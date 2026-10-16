@@ -243,7 +243,8 @@ Outputs go to `<file dir>/out`: `sprites/<n>.png`, `scenes/<n>.png`, `<sheet>.pn
 
 `serve` opens a live viewer that rebuilds on save, follows the asset you edited and replays its
 painting steps (each top-level op, layer and post-processing step, with its file:line). It also
-writes the same outputs as `build`.
+writes the same outputs as `build`. For anims, "onion" holds the animation on one frame with the
+previous frame tinted red and the next tinted blue underneath; `,` and `.` step frames.
 
 ## Library
 

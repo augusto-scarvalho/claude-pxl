@@ -233,7 +233,7 @@ function draw(): void {
   showError();
   if (!cur) { $("hud").textContent = ""; return; }
 
-  const pic = animating() ? cur.anim[animAt].pic : picAt(cur, step);
+  const pic = onFrames() ? cur.anim[animAt].pic : picAt(cur, step);
   const fit = Math.max(1, Math.min(48, Math.floor(Math.min((W - 40) / pic.w, (H - 40) / pic.h))));
   const z = zoom || fit;
   const ox = Math.floor((W - pic.w * z) / 2 + pan.x * dpr), oy = Math.floor((H - pic.h * z) / 2 + pan.y * dpr);
@@ -244,9 +244,19 @@ function draw(): void {
       g.fillStyle = (x + y) % 2 ? "#2a2735" : "#33303f";
       g.fillRect(ox + x * z, oy + y * z, z, z);
     }
+  g.imageSmoothingEnabled = false;
+  // Onion skin: the previous frame tinted red and the next tinted blue, faint, under this one.
+  if (onion() && cur.anim.length > 1) {
+    const n = cur.anim.length;
+    for (const [d, tint] of [[-1, "#ff5a5a"], [1, "#5aa8ff"]] as const) {
+      const p = cur.anim[(animAt + d + n) % n].pic, ghost = new OffscreenCanvas(p.w, p.h), gc = ghost.getContext("2d")!;
+      gc.putImageData(toImageData(p), 0, 0);
+      gc.globalCompositeOperation = "source-atop"; gc.globalAlpha = 0.6; gc.fillStyle = tint; gc.fillRect(0, 0, p.w, p.h);
+      g.globalAlpha = 0.35; g.drawImage(ghost, ox, oy, p.w * z, p.h * z); g.globalAlpha = 1;
+    }
+  }
   const off = new OffscreenCanvas(pic.w, pic.h);
   off.getContext("2d")!.putImageData(toImageData(pic), 0, 0);
-  g.imageSmoothingEnabled = false;
   g.drawImage(off, ox, oy, pic.w * z, pic.h * z);
 
   if (($<HTMLInputElement>("gridtog")).checked && z >= 6) {
@@ -275,7 +285,7 @@ function draw(): void {
   }
 
   $("hud").textContent = `${cur.j.kind} ${cur.j.name} · ${pic.w}×${pic.h} · ${z}×${zoom ? "" : " (fit)"}` +
-    (cur.anim.length ? ` · frame ${animating() ? animAt : 0}/${cur.anim.length - 1}` : "");
+    (cur.anim.length ? ` · frame ${onFrames() ? animAt : 0}/${cur.anim.length - 1}${onion() ? " (onion: , . step)" : ""}` : "");
   inspect(pic, ox, oy, z, dpr);
 }
 
@@ -331,8 +341,16 @@ function tick(t: number): void {
 // Animated assets loop through their frames once the painting replay has reached the end.
 
 let animAt = 0, animTimer = 0;
+/** Showing anim frames (not painting steps): the replay is done and animate or onion is on. */
+function onFrames(): boolean {
+  return !!cur && cur.anim.length > 1 && !playing && step >= cur.frames.length - 1 && ($<HTMLInputElement>("animtog").checked || onion());
+}
+function onion(): boolean {
+  return $<HTMLInputElement>("oniontog").checked;
+}
+/** Frames advance by themselves; onion skin holds still for stepping with , and . */
 function animating(): boolean {
-  return !!cur && cur.anim.length > 1 && $<HTMLInputElement>("animtog").checked && !playing && step >= cur.frames.length - 1;
+  return onFrames() && $<HTMLInputElement>("animtog").checked && !onion();
 }
 
 function animTick(): void {
@@ -395,7 +413,7 @@ $("last").onclick = () => { play(false); setStep(Infinity); };
 $("prev").onclick = () => { play(false); setStep(step - 1); };
 $("next").onclick = () => { play(false); setStep(step + 1); };
 $("filter").oninput = renderList;
-for (const id of ["gridtog", "hl", "animtog"]) $(id).onchange = draw;
+for (const id of ["gridtog", "hl", "animtog", "oniontog"]) $(id).onchange = draw;
 
 const stage = $("stage");
 stage.addEventListener("wheel", (e) => {
@@ -428,6 +446,12 @@ window.addEventListener("keydown", (e) => {
   else if (e.key === "Home") { play(false); setStep(0); }
   else if (e.key === "End") { play(false); setStep(Infinity); }
   else if (e.key === "f") { zoom = 0; pan = { x: 0, y: 0 }; draw(); }
+  else if ((e.key === "," || e.key === ".") && cur && cur.anim.length > 1) {
+    // Step anim frames (onion skin holds still for this).
+    const n = cur.anim.length;
+    animAt = (animAt + (e.key === "," ? -1 : 1) + n) % n;
+    draw();
+  }
   else if (e.key === "g") { const t = $<HTMLInputElement>("gridtog"); t.checked = !t.checked; draw(); }
   else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
     e.preventDefault();
