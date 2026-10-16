@@ -18,6 +18,7 @@
     "scripts",
     "types",
     "examples/*.px.js",
+    "examples/sidescroller/*.{px.js,hex,png}",
     "SKILL.md",
     "reference.md",
     "lighting.md"
