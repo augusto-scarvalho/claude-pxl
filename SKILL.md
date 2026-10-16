@@ -92,6 +92,7 @@ cheaper than inventing one.
 | File | What it is | Read it for |
 |---|---|---|
 | `basics.px.js` | slimes, heart, coin, chest | the starter: `mx` + `outline`, `base`/`swap` variants, parts, `sheet` |
+| `platformer.px.js` | 16×16 platformer tileset laid out as a level | `tilemap`, a `group` for tile variety, a tile `sheet` for the engine, `dither`, `fill` (arched door), `my`, `include` |
 | `shop.px.js` | telescope shop under a dome, night, flat front view | building a facade from parts, `group`s of trinkets/bulbs, `wire` light strings, `text` signs, dithered window/lamp halos |
 | `moon_bakery.px.js` | corner bakery, day, flat front view | the same toolkit on a smaller build: brick/siding `tile`s, window goods, awning, street props |
 | `moon_bakery_3d.px.js` | the same bakery in 3/4 view | turning a flat facade into front + side + roof: oblique helpers, slanted course lines, cast shadow |
