@@ -161,7 +161,8 @@ To see how a complex piece was built, in order: `PXL steps <example> <asset> --o
   a whole area it reads as a checkerboard; use it only where two tones meet.
 - Lighting: define `ramps`, then `light`/`shade` regions; stack a `density: 0.5` pass for soft edges.
   Use `shade: true` layers with a `poly` for cast shadows across many objects.
-- Use mnemonic keys (`g`/`G` light/dark green). Keep 2–4 shades per material for a clean pixel-art look.
+- Use mnemonic keys (`g`/`G` light/dark green). Keep 2–4 shades per material for a clean pixel-art look:
+  `shades("HGgl", "#5aa040")` makes them from one base color, hue-shifted, and adds the ramp.
 - Build with `--only` while iterating; a full build also writes every preview.
 - Assert what a preview hides. When a scene is built from separate maps (terrain, props), a `throw`
   in the placement loop (a prop landing on water) catches the drift before anyone sees it.

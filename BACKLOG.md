@@ -36,7 +36,7 @@ Mark items `[x]` when they ship, with the commit.
 - [ ] **Free rotation** with RotSprite or cleanEdge. (Aseprite RotSprite; Pixelorama cleanEdge.)
 - [x] **Inside outline and selout** (`inline`, `selout`) (outline takes the dark shade of the color it touches).
   (Aseprite Outline command.)
-- [ ] **Hue-shifted ramp generator**: `ramp("#5aa040", 5)` builds shades that shift hue. (Aseprite
+- [x] **Hue-shifted ramp generator**: `shades("HGgl", "#5aa040")` defines the keys and their ramp. (Aseprite
   Shading ink, Pixelorama shading with hue shift.)
 - [x] **Sheet extrude**: `sheet(..., { extrude: n })` against texture bleeding in engines. (Aseprite export options.)
 - [ ] **9-slice** for UI panels and buttons. (Aseprite 9-patch slices.)

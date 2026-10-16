@@ -1,7 +1,7 @@
 // Project: the registry an art file fills in, plus the lazy, cached, cycle-checked resolver.
 import { type BuildCtx, type BuildOut, buildAsset, drawnFrames, gcd } from "./build.ts";
 import { OPS } from "./canvas.ts";
-import { TRANSPARENT } from "./color.ts";
+import { TRANSPARENT, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
 import {
@@ -232,6 +232,20 @@ export class Project implements BuildCtx {
     };
     env.pal = (aliases: Record<string, string | number>) => {
       try { this.pal = this.pal.extend(aliases); } catch (e) { throw wrap(e).within("pal", this.callerLoc()); }
+    };
+    env.shades = (keys: unknown, base: unknown, opts: { hue?: number; at?: number } = {}) => {
+      const loc = this.callerLoc();
+      try {
+        const ks = typeof keys === "string" ? [...keys] : [];
+        if (ks.length < 2) throw new PxError('shades("HGgl", "#5aa040"): two or more keys, dark to light, then the base color');
+        checkKeys("shades", opts, ["hue", "at"]);
+        const c = this.pal.resolve(base);
+        if (c === null || c === TRANSPARENT) throw new PxError(`shades needs a visible base color, got ${JSON.stringify(base)}`);
+        const at = opts.at ?? Math.floor(ks.length / 2);
+        if (!(Number.isInteger(at) && at >= 0 && at < ks.length)) throw new PxError(`at must be a key index 0..${ks.length - 1}, got ${at}`);
+        const cols = shadeRamp(c, ks.length, at, opts.hue ?? 20);
+        this.pal = this.pal.extend(Object.fromEntries(ks.map((k, i) => [k, toHex(cols[i])]))).withRamps([ks.join("")]);
+      } catch (e) { throw wrap(e).within("shades", loc); }
     };
     env.ramps = (...ramps: string[]) => {
       try { this.pal = this.pal.withRamps(ramps); } catch (e) { throw wrap(e).within("ramps", this.callerLoc()); }

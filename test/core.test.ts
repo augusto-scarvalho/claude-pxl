@@ -115,6 +115,19 @@ test("inline and selout: lines on the sprite's own edge, lines that take the col
   assert.match(failure(R + 'sprite("t", { selout: true }, "d")', "t").message, /selout recolors a line/);
 });
 
+test("shades: keys from one base color, dark to light, hue-shifted, registered as a ramp", () => {
+  const p = loadSource('shades("abc", "#5aa040"); sprite("t", "abc"); sprite("s", { base: "t" }, shade())', "t.px.js");
+  const [a, b, c] = p.image("t").data, rgb = (v: number) => [v >>> 24, (v >>> 16) & 255, (v >>> 8) & 255];
+  const sum = (v: number) => rgb(v).reduce((x, y) => x + y, 0);
+  assert.deepEqual(rgb(b), [0x5a, 0xa0, 0x40], "the base sits exactly at the middle key");
+  assert.ok(sum(a) < sum(b) && sum(b) < sum(c), "dark to light");
+  const flat = loadSource('shades("abc", "#5aa040", { hue: 0 }); sprite("t", "abc")', "t.px.js").image("t").data[0];
+  assert.ok(rgb(a)[2] > rgb(flat)[2], "with hue shifting the dark shade turns toward blue");
+  assert.deepEqual([...p.image("s").data], [a, a, b], "the keys form a ramp: shade() steps down it");
+  assert.match(failure('shades("a", "#fff")').message, /two or more keys/);
+  assert.match(failure('shades("ab", "#fff", { at: 2 })').message, /at must be a key index 0..1/);
+});
+
 test("curve: through the points, pixel-perfect at 1px, closed loops", () => {
   eq(art(PAL + 'sprite("t", { w: 5, h: 1 }, curve([0, 0, 4, 0], "r"))', "t"), "rrrrr");
   // An arch through 3 points: every point is on it, and no 2x2 block holds an L-corner (3 pixels).

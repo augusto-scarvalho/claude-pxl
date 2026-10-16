@@ -98,6 +98,8 @@ declare global {
   function use(palette: "pico8" | "sweetie16" | "db16" | "endesga32" | "gray8" | `${string}.${"hex" | "gpl" | "pal" | "txt" | "png"}` | (string | number)[]): void;
   function pal(keys: Record<string, string | number>): void;
   function ramps(...darkToLight: string[]): void;
+  /** Define keys (dark to light) as hue-shifted shades of `base` and add them as a ramp; base sits at `at` (default the middle). */
+  function shades(keys: string, base: PxColor, opts?: { hue?: number; at?: number }): void;
   function sprite(name: string, opts: PxAssetOpts, ...items: PxItem[]): void;
   function sprite(name: string, ...items: PxItem[]): void;
   function scene(name: string, opts: PxSceneOpts, ...items: PxItem[]): void;
