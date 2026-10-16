@@ -195,6 +195,25 @@ test("include { palette: true } shares the included palette", () => {
   assert.equal(loadProject(file).image("b").data[0], pack(255, 0, 0));
 });
 
+test("cli steps: the painting log, --at follows one pixel, --sheet writes thumbnails", async () => {
+  const { dir, file } = tmpArt(`use("pico8")\nsprite("t", { w: 3, h: 1, outline: "0" },\n  rect(0, 0, 3, 1, "8"), px(1, 0, "7"), px(9, 9, "7"))`);
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try {
+    assert.equal(await main(["steps", file, "t", "--sheet"]), 0);
+    assert.equal(await main(["steps", file, "t", "--at", "2,1"]), 0);
+  } finally { console.log = log; }
+  const out = lines.join("\n");
+  assert.match(out, /t: 4 steps \(sprite 5x3\)/);
+  assert.match(out, /1  rect\(0, 0, 3, 1, "8"\).*a\.px\.js:3:3 +3px at 0,0 3x1 \(canvas 3x1\)/);
+  assert.match(out, /3  px\(9, 9, "7"\).*no change/, "an op that paints nothing says so");
+  assert.match(out, /4  outline 0.*canvas resized to 5x3/);
+  // final (2, 1) is (1, 0) before the outline: painted 8, then 7
+  const at = lines.slice(lines.findIndex((l) => l.startsWith("t pixel (2, 1)")) + 1);
+  assert.deepEqual(at.map((l) => l.trim().split(/\s+/)[0] + " " + l.trim().split(" ").pop()), ["1 8", "2 7"]);
+  assert.ok(existsSync(join(dir, "out", "_preview", "t_steps.png")));
+});
+
 test("cli build reports per-asset errors and still writes the rest", async () => {
   const { dir, file } = tmpArt(`use("pico8")\nsprite("good", "8")\nsprite("bad", "z")`);
   const err = console.error, log = console.log;

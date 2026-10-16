@@ -54,10 +54,10 @@ const grime = (x0, x1, yb, h, from, to) => (c) => {
 sprite("shop", { w: 192, h: 172, outline: "k" },
   layer("mass",
     ...box3(F0, T0, W, H, D, "M", "T", "t"),                // roof deck, side, front
-    ...box3(52, 50, 40, 23, 12, "N", "C", "c")),            // wheelhouse on the roof
+    ...box3(52, 50, 40, 23, 12, "N", "C", "c"),             // wheelhouse on the roof
+    noise(40, 65, 94, 11, "n", 0.08, 5, "M")),              // tar-and-gravel roof deck (on "M": same layer)
 
   layer("roof",
-    noise(40, 65, 94, 11, "n", 0.08, 5, "M"),
     // funnel behind the bridge: red stack, white band, sooty rim
     rect(66, 25, 11, 22, "r"), vline(66, 25, 22, "o"), rect(75, 25, 2, 22, "R"),
     rect(66, 31, 11, 4, "w"), rect(75, 31, 2, 4, "C"), stamp("_anchor", 69, 37),

@@ -1,9 +1,12 @@
 // pxl command line.
 import { dirname, join, resolve } from "node:path";
 import { PxError, wrap } from "../core/errors.ts";
-import { ascii } from "../core/render.ts";
+import { type Color, TRANSPARENT, toHex } from "../core/color.ts";
+import type { Img } from "../core/image.ts";
+import { ascii, preview } from "../core/render.ts";
+import { mapPixel, replay, stepSheet } from "../core/steps.ts";
 import { loadProject } from "./load.ts";
-import { writeOutputs } from "./output.ts";
+import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 
 const USAGE = `pxl — pixel-art DSL
@@ -17,6 +20,10 @@ const USAGE = `pxl — pixel-art DSL
       Print an asset as palette keys with x/y rulers (anims: every frame).
   pxl list  <art.px.js>
       List assets, groups and sheets with their source locations.
+  pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
+      How an asset was painted: every step (op, file:line, pixels changed, where), in order.
+      --at x,y lists only the steps that changed that pixel of the final image, and its color
+      after each; --sheet also writes a thumbnail per step to _preview/<name>_steps.png.
 
 Art files may be .js or .ts. Default out dir: <art file dir>/out.`;
 
@@ -29,6 +36,8 @@ interface Args {
   scale?: number;
   preview?: boolean;
   port?: number;
+  at?: [number, number];
+  sheet?: boolean;
 }
 
 function parse(argv: string[]): Args {
@@ -46,6 +55,12 @@ function parse(argv: string[]): Args {
     else if (v === "--scale") a.scale = Number(val());
     else if (v === "--port") a.port = Number(val());
     else if (v === "--no-preview") a.preview = false;
+    else if (v === "--sheet") a.sheet = true;
+    else if (v === "--at") {
+      const m = /^(\d+),(\d+)$/.exec(val().replace(/\s/g, ""));
+      if (!m) throw new PxError("--at needs x,y (e.g. --at 5,3)");
+      a.at = [Number(m[1]), Number(m[2])];
+    }
     else if (v === "-h" || v === "--help") a.cmd = "help";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -92,6 +107,52 @@ export async function main(argv: string[]): Promise<number> {
         }
         for (const g of p.groups.values()) console.log(`${"group".padEnd(6)} ${g.name.padEnd(24)} ${g.loc ?? ""}  [${g.members.join(" ")}]`);
         for (const s of p.sheets) console.log(`${"sheet".padEnd(6)} ${s.name.padEnd(24)} ${s.loc ?? ""}`);
+        return 0;
+      }
+      case "steps": {
+        const name = a.rest[0];
+        if (!name) throw new PxError("steps needs an asset name: pxl steps <file> <name> [--at x,y] [--sheet]");
+        const p = loadProject(file, { trace: true });
+        const def = p.assets.get(name);
+        const b = p.build(name);
+        if (!def || !b.trace) throw new PxError(`no painting log for '${name}'`);
+        const rev = def.pal.reverse();
+        const key = (c: Color) => (c === TRANSPARENT ? "." : rev.get(c) ?? toHex(c));
+        const label = (s: string) => (s.length > 48 ? s.slice(0, 47) + "…" : s).padEnd(48);
+        const row = (n: number, text: string, loc: string | undefined, info: string) =>
+          console.log(`${String(n).padStart(4)}  ${label(text)}  ${(loc ?? "").padEnd(22)}  ${info}`);
+        const final = { w: b.img.w, h: b.img.h }, frame0 = b.anim ? ", frame 0" : "";
+        if (a.at) {
+          const [x, y] = a.at;
+          if (x >= final.w || y >= final.h) throw new PxError(`(${x}, ${y}) is outside ${name} (${final.w}x${final.h})`);
+          console.log(`${name} pixel (${x}, ${y}): the steps that changed it${frame0}`);
+          let prev: Color = TRANSPARENT, lost = false;
+          replay(b.trace, (s, img) => {
+            const i = mapPixel(x, y, final, s.w, s.h);
+            if (i === undefined) {
+              if (!lost) row(s.n, s.label, s.loc, "(canvas cropped here: the pixel can't be followed)");
+              lost = true;
+              return;
+            }
+            lost = false;
+            if (img.data[i] !== prev) row(s.n, s.label, s.loc, `-> ${key(img.data[i])}`);
+            prev = img.data[i];
+          });
+          return 0;
+        }
+        console.log(`${name}: ${b.trace.frames.length} steps (${def.kind} ${final.w}x${final.h}${frame0})`);
+        // A sheet holds up to 120 steps: every k-th one (and the last) when there are more.
+        const thumbs: { n: number; img: Img }[] = [], total = b.trace.frames.length, every = Math.ceil(total / 120);
+        replay(b.trace, (s, img) => {
+          const at = s.box ? `${s.changed}px at ${s.box.x},${s.box.y} ${s.box.w}x${s.box.h}` : "no change";
+          row(s.n, s.label, s.loc, !s.fresh ? at : s.n === 1 ? `${at} (canvas ${s.w}x${s.h})` : `canvas resized to ${s.w}x${s.h}`);
+          if (a.sheet && ((s.n - 1) % every === 0 || s.n === total)) thumbs.push({ n: s.n, img: img.copy() });
+        });
+        if (a.sheet) {
+          const path = join(outDir, "_preview", name + "_steps.png"), sheet = stepSheet(thumbs);
+          writePng(path, preview(sheet, Math.max(1, Math.min(3, Math.floor(2400 / Math.max(sheet.w, sheet.h))))));
+          console.log(`-> ${path}${every > 1 ? ` (every ${every}th of ${total} steps)` : ""}`);
+        }
         return 0;
       }
       case "serve": {

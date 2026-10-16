@@ -19,7 +19,9 @@ parts, primitives, brushes and tilemaps. Needs Node ≥ 22.18. No install step.
 3. **Look at it**: read `out/_preview/<name>.png` (upscaled, checkerboard = transparent, grid every
    pixel, darker every 8). For exact pixel fixes use `PXL ascii art.px.js <name>` (keys + x/y rulers);
    it's cheaper than an image.
-4. Fix with small edits (a `grid(x, y, ...)` patch, one op) and rebuild. Repeat.
+4. Fix with small edits (a `grid(x, y, ...)` patch, one op) and rebuild. Repeat. A pixel came out
+   wrong and you don't know which op painted it? `PXL steps art.px.js <name> --at x,y` lists the
+   steps that changed it, with file:line and the color after each.
 5. Before handing it over, look at the preview once more as a critic, for what reviewers flag most:
    tiles repeating into a visible grid, props floating or standing on the wrong ground, big flat
    areas with no detail, dither used as a texture.
@@ -129,6 +131,8 @@ cheaper than inventing one.
 To find an op in real use: `grep -n "scatter(" <skill dir>/examples/*.px.js`. `PXL list <file>`
 gives each asset's line. To see one rendered, build it into your own dir so the skill's folder
 stays clean: `PXL build <skill dir>/examples/shop.px.js --only comet_repair --out <scratch dir>`.
+To see how a complex piece was built, in order: `PXL steps <example> <asset> --out <scratch dir>`
+(every op with its line and what it changed; "no change" marks an op that painted nothing).
 
 ## Habits that save tokens and give better art
 

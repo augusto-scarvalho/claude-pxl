@@ -26,7 +26,7 @@ Mark items `[x]` when they ship, with the commit.
 
 ## Next
 
-- [ ] **`pxl steps <file> <asset>`**: the painting log pxl already records (every op with its args,
+- [x] **`pxl steps <file> <asset>`**: the painting log pxl already records (every op with its args,
   file:line and pixels changed; today only the live viewer replays it) as text: how a complex
   piece is built, step by step. `--at x,y` lists only the steps that touched that pixel (which
   line painted it wrong?); `--sheet` writes thumbnails of the steps for a human.

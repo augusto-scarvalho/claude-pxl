@@ -271,6 +271,8 @@ export class Canvas {
   noise(x: number, y: number, w: number, h: number, colors: string | string[], density = 0.1, seed = 1, on?: string): void {
     const cols = colorList(colors).map((c) => this.color(c));
     const ok = this.maskAt(on);
+    if (on !== undefined && !anyIn(ok, x, y, w, h))
+      throw new PxError(`'on: ${on}' matched nothing in [${x}, ${y}, ${w}, ${h}]; a layer starts empty, so put the noise in the layer that drew those colors`);
     const r = this.rng(seed);
     for (let yy = y; yy < y + h; yy++)
       for (let xx = x; xx < x + w; xx++)
@@ -600,4 +602,10 @@ for (const name of OPS) {
       if (ok && this._depth === 0 && this.onOp) this.onOp(name, args);
     }
   };
+}
+
+/** Does any pixel of the area pass the mask? */
+function anyIn(ok: (x: number, y: number) => boolean, x: number, y: number, w: number, h: number): boolean {
+  for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) if (ok(xx, yy)) return true;
+  return false;
 }

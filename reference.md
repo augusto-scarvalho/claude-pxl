@@ -219,7 +219,14 @@ node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-pr
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
 node <pxl>/bin/pxl.js ascii <file> <name>
 node <pxl>/bin/pxl.js list  <file>
+node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--sheet] [--out DIR]
 ```
+
+`steps` prints how an asset was painted: every top-level op, layer and post-processing step in
+order, with its file:line, the pixels it changed and where ("no change" = it painted nothing).
+`--at x,y` keeps only the steps that changed that pixel of the final image, with its color after
+each: which line painted it wrong. `--sheet` also writes `_preview/<name>_steps.png`, a numbered
+thumbnail per step (every k-th of a long build). Anims show frame 0.
 
 Outputs go to `<file dir>/out`: `sprites/<n>.png`, `scenes/<n>.png`, `<sheet>.png` + `<sheet>.json`
 (TexturePacker hash format: Phaser, Godot importers, ...), `_preview/<n>.png` (upscaled to

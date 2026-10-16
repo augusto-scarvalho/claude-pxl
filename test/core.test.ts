@@ -85,6 +85,8 @@ test("scatter: count, on-mask, clip, below", () => {
   const ev = art(PAL + 'sprite("_d", "w"); sprite("t", { w: 8, h: 8 }, scatter("_d", 0, 0, 8, 8, 4, { even: true, seed: 5 }))', "t").split("\n");
   for (const [x0, y0] of [[0, 0], [4, 0], [0, 4], [4, 4]])
     eq(String(ev.slice(y0, y0 + 4).map((row) => row.slice(x0, x0 + 4)).join("").split("w").length - 1), "1");
+  // noise's "on" reads its own layer too: matching nothing there is an error, not a silent no-op
+  assert.match(failure(PAL + 'sprite("t", { w: 4, h: 1 }, rect(0, 0, 4, 1, "r"), layer("x", noise(0, 0, 4, 1, "w", 1, 1, "r")))', "t").message, /'on: r' matched nothing/);
   // ...and without below, an "on" that finds nothing fails loudly instead of painting nothing
   assert.match(failure(PAL + 'sprite("_d", "w"); sprite("t", { w: 4, h: 1 }, rect(0, 0, 2, 1, "r"), layer("x", scatter("_d", 0, 0, 4, 1, 20, { on: "r" })))', "t").message, /0 of 20 placed.*add below: true/);
 });
