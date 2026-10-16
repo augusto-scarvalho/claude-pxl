@@ -420,6 +420,10 @@ export class Canvas {
       this.put(src, cx - Math.floor(src.w / 2), cy - Math.floor(src.h / 2), opts.clip ? ok : undefined);
       placed++;
     }
+    // A brush that silently paints nothing is the usual sign of an empty layer under `on`.
+    if (opts.on !== undefined && count > 0 && placed === 0)
+      throw new PxError(`scatter: 'on: ${opts.on}' matched nothing in [${x}, ${y}, ${w}, ${h}] (0 of ${count} placed)` +
+        (opts.below ? "" : "; a layer starts empty: add below: true to read the layers under it"));
   }
 
   /** Grid string at (x, y): one char per pixel; "." keeps, "_" erases. */

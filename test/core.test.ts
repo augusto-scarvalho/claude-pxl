@@ -80,6 +80,8 @@ test("scatter: count, on-mask, clip, below", () => {
     "rww...\nrww...\nrww...");
   // below: a layer's brush can see the composite under it
   eq(art(PAL + 'sprite("_d", "w"); sprite("t", { w: 4, h: 1 }, rect(0, 0, 2, 1, "r"), layer("x", scatter("_d", 0, 0, 4, 1, 20, { on: "r", below: true })))', "t"), "ww..");
+  // ...and without below, an "on" that finds nothing fails loudly instead of painting nothing
+  assert.match(failure(PAL + 'sprite("_d", "w"); sprite("t", { w: 4, h: 1 }, rect(0, 0, 2, 1, "r"), layer("x", scatter("_d", 0, 0, 4, 1, 20, { on: "r" })))', "t").message, /0 of 20 placed.*add below: true/);
 });
 
 test("layers: order, offset, hidden, blend, inferred size, outline after", () => {
