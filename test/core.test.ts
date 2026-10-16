@@ -145,7 +145,7 @@ test("font: glyphs cut from a sprite, trimmed to their ink (proportional), used 
   // two 3x2 cells: "A" fills its cell, "i" is one column in the middle
   const F = PAL + 'sprite("_f", "rrr.r.\\nr.r.r."); font("tiny", "_f", { chars: "Ai", w: 3, h: 2 }); ';
   eq(art(F + 'sprite("t", { w: 7, h: 2 }, text(0, 0, "AiA", "w", { font: "tiny" }))', "t"), "www.w.w\nw.w.w.w");
-  eq(art(F + 'sprite("t", { w: 3, h: 2 }, text(0, 0, "a", "w", { font: "tiny" }))', "t"), "www\nw.w", "lowercase falls back to the capital");
+  assert.equal(art(F + 'sprite("t", { w: 3, h: 2 }, text(0, 0, "a", "w", { font: "tiny" }))', "t"), "www\nw.w", "lowercase falls back to the capital");
   assert.match(failure(F + 'sprite("t", { w: 4, h: 4 }, text(0, 0, "Z", "w", { font: "tiny" }))', "t").message, /font 'tiny' has no glyph for 'Z'/);
   assert.match(failure(F + 'sprite("t", { w: 4, h: 4 }, text(0, 0, "A", "w", { font: "tinny" }))', "t").message, /unknown font 'tinny'.*tiny/);
   assert.match(failure(PAL + 'font("x", "_f", { chars: "A" })').message, /needs \{ chars: "ABC\.\.\.", w, h \}/);
