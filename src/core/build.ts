@@ -1,7 +1,7 @@
 // Turns an asset definition into an image: base -> items (ops, grids, functions, layers)
 // -> post-processing (mirror, swap, flip, rot, outline, crop). Optionally traced.
 import { Canvas, type Resolver } from "./canvas.ts";
-import { type Color, TRANSPARENT } from "./color.ts";
+import { type Color, TRANSPARENT, pack } from "./color.ts";
 import { PxError, wrap } from "./errors.ts";
 import { Img } from "./image.ts";
 import { applyGlow } from "./glow.ts";
@@ -358,6 +358,7 @@ function solid(pal: Palette, spec: string): Color {
 /** Composite a layer onto img: draw it, or (shade/light) step what's below where it's opaque. */
 export function blend(img: Img, limg: Img, l: LayerOpts, pal: Palette): void {
   if (limg.lamps?.length) (img.lamps ??= []).push(...limg.lamps);
+  if (l.blend !== undefined || l.opacity !== undefined) return mix(img, limg, l, pal);
   const density = l.density ?? 1;
   const mode = l.shade ?? l.light;
   if (mode === undefined || mode === false) {
@@ -388,5 +389,45 @@ export function blend(img: Img, limg: Img, l: LayerOpts, pal: Palette): void {
     let c = img.data[i];
     for (let s = 0; s < steps; s++) c = map.get(c) ?? c;
     img.data[i] = c;
+  }
+}
+
+const MIXES: Record<string, (s: number, d: number) => number> = {
+  normal: (s) => s,
+  multiply: (s, d) => (s * d) / 255,
+  screen: (s, d) => 255 - ((255 - s) * (255 - d)) / 255,
+  add: (s, d) => Math.min(255, s + d),
+  overlay: (s, d) => (d < 128 ? (2 * s * d) / 255 : 255 - (2 * (255 - s) * (255 - d)) / 255),
+};
+
+/**
+ * Color-math layers (`blend`, `opacity`), as image editors have them. The results are new colors,
+ * outside the palette, unless `palettize` snaps them back to the nearest keyed color. Over empty
+ * pixels only a "normal" layer leaves anything (with its opacity as alpha).
+ */
+function mix(img: Img, limg: Img, l: LayerOpts, pal: Palette): void {
+  const f = MIXES[l.blend ?? "normal"];
+  if (!f) throw new PxError(`layer blend must be ${Object.keys(MIXES).map((k) => `"${k}"`).join(", ")}, got ${JSON.stringify(l.blend)}`);
+  const op = l.opacity ?? 1, density = l.density ?? 1;
+  if (!(op >= 0 && op <= 1)) throw new PxError(`layer opacity must be 0..1, got ${l.opacity}`);
+  const out = new Map<number, Color>();
+  for (let i = 0; i < img.data.length; i++) {
+    const s = limg.data[i];
+    if (s === TRANSPARENT || (density < 1 && bayer(i % img.w, Math.floor(i / img.w)) >= density)) continue;
+    const d = img.data[i];
+    if (d === TRANSPARENT) {
+      if (!l.blend || l.blend === "normal") img.data[i] = op >= 1 ? s : ((s & ~255) | Math.round((s & 255) * op)) >>> 0;
+      continue;
+    }
+    const ch = (sh: number) => {
+      const sv = (s >>> sh) & 255, dv = (d >>> sh) & 255;
+      return Math.round(dv + (f(sv, dv) - dv) * op);
+    };
+    img.data[i] = pack(ch(24), ch(16), ch(8), d & 255);
+    out.set(i, img.data[i]);
+  }
+  if (l.palettize) {
+    const snap = pal.snapMap(out.values());
+    for (const [i, c] of out) img.data[i] = snap.get(c) ?? c;
   }
 }

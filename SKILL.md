@@ -170,6 +170,16 @@ To see how a complex piece was built, in order: `PXL steps <example> <asset> --o
   a whole area it reads as a checkerboard; use it only where two tones meet.
 - Lighting: define `ramps`, then `light`/`shade` regions; stack a `density: 0.5` pass for soft edges.
   Use `shade: true` layers with a `poly` for cast shadows across many objects.
+- **Blend modes leave the palette.** A layer with `blend: "multiply"` (or `"screen"`, `"add"`,
+  `"overlay"`) and/or `opacity` does color math with what's below: one `rect` of deep blue at
+  `{ blend: "multiply", opacity: 0.7 }` turns a scene to night, `opacity` makes real glass or fog.
+  But every pixel it touches becomes a color nobody picked: the art is no longer palette pixel art,
+  and palette swaps in an engine stop finding those colors. Try the palette-safe tools first:
+  `shade:`/`light:` layers (step along the ramps), `density` (dithered translucency), `glow`,
+  `lighting()`. Use blend modes for whole-scene grading or true translucency, and tell the user.
+  `palettize: true` snaps the results back to the palette, but only works when the palette already
+  has those tones; without them, distinct colors collapse into one and the shading disappears
+  (night-tinted trees merge into the grass).
 - Use mnemonic keys (`g`/`G` light/dark green). Keep 2–4 shades per material for a clean pixel-art look:
   `shades("HGgl", "#5aa040")` makes them from one base color, hue-shifted, and adds the ramp.
 - Build with `--only` while iterating; a full build also writes every preview.

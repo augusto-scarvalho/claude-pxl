@@ -42,6 +42,8 @@ declare global {
   interface PxLayerOpts {
     x?: number; y?: number; hidden?: boolean; density?: number; solid?: boolean; wall?: boolean; unlit?: boolean;
     shade?: boolean | number | Record<string, PxColor>; light?: boolean | number | Record<string, PxColor>;
+    /** Color math with what's below (new colors, off the palette; palettize snaps them back). */
+    blend?: "normal" | "multiply" | "screen" | "add" | "overlay"; opacity?: number; palettize?: boolean;
   }
 
   interface PxLamp { r?: number; color?: PxColor; power?: number; z?: number }

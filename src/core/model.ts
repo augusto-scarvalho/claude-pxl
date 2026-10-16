@@ -22,6 +22,12 @@ export interface LayerOpts {
   light?: boolean | number | Record<string, string>;
   /** Fraction (0..1) of a blend layer's pixels that apply (ordered dither). */
   density?: number;
+  /** Color math with what's below, as image editors do: new colors, outside the palette. */
+  blend?: "normal" | "multiply" | "screen" | "add" | "overlay";
+  /** 0..1: how much of the layer (or of its blend) shows. New colors too. */
+  opacity?: number;
+  /** With blend / opacity: snap the results to the nearest keyed palette color. */
+  palettize?: boolean;
   /** Opaque pixels block light (lighting()). */
   solid?: boolean;
   /** Opaque pixels are back walls: they stop sky light from entering but let light pass. */

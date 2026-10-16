@@ -141,6 +141,21 @@ test("curve: through the points, pixel-perfect at 1px, closed loops", () => {
   assert.match(failure(PAL + 'sprite("t", { w: 2, h: 2 }, curve([0, 0], "r"))', "t").message, /curve needs \[x0, y0, x1, y1, \.\.\.\]/);
 });
 
+test("layer blend / opacity: color math with what's below; palettize snaps it back", () => {
+  const px1 = (src: string) => loadSource(src, "t.px.js").image("t").data;
+  const rgb = (v: number) => [v >>> 24, (v >>> 16) & 255, (v >>> 8) & 255, v & 255];
+  // multiply: 200 * 128 / 255
+  assert.deepEqual(rgb(px1('sprite("t", { w: 1, h: 1 }, px(0, 0, "#c86432"), layer("m", { blend: "multiply" }, px(0, 0, "#808080")))')[0]), [100, 50, 25, 255]);
+  // opacity: halfway between black and white
+  assert.deepEqual(rgb(px1('sprite("t", { w: 1, h: 1 }, px(0, 0, "#000"), layer("o", { opacity: 0.5 }, px(0, 0, "#fff")))')[0]), [128, 128, 128, 255]);
+  // over empty pixels: normal keeps the layer at that alpha; multiply has nothing to work on
+  const empty = px1('sprite("t", { w: 2, h: 1 }, layer("a", { opacity: 0.5 }, px(0, 0, "#fff")), layer("b", { blend: "multiply" }, px(1, 0, "#fff")))');
+  assert.deepEqual([rgb(empty[0])[3], empty[1]], [128, 0]);
+  // palettize: the 50% grey snaps to the nearest keyed color
+  assert.deepEqual(rgb(px1('pal({ k: "#000", g: "#7a7a7a", w: "#fff" }); sprite("t", { w: 1, h: 1 }, px(0, 0, "k"), layer("o", { opacity: 0.5, palettize: true }, px(0, 0, "w")))')[0]), [0x7a, 0x7a, 0x7a, 255]);
+  assert.match(failure(PAL + 'sprite("t", { w: 1, h: 1 }, px(0, 0, "r"), layer("x", { blend: "darken" }, px(0, 0, "w")))', "t").message, /layer blend must be "normal", "multiply"/);
+});
+
 test("tilemap iso: a diamond grid drawn back to front", () => {
   const T = ["a", "b", "c", "d"].map((k, i) => `sprite("${k}", { w: 4, h: 2 }, rect(0, 0, 4, 2, "${"rwgk"[i]}")); `).join("");
   eq(art(PAL + T + 'scene("s", { w: 8, h: 4 }, tilemap("ab\\ncd", { iso: true, w: 4, h: 2, x: 2, map: { a: "a", b: "b", c: "c", d: "d" } }))', "s"),

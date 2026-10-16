@@ -70,7 +70,7 @@ const ASSET_OPTS: Record<AssetKind, string[]> = {
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
 const MAX_LOOP = 60000;
-const LAYER_OPTS = ["x", "y", "hidden", "shade", "light", "density", "solid", "wall", "unlit"];
+const LAYER_OPTS = ["x", "y", "hidden", "shade", "light", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit"];
 const SHEET_OPTS = ["cols", "pad", "extrude"];
 
 function checkArgs(name: string, args: unknown[]): void {

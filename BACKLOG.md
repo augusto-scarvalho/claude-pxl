@@ -46,8 +46,8 @@ Mark items `[x]` when they ship, with the commit.
 
 ## Later / niche
 
-- [ ] Layer blend modes and opacity (multiply, screen, ...): leave the palette; `shade`/`light`/
-  `glow` cover most uses.
+- [x] Layer blend modes and opacity (`blend`, `opacity`, `palettize`), with the palette caveats in
+  SKILL.md: they make new colors, so the palette-safe `shade`/`light`/`density`/`glow` come first.
 - [x] Onion skin in the live viewer: an "onion" toggle, `,` and `.` step frames.
 - [x] Isometric `tilemap` (`iso: true`, one level).
 - [x] Export tilemaps to Tiled: `<asset>.tmj` + a tileset image per layer (isometric alignment unchecked in Tiled itself).
