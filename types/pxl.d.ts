@@ -24,7 +24,7 @@ declare global {
   interface PxText { scale?: number; gap?: number; lead?: number; align?: "l" | "c" | "r"; shadow?: PxColor; font?: string }
   interface PxAssetOpts {
     w?: number; h?: number; base?: string; mx?: boolean | "c"; my?: boolean | "c"; swap?: Record<string, PxColor>;
-    flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; outline?: PxColor; outline8?: PxColor; crop?: boolean; layers?: boolean;
+    flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; angle?: number; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; outline?: PxColor; outline8?: PxColor; crop?: boolean; layers?: boolean;
     /** inline: a 1px line over the sprite's own edge; selout: the line takes the color it touches, n steps darker (true = 2). */
     inline?: PxColor; selout?: boolean | number;
     /** Point that stamp / scatter / wire hangs place: "bottom" / "center" of the final image, or [x, y] in drawing coords. */
@@ -118,6 +118,8 @@ declare global {
   function sheet(name: string, entries: string[], opts?: { cols?: number; pad?: number; extrude?: number }): void;
   /** A bitmap font from glyphs drawn in w x h cells on a sprite, in the order of `chars`; use it with text(..., { font }). */
   function font(name: string, sprite: string, opts: { chars: string; w: number; h: number; cols?: number }): void;
+  /** n directions (sprites name_0.. + group name) from a pose pointing up, via exact quarter turns and diagonal mirrors where possible. See rotation.md. */
+  function directions(name: string, n: number, opts: { from: string; outline?: PxColor; outline8?: PxColor; symmetric?: boolean; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; draw?: Record<string, string>; pivot?: "bottom" | "center" | [number, number] }): void;
   /** palette: true keeps the included file's use()/pal()/ramps() active afterwards. */
   function include(path: string, opts?: { palette?: boolean }): void;
   function rng(seed?: number): () => number;

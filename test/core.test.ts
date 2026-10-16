@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { art, failure, PAL } from "./helpers.ts";
 import { loadSource } from "../src/node/load.ts";
 import { packSheet, sheetJson } from "../src/core/render.ts";
+import { rotate } from "../src/core/rotate.ts";
+import { Img } from "../src/core/image.ts";
 
 const eq = (a: string, b: string) => assert.equal(a, b);
 
@@ -139,6 +141,41 @@ test("curve: through the points, pixel-perfect at 1px, closed loops", () => {
   const loop = art(PAL + 'sprite("t", { w: 12, h: 12 }, curve([6, 1, 10, 6, 6, 10, 1, 6], "r", { closed: true }), fill(6, 6, "w"))', "t");
   assert.ok(loop.includes("w") && !loop.split("\n")[0].includes("w") && loop.split("\n")[0].startsWith("."));
   assert.match(failure(PAL + 'sprite("t", { w: 2, h: 2 }, curve([0, 0], "r"))', "t").message, /curve needs \[x0, y0, x1, y1, \.\.\.\]/);
+});
+
+test("rotate: quarter turns exact, RotSprite invents no colors, shear keeps every pixel", () => {
+  const p = loadSource(PAL + `sprite("s", { mx: true }, \`
+    ..rr
+    .rwr
+    rrrg
+    .kkk
+    rrk.\`)`, "t.px.js");
+  const img = p.image("s"), count = (im: Img) => { const m = new Map<number, number>(); for (const c of im.data) if (c) m.set(c, (m.get(c) ?? 0) + 1); return m; };
+  assert.deepEqual([...rotate(img, 90).data], [...img.rot(90).data], "a quarter turn is the exact one");
+  assert.deepEqual([...rotate(img, -270).data], [...img.rot(90).data]);
+  const colors = new Set(img.data);
+  for (const a of [22.5, 30, 45, 135]) for (const c of rotate(img, a, "rotsprite").data) assert.ok(colors.has(c), `new color at ${a} degrees`);
+  for (const a of [5, 10, -8, 95]) assert.deepEqual(count(rotate(img, a, "shear")), count(img), `shear at ${a} keeps every pixel`);
+  // auto: small angles shear (pixel count kept), larger ones resample
+  assert.deepEqual(count(rotate(img, 7)), count(img));
+});
+
+test("angle: rotates before the outline; directions() derives the quarter turns and diagonal mirrors exactly", () => {
+  const SRC = PAL + `sprite("_b", { mx: true }, "..rr\\n.rwr\\nrrrr\\n.r.r"); `;
+  const p = loadSource(SRC + `sprite("t", { base: "_b", angle: 30, outline: "k" })
+directions("d", 16, { from: "_b", outline: "k", symmetric: true })
+directions("e", 8, { from: "_b", outline: "k", draw: { 45: "_hand" } }); sprite("_hand", { w: 3, h: 3 }, rect(0, 0, 3, 3, "w"))`, "t.px.js");
+  // the outline is drawn fresh: every outline pixel touches the sprite on a side, and none is doubled
+  const t = p.image("t"), k = p.assets.get("t")!.pal.keys.get("k")!;
+  for (let y = 0; y < t.h; y++) for (let x = 0; x < t.w; x++)
+    if (t.get(x, y) === k) assert.ok([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const c = t.get(x + dx, y + dy); return c !== k && c !== 0; }), `outline pixel ${x},${y} touches nothing`);
+  const d = (i: number) => p.image("d_" + i);
+  assert.deepEqual([...d(4).data], [...d(0).rot(90).data], "90 degrees: a quarter turn of 0");
+  assert.deepEqual([...d(5).data], [...d(1).rot(90).data], "112.5: a quarter turn of 22.5");
+  assert.deepEqual([...d(3).data], [...d(1).flip("x").rot(90).data], "67.5: 22.5 mirrored across the diagonal");
+  assert.equal(p.candidates("d").length, 16, "a group of all directions");
+  assert.deepEqual([...p.image("e_1").data], [...p.image("_hand").data], "a hand-drawn pose wins");
+  assert.deepEqual([...p.image("e_3").data], [...p.image("_hand").rot(90).data], "and its quarter turns follow it");
 });
 
 test("layer blend / opacity: color math with what's below; palettize snaps it back", () => {

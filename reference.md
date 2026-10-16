@@ -32,6 +32,7 @@ layer(name, layerOpts?, ...items)      // only as an item of a sprite or scene
 group(name, ["a", "b", "rock_*", ...])  // random pick per placement; repeat a name to weight it
 sheet(name, ["slime*", "heart", groupName], { cols?, pad?, extrude? })  // extrude: repeat edge pixels n px out
 include("other.px.js")                  // path relative to the current file
+directions("ship", 16, { from, outline?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
 font(name, "glyph_sprite", { chars: "ABC...", w, h, cols? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional)
 include("palette.px.js", { palette: true })  // also take its use()/pal()/ramps() from here on
 ```
@@ -64,6 +65,7 @@ sheet globs.
 | `mx: true` | Mirror the left half onto the right after all items. Inferred width doubles (write half a row). `mx: "c"`: odd width, shared center column. `my` likewise vertically. |
 | `swap: { g: "r" }` | Recolor after drawing. |
 | `flip: "x" \| "y" \| "xy"`, `rot: 90 \| 180 \| 270` | Transform. |
+| `angle: deg`, `rotate: "auto" \| "rotsprite" \| "shear" \| "nearest"` | Any angle, clockwise, after `flip`/`rot` and before `outline` (the outline is drawn around the turned shape). `auto`: quarter turns exact, under 12° a shear (a lean that keeps every pixel), else RotSprite. No new colors. See [rotation.md](rotation.md) for which angles hold up. |\| "y" \| "xy"`, `rot: 90 \| 180 \| 270` | Transform. |
 | `outline: "k"` | 1px outline around opaque pixels; **grows the canvas 1px on every side**. `outline8` also fills diagonals. |
 | `inline: "k"` | 1px line over the sprite's own edge pixels (Aseprite's inside outline): the canvas keeps its size. |
 | `selout: true \| n` | With `outline`/`outline8`/`inline`: each line pixel takes the sprite color it touches, `n` steps darker along the ramps (`true` = 2), so the line softens next to light colors; colors without a ramp keep the line color. Needs `ramps`. |

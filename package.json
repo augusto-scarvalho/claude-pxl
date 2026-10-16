@@ -22,7 +22,8 @@
     "examples/fonts/*.px.js",
     "SKILL.md",
     "reference.md",
-    "lighting.md"
+    "lighting.md",
+    "rotation.md"
   ],
   "engines": {
     "node": ">=22.18"

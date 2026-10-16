@@ -33,7 +33,12 @@ Mark items `[x]` when they ship, with the commit.
 - [x] **Curves**: `curve(points, c, { width, closed })` through the points (Catmull-Rom), pixel-perfect. (Aseprite
   curve tool + pixel-perfect mode.)
 - [x] **Radial gradient**: `grad(..., "r")`, center out to the ellipse that fits the box. (Gradient tool, both editors.)
-- [ ] **Free rotation** with RotSprite or cleanEdge. (Aseprite RotSprite; Pixelorama cleanEdge.)
+- [x] **Free rotation**: `angle` (quarter turns exact, shear under 12°, RotSprite otherwise),
+  outline after the turn, and `directions()` for 8/16-direction sets via exact quarter turns and
+  diagonal mirrors, with hand-drawn poses through `draw`. Study and angle guide in `rotation.md`.
+  (Aseprite RotSprite; Paeth three-shear.)
+- [ ] **cleanEdge or MMPX inside the rotation**: newer edge-aware magnifiers; MMPX could replace
+  Scale2x in RotSprite. Only if RotSprite's results fall short on real sprites.
 - [x] **Inside outline and selout** (`inline`, `selout`) (outline takes the dark shade of the color it touches).
   (Aseprite Outline command.)
 - [x] **Hue-shifted ramp generator**: `shades("HGgl", "#5aa040")` defines the keys and their ramp. (Aseprite

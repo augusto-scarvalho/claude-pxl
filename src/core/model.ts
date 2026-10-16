@@ -56,6 +56,10 @@ export interface AssetOpts {
   swap?: Record<string, string>;
   flip?: "x" | "y" | "xy";
   rot?: 90 | 180 | 270;
+  /** Any angle, clockwise, before the outline: quarter turns exact, small angles shear, the rest RotSprite. */
+  angle?: number;
+  /** How `angle` turns it: "auto" (default), "rotsprite", "shear", "nearest". */
+  rotate?: "auto" | "rotsprite" | "shear" | "nearest";
   outline?: string;
   outline8?: string;
   /** 1px line on the sprite's own edge pixels; the canvas keeps its size. */

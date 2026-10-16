@@ -6,6 +6,7 @@ import { PxError, wrap } from "./errors.ts";
 import { Img } from "./image.ts";
 import { applyGlow } from "./glow.ts";
 import { applyLighting } from "./light.ts";
+import { rotate } from "./rotate.ts";
 import { normalImage } from "./normals.ts";
 import { type AssetDef, type FrameOpts, type GlowOpts, type Item, type Layer, type LayerOpts, type LightingOpts, type Op, type TileLayer, type Timeline, isLayer, isOp } from "./model.ts";
 import type { Palette } from "./palette.ts";
@@ -318,6 +319,9 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
   }
   if (o.flip) step(`flip ${o.flip}`, () => img.flip(o.flip!));
   if (o.rot) step(`rot ${o.rot}`, () => img.rot(o.rot!));
+  // Any angle, before the outline so the line is drawn fresh around the turned shape.
+  if (o.angle) step(`angle ${o.angle}${o.rotate ? ` (${o.rotate})` : ""}`, () => rotate(img, o.angle!, o.rotate));
+  else if (o.rotate) throw new PxError("rotate picks how `angle` turns the sprite: add angle: degrees");
   // selout: the line takes the color it touches, `selout` steps darker along the ramps (colors
   // without a ramp keep the line color).
   const sel = o.selout ? seloutPick(pal, o.selout === true ? 2 : o.selout) : undefined;

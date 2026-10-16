@@ -106,6 +106,9 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 Full API with every option: [reference.md](reference.md).
 Dynamic lighting (lamps, light blocked by solid layers, sky light, Terraria-style): read
 [lighting.md](lighting.md) only when a scene needs lights.
+Turning a sprite by an angle that isn't a quarter turn (`angle: 30`), or making 8/16 directions
+(`directions("ship", 16, { from, symmetric })`): read [rotation.md](rotation.md) first. It says which
+angles hold up, which to draw by hand, and why the outline goes on after the turn.
 
 ## Examples
 

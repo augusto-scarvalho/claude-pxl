@@ -63,9 +63,9 @@ const OP_OPTS: Record<string, string[]> = {
 };
 
 const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "slice", "png", "area", "palettize"],
-  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "slice", "png", "area", "palettize", "fps", "frames", "loop", "dir"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "slice", "png", "area", "palettize"],
+  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "slice", "png", "area", "palettize", "fps", "frames", "loop", "dir"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -276,6 +276,40 @@ export class Project implements BuildCtx {
       const prev = this.assets.get(name) ?? this.groups.get(name);
       if (prev) throw new PxError(`'${name}' is already defined at ${prev.loc}`, loc);
       this.groups.set(name, { name, members, loc });
+    };
+    env.directions = (name: unknown, n: unknown, opts: Record<string, unknown> = {}) => {
+      const loc = this.callerLoc();
+      try {
+        if (typeof name !== "string" || !Number.isInteger(n) || (n as number) < 1 || (n as number) > 360)
+          throw new PxError('directions("ship", 16, { from: "_ship_body", outline: "k", symmetric: true })');
+        checkKeys("directions", opts, ["from", "outline", "outline8", "symmetric", "rotate", "draw", "pivot"]);
+        const { from, symmetric, rotate, draw = {}, pivot, outline, outline8 } = opts as {
+          from?: string; symmetric?: boolean; rotate?: string; draw?: Record<string, string>; pivot?: unknown; outline?: string; outline8?: string };
+        if (typeof from !== "string") throw new PxError("directions needs { from: sprite } (the pose at 0 degrees, pointing up, best without its outline)");
+        const line = { ...(outline ? { outline } : {}), ...(outline8 ? { outline8 } : {}) };
+        // One finished sprite per angle within a quarter turn; every direction is a quarter turn of one.
+        const part = (r: number) => `_${name}@${r}`, made = new Set<number>();
+        const want = [...Array(n as number).keys()].map((i) => (i * 360) / (n as number));
+        const rests = [...new Set(want.map((a) => +(a % 90).toFixed(6)))].sort((a, b) => a - b);
+        const hand = (r: number) => draw[String(r)];
+        const make = (r: number) => {
+          if (made.has(r)) return;
+          made.add(r);
+          // A hand-drawn pose wins; a symmetric sprite mirrors 90 - r across the diagonal (exact);
+          // otherwise rotate the source and outline the result.
+          if (hand(r)) define("sprite", part(r), [{ base: hand(r) }]);
+          else if (symmetric && r > 45 && (rests.includes(+(90 - r).toFixed(6)) || hand(+(90 - r).toFixed(6)))) {
+            make(+(90 - r).toFixed(6));
+            define("sprite", part(r), [{ base: part(+(90 - r).toFixed(6)), flip: "x", rot: 90 }]);
+          } else define("sprite", part(r), [{ base: from, ...(r ? { angle: r } : {}), ...(rotate ? { rotate } : {}), ...line }]);
+        };
+        rests.forEach(make);
+        want.forEach((a, i) => {
+          const r = +(a % 90).toFixed(6), q = Math.round((a - r) / 90) % 4;
+          define("sprite", `${name}_${i}`, [{ base: part(r), ...(q ? { rot: q * 90 } : {}), ...(pivot ? { pivot } : {}) }]);
+        });
+        (env.group as (n: string, m: string[]) => void)(name, want.map((_, i) => `${name}_${i}`));
+      } catch (e) { throw wrap(e).within("directions", loc); }
     };
     env.font = (name: unknown, asset: unknown, opts: Partial<FontDef> = {}) => {
       const loc = this.callerLoc();
