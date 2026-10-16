@@ -440,6 +440,21 @@ export class Canvas {
     const r = rng(hash(x * 31 + w, y * 17 + h, (opts.seed ?? 0) + this.seed));
     const ok = this.maskAt(opts.on, opts.below);
     let placed = 0, tries = 0;
+    if (opts.even) {
+      // One pick per cell of a grid sized to `count`, at a random spot inside it: spread evenly over
+      // the whole area, never in rows (pure random clumps and leaves holes).
+      const s = Math.sqrt((w * h) / count), cols = Math.max(1, Math.round(w / s)), rows = Math.max(1, Math.round(h / s));
+      for (let j = 0; j < rows; j++)
+        for (let i = 0; i < cols; i++)
+          for (let t = 0; t < 30; t++) {
+            const cx = x + Math.floor(((i + r()) * w) / cols), cy = y + Math.floor(((j + r()) * h) / rows);
+            if (!ok(cx, cy)) continue;
+            this.putAt(this.asset(name, opts, cx, cy), cx, cy, [0.5, 0.5], opts.clip ? ok : undefined);
+            placed++;
+            break;
+          }
+      tries = count * 30;
+    }
     while (placed < count && tries < count * 30) {
       tries++;
       const cx = x + Math.floor(r() * w), cy = y + Math.floor(r() * h);

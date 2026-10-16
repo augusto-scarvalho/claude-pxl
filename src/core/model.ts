@@ -165,6 +165,8 @@ export interface ScatterOpts extends PlaceOpts {
   clip?: boolean;
   /** Masks read the composite below the current layer instead of the layer itself. */
   below?: boolean;
+  /** Even spacing: one pick per cell of a grid sized to `count`, at a random spot in the cell. */
+  even?: boolean;
 }
 
 export interface TilemapOpts extends PlaceOpts {

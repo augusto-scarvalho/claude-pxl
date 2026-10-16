@@ -119,7 +119,7 @@ rect, `[x0, y0, x1, y1, x2, y2, ...]` polygon, or `(x, y) => boolean`.
 | `tile(name, x, y, cols, rows, opts?)` | grid of copies (each cell picks separately for groups) |
 | `pattern(name, x, y, w, h, opts?)` | fill an area with copies; edges cut to fit |
 | `tilemap("gg\nd.", { map: { g: "grass", d: "dirt" }, size?, w?, h?, x?, y?, ...placement })` | character map; `.` empty |
-| `scatter(name, x, y, w, h, count, { on?, clip?, below?, ...placement })` | brush: `count` picks centered (or pivoted) at random points; `on` = center must land on these keys; `clip` = paint only onto them; `below` = masks read the composite under this layer (a layer starts empty, so an `on` that places nothing is an error) |
+| `scatter(name, x, y, w, h, count, { on?, clip?, below?, even?, ...placement })` | brush: `count` picks centered (or pivoted) at random points; `on` = center must land on these keys; `clip` = paint only onto them; `below` = masks read the composite under this layer (a layer starts empty, so an `on` that places nothing is an error); `even` = one pick per cell of a grid sized to `count`, at a random spot in the cell: stones, pebbles and flowers spread evenly over the whole area, without the clumps and holes of pure random |
 | `clip(region, ...items)` | run items with drawing restricted to the region (half domes, roof slopes, masked textures) |
 
 Any `name` may be a sprite, scene, group, or glob (`"tree_*"`). **Placement opts**: `flip`, `rot`,

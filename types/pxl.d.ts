@@ -18,7 +18,7 @@ declare global {
     /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
     silhouette?: PxColor;
   }
-  interface PxScatter extends PxPlace { on?: string; clip?: boolean; below?: boolean }
+  interface PxScatter extends PxPlace { on?: string; clip?: boolean; below?: boolean; even?: boolean }
   interface PxTilemap extends PxPlace { map: Record<string, string>; size?: number; w?: number; h?: number; x?: number; y?: number }
   interface PxWire extends PxPlace { hang?: string; every?: number; start?: number }
   interface PxText { scale?: number; gap?: number; lead?: number; align?: "l" | "c" | "r"; shadow?: PxColor }

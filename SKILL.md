@@ -137,8 +137,8 @@ stays clean: `PXL build <skill dir>/examples/shop.px.js --only comet_repair --ou
 - Large areas: primitives, `grad`, `noise`, `pattern`, `tilemap`. Never big hand grids.
 - Tiles that repeat: give them `wrap: true` (or `"x"`/`"y"`). The preview then shows the tile 3×3,
   so you can check the seams, and anything drawn past an edge continues on the other side.
-  A detail in the same spot of every copy lines up into a grid: make 2–3 variants in a `group`,
-  some plain, and place them with `tile`/`tilemap` plus `rflip`.
+  Keep small details that dot an area (pebbles, stones, flowers, tufts) out of tiles: baked in, they
+  repeat as a pattern. Lay plain tiles, then `scatter(..., { even: true })` the details over the area.
 - Organic texture (leaves, grass, stones, rust): 2–3 tiny brush parts + `scatter` with `on`/`clip`.
 - **No filler noise.** Don't sprinkle `noise` speckle over walls, floors or plaster to make them
   "less flat": it reads as random dots, not material. Every mark on a surface needs a cause you
@@ -161,6 +161,7 @@ stays clean: `PXL build <skill dir>/examples/shop.px.js --only comet_repair --ou
 ## When pxl gets in your way
 
 If something cost you a rebuild or a workaround (a misleading error, a missing op, a doc that sent
-you wrong, a trap you fell into), add one line to `FEEDBACK.md` in this skill's directory: the date,
-what you were making, what happened, what would have helped. Only real friction, not taste. The
-skill's curators turn these lines into fixes, docs and examples.
+you wrong, a trap you fell into), add one line to `FEEDBACK.md` in this skill's directory (create it
+if missing): the date, the kind of asset, what happened in pxl, what would have helped. Describe
+pxl's side only, never the project: no names, paths or story details. Only real friction, not
+taste. The file stays out of git; the skill's curators turn its lines into fixes, docs and examples.
