@@ -32,9 +32,9 @@ Mark items `[x]` when they ship, with the commit.
   line painted it wrong?); `--sheet` writes thumbnails of the steps for a human.
 - [ ] **Curves**: `curve(...)` (bezier) with pixel-perfect strokes, no doubled corners. (Aseprite
   curve tool + pixel-perfect mode.)
-- [ ] **Radial gradient** with dithering. (Gradient tool, both editors.)
+- [x] **Radial gradient**: `grad(..., "r")`, center out to the ellipse that fits the box. (Gradient tool, both editors.)
 - [ ] **Free rotation** with RotSprite or cleanEdge. (Aseprite RotSprite; Pixelorama cleanEdge.)
-- [ ] **Inside outline and selout** (outline takes the dark shade of the color it touches).
+- [x] **Inside outline and selout** (`inline`, `selout`) (outline takes the dark shade of the color it touches).
   (Aseprite Outline command.)
 - [ ] **Hue-shifted ramp generator**: `ramp("#5aa040", 5)` builds shades that shift hue. (Aseprite
   Shading ink, Pixelorama shading with hue shift.)
@@ -42,7 +42,7 @@ Mark items `[x]` when they ship, with the commit.
 - [ ] **9-slice** for UI panels and buttons. (Aseprite 9-patch slices.)
 - [x] **Palette keys in the file** (dogfood): `1a1626 k ink` (a one-character word after the color;
   the name in a `.gpl`), so a shared palette needs no `pal({ k: 0, K: 1, ... })` index mapping.
-- [ ] **Asset size inside functions**: `c.size("name")` (found building the iso example).
+- [x] **Asset size inside functions**: `c.size("name")` (found building the iso example).
 
 ## Later / niche
 

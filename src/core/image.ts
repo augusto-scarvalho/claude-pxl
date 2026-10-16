@@ -216,17 +216,29 @@ export class Img {
     return this.moveLamps(o, (x, y) => [x + n, y + n]);
   }
 
-  /** 1px outline around opaque pixels; grows the canvas by 1 on every side. */
-  outline(c: Color, diagonal = false): Img {
+  /**
+   * 1px outline around opaque pixels; grows the canvas by 1 on every side. With `pick`, each
+   * outline pixel takes pick(the sprite color it touches) instead of `c` (selout).
+   */
+  outline(c: Color, diagonal = false, pick?: (touching: Color) => Color): Img {
     const src = this.pad(1);
     const o = src.copy();
-    const op = (x: number, y: number) => src.get(x, y) !== TRANSPARENT;
     for (let y = 0; y < src.h; y++)
       for (let x = 0; x < src.w; x++) {
-        if (op(x, y)) continue;
-        let hit = op(x - 1, y) || op(x + 1, y) || op(x, y - 1) || op(x, y + 1);
-        if (!hit && diagonal) hit = op(x - 1, y - 1) || op(x + 1, y - 1) || op(x - 1, y + 1) || op(x + 1, y + 1);
-        if (hit) o.set(x, y, c);
+        if (src.get(x, y) !== TRANSPARENT) continue;
+        const nb = touching(src, x, y, diagonal, (p) => p !== TRANSPARENT);
+        if (nb !== undefined) o.set(x, y, pick ? pick(nb) : c);
+      }
+    return o;
+  }
+
+  /** 1px line over the sprite's own edge pixels (an inside outline): the canvas keeps its size. */
+  inline(c: Color, diagonal = false, pick?: (under: Color) => Color): Img {
+    const o = this.copy();
+    for (let y = 0; y < this.h; y++)
+      for (let x = 0; x < this.w; x++) {
+        const p = this.get(x, y);
+        if (p !== TRANSPARENT && touching(this, x, y, diagonal, (q) => q === TRANSPARENT) !== undefined) o.set(x, y, pick ? pick(p) : c);
       }
     return o;
   }
@@ -270,3 +282,15 @@ export class Img {
     return (h >>> 0).toString(36);
   }
 }
+
+/** The first 4-neighbour (then diagonal) of (x, y) that `want` accepts, or undefined. */
+function touching(img: Img, x: number, y: number, diagonal: boolean, want: (c: Color) => boolean): Color | undefined {
+  const near = diagonal ? NEAR8 : NEAR4;
+  for (let i = 0; i < near.length; i += 2) {
+    const c = img.get(x + near[i], y + near[i + 1]);
+    if (want(c)) return c;
+  }
+  return undefined;
+}
+const NEAR4 = [0, 1, 0, -1, -1, 0, 1, 0];
+const NEAR8 = [...NEAR4, -1, 1, 1, 1, -1, -1, 1, -1];

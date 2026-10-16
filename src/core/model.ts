@@ -52,6 +52,10 @@ export interface AssetOpts {
   rot?: 90 | 180 | 270;
   outline?: string;
   outline8?: string;
+  /** 1px line on the sprite's own edge pixels; the canvas keeps its size. */
+  inline?: string;
+  /** The outline/inline takes the color it touches, n steps darker along the ramps (true = 2). */
+  selout?: boolean | number;
   crop?: boolean;
   /** Also export each layer as its own PNG. */
   layers?: boolean;

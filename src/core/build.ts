@@ -313,11 +313,28 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
   }
   if (o.flip) step(`flip ${o.flip}`, () => img.flip(o.flip!));
   if (o.rot) step(`rot ${o.rot}`, () => img.rot(o.rot!));
-  if (o.outline) step(`outline ${o.outline}`, () => img.outline(solid(pal, o.outline!), false));
-  if (o.outline8) step(`outline8 ${o.outline8}`, () => img.outline(solid(pal, o.outline8!), true));
+  // selout: the line takes the color it touches, `selout` steps darker along the ramps (colors
+  // without a ramp keep the line color).
+  const sel = o.selout ? seloutPick(pal, o.selout === true ? 2 : o.selout) : undefined;
+  if (o.selout && !o.outline && !o.outline8 && !o.inline) throw new PxError("selout recolors a line: add outline, outline8 or inline");
+  const as = (c: Color) => (sel ? (t: Color) => sel(t, c) : undefined);
+  if (o.inline) step(`inline ${o.inline}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.inline!); return img.inline(c, false, as(c)); });
+  if (o.outline) step(`outline ${o.outline}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline!); return img.outline(c, false, as(c)); });
+  if (o.outline8) step(`outline8 ${o.outline8}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline8!); return img.outline(c, true, as(c)); });
   if (o.crop) step("crop", () => img.crop());
   if (pv === "bottom" || pv === "center") img.pivot = [img.w / 2, pv === "bottom" ? img.h : img.h / 2];
   return img;
+}
+
+function seloutPick(pal: Palette, steps: number): (touching: Color, line: Color) => Color {
+  if (!(Number.isInteger(steps) && steps >= 1)) throw new PxError(`selout must be true or a number of steps >= 1, got ${steps}`);
+  if (!pal.ramps.length) throw new PxError('selout darkens along the ramps: add ramps("kDdu", ...) first');
+  const dark = pal.stepMap(-1);
+  return (t, line) => {
+    let c = t;
+    for (let i = 0; i < steps; i++) c = dark.get(c) ?? c;
+    return c === t ? line : c;
+  };
 }
 
 function solid(pal: Palette, spec: string): Color {

@@ -25,6 +25,8 @@ declare global {
   interface PxAssetOpts {
     w?: number; h?: number; base?: string; mx?: boolean | "c"; my?: boolean | "c"; swap?: Record<string, PxColor>;
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; outline?: PxColor; outline8?: PxColor; crop?: boolean; layers?: boolean;
+    /** inline: a 1px line over the sprite's own edge; selout: the line takes the color it touches, n steps darker (true = 2). */
+    inline?: PxColor; selout?: boolean | number;
     /** Point that stamp / scatter / wire hangs place: "bottom" / "center" of the final image, or [x, y] in drawing coords. */
     pivot?: "bottom" | "center" | [number, number];
     /** Seamless tile: drawing past these edges continues on the other side; previews repeat 3x3. */
@@ -58,6 +60,8 @@ declare global {
     key(x: number, y: number): string;
     get(x: number, y: number): number;
     rng(seed?: number): () => number;
+    /** An asset's size as it would be placed (a group's first member), for layouts. */
+    size(name: string): { w: number; h: number };
     clip(where: PxRegion, fn: () => void): void;
     px(x: number, y: number, c: PxColor): void;
     rect(x: number, y: number, w: number, h: number, c: PxColor): void;
@@ -71,7 +75,7 @@ declare global {
     poly(points: number[], c: PxColor): void;
     fill(x: number, y: number, c: PxColor): void;
     dither(x: number, y: number, w: number, h: number, c1: PxColor, c2: PxColor, density?: number): void;
-    grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h", soft?: number): void;
+    grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h" | "r", soft?: number): void;
     noise(x: number, y: number, w: number, h: number, colors: string | string[], density?: number, seed?: number, on?: string): void;
     shade(where?: PxRegion, steps?: number, density?: number): void;
     light(where?: PxRegion, steps?: number, density?: number): void;
@@ -121,7 +125,7 @@ declare global {
   function poly(points: number[], c: PxColor): PxOp;
   function fill(x: number, y: number, c: PxColor): PxOp;
   function dither(x: number, y: number, w: number, h: number, c1: PxColor, c2: PxColor, density?: number): PxOp;
-  function grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h", soft?: number): PxOp;
+  function grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h" | "r", soft?: number): PxOp;
   function noise(x: number, y: number, w: number, h: number, colors: string | string[], density?: number, seed?: number, on?: string): PxOp;
   function shade(where?: PxRegion, steps?: number, density?: number): PxOp;
   function light(where?: PxRegion, steps?: number, density?: number): PxOp;

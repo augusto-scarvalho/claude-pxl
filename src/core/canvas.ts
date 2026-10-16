@@ -246,15 +246,18 @@ export class Canvas {
   }
 
   /** Banded gradient through colors with dithered seams. dir "v" (default) or "h"; soft 0..1. */
-  grad(x: number, y: number, w: number, h: number, colors: string | string[], dir: "v" | "h" = "v", soft = 0.5): void {
+  grad(x: number, y: number, w: number, h: number, colors: string | string[], dir: "v" | "h" | "r" = "v", soft = 0.5): void {
     const cols = colorList(colors).map((c) => this.color(c));
     const n = cols.length;
     if (!n) throw new PxError("grad needs at least one color");
+    if (dir !== "v" && dir !== "h" && dir !== "r") throw new PxError(`grad direction must be "v", "h" or "r" (radial), got ${JSON.stringify(dir)}`);
     const len = dir === "h" ? w : h;
     for (let yy = 0; yy < h; yy++)
       for (let xx = 0; xx < w; xx++) {
-        const pos = dir === "h" ? xx : yy;
-        const f = len > 1 ? (pos / (len - 1)) * (n - 1) : 0;
+        // Radial: 0 at the center, 1 on the ellipse that fits the box (and past it, in the corners).
+        const f = dir === "r"
+          ? Math.min(1, Math.hypot((xx + 0.5 - w / 2) / (w / 2), (yy + 0.5 - h / 2) / (h / 2))) * (n - 1)
+          : len > 1 ? ((dir === "h" ? xx : yy) / (len - 1)) * (n - 1) : 0;
         const i = Math.floor(f);
         let col: Resolved;
         if (i >= n - 1) col = cols[n - 1];
@@ -386,6 +389,12 @@ export class Canvas {
           n.set(src.norm.subarray(j * 3, j * 3 + 3), i * 3);
         } else if (this.img.norm) this.img.norm[i * 3 + 2] = 0;
       }
+  }
+
+  /** An asset's size as it would be placed (a group's first member): for layouts in drawing code. */
+  size(name: string): { w: number; h: number } {
+    const img = this.res.image(this.res.candidates(name)[0], 0, 0, false);
+    return { w: img.w, h: img.h };
   }
 
   /** Draw `src` with its pivot (default: `def`, as a fraction of its size) on (x, y). */

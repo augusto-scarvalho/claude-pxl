@@ -106,6 +106,21 @@ test("pivot: placements line it up, transforms carry it, sheets export it", () =
   assert.match(failure(PAL + 'sprite("t", { pivot: "feet" }, "r")', "t").message, /pivot must be "bottom", "center" or \[x, y\]/);
 });
 
+test("inline and selout: lines on the sprite's own edge, lines that take the color they touch", () => {
+  const R = 'use("pico8"); pal({ k: 0, D: 2, d: 8, w: 7 }); ramps("kDd"); ';
+  eq(art(R + 'sprite("t", { w: 3, h: 3, inline: "k" }, rect(0, 0, 3, 3, "d"))', "t"), "kkk\nkdk\nkkk");
+  eq(art(R + 'sprite("t", { w: 3, h: 3, inline: "k", selout: 1 }, rect(0, 0, 3, 3, "d"))', "t"), "DDD\nDdD\nDDD");
+  // outline + selout: each outline pixel is the sprite color it touches, a step darker; no ramp -> the line color
+  eq(art(R + 'sprite("t", { w: 2, h: 1, outline: "k", selout: 1 }, "dw")', "t"), ".Dk.\nDdwk\n.Dk.");
+  assert.match(failure(R + 'sprite("t", { selout: true }, "d")', "t").message, /selout recolors a line/);
+});
+
+test("grad r: radial from the center to the ellipse that fits the box; c.size() reads an asset's size", () => {
+  eq(art(PAL + 'sprite("t", { w: 5, h: 5 }, grad(0, 0, 5, 5, ["r", "."], "r", 0))', "t"), ".....\n..r..\n.rrr.\n..r..\n....."); // 2 colors meet halfway out
+  eq(art(PAL + 'sprite("_d", { w: 3, h: 2 }, rect(0, 0, 3, 2, "r")); sprite("t", { w: 4, h: 1 }, (c) => c.px(c.size("_d").w, 0, "w"))', "t"), "...w");
+  assert.match(failure(PAL + 'sprite("t", { w: 2, h: 2 }, grad(0, 0, 2, 2, "rw", "d"))', "t").message, /grad direction must be "v", "h" or "r"/);
+});
+
 test("wrap: drawing, stamps, fills and reads continue across the wrapped edges", () => {
   eq(art(PAL + 'sprite("t", { w: 4, h: 1, wrap: "x" }, rect(3, 0, 2, 1, "r"))', "t"), "r..r");
   eq(art(PAL + 'sprite("t", { w: 2, h: 3, wrap: "x" }, rect(0, 2, 1, 2, "r"))', "t"), "..\n..\nr.");     // "x" only: y clips

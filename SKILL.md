@@ -74,7 +74,7 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 - **Items run in order**: grid strings (drawn at 0,0), ops, `(c) => { c.rect(...) }` functions,
   `layer(...)`s. Then mirror → swap → flip → rot → outline (grows 1px each side) → crop.
 - **Shapes**: `px rect box line(…, width) hline vline circ ring ellipse poly fill wire text`.
-- **Tone**: `dither grad noise`, `shade/light(region, steps, density)`, `recolor`, and
+- **Tone**: `dither`, `grad` (`"v"`, `"h"`, `"r"` radial), `noise`, `shade/light(region, steps, density)`, `recolor`, and
   `shade:`/`light:` layers for cast shadows and glows. Regions: `[cx,cy,r]`, `[x,y,w,h]`,
   polygon, or a function. `clip(region, ...items)` restricts any items (half shapes, slopes).
 - **Reuse**: `stamp tile pattern tilemap scatter`. Names can be groups or globs
@@ -137,6 +137,8 @@ To see how a complex piece was built, in order: `PXL steps <example> <asset> --o
 ## Habits that save tokens and give better art
 
 - Write half of anything symmetric (`mx`) and let `outline` draw outlines. Never hand-draw either.
+  `selout: true` makes the outline take a dark shade of what it touches (softer than flat black);
+  `inline: "k"` draws it on the sprite's own edge without growing it.
 - Recolors are `base` + `swap`; repeated details are `_parts` + `stamp`; families are a `group` or a
   loop: `for (let i = 1; i <= 3; i++) sprite("tree_" + i, ...)`.
 - Large areas: primitives, `grad`, `noise`, `pattern`, `tilemap`. Never big hand grids.
