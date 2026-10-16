@@ -39,6 +39,7 @@ export const SIGNATURES: Record<string, string> = {
   stamp: "name:s ?x:n y:n opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
   pattern: "name:s x:n y:n w:n h:n ?opts:o",
+  panel: "name:s x:n y:n w:n h:n ?opts:o",
   tilemap: "map:s opts:o",
   scatter: "name:s x:n y:n w:n h:n count:n ?opts:o",
   grid: "x:n y:n str:s",
@@ -62,9 +63,9 @@ const OP_OPTS: Record<string, string[]> = {
 };
 
 const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "png", "area", "palettize"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "slice", "png", "area", "palettize"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "png", "area", "palettize", "fps", "frames", "loop", "dir"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "slice", "png", "area", "palettize", "fps", "frames", "loop", "dir"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */

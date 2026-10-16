@@ -120,5 +120,12 @@ export function sheetJson(image: string, sheet: Img, frames: SheetFrame[], tags:
   }
   const meta: Record<string, unknown> = { app: "pxl", image, format: "RGBA8888", size: { w: sheet.w, h: sheet.h }, scale: "1" };
   if (tags.length) meta.frameTags = tags.map((t) => ({ ...t, direction: t.direction ?? "forward" }));
+  // 9-slice margins, as Aseprite exports slices: bounds and center in the frame's own coordinates.
+  const slices = frames.flatMap((f, i) => {
+    if (!f.img.slice) return [];
+    const [l, t, r, b] = f.img.slice, { w, h } = f.img;
+    return [{ name: f.name, color: "#0000ffff", keys: [{ frame: i, bounds: { x: 0, y: 0, w, h }, center: { x: l, y: t, w: w - l - r, h: h - t - b } }] }];
+  });
+  if (slices.length) meta.slices = slices;
   return JSON.stringify({ frames: out, meta }, null, 1) + "\n";
 }

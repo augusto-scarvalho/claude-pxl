@@ -465,6 +465,23 @@ export class Canvas {
       }
   }
 
+  /**
+   * 9-slice: draw an asset with `slice` margins at any size w x h. Corners stay as drawn; edges and
+   * center repeat (never stretch, so pixels keep their shape).
+   */
+  panel(name: string, x: number, y: number, w: number, h: number, opts?: PlaceOpts): void {
+    const src = this.asset(name, opts, x, y);
+    if (!src.slice) throw new PxError(`panel: '${name}' has no slice margins: give it { slice: n } or { slice: [left, top, right, bottom] }`);
+    const [l, t, r, b] = src.slice, cw = src.w - l - r, ch = src.h - t - b;
+    w = Math.floor(w); h = Math.floor(h);
+    if (w < l + r || h < t + b) throw new PxError(`panel: ${w}x${h} is smaller than '${name}'s corners (${l + r}x${t + b})`);
+    const sx = (v: number, size: number, a: number, z: number, mid: number) => (v < a ? v : v >= size - z ? mid + a + z - (size - v) : a + ((v - a) % mid));
+    const out = new Img(w, h);
+    for (let yy = 0; yy < h; yy++)
+      for (let xx = 0; xx < w; xx++) out.data[yy * w + xx] = src.get(sx(xx, w, l, r, cw), sx(yy, h, t, b, ch));
+    this.put(out, x, y);
+  }
+
   /** Character map of tiles: tilemap(`gg\ndd`, { map: { g: "grass" }, size: 16 }). */
   tilemap(str: string, opts: TilemapOpts): void {
     if (typeof str !== "string") throw new PxError("tilemap(str, { map, size }) needs the map string first");
@@ -628,7 +645,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light",
-  "stamp", "tile", "pattern", "tilemap", "scatter", "grid", "wire", "text", "lamp", "bump", "normals",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "wire", "text", "lamp", "bump", "normals",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

@@ -39,7 +39,7 @@ Mark items `[x]` when they ship, with the commit.
 - [x] **Hue-shifted ramp generator**: `shades("HGgl", "#5aa040")` defines the keys and their ramp. (Aseprite
   Shading ink, Pixelorama shading with hue shift.)
 - [x] **Sheet extrude**: `sheet(..., { extrude: n })` against texture bleeding in engines. (Aseprite export options.)
-- [ ] **9-slice** for UI panels and buttons. (Aseprite 9-patch slices.)
+- [x] **9-slice**: `slice` margins + `panel(name, x, y, w, h)`, exported as Aseprite `meta.slices`. (Aseprite 9-patch slices.)
 - [x] **Palette keys in the file** (dogfood): `1a1626 k ink` (a one-character word after the color;
   the name in a `.gpl`), so a shared palette needs no `pal({ k: 0, K: 1, ... })` index mapping.
 - [x] **Asset size inside functions**: `c.size("name")` (found building the iso example).

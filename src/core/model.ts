@@ -63,6 +63,8 @@ export interface AssetOpts {
   pivot?: "bottom" | "center" | [number, number];
   /** Seamless tile: drawing past these edges continues on the other side; previews repeat 3x3. */
   wrap?: boolean | "x" | "y";
+  /** 9-slice margins of the final image (n, or [left, top, right, bottom]) for panel(). */
+  slice?: number | [number, number, number, number];
   /** Start from a PNG file (path relative to the art file); anims with `frames` split it into a strip. */
   png?: string;
   /** Only this part of the PNG: [x, y, w, h]. */

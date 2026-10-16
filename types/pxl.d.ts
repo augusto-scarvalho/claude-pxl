@@ -29,6 +29,8 @@ declare global {
     inline?: PxColor; selout?: boolean | number;
     /** Point that stamp / scatter / wire hangs place: "bottom" / "center" of the final image, or [x, y] in drawing coords. */
     pivot?: "bottom" | "center" | [number, number];
+    /** 9-slice margins of the final image for panel(): n or [left, top, right, bottom]. */
+    slice?: number | [number, number, number, number];
     /** Seamless tile: drawing past these edges continues on the other side; previews repeat 3x3. */
     wrap?: boolean | "x" | "y";
     /** Start from a PNG file (relative to the art file); anims with frames split it into a strip. */
@@ -84,6 +86,7 @@ declare global {
     stamp(name: string, x?: number, y?: number, opts?: PxPlace): void;
     tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): void;
     pattern(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): void;
+    panel(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): void;
     tilemap(map: string, opts: PxTilemap): void;
     scatter(name: string, x: number, y: number, w: number, h: number, count: number, opts?: PxScatter): void;
     grid(x: number, y: number, str: string): void;
@@ -138,6 +141,8 @@ declare global {
   function stamp(name: string, x?: number, y?: number, opts?: PxPlace): PxOp;
   function tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): PxOp;
   function pattern(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): PxOp;
+  /** 9-slice: an asset with `slice` margins drawn at w x h; corners stay, edges and center repeat. */
+  function panel(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): PxOp;
   function tilemap(map: string, opts: PxTilemap): PxOp;
   function scatter(name: string, x: number, y: number, w: number, h: number, count: number, opts?: PxScatter): PxOp;
   function grid(x: number, y: number, str: string): PxOp;

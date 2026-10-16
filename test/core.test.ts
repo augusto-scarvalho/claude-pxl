@@ -141,6 +141,19 @@ test("curve: through the points, pixel-perfect at 1px, closed loops", () => {
   assert.match(failure(PAL + 'sprite("t", { w: 2, h: 2 }, curve([0, 0], "r"))', "t").message, /curve needs \[x0, y0, x1, y1, \.\.\.\]/);
 });
 
+test("panel: 9-slice, corners stay, edges and center repeat; flips turn the margins; sheets export them", () => {
+  // corners k, top/bottom edge g, left/right edge w, center r, 1px margins
+  const box = 'sprite("b", { slice: 1 }, "kgk\\nwrw\\nkgk"); ';
+  eq(art(PAL + box + 'scene("s", { w: 5, h: 4 }, panel("b", 0, 0, 5, 4))', "s"), "kgggk\nwrrrw\nwrrrw\nkgggk");
+  // asymmetric margins follow a flip: the 2px side ends up on the right
+  eq(art(PAL + 'sprite("a", { slice: [2, 0, 1, 0] }, "kkrw"); scene("s", { w: 6, h: 1 }, panel("a", 0, 0, 6, 1, { flip: "x" }))', "s"), "wrrrkk");
+  const p = loadSource(PAL + box);
+  const json = JSON.parse(sheetJson("s.png", p.image("b"), packSheet([{ name: "b", img: p.image("b") }]).frames));
+  assert.deepEqual(json.meta.slices[0].keys[0].center, { x: 1, y: 1, w: 1, h: 1 });
+  assert.match(failure(PAL + 'sprite("b", "kk"); scene("s", { w: 4, h: 4 }, panel("b", 0, 0, 4, 4))', "s").message, /has no slice margins/);
+  assert.match(failure(PAL + 'sprite("b", { slice: 2 }, "kkk\\nkkk\\nkkk")', "b").message, /slice must be n or \[left, top, right, bottom\] leaving a center/);
+});
+
 test("sheet extrude: edge pixels repeat outward, frame rects stay put", () => {
   const p = loadSource(PAL + 'sprite("a", "rw"); sprite("b", "wr")');
   const { sheet, frames } = packSheet([{ name: "a", img: p.image("a") }, { name: "b", img: p.image("b") }], 2, 0, 1);

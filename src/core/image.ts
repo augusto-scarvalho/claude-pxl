@@ -31,6 +31,8 @@ export class Img {
    * middle of the bottom edge. Set from the asset's `pivot`; travels through transforms.
    */
   pivot?: [number, number];
+  /** 9-slice margins [left, top, right, bottom] from the asset's `slice`; flips and rotations turn them. */
+  slice?: [number, number, number, number];
 
   constructor(w: number, h: number, data?: Uint32Array) {
     w = Math.floor(w);
@@ -63,6 +65,7 @@ export class Img {
     if (this.lamps) o.lamps = this.lamps.map((l) => ({ ...l }));
     if (this.norm) o.norm = this.norm.slice();
     if (this.pivot) o.pivot = [...this.pivot];
+    if (this.slice) o.slice = [...this.slice];
     return o;
   }
 
@@ -133,6 +136,7 @@ export class Img {
         if (this.norm) Img.moveNorm(this.norm, j, o.normals(), y * this.w + x, fx ? -1 : 1, fy ? -1 : 1);
       }
     this.movePivot(o, (x, y) => [fx ? this.w - x : x, fy ? this.h - y : y]);
+    if (this.slice) { const [l, t, r, b] = this.slice; o.slice = [fx ? r : l, fy ? b : t, fx ? l : r, fy ? t : b]; }
     return this.moveLamps(o, (x, y) => [fx ? this.w - 1 - x : x, fy ? this.h - 1 - y : y]);
   }
 
@@ -151,6 +155,7 @@ export class Img {
         if (this.norm) Img.moveNorm(this.norm, y * this.w + x, o.normals(), ty * o.w + tx, 1, 1, d);
       }
     this.movePivot(o, (x, y) => (d === 90 ? [this.h - y, x] : [y, this.w - x]));
+    if (this.slice) { const [l, t, r, b] = this.slice; o.slice = d === 90 ? [b, l, t, r] : [t, r, b, l]; }
     return this.moveLamps(o, (x, y) => (d === 90 ? [this.h - 1 - y, x] : [y, this.w - 1 - x]));
   }
 

@@ -323,6 +323,13 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
   if (o.outline8) step(`outline8 ${o.outline8}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline8!); return img.outline(c, true, as(c)); });
   if (o.crop) step("crop", () => img.crop());
   if (pv === "bottom" || pv === "center") img.pivot = [img.w / 2, pv === "bottom" ? img.h : img.h / 2];
+  if (o.slice !== undefined) {
+    // 9-slice margins of the final image (outline included): corners stay, edges and center repeat.
+    const s = typeof o.slice === "number" ? [o.slice, o.slice, o.slice, o.slice] : o.slice;
+    if (!Array.isArray(s) || s.length !== 4 || !s.every((v) => Number.isInteger(v) && v >= 0) || s[0] + s[2] >= img.w || s[1] + s[3] >= img.h)
+      throw new PxError(`slice must be n or [left, top, right, bottom] leaving a center inside the ${img.w}x${img.h} image, got ${fmtArgs([o.slice])}`);
+    img.slice = [s[0], s[1], s[2], s[3]];
+  }
   return img;
 }
 
