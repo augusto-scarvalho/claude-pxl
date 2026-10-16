@@ -60,7 +60,10 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 
 - **Colors**: one-char keys from `pal`, `"#hex"`, `"."` skip, `"_"` erase. Default palette is pico8
   (`0-f`); `use("sweetie16" | "db16" | "endesga32" | "gray8")` for others, or a palette file next to
-  the art file: `use("palette.hex")` (Lospec downloads; also `.gpl`, `.pal`, `.txt`).
+  the art file: `use("palette.hex")` (Lospec downloads; also `.gpl`, `.pal`, `.txt`). Several art
+  files of one game share it through a `palette.px.js` holding `use(...)`, the `pal({ g: 5, ... })`
+  index → mnemonic keys and `ramps(...)`, which each file loads with
+  `include("palette.px.js", { palette: true })`.
 - **Items run in order**: grid strings (drawn at 0,0), ops, `(c) => { c.rect(...) }` functions,
   `layer(...)`s. Then mirror → swap → flip → rot → outline (grows 1px each side) → crop.
 - **Shapes**: `px rect box line(…, width) hline vline circ ring ellipse poly fill wire text`.
@@ -77,7 +80,8 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   frames are patches over shared items or a `base`; or `frames: 6` + `(c) => ... c.phase ...` for
   procedural loops. `dir: "pingpong"` plays them there and back, so a sway or a breath is drawn
   one way only. Stamping an anim animates the scene (`rdelay: true` desyncs copies, `frame: n`
-  freezes one). Hit flash: `anim("hero_hit", { base: "hero" }, frame(), frame(recolor({ "*": "w" })))`. Check
+  freezes one). Hit flash, keeping the outline:
+  `anim("hero_hit", { base: "hero" }, frame(), frame(recolor({ "*": "w", k: "k" })))`. Check
   `_preview/<name>.png` (all frames side by side) or `pxl ascii` per frame.
 - **Glow**: `glow("zgQ", { r: 6, strength: 0.5 })` directly in a sprite/scene body gives every pixel
   of those keys a halo (flames, potions, moons, neon); `ramp: 2` instead stays in the palette.

@@ -74,7 +74,8 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       }
       if (frames.length) {
         write(join(out, dir, n + ".gif"), encodeGif(frames));
-        info = ` (${frames.length} frames, ${b.anim!.loop}ms)`;
+        const play = p.direction(n);
+        info = play === "forward" ? ` (${frames.length} frames, ${b.anim!.loop}ms)` : ` (${p.drawn(n).length} frames ${play}, ${b.anim!.loop}ms)`;
       }
       if (def.opts.layers) for (const l of b.layers) writePng(join(out, dir, n, l.name + ".png"), l.img);
       let pv = "";
