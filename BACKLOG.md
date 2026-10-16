@@ -8,8 +8,10 @@ Mark items `[x]` when they ship, with the commit.
 - [x] **Pivot / anchor**: `pivot: "bottom" | "center" | [x, y]` on an asset. `stamp`, `scatter` and
   wire hangs place the pivot on the given point; flips and rotations carry it; sheet JSON exports
   it. (Aseprite slice pivot.) Fixes "props in iso need hardcoded sizes".
-- [ ] **Tile mode + `offset`**: `--tiled` previews a tile repeated 3x3 so seams show; `offset(dx, dy)`
-  rolls the canvas with wrap to fix them. (Aseprite Tiled Mode, Pixelorama Tile Mode + Offset.)
+- [x] **Tile mode**: `wrap: true | "x" | "y"` on an asset: drawing past an edge continues on the
+  other side and the preview shows the tile 3x3. (Aseprite Tiled Mode, Pixelorama Tile Mode.)
+  `offset(dx, dy)` skipped: with wrapped drawing there was nothing left for it to fix; add it if a
+  seam ever needs rolling into view.
 - [ ] **Palette files**: `use("file.hex" | ".gpl" | ".pal")`, relative to the art file (Lospec
   downloads). (Both editors load palettes.)
 - [ ] **Import PNG** as an asset (`image("hero.png")`), with a palettize step to the active

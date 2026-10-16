@@ -100,6 +100,14 @@ test("pivot: placements line it up, transforms carry it, sheets export it", () =
   assert.match(failure(PAL + 'sprite("t", { pivot: "feet" }, "r")', "t").message, /pivot must be "bottom", "center" or \[x, y\]/);
 });
 
+test("wrap: drawing, stamps, fills and reads continue across the wrapped edges", () => {
+  eq(art(PAL + 'sprite("t", { w: 4, h: 1, wrap: "x" }, rect(3, 0, 2, 1, "r"))', "t"), "r..r");
+  eq(art(PAL + 'sprite("t", { w: 2, h: 3, wrap: "x" }, rect(0, 2, 1, 2, "r"))', "t"), "..\n..\nr.");     // "x" only: y clips
+  eq(art(PAL + 'sprite("_d", "rr\\nrr"); sprite("t", { w: 3, h: 3, wrap: true }, stamp("_d", 2, 2))', "t"), "r.r\n...\nr.r");
+  eq(art(PAL + 'sprite("t", { w: 4, h: 1, wrap: "x" }, px(1, 0, "k"), px(2, 0, "k"), fill(3, 0, "r"))', "t"), "rkkr");
+  eq(art(PAL + 'sprite("t", { w: 3, h: 1, wrap: "x" }, px(0, 0, "r"), (c) => { if (c.is(3, 0, "r")) c.px(1, 0, "w") })', "t"), "rw.");
+});
+
 test("layers: order, offset, hidden, blend, inferred size, outline after", () => {
   eq(art(PAL + 'sprite("a", { w: 4, h: 1 }, rect(0, 0, 4, 1, "w"), layer("l", { x: 1 }, px(0, 0, "r")), px(1, 0, "g"), layer("h", { hidden: true }, px(3, 0, "r")))', "a"), "wgww");
   eq(art(PAL + 'ramps("rw"); sprite("a", { w: 3, h: 1 }, rect(0, 0, 3, 1, "w"), layer("s", { shade: true }, px(2, 0, "k")))', "a"), "wwr");

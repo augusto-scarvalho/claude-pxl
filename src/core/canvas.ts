@@ -43,6 +43,8 @@ export class Canvas {
   inAnim = false;
   /** Composite below the current layer (absolute coords), for `below` masks. */
   below?: Img;
+  /** Seamless tiles: drawing (and reading) past these edges continues on the opposite side. */
+  wrap?: { x: boolean; y: boolean };
   /** Called after each top-level (non-nested) op call; used for tracing. */
   onOp?: (name: string, args: unknown[]) => void;
   /** Art-file location of the op item currently running (set by the builder). */
@@ -77,13 +79,24 @@ export class Canvas {
     x = Math.floor(x);
     y = Math.floor(y);
     if (this.clipPred && !this.clipPred(x, y)) return false;
-    if (!this.img.inside(this.ox + x, this.oy + y)) return false;
-    this.img.set(this.ox + x, this.oy + y, c);
+    const i = this.index(x, y);
+    if (i < 0) return false;
+    this.img.data[i] = c;
     return true;
   }
 
+  /** Image index of canvas (x, y), wrapping around wrapped edges; -1 when outside. */
+  index(x: number, y: number): number {
+    const { w, h } = this.img;
+    let ix = this.ox + Math.floor(x), iy = this.oy + Math.floor(y);
+    if (this.wrap?.x) ix = ((ix % w) + w) % w;
+    if (this.wrap?.y) iy = ((iy % h) + h) % h;
+    return ix >= 0 && iy >= 0 && ix < w && iy < h ? iy * w + ix : -1;
+  }
+
   get(x: number, y: number): Color {
-    return this.img.get(this.ox + Math.floor(x), this.oy + Math.floor(y));
+    const i = this.index(x, y);
+    return i < 0 ? TRANSPARENT : this.img.data[i];
   }
 
   /** Palette key at (x, y): "." when transparent, "?" when not in the palette. */
@@ -207,19 +220,18 @@ export class Canvas {
     const col = this.color(c);
     if (col === null) return;
     const img = this.img;
-    const sx = this.ox + Math.floor(x), sy = this.oy + Math.floor(y);
-    if (!img.inside(sx, sy)) return;
-    const target = img.get(sx, sy);
+    const start = this.index(x, y);
+    if (start < 0) return;
+    const target = img.data[start];
     if (target === col) return;
     const seen = new Uint8Array(img.w * img.h);
-    const stack = [sx, sy];
+    const stack = [Math.floor(x), Math.floor(y)];
     while (stack.length) {
       const py = stack.pop()!, px = stack.pop()!;
-      if (!img.inside(px, py)) continue;
-      const i = py * img.w + px;
-      if (seen[i] || img.data[i] !== target) continue;
+      const i = this.index(px, py);
+      if (i < 0 || seen[i] || img.data[i] !== target) continue;
       seen[i] = 1;
-      this.plot(px - this.ox, py - this.oy, col);
+      this.plot(px, py, col);
       stack.push(px + 1, py, px - 1, py, px, py + 1, px, py - 1);
     }
   }
@@ -348,7 +360,7 @@ export class Canvas {
       const dx = this.ox + Math.floor(x), dy = this.oy + Math.floor(y);
       (this.img.lamps ??= []).push(...src.lamps.map((l) => ({ ...l, x: l.x + dx, y: l.y + dy })));
     }
-    if (!ok && !this.clipPred) {
+    if (!ok && !this.clipPred && !this.wrap) {
       this.img.blit(src, this.ox + x, this.oy + y);
       return;
     }
@@ -356,7 +368,7 @@ export class Canvas {
       for (let xx = 0; xx < src.w; xx++) {
         const c = src.data[yy * src.w + xx];
         if (c === TRANSPARENT || (ok && !ok(x + xx, y + yy)) || !this.plot(x + xx, y + yy, c)) continue;
-        const i = (this.oy + Math.floor(y) + yy) * this.img.w + this.ox + Math.floor(x) + xx, j = yy * src.w + xx;
+        const i = this.index(Math.floor(x) + xx, Math.floor(y) + yy), j = yy * src.w + xx;
         if (src.norm) {
           const n = this.img.normals();
           n.set(src.norm.subarray(j * 3, j * 3 + 3), i * 3);
@@ -495,8 +507,8 @@ export class Canvas {
         let d;
         try { d = dirOf(ch); } catch (e) { throw new PxError(`${(e as Error).message} at row ${r}, col ${i}`); }
         const px = Math.floor(x) + i, py = Math.floor(y) + r;
-        if (d === null || (this.clipPred && !this.clipPred(px, py)) || !this.img.inside(this.ox + px, this.oy + py)) return;
-        const k = (this.oy + py) * this.img.w + this.ox + px;
+        const k = this.index(px, py);
+        if (d === null || (this.clipPred && !this.clipPred(px, py)) || k < 0) return;
         if (d === "none") { if (this.img.norm) this.img.norm[k * 3 + 2] = 0; }
         else setNormal(this.img.normals(), k, d[0], d[1], d[2]);
       });

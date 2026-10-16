@@ -39,8 +39,8 @@ sprite("dirt_r", { base: "dirt_l", flip: "x" })
 
 // ---------------------------------------------------------------- grass tops
 // Erase the dirt's top rows, then lay the turf over it: blades stick up into the air above,
-// roots hang into the dirt below.
-sprite("grass", { w: 16, h: 16 }, stamp("dirt_a", 0, 0), rect(0, 0, 16, 2, "_"), `
+// roots hang into the dirt below. wrap: "x" previews it 3 wide, so a seam between copies shows.
+sprite("grass", { w: 16, h: 16, wrap: "x" }, stamp("dirt_a", 0, 0), rect(0, 0, 16, 2, "_"), `
   ...g.......g....
   ..gGg..g..gGg..g
   ggGGGggGggGGGggG

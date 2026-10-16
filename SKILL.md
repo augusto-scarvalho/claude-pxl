@@ -118,6 +118,8 @@ stays clean: `PXL build <skill dir>/examples/shop.px.js --only comet_repair --ou
 - Recolors are `base` + `swap`; repeated details are `_parts` + `stamp`; families are a `group` or a
   loop: `for (let i = 1; i <= 3; i++) sprite("tree_" + i, ...)`.
 - Large areas: primitives, `grad`, `noise`, `pattern`, `tilemap`. Never big hand grids.
+- Tiles that repeat: give them `wrap: true` (or `"x"`/`"y"`). The preview then shows the tile 3×3,
+  so you can check the seams, and anything drawn past an edge continues on the other side.
 - Organic texture (leaves, grass, stones, rust): 2–3 tiny brush parts + `scatter` with `on`/`clip`.
 - **No filler noise.** Don't sprinkle `noise` speckle over walls, floors or plaster to make them
   "less flat": it reads as random dots, not material. Every mark on a surface needs a cause you

@@ -33,6 +33,13 @@ export function preview(img: Img, scale = previewScale(img)): Img {
   return o;
 }
 
+/** The image repeated nx by ny times: how a seamless tile looks laid out (seams show). */
+export function tiled(img: Img, nx: number, ny: number): Img {
+  const o = new Img(img.w * nx, img.h * ny);
+  for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) o.blit(img, x * img.w, y * img.h);
+  return o;
+}
+
 /** Text dump with x/y rulers; colors shown as palette keys ("." transparent, "?" unknown). */
 export function ascii(img: Img, pal: Palette): string {
   const rev = pal.reverse();

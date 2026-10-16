@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { PxError, didYouMean, wrap } from "../core/errors.ts";
 import type { Img } from "../core/image.ts";
 import type { Project } from "../core/project.ts";
-import { type FrameTag, packSheet, preview, previewScale, sheetJson } from "../core/render.ts";
+import { type FrameTag, packSheet, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
 import { normalImage } from "../core/normals.ts";
 import { encodeGif } from "./gif.ts";
 import { encodePng } from "./png.ts";
@@ -64,6 +64,9 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         write(join(out, dir, n + ".json"), sheetJson(n + ".png", sheet, fr, [{ name: n, from: 0, to: fr.length - 1 }]));
         shown = packSheet(frames.map((f) => ({ name: "", img: f.img })), frames.length, 1).sheet;
       } else {
+        // Seamless tiles preview laid out 3x3 (or 3x1 / 1x3), so seams show.
+        const wr = def.opts.wrap;
+        if (wr) shown = tiled(b.img, wr === "y" ? 1 : 3, wr === "x" ? 1 : 3);
         writePng(join(out, dir, n + ".png"), b.img);
         if (b.img.norm) writePng(join(out, dir, n + "_n.png"), normalImage(b.img)); // for engine lights
       }

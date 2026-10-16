@@ -56,6 +56,8 @@ export interface AssetOpts {
   layers?: boolean;
   /** Point that stamp/scatter/wire hangs place: "bottom" / "center" of the final image, or [x, y] in drawing coords. */
   pivot?: "bottom" | "center" | [number, number];
+  /** Seamless tile: drawing past these edges continues on the other side; previews repeat 3x3. */
+  wrap?: boolean | "x" | "y";
   /** Scene background color. */
   bg?: string;
   /** anim: default frame rate (frames per second, default 8). */

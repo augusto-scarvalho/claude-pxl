@@ -25,6 +25,8 @@ declare global {
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; outline?: PxColor; outline8?: PxColor; crop?: boolean; layers?: boolean;
     /** Point that stamp / scatter / wire hangs place: "bottom" / "center" of the final image, or [x, y] in drawing coords. */
     pivot?: "bottom" | "center" | [number, number];
+    /** Seamless tile: drawing past these edges continues on the other side; previews repeat 3x3. */
+    wrap?: boolean | "x" | "y";
   }
   interface PxSceneOpts extends PxAssetOpts { w: number; h: number; bg?: PxColor }
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean }

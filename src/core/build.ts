@@ -127,7 +127,10 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   const layers: LayerOut[] = [];
   // Pixels of solid / wall layers, for lighting().
   let solid: Uint8Array | undefined, wall: Uint8Array | undefined, unlit: Uint8Array | undefined;
+  if (![undefined, true, false, "x", "y"].includes(opts.wrap)) throw new PxError(`wrap must be true, "x" or "y", got ${fmtArgs([opts.wrap])}`);
+  const edges = opts.wrap ? { x: opts.wrap !== "y", y: opts.wrap !== "x" } : undefined;
   const timed = (c: Canvas) => {
+    c.wrap = edges;
     c.t = t;
     c.frame = frame;
     c.frames = frames;
