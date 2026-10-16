@@ -59,7 +59,8 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 ## Essentials
 
 - **Colors**: one-char keys from `pal`, `"#hex"`, `"."` skip, `"_"` erase. Default palette is pico8
-  (`0-f`); `use("sweetie16" | "db16" | "endesga32" | "gray8")` for others.
+  (`0-f`); `use("sweetie16" | "db16" | "endesga32" | "gray8")` for others, or a palette file next to
+  the art file: `use("palette.hex")` (Lospec downloads; also `.gpl`, `.pal`, `.txt`).
 - **Items run in order**: grid strings (drawn at 0,0), ops, `(c) => { c.rect(...) }` functions,
   `layer(...)`s. Then mirror → swap → flip → rot → outline (grows 1px each side) → crop.
 - **Shapes**: `px rect box line(…, width) hline vline circ ring ellipse poly fill wire text`.

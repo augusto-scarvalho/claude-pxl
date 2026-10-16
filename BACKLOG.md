@@ -12,7 +12,7 @@ Mark items `[x]` when they ship, with the commit.
   other side and the preview shows the tile 3x3. (Aseprite Tiled Mode, Pixelorama Tile Mode.)
   `offset(dx, dy)` skipped: with wrapped drawing there was nothing left for it to fix; add it if a
   seam ever needs rolling into view.
-- [ ] **Palette files**: `use("file.hex" | ".gpl" | ".pal")`, relative to the art file (Lospec
+- [x] **Palette files**: `use("file.hex" | ".gpl" | ".pal")`, relative to the art file (Lospec
   downloads). (Both editors load palettes.)
 - [ ] **Import PNG** as an asset (`image("hero.png")`), with a palettize step to the active
   palette. Needs a PNG decoder (pxl only writes PNGs today).

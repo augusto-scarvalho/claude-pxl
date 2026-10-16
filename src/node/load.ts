@@ -34,7 +34,18 @@ export function loadProject(file: string, opts: ProjectOptions = {}): Project {
       stack.pop();
     }
   };
-  p.includeHook = (path) => run(isAbsolute(path) ? path : resolve(dirname(stack[stack.length - 1]), path));
+  const near = (path: string) => (isAbsolute(path) ? path : resolve(dirname(stack[stack.length - 1]), path));
+  p.includeHook = (path) => run(near(path));
+  p.readHook = (path) => {
+    const abs = near(path);
+    try {
+      const text = readFileSync(abs, "utf8");
+      p.addFile(abs); // the live viewer rebuilds when it changes
+      return text;
+    } catch {
+      throw new PxError(`cannot read '${abs}'`);
+    }
+  };
   run(file);
   return p;
 }

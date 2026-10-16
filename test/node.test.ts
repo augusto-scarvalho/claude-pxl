@@ -76,6 +76,24 @@ test("include keeps each file's palette to itself", () => {
   assert.throws(() => p.image("c"), /unknown color key 'z'/);
 });
 
+test("use() reads palette files next to the art file: .hex, .gpl, .pal, .txt", () => {
+  const files: Record<string, string> = {
+    "a.hex": "ff0000\n00ff00\n",
+    "a.gpl": "GIMP Palette\nName: t\nColumns: 2\n#\n255   0   0\tred\n  0 255   0\tgreen\n",
+    "a.pal": "JASC-PAL\n0100\n2\n255 0 0\n0 255 0\n",
+    "a.txt": "; paint.net\nFFFF0000\nFF00FF00\n",
+  };
+  for (const [name, text] of Object.entries(files)) {
+    const { dir, file } = tmpArt(`use("${name}")\nsprite("t", "01")`);
+    writeFileSync(join(dir, name), text);
+    const p = loadProject(file);
+    assert.deepEqual([...p.image("t").data], [pack(255, 0, 0), pack(0, 255, 0)], name);
+    assert.ok(p.files.some((f) => f.endsWith(name)), "watched for live rebuilds");
+  }
+  const { file } = tmpArt(`use("missing.hex")`);
+  assert.throws(() => loadProject(file), /cannot read .*missing\.hex/);
+});
+
 test("include { palette: true } shares the included palette", () => {
   const { dir, file } = tmpArt(`include("pal.px.js", { palette: true })\nsprite("b", "z")`);
   writeFileSync(join(dir, "pal.px.js"), `pal({ z: "#ff0000" })`);

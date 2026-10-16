@@ -85,7 +85,8 @@ declare global {
     normals(x: number, y: number, str: string): void;
   }
 
-  function use(palette: "pico8" | "sweetie16" | "db16" | "endesga32" | "gray8" | (string | number)[]): void;
+  /** A built-in palette, a palette file (.hex .gpl .pal .txt, relative to the art file) or a color list. */
+  function use(palette: "pico8" | "sweetie16" | "db16" | "endesga32" | "gray8" | `${string}.${"hex" | "gpl" | "pal" | "txt"}` | (string | number)[]): void;
   function pal(keys: Record<string, string | number>): void;
   function ramps(...darkToLight: string[]): void;
   function sprite(name: string, opts: PxAssetOpts, ...items: PxItem[]): void;

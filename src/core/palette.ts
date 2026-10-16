@@ -18,6 +18,29 @@ export const BUILTIN: Record<string, string[]> = {
   gray8: ["000000", "242424", "494949", "6d6d6d", "929292", "b6b6b6", "dbdbdb", "ffffff"],
 };
 
+/** File extensions use() reads as palettes. */
+export const PALETTE_FILE = /\.(hex|gpl|pal|txt)$/i;
+
+/**
+ * Colors of a palette file as "rrggbb": .hex (Lospec: one per line), .gpl (GIMP) and .pal (JASC:
+ * "R G B" lines), .txt (Paint.NET: "aarrggbb", ";" comments).
+ */
+export function parsePaletteFile(text: string, file: string): string[] {
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  const ext = file.toLowerCase().replace(/^.*\./, "");
+  const out: string[] = [];
+  for (const l of lines) {
+    if (ext === "hex") { if (/^#?[0-9a-f]{6}$/i.test(l)) out.push(l.replace("#", "")); }
+    else if (ext === "txt") { if (/^[0-9a-f]{8}$/i.test(l)) out.push(l.slice(2)); }
+    else {
+      const m = /^(\d+)\s+(\d+)\s+(\d+)(\s|$)/.exec(l);
+      if (m) out.push([m[1], m[2], m[3]].map((v) => Math.min(255, +v).toString(16).padStart(2, "0")).join(""));
+    }
+  }
+  if (!out.length) throw new PxError(`no colors found in palette file '${file}'`);
+  return out;
+}
+
 /** What a color spec resolves to: a color, or null for "skip this pixel". */
 export type Resolved = Color | null;
 

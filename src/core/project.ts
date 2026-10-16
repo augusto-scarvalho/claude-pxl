@@ -7,7 +7,7 @@ import {
   type AssetDef, type AssetKind, type AssetOpts, type GroupDef, type Item, type Layer, type LayerOpts, type Op,
   type SheetDef, type SheetOpts, type Timeline, isLayer, isOp,
 } from "./model.ts";
-import { Palette } from "./palette.ts";
+import { PALETTE_FILE, Palette, parsePaletteFile } from "./palette.ts";
 import { Trace } from "./trace.ts";
 import { globRe, rng } from "./util.ts";
 
@@ -137,6 +137,8 @@ export class Project implements BuildCtx {
   pal: Palette = Palette.builtin("pico8");
   /** Set by a loader to support include(). */
   includeHook?: (path: string) => void;
+  /** Set by a loader to support palette files in use(): the file's text, path relative to the art file. */
+  readHook?: (path: string) => string;
 
   private cache = new Map<string, BuildOut>();
   /** Timelines gathered from animated assets placed by the builds in progress (innermost last). */
@@ -194,9 +196,13 @@ export class Project implements BuildCtx {
     };
 
     env.use = (p: unknown) => {
+      const loc = this.callerLoc();
       if (Array.isArray(p)) this.pal = Palette.fromColors(p as (string | number)[]);
-      else if (typeof p === "string") this.pal = Palette.builtin(p);
-      else throw new PxError('use("pico8") or use(["#000", "#fff", ...])', this.callerLoc());
+      else if (typeof p === "string" && PALETTE_FILE.test(p)) {
+        if (!this.readHook) throw new PxError("palette files need an art file on disk", loc);
+        try { this.pal = Palette.fromColors(parsePaletteFile(this.readHook(p), p)); } catch (e) { throw wrap(e).within("use", loc); }
+      } else if (typeof p === "string") this.pal = Palette.builtin(p);
+      else throw new PxError('use("pico8"), use("colors.hex" | ".gpl" | ".pal" | ".txt") or use(["#000", "#fff", ...])', loc);
     };
     env.pal = (aliases: Record<string, string | number>) => {
       try { this.pal = this.pal.extend(aliases); } catch (e) { throw wrap(e).within("pal", this.callerLoc()); }
