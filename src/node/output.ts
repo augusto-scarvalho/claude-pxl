@@ -105,7 +105,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         fr.forEach((f, i) => items.push({ name: `${name}_${i}`, img: f.img, ms: f.ms }));
       }
       if (!items.length) throw new PxError("sheet is empty (no entries matched)");
-      const { sheet, frames } = packSheet(items, s.opts.cols, s.opts.pad);
+      const { sheet, frames } = packSheet(items, s.opts.cols, s.opts.pad, s.opts.extrude);
       writePng(join(out, s.name + ".png"), sheet);
       write(join(out, s.name + ".json"), sheetJson(s.name + ".png", sheet, frames, tags));
       lines.push(`sheet ${s.name} ${sheet.w}x${sheet.h} (${frames.length} frames)${prev(s.name, sheet)}`);

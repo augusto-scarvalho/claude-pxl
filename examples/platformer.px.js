@@ -154,5 +154,6 @@ scene("level", { w: 256, h: 160 },
     stamp("slime_red", 20, 88), stamp("slime_blue", 166, 72, { flip: "x" }),
     stamp("gem", 39, 48), stamp("gem", 119, 70), stamp("gem_blue", 199, 16)))
 
-// For the engine: the tiles alone, one 16x16 cell each.
-sheet("tiles", ["grass_l", "grass", "grass_r", "dirt_a", "dirt_b", "dirt_c", "dirt_l", "dirt_r", "plat_l", "plat", "plat_r", "ladder", "spikes", "water_top", "water"], { cols: 8 })
+// For the engine: the tiles alone, one 16x16 cell each. extrude: 1 repeats each edge 1px out so
+// filtering never bleeds a neighbour in; a grid-slicing importer then wants margin 1, separation 2.
+sheet("tiles", ["grass_l", "grass", "grass_r", "dirt_a", "dirt_b", "dirt_c", "dirt_l", "dirt_r", "plat_l", "plat", "plat_r", "ladder", "spikes", "water_top", "water"], { cols: 8, extrude: 1 })

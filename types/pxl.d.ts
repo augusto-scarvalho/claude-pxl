@@ -107,7 +107,7 @@ declare global {
   function layer(name: string, opts: PxLayerOpts, ...items: PxItem[]): PxLayer;
   function layer(name: string, ...items: PxItem[]): PxLayer;
   function group(name: string, members: string[]): void;
-  function sheet(name: string, entries: string[], opts?: { cols?: number; pad?: number }): void;
+  function sheet(name: string, entries: string[], opts?: { cols?: number; pad?: number; extrude?: number }): void;
   /** palette: true keeps the included file's use()/pal()/ramps() active afterwards. */
   function include(path: string, opts?: { palette?: boolean }): void;
   function rng(seed?: number): () => number;

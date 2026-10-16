@@ -131,6 +131,8 @@ export interface GroupDef {
 export interface SheetOpts {
   cols?: number;
   pad?: number;
+  /** Repeat each frame's edge pixels this many px outward (texture bleeding in engines). */
+  extrude?: number;
 }
 
 export interface SheetDef {

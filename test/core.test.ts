@@ -115,6 +115,14 @@ test("inline and selout: lines on the sprite's own edge, lines that take the col
   assert.match(failure(R + 'sprite("t", { selout: true }, "d")', "t").message, /selout recolors a line/);
 });
 
+test("sheet extrude: edge pixels repeat outward, frame rects stay put", () => {
+  const p = loadSource(PAL + 'sprite("a", "rw"); sprite("b", "wr")');
+  const { sheet, frames } = packSheet([{ name: "a", img: p.image("a") }, { name: "b", img: p.image("b") }], 2, 0, 1);
+  assert.deepEqual([sheet.w, sheet.h, frames[0].x, frames[0].y, frames[1].x], [8, 3, 1, 1, 5]);
+  const r = p.image("a").data[0], w = p.image("a").data[1];
+  for (let y = 0; y < 3; y++) assert.deepEqual([...sheet.data.subarray(y * 8, y * 8 + 8)], [r, r, w, w, w, w, r, r]);
+});
+
 test("grad r: radial from the center to the ellipse that fits the box; c.size() reads an asset's size", () => {
   eq(art(PAL + 'sprite("t", { w: 5, h: 5 }, grad(0, 0, 5, 5, ["r", "."], "r", 0))', "t"), ".....\n..r..\n.rrr.\n..r..\n....."); // 2 colors meet halfway out
   eq(art(PAL + 'sprite("_d", { w: 3, h: 2 }, rect(0, 0, 3, 2, "r")); sprite("t", { w: 4, h: 1 }, (c) => c.px(c.size("_d").w, 0, "w"))', "t"), "...w");

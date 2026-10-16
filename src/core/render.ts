@@ -74,21 +74,31 @@ export interface FrameTag {
   direction?: "forward" | "reverse" | "pingpong";
 }
 
-/** Shelf packing: `cols` frames per row, `pad` px between them. */
-export function packSheet(items: { name: string; img: Img; ms?: number }[], cols?: number, pad = 0): { sheet: Img; frames: SheetFrame[] } {
+/**
+ * Shelf packing: `cols` frames per row, `pad` px between them. `extrude` repeats each frame's edge
+ * pixels that many px outward (the frame rect stays the same), so engines that filter or round
+ * texture coordinates bleed the frame's own colors instead of a neighbour's.
+ */
+export function packSheet(items: { name: string; img: Img; ms?: number }[], cols?: number, pad = 0, extrude = 0): { sheet: Img; frames: SheetFrame[] } {
   if (!items.length) throw new Error("sheet is empty");
+  if (!(Number.isInteger(extrude) && extrude >= 0)) throw new Error(`extrude must be a whole number of px >= 0, got ${extrude}`);
   const perRow = cols ?? Math.ceil(Math.sqrt(items.length));
-  const frames: SheetFrame[] = [];
+  const frames: SheetFrame[] = [], e = extrude;
   let x = 0, y = 0, rowH = 0, W = 0;
   items.forEach((it, i) => {
     if (i > 0 && i % perRow === 0) { x = 0; y += rowH + pad; rowH = 0; }
-    frames.push({ ...it, x, y });
-    W = Math.max(W, x + it.img.w);
-    x += it.img.w + pad;
-    rowH = Math.max(rowH, it.img.h);
+    frames.push({ ...it, x: x + e, y: y + e });
+    W = Math.max(W, x + it.img.w + 2 * e);
+    x += it.img.w + 2 * e + pad;
+    rowH = Math.max(rowH, it.img.h + 2 * e);
   });
   const sheet = new Img(W, y + rowH);
-  for (const f of frames) sheet.blit(f.img, f.x, f.y);
+  for (const f of frames) {
+    const { w, h } = f.img;
+    for (let yy = -e; yy < h + e; yy++)
+      for (let xx = -e; xx < w + e; xx++)
+        sheet.set(f.x + xx, f.y + yy, f.img.get(Math.min(w - 1, Math.max(0, xx)), Math.min(h - 1, Math.max(0, yy))));
+  }
   return { sheet, frames };
 }
 
