@@ -13,7 +13,8 @@ parts, primitives, brushes and tilemaps. Needs Node ≥ 22.18. No install step.
 
 ## Workflow
 
-1. Write `art.px.js` (start from the template below; examples in `examples/`).
+1. Write `art.px.js`: start from the template below, and first read the example closest to what
+   you're making (see [Examples](#examples)).
 2. Build only what you're working on: `PXL build art.px.js --only slime,heart`
 3. **Look at it**: read `out/_preview/<name>.png` (upscaled, checkerboard = transparent, grid every
    pixel, darker every 8). For exact pixel fixes use `PXL ascii art.px.js <name>` (keys + x/y rulers);
@@ -81,6 +82,31 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 Full API with every option: [reference.md](reference.md).
 Dynamic lighting (lamps, light blocked by solid layers, sky light, Terraria-style): read
 [lighting.md](lighting.md) only when a scene needs lights.
+
+## Examples
+
+Finished, working art files in `examples/` (in this skill's directory). Before starting a scene,
+a building, an animation or anything lit, read the closest one and copy its structure; it's
+cheaper than inventing one.
+
+| File | What it is | Read it for |
+|---|---|---|
+| `basics.px.js` | slimes, heart, coin, chest | the starter: `mx` + `outline`, `base`/`swap` variants, parts, `sheet` |
+| `shop.px.js` | telescope shop under a dome, night, flat front view | building a facade from parts, `group`s of trinkets/bulbs, `wire` light strings, `text` signs, dithered window/lamp halos |
+| `moon_bakery.px.js` | corner bakery, day, flat front view | the same toolkit on a smaller build: brick/siding `tile`s, window goods, awning, street props |
+| `moon_bakery_3d.px.js` | the same bakery in 3/4 view | turning a flat facade into front + side + roof: oblique helpers, slanted course lines, cast shadow |
+| `tackle.px.js` | bait shop with a tugboat on the roof, 3/4 view | weathering with a cause: paint flaking along boards, rust runs, rain stains, splash-back grime |
+| `neon_noodle_3d.px.js` | ramen bar on a rainy night street, 3/4 view | night city: neon, skyline window grid, puddle reflections, steam, light spill on the sidewalk |
+| `lighting.px.js` | snowy cabin at night | the smallest `lighting()` setup: lamps on props, `solid` and `wall` layers, sky light |
+| `outpost.px.js` | smithy + house over a dug-out cave, rain | a larger `lighting()` scene; grass on every dirt edge; brick/plank/shingle tiles |
+| `normals.px.js` | bricks, crate, rock, slime under a swinging lantern | normal maps: `bump` (dome, bevel, luma) vs hand-painted `normals`, lit vs flat |
+| `cave.px.js` | animated cave lit only by glowing fungus and bugs | `glow`, pulsing lamps, props placed on polyline terrain, seamless loops, `rdelay` |
+| `grotto.px.js` | big animated cavern with pool and waterfall | `cave.px.js` scaled up: swaying plants, waterfall, water reflection, drifting particles |
+| `no_magic.px.js` | witch's room, 256×224, the largest | character anims (cat, frog) with `frame()` patches, procedural fire/bubbles, an interior full of props, a flat and a lamp-lit version of one scene |
+
+To find an op in real use: `grep -n "scatter(" <skill dir>/examples/*.px.js`. `PXL list <file>`
+gives each asset's line. To see one rendered, build it into your own dir so the skill's folder
+stays clean: `PXL build <skill dir>/examples/shop.px.js --only comet_repair --out <scratch dir>`.
 
 ## Habits that save tokens and give better art
 
