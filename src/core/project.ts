@@ -28,6 +28,7 @@ export const SIGNATURES: Record<string, string> = {
   circ: "cx:n cy:n r:n c:c",
   ring: "cx:n cy:n r:n c:c",
   poly: "points:a c:c",
+  curve: "points:a c:c ?opts:o",
   fill: "x:n y:n c:c",
   dither: "x:n y:n w:n h:n c1:c c2:c ?density:n",
   grad: "x:n y:n w:n h:n colors:S ?dir:s soft:n",
@@ -54,6 +55,7 @@ export const SIGNATURES: Record<string, string> = {
 /** Allowed option keys of ops whose last argument is an options object. */
 const OP_OPTS: Record<string, string[]> = {
   lamp: ["r", "color", "power", "z"],
+  curve: ["width", "closed"],
   bump: ["w", "depth", "on", "where"],
   lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "shape", "relief", "skyDir"],
   glow: ["where", "r", "strength", "color", "bands", "ramp"],

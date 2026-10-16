@@ -73,7 +73,8 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   with `include("palette.px.js", { palette: true })`.
 - **Items run in order**: grid strings (drawn at 0,0), ops, `(c) => { c.rect(...) }` functions,
   `layer(...)`s. Then mirror → swap → flip → rot → outline (grows 1px each side) → crop.
-- **Shapes**: `px rect box line(…, width) hline vline circ ring ellipse poly fill wire text`.
+- **Shapes**: `px rect box line(…, width) curve hline vline circ ring ellipse poly fill wire text`;
+  `curve([x0, y0, x1, y1, ...], c)` passes through every point, pixel-perfect (tails, vines, hair).
 - **Tone**: `dither`, `grad` (`"v"`, `"h"`, `"r"` radial), `noise`, `shade/light(region, steps, density)`, `recolor`, and
   `shade:`/`light:` layers for cast shadows and glows. Regions: `[cx,cy,r]`, `[x,y,w,h]`,
   polygon, or a function. `clip(region, ...items)` restricts any items (half shapes, slopes).

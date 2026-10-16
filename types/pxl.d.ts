@@ -73,6 +73,7 @@ declare global {
     ring(cx: number, cy: number, r: number, c: PxColor): void;
     ellipse(cx: number, cy: number, rx: number, ry: number, c: PxColor, ring?: boolean): void;
     poly(points: number[], c: PxColor): void;
+    curve(points: number[], c: PxColor, opts?: { width?: number; closed?: boolean }): void;
     fill(x: number, y: number, c: PxColor): void;
     dither(x: number, y: number, w: number, h: number, c1: PxColor, c2: PxColor, density?: number): void;
     grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h" | "r", soft?: number): void;
@@ -123,6 +124,8 @@ declare global {
   function ring(cx: number, cy: number, r: number, c: PxColor): PxOp;
   function ellipse(cx: number, cy: number, rx: number, ry: number, c: PxColor, ring?: boolean): PxOp;
   function poly(points: number[], c: PxColor): PxOp;
+  /** A smooth curve through the points (Catmull-Rom), pixel-perfect at width 1; closed loops it. */
+  function curve(points: number[], c: PxColor, opts?: { width?: number; closed?: boolean }): PxOp;
   function fill(x: number, y: number, c: PxColor): PxOp;
   function dither(x: number, y: number, w: number, h: number, c1: PxColor, c2: PxColor, density?: number): PxOp;
   function grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h" | "r", soft?: number): PxOp;

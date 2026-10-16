@@ -190,6 +190,43 @@ export class Canvas {
     }
   }
 
+  /**
+   * A smooth curve through the points (Catmull-Rom: it passes through every point, no control
+   * points). 1px wide it is pixel-perfect: no doubled L-corners. `closed` loops back to the start.
+   */
+  curve(pts: number[], c: string, opts: { width?: number; closed?: boolean } = {}): void {
+    if (!Array.isArray(pts) || pts.length < 4 || pts.length % 2) throw new PxError("curve needs [x0, y0, x1, y1, ...]: two points or more");
+    const P: [number, number][] = [];
+    for (let i = 0; i < pts.length; i += 2) P.push([pts[i], pts[i + 1]]);
+    const n = P.length, closed = !!opts.closed && n > 2;
+    const at = (i: number) => P[closed ? (i + n) % n : Math.max(0, Math.min(n - 1, i))];
+    const path: [number, number][] = [];
+    const add = (x: number, y: number) => {
+      const p: [number, number] = [Math.round(x), Math.round(y)], q = path[path.length - 1];
+      if (q && q[0] === p[0] && q[1] === p[1]) return;
+      path.push(p);
+      // Pixel-perfect: drop the corner of an L (the middle of three pixels whose ends touch diagonally).
+      while (path.length >= 3) {
+        const [a, b, d] = path.slice(-3);
+        if (Math.abs(a[0] - d[0]) === 1 && Math.abs(a[1] - d[1]) === 1 && (b[0] === a[0] || b[1] === a[1]) && (b[0] === d[0] || b[1] === d[1])) path.splice(-2, 1);
+        else break;
+      }
+    };
+    for (let s = 0; s < (closed ? n : n - 1); s++) {
+      const [p0, p1, p2, p3] = [at(s - 1), at(s), at(s + 1), at(s + 2)];
+      const steps = Math.max(1, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) * 4));
+      for (let k = 0; k <= steps; k++) {
+        const t = k / steps, t2 = t * t, t3 = t2 * t;
+        const f = (a: number, b: number, c2: number, d: number) =>
+          0.5 * (2 * b + (c2 - a) * t + (2 * a - 5 * b + 4 * c2 - d) * t2 + (3 * b - a - 3 * c2 + d) * t3);
+        add(f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1]));
+      }
+    }
+    const width = opts.width ?? 1;
+    if (width > 1) for (let i = 0; i < path.length; i++) { const a = path[i], b = path[Math.min(i + 1, path.length - 1)]; this.line(a[0], a[1], b[0], b[1], c, width); }
+    else { const col = this.color(c); for (const [x, y] of path) this.plot(x, y, col); }
+  }
+
   hline(x: number, y: number, len: number, c: string): void { this.rect(x, y, len, 1, c); }
   vline(x: number, y: number, len: number, c: string): void { this.rect(x, y, 1, len, c); }
 
@@ -589,7 +626,7 @@ export function frameStart(tl: Timeline, n: number): number {
 
 /** Ops callable from art files; each top-level call can be traced as one painting step. */
 export const OPS = [
-  "px", "rect", "box", "line", "hline", "vline", "ellipse", "circ", "ring", "poly", "fill",
+  "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light",
   "stamp", "tile", "pattern", "tilemap", "scatter", "grid", "wire", "text", "lamp", "bump", "normals",
 ] as const;

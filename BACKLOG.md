@@ -30,7 +30,7 @@ Mark items `[x]` when they ship, with the commit.
   file:line and pixels changed; today only the live viewer replays it) as text: how a complex
   piece is built, step by step. `--at x,y` lists only the steps that touched that pixel (which
   line painted it wrong?); `--sheet` writes thumbnails of the steps for a human.
-- [ ] **Curves**: `curve(...)` (bezier) with pixel-perfect strokes, no doubled corners. (Aseprite
+- [x] **Curves**: `curve(points, c, { width, closed })` through the points (Catmull-Rom), pixel-perfect. (Aseprite
   curve tool + pixel-perfect mode.)
 - [x] **Radial gradient**: `grad(..., "r")`, center out to the ellipse that fits the box. (Gradient tool, both editors.)
 - [ ] **Free rotation** with RotSprite or cleanEdge. (Aseprite RotSprite; Pixelorama cleanEdge.)

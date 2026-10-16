@@ -115,6 +115,19 @@ test("inline and selout: lines on the sprite's own edge, lines that take the col
   assert.match(failure(R + 'sprite("t", { selout: true }, "d")', "t").message, /selout recolors a line/);
 });
 
+test("curve: through the points, pixel-perfect at 1px, closed loops", () => {
+  eq(art(PAL + 'sprite("t", { w: 5, h: 1 }, curve([0, 0, 4, 0], "r"))', "t"), "rrrrr");
+  // An arch through 3 points: every point is on it, and no 2x2 block holds an L-corner (3 pixels).
+  const arch = art(PAL + 'sprite("t", { w: 13, h: 9 }, curve([0, 8, 6, 0, 12, 8], "r"))', "t").split("\n");
+  for (const [x, y] of [[0, 8], [6, 0], [12, 8]]) eq(arch[y][x], "r");
+  for (let y = 0; y < 8; y++)
+    for (let x = 0; x < 12; x++) assert.ok([arch[y][x], arch[y][x + 1], arch[y + 1][x], arch[y + 1][x + 1]].filter((c) => c === "r").length < 3, `L-corner at ${x},${y}\n${arch.join("\n")}`);
+  // closed: the loop has no gap, so a fill inside stays inside
+  const loop = art(PAL + 'sprite("t", { w: 12, h: 12 }, curve([6, 1, 10, 6, 6, 10, 1, 6], "r", { closed: true }), fill(6, 6, "w"))', "t");
+  assert.ok(loop.includes("w") && !loop.split("\n")[0].includes("w") && loop.split("\n")[0].startsWith("."));
+  assert.match(failure(PAL + 'sprite("t", { w: 2, h: 2 }, curve([0, 0], "r"))', "t").message, /curve needs \[x0, y0, x1, y1, \.\.\.\]/);
+});
+
 test("sheet extrude: edge pixels repeat outward, frame rects stay put", () => {
   const p = loadSource(PAL + 'sprite("a", "rw"); sprite("b", "wr")');
   const { sheet, frames } = packSheet([{ name: "a", img: p.image("a") }, { name: "b", img: p.image("b") }], 2, 0, 1);
