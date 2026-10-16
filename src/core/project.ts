@@ -234,10 +234,15 @@ export class Project implements BuildCtx {
       checkKeys(`sheet '${name}'`, opts, SHEET_OPTS, loc);
       this.sheets.push({ name, entries, opts, loc });
     };
-    env.include = (path: unknown) => {
-      if (typeof path !== "string") throw new PxError('include("other.px.js")', this.callerLoc());
-      if (!this.includeHook) throw new PxError("include() is not available here", this.callerLoc());
-      this.includeHook(path);
+    env.include = (path: unknown, opts: { palette?: boolean } = {}) => {
+      const loc = this.callerLoc();
+      if (typeof path !== "string") throw new PxError('include("other.px.js", { palette? })', loc);
+      checkKeys("include", opts, ["palette"], loc);
+      if (!this.includeHook) throw new PxError("include() is not available here", loc);
+      // The included file's use()/pal()/ramps() stay with its own assets, unless the includer
+      // asks for them ({ palette: true }: a shared palette file).
+      const pal = this.pal;
+      try { this.includeHook(path); } finally { if (!opts.palette) this.pal = pal; }
     };
     env.rng = (seed?: number) => rng(seed);
 

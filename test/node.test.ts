@@ -8,6 +8,7 @@ import { Img } from "../src/core/image.ts";
 import { pack } from "../src/core/color.ts";
 import { encodePng } from "../src/node/png.ts";
 import { main } from "../src/node/cli.ts";
+import { loadProject } from "../src/node/load.ts";
 import { serve } from "../src/node/server.ts";
 
 function chunks(buf: Buffer): { type: string; data: Buffer; crcOk: boolean }[] {
@@ -64,6 +65,21 @@ sheet("all", ["*"], { pad: 1 })`);
   assert.deepEqual(Object.keys(json.frames), ["dot", "lay"]);
   assert.deepEqual(json.frames.dot.frame, { x: 0, y: 0, w: 3, h: 3 });
   assert.ok(lines.some((l) => l.startsWith("sprite dot 3x3")));
+});
+
+test("include keeps each file's palette to itself", () => {
+  const { dir, file } = tmpArt(`pal({ q: "#00ff00" })\ninclude("lib.px.js")\nsprite("b", "q")\nsprite("c", "z")`);
+  writeFileSync(join(dir, "lib.px.js"), `use("sweetie16")\npal({ z: "#ff0000" })\nsprite("a", "z")`);
+  const p = loadProject(file);
+  assert.equal(p.image("a").data[0], pack(255, 0, 0));
+  assert.equal(p.image("b").data[0], pack(0, 255, 0));
+  assert.throws(() => p.image("c"), /unknown color key 'z'/);
+});
+
+test("include { palette: true } shares the included palette", () => {
+  const { dir, file } = tmpArt(`include("pal.px.js", { palette: true })\nsprite("b", "z")`);
+  writeFileSync(join(dir, "pal.px.js"), `pal({ z: "#ff0000" })`);
+  assert.equal(loadProject(file).image("b").data[0], pack(255, 0, 0));
 });
 
 test("cli build reports per-asset errors and still writes the rest", async () => {

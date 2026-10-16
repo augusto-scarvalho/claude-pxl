@@ -29,7 +29,12 @@ layer(name, layerOpts?, ...items)      // only as an item of a sprite or scene
 group(name, ["a", "b", "rock_*", ...])  // random pick per placement; repeat a name to weight it
 sheet(name, ["slime*", "heart", groupName], { cols?, pad? })
 include("other.px.js")                  // path relative to the current file
+include("palette.px.js", { palette: true })  // also take its use()/pal()/ramps() from here on
 ```
+
+An included file's `use`/`pal`/`ramps` apply to its own assets only; your palette is the same
+after the `include` as before it. Pass `{ palette: true }` to share one palette file across art
+files.
 
 Names starting with `_` are **parts**: usable everywhere but not exported, and not matched by
 sheet globs.
