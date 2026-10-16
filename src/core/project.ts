@@ -1,6 +1,7 @@
 // Project: the registry an art file fills in, plus the lazy, cached, cycle-checked resolver.
 import { type BuildCtx, type BuildOut, buildAsset, drawnFrames, gcd } from "./build.ts";
 import { OPS } from "./canvas.ts";
+import { TRANSPARENT } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
 import {
@@ -59,9 +60,9 @@ const OP_OPTS: Record<string, string[]> = {
 };
 
 const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot", "wrap"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot", "wrap", "png", "area", "palettize"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot", "wrap"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot", "wrap", "fps", "frames", "loop", "dir"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot", "wrap", "png", "area", "palettize", "fps", "frames", "loop", "dir"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -139,6 +140,25 @@ export class Project implements BuildCtx {
   includeHook?: (path: string) => void;
   /** Set by a loader to support palette files in use(): the file's text, path relative to the art file. */
   readHook?: (path: string) => string;
+  /** Set by a loader to support { png } and use("x.png"): the decoded image, path relative to the art file. */
+  pngHook?: (path: string) => Img;
+
+  /** The image an asset's { png, area } starts from. */
+  private readPng(what: string, o: AssetOpts, loc?: string): Img {
+    try {
+      if (typeof o.png !== "string" || !/\.png$/i.test(o.png)) throw new PxError(`png must be a .png path, got ${JSON.stringify(o.png)}`);
+      if (o.base) throw new PxError("png and base both set the starting image: use one");
+      if (!this.pngHook) throw new PxError("png needs an art file on disk");
+      const img = this.pngHook(o.png);
+      if (!o.area) return img;
+      const a = o.area;
+      if (!Array.isArray(a) || a.length !== 4 || !a.every(Number.isInteger) || a[2] < 1 || a[3] < 1 || a[0] < 0 || a[1] < 0 || a[0] + a[2] > img.w || a[1] + a[3] > img.h)
+        throw new PxError(`area must be [x, y, w, h] inside the ${img.w}x${img.h} image, got ${JSON.stringify(a)}`);
+      return img.sub(a[0], a[1], a[2], a[3]);
+    } catch (e) {
+      throw wrap(e).within(what, loc);
+    }
+  }
 
   private cache = new Map<string, BuildOut>();
   /** Timelines gathered from animated assets placed by the builds in progress (innermost last). */
@@ -191,14 +211,18 @@ export class Project implements BuildCtx {
       const opts = (isPlainObject(rest[0]) ? rest.shift() : {}) as AssetOpts;
       checkKeys(`${kind} '${name}'`, opts, ASSET_OPTS[kind], loc);
       const items = checkItems(`${kind} '${name}'`, rest, loc);
-      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc });
+      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, png: opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc) });
       this.order.push(name);
     };
 
     env.use = (p: unknown) => {
       const loc = this.callerLoc();
       if (Array.isArray(p)) this.pal = Palette.fromColors(p as (string | number)[]);
-      else if (typeof p === "string" && PALETTE_FILE.test(p)) {
+      else if (typeof p === "string" && /\.png$/i.test(p)) {
+        // The image's own colors, keyed 0-9a-zA-Z in the order they first appear.
+        if (!this.pngHook) throw new PxError("png palettes need an art file on disk", loc);
+        try { this.pal = Palette.fromColors([...new Set(this.pngHook(p).data)].filter((c) => c !== TRANSPARENT)); } catch (e) { throw wrap(e).within("use", loc); }
+      } else if (typeof p === "string" && PALETTE_FILE.test(p)) {
         if (!this.readHook) throw new PxError("palette files need an art file on disk", loc);
         try { this.pal = paletteFromFile(this.readHook(p), p); } catch (e) { throw wrap(e).within("use", loc); }
       } else if (typeof p === "string") this.pal = Palette.builtin(p);
@@ -303,6 +327,7 @@ export class Project implements BuildCtx {
     const tl = first.anim;
     if (tl && track && this.collect.length) {
       const acc = this.collect[this.collect.length - 1];
+      if (tl.capped || (acc.loop && lcm(acc.loop, tl.loop) > MAX_LOOP)) acc.capped = true;
       acc.loop = acc.loop ? Math.min(MAX_LOOP, lcm(acc.loop, tl.loop)) : tl.loop;
       acc.step = acc.step ? gcd(acc.step, tl.step) : tl.step;
     }
@@ -361,7 +386,7 @@ export class Project implements BuildCtx {
     try {
       const out = buildAsset(this, def, seed, this.tracing && seed === 0 && t === 0 ? new Trace() : undefined, t);
       // Anims keep their own frame timing; other assets are as animated as what they place.
-      if (!out.anim && acc.loop) out.anim = { loop: acc.loop, step: acc.step! };
+      if (!out.anim && acc.loop) out.anim = { loop: acc.loop, step: acc.step!, ...(acc.capped ? { capped: true } : {}) };
       this.cache.set(key, out);
       return out;
     } catch (e) {

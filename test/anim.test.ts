@@ -47,6 +47,20 @@ scene("s", { w: 1, h: 1 }, stamp("a", 0, 0, { frame: 2 }))`, "t.px.js");
   assert.match(failure(PAL + `anim("x", { dir: "yoyo" }, "r")`, "x").message, /dir must be "forward", "reverse" or "pingpong"/);
 });
 
+test("anim: loops that don't line up are cut at 60s and the build line says why", () => {
+  const p = loadSource(PAL + `anim("a", { fps: 6, frames: 4, w: 1, h: 1 }, (c) => c.px(0, 0, "w"))
+anim("b", { fps: 4, frames: 2, w: 1, h: 1 }, (c) => c.px(0, 0, "r"))
+scene("s", { w: 2, h: 1 }, stamp("a", 0, 0), stamp("b", 1, 0))
+scene("ok", { w: 1, h: 1 }, stamp("b", 0, 0))`, "t.px.js");
+  assert.equal(p.timeline("s")!.capped, true);
+  assert.equal(p.timeline("ok")!.capped, undefined);
+  const dir = mkdtempSync(join(tmpdir(), "pxl-"));
+  try {
+    const { lines } = writeOutputs(p, dir, { only: ["s"], preview: false });
+    assert.match(lines[0], /loops don't line up, cut at 60s/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("silhouettes: the placement option, and recolor's \"*\" for hit-flash frames", () => {
   assert.equal(keys(loadSource(PAL + `sprite("d", ".rw"); scene("s", { w: 3, h: 1 }, stamp("d", 0, 0, { silhouette: "k" }))`, "t.px.js"), "s"), ".kk");
   const p = loadSource(PAL + `sprite("h", { pivot: "bottom" }, ".rw")

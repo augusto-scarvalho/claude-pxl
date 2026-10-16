@@ -1,6 +1,7 @@
 // The data an art file produces. Definitions are plain data + closures; nothing is drawn
 // until build time, so references between assets are order-independent.
 import type { Palette } from "./palette.ts";
+import type { Img } from "./image.ts";
 import type { Canvas } from "./canvas.ts";
 import type { Region } from "./util.ts";
 
@@ -58,6 +59,12 @@ export interface AssetOpts {
   pivot?: "bottom" | "center" | [number, number];
   /** Seamless tile: drawing past these edges continues on the other side; previews repeat 3x3. */
   wrap?: boolean | "x" | "y";
+  /** Start from a PNG file (path relative to the art file); anims with `frames` split it into a strip. */
+  png?: string;
+  /** Only this part of the PNG: [x, y, w, h]. */
+  area?: [number, number, number, number];
+  /** Snap the PNG's colors to the nearest keyed palette color. */
+  palettize?: boolean;
   /** Scene background color. */
   bg?: string;
   /** anim: default frame rate (frames per second, default 8). */
@@ -96,6 +103,8 @@ export interface Timeline {
   dir?: "reverse" | "pingpong";
   /** anim loop: false (holds the last frame). */
   once?: boolean;
+  /** The placed anims' loops don't line up: their combined loop was cut at the 60s maximum. */
+  capped?: boolean;
 }
 
 export interface AssetDef {
@@ -105,6 +114,8 @@ export interface AssetDef {
   items: Item[];
   pal: Palette;
   loc?: string;
+  /** The decoded `png` option (its `area` applied), read when the art file ran. */
+  png?: Img;
 }
 
 export interface GroupDef {

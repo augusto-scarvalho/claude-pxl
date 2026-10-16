@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { crc32, inflateSync } from "node:zlib";
+import { crc32, deflateSync, inflateSync } from "node:zlib";
 import { Img } from "../src/core/image.ts";
 import { pack } from "../src/core/color.ts";
-import { encodePng } from "../src/node/png.ts";
+import { decodePng, encodePng } from "../src/node/png.ts";
 import { main } from "../src/node/cli.ts";
 import { loadProject } from "../src/node/load.ts";
 import { serve } from "../src/node/server.ts";
@@ -39,6 +39,84 @@ test("png: RGBA when more than 256 colors", () => {
   const c = chunks(encodePng(img));
   assert.equal(c[0].data[9], 6);
   assert.equal(inflateSync(c.find((x) => x.type === "IDAT")!.data).length, 20 * (20 * 4 + 1));
+});
+
+/** A PNG from raw (unfiltered) rows, each row filtered with `filter(row)`, as other encoders write them. */
+function rawPng(w: number, h: number, type: number, depth: number, rows: number[][], filter: (y: number) => number, extra: [string, number[]][] = []): Buffer {
+  const chunk = (t: string, d: Buffer) => {
+    const head = Buffer.alloc(8); head.writeUInt32BE(d.length); head.write(t, 4, "ascii");
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(Buffer.concat([head.subarray(4), d])) >>> 0);
+    return Buffer.concat([head, d, crc]);
+  };
+  const bpp = Math.max(1, ({ 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 } as Record<number, number>)[type] * depth >> 3);
+  let prev = new Array(rows[0].length).fill(0);
+  const body = rows.flatMap((row, y) => {
+    const f = filter(y);
+    const out = row.map((v, i) => {
+      const a = i >= bpp ? row[i - bpp] : 0, b = prev[i], c = i >= bpp ? prev[i - bpp] : 0;
+      const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+      const pred = [0, a, b, (a + b) >> 1, pa <= pb && pa <= pc ? a : pb <= pc ? b : c][f];
+      return (v - pred) & 255;
+    });
+    prev = row;
+    return [f, ...out];
+  });
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = depth; ihdr[9] = type;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr),
+    ...extra.map(([t, d]) => chunk(t, Buffer.from(d))), chunk("IDAT", deflateSync(Buffer.from(body))), chunk("IEND", Buffer.alloc(0))]);
+}
+
+test("png decode: round-trips the encoder (indexed + RGBA), all filters, gray / 16-bit / tRNS", () => {
+  const small = new Img(3, 2);
+  small.data.set([pack(255, 0, 0), 0, pack(0, 0, 255, 128), pack(1, 2, 3), pack(255, 0, 0), 0]);
+  assert.deepEqual([...decodePng(encodePng(small)).data], [...small.data]);
+  const big = new Img(20, 20);
+  for (let i = 0; i < 400; i++) big.data[i] = pack(i % 256, Math.floor(i / 256), 7);
+  assert.deepEqual([...decodePng(encodePng(big)).data], [...big.data]);
+  // RGB 8-bit, 3x5, one row per filter type; tRNS makes (9, 9, 9) transparent.
+  const rows = [0, 1, 2, 3, 4].map((y) => [10 * y, 200, 9, 30 + y, 40, 50, 9, 9, 9].map((v, i) => (i < 3 && y === 2 ? 9 : v)));
+  const rgb = decodePng(rawPng(3, 5, 2, 8, rows, (y) => y, [["tRNS", [0, 9, 0, 9, 0, 9]]]));
+  assert.equal(rgb.data[0], pack(0, 200, 9));
+  assert.equal(rgb.data[3 * 3 + 1], pack(33, 40, 50));
+  assert.equal(rgb.data[2 * 3], 0, "the tRNS color is transparent");
+  assert.equal(rgb.data[4 * 3 + 2], 0);
+  // 2-bit gray: 0..3 -> 0, 85, 170, 255
+  assert.deepEqual([...decodePng(rawPng(4, 1, 0, 2, [[0b00011011]], () => 0)).data], [0, 85, 170, 255].map((v) => pack(v, v, v)));
+  // 16-bit RGBA keeps the high bytes
+  assert.equal(decodePng(rawPng(1, 1, 6, 16, [[0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xff, 0xff]], () => 4)).data[0], pack(0x12, 0x56, 0x9a));
+  // indexed 4-bit with a palette
+  assert.deepEqual([...decodePng(rawPng(2, 1, 3, 4, [[0x10]], () => 0, [["PLTE", [1, 2, 3, 4, 5, 6]]])).data], [pack(4, 5, 6), pack(1, 2, 3)]);
+  assert.throws(() => decodePng(Buffer.from("nope, not a png")), /not a PNG/);
+});
+
+test("png assets: { png, area }, strip anims, palettize, use(\"x.png\"), errors", () => {
+  const { dir, file } = tmpArt(`pal({ R: "#ff0000", B: "#0000ff" })
+sprite("whole", { png: "sheet.png", outline: "0" })
+sprite("part", { png: "sheet.png", area: [2, 0, 2, 1] })
+anim("strip", { png: "sheet.png", frames: 2, fps: 10 })
+sprite("snap", { png: "near.png", palettize: true })`);
+  const sheet = new Img(4, 1);
+  sheet.data.set([pack(255, 0, 0), pack(0, 255, 0), pack(0, 0, 255), 0]);
+  writeFileSync(join(dir, "sheet.png"), encodePng(sheet));
+  const near = new Img(2, 1);
+  near.data.set([pack(250, 10, 5), pack(20, 0, 230)]);
+  writeFileSync(join(dir, "near.png"), encodePng(near));
+  const p = loadProject(file);
+  assert.equal(p.image("whole").w, 6, "asset options apply (outline grows it)");
+  assert.deepEqual([...p.image("part").data], [pack(0, 0, 255), 0]);
+  assert.deepEqual(p.frames("strip").map((f) => [...f.img.data]), [[pack(255, 0, 0), pack(0, 255, 0)], [pack(0, 0, 255), 0]]);
+  assert.deepEqual([...p.image("snap").data], [pack(255, 0, 0), pack(0, 0, 255)]);
+  assert.ok(p.files.some((f) => f.endsWith("sheet.png")), "watched for live rebuilds");
+
+  // use("x.png"): the image's colors, keyed in order of first appearance
+  const u = tmpArt(`use("sheet.png")\nsprite("t", "210")`);
+  writeFileSync(join(u.dir, "sheet.png"), encodePng(sheet));
+  assert.deepEqual([...loadProject(u.file).image("t").data], [pack(0, 0, 255), pack(0, 255, 0), pack(255, 0, 0)]);
+
+  const bad = (src: string, re: RegExp) => { const t = tmpArt(src); writeFileSync(join(t.dir, "s.png"), encodePng(sheet)); assert.throws(() => loadProject(t.file), re); };
+  bad(`sprite("a", { png: "s.png", area: [3, 0, 2, 1] })`, /area must be \[x, y, w, h\] inside the 4x1 image/);
+  bad(`sprite("a", { png: "missing.png" })`, /cannot read .*missing\.png/);
+  bad(`sprite("b", "r"); sprite("a", { png: "s.png", base: "b" })`, /png and base both set the starting image/);
 });
 
 function tmpArt(src: string): { dir: string; file: string } {

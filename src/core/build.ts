@@ -106,6 +106,12 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     }
   } else if (opts.base) {
     base = ctx.image(opts.base, seed, t).copy();
+  } else if (def.png) {
+    // A strip anim ({ frames: n }) shows the n-th equal slice; anything else the whole image.
+    const n = def.kind === "anim" && opts.frames ? frames : 1, fw = Math.floor(def.png.w / n);
+    if (fw < 1) throw new PxError(`png is ${def.png.w}px wide: too narrow for ${n} frames`);
+    base = n > 1 ? def.png.sub(frame * fw, 0, fw, def.png.h) : def.png.copy();
+    if (opts.palettize) base = base.remap(pal.snapMap(base.data));
   } else {
     let { w, h } = opts;
     if (!w || !h) {

@@ -14,8 +14,10 @@ Mark items `[x]` when they ship, with the commit.
   seam ever needs rolling into view.
 - [x] **Palette files**: `use("file.hex" | ".gpl" | ".pal")`, relative to the art file (Lospec
   downloads). (Both editors load palettes.)
-- [ ] **Import PNG** as an asset (`image("hero.png")`), with a palettize step to the active
-  palette. Needs a PNG decoder (pxl only writes PNGs today).
+- [x] **Import PNG**: `sprite("hero", { png: "hero.png", area?, palettize? })`, strips into anims
+  with `frames`, `use("art.png")` for an image's palette. The decoder matches Pillow pixel for
+  pixel on 200+ real and generated PNGs (indexed 1-8 bit, gray, gray+alpha, 16-bit, RGB, RGBA,
+  tRNS); interlaced PNGs fail with a message.
 - [x] **Silhouette / flash**: a placement option that paints every opaque pixel one color
   (drop shadows, silhouettes), plus `recolor({ "*": "w" })` for hit-flash frames, which a
   placement can't do once the sprite has a pivot. (Pixelorama Drop Shadow.)

@@ -146,6 +146,22 @@ export class Palette {
     return c;
   }
 
+  /** Map each of `colors` to the nearest keyed color (redmean distance); transparent stays. */
+  snapMap(colors: Iterable<Color>): Map<Color, Color> {
+    const keyed = [...new Set(this.keys.values())].filter((c) => c !== TRANSPARENT), m = new Map<Color, Color>();
+    for (const c of colors) {
+      if (c === TRANSPARENT || m.has(c)) continue;
+      let best = c, bd = Infinity;
+      for (const k of keyed) {
+        const rm = ((c >>> 24) + (k >>> 24)) / 2, dr = (c >>> 24) - (k >>> 24), dg = ((c >>> 16) & 255) - ((k >>> 16) & 255), db = ((c >>> 8) & 255) - ((k >>> 8) & 255);
+        const d = (2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db;
+        if (d < bd) { bd = d; best = k; }
+      }
+      m.set(c, best);
+    }
+    return m;
+  }
+
   /** Map color -> darker (dir -1) or lighter (dir +1) neighbour along the ramps. */
   stepMap(dir: -1 | 1): Map<Color, Color> {
     if (!this.ramps.length) throw new PxError('no ramps defined: add ramps("kDdu", ...) (dark -> light) after pal()');

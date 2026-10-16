@@ -80,9 +80,14 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   frames are patches over shared items or a `base`; or `frames: 6` + `(c) => ... c.phase ...` for
   procedural loops. `dir: "pingpong"` plays them there and back, so a sway or a breath is drawn
   one way only. Stamping an anim animates the scene (`rdelay: true` desyncs copies, `frame: n`
-  freezes one). Hit flash, keeping the outline:
+  freezes one); keep frame times on one grid (fps 4, 5, 10) so several anims loop short together. Hit flash, keeping the outline:
   `anim("hero_hit", { base: "hero" }, frame(), frame(recolor({ "*": "w", k: "k" })))`. Check
   `_preview/<name>.png` (all frames side by side) or `pxl ascii` per frame.
+- **Existing PNGs**: `sprite("hero", { png: "hero.png", outline: "k" })` starts an asset from a file,
+  then every option and item works on it; `area: [x, y, w, h]` cuts one out of a sheet,
+  `anim("walk", { png: "walk.png", frames: 4 })` splits a strip, `palettize: true` snaps its colors to
+  your keyed palette so `ascii`/`swap`/`recolor` see keys. `use("art.png")` takes a palette from an
+  image (keys `0-9a-z` in order of appearance).
 - **Glow**: `glow("zgQ", { r: 6, strength: 0.5 })` directly in a sprite/scene body gives every pixel
   of those keys a halo (flames, potions, moons, neon); `ramp: 2` instead stays in the palette.
   Give glowing things their own keys so nothing else lights up, or limit it with `where`.

@@ -6,6 +6,7 @@ import * as vm from "node:vm";
 import { stripTypeScriptTypes } from "node:module";
 import { PxError, wrap } from "../core/errors.ts";
 import { Project, type ProjectOptions } from "../core/project.ts";
+import { decodePng } from "./png.ts";
 
 function compile(code: string, file: string): string {
   // Type stripping keeps every line and column in place, so error locations stay exact.
@@ -36,6 +37,13 @@ export function loadProject(file: string, opts: ProjectOptions = {}): Project {
   };
   const near = (path: string) => (isAbsolute(path) ? path : resolve(dirname(stack[stack.length - 1]), path));
   p.includeHook = (path) => run(near(path));
+  p.pngHook = (path) => {
+    const abs = near(path);
+    let bytes: Buffer;
+    try { bytes = readFileSync(abs); } catch { throw new PxError(`cannot read '${abs}'`); }
+    p.addFile(abs); // the live viewer rebuilds when it changes
+    try { return decodePng(bytes); } catch (e) { throw new PxError(`${abs}: ${(e as Error).message}`); }
+  };
   p.readHook = (path) => {
     const abs = near(path);
     try {

@@ -86,6 +86,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         if (frames.length) write(join(out, "_preview", n + ".gif"), encodeGif(frames.map((f) => ({ img: preview(f.img, s), ms: f.ms }))));
         pv = ` @${s}x`;
       }
+      if (b.anim?.capped) info += " -- loops don't line up, cut at 60s: give the anims durations on one grid (fps 4, 5, 10 or ms in 100s; fps 6 makes 167ms frames)";
       lines.push(`${def.kind} ${n} ${b.img.w}x${b.img.h}${info}${pv}`);
     } catch (e) {
       errors.push(wrap(e));

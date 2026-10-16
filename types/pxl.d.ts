@@ -29,6 +29,8 @@ declare global {
     pivot?: "bottom" | "center" | [number, number];
     /** Seamless tile: drawing past these edges continues on the other side; previews repeat 3x3. */
     wrap?: boolean | "x" | "y";
+    /** Start from a PNG file (relative to the art file); anims with frames split it into a strip. */
+    png?: string; area?: [number, number, number, number]; palettize?: boolean;
   }
   interface PxSceneOpts extends PxAssetOpts { w: number; h: number; bg?: PxColor }
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong" }
@@ -88,7 +90,7 @@ declare global {
   }
 
   /** A built-in palette, a palette file (.hex .gpl .pal .txt, relative to the art file) or a color list. */
-  function use(palette: "pico8" | "sweetie16" | "db16" | "endesga32" | "gray8" | `${string}.${"hex" | "gpl" | "pal" | "txt"}` | (string | number)[]): void;
+  function use(palette: "pico8" | "sweetie16" | "db16" | "endesga32" | "gray8" | `${string}.${"hex" | "gpl" | "pal" | "txt" | "png"}` | (string | number)[]): void;
   function pal(keys: Record<string, string | number>): void;
   function ramps(...darkToLight: string[]): void;
   function sprite(name: string, opts: PxAssetOpts, ...items: PxItem[]): void;
