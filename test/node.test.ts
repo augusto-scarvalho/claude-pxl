@@ -9,6 +9,7 @@ import { pack } from "../src/core/color.ts";
 import { decodePng, encodePng } from "../src/node/png.ts";
 import { main } from "../src/node/cli.ts";
 import { loadProject } from "../src/node/load.ts";
+import { writeOutputs } from "../src/node/output.ts";
 import { serve } from "../src/node/server.ts";
 
 function chunks(buf: Buffer): { type: string; data: Buffer; crcOk: boolean }[] {
@@ -212,6 +213,37 @@ test("cli steps: the painting log, --at follows one pixel, --sheet writes thumbn
   const at = lines.slice(lines.findIndex((l) => l.startsWith("t pixel (2, 1)")) + 1);
   assert.deepEqual(at.map((l) => l.trim().split(/\s+/)[0] + " " + l.trim().split(" ").pop()), ["1 8", "2 7"]);
   assert.ok(existsSync(join(dir, "out", "_preview", "t_steps.png")));
+});
+
+test("tilemaps export to Tiled: redrawing the .tmj the way Tiled does gives back the layer", () => {
+  // 2x2 cells of 2x2; the "t" tile is 2x3, taller than its cell (Tiled bottom-aligns it).
+  const { dir, file } = tmpArt(`use("pico8")
+sprite("a", { w: 2, h: 2 }, rect(0, 0, 2, 2, "8"))
+sprite("b", { w: 2, h: 2 }, rect(0, 0, 2, 2, "b"), px(0, 0, "7"))
+sprite("t", { w: 2, h: 3 }, rect(0, 0, 2, 3, "c"))
+scene("s", { w: 8, h: 8, layers: true }, layer("ground", tilemap("ab\\nba", { size: 2, x: 1, y: 1, map: { a: "a", b: "b" } })),
+  layer("tall", tilemap("t.\\n.t", { w: 2, h: 2, x: 4, y: 2, map: { t: "t" } })))`);
+  const p = loadProject(file);
+  writeOutputs(p, join(dir, "out"), { preview: false });
+  const tmj = JSON.parse(readFileSync(join(dir, "out", "scenes", "s.tmj"), "utf8"));
+  assert.equal(tmj.orientation, "orthogonal");
+  assert.deepEqual(tmj.layers.map((l: { name: string }) => l.name), ["ground", "tall"]);
+  assert.equal(tmj.tilesets[0].tilecount, 2, "a and b, each once");
+  for (const [li, layer] of tmj.layers.entries()) {
+    const ts = [...tmj.tilesets].reverse().find((t: { firstgid: number }) => t.firstgid <= Math.max(...layer.data));
+    const sheet = decodePng(readFileSync(join(dir, "out", "scenes", ts.image)));
+    const redrawn = new Img(8, 8);
+    layer.data.forEach((gid: number, k: number) => {
+      if (!gid) return;
+      const id = gid - ts.firstgid, sx = (id % ts.columns) * ts.tilewidth, sy = Math.floor(id / ts.columns) * ts.tileheight;
+      // Tiled: tile bottom on the cell bottom, then the tileset's tileoffset.
+      const x = layer.offsetx + (k % layer.width) * tmj.tilewidth + (ts.tileoffset?.x ?? 0);
+      const y = layer.offsety + (Math.floor(k / layer.width) + 1) * tmj.tileheight - ts.tileheight + (ts.tileoffset?.y ?? 0);
+      for (let yy = 0; yy < ts.tileheight; yy++) for (let xx = 0; xx < ts.tilewidth; xx++) redrawn.set(x + xx, y + yy, sheet.get(sx + xx, sy + yy));
+    });
+    const drawn = decodePng(readFileSync(join(dir, "out", "scenes", "s", ["ground", "tall"][li] + ".png")));
+    assert.deepEqual([...redrawn.data], [...drawn.data], `layer ${layer.name}`);
+  }
 });
 
 test("cli build reports per-asset errors and still writes the rest", async () => {

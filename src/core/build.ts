@@ -7,7 +7,7 @@ import { Img } from "./image.ts";
 import { applyGlow } from "./glow.ts";
 import { applyLighting } from "./light.ts";
 import { normalImage } from "./normals.ts";
-import { type AssetDef, type FrameOpts, type GlowOpts, type Item, type Layer, type LayerOpts, type LightingOpts, type Op, type Timeline, isLayer, isOp } from "./model.ts";
+import { type AssetDef, type FrameOpts, type GlowOpts, type Item, type Layer, type LayerOpts, type LightingOpts, type Op, type TileLayer, type Timeline, isLayer, isOp } from "./model.ts";
 import type { Palette } from "./palette.ts";
 import { Trace } from "./trace.ts";
 import { bayer, fmtArgs, gridRows, gridSize, type Region } from "./util.ts";
@@ -30,6 +30,8 @@ export interface BuildOut {
   trace?: Trace;
   /** Set when the asset is animated (an anim, or places one). */
   anim?: Timeline;
+  /** The tilemaps it placed, cell by cell (for a Tiled export). */
+  tilemaps?: TileLayer[];
 }
 
 /** An anim's frames: count and durations (ms), from its frame() items or { frames, fps }. */
@@ -147,7 +149,9 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   let solid: Uint8Array | undefined, wall: Uint8Array | undefined, unlit: Uint8Array | undefined;
   if (![undefined, true, false, "x", "y"].includes(opts.wrap)) throw new PxError(`wrap must be true, "x" or "y", got ${fmtArgs([opts.wrap])}`);
   const edges = opts.wrap ? { x: opts.wrap !== "y", y: opts.wrap !== "x" } : undefined;
+  const maps: TileLayer[] = [];
   const timed = (c: Canvas) => {
+    c.maps = maps;
     c.wrap = edges;
     c.t = t;
     c.frame = frame;
@@ -185,6 +189,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   runItems(ctx, def.items, main, def.loc, onPass, (l) => {
     const limg = new Img(base.w, base.h);
     const lc = timed(new Canvas(limg, pal, ctx, l.opts.x ?? 0, l.opts.y ?? 0, seed));
+    lc.layerName = l.name;
     lc.below = base;
     hook(lc);
     cur = { img: limg, opts: l.opts };
@@ -214,7 +219,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
 
   const img = finish(base, def, pal, trace);
   trace?.finish(img);
-  return { img, layers, trace, anim: tl };
+  return { img, layers, trace, anim: tl, ...(maps.length ? { tilemaps: maps } : {}) };
 }
 
 /** Whole-image passes (lighting, glow) that run on everything drawn before them. */

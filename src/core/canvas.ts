@@ -3,7 +3,7 @@ import { Img } from "./image.ts";
 import type { Palette, Resolved } from "./palette.ts";
 import { PxError } from "./errors.ts";
 import { glyph, lineWidth } from "./font.ts";
-import type { BumpOpts, LampOpts, PlaceOpts, ScatterOpts, TextOpts, Timeline, TilemapOpts, WireOpts } from "./model.ts";
+import type { BumpOpts, LampOpts, PlaceOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
 import { bump, dirOf, setNormal } from "./normals.ts";
 import { bayer, colorList, gridRows, hash, inPoly, polyBounds, type Region, regionPred, rng } from "./util.ts";
 
@@ -47,6 +47,10 @@ export class Canvas {
   below?: Img;
   /** Seamless tiles: drawing (and reading) past these edges continues on the opposite side. */
   wrap?: { x: boolean; y: boolean };
+  /** Where tilemap() records what it placed (the build collects them for a Tiled export). */
+  maps?: TileLayer[];
+  /** The layer this canvas paints, if any: names exported tile layers. */
+  layerName?: string;
   /** Called after each top-level (non-nested) op call; used for tracing. */
   onOp?: (name: string, args: unknown[]) => void;
   /** Art-file location of the op item currently running (set by the builder). */
@@ -500,6 +504,12 @@ export class Canvas {
         cells.push({ r, i, name });
       });
     });
+    // Record what lands in each cell, for exporting the map (Tiled).
+    const cols = Math.max(0, ...rows.map((row) => [...row].length));
+    const first = cells.length ? this.res.image(this.res.candidates(cells[0].name)[0], 0, 0, false) : undefined;
+    const layer: TileLayer = { name: this.layerName ?? "tilemap", iso: !!opts.iso, cols, rows: rows.length,
+      tw: opts.w ?? opts.size ?? first?.w ?? 0, th: opts.h ?? opts.size ?? first?.h ?? 0, x: x0, y: y0, cells: new Array(cols * rows.length) };
+    this.maps?.push(layer);
     if (opts.iso) {
       // Columns run down-right, rows down-left; back to front, so nearer tiles cover farther ones.
       // A tile's top-left sits on its diamond's top-left; a tile with a pivot stands it on the
@@ -508,6 +518,7 @@ export class Canvas {
       cells.sort((a, b) => a.i + a.r - (b.i + b.r) || a.r - b.r);
       for (const { r, i, name } of cells) {
         const tx = x0 + ((i - r) * w) / 2, ty = y0 + ((i + r) * h) / 2, src = this.asset(name, opts, tx, ty);
+        layer.cells[r * cols + i] = src;
         if (src.pivot) this.putAt(src, tx + w / 2, ty + h / 2, [0, 0]);
         else this.put(src, tx, ty);
       }
@@ -516,7 +527,9 @@ export class Canvas {
     for (const { r, i, name } of cells) {
       const step = opts.w && opts.h ? null : this.res.image(this.res.candidates(name)[0], 0);
       const tx = x0 + i * (opts.w ?? opts.size ?? step!.w), ty = y0 + r * (opts.h ?? opts.size ?? step!.h);
-      this.put(this.asset(name, opts, tx, ty), tx, ty);
+      const src = this.asset(name, opts, tx, ty);
+      layer.cells[r * cols + i] = src;
+      this.put(src, tx, ty);
     }
   }
 

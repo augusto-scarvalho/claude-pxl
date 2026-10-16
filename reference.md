@@ -240,6 +240,11 @@ thumbnail per step (every k-th of a long build). Anims show frame 0.
 Outputs go to `<file dir>/out`: `sprites/<n>.png`, `scenes/<n>.png`, `<sheet>.png` + `<sheet>.json`
 (TexturePacker hash format: Phaser, Godot importers, ...), `_preview/<n>.png` (upscaled to
 ~768px, checkerboard behind transparency, pixel grid at scale ≥ 6 with every 8th line darker).
+An asset that places tilemaps also gets `<n>.tmj`, a Tiled map with one tile layer per tilemap
+(named after its `layer`) and a tileset image per layer (`<n>.1.png`, ...) holding the distinct tiles
+it used, after group picks, flips and swaps. Orthogonal maps redraw exactly; for isometric ones,
+check the tile alignment in Tiled. A layer whose tiles differ in size or stand by a pivot (props)
+is left out, and the build line says why.
 
 `serve` opens a live viewer that rebuilds on save, follows the asset you edited and replays its
 painting steps (each top-level op, layer and post-processing step, with its file:line). It also

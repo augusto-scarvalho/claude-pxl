@@ -188,6 +188,20 @@ export interface TilemapOpts extends PlaceOpts {
   y?: number;
 }
 
+/** A tilemap as placed, for exporting the map (Tiled): the image put in each cell, row by row. */
+export interface TileLayer {
+  name: string;
+  iso: boolean;
+  cols: number;
+  rows: number;
+  /** Cell size: the tile size, or the floor diamond's size for iso. */
+  tw: number;
+  th: number;
+  x: number;
+  y: number;
+  cells: (Img | undefined)[];
+}
+
 export interface WireOpts extends PlaceOpts {
   hang?: string;
   every?: number;

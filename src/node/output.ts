@@ -6,6 +6,7 @@ import type { Img } from "../core/image.ts";
 import type { Project } from "../core/project.ts";
 import { type FrameTag, packSheet, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
 import { normalImage } from "../core/normals.ts";
+import { tiledMap } from "../core/tiled.ts";
 import { encodeGif } from "./gif.ts";
 import { encodePng } from "./png.ts";
 
@@ -78,6 +79,13 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         info = play === "forward" ? ` (${frames.length} frames, ${b.anim!.loop}ms)` : ` (${p.drawn(n).length} frames ${play}, ${b.anim!.loop}ms)`;
       }
       if (def.opts.layers) for (const l of b.layers) writePng(join(out, dir, n, l.name + ".png"), l.img);
+      if (b.tilemaps) {
+        // Tilemaps also go out as a Tiled map, with a tileset image per layer.
+        const t = tiledMap(n, b.tilemaps);
+        for (const { file, img } of t.images) writePng(join(out, dir, file), img);
+        if (t.json) { write(join(out, dir, n + ".tmj"), t.json); info += ` + ${n}.tmj`; }
+        for (const s of t.skipped) info += ` (tiled: ${s})`;
+      }
       let pv = "";
       if (opts.preview !== false) {
         // Previews: anims show every frame side by side; anything animated also gets a GIF.

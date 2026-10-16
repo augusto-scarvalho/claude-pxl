@@ -80,7 +80,8 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 - **Tone**: `dither`, `grad` (`"v"`, `"h"`, `"r"` radial), `noise`, `shade/light(region, steps, density)`, `recolor`, and
   `shade:`/`light:` layers for cast shadows and glows. Regions: `[cx,cy,r]`, `[x,y,w,h]`,
   polygon, or a function. `clip(region, ...items)` restricts any items (half shapes, slopes).
-- **Reuse**: `stamp tile pattern tilemap scatter`, and `panel` for 9-slice UI frames (`slice: 4` on the asset). Names can be groups or globs
+- **Reuse**: `stamp tile pattern tilemap scatter`, and `panel` for 9-slice UI frames (`slice: 4` on the asset).
+  A scene with tilemaps also exports a Tiled map (`<scene>.tmj`), for levels in an engine. Names can be groups or globs
   (`group("rocks", ["rock_a", "rock_a", "rock_b"])`, `"tree_*"`). Each placement picks randomly but
   reproducibly. Use `rflip`, `rswap`, `seed`, and `reseed: true` for per-copy variety.
   Give props `pivot: "bottom"`: `stamp("tree", x, groundY)` then stands them on the ground at any size.

@@ -50,5 +50,5 @@ Mark items `[x]` when they ship, with the commit.
   `glow` cover most uses.
 - [x] Onion skin in the live viewer: an "onion" toggle, `,` and `.` step frames.
 - [x] Isometric `tilemap` (`iso: true`, one level).
-- [ ] Export tilemaps to Tiled (`.tmj`) for engines.
+- [x] Export tilemaps to Tiled: `<asset>.tmj` + a tileset image per layer (isometric alignment unchecked in Tiled itself).
 - [x] Bitmap fonts: `font(name, sprite, { chars, w, h })` + `text(..., { font })`, and a ready 5x7 font in `examples/fonts/`.
