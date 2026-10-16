@@ -20,7 +20,12 @@ parts, primitives, brushes and tilemaps. Needs Node ≥ 22.18. No install step.
    pixel, darker every 8). For exact pixel fixes use `PXL ascii art.px.js <name>` (keys + x/y rulers);
    it's cheaper than an image.
 4. Fix with small edits (a `grid(x, y, ...)` patch, one op) and rebuild. Repeat.
-5. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL.
+5. Before handing it over, look at the preview once more as a critic, for what reviewers flag most:
+   tiles repeating into a visible grid, props floating or standing on the wrong ground, big flat
+   areas with no detail, dither used as a texture.
+6. Replacing art someone already approved? Keep the old one as `name_old`, stamp both side by side
+   in a `compare` scene, and let them choose. Your redraw is not always better.
+7. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL.
    It rebuilds on every save and replays the edited asset's painting steps; it also writes the same
    `out/` files, so keep reading previews as usual.
 
@@ -132,6 +137,8 @@ stays clean: `PXL build <skill dir>/examples/shop.px.js --only comet_repair --ou
 - Large areas: primitives, `grad`, `noise`, `pattern`, `tilemap`. Never big hand grids.
 - Tiles that repeat: give them `wrap: true` (or `"x"`/`"y"`). The preview then shows the tile 3×3,
   so you can check the seams, and anything drawn past an edge continues on the other side.
+  A detail in the same spot of every copy lines up into a grid: make 2–3 variants in a `group`,
+  some plain, and place them with `tile`/`tilemap` plus `rflip`.
 - Organic texture (leaves, grass, stones, rust): 2–3 tiny brush parts + `scatter` with `on`/`clip`.
 - **No filler noise.** Don't sprinkle `noise` speckle over walls, floors or plaster to make them
   "less flat": it reads as random dots, not material. Every mark on a surface needs a cause you
@@ -142,8 +149,18 @@ stays clean: `PXL build <skill dir>/examples/shop.px.js --only comet_repair --ou
   - clutter that tells the story: posters, pipes, vents, cracks from a corner.
   Flat color is fine; a clean wall beats a dotted one. `noise` is OK only where the material itself
   is granular (gravel, sand, asphalt, tar roofs, rough stone), and keep it sparse. On faces drawn
-  at an angle (3/4 views), make the marks follow the face's slant.
+  at an angle (3/4 views), make the marks follow the face's slant. The same goes for `dither`: over
+  a whole area it reads as a checkerboard; use it only where two tones meet.
 - Lighting: define `ramps`, then `light`/`shade` regions; stack a `density: 0.5` pass for soft edges.
   Use `shade: true` layers with a `poly` for cast shadows across many objects.
 - Use mnemonic keys (`g`/`G` light/dark green). Keep 2–4 shades per material for a clean pixel-art look.
 - Build with `--only` while iterating; a full build also writes every preview.
+- Assert what a preview hides. When a scene is built from separate maps (terrain, props), a `throw`
+  in the placement loop (a prop landing on water) catches the drift before anyone sees it.
+
+## When pxl gets in your way
+
+If something cost you a rebuild or a workaround (a misleading error, a missing op, a doc that sent
+you wrong, a trap you fell into), add one line to `FEEDBACK.md` in this skill's directory: the date,
+what you were making, what happened, what would have helped. Only real friction, not taste. The
+skill's curators turn these lines into fixes, docs and examples.
