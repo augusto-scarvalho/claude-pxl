@@ -58,10 +58,12 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       const frames = b.anim ? p.frames(n) : [];
       let shown = b.img, info = "";
       if (def.kind === "anim") {
-        // Anims: a horizontal strip of frames + Aseprite-style JSON, plus a GIF.
-        const { sheet, frames: fr } = packSheet(frames.map((f, i) => ({ name: `${n}_${i}`, img: f.img, ms: f.ms })), frames.length);
+        // Anims: a horizontal strip of the drawn frames + Aseprite-style JSON (the tag carries the
+        // direction), plus a GIF of the full playback.
+        const drawn = p.drawn(n);
+        const { sheet, frames: fr } = packSheet(drawn.map((f, i) => ({ name: `${n}_${i}`, img: f.img, ms: f.ms })), drawn.length);
         writePng(join(out, dir, n + ".png"), sheet);
-        write(join(out, dir, n + ".json"), sheetJson(n + ".png", sheet, fr, [{ name: n, from: 0, to: fr.length - 1 }]));
+        write(join(out, dir, n + ".json"), sheetJson(n + ".png", sheet, fr, [{ name: n, from: 0, to: fr.length - 1, direction: p.direction(n) }]));
         shown = packSheet(frames.map((f) => ({ name: "", img: f.img })), frames.length, 1).sheet;
       } else {
         // Seamless tiles preview laid out 3x3 (or 3x1 / 1x3), so seams show.
@@ -95,9 +97,9 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       // Animated entries expand to one frame each (name_0, name_1, ...) with durations and a tag.
       const items: { name: string; img: Img; ms?: number }[] = [], tags: FrameTag[] = [];
       for (const name of p.sheetNames(s)) {
-        const fr = p.frames(name);
+        const fr = p.drawn(name);
         if (!fr.length) { items.push({ name, img: p.image(name) }); continue; }
-        tags.push({ name, from: items.length, to: items.length + fr.length - 1 });
+        tags.push({ name, from: items.length, to: items.length + fr.length - 1, direction: p.direction(name) });
         fr.forEach((f, i) => items.push({ name: `${name}_${i}`, img: f.img, ms: f.ms }));
       }
       if (!items.length) throw new PxError("sheet is empty (no entries matched)");

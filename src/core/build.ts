@@ -55,8 +55,19 @@ export function animTimeline(def: AssetDef): Timeline {
     if (!(ms > 0)) throw new PxError(`frame ${i} duration must be > 0`, f?.loc);
     durations.push(Math.round(ms));
   }
-  const loop = durations.reduce((a, d) => a + d, 0);
-  return { loop, step: durations.reduce(gcd), durations, once: def.opts.loop === false };
+  // reverse / pingpong play the drawn frames in another order: 0 1 2 3 2 1, 0 1 2 3 2 1, ...
+  const dir = def.opts.dir ?? "forward";
+  if (dir !== "forward" && dir !== "reverse" && dir !== "pingpong") throw new PxError(`dir must be "forward", "reverse" or "pingpong", got ${fmtArgs([dir])}`);
+  const order = dir === "reverse" ? durations.map((_, i) => n - 1 - i)
+    : dir === "pingpong" && n > 2 ? [...durations.keys(), ...durations.slice(1, -1).map((_, i) => n - 2 - i)] : undefined;
+  const play = order ? order.map((k) => durations[k]) : durations;
+  const loop = play.reduce((a, d) => a + d, 0);
+  return { loop, step: play.reduce(gcd), durations: play, once: def.opts.loop === false, ...(order ? { order } : {}), ...(dir !== "forward" ? { dir } : {}) };
+}
+
+/** How many frames an anim draws (pingpong plays some of them twice). */
+export function drawnFrames(tl: Timeline): number {
+  return tl.order ? Math.max(...tl.order) + 1 : tl.durations!.length;
 }
 
 /** Index of the frame showing at time t. */
@@ -83,7 +94,8 @@ function isFrameOpts(v: unknown): boolean {
 export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: Trace, t = 0): BuildOut {
   const { opts, pal } = def;
   const tl = def.kind === "anim" ? animTimeline(def) : undefined;
-  const frame = tl ? frameAt(tl, t) : 0, frames = tl ? tl.durations!.length : 1;
+  const at = tl ? frameAt(tl, t) : 0;
+  const frame = tl?.order ? tl.order[at] : at, frames = tl ? drawnFrames(tl) : 1;
   let base: Img;
   if (def.kind === "scene") {
     if (!opts.w || !opts.h) throw new PxError("scene needs { w, h }");

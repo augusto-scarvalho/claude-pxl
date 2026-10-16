@@ -1,5 +1,5 @@
 // Project: the registry an art file fills in, plus the lazy, cached, cycle-checked resolver.
-import { type BuildCtx, type BuildOut, buildAsset, gcd } from "./build.ts";
+import { type BuildCtx, type BuildOut, buildAsset, drawnFrames, gcd } from "./build.ts";
 import { OPS } from "./canvas.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
@@ -61,7 +61,7 @@ const OP_OPTS: Record<string, string[]> = {
 const ASSET_OPTS: Record<AssetKind, string[]> = {
   sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot", "wrap"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot", "wrap"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot", "wrap", "fps", "frames", "loop"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot", "wrap", "fps", "frames", "loop", "dir"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -325,6 +325,21 @@ export class Project implements BuildCtx {
     }
     const n = Math.max(1, Math.min(max, Math.round(tl.loop / tl.step)));
     return Array.from({ length: n }, (_, i) => ({ img: this.build(name, seed, i * tl.step).img, ms: tl.step }));
+  }
+
+  /**
+   * The frames an anim draws, once each and in drawing order: what sheets export, with the
+   * direction in the tag. Same as frames() unless the anim plays reverse / pingpong.
+   */
+  drawn(name: string, seed = 0): { img: Img; ms: number }[] {
+    const all = this.frames(name, seed), tl = this.build(name, seed).anim;
+    if (!tl?.order) return all;
+    return Array.from({ length: drawnFrames(tl) }, (_, k) => all[tl.order!.indexOf(k)]);
+  }
+
+  /** Playback direction of an anim, for export ("forward" unless it says otherwise). */
+  direction(name: string): "forward" | "reverse" | "pingpong" {
+    return this.build(name).anim?.dir ?? "forward";
   }
 
   private buildAt(name: string, seed: number, t: number): BuildOut {

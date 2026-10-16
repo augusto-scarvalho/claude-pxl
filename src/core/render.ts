@@ -71,6 +71,7 @@ export interface FrameTag {
   name: string;
   from: number;
   to: number;
+  direction?: "forward" | "reverse" | "pingpong";
 }
 
 /** Shelf packing: `cols` frames per row, `pad` px between them. */
@@ -108,6 +109,6 @@ export function sheetJson(image: string, sheet: Img, frames: SheetFrame[], tags:
     };
   }
   const meta: Record<string, unknown> = { app: "pxl", image, format: "RGBA8888", size: { w: sheet.w, h: sheet.h }, scale: "1" };
-  if (tags.length) meta.frameTags = tags.map((t) => ({ ...t, direction: "forward" }));
+  if (tags.length) meta.frameTags = tags.map((t) => ({ ...t, direction: t.direction ?? "forward" }));
   return JSON.stringify({ frames: out, meta }, null, 1) + "\n";
 }

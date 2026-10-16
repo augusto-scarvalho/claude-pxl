@@ -103,7 +103,7 @@ Post-processing order: mirror → swap → flip → rot → outline → crop.
 | `grad(x, y, w, h, "abc", dir = "v", soft = 0.5)` | bands with dithered seams; `"h"` horizontal; soft 0 = hard bands |
 | `noise(x, y, w, h, "ab", density = 0.1, seed = 1, on?)` | deterministic speckle; `on: "g"` only touches those keys (`"*"` any opaque) |
 | `shade(where?, steps = 1, density = 1)` · `light(...)` | step colors along ramps inside a region |
-| `recolor({ a: "b" }, where?, density = 1)` | swap colors inside a region |
+| `recolor({ a: "b" }, where?, density = 1)` | swap colors inside a region; `"*"` takes every other opaque color (`frame(recolor({ "*": "w" }))`: a hit-flash frame) |
 
 **Regions** (`where`, `clip`): `undefined` = everywhere, `[cx, cy, r]` circle, `[x, y, w, h]`
 rect, `[x0, y0, x1, y1, x2, y2, ...]` polygon, or `(x, y) => boolean`.
@@ -122,7 +122,8 @@ Any `name` may be a sprite, scene, group, or glob (`"tree_*"`). **Placement opts
 `swap`, `rflip: "x"|"y"|"xy"` (random flips), `rswap: [{ g: "r" }, {}]` (random recolor; `{}` =
 none), `seed`, `reseed: true | n` (rebuild the placed asset with its own random choices; `true`
 derives it from the position, so `tile("house", 0, 0, 4, 1, { reseed: true })` gives four
-different houses from one definition).
+different houses from one definition), `silhouette: "w"` (every opaque pixel in that color: hit
+flashes, and cast shadows when placed in a `shade: true` layer).
 
 Randomness is seeded from the placement position + `seed`, so builds are reproducible and moving
 one placement doesn't reshuffle the others. Change `seed` to reroll.
@@ -156,14 +157,17 @@ changed their colors.
 ## Animation
 
 ```js
-anim(name, { fps = 8, frames, loop = true, base, w, h, outline, mx, ... }, ...items)
+anim(name, { fps = 8, frames, loop = true, dir = "forward", base, w, h, outline, mx, ... }, ...items)
 frame({ ms, hold }?, ...items)          // only inside an anim (top level or in its layers)
 ```
 
 An anim is a sprite with frames. Its items run in order on every frame, except `frame(...)` items:
 the k-th `frame()` only runs on frame k, so frames are **patches** over the shared items (or over
 `base`). Post-processing (mirror, outline, ...) runs on each frame. A frame lasts `1000 / fps` ms,
-or `ms`, or `hold` × that. `loop: false` plays once and holds the last frame.
+or `ms`, or `hold` × that. `loop: false` plays once and holds the last frame. `dir: "pingpong"`
+plays the drawn frames there and back (0 1 2 3 2 1), `"reverse"` backwards: draw a breathing or
+swaying loop once, not twice. Exports keep each drawn frame once and put the direction in the tag
+(Aseprite's `frameTags[].direction`); GIFs, previews and scenes play it.
 
 ```js
 anim("candle", { outline: "k", fps: 5 }, `

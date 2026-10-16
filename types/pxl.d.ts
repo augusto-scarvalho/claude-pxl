@@ -15,6 +15,8 @@ declare global {
     rflip?: "x" | "y" | "xy"; rswap?: Record<string, PxColor>[]; seed?: number; reseed?: boolean | number;
     /** Animated assets: freeze on frame n / start later (ms) / random start. */
     frame?: number; delay?: number; rdelay?: boolean;
+    /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
+    silhouette?: PxColor;
   }
   interface PxScatter extends PxPlace { on?: string; clip?: boolean; below?: boolean }
   interface PxTilemap extends PxPlace { map: Record<string, string>; size?: number; w?: number; h?: number; x?: number; y?: number }
@@ -29,7 +31,7 @@ declare global {
     wrap?: boolean | "x" | "y";
   }
   interface PxSceneOpts extends PxAssetOpts { w: number; h: number; bg?: PxColor }
-  interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean }
+  interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong" }
   interface PxFrame { ms?: number; hold?: number }
   interface PxLayerOpts {
     x?: number; y?: number; hidden?: boolean; density?: number; solid?: boolean; wall?: boolean; unlit?: boolean;

@@ -16,9 +16,10 @@ Mark items `[x]` when they ship, with the commit.
   downloads). (Both editors load palettes.)
 - [ ] **Import PNG** as an asset (`image("hero.png")`), with a palettize step to the active
   palette. Needs a PNG decoder (pxl only writes PNGs today).
-- [ ] **Silhouette / flash**: a placement option that paints every opaque pixel one color
-  (hit-flash frames, drop shadows, silhouettes). (Pixelorama Drop Shadow.)
-- [ ] **Ping-pong**: `anim(..., { dir: "pingpong" | "reverse" })`, exported as the tag direction.
+- [x] **Silhouette / flash**: a placement option that paints every opaque pixel one color
+  (drop shadows, silhouettes), plus `recolor({ "*": "w" })` for hit-flash frames, which a
+  placement can't do once the sprite has a pivot. (Pixelorama Drop Shadow.)
+- [x] **Ping-pong**: `anim(..., { dir: "pingpong" | "reverse" })`, exported as the tag direction.
   (Aseprite tag directions.)
 
 ## Next

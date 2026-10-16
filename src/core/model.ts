@@ -66,6 +66,8 @@ export interface AssetOpts {
   frames?: number;
   /** anim: false = play once and hold the last frame (default true). */
   loop?: boolean;
+  /** anim: playback direction, as Aseprite tags have it (default "forward"). */
+  dir?: "forward" | "reverse" | "pingpong";
 }
 
 export type AssetKind = "sprite" | "scene" | "anim";
@@ -87,8 +89,11 @@ export interface Timeline {
   loop: number;
   /** Time resolution in ms: frames change at multiples of this. */
   step: number;
-  /** Own frame durations in ms (anims only). */
+  /** Own frame durations in ms, in playback order (anims only). */
   durations?: number[];
+  /** reverse / pingpong anims: the drawn frame shown at each playback position. */
+  order?: number[];
+  dir?: "reverse" | "pingpong";
   /** anim loop: false (holds the last frame). */
   once?: boolean;
 }
@@ -129,6 +134,8 @@ export interface PlaceOpts {
   rflip?: "x" | "y" | "xy";
   /** Random recolor per placement; {} = keep. */
   rswap?: Record<string, string>[];
+  /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
+  silhouette?: string;
   seed?: number;
   /** Rebuild the placed asset with its own random choices (true = derived from position). */
   reseed?: boolean | number;

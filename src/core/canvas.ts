@@ -292,9 +292,15 @@ export class Canvas {
       }
   }
 
-  /** Recolor { m: "M" } inside a region. */
+  /** Recolor { m: "M" } inside a region; "*" takes every other opaque color ({ "*": "w" }: hit flash). */
   recolor(map: Record<string, string>, where?: Region, density = 1): void {
-    this.remap(this.swapMap(map), where, 1, density);
+    const { "*": any, ...rest } = map;
+    const m = this.swapMap(rest);
+    if (any !== undefined) {
+      const to = this.color(any);
+      if (to !== null) for (const c of new Set(this.img.data)) if (c !== TRANSPARENT && !m.has(c)) m.set(c, to);
+    }
+    this.remap(m, where, 1, density);
   }
 
   /** Step colors darker along the palette ramps inside a region. */
@@ -344,6 +350,10 @@ export class Canvas {
     let src = this.res.image(pick, inner, t, track);
     const swap = opts.rswap ? opts.rswap[Math.floor(r() * opts.rswap.length)] : opts.swap;
     if (swap && Object.keys(swap).length) src = src.remap(this.swapMap(swap));
+    if (opts.silhouette !== undefined) {
+      const c = this.color(opts.silhouette);
+      if (c !== null) src = src.silhouette(c);
+    }
     if (opts.flip) src = src.flip(opts.flip);
     if (opts.rflip) {
       let f = "";
@@ -542,7 +552,10 @@ export class Canvas {
 /** Start time (ms) of frame `n` of a timeline. */
 export function frameStart(tl: Timeline, n: number): number {
   if (!tl.durations) return Math.max(0, Math.floor(n)) * tl.step;
-  const d = tl.durations, k = ((Math.floor(n) % d.length) + d.length) % d.length;
+  const d = tl.durations, count = tl.order ? Math.max(...tl.order) + 1 : d.length;
+  // n counts drawn frames; reverse / pingpong show frame n first at another playback position.
+  let k = ((Math.floor(n) % count) + count) % count;
+  if (tl.order) k = tl.order.indexOf(k);
   let t = 0;
   for (let i = 0; i < k; i++) t += d[i];
   return t;

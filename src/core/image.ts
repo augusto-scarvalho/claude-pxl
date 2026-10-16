@@ -241,6 +241,14 @@ export class Img {
     return o;
   }
 
+  /** Every opaque pixel in one color: hit flashes, cast shadows. A shape only: no normals or lamps. */
+  silhouette(c: Color): Img {
+    const o = new Img(this.w, this.h);
+    for (let i = 0; i < o.data.length; i++) if (this.data[i] !== TRANSPARENT) o.data[i] = c;
+    if (this.pivot) o.pivot = [...this.pivot];
+    return o;
+  }
+
   /** Nearest-neighbour upscale. */
   scale(s: number): Img {
     if (s === 1) return this.copy();

@@ -75,8 +75,10 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   texture with tiny part sprites, only on the given colors.
 - **Animation**: `anim("cat", { outline: "k", fps: 10 }, grid, frame(), frame(grid(23, 0, "_K")))`:
   frames are patches over shared items or a `base`; or `frames: 6` + `(c) => ... c.phase ...` for
-  procedural loops. Stamping an anim animates the scene (`rdelay: true` desyncs copies, `frame: n`
-  freezes one). Check `_preview/<name>.png` (all frames side by side) or `pxl ascii` per frame.
+  procedural loops. `dir: "pingpong"` plays them there and back, so a sway or a breath is drawn
+  one way only. Stamping an anim animates the scene (`rdelay: true` desyncs copies, `frame: n`
+  freezes one). Hit flash: `anim("hero_hit", { base: "hero" }, frame(), frame(recolor({ "*": "w" })))`. Check
+  `_preview/<name>.png` (all frames side by side) or `pxl ascii` per frame.
 - **Glow**: `glow("zgQ", { r: 6, strength: 0.5 })` directly in a sprite/scene body gives every pixel
   of those keys a halo (flames, potions, moons, neon); `ramp: 2` instead stays in the palette.
   Give glowing things their own keys so nothing else lights up, or limit it with `where`.

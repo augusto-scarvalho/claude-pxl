@@ -80,7 +80,7 @@ export async function main(argv: string[]): Promise<number> {
         const p = loadProject(file);
         const pal = p.assets.get(name)?.pal ?? p.pal;
         if (p.assets.get(name)?.kind === "anim")
-          p.frames(name).forEach((f, i) => console.log(`frame ${i} (${f.ms}ms)\n${ascii(f.img, pal)}\n`));
+          p.drawn(name).forEach((f, i) => console.log(`frame ${i} (${f.ms}ms)\n${ascii(f.img, pal)}\n`));
         else console.log(ascii(p.image(name), pal));
         return 0;
       }
