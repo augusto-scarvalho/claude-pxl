@@ -22,23 +22,37 @@ export const BUILTIN: Record<string, string[]> = {
 export const PALETTE_FILE = /\.(hex|gpl|pal|txt)$/i;
 
 /**
- * Colors of a palette file as "rrggbb": .hex (Lospec: one per line), .gpl (GIMP) and .pal (JASC:
- * "R G B" lines), .txt (Paint.NET: "aarrggbb", ";" comments).
+ * A palette file: .hex (Lospec: "rrggbb" per line), .gpl (GIMP, Aseprite) and .pal (JASC: "R G B"
+ * lines), .txt (Paint.NET: "aarrggbb"). A one-character word right after a color is its key
+ * ("1a1626 k ink"; in a .gpl, the color's name), so keys sit next to their colors. A file that
+ * names no keys gets index keys 0-9a-zA-Z; in one that does, only the named colors have keys.
  */
-export function parsePaletteFile(text: string, file: string): string[] {
-  const lines = text.split(/\r?\n/).map((l) => l.trim());
+export function paletteFromFile(text: string, file: string): Palette {
   const ext = file.toLowerCase().replace(/^.*\./, "");
-  const out: string[] = [];
-  for (const l of lines) {
-    if (ext === "hex") { if (/^#?[0-9a-f]{6}$/i.test(l)) out.push(l.replace("#", "")); }
-    else if (ext === "txt") { if (/^[0-9a-f]{8}$/i.test(l)) out.push(l.slice(2)); }
-    else {
-      const m = /^(\d+)\s+(\d+)\s+(\d+)(\s|$)/.exec(l);
-      if (m) out.push([m[1], m[2], m[3]].map((v) => Math.min(255, +v).toString(16).padStart(2, "0")).join(""));
-    }
+  const colors: string[] = [], named: { key: string; i: number; line: number }[] = [];
+  text.split(/\r?\n/).forEach((raw, n) => {
+    const l = raw.trim();
+    let m: RegExpExecArray | null = null, hex = "";
+    if (ext === "hex" && (m = /^#?([0-9a-f]{6})(?=\s|$)(.*)$/i.exec(l))) hex = m[1];
+    else if (ext === "txt" && (m = /^[0-9a-f]{2}([0-9a-f]{6})(?=\s|$)(.*)$/i.exec(l))) hex = m[1];
+    else if ((ext === "gpl" || ext === "pal") && (m = /^(\d+)\s+(\d+)\s+(\d+)(?=\s|$)(.*)$/.exec(l)))
+      hex = [m[1], m[2], m[3]].map((v) => Math.min(255, +v).toString(16).padStart(2, "0")).join("");
+    if (!m) return;
+    const key = m[m.length - 1].trim().split(/\s+/)[0];
+    if (key && [...key].length === 1) named.push({ key, i: colors.length, line: n + 1 });
+    colors.push(hex);
+  });
+  if (!colors.length) throw new PxError(`no colors found in palette file '${file}'`);
+  const base = Palette.fromColors(colors);
+  if (!named.length) return base;
+  const keys = new Map<string, Color>(), order: string[] = [];
+  for (const { key, i, line } of named) {
+    if (RESERVED.has(key)) throw new PxError(`${file} line ${line}: key '${key}' is reserved (. _ space #)`);
+    if (keys.has(key)) throw new PxError(`${file} line ${line}: key '${key}' is already used by an earlier color`);
+    keys.set(key, base.list[i]);
+    order.push(key);
   }
-  if (!out.length) throw new PxError(`no colors found in palette file '${file}'`);
-  return out;
+  return new Palette(keys, [...base.list], order, new Set(), []);
 }
 
 /** What a color spec resolves to: a color, or null for "skip this pixel". */

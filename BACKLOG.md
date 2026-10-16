@@ -34,8 +34,8 @@ Mark items `[x]` when they ship, with the commit.
   Shading ink, Pixelorama shading with hue shift.)
 - [ ] **Sheet extrude / padding** against texture bleeding in engines. (Aseprite export options.)
 - [ ] **9-slice** for UI panels and buttons. (Aseprite 9-patch slices.)
-- [ ] **Palette keys from the file** (dogfood): a `.gpl` color named with one character becomes that
-  key, so a shared palette needs no `pal({ k: 0, K: 1, ... })` index mapping.
+- [x] **Palette keys in the file** (dogfood): `1a1626 k ink` (a one-character word after the color;
+  the name in a `.gpl`), so a shared palette needs no `pal({ k: 0, K: 1, ... })` index mapping.
 - [ ] **Asset size inside functions**: `c.size("name")` (found building the iso example).
 
 ## Later / niche

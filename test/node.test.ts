@@ -94,6 +94,23 @@ test("use() reads palette files next to the art file: .hex, .gpl, .pal, .txt", (
   assert.throws(() => loadProject(file), /cannot read .*missing\.hex/);
 });
 
+test("palette files name keys next to their colors: '1a1626 k ink', .gpl names", () => {
+  const cases: Record<string, string> = {
+    "k.hex": "ff0000 r  red, the rest is a comment\n00ff00\n0000ff b\n",
+    "k.gpl": "GIMP Palette\nName: t\n255 0 0\tr\n0 255 0\tGreen\n0 0 255\tb\n",
+  };
+  for (const [name, text] of Object.entries(cases)) {
+    const { dir, file } = tmpArt(`use("${name}")\npal({ g: 1 })\nsprite("t", "rgb")`);
+    writeFileSync(join(dir, name), text);
+    const p = loadProject(file);
+    assert.deepEqual([...p.image("t").data], [pack(255, 0, 0), pack(0, 255, 0), pack(0, 0, 255)], name);
+    assert.deepEqual([...p.assets.get("t")!.pal.keys.keys()].sort(), ["b", "g", "r"], "named files have only the named keys (+ pal)");
+  }
+  const { dir, file } = tmpArt(`use("d.hex")`);
+  writeFileSync(join(dir, "d.hex"), "ff0000 r\n00ff00 r\n");
+  assert.throws(() => loadProject(file), /d\.hex line 2: key 'r' is already used/);
+});
+
 test("include { palette: true } shares the included palette", () => {
   const { dir, file } = tmpArt(`include("pal.px.js", { palette: true })\nsprite("b", "z")`);
   writeFileSync(join(dir, "pal.px.js"), `pal({ z: "#ff0000" })`);
