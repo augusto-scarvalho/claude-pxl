@@ -97,7 +97,7 @@ Post-processing order: mirror → swap → flip → rot → outline → crop.
 | `px(x, y, c)` | |
 | `rect(x, y, w, h, c)` · `box(x, y, w, h, c)` | filled · 1px border |
 | `line(x0, y0, x1, y1, c, width?)` | width > 1 = round brush (tubes, poles, thick strokes) |
-| `curve([x0, y0, x1, y1, ...], c, { width?, closed? })` | smooth curve **through** the points (Catmull-Rom, no hidden control points): tails, vines, hair, cables, handles. 1px wide it is pixel-perfect (no doubled L-corners); `width` > 1 = round brush; `closed: true` loops back to the first point (blobs, leaves: then `fill` inside) |
+| `curve([x0, y0, x1, y1, ...], c, { width?, closed? })` | smooth curve **through** the points (Catmull-Rom, no hidden control points): tails, vines, hair, cables, handles. 1px wide it is pixel-perfect (no doubled L-corners); `width` > 1 = round brush; `closed: true` loops back to the first point (then `fill` inside). For linework; a small closed shape such as a leaf reads better drawn pixel by pixel in a grid |
 | `hline(x, y, len, c)` · `vline(x, y, len, c)` | |
 | `circ(cx, cy, r, c)` · `ring(cx, cy, r, c)` | pixel-art circles; ring is a clean 1px border |
 | `ellipse(cx, cy, rx, ry, c, ring?)` | |

@@ -143,6 +143,11 @@ To see how a complex piece was built, in order: `PXL steps <example> <asset> --o
 - Recolors are `base` + `swap`; repeated details are `_parts` + `stamp`; families are a `group` or a
   loop: `for (let i = 1; i <= 3; i++) sprite("tree_" + i, ...)`.
 - Large areas: primitives, `grad`, `noise`, `pattern`, `tilemap`. Never big hand grids.
+- Small organic shapes are the opposite: a leaf, a face, a character, an item icon look far better
+  placed pixel by pixel in a grid string, where you choose each cluster, highlight and shadow.
+  Built from `curve`/`ellipse` + `fill` they come out vector-like (even outline, no shading). Use
+  primitives for structure, large areas and long linework (cables, tails, vines), and grids for
+  anything small enough that each pixel is a decision.
 - Tiles that repeat: give them `wrap: true` (or `"x"`/`"y"`). The preview then shows the tile 3×3,
   so you can check the seams, and anything drawn past an edge continues on the other side.
   Keep small details that dot an area (pebbles, stones, flowers, tufts) out of tiles: baked in, they
