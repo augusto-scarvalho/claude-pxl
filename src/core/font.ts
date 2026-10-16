@@ -40,15 +40,15 @@ export interface FontOpts {
   gap?: number;
 }
 
-/** Pixel width of a single line. */
-export function lineWidth(line: string, opts: FontOpts = {}): number {
+/** Pixel width of a single line (`g`: the font's glyph lookup, default the built-in 3x5). */
+export function lineWidth(line: string, opts: FontOpts = {}, g: (ch: string) => string[] = glyph): number {
   const sc = opts.scale ?? 1, gap = opts.gap ?? 1;
   let w = 0;
-  for (const ch of line) w += (glyph(ch)[0].length + gap) * sc;
+  for (const ch of line) w += (g(ch)[0].length + gap) * sc;
   return line.length ? w - gap * sc : 0;
 }
 
 /** Pixel width of the longest line. */
-export function textWidth(s: string, opts: FontOpts = {}): number {
-  return Math.max(0, ...String(s).split("\n").map((l) => lineWidth(l, opts)));
+export function textWidth(s: string, opts: FontOpts = {}, g: (ch: string) => string[] = glyph): number {
+  return Math.max(0, ...String(s).split("\n").map((l) => lineWidth(l, opts, g)));
 }

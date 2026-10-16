@@ -50,4 +50,4 @@ Mark items `[x]` when they ship, with the commit.
   `glow` cover most uses.
 - [ ] Onion skin in the live viewer.
 - [ ] Isometric `tilemap` and export to Tiled (`.tmj`) for engines.
-- [ ] Bigger fonts, or a bitmap font from a sprite.
+- [x] Bitmap fonts: `font(name, sprite, { chars, w, h })` + `text(..., { font })`, and a ready 5x7 font in `examples/fonts/`.

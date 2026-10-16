@@ -263,6 +263,20 @@ export interface TextOpts {
   lead?: number;
   align?: "l" | "c" | "r";
   shadow?: string;
+  /** A font() name; default the built-in 3x5. */
+  font?: string;
+}
+
+/** A bitmap font: glyphs in cells of w x h on an asset, in the order of `chars`. */
+export interface FontDef {
+  name: string;
+  asset: string;
+  chars: string;
+  w: number;
+  h: number;
+  /** Cells per row on the asset (default: as many as fit its width). */
+  cols?: number;
+  loc?: string;
 }
 
 export type { Region };

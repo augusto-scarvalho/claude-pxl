@@ -18,6 +18,8 @@ export interface Resolver {
   timeline(name: string, seed: number): Timeline | undefined;
   /** Names a reference can stand for: group members, glob matches, or itself. */
   candidates(name: string): string[];
+  /** Glyph lookup of a font() (rows of "#" / "."), for text(). */
+  glyphs(font: string): (ch: string) => string[];
 }
 
 type Pred = (x: number, y: number) => boolean;
@@ -611,12 +613,13 @@ export class Canvas {
     if (opts.shadow) this.text(x + 1, y + 1, s, opts.shadow, { ...opts, shadow: undefined });
     const col = this.color(c);
     const sc = opts.scale ?? 1, gap = opts.gap ?? 1, lead = opts.lead ?? 1;
+    const g = opts.font ? this.res.glyphs(opts.font) : glyph, lineH = g(" ").length;
     let ly = y;
     for (const line of s.split("\n")) {
-      const lw = lineWidth(line, opts);
+      const lw = lineWidth(line, opts, g);
       let cx = opts.align === "c" ? x - Math.floor(lw / 2) : opts.align === "r" ? x - lw + 1 : x;
       for (const ch of line) {
-        const rows = glyph(ch);
+        const rows = g(ch);
         rows.forEach((row, r) => {
           for (let b = 0; b < row.length; b++)
             if (row[b] === "#")
@@ -624,7 +627,7 @@ export class Canvas {
         });
         cx += (rows[0].length + gap) * sc;
       }
-      ly += (5 + lead) * sc;
+      ly += (lineH + lead) * sc;
     }
   }
 }

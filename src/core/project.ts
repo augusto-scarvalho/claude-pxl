@@ -6,7 +6,7 @@ import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
 import {
   type AssetDef, type AssetKind, type AssetOpts, type GroupDef, type Item, type Layer, type LayerOpts, type Op,
-  type SheetDef, type SheetOpts, type Timeline, isLayer, isOp,
+  type FontDef, type SheetDef, type SheetOpts, type Timeline, isLayer, isOp,
 } from "./model.ts";
 import { PALETTE_FILE, Palette, paletteFromFile } from "./palette.ts";
 import { Trace } from "./trace.ts";
@@ -136,6 +136,8 @@ export class Project implements BuildCtx {
   readonly order: string[] = [];
   readonly groups = new Map<string, GroupDef>();
   readonly sheets: SheetDef[] = [];
+  readonly fonts = new Map<string, FontDef>();
+  private glyphCache = new Map<string, (ch: string) => string[]>();
   /** Art files loaded so far (absolute paths or virtual names), for locations and watching. */
   readonly files: string[] = [];
   pal: Palette = Palette.builtin("pico8");
@@ -275,6 +277,16 @@ export class Project implements BuildCtx {
       if (prev) throw new PxError(`'${name}' is already defined at ${prev.loc}`, loc);
       this.groups.set(name, { name, members, loc });
     };
+    env.font = (name: unknown, asset: unknown, opts: Partial<FontDef> = {}) => {
+      const loc = this.callerLoc();
+      if (typeof name !== "string" || typeof asset !== "string") throw new PxError('font("name", "glyph_sprite", { chars, w, h, cols? })', loc);
+      checkKeys(`font '${name}'`, opts, ["chars", "w", "h", "cols"], loc);
+      const { chars, w, h, cols } = opts;
+      if (typeof chars !== "string" || !chars || !(Number.isInteger(w) && w! > 0 && Number.isInteger(h) && h! > 0))
+        throw new PxError(`font '${name}' needs { chars: "ABC...", w, h }: the glyph cell size and the characters in cell order`, loc);
+      if (this.fonts.has(name)) throw new PxError(`font '${name}' is already defined at ${this.fonts.get(name)!.loc}`, loc);
+      this.fonts.set(name, { name, asset, chars, w: w!, h: h!, cols, loc });
+    };
     env.sheet = (name: unknown, entries: unknown, opts: SheetOpts = {}) => {
       const loc = this.callerLoc();
       if (typeof name !== "string" || !Array.isArray(entries)) throw new PxError('sheet("name", ["a", "b*"], { cols, pad })', loc);
@@ -309,6 +321,34 @@ export class Project implements BuildCtx {
   }
 
   // ---------------------------------------------------------------- resolving
+
+  /**
+   * A font's glyphs as rows of "#" / ".", cut from its asset once. Each glyph is trimmed to its
+   * opaque columns (a proportional font); a space not in `chars` is half a cell wide.
+   */
+  glyphs(font: string): (ch: string) => string[] {
+    const hit = this.glyphCache.get(font);
+    if (hit) return hit;
+    const f = this.fonts.get(font);
+    if (!f) throw new PxError(`unknown font '${font}'${didYouMean(font, [...this.fonts.keys()])}`);
+    const img = this.image(f.asset, 0, 0, false), cols = f.cols ?? Math.max(1, Math.floor(img.w / f.w));
+    const map = new Map<string, string[]>();
+    [...f.chars].forEach((ch, i) => {
+      const x0 = (i % cols) * f.w, y0 = Math.floor(i / cols) * f.h;
+      let rows = Array.from({ length: f.h }, (_, y) => Array.from({ length: f.w }, (_, x) => (img.get(x0 + x, y0 + y) !== TRANSPARENT ? "#" : ".")).join(""));
+      const used = [...Array(f.w).keys()].filter((x) => rows.some((r) => r[x] === "#"));
+      if (used.length) rows = rows.map((r) => r.slice(used[0], used[used.length - 1] + 1));
+      map.set(ch, rows);
+    });
+    if (!map.has(" ")) map.set(" ", Array(f.h).fill(".".repeat(Math.ceil(f.w / 2))));
+    const g = (ch: string) => {
+      const rows = map.get(ch) ?? map.get(ch.toUpperCase()) ?? map.get(ch.toLowerCase());
+      if (!rows) throw new PxError(`font '${font}' has no glyph for '${ch}' (it has: ${f.chars})`);
+      return rows;
+    };
+    this.glyphCache.set(font, g);
+    return g;
+  }
 
   candidates(name: string, depth = 0): string[] {
     const hit = this.cands.get(name);

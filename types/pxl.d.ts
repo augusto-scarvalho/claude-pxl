@@ -21,7 +21,7 @@ declare global {
   interface PxScatter extends PxPlace { on?: string; clip?: boolean; below?: boolean; even?: boolean }
   interface PxTilemap extends PxPlace { map: Record<string, string>; size?: number; w?: number; h?: number; x?: number; y?: number }
   interface PxWire extends PxPlace { hang?: string; every?: number; start?: number }
-  interface PxText { scale?: number; gap?: number; lead?: number; align?: "l" | "c" | "r"; shadow?: PxColor }
+  interface PxText { scale?: number; gap?: number; lead?: number; align?: "l" | "c" | "r"; shadow?: PxColor; font?: string }
   interface PxAssetOpts {
     w?: number; h?: number; base?: string; mx?: boolean | "c"; my?: boolean | "c"; swap?: Record<string, PxColor>;
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; outline?: PxColor; outline8?: PxColor; crop?: boolean; layers?: boolean;
@@ -114,6 +114,8 @@ declare global {
   function layer(name: string, ...items: PxItem[]): PxLayer;
   function group(name: string, members: string[]): void;
   function sheet(name: string, entries: string[], opts?: { cols?: number; pad?: number; extrude?: number }): void;
+  /** A bitmap font from glyphs drawn in w x h cells on a sprite, in the order of `chars`; use it with text(..., { font }). */
+  function font(name: string, sprite: string, opts: { chars: string; w: number; h: number; cols?: number }): void;
   /** palette: true keeps the included file's use()/pal()/ramps() active afterwards. */
   function include(path: string, opts?: { palette?: boolean }): void;
   function rng(seed?: number): () => number;

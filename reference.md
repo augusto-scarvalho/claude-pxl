@@ -32,6 +32,7 @@ layer(name, layerOpts?, ...items)      // only as an item of a sprite or scene
 group(name, ["a", "b", "rock_*", ...])  // random pick per placement; repeat a name to weight it
 sheet(name, ["slime*", "heart", groupName], { cols?, pad?, extrude? })  // extrude: repeat edge pixels n px out
 include("other.px.js")                  // path relative to the current file
+font(name, "glyph_sprite", { chars: "ABC...", w, h, cols? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional)
 include("palette.px.js", { palette: true })  // also take its use()/pal()/ramps() from here on
 ```
 
@@ -104,7 +105,8 @@ Post-processing order: mirror → swap → flip → rot → outline → crop.
 | `poly([x0, y0, x1, y1, ...], c)` | filled; vertices on pixel corners (`[0,0, 4,0, 4,4, 0,4]` = `rect(0,0,4,4)`) |
 | `fill(x, y, c)` | 4-connected flood fill |
 | `wire(x0, y0, x1, y1, sag, c, { hang?, every = 6, start?, ...placement })` | sagging cable; `hang` stamps an asset/group under it every `every` px (string lights) |
-| `text(x, y, "str", c, { scale = 1, gap = 1, lead = 1, align: "l"\|"c"\|"r", shadow? })` | built-in 3×5 font: A-Z 0-9 and common punctuation, `\n` for lines |
+| `text(x, y, "str", c, { scale = 1, gap = 1, lead = 1, align: "l"\|"c"\|"r", shadow?, font? })` | built-in 3×5 font: A-Z 0-9 and common punctuation, `
+` for lines; `font` uses a `font()` instead (`examples/fonts/font5x7.px.js` is a ready 5×7 one to `include`) |
 
 ### Texture and tone
 | Op | Notes |
