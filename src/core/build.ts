@@ -272,6 +272,11 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
     if (r) img = r;
     trace?.record(label, def.loc, img);
   };
+  // [x, y] is in drawing coords and moves with flip/rot/outline/crop; keywords use the final size.
+  const pv = o.pivot;
+  if (pv !== undefined && !(pv === "bottom" || pv === "center" || (Array.isArray(pv) && pv.length === 2 && pv.every(Number.isFinite))))
+    throw new PxError(`pivot must be "bottom", "center" or [x, y], got ${fmtArgs([pv])}`);
+  if (Array.isArray(pv)) img.pivot = [pv[0], pv[1]];
   if (o.mx) step("mirror x", () => img.mirror("x"));
   if (o.my) step("mirror y", () => img.mirror("y"));
   if (o.swap) {
@@ -290,6 +295,7 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
   if (o.outline) step(`outline ${o.outline}`, () => img.outline(solid(pal, o.outline!), false));
   if (o.outline8) step(`outline8 ${o.outline8}`, () => img.outline(solid(pal, o.outline8!), true));
   if (o.crop) step("crop", () => img.crop());
+  if (pv === "bottom" || pv === "center") img.pivot = [img.w / 2, pv === "bottom" ? img.h : img.h / 2];
   return img;
 }
 

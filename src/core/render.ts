@@ -96,6 +96,8 @@ export function sheetJson(image: string, sheet: Img, frames: SheetFrame[], tags:
       frame: { x: f.x, y: f.y, w, h }, rotated: false, trimmed: false,
       spriteSourceSize: { x: 0, y: 0, w, h }, sourceSize: { w, h },
       ...(f.ms !== undefined ? { duration: f.ms } : {}),
+      // TexturePacker convention: normalized, (0.5, 1) = bottom center.
+      ...(f.img.pivot ? { pivot: { x: +(f.img.pivot[0] / w).toFixed(4), y: +(f.img.pivot[1] / h).toFixed(4) } } : {}),
     };
   }
   const meta: Record<string, unknown> = { app: "pxl", image, format: "RGBA8888", size: { w: sheet.w, h: sheet.h }, scale: "1" };

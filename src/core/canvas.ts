@@ -364,8 +364,14 @@ export class Canvas {
       }
   }
 
+  /** Draw `src` with its pivot (default: `def`, as a fraction of its size) on (x, y). */
+  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred): void {
+    const [px, py] = src.pivot ?? [src.w * def[0], src.h * def[1]];
+    this.put(src, x - Math.floor(px), y - Math.floor(py), ok);
+  }
+
   stamp(name: string, x = 0, y = 0, opts?: PlaceOpts): void {
-    this.put(this.asset(name, opts, x, y), x, y);
+    this.putAt(this.asset(name, opts, x, y), x, y, [0, 0]);
   }
 
   tile(name: string, x: number, y: number, cols = 1, rows = 1, opts?: PlaceOpts): void {
@@ -417,7 +423,7 @@ export class Canvas {
       const cx = x + Math.floor(r() * w), cy = y + Math.floor(r() * h);
       if (!ok(cx, cy)) continue;
       const src = this.asset(name, opts, cx, cy);
-      this.put(src, cx - Math.floor(src.w / 2), cy - Math.floor(src.h / 2), opts.clip ? ok : undefined);
+      this.putAt(src, cx, cy, [0.5, 0.5], opts.clip ? ok : undefined);
       placed++;
     }
     // A brush that silently paints nothing is the usual sign of an empty layer under `on`.
@@ -457,7 +463,7 @@ export class Canvas {
       const [, fy] = at(d / span);
       const hx = x0 + dir * d, hy = Math.round(fy);
       const src = this.asset(opts.hang, opts, hx, hy);
-      this.put(src, hx - Math.floor(src.w / 2), hy + 1);
+      this.putAt(src, hx, hy + 1, [0.5, 0]);
     }
   }
 

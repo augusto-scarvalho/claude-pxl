@@ -69,6 +69,7 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 - **Reuse**: `stamp tile pattern tilemap scatter`. Names can be groups or globs
   (`group("rocks", ["rock_a", "rock_a", "rock_b"])`, `"tree_*"`). Each placement picks randomly but
   reproducibly. Use `rflip`, `rswap`, `seed`, and `reseed: true` for per-copy variety.
+  Give props `pivot: "bottom"`: `stamp("tree", x, groundY)` then stands them on the ground at any size.
 - **Brushes**: `scatter("_leaf*", x, y, w, h, 30, { on: "g", clip: true, rflip: "xy" })` paints
   texture with tiny part sprites, only on the given colors.
 - **Animation**: `anim("cat", { outline: "k", fps: 10 }, grid, frame(), frame(grid(23, 0, "_K")))`:

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { art, failure, PAL } from "./helpers.ts";
 import { loadSource } from "../src/node/load.ts";
+import { packSheet, sheetJson } from "../src/core/render.ts";
 
 const eq = (a: string, b: string) => assert.equal(a, b);
 
@@ -82,6 +83,21 @@ test("scatter: count, on-mask, clip, below", () => {
   eq(art(PAL + 'sprite("_d", "w"); sprite("t", { w: 4, h: 1 }, rect(0, 0, 2, 1, "r"), layer("x", scatter("_d", 0, 0, 4, 1, 20, { on: "r", below: true })))', "t"), "ww..");
   // ...and without below, an "on" that finds nothing fails loudly instead of painting nothing
   assert.match(failure(PAL + 'sprite("_d", "w"); sprite("t", { w: 4, h: 1 }, rect(0, 0, 2, 1, "r"), layer("x", scatter("_d", 0, 0, 4, 1, 20, { on: "r" })))', "t").message, /0 of 20 placed.*add below: true/);
+});
+
+test("pivot: placements line it up, transforms carry it, sheets export it", () => {
+  // "bottom" of the final 3x2 image is [1.5, 2]: stamped at (3, 3), it stands on row 3, centered on x 3.
+  eq(art(PAL + 'sprite("t", { w: 3, h: 2, pivot: "bottom" }, rect(0, 0, 3, 2, "r")); scene("s", { w: 7, h: 4 }, stamp("t", 3, 3))', "s"),
+    ".......\n..rrr..\n..rrr..\n.......");
+  // [x, y] is in drawing coords: the outline shifts it by 1.
+  eq(art(PAL + 'sprite("u", { w: 2, h: 1, pivot: [0, 0], outline: "k" }, rect(0, 0, 2, 1, "r")); scene("s", { w: 6, h: 3 }, stamp("u", 2, 1))', "s"),
+    "..kk..\n.krrk.\n..kk..");
+  // A placement flip mirrors the pivot too.
+  eq(art(PAL + 'sprite("v", { pivot: [0, 0] }, "rw"); scene("s", { w: 4, h: 1 }, stamp("v", 3, 0, { flip: "x" }))', "s"), ".wr.");
+  const img = loadSource(PAL + 'sprite("t", { w: 4, h: 2, pivot: "bottom" }, rect(0, 0, 4, 2, "r"))').image("t");
+  const json = JSON.parse(sheetJson("a.png", img, packSheet([{ name: "t", img }]).frames));
+  assert.deepEqual(json.frames.t.pivot, { x: 0.5, y: 1 });
+  assert.match(failure(PAL + 'sprite("t", { pivot: "feet" }, "r")', "t").message, /pivot must be "bottom", "center" or \[x, y\]/);
 });
 
 test("layers: order, offset, hidden, blend, inferred size, outline after", () => {

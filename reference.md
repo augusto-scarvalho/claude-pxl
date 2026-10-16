@@ -62,6 +62,7 @@ sheet globs.
 | `outline: "k"` | 1px outline around opaque pixels; **grows the canvas 1px on every side**. `outline8` also fills diagonals. |
 | `crop: true` | Trim to opaque bounds. |
 | `layers: true` | Also export each layer as `out/<sprites\|scenes>/<name>/<layer>.png`. |
+| `pivot: "bottom" \| "center" \| [x, y]` | The point `stamp`, `scatter` and wire hangs put on the given position. `"bottom"` is the middle of the final image's bottom edge, so `stamp("tree", x, groundY)` stands it on row `groundY` whatever its size. `[x, y]` is in drawing coordinates (pixel corners) and moves with flip, rot, outline and crop, here and in placements. A `base` variant starts with its base's pivot. Sheets export it as a normalized `pivot` (0.5, 1 = bottom center). |
 
 Post-processing order: mirror → swap → flip → rot → outline → crop.
 
@@ -108,11 +109,11 @@ rect, `[x0, y0, x1, y1, x2, y2, ...]` polygon, or `(x, y) => boolean`.
 ### Placing assets
 | Op | Notes |
 |---|---|
-| `stamp(name, x, y, opts?)` | |
+| `stamp(name, x, y, opts?)` | puts the asset's `pivot` on (x, y); without one, its top-left corner |
 | `tile(name, x, y, cols, rows, opts?)` | grid of copies (each cell picks separately for groups) |
 | `pattern(name, x, y, w, h, opts?)` | fill an area with copies; edges cut to fit |
 | `tilemap("gg\nd.", { map: { g: "grass", d: "dirt" }, size?, w?, h?, x?, y?, ...placement })` | character map; `.` empty |
-| `scatter(name, x, y, w, h, count, { on?, clip?, below?, ...placement })` | brush: `count` picks centered at random points; `on` = center must land on these keys; `clip` = paint only onto them; `below` = masks read the composite under this layer (a layer starts empty, so an `on` that places nothing is an error) |
+| `scatter(name, x, y, w, h, count, { on?, clip?, below?, ...placement })` | brush: `count` picks centered (or pivoted) at random points; `on` = center must land on these keys; `clip` = paint only onto them; `below` = masks read the composite under this layer (a layer starts empty, so an `on` that places nothing is an error) |
 | `clip(region, ...items)` | run items with drawing restricted to the region (half domes, roof slopes, masked textures) |
 
 Any `name` may be a sprite, scene, group, or glob (`"tree_*"`). **Placement opts**: `flip`, `rot`,

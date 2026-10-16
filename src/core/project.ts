@@ -59,9 +59,9 @@ const OP_OPTS: Record<string, string[]> = {
 };
 
 const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers"],
-  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "fps", "frames", "loop"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot"],
+  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "outline", "outline8", "crop", "layers", "pivot", "fps", "frames", "loop"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */

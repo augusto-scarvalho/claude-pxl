@@ -54,7 +54,7 @@ sprite("grass", { w: 32, h: 24 },
 
 // ---------------------------------------------------------------- props
 // Written as the left half; mx mirrors it. Outer edges dark, middle light: a lit cone.
-sprite("pine", { mx: true, outline: "k" }, `
+sprite("pine", { mx: true, outline: "k", pivot: "bottom" }, `
   ......h
   .....hG
   .....hg
@@ -73,11 +73,11 @@ sprite("pine", { mx: true, outline: "k" }, `
   ......W
   ......W`)
 
-sprite("rock", { w: 11, h: 7, outline: "k" },
+sprite("rock", { w: 11, h: 7, outline: "k", pivot: "bottom" },
   ellipse(5, 4, 5, 3, "s"), ellipse(4, 3, 3, 2, "i"), px(3, 2, "I"), hline(2, 6, 7, "S"), hline(7, 5, 2, "S"))
 
 // Odd width: the center column is shared.
-sprite("crystal", { mx: "c", outline: "k" }, `
+sprite("crystal", { mx: "c", outline: "k", pivot: "bottom" }, `
   ...j
   ..cj
   ..cj
@@ -117,8 +117,8 @@ const PROPS = `
   .......o
   ..o.....
   ........`
-// [asset, width, height] after the outline; the prop's bottom centre stands on the top face.
-const PROP = { p: ["pine", 16, 19], o: ["rock", 13, 9], "*": ["crystal", 9, 12] }
+// Props have pivot: "bottom", so each one stands on the middle of its cell's top face.
+const PROP = { p: "pine", o: "rock", "*": "crystal" }
 
 const rows = (s) => s.trim().split("\n").map((r) => r.trim())
 
@@ -137,7 +137,7 @@ scene("island", { w: 256, h: 168, bg: "o" }, (c) => {
       const p = PROP[props[row][col]]
       if (p) {
         const [x, y] = iso(col, row, t.h - 1)
-        c.stamp(p[0], x + 16 - (p[1] >> 1), y + 9 - p[2])
+        c.stamp(p, x + 16, y + 9)
       }
     }
 })

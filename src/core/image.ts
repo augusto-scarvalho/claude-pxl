@@ -26,6 +26,11 @@ export class Img {
    * (lit flat). Set by bump() / normals(); travels with the pixels like lamps do.
    */
   norm?: Int8Array;
+  /**
+   * The point placements line up with (stamp's x, y), in pixel-corner coords: [w / 2, h] is the
+   * middle of the bottom edge. Set from the asset's `pivot`; travels through transforms.
+   */
+  pivot?: [number, number];
 
   constructor(w: number, h: number, data?: Uint32Array) {
     w = Math.floor(w);
@@ -57,6 +62,13 @@ export class Img {
     const o = new Img(this.w, this.h, this.data.slice());
     if (this.lamps) o.lamps = this.lamps.map((l) => ({ ...l }));
     if (this.norm) o.norm = this.norm.slice();
+    if (this.pivot) o.pivot = [...this.pivot];
+    return o;
+  }
+
+  /** Carry the pivot into `o` through a transform of pixel-corner coords. */
+  private movePivot(o: Img, f: (x: number, y: number) => [number, number]): Img {
+    if (this.pivot) o.pivot = f(...this.pivot);
     return o;
   }
 
@@ -120,6 +132,7 @@ export class Img {
         o.data[y * this.w + x] = this.data[j];
         if (this.norm) Img.moveNorm(this.norm, j, o.normals(), y * this.w + x, fx ? -1 : 1, fy ? -1 : 1);
       }
+    this.movePivot(o, (x, y) => [fx ? this.w - x : x, fy ? this.h - y : y]);
     return this.moveLamps(o, (x, y) => [fx ? this.w - 1 - x : x, fy ? this.h - 1 - y : y]);
   }
 
@@ -137,6 +150,7 @@ export class Img {
         o.set(tx, ty, c);
         if (this.norm) Img.moveNorm(this.norm, y * this.w + x, o.normals(), ty * o.w + tx, 1, 1, d);
       }
+    this.movePivot(o, (x, y) => (d === 90 ? [this.h - y, x] : [y, this.w - x]));
     return this.moveLamps(o, (x, y) => (d === 90 ? [this.h - 1 - y, x] : [y, this.w - 1 - x]));
   }
 
@@ -186,6 +200,7 @@ export class Img {
         o.data[yy * w + xx] = this.get(x + xx, y + yy);
         if (this.norm && this.inside(x + xx, y + yy)) Img.moveNorm(this.norm, (y + yy) * this.w + x + xx, o.normals(), yy * w + xx);
       }
+    this.movePivot(o, (px, py) => [px - x, py - y]);
     return this.moveLamps(o, (lx, ly) => [lx - x, ly - y]);
   }
 
@@ -197,6 +212,7 @@ export class Img {
   pad(n: number): Img {
     const o = new Img(this.w + 2 * n, this.h + 2 * n);
     o.blit(this, n, n);
+    this.movePivot(o, (x, y) => [x + n, y + n]);
     return this.moveLamps(o, (x, y) => [x + n, y + n]);
   }
 

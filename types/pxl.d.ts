@@ -23,6 +23,8 @@ declare global {
   interface PxAssetOpts {
     w?: number; h?: number; base?: string; mx?: boolean | "c"; my?: boolean | "c"; swap?: Record<string, PxColor>;
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; outline?: PxColor; outline8?: PxColor; crop?: boolean; layers?: boolean;
+    /** Point that stamp / scatter / wire hangs place: "bottom" / "center" of the final image, or [x, y] in drawing coords. */
+    pivot?: "bottom" | "center" | [number, number];
   }
   interface PxSceneOpts extends PxAssetOpts { w: number; h: number; bg?: PxColor }
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean }
