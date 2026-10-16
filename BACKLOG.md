@@ -49,5 +49,6 @@ Mark items `[x]` when they ship, with the commit.
 - [ ] Layer blend modes and opacity (multiply, screen, ...): leave the palette; `shade`/`light`/
   `glow` cover most uses.
 - [x] Onion skin in the live viewer: an "onion" toggle, `,` and `.` step frames.
-- [ ] Isometric `tilemap` and export to Tiled (`.tmj`) for engines.
+- [x] Isometric `tilemap` (`iso: true`, one level).
+- [ ] Export tilemaps to Tiled (`.tmj`) for engines.
 - [x] Bitmap fonts: `font(name, sprite, { chars, w, h })` + `text(..., { font })`, and a ready 5x7 font in `examples/fonts/`.

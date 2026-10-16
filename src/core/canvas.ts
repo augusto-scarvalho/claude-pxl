@@ -490,16 +490,34 @@ export class Canvas {
     if (!opts?.map) throw new PxError("tilemap needs { map: { char: assetName } }");
     const rows = gridRows(str);
     const x0 = opts.x ?? 0, y0 = opts.y ?? 0;
+    if (opts.iso && !(opts.w && opts.h)) throw new PxError("tilemap { iso: true } needs the floor diamond's size: { w: 32, h: 16 }");
+    const cells: { r: number; i: number; name: string }[] = [];
     rows.forEach((row, r) => {
       [...row].forEach((ch, i) => {
         if (ch === "." || ch === " ") return;
         const name = opts.map[ch];
         if (!name) throw new PxError(`tilemap: no tile for '${ch}' (row ${r}, col ${i}); map has: ${Object.keys(opts.map).join(" ")}`);
-        const step = opts.w && opts.h ? null : this.res.image(this.res.candidates(name)[0], 0);
-        const tx = x0 + i * (opts.w ?? opts.size ?? step!.w), ty = y0 + r * (opts.h ?? opts.size ?? step!.h);
-        this.put(this.asset(name, opts, tx, ty), tx, ty);
+        cells.push({ r, i, name });
       });
     });
+    if (opts.iso) {
+      // Columns run down-right, rows down-left; back to front, so nearer tiles cover farther ones.
+      // A tile's top-left sits on its diamond's top-left; a tile with a pivot stands it on the
+      // diamond's center (trees, props).
+      const w = opts.w!, h = opts.h!;
+      cells.sort((a, b) => a.i + a.r - (b.i + b.r) || a.r - b.r);
+      for (const { r, i, name } of cells) {
+        const tx = x0 + ((i - r) * w) / 2, ty = y0 + ((i + r) * h) / 2, src = this.asset(name, opts, tx, ty);
+        if (src.pivot) this.putAt(src, tx + w / 2, ty + h / 2, [0, 0]);
+        else this.put(src, tx, ty);
+      }
+      return;
+    }
+    for (const { r, i, name } of cells) {
+      const step = opts.w && opts.h ? null : this.res.image(this.res.candidates(name)[0], 0);
+      const tx = x0 + i * (opts.w ?? opts.size ?? step!.w), ty = y0 + r * (opts.h ?? opts.size ?? step!.h);
+      this.put(this.asset(name, opts, tx, ty), tx, ty);
+    }
   }
 
   /** Brush: `count` random picks of `name` centered at random points in the area. */

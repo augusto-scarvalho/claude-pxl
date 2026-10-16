@@ -127,7 +127,7 @@ rect, `[x0, y0, x1, y1, x2, y2, ...]` polygon, or `(x, y) => boolean`.
 | `tile(name, x, y, cols, rows, opts?)` | grid of copies (each cell picks separately for groups) |
 | `pattern(name, x, y, w, h, opts?)` | fill an area with copies; edges cut to fit |
 | `panel(name, x, y, w, h, opts?)` | 9-slice: an asset with `slice` margins drawn at w×h. Corners stay as drawn; edges and center **repeat** (never stretch), so keep the center a flat fill or a seamless pattern. UI frames, buttons, dialog boxes |
-| `tilemap("gg\nd.", { map: { g: "grass", d: "dirt" }, size?, w?, h?, x?, y?, ...placement })` | character map; `.` empty |
+| `tilemap("gg\nd.", { map: { g: "grass", d: "dirt" }, size?, w?, h?, x?, y?, ...placement })` | character map; `.` empty. `iso: true` with the floor diamond's `w`, `h` (e.g. 32×16): cells on an isometric grid, columns down-right and rows down-left, drawn back to front; a tile's top-left sits on its diamond's top-left, and a tile with a `pivot` stands on the diamond's center (props). One level; stacked heights take a loop (`examples/isometric.px.js`) |
 | `scatter(name, x, y, w, h, count, { on?, clip?, below?, even?, ...placement })` | brush: `count` picks centered (or pivoted) at random points; `on` = center must land on these keys; `clip` = paint only onto them; `below` = masks read the composite under this layer (a layer starts empty, so an `on` that places nothing is an error); `even` = one pick per cell of a grid sized to `count`, at a random spot in the cell: stones, pebbles and flowers spread evenly over the whole area, without the clumps and holes of pure random |
 | `clip(region, ...items)` | run items with drawing restricted to the region (half domes, roof slopes, masked textures) |
 

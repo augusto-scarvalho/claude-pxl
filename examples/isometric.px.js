@@ -36,7 +36,8 @@ const block = (top, rim, left, right, y0 = 0, lip = [left, right]) => (c) => {
   }
 }
 
-// Map cell -> screen position of its block at stack level z. Columns run down-right, rows
+// A single-level map needs none of this: tilemap(map, { iso: true, w: 32, h: 16 }). Stacked
+// heights do: map cell -> screen position of its block at stack level z. Columns run down-right, rows
 // down-left, each level lifts the block by its 8px side.
 const OX = 112, OY = 24
 const iso = (col, row, z) => [OX + (col - row) * 16, OY + (col + row) * 8 - z * 8]

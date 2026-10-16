@@ -141,6 +141,13 @@ test("curve: through the points, pixel-perfect at 1px, closed loops", () => {
   assert.match(failure(PAL + 'sprite("t", { w: 2, h: 2 }, curve([0, 0], "r"))', "t").message, /curve needs \[x0, y0, x1, y1, \.\.\.\]/);
 });
 
+test("tilemap iso: a diamond grid drawn back to front", () => {
+  const T = ["a", "b", "c", "d"].map((k, i) => `sprite("${k}", { w: 4, h: 2 }, rect(0, 0, 4, 2, "${"rwgk"[i]}")); `).join("");
+  eq(art(PAL + T + 'scene("s", { w: 8, h: 4 }, tilemap("ab\\ncd", { iso: true, w: 4, h: 2, x: 2, map: { a: "a", b: "b", c: "c", d: "d" } }))', "s"),
+    "..rrrr..\nggggwwww\nggkkkkww\n..kkkk..");
+  assert.match(failure(PAL + 'sprite("a", "r"); scene("s", { w: 4, h: 4 }, tilemap("a", { iso: true, map: { a: "a" } }))', "s").message, /needs the floor diamond's size/);
+});
+
 test("font: glyphs cut from a sprite, trimmed to their ink (proportional), used by text()", () => {
   // two 3x2 cells: "A" fills its cell, "i" is one column in the middle
   const F = PAL + 'sprite("_f", "rrr.r.\\nr.r.r."); font("tiny", "_f", { chars: "Ai", w: 3, h: 2 }); ';

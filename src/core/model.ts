@@ -179,6 +179,8 @@ export interface ScatterOpts extends PlaceOpts {
 
 export interface TilemapOpts extends PlaceOpts {
   map: Record<string, string>;
+  /** Isometric: cells on a diamond grid of w x h floors, drawn back to front. */
+  iso?: boolean;
   size?: number;
   w?: number;
   h?: number;
