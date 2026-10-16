@@ -77,7 +77,7 @@ flips, rotations and mirroring. A layer drawn on top without normals clears them
 
 ```js
 sprite("bricks", { w: 32, h: 24 }, pattern("_brick", 0, 0, 32, 24),
-  bump("bevel", { on: "b", w: 2 }))                        // each brick bevelled; mortar is the edge
+  bump("bevel", { on: "b", w: 1 }))                        // each 3px brick bevelled; mortar is the edge
 sprite("slime", ..., bump("dome", { depth: 1.5 }))          // the blob bulges like a pillow
 sprite("rock", ..., bump("luma", { depth: 2 }))             // the existing shading becomes relief
 sprite("crate", `...`, normals(0, 0, `
@@ -92,7 +92,7 @@ opaque pixels:
 | Shape | Height comes from |
 |---|---|
 | `"dome"` | Each connected blob bulges, steep at the rim and flat at the top (barrels, slimes, fruit). |
-| `"bevel"` | Edges slope over `w` px (default 2), with a flat top (bricks, panels, buttons, tiles). |
+| `"bevel"` | Edges slope over `w` px (default 2), with a flat top (bricks, panels, buttons, tiles). Keep `w` under half the shape's smallest side: a 3px-tall brick needs `w: 1`, or it has no flat top and reads as a hole under a near lamp. |
 | `"luma"` | Brightness: lighter pixels are higher. Good for art that's already shaded. |
 
 `on` limits it to some keys, and the other keys act as edges, so `on: "b"` bevels every brick

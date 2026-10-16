@@ -4,7 +4,7 @@ pal({
   k: "#1c1626",                                                     // ink
   l: "#c8ee88", g: "#8ccf5a", G: "#5aa040", h: "#3c7a3a",           // grass: rim, top, sides
   U: "#e6b884", u: "#c89058", d: "#a8703e", D: "#7e4e30",           // dirt: rim, top, left, right
-  I: "#e2e2ec", i: "#b4b4c8", s: "#8e8ea8", S: "#66667e",           // stone
+  I: "#e2e2ec", i: "#b4b4c8", s: "#8e8ea8", S: "#66667e", Z: "#4c4c62", // stone, mortar
   Y: "#fff4c8", y: "#f2dc9c", a: "#d8b874", A: "#ae8c58",           // sand
   f: "#dff8ff", b: "#5cc4ec", B: "#3a92d0", n: "#2a68a8",           // water
   w: "#9a6438", W: "#6a4026",                                       // wood
@@ -43,7 +43,13 @@ const iso = (col, row, z) => [OX + (col - row) * 16, OY + (col + row) * 8 - z * 
 
 // ---------------------------------------------------------------- blocks
 sprite("dirt", { w: 32, h: 24 }, block("u", "U", "d", "D"))
-sprite("stone", { w: 32, h: 24 }, block("i", "I", "s", "S"))
+// Masonry: a mortar course halfway down each side face, following the iso slant, and joints
+// staggered between the courses (stacked blocks repeat it, so they stagger too).
+const masonry = (lm, rm) => (c) => {
+  for (let k = 0; k < 8; k++) { c.hline(2 * k, 12 + k, 2, lm); c.hline(30 - 2 * k, 12 + k, 2, rm) }
+  for (const [k, down] of [[2, 1], [6, 1], [4, 5]]) { c.vline(2 * k, 8 + k + down, 3, lm); c.vline(31 - 2 * k, 8 + k + down, 3, rm) }
+}
+sprite("stone", { w: 32, h: 24 }, block("i", "I", "s", "S"), masonry("S", "Z"))
 sprite("sand", { w: 32, h: 24 }, block("y", "Y", "a", "A"))
 sprite("water", { w: 32, h: 24 }, block("b", "f", "B", "n", 4))
 
@@ -114,7 +120,7 @@ const PROPS = `
   ....p...
   ..p.....
   ....*p..
-  .......o
+  ......o.
   ..o.....
   ........`
 // Props have pivot: "bottom", so each one stands on the middle of its cell's top face.
@@ -135,6 +141,8 @@ scene("island", { w: 256, h: 168, bg: "o" }, (c) => {
         c.stamp(z === t.h - 1 ? t.top : t.under, x, y)
       }
       const p = PROP[props[row][col]]
+      // The prop map is drawn apart from the terrain: fail loudly instead of floating a rock on water.
+      if (p && t.top === "water") throw new Error(`${p} at row ${row}, col ${col} would stand in water`)
       if (p) {
         const [x, y] = iso(col, row, t.h - 1)
         c.stamp(p, x + 16, y + 9)

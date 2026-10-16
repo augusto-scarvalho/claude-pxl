@@ -19,8 +19,9 @@ sprite("_brick", `
   bbbmbbbb
   mmmmmmmm`)
 
-// Each brick bevels on its own: mortar counts as the edge.
-sprite("bricks", { w: 32, h: 24 }, pattern("_brick", 0, 0, 32, 24), bump("bevel", { on: "b", w: 2 }))
+// Each brick bevels on its own: mortar counts as the edge. 1px, because the bricks are 3px tall: a
+// wider bevel leaves no flat face, and under a near lamp they read as holes.
+sprite("bricks", { w: 32, h: 24 }, pattern("_brick", 0, 0, 32, 24), bump("bevel", { on: "b", w: 1 }))
 
 sprite("slime", { w: 15, h: 10 }, ellipse(7, 9, 7, 8, "g"),
   px(5, 5, "k"), px(9, 5, "k"), bump("dome", { depth: 1.5 }))
