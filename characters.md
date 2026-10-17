@@ -57,7 +57,9 @@ the curves of the clothes exactly.
    - eyes, mouth and other 1–2 px face features;
    - thin lines, like collars and ties;
    - small clutter, like hands and buckles;
-   - stray specks in flat areas, which a region-limited `recolor` clears.
+   - stray specks in flat areas, which a region-limited `recolor` clears;
+   - 1 px bumps on thin limbs. A sock that widens where it meets the shoe is shape at full size and
+     reads as swelling at half size, so run calves and wrists straight.
 3. **Close the gaps in the contour, and nothing else.** Halving keeps most of the outline, including
    its selective colours. It only drops the line where a 2×2 block's vote went to the fill colour.
    - Keep every edge pixel that is already dark.
