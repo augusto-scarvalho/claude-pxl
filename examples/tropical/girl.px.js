@@ -48,8 +48,8 @@ sprite("girl_pose", { w: 30, h: 26, outline: "k" }, `
 // driven by the CC0 walk guide in ../motion/walk.json: the guide says which foot is planted, how far
 // each foot is ahead or behind, where the hands swing and when the body rises; the parts are drawn by
 // hand at her size. The guide shows in the previews (a ref layer), limbs colored by side.
-// Head, torso and skirt: the standing girl without her legs, her near arm, her far hand and the
-// hair that hangs below her shoulder.
+// Head, torso and skirt: the standing girl without her legs, her near arm and her far hand. Her
+// long hair hangs behind her (a part of its own, drawn under everything).
 // Sockets mark where those attach; the pivot is between her feet on the ground.
 const TOP = `
   ...........1hhhhhhhh1.........
@@ -74,7 +74,7 @@ const TOP = `
   ............bBbBbBbO..........
   ...........bBbBbBbBO..........
   ...........b.Bb.bB.O..........`
-sprite("girl_top", { w: 30, h: 22, pivot: [15, 26], sockets: { arm_r: [9, 15], hand_l: [20, 18], leg_r: [11, 21], leg_l: [16, 21], hair: [18, 15] } }, TOP)
+sprite("girl_top", { w: 30, h: 22, pivot: [15, 26], sockets: { arm_r: [9, 15], hand_l: [20, 18], leg_r: [11, 21], leg_l: [16, 21], hair: [16, 13] } }, TOP)
 
 // Legs, planted (the foot pointing the way she walks) and lifted (the foot drawn up). Their top row
 // hides under the skirt, so a leg stepping down a pixel doesn't open a gap.
@@ -87,11 +87,33 @@ sprite("arm_r_0", { pivot: [0, 0] }, "RD\nft\nft\ntS\nft")
 sprite("arm_r_1", { pivot: [1, 0] }, ".RD\n.ft\nft.\ntS.\nf..")
 sprite("arm_r_2", { pivot: [2, 0] }, "..RD\n.ft.\nft..\ntS..")
 sprite("hand_l", "t\nS")
-// The hair below her shoulder, cut straight at the bottom, as it hangs and with its ends swung back
-// and forward: the top stays on her shoulder and the ends move a pixel, like a skirt's hem.
-sprite("hair_rest", "hhh1\nhhh1\nhhh1")
-sprite("hair_back", "hhh1.\nhhhh1\n.hhh1")
-sprite("hair_fwd", { pivot: [1, 0] }, ".hhh1\nhhhh1\nhhh1.")
+// Her long hair, behind her: from the nape down her back to the waist, cut straight at the bottom.
+// Her body and arms are in front of it, so what shows is the part past her back. Drawn as it hangs
+// and with its hem swung back and forward: it swings once a step like a skirt.
+sprite("hair_back_rest", `
+  ..hhhh1
+  ..hhhh1
+  .hhhhh1
+  .hhhhh1
+  .hhhhh1
+  .hhhhh1
+  .111111`)
+sprite("hair_back_swung", `
+  ..hhhh1.
+  ..hhhh1.
+  .hhhhh1.
+  .hhhhh1.
+  .hhhhhh1
+  ..hhhhh1
+  ..111111`)
+sprite("hair_back_fwd", { pivot: [1, 0] }, `
+  ...hhhh1
+  ...hhhh1
+  ..hhhhh1
+  ..hhhhh1
+  .hhhhhh1
+  .hhhhh1.
+  .111111.`)
 
 {
   // What the guide gives, per frame. Ankles and wrists are measured from the hip and the shoulder,
@@ -124,7 +146,7 @@ sprite("hair_fwd", { pivot: [1, 0] }, ".hhh1\nhhhh1\nhhh1.")
       c.stamp(p.upR ? "leg_r_up" : "leg_r", p.legR, p.legRy, { at: "girl_top.leg_r", z: p.rFront ? 1 : 0 })
       c.stamp(p.upL ? "leg_l_up" : "leg_l", p.legL, p.legLy, { at: "girl_top.leg_l", z: p.rFront ? 0 : 1 })
       c.stamp(`arm_r_${Math.max(0, p.arm)}`, 0, 0, { at: "girl_top.arm_r", z: 3 })
-      c.stamp(["hair_rest", "hair_back", "hair_rest", "hair_fwd"][c.frame % 4], 0, 0, { at: "girl_top.hair", z: 2.5 })   // one swing a step
+      c.stamp(["hair_back_rest", "hair_back_swung", "hair_back_rest", "hair_back_fwd"][c.frame % 4], 0, 0, { at: "girl_top.hair", z: -2 })   // behind her; one swing a step
       if (p.hand > 0) c.stamp("hand_l", Math.min(1, p.hand - 1), 0, { at: "girl_top.hand_l", z: -1 })
     }),
     layer("guide", { ref: 0.6 }, (c) => c.pose(SMALL.frames[c.frame], { sides: true, joint: false })))
