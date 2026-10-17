@@ -206,10 +206,12 @@ offset points back to, so nothing tears open and no color is made up.
 - **Breathing:** move every row above the knees down 1 px on the out-breath,
   `(c) => { if (c.frame % 2) c.warp((x, y) => y <= knee && [0, 1]) }`, and let the row the shift
   lands on be a plain one, so hems and fringes keep their shape.
-- **Hair, tails, cloth following a frame late:** after the parts are drawn (an item after their
-  layer), warp the ends a pixel toward where they were: when the body rises, the hair's ends stay a
-  pixel lower for that frame (`examples/tropical/girl.px.js`). One pixel at 32 px is enough; more
-  reads as the hair coming loose.
+- **Hair, tails, cloth following a frame late:** the ends lag the body *both ways*. Stretching the
+  hair a pixel only when the body rises reads as a twitch: it never comes back. Make the hanging part
+  its own sprite on a socket, draw it in a few poses (at rest, ends bounced up, ends stretched down,
+  ends trailing behind) and pick one per frame from the body's bob a frame earlier: just landed →
+  ends up, just risen → ends down, in between → trailing, then rest (`examples/tropical/girl.px.js`).
+  One pixel of travel at 32 px is enough; more reads as the hair coming loose.
 
 ## 10. Animating with parts
 

@@ -47,9 +47,10 @@ sprite("girl_pose", { w: 30, h: 26, outline: "k" }, `
 // driven by the CC0 walk guide in ../motion/walk.json: the guide says which foot is planted, how far
 // each foot is ahead or behind, where the hands swing and when the body rises; the parts are drawn by
 // hand at her size. The guide shows in the previews (a ref layer), limbs colored by side.
-// Head, torso and skirt: the standing girl without her legs, her near arm and her far hand.
+// Head, torso and skirt: the standing girl without her legs, her near arm, her far hand and the
+// hair that hangs below her shoulder.
 // Sockets mark where those attach; the pivot is between her feet on the ground.
-sprite("girl_top", { w: 30, h: 22, pivot: [15, 26], sockets: { arm_r: [9, 15], hand_l: [20, 18], leg_r: [11, 21], leg_l: [16, 21] } }, `
+sprite("girl_top", { w: 30, h: 22, pivot: [15, 26], sockets: { arm_r: [9, 15], hand_l: [20, 18], leg_r: [11, 21], leg_l: [16, 21], hair: [18, 15] } }, `
   ...........1hhhhhhhh1.........
   .........1hhjjjhhhhhh1........
   ........1hjJJjhhhhhhhh1.......
@@ -65,9 +66,9 @@ sprite("girl_top", { w: 30, h: 22, pivot: [15, 26], sockets: { arm_r: [9, 15], h
   .........1h1tfffftShhh1.......
   .........1h...Stt..hhhh1......
   .........1httytttytthhh1......
-  ...........ttReutthhh1........
-  ...........rRRRRRDhhh1........
-  ...........RnRnRnDhh1.........
+  ...........ttReuttS...........
+  ...........rRRRRRDD...........
+  ...........RnRnRnDD...........
   ............OOOOOOO...........
   ............bBbBbBbO..........
   ...........bBbBbBbBO..........
@@ -84,6 +85,13 @@ sprite("arm_r_0", { pivot: [0, 0] }, "RD\nft\nft\ntS\nft")
 sprite("arm_r_1", { pivot: [1, 0] }, ".RD\n.ft\nft.\ntS.\nf..")
 sprite("arm_r_2", { pivot: [2, 0] }, "..RD\n.ft.\nft..\ntS..")
 sprite("hand_l", "t\nS")
+// The hair below her shoulder, as it hangs, bounced up (she came down, the ends lag above),
+// thrown back (she walks to the left, the ends trail right) and stretched (she went up, the ends
+// lag below). Drawn once each; per frame the walk picks one.
+sprite("hair_rest", "hhh1\nhhh1\nhh1.")
+sprite("hair_up", "hhh1\nhh1.")
+sprite("hair_back", ".hhh1\n.hhh1\n..hh1")
+sprite("hair_down", "hhh1\nhhh1\nhhh1\nhh1.")
 
 {
   // What the guide gives, per frame. Ankles and wrists are measured from the hip and the shoulder,
@@ -106,6 +114,12 @@ sprite("hand_l", "t\nS")
     arm: Math.min(2, Math.round(-rel(i, "r_wrist", "r_shoulder")[0] * SWING)),        // near arm: 0 down .. 2 forward
     hand: Math.round(rel(i, "l_wrist", "l_shoulder")[0] * SWING),           // far hand: > 0 behind her
   }))
+  // The hair follows the body a frame late, both ways: when she has just come down its ends are
+  // still up, when she has just gone up they are still down; in between they trail behind her.
+  PLAN.forEach((p, i) => {
+    const lag = p.bob - PLAN[(i + 7) % 8].bob
+    p.hair = lag < 0 ? "hair_up" : lag > 0 ? "hair_down" : i % 4 === 1 ? "hair_back" : "hair_rest"
+  })
 
   for (const p of PLAN) p.legL = Math.max(p.legL, p.legR - 1)
 
@@ -116,14 +130,9 @@ sprite("hand_l", "t\nS")
       c.stamp(p.upR ? "leg_r_up" : "leg_r", p.legR, p.legRy, { at: "girl_top.leg_r", z: p.rFront ? 1 : 0 })
       c.stamp(p.upL ? "leg_l_up" : "leg_l", p.legL, p.legLy, { at: "girl_top.leg_l", z: p.rFront ? 0 : 1 })
       c.stamp(`arm_r_${Math.max(0, p.arm)}`, 0, 0, { at: "girl_top.arm_r", z: 3 })
+      c.stamp(p.hair, 0, 0, { at: "girl_top.hair", z: 2.5 })
       if (p.hand > 0) c.stamp("hand_l", Math.min(1, p.hand - 1), 0, { at: "girl_top.hand_l", z: -1 })
     }),
-    // her hair hangs behind her shoulders and follows a frame late: when she rises, its ends are
-    // still a pixel lower, so the hair stretches (after the parts layer, so it moves what's drawn)
-    (c) => {
-      const p = PLAN[c.frame], before = PLAN[(c.frame + 7) % 8]
-      if (p.bob > before.bob) c.warp(() => [0, 1], [18, 15 - p.bob, 6, 4])
-    },
     layer("guide", { ref: 0.6 }, (c) => c.pose(SMALL.frames[c.frame], { sides: true, joint: false })))
   anim("girl_walk_se", { base: "girl_walk", flip: "x" })
 }

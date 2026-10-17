@@ -106,8 +106,9 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
   one y offset per cycle; never by the bounding box.
 - [x] **Small warps for secondary motion** (b20305a): `warp((x, y) => [dx, dy], where?)`, whole-pixel
   offsets read back from each pixel's new place (no holes, no new colors): the useful side of Warp's
-  pins. The forest's breathing and the jaguar's shear became one line each (identical output); the
-  walking girl's hair follows a frame late. Skipped: `breathe` / `sway` helpers (each is one line of
+  pins. The forest's breathing and the jaguar's shear became one line each (identical output). For the
+  walking girl's hair it fell short: a stretch on the rise alone read as a twitch, so the hair became
+  a part drawn in four poses, picked a frame late. Skipped: `breathe` / `sway` helpers (each is one line of
   `warp`; recipes in characters.md §9). Not for bending limbs.
 - [ ] **Scatter near a color**: `scatter(..., { on: "g", near: "a", within: 2 })` for grass along paths
   and at the foot of things. (Selection border / expand in both editors.)
