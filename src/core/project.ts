@@ -9,6 +9,7 @@ import {
   type FontDef, type SheetDef, type SheetOpts, type Timeline, isLayer, isOp,
 } from "./model.ts";
 import { PALETTE_FILE, Palette, paletteFromFile } from "./palette.ts";
+import { readJoints } from "./pose.ts";
 import { Trace } from "./trace.ts";
 import { globRe, rng } from "./util.ts";
 
@@ -43,6 +44,7 @@ export const SIGNATURES: Record<string, string> = {
   tilemap: "map:s opts:o",
   scatter: "name:s x:n y:n w:n h:n count:n ?opts:o",
   grid: "x:n y:n str:s",
+  runs: "rows:o",
   wire: "x0:n y0:n x1:n y1:n sag:n c:c ?opts:o",
   text: "x:n y:n str:t c:c ?opts:o",
   clip: "where:r ...items:I",
@@ -63,14 +65,14 @@ const OP_OPTS: Record<string, string[]> = {
 };
 
 const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "slice", "png", "area", "palettize"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "slice", "png", "area", "palettize", "shrink"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "slice", "png", "area", "palettize", "fps", "frames", "loop", "dir"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
 const MAX_LOOP = 60000;
-const LAYER_OPTS = ["x", "y", "hidden", "shade", "light", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit"];
+const LAYER_OPTS = ["x", "y", "hidden", "shade", "light", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref"];
 const SHEET_OPTS = ["cols", "pad", "extrude"];
 
 function checkArgs(name: string, args: unknown[]): void {
@@ -154,12 +156,19 @@ export class Project implements BuildCtx {
       if (typeof o.png !== "string" || !/\.png$/i.test(o.png)) throw new PxError(`png must be a .png path, got ${JSON.stringify(o.png)}`);
       if (o.base) throw new PxError("png and base both set the starting image: use one");
       if (!this.pngHook) throw new PxError("png needs an art file on disk");
-      const img = this.pngHook(o.png);
-      if (!o.area) return img;
+      let img = this.pngHook(o.png);
       const a = o.area;
-      if (!Array.isArray(a) || a.length !== 4 || !a.every(Number.isInteger) || a[2] < 1 || a[3] < 1 || a[0] < 0 || a[1] < 0 || a[0] + a[2] > img.w || a[1] + a[3] > img.h)
-        throw new PxError(`area must be [x, y, w, h] inside the ${img.w}x${img.h} image, got ${JSON.stringify(a)}`);
-      return img.sub(a[0], a[1], a[2], a[3]);
+      if (a) {
+        if (!Array.isArray(a) || a.length !== 4 || !a.every(Number.isInteger) || a[2] < 1 || a[3] < 1 || a[0] < 0 || a[1] < 0 || a[0] + a[2] > img.w || a[1] + a[3] > img.h)
+          throw new PxError(`area must be [x, y, w, h] inside the ${img.w}x${img.h} image, got ${JSON.stringify(a)}`);
+        img = img.sub(a[0], a[1], a[2], a[3]);
+      }
+      if (o.shrink !== undefined) {
+        if (!(Number.isInteger(o.shrink) && o.shrink >= 2 && o.shrink <= Math.min(img.w, img.h)))
+          throw new PxError(`shrink must be a whole factor from 2 to ${Math.min(img.w, img.h)}, got ${JSON.stringify(o.shrink)}`);
+        img = img.shrink(o.shrink);
+      }
+      return img;
     } catch (e) {
       throw wrap(e).within(what, loc);
     }
@@ -351,6 +360,20 @@ export class Project implements BuildCtx {
         return { __op: true, name, args, loc };
       };
     }
+    // pose("pose.json" | { name: [x, y, score] }, opts): joints from a pose detector, drawn as a guide.
+    env.pose = (src: unknown, opts: unknown = {}): Op => {
+      const loc = this.callerLoc();
+      try {
+        if (!isPlainObject(opts)) throw new PxError('pose("pose.json", { x, y, scale, color, joint, min, bones })');
+        checkKeys("pose", opts, ["x", "y", "scale", "color", "joint", "min", "bones"]);
+        let data = src;
+        if (typeof src === "string") {
+          if (!this.readHook) throw new PxError("pose files need an art file on disk");
+          try { data = JSON.parse(this.readHook(src)); } catch (e) { throw e instanceof PxError ? e : new PxError(`${src}: not JSON (${(e as Error).message})`); }
+        }
+        return { __op: true, name: "pose", args: [readJoints(data), opts], loc };
+      } catch (e) { throw wrap(e).within("pose", loc); }
+    };
     return env;
   }
 

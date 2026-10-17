@@ -129,3 +129,49 @@ export function sheetJson(image: string, sheet: Img, frames: SheetFrame[], tags:
   if (slices.length) meta.slices = slices;
   return JSON.stringify({ frames: out, meta }, null, 1) + "\n";
 }
+
+/** Opaque runs of a row, as "a-b c-d". */
+function rowRuns(img: Img, y: number, dx = 0): { text: string; l?: number; r?: number } {
+  if (y < 0 || y >= img.h) return { text: "" };
+  const parts: string[] = [];
+  let l: number | undefined, r: number | undefined, start = -1;
+  for (let x = 0; x <= img.w; x++) {
+    const solid = x < img.w && img.data[y * img.w + x] !== TRANSPARENT;
+    if (solid && start < 0) start = x;
+    if (!solid && start >= 0) {
+      parts.push(start === x - 1 ? `${start + dx}` : `${start + dx}-${x - 1 + dx}`);
+      l ??= start + dx;
+      r = x - 1 + dx;
+      start = -1;
+    }
+  }
+  return { text: parts.join(" "), l, r };
+}
+
+/**
+ * Row-by-row silhouette check of an asset against a reference image (placed at ox, oy in the
+ * asset's coordinates): each row's opaque runs side by side and how much wider the asset is on
+ * each side. Widths that differ by a pixel per side are easy to miss in a preview.
+ */
+export function compareSilhouettes(img: Img, ref: Img, ox = 0, oy = 0): string {
+  const out = [`row  ${"reference".padEnd(22)} ${"asset".padEnd(22)} wider: left right`];
+  let wider = 0, narrower = 0, same = 0, rows = 0, maxL = 0, maxR = 0, minL = 0, minR = 0;
+  for (let y = Math.min(0, oy); y < Math.max(img.h, ref.h + oy); y++) {
+    const a = rowRuns(img, y), b = rowRuns(ref, y - oy, ox);
+    if (!a.text && !b.text) continue;
+    let d = "";
+    if (a.l !== undefined && b.l !== undefined) {
+      const dl = b.l - a.l, dr = a.r! - b.r!;
+      rows++;
+      if (dl > 0 || dr > 0) wider++;
+      else if (dl < 0 || dr < 0) narrower++;
+      else same++;
+      maxL = Math.max(maxL, dl); maxR = Math.max(maxR, dr); minL = Math.min(minL, dl); minR = Math.min(minR, dr);
+      const f = (v: number) => (v > 0 ? `+${v}` : `${v}`).padStart(5);
+      d = dl || dr ? `${f(dl)} ${f(dr)}` : "";
+    } else d = a.text ? "  (asset only)" : "  (reference only)";
+    out.push(`${String(y).padStart(3)}  ${b.text.padEnd(22)} ${a.text.padEnd(22)}${d}`);
+  }
+  out.push("", `${rows} rows in both: the asset is wider on ${wider} (up to +${maxL} left, +${maxR} right), narrower on ${narrower} (down to ${minL} left, ${minR} right), the same on ${same}.`);
+  return out.join("\n");
+}

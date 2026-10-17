@@ -21,6 +21,7 @@
     "examples/sidescroller/*.{px.js,hex,png}",
     "examples/fonts/*.px.js",
     "SKILL.md",
+    "characters.md",
     "reference.md",
     "lighting.md",
     "rotation.md"

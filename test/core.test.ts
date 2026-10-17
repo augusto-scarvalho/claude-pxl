@@ -2,7 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { art, failure, PAL } from "./helpers.ts";
 import { loadSource } from "../src/node/load.ts";
-import { packSheet, sheetJson } from "../src/core/render.ts";
+import { compareSilhouettes, packSheet, sheetJson } from "../src/core/render.ts";
+import { pack } from "../src/core/color.ts";
+import { readJoints } from "../src/core/pose.ts";
 import { rotate } from "../src/core/rotate.ts";
 import { Img } from "../src/core/image.ts";
 
@@ -287,4 +289,57 @@ test("trace records each top-level op, layer and post step", () => {
   assert.equal(frames[0].loc, "t.px.js:2:3");
   assert.equal(frames[1].loc, "t.px.js:3:14");
   assert.equal(frames[3].w, 5); // outline frame shows the grown image
+});
+
+test("runs: [x, chars] runs at absolute x, row by row; '.' keeps, '_' erases", () => {
+  eq(art(PAL + 'sprite("t", { w: 5, h: 2 }, rect(0, 0, 5, 2, "w"), runs({ 0: [[1, "rr"]], 1: [[0, "k"], [3, ".__"]] }))', "t"), "wrrww\nkwww.");
+  assert.match(failure(PAL + 'sprite("t", { w: 2, h: 1 }, runs({ 0: [[1]] }))', "t").message, /runs: row 0, run 1 must be \[x, "chars"\]/);
+  assert.match(failure(PAL + 'sprite("t", { w: 2, h: 1 }, runs({ 0: [[0, "z"]] }))', "t").message, /in runs row 0, run 1/);
+});
+
+test("inline keep: edge pixels in the kept keys stay, the rest of the edge becomes the line", () => {
+  const R = 'use("pico8"); pal({ k: 0, D: 2, d: 8, w: 7 }); ';
+  eq(art(R + 'sprite("t", { w: 3, h: 3, inline: { color: "k", keep: "D" } }, runs({ 0: [[0, "DdD"]], 1: [[0, "ddd"]], 2: [[0, "ddd"]] }))', "t"), "DkD\nkdk\nkkk");
+  assert.match(failure(R + 'sprite("t", { inline: { color: "k", keep: "q" } }, "d")', "t").message, /inline keep: unknown color key 'q'/);
+  assert.match(failure(R + 'sprite("t", { inline: { colour: "k" } }, "d")', "t").message, /inline must be a color, or \{ color, keep/);
+});
+
+test("shrink: most common opaque color per block, ties to the first by columns, transparent under half", () => {
+  const a = pack(255, 0, 0), b = pack(0, 0, 255), img = new Img(6, 2);
+  // block 1: a a / a b -> a; block 2: b a / a b -> tie, first by columns is b; block 3: one pixel -> empty
+  [[0, 0, a], [1, 0, a], [0, 1, a], [1, 1, b], [2, 0, b], [3, 0, a], [2, 1, a], [3, 1, b], [4, 0, a]]
+    .forEach(([x, y, c]) => img.set(x, y, c));
+  assert.deepEqual([...img.shrink(2).data], [a, b, 0]);
+});
+
+test("reference layers: in the guide image only, not in the art; transforms that move the art are refused", () => {
+  const src = PAL + 'sprite("t", { w: 3, h: 1 }, "rr", layer("guide", { ref: true }, ".ww"))';
+  const p = loadSource(src);
+  eq(art(src, "t"), "rr.");
+  const g = p.build("t").guide!;
+  assert.equal(g.data[2], p.assets.get("t")!.pal.resolve("w"));
+  assert.notEqual(g.data[1], g.data[0]); // over the art: half and half
+  assert.match(failure(PAL + 'sprite("t", { mx: true }, "r", layer("g", { ref: true }, "w"))', "t").message, /reference layers stay in drawing coordinates; mx/);
+});
+
+test("pose: bones and joints from named joints, scaled and moved; OpenPose COCO-18 read by position", () => {
+  eq(art(PAL + 'sprite("t", { w: 6, h: 1 }, pose({ a: [0, 0], b: [2, 0, 0.9], c: [9, 9, 0.1] }, { scale: 2, x: 1, bones: [["a", "b"], ["b", "c"]], color: "r", joint: "w", min: 0.5 }))', "t"), ".wrrrw");
+  const kp = Array(54).fill(0);
+  kp.splice(2 * 3, 3, 10, 20, 1); kp.splice(5 * 3, 3, 30, 20, 1);   // r_shoulder, l_shoulder
+  const j = readJoints({ people: [{ pose_keypoints_2d: kp }] });
+  assert.deepEqual(j.r_shoulder, [10, 20, 1]);
+  assert.deepEqual(j.neck, [20, 20, 1]); // 0,0,0 means missing in OpenPose; the neck comes from the shoulders
+  assert.deepEqual(readJoints({ l_shoulder: [30, 20], r_shoulder: [10, 20] }).neck, [20, 20, 1]);
+  assert.match(failure(PAL + 'sprite("t", pose({ a: "x" }))', "t").message, /joint 'a' must be \[x, y\]/);
+});
+
+test("compareSilhouettes: row extents side by side and how much wider the asset is", () => {
+  const solid = (w: number, h: number, rows: [number, number][]) => {
+    const im = new Img(w, h);
+    rows.forEach(([l, r], y) => { for (let x = l; x <= r; x++) im.set(x, y, pack(1, 2, 3)); });
+    return im;
+  };
+  const out = compareSilhouettes(solid(8, 2, [[1, 6], [2, 5]]), solid(8, 2, [[2, 5], [2, 5]]));
+  assert.match(out, /^ {2}0 {2}2-5 +1-6 +\+1 +\+1$/m);
+  assert.match(out, /wider on 1 \(up to \+1 left, \+1 right\).*the same on 1/);
 });

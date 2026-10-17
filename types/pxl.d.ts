@@ -25,8 +25,12 @@ declare global {
   interface PxAssetOpts {
     w?: number; h?: number; base?: string; mx?: boolean | "c"; my?: boolean | "c"; swap?: Record<string, PxColor>;
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; angle?: number; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; outline?: PxColor; outline8?: PxColor; crop?: boolean; layers?: boolean;
-    /** inline: a 1px line over the sprite's own edge; selout: the line takes the color it touches, n steps darker (true = 2). */
-    inline?: PxColor; selout?: boolean | number;
+    /**
+     * inline: a 1px line over the sprite's own edge; { color, keep: "keys" } leaves edge pixels in
+     * those keys alone (closes only the gaps of an outline already there). selout: the line takes
+     * the color it touches, n steps darker (true = 2).
+     */
+    inline?: PxColor | { color: PxColor; keep?: string }; selout?: boolean | number;
     /** Point that stamp / scatter / wire hangs place: "bottom" / "center" of the final image, or [x, y] in drawing coords. */
     pivot?: "bottom" | "center" | [number, number];
     /** 9-slice margins of the final image for panel(): n or [left, top, right, bottom]. */
@@ -35,6 +39,8 @@ declare global {
     wrap?: boolean | "x" | "y";
     /** Start from a PNG file (relative to the art file); anims with frames split it into a strip. */
     png?: string; area?: [number, number, number, number]; palettize?: boolean;
+    /** Shrink the PNG by a whole factor: each block becomes its most common opaque color. */
+    shrink?: number;
   }
   interface PxSceneOpts extends PxAssetOpts { w: number; h: number; bg?: PxColor }
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong" }
@@ -44,6 +50,13 @@ declare global {
     shade?: boolean | number | Record<string, PxColor>; light?: boolean | number | Record<string, PxColor>;
     /** Color math with what's below (new colors, off the palette; palettize snaps them back). */
     blend?: "normal" | "multiply" | "screen" | "add" | "overlay"; opacity?: number; palettize?: boolean;
+    /** Reference / guide layer: shown over the art in previews, left out of the exported image. */
+    ref?: boolean;
+  }
+  interface PxPose {
+    /** Joint (x, y) lands at (x * scale + x, y * scale + y). */
+    x?: number; y?: number; scale?: number;
+    color?: PxColor; joint?: PxColor | false; min?: number; bones?: [string, string][];
   }
 
   interface PxLamp { r?: number; color?: PxColor; power?: number; z?: number }
@@ -92,6 +105,8 @@ declare global {
     tilemap(map: string, opts: PxTilemap): void;
     scatter(name: string, x: number, y: number, w: number, h: number, count: number, opts?: PxScatter): void;
     grid(x: number, y: number, str: string): void;
+    runs(rows: Record<number, [number, string][]>): void;
+    pose(joints: Record<string, number[]>, opts?: PxPose): void;
     wire(x0: number, y0: number, x1: number, y1: number, sag: number, c: PxColor, opts?: PxWire): void;
     text(x: number, y: number, str: string | number, c: PxColor, opts?: PxText): void;
     lamp(x: number, y: number, opts?: PxLamp): void;
@@ -152,6 +167,10 @@ declare global {
   function tilemap(map: string, opts: PxTilemap): PxOp;
   function scatter(name: string, x: number, y: number, w: number, h: number, count: number, opts?: PxScatter): PxOp;
   function grid(x: number, y: number, str: string): PxOp;
+  /** Runs at absolute x, row by row: { 30: [[19, "3H3"], [23, "deeR"]] }. Same keys as grid. */
+  function runs(rows: Record<number, [number, string][]>): PxOp;
+  /** A pose skeleton from a detector's JSON file (or a { name: [x, y, score] } map), as a guide. */
+  function pose(src: string | Record<string, number[]>, opts?: PxPose): PxOp;
   function wire(x0: number, y0: number, x1: number, y1: number, sag: number, c: PxColor, opts?: PxWire): PxOp;
   function text(x: number, y: number, str: string | number, c: PxColor, opts?: PxText): PxOp;
   function lamp(x: number, y: number, opts?: PxLamp): PxOp;

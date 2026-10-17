@@ -26,7 +26,10 @@ parts, primitives, brushes and tilemaps. Needs Node ≥ 22.18. No install step.
    tiles repeating into a visible grid, props floating or standing on the wrong ground, big flat
    areas with no detail, dither used as a texture.
 6. Replacing art someone already approved? Keep the old one as `name_old`, stamp both side by side
-   in a `compare` scene, and let them choose. Your redraw is not always better.
+   in a `compare` scene, and let them choose. Your redraw is not always better. Following a
+   reference image (a bigger version, a sprite to match)? `PXL compare art.px.js <name> ref.png
+   [--shrink N] [--offset x,y]` lists each row's extents side by side. A preview won't show that a
+   figure is 1–2 px too wide per side; this does.
 7. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL.
    It rebuilds on every save and replays the edited asset's painting steps; it also writes the same
    `out/` files, so keep reading previews as usual.

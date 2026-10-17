@@ -33,6 +33,8 @@ export interface BuildOut {
   anim?: Timeline;
   /** The tilemaps it placed, cell by cell (for a Tiled export). */
   tilemaps?: TileLayer[];
+  /** Reference layers composited over the art, for previews only (the art itself leaves them out). */
+  guide?: Img;
 }
 
 /** An anim's frames: count and durations (ms), from its frame() items or { frames, fps }. */
@@ -146,6 +148,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   };
 
   const layers: LayerOut[] = [];
+  const refs: Img[] = [];
   // Pixels of solid / wall layers, for lighting().
   let solid: Uint8Array | undefined, wall: Uint8Array | undefined, unlit: Uint8Array | undefined;
   if (![undefined, true, false, "x", "y"].includes(opts.wrap)) throw new PxError(`wrap must be true, "x" or "y", got ${fmtArgs([opts.wrap])}`);
@@ -201,6 +204,11 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     } finally {
       cur = undefined;
     }
+    if (l.opts.ref) {
+      refs.push(limg);
+      snap?.(`reference layer '${l.name}' (previews only)`, l.loc);
+      return;
+    }
     if (!l.opts.hidden) {
       blend(base, limg, l.opts, pal);
       if (l.opts.solid || l.opts.wall) {
@@ -220,7 +228,30 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
 
   const img = finish(base, def, pal, trace);
   trace?.finish(img);
-  return { img, layers, trace, anim: tl, ...(maps.length ? { tilemaps: maps } : {}) };
+  const guide = refs.length ? guideOver(img, refs, def) : undefined;
+  return { img, layers, trace, anim: tl, ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide } : {}) };
+}
+
+/**
+ * The art with its reference layers over it at half strength (full color where the art is empty).
+ * Reference layers are in drawing coordinates: an outline's 1px growth is followed, other
+ * transforms of the art would move it away from them.
+ */
+function guideOver(img: Img, refs: Img[], def: AssetDef): Img {
+  const o = def.opts;
+  const moved = ["mx", "my", "flip", "rot", "angle", "crop"].filter((k) => o[k as keyof typeof o]);
+  if (moved.length) throw new PxError(`reference layers stay in drawing coordinates; ${moved.join(", ")} would move the art away from them`, def.loc);
+  const d = o.outline || o.outline8 ? 1 : 0, out = img.copy();
+  for (const r of refs)
+    for (let y = 0; y < r.h; y++)
+      for (let x = 0; x < r.w; x++) {
+        const c = r.data[y * r.w + x];
+        if (c === TRANSPARENT) continue;
+        const i = (y + d) * out.w + x + d, under = out.data[i];
+        out.data[i] = under === TRANSPARENT ? c
+          : pack(...([24, 16, 8].map((sh) => Math.round((((c >>> sh) & 255) + ((under >>> sh) & 255)) / 2)) as [number, number, number]));
+      }
+  return out;
 }
 
 /** Whole-image passes (lighting, glow) that run on everything drawn before them. */
@@ -327,7 +358,19 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
   const sel = o.selout ? seloutPick(pal, o.selout === true ? 2 : o.selout) : undefined;
   if (o.selout && !o.outline && !o.outline8 && !o.inline) throw new PxError("selout recolors a line: add outline, outline8 or inline");
   const as = (c: Color) => (sel ? (t: Color) => sel(t, c) : undefined);
-  if (o.inline) step(`inline ${o.inline}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.inline!); return img.inline(c, false, as(c)); });
+  if (o.inline) {
+    // inline: "k", or { color: "k", keep: "Kk12" } to close only the gaps of an outline already there
+    const spec = typeof o.inline === "string" ? { color: o.inline } : o.inline;
+    if (typeof spec !== "object" || spec === null || typeof spec.color !== "string" || Object.keys(spec).some((k) => k !== "color" && k !== "keep") || (spec.keep !== undefined && typeof spec.keep !== "string"))
+      throw new PxError(`inline must be a color, or { color, keep: "keys" }, got ${fmtArgs([o.inline])}`);
+    const keep = spec.keep === undefined ? undefined : new Set([...spec.keep].map((k) => {
+      let c;
+      try { c = pal.resolve(k); } catch (e) { throw new PxError(`inline keep: ${(e as Error).message}`); }
+      if (c === null) throw new PxError(`inline keep: '${k}' is not a palette key`);
+      return c;
+    }));
+    step(`inline ${spec.color}${keep ? ` keep ${spec.keep}` : ""}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, spec.color); return img.inline(c, false, as(c), keep); });
+  }
   if (o.outline) step(`outline ${o.outline}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline!); return img.outline(c, false, as(c)); });
   if (o.outline8) step(`outline8 ${o.outline8}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline8!); return img.outline(c, true, as(c)); });
   if (o.crop) step("crop", () => img.crop());

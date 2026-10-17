@@ -34,6 +34,12 @@ export interface LayerOpts {
   wall?: boolean;
   /** Pixels this layer leaves visible ignore lighting (skies, backdrops). */
   unlit?: boolean;
+  /**
+   * Reference / guide layer: previews show it over the art at half strength; the exported PNG,
+   * sheets and stamps of this asset leave it out. For drawing over a skeleton, a mannequin or a
+   * reduced original.
+   */
+  ref?: boolean;
 }
 
 export interface Layer {
@@ -62,8 +68,12 @@ export interface AssetOpts {
   rotate?: "auto" | "rotsprite" | "shear" | "nearest";
   outline?: string;
   outline8?: string;
-  /** 1px line on the sprite's own edge pixels; the canvas keeps its size. */
-  inline?: string;
+  /**
+   * 1px line on the sprite's own edge pixels; the canvas keeps its size. `{ color, keep }` leaves
+   * edge pixels in the `keep` keys as they are, closing only the gaps of an outline that is
+   * already there (a reduced image's surviving outline, selective colors included).
+   */
+  inline?: string | { color: string; keep?: string };
   /** The outline/inline takes the color it touches, n steps darker along the ramps (true = 2). */
   selout?: boolean | number;
   crop?: boolean;
@@ -81,6 +91,12 @@ export interface AssetOpts {
   area?: [number, number, number, number];
   /** Snap the PNG's colors to the nearest keyed palette color. */
   palettize?: boolean;
+  /**
+   * Shrink the PNG by this whole factor: each n x n block becomes its most common opaque color
+   * (ties: the first, scanning the block column by column), or transparent when fewer than half
+   * of its pixels are opaque. Applied after `area`.
+   */
+  shrink?: number;
   /** Scene background color. */
   bg?: string;
   /** anim: default frame rate (frames per second, default 8). */
@@ -210,6 +226,22 @@ export interface TileLayer {
   x: number;
   y: number;
   cells: (Img | undefined)[];
+}
+
+/** Options of pose(): where the joints land and how they're drawn. */
+export interface PoseOpts {
+  /** Joint (x, y) -> (x * scale + x, y * scale + y), rounded. */
+  x?: number;
+  y?: number;
+  scale?: number;
+  /** Bone color (default "R"). */
+  color?: string;
+  /** Joint dot color (default "Y"); false: no dots. */
+  joint?: string | false;
+  /** Skip joints whose score is below this (detectors give one per joint). */
+  min?: number;
+  /** Pairs of joint names to connect (default: body, head and feet bones). */
+  bones?: [string, string][];
 }
 
 export interface WireOpts extends PlaceOpts {

@@ -3,8 +3,9 @@ import { Img } from "./image.ts";
 import type { Palette, Resolved } from "./palette.ts";
 import { PxError } from "./errors.ts";
 import { glyph, lineWidth } from "./font.ts";
-import type { BumpOpts, LampOpts, PlaceOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
+import type { BumpOpts, LampOpts, PlaceOpts, PoseOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
 import { bump, dirOf, setNormal } from "./normals.ts";
+import { POSE_BONES } from "./pose.ts";
 import { bayer, colorList, gridRows, hash, inPoly, polyBounds, type Region, regionPred, rng } from "./util.ts";
 
 /** How a canvas reaches other assets. */
@@ -581,6 +582,46 @@ export class Canvas {
     });
   }
 
+  /**
+   * Runs at absolute x, row by row: `{ 30: [[19, "3H3"], [23, "deeR"]] }`. Same keys as grid
+   * ("." keeps, "_" erases), but nothing is counted: each run starts where it says.
+   */
+  runs(rows: Record<string, unknown>): void {
+    for (const [ys, list] of Object.entries(rows)) {
+      const y = Number(ys);
+      if (!Number.isInteger(y) || !Array.isArray(list))
+        throw new PxError(`runs: each row is y: [[x, "chars"], ...], got ${JSON.stringify(ys)}: ${JSON.stringify(list)}`);
+      list.forEach((run, i) => {
+        if (!Array.isArray(run) || run.length !== 2 || !Number.isInteger(run[0]) || typeof run[1] !== "string")
+          throw new PxError(`runs: row ${y}, run ${i + 1} must be [x, "chars"], got ${JSON.stringify(run)}`);
+        [...(run[1] as string)].forEach((ch, k) => {
+          if (ch === ".") return;
+          let c: Resolved;
+          try { c = this.color(ch); } catch (e) { throw new PxError(`${(e as Error).message} in runs row ${y}, run ${i + 1}`); }
+          this.plot((run[0] as number) + k, y, c);
+        });
+      });
+    }
+  }
+
+  /**
+   * A pose skeleton as a guide: bones as lines, joints as dots. `joints` maps names to [x, y] or
+   * [x, y, score] (pose() in an art file reads them from a pose detector's JSON).
+   */
+  pose(joints: Record<string, unknown>, opts: PoseOpts = {}): void {
+    const { x = 0, y = 0, scale = 1, color = "R", joint = "Y", min = 0 } = opts;
+    const at = (n: string): [number, number] | undefined => {
+      const j = joints[n] as number[] | undefined;
+      if (!Array.isArray(j) || !Number.isFinite(j[0]) || !Number.isFinite(j[1]) || (j.length > 2 && j[2] < min)) return undefined;
+      return [Math.round(j[0] * scale + x), Math.round(j[1] * scale + y)];
+    };
+    for (const [a, b] of opts.bones ?? POSE_BONES) {
+      const p = at(a), q = at(b);
+      if (p && q) this.line(p[0], p[1], q[0], q[1], color);
+    }
+    if (joint) for (const n of Object.keys(joints)) { const p = at(n); if (p) this.px(p[0], p[1], joint); }
+  }
+
   /** Hanging cable sagging `sag` px; `hang` stamps an asset/group under it every `every` px. */
   wire(x0: number, y0: number, x1: number, y1: number, sag: number, c: string, opts: WireOpts = {}): void {
     const at = (t: number): [number, number] => [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t + sag * 4 * t * (1 - t)];
@@ -679,7 +720,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "wire", "text", "lamp", "bump", "normals",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

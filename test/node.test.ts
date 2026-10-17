@@ -120,6 +120,43 @@ sprite("snap", { png: "near.png", palettize: true })`);
   bad(`sprite("b", "r"); sprite("a", { png: "s.png", base: "b" })`, /png and base both set the starting image/);
 });
 
+test("png shrink, pose from a JSON file, reference layers in previews only", () => {
+  const { dir, file } = tmpArt(`pal({ R: "#ff0000", B: "#0000ff", k: "#000000", w: "#ffffff" })
+sprite("small", { png: "big.png", shrink: 2 })
+sprite("posed", { w: 4, h: 2 }, pose("pose.json", { scale: 0.5, color: "R", joint: "w", bones: [["a", "b"]] }))
+sprite("guided", { w: 2, h: 1 }, "R", layer("guide", { ref: true }, ".B"))`);
+  const big = new Img(4, 2);
+  big.data.set([pack(255, 0, 0), pack(255, 0, 0), pack(0, 0, 255), 0, pack(255, 0, 0), pack(0, 0, 255), 0, 0]);
+  writeFileSync(join(dir, "big.png"), encodePng(big));
+  writeFileSync(join(dir, "pose.json"), JSON.stringify({ a: [0, 2, 0.9], b: [6, 2, 0.8] }));
+  const p = loadProject(file);
+  assert.deepEqual([...p.image("small").data], [pack(255, 0, 0), 0], "majority per 2x2 block; a quarter-filled block is empty");
+  assert.deepEqual([...p.image("posed").data].slice(4, 8), [pack(255, 255, 255), pack(255, 0, 0), pack(255, 0, 0), pack(255, 255, 255)]);
+  assert.ok(p.files.some((f) => f.endsWith("pose.json")), "watched for live rebuilds");
+  assert.deepEqual([...p.image("guided").data], [pack(255, 0, 0), 0], "the art leaves the reference layer out");
+  const out = join(dir, "out");
+  writeOutputs(p, out, { only: ["guided"], scale: 1 });
+  assert.deepEqual([...decodePng(readFileSync(join(out, "sprites", "guided.png"))).data], [pack(255, 0, 0), 0]);
+  assert.equal(decodePng(readFileSync(join(out, "_preview", "guided.png"))).data[1], pack(0, 0, 255), "the preview shows it");
+
+  const bad = (src: string, re: RegExp) => { const t = tmpArt(src); writeFileSync(join(t.dir, "big.png"), encodePng(big)); assert.throws(() => loadProject(t.file), re); };
+  bad(`sprite("a", { png: "big.png", shrink: 3 })`, /shrink must be a whole factor from 2 to 2/);
+  bad(`sprite("a", pose("missing.json"))`, /cannot read .*missing\.json/);
+});
+
+test("cli compare: the asset's rows against a reference PNG, shrunk and offset", async () => {
+  const { dir, file } = tmpArt(`pal({ R: "#ff0000" })\nsprite("t", { w: 4, h: 1 }, "RRRR")`);
+  const ref = new Img(4, 2);
+  ref.data.set([0, pack(9, 9, 9), pack(9, 9, 9), 0, 0, pack(9, 9, 9), pack(9, 9, 9), 0]);
+  writeFileSync(join(dir, "ref.png"), encodePng(ref));
+  const lines: string[] = [], log = console.log;
+  console.log = (s: string) => lines.push(s);
+  try { assert.equal(await main(["compare", file, "t", join(dir, "ref.png"), "--shrink", "2", "--offset", "1,0"]), 0); } finally { console.log = log; }
+  const text = lines.join("\n");
+  assert.match(text, /^ {2}0 {2}1-2 +0-3 +\+1 +\+1$/m);
+  assert.match(text, /wider on 1/);
+});
+
 function tmpArt(src: string): { dir: string; file: string } {
   const dir = mkdtempSync(join(tmpdir(), "pxl-"));
   const file = join(dir, "a.px.js");

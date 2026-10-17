@@ -3,9 +3,11 @@ import { dirname, join, resolve } from "node:path";
 import { PxError, wrap } from "../core/errors.ts";
 import { type Color, TRANSPARENT, toHex } from "../core/color.ts";
 import type { Img } from "../core/image.ts";
-import { ascii, preview } from "../core/render.ts";
+import { ascii, compareSilhouettes, preview } from "../core/render.ts";
 import { mapPixel, replay, stepSheet } from "../core/steps.ts";
+import { readFileSync } from "node:fs";
 import { loadProject } from "./load.ts";
+import { decodePng } from "./png.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 
@@ -24,6 +26,9 @@ const USAGE = `pxl — pixel-art DSL
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
       after each; --sheet also writes a thumbnail per step to _preview/<name>_steps.png.
+  pxl compare <art.px.js> <name> <ref.png> [--shrink N] [--offset x,y]
+      Silhouette check: each row's opaque extents in the asset and in a reference image (shrunk
+      by N first, placed at x,y), and how many px wider the asset is on each side.
 
 Art files may be .js or .ts. Default out dir: <art file dir>/out.`;
 
@@ -38,6 +43,8 @@ interface Args {
   port?: number;
   at?: [number, number];
   sheet?: boolean;
+  shrink?: number;
+  offset?: [number, number];
 }
 
 function parse(argv: string[]): Args {
@@ -56,6 +63,12 @@ function parse(argv: string[]): Args {
     else if (v === "--port") a.port = Number(val());
     else if (v === "--no-preview") a.preview = false;
     else if (v === "--sheet") a.sheet = true;
+    else if (v === "--shrink") a.shrink = Number(val());
+    else if (v === "--offset") {
+      const m = /^(-?\d+),(-?\d+)$/.exec(val().replace(/\s/g, ""));
+      if (!m) throw new PxError("--offset needs x,y (e.g. --offset 8,-1)");
+      a.offset = [Number(m[1]), Number(m[2])];
+    }
     else if (v === "--at") {
       const m = /^(\d+),(\d+)$/.exec(val().replace(/\s/g, ""));
       if (!m) throw new PxError("--at needs x,y (e.g. --at 5,3)");
@@ -153,6 +166,21 @@ export async function main(argv: string[]): Promise<number> {
           writePng(path, preview(sheet, Math.max(1, Math.min(3, Math.floor(2400 / Math.max(sheet.w, sheet.h))))));
           console.log(`-> ${path}${every > 1 ? ` (every ${every}th of ${total} steps)` : ""}`);
         }
+        return 0;
+      }
+      case "compare": {
+        const [name, ref] = a.rest;
+        if (!name || !ref) throw new PxError("compare needs an asset and a reference PNG: pxl compare <file> <name> <ref.png> [--shrink N] [--offset x,y]");
+        const p = loadProject(file);
+        const img = p.image(name);
+        let r: Img;
+        try { r = decodePng(readFileSync(resolve(ref))); } catch (e) { throw new PxError(`${ref}: ${(e as Error).message}`); }
+        if (a.shrink !== undefined) {
+          if (!(Number.isInteger(a.shrink) && a.shrink >= 2)) throw new PxError(`--shrink must be a whole factor >= 2, got ${a.shrink}`);
+          r = r.shrink(a.shrink);
+        }
+        console.log(`${name} (${img.w}x${img.h}) against ${ref} (${r.w}x${r.h}${a.shrink ? `, shrunk ${a.shrink}x` : ""}${a.offset ? ` at ${a.offset.join(",")}` : ""})`);
+        console.log(compareSilhouettes(img, r, ...(a.offset ?? [0, 0])));
         return 0;
       }
       case "serve": {

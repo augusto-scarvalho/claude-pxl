@@ -37,6 +37,11 @@ the top of the head to the soles.
   iso charset are CC-BY-SA.
 - **Bring it to 1×.** Downloaded previews are often upscaled. Sample block centres to get back to
   native pixels.
+- **Use a pose detector for the joints** when you build from a bigger image or a photo-like
+  reference, instead of marking joints by eye. rtmlib (DWPose/RTMPose in onnxruntime, CPU is fine)
+  on the image upscaled 8× gives eyes, ears, shoulders, elbows, wrists, hips, knees, ankles, toes
+  and heels. Save them as `{ name: [x, y, score] }` JSON and show them with
+  `layer("pose", { ref: true }, pose("pose.json", { scale, x, y }))`.
 - **Read off the landmarks.** Import the reference with `sprite("ref", { png: "ref.png" })` and run
   `PXL ascii` on it. Note the rows of the chin, shoulders, waist, hands, knees and soles, and the
   widths of the head and shoulders. Draw your silhouette on those rows.
@@ -51,9 +56,9 @@ If the user has the character at a larger size, start there. It beats drawing fr
 with a pose skeleton or a mannequin, because the reduction keeps the silhouette, the proportions and
 the curves of the clothes exactly.
 
-1. **Halve it** outside pxl. For each 2×2 block take its most common colour, and make the block
-   transparent when most of it is. Import the result with `palettize: true`.
-2. **Redraw what halving breaks** as `[x, chars]` runs (section 7):
+1. **Halve it:** `sprite("_half", { png: "big.png", shrink: 2, palettize: true })`. Each 2×2 block
+   becomes its most common colour, or transparent when most of it is.
+2. **Redraw what halving breaks** with `runs()` (section 7):
    - eyes, mouth and other 1–2 px face features;
    - thin lines, like collars and ties;
    - small clutter, like hands and buckles;
@@ -62,16 +67,17 @@ the curves of the clothes exactly.
      reads as swelling at half size, so run calves and wrists straight.
 3. **Close the gaps in the contour, and nothing else.** Halving keeps most of the outline, including
    its selective colours. It only drops the line where a 2×2 block's vote went to the fill colour.
-   - Keep every edge pixel that is already dark.
-   - Turn only the light edge pixels into the line. A short `(c) => { ... }` step does it: for each
-     pixel next to a transparent one where `!c.is(x, y, darkKeys)`, call `c.px(x, y, "k")`. Test keys
-     with `c.is` or `c.key`; `c.get` returns a packed colour and never equals a key.
-   - On thin parts (a run of 4 px or less across, like a calf or a wrist), put the line on the
-     transparent pixel outside instead. Otherwise the part loses half its width.
-   - `inline` would overwrite the surviving outline too.
-   - `outline` after erasing the edge widens the figure by 1 px on each side.
+   - `inline: { color: "k", keep: "zZKk123hHg4DdLP" }` turns only the light edge pixels into the
+     line. Edge pixels in the `keep` keys (your dark keys) stay as they are.
+   - A plain `inline: "k"` would overwrite the surviving outline too. `outline` after erasing the
+     edge widens the figure by 1 px on each side.
+   - Thin parts (a calf, a wrist) lose a pixel of width to the line. Where that shows, move the line
+     outside by hand with a run, and keep the two sides of the figure consistent.
 4. **Leave alone what survived.** Redraw only what is actually broken. If the user picked a version,
    don't "improve" its face or details while fixing something else.
+5. **Check the silhouette:** `PXL compare art.px.js hero big.png --shrink 2 --offset x,y` lists
+   each row's extents against the halved original. Rows that come out wider are usually where a
+   redraw added bulk.
 
 ### A base body in the view you need: dress it
 
@@ -88,7 +94,7 @@ and leg are in front.
 sprite("_base", { png: "base.png", palettize: true, flip: "x" })    // flip only if it faces the wrong way
 sprite("hero", { w: 32, h: 64, inline: "k" },
   stamp("_base", 0, 0),
-  ...runs)                          // hair, face and clothes as [x, chars] runs (section 7)
+  runs(OUTFIT))                     // hair, face and clothes as [x, chars] runs (section 7)
 ```
 
 - **Outline:** `inline` puts one line on the dressed figure's edge, wherever the clothes moved it.
@@ -100,6 +106,8 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
 
 1. **Silhouette.** Draw the figure in flat colours, then check it as one shape with a
    `recolor({ "*": "k" })` variant. The limbs should read apart, with gaps where they belong.
+   Put the skeleton, mannequin or reference you follow in a `ref: true` layer: previews show it
+   over your pixels, the export leaves it out.
 2. **Body light.** Light comes from above, so the bottoms of forms are darker. Put a shadow under
    anything that sticks out: the head on the neck, a sash on the robe, sleeves on the sides, a hem
    on the legs.
@@ -150,12 +158,11 @@ Counting dots in 30-character rows is the main source of misplaced pixels.
 
 ```js
 // one entry per row: [x, chars] runs, so nothing is counted by hand
-const body = {
+const BODY = {
   30: [[19, "3H3"], [23, "deeReeeeeed"], [35, "HlH"]],
   31: [[19, "StS"], [23, "QWewewwwvvW"], [35, "tftS"]],
 }
-sprite("hero", { w: 62, h: 62, outline: "k" }, grid(18, 0, HEAD),
-  ...Object.entries(body).flatMap(([y, runs]) => runs.map(([x, s]) => grid(x, +y, s))))
+sprite("hero", { w: 62, h: 62, outline: "k" }, grid(18, 0, HEAD), runs(BODY))
 ```
 
 Look at the result at 1× too. Something that reads as cute at 12× can turn to mush at its real size.

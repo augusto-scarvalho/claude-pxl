@@ -156,7 +156,7 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
       name, kind: def.kind, w: b.img.w, h: b.img.h, loc: def.loc,
       palette: def.pal.table(),
       layers: b.layers.map((l) => l.name),
-      image: b64(b.img.data),
+      image: b64((b.guide ?? b.img).data), // reference layers show here too, as in previews
       anim: b.anim ? project.frames(name, 0, 240).map((f) => ({ ms: f.ms, image: b64(f.img.data) })) : undefined,
       frames: (withFrames ? b.trace?.frames ?? [] : []).map((f) => ({
         label: f.label, loc: f.loc, w: f.w, h: f.h,

@@ -51,26 +51,24 @@ Mark items `[x]` when they ship, with the commit.
 
 ## Characters (from dogfooding a 64 px character)
 
-Each of these was worked around by hand in the art file or by a Python script on the side; see
-characters.md for the workflow they serve.
+Each of these was first worked around by hand in an art file or by a Python script on the side.
+characters.md has the workflow they serve.
 
-- [ ] **`runs()` helper**: `runs({ 30: [[19, "3H3"], [23, "deeR"]] })` places `[x, chars]` runs at
-  absolute x. Today every file repeats a `flatMap` over `grid(x, y, s)`. Cheap.
-- [ ] **Close outline gaps**: an `inline` mode that only turns light edge pixels into the line and
-  keeps edge pixels that are already dark, including selective colours. Today it's a hand-written
-  function, and the first version compared `c.get` (a colour) with keys and repainted every edge.
-  Open question: thin parts. Putting the line outside fixed one calf and fattened the other.
-- [ ] **Downscale on import**: `sprite("x", { png, scale: 1/2 })`, taking the most common colour of
-  each block. "Reduce a bigger version, then clean it" is the best route for smaller sizes of a
-  character, and it still needs a script outside pxl.
-- [ ] **Reference / guide layer**: a layer that previews draw but exports and sheets skip, for
-  drawing over a skeleton, a mannequin or a reduced original. (Aseprite reference layer.) Today the
-  comparisons are composed by hand.
-- [ ] **Silhouette compare**: `pxl compare art.px.js <asset> ref.png` printing each row's opaque
-  extents side by side. Comparing rows like this showed that a figure was 1–3 px too wide per side,
-  which no preview made obvious.
-- [ ] **Pose skeleton import** (niche): read a pose-detector JSON (DWPose/OpenPose keypoints) and
-  draw the bones and joints as a guide. The detector stays outside pxl.
+- [x] **`runs()`**: `runs({ 30: [[19, "3H3"], [23, "deeR"]] })` places `[x, chars]` runs at
+  absolute x, so nothing in a wide figure is counted by hand.
+- [x] **Close outline gaps**: `inline: { color, keep }` turns only light edge pixels into the line
+  and keeps the dark ones, selective colours included. Still open: thin parts. Putting the line
+  outside fixed one calf and fattened the other, so thin parts stay a hand fix.
+- [x] **Downscale on import**: `png` + `shrink: n` takes the most common colour of each block. It
+  reproduces the side script exactly, pixel for pixel.
+- [x] **Reference / guide layer**: `layer(..., { ref: true })` shows in previews and the live viewer,
+  over the art, and is left out of the export, sheets and stamps. (Aseprite reference layer.)
+- [x] **Silhouette compare**: `pxl compare art.px.js <asset> ref.png [--shrink N] [--offset x,y]`
+  prints each row's opaque extents side by side. Comparing rows like this showed a figure 1–3 px
+  too wide per side, which no preview made obvious.
+- [x] **Pose skeleton import**: `pose("pose.json", { scale, x, y })` draws a detector's bones and
+  joints. It reads `{ name: [x, y, score] }` maps and OpenPose COCO-18 or BODY_25. The detector
+  stays outside pxl.
 
 ## Later / niche
 

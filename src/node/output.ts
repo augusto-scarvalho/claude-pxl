@@ -68,8 +68,9 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         shown = packSheet(frames.map((f) => ({ name: "", img: f.img })), frames.length, 1).sheet;
       } else {
         // Seamless tiles preview laid out 3x3 (or 3x1 / 1x3), so seams show.
-        const wr = def.opts.wrap;
-        if (wr) shown = tiled(b.img, wr === "y" ? 1 : 3, wr === "x" ? 1 : 3);
+        // Reference layers show in the preview only, over the art.
+        const wr = def.opts.wrap, art = b.guide ?? b.img;
+        shown = wr ? tiled(art, wr === "y" ? 1 : 3, wr === "x" ? 1 : 3) : art;
         writePng(join(out, dir, n + ".png"), b.img);
         if (b.img.norm) writePng(join(out, dir, n + "_n.png"), normalImage(b.img)); // for engine lights
       }

@@ -238,12 +238,40 @@ export class Img {
   }
 
   /** 1px line over the sprite's own edge pixels (an inside outline): the canvas keeps its size. */
-  inline(c: Color, diagonal = false, pick?: (under: Color) => Color): Img {
+  /** Edge pixels become the line; colors in `keep` stay as they are (an outline already there). */
+  inline(c: Color, diagonal = false, pick?: (under: Color) => Color, keep?: Set<Color>): Img {
     const o = this.copy();
     for (let y = 0; y < this.h; y++)
       for (let x = 0; x < this.w; x++) {
         const p = this.get(x, y);
-        if (p !== TRANSPARENT && touching(this, x, y, diagonal, (q) => q === TRANSPARENT) !== undefined) o.set(x, y, pick ? pick(p) : c);
+        if (p === TRANSPARENT || keep?.has(p)) continue;
+        if (touching(this, x, y, diagonal, (q) => q === TRANSPARENT) !== undefined) o.set(x, y, pick ? pick(p) : c);
+      }
+    return o;
+  }
+
+  /**
+   * Shrink by a whole factor: each n x n block becomes its most common opaque color (ties: the
+   * first, scanning the block column by column), or transparent when fewer than half of its
+   * pixels are opaque. Keeps silhouettes and thin features better than sampling one pixel.
+   */
+  shrink(n: number): Img {
+    const o = new Img(Math.floor(this.w / n), Math.floor(this.h / n));
+    for (let by = 0; by < o.h; by++)
+      for (let bx = 0; bx < o.w; bx++) {
+        const count = new Map<Color, number>();
+        let solid = 0;
+        for (let dx = 0; dx < n; dx++)
+          for (let dy = 0; dy < n; dy++) {
+            const c = this.data[(by * n + dy) * this.w + bx * n + dx];
+            if (c === TRANSPARENT) continue;
+            solid++;
+            count.set(c, (count.get(c) ?? 0) + 1);
+          }
+        if (solid * 2 < n * n) continue;
+        let best = TRANSPARENT, most = 0;
+        for (const [c, k] of count) if (k > most) { best = c; most = k; }
+        o.data[by * o.w + bx] = best;
       }
     return o;
   }
