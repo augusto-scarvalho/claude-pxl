@@ -72,15 +72,19 @@ characters.md has the workflow they serve.
 
 ## From the tropical forest
 
-- [ ] **Projected cast shadows**: a placement option such as `stamp(name, x, y, { cast: [0.62, 0.22] })`
-  that lays the asset flat on the ground, sheared about its pivot (each pixel at height h lands
-  h * (kx, ky) from the base), for a `shade` layer. A `silhouette` stamped at an offset is an upright
-  dark copy. For tall objects it reads wrong, and a mirrored palm then throws its shadow the other way.
-  The forest does it with a helper that builds `<name>_shadow` sprites from the plants' own pixels.
+Each was first done by hand in the forest's files; `examples/tropical/` now uses the shipped ones.
 
-- [ ] **Relight a flat sprite**: an op that steps every pixel along its ramp by its place in the shape:
-  lit edges toward the light, undersides away from it, occluded cores darker. A reduced palm (3 greens
-  that `palettize` merged into one) got its depth back this way, with a hand-written function.
+- [x] **Projected cast shadows** (ae43468): `stamp(name, x, y, { cast: [0.62, 0.22] })` lays the asset
+  flat on the ground from its base (a pixel h above it lands h * (kx, ky) away), after `flip`, for a
+  `shade` layer. A `silhouette` stamped at an offset is an upright dark copy: for tall objects it
+  reads wrong, and a mirrored palm then throws its shadow the other way.
+- [x] **Relight a flat sprite** (ae43468): `relight(where?, { light, reach, strength, ramps })` steps
+  every pixel along its ramp by the edges it sits on. A reduced palm (3 greens that `palettize` merged
+  into one) gets its depth back with it, pixel for pixel what the hand-written pass did.
+- [x] **Corner tilemaps** (ae43468): `tilemap(map, { corners: "#", map: "dirt_" })` reads one char
+  per tile corner and picks each tile by its corner mask. The corner-to-mask loop had been
+  hand-written twice (topdown.px.js, the forest's trail); reference.md maps an LPC terrain block
+  to the masks.
 
 ## Later / niche
 

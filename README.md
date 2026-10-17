@@ -24,6 +24,28 @@ for people too. No runtime dependencies, no build step: just Node ≥ 22.18.
 
 Every image above is generated from a file in [`examples/`](examples).
 
+## Showcase: a tropical forest
+
+<p>
+  <img src="docs/gallery/tropical_forest.gif" width="100%" alt="Animated tropical forest seen from above at an angle: a waterfall churning its pool, a river under a plank bridge, a dirt trail, palms and big trees, a jaguar on a branch, a monkey swinging, a macaw, butterflies and a girl breathing on the trail">
+</p>
+
+The first long project made with pxl, by an agent working with a curator over many rounds of
+feedback: a 320×240 animated jungle in [`examples/tropical/`](examples/tropical). A waterfall
+churns its pool and sends foam down a river that winds under a plank bridge. A dirt trail is laid
+with a terrain tileset. Big trees, palms and the understory throw shadows laid flat on the ground,
+and grass and weeds cover the whole floor. In the trees, a jaguar lies on a branch and a monkey
+swings; a macaw, a frog and butterflies are around, and an Indigenous girl breathes on the trail.
+What the agent kept getting wrong on the way became pxl features (`cast` shadows, `relight`,
+`tilemap` corners) and notes in [`SKILL.md`](SKILL.md) and [`characters.md`](characters.md).
+
+The trees, palms and big leaves are reduced from "[LPC] Jungle" by bluecarrot16, Lanea Zimmerman
+(Sharm), Sevarihk, Hyptosis and others, and from Sevarihk's "Animated Palm Tree Sprite" (both
+CC-BY 4.0). The trail tiles come from "ZRPG Beach" by Zabin, built on "[LPC] Beach/Desert" by
+bluecarrot16 and others (CC-BY-SA 3.0). Full credits are in the files and in
+[`examples/tropical/refs/CREDITS.md`](examples/tropical/refs/CREDITS.md). Because of the share-alike tiles, the forest
+image and those files are CC-BY-SA 3.0; the rest of the repository stays MIT.
+
 ## Quick start
 
 ```sh

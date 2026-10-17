@@ -1,4 +1,4 @@
-# Characters (people and humanoids, 16–64 px)
+# Characters (people, humanoids and small animals, 16–64 px)
 
 Read this before drawing a person. At these sizes, most failures come from proportion and
 construction, not from where single pixels go: a head that's the wrong size, a body that's too wide
@@ -154,7 +154,10 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
 - **Hems and belts:** they curve, lower in the middle, because the figure is seen from slightly
   above.
 - **Limb shape:**
-  - Arms hang slightly outward, with a 1 px gap to the body at the hands.
+  - Arms hang slightly outward, with a 1 px gap to the body at the hands. Bare arms against a
+    bare or skin-colored torso need the gap their whole length (the outline turns it into a line),
+    or arms, top and skirt read as one round belly.
+  - The waist is no wider than the chest, and a skirt flares 1 px a side at most.
   - Forearms and wrists are narrower than the sleeves above them.
   - Shoulders slope down from the neck. Flat shoulders read as shoulder pads.
 
@@ -173,3 +176,29 @@ sprite("hero", { w: 62, h: 62, outline: "k" }, grid(18, 0, HEAD), runs(BODY))
 ```
 
 Look at the result at 1× too. Something that reads as cute at 12× can turn to mush at its real size.
+
+## 8. The same character, someone else
+
+To turn a character into another person (another people, age or job), keep the head, face and
+proportions that already work and change what makes the person: hair (color, cut, length), skin,
+clothes and what they carry or wear. Use real details of the people you mean, not costume
+shorthand: for an Indigenous Brazilian girl, long straight black hair with a straight fringe, red
+urucum dots and black jenipapo bands painted on the skin, a bead necklace, a woven top and a
+fiber skirt, bare feet; no feather headdress. Keep the original as its own file.
+
+## 9. Small animals
+
+Animals at scene scale (a jaguar 25 px long, a monkey 12 px tall) read best as grid strings, one
+decision per pixel, with `outline` around them.
+
+- **Lying along a slope** (a jaguar on a sloping branch): draw it lying flat, then shear it in a
+  function, moving each column down by `Math.floor((x - x0) / 3)` from the neck on. Legs and tail
+  stay vertical, so they still hang. Use `floor` with a fixed step: `Math.round(x * 0.3)` gives
+  runs of 2, 3 and 4 pixels and the back comes out lumpy. Keep the grid's back one straight row
+  (no hump at the shoulders or hips) and let the shear do the slope; round the rump off into the
+  tail with steps that get shorter. Put each leg inside one step of the shear, or it splits in two.
+- **Swinging from a hand** (a monkey on a branch): shift the whole body by `dx` per frame
+  (`[0, 1, 0, -1]`) and bend only the arm toward the hand, each arm row moving
+  `Math.round(dx * y / armLength)`. Shifting every row by its own amount tears the head.
+- **Breathing:** move every row above the knees down 1 px on the out-breath (rows shift, nothing is
+  redrawn), and let the row the shift lands on be a plain one, so hems and fringes keep their shape.

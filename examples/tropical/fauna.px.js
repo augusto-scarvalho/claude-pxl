@@ -1,0 +1,67 @@
+// Tropical forest, part 3: a jaguar lounging on a branch and a little monkey hanging from one.
+// Small animals read best placed pixel by pixel, so they're grids; their motion is a few frames.
+use("palette.hex")
+
+// The jaguar is drawn lying flat, then sheared down to the right so its body follows the slope of
+// the branch it lies on while its legs and tail still hang straight down. Its back is one smooth
+// line from the neck to the rump, which rounds off into the tail; each leg sits inside one step
+// of the shear so it doesn't break in two. Head turned to us, chin
+// on its paws, near legs draped over the branch; golden coat lit on the back, darker underneath,
+// rosettes; the tail sways.
+const JAGUAR = `
+J.....J...................
+JJJJJJJ...................
+JkJJJkJJJJJJJJJJJJJJJ.....
+jjEkEjjJjjKKjjjjKKjjjJ....
+.jEEEjjjjKjjjjKjjjjjKjj...
+.EEjEEjjjjjjjKKjjjKjjjj...
+.......OjjjjjjjjjjjjjjO...
+.......jjOOOOOOOjjOOOOO...
+.......jj.......jj........
+.......jO.......jO........
+.......jO.......jO........
+.......JJ.......JJ........`
+const STEP = 3, NECK = 7
+const shear = (c) => {
+  const px = []
+  for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) if (c.is(x, y, "*")) px.push([x, y, c.key(x, y)])
+  for (const [x, y] of px) c.px(x, y, "_")
+  for (const [x, y, k] of px) c.px(x, y + Math.max(0, Math.floor((x - NECK) / STEP)), k)
+}
+anim("jaguar", { w: 30, h: 30, frames: 4, fps: 4, outline: "k", pivot: [4, 6] }, JAGUAR, shear, (c) => {
+  // the tail hangs from the rump and sways; its tip is dark
+  const sway = [0, 1, 2, 1][c.frame], x0 = 22, y0 = 4 + Math.floor((x0 - NECK) / STEP)
+  for (let i = 1; i < 13; i++) {
+    const x = x0 + Math.round(Math.sin(i * 0.3) * 1.5 + (sway * i) / 12)
+    c.px(x, y0 + i, i > 11 ? "K" : i % 4 === 2 ? "K" : "j")
+  }
+})
+
+// The monkey hangs by one hand, the other arm out, legs dangling, tail curled; it swings from
+// the hand, so each row below it shifts a little more.
+const MONKEY = `
+c...........
+c...bbb.....
+c..bbbbb....
+c.abaaaba...
+c.abkakba...
+c..baaab....
+c...bbb.....
+cccbbbbbc...
+...bcccbbc..
+...bcccb.c..
+...bbbbbb...
+...bb.bb.b..
+...bb.bb..b.
+...aa.aa..b.
+.........b..
+........bb..`.slice(1).split("\n")
+anim("monkey", { w: 14, h: 18, frames: 4, fps: 4, outline: "k", pivot: [1, 1] }, (c) => {
+  const dx = [0, 1, 0, -1][c.frame]
+  MONKEY.forEach((row, y) => {
+    // the arm bends toward the hand; everything else moves with the body
+    for (let x = 0; x < row.length; x++) if (row[x] !== ".") c.px(x + 1 + (x ? dx : Math.round((dx * y) / 7)), y + 1, row[x])
+  })
+})
+
+scene("fauna", { w: 70, h: 40, bg: "g" }, stamp("jaguar", 6, 8), stamp("monkey", 52, 4))
