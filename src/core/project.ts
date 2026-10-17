@@ -10,6 +10,7 @@ import {
 } from "./model.ts";
 import { PALETTE_FILE, Palette, paletteFromFile } from "./palette.ts";
 import { type Motion, readJoints, readMotion } from "./pose.ts";
+import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
 import { globRe, rng } from "./util.ts";
 
@@ -377,6 +378,15 @@ export class Project implements BuildCtx {
         }
         return { __op: true, name: "pose", args: [readJoints(data), opts], loc };
       } catch (e) { throw wrap(e).within("pose", loc); }
+    };
+    // chain(anchors, opts): hair / tail points per frame, following the anchors with lag (chain.ts).
+    env.chain = (anchors: unknown, opts: unknown = {}): number[][][] => {
+      const loc = this.callerLoc();
+      try {
+        if (!isPlainObject(opts)) throw new PxError("chain(anchors, { links, length, gravity, drag, rest, stiff, move, steps, loops })");
+        checkKeys("chain", opts, ["links", "length", "gravity", "drag", "rest", "stiff", "move", "steps", "loops"]);
+        return chain(anchors as [number, number][], opts as ChainOpts);
+      } catch (e) { throw wrap(e).within("chain", loc); }
     };
     // motion("walk.json", { dir, scale, at }): a motion guide's frames for one direction, as joints
     // to draw with pose() in an anim and to place parts with.

@@ -5,6 +5,7 @@ import { loadSource } from "../src/node/load.ts";
 import { compareSilhouettes, packSheet, sheetJson } from "../src/core/render.ts";
 import { pack } from "../src/core/color.ts";
 import { readJoints, readMotion, sideColor } from "../src/core/pose.ts";
+import { chain } from "../src/core/chain.ts";
 import { rotate } from "../src/core/rotate.ts";
 import { Img } from "../src/core/image.ts";
 
@@ -428,4 +429,20 @@ test("warp: pixels move by whole-pixel offsets, taking the color behind them; no
   // a region limits it, and the offsets are rounded
   eq(art(PAL + 'sprite("a", { w: 3, h: 1 }, "rwg", warp(() => [0.6, 0], [1, 0, 2, 1]))', "a"), "rrw");
   assert.match(failure(PAL + 'sprite("a", { w: 1, h: 1 }, "r", warp(() => 5))', "a").message, /must give \[dx, dy\]/);
+});
+
+test("chain: links keep their length, hang along gravity, trail behind travel, and loop", () => {
+  const still = chain([[0, 0], [0, 0]], { links: 3, length: 2 });
+  for (const f of still) {
+    for (let i = 1; i < f.length; i++) assert.ok(Math.abs(Math.hypot(f[i][0] - f[i - 1][0], f[i][1] - f[i - 1][1]) - 2) < 1e-6);
+    assert.ok(Math.abs(f[3][0]) < 0.01 && f[3][1] > 5.9, "hangs straight down");
+  }
+  // walking left: the end trails to the right of the anchor
+  const walk = chain([[0, 0], [0, 0], [0, 0], [0, 0]], { links: 3, length: 2, move: [-1, 0] });
+  assert.ok(walk.every((f) => f[3][0] > 0.5), "trails right");
+  // seamless: one more frame after the last comes back to the first
+  const bob = chain([[0, 0], [0, -1], [0, 0], [0, -1]], { links: 3, loops: 40 });
+  const again = chain([[0, 0], [0, -1], [0, 0], [0, -1]], { links: 3, loops: 41 });
+  assert.ok(Math.abs(bob[0][3][1] - again[0][3][1]) < 0.01, "the loop repeats");
+  assert.throws(() => chain([]), /one \[x, y\] per frame/);
 });

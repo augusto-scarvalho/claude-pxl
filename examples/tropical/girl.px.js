@@ -49,9 +49,9 @@ sprite("girl_pose", { w: 30, h: 26, outline: "k" }, `
 // each foot is ahead or behind, where the hands swing and when the body rises; the parts are drawn by
 // hand at her size. The guide shows in the previews (a ref layer), limbs colored by side.
 // Head, torso and skirt: the standing girl without her legs, her near arm, her far hand and the
-// hair that hangs below her shoulder.
+// long hair down her back (a chain draws that).
 // Sockets mark where those attach; the pivot is between her feet on the ground.
-sprite("girl_top", { w: 30, h: 22, pivot: [15, 26], sockets: { arm_r: [9, 15], hand_l: [20, 18], leg_r: [11, 21], leg_l: [16, 21], hair: [18, 15] } }, `
+sprite("girl_top", { w: 30, h: 22, pivot: [15, 26], sockets: { arm_r: [9, 15], hand_l: [20, 18], leg_r: [11, 21], leg_l: [16, 21] } }, `
   ...........1hhhhhhhh1.........
   .........1hhjjjhhhhhh1........
   ........1hjJJjhhhhhhhh1.......
@@ -63,10 +63,10 @@ sprite("girl_top", { w: 30, h: 22, pivot: [15, 26], sockets: { arm_r: [9, 15], h
   ........1h1f3Yff3YftSh1.......
   .........1hfH3ffH3ftSh1.......
   .........1hfRffffRftSh1.......
-  .........1hfffSffftShh1.......
-  .........1h1tfffftShhh1.......
-  ..............Stt..hhhh1......
-  ..........fttytttytthhh1......
+  .........1hfffSffftS..........
+  .........1h1tfffftS...........
+  ..............Stt.............
+  ..........fttytttytt..........
   ...........ttReuttS...........
   ...........rRRRRRDD...........
   ...........RnRnRnDD...........
@@ -86,13 +86,6 @@ sprite("arm_r_0", { pivot: [0, 0] }, "RD\nft\nft\ntS\nft")
 sprite("arm_r_1", { pivot: [1, 0] }, ".RD\n.ft\nft.\ntS.\nf..")
 sprite("arm_r_2", { pivot: [2, 0] }, "..RD\n.ft.\nft..\ntS..")
 sprite("hand_l", "t\nS")
-// The hair below her shoulder, as it hangs, bounced up (she came down, the ends lag above),
-// thrown back (she walks to the left, the ends trail right) and stretched (she went up, the ends
-// lag below). Drawn once each; per frame the walk picks one.
-sprite("hair_rest", "hhh1\nhhh1\nhh1.")
-sprite("hair_up", "hhh1\nhh1.")
-sprite("hair_back", ".hhh1\n.hhh1\n..hh1")
-sprite("hair_down", "hhh1\nhhh1\nhhh1\nhh1.")
 
 {
   // What the guide gives, per frame. Ankles and wrists are measured from the hip and the shoulder,
@@ -115,23 +108,24 @@ sprite("hair_down", "hhh1\nhhh1\nhhh1\nhh1.")
     arm: Math.min(2, Math.round(-rel(i, "r_wrist", "r_shoulder")[0] * SWING)),        // near arm: 0 down .. 2 forward
     hand: Math.round(rel(i, "l_wrist", "l_shoulder")[0] * SWING),           // far hand: > 0 behind her
   }))
-  // The hair follows the body a frame late, both ways: when she has just come down its ends are
-  // still up, when she has just gone up they are still down; in between they trail behind her.
-  PLAN.forEach((p, i) => {
-    const lag = p.bob - PLAN[(i + 7) % 8].bob
-    p.hair = lag < 0 ? "hair_up" : lag > 0 ? "hair_down" : i % 4 === 1 ? "hair_back" : "hair_rest"
-  })
 
   for (const p of PLAN) p.legL = Math.max(p.legL, p.legR - 1)
 
+  // Her long hair down her back is a chain fixed behind her head (chain(): Celeste-style hair). It
+  // hangs behind her, trails back as she walks down-left and swings a frame late with every step;
+  // drawn first, so her body covers its root and it shows only past her back.
+  const HAIR = chain(PLAN.map((p) => [21, 9 - p.bob]), { links: 4, length: 2.5, gravity: [0, 0.5], drag: 0.75,
+    rest: [0.3, 1], stiff: 0.2, move: [-1.2, 0.6] })
+  const RADII = [2.6, 2.4, 2.1, 1.8, 1.3]
+
   anim("girl_walk", { w: 30, h: 28, frames: 8, fps: 6, outline: "k", pivot: [15, 26] },
+    layer("hair", (c) => HAIR[c.frame].forEach(([x, y], i) => c.circ(Math.round(x), Math.round(y), RADII[i], "h"))),
     layer("parts", { sort: "z" }, (c) => {
       const p = PLAN[c.frame]
       c.stamp("girl_top", 15, 26 - p.bob, { z: 2 })
       c.stamp(p.upR ? "leg_r_up" : "leg_r", p.legR, p.legRy, { at: "girl_top.leg_r", z: p.rFront ? 1 : 0 })
       c.stamp(p.upL ? "leg_l_up" : "leg_l", p.legL, p.legLy, { at: "girl_top.leg_l", z: p.rFront ? 0 : 1 })
       c.stamp(`arm_r_${Math.max(0, p.arm)}`, 0, 0, { at: "girl_top.arm_r", z: 3 })
-      c.stamp(p.hair, 0, 0, { at: "girl_top.hair", z: 2.5 })
       if (p.hand > 0) c.stamp("hand_l", Math.min(1, p.hand - 1), 0, { at: "girl_top.hand_l", z: -1 })
     }),
     layer("guide", { ref: 0.6 }, (c) => c.pose(SMALL.frames[c.frame], { sides: true, joint: false })))

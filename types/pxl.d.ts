@@ -162,6 +162,14 @@ declare global {
   /** palette: true keeps the included file's use()/pal()/ramps() active afterwards. */
   function include(path: string, opts?: { palette?: boolean }): void;
   function rng(seed?: number): () => number;
+  /**
+   * Hair, tails, scarves: a chain fixed at anchors[f] in frame f that follows with lag (inertia,
+   * weight, a rest shape), simulated until the loop repeats. Returns per frame [anchor, p1, ...pN].
+   */
+  function chain(anchors: [number, number][], opts?: {
+    links?: number; length?: number; gravity?: [number, number]; drag?: number; rest?: [number, number]; stiff?: number;
+    move?: [number, number]; steps?: number; loops?: number;
+  }): [number, number][][];
   /** One direction of a motion guide file (examples/motion/walk.json): whole-pixel joints per frame, the floor point moved to `at`. */
   function motion(file: string, opts?: { dir?: "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW" | string; scale?: number; at?: [number, number] }): {
     name: string; dir: string; ms: number[]; frames: Record<string, [number, number]>[]; depth: Record<string, number>[]; contact: [number, number][];

@@ -206,12 +206,13 @@ offset points back to, so nothing tears open and no color is made up.
 - **Breathing:** move every row above the knees down 1 px on the out-breath,
   `(c) => { if (c.frame % 2) c.warp((x, y) => y <= knee && [0, 1]) }`, and let the row the shift
   lands on be a plain one, so hems and fringes keep their shape.
-- **Hair, tails, cloth following a frame late:** the ends lag the body *both ways*. Stretching the
-  hair a pixel only when the body rises reads as a twitch: it never comes back. Make the hanging part
-  its own sprite on a socket, draw it in a few poses (at rest, ends bounced up, ends stretched down,
-  ends trailing behind) and pick one per frame from the body's bob a frame earlier: just landed →
-  ends up, just risen → ends down, in between → trailing, then rest (`examples/tropical/girl.px.js`).
-  One pixel of travel at 32 px is enough; more reads as the hair coming loose.
+- **Hair, tails, scarves following with lag:** a `chain()` fixed behind the head (or at the root
+  of the tail) and given the character's travel (`move`): it hangs, trails behind when they walk,
+  swings with each step and settles, and the loop closes by itself. Draw it as discs shrinking to the
+  tip, in a layer *under* the body, so the body covers its root and it shows only past the back
+  (`examples/tropical/girl.px.js`, after the hair physics of games like Celeste). What failed first:
+  stretching the hair a pixel only when the body rose read as a twitch (the ends must lag both ways),
+  and four drawn hair poses swapped per frame still read as stepping, not swinging.
 
 ## 10. Animating with parts
 
