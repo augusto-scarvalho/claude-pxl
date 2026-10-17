@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { PxError, didYouMean, wrap } from "../core/errors.ts";
 import type { Img } from "../core/image.ts";
 import type { Project } from "../core/project.ts";
-import { type FrameTag, packSheet, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
+import { type FrameTag, onionSheet, packSheet, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
 import { normalImage } from "../core/normals.ts";
 import { tiledMap } from "../core/tiled.ts";
 import { encodeGif } from "./gif.ts";
@@ -93,6 +93,11 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         const s = opts.scale ?? Math.max(1, Math.min(previewScale(b.img), Math.floor(2048 / shown.w)));
         writePng(join(out, "_preview", n + ".png"), preview(shown, s));
         if (frames.length) write(join(out, "_preview", n + ".gif"), encodeGif(frames.map((f) => ({ img: preview(f.img, s), ms: f.ms }))));
+        // Anims also get a review sheet: a motion map, then each frame over its neighbours' ghosts.
+        if (def.kind === "anim" && frames.length > 1) {
+          const sheet = onionSheet(frames.map((f) => f.img));
+          writePng(join(out, "_preview", n + "_onion.png"), preview(sheet, opts.scale ?? Math.max(1, Math.min(previewScale(b.img), Math.floor(2048 / sheet.w)))));
+        }
         pv = ` @${s}x`;
       }
       if (b.anim?.capped) info += " -- loops don't line up, cut at 60s: give the anims durations on one grid (fps 4, 5, 10 or ms in 100s; fps 6 makes 167ms frames)";

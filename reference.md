@@ -80,6 +80,7 @@ sheet globs.
 | `slice: n \| [left, top, right, bottom]` | 9-slice margins of the final image (outline included) for `panel()`; flips and rotations turn them; sheets export them as Aseprite `meta.slices` (bounds + center). |
 | `wrap: true \| "x" \| "y"` | Seamless tile (Aseprite's tiled mode): drawing, stamps, fills and reads past those edges continue on the opposite side, and the preview lays the tile out 3×3 (3×1, 1×3) so seams show. For tiles that repeat themselves; random variants placed side by side don't line up across edges. |
 | `pivot: "bottom" \| "center" \| [x, y]` | The point `stamp`, `scatter` and wire hangs put on the given position. `"bottom"` is the middle of the final image's bottom edge, so `stamp("tree", x, groundY)` stands it on row `groundY` whatever its size. `[x, y]` is in drawing coordinates (pixel corners) and moves with flip, rot, outline and crop, here and in placements. A `base` variant starts with its base's pivot. Sheets export it as a normalized `pivot` (0.5, 1 = bottom center). |
+| `sockets: { name: [x, y], ... }` | Named points in drawing coordinates (pixel corners) that other stamps attach to: `stamp("arm_3", 0, 0, { at: "body.shoulder" })` puts the arm's pivot on the body's `shoulder` socket, wherever and however the body was placed. They move with flip, rot, angle, outline and crop, like the pivot. For characters built from parts (characters.md §10). |
 
 Post-processing order: mirror → swap → flip → rot → outline → crop.
 
@@ -88,6 +89,7 @@ Post-processing order: mirror → swap → flip → rot → outline → crop.
 | Option | Meaning |
 |---|---|
 | `x, y` | Offset of every op in the layer. |
+| `sort: "y" \| "z"` | Draw the layer's `stamp`s sorted instead of in call order: `"y"` by the point they stand on (top-down scenes: what stands lower, nearer the viewer, covers what stands higher), `"z"` by their `z` option (default 0). Ties keep call order. Other ops in the layer draw at once, before the sorted stamps. |
 | `hidden: true` | Skip when compositing (still exported with `layers: true`). |
 | `ref: true \| 0..1` | Reference / guide layer: previews and the live viewer show it over the art (`true`: full color, so small marks stay visible; a number: that strength over drawn pixels, to see the art through a mannequin or a shrunk original); the exported PNG, sheets, `layers: true` and stamps of the asset leave it out. For drawing over a pose skeleton (`pose`), a mannequin or a shrunk original. It stays in drawing coordinates: an `outline`'s growth is followed, but mirror, flip, rot, angle and crop are refused. |
 | `shade: true \| n \| { m: "M" }` | Blend layer: not drawn. Wherever it is opaque, what's below steps darker along the ramps (`n` steps, or the given map). |
@@ -148,7 +150,9 @@ Any `name` may be a sprite, scene, group, or glob (`"tree_*"`). **Placement opts
 none), `seed`, `reseed: true | n` (rebuild the placed asset with its own random choices; `true`
 derives it from the position, so `tile("house", 0, 0, 4, 1, { reseed: true })` gives four
 different houses from one definition), `silhouette: "w"` (every opaque pixel in that color: hit
-flashes, and cast shadows when placed in a `shade: true` layer), `cast: [kx, ky]` (the asset laid
+flashes, and cast shadows when placed in a `shade: true` layer), `at: "id.socket"` (attach to a
+socket of a stamp placed earlier in the same asset, any layer: x, y become an offset from it; `id`
+names a placement, default its asset name), `z` (order in a `sort: "z"` layer), `cast: [kx, ky]` (the asset laid
 flat on the ground as its shadow: a pixel h px above its base lands h × (kx, ky) from where it
 stands, e.g. `[0.6, 0.2]` for light from the top-left. The base is the pivot's row, so give tall
 props `pivot: "bottom"`; it applies after `flip`, so a mirrored tree still throws its shadow the
@@ -258,7 +262,11 @@ what it contains (capped at 60s), sampled at their common step. Keep durations o
 `duration` + `meta.frameTags`, Aseprite style: Phaser, Godot, ... read it) and `anims/<name>.gif`.
 Animated sprites and scenes get `<name>.gif` next to their PNG (which shows frame 0). Previews:
 `_preview/<name>.png` shows an anim's frames side by side; anything animated also gets
-`_preview/<name>.gif`. Sheets expand anims into `name_0`, `name_1`, ... with durations and tags.
+`_preview/<name>.gif`. Anims also get `_preview/<name>_onion.png`, a review sheet for eyes that
+can't watch a GIF: first a motion map (what stays put, dimmed; what moves, gray, with each frame's
+contour in its own color, red first to violet last), then every frame over ghosts of the frame
+before it (red) and after it (blue), wrapping around so the loop seam shows. Jitter, a part that
+jumps, a limb that changes sides and a hitch at the loop all show there. Sheets expand anims into `name_0`, `name_1`, ... with durations and tags.
 `pxl ascii` prints every frame of an anim. The live viewer loops animated assets after the
 painting replay ends ("animate" toggle).
 

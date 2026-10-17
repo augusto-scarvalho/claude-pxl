@@ -16,6 +16,8 @@ export interface Op {
 export interface LayerOpts {
   x?: number;
   y?: number;
+  /** Draw this layer's stamps sorted: "y" by where they stand (top-down props), "z" by their z option. */
+  sort?: "y" | "z";
   hidden?: boolean;
   /** Blend layer: instead of drawing, step what's below darker/lighter where this layer is opaque. */
   shade?: boolean | number | Record<string, string>;
@@ -81,6 +83,8 @@ export interface AssetOpts {
   layers?: boolean;
   /** Point that stamp/scatter/wire hangs place: "bottom" / "center" of the final image, or [x, y] in drawing coords. */
   pivot?: "bottom" | "center" | [number, number];
+  /** Named points in drawing coords that other placements attach to (stamp ..., { at: "name.socket" }). */
+  sockets?: Record<string, [number, number]>;
   /** Seamless tile: drawing past these edges continues on the other side; previews repeat 3x3. */
   wrap?: boolean | "x" | "y";
   /** 9-slice margins of the final image (n, or [left, top, right, bottom]) for panel(). */
@@ -183,6 +187,12 @@ export interface PlaceOpts {
   silhouette?: string;
   /** Lay the asset flat on the ground as its shadow: a pixel h above the base lands h * [kx, ky] away. */
   cast?: [number, number];
+  /** Attach to a socket of an earlier placement in this asset: "id.socket"; x, y become an offset from it. */
+  at?: string;
+  /** Name this placement for `at` (default: the asset name). */
+  id?: string;
+  /** Draw order in a layer with sort: "z" (default 0; ties keep call order). */
+  z?: number;
   seed?: number;
   /** Rebuild the placed asset with its own random choices (true = derived from position). */
   reseed?: boolean | number;

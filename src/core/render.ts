@@ -57,6 +57,57 @@ export function ascii(img: Img, pal: Palette): string {
   return lines.join("\n");
 }
 
+/** Fixed preview colors of the onion sheet: the frame before (red), after (blue), both (purple). */
+const GHOST_PREV = pack(236, 120, 120), GHOST_NEXT = pack(110, 150, 236), GHOST_BOTH = pack(176, 120, 210), MOVING = pack(96, 96, 104);
+
+/** A hue from red (first frame) to violet (last), for the motion map. */
+function frameHue(i: number, n: number): Color {
+  const h = (n > 1 ? i / (n - 1) : 0) * 270, f = (k: number) => {
+    const t = (k + h / 60) % 6;
+    return Math.round(255 * (1 - Math.max(0, Math.min(t, 4 - t, 1))));
+  };
+  return pack(f(5), f(3), f(1));
+}
+
+/**
+ * Review sheet for an animation, previews only. The first cell is a motion map: what stays put in
+ * every frame, dimmed; what moves, gray, with the contour of each frame's moving part in its own
+ * color (red first, violet last), so arcs, jitter and parts that jump read at a glance. Then each
+ * frame over ghosts of the frame before it (red) and after it (blue), wrapping around, so the loop
+ * seam shows in the first and last cells.
+ */
+export function onionSheet(frames: Img[]): Img {
+  const n = frames.length, w = Math.max(...frames.map((f) => f.w)), h = Math.max(...frames.map((f) => f.h));
+  const motion = new Img(w, h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const c0 = frames[0].get(x, y);
+      if (c0 !== TRANSPARENT && frames.every((f) => f.get(x, y) === c0)) motion.set(x, y, darken(c0, 0.55));
+    }
+  // what moves: a gray body under each frame's contour in its own color
+  const moving = (f: Img, x: number, y: number) => f.get(x, y) !== TRANSPARENT && !frames.every((g) => g.get(x, y) === f.get(x, y));
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) if (frames.some((f) => moving(f, x, y))) motion.set(x, y, MOVING);
+  frames.forEach((f, i) => {
+    const hue = frameHue(i, n);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++)
+        if (moving(f, x, y) && [[0, -1], [-1, 0], [0, 1], [1, 0]].some(([dx, dy]) => f.get(x + dx, y + dy) === TRANSPARENT)) motion.set(x, y, hue);
+  });
+  const cells = frames.map((f, i) => {
+    const prev = frames[(i + n - 1) % n], next = frames[(i + 1) % n], o = new Img(w, h);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const c = f.get(x, y);
+        if (c !== TRANSPARENT) { o.set(x, y, c); continue; }
+        const p = prev.get(x, y) !== TRANSPARENT, q = next.get(x, y) !== TRANSPARENT;
+        if (p || q) o.set(x, y, p && q ? GHOST_BOTH : p ? GHOST_PREV : GHOST_NEXT);
+      }
+    return o;
+  });
+  return packSheet([motion, ...cells].map((img) => ({ name: "", img })), n + 1, 1).sheet;
+}
+
 export interface SheetFrame {
   name: string;
   img: Img;

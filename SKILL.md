@@ -18,7 +18,9 @@ parts, primitives, brushes and tilemaps. Needs Node ≥ 22.18. No install step.
 2. Build only what you're working on: `PXL build art.px.js --only slime,heart`
 3. **Look at it**: read `out/_preview/<name>.png` (upscaled, checkerboard = transparent, grid every
    pixel, darker every 8). For exact pixel fixes use `PXL ascii art.px.js <name>` (keys + x/y rulers);
-   it's cheaper than an image.
+   it's cheaper than an image. For an anim, also read `_preview/<name>_onion.png`: a motion map and
+   each frame over its neighbours' ghosts, where jitter, jumps and a hitch at the loop show (a GIF
+   opens as its first frame only).
 4. Fix with small edits (a `grid(x, y, ...)` patch, one op) and rebuild. Repeat. A pixel came out
    wrong and you don't know which op painted it? `PXL steps art.px.js <name> --at x,y` lists the
    steps that changed it, with file:line and the color after each.
@@ -96,7 +98,9 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   one way only. Stamping an anim animates the scene (`rdelay: true` desyncs copies, `frame: n`
   freezes one); keep frame times on one grid (fps 4, 5, 10) so several anims loop short together. Hit flash, keeping the outline:
   `anim("hero_hit", { base: "hero" }, frame(), frame(recolor({ "*": "w", k: "k" })))`. Check
-  `_preview/<name>.png` (all frames side by side) or `pxl ascii` per frame.
+  `_preview/<name>_onion.png` (motion map + onion skin) and `_preview/<name>.png` (frames side by
+  side), or `pxl ascii` per frame. A character moving its limbs: draw the parts per pose and attach
+  them with `sockets` + `stamp(..., { at })` in a `sort: "z"` layer (characters.md §10).
 - **Existing PNGs**: `sprite("hero", { png: "hero.png", outline: "k" })` starts an asset from a file,
   then every option and item works on it; `area: [x, y, w, h]` cuts one out of a sheet,
   `anim("walk", { png: "walk.png", frames: 4 })` splits a strip, `palettize: true` snaps its colors to

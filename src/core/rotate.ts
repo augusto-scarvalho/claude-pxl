@@ -84,7 +84,7 @@ function sampled(src: Img, deg: number, big: Img, k: number): Img {
   }
   const o = new Img(W, H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) o.data[y * W + x] = at(x, y, best[0], best[1]);
-  if (src.pivot) o.pivot = fwd(src.pivot[0], src.pivot[1]);
+  src.movePivot(o, fwd);
   return o;
 }
 
@@ -106,6 +106,6 @@ function shear(src: Img, deg: number): Img {
   for (const [x, y] of pts) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
   const o = new Img(x1 - x0 + 1, y1 - y0 + 1);
   for (const [x, y, c] of pts) o.set(x - x0, y - y0, c);
-  if (src.pivot) { const [px, py] = move(src.pivot[0] - cx, src.pivot[1] - cy); o.pivot = [px - x0, py - y0]; }
+  src.movePivot(o, (x, y) => { const [px, py] = move(x - cx, y - cy); return [px - x0, py - y0]; });
   return o;
 }

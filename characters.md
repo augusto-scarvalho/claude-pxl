@@ -202,3 +202,37 @@ decision per pixel, with `outline` around them.
   `Math.round(dx * y / armLength)`. Shifting every row by its own amount tears the head.
 - **Breathing:** move every row above the knees down 1 px on the out-breath (rows shift, nothing is
   redrawn), and let the row the shift lands on be a plain one, so hems and fringes keep their shape.
+
+## 10. Animating with parts
+
+How a previous studio pipeline (Smack Studio rigs, Warp pin meshes, mocap guides) got to animation
+its curator accepted, after rejecting most of what it tried first:
+
+- **Rejected:** a limb cut out and bent or rotated (it reads as a paper doll), cutouts leaving
+  trails, a flat part rotated in a 3/4 or iso view, fake thickness, interpolating between two
+  drawings. Rotating a 32 px limb by any angle that isn't a quarter turn breaks its pixel clusters.
+- **Accepted:** a stable body plus each moving limb **drawn whole, once per pose**, attached at a
+  socket and moved by whole pixels only. In-betweens are more drawn poses, not blends.
+
+In pxl:
+
+```js
+sprite("body", { pivot: [15, 26], sockets: { shoulder: [12, 14] } }, BODY)
+for (let i = 0; i < 8; i++) sprite(`arm_${i}`, { pivot: [1, 1] }, ARM[i])     // one drawing per pose
+anim("walk", { frames: 8, fps: 8, outline: "k" },
+  layer("parts", { sort: "z" }, (c) => {
+    c.stamp("body", 16, 30 + BOB[c.frame])
+    c.stamp(`arm_${c.frame}`, 0, 0, { at: "body.shoulder", z: ARM_Z[c.frame] })   // in front or behind
+  }))
+```
+
+- **Register the whole figure by one point**, the pelvis: move the entire frame so it lands on the
+  same x every frame, with one constant y offset per cycle for the bob. Never centre frames on
+  their bounding box (an arm reaching out moves it), and never pin head and feet separately (the
+  torso goes soft).
+- **Review the whole cycle**, not the key frames: `_preview/<name>_onion.png`, the half-cycle
+  pairs (frame i next to i + n/2), and the seam (last → 0 → 1). Fixing a limb only on the contact
+  frame leaves the wrong leg moving in the in-betweens. Draw left and right limbs in distinct guide
+  colors while working so their identity can't swap. Check that shoulders stay on the torso.
+- Motion references (mocap, a video, a CC0 walk cycle) are guides for timing and arcs, drawn in
+  a `ref: true` layer under the pose; they are not the authority on the body's proportions.

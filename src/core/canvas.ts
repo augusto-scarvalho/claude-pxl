@@ -27,6 +27,9 @@ export interface Resolver {
 
 type Pred = (x: number, y: number) => boolean;
 
+/** Where stamps landed in an asset (top-left in image coords) with their sockets, by id: for `at`. */
+export type Placed = Map<string, { x: number; y: number; sockets?: Record<string, [number, number]> }>;
+
 /**
  * Drawing surface over an image. Coordinates are relative to (ox, oy); colors are palette
  * keys, "#hex", "." (skip) or "_" (erase). All writes go through plot(), which honours clip().
@@ -54,6 +57,10 @@ export class Canvas {
   maps?: TileLayer[];
   /** The layer this canvas paints, if any: names exported tile layers. */
   layerName?: string;
+  /** Stamps placed so far in this asset (shared by its layers), for stamp(..., { at }). */
+  placed?: Placed;
+  /** A layer with sort: its stamps wait here and draw in order on flush(). */
+  sorted?: { by: "y" | "z"; queue: { key: number; seq: number; draw: () => void }[] };
   /** Called after each top-level (non-nested) op call; used for tracing. */
   onOp?: (name: string, args: unknown[]) => void;
   /** Art-file location of the op item currently running (set by the builder). */
@@ -489,7 +496,38 @@ export class Canvas {
   }
 
   stamp(name: string, x = 0, y = 0, opts?: PlaceOpts): void {
-    this.putAt(this.asset(name, opts, x, y), x, y, [0, 0]);
+    if (opts?.at !== undefined) [x, y] = this.socketAt(opts.at, x, y);
+    const src = this.asset(name, opts, x, y), [px, py] = src.pivot ?? [0, 0];
+    const tx = x - Math.floor(px), ty = y - Math.floor(py);
+    this.placed?.set(opts?.id ?? name, { x: this.ox + tx, y: this.oy + ty, sockets: src.sockets });
+    if (!this.sorted) return this.put(src, tx, ty);
+    const z = opts?.z ?? 0;
+    if (!Number.isFinite(z)) throw new PxError(`z must be a number, got ${JSON.stringify(opts?.z)}`);
+    // Drawn later, in order: keep the clip that was active at the call.
+    const clip = this.clipPred, q = this.sorted.queue;
+    q.push({ key: this.sorted.by === "y" ? y : z, seq: q.length, draw: () => {
+      const prev = this.clipPred;
+      this.clipPred = clip;
+      try { this.put(src, tx, ty); } finally { this.clipPred = prev; }
+    } });
+  }
+
+  /** Draw the stamps a sorted layer queued: by key (y or z), ties in call order. */
+  flush(): void {
+    if (!this.sorted) return;
+    const q = this.sorted.queue.splice(0).sort((a, b) => a.key - b.key || a.seq - b.seq);
+    for (const d of q) d.draw();
+  }
+
+  /** "id.socket" -> canvas coords of that socket of an earlier placement, plus (dx, dy). */
+  private socketAt(at: string, dx: number, dy: number): [number, number] {
+    const i = typeof at === "string" ? at.lastIndexOf(".") : -1;
+    if (i <= 0 || i === at.length - 1) throw new PxError(`at must be "placement.socket" (e.g. "body.shoulder"), got ${JSON.stringify(at)}`);
+    const id = at.slice(0, i), name = at.slice(i + 1), p = this.placed?.get(id);
+    if (!p) throw new PxError(`at "${at}": nothing placed as '${id}' yet in this asset; stamp it first (an earlier layer counts), or name a placement with { id }`);
+    const s = p.sockets?.[name];
+    if (!s) throw new PxError(`at "${at}": '${id}' has no socket '${name}'` + (p.sockets ? `; it has: ${Object.keys(p.sockets).join(", ")}` : `; give its asset { sockets: { ${name}: [x, y] } }`));
+    return [p.x + s[0] - this.ox + dx, p.y + s[1] - this.oy + dy];
   }
 
   tile(name: string, x: number, y: number, cols = 1, rows = 1, opts?: PlaceOpts): void {

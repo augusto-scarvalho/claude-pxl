@@ -377,3 +377,21 @@ test("tilemap corners: one char per tile corner, each tile picked by its corner 
   eq(art(T + 'scene("s", { w: 1, h: 1 }, tilemap("ww\\nww", { corners: "w", size: 1, map: { 15: "full" } }))', "s"), "g");
   assert.match(failure(T + 'scene("s", { w: 1, h: 1 }, tilemap("#.\\n.#", { corners: true, size: 1, map: "t_" }))', "s").message, /no tile for corner mask 9 \(top-left \+ bottom-right set\)/);
 });
+
+test("sockets: a stamp attaches to a socket of an earlier stamp, through flips; errors name what exists", () => {
+  // a 3x1 body with a socket at its right end; an arm (1x1, pivot at its corner) hangs from it
+  const S = PAL + 'sprite("body", { sockets: { hand: [3, 0] } }, "rrr"); sprite("arm", "w"); ';
+  eq(art(S + 'scene("s", { w: 5, h: 1 }, stamp("body", 0, 0), stamp("arm", 0, 0, { at: "body.hand" }))', "s"), "rrrw.");
+  // offsets add to the socket; a flipped body carries its socket to the other side
+  eq(art(S + 'scene("s", { w: 5, h: 1 }, stamp("body", 2, 0, { flip: "x", id: "b" }), stamp("arm", -1, 0, { at: "b.hand" }))', "s"), ".wrrr");
+  assert.match(failure(S + 'scene("s", { w: 5, h: 1 }, stamp("arm", 0, 0, { at: "body.hand" }))', "s").message, /nothing placed as 'body' yet/);
+  assert.match(failure(S + 'scene("s", { w: 5, h: 1 }, stamp("body"), stamp("arm", 0, 0, { at: "body.foot" }))', "s").message, /no socket 'foot'; it has: hand/);
+});
+
+test("layer sort: stamps draw by z, or by where they stand, ties in call order", () => {
+  const S = PAL + 'sprite("a", "rr"); sprite("b", "ww"); ';
+  // without sort the later stamp covers; with sort "z" the higher z does
+  eq(art(S + 'scene("s", { w: 3, h: 1 }, layer("l", { sort: "z" }, stamp("a", 0, 0, { z: 1 }), stamp("b", 1, 0)))', "s"), "rrw");
+  eq(art(S + 'sprite("t", { pivot: "bottom" }, "g\\ng"); scene("s", { w: 3, h: 3 }, layer("l", { sort: "y" }, stamp("t", 1, 3), stamp("a", 0, 2)))', "s"), "...\n.g.\nrg.");   // the post stands lower (y 3), so it covers the bar (y 2)
+  assert.match(failure(S + 'scene("s", { w: 3, h: 1 }, layer("l", { sort: "x" }, stamp("a")))', "s").message, /sort must be "y" or "z"/);
+});

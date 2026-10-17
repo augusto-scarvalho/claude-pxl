@@ -31,6 +31,8 @@ export class Img {
    * middle of the bottom edge. Set from the asset's `pivot`; travels through transforms.
    */
   pivot?: [number, number];
+  /** Named points (pixel-corner coords) other placements attach to, from the asset's `sockets`; they travel like the pivot. */
+  sockets?: Record<string, [number, number]>;
   /** 9-slice margins [left, top, right, bottom] from the asset's `slice`; flips and rotations turn them. */
   slice?: [number, number, number, number];
 
@@ -65,13 +67,15 @@ export class Img {
     if (this.lamps) o.lamps = this.lamps.map((l) => ({ ...l }));
     if (this.norm) o.norm = this.norm.slice();
     if (this.pivot) o.pivot = [...this.pivot];
+    if (this.sockets) o.sockets = mapPoints(this.sockets, (x, y) => [x, y]);
     if (this.slice) o.slice = [...this.slice];
     return o;
   }
 
-  /** Carry the pivot into `o` through a transform of pixel-corner coords. */
-  private movePivot(o: Img, f: (x: number, y: number) => [number, number]): Img {
+  /** Carry the pivot and sockets into `o` through a transform of pixel-corner coords. */
+  movePivot(o: Img, f: (x: number, y: number) => [number, number]): Img {
     if (this.pivot) o.pivot = f(...this.pivot);
+    if (this.sockets) o.sockets = mapPoints(this.sockets, f);
     return o;
   }
 
@@ -290,8 +294,7 @@ export class Img {
   silhouette(c: Color): Img {
     const o = new Img(this.w, this.h);
     for (let i = 0; i < o.data.length; i++) if (this.data[i] !== TRANSPARENT) o.data[i] = c;
-    if (this.pivot) o.pivot = [...this.pivot];
-    return o;
+    return this.movePivot(o, (x, y) => [x, y]);
   }
 
   /**
@@ -343,6 +346,13 @@ export class Img {
     }
     return (h >>> 0).toString(36);
   }
+}
+
+/** A copy of named points, each moved by f. */
+export function mapPoints(pts: Record<string, [number, number]>, f: (x: number, y: number) => [number, number]): Record<string, [number, number]> {
+  const o: Record<string, [number, number]> = {};
+  for (const k of Object.keys(pts)) o[k] = f(...pts[k]);
+  return o;
 }
 
 /** The first 4-neighbour (then diagonal) of (x, y) that `want` accepts, or undefined. */

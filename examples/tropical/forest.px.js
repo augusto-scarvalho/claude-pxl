@@ -137,7 +137,7 @@ const PLANTS = [
 ]
 for (const [n, x, y] of PLANTS) if (isWater(x, y)) throw new Error(`${n} at ${x},${y} stands in the water`)
 const POOL_LIFE = [["lilypad", 216, 46], ["lilyflower", 204, 58], ["lilypad", 288, 24], ["lilypad", 150, 206], ["lilyflower", 140, 168]]
-const byDepth = (list) => [...list].sort((a, b) => a[2] - b[2]).map(([n, x, y, o]) => stamp(n, x, y, o))
+const place = ([n, x, y, o]) => stamp(n, x, y, o)
 // ---------------------------------------------------------------- grass and weeds
 // Clumps that stand on the ground (pivot at the base) and are sorted with the plants, so a clump in
 // front of a trunk hides its roots and one behind is hidden. Lit blade tips, a dark base that
@@ -292,10 +292,12 @@ scene("forest", { w: W, h: H },
     scatter("sprout", 0, 0, W, H, 60, { on: "g", below: true, even: true, rflip: "x", seed: 17 }),
     scatter("blooms", 0, 0, W, H, 26, { on: "g", below: true, even: true, seed: 9 })),
   layer("shadows", { shade: 2 }, ...PLANTS.filter(([n]) => TALL.includes(n)).map(shadowOf)),
-  layer("water", stamp("ripples", 0, 0), stamp("splash", 0, 0), ...byDepth(POOL_LIFE), stamp("frog", 217, 44)),
+  layer("water", stamp("ripples", 0, 0), stamp("splash", 0, 0), ...POOL_LIFE.map(place), stamp("frog", 217, 44)),
   layer("dapples", { light: 1 }, ...DAPPLES.map(([x, y, rx, ry]) => ellipse(x, y, rx, ry, "Z"))),
   layer("bridge", stamp("bridge", 112, 140)),
-  layer("props", ...byDepth([...PLANTS, ...GRASS, ["girl", 92, 137]]), stamp("macaw", 116, 142)),
+  // sort: "y" draws what stands lower (nearer) over what stands higher, whatever the call order
+  layer("props", { sort: "y" }, ...[...PLANTS, ...GRASS, ["girl", 92, 137]].map(place)),
+  layer("perch", stamp("macaw", 116, 142)),
   // in the trees: the jaguar on the big tree's low branch, the monkey under a leaf pad of the other
   layer("fauna", stamp("jaguar", 21, 73), stamp("monkey", 150, 51)),
   layer("falls", stamp("waterfall", 248, 34), stamp("spray", 0, 0)),

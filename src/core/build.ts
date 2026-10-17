@@ -1,6 +1,6 @@
 // Turns an asset definition into an image: base -> items (ops, grids, functions, layers)
 // -> post-processing (mirror, swap, flip, rot, outline, crop). Optionally traced.
-import { Canvas, type Resolver } from "./canvas.ts";
+import { Canvas, type Placed, type Resolver } from "./canvas.ts";
 import { type Color, TRANSPARENT, pack } from "./color.ts";
 import { PxError, wrap } from "./errors.ts";
 import { Img } from "./image.ts";
@@ -154,8 +154,10 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   if (![undefined, true, false, "x", "y"].includes(opts.wrap)) throw new PxError(`wrap must be true, "x" or "y", got ${fmtArgs([opts.wrap])}`);
   const edges = opts.wrap ? { x: opts.wrap !== "y", y: opts.wrap !== "x" } : undefined;
   const maps: TileLayer[] = [];
+  const placed: Placed = new Map();
   const timed = (c: Canvas) => {
     c.maps = maps;
+    c.placed = placed;
     c.wrap = edges;
     c.t = t;
     c.frame = frame;
@@ -195,10 +197,15 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     const lc = timed(new Canvas(limg, pal, ctx, l.opts.x ?? 0, l.opts.y ?? 0, seed));
     lc.layerName = l.name;
     lc.below = base;
+    if (l.opts.sort !== undefined) {
+      if (l.opts.sort !== "y" && l.opts.sort !== "z") throw new PxError(`layer '${l.name}': sort must be "y" or "z", got ${fmtArgs([l.opts.sort])}`, l.loc);
+      lc.sorted = { by: l.opts.sort, queue: [] };
+    }
     hook(lc);
     cur = { img: limg, opts: l.opts };
     try {
       runItems(ctx, l.items, lc, l.loc);
+      lc.flush();
     } catch (e) {
       throw wrap(e, (st) => ctx.locFromStack(st)).within(`layer '${l.name}'`, l.loc);
     } finally {
@@ -338,6 +345,12 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
   if (pv !== undefined && !(pv === "bottom" || pv === "center" || (Array.isArray(pv) && pv.length === 2 && pv.every(Number.isFinite))))
     throw new PxError(`pivot must be "bottom", "center" or [x, y], got ${fmtArgs([pv])}`);
   if (Array.isArray(pv)) img.pivot = [pv[0], pv[1]];
+  if (o.sockets !== undefined) {
+    const so = o.sockets as unknown;
+    if (typeof so !== "object" || so === null || Array.isArray(so) || !Object.values(so).every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)))
+      throw new PxError(`sockets must be { name: [x, y], ... } in drawing coords, got ${fmtArgs([so])}`);
+    img.sockets = Object.fromEntries(Object.entries(so as Record<string, number[]>).map(([k, p]) => [k, [p[0], p[1]] as [number, number]]));
+  }
   if (o.mx) step("mirror x", () => img.mirror("x"));
   if (o.my) step("mirror y", () => img.mirror("y"));
   if (o.swap) {

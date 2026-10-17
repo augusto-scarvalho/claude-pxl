@@ -19,6 +19,12 @@ declare global {
     silhouette?: PxColor;
     /** Lay the asset flat on the ground as its cast shadow: a pixel h above the base lands h * [kx, ky] away. */
     cast?: [number, number];
+    /** Attach to a socket of an earlier stamp in this asset, "id.socket"; x, y become an offset from it. */
+    at?: string;
+    /** Name this stamp for `at` (default: the asset name). */
+    id?: string;
+    /** Draw order in a layer with sort: "z" (default 0; ties keep call order). */
+    z?: number;
   }
   interface PxScatter extends PxPlace { on?: string; clip?: boolean; below?: boolean; even?: boolean }
   interface PxTilemap extends PxPlace {
@@ -42,6 +48,8 @@ declare global {
     inline?: PxColor | { color: PxColor; keep?: string }; selout?: boolean | number;
     /** Point that stamp / scatter / wire hangs place: "bottom" / "center" of the final image, or [x, y] in drawing coords. */
     pivot?: "bottom" | "center" | [number, number];
+    /** Named points in drawing coords (they travel with flips, turns and the outline) that other stamps attach to with { at: "id.socket" }. */
+    sockets?: Record<string, [number, number]>;
     /** 9-slice margins of the final image for panel(): n or [left, top, right, bottom]. */
     slice?: number | [number, number, number, number];
     /** Seamless tile: drawing past these edges continues on the other side; previews repeat 3x3. */
@@ -55,6 +63,8 @@ declare global {
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong" }
   interface PxFrame { ms?: number; hold?: number }
   interface PxLayerOpts {
+    /** Draw the layer's stamps sorted: "y" by where they stand (top-down props), "z" by their z. */
+    sort?: "y" | "z";
     x?: number; y?: number; hidden?: boolean; density?: number; solid?: boolean; wall?: boolean; unlit?: boolean;
     shade?: boolean | number | Record<string, PxColor>; light?: boolean | number | Record<string, PxColor>;
     /** Color math with what's below (new colors, off the palette; palettize snaps them back). */
