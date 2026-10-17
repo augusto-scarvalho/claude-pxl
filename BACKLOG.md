@@ -120,8 +120,9 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
 
 - [x] **Hair physics** (35a57b4): `chain(anchors, { links, length, gravity, drag, rest, stiff, move })`,
   Celeste-style: points that follow an anchor with inertia and weight, simulated over the loop until
-  it repeats. Asked for after a GameMaker hair-physics clip; the walking girl's hair uses it, after a
-  stretch-only warp and four drawn poses both read wrong.
+  it repeats, plus Celeste's way of following (`follow`, `step`, `max`). Asked for after a GameMaker
+  hair-physics clip. For the 32 px girl it read wrong (it turned her hair into a point): her hair is
+  drawn, cut straight, and its ends swing like a skirt's hem. Kept for long hair, tails and scarves.
 
 Left out on purpose: effects that leave the palette (blur, curves, HSV, convolution), keyframed
 tweens and interpolating between drawings, free rotation of cut-out limbs, 2.5D thickness, 3D layers

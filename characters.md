@@ -206,15 +206,18 @@ offset points back to, so nothing tears open and no color is made up.
 - **Breathing:** move every row above the knees down 1 px on the out-breath,
   `(c) => { if (c.frame % 2) c.warp((x, y) => y <= knee && [0, 1]) }`, and let the row the shift
   lands on be a plain one, so hems and fringes keep their shape.
-- **Hair, tails, scarves following with lag:** a `chain()` fixed behind the head (or at the root
-  of the tail) and given the character's travel (`move`): it hangs, trails behind when they walk,
-  sways with each step and settles, and the loop closes by itself. For hair, follow the way Celeste
-  does (`follow: 1.6, step: [0.4, 2]`: no bounce) and keep the travel small for a walk, or it streams
-  back as if she were running into wind. Draw it as discs shrinking to the tip, then a couple of
-  1 px strands (wispy ends), in a layer *under* the body, so the body covers its root and it shows
-  only past the back; fill the space between her back and the hair where it swings away, or the
-  background shows through; and drop the dark edge at the back of the head, which would sit as a
-  line between head and hair (`examples/tropical/girl.px.js`). What failed first:
+- **Hair on a small character:** keep the hair as drawn and move only its ends. The walking girl's
+  hair below the shoulder is a part on a socket, cut straight at the bottom, drawn three ways (as it
+  hangs, ends swung back, ends swung forward) and swung once a step like a skirt's hem: the top stays
+  on the shoulder, the ends move a pixel (`examples/tropical/girl.px.js`). What read wrong on the
+  way: stretching the ends only when the body rose (a twitch), four poses with the ends bouncing
+  up and down (stepping, not swinging), and a `chain()` of discs (it replaced her hair's drawn
+  silhouette with a point).
+- **Long flowing hair, tails, scarves:** a `chain()` fixed behind the head (or at the root of the
+  tail) and given the character's travel (`move`): it trails behind, sways and settles, and the loop
+  closes by itself. Follow the way Celeste does (`follow: 1.5`, a small `step`: no bounce), draw it
+  as shrinking discs in a layer *under* the body so the body covers its root, and keep the travel
+  small for a walk, or it streams back as if into wind. What failed first:
   stretching the hair a pixel only when the body rose read as a twitch (the ends must lag both ways),
   and four drawn hair poses swapped per frame still read as stepping, not swinging.
 
