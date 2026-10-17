@@ -189,10 +189,13 @@ fiber skirt, bare feet; no feather headdress. Keep the original as its own file.
 ## 9. Small animals
 
 Animals at scene scale (a jaguar 25 px long, a monkey 12 px tall) read best as grid strings, one
-decision per pixel, with `outline` around them.
+decision per pixel, with `outline` around them. Motion that bends what's drawn without redrawing
+it is a `warp((x, y) => [dx, dy], where?)`: whole-pixel offsets, each pixel taking the color the
+offset points back to, so nothing tears open and no color is made up.
 
-- **Lying along a slope** (a jaguar on a sloping branch): draw it lying flat, then shear it in a
-  function, moving each column down by `Math.floor((x - x0) / 3)` from the neck on. Legs and tail
+- **Lying along a slope** (a jaguar on a sloping branch): draw it lying flat, then shear it with
+  `warp((x) => [0, Math.max(0, Math.floor((x - x0) / 3))])`, each column down a step every 3 from
+  the neck on. Legs and tail
   stay vertical, so they still hang. Use `floor` with a fixed step: `Math.round(x * 0.3)` gives
   runs of 2, 3 and 4 pixels and the back comes out lumpy. Keep the grid's back one straight row
   (no hump at the shoulders or hips) and let the shear do the slope; round the rump off into the
@@ -200,8 +203,13 @@ decision per pixel, with `outline` around them.
 - **Swinging from a hand** (a monkey on a branch): shift the whole body by `dx` per frame
   (`[0, 1, 0, -1]`) and bend only the arm toward the hand, each arm row moving
   `Math.round(dx * y / armLength)`. Shifting every row by its own amount tears the head.
-- **Breathing:** move every row above the knees down 1 px on the out-breath (rows shift, nothing is
-  redrawn), and let the row the shift lands on be a plain one, so hems and fringes keep their shape.
+- **Breathing:** move every row above the knees down 1 px on the out-breath,
+  `(c) => { if (c.frame % 2) c.warp((x, y) => y <= knee && [0, 1]) }`, and let the row the shift
+  lands on be a plain one, so hems and fringes keep their shape.
+- **Hair, tails, cloth following a frame late:** after the parts are drawn (an item after their
+  layer), warp the ends a pixel toward where they were: when the body rises, the hair's ends stay a
+  pixel lower for that frame (`examples/tropical/girl.px.js`). One pixel at 32 px is enough; more
+  reads as the hair coming loose.
 
 ## 10. Animating with parts
 

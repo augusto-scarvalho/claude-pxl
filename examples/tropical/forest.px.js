@@ -267,12 +267,10 @@ anim("spray", { w: W, h: H, frames: 8, fps: 8 }, (c) => {
 })
 
 // The girl breathes: everything above her knees sinks 1px on the out-breath (rows shift, nothing
-// is redrawn), 4 frames at 4 fps so her loop lines up with the waterfall's.
-const sink = (c, last, dy) => {
-  for (let y = last; y >= 0; y--) for (let x = 0; x < c.w; x++) c.px(x, y + dy, c.get(x, y) || "_")
-  for (let y = 0; y < dy; y++) for (let x = 0; x < c.w; x++) c.px(x, y, "_")
-}
-anim("girl", { base: "girl_pose", frames: 4, fps: 4, flip: "x", pivot: "bottom" }, (c) => { if (c.frame % 2) sink(c, 20, 1) })
+// is redrawn; the skirt's frayed hem row stays), 4 frames at 4 fps so her loop lines up with the
+// waterfall's.
+anim("girl", { base: "girl_pose", frames: 4, fps: 4, flip: "x", pivot: "bottom" },
+  (c) => { if (c.frame % 2) c.warp((x, y) => y <= 21 && [0, 1]) })
 
 // ---------------------------------------------------------------- cast shadows
 // A tall plant's shadow is the plant laid flat on the ground (cast): a pixel h px above its base

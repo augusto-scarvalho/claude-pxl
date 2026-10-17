@@ -22,12 +22,7 @@ jjEkEjjJjjKKjjjjKKjjjJ....
 .......jO.......jO........
 .......JJ.......JJ........`
 const STEP = 3, NECK = 7
-const shear = (c) => {
-  const px = []
-  for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) if (c.is(x, y, "*")) px.push([x, y, c.key(x, y)])
-  for (const [x, y] of px) c.px(x, y, "_")
-  for (const [x, y, k] of px) c.px(x, y + Math.max(0, Math.floor((x - NECK) / STEP)), k)
-}
+const shear = warp((x) => [0, Math.max(0, Math.floor((x - NECK) / STEP))])
 anim("jaguar", { w: 30, h: 30, frames: 4, fps: 4, outline: "k", pivot: [4, 6] }, JAGUAR, shear, (c) => {
   // the tail hangs from the rump and sways; its tip is dark
   const sway = [0, 1, 2, 1][c.frame], x0 = 22, y0 = 4 + Math.floor((x0 - NECK) / STEP)

@@ -102,7 +102,9 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   side), or `pxl ascii` per frame. A character moving its limbs: draw the parts per pose and attach
   them with `sockets` + `stamp(..., { at })` in a `sort: "z"` layer, timed by a motion guide
   (`motion("<skill dir>/examples/motion/walk.json", { dir: "SW" })`: CC0 walk and run cycles in 8
-  directions) drawn in a `ref: true` layer (characters.md §10).
+  directions) drawn in a `ref: true` layer (characters.md §10). Motion that bends what's drawn
+  (breathing, hair and tails swaying, a body on a slope) is `warp((x, y) => [dx, dy])`: whole-pixel
+  offsets, nothing redrawn (characters.md §9).
 - **Existing PNGs**: `sprite("hero", { png: "hero.png", outline: "k" })` starts an asset from a file,
   then every option and item works on it; `area: [x, y, w, h]` cuts one out of a sheet,
   `anim("walk", { png: "walk.png", frames: 4 })` splits a strip, `palettize: true` snaps its colors to

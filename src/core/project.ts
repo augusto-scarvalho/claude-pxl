@@ -16,7 +16,7 @@ import { globRe, rng } from "./util.ts";
 /**
  * Op signatures: name:type, "?" marks the first optional argument.
  * n number, c color, s string, t text (string|number), S colors ("abc" or array),
- * a point array, r region, o object, b boolean, I items (rest).
+ * a point array, r region, o object, b boolean, f function, I items (rest).
  */
 export const SIGNATURES: Record<string, string> = {
   px: "x:n y:n c:c",
@@ -38,6 +38,7 @@ export const SIGNATURES: Record<string, string> = {
   shade: "?where:r steps:n density:n",
   light: "?where:r steps:n density:n",
   relight: "?where:r opts:o",
+  warp: "fn:f ?where:r",
   stamp: "name:s ?x:n y:n opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
   pattern: "name:s x:n y:n w:n h:n ?opts:o",
@@ -102,6 +103,7 @@ function checkArgs(name: string, args: unknown[]): void {
       case "a": if (!Array.isArray(v)) bad("an array of numbers"); break;
       case "o": if (typeof v !== "object" || v === null || Array.isArray(v)) bad("an options object"); break;
       case "b": if (typeof v !== "boolean") bad("true/false"); break;
+      case "f": if (typeof v !== "function") bad("a function"); break;
     }
   });
 }

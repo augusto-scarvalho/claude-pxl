@@ -419,3 +419,13 @@ test("pose sides: limbs take a color by side, the spine keeps its own", () => {
   const src = PAL + `pal({ m: "#e048d8" }); sprite("p", { w: 3, h: 3 }, pose(${j}, { sides: true, color: "w", joint: false }))`;
   eq(art(src, "p"), ".wm\n.wm\n.wm");
 });
+
+test("warp: pixels move by whole-pixel offsets, taking the color behind them; no holes", () => {
+  // rows above the third move down one: the top row empties, the third is covered
+  eq(art(PAL + 'sprite("a", { w: 1, h: 4 }, "r\\nw\\ng\\nk", warp((x, y) => (y <= 2 ? [0, 1] : null)))', "a"), ".\nr\nw\nk");
+  // a shear: each column down by its x, legs (columns) stay whole
+  eq(art(PAL + 'sprite("a", { w: 3, h: 3 }, "rrr\\nw.w", warp((x) => [0, x]))', "a"), "r..\nwr.\n..r");
+  // a region limits it, and the offsets are rounded
+  eq(art(PAL + 'sprite("a", { w: 3, h: 1 }, "rwg", warp(() => [0.6, 0], [1, 0, 2, 1]))', "a"), "rrw");
+  assert.match(failure(PAL + 'sprite("a", { w: 1, h: 1 }, "r", warp(() => 5))', "a").message, /must give \[dx, dy\]/);
+});

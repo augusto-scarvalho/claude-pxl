@@ -118,6 +118,12 @@ sprite("hand_l", "t\nS")
       c.stamp(`arm_r_${Math.max(0, p.arm)}`, 0, 0, { at: "girl_top.arm_r", z: 3 })
       if (p.hand > 0) c.stamp("hand_l", Math.min(1, p.hand - 1), 0, { at: "girl_top.hand_l", z: -1 })
     }),
+    // her hair hangs behind her shoulders and follows a frame late: when she rises, its ends are
+    // still a pixel lower, so the hair stretches (after the parts layer, so it moves what's drawn)
+    (c) => {
+      const p = PLAN[c.frame], before = PLAN[(c.frame + 7) % 8]
+      if (p.bob > before.bob) c.warp(() => [0, 1], [18, 15 - p.bob, 6, 4])
+    },
     layer("guide", { ref: 0.6 }, (c) => c.pose(SMALL.frames[c.frame], { sides: true, joint: false })))
   anim("girl_walk_se", { base: "girl_walk", flip: "x" })
 }

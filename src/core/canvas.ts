@@ -373,6 +373,28 @@ export class Canvas {
   }
 
   /**
+   * Move pixels by whole-pixel offsets, for motion drawn once: breathing, hair and tails swaying, a
+   * body following a slope. fn(x, y) gives the offset [dx, dy] at a pixel's new place (or nothing:
+   * stays); the pixel takes the color found (dx, dy) behind it, so no hole opens and no color is
+   * made up. Offsets are rounded. `where` limits it to a region (of new places).
+   */
+  warp(fn: (x: number, y: number) => unknown, where?: Region): void {
+    if (typeof fn !== "function") throw new PxError("warp((x, y) => [dx, dy], where?) needs a function giving each pixel's offset");
+    const ok = regionPred(where), src = this.img.copy(), out: [number, number, Color][] = [];
+    for (let y = -this.oy; y < this.img.h - this.oy; y++)
+      for (let x = -this.ox; x < this.img.w - this.ox; x++) {
+        if (!ok(x, y)) continue;
+        const d = fn(x, y);
+        if (d === undefined || d === null || d === false || d === 0) continue;
+        if (!Array.isArray(d) || d.length !== 2 || !d.every(Number.isFinite))
+          throw new PxError(`warp: the function must give [dx, dy] (or nothing), got ${JSON.stringify(d)} at ${x}, ${y}`);
+        const dx = Math.round(d[0]), dy = Math.round(d[1]);
+        if (dx || dy) out.push([x, y, src.get(this.ox + x - dx, this.oy + y - dy)]);
+      }
+    for (const [x, y, c] of out) this.plot(x, y, c);
+  }
+
+  /**
    * Volume for flat art: each pixel steps along its ramp by where it sits in the shape. An edge
    * facing the light (empty space on that side) gets lighter, one facing away darker; the steps
    * come from the light direction, so with the default top-left light a top edge gets +1, a left
@@ -803,7 +825,7 @@ export function frameStart(tl: Timeline, n: number): number {
 /** Ops callable from art files; each top-level call can be traced as one painting step. */
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "poly", "fill",
-  "dither", "grad", "noise", "recolor", "shade", "light", "relight",
+  "dither", "grad", "noise", "recolor", "shade", "light", "relight", "warp",
   "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose",
 ] as const;
 export type OpName = (typeof OPS)[number];

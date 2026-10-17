@@ -119,6 +119,8 @@ declare global {
     shade(where?: PxRegion, steps?: number, density?: number): void;
     light(where?: PxRegion, steps?: number, density?: number): void;
     relight(where?: PxRegion, opts?: PxRelight): void;
+    /** Move pixels by whole-pixel offsets: fn(x, y) gives [dx, dy] at a pixel's new place; it takes the color (dx, dy) behind it. */
+    warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): void;
     recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): void;
     stamp(name: string, x?: number, y?: number, opts?: PxPlace): void;
     tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): void;
@@ -186,6 +188,8 @@ declare global {
   function light(where?: PxRegion, steps?: number, density?: number): PxOp;
   /** Volume for flat art: edges facing the light step lighter along their ramp, edges facing away darker. */
   function relight(where?: PxRegion, opts?: PxRelight): PxOp;
+  /** Move pixels by whole-pixel offsets (breathing, hair and tails swaying, a body on a slope): fn(x, y) gives [dx, dy] at a pixel's new place. */
+  function warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): PxOp;
   function recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): PxOp;
   function stamp(name: string, x?: number, y?: number, opts?: PxPlace): PxOp;
   function tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): PxOp;
