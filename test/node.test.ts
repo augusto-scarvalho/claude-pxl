@@ -190,6 +190,12 @@ test("palette files name keys next to their colors: '1a1626 k ink', .gpl names",
   assert.throws(() => loadProject(file), /d\.hex line 2: key 'r' is already used/);
 });
 
+test("include: a top-level name declared in two files says that included files share one scope", () => {
+  const { dir, file } = tmpArt(`const SIZE = 1\ninclude("lib.px.js")`);
+  writeFileSync(join(dir, "lib.px.js"), `const SIZE = 2`);
+  assert.throws(() => loadProject(file), /lib\.px\.js: Identifier 'SIZE' has already been declared\. Included files share one scope/);
+});
+
 test("include { palette: true } shares the included palette", () => {
   const { dir, file } = tmpArt(`include("pal.px.js", { palette: true })\nsprite("b", "z")`);
   writeFileSync(join(dir, "pal.px.js"), `pal({ z: "#ff0000" })`);

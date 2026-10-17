@@ -30,6 +30,9 @@ export function loadProject(file: string, opts: ProjectOptions = {}): Project {
     try {
       vm.runInContext(compile(code, abs), ctx, { filename: abs });
     } catch (e) {
+      // Included files run in one shared scope: say so instead of JavaScript's bare redeclaration.
+      if ((e as Error)?.name === "SyntaxError" && /has already been declared/.test((e as Error).message) && stack.length > 1)
+        throw new PxError(`${abs.replace(/^.*[\\/]/, "")}: ${(e as Error).message}. Included files share one scope for top-level names, so each const/let/function name can be declared in only one of them; rename it in one file`);
       throw syntaxAware(e, abs, p);
     } finally {
       stack.pop();
