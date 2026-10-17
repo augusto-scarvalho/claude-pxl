@@ -383,8 +383,8 @@ export class Project implements BuildCtx {
     env.chain = (anchors: unknown, opts: unknown = {}): number[][][] => {
       const loc = this.callerLoc();
       try {
-        if (!isPlainObject(opts)) throw new PxError("chain(anchors, { links, length, gravity, drag, rest, stiff, move, steps, loops })");
-        checkKeys("chain", opts, ["links", "length", "gravity", "drag", "rest", "stiff", "move", "steps", "loops"]);
+        if (!isPlainObject(opts)) throw new PxError("chain(anchors, { links, length, gravity, drag, rest, stiff, follow, step, max, move, steps, loops })");
+        checkKeys("chain", opts, ["links", "length", "gravity", "drag", "rest", "stiff", "follow", "step", "max", "move", "steps", "loops"]);
         return chain(anchors as [number, number][], opts as ChainOpts);
       } catch (e) { throw wrap(e).within("chain", loc); }
     };

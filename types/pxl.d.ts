@@ -168,6 +168,8 @@ declare global {
    */
   function chain(anchors: [number, number][], opts?: {
     links?: number; length?: number; gravity?: [number, number]; drag?: number; rest?: [number, number]; stiff?: number;
+    /** Celeste-style: each frame a point covers 1/follow of the way to (the point before + step), never farther than max. */
+    follow?: number; step?: [number, number]; max?: number;
     move?: [number, number]; steps?: number; loops?: number;
   }): [number, number][][];
   /** One direction of a motion guide file (examples/motion/walk.json): whole-pixel joints per frame, the floor point moved to `at`. */

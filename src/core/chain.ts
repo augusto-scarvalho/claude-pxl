@@ -1,6 +1,10 @@
 // Hair, tails, scarves and ropes that follow a moving anchor with lag (Celeste-style hair): a chain
-// of points, each kept a link's length from the one before, with inertia, weight and a shape it
-// relaxes toward. Simulated over an anim's loop until the motion repeats, so the loop is seamless.
+// of points fixed at an anchor, each following the one before. Two ways to follow:
+// - default, physical: inertia, weight and a rest shape the links turn back toward (they swing);
+// - `follow`, as Celeste does it: each point moves a fraction of the way to where it should sit
+//   (the point before plus a fixed `step`) and never drifts more than `max` from it; no inertia,
+//   so it trails behind and settles without bouncing.
+// Simulated over an anim's loop until the motion repeats, so the loop is seamless.
 import { PxError } from "./errors.ts";
 
 export interface ChainOpts {
@@ -16,6 +20,15 @@ export interface ChainOpts {
   rest?: [number, number];
   /** How strongly each link turns back toward `rest`, 0..1 per step (default 0.15; stiffer hair). */
   stiff?: number;
+  /**
+   * Celeste-style following: each frame a point covers 1/follow of the way to its place (1.5 in
+   * Celeste Classic; higher = lazier). Uses `step` and `max`, not gravity / drag / stiff.
+   */
+  follow?: number;
+  /** With follow: where a point sits from the one before at rest, [x, y] (default rest * length). */
+  step?: [number, number];
+  /** With follow: the farthest a point may trail from the one before (default 1.5 * length). */
+  max?: number;
   /** The character's travel per frame in the world, [x, y]: walking left makes the chain trail right. */
   move?: [number, number];
   /** Simulation steps per frame (default 4). */
@@ -37,7 +50,9 @@ export function chain(anchors: P[], opts: ChainOpts = {}): P[][] {
   const [gx, gy] = opts.gravity ?? [0, 0.5], drag = opts.drag ?? 0.8, stiff = opts.stiff ?? 0.15, [mx, my] = opts.move ?? [0, 0];
   const [rx0, ry0] = opts.rest ?? [0, 1], rl = Math.hypot(rx0, ry0) || 1, rx = rx0 / rl, ry = ry0 / rl;
   const loops = Math.max(1, Math.floor(opts.loops ?? 24)), F = anchors.length;
-  if (![len, drag, stiff, gx, gy, mx, my].every(Number.isFinite) || len <= 0) throw new PxError(`chain: options must be numbers, length > 0, got ${JSON.stringify(opts)}`);
+  const follow = opts.follow, [sx, sy] = opts.step ?? [rx * len, ry * len], max = opts.max ?? len * 1.5;
+  if (![len, drag, stiff, gx, gy, mx, my, sx, sy, max].every(Number.isFinite) || len <= 0) throw new PxError(`chain: options must be numbers, length > 0, got ${JSON.stringify(opts)}`);
+  if (follow !== undefined && !(follow >= 1)) throw new PxError(`chain: follow must be 1 or more (1.5 is Celeste's), got ${follow}`);
   // world position of the anchor at time t (frames, fractional): the sprite's anchor plus the travel
   const at = (t: number): P => {
     const f = Math.floor(t), u = t - f, a = anchors[((f % F) + F) % F], b = anchors[(((f + 1) % F) + F) % F];
@@ -48,12 +63,26 @@ export function chain(anchors: P[], opts: ChainOpts = {}): P[][] {
   let prev: P[] = pts.map((p) => [...p] as P);
   const out: P[][] = [];
   const g = [gx / (steps * steps), gy / (steps * steps)];
+  // follow: a frame's 1/follow of the way, spread over the steps
+  const rate = follow === undefined ? 0 : 1 - Math.pow(1 - 1 / follow, 1 / steps);
   for (let loop = 0; loop <= loops; loop++)
     for (let f = 0; f < F; f++) {
       const t0 = loop * F + f;
       if (loop === loops) out.push(pts.map(([x, y]) => [x - mx * t0, y - my * t0] as P));
       for (let s = 1; s <= steps; s++) {
         const a = at(t0 + s / steps);
+        if (follow !== undefined) {
+          const next: P[] = [a];
+          for (let i = 1; i <= n; i++) {
+            const [px, py] = next[i - 1], tx = px + sx, ty = py + sy;
+            let x = pts[i][0] + (tx - pts[i][0]) * rate, y = pts[i][1] + (ty - pts[i][1]) * rate;
+            const d = Math.hypot(x - px, y - py);
+            if (d > max) { x = px + ((x - px) / d) * max; y = py + ((y - py) / d) * max; }
+            next.push([x, y]);
+          }
+          pts = next;
+          continue;
+        }
         const next: P[] = pts.map(([x, y], i) => (i === 0 ? a : [x + (x - prev[i][0]) * drag + g[0], y + (y - prev[i][1]) * drag + g[1]]));
         prev = pts;
         // keep each link its length, then let it turn a little toward its rest direction

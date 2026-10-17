@@ -445,4 +445,9 @@ test("chain: links keep their length, hang along gravity, trail behind travel, a
   const again = chain([[0, 0], [0, -1], [0, 0], [0, -1]], { links: 3, loops: 41 });
   assert.ok(Math.abs(bob[0][3][1] - again[0][3][1]) < 0.01, "the loop repeats");
   assert.throws(() => chain([]), /one \[x, y\] per frame/);
+  // Celeste-style following: at rest each point sits a step from the one before; moving, it trails
+  const rest = chain([[0, 0], [0, 0]], { links: 3, follow: 1.5, step: [0, 1] });
+  assert.ok(Math.abs(rest[0][3][1] - 3) < 0.01 && Math.abs(rest[0][3][0]) < 0.01);
+  const run = chain([[0, 0], [0, 0]], { links: 3, follow: 1.5, step: [0, 1], max: 3, move: [-2, 0] });
+  assert.ok(run[0][3][0] > 1 && run[0].every((p, i) => i === 0 || Math.hypot(p[0] - run[0][i - 1][0], p[1] - run[0][i - 1][1]) <= 3 + 1e-9));
 });
