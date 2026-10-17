@@ -104,9 +104,11 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
   Skipped: dimming inferred joints (the CC0 projections have none).
 - [ ] **Register by a point**: move each frame so a marked point (the pelvis) lands on the same x, with
   one y offset per cycle; never by the bounding box.
-- [ ] **Small warps for secondary motion**: `warp((x, y) => [dx, dy])` with whole-pixel offsets and
-  nearest sampling, plus `breathe` / `sway` helpers: the useful side of Warp's pins, for hair, tails,
-  cloth and breathing (the tropical forest hand-codes three of these). Not for bending limbs.
+- [x] **Small warps for secondary motion** (b20305a): `warp((x, y) => [dx, dy], where?)`, whole-pixel
+  offsets read back from each pixel's new place (no holes, no new colors): the useful side of Warp's
+  pins. The forest's breathing and the jaguar's shear became one line each (identical output); the
+  walking girl's hair follows a frame late. Skipped: `breathe` / `sway` helpers (each is one line of
+  `warp`; recipes in characters.md §9). Not for bending limbs.
 - [ ] **Scatter near a color**: `scatter(..., { on: "g", near: "a", within: 2 })` for grass along paths
   and at the foot of things. (Selection border / expand in both editors.)
 - [ ] **Map tones onto a ramp by luminance**: an import option that sorts an image's colors by
