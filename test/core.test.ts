@@ -313,13 +313,15 @@ test("shrink: most common opaque color per block, ties to the first by columns, 
 });
 
 test("reference layers: in the guide image only, not in the art; transforms that move the art are refused", () => {
-  const src = PAL + 'sprite("t", { w: 3, h: 1 }, "rr", layer("guide", { ref: true }, ".ww"))';
+  const src = PAL + 'sprite("t", { w: 3, h: 1 }, "rr", layer("guide", { ref: 0.5 }, ".ww"))';
   const p = loadSource(src);
   eq(art(src, "t"), "rr.");
   const g = p.build("t").guide!;
   assert.equal(g.data[2], p.assets.get("t")!.pal.resolve("w"));
   assert.notEqual(g.data[1], g.data[0]); // over the art: half and half
   assert.match(failure(PAL + 'sprite("t", { mx: true }, "r", layer("g", { ref: true }, "w"))', "t").message, /reference layers stay in drawing coordinates; mx/);
+  assert.equal(loadSource(PAL + 'sprite("t", { w: 1, h: 1 }, "r", layer("g", { ref: true }, "w"))').build("t").guide!.data[0], pack(255, 241, 232), "true: full color");
+  assert.match(failure(PAL + 'sprite("t", "r", layer("g", { ref: 2 }, "w"))', "t").message, /ref must be true or a strength from 0 to 1/);
 });
 
 test("pose: bones and joints from named joints, scaled and moved; OpenPose COCO-18 read by position", () => {

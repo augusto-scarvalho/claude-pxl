@@ -89,7 +89,7 @@ Post-processing order: mirror → swap → flip → rot → outline → crop.
 |---|---|
 | `x, y` | Offset of every op in the layer. |
 | `hidden: true` | Skip when compositing (still exported with `layers: true`). |
-| `ref: true` | Reference / guide layer: previews and the live viewer show it over the art (half strength over drawn pixels, full color over empty ones); the exported PNG, sheets, `layers: true` and stamps of the asset leave it out. For drawing over a pose skeleton (`pose`), a mannequin or a shrunk original. It stays in drawing coordinates: an `outline`'s growth is followed, but mirror, flip, rot, angle and crop are refused. |
+| `ref: true \| 0..1` | Reference / guide layer: previews and the live viewer show it over the art (`true`: full color, so small marks stay visible; a number: that strength over drawn pixels, to see the art through a mannequin or a shrunk original); the exported PNG, sheets, `layers: true` and stamps of the asset leave it out. For drawing over a pose skeleton (`pose`), a mannequin or a shrunk original. It stays in drawing coordinates: an `outline`'s growth is followed, but mirror, flip, rot, angle and crop are refused. |
 | `shade: true \| n \| { m: "M" }` | Blend layer: not drawn. Wherever it is opaque, what's below steps darker along the ramps (`n` steps, or the given map). |
 | `light: ...` | Same, lighter. Cast shadows, light spills, glows. |
 | `density: 0..1` | Ordered-dither the layer (soft edges). Stack a low-density big shape and a full small one for falloff. |

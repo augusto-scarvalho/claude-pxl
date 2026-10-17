@@ -50,8 +50,8 @@ declare global {
     shade?: boolean | number | Record<string, PxColor>; light?: boolean | number | Record<string, PxColor>;
     /** Color math with what's below (new colors, off the palette; palettize snaps them back). */
     blend?: "normal" | "multiply" | "screen" | "add" | "overlay"; opacity?: number; palettize?: boolean;
-    /** Reference / guide layer: shown over the art in previews, left out of the exported image. */
-    ref?: boolean;
+    /** Reference / guide layer: shown over the art in previews (true, or a 0..1 strength), left out of the exported image. */
+    ref?: boolean | number;
   }
   interface PxPose {
     /** Joint (x, y) lands at (x * scale + x, y * scale + y). */

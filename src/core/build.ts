@@ -148,7 +148,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   };
 
   const layers: LayerOut[] = [];
-  const refs: Img[] = [];
+  const refs: { img: Img; k: number }[] = [];
   // Pixels of solid / wall layers, for lighting().
   let solid: Uint8Array | undefined, wall: Uint8Array | undefined, unlit: Uint8Array | undefined;
   if (![undefined, true, false, "x", "y"].includes(opts.wrap)) throw new PxError(`wrap must be true, "x" or "y", got ${fmtArgs([opts.wrap])}`);
@@ -205,7 +205,9 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
       cur = undefined;
     }
     if (l.opts.ref) {
-      refs.push(limg);
+      const k = l.opts.ref === true ? 1 : l.opts.ref;
+      if (!(typeof k === "number" && k > 0 && k <= 1)) throw new PxError(`layer '${l.name}': ref must be true or a strength from 0 to 1, got ${fmtArgs([l.opts.ref])}`, l.loc);
+      refs.push({ img: limg, k });
       snap?.(`reference layer '${l.name}' (previews only)`, l.loc);
       return;
     }
@@ -233,23 +235,24 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
 }
 
 /**
- * The art with its reference layers over it at half strength (full color where the art is empty).
+ * The art with its reference layers over it: full color where the art is empty, and over drawn
+ * pixels at the layer's strength (`ref: true` = 1, `ref: 0.5` = half, to see the art through).
  * Reference layers are in drawing coordinates: an outline's 1px growth is followed, other
  * transforms of the art would move it away from them.
  */
-function guideOver(img: Img, refs: Img[], def: AssetDef): Img {
+function guideOver(img: Img, refs: { img: Img; k: number }[], def: AssetDef): Img {
   const o = def.opts;
   const moved = ["mx", "my", "flip", "rot", "angle", "crop"].filter((k) => o[k as keyof typeof o]);
   if (moved.length) throw new PxError(`reference layers stay in drawing coordinates; ${moved.join(", ")} would move the art away from them`, def.loc);
   const d = o.outline || o.outline8 ? 1 : 0, out = img.copy();
-  for (const r of refs)
+  for (const { img: r, k } of refs)
     for (let y = 0; y < r.h; y++)
       for (let x = 0; x < r.w; x++) {
         const c = r.data[y * r.w + x];
         if (c === TRANSPARENT) continue;
         const i = (y + d) * out.w + x + d, under = out.data[i];
-        out.data[i] = under === TRANSPARENT ? c
-          : pack(...([24, 16, 8].map((sh) => Math.round((((c >>> sh) & 255) + ((under >>> sh) & 255)) / 2)) as [number, number, number]));
+        out.data[i] = under === TRANSPARENT || k >= 1 ? c
+          : pack(...([24, 16, 8].map((sh) => Math.round(((c >>> sh) & 255) * k + ((under >>> sh) & 255) * (1 - k))) as [number, number, number]));
       }
   return out;
 }

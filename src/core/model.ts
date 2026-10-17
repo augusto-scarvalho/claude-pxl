@@ -35,11 +35,11 @@ export interface LayerOpts {
   /** Pixels this layer leaves visible ignore lighting (skies, backdrops). */
   unlit?: boolean;
   /**
-   * Reference / guide layer: previews show it over the art at half strength; the exported PNG,
-   * sheets and stamps of this asset leave it out. For drawing over a skeleton, a mannequin or a
-   * reduced original.
+   * Reference / guide layer: previews show it over the art (true = full strength, 0..1 = that
+   * strength over drawn pixels); the exported PNG, sheets and stamps of this asset leave it out.
+   * For drawing over a skeleton, a mannequin or a reduced original.
    */
-  ref?: boolean;
+  ref?: boolean | number;
 }
 
 export interface Layer {
