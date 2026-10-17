@@ -86,6 +86,38 @@ Each was first done by hand in the forest's files; `examples/tropical/` now uses
   hand-written twice (topdown.px.js, the forest's trail); reference.md maps an LPC terrain block
   to the masks.
 
+## Animation and editors (from the studio pipeline handoff and a second look at Aseprite / Pixelorama)
+
+The studio pipeline drove Smack Studio (bone rigs), Warp Studio (pin meshes) and mocap guides;
+what its curator accepted was drawn poses composed from parts, reviewed as whole cycles. In order:
+
+- [x] **Onion review sheet** (f613acc): `_preview/<anim>_onion.png`, a motion map plus each frame over
+  its neighbours' ghosts, wrapping to show the loop seam. (Aseprite / Pixelorama onion skin, as an
+  image: an agent can't watch a GIF.)
+- [x] **Sockets and sorted layers** (f613acc): `sockets` on assets, `stamp(..., { at: "id.socket" })`,
+  `layer({ sort: "y" | "z" })`. Parts attached per pose with a draw order per frame; top-down depth
+  sort. (Aseprite cel z-index; engines' y-sort.)
+- [ ] **Motion guides per frame**: `pose()` reading a sequence of frames (`frames: [[x, y, v] x
+  joints]`) and drawing the current one in an anim, left / right limbs in fixed colors, inferred
+  joints dimmed. Ship CC0 walk and run guides (Quaternius / Mesh2Motion, projected for a 2:1 view,
+  8 directions) converted from the pipeline's guide sheets.
+- [ ] **Register by a point**: move each frame so a marked point (the pelvis) lands on the same x, with
+  one y offset per cycle; never by the bounding box.
+- [ ] **Small warps for secondary motion**: `warp((x, y) => [dx, dy])` with whole-pixel offsets and
+  nearest sampling, plus `breathe` / `sway` helpers: the useful side of Warp's pins, for hair, tails,
+  cloth and breathing (the tropical forest hand-codes three of these). Not for bending limbs.
+- [ ] **Scatter near a color**: `scatter(..., { on: "g", near: "a", within: 2 })` for grass along paths
+  and at the foot of things. (Selection border / expand in both editors.)
+- [ ] **Map tones onto a ramp by luminance**: an import option that sorts an image's colors by
+  luminance and spreads them over a ramp, so tones never merge as with nearest-color `palettize`.
+  (Pixelorama Gradient Map.)
+- [ ] **Export `.aseprite`**: layers, frames, tags, slices and palette, so a person can keep editing
+  what the agent drew. (Documented format; zlib cels.)
+
+Left out on purpose: effects that leave the palette (blur, curves, HSV, convolution), keyframed
+tweens and interpolating between drawings, free rotation of cut-out limbs, 2.5D thickness, 3D layers
+(render a base in Blender and reduce it instead), mouse-only tools.
+
 ## Later / niche
 
 - [x] Layer blend modes and opacity (`blend`, `opacity`, `palettize`), with the palette caveats in
