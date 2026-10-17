@@ -62,7 +62,10 @@ the curves of the clothes exactly.
    its selective colours. It only drops the line where a 2×2 block's vote went to the fill colour.
    - Keep every edge pixel that is already dark.
    - Turn only the light edge pixels into the line. A short `(c) => { ... }` step does it: for each
-     pixel next to a transparent one whose key isn't a dark key, `c.px(x, y, "k")`.
+     pixel next to a transparent one where `!c.is(x, y, darkKeys)`, call `c.px(x, y, "k")`. Test keys
+     with `c.is` or `c.key`; `c.get` returns a packed colour and never equals a key.
+   - On thin parts (a run of 4 px or less across, like a calf or a wrist), put the line on the
+     transparent pixel outside instead. Otherwise the part loses half its width.
    - `inline` would overwrite the surviving outline too.
    - `outline` after erasing the edge widens the figure by 1 px on each side.
 4. **Leave alone what survived.** Redraw only what is actually broken. If the user picked a version,
