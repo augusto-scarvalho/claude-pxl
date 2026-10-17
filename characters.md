@@ -43,10 +43,32 @@ the top of the head to the soles.
 - **Take proportions, not costume.** Hair and clothes come from the character, not the reference.
   Hair tied in a bun hugs the skull, whatever volume the reference has.
 
-## 3. Drawing over a base body
+## 3. Start from art that already exists
 
-When a base body exists in the view you need, dress it instead of inventing the anatomy. The base
-already has the hard parts: proportions, the 3/4 turn, which arm and leg are in front.
+### A bigger version of the same character: reduce it, then clean it
+
+If the user has the character at a larger size, start there. It beats drawing from scratch, even
+with a pose skeleton or a mannequin, because the reduction keeps the silhouette, the proportions and
+the curves of the clothes exactly.
+
+1. **Halve it** outside pxl. For each 2×2 block take its most common colour, and make the block
+   transparent when most of it is. Import the result with `palettize: true`.
+2. **Redraw what halving breaks** as `[x, chars]` runs (section 7):
+   - eyes, mouth and other 1–2 px face features;
+   - thin lines, like collars and ties;
+   - small clutter, like hands and buckles;
+   - stray specks in flat areas, which a region-limited `recolor` clears.
+3. **Restore the contour with `inline: "k"`.** It draws one continuous line on the sprite's own edge,
+   so the silhouette stays the original's. Don't patch the outline by hand, and don't erase the edge
+   and use `outline`: that widens the figure by 1 px on each side.
+4. **Consider `selout: true`.** At half size a 1 px outline weighs twice as much as it did at full
+   size. `selout` lightens it on the lit side.
+
+### A base body in the view you need: dress it
+
+When there is no bigger version but there is a base body in the right view, dress it instead of
+inventing the anatomy. The base already has the hard parts: proportions, the 3/4 turn, and which arm
+and leg are in front.
 
 - **Check which way the base faces** by its face, not by its file name or a caption. The eyes and
   the nose are on the side it faces, and the ear sits toward the back of the head. If the base faces
@@ -55,14 +77,13 @@ already has the hard parts: proportions, the 3/4 turn, which arm and leg are in 
 
 ```js
 sprite("_base", { png: "base.png", palettize: true, flip: "x" })    // flip only if it faces the wrong way
-sprite("hero", { w: 32, h: 64, outline: "k" },
+sprite("hero", { w: 32, h: 64, inline: "k" },
   stamp("_base", 0, 0),
-  recolor({ "3": "_", z: "_" }),   // remove the base's own outline keys (see them with PXL ascii)
   ...runs)                          // hair, face and clothes as [x, chars] runs (section 7)
 ```
 
-- **How the outline works here:** removing the base's outline lets `outline` draw a new edge around
-  the clothes. Inner lines, like the gap between an arm and the body, come back as outline too.
+- **Outline:** `inline` puts one line on the dressed figure's edge, wherever the clothes moved it.
+  Draw inner lines, like the gap between an arm and the body, in the runs.
 - **Licence:** whatever you paint over the base is a derivative of it. With a CC-BY-SA base, the
   result has to credit its author and be shared under CC-BY-SA, so tell the user.
 
