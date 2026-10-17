@@ -37,21 +37,19 @@ One broken asset doesn't stop the others from building.
 ## Template
 
 ```js
-pal({ k: "#1b1630", g: "#8ccf63", G: "#4c8a44", t: "#2a5560", w: "#fff6e0", r: "#e2585e", R: "#a63a4c" })
-ramps("ktGg", "kRr")                   // dark -> light, drives shade()/light()
+pal({ k: "#1b1630", l: "#c8f0a0", g: "#8ccf63", G: "#4c8a44", t: "#2a5560", w: "#fff6e0", r: "#e2585e", R: "#a63a4c" })
+ramps("ktGgl", "kRr")                  // dark -> light, drives shade()/light()
 
-// Symmetric shape: write the left half and mirror it. Light comes from one side, so the shine goes
-// on after the mirror (a mirrored shine reads as a second pair of eyes); then outline it.
-sprite("_slime", { mx: true }, `
+// Symmetric: write the left half, mirror it, outline it. The shine is a light green (l), not white.
+sprite("slime", { mx: true, outline: "k" }, `
   ....ggg
-  ..ggggg
-  .gggggg
+  ..gglgg
+  .gglllg
   gggkwgg
   gggkkgg
   tgggggg
   .tttttt`)
-sprite("slime", { base: "_slime", outline: "k" }, px(4, 1, "w"))
-sprite("slime_red", { base: "slime", swap: { g: "r", G: "R" } })   // variant: 1 line
+sprite("slime_red", { base: "slime", swap: { g: "r", G: "R", l: "#f6b0a8" } })   // variant: 1 line
 
 sprite("_eye", "wk\nkk")                                            // "_" = part, not exported
 sprite("chest", { w: 16, h: 12, outline: "k" },
@@ -147,8 +145,8 @@ To see how a complex piece was built, in order: `PXL steps <example> <asset> --o
 ## Habits that save tokens and give better art
 
 - Write half of anything symmetric (`mx`) and let `outline` draw outlines. Never hand-draw either.
-  Mirror the shape, not the light: shine and highlights come from one side, so add them after the
-  mirror (a `base` variant + `px`/`grid`); a mirrored shine on a face reads as a second pair of eyes.
+  Shine on a face or a body in a lighter tone of its own color, not white: `mx` mirrors it, and
+  two white dots near the eyes read as a second pair of eyes.
   `selout: true` makes the outline take a dark shade of what it touches (softer than flat black);
   `inline: "k"` draws it on the sprite's own edge without growing it.
 - Recolors are `base` + `swap`; repeated details are `_parts` + `stamp`; families are a `group` or a

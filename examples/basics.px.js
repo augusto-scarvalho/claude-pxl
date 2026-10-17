@@ -1,23 +1,22 @@
 // Basics: palette, mirrored + outlined sprites, variants, parts, primitives, sheets.
 use("sweetie16")
-pal({ k: 0, p: 1, r: 2, o: 3, y: 4, G: 5, g: 6, t: 7, n: 8, b: 9, B: 10, c: 11, w: 12, l: 13, s: 14, d: 15 })
-ramps("ktgG", "kproy", "knbBc", "kdslw")
+pal({ k: 0, p: 1, r: 2, o: 3, y: 4, G: 5, g: 6, t: 7, n: 8, b: 9, B: 10, c: 11, w: 12, l: 13, s: 14, d: 15, h: "#d8f8b0" })
+ramps("ktgGh", "kproy", "knbBc", "kdslw")
 
-// Draw the left half; mx mirrors it. The shine goes on after the mirror, on one side only: a
-// mirrored highlight shows up twice and reads as a second pair of eyes. Then outline wraps it.
-sprite("_slime_body", { mx: true }, `
+// Draw the left half; mx mirrors it, outline wraps it. The shine is a lighter green (h), not
+// white: mirrored, white dots on a face read as a second pair of eyes.
+sprite("slime", { mx: true, outline: "k" }, `
   ....ggg
-  ..ggggg
-  .gggggg
+  ..ggGGg
+  .ggGhGg
   .gggggg
   gggkwgg
   gggkkgg
   tgggggg
   .tttttt`)
-sprite("slime", { base: "_slime_body", outline: "k" }, grid(3, 1, "GG\nGwG"))
 
-sprite("slime_red", { base: "slime", swap: { g: "r", G: "o", t: "p" } })
-sprite("slime_blue", { base: "slime", swap: { g: "b", G: "B", t: "n" } })
+sprite("slime_red", { base: "slime", swap: { g: "r", G: "o", t: "p", h: "y" } })
+sprite("slime_blue", { base: "slime", swap: { g: "b", G: "B", t: "n", h: "c" } })
 sprite("slime_wink", { base: "slime" }, grid(10, 5, `
   gg
   kk`))
