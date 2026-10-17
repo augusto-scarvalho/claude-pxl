@@ -14,7 +14,7 @@ the top of the head to the soles.
 | chibi girl (Pixilart) | 16×16 | front | 56% (9 of 16) | 11 | 0.64 | 1.2 |
 | chibi girl (Pixilart) | 32×32 | 3/4 | 48% (14 of 29) | 18 | 0.55 | 0.9 |
 | Tiny Tactics cleric (CC0) | 32×32 | SW | 46% (12 of 26) | 13 | – | 1.15 |
-| SC iso charset base (CC-BY-SA) | 32×64 | SW | 43% (21 of 49) | 19 | 0.6 | 0.85 |
+| SC iso charset base (CC-BY-SA) | 32×64 | SE | 43% (21 of 49) | 19 | 0.6 | 0.85 |
 | Eldiran soldier (CC0) | 32×35 | SW | 41% (14 of 34) | 17 | – | 1.2 (armour) |
 | LPC female base (CC-BY-SA) | 64×64 | front | 40% (19 of 47) | 20 | 1.0 | 1.4 |
 | Pixilart "How to Draw a Person" | 96 tall | front | 37% | 30 | 0.93 | 1.2–1.33 |
@@ -43,7 +43,30 @@ the top of the head to the soles.
 - **Take proportions, not costume.** Hair and clothes come from the character, not the reference.
   Hair tied in a bun hugs the skull, whatever volume the reference has.
 
-## 3. Build order
+## 3. Drawing over a base body
+
+When a base body exists in the view you need, dress it instead of inventing the anatomy. The base
+already has the hard parts: proportions, the 3/4 turn, which arm and leg are in front.
+
+- **Check which way the base faces** by its face, not by its file name or a caption. The eyes and
+  the nose are on the side it faces, and the ear sits toward the back of the head. If the base faces
+  the wrong way, set `flip: "x"` on the import before drawing anything.
+- **Dress it in pxl:**
+
+```js
+sprite("_base", { png: "base.png", palettize: true, flip: "x" })    // flip only if it faces the wrong way
+sprite("hero", { w: 32, h: 64, outline: "k" },
+  stamp("_base", 0, 0),
+  recolor({ "3": "_", z: "_" }),   // remove the base's own outline keys (see them with PXL ascii)
+  ...runs)                          // hair, face and clothes as [x, chars] runs (section 7)
+```
+
+- **How the outline works here:** removing the base's outline lets `outline` draw a new edge around
+  the clothes. Inner lines, like the gap between an arm and the body, come back as outline too.
+- **Licence:** whatever you paint over the base is a derivative of it. With a CC-BY-SA base, the
+  result has to credit its author and be shared under CC-BY-SA, so tell the user.
+
+## 4. Build order
 
 1. **Silhouette.** Draw the figure in flat colours, then check it as one shape with a
    `recolor({ "*": "k" })` variant. The limbs should read apart, with gaps where they belong.
@@ -52,7 +75,7 @@ the top of the head to the soles.
    on the legs.
 3. **Clothes.** Add them one piece at a time. The face goes last.
 
-## 4. Faces
+## 5. Faces
 
 - **16 px:**
   - Eyes are 2×2, right under the bangs. Leave one row of skin between the bangs and the eyes.
@@ -72,7 +95,7 @@ the top of the head to the soles.
   - White on the outer side of both eyes looks cross-eyed.
   - A full dark lash row over a short iris looks sleepy.
 
-## 5. 3/4 (diagonal) views
+## 6. 3/4 (diagonal) views
 
 - **Face:**
   - Eyes and mouth shift toward the side the character faces, and the far eye moves in.
@@ -90,7 +113,7 @@ the top of the head to the soles.
   - Forearms and wrists are narrower than the sleeves above them.
   - Shoulders slope down from the neck. Flat shoulders read as shoulder pads.
 
-## 6. Placing the pixels
+## 7. Placing the pixels
 
 Write a figure wider than about 20 px as runs at absolute x, not as long rows full of dots.
 Counting dots in 30-character rows is the main source of misplaced pixels.
