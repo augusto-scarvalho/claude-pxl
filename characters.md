@@ -206,10 +206,12 @@ offset points back to, so nothing tears open and no color is made up.
 - **Breathing:** move every row above the knees down 1 px on the out-breath,
   `(c) => { if (c.frame % 2) c.warp((x, y) => y <= knee && [0, 1]) }`, and let the row the shift
   lands on be a plain one, so hems and fringes keep their shape.
-- **Long hair on a small character:** it hangs *behind* the body, on the back, like a cape: a part
-  of its own drawn under the body and arms (lowest `z`), from the nape to the waist, cut straight at
-  the bottom. Only what's past the back shows, and its hem swings once a step like a skirt (drawn as
-  it hangs, swung back, swung forward). The walking girl in `examples/tropical/girl.px.js`. What read
+- **Long hair on a small character:** it hangs *behind* the body, on the back: a part of its own in
+  a layer under the head, body and arms, from the top of the head to the waist, cut straight at the
+  bottom. Only what's past the back shows, and the arm on that side is drawn in front of it. It swings
+  like a pendulum hung from the top of the head: `warp` that layer so each row moves sideways in
+  proportion to how far it is below the crown (the hem a pixel each way, once a stride). The walking
+  and standing girl in `examples/tropical/girl.px.js` are built from the same parts. What read
   wrong on the way: stretching the ends only when the body rose (a twitch), ends bouncing up and down
   (stepping, not swinging), a `chain()` of discs (it turned the hair's drawn silhouette into a point),
   and a lock hanging beside the body instead of behind it.
