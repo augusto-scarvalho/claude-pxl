@@ -352,3 +352,28 @@ test("compareSilhouettes: row extents side by side and how much wider the asset 
   assert.match(out, /^ {2}0 {2}2-5 +1-6 +\+1 +\+1$/m);
   assert.match(out, /wider on 1 \(up to \+1 left, \+1 right\).*the same on 1/);
 });
+
+test("cast: an upright asset laid flat on the ground from its base, carrying its pivot", () => {
+  // a 1x3 post standing on its pivot; the shadow lies along the ground, one px further out per px of height
+  const P = PAL + 'sprite("post", { pivot: "bottom" }, "r\\nr\\nr"); ';
+  eq(art(P + 'scene("s", { w: 4, h: 3 }, stamp("post", 0, 3, { cast: [1, 0], silhouette: "k" }))', "s"), "....\n....\nkkk.");
+  // ky stretches it down the screen too, and a row never leaves a gap
+  eq(art(P + 'scene("s", { w: 3, h: 6 }, stamp("post", 0, 3, { cast: [0, 1.5], silhouette: "k" }))', "s"), "...\n...\nk..\nk..\nk..\nk..");
+  assert.match(failure(P + 'scene("s", { w: 4, h: 3 }, stamp("post", 0, 3, { cast: 0.5 }))', "s").message, /cast must be \[kx, ky\]/);
+});
+
+test("relight: edges facing the light step lighter along their ramp, edges facing away darker", () => {
+  // default light from the top-left: top +1, left +0.5, bottom -1, right -0.5, rounded
+  eq(art(PAL + 'ramps("krw"); sprite("a", { w: 3, h: 3 }, rect(0, 0, 3, 3, "r"), relight())', "a"), "www\nwrr\nrkk");
+  // reach: empty space up to 2 px away counts, past other colors too; ramps given inline; colors on no ramp stay
+  eq(art(PAL + 'sprite("a", { w: 4, h: 1 }, rect(0, 0, 4, 1, "r"), px(3, 0, "g"), relight(null, { ramps: ["krw"], light: [-1, 0], reach: 2 }))', "a"), "wwkg");
+  assert.match(failure(PAL + 'sprite("a", { w: 1, h: 1 }, px(0, 0, "r"), relight())', "a").message, /relight: no ramps/);
+});
+
+test("tilemap corners: one char per tile corner, each tile picked by its corner mask", () => {
+  const T = PAL + 'sprite("t_13", "r"); sprite("t_4", "w"); sprite("full", "g"); ';
+  // corners "#.." over "##.": the left tile has TL+BL+BR set (1+4+8 = 13), the right one BL (4)
+  eq(art(T + 'scene("s", { w: 2, h: 1 }, tilemap("#..\\n##.", { corners: "#", size: 1, map: "t_" }))', "s"), "rw");
+  eq(art(T + 'scene("s", { w: 1, h: 1 }, tilemap("ww\\nww", { corners: "w", size: 1, map: { 15: "full" } }))', "s"), "g");
+  assert.match(failure(T + 'scene("s", { w: 1, h: 1 }, tilemap("#.\\n.#", { corners: true, size: 1, map: "t_" }))', "s").message, /no tile for corner mask 9 \(top-left \+ bottom-right set\)/);
+});

@@ -37,6 +37,7 @@ export const SIGNATURES: Record<string, string> = {
   recolor: "map:o ?where:r density:n",
   shade: "?where:r steps:n density:n",
   light: "?where:r steps:n density:n",
+  relight: "?where:r opts:o",
   stamp: "name:s ?x:n y:n opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
   pattern: "name:s x:n y:n w:n h:n ?opts:o",
@@ -59,6 +60,7 @@ export const SIGNATURES: Record<string, string> = {
 const OP_OPTS: Record<string, string[]> = {
   lamp: ["r", "color", "power", "z"],
   curve: ["width", "closed"],
+  relight: ["light", "reach", "strength", "ramps"],
   bump: ["w", "depth", "on", "where"],
   lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "shape", "relief", "skyDir"],
   glow: ["where", "r", "strength", "color", "bands", "ramp"],
@@ -405,6 +407,10 @@ export class Project implements BuildCtx {
     };
     this.glyphCache.set(font, g);
     return g;
+  }
+
+  has(name: string): boolean {
+    return this.assets.has(name) || this.groups.has(name);
   }
 
   candidates(name: string, depth = 0): string[] {

@@ -17,9 +17,18 @@ declare global {
     frame?: number; delay?: number; rdelay?: boolean;
     /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
     silhouette?: PxColor;
+    /** Lay the asset flat on the ground as its cast shadow: a pixel h above the base lands h * [kx, ky] away. */
+    cast?: [number, number];
   }
   interface PxScatter extends PxPlace { on?: string; clip?: boolean; below?: boolean; even?: boolean }
-  interface PxTilemap extends PxPlace { map: Record<string, string>; iso?: boolean; size?: number; w?: number; h?: number; x?: number; y?: number }
+  interface PxTilemap extends PxPlace {
+    /** char -> asset; with corners, corner mask (0-15) -> asset, or a name prefix ("shore_" -> shore_<mask>). */
+    map: Record<string, string> | string;
+    /** The map marks tile corners: these chars (true: any but "." and " ") are set; mask 1 TL + 2 TR + 4 BL + 8 BR. */
+    corners?: boolean | string;
+    iso?: boolean; size?: number; w?: number; h?: number; x?: number; y?: number;
+  }
+  interface PxRelight { light?: [number, number]; reach?: number; strength?: number; ramps?: string[] }
   interface PxWire extends PxPlace { hang?: string; every?: number; start?: number }
   interface PxText { scale?: number; gap?: number; lead?: number; align?: "l" | "c" | "r"; shadow?: PxColor; font?: string }
   interface PxAssetOpts {
@@ -97,6 +106,7 @@ declare global {
     noise(x: number, y: number, w: number, h: number, colors: string | string[], density?: number, seed?: number, on?: string): void;
     shade(where?: PxRegion, steps?: number, density?: number): void;
     light(where?: PxRegion, steps?: number, density?: number): void;
+    relight(where?: PxRegion, opts?: PxRelight): void;
     recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): void;
     stamp(name: string, x?: number, y?: number, opts?: PxPlace): void;
     tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): void;
@@ -158,6 +168,8 @@ declare global {
   function noise(x: number, y: number, w: number, h: number, colors: string | string[], density?: number, seed?: number, on?: string): PxOp;
   function shade(where?: PxRegion, steps?: number, density?: number): PxOp;
   function light(where?: PxRegion, steps?: number, density?: number): PxOp;
+  /** Volume for flat art: edges facing the light step lighter along their ramp, edges facing away darker. */
+  function relight(where?: PxRegion, opts?: PxRelight): PxOp;
   function recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): PxOp;
   function stamp(name: string, x?: number, y?: number, opts?: PxPlace): PxOp;
   function tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): PxOp;

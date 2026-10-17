@@ -181,6 +181,8 @@ export interface PlaceOpts {
   rswap?: Record<string, string>[];
   /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
   silhouette?: string;
+  /** Lay the asset flat on the ground as its shadow: a pixel h above the base lands h * [kx, ky] away. */
+  cast?: [number, number];
   seed?: number;
   /** Rebuild the placed asset with its own random choices (true = derived from position). */
   reseed?: boolean | number;
@@ -204,7 +206,13 @@ export interface ScatterOpts extends PlaceOpts {
 }
 
 export interface TilemapOpts extends PlaceOpts {
-  map: Record<string, string>;
+  /** char -> asset; with `corners`, corner mask (0-15) -> asset, or a prefix ("shore_" -> shore_<mask>). */
+  map: Record<string, string> | string;
+  /**
+   * The map marks tile corners, not tiles: these chars (true: any but "." and " ") are set. Each
+   * tile's mask is 1 top-left + 2 top-right + 4 bottom-left + 8 bottom-right.
+   */
+  corners?: boolean | string;
   /** Isometric: cells on a diamond grid of w x h floors, drawn back to front. */
   iso?: boolean;
   size?: number;
@@ -226,6 +234,18 @@ export interface TileLayer {
   x: number;
   y: number;
   cells: (Img | undefined)[];
+}
+
+/** Options of relight(): where the light comes from and which ramps the pixels step along. */
+export interface RelightOpts {
+  /** Direction the light comes from, [x, y] (default [-0.5, -1]: top-left, mostly from above). */
+  light?: [number, number];
+  /** Empty space up to this many px away counts as an edge (default 1). */
+  reach?: number;
+  /** Multiplies the steps (default 1). */
+  strength?: number;
+  /** Ramps, dark to light, to step along (default: the palette's ramps). */
+  ramps?: string[];
 }
 
 /** Options of pose(): where the joints land and how they're drawn. */

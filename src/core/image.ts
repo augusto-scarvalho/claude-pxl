@@ -294,6 +294,35 @@ export class Img {
     return o;
   }
 
+  /**
+   * The image laid flat on the ground, as its cast shadow: a pixel at height h above the base (the
+   * pivot's row, else the bottom edge) lands h * (kx, ky) away from where it stands. The pivot
+   * stays on the base; colors are kept (add `silhouette` for a flat shadow).
+   */
+  cast(kx: number, ky: number): Img {
+    const [px, py] = this.pivot ?? [this.w / 2, this.h];
+    const base = Math.floor(py) - 1, pts: number[] = [];
+    for (let y = 0; y < this.h; y++)
+      for (let x = 0; x < this.w; x++) {
+        const c = this.data[y * this.w + x];
+        if (c === TRANSPARENT) continue;
+        // a row of height h covers the ground from h * ky to (h + 1) * ky: at least one row, no gaps
+        const h = base - y, a = h * ky, b = (h + 1) * ky, lo = Math.floor(Math.min(a, b));
+        const hi = Math.max(lo + 1, Math.floor(Math.max(a, b)));
+        for (let yy = lo; yy < hi; yy++) pts.push(x + Math.round(h * kx), base + yy, c);
+      }
+    if (!pts.length) return this.copy();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i < pts.length; i += 3) {
+      x0 = Math.min(x0, pts[i]); x1 = Math.max(x1, pts[i]);
+      y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]);
+    }
+    const o = new Img(x1 - x0 + 1, y1 - y0 + 1);
+    for (let i = 0; i < pts.length; i += 3) o.data[(pts[i + 1] - y0) * o.w + pts[i] - x0] = pts[i + 2];
+    o.pivot = [px - x0, py - y0];
+    return o;
+  }
+
   /** Nearest-neighbour upscale. */
   scale(s: number): Img {
     if (s === 1) return this.copy();

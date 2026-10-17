@@ -76,18 +76,15 @@ const CORNERS = `
   wwwwwwgggggwwwwww
   wwwwwwwwwwwwwwwww
   wwwwwwwwwwwwwwwww`
-const cr = CORNERS.trim().split("\n").map((r) => r.trim())
-const wet = (i, j) => cr[j][i] === "w" ? 1 : 0
-// Each tile's 4 corners -> its mask, written as one hex digit per tile for tilemap().
-const TILES = cr.slice(1).map((_, j) => [...cr[0].slice(1)].map((_, i) =>
-  (wet(i, j) | wet(i + 1, j) << 1 | wet(i, j + 1) << 2 | wet(i + 1, j + 1) << 3).toString(16)).join("")).join("\n")
-const tileMap = { 0: "land", f: "sea" }
-for (let m = 1; m < 15; m++) tileMap[m.toString(16)] = "shore_" + m
+// tilemap({ corners: "w" }) reads each tile's 4 corners as its mask; full land and full sea get the
+// variant groups, the rest are the shore pieces.
+const tileMap = { 0: "land", 15: "sea" }
+for (let m = 1; m < 15; m++) tileMap[m] = "shore_" + m
 
 const trees = [[56, 42], [78, 34], [150, 40], [44, 74], [170, 70]]
 
 scene("island", { w: 256, h: 160 },
-  layer("ground", tilemap(TILES, { size: T, map: tileMap })),
+  layer("ground", tilemap(CORNERS, { corners: "w", size: T, map: tileMap })),
   // below: the layer starts empty, so "on grass" has to look at the layers under it.
   layer("flowers", scatter("flowers", 64, 56, 120, 48, 14, { on: "g", below: true, seed: 3 })),
   layer("shadows", { shade: true },

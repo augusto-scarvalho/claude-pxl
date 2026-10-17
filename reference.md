@@ -124,6 +124,7 @@ Post-processing order: mirror → swap → flip → rot → outline → crop.
 | `grad(x, y, w, h, "abc", dir = "v", soft = 0.5)` | bands with dithered seams; `"h"` horizontal; `"r"` radial, from the center out to the ellipse that fits the box (end on `"."` to leave the corners alone: suns, halos, vignettes); soft 0 = hard bands (crisp rings) |
 | `noise(x, y, w, h, "ab", density = 0.1, seed = 1, on?)` | deterministic speckle; `on: "g"` only touches those keys (`"*"` any opaque) |
 | `shade(where?, steps = 1, density = 1)` · `light(...)` | step colors along ramps inside a region |
+| `relight(where?, { light?, reach?, strength?, ramps? })` | volume for flat art (a reduced import whose tones merged, a shape filled in one color): each pixel steps along its ramp by where it sits in the shape. An edge facing the light (empty space on that side, up to `reach` px away, default 1) gets lighter, one facing away darker. `light` is the direction it comes from, default `[-0.5, -1]` (top-left, mostly from above): a top edge +1, left +0.5, bottom -1, right -0.5, rounded, times `strength`. `ramps` defaults to the palette's. Then `shade` the occluded core (the heart of a crown) and low hanging parts by region |
 | `recolor({ a: "b" }, where?, density = 1)` | swap colors inside a region; `"*"` takes every other opaque color (`frame(recolor({ "*": "w" }))`: a hit-flash frame) |
 
 **Regions** (`where`, `clip`): `undefined` = everywhere, `[cx, cy, r]` circle, `[x, y, w, h]`
@@ -136,7 +137,7 @@ rect, `[x0, y0, x1, y1, x2, y2, ...]` polygon, or `(x, y) => boolean`.
 | `tile(name, x, y, cols, rows, opts?)` | grid of copies (each cell picks separately for groups) |
 | `pattern(name, x, y, w, h, opts?)` | fill an area with copies; edges cut to fit |
 | `panel(name, x, y, w, h, opts?)` | 9-slice: an asset with `slice` margins drawn at w×h. Corners stay as drawn; edges and center **repeat** (never stretch), so keep the center a flat fill or a seamless pattern. UI frames, buttons, dialog boxes |
-| `tilemap("gg\nd.", { map: { g: "grass", d: "dirt" }, size?, w?, h?, x?, y?, ...placement })` | character map; `.` empty. `iso: true` with the floor diamond's `w`, `h` (e.g. 32×16): cells on an isometric grid, columns down-right and rows down-left, drawn back to front; a tile's top-left sits on its diamond's top-left, and a tile with a `pivot` stands on the diamond's center (props). One level; stacked heights take a loop (`examples/isometric.px.js`) |
+| `tilemap("gg\nd.", { map: { g: "grass", d: "dirt" }, size?, w?, h?, x?, y?, ...placement })` | character map; `.` empty. `corners: "#"` (or `true`: any char but `.`): the map marks tile **corners** instead, one more row and column than tiles, and each tile is picked by its corner mask, 1 top-left + 2 top-right + 4 bottom-left + 8 bottom-right: `map: { 15: "dirt_full", ... }`, or a name prefix, `map: "dirt_"` for `dirt_1` … `dirt_15` (mask 0 stays empty unless `dirt_0` exists); the way to lay paths, shores and patches with a terrain tileset (see Terrain tilesets below). `iso: true` with the floor diamond's `w`, `h` (e.g. 32×16): cells on an isometric grid, columns down-right and rows down-left, drawn back to front; a tile's top-left sits on its diamond's top-left, and a tile with a `pivot` stands on the diamond's center (props). One level; stacked heights take a loop (`examples/isometric.px.js`) |
 | `scatter(name, x, y, w, h, count, { on?, clip?, below?, even?, ...placement })` | brush: `count` picks centered (or pivoted) at random points; `on` = center must land on these keys (`.` = an empty pixel: around a shape, not on it); `clip` = paint only onto them; `below` = masks read the composite under this layer (a layer starts empty, so an `on` that places nothing is an error); `even` = one pick per cell of a grid sized to `count`, at a random spot in the cell: stones, pebbles and flowers spread evenly over the whole area, without the clumps and holes of pure random |
 | `clip(region, ...items)` | run items with drawing restricted to the region (half domes, roof slopes, masked textures) |
 | `runs({ y: [[x, "chars"], ...], ... })` | pixels as runs at absolute x, row by row: `runs({ 30: [[19, "3H3"], [23, "deeR"]] })`. Same keys as a grid (`.` keeps, `_` erases), but each run starts where it says, so nothing is counted: for hand-drawn figures and patches over a shrunk or base image |
@@ -147,10 +148,36 @@ Any `name` may be a sprite, scene, group, or glob (`"tree_*"`). **Placement opts
 none), `seed`, `reseed: true | n` (rebuild the placed asset with its own random choices; `true`
 derives it from the position, so `tile("house", 0, 0, 4, 1, { reseed: true })` gives four
 different houses from one definition), `silhouette: "w"` (every opaque pixel in that color: hit
-flashes, and cast shadows when placed in a `shade: true` layer).
+flashes, and cast shadows when placed in a `shade: true` layer), `cast: [kx, ky]` (the asset laid
+flat on the ground as its shadow: a pixel h px above its base lands h × (kx, ky) from where it
+stands, e.g. `[0.6, 0.2]` for light from the top-left. The base is the pivot's row, so give tall
+props `pivot: "bottom"`; it applies after `flip`, so a mirrored tree still throws its shadow the
+same way. In a `shade` layer: `stamp("palm", x, y, { cast: [0.6, 0.2] })`).
 
 Randomness is seeded from the placement position + `seed`, so builds are reproducible and moving
 one placement doesn't reshuffle the others. Change `seed` to reroll.
+
+### Terrain tilesets
+
+A path, shore or patch laid with tiles reads as ground; the same shape stroked with `curve` or
+filled with `poly` reads as paint on top of it. Mark the terrain at tile corners and let
+`tilemap(..., { corners })` pick the pieces:
+
+```js
+tilemap(`
+  ...#....
+  ...##...
+  ....###.`, { corners: "#", size: 16, map: "dirt_" })   // dirt_1 ... dirt_15, by corner mask
+```
+
+Draw the 16 pieces yourself (one function over the mask, as `examples/topdown.px.js` does), or
+take them from a tileset. In an LPC-style terrain (32px tiles), the 3×3 ring of outer corners and edges
+holds masks `8 12 4` / `10 · 5` / `2 3 1`, read row by row (its center is often empty: take full
+tiles, mask 15, from the fill variants), and the 2×2 block around a hole holds the inner corners
+`7 11` / `13 14`. Masks 6 and 9 (two opposite corners)
+are usually missing: stamp the two outer corners over each other. LPC inner corners are cut deeper
+than the edges, so they leave a 2–3 px step where they meet; building them from two edges instead
+draws the edges' dark rims across the terrain. `shrink: 2` takes 32px tiles to 16px.
 
 ## Lighting
 

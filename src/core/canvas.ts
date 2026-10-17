@@ -3,7 +3,7 @@ import { Img } from "./image.ts";
 import type { Palette, Resolved } from "./palette.ts";
 import { PxError } from "./errors.ts";
 import { glyph, lineWidth } from "./font.ts";
-import type { BumpOpts, LampOpts, PlaceOpts, PoseOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
+import type { BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
 import { bump, dirOf, setNormal } from "./normals.ts";
 import { POSE_BONES } from "./pose.ts";
 import { bayer, colorList, gridRows, hash, inPoly, polyBounds, type Region, regionPred, rng } from "./util.ts";
@@ -19,6 +19,8 @@ export interface Resolver {
   timeline(name: string, seed: number): Timeline | undefined;
   /** Names a reference can stand for: group members, glob matches, or itself. */
   candidates(name: string): string[];
+  /** Is there an asset or group of this name? */
+  has(name: string): boolean;
   /** Glyph lookup of a font() (rows of "#" / "."), for text(). */
   glyphs(font: string): (ch: string) => string[];
 }
@@ -363,6 +365,38 @@ export class Canvas {
     this.remap(this.pal.stepMap(1), where, steps, density);
   }
 
+  /**
+   * Volume for flat art: each pixel steps along its ramp by where it sits in the shape. An edge
+   * facing the light (empty space on that side) gets lighter, one facing away darker; the steps
+   * come from the light direction, so with the default top-left light a top edge gets +1, a left
+   * edge +0.5, a bottom edge -1, a right edge -0.5 (rounded). Pixels on no ramp are left alone.
+   */
+  relight(where?: Region, opts: RelightOpts = {}): void {
+    const [lx, ly] = opts.light ?? [-0.5, -1], reach = Math.max(1, Math.floor(opts.reach ?? 1)), strength = opts.strength ?? 1;
+    const ramps = opts.ramps ?? [...this.pal.ramps];
+    if (!ramps.length) throw new PxError('relight: no ramps: add ramps("kDdu", ...) (dark -> light), or pass { ramps: ["kDdu"] }');
+    const on = new Map<Color, Color[]>(), at = new Map<Color, number>();
+    for (const r of ramps) {
+      const cs = [...r].map((k) => this.color(k)).filter((c): c is Color => c !== null && c !== TRANSPARENT);
+      cs.forEach((c, i) => { if (!on.has(c)) { on.set(c, cs); at.set(c, i); } });
+    }
+    const ok = regionPred(where), out: [number, number, Color][] = [];
+    const open = (x: number, y: number, ex: number, ey: number) => {
+      for (let k = 1; k <= reach; k++) if (this.get(x + ex * k, y + ey * k) === TRANSPARENT) return true;
+      return false;
+    };
+    for (let y = -this.oy; y < this.img.h - this.oy; y++)
+      for (let x = -this.ox; x < this.img.w - this.ox; x++) {
+        const c = this.get(x, y), ramp = on.get(c);
+        if (!ramp || !ok(x, y)) continue;
+        let s = 0;
+        for (const [ex, ey] of [[0, -1], [-1, 0], [0, 1], [1, 0]]) if (open(x, y, ex, ey)) s += ex * lx + ey * ly;
+        const i = Math.max(0, Math.min(ramp.length - 1, at.get(c)! + Math.round(s * strength)));
+        if (ramp[i] !== c) out.push([x, y, ramp[i]]);
+      }
+    for (const [x, y, c] of out) this.plot(x, y, c);
+  }
+
   swapMap(swap: Record<string, string>): Map<Color, Color> {
     const m = new Map<Color, Color>();
     for (const from of Object.keys(swap)) {
@@ -411,6 +445,12 @@ export class Canvas {
       if (f) src = src.flip(f as "x" | "y" | "xy");
     }
     if (opts.rot) src = src.rot(opts.rot);
+    if (opts.cast !== undefined) {
+      const k = opts.cast;
+      if (!Array.isArray(k) || k.length !== 2 || !k.every(Number.isFinite))
+        throw new PxError(`cast must be [kx, ky], how far a pixel 1px up lands from its base (e.g. [0.6, 0.2]), got ${JSON.stringify(k)}`);
+      src = src.cast(k[0], k[1]);
+    }
     return src;
   }
 
@@ -494,6 +534,11 @@ export class Canvas {
   tilemap(str: string, opts: TilemapOpts): void {
     if (typeof str !== "string") throw new PxError("tilemap(str, { map, size }) needs the map string first");
     if (!opts?.map) throw new PxError("tilemap needs { map: { char: assetName } }");
+    if (opts.corners) {
+      return this.tilemap(...cornerTiles(str, opts, (n) => this.res.has(n)));
+    }
+    if (typeof opts.map === "string") throw new PxError(`tilemap: map "${opts.map}" as a name prefix needs { corners: ... }; a tile map takes { map: { char: assetName } }`);
+    const map = opts.map;
     const rows = gridRows(str);
     const x0 = opts.x ?? 0, y0 = opts.y ?? 0;
     if (opts.iso && !(opts.w && opts.h)) throw new PxError("tilemap { iso: true } needs the floor diamond's size: { w: 32, h: 16 }");
@@ -501,8 +546,8 @@ export class Canvas {
     rows.forEach((row, r) => {
       [...row].forEach((ch, i) => {
         if (ch === "." || ch === " ") return;
-        const name = opts.map[ch];
-        if (!name) throw new PxError(`tilemap: no tile for '${ch}' (row ${r}, col ${i}); map has: ${Object.keys(opts.map).join(" ")}`);
+        const name = map[ch];
+        if (!name) throw new PxError(`tilemap: no tile for '${ch}' (row ${r}, col ${i}); map has: ${Object.keys(map).join(" ")}`);
         cells.push({ r, i, name });
       });
     });
@@ -720,7 +765,7 @@ export function frameStart(tl: Timeline, n: number): number {
 /** Ops callable from art files; each top-level call can be traced as one painting step. */
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "poly", "fill",
-  "dither", "grad", "noise", "recolor", "shade", "light",
+  "dither", "grad", "noise", "recolor", "shade", "light", "relight",
   "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose",
 ] as const;
 export type OpName = (typeof OPS)[number];
@@ -741,6 +786,37 @@ for (const name of OPS) {
       if (ok && this._depth === 0 && this.onOp) this.onOp(name, args);
     }
   };
+}
+
+const CORNER_NAMES = ["top-left", "top-right", "bottom-left", "bottom-right"];
+
+/**
+ * A map of tile corners -> the plain tile map and char map for the same tilemap: each tile's mask
+ * (1 top-left + 2 top-right + 4 bottom-left + 8 bottom-right) as one hex char, "." where no tile.
+ * A prefix map names <prefix><mask>; a mask with no such asset is an error, except 0 (left empty).
+ */
+function cornerTiles(str: string, opts: TilemapOpts, known: (name: string) => boolean): [string, TilemapOpts] {
+  if (opts.iso) throw new PxError("tilemap: corners work on the square grid only, not with iso");
+  const rows = gridRows(str).map((r) => [...r]);
+  const set = (ch: string | undefined) => ch !== undefined && (opts.corners === true ? ch !== "." && ch !== " " : (opts.corners as string).includes(ch));
+  const name = (m: number) => (typeof opts.map === "string" ? (known(opts.map + m) ? opts.map + m : undefined) : opts.map[m]);
+  const map: Record<string, string> = {}, out: string[] = [];
+  for (let j = 0; j + 1 < rows.length; j++) {
+    let line = "";
+    for (let i = 0; i + 1 < Math.max(rows[j].length, rows[j + 1].length); i++) {
+      const m = (set(rows[j][i]) ? 1 : 0) | (set(rows[j][i + 1]) ? 2 : 0) | (set(rows[j + 1][i]) ? 4 : 0) | (set(rows[j + 1][i + 1]) ? 8 : 0);
+      const n = name(m);
+      if (!n) {
+        if (m === 0) { line += "."; continue; }
+        const which = CORNER_NAMES.filter((_, b) => m & (1 << b)).join(" + ");
+        throw new PxError(`tilemap: no tile for corner mask ${m} (${which} set) at tile row ${j}, col ${i}; map has: ${typeof opts.map === "string" ? opts.map + "<mask>" : Object.keys(opts.map).join(" ")}`);
+      }
+      map[m.toString(16)] = n;
+      line += m.toString(16);
+    }
+    out.push(line);
+  }
+  return [out.join("\n"), { ...opts, corners: undefined, map }];
 }
 
 /** Does any pixel of the area pass the mask? */
