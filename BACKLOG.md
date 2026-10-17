@@ -78,6 +78,10 @@ characters.md has the workflow they serve.
   dark copy. For tall objects it reads wrong, and a mirrored palm then throws its shadow the other way.
   The forest does it with a helper that builds `<name>_shadow` sprites from the plants' own pixels.
 
+- [ ] **Relight a flat sprite**: an op that steps every pixel along its ramp by its place in the shape:
+  lit edges toward the light, undersides away from it, occluded cores darker. A reduced palm (3 greens
+  that `palettize` merged into one) got its depth back this way, with a hand-written function.
+
 ## Later / niche
 
 - [x] Layer blend modes and opacity (`blend`, `opacity`, `palettize`), with the palette caveats in

@@ -58,6 +58,13 @@ the curves of the clothes exactly.
 
 1. **Halve it:** `sprite("_half", { png: "big.png", shrink: 2, palettize: true })`. Each 2×2 block
    becomes its most common colour, or transparent when most of it is.
+   - **Watch for merged tones.** `palettize` snaps each colour to the nearest key, and two tones
+     of the original can land on the same key. A palm with three greens came out in one green and
+     looked flat. Count the keys with `PXL ascii`. If tones merged, drop `palettize` and map each
+     original colour to its own key with `recolor({ "#2c963c": "g", "#27773c": "G" })`.
+   - **Restore volume with a light pass** if it is still flat. Step each pixel along its ramp by
+     its place in the shape: up if it borders empty space above or to the left (lit edges), down if
+     below or to the right (undersides), down where parts crowd together (the heart of a crown).
 2. **Redraw what halving breaks** with `runs()` (section 7):
    - eyes, mouth and other 1–2 px face features;
    - thin lines, like collars and ties;
