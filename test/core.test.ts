@@ -291,6 +291,13 @@ test("trace records each top-level op, layer and post step", () => {
   assert.equal(frames[3].w, 5); // outline frame shows the grown image
 });
 
+test("on masks: '.' means an empty pixel (scatter around a shape, not on it)", () => {
+  // a 1px dot scattered only where the canvas is still empty: never over the red block
+  const out = art(PAL + 'sprite("_d", "w"); sprite("t", { w: 4, h: 1 }, "rr", scatter("_d", 0, 0, 4, 1, 4, { on: ".", even: true }))', "t");
+  assert.match(out, /^rr/);
+  assert.ok(out.includes("w"), "placed on the empty pixels");
+});
+
 test("runs: [x, chars] runs at absolute x, row by row; '.' keeps, '_' erases", () => {
   eq(art(PAL + 'sprite("t", { w: 5, h: 2 }, rect(0, 0, 5, 2, "w"), runs({ 0: [[1, "rr"]], 1: [[0, "k"], [3, ".__"]] }))', "t"), "wrrww\nkwww.");
   assert.match(failure(PAL + 'sprite("t", { w: 2, h: 1 }, runs({ 0: [[1]] }))', "t").message, /runs: row 0, run 1 must be \[x, "chars"\]/);

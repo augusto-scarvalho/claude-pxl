@@ -125,11 +125,12 @@ export class Canvas {
     return rng(hash(seed, 0, this.seed));
   }
 
+  /** Test for `on` masks: palette keys, "*" any opaque, "." (or "_") an empty pixel. */
   private colorTest(on: string): (c: Color) => boolean {
     if (on === "*") return (c) => c !== TRANSPARENT;
     const set = new Set<Color>();
     for (const k of colorList(on)) {
-      const c = this.color(k);
+      const c = k === "." ? TRANSPARENT : this.color(k);
       if (c !== null) set.add(c);
     }
     return (c) => set.has(c);
@@ -565,7 +566,7 @@ export class Canvas {
     // A brush that silently paints nothing is the usual sign of an empty layer under `on`.
     if (opts.on !== undefined && count > 0 && placed === 0)
       throw new PxError(`scatter: 'on: ${opts.on}' matched nothing in [${x}, ${y}, ${w}, ${h}] (0 of ${count} placed)` +
-        (opts.below ? "" : "; a layer starts empty: add below: true to read the layers under it"));
+        (opts.below || !this.layerName ? "" : "; a layer starts empty: add below: true to read the layers under it"));
   }
 
   /** Grid string at (x, y): one char per pixel; "." keeps, "_" erases. */
