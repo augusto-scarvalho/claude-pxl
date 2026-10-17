@@ -118,6 +118,11 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
 - [ ] **Export `.aseprite`**: layers, frames, tags, slices and palette, so a person can keep editing
   what the agent drew. (Documented format; zlib cels.)
 
+- [x] **Hair physics** (35a57b4): `chain(anchors, { links, length, gravity, drag, rest, stiff, move })`,
+  Celeste-style: points that follow an anchor with inertia and weight, simulated over the loop until
+  it repeats. Asked for after a GameMaker hair-physics clip; the walking girl's hair uses it, after a
+  stretch-only warp and four drawn poses both read wrong.
+
 Left out on purpose: effects that leave the palette (blur, curves, HSV, convolution), keyframed
 tweens and interpolating between drawings, free rotation of cut-out limbs, 2.5D thickness, 3D layers
 (render a base in Blender and reduce it instead), mouse-only tools.
