@@ -40,11 +40,10 @@ What the agent kept getting wrong on the way became pxl features (`cast` shadows
 `tilemap` corners) and notes in [`SKILL.md`](SKILL.md) and [`characters.md`](characters.md).
 
 The trees, palms and big leaves are reduced from "[LPC] Jungle" by bluecarrot16, Lanea Zimmerman
-(Sharm), Sevarihk, Hyptosis and others, and from Sevarihk's "Animated Palm Tree Sprite" (both
-CC-BY 4.0). The trail tiles come from "ZRPG Beach" by Zabin, built on "[LPC] Beach/Desert" by
-bluecarrot16 and others (CC-BY-SA 3.0). Full credits are in the files and in
-[`examples/tropical/refs/CREDITS.md`](examples/tropical/refs/CREDITS.md). Because of the share-alike tiles, the forest
-image and those files are CC-BY-SA 3.0; the rest of the repository stays MIT.
+(Sharm), Sevarihk, Hyptosis and others, and from Sevarihk's "Animated Palm Tree Sprite", both
+CC-BY 4.0: they keep that license, so credit their authors when you reuse them (full list in
+[`examples/tropical/refs/CREDITS.md`](examples/tropical/refs/CREDITS.md)). Everything else in the
+scene, the trail's tileset included, is drawn in code and MIT like the rest of the repository.
 
 ## Quick start
 

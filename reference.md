@@ -170,8 +170,11 @@ tilemap(`
   ....###.`, { corners: "#", size: 16, map: "dirt_" })   // dirt_1 ... dirt_15, by corner mask
 ```
 
-Draw the 16 pieces yourself (one function over the mask, as `examples/topdown.px.js` does), or
-take them from a tileset. In an LPC-style terrain (32px tiles), the 3×3 ring of outer corners and edges
+Draw the 16 pieces yourself, one function over the mask (`examples/topdown.px.js` for a shore,
+`examples/tropical/trail.px.js` for dirt with a ragged edge that frays into the grass), or take
+them from a tileset. Check its license first: with a share-alike one (CC-BY-SA, GPL) everything
+built with it has to be shared under that license too, so prefer CC0 / CC-BY, or draw your own
+after its look. In an LPC-style terrain (32px tiles), the 3×3 ring of outer corners and edges
 holds masks `8 12 4` / `10 · 5` / `2 3 1`, read row by row (its center is often empty: take full
 tiles, mask 15, from the fill variants), and the 2×2 block around a hole holds the inner corners
 `7 11` / `13 14`. Masks 6 and 9 (two opposite corners)

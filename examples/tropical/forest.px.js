@@ -2,10 +2,10 @@
 // through the jungle, a dirt trail crossing it on a plank bridge, big canopy trees, palms, bananas
 // and the understory, a macaw, butterflies, a frog, and an Indigenous girl walking the trail.
 // Light comes from the top left: crowns cast their shadows down and right, sun shafts fall through.
-// The art is spread over the files included below; refs/ has the CC art some of it is reduced from.
+// The art is spread over the files included below; refs/ has the CC-BY art the trees are reduced from.
 use("palette.hex")
 include("plants.px.js", { palette: true })
-include("trail.px.js")    // the trail's tileset, from CC-BY-SA art (credits inside)
+include("trail.px.js")    // the trail's tileset, drawn in code
 include("trees.px.js")    // trees, palms and big leaves reduced from CC-BY art (credits inside)
 include("fauna.px.js")    // the jaguar and the monkey
 include("girl.px.js")     // the girl, with her own palette

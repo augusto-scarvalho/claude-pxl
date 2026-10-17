@@ -141,7 +141,7 @@ cheaper than inventing one.
 | `normals.px.js` | bricks, crate, rock, slime under a swinging lantern | normal maps: `bump` (dome, bevel, luma) vs hand-painted `normals`, lit vs flat |
 | `cave.px.js` | animated cave lit only by glowing fungus and bugs | `glow`, pulsing lamps, props placed on polyline terrain, seamless loops, `rdelay` |
 | `grotto.px.js` | big animated cavern with pool and waterfall | `cave.px.js` scaled up: swaying plants, waterfall, water reflection, drifting particles |
-| `tropical/` | animated tropical forest, 3/4 top-down, 320×240, the largest: river, waterfall, trail, jungle, animals, a girl | trees and big leaves reduced from CC art (`png` + `shrink`, `inline` keep, `relight`), a river from a corner field with depth bands, a trail laid with a terrain tileset (`tilemap` `corners`), `cast` shadows, a waterfall that churns its pool, grass over all the ground, a jaguar sheared onto a sloping branch, a swinging monkey, a breathing girl, a `ref` guide layer, credits for third-party art |
+| `tropical/` | animated tropical forest, 3/4 top-down, 320×240, the largest: river, waterfall, trail, jungle, animals, a girl | trees and big leaves reduced from CC art (`png` + `shrink`, `inline` keep, `relight`), a river from a corner field with depth bands, a trail laid with a corner tileset drawn in code (`tilemap` `corners`, 16 pieces from one function), `cast` shadows, a waterfall that churns its pool, grass over all the ground, a jaguar sheared onto a sloping branch, a swinging monkey, a breathing girl, a `ref` guide layer, credits for the third-party art |
 | `no_magic.px.js` | witch's room, 256×224 | character anims (cat, frog) with `frame()` patches, procedural fire/bubbles, an interior full of props, a flat and a lamp-lit version of one scene |
 
 To find an op in real use: `grep -n "scatter(" <skill dir>/examples/*.px.js`. `PXL list <file>`
@@ -189,7 +189,8 @@ To see how a complex piece was built, in order: `PXL steps <example> <asset> --o
   `tilemap(..., { corners })` and a terrain tileset (drawn, or reduced from a free LPC-style one).
   A `curve` or `poly` stroke of dirt reads as paint on top of the grass.
 - **Trees, palms and other big organic shapes** are where code drawing fails worst (lobes read as
-  broccoli, fronds as combs). Start from free art instead (CC0 / CC-BY, credited in the file):
+  broccoli, fronds as combs). Start from free art instead (CC0 / CC-BY, credited in the file; share-alike art such as
+  CC-BY-SA puts its license on everything built with it, so ask the user first):
   `png` + `shrink: 2`, then fix it (`examples/tropical/trees.px.js`; characters.md §3 has the steps).
 - **Things that land leave marks.** A waterfall that ends in a strip of foam over still water looks
   pasted on: spread churning foam to the sides and forward, send rings out, and let a wake of foam
