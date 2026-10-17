@@ -97,7 +97,7 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
 - [x] **Sockets and sorted layers** (f613acc): `sockets` on assets, `stamp(..., { at: "id.socket" })`,
   `layer({ sort: "y" | "z" })`. Parts attached per pose with a draw order per frame; top-down depth
   sort. (Aseprite cel z-index; engines' y-sort.)
-- [x] **Motion guides per frame**: `motion("walk.json", { dir, scale, at })` reads a guide (joints per
+- [x] **Motion guides per frame** (c43c0e1): `motion("walk.json", { dir, scale, at })` reads a guide (joints per
   frame, which foot is down, which limb is nearer) and `pose(frame, { sides: true })` draws it, limbs
   colored by side; anim previews show `ref` layers. CC0 walk and run cycles in 8 directions ship in
   `examples/motion/`, converted from the pipeline's projections; the tropical girl walks with them.
