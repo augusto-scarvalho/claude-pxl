@@ -97,10 +97,11 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
 - [x] **Sockets and sorted layers** (f613acc): `sockets` on assets, `stamp(..., { at: "id.socket" })`,
   `layer({ sort: "y" | "z" })`. Parts attached per pose with a draw order per frame; top-down depth
   sort. (Aseprite cel z-index; engines' y-sort.)
-- [ ] **Motion guides per frame**: `pose()` reading a sequence of frames (`frames: [[x, y, v] x
-  joints]`) and drawing the current one in an anim, left / right limbs in fixed colors, inferred
-  joints dimmed. Ship CC0 walk and run guides (Quaternius / Mesh2Motion, projected for a 2:1 view,
-  8 directions) converted from the pipeline's guide sheets.
+- [x] **Motion guides per frame**: `motion("walk.json", { dir, scale, at })` reads a guide (joints per
+  frame, which foot is down, which limb is nearer) and `pose(frame, { sides: true })` draws it, limbs
+  colored by side; anim previews show `ref` layers. CC0 walk and run cycles in 8 directions ship in
+  `examples/motion/`, converted from the pipeline's projections; the tropical girl walks with them.
+  Skipped: dimming inferred joints (the CC0 projections have none).
 - [ ] **Register by a point**: move each frame so a marked point (the pelvis) lands on the same x, with
   one y offset per cycle; never by the bounding box.
 - [ ] **Small warps for secondary motion**: `warp((x, y) => [dx, dy])` with whole-pixel offsets and

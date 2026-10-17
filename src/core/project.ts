@@ -9,7 +9,7 @@ import {
   type FontDef, type SheetDef, type SheetOpts, type Timeline, isLayer, isOp,
 } from "./model.ts";
 import { PALETTE_FILE, Palette, paletteFromFile } from "./palette.ts";
-import { readJoints } from "./pose.ts";
+import { type Motion, readJoints, readMotion } from "./pose.ts";
 import { Trace } from "./trace.ts";
 import { globRe, rng } from "./util.ts";
 
@@ -367,7 +367,7 @@ export class Project implements BuildCtx {
       const loc = this.callerLoc();
       try {
         if (!isPlainObject(opts)) throw new PxError('pose("pose.json", { x, y, scale, color, joint, min, bones })');
-        checkKeys("pose", opts, ["x", "y", "scale", "color", "joint", "min", "bones"]);
+        checkKeys("pose", opts, ["x", "y", "scale", "color", "joint", "min", "bones", "sides"]);
         let data = src;
         if (typeof src === "string") {
           if (!this.readHook) throw new PxError("pose files need an art file on disk");
@@ -375,6 +375,20 @@ export class Project implements BuildCtx {
         }
         return { __op: true, name: "pose", args: [readJoints(data), opts], loc };
       } catch (e) { throw wrap(e).within("pose", loc); }
+    };
+    // motion("walk.json", { dir, scale, at }): a motion guide's frames for one direction, as joints
+    // to draw with pose() in an anim and to place parts with.
+    env.motion = (src: unknown, opts: unknown = {}): Motion => {
+      const loc = this.callerLoc();
+      try {
+        if (typeof src !== "string") throw new PxError('motion("walk.json", { dir: "SE", scale: 0.25, at: [x, y] })');
+        if (!isPlainObject(opts)) throw new PxError("motion: options must be { dir, scale, at }");
+        checkKeys("motion", opts, ["dir", "scale", "at"]);
+        if (!this.readHook) throw new PxError("motion files need an art file on disk");
+        let data: unknown;
+        try { data = JSON.parse(this.readHook(src)); } catch (e) { throw e instanceof PxError ? e : new PxError(`${src}: not JSON (${(e as Error).message})`); }
+        return readMotion(data, opts as { dir?: string; scale?: number; at?: [number, number] });
+      } catch (e) { throw wrap(e).within("motion", loc); }
     };
     return env;
   }
@@ -456,20 +470,27 @@ export class Project implements BuildCtx {
     return tt === 0 ? first : this.buildAt(name, seed, tt);
   }
 
-  /** One full loop of an animated asset as [{ img, ms }]; [] for still assets. */
-  frames(name: string, seed = 0, max = 600): { img: Img; ms: number }[] {
+  /**
+   * One full loop of an animated asset as [{ img, ms }]; [] for still assets. `guide` is the frame
+   * with its reference layers over it, when it has any (previews only).
+   */
+  frames(name: string, seed = 0, max = 600): { img: Img; ms: number; guide?: Img }[] {
     const tl = this.build(name, seed).anim;
     if (!tl) return [];
+    const at = (t: number, ms: number) => {
+      const b = this.build(name, seed, t);
+      return { img: b.img, ms, ...(b.guide ? { guide: b.guide } : {}) };
+    };
     if (tl.durations) {
       let t = 0;
       return tl.durations.map((ms) => {
-        const f = { img: this.build(name, seed, t).img, ms };
+        const f = at(t, ms);
         t += ms;
         return f;
       });
     }
     const n = Math.max(1, Math.min(max, Math.round(tl.loop / tl.step)));
-    return Array.from({ length: n }, (_, i) => ({ img: this.build(name, seed, i * tl.step).img, ms: tl.step }));
+    return Array.from({ length: n }, (_, i) => at(i * tl.step, tl.step));
   }
 
   /**

@@ -76,6 +76,8 @@ declare global {
     /** Joint (x, y) lands at (x * scale + x, y * scale + y). */
     x?: number; y?: number; scale?: number;
     color?: PxColor; joint?: PxColor | false; min?: number; bones?: [string, string][];
+    /** Limbs colored by side: left arm magenta, right green, left leg orange, right cyan. */
+    sides?: boolean;
   }
 
   interface PxLamp { r?: number; color?: PxColor; power?: number; z?: number }
@@ -158,6 +160,10 @@ declare global {
   /** palette: true keeps the included file's use()/pal()/ramps() active afterwards. */
   function include(path: string, opts?: { palette?: boolean }): void;
   function rng(seed?: number): () => number;
+  /** One direction of a motion guide file (examples/motion/walk.json): whole-pixel joints per frame, the floor point moved to `at`. */
+  function motion(file: string, opts?: { dir?: "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW" | string; scale?: number; at?: [number, number] }): {
+    name: string; dir: string; ms: number[]; frames: Record<string, [number, number]>[]; depth: Record<string, number>[]; contact: [number, number][];
+  };
   function clip(where: PxRegion, ...items: PxItem[]): PxOp;
 
   function px(x: number, y: number, c: PxColor): PxOp;

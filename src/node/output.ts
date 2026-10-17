@@ -65,7 +65,8 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         const { sheet, frames: fr } = packSheet(drawn.map((f, i) => ({ name: `${n}_${i}`, img: f.img, ms: f.ms })), drawn.length);
         writePng(join(out, dir, n + ".png"), sheet);
         write(join(out, dir, n + ".json"), sheetJson(n + ".png", sheet, fr, [{ name: n, from: 0, to: fr.length - 1, direction: p.direction(n) }]));
-        shown = packSheet(frames.map((f) => ({ name: "", img: f.img })), frames.length, 1).sheet;
+        // previews show reference layers (guides) over each frame, like still assets do
+        shown = packSheet(frames.map((f) => ({ name: "", img: f.guide ?? f.img })), frames.length, 1).sheet;
       } else {
         // Seamless tiles preview laid out 3x3 (or 3x1 / 1x3), so seams show.
         // Reference layers show in the preview only, over the art.
@@ -92,7 +93,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         // Previews: anims show every frame side by side; anything animated also gets a GIF.
         const s = opts.scale ?? Math.max(1, Math.min(previewScale(b.img), Math.floor(2048 / shown.w)));
         writePng(join(out, "_preview", n + ".png"), preview(shown, s));
-        if (frames.length) write(join(out, "_preview", n + ".gif"), encodeGif(frames.map((f) => ({ img: preview(f.img, s), ms: f.ms }))));
+        if (frames.length) write(join(out, "_preview", n + ".gif"), encodeGif(frames.map((f) => ({ img: preview(f.guide ?? f.img, s), ms: f.ms }))));
         // Anims also get a review sheet: a motion map, then each frame over its neighbours' ghosts.
         if (def.kind === "anim" && frames.length > 1) {
           const sheet = onionSheet(frames.map((f) => f.img));

@@ -4,7 +4,7 @@ import { art, failure, PAL } from "./helpers.ts";
 import { loadSource } from "../src/node/load.ts";
 import { compareSilhouettes, packSheet, sheetJson } from "../src/core/render.ts";
 import { pack } from "../src/core/color.ts";
-import { readJoints } from "../src/core/pose.ts";
+import { readJoints, readMotion, sideColor } from "../src/core/pose.ts";
 import { rotate } from "../src/core/rotate.ts";
 import { Img } from "../src/core/image.ts";
 
@@ -394,4 +394,28 @@ test("layer sort: stamps draw by z, or by where they stand, ties in call order",
   eq(art(S + 'scene("s", { w: 3, h: 1 }, layer("l", { sort: "z" }, stamp("a", 0, 0, { z: 1 }), stamp("b", 1, 0)))', "s"), "rrw");
   eq(art(S + 'sprite("t", { pivot: "bottom" }, "g\\ng"); scene("s", { w: 3, h: 3 }, layer("l", { sort: "y" }, stamp("t", 1, 3), stamp("a", 0, 2)))', "s"), "...\n.g.\nrg.");   // the post stands lower (y 3), so it covers the bar (y 2)
   assert.match(failure(S + 'scene("s", { w: 3, h: 1 }, layer("l", { sort: "x" }, stamp("a")))', "s").message, /sort must be "y" or "z"/);
+});
+
+test("motion: one direction of a motion file, scaled and placed by its floor point, whole pixels", () => {
+  const file = { format: "pxl-motion/1", name: "hop", floor: [10, 20], joints: ["mid_hip", "l_ankle"],
+    directions: { S: { ms: [100, 100], contact: [[1, 0], [0, 1]], frames: [[[10, 10, 0.5], [8, 20, 0.2]], [[10, 8, 0.5], [12, 18, 0.3]]] } } };
+  const m = readMotion(file, { dir: "S", scale: 0.5, at: [4, 9] });
+  assert.deepEqual(m.frames[0], { mid_hip: [4, 4], l_ankle: [3, 9] });
+  assert.deepEqual(m.frames[1], { mid_hip: [4, 3], l_ankle: [5, 8] });
+  assert.deepEqual(m.ms, [100, 100]);
+  assert.deepEqual(m.contact, [[1, 0], [0, 1]]);
+  assert.equal(m.depth[1].l_ankle, 0.3);
+  assert.throws(() => readMotion(file, { dir: "N" }), /no direction 'N'.*it has S/);
+  assert.throws(() => readMotion({ joints: [] }), /not a pxl motion file/);
+});
+
+test("pose sides: limbs take a color by side, the spine keeps its own", () => {
+  assert.equal(sideColor("l_shoulder", "l_elbow"), "#e048d8");
+  assert.equal(sideColor("r_knee", "r_ankle"), "#28c0e8");
+  assert.equal(sideColor("mid_hip", "l_hip"), "#f09a28");
+  assert.equal(sideColor("head", "neck"), undefined);
+  // drawn: a left arm in magenta, the spine in the given color
+  const j = '{ neck: [1, 0], mid_hip: [1, 2], l_shoulder: [2, 0], l_elbow: [2, 2] }';
+  const src = PAL + `pal({ m: "#e048d8" }); sprite("p", { w: 3, h: 3 }, pose(${j}, { sides: true, color: "w", joint: false }))`;
+  eq(art(src, "p"), ".wm\n.wm\n.wm");
 });

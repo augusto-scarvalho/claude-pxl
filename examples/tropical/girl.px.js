@@ -41,3 +41,83 @@ sprite("girl_pose", { w: 30, h: 26, outline: "k" }, `
   ............nnn.nnn...........
   ............ftS.ttS...........
   ...........fttS.ttS...........`)
+
+// ---------------------------------------------------------------- walking
+// She walks toward the bottom left (SW; flipped for SE), 8 frames, built from parts on sockets and
+// driven by the CC0 walk guide in ../motion/walk.json: the guide says which foot is planted, how far
+// each foot is ahead or behind, where the hands swing and when the body rises; the parts are drawn by
+// hand at her size. The guide shows in the previews (a ref layer), limbs colored by side.
+// Head, torso and skirt: the standing girl without her legs, her near arm and her far hand.
+// Sockets mark where those attach; the pivot is between her feet on the ground.
+sprite("girl_top", { w: 30, h: 22, pivot: [15, 26], sockets: { arm_r: [9, 15], hand_l: [20, 18], leg_r: [11, 21], leg_l: [16, 21] } }, `
+  ...........1hhhhhhhh1.........
+  .........1hhjjjhhhhhh1........
+  ........1hjJJjhhhhhhhh1.......
+  ........1hjjhhhhhhhhhh1.......
+  ........1hhhhhhhhhhhhh1.......
+  ........1hhhhhhhhhhhhh1.......
+  ........1h1sssssssssSh1.......
+  ........1h1fzzffzzftSh1.......
+  ........1h1f3Yff3YftSh1.......
+  .........1hfH3ffH3ftSh1.......
+  .........1hfRffffRftSh1.......
+  .........1hfffSffftShh1.......
+  .........1h1tfffftShhh1.......
+  .........1h...Stt..hhhh1......
+  .........1httytttytthhh1......
+  ...........ttReutthhh1........
+  ...........rRRRRRDhhh1........
+  ...........RnRnRnDhh1.........
+  ............OOOOOOO...........
+  ............bBbBbBbO..........
+  ...........bBbBbBbBO..........
+  ...........b.Bb.bB.O..........`)
+
+// Legs, planted (the foot pointing the way she walks) and lifted (the foot drawn up). Their top row
+// hides under the skirt, so a leg stepping down a pixel doesn't open a gap.
+sprite("leg_r", ".ftS\n.ftS\n.nnn\n.ftS\nfttS")
+sprite("leg_r_up", ".ftS\n.ftS\n.nnn\nfttS")
+sprite("leg_l", "ttS\nttS\nnnn\nttS\nttS")
+sprite("leg_l_up", "ttS\nttS\nnnn\nttS")
+// The near arm hanging, swung forward a little, and swung forward (it hangs from the shoulder corner).
+sprite("arm_r_0", { pivot: [0, 0] }, "RD\nft\nft\ntS\nft")
+sprite("arm_r_1", { pivot: [1, 0] }, ".RD\n.ft\nft.\ntS.\nf..")
+sprite("arm_r_2", { pivot: [2, 0] }, "..RD\n.ft.\nft..\ntS..")
+sprite("hand_l", "t\nS")
+
+{
+  // What the guide gives, per frame. Ankles and wrists are measured from the hip and the shoulder,
+  // in guide pixels; at her size a guide pixel is about a tenth of hers.
+  const G = motion("../motion/walk.json", { dir: "SW" })
+  const SMALL = motion("../motion/walk.json", { dir: "SW", scale: 0.2, at: [15, 26] })   // the guide at her size
+  const rel = (f, a, b) => [G.frames[f][a][0] - G.frames[f][b][0], G.frames[f][a][1] - G.frames[f][b][1]]
+  const STEP = 0.05, DEPTH = 0.07, SWING = 0.12
+  const lowest = Math.max(...G.frames.map((f) => f.mid_hip[1]))
+  // in a 3/4 view the foot ahead is also lower on screen and the one behind higher
+  const meanY = (a) => G.frames.reduce((t, _, i) => t + rel(i, a, "mid_hip")[1], 0) / G.frames.length
+  // At 32 px legs that cross read as a tangle: the far leg stops a pixel short of the near one.
+  const PLAN = G.frames.map((_, i) => ({
+    bob: lowest - G.frames[i].mid_hip[1] > 1.5 ? 1 : 0,                       // up in the passing frames
+    legR: Math.round(rel(i, "r_ankle", "mid_hip")[0] * STEP), upR: !G.contact[i][1],
+    legRy: Math.round((rel(i, "r_ankle", "mid_hip")[1] - meanY("r_ankle")) * DEPTH),
+    legL: Math.round(rel(i, "l_ankle", "mid_hip")[0] * STEP), upL: !G.contact[i][0],
+    legLy: Math.round((rel(i, "l_ankle", "mid_hip")[1] - meanY("l_ankle")) * DEPTH),
+    rFront: G.depth[i].r_ankle >= G.depth[i].l_ankle,                        // which leg is nearer
+    arm: Math.min(2, Math.round(-rel(i, "r_wrist", "r_shoulder")[0] * SWING)),        // near arm: 0 down .. 2 forward
+    hand: Math.round(rel(i, "l_wrist", "l_shoulder")[0] * SWING),           // far hand: > 0 behind her
+  }))
+
+  for (const p of PLAN) p.legL = Math.max(p.legL, p.legR - 1)
+
+  anim("girl_walk", { w: 30, h: 28, frames: 8, fps: 6, outline: "k", pivot: [15, 26] },
+    layer("parts", { sort: "z" }, (c) => {
+      const p = PLAN[c.frame]
+      c.stamp("girl_top", 15, 26 - p.bob, { z: 2 })
+      c.stamp(p.upR ? "leg_r_up" : "leg_r", p.legR, p.legRy, { at: "girl_top.leg_r", z: p.rFront ? 1 : 0 })
+      c.stamp(p.upL ? "leg_l_up" : "leg_l", p.legL, p.legLy, { at: "girl_top.leg_l", z: p.rFront ? 0 : 1 })
+      c.stamp(`arm_r_${Math.max(0, p.arm)}`, 0, 0, { at: "girl_top.arm_r", z: 3 })
+      if (p.hand > 0) c.stamp("hand_l", Math.min(1, p.hand - 1), 0, { at: "girl_top.hand_l", z: -1 })
+    }),
+    layer("guide", { ref: 0.6 }, (c) => c.pose(SMALL.frames[c.frame], { sides: true, joint: false })))
+  anim("girl_walk_se", { base: "girl_walk", flip: "x" })
+}

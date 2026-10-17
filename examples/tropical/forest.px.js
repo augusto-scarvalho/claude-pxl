@@ -315,4 +315,4 @@ scene("forest_guide", { w: W, h: H }, stamp("forest"),
 
 // For a game: the plants, props and animals on one sheet.
 sheet("jungle_kit", ["tree", "tree2", "palm", "banana", "fanpalm", "fern", "monstera", "heliconia", "bromeliad", "rock", "rock_small", "log",
-  "lilypad", "lilyflower", "bridge", "waterfall", "macaw", "butterfly", "frog", "jaguar", "monkey"], { pad: 1 })
+  "lilypad", "lilyflower", "bridge", "waterfall", "macaw", "butterfly", "frog", "jaguar", "monkey", "girl_walk", "girl_walk_se"], { pad: 1 })

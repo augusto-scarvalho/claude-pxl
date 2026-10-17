@@ -21,6 +21,7 @@
     "examples/sidescroller/*.{px.js,hex,png}",
     "examples/tropical/*.{px.js,hex}",
     "examples/tropical/refs/*.{png,txt,md}",
+    "examples/motion/*.{json,md}",
     "examples/fonts/*.px.js",
     "SKILL.md",
     "characters.md",

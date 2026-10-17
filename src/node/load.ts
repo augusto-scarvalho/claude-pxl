@@ -38,7 +38,12 @@ export function loadProject(file: string, opts: ProjectOptions = {}): Project {
       stack.pop();
     }
   };
-  const near = (path: string) => (isAbsolute(path) ? path : resolve(dirname(stack[stack.length - 1]), path));
+  const near = (path: string) => {
+    if (isAbsolute(path)) return path;
+    // Files are read while the art file runs; drawing functions run later, at build time.
+    if (!stack.length) throw new PxError(`'${path}' is read while the art file loads: call use(), pose(), motion() or png at the top of the file, not inside a drawing function`);
+    return resolve(dirname(stack[stack.length - 1]), path);
+  };
   p.includeHook = (path) => run(near(path));
   p.pngHook = (path) => {
     const abs = near(path);

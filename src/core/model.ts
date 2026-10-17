@@ -270,6 +270,8 @@ export interface PoseOpts {
   joint?: string | false;
   /** Skip joints whose score is below this (detectors give one per joint). */
   min?: number;
+  /** Color the limbs by side (left arm magenta, right green, left leg orange, right cyan): a swapped limb shows. */
+  sides?: boolean;
   /** Pairs of joint names to connect (default: body, head and feet bones). */
   bones?: [string, string][];
 }

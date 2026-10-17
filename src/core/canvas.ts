@@ -5,7 +5,7 @@ import { PxError } from "./errors.ts";
 import { glyph, lineWidth } from "./font.ts";
 import type { BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
 import { bump, dirOf, setNormal } from "./normals.ts";
-import { POSE_BONES } from "./pose.ts";
+import { POSE_BONES, sideColor } from "./pose.ts";
 import { bayer, colorList, gridRows, hash, inPoly, polyBounds, type Region, regionPred, rng } from "./util.ts";
 
 /** How a canvas reaches other assets. */
@@ -701,7 +701,7 @@ export class Canvas {
     };
     for (const [a, b] of opts.bones ?? POSE_BONES) {
       const p = at(a), q = at(b);
-      if (p && q) this.line(p[0], p[1], q[0], q[1], color);
+      if (p && q) this.line(p[0], p[1], q[0], q[1], (opts.sides && sideColor(a, b)) || color);
     }
     if (joint) for (const n of Object.keys(joints)) { const p = at(n); if (p) this.px(p[0], p[1], joint); }
   }

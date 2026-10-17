@@ -236,3 +236,9 @@ anim("walk", { frames: 8, fps: 8, outline: "k" },
   colors while working so their identity can't swap. Check that shoulders stay on the torso.
 - Motion references (mocap, a video, a CC0 walk cycle) are guides for timing and arcs, drawn in
   a `ref: true` layer under the pose; they are not the authority on the body's proportions.
+  `examples/motion/` has CC0 walk and run cycles in 8 directions: `motion("walk.json", { dir })`
+  gives each frame's joints, which foot is down and which limb is nearer, and
+  `examples/tropical/girl.px.js` turns them into a 32 px chibi's walk. At that size, scale the
+  stride down (her feet move a pixel or two, not the guide's length), show a step forward as the
+  foot lower on screen as much as to the side, keep the legs from crossing, and let the body rise
+  a pixel in the passing frames. Review it as pairs, frames 0–3 above 4–7.

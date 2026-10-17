@@ -13,12 +13,60 @@ const BODY25 = ["nose", "neck", "r_shoulder", "r_elbow", "r_wrist", "l_shoulder"
   "l_heel", "r_big_toe", "r_small_toe", "r_heel"];
 
 export const POSE_BONES: [string, string][] = [
-  ["nose", "l_eye"], ["nose", "r_eye"], ["l_eye", "l_ear"], ["r_eye", "r_ear"], ["nose", "neck"],
+  ["head", "neck"], ["nose", "l_eye"], ["nose", "r_eye"], ["l_eye", "l_ear"], ["r_eye", "r_ear"], ["nose", "neck"],
   ["neck", "l_shoulder"], ["neck", "r_shoulder"], ["l_shoulder", "l_elbow"], ["l_elbow", "l_wrist"],
   ["r_shoulder", "r_elbow"], ["r_elbow", "r_wrist"], ["neck", "mid_hip"], ["mid_hip", "l_hip"], ["mid_hip", "r_hip"],
   ["l_hip", "l_knee"], ["l_knee", "l_ankle"], ["r_hip", "r_knee"], ["r_knee", "r_ankle"],
   ["l_ankle", "l_big_toe"], ["l_ankle", "l_heel"], ["r_ankle", "r_big_toe"], ["r_ankle", "r_heel"],
 ];
+
+/**
+ * Guide colors by side (`sides: true`): left arm magenta, right arm green, left leg orange, right
+ * leg cyan, so a limb that swaps sides between frames shows. Previews only.
+ */
+export const SIDE_COLORS = { l_arm: "#e048d8", r_arm: "#38c048", l_leg: "#f09a28", r_leg: "#28c0e8" };
+const LEG = /_(hip|knee|ankle|big_toe|small_toe|heel)$/;
+
+/** The side color of a bone, or undefined for the spine and head. */
+export function sideColor(a: string, b: string): string | undefined {
+  const end = [a, b].find((n) => n.startsWith("l_") || n.startsWith("r_"));
+  if (!end || /_(eye|ear)$/.test(end)) return undefined;
+  return SIDE_COLORS[`${end[0]}_${LEG.test(end) ? "leg" : "arm"}` as keyof typeof SIDE_COLORS];
+}
+
+/** One direction of a pxl motion file, placed: whole-pixel joints per frame. */
+export interface Motion {
+  name: string;
+  dir: string;
+  /** Frame durations (ms). */
+  ms: number[];
+  /** Joints per frame, { name: [x, y] }, with the floor point moved to `at` and scaled. */
+  frames: Record<string, [number, number]>[];
+  /** Per frame, each joint's distance toward the viewer (larger = nearer): which limb is in front. */
+  depth: Record<string, number>[];
+  /** Per frame, [left, right] foot on the ground (1) or not (0). */
+  contact: [number, number][];
+}
+
+/** Read a pxl motion file (format "pxl-motion/1") for one direction, scaled and placed. */
+export function readMotion(src: unknown, opts: { dir?: string; scale?: number; at?: [number, number] } = {}): Motion {
+  const m = src as { format?: string; name?: string; floor?: number[]; joints?: string[]; directions?: Record<string, { ms: number[]; contact: [number, number][]; frames: number[][][] }> };
+  if (m?.format !== "pxl-motion/1" || !Array.isArray(m.joints) || !m.directions)
+    throw new PxError('motion: not a pxl motion file (format "pxl-motion/1"); see examples/motion/');
+  const dirs = Object.keys(m.directions), dir = opts.dir ?? dirs[0], d = m.directions[dir];
+  if (!d) throw new PxError(`motion: no direction '${dir}' in ${m.name ?? "the file"}; it has ${dirs.join(" ")}`);
+  const scale = opts.scale ?? 1, [fx, fy] = m.floor ?? [0, 0], [ax, ay] = opts.at ?? [fx, fy];
+  if (!(scale > 0) || ![ax, ay].every(Number.isFinite)) throw new PxError(`motion: scale must be > 0 and at [x, y], got ${JSON.stringify(opts)}`);
+  const names = m.joints;
+  return {
+    name: m.name ?? "",
+    dir,
+    ms: [...d.ms],
+    frames: d.frames.map((f) => Object.fromEntries(names.map((n, i) => [n, [Math.round(ax + (f[i][0] - fx) * scale), Math.round(ay + (f[i][1] - fy) * scale)] as [number, number]]))),
+    depth: d.frames.map((f) => Object.fromEntries(names.map((n, i) => [n, f[i][2] ?? 0]))),
+    contact: d.contact.map((c) => [c[0], c[1]] as [number, number]),
+  };
+}
 
 /**
  * Joints from a detector's output: a { name: [x, y, score?] } map, or OpenPose JSON
