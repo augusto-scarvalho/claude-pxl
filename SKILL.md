@@ -109,6 +109,8 @@ Dynamic lighting (lamps, light blocked by solid layers, sky light, Terraria-styl
 Turning a sprite by an angle that isn't a quarter turn (`angle: 30`), or making 8/16 directions
 (`directions("ship", 16, { from, symmetric })`): read [rotation.md](rotation.md) first. It says which
 angles hold up, which to draw by hand, and why the outline goes on after the turn.
+Drawing a person or a humanoid: read [characters.md](characters.md) first. It has head-to-body
+proportions measured on finished 16–64 px sprites, the build order, face sizes, and 3/4-view rules.
 
 ## Examples
 
