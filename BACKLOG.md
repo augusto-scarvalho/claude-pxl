@@ -70,6 +70,14 @@ characters.md has the workflow they serve.
   joints. It reads `{ name: [x, y, score] }` maps and OpenPose COCO-18 or BODY_25. The detector
   stays outside pxl.
 
+## From the tropical forest
+
+- [ ] **Projected cast shadows**: a placement option such as `stamp(name, x, y, { cast: [0.62, 0.22] })`
+  that lays the asset flat on the ground, sheared about its pivot (each pixel at height h lands
+  h * (kx, ky) from the base), for a `shade` layer. A `silhouette` stamped at an offset is an upright
+  dark copy. For tall objects it reads wrong, and a mirrored palm then throws its shadow the other way.
+  The forest does it with a helper that builds `<name>_shadow` sprites from the plants' own pixels.
+
 ## Later / niche
 
 - [x] Layer blend modes and opacity (`blend`, `opacity`, `palettize`), with the palette caveats in
