@@ -58,11 +58,15 @@ the curves of the clothes exactly.
    - thin lines, like collars and ties;
    - small clutter, like hands and buckles;
    - stray specks in flat areas, which a region-limited `recolor` clears.
-3. **Restore the contour with `inline: "k"`.** It draws one continuous line on the sprite's own edge,
-   so the silhouette stays the original's. Don't patch the outline by hand, and don't erase the edge
-   and use `outline`: that widens the figure by 1 px on each side.
-4. **Consider `selout: true`.** At half size a 1 px outline weighs twice as much as it did at full
-   size. `selout` lightens it on the lit side.
+3. **Close the gaps in the contour, and nothing else.** Halving keeps most of the outline, including
+   its selective colours. It only drops the line where a 2×2 block's vote went to the fill colour.
+   - Keep every edge pixel that is already dark.
+   - Turn only the light edge pixels into the line. A short `(c) => { ... }` step does it: for each
+     pixel next to a transparent one whose key isn't a dark key, `c.px(x, y, "k")`.
+   - `inline` would overwrite the surviving outline too.
+   - `outline` after erasing the edge widens the figure by 1 px on each side.
+4. **Leave alone what survived.** Redraw only what is actually broken. If the user picked a version,
+   don't "improve" its face or details while fixing something else.
 
 ### A base body in the view you need: dress it
 
