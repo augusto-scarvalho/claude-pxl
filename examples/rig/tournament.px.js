@@ -11,6 +11,7 @@ pal({
   A: "#3a6ea8", B: "#5b92c8", C: "#8cbbe2", D: "#c6e2f2",                 // sky, top down
   E: "#f4f8fb", F: "#d6e2ee", K: "#a8bcd2",                               // clouds: lit, body, underside
   P: "#56688a", Q: "#8a9cc0",                                              // slate roofs, hazy
+  M: "#3f6460", u: "#5b8270", p: "#7ea48c", X: "#b2b49c",                 // the castle's hill: woods, slopes, fields, road
   G: "#7d9cb4", H: "#5e8098", I: "#4a6a64",                               // far hills, haze
   i: "#2c5a32", g: "#3e7a3a", h: "#5e9a48", l: "#8cbc5a",                 // grass
   S: "#5e6470", s: "#8a909c", U: "#c4c8d0",                               // castle stone
@@ -21,7 +22,7 @@ pal({
   c: "#e8e2d4", v: "#b8b0a0",                                              // white cloth
   j: "#e2aa7c", J: "#b47a52", z: "#3a2418",                               // skin, hair
 })
-ramps("ABCD", "KFE", "PQ", "IHG", "ighl", "SsU", "fbad", "tTLW", "nNm", "yZ", "vc", "Jj")
+ramps("ABCD", "KFE", "PQ", "Mup", "IHG", "ighl", "SsU", "fbad", "tTLW", "nNm", "yZ", "vc", "Jj")
 
 const W = 320, H = 180, HZ = 104, EYE = 1.6, LIGHT = [0.6, -1]
 const ppm = (y) => (y - HZ) / EYE                       // px per meter on the ground at row y
@@ -100,7 +101,43 @@ sprite("castle", { w: 66, h: 50, pivot: "bottom" },
   vline(6, 1, 6, "S"), poly([7, 1, 11, 2, 7, 4], "w"),
   vline(59, 0, 5, "S"), poly([60, 0, 64, 1, 60, 3], "r"),
   vline(30, 3, 7, "S"), poly([31, 3, 35, 4, 31, 6], "Z"))
-const far = [...hills, stamp("castle", 274, 85)]
+// The hill the castle stands on: its slopes lit from the right, the rock it is built on cropping out
+// under the walls, the road winding down from the gate, woods in clumps on the slopes, a few fields
+// edged with hedges. Greens already cooled by the distance; the haze over it does the rest.
+const HW = 140, HH = 30, sx = HW / 120, sy = HH / 24
+const P = (pts) => pts.map((v, i) => Math.round(i % 2 ? v * sy : v * sx))   // drawn at 120 x 24, laid out at HW x HH
+const HILL = P([0, 24, 18, 16, 34, 10, 46, 6, 54, 4, 66, 4, 76, 6, 88, 11, 104, 17, 120, 22, 120, 24])
+sprite("castle_hill", { w: HW, h: HH, pivot: "bottom" }, (c) => {
+  const r = c.rng(11)
+  c.poly(HILL, "u"); c.relight(undefined, { light: LIGHT, reach: 3 })
+  // fields and their hedges, on the gentler slopes
+  for (const f of [[78, 12, 94, 16, 90, 20, 74, 16], [96, 17, 110, 20, 106, 23, 92, 21], [22, 18, 34, 13, 40, 17, 28, 22], [36, 10, 44, 8, 46, 12, 38, 13]].map(P)) {
+    c.clip(HILL, () => { c.poly(f, "p"); for (let i = 0; i < f.length; i += 2) { const j = (i + 2) % f.length; c.line(f[i], f[i + 1], f[j], f[j + 1], "M") } })
+  }
+  // woods: clumps of crowns, dark with a lit top, thicker low on the slopes
+  for (let i = 0; i < 70; i++) {
+    const x = Math.round(r() * (HW - 2)), y = Math.round(9 + r() * (HH - 10))
+    if (!c.is(x, y, "u") && !c.is(x, y, "p") && !c.is(x, y, "M")) continue
+    if (Math.abs(x - HW / 2) < 16 && y < 14) continue                               // not on the crown
+    c.ellipse(x, y, 2, 1, "M"); c.px(x, y - 1, "u"); c.px(x + 1, y - 1, "p")
+  }
+  // the rock under the walls
+  const crown = P([47, 7, 53, 3, 67, 3, 73, 7, 70, 11, 60, 12, 50, 11])
+  c.poly(crown, "s"); c.relight([crown[0] - 1, 2, 34, 13], { light: LIGHT, reach: 2 })
+  c.line(...P([56, 6, 58, 10]), "S"); c.line(...P([66, 5, 64, 9]), "S")
+  // the road from the gate, winding down to the left
+  c.curve(P([60, 11, 52, 13, 58, 15, 46, 17, 50, 19, 34, 21, 22, 24]), "X")
+})
+const CASTLE_X = 257                                    // in the gap between the two pavilions
+const far = [...hills, stamp("castle_hill", CASTLE_X, 104), stamp("castle", CASTLE_X, 80)]
+// The air between us and all that: a veil of the sky's pale blue laid over the far things only
+// (their silhouettes, so the sky and its clouds stay as they are), which lowers their contrast and
+// cools their colors; and a mist lying in the valley at the hill's foot, thicker low, where the air
+// is denser, half hiding the woods and the road's last bend. Real translucency: new colors, not
+// palette keys (opacity layers leave the palette).
+const veil = [...hills.map((h) => ({ ...h, args: [h.args[0], "D"] })),
+  stamp("castle_hill", CASTLE_X, 104, { silhouette: "D" }), stamp("castle", CASTLE_X, 80, { silhouette: "D" })]
+const valleyMist = [...Array(7).keys()].map((i) => ellipse(20 + i * 48 + (i % 2) * 10, 101 - (i % 3), 34, 3, "D"))
 
 // ---------------------------------------------------------------- the field
 const field = [
@@ -210,11 +247,13 @@ const sand = [
 scene("tournament", { w: W, h: H, bg: "A", world: { horizon: HZ, eye: EYE, light: LIGHT } },
   layer("sky", ...sky),
   layer("far", ...far),
+  layer("veil", { opacity: 0.32 }, ...veil),
+  layer("valley", { opacity: 0.45 }, ...valleyMist, rect(0, 102, W, 2, "D")),
   layer("field", ...field, ...sand),
   layer("stands", { sort: "y" }, stamp("stand_full", 92, 122), stamp("trumpeter", 14, 122), stamp("trumpeter", 184, 122, { flip: "x" }),
-    stamp("pavilion_set", 214, 121), stamp("pavilion_set", 258, 121, { swap: { w: "r" } }), stamp("pavilion_set", 300, 121)),
+    stamp("pavilion_set", 210, 121), stamp("pavilion_set", 304, 121, { swap: { w: "r" } })),
   layer("lists", tile("palisade", 0, 117, 23, 1)),
   layer("shadows", { shade: true }, ...shadows,
-    ...[["stand_full", 92], ["pavilion_set", 214], ["pavilion_set", 258], ["pavilion_set", 300]].map(([n, x]) =>
+    ...[["stand_full", 92], ["pavilion_set", 210], ["pavilion_set", 304]].map(([n, x]) =>
       stamp(n, x, n === "stand_full" ? 122 : 121, { cast: [-0.45, 0.1], silhouette: "k" }))),
   layer("knights", { sort: "y" }, stamp("marshal", 160, 140), ...knights))

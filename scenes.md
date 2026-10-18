@@ -70,6 +70,19 @@ A waterfall that ends in a strip of foam over still water looks pasted on: sprea
 the sides and forward, send rings out, and let a wake ride the current downstream. A figure walks
 on the ground, not over it: tufts at the edges of paths and at the foot of trees and rocks.
 
+## Distance (aerial perspective)
+
+- The air between the viewer and far things lowers their contrast and cools them toward the
+  horizon's sky, more at their foot, where it is denser. Lay a veil of the horizon color over the
+  far things only: their silhouettes (`stamp(n, x, y, { silhouette: "D" })`, the hills' polygons
+  in that color) in a layer with `opacity` 0.25–0.35, so the sky and its clouds stay as they are;
+  then a mist lying low at the foot of the far hills (flat ellipses, `opacity` 0.4–0.5) that half
+  hides what stands there. `PXL describe` shows it worked: the far things' contrast against what is
+  around them drops (`lum 6/5 dE 8`). Opacity makes new colors outside the palette: say so.
+- Detail far things before veiling them (a hill with woods, fields and a road reads as a place; a
+  flat shape stays flat under any haze), and keep them visible: a castle hidden behind the
+  foreground's tents is wasted; open a gap in the foreground for it.
+
 ## Slow motion in a short loop (clouds, mist, drifting things)
 
 - Scrolling a strip that wraps makes the loop as long as its width over the speed: slow clouds
