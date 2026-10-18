@@ -96,7 +96,12 @@ sprite("crypt", { w: CW, h: CH, outline: "k", pivot: "bottom" },
 // A silhouette against the moon: limbs from a seeded walk that drifts back upward, thinning to
 // 1 px twigs; a limb splits now and then, more often the thinner it gets.
 const TREE_W = 140, TREE_H = 150, TREE_X = 100
-sprite("tree_dead", { w: TREE_W, h: TREE_H, outline: "k", pivot: [TREE_X, TREE_H] }, (c) => {
+// roots from the trunk's foot, [dx, dy] from where the trunk meets the ground: one along the ground to
+// each side, snaking over a stone, one reaching toward us on each side (lower: the ground is seen a
+// little from above), one behind. Thick at the trunk, tapering, the tips sunk into the grass.
+const ROOTS = [[[-6, -8], [-9, -3], [-13, -1], [-16, -2], [-21, 0]], [[-3, -4], [-5, 0], [-7, 2], [-10, 3]],
+  [[6, -8], [9, -4], [13, -2], [17, -2], [23, 0]], [[3, -3], [5, 1], [8, 3]], [[1, -7], [4, -5], [8, -5]]]
+sprite("tree_dead", { w: TREE_W, h: TREE_H + 4, outline: "k", pivot: [TREE_X, TREE_H] }, (c) => {
   const r = c.rng(5)
   const limb = (x, y, ang, n, w, depth) => {
     for (let i = 0; i < n; i++) {
@@ -108,13 +113,27 @@ sprite("tree_dead", { w: TREE_W, h: TREE_H, outline: "k", pivot: [TREE_X, TREE_H
         limb(x, y, ang + (r() < 0.5 ? -1 : 1) * (0.5 + r() * 0.6), Math.max(2, Math.round(n * 0.55)), w * 0.75, depth + 1)
     }
   }
-  // trunk flaring into roots
-  c.poly([TREE_X - 12, TREE_H, TREE_X + 13, TREE_H, TREE_X + 6, TREE_H - 6, TREE_X + 4, TREE_H - 44, TREE_X - 4, TREE_H - 44, TREE_X - 6, TREE_H - 6], "x")
+  // the trunk, widening toward the ground in a curve (the buttress), then the roots: one curve per
+  // width, each shorter than the last, so a root thins from 3 px at the trunk to 1 at the tip
+  c.poly([TREE_X - 4, TREE_H - 44, TREE_X + 4, TREE_H - 44, TREE_X + 5, TREE_H - 14, TREE_X + 7, TREE_H - 6, TREE_X + 10, TREE_H - 1,
+    TREE_X + 10, TREE_H, TREE_X - 10, TREE_H, TREE_X - 10, TREE_H - 1, TREE_X - 7, TREE_H - 6, TREE_X - 5, TREE_H - 14], "x")
+  for (const root of ROOTS) {
+    const pts = root.flatMap(([dx, dy]) => [TREE_X + dx, TREE_H + dy])
+    for (let w = 1; w <= 3; w++) {
+      const n = pts.length - 2 * (w - 1)
+      if (n >= 4) c.curve(pts.slice(0, n), "x", { width: w })
+    }
+  }
   limb(TREE_X - 2, TREE_H - 42, -Math.PI / 2 - 0.55, 22, 5, 1)   // the long limb over the moon
   limb(TREE_X + 1, TREE_H - 44, -Math.PI / 2 + 0.05, 18, 5, 1)
   limb(TREE_X + 3, TREE_H - 38, -0.55, 12, 4, 1)
   limb(TREE_X - 3, TREE_H - 30, -Math.PI + 0.35, 9, 3, 2)
   c.vline(TREE_X + 3, TREE_H - 40, 36, "W")                       // moonlit side of the trunk
+  // the moon from above catches the roots' tops and the knuckles where they leave the trunk
+  const tops = []
+  for (let y = TREE_H - 10; y < TREE_H + 4; y++) for (let x = TREE_X - 28; x < TREE_X + 30; x++)
+    if (c.is(x, y, "x") && c.is(x, y - 1, ".") && x !== TREE_X - 4) tops.push([x, y])
+  for (const [x, y] of tops) c.px(x, y, "W")
 })
 
 // ---------------------------------------------------------------- iron fence
@@ -202,13 +221,18 @@ anim("disco", { w: 9, h: 14, frames: 4, fps: 8, outline: "k", pivot: [4, 0] }, (
 })
 
 // ---------------------------------------------------------------- foreground headstones
-// Big and close, cut by the bottom of the frame: they frame the party.
-sprite("tomb_big", { w: 18, h: 26, outline: "k", pivot: "bottom" },
+// Big and close, cut by the bottom of the frame: they frame the party. One stone, two carvings (a
+// mirrored copy would read its epitaph backwards and turn its moonlit side away from the moon).
+const tombBig = (...carving) => [
   rect(0, 8, 18, 18, "S"), ellipse(8, 8, 8, 8, "S"), rect(0, 8, 1, 18, "t"), ellipse(8, 8, 8, 8, "t", true),
   clip([9, 0, 9, 26], ellipse(8, 8, 8, 8, "s", true)), vline(17, 8, 18, "s"), vline(0, 8, 18, "t"),
+  ...carving, dither(0, 21, 18, 5, "S", "G", 0.3)]
+sprite("tomb_big", { w: 18, h: 26, outline: "k", pivot: "bottom" }, ...tombBig(
   text(9, 9, "RIP", "t", { align: "c" }), hline(4, 16, 10, "t"), hline(5, 18, 8, "t"),
-  line(13, 3, 11, 7, "T"), line(11, 7, 12, 10, "T"),
-  dither(0, 21, 18, 5, "S", "G", 0.3))
+  line(13, 3, 11, 7, "T"), line(11, 7, 12, 10, "T")))
+sprite("tomb_big_2", { w: 18, h: 26, outline: "k", pivot: "bottom" }, ...tombBig(
+  vline(8, 4, 10, "t"), hline(5, 7, 7, "t"), hline(4, 16, 10, "t"), hline(5, 18, 8, "t"),
+  line(4, 5, 6, 9, "T"), line(6, 9, 5, 12, "T")))
 sprite("cross_big", { outline: "k", pivot: "bottom" }, `
   ....sss....
   ....tSs....

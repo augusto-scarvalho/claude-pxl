@@ -67,7 +67,10 @@ scene("party", { w: W, h: H, bg: "n" },
   layer("cast", { shade: 2 },
     ...DANCERS.filter(([n]) => n !== "ghost").map(([n, x, y]) => castFrom(DISCO, n, x, y)),
     castFrom(DISCO, "dj", 160, 142), castFrom(DISCO, "speaker", 130, 142), castFrom(DISCO, "speaker", 190, 142, { flip: "x" }),
-    castFrom(FIRE, "witch_body", 96, 156)),
+    castFrom(FIRE, "witch_body", 96, 156),
+    // the tree's, from the moon (high, behind, to the right): it comes toward us and a little left,
+    // most of the crown's falling below the frame
+    stamp("tree_dead", 296, GROUND + 30, { cast: [-0.12, 0.3], silhouette: "k" })),
   // low mist lying on the grass, behind the dancers' legs: banks of puffs drifting right
   layer("mist", { opacity: 0.18 }, (c) => {
     const r = c.rng(9)
@@ -80,7 +83,7 @@ scene("party", { w: W, h: H, bg: "n" },
   }),
   layer("party", { sort: "y" },
     stamp("werewolf", 15, 76),
-    stamp("tomb_big", 12, 188), stamp("cross_big", 306, 186), stamp("tomb_big", 248, 192, { flip: "x" }),
+    stamp("tomb_big", 12, 188), stamp("cross_big", 306, 186), stamp("tomb_big_2", 248, 192),
     stamp("speaker", 130, 142), stamp("speaker", 190, 142, { flip: "x" }), stamp("dj", 160, 142),
     stamp("notes", 118, 112, { rdelay: true }), stamp("notes", 178, 112),
     stamp("witch", 96, 156),
