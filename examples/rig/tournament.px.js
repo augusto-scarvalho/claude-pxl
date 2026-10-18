@@ -104,39 +104,41 @@ sprite("castle", { w: 66, h: 50, pivot: "bottom" },
 // The hill the castle stands on: its slopes lit from the right, the rock it is built on cropping out
 // under the walls, the road winding down from the gate, woods in clumps on the slopes, a few fields
 // edged with hedges. Greens already cooled by the distance; the haze over it does the rest.
-const HW = 140, HH = 30, sx = HW / 120, sy = HH / 24
-const P = (pts) => pts.map((v, i) => Math.round(i % 2 ? v * sy : v * sx))   // drawn at 120 x 24, laid out at HW x HH
-const HILL = P([0, 24, 18, 16, 34, 10, 46, 6, 54, 4, 66, 4, 76, 6, 88, 11, 104, 17, 120, 22, 120, 24])
+// The castle doesn't perch on a peak: it stands on a plateau wider than its walls, the rock it is
+// built on showing as a scarp all round under them, and the slopes fall away from there.
+const HW = 160, HH = 32
+const HILL = [0, 32, 12, 28, 24, 22, 34, 15, 40, 9, 43, 5, 117, 5, 120, 9, 126, 15, 136, 22, 148, 28, 160, 30, 160, 32]
+const SCARP = [[40, 7, 50, 6, 52, 12, 47, 15, 39, 10], [50, 6, 62, 6, 62, 9, 58, 11, 52, 12], [62, 6, 76, 6, 77, 11, 71, 15, 64, 12, 62, 9],
+  [83, 6, 90, 6, 92, 12, 86, 15, 83, 10], [90, 6, 102, 6, 103, 9, 97, 11, 92, 12], [102, 6, 112, 6, 114, 12, 108, 15, 103, 9],
+  [112, 6, 118, 6, 121, 10, 118, 12, 114, 12]]
 sprite("castle_hill", { w: HW, h: HH, pivot: "bottom" }, (c) => {
   const r = c.rng(11)
   c.poly(HILL, "u"); c.relight(undefined, { light: LIGHT, reach: 3 })
-  // fields and their hedges, on the gentler slopes
-  for (const f of [[78, 12, 94, 16, 90, 20, 74, 16], [96, 17, 110, 20, 106, 23, 92, 21], [22, 18, 34, 13, 40, 17, 28, 22], [36, 10, 44, 8, 46, 12, 38, 13]].map(P)) {
+  // fields and their hedges, on the gentler slopes low down
+  for (const f of [[96, 18, 112, 21, 108, 25, 92, 22], [118, 23, 132, 25, 128, 29, 114, 27], [22, 27, 34, 22, 40, 26, 28, 30], [44, 18, 54, 16, 56, 20, 46, 21]]) {
     c.clip(HILL, () => { c.poly(f, "p"); for (let i = 0; i < f.length; i += 2) { const j = (i + 2) % f.length; c.line(f[i], f[i + 1], f[j], f[j + 1], "M") } })
   }
-  // woods: clumps of crowns, dark with a lit top, thicker low on the slopes
-  for (let i = 0; i < 70; i++) {
-    const x = Math.round(r() * (HW - 2)), y = Math.round(9 + r() * (HH - 10))
+  // woods: clumps of crowns, dark with a lit top, thicker low on the slopes, none on the plateau
+  for (let i = 0; i < 90; i++) {
+    const x = Math.round(r() * (HW - 2)), y = Math.round(13 + r() * (HH - 14))
     if (!c.is(x, y, "u") && !c.is(x, y, "p") && !c.is(x, y, "M")) continue
-    if (Math.abs(x - HW / 2) < 16 && y < 14) continue                               // not on the crown
     c.ellipse(x, y, 2, 1, "M"); c.px(x, y - 1, "u"); c.px(x + 1, y - 1, "p")
   }
-  // the rock under the walls
-  const crown = P([47, 7, 53, 3, 67, 3, 73, 7, 70, 11, 60, 12, 50, 11])
-  c.poly(crown, "s"); c.relight([crown[0] - 1, 2, 34, 13], { light: LIGHT, reach: 2 })
-  c.line(...P([56, 6, 58, 10]), "S"); c.line(...P([66, 5, 64, 9]), "S")
-  // the road from the gate, winding down to the left
-  c.curve(P([60, 11, 52, 13, 58, 15, 46, 17, 50, 19, 34, 21, 22, 24]), "X")
-})
+},
+// the scarp: the rock under the walls, a row of crags each lit on its own (the plate way), so they
+// read as faces of rock and not one slab; the grass rim of the plateau stays above them
+...SCARP.map((f) => layer("crag", poly(f, "s"), relight(undefined, { light: LIGHT, reach: 2 }))),
+// the road from the gate, through a cut in the scarp and winding down to the left
+(c) => c.curve([80, 6, 80, 13, 72, 16, 78, 19, 64, 22, 70, 25, 50, 28, 36, 32], "X"))
 const CASTLE_X = 257                                    // in the gap between the two pavilions
-const far = [...hills, stamp("castle_hill", CASTLE_X, 104), stamp("castle", CASTLE_X, 80)]
+const far = [...hills, stamp("castle_hill", CASTLE_X, 104), stamp("castle", CASTLE_X, 78)]
 // The air between us and all that: a veil of the sky's pale blue laid over the far things only
 // (their silhouettes, so the sky and its clouds stay as they are), which lowers their contrast and
 // cools their colors; and a mist lying in the valley at the hill's foot, thicker low, where the air
 // is denser, half hiding the woods and the road's last bend. Real translucency: new colors, not
 // palette keys (opacity layers leave the palette).
 const veil = [...hills.map((h) => ({ ...h, args: [h.args[0], "D"] })),
-  stamp("castle_hill", CASTLE_X, 104, { silhouette: "D" }), stamp("castle", CASTLE_X, 80, { silhouette: "D" })]
+  stamp("castle_hill", CASTLE_X, 104, { silhouette: "D" }), stamp("castle", CASTLE_X, 78, { silhouette: "D" })]
 const valleyMist = [...Array(7).keys()].map((i) => ellipse(20 + i * 48 + (i % 2) * 10, 101 - (i % 3), 34, 3, "D"))
 
 // ---------------------------------------------------------------- the field
