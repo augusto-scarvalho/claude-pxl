@@ -22,6 +22,8 @@
     "examples/tropical/*.{px.js,hex}",
     "examples/tropical/refs/*.{png,txt,md}",
     "examples/halloween/*.{px.js,hex}",
+    "examples/sunset/*.px.js",
+    "examples/rig/*.px.js",
     "examples/motion/*.{json,md}",
     "examples/fonts/*.px.js",
     "SKILL.md",

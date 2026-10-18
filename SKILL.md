@@ -121,8 +121,9 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `tropical/` | 320×240 animated forest: imported trees, river, trail tileset, animals, a walking girl |
 | `halloween/` | 320×180 night party: `lighting()` with many lamps, point-light `cast` shadows, dancing monsters (bones drawn between joints, a cape polygon, `warp`) |
 | `no_magic.px.js` | the largest interior: character anims, fire, many props |
-| `rig/tournament.px.js` | the knights in a scene: ground in perspective with every height checked, a turned rig recolored, a crowd, banners |
-| `rig/knight.px.js` | a 72 px knight built skeleton first: `rig`, `figure`, stand-ins, parts, retouch; turned around; `facing` and `world` read out by describe |
+| `sunset/` | 320×180 backlit scene: long shadows toward us, glowing edges, a tent lit through, a sky that loops slower than the rest |
+| `rig/tournament.px.js` | the knights in a scene: ground in perspective with every height checked, a 96-frame bout with trumpeters and marshal on named cues, pavilions, ground shadows from one sun, distance haze |
+| `rig/knight.px.js` | a 72 px knight built skeleton first: `rig`, `figure`, stand-ins, `plate`-lit parts, `twin` parts for the turned rig; poses from `ik`, slashes with `arc` smears; `facing` and `world` read out by describe |
 | `fonts/font5x7.px.js` | a 5×7 font for titles: `include` it, `text(..., { font: "5x7" })` |
 
 Render one into your own dir to keep the skill clean: `PXL build <skill dir>/examples/shop.px.js

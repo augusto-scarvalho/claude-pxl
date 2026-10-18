@@ -19,6 +19,8 @@ declare global {
     silhouette?: PxColor;
     /** Lay the asset flat on the ground as its cast shadow: a pixel h above the base lands h * [kx, ky] away. */
     cast?: [number, number];
+    /** Where cast measures height from: the pivot's row (default), or each column's lowest pixel (a hem or a base that isn't level). */
+    castBase?: "pivot" | "column";
     /** Attach to a socket of an earlier stamp in this asset, "id.socket"; x, y become an offset from it. */
     at?: string;
     /** Name this stamp for `at` (default: the asset name). */
@@ -38,7 +40,11 @@ declare global {
     corners?: boolean | string;
     iso?: boolean; size?: number; w?: number; h?: number; x?: number; y?: number;
   }
-  interface PxRelight { light?: [number, number]; reach?: number; strength?: number; ramps?: string[] }
+  interface PxRelight {
+    light?: [number, number]; reach?: number; strength?: number; ramps?: string[];
+    /** Pixels at least this exposed (open above and toward the light) take their ramp's lightest key. */
+    glint?: number;
+  }
   interface PxWire extends PxPlace { hang?: string; every?: number; start?: number }
   interface PxText { scale?: number; gap?: number; lead?: number; align?: "l" | "c" | "r"; shadow?: PxColor; font?: string }
   interface PxAssetOpts {
@@ -62,8 +68,24 @@ declare global {
     png?: string; area?: [number, number, number, number]; palettize?: boolean;
     /** Shrink the PNG by a whole factor: each block becomes its most common opaque color. */
     shrink?: number;
+    /** Which way it faces as drawn; flips and turns carry it, describe reads it out. A label: the pixels aren't checked. */
+    facing?: "right" | "left" | "front" | "back";
+    /** Its real height in meters, checked against a scene's `world` scale where it stands. */
+    height?: number;
+    /** Also the asset facing the other way under this name: drawn mirrored before it is lit, so relight keeps the light where it is. */
+    twin?: string;
+    /** Register every frame by a marker pixel of this key (the pelvis): moved sideways so it lands on x (default the middle). */
+    register?: string | { key: string; x?: number };
   }
-  interface PxSceneOpts extends PxAssetOpts { w: number; h: number; bg?: PxColor }
+  interface PxWorld {
+    /** Ground in perspective: the horizon's row and the eye's height in meters; or a flat side view's px per meter. */
+    horizon?: number; eye?: number; scale?: number;
+    /** Where the light comes from: each object's lit side is checked against it. */
+    light?: [number, number];
+    /** Flat side view: the ground's row; what has a height is checked for floating or sinking. */
+    ground?: number;
+  }
+  interface PxSceneOpts extends PxAssetOpts { w: number; h: number; bg?: PxColor; world?: PxWorld }
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong" }
   interface PxFrame { ms?: number; hold?: number }
   interface PxLayerOpts {
@@ -75,6 +97,8 @@ declare global {
     blend?: "normal" | "multiply" | "screen" | "add" | "overlay"; opacity?: number; palettize?: boolean;
     /** Reference / guide layer: shown over the art in previews (true, or a 0..1 strength), left out of the exported image. */
     ref?: boolean | number;
+    /** false: the asset's outline isn't drawn around this layer's pixels (1px ropes, pegs, smears stay 1px). */
+    outline?: false;
   }
   interface PxPose {
     /** Joint (x, y) lands at (x * scale + x, y * scale + y). */
@@ -82,6 +106,36 @@ declare global {
     color?: PxColor; joint?: PxColor | false; min?: number; bones?: [string, string][];
     /** Limbs colored by side: left arm magenta, right green, left leg orange, right cyan. */
     sides?: boolean;
+  }
+
+  interface PxSlot {
+    /** The joint where the part's pivot lands, and the part's box (its size, and the stand-in's until it is drawn). */
+    at: [number, number]; size: [number, number]; pivot?: [number, number];
+    /** The body's side: "l" its left, "r" its right; none for the middle. */
+    side?: "l" | "r";
+    /** Fine order (higher = in front) on top of far -100 / middle 0 / near +100; out: how far outside its limb. */
+    z?: number; out?: number;
+    /** The part's asset (default "<rig>_<slot>"); on: its joint is a socket of another slot's part ("arm_l.hand"). */
+    part?: string; on?: string;
+    /** A part with two faces, each its own drawing; the one turned to us shows. */
+    faces?: { outer?: string; inner?: string; edge?: string }; facesTo?: "left" | "right" | "front" | "back";
+    /** Two of its sockets and two of another slot's whose lines must run parallel. */
+    parallel?: [string, string, string, string];
+  }
+  interface PxRigOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "flip" | "rot" | "angle" | "mx" | "my"> {
+    w: number; h: number; facing: "right" | "left" | "front" | "back";
+    slots: Record<string, PxSlot>;
+    /** false: stand-ins only (a blocking pass); guide: false leaves out the skeleton ref layer. */
+    parts?: boolean; guide?: boolean;
+    /** Where the light its parts are drawn under comes from; far: steps darker for the far side's parts. */
+    light?: [number, number]; far?: number;
+    /** Also the rig facing the other way: its name, or { name, parts: [from, to] } to look its parts up under another prefix. */
+    turn?: string | { name: string; parts?: [string, string] };
+  }
+  interface PxFigure {
+    head: number; headW: number; eyes: number; chin: number; shoulders: number; chest: number; elbows: number;
+    waist: number; crotch: number; wrists: number; knees: number; ankles: number; sole: number;
+    shoulderW: number; hipW: number;
   }
 
   interface PxLamp { r?: number; color?: PxColor; power?: number; z?: number }
@@ -96,8 +150,10 @@ declare global {
 
   interface PxCanvas {
     readonly w: number; readonly h: number; readonly seed: number;
-    /** Time in ms; inside an anim also the frame index, frame count and frame / frames. */
+    /** Time in ms; inside an anim (or a scene animated by what it places) also the frame index, frame count and frame / frames. */
     readonly t: number; readonly frame: number; readonly frames: number; readonly phase: number;
+    /** Drawing a twin: every x lands mirrored (for the few choices a mirror doesn't make by itself). */
+    readonly mirrored: boolean;
     is(x: number, y: number, keys: string): boolean;
     key(x: number, y: number): string;
     get(x: number, y: number): number;
@@ -105,6 +161,8 @@ declare global {
     /** An asset's size as it would be placed (a group's first member), for layouts. */
     size(name: string): { w: number; h: number };
     clip(where: PxRegion, fn: () => void): void;
+    /** Draw on a plate of its own, lit there with relight's opts, then lay it down. */
+    plate(fn: () => void, opts?: PxRelight): void;
     px(x: number, y: number, c: PxColor): void;
     rect(x: number, y: number, w: number, h: number, c: PxColor): void;
     box(x: number, y: number, w: number, h: number, c: PxColor): void;
@@ -113,6 +171,7 @@ declare global {
     vline(x: number, y: number, len: number, c: PxColor): void;
     circ(cx: number, cy: number, r: number, c: PxColor): void;
     ring(cx: number, cy: number, r: number, c: PxColor): void;
+    arc(cx: number, cy: number, r: number, from: number, to: number, c: PxColor, opts?: { inner?: number; taper?: boolean }): void;
     ellipse(cx: number, cy: number, rx: number, ry: number, c: PxColor, ring?: boolean): void;
     poly(points: number[], c: PxColor): void;
     curve(points: number[], c: PxColor, opts?: { width?: number; closed?: boolean }): void;
@@ -183,6 +242,17 @@ declare global {
     name: string; dir: string; ms: number[]; frames: Record<string, [number, number]>[]; depth: Record<string, number>[]; contact: [number, number][];
   };
   function clip(where: PxRegion, ...items: PxItem[]): PxOp;
+  /** The items drawn on a plate of their own, lit there with relight (only the plate's edges), and laid down. */
+  function plate(opts: PxRelight, ...items: PxItem[]): PxOp;
+  function plate(...items: PxItem[]): PxOp;
+  /** A figure built skeleton first: stand-ins in slots until each part is drawn (characters.md §11). */
+  function rig(name: string, opts: PxRigOpts, ...retouch: PxItem[]): void;
+  /** A standing figure's landmark rows from its height in px and heads tall (default 7.5). */
+  function figure(h: number, heads?: number): PxFigure;
+  /** Two bones from (0, 0) reaching for the point: [joint, end]; bend 1 (default) or -1 picks the side the joint bends to. */
+  function ik(a: number, b: number, target: [number, number], bend?: number): [[number, number], [number, number]];
+  /** Is there an asset or group of that name yet (a generated part made once). */
+  function has(name: string): boolean;
 
   function px(x: number, y: number, c: PxColor): PxOp;
   function rect(x: number, y: number, w: number, h: number, c: PxColor): PxOp;
@@ -192,6 +262,8 @@ declare global {
   function vline(x: number, y: number, len: number, c: PxColor): PxOp;
   function circ(cx: number, cy: number, r: number, c: PxColor): PxOp;
   function ring(cx: number, cy: number, r: number, c: PxColor): PxOp;
+  /** Part of a ring from angle `from` to `to` (degrees, clockwise from pointing right); inner: down to that radius; taper: a smear. */
+  function arc(cx: number, cy: number, r: number, from: number, to: number, c: PxColor, opts?: { inner?: number; taper?: boolean }): PxOp;
   function ellipse(cx: number, cy: number, rx: number, ry: number, c: PxColor, ring?: boolean): PxOp;
   function poly(points: number[], c: PxColor): PxOp;
   /** A smooth curve through the points (Catmull-Rom), pixel-perfect at width 1; closed loops it. */

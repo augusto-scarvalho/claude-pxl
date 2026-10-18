@@ -67,7 +67,7 @@ function drawsWithFunctions(items: Item[]): boolean {
 }
 
 /** Allowed option keys of ops whose last argument is an options object. */
-const OP_OPTS: Record<string, string[]> = {
+export const OP_OPTS: Record<string, string[]> = {
   lamp: ["r", "color", "power", "z"],
   curve: ["width", "closed"],
   arc: ["inner", "taper"],
@@ -78,7 +78,7 @@ const OP_OPTS: Record<string, string[]> = {
   glow: ["where", "r", "strength", "color", "bands", "ramp"],
 };
 
-const ASSET_OPTS: Record<AssetKind, string[]> = {
+export const ASSET_OPTS: Record<AssetKind, string[]> = {
   sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "facing", "height", "twin", "register"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world"],
   anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir", "facing", "height", "twin", "register"],
@@ -86,7 +86,7 @@ const ASSET_OPTS: Record<AssetKind, string[]> = {
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
 const MAX_LOOP = 60000;
-const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline"];
+export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline"];
 const SHEET_OPTS = ["cols", "pad", "extrude"];
 
 function checkArgs(name: string, args: unknown[]): void {

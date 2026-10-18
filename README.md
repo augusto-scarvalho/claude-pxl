@@ -155,7 +155,14 @@ pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--ase
 pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
 pxl ascii <art.px.js> <name>     print an asset as palette keys with x/y rulers
 pxl list  <art.px.js>            list assets, groups and sheets with source locations
+pxl describe <art.px.js> <name>  a whole scene as text: what is where, what covers it, how it moves
+pxl check <art.px.js>            every check describe makes, on every frame: warnings only
+pxl shot <art.px.js> <name>      frames side by side, a region enlarged, --vs HEAD --diff
+pxl steps <art.px.js> <name>     how it was painted, step by step; --at x,y: what painted that pixel
+pxl help [name]                  what the reference says about an op or option
 ```
+
+`pxl` alone prints every command with its options.
 
 `pxl` means `node bin/pxl.js` in a clone, or `npx github:crsolver/claude-pxl`. Art files can be `.js` or
 `.ts` (`types/pxl.d.ts` gives editor completion).
@@ -170,6 +177,8 @@ pxl list  <art.px.js>            list assets, groups and sheets with source loca
   pixel font, `scatter` brushes, tilemaps, random groups with reproducible seeds.
 - **Scenes**: layers, cast-shadow and light layers, per-layer PNG export.
 - **Animation**: frames as patches over a base sprite → strips + JSON tags + GIF.
+- **Characters**: `rig()` skeleton first (slots, stand-ins, parts ordered by facing, turned with
+  `twin` parts), `ik` for poses, `register` by the pelvis (see [`characters.md`](characters.md)).
 - **Lighting** (optional): lamps, glow, normal-based relief (see [`lighting.md`](lighting.md)).
 - **Errors** point at `file:line:col` and the asset/layer/op path, with "did you mean…" hints.
 
