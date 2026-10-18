@@ -302,17 +302,30 @@ us (its front × its top points at us); facing left, its left. The rig draws the
 behind the middle (-100) and the near side's in front (+100); `z` adds to that and is the body's own
 layering, the same for both sides (both legs under the tabard: `z: -50`), so a rig turned around
 reorders correctly. Don't flip a finished figure to turn it: a mirror moves its sword to the other
-hand (`PXL describe` says "mirrored"). Give it its own rig facing the other way, the slots mirrored
-and the parts flipped (`knight_l` in the example). In a side view a limb's drawing belongs to its
-depth more than to its side (the near arm drawn whole, the far one mostly hidden), so a rig turned
-around may need its new near limbs drawn.
+hand (`PXL describe` says "mirrored"). Give the rig `turn: "<name>_l"`: the same rig facing the
+other way, the joints mirrored, each slot's part flipped unless you draw `<name>_l_<slot>` (a near
+limb seen from its own side), the retouch mirrored, and both side by side in `<name>_turnaround`.
+A flipped part carries its light to the other side, so draw each part as a flat shape and light it
+with `relight({ light, reach, glint })` after the flip (`part()` in the example does both versions);
+thin parts (a 2 px blade) want `reach: 1`, or each pixel sees open space on both sides. `far: 1`
+darkens the far side by depth, not by side: turned, the other leg darkens. In a side view a limb's
+drawing belongs to its depth more than to its side (the near arm drawn whole, the far one mostly
+hidden), so a turned rig may need its new near limbs drawn.
 
-**What is checked, and what isn't.** `facing` is a label you write, not something pxl reads off the
-pixels. pxl follows it exactly through flips and turns, and lettering is tracked from `text()`
-itself, so a mirrored sign is always caught. Give each part with a front its own `facing` too: the
-RIG section then calls out a part that faces another way than the rig (a head drawn facing left
-on a body facing right). A drawing that faces left while its label says right is not caught: look
-at each part's preview once when you label it, while it is small and alone.
+**What is checked, and what isn't.** `facing` is a label you write; pxl follows it exactly through
+flips and turns. What reads the pixels:
+- lettering is tracked from `text()` itself: a mirrored sign is always caught;
+- a part's `front` socket, put on the pixel that is its front (the visor, the toe, the fist, the
+  blade's tip), has to sit on the drawing, on the half its `facing` names: a drawing that faces the
+  other way than its label is caught, as long as the marker is on the right pixel;
+- the lit side, read off each part's rim, against the rig's or the scene's `light` (thin diagonals,
+  where left and top can't be told apart, are left unread);
+- in a rig, a part labelled another way than the rig (a head facing left on a body facing right).
+For the labels themselves, `PXL blind <file> <rig>` writes the parts unnamed and shuffled for a
+reader who doesn't know the labels, and `--check answers.json` compares. A reader that is another
+Claude may share your blind spots (left/right is exactly where they hide): prefer a different model,
+or ask the user, and look at a few yourself. The reader checks which way a part faces in the picture,
+not which of the body's arms it is: that is the slot's `side`, and the rig's near/far follows from it.
 
 `examples/rig/knight.px.js`: a 72 px knight in three stages (`knight_blocking`, `knight_parts`,
 `knight`), the same knight turned left, and both next to a flipped copy in a scene with a world

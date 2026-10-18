@@ -1,7 +1,7 @@
 // Project: the registry an art file fills in, plus the lazy, cached, cycle-checked resolver.
 import { type BuildCtx, type BuildOut, buildAsset, drawnFrames, gcd } from "./build.ts";
 import { type Canvas, OPS } from "./canvas.ts";
-import { type RigDef, drawGuide, drawParts, figure, readRig } from "./rig.ts";
+import { type RigDef, drawGuide, drawParts, figure, readRig, turnRig } from "./rig.ts";
 import { TRANSPARENT, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
@@ -64,7 +64,7 @@ export const SIGNATURES: Record<string, string> = {
 const OP_OPTS: Record<string, string[]> = {
   lamp: ["r", "color", "power", "z"],
   curve: ["width", "closed"],
-  relight: ["light", "reach", "strength", "ramps"],
+  relight: ["light", "reach", "strength", "ramps", "glint"],
   rampmap: ["where", "hue"],
   bump: ["w", "depth", "on", "where"],
   lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "shape", "relief", "skyDir"],
@@ -363,15 +363,31 @@ export class Project implements BuildCtx {
     env.rig = (name: unknown, opts: unknown, ...retouch: unknown[]) => {
       const loc = this.callerLoc();
       if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError('rig("name", { w, h, facing, slots: { torso: { at, size }, ... } }, ...retouch items)', loc);
-      const { slots, guide = true, parts, ...rest } = opts as Record<string, unknown>;
-      const rig = readRig(name, rest.facing, slots, parts, loc);
-      checkKeys(`rig '${name}'`, rest, ASSET_OPTS.sprite.filter((k) => !["base", "png", "area", "palettize", "shrink"].includes(k)), loc);
+      const { slots, guide = true, parts, light, turn, far, ...rest } = opts as Record<string, unknown>;
+      const rig = readRig(name, rest.facing, slots, parts, light, far, loc);
+      checkKeys(`rig '${name}'`, rest, ASSET_OPTS.sprite.filter((k) => !["base", "png", "area", "palettize", "shrink", "flip", "rot", "angle", "mx", "my"].includes(k)), loc);
       const layer = (n: string, o: LayerOpts, items: Item[]): Layer => ({ __layer: true, name: n, opts: o, items, loc });
-      const items: Item[] = [layer("parts", {}, [(c: Canvas) => drawParts(rig, c)])];
-      if (guide) items.push(layer("skeleton", { ref: true }, [(c: Canvas) => drawGuide(rig, c)]));
-      if (retouch.length) items.push(layer("retouch", {}, checkItems(`rig '${name}' retouch`, retouch, loc)));
-      define("sprite", name, [rest, ...items]);
-      this.rigs.set(name, rig);
+      const stampOp = (...args: unknown[]): Op => ({ __op: true, name: "stamp", args, loc });
+      // the retouch is a sprite of its own, the rig's size, so a turned rig can stamp it mirrored
+      const touch = `_${name}_retouch`;
+      if (retouch.length) define("sprite", touch, [{ w: rest.w, h: rest.h }, ...checkItems(`rig '${name}' retouch`, retouch, loc)]);
+      const make = (r: RigDef, o: Record<string, unknown>, flip: boolean) => {
+        const items: Item[] = [layer("parts", {}, [(c: Canvas) => drawParts(r, c)])];
+        if (guide) items.push(layer("skeleton", { ref: true }, [(c: Canvas) => drawGuide(r, c)]));
+        if (retouch.length) items.push(layer("retouch", {}, [stampOp(touch, 0, 0, flip ? { flip: "x" } : {})]));
+        define("sprite", r.name, [o, ...items]);
+        this.rigs.set(r.name, r);
+      };
+      make(rig, rest, false);
+      if (turn === undefined) return;
+      // turned: the same rig mirrored, facing the other way; and both side by side
+      const W = rest.w as number, H = rest.h as number;
+      if (typeof turn !== "string" || !turn) throw new PxError(`rig '${name}': turn names the rig facing the other way (e.g. turn: "${name}_l")`, loc);
+      if (!(Number.isInteger(W) && Number.isInteger(H))) throw new PxError(`rig '${name}': turn needs { w, h }`, loc);
+      const t = turnRig(rig, turn, W), pv = rest.pivot, mp = (p: unknown) => (Array.isArray(p) ? [W - p[0], p[1]] : p);
+      const so = rest.sockets as Record<string, [number, number]> | undefined;
+      make(t, { ...rest, facing: t.facing, pivot: mp(pv), ...(so ? { sockets: Object.fromEntries(Object.entries(so).map(([k, p]) => [k, mp(p)])) } : {}) }, true);
+      define("sprite", `${name}_turnaround`, [{ w: 2 * W + 4, h: H }, (c: Canvas) => { c.put(c.asset(name), 0, 0); c.put(c.asset(turn), W + 4, 0); }]);
     };
 
     for (const name of [...OPS, "clip", "lighting", "glow"]) {

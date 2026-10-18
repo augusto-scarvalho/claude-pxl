@@ -127,6 +127,10 @@ export interface World {
   horizon?: number;
   eye?: number;
   scale?: number;
+  /** Where the scene's light comes from, [x, y] (e.g. [0.6, -1]: the top right): each object's lit side is checked against it. */
+  light?: [number, number];
+  /** Flat side view: the ground's row; what stands (has a height) is checked for floating or sinking. */
+  ground?: number;
 }
 
 export type AssetKind = "sprite" | "scene" | "anim";
@@ -275,6 +279,11 @@ export interface RelightOpts {
   strength?: number;
   /** Ramps, dark to light, to step along (default: the palette's ramps). */
   ramps?: string[];
+  /**
+   * Pixels this exposed to the light or more take their ramp's lightest key: a glint on the
+   * corners facing it (with the default light, 1.5 = open both above and toward the light's side).
+   */
+  glint?: number;
 }
 
 /** Options of pose(): where the joints land and how they're drawn. */

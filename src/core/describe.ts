@@ -11,6 +11,7 @@ import type { Placement } from "./canvas.ts";
 import { type Color, TRANSPARENT, toHex } from "./color.ts";
 import { Img, type Orient } from "./image.ts";
 import type { World } from "./model.ts";
+import { dirWords, frontWords, lightWords } from "./checks.ts";
 import type { Palette } from "./palette.ts";
 import { replay } from "./steps.ts";
 
@@ -150,6 +151,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
   if (opts.note) out.push(opts.note);
   if (opts.extra?.length) out.push(...opts.extra);
   const wo = opts.world;
+  if (wo?.light) out.push(`LIGHT: from ${dirWords(wo.light[0], wo.light[1])}; each object's lit side (from its edges) is checked against it.`);
   if (wo?.scale !== undefined) out.push(`WORLD: flat side view, ${wo.scale} px per meter (a 1.8 m figure is ${Math.round(1.8 * wo.scale)} px tall).`);
   else if (wo?.horizon !== undefined && wo.eye)
     out.push(`WORLD: ground in perspective, horizon at y ${wo.horizon}, eye ${wo.eye} m up: a thing standing on row y is (y - ${wo.horizon}) / ${wo.eye} px per meter, ` +
@@ -347,6 +349,17 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       const turned = p.img.orient && (p.img.orient.f || p.img.orient.mirrored || tiltOf(p.img.orient)) ? orientWords(p.img.orient) : "";
       let size = "";
       const bb = p.img.bounds();
+      // pixel checks: its front marker against its facing, its lit side against the scene's light, its
+      // feet against where it was stamped (a pivot below the sole floats it) and the ground
+      const checks = [frontWords(p.img), wo?.light ? lightWords(p.img, wo.light) : ""];
+      const pv = p.img.pivot;
+      if (bb && p.img.meters) {   // what has a real height stands on the ground: a ghost may float
+        const feet = p.y + bb.y + bb.h, off = pv ? Math.round(p.y + pv[1] - feet) : 0;
+        if (Math.abs(off) >= 2) checks.push(`WARNING: its feet are ${Math.abs(off)} px ${off > 0 ? "above" : "below"} where it stands (its pivot is ${Math.abs(off)} px ${off > 0 ? "below its sole" : "above it"}): it ${off > 0 ? "floats" : "sinks"}`);
+        if (wo?.ground !== undefined && p.img.meters && Math.abs(wo.ground - feet) >= 2)
+          checks.push(`WARNING: its feet (y ${feet}) are ${Math.abs(wo.ground - feet)} px ${wo.ground > feet ? "above" : "below"} the ground (y ${wo.ground})`);
+      }
+      const check = checks.filter(Boolean).join("; ");
       if (wo && p.img.meters && bb) {
         const lying = p.img.orient && Math.abs(Math.abs(tiltOf(p.img.orient)) - 90) <= 45;
         const drawn = lying ? bb.w : bb.h, feet = p.y + bb.y + bb.h, ppm = pxPerMeter(wo, feet);
@@ -367,12 +380,12 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
         const bh = coveredBy.length ? `behind ${[...sh.cover].filter(([o]) => isMain(o)).map(([o]) => label(o)).join(",")}` : "";
         const sm = st.replace("stands out: brightness ", "lum ").replace(" vs ", "/").replace(" around, color difference ", " dE ");
         const mm = mo.replace("animated: ", "anim ").replace("% of its drawing changes per frame", "%").replace(/, shifts .*$/, " moving");
-        out.push(out1 + "; " + [n1, fr, bh, sm, mm, turned, size.replace(/ where it stands \(y \d+\)/, "")].filter(Boolean).join("; "));
+        out.push(out1 + "; " + [n1, fr, bh, sm, mm, turned, size.replace(/ where it stands \(y \d+\)/, ""), check].filter(Boolean).join("; "));
         continue;
       }
       out.push("      " + rel.join("; "));
       if (st || mo) out.push("      " + [st, mo].filter(Boolean).join("; "));
-      if (turned || size) out.push("      " + [turned && "turned: " + turned, size].filter(Boolean).join("; "));
+      if (turned || size || check) out.push("      " + [turned && "turned: " + turned, size, check].filter(Boolean).join("; "));
     }
     out.push("");
   }

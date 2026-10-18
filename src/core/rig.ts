@@ -6,7 +6,9 @@
 // so a left arm never ends up in front because of a left/right mix-up. Retouches go on top.
 import type { Canvas } from "./canvas.ts";
 import type { Img } from "./image.ts";
+import { TRANSPARENT } from "./color.ts";
 import { PxError } from "./errors.ts";
+import { frontWords, lightWords } from "./checks.ts";
 
 export interface Slot {
   /** The joint in the rig where the part's pivot lands. */
@@ -25,6 +27,8 @@ export interface Slot {
   z?: number;
   /** The part's asset (default "<rig>_<slot>"). */
   part?: string;
+  /** A turned rig's slot: the part of the rig it was turned from, flipped, while it has none of its own. */
+  mirrorOf?: string;
 }
 
 export interface RigDef {
@@ -33,6 +37,12 @@ export interface RigDef {
   slots: [string, Slot][];
   /** false: stand-ins only, a blocking pass (no part is looked up). */
   parts: boolean;
+  /** Where the light its parts are drawn under comes from, [x, y]: each part's lit side is checked against it. */
+  light?: [number, number];
+  /** Steps darker along the ramps for the far side's parts (a turned rig's far limbs darken with it). */
+  far?: number;
+  /** Turned from this rig (the slots mirrored). */
+  from?: string;
   loc?: string;
 }
 
@@ -40,7 +50,9 @@ const SLOT_KEYS = ["at", "size", "pivot", "side", "z", "part"];
 const pair = (v: unknown) => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
 
 /** Check a rig's options; the slots in the order they were written. */
-export function readRig(name: string, facing: unknown, slots: unknown, parts: unknown = true, loc?: string): RigDef {
+export function readRig(name: string, facing: unknown, slots: unknown, parts: unknown = true, light?: unknown, far?: unknown, loc?: string): RigDef {
+  if (far !== undefined && !(Number.isInteger(far) && (far as number) >= 0)) throw new PxError(`rig '${name}': far is how many steps darker the far side's parts are (e.g. 1), got ${JSON.stringify(far)}`, loc);
+  if (light !== undefined && !pair(light)) throw new PxError(`rig '${name}': light must be [x, y], where the light comes from (e.g. [0.6, -1]: the top right), got ${JSON.stringify(light)}`, loc);
   if (typeof parts !== "boolean") throw new PxError(`rig '${name}': parts must be true or false (stand-ins only, a blocking pass), got ${JSON.stringify(parts)}`, loc);
   if (!["right", "left", "front", "back"].includes(facing as string))
     throw new PxError(`rig '${name}' needs facing: "right", "left", "front" (toward us) or "back": it decides which side's parts are near`, loc);
@@ -59,7 +71,21 @@ export function readRig(name: string, facing: unknown, slots: unknown, parts: un
     if (s.z !== undefined && !Number.isFinite(s.z)) throw bad(`z must be a number, got ${JSON.stringify(s.z)}`);
     out.push([k, s]);
   }
-  return { name, facing: facing as RigDef["facing"], slots: out, parts, loc };
+  return { name, facing: facing as RigDef["facing"], slots: out, parts, light: light as [number, number] | undefined, far: far as number | undefined, loc };
+}
+
+/**
+ * The same rig facing the other way, `w` wide: every joint and pivot mirrored. Each slot's part is
+ * "<turned>_<slot>" when that is drawn (a near limb seen from its own side, a part relit for the
+ * light), else the original's part flipped. The light stays where it was: it doesn't turn with it.
+ */
+export function turnRig(rig: RigDef, name: string, w: number): RigDef {
+  if (rig.facing !== "right" && rig.facing !== "left") throw new PxError(`rig '${rig.name}': turn mirrors a side view, so it needs facing "right" or "left"`, rig.loc);
+  const slots = rig.slots.map(([k, s]): [string, Slot] => {
+    const [px, py] = s.pivot ?? [s.size[0] / 2, 0];
+    return [k, { ...s, at: [w - s.at[0], s.at[1]], pivot: [s.size[0] - px, py], part: undefined, mirrorOf: partOf(rig, k, s) }];
+  });
+  return { ...rig, name, facing: rig.facing === "right" ? "left" : "right", slots, from: rig.name };
 }
 
 /** "near", "far" or "" (middle, or a front/back view where both sides show) for a body side. */
@@ -91,7 +117,14 @@ function corner(s: Slot, pivot?: [number, number]): [number, number] {
   return [Math.round(s.at[0] - px), Math.round(s.at[1] - py)];
 }
 
-const drawn = (rig: RigDef, c: Canvas, part: string) => rig.parts && c.exists(part);
+/** What fills a slot: its own part, or (a turned rig) the original's flipped; undefined: a stand-in. */
+function source(rig: RigDef, has: (n: string) => boolean, slot: string, s: Slot): { part: string; flip: boolean } | undefined {
+  if (!rig.parts) return undefined;
+  const own = partOf(rig, slot, s);
+  if (has(own)) return { part: own, flip: false };
+  if (s.mirrorOf && has(s.mirrorOf)) return { part: s.mirrorOf, flip: true };
+  return undefined;
+}
 
 /**
  * Draw the parts back to front: each drawn part on its joint, a stand-in box where none is drawn
@@ -99,12 +132,15 @@ const drawn = (rig: RigDef, c: Canvas, part: string) => rig.parts && c.exists(pa
  */
 export function drawParts(rig: RigDef, c: Canvas): void {
   for (const [slot, s] of ordered(rig)) {
-    const part = partOf(rig, slot, s);
-    if (drawn(rig, c, part)) {
-      const img = c.asset(part);
+    const src = source(rig, (n) => c.exists(n), slot, s);
+    if (src) {
+      const opts = src.flip ? { flip: "x" as const } : {}, img = c.asset(src.part, opts);
       const [x, y] = corner(s, img.pivot);
       // stamped by its top-left: the pivot (its own, or the slot's) already worked out
-      c.stamp(part, x + Math.floor(img.pivot?.[0] ?? 0), y + Math.floor(img.pivot?.[1] ?? 0), { id: slot });
+      c.stamp(src.part, x + Math.floor(img.pivot?.[0] ?? 0), y + Math.floor(img.pivot?.[1] ?? 0), { ...opts, id: slot });
+      // the far side a step or more darker, on this part's own pixels only
+      if (rig.far && depthOf(rig.facing, s.side) === "far")
+        c.shade((px, py) => img.get(px - x, py - y) !== TRANSPARENT, rig.far);
       continue;
     }
     const [x, y] = corner(s), [fill, edge] = standIn(rig, s), [w, h] = s.size;
@@ -118,7 +154,7 @@ export function drawParts(rig: RigDef, c: Canvas): void {
 /** The skeleton over the art, for previews: each drawn part's slot box in its side's color, and the joints. */
 export function drawGuide(rig: RigDef, c: Canvas): void {
   for (const [slot, s] of ordered(rig)) {
-    if (!drawn(rig, c, partOf(rig, slot, s))) continue;
+    if (!source(rig, (n) => c.exists(n), slot, s)) continue;
     const [x, y] = corner(s);
     c.box(x, y, s.size[0], s.size[1], standIn(rig, s)[0]);
   }
@@ -138,7 +174,7 @@ function facingOf(img: Img): RigDef["facing"] | undefined {
  * drawn. A part that says which way it faces is checked against the rig: a head drawn facing left
  * on a body facing right is called out (the labels are what is checked, not the pixels).
  */
-export function rigLines(rig: RigDef, image: (part: string) => Img | undefined): string[] {
+export function rigLines(rig: RigDef, has: (part: string) => boolean, image: (part: string, flip: boolean) => Img): string[] {
   const side = (s: Slot) => {
     if (!s.side) return "middle";
     const d = depthOf(rig.facing, s.side), its = s.side === "r" ? "its right" : "its left";
@@ -146,19 +182,22 @@ export function rigLines(rig: RigDef, image: (part: string) => Img | undefined):
     const ours = (rig.facing === "front") === (s.side === "r") ? "left" : "right";
     return `${its}, on our ${ours}`;
   };
-  const out = [`RIG (facing ${rig.facing}; slots back to front; each part's pivot, or the slot's, sits on the joint):`];
+  const lit = rig.light ? `; parts lit from ${rig.light[0] > 0 ? "the right" : "the left"}${rig.light[1] < 0 ? ", above" : ""}` : "";
+  const out = [`RIG (facing ${rig.facing}${rig.from ? `, turned from '${rig.from}'` : ""}${lit}; slots back to front; each part's pivot, or the slot's, sits on the joint):`];
   let missing = 0;
   for (const [slot, s] of ordered(rig)) {
-    const part = partOf(rig, slot, s), img = rig.parts ? image(part) : undefined, got = img && [img.w, img.h];
+    const part = partOf(rig, slot, s), src = source(rig, has, slot, s), img = src && image(src.part, src.flip), got = img && [img.w, img.h];
     const [x, y] = corner(s), box = `${s.size[0]}x${s.size[1]} at x ${x}-${x + s.size[0] - 1}, y ${y}-${y + s.size[1] - 1}`;
+    const name = src?.flip ? `'${src.part}' flipped (no '${part}' of its own)` : `'${part}'`;
     let state: string;
     if (!rig.parts) { missing++; state = "stand-in (blocking pass)"; }
     else if (!got) { missing++; state = `not drawn yet: stand-in box (draw '${part}' ${s.size[0]}x${s.size[1]})`; }
-    else if (got[0] === s.size[0] && got[1] === s.size[1]) state = `drawn '${part}'`;
-    else state = `drawn '${part}' at ${got[0]}x${got[1]}, not the slot's ${s.size[0]}x${s.size[1]}`;
+    else if (got[0] === s.size[0] && got[1] === s.size[1]) state = `drawn ${name}`;
+    else state = `drawn ${name} at ${got[0]}x${got[1]}, not the slot's ${s.size[0]}x${s.size[1]}`;
     const pf = img && facingOf(img);
     if (pf && pf !== rig.facing) state += `; WARNING: it faces ${pf}, the rig faces ${rig.facing}`;
     else if (pf && img?.orient?.mirrored) state += "; a mirror image (flipped)";
+    if (img) for (const w of [frontWords(img), rig.light ? lightWords(img, rig.light) : ""]) if (w) state += "; " + w;
     out.push(`  ${slot}: ${box}, joint ${s.at[0]},${s.at[1]}; ${side(s)}; ${state}`);
   }
   out.push(`  ${rig.slots.length - missing} of ${rig.slots.length} parts drawn`);

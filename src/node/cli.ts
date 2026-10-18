@@ -3,7 +3,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { PxError, wrap } from "../core/errors.ts";
 import { type Color, TRANSPARENT, toHex } from "../core/color.ts";
 import { Palette } from "../core/palette.ts";
-import type { Img } from "../core/image.ts";
+import { Img } from "../core/image.ts";
 import { type Snapshot, describe } from "../core/describe.ts";
 import type { BuildOut } from "../core/build.ts";
 import type { World } from "../core/model.ts";
@@ -42,6 +42,11 @@ const USAGE = `pxl — pixel-art DSL
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
       after each; --sheet also writes a thumbnail per step to _preview/<name>_steps.png.
+  pxl blind <art.px.js> <name...> [--out DIR]   |   pxl blind <art.px.js> --check answers.json
+      Check facing labels against the drawings with a reader who doesn't know them: writes each
+      asset (a rig: each of its parts) to <out>/_blind/<n>.png, shuffled and unnamed, and the
+      labels to key.json. Show only the images to the reader, ask which way each one faces (right,
+      left, front = toward us, back), save the answers as {"1": "right", ...}; --check compares.
   pxl compare <art.px.js> <name> <ref.png> [--shrink N] [--offset x,y]
       Silhouette check: each row's opaque extents in the asset and in a reference image (shrunk
       by N first, placed at x,y), and how many px wider the asset is on each side.
@@ -65,6 +70,7 @@ interface Args {
   sheet?: boolean;
   shrink?: number;
   offset?: [number, number];
+  check?: string;
 }
 
 function parse(argv: string[]): Args {
@@ -98,6 +104,7 @@ function parse(argv: string[]): Args {
     else if (v === "--cell") a.cell = Number(val());
     else if (v === "--diff") a.diff = true;
     else if (v === "--brief") a.brief = true;
+    else if (v === "--check") a.check = val();
     else if (v === "-h" || v === "--help") a.cmd = "usage";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -182,7 +189,7 @@ export async function main(argv: string[]): Promise<number> {
           pal = def.pal;
           world = def.opts.world;
           const rig = p.rigs.get(name);
-          if (rig) extra = rigLines(rig, (part) => (p.has(part) ? p.image(part) : undefined));
+          if (rig) extra = rigLines(rig, (part) => p.has(part), (part, flip) => (flip ? p.image(part).flip("x") : p.image(part)));
           frames = b.anim ? p.frames(name, 0, 64).map((f) => p.build(name, 0, f.t)) : undefined;
         }
         // each describe keeps what it saw in <out>/_describe; --diff compares with the last one
@@ -260,6 +267,53 @@ export async function main(argv: string[]): Promise<number> {
         }
         console.log(`${name} (${img.w}x${img.h}) against ${ref} (${r.w}x${r.h}${a.shrink ? `, shrunk ${a.shrink}x` : ""}${a.offset ? ` at ${a.offset.join(",")}` : ""})`);
         console.log(compareSilhouettes(img, r, ...(a.offset ?? [0, 0])));
+        return 0;
+      }
+      case "blind": {
+        const dir = join(outDir, "_blind");
+        const words: Record<string, string> = { right: "right", left: "left", front: "front", "toward us": "front", us: "front", back: "back", away: "back" };
+        if (a.check) {
+          if (!existsSync(join(dir, "key.json"))) throw new PxError(`no ${join(dir, "key.json")}: run pxl blind <file> <names...> first`);
+          const key = JSON.parse(readFileSync(join(dir, "key.json"), "utf8")) as { n: number; name: string; facing: string }[];
+          const ans = JSON.parse(readFileSync(resolve(a.check), "utf8")) as Record<string, string>;
+          let agree = 0, asked = 0;
+          for (const k of key) {
+            const said = ans[String(k.n)];
+            if (said === undefined || k.facing === "none") continue;
+            asked++;
+            const w = words[String(said).toLowerCase().trim()] ?? String(said);
+            if (w === k.facing) agree++;
+            else console.log(`${k.n} ${k.name}: labelled ${k.facing}, the reader says ${said}: look at it`);
+          }
+          console.log(`${agree} of ${asked} labels agree with the reader`);
+          return agree === asked ? 0 : 1;
+        }
+        if (!a.rest.length) throw new PxError("blind needs assets (or rigs) to show: pxl blind <file> <name...>");
+        const p = loadProject(file), items: { name: string; img: Img }[] = [];
+        for (const n of a.rest) {
+          const rig = p.rigs.get(n);
+          if (!rig) { items.push({ name: n, img: p.image(n) }); continue; }
+          for (const [slot, s] of rig.slots) {
+            const own = s.part ?? `${rig.name}_${slot}`;
+            if (p.has(own)) items.push({ name: own, img: p.image(own) });
+            else if (s.mirrorOf && p.has(s.mirrorOf)) items.push({ name: `${s.mirrorOf} flipped (${n})`, img: p.image(s.mirrorOf).flip("x") });
+          }
+        }
+        // shuffled, so the order gives nothing away; each on a plain gray, 8x
+        const order = items.map((it, i) => ({ it, r: (Math.sin(i * 12.9898 + 78.233) * 43758.5453) % 1 })).sort((u, v) => u.r - v.r).map(({ it }) => it);
+        const key = order.map(({ name, img }, i) => {
+          const f = img.orient?.f, facing = !f ? "none" : Math.abs(f[2]) > Math.max(Math.abs(f[0]), Math.abs(f[1])) ? (f[2] < 0 ? "front" : "back") : f[0] > 0 ? "right" : "left";
+          const k = 8, o = new Img(img.w * k + 16, img.h * k + 16).fill(0x808080ff);
+          for (let y = 0; y < img.h * k; y++) for (let x = 0; x < img.w * k; x++) {
+            const c = img.data[Math.floor(y / k) * img.w + Math.floor(x / k)];
+            if (c !== TRANSPARENT) o.data[(y + 8) * o.w + x + 8] = c;
+          }
+          writePng(join(dir, `${i + 1}.png`), o);
+          return { n: i + 1, name, facing };
+        });
+        writeFileSync(join(dir, "key.json"), JSON.stringify(key, null, 1) + "\n");
+        console.log(`${key.length} images in ${dir} (1.png ... ${key.length}.png), the labels in key.json.`);
+        console.log(`Give a reader only the images (not the art file, not key.json) and ask, for each: which way does it face: right, left, front (toward us) or back? Save the answers as {"1": "right", ...} and run: pxl blind ${a.file} --check answers.json`);
         return 0;
       }
       case "serve": {

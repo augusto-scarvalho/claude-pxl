@@ -453,7 +453,7 @@ export class Canvas {
         if (!ramp || !ok(x, y)) continue;
         let s = 0;
         for (const [ex, ey] of [[0, -1], [-1, 0], [0, 1], [1, 0]]) if (open(x, y, ex, ey)) s += ex * lx + ey * ly;
-        const i = Math.max(0, Math.min(ramp.length - 1, at.get(c)! + Math.round(s * strength)));
+        const i = opts.glint !== undefined && s >= opts.glint ? ramp.length - 1 : Math.max(0, Math.min(ramp.length - 1, at.get(c)! + Math.round(s * strength)));
         if (ramp[i] !== c) out.push([x, y, ramp[i]]);
       }
     for (const [x, y, c] of out) this.plot(x, y, c);

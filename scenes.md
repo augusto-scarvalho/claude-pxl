@@ -19,6 +19,10 @@ shapes · Water and things that land · Shadows and light · Blend modes · Chec
 - **Say which way things face.** `facing: "right"` on an asset, and describe says for each placement
   where it faces, which of its sides is toward us, whether it lies or stands upside down, and when a
   flip made it a mirror image (a sword in the other hand; a sign's lettering backwards).
+- **Say where the light comes from, and where the ground is.** `world: { light: [0.6, -1], ground:
+  84 }`: describe reads each object's lit side off its rim and warns when a flipped copy is lit from
+  the wrong side, and calls out what has a `height` but floats or sinks (also a pivot left below the
+  sole: `stamp(x, groundY)` then stands it above the ground).
 - What stands on the ground goes in a `sort: "y"` layer, so the lower (nearer) thing draws in front.
   Give props `pivot: "bottom"` and stamp them at the ground's y.
 - Figures need a few px of air to read. `PXL describe <file> <scene>` gives the gap between objects
