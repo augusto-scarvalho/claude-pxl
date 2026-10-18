@@ -233,25 +233,40 @@ sprite("palisade", { w: 14, h: 16, wrap: "x" },
   hline(0, 3, 14, "d"), hline(0, 9, 14, "d"), rect(5, 0, 2, 16, "b"), vline(6, 0, 16, "a"), rect(5, 0, 2, 1, "d"))
 
 // ---------------------------------------------------------------- the marshal
-// the tournament's marshal, between the two and a little behind, facing us: a red chaperon, a
-// tabard quartered in both knights' colors, his right hand (our left) holding the white baton;
-// when it drops, they fight. 1.65 m on row 140 is 37 px. His arm and baton: up through the fanfare,
-// swept down at the signal (frame 20), up again as the knights walk back to their marks
+// the tournament's marshal, between the two and a little behind, facing us: an old herald in a red
+// chaperon (its rolled brim, a gold brooch, a white feather), grey hair and a trimmed white beard, a
+// tabard quartered in both knights' colors under a gold cross, its short wings over the shoulders,
+// parti-colored hose (a blue leg and a red one) and pointed shoes; his left hand on his hip, the
+// right holding the white baton with its gold ends. When it drops, they fight. 1.65 m on row 140 is
+// 37 px. Each mass is drawn flat and lit on its own. His arm and baton: up through the fanfare, swept
+// down at the signal (frame 20), up again as the knights walk back to their marks.
+// drawn 8 px in and 3 down, for the baton's room: each mass a layer lit on its own, the details unlit
+const lit = (...items) => layer("mass", { x: 8, y: 3 }, ...items, relight(undefined, { light: LIGHT, reach: 1 }))
+const flat = (...items) => layer("detail", { x: 8, y: 3 }, ...items)
+const TABARD = [4, 13, 12, 13, 13, 27, 3, 27]
 const BATON = {
-  up: [vline(11, 0, 8, "c"), rect(11, 7, 2, 2, "j"), rect(11, 9, 2, 8, "c")],
-  out: [line(12, 17, 8, 13, "c", 2), rect(6, 11, 2, 2, "j"), line(6, 11, 1, 6, "c")],
-  down: [rect(11, 17, 2, 8, "c"), rect(11, 25, 2, 2, "j"), line(11, 27, 8, 33, "c")],
+  up: [rect(2, 7, 2, 7, "c"), rect(2, 5, 2, 2, "j"), vline(3, -3, 8, "c"), px(3, -3, "Z")],
+  out: [line(3, 14, -1, 10, "c", 2), rect(-3, 8, 2, 2, "j"), line(-3, 8, -7, 4, "c"), px(-7, 4, "Z")],
+  down: [rect(2, 14, 2, 7, "c"), rect(2, 21, 2, 2, "j"), line(2, 23, -1, 30, "c"), px(-1, 30, "Z")],
 }
-anim("marshal", { w: 25, h: 37, pivot: [17, 37], fps: 8, outline: "k", selout: true, facing: "front", height: 1.65 },
-  layer("body", { x: 10 },
-    ellipse(7, 12, 3, 3, "j"), px(6, 12, "z"), px(8, 12, "z"), hline(6, 14, 3, "J"),     // face
-    ellipse(7, 9, 4, 2, "r"), hline(3, 10, 9, "R"),                                       // chaperon
-    rect(6, 15, 3, 1, "J"),                                                               // neck
-    rect(3, 16, 4, 13, "w"), rect(8, 16, 4, 13, "r"), vline(7, 16, 13, "Z"), hline(3, 28, 9, "Z"),   // tabard
-    rect(12, 17, 2, 8, "c"), rect(12, 25, 2, 2, "j"),                                     // the other arm, down
-    rect(4, 29, 3, 6, "q"), rect(8, 29, 3, 6, "q"), rect(3, 35, 4, 2, "t"), rect(8, 35, 4, 2, "t"),   // hose, shoes
-    relight([3, 7, 11, 22], { light: LIGHT, reach: 1 })),
-  frame({ hold: 20 }, ...BATON.up), frame(...BATON.out), frame({ hold: 64 }, ...BATON.down), frame(...BATON.out), frame({ hold: 10 }, ...BATON.up))
+anim("marshal", { w: 27, h: 40, pivot: [16, 40], fps: 8, outline: "k", selout: true, facing: "front", height: 1.65 },
+  // the baton arm, under the tabard's wing
+  layer("arm", { x: 8, y: 3 },
+    frame({ hold: 20 }, ...BATON.up), frame(...BATON.out), frame({ hold: 64 }, ...BATON.down), frame(...BATON.out), frame({ hold: 10 }, ...BATON.up),
+    relight(undefined, { light: LIGHT, reach: 1 })),
+  lit(rect(5, 28, 3, 7, "w")), lit(rect(9, 28, 3, 7, "r")),                                   // hose
+    lit(rect(4, 35, 4, 2, "T"), px(3, 36, "T")), lit(rect(9, 35, 4, 2, "T"), px(13, 36, "T")),   // shoes
+    lit(clip(TABARD, rect(0, 13, 8, 7, "w"), rect(9, 13, 8, 7, "r"), rect(0, 21, 8, 7, "r"), rect(9, 21, 8, 7, "w")),
+      poly([2, 13, 5, 13, 5, 16, 2, 17], "w"), poly([11, 13, 14, 13, 14, 17, 11, 16], "r")),     // tabard, its wings
+    flat(clip(TABARD, vline(8, 13, 15, "Z"), hline(0, 20, 17, "Z")), hline(3, 27, 11, "y")),    // the gold cross, the hem
+    lit(line(13, 16, 15, 19, "c", 2), line(15, 19, 13, 21, "c", 2)), lit(rect(12, 21, 2, 2, "j")),   // the hand on his hip
+    flat(rect(7, 12, 3, 1, "J")),                                                             // neck
+    lit(rect(5, 6, 7, 5, "j"), hline(6, 11, 5, "j"), px(4, 8, "j"), px(12, 8, "j")),           // face, ears
+    flat(vline(4, 6, 2, "v"), vline(12, 6, 2, "v"),                                           // grey hair
+      px(6, 7, "z"), px(10, 7, "z"), px(6, 6, "v"), px(10, 6, "v"), px(8, 8, "J")),             // eyes, brows, nose
+    lit(hline(6, 9, 5, "c"), rect(6, 10, 5, 1, "c"), hline(7, 11, 3, "c"), px(8, 12, "c")), flat(px(8, 10, "v")),   // beard
+    lit(poly([10, 3, 12, 0, 14, -2, 15, -2, 15, -1, 13, 1, 11, 4], "c")),                    // the feather, behind the brooch
+    lit(ellipse(8, 2, 3, 2, "r")), lit(ellipse(8, 4, 5, 1, "R")), flat(px(10, 4, "Z")))      // chaperon, brooch
 
 // ---------------------------------------------------------------- the two knights
 // fighting their bout, both anims on the middle of the lists; the red one (knight.px.js's RED: its

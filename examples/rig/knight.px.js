@@ -369,24 +369,26 @@ const MOVES = {
   guardIn: { hand: [8, 10], sword: -60, feet: [[-4, 0], [3, 0]] },
   guard: { hand: [9, 6], sword: -50, feet: GUARD, lean: 1 },
   windHigh: { hand: [-2, -16], sword: -150, feet: GUARD, lean: -1 },
-  cut: { hand: [13, -8], sword: -35, feet: LUNGE, bob: 3, lean: 2 },
+  cut: { hand: [13, -8], sword: -35, feet: LUNGE, bob: 3, lean: 2, arc: 1 },
   recoil: { hand: [10, -8], sword: -75, feet: GUARD },
   // low behind, the arm and the blade in one line, the point toward the ground (the tail guard): with
   // the fist at the hip and the blade level it read as a sword going into its scabbard
   windLow: { hand: [-15, 16], sword: 130, feet: GUARD, lean: 1 },
-  rise: { hand: [13, -4], sword: -55, feet: LUNGE, bob: 3, lean: 2 },
-  // onto the shield: the cut comes down from straight overhead and lands on the shield's face; the
-  // shield goes up square before the face (the elbow up, the forearm level), the sword drawn back
-  // behind the head for the answer
-  swing: { hand: [4, -20], sword: -80, feet: GUARD },
-  smash: { hand: [14, -16], sword: 30, feet: LUNGE, bob: 3, lean: 2 },
-  smashDown: { hand: [14, -13], sword: 40, feet: LUNGE, bob: 3, lean: 2 },
-  rebound: { hand: [11, -12], sword: -15, feet: GUARD },
+  rise: { hand: [13, -4], sword: -55, feet: LUNGE, bob: 3, lean: 2, arc: -1 },
+  // onto the shield, a slash: from behind the head, through straight up, the edge comes down on the
+  // top of the shield. Where it lands the arm still points up and forward and the blade has gone over
+  // past it, down: the wrist broken over. Arm and blade in one line would be a thrust. The shield goes
+  // up square before the face (the elbow up, the forearm level), the sword drawn back behind the head
+  // for the answer
+  swing: { hand: [3, -21], sword: -90, feet: GUARD },
+  slash: { hand: [12, -18], sword: 15, feet: LUNGE, bob: 3, lean: 2, arc: 1 },
+  slashDown: { hand: [14, -11], sword: 45, feet: LUNGE, bob: 3, lean: 2 },
+  rebound: { hand: [9, -14], sword: -30, feet: GUARD },
   blockIn: { hand: [3, 2], sword: -110, feet: GUARD, shield: { hand: [9, -4], bend: -1 } },
   block: { hand: [-3, -14], sword: -150, feet: GUARD, bob: 2, lean: 1, shield: { hand: [11, -9], bend: -1 } },
   blockHit: { hand: [-3, -13], sword: -150, feet: GUARD, bob: 3, shield: { hand: [10, -8], bend: -1 } },
   windBig: { hand: [-4, -18], sword: -160, feet: GUARD, lean: -2 },
-  big: { hand: [14, -6], sword: -45, feet: [[-12, 0], [11, 0]], bob: 4, lean: 3 },
+  big: { hand: [14, -6], sword: -45, feet: [[-12, 0], [11, 0]], bob: 4, lean: 3, arc: 1 },
   thrown: { hand: [-1, -11], sword: -125, feet: [[-9, 0], [8, 0]], lean: -3 },
   stagger: { hand: [7, 8], sword: 25, feet: [[-6, 0], [5, 0]], lean: -1 },
   saluteIn: { hand: [8, 2], sword: -60, feet: [[-3, 0], [2, 0]] },
@@ -397,9 +399,9 @@ const MOVES = {
 const RUNS = [[21, "rest", 0], [1, "guardIn", 0], [3, "guard", 0],
   [2, "windHigh", -1], [2, "cut", 4], [1, "recoil", 2], [2, "guard", 0],                         // a cut from above, both
   [2, "windLow", -1], [2, "rise", 6], [1, "recoil", 2], [2, "guard", 0],                         // a rising cut, both
-  [1, "windHigh", -1, "guard", 0], [1, "swing", 0, "blockIn", 0], [1, "smash", 6, "block", 0],    // blue cuts onto the shield,
-  [1, "smashDown", 6, "blockHit", 0], [1, "rebound", 2, "block", 0], [1, "blockIn", 0, "swing", 0],
-  [1, "block", 0, "smash", 6], [1, "blockHit", 0, "smashDown", 6], [1, "block", 0, "rebound", 2],  // red cuts back
+  [1, "windHigh", -1, "guard", 0], [1, "swing", 0, "blockIn", 0], [1, "slash", 6, "block", 0],    // blue cuts onto the shield,
+  [1, "slashDown", 6, "blockHit", 0], [1, "rebound", 2, "block", 0], [1, "blockIn", 0, "swing", 0],
+  [1, "block", 0, "slash", 6], [1, "blockHit", 0, "slashDown", 6], [1, "block", 0, "rebound", 2],  // red cuts back
   [1, "guard", 0],
   [3, "windBig", -2], [2, "big", 5],                                                             // the last
   [1, "thrown", 1], [1, "thrown", -5], [1, "thrown", -10], [1, "thrown", -13], [1, "thrown", -14],
@@ -453,8 +455,8 @@ const HITS = []
 BOUTS[0].forEach(([, db, mb], f) => {
   const [, dr, mr] = BOUTS[1][f], fresh = (k) => BOUTS[k][f - 1][2] !== BOUTS[k][f][2]
   if (["cut", "rise", "big"].includes(mb) && fresh(0)) HITS.push({ f, big: mb === "big", at: along(MOVES[mb], db, 0), feet: [0, 1] })
-  if (mb === "smash" && fresh(0)) HITS.push({ f, shield: true, at: along(MOVES[mb], db, shieldEdge(MOVES[mr], dr)), feet: [0] })
-  if (mr === "smash" && fresh(1)) {
+  if (mb === "slash" && fresh(0)) HITS.push({ f, shield: true, at: along(MOVES[mb], db, shieldEdge(MOVES[mr], dr)), feet: [0] })
+  if (mr === "slash" && fresh(1)) {
     const [x, y] = along(MOVES[mr], dr, shieldEdge(MOVES[mb], db))
     HITS.push({ f, shield: true, at: [-x, y], feet: [1] })
   }
@@ -463,6 +465,18 @@ BOUTS[0].forEach(([, db, mb], f) => {
 const footAt = ([, dx, m, walk], j) => -HALF + dx + HIPS[j] + (walk ?? MOVES[m].feet ?? [[-0.5], [-0.5]])[j][0] + (j ? 5 : -3)
 const toeOf = (k, f, j = 1) => (k ? -1 : 1) * footAt(BOUTS[k][f], j)
 
+// The smear: the frame a blow lands (an arc of 40 degrees or more from the frame before), the path
+// of the blade's outer part, a crescent from where it was to where it is, thin at its tail; the
+// move's `arc` says which way round it went (a rising cut comes from below behind, not over the top).
+// Only the last 100 degrees: a whole half turn in one frame would ring the bodies.
+const SMEARS = []
+for (const k of [0, 1]) BOUTS[k].forEach(([, dx, m], f) => {
+  const was = MOVES[BOUTS[k][f - 1]?.[2]], now = MOVES[m]
+  if (!now?.arc || !was || BOUTS[k][f - 1][2] === m) return
+  const turn = now.arc * (((now.arc * (now.sword - was.sword)) % 360 + 360) % 360)
+  const shown = Math.sign(turn) * Math.min(Math.abs(turn), 100)       // its last 100 degrees at most
+  if (Math.abs(turn) >= 40) SMEARS.push({ f, k, at: handAt(now, dx), from: now.sword - shown, turn: shown })
+})
 // The sparks: the frame the blades hit, a white-hot star; the next, a smaller one, and the sparks
 // flying out and falling, gold, then orange, then red, gone in a few frames (the last clash: twice as
 // many, flying farther, the star lasting a frame longer; on a shield: fewer, and splinters of its
@@ -470,6 +484,19 @@ const toeOf = (k, f, j = 1) => (k ? -1 : 1) * footAt(BOUTS[k][f], j)
 // as the last clash slides them back; brown, for the scene to swap to its ground.
 const FW = 150, FX = 75
 anim("knight_bout_fx", { w: FW, h: RH, frames: 96, fps: 8, pivot: [FX, SOLE] }, (c) => {
+  for (const { f, k, at: [hx, hy], from, turn } of SMEARS) {
+    if (c.frame !== f) continue
+    const arc = (r0, r1, col) => {                              // r1 at the tail, r0 at the blade
+      const out = [], back = []
+      for (let i = 0; i <= 10; i++) {
+        const t = i / 10, a = ((from + turn * t) * Math.PI) / 180, r = r1 + (r0 - r1) * t
+        const pt = (rad) => [FX + (k ? -1 : 1) * (hx + Math.cos(a) * rad), SOLE + hy + Math.sin(a) * rad]
+        out.push(...pt(31)); back.unshift(...pt(r))
+      }
+      c.poly([...out, ...back].map(Math.round), col)
+    }
+    arc(22, 30, "4"); arc(27, 30.5, "5")
+  }
   const puff = (x, y, age) => {
     if (age === 0) c.ellipse(x, y, 1, 1, "L")
     else if (age === 1) c.ellipse(x, y - 1, 2, 1, "L")
@@ -507,7 +534,7 @@ anim("knight_bout_fx", { w: FW, h: RH, frames: 96, fps: 8, pivot: [FX, SOLE] }, 
 
 // every move in a row, and the bout on bare ground
 const RED = { q: "x", w: "r", e: "R", x: "q", r: "w", R: "e" }
-const SHOWN = ["rest", "guard", "windHigh", "cut", "windLow", "rise", "swing", "smash", "block", "windBig", "big", "thrown", "salute"]
+const SHOWN = ["rest", "guard", "windHigh", "cut", "windLow", "rise", "swing", "slash", "block", "windBig", "big", "thrown", "salute"]
 scene("knight_moves", { w: 60 * SHOWN.length, h: 116, bg: "#2a2f3e", world: { scale: 40, light: LIT.light, ground: 108 } },
   rect(0, 108, 60 * SHOWN.length, 8, "T"), hline(0, 108, 60 * SHOWN.length, "L"),
   ...SHOWN.map((m, i) => stamp("knight_" + pose(MOVES[m]), 26 + 60 * i, 108)),
