@@ -1,14 +1,16 @@
 // A tournament: two knights meet on foot in the lists, the blue one (the rig, facing right) and the
 // red one (the same rig turned, its colors swapped), each with the shield on its left arm and the
 // sword in its right hand. Behind them the lists' palisade, the grandstand under a striped canopy
-// with the crowd on its tiers, the pavilions with their pennants, a castle on the hill. Daylight
+// with the crowd on its tiers, the pavilions with their pennants, a castle on the hill, clouds
+// drifting over (the loop is 12 s for them; everything else repeats every second). Daylight
 // from the top right, as the knights are lit. The ground is seen in perspective: the horizon at
 // y 104 and the eye 1.6 m up make 40 px to the meter where the knights stand (y 168), so their
 // 1.8 m is 72 px, and everything with a height is checked against it by pxl describe.
 include("knight.px.js", { palette: true })
 pal({
   A: "#3a6ea8", B: "#5b92c8", C: "#8cbbe2", D: "#c6e2f2",                 // sky, top down
-  E: "#f4f8fb", F: "#c4d4e4",                                              // clouds
+  E: "#f4f8fb", F: "#d6e2ee", K: "#a8bcd2",                               // clouds: lit, body, underside
+  P: "#56688a", Q: "#8a9cc0",                                              // slate roofs, hazy
   G: "#7d9cb4", H: "#5e8098", I: "#4a6a64",                               // far hills, haze
   i: "#2c5a32", g: "#3e7a3a", h: "#5e9a48", l: "#8cbc5a",                 // grass
   S: "#5e6470", s: "#8a909c", U: "#c4c8d0",                               // castle stone
@@ -19,34 +21,86 @@ pal({
   c: "#e8e2d4", v: "#b8b0a0",                                              // white cloth
   j: "#e2aa7c", J: "#b47a52", z: "#3a2418",                               // skin, hair
 })
-ramps("ABCD", "FE", "IHG", "ighl", "SsU", "fbad", "tTLW", "nNm", "yZ", "vc", "Jj")
+ramps("ABCD", "KFE", "PQ", "IHG", "ighl", "SsU", "fbad", "tTLW", "nNm", "yZ", "vc", "Jj")
 
 const W = 320, H = 180, HZ = 104, EYE = 1.6, LIGHT = [0.6, -1]
 const ppm = (y) => (y - HZ) / EYE                       // px per meter on the ground at row y
 const FEET = 168                                        // where the knights stand
 
 // ---------------------------------------------------------------- sky and the far land
-const sky = [
-  grad(0, 0, W, HZ, "ABCD"),
-  ...[[40, 18, 30, 4], [70, 22, 22, 3], [196, 12, 34, 4], [230, 16, 20, 3], [120, 40, 26, 3]].flatMap(([x, y, rx, ry]) =>
-    [ellipse(x, y, rx, ry, "E"), ellipse(x + 4, y + 2, rx - 6, ry - 1, "F"), hline(x - rx + 4, y + ry, 2 * rx - 8, "F")]),
-]
+// Clouds, the sunset's way: each drifts with the wind from the left in one piece, a whole pixel at
+// even intervals (the high ones, nearer, 1 px every 4 frames; the low ones, toward the horizon and
+// farther, every 6), and lives one loop: it forms out of a pale haze, drifts, and thins away again
+// where it started, out of step with the others, so the loop has no seam and needs no strip
+// scrolling a whole width. A wisp is a long thin streak of haze; as it gains body the light takes it
+// from the top down (a cap of white thickening row by row, then its gray underside). The sunset's
+// thin streaks took their light column by column; on a heaped cloud that shows as stripes.
+const LOOP = 96                                         // 12 s at 8 fps; everything else repeats in 1 s
+const CLOUDS = [[44, 16, 28, 4], [196, 12, 32, 5], [124, 34, 22, 3], [262, 26, 18, 3], [78, 46, 16, 2]]   // x, y (base), half-length, height
+anim("clouds", { w: W, h: HZ, frames: LOOP, fps: 8 }, (c) => {
+  const r = c.rng(5)
+  CLOUDS.forEach(([x0, y, len, hgt], k) => {
+    const drift = LOOP / (y < 25 ? 4 : 6)
+    const age = (c.phase - ((k * 3) % 5) / 5 + 1) % 1
+    const env = Math.min(1, 1.5 * Math.sin(age * Math.PI))
+    const x = x0 - drift / 2 + Math.floor(drift * age)
+    // a heap of puffs on a flat base, the middle ones the tallest. Thin, it is a long wisp: the puffs
+    // lose their height faster than their length, and the base joins them from the start
+    const n = 4 + Math.floor(r() * 3)
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n, cx = Math.round(x - len + 2 * len * t + (r() - 0.5) * 6)
+      const rx = Math.round(len * (0.28 + r() * 0.16) * (0.4 + 0.6 * env)), ry = Math.round(hgt * (0.6 + Math.sin(t * Math.PI) * 0.8) * env)
+      if (ry >= 1 && rx > 1) c.ellipse(cx, y - ry + 1, rx, ry, "D")
+    }
+    if (env > 0.08) c.hline(Math.round(x - len * (0.5 + 0.4 * env)), y, Math.round(2 * len * (0.5 + 0.4 * env)), "D")
+    // as it gains body it takes the light from the top down: first its own body tone, then a white
+    // cap thickening row by row to half its height, then the gray of its underside
+    if (env < 0.3) return
+    const cap = Math.min(1, (env - 0.3) / 0.5)
+    for (let px = x - len - 6; px <= x + len + 6; px++) {
+      let top = -1, bot = -1
+      for (let py = y - 3 * hgt - 2; py <= y + 1; py++) if (c.is(px, py, "D")) { if (top < 0) top = py; bot = py }
+      if (top < 0) continue
+      const white = Math.round(((bot - top + 1) / 2) * cap)
+      for (let py = top; py <= bot; py++) c.px(px, py, py === bot && env > 0.55 ? "K" : py < top + white ? "E" : "F")
+    }
+  })
+})
+const sky = [grad(0, 0, W, HZ, "ABCD"), stamp("clouds", 0, 0)]
 const hills = [
-  poly([0, 98, 40, 92, 90, 95, 150, 90, 210, 94, 250, 86, 290, 84, 320, 90, 320, HZ, 0, HZ], "G"),
+  poly([0, 98, 40, 92, 90, 95, 150, 90, 200, 93, 230, 86, 256, 82, 296, 82, 314, 87, 320, 90, 320, HZ, 0, HZ], "G"),
   poly([0, 101, 60, 98, 130, 100, 200, 97, 260, 99, 320, 96, 320, HZ, 0, HZ], "H"),
 ]
-// a castle on the far hill to the right: a curtain wall between two towers, the keep behind, its
-// pennants; lit from the right
-sprite("castle", { w: 52, h: 34, pivot: "bottom" },
-  rect(14, 10, 14, 24, "S"), rect(16, 4, 10, 30, "S"),                                  // keep
-  rect(4, 14, 44, 20, "s"), rect(0, 8, 10, 26, "s"), rect(42, 6, 10, 28, "s"),          // wall, towers
-  ...[0, 3, 6].map((x) => rect(x, 6, 2, 2, "s")), ...[42, 45, 48].map((x) => rect(x, 4, 2, 2, "s")),
-  ...[16, 19, 22].map((x) => rect(x, 2, 2, 2, "S")),
-  vline(9, 8, 26, "U"), vline(51, 6, 28, "U"), vline(47, 14, 20, "U"),                  // lit sides
-  rect(22, 24, 6, 10, "S"), ellipse(25, 24, 3, 2, "S"),                                 // gate
-  ...[[5, 18], [46, 16], [20, 12], [30, 20]].map(([x, y]) => rect(x, y, 1, 2, "S")),    // windows
-  vline(46, 0, 5, "S"), poly([47, 0, 51, 1, 47, 2], "R"))                               // the banner
-const far = [...hills, stamp("castle", 274, 99)]
+// A castle on the far hill, its towers and roofs over the pavilions: a curtain wall with its merlons
+// between two drum towers under slate cones, the keep behind with a turret on its corner, the
+// gatehouse in front with its portcullis down, arrow slits, the knights' colors flying from the
+// towers and gold from the keep. Each mass is drawn flat and lit on its own from the top right, the
+// round towers with a band of light where they turn toward the sun. Hazy with the distance: no
+// black, its darkest a blue gray.
+const merlons = (x0, x1, y) => [...Array(Math.floor((x1 - x0) / 4) + 1).keys()].map((i) => rect(x0 + i * 4, y, 2, 3, "s"))
+const mass = (...items) => layer("mass", ...items, relight(undefined, { light: LIGHT, reach: 2 }))
+sprite("castle", { w: 66, h: 50, pivot: "bottom" },
+  // the keep, behind, and its corner turret with a little cone
+  mass(rect(22, 12, 20, 30, "s"), ...merlons(22, 40, 9)),
+  mass(rect(37, 6, 6, 10, "s"), poly([36, 6, 40, 1, 44, 6], "P")),
+  // the curtain wall, its merlons, the wall-walk's shadow under them
+  mass(rect(8, 31, 50, 19, "s"), ...merlons(8, 56, 28)),
+  hline(8, 31, 50, "S"),
+  // the drum towers under their cones, the light turning round them
+  mass(rect(0, 20, 13, 30, "s"), poly([0, 20, 6, 6, 7, 6, 13, 20], "P")), vline(9, 21, 29, "U"),
+  mass(rect(53, 18, 13, 32, "s"), poly([53, 18, 59, 4, 60, 4, 66, 18], "P")), vline(62, 19, 31, "U"),
+  // the gatehouse, its arch and the portcullis
+  mass(rect(25, 25, 16, 25, "s"), ...merlons(25, 39, 22)),
+  rect(29, 39, 8, 11, "S"), ellipse(33, 39, 4, 3, "S"),
+  ...[30, 32, 34, 36].map((x) => vline(x, 37, 13, "H")), hline(29, 43, 8, "H"), hline(29, 47, 8, "H"),
+  // arrow slits and windows
+  ...[[5, 28], [5, 38], [58, 26], [58, 36], [27, 18], [35, 18], [16, 36], [48, 36]].map(([x, y]) => rect(x, y, 1, 3, "S")),
+  rect(30, 28, 2, 3, "S"), rect(34, 28, 2, 3, "S"),
+  // the flags: blue on the left tower, red on the right, gold on the keep
+  vline(6, 1, 6, "S"), poly([7, 1, 11, 2, 7, 4], "w"),
+  vline(59, 0, 5, "S"), poly([60, 0, 64, 1, 60, 3], "r"),
+  vline(30, 3, 7, "S"), poly([31, 3, 35, 4, 31, 6], "Z"))
+const far = [...hills, stamp("castle", 274, 85)]
 
 // ---------------------------------------------------------------- the field
 const field = [
