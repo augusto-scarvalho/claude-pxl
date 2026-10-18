@@ -21,6 +21,8 @@ export interface Resolver {
   candidates(name: string): string[];
   /** Is there an asset or group of this name? */
   has(name: string): boolean;
+  /** Something wrong but not fatal, found while drawing (a shade step that left its ramp). */
+  warn?(msg: string, loc?: string): void;
   /** Glyph lookup of a font() (rows of "#" / "."), for text(). */
   glyphs(font: string): (ch: string) => string[];
 }
@@ -418,11 +420,13 @@ export class Canvas {
 
   /** Step colors darker along the palette ramps inside a region. */
   shade(where?: Region, steps = 1, density = 1): void {
+    this.clashes(-1, where);
     this.remap(this.pal.stepMap(-1), where, steps, density);
   }
 
   /** Step colors lighter along the palette ramps inside a region. */
   light(where?: Region, steps = 1, density = 1): void {
+    this.clashes(1, where);
     this.remap(this.pal.stepMap(1), where, steps, density);
   }
 
@@ -508,6 +512,19 @@ export class Canvas {
         if (ramp[i] !== c) out.push([x, y, ramp[i]]);
       }
     for (const [x, y, c] of out) this.plot(x, y, c);
+  }
+
+  /** Before a shade / light step: warn if a pixel it reaches has a color its ramps disagree on. */
+  private clashes(dir: -1 | 1, where?: Region): void {
+    if (!this.res.warn || !this.pal.ramps.length) return;
+    const cl = this.pal.stepClashes(dir);
+    if (!cl.size) return;
+    const ok = regionPred(where);
+    for (let y = -this.oy; y < this.img.h - this.oy; y++)
+      for (let x = -this.ox; x < this.img.w - this.ox; x++) {
+        const why = cl.get(this.get(x, y));
+        if (why && ok(x, y)) { this.res.warn(why, this.loc); cl.delete(this.get(x, y)); }
+      }
   }
 
   swapMap(swap: Record<string, string>): Map<Color, Color> {

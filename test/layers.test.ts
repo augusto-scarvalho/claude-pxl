@@ -72,3 +72,29 @@ sprite("flipped", { base: "blob", flip: "x" })`;
   assert.deepEqual([t.pivot, t.sockets?.front, t.orient?.f?.[0]], [[5, 3], [0, 1], -1]);
   assert.throws(() => loadSource(PAL + `sprite("sign", { w: 9, h: 7, twin: "sign_l" }, text(0, 0, "AB", "r"))`, "t.px.js").image("sign_l"), /text in a twin would read backwards/);
 });
+
+const cli = async (src: string, ...args: string[]) => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
+  writeFileSync(file, src);
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try { await main([args[0], file, ...args.slice(1)]); } finally { console.log = log; }
+  return lines.join("\n");
+};
+const GREENS = `pal({ k: "#14101c", E: "#2a5a2a", G: "#3e8a3a", g: "#6ab04a", P: "#3a1a5a", p: "#7a3ad0", S: "#3d3a4c", s: "#5a5770", B: "#8a7a68", C: "#b8a890" })
+`;
+
+test("ramps that branch at a key: a light stepping through it is a warning in pxl check", async () => {
+  // dark stone S starts both the stone ramp and the paper one: lit, a paper shadow turns stone gray
+  const text = await cli(GREENS + `ramps("kSs", "SBC")
+scene("s", { w: 4, h: 2, bg: "S" }, layer("glow", { light: true }, rect(0, 0, 4, 2, "k")))`, "check");
+  assert.match(text, /WARNING: light stepped 'S' to 's' along the ramp "kSs", but the ramps branch there \(in "SBC" it goes on to 'B'\)/);
+});
+
+test("ramps joined end to end aren't a warning; pxl steps names the ramps a shadow went along", async () => {
+  // grass "EGgl" and a potion ramp ending in the grass's darkest: shade 2 takes the grass into the potion
+  const src = GREENS + `ramps("EGg", "PpE")
+scene("s", { w: 8, h: 4 }, rect(0, 0, 8, 4, "G"), layer("shadow", { shade: 2 }, rect(2, 1, 4, 2, "k")))`;
+  assert.doesNotMatch(await cli(src, "check"), /WARNING/);
+  assert.match(await cli(src, "steps", "s", "--at", "3,1"), /in shade layer 'shadow' .* -> p {2}\(G→E along "EGg", E→p along "PpE"\)/);
+});

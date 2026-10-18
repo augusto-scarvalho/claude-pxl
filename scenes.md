@@ -121,7 +121,11 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - The ground ramp needs a tone below its darkest for shadows to show after lighting (`"0EGgl"`, then
   `shade: 2`).
 - **A key belongs to one ramp.** In two ramps, `shade` can step it along the wrong one: a grass
-  shadow turned into glowing potion green.
+  shadow turned into glowing potion green. Where ramps branch at a key (two go on from it to
+  different keys), `pxl check` warns when a step goes through it. Where one ramp ends at a key and
+  another goes on from it (a deliberate shadow ramp under a grass ramp looks the same as a potion ramp
+  by mistake), nothing can tell: `pxl steps <file> <scene> --at x,y` on a pixel that came out wrong
+  names the ramps each shade step went along (`G→E along "EGgl", E→p along "PpE"`).
 - Night scenes: `lighting()` with a cold ambient and lamps on the props (lighting.md). Then check the
   figures in `PXL describe`: `stands out: brightness 1 vs 1 around` means as dark as the ground,
   read only by the outline. Give them light (a lamp, a mirror ball), a rim on the side facing the

@@ -120,6 +120,48 @@ export class Palette {
     return new Palette(keys, [...this.list], order, al, [...this.ramps]);
   }
 
+  /**
+   * Colors where ramps branch (`dir` -1 darker, 1 lighter): two ramps go on from the color to different
+   * keys, and stepMap takes the first ramp's, so a pixel of the other branch steps into this one's hue
+   * (a light on "SBCcx" turning S into "kSsiI"'s s). Not a branch: a shared end (an ink darkest in every
+   * ramp, a glint lightest), a ramp inside another, two ramps joined end to end (one goes on where the
+   * other stops: a shadow ramp under a grass ramp). Color -> the words for when a step is taken there.
+   */
+  stepClashes(dir: -1 | 1): Map<Color, string> {
+    const by = new Map<Color, { ramp: string; key: string; to?: string }[]>();
+    for (const r of new Set(this.ramps)) {
+      const ks = [...r];
+      ks.forEach((k, i) => { const c = this.keys.get(k)!; if (!by.has(c)) by.set(c, []); by.get(c)!.push({ ramp: r, key: k, to: ks[i + dir] }); });
+    }
+    const out = new Map<Color, string>(), verb = dir < 0 ? "shade" : "light";
+    for (const [c, list] of by) {
+      const on = list.filter((e) => e.to !== undefined && !list.some((f) => f !== e && f.ramp.includes(e.ramp)));
+      if (new Set(on.map((e) => e.to)).size < 2) continue;
+      const ends = (e: (typeof list)[number]) => e.ramp[0] === e.key ? "first" : e.ramp[e.ramp.length - 1] === e.key ? "last" : "mid";
+      if (list.every((e) => ends(e) === "first") || list.every((e) => ends(e) === "last")) continue;
+      const [won, ...rest] = on;
+      out.set(c, `${verb} stepped '${won.key}' to '${won.to}' along the ramp "${won.ramp}", but the ramps branch there (${rest.map((e) => `in "${e.ramp}" it goes on to '${e.to}'`).join("; ")}): a pixel of the other branch takes this one's color. If both are ${verb === "shade" ? "shaded" : "lit"}, give each branch its own key`);
+    }
+    return out;
+  }
+
+  /**
+   * The ramps a run of steps went along, from color a to b (shade: dir -1): "G→E along "EGgl", E→p
+   * along "PpE"", or undefined when b isn't a few steps from a. For `pxl steps`.
+   */
+  stepPath(a: Color, b: Color, dir: -1 | 1): string | undefined {
+    const m = this.stepMap(dir), rev = this.reverse(), parts: string[] = [];
+    let c = a;
+    for (let n = 0; n < 8 && c !== b; n++) {
+      const next = m.get(c);
+      if (next === undefined) return undefined;
+      const ka = rev.get(c)!, kb = rev.get(next)!, ramp = this.ramps.find((r) => r.includes(dir < 0 ? kb + ka : ka + kb));
+      parts.push(`${ka}→${kb}${ramp ? ` along "${ramp}"` : ""}`);
+      c = next;
+    }
+    return c === b && parts.length ? parts.join(", ") : undefined;
+  }
+
   withRamps(ramps: string[]): Palette {
     for (const r of ramps)
       for (const k of r) if (!this.keys.has(k)) throw new PxError(`ramp "${r}" uses unknown key '${k}'${didYouMean(k, this.order)}`);

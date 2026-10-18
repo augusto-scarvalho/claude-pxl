@@ -155,9 +155,9 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     : undefined;
   if (snap && def.kind === "scene") snap("background", def.loc);
 
-  const hook = (c: Canvas) => {
+  const hook = (c: Canvas, tag = "") => {
     if (!snap) return;
-    c.onOp = (name, args) => snap(`${name}(${fmtArgs(args)})`, c.loc ?? ctx.callerLoc());
+    c.onOp = (name, args) => snap(`${name}(${fmtArgs(args)})${tag}`, c.loc ?? ctx.callerLoc());
   };
 
   const layers: LayerOut[] = [];
@@ -220,7 +220,9 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
       if (l.opts.sort !== "y" && l.opts.sort !== "z") throw new PxError(`layer '${l.name}': sort must be "y" or "z", got ${fmtArgs([l.opts.sort])}`, l.loc);
       lc.sorted = { by: l.opts.sort, queue: [] };
     }
-    hook(lc);
+    // what is drawn in a shade or light layer steps what's under it: the painting log says so
+    const steps = l.opts.shade !== undefined && l.opts.shade !== false ? "shade" : l.opts.light !== undefined && l.opts.light !== false ? "light" : "";
+    hook(lc, steps ? ` in ${steps} layer '${l.name}'` : "");
     cur = { img: limg, opts: l.opts };
     try {
       runItems(ctx, l.items, lc, l.loc);
@@ -238,7 +240,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
       return;
     }
     if (!l.opts.hidden) {
-      blend(base, limg, l.opts, pal);
+      blend(base, limg, l.opts, pal, (msg) => ctx.warn?.(msg, l.loc));
       if (l.opts.solid || l.opts.wall) {
         const m = l.opts.solid ? (solid ??= new Uint8Array(base.data.length)) : (wall ??= new Uint8Array(base.data.length));
         for (let i = 0; i < m.length; i++) if (limg.data[i] !== TRANSPARENT) m[i] = 1;
@@ -483,7 +485,7 @@ export function lettered(img: Img): void {
 }
 
 /** Composite a layer onto img: draw it, or (shade/light) step what's below where it's opaque. */
-export function blend(img: Img, limg: Img, l: LayerOpts, pal: Palette): void {
+export function blend(img: Img, limg: Img, l: LayerOpts, pal: Palette, warn?: (msg: string) => void): void {
   if (limg.lamps?.length) (img.lamps ??= []).push(...limg.lamps);
   if (limg.orient?.text) lettered(img);
   if (l.blend !== undefined || l.opacity !== undefined) return mix(img, limg, l, pal);
@@ -511,11 +513,17 @@ export function blend(img: Img, limg: Img, l: LayerOpts, pal: Palette): void {
     map = pal.stepMap(l.shade !== undefined && l.shade !== false ? -1 : 1);
     if (typeof mode === "number") steps = mode;
   }
+  // a step through a color its ramps disagree on: say which ramp it went along (once per color)
+  const clash = warn && typeof mode !== "object" ? pal.stepClashes(l.shade !== undefined && l.shade !== false ? -1 : 1) : undefined;
   for (let i = 0; i < img.data.length; i++) {
     if (limg.data[i] === TRANSPARENT) continue;
     if (density < 1 && bayer(i % img.w, Math.floor(i / img.w)) >= density) continue;
     let c = img.data[i];
-    for (let s = 0; s < steps; s++) c = map.get(c) ?? c;
+    for (let s = 0; s < steps; s++) {
+      const why = clash?.get(c);
+      if (why) { warn!(why); clash!.delete(c); }
+      c = map.get(c) ?? c;
+    }
     img.data[i] = c;
   }
 }

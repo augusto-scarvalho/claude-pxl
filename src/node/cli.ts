@@ -155,6 +155,7 @@ export async function main(argv: string[]): Promise<number> {
       case "build": {
         const p = loadProject(file);
         const r = writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite });
+        for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);
         for (const l of r.lines) console.log(l);
         for (const e of r.errors) console.error("error: " + e.message);
         console.log(`-> ${outDir}${r.errors.length ? ` (${r.errors.length} error${r.errors.length > 1 ? "s" : ""})` : ""}`);
@@ -249,6 +250,12 @@ export async function main(argv: string[]): Promise<number> {
           if (x >= final.w || y >= final.h) throw new PxError(`(${x}, ${y}) is outside ${name} (${final.w}x${final.h})`);
           console.log(`${name} pixel (${x}, ${y}): the steps that changed it${frame0}`);
           let prev: Color = TRANSPARENT, lost = false;
+          // a shade or light step: the ramps it went along (where a shadow left its ramp for another's)
+          const via = (from: Color, to: Color, label: string) => {
+            if (from === TRANSPARENT || !def.pal.ramps.length || !/^(shade|light)\(| in (shade|light) layer '/.test(label)) return "";
+            const path = def.pal.stepPath(from, to, -1) ?? def.pal.stepPath(from, to, 1);
+            return path ? `  (${path})` : "";
+          };
           replay(b.trace, (s, img) => {
             const i = mapPixel(x, y, final, s.w, s.h);
             if (i === undefined) {
@@ -257,7 +264,7 @@ export async function main(argv: string[]): Promise<number> {
               return;
             }
             lost = false;
-            if (img.data[i] !== prev) row(s.n, s.label, s.loc, `-> ${key(img.data[i])}`);
+            if (img.data[i] !== prev) row(s.n, s.label, s.loc, `-> ${key(img.data[i])}${via(prev, img.data[i], s.label)}`);
             prev = img.data[i];
           });
           return 0;

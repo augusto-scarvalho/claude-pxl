@@ -151,6 +151,12 @@ export class Project implements BuildCtx {
   readonly fonts = new Map<string, FontDef>();
   /** rig() skeletons by name, for describe's RIG section. */
   readonly rigs = new Map<string, RigDef>();
+  /** What building found wrong but not fatal (a shade step that left its ramp): the CLI prints them, pxl check counts them. */
+  readonly warnings: { msg: string; loc?: string }[] = [];
+
+  warn(msg: string, loc?: string): void {
+    if (!this.warnings.some((w) => w.msg === msg && w.loc === loc)) this.warnings.push({ msg, loc });
+  }
   private glyphCache = new Map<string, (ch: string) => string[]>();
   /** Art files loaded so far (absolute paths or virtual names), for locations and watching. */
   readonly files: string[] = [];

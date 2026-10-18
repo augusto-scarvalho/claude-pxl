@@ -2,7 +2,8 @@
 // to an example) that adds or removes a warning anywhere, or what the checks could run on, shows up here.
 // The two warnings today are known: the knights scene shows a flipped knight beside the turned one, lit
 // from the wrong side (its lesson); the cemetery's crypt is misread (its outline is mostly trims: the
-// cornice, the steps; its columns are lit from the right, as the scene is).
+// cornice, the steps; its columns are lit from the right, as the scene is); no_magic's ramps branch at
+// its dark stone (stone and paper) and its dark rose (cloth and fire), and its lights step through them.
 // After a change you meant, rewrite the file: PXL_UPDATE=1 npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";

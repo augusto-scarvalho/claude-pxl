@@ -23,8 +23,11 @@ moon_bakery_3d.px.js: 0 warnings (1 scene (1 frame, 18 distinct placements), 0 r
   ran: lettering on 1; not run: front marker (nothing has one), lit side (no scene declares world.light), feet and size (nothing placed has a height)
 neon_noodle_3d.px.js: 0 warnings (1 scene (1 frame, 23 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lettering on 1; not run: front marker (nothing has one), lit side (no scene declares world.light), feet and size (nothing placed has a height)
-no_magic.px.js: 0 warnings (2 scenes (48 frames, 148 distinct placements), 0 rigs, 0 other assets with a front marker)
+no_magic.px.js: 3 warnings (2 scenes (48 frames, 148 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lettering on 16; not run: front marker (nothing has one), lit side (no scene declares world.light), feet and size (nothing placed has a height)
+  ramps (no_magic.px.js:928:3) › WARNING: light stepped 'S' to 's' along the ramp "kSsiI", but the ramps branch there (in "SBCcx" it goes on to 'B'): a pixel of the other branch takes this one's color. If both are lit, give each branch its own key
+  ramps (no_magic.px.js:974:3) › WARNING: light stepped 'S' to 's' along the ramp "kSsiI", but the ramps branch there (in "SBCcx" it goes on to 'B'): a pixel of the other branch takes this one's color. If both are lit, give each branch its own key
+  ramps (no_magic.px.js:974:3) › WARNING: light stepped 'R' to 'r' along the ramp "kRrq", but the ramps branch there (in "RHh" it goes on to 'H'): a pixel of the other branch takes this one's color. If both are lit, give each branch its own key
 normals.px.js: 0 warnings (2 scenes (2 frames, 14 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one), lit side (no scene declares world.light), feet and size (nothing placed has a height)
 outpost.px.js: 0 warnings (1 scene (1 frame, 12 distinct placements), 0 rigs, 0 other assets with a front marker)
