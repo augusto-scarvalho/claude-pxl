@@ -307,6 +307,13 @@ and the parts flipped (`knight_l` in the example). In a side view a limb's drawi
 depth more than to its side (the near arm drawn whole, the far one mostly hidden), so a rig turned
 around may need its new near limbs drawn.
 
+**What is checked, and what isn't.** `facing` is a label you write, not something pxl reads off the
+pixels. pxl follows it exactly through flips and turns, and lettering is tracked from `text()`
+itself, so a mirrored sign is always caught. Give each part with a front its own `facing` too: the
+RIG section then calls out a part that faces another way than the rig (a head drawn facing left
+on a body facing right). A drawing that faces left while its label says right is not caught: look
+at each part's preview once when you label it, while it is small and alone.
+
 `examples/rig/knight.px.js`: a 72 px knight in three stages (`knight_blocking`, `knight_parts`,
 `knight`), the same knight turned left, and both next to a flipped copy in a scene with a world
 scale, which `PXL describe` reads out.

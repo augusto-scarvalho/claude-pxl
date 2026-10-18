@@ -182,7 +182,7 @@ export async function main(argv: string[]): Promise<number> {
           pal = def.pal;
           world = def.opts.world;
           const rig = p.rigs.get(name);
-          if (rig) extra = rigLines(rig, (part) => { if (!p.has(part)) return undefined; const im = p.image(part); return [im.w, im.h]; });
+          if (rig) extra = rigLines(rig, (part) => (p.has(part) ? p.image(part) : undefined));
           frames = b.anim ? p.frames(name, 0, 64).map((f) => p.build(name, 0, f.t)) : undefined;
         }
         // each describe keeps what it saw in <out>/_describe; --diff compares with the last one

@@ -74,3 +74,12 @@ test("figure: landmarks of a standing figure by heads tall", () => {
   // 8 heads of 10 px: chin 10, crotch at 4 heads (40), knees at 6 (60), shoulders 2 heads wide
   assert.deepEqual([F.head, F.chin, F.crotch, F.knees, F.sole, F.shoulderW], [10, 10, 40, 60, 80, 20]);
 });
+
+test("rig: a part that faces another way than the rig is called out", async () => {
+  const text = await describeOf(PAL + `rig("man", { w: 9, h: 9, facing: "right", guide: false, slots: {
+  torso: { at: [4, 3], size: [3, 6] }, head: { at: [4, 3], size: [3, 3], pivot: [1, 3] } } })
+sprite("man_torso", { w: 3, h: 6, facing: "right" }, rect(0, 0, 3, 6, "w"))
+sprite("man_head", { w: 3, h: 3, facing: "left" }, rect(0, 0, 3, 3, "r"))`, "man");
+  assert.match(text, /head: [^\n]*drawn 'man_head'; WARNING: it faces left, the rig faces right/);
+  assert.doesNotMatch(text, /torso: [^\n]*WARNING/);
+});

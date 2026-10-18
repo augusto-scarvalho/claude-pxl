@@ -5,6 +5,7 @@
 // parts from the way it faces: the near side's limbs in front of the body, the far side's behind,
 // so a left arm never ends up in front because of a left/right mix-up. Retouches go on top.
 import type { Canvas } from "./canvas.ts";
+import type { Img } from "./image.ts";
 import { PxError } from "./errors.ts";
 
 export interface Slot {
@@ -124,8 +125,20 @@ export function drawGuide(rig: RigDef, c: Canvas): void {
   for (const [, s] of rig.slots) c.px(s.at[0], s.at[1], "#ffffff");
 }
 
-/** The RIG section of describe: slots back to front, where each goes, its side, and whether it's drawn. */
-export function rigLines(rig: RigDef, size: (part: string) => [number, number] | undefined): string[] {
+/** Which way a part's front points, in the rig's words, or undefined when it doesn't say. */
+function facingOf(img: Img): RigDef["facing"] | undefined {
+  const f = img.orient?.f;
+  if (!f) return undefined;
+  if (Math.abs(f[2]) > Math.max(Math.abs(f[0]), Math.abs(f[1]))) return f[2] < 0 ? "front" : "back";
+  return Math.abs(f[0]) >= Math.abs(f[1]) ? (f[0] > 0 ? "right" : "left") : undefined;
+}
+
+/**
+ * The RIG section of describe: slots back to front, where each goes, its side, and whether it's
+ * drawn. A part that says which way it faces is checked against the rig: a head drawn facing left
+ * on a body facing right is called out (the labels are what is checked, not the pixels).
+ */
+export function rigLines(rig: RigDef, image: (part: string) => Img | undefined): string[] {
   const side = (s: Slot) => {
     if (!s.side) return "middle";
     const d = depthOf(rig.facing, s.side), its = s.side === "r" ? "its right" : "its left";
@@ -136,13 +149,16 @@ export function rigLines(rig: RigDef, size: (part: string) => [number, number] |
   const out = [`RIG (facing ${rig.facing}; slots back to front; each part's pivot, or the slot's, sits on the joint):`];
   let missing = 0;
   for (const [slot, s] of ordered(rig)) {
-    const part = partOf(rig, slot, s), got = rig.parts ? size(part) : undefined;
+    const part = partOf(rig, slot, s), img = rig.parts ? image(part) : undefined, got = img && [img.w, img.h];
     const [x, y] = corner(s), box = `${s.size[0]}x${s.size[1]} at x ${x}-${x + s.size[0] - 1}, y ${y}-${y + s.size[1] - 1}`;
     let state: string;
     if (!rig.parts) { missing++; state = "stand-in (blocking pass)"; }
     else if (!got) { missing++; state = `not drawn yet: stand-in box (draw '${part}' ${s.size[0]}x${s.size[1]})`; }
     else if (got[0] === s.size[0] && got[1] === s.size[1]) state = `drawn '${part}'`;
     else state = `drawn '${part}' at ${got[0]}x${got[1]}, not the slot's ${s.size[0]}x${s.size[1]}`;
+    const pf = img && facingOf(img);
+    if (pf && pf !== rig.facing) state += `; WARNING: it faces ${pf}, the rig faces ${rig.facing}`;
+    else if (pf && img?.orient?.mirrored) state += "; a mirror image (flipped)";
     out.push(`  ${slot}: ${box}, joint ${s.at[0]},${s.at[1]}; ${side(s)}; ${state}`);
   }
   out.push(`  ${rig.slots.length - missing} of ${rig.slots.length} parts drawn`);

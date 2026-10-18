@@ -42,12 +42,13 @@ rig("knight_blocking", { w: 60, h: 76, facing: "right", pivot: [X, Y(F.sole)], p
 
 // ---------------------------------------------------------------- stage 2: the parts, one by one
 // Each part is drawn flat in a mid tone and given volume with relight (edges facing the light a
-// step lighter, the others darker), then glints and trims by hand. Each has its own outline, so
+// step lighter, the others darker), then glints and trims by hand. The parts that have a front say
+// which way it points (facing): describe checks them against the rig's facing. Each has its own outline, so
 // parts read apart where they overlap; its box is its slot's size, the outline included.
 
 // a bascinet with its visor down, in profile facing right: the slit and breaths at the front, a
 // gold band, the mail of the neck below
-sprite("knight_head", { w: 13, h: 13, outline: "k", pivot: [6, 13] },
+sprite("knight_head", { w: 13, h: 13, outline: "k", facing: "right", pivot: [6, 13] },
   ellipse(6, 5, 5, 5, "3"), poly([7, 2, 12, 5, 12, 8, 8, 10], "3"), rect(3, 9, 7, 4, "2"),
   relight(undefined, LIGHT),
   hline(6, 5, 7, "k"), px(10, 7, "1"), px(11, 8, "1"), px(9, 8, "1"),          // the slit, the breaths
@@ -56,7 +57,7 @@ sprite("knight_head", { w: 13, h: 13, outline: "k", pivot: [6, 13] },
   ...[[4, 11], [6, 11], [8, 11], [5, 12], [7, 12]].map(([x, y]) => px(x, y, "1")))   // mail rings
 
 // the chest under a blue surcoat: steel only at the neck; a gold trim, a belt with its buckle
-sprite("knight_torso", { w: 14, h: F.crotch - F.chin, outline: "k", pivot: [7, 0] },
+sprite("knight_torso", { w: 14, h: F.crotch - F.chin, outline: "k", facing: "right", pivot: [7, 0] },
   poly([3, 0, 9, 0, 12, 5, 13, 10, 12, 15, 11, 20, 12, 25, 3, 25, 2, 18, 1, 9, 2, 3], "w"),
   relight(undefined, LIGHT),
   hline(4, 0, 5, "2"), hline(4, 1, 6, "O"),                                     // collar of the mail, gold trim
@@ -64,14 +65,14 @@ sprite("knight_torso", { w: 14, h: F.crotch - F.chin, outline: "k", pivot: [7, 0
   hline(2, 16, 11, "T"), hline(2, 17, 11, "t"), rect(9, 15, 3, 3, "O"), px(10, 16, "Y"))   // belt and buckle
 
 // the surcoat's skirt below the belt: split at the front, a gold hem, folds hanging straight
-sprite("knight_tabard", { w: 16, h: 17, outline: "k", pivot: [8, 0] },
+sprite("knight_tabard", { w: 16, h: 17, outline: "k", facing: "right", pivot: [8, 0] },
   poly([2, 0, 13, 0, 15, 16, 0, 16], "w"),
   relight(undefined, LIGHT),
   vline(5, 4, 12, "q"), vline(10, 3, 13, "q"), vline(11, 5, 11, "e"),           // folds
   hline(0, 15, 16, "O"), hline(0, 16, 16, "o"), px(14, 15, "Y"))                // the hem
 
 // a leg in plate, profile: cuisse, the knee cop pointing forward, greave, sabaton
-sprite("knight_leg_r", { w: 10, h: 34, outline: "k", pivot: [5, 0] },
+sprite("knight_leg_r", { w: 10, h: 34, outline: "k", facing: "right", pivot: [5, 0] },
   poly([1, 0, 8, 0, 8, 15, 2, 15], "3"),                                        // thigh
   ellipse(6, 17, 3, 2, "3"),                                                    // knee cop
   poly([2, 19, 7, 19, 7, 30, 3, 30], "3"),                                      // shin
@@ -84,7 +85,7 @@ sprite("knight_leg_l", { base: "knight_leg_r", swap: { 5: "4", 4: "3", 3: "2", 2
 
 // the near arm: pauldron, the upper arm straight down, the elbow's couter behind, the forearm
 // reaching forward to the gauntlet closed on the sword's grip in front of the hip
-sprite("knight_arm_r", { w: 10, h: 27, outline: "k", pivot: [4, 0] },
+sprite("knight_arm_r", { w: 10, h: 27, outline: "k", facing: "right", pivot: [4, 0] },
   ellipse(4, 3, 4, 3, "3"), rect(0, 3, 9, 3, "3"),                              // pauldron
   rect(2, 6, 5, 7, "3"), ellipse(2, 13, 2, 2, "3"),                             // upper arm, couter
   poly([2, 13, 6, 13, 8, 20, 4, 21], "3"),                                      // forearm, forward
@@ -93,7 +94,7 @@ sprite("knight_arm_r", { w: 10, h: 27, outline: "k", pivot: [4, 0] },
   hline(0, 5, 9, "1"), hline(2, 12, 5, "1"), line(4, 20, 8, 19, "1"),           // plate edges
   px(6, 1, "5"), px(7, 2, "4"), vline(6, 7, 4, "4"), line(6, 14, 7, 18, "4"), px(8, 22, "4"))   // glints
 // the far arm: from the shoulder down and forward to the shield's grip, mostly hidden
-sprite("knight_arm_l", { w: 10, h: 16, outline: "k", pivot: [2, 0] },
+sprite("knight_arm_l", { w: 10, h: 16, outline: "k", facing: "right", pivot: [2, 0] },
   rect(0, 0, 5, 9, "2"), poly([2, 8, 6, 8, 10, 13, 9, 15, 4, 12], "2"),
   relight(undefined, LIGHT))
 
