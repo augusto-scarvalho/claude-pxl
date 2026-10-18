@@ -137,9 +137,11 @@ const CASTLE_X = 257                                    // in the gap between th
 const far = [...hills, stamp("castle_hill", CASTLE_X, 104), stamp("castle", CASTLE_X, 78)]
 // The air between us and all that: a veil of the sky's pale blue laid over the far things only
 // (their silhouettes, so the sky and its clouds stay as they are), which lowers their contrast and
-// cools their colors; and a mist lying in the valley at the hill's foot, thicker low, where the air
-// is denser, half hiding the woods and the road's last bend. Real translucency: new colors, not
-// palette keys (opacity layers leave the palette).
+// cools their colors (at 0.45: at 0.32 the castle's dark windows and its flags still read as near);
+// over it a band of haze down to the horizon, so the hill's foot fades more than its top (the sky
+// there is the haze's own color already, so only the land shows it); and a mist lying in the valley
+// at the hill's foot, half hiding the woods and the road's last bend. Real translucency: new colors,
+// not palette keys (opacity layers leave the palette).
 const veil = [...hills.map((h) => ({ ...h, args: [h.args[0], "D"] })),
   stamp("castle_hill", CASTLE_X, 104, { silhouette: "D" }), stamp("castle", CASTLE_X, 78, { silhouette: "D" })]
 const valleyMist = [...Array(7).keys()].map((i) => ellipse(20 + i * 48 + (i % 2) * 10, 101 - (i % 3), 34, 3, "D"))
@@ -210,20 +212,57 @@ anim("trumpeter", { w: 12, h: 18, frames: 96, fps: 8, pivot: [4, 18], outline: "
 })
 
 // ---------------------------------------------------------------- pavilions
-// round tents striped in a knight's colors, a pennant on the pole, flapping in the breeze from the
-// left; lit from the right
+// Round pavilions in a knight's colors, a cylinder under a cone seen from the side: the stripes run
+// round it, so they narrow toward its sides, and each is shaded by how far it has turned toward the
+// light from the right; the roof's stripes run up to the pole; a scalloped valance hangs from the eave
+// with a gold trim at its top; the door's flaps are tied back on their white lining; the base curves a
+// pixel toward us (it lies below the eye, the eave a little above). A gold finial, the pennant
+// flapping in the breeze from the left, guy ropes out to stakes (drawn outside the outline: a rope
+// isn't 3 px thick).
 anim("pennant_t", { w: 10, h: 5, frames: 8, fps: 8 }, (c) => {
   const k = c.phase * Math.PI * 2
   for (let x = 0; x < 9; x++) { const dy = Math.round(Math.sin(k - x * 0.7) * (x / 8)); c.vline(x, 1 + dy, Math.max(1, 3 - Math.floor(x / 3)), x > 5 ? "Z" : "y") }
 })
-const pavilion = (name, a, b) => sprite(name, { w: 34, h: 44, pivot: "bottom", outline: "k", height: 4.2 },
-  ...[...Array(6).keys()].map((i) => clip([2, 14, 32, 14, 33, 43, 1, 43], rect(1 + i * 6, 14, 6, 30, i % 2 ? b : a))),
-  ...[...Array(6).keys()].map((i) => clip([17, 2, 33, 15, 1, 15], poly([17, 2, 4 + i * 5, 15, 9 + i * 5, 15], i % 2 ? b : a))),
-  poly([12, 43, 17, 22, 22, 43], "t"),                                                  // the door, open
-  vline(17, 0, 3, "L"), relight([1, 2, 33, 42], { light: LIGHT, reach: 2 }))
-pavilion("pavilion_blue", "w", "c")
-pavilion("pavilion_red", "r", "c")
-sprite("pavilion_set", { w: 34, h: 50, pivot: "bottom", height: 4.5 }, stamp("pavilion_blue", 17, 50), stamp("pennant_t", 17, 2, { rdelay: true }))
+const PW = 38, PC = 19, PH = 46, TOP = 4, EAVE = 22, BASE = 44, WALL = 13, RIM = 17, STRIPES = 10
+const COLS = [["q", "w", "e"], ["v", "v", "c"]]                  // a stripe's shade, middle and lit tones
+sprite("pavilion", { w: PW, h: PH, pivot: "bottom", outline: "k", height: 4.2 }, (c) => {
+  // where round the tent a point is (-90 to 90 degrees, 0 facing us), its stripe and its tone
+  const turn = (x, r) => Math.asin(Math.max(-1, Math.min(1, (x + 0.5 - PC) / r)))
+  const band = (a) => Math.min(STRIPES - 1, Math.floor(((a + Math.PI / 2) / Math.PI) * STRIPES))
+  const tone = (a) => (Math.sin(a) > 0.3 ? 2 : Math.sin(a) > -0.5 ? 1 : 0)
+  const paint = (x, y, a, up = 0, shift = 0) => c.px(x, y, COLS[(band(a) + shift) % 2][Math.max(0, Math.min(2, tone(a) + up))])
+  // the wall, down to its base curving toward us; a row of shade under the valance
+  for (let x = PC - WALL; x < PC + WALL; x++) {
+    const a = turn(x, WALL), foot = BASE + Math.round(1.2 * Math.cos(a))
+    for (let y = EAVE; y <= foot; y++) paint(x, y, a, y <= EAVE + 7 ? -1 : 0)
+  }
+  // the roof sags a little between the pole and the eave (its radius grows faster low down); each
+  // pixel's stripe from where its line up to the pole meets the eave; facing the sky, a step lighter
+  for (let y = TOP; y <= EAVE; y++) {
+    const r = RIM * ((y - TOP + 0.5) / (EAVE - TOP)) ** 1.35
+    for (let x = Math.ceil(PC - r); x < PC + r; x++) paint(x, y, turn(x, r), 1)
+  }
+  // the valance round the eave, its stripes set half a stripe over from the wall's so it stands off
+  // it, each ending in a scallop; a gold trim along its top
+  for (let x = PC - RIM; x < PC + RIM; x++) {
+    const a = turn(x, RIM), s = ((a + Math.PI / 2) / Math.PI) * STRIPES, f = s - Math.floor(s)
+    const drop = EAVE + 3 + (f > 0.1 && f < 0.9 ? 1 : 0) + (f > 0.25 && f < 0.75 ? 1 : 0) + (f > 0.4 && f < 0.6 ? 1 : 0)
+    for (let y = EAVE + 1; y <= drop; y++) paint(x, y, a, 0, 1)
+    c.px(x, EAVE + 1, tone(a) === 2 ? "Z" : "y")
+  }
+  // the door: a pointed opening, dark inside, its flaps tied back on their white lining
+  c.poly([PC - 7, BASE + 2, PC - 3, 31, PC - 2, 31, PC - 3, BASE + 2], "c"); c.poly([PC + 3, BASE + 2, PC + 2, 31, PC + 3, 31, PC + 7, BASE + 2], "v")
+  c.poly([PC - 3, BASE + 2, PC - 2, 31, PC + 2, 31, PC + 3, BASE + 2], "z")
+  c.px(PC - 5, 38, "Z"); c.px(PC + 5, 38, "Z")
+  // the pole's top and its gold finial
+  c.vline(PC, 1, TOP, "L"); c.px(PC, 0, "Z")
+})
+// with its pennant and its guy ropes, pegged into the grass
+const ROPE = 6
+sprite("pavilion_set", { w: PW + 2 * ROPE, h: PH + 4, pivot: "bottom", height: 4.5 },
+  line(ROPE + PC - RIM, EAVE + 5, 1, PH + 3, "v"), line(ROPE + PC + RIM, EAVE + 5, PW + 2 * ROPE - 2, PH + 3, "v"),
+  px(0, PH + 3, "t"), px(PW + 2 * ROPE - 1, PH + 3, "t"),
+  stamp("pavilion", ROPE + PC + 1, PH + 3), stamp("pennant_t", ROPE + PC + 2, 2, { rdelay: true }))
 
 // ---------------------------------------------------------------- the lists' palisade
 // a rail of planks on posts, painted, between the field and the sand where the knights fight
@@ -273,10 +312,17 @@ anim("marshal", { w: 27, h: 40, pivot: [16, 40], fps: 8, outline: "k", selout: t
 // surcoat and shield field red, its cape blue) first, so the blue one's sword, on its near side,
 // crosses over the red one's, on its far side
 const KNIGHTS = [["knight_l_bout", 160, { swap: RED }], ["knight_bout", 160, {}]]
-// their shadows: the sun high at the top right lays them short, to the left and toward us
+// The sun is high, in front of us and to the right (the knights' fronts are lit): shadows fall to the
+// left and a little back, onto the ground behind what casts them. Those of what stands behind the
+// lists (the stand, the pavilions, the trumpeters, the palisade itself) go on the grass before those
+// things are drawn, so the palisade hides them where it should and they don't darken its rails (two
+// steps darker: one is lost in the grass's dither); the knights' and the marshal's go on the sand.
+const SUN = [-0.45, -0.25]
+const BEHIND = [["stand_full", 92, 122, {}], ["pavilion_set", 210, 121, {}], ["pavilion_set", 304, 121, { swap: RED }],
+  ["trumpeter", 14, 122, {}], ["trumpeter", 252, 122, { flip: "x" }]]
 const knights = KNIGHTS.map(([n, x, o]) => stamp(n, x, FEET, o))
-const shadows = [...KNIGHTS.map(([n, x, o]) => stamp(n, x, FEET, { ...o, cast: [-0.45, 0.1], silhouette: "k" })),
-  stamp("marshal", 160, 140, { cast: [-0.45, 0.1], silhouette: "k" })]
+const shadows = [...KNIGHTS.map(([n, x, o]) => stamp(n, x, FEET, { ...o, cast: SUN, silhouette: "k" })),
+  stamp("marshal", 160, 140, { cast: SUN, silhouette: "k" })]
 // the sand: trampled darker along the palisade's foot, scuffed where the knights have been
 // shifting their feet, a few straws blown in
 const sand = [
@@ -289,15 +335,14 @@ const sand = [
 scene("tournament", { w: W, h: H, bg: "A", world: { horizon: HZ, eye: EYE, light: LIGHT } },
   layer("sky", ...sky),
   layer("far", ...far),
-  layer("veil", { opacity: 0.32 }, ...veil),
+  layer("veil", { opacity: 0.45 }, ...veil),
+  layer("horizon haze", { opacity: 0.3 }, rect(0, 86, W, 18, "D")),
   layer("valley", { opacity: 0.45 }, ...valleyMist, rect(0, 102, W, 2, "D")),
   layer("field", ...field, ...sand),
-  layer("stands", { sort: "y" }, stamp("stand_full", 92, 122), stamp("trumpeter", 14, 122), stamp("trumpeter", 252, 122, { flip: "x" }),
-    stamp("pavilion_set", 210, 121), stamp("pavilion_set", 304, 121, { swap: { w: "r" } })),
+  layer("ground shadows", { shade: 2 }, ...BEHIND.map(([n, x, y, o]) => stamp(n, x, y, { ...o, cast: SUN, silhouette: "k" })),
+    tile("palisade", 0, 117, 23, 1, { cast: SUN, silhouette: "k" })),
+  layer("stands", { sort: "y" }, ...BEHIND.map(([n, x, y, o]) => stamp(n, x, y, o))),
   layer("lists", tile("palisade", 0, 117, 23, 1)),
-  layer("shadows", { shade: true }, ...shadows,
-    ...[["stand_full", 92], ["pavilion_set", 210], ["pavilion_set", 304]].map(([n, x]) =>
-      stamp(n, x, n === "stand_full" ? 122 : 121, { cast: [-0.45, 0.1], silhouette: "k" })),
-    ...[[14, {}], [252, { flip: "x" }]].map(([x, o]) => stamp("trumpeter", x, 122, { ...o, cast: [-0.45, 0.1], silhouette: "k" }))),
+  layer("shadows", { shade: true }, ...shadows),
   layer("knights", { sort: "y" }, stamp("marshal", 160, 140), ...knights),
   layer("sparks", stamp("knight_bout_fx", 160, FEET, { swap: { L: "v", T: "d" } })))

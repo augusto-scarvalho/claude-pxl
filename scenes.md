@@ -75,10 +75,15 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - The air between the viewer and far things lowers their contrast and cools them toward the
   horizon's sky, more at their foot, where it is denser. Lay a veil of the horizon color over the
   far things only: their silhouettes (`stamp(n, x, y, { silhouette: "D" })`, the hills' polygons
-  in that color) in a layer with `opacity` 0.25–0.35, so the sky and its clouds stay as they are;
-  then a mist lying low at the foot of the far hills (flat ellipses, `opacity` 0.4–0.5) that half
-  hides what stands there. `PXL describe` shows it worked: the far things' contrast against what is
-  around them drops (`lum 6/5 dE 8`). Opacity makes new colors outside the palette: say so.
+  in that color) in a layer with `opacity` 0.4–0.5, so the sky and its clouds stay as they are. At
+  0.3 the haze is there but doesn't read: dark windows and saturated flags still look near. Then a
+  band of the same color down to the horizon at `opacity` ~0.3: the sky there is that color already,
+  so only the land shows it, and the far things' feet fade more than their tops. Then a mist lying
+  low at the foot of the far hills (flat ellipses, `opacity` 0.4–0.5) that half hides what stands
+  there. `PXL describe` shows it worked: the far things' contrast against what is around them drops.
+  To check a translucent layer reaches something, build the scene with its opacity at 0 and compare
+  the pixels (what it doesn't change, it doesn't reach); a region it seems to miss may just be
+  hidden by what is in front. Opacity makes new colors outside the palette: say so.
 - Detail far things before veiling them (a hill with woods, fields and a road reads as a place; a
   flat shape stays flat under any haze), and keep them visible: a castle hidden behind the
   foreground's tents is wasted; open a gap in the foreground for it.
@@ -99,7 +104,14 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 ## Shadows and light
 
 - Cast shadows: a `shade: true` layer, with tall things stamped there by `cast: [kx, ky]` (laid flat
-  from their base, `silhouette: "k"`): a pixel h px up lands h × (kx, ky) away.
+  from their base, `silhouette: "k"`): a pixel h px up lands h × (kx, ky) away. One sun, one
+  `cast` for everything. `ky` says where the sun is in depth: negative, the shadows fall back (the
+  sun in front of us: the fronts we see are lit), positive, toward us (backlit).
+- A shadow is drawn on the ground before what stands in front of it: for things behind a fence or a
+  wall, give their shadows their own shade layer between the ground and those things, or the shadow
+  darkens the fence. Their shadows are mostly hidden there, as they should be; a sun low enough (a
+  more negative `ky`) lays them back onto ground that shows. On a dithered ground (grass) one step
+  of shade is lost in the dither: `shade: 2`.
 - From a point light near the ground (a lamp, a fire, a mirror ball), each shadow points away from
   the light and is longer the lower and nearer the light: `[kx, ky] = (base − light's ground point) /
   light height`, capped at length 1. Keep other lamps out of where a shadow falls: they fill it.
