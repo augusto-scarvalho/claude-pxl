@@ -257,11 +257,19 @@ anim("girl", { base: "girl_pose", frames: 4, fps: 4, flip: "x", pivot: "bottom" 
   (c) => { if (c.frame % 2) c.warp((x, y) => y <= 21 && [0, 1]) })
 
 // ---------------------------------------------------------------- cast shadows
-// A tall plant's shadow is the plant laid flat on the ground (cast): a pixel h px above its base
-// lands h * (0.62, 0.22) away, down and right of it, since the light comes from the top left. cast
-// applies after flip, so a mirrored palm still throws its shadow to the right.
+// Everything standing on the ground throws a shadow, the girl too: the thing laid flat on the ground
+// (cast), a pixel h px above its base landing h * (0.62, 0.22) away, down and right of it, since the
+// light comes from the top left. Low things (the log, rocks, ferns) get a short one that only
+// grounds them. cast applies after flip, so a mirrored palm still throws its shadow to the right.
+// Shadows in one layer don't add up, so whatever stands inside a tree's shadow (the girl does) shows
+// none of its own there: that's right, there's no sun to block. What still grounds it is the contact
+// shadow, where it meets the ground and the light around can't reach: the same silhouette squashed
+// to a tenth, in a layer of its own so it darkens inside the big shadows too. The tall plants don't
+// get one; their trunks and roots already meet the ground in their own shade.
 const TALL = ["tree", "tree2", "palm", "banana"]
+const GIRL = ["girl", 92, 137]
 const shadowOf = ([n, x, y, o]) => stamp(n, x, y, { ...o, cast: [0.62, 0.22], silhouette: "k" })
+const contactOf = ([n, x, y, o]) => stamp(n, x, y, { ...o, cast: [0.18, 0.12], silhouette: "k" })
 
 scene("forest", { w: W, h: H },
   layer("ground", terrain),
@@ -273,12 +281,13 @@ scene("forest", { w: W, h: H },
     scatter("clump", 0, 0, W, H, 80, { on: "g", below: true, even: true, rflip: "x", seed: 13 }),
     scatter("sprout", 0, 0, W, H, 60, { on: "g", below: true, even: true, rflip: "x", seed: 17 }),
     scatter("blooms", 0, 0, W, H, 26, { on: "g", below: true, even: true, seed: 9 })),
-  layer("shadows", { shade: 2 }, ...PLANTS.filter(([n]) => TALL.includes(n)).map(shadowOf)),
+  layer("shadows", { shade: 2 }, ...[...PLANTS, GIRL].map(shadowOf)),
+  layer("contact", { shade: 2 }, ...[...PLANTS.filter(([n]) => !TALL.includes(n)), GIRL].map(contactOf)),
   layer("water", stamp("ripples", 0, 0), stamp("splash", 0, 0), ...POOL_LIFE.map(place), stamp("frog", 217, 44)),
   layer("dapples", { light: 1 }, ...DAPPLES.map(([x, y, rx, ry]) => ellipse(x, y, rx, ry, "Z"))),
   layer("bridge", stamp("bridge", 112, 140)),
   // sort: "y" draws what stands lower (nearer) over what stands higher, whatever the call order
-  layer("props", { sort: "y" }, ...[...PLANTS, ...GRASS, ["girl", 92, 137]].map(place),
+  layer("props", { sort: "y" }, ...[...PLANTS, ...GRASS, GIRL].map(place),
     // grass along both edges of the trail (on grass within 3 px of its dirt), and now and then a
     // sprout on the trail itself, where feet go less; sorted with the rest by where they stand
     scatter("clump", 0, 0, W, H, 110, { on: "g", near: "aAo", within: 3, below: true, even: true, rflip: "x", seed: 23 }),
