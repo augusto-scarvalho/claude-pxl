@@ -80,6 +80,24 @@ speed, so each cloud instead thins away once a loop and re-forms where it starte
 the others. A skein of birds crosses toward the sun, and a faint aura breathes around it. Everything
 is drawn in code, MIT.
 
+## Showcase: knights built skeleton first, at a tournament
+
+<p>
+  <img src="docs/gallery/tournament.gif" width="100%" alt="Animated tournament in pixel art: two armored knights, blue and red, face each other on foot in a sand arena, the marshal between them raising a white baton; behind them a palisade, a grandstand under a striped canopy with a cheering crowd and heraldic banners, two trumpeters, striped pavilions with pennants and a castle on a hill">
+</p>
+
+The fourth, in [`examples/rig/`](examples/rig): a 72 px knight built the way
+[`characters.md`](characters.md) §11 describes. A `rig()` lays out its slots first (joints, boxes,
+the body's sides) and shows a stand-in for each part not drawn yet; each part is then drawn on its
+own from plates, each lit on its own layer, and drops in. The rig orders the parts from the way the
+knight faces, so the near arm is in front and the far one behind; `turn` makes the same knight
+facing left, relit for the same light, and the red knight is that one recolored. The shield is a
+part with two faces: facing right we see its inside (straps, grip), facing left its cross; it
+hangs from the hand and lies along the forearm. Assets say which way they face and how tall they
+really are, the scene says where its horizon, eye and light are, and `pxl describe` checks every
+placement against them: which way it faces, whether it's a mirror image, its size where it
+stands, whether its feet are on the ground, which side it's lit from.
+
 ## Quick start
 
 ```sh
