@@ -103,6 +103,21 @@ sprite("man_l_nose", { w: 1, h: 1 }, px(0, 0, "g"))`;
   assert.match(text, /nose: [^\n]*drawn 'man_l_nose'/);
 });
 
+test("rig turn with a part-name map: slots that name shared parts look them up under the other prefix", () => {
+  // two rigs (poses) share the parts kit_body and kit_nose; turned, each finds kit_l_<part>, else flips
+  const src = PAL + `const slots = { body: { at: [2, 0], size: [3, 4], pivot: [0, 0], part: "kit_body" }, nose: { at: [5, 1], size: [1, 1], pivot: [0, 0], part: "kit_nose" } }
+rig("pose_a", { w: 8, h: 4, facing: "right", guide: false, turn: { name: "pose_a_l", parts: ["kit_", "kit_l_"] }, slots })
+sprite("kit_body", { w: 3, h: 4 }, rect(0, 0, 3, 4, "r"))
+sprite("kit_nose", { w: 1, h: 1 }, px(0, 0, "k"))
+sprite("kit_l_nose", { w: 1, h: 1 }, px(0, 0, "g"))`;
+  const p = loadSource(src, "t.px.js"), rev = p.assets.get("pose_a")!.pal.reverse();
+  const row = (n: string, y: number) => { const im = p.image(n); return [...Array(im.w).keys()].map((x) => rev.get(im.data[y * im.w + x]) ?? ".").join(""); };
+  assert.equal(row("pose_a", 1), "..rrrk..");
+  // its own nose (kit_l_nose, g); no kit_l_body, so kit_body flipped
+  assert.equal(row("pose_a_l", 1), "..grrr..");
+  assert.throws(() => loadSource(PAL + `rig("x", { w: 4, h: 4, facing: "right", turn: { name: "x_l", parts: ["a"] }, slots: { b: { at: [0, 0], size: [1, 1] } } })`, "t.px.js"), /turn\.parts maps part names by prefix/);
+});
+
 test("pxl blind: shuffled unnamed images and a key; --check compares a reader's answers", async () => {
   const src = PAL + HEAD + `
 sprite("head_l", { base: "head", flip: "x" })`;

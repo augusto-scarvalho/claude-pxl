@@ -333,16 +333,15 @@ const pose = (p) => {
     once("shield" + held, () => shieldParts(held, shieldFrame((deg * Math.PI) / 180)))
     MOVED.arm_l = [lean, bob, armPart(p.shield.hand, "sarm", bend)]
   }
-  for (const [pre, m] of [["knight_", false], ["knight_l_", true]]) {
-    const slots = Object.fromEntries(Object.entries(SLOTS).map(([k, s]) => {
-      const [dx, dy, own] = MOVED[k] ?? [lean, bob], x = s.at[0] + OX + dx, y = s.at[1] + OY + dy
-      return [k, { ...s, at: [m ? RW - x : x, y], part: pre + (own ?? k),
-        ...(s.faces ? { faces: { outer: pre + "shield" + held, inner: pre + "shield_back" + held } } : {}) }]
-    }))
-    rig(pre + name, { w: RW, h: RH, facing: m ? "left" : "right", pivot: [m ? RW - X - OX : X + OX, Y(F.sole) + OY], height: 1.8,
-      light: LIT.light, far: 1, slots },
-      ...PLUME.map(([dx, dy, k]) => { const x = 29 + OX + lean + dx; return px(m ? RW - 1 - x : x, 3 + OY + bob + dy, k) }))
-  }
+  // the slots name their parts (shared by every pose); turned, each is looked up as knight_l_<part>
+  const slots = Object.fromEntries(Object.entries(SLOTS).map(([k, s]) => {
+    const [dx, dy, own] = MOVED[k] ?? [lean, bob]
+    return [k, { ...s, at: [s.at[0] + OX + dx, s.at[1] + OY + dy], part: "knight_" + (own ?? k),
+      ...(s.faces ? { faces: { outer: "knight_shield" + held, inner: "knight_shield_back" + held } } : {}) }]
+  }))
+  rig("knight_" + name, { w: RW, h: RH, facing: "right", pivot: [X + OX, Y(F.sole) + OY], height: 1.8, light: LIT.light, far: 1, slots,
+    turn: { name: "knight_l_" + name, parts: ["knight_", "knight_l_"] } },
+    ...PLUME.map(([dx, dy, k]) => px(29 + OX + lean + dx, 3 + OY + bob + dy, k)))
   return name
 }
 

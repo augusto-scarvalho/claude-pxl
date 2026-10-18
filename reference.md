@@ -55,7 +55,9 @@ previews. Items after the options are a retouch layer on top. `PXL describe` pri
 `light: [x, y]`: the light the parts are drawn under; each part's lit side is checked against it.
 `far: n`: the far side's parts n steps darker along the ramps. `turn: "name_l"`: also the same rig
 facing the other way (side views), its joints and pivots mirrored, each slot taking `name_l_<slot>`
-when that is drawn, else the original part flipped; the retouch mirrored; and `<rig>_turnaround`,
+when that is drawn, else the original part flipped (`turn: { name, parts: ["a_", "a_l_"] }`: slots
+that name their parts, shared by many rigs, are looked up under the other prefix instead, faces too);
+the retouch mirrored; and `<rig>_turnaround`,
 both side by side. A part's `front` socket (a point on its nose, toe, fist, blade's tip) is checked
 against its `facing`: it must sit on the drawing, on the half the label says it faces (behind both its center of mass and the middle of what's around the marker is the back half). A long thin part (a blade) is checked for which face is lit, not which side.
 Slots also take: `on: "arm_l.hand"` (its joint is that socket of the part in another slot: a shield

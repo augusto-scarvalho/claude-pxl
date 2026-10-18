@@ -60,6 +60,8 @@ export interface RigDef {
   far?: number;
   /** Turned from this rig (the slots mirrored). */
   from?: string;
+  /** Turned with a part-name prefix map: a part named from[0]+x is looked up as from[1]+x. */
+  rename?: [string, string];
   loc?: string;
 }
 
@@ -115,13 +117,14 @@ export function readRig(name: string, facing: unknown, slots: unknown, parts: un
  * light), else the original's part flipped; a two-faced part's faces likewise. The light stays where
  * it was: it doesn't turn with the rig.
  */
-export function turnRig(rig: RigDef, name: string, w: number): RigDef {
+export function turnRig(rig: RigDef, name: string, w: number, rename?: [string, string]): RigDef {
   if (rig.facing !== "right" && rig.facing !== "left") throw new PxError(`rig '${rig.name}': turn mirrors a side view, so it needs facing "right" or "left"`, rig.loc);
+  const map = (n: string) => (rename && n.startsWith(rename[0]) ? rename[1] + n.slice(rename[0].length) : undefined);
   const slots = rig.slots.map(([k, s]): [string, Slot] => {
-    const [px, py] = s.pivot ?? [s.size[0] / 2, 0];
-    return [k, { ...s, at: [w - s.at[0], s.at[1]], pivot: [s.size[0] - px, py], part: undefined, mirrorOf: partOf(rig, k, s) }];
+    const [px, py] = s.pivot ?? [s.size[0] / 2, 0], was = partOf(rig, k, s);
+    return [k, { ...s, at: [w - s.at[0], s.at[1]], pivot: [s.size[0] - px, py], part: map(was), mirrorOf: was }];
   });
-  return { ...rig, name, facing: rig.facing === "right" ? "left" : "right", slots, from: rig.name };
+  return { ...rig, name, facing: rig.facing === "right" ? "left" : "right", slots, from: rig.name, ...(rename ? { rename } : {}) };
 }
 
 /** "near", "far" or "" (middle, or a front/back view where both sides show) for a body side. */
@@ -181,8 +184,10 @@ function source(rig: RigDef, has: (n: string) => boolean, slot: string, s: Slot)
   if (s.faces) {
     const view = viewOf(rig, s)!, want = s.faces[view], name = want ?? s.faces.outer ?? s.faces.inner ?? s.faces.edge!;
     const lacking = want ? undefined : view;
-    if (rig.from && name.startsWith(rig.from + "_")) {
-      const own = rig.name + name.slice(rig.from.length);
+    const mapped = rig.rename ? (name.startsWith(rig.rename[0]) ? rig.rename[1] + name.slice(rig.rename[0].length) : undefined)
+      : rig.from && name.startsWith(rig.from + "_") ? rig.name + name.slice(rig.from.length) : undefined;
+    if (mapped) {
+      const own = mapped;
       if (has(own)) return { part: own, flip: false, view, lacking };
       if (has(name)) return { part: name, flip: true, view, lacking };
       return undefined;

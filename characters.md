@@ -336,9 +336,10 @@ rather than by hand: an arm from the shoulder to where the pose puts the hand (t
 comes out of the lengths, bent down and back), a sword at any angle from the hand, a leg from the hip
 to its foot flat on the ground (the knee bent forward, the body lowered when the feet are apart).
 Drawn plate by plate and relit like the hand-drawn parts, they look like them, and the rig still
-orders, darkens and checks them. The rest are the drawn parts, moved with the body. Build both
-facings of every pose (the mirrored parts are free with a draw helper that flips x) instead of
-`turn`, which looks up parts by the rig's name. Then the timing is a list: `[frames, pose, how far
+orders, darkens and checks them. The rest are the drawn parts, moved with the body. A pose's slots
+name their parts (`part: "knight_head"`: every pose shares them), so turn it with a prefix map,
+`turn: { name: "knight_l_pose3", parts: ["knight_", "knight_l_"] }`: the turned rig looks each part
+up as `knight_l_<part>`, else flips the original. Then the timing is a list: `[frames, pose, how far
 forward]`, and anything else on the same clock (sparks where the blades meet, dust at the feet, a
 marshal's signal) is computed from it. The two can differ where the fight isn't a mirror: a cut
 taken on the shield is one knight's cut and the other's block. A shield raised is the shield arm by

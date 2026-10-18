@@ -396,12 +396,18 @@ export class Project implements BuildCtx {
       if (turn === undefined) return;
       // turned: the same rig mirrored, facing the other way; and both side by side
       const W = rest.w as number, H = rest.h as number;
-      if (typeof turn !== "string" || !turn) throw new PxError(`rig '${name}': turn names the rig facing the other way (e.g. turn: "${name}_l")`, loc);
+      // turn: "name", or { name, parts: ["knight_", "knight_l_"] } when slots name their parts (shared
+      // by many rigs): the turned rig looks each one up under the other prefix
+      const tn = isPlainObject(turn) ? (turn as { name?: unknown }).name : turn, tp = isPlainObject(turn) ? (turn as { parts?: unknown }).parts : undefined;
+      if (typeof tn !== "string" || !tn) throw new PxError(`rig '${name}': turn names the rig facing the other way (e.g. turn: "${name}_l", or { name, parts: ["a_", "a_l_"] }), got ${JSON.stringify(turn)}`, loc);
+      if (isPlainObject(turn)) checkKeys(`rig '${name}' turn`, turn, ["name", "parts"], loc);
+      if (tp !== undefined && !(Array.isArray(tp) && tp.length === 2 && tp.every((x) => typeof x === "string")))
+        throw new PxError(`rig '${name}': turn.parts maps part names by prefix: [from, to] (e.g. ["knight_", "knight_l_"]), got ${JSON.stringify(tp)}`, loc);
       if (!(Number.isInteger(W) && Number.isInteger(H))) throw new PxError(`rig '${name}': turn needs { w, h }`, loc);
-      const t = turnRig(rig, turn, W), pv = rest.pivot, mp = (p: unknown) => (Array.isArray(p) ? [W - p[0], p[1]] : p);
+      const t = turnRig(rig, tn, W, tp as [string, string] | undefined), pv = rest.pivot, mp = (p: unknown) => (Array.isArray(p) ? [W - p[0], p[1]] : p);
       const so = rest.sockets as Record<string, [number, number]> | undefined;
       make(t, { ...rest, facing: t.facing, pivot: mp(pv), ...(so ? { sockets: Object.fromEntries(Object.entries(so).map(([k, p]) => [k, mp(p)])) } : {}) }, true);
-      define("sprite", `${name}_turnaround`, [{ w: 2 * W + 4, h: H }, (c: Canvas) => { c.put(c.asset(name), 0, 0); c.put(c.asset(turn), W + 4, 0); }]);
+      define("sprite", `${name}_turnaround`, [{ w: 2 * W + 4, h: H }, (c: Canvas) => { c.put(c.asset(name), 0, 0); c.put(c.asset(tn), W + 4, 0); }]);
     };
 
     for (const name of [...OPS, "clip", "lighting", "glow"]) {

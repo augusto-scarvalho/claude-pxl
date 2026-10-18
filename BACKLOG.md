@@ -203,11 +203,12 @@ Wave 2: describe and small engine features
 Wave 3: rigs in motion
 - [ ] **`twin: "<n>_l"` on a sprite**: its items drawn mirrored before lighting, pivot, sockets and
   facing mirrored: today a 25-line draw helper wraps every op to get a part lit for both facings.
-- [ ] **`turn` with a part-name prefix map** (`turn: { name, parts: ["knight_", "knight_l_"] }`), so
-  pose rigs whose slots name shared parts can use it; **`ik(a, b, target, bend)`** in the DSL (two
-  bones for arms and legs, written in the art file today).
-- [ ] **`arc(cx, cy, r, from, to, c, { inner })`** (smears, halos, partial rings) and **`has(name)`**
-  (a generated part defined once without a guard of one's own).
+- [x] **`turn` with a part-name prefix map** (`turn: { name, parts: ["knight_", "knight_l_"] }`), so
+  pose rigs whose slots name shared parts can use it (the knight's 33 poses do: one rig each instead
+  of two built by hand, 0 px changed); **`ik(a, b, target, bend)`** in the DSL (two bones for arms
+  and legs; the knight's own copy is gone).
+- [x] **`arc(cx, cy, r, from, to, c, { inner, taper })`** (smears, halos, partial rings: the bout's
+  smears use it) and **`has(name)`** (a generated part defined once without a guard of one's own).
 - [ ] Docs: included files share one scope (only an error message says so): name the cues two files
   share (the bout's signal frame) instead of matching numbers by hand.
 
