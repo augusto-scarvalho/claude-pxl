@@ -420,6 +420,26 @@ scene("s", { w: 16, h: 8, bg: "g" }, layer("props", stamp("rock", 0, 0), stamp("
   assert.match(png, /PIXELS 0,0 2x1[^\n]*\n[^\n]*\n[^\n]*\n {2}0 \w\w/);
 });
 
+test("describe --diff: what changed since the last describe (moved, recolored, regions)", async () => {
+  const art = (x: number, g: string) => `pal({ k: "#1b1630", g: "${g}" })
+sprite("rock", "kk\\nkk")
+scene("s", { w: 32, h: 20, bg: "g" }, layer("props", stamp("rock", 2, 2), stamp("rock", ${x}, 10)))`;
+  const { dir, file } = tmpArt(art(10, "#8ccf63"));
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try {
+    assert.equal(await main(["describe", file, "s"]), 0);
+    writeFileSync(file, art(13, "#7cc053"));
+    assert.equal(await main(["describe", file, "s", "--diff"]), 0);
+  } finally { console.log = log; }
+  assert.ok(existsSync(join(dir, "out", "_describe", "s.json")));
+  const diff = lines[1];
+  assert.match(diff, /recolor: #8ccf63 -> g=#7cc053 on \d+ px/);
+  assert.match(diff, /region x 10-14, y 10-11: 8 px \([^)]*rock #2 4px[^)]*\)/);   // where it left and where it went
+  assert.match(diff, /rock #2: moved \+3,\+0/);
+  assert.doesNotMatch(diff, /rock #1:/);   // the other rock did not change
+});
+
 test("describe: objects with their ranges, gaps and cover; shapes on a clear background, mirrored ones too", async () => {
   const { dir, file } = tmpArt(`pal({ k: "#1b1630", g: "#8ccf63", w: "#fff6e0" })
 sprite("rock", "kk\\nkk")

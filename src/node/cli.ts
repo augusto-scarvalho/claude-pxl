@@ -4,10 +4,11 @@ import { PxError, wrap } from "../core/errors.ts";
 import { type Color, TRANSPARENT, toHex } from "../core/color.ts";
 import { Palette } from "../core/palette.ts";
 import type { Img } from "../core/image.ts";
-import { describe } from "../core/describe.ts";
+import { type Snapshot, describe } from "../core/describe.ts";
+import type { BuildOut } from "../core/build.ts";
 import { ascii, compareSilhouettes, preview } from "../core/render.ts";
 import { mapPixel, replay, stepSheet } from "../core/steps.ts";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { loadProject } from "./load.ts";
 import { decodePng } from "./png.ts";
 import { writeOutputs, writePng } from "./output.ts";
@@ -26,7 +27,7 @@ const USAGE = `pxl — pixel-art DSL
       Print an asset as palette keys with x/y rulers (anims: every frame).
   pxl list  <art.px.js>
       List assets, groups and sheets with their source locations.
-  pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h]   (or: pxl describe <image.png> [...])
+  pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h] [--diff]   (or: pxl describe <image.png> [...])
       A whole scene as text to read at once: what was painted (steps grouped by source line), what
       was placed where, cell maps (object on top, color before lighting, brightness after it), how
       each placement stands out from its surroundings; --at adds that region's exact pixels. Any PNG
@@ -53,6 +54,7 @@ interface Args {
   port?: number;
   at?: number[];
   cell?: number;
+  diff?: boolean;
   sheet?: boolean;
   shrink?: number;
   offset?: [number, number];
@@ -87,6 +89,7 @@ function parse(argv: string[]): Args {
       a.at = m.slice(1).filter((s) => s !== undefined).map(Number);
     }
     else if (v === "--cell") a.cell = Number(val());
+    else if (v === "--diff") a.diff = true;
     else if (v === "-h" || v === "--help") a.cmd = "help";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -138,23 +141,40 @@ export async function main(argv: string[]): Promise<number> {
       case "describe": {
         if (a.at && a.at.length !== 4) throw new PxError("describe --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
         const at = a.at as [number, number, number, number] | undefined;
+        let name: string, b: BuildOut, pal: Palette, frames: BuildOut[] | undefined;
         if (/\.png$/i.test(file)) {
           // any image: its colors get index keys, most common first (past 62 they show as "~")
           let img: Img;
           try { img = decodePng(readFileSync(file)); } catch (e) { throw new PxError(`${a.file}: ${(e as Error).message}`); }
           const n = new Map<Color, number>();
           for (const c of img.data) if (c !== TRANSPARENT) n.set(c, (n.get(c) ?? 0) + 1);
-          const pal = Palette.fromColors([...n].sort((x, y) => y[1] - x[1]).slice(0, 62).map(([c]) => c));
-          console.log(describe(a.file!.replace(/^.*[\/]/, ""), { img, layers: [], placements: [] }, pal, { cell: a.cell, at }));
-          return 0;
+          name = basename(file);
+          b = { img, layers: [], placements: [] };
+          pal = Palette.fromColors([...n].sort((x, y) => y[1] - x[1]).slice(0, 62).map(([c]) => c));
+        } else {
+          name = a.rest[0];
+          if (!name) throw new PxError("describe needs an asset name: pxl describe <file> <name> [--cell N] [--at x,y,w,h] [--diff]");
+          const p = loadProject(file, { trace: true });
+          const def = p.assets.get(name);
+          if (!def) throw new PxError(`unknown asset '${name}'`);
+          b = p.build(name);
+          pal = def.pal;
+          frames = b.anim ? p.frames(name, 0, 64).map((f) => p.build(name, 0, f.t)) : undefined;
         }
-        const name = a.rest[0];
-        if (!name) throw new PxError("describe needs an asset name: pxl describe <file> <name> [--cell N] [--at x,y,w,h]");
-        const p = loadProject(file, { trace: true });
-        const def = p.assets.get(name);
-        if (!def) throw new PxError(`unknown asset '${name}'`);
-        const b = p.build(name), frames = b.anim ? p.frames(name, 0, 64).map((f) => p.build(name, 0, f.t)) : undefined;
-        console.log(describe(name, b, def.pal, { cell: a.cell, at, frames }));
+        // each describe keeps what it saw in <out>/_describe; --diff compares with the last one
+        const keep = join(outDir, "_describe", name.replace(/[^\w.-]/g, "_"));
+        let prev: Snapshot | undefined;
+        if (a.diff) {
+          if (!existsSync(keep + ".json")) console.log(`(no earlier describe of ${name} in ${join(outDir, "_describe")}: this one is kept for the next --diff)\n`);
+          else prev = { objects: JSON.parse(readFileSync(keep + ".json", "utf8")).objects, img: decodePng(readFileSync(keep + ".png")), unlit: decodePng(readFileSync(keep + ".unlit.png")) };
+        }
+        const r = describe(name, b, pal, { cell: a.cell, at, frames, prev });
+        console.log(r.text);
+        if (a.out !== false) {
+          writePng(keep + ".png", r.snap.img);
+          writePng(keep + ".unlit.png", r.snap.unlit);
+          writeFileSync(keep + ".json", JSON.stringify({ name, time: new Date().toISOString(), objects: r.snap.objects }, null, 1) + "\n");
+        }
         return 0;
       }
       case "steps": {

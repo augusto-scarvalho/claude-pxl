@@ -22,6 +22,15 @@ export interface DescribeOpts {
   tile?: number;
   /** The asset at each frame of its loop, for motion (same placements in the same order). */
   frames?: BuildOut[];
+  /** What an earlier describe saw: CHANGES then says what is different now. */
+  prev?: Snapshot;
+}
+
+/** What describe saw, kept to tell later what changed: objects by label, and the pixels. */
+export interface Snapshot {
+  objects: { label: string; x0: number; y0: number; x1: number; y1: number; n: number; hash: string }[];
+  img: Img;
+  unlit: Img;
 }
 
 const SYMBOLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&*+=?";
@@ -44,7 +53,7 @@ const mean3 = (cs: Color[]): [number, number, number] => {
 /** Many copies of one small thing (a brush, a string of lights): one line, not one per copy. */
 const MANY = 6;
 
-export function describe(name: string, b: BuildOut, pal: Palette, opts: DescribeOpts = {}): string {
+export function describe(name: string, b: BuildOut, pal: Palette, opts: DescribeOpts = {}): { text: string; snap: Snapshot } {
   const C = opts.cell ?? 8, img = b.img, W = img.w, H = img.h, out: string[] = [];
   // colors outside the palette (made by blending: mist, opacity) all show as "~"
   const rev = pal.reverse(), key = (c: Color) => (c === TRANSPARENT ? "." : rev.get(c) ?? "~");
@@ -195,6 +204,75 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     const share = Math.round((100 * ch) / Math.max(1, tot));
     return share === 0 && !moved ? "still" : `animated: ${share}% of its drawing changes per frame` + (moved ? `, shifts ${x1 - x0}px across, ${y1 - y0}px up/down` : "");
   };
+
+
+  // what changed since an earlier describe: objects by label, then the pixels, in regions
+  const snap: Snapshot = {
+    objects: main.filter((i) => shown[i].n).map((i) => ({ label: label(i), x0: shown[i].x0, y0: shown[i].y0, x1: shown[i].x1, y1: shown[i].y1, n: shown[i].n, hash: b.placements[i].img.hash() })),
+    img, unlit,
+  };
+  if (opts.prev) {
+    const pv = opts.prev, before = new Map(pv.objects.map((o) => [o.label, o])), now = new Set(snap.objects.map((o) => o.label));
+    const lines: string[] = [];
+    for (const o of snap.objects) {
+      const q = before.get(o.label);
+      if (!q) { lines.push(`added ${o.label}: x ${o.x0}-${o.x1}, y ${o.y0}-${o.y1}`); continue; }
+      const dx = o.x0 - q.x0, dy = o.y0 - q.y0, same = o.x1 - o.x0 === q.x1 - q.x0 && o.y1 - o.y0 === q.y1 - q.y0;
+      const what: string[] = [];
+      if ((dx || dy) && same) what.push(`moved ${dx >= 0 ? "+" : ""}${dx},${dy >= 0 ? "+" : ""}${dy}`);
+      else if (!same || dx || dy) what.push(`now x ${o.x0}-${o.x1}, y ${o.y0}-${o.y1} (was x ${q.x0}-${q.x1}, y ${q.y0}-${q.y1})`);
+      if (o.hash !== q.hash) what.push("redrawn");
+      else if (o.n !== q.n) what.push(`${o.n - q.n > 0 ? "more" : "less"} of it shows (${q.n} -> ${o.n} px)`);
+      if (what.length) lines.push(`${o.label}: ${what.join(", ")}`);
+    }
+    for (const o of pv.objects) if (!now.has(o.label)) lines.push(`removed ${o.label} (was x ${o.x0}-${o.x1}, y ${o.y0}-${o.y1})`);
+    out.push("CHANGES (since the last describe of this asset):");
+    if (pv.img.w !== W || pv.img.h !== H) out.push(`  size: ${pv.img.w}x${pv.img.h} -> ${W}x${H}`);
+    else {
+      const art = new Uint8Array(W * H), light = new Uint8Array(W * H);
+      let nArt = 0, nLight = 0;
+      for (let j = 0; j < W * H; j++) {
+        if (unlit.data[j] !== pv.unlit.data[j]) { art[j] = 1; nArt++; }
+        else if (img.data[j] !== pv.img.data[j]) { light[j] = 1; nLight++; }
+      }
+      out.push(`  pixels: ${nArt} changed in the drawing${unlit !== img ? `, ${nLight} more only in the light` : ""}`);
+      // one color turned into another over many pixels is a palette or recolor change: one line, and
+      // its pixels stay out of the regions so a small edit next to it still shows
+      const pairs = new Map<string, number>();
+      for (let j = 0; j < W * H; j++) if (art[j]) { const k = `${pv.unlit.data[j]}>${unlit.data[j]}`; pairs.set(k, (pairs.get(k) ?? 0) + 1); }
+      const recolor = new Set([...pairs].filter(([, n]) => n >= Math.max(200, nArt / 10)).map(([k]) => k));
+      for (const k of recolor) {
+        const [from, to] = k.split(">").map(Number);
+        out.push(`  recolor: ${toHex(from)} -> ${key(to)}=${toHex(to)} on ${pairs.get(k)} px`);
+      }
+      if (recolor.size) for (let j = 0; j < W * H; j++) if (art[j] && recolor.has(`${pv.unlit.data[j]}>${unlit.data[j]}`)) art[j] = 0;
+      // regions: changed pixels grouped when within 2 px of each other
+      const any = (j: number) => art[j] || light[j], seen = new Uint8Array(W * H), regions: { x0: number; y0: number; x1: number; y1: number; n: number; who: Map<string, number> }[] = [];
+      for (let j = 0; j < W * H; j++) {
+        if (!any(j) || seen[j]) continue;
+        const r = { x0: W, y0: H, x1: -1, y1: -1, n: 0, who: new Map<string, number>() }, stack = [j];
+        seen[j] = 1;
+        while (stack.length) {
+          const k = stack.pop()!, x = k % W, y = (k - x) / W;
+          r.n++; r.x0 = Math.min(r.x0, x); r.x1 = Math.max(r.x1, x); r.y0 = Math.min(r.y0, y); r.y1 = Math.max(r.y1, y);
+          const o = owner[k], wname = o >= 0 && isMain(o) ? label(o) : o >= 0 ? b.placements[o].name : "background";
+          r.who.set(wname, (r.who.get(wname) ?? 0) + 1);
+          for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+            const X = x + dx, Y = y + dy, n = Y * W + X;
+            if (X >= 0 && Y >= 0 && X < W && Y < H && !seen[n] && any(n)) { seen[n] = 1; stack.push(n); }
+          }
+        }
+        regions.push(r);
+      }
+      regions.sort((p, q) => q.n - p.n).slice(0, 8).forEach((r) => {
+        const who = [...r.who].sort((p, q) => q[1] - p[1]).slice(0, 3).map(([w, n]) => `${w} ${n}px`).join(", ");
+        out.push(`  region x ${r.x0}-${r.x1}, y ${r.y0}-${r.y1}: ${r.n} px (${who})`);
+      });
+      if (regions.length > 8) out.push(`  …+${regions.length - 8} smaller regions`);
+    }
+    out.push(...(lines.length ? lines.map((l) => "  " + l) : ["  objects: none moved, redrawn, added or removed"]));
+    out.push("");
+  }
 
   if (main.length) {
     out.push("OBJECTS (in drawing order: later ones are in front; ranges are inclusive px; feet = bottom middle):");
@@ -356,5 +434,5 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       out.push(row);
     }
   }
-  return out.join("\n");
+  return { text: out.join("\n"), snap };
 }

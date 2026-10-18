@@ -24,7 +24,9 @@ parts, primitives, brushes and tilemaps. Needs Node ≥ 22.18. No install step.
    text (~5k tokens): each object's visible ranges, feet, what covers it, its nearest neighbours and
    gaps, how it stands out after lighting and how much it moves, then cell maps; `--at x,y,w,h` adds
    a region's exact pixels. Answer layout questions from it, not by eyeballing the preview.
-4. Fix with small edits (a `grid(x, y, ...)` patch, one op) and rebuild. Repeat. A pixel came out
+4. Fix with small edits (a `grid(x, y, ...)` patch, one op) and rebuild. Repeat. In a scene,
+   `PXL describe art.px.js <scene> --diff` after the edit lists what moved, was redrawn or
+   recolored since the last describe, so a change that spilled somewhere else shows. A pixel came out
    wrong and you don't know which op painted it? `PXL steps art.px.js <name> --at x,y` lists the
    steps that changed it, with file:line and the color after each.
 5. Before handing it over, look at the preview once more as a critic, for what reviewers flag most:

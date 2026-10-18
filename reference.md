@@ -282,7 +282,7 @@ node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-pr
 node <pxl>/bin/pxl.js ascii <file> <name>
 node <pxl>/bin/pxl.js list  <file>
 node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--sheet] [--out DIR]
-node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h]     (or describe <image.png>)
+node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h] [--diff]     (or describe <image.png>)
 node <pxl>/bin/pxl.js compare <file> <name> <ref.png> [--shrink N] [--offset x,y]
 ```
 
@@ -309,6 +309,12 @@ models reading layout):
 - PAINTED: the painting steps grouped by source line (one line of code is one intent: a fence loop
   is `vline/px x104`).
 - `--at x,y,w,h`: that region's exact keys, with absolute rulers.
+- `--diff`: each describe keeps what it saw in `<out>/_describe/`; with `--diff` the output starts
+  with CHANGES since the last one: objects moved (`werewolf: moved +2,+0`), redrawn, added or
+  removed; how many pixels changed in the drawing and only in the light; one color turned into
+  another over many pixels as one `recolor` line; and the other changed pixels as regions with the
+  objects they belong to, largest first. Run it after an edit to see that it touched only what you
+  meant.
 
 A 320x180 lit scene comes to ~17k characters (~5k tokens; a busy 320x240 one ~21k), where the 2x
 preview costs a few hundred tokens: read the preview for the look, this for anything you would
