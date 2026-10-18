@@ -24,6 +24,8 @@ export interface DescribeOpts {
   frames?: BuildOut[];
   /** What an earlier describe saw: CHANGES then says what is different now. */
   prev?: Snapshot;
+  /** A line to print under the header (how the image was read). */
+  note?: string;
 }
 
 /** What describe saw, kept to tell later what changed: objects by label, and the pixels. */
@@ -103,6 +105,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
 
   const frames = b.anim ? `, animated (frame 0 of the loop, ${b.anim.loop} ms)` : "";
   out.push(`${name} ${W}x${H}${frames}. Coordinates are x,y in px from the top left; a range a-b includes both ends.`);
+  if (opts.note) out.push(opts.note);
   out.push("");
   // objects: every placement but the many-copies ones, each with its relations worked out
   const many = new Set(keys.filter((k) => byKey.get(k)!.length > MANY));
@@ -335,7 +338,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       for (const [k, v] of n) if (v > most) { most = v; best = k; }
       return most * 4 >= total ? sym.get(best)! : ".";
     });
-  map(`COLOR (each cell: its most common palette key before lighting):`, (x0, y0) => {
+  map(`COLOR (each cell: its most common ${b.trace ? "palette key before lighting" : "color key"}):`, (x0, y0) => {
     const n = new Map<Color, number>();
     cells(x0, y0, (i) => n.set(unlit.data[i], (n.get(unlit.data[i]) ?? 0) + 1));
     let best: Color = TRANSPARENT, most = -1;
@@ -398,8 +401,74 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     out.push("");
   }
 
-  // a plain opaque image (no build behind it): what repeats is found in the pixels, tile by tile
+  // a plain opaque image (no build behind it): the background is what forms large patches of one
+  // color (8-connected, so a dither counts as one patch); what is left, grouped into 8-connected
+  // patches, are the objects; identical or mirrored ones are one entry; a grid of identical tiles
+  // shows too when the image is built from them
   else if (!b.trace && !b.placements.length) {
+    const big = Math.max(64, Math.round(W * H * 0.004)), comp = new Int32Array(W * H).fill(-1);
+    const patches: { c: Color; n: number; x0: number; y0: number; x1: number; y1: number }[] = [];
+    for (let j = 0; j < W * H; j++) {
+      if (comp[j] >= 0) continue;
+      const c = img.data[j], id = patches.length, r = { c, n: 0, x0: W, y0: H, x1: -1, y1: -1 }, stack = [j];
+      comp[j] = id;
+      while (stack.length) {
+        const k = stack.pop()!, x = k % W, y = (k - x) / W;
+        r.n++; r.x0 = Math.min(r.x0, x); r.x1 = Math.max(r.x1, x); r.y0 = Math.min(r.y0, y); r.y1 = Math.max(r.y1, y);
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const X = x + dx, Y = y + dy, n = Y * W + X;
+          if (X >= 0 && Y >= 0 && X < W && Y < H && comp[n] < 0 && img.data[n] === c) { comp[n] = id; stack.push(n); }
+        }
+      }
+      patches.push(r);
+    }
+    const isBg = (j: number) => patches[comp[j]].n >= big;
+    const bgList = patches.filter((r) => r.n >= big).sort((p, q) => q.n - p.n);
+    out.push(`REGIONS (patches of one color of ${big} px or more, the background; largest first):`);
+    for (const r of bgList.slice(0, 14)) out.push(`  ${key(r.c)}=${r.c === TRANSPARENT ? "clear" : toHex(r.c)} ${r.n}px over x ${r.x0}-${r.x1}, y ${r.y0}-${r.y1}`);
+    if (bgList.length > 14) out.push(`  …+${bgList.length - 14} more`);
+    out.push("");
+    // objects: what is not background, in 8-connected patches
+    const seen = new Uint8Array(W * H), shapes = new Map<string, { img: Img; at: string[]; box: [number, number, number, number]; n: number }>();
+    const flipX = (q: Img) => { const o = new Img(q.w, q.h); for (let y = 0; y < q.h; y++) for (let x = 0; x < q.w; x++) o.data[y * q.w + x] = q.data[y * q.w + q.w - 1 - x]; return o; };
+    let specks = 0;
+    for (let j = 0; j < W * H; j++) {
+      if (seen[j] || isBg(j)) continue;
+      const stack = [j], px: number[] = [];
+      seen[j] = 1;
+      let x0 = W, y0 = H, x1 = -1, y1 = -1;
+      while (stack.length) {
+        const k = stack.pop()!, x = k % W, y = (k - x) / W;
+        px.push(k); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const X = x + dx, Y = y + dy, n = Y * W + X;
+          if (X >= 0 && Y >= 0 && X < W && Y < H && !seen[n] && !isBg(n)) { seen[n] = 1; stack.push(n); }
+        }
+      }
+      if (px.length <= 3) { specks++; continue; }
+      const shape = new Img(x1 - x0 + 1, y1 - y0 + 1);
+      for (const k of px) { const x = k % W, y = (k - x) / W; shape.data[(y - y0) * shape.w + x - x0] = img.data[k]; }
+      const h = shape.hash(), hf = flipX(shape).hash(), hit = shapes.get(h) ?? shapes.get(hf);
+      const where = `${x0},${y0}${!shapes.has(h) && shapes.has(hf) ? " flipped" : ""}`;
+      if (hit) hit.at.push(where); else shapes.set(h, { img: shape, at: [where], box: [x0, y0, x1, y1], n: px.length });
+    }
+    const colorsOf = (q: Img) => {
+      const n = new Map<string, number>();
+      for (const c of q.data) if (c !== TRANSPARENT) n.set(key(c), (n.get(key(c)) ?? 0) + 1);
+      return [...n].sort((p, r) => r[1] - p[1]).slice(0, 3).map(([k]) => k).join("");
+    };
+    const single = [...shapes.values()].filter((v) => v.at.length === 1).sort((p, q) => q.n - p.n);
+    const repeated = [...shapes.values()].filter((v) => v.at.length > 1).sort((p, q) => q.at.length - p.at.length);
+    out.push(`OBJECTS (what is not background, in 8-connected patches; largest first; touching things come out as one):`);
+    for (const v of single.slice(0, 40)) out.push(`  x ${v.box[0]}-${v.box[2]}, y ${v.box[1]}-${v.box[3]} (${v.img.w}x${v.img.h}), ${v.n}px, colors ${colorsOf(v.img)}`);
+    if (single.length > 40) out.push(`  …+${single.length - 40} smaller`);
+    if (repeated.length) {
+      out.push("  repeated (identical or mirrored):");
+      for (const v of repeated.slice(0, 20)) out.push(`    ${v.img.w}x${v.img.h} x${v.at.length}, colors ${colorsOf(v.img)}: ${v.at.slice(0, 10).join("  ")}${v.at.length > 10 ? ` …+${v.at.length - 10}` : ""}`);
+    }
+    if (specks) out.push(`  and ${specks} specks of 1-3 px (stars, sparkles, dither ends)`);
+    out.push("");
+
     const T = opts.tile ?? 16, tw = Math.ceil(W / T), th = Math.ceil(H / T), ids = new Map<string, number>(), first: [number, number][] = [];
     const rows: string[] = [];
     let empty = 0;
@@ -415,12 +484,14 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       rows.push(row);
     }
     const filled = tw * th - empty;
-    out.push(`TILES (${T}x${T} grid: each symbol is one distinct tile; ${ids.size} distinct of ${filled} filled${ids.size > SYMBOLS.length ? `, "~" = past the ${SYMBOLS.length}th` : ""}):`);
-    out.push("    " + Array.from({ length: tw }, (_, i) => String(Math.floor((i * T) / 100) % 10)).join("") + "  (x / 100)");
-    out.push("    " + Array.from({ length: tw }, (_, i) => String(Math.floor((i * T) / 10) % 10)).join("") + "  (x / 10)");
-    out.push(...rows);
-    out.push("  first seen at (for --at x,y," + T + "," + T + "): " + first.slice(0, SYMBOLS.length).map(([x, y], i) => `${SYMBOLS[i]} ${x},${y}`).join("  "));
-    out.push("");
+    if (ids.size * 2 <= filled) {
+      out.push(`TILES (${T}x${T} grid: each symbol is one distinct tile; ${ids.size} distinct of ${filled} filled${ids.size > SYMBOLS.length ? `, "~" = past the ${SYMBOLS.length}th` : ""}):`);
+      out.push("    " + Array.from({ length: tw }, (_, i) => String(Math.floor((i * T) / 100) % 10)).join("") + "  (x / 100)");
+      out.push("    " + Array.from({ length: tw }, (_, i) => String(Math.floor((i * T) / 10) % 10)).join("") + "  (x / 10)");
+      out.push(...rows);
+      out.push("  first seen at (for --at x,y," + T + "," + T + "): " + first.slice(0, SYMBOLS.length).map(([x, y], i) => `${SYMBOLS[i]} ${x},${y}`).join("  "));
+      out.push("");
+    }
   }
 
   if (opts.at) {

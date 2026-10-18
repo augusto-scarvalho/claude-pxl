@@ -11,6 +11,7 @@ import { mapPixel, replay, stepSheet } from "../core/steps.ts";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { loadProject } from "./load.ts";
 import { decodePng } from "./png.ts";
+import { reduceColors } from "./gif.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 
@@ -141,7 +142,7 @@ export async function main(argv: string[]): Promise<number> {
       case "describe": {
         if (a.at && a.at.length !== 4) throw new PxError("describe --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
         const at = a.at as [number, number, number, number] | undefined;
-        let name: string, b: BuildOut, pal: Palette, frames: BuildOut[] | undefined;
+        let name: string, b: BuildOut, pal: Palette, frames: BuildOut[] | undefined, note: string | undefined;
         if (/\.png$/i.test(file)) {
           // any image: its colors get index keys, most common first (past 62 they show as "~")
           let img: Img;
@@ -149,6 +150,14 @@ export async function main(argv: string[]): Promise<number> {
           const n = new Map<Color, number>();
           for (const c of img.data) if (c !== TRANSPARENT) n.set(c, (n.get(c) ?? 0) + 1);
           name = basename(file);
+          if (n.size > 64 && !img.data.some((c) => c === TRANSPARENT)) {
+            // many colors (a lit render, a painting): read it in 32, or every pixel is its own patch
+            const from = n.size;
+            img = reduceColors(img, 32);
+            n.clear();
+            for (const c of img.data) n.set(c, (n.get(c) ?? 0) + 1);
+            note = `(read in ${n.size} colors, reduced from ${from})`;
+          }
           b = { img, layers: [], placements: [] };
           pal = Palette.fromColors([...n].sort((x, y) => y[1] - x[1]).slice(0, 62).map(([c]) => c));
         } else {
@@ -168,7 +177,7 @@ export async function main(argv: string[]): Promise<number> {
           if (!existsSync(keep + ".json")) console.log(`(no earlier describe of ${name} in ${join(outDir, "_describe")}: this one is kept for the next --diff)\n`);
           else prev = { objects: JSON.parse(readFileSync(keep + ".json", "utf8")).objects, img: decodePng(readFileSync(keep + ".png")), unlit: decodePng(readFileSync(keep + ".unlit.png")) };
         }
-        const r = describe(name, b, pal, { cell: a.cell, at, frames, prev });
+        const r = describe(name, b, pal, { cell: a.cell, at, frames, prev, note });
         console.log(r.text);
         if (a.out !== false) {
           writePng(keep + ".png", r.snap.img);

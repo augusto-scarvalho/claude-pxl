@@ -323,9 +323,13 @@ gaps, depth, contrast and motion) the 2x preview scored 66%, the first text form
 instead of visible pixels, no motion) 77% and this one 100%, on the scene it was built with and on
 a held-out one whose questions came before its text.
 
-Any PNG works too: its colors get index keys (most common first); on a clear background each
-8-connected patch is a shape, identical or mirrored shapes one entry with a list of where they
-are; an opaque image shows its repeats as a map of identical 16x16 tiles.
+Any PNG works too: its colors get index keys (most common first). On a clear background (a sheet,
+a cutout) each 8-connected patch is a shape, identical or mirrored shapes one entry with a list of
+where they are. On an opaque one, REGIONS are the large patches of one color (the background; a
+dither counts as one patch) and OBJECTS the rest in 8-connected patches, repeats folded, specks
+counted; a map of identical 16x16 tiles is added when the image is built from tiles. An image of
+more than 64 colors is read in 32. Things that touch come out as one object, and a lit render
+breaks into light bands: for a pxl scene, describe the scene, not its PNG.
 
 `steps` prints how an asset was painted: every top-level op, layer and post-processing step in
 order, with its file:line, the pixels it changed and where ("no change" = it painted nothing).

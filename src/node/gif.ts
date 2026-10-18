@@ -205,6 +205,21 @@ export function medianCut(counts: Map<number, number>, n: number): number[] {
   return pal;
 }
 
+/** The image in at most n colors (median cut + k-means, nearest by eye), alpha kept. */
+export function reduceColors(img: Img, n: number): Img {
+  const counts = new Map<number, number>();
+  for (const c of img.data) if (!isClear(c)) counts.set(c >>> 8, (counts.get(c >>> 8) ?? 0) + 1);
+  if (counts.size <= n) return img;
+  const pal = medianCut(counts, n), memo = new Map<number, number>(), o = img.copy();
+  o.data.forEach((c, i) => {
+    if (isClear(c)) return;
+    let m = memo.get(c >>> 8);
+    if (m === undefined) { m = pal[nearest(pal, c >>> 8)]; memo.set(c >>> 8, m); }
+    o.data[i] = ((m << 8) | (c & 255)) >>> 0;
+  });
+  return o;
+}
+
 function nearest(pal: number[], rgb: number): number {
   const r = (rgb >> 16) & 255, g = (rgb >> 8) & 255, b = rgb & 255;
   let best = 0, bd = Infinity;

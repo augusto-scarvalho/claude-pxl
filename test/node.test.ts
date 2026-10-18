@@ -416,7 +416,7 @@ scene("s", { w: 16, h: 8, bg: "g" }, layer("props", stamp("rock", 0, 0), stamp("
   assert.match(scene, /A rock #1 @props: x 0-1, y 0-1 \(2x2\), feet 1,1; colors k\n\s+nearest: rock #2 6px right/);   // ranges worked out
   assert.match(scene, /ON TOP[^\n]*\n[^\n]*\n[^\n]*\n {2}0 A.A.\n {2}4 \.\.\.A/);  // the rock on top of its cells
   assert.match(scene, /PIXELS 4,4 4x2[^\n]*\n[^\n]*\n[^\n]*\n {2}4 gggg\n {2}5 gwgg/);
-  assert.match(png, /TILES \(16x16 grid: each symbol is one distinct tile; 1 distinct of 1 filled\)/);
+  assert.match(png, /REGIONS[^\n]*\n {2}\w=#8ccf63 \d+px over x 0-15, y 0-7/);   // the ground, as background
   assert.match(png, /PIXELS 0,0 2x1[^\n]*\n[^\n]*\n[^\n]*\n {2}0 \w\w/);
 });
 
@@ -438,6 +438,25 @@ scene("s", { w: 32, h: 20, bg: "g" }, layer("props", stamp("rock", 2, 2), stamp(
   assert.match(diff, /region x 10-14, y 10-11: 8 px \([^)]*rock #2 4px[^)]*\)/);   // where it left and where it went
   assert.match(diff, /rock #2: moved \+3,\+0/);
   assert.doesNotMatch(diff, /rock #1:/);   // the other rock did not change
+});
+
+test("describe an opaque PNG: large one-color patches are the background, the rest are objects", async () => {
+  // a dithered sky over grass (patches stay whole), two identical rocks, one bush, a few specks
+  const { dir, file } = tmpArt(`pal({ k: "#1b1630", g: "#8ccf63", s: "#3b5dc9", S: "#29366f", w: "#fff6e0", r: "#b13e53" })
+sprite("rock", "kk\\nkk")
+sprite("bush", ".rr.\\nrrrr\\nrrrr")
+scene("s", { w: 40, h: 24, bg: "g" }, dither(0, 0, 40, 12, "s", "S", 0.5), px(5, 3, "w"), px(30, 5, "w"),
+  stamp("rock", 4, 16), stamp("rock", 20, 18), stamp("bush", 30, 15))`);
+  writePng(join(dir, "s.png"), loadProject(file).image("s"));
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try { assert.equal(await main(["describe", join(dir, "s.png"), "--no-out"]), 0); } finally { console.log = log; }
+  const out = lines[0];
+  assert.match(out, /REGIONS[^\n]*\n {2}\w=#8ccf63 \d+px over x 0-39, y 12-23/);   // the grass
+  assert.match(out, /x 30-33, y 15-17 \(4x3\), 10px, colors \w/);                  // the bush
+  assert.match(out, /repeated \(identical or mirrored\):\n {4}2x2 x2, colors \w: 4,16 {2}20,18/);
+  assert.match(out, /and 2 specks of 1-3 px/);
+  assert.doesNotMatch(out, /TILES/);                                               // no grid repeats here
 });
 
 test("describe: objects with their ranges, gaps and cover; shapes on a clear background, mirrored ones too", async () => {
