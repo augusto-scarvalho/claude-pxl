@@ -114,7 +114,7 @@ sheet globs.
 | `register: "m" \| { key, x }` | Register every frame by a marked point (the pelvis): the drawing moves sideways so the pixel of key `m` lands on `x` (default the middle); y is left alone, so the bob stays. Never by the bounding box: an arm reaching out moves it. The marker is a key used for nothing else, best drawn per frame in a `ref: true` layer (`layer("marks", { ref: true }, frame(px(12, 20, "m")), ...)`); drawn in the art, it is erased once found. A frame without it is an error. |
 | `twin: "name_l"` | Also the asset facing the other way under that name: the same items drawn mirrored before they are lit, so `relight` lights it from where the light really is (a `flip` carries the light across); pivot, sockets and `facing` mirrored. Art functions see `c.mirrored` (for choices a mirror doesn't make, such as which edge of a hand-lit blade is the lit one). `text`, `bump` and `normals` refuse to run in a twin. |
 | `facing: "right" \| "left" \| "front" \| "back"` | Which way it faces as drawn ("front": toward us). Flips and turns carry it, and `PXL describe` says for each placement where it faces, which way its top points (upright, lying, upside down, leaning), which of its sides is toward us, and when it is a mirror image (a flip moves a sword to the other hand). Lettering is tracked even without `facing`: a mirrored sign gets a warning that it reads backwards. In a rig, a part whose `facing` differs from the rig's is called out. It is a label: pxl does not read the pixels to check it. |
-| `height: meters` | Its real height. In a scene with `world`, describe says how tall it should be where it stands, and how far off the drawing is. |
+| `height: meters` | Its real height. In a scene with `world`, describe says how tall it should be where it stands, and how far off the drawing is. It measures the drawing's box, top to bottom: a thing seen at an angle (a tent, a cart, a log) has its far end higher on screen, which the box counts too, so judge its near end yourself (describe says so when a wide thing comes out too tall). |
 | `world: { horizon, eye }` or `{ scale }` | Scene: the world's scale. Ground in perspective: the horizon's row and the eye's height in meters (a thing standing on row y is (y − horizon) / eye px per meter); flat side view: `scale` px per meter. Used by describe with `height`. `light: [x, y]` (where the light comes from): describe reads each object's lit side off its rim and warns when it disagrees (a flipped copy is lit from the other side). `light: { at: [x, y] }`: a point light in the scene (a fire, a lamp): each object is checked against the way from its middle to that point, and the one it sits in isn't checked. `ground: y` (flat views): what has a `height` is checked for floating or sinking; with or without it, a thing whose feet aren't where it was stamped (its pivot below its sole) is called out. |
 | `sockets: { name: [x, y], ... }` | Named points in drawing coordinates (pixel corners) that other stamps attach to: `stamp("arm_3", 0, 0, { at: "body.shoulder" })` puts the arm's pivot on the body's `shoulder` socket, wherever and however the body was placed. They move with flip, rot, angle, outline and crop, like the pivot. For characters built from parts (characters.md §10). |
 
@@ -240,7 +240,7 @@ draws the edges' dark rims across the terrain. `shrink: 2` takes 32px tiles to 1
 
 ## Glow
 
-`glow(keys, { where, r = 6, strength = 0.5, color, bands, ramp })` goes directly in a sprite or
+`glow(keys, { where, r = 6, strength = 0.5, color, bands, ramp, keep })` goes directly in a sprite or
 scene body (like `lighting`) and works on everything drawn before it: every pixel whose color is
 one of `keys` spills a halo onto the opaque pixels within `r`, falling off with distance. The
 glowing pixels themselves are left as they are, and transparent pixels stay empty.
@@ -253,6 +253,7 @@ glowing pixels themselves are left as they are, and transparent pixels stay empt
 | `color` | One tint for the whole halo instead of each pixel's own color. |
 | `bands` | Quantize the falloff into this many rings: crisp, pixel-art halos. |
 | `ramp` | Palette mode: step neighbours up to `ramp` shades lighter along the ramps, dithering between steps. Stays in the palette; ignores `strength`/`color`. Use it before `lighting()`. |
+| `keep` | Keys the halo leaves as drawn: what the glowing thing is made of. Without it the halo lifts everything in reach, the logs and stones under a fire too, and two ramp steps wash their shapes out (`glow("yYo", { ramp: 2, keep: "WuRr" })`). Give the source keys of its own, or whatever shares them stays unlit too. |
 
 Color mode leaves the palette (like lighting). Several `glow`s can stack, each with its own keys
 and radius. After `lighting()`, pixels still glow by their palette key even though the light has

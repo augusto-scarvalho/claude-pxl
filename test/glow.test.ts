@@ -37,6 +37,17 @@ test("glow: ramp mode steps neighbours lighter and stays in the palette", () => 
   assert.equal(row[0], "k", "beyond the radius is unlit");
 });
 
+test("glow: keep leaves what the glowing thing is made of as drawn", () => {
+  // a flame (y) on a log (d) next to the ground (d too, but the log has its own key: m)
+  const src = (keep: string) => 'use("pico8"); pal({ k: 0, d: 5, m: 6, w: 7, y: 10 }); ramps("kdmw"); ' +
+    `scene("s", { w: 7, h: 1, bg: "k" }, rect(0, 0, 7, 1, "d"), px(3, 0, "y"), px(4, 0, "m"), glow("y", { r: 3, ramp: 2${keep} }))`;
+  assert.notEqual(keys(loadSource(src(""), "t.px.js"), "s")[4], "m", "without keep the log is lifted");
+  const kept = keys(loadSource(src(', keep: "m"'), "t.px.js"), "s");
+  assert.equal(kept[4], "m", "kept: the log stays as drawn");
+  assert.notEqual(kept[2], "d", "the ground around is still lit");
+  assert.match(failure('use("pico8"); scene("s", { w: 2, h: 1 }, glow("8", { keep: "@" }))', "s").message, /glow: unknown color key '@'/);
+});
+
 test("glow: only directly in a sprite or scene; options are validated", () => {
   assert.match(failure(PAL + 'scene("s", { w: 4, h: 4 }, layer("a", glow("r")))', "s").message, /directly in a sprite or scene/);
   assert.match(failure(PAL + 'scene("s", { w: 4, h: 4 }, glow("r", { radius: 3 }))', "s").message, /radius/);

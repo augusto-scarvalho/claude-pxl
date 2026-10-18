@@ -75,7 +75,7 @@ export const OP_OPTS: Record<string, string[]> = {
   rampmap: ["where", "hue"],
   bump: ["w", "depth", "on", "where"],
   lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "shape", "relief", "skyDir"],
-  glow: ["where", "r", "strength", "color", "bands", "ramp"],
+  glow: ["where", "r", "strength", "color", "bands", "ramp", "keep"],
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {

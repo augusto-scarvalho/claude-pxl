@@ -18,6 +18,14 @@ export function applyGlow(img: Img, keys: string | string[], o: GlowOpts, pal: P
     const c = pal.resolve(k);
     if (c !== null && c !== TRANSPARENT) src.add(c);
   }
+  // keys the halo leaves as drawn: what the glowing thing is made of (the logs and stones under the
+  // flames), so its own shapes don't wash out
+  const kept = new Set<Color>();
+  for (const k of o.keep === undefined ? [] : colorList(o.keep)) {
+    const c = pal.resolve(k);
+    if (c === null || c === TRANSPARENT) throw new PxError(`glow keep: '${k}' must be a visible palette key`);
+    kept.add(c);
+  }
   const r = o.r ?? 6;
   if (!(r > 0)) throw new PxError(`glow r must be > 0, got ${r}`);
   const inside = o.where === undefined ? undefined : regionPred(o.where)
@@ -57,7 +65,7 @@ export function applyGlow(img: Img, keys: string | string[], o: GlowOpts, pal: P
   const up = steps ? pal.stepMap(1) : undefined;
   for (let i = 0; i < data.length; i++) {
     const c = data[i];
-    if (c === TRANSPARENT || src.has(keyed[i]) || weight[i] === 0) continue;
+    if (c === TRANSPARENT || src.has(keyed[i]) || kept.has(keyed[i]) || weight[i] === 0) continue;
     if (up) {
       // Whole steps near the source, ordered dither on the fractional step: crisp, in palette.
       const s = weight[i] * steps!, x = i % w, y = (i - x) / w;

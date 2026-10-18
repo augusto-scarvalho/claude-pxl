@@ -146,7 +146,11 @@ declare global {
     block?: number; smooth?: boolean; emit?: string; shape?: "round" | "diamond";
     relief?: number; skyDir?: [number, number];
   }
-  interface PxGlow { where?: PxRegion; r?: number; strength?: number; color?: PxColor; bands?: number; ramp?: number }
+  interface PxGlow {
+    where?: PxRegion; r?: number; strength?: number; color?: PxColor; bands?: number; ramp?: number;
+    /** Keys the halo leaves as drawn: what the glowing thing is made of (the logs and stones under flames). */
+    keep?: string | string[];
+  }
 
   interface PxCanvas {
     readonly w: number; readonly h: number; readonly seed: number;

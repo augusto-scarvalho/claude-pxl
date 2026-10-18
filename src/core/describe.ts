@@ -400,7 +400,10 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
         else {
           const want = p.img.meters * ppm, off = Math.round((100 * (drawn - want)) / want);
           size = `size: ${p.img.meters} m ${lying ? "long" : "tall"} is ${Math.round(want)} px where it stands (y ${feet}); drawn ${drawn} px` +
-            (Math.abs(off) <= 8 ? ", right" : `, ${Math.abs(off)}% too ${off > 0 ? (lying ? "long" : "tall") : lying ? "short" : "small"}`);
+            (Math.abs(off) <= 8 ? ", right" : `, ${Math.abs(off)}% too ${off > 0 ? (lying ? "long" : "tall") : lying ? "short" : "small"}`) +
+            // a wide thing (a tent, a cart, a log) is often seen at an angle: its far end rises on
+            // screen and its box counts that; silhouettes can't tell that from a wrong scale
+            (off > 8 && !lying && bb.w > bb.h ? " (its box, top to bottom: seen at an angle, its far end rises on screen and counts too, so compare its near end)" : "");
         }
       }
       if (opts.brief) {

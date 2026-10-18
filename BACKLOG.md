@@ -296,14 +296,20 @@ one), and the art code itself (4% of the cost).
   or leave those objects out of the check.
   Shipped: on two of those campsites, the fire's place as the light cleared every false warning
   (two and one), and a head lit from the wrong side of a fire is still caught (test).
-- [ ] **A glow that leaves its source as drawn**: `glow(keys, { ramp })` steps up everything in its
+- [x] **A glow that leaves its source as drawn**: `glow(keys, { ramp })` steps up everything in its
   radius, the source asset's own darker pixels too: logs and stones under the flames turned tan and
   lost their shapes. Two agents stamped the fire a second time after the glow. An option to keep
   the glowing asset (or given keys) out of the halo would make that a word instead of a trick.
-- [ ] **Height of deep things in perspective**: a tent or a log seen at an angle has its far end
+  Shipped as `keep: "WuRr"` (keys, so it works in a sprite too): on one agent's fire, the stones
+  and logs kept their shapes under the halo and the ground around stayed lit.
+- [x] **Height of deep things in perspective**: a tent or a log seen at an angle has its far end
   higher on screen, so its box is taller than its front, and describe calls it too tall (a tent
   1.3 m at its front: "drawn 22 px, 32% too tall"). Measure from the front's foot to its top, or
   say what the box includes.
+  Shipped as the second: measuring from the silhouette was tried twice and dropped (per-column
+  scale flagged the pines, whose bough tips sit near the horizon's fast-changing scale; a foot-line
+  rise read a lunging knight's back foot as a far end and still left the tent at 20%). Now a wide
+  thing that comes out too tall gets told the box counts its far end, and `height` says so.
 
 ## Later / niche
 

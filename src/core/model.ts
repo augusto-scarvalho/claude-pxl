@@ -400,6 +400,8 @@ export interface GlowOpts {
   bands?: number;
   /** Ramp mode: step neighbours up to this many shades lighter along the ramps (stays in palette). */
   ramp?: number;
+  /** Keys the halo leaves as drawn: what the glowing thing is made of (the logs and stones under flames). */
+  keep?: string | string[];
 }
 
 export interface TextOpts {
