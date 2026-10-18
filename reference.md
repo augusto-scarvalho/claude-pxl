@@ -198,7 +198,10 @@ names a placement, default its asset name), `z` (order in a `sort: "z"` layer), 
 flat on the ground as its shadow: a pixel h px above its base lands h × (kx, ky) from where it
 stands, e.g. `[0.6, 0.2]` for light from the top-left. The base is the pivot's row, so give tall
 props `pivot: "bottom"`; it applies after `flip`, so a mirrored tree still throws its shadow the
-same way. In a `shade` layer: `stamp("palm", x, y, { cast: [0.6, 0.2] })`).
+same way. In a `shade` layer: `stamp("palm", x, y, { cast: [0.6, 0.2] })`. `castBase: "column"`:
+each column stands on its own lowest pixel instead of the pivot's row, for a base that isn't level
+(a tent seen at an angle, its hem higher at the back: with the pivot's row, what hangs below it
+would cast toward the sun)).
 
 Randomness is seeded from the placement position + `seed`, so builds are reproducible and moving
 one placement doesn't reshuffle the others. Change `seed` to reroll.

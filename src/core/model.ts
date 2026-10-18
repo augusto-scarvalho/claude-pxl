@@ -217,6 +217,11 @@ export interface PlaceOpts {
   silhouette?: string;
   /** Lay the asset flat on the ground as its shadow: a pixel h above the base lands h * [kx, ky] away. */
   cast?: [number, number];
+  /**
+   * Where `cast` measures heights from: "pivot" (default), the pivot's row; "column", each column's
+   * own lowest pixel (a base that isn't level: a tent seen at an angle, a crate on a slope).
+   */
+  castBase?: "pivot" | "column";
   /** Attach to a socket of an earlier placement in this asset: "id.socket"; x, y become an offset from it. */
   at?: string;
   /** Name this placement for `at` (default: the asset name). */

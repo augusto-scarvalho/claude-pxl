@@ -579,7 +579,9 @@ export class Canvas {
       const k = opts.cast;
       if (!Array.isArray(k) || k.length !== 2 || !k.every(Number.isFinite))
         throw new PxError(`cast must be [kx, ky], how far a pixel 1px up lands from its base (e.g. [0.6, 0.2]), got ${JSON.stringify(k)}`);
-      src = src.cast(k[0], k[1]);
+      if (opts.castBase !== undefined && opts.castBase !== "pivot" && opts.castBase !== "column")
+        throw new PxError(`castBase must be "pivot" (the pivot's row) or "column" (each column's lowest pixel), got ${JSON.stringify(opts.castBase)}`);
+      src = src.cast(k[0], k[1], opts.castBase);
     }
     return src;
   }

@@ -119,7 +119,15 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   the light and is longer the lower and nearer the light: `[kx, ky] = (base − light's ground point) /
   light height`, capped at length 1. Keep other lamps out of where a shadow falls: they fill it.
 - The ground ramp needs a tone below its darkest for shadows to show after lighting (`"0EGgl"`, then
-  `shade: 2`).
+  `shade: 2`): a shade can't step below a ramp's darkest key, so ground already there under a
+  shadow doesn't change.
+- Shadows in one `shade` layer are a union: a figure standing in a tree's shadow casts none of its
+  own there and looks like it floats. Give what stands a contact shadow in a second `shade` layer,
+  its silhouette squashed under its base (`cast: [0.18, 0.12]`, or a flat ellipse at the feet): dark
+  where it touches the ground, inside the bigger shadow too.
+- A base that isn't level (a tent seen at an angle, its hem higher at the back; a crate on a slope)
+  casts from each column's own lowest pixel: `castBase: "column"`. From the pivot's row, what hangs
+  below it would cast toward the sun.
 - **A key belongs to one ramp.** In two ramps, `shade` can step it along the wrong one: a grass
   shadow turned into glowing potion green. Where ramps branch at a key (two go on from it to
   different keys), `pxl check` warns when a step goes through it. Where one ramp ends at a key and

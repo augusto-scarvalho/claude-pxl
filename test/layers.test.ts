@@ -111,3 +111,15 @@ scene("s", { w: 8, h: 3, bg: "k" }, stamp("blink", 0, 0), (c) => c.px(2 + c.fram
   const red = p.assets.get("s")!.pal.resolve("r");
   assert.deepEqual(p.frames("s").map((f) => f.img.data[2 * 8 + 4] === red), [false, false, true, false]);
 });
+
+test("cast from each column's foot: a base that isn't level lies where it stands", () => {
+  // a hem rising from the front (x 0, y 3) to the back (x 3, y 0): every pixel is on the ground
+  const src = PAL + `
+sprite("hem", { w: 4, h: 4, pivot: [2, 4] }, px(0, 3, "r"), px(1, 2, "r"), px(2, 1, "r"), px(3, 0, "r"))
+scene("by_column", { w: 12, h: 8, bg: "k" }, stamp("hem", 6, 6, { cast: [-1, 0], castBase: "column", silhouette: "w" }))
+scene("by_pivot", { w: 12, h: 8, bg: "k" }, stamp("hem", 6, 6, { cast: [-1, 0], silhouette: "w" }))`;
+  // by column: each pixel has height 0, the shadow is the hem itself; by the pivot's row the back of
+  // the hem is "up" 1 to 3 rows, lands 1 to 3 px to the left, and the four pixels fall on one
+  assert.equal(art(src, "by_column").split("\n").slice(2, 6).join("\n"), ["kkkkkkkwkkkk", "kkkkkkwkkkkk", "kkkkkwkkkkkk", "kkkkwkkkkkkk"].join("\n"));
+  assert.deepEqual(art(src, "by_pivot").split("\n").slice(2, 6), ["kkkkkkkkkkkk", "kkkkkkkkkkkk", "kkkkkkkkkkkk", "kkkkwkkkkkkk"]);
+});

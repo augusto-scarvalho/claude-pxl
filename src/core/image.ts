@@ -345,15 +345,21 @@ export class Img {
    * pivot's row, else the bottom edge) lands h * (kx, ky) away from where it stands. The pivot
    * stays on the base; colors are kept (add `silhouette` for a flat shadow).
    */
-  cast(kx: number, ky: number): Img {
+  cast(kx: number, ky: number, from: "pivot" | "column" = "pivot"): Img {
     const [px, py] = this.pivot ?? [this.w / 2, this.h];
-    const base = Math.floor(py) - 1, pts: number[] = [];
+    const pts: number[] = [];
+    // where each column stands: the pivot's row, or (a base that isn't level: a tent seen at an angle,
+    // its hem higher at the back) the column's own lowest pixel
+    const foot = new Int32Array(this.w).fill(Math.floor(py) - 1);
+    if (from === "column")
+      for (let x = 0; x < this.w; x++)
+        for (let y = this.h - 1; y >= 0; y--) if (this.data[y * this.w + x] !== TRANSPARENT) { foot[x] = y; break; }
     for (let y = 0; y < this.h; y++)
       for (let x = 0; x < this.w; x++) {
         const c = this.data[y * this.w + x];
         if (c === TRANSPARENT) continue;
         // a row of height h covers the ground from h * ky to (h + 1) * ky: at least one row, no gaps
-        const h = base - y, a = h * ky, b = (h + 1) * ky, lo = Math.floor(Math.min(a, b));
+        const base = foot[x], h = base - y, a = h * ky, b = (h + 1) * ky, lo = Math.floor(Math.min(a, b));
         const hi = Math.max(lo + 1, Math.floor(Math.max(a, b)));
         for (let yy = lo; yy < hi; yy++) pts.push(x + Math.round(h * kx), base + yy, c);
       }
