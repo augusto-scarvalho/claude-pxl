@@ -7,6 +7,7 @@ import { crc32, deflateSync, inflateSync } from "node:zlib";
 import { Img } from "../src/core/image.ts";
 import { pack } from "../src/core/color.ts";
 import { decodePng, encodePng } from "../src/node/png.ts";
+import { medianCut } from "../src/node/gif.ts";
 import { main } from "../src/node/cli.ts";
 import { loadProject } from "../src/node/load.ts";
 import { writeOutputs } from "../src/node/output.ts";
@@ -386,4 +387,16 @@ sprite("half", { mx: true }, layer("a", "gG"))`);
     layers.forEach((l, li) => { if (l.flags === 3 && cels[i][li]) redrawn.blit(cels[i][li], 0, 0); });
     assert.deepEqual([...redrawn.data], [...f.img.data], `frame ${i}`);
   });
+});
+
+test("gif palette: a small, distinct figure keeps its color next to big lit areas", () => {
+  // a night sky's shades and a warm glow, hundreds of pixels each, and a pale figure of 40 px
+  // next to the glow in color: weighting by count alone averaged the figure into the glow (60 off)
+  const counts = new Map<number, number>(), rgb = (r: number, g: number, b: number) => (r << 16) | (g << 8) | b;
+  for (let i = 0; i < 900; i++) counts.set(rgb(10 + (i % 30), 10 + Math.floor(i / 30), 40 + (i % 60)), 3000);
+  for (let i = 0; i < 400; i++) counts.set(rgb(170 + (i % 20) * 2, 130 + Math.floor(i / 20) * 2, 60 + (i % 7) * 3), 800);
+  for (let i = 0; i < 8; i++) counts.set(rgb(150 + i, 140 + i, 125 + i), 5);
+  const pal = medianCut(counts, 64);
+  const d = Math.min(...pal.map((c) => Math.hypot(((c >> 16) & 255) - 154, ((c >> 8) & 255) - 144, (c & 255) - 129)));
+  assert.ok(d < 8, `nearest entry to the figure is ${d.toFixed(0)} away`);
 });
