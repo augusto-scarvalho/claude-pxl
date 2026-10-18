@@ -107,7 +107,8 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   offsets, nothing redrawn (characters.md §9).
 - **Existing PNGs**: `sprite("hero", { png: "hero.png", outline: "k" })` starts an asset from a file,
   then every option and item works on it; `area: [x, y, w, h]` cuts one out of a sheet,
-  `anim("walk", { png: "walk.png", frames: 4 })` splits a strip, `palettize: true` snaps its colors to
+  `anim("walk", { png: "walk.png", frames: 4 })` splits a strip, `rampmap("Ggl", { hue: [70, 170] })`
+  maps its tones onto a ramp by brightness (none merge), `palettize: true` snaps its colors to
   your keyed palette so `ascii`/`swap`/`recolor` see keys. `use("art.png")` takes a palette from an
   image (keys `0-9a-z` in order of appearance).
 - **Glow**: `glow("zgQ", { r: 6, strength: 0.5 })` directly in a sprite/scene body gives every pixel

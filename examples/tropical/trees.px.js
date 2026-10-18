@@ -9,13 +9,13 @@ use("palette.hex")
 ramps("DHGglL")   // the greens; the palm's trunk steps along its own ramp below
 const DARK = "kKDHqBSn"
 // The palm has 3 greens and 3 browns. Snapping them to the nearest palette color merged its mid
-// and dark greens into one, which left it flat, so each original color gets its own key; relight()
+// and dark greens into one, which left it flat, so rampmap() gives them keys by brightness instead
+// (the greens to "Ggl", the browns to "bco", told apart by hue): nothing merges. relight()
 // then gives it depth: frond tops and left edges catch the light, undersides and right edges
 // darken. The heart of the crown sits in shade, the frond tips hanging low are darker, and the
 // trunk is lit on its left and dark on its right.
-const PALM_COLORS = { "#57c13b": "l", "#2c963c": "g", "#27773c": "G", "#b57d47": "o", "#996c46": "c", "#815637": "b" }
 sprite("palm", { png: "refs/palm.png", shrink: 2, outline: "D", pivot: [23, 60] },
-  recolor(PALM_COLORS),
+  rampmap("Ggl", { hue: [70, 170] }), rampmap("bco", { hue: [10, 50] }),
   relight(),
   shade((x, y) => Math.hypot(x - 29, (y - 13) * 1.4) < 7),
   shade([0, 22, 64, 64]),

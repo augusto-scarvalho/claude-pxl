@@ -373,6 +373,35 @@ export class Canvas {
   }
 
   /**
+   * Gradient map onto a ramp (Pixelorama's Gradient Map, kept in the palette): the distinct colors
+   * in the region, dark to light by luminance, take the ramp's keys in that order, spread from its
+   * darkest to its lightest. Tones never merge while there are no more colors than keys (snapping
+   * each color to its nearest key can merge two). `hue: [from, to]` (degrees) takes only colors of
+   * that hue, so the greens and the browns of an import can go to their own ramps.
+   */
+  rampmap(ramp: string | string[], opts: { where?: Region; hue?: [number, number] } = {}): void {
+    const keys = [...(Array.isArray(ramp) ? ramp.join("") : ramp)].map((k) => {
+      const c = this.color(k);
+      if (c === null || c === TRANSPARENT) throw new PxError(`rampmap: '${k}' is not a visible color`);
+      return c;
+    });
+    if (!keys.length) throw new PxError('rampmap needs a ramp of keys, dark to light: rampmap("DHGglL")');
+    const hue = opts.hue;
+    if (hue !== undefined && !(Array.isArray(hue) && hue.length === 2 && hue.every(Number.isFinite)))
+      throw new PxError(`rampmap: hue must be [from, to] in degrees, got ${JSON.stringify(hue)}`);
+    const ok = regionPred(opts.where), found = new Set<Color>();
+    for (let y = -this.oy; y < this.img.h - this.oy; y++)
+      for (let x = -this.ox; x < this.img.w - this.ox; x++) {
+        const c = this.get(x, y);
+        if (c !== TRANSPARENT && ok(x, y) && (!hue || inHue(c, hue))) found.add(c);
+      }
+    const cols = [...found].sort((a, b) => luma(a) - luma(b)), k = cols.length, n = keys.length;
+    const map = new Map<Color, Color>();
+    cols.forEach((c, i) => map.set(c, keys[k === 1 ? Math.floor((n - 1) / 2) : k <= n ? Math.round((i * (n - 1)) / (k - 1)) : Math.floor((i * n) / k)]));
+    this.remap(map, opts.where);
+  }
+
+  /**
    * Move pixels by whole-pixel offsets, for motion drawn once: breathing, hair and tails swaying, a
    * body following a slope. fn(x, y) gives the offset [dx, dy] at a pixel's new place (or nothing:
    * stays); the pixel takes the color found (dx, dy) behind it, so no hole opens and no color is
@@ -841,7 +870,7 @@ export function frameStart(tl: Timeline, n: number): number {
 /** Ops callable from art files; each top-level call can be traced as one painting step. */
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "poly", "fill",
-  "dither", "grad", "noise", "recolor", "shade", "light", "relight", "warp",
+  "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp",
   "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose",
 ] as const;
 export type OpName = (typeof OPS)[number];
@@ -865,6 +894,22 @@ for (const name of OPS) {
 }
 
 const CORNER_NAMES = ["top-left", "top-right", "bottom-left", "bottom-right"];
+
+/** Perceived brightness of a color, 0..255. */
+function luma(c: Color): number {
+  return 0.2126 * ((c >>> 24) & 255) + 0.7152 * ((c >>> 16) & 255) + 0.0722 * ((c >>> 8) & 255);
+}
+
+/** Is a color's hue within [from, to] degrees (wrapping past 360)? Grays have no hue. */
+function inHue(c: Color, [from, to]: [number, number]): boolean {
+  const r = ((c >>> 24) & 255) / 255, g = ((c >>> 16) & 255) / 255, b = ((c >>> 8) & 255) / 255;
+  const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+  if (d < 0.04) return false;
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h = (h * 60 + 360) % 360;
+  const a = ((from % 360) + 360) % 360, z = ((to % 360) + 360) % 360;
+  return a <= z ? h >= a && h <= z : h >= a || h <= z;
+}
 
 /**
  * A map of tile corners -> the plain tile map and char map for the same tilemap: each tile's mask

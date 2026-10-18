@@ -462,3 +462,11 @@ test("scatter near: only where `on` is within `within` px of `near`; sorted laye
   const T = PAL + 'sprite("post", { pivot: "bottom" }, "r\\nr"); sprite("dot", "w"); ';
   eq(art(T + 'scene("s", { w: 1, h: 3, bg: "g" }, layer("l", { sort: "y" }, stamp("post", 0, 3), scatter("dot", 0, 2, 1, 1, 1)))', "s"), "g\nr\nr");
 });
+
+test("rampmap: colors dark to light take a ramp's keys in order; hue picks which colors", () => {
+  // three grays, light, dark, mid: onto "krw" by brightness, not by nearest color
+  eq(art(PAL + 'sprite("a", { w: 3, h: 1 }, px(0, 0, "#cccccc"), px(1, 0, "#202020"), px(2, 0, "#808080"), rampmap("krw"))', "a"), "wkr");
+  // two colors onto a 3-key ramp spread to its ends; a green left alone by a red-only hue range
+  eq(art(PAL + 'sprite("a", { w: 3, h: 1 }, px(0, 0, "#400000"), px(1, 0, "#ff4040"), px(2, 0, "g"), rampmap("krw", { hue: [340, 20] }))', "a"), "kwg");
+  assert.match(failure(PAL + 'sprite("a", { w: 1, h: 1 }, px(0, 0, "r"), rampmap("kq"))', "a").message, /unknown color key 'q'|'q'/);
+});
