@@ -74,6 +74,14 @@ shear kept every pixel but stair-warped the ship at 45°; at 5°-10° both resam
 step on the slime while the shear read as a lean; every method turned the crate's checker dither
 into stripes; outlining after the turn gave even 1px outlines where turned outlines thickened.
 
+Then on finished sprites from the examples (the knight's sword, head, shield and arm, the palm, the
+fan palm and the girl) at 15°, 30°, 45° and 60°: RotSprite kept blades, crossguards, the shield's
+rim and cross, the palm's trunk and fronds and the girl's outline whole at every angle; nearest at
+30° broke the blade into steps and the girl's outline into gaps. What RotSprite does lose is a
+lone pixel against its neighbours (one of the girl's eyes at 60°): the turned image is sampled
+back at 1×, so a 1px feature can fall between samples whatever magnifier ran first. Draw that pose
+instead, or turn by a quarter and mirror.
+
 ## Sources
 
 - RotSprite (Xenowhirl) and Scale2x/EPX: Wikipedia, "Pixel-art scaling algorithms";
@@ -81,6 +89,7 @@ into stripes; outlining after the turn gave even 1px outlines where turned outli
 - Three-shear rotation: A. W. Paeth, "A Fast Algorithm for General Raster Rotation", Graphics
   Interface 1986.
 - cleanEdge (torcado) and MMPX (McGuire & Gagiu, JCGT 2021): newer edge-aware magnifiers; MMPX
-  could replace Scale2x inside RotSprite. Not implemented.
+  could replace Scale2x inside RotSprite. Not implemented: on the real sprites above RotSprite held,
+  and what it lost (1px features) is lost in the sampling back, not in the magnifying.
 - Pixel-art practice: slopes of 2:1 and 3:1 for clean edges; draw 3 poses of a symmetric sprite and
   mirror the rest (Spectrum Computing forums).

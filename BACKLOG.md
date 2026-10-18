@@ -37,8 +37,10 @@ Mark items `[x]` when they ship, with the commit.
   outline after the turn, and `directions()` for 8/16-direction sets via exact quarter turns and
   diagonal mirrors, with hand-drawn poses through `draw`. Study and angle guide in `rotation.md`.
   (Aseprite RotSprite; Paeth three-shear.)
-- [ ] **cleanEdge or MMPX inside the rotation**: newer edge-aware magnifiers; MMPX could replace
-  Scale2x in RotSprite. Only if RotSprite's results fall short on real sprites.
+- [x] **cleanEdge or MMPX inside the rotation**: newer edge-aware magnifiers; MMPX could replace
+  Scale2x in RotSprite. Only if RotSprite's results fall short on real sprites. Evaluated on the
+  examples' sprites (knight parts, palms, girl) at 15°-60°: RotSprite held; the one loss, a 1px
+  eye at 60°, happens sampling back at 1×, which no magnifier fixes. Not needed (see `rotation.md`).
 - [x] **Inside outline and selout** (`inline`, `selout`) (outline takes the dark shade of the color it touches).
   (Aseprite Outline command.)
 - [x] **Hue-shifted ramp generator**: `shades("HGgl", "#5aa040")` defines the keys and their ramp. (Aseprite
