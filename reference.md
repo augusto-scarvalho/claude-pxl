@@ -282,6 +282,7 @@ node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-pr
 node <pxl>/bin/pxl.js ascii <file> <name>
 node <pxl>/bin/pxl.js list  <file>
 node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--sheet] [--out DIR]
+node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h]     (or describe <image.png>)
 node <pxl>/bin/pxl.js compare <file> <name> <ref.png> [--shrink N] [--offset x,y]
 ```
 
@@ -289,6 +290,18 @@ node <pxl>/bin/pxl.js compare <file> <name> <ref.png> [--shrink N] [--offset x,y
 reference (shrunk by N first, placed at x,y in the asset's coordinates) and of the asset, and how
 many px wider the asset is on each side, then a summary. A figure 1 to 3 px too wide per side reads
 as heavy or "fat" without anyone being able to say why in a preview; this shows where.
+
+`describe` gives a whole asset as text to read at once, cheapest level first: PAINTED (the painting
+steps grouped by source line, since one line of code is one intent: a fence loop is one line,
+`vline/px x104`), PLACED (every stamp, scatter pick and wire hang by asset and layer, repeats folded
+into one line with their top-left positions; drawing order is depth), cell maps of `--cell` px
+(default 8: ON TOP, the placement owning most of each cell; COLOR, its most common key before
+lighting, `~` for blended colors outside the palette; LIGHT, brightness after lighting 0..9), and
+STANDS OUT: per placement, its body tone (75th percentile of what shows of it) over the median of
+the 2 px around it, after lighting. A figure at `1/1` reads only by its outline. `--at x,y,w,h`
+adds that region's exact keys with absolute rulers. A 320x180 lit scene comes to ~11k characters
+(its raw keys alone would be ~60k). Any PNG works too: its colors get index keys (most common
+first), and what repeats shows as a map of identical 16x16 tiles.
 
 `steps` prints how an asset was painted: every top-level op, layer and post-processing step in
 order, with its file:line, the pixels it changed and where ("no change" = it painted nothing).

@@ -1,6 +1,6 @@
 // Turns an asset definition into an image: base -> items (ops, grids, functions, layers)
 // -> post-processing (mirror, swap, flip, rot, outline, crop). Optionally traced.
-import { Canvas, type Placed, type Resolver } from "./canvas.ts";
+import { Canvas, type Placed, type Placement, type Resolver } from "./canvas.ts";
 import { type Color, TRANSPARENT, pack } from "./color.ts";
 import { PxError, wrap } from "./errors.ts";
 import { Img } from "./image.ts";
@@ -41,6 +41,8 @@ export interface BuildOut {
   refs?: { name: string; img: Img; k: number }[];
   /** What the layers were drawn over: the canvas as it was when the first layer began. */
   under?: Img;
+  /** Everything stamped, scattered or hung, in drawing order. */
+  placements: Placement[];
 }
 
 /** An anim's frames: count and durations (ms), from its frame() items or { frames, fps }. */
@@ -161,10 +163,11 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   if (![undefined, true, false, "x", "y"].includes(opts.wrap)) throw new PxError(`wrap must be true, "x" or "y", got ${fmtArgs([opts.wrap])}`);
   const edges = opts.wrap ? { x: opts.wrap !== "y", y: opts.wrap !== "x" } : undefined;
   const maps: TileLayer[] = [];
-  const placed: Placed = new Map();
+  const placed: Placed = new Map(), log: Placement[] = [];
   const timed = (c: Canvas) => {
     c.maps = maps;
     c.placed = placed;
+    c.log = log;
     c.wrap = edges;
     c.t = t;
     c.frame = frame;
@@ -249,7 +252,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   const img = finish(base, def, pal, trace);
   trace?.finish(img);
   const guide = refs.length ? guideOver(img, refs, def) : undefined;
-  return { img, layers, trace, anim: tl, ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}) };
+  return { img, layers, trace, anim: tl, placements: log, ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}) };
 }
 
 /**

@@ -1,8 +1,10 @@
 // pxl command line.
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { PxError, wrap } from "../core/errors.ts";
 import { type Color, TRANSPARENT, toHex } from "../core/color.ts";
+import { Palette } from "../core/palette.ts";
 import type { Img } from "../core/image.ts";
+import { describe } from "../core/describe.ts";
 import { ascii, compareSilhouettes, preview } from "../core/render.ts";
 import { mapPixel, replay, stepSheet } from "../core/steps.ts";
 import { readFileSync } from "node:fs";
@@ -24,6 +26,11 @@ const USAGE = `pxl — pixel-art DSL
       Print an asset as palette keys with x/y rulers (anims: every frame).
   pxl list  <art.px.js>
       List assets, groups and sheets with their source locations.
+  pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h]   (or: pxl describe <image.png> [...])
+      A whole scene as text to read at once: what was painted (steps grouped by source line), what
+      was placed where, cell maps (object on top, color before lighting, brightness after it), how
+      each placement stands out from its surroundings; --at adds that region's exact pixels. Any PNG
+      works too: its colors get keys, and repeats are found as identical 16x16 tiles.
   pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
@@ -44,7 +51,8 @@ interface Args {
   preview?: boolean;
   aseprite?: boolean;
   port?: number;
-  at?: [number, number];
+  at?: number[];
+  cell?: number;
   sheet?: boolean;
   shrink?: number;
   offset?: [number, number];
@@ -74,10 +82,11 @@ function parse(argv: string[]): Args {
       a.offset = [Number(m[1]), Number(m[2])];
     }
     else if (v === "--at") {
-      const m = /^(\d+),(\d+)$/.exec(val().replace(/\s/g, ""));
-      if (!m) throw new PxError("--at needs x,y (e.g. --at 5,3)");
-      a.at = [Number(m[1]), Number(m[2])];
+      const m = /^(\d+),(\d+)(?:,(\d+),(\d+))?$/.exec(val().replace(/\s/g, ""));
+      if (!m) throw new PxError("--at needs x,y (steps) or x,y,w,h (describe), e.g. --at 5,3");
+      a.at = m.slice(1).filter((s) => s !== undefined).map(Number);
     }
+    else if (v === "--cell") a.cell = Number(val());
     else if (v === "-h" || v === "--help") a.cmd = "help";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -124,6 +133,27 @@ export async function main(argv: string[]): Promise<number> {
         }
         for (const g of p.groups.values()) console.log(`${"group".padEnd(6)} ${g.name.padEnd(24)} ${g.loc ?? ""}  [${g.members.join(" ")}]`);
         for (const s of p.sheets) console.log(`${"sheet".padEnd(6)} ${s.name.padEnd(24)} ${s.loc ?? ""}`);
+        return 0;
+      }
+      case "describe": {
+        if (a.at && a.at.length !== 4) throw new PxError("describe --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
+        const at = a.at as [number, number, number, number] | undefined;
+        if (/\.png$/i.test(file)) {
+          // any image: its colors get index keys, most common first (past 62 they show as "~")
+          let img: Img;
+          try { img = decodePng(readFileSync(file)); } catch (e) { throw new PxError(`${a.file}: ${(e as Error).message}`); }
+          const n = new Map<Color, number>();
+          for (const c of img.data) if (c !== TRANSPARENT) n.set(c, (n.get(c) ?? 0) + 1);
+          const pal = Palette.fromColors([...n].sort((x, y) => y[1] - x[1]).slice(0, 62).map(([c]) => c));
+          console.log(describe(a.file!.replace(/^.*[\/]/, ""), { img, layers: [], placements: [] }, pal, { cell: a.cell, at }));
+          return 0;
+        }
+        const name = a.rest[0];
+        if (!name) throw new PxError("describe needs an asset name: pxl describe <file> <name> [--cell N] [--at x,y,w,h]");
+        const p = loadProject(file, { trace: true });
+        const def = p.assets.get(name);
+        if (!def) throw new PxError(`unknown asset '${name}'`);
+        console.log(describe(name, p.build(name), def.pal, { cell: a.cell, at }));
         return 0;
       }
       case "steps": {

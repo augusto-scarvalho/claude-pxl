@@ -127,6 +127,15 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
   hair-physics clip. For the 32 px girl it read wrong (it turned her hair into a point): her hair is
   drawn, cut straight, and its ends swing like a skirt's hem. Kept for long hair, tails and scarves.
 
+- [x] **`pxl describe`** (HASH): a whole scene as text an agent reads at once (asked as an experiment:
+  how to translate a whole image for the model, compressed but semantic). Levels: painting steps by
+  source line, placements with repeats folded, cell maps (on top, color, light), and how each
+  placement stands out after lighting; exact pixels of a region on request. The Halloween scene:
+  ~11k characters against ~60k for its raw keys, and it measured what reading the image only
+  suggested (three monsters as dark as the ground around them). Any PNG: index keys and a map of
+  repeated 16x16 tiles. Next, if needed: repeats at any offset (connected components), not only on
+  a grid.
+
 Left out on purpose: effects that leave the palette (blur, curves, HSV, convolution), keyframed
 tweens and interpolating between drawings, free rotation of cut-out limbs, 2.5D thickness, 3D layers
 (render a base in Blender and reduce it instead), mouse-only tools.

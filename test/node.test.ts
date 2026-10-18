@@ -10,7 +10,7 @@ import { decodePng, encodePng } from "../src/node/png.ts";
 import { medianCut } from "../src/node/gif.ts";
 import { main } from "../src/node/cli.ts";
 import { loadProject } from "../src/node/load.ts";
-import { writeOutputs } from "../src/node/output.ts";
+import { writeOutputs, writePng } from "../src/node/output.ts";
 import { serve } from "../src/node/server.ts";
 
 function chunks(buf: Buffer): { type: string; data: Buffer; crcOk: boolean }[] {
@@ -399,4 +399,23 @@ test("gif palette: a small, distinct figure keeps its color next to big lit area
   const pal = medianCut(counts, 64);
   const d = Math.min(...pal.map((c) => Math.hypot(((c >> 16) & 255) - 154, ((c >> 8) & 255) - 144, (c & 255) - 129)));
   assert.ok(d < 8, `nearest entry to the figure is ${d.toFixed(0)} away`);
+});
+
+test("cli describe: repeats folded, cell maps, exact pixels on request; any PNG by its tiles", async () => {
+  const { dir, file } = tmpArt(`pal({ k: "#1b1630", g: "#8ccf63", w: "#fff6e0" })
+sprite("rock", "kk\\nkk")
+scene("s", { w: 16, h: 8, bg: "g" }, layer("props", stamp("rock", 0, 0), stamp("rock", 8, 0), stamp("rock", 12, 4)), px(5, 5, "w"))`);
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try {
+    assert.equal(await main(["describe", file, "s", "--cell", "4", "--at", "4,4,4,2"]), 0);
+    writePng(join(dir, "tiles.png"), loadProject(file).image("s"));
+    assert.equal(await main(["describe", join(dir, "tiles.png"), "--at", "0,0,2,1"]), 0);
+  } finally { console.log = log; }
+  const [scene, png] = lines;
+  assert.match(scene, /A rock @props 2x2 x3: 0,0 8,0 12,4/);                 // one line for three stamps
+  assert.match(scene, /ON TOP[^\n]*\n[^\n]*\n[^\n]*\n {2}0 A.A.\n {2}4 \.\.\.A/);  // the rock on top of its cells
+  assert.match(scene, /PIXELS 4,4 4x2[^\n]*\n[^\n]*\n[^\n]*\n {2}4 gggg\n {2}5 gwgg/);
+  assert.match(png, /TILES \(16x16 grid: each symbol is one distinct tile; 1 distinct of 1 filled\)/);
+  assert.match(png, /PIXELS 0,0 2x1[^\n]*\n[^\n]*\n[^\n]*\n {2}0 \w\w/);
 });

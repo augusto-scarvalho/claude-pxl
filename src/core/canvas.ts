@@ -29,6 +29,8 @@ type Pred = (x: number, y: number) => boolean;
 
 /** Where stamps landed in an asset (top-left in image coords) with their sockets, by id: for `at`. */
 export type Placed = Map<string, { x: number; y: number; sockets?: Record<string, [number, number]> }>;
+/** What was stamped where, in drawing order (top-left in asset coords): for `pxl describe`. */
+export type Placement = { name: string; x: number; y: number; w: number; h: number; layer?: string; img: Img };
 
 /**
  * Drawing surface over an image. Coordinates are relative to (ox, oy); colors are palette
@@ -57,6 +59,8 @@ export class Canvas {
   maps?: TileLayer[];
   /** The layer this canvas paints, if any: names exported tile layers. */
   layerName?: string;
+  /** Placements log shared by an asset's canvases (stamps, scatter picks, wire hangs). */
+  log?: Placement[];
   /** Stamps placed so far in this asset (shared by its layers), for stamp(..., { at }). */
   placed?: Placed;
   /** A layer with sort: its stamps wait here and draw in order on flush(). */
@@ -541,31 +545,32 @@ export class Canvas {
   }
 
   /** Draw `src` with its pivot (default: `def`, as a fraction of its size) on (x, y). */
-  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred): void {
+  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string): void {
     const [px, py] = src.pivot ?? [src.w * def[0], src.h * def[1]];
     this.put(src, x - Math.floor(px), y - Math.floor(py), ok);
+    if (name) this.log?.push({ name, x: this.ox + x - Math.floor(px), y: this.oy + y - Math.floor(py), w: src.w, h: src.h, layer: this.layerName, img: src });
   }
 
   stamp(name: string, x = 0, y = 0, opts?: PlaceOpts): void {
     if (opts?.at !== undefined) [x, y] = this.socketAt(opts.at, x, y);
     const src = this.asset(name, opts, x, y), [px, py] = src.pivot ?? [0, 0];
     this.placed?.set(opts?.id ?? name, { x: this.ox + x - Math.floor(px), y: this.oy + y - Math.floor(py), sockets: src.sockets });
-    this.place(src, x, y, [0, 0], undefined, opts?.z);
+    this.place(src, x, y, [0, 0], undefined, opts?.z, name);
   }
 
   /**
    * Put a placed asset's pivot on (x, y): drawn now, or in a sorted layer queued and drawn on
    * flush() by y (where it stands) or z.
    */
-  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0): void {
-    if (!this.sorted) return this.putAt(src, x, y, def, ok);
+  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string): void {
+    if (!this.sorted) return this.putAt(src, x, y, def, ok, name);
     if (!Number.isFinite(z)) throw new PxError(`z must be a number, got ${JSON.stringify(z)}`);
     // Drawn later, in order: keep the clip that was active at the call.
     const clip = this.clipPred, q = this.sorted.queue;
     q.push({ key: this.sorted.by === "y" ? y : z, seq: q.length, draw: () => {
       const prev = this.clipPred;
       this.clipPred = clip;
-      try { this.putAt(src, x, y, def, ok); } finally { this.clipPred = prev; }
+      try { this.putAt(src, x, y, def, ok, name); } finally { this.clipPred = prev; }
     } });
   }
 
@@ -700,7 +705,7 @@ export class Canvas {
           for (let t = 0; t < 30; t++) {
             const cx = x + Math.floor(((i + r()) * w) / cols), cy = y + Math.floor(((j + r()) * h) / rows);
             if (!ok(cx, cy)) continue;
-            this.place(this.asset(name, opts, cx, cy), cx, cy, [0.5, 0.5], opts.clip ? on : undefined);
+            this.place(this.asset(name, opts, cx, cy), cx, cy, [0.5, 0.5], opts.clip ? on : undefined, 0, name);
             placed++;
             break;
           }
@@ -710,7 +715,7 @@ export class Canvas {
       tries++;
       const cx = x + Math.floor(r() * w), cy = y + Math.floor(r() * h);
       if (!ok(cx, cy)) continue;
-      this.place(this.asset(name, opts, cx, cy), cx, cy, [0.5, 0.5], opts.clip ? on : undefined);
+      this.place(this.asset(name, opts, cx, cy), cx, cy, [0.5, 0.5], opts.clip ? on : undefined, 0, name);
       placed++;
     }
     // A brush that silently paints nothing is the usual sign of an empty layer under `on`.
@@ -790,7 +795,7 @@ export class Canvas {
       const [, fy] = at(d / span);
       const hx = x0 + dir * d, hy = Math.round(fy);
       const src = this.asset(opts.hang, opts, hx, hy);
-      this.putAt(src, hx, hy + 1, [0.5, 0]);
+      this.putAt(src, hx, hy + 1, [0.5, 0], undefined, opts.hang);
     }
   }
 
