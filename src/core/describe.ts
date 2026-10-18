@@ -11,7 +11,7 @@ import type { Placement } from "./canvas.ts";
 import { type Color, TRANSPARENT, toHex } from "./color.ts";
 import { Img, type Orient } from "./image.ts";
 import type { World } from "./model.ts";
-import { dirWords, frontWords, lightWords } from "./checks.ts";
+import { dirWords, frontWords, lightWords, rampSteps } from "./checks.ts";
 import type { Palette } from "./palette.ts";
 import { replay } from "./steps.ts";
 
@@ -150,6 +150,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
   out.push(`${name} ${W}x${H}${frames}. Coordinates are x,y in px from the top left; a range a-b includes both ends.`);
   if (opts.note) out.push(opts.note);
   if (opts.extra?.length) out.push(...opts.extra);
+  const steps = rampSteps(pal);
   const wo = opts.world;
   if (wo?.light) out.push(`LIGHT: from ${dirWords(wo.light[0], wo.light[1])}; each object's lit side (from its edges) is checked against it.`);
   if (wo?.scale !== undefined) out.push(`WORLD: flat side view, ${wo.scale} px per meter (a 1.8 m figure is ${Math.round(1.8 * wo.scale)} px tall).`);
@@ -351,7 +352,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       const bb = p.img.bounds();
       // pixel checks: its front marker against its facing, its lit side against the scene's light, its
       // feet against where it was stamped (a pivot below the sole floats it) and the ground
-      const checks = [frontWords(p.img), wo?.light ? lightWords(p.img, wo.light) : ""];
+      const checks = [frontWords(p.img), wo?.light ? lightWords(p.img, wo.light, steps) : ""];
       const pv = p.img.pivot;
       if (bb && p.img.meters) {   // what has a real height stands on the ground: a ghost may float
         const feet = p.y + bb.y + bb.h, off = pv ? Math.round(p.y + pv[1] - feet) : 0;

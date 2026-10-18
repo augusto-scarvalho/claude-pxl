@@ -4,6 +4,19 @@
 // catch a label that doesn't match the drawing.
 import { type Color, TRANSPARENT } from "./color.ts";
 import type { Img } from "./image.ts";
+import type { Palette } from "./palette.ts";
+
+/** Each ramp color's ramp and step (dark to light), for reading light as steps along a ramp. */
+export type Steps = Map<Color, [number, number]>;
+export function rampSteps(pal: Palette): Steps {
+  const m: Steps = new Map();
+  pal.ramps.forEach((r, ri) => [...r].forEach((k, i) => {
+    let c;
+    try { c = pal.resolve(k); } catch { return; }
+    if (c !== null && c !== TRANSPARENT && !m.has(c)) m.set(c, [ri, i]);
+  }));
+  return m;
+}
 
 const lum = (c: Color) => (0.2126 * ((c >>> 24) & 255) + 0.7152 * ((c >>> 16) & 255) + 0.0722 * ((c >>> 8) & 255)) / 255;
 
@@ -17,11 +30,13 @@ export function dirWords(x: number, y: number): string {
  * Which way the drawing is lit, from its rim: the light direction L that best explains, for each
  * pixel on its edge (one step in past an outline, when the edge is mostly one color), how much
  * lighter it is than the material a few px further in, given the sides it is open on (e): b = L . e.
- * Least squares, refit without the fifth that fit worst (a slit or a seam just inside an edge is a
- * few pixels, not the light). An axis the shape can't tell apart from the other is left at 0: a thin
- * diagonal's top edges are its left ones. Undefined when it's lit evenly, or too thin to tell.
+ * With the palette's ramps (`steps`), "lighter" is steps up the same ramp, and only pairs on one
+ * ramp count: a light wood end grain next to dark bark, or hair next to skin, is material, not light.
+ * Without them, luminance (any pair). Least squares, refit without the fifth that fit worst (a slit
+ * or a seam just inside an edge). An axis the shape can't tell apart from the other is left at 0: a
+ * thin diagonal's top edges are its left ones. Undefined when it's lit evenly, or too thin to tell.
  */
-export function litDir(img: Img): [number, number] | undefined {
+export function litDir(img: Img, steps?: Steps): [number, number] | undefined {
   const W = img.w, H = img.h, at = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? TRANSPARENT : img.data[y * W + x]);
   const sides: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   // the outline: the color most of the edge pixels share
@@ -49,10 +64,14 @@ export function litDir(img: Img): [number, number] | undefined {
       if (q === TRANSPARENT || q === outline) break;
       d = q;
     }
-    if (d !== TRANSPARENT) rim.push({ ex, ey, b: lum(at(x, y)) - lum(d) });
+    if (d === TRANSPARENT) continue;
+    if (!steps) { rim.push({ ex, ey, b: lum(at(x, y)) - lum(d) }); continue; }
+    const sc = steps.get(at(x, y)), sd = steps.get(d);
+    if (sc && sd && sc[0] === sd[0]) rim.push({ ex, ey, b: sc[1] - sd[1] });
   }
-  // too thin to read (a blade, a rope): most of its rim has no material behind it to compare with
-  if (rim.length < 6 || rim.length < edges / 2) return undefined;
+  // too thin to read (a blade, a rope), or too few pairs on one ramp: most of its rim has nothing
+  // behind it to compare with
+  if (rim.length < 6 || rim.length < edges / (steps ? 3 : 2)) return undefined;
   const fit = (pts: typeof rim) => {
     let axx = 0, ayy = 0, axy = 0, rx = 0, ry = 0;
     for (const { ex, ey, b } of pts) { axx += ex * ex; ayy += ey * ey; axy += ex * ey; rx += b * ex; ry += b * ey; }
@@ -68,19 +87,28 @@ export function litDir(img: Img): [number, number] | undefined {
   const kept = rim.map((p) => ({ p, r: Math.abs(p.b - L[0] * p.ex - L[1] * p.ey) })).sort((u, v) => u.r - v.r);
   L = fit(kept.slice(0, Math.ceil(kept.length * 0.8)).map(({ p }) => p));
   const v: [number, number] = [L[0], L[1]];
-  return Math.hypot(...v) < 0.04 ? undefined : v;
+  return Math.hypot(...v) < (steps ? 0.15 : 0.04) ? undefined : v;
 }
 
-/** The side a drawing is lit from, checked against the light it should be under ([x, y] toward the light). */
-export function lightWords(img: Img, light?: [number, number]): string {
-  const d = litDir(img);
+/**
+ * The side a drawing is lit from, checked against the light it should be under ([x, y] toward the
+ * light). It only claims what the rim shows clearly: a side (left or right) at 0.3 ramp steps or more
+ * (0.08 in luminance), and nothing when the reading says lit from below while the light comes from
+ * above (a symmetric plant, a few pixels: noise, not light). Read on art it wasn't tuned on: stones,
+ * rocks and props shaded at their rims agree; a flipped variant is caught; a building whose outline is
+ * mostly trims (cornice, steps) can still read wrong. Look before trusting a warning.
+ */
+export function lightWords(img: Img, light?: [number, number], steps?: Steps): string {
+  const d = litDir(img, steps);
   if (!d) return "";
-  const from = `lit from ${dirWords(d[0], d[1])}`;
+  const m = Math.hypot(...d);
+  if (light && light[1] < -0.2 && d[1] > 0.2 * m) return "";
+  const side = Math.abs(d[0]) >= (steps ? 0.3 : 0.08) && Math.abs(d[0]) >= 0.25 * m;
+  const from = `lit from ${side ? dirWords(d[0], d[1]) : dirWords(0, d[1])}`;
   if (!light) return from;
-  // the sides tell it apart: a top light lights every top alike
-  if (Math.abs(d[0]) > 0.03 && Math.abs(light[0]) > 0.2 && Math.sign(d[0]) !== Math.sign(light[0]))
+  if (side && Math.abs(light[0]) > 0.2 && Math.sign(d[0]) !== Math.sign(light[0]))
     return `WARNING: ${from}, but its light comes from ${dirWords(light[0], light[1])} (a flipped drawing carries its light to the other side)`;
-  return `${from}, as its light`;
+  return `${from}${side ? ", as its light" : ""}`;
 }
 
 /**

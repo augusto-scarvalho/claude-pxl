@@ -8,6 +8,7 @@ import { type Snapshot, describe } from "../core/describe.ts";
 import type { BuildOut } from "../core/build.ts";
 import type { World } from "../core/model.ts";
 import { rigLines } from "../core/rig.ts";
+import { rampSteps } from "../core/checks.ts";
 import { ascii, compareSilhouettes, preview } from "../core/render.ts";
 import { mapPixel, replay, stepSheet } from "../core/steps.ts";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -189,7 +190,7 @@ export async function main(argv: string[]): Promise<number> {
           pal = def.pal;
           world = def.opts.world;
           const rig = p.rigs.get(name);
-          if (rig) extra = rigLines(rig, (part) => p.has(part), (part, flip) => (flip ? p.image(part).flip("x") : p.image(part)));
+          if (rig) extra = rigLines(rig, { has: (part) => p.has(part), image: (part, flip) => (flip ? p.image(part).flip("x") : p.image(part)) }, rampSteps(def.pal));
           frames = b.anim ? p.frames(name, 0, 64).map((f) => p.build(name, 0, f.t)) : undefined;
         }
         // each describe keeps what it saw in <out>/_describe; --diff compares with the last one
@@ -294,9 +295,14 @@ export async function main(argv: string[]): Promise<number> {
           const rig = p.rigs.get(n);
           if (!rig) { items.push({ name: n, img: p.image(n) }); continue; }
           for (const [slot, s] of rig.slots) {
-            const own = s.part ?? `${rig.name}_${slot}`;
-            if (p.has(own)) items.push({ name: own, img: p.image(own) });
-            else if (s.mirrorOf && p.has(s.mirrorOf)) items.push({ name: `${s.mirrorOf} flipped (${n})`, img: p.image(s.mirrorOf).flip("x") });
+            // a two-faced part: each face drawn (a turned rig's own, else the original's flipped)
+            const names = s.faces ? Object.values(s.faces) : [s.part ?? `${rig.name}_${slot}`];
+            for (const nm of names) {
+              const own = s.faces && rig.from && nm.startsWith(rig.from + "_") ? rig.name + nm.slice(rig.from.length) : nm;
+              if (p.has(own) && (!s.faces || own !== nm || !rig.from)) items.push({ name: own, img: p.image(own) });
+              else if (s.faces && rig.from && p.has(nm)) items.push({ name: `${nm} flipped (${n})`, img: p.image(nm).flip("x") });
+              else if (!s.faces && s.mirrorOf && p.has(s.mirrorOf)) items.push({ name: `${s.mirrorOf} flipped (${n})`, img: p.image(s.mirrorOf).flip("x") });
+            }
           }
         }
         // shuffled, so the order gives nothing away; each on a plain gray, 8x

@@ -26,18 +26,41 @@ const F = figure(72, 6.5), Y = (y) => 2 + y          // figure's y (from the top
 const X = 30                                         // the body's centre line in the rig; the pivot is
                                                      // its sole, so stamp("knight", x, groundY) stands it
 
+// The shield is held by enarmes: a strap the forearm goes through and a grip for the hand, both
+// across the forearm, so the shield turns with the forearm: forearm level (on guard), the shield
+// stands up; forearm hanging, it lies down. At rest here the left forearm goes down and forward, as
+// the arm part draws it (its elbow and hand sockets), and the shield leans with it: its top forward,
+// its point back. In its own frame, u runs along the straps (elbow to hand) and v to its point.
+const ELBOW = [3.5, 12.5], HAND = [9.5, 19.5]
+const A = Math.atan2(HAND[1] - ELBOW[1], HAND[0] - ELBOW[0]), U = [Math.cos(A), Math.sin(A)], V = [-Math.sin(A), Math.cos(A)]
+const OUTLINE = [[-9, -9], [9, -9], [9, 4], [6, 10], [0, 17], [-6, 10], [-9, 4]]
+const FIELD = [[-7.5, -7.5], [7.5, -7.5], [7.5, 3.6], [5, 9], [0, 15], [-5, 9], [-7.5, 3.6]]
+const GRIP = [3, -3], STRAP = [-5, -3], GRIP_A = [3, -6], GRIP_B = [3, 0], STRAP_A = [-5, -6], STRAP_B = [-5, 0]
+const turn = ([u, v]) => [u * U[0] + v * V[0], u * U[1] + v * V[1]], TP = OUTLINE.map(turn)
+const SX0 = Math.min(...TP.map((p) => p[0])), SY0 = Math.min(...TP.map((p) => p[1]))
+const SW = Math.ceil(Math.max(...TP.map((p) => p[0])) - SX0) + 1, SH = Math.ceil(Math.max(...TP.map((p) => p[1])) - SY0) + 1
+const S = (p) => { const [x, y] = turn(p); return [Math.round(x - SX0), Math.round(y - SY0)] }   // shield frame -> its px
+const C = (p) => { const [x, y] = turn(p); return [x - SX0 + 0.5, y - SY0 + 0.5] }                // -> pixel corners
+const shieldPoly = (P, c) => poly(P.map(S).flat(), c)
+const shieldLine = (a, b, c, w = 1) => line(...S(a), ...S(b), c, w)
+const SHIELD = { pivot: C(GRIP), sockets: { grip: C(GRIP), strap: C(STRAP) } }
+
 // Where each part's joint sits, the part's box (the size to draw it at, its outline included), and
 // its side. Far side at -100, the middle at 0, the near side at +100; z adds to that. z is the
 // body's layering, the same on both sides (both legs under the tabard): the facing says which is near.
 const SLOTS = {
   cape:   { at: [X - 4, Y(F.shoulders) - 1], size: [16, 46], pivot: [12, 0], z: -150 },
   leg_l:  { at: [X - 5, Y(F.crotch)], size: [12, 36], side: "l", z: -50 },
-  arm_l:  { at: [X + 1, Y(F.shoulders)], size: [12, 18], pivot: [3, 1], side: "l" },
+  arm_l:  { at: [X + 1, Y(F.shoulders)], size: [14, 24], side: "l" },
   torso:  { at: [X, Y(F.chin)], size: [16, F.crotch - F.chin + 2] },
   head:   { at: [X + 1, Y(F.chin) + 1], size: [15, 15], pivot: [7, 14], z: 10 },
   leg_r:  { at: [X + 3, Y(F.crotch)], size: [12, 36], side: "r", z: -50 },
   tabard: { at: [X, Y(F.waist)], size: [18, 19], z: 75 },
-  shield: { at: [X + 11, Y(F.waist) + 1], size: [14, 22], pivot: [4, 9], side: "l", z: 180 },
+  // the shield hangs from the left hand, outside the arm (over it near, under it far); the rig shows
+  // the face turned to us: facing right its outer face points away (we see the straps), facing left
+  // toward us (the cross); its straps must run along the forearm
+  shield: { at: [X + 9, Y(F.waist) + 4], size: [SW + 2, SH + 2], side: "l", out: 20, on: "arm_l.hand",
+    faces: { outer: "knight_shield", inner: "knight_shield_back" }, parallel: ["strap", "grip", "arm_l.elbow", "arm_l.hand"] },
   sword:  { at: [X + 1, Y(F.crotch)], size: [16, 38], pivot: [3, 4], side: "r", z: -10 },
   arm_r:  { at: [X - 1, Y(F.shoulders)], size: [12, 29], pivot: [5, 1], side: "r" },
 }
@@ -60,7 +83,7 @@ const part = (name, w, h, o, ...shape) => {
   sprite(`_knight_${name}_shape_l`, { base: `_knight_${name}_shape`, flip: "x" })
   sprite(`knight_${name}`, { base: `_knight_${name}_shape`, outline: "k", ...o }, relight(undefined, lit))
   sprite(`knight_l_${name}`, { base: `_knight_${name}_shape_l`, outline: "k", ...o, ...(o.facing ? { facing: "left" } : {}),
-    pivot: m(o.pivot), ...(o.sockets ? { sockets: { front: m(o.sockets.front) } } : {}) }, relight(undefined, lit))
+    pivot: m(o.pivot), ...(o.sockets ? { sockets: Object.fromEntries(Object.entries(o.sockets).map(([k, p]) => [k, m(p)])) } : {}) }, relight(undefined, lit))
 }
 
 // a bascinet with its visor down, in profile: the slit and breaths at the front, a gold band, the
@@ -98,16 +121,22 @@ part("arm_r", 10, 27, { facing: "right", pivot: [4, 0], sockets: { front: [9, 23
   rect(2, 6, 5, 7, "3"), ellipse(2, 13, 2, 2, "3"),                              // upper arm, couter
   poly([2, 13, 6, 13, 8, 20, 4, 21], "3"), ellipse(6, 23, 3, 3, "3"),            // forearm, gauntlet
   hline(0, 5, 9, "1"), hline(2, 12, 5, "1"), line(4, 20, 8, 19, "1"))            // plate edges
-// the left arm: its pauldron, the upper arm, the forearm forward to the shield's grip; mostly
-// behind the body facing right, in front of it (under the shield) facing left
-part("arm_l", 10, 16, { facing: "right", pivot: [2, 0], sockets: { front: [10, 14] } },
-  ellipse(2, 3, 3, 3, "3"), rect(0, 3, 5, 6, "3"), poly([2, 8, 6, 8, 10, 13, 9, 15, 4, 12], "3"),
-  hline(0, 5, 5, "1"))
+// the left arm at rest, carrying the shield: its pauldron, the upper arm down to the elbow at the
+// waist, the forearm down and forward to the fist on the shield's grip. Mostly behind the body
+// facing right, in front of it (behind the shield) facing left
+part("arm_l", 12, 22, { facing: "right", pivot: [3, 0], sockets: { front: [11, 20], elbow: ELBOW, hand: HAND } },
+  ellipse(3, 3, 3, 3, "3"), poly([1, 4, 5, 4, 5, 12, 1, 12], "3"), ellipse(3, 12, 2, 2, "3"),   // pauldron, upper arm, couter
+  line(3, 12, 9, 19, "3", 4), ellipse(9, 19, 2, 2, "3"),                                       // forearm, gauntlet
+  hline(0, 5, 6, "1"), line(2, 15, 5, 13, "1"))                                                 // plate edges
 
-// a heater shield held up, its face turned a little toward us: a gold rim and a gold cross on blue
-part("shield", 12, 20, { pivot: [4, 9] },
-  poly([0, 0, 11, 0, 11, 10, 6, 19, 5, 19, 0, 10], "O"), poly([1, 1, 10, 1, 10, 10, 6, 17, 5, 17, 1, 10], "w"),
-  rect(5, 3, 2, 11, "O"), rect(2, 6, 8, 2, "O"))                                 // the cross
+// the shield's two faces, drawn square to the forearm (SHIELD, above): outside, a gold rim and a gold
+// cross on blue; inside, planks, the forearm strap and the hand grip with their rivets
+part("shield", SW, SH, SHIELD, shieldPoly(OUTLINE, "O"), shieldPoly(FIELD, "w"),
+  clip(FIELD.map(S).flat(), shieldLine([0, -7], [0, 13], "O", 2), shieldLine([-6, -2], [6, -2], "O", 2)))
+part("shield_back", SW, SH, SHIELD, shieldPoly(OUTLINE, "t"), shieldPoly(FIELD, "L"),
+  clip(FIELD.map(S).flat(), ...[-4, 0, 4].map((u) => shieldLine([u, -9], [u, 16], "T"))),     // planks
+  shieldLine(STRAP_A, STRAP_B, "t", 2), shieldLine(GRIP_A, GRIP_B, "t", 2),                   // forearm strap, hand grip
+  ...[STRAP_A, STRAP_B, GRIP_A, GRIP_B].map((p) => px(...S(p), "O")))                         // rivets
 
 // a longsword pointing down and forward from the hand: pommel, grip, crossguard square to the
 // blade; pivot on the grip, where the gauntlet closes. A 2 px blade is lit with a 1 px rim: with 2,
@@ -123,7 +152,7 @@ part("cape", 14, 44, { pivot: [11, 0] },
   line(7, 6, 4, 38, "x"), line(10, 8, 9, 40, "x"))
 
 sheet("knight_parts", ["knight_head", "knight_torso", "knight_tabard", "knight_arm_r", "knight_arm_l", "knight_leg",
-  "knight_shield", "knight_sword", "knight_cape"], { pad: 2 })
+  "knight_shield", "knight_shield_back", "knight_sword", "knight_cape"], { pad: 2 })
 
 // ---------------------------------------------------------------- stage 3: assembled, retouched
 // The retouch layer goes over the assembled parts: what spans more than one part, or only makes

@@ -55,6 +55,13 @@ facing the other way (side views), its joints and pivots mirrored, each slot tak
 when that is drawn, else the original part flipped; the retouch mirrored; and `<rig>_turnaround`,
 both side by side. A part's `front` socket (a point on its nose, toe, fist, blade's tip) is checked
 against its `facing`: it must sit on the drawing, on the half the label says it faces.
+Slots also take: `on: "arm_l.hand"` (its joint is that socket of the part in another slot: a shield
+in the hand); `out: n` (how far out from the body's side it sits beyond its limb: over the arm on
+the near side, under it on the far side); `faces: { outer, inner, edge }` (a part whose two sides
+differ, each its own drawing: the rig shows the one turned to us, from `facesTo`, the body's way its
+outer face points, default its side; `edge` when it is seen side on); `parallel: ["strap", "grip",
+"arm_l.elbow", "arm_l.hand"]` (two of its sockets and two of another slot's, whose lines must run
+parallel: the shield's straps along the forearm).
 
 An included file's `use`/`pal`/`ramps` apply to its own assets only; your palette is the same
 after the `include` as before it. Pass `{ palette: true }` to share one palette file across art

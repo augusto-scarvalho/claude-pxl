@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadSource } from "../src/node/load.ts";
 import { main } from "../src/node/cli.ts";
-import { frontWords, lightWords, litDir } from "../src/core/checks.ts";
+import { frontWords, lightWords, litDir, rampSteps } from "../src/core/checks.ts";
 import { PAL } from "./helpers.ts";
 
 const run = async (src: string, ...args: string[]) => {
@@ -86,4 +86,41 @@ sprite("head_l", { base: "head", flip: "x" })`;
   console.log = (s: string) => lines.push(s);
   try { assert.equal(await main(["blind", file, "--check", join(dir, "answers.json")]), 1); } finally { console.log = log; }
   assert.match(lines.join("\n"), /head_l: labelled left, the reader says right: look at it\n1 of 2 labels agree/);
+});
+
+// a body with an arm on its left and a shield in that hand: the shield's outer face (o) and inner
+// face (i), its strap along the arm's forearm
+const SHIELDED = (facing: string, strap = "[1.5, 0]") => PAL + `rig("man", { w: 12, h: 8, facing: "${facing}", guide: false, turn: "man_l", slots: {
+  body: { at: [6, 0], size: [2, 8], pivot: [1, 0] },
+  arm: { at: [6, 1], size: [1, 4], pivot: [0, 0], side: "l" },
+  shield: { at: [0, 0], size: [3, 3], side: "l", out: 10, on: "arm.hand", faces: { outer: "man_shield", inner: "man_shield_in" },
+    parallel: ["strap", "grip", "arm.elbow", "arm.hand"] } } })
+sprite("man_body", { w: 2, h: 8 }, rect(0, 0, 2, 8, "w"))
+sprite("man_arm", { w: 1, h: 4, sockets: { elbow: [0.5, 0.5], hand: [0.5, 3.5] } }, rect(0, 0, 1, 4, "r"))
+sprite("man_shield", { w: 3, h: 3, pivot: [1.5, 1.5], sockets: { strap: ${strap}, grip: [1.5, 1.5] } }, rect(0, 0, 3, 3, "g"))
+sprite("man_shield_in", { w: 3, h: 3, pivot: [1.5, 1.5], sockets: { strap: ${strap}, grip: [1.5, 1.5] } }, rect(0, 0, 3, 3, "k"))`;
+
+test("rig faces, out and on: the face turned to us, outside the arm, hung from the hand", async () => {
+  const p = loadSource(SHIELDED("right"), "t.px.js"), rev = p.assets.get("man")!.pal.reverse();
+  const row = (n: string, y: number) => { const im = p.image(n); return [...Array(im.w).keys()].map((x) => rev.get(im.data[y * im.w + x]) ?? ".").join(""); };
+  // facing right, its left side is far: the shield shows its inner face (k), behind the arm and the
+  // body (w), centred on the hand; only its right column shows past the body
+  assert.equal(row("man", 4), ".....wwk....");
+  // facing left (turned), its left side is near: the arm (r) over the body, the outer face (g) over both
+  assert.equal(row("man_l", 1), ".....rw.....");
+  assert.equal(row("man_l", 4), "....ggg.....");
+  const { text } = await run(SHIELDED("right"), "describe", "man", "--no-out");
+  assert.match(text, /shield: [^\n]*drawn 'man_shield_in'; shows its inner face; hangs from arm\.hand; its strap-grip runs parallel to arm's elbow-hand \(0 deg apart\)/);
+  const bad = await run(SHIELDED("right", "[0, 0]"), "describe", "man", "--no-out");
+  assert.match(bad.text, /WARNING: its strap-grip is 45 deg off arm's elbow-hand: they should run parallel/);
+});
+
+test("light words: a weak side or a light from below claims nothing", () => {
+  const p = loadSource(PAL + `ramps("1d6")
+sprite("lit", { w: 9, h: 9, outline: "k" }, rect(0, 0, 9, 9, "d"), relight(undefined, { light: [0.6, -1], reach: 2 }))
+sprite("below", { base: "lit", flip: "y" })`, "t.px.js");
+  const st = rampSteps(p.assets.get("lit")!.pal);
+  assert.equal(lightWords(p.image("lit"), [0.6, -1], st), "lit from the top right, as its light");
+  // lit from below while the light is above: noise, not light, so nothing is claimed
+  assert.equal(lightWords(p.image("below"), [0.6, -1], st), "");
 });

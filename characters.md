@@ -318,14 +318,25 @@ flips and turns. What reads the pixels:
 - a part's `front` socket, put on the pixel that is its front (the visor, the toe, the fist, the
   blade's tip), has to sit on the drawing, on the half its `facing` names: a drawing that faces the
   other way than its label is caught, as long as the marker is on the right pixel;
-- the lit side, read off each part's rim, against the rig's or the scene's `light` (thin diagonals,
-  where left and top can't be told apart, are left unread);
+- the lit side, read off each part's rim as steps along its ramps, against the rig's or the scene's
+  `light`. It only claims a side when the rim shows it clearly, and stays quiet on thin diagonals and
+  on readings lit from below. Tried on art it wasn't tuned on (forest, cemetery, island: 30 objects),
+  it agreed or stayed quiet, caught a flipped tombstone lit from the wrong side, and was wrong once,
+  on a building whose outline is mostly trims: look before trusting a warning;
 - in a rig, a part labelled another way than the rig (a head facing left on a body facing right).
 For the labels themselves, `PXL blind <file> <rig>` writes the parts unnamed and shuffled for a
 reader who doesn't know the labels, and `--check answers.json` compares. A reader that is another
 Claude may share your blind spots (left/right is exactly where they hide): prefer a different model,
 or ask the user, and look at a few yourself. The reader checks which way a part faces in the picture,
 not which of the body's arms it is: that is the slot's `side`, and the rig's near/far follows from it.
+
+**Parts with two sides.** A flip shows the same face mirrored; a shield, a book, a badge has another
+face behind. Give the slot `faces: { outer, inner }` (each drawn): the rig shows the face turned to us.
+A shield at rest faces out from the body's side: on the near side we see its face (the cross), on the
+far side its inside (the straps); turned to face us, it is seen side on (`edge`). It hangs from the
+hand (`on: "arm_l.hand"`), sits outside the arm (`out`: over the arm near, under it far), and its
+straps run along the forearm (`parallel`): forearm level (on guard), the shield stands up; forearm
+hanging, it lies down; in between, it leans with it.
 
 `examples/rig/knight.px.js`: a 72 px knight in three stages (`knight_blocking`, `knight_parts`,
 `knight`), the same knight turned left, and both next to a flipped copy in a scene with a world

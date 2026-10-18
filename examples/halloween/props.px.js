@@ -55,7 +55,8 @@ sprite("tomb_obelisk", { outline: "k", pivot: "bottom" }, `
 
 // leaning copies: the ground settled under them
 sprite("tomb_round_lean", { base: "tomb_round" }, warp((x, y) => [Math.floor((12 - y) / 4) - 2, 0]))
-sprite("tomb_slab_lean", { base: "tomb_slab", flip: "x" }, warp((x, y) => [Math.floor((9 - y) / 3) - 2, 0]))
+// not flipped: a flip would light it from the left, away from the moon (describe caught it)
+sprite("tomb_slab_lean", { base: "tomb_slab" }, warp((x, y) => [2 - Math.floor((9 - y) / 3), 0]))
 group("tombs", ["tomb_round", "tomb_round", "tomb_cross", "tomb_slab", "tomb_round_lean", "tomb_slab_lean", "tomb_obelisk"])
 
 // ---------------------------------------------------------------- mausoleum
