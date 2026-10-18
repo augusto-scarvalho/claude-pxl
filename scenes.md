@@ -70,6 +70,19 @@ A waterfall that ends in a strip of foam over still water looks pasted on: sprea
 the sides and forward, send rings out, and let a wake ride the current downstream. A figure walks
 on the ground, not over it: tufts at the edges of paths and at the foot of trees and rocks.
 
+## Slow motion in a short loop (clouds, mist, drifting things)
+
+- Scrolling a strip that wraps makes the loop as long as its width over the speed: slow clouds
+  then need half a minute or more. Instead give each cloud a life of one loop: it forms, drifts in
+  one piece (a whole pixel at even intervals: `Math.floor(drift * age)`, with `drift` a divisor of
+  the loop), and thins away where it started; start each at its own moment so only one or two are
+  forming or fading at a time. Make the loop a multiple of the scene's other loops.
+- Thin, a cloud is a long pale wisp in a tone close to the sky's (puffs losing their height faster
+  than their length, a flat base joining them), not a row of small blobs. A heaped cloud takes its
+  light from the top down as it gains body (a white cap thickening row by row, then a gray
+  underside); a thin streak can take its lit underside column by column. Examples:
+  `examples/sunset/sunset.px.js` (streaks at sunset), `examples/rig/tournament.px.js` (daylight cumulus).
+
 ## Shadows and light
 
 - Cast shadows: a `shade: true` layer, with tall things stamped there by `cast: [kx, ky]` (laid flat
