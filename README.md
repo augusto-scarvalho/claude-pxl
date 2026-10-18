@@ -62,6 +62,24 @@ it led to `pxl describe` (a whole scene as text an agent reads at once: where ea
 gaps, what covers it, how it stands out after lighting, how it moves; `--diff` after an edit) and
 to a GIF encoder that keeps small figures' colors in lit scenes. Everything is drawn in code, MIT.
 
+## Showcase: journey's end on a sea cliff
+
+<p>
+  <img src="docs/gallery/sunset_cliff.gif" width="100%" alt="Animated sunset on a sea cliff: an adventurer seen from behind, cloak streaming in the wind, watches the sun go down over the sea while the camp goes up behind them: a ridge tent glowing where the low sun comes through the canvas, its loose corner flapping, a campfire, a pack, a sleeping bag laid out at the door, a cairn with a pennant; clouds drift, a skein of birds crosses toward the sun">
+</p>
+
+The third, in [`examples/sunset/`](examples/sunset): a 320×180 backlit scene. A fresh agent made
+the first version from the skill alone; a curator's notes then went into the tent, the sleeping bag
+and the sky. With the sun low ahead, everything facing us is in shadow, edges toward the sun glow,
+and shadows run long toward us, each one laid away from the sun's point on the horizon. The tent's
+canvas glows where the light comes through it, darker wherever the cloth doubles (seams, patches,
+the ridge tape), and its unpegged corner lifts in the wind. The sky loops in 19.2 s while
+everything else repeats every 1.2 s. Its clouds drift a whole pixel at even intervals, slower near
+the horizon. Scrolling a wrapping strip would make the loop as long as the strip's width over the
+speed, so each cloud instead thins away once a loop and re-forms where it started, out of step with
+the others. A skein of birds crosses toward the sun, and a faint aura breathes around it. Everything
+is drawn in code, MIT.
+
 ## Quick start
 
 ```sh
