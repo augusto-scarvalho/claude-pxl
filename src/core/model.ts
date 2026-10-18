@@ -123,6 +123,12 @@ export interface AssetOpts {
    * sockets and facing mirrored. Art functions see `c.mirrored`. text, bump and normals refuse.
    */
   twin?: string;
+  /**
+   * Register every frame by a marked point (the pelvis): the drawing moves sideways so the pixel of
+   * this key lands on `x` (default the middle); y is left alone (the bob). A key used for nothing else,
+   * best in a `ref: true` layer (else erased from the art once found).
+   */
+  register?: string | { key: string; x?: number };
   /** Scene: the world's scale, { horizon, eye } (ground seen in perspective) or { scale } (px per meter, flat side view). */
   world?: World;
 }

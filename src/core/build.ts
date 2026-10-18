@@ -277,6 +277,10 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     snap?.(`layer '${l.name}'${l.opts.hidden ? " (hidden)" : ""}`, l.loc);
   });
 
+  if (opts.register !== undefined) {
+    register(base, refs.map((r) => r.img), opts.register, pal, frame);
+    snap?.(`register on '${typeof opts.register === "string" ? opts.register : opts.register.key}'`, def.loc);
+  }
   const img = finish(base, def, pal, trace, loose);
   trace?.finish(img);
   const guide = refs.length ? guideOver(img, refs, def) : undefined;
@@ -304,6 +308,36 @@ function guideOver(img: Img, refs: { img: Img; k: number }[], def: AssetDef): Im
           : pack(...([24, 16, 8].map((sh) => Math.round(((c >>> sh) & 255) * k + ((under >>> sh) & 255) * (1 - k))) as [number, number, number]));
       }
   return out;
+}
+
+/**
+ * Register a frame by a marked point (the pelvis): move the whole drawing sideways so the marker's
+ * pixel lands on x (default the middle), never by the bounding box (an arm reaching out moves that),
+ * and leave y alone (the bob stays). The marker is a key used for nothing else, best drawn in a
+ * `ref: true` layer; drawn in the art itself, it is erased once found.
+ */
+function register(base: Img, refs: Img[], spec: string | { key: string; x?: number }, pal: Palette, frame: number): void {
+  const { key, x } = typeof spec === "string" ? { key: spec, x: undefined } : spec;
+  if (typeof key !== "string" || (x !== undefined && !Number.isFinite(x)))
+    throw new PxError(`register: "key" of the marker (e.g. register: "m"), or { key, x }, got ${fmtArgs([spec])}`);
+  const c = pal.resolve(key);
+  if (c === null || c === TRANSPARENT) throw new PxError(`register: '${key}' must be a visible palette key`);
+  const find = (img: Img) => { const xs: number[] = []; img.data.forEach((v, i) => { if (v === c) xs.push(i % img.w); }); return xs; };
+  let xs: number[] = [];
+  for (const r of refs) if (!xs.length) xs = find(r);
+  const inArt = !xs.length;
+  if (inArt) xs = find(base);
+  if (!xs.length) throw new PxError(`register: frame ${frame} has no '${key}' marker`);
+  if (inArt) for (let i = 0; i < base.data.length; i++) if (base.data[i] === c) base.data[i] = TRANSPARENT;
+  const dx = Math.round((x ?? Math.floor(base.w / 2)) - xs.reduce((a, b) => a + b, 0) / xs.length);
+  if (!dx) return;
+  for (const img of [base, ...refs]) {
+    const moved = new Img(img.w, img.h);
+    moved.blit(img, dx, 0);
+    img.data.set(moved.data);
+    if (moved.norm) img.norm = moved.norm;
+  }
+  if (base.lamps) for (const l of base.lamps) l.x += dx;
 }
 
 /** Whole-image passes (lighting, glow) that run on everything drawn before them. */

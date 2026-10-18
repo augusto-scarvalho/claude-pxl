@@ -102,8 +102,11 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
   colored by side; anim previews show `ref` layers. CC0 walk and run cycles in 8 directions ship in
   `examples/motion/`, converted from the pipeline's projections; the tropical girl walks with them.
   Skipped: dimming inferred joints (the CC0 projections have none).
-- [ ] **Register by a point**: move each frame so a marked point (the pelvis) lands on the same x, with
-  one y offset per cycle; never by the bounding box.
+- [x] **Register by a point**: move each frame so a marked point (the pelvis) lands on the same x, with
+  one y offset per cycle; never by the bounding box. `register: "m"` (or `{ key, x }`) on a sprite
+  or anim: a marker pixel per frame, best in a `ref: true` layer (in the art it's erased once found);
+  each frame moves sideways to put it on x, y left alone (the bob; a constant offset is the pivot's
+  or a layer's job).
 - [x] **Small warps for secondary motion** (b20305a): `warp((x, y) => [dx, dy], where?)`, whole-pixel
   offsets read back from each pixel's new place (no holes, no new colors): the useful side of Warp's
   pins. The forest's breathing and the jaguar's shear became one line each (identical output). For the

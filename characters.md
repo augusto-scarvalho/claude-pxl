@@ -263,7 +263,8 @@ anim("walk", { frames: 8, fps: 8, outline: "k" },
 - **Register the whole figure by one point**, the pelvis: move the entire frame so it lands on the
   same x every frame, with one constant y offset per cycle for the bob. Never centre frames on
   their bounding box (an arm reaching out moves it), and never pin head and feet separately (the
-  torso goes soft).
+  torso goes soft). `register: "m"` on the anim does it: a marker pixel on the pelvis in each
+  frame, in a `ref: true` layer, and every frame moves sideways to put it on one x.
 - **Review the whole cycle**, not the key frames: `_preview/<name>_onion.png`, the half-cycle
   pairs (frame i next to i + n/2), and the seam (last → 0 → 1). Fixing a limb only on the contact
   frame leaves the wrong leg moving in the in-betweens. Draw left and right limbs in distinct guide

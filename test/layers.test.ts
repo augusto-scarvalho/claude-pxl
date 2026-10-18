@@ -123,3 +123,22 @@ scene("by_pivot", { w: 12, h: 8, bg: "k" }, stamp("hem", 6, 6, { cast: [-1, 0], 
   assert.equal(art(src, "by_column").split("\n").slice(2, 6).join("\n"), ["kkkkkkkwkkkk", "kkkkkkwkkkkk", "kkkkkwkkkkkk", "kkkkwkkkkkkk"].join("\n"));
   assert.deepEqual(art(src, "by_pivot").split("\n").slice(2, 6), ["kkkkkkkkkkkk", "kkkkkkkkkkkk", "kkkkkkkkkkkk", "kkkkwkkkkkkk"]);
 });
+
+test("register: each frame moved so its marker (the pelvis) lands on one x, whatever an arm does", () => {
+  // the body drawn 4 px apart in two frames, an arm reaching out in the second: by the marker (in a
+  // ref layer, so not in the art) both bodies land on x 4-6; by the bounding box they wouldn't
+  const src = PAL + `
+anim("walk", { w: 10, h: 3, register: "c" },
+  frame(rect(1, 0, 3, 3, "r")), frame(rect(5, 0, 3, 3, "r"), px(9, 1, "r")),
+  layer("marks", { ref: true }, frame(px(2, 1, "c")), frame(px(6, 1, "c"))))
+sprite("inked", { w: 6, h: 1, register: { key: "c", x: 3 } }, px(1, 0, "r"), px(2, 0, "c"))
+sprite("lost", { w: 4, h: 1, register: "c" }, px(1, 0, "r"))`;
+  const p = loadSource(src, "t.px.js"), red = p.assets.get("walk")!.pal.resolve("r");
+  const row = (img: { w: number; data: Uint32Array }, y: number) => [...Array(img.w).keys()].map((x) => (img.data[y * img.w + x] === red ? "r" : ".")).join("");
+  const [f0, f1] = p.frames("walk").map((f) => f.img);
+  assert.equal(row(f0, 1), "....rrr...");
+  assert.equal(row(f1, 1), "....rrr.r.");
+  // a marker drawn in the art is erased once found
+  assert.equal(art(src, "inked"), "..r...");
+  assert.throws(() => p.image("lost"), /register: frame 0 has no 'c' marker/);
+});
