@@ -27,11 +27,14 @@ test("front marker: on the half the label faces; off the drawing or on the back 
   const p = loadSource(PAL + HEAD + `
 sprite("head_wrong", { base: "head", facing: "left" })
 sprite("head_off", { base: "head", sockets: { front: [0, -3] } })
+sprite("herald", { w: 20, h: 9, facing: "right", outline: "k", sockets: { front: [7, 4] } }, rect(0, 0, 6, 9, "d"), hline(6, 4, 14, "6"))
 sprite("blade", { w: 12, h: 12, outline: "k" }, line(0, 11, 11, 0, "d", 2), relight(undefined, { light: [0.6, -1], ramps: ["1d6"] }))`, "t.px.js");
   assert.equal(frontWords(p.image("head")), "front marker agrees");
   // the label says left, but the marker (the nose) is on the right half: the drawing faces right
   assert.match(frontWords(p.image("head_wrong")), /WARNING: its front marker is on its back half: the drawing faces right, its label says left/);
   assert.match(frontWords(p.image("head_off")), /WARNING: its front marker \(\d+,-?\d+\) is off the drawing/);
+  // a trumpet held out in front stretches the box past the face; the face is still the front
+  assert.equal(frontWords(p.image("herald")), "front marker agrees");
   // a thin diagonal's top edges are its left ones: left and top can't be told apart, so x is left unsaid
   assert.equal(litDir(p.image("blade"))?.[0] ?? 0, 0);
 });

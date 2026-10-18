@@ -129,7 +129,12 @@ export function frontWords(img: Img): string {
       if (x >= 0 && y >= 0 && x < img.w && y < img.h && img.data[y * img.w + x] !== TRANSPARENT) on = true;
   if (!on) return `WARNING: its front marker (${s[0]},${s[1]}) is off the drawing`;
   if (!f || Math.hypot(f[0], f[1]) < 0.5) return "";
-  const cx = b.x + b.w / 2, cy = b.y + b.h / 2, dot = (s[0] - cx) * f[0] + (s[1] - cy) * f[1];
+  // halves split at the drawing's center of mass, not its box: a trumpet or a lance held out in
+  // front stretches the box forward, past a face that is still the front
+  let n = 0, cx = 0, cy = 0;
+  for (let i = 0; i < img.data.length; i++) if (img.data[i] !== TRANSPARENT) { n++; cx += (i % img.w) + 0.5; cy += Math.floor(i / img.w) + 0.5; }
+  cx /= n; cy /= n;
+  const dot = (s[0] - cx) * f[0] + (s[1] - cy) * f[1];
   if (dot < 0) return `WARNING: its front marker is on its back half: the drawing faces ${dirWords(-f[0], -f[1]).replace("the ", "")}, its label says ${dirWords(f[0], f[1]).replace("the ", "")}`;
   return "front marker agrees";
 }

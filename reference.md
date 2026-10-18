@@ -54,7 +54,7 @@ previews. Items after the options are a retouch layer on top. `PXL describe` pri
 facing the other way (side views), its joints and pivots mirrored, each slot taking `name_l_<slot>`
 when that is drawn, else the original part flipped; the retouch mirrored; and `<rig>_turnaround`,
 both side by side. A part's `front` socket (a point on its nose, toe, fist, blade's tip) is checked
-against its `facing`: it must sit on the drawing, on the half the label says it faces.
+against its `facing`: it must sit on the drawing, on the half the label says it faces (split at its center of mass).
 Slots also take: `on: "arm_l.hand"` (its joint is that socket of the part in another slot: a shield
 in the hand); `out: n` (how far out from the body's side it sits beyond its limb: over the arm on
 the near side, under it on the far side); `faces: { outer, inner, edge }` (a part whose two sides

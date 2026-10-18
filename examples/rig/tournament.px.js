@@ -81,9 +81,10 @@ const hills = [
 const merlons = (x0, x1, y) => [...Array(Math.floor((x1 - x0) / 4) + 1).keys()].map((i) => rect(x0 + i * 4, y, 2, 3, "s"))
 const mass = (...items) => layer("mass", ...items, relight(undefined, { light: LIGHT, reach: 2 }))
 sprite("castle", { w: 66, h: 50, pivot: "bottom" },
-  // the keep, behind, and its corner turret with a little cone
-  mass(rect(22, 12, 20, 30, "s"), ...merlons(22, 40, 9)),
-  mass(rect(37, 6, 6, 10, "s"), poly([36, 6, 40, 1, 44, 6], "P")),
+  // the keep, behind, and the stair turret on its corner: a slim round tower coming up from behind
+  // the wall and over the battlements, under a cone as steep as the drum towers'
+  mass(rect(22, 12, 20, 30, "s"), ...merlons(22, 34, 9)),
+  mass(rect(37, 8, 6, 20, "s"), poly([35, 8, 39, 0, 40, 0, 44, 8], "P")), vline(41, 9, 19, "U"), rect(39, 12, 1, 2, "S"),
   // the curtain wall, its merlons, the wall-walk's shadow under them
   mass(rect(8, 31, 50, 19, "s"), ...merlons(8, 56, 28)),
   hline(8, 31, 50, "S"),
@@ -100,7 +101,7 @@ sprite("castle", { w: 66, h: 50, pivot: "bottom" },
   // the flags: blue on the left tower, red on the right, gold on the keep
   vline(6, 1, 6, "S"), poly([7, 1, 11, 2, 7, 4], "w"),
   vline(59, 0, 5, "S"), poly([60, 0, 64, 1, 60, 3], "r"),
-  vline(30, 3, 7, "S"), poly([31, 3, 35, 4, 31, 6], "Z"))
+  vline(28, 3, 7, "S"), poly([29, 3, 33, 4, 29, 6], "Z"))
 // The hill the castle stands on: its slopes lit from the right, the rock it is built on cropping out
 // under the walls, the road winding down from the gate, woods in clumps on the slopes, a few fields
 // edged with hedges. Greens already cooled by the distance; the haze over it does the rest.
@@ -183,14 +184,27 @@ const BANNERS = [[20, "w", "e"], [56, "r", "R"], [92, "w", "e"], [128, "r", "R"]
   poly([x, 9, x + 8, 9, x + 8, 20, x + 4, 23, x, 20], c), vline(x + 7, 9, 12, l), hline(x, 9, 9, "k"),
   rect(x + 3, 11, 2, 8, "Z"), rect(x + 1, 13, 6, 2, "Z")])
 sprite("stand_full", { w: STAND_W, h: STAND_H, pivot: "bottom", height: 4.1 }, stamp("grandstand", STAND_W / 2, STAND_H), ...crowd, ...BANNERS)
-// a herald's trumpeter in a red and gold tabard, the trumpet raised toward the lists with its banner
-// hanging; 1.7 m, so 18 px where the stand stands
-sprite("trumpeter", { w: 12, h: 18, pivot: [4, 18], outline: "k", facing: "right", height: 1.7, sockets: { front: [12, 2] } },
-  rect(2, 2, 4, 4, "j"), rect(2, 1, 4, 2, "Z"), px(5, 3, "z"),                         // face, cap
-  rect(1, 6, 6, 7, "r"), rect(1, 6, 3, 7, "y"), hline(1, 12, 6, "Z"),                 // tabard, quartered
-  rect(2, 13, 2, 5, "q"), rect(5, 13, 2, 5, "q"),                                      // legs
-  line(6, 4, 11, 1, "Z"), px(11, 0, "Z"), px(11, 2, "Z"),                              // the trumpet
-  poly([7, 4, 10, 3, 10, 7, 8, 8], "r"), px(8, 5, "Z"))                                // its banner
+// a herald's trumpeter in a red and gold tabard, 1.7 m, so 18 px where the stand stands. A fanfare
+// every 3 s, both together: the trumpet comes up to the lips, the call in threes (the bell lifting
+// on each note, the banner hanging from it swinging), then down to the waist, the banner still.
+const CALL = [0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1]                                      // the bell up on the notes
+anim("trumpeter", { w: 12, h: 18, frames: 24, fps: 8, pivot: [4, 18], outline: "k", facing: "right", height: 1.7, sockets: { front: [6, 3] } }, (c) => {
+  c.rect(2, 2, 4, 4, "j"); c.rect(2, 1, 4, 2, "Z"); c.px(5, 3, "z")                    // face, cap
+  c.rect(1, 6, 6, 7, "r"); c.rect(1, 6, 3, 7, "y"); c.hline(1, 12, 6, "Z")             // tabard, quartered
+  c.rect(2, 13, 2, 5, "q"); c.rect(5, 13, 2, 5, "q")                                   // legs
+  const f = c.frame
+  if (f >= 2 && f < 14) {                                                              // playing
+    const s = CALL[f - 2], d = 1 - s                                                    // the bell a pixel lower between notes
+    c.line(6, 4, 11, 1 + d, "Z"); c.px(11, d, "Z"); c.px(11, 2 + d, "Z")
+    c.poly([8, 4 + d, 10, 3 + d, 10 + s, 7 + d, 9 + s, 8 + d], "r"); c.px(9, 5 + d, "Z")
+  } else if (f < 16) {                                                                 // on the way up or down
+    c.line(6, 6, 11, 5, "Z"); c.px(11, 4, "Z"); c.px(11, 6, "Z")
+    c.poly([8, 7, 10, 6, 10, 10, 9, 11], "r"); c.px(9, 8, "Z")
+  } else {                                                                             // at rest, at the waist
+    c.line(6, 9, 11, 9, "Z"); c.px(11, 8, "Z"); c.px(11, 10, "Z")
+    c.poly([8, 10, 10, 10, 10, 14, 9, 15], "r"); c.px(9, 12, "Z")
+  }
+})
 
 // ---------------------------------------------------------------- pavilions
 // round tents striped in a knight's colors, a pennant on the pole, flapping in the breeze from the
@@ -257,5 +271,6 @@ scene("tournament", { w: W, h: H, bg: "A", world: { horizon: HZ, eye: EYE, light
   layer("lists", tile("palisade", 0, 117, 23, 1)),
   layer("shadows", { shade: true }, ...shadows,
     ...[["stand_full", 92], ["pavilion_set", 210], ["pavilion_set", 304]].map(([n, x]) =>
-      stamp(n, x, n === "stand_full" ? 122 : 121, { cast: [-0.45, 0.1], silhouette: "k" }))),
+      stamp(n, x, n === "stand_full" ? 122 : 121, { cast: [-0.45, 0.1], silhouette: "k" })),
+    ...[[14, {}], [184, { flip: "x" }]].map(([x, o]) => stamp("trumpeter", x, 122, { ...o, cast: [-0.45, 0.1], silhouette: "k" }))),
   layer("knights", { sort: "y" }, stamp("marshal", 160, 140), ...knights))

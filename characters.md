@@ -316,8 +316,9 @@ hidden), so a turned rig may need its new near limbs drawn.
 flips and turns. What reads the pixels:
 - lettering is tracked from `text()` itself: a mirrored sign is always caught;
 - a part's `front` socket, put on the pixel that is its front (the visor, the toe, the fist, the
-  blade's tip), has to sit on the drawing, on the half its `facing` names: a drawing that faces the
-  other way than its label is caught, as long as the marker is on the right pixel;
+  blade's tip), has to sit on the drawing, on the half its `facing` names (split at its center of
+  mass, so a trumpet or a lance held out in front doesn't push the line past the face): a drawing
+  that faces the other way than its label is caught, as long as the marker is on the right pixel;
 - the lit side, read off each part's rim as steps along its ramps, against the rig's or the scene's
   `light`. It only claims a side when the rim shows it clearly, and stays quiet on thin diagonals and
   on readings lit from below. Tried on art it wasn't tuned on (forest, cemetery, island: 30 objects),
