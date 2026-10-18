@@ -17,6 +17,8 @@ import { decodePng } from "./png.ts";
 import { reduceColors } from "./gif.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
+import { checkProject } from "./check.ts";
+import { diffRow, frameTime, otherVersion, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
 
 const USAGE = `pxl — pixel-art DSL
@@ -30,15 +32,28 @@ const USAGE = `pxl — pixel-art DSL
       never reads it back and the next --aseprite build overwrites it, so copy it out of out/.
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
       Live viewer: rebuilds on save and replays each asset's painting steps.
-  pxl ascii <art.px.js> <name>
-      Print an asset as palette keys with x/y rulers (anims: every frame).
+  pxl ascii <art.px.js> <name> [--frame N]
+      Print an asset as palette keys with x/y rulers (anims: every frame; --frame N: that one).
   pxl list  <art.px.js>
       List assets, groups and sheets with their source locations.
-  pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h] [--diff] [--brief]   (or: pxl describe <image.png> [...])
+  pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief]   (or: pxl describe <image.png> [...])
       A whole scene as text to read at once: what was painted (steps grouped by source line), what
       was placed where, cell maps (object on top, color before lighting, brightness after it), how
-      each placement stands out from its surroundings; --at adds that region's exact pixels. Any PNG
-      works too: its colors get keys, and repeats are found as identical 16x16 tiles.
+      each placement stands out from its surroundings; --at adds that region's exact pixels; --frame
+      reads an animated asset at frame N of its loop (a scene: each step of its clock), not the
+      first. Any PNG works too: its colors get keys, and repeats are found as identical 16x16 tiles.
+  pxl check <art.px.js> [name...] [--frame N]
+      Every check describe makes that can warn (facing, front marker, lit side, parallel parts, feet
+      on the ground, lettering), on every scene and rig the file defines (not those it includes, or
+      just the named assets) and the front marker of any other asset that has one, from one load: the
+      warnings only, one line each. An animated scene is checked at every frame of its loop, each
+      distinct placement once, and a warning says at which frames (--frame N: that one only). Exits 1
+      when there is any.
+  pxl shot <art.px.js> <name> [--frames a,b,c] [--at x,y,w,h] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
+      A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
+      to the region, side by side, enlarged, written to <out>/_shot/<name>.png. --vs puts the same
+      shot of another version above it (a git revision takes the file itself from there; what it
+      includes is read as it is now); --diff adds a row with the pixels that changed in red.
   pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
@@ -72,6 +87,9 @@ interface Args {
   shrink?: number;
   offset?: [number, number];
   check?: string;
+  frame?: number;
+  frames?: number[];
+  vs?: string;
 }
 
 function parse(argv: string[]): Args {
@@ -106,6 +124,9 @@ function parse(argv: string[]): Args {
     else if (v === "--diff") a.diff = true;
     else if (v === "--brief") a.brief = true;
     else if (v === "--check") a.check = val();
+    else if (v === "--frame") a.frame = Number(val());
+    else if (v === "--frames") a.frames = val().split(",").map((s) => Number(s.trim()));
+    else if (v === "--vs") a.vs = val();
     else if (v === "-h" || v === "--help") a.cmd = "usage";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -120,7 +141,7 @@ export async function main(argv: string[]): Promise<number> {
   try { a = parse(argv); } catch (e) { console.error(wrap(e).message); return 2; }
   if (a.cmd === "help") {
     // the reference looked up, not read: an index, or what it says about one name
-    console.log(help(a.file) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | compare (pxl --help for their options)"));
+    console.log(help(a.file) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | check | shot | compare (pxl --help for their options)"));
     return 0;
   }
   if (!a.cmd || a.cmd === "usage" || !a.file) {
@@ -144,7 +165,8 @@ export async function main(argv: string[]): Promise<number> {
         if (!name) throw new PxError("ascii needs an asset name: pxl ascii <file> <name>");
         const p = loadProject(file);
         const pal = p.assets.get(name)?.pal ?? p.pal;
-        if (p.assets.get(name)?.kind === "anim")
+        if (a.frame !== undefined) console.log(`frame ${a.frame}\n${ascii(p.image(name, 0, frameTime(p, name, a.frame)), pal)}`);
+        else if (p.assets.get(name)?.kind === "anim")
           p.drawn(name).forEach((f, i) => console.log(`frame ${i} (${f.ms}ms)\n${ascii(f.img, pal)}\n`));
         else console.log(ascii(p.image(name), pal));
         return 0;
@@ -186,7 +208,7 @@ export async function main(argv: string[]): Promise<number> {
           const p = loadProject(file, { trace: true });
           const def = p.assets.get(name);
           if (!def) throw new PxError(`unknown asset '${name}'`);
-          b = p.build(name);
+          b = p.build(name, 0, a.frame ? frameTime(p, name, a.frame) : 0);
           pal = def.pal;
           world = def.opts.world;
           const rig = p.rigs.get(name);
@@ -200,7 +222,7 @@ export async function main(argv: string[]): Promise<number> {
           if (!existsSync(keep + ".json")) console.log(`(no earlier describe of ${name} in ${join(outDir, "_describe")}: this one is kept for the next --diff)\n`);
           else prev = { objects: JSON.parse(readFileSync(keep + ".json", "utf8")).objects, img: decodePng(readFileSync(keep + ".png")), unlit: decodePng(readFileSync(keep + ".unlit.png")) };
         }
-        const r = describe(name, b, pal, { cell: a.cell, at, frames, prev, note, brief: a.brief, world, extra });
+        const r = describe(name, b, pal, { cell: a.cell, at, frames, prev, note, brief: a.brief, world, extra, frame: a.frame });
         console.log(r.text);
         if (a.out !== false) {
           writePng(keep + ".png", r.snap.img);
@@ -253,6 +275,38 @@ export async function main(argv: string[]): Promise<number> {
           writePng(path, preview(sheet, Math.max(1, Math.min(3, Math.floor(2400 / Math.max(sheet.w, sheet.h))))));
           console.log(`-> ${path}${every > 1 ? ` (every ${every}th of ${total} steps)` : ""}`);
         }
+        return 0;
+      }
+      case "check": {
+        const p = loadProject(file);
+        const r = checkProject(p, { names: a.rest.length ? a.rest : undefined, frame: a.frame, file: basename(file) });
+        for (const l of r.lines) console.log(l);
+        console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"} (checked ${r.checked}${a.frame ? `, at frame ${a.frame}` : ""})`);
+        return r.warnings ? 1 : 0;
+      }
+      case "shot": {
+        const name = a.rest[0];
+        if (!name) throw new PxError("shot needs an asset name: pxl shot <file> <name> [--frames a,b] [--at x,y,w,h] [--scale N] [--vs rev] [--diff]");
+        if (a.at && a.at.length !== 4) throw new PxError("shot --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
+        if (a.diff && !a.vs) throw new PxError("shot --diff compares with another version: give it --vs <git rev | file>");
+        const frames = a.frames ?? (a.frame !== undefined ? [a.frame] : [0]);
+        const now = shotRow(loadProject(file), name, frames, a.at);
+        const rows = [now];
+        if (a.vs) {
+          const o = otherVersion(file, a.vs);
+          let was: Img;
+          try { was = shotRow(loadProject(o.path), name, frames, a.at); } finally { o.done(); }
+          rows.unshift(was);
+          if (a.diff) {
+            const d = diffRow(was, now);
+            rows.push(d.img);
+            console.log(`${d.changed} px changed`);
+          }
+        }
+        const sheet = stack(rows), k = a.scale ?? Math.max(1, Math.min(8, Math.floor(1600 / sheet.w)));
+        const path = join(outDir, "_shot", name.replace(/[^\w.-]/g, "_") + ".png");
+        writePng(path, sheet.scale(k));
+        console.log(`-> ${path} (frames ${frames.join(",")}${a.vs ? `; above: ${a.vs}` : ""}${a.diff ? "; below: what changed" : ""}; ${k}x)`);
         return 0;
       }
       case "compare": {

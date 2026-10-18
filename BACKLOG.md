@@ -153,6 +153,53 @@ Left out on purpose: effects that leave the palette (blur, curves, HSV, convolut
 tweens and interpolating between drawings, free rotation of cut-out limbs, 2.5D thickness, 3D layers
 (render a base in Blender and reduce it instead), mouse-only tools.
 
+## From the tournament bout (rigs in motion): review tooling first, then the engine, in waves
+
+What a long art session wrote again and again in throwaway scripts (cropping and enlarging ~45
+times, exact frames of a 96-frame scene, a shell loop of 66 describes, a light-check comparison over
+four scenes, three scripts to see what a haze layer reached), and what the knight's file had to build
+by hand. Shipped in waves; each item names the friction it removes.
+
+Wave 1: looking and checking
+- [x] **`pxl shot <file> <name>`**: `--frames a,b,c` (timeline frames, not the GIF's, which merges
+  equal ones), `--at x,y,w,h`, `--scale N`, side by side; `--vs <git rev | file>` puts the same shot
+  of another version under it, `--diff` marks the pixels that changed. Before/after pictures without
+  copying old versions of a file by hand.
+- [x] **`pxl check <file> [names...]`**: every check that can warn (facing, front marker, light,
+  parallel, feet, lettering) on every scene and rig of the file, warnings only, the project loaded
+  once, exit code 1 when there is any. An animated scene at every frame of its loop, each distinct
+  placement (name, layer, position, image) checked once: the tournament's 96 frames hold 2112
+  placements, 339 distinct, 4 s. The checks were moved out of describe into one function both use.
+  A rig with 33 poses took 66 describes in a loop.
+- [x] **`describe --frame N`, `ascii --frame N`**: describe reads frame 0 only, so an effects anim
+  reads "nothing drawn", a fight can't be read mid-loop, a baton raised at frame 0 makes a figure
+  "10% too tall".
+- [x] **The examples' warnings as a test**: what `pxl check` says on every example, every frame, kept
+  in `test/examples.checks.txt` (`PXL_UPDATE=1 npm test` after a change you meant). Its first run
+  caught a false positive mid-loop: a slash's smear read as a thing lit from the left; effects now go
+  on `unlit` layers, which describe doesn't read a lit side off.
+
+Wave 2: describe and small engine features
+- [ ] **Blend layers in describe**: an opacity / blend / shade layer's line: what it covers, px
+  changed per object under it, px hidden by what is in front ("does the haze reach the castle?" took
+  three scripts; the part it seemed to miss was behind the tents).
+- [ ] **`outline: false` on a layer**: keep 1 px ropes, pegs, smears out of the asset's outline
+  (reported twice: a tent's guy ropes, a pavilion's).
+- [ ] **`plate(...items, relightOpts)`**, allowed anywhere (layers don't nest): the castle's
+  masses, the knight's parts, a hill's crags and the marshal all wrap `layer(...items, relight())`,
+  and the marshal had to repeat its offset on every top-level layer.
+
+Wave 3: rigs in motion
+- [ ] **`twin: "<n>_l"` on a sprite**: its items drawn mirrored before lighting, pivot, sockets and
+  facing mirrored: today a 25-line draw helper wraps every op to get a part lit for both facings.
+- [ ] **`turn` with a part-name prefix map** (`turn: { name, parts: ["knight_", "knight_l_"] }`), so
+  pose rigs whose slots name shared parts can use it; **`ik(a, b, target, bend)`** in the DSL (two
+  bones for arms and legs, written in the art file today).
+- [ ] **`arc(cx, cy, r, from, to, c, { inner })`** (smears, halos, partial rings) and **`has(name)`**
+  (a generated part defined once without a guard of one's own).
+- [ ] Docs: included files share one scope (only an error message says so): name the cues two files
+  share (the bout's signal frame) instead of matching numbers by hand.
+
 ## Later / niche
 
 - [x] Layer blend modes and opacity (`blend`, `opacity`, `palettize`), with the palette caveats in

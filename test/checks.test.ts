@@ -51,6 +51,18 @@ sprite("head_l", { base: "head", flip: "x" })`, "t.px.js");
   assert.match(lightWords(p.image("head_l"), [0.6, -1]), /^WARNING: lit from the top left, but its light comes from the top right/);
 });
 
+test("light: what an unlit layer holds (sparks, smears) isn't read for its lit side", async () => {
+  // read in ramp steps, as in any scene: the palette needs the ramp the head was lit along
+  const src = PAL + `ramps("1d6")
+` + HEAD + `
+sprite("head_l", { base: "head", flip: "x" })
+scene("s", { w: 60, h: 20, bg: "d", world: { scale: 10, light: [0.6, -1] } },
+  layer("solid", stamp("head_l", 10, 2)), layer("fx", { unlit: true }, stamp("head_l", 40, 2)))`;
+  const { text } = await run(src, "describe", "s", "--no-out");
+  assert.match(text, /head_l @solid[^]*?WARNING: lit from the top left/);
+  assert.doesNotMatch(text.slice(text.indexOf("head_l @fx")), /^\s+.*WARNING: lit from/m);
+});
+
 test("light: a blade shows two faces; the lit one has to look toward the light", () => {
   const lit = (name: string, line: string) => `sprite("${name}", { w: 26, h: 28, outline: "k" }, ${line}, relight(undefined, { light: [0.6, -1], reach: 1, ramps: ["1d6"] }))`;
   const p = loadSource(PAL + lit("lying", 'line(1, 14, 24, 2, "d", 3)') + "\n" + lit("steep", 'line(9, 26, 16, 1, "d", 3)') + `

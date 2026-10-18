@@ -3,3 +3,6 @@ out/
 dist/
 *.tgz
 FEEDBACK.md
+
+# pxl shot --vs: the other version, written next to the file while it builds
+._vs_*

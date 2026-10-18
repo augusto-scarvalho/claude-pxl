@@ -11,7 +11,7 @@ import type { Placement } from "./canvas.ts";
 import { type Color, TRANSPARENT, toHex } from "./color.ts";
 import { Img, type Orient } from "./image.ts";
 import type { World } from "./model.ts";
-import { dirWords, frontWords, lightWords, rampSteps } from "./checks.ts";
+import { type Steps, dirWords, frontWords, lightWords, rampSteps } from "./checks.ts";
 import type { Palette } from "./palette.ts";
 import { replay } from "./steps.ts";
 
@@ -30,6 +30,8 @@ export interface DescribeOpts {
   note?: string;
   /** Busy scenes: one line per object (nearest neighbour only), no color and light maps, no steps. */
   brief?: boolean;
+  /** Which frame of the loop `b` is (for the header). */
+  frame?: number;
   /** The scene's world scale: objects with a real `height` get told how tall they should be. */
   world?: World;
   /** Lines to print under the header (a rig's slots). */
@@ -91,6 +93,24 @@ export function orientWords(o: Orient): string {
   return w.join(", ");
 }
 
+/**
+ * The pixel checks on one placement, in words (those that fail start with "WARNING"): its front
+ * marker against its facing; its lit side against the world's light, unless it is on an unlit layer
+ * (sparks, a smear, a glow give light or have none); its feet against where it was stamped (a pivot
+ * below the sole floats it) and against the ground. describe and pxl check both use this.
+ */
+export function placementChecks(p: Placement, wo: World | undefined, steps: Steps | undefined, unlit = false): string[] {
+  const checks = [frontWords(p.img), wo?.light && !unlit ? lightWords(p.img, wo.light, steps) : ""];
+  const bb = p.img.bounds(), pv = p.img.pivot;
+  if (bb && p.img.meters) {   // what has a real height stands on the ground: a ghost may float
+    const feet = p.y + bb.y + bb.h, off = pv ? Math.round(p.y + pv[1] - feet) : 0;
+    if (Math.abs(off) >= 2) checks.push(`WARNING: its feet are ${Math.abs(off)} px ${off > 0 ? "above" : "below"} where it stands (its pivot is ${Math.abs(off)} px ${off > 0 ? "below its sole" : "above it"}): it ${off > 0 ? "floats" : "sinks"}`);
+    if (wo?.ground !== undefined && Math.abs(wo.ground - feet) >= 2)
+      checks.push(`WARNING: its feet (y ${feet}) are ${Math.abs(wo.ground - feet)} px ${wo.ground > feet ? "above" : "below"} the ground (y ${wo.ground})`);
+  }
+  return checks.filter(Boolean);
+}
+
 /** px per meter where a thing stands (its feet on row y), or undefined without a usable world. */
 export function pxPerMeter(world: World, y: number): number | undefined {
   if (world.scale !== undefined) return world.scale;
@@ -133,6 +153,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
   // light layer only darkens or lights what is under it: it owns the ground it falls on, never an
   // object (a tree's shadow over a girl's legs leaves them hers)
   const blended = new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name));
+  const unlitLayers = new Set(b.layers.filter((l) => l.unlit).map((l) => l.name));
   const owner = new Int16Array(W * H).fill(-1);
   for (const effects of [false, true])
     b.placements.forEach((p, i) => {
@@ -146,7 +167,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     });
   const kOf = (i: number) => { const p = b.placements[i]; return `${p.name}@${p.layer ?? ""}`; };
 
-  const frames = b.anim ? `, animated (frame 0 of the loop, ${b.anim.loop} ms)` : "";
+  const frames = b.anim ? `, animated (frame ${opts.frame ?? 0} of the loop, ${b.anim.loop} ms)` : "";
   out.push(`${name} ${W}x${H}${frames}. Coordinates are x,y in px from the top left; a range a-b includes both ends.`);
   if (opts.note) out.push(opts.note);
   if (opts.extra?.length) out.push(...opts.extra);
@@ -351,17 +372,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       const turned = p.img.orient && (p.img.orient.f || p.img.orient.mirrored || tiltOf(p.img.orient)) ? orientWords(p.img.orient) : "";
       let size = "";
       const bb = p.img.bounds();
-      // pixel checks: its front marker against its facing, its lit side against the scene's light, its
-      // feet against where it was stamped (a pivot below the sole floats it) and the ground
-      const checks = [frontWords(p.img), wo?.light ? lightWords(p.img, wo.light, steps) : ""];
-      const pv = p.img.pivot;
-      if (bb && p.img.meters) {   // what has a real height stands on the ground: a ghost may float
-        const feet = p.y + bb.y + bb.h, off = pv ? Math.round(p.y + pv[1] - feet) : 0;
-        if (Math.abs(off) >= 2) checks.push(`WARNING: its feet are ${Math.abs(off)} px ${off > 0 ? "above" : "below"} where it stands (its pivot is ${Math.abs(off)} px ${off > 0 ? "below its sole" : "above it"}): it ${off > 0 ? "floats" : "sinks"}`);
-        if (wo?.ground !== undefined && p.img.meters && Math.abs(wo.ground - feet) >= 2)
-          checks.push(`WARNING: its feet (y ${feet}) are ${Math.abs(wo.ground - feet)} px ${wo.ground > feet ? "above" : "below"} the ground (y ${wo.ground})`);
-      }
-      const check = checks.filter(Boolean).join("; ");
+      const check = placementChecks(p, wo, steps, unlitLayers.has(p.layer ?? "")).join("; ");
       if (wo && p.img.meters && bb) {
         const lying = p.img.orient && Math.abs(Math.abs(tiltOf(p.img.orient)) - 90) <= 45;
         const drawn = lying ? bb.w : bb.h, feet = p.y + bb.y + bb.h, ppm = pxPerMeter(wo, feet);

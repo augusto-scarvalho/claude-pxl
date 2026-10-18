@@ -345,4 +345,5 @@ scene("tournament", { w: W, h: H, bg: "A", world: { horizon: HZ, eye: EYE, light
   layer("lists", tile("palisade", 0, 117, 23, 1)),
   layer("shadows", { shade: true }, ...shadows),
   layer("knights", { sort: "y" }, stamp("marshal", 160, 140), ...knights),
-  layer("sparks", stamp("knight_bout_fx", 160, FEET, { swap: { L: "v", T: "d" } })))
+  // sparks, smears and dust give light or take none: `unlit`, so describe doesn't read a lit side off them
+  layer("sparks", { unlit: true }, stamp("knight_bout_fx", 160, FEET, { swap: { L: "v", T: "d" } })))

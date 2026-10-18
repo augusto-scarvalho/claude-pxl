@@ -25,6 +25,8 @@ export interface LayerOut {
   img: Img;
   /** How it reached the art: drawn as it is (unset), not at all, or blended (shade, light, blend, opacity, density). */
   how?: "hidden" | "blended";
+  /** Its pixels ignore lighting (the layer's `unlit`): sparks, glows, skies; describe doesn't judge their lit side. */
+  unlit?: boolean;
 }
 
 export interface BuildOut {
@@ -245,7 +247,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     // drawn as it is: what blend() blits (an Aseprite export keeps it as its own layer)
     const o = l.opts, mode = o.shade ?? o.light;
     const plain = o.blend === undefined && o.opacity === undefined && (o.density ?? 1) >= 1 && (mode === undefined || mode === false);
-    layers.push({ name: l.name, img: limg, ...(o.hidden ? { how: "hidden" as const } : plain ? {} : { how: "blended" as const }) });
+    layers.push({ name: l.name, img: limg, ...(o.hidden ? { how: "hidden" as const } : plain ? {} : { how: "blended" as const }), ...(o.unlit ? { unlit: true } : {}) });
     snap?.(`layer '${l.name}'${l.opts.hidden ? " (hidden)" : ""}`, l.loc);
   });
 

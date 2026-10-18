@@ -107,6 +107,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   from their base, `silhouette: "k"`): a pixel h px up lands h × (kx, ky) away. One sun, one
   `cast` for everything. `ky` says where the sun is in depth: negative, the shadows fall back (the
   sun in front of us: the fronts we see are lit), positive, toward us (backlit).
+- Effects that give light or take none (sparks, smears, glows, flames drawn as shapes) go on a layer
+  with `unlit: true`: describe doesn't read a lit side off them (a white smear with a gray rim
+  reads as a thing lit from that side).
 - A shadow is drawn on the ground before what stands in front of it: for things behind a fence or a
   wall, give their shadows their own shade layer between the ground and those things, or the shadow
   darkens the fence. Their shadows are mostly hidden there, as they should be; a sun low enough (a

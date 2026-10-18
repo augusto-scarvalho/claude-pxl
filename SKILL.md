@@ -18,11 +18,16 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an image). Anims: also
    `_preview/<name>_onion.png` (motion map + onion skin). Scenes: `PXL describe art.px.js <scene>`
    (`--brief` when busy) gives each object's position, gaps, cover, contrast and motion as text:
-   answer layout questions from it, not by eyeballing.
+   answer layout questions from it, not by eyeballing. An animated scene is read at frame 0: pass
+   `--frame N` for another. To look at a part of it enlarged, or at some frames side by side:
+   `PXL shot art.px.js <name> --frames 0,12,30 --at x,y,w,h` (writes `out/_shot/<name>.png`).
 4. Fix with small edits and rebuild. In a scene, `PXL describe ... --diff` lists what the edit moved,
-   redrew or recolored. A wrong pixel: `PXL steps art.px.js <name> --at x,y` names the line that
+   redrew or recolored; `PXL shot ... --vs HEAD --diff` shows the last committed version above and
+   the pixels that changed below. A wrong pixel: `PXL steps art.px.js <name> --at x,y` names the line that
    painted it.
-5. Before handing over, look as a critic. Replacing approved art: keep `name_old` beside the new one
+5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
+   rig of the file and every frame of an animated scene, warnings only, with the frames they happen
+   at. Fix each or say why it's meant. Then look as a critic. Replacing approved art: keep `name_old` beside the new one
    in a `compare` scene and let the user choose. Matching a reference: `PXL compare art.px.js <name>
    ref.png [--shrink N]` lists each row's extents side by side.
 6. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL.

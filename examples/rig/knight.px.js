@@ -542,4 +542,4 @@ scene("knight_moves", { w: 60 * SHOWN.length, h: 116, bg: "#2a2f3e", world: { sc
 scene("bout", { w: 240, h: 120, bg: "#2a2f3e", world: { scale: 40, light: LIT.light, ground: 112 } },
   rect(0, 112, 240, 8, "T"), hline(0, 112, 240, "L"),
   layer("knights", stamp("knight_l_bout", 120, 112, { swap: RED }), stamp("knight_bout", 120, 112)),
-  layer("fx", stamp("knight_bout_fx", 120, 112)))
+  layer("fx", { unlit: true }, stamp("knight_bout_fx", 120, 112)))
