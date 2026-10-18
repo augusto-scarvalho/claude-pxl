@@ -222,6 +222,51 @@ Wave 3: rigs in motion
   the bout names its clock (BOUT_LOOP, BOUT_SIGNAL, BOUT_HOME), which the tournament's clouds,
   trumpeters and marshal read instead of numbers matched by hand.
 
+## Token efficiency (measured on a fresh agent's sunset scene)
+
+Measured with `tools/tokens.py` in the dogfood folder on the agent that made `examples/sunset`
+from the skill alone: 149 model calls, context 38k at the start, 285k in the middle, 415k at the
+end. Cache reads were 75% of the cost, cache writes 20%, the text it wrote 4%. Every call re-reads
+the whole context, so one more call costs ~27k tokens, and a token read at call 10 is paid ~15
+times. Of the 377k the context grew, tool results were ~96k (docs and examples read with
+`sed`/Read 39k, its own art file re-read 18k, images 16k, `pxl help` 5k), the tool inputs it wrote
+~47k, and the rest (~230k) its own reasoning, kept for the whole run because a sub-agent's run is
+one turn. So the levers are, in order: fewer calls, less read early, smaller outputs. Each wave is
+measured again on the same brief.
+
+Wave 1: fewer calls.
+- [ ] **One look, all fixes** (SKILL.md habit): send every edit decided from one look in the same
+  message (parallel tool calls are one model call), then one shot. The run made 52 edits, mostly
+  one per call.
+- [ ] **`pxl shot` is the loop's step**: it already builds the asset; its text adds the warnings
+  `check` finds on it (at the frames shown) and what changed since the last shot of it (pixels,
+  box), so the loop is edit → shot → look, with no separate build, check, describe or `| tail`.
+  The run chained build + describe + tail in long commands 35 times.
+- [ ] **`pxl build` of a whole file prints a summary** (counts, warnings, out dir), not one line per
+  asset (knight.px.js: 297 lines, ~3k tokens); `--list` for the lines.
+
+Wave 2: less read early.
+- [ ] **Short `pxl help`**: the row that defines the name, then one line per other place that
+  mentions it (section and sentence), examples capped at 3 (`--all` for the rest). `help stamp`
+  is 5.5k characters, mostly whole rows of other ops that mention stamp.
+- [ ] **Guide sections on demand**: `pxl help "<heading>"` prints that section of a guide, and
+  SKILL.md's table names the sections to read (a walk: characters.md §9-10) instead of "whole".
+  The run read characters.md whole twice (10k) and reference.md in `sed` slices (7.6k).
+- [ ] **`pxl list` as a file's map**: each definition's line range, the comment above it, and the
+  assets a loop makes grouped on one line (knight.px.js: 330 lines today). Then an agent reads the
+  40 lines of the example it needs, and the asset it is fixing in its own file, not the whole file.
+
+Wave 3: experiments, measured before anything is built.
+- [ ] **Sub-agents for the props of a big scene**: each draws one prop from its spec in a small
+  context; the main agent composes. The reasoning that piles up over one long run is most of the
+  context; split runs start fresh.
+- [ ] **describe brief by default on busy scenes** (forest: 23k characters full), with a line
+  saying how to get the full text.
+
+Not worth it (measured): images (previews cap at 768 px, ~340 tokens each), a shorter CLI
+invocation (~12 tokens a call), new ops for helpers the examples repeat (at most 3 files share
+one), and the art code itself (4% of the cost).
+
 ## Later / niche
 
 - [x] Layer blend modes and opacity (`blend`, `opacity`, `palettize`), with the palette caveats in
