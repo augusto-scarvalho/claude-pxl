@@ -116,7 +116,7 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
 - [x] **Map tones onto a ramp by luminance** (c64d91d): `rampmap(ramp, { where, hue })`, an op rather than
   an import option, so it works on anything drawn too. The palm's hand-written color map became two
   rampmaps (identical output). (Pixelorama Gradient Map.)
-- [x] **Export `.aseprite`** (HASH): `build --aseprite` writes layers, frames with durations, the tag,
+- [x] **Export `.aseprite`** (f17ed83): `build --aseprite` writes layers, frames with durations, the tag,
   slices and the palette (keys as color names). Outline, shade layers and glow go to one layer over
   the others, so the file shows exactly the built frames; Aseprite 1.3.18 renders the girl's walk and
   the forest pixel for pixel. One way: nothing reads it back. (Documented format; zlib cels.)
