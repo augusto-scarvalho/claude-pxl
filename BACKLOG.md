@@ -235,15 +235,17 @@ one turn. So the levers are, in order: fewer calls, less read early, smaller out
 measured again on the same brief.
 
 Wave 1: fewer calls.
-- [ ] **One look, all fixes** (SKILL.md habit): send every edit decided from one look in the same
+- [x] **One look, all fixes** (SKILL.md habit): send every edit decided from one look in the same
   message (parallel tool calls are one model call), then one shot. The run made 52 edits, mostly
   one per call.
-- [ ] **`pxl shot` is the loop's step**: it already builds the asset; its text adds the warnings
+- [x] **`pxl shot` is the loop's step**: it already builds the asset; its text adds the warnings
   `check` finds on it (at the frames shown) and what changed since the last shot of it (pixels,
   box), so the loop is edit → shot → look, with no separate build, check, describe or `| tail`.
   The run chained build + describe + tail in long commands 35 times.
-- [ ] **`pxl build` of a whole file prints a summary** (counts, warnings, out dir), not one line per
-  asset (knight.px.js: 297 lines, ~3k tokens); `--list` for the lines.
+- [x] **`pxl build` of a whole file prints a summary** (counts, warnings, out dir), not one line per
+  asset (knight.px.js: 297 lines, ~3k tokens); `--list` for the lines. Shipped together; shot's
+  default size also became an area budget (~600k px, what a preview costs) instead of 1600 px wide,
+  which made a whole 2:1 scene cost ~2x a preview.
 
 Wave 2: less read early.
 - [ ] **Short `pxl help`**: the row that defines the name, then one line per other place that

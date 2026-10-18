@@ -321,7 +321,10 @@ painting replay ends ("animate" toggle).
 ## CLI
 
 ```
-node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite]
+node <pxl>/bin/pxl.js shot <file> <name> [--frames a,b,c] [--at x,y,w,h] [--scale N] [--vs <git rev | file>] [--diff]
+node <pxl>/bin/pxl.js check <file> [name...] [--frame N]
+node <pxl>/bin/pxl.js help [name]
+node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
 node <pxl>/bin/pxl.js ascii <file> <name>
 node <pxl>/bin/pxl.js list  <file>
@@ -329,6 +332,12 @@ node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--sheet] [--out DIR]
 node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h] [--diff] [--brief]     (or describe <image.png>)
 node <pxl>/bin/pxl.js compare <file> <name> <ref.png> [--shrink N] [--offset x,y]
 ```
+
+`shot` is the look while iterating: the asset built at those frames (side by side, cropped to the
+region, enlarged to about 600k px), what changed since the last shot of the same frames and region
+(pixels, and the box around them in the asset's coordinates), and the warnings `check` finds on it
+at those frames. `check` runs them on every scene and rig of a file at every frame. A `build` of a
+whole file prints how many assets of each kind it wrote; `--list` or `--only` print a line each.
 
 `compare` checks a silhouette against a reference image: for every row, the opaque runs of the
 reference (shrunk by N first, placed at x,y in the asset's coordinates) and of the asset, and how

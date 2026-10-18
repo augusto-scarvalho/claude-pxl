@@ -13,18 +13,22 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
 ## Workflow
 
 1. Read the [example](#examples) closest to what you're making and start from the template below.
-2. Build only what you're working on: `PXL build art.px.js --only slime,heart`.
-3. Look at `out/_preview/<name>.png` (checkerboard = transparent, pixel grid). For exact pixels:
-   `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an image). Anims: also
-   `_preview/<name>_onion.png` (motion map + onion skin). Scenes: `PXL describe art.px.js <scene>`
-   (`--brief` when busy) gives each object's position, gaps, cover, contrast and motion as text:
-   answer layout questions from it, not by eyeballing. An animated scene is read at frame 0: pass
-   `--frame N` for another. To look at a part of it enlarged, or at some frames side by side:
-   `PXL shot art.px.js <name> --frames 0,12,30 --at x,y,w,h` (writes `out/_shot/<name>.png`).
-4. Fix with small edits and rebuild. In a scene, `PXL describe ... --diff` lists what the edit moved,
-   redrew or recolored; `PXL shot ... --vs HEAD --diff` shows the last committed version above and
-   the pixels that changed below. A wrong pixel: `PXL steps art.px.js <name> --at x,y` names the line that
-   painted it.
+2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
+   `out/_shot/<name>.png` (read it). Its text says what changed since your last shot of it (pixels
+   and where, so an edit that did nothing shows) and the warnings `check` finds on it.
+   `--frames 0,12,30` puts frames side by side, `--at x,y,w,h` enlarges a part. Exact pixels:
+   `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an image). Scenes: `PXL describe
+   art.px.js <scene>` (`--brief` when busy) gives each object's position, gaps, cover, contrast and
+   motion as text: answer layout questions from it, not by eyeballing (`--frame N` for another frame).
+3. Fix everything one look showed, then look again: send all the edits in the same message
+   (parallel tool calls are one turn, and every turn re-reads the whole conversation, so a turn
+   per edit is what makes a long session expensive). `PXL describe ... --diff` lists the objects an
+   edit moved, redrew or recolored; `PXL shot ... --vs HEAD --diff` shows the last
+   committed version above and the pixels that changed below. A wrong pixel: `PXL steps art.px.js
+   <name> --at x,y` names the line that painted it.
+4. `PXL build art.px.js` writes the outputs: PNGs, sheets, GIFs, and previews in `out/_preview/`
+   (checkerboard = transparent, pixel grid; anims also `<name>_onion.png`, a motion map + onion
+   skin). `--only a,b` for some of them.
 5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
    rig of the file and every frame of an animated scene, warnings only, with the frames they happen
    at. Fix each or say why it's meant. Its last line says which rules ran: a rule runs only where
@@ -138,7 +142,7 @@ Render one into your own dir to keep the skill clean: `PXL build <skill dir>/exa
   structure, large areas and long lines. Never big hand grids.
 - Every mark on a surface needs a cause (seams, weathering, story): no filler `noise` or `dither`.
 - 2–4 shades per material, mnemonic keys (`g`/`G`).
-- Build with `--only` while iterating.
+- Look with `shot` while iterating; `build` when you need the files.
 
 ## When pxl gets in your way
 

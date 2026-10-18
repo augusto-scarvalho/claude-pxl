@@ -23,10 +23,10 @@ const ranges = (fs: number[]) => fs.reduce<[number, number][]>((r, f) => {
 /**
  * The warnings, one line each: `asset › where › what`, `where` being the placement or the rig slot,
  * and, for an animated scene, the frames it happens at. `file`: only the assets defined in the file of
- * that name (not those it includes), unless `names` are given. `frame`: that frame of each animated
- * scene only, instead of all of them.
+ * that name (not those it includes), unless `names` are given. `frame` / `frames`: those frames of
+ * each animated scene only, instead of all of them.
  */
-export function checkProject(p: Project, opts: { names?: string[]; frame?: number; file?: string } = {}): CheckResult {
+export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string } = {}): CheckResult {
   const lines: string[] = [];
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
@@ -64,7 +64,8 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     groundSaid ||= wo?.ground !== undefined;
     const tl = p.timeline(name), count = !tl ? 1 : tl.durations ? tl.durations.length : Math.max(1, Math.round(tl.loop / tl.step));
     const seen = new Map<string, string[]>(), found = new Map<string, Set<number>>(), at = new Map<string, Set<string>>();
-    for (const f of opts.frame !== undefined && tl ? [opts.frame] : [...Array(count).keys()]) {
+    const only = opts.frames ?? (opts.frame !== undefined ? [opts.frame] : undefined);
+    for (const f of only && tl ? only : [...Array(count).keys()]) {
       const b = p.build(name, 0, tl ? frameTime(p, name, f) : 0);
       const unlit = new Set(b.layers.filter((l) => l.unlit).map((l) => l.name));
       frames++;

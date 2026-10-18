@@ -47,6 +47,26 @@ export function diffRow(was: Img, now: Img): { img: Img; changed: number } {
   return { img: out, changed };
 }
 
+/**
+ * What changed between two shots of the same frames and region: per frame, how many pixels and the
+ * box around them, in the asset's coordinates (so an edit that did nothing, or hit the wrong place, shows).
+ */
+export function shotChanges(was: Img, now: Img, frames: number[], at?: number[]): string {
+  if (was.w !== now.w || was.h !== now.h) return `size ${was.w}x${was.h} -> ${now.w}x${now.h}`;
+  const w = (now.w + GAP) / frames.length - GAP, [ox, oy] = at ?? [0, 0];
+  return frames.map((f, i) => {
+    let n = 0, x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
+    for (let y = 0; y < now.h; y++) for (let x = 0; x < w; x++) {
+      const k = y * now.w + i * (w + GAP) + x;
+      if (was.data[k] === now.data[k]) continue;
+      n++;
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    const what = n ? `${n} px changed in ${ox + x0},${oy + y0} ${x1 - x0 + 1}x${y1 - y0 + 1}` : "no change";
+    return frames.length > 1 ? `frame ${f}: ${what}` : what;
+  }).join("; ");
+}
+
 /** Rows stacked, a gap between. */
 export function stack(rows: Img[]): Img {
   const w = Math.max(...rows.map((r) => r.w)), h = rows.reduce((s, r) => s + r.h, 0) + GAP * (rows.length - 1);

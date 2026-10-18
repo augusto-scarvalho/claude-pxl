@@ -18,16 +18,17 @@ import { reduceColors } from "./gif.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 import { checkProject } from "./check.ts";
-import { diffRow, frameTime, otherVersion, shotRow, stack } from "./shot.ts";
+import { diffRow, frameTime, otherVersion, shotChanges, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
 
 const USAGE = `pxl — pixel-art DSL
 
   pxl help [name]
       What the reference says about an op or option (and where the examples use it); no name: an index.
-  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite]
+  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
-      previews (out/_preview; animated assets also get a .gif). --aseprite also writes each
+      previews (out/_preview; animated assets also get a .gif). A whole file prints a count of what
+      it wrote; --only and --list print a line per asset (size, frames, preview scale). --aseprite also writes each
       asset as <name>.aseprite (layers, frames, tag, palette) to keep editing in Aseprite; pxl
       never reads it back and the next --aseprite build overwrites it, so copy it out of out/.
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
@@ -53,7 +54,9 @@ const USAGE = `pxl — pixel-art DSL
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
       to the region, side by side, enlarged, written to <out>/_shot/<name>.png. --vs puts the same
       shot of another version above it (a git revision takes the file itself from there; what it
-      includes is read as it is now); --diff adds a row with the pixels that changed in red.
+      includes is read as it is now); --diff adds a row with the pixels that changed in red. It
+      also prints what changed since the last shot of the same frames and region (pixels, where)
+      and the warnings pxl check finds on the asset at those frames: one call per look.
   pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
@@ -90,6 +93,7 @@ interface Args {
   frame?: number;
   frames?: number[];
   vs?: string;
+  list?: boolean;
 }
 
 function parse(argv: string[]): Args {
@@ -127,6 +131,7 @@ function parse(argv: string[]): Args {
     else if (v === "--frame") a.frame = Number(val());
     else if (v === "--frames") a.frames = val().split(",").map((s) => Number(s.trim()));
     else if (v === "--vs") a.vs = val();
+    else if (v === "--list") a.list = true;
     else if (v === "-h" || v === "--help") a.cmd = "usage";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -156,7 +161,15 @@ export async function main(argv: string[]): Promise<number> {
         const p = loadProject(file);
         const r = writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite });
         for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);
-        for (const l of r.lines) console.log(l);
+        if (a.only || a.list || r.lines.length <= 12) for (const l of r.lines) console.log(l);
+        else {
+          // a whole file: what it wrote, counted (a rig file makes hundreds of parts and poses), and
+          // the lines that carry a note
+          const kinds = new Map<string, number>();
+          for (const l of r.lines) kinds.set(l.split(" ")[0], (kinds.get(l.split(" ")[0]) ?? 0) + 1);
+          for (const l of r.lines) if (/ -- |\(tiled: /.test(l)) console.log(l);
+          console.log(`${r.lines.length} written: ${[...kinds].map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(", ")} (--list: one line each)`);
+        }
         for (const e of r.errors) console.error("error: " + e.message);
         console.log(`-> ${outDir}${r.errors.length ? ` (${r.errors.length} error${r.errors.length > 1 ? "s" : ""})` : ""}`);
         return r.errors.length ? 1 : 0;
@@ -298,7 +311,7 @@ export async function main(argv: string[]): Promise<number> {
         if (a.at && a.at.length !== 4) throw new PxError("shot --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
         if (a.diff && !a.vs) throw new PxError("shot --diff compares with another version: give it --vs <git rev | file>");
         const frames = a.frames ?? (a.frame !== undefined ? [a.frame] : [0]);
-        const now = shotRow(loadProject(file), name, frames, a.at);
+        const p = loadProject(file), now = shotRow(p, name, frames, a.at);
         const rows = [now];
         if (a.vs) {
           const o = otherVersion(file, a.vs);
@@ -311,10 +324,23 @@ export async function main(argv: string[]): Promise<number> {
             console.log(`${d.changed} px changed`);
           }
         }
-        const sheet = stack(rows), k = a.scale ?? Math.max(1, Math.min(8, Math.floor(1600 / sheet.w)));
-        const path = join(outDir, "_shot", name.replace(/[^\w.-]/g, "_") + ".png");
+        // as big as ~600k px allow (an image costs ~w*h/750 tokens: about what a preview costs), never
+        // past the 1568 px a model is shown
+        const sheet = stack(rows), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
+        const base = join(outDir, "_shot", name.replace(/[^\w.-]/g, "_")), path = base + ".png";
         writePng(path, sheet.scale(k));
         console.log(`-> ${path} (frames ${frames.join(",")}${a.vs ? `; above: ${a.vs}` : ""}${a.diff ? "; below: what changed" : ""}; ${k}x)`);
+        // against the last shot of the same frames and region: did the edit change anything, and where
+        const key = JSON.stringify({ frames, at: a.at ?? null });
+        if (existsSync(base + ".last.json") && readFileSync(base + ".last.json", "utf8") === key)
+          console.log(`since the last shot: ${shotChanges(decodePng(readFileSync(base + ".last.png")), now, frames, a.at)}`);
+        writePng(base + ".last.png", now);
+        writeFileSync(base + ".last.json", key);
+        // what pxl check finds on it at these frames, so a look needs no other call
+        const r = checkProject(p, { names: [name], frames });
+        for (const l of r.lines) console.log(l);
+        if (r.warnings || p.assets.get(name)?.kind === "scene" || p.rigs.has(name))
+          console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
         return 0;
       }
       case "compare": {

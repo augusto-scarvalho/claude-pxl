@@ -290,6 +290,38 @@ scene("s", { w: 8, h: 8, layers: true }, layer("ground", tilemap("ab\\nba", { si
   }
 });
 
+const said = async (...argv: string[]) => {
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try { await main(argv); } finally { console.log = log; }
+  return lines.join("\n");
+};
+
+test("cli build of a whole file counts what it wrote; --list (or --only) gives a line each", async () => {
+  const { file } = tmpArt(`use("pico8")\nfor (let i = 0; i < 13; i++) sprite("d" + i, "8")`);
+  assert.match(await said("build", file), /^13 written: 13 sprites \(--list: one line each\)$/m);
+  assert.match(await said("build", file, "--list"), /^sprite d12 1x1 @16x$/m);
+  assert.match(await said("build", file, "--only", "d3"), /^sprite d3 1x1 @16x$/m);
+});
+
+test("cli shot: one call per look: the picture, what changed since the last shot, check's warnings", async () => {
+  // a figure whose pivot is 3 px under its sole: it floats, and the shot says so
+  const { dir, file } = tmpArt(`use("pico8")
+sprite("man", { w: 3, h: 12, height: 1.8, pivot: [1.5, 12] }, rect(0, 0, 3, 9, "8"))
+scene("s", { w: 30, h: 30, bg: "1", world: { scale: 5, ground: 26 } }, stamp("man", 10, 26))`);
+  const first = await said("shot", file, "s");
+  assert.ok(existsSync(join(dir, "out", "_shot", "s.png")));
+  assert.doesNotMatch(first, /since the last shot/);
+  assert.match(first, /^s › man @-, feet 11,22 › WARNING: its feet are 3 px above where it stands/m);
+  assert.match(first, /^2 warnings; ran: feet on 1/m);
+  // moved 2 px right: what changed is the old place and the new one; the same shot again: nothing
+  writeFileSync(file, readFileSync(file, "utf8").replace('stamp("man", 10, 26)', 'stamp("man", 12, 26)'));
+  assert.match(await said("shot", file, "s"), /^since the last shot: 36 px changed in 9,14 5x9$/m);
+  assert.match(await said("shot", file, "s"), /^since the last shot: no change$/m);
+  // another region is another shot: not compared
+  assert.doesNotMatch(await said("shot", file, "s", "--at", "0,0,10,10"), /since the last shot/);
+});
+
 test("cli build reports per-asset errors and still writes the rest", async () => {
   const { dir, file } = tmpArt(`use("pico8")\nsprite("good", "8")\nsprite("bad", "z")`);
   const err = console.error, log = console.log;
