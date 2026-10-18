@@ -141,8 +141,12 @@ export interface World {
   horizon?: number;
   eye?: number;
   scale?: number;
-  /** Where the scene's light comes from, [x, y] (e.g. [0.6, -1]: the top right): each object's lit side is checked against it. */
-  light?: [number, number];
+  /**
+   * Where the scene's light comes from, [x, y] (e.g. [0.6, -1]: the top right), or a point light in
+   * the scene, { at: [x, y] } (a fire, a lamp): each object's lit side is checked against it (against
+   * the way from the object to the point).
+   */
+  light?: [number, number] | { at: [number, number] };
   /** Flat side view: the ground's row; what stands (has a height) is checked for floating or sinking. */
   ground?: number;
 }

@@ -256,6 +256,9 @@ export class Project implements BuildCtx {
       if (prev) throw new PxError(`'${name}' is already defined at ${prev.loc}`, loc);
       const opts = (isPlainObject(rest[0]) ? rest.shift() : {}) as AssetOpts;
       checkKeys(`${kind} '${name}'`, opts, ASSET_OPTS[kind], loc);
+      const light = opts.world?.light, pair = (v: unknown) => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
+      if (light !== undefined && !pair(light) && !(isPlainObject(light) && pair((light as { at?: unknown }).at)))
+        throw new PxError(`${kind} '${name}': world.light is where the light comes from, [x, y] (e.g. [0.6, -1]: the top right), or a point light in the scene, { at: [x, y] }; got ${JSON.stringify(light)}`, loc);
       const items = checkItems(`${kind} '${name}'`, rest, loc);
       const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true);
       this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png });

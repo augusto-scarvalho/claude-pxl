@@ -100,7 +100,8 @@ export function orientWords(o: Orient): string {
  * below the sole floats it) and against the ground. describe and pxl check both use this.
  */
 export function placementChecks(p: Placement, wo: World | undefined, steps: Steps | undefined, unlit = false): string[] {
-  const checks = [frontWords(p.img), wo?.light && !unlit ? lightWords(p.img, wo.light, steps) : ""];
+  const light = lightFor(wo, p);
+  const checks = [frontWords(p.img), light && !unlit ? lightWords(p.img, light, steps) : ""];
   const bb = p.img.bounds(), pv = p.img.pivot;
   if (bb && p.img.meters) {   // what has a real height stands on the ground: a ghost may float
     const feet = p.y + bb.y + bb.h, off = pv ? Math.round(p.y + pv[1] - feet) : 0;
@@ -109,6 +110,22 @@ export function placementChecks(p: Placement, wo: World | undefined, steps: Step
       checks.push(`WARNING: its feet (y ${feet}) are ${Math.abs(wo.ground - feet)} px ${wo.ground > feet ? "above" : "below"} the ground (y ${wo.ground})`);
   }
   return checks.filter(Boolean);
+}
+
+/**
+ * Which way a placement's light comes from: the world's `light` as given, or for a point light
+ * (`{ at: [x, y] }`: a fire, a lamp) the way from the middle of what shows of it to that point; none
+ * when the point is inside its box (the fire itself).
+ */
+export function lightFor(wo: World | undefined, p: Placement): [number, number] | undefined {
+  const l = wo?.light;
+  if (!l || Array.isArray(l)) return l;
+  const bb = p.img.bounds();
+  if (!bb) return undefined;
+  const dx = l.at[0] - (p.x + bb.x + bb.w / 2), dy = l.at[1] - (p.y + bb.y + bb.h / 2);
+  if (Math.abs(dx) <= bb.w / 2 && Math.abs(dy) <= bb.h / 2) return undefined;
+  const k = Math.hypot(dx, dy);
+  return [dx / k, dy / k];
 }
 
 /** px per meter where a thing stands (its feet on row y), or undefined without a usable world. */
@@ -173,7 +190,9 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
   if (opts.extra?.length) out.push(...opts.extra);
   const steps = rampSteps(pal);
   const wo = opts.world;
-  if (wo?.light) out.push(`LIGHT: from ${dirWords(wo.light[0], wo.light[1])}; each object's lit side (from its edges) is checked against it.`);
+  if (wo?.light) out.push(Array.isArray(wo.light)
+    ? `LIGHT: from ${dirWords(wo.light[0], wo.light[1])}; each object's lit side (from its edges) is checked against it.`
+    : `LIGHT: a point at ${wo.light.at.join(",")}; each object's lit side (from its edges) is checked against the way from its middle to there.`);
   if (wo?.scale !== undefined) out.push(`WORLD: flat side view, ${wo.scale} px per meter (a 1.8 m figure is ${Math.round(1.8 * wo.scale)} px tall).`);
   else if (wo?.horizon !== undefined && wo.eye)
     out.push(`WORLD: ground in perspective, horizon at y ${wo.horizon}, eye ${wo.eye} m up: a thing standing on row y is (y - ${wo.horizon}) / ${wo.eye} px per meter, ` +

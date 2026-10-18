@@ -283,11 +283,13 @@ one), and the art code itself (4% of the cost).
 
 ## From the campsite A/B runs
 
-- [ ] **A point light for the lit-side check**: `world: { light: { at: [x, y] } }` (a fire, a lamp
+- [x] **A point light for the lit-side check**: `world: { light: { at: [x, y] } }` (a fire, a lamp
   in the scene), each object checked against the direction from it to the light. Three of four
   agents lighting a campsite by its fire had to pick one direction for the whole scene and either
   live with warnings on what stands on the fire's other side (a woodpile lit correctly, flagged)
   or leave those objects out of the check.
+  Shipped: on two of those campsites, the fire's place as the light cleared every false warning
+  (two and one), and a head lit from the wrong side of a fire is still caught (test).
 
 ## Later / niche
 

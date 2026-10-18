@@ -80,8 +80,8 @@ declare global {
   interface PxWorld {
     /** Ground in perspective: the horizon's row and the eye's height in meters; or a flat side view's px per meter. */
     horizon?: number; eye?: number; scale?: number;
-    /** Where the light comes from: each object's lit side is checked against it. */
-    light?: [number, number];
+    /** Where the light comes from, or a point light in the scene ({ at: [x, y] }: a fire, a lamp): each object's lit side is checked against it. */
+    light?: [number, number] | { at: [number, number] };
     /** Flat side view: the ground's row; what has a height is checked for floating or sinking. */
     ground?: number;
   }

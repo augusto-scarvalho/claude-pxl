@@ -22,7 +22,9 @@ shapes · Water and things that land · Shadows and light · Blend modes · Chec
 - **Say where the light comes from, and where the ground is.** `world: { light: [0.6, -1], ground:
   84 }`: describe reads each object's lit side off its rim and warns when a flipped copy is lit from
   the wrong side, and calls out what has a `height` but floats or sinks (also a pivot left below the
-  sole: `stamp(x, groundY)` then stands it above the ground).
+  sole: `stamp(x, groundY)` then stands it above the ground). Lit by a fire or a lamp in the
+  scene, give its place instead, `light: { at: [x, y] }` (the flames' middle): each object is then
+  checked against the way from it to the fire, so what stands on either side of it can be right.
 - What stands on the ground goes in a `sort: "y"` layer, so the lower (nearer) thing draws in front.
   Give props `pivot: "bottom"` and stamp them at the ground's y.
 - Figures need a few px of air to read. `PXL describe <file> <scene>` gives the gap between objects

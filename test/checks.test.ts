@@ -63,6 +63,23 @@ scene("s", { w: 60, h: 20, bg: "d", world: { scale: 10, light: [0.6, -1] } },
   assert.doesNotMatch(text.slice(text.indexOf("head_l @fx")), /^\s+.*WARNING: lit from/m);
 });
 
+test("light: a point light in the scene (a fire): each object checked against the way from it to the fire", async () => {
+  // the head is lit from the right: right for a head left of the fire, wrong for one right of it;
+  // the flipped head, lit from the left, is right on the fire's right
+  const src = PAL + `ramps("1d6")
+` + HEAD + `
+sprite("head_l", { base: "head", flip: "x" })
+sprite("fire", { w: 4, h: 4 }, rect(0, 0, 4, 4, "8"))
+scene("s", { w: 60, h: 20, bg: "d", world: { scale: 10, light: { at: [30, 6] } } },
+  layer("a", stamp("head", 5, 2)), layer("b", stamp("head_l", 40, 2)), layer("c", stamp("head", 44, 2)), layer("fire", stamp("fire", 28, 4)))`;
+  const { text } = await run(src, "describe", "s", "--no-out");
+  assert.match(text, /^LIGHT: a point at 30,6;/m);
+  assert.match(text, /A head @a[^]*?lit from the top right, as its light\n {2}B /);
+  assert.match(text, /B head_l @b[^]*?lit from the top left, as its light\n {2}C /);
+  assert.match(text, /C head @c[^]*?WARNING: lit from the top right, but its light comes from the left[^\n]*\n {2}D fire/);
+  assert.throws(() => loadSource(PAL + `scene("s", { w: 4, h: 4, world: { light: { at: 3 } } })`, "t.px.js"), /world\.light is where the light comes from, \[x, y\][^]*or a point light in the scene, \{ at: \[x, y\] \}/);
+});
+
 test("light: a blade shows two faces; the lit one has to look toward the light", () => {
   const lit = (name: string, line: string) => `sprite("${name}", { w: 26, h: 28, outline: "k" }, ${line}, relight(undefined, { light: [0.6, -1], reach: 1, ramps: ["1d6"] }))`;
   const p = loadSource(PAL + lit("lying", 'line(1, 14, 24, 2, "d", 3)') + "\n" + lit("steep", 'line(9, 26, 16, 1, "d", 3)') + `
