@@ -119,7 +119,7 @@ group("tufts", ["_tuft1", "_tuft2"])
 // that grows on land lands in the water.
 const PLANTS = [
   ["tree", 42, 122], ["tree2", 130, 74], ["tree", 22, 238, { flip: "x" }],
-  ["palm", 296, 104, { flip: "x" }], ["palm", 228, 140], ["palm", 100, 214],
+  ["palm", 296, 104], ["palm", 228, 140], ["palm", 100, 214],                    // not flipped: its light would go with it
   ["banana", 212, 206], ["banana", 300, 200, { flip: "x" }], ["banana", 36, 176],
   ["heliconia", 252, 178], ["heliconia", 232, 222], ["heliconia", 90, 178],
   ["monstera", 16, 150], ["monstera", 92, 236, { flip: "x" }], ["monstera", 288, 238],
@@ -271,7 +271,7 @@ const GIRL = ["girl", 92, 137]
 const shadowOf = ([n, x, y, o]) => stamp(n, x, y, { ...o, cast: [0.62, 0.22], silhouette: "k" })
 const contactOf = ([n, x, y, o]) => stamp(n, x, y, { ...o, cast: [0.18, 0.12], silhouette: "k" })
 
-scene("forest", { w: W, h: H },
+scene("forest", { w: W, h: H, world: { light: [-0.5, -1] } },
   layer("ground", terrain),
   layer("trail", trail),
   layer("cover", scatter("litter", 0, 0, W, H, 90, { on: "g", below: true, even: true, rflip: "xy", seed: 2 }),

@@ -322,8 +322,9 @@ flips and turns. What reads the pixels:
   toe; neither is wrong). A drawing that faces the other way than its label is caught, as long as the
   marker is on the right pixel. A sword swung back has no front of the knight's: give it no marker;
 - the lit side, read off each part's rim as steps along its ramps, against the rig's or the scene's
-  `light`. It only claims a side when the rim shows it clearly, and stays quiet on readings lit from
-  below. A long thin shape (a blade, a pole) shows only two faces, so it says which one is lit and
+  `light`. It only claims a side when the rim shows it clearly and was seen on both sides (6 rim
+  pixels facing each way at least: an 8 px frog drawn a pixel off its middle gives a side from that
+  pixel), and stays quiet on readings lit from below. A long thin shape (a blade, a pole) shows only two faces, so it says which one is lit and
   whether that one looks toward the light: a blade lying up and to the right is lit on its upper face,
   up and to the left, under a light from the top right, and that is right. Tried on art it wasn't tuned on (forest, cemetery, island: 30 objects),
   it agreed or stayed quiet, caught a flipped tombstone lit from the wrong side, and was wrong once,

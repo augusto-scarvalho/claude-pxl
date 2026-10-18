@@ -63,7 +63,7 @@ const mean3 = (cs: Color[]): [number, number, number] => {
   return [t[0] / cs.length, t[1] / cs.length, t[2] / cs.length];
 };
 /** Many copies of one small thing (a brush, a string of lights): one line, not one per copy. */
-const MANY = 6;
+export const MANY = 6;
 
 /** Degrees its top leans from straight up, clockwise (0 upright, 90 top to the right, 180 upside down). */
 const tiltOf = (o: Orient) => Math.round((Math.atan2(o.u[0], -o.u[1]) * 180) / Math.PI);

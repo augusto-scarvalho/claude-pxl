@@ -1,6 +1,8 @@
 // What `pxl check` says about every example, kept in test/examples.checks.txt: a change to a check (or
-// to an example) that adds or removes a warning anywhere shows up here. The one warning today is meant:
-// the knights scene shows a flipped knight beside the turned one, lit from the wrong side.
+// to an example) that adds or removes a warning anywhere, or what the checks could run on, shows up here.
+// The two warnings today are known: the knights scene shows a flipped knight beside the turned one, lit
+// from the wrong side (its lesson); the cemetery's crypt is misread (its outline is mostly trims: the
+// cornice, the steps; its columns are lit from the right, as the scene is).
 // After a change you meant, rewrite the file: PXL_UPDATE=1 npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";

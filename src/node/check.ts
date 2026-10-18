@@ -3,7 +3,7 @@
 // every frame of its loop, each distinct placement once: the checks that warn (facing, front marker,
 // lit side, feet, lettering) depend only on the placement (what it looks like, where) and the world.
 import type { Project } from "../core/project.ts";
-import { orientWords, placementChecks } from "../core/describe.ts";
+import { MANY, orientWords, placementChecks } from "../core/describe.ts";
 import { rigLines } from "../core/rig.ts";
 import { frontWords, rampSteps } from "../core/checks.ts";
 import { PxError } from "../core/errors.ts";
@@ -68,7 +68,12 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       const b = p.build(name, 0, tl ? frameTime(p, name, f) : 0);
       const unlit = new Set(b.layers.filter((l) => l.unlit).map((l) => l.name));
       frames++;
+      // many copies of one small thing (a brush scattered over the ground) are texture, not objects:
+      // describe lists them on one line and checks none of them, and so does this
+      const copies = new Map<string, number>();
+      for (const q of b.placements) copies.set(`${q.name}@${q.layer}`, (copies.get(`${q.name}@${q.layer}`) ?? 0) + 1);
       for (const q of b.placements) {
+        if (copies.get(`${q.name}@${q.layer}`)! > MANY) continue;
         const key = `${q.name}|${q.layer}|${q.x},${q.y}|${q.img.w}x${q.img.h}|${hash(q.img.data)}`;
         let ws = seen.get(key);
         if (!ws) {

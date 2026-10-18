@@ -45,7 +45,7 @@ const hills = [
   poly([0, 116, 60, 108, 130, 112, 200, 110, 260, 114, 320, 108, 320, GROUND, 0, GROUND], "J"),
 ]
 
-scene("party", { w: W, h: H, bg: "n" },
+scene("party", { w: W, h: H, bg: "n", world: { light: [0.6, -1] } },
   layer("sky", { unlit: true }, ...sky),
   layer("hills", { unlit: true }, ...hills),
   layer("ground",

@@ -36,7 +36,10 @@ export function dirWords(x: number, y: number): string {
  * or a seam just inside an edge). An axis the shape can't tell apart from the other is left at 0: a
  * thin diagonal's top edges are its left ones. Undefined when it's lit evenly, or too thin to tell.
  */
-export function litDir(img: Img, steps?: Steps): [number, number] | undefined {
+/** A lit side: the light's direction as read, and how many rim pixels face left and right behind it. */
+export type LitReading = [number, number] & { left: number; right: number };
+
+export function litDir(img: Img, steps?: Steps): LitReading | undefined {
   const W = img.w, H = img.h, at = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? TRANSPARENT : img.data[y * W + x]);
   const sides: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   // the outline: the color most of the edge pixels share, or (a selective outline, each line pixel
@@ -91,7 +94,8 @@ export function litDir(img: Img, steps?: Steps): [number, number] | undefined {
   const kept = rim.map((p) => ({ p, r: Math.abs(p.b - L[0] * p.ex - L[1] * p.ey) })).sort((u, v) => u.r - v.r);
   L = fit(kept.slice(0, Math.ceil(kept.length * 0.8)).map(({ p }) => p));
   const v: [number, number] = [L[0], L[1]];
-  return Math.hypot(...v) < (steps ? 0.15 : 0.04) ? undefined : v;
+  if (Math.hypot(...v) < (steps ? 0.15 : 0.04)) return undefined;
+  return Object.assign(v, { left: rim.filter((p) => p.ex < 0).length, right: rim.filter((p) => p.ex > 0).length });
 }
 
 /**
@@ -141,7 +145,9 @@ export function lightWords(img: Img, light?: [number, number], steps?: Steps): s
       : `WARNING: lit on its face away from the light, which comes from ${dirWords(light[0], light[1])} (a flipped drawing carries its light to the other side)`;
   }
   if (light && light[1] < -0.2 && d[1] > 0.2 * m) return "";
-  const side = Math.abs(d[0]) >= (steps ? 0.3 : 0.08) && Math.abs(d[0]) >= 0.25 * m;
+  // a side needs both sides seen: 6 rim pixels facing each way at least (an 8 px frog drawn one pixel
+  // off its middle, a grass tuft, give a side from a pixel or two)
+  const side = Math.abs(d[0]) >= (steps ? 0.3 : 0.08) && Math.abs(d[0]) >= 0.25 * m && d.left >= 6 && d.right >= 6;
   const from = `lit from ${side ? dirWords(d[0], d[1]) : dirWords(0, d[1])}`;
   if (!light) return from;
   if (side && Math.abs(light[0]) > 0.2 && Math.sign(d[0]) !== Math.sign(light[0]))

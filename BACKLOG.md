@@ -192,9 +192,13 @@ Wave 2: describe and small engine features
 - [x] **`pxl check` says which rules ran**: a rule only runs where the art says what it needs
   (`world.light`, `world.ground`, `height`, a front marker), and on most examples none does: "no
   warnings" read as approval. Its last line now counts where each ran and says why the others didn't.
-- [ ] **The examples declare what they mean**: 16 example files run no rule at all (no scene light, no
-  heights, no front markers). Declare the light their comments state (forest, cemetery, island...)
-  and the heights of what stands; then answer what comes up (the frog; the crypt, a known misreading).
+- [x] **The examples declare what they mean**: 16 example files ran no rule at all. The five whose
+  comments state the light (cemetery, tropical forest and plants, island, sunset) declare it now.
+  What came up: a palm flipped for variety in the forest carried its light to the wrong side (fixed:
+  not flipped); grass tufts and an 8 px frog gave a side from a pixel or two (a side now needs 6 rim
+  pixels facing each way, and pxl check skips brushes scattered many times, as describe does); the
+  crypt stays a known misreading (its outline is mostly trims). No example states real sizes, so
+  none declares heights: feet and size still don't run there, and check says so.
 
 Wave 3: rigs in motion
 - [ ] **`twin: "<n>_l"` on a sprite**: its items drawn mirrored before lighting, pivot, sockets and

@@ -150,7 +150,7 @@ sprite("frog", { w: 8, h: 5, outline: "D", pivot: [4, 4] }, runs({
   0: [[1, "lk"], [5, "kl"]], 1: [[1, "ggllgg"]], 2: [[0, "gGgllgGg"]], 3: [[1, "GgggggG"]] }))
 
 // ---------------------------------------------------------------- showcase
-scene("plants", { w: 300, h: 70, bg: "v" },
+scene("plants", { w: 300, h: 70, bg: "v", world: { light: [-0.5, -1] } },
   stamp("heliconia", 14, 40), stamp("fern", 46, 34), stamp("bromeliad", 78, 30), stamp("rock", 98, 30), stamp("rock_small", 116, 30),
   stamp("log", 150, 30), stamp("lilypad", 182, 24), stamp("lilyflower", 196, 24), stamp("waterfall", 230, 44),
   stamp("macaw", 266, 30), stamp("butterfly", 280, 14), stamp("frog", 292, 28),

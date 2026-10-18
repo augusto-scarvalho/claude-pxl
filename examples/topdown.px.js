@@ -83,7 +83,7 @@ for (let m = 1; m < 15; m++) tileMap[m] = "shore_" + m
 
 const trees = [[56, 42], [78, 34], [150, 40], [44, 74], [170, 70]]
 
-scene("island", { w: 256, h: 160 },
+scene("island", { w: 256, h: 160, world: { light: [-0.5, -1] } },
   layer("ground", tilemap(CORNERS, { corners: "w", size: T, map: tileMap })),
   // below: the layer starts empty, so "on grass" has to look at the layers under it.
   layer("flowers", scatter("flowers", 64, 56, 120, 48, 14, { on: "g", below: true, seed: 3 })),
