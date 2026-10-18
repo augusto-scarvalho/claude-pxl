@@ -110,8 +110,9 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
   walking girl's hair it fell short: a stretch on the rise alone read as a twitch, so the hair became
   a part drawn in four poses, picked a frame late. Skipped: `breathe` / `sway` helpers (each is one line of
   `warp`; recipes in characters.md §9). Not for bending limbs.
-- [ ] **Scatter near a color**: `scatter(..., { on: "g", near: "a", within: 2 })` for grass along paths
-  and at the foot of things. (Selection border / expand in both editors.)
+- [x] **Scatter near a color** (67bc9ee): `scatter(..., { on: "g", near: "aAo", within: 3 })`, and scatter
+  picks sort with stamps in `sort` layers. The forest's hand-computed trail-edge grass became one
+  scatter. (Selection border / expand in both editors.)
 - [ ] **Map tones onto a ramp by luminance**: an import option that sorts an image's colors by
   luminance and spreads them over a ramp, so tones never merge as with nearest-color `palettize`.
   (Pixelorama Gradient Map.)
