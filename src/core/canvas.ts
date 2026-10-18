@@ -548,7 +548,8 @@ export class Canvas {
   private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string): void {
     const [px, py] = src.pivot ?? [src.w * def[0], src.h * def[1]];
     this.put(src, x - Math.floor(px), y - Math.floor(py), ok);
-    if (name) this.log?.push({ name, x: this.ox + x - Math.floor(px), y: this.oy + y - Math.floor(py), w: src.w, h: src.h, layer: this.layerName, img: src });
+    // logged where it was drawn: blit floors a fractional position (stamp("p", 282 + 8 * 0.88, y))
+    if (name) this.log?.push({ name, x: Math.floor(this.ox + x - Math.floor(px)), y: Math.floor(this.oy + y - Math.floor(py)), w: src.w, h: src.h, layer: this.layerName, img: src });
   }
 
   stamp(name: string, x = 0, y = 0, opts?: PlaceOpts): void {

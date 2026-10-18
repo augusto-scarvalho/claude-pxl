@@ -440,6 +440,16 @@ scene("s", { w: 32, h: 20, bg: "g" }, layer("props", stamp("rock", 2, 2), stamp(
   assert.doesNotMatch(diff, /rock #1:/);   // the other rock did not change
 });
 
+test("describe: a stamp at a fractional position is placed where it was drawn", async () => {
+  const { file } = tmpArt(`pal({ k: "#1b1630", g: "#8ccf63" }); ramps("kg")
+sprite("rock", "kk\\nkk")
+scene("s", { w: 16, h: 8, bg: "g" }, layer("props", stamp("rock", 3.7, 2.2)), layer("sh", { shade: true }, stamp("rock", 8.5, 4.9)))`);
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try { assert.equal(await main(["describe", file, "s", "--no-out"]), 0); } finally { console.log = log; }
+  assert.match(lines[0], /A rock @props: x 3-4, y 2-3 \(2x2\)/);
+});
+
 test("describe --brief: one line per object, no color or light maps, no steps", async () => {
   const { file } = tmpArt(`pal({ k: "#1b1630", g: "#8ccf63" })
 sprite("rock", "kk\\nkk")
