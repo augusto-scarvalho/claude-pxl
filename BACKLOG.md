@@ -141,7 +141,7 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
   patches as background, the rest as objects; touching things merge and lit renders band: 460780d)
   and `--brief` (a third of the size, 96% on the same test).
 
-- [x] **A leaner skill** (HASH): SKILL.md from ~5k to ~2k tokens (the core, a one-level "where to
+- [x] **A leaner skill** (c007439): SKILL.md from ~5k to ~2k tokens (the core, a one-level "where to
   look" table); scene guidance moved to `scenes.md`, read only for scenes; `pxl help [name]` looks
   the reference up instead of reading it (~350 tokens for the index, 200-850 per name, against ~9k
   for reference.md); contents lines in the long guides (Anthropic's skill authoring guidance:
