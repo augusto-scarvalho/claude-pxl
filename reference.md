@@ -315,9 +315,11 @@ preview costs a few hundred tokens: read the preview for the look, this for anyt
 count or measure. In blind tests (readers given only one form, questions on counts, positions,
 gaps, depth, contrast and motion) the 2x preview scored 66%, the first text form (sprite boxes
 instead of visible pixels, no motion) 77% and this one 100%, on the scene it was built with and on
-a held-out one whose questions came before its text. Any PNG works too: its colors get index keys (most common first); on a
-clear background each 8-connected patch is a shape, identical or mirrored shapes one entry with a
-list of where they are; an opaque image shows its repeats as a map of identical 16x16 tiles.
+a held-out one whose questions came before its text.
+
+Any PNG works too: its colors get index keys (most common first); on a clear background each
+8-connected patch is a shape, identical or mirrored shapes one entry with a list of where they
+are; an opaque image shows its repeats as a map of identical 16x16 tiles.
 
 `steps` prints how an asset was painted: every top-level op, layer and post-processing step in
 order, with its file:line, the pixels it changed and where ("no change" = it painted nothing).
