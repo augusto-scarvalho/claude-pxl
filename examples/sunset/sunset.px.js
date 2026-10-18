@@ -608,6 +608,13 @@ const awayFromSun = (x, y, len) => { const dx = x - SX, dy = y - HZ, d = Math.hy
 
 const AT = { hero: [200, 134], fire: [148, 164], pack: [127, 148], bedroll: [99, 162],
   logs: [171, 165], pot: [137, 151], cairn: [282, 132] }
+// The sleeping bag lies on a slant (its underside runs from the pillow's row down to the foot's, 3 px
+// lower), and cast lays a shadow from one base row, so its shadow is drawn: the bag's underside moved
+// away from the sun (left and toward us) by about its own thickness, the way the pack's falls. It
+// lies inside the tent's shadow, where one more shadow in the same layer adds nothing, so it goes in
+// a layer of its own and darkens there too (a contact shadow, where the bag meets the ground).
+const BEDROLL_SHADOW = ((x, y) => poly([x - 4, y - 3, x - 3, y, x + 1, y + 1, x + 7, y + 2, x + 15, y + 3, x + 25, y + 3, x + 27, y + 1,
+  x + 22, y + 4, x + 20, y + 6, x + 10, y + 6, x + 2, y + 5, x - 4, y + 4, x - 8, y + 3, x - 8, y - 1], "k"))(...AT.bedroll)
 
 scene("sunset", { w: W, h: H, bg: "N" },
   layer("sky", ...sky, stamp("_birds", 0, 0)),
@@ -620,10 +627,15 @@ scene("sunset", { w: W, h: H, bg: "N" },
     stamp("hero", ...AT.hero, { cast: awayFromSun(...AT.hero, 1), silhouette: "k" }),
     ...TENT_SHADOW,
     stamp("pack", ...AT.pack, { cast: awayFromSun(...AT.pack, 1), silhouette: "k" }),
+    stamp("pot", ...AT.pot, { cast: awayFromSun(...AT.pot, 1), silhouette: "k" }),
     stamp("logs", ...AT.logs, { cast: awayFromSun(...AT.logs, 1.5), silhouette: "k" }),
     stamp("cairn", ...AT.cairn, { cast: awayFromSun(...AT.cairn, 1.2), silhouette: "k" }),
     // the pennant stands 8 px up inside the cairn: its shadow starts where that point's shadow lands
     ((k) => stamp("pennant", Math.round(AT.cairn[0] + 8 * k[0]), Math.round(AT.cairn[1] + 8 * k[1]), { cast: k, silhouette: "k" }))(awayFromSun(...AT.cairn, 1.2))),
+  // the fire's light falls off in three rings, the faintest reaching the tent's door; the bag
+  // blocks it, so its shadow comes after that ring
+  layer("firelight0", { light: true, density: 0.25 }, ellipse(146, 164, 42, 10, "k")),
+  layer("contact", { shade: true }, BEDROLL_SHADOW),
   layer("firelight", { light: true, density: 0.5 }, ellipse(148, 163, 26, 7, "k")),
   layer("firelight2", { light: true }, ellipse(148, 163, 14, 4, "k")),
   layer("camp", { sort: "y" },
