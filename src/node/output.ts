@@ -7,6 +7,7 @@ import type { Project } from "../core/project.ts";
 import { type FrameTag, onionSheet, packSheet, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
 import { normalImage } from "../core/normals.ts";
 import { tiledMap } from "../core/tiled.ts";
+import { encodeAseprite } from "./aseprite.ts";
 import { encodeGif } from "./gif.ts";
 import { encodePng } from "./png.ts";
 
@@ -17,6 +18,8 @@ export interface OutputOptions {
   preview?: boolean;
   /** Fixed preview scale (default: auto). */
   scale?: number;
+  /** Also write each asset as an .aseprite file (layers, frames, tag, palette). */
+  aseprite?: boolean;
 }
 
 export interface OutputResult {
@@ -87,6 +90,11 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         for (const { file, img } of t.images) writePng(join(out, dir, file), img);
         if (t.json) { write(join(out, dir, n + ".tmj"), t.json); info += ` + ${n}.tmj`; }
         for (const s of t.skipped) info += ` (tiled: ${s})`;
+      }
+      if (opts.aseprite) {
+        const a = encodeAseprite(p, n);
+        write(join(out, dir, n + ".aseprite"), a.data);
+        info += ` + ${n}.aseprite${a.flat ? ` (one layer: ${a.flat})` : ""}`;
       }
       let pv = "";
       if (opts.preview !== false) {

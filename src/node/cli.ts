@@ -13,9 +13,11 @@ import { serve } from "./server.ts";
 
 const USAGE = `pxl — pixel-art DSL
 
-  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview]
+  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
-      previews (out/_preview; animated assets also get a .gif).
+      previews (out/_preview; animated assets also get a .gif). --aseprite also writes each
+      asset as <name>.aseprite (layers, frames, tag, palette) to keep editing in Aseprite; pxl
+      never reads it back and the next --aseprite build overwrites it, so copy it out of out/.
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
       Live viewer: rebuilds on save and replays each asset's painting steps.
   pxl ascii <art.px.js> <name>
@@ -40,6 +42,7 @@ interface Args {
   only?: string[];
   scale?: number;
   preview?: boolean;
+  aseprite?: boolean;
   port?: number;
   at?: [number, number];
   sheet?: boolean;
@@ -62,6 +65,7 @@ function parse(argv: string[]): Args {
     else if (v === "--scale") a.scale = Number(val());
     else if (v === "--port") a.port = Number(val());
     else if (v === "--no-preview") a.preview = false;
+    else if (v === "--aseprite") a.aseprite = true;
     else if (v === "--sheet") a.sheet = true;
     else if (v === "--shrink") a.shrink = Number(val());
     else if (v === "--offset") {
@@ -96,7 +100,7 @@ export async function main(argv: string[]): Promise<number> {
     switch (a.cmd) {
       case "build": {
         const p = loadProject(file);
-        const r = writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale });
+        const r = writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite });
         for (const l of r.lines) console.log(l);
         for (const e of r.errors) console.error("error: " + e.message);
         console.log(`-> ${outDir}${r.errors.length ? ` (${r.errors.length} error${r.errors.length > 1 ? "s" : ""})` : ""}`);

@@ -116,8 +116,10 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
 - [x] **Map tones onto a ramp by luminance** (c64d91d): `rampmap(ramp, { where, hue })`, an op rather than
   an import option, so it works on anything drawn too. The palm's hand-written color map became two
   rampmaps (identical output). (Pixelorama Gradient Map.)
-- [ ] **Export `.aseprite`**: layers, frames, tags, slices and palette, so a person can keep editing
-  what the agent drew. (Documented format; zlib cels.)
+- [x] **Export `.aseprite`** (HASH): `build --aseprite` writes layers, frames with durations, the tag,
+  slices and the palette (keys as color names). Outline, shade layers and glow go to one layer over
+  the others, so the file shows exactly the built frames; Aseprite 1.3.18 renders the girl's walk and
+  the forest pixel for pixel. One way: nothing reads it back. (Documented format; zlib cels.)
 
 - [x] **Hair physics** (35a57b4): `chain(anchors, { links, length, gravity, drag, rest, stiff, move })`,
   Celeste-style: points that follow an anchor with inertia and weight, simulated over the loop until

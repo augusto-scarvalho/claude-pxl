@@ -277,7 +277,7 @@ painting replay ends ("animate" toggle).
 ## CLI
 
 ```
-node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview]
+node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
 node <pxl>/bin/pxl.js ascii <file> <name>
 node <pxl>/bin/pxl.js list  <file>
@@ -304,6 +304,17 @@ An asset that places tilemaps also gets `<n>.tmj`, a Tiled map with one tile lay
 it used, after group picks, flips and swaps. Orthogonal maps redraw exactly; for isometric ones,
 check the tile alignment in Tiled. A layer whose tiles differ in size or stand by a pivot (props)
 is left out, and the build line says why.
+
+`build --aseprite` also writes each asset as `<n>.aseprite`, for a person to keep editing in Aseprite:
+its layers by name, every frame with its duration (anims once each, as in sheets), a tag with the
+playback direction, the palette with each key as its color's name, and `slice` / `pivot` as a slice.
+What the asset changes on top of its layers (outline, `shade:` / `light:` layers, glow, lighting) goes to
+one layer over them, `outline` or `effects`, in the colors it left, so the file shows exactly the built
+frames; blended and `hidden` layers come along hidden, `ref` layers as reference layers. Assets with
+no layers, or with `mx`, `my`, `flip`, `rot`, `angle` or `crop` (which move the art away from its
+layers), come out as one layer, and the build line says why. One way only: pxl never reads the file
+back, and the next `--aseprite` build writes over it, so copy it out of `out/` before editing.
+(`build` and `serve` without the flag leave it alone.)
 
 `serve` opens a live viewer that rebuilds on save, follows the asset you edited and replays its
 painting steps (each top-level op, layer and post-processing step, with its file:line). It also

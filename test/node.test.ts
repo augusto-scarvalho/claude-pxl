@@ -333,3 +333,57 @@ test("server: state, asset frames, rebuild on change", async () => {
     s.close();
   }
 });
+
+test("aseprite export: redrawing its visible layers the way Aseprite does gives back every frame", () => {
+  // outline (its own layer), a shade layer (hidden; its effect goes over), a hidden and a reference layer,
+  // a body that never changes (linked cels), pingpong; a mirrored sprite comes out as one layer
+  const { dir, file } = tmpArt(`pal({ k: "#1b1630", g: "#8ccf63", G: "#4c8a44", w: "#fff6e0" }); ramps("kGg")
+anim("blink", { w: 6, h: 6, fps: 5, dir: "pingpong", outline: "k" },
+  layer("body", rect(0, 0, 6, 6, "g")),
+  layer("eye", frame(px(2, 2, "w")), frame(px(3, 2, "w")), frame(px(4, 2, "w"))),
+  layer("shadow", { shade: true }, rect(0, 4, 6, 2, "k")),
+  layer("mask", { hidden: true }, rect(0, 0, 2, 2, "w")),
+  layer("guide", { ref: 0.5 }, px(0, 0, "w")))
+sprite("half", { mx: true }, layer("a", "gG"))`);
+  const p = loadProject(file), out = join(dir, "out");
+  const r = writeOutputs(p, out, { preview: false, aseprite: true });
+  assert.ok(r.lines.some((l) => l.includes("half.aseprite (one layer: mx moves the art away from its layers)")), r.lines.join("\n"));
+  const b = readFileSync(join(out, "anims", "blink.aseprite"));
+  assert.equal(b.readUInt32LE(0), b.length);
+  assert.equal(b.readUInt16LE(4), 0xa5e0);
+  const [frames, w, h] = [b.readUInt16LE(6), b.readUInt16LE(8), b.readUInt16LE(10)];
+  const layers: { name: string; flags: number }[] = [], cels: Img[][] = [], ms: number[] = [];
+  let tag: { from: number; to: number; dir: number; name: string } | undefined, linked = 0;
+  for (let f = 0, o = 128; f < frames; f++) {
+    const end = o + b.readUInt32LE(o), n = b.readUInt32LE(o + 12);
+    ms.push(b.readUInt16LE(o + 8));
+    cels.push([]);
+    for (let c = 0, q = o + 16; c < n; c++) {
+      const size = b.readUInt32LE(q), type = b.readUInt16LE(q + 4), d = b.subarray(q + 6, q + size);
+      if (type === 0x2004) layers.push({ flags: d.readUInt16LE(0), name: d.toString("utf8", 18, 18 + d.readUInt16LE(16)) });
+      if (type === 0x2018) tag = { from: d.readUInt16LE(10), to: d.readUInt16LE(12), dir: d[14], name: d.toString("utf8", 29, 29 + d.readUInt16LE(27)) };
+      if (type === 0x2005) {
+        const li = d.readUInt16LE(0), x = d.readInt16LE(2), y = d.readInt16LE(4), kind = d.readUInt16LE(7), img = new Img(w, h);
+        if (kind === 1) { linked++; cels[f][li] = cels[d.readUInt16LE(16)][li]; }
+        else {
+          assert.equal(kind, 2);
+          const cw = d.readUInt16LE(16), ch = d.readUInt16LE(18), px = inflateSync(d.subarray(20));
+          for (let i = 0; i < cw * ch; i++) img.set(x + (i % cw), y + Math.floor(i / cw), px.readUInt32BE(i * 4));
+          cels[f][li] = img;
+        }
+      }
+      q += size;
+    }
+    o = end;
+  }
+  assert.deepEqual(layers.map((l) => `${l.name}:${l.flags}`), ["body:3", "eye:3", "shadow:2", "mask:2", "outline + effects:3", "guide:67"]);
+  assert.deepEqual(tag, { from: 0, to: 2, dir: 2, name: "blink" });
+  assert.ok(linked >= 2, "the unchanged body links to frame 0");
+  const drawn = p.drawn("blink");
+  assert.deepEqual(ms, drawn.map((f) => f.ms));
+  drawn.forEach((f, i) => {
+    const redrawn = new Img(w, h);
+    layers.forEach((l, li) => { if (l.flags === 3 && cels[i][li]) redrawn.blit(cels[i][li], 0, 0); });
+    assert.deepEqual([...redrawn.data], [...f.img.data], `frame ${i}`);
+  });
+});

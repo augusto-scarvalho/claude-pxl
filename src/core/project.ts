@@ -488,12 +488,12 @@ export class Project implements BuildCtx {
    * One full loop of an animated asset as [{ img, ms }]; [] for still assets. `guide` is the frame
    * with its reference layers over it, when it has any (previews only).
    */
-  frames(name: string, seed = 0, max = 600): { img: Img; ms: number; guide?: Img }[] {
+  frames(name: string, seed = 0, max = 600): { img: Img; ms: number; t: number; guide?: Img }[] {
     const tl = this.build(name, seed).anim;
     if (!tl) return [];
     const at = (t: number, ms: number) => {
       const b = this.build(name, seed, t);
-      return { img: b.img, ms, ...(b.guide ? { guide: b.guide } : {}) };
+      return { img: b.img, ms, t, ...(b.guide ? { guide: b.guide } : {}) };
     };
     if (tl.durations) {
       let t = 0;
@@ -511,7 +511,7 @@ export class Project implements BuildCtx {
    * The frames an anim draws, once each and in drawing order: what sheets export, with the
    * direction in the tag. Same as frames() unless the anim plays reverse / pingpong.
    */
-  drawn(name: string, seed = 0): { img: Img; ms: number }[] {
+  drawn(name: string, seed = 0): { img: Img; ms: number; t: number }[] {
     const all = this.frames(name, seed), tl = this.build(name, seed).anim;
     if (!tl?.order) return all;
     return Array.from({ length: drawnFrames(tl) }, (_, k) => all[tl.order!.indexOf(k)]);

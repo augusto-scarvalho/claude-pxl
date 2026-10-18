@@ -95,7 +95,7 @@ writes the same `out/` files as `build`.
 ## Commands
 
 ```
-pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview]
+pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite]
 pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
 pxl ascii <art.px.js> <name>     print an asset as palette keys with x/y rulers
 pxl list  <art.px.js>            list assets, groups and sheets with source locations

@@ -23,6 +23,8 @@ export interface BuildCtx extends Resolver {
 export interface LayerOut {
   name: string;
   img: Img;
+  /** How it reached the art: drawn as it is (unset), not at all, or blended (shade, light, blend, opacity, density). */
+  how?: "hidden" | "blended";
 }
 
 export interface BuildOut {
@@ -35,6 +37,10 @@ export interface BuildOut {
   tilemaps?: TileLayer[];
   /** Reference layers composited over the art, for previews only (the art itself leaves them out). */
   guide?: Img;
+  /** The reference layers themselves (strength k), in drawing coordinates. */
+  refs?: { name: string; img: Img; k: number }[];
+  /** What the layers were drawn over: the canvas as it was when the first layer began. */
+  under?: Img;
 }
 
 /** An anim's frames: count and durations (ms), from its frame() items or { frames, fps }. */
@@ -148,7 +154,8 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   };
 
   const layers: LayerOut[] = [];
-  const refs: { img: Img; k: number }[] = [];
+  const refs: { name: string; img: Img; k: number }[] = [];
+  let under: Img | undefined;
   // Pixels of solid / wall layers, for lighting().
   let solid: Uint8Array | undefined, wall: Uint8Array | undefined, unlit: Uint8Array | undefined;
   if (![undefined, true, false, "x", "y"].includes(opts.wrap)) throw new PxError(`wrap must be true, "x" or "y", got ${fmtArgs([opts.wrap])}`);
@@ -193,6 +200,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     snap?.("lighting", loc);
   };
   runItems(ctx, def.items, main, def.loc, onPass, (l) => {
+    under ??= base.copy();
     const limg = new Img(base.w, base.h);
     const lc = timed(new Canvas(limg, pal, ctx, l.opts.x ?? 0, l.opts.y ?? 0, seed));
     lc.layerName = l.name;
@@ -214,7 +222,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     if (l.opts.ref) {
       const k = l.opts.ref === true ? 1 : l.opts.ref;
       if (!(typeof k === "number" && k > 0 && k <= 1)) throw new PxError(`layer '${l.name}': ref must be true or a strength from 0 to 1, got ${fmtArgs([l.opts.ref])}`, l.loc);
-      refs.push({ img: limg, k });
+      refs.push({ name: l.name, img: limg, k });
       snap?.(`reference layer '${l.name}' (previews only)`, l.loc);
       return;
     }
@@ -231,14 +239,17 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
         for (let i = 0; i < unlit.length; i++) if (limg.data[i] !== TRANSPARENT) unlit[i] = v;
       }
     }
-    layers.push({ name: l.name, img: limg });
+    // drawn as it is: what blend() blits (an Aseprite export keeps it as its own layer)
+    const o = l.opts, mode = o.shade ?? o.light;
+    const plain = o.blend === undefined && o.opacity === undefined && (o.density ?? 1) >= 1 && (mode === undefined || mode === false);
+    layers.push({ name: l.name, img: limg, ...(o.hidden ? { how: "hidden" as const } : plain ? {} : { how: "blended" as const }) });
     snap?.(`layer '${l.name}'${l.opts.hidden ? " (hidden)" : ""}`, l.loc);
   });
 
   const img = finish(base, def, pal, trace);
   trace?.finish(img);
   const guide = refs.length ? guideOver(img, refs, def) : undefined;
-  return { img, layers, trace, anim: tl, ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide } : {}) };
+  return { img, layers, trace, anim: tl, ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}) };
 }
 
 /**
