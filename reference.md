@@ -36,7 +36,7 @@ layer(name, layerOpts?, ...items)      // only as an item of a sprite or scene (
 plate(relightOpts?, ...items)          // the items drawn and lit on their own, then laid down: anywhere
 group(name, ["a", "b", "rock_*", ...])  // random pick per placement; repeat a name to weight it
 sheet(name, ["slime*", "heart", groupName], { cols?, pad?, extrude? })  // extrude: repeat edge pixels n px out
-include("other.px.js")                  // path relative to the current file
+include("other.px.js")                  // path relative to the current file; included files share one scope: a const of one is seen by the other (name what they share, like a cue frame; each name declared once)
 directions("ship", 16, { from, outline?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
 font(name, "glyph_sprite", { chars: "ABC...", w, h, cols? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional)
 include("palette.px.js", { palette: true })  // also take its use()/pal()/ramps() from here on

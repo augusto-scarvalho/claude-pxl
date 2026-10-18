@@ -38,7 +38,7 @@ const FEET = 168                                        // where the knights sta
 // scrolling a whole width. A wisp is a long thin streak of haze; as it gains body the light takes it
 // from the top down (a cap of white thickening row by row, then its gray underside). The sunset's
 // thin streaks took their light column by column; on a heaped cloud that shows as stripes.
-const LOOP = 96                                         // 12 s at 8 fps; everything else repeats in 1 s
+const LOOP = BOUT_LOOP                                  // the bout's 12 s at 8 fps (knight.px.js): one clock for the scene
 const CLOUDS = [[44, 16, 28, 4], [196, 12, 32, 5], [124, 34, 22, 3], [262, 26, 18, 3], [78, 46, 16, 2]]   // x, y (base), half-length, height
 anim("clouds", { w: W, h: HZ, frames: LOOP, fps: 8 }, (c) => {
   const r = c.rng(5)
@@ -193,16 +193,16 @@ sprite("stand_full", { w: STAND_W, h: STAND_H, pivot: "bottom", height: 4.1 }, s
 // bell lifting on each note, the banner hanging from it swinging) and a long last note, then down to
 // the waist for the bout, the banner still.
 const CALL = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1]                          // the bell up on the notes
-anim("trumpeter", { w: 12, h: 18, frames: 96, fps: 8, pivot: [4, 18], outline: "k", facing: "right", height: 1.7, sockets: { front: [6, 3] } }, (c) => {
+anim("trumpeter", { w: 12, h: 18, frames: BOUT_LOOP, fps: 8, pivot: [4, 18], outline: "k", facing: "right", height: 1.7, sockets: { front: [6, 3] } }, (c) => {
   c.rect(2, 2, 4, 4, "j"); c.rect(2, 1, 4, 2, "Z"); c.px(5, 3, "z")                    // face, cap
   c.rect(1, 6, 6, 7, "r"); c.rect(1, 6, 3, 7, "y"); c.hline(1, 12, 6, "Z")             // tabard, quartered
   c.rect(2, 13, 2, 5, "q"); c.rect(5, 13, 2, 5, "q")                                   // legs
   const f = c.frame
-  if (f >= 2 && f < 18) {                                                              // playing
+  if (f >= 2 && f < BOUT_SIGNAL - 2) {                                                 // playing, done by the signal
     const s = CALL[f - 2], d = 1 - s                                                    // the bell a pixel lower between notes
     c.line(6, 4, 11, 1 + d, "Z"); c.px(11, d, "Z"); c.px(11, 2 + d, "Z")
     c.poly([8, 4 + d, 10, 3 + d, 10 + s, 7 + d, 9 + s, 8 + d], "r"); c.px(9, 5 + d, "Z")
-  } else if (f < 20) {                                                                 // on the way up or down
+  } else if (f < BOUT_SIGNAL) {                                                        // on the way up or down
     c.line(6, 6, 11, 5, "Z"); c.px(11, 4, "Z"); c.px(11, 6, "Z")
     c.poly([8, 7, 10, 6, 10, 10, 9, 11], "r"); c.px(9, 8, "Z")
   } else {                                                                             // at rest, at the waist
@@ -278,7 +278,7 @@ sprite("palisade", { w: 14, h: 16, wrap: "x" },
 // parti-colored hose (a blue leg and a red one) and pointed shoes; his left hand on his hip, the
 // right holding the white baton with its gold ends. When it drops, they fight. 1.65 m on row 140 is
 // 37 px. Each mass is drawn flat and lit on its own. His arm and baton: up through the fanfare, swept
-// down at the signal (frame 20), up again as the knights walk back to their marks.
+// down at the bout's signal (BOUT_SIGNAL), up again once the knights are back on their marks.
 // Drawn 8 px in and 3 down, for the baton's room: each mass a plate lit on its own, the details unlit.
 const lit = (...items) => plate({ light: LIGHT, reach: 1 }, ...items)
 const TABARD = [4, 13, 12, 13, 13, 27, 3, 27]
@@ -287,10 +287,12 @@ const BATON = {
   out: [line(3, 14, -1, 10, "c", 2), rect(-3, 8, 2, 2, "j"), line(-3, 8, -7, 4, "c"), px(-7, 4, "Z")],
   down: [rect(2, 14, 2, 7, "c"), rect(2, 21, 2, 2, "j"), line(2, 23, -1, 30, "c"), px(-1, 30, "Z")],
 }
+const RAISE = BOUT_HOME + 5                             // the baton goes up again: the knights home and settled
 anim("marshal", { w: 27, h: 40, pivot: [16, 40], fps: 8, outline: "k", selout: true, facing: "front", height: 1.65 },
   // the baton arm, under the tabard's wing
   layer("arm", { x: 8, y: 3 },
-    frame({ hold: 20 }, ...BATON.up), frame(...BATON.out), frame({ hold: 64 }, ...BATON.down), frame(...BATON.out), frame({ hold: 10 }, ...BATON.up),
+    frame({ hold: BOUT_SIGNAL }, ...BATON.up), frame(...BATON.out), frame({ hold: RAISE - BOUT_SIGNAL - 1 }, ...BATON.down),
+    frame(...BATON.out), frame({ hold: BOUT_LOOP - RAISE - 1 }, ...BATON.up),
     relight(undefined, { light: LIGHT, reach: 1 })),
   layer("body", { x: 8, y: 3 },
     lit(rect(5, 28, 3, 7, "w")), lit(rect(9, 28, 3, 7, "r")),                                   // hose

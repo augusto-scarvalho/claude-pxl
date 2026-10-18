@@ -213,8 +213,9 @@ Wave 3: rigs in motion
   and legs; the knight's own copy is gone).
 - [x] **`arc(cx, cy, r, from, to, c, { inner, taper })`** (smears, halos, partial rings: the bout's
   smears use it) and **`has(name)`** (a generated part defined once without a guard of one's own).
-- [ ] Docs: included files share one scope (only an error message says so): name the cues two files
-  share (the bout's signal frame) instead of matching numbers by hand.
+- [x] Docs: included files share one scope (only an error message said so): reference.md says it, and
+  the bout names its clock (BOUT_LOOP, BOUT_SIGNAL, BOUT_HOME), which the tournament's clouds,
+  trumpeters and marshal read instead of numbers matched by hand.
 
 ## Later / niche
 

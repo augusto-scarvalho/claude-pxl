@@ -343,10 +343,13 @@ const pose = (p) => {
 // Then from above onto the shield: the blue one cuts, the red one takes it on its shield, its sword
 // already drawn back, and cuts back at once; the blue one takes that on its own. Then both wind up
 // all the way and the last clash throws them both back: a draw. They salute, the sword up before the
-// visor, and walk back to their marks. 96 frames at 8 fps (12 s); it begins on frame 21, leaving a
-// scene the first 20 for what comes before (a fanfare, the marshal's signal). Each knight is an anim
-// whose pivot is the middle of the lists, so both stamp on the same spot, and so does knight_bout_fx
-// (sparks, dust).
+// visor, and walk back to their marks. Each knight is an anim whose pivot is the middle of the
+// lists, so both stamp on the same spot, and so does knight_bout_fx (sparks, dust).
+// Its clock, named for the scene that shares it (a file including this one sees these names: included
+// files share one scope): BOUT_LOOP frames at 8 fps; the knights stand still until the signal, frame
+// BOUT_SIGNAL, which leaves a scene the frames before it for what comes first (a fanfare, the
+// marshal's baton); they are back on their marks at BOUT_HOME (set below, where the walk ends).
+const BOUT_LOOP = 96, BOUT_SIGNAL = 20
 const HALF = 33                                               // each one's mark from the middle
 const GUARD = [[-7, 0], [6, 0]], LUNGE = [[-10, 0], [10, 0]]  // the far foot back, the near one forward
 const MOVES = {
@@ -381,7 +384,7 @@ const MOVES = {
   lower: { hand: [6, 12], sword: 35 },
 }
 // [frames, the blue one's move, how far forward of its mark, the red one's (default: the same)]
-const RUNS = [[21, "rest", 0], [1, "guardIn", 0], [3, "guard", 0],
+const RUNS = [[BOUT_SIGNAL + 1, "rest", 0], [1, "guardIn", 0], [3, "guard", 0],
   [2, "windHigh", -1], [2, "cut", 4], [1, "recoil", 2], [2, "guard", 0],                         // a cut from above, both
   [2, "windLow", -1], [2, "rise", 6], [1, "recoil", 2], [2, "guard", 0],                         // a rising cut, both
   [1, "windHigh", -1, "guard", 0], [1, "swing", 0, "blockIn", 0], [1, "slash", 6, "block", 0],    // blue cuts onto the shield,
@@ -409,14 +412,15 @@ for (const [i, len] of [[1, 7], [0, 14], [1, 7]]) {
     for (const b of BOUTS) b.push([pose({ ...MOVES.rest, feet }), dx, "walk", feet])
   }
 }
-for (const b of BOUTS) while (b.length < 96) b.push([pose(MOVES.rest), 0, "rest"])
+const BOUT_HOME = BOUTS[0].length
+for (const b of BOUTS) while (b.length < BOUT_LOOP) b.push([pose(MOVES.rest), 0, "rest"])
 
 const AW = 130, AX = 102, SOLE = Y(F.sole) + OY
-anim("knight_bout", { w: AW, h: RH, frames: 96, fps: 8, pivot: [AX, SOLE], facing: "right", height: 1.8 }, (c) => {
+anim("knight_bout", { w: AW, h: RH, frames: BOUT_LOOP, fps: 8, pivot: [AX, SOLE], facing: "right", height: 1.8 }, (c) => {
   const [name, dx] = BOUTS[0][c.frame]
   c.stamp("knight_" + name, AX - HALF + dx, SOLE)
 })
-anim("knight_l_bout", { w: AW, h: RH, frames: 96, fps: 8, pivot: [AW - AX, SOLE], facing: "left", height: 1.8 }, (c) => {
+anim("knight_l_bout", { w: AW, h: RH, frames: BOUT_LOOP, fps: 8, pivot: [AW - AX, SOLE], facing: "left", height: 1.8 }, (c) => {
   const [name, dx] = BOUTS[1][c.frame]
   c.stamp("knight_l_" + name, AW - AX + HALF - dx, SOLE)
 })
@@ -468,7 +472,7 @@ for (const k of [0, 1]) BOUTS[k].forEach(([, dx, m], f) => {
 // wood dropping). Dust: a puff at the front foot as it stamps into each blow, and from all four feet
 // as the last clash slides them back; brown, for the scene to swap to its ground.
 const FW = 150, FX = 75
-anim("knight_bout_fx", { w: FW, h: RH, frames: 96, fps: 8, pivot: [FX, SOLE] }, (c) => {
+anim("knight_bout_fx", { w: FW, h: RH, frames: BOUT_LOOP, fps: 8, pivot: [FX, SOLE] }, (c) => {
   for (const { f, k, at: [hx, hy], from, turn } of SMEARS) {
     if (c.frame !== f) continue
     // round the fist, out to the blade's tip, thickening from the tail to the blade; the red one's mirrored
