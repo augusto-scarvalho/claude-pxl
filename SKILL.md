@@ -111,6 +111,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `normals.px.js` | normal maps: `bump` vs painted `normals` |
 | `cave.px.js`, `grotto.px.js` | animated glow scenes: pulsing lamps, waterfall, particles |
 | `tropical/` | 320×240 animated forest: imported trees, river, trail tileset, animals, a walking girl |
+| `halloween/` | 320×180 night party: `lighting()` with many lamps, point-light `cast` shadows, dancing monsters (bones drawn between joints, a cape polygon, `warp`) |
 | `no_magic.px.js` | the largest interior: character anims, fire, many props |
 | `fonts/font5x7.px.js` | a 5×7 font for titles: `include` it, `text(..., { font: "5x7" })` |
 

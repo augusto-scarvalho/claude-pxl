@@ -45,6 +45,23 @@ CC-BY 4.0: they keep that license, so credit their authors when you reuse them (
 [`examples/tropical/refs/CREDITS.md`](examples/tropical/refs/CREDITS.md)). Everything else in the
 scene, the trail's tileset included, is drawn in code and MIT like the rest of the repository.
 
+## Showcase: a Halloween party in the cemetery
+
+<p>
+  <img src="docs/gallery/halloween_party.gif" width="100%" alt="Animated Halloween party at night in a cemetery: a full moon behind a dead tree, a crypt with its door glowing and a werewolf howling on its roof, string lights and a mirror ball, a Frankenstein DJ at a coffin booth between coffin speakers, a witch stirring a cauldron, and a skeleton, a vampire, a mummy, a zombie and a ghost dancing among graves and jack-o'-lanterns">
+</p>
+
+The second long project, in [`examples/halloween/`](examples/halloween): a 320×180 night scene lit
+only by `lighting()`, with a cold moonlit ambient and lamps on everything that glows (jack-o'-lanterns
+flickering out of step, string lights, the crypt's door, a witch's cauldron, a mirror ball over the
+dance floor). Eight monsters loop on one 2-second cycle: a skeleton whose bones are drawn between
+joints, a vampire whose cape opens like bat wings, a mummy doing the Egyptian, a zombie doing
+Thriller, a ghost, a witch stirring, a Frankenstein DJ and a werewolf howling at the moon. Figures
+near the strongest lights throw their silhouettes away from them (`cast` from a point light). Making
+it led to `pxl describe` (a whole scene as text an agent reads at once: where each object shows, its
+gaps, what covers it, how it stands out after lighting, how it moves; `--diff` after an edit) and
+to a GIF encoder that keeps small figures' colors in lit scenes. Everything is drawn in code, MIT.
+
 ## Quick start
 
 ```sh
