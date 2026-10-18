@@ -271,9 +271,15 @@ after, 22 and 24 builds before). The edits were already batched (each run wrote 
 script). The art came out alike. So what's left to win is in the reasoning: split runs (wave 3).
 
 Wave 3: experiments, measured before anything is built.
-- [ ] **Sub-agents for the props of a big scene**: each draws one prop from its spec in a small
+- [x] **Sub-agents for the props of a big scene**: each draws one prop from its spec in a small
   context; the main agent composes. The reasoning that piles up over one long run is most of the
-  context; split runs start fresh.
+  context; split runs start fresh. Tried, not adopted: the same campsite brief as a pipeline, a
+  planner (palette, plan, scene file), five part agents at once, a composer; twice. Each pipeline
+  cost ~1.75x a single agent (cache reads 27.5M and 25.8M against ~18.3M, writes ~910k against
+  ~265k; 260 and 243 calls against ~98) and took longer (~40 min against ~27). Every agent pays
+  the skill and docs again, the part agents still grew to 126-171k (a part is not a small job),
+  and the composer alone cost ~8M, reworking parts that didn't fit. The scenes came out about as
+  good, cleaner in places. Worth trying again only for scenes whose single run goes past ~400k.
 - [ ] **describe brief by default on busy scenes** (forest: 23k characters full), with a line
   saying how to get the full text.
 
@@ -290,6 +296,14 @@ one), and the art code itself (4% of the cost).
   or leave those objects out of the check.
   Shipped: on two of those campsites, the fire's place as the light cleared every false warning
   (two and one), and a head lit from the wrong side of a fire is still caught (test).
+- [ ] **A glow that leaves its source as drawn**: `glow(keys, { ramp })` steps up everything in its
+  radius, the source asset's own darker pixels too: logs and stones under the flames turned tan and
+  lost their shapes. Two agents stamped the fire a second time after the glow. An option to keep
+  the glowing asset (or given keys) out of the halo would make that a word instead of a trick.
+- [ ] **Height of deep things in perspective**: a tent or a log seen at an angle has its far end
+  higher on screen, so its box is taller than its front, and describe calls it too tall (a tent
+  1.3 m at its front: "drawn 22 px, 32% too tall"). Measure from the front's foot to its top, or
+  say what the box includes.
 
 ## Later / niche
 
