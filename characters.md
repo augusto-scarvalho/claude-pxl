@@ -4,6 +4,10 @@ Read this before drawing a person. At these sizes, most failures come from propo
 construction, not from where single pixels go: a head that's the wrong size, a body that's too wide
 for it, a neck under the chin, arms like columns.
 
+Contents: 1 Pick a style · 2 Measure a reference · 3 Start from existing art · 4 Build order ·
+5 Faces · 6 3/4 and profile views · 7 Placing the pixels · 8 The same character, someone else ·
+9 Small animals (warp, hair) · 10 Animating with parts (sockets, motion guides)
+
 ## 1. Pick a style and stay in it
 
 These measurements come from finished sprites. Head means crown to chin, hair included. Height means
@@ -142,7 +146,7 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
   - White on the outer side of both eyes looks cross-eyed.
   - A full dark lash row over a short iris looks sleepy.
 
-## 6. 3/4 (diagonal) views
+## 6. 3/4 (diagonal) and profile views
 
 - **Face:**
   - Eyes and mouth shift toward the side the character faces, and the far eye moves in.
@@ -162,6 +166,14 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
   - The waist is no wider than the chest, and a skirt flares 1 px a side at most.
   - Forearms and wrists are narrower than the sleeves above them.
   - Shoulders slope down from the neck. Flat shoulders read as shoulder pads.
+- **Profile (side view):** everything says which way the figure faces. The far arm and far leg hide
+  behind the near ones or show as a darker sliver on the same side; a far arm drawn out on the back
+  with a tail beside it made a werewolf's body read as facing away from its head. Fix one part at a
+  time against the facing; when fixes start contradicting each other, go back to the last version
+  that read right.
+- **A chosen silhouette, redrawn in another way** (shapes to a hand grid, or the reverse), grows: a
+  chest pushed forward 2 px reads as a pot belly. Compare the redraw with the chosen version side by
+  side before replacing it.
 
 ## 7. Placing the pixels
 

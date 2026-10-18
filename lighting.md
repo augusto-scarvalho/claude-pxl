@@ -1,5 +1,8 @@
 # pxl lighting (Terraria-style)
 
+Contents: Setup in three parts · lamp() · lighting() options · Layer flags · Normal maps · Glow on
+top of the light · Tips
+
 Light spreads over a grid of cells from lamps and the sky. Open cells cost a fixed amount (so a
 lamp's `r` is its reach). Solid cells keep only a fraction of the light that enters, so bright
 light seeps deeper into blocks than dim light. Rooms fill with light, wall and ground edges fade

@@ -25,6 +25,7 @@
     "examples/fonts/*.px.js",
     "SKILL.md",
     "characters.md",
+    "scenes.md",
     "reference.md",
     "lighting.md",
     "rotation.md"

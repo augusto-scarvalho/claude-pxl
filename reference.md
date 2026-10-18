@@ -1,5 +1,9 @@
 # pxl reference
 
+Contents: Palette · Assets (items, sprite/scene options, layer options) · Ops (shapes, texture and
+tone, placing assets, terrain tilesets) · Lighting · Glow · Animation · CLI · Library.
+To look up one name instead of reading this file: `pxl help <name>`.
+
 Art files are plain JavaScript (or TypeScript) evaluated with the DSL as globals. Nothing draws
 at definition time: `sprite`, `scene`, ... record definitions; everything renders at build time,
 so assets may reference each other in any order.

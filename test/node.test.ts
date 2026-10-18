@@ -489,3 +489,19 @@ scene("sheet", { w: 16, h: 8 }, stamp("rock", 0, 0), stamp("rock", 4, 0), stamp(
   assert.match(scene, /B arrow @props: x 8-9, y 4-5 \(2x2\)[^\n]*\n\s+nearest: rock #2 5px left/);
   assert.match(sheet, /SHAPES[^\n]*2 distinct of 4[^\n]*\n {2}A 2x2 x2: 0,0 {2}4,0\n {2}B 2x2 x2: 8,0 {2}12,0 flipped/);
 });
+
+test("pxl help: an index of the reference, or what it says about one name and where examples use it", async () => {
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try {
+    assert.equal(await main(["help"]), 0);
+    assert.equal(await main(["help", "wrap"]), 0);
+    assert.equal(await main(["help", "scater"]), 0);
+  } finally { console.log = log; }
+  const [index, wrap, typo] = lines;
+  assert.match(index, /Ops > Shapes: px rect box line curve/);
+  assert.match(index, /scenes\.md: Layout and scale;/);
+  assert.match(wrap, /\[reference\.md: Assets > Sprite \/ scene options\]\n\| `wrap: true/);
+  assert.match(wrap, /\[examples: \d+ uses\]\n {2}examples\/[\w/]+\.px\.js:\d+:/);
+  assert.match(typo, /nothing about 'scater'.*did you mean 'scatter'/);
+});

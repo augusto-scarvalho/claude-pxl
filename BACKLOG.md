@@ -141,6 +141,14 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
   patches as background, the rest as objects; touching things merge and lit renders band: 460780d)
   and `--brief` (a third of the size, 96% on the same test).
 
+- [x] **A leaner skill** (HASH): SKILL.md from ~5k to ~2k tokens (the core, a one-level "where to
+  look" table); scene guidance moved to `scenes.md`, read only for scenes; `pxl help [name]` looks
+  the reference up instead of reading it (~350 tokens for the index, 200-850 per name, against ~9k
+  for reference.md); contents lines in the long guides (Anthropic's skill authoring guidance:
+  progressive disclosure, scripts over docs, contents for files over 100 lines). Fresh agents with
+  each version: same results (6/6 lookups, 4/4 first-try builds), 2-5% fewer tokens on small tasks
+  (a subagent's fixed overhead dominates there), fewer tool calls.
+
 Left out on purpose: effects that leave the palette (blur, curves, HSV, convolution), keyframed
 tweens and interpolating between drawings, free rotation of cut-out limbs, 2.5D thickness, 3D layers
 (render a base in Blender and reduce it instead), mouse-only tools.

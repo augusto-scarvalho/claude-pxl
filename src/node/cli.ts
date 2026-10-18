@@ -14,9 +14,12 @@ import { decodePng } from "./png.ts";
 import { reduceColors } from "./gif.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
+import { help } from "./help.ts";
 
 const USAGE = `pxl — pixel-art DSL
 
+  pxl help [name]
+      What the reference says about an op or option (and where the examples use it); no name: an index.
   pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
       previews (out/_preview; animated assets also get a .gif). --aseprite also writes each
@@ -93,7 +96,7 @@ function parse(argv: string[]): Args {
     else if (v === "--cell") a.cell = Number(val());
     else if (v === "--diff") a.diff = true;
     else if (v === "--brief") a.brief = true;
-    else if (v === "-h" || v === "--help") a.cmd = "help";
+    else if (v === "-h" || v === "--help") a.cmd = "usage";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
     else if (!a.file) a.file = v;
@@ -105,9 +108,14 @@ function parse(argv: string[]): Args {
 export async function main(argv: string[]): Promise<number> {
   let a: Args;
   try { a = parse(argv); } catch (e) { console.error(wrap(e).message); return 2; }
-  if (!a.cmd || a.cmd === "help" || !a.file) {
+  if (a.cmd === "help") {
+    // the reference looked up, not read: an index, or what it says about one name
+    console.log(help(a.file) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | compare (pxl --help for their options)"));
+    return 0;
+  }
+  if (!a.cmd || a.cmd === "usage" || !a.file) {
     console.log(USAGE);
-    return a.cmd === "help" ? 0 : 2;
+    return a.cmd === "usage" ? 0 : 2;
   }
   const file = resolve(a.file);
   const outDir = typeof a.out === "string" ? resolve(a.out) : join(dirname(file), "out");
