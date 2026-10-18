@@ -146,6 +146,13 @@ export class Img {
   }
 
   /** Draw src at (dx, dy); transparent source pixels are skipped. */
+  /** A copy with the pixels `skip` marks made transparent. */
+  without(skip: Uint8Array): Img {
+    const o = this.copy();
+    for (let i = 0; i < o.data.length; i++) if (skip[i]) o.data[i] = TRANSPARENT;
+    return o;
+  }
+
   blit(src: Img, dx: number, dy: number): void {
     dx = Math.floor(dx);
     dy = Math.floor(dy);
@@ -264,13 +271,14 @@ export class Img {
    * 1px outline around opaque pixels; grows the canvas by 1 on every side. With `pick`, each
    * outline pixel takes pick(the sprite color it touches) instead of `c` (selout).
    */
-  outline(c: Color, diagonal = false, pick?: (touching: Color) => Color): Img {
-    const src = this.pad(1);
-    const o = src.copy();
+  outline(c: Color, diagonal = false, pick?: (touching: Color) => Color, skip?: Uint8Array): Img {
+    const src = this.pad(1), o = src.copy();
+    // `skip`: pixels the line isn't drawn around (they stay, but don't count as the shape's edge)
+    const shape = skip ? this.without(skip).pad(1) : src;
     for (let y = 0; y < src.h; y++)
       for (let x = 0; x < src.w; x++) {
         if (src.get(x, y) !== TRANSPARENT) continue;
-        const nb = touching(src, x, y, diagonal, (p) => p !== TRANSPARENT);
+        const nb = touching(shape, x, y, diagonal, (p) => p !== TRANSPARENT);
         if (nb !== undefined) o.set(x, y, pick ? pick(nb) : c);
       }
     return o;
@@ -278,13 +286,13 @@ export class Img {
 
   /** 1px line over the sprite's own edge pixels (an inside outline): the canvas keeps its size. */
   /** Edge pixels become the line; colors in `keep` stay as they are (an outline already there). */
-  inline(c: Color, diagonal = false, pick?: (under: Color) => Color, keep?: Set<Color>): Img {
-    const o = this.copy();
+  inline(c: Color, diagonal = false, pick?: (under: Color) => Color, keep?: Set<Color>, skip?: Uint8Array): Img {
+    const o = this.copy(), shape = skip ? this.without(skip) : this;
     for (let y = 0; y < this.h; y++)
       for (let x = 0; x < this.w; x++) {
-        const p = this.get(x, y);
+        const p = shape.get(x, y);
         if (p === TRANSPARENT || keep?.has(p)) continue;
-        if (touching(this, x, y, diagonal, (q) => q === TRANSPARENT) !== undefined) o.set(x, y, pick ? pick(p) : c);
+        if (touching(shape, x, y, diagonal, (q) => q === TRANSPARENT) !== undefined) o.set(x, y, pick ? pick(p) : c);
       }
     return o;
   }

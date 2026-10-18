@@ -79,7 +79,7 @@ const ASSET_OPTS: Record<AssetKind, string[]> = {
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
 const MAX_LOOP = 60000;
-const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref"];
+const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline"];
 const SHEET_OPTS = ["cols", "pad", "extrude"];
 
 function checkArgs(name: string, args: unknown[]): void {
@@ -279,6 +279,13 @@ export class Project implements BuildCtx {
       if (isPlainObject(args[0])) checkKeys("frame", args[0], FRAME_OPTS, loc);
       checkItems("frame", isPlainObject(args[0]) ? args.slice(1) : args, loc);
       return { __op: true, name: "frame", args, loc };
+    };
+    // plate(relight opts?, ...items): the items drawn and lit on their own, then laid down; anywhere
+    env.plate = (...args: unknown[]): Op => {
+      const loc = this.callerLoc();
+      if (isPlainObject(args[0])) checkKeys("plate", args[0], OP_OPTS.relight, loc);
+      checkItems("plate", isPlainObject(args[0]) ? args.slice(1) : args, loc);
+      return { __op: true, name: "plate", args, loc };
     };
     env.scene = (name: unknown, ...rest: unknown[]) => define("scene", name, rest);
     env.layer = (name: unknown, ...rest: unknown[]): Layer => {

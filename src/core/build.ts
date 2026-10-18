@@ -8,7 +8,7 @@ import { applyGlow } from "./glow.ts";
 import { applyLighting } from "./light.ts";
 import { rotate } from "./rotate.ts";
 import { normalImage } from "./normals.ts";
-import { type AssetDef, type FrameOpts, type GlowOpts, type Item, type Layer, type LayerOpts, type LightingOpts, type Op, type TileLayer, type Timeline, isLayer, isOp } from "./model.ts";
+import { type AssetDef, type FrameOpts, type GlowOpts, type Item, type Layer, type LayerOpts, type LightingOpts, type Op, type RelightOpts, type TileLayer, type Timeline, isLayer, isOp } from "./model.ts";
 import type { Palette } from "./palette.ts";
 import { Trace } from "./trace.ts";
 import { bayer, fmtArgs, gridRows, gridSize, type Region } from "./util.ts";
@@ -27,6 +27,8 @@ export interface LayerOut {
   how?: "hidden" | "blended";
   /** Its pixels ignore lighting (the layer's `unlit`): sparks, glows, skies; describe doesn't judge their lit side. */
   unlit?: boolean;
+  /** A blended layer's mode in words ("opacity 0.45", "shade 2"), for describe. */
+  mode?: string;
 }
 
 export interface BuildOut {
@@ -162,6 +164,8 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   let under: Img | undefined;
   // Pixels of solid / wall layers, for lighting().
   let solid: Uint8Array | undefined, wall: Uint8Array | undefined, unlit: Uint8Array | undefined;
+  // Pixels of `outline: false` layers still showing: the asset's outline isn't drawn around them.
+  let loose: Uint8Array | undefined;
   if (![undefined, true, false, "x", "y"].includes(opts.wrap)) throw new PxError(`wrap must be true, "x" or "y", got ${fmtArgs([opts.wrap])}`);
   const edges = opts.wrap ? { x: opts.wrap !== "y", y: opts.wrap !== "x" } : undefined;
   const maps: TileLayer[] = [];
@@ -243,15 +247,26 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
         const v = l.opts.unlit ? 1 : 0;
         for (let i = 0; i < unlit.length; i++) if (limg.data[i] !== TRANSPARENT) unlit[i] = v;
       }
+      if (l.opts.outline !== undefined && l.opts.outline !== false)
+        throw new PxError(`layer '${l.name}': outline can only be false (its pixels left out of the asset's outline), got ${fmtArgs([l.opts.outline])}`, l.loc);
+      if (l.opts.outline === false || loose) {
+        loose ??= new Uint8Array(base.data.length);
+        const v = l.opts.outline === false ? 1 : 0;
+        for (let i = 0; i < loose.length; i++) if (limg.data[i] !== TRANSPARENT) loose[i] = v;
+      }
     }
     // drawn as it is: what blend() blits (an Aseprite export keeps it as its own layer)
     const o = l.opts, mode = o.shade ?? o.light;
     const plain = o.blend === undefined && o.opacity === undefined && (o.density ?? 1) >= 1 && (mode === undefined || mode === false);
-    layers.push({ name: l.name, img: limg, ...(o.hidden ? { how: "hidden" as const } : plain ? {} : { how: "blended" as const }), ...(o.unlit ? { unlit: true } : {}) });
+    const words = [o.blend !== undefined && `blend ${o.blend}`, o.opacity !== undefined && `opacity ${o.opacity}`,
+      o.shade !== undefined && o.shade !== false && (typeof o.shade === "number" ? `shade ${o.shade}` : "shade"),
+      o.light !== undefined && o.light !== false && (typeof o.light === "number" ? `light ${o.light}` : "light"),
+      o.density !== undefined && o.density < 1 && `density ${o.density}`].filter(Boolean).join(", ");
+    layers.push({ name: l.name, img: limg, ...(o.hidden ? { how: "hidden" as const } : plain ? {} : { how: "blended" as const, mode: words }), ...(o.unlit ? { unlit: true } : {}) });
     snap?.(`layer '${l.name}'${l.opts.hidden ? " (hidden)" : ""}`, l.loc);
   });
 
-  const img = finish(base, def, pal, trace);
+  const img = finish(base, def, pal, trace, loose);
   trace?.finish(img);
   const guide = refs.length ? guideOver(img, refs, def) : undefined;
   return { img, layers, trace, anim: tl, placements: log, ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}) };
@@ -306,6 +321,10 @@ function runItems(
         } else if (item.name === "clip") {
           const [region, ...inner] = item.args as [Region, ...Item[]];
           c.clip(region, () => runItems(ctx, inner, c, item.loc));
+        } else if (item.name === "plate") {
+          const o = (isFrameOpts(item.args[0]) ? item.args[0] : {}) as RelightOpts;
+          const inner = (isFrameOpts(item.args[0]) ? item.args.slice(1) : item.args) as Item[];
+          c.plate(() => runItems(ctx, inner, c, item.loc, undefined, undefined, inFrame), o);
         } else if (item.name === "lighting" || item.name === "glow") {
           if (!onPass) throw new PxError(`${item.name}() goes directly in a sprite or scene, after what it affects, not inside a layer or clip`);
           onPass(item.name, item.args, item.loc);
@@ -352,13 +371,21 @@ function inferSize(items: Item[]): { w: number; h: number } {
 /** facing -> the front's direction in picture space (x right, y down, z into the picture). */
 const FACING: Record<string, [number, number, number]> = { right: [1, 0, 0], left: [-1, 0, 0], front: [0, 0, -1], back: [0, 0, 1] };
 
-function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
+function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Uint8Array): Img {
   const o = def.opts;
-  const step = (label: string, f: () => Img | void) => {
+  // `outline: false` layers: their pixels, as a mask moved along with the art until the line is drawn
+  let mask: Img | undefined;
+  if (loose?.some((v) => v) && (o.outline || o.outline8 || o.inline)) {
+    mask = new Img(img.w, img.h);
+    for (let i = 0; i < loose.length; i++) if (loose[i]) mask.data[i] = 0xffffffff;
+  }
+  const step = (label: string, f: () => Img | void, m?: (k: Img) => Img) => {
     const r = f();
     if (r) img = r;
+    if (mask && m) mask = m(mask);
     trace?.record(label, def.loc, img);
   };
+  const skip = () => mask && Uint8Array.from(mask.data, (c) => (c === TRANSPARENT ? 0 : 1));
   // [x, y] is in drawing coords and moves with flip/rot/outline/crop; keywords use the final size.
   const pv = o.pivot;
   if (pv !== undefined && !(pv === "bottom" || pv === "center" || (Array.isArray(pv) && pv.length === 2 && pv.every(Number.isFinite))))
@@ -379,8 +406,8 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
     if (!(typeof o.height === "number" && o.height > 0)) throw new PxError(`height is its real height in meters (e.g. 1.8), got ${fmtArgs([o.height])}`);
     img.meters = o.height;
   }
-  if (o.mx) step("mirror x", () => img.mirror("x"));
-  if (o.my) step("mirror y", () => img.mirror("y"));
+  if (o.mx) step("mirror x", () => img.mirror("x"), (k) => { k.mirror("x"); return k; });
+  if (o.my) step("mirror y", () => img.mirror("y"), (k) => { k.mirror("y"); return k; });
   if (o.swap) {
     const sw = o.swap;
     step(`swap ${fmtArgs([sw])}`, () => {
@@ -392,10 +419,10 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
       return img.remap(m);
     });
   }
-  if (o.flip) step(`flip ${o.flip}`, () => img.flip(o.flip!));
-  if (o.rot) step(`rot ${o.rot}`, () => img.rot(o.rot!));
+  if (o.flip) step(`flip ${o.flip}`, () => img.flip(o.flip!), (k) => k.flip(o.flip!));
+  if (o.rot) step(`rot ${o.rot}`, () => img.rot(o.rot!), (k) => k.rot(o.rot!));
   // Any angle, before the outline so the line is drawn fresh around the turned shape.
-  if (o.angle) step(`angle ${o.angle}${o.rotate ? ` (${o.rotate})` : ""}`, () => rotate(img, o.angle!, o.rotate));
+  if (o.angle) step(`angle ${o.angle}${o.rotate ? ` (${o.rotate})` : ""}`, () => rotate(img, o.angle!, o.rotate), (k) => rotate(k, o.angle!, o.rotate));
   else if (o.rotate) throw new PxError("rotate picks how `angle` turns the sprite: add angle: degrees");
   // selout: the line takes the color it touches, `selout` steps darker along the ramps (colors
   // without a ramp keep the line color).
@@ -413,10 +440,10 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
       if (c === null) throw new PxError(`inline keep: '${k}' is not a palette key`);
       return c;
     }));
-    step(`inline ${spec.color}${keep ? ` keep ${spec.keep}` : ""}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, spec.color); return img.inline(c, false, as(c), keep); });
+    step(`inline ${spec.color}${keep ? ` keep ${spec.keep}` : ""}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, spec.color); return img.inline(c, false, as(c), keep, skip()); });
   }
-  if (o.outline) step(`outline ${o.outline}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline!); return img.outline(c, false, as(c)); });
-  if (o.outline8) step(`outline8 ${o.outline8}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline8!); return img.outline(c, true, as(c)); });
+  if (o.outline) step(`outline ${o.outline}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline!); return img.outline(c, false, as(c), skip()); }, (k) => k.pad(1));
+  if (o.outline8) step(`outline8 ${o.outline8}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline8!); return img.outline(c, true, as(c), skip()); }, (k) => k.pad(1));
   if (o.crop) step("crop", () => img.crop());
   if (pv === "bottom" || pv === "center") img.pivot = [img.w / 2, pv === "bottom" ? img.h : img.h / 2];
   if (o.slice !== undefined) {

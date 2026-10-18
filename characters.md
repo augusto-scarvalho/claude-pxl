@@ -360,8 +360,8 @@ not which of the body's arms it is: that is the slot's `side`, and the rig's nea
 
 **Build a part from plates.** Drawn as one shape and lit once, a part reads as a tube. Build it the
 way the thing is made (a pauldron and its lames, rerebrace, couter, vambrace, gauntlet; cuisse,
-poleyn, greave, sabaton; cloth in panels), each plate flat in a mid tone on a layer of its own, lit
-there (`relight` at the end of the layer): each plate's own edges take the rim light and the shade,
+poleyn, greave, sabaton; cloth in panels), each plate flat in a mid tone in a `plate()` of its own,
+lit there (`plate({ light, reach }, ...)`): each plate's own edges take the rim light and the shade,
 and the plates read as lying over one another. Seams, rivets, slits and trims go on after, unlit.
 Light steel harder than cloth (`strength` 1.3: its corners facing the light flash), outline with
 `selout` (each line a darker shade of what it touches), and draw a thin diagonal (a blade) in lines,

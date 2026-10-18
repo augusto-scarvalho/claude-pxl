@@ -282,6 +282,7 @@ export async function main(argv: string[]): Promise<number> {
         const r = checkProject(p, { names: a.rest.length ? a.rest : undefined, frame: a.frame, file: basename(file) });
         for (const l of r.lines) console.log(l);
         console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"} (checked ${r.checked}${a.frame ? `, at frame ${a.frame}` : ""})`);
+        console.log(r.coverage);
         return r.warnings ? 1 : 0;
       }
       case "shot": {

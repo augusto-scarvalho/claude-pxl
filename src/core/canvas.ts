@@ -164,6 +164,27 @@ export class Canvas {
     return (x, y) => test(this.get(x, y));
   }
 
+  /**
+   * Run `fn` drawing onto a plate of its own, light the plate on its own (relight with `opts`, which
+   * reads only the plate's pixels: its own edges take the rim light and the shade, as a plate of armor
+   * or a mass of stone does, whatever is under it), then lay it down. Works anywhere, in a layer too.
+   */
+  plate(fn: () => void, opts: RelightOpts = {}): void {
+    const under = this.img, sorted = this.sorted, plate = new Img(under.w, under.h);
+    this.img = plate;
+    this.sorted = undefined;                     // stamps inside are drawn now, to be lit with it
+    try {
+      fn();
+      this.relight(undefined, opts);
+    } finally {
+      this.img = under;
+      this.sorted = sorted;
+    }
+    if (plate.lamps?.length) (under.lamps ??= []).push(...plate.lamps);
+    if (plate.orient?.text) this.lettered();
+    under.blit(plate, 0, 0);
+  }
+
   /** Run `fn` with drawing restricted to `region` (nests by intersection). */
   clip(region: Region, fn: () => void): void {
     const prev = this.clipPred, p = regionPred(region);

@@ -9,7 +9,8 @@ import { frontWords, rampSteps } from "../core/checks.ts";
 import { PxError } from "../core/errors.ts";
 import { frameTime } from "./shot.ts";
 
-export interface CheckResult { lines: string[]; warnings: number; checked: string }
+/** `coverage`: which rules ran and on how many, and those that couldn't (nothing to check them on) */
+export interface CheckResult { lines: string[]; warnings: number; checked: string; coverage: string }
 
 const hash = (d: Uint32Array) => { let h = 2166136261; for (let i = 0; i < d.length; i++) h = Math.imul(h ^ d[i], 16777619); return h >>> 0; };
 /** 3, 4, 5, 9 -> "3-5, 9" */
@@ -28,6 +29,10 @@ const ranges = (fs: number[]) => fs.reduce<[number, number][]>((r, f) => {
 export function checkProject(p: Project, opts: { names?: string[]; frame?: number; file?: string } = {}): CheckResult {
   const lines: string[] = [];
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
+  // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
+  // count where it did, so "no warnings" isn't read as "checked"
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0 };
+  let lightSaid = false, groundSaid = false;
   // by default what the file itself defines (what it includes is checked where it's defined)
   const own = (n: string) => !opts.file || (p.assets.get(n)?.loc ?? "").split(":")[0] === opts.file;
   for (const name of opts.names ?? p.order.filter(own)) {
@@ -37,6 +42,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     if (rig) {
       // its parts: each slot's line from describe's RIG section
       rigs++;
+      ran.parts += rig.slots.length;
       for (const l of rigLines(rig, { has: (n) => p.has(n), image: (n, flip) => (flip ? p.image(n).flip("x") : p.image(n)) }, steps)) {
         const slot = /^ {2}(\w+): /.exec(l)?.[1];
         for (const w of l.split("; ").filter((s) => s.includes("WARNING"))) lines.push(`${name} › ${slot ?? "-"} › ${w.slice(w.indexOf("WARNING"))}`);
@@ -53,6 +59,9 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       continue;
     }
     scenes++;
+    const wo = def.opts.world;
+    lightSaid ||= !!wo?.light;
+    groundSaid ||= wo?.ground !== undefined;
     const tl = p.timeline(name), count = !tl ? 1 : tl.durations ? tl.durations.length : Math.max(1, Math.round(tl.loop / tl.step));
     const seen = new Map<string, string[]>(), found = new Map<string, Set<number>>(), at = new Map<string, Set<string>>();
     for (const f of opts.frame !== undefined && tl ? [opts.frame] : [...Array(count).keys()]) {
@@ -63,9 +72,14 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         const key = `${q.name}|${q.layer}|${q.x},${q.y}|${q.img.w}x${q.img.h}|${hash(q.img.data)}`;
         let ws = seen.get(key);
         if (!ws) {
-          const o = q.img.orient;
-          ws = [...placementChecks(q, def.opts.world, steps, unlit.has(q.layer ?? "")), ...(o ? orientWords(o).split(", ") : [])].filter((w) => w.startsWith("WARNING"));
+          const o = q.img.orient, dark = unlit.has(q.layer ?? "");
+          const all = [...placementChecks(q, wo, steps, dark), ...(o ? orientWords(o).split(", ") : [])];
+          ws = all.filter((w) => w.startsWith("WARNING"));
           seen.set(key, ws);
+          if (q.img.sockets?.front && o?.f) ran.front++;
+          if (wo?.light && !dark) { ran.light++; if (all.some((w) => /^(WARNING: )?lit (from|on)/.test(w))) ran.read++; }
+          if (q.img.meters) { ran.feet++; if (wo?.ground !== undefined) ran.ground++; }
+          if (o?.text) ran.text++;
         }
         for (const w of ws) {
           const k = `${q.name} @${q.layer ?? "-"} › ${w}`, bb = q.img.bounds();
@@ -83,6 +97,15 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     }
   }
   const n = (k: number, w: string) => `${k} ${w}${k === 1 ? "" : "s"}`;
+  const run: string[] = [], not: string[] = [];
+  if (ran.front + others) run.push(`front marker on ${ran.front + others}`); else not.push("front marker (nothing has one)");
+  if (scenes) {
+    if (lightSaid) run.push(`lit side on ${ran.light} (a clear reading on ${ran.read})`); else not.push("lit side (no scene declares world.light)");
+    if (ran.feet) run.push(`feet on ${ran.feet}${groundSaid ? ` (against the ground row on ${ran.ground})` : ""}`); else not.push("feet and size (nothing placed has a height)");
+  }
+  if (ran.text) run.push(`lettering on ${ran.text}`);
+  if (rigs) run.push(`rig parts ${ran.parts}`);
   return { lines, warnings: lines.length,
+    coverage: `ran: ${run.join(", ") || "nothing"}${not.length ? `; not run: ${not.join(", ")}` : ""}`,
     checked: `${n(scenes, "scene")} (${n(frames, "frame")}, ${n(distinct, "distinct placement")}), ${n(rigs, "rig")}, ${n(others, "other asset")} with a front marker` };
 }

@@ -81,7 +81,7 @@ const hills = [
 // round towers with a band of light where they turn toward the sun. Hazy with the distance: no
 // black, its darkest a blue gray.
 const merlons = (x0, x1, y) => [...Array(Math.floor((x1 - x0) / 4) + 1).keys()].map((i) => rect(x0 + i * 4, y, 2, 3, "s"))
-const mass = (...items) => layer("mass", ...items, relight(undefined, { light: LIGHT, reach: 2 }))
+const mass = (...items) => plate({ light: LIGHT, reach: 2 }, ...items)
 sprite("castle", { w: 66, h: 50, pivot: "bottom" },
   // the keep, behind, and the stair turret on its corner: a slim round tower coming up from behind
   // the wall and over the battlements, under a cone as steep as the drum towers'
@@ -130,7 +130,7 @@ sprite("castle_hill", { w: HW, h: HH, pivot: "bottom" }, (c) => {
 },
 // the scarp: the rock under the walls, a row of crags each lit on its own (the plate way), so they
 // read as faces of rock and not one slab; the grass rim of the plateau stays above them
-...SCARP.map((f) => layer("crag", poly(f, "s"), relight(undefined, { light: LIGHT, reach: 2 }))),
+...SCARP.map((f) => plate({ light: LIGHT, reach: 2 }, poly(f, "s"))),
 // the road from the gate, through a cut in the scarp and winding down to the left
 (c) => c.curve([80, 6, 80, 13, 72, 16, 78, 19, 64, 22, 70, 25, 50, 28, 36, 32], "X"))
 const CASTLE_X = 257                                    // in the gap between the two pavilions
@@ -279,9 +279,8 @@ sprite("palisade", { w: 14, h: 16, wrap: "x" },
 // right holding the white baton with its gold ends. When it drops, they fight. 1.65 m on row 140 is
 // 37 px. Each mass is drawn flat and lit on its own. His arm and baton: up through the fanfare, swept
 // down at the signal (frame 20), up again as the knights walk back to their marks.
-// drawn 8 px in and 3 down, for the baton's room: each mass a layer lit on its own, the details unlit
-const lit = (...items) => layer("mass", { x: 8, y: 3 }, ...items, relight(undefined, { light: LIGHT, reach: 1 }))
-const flat = (...items) => layer("detail", { x: 8, y: 3 }, ...items)
+// Drawn 8 px in and 3 down, for the baton's room: each mass a plate lit on its own, the details unlit.
+const lit = (...items) => plate({ light: LIGHT, reach: 1 }, ...items)
 const TABARD = [4, 13, 12, 13, 13, 27, 3, 27]
 const BATON = {
   up: [rect(2, 7, 2, 7, "c"), rect(2, 5, 2, 2, "j"), vline(3, -3, 8, "c"), px(3, -3, "Z")],
@@ -293,19 +292,20 @@ anim("marshal", { w: 27, h: 40, pivot: [16, 40], fps: 8, outline: "k", selout: t
   layer("arm", { x: 8, y: 3 },
     frame({ hold: 20 }, ...BATON.up), frame(...BATON.out), frame({ hold: 64 }, ...BATON.down), frame(...BATON.out), frame({ hold: 10 }, ...BATON.up),
     relight(undefined, { light: LIGHT, reach: 1 })),
-  lit(rect(5, 28, 3, 7, "w")), lit(rect(9, 28, 3, 7, "r")),                                   // hose
+  layer("body", { x: 8, y: 3 },
+    lit(rect(5, 28, 3, 7, "w")), lit(rect(9, 28, 3, 7, "r")),                                   // hose
     lit(rect(4, 35, 4, 2, "T"), px(3, 36, "T")), lit(rect(9, 35, 4, 2, "T"), px(13, 36, "T")),   // shoes
     lit(clip(TABARD, rect(0, 13, 8, 7, "w"), rect(9, 13, 8, 7, "r"), rect(0, 21, 8, 7, "r"), rect(9, 21, 8, 7, "w")),
       poly([2, 13, 5, 13, 5, 16, 2, 17], "w"), poly([11, 13, 14, 13, 14, 17, 11, 16], "r")),     // tabard, its wings
-    flat(clip(TABARD, vline(8, 13, 15, "Z"), hline(0, 20, 17, "Z")), hline(3, 27, 11, "y")),    // the gold cross, the hem
+    clip(TABARD, vline(8, 13, 15, "Z"), hline(0, 20, 17, "Z")), hline(3, 27, 11, "y"),          // the gold cross, the hem
     lit(line(13, 16, 15, 19, "c", 2), line(15, 19, 13, 21, "c", 2)), lit(rect(12, 21, 2, 2, "j")),   // the hand on his hip
-    flat(rect(7, 12, 3, 1, "J")),                                                             // neck
+    rect(7, 12, 3, 1, "J"),                                                                   // neck
     lit(rect(5, 6, 7, 5, "j"), hline(6, 11, 5, "j"), px(4, 8, "j"), px(12, 8, "j")),           // face, ears
-    flat(vline(4, 6, 2, "v"), vline(12, 6, 2, "v"),                                           // grey hair
-      px(6, 7, "z"), px(10, 7, "z"), px(6, 6, "v"), px(10, 6, "v"), px(8, 8, "J")),             // eyes, brows, nose
-    lit(hline(6, 9, 5, "c"), rect(6, 10, 5, 1, "c"), hline(7, 11, 3, "c"), px(8, 12, "c")), flat(px(8, 10, "v")),   // beard
+    vline(4, 6, 2, "v"), vline(12, 6, 2, "v"),                                                // grey hair
+    px(6, 7, "z"), px(10, 7, "z"), px(6, 6, "v"), px(10, 6, "v"), px(8, 8, "J"),               // eyes, brows, nose
+    lit(hline(6, 9, 5, "c"), rect(6, 10, 5, 1, "c"), hline(7, 11, 3, "c"), px(8, 12, "c")), px(8, 10, "v"),   // beard
     lit(poly([10, 3, 12, 0, 14, -2, 15, -2, 15, -1, 13, 1, 11, 4], "c")),                    // the feather, behind the brooch
-    lit(ellipse(8, 2, 3, 2, "r")), lit(ellipse(8, 4, 5, 1, "R")), flat(px(10, 4, "Z")))      // chaperon, brooch
+    lit(ellipse(8, 2, 3, 2, "r")), lit(ellipse(8, 4, 5, 1, "R")), px(10, 4, "Z")))           // chaperon, brooch
 
 // ---------------------------------------------------------------- the two knights
 // fighting their bout, both anims on the middle of the lists; the red one (knight.px.js's RED: its

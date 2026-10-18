@@ -27,7 +27,9 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    painted it.
 5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
    rig of the file and every frame of an animated scene, warnings only, with the frames they happen
-   at. Fix each or say why it's meant. Then look as a critic. Replacing approved art: keep `name_old` beside the new one
+   at. Fix each or say why it's meant. Its last line says which rules ran: a rule runs only where
+   the art says what it needs (`world.light`, `world.ground`, `height`, a `front` socket), so "no
+   warnings" with "not run: lit side" checked nothing about the light. Then look as a critic. Replacing approved art: keep `name_old` beside the new one
    in a `compare` scene and let the user choose. Matching a reference: `PXL compare art.px.js <name>
    ref.png [--shrink N]` lists each row's extents side by side.
 6. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL.

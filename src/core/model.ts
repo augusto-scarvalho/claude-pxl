@@ -36,6 +36,8 @@ export interface LayerOpts {
   wall?: boolean;
   /** Pixels this layer leaves visible ignore lighting (skies, backdrops). */
   unlit?: boolean;
+  /** false: the asset's outline isn't drawn around this layer's pixels (1 px ropes, pegs, smears). */
+  outline?: false;
   /**
    * Reference / guide layer: previews show it over the art (true = full strength, 0..1 = that
    * strength over drawn pixels); the exported PNG, sheets and stamps of this asset leave it out.

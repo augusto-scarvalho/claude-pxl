@@ -180,14 +180,21 @@ Wave 1: looking and checking
   on `unlit` layers, which describe doesn't read a lit side off.
 
 Wave 2: describe and small engine features
-- [ ] **Blend layers in describe**: an opacity / blend / shade layer's line: what it covers, px
+- [x] **Blend layers in describe**: an opacity / blend / shade layer's line: what it covers, px
   changed per object under it, px hidden by what is in front ("does the haze reach the castle?" took
   three scripts; the part it seemed to miss was behind the tents).
-- [ ] **`outline: false` on a layer**: keep 1 px ropes, pegs, smears out of the asset's outline
+- [x] **`outline: false` on a layer**: keep 1 px ropes, pegs, smears out of the asset's outline
   (reported twice: a tent's guy ropes, a pavilion's).
-- [ ] **`plate(...items, relightOpts)`**, allowed anywhere (layers don't nest): the castle's
-  masses, the knight's parts, a hill's crags and the marshal all wrap `layer(...items, relight())`,
-  and the marshal had to repeat its offset on every top-level layer.
+- [x] **`plate(relightOpts?, ...items)`**, allowed anywhere (layers don't nest): the castle's
+  masses, the knight's parts, a hill's crags and the marshal all wrapped `layer(...items, relight())`,
+  and the marshal had to repeat its offset on every top-level layer. All four use it now, pixel for
+  pixel the same (`pxl shot --vs HEAD --diff`: 0 px changed).
+- [x] **`pxl check` says which rules ran**: a rule only runs where the art says what it needs
+  (`world.light`, `world.ground`, `height`, a front marker), and on most examples none does: "no
+  warnings" read as approval. Its last line now counts where each ran and says why the others didn't.
+- [ ] **The examples declare what they mean**: 16 example files run no rule at all (no scene light, no
+  heights, no front markers). Declare the light their comments state (forest, cemetery, island...)
+  and the heights of what stands; then answer what comes up (the frog; the crypt, a known misreading).
 
 Wave 3: rigs in motion
 - [ ] **`twin: "<n>_l"` on a sprite**: its items drawn mirrored before lighting, pivot, sockets and

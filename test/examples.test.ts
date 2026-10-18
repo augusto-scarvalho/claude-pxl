@@ -22,7 +22,7 @@ test("pxl check on every example: the same warnings as kept", () => {
       const p = loadProject(join(root, "examples", f));
       // every frame of every animated scene (the bout's blows, the blocks, the last clash included)
       const r = checkProject(p, { file: basename(f) });
-      out.push(`${f}: ${r.warnings} warning${r.warnings === 1 ? "" : "s"} (${r.checked})`, ...r.lines.map((l) => "  " + l));
+      out.push(`${f}: ${r.warnings} warning${r.warnings === 1 ? "" : "s"} (${r.checked})`, `  ${r.coverage}`, ...r.lines.map((l) => "  " + l));
     } catch {
       out.push(`${f}: included only (doesn't build on its own: its palette comes from the file including it)`);
     }

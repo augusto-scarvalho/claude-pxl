@@ -73,14 +73,13 @@ rig("knight_blocking", { w: 60, h: 76, facing: "right", pivot: [X, Y(F.sole)], p
 
 // ---------------------------------------------------------------- stage 2: the parts, one by one
 // Each part is built from plates, the way armor is: a pauldron and the lames under it, the
-// rerebrace, the couter, the vambrace, the gauntlet. Each plate is drawn flat in a mid tone on a layer
-// of its own and lit there (relight with LIT), so its own edges take the rim light and the shade and
+// rerebrace, the couter, the vambrace, the gauntlet. Each plate is drawn flat in a mid tone in a
+// plate() of its own and lit there (with LIT), so its own edges take the rim light and the shade and
 // the plates read as lying over one another. Seams, rivets, trims and slits go on after, unlit (they
 // are dark or gold whichever way the light falls). part() builds each part twice from the same
 // drawing: as drawn, facing right, and with every x mirrored, facing left, for the turned knight;
 // both lit from the top right, where the scene has the light. A part with a front says so (facing)
 // and marks it with a `front` socket on the drawing: describe checks the marker against the label.
-let PLATES = 0
 const draw = (w, m, lit) => {
   const X = (x) => (m ? w - 1 - x : x), XS = (p) => p.map((v, i) => (i % 2 ? v : X(v)))
   return {
@@ -93,9 +92,9 @@ const draw = (w, m, lit) => {
     poly: (p, c) => poly(XS(p), c),
     ellipse: (cx, cy, rx, ry, c) => ellipse(X(cx), cy, rx, ry, c),
     clip: (p, ...items) => clip(XS(p), ...items),
-    // a plate: its own layer, lit on its own; steel harder
-    plate: (...items) => layer(`plate${PLATES++}`, ...items, relight(undefined, lit)),
-    steel: (...items) => layer(`plate${PLATES++}`, ...items, relight(undefined, { ...STEEL, reach: lit.reach })),
+    // a plate, lit on its own; steel harder
+    plate: (...items) => plate(lit, ...items),
+    steel: (...items) => plate({ ...STEEL, reach: lit.reach }, ...items),
   }
 }
 const part = (name, w, h, o, art) => {

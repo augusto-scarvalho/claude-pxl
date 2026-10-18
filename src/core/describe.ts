@@ -414,6 +414,42 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     out.push("");
   }
 
+  // layers that change what is under them (opacity, blend, shade, light): what each one reaches, and
+  // how much of it what is drawn later hides (does the haze reach the castle, or is that part of it
+  // behind the tents?). Under it: the last thing stamped there on an earlier layer, else the painting.
+  const blends = b.layers.map((l, li) => ({ l, li })).filter(({ l }) => l.how === "blended");
+  if (blends.length) {
+    out.push("BLENDS (layers that change what is under them instead of drawing over it):");
+    const at = new Map<string, number>();
+    b.layers.forEach((l, li) => { if (!at.has(l.name)) at.set(l.name, li); });
+    const plain = b.layers.map((l) => !l.how);
+    for (const { l, li } of blends) {
+      const under = new Int16Array(W * H).fill(-1), over = new Int16Array(W * H).fill(-1), later = new Uint8Array(W * H);
+      b.placements.forEach((p, i) => {
+        const pl = p.layer === undefined ? -1 : at.get(p.layer) ?? -1;
+        if (pl === li || (p.layer !== undefined && !plain[pl])) return;
+        const tgt = pl < li ? under : over;
+        for (let y = 0; y < p.img.h; y++)
+          for (let x = 0; x < p.img.w; x++) {
+            const X = p.x + x, Y = p.y + y;
+            if (X >= 0 && Y >= 0 && X < W && Y < H && p.img.data[y * p.img.w + x] !== TRANSPARENT) tgt[Y * W + X] = i;
+          }
+      });
+      b.layers.forEach((k, ki) => { if (ki > li && plain[ki]) for (let j = 0; j < W * H; j++) if (k.img.data[j] !== TRANSPARENT) later[j] = 1; });
+      let n = 0, hidden = 0;
+      const on = new Map<string, number>(), by = new Map<string, number>(), add = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
+      const name = (i: number) => (i < 0 ? "painting" : b.placements[i].name);
+      for (let j = 0; j < W * H; j++) {
+        if (l.img.data[j] === TRANSPARENT) continue;
+        n++;
+        if (later[j]) { hidden++; add(by, name(over[j])); } else add(on, name(under[j]));
+      }
+      const list = (m: Map<string, number>) => [...m].sort((u, v) => v[1] - u[1]).slice(0, 6).map(([k, v]) => `${k} (${v})`).join(", ") + (m.size > 6 ? `, ${m.size - 6} more` : "");
+      out.push(`  ${l.name} (${l.mode}): ${n} px` + (n - hidden ? `; over ${list(on)}` : "") + (hidden ? `; ${hidden} px of it hidden by what is drawn later: ${list(by)}` : ""));
+    }
+    out.push("");
+  }
+
   // the cell maps
   const cw = Math.ceil(W / C), ch = Math.ceil(H / C);
   const map = (title: string, cellChar: (x0: number, y0: number) => string) => {
