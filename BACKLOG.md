@@ -260,6 +260,16 @@ Wave 2: less read early.
   Shipped: `help stamp` 5.5k -> 1.6k characters, `help plate` 3.0k -> 1.2k; `pxl help "characters
   1 9"` prints those sections; `list` of knight.px.js 330 lines (16.6k characters) -> 22 (2.1k).
 
+Measured after waves 1 and 2: four fresh agents on one brief (a 160x120 night campsite, animated),
+two with the skill from before the waves (d393d84), two with it after (a282cfc). Early reading
+fell ~40% (docs, examples and help: 50k and 56k tokens before, 32k and 32k after), but the runs
+cost about the same: cache reads 15.8M and 22.6M before, 18.0M and 18.6M after (-5% on the mean,
+less than the gap between the two runs before); 82 and 107 calls before, 92 and 104 after. Two
+reasons: the agent's own reasoning is most of the context (each ended near 265k, of which tool
+results were ~70k and written text ~20k), and a cheaper look got more looks (30 and 35 shots
+after, 22 and 24 builds before). The edits were already batched (each run wrote its fixes as one
+script). The art came out alike. So what's left to win is in the reasoning: split runs (wave 3).
+
 Wave 3: experiments, measured before anything is built.
 - [ ] **Sub-agents for the props of a big scene**: each draws one prop from its spec in a small
   context; the main agent composes. The reasoning that piles up over one long run is most of the
@@ -270,6 +280,14 @@ Wave 3: experiments, measured before anything is built.
 Not worth it (measured): images (previews cap at 768 px, ~340 tokens each), a shorter CLI
 invocation (~12 tokens a call), new ops for helpers the examples repeat (at most 3 files share
 one), and the art code itself (4% of the cost).
+
+## From the campsite A/B runs
+
+- [ ] **A point light for the lit-side check**: `world: { light: { at: [x, y] } }` (a fire, a lamp
+  in the scene), each object checked against the direction from it to the light. Three of four
+  agents lighting a campsite by its fire had to pick one direction for the whole scene and either
+  live with warnings on what stands on the fire's other side (a woodpile lit correctly, flagged)
+  or leave those objects out of the check.
 
 ## Later / niche
 
