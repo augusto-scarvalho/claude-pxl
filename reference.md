@@ -291,17 +291,33 @@ reference (shrunk by N first, placed at x,y in the asset's coordinates) and of t
 many px wider the asset is on each side, then a summary. A figure 1 to 3 px too wide per side reads
 as heavy or "fat" without anyone being able to say why in a preview; this shows where.
 
-`describe` gives a whole asset as text to read at once, cheapest level first: PAINTED (the painting
-steps grouped by source line, since one line of code is one intent: a fence loop is one line,
-`vline/px x104`), PLACED (every stamp, scatter pick and wire hang by asset and layer, repeats folded
-into one line with their top-left positions; drawing order is depth), cell maps of `--cell` px
-(default 8: ON TOP, the placement owning most of each cell; COLOR, its most common key before
-lighting, `~` for blended colors outside the palette; LIGHT, brightness after lighting 0..9), and
-STANDS OUT: per placement, its body tone (75th percentile of what shows of it) over the median of
-the 2 px around it, after lighting. A figure at `1/1` reads only by its outline. `--at x,y,w,h`
-adds that region's exact keys with absolute rulers. A 320x180 lit scene comes to ~11k characters
-(its raw keys alone would be ~60k). Any PNG works too: its colors get index keys (most common
-first), and what repeats shows as a map of identical 16x16 tiles.
+`describe` gives a whole asset as text to read at once, objects first, with what a reader would
+otherwise work out by counting characters already worked out (object lists beat raw grids for
+models reading layout):
+
+- OBJECTS, in drawing order (later is in front): where each one shows as inclusive ranges of its
+  visible pixels (`x 189-207, y 135-163`), its feet (bottom middle), how much of it shows, its main
+  colors; what it is in front of and behind (px covered); its three nearest objects with the empty
+  px between their visible pixels and the side; its shadow from a `shade:` layer; how it stands out
+  after lighting (brightness of its body vs the 2 px around it, 0..9, and the color difference in
+  OKLab: under ~10 it reads only by its outline); and, in an animated asset, how much of its own
+  drawing changes per frame and how far it shifts.
+- MANY: things placed more than 6 times (grass, bulbs) in one line each, with the area they cover.
+- Cell maps of `--cell` px (default 8): ON TOP (the object owning most of each cell), COLOR (most
+  common key before lighting, `~` for blended colors outside the palette), LIGHT (brightness after
+  lighting, 0..9).
+- PAINTED: the painting steps grouped by source line (one line of code is one intent: a fence loop
+  is `vline/px x104`).
+- `--at x,y,w,h`: that region's exact keys, with absolute rulers.
+
+A 320x180 lit scene comes to ~17k characters (~5k tokens; a busy 320x240 one ~21k), where the 2x
+preview costs a few hundred tokens: read the preview for the look, this for anything you would
+count or measure. In blind tests (readers given only one form, questions on counts, positions,
+gaps, depth, contrast and motion) the 2x preview scored 66%, the first text form (sprite boxes
+instead of visible pixels, no motion) 77% and this one 100%, on the scene it was built with and on
+a held-out one whose questions came before its text. Any PNG works too: its colors get index keys (most common first); on a
+clear background each 8-connected patch is a shape, identical or mirrored shapes one entry with a
+list of where they are; an opaque image shows its repeats as a map of identical 16x16 tiles.
 
 `steps` prints how an asset was painted: every top-level op, layer and post-processing step in
 order, with its file:line, the pixels it changed and where ("no change" = it painted nothing).

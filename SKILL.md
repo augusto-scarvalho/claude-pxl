@@ -21,9 +21,9 @@ parts, primitives, brushes and tilemaps. Needs Node ≥ 22.18. No install step.
    it's cheaper than an image. For an anim, also read `_preview/<name>_onion.png`: a motion map and
    each frame over its neighbours' ghosts, where jitter, jumps and a hitch at the loop show (a GIF
    opens as its first frame only). For a whole scene, `PXL describe art.px.js <scene>` gives it as
-   text in ~3k tokens: what was placed where, cell maps (object on top, color, brightness after
-   lighting) and how each object stands out from its surroundings (a figure at `1/1` is as dark as
-   the ground around it); `--at x,y,w,h` adds a region's exact pixels.
+   text (~5k tokens): each object's visible ranges, feet, what covers it, its nearest neighbours and
+   gaps, how it stands out after lighting and how much it moves, then cell maps; `--at x,y,w,h` adds
+   a region's exact pixels. Answer layout questions from it, not by eyeballing the preview.
 4. Fix with small edits (a `grid(x, y, ...)` patch, one op) and rebuild. Repeat. A pixel came out
    wrong and you don't know which op painted it? `PXL steps art.px.js <name> --at x,y` lists the
    steps that changed it, with file:line and the color after each.

@@ -1,8 +1,11 @@
-// A whole asset as text an agent can read at once (`pxl describe`), in levels, cheapest first:
-// what was painted (the painting steps, grouped by source line: one line of code is one intent),
-// what is where (placements, repeats folded into one line), and how it came out (cell maps of the
-// object on top, the dominant color before lighting and the brightness after it, and how well each
-// object stands out from what is around it). A region's exact pixels come on request (`at`).
+// A whole asset as text an agent can read at once (`pxl describe`). Objects first, with what a
+// reader would otherwise work out by counting characters already worked out: where each one shows
+// (inclusive x and y ranges), where its feet are, what covers it and what it covers, its nearest
+// neighbours with the gap and the side, how it stands out after lighting (brightness and color)
+// and how much it moves. Repeated small things (grass, bulbs) fold into one line each. Then cell
+// maps for the layout (object on top, color, light), the painting steps grouped by source line,
+// and a region's exact pixels on request (`at`). Object lists beat raw grids for models reading
+// layout (ARC: LLMs and the Abstraction and Reasoning Corpus, arXiv 2305.18354).
 import type { BuildOut } from "./build.ts";
 import type { Placement } from "./canvas.ts";
 import { type Color, TRANSPARENT, toHex } from "./color.ts";
@@ -17,11 +20,29 @@ export interface DescribeOpts {
   at?: [number, number, number, number];
   /** Tile size for the repeats of a plain image (default 16). */
   tile?: number;
+  /** The asset at each frame of its loop, for motion (same placements in the same order). */
+  frames?: BuildOut[];
 }
 
 const SYMBOLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&*+=?";
 const lum = (c: Color) => (0.2126 * ((c >>> 24) & 255) + 0.7152 * ((c >>> 16) & 255) + 0.0722 * ((c >>> 8) & 255)) / 255;
 const digit = (v: number) => String(Math.max(0, Math.min(9, Math.floor(v * 10))));
+/** OKLab (perceptual): distances between colors read like what the eye sees. */
+const oklab = (c: Color): [number, number, number] => {
+  const f = (v: number) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const r = f((c >>> 24) & 255), g = f((c >>> 16) & 255), b = f((c >>> 8) & 255);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+};
+const mean3 = (cs: Color[]): [number, number, number] => {
+  const t = [0, 0, 0];
+  for (const c of cs) { const o = oklab(c); t[0] += o[0]; t[1] += o[1]; t[2] += o[2]; }
+  return [t[0] / cs.length, t[1] / cs.length, t[2] / cs.length];
+};
+/** Many copies of one small thing (a brush, a string of lights): one line, not one per copy. */
+const MANY = 6;
 
 export function describe(name: string, b: BuildOut, pal: Palette, opts: DescribeOpts = {}): string {
   const C = opts.cell ?? 8, img = b.img, W = img.w, H = img.h, out: string[] = [];
@@ -54,35 +75,159 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     (byKey.get(k) ?? byKey.set(k, []).get(k)!).push(p);
   }
   const keys = [...byKey.keys()], sym = new Map(keys.map((k, i) => [k, SYMBOLS[i] ?? "~"]));
-  // who owns each pixel: the last placement with an opaque pixel there
+  // who owns each pixel: the last placement with an opaque pixel there. A placement in a shade or
+  // light layer only darkens or lights what is under it: it owns the ground it falls on, never an
+  // object (a tree's shadow over a girl's legs leaves them hers)
+  const blended = new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name));
   const owner = new Int16Array(W * H).fill(-1);
-  b.placements.forEach((p, i) => {
-    for (let y = 0; y < p.img.h; y++)
-      for (let x = 0; x < p.img.w; x++) {
-        const X = p.x + x, Y = p.y + y;
-        if (X >= 0 && Y >= 0 && X < W && Y < H && p.img.data[y * p.img.w + x] !== TRANSPARENT) owner[Y * W + X] = i;
-      }
-  });
+  for (const effects of [false, true])
+    b.placements.forEach((p, i) => {
+      if (blended.has(p.layer ?? "") !== effects) return;
+      for (let y = 0; y < p.img.h; y++)
+        for (let x = 0; x < p.img.w; x++) {
+          const X = p.x + x, Y = p.y + y, j = Y * W + X;
+          if (X < 0 || Y < 0 || X >= W || Y >= H || p.img.data[y * p.img.w + x] === TRANSPARENT) continue;
+          if (!effects || owner[j] < 0 || blended.has(b.placements[owner[j]].layer ?? "")) owner[j] = i;
+        }
+    });
   const kOf = (i: number) => { const p = b.placements[i]; return `${p.name}@${p.layer ?? ""}`; };
 
   const frames = b.anim ? `, animated (frame 0 of the loop, ${b.anim.loop} ms)` : "";
-  out.push(`${name} ${W}x${H}${frames}. Coordinates are x,y from the top left; boxes are x,y wxh.`);
+  out.push(`${name} ${W}x${H}${frames}. Coordinates are x,y in px from the top left; a range a-b includes both ends.`);
   out.push("");
-  if (groups.length) {
-    out.push("PAINTED (steps in order, grouped by source line; a layer line closes that layer):");
-    for (const g of groups) {
-      const box = g.box ? `${g.box[0]},${g.box[1]} ${g.box[2] - g.box[0]}x${g.box[3] - g.box[1]}` : "no change";
-      const what = g.n === 1 ? g.first : `${[...g.ops].join("/")} x${g.n}`;
-      out.push(`  ${(g.loc.replace(/^.*[\\/]/, "") || "-").padEnd(20)} ${what.length > 60 ? what.slice(0, 59) + "…" : what.padEnd(60)} ${box}`);
+  // objects: every placement but the many-copies ones, each with its relations worked out
+  const many = new Set(keys.filter((k) => byKey.get(k)!.length > MANY));
+  const shown = b.placements.map((p, i) => {
+    let x0 = W, y0 = H, x1 = -1, y1 = -1, n = 0, all = 0;
+    const cover = new Map<number, number>();
+    for (let y = 0; y < p.img.h; y++)
+      for (let x = 0; x < p.img.w; x++) {
+        const X = p.x + x, Y = p.y + y;
+        if (X < 0 || Y < 0 || X >= W || Y >= H || p.img.data[y * p.img.w + x] === TRANSPARENT) continue;
+        all++;
+        const o = owner[Y * W + X];
+        if (o !== i) { if (o >= 0) cover.set(o, (cover.get(o) ?? 0) + 1); continue; }
+        n++; x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y);
+      }
+    return { x0, y0, x1, y1, n, all, cover };
+  });
+  type Shown = (typeof shown)[number];
+  const isMain = (i: number) => !many.has(kOf(i)) && !blended.has(b.placements[i].layer ?? "");
+  const main = b.placements.map((_, i) => i).filter(isMain);
+  const label = (i: number) => {
+    const same = byKey.get(kOf(i))!, n = b.placements[i].name;
+    return same.length > 1 ? `${n} #${same.indexOf(b.placements[i]) + 1}` : n;
+  };
+  // empty px between two objects' visible pixels (8-neighbour steps), up to FAR
+  const FAR = 96, dist = new Map<number, Int16Array>();
+  const field = (i: number) => {
+    let d = dist.get(i);
+    if (d) return d;
+    d = new Int16Array(W * H).fill(-1);
+    let q: number[] = [];
+    for (let j = 0; j < W * H; j++) if (owner[j] === i) { d[j] = 0; q.push(j); }
+    for (let r = 1; r <= FAR && q.length; r++) {
+      const next: number[] = [];
+      for (const j of q) {
+        const x = j % W, y = (j - x) / W;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const X = x + dx, Y = y + dy, k = Y * W + X;
+          if (X >= 0 && Y >= 0 && X < W && Y < H && d[k] < 0) { d[k] = r; next.push(k); }
+        }
+      }
+      q = next;
+    }
+    dist.set(i, d);
+    return d;
+  };
+  const gapOf = (i: number, j: number) => {
+    const d = field(i), sj = shown[j];
+    let m = Infinity;
+    for (let y = sj.y0; y <= sj.y1; y++) for (let x = sj.x0; x <= sj.x1; x++) { const k = y * W + x; if (owner[k] === j && d[k] >= 0 && d[k] < m) m = d[k]; }
+    return m === Infinity ? Infinity : m - 1;
+  };
+  const side = (a: Shown, c: Shown) => {
+    const dx = (c.x0 + c.x1) / 2 - (a.x0 + a.x1) / 2, dy = (c.y0 + c.y1) / 2 - (a.y0 + a.y1) / 2;
+    return Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? "left" : "right") : dy < 0 ? "above" : "below";
+  };
+  const stands = (i: number) => {
+    const sh = shown[i], inC: Color[] = [], outC: Color[] = [];
+    for (let y = Math.max(0, sh.y0 - 2); y <= Math.min(H - 1, sh.y1 + 2); y++)
+      for (let x = Math.max(0, sh.x0 - 2); x <= Math.min(W - 1, sh.x1 + 2); x++) {
+        const j = y * W + x;
+        if (owner[j] === i) { inC.push(img.data[j]); continue; }
+        let near = false;
+        for (let dy = -2; dy <= 2 && !near; dy++) for (let dx = -2; dx <= 2 && !near; dx++) {
+          const X = x + dx, Y = y + dy;
+          if (X >= 0 && Y >= 0 && X < W && Y < H && owner[Y * W + X] === i) near = true;
+        }
+        if (near) outC.push(img.data[j]);
+      }
+    if (!inC.length || !outC.length) return "";
+    // the body: its lighter three quarters (the outline is not what the eye reads)
+    const body = inC.slice().sort((p, q) => lum(p) - lum(q)).slice(Math.floor(inC.length / 4));
+    const q = (a: number[], f: number) => a.sort((u, v) => u - v)[Math.min(a.length - 1, Math.floor(a.length * f))];
+    const [bl, ba, bb] = mean3(body), [ol, oa, ob] = mean3(outC);
+    const dE = Math.round(100 * Math.hypot(bl - ol, ba - oa, bb - ob));
+    return `stands out: brightness ${digit(q(inC.map(lum), 0.75))} vs ${digit(q(outC.map(lum), 0.5))} around, color difference ${dE}`;
+  };
+  const keysOf = (i: number) => {
+    const n = new Map<string, number>(), sh = shown[i];
+    for (let y = sh.y0; y <= sh.y1; y++) for (let x = sh.x0; x <= sh.x1; x++) if (owner[y * W + x] === i) { const k = key(unlit.data[y * W + x]); n.set(k, (n.get(k) ?? 0) + 1); }
+    return [...n].sort((p, q) => q[1] - p[1]).slice(0, 3).map(([k]) => k).join("");
+  };
+  // motion over the loop: how much of its own drawing changes from one frame to the next
+  const motion = (i: number) => {
+    const fr = opts.frames;
+    if (!fr || fr.length < 2) return "";
+    let ch = 0, tot = 0, moved = 0, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let k = 0; k < fr.length; k++) {
+      const a = fr[k].placements[i], c = fr[(k + 1) % fr.length].placements[i];
+      if (!a || !c || a.name !== b.placements[i].name) return "";
+      x0 = Math.min(x0, a.x); x1 = Math.max(x1, a.x); y0 = Math.min(y0, a.y); y1 = Math.max(y1, a.y);
+      if (a.x !== c.x || a.y !== c.y) moved++;
+      for (let j = 0; j < a.img.data.length; j++) {
+        const u = a.img.data[j], v = c.img.data[j] ?? TRANSPARENT;
+        if (u !== TRANSPARENT || v !== TRANSPARENT) tot++;
+        if (u !== v) ch++;
+      }
+    }
+    const share = Math.round((100 * ch) / Math.max(1, tot));
+    return share === 0 && !moved ? "still" : `animated: ${share}% of its drawing changes per frame` + (moved ? `, shifts ${x1 - x0}px across, ${y1 - y0}px up/down` : "");
+  };
+
+  if (main.length) {
+    out.push("OBJECTS (in drawing order: later ones are in front; ranges are inclusive px; feet = bottom middle):");
+    for (const i of main) {
+      const p = b.placements[i], sh = shown[i];
+      if (!sh.n) { out.push(`  ${sym.get(kOf(i))} ${label(i)} @${p.layer ?? "-"}: hidden (all ${sh.all} px covered)`); continue; }
+      const parts = [`x ${sh.x0}-${sh.x1}, y ${sh.y0}-${sh.y1} (${sh.x1 - sh.x0 + 1}x${sh.y1 - sh.y0 + 1}), feet ${Math.round((sh.x0 + sh.x1) / 2)},${sh.y1}`];
+      if (sh.n < sh.all) parts.push(`${Math.round((100 * sh.n) / sh.all)}% shows`);
+      parts.push(`colors ${keysOf(i)}`);
+      out.push(`  ${sym.get(kOf(i))} ${label(i)} @${p.layer ?? "-"}: ${parts.join("; ")}`);
+      const rel: string[] = [];
+      const covers = main.filter((j) => j !== i && shown[j].cover.get(i)).map((j) => `${label(j)} (${shown[j].cover.get(i)}px of it)`);
+      const coveredBy = [...sh.cover].filter(([o]) => isMain(o)).map(([o, n]) => `${label(o)} (${n}px)`);
+      if (covers.length) rel.push(`in front of ${covers.join(", ")}`);
+      if (coveredBy.length) rel.push(`behind ${coveredBy.join(", ")}`);
+      const near = main.filter((j) => j !== i && shown[j].n).map((j) => ({ j, g: gapOf(i, j) })).filter(({ g }) => g < Infinity).sort((u, v) => u.g - v.g).slice(0, 3);
+      rel.push(near.length ? "nearest: " + near.map(({ j, g }) => `${label(j)} ${g ? g + "px" : "touching"} ${side(sh, shown[j])}`).join(", ") : `nothing within ${FAR}px`);
+      const shadow = b.placements.map((q, j) => [q, j] as const).filter(([q, j]) => q.name === p.name && blended.has(q.layer ?? "") && shown[j].n);
+      if (shadow.length && byKey.get(kOf(i))!.length === 1) rel.push(shadow.map(([q, j]) => `its ${q.layer} shows at x ${shown[j].x0}-${shown[j].x1}, y ${shown[j].y0}-${shown[j].y1}`).join(", "));
+      const st = stands(i), mo = motion(i);
+      out.push("      " + rel.join("; "));
+      if (st || mo) out.push("      " + [st, mo].filter(Boolean).join("; "));
     }
     out.push("");
   }
-
-  if (keys.length) {
-    out.push("PLACED (symbol, asset @ layer, size, count: top-left positions; drawing order = depth, later is in front):");
-    for (const k of keys) {
-      const ps = byKey.get(k)!, [n, layer] = k.split("@"), pos = ps.slice(0, 12).map((p) => `${p.x},${p.y}`).join(" ");
-      out.push(`  ${sym.get(k)} ${n}${layer ? " @" + layer : ""} ${ps[0].w}x${ps[0].h} x${ps.length}: ${pos}${ps.length > 12 ? ` …+${ps.length - 12}` : ""}`);
+  if (many.size) {
+    out.push("MANY (small things placed many times, one line each):");
+    for (const k of many) {
+      const ps = byKey.get(k)!, idx = ps.map((q) => b.placements.indexOf(q)).filter((i) => shown[i].n);
+      const x0 = Math.min(...idx.map((i) => shown[i].x0)), x1 = Math.max(...idx.map((i) => shown[i].x1));
+      const y0 = Math.min(...idx.map((i) => shown[i].y0)), y1 = Math.max(...idx.map((i) => shown[i].y1));
+      const [n, layer] = k.split("@");
+      out.push(`  ${sym.get(k)} ${n} @${layer || "-"} x${ps.length}, ${ps[0].w}x${ps[0].h} each, over x ${x0}-${x1}, y ${y0}-${y1}`);
     }
     out.push("");
   }
@@ -131,37 +276,52 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       return digit(s / n);
     });
 
-  // how each placement stands out: brightness of the pixels it still owns vs a 2 px ring around them
-  if (keys.length) {
-    out.push("STANDS OUT (per placement after lighting: its body tone, the 75th percentile of what shows of it, / the median of the 2 px around it, 0..9; visible px):");
-    const ring = (i: number) => {
-      const p = b.placements[i];
-      const inL: number[] = [], outL: number[] = [];
-      for (let y = p.y - 2; y < p.y + p.h + 2; y++)
-        for (let x = p.x - 2; x < p.x + p.w + 2; x++) {
-          if (x < 0 || y < 0 || x >= W || y >= H) continue;
-          const j = y * W + x, l = lum(img.data[j]);
-          if (owner[j] === i) { inL.push(l); continue; }
-          let near = false;
-          for (let dy = -2; dy <= 2 && !near; dy++) for (let dx = -2; dx <= 2 && !near; dx++) {
-            const X = x + dx, Y = y + dy;
-            if (X >= 0 && Y >= 0 && X < W && Y < H && owner[Y * W + X] === i) near = true;
-          }
-          if (near) outL.push(l);
-        }
-      const q = (a: number[], f: number) => a.sort((x, y) => x - y)[Math.min(a.length - 1, Math.floor(a.length * f))];
-      return inL.length ? `${digit(q(inL, 0.75))}/${outL.length ? digit(q(outL, 0.5)) : "-"} ${inL.length}px` : "hidden";
-    };
-    for (const k of keys) {
-      const idx = b.placements.map((p, i) => [p, i] as const).filter(([p]) => `${p.name}@${p.layer ?? ""}` === k).map(([, i]) => i);
-      if (idx.length > 6) continue;   // brushes and strings of lights: many small copies
-      out.push(`  ${sym.get(k)} ${k.replace(/@$/, "")}: ${idx.map(ring).join(", ")}`);
+  if (groups.length) {
+    out.push("PAINTED (steps in order, grouped by source line; a layer line closes that layer):");
+    for (const g of groups) {
+      const box = g.box ? `${g.box[0]},${g.box[1]} ${g.box[2] - g.box[0]}x${g.box[3] - g.box[1]}` : "no change";
+      const what = g.n === 1 ? g.first : `${[...g.ops].join("/")} x${g.n}`;
+      out.push(`  ${(g.loc.replace(/^.*[\\/]/, "") || "-").padEnd(20)} ${what.length > 60 ? what.slice(0, 59) + "…" : what.padEnd(60)} ${box}`);
     }
     out.push("");
   }
 
-  // a plain image (no build behind it): what repeats is found in the pixels, tile by tile
-  if (!b.trace && !b.placements.length) {
+  // a plain image with a clear background (a sheet, a cutout): each 8-connected patch of drawn
+  // pixels is a shape; identical shapes, mirrored ones too, are one dictionary entry with a list
+  // of where they are
+  const clear = img.data.reduce((n, c) => n + (c === TRANSPARENT ? 1 : 0), 0);
+  if (!b.trace && !b.placements.length && clear > img.data.length / 10) {
+    const seen = new Uint8Array(W * H), shapes = new Map<string, { img: Img; at: string[] }>();
+    const flipX = (q: Img) => { const o = new Img(q.w, q.h); for (let y = 0; y < q.h; y++) for (let x = 0; x < q.w; x++) o.data[y * q.w + x] = q.data[y * q.w + q.w - 1 - x]; return o; };
+    for (let j = 0; j < W * H; j++) {
+      if (seen[j] || img.data[j] === TRANSPARENT) continue;
+      const stack = [j], px: number[] = [];
+      seen[j] = 1;
+      let x0 = W, y0 = H, x1 = -1, y1 = -1;
+      while (stack.length) {
+        const k = stack.pop()!, x = k % W, y = (k - x) / W;
+        px.push(k); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const X = x + dx, Y = y + dy, n = Y * W + X;
+          if (X >= 0 && Y >= 0 && X < W && Y < H && !seen[n] && img.data[n] !== TRANSPARENT) { seen[n] = 1; stack.push(n); }
+        }
+      }
+      const shape = new Img(x1 - x0 + 1, y1 - y0 + 1);
+      for (const k of px) { const x = k % W, y = (k - x) / W; shape.data[(y - y0) * shape.w + x - x0] = img.data[k]; }
+      const h = shape.hash(), hf = flipX(shape).hash(), hit = shapes.get(h) ?? shapes.get(hf);
+      const where = `${x0},${y0}${!shapes.has(h) && shapes.has(hf) ? " flipped" : ""}`;
+      if (hit) hit.at.push(where); else shapes.set(h, { img: shape, at: [where] });
+    }
+    const list = [...shapes.values()].sort((p, q) => q.at.length - p.at.length || q.img.w * q.img.h - p.img.w * p.img.h);
+    const total = list.reduce((n, sh) => n + sh.at.length, 0);
+    out.push(`SHAPES (each 8-connected patch of drawn pixels; identical or mirrored ones are one entry: ${list.length} distinct of ${total}; positions are top-left):`);
+    list.slice(0, 60).forEach((sh, i) => out.push(`  ${SYMBOLS[i] ?? "~"} ${sh.img.w}x${sh.img.h} x${sh.at.length}: ${sh.at.slice(0, 10).join("  ")}${sh.at.length > 10 ? ` …+${sh.at.length - 10}` : ""}`));
+    if (list.length > 60) out.push(`  …+${list.length - 60} more distinct shapes`);
+    out.push("");
+  }
+
+  // a plain opaque image (no build behind it): what repeats is found in the pixels, tile by tile
+  else if (!b.trace && !b.placements.length) {
     const T = opts.tile ?? 16, tw = Math.ceil(W / T), th = Math.ceil(H / T), ids = new Map<string, number>(), first: [number, number][] = [];
     const rows: string[] = [];
     let empty = 0;

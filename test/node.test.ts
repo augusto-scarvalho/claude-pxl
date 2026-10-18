@@ -413,9 +413,29 @@ scene("s", { w: 16, h: 8, bg: "g" }, layer("props", stamp("rock", 0, 0), stamp("
     assert.equal(await main(["describe", join(dir, "tiles.png"), "--at", "0,0,2,1"]), 0);
   } finally { console.log = log; }
   const [scene, png] = lines;
-  assert.match(scene, /A rock @props 2x2 x3: 0,0 8,0 12,4/);                 // one line for three stamps
+  assert.match(scene, /A rock #1 @props: x 0-1, y 0-1 \(2x2\), feet 1,1; colors k\n\s+nearest: rock #2 6px right/);   // ranges worked out
   assert.match(scene, /ON TOP[^\n]*\n[^\n]*\n[^\n]*\n {2}0 A.A.\n {2}4 \.\.\.A/);  // the rock on top of its cells
   assert.match(scene, /PIXELS 4,4 4x2[^\n]*\n[^\n]*\n[^\n]*\n {2}4 gggg\n {2}5 gwgg/);
   assert.match(png, /TILES \(16x16 grid: each symbol is one distinct tile; 1 distinct of 1 filled\)/);
   assert.match(png, /PIXELS 0,0 2x1[^\n]*\n[^\n]*\n[^\n]*\n {2}0 \w\w/);
+});
+
+test("describe: objects with their ranges, gaps and cover; shapes on a clear background, mirrored ones too", async () => {
+  const { dir, file } = tmpArt(`pal({ k: "#1b1630", g: "#8ccf63", w: "#fff6e0" })
+sprite("rock", "kk\\nkk")
+sprite("arrow", "kw\\nk.")
+scene("s", { w: 16, h: 8, bg: "g" }, layer("props", stamp("rock", 0, 0), stamp("rock", 1, 1), stamp("arrow", 8, 4)))
+scene("sheet", { w: 16, h: 8 }, stamp("rock", 0, 0), stamp("rock", 4, 0), stamp("arrow", 8, 0), stamp("arrow", 12, 0, { flip: "x" }))`);
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try {
+    assert.equal(await main(["describe", file, "s"]), 0);
+    writePng(join(dir, "sheet.png"), loadProject(file).image("sheet"));
+    assert.equal(await main(["describe", join(dir, "sheet.png")]), 0);
+  } finally { console.log = log; }
+  const [scene, sheet] = lines;
+  // the second rock covers 1 px of the first
+  assert.match(scene, /A rock #1 @props: x 0-1, y 0-1 \(2x2\), feet 1,1; 75% shows; colors k\n\s+behind rock #2 \(1px\); nearest: rock #2 touching right/);
+  assert.match(scene, /B arrow @props: x 8-9, y 4-5 \(2x2\)[^\n]*\n\s+nearest: rock #2 5px left/);
+  assert.match(sheet, /SHAPES[^\n]*2 distinct of 4[^\n]*\n {2}A 2x2 x2: 0,0 {2}4,0\n {2}B 2x2 x2: 8,0 {2}12,0 flipped/);
 });

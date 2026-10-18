@@ -153,7 +153,8 @@ export async function main(argv: string[]): Promise<number> {
         const p = loadProject(file, { trace: true });
         const def = p.assets.get(name);
         if (!def) throw new PxError(`unknown asset '${name}'`);
-        console.log(describe(name, p.build(name), def.pal, { cell: a.cell, at }));
+        const b = p.build(name), frames = b.anim ? p.frames(name, 0, 64).map((f) => p.build(name, 0, f.t)) : undefined;
+        console.log(describe(name, b, def.pal, { cell: a.cell, at, frames }));
         return 0;
       }
       case "steps": {

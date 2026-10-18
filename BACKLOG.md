@@ -133,8 +133,11 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
   placement stands out after lighting; exact pixels of a region on request. The Halloween scene:
   ~11k characters against ~60k for its raw keys, and it measured what reading the image only
   suggested (three monsters as dark as the ground around them). Any PNG: index keys and a map of
-  repeated 16x16 tiles. Next, if needed: repeats at any offset (connected components), not only on
-  a grid.
+  repeated 16x16 tiles. Second pass (study: object lists beat raw grids for LLMs, ARC 2305.18354):
+  OBJECTS with visible ranges, feet, cover, nearest neighbours by pixel gap, OKLab contrast and
+  motion; shapes at any offset on clear backgrounds. Blind readers: preview 66%, first form 77%,
+  this 100% (20 questions, two scenes, one held out). Next: a diff against an earlier render (what
+  an edit changed), segmenting opaque PNGs, a shorter mode for busy scenes.
 
 Left out on purpose: effects that leave the palette (blur, curves, HSV, convolution), keyframed
 tweens and interpolating between drawings, free rotation of cut-out limbs, 2.5D thickness, 3D layers
