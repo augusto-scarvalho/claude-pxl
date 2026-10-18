@@ -440,6 +440,17 @@ scene("s", { w: 32, h: 20, bg: "g" }, layer("props", stamp("rock", 2, 2), stamp(
   assert.doesNotMatch(diff, /rock #1:/);   // the other rock did not change
 });
 
+test("describe --brief: one line per object, no color or light maps, no steps", async () => {
+  const { file } = tmpArt(`pal({ k: "#1b1630", g: "#8ccf63" })
+sprite("rock", "kk\\nkk")
+scene("s", { w: 16, h: 8, bg: "g" }, layer("props", stamp("rock", 0, 0), stamp("rock", 1, 1)))`);
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try { assert.equal(await main(["describe", file, "s", "--brief", "--no-out"]), 0); } finally { console.log = log; }
+  assert.match(lines[0], /A rock #1 @props: x 0-1, y 0-1 \(2x2\), feet 1,1; 75% shows; near rock #2 touching right; behind rock #2; lum \d\/\d dE \d+\n/);
+  assert.doesNotMatch(lines[0], /COLOR|LIGHT|PAINTED|nearest:/);
+});
+
 test("describe an opaque PNG: large one-color patches are the background, the rest are objects", async () => {
   // a dithered sky over grass (patches stay whole), two identical rocks, one bush, a few specks
   const { dir, file } = tmpArt(`pal({ k: "#1b1630", g: "#8ccf63", s: "#3b5dc9", S: "#29366f", w: "#fff6e0", r: "#b13e53" })

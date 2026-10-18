@@ -282,7 +282,7 @@ node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-pr
 node <pxl>/bin/pxl.js ascii <file> <name>
 node <pxl>/bin/pxl.js list  <file>
 node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--sheet] [--out DIR]
-node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h] [--diff]     (or describe <image.png>)
+node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h] [--diff] [--brief]     (or describe <image.png>)
 node <pxl>/bin/pxl.js compare <file> <name> <ref.png> [--shrink N] [--offset x,y]
 ```
 
@@ -315,6 +315,9 @@ models reading layout):
   another over many pixels as one `recolor` line; and the other changed pixels as regions with the
   objects they belong to, largest first. Run it after an edit to see that it touched only what you
   meant.
+- `--brief`: one line per object (ranges, feet, the two nearest objects, cover, contrast, motion)
+  and the ON TOP map; no color or light maps, no steps. About a third of the size (a 320x180 scene
+  ~5.6k characters) and 96% in the same blind test: use it on busy scenes.
 
 A 320x180 lit scene comes to ~17k characters (~5k tokens; a busy 320x240 one ~21k), where the 2x
 preview costs a few hundred tokens: read the preview for the look, this for anything you would

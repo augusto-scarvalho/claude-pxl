@@ -28,7 +28,7 @@ const USAGE = `pxl — pixel-art DSL
       Print an asset as palette keys with x/y rulers (anims: every frame).
   pxl list  <art.px.js>
       List assets, groups and sheets with their source locations.
-  pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h] [--diff]   (or: pxl describe <image.png> [...])
+  pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h] [--diff] [--brief]   (or: pxl describe <image.png> [...])
       A whole scene as text to read at once: what was painted (steps grouped by source line), what
       was placed where, cell maps (object on top, color before lighting, brightness after it), how
       each placement stands out from its surroundings; --at adds that region's exact pixels. Any PNG
@@ -56,6 +56,7 @@ interface Args {
   at?: number[];
   cell?: number;
   diff?: boolean;
+  brief?: boolean;
   sheet?: boolean;
   shrink?: number;
   offset?: [number, number];
@@ -91,6 +92,7 @@ function parse(argv: string[]): Args {
     }
     else if (v === "--cell") a.cell = Number(val());
     else if (v === "--diff") a.diff = true;
+    else if (v === "--brief") a.brief = true;
     else if (v === "-h" || v === "--help") a.cmd = "help";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -177,7 +179,7 @@ export async function main(argv: string[]): Promise<number> {
           if (!existsSync(keep + ".json")) console.log(`(no earlier describe of ${name} in ${join(outDir, "_describe")}: this one is kept for the next --diff)\n`);
           else prev = { objects: JSON.parse(readFileSync(keep + ".json", "utf8")).objects, img: decodePng(readFileSync(keep + ".png")), unlit: decodePng(readFileSync(keep + ".unlit.png")) };
         }
-        const r = describe(name, b, pal, { cell: a.cell, at, frames, prev, note });
+        const r = describe(name, b, pal, { cell: a.cell, at, frames, prev, note, brief: a.brief });
         console.log(r.text);
         if (a.out !== false) {
           writePng(keep + ".png", r.snap.img);

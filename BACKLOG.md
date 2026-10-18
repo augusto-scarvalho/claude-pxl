@@ -136,8 +136,10 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
   repeated 16x16 tiles. Second pass (study: object lists beat raw grids for LLMs, ARC 2305.18354):
   OBJECTS with visible ranges, feet, cover, nearest neighbours by pixel gap, OKLab contrast and
   motion; shapes at any offset on clear backgrounds. Blind readers: preview 66%, first form 77%,
-  this 100% (20 questions, two scenes, one held out). Next: a diff against an earlier render (what
-  an edit changed), segmenting opaque PNGs, a shorter mode for busy scenes.
+  this 100% (20 questions, two scenes, one held out). Then `--diff` (what changed since the last
+  describe: moved, redrawn, recolored, regions; b285ad1), objects in opaque PNGs (large one-color
+  patches as background, the rest as objects; touching things merge and lit renders band: 460780d)
+  and `--brief` (a third of the size, 96% on the same test).
 
 Left out on purpose: effects that leave the palette (blur, curves, HSV, convolution), keyframed
 tweens and interpolating between drawings, free rotation of cut-out limbs, 2.5D thickness, 3D layers

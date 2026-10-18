@@ -26,6 +26,8 @@ export interface DescribeOpts {
   prev?: Snapshot;
   /** A line to print under the header (how the image was read). */
   note?: string;
+  /** Busy scenes: one line per object (nearest neighbour only), no color and light maps, no steps. */
+  brief?: boolean;
 }
 
 /** What describe saw, kept to tell later what changed: objects by label, and the pixels. */
@@ -296,6 +298,18 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       const shadow = b.placements.map((q, j) => [q, j] as const).filter(([q, j]) => q.name === p.name && blended.has(q.layer ?? "") && shown[j].n);
       if (shadow.length && byKey.get(kOf(i))!.length === 1) rel.push(shadow.map(([q, j]) => `its ${q.layer} shows at x ${shown[j].x0}-${shown[j].x1}, y ${shown[j].y0}-${shown[j].y1}`).join(", "));
       const st = stands(i), mo = motion(i);
+      if (opts.brief) {
+        // one line: ranges, feet, the nearest neighbour, cover, contrast, motion, in short words
+        const out1 = out.pop()!.replace(/; colors \S+$/, "");
+        // two neighbours, not one: with one, a tie hid the other (a blind reader lost the witch)
+        const n1 = near.length ? "near " + near.slice(0, 2).map(({ j, g }) => `${label(j)} ${g ? g + "px" : "touching"} ${side(sh, shown[j])}`).join(", ") : "";
+        const fr = covers.length ? `front of ${main.filter((j) => j !== i && shown[j].cover.get(i)).map(label).join(",")}` : "";
+        const bh = coveredBy.length ? `behind ${[...sh.cover].filter(([o]) => isMain(o)).map(([o]) => label(o)).join(",")}` : "";
+        const sm = st.replace("stands out: brightness ", "lum ").replace(" vs ", "/").replace(" around, color difference ", " dE ");
+        const mm = mo.replace("animated: ", "anim ").replace("% of its drawing changes per frame", "%").replace(/, shifts .*$/, " moving");
+        out.push(out1 + "; " + [n1, fr, bh, sm, mm].filter(Boolean).join("; "));
+        continue;
+      }
       out.push("      " + rel.join("; "));
       if (st || mo) out.push("      " + [st, mo].filter(Boolean).join("; "));
     }
@@ -333,12 +347,13 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     map(`ON TOP (each cell: the placement owning most of its ${C}x${C} px, if a quarter or more; "." = only the painted background):`, (x0, y0) => {
       const n = new Map<string, number>();
       let total = 0;
-      cells(x0, y0, (i) => { total++; if (owner[i] >= 0) { const k = kOf(owner[i]); n.set(k, (n.get(k) ?? 0) + 1); } });
+      // a shadow or a light (blended layers) is not an object: its cells read as background
+      cells(x0, y0, (i) => { total++; const o = owner[i]; if (o >= 0 && !blended.has(b.placements[o].layer ?? "")) { const k = kOf(o); n.set(k, (n.get(k) ?? 0) + 1); } });
       let best = "", most = 0;
       for (const [k, v] of n) if (v > most) { most = v; best = k; }
       return most * 4 >= total ? sym.get(best)! : ".";
     });
-  map(`COLOR (each cell: its most common ${b.trace ? "palette key before lighting" : "color key"}):`, (x0, y0) => {
+  if (!opts.brief || !b.trace) map(`COLOR (each cell: its most common ${b.trace ? "palette key before lighting" : "color key"}):`, (x0, y0) => {
     const n = new Map<Color, number>();
     cells(x0, y0, (i) => n.set(unlit.data[i], (n.get(unlit.data[i]) ?? 0) + 1));
     let best: Color = TRANSPARENT, most = -1;
@@ -348,16 +363,18 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
   const used = new Map<Color, number>();
   for (const c of unlit.data) used.set(c, (used.get(c) ?? 0) + 1);
   const listed = [...used].sort((a, b) => b[1] - a[1]).filter(([c]) => key(c) !== "~");
-  out.push("  keys: " + listed.map(([c]) => `${key(c)}=${c === TRANSPARENT ? "clear" : toHex(c)}`).join(" ") + (listed.length < used.size ? "  ~=blended, outside the palette" : ""));
-  out.push("");
-  if (unlit !== img)
+  if (!opts.brief || !b.trace) {
+    out.push("  keys: " + listed.map(([c]) => `${key(c)}=${c === TRANSPARENT ? "clear" : toHex(c)}`).join(" ") + (listed.length < used.size ? "  ~=blended, outside the palette" : ""));
+    out.push("");
+  }
+  if (unlit !== img && !opts.brief)
     map(`LIGHT (each cell: brightness after lighting, 0 black .. 9 white):`, (x0, y0) => {
       let s = 0, n = 0;
       cells(x0, y0, (i) => { s += img.data[i] === TRANSPARENT ? 0 : lum(img.data[i]); n++; });
       return digit(s / n);
     });
 
-  if (groups.length) {
+  if (groups.length && !opts.brief) {
     out.push("PAINTED (steps in order, grouped by source line; a layer line closes that layer):");
     for (const g of groups) {
       const box = g.box ? `${g.box[0]},${g.box[1]} ${g.box[2] - g.box[0]}x${g.box[3] - g.box[1]}` : "no change";
