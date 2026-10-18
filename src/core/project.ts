@@ -61,6 +61,11 @@ export const SIGNATURES: Record<string, string> = {
   glow: "keys:S ?opts:o",
 };
 
+/** Does any item draw with a function (top level, in layers, frames, clips, plates)? */
+function drawsWithFunctions(items: Item[]): boolean {
+  return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && drawsWithFunctions(v.args as Item[])));
+}
+
 /** Allowed option keys of ops whose last argument is an options object. */
 const OP_OPTS: Record<string, string[]> = {
   lamp: ["r", "color", "power", "z"],
@@ -542,8 +547,11 @@ export class Project implements BuildCtx {
    * result makes the asset being built around this call animated too.
    */
   build(name: string, seed = 0, t = 0, track = true): BuildOut {
-    const first = this.buildAt(name, seed, 0);
-    const tl = first.anim;
+    let first = this.buildAt(name, seed, 0);
+    const tl = first.anim, def = this.assets.get(name);
+    // animated by what it places: its functions run on that loop. The loop is known once built, so a
+    // first frame drawn by functions is drawn again knowing it (c.frames)
+    if (tl && def && def.kind !== "anim" && !first.clocked && drawsWithFunctions(def.items)) first = this.buildAt(name, seed, 0, tl, true);
     if (tl && track && this.collect.length) {
       const acc = this.collect[this.collect.length - 1];
       if (tl.capped || (acc.loop && lcm(acc.loop, tl.loop) > MAX_LOOP)) acc.capped = true;
@@ -552,7 +560,7 @@ export class Project implements BuildCtx {
     }
     if (!tl || t === 0) return first;
     const tt = tl.once ? Math.min(Math.max(0, t), tl.loop) : ((t % tl.loop) + tl.loop) % tl.loop;
-    return tt === 0 ? first : this.buildAt(name, seed, tt);
+    return tt === 0 ? first : this.buildAt(name, seed, tt, def?.kind !== "anim" ? tl : undefined);
   }
 
   /**
@@ -593,10 +601,10 @@ export class Project implements BuildCtx {
     return this.build(name).anim?.dir ?? "forward";
   }
 
-  private buildAt(name: string, seed: number, t: number): BuildOut {
+  private buildAt(name: string, seed: number, t: number, clock?: Timeline, again = false): BuildOut {
     const key = (seed === 0 ? name : `${name}@${seed}`) + (t ? `#${t}` : "");
     const hit = this.cache.get(key);
-    if (hit) return hit;
+    if (hit && !again) return hit;
     const def = this.assets.get(name);
     if (!def) {
       if (this.groups.has(name) || name.includes("*"))
@@ -610,7 +618,7 @@ export class Project implements BuildCtx {
     const acc: Partial<Timeline> = {};
     this.collect.push(acc);
     try {
-      const out = buildAsset(this, def, seed, this.tracing && seed === 0 && t === 0 ? new Trace() : undefined, t);
+      const out = buildAsset(this, def, seed, this.tracing && seed === 0 && t === 0 ? new Trace() : undefined, t, clock);
       // Anims keep their own frame timing; other assets are as animated as what they place.
       if (!out.anim && acc.loop) out.anim = { loop: acc.loop, step: acc.step!, ...(acc.capped ? { capped: true } : {}) };
       this.cache.set(key, out);

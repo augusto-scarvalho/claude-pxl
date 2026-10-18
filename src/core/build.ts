@@ -47,6 +47,8 @@ export interface BuildOut {
   under?: Img;
   /** Everything stamped, scattered or hung, in drawing order. */
   placements: Placement[];
+  /** Built with the loop of what it places as its clock (its functions saw the real frame). */
+  clocked?: boolean;
 }
 
 /** An anim's frames: count and durations (ms), from its frame() items or { frames, fps }. */
@@ -108,11 +110,16 @@ function isFrameOpts(v: unknown): boolean {
   return typeof v === "object" && v !== null && !Array.isArray(v) && !isOp(v) && !isLayer(v);
 }
 
-export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: Trace, t = 0): BuildOut {
+/**
+ * `clock`: the loop of a sprite or scene that is animated by what it places, so its functions get
+ * c.frame / c.frames / c.phase over it (an anim has its own frames).
+ */
+export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: Trace, t = 0, clock?: Timeline): BuildOut {
   const { opts, pal } = def;
   const tl = def.kind === "anim" ? animTimeline(def) : undefined;
   const at = tl ? frameAt(tl, t) : 0;
   const frame = tl?.order ? tl.order[at] : at, frames = tl ? drawnFrames(tl) : 1;
+  const tick = !tl && clock ? { frame: Math.round(t / clock.step), frames: Math.max(1, Math.round(clock.loop / clock.step)) } : undefined;
   let base: Img;
   if (def.kind === "scene") {
     if (!opts.w || !opts.h) throw new PxError("scene needs { w, h }");
@@ -177,8 +184,8 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     c.log = log;
     c.wrap = edges;
     c.t = t;
-    c.frame = frame;
-    c.frames = frames;
+    c.frame = tick?.frame ?? frame;
+    c.frames = tick?.frames ?? frames;
     c.inAnim = !!tl;
     c.mirrored = !!def.mirror;
     return c;
@@ -273,7 +280,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   const img = finish(base, def, pal, trace, loose);
   trace?.finish(img);
   const guide = refs.length ? guideOver(img, refs, def) : undefined;
-  return { img, layers, trace, anim: tl, placements: log, ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}) };
+  return { img, layers, trace, anim: tl, placements: log, ...(tick ? { clocked: true } : {}), ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}) };
 }
 
 /**

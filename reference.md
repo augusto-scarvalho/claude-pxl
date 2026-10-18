@@ -292,7 +292,9 @@ anim("fire", { w: 22, h: 23, frames: 6, fps: 10 }, (c) => {
 **Placing anims animates the placer.** A sprite or scene that stamps (tiles, scatters, ...) an anim,
 directly or through other assets, is animated too: it loops over the least common multiple of
 what it contains (capped at 60s), sampled at their common step. Keep durations on a shared grid
-(e.g. multiples of 100ms) so loops stay short. Placement options:
+(e.g. multiples of 100ms) so loops stay short. Its own functions (in it, its layers, frames, clips)
+run on that loop: `c.frame` (0..n-1 in steps of the common step), `c.frames`, `c.phase`, and `c.t`,
+the time in ms. A sun's aura can pulse in the scene itself, over the sky it reads. Placement options:
 
 | Option | Meaning |
 |---|---|

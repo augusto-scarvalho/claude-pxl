@@ -98,3 +98,16 @@ scene("s", { w: 8, h: 4 }, rect(0, 0, 8, 4, "G"), layer("shadow", { shade: 2 }, 
   assert.doesNotMatch(await cli(src, "check"), /WARNING/);
   assert.match(await cli(src, "steps", "s", "--at", "3,1"), /in shade layer 'shadow' .* -> p {2}\(G→E along "EGg", E→p along "PpE"\)/);
 });
+
+test("a scene animated by what it places: its functions get c.frame, c.frames, c.phase over that loop", () => {
+  const p = loadSource(PAL + `
+anim("blink", { w: 1, h: 1, frames: 4, fps: 4 }, (c) => c.px(0, 0, c.frame % 2 ? "r" : "w"))
+scene("s", { w: 8, h: 3, bg: "k" }, stamp("blink", 0, 0), (c) => c.px(2 + c.frame, 1, "g"),
+  layer("l", (c) => c.px(c.frames, 2, c.phase === 0.5 ? "r" : "w")))`, "t.px.js");
+  const rows = p.frames("s").map((f) => [1, 2].map((y) => [...Array(8).keys()].map((x) => f.img.data[y * 8 + x] === p.assets.get("s")!.pal.resolve("k") ? "." : "#").join("")));
+  // the function's mark walks one pixel a frame; the layer's sits at x = frames (4), lit at phase 0.5
+  assert.deepEqual(rows.map((r) => r[0]), ["..#.....", "...#....", "....#...", ".....#.."]);
+  assert.deepEqual(rows.map((r) => r[1]), ["....#...", "....#...", "....#...", "....#..."]);
+  const red = p.assets.get("s")!.pal.resolve("r");
+  assert.deepEqual(p.frames("s").map((f) => f.img.data[2 * 8 + 4] === red), [false, false, true, false]);
+});
