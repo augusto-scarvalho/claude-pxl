@@ -117,6 +117,12 @@ export interface AssetOpts {
   facing?: "right" | "left" | "front" | "back";
   /** Its real height in meters, for a scene's `world` scale (describe says how tall it should be where it stands). */
   height?: number;
+  /**
+   * Also the asset facing the other way, under this name: its items drawn mirrored before they are lit,
+   * so relight lights it from where the light really is (a flip would carry the light across); pivot,
+   * sockets and facing mirrored. Art functions see `c.mirrored`. text, bump and normals refuse.
+   */
+  twin?: string;
   /** Scene: the world's scale, { horizon, eye } (ground seen in perspective) or { scale } (px per meter, flat side view). */
   world?: World;
 }
@@ -174,6 +180,8 @@ export interface AssetDef {
   loc?: string;
   /** The decoded `png` option (its `area` applied), read when the art file ran. */
   png?: Img;
+  /** A twin: the items of the asset it was made from, drawn mirrored (before lighting). */
+  mirror?: boolean;
 }
 
 export interface GroupDef {

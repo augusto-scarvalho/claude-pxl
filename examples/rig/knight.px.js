@@ -76,33 +76,20 @@ rig("knight_blocking", { w: 60, h: 76, facing: "right", pivot: [X, Y(F.sole)], p
 // rerebrace, the couter, the vambrace, the gauntlet. Each plate is drawn flat in a mid tone in a
 // plate() of its own and lit there (with LIT), so its own edges take the rim light and the shade and
 // the plates read as lying over one another. Seams, rivets, trims and slits go on after, unlit (they
-// are dark or gold whichever way the light falls). part() builds each part twice from the same
-// drawing: as drawn, facing right, and with every x mirrored, facing left, for the turned knight;
-// both lit from the top right, where the scene has the light. A part with a front says so (facing)
-// and marks it with a `front` socket on the drawing: describe checks the marker against the label.
-const draw = (w, m, lit) => {
-  const X = (x) => (m ? w - 1 - x : x), XS = (p) => p.map((v, i) => (i % 2 ? v : X(v)))
-  return {
-    m,                                                  // drawn mirrored (facing left)
-    px: (x, y, c) => px(X(x), y, c),
-    rect: (x, y, rw, rh, c) => rect(m ? w - x - rw : x, y, rw, rh, c),
-    hline: (x, y, n, c) => hline(m ? w - x - n : x, y, n, c),
-    vline: (x, y, n, c) => vline(X(x), y, n, c),
-    line: (x0, y0, x1, y1, c, wd = 1) => line(X(x0), y0, X(x1), y1, c, wd),
-    poly: (p, c) => poly(XS(p), c),
-    ellipse: (cx, cy, rx, ry, c) => ellipse(X(cx), cy, rx, ry, c),
-    clip: (p, ...items) => clip(XS(p), ...items),
-    // a plate, lit on its own; steel harder
-    plate: (...items) => plate(lit, ...items),
-    steel: (...items) => plate({ ...STEEL, reach: lit.reach }, ...items),
-  }
-}
+// are dark or gold whichever way the light falls). part() makes each part and its twin, facing left
+// for the turned knight: the same items drawn mirrored before they're lit, so both are lit from the
+// top right, where the scene has the light. A part with a front says so (facing) and marks it with a
+// `front` socket on the drawing: describe checks the marker against the label.
+// The draw helper is the DSL's own ops, and plate / steel with the part's light; part() makes each part
+// and its twin, knight_l_<name>: the same items drawn mirrored before they're lit (twin), so the
+// mirrored part is lit from the same side, its pivot, sockets and facing mirrored.
+const draw = (lit) => ({ px, rect, hline, vline, line, poly, ellipse, clip,
+  plate: (...items) => plate(lit, ...items),                          // a plate, lit on its own
+  steel: (...items) => plate({ ...STEEL, reach: lit.reach }, ...items), // steel, harder
+})
 const part = (name, w, h, o, art) => {
   const { lit = LIT, ...opts } = o
-  const m = (p) => p && [w - p[0], p[1]]
-  sprite(`knight_${name}`, { w, h, outline: "k", selout: true, ...opts }, ...art(draw(w, false, lit)))
-  sprite(`knight_l_${name}`, { w, h, outline: "k", selout: true, ...opts, ...(opts.facing ? { facing: "left" } : {}), pivot: m(opts.pivot),
-    ...(opts.sockets ? { sockets: Object.fromEntries(Object.entries(opts.sockets).map(([k, p]) => [k, m(p)])) } : {}) }, ...art(draw(w, true, lit)))
+  sprite(`knight_${name}`, { w, h, outline: "k", selout: true, ...opts, twin: `knight_l_${name}` }, ...art(draw(lit)))
 }
 
 // a hounskull bascinet in profile: the round skull, the pointed visor over the face with its sight
@@ -193,8 +180,12 @@ part("sword", 15, 35, { facing: "right", pivot: [2, 3], sockets: { front: [14, 3
   // face looks up and right, into the light: lit, with glints; its lower face dark. Mirrored, the
   // blade leans left: its upper face now looks left, a little away from the light, and its lower face
   // right, a little toward it (describe caught it the other way round)
-  d.line(3, 7, 13, 33, "3", 3), d.line(4, 7, 14, 33, d.m ? "2" : "4"), d.line(2, 8, 12, 34, d.m ? "3" : "2"),
-  d.line(4, 10, 12, 31, "2"), ...(d.m ? [] : [d.px(5, 9, "5"), d.px(7, 15, "5")]),   // fuller, glints
+  d.line(3, 7, 13, 33, "3", 3),
+  (c) => {                                                       // its faces, the fuller, the glints
+    const m = c.mirrored
+    c.line(4, 7, 14, 33, m ? "2" : "4"); c.line(2, 8, 12, 34, m ? "3" : "2"); c.line(4, 10, 12, 31, "2")
+    if (!m) { c.px(5, 9, "5"); c.px(7, 15, "5") }
+  },
   d.plate(d.line(2, 1, 2, 5, "T", 2)), d.px(2, 2, "t"), d.px(2, 4, "t"),         // grip and its binding
   d.plate(d.line(0, 7, 6, 4, "O", 2)), d.plate(d.ellipse(2, 1, 1, 1, "O"))])      // crossguard, pommel
 
@@ -282,16 +273,17 @@ const swordPart = (deg) => once(`sword_${nm(deg)}`, (name) => {
   const at = (t, s = 0) => [t * b[0] + s * n[0], t * b[1] + s * n[1]]
   const { w, h, P } = boxOf([at(-4), at(32), at(4, 4), at(4, -4)], 2), G = P([0, 0]), tip = P(at(31))
   part(name, w, h, { facing: "right", pivot: [G[0] + 0.5, G[1] + 0.5],
-    ...(b[0] > 0.3 ? { sockets: { front: [tip[0] + 0.5, tip[1] + 0.5] } } : {}), lit: { ...LIT, reach: 1 } }, (d) => {
-    const L = [d.m ? -0.6 : 0.6, -1], dot = (n[0] * L[0] + n[1] * L[1]) / Math.hypot(...L), up = dot > 0 ? 1 : -1
-    const edge = (s, c) => d.line(...P(at(4.5, s)), ...P(at(31, s)), c)
-    return [
-      d.line(...P(at(4.5)), ...P(at(31)), "3", 3), edge(up, "4"), edge(-up, "2"),
-      d.line(...P(at(7)), ...P(at(28)), "2"),                                                     // fuller
-      ...(Math.abs(dot) > 0.6 ? [d.px(...P(at(8, up)), "5"), d.px(...P(at(15, up)), "5")] : []),   // glints
-      d.plate(d.line(...P(at(-2)), ...P(at(2)), "T", 2)), d.px(...P(at(-1)), "t"), d.px(...P(at(1)), "t"),
-      d.plate(d.line(...P(at(3.5, -3.5)), ...P(at(3.5, 3.5)), "O", 2)), d.plate(d.ellipse(...P(at(-3.5)), 1, 1, "O"))]
-  })
+    ...(b[0] > 0.3 ? { sockets: { front: [tip[0] + 0.5, tip[1] + 0.5] } } : {}), lit: { ...LIT, reach: 1 } }, (d) => [
+    (c) => {
+      // which edge looks toward the light in the picture (mirrored, x runs the other way)
+      const L = [c.mirrored ? -0.6 : 0.6, -1], dot = (n[0] * L[0] + n[1] * L[1]) / Math.hypot(...L), up = dot > 0 ? 1 : -1
+      const edge = (s, col) => c.line(...P(at(4.5, s)), ...P(at(31, s)), col)
+      c.line(...P(at(4.5)), ...P(at(31)), "3", 3); edge(up, "4"); edge(-up, "2")
+      c.line(...P(at(7)), ...P(at(28)), "2")                                                      // fuller
+      if (Math.abs(dot) > 0.6) { c.px(...P(at(8, up)), "5"); c.px(...P(at(15, up)), "5") }         // glints
+    },
+    d.plate(d.line(...P(at(-2)), ...P(at(2)), "T", 2)), d.px(...P(at(-1)), "t"), d.px(...P(at(1)), "t"),
+    d.plate(d.line(...P(at(3.5, -3.5)), ...P(at(3.5, 3.5)), "O", 2)), d.plate(d.ellipse(...P(at(-3.5)), 1, 1, "O"))])
 })
 
 // a leg from the hip to its foot flat on the ground, the ankle at `ank` from the hip: cuisse, the

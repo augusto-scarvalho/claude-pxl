@@ -83,6 +83,13 @@ export class Canvas {
     this.seed = seed;
   }
 
+  /**
+   * Drawing a twin (`twin` on the asset it was made from): every x lands mirrored, so the items run as
+   * written and come out facing the other way, and relight takes the light from where it really is.
+   * Art functions read it for the few choices a mirror doesn't make by itself.
+   */
+  mirrored = false;
+
   /** Inside an anim: frame / frames, 0 (first frame) up to just below 1. */
   get phase(): number { return this.frame / this.frames; }
 
@@ -109,6 +116,7 @@ export class Canvas {
   index(x: number, y: number): number {
     const { w, h } = this.img;
     let ix = this.ox + Math.floor(x), iy = this.oy + Math.floor(y);
+    if (this.mirrored) ix = w - 1 - ix;
     if (this.wrap?.x) ix = ((ix % w) + w) % w;
     if (this.wrap?.y) iy = ((iy % h) + h) % h;
     return ix >= 0 && iy >= 0 && ix < w && iy < h ? iy * w + ix : -1;
@@ -476,7 +484,8 @@ export class Canvas {
    * edge +0.5, a bottom edge -1, a right edge -0.5 (rounded). Pixels on no ramp are left alone.
    */
   relight(where?: Region, opts: RelightOpts = {}): void {
-    const [lx, ly] = opts.light ?? [-0.5, -1], reach = Math.max(1, Math.floor(opts.reach ?? 1)), strength = opts.strength ?? 1;
+    // drawn mirrored (a twin), x runs the other way: the light keeps its place in the picture
+    const [lx0, ly] = opts.light ?? [-0.5, -1], lx = this.mirrored ? -lx0 : lx0, reach = Math.max(1, Math.floor(opts.reach ?? 1)), strength = opts.strength ?? 1;
     const ramps = opts.ramps ?? [...this.pal.ramps];
     if (!ramps.length) throw new PxError('relight: no ramps: add ramps("kDdu", ...) (dark -> light), or pass { ramps: ["kDdu"] }');
     const on = new Map<Color, Color[]>(), at = new Map<Color, number>();
@@ -567,10 +576,11 @@ export class Canvas {
   put(src: Img, x: number, y: number, ok?: Pred): void {
     if (src.orient?.text) this.lettered();
     if (src.lamps?.length) {
-      const dx = this.ox + Math.floor(x), dy = this.oy + Math.floor(y);
-      (this.img.lamps ??= []).push(...src.lamps.map((l) => ({ ...l, x: l.x + dx, y: l.y + dy })));
+      const dx = this.ox + Math.floor(x), dy = this.oy + Math.floor(y), w = this.img.w;
+      (this.img.lamps ??= []).push(...src.lamps.map((l) => ({ ...l, x: this.mirrored ? w - 1 - (l.x + dx) : l.x + dx, y: l.y + dy })));
     }
-    if (!ok && !this.clipPred && !this.wrap) {
+    // a twin draws pixel by pixel, each one landing mirrored
+    if (!ok && !this.clipPred && !this.wrap && !this.mirrored) {
       this.img.blit(src, this.ox + x, this.oy + y);
       return;
     }
@@ -864,6 +874,7 @@ export class Canvas {
 
   /** Generate surface normals for this canvas's opaque pixels (see normals.ts). */
   bump(shape: BumpOpts["shape"] = "dome", opts: BumpOpts = {}): void {
+    if (this.mirrored) throw new PxError("bump in a twin would put the relief's light on the wrong side: give the twin its own bump");
     const { w, h } = this.img, mask = new Uint8Array(w * h);
     const keys = this.maskAt(opts.on ?? "*"), inside = opts.where === undefined ? undefined : regionPred(opts.where);
     for (let y = 0; y < h; y++)
@@ -876,6 +887,7 @@ export class Canvas {
 
   /** Paint normals with a numpad grid: 8 faces up, 3 down-right, 5 the viewer; qweasdzxc are softer. */
   normals(x: number, y: number, s: string): void {
+    if (this.mirrored) throw new PxError("normals in a twin would point the wrong way: give the twin its own");
     gridRows(String(s)).forEach((row, r) => {
       [...row].forEach((ch, i) => {
         let d;
@@ -891,6 +903,7 @@ export class Canvas {
 
   /** Text in the built-in 3x5 font. */
   text(x: number, y: number, s: string, c: string, opts: TextOpts = {}): void {
+    if (this.mirrored) throw new PxError("text in a twin would read backwards: letter the twin on its own, or keep the sign out of what's mirrored");
     s = String(s);
     this.lettered();
     if (opts.shadow) this.text(x + 1, y + 1, s, opts.shadow, { ...opts, shadow: undefined });

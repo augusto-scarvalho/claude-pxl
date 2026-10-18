@@ -367,9 +367,10 @@ lit there (`plate({ light, reach }, ...)`): each plate's own edges take the rim 
 and the plates read as lying over one another. Seams, rivets, slits and trims go on after, unlit.
 Light steel harder than cloth (`strength` 1.3: its corners facing the light flash), outline with
 `selout` (each line a darker shade of what it touches), and draw a thin diagonal (a blade) in lines,
-not as a lit plate, which steps into a chain. For a turned rig, draw the part from a function with
-every x mirrored rather than flipping the finished image, and light it again: the light stays put
-(`part()` and `draw()` in the example).
+not as a lit plate, which steps into a chain. For a turned rig, give the part a `twin`
+(`twin: "knight_l_arm"`) rather than flipping the finished image: the twin's items are drawn mirrored
+before they're lit, so the light stays put. What a mirror doesn't decide by itself (which edge of a
+blade is lit, drawn by hand) reads `c.mirrored` in a function (`part()` in the example).
 
 **Parts with two sides.** A flip shows the same face mirrored; a shield, a book, a badge has another
 face behind. Give the slot `faces: { outer, inner }` (each drawn): the rig shows the face turned to us.

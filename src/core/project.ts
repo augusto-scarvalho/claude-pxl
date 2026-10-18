@@ -74,9 +74,9 @@ const OP_OPTS: Record<string, string[]> = {
 };
 
 const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "facing", "height"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "facing", "height", "twin"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir", "facing", "height"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir", "facing", "height", "twin"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -237,8 +237,18 @@ export class Project implements BuildCtx {
       const opts = (isPlainObject(rest[0]) ? rest.shift() : {}) as AssetOpts;
       checkKeys(`${kind} '${name}'`, opts, ASSET_OPTS[kind], loc);
       const items = checkItems(`${kind} '${name}'`, rest, loc);
-      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, png: opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc) });
+      const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc);
+      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, png });
       this.order.push(name);
+      // twin: the same items drawn mirrored before they're lit, facing the other way
+      const twin = (opts as { twin?: unknown }).twin;
+      if (twin === undefined) return;
+      if (typeof twin !== "string" || !twin || twin === name) throw new PxError(`${kind} '${name}': twin names the asset facing the other way (e.g. twin: "${name}_l")`, loc);
+      const other = this.assets.get(twin) ?? this.groups.get(twin);
+      if (other) throw new PxError(`'${twin}' (the twin of '${name}') is already defined at ${other.loc}`, loc);
+      const { twin: _, ...topts } = opts as AssetOpts & { twin?: string };
+      this.assets.set(twin, { kind, name: twin, opts: topts, items, pal: this.pal, loc, png, mirror: true });
+      this.order.push(twin);
     };
 
     env.use = (p: unknown) => {

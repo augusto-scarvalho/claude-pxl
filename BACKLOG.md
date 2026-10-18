@@ -201,8 +201,12 @@ Wave 2: describe and small engine features
   none declares heights: feet and size still don't run there, and check says so.
 
 Wave 3: rigs in motion
-- [ ] **`twin: "<n>_l"` on a sprite**: its items drawn mirrored before lighting, pivot, sockets and
-  facing mirrored: today a 25-line draw helper wraps every op to get a part lit for both facings.
+- [x] **`twin: "<n>_l"` on a sprite**: its items drawn mirrored before lighting, pivot, sockets and
+  facing mirrored: a 25-line draw helper wrapped every op to get a part lit for both facings. The
+  canvas mirrors x where pixels are read and written, relight takes the light where it really is,
+  `c.mirrored` for the hand-lit choices (a blade's lit edge). The knight's parts use it: the turned
+  ones are now the exact mirror of the drawing, where the helper rasterized mirrored coordinates (a
+  pixel here and there on rims; every part still reads lit from the right side).
 - [x] **`turn` with a part-name prefix map** (`turn: { name, parts: ["knight_", "knight_l_"] }`), so
   pose rigs whose slots name shared parts can use it (the knight's 33 poses do: one rig each instead
   of two built by hand, 0 px changed); **`ik(a, b, target, bend)`** in the DSL (two bones for arms

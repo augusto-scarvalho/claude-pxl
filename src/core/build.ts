@@ -122,12 +122,13 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
       if (bg !== null) base.fill(bg);
     }
   } else if (opts.base) {
-    base = ctx.image(opts.base, seed, t).copy();
+    base = def.mirror ? ctx.image(opts.base, seed, t).flip("x") : ctx.image(opts.base, seed, t).copy();
   } else if (def.png) {
     // A strip anim ({ frames: n }) shows the n-th equal slice; anything else the whole image.
     const n = def.kind === "anim" && opts.frames ? frames : 1, fw = Math.floor(def.png.w / n);
     if (fw < 1) throw new PxError(`png is ${def.png.w}px wide: too narrow for ${n} frames`);
     base = n > 1 ? def.png.sub(frame * fw, 0, fw, def.png.h) : def.png.copy();
+    if (def.mirror) base = base.flip("x");
     if (opts.palettize) base = base.remap(pal.snapMap(base.data));
   } else {
     let { w, h } = opts;
@@ -179,6 +180,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     c.frame = frame;
     c.frames = frames;
     c.inAnim = !!tl;
+    c.mirrored = !!def.mirror;
     return c;
   };
   const main = timed(new Canvas(base, pal, ctx, 0, 0, seed));
@@ -390,15 +392,17 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
   const pv = o.pivot;
   if (pv !== undefined && !(pv === "bottom" || pv === "center" || (Array.isArray(pv) && pv.length === 2 && pv.every(Number.isFinite))))
     throw new PxError(`pivot must be "bottom", "center" or [x, y], got ${fmtArgs([pv])}`);
-  if (Array.isArray(pv)) img.pivot = [pv[0], pv[1]];
+  // a twin: drawn mirrored, its pivot and sockets mirrored with it (drawing coords: x -> w - x)
+  const mx = (p: number[]): [number, number] => [def.mirror ? img.w - p[0] : p[0], p[1]];
+  if (Array.isArray(pv)) img.pivot = mx(pv);
   if (o.sockets !== undefined) {
     const so = o.sockets as unknown;
     if (typeof so !== "object" || so === null || Array.isArray(so) || !Object.values(so).every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)))
       throw new PxError(`sockets must be { name: [x, y], ... } in drawing coords, got ${fmtArgs([so])}`);
-    img.sockets = Object.fromEntries(Object.entries(so as Record<string, number[]>).map(([k, p]) => [k, [p[0], p[1]] as [number, number]]));
+    img.sockets = Object.fromEntries(Object.entries(so as Record<string, number[]>).map(([k, p]) => [k, mx(p)]));
   }
   if (o.facing !== undefined) {
-    const f = FACING[o.facing as string];
+    const f = FACING[(def.mirror ? { right: "left", left: "right" }[o.facing as string] : undefined) ?? (o.facing as string)];
     if (!f) throw new PxError(`facing must be "right", "left", "front" (toward us) or "back", got ${fmtArgs([o.facing])}`);
     img.orient = { f: [...f], u: [0, -1, 0], mirrored: false, text: img.orient?.text ?? false };
   }

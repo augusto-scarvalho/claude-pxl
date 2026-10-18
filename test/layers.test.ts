@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { art, PAL } from "./helpers.ts";
 import { main } from "../src/node/cli.ts";
+import { loadSource } from "../src/node/load.ts";
 
 const LIT = '{ light: [1, 0], reach: 1, ramps: ["1d6"] }';
 
@@ -55,4 +56,19 @@ scene("s", { w: 20, h: 10, bg: "1" }, layer("things", stamp("box", 2, 2)), layer
   try { await main(["describe", file, "s", "--no-out"]); } finally { console.log = log; }
   // 12x10 of haze: 16 px over the first box, 16 hidden by the second, drawn after it, the rest over the painted ground
   assert.match(lines.join("\n"), /^ {2}haze \(opacity 0\.5\): 120 px; over painting \(88\), box \(16\); 16 px of it hidden by what is drawn later: box \(16\)$/m);
+});
+
+test("twin: drawn mirrored before it's lit, so the light stays where it is (a flip carries it across)", () => {
+  const src = PAL + `
+sprite("blob", { w: 6, h: 3, facing: "right", pivot: [1, 3], sockets: { front: [6, 1] }, twin: "blob_l" },
+  rect(0, 0, 5, 3, "d"), px(5, 1, "d"), relight(undefined, ${LIT}))
+sprite("flipped", { base: "blob", flip: "x" })`;
+  // lit from the right: its right edges light (6), its left ones dark (1); the nose points right
+  assert.equal(art(src, "blob"), ["1ddd6.", "1dddd6", "1ddd6."].join("\n"));
+  // the twin's nose points left, and it is still lit from the right; the flip is lit from the left
+  assert.equal(art(src, "blob_l"), [".1ddd6", "1dddd6", ".1ddd6"].join("\n"));
+  assert.equal(art(src, "flipped"), [".6ddd1", "6dddd1", ".6ddd1"].join("\n"));
+  const p = loadSource(src, "t.px.js"), t = p.image("blob_l");
+  assert.deepEqual([t.pivot, t.sockets?.front, t.orient?.f?.[0]], [[5, 3], [0, 1], -1]);
+  assert.throws(() => loadSource(PAL + `sprite("sign", { w: 9, h: 7, twin: "sign_l" }, text(0, 0, "AB", "r"))`, "t.px.js").image("sign_l"), /text in a twin would read backwards/);
 });

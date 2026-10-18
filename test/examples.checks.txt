@@ -32,7 +32,7 @@ outpost.px.js: 0 warnings (1 scene (1 frame, 12 distinct placements), 0 rigs, 0 
 platformer.px.js: 0 warnings (1 scene (1 frame, 8 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one), lit side (no scene declares world.light), feet and size (nothing placed has a height)
 rig/knight.px.js: 1 warning (3 scenes (98 frames, 123 distinct placements), 69 rigs, 150 other assets with a front marker)
-  ran: front marker on 150, lit side on 94 (a clear reading on 94), feet on 94 (against the ground row on 94), rig parts 690
+  ran: front marker on 150, lit side on 94 (a clear reading on 93), feet on 94 (against the ground row on 94), rig parts 690
   knights › knight @knights, feet 100,84 › WARNING: lit from the top left, but its light comes from the top right (a flipped drawing carries its light to the other side)
 rig/tournament.px.js: 0 warnings (1 scene (96 frames, 339 distinct placements), 0 rigs, 1 other asset with a front marker)
   ran: front marker on 9, lit side on 310 (a clear reading on 179), feet on 109
