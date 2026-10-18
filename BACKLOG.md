@@ -113,9 +113,9 @@ what its curator accepted was drawn poses composed from parts, reviewed as whole
 - [x] **Scatter near a color** (67bc9ee): `scatter(..., { on: "g", near: "aAo", within: 3 })`, and scatter
   picks sort with stamps in `sort` layers. The forest's hand-computed trail-edge grass became one
   scatter. (Selection border / expand in both editors.)
-- [ ] **Map tones onto a ramp by luminance**: an import option that sorts an image's colors by
-  luminance and spreads them over a ramp, so tones never merge as with nearest-color `palettize`.
-  (Pixelorama Gradient Map.)
+- [x] **Map tones onto a ramp by luminance** (c64d91d): `rampmap(ramp, { where, hue })`, an op rather than
+  an import option, so it works on anything drawn too. The palm's hand-written color map became two
+  rampmaps (identical output). (Pixelorama Gradient Map.)
 - [ ] **Export `.aseprite`**: layers, frames, tags, slices and palette, so a person can keep editing
   what the agent drew. (Documented format; zlib cels.)
 
