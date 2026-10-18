@@ -339,8 +339,14 @@ orders, darkens and checks them. The rest are the drawn parts, moved with the bo
 facings of every pose (the mirrored parts are free with a draw helper that flips x) instead of
 `turn`, which looks up parts by the rig's name. Then the timing is a list: `[frames, pose, how far
 forward]`, and anything else on the same clock (sparks where the blades meet, dust at the feet, a
-marshal's signal) is computed from it. `examples/rig/knight.px.js` (stages 4 and 5): fifteen moves,
-a bout of three exchanges, a clash that throws both back, a salute and the walk back to the marks.
+marshal's signal) is computed from it. The two can differ where the fight isn't a mirror: a cut
+taken on the shield is one knight's cut and the other's block. A shield raised is the shield arm by
+the same two bones and the shield drawn turned with its forearm, so its straps still run along it.
+Look at each pose for what it says, not only whether it works: a fist at the hip and a level blade
+pointing back is a sword going into its scabbard, whatever it was meant to be (a guard low behind
+wants the arm and the blade in one line, the point toward the ground). `examples/rig/knight.px.js`
+(stages 4 and 5): twenty moves; two exchanges blade to blade, a cut from above taken on the shield
+each way, a clash that throws both back, a salute and the walk back to the marks.
 
 For the labels themselves, `PXL blind <file> <rig>` writes the parts unnamed and shuffled for a
 reader who doesn't know the labels, and `--check answers.json` compares. A reader that is another

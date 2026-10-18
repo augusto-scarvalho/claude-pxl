@@ -34,18 +34,19 @@ const X = 30                                         // the body's centre line i
 // the arm part draws it (its elbow and hand sockets), and the shield leans with it: its top forward,
 // its point back. In its own frame, u runs along the straps (elbow to hand) and v to its point.
 const ELBOW = [3.5, 12.5], HAND = [9.5, 19.5]
-const A = Math.atan2(HAND[1] - ELBOW[1], HAND[0] - ELBOW[0]), U = [Math.cos(A), Math.sin(A)], V = [-Math.sin(A), Math.cos(A)]
 const OUTLINE = [[-9, -9], [9, -9], [9, 4], [6, 10], [0, 17], [-6, 10], [-9, 4]]
 const FIELD = [[-7.5, -7.5], [7.5, -7.5], [7.5, 3.6], [5, 9], [0, 15], [-5, 9], [-7.5, 3.6]]
 const GRIP = [3, -3], STRAP = [-5, -3], GRIP_A = [3, -6], GRIP_B = [3, 0], STRAP_A = [-5, -6], STRAP_B = [-5, 0]
-const turn = ([u, v]) => [u * U[0] + v * V[0], u * U[1] + v * V[1]], TP = OUTLINE.map(turn)
-const SX0 = Math.min(...TP.map((p) => p[0])), SY0 = Math.min(...TP.map((p) => p[1]))
-const SW = Math.ceil(Math.max(...TP.map((p) => p[0])) - SX0) + 1, SH = Math.ceil(Math.max(...TP.map((p) => p[1])) - SY0) + 1
-const S = (p) => { const [x, y] = turn(p); return [Math.round(x - SX0), Math.round(y - SY0)] }   // shield frame -> its px
-const C = (p) => { const [x, y] = turn(p); return [x - SX0 + 0.5, y - SY0 + 0.5] }                // -> pixel corners
-const shieldPoly = (P, c) => poly(P.map(S).flat(), c)
-const shieldLine = (a, b, c, w = 1) => line(...S(a), ...S(b), c, w)
-const SHIELD = { pivot: C(GRIP), sockets: { grip: C(GRIP), strap: C(STRAP) } }
+// the shield's frame turned with a forearm at angle a: its size, S (a point -> its px), C (-> pixel corners)
+const shieldFrame = (a) => {
+  const U = [Math.cos(a), Math.sin(a)], V = [-Math.sin(a), Math.cos(a)]
+  const turn = ([u, v]) => [u * U[0] + v * V[0], u * U[1] + v * V[1]], TP = OUTLINE.map(turn)
+  const x0 = Math.min(...TP.map((p) => p[0])), y0 = Math.min(...TP.map((p) => p[1]))
+  return { w: Math.ceil(Math.max(...TP.map((p) => p[0])) - x0) + 1, h: Math.ceil(Math.max(...TP.map((p) => p[1])) - y0) + 1,
+    S: (p) => { const [x, y] = turn(p); return [Math.round(x - x0), Math.round(y - y0)] },
+    C: (p) => { const [x, y] = turn(p); return [x - x0 + 0.5, y - y0 + 0.5] } }
+}
+const REST_SHIELD = shieldFrame(Math.atan2(HAND[1] - ELBOW[1], HAND[0] - ELBOW[0]))
 
 // Where each part's joint sits, the part's box (the size to draw it at, its outline included), and
 // its side. Far side at -100, the middle at 0, the near side at +100; z adds to that. z is the
@@ -61,7 +62,7 @@ const SLOTS = {
   // the shield hangs from the left hand, outside the arm (over it near, under it far); the rig shows
   // the face turned to us: facing right its outer face points away (we see the straps), facing left
   // toward us (the cross); its straps must run along the forearm
-  shield: { at: [X + 9, Y(F.waist) + 4], size: [SW + 2, SH + 2], side: "l", out: 20, on: "arm_l.hand",
+  shield: { at: [X + 9, Y(F.waist) + 4], size: [REST_SHIELD.w + 2, REST_SHIELD.h + 2], side: "l", out: 20, on: "arm_l.hand",
     faces: { outer: "knight_shield", inner: "knight_shield_back" }, parallel: ["strap", "grip", "arm_l.elbow", "arm_l.hand"] },
   sword:  { at: [X + 1, Y(F.crotch)], size: [17, 37], side: "r", z: -10, on: "arm_r.hand" },
   arm_r:  { at: [X - 1, Y(F.shoulders)], size: [14, 30], side: "r" },
@@ -162,23 +163,28 @@ part("arm_l", 12, 22, { facing: "right", pivot: [3, 0], sockets: { front: [11, 2
   d.steel(d.ellipse(3, 12, 2, 2, "3")), d.steel(d.ellipse(9, 19, 2, 2, "3")),    // couter, fist
   d.steel(d.poly([0, 5, 6, 5, 5, 8, 1, 8], "3")), d.steel(d.ellipse(3, 3, 3, 4, "3"))])   // lame, pauldron
 
-// the shield's two faces, drawn square to the forearm (SHIELD, above): outside, a gold rim with its
-// rivets and a raised gold cross on blue; inside, planks, the forearm strap and the hand grip riveted on
-const sh = (d) => ({ poly: (P, c) => d.poly(P.map(S).flat(), c), line: (a, b, c, w = 1) => d.line(...S(a), ...S(b), c, w), field: FIELD.map(S).flat() })
+// the shield's two faces, drawn square to the forearm (shieldFrame, above): outside, a gold rim with
+// its rivets and a raised gold cross on blue; inside, planks, the forearm strap and the hand grip
+// riveted on. shieldParts draws both for a frame: "shield" + suffix, "shield_back" + suffix
 const RIVETS = [[-8, -8], [8, -8], [8, 3], [0, 16], [-8, 3]]
-part("shield", SW, SH, SHIELD, (d) => {
-  const s = sh(d)
-  return [d.plate(s.poly(OUTLINE, "O")), d.plate(s.poly(FIELD, "w")),
-    d.plate(d.clip(s.field, s.line([0, -7], [0, 13], "O", 2), s.line([-6, -2], [6, -2], "O", 2))),
-    ...RIVETS.map((p) => d.px(...S(p), "o"))]
-})
-part("shield_back", SW, SH, SHIELD, (d) => {
-  const s = sh(d)
-  return [d.plate(s.poly(OUTLINE, "t")), d.plate(s.poly(FIELD, "L")),
-    d.clip(s.field, ...[-4, 0, 4].map((u) => s.line([u, -9], [u, 16], "T"))),                  // planks
-    d.plate(s.line(STRAP_A, STRAP_B, "T", 2)), d.plate(s.line(GRIP_A, GRIP_B, "T", 2)),          // strap, grip
-    ...[STRAP_A, STRAP_B, GRIP_A, GRIP_B].map((p) => d.px(...S(p), "O"))]                        // rivets
-})
+const shieldParts = (suffix, fr) => {
+  const o = { pivot: fr.C(GRIP), sockets: { grip: fr.C(GRIP), strap: fr.C(STRAP) } }
+  const sh = (d) => ({ poly: (P, c) => d.poly(P.map(fr.S).flat(), c), line: (a, b, c, w = 1) => d.line(...fr.S(a), ...fr.S(b), c, w), field: FIELD.map(fr.S).flat() })
+  part("shield" + suffix, fr.w, fr.h, o, (d) => {
+    const s = sh(d)
+    return [d.plate(s.poly(OUTLINE, "O")), d.plate(s.poly(FIELD, "w")),
+      d.plate(d.clip(s.field, s.line([0, -7], [0, 13], "O", 2), s.line([-6, -2], [6, -2], "O", 2))),
+      ...RIVETS.map((p) => d.px(...fr.S(p), "o"))]
+  })
+  part("shield_back" + suffix, fr.w, fr.h, o, (d) => {
+    const s = sh(d)
+    return [d.plate(s.poly(OUTLINE, "t")), d.plate(s.poly(FIELD, "L")),
+      d.clip(s.field, ...[-4, 0, 4].map((u) => s.line([u, -9], [u, 16], "T"))),                  // planks
+      d.plate(s.line(STRAP_A, STRAP_B, "T", 2)), d.plate(s.line(GRIP_A, GRIP_B, "T", 2)),          // strap, grip
+      ...[STRAP_A, STRAP_B, GRIP_A, GRIP_B].map((p) => d.px(...fr.S(p), "O"))]                        // rivets
+  })
+}
+shieldParts("", REST_SHIELD)
 
 // a longsword pointing down and forward from the hand: a gilt pommel and crossguard, the grip
 // wound in leather, a 3 px blade with its fuller down the middle; pivot on the grip. The blade is
@@ -256,20 +262,22 @@ const boxOf = (pts, r) => {
 const made = new Set()
 const once = (name, make) => { if (!made.has(name)) { made.add(name); make(name) } return name }
 
-// the sword arm, from the pauldron's middle to the fist: rerebrace, vambrace, the couter at the elbow,
-// the gauntlet's cuff and fist, the lames and the pauldron over them. Its front is the fist when it is
-// out in front, else the pauldron
-const armPart = (hand) => once(`arm_${nm(...hand)}`, (name) => {
-  const s = [0, 0], [e, h] = ik(LU, LF, hand, 1), { w, h: bh, P } = boxOf([s, e, h], 5)
-  const S = P(s), E = P(e), H = P(h), front = h[0] > 2 ? [H[0] + 2.5, H[1] + 0.5] : [S[0] + 4.5, S[1] + 0.5]
-  part(name, w, bh, { facing: "right", pivot: [S[0], S[1] - 4], sockets: { front, hand: [H[0] + 0.5, H[1] + 0.5] } }, (d) => [
+// an arm, from the pauldron's middle to the fist: rerebrace, vambrace, the couter at the elbow, the
+// gauntlet's cuff and fist, the lames and the pauldron over them. The sword arm ("arm") as drawn
+// above, or the shield arm ("sarm"): shorter, its pauldron taller. `bend` 1 bends the elbow down and
+// back, -1 up and forward. Its front is the fist when it is out in front, else the pauldron
+const ARMS = { arm: { lu: LU, lf: LF, pr: [4, 3], drop: 4 }, sarm: { lu: 10, lf: 9, pr: [3, 4], drop: 3 } }
+const armPart = (hand, kind = "arm", bend = 1) => once(`${kind}_${nm(...hand, bend)}`, (name) => {
+  const { lu, lf, pr, drop } = ARMS[kind], s = [0, 0], [e, h] = ik(lu, lf, hand, bend), { w, h: bh, P } = boxOf([s, e, h], 5)
+  const S = P(s), E = P(e), H = P(h), front = h[0] > 2 ? [H[0] + 2.5, H[1] + 0.5] : [S[0] + pr[0] + 0.5, S[1] + 0.5]
+  part(name, w, bh, { facing: "right", pivot: [S[0], S[1] - drop], sockets: { front, elbow: [E[0] + 0.5, E[1] + 0.5], hand: [H[0] + 0.5, H[1] + 0.5] } }, (d) => [
     d.steel(d.line(...S, ...E, "3", 5)),                                     // rerebrace
     d.steel(d.line(...E, ...H, "3", 4)),                                     // vambrace
     d.steel(d.ellipse(...E, 2, 2, "3")),                                     // couter
     d.steel(d.line(...P(lerp(e, h, 0.55)), ...P(lerp(e, h, 0.8)), "3", 5)),  // cuff
     d.steel(d.ellipse(...H, 2, 2, "3")),                                     // fist
     d.steel(d.line(...P(lerp(s, e, 0.3)), ...P(lerp(s, e, 0.55)), "3", 6)),  // lames
-    d.steel(d.ellipse(...S, 4, 3, "3")), d.px(S[0] + 1, S[1] - 1, "O")])    // pauldron, rivet
+    d.steel(d.ellipse(...S, ...pr, "3")), d.px(S[0] + 1, S[1] - 1, "O")])   // pauldron, rivet
 })
 
 // the longsword at any angle (degrees, clockwise from pointing forward), pivot on the grip: pommel,
@@ -307,7 +315,9 @@ const legPart = (ank) => once(`leg_${nm(...ank)}`, (name) => {
 })
 
 // p: { hand: [x, y] from the pauldron's middle, sword: degrees, feet: [[x from its hip, lift] of the
-// far (left) foot, of the near (right) one], bob, lean } -> the pose's name
+// far (left) foot, of the near (right) one], bob, lean, shield: { hand, bend } (the shield arm's
+// fist from its pauldron, and the shield turned with its forearm; none: the arm at rest) } -> the
+// pose's name
 const bobOf = (p) => Math.max(p.bob ?? 0, ...(p.feet ?? [[0]]).map(([x]) => {
   const v = STAND - Math.sqrt((LT + LS - 0.01) ** 2 - x * x)
   return v > 0.1 ? Math.ceil(v) : 0
@@ -315,17 +325,25 @@ const bobOf = (p) => Math.max(p.bob ?? 0, ...(p.feet ?? [[0]]).map(([x]) => {
 const POSES = new Map()
 const pose = (p) => {
   const { hand, sword, feet = [[-0.5, 0], [-0.5, 0]], lean = 0 } = p, bob = bobOf(p)
-  const key = nm(...hand, sword, ...feet.flat(), lean, bob)
+  const key = nm(...hand, sword, ...feet.flat(), lean, bob, ...(p.shield ? [...p.shield.hand, p.shield.bend ?? 1] : []))
   if (POSES.has(key)) return POSES.get(key)
   const name = `pose${POSES.size}`
   POSES.set(key, name)
   const legs = feet.map(([x, lift]) => legPart([x, STAND - bob - lift])), arm = armPart(hand), blade = swordPart(sword)
   const MOVED = { leg_l: [0, bob, legs[0]], leg_r: [0, bob, legs[1]], arm_r: [lean, bob, arm], sword: [lean, bob, blade] }
+  let held = ""                                                 // the raised shield's suffix
+  if (p.shield) {
+    const bend = p.shield.bend ?? 1, [e, h] = ik(ARMS.sarm.lu, ARMS.sarm.lf, p.shield.hand, bend)
+    const deg = Math.round((Math.atan2(h[1] - e[1], h[0] - e[0]) * 180) / Math.PI)
+    held = `_${nm(deg)}`
+    once("shield" + held, () => shieldParts(held, shieldFrame((deg * Math.PI) / 180)))
+    MOVED.arm_l = [lean, bob, armPart(p.shield.hand, "sarm", bend)]
+  }
   for (const [pre, m] of [["knight_", false], ["knight_l_", true]]) {
     const slots = Object.fromEntries(Object.entries(SLOTS).map(([k, s]) => {
       const [dx, dy, own] = MOVED[k] ?? [lean, bob], x = s.at[0] + OX + dx, y = s.at[1] + OY + dy
       return [k, { ...s, at: [m ? RW - x : x, y], part: pre + (own ?? k),
-        ...(s.faces ? { faces: { outer: pre + "shield", inner: pre + "shield_back" } } : {}) }]
+        ...(s.faces ? { faces: { outer: pre + "shield" + held, inner: pre + "shield_back" + held } } : {}) }]
     }))
     rig(pre + name, { w: RW, h: RH, facing: m ? "left" : "right", pivot: [m ? RW - X - OX : X + OX, Y(F.sole) + OY], height: 1.8,
       light: LIT.light, far: 1, slots },
@@ -335,13 +353,15 @@ const pose = (p) => {
 }
 
 // ---------------------------------------------------------------- stage 5: a bout
-// The knight and the one turned, mirror to mirror, a sword's reach apart: each cut meets the other's
-// blade halfway, over the middle, and sparks fly from it. Three exchanges (a cut from above, a rising
-// one, another from above), then both wind up all the way and the last clash throws them both back: a
-// draw. They salute, the sword up before the visor, and walk back to their marks. 96 frames at 8 fps
-// (12 s); it begins on frame 21, leaving a scene the first 20 for what comes before (a fanfare, the
-// marshal's signal). Each knight is an anim whose pivot is the middle of the lists, so both stamp on
-// the same spot, and so does knight_bout_fx (sparks, dust).
+// The knight and the one turned, a sword's reach apart. Mirror to mirror first: each cut meets the
+// other's blade halfway, over the middle, and sparks fly from it (a cut from above, a rising one).
+// Then from above onto the shield: the blue one cuts, the red one takes it on its shield, its sword
+// already drawn back, and cuts back at once; the blue one takes that on its own. Then both wind up
+// all the way and the last clash throws them both back: a draw. They salute, the sword up before the
+// visor, and walk back to their marks. 96 frames at 8 fps (12 s); it begins on frame 21, leaving a
+// scene the first 20 for what comes before (a fanfare, the marshal's signal). Each knight is an anim
+// whose pivot is the middle of the lists, so both stamp on the same spot, and so does knight_bout_fx
+// (sparks, dust).
 const HALF = 33                                               // each one's mark from the middle
 const GUARD = [[-7, 0], [6, 0]], LUNGE = [[-10, 0], [10, 0]]  // the far foot back, the near one forward
 const MOVES = {
@@ -351,8 +371,20 @@ const MOVES = {
   windHigh: { hand: [-2, -16], sword: -150, feet: GUARD, lean: -1 },
   cut: { hand: [13, -8], sword: -35, feet: LUNGE, bob: 3, lean: 2 },
   recoil: { hand: [10, -8], sword: -75, feet: GUARD },
-  windLow: { hand: [-6, 14], sword: 160, feet: GUARD },
+  // low behind, the arm and the blade in one line, the point toward the ground (the tail guard): with
+  // the fist at the hip and the blade level it read as a sword going into its scabbard
+  windLow: { hand: [-15, 16], sword: 130, feet: GUARD, lean: 1 },
   rise: { hand: [13, -4], sword: -55, feet: LUNGE, bob: 3, lean: 2 },
+  // onto the shield: the cut comes down from straight overhead and lands on the shield's face; the
+  // shield goes up square before the face (the elbow up, the forearm level), the sword drawn back
+  // behind the head for the answer
+  swing: { hand: [4, -20], sword: -80, feet: GUARD },
+  smash: { hand: [14, -16], sword: 30, feet: LUNGE, bob: 3, lean: 2 },
+  smashDown: { hand: [14, -13], sword: 40, feet: LUNGE, bob: 3, lean: 2 },
+  rebound: { hand: [11, -12], sword: -15, feet: GUARD },
+  blockIn: { hand: [3, 2], sword: -110, feet: GUARD, shield: { hand: [9, -4], bend: -1 } },
+  block: { hand: [-3, -14], sword: -150, feet: GUARD, bob: 2, lean: 1, shield: { hand: [11, -9], bend: -1 } },
+  blockHit: { hand: [-3, -13], sword: -150, feet: GUARD, bob: 3, shield: { hand: [10, -8], bend: -1 } },
   windBig: { hand: [-4, -18], sword: -160, feet: GUARD, lean: -2 },
   big: { hand: [14, -6], sword: -45, feet: [[-12, 0], [11, 0]], bob: 4, lean: 3 },
   thrown: { hand: [-1, -11], sword: -125, feet: [[-9, 0], [8, 0]], lean: -3 },
@@ -361,15 +393,20 @@ const MOVES = {
   salute: { hand: [6, -5], sword: -88, feet: [[-1.5, 0], [0.5, 0]] },
   lower: { hand: [6, 12], sword: 35 },
 }
-// [frames, move, dx: how far forward of its mark]
-const RUNS = [[21, "rest", 0], [1, "guardIn", 0], [4, "guard", 0],
-  [2, "windHigh", -1], [2, "cut", 4], [1, "recoil", 2], [3, "guard", 0],                 // a cut from above
-  [2, "windLow", -1], [2, "rise", 6], [1, "recoil", 2], [2, "guard", 0],                 // a rising cut
-  [1, "windHigh", -1], [2, "cut", 4], [1, "recoil", 2], [2, "guard", 0],                 // from above again, quicker
-  [3, "windBig", -2], [2, "big", 5],                                                     // the last
+// [frames, the blue one's move, how far forward of its mark, the red one's (default: the same)]
+const RUNS = [[21, "rest", 0], [1, "guardIn", 0], [3, "guard", 0],
+  [2, "windHigh", -1], [2, "cut", 4], [1, "recoil", 2], [2, "guard", 0],                         // a cut from above, both
+  [2, "windLow", -1], [2, "rise", 6], [1, "recoil", 2], [2, "guard", 0],                         // a rising cut, both
+  [1, "windHigh", -1, "guard", 0], [1, "swing", 0, "blockIn", 0], [1, "smash", 6, "block", 0],    // blue cuts onto the shield,
+  [1, "smashDown", 6, "blockHit", 0], [1, "rebound", 2, "block", 0], [1, "blockIn", 0, "swing", 0],
+  [1, "block", 0, "smash", 6], [1, "blockHit", 0, "smashDown", 6], [1, "block", 0, "rebound", 2],  // red cuts back
+  [1, "guard", 0],
+  [3, "windBig", -2], [2, "big", 5],                                                             // the last
   [1, "thrown", 1], [1, "thrown", -5], [1, "thrown", -10], [1, "thrown", -13], [1, "thrown", -14],
-  [1, "stagger", -14], [4, "guard", -14], [1, "saluteIn", -14], [4, "salute", -14], [1, "lower", -14], [2, "rest", -14]]
-const BOUT = RUNS.flatMap(([n, m, dx]) => Array(n).fill([pose(MOVES[m]), dx, m]))
+  [1, "stagger", -14], [2, "guard", -14], [1, "saluteIn", -14], [3, "salute", -14], [1, "lower", -14], [1, "rest", -14]]
+const BOUTS = [[], []]                                        // the blue one's frames, the red one's: [pose, dx, move, feet]
+for (const [n, mb, db, mr = mb, dr = db] of RUNS)
+  for (let i = 0; i < n; i++) { BOUTS[0].push([pose(MOVES[mb]), db, mb]); BOUTS[1].push([pose(MOVES[mr]), dr, mr]) }
 // the walk back: three steps (the near foot, the far one, the near one), 4 frames each; the foot on
 // the ground stays put while the body goes over it, the other is lifted and swung through
 const HIPS = [SLOTS.leg_l.at[0] - X, SLOTS.leg_r.at[0] - X]
@@ -382,36 +419,55 @@ for (const [i, len] of [[1, 7], [0, 14], [1, 7]]) {
     body = b0 + (len / 2) * t
     ank[i] = a0 + (len * (1 - Math.cos(Math.PI * t))) / 2
     const feet = HIPS.map((h, j) => [Math.round(ank[j] - dx - h), j === i ? Math.round(3 * Math.sin(Math.PI * t)) : 0])
-    BOUT.push([pose({ ...MOVES.rest, feet }), dx, "walk", feet])
+    for (const b of BOUTS) b.push([pose({ ...MOVES.rest, feet }), dx, "walk", feet])
   }
 }
-while (BOUT.length < 96) BOUT.push([pose(MOVES.rest), 0, "rest"])
+for (const b of BOUTS) while (b.length < 96) b.push([pose(MOVES.rest), 0, "rest"])
 
 const AW = 130, AX = 102, SOLE = Y(F.sole) + OY
 anim("knight_bout", { w: AW, h: RH, frames: 96, fps: 8, pivot: [AX, SOLE], facing: "right", height: 1.8 }, (c) => {
-  const [name, dx] = BOUT[c.frame]
+  const [name, dx] = BOUTS[0][c.frame]
   c.stamp("knight_" + name, AX - HALF + dx, SOLE)
 })
 anim("knight_l_bout", { w: AW, h: RH, frames: 96, fps: 8, pivot: [AW - AX, SOLE], facing: "left", height: 1.8 }, (c) => {
-  const [name, dx] = BOUT[c.frame]
+  const [name, dx] = BOUTS[1][c.frame]
   c.stamp("knight_l_" + name, AW - AX + HALF - dx, SOLE)
 })
 
-// Where the blades cross: on the middle line, from the fist along the blade (from the pivot, y up is
-// negative). The frame each cut lands, and where.
-const clash = (m, dx) => {
-  const [, h] = ik(LU, LF, m.hand, 1), a = (m.sword * Math.PI) / 180
-  const hx = -HALF + dx - 1 + (m.lean ?? 0) + Math.round(h[0]), hy = -54 + bobOf(m) + Math.round(h[1])
-  return [0, Math.round(hy - (hx / Math.cos(a)) * Math.sin(a))]
+// Where a blade lands, from the middle of the lists on the ground (y up is negative), as if the blue
+// one struck: on the middle line where two blades cross, or at the near edge of the other one's shield.
+const handAt = (m, dx) => {
+  const [, h] = ik(LU, LF, m.hand, 1)
+  return [-HALF + dx - 1 + (m.lean ?? 0) + Math.round(h[0]), -54 + bobOf(m) + Math.round(h[1])]
 }
-const HITS = BOUT.flatMap(([, dx, m], f) => ["cut", "rise", "big"].includes(m) && BOUT[f - 1][2] !== m ? [{ f, big: m === "big", at: clash(MOVES[m], dx) }] : [])
+const along = (m, dx, x) => {
+  const [hx, hy] = handAt(m, dx), a = (m.sword * Math.PI) / 180
+  return [x, Math.round(hy + ((x - hx) / Math.cos(a)) * Math.sin(a))]
+}
+const shieldEdge = (m, dx) => {                               // the other one's: its fist, less half the shield
+  const [, h] = ik(ARMS.sarm.lu, ARMS.sarm.lf, m.shield.hand, m.shield.bend ?? 1)
+  return HALF - dx - 1 - (m.lean ?? 0) - Math.round(h[0]) - 8
+}
+// the frame each blow lands: where, how big, whose front foot stamps (0 the blue one, 1 the red one)
+const HITS = []
+BOUTS[0].forEach(([, db, mb], f) => {
+  const [, dr, mr] = BOUTS[1][f], fresh = (k) => BOUTS[k][f - 1][2] !== BOUTS[k][f][2]
+  if (["cut", "rise", "big"].includes(mb) && fresh(0)) HITS.push({ f, big: mb === "big", at: along(MOVES[mb], db, 0), feet: [0, 1] })
+  if (mb === "smash" && fresh(0)) HITS.push({ f, shield: true, at: along(MOVES[mb], db, shieldEdge(MOVES[mr], dr)), feet: [0] })
+  if (mr === "smash" && fresh(1)) {
+    const [x, y] = along(MOVES[mr], dr, shieldEdge(MOVES[mb], db))
+    HITS.push({ f, shield: true, at: [-x, y], feet: [1] })
+  }
+})
 // a foot's toe (near) or heel (far) on the ground, from the middle, for the blue one (the red one: -x)
 const footAt = ([, dx, m, walk], j) => -HALF + dx + HIPS[j] + (walk ?? MOVES[m].feet ?? [[-0.5], [-0.5]])[j][0] + (j ? 5 : -3)
+const toeOf = (k, f, j = 1) => (k ? -1 : 1) * footAt(BOUTS[k][f], j)
 
 // The sparks: the frame the blades hit, a white-hot star; the next, a smaller one, and the sparks
 // flying out and falling, gold, then orange, then red, gone in a few frames (the last clash: twice as
-// many, flying farther, and the star lasting a frame longer). Dust: a puff at the front foot as it stamps into each cut,
-// and from all four feet as the last clash slides them back; brown, for the scene to swap to its ground.
+// many, flying farther, the star lasting a frame longer; on a shield: fewer, and splinters of its
+// wood dropping). Dust: a puff at the front foot as it stamps into each blow, and from all four feet
+// as the last clash slides them back; brown, for the scene to swap to its ground.
 const FW = 150, FX = 75
 anim("knight_bout_fx", { w: FW, h: RH, frames: 96, fps: 8, pivot: [FX, SOLE] }, (c) => {
   const puff = (x, y, age) => {
@@ -419,12 +475,12 @@ anim("knight_bout_fx", { w: FW, h: RH, frames: 96, fps: 8, pivot: [FX, SOLE] }, 
     else if (age === 1) c.ellipse(x, y - 1, 2, 1, "L")
     else if (age === 2) { c.px(x - 3, y - 1, "T"); c.px(x + 2, y - 2, "T"); c.px(x, y - 3, "T") }
   }
-  for (const { f, big, at: [cx, cy] } of HITS) {
+  for (const { f, big, shield, at: [cx, cy], feet } of HITS) {
     const age = c.frame - f, x = FX + cx, y = SOLE + cy, rnd = c.rng(f + 1)
-    if (age >= 0 && age < 3) for (const s of [-1, 1]) puff(FX + s * footAt(BOUT[f], 1), SOLE - 1, age)
+    if (age >= 0 && age < 3) for (const k of feet) puff(FX + toeOf(k, f), SOLE - 1, age)
     if (age < 0 || age > (big ? 6 : 4)) continue
     if (age === 0) {
-      const r = big ? 8 : 5, q = big ? 4 : 2
+      const r = big ? 8 : shield ? 4 : 5, q = big ? 4 : 2
       c.line(x - r, y, x + r, y, "Y"); c.line(x, y - r, x, y + r, "Y")
       c.line(x - q, y - q, x + q, y + q, "Y"); c.line(x - q, y + q, x + q, y - q, "Y")
       c.rect(x - 1, y - 1, 3, 3, "5"); c.line(x - r + 3, y, x + r - 3, y, "5"); c.line(x, y - r + 3, x, y + r - 3, "5")
@@ -433,22 +489,25 @@ anim("knight_bout_fx", { w: FW, h: RH, frames: 96, fps: 8, pivot: [FX, SOLE] }, 
       c.line(x - r, y, x + r, y, "Y"); c.line(x, y - r, x, y + r, "Y"); c.px(x, y, "5")
       if (big) { c.rect(x - 1, y - 1, 3, 3, "5"); c.line(x - 2, y - 2, x + 2, y + 2, "Y"); c.line(x - 2, y + 2, x + 2, y - 2, "Y") }
     }
-    for (let i = 0; i < (big ? 18 : 9); i++) {
+    for (let i = 0; i < (big ? 18 : shield ? 6 : 9); i++) {
       const a = rnd() * Math.PI * 2, v = 2 + rnd() * (big ? 3 : 2), life = 2 + Math.floor(rnd() * (big ? 5 : 3))
       if (age < 1 || age > life) continue
       const p = (t) => [Math.round(x + Math.cos(a) * v * t), Math.round(y + Math.sin(a) * v * t + 0.4 * t * t)]
       c.line(...p(age - 0.7), ...p(age), age < 2 ? "5" : age < 3 ? "Y" : age < 5 ? "O" : "R")
     }
+    if (shield) for (let i = 0; i < 4; i++) {                 // splinters: knocked off, falling fast
+      const vx = (rnd() - 0.5) * 3, vy = -1 - rnd() * 1.5
+      if (age >= 1) c.px(Math.round(x + vx * age), Math.round(y + vy * age + 0.9 * age * age), "o")
+    }
   }
-  BOUT.forEach((b, f) => {
-    if (b[2] !== "thrown") return
-    for (const s of [-1, 1]) for (const j of [0, 1]) puff(FX + s * footAt(b, j), SOLE - 1, c.frame - f)
+  for (const k of [0, 1]) BOUTS[k].forEach((b, f) => {
+    if (b[2] === "thrown") for (const j of [0, 1]) puff(FX + toeOf(k, f, j), SOLE - 1, c.frame - f)
   })
 })
 
 // every move in a row, and the bout on bare ground
 const RED = { q: "x", w: "r", e: "R", x: "q", r: "w", R: "e" }
-const SHOWN = ["rest", "guard", "windHigh", "cut", "windLow", "rise", "windBig", "big", "thrown", "salute"]
+const SHOWN = ["rest", "guard", "windHigh", "cut", "windLow", "rise", "swing", "smash", "block", "windBig", "big", "thrown", "salute"]
 scene("knight_moves", { w: 60 * SHOWN.length, h: 116, bg: "#2a2f3e", world: { scale: 40, light: LIT.light, ground: 108 } },
   rect(0, 108, 60 * SHOWN.length, 8, "T"), hline(0, 108, 60 * SHOWN.length, "L"),
   ...SHOWN.map((m, i) => stamp("knight_" + pose(MOVES[m]), 26 + 60 * i, 108)),
