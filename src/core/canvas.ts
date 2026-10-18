@@ -286,6 +286,27 @@ export class Canvas {
   circ(cx: number, cy: number, r: number, c: string): void { this.ellipse(cx, cy, r, r, c); }
   ring(cx: number, cy: number, r: number, c: string): void { this.ellipse(cx, cy, r, r, c, true); }
 
+  /**
+   * Part of a ring around (cx, cy), from angle `from` to `to` (degrees, clockwise from pointing right;
+   * the sweep goes from one to the other, either way round): 1 px wide, or down to radius `inner`
+   * (0: a filled sector). `taper`: its width grows from nothing at `from` to `inner` at `to`, the way a
+   * blade's smear thickens toward the blade.
+   */
+  arc(cx: number, cy: number, r: number, from: number, to: number, c: string, opts: { inner?: number; taper?: boolean } = {}): void {
+    const col = this.color(c), sweep = to - from, inner = opts.inner ?? r - 1;
+    if (!sweep) return;
+    for (let y = Math.floor(cy - r - 1); y <= Math.ceil(cy + r + 1); y++)
+      for (let x = Math.floor(cx - r - 1); x <= Math.ceil(cx + r + 1); x++) {
+        const d = Math.hypot(x - cx, y - cy);
+        if (d >= r + 0.5) continue;
+        const a = (Math.atan2(y - cy, x - cx) * 180) / Math.PI, t = ((((a - from) * Math.sign(sweep)) % 360) + 360) % 360 / Math.abs(sweep);
+        if (t > 1) continue;
+        const ri = opts.taper ? r - (r - inner) * t : inner;
+        if (ri > 0 && d < ri + 0.5) continue;
+        this.plot(x, y, col);
+      }
+  }
+
   /** Filled polygon [x0,y0, x1,y1, ...] with vertices on pixel corners. */
   poly(pts: number[], c: string): void {
     if (!Array.isArray(pts) || pts.length < 6 || pts.length % 2) throw new PxError("poly needs [x0,y0, x1,y1, x2,y2, ...]");
@@ -908,7 +929,7 @@ export function frameStart(tl: Timeline, n: number): number {
 
 /** Ops callable from art files; each top-level call can be traced as one painting step. */
 export const OPS = [
-  "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "poly", "fill",
+  "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp",
   "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose",
 ] as const;

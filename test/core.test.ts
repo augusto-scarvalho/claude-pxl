@@ -7,6 +7,7 @@ import { pack } from "../src/core/color.ts";
 import { readJoints, readMotion, sideColor } from "../src/core/pose.ts";
 import { chain } from "../src/core/chain.ts";
 import { rotate } from "../src/core/rotate.ts";
+import { ik } from "../src/core/rig.ts";
 import { Img } from "../src/core/image.ts";
 
 const eq = (a: string, b: string) => assert.equal(a, b);
@@ -469,4 +470,38 @@ test("rampmap: colors dark to light take a ramp's keys in order; hue picks which
   // two colors onto a 3-key ramp spread to its ends; a green left alone by a red-only hue range
   eq(art(PAL + 'sprite("a", { w: 3, h: 1 }, px(0, 0, "#400000"), px(1, 0, "#ff4040"), px(2, 0, "g"), rampmap("krw", { hue: [340, 20] }))', "a"), "kwg");
   assert.match(failure(PAL + 'sprite("a", { w: 1, h: 1 }, px(0, 0, "r"), rampmap("kq"))', "a").message, /unknown color key 'q'|'q'/);
+});
+
+test("arc: a quarter clockwise or the other way round, a filled sector, a smear thickening toward its head", () => {
+  const src = PAL + `
+sprite("quarter", { w: 7, h: 7 }, arc(3, 3, 3, 0, 90, "r"))
+sprite("sector", { w: 7, h: 7 }, arc(3, 3, 3, 0, 90, "r", { inner: 0 }))
+sprite("ccw", { w: 7, h: 7 }, arc(3, 3, 3, 0, -90, "r"))
+sprite("taper", { w: 13, h: 7 }, arc(6, 6, 6, 180, 360, "r", { inner: 2, taper: true }))`;
+  assert.equal(art(src, "quarter"), [".......", ".......", ".......", "......r", "......r", ".....r.", "...rr.."].join("\n"));
+  assert.equal(art(src, "sector"), [".......", ".......", ".......", "...rrrr", "...rrrr", "...rrr.", "...rr.."].join("\n"));
+  assert.equal(art(src, "ccw"), ["...rr..", ".....r.", "......r", "......r", ".......", ".......", "......."].join("\n"));
+  // from pointing left over the top to pointing right: thin where it starts, 4 px where it ends
+  assert.deepEqual(art(src, "taper").split("\n").map((r) => [r.indexOf("r"), r.lastIndexOf("r") - r.indexOf("r") + 1]).slice(4), [[0, 13], [9, 4], [9, 4]]);
+});
+
+test("ik: two bones reach the point, the joint on the side asked for; out of reach they lie straight", () => {
+  const len = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const up = ik(10, 10, [10, 10], 1), down = ik(10, 10, [10, 10], -1), far = ik(10, 10, [30, 0]);
+  for (const [j, e] of [up, down]) {
+    assert.ok(Math.abs(len([0, 0], j) - 10) < 1e-9 && Math.abs(len(j, e) - 10) < 1e-9 && len(e, [10, 10]) < 1e-9);
+  }
+  assert.ok(up[0][1] > down[0][1], "bend 1 puts the joint below (y down), -1 above");
+  assert.ok(Math.abs(far[0][1]) < 0.5 && far[1][0] > 19.9 && far[1][0] < 20, "out of reach: straight to the pixel, short of it");
+  // in an art file: the hand where the bones put it
+  assert.equal(art(PAL + `const [elbow, hand] = ik(3, 3, [4, 2])
+sprite("arm", { w: 5, h: 3 }, line(0, 0, Math.round(elbow[0]), Math.round(elbow[1]), "r"), px(Math.round(hand[0]), Math.round(hand[1]), "w"))`, "arm").split("\n")[2][4], "w");
+});
+
+test("has: an asset or a group defined so far", () => {
+  const p = loadSource(PAL + `const before = has("dot")
+sprite("dot", "r")
+group("dots", ["dot"])
+if (!before && has("dot") && has("dots") && !has("nothing")) sprite("ok", "r")`, "t.px.js");
+  assert.ok(p.assets.has("ok"));
 });

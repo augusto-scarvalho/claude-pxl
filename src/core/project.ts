@@ -1,7 +1,7 @@
 // Project: the registry an art file fills in, plus the lazy, cached, cycle-checked resolver.
 import { type BuildCtx, type BuildOut, buildAsset, drawnFrames, gcd } from "./build.ts";
 import { type Canvas, OPS } from "./canvas.ts";
-import { type RigDef, drawGuide, drawParts, figure, readRig, turnRig } from "./rig.ts";
+import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from "./rig.ts";
 import { TRANSPARENT, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
@@ -30,6 +30,7 @@ export const SIGNATURES: Record<string, string> = {
   ellipse: "cx:n cy:n rx:n ry:n c:c ?ring:b",
   circ: "cx:n cy:n r:n c:c",
   ring: "cx:n cy:n r:n c:c",
+  arc: "cx:n cy:n r:n from:n to:n c:c ?opts:o",
   poly: "points:a c:c",
   curve: "points:a c:c ?opts:o",
   fill: "x:n y:n c:c",
@@ -64,6 +65,7 @@ export const SIGNATURES: Record<string, string> = {
 const OP_OPTS: Record<string, string[]> = {
   lamp: ["r", "color", "power", "z"],
   curve: ["width", "closed"],
+  arc: ["inner", "taper"],
   relight: ["light", "reach", "strength", "ramps", "glint"],
   rampmap: ["where", "hue"],
   bump: ["w", "depth", "on", "where"],
@@ -364,6 +366,11 @@ export class Project implements BuildCtx {
       try { this.includeHook(path); } finally { if (!opts.palette) this.pal = pal; }
     };
     env.rng = (seed?: number) => rng(seed);
+    env.ik = (a: unknown, b: unknown, target: unknown, bend: unknown = 1) => {
+      try { return ik(a as number, b as number, target as [number, number], bend as number); } catch (e) { throw wrap(e).within("ik", this.callerLoc()); }
+    };
+    // has("name"): is there an asset or a group of that name yet (a generated part made once)
+    env.has = (name: unknown) => typeof name === "string" && (this.assets.has(name) || this.groups.has(name));
     env.figure = (h: unknown, heads?: unknown) => {
       try { return figure(h as number, heads as number | undefined); } catch (e) { throw wrap(e).within("figure", this.callerLoc()); }
     };

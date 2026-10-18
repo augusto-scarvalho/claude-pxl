@@ -245,21 +245,16 @@ const LU = 12, LF = 11, LT = 14, LS = 15, STAND = 29          // upper arm, fore
 const OX = 25, OY = 36, RW = 110, RH = 112                    // room around the body for a swung sword
 const nm = (...v) => v.map((x) => String(Math.round(x)).replace("-", "m")).join("_")
 const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]
-// two bones a, b from (0, 0) reaching for t, the joint bent to the +angle side (bend 1) or the other:
-// the joint, and the end (on t, or as far toward it as they reach)
-const ik = (a, b, [tx, ty], bend) => {
-  const d = Math.min(Math.hypot(tx, ty), a + b - 0.01), f = Math.atan2(ty, tx)
-  const al = Math.acos(Math.max(-1, Math.min(1, (a * a + d * d - b * b) / (2 * a * d))))
-  return [[a * Math.cos(f + bend * al), a * Math.sin(f + bend * al)], [d * Math.cos(f), d * Math.sin(f)]]
-}
+// the joints come from ik(a, b, target, bend): two bones from (0, 0) reaching for the target, the
+// joint bent to the +angle side (bend 1) or the other; [joint, end]
 // the box around some points with r px of room, and a point's pixel in it
 const boxOf = (pts, r) => {
   const x0 = Math.floor(Math.min(...pts.map((p) => p[0])) - r), y0 = Math.floor(Math.min(...pts.map((p) => p[1])) - r)
   return { w: Math.ceil(Math.max(...pts.map((p) => p[0])) + r) - x0 + 1, h: Math.ceil(Math.max(...pts.map((p) => p[1])) + r) - y0 + 1,
     P: ([x, y]) => [Math.round(x - x0), Math.round(y - y0)] }
 }
-const made = new Set()
-const once = (name, make) => { if (!made.has(name)) { made.add(name); make(name) } return name }
+// a generated part is made the first time a pose asks for it
+const once = (name, make) => { if (!has("knight_" + name)) make(name); return name }
 
 // an arm, from the pauldron's middle to the fist: rerebrace, vambrace, the couter at the elbow, the
 // gauntlet's cuff and fist, the lames and the pauldron over them. The sword arm ("arm") as drawn
@@ -485,16 +480,9 @@ const FW = 150, FX = 75
 anim("knight_bout_fx", { w: FW, h: RH, frames: 96, fps: 8, pivot: [FX, SOLE] }, (c) => {
   for (const { f, k, at: [hx, hy], from, turn } of SMEARS) {
     if (c.frame !== f) continue
-    const arc = (r0, r1, col) => {                              // r1 at the tail, r0 at the blade
-      const out = [], back = []
-      for (let i = 0; i <= 10; i++) {
-        const t = i / 10, a = ((from + turn * t) * Math.PI) / 180, r = r1 + (r0 - r1) * t
-        const pt = (rad) => [FX + (k ? -1 : 1) * (hx + Math.cos(a) * rad), SOLE + hy + Math.sin(a) * rad]
-        out.push(...pt(31)); back.unshift(...pt(r))
-      }
-      c.poly([...out, ...back].map(Math.round), col)
-    }
-    arc(22, 30, "4"); arc(27, 30.5, "5")
+    // round the fist, out to the blade's tip, thickening from the tail to the blade; the red one's mirrored
+    const x = FX + (k ? -hx : hx), y = SOLE + hy, a0 = k ? 180 - from : from, a1 = k ? 180 - from - turn : from + turn
+    c.arc(x, y, 31, a0, a1, "4", { inner: 22, taper: true }); c.arc(x, y, 31, a0, a1, "5", { inner: 27, taper: true })
   }
   const puff = (x, y, age) => {
     if (age === 0) c.ellipse(x, y, 1, 1, "L")

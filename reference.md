@@ -42,6 +42,8 @@ font(name, "glyph_sprite", { chars: "ABC...", w, h, cols? })  // bitmap font: gl
 include("palette.px.js", { palette: true })  // also take its use()/pal()/ramps() from here on
 rig(name, { w, h, facing, slots: { torso: { at, size }, arm: { at, size, side: "r" } }, parts?, guide? }, ...retouch)  // skeleton first: characters.md §11
 figure(h, heads?)                       // a standing figure's landmark rows: chin, shoulders, chest, waist, crotch, knees, ankles, sole; shoulderW
+ik(a, b, [x, y], bend?)                 // two bones from (0, 0) reaching for the point: [joint, end]; bend 1 (default) bends toward increasing angle (y down: an arm's elbow below, a leg's knee behind), -1 the other way
+has(name)                               // is there an asset or a group of that name yet (a generated part made once)
 ```
 
 A rig is a sprite: each slot is a joint `at`, a box `size` (the part's size, outline included), the
@@ -144,6 +146,7 @@ Post-processing order: mirror → swap → flip → rot → outline → crop.
 | `hline(x, y, len, c)` · `vline(x, y, len, c)` | |
 | `circ(cx, cy, r, c)` · `ring(cx, cy, r, c)` | pixel-art circles; ring is a clean 1px border |
 | `ellipse(cx, cy, rx, ry, c, ring?)` | |
+| `arc(cx, cy, r, from, to, c, { inner?, taper? })` | part of a ring, from angle `from` to `to` (degrees, clockwise from pointing right; the sweep goes from one to the other, either way round): 1 px wide, or down to radius `inner` (0: a filled sector). `taper: true` grows its width from nothing at `from` to `inner` at `to`: a blade's smear, thickening toward the blade. Halos, rainbows, partial rings |
 | `poly([x0, y0, x1, y1, ...], c)` | filled; vertices on pixel corners (`[0,0, 4,0, 4,4, 0,4]` = `rect(0,0,4,4)`) |
 | `fill(x, y, c)` | 4-connected flood fill |
 | `wire(x0, y0, x1, y1, sag, c, { hang?, every = 6, start?, ...placement })` | sagging cable; `hang` stamps an asset/group under it every `every` px (string lights) |

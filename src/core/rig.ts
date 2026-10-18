@@ -324,6 +324,20 @@ export function rigLines(rig: RigDef, look: Look, steps?: Steps): string[] {
   return out;
 }
 
+/**
+ * Two bones of lengths a and b from (0, 0) reaching for `target`: [joint, end]. The joint bends to
+ * the side of increasing angle (bend 1: with y down, an arm reaching forward has its elbow below; a
+ * leg reaching down has its knee behind) or the other (bend -1). Out of reach, the bones lie (to the pixel)
+ * straight toward the target and `end` stops short of it.
+ */
+export function ik(a: number, b: number, target: [number, number], bend = 1): [[number, number], [number, number]] {
+  if (!(a > 0 && b > 0) || !Array.isArray(target) || target.length !== 2 || !target.every(Number.isFinite) || (bend !== 1 && bend !== -1))
+    throw new PxError(`ik(a, b, [x, y], bend): two bone lengths, the point to reach and 1 or -1, got ${a}, ${b}, ${JSON.stringify(target)}, ${bend}`);
+  const [tx, ty] = target, d = Math.max(1e-6, Math.min(Math.hypot(tx, ty), a + b - 0.01)), f = Math.atan2(ty, tx);
+  const al = Math.acos(Math.max(-1, Math.min(1, (a * a + d * d - b * b) / (2 * a * d))));
+  return [[a * Math.cos(f + bend * al), a * Math.sin(f + bend * al)], [d * Math.cos(f), d * Math.sin(f)]];
+}
+
 export interface Figure {
   head: number; headW: number; eyes: number; chin: number; shoulders: number; chest: number; elbows: number;
   waist: number; crotch: number; wrists: number; knees: number; ankles: number; sole: number;
