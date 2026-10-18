@@ -330,6 +330,17 @@ Claude may share your blind spots (left/right is exactly where they hide): prefe
 or ask the user, and look at a few yourself. The reader checks which way a part faces in the picture,
 not which of the body's arms it is: that is the slot's `side`, and the rig's near/far follows from it.
 
+**Build a part from plates.** Drawn as one shape and lit once, a part reads as a tube. Build it the
+way the thing is made (a pauldron and its lames, rerebrace, couter, vambrace, gauntlet; cuisse,
+poleyn, greave, sabaton; cloth in panels), each plate flat in a mid tone on a layer of its own, lit
+there (`relight` at the end of the layer): each plate's own edges take the rim light and the shade,
+and the plates read as lying over one another. Seams, rivets, slits and trims go on after, unlit.
+Light steel harder than cloth (`strength` 1.3: its corners facing the light flash), outline with
+`selout` (each line a darker shade of what it touches), and draw a thin diagonal (a blade) in lines,
+not as a lit plate, which steps into a chain. For a turned rig, draw the part from a function with
+every x mirrored rather than flipping the finished image, and light it again: the light stays put
+(`part()` and `draw()` in the example).
+
 **Parts with two sides.** A flip shows the same face mirrored; a shield, a book, a badge has another
 face behind. Give the slot `faces: { outer, inner }` (each drawn): the rig shows the face turned to us.
 A shield at rest faces out from the body's side: on the near side we see its face (the cross), on the

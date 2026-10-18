@@ -39,16 +39,20 @@ export function dirWords(x: number, y: number): string {
 export function litDir(img: Img, steps?: Steps): [number, number] | undefined {
   const W = img.w, H = img.h, at = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? TRANSPARENT : img.data[y * W + x]);
   const sides: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  // the outline: the color most of the edge pixels share
-  const edge = new Map<Color, number>();
-  let n = 0;
+  // the outline: the color most of the edge pixels share, or (a selective outline, each line pixel
+  // a darker shade of what it touches) a ring of edge pixels nearly all darker than the pixel inside
+  const edge = new Map<Color, number>(), ring = new Set<number>();
+  let n = 0, darker = 0;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const c = at(x, y);
-    if (c !== TRANSPARENT && sides.some(([dx, dy]) => at(x + dx, y + dy) === TRANSPARENT)) { edge.set(c, (edge.get(c) ?? 0) + 1); n++; }
+    const c = at(x, y), out = sides.find(([dx, dy]) => at(x + dx, y + dy) === TRANSPARENT);
+    if (c === TRANSPARENT || !out) continue;
+    edge.set(c, (edge.get(c) ?? 0) + 1); n++; ring.add(y * W + x);
+    const inner = at(x - out[0], y - out[1]);
+    if (inner !== TRANSPARENT && lum(inner) > lum(c) + 0.03) darker++;
   }
   if (!n) return undefined;
-  const [ink, inkN] = [...edge].sort((a, b) => b[1] - a[1])[0], outline = inkN > n * 0.6 ? ink : undefined;
-  const open = (x: number, y: number) => { const c = at(x, y); return c === TRANSPARENT || c === outline; };
+  const [ink, inkN] = [...edge].sort((a, b) => b[1] - a[1])[0], outline = inkN > n * 0.6 ? ink : undefined, selout = !outline && darker >= n * 0.7;
+  const open = (x: number, y: number) => { const c = at(x, y); return c === TRANSPARENT || c === outline || (selout && ring.has(y * W + x)); };
   // the rim: each pixel open on some side, how it faces (e), and how much lighter it is than the
   // material up to 3 px inward, against e (b)
   const rim: { ex: number; ey: number; b: number }[] = [];

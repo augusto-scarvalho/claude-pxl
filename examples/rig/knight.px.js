@@ -20,6 +20,8 @@ ramps("k12345", "qwe", "oOY", "xrR", "tTL")
 // relight: the light from the top right, 2 px of rim, and a glint (the ramp's top) on the corners
 // facing it, so every part, turned or not, is lit by one rule rather than by hand
 const LIT = { light: [0.6, -1], reach: 2, glint: 1.5 }
+// steel takes the light harder than cloth: its corners facing the light flash, those away go dark
+const STEEL = { ...LIT, strength: 1.3 }
 
 // The body: 72 px, 6.5 heads (stylized heroic), two rows of margin above the head.
 const F = figure(72, 6.5), Y = (y) => 2 + y          // figure's y (from the top of the head) -> rig's
@@ -49,107 +51,156 @@ const SHIELD = { pivot: C(GRIP), sockets: { grip: C(GRIP), strap: C(STRAP) } }
 // its side. Far side at -100, the middle at 0, the near side at +100; z adds to that. z is the
 // body's layering, the same on both sides (both legs under the tabard): the facing says which is near.
 const SLOTS = {
-  cape:   { at: [X - 4, Y(F.shoulders) - 1], size: [16, 46], pivot: [12, 0], z: -150 },
-  leg_l:  { at: [X - 5, Y(F.crotch)], size: [12, 36], side: "l", z: -50 },
+  cape:   { at: [X - 4, Y(F.shoulders) - 1], size: [18, 46], z: -150 },
+  leg_l:  { at: [X - 5, Y(F.crotch)], size: [14, 36], side: "l", z: -50 },
   arm_l:  { at: [X + 1, Y(F.shoulders)], size: [14, 24], side: "l" },
   torso:  { at: [X, Y(F.chin)], size: [16, F.crotch - F.chin + 2] },
-  head:   { at: [X + 1, Y(F.chin) + 1], size: [15, 15], pivot: [7, 14], z: 10 },
-  leg_r:  { at: [X + 3, Y(F.crotch)], size: [12, 36], side: "r", z: -50 },
+  head:   { at: [X + 1, Y(F.chin) + 1], size: [17, 14], z: 10 },
+  leg_r:  { at: [X + 3, Y(F.crotch)], size: [14, 36], side: "r", z: -50 },
   tabard: { at: [X, Y(F.waist)], size: [18, 19], z: 75 },
   // the shield hangs from the left hand, outside the arm (over it near, under it far); the rig shows
   // the face turned to us: facing right its outer face points away (we see the straps), facing left
   // toward us (the cross); its straps must run along the forearm
   shield: { at: [X + 9, Y(F.waist) + 4], size: [SW + 2, SH + 2], side: "l", out: 20, on: "arm_l.hand",
     faces: { outer: "knight_shield", inner: "knight_shield_back" }, parallel: ["strap", "grip", "arm_l.elbow", "arm_l.hand"] },
-  sword:  { at: [X + 1, Y(F.crotch)], size: [16, 38], pivot: [3, 4], side: "r", z: -10 },
-  arm_r:  { at: [X - 1, Y(F.shoulders)], size: [12, 29], pivot: [5, 1], side: "r" },
+  sword:  { at: [X + 1, Y(F.crotch)], size: [17, 37], side: "r", z: -10, on: "arm_r.hand" },
+  arm_r:  { at: [X - 1, Y(F.shoulders)], size: [14, 30], side: "r" },
 }
 
 // Stage 1: stand-ins only (parts: false), labelled with their slots' first letters.
 rig("knight_blocking", { w: 60, h: 76, facing: "right", pivot: [X, Y(F.sole)], parts: false, slots: SLOTS })
 
 // ---------------------------------------------------------------- stage 2: the parts, one by one
-// Each part is its shape, drawn flat in mid tones with its trims and seams (what doesn't depend on
-// the light), then lit by LIT and outlined. part() makes it twice: as drawn, facing right, and
-// mirrored for the turned knight, relit after the mirror so its light stays at the top right
-// (a flipped drawing would carry its light to the left). A part with a front says so (facing) and
-// marks it with a `front` socket on the drawing (the visor, the chest, the toe, the fist, the
-// blade's tip): describe checks the marker against the label.
-const part = (name, w, h, o, ...shape) => {
+// Each part is built from plates, the way armor is: a pauldron and the lames under it, the
+// rerebrace, the couter, the vambrace, the gauntlet. Each plate is drawn flat in a mid tone on a layer
+// of its own and lit there (relight with LIT), so its own edges take the rim light and the shade and
+// the plates read as lying over one another. Seams, rivets, trims and slits go on after, unlit (they
+// are dark or gold whichever way the light falls). part() builds each part twice from the same
+// drawing: as drawn, facing right, and with every x mirrored, facing left, for the turned knight;
+// both lit from the top right, where the scene has the light. A part with a front says so (facing)
+// and marks it with a `front` socket on the drawing: describe checks the marker against the label.
+let PLATES = 0
+const draw = (w, m, lit) => {
+  const X = (x) => (m ? w - 1 - x : x), XS = (p) => p.map((v, i) => (i % 2 ? v : X(v)))
+  return {
+    m,                                                  // drawn mirrored (facing left)
+    px: (x, y, c) => px(X(x), y, c),
+    rect: (x, y, rw, rh, c) => rect(m ? w - x - rw : x, y, rw, rh, c),
+    hline: (x, y, n, c) => hline(m ? w - x - n : x, y, n, c),
+    vline: (x, y, n, c) => vline(X(x), y, n, c),
+    line: (x0, y0, x1, y1, c, wd = 1) => line(X(x0), y0, X(x1), y1, c, wd),
+    poly: (p, c) => poly(XS(p), c),
+    ellipse: (cx, cy, rx, ry, c) => ellipse(X(cx), cy, rx, ry, c),
+    clip: (p, ...items) => clip(XS(p), ...items),
+    // a plate: its own layer, lit on its own; steel harder
+    plate: (...items) => layer(`plate${PLATES++}`, ...items, relight(undefined, lit)),
+    steel: (...items) => layer(`plate${PLATES++}`, ...items, relight(undefined, { ...STEEL, reach: lit.reach })),
+  }
+}
+const part = (name, w, h, o, art) => {
   const { lit = LIT, ...opts } = o
-  o = opts
   const m = (p) => p && [w - p[0], p[1]]
-  sprite(`_knight_${name}_shape`, { w, h }, ...shape)
-  sprite(`_knight_${name}_shape_l`, { base: `_knight_${name}_shape`, flip: "x" })
-  sprite(`knight_${name}`, { base: `_knight_${name}_shape`, outline: "k", ...o }, relight(undefined, lit))
-  sprite(`knight_l_${name}`, { base: `_knight_${name}_shape_l`, outline: "k", ...o, ...(o.facing ? { facing: "left" } : {}),
-    pivot: m(o.pivot), ...(o.sockets ? { sockets: Object.fromEntries(Object.entries(o.sockets).map(([k, p]) => [k, m(p)])) } : {}) }, relight(undefined, lit))
+  sprite(`knight_${name}`, { w, h, outline: "k", selout: true, ...opts }, ...art(draw(w, false, lit)))
+  sprite(`knight_l_${name}`, { w, h, outline: "k", selout: true, ...opts, ...(opts.facing ? { facing: "left" } : {}), pivot: m(opts.pivot),
+    ...(opts.sockets ? { sockets: Object.fromEntries(Object.entries(opts.sockets).map(([k, p]) => [k, m(p)])) } : {}) }, ...art(draw(w, true, lit)))
 }
 
-// a bascinet with its visor down, in profile: the slit and breaths at the front, a gold band, the
-// mail of the neck below
-part("head", 13, 13, { facing: "right", pivot: [6, 13], sockets: { front: [12, 6] } },
-  ellipse(6, 5, 5, 5, "3"), poly([7, 2, 12, 5, 12, 8, 8, 10], "3"), rect(3, 9, 7, 4, "2"),
-  hline(6, 5, 7, "k"), px(10, 7, "1"), px(11, 8, "1"), px(9, 8, "1"),            // the slit, the breaths
-  line(1, 6, 5, 2, "O"), line(1, 7, 5, 3, "o"),                                  // gold band, back to crown
-  ...[[4, 11], [6, 11], [8, 11], [5, 12], [7, 12]].map(([x, y]) => px(x, y, "1")))   // mail rings
+// a hounskull bascinet in profile: the round skull, the pointed visor over the face with its sight
+// slit and breaths, the gilt rivet of its hinge at the temple, a gorget lame at the neck
+part("head", 15, 12, { facing: "right", pivot: [6, 12], sockets: { front: [14, 8] } }, (d) => [
+  d.steel(d.ellipse(6, 5, 5, 5, "3")),                                            // skull
+  d.steel(d.poly([5, 3, 9, 2, 12, 5, 14, 7, 12, 9, 9, 10, 6, 10], "3")),         // visor, its snout forward
+  d.steel(d.rect(3, 10, 7, 2, "3")),                                              // a gorget lame over the collar
+  d.line(7, 5, 12, 6, "k"), d.px(11, 8, "1"), d.px(12, 8, "1"), d.px(10, 9, "1"),   // the slit, the breaths
+  d.px(4, 7, "O")])                                                               // the hinge
 
-// the chest under a blue surcoat: steel only at the neck; a gold trim, a belt with its buckle
-part("torso", 14, F.crotch - F.chin, { facing: "right", pivot: [7, 0], sockets: { front: [13, 10] } },
-  poly([3, 0, 9, 0, 12, 5, 13, 10, 12, 15, 11, 20, 12, 25, 3, 25, 2, 18, 1, 9, 2, 3], "w"),
-  hline(4, 0, 5, "2"), hline(4, 1, 6, "O"),                                       // collar of the mail, gold trim
-  hline(2, 16, 11, "T"), hline(2, 17, 11, "t"), rect(9, 15, 3, 3, "O"))           // belt and buckle
+// the chest under a blue surcoat: the gorget's steel at the neck with a gold trim, the cloth over
+// the chest's swell, a fold falling from under it, the belt with its buckle
+part("torso", 14, F.crotch - F.chin, { facing: "right", pivot: [7, 0], sockets: { front: [14, 10] } }, (d) => [
+  d.steel(d.poly([4, 0, 10, 0, 11, 2, 3, 2], "3")),                                                // gorget
+  d.plate(d.poly([3, 2, 9, 2, 10, 14, 11, 16, 12, 22, 12, 25, 2, 25, 2, 18, 1, 12, 1, 7, 2, 4], "w")),   // back, stomach
+  d.plate(d.poly([8, 2, 10, 2, 12, 5, 13, 9, 13, 12, 12, 14, 10, 15, 8, 12], "w")),                    // the chest's swell
+  d.hline(4, 2, 7, "O"),                                                                           // trim
+  d.line(10, 13, 9, 15, "q"), d.line(4, 7, 3, 14, "q"),                                            // folds
+  d.plate(d.poly([1, 16, 12, 16, 12, 18, 1, 18], "T")), d.plate(d.rect(9, 15, 3, 4, "O"))])        // belt, buckle
 
-// the surcoat's skirt below the belt: a gold hem, folds hanging straight. It has no front of its own
-// (two blind readers said so, against an earlier label): no facing
-part("tabard", 16, 17, { pivot: [8, 0] },
-  poly([2, 0, 13, 0, 15, 16, 0, 16], "w"),
-  vline(5, 4, 12, "q"), vline(10, 3, 13, "q"), hline(0, 15, 16, "O"), hline(0, 16, 16, "o"))
+// the surcoat's skirt: a back panel and a narrow front flap, split where the leg moves; folds
+// hanging, a gold hem. It has no front of its own (two blind readers said so): no facing
+part("tabard", 16, 17, { pivot: [8, 0] }, (d) => [
+  d.plate(d.poly([2, 0, 11, 0, 11, 16, 0, 16], "w")),
+  d.plate(d.poly([11, 0, 13, 0, 15, 16, 11, 16], "w")),
+  d.line(5, 2, 3, 14, "q"), d.line(8, 1, 8, 14, "q"),
+  d.plate(d.rect(0, 15, 16, 2, "O"))])
 
-// a leg in plate, profile: cuisse, the knee cop pointing forward, greave, sabaton; both legs are
-// this drawing (the far one comes out a step darker: the rig's `far`)
-part("leg", 10, 34, { facing: "right", pivot: [5, 0], sockets: { front: [10, 33] } },
-  poly([1, 0, 8, 0, 8, 15, 2, 15], "3"), ellipse(6, 17, 3, 2, "3"),             // thigh, knee cop
-  poly([2, 19, 7, 19, 7, 30, 3, 30], "3"), poly([2, 30, 7, 30, 9, 32, 9, 33, 2, 33], "3"),   // shin, sabaton
-  hline(2, 15, 6, "1"), hline(2, 19, 6, "1"), hline(3, 30, 5, "1"))              // plate joints
+// a leg in plate, profile: the cuisse over the thigh, the poleyn at the knee with its round wing,
+// the greave swelling over the calf, the sabaton's lames down to a pointed toe. Both legs are this
+// drawing (the far one comes out a step darker: the rig's `far`)
+part("leg", 12, 34, { facing: "right", pivot: [5, 0], sockets: { front: [12, 33] } }, (d) => [
+  d.steel(d.poly([1, 0, 8, 0, 9, 5, 8, 12, 2, 13, 1, 6], "3")),                  // cuisse
+  d.steel(d.poly([3, 16, 7, 16, 7, 28, 6, 29, 3, 29, 2, 25, 1, 21, 2, 18], "3")),   // greave
+  d.steel(d.ellipse(6, 14, 3, 2, "3")), d.steel(d.ellipse(4, 14, 2, 2, "3")),    // poleyn, its wing
+  d.steel(d.poly([2, 29, 7, 29, 9, 31, 11, 32, 11, 33, 2, 33], "3")),           // sabaton
+  d.hline(3, 31, 5, "1"), d.px(1, 16, "T"), d.px(1, 17, "T")])                   // its lames, the knee strap
 for (const s of ["", "l_"]) for (const side of ["l", "r"]) sprite(`knight_${s}leg_${side}`, { base: `knight_${s}leg` })
 
-// the right arm: pauldron, the upper arm straight down, the elbow's couter behind, the forearm
-// reaching forward to the gauntlet closed on the sword's grip in front of the hip
-part("arm_r", 10, 27, { facing: "right", pivot: [4, 0], sockets: { front: [9, 23] } },
-  ellipse(4, 3, 4, 3, "3"), rect(0, 3, 9, 3, "3"),                               // pauldron
-  rect(2, 6, 5, 7, "3"), ellipse(2, 13, 2, 2, "3"),                              // upper arm, couter
-  poly([2, 13, 6, 13, 8, 20, 4, 21], "3"), ellipse(6, 23, 3, 3, "3"),            // forearm, gauntlet
-  hline(0, 5, 9, "1"), hline(2, 12, 5, "1"), line(4, 20, 8, 19, "1"))            // plate edges
-// the left arm at rest, carrying the shield: its pauldron, the upper arm down to the elbow at the
-// waist, the forearm down and forward to the fist on the shield's grip. Mostly behind the body
-// facing right, in front of it (behind the shield) facing left
-part("arm_l", 12, 22, { facing: "right", pivot: [3, 0], sockets: { front: [11, 20], elbow: ELBOW, hand: HAND } },
-  ellipse(3, 3, 3, 3, "3"), poly([1, 4, 5, 4, 5, 12, 1, 12], "3"), ellipse(3, 12, 2, 2, "3"),   // pauldron, upper arm, couter
-  line(3, 12, 9, 19, "3", 4), ellipse(9, 19, 2, 2, "3"),                                       // forearm, gauntlet
-  hline(0, 5, 6, "1"), line(2, 15, 5, 13, "1"))                                                 // plate edges
+// the right arm: the pauldron and its two lames, the rerebrace down to the couter behind the elbow
+// with its fan, the vambrace reaching forward, the gauntlet's flared cuff and the fist closed on the
+// sword's grip in front of the hip
+part("arm_r", 12, 28, { facing: "right", pivot: [5, 0], sockets: { front: [12, 25], hand: [8.5, 25.5] } }, (d) => [
+  d.steel(d.rect(3, 8, 5, 7, "3")),                                               // rerebrace
+  d.steel(d.line(4, 16, 8, 22, "3", 4)),                                          // vambrace
+  d.steel(d.ellipse(4, 16, 2, 2, "3")), d.steel(d.poly([2, 14, 5, 15, 3, 19, 1, 17], "3")),   // couter, fan
+  d.steel(d.ellipse(8, 25, 3, 2, "3")), d.steel(d.poly([6, 21, 10, 20, 11, 23, 7, 24], "3")), // fist, cuff
+  d.steel(d.poly([2, 9, 8, 9, 7, 11, 3, 11], "3")), d.steel(d.poly([1, 6, 9, 6, 9, 8, 8, 9, 2, 9, 1, 8], "3")),  // lames
+  d.steel(d.ellipse(5, 4, 4, 3, "3")),                                            // pauldron
+  d.px(10, 25, "1"), d.px(10, 26, "1"), d.px(6, 3, "O")])                         // knuckles, rivet
+// the left arm at rest, carrying the shield: the same plates, the forearm down and forward from the
+// elbow to the fist on the shield's grip (ELBOW and HAND, which the shield is drawn from)
+part("arm_l", 12, 22, { facing: "right", pivot: [3, 0], sockets: { front: [11, 20], elbow: ELBOW, hand: HAND } }, (d) => [
+  d.steel(d.rect(1, 7, 5, 5, "3")),                                               // rerebrace
+  d.steel(d.line(3, 12, 9, 19, "3", 4)),                                          // vambrace
+  d.steel(d.ellipse(3, 12, 2, 2, "3")), d.steel(d.ellipse(9, 19, 2, 2, "3")),    // couter, fist
+  d.steel(d.poly([0, 5, 6, 5, 5, 8, 1, 8], "3")), d.steel(d.ellipse(3, 3, 3, 4, "3"))])   // lame, pauldron
 
-// the shield's two faces, drawn square to the forearm (SHIELD, above): outside, a gold rim and a gold
-// cross on blue; inside, planks, the forearm strap and the hand grip with their rivets
-part("shield", SW, SH, SHIELD, shieldPoly(OUTLINE, "O"), shieldPoly(FIELD, "w"),
-  clip(FIELD.map(S).flat(), shieldLine([0, -7], [0, 13], "O", 2), shieldLine([-6, -2], [6, -2], "O", 2)))
-part("shield_back", SW, SH, SHIELD, shieldPoly(OUTLINE, "t"), shieldPoly(FIELD, "L"),
-  clip(FIELD.map(S).flat(), ...[-4, 0, 4].map((u) => shieldLine([u, -9], [u, 16], "T"))),     // planks
-  shieldLine(STRAP_A, STRAP_B, "t", 2), shieldLine(GRIP_A, GRIP_B, "t", 2),                   // forearm strap, hand grip
-  ...[STRAP_A, STRAP_B, GRIP_A, GRIP_B].map((p) => px(...S(p), "O")))                         // rivets
+// the shield's two faces, drawn square to the forearm (SHIELD, above): outside, a gold rim with its
+// rivets and a raised gold cross on blue; inside, planks, the forearm strap and the hand grip riveted on
+const sh = (d) => ({ poly: (P, c) => d.poly(P.map(S).flat(), c), line: (a, b, c, w = 1) => d.line(...S(a), ...S(b), c, w), field: FIELD.map(S).flat() })
+const RIVETS = [[-8, -8], [8, -8], [8, 3], [0, 16], [-8, 3]]
+part("shield", SW, SH, SHIELD, (d) => {
+  const s = sh(d)
+  return [d.plate(s.poly(OUTLINE, "O")), d.plate(s.poly(FIELD, "w")),
+    d.plate(d.clip(s.field, s.line([0, -7], [0, 13], "O", 2), s.line([-6, -2], [6, -2], "O", 2))),
+    ...RIVETS.map((p) => d.px(...S(p), "o"))]
+})
+part("shield_back", SW, SH, SHIELD, (d) => {
+  const s = sh(d)
+  return [d.plate(s.poly(OUTLINE, "t")), d.plate(s.poly(FIELD, "L")),
+    d.clip(s.field, ...[-4, 0, 4].map((u) => s.line([u, -9], [u, 16], "T"))),                  // planks
+    d.plate(s.line(STRAP_A, STRAP_B, "T", 2)), d.plate(s.line(GRIP_A, GRIP_B, "T", 2)),          // strap, grip
+    ...[STRAP_A, STRAP_B, GRIP_A, GRIP_B].map((p) => d.px(...S(p), "O"))]                        // rivets
+})
 
-// a longsword pointing down and forward from the hand: pommel, grip, crossguard square to the
-// blade; pivot on the grip, where the gauntlet closes. A 2 px blade is lit with a 1 px rim: with 2,
-// each of its pixels sees open space on both sides, and a diagonal leaning the other way (the
-// turned knight's) came out lit from the left (describe caught it)
-part("sword", 14, 36, { facing: "right", pivot: [2, 3], sockets: { front: [13, 35] }, lit: { ...LIT, reach: 1 } },
-  rect(1, 0, 2, 2, "O"), vline(2, 1, 5, "T"), line(0, 6, 5, 4, "O"),             // pommel, grip, crossguard
-  line(3, 7, 13, 35, "3", 2))                                                    // the blade
+// a longsword pointing down and forward from the hand: a gilt pommel and crossguard, the grip
+// wound in leather, a 3 px blade with its fuller down the middle; pivot on the grip. The blade is
+// drawn in lines, not lit as a plate (a plate this thin steps into a chain)
+part("sword", 15, 35, { facing: "right", pivot: [2, 3], sockets: { front: [14, 34] }, lit: { ...LIT, reach: 1 } }, (d) => [
+  // blade: nearly upright, its faces look mostly left and right. Leaning forward (right), its upper
+  // face looks up and right, into the light: lit, with glints; its lower face dark. Mirrored, the
+  // blade leans left: its upper face now looks left, a little away from the light, and its lower face
+  // right, a little toward it (describe caught it the other way round)
+  d.line(3, 7, 13, 33, "3", 3), d.line(4, 7, 14, 33, d.m ? "2" : "4"), d.line(2, 8, 12, 34, d.m ? "3" : "2"),
+  d.line(4, 10, 12, 31, "2"), ...(d.m ? [] : [d.px(5, 9, "5"), d.px(7, 15, "5")]),   // fuller, glints
+  d.plate(d.line(2, 1, 2, 5, "T", 2)), d.px(2, 2, "t"), d.px(2, 4, "t"),         // grip and its binding
+  d.plate(d.line(0, 7, 6, 4, "O", 2)), d.plate(d.ellipse(2, 1, 1, 1, "O"))])      // crossguard, pommel
 
-// the cape hanging behind from the shoulders, swinging back in the wind, its folds
-part("cape", 14, 44, { pivot: [11, 0] },
-  poly([8, 0, 13, 0, 13, 6, 12, 20, 13, 38, 10, 43, 6, 41, 3, 43, 0, 40, 2, 24, 5, 8], "r"),
-  line(7, 6, 4, 38, "x"), line(10, 8, 9, 40, "x"))
+// the cape hanging from a gold clasp at the shoulder and swinging back in the wind: two panels of
+// cloth, the front one over the back one, each catching the light on its own edge; the darker
+// lining shows along the back edge where the wind lifts it
+part("cape", 16, 44, { pivot: [12, 0] }, (d) => [
+  d.plate(d.poly([6, 3, 11, 3, 8, 22, 5, 40, 2, 43, 0, 40, 1, 28, 3, 14], "r")),
+  d.plate(d.poly([10, 0, 15, 0, 15, 10, 14, 24, 15, 38, 12, 43, 8, 41, 9, 22], "r")),
+  d.line(1, 29, 3, 15, "x"), d.line(0, 40, 1, 30, "x"),                           // the lining at the back edge
+  d.plate(d.ellipse(13, 1, 1, 1, "O"))])
 
 sheet("knight_parts", ["knight_head", "knight_torso", "knight_tabard", "knight_arm_r", "knight_arm_l", "knight_leg",
   "knight_shield", "knight_shield_back", "knight_sword", "knight_cape"], { pad: 2 })
@@ -160,9 +211,11 @@ sheet("knight_parts", ["knight_head", "knight_torso", "knight_tabard", "knight_a
 // rig facing left, its slots mirrored: it takes the knight_l_<slot> parts (relit above), puts its
 // left side (shield arm, left leg) in front and darkens its right (sword arm, sword) behind, and
 // mirrors the retouch. `light` is checked against each part's lit side; `far` darkens the far side.
-const PLUME = [[2, 0, "R"], [1, 0, "R"], [0, 1, "r"], [-1, 2, "r"], [-2, 3, "x"], [-3, 5, "x"], [0, 0, "R"], [-1, 1, "R"], [-2, 2, "r"], [-3, 3, "r"], [-4, 4, "x"]]
+// the plume: a feather from a holder at the back of the skull's crown, curling back over the cape
+const PLUME = [[0, 0, "x"], [0, -1, "R"], [-1, -2, "R"], [-2, -2, "R"], [-3, -2, "r"], [-4, -1, "r"], [-5, 0, "r"], [-6, 1, "x"], [-7, 2, "x"],
+  [-1, -1, "r"], [-2, -1, "r"], [-3, -1, "x"], [-4, 0, "x"], [-5, 1, "x"], [1, -1, "k"], [0, -2, "k"], [-1, -3, "k"], [-2, -3, "k"], [-3, -3, "k"]]
 rig("knight", { w: 60, h: 76, facing: "right", pivot: [X, Y(F.sole)], height: 1.8, light: LIT.light, far: 1, turn: "knight_l", slots: SLOTS },
-  ...PLUME.map(([dx, dy, k]) => px(29 + dx, 1 + dy, k)), px(28, 0, "k"), px(30, 0, "k"), px(31, 1, "k"))
+  ...PLUME.map(([dx, dy, k]) => px(29 + dx, 3 + dy, k)))
 
 // The knight, the finished knight flipped, and the turned rig, on the ground of a world 40 px to
 // the meter, lit from the top right. pxl describe reads out which way each faces, which side is
