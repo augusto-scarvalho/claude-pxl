@@ -83,7 +83,7 @@ is drawn in code, MIT.
 ## Showcase: knights built skeleton first, at a tournament
 
 <p>
-  <img src="docs/gallery/tournament.gif" width="100%" alt="Animated tournament in pixel art: two armored knights, blue and red, face each other on foot in a sand arena, the marshal between them raising a white baton; behind them a palisade, a grandstand under a striped canopy with a cheering crowd and heraldic banners, two trumpeters, striped pavilions with pennants and a castle on a hill">
+  <img src="docs/gallery/tournament.gif" width="100%" alt="Animated tournament in pixel art: two trumpeters sound a fanfare, the marshal drops his white baton, and two armored knights, blue and red, fight on foot in a sand arena, mirror to mirror: three exchanges, sparks where the blades meet, a last clash that throws both back in a cloud of dust, a salute, and the walk back to their marks; behind them a palisade, a grandstand under a striped canopy with a cheering crowd and heraldic banners, two trumpeters, striped pavilions with pennants and a castle on a hill">
 </p>
 
 The fourth, in [`examples/rig/`](examples/rig): a 72 px knight built the way
@@ -96,7 +96,10 @@ part with two faces: facing right we see its inside (straps, grip), facing left 
 hangs from the hand and lies along the forearm. Assets say which way they face and how tall they
 really are, the scene says where its horizon, eye and light are, and `pxl describe` checks every
 placement against them: which way it faces, whether it's a mirror image, its size where it
-stands, whether its feet are on the ground, which side it's lit from.
+stands, whether its feet are on the ground, which side it's lit from. Then they fight: each pose
+is a rig of its own, its sword arm, sword and legs drawn from the pose's joints (two-bone IK, the
+feet flat on the ground), and a 96-frame list of poses is the bout, with the sparks, the dust, the
+marshal's signal and the fanfare on the same clock.
 
 ## Quick start
 

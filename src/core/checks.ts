@@ -95,6 +95,28 @@ export function litDir(img: Img, steps?: Steps): [number, number] | undefined {
 }
 
 /**
+ * Across which way a long thin shape (a blade, a pole) is thin: the unit vector across it, or
+ * undefined when it isn't: its pixels, outline and all, spread no more than 2 px (a standard
+ * deviation) either side of its long axis, and 4.5 times that along it. A sword with its crossguard
+ * counts, a leg with its foot doesn't. ponytail: second moments of the whole drawing, so a blade with
+ * a big hand on it may not count; a skeleton of the shape would.
+ */
+function thinAcross(img: Img): [number, number] | undefined {
+  let n = 0, mx = 0, my = 0, xx = 0, yy = 0, xy = 0;
+  for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++)
+    if (img.data[y * img.w + x] !== TRANSPARENT) { n++; mx += x; my += y; xx += x * x; yy += y * y; xy += x * y; }
+  if (n < 10) return undefined;
+  mx /= n; my /= n;
+  const a = xx / n - mx * mx, c = yy / n - my * my, b = xy / n - mx * my;
+  const mid = (a + c) / 2, r = Math.hypot((a - c) / 2, b), lo = mid - r, hi = mid + r;
+  if (lo > 4 || hi < 20 * lo) return undefined;
+  // the eigenvector of the small spread
+  const v: [number, number] = Math.abs(b) > 1e-9 ? [lo - c, b] : a < c ? [1, 0] : [0, 1];
+  const k = Math.hypot(...v);
+  return [v[0] / k, v[1] / k];
+}
+
+/**
  * The side a drawing is lit from, checked against the light it should be under ([x, y] toward the
  * light). It only claims what the rim shows clearly: a side (left or right) at 0.3 ramp steps or more
  * (0.08 in luminance), and nothing when the reading says lit from below while the light comes from
@@ -105,7 +127,19 @@ export function litDir(img: Img, steps?: Steps): [number, number] | undefined {
 export function lightWords(img: Img, light?: [number, number], steps?: Steps): string {
   const d = litDir(img, steps);
   if (!d) return "";
-  const m = Math.hypot(...d);
+  const m = Math.hypot(...d), n = thinAcross(img);
+  if (n) {
+    // a blade: its rim shows two faces, so the reading only says which one is lit; whether that
+    // one looks toward the light is what can be checked (lit from the top left, a blade lying
+    // up and to the right can be right: its upper face looks up, into a light from the top right)
+    const dn = d[0] * n[0] + d[1] * n[1];
+    if (Math.abs(dn) < 0.5 * m) return "";
+    if (!light) return "lit on one face";
+    const ln = (light[0] * n[0] + light[1] * n[1]) / Math.hypot(...light);
+    if (Math.abs(ln) < 0.1) return "";
+    return Math.sign(dn) === Math.sign(ln) ? "lit on its face toward the light"
+      : `WARNING: lit on its face away from the light, which comes from ${dirWords(light[0], light[1])} (a flipped drawing carries its light to the other side)`;
+  }
   if (light && light[1] < -0.2 && d[1] > 0.2 * m) return "";
   const side = Math.abs(d[0]) >= (steps ? 0.3 : 0.08) && Math.abs(d[0]) >= 0.25 * m;
   const from = `lit from ${side ? dirWords(d[0], d[1]) : dirWords(0, d[1])}`;
@@ -129,12 +163,18 @@ export function frontWords(img: Img): string {
       if (x >= 0 && y >= 0 && x < img.w && y < img.h && img.data[y * img.w + x] !== TRANSPARENT) on = true;
   if (!on) return `WARNING: its front marker (${s[0]},${s[1]}) is off the drawing`;
   if (!f || Math.hypot(f[0], f[1]) < 0.5) return "";
-  // halves split at the drawing's center of mass, not its box: a trumpet or a lance held out in
-  // front stretches the box forward, past a face that is still the front
-  let n = 0, cx = 0, cy = 0;
-  for (let i = 0; i < img.data.length; i++) if (img.data[i] !== TRANSPARENT) { n++; cx += (i % img.w) + 0.5; cy += Math.floor(i / img.w) + 0.5; }
-  cx /= n; cy /= n;
-  const dot = (s[0] - cx) * f[0] + (s[1] - cy) * f[1];
-  if (dot < 0) return `WARNING: its front marker is on its back half: the drawing faces ${dirWords(-f[0], -f[1]).replace("the ", "")}, its label says ${dirWords(f[0], f[1]).replace("the ", "")}`;
+  // Behind the middle twice over: behind the drawing's center of mass (not its box: a trumpet or a
+  // lance held out in front stretches the box past a face that is still the front) and behind the
+  // middle of what lies within 4 px of it (a leg reaching back has most of its mass ahead of its toe,
+  // but the toe is still the front of its foot). A drawing that faces the other way fails both.
+  const behind = (x0: number, y0: number, x1: number, y1: number) => {
+    let n = 0, cx = 0, cy = 0;
+    for (let y = Math.max(0, y0); y <= Math.min(img.h - 1, y1); y++)
+      for (let x = Math.max(0, x0); x <= Math.min(img.w - 1, x1); x++)
+        if (img.data[y * img.w + x] !== TRANSPARENT) { n++; cx += x + 0.5; cy += y + 0.5; }
+    return n > 0 && (s[0] - cx / n) * f[0] + (s[1] - cy / n) * f[1] < 0;
+  };
+  const sx = Math.floor(s[0]), sy = Math.floor(s[1]);
+  if (behind(0, 0, img.w - 1, img.h - 1) && behind(sx - 4, sy - 4, sx + 4, sy + 4)) return `WARNING: its front marker is on its back half: the drawing faces ${dirWords(-f[0], -f[1]).replace("the ", "")}, its label says ${dirWords(f[0], f[1]).replace("the ", "")}`;
   return "front marker agrees";
 }

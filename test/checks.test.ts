@@ -28,6 +28,7 @@ test("front marker: on the half the label faces; off the drawing or on the back 
 sprite("head_wrong", { base: "head", facing: "left" })
 sprite("head_off", { base: "head", sockets: { front: [0, -3] } })
 sprite("herald", { w: 20, h: 9, facing: "right", outline: "k", sockets: { front: [7, 4] } }, rect(0, 0, 6, 9, "d"), hline(6, 4, 14, "6"))
+sprite("stride", { w: 18, h: 28, facing: "right", outline: "k", sockets: { front: [9, 25] } }, rect(8, 0, 10, 8, "d"), line(10, 8, 3, 24, "d", 3), rect(1, 24, 8, 3, "d"))
 sprite("blade", { w: 12, h: 12, outline: "k" }, line(0, 11, 11, 0, "d", 2), relight(undefined, { light: [0.6, -1], ramps: ["1d6"] }))`, "t.px.js");
   assert.equal(frontWords(p.image("head")), "front marker agrees");
   // the label says left, but the marker (the nose) is on the right half: the drawing faces right
@@ -35,6 +36,8 @@ sprite("blade", { w: 12, h: 12, outline: "k" }, line(0, 11, 11, 0, "d", 2), reli
   assert.match(frontWords(p.image("head_off")), /WARNING: its front marker \(\d+,-?\d+\) is off the drawing/);
   // a trumpet held out in front stretches the box past the face; the face is still the front
   assert.equal(frontWords(p.image("herald")), "front marker agrees");
+  // a leg reaching back: its mass is ahead of the toe, but the toe is the front of its foot
+  assert.equal(frontWords(p.image("stride")), "front marker agrees");
   // a thin diagonal's top edges are its left ones: left and top can't be told apart, so x is left unsaid
   assert.equal(litDir(p.image("blade"))?.[0] ?? 0, 0);
 });
@@ -46,6 +49,18 @@ sprite("head_l", { base: "head", flip: "x" })`, "t.px.js");
   assert.ok(d[0] > 0 && d[1] < 0, `lit from the top right, got ${d}`);
   assert.equal(lightWords(p.image("head"), [0.6, -1]), "lit from the top right, as its light");
   assert.match(lightWords(p.image("head_l"), [0.6, -1]), /^WARNING: lit from the top left, but its light comes from the top right/);
+});
+
+test("light: a blade shows two faces; the lit one has to look toward the light", () => {
+  const lit = (name: string, line: string) => `sprite("${name}", { w: 26, h: 28, outline: "k" }, ${line}, relight(undefined, { light: [0.6, -1], reach: 1, ramps: ["1d6"] }))`;
+  const p = loadSource(PAL + lit("lying", 'line(1, 14, 24, 2, "d", 3)') + "\n" + lit("steep", 'line(9, 26, 16, 1, "d", 3)') + `
+sprite("steep_l", { base: "steep", flip: "x" })`, "t.px.js");
+  // lying up and to the right, its upper face looks up and to the left: into a light from the top
+  // right all the same (read by sides it would say "lit from the top left")
+  assert.equal(lightWords(p.image("lying"), [0.6, -1]), "lit on its face toward the light");
+  assert.equal(lightWords(p.image("steep"), [0.6, -1]), "lit on its face toward the light");
+  // flipped, the lit face looks left and down, away from it
+  assert.match(lightWords(p.image("steep_l"), [0.6, -1]), /^WARNING: lit on its face away from the light/);
 });
 
 test("describe: feet above where a thing stands, and off the ground", async () => {

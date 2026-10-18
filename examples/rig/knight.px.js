@@ -225,3 +225,235 @@ scene("knights", { w: 200, h: 92, bg: "#2a2f3e", world: { scale: 40, light: LIT.
   rect(0, 84, 200, 8, "T"), hline(0, 84, 200, "L"),
   layer("knights", stamp("knight", 40, 84), stamp("knight", 100, 84, { flip: "x" }), stamp("knight_l", 160, 84)),
   text(40, 2, "RIG", "4", { align: "c" }), text(100, 2, "FLIP", "4", { align: "c" }), text(160, 2, "TURN", "4", { align: "c" }))
+
+// ---------------------------------------------------------------- stage 4: poses
+// A pose is a rig of its own. What moves is drawn from the pose's joints: the sword arm from the
+// shoulder to where the pose puts the fist (two bones, the elbow bending down and back), the sword at
+// the pose's angle from the fist, each leg from the hip to its foot flat on the ground (the knee
+// bending forward). Built plate by plate like the parts above, lit by the same rule, facing right and
+// mirrored; of the blade's edges the one looking toward the light in the picture is the lit one, so
+// it changes sides as the sword turns. The rest (head, torso, tabard, cape, the shield arm and the
+// shield) is the parts above, carried with the body: `bob` lowers it (feet apart need it, and get it
+// whether asked or not), `lean` takes the upper body forward. pose() builds a pose's parts and its two
+// rigs, knight_<name> and knight_l_<name>, once per distinct pose.
+const LU = 12, LF = 11, LT = 14, LS = 15, STAND = 29          // upper arm, forearm, thigh, shin; ankle under the hip
+const OX = 25, OY = 36, RW = 110, RH = 112                    // room around the body for a swung sword
+const nm = (...v) => v.map((x) => String(Math.round(x)).replace("-", "m")).join("_")
+const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]
+// two bones a, b from (0, 0) reaching for t, the joint bent to the +angle side (bend 1) or the other:
+// the joint, and the end (on t, or as far toward it as they reach)
+const ik = (a, b, [tx, ty], bend) => {
+  const d = Math.min(Math.hypot(tx, ty), a + b - 0.01), f = Math.atan2(ty, tx)
+  const al = Math.acos(Math.max(-1, Math.min(1, (a * a + d * d - b * b) / (2 * a * d))))
+  return [[a * Math.cos(f + bend * al), a * Math.sin(f + bend * al)], [d * Math.cos(f), d * Math.sin(f)]]
+}
+// the box around some points with r px of room, and a point's pixel in it
+const boxOf = (pts, r) => {
+  const x0 = Math.floor(Math.min(...pts.map((p) => p[0])) - r), y0 = Math.floor(Math.min(...pts.map((p) => p[1])) - r)
+  return { w: Math.ceil(Math.max(...pts.map((p) => p[0])) + r) - x0 + 1, h: Math.ceil(Math.max(...pts.map((p) => p[1])) + r) - y0 + 1,
+    P: ([x, y]) => [Math.round(x - x0), Math.round(y - y0)] }
+}
+const made = new Set()
+const once = (name, make) => { if (!made.has(name)) { made.add(name); make(name) } return name }
+
+// the sword arm, from the pauldron's middle to the fist: rerebrace, vambrace, the couter at the elbow,
+// the gauntlet's cuff and fist, the lames and the pauldron over them. Its front is the fist when it is
+// out in front, else the pauldron
+const armPart = (hand) => once(`arm_${nm(...hand)}`, (name) => {
+  const s = [0, 0], [e, h] = ik(LU, LF, hand, 1), { w, h: bh, P } = boxOf([s, e, h], 5)
+  const S = P(s), E = P(e), H = P(h), front = h[0] > 2 ? [H[0] + 2.5, H[1] + 0.5] : [S[0] + 4.5, S[1] + 0.5]
+  part(name, w, bh, { facing: "right", pivot: [S[0], S[1] - 4], sockets: { front, hand: [H[0] + 0.5, H[1] + 0.5] } }, (d) => [
+    d.steel(d.line(...S, ...E, "3", 5)),                                     // rerebrace
+    d.steel(d.line(...E, ...H, "3", 4)),                                     // vambrace
+    d.steel(d.ellipse(...E, 2, 2, "3")),                                     // couter
+    d.steel(d.line(...P(lerp(e, h, 0.55)), ...P(lerp(e, h, 0.8)), "3", 5)),  // cuff
+    d.steel(d.ellipse(...H, 2, 2, "3")),                                     // fist
+    d.steel(d.line(...P(lerp(s, e, 0.3)), ...P(lerp(s, e, 0.55)), "3", 6)),  // lames
+    d.steel(d.ellipse(...S, 4, 3, "3")), d.px(S[0] + 1, S[1] - 1, "O")])    // pauldron, rivet
+})
+
+// the longsword at any angle (degrees, clockwise from pointing forward), pivot on the grip: pommel,
+// the grip wound in leather, the crossguard square to the blade, a 3 px blade and its fuller. Its tip
+// is its front only while it points forward: swung back, a sword has no front of the knight's
+const swordPart = (deg) => once(`sword_${nm(deg)}`, (name) => {
+  const a = (deg * Math.PI) / 180, b = [Math.cos(a), Math.sin(a)], n = [-b[1], b[0]]
+  const at = (t, s = 0) => [t * b[0] + s * n[0], t * b[1] + s * n[1]]
+  const { w, h, P } = boxOf([at(-4), at(32), at(4, 4), at(4, -4)], 2), G = P([0, 0]), tip = P(at(31))
+  part(name, w, h, { facing: "right", pivot: [G[0] + 0.5, G[1] + 0.5],
+    ...(b[0] > 0.3 ? { sockets: { front: [tip[0] + 0.5, tip[1] + 0.5] } } : {}), lit: { ...LIT, reach: 1 } }, (d) => {
+    const L = [d.m ? -0.6 : 0.6, -1], dot = (n[0] * L[0] + n[1] * L[1]) / Math.hypot(...L), up = dot > 0 ? 1 : -1
+    const edge = (s, c) => d.line(...P(at(4.5, s)), ...P(at(31, s)), c)
+    return [
+      d.line(...P(at(4.5)), ...P(at(31)), "3", 3), edge(up, "4"), edge(-up, "2"),
+      d.line(...P(at(7)), ...P(at(28)), "2"),                                                     // fuller
+      ...(Math.abs(dot) > 0.6 ? [d.px(...P(at(8, up)), "5"), d.px(...P(at(15, up)), "5")] : []),   // glints
+      d.plate(d.line(...P(at(-2)), ...P(at(2)), "T", 2)), d.px(...P(at(-1)), "t"), d.px(...P(at(1)), "t"),
+      d.plate(d.line(...P(at(3.5, -3.5)), ...P(at(3.5, 3.5)), "O", 2)), d.plate(d.ellipse(...P(at(-3.5)), 1, 1, "O"))]
+  })
+})
+
+// a leg from the hip to its foot flat on the ground, the ankle at `ank` from the hip: cuisse, the
+// poleyn and its wing at the knee, greave, the sabaton's lames to the toe
+const legPart = (ank) => once(`leg_${nm(...ank)}`, (name) => {
+  const hip = [0, 0], [k, a] = ik(LT, LS, ank, -1)
+  const foot = [[-2.5, 0], [2.5, 0], [4.5, 2], [6.5, 3], [6.5, 4], [-2.5, 4]].map(([x, y]) => [a[0] + x, a[1] + y])
+  const { w, h, P } = boxOf([hip, k, ...foot], 4), H = P(hip), K = P(k), A = P(a), toe = P(foot[3])
+  part(name, w, h, { facing: "right", pivot: H, sockets: { front: [toe[0] + 0.5, toe[1] + 0.5] } }, (d) => [
+    d.steel(d.line(...H, ...K, "3", 6)),                                                          // cuisse
+    d.steel(d.line(...K, ...A, "3", 4)),                                                          // greave
+    d.steel(d.ellipse(K[0] + 1, K[1], 3, 2, "3")), d.steel(d.ellipse(K[0] - 1, K[1], 2, 2, "3")),  // poleyn, wing
+    d.steel(d.poly(foot.map(P).flat(), "3")),                                                     // sabaton
+    d.hline(A[0] - 2, A[1] + 2, 5, "1"), d.px(K[0] - 3, K[1] + 2, "T")])
+})
+
+// p: { hand: [x, y] from the pauldron's middle, sword: degrees, feet: [[x from its hip, lift] of the
+// far (left) foot, of the near (right) one], bob, lean } -> the pose's name
+const bobOf = (p) => Math.max(p.bob ?? 0, ...(p.feet ?? [[0]]).map(([x]) => {
+  const v = STAND - Math.sqrt((LT + LS - 0.01) ** 2 - x * x)
+  return v > 0.1 ? Math.ceil(v) : 0
+}))
+const POSES = new Map()
+const pose = (p) => {
+  const { hand, sword, feet = [[-0.5, 0], [-0.5, 0]], lean = 0 } = p, bob = bobOf(p)
+  const key = nm(...hand, sword, ...feet.flat(), lean, bob)
+  if (POSES.has(key)) return POSES.get(key)
+  const name = `pose${POSES.size}`
+  POSES.set(key, name)
+  const legs = feet.map(([x, lift]) => legPart([x, STAND - bob - lift])), arm = armPart(hand), blade = swordPart(sword)
+  const MOVED = { leg_l: [0, bob, legs[0]], leg_r: [0, bob, legs[1]], arm_r: [lean, bob, arm], sword: [lean, bob, blade] }
+  for (const [pre, m] of [["knight_", false], ["knight_l_", true]]) {
+    const slots = Object.fromEntries(Object.entries(SLOTS).map(([k, s]) => {
+      const [dx, dy, own] = MOVED[k] ?? [lean, bob], x = s.at[0] + OX + dx, y = s.at[1] + OY + dy
+      return [k, { ...s, at: [m ? RW - x : x, y], part: pre + (own ?? k),
+        ...(s.faces ? { faces: { outer: pre + "shield", inner: pre + "shield_back" } } : {}) }]
+    }))
+    rig(pre + name, { w: RW, h: RH, facing: m ? "left" : "right", pivot: [m ? RW - X - OX : X + OX, Y(F.sole) + OY], height: 1.8,
+      light: LIT.light, far: 1, slots },
+      ...PLUME.map(([dx, dy, k]) => { const x = 29 + OX + lean + dx; return px(m ? RW - 1 - x : x, 3 + OY + bob + dy, k) }))
+  }
+  return name
+}
+
+// ---------------------------------------------------------------- stage 5: a bout
+// The knight and the one turned, mirror to mirror, a sword's reach apart: each cut meets the other's
+// blade halfway, over the middle, and sparks fly from it. Three exchanges (a cut from above, a rising
+// one, another from above), then both wind up all the way and the last clash throws them both back: a
+// draw. They salute, the sword up before the visor, and walk back to their marks. 96 frames at 8 fps
+// (12 s); it begins on frame 21, leaving a scene the first 20 for what comes before (a fanfare, the
+// marshal's signal). Each knight is an anim whose pivot is the middle of the lists, so both stamp on
+// the same spot, and so does knight_bout_fx (sparks, dust).
+const HALF = 33                                               // each one's mark from the middle
+const GUARD = [[-7, 0], [6, 0]], LUNGE = [[-10, 0], [10, 0]]  // the far foot back, the near one forward
+const MOVES = {
+  rest: { hand: [3.5, 21.5], sword: 69 },
+  guardIn: { hand: [8, 10], sword: -60, feet: [[-4, 0], [3, 0]] },
+  guard: { hand: [9, 6], sword: -50, feet: GUARD, lean: 1 },
+  windHigh: { hand: [-2, -16], sword: -150, feet: GUARD, lean: -1 },
+  cut: { hand: [13, -8], sword: -35, feet: LUNGE, bob: 3, lean: 2 },
+  recoil: { hand: [10, -8], sword: -75, feet: GUARD },
+  windLow: { hand: [-6, 14], sword: 160, feet: GUARD },
+  rise: { hand: [13, -4], sword: -55, feet: LUNGE, bob: 3, lean: 2 },
+  windBig: { hand: [-4, -18], sword: -160, feet: GUARD, lean: -2 },
+  big: { hand: [14, -6], sword: -45, feet: [[-12, 0], [11, 0]], bob: 4, lean: 3 },
+  thrown: { hand: [-1, -11], sword: -125, feet: [[-9, 0], [8, 0]], lean: -3 },
+  stagger: { hand: [7, 8], sword: 25, feet: [[-6, 0], [5, 0]], lean: -1 },
+  saluteIn: { hand: [8, 2], sword: -60, feet: [[-3, 0], [2, 0]] },
+  salute: { hand: [6, -5], sword: -88, feet: [[-1.5, 0], [0.5, 0]] },
+  lower: { hand: [6, 12], sword: 35 },
+}
+// [frames, move, dx: how far forward of its mark]
+const RUNS = [[21, "rest", 0], [1, "guardIn", 0], [4, "guard", 0],
+  [2, "windHigh", -1], [2, "cut", 4], [1, "recoil", 2], [3, "guard", 0],                 // a cut from above
+  [2, "windLow", -1], [2, "rise", 6], [1, "recoil", 2], [2, "guard", 0],                 // a rising cut
+  [1, "windHigh", -1], [2, "cut", 4], [1, "recoil", 2], [2, "guard", 0],                 // from above again, quicker
+  [3, "windBig", -2], [2, "big", 5],                                                     // the last
+  [1, "thrown", 1], [1, "thrown", -5], [1, "thrown", -10], [1, "thrown", -13], [1, "thrown", -14],
+  [1, "stagger", -14], [4, "guard", -14], [1, "saluteIn", -14], [4, "salute", -14], [1, "lower", -14], [2, "rest", -14]]
+const BOUT = RUNS.flatMap(([n, m, dx]) => Array(n).fill([pose(MOVES[m]), dx, m]))
+// the walk back: three steps (the near foot, the far one, the near one), 4 frames each; the foot on
+// the ground stays put while the body goes over it, the other is lifted and swung through
+const HIPS = [SLOTS.leg_l.at[0] - X, SLOTS.leg_r.at[0] - X]
+let body = -14
+const ank = HIPS.map((h) => body + h - 0.5)
+for (const [i, len] of [[1, 7], [0, 14], [1, 7]]) {
+  const b0 = body, a0 = ank[i]
+  for (let k = 1; k <= 4; k++) {
+    const t = k / 4, dx = Math.round(b0 + (len / 2) * t)
+    body = b0 + (len / 2) * t
+    ank[i] = a0 + (len * (1 - Math.cos(Math.PI * t))) / 2
+    const feet = HIPS.map((h, j) => [Math.round(ank[j] - dx - h), j === i ? Math.round(3 * Math.sin(Math.PI * t)) : 0])
+    BOUT.push([pose({ ...MOVES.rest, feet }), dx, "walk", feet])
+  }
+}
+while (BOUT.length < 96) BOUT.push([pose(MOVES.rest), 0, "rest"])
+
+const AW = 130, AX = 102, SOLE = Y(F.sole) + OY
+anim("knight_bout", { w: AW, h: RH, frames: 96, fps: 8, pivot: [AX, SOLE], facing: "right", height: 1.8 }, (c) => {
+  const [name, dx] = BOUT[c.frame]
+  c.stamp("knight_" + name, AX - HALF + dx, SOLE)
+})
+anim("knight_l_bout", { w: AW, h: RH, frames: 96, fps: 8, pivot: [AW - AX, SOLE], facing: "left", height: 1.8 }, (c) => {
+  const [name, dx] = BOUT[c.frame]
+  c.stamp("knight_l_" + name, AW - AX + HALF - dx, SOLE)
+})
+
+// Where the blades cross: on the middle line, from the fist along the blade (from the pivot, y up is
+// negative). The frame each cut lands, and where.
+const clash = (m, dx) => {
+  const [, h] = ik(LU, LF, m.hand, 1), a = (m.sword * Math.PI) / 180
+  const hx = -HALF + dx - 1 + (m.lean ?? 0) + Math.round(h[0]), hy = -54 + bobOf(m) + Math.round(h[1])
+  return [0, Math.round(hy - (hx / Math.cos(a)) * Math.sin(a))]
+}
+const HITS = BOUT.flatMap(([, dx, m], f) => ["cut", "rise", "big"].includes(m) && BOUT[f - 1][2] !== m ? [{ f, big: m === "big", at: clash(MOVES[m], dx) }] : [])
+// a foot's toe (near) or heel (far) on the ground, from the middle, for the blue one (the red one: -x)
+const footAt = ([, dx, m, walk], j) => -HALF + dx + HIPS[j] + (walk ?? MOVES[m].feet ?? [[-0.5], [-0.5]])[j][0] + (j ? 5 : -3)
+
+// The sparks: the frame the blades hit, a white-hot star; the next, a smaller one, and the sparks
+// flying out and falling, gold, then orange, then red, gone in a few frames (the last clash: twice as
+// many, flying farther, and the star lasting a frame longer). Dust: a puff at the front foot as it stamps into each cut,
+// and from all four feet as the last clash slides them back; brown, for the scene to swap to its ground.
+const FW = 150, FX = 75
+anim("knight_bout_fx", { w: FW, h: RH, frames: 96, fps: 8, pivot: [FX, SOLE] }, (c) => {
+  const puff = (x, y, age) => {
+    if (age === 0) c.ellipse(x, y, 1, 1, "L")
+    else if (age === 1) c.ellipse(x, y - 1, 2, 1, "L")
+    else if (age === 2) { c.px(x - 3, y - 1, "T"); c.px(x + 2, y - 2, "T"); c.px(x, y - 3, "T") }
+  }
+  for (const { f, big, at: [cx, cy] } of HITS) {
+    const age = c.frame - f, x = FX + cx, y = SOLE + cy, rnd = c.rng(f + 1)
+    if (age >= 0 && age < 3) for (const s of [-1, 1]) puff(FX + s * footAt(BOUT[f], 1), SOLE - 1, age)
+    if (age < 0 || age > (big ? 6 : 4)) continue
+    if (age === 0) {
+      const r = big ? 8 : 5, q = big ? 4 : 2
+      c.line(x - r, y, x + r, y, "Y"); c.line(x, y - r, x, y + r, "Y")
+      c.line(x - q, y - q, x + q, y + q, "Y"); c.line(x - q, y + q, x + q, y - q, "Y")
+      c.rect(x - 1, y - 1, 3, 3, "5"); c.line(x - r + 3, y, x + r - 3, y, "5"); c.line(x, y - r + 3, x, y + r - 3, "5")
+    } else if (age === 1) {
+      const r = big ? 6 : 2
+      c.line(x - r, y, x + r, y, "Y"); c.line(x, y - r, x, y + r, "Y"); c.px(x, y, "5")
+      if (big) { c.rect(x - 1, y - 1, 3, 3, "5"); c.line(x - 2, y - 2, x + 2, y + 2, "Y"); c.line(x - 2, y + 2, x + 2, y - 2, "Y") }
+    }
+    for (let i = 0; i < (big ? 18 : 9); i++) {
+      const a = rnd() * Math.PI * 2, v = 2 + rnd() * (big ? 3 : 2), life = 2 + Math.floor(rnd() * (big ? 5 : 3))
+      if (age < 1 || age > life) continue
+      const p = (t) => [Math.round(x + Math.cos(a) * v * t), Math.round(y + Math.sin(a) * v * t + 0.4 * t * t)]
+      c.line(...p(age - 0.7), ...p(age), age < 2 ? "5" : age < 3 ? "Y" : age < 5 ? "O" : "R")
+    }
+  }
+  BOUT.forEach((b, f) => {
+    if (b[2] !== "thrown") return
+    for (const s of [-1, 1]) for (const j of [0, 1]) puff(FX + s * footAt(b, j), SOLE - 1, c.frame - f)
+  })
+})
+
+// every move in a row, and the bout on bare ground
+const RED = { q: "x", w: "r", e: "R", x: "q", r: "w", R: "e" }
+const SHOWN = ["rest", "guard", "windHigh", "cut", "windLow", "rise", "windBig", "big", "thrown", "salute"]
+scene("knight_moves", { w: 60 * SHOWN.length, h: 116, bg: "#2a2f3e", world: { scale: 40, light: LIT.light, ground: 108 } },
+  rect(0, 108, 60 * SHOWN.length, 8, "T"), hline(0, 108, 60 * SHOWN.length, "L"),
+  ...SHOWN.map((m, i) => stamp("knight_" + pose(MOVES[m]), 26 + 60 * i, 108)),
+  ...SHOWN.map((m, i) => text(30 + 60 * i, 2, m.toUpperCase(), "4", { align: "c" })))
+scene("bout", { w: 240, h: 120, bg: "#2a2f3e", world: { scale: 40, light: LIT.light, ground: 112 } },
+  rect(0, 112, 240, 8, "T"), hline(0, 112, 240, "L"),
+  layer("knights", stamp("knight_l_bout", 120, 112, { swap: RED }), stamp("knight_bout", 120, 112)),
+  layer("fx", stamp("knight_bout_fx", 120, 112)))

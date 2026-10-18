@@ -316,15 +316,32 @@ hidden), so a turned rig may need its new near limbs drawn.
 flips and turns. What reads the pixels:
 - lettering is tracked from `text()` itself: a mirrored sign is always caught;
 - a part's `front` socket, put on the pixel that is its front (the visor, the toe, the fist, the
-  blade's tip), has to sit on the drawing, on the half its `facing` names (split at its center of
-  mass, so a trumpet or a lance held out in front doesn't push the line past the face): a drawing
-  that faces the other way than its label is caught, as long as the marker is on the right pixel;
+  blade's tip), has to sit on the drawing, on the half its `facing` names: it is called out when it
+  is behind both the drawing's center of mass and the middle of what lies within 4 px of it (a
+  trumpet held out in front pulls the mass past a face; a leg reaching back has its mass ahead of its
+  toe; neither is wrong). A drawing that faces the other way than its label is caught, as long as the
+  marker is on the right pixel. A sword swung back has no front of the knight's: give it no marker;
 - the lit side, read off each part's rim as steps along its ramps, against the rig's or the scene's
-  `light`. It only claims a side when the rim shows it clearly, and stays quiet on thin diagonals and
-  on readings lit from below. Tried on art it wasn't tuned on (forest, cemetery, island: 30 objects),
+  `light`. It only claims a side when the rim shows it clearly, and stays quiet on readings lit from
+  below. A long thin shape (a blade, a pole) shows only two faces, so it says which one is lit and
+  whether that one looks toward the light: a blade lying up and to the right is lit on its upper face,
+  up and to the left, under a light from the top right, and that is right. Tried on art it wasn't tuned on (forest, cemetery, island: 30 objects),
   it agreed or stayed quiet, caught a flipped tombstone lit from the wrong side, and was wrong once,
   on a building whose outline is mostly trims: look before trusting a warning;
 - in a rig, a part labelled another way than the rig (a head facing left on a body facing right).
+**Moving it: a pose is a rig.** A rig has no frames, but it doesn't need them: give each pose a
+rig of its own and let an anim pick one per frame. What moves is best drawn from the pose's joints
+rather than by hand: an arm from the shoulder to where the pose puts the hand (two bones: the elbow
+comes out of the lengths, bent down and back), a sword at any angle from the hand, a leg from the hip
+to its foot flat on the ground (the knee bent forward, the body lowered when the feet are apart).
+Drawn plate by plate and relit like the hand-drawn parts, they look like them, and the rig still
+orders, darkens and checks them. The rest are the drawn parts, moved with the body. Build both
+facings of every pose (the mirrored parts are free with a draw helper that flips x) instead of
+`turn`, which looks up parts by the rig's name. Then the timing is a list: `[frames, pose, how far
+forward]`, and anything else on the same clock (sparks where the blades meet, dust at the feet, a
+marshal's signal) is computed from it. `examples/rig/knight.px.js` (stages 4 and 5): fifteen moves,
+a bout of three exchanges, a clash that throws both back, a salute and the walk back to the marks.
+
 For the labels themselves, `PXL blind <file> <rig>` writes the parts unnamed and shuffled for a
 reader who doesn't know the labels, and `--check answers.json` compares. A reader that is another
 Claude may share your blind spots (left/right is exactly where they hide): prefer a different model,

@@ -332,7 +332,8 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     out.push("OBJECTS (in drawing order: later ones are in front; ranges are inclusive px; feet = bottom middle):");
     for (const i of main) {
       const p = b.placements[i], sh = shown[i];
-      if (!sh.n) { out.push(`  ${sym.get(kOf(i))} ${label(i)} @${p.layer ?? "-"}: hidden (all ${sh.all} px covered)`); continue; }
+      // an anim can draw nothing at the moment described (sparks between clashes): that is not hidden
+      if (!sh.n) { out.push(`  ${sym.get(kOf(i))} ${label(i)} @${p.layer ?? "-"}: ${sh.all ? `hidden (all ${sh.all} px covered)` : "nothing drawn in this frame"}`); continue; }
       const parts = [`x ${sh.x0}-${sh.x1}, y ${sh.y0}-${sh.y1} (${sh.x1 - sh.x0 + 1}x${sh.y1 - sh.y0 + 1}), feet ${Math.round((sh.x0 + sh.x1) / 2)},${sh.y1}`];
       if (sh.n < sh.all) parts.push(`${Math.round((100 * sh.n) / sh.all)}% shows`);
       parts.push(`colors ${keysOf(i)}`);

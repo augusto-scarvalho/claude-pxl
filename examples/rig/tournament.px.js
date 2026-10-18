@@ -2,7 +2,9 @@
 // red one (the same rig turned, its colors swapped), each with the shield on its left arm and the
 // sword in its right hand. Behind them the lists' palisade, the grandstand under a striped canopy
 // with the crowd on its tiers, the pavilions with their pennants, a castle on the hill, clouds
-// drifting over (the loop is 12 s for them; everything else repeats every second). Daylight
+// drifting over. Everything runs on one 12 s loop (96 frames at 8 fps): the trumpeters sound a
+// fanfare, the marshal drops his baton, and the knights fight their bout (knight.px.js, stage 5), a
+// draw; they walk back to their marks and it starts again. Daylight
 // from the top right, as the knights are lit. The ground is seen in perspective: the horizon at
 // y 104 and the eye 1.6 m up make 40 px to the meter where the knights stand (y 168), so their
 // 1.8 m is 72 px, and everything with a height is checked against it by pxl describe.
@@ -184,20 +186,21 @@ const BANNERS = [[20, "w", "e"], [56, "r", "R"], [92, "w", "e"], [128, "r", "R"]
   poly([x, 9, x + 8, 9, x + 8, 20, x + 4, 23, x, 20], c), vline(x + 7, 9, 12, l), hline(x, 9, 9, "k"),
   rect(x + 3, 11, 2, 8, "Z"), rect(x + 1, 13, 6, 2, "Z")])
 sprite("stand_full", { w: STAND_W, h: STAND_H, pivot: "bottom", height: 4.1 }, stamp("grandstand", STAND_W / 2, STAND_H), ...crowd, ...BANNERS)
-// a herald's trumpeter in a red and gold tabard, 1.7 m, so 18 px where the stand stands. A fanfare
-// every 3 s, both together: the trumpet comes up to the lips, the call in threes (the bell lifting
-// on each note, the banner hanging from it swinging), then down to the waist, the banner still.
-const CALL = [0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1]                                      // the bell up on the notes
-anim("trumpeter", { w: 12, h: 18, frames: 24, fps: 8, pivot: [4, 18], outline: "k", facing: "right", height: 1.7, sockets: { front: [6, 3] } }, (c) => {
+// a herald's trumpeter in a red and gold tabard, 1.7 m, so 18 px where the stand stands. The
+// fanfare opens the loop, both together: the trumpet comes up to the lips, the call in threes (the
+// bell lifting on each note, the banner hanging from it swinging) and a long last note, then down to
+// the waist for the bout, the banner still.
+const CALL = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1]                          // the bell up on the notes
+anim("trumpeter", { w: 12, h: 18, frames: 96, fps: 8, pivot: [4, 18], outline: "k", facing: "right", height: 1.7, sockets: { front: [6, 3] } }, (c) => {
   c.rect(2, 2, 4, 4, "j"); c.rect(2, 1, 4, 2, "Z"); c.px(5, 3, "z")                    // face, cap
   c.rect(1, 6, 6, 7, "r"); c.rect(1, 6, 3, 7, "y"); c.hline(1, 12, 6, "Z")             // tabard, quartered
   c.rect(2, 13, 2, 5, "q"); c.rect(5, 13, 2, 5, "q")                                   // legs
   const f = c.frame
-  if (f >= 2 && f < 14) {                                                              // playing
+  if (f >= 2 && f < 18) {                                                              // playing
     const s = CALL[f - 2], d = 1 - s                                                    // the bell a pixel lower between notes
     c.line(6, 4, 11, 1 + d, "Z"); c.px(11, d, "Z"); c.px(11, 2 + d, "Z")
     c.poly([8, 4 + d, 10, 3 + d, 10 + s, 7 + d, 9 + s, 8 + d], "r"); c.px(9, 5 + d, "Z")
-  } else if (f < 16) {                                                                 // on the way up or down
+  } else if (f < 20) {                                                                 // on the way up or down
     c.line(6, 6, 11, 5, "Z"); c.px(11, 4, "Z"); c.px(11, 6, "Z")
     c.poly([8, 7, 10, 6, 10, 10, 9, 11], "r"); c.px(9, 8, "Z")
   } else {                                                                             // at rest, at the waist
@@ -231,22 +234,30 @@ sprite("palisade", { w: 14, h: 16, wrap: "x" },
 
 // ---------------------------------------------------------------- the marshal
 // the tournament's marshal, between the two and a little behind, facing us: a red chaperon, a
-// tabard quartered in both knights' colors, his right hand (our left) holding the white baton up;
-// when it drops, they fight. 1.65 m on row 140 is 37 px
-sprite("marshal", { w: 15, h: 37, pivot: [7, 37], outline: "k", selout: true, facing: "front", height: 1.65 },
-  vline(1, 0, 8, "c"), rect(1, 7, 2, 2, "j"), rect(1, 9, 2, 8, "c"),                   // baton, hand, raised sleeve
-  ellipse(7, 12, 3, 3, "j"), px(6, 12, "z"), px(8, 12, "z"), hline(6, 14, 3, "J"),     // face
-  ellipse(7, 9, 4, 2, "r"), hline(3, 10, 9, "R"),                                       // chaperon
-  rect(6, 15, 3, 1, "J"),                                                               // neck
-  rect(3, 16, 4, 13, "w"), rect(8, 16, 4, 13, "r"), vline(7, 16, 13, "Z"), hline(3, 28, 9, "Z"),   // tabard
-  rect(12, 17, 2, 8, "c"), rect(12, 25, 2, 2, "j"),                                     // the other arm, down
-  rect(4, 29, 3, 6, "q"), rect(8, 29, 3, 6, "q"), rect(3, 35, 4, 2, "t"), rect(8, 35, 4, 2, "t"),   // hose, shoes
-  relight([3, 7, 11, 22], { light: LIGHT, reach: 1 }))
+// tabard quartered in both knights' colors, his right hand (our left) holding the white baton;
+// when it drops, they fight. 1.65 m on row 140 is 37 px. His arm and baton: up through the fanfare,
+// swept down at the signal (frame 20), up again as the knights walk back to their marks
+const BATON = {
+  up: [vline(11, 0, 8, "c"), rect(11, 7, 2, 2, "j"), rect(11, 9, 2, 8, "c")],
+  out: [line(12, 17, 8, 13, "c", 2), rect(6, 11, 2, 2, "j"), line(6, 11, 1, 6, "c")],
+  down: [rect(11, 17, 2, 8, "c"), rect(11, 25, 2, 2, "j"), line(11, 27, 8, 33, "c")],
+}
+anim("marshal", { w: 25, h: 37, pivot: [17, 37], fps: 8, outline: "k", selout: true, facing: "front", height: 1.65 },
+  layer("body", { x: 10 },
+    ellipse(7, 12, 3, 3, "j"), px(6, 12, "z"), px(8, 12, "z"), hline(6, 14, 3, "J"),     // face
+    ellipse(7, 9, 4, 2, "r"), hline(3, 10, 9, "R"),                                       // chaperon
+    rect(6, 15, 3, 1, "J"),                                                               // neck
+    rect(3, 16, 4, 13, "w"), rect(8, 16, 4, 13, "r"), vline(7, 16, 13, "Z"), hline(3, 28, 9, "Z"),   // tabard
+    rect(12, 17, 2, 8, "c"), rect(12, 25, 2, 2, "j"),                                     // the other arm, down
+    rect(4, 29, 3, 6, "q"), rect(8, 29, 3, 6, "q"), rect(3, 35, 4, 2, "t"), rect(8, 35, 4, 2, "t"),   // hose, shoes
+    relight([3, 7, 11, 22], { light: LIGHT, reach: 1 })),
+  frame({ hold: 20 }, ...BATON.up), frame(...BATON.out), frame({ hold: 64 }, ...BATON.down), frame(...BATON.out), frame({ hold: 10 }, ...BATON.up))
 
 // ---------------------------------------------------------------- the two knights
-// the red one: the same turned rig, its surcoat and shield field red, its cape blue
-const RED = { q: "x", w: "r", e: "R", x: "q", r: "w", R: "e" }
-const KNIGHTS = [["knight", 112, {}], ["knight_l", 210, { swap: RED }]]
+// fighting their bout, both anims on the middle of the lists; the red one (knight.px.js's RED: its
+// surcoat and shield field red, its cape blue) first, so the blue one's sword, on its near side,
+// crosses over the red one's, on its far side
+const KNIGHTS = [["knight_l_bout", 160, { swap: RED }], ["knight_bout", 160, {}]]
 // their shadows: the sun high at the top right lays them short, to the left and toward us
 const knights = KNIGHTS.map(([n, x, o]) => stamp(n, x, FEET, o))
 const shadows = [...KNIGHTS.map(([n, x, o]) => stamp(n, x, FEET, { ...o, cast: [-0.45, 0.1], silhouette: "k" })),
@@ -266,11 +277,12 @@ scene("tournament", { w: W, h: H, bg: "A", world: { horizon: HZ, eye: EYE, light
   layer("veil", { opacity: 0.32 }, ...veil),
   layer("valley", { opacity: 0.45 }, ...valleyMist, rect(0, 102, W, 2, "D")),
   layer("field", ...field, ...sand),
-  layer("stands", { sort: "y" }, stamp("stand_full", 92, 122), stamp("trumpeter", 14, 122), stamp("trumpeter", 184, 122, { flip: "x" }),
+  layer("stands", { sort: "y" }, stamp("stand_full", 92, 122), stamp("trumpeter", 14, 122), stamp("trumpeter", 252, 122, { flip: "x" }),
     stamp("pavilion_set", 210, 121), stamp("pavilion_set", 304, 121, { swap: { w: "r" } })),
   layer("lists", tile("palisade", 0, 117, 23, 1)),
   layer("shadows", { shade: true }, ...shadows,
     ...[["stand_full", 92], ["pavilion_set", 210], ["pavilion_set", 304]].map(([n, x]) =>
       stamp(n, x, n === "stand_full" ? 122 : 121, { cast: [-0.45, 0.1], silhouette: "k" })),
-    ...[[14, {}], [184, { flip: "x" }]].map(([x, o]) => stamp("trumpeter", x, 122, { ...o, cast: [-0.45, 0.1], silhouette: "k" }))),
-  layer("knights", { sort: "y" }, stamp("marshal", 160, 140), ...knights))
+    ...[[14, {}], [252, { flip: "x" }]].map(([x, o]) => stamp("trumpeter", x, 122, { ...o, cast: [-0.45, 0.1], silhouette: "k" }))),
+  layer("knights", { sort: "y" }, stamp("marshal", 160, 140), ...knights),
+  layer("sparks", stamp("knight_bout_fx", 160, FEET, { swap: { L: "v", T: "d" } })))
