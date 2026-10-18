@@ -20,11 +20,14 @@ import { serve } from "./server.ts";
 import { checkProject } from "./check.ts";
 import { diffRow, frameTime, otherVersion, shotChanges, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
+import { listProject } from "./list.ts";
 
 const USAGE = `pxl — pixel-art DSL
 
-  pxl help [name]
-      What the reference says about an op or option (and where the examples use it); no name: an index.
+  pxl help [name | "words of a heading"] [--all]
+      What the reference says about an op or option: the rows that define it, a line for each other
+      mention, and a few uses in the examples (--all: everything in full). Words of a guide's
+      heading print that section ("characters 9", "small animals"). No name: an index.
   pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
       previews (out/_preview; animated assets also get a .gif). A whole file prints a count of what
@@ -36,7 +39,9 @@ const USAGE = `pxl — pixel-art DSL
   pxl ascii <art.px.js> <name> [--frame N]
       Print an asset as palette keys with x/y rulers (anims: every frame; --frame N: that one).
   pxl list  <art.px.js>
-      List assets, groups and sheets with their source locations.
+      A map of the file (and what it includes): each top-level statement that defines assets, its
+      line range, the comment above it and what it defines (a loop's many assets on one line); then
+      groups and sheets. Read those lines instead of the whole file.
   pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief]   (or: pxl describe <image.png> [...])
       A whole scene as text to read at once: what was painted (steps grouped by source line), what
       was placed where, cell maps (object on top, color before lighting, brightness after it), how
@@ -94,6 +99,7 @@ interface Args {
   frames?: number[];
   vs?: string;
   list?: boolean;
+  all?: boolean;
 }
 
 function parse(argv: string[]): Args {
@@ -132,6 +138,7 @@ function parse(argv: string[]): Args {
     else if (v === "--frames") a.frames = val().split(",").map((s) => Number(s.trim()));
     else if (v === "--vs") a.vs = val();
     else if (v === "--list") a.list = true;
+    else if (v === "--all") a.all = true;
     else if (v === "-h" || v === "--help") a.cmd = "usage";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -146,7 +153,7 @@ export async function main(argv: string[]): Promise<number> {
   try { a = parse(argv); } catch (e) { console.error(wrap(e).message); return 2; }
   if (a.cmd === "help") {
     // the reference looked up, not read: an index, or what it says about one name
-    console.log(help(a.file) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | check | shot | compare (pxl --help for their options)"));
+    console.log(help(a.file, { all: a.all }) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | check | shot | compare (pxl --help for their options)"));
     return 0;
   }
   if (!a.cmd || a.cmd === "usage" || !a.file) {
@@ -186,13 +193,7 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case "list": {
-        const p = loadProject(file);
-        for (const n of p.order) {
-          const d = p.assets.get(n)!;
-          console.log(`${d.kind.padEnd(6)} ${n.padEnd(24)} ${d.loc ?? ""}`);
-        }
-        for (const g of p.groups.values()) console.log(`${"group".padEnd(6)} ${g.name.padEnd(24)} ${g.loc ?? ""}  [${g.members.join(" ")}]`);
-        for (const s of p.sheets) console.log(`${"sheet".padEnd(6)} ${s.name.padEnd(24)} ${s.loc ?? ""}`);
+        for (const l of listProject(loadProject(file))) console.log(l);
         return 0;
       }
       case "describe": {

@@ -248,15 +248,17 @@ Wave 1: fewer calls.
   which made a whole 2:1 scene cost ~2x a preview.
 
 Wave 2: less read early.
-- [ ] **Short `pxl help`**: the row that defines the name, then one line per other place that
+- [x] **Short `pxl help`**: the row that defines the name, then one line per other place that
   mentions it (section and sentence), examples capped at 3 (`--all` for the rest). `help stamp`
   is 5.5k characters, mostly whole rows of other ops that mention stamp.
-- [ ] **Guide sections on demand**: `pxl help "<heading>"` prints that section of a guide, and
+- [x] **Guide sections on demand**: `pxl help "<heading>"` prints that section of a guide, and
   SKILL.md's table names the sections to read (a walk: characters.md §9-10) instead of "whole".
   The run read characters.md whole twice (10k) and reference.md in `sed` slices (7.6k).
-- [ ] **`pxl list` as a file's map**: each definition's line range, the comment above it, and the
+- [x] **`pxl list` as a file's map**: each definition's line range, the comment above it, and the
   assets a loop makes grouped on one line (knight.px.js: 330 lines today). Then an agent reads the
   40 lines of the example it needs, and the asset it is fixing in its own file, not the whole file.
+  Shipped: `help stamp` 5.5k -> 1.6k characters, `help plate` 3.0k -> 1.2k; `pxl help "characters
+  1 9"` prints those sections; `list` of knight.px.js 330 lines (16.6k characters) -> 22 (2.1k).
 
 Wave 3: experiments, measured before anything is built.
 - [ ] **Sub-agents for the props of a big scene**: each draws one prop from its spec in a small

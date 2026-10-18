@@ -215,24 +215,33 @@ export class Project implements BuildCtx {
     if (!this.files.includes(file)) this.files.push(file);
   }
 
-  locFromStack(stack: string): string | undefined {
+  /**
+   * The art-file location a stack was called from: its innermost frame in an art file, or with
+   * `outer`, the outermost frame in that same file (the top-level statement that led to the call,
+   * through helper functions and callbacks).
+   */
+  locFromStack(stack: string, outer = false): string | undefined {
+    let found: string | undefined, file: string | undefined;
     for (const line of stack.split("\n")) {
       for (const f of this.files) {
         const i = line.indexOf(f + ":");
-        if (i < 0) continue;
+        if (i < 0 || (file && f !== file)) continue;
         const m = /^:(\d+):(\d+)/.exec(line.slice(i + f.length));
-        if (m) return `${shortName(f)}:${m[1]}:${m[2]}`;
+        if (!m) continue;
+        found = `${shortName(f)}:${m[1]}:${m[2]}`;
+        if (!outer) return found;
+        file = f;
       }
     }
-    return undefined;
+    return found;
   }
 
-  callerLoc(): string | undefined {
+  callerLoc(outer = false): string | undefined {
     const limit = Error.stackTraceLimit;
     Error.stackTraceLimit = 60;
     const stack = new Error().stack ?? "";
     Error.stackTraceLimit = limit;
-    return this.locFromStack(stack);
+    return this.locFromStack(stack, outer);
   }
 
   // ---------------------------------------------------------------- DSL
@@ -248,8 +257,8 @@ export class Project implements BuildCtx {
       const opts = (isPlainObject(rest[0]) ? rest.shift() : {}) as AssetOpts;
       checkKeys(`${kind} '${name}'`, opts, ASSET_OPTS[kind], loc);
       const items = checkItems(`${kind} '${name}'`, rest, loc);
-      const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc);
-      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, png });
+      const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true);
+      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png });
       this.order.push(name);
       // twin: the same items drawn mirrored before they're lit, facing the other way
       const twin = (opts as { twin?: unknown }).twin;
@@ -258,7 +267,7 @@ export class Project implements BuildCtx {
       const other = this.assets.get(twin) ?? this.groups.get(twin);
       if (other) throw new PxError(`'${twin}' (the twin of '${name}') is already defined at ${other.loc}`, loc);
       const { twin: _, ...topts } = opts as AssetOpts & { twin?: string };
-      this.assets.set(twin, { kind, name: twin, opts: topts, items, pal: this.pal, loc, png, mirror: true });
+      this.assets.set(twin, { kind, name: twin, opts: topts, items, pal: this.pal, loc, top, png, mirror: true });
       this.order.push(twin);
     };
 

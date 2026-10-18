@@ -322,6 +322,28 @@ scene("s", { w: 30, h: 30, bg: "1", world: { scale: 5, ground: 26 } }, stamp("ma
   assert.doesNotMatch(await said("shot", file, "s", "--at", "0,0,10,10"), /since the last shot/);
 });
 
+test("pxl list maps a file: each statement that defines assets, its lines, the comment above, a loop's assets on one line", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
+  writeFileSync(join(dir, "parts.px.js"), `use("pico8")\n// a dot\nsprite("dot", "8")\n`);
+  writeFileSync(file, [
+    `include("parts.px.js", { palette: true })`,
+    `const part = (n) => sprite(n, { w: 2, h: 1 },`,
+    `  px(0, 0, "8"), px(1, 0, "7"))`,
+    `// the gems: one per color`,
+    `for (const c of ["r", "g", "b", "y", "w"])`,
+    `  part("gem_" + c)`,
+    // a regex with a bracket in it, and a template with an expression, don't throw the count off
+    `sprite("slash", { w: 1, h: 1 }, (c) => c.px(0, 0, /[(]/.test("(") ? "8" : "7"))`,
+    "scene(`s${\"\" + \"\"}`, { w: 4, h: 4 }, stamp(\"dot\", 0, 0))",
+  ].join("\n"));
+  const text = await said("list", file);
+  // the helper's sprite() call is not where the gems are made: the loop that calls it is
+  assert.match(text, /^parts\.px\.js \(\d+ lines\)\n {2}3-3 +sprite: dot {2}\/\/ a dot$/m);
+  assert.match(text, /^ {2}5-6 +sprite x5: gem_r, gem_g, gem_b, gem_y \(\+1\) {2}\/\/ the gems: one per color$/m);
+  assert.match(text, /^ {2}7-7 +sprite: slash$/m);
+  assert.match(text, /^ {2}8-8 +scene: s$/m);
+});
+
 test("cli build reports per-asset errors and still writes the rest", async () => {
   const { dir, file } = tmpArt(`use("pico8")\nsprite("good", "8")\nsprite("bad", "z")`);
   const err = console.error, log = console.log;
@@ -542,8 +564,28 @@ test("pxl help: an index of the reference, or what it says about one name and wh
   } finally { console.log = log; }
   const [index, wrap, typo] = lines;
   assert.match(index, /Ops > Shapes: px rect box line curve/);
-  assert.match(index, /scenes\.md: Layout and scale;/);
+  assert.match(index, /scenes\.md: Layout and scale \(\d\.\d\);/);
   assert.match(wrap, /\[reference\.md: Assets > Sprite \/ scene options\]\n\| `wrap: true/);
-  assert.match(wrap, /\[examples: \d+ uses\]\n {2}examples\/[\w/]+\.px\.js:\d+:/);
+  assert.match(wrap, /\[examples: \d+ uses[^\]]*\]\n {2}examples\/[\w/]+\.px\.js:\d+:/);
   assert.match(typo, /nothing about 'scater'.*did you mean 'scatter'/);
+});
+
+test("pxl help is short: other mentions a line each, a guide section by its heading, --all for everything", async () => {
+  const said = async (...argv: string[]) => {
+    const log = console.log, lines: string[] = [];
+    console.log = (s: string) => lines.push(s);
+    try { await main(argv); } finally { console.log = log; }
+    return lines.join("\n");
+  };
+  const stamp = await said("help", "stamp"), full = await said("help", "stamp", "--all");
+  // the row that defines it whole; every other place one line, a few of them; three example uses
+  assert.match(stamp, /^\| `stamp\(name, x, y, opts\?\)` \|/m);
+  assert.match(stamp, /^ {2}\(…\d+ more: pxl help stamp --all\)$/m);
+  assert.match(stamp, /\[examples: \d+ uses, 3 shown\]/);
+  assert.ok(stamp.length < 2500 && full.length > 2 * stamp.length, `${stamp.length} vs ${full.length}`);
+  // words of a heading: that section, whole; a guide's name narrows to it
+  assert.match(await said("help", "small animals"), /^\[characters\.md\]\n## 9\. Small animals\n/);
+  assert.match(await said("help", "characters 9"), /^\[characters\.md\]\n## 9\. Small animals\n/);
+  // a name that is an op: its rows, and the sections that share its words named, not printed
+  assert.match(await said("help", "light"), /\[guides: 3 sections\]\n {2}pxl help "scenes Shadows and light"/);
 });

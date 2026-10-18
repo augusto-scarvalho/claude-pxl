@@ -43,17 +43,23 @@ the others.
 
 ## Looking things up
 
-Don't read reference.md whole. `PXL help` lists every op and option by section; `PXL help <name>`
-prints what the reference says about it and where the examples use it (a few hundred tokens).
-Read the guide your task needs, whole, before starting:
+Don't read reference.md or a guide whole: what you read early is paid again on every later turn.
+`PXL help` lists every op and option by section, and each guide's sections with their size;
+`PXL help <name>` prints what the reference says about it and where the examples use it;
+`PXL help "<guide> <numbers or words of a heading>"` prints those sections. Read the ones your
+task needs before starting:
 
 | Making | Read |
 |---|---|
-| a person, humanoid or small animal; limbs that animate | [characters.md](characters.md) |
-| a big figure or prop (48 px and up), built part by part on a skeleton | [characters.md](characters.md) §11 (`rig`) |
-| a scene, level, building or environment | [scenes.md](scenes.md) |
-| lamps, night, light blocked by walls | [lighting.md](lighting.md) |
-| a turn that isn't a quarter turn; 8/16 directions | [rotation.md](rotation.md) |
+| a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate |
+| a small animal | `PXL help "characters 1 9"` |
+| a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
+| a scene, level, building or environment | [scenes.md](scenes.md), whole (~3k tokens) |
+| lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2k tokens) |
+| a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
+
+An example, or your own file after many edits: `PXL list <file>` maps it (each definition's line
+range, the comment above it, what a loop makes on one line). Read those lines, not the file.
 
 ## Template
 

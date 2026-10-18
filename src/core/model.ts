@@ -184,6 +184,8 @@ export interface AssetDef {
   items: Item[];
   pal: Palette;
   loc?: string;
+  /** Where the top-level statement that defined it makes its call (a loop's, a helper's caller): `pxl list` groups by it. */
+  top?: string;
   /** The decoded `png` option (its `area` applied), read when the art file ran. */
   png?: Img;
   /** A twin: the items of the asset it was made from, drawn mirrored (before lighting). */
