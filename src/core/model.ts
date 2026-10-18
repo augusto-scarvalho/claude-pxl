@@ -213,6 +213,9 @@ export interface ScatterOpts extends PlaceOpts {
   below?: boolean;
   /** Even spacing: one pick per cell of a grid sized to `count`, at a random spot in the cell. */
   even?: boolean;
+  /** Center must also be within `within` px (default 2) of these keys: along a path, at a rock's foot. */
+  near?: string;
+  within?: number;
 }
 
 export interface TilemapOpts extends PlaceOpts {

@@ -451,3 +451,14 @@ test("chain: links keep their length, hang along gravity, trail behind travel, a
   const run = chain([[0, 0], [0, 0]], { links: 3, follow: 1.5, step: [0, 1], max: 3, move: [-2, 0] });
   assert.ok(run[0][3][0] > 1 && run[0].every((p, i) => i === 0 || Math.hypot(p[0] - run[0][i - 1][0], p[1] - run[0][i - 1][1]) <= 3 + 1e-9));
 });
+
+test("scatter near: only where `on` is within `within` px of `near`; sorted layers order scattered picks too", () => {
+  // a 9x1 strip of grass with dirt at x 0: tufts land only on grass next to the dirt
+  const S = PAL + 'sprite("t", "w"); ';
+  const out = art(S + 'scene("s", { w: 9, h: 1 }, rect(0, 0, 9, 1, "g"), px(0, 0, "k"), scatter("t", 0, 0, 9, 1, 3, { on: "g", near: "k", within: 1 }))', "s");
+  assert.equal(out, "kw" + "g".repeat(7));
+  assert.match(failure(S + 'scene("s", { w: 9, h: 1 }, rect(0, 0, 9, 1, "g"), scatter("t", 0, 0, 9, 1, 3, { on: "g", near: "k" }))', "s").message, /within 2 px of 'k' matched nothing/);
+  // in a sort: "y" layer a scattered pick standing lower covers a stamp standing higher
+  const T = PAL + 'sprite("post", { pivot: "bottom" }, "r\\nr"); sprite("dot", "w"); ';
+  eq(art(T + 'scene("s", { w: 1, h: 3, bg: "g" }, layer("l", { sort: "y" }, stamp("post", 0, 3), scatter("dot", 0, 2, 1, 1, 1)))', "s"), "g\nr\nr");
+});

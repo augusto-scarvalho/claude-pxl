@@ -26,7 +26,11 @@ declare global {
     /** Draw order in a layer with sort: "z" (default 0; ties keep call order). */
     z?: number;
   }
-  interface PxScatter extends PxPlace { on?: string; clip?: boolean; below?: boolean; even?: boolean }
+  interface PxScatter extends PxPlace {
+    on?: string; clip?: boolean; below?: boolean; even?: boolean;
+    /** Center also within `within` px (default 2) of these keys: grass along a path, moss at a rock's foot. */
+    near?: string; within?: number;
+  }
   interface PxTilemap extends PxPlace {
     /** char -> asset; with corners, corner mask (0-15) -> asset, or a name prefix ("shore_" -> shore_<mask>). */
     map: Record<string, string> | string;

@@ -178,6 +178,8 @@ To see how a complex piece was built, in order: `PXL steps <example> <asset> --o
   Keep small details that dot an area (pebbles, stones, flowers, tufts) out of tiles: baked in, they
   repeat as a pattern. Lay plain tiles, then `scatter(..., { even: true })` the details over the area.
 - Organic texture (leaves, grass, stones, rust): 2–3 tiny brush parts + `scatter` with `on`/`clip`.
+  Along an edge (grass on a path's border, moss at a rock's foot): `scatter(..., { on: "g", near:
+  "<path keys>", within: 3 })`.
 - **No filler noise.** Don't sprinkle `noise` speckle over walls, floors or plaster to make them
   "less flat": it reads as random dots, not material. Every mark on a surface needs a cause you
   could name, and it should sit where that cause would put it:

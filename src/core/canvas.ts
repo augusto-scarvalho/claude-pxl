@@ -520,17 +520,23 @@ export class Canvas {
   stamp(name: string, x = 0, y = 0, opts?: PlaceOpts): void {
     if (opts?.at !== undefined) [x, y] = this.socketAt(opts.at, x, y);
     const src = this.asset(name, opts, x, y), [px, py] = src.pivot ?? [0, 0];
-    const tx = x - Math.floor(px), ty = y - Math.floor(py);
-    this.placed?.set(opts?.id ?? name, { x: this.ox + tx, y: this.oy + ty, sockets: src.sockets });
-    if (!this.sorted) return this.put(src, tx, ty);
-    const z = opts?.z ?? 0;
-    if (!Number.isFinite(z)) throw new PxError(`z must be a number, got ${JSON.stringify(opts?.z)}`);
+    this.placed?.set(opts?.id ?? name, { x: this.ox + x - Math.floor(px), y: this.oy + y - Math.floor(py), sockets: src.sockets });
+    this.place(src, x, y, [0, 0], undefined, opts?.z);
+  }
+
+  /**
+   * Put a placed asset's pivot on (x, y): drawn now, or in a sorted layer queued and drawn on
+   * flush() by y (where it stands) or z.
+   */
+  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0): void {
+    if (!this.sorted) return this.putAt(src, x, y, def, ok);
+    if (!Number.isFinite(z)) throw new PxError(`z must be a number, got ${JSON.stringify(z)}`);
     // Drawn later, in order: keep the clip that was active at the call.
     const clip = this.clipPred, q = this.sorted.queue;
     q.push({ key: this.sorted.by === "y" ? y : z, seq: q.length, draw: () => {
       const prev = this.clipPred;
       this.clipPred = clip;
-      try { this.put(src, tx, ty); } finally { this.clipPred = prev; }
+      try { this.putAt(src, x, y, def, ok); } finally { this.clipPred = prev; }
     } });
   }
 
@@ -643,7 +649,18 @@ export class Canvas {
   /** Brush: `count` random picks of `name` centered at random points in the area. */
   scatter(name: string, x: number, y: number, w: number, h: number, count: number, opts: ScatterOpts = {}): void {
     const r = rng(hash(x * 31 + w, y * 17 + h, (opts.seed ?? 0) + this.seed));
-    const ok = this.maskAt(opts.on, opts.below);
+    const on = this.maskAt(opts.on, opts.below);
+    let ok = on;
+    if (opts.near !== undefined) {
+      // also within `within` px of a pixel in the `near` keys: grass along a path, moss at a rock's foot
+      const near = this.maskAt(opts.near, opts.below), d = opts.within ?? 2, k = Math.ceil(d);
+      if (!(d >= 0)) throw new PxError(`scatter: within must be a distance in px, got ${opts.within}`);
+      ok = (cx, cy) => {
+        if (!on(cx, cy)) return false;
+        for (let dy = -k; dy <= k; dy++) for (let dx = -k; dx <= k; dx++) if (dx * dx + dy * dy <= d * d && near(cx + dx, cy + dy)) return true;
+        return false;
+      };
+    }
     let placed = 0, tries = 0;
     if (opts.even) {
       // One pick per cell of a grid sized to `count`, at a random spot inside it: spread evenly over
@@ -654,7 +671,7 @@ export class Canvas {
           for (let t = 0; t < 30; t++) {
             const cx = x + Math.floor(((i + r()) * w) / cols), cy = y + Math.floor(((j + r()) * h) / rows);
             if (!ok(cx, cy)) continue;
-            this.putAt(this.asset(name, opts, cx, cy), cx, cy, [0.5, 0.5], opts.clip ? ok : undefined);
+            this.place(this.asset(name, opts, cx, cy), cx, cy, [0.5, 0.5], opts.clip ? on : undefined);
             placed++;
             break;
           }
@@ -664,13 +681,12 @@ export class Canvas {
       tries++;
       const cx = x + Math.floor(r() * w), cy = y + Math.floor(r() * h);
       if (!ok(cx, cy)) continue;
-      const src = this.asset(name, opts, cx, cy);
-      this.putAt(src, cx, cy, [0.5, 0.5], opts.clip ? ok : undefined);
+      this.place(this.asset(name, opts, cx, cy), cx, cy, [0.5, 0.5], opts.clip ? on : undefined);
       placed++;
     }
     // A brush that silently paints nothing is the usual sign of an empty layer under `on`.
-    if (opts.on !== undefined && count > 0 && placed === 0)
-      throw new PxError(`scatter: 'on: ${opts.on}' matched nothing in [${x}, ${y}, ${w}, ${h}] (0 of ${count} placed)` +
+    if ((opts.on !== undefined || opts.near !== undefined) && count > 0 && placed === 0)
+      throw new PxError(`scatter: ${opts.on !== undefined ? `'on: ${opts.on}'` : "nothing"}${opts.near !== undefined ? ` within ${opts.within ?? 2} px of '${opts.near}'` : ""} matched nothing in [${x}, ${y}, ${w}, ${h}] (0 of ${count} placed)` +
         (opts.below || !this.layerName ? "" : "; a layer starts empty: add below: true to read the layers under it"));
   }
 

@@ -95,12 +95,6 @@ const TRAIL = `
 const trail = tilemap(TRAIL, { corners: "#", size: T, map: "dirt_" })
 const tc = TRAIL.trim().split("\n").map((r) => [...r.trim()].map((ch) => (ch === "#" ? 1 : 0)))
 const dirt = (i, j) => tc[j]?.[i] ?? 0
-// How much dirt there is at a pixel: the 4 corners blended (0 grass ... 1 dirt). The tiles' dirt
-// reaches out to about 0.3 of the way from a dirt corner to a grass one.
-const dirtAt = (x, y) => {
-  const i = Math.floor(x / T), j = Math.floor(y / T), u = x / T - i, v = y / T - j
-  return dirt(i, j) * (1 - u) * (1 - v) + dirt(i + 1, j) * u * (1 - v) + dirt(i, j + 1) * (1 - u) * v + dirt(i + 1, j + 1) * u * v
-}
 
 // ---------------------------------------------------------------- ground cover
 // Fallen leaves and seedlings, evenly spread so they never clump into a pattern.
@@ -177,21 +171,11 @@ sprite("sprout", { pivot: "bottom" }, ".l.g\ngGlG\n.HH.")
 group("clump", ["grass_a", "grass_a", "grass_b", "weed", "grass_flower"])
 const CLUMPS = ["grass_a", "grass_b", "weed", "grass_a", "grass_flower", "grass_b", "weed"]
 
-// Along both edges of the trail, where its dirt gives way to grass, on a jittered 6px grid (so it
-// never reads as a hedge); now and then a sprout on the trail, where feet go less.
-const pick = rng(11)
-const trailEdge = []
-for (let y = 3; y < H; y += 6) for (let x = 3; x < W; x += 6) {
-  const px = x + Math.floor(pick() * 5) - 2, py = y + Math.floor(pick() * 5) - 2, f = dirtAt(px, py), r = pick()
-  if (f > 0.12 && f < 0.3 && r < 0.75) trailEdge.push([CLUMPS[Math.floor(pick() * CLUMPS.length)], px, py])
-  else if (f > 0.85 && r < 0.06) trailEdge.push(["sprout", px, py])
-}
 // Around the foot of every tree and palm, and against rocks and the log.
 const AROUND = { tree: [[-20, -1], [-16, 1], [-9, 2], [-4, 3], [5, 3], [10, 2], [17, 0], [22, -1]], tree2: [[-12, 0], [-7, 2], [6, 3], [11, 1]],
   palm: [[-7, 1], [6, 2]], rock: [[-9, 1], [8, 0]], rock_small: [[6, 1]], log: [[-24, 1], [22, 0], [0, 2]] }
 const bridge = (x, y) => x >= 108 && x <= 196 && y >= 136 && y <= 166
 const GRASS = [
-  ...trailEdge,
   ...PLANTS.flatMap(([n, x, y]) => (AROUND[n] ?? []).map(([dx, dy], k) => [CLUMPS[(k + x) % CLUMPS.length], x + dx, y + dy])),
 ].filter(([, x, y]) => x > 2 && x < W - 2 && y > 6 && y < H + 4 && !isWater(x, y - 1) && !isWater(x, y - 4) && !bridge(x, y))
 
@@ -294,7 +278,11 @@ scene("forest", { w: W, h: H },
   layer("dapples", { light: 1 }, ...DAPPLES.map(([x, y, rx, ry]) => ellipse(x, y, rx, ry, "Z"))),
   layer("bridge", stamp("bridge", 112, 140)),
   // sort: "y" draws what stands lower (nearer) over what stands higher, whatever the call order
-  layer("props", { sort: "y" }, ...[...PLANTS, ...GRASS, ["girl", 92, 137]].map(place)),
+  layer("props", { sort: "y" }, ...[...PLANTS, ...GRASS, ["girl", 92, 137]].map(place),
+    // grass along both edges of the trail (on grass within 3 px of its dirt), and now and then a
+    // sprout on the trail itself, where feet go less; sorted with the rest by where they stand
+    scatter("clump", 0, 0, W, H, 110, { on: "g", near: "aAo", within: 3, below: true, even: true, rflip: "x", seed: 23 }),
+    scatter("sprout", 0, 0, W, H, 8, { on: "a", below: true, seed: 29 })),
   layer("perch", stamp("macaw", 116, 142)),
   // in the trees: the jaguar on the big tree's low branch, the monkey under a leaf pad of the other
   layer("fauna", stamp("jaguar", 21, 73), stamp("monkey", 150, 51)),
