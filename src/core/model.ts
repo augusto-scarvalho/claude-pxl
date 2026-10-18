@@ -111,6 +111,22 @@ export interface AssetOpts {
   loop?: boolean;
   /** anim: playback direction, as Aseprite tags have it (default "forward"). */
   dir?: "forward" | "reverse" | "pingpong";
+  /** Which way it faces as drawn: "right", "left", "front" (toward us) or "back". Flips and turns follow it; describe reports it. */
+  facing?: "right" | "left" | "front" | "back";
+  /** Its real height in meters, for a scene's `world` scale (describe says how tall it should be where it stands). */
+  height?: number;
+  /** Scene: the world's scale, { horizon, eye } (ground seen in perspective) or { scale } (px per meter, flat side view). */
+  world?: World;
+}
+
+/**
+ * A scene's world scale. Ground in perspective: the horizon's row and the eye's height in meters
+ * (a thing standing on row y is (y - horizon) / eye px per meter). Flat side view: px per meter.
+ */
+export interface World {
+  horizon?: number;
+  eye?: number;
+  scale?: number;
 }
 
 export type AssetKind = "sprite" | "scene" | "anim";

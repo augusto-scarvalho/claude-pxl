@@ -14,6 +14,21 @@ export interface Lamp {
   z: number;
 }
 
+/**
+ * Which way a placed thing is turned, in picture space: x right, y down, z into the picture (so a
+ * body's right is forward x up). From the asset's `facing`; flips and rotations turn it.
+ */
+export interface Orient {
+  /** Where its front points: [1, 0, 0] facing right, [0, 0, -1] facing us. Unset: no front given. */
+  f?: [number, number, number];
+  /** Where its top points: [0, -1, 0] upright. */
+  u: [number, number, number];
+  /** Flipped an odd number of times: a mirror image, its drawn right side now plays its left. */
+  mirrored: boolean;
+  /** It has lettering, which a mirror turns backwards. */
+  text: boolean;
+}
+
 /** RGBA image as packed colors. Out-of-bounds reads are transparent, writes are ignored. */
 export class Img {
   readonly w: number;
@@ -35,6 +50,10 @@ export class Img {
   sockets?: Record<string, [number, number]>;
   /** 9-slice margins [left, top, right, bottom] from the asset's `slice`; flips and rotations turn them. */
   slice?: [number, number, number, number];
+  /** Which way it faces and which way is up, from the asset's `facing`; travels like the pivot. */
+  orient?: Orient;
+  /** Its real height in meters, from the asset's `height` (for a scene's `world` scale). */
+  meters?: number;
 
   constructor(w: number, h: number, data?: Uint32Array) {
     w = Math.floor(w);
@@ -69,13 +88,29 @@ export class Img {
     if (this.pivot) o.pivot = [...this.pivot];
     if (this.sockets) o.sockets = mapPoints(this.sockets, (x, y) => [x, y]);
     if (this.slice) o.slice = [...this.slice];
+    if (this.orient) o.orient = { ...this.orient, f: this.orient.f && [...this.orient.f], u: [...this.orient.u] };
+    if (this.meters) o.meters = this.meters;
     return o;
   }
 
-  /** Carry the pivot and sockets into `o` through a transform of pixel-corner coords. */
+  /**
+   * Carry the pivot, sockets and orientation into `o` through a transform of pixel-corner coords.
+   * The orientation turns with the transform's linear part; a negative determinant is a mirror.
+   */
   movePivot(o: Img, f: (x: number, y: number) => [number, number]): Img {
     if (this.pivot) o.pivot = f(...this.pivot);
     if (this.sockets) o.sockets = mapPoints(this.sockets, f);
+    if (this.meters) o.meters = this.meters;
+    if (this.orient) {
+      const [ox, oy] = f(0, 0), [ax, ay] = f(1, 0), [bx, by] = f(0, 1);
+      const m = [ax - ox, ay - oy, bx - ox, by - oy];
+      const turn = (v: [number, number, number]): [number, number, number] => {
+        const x = m[0] * v[0] + m[2] * v[1], y = m[1] * v[0] + m[3] * v[1], n = Math.hypot(x, y, v[2]) || 1;
+        return [x / n, y / n, v[2] / n];
+      };
+      const o0 = this.orient;
+      o.orient = { f: o0.f && turn(o0.f), u: turn(o0.u), mirrored: m[0] * m[3] - m[1] * m[2] < 0 ? !o0.mirrored : o0.mirrored, text: o0.text };
+    }
     return o;
   }
 

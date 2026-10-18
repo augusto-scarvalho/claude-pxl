@@ -6,7 +6,7 @@ for it, a neck under the chin, arms like columns.
 
 Contents: 1 Pick a style · 2 Measure a reference · 3 Start from existing art · 4 Build order ·
 5 Faces · 6 3/4 and profile views · 7 Placing the pixels · 8 The same character, someone else ·
-9 Small animals (warp, hair) · 10 Animating with parts (sockets, motion guides)
+9 Small animals (warp, hair) · 10 Animating with parts (sockets, motion guides) · 11 Big pieces: rig first
 
 ## 1. Pick a style and stay in it
 
@@ -276,3 +276,37 @@ anim("walk", { frames: 8, fps: 8, outline: "k" },
   stride down (her feet move a pixel or two, not the guide's length), show a step forward as the
   foot lower on screen as much as to the side, keep the legs from crossing, and let the body rise
   a pixel in the passing frames. Review it as pairs, frames 0–3 above 4–7.
+
+## 11. Big pieces: rig first
+
+A figure or prop past ~48 px is too much to draw in one go: the proportions drift, a limb lands on
+the wrong side, and fixing one thing breaks another. Build it as a rig, in stages:
+
+1. **Skeleton.** `figure(h, heads)` gives a standing figure's landmark rows (chin, shoulders,
+   chest, waist, crotch, knees, ankles, sole) and its shoulder width. Lay the slots out from them:
+   a joint (`at`), a box (`size`: the part's size, its outline included), the point of the part on
+   the joint (`pivot`, default its top middle), and the body side (`side: "l"` its left, `"r"` its
+   right; none for the middle).
+2. **Blocking.** `rig(name, { ..., parts: false })` draws a stand-in box per slot, labelled with the
+   slot's first letters: its right green, its left magenta, the middle gray, the far side darker.
+   Judge the layout and the proportions here. `PXL describe <file> <rig>` lists the slots back to
+   front with their boxes and sides.
+3. **Parts.** Draw each part on its own as an ordinary sprite (or anim) named `<rig>_<slot>`, at its
+   slot's size. Each is small enough to get right, and drops into its slot as soon as it exists;
+   the RIG section says which are drawn, which are missing, and which are the wrong size.
+4. **Retouch.** Items after the rig's options go in a layer over the assembled parts: what spans
+   more than one part or only reads once they're together (a plume over the helmet, a strap).
+
+**Near and far.** `facing` decides which side is near: facing right, a body's right side is toward
+us (its front × its top points at us); facing left, its left. The rig draws the far side's parts
+behind the middle (-100) and the near side's in front (+100); `z` adds to that and is the body's own
+layering, the same for both sides (both legs under the tabard: `z: -50`), so a rig turned around
+reorders correctly. Don't flip a finished figure to turn it: a mirror moves its sword to the other
+hand (`PXL describe` says "mirrored"). Give it its own rig facing the other way, the slots mirrored
+and the parts flipped (`knight_l` in the example). In a side view a limb's drawing belongs to its
+depth more than to its side (the near arm drawn whole, the far one mostly hidden), so a rig turned
+around may need its new near limbs drawn.
+
+`examples/rig/knight.px.js`: a 72 px knight in three stages (`knight_blocking`, `knight_parts`,
+`knight`), the same knight turned left, and both next to a flipped copy in a scene with a world
+scale, which `PXL describe` reads out.

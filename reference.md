@@ -39,7 +39,16 @@ include("other.px.js")                  // path relative to the current file
 directions("ship", 16, { from, outline?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
 font(name, "glyph_sprite", { chars: "ABC...", w, h, cols? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional)
 include("palette.px.js", { palette: true })  // also take its use()/pal()/ramps() from here on
+rig(name, { w, h, facing, slots: { torso: { at, size }, arm: { at, size, side: "r" } }, parts?, guide? }, ...retouch)  // skeleton first: characters.md §11
+figure(h, heads?)                       // a standing figure's landmark rows: chin, shoulders, chest, waist, crotch, knees, ankles, sole; shoulderW
 ```
+
+A rig is a sprite: each slot is a joint `at`, a box `size` (the part's size, outline included), the
+point of the part on the joint (`pivot`, default its top middle), its body side (`side: "l" | "r"`)
+and `z`; the part is the asset `<rig>_<slot>` (or `part`), a labelled stand-in box until it exists
+(`parts: false`: stand-ins only). The far side's parts go behind the middle (-100), the near side's
+in front (+100), plus `z`. `guide` (default true) shows the drawn parts' slot boxes and the joints in
+previews. Items after the options are a retouch layer on top. `PXL describe` prints a RIG section.
 
 An included file's `use`/`pal`/`ramps` apply to its own assets only; your palette is the same
 after the `include` as before it. Pass `{ palette: true }` to share one palette file across art
@@ -84,6 +93,9 @@ sheet globs.
 | `slice: n \| [left, top, right, bottom]` | 9-slice margins of the final image (outline included) for `panel()`; flips and rotations turn them; sheets export them as Aseprite `meta.slices` (bounds + center). |
 | `wrap: true \| "x" \| "y"` | Seamless tile (Aseprite's tiled mode): drawing, stamps, fills and reads past those edges continue on the opposite side, and the preview lays the tile out 3×3 (3×1, 1×3) so seams show. For tiles that repeat themselves; random variants placed side by side don't line up across edges. |
 | `pivot: "bottom" \| "center" \| [x, y]` | The point `stamp`, `scatter` and wire hangs put on the given position. `"bottom"` is the middle of the final image's bottom edge, so `stamp("tree", x, groundY)` stands it on row `groundY` whatever its size. `[x, y]` is in drawing coordinates (pixel corners) and moves with flip, rot, outline and crop, here and in placements. A `base` variant starts with its base's pivot. Sheets export it as a normalized `pivot` (0.5, 1 = bottom center). |
+| `facing: "right" \| "left" \| "front" \| "back"` | Which way it faces as drawn ("front": toward us). Flips and turns carry it, and `PXL describe` says for each placement where it faces, which way its top points (upright, lying, upside down, leaning), which of its sides is toward us, and when it is a mirror image (a flip moves a sword to the other hand). Lettering is tracked even without `facing`: a mirrored sign gets a warning that it reads backwards. |
+| `height: meters` | Its real height. In a scene with `world`, describe says how tall it should be where it stands, and how far off the drawing is. |
+| `world: { horizon, eye }` or `{ scale }` | Scene: the world's scale. Ground in perspective: the horizon's row and the eye's height in meters (a thing standing on row y is (y − horizon) / eye px per meter); flat side view: `scale` px per meter. Used by describe with `height`. |
 | `sockets: { name: [x, y], ... }` | Named points in drawing coordinates (pixel corners) that other stamps attach to: `stamp("arm_3", 0, 0, { at: "body.shoulder" })` puts the arm's pivot on the body's `shoulder` socket, wherever and however the body was placed. They move with flip, rot, angle, outline and crop, like the pivot. For characters built from parts (characters.md §10). |
 
 Post-processing order: mirror → swap → flip → rot → outline → crop.

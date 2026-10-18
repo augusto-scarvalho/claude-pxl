@@ -347,6 +347,9 @@ function inferSize(items: Item[]): { w: number; h: number } {
   return { w, h };
 }
 
+/** facing -> the front's direction in picture space (x right, y down, z into the picture). */
+const FACING: Record<string, [number, number, number]> = { right: [1, 0, 0], left: [-1, 0, 0], front: [0, 0, -1], back: [0, 0, 1] };
+
 function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
   const o = def.opts;
   const step = (label: string, f: () => Img | void) => {
@@ -364,6 +367,15 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace): Img {
     if (typeof so !== "object" || so === null || Array.isArray(so) || !Object.values(so).every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)))
       throw new PxError(`sockets must be { name: [x, y], ... } in drawing coords, got ${fmtArgs([so])}`);
     img.sockets = Object.fromEntries(Object.entries(so as Record<string, number[]>).map(([k, p]) => [k, [p[0], p[1]] as [number, number]]));
+  }
+  if (o.facing !== undefined) {
+    const f = FACING[o.facing as string];
+    if (!f) throw new PxError(`facing must be "right", "left", "front" (toward us) or "back", got ${fmtArgs([o.facing])}`);
+    img.orient = { f: [...f], u: [0, -1, 0], mirrored: false, text: img.orient?.text ?? false };
+  }
+  if (o.height !== undefined) {
+    if (!(typeof o.height === "number" && o.height > 0)) throw new PxError(`height is its real height in meters (e.g. 1.8), got ${fmtArgs([o.height])}`);
+    img.meters = o.height;
   }
   if (o.mx) step("mirror x", () => img.mirror("x"));
   if (o.my) step("mirror y", () => img.mirror("y"));
@@ -432,9 +444,15 @@ function solid(pal: Palette, spec: string): Color {
   return c;
 }
 
+/** Mark an image as having lettering (a mirror would turn it backwards). */
+export function lettered(img: Img): void {
+  (img.orient ??= { u: [0, -1, 0], mirrored: false, text: false }).text = true;
+}
+
 /** Composite a layer onto img: draw it, or (shade/light) step what's below where it's opaque. */
 export function blend(img: Img, limg: Img, l: LayerOpts, pal: Palette): void {
   if (limg.lamps?.length) (img.lamps ??= []).push(...limg.lamps);
+  if (limg.orient?.text) lettered(img);
   if (l.blend !== undefined || l.opacity !== undefined) return mix(img, limg, l, pal);
   const density = l.density ?? 1;
   const mode = l.shade ?? l.light;

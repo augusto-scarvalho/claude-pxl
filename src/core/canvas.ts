@@ -516,8 +516,14 @@ export class Canvas {
     return src;
   }
 
+  /** This image now has lettering: describe warns when a mirror turns it backwards. */
+  private lettered(): void {
+    (this.img.orient ??= { u: [0, -1, 0], mirrored: false, text: false }).text = true;
+  }
+
   /** Draw an image at canvas coords; with a predicate, only onto pixels it accepts. Lamps come along. */
   put(src: Img, x: number, y: number, ok?: Pred): void {
+    if (src.orient?.text) this.lettered();
     if (src.lamps?.length) {
       const dx = this.ox + Math.floor(x), dy = this.oy + Math.floor(y);
       (this.img.lamps ??= []).push(...src.lamps.map((l) => ({ ...l, x: l.x + dx, y: l.y + dy })));
@@ -536,6 +542,11 @@ export class Canvas {
           n.set(src.norm.subarray(j * 3, j * 3 + 3), i * 3);
         } else if (this.img.norm) this.img.norm[i * 3 + 2] = 0;
       }
+  }
+
+  /** Is there an asset or group of this name (a part drawn yet)? */
+  exists(name: string): boolean {
+    return this.res.has(name);
   }
 
   /** An asset's size as it would be placed (a group's first member): for layouts in drawing code. */
@@ -839,6 +850,7 @@ export class Canvas {
   /** Text in the built-in 3x5 font. */
   text(x: number, y: number, s: string, c: string, opts: TextOpts = {}): void {
     s = String(s);
+    this.lettered();
     if (opts.shadow) this.text(x + 1, y + 1, s, opts.shadow, { ...opts, shadow: undefined });
     const col = this.color(c);
     const sc = opts.scale ?? 1, gap = opts.gap ?? 1, lead = opts.lead ?? 1;

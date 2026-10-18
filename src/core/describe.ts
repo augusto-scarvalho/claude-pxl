@@ -9,7 +9,8 @@
 import type { BuildOut } from "./build.ts";
 import type { Placement } from "./canvas.ts";
 import { type Color, TRANSPARENT, toHex } from "./color.ts";
-import { Img } from "./image.ts";
+import { Img, type Orient } from "./image.ts";
+import type { World } from "./model.ts";
 import type { Palette } from "./palette.ts";
 import { replay } from "./steps.ts";
 
@@ -28,6 +29,10 @@ export interface DescribeOpts {
   note?: string;
   /** Busy scenes: one line per object (nearest neighbour only), no color and light maps, no steps. */
   brief?: boolean;
+  /** The scene's world scale: objects with a real `height` get told how tall they should be. */
+  world?: World;
+  /** Lines to print under the header (a rig's slots). */
+  extra?: string[];
 }
 
 /** What describe saw, kept to tell later what changed: objects by label, and the pixels. */
@@ -56,6 +61,41 @@ const mean3 = (cs: Color[]): [number, number, number] => {
 };
 /** Many copies of one small thing (a brush, a string of lights): one line, not one per copy. */
 const MANY = 6;
+
+/** Degrees its top leans from straight up, clockwise (0 upright, 90 top to the right, 180 upside down). */
+const tiltOf = (o: Orient) => Math.round((Math.atan2(o.u[0], -o.u[1]) * 180) / Math.PI);
+
+/**
+ * How a placed thing is turned, in words: where it faces, which way its top points, which of its
+ * sides is toward us, and whether it is a mirror image. Picture space: x right, y down, z into the
+ * picture, so a body's right is front x top; the side with z < 0 is the near one.
+ */
+export function orientWords(o: Orient): string {
+  const w: string[] = [];
+  if (o.f) {
+    const [fx, fy, fz] = o.f;
+    w.push(Math.abs(fz) > Math.max(Math.abs(fx), Math.abs(fy)) ? (fz < 0 ? "facing us" : "facing away")
+      : Math.abs(fx) >= Math.abs(fy) ? `facing ${fx > 0 ? "right" : "left"}` : `facing ${fy > 0 ? "down" : "up"}`);
+  }
+  const t = tiltOf(o), a = Math.abs(t), to = t > 0 ? "right" : "left";
+  w.push(a <= 5 ? "upright" : a >= 175 ? "upside down" : Math.abs(a - 90) <= 5 ? `lying, its top to the ${to}` : `leaning ${a}° to the ${to}`);
+  if (o.f) {
+    const [fx, fy, fz] = o.f, [ux, uy, uz] = o.u, r = [fy * uz - fz * uy, fz * ux - fx * uz, fx * uy - fy * ux];
+    if (r[2] < -0.5) w.push("its right side toward us, its left away");
+    else if (r[2] > 0.5) w.push("its left side toward us, its right away");
+    else if (Math.abs(r[0]) > 0.5) w.push(`its right hand on our ${r[0] > 0 ? "right" : "left"}`);
+  }
+  if (o.mirrored) w.push("mirrored: what was drawn as its right side now plays its left");
+  if (o.mirrored && o.text) w.push("WARNING: mirrored lettering reads backwards");
+  return w.join(", ");
+}
+
+/** px per meter where a thing stands (its feet on row y), or undefined without a usable world. */
+export function pxPerMeter(world: World, y: number): number | undefined {
+  if (world.scale !== undefined) return world.scale;
+  if (world.horizon !== undefined && world.eye) return (y - world.horizon) / world.eye;
+  return undefined;
+}
 
 export function describe(name: string, b: BuildOut, pal: Palette, opts: DescribeOpts = {}): { text: string; snap: Snapshot } {
   const C = opts.cell ?? 8, img = b.img, W = img.w, H = img.h, out: string[] = [];
@@ -108,6 +148,12 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
   const frames = b.anim ? `, animated (frame 0 of the loop, ${b.anim.loop} ms)` : "";
   out.push(`${name} ${W}x${H}${frames}. Coordinates are x,y in px from the top left; a range a-b includes both ends.`);
   if (opts.note) out.push(opts.note);
+  if (opts.extra?.length) out.push(...opts.extra);
+  const wo = opts.world;
+  if (wo?.scale !== undefined) out.push(`WORLD: flat side view, ${wo.scale} px per meter (a 1.8 m figure is ${Math.round(1.8 * wo.scale)} px tall).`);
+  else if (wo?.horizon !== undefined && wo.eye)
+    out.push(`WORLD: ground in perspective, horizon at y ${wo.horizon}, eye ${wo.eye} m up: a thing standing on row y is (y - ${wo.horizon}) / ${wo.eye} px per meter, ` +
+      `so a 1.8 m figure is ${[Math.round(wo.horizon + (H - wo.horizon) / 3), H].map((y) => `${Math.round((1.8 * (y - wo.horizon!)) / wo.eye!)} px at y ${y}`).join(", ")}; anything at eye height sits on the horizon.`);
   out.push("");
   // objects: every placement but the many-copies ones, each with its relations worked out
   const many = new Set(keys.filter((k) => byKey.get(k)!.length > MANY));
@@ -298,6 +344,20 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       const shadow = b.placements.map((q, j) => [q, j] as const).filter(([q, j]) => q.name === p.name && blended.has(q.layer ?? "") && shown[j].n);
       if (shadow.length && byKey.get(kOf(i))!.length === 1) rel.push(shadow.map(([q, j]) => `its ${q.layer} shows at x ${shown[j].x0}-${shown[j].x1}, y ${shown[j].y0}-${shown[j].y1}`).join(", "));
       const st = stands(i), mo = motion(i);
+      const turned = p.img.orient && (p.img.orient.f || p.img.orient.mirrored || tiltOf(p.img.orient)) ? orientWords(p.img.orient) : "";
+      let size = "";
+      const bb = p.img.bounds();
+      if (wo && p.img.meters && bb) {
+        const lying = p.img.orient && Math.abs(Math.abs(tiltOf(p.img.orient)) - 90) <= 45;
+        const drawn = lying ? bb.w : bb.h, feet = p.y + bb.y + bb.h, ppm = pxPerMeter(wo, feet);
+        if (ppm === undefined) size = "";
+        else if (ppm <= 0) size = `size: its foot (y ${feet}) is at or above the horizon (y ${wo.horizon}): it floats, or the horizon is wrong`;
+        else {
+          const want = p.img.meters * ppm, off = Math.round((100 * (drawn - want)) / want);
+          size = `size: ${p.img.meters} m ${lying ? "long" : "tall"} is ${Math.round(want)} px where it stands (y ${feet}); drawn ${drawn} px` +
+            (Math.abs(off) <= 8 ? ", right" : `, ${Math.abs(off)}% too ${off > 0 ? (lying ? "long" : "tall") : lying ? "short" : "small"}`);
+        }
+      }
       if (opts.brief) {
         // one line: ranges, feet, the nearest neighbour, cover, contrast, motion, in short words
         const out1 = out.pop()!.replace(/; colors \S+$/, "");
@@ -307,11 +367,12 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
         const bh = coveredBy.length ? `behind ${[...sh.cover].filter(([o]) => isMain(o)).map(([o]) => label(o)).join(",")}` : "";
         const sm = st.replace("stands out: brightness ", "lum ").replace(" vs ", "/").replace(" around, color difference ", " dE ");
         const mm = mo.replace("animated: ", "anim ").replace("% of its drawing changes per frame", "%").replace(/, shifts .*$/, " moving");
-        out.push(out1 + "; " + [n1, fr, bh, sm, mm].filter(Boolean).join("; "));
+        out.push(out1 + "; " + [n1, fr, bh, sm, mm, turned, size.replace(/ where it stands \(y \d+\)/, "")].filter(Boolean).join("; "));
         continue;
       }
       out.push("      " + rel.join("; "));
       if (st || mo) out.push("      " + [st, mo].filter(Boolean).join("; "));
+      if (turned || size) out.push("      " + [turned && "turned: " + turned, size].filter(Boolean).join("; "));
     }
     out.push("");
   }

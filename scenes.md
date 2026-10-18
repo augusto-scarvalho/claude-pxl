@@ -11,6 +11,14 @@ shapes · Water and things that land · Shadows and light · Blend modes · Chec
   could walk through it (figures of 26–34 px: a 34 px door). A crypt whose door was shorter than its
   monsters turned a werewolf on its roof into a giant.
 - Flat side views and top-down maps have no perspective: things do not shrink with distance.
+- **Give things a real size, and the scene a world.** `height: 1.8` (meters) on an asset, and on the
+  scene `world: { horizon, eye }` (ground in perspective: a thing standing on row y is
+  (y − horizon) / eye px per meter) or `world: { scale }` (flat: px per meter). `PXL describe` then
+  says how tall each thing should be where it stands: `1.8 m tall is 41 px where it stands (y 134);
+  drawn 46 px, 12% too tall`.
+- **Say which way things face.** `facing: "right"` on an asset, and describe says for each placement
+  where it faces, which of its sides is toward us, whether it lies or stands upside down, and when a
+  flip made it a mirror image (a sword in the other hand; a sign's lettering backwards).
 - What stands on the ground goes in a `sort: "y"` layer, so the lower (nearer) thing draws in front.
   Give props `pivot: "bottom"` and stamp them at the ground's y.
 - Figures need a few px of air to read. `PXL describe <file> <scene>` gives the gap between objects

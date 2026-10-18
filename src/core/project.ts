@@ -1,6 +1,7 @@
 // Project: the registry an art file fills in, plus the lazy, cached, cycle-checked resolver.
 import { type BuildCtx, type BuildOut, buildAsset, drawnFrames, gcd } from "./build.ts";
-import { OPS } from "./canvas.ts";
+import { type Canvas, OPS } from "./canvas.ts";
+import { type RigDef, drawGuide, drawParts, figure, readRig } from "./rig.ts";
 import { TRANSPARENT, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
@@ -71,9 +72,9 @@ const OP_OPTS: Record<string, string[]> = {
 };
 
 const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink"],
-  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "facing", "height"],
+  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir", "facing", "height"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -146,6 +147,8 @@ export class Project implements BuildCtx {
   readonly groups = new Map<string, GroupDef>();
   readonly sheets: SheetDef[] = [];
   readonly fonts = new Map<string, FontDef>();
+  /** rig() skeletons by name, for describe's RIG section. */
+  readonly rigs = new Map<string, RigDef>();
   private glyphCache = new Map<string, (ch: string) => string[]>();
   /** Art files loaded so far (absolute paths or virtual names), for locations and watching. */
   readonly files: string[] = [];
@@ -354,6 +357,22 @@ export class Project implements BuildCtx {
       try { this.includeHook(path); } finally { if (!opts.palette) this.pal = pal; }
     };
     env.rng = (seed?: number) => rng(seed);
+    env.figure = (h: unknown, heads?: unknown) => {
+      try { return figure(h as number, heads as number | undefined); } catch (e) { throw wrap(e).within("figure", this.callerLoc()); }
+    };
+    env.rig = (name: unknown, opts: unknown, ...retouch: unknown[]) => {
+      const loc = this.callerLoc();
+      if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError('rig("name", { w, h, facing, slots: { torso: { at, size }, ... } }, ...retouch items)', loc);
+      const { slots, guide = true, parts, ...rest } = opts as Record<string, unknown>;
+      const rig = readRig(name, rest.facing, slots, parts, loc);
+      checkKeys(`rig '${name}'`, rest, ASSET_OPTS.sprite.filter((k) => !["base", "png", "area", "palettize", "shrink"].includes(k)), loc);
+      const layer = (n: string, o: LayerOpts, items: Item[]): Layer => ({ __layer: true, name: n, opts: o, items, loc });
+      const items: Item[] = [layer("parts", {}, [(c: Canvas) => drawParts(rig, c)])];
+      if (guide) items.push(layer("skeleton", { ref: true }, [(c: Canvas) => drawGuide(rig, c)]));
+      if (retouch.length) items.push(layer("retouch", {}, checkItems(`rig '${name}' retouch`, retouch, loc)));
+      define("sprite", name, [rest, ...items]);
+      this.rigs.set(name, rig);
+    };
 
     for (const name of [...OPS, "clip", "lighting", "glow"]) {
       env[name] = (...args: unknown[]): Op => {
