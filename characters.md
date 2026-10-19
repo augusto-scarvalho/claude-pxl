@@ -265,8 +265,9 @@ anim("walk", { frames: 8, fps: 8, outline: "k" },
   their bounding box (an arm reaching out moves it), and never pin head and feet separately (the
   torso goes soft). `register: "m"` on the anim does it: a marker pixel on the pelvis in each
   frame, in a `ref: true` layer, and every frame moves sideways to put it on one x.
-- **Review the whole cycle**, not the key frames: `_preview/<name>_onion.png`, the half-cycle
-  pairs (frame i next to i + n/2), and the seam (last → 0 → 1). Fixing a limb only on the contact
+- **Review the whole cycle**, not the key frames: `_preview/<name>_onion.png` (from `PXL build`),
+  the half-cycle pairs (frame i next to i + n/2: `PXL shot file walk --frames 0,4` and `1,5`...), and
+  the seam (last → 0 → 1: `--frames 7,0,1`). Fixing a limb only on the contact
   frame leaves the wrong leg moving in the in-betweens. Draw left and right limbs in distinct guide
   colors while working so their identity can't swap. Check that shoulders stay on the torso.
 - Motion references (mocap, a video, a CC0 walk cycle) are guides for timing and arcs, drawn in
@@ -331,6 +332,7 @@ flips and turns. What reads the pixels:
   it agreed or stayed quiet, caught a flipped tombstone lit from the wrong side, and was wrong once,
   on a building whose outline is mostly trims: look before trusting a warning;
 - in a rig, a part labelled another way than the rig (a head facing left on a body facing right).
+
 **Moving it: a pose is a rig.** A rig has no frames, but it doesn't need them: give each pose a
 rig of its own and let an anim pick one per frame. What moves is best drawn from the pose's joints
 rather than by hand: an arm from the shoulder to where the pose puts the hand (two bones: the elbow

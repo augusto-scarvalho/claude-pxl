@@ -123,14 +123,22 @@ palette key even though lighting changed their colors, so you don't need them in
 ```js
 lighting({ cell: 2, smooth: true, ambient: 0.4, emit: "zQ" }),
 glow("zgG", { r: 7, strength: 0.3 }),                      // potion
-glow("lLah", { where: [155, 66, 26, 22], r: 14 }),          // just the fire, not every orange pixel
+glow("lLah", { where: [155, 66, 26, 22], r: 14, keep: "WuK" }),  // just the fire; its logs keep their shapes
 glow("L", { r: 5, strength: 0.7 })                          // candle flames
 ```
 
+The halo lifts everything in reach, what the glowing thing is made of too: the logs and stones
+under a fire turn to one tan blob. `keep: "WuK"` leaves those keys as drawn (give them keys of their
+own, or whatever shares them near the fire stays unlit too).
+
 ## Tips
 
-- Check the result in the live viewer. The painting steps include a **light map** frame right
+- Look at the result with `PXL shot`, and at the light alone in describe's LIGHT map (brightness
+  per cell after lighting). The live viewer's painting steps also show a **light map** frame right
   before the lit result.
+- Lamps don't tell `pxl check` where the light comes from; `world.light` does. For a scene lit by a
+  fire or a lamp, give the scene `world: { light: { at: [x, y] } }` at that lamp, and each object's
+  lit side is checked against the way from it to there (`check` says "not run: lit side" without it).
 - Doors, windows and holes in floors are just gaps in the `solid` layer. Light flows through them.
 - Too dark? Raise the lamp's `r` before `power`. Light reaching too far into the ground? Raise `block`
   (0.5–0.6). Want more Terraria-style glow through dirt? Lower it (0.25–0.3).

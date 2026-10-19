@@ -12,14 +12,17 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
 
 ## Workflow
 
-1. Read the [example](#examples) closest to what you're making and start from the template below.
+1. Read the [example](#examples) closest to what you're making (`PXL list <file>` maps it: read the
+   lines you need) and start from the template below.
 2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
    `out/_shot/<name>.png` (read it). Its text says what changed since your last shot of it (pixels
    and where, so an edit that did nothing shows) and the warnings `check` finds on it.
-   `--frames 0,12,30` puts frames side by side, `--at x,y,w,h` enlarges a part. Exact pixels:
-   `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an image). Scenes: `PXL describe
-   art.px.js <scene>` (`--brief` when busy) gives each object's position, gaps, cover, contrast and
-   motion as text: answer layout questions from it, not by eyeballing (`--frame N` for another frame).
+   `--frames 0,12,30` puts frames side by side, `--at x,y,w,h` enlarges a part (again for another
+   part, a column each); more names (another file's as `other.px.js:name`, or any PNG at 1×) make a
+   row each, to compare. Exact pixels: `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an
+   image). Scenes: `PXL describe art.px.js <scene>` (`--brief` when busy) gives each object's
+   position, gaps, cover, contrast and motion as text: answer layout questions from it, not by
+   eyeballing (`--frame N` for another frame).
 3. Fix everything one look showed, then look again: send all the edits in the same message
    (parallel tool calls are one turn, and every turn re-reads the whole conversation, so a turn
    per edit is what makes a long session expensive). `PXL describe ... --diff` lists the objects an
@@ -28,14 +31,18 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    <name> --at x,y` names the line that painted it.
 4. `PXL build art.px.js` writes the outputs: PNGs, sheets, GIFs, and previews in `out/_preview/`
    (checkerboard = transparent, pixel grid; anims also `<name>_onion.png`, a motion map + onion
-   skin). `--only a,b` for some of them.
+   skin). `--only a,b` for some of them; a long loop's preview GIF runs to many MB, `--every 3`
+   keeps one frame in three.
 5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
    rig of the file and every frame of an animated scene, warnings only, with the frames they happen
    at. Fix each or say why it's meant. Its last line says which rules ran: a rule runs only where
    the art says what it needs (`world.light`, `world.ground`, `height`, a `front` socket), so "no
-   warnings" with "not run: lit side" checked nothing about the light. Then look as a critic. Replacing approved art: keep `name_old` beside the new one
-   in a `compare` scene and let the user choose. Matching a reference: `PXL compare art.px.js <name>
-   ref.png [--shrink N]` lists each row's extents side by side.
+   warnings" with "not run: lit side" checked nothing about the light (a scene lit by a fire or a
+   lamp: `world: { light: { at: [x, y] } }`). A lit-side warning that looks wrong: `--readings` shows
+   what the rule read on every placement. Then look as a critic. Replacing approved art: keep
+   `name_old` beside the new one and show both, `PXL shot art.px.js name name_old`, for the user to
+   choose. Matching a reference: `PXL compare art.px.js <name> ref.png [--shrink N]` lists each
+   row's extents side by side.
 6. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL.
 
 Errors name file:line:col and the asset/layer/op, and suggest fixes. One broken asset doesn't stop
@@ -47,28 +54,31 @@ For a big, busy scene (320×180 and up, many props, animated), ask the user firs
 
 - **One agent** (the default): you plan and draw it all. The cheapest and the most coherent: a
   320×180 animated city street took 85 turns and 31 minutes.
-- **A pipeline**: you write `palette.px.js` (keys and ramps only), a plan (per part: its file, its
-  assets with the part's name as prefix, box, pivot, where it is stamped, its light, one timing for
-  every loop) and the scene file that includes the parts. Then one fork of yourself per part draws
-  it in its own file with a `test_<part>` scene, all at once (in Claude Code: the Agent tool with
-  `subagent_type: "fork"`; headless: `claude -p --resume <your session> --fork-session`). When they
-  report, you put the scene together. The same street came out denser (more people, cars, shops)
-  but less coherent, for ~5× the tokens and ~2× the time.
+- **A pipeline**: a planner writes `palette.px.js` (keys and ramps only), a plan (per part: its
+  file, its assets with the part's name as prefix, box, pivot, where it is stamped, its light, one
+  timing for every loop) and the scene file that includes the parts. Then one fork of the planner
+  per part draws it in its own file with a `test_<part>` scene, all at once, and a last fork puts
+  the scene together. The same street came out denser (more people, cars, shops) but less
+  coherent, for ~5× the tokens and ~2× the time.
 
-  That ~5× was measured with the planner in a new session (~130k of context when it forked). A fork
-  carries everything in the session that makes it and rereads it on every step: forked from a long
-  conversation (500k and more), each of 8-10 forks carries all of it, many times the cost, enough to
-  run out a usage limit. So say how long this conversation is when you ask, and run a pipeline from
-  a new session that holds only the skill, the brief and the plan: write the brief to a file, then
-  `claude -p --session-id <new uuid> < plan_prompt.txt` plans, and each part is
-  `claude -p --resume <that uuid> --fork-session < part_prompt.txt`.
+  Run it from a new session, not from this conversation. A fork carries everything in the session
+  that makes it and rereads it on every step: the ~5× was measured with the planner new (~130k of
+  context when it forked); forked from a long conversation (500k and more), each of 8-10 forks
+  carries all of it, many times the cost, enough to run out a usage limit. So say how long this
+  conversation is when you ask. Write the brief to a file; the planner is
+  `claude -p --session-id <new uuid> --allowedTools "Bash Read Write Edit Glob Grep" < plan_prompt.txt`,
+  each part `claude -p --resume <that uuid> --fork-session --allowedTools "..." < part_prompt.txt`
+  (the prompt on stdin: `--add-dir` takes several values and would swallow it). Only when this
+  session is still short is a fork of yourself (Claude Code's Agent tool, `subagent_type: "fork"`)
+  as cheap.
 
 Both are in `examples/cyberpunk/`; `pipeline/plan.md` is a plan whose parts fit. Included files
 share one scope, so every top-level name in a part starts with the part's name.
 
 ## Looking things up
 
-Don't read reference.md or a guide whole: what you read early is paid again on every later turn.
+Don't read reference.md or characters.md whole: what you read early is paid again on every later
+turn (scenes.md and lighting.md are short enough to read whole).
 `PXL help` lists every op and option by section, and each guide's sections with their size;
 `PXL help <name>` prints what the reference says about it and where the examples use it;
 `PXL help "<guide> <numbers or words of a heading>"` prints those sections. Read the ones your
@@ -90,7 +100,7 @@ range, the comment above it, what a loop makes on one line). Read those lines, n
 
 ```js
 pal({ k: "#1b1630", l: "#c8f0a0", g: "#8ccf63", G: "#4c8a44", t: "#2a5560", w: "#fff6e0", r: "#e2585e", R: "#a63a4c" })
-ramps("ktGgl", "kRr")                  // dark -> light, drives shade()/light(); a key in one ramp only
+ramps("ktGgl", "kRr")                  // dark -> light, drives shade()/light(); a key in one ramp only (ends shared)
 
 // Symmetric: write the left half, mirror it, outline it. The shine is a light green (l), not white.
 sprite("slime", { mx: true, outline: "k" }, `
@@ -128,7 +138,8 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 - **Reuse**: variants are `base` + `swap`; repeated details `_parts` + `stamp`; families a `group` or a
   loop; props get `pivot: "bottom"`; texture is `scatter` of tiny parts; areas are `tilemap`/`pattern`.
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` and functions reading `c.phase`;
-  `dir: "pingpong"`; stamping an anim animates the scene. Limbs, walks, hair: characters.md §9–10.
+  `dir: "pingpong"`; stamping an anim animates the scene, and the scene's own functions then get its
+  loop (`c.frame`, `c.frames`, `c.phase`, `c.t`). Limbs, walks, hair: `PXL help "characters 9 10"`.
 - **Existing art**: `sprite("x", { png, area, shrink, palettize })`, `anim(..., { png, frames })`;
   `rampmap` maps imported tones onto a ramp without merging them.
 - **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj` for tilemaps, `build --aseprite` for a
@@ -162,8 +173,9 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `cyberpunk/` | a 320×180 animated city street at dusk made two ways: by one agent (`sodium_hour.px.js`) and by a pipeline (`pipeline/`: the plan, the palette, eight part files, the scene) |
 | `fonts/font5x7.px.js` | a 5×7 font for titles: `include` it, `text(..., { font: "5x7" })` |
 
-Render one into your own dir to keep the skill clean: `PXL build <skill dir>/examples/shop.px.js
---only comet_repair --out <scratch dir>`.
+Every command run on an example writes an `out/` next to it (build, shot, describe): give it
+`--out <scratch dir>` to keep the skill clean, e.g. `PXL shot <skill dir>/examples/shop.px.js
+comet_repair --out <scratch dir>`.
 
 ## Habits that give better art
 

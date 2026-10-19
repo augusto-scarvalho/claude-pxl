@@ -31,10 +31,11 @@ const USAGE = `pxl — pixel-art DSL
       heading print that section ("characters 9", "small animals"). No name: an index.
   pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
-      previews (out/_preview; animated assets also get a .gif). A whole file prints a count of what
-      it wrote; --only and --list print a line per asset (size, frames, preview scale). --every N:
-      preview GIFs keep one frame in N (a long loop's runs to many MB). --aseprite also writes each
-      asset as <name>.aseprite (layers, frames, tag, palette) to keep editing in Aseprite; pxl
+      previews (out/_preview; animated assets also get a .gif). A whole file of more than 12 assets
+      prints a count of what it wrote; --only and --list print a line per asset (size, frames,
+      preview scale). --every N: preview GIFs keep one frame in N (a long loop's runs to many MB).
+      --aseprite also writes each asset as <name>.aseprite (layers, frames, tag, palette) to keep
+      editing in Aseprite; pxl
       never reads it back and the next --aseprite build overwrites it, so copy it out of out/.
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
       Live viewer: rebuilds on save and replays each asset's painting steps.
@@ -64,10 +65,12 @@ const USAGE = `pxl — pixel-art DSL
       to the region, side by side, enlarged, written to <out>/_shot/<name>.png. --vs puts the same
       shot of another version above it (a git revision takes the file itself from there; what it
       includes is read as it is now); --diff adds a row with the pixels that changed in red. It
-      also prints what changed since the last shot of the same frames and region (pixels, where)
-      and the warnings pxl check finds on the asset at those frames: one call per look. Several
+      also prints what changed since the last shot of the same frames and region (one asset, one
+      region: pixels, where) and the warnings pxl check finds on the asset at those frames: one call
+      per look. Several
       names (another file's as other.px.js:name, or any PNG) make a row each, one under the other,
       and several --at a column each: two versions, two agents' scenes, details of a big one.
+      Give PNGs at 1x (out/scenes/x.png): rows are enlarged together.
   pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
@@ -166,7 +169,7 @@ export async function main(argv: string[]): Promise<number> {
   try { a = parse(argv); } catch (e) { console.error(wrap(e).message); return 2; }
   if (a.cmd === "help") {
     // the reference looked up, not read: an index, or what it says about one name
-    console.log(help(a.file, { all: a.all }) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | check | shot | compare (pxl --help for their options)"));
+    console.log(help(a.file, { all: a.all }) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | check | shot | compare | blind | help (pxl --help for their options)"));
     return 0;
   }
   if (!a.cmd || a.cmd === "usage" || !a.file) {

@@ -97,7 +97,7 @@ sheet globs.
 | `mx: true` | Mirror the left half onto the right after all items. Inferred width doubles (write half a row). `mx: "c"`: odd width, shared center column. `my` likewise vertically. |
 | `swap: { g: "r" }` | Recolor after drawing. |
 | `flip: "x" \| "y" \| "xy"`, `rot: 90 \| 180 \| 270` | Transform. |
-| `angle: deg`, `rotate: "auto" \| "rotsprite" \| "shear" \| "nearest"` | Any angle, clockwise, after `flip`/`rot` and before `outline` (the outline is drawn around the turned shape). `auto`: quarter turns exact, under 12° a shear (a lean that keeps every pixel), else RotSprite. No new colors. See [rotation.md](rotation.md) for which angles hold up. |\| "y" \| "xy"`, `rot: 90 \| 180 \| 270` | Transform. |
+| `angle: deg`, `rotate: "auto" \| "rotsprite" \| "shear" \| "nearest"` | Any angle, clockwise, after `flip`/`rot` and before `outline` (the outline is drawn around the turned shape). `auto`: quarter turns exact, under 12° a shear (a lean that keeps every pixel), else RotSprite. No new colors. See [rotation.md](rotation.md) for which angles hold up. |
 | `outline: "k"` | 1px outline around opaque pixels; **grows the canvas 1px on every side**. `outline8` also fills diagonals. |
 | `inline: "k"` | 1px line over the sprite's own edge pixels (Aseprite's inside outline): the canvas keeps its size. |
 | `inline: { color: "k", keep: "Kk12" }` | The same, but edge pixels in the `keep` keys stay as they are: closes only the gaps of an outline that is already there, such as the one left after shrinking an image (`shrink`), selective colors included. |
@@ -187,21 +187,22 @@ rect, `[x0, y0, x1, y1, x2, y2, ...]` polygon, or `(x, y) => boolean`.
 | `runs({ y: [[x, "chars"], ...], ... })` | pixels as runs at absolute x, row by row: `runs({ 30: [[19, "3H3"], [23, "deeR"]] })`. Same keys as a grid (`.` keeps, `_` erases), but each run starts where it says, so nothing is counted: for hand-drawn figures and patches over a shrunk or base image |
 | `pose("pose.json" \| joints, { x?, y?, scale?, color?, joint?, min?, bones?, sides? })` | a pose skeleton as a guide: bones as lines (`color`, default `"R"`), joints as dots (`joint`, default `"Y"`; `false` for none); `sides: true` colors the limbs by side (left arm magenta, right arm green, left leg orange, right leg cyan), so a limb that swaps sides between frames shows. Reads a pose detector's output (a `{ name: [x, y, score?] }` map, or OpenPose JSON in COCO-18 or BODY_25), placed at `(x * scale + x, y * scale + y)`; joints scoring under `min` are skipped. Names: `head`, `nose`, `neck`, `l_`/`r_` + `eye ear shoulder elbow wrist hip knee ankle big_toe heel`, `mid_hip`. In an anim, draw a motion guide's current frame: `layer("guide", { ref: true }, (c) => c.pose(walk.frames[c.frame], { sides: true }))`. Usually inside a `ref: true` layer. The detector runs outside pxl (e.g. rtmlib's DWPose on the image upscaled) |
 
-Any `name` may be a sprite, scene, group, or glob (`"tree_*"`). **Placement opts**: `flip`, `rot`,
-`swap`, `rflip: "x"|"y"|"xy"` (random flips), `rswap: [{ g: "r" }, {}]` (random recolor; `{}` =
-none), `seed`, `reseed: true | n` (rebuild the placed asset with its own random choices; `true`
-derives it from the position, so `tile("house", 0, 0, 4, 1, { reseed: true })` gives four
-different houses from one definition), `silhouette: "w"` (every opaque pixel in that color: hit
-flashes, and cast shadows when placed in a `shade: true` layer), `at: "id.socket"` (attach to a
-socket of a stamp placed earlier in the same asset, any layer: x, y become an offset from it; `id`
-names a placement, default its asset name), `z` (order in a `sort: "z"` layer), `cast: [kx, ky]` (the asset laid
-flat on the ground as its shadow: a pixel h px above its base lands h × (kx, ky) from where it
-stands, e.g. `[0.6, 0.2]` for light from the top-left. The base is the pivot's row, so give tall
-props `pivot: "bottom"`; it applies after `flip`, so a mirrored tree still throws its shadow the
-same way. In a `shade` layer: `stamp("palm", x, y, { cast: [0.6, 0.2] })`. `castBase: "column"`:
-each column stands on its own lowest pixel instead of the pivot's row, for a base that isn't level
-(a tent seen at an angle, its hem higher at the back: with the pivot's row, what hangs below it
-would cast toward the sun)).
+Any `name` may be a sprite, scene, group, or glob (`"tree_*"`). Placement options, for `stamp`,
+`tile`, `pattern`, `panel`, `scatter` and wire hangs (anims add `frame`, `delay`, `rdelay`; see
+Animation):
+
+| Option | Effect |
+|---|---|
+| `flip: "x"\|"y"\|"xy"`, `rot: 90\|180\|270` | mirror or turn this copy |
+| `swap: { g: "r" }` | recolor this copy |
+| `rflip: "x"\|"y"\|"xy"` | random flips, per copy |
+| `rswap: [{ g: "r" }, {}]` | a random recolor per copy (`{}` = none) |
+| `seed`, `reseed: true \| n` | `reseed` rebuilds the placed asset with its own random choices; `true` derives them from the position, so `tile("house", 0, 0, 4, 1, { reseed: true })` gives four different houses from one definition |
+| `silhouette: "w"` | every opaque pixel in that color: hit flashes, and cast shadows when placed in a `shade: true` layer |
+| `at: "id.socket"`, `id` | attach to a socket of a stamp placed earlier in the same asset, any layer: x, y become an offset from it; `id` names a placement (default: its asset name) |
+| `z` | its order in a `sort: "z"` layer |
+| `cast: [kx, ky]` | the asset laid flat on the ground as its shadow: a pixel h px above its base lands h × (kx, ky) from where it stands, e.g. `[0.6, 0.2]` for light from the top left. The base is the pivot's row, so give tall props `pivot: "bottom"`; it applies after `flip`, so a mirrored tree still throws its shadow the same way. In a `shade` layer: `stamp("palm", x, y, { cast: [0.6, 0.2] })` |
+| `castBase: "column"` | with `cast`: each column stands on its own lowest pixel instead of the pivot's row, for a base that isn't level (a tent seen at an angle, its hem higher at the back: from the pivot's row, what hangs below it would cast toward the sun) |
 
 Randomness is seeded from the placement position + `seed`, so builds are reproducible and moving
 one placement doesn't reshuffle the others. Change `seed` to reroll.
@@ -321,27 +322,32 @@ painting replay ends ("animate" toggle).
 ## CLI
 
 ```
-node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image.png> ...] [--frames a,b,c] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff]
+node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image.png> ...] [--frames a,b,c] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
+node <pxl>/bin/pxl.js shot <image.png> [<image.png> ...] [--at x,y,w,h ...] [--scale N] [--out DIR]
 node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
 node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
-node <pxl>/bin/pxl.js ascii <file> <name>
+node <pxl>/bin/pxl.js ascii <file> <name> [--frame N]
 node <pxl>/bin/pxl.js list  <file>
 node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--sheet] [--out DIR]
-node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h] [--diff] [--brief]     (or describe <image.png>)
+node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief] [--out DIR | --no-out]     (or describe <image.png>)
 node <pxl>/bin/pxl.js compare <file> <name> <ref.png> [--shrink N] [--offset x,y]
+node <pxl>/bin/pxl.js blind <file> <name...> [--out DIR]   |   blind <file> --check answers.json
 ```
 
 `shot` is the look while iterating: the asset built at those frames (side by side, cropped to the
 region, enlarged to about 600k px), what changed since the last shot of the same frames and region
-(pixels, and the box around them in the asset's coordinates), and the warnings `check` finds on it
-at those frames. Several names make a row each, one under the other (`other.px.js:name` takes
-another file's, and a PNG from anywhere is a row too), and several `--at` a column each: two
-versions of a scene, one scene from two agents, three details of a big one. `check --readings`
+(pixels, and the box around them in the asset's coordinates; for one asset and one region), and the
+warnings `check` finds on it at those frames. Several names make a row each, one under the other
+(`other.px.js:name` takes another file's, and a PNG from anywhere is a row too), and several `--at`
+a column each: two versions of a scene, one scene from two agents, three details of a big one.
+Give PNGs at 1× (`out/scenes/x.png`, not an enlarged `_shot`): rows are enlarged together, so a big
+one leaves no room for the rest. `check --readings`
 also lists what the lit-side rule read on every placement, warning or not, with a tally.
 `check` runs them on every scene and rig of a file at every frame. A `build` of a
-whole file prints how many assets of each kind it wrote; `--list` or `--only` print a line each.
+whole file with more than 12 assets prints how many of each kind it wrote; `--list` or `--only`
+print a line each (a smaller file prints them anyway).
 A preview GIF past 4 MB says so; `--every N` keeps one frame in N in the previews (the GIFs in
 `out/` keep every frame).
 `list` maps a file: each top-level statement that defines assets, its line range, the comment
@@ -383,7 +389,7 @@ models reading layout):
   ~5.6k characters) and 96% in the same blind test: use it on busy scenes.
 
 A 320x180 lit scene comes to ~17k characters (~5k tokens; a busy 320x240 one ~21k), where the 2x
-preview costs a few hundred tokens: read the preview for the look, this for anything you would
+preview costs a few hundred tokens: look with `shot`, and read this for anything you would
 count or measure. In blind tests (readers given only one form, questions on counts, positions,
 gaps, depth, contrast and motion) the 2x preview scored 66%, the first text form (sprite boxes
 instead of visible pixels, no motion) 77% and this one 100%, on the scene it was built with and on

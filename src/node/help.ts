@@ -41,10 +41,10 @@ function entries(): Entry[] {
   return out;
 }
 
-/** Every ## and ### section of the guides, each with its text up to the next heading as high. */
-function sections(): Section[] {
+/** Every ## and ### section of these files (the guides), each with its text up to the next heading as high. */
+function sections(files = GUIDES): Section[] {
   const out: Section[] = [];
-  for (const file of GUIDES) {
+  for (const file of files) {
     let lines: string[];
     try { lines = readFileSync(join(ROOT, file), "utf8").split(/\r?\n/); } catch { continue; }
     lines.forEach((l, i) => {
@@ -109,14 +109,22 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
   const words = low.split(/[^a-z0-9§]+/).map((w) => w.replace(/^§/, "")).filter((w) => w.length > 1 || /\d/.test(w));
   // (a word that is a guide's name picks that guide; numbers alone pick those sections, any of them:
   // "characters 1 4 5")
-  const inHead = (w: string, s: Section) => new RegExp(`(^|[^a-z0-9])${w}${/^\d+$/.test(w) ? "([^0-9]|$)" : ""}`).test(s.head.toLowerCase());
+  // whole words, a plural too ("shadow": "Shadows and light"), so "anim" doesn't pick "Small animals"
+  const inHead = (w: string, s: Section) => new RegExp(`(^|[^a-z0-9])${w}${/^\d+$/.test(w) ? "" : "s?"}([^a-z0-9]|$)`).test(s.head.toLowerCase());
   const nums = words.some((w) => /^\d+$/.test(w)) && words.every((w) => /^\d+$/.test(w) || GUIDES.includes(`${w}.md`));
   const secs = sections().filter((s) => {
     const i = words.indexOf(s.file.replace(".md", "")), rest = words.filter((_, j) => j !== i);
     if (!rest.length) return i >= 0;
     return nums ? (i >= 0 || !words.some((w) => GUIDES.includes(`${w}.md`))) && rest.some((w) => inHead(w, s)) : rest.every((w) => inHead(w, s));
   });
-  const whole = !own.length && (secs.length <= 2 || nums) ? secs : [];
+  // a section of the reference itself whose heading starts with its words ("glow": Glow, "anim":
+  // Animation) is where a name with no row of its own is defined: that one whole, the guides named
+  const refs = !own.length && !nums && words.length
+    ? sections(["reference.md"]).filter((s) => words.every((w) => new RegExp(`(^|[^a-z0-9])${w}`).test(s.head.toLowerCase()))) : [];
+  const refWhole = refs.length <= 2 ? refs : [];
+  for (const s of refWhole) out.push(`[reference.md: ${s.head}]`, s.text);
+  if (refs.length > refWhole.length) out.push(`[reference.md: ${refs.length} sections]`, ...refs.slice(0, 8).map((s) => `  pxl help "${s.head}" (${k(s.text.length)})`));
+  const whole = !own.length && !refWhole.length && (secs.length <= 2 || nums) ? secs : [];
   for (const s of whole) out.push(`[${s.file}]`, s.text);
   if (secs.length > whole.length) {
     const list = opts.all ? secs : secs.slice(0, 8);

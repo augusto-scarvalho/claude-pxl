@@ -171,15 +171,16 @@ writes the same `out/` files as `build`.
 ## Commands
 
 ```
-pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite]
+pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N]
 pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
 pxl ascii <art.px.js> <name>     print an asset as palette keys with x/y rulers
-pxl list  <art.px.js>            list assets, groups and sheets with source locations
+pxl list  <art.px.js>            a map of the file: each definition's lines, its comment, what it makes
 pxl describe <art.px.js> <name>  a whole scene as text: what is where, what covers it, how it moves
-pxl check <art.px.js>            every check describe makes, on every frame: warnings only
-pxl shot <art.px.js> <name>      frames side by side, a region enlarged, --vs HEAD --diff
+pxl check <art.px.js>            every check describe makes, on every frame: warnings only (--readings: all)
+pxl shot <art.px.js> <name>      frames side by side, a region enlarged, --vs HEAD --diff; with several
+                                 names, other files' or PNGs, a row each (--at again: a column each)
 pxl steps <art.px.js> <name>     how it was painted, step by step; --at x,y: what painted that pixel
-pxl help [name]                  what the reference says about an op or option
+pxl help [name]                  what the reference says about an op or option, or a guide's section
 ```
 
 `pxl` alone prints every command with its options.

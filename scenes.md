@@ -3,7 +3,8 @@
 Read this before building a scene, a level, a building or any environment.
 
 Contents: Layout and scale · Ground, paths and tiles · Texture without filler · Trees and big organic
-shapes · Water and things that land · Shadows and light · Blend modes · Checking a scene
+shapes · Water and things that land · Distance (aerial perspective) · Slow motion in a short loop ·
+Shadows and light · Blend modes · Checking a scene
 
 ## Layout and scale
 
@@ -15,7 +16,8 @@ shapes · Water and things that land · Shadows and light · Blend modes · Chec
   scene `world: { horizon, eye }` (ground in perspective: a thing standing on row y is
   (y − horizon) / eye px per meter) or `world: { scale }` (flat: px per meter). `PXL describe` then
   says how tall each thing should be where it stands: `1.8 m tall is 41 px where it stands (y 134);
-  drawn 46 px, 12% too tall`.
+  drawn 46 px, 12% too tall`. It measures the drawing's box: a wide thing seen at an angle (a tent,
+  a cart) has its far end higher on screen, so judge its near end.
 - **Say which way things face.** `facing: "right"` on an asset, and describe says for each placement
   where it faces, which of its sides is toward us, whether it lies or stands upside down, and when a
   flip made it a mirror image (a sword in the other hand; a sign's lettering backwards).
@@ -153,8 +155,13 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
 
 ## Checking a scene
 
+- `PXL shot <file> <scene>`: the look, with what changed since the last shot and the warnings on
+  it; `--at x,y,w,h` again and again for details side by side, `--frames` for moments of the loop,
+  another version as a second name (`old.px.js:scene`) for a before and after.
 - `PXL describe <file> <scene>`: every object's visible ranges, gaps, cover, contrast and motion
   (`--brief` for busy scenes); after an edit, `--diff` lists what moved, was redrawn or recolored.
+- `PXL check <file>` before handing over: every frame of the loop; its last line says which rules
+  ran, and `--readings` shows what the lit-side rule read on each thing when a warning looks wrong.
 - A scene built from separate maps (terrain, props): `throw` in the placement loop when a prop lands
   on the wrong ground; it catches the drift before anyone sees it.
 - Before handing over, look as a critic: tiles repeating into a visible grid, props floating or on
