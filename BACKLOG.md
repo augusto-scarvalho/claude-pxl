@@ -395,9 +395,10 @@ one), and the art code itself (4% of the cost).
   over the `solid` global (`stick`, `blob`, `box`, `cone`, `poly`), drawn far to near and swept onto
   the ground from one sun; the park's own, lifted out (src/core/solids.ts), and the park now uses
   them. Cones stay the park's: the hull of level rings, for things standing roughly upright (a tilted
-  limb is a `capsule`). road keeps its own: its shapes are 2D in a plane. The park sizes its shapes
-  by `P.scale` of their depth, 1/cos(yaw) = 1.3 times the camera's, and every width there was tuned
-  to it, so it passes that as `scale` instead of the default.
+  limb is a `capsule`). road keeps its own: its shapes are 2D in a plane. Lifting it out showed
+  the park had sized everything by `P.scale` of its depth, which with the camera turned is
+  1/cos(yaw) = 1.3 times too big: it now takes the camera's own scale, its people, dog, pigeons and
+  trunks at their true widths, and the crowns and tall grass given real sizes that fill as before.
 - [x] **A capsule painted round**: `capsule(x0, y0, r0, x1, y1, r1, ramp, { light, rim })`, in px:
   every pixel shaded by where it sits across it toward the light, a rim on the lit side. extinction's
   limbs use it through `P.ground`/`P.scale`.

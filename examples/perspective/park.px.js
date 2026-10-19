@@ -61,6 +61,8 @@ const P = perspective({ w: W, horizon: 70, eye: 1.6, fov: 90, yaw: 40 })
 const CX = 2.2, CZ = 2.6, SIN = Math.sin((P.yaw * Math.PI) / 180), COS = Math.cos((P.yaw * Math.PI) / 180)
 const at = (x, z, u = 0) => P.ground(x - CX, z - CZ, u).map(Math.round)
 const ahead = (x, z) => (x - CX) * SIN + (z - CZ) * COS             // depth from the eye: what's farther is drawn first
+// px per meter at a world point, and at a depth
+const pxm = (x, z) => P.scale(z - CZ, x - CX), pxd = (d) => P.focal / d
 // the sun at two in the afternoon: 55 degrees up, from the left and a little ahead; the shadows fall
 // short, to the right and toward us
 const SUN_FROM = [-0.894, 0.447]
@@ -240,10 +242,10 @@ function paving(c) {
   // a weed in a joint by the lawn, here and there; near, one where the joints cross mid-path
   for (const [x, z] of [...JOINTS_A.flatMap((x) => [[x, PATH_A[0] + 0.05], [x, PATH_A[1] - 0.05]]), ...JOINTS_B.flatMap((z) => [[PATH_B[0] + 0.05, z], [PATH_B[1] - 0.05, z]])]) {
     if (ahead(x, z) > 12 || hash(Math.round(x * 10) + 3, Math.round(z * 10)) > 0.3) continue
-    tuft(c, ...at(x, z), 0.1 * P.scale(ahead(x, z)), 3, Math.round(x * 91 + z * 7))
+    tuft(c, ...at(x, z), 0.1 * pxm(x, z), 3, Math.round(x * 91 + z * 7))
   }
   for (const [x, z] of [...JOINTS_A.map((x) => [x, mid(...PATH_A)]), ...JOINTS_B.map((z) => [mid(...PATH_B), z])])
-    if (ahead(x, z) > 1 && ahead(x, z) < 8 && hash(Math.round(x * 10) + 7, Math.round(z * 10)) < 0.5) tuft(c, ...at(x, z), 0.06 * P.scale(ahead(x, z)), 4, Math.round(x * 13 + z * 5))
+    if (ahead(x, z) > 1 && ahead(x, z) < 8 && hash(Math.round(x * 10) + 7, Math.round(z * 10)) < 0.5) tuft(c, ...at(x, z), 0.06 * pxm(x, z), 4, Math.round(x * 13 + z * 5))
 }
 
 // ================================================================ shapes
@@ -254,9 +256,6 @@ function paving(c) {
 const { stick, blob, box, cone } = solid
 // the sun for both: which faces of a box it lights, which way and how long the shadows fall
 const SUN = { from: SUN_FROM, up: 55 }
-// px per meter where a shape stands, as the park has always taken it: P.scale of its depth. That is
-// 1 / cos(yaw), 1.3 times, the camera's own (solids()' default): every width here was tuned to it.
-const SIZE = (x, z) => P.scale(ahead(x, z))
 // a box's faces the eye can see; a face turned to the sun is lit
 function faces(b) {
   const [x0, z0, x1, z1, u0, u1] = b, out = [], q = (pts) => pts.flatMap(([x, z, u]) => at(x, z, u))
@@ -269,7 +268,7 @@ function faces(b) {
   return out
 }
 // draw shapes far to near; `ramps` light them on a plate when they're big enough to show it
-const drawShapes = (c, shapes, ramps) => c.solids(P, shapes, { at: [CX, CZ], sun: SUN, scale: SIZE, ramps, light: LIGHT })
+const drawShapes = (c, shapes, ramps) => c.solids(P, shapes, { at: [CX, CZ], sun: SUN, ramps, light: LIGHT })
 // what each ground color turns into in shade
 const SHADE = { a: "c", b: "d", e: "c", f: "h", g: "h", i: "j", k: "l", m: "l", t: "s", u: "t", "(": ")", ")": "]", "[": ")", "{": "c", "}": "d", "|": "h", "/": "h", "`": "h", "?": "h", ",": "2", "~": "d", "á": "c", "é": "d", "ú": "c", "ó": "d" }
 // their shadows on the ground; an umbrella casts as its disc
@@ -366,7 +365,7 @@ function grow(seed, { tall = 7, spread = 1, limbs = 4, depth = 3, side = [1, 0] 
   branch([lean[0], lean[1], trunk], norm([(r() - 0.5) * 0.3, (r() - 0.5) * 0.3, 1]), tall * 0.32, tr * 0.55, depth, true)
   return { wood, tips, trunk: { line, r: tr } }
 }
-function foliage(seed, tree, { size = 0.75, per = 6, reach = 0.85 }) {
+function foliage(seed, tree, { size = 1, per = 6, reach = 0.85 }) {
   const r = rng(seed + 1), out = []
   for (const t of tree.tips) for (let i = 0; i < per; i++) {
     const o = norm([r() - 0.5, r() - 0.5, r() - 0.3]), d = Math.cbrt(r()) * reach
@@ -463,13 +462,13 @@ function trunkBody(c, tk, fork, scr, scaleAt, C, R, bark) {
 // a grown tree standing at (tx, tz), drawn far to near through the camera
 function paintTree(c, tx, tz, t, ramp, bark) {
   const W3 = ([x, z, u]) => [tx + x, tz + z, u], scr = (p) => { const [x, z, u] = W3(p); return P.ground(x - CX, z - CZ, u) }
-  const scaleAt = (p) => P.scale(ahead(tx + p[0], tz + p[1])), limbs = new Map()
+  const scaleAt = (p) => pxm(tx + p[0], tz + p[1]), limbs = new Map()
   for (const w of t.wood) if (!w.root && !w.fork) limbs.set(w.g, [...(limbs.get(w.g) ?? []), w])
   const mid = (ws) => ahead(tx + ws.reduce((a, w) => a + w.a[0] + w.b[0], 0) / (2 * ws.length), tz + ws.reduce((a, w) => a + w.a[1] + w.b[1], 0) / (2 * ws.length))
   const items = [...t.wood.filter((w) => w.root).map((w) => ({ d: mid([w]) - 0.2, wood: [w] })), ...[...limbs.values()].map((ws) => ({ d: mid(ws), wood: ws })),
     { d: ahead(tx, tz) - 0.3, trunk: t.trunk }, ...t.leaves.map((q) => ({ d: ahead(tx + q.p[0], tz + q.p[1]), q }))].sort((a, b) => b.d - a.d)
   for (const it of items) {
-    const s = P.scale(it.d)
+    const s = pxd(it.d)
     if (it.trunk) { trunkBody(c, it.trunk, t.wood.filter((w) => w.fork), scr, scaleAt, t.C, t.R, bark); continue }
     if (it.wood) { woodBody(c, along(it.wood, scr, scaleAt), t.C, t.R, bark); continue }
     const q = it.q, px = Math.max(2, Math.min(10, Math.round(q.size * s))), [x, y] = scr(q.p)
@@ -479,7 +478,7 @@ function paintTree(c, tx, tz, t, ramp, bark) {
 }
 // a tree in the park: grown, painted where it stands; its limbs and leaf clusters cast its shadow
 function tree(x, z, { tall = 7, crown = 2.6, ipe = false, seed = 1, limbs = 4 } = {}) {
-  const opts = { tall, spread: crown / 2.2, limbs, side: [COS, -SIN], ...(ipe ? { size: 0.5, per: 12, reach: 0.75 } : {}) }
+  const opts = { tall, spread: crown / 2.2, limbs, side: [COS, -SIN], ...(ipe ? { size: 0.65, per: 12, reach: 0.75 } : {}) }
   const t = grow(seed, opts), f = foliage(seed, t, opts), body = { ...t, ...f }
   const shapes = [...t.wood.map((w) => stick([x + w.a[0], z + w.a[1], w.a[2]], [x + w.b[0], z + w.b[1], w.b[2]], (w.r0 + w.r1) / 2, "m")),
     ...t.trunk.line.slice(1).map((b, i) => stick([x + t.trunk.line[i][0], z + t.trunk.line[i][1], t.trunk.line[i][2]], [x + b[0], z + b[1], b[2]], t.trunk.r, "m")),
@@ -495,7 +494,7 @@ function tree(x, z, { tall = 7, crown = 2.6, ipe = false, seed = 1, limbs = 4 } 
 }
 // a clump of tall grass about (x, z), its blades `tall` times 0.3-0.65 m fanning `fan` wide, a few with
 // a seed head
-function weed(r, x, z, tall = 1, fan = 0.7) {
+function weed(r, x, z, tall = 1.3, fan = 0.7) {
   const n = 5 + Math.floor(r() * 4)
   return { x: x + (r() - 0.5) * 0.2, z: z + (r() - 0.5) * 0.2, blades: Array.from({ length: n }, (_, i) => ({ h: (0.3 + r() * 0.35) * tall, lean: ((i + 0.5) / n - 0.5) * fan + (r() - 0.5) * 0.2, ph: r() * 6.28, head: r() < 0.3, tip: r() })) }
 }
@@ -504,7 +503,7 @@ function weed(r, x, z, tall = 1, fan = 0.7) {
 // turn rather than all at once; a few carry a seed head.
 function sway(c, weeds, frame) {
   for (const w of weeds) {
-    const s = P.scale(ahead(w.x, w.z)), [bx, by] = at(w.x, w.z), gust = (frame / 80) * Math.PI * 2 - w.x * 0.6 - w.z * 0.35
+    const s = pxm(w.x, w.z), [bx, by] = at(w.x, w.z), gust = (frame / 80) * Math.PI * 2 - w.x * 0.6 - w.z * 0.35
     for (const b of w.blades) {
       const hp = Math.max(2, Math.round(b.h * s)), bend = (0.07 + 0.05 * Math.sin(gust * 0.5 + b.ph)) * s * (b.h / 0.5) * Math.sin(gust + b.ph * 0.25)
       let ex = bx, ey = by
@@ -557,7 +556,7 @@ function hedge(x0, z0, x1, z1, tall) {
     const a = i / n, b = (i + 1) / n, bx = along ? [x0 + (x1 - x0) * a, z0, x0 + (x1 - x0) * b, z1] : [x0, z0 + (z1 - z0) * a, x1, z0 + (z1 - z0) * b]
     const b3 = [...bx, 0, tall], keys = { top: "q", lit: "p", shade: "o" }, mx = (bx[0] + bx[2]) / 2, mz = (bx[1] + bx[3]) / 2
     const paint = (c) => {
-      const s = P.scale(ahead(mx, mz)), r = rng(Math.round(mx * 17 + mz * 5)), rb = Math.max(2, Math.round(0.3 * s)), small = Math.max(2, Math.round(0.17 * s))
+      const s = pxm(mx, mz), r = rng(Math.round(mx * 17 + mz * 5)), rb = Math.max(2, Math.round(0.3 * s)), small = Math.max(2, Math.round(0.17 * s))
       let lit = false
       for (const [kind, pts] of faces(b3)) { c.poly(pts, keys[kind]); if (kind === "lit") lit = true }
       const [fx0, fz0, fx1, fz1] = bx, near = along ? fz0 : fx0
@@ -665,7 +664,7 @@ const lerp3 = (a, b, t) => a.map((v, k) => v + (b[k] - v) * t)
 // does a point's outward direction (dx, dz) at (x, z) face the eye?
 const facing = (x, z, dx, dz) => (dx * (CX - x) + dz * (CZ - z)) / (Math.hypot(dx, dz) * Math.hypot(CX - x, CZ - z) || 1) > 0.2
 function person(b, { x, z, heading: [hx, hz], phase, gait, look, hat, tail, wave = 0, bag = null }) {
-  const g = GAITS[gait], th = phase * Math.PI * 2, L = b.thigh + b.shin, sh = [], wrap = [], px = P.scale(ahead(x, z))
+  const g = GAITS[gait], th = phase * Math.PI * 2, L = b.thigh + b.shin, sh = [], wrap = [], px = pxm(x, z)
   const w3 = (f, r, u) => [x + f * hx + r * hz, z + f * hz - r * hx, u], fine = { noShadow: true }
   const hipU = b.hip + g.bob * Math.cos(2 * th) - (gait === "run" ? 0.04 : 0)
   for (const sd of [-1, 1]) {
@@ -799,7 +798,7 @@ function figures(frame) {
   // bigger), turned to the way they face; their shadows from a body and a head
   for (const [px, pz, dir, off] of [[2.85, 7.3, -0.55, 0], [4.0, 7.9, 2.3, 5], [3.1, 8.2, 2.8, 9]]) {
     const peck = (frame + off) % 14 < 4, hx = Math.cos(dir), hz = Math.sin(dir), w3 = (f, r, u) => [px + f * hx + r * hz, pz + f * hz - r * hx, u]
-    const [sx, sy] = at(px, pz), big = P.scale(ahead(px, pz)) > 35
+    const [sx, sy] = at(px, pz), big = pxm(px, pz) > 35
     out.push({ d: ahead(px, pz), sprite: (peck ? "_pigeon_peck" : "_pigeon") + (big ? "" : "_s"), x: sx, y: sy + 1, flip: at(px + hx, pz + hz)[0] < sx,
       shapes: [blob(w3(0, 0, 0.12), 0.11, 0.07, "3"), blob(peck ? w3(0.14, 0, 0.05) : w3(0.1, 0, 0.22), 0.045, 0.045, "4")] })
   }
@@ -844,17 +843,17 @@ const WILD = (() => {
   const r = rng(77), out = []
   for (let i = 0; i < 34; i++) {
     const a = r() * Math.PI * 2, d = Math.sqrt(r()), x = MEADOW[0] + Math.cos(a) * d * MEADOW[2], z = MEADOW[1] + Math.sin(a) * d * MEADOW[3]
-    if (inMeadow(x, z)) out.push(weed(r, x, z, 0.6 + r() * 0.4, 0.9))
+    if (inMeadow(x, z)) out.push(weed(r, x, z, 0.8 + r() * 0.5, 0.9))
   }
   // along the paths, a panel's length here and there the edger missed, grown tall over the edge (which
   // path, which edge, which panel); and a clump at a joint now and then
   const edges = [(a) => [a, PATH_A[0] - 0.08], (a) => [a, PATH_A[1] + 0.08], (a) => [PATH_B[0] - 0.08, a], (a) => [PATH_B[1] + 0.08, a]]
   const spot = (x, z) => ahead(x, z) > 3 && ahead(x, z) < 14 && !paved(x, z) && !inRect(x, z, SAND) && !worn(x, z)
   for (const [e, from] of [[1, JOINTS_A[0]], [0, JOINTS_A[0]], [2, JOINTS_B[0]], [0, JOINTS_A[10]], [3, JOINTS_B[1]], [3, JOINTS_B[11]], [1, JOINTS_A[11]]])
-    for (let a = 0.08; a < SLAB; a += 0.17) { const [x, z] = edges[e](from + a); if (spot(x, z)) out.push(weed(r, x, z, 0.45, 1.2)) }
+    for (let a = 0.08; a < SLAB; a += 0.17) { const [x, z] = edges[e](from + a); if (spot(x, z)) out.push(weed(r, x, z, 0.6, 1.2)) }
   for (const e of [0, 1, 2, 3]) for (const j of e < 2 ? JOINTS_A : JOINTS_B) {
     const [x, z] = edges[e](j)
-    if (spot(x, z) && !(e === 2 && z > 10 && z < 18) && hash(Math.round(j * 10) + 40, e) < 0.3) out.push(weed(r, x, z, 0.5, 1.4))
+    if (spot(x, z) && !(e === 2 && z > 10 && z < 18) && hash(Math.round(j * 10) + 40, e) < 0.3) out.push(weed(r, x, z, 0.65, 1.4))
   }
   return out
 })()
@@ -885,8 +884,8 @@ function treeline(c) {
   for (let z = -2; z < 72; z += 4 + r() * 3) crowns.push([72 + r() * 4, z, 8 + r() * 4])
   crowns.sort((m, n) => ahead(n[0], n[1]) - ahead(m[0], m[1]))
   for (const [x, z, tall] of crowns) {
-    const s = P.scale(ahead(x, z)), [cx, cy] = at(x, z, tall * 0.65)
-    const seed = Math.round(x * 13 + z) & 0xffff, opts = { tall, spread: 1.3, depth: 2, size: 1.1, per: 4 }, t = grow(seed, opts)
+    const s = pxm(x, z), [cx, cy] = at(x, z, tall * 0.65)
+    const seed = Math.round(x * 13 + z) & 0xffff, opts = { tall, spread: 1.3, depth: 2, size: 1.4, per: 4 }, t = grow(seed, opts)
     paintTree(c, x, z, { ...t, ...foliage(seed, t, opts) }, "<<ST>", "<<<SST")
   }
 }
@@ -1038,7 +1037,7 @@ for (const s of STATIC)
     }
     // the taller grass at its foot, in front of it
     for (const [x, z] of s.fringe ?? []) {
-      const sc = P.scale(ahead(x, z)), [px, py] = at(x, z), h = hash(Math.round(x * 100), Math.round(z * 100))
+      const sc = pxm(x, z), [px, py] = at(x, z), h = hash(Math.round(x * 100), Math.round(z * 100))
       tuft(c, px, py, 0.26 * sc * (0.75 + h * 0.5), 4 + Math.floor(h * 3), Math.round(x * 977 + z * 31))
     }
   })
@@ -1055,7 +1054,7 @@ anim("park", { w: W, h: H, frames: FRAMES, fps: FPS },
       if (m.still) { c.stamp("_s" + m.still.id, 0, 0); continue }
       if (m.weeds) { sway(c, m.weeds, c.frame); continue }
       if (m.sprite) { c.stamp(m.sprite, m.x, m.y, m.flip ? { flip: "x" } : undefined); continue }
-      const big = P.scale(m.d) * 1.2 > 14
+      const big = pxd(m.d) * 1.2 > 14
       drawShapes(c, m.shapes, big ? BODY_RAMPS : undefined)
       if (m.leash) { const [hx, hy, cx, cy] = m.leash, mx = Math.round((hx + cx) / 2), my = Math.round((hy + cy) / 2) + 1; c.line(hx, hy, mx, my, "!"); c.line(mx, my, cx, cy, "!") }
     }
