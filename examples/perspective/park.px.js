@@ -50,6 +50,9 @@ pal({
   N: "#2b2330", "'": "#c49464",
   // grass worn thin, the earth nearly through
   "~": "#a7b45e",
+  // feral pigeons: blue-gray body, pale wing, the dark of the bars and the tail band, slate head; the
+  // neck's green and purple sheen; orange eye, pink feet
+  "ç": "#8a90a3", "â": "#b6bbca", "ê": "#3b3e4c", "ã": "#646b80", "ô": "#4f9a7a", "õ": "#8a5c9a", "à": "#f08a24", "í": "#e07a86",
 })
 
 const W = 320, H = 180, FPS = 10, FRAMES = 240
@@ -81,23 +84,32 @@ const joints = (lo, hi) => [...Array.from({ length: 10 }, (_, k) => lo - (k + 1)
 const JOINTS_A = joints(PLAZA[0], PLAZA[2]), JOINTS_B = joints(PLAZA[1], PLAZA[3])
 const GRID_X = [PLAZA[0], PATH_B[0], (PATH_B[0] + PATH_B[1]) / 2, PATH_B[1], PLAZA[2]], GRID_Z = [PLAZA[1], PATH_A[0], (PATH_A[0] + PATH_A[1]) / 2, PATH_A[1], PLAZA[3]]
 const paved = (x, z) => (z >= PATH_A[0] && z <= PATH_A[1]) || (x >= PATH_B[0] && x <= PATH_B[1]) || inRect(x, z, PLAZA)
-// Worn earth, each where something wore the grass away: a shortcut cut across the corner by the
-// crossing, bare ground in the deep shade under the big trees, in front of the benches on the lawn;
-// in the sand, hollows dug by feet under the swings and at the slide's end.
-const SHORTCUT = [[5.2, 4.4], [3.6, 6.4]]
+// Worn earth, each where something wore the grass away: bare ground in the deep shade under the big
+// trees, in front of the benches on the lawn; in the sand, hollows dug by feet under the swings and at
+// the slide's end.
 const BARE = [[3, 17.3, 1.7], [25, 27, 1.8], [31, 13.5, 1.6], [40, 22, 1.6]]
 const FEET = [[20, 9.05, 1.0, 0.35], [-2, 9.05, 1.0, 0.35]]
 const PITS = [[11.9, 12.8, 0.35, 0.9], [13.6, 12.8, 0.3, 0.7], [23.0, 13.45, 0.45, 0.4]]
 // a stretch of lawn the mower goes around, left to grow tall: an uneven oval, (x, z) and its radii
 const MEADOW = [2.0, 10.0, 1.1, 0.5]
 const inMeadow = (x, z) => ((x - MEADOW[0]) / MEADOW[2]) ** 2 + ((z - MEADOW[1]) / MEADOW[3]) ** 2 < 0.85 + 0.3 * noise(x * 2.5, z * 2.5)
-const distSeg = (x, z, [[ax, az], [bx, bz]]) => { const dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))); return Math.hypot(x - ax - t * dx, z - az - t * dz) }
+// How worn the grass is at (x, z), 0 to 1: under the big trees, in front of the benches
+function wear(x, z) {
+  let w = 0
+  for (const [tx, tz, rad] of BARE) w = Math.max(w, 1.4 * (1 - Math.hypot(x - tx, (z - tz) * 1.1) / rad))
+  for (const [fx, fz, hx, hz] of FEET) w = Math.max(w, 1.3 * (1 - Math.max(Math.abs(x - fx) / hx, Math.abs(z - fz) / hz)))
+  return w
+}
+// What shows where it's worn, from the most to the least: bare earth, packed and dry, dusty where it's
+// raised and dark in the hollows; earth between thin blades; grass thinned and yellowing among the
+// lawn. Each step gives way to the next in small irregular clumps, so the earth mixes into the grass.
 function worn(x, z) {
-  const n = noise(x * 3, z * 3), d = distSeg(x, z, SHORTCUT)
-  if (d < 0.14 + 0.06 * n && noise(x * 6, z * 6) > 0.42) return n > 0.82 ? "[" : "("
-  if (d < 0.3 && noise(x * 7, z * 7) > 0.5) return "~"
-  for (const [tx, tz, rad] of BARE) { const e = Math.hypot(x - tx, (z - tz) * 1.1) / rad; if (e < 0.7 + 0.35 * n) return e < 0.45 && n > 0.6 ? ")" : "(" }
-  for (const [fx, fz, hx, hz] of FEET) if (Math.abs(x - fx) < hx * (0.8 + 0.3 * n) && Math.abs(z - fz) < hz * (0.7 + 0.4 * n)) return "("
+  const w = wear(x, z)
+  if (w < 0.25) return null
+  const v = w + (noise(x * 7, z * 7) - 0.5) * 0.35, clump = hash(Math.floor(x * 25), Math.floor(z * 25))
+  if (v > 0.72) { const n = noise(x * 4 + 3, z * 4); return n > 0.56 ? "[" : n < 0.24 ? ")" : "(" }
+  if (v > 0.5) return clump < (v - 0.5) / 0.22 ? "(" : "~"
+  if (v > 0.32 && clump < ((v - 0.32) / 0.18) * 0.8) return "~"
   return null
 }
 // Concrete as it is outside: an almost even gray, a panel here and there a shade lighter (one replaced)
@@ -136,11 +148,8 @@ function ground(x, z) {
     // grass creeping over the slabs' edges, where it's near enough to see; slabs weathered each its own shade
     const edge = Math.min(onA ? Math.min(z - PATH_A[0], PATH_A[1] - z) : 9, onB ? Math.min(x - PATH_B[0], PATH_B[1] - x) : 9)
     if (dd < 16 && edge < 0.1 && noise(x * 9, z * 9) > 0.45) return lawn(x, z)
-    // near, the soil that rain and the mower throw onto the slabs' edges by the lawn; and where the
-    // shortcut across the lawn meets a path, the earth feet carry onto it, thinning out along the path
+    // near, the soil that rain and the mower throw onto the slabs' edges by the lawn
     if (dd < 10 && edge < 0.16 && noise(x * 7 + 5, z * 7) > 0.6) return edge < 0.07 && noise(x * 13, z * 13) > 0.62 ? "(" : "["
-    const tracked = Math.min(...SHORTCUT.map(([ex, ez]) => (onA ? Math.hypot(x - ex, (z - ez) * 1.6) : Math.hypot((x - ex) * 1.6, z - ez))))
-    if (dd < 12 && tracked < 1.1 && noise(x * 10, z * 10) > 0.38 + tracked * 0.5) return tracked < 0.4 && noise(x * 4, z * 4) > 0.5 ? "[" : "/"
     if (dd > 26) return "f"
     // poured concrete in square panels, two across the path, counted out from the plaza
     const along = onA ? x : z, across = onA ? z - PATH_A[0] : x - PATH_B[0], width = onA ? PATH_A[1] - PATH_A[0] : PATH_B[1] - PATH_B[0]
@@ -177,11 +186,15 @@ function details(c) {
     const dd = (P.focal * P.eye) / (y + 0.5 - P.horizon), len = (0.08 * P.focal) / dd
     if (dd > 26) continue
     for (let x = 0; x < W; x++) {
-      if (!LAWN.includes(c.key(x, y))) continue
-      const h = hash(x * 3 + 1, y * 7)
+      const k = c.key(x, y), h = hash(x * 3 + 1, y * 7)
+      // the thinned grass on worn ground: a short blade here and there, flattened, yellowing
+      if (k === "~") { if (dd < 10 && h < 0.3) c.px(x, y - 1, h < 0.12 ? "ú" : "{"); continue }
+      if (!LAWN.includes(k)) continue
       if (dd < 10) {
+        // where the lawn meets the worn earth its blades lean over it, as grass hangs over a path's edge
+        const edge = "~()[".includes(c.key(x, y - 1)) || "~()[".includes(c.key(x, y - 2))
         if (h < 0.0035) { c.px(x, y, ","); if (len > 2) c.px(x, y - 1, ","); continue }
-        if (h < 0.022) { tuft(c, x, y, len, 3 + Math.floor(hash(x, y) * 3), x * 131 + y); continue }
+        if (h < 0.022 || (edge && h < 0.16)) { tuft(c, x, y, len, 3 + Math.floor(hash(x, y) * 3), x * 131 + y); continue }
         // the lawn's own blades: short strokes, some catching the light, some in their own shade
         if (h < 0.022 + 0.13 * Math.min(1, 4 / dd)) {
           const g = hash(y, x * 5), n = Math.max(1, Math.round(len * (0.35 + g * 0.35))), key = g < 0.5 ? "}" : "{"
@@ -839,11 +852,13 @@ function figures(frame) {
   const pup = dog({ x: 6.45, z: zw + 1.5, heading: [0, 1], phase: (frame % 5) / 5 })
   const [hx, hy] = at(...woman.hand), [cx, cy] = at(...pup.collar)
   out.push({ d: ahead(5.75, zw), shapes: woman, leash: [hx, hy, cx, cy] }, { d: ahead(6.45, zw + 1.5), shapes: pup })
-  // pigeons pecking on the path, each to its own beat
-  for (const [px, pz, dir, off] of [[3.5, 7.0, 0.6, 0], [4.0, 7.9, 2.4, 5], [3.1, 8.2, 4.0, 9]]) {
+  // pigeons pecking on the path, each to its own beat, side on to us: drawn by hand (the nearest a size
+  // bigger), turned to the way they face; their shadows from a body and a head
+  for (const [px, pz, dir, off] of [[2.85, 7.3, -0.55, 0], [4.0, 7.9, 2.3, 5], [3.1, 8.2, 2.8, 9]]) {
     const peck = (frame + off) % 14 < 4, hx = Math.cos(dir), hz = Math.sin(dir), w3 = (f, r, u) => [px + f * hx + r * hz, pz + f * hz - r * hx, u]
-    out.push({ d: ahead(px, pz), shapes: [blob(w3(0, 0, 0.12), 0.1, 0.07, "3"), stick(w3(-0.08, 0, 0.13), w3(-0.2, 0, 0.11), 0.035, "4"),
-      blob(peck ? w3(0.14, 0, 0.05) : w3(0.11, 0, 0.2), 0.045, 0.045, "4", { top: 2 }), stick(w3(0.02, 0, 0.06), w3(0.02, 0, 0), 0.01, "!")] })
+    const [sx, sy] = at(px, pz), big = P.scale(ahead(px, pz)) > 35
+    out.push({ d: ahead(px, pz), sprite: (peck ? "_pigeon_peck" : "_pigeon") + (big ? "" : "_s"), x: sx, y: sy + 1, flip: at(px + hx, pz + hz)[0] < sx,
+      shapes: [blob(w3(0, 0, 0.12), 0.11, 0.07, "3"), blob(peck ? w3(0.14, 0, 0.05) : w3(0.1, 0, 0.22), 0.045, 0.045, "4")] })
   }
   // the vendor by his cart, ringing his bell now and then
   const ring = frame % 60 < 8 ? Math.abs(Math.sin((frame % 60) * 1.2)) * 1.2 : 0
@@ -891,8 +906,8 @@ const WILD = (() => {
   // along the paths, a panel's length here and there the edger missed, grown tall over the edge (which
   // path, which edge, which panel); and a clump at a joint now and then
   const edges = [(a) => [a, PATH_A[0] - 0.08], (a) => [a, PATH_A[1] + 0.08], (a) => [PATH_B[0] - 0.08, a], (a) => [PATH_B[1] + 0.08, a]]
-  const spot = (x, z) => ahead(x, z) > 3 && ahead(x, z) < 14 && !paved(x, z) && !inRect(x, z, SAND) && !worn(x, z) && distSeg(x, z, SHORTCUT) > 0.6
-  for (const [e, from] of [[1, JOINTS_A[0]], [0, JOINTS_A[10]], [3, JOINTS_B[1]], [3, JOINTS_B[11]], [1, JOINTS_A[11]]])
+  const spot = (x, z) => ahead(x, z) > 3 && ahead(x, z) < 14 && !paved(x, z) && !inRect(x, z, SAND) && !worn(x, z)
+  for (const [e, from] of [[1, JOINTS_A[0]], [0, JOINTS_A[0]], [2, JOINTS_B[0]], [0, JOINTS_A[10]], [3, JOINTS_B[1]], [3, JOINTS_B[11]], [1, JOINTS_A[11]]])
     for (let a = 0.08; a < SLAB; a += 0.17) { const [x, z] = edges[e](from + a); if (spot(x, z)) out.push(weed(r, x, z, 0.45, 1.2)) }
   for (const e of [0, 1, 2, 3]) for (const j of e < 2 ? JOINTS_A : JOINTS_B) {
     const [x, z] = edges[e](j)
@@ -1002,6 +1017,58 @@ function decals(c) {
   }
 }
 
+// A feral pigeon in profile, facing right, standing and pecking, in two sizes (13 and 10 px long, as
+// they come out where they stand): the plump chest and the back sloping to the tail, the small round
+// head, the green and purple sheen on the neck, two dark bars on the pale wing, the dark tail band,
+// orange eye, the white cere over the beak, pink feet. Their feet are the pivot.
+sprite("_pigeon", { pivot: "bottom" }, `
+..........ããã..
+.........ããàã1.
+.........ãããêê.
+........ãõôã...
+.......çõôõç...
+.....ççââçõçç..
+...ççââêââççç..
+.êçâââêââêççç..
+êêççââââââçç...
+..êêçççççççê...
+....êêêççêê....
+.......í.í.....
+......íí.íí....`)
+sprite("_pigeon_peck", { pivot: "bottom" }, `
+.ê.............
+êêçç...........
+.êçççççç.......
+..çââââççç.....
+..çâêââêâçõ....
+...çâââêââõôã..
+....êççççãôããã.
+.....êêêçêãàãã.
+......í.í.êãã1.
+.....íí.íí..êê.`)
+sprite("_pigeon_s", { pivot: "bottom" }, `
+.......ãã..
+......ããàã1
+......ãããêê
+.....ãõôã..
+....ççôõç..
+..ççââççç..
+.çââêâêçç..
+êêçâââââç..
+.êêçççççê..
+...êêêêê...
+.....í.í...
+....íí.íí..`)
+sprite("_pigeon_peck_s", { pivot: "bottom" }, `
+ê..........
+êêççç......
+.çççççç....
+.çâêââêçõ..
+..çâââêõôã.
+...êçççãàã.
+....êêíãã1.
+....íí.íêê.`)
+
 // the sky on its own, the clouds drift over it each frame, the rest of the picture over them
 sprite("_sky", { w: W, h: P.horizon + 1 }, grad(0, 0, W, P.horizon + 1, "ABCDE", "v"))
 sprite("_bg", { w: W, h: H },
@@ -1045,6 +1112,7 @@ anim("park", { w: W, h: H, frames: FRAMES, fps: FPS },
     for (const m of all) {
       if (m.still) { c.stamp("_s" + m.still.id, 0, 0); continue }
       if (m.weeds) { sway(c, m.weeds, c.frame); continue }
+      if (m.sprite) { c.stamp(m.sprite, m.x, m.y, m.flip ? { flip: "x" } : undefined); continue }
       const big = P.scale(m.d) * 1.2 > 14
       drawShapes(c, m.shapes, big ? BODY_RAMPS : undefined)
       if (m.leash) { const [hx, hy, cx, cy] = m.leash, mx = Math.round((hx + cx) / 2), my = Math.round((hy + cy) / 2) + 1; c.line(hx, hy, mx, my, "!"); c.line(mx, my, cx, cy, "!") }
