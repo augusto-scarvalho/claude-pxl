@@ -24,6 +24,8 @@
     "examples/halloween/*.{px.js,hex}",
     "examples/sunset/*.px.js",
     "examples/rig/*.px.js",
+    "examples/cyberpunk/*.px.js",
+    "examples/cyberpunk/pipeline/*.{px.js,md}",
     "examples/motion/*.{json,md}",
     "examples/fonts/*.px.js",
     "SKILL.md",

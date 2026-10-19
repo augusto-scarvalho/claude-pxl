@@ -101,6 +101,26 @@ is a rig of its own, its sword arm, sword and legs drawn from the pose's joints 
 feet flat on the ground), and a 96-frame list of poses is the bout, with the sparks, the dust, the
 marshal's signal and the fanfare on the same clock.
 
+## Showcase: a cyberpunk street at dusk, made two ways
+
+<p>
+  <img src="docs/gallery/sodium_hour.gif" width="100%" alt="Animated pixel-art cyberpunk street at dusk in dusty yellow haze, made by one agent: a sun-bleached megacity of brutalist blocks and glass towers behind an elevated freeway with its own traffic, a taco stand, a liquor store, a parking lot with fan palms, a clinic under a cyberware billboard, a red hotel with a fire escape and neon signs, power lines and a wooden pole, cars along four lanes and people walking the sidewalk">
+</p>
+<p>
+  <img src="docs/gallery/cyberpunk_city.gif" width="100%" alt="The same brief made by a pipeline of agents: a denser cyberpunk street at dusk, teal shade and sodium lamps, apartment blocks and shops with neon signs (FIX, TACO, OPEN, WASH, DOC), a billboard, a teal hologram bust, an elevated freeway, palms and power lines, cars and a bus in the street and a crowd walking the near sidewalk">
+</p>
+
+The fifth, in [`examples/cyberpunk/`](examples/cyberpunk): one brief, a 320×180 street at dusk in
+the spirit of Cyberpunk 2077's Night City (sun-bleached megablocks, dusty yellow haze, freeways,
+holo-ads, traffic and people; original art, no real logos), made twice from the skill alone. On
+top, one agent: 85 turns in 31 minutes, a 36 s loop. Below, a pipeline: a planner wrote the
+palette, a plan with every part's box, light and timing, and the scene file; eight forks of it drew
+the sky, towers, freeway, shops, signs, street, traffic and crowd at once, each in its own file;
+a last fork put them together. The pipeline came out denser, with more people, cars and shops, but
+less coherent, and cost about five times the tokens and twice the time: worth offering for a big
+scene, not a default. Its plan is there to read (`pipeline/plan.md`). The GIFs keep every third
+frame.
+
 ## Quick start
 
 ```sh

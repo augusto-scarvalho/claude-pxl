@@ -41,6 +41,24 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
 Errors name file:line:col and the asset/layer/op, and suggest fixes. One broken asset doesn't stop
 the others.
 
+## A big scene: ask how to make it
+
+For a big, busy scene (320×180 and up, many props, animated), ask the user first, with the numbers:
+
+- **One agent** (the default): you plan and draw it all. The cheapest and the most coherent: a
+  320×180 animated city street took 85 turns and 31 minutes.
+- **A pipeline**: you write `palette.px.js` (keys and ramps only), a plan (per part: its file, its
+  assets with the part's name as prefix, box, pivot, where it is stamped, its light, one timing for
+  every loop) and the scene file that includes the parts. Then one fork of yourself per part draws
+  it in its own file with a `test_<part>` scene, all at once (in Claude Code: the Agent tool with
+  `subagent_type: "fork"`; headless: `claude -p --resume <your session> --fork-session`): forks start
+  from what you read and plan, out of your cache. When they report, you put the scene together.
+  The same street came out denser (more people, cars, shops) but less coherent, for ~5× the tokens
+  and ~2× the time.
+
+Both are in `examples/cyberpunk/`; `pipeline/plan.md` is a plan whose parts fit. Included files
+share one scope, so every top-level name in a part starts with the part's name.
+
 ## Looking things up
 
 Don't read reference.md or a guide whole: what you read early is paid again on every later turn.
@@ -134,6 +152,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `sunset/` | 320×180 backlit scene: long shadows toward us, glowing edges, a tent lit through, a sky that loops slower than the rest |
 | `rig/tournament.px.js` | the knights in a scene: ground in perspective with every height checked, a 96-frame bout with trumpeters and marshal on named cues, pavilions, ground shadows from one sun, distance haze |
 | `rig/knight.px.js` | a 72 px knight built skeleton first: `rig`, `figure`, stand-ins, `plate`-lit parts, `twin` parts for the turned rig; poses from `ik`, slashes with `arc` smears; `facing` and `world` read out by describe |
+| `cyberpunk/` | a 320×180 animated city street at dusk made two ways: by one agent (`sodium_hour.px.js`) and by a pipeline (`pipeline/`: the plan, the palette, eight part files, the scene) |
 | `fonts/font5x7.px.js` | a 5×7 font for titles: `include` it, `text(..., { font: "5x7" })` |
 
 Render one into your own dir to keep the skill clean: `PXL build <skill dir>/examples/shop.px.js

@@ -4,6 +4,9 @@
 // from the wrong side (its lesson); the cemetery's crypt is misread (its outline is mostly trims: the
 // cornice, the steps; its columns are lit from the right, as the scene is); no_magic's ramps branch at
 // its dark stone (stone and paper) and its dark rose (cloth and fire), and its lights step through them.
+// The parts of a pipeline (`pipeline/part_*.px.js`) are left out: their test_* scenes are scaffolding
+// (a whole 240-frame street each, minutes of checking), and their assets are checked where the
+// pipeline's scene places them.
 // After a change you meant, rewrite the file: PXL_UPDATE=1 npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -18,7 +21,7 @@ const SNAP = join(root, "test", "examples.checks.txt");
 
 test("pxl check on every example: the same warnings as kept", () => {
   const files = (readdirSync(join(root, "examples"), { recursive: true }) as string[])
-    .map((f) => f.split("\\").join("/")).filter((f) => f.endsWith(".px.js") && !f.split("/").some((s) => s.startsWith("_") || s === "out")).sort();
+    .map((f) => f.split("\\").join("/")).filter((f) => f.endsWith(".px.js") && !f.split("/").some((s) => s.startsWith("_") || s === "out") && !/(^|\/)pipeline\/part_/.test(f)).sort();
   const out: string[] = [];
   for (const f of files) {
     try {
