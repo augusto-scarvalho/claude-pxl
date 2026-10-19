@@ -280,6 +280,15 @@ Wave 3: experiments, measured before anything is built.
   the skill and docs again, the part agents still grew to 126-171k (a part is not a small job),
   and the composer alone cost ~8M, reworking parts that didn't fit. The scenes came out about as
   good, cleaner in places. Worth trying again only for scenes whose single run goes past ~400k.
+  Then with forks, through the headless CLI: the planner as a session (`claude -p --session-id`),
+  each part and the composer as `claude -p --resume <id> --fork-session`. Every fork's first
+  request read the planner's 118.6k from the cache (1h TTL for -p runs) and wrote ~3.7k: the
+  reasoning stays in a resumed session, so the prefix matches. But the parts cost more, not less
+  (2.65M input units against 2.42M and 2.35M with fresh agents; 1h writes at 2x): each fork rereads
+  the planner's 118k, reasoning included, on every call, and peaked at 147-205k. The composer got
+  cheap (0.53M against ~1.0M, 3.7 min): parts that share the planner's whole picture fit together.
+  Total 3.56M against 3.80M for fresh agents and 2.16M for one agent; ~26 min against ~40 and ~27;
+  art about as good. Forks help a pipeline a little; one agent is still the cheapest.
 - [ ] **describe brief by default on busy scenes** (forest: 23k characters full), with a line
   saying how to get the full text.
 
