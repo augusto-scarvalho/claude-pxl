@@ -289,6 +289,14 @@ Wave 3: experiments, measured before anything is built.
   cheap (0.53M against ~1.0M, 3.7 min): parts that share the planner's whole picture fit together.
   Total 3.56M against 3.80M for fresh agents and 2.16M for one agent; ~26 min against ~40 and ~27;
   art about as good. Forks help a pipeline a little; one agent is still the cheapest.
+  And on the scene a pipeline should win: a 320x180 Night City street at dusk, animated, with
+  traffic, people, signs (one headless agent against a planner + 8 part forks + a composer fork).
+  The single agent didn't balloon: 85 turns, mean context ~130k, 1.60M input units + 0.77M output
+  (x5), 31 min. The pipeline: 350 turns, 8.71M + 3.62M, 5.2x the cost, ~55 min end to end; each
+  fork starts at the planner's ~130k and the busiest parts (the shop strip, the signs) and the
+  composer (88 turns) grew past it. Its scene came out denser (more people and cars, more shops, a
+  hologram) but busier and off the brief's dusty-yellow palette; the single one more coherent. So
+  a pipeline buys detail at ~5x the tokens and ~2x the time, a choice to offer, not a default.
 - [ ] **describe brief by default on busy scenes** (forest: 23k characters full), with a line
   saying how to get the full text.
 
