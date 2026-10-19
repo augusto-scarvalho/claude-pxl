@@ -293,6 +293,7 @@ function treeFire(c, T, frame) {
   }
 }
 
+const SKY = new Uint8Array(W * H)
 sprite("_bg", { w: W, h: H }, (c) => {
   for (let col = 0; col < W; col++) {
     let t = 0.5, open = false
@@ -300,7 +301,7 @@ sprite("_bg", { w: W, h: H }, (c) => {
       const hit = open ? null : march(col, row, t)
       if (hit) { t = hit[3] * 0.98; c.px(col, row, shadeLand(col, row, hit)) }
       else if (row >= P.horizon) c.px(col, row, "f")
-      else { open = true; c.px(col, row, sky(col, row)) }
+      else { open = true; SKY[row * W + col] = 1; c.px(col, row, sky(col, row)) }
     }
   }
   impact(c)
@@ -340,7 +341,7 @@ function paintCone(c, [a, ra, b, rb], ramp) {
 // dropped open. Legs posed by a run worked out in 3D like the park's people (each toe on an oval,
 // the knee by two-bone IK, bent forward as a bird's is), the big thigh merging into the body.
 const TREX = {
-  hip: 2.9, thigh: 1.4, shin: 1.3, foot: 0.8, reach: 1.25, lift: 0.55, bob: 0.1, side: 0.5, thighR: 0.62, shinR: 0.3, footR: 0.15,
+  hip: 2.9, thigh: 1.4, shin: 1.3, foot: 0.8, reach: 1.25, lift: 0.55, bob: 0.1, side: 0.5, thighR: 0.72, shinR: 0.38, footR: 0.17,
   upper: [[-6.7, 0.1], [-5.2, 0.32], [-3.4, 0.55], [-1.6, 0.8], [0, 0.95], [1.3, 0.88], [2.3, 0.78], [2.95, 0.98], [3.4, 1.35], [3.8, 1.55], [4.3, 1.55], [4.8, 1.4], [5.25, 1.14], [5.42, 0.95]],
   lower: [[-6.7, 0.05], [-5.2, 0.04], [-3.4, -0.06], [-1.6, -0.3], [-0.5, -0.65], [0.6, -0.95], [1.6, -0.95], [2.35, -0.6], [2.9, -0.15], [3.45, 0.35], [3.75, 0.62], [4.3, 0.68], [5.42, 0.74]],
   jaw: { at: [3.72, 0.62], len: 1.55, back: 0.38, front: 0.2, gape: 0.4 }, eye: [4.25, 1.3], nostril: [5.22, 1.02], arm: [2.25, -0.4],
@@ -395,9 +396,12 @@ function runner(B, { x, z, phase, ramp }) {
     return { sd, hip: at3(0, hipU), knee: at3(Math.cos(ka) * B.thigh, hipU + Math.sin(ka) * B.thigh), ankle: at3(ankle[0], ankle[1]), toe: at3(toeF + B.foot * 0.3, lift + 0.02) }
   })
   const far = ramp[0] + ramp.slice(0, 3)
+  // the thigh in the body's own tone, only its underside in shade, so it reads as muscle under the
+  // hide and its top sinks into the body (no hot rim across the hip); the shin thick at the calf
   const leg = (L, rp) => {
-    paintCone(c_, [L.hip, B.thighR, L.knee, B.thighR * 0.5], rp)
-    paintCone(c_, [L.knee, B.shinR, L.ankle, B.shinR * 0.6], rp)
+    const flat = rp[0] + rp[1] + rp[1] + rp[1]
+    paintCone(c_, [L.knee, B.shinR, L.ankle, B.shinR * 0.45], rp)
+    paintCone(c_, [L.hip, B.thighR, L.knee, B.thighR * 0.42], flat)
     paintCone(c_, [L.ankle, B.footR, L.toe, B.footR * 0.7], rp)
   }
   let c_
@@ -636,10 +640,55 @@ function smoke(c) {
   }
 }
 
+// ================================================================ soot clouds across the sun
+// A lane of soot clouds blown right across the sun's height: black at their cores, ragged, pouches
+// hanging from their bellies (mammatus, a storm sky's), trailing wisps downwind, their edges lit only
+// where the sun is close behind them. Each moves one slot along
+// in the loop while turning into the next one's shape (as the park's clouds do), so the loop closes.
+// They go behind the mountain and the trees (only the sky's pixels take them). As they pass they
+// cover the sun now partly, now hardly, and its light dims with it, on the soot and on the mountain.
+const SUN_AT = (() => { const zc = SUN[1] * cp + SUN[2] * sp, yc = SUN[2] * cp - SUN[1] * sp; return [P.vp + (P.focal * SUN[0]) / zc, CY - (P.focal * yc) / zc] })()
+const SLOT = 110, NSLOT = 4
+const SHAPES = Array.from({ length: NSLOT }, (_, i) => {
+  const r = rng(4100 + i), dy = [-10, -4, -12, -2][i]
+  return [...Array.from({ length: 7 }, () => [(r() - 0.5) * 44, dy - 2 + (r() - 0.5) * 8, 8 + r() * 9, 5 + r() * 4]),
+    ...Array.from({ length: 5 }, (_, k) => [-18 + k * 9 + (r() - 0.5) * 4, dy + 6 + r() * 3, 3 + r() * 1.6, 2.6 + r() * 1.4]),
+    ...Array.from({ length: 2 }, () => [20 + r() * 16, dy + (r() - 0.5) * 5, 12 + r() * 8, 1.5 + r() * 1.2])]
+})
+function sootClouds(c, frame) {
+  const t = frame / FRAMES, toSun = (x, y) => { const dx = SUN_AT[0] - x, dy = SUN_AT[1] - y, l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l, l] }
+  let covered = 0, disk = 0
+  for (let k = 0; k < NSLOT; k++) {
+    const A = SHAPES[k], B = SHAPES[(k + 1) % NSLOT], cx = -70 + (k + t) * SLOT, cy = SUN_AT[1]
+    const puffs = A.map((a, i) => a.map((v, j) => v + (B[i][j] - v) * t))
+    const dens = (x, y) => { let m = 0; for (const [px, py, rx, ry] of puffs) m = Math.max(m, 1 - Math.hypot((x - cx - px) / rx, (y - cy - py) / ry)); return m }
+    for (let y = Math.floor(cy - 26); y <= Math.ceil(cy + 26); y++) for (let x = Math.floor(cx - 50); x <= Math.ceil(cx + 66); x++) {
+      if (x < 0 || x >= W || y < 0 || y >= H || !SKY[y * W + x]) continue
+      // the shape: puffs together, its outline ragged by a slow noise; inside, darkest at the core
+      const d = dens(x, y)
+      if (d + (noise(x / 6 + k * 9, y / 4) - 0.5) * 0.22 <= 0) continue
+      const [ux, uy, far] = toSun(x, y), rim = d < 0.22 && d - dens(x + ux * 3, y + uy * 3) > 0.12
+      const under = d < 0.3 && d - dens(x, y + 2) > 0.12
+      c.px(x, y, rim && far < 30 ? "J" : rim && far < 70 ? "F" : rim ? "D" : under ? "C" : d > 0.4 ? "A" : d > 0.12 ? "B" : "C")
+    }
+  }
+  // how much of the sun's disk is behind them; the light dims as much
+  for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) if (x * x + y * y <= 16) { disk++; if (!"IJ".includes(c.key(Math.round(SUN_AT[0]) + x, Math.round(SUN_AT[1]) + y))) covered++ }
+  // two steps: half hidden, the brightest soot round it and the sunlit rock a step down; nearly all
+  // hidden, the glow round it a step further
+  const dim = covered / disk
+  if (dim < 0.45) return
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const k = c.key(x, y), r = Math.hypot(x - SUN_AT[0], y - SUN_AT[1])
+    if (SKY[y * W + x]) { if (r < 95 && "KF".includes(k)) c.px(x, y, { K: "F", F: "E" }[k]); else if (dim > 0.8 && r < 60 && k === "E") c.px(x, y, "D") }
+    else if (k === "K") c.px(x, y, "O")
+  }
+}
+
 // each tree's still parts on a sprite of their own, cropped to what they draw
 for (const [i, T] of TREES.entries()) sprite("_tree" + i, { w: W, h: H, crop: true, pivot: [0, 0] }, (c) => paintTree(c, T))
 anim("extinction", { w: W, h: H, frames: FRAMES, fps: FPS }, stamp("_bg", 0, 0), (c) => {
-  meteors(c, c.frame); lava(c, c.frame); crater(c, c.frame); frontFire(c, c.frame)
+  meteors(c, c.frame); sootClouds(c, c.frame); lava(c, c.frame); crater(c, c.frame); frontFire(c, c.frame)
   const all = [...TREES.map((T, i) => ({ d: T.d, tree: i })), ...runners(c.frame), ...flyers(c.frame)].sort((m, n) => n.d - m.d)
   for (const m of all) {
     if (m.tree !== undefined) { c.stamp("_tree" + m.tree, 0, 0); treeFire(c, TREES[m.tree], c.frame); continue }
