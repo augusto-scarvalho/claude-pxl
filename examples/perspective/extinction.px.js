@@ -527,10 +527,13 @@ function runner(B, { x, z, phase, ramp }) {
       if (B.arm) c.line(...at(...w3(B.arm[0], 0.4, B.arm[1])), ...at(...w3(B.arm[0] + 0.35, 0.4, B.arm[1] - 0.3)), far[1])
       paintBody(c, B, w3, du, ramp, B.upper[0][0], B.upper[B.upper.length - 1][0])
       if (B.jaw) {
-        // the lower jaw, hinged behind and dropped open; the mouth red inside; teeth in both jaws
+        // the lower jaw, hinged behind and dropped open; between the jaws, open air (what's behind shows
+        // through), but for the corner of the mouth, dark, and the tongue lying in the lower jaw; teeth
+        // in both jaws
         const J = B.jaw, rot = (l, dn) => [J.at[0] + l * Math.cos(J.gape) - dn * Math.sin(J.gape), J.at[1] - l * Math.sin(J.gape) - dn * Math.cos(J.gape)]
         const P2 = (p) => at(...w3(p[0], -0.05, p[1] + du(p[0])))
-        c.poly([...P2(J.at), ...P2([B.lower[B.lower.length - 1][0] - 0.05, B.lower[B.lower.length - 1][1]]), ...P2(rot(J.len, 0))], "x")
+        c.poly([...P2(J.at), ...P2([J.at[0] + 0.32, along2(B.bot, J.at[0] + 0.32)]), ...P2(rot(0.32, 0))], "0")
+        c.line(...P2(rot(0.05, -0.05)), ...P2(rot(J.len * 0.62, -0.07)), "x", Math.max(1, Math.round(0.1 * P.scale(z, x))))
         for (let l = 0; l <= J.len; l += 0.03) {
           const top = rot(l, 0), bot = rot(l, J.back + (J.front - J.back) * (l / J.len)), [tx, ty] = P2(top), [bx, by] = P2(bot), n = Math.max(1, Math.ceil(Math.hypot(bx - tx, by - ty)))
           for (let i = 0; i <= n; i++) c.px(Math.round(tx + (bx - tx) * (i / n)), Math.round(ty + (by - ty) * (i / n)), ramp[i / n < 0.5 ? 1 : 0])
