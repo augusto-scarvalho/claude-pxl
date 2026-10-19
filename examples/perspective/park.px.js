@@ -38,6 +38,14 @@ pal({
   U: "#2b3b6c", V: "#2f8a4a", W: "#1f5e34", X: "#ec735e", Y: "#b24c42", "@": "#e8cf8a", "&": "#b89a58", "!": "#d02a5a",
   // the dog, a caramelo: caramel, its shade, cream
   "%": "#cf8a3e", "$": "#97582a", "+": "#f0cf98",
+  // foliage: the deep shade under a crown; the ipê's deepest and its glint; bark's deepest; the treeline's dark and light
+  "=": "#1d4428", "-": "#9a6c08", ":": "#fff4b0", ";": "#2e2018", "<": "#466f52", ">": "#a3c39e",
+  // worn earth, a darker patch of it, pebbles, earth in shade; grass blades in the sun and in their own shade; daisies
+  "(": "#8f6d48", ")": "#6e5236", "[": "#b49a72", "]": "#4f3b2b", "{": "#98d25c", "}": "#5a9a3a", ",": "#fbfbef",
+  // paving: slabs a shade lighter and darker, a crack; the plaza's warm stone
+  "|": "#e6dece", "/": "#cdc3b0", "?": "#a59b8b", "`": "#e9d6b6",
+  // grass worn thin, the earth nearly through
+  "~": "#a7b45e",
 })
 
 const W = 320, H = 180, FPS = 10, FRAMES = 240
@@ -52,17 +60,90 @@ const SUN_FROM = [-0.894, 0.447], LONG = 1 / Math.tan((55 * Math.PI) / 180), SOX
 const facesSun = (nx, nz) => nx * SUN_FROM[0] + nz * SUN_FROM[1] > 0
 const LIGHT = [-0.8, -1]                                           // on screen: from the upper left
 const hash = (i, j) => { let k = Math.imul(i, 374761393) + Math.imul(j, 668265263); k = Math.imul(k ^ (k >>> 13), 1274126177); return ((k ^ (k >>> 16)) >>> 0) / 4294967296 }
+const noise = (x, y) => {
+  const i = Math.floor(x), j = Math.floor(y), u = x - i, v = y - j, su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v)
+  const a = hash(i, j), b = hash(i + 1, j), c = hash(i, j + 1), d = hash(i + 1, j + 1)
+  return a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv
+}
 
 // ================================================================ ground
 const PATH_A = [6.4, 8.6], PATH_B = [5.2, 7.4], PLAZA = [4.4, 5.6, 8.2, 9.4], SAND = [10, 11, 23, 21]
 const inRect = (x, z, [x0, z0, x1, z1]) => x >= x0 && x <= x1 && z >= z0 && z <= z1
 const paved = (x, z) => (z >= PATH_A[0] && z <= PATH_A[1]) || (x >= PATH_B[0] && x <= PATH_B[1]) || inRect(x, z, PLAZA)
+// Worn earth, each where something wore the grass away: a shortcut cut across the corner by the
+// crossing, bare ground in the deep shade under the big trees, in front of the benches on the lawn;
+// in the sand, hollows dug by feet under the swings and at the slide's end.
+const SHORTCUT = [[5.2, 4.4], [3.6, 6.4]]
+const BARE = [[3, 17.3, 1.7], [25, 27, 1.8], [31, 13.5, 1.6], [40, 22, 1.6]]
+const FEET = [[20, 9.05, 1.0, 0.35], [-2, 9.05, 1.0, 0.35]]
+const PITS = [[11.9, 12.8, 0.35, 0.9], [13.6, 12.8, 0.3, 0.7], [23.0, 13.45, 0.45, 0.4]]
+const distSeg = (x, z, [[ax, az], [bx, bz]]) => { const dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))); return Math.hypot(x - ax - t * dx, z - az - t * dz) }
+function worn(x, z) {
+  const n = noise(x * 3, z * 3), d = distSeg(x, z, SHORTCUT)
+  if (d < 0.14 + 0.06 * n && noise(x * 6, z * 6) > 0.42) return n > 0.82 ? "[" : "("
+  if (d < 0.3 && noise(x * 7, z * 7) > 0.5) return "~"
+  for (const [tx, tz, rad] of BARE) { const e = Math.hypot(x - tx, (z - tz) * 1.1) / rad; if (e < 0.7 + 0.35 * n) return e < 0.45 && n > 0.6 ? ")" : "(" }
+  for (const [fx, fz, hx, hz] of FEET) if (Math.abs(x - fx) < hx * (0.8 + 0.3 * n) && Math.abs(z - fz) < hz * (0.7 + 0.4 * n)) return "("
+  return null
+}
+const lawn = (x) => ((Math.floor(x / 2.5) & 1) ? "a" : "b")                   // mowing stripes, along z: they run to the left point
 function ground(x, z) {
-  if (ahead(x, z) > 140) return "e"
-  if (paved(x, z)) return "f"
-  if (inRect(x, z, SAND)) return "i"
-  if (ahead(x, z) > 70) return "e"
-  return (Math.floor(x / 2.5) & 1) ? "a" : "b"                     // mowing stripes, along z: they run to the left point
+  const dd = ahead(x, z)
+  if (dd > 140) return "e"
+  if (inRect(x, z, PLAZA)) {
+    // the plaza: a border of darker stone, inside squares of two stones in a checker
+    const [x0, z0, x1, z1] = PLAZA
+    if (x - x0 < 0.3 || x1 - x < 0.3 || z - z0 < 0.3 || z1 - z < 0.3) return "/"
+    return (Math.floor((x - x0 - 0.3) / 0.8) + Math.floor((z - z0 - 0.3) / 0.8)) & 1 ? "`" : "f"
+  }
+  const onA = z >= PATH_A[0] && z <= PATH_A[1], onB = x >= PATH_B[0] && x <= PATH_B[1]
+  if (onA || onB) {
+    // grass creeping over the slabs' edges, where it's near enough to see; slabs weathered each its own shade
+    const edge = Math.min(onA ? Math.min(z - PATH_A[0], PATH_A[1] - z) : 9, onB ? Math.min(x - PATH_B[0], PATH_B[1] - x) : 9)
+    if (dd < 16 && edge < 0.1 && noise(x * 9, z * 9) > 0.45) return lawn(x)
+    if (dd > 26) return "f"
+    return ["f", "|", "/", "f"][Math.floor(hash(onA ? Math.floor(x / 1.5) : Math.floor(z / 1.5), onA ? 1 : 2) * 4)]
+  }
+  if (inRect(x, z, SAND)) {
+    for (const [px, pz, rx, rz] of PITS) if (((x - px) / rx) ** 2 + ((z - pz) / rz) ** 2 < 1) return "j"
+    return "i"
+  }
+  if (dd > 70) return "e"
+  return worn(x, z) ?? lawn(x)
+}
+// near the eye, what a flat color can't say: grass blades standing up out of the lawn, some catching
+// the sun, some in their own shade; a daisy here and there; roots across the bare earth under the
+// trees; a crack across a slab now and then
+function details(c) {
+  for (let y = H - 1; y > P.horizon + 14; y--) {
+    const dd = (P.focal * P.eye) / (y + 0.5 - P.horizon), len = Math.round((0.07 * P.focal) / dd)
+    if (dd > 11 || len < 1) continue
+    for (let x = 0; x < W; x++) {
+      const k = c.key(x, y)
+      if (k !== "a" && k !== "b") continue
+      const h = hash(x * 3 + 1, y * 7)
+      if (h < 0.0035) { c.px(x, y, ","); if (len > 1) c.px(x, y - 1, ","); continue }
+      if (h > 0.075) continue
+      const blade = hash(x, y * 3) < 0.6 ? "{" : "}"
+      for (let i = 0; i < len; i++) if ("ab".includes(c.key(x, y - i))) c.px(x, y - i, blade)
+    }
+  }
+  for (const [tx, tz, rad] of BARE) {
+    const r = rng(Math.round(tx * 7 + tz))
+    for (let i = 0; i < 6; i++) { const a = r() * Math.PI * 2, len = rad * (0.45 + r() * 0.45); seg(c, tx, tz, tx + Math.cos(a) * len, tz + Math.sin(a) * len * 0.9, 0, i % 2 ? "m" : "l") }
+  }
+  for (let k = 1; k < 14; k++) {
+    if (hash(k, 9) < 0.35) {                                           // path A, slab k
+      const x0 = k * 1.5, r = rng(k * 31), pts = [[x0 + 0.2 + r() * 0.4, PATH_A[0] + 0.05]]
+      for (let i = 1; i <= 3; i++) pts.push([pts[i - 1][0] + (r() - 0.3) * 0.35, PATH_A[0] + (i / 3) * (PATH_A[1] - PATH_A[0] - 0.1)])
+      for (let i = 1; i < pts.length; i++) seg(c, ...pts[i - 1], ...pts[i], 0, "?")
+    }
+    if (hash(k, 11) < 0.3) {                                           // path B, slab k
+      const z0 = k * 1.5, r = rng(k * 47), pts = [[PATH_B[0] + 0.05, z0 + 0.2 + r() * 0.4]]
+      for (let i = 1; i <= 3; i++) pts.push([PATH_B[0] + (i / 3) * (PATH_B[1] - PATH_B[0] - 0.1), pts[i - 1][1] + (r() - 0.3) * 0.35])
+      for (let i = 1; i < pts.length; i++) seg(c, ...pts[i - 1], ...pts[i], 0, "?")
+    }
+  }
 }
 // a level line on the ground (or u m up), cut where it would pass behind the eye
 function seg(c, x0, z0, x1, z1, u, key) {
@@ -191,25 +272,126 @@ function cast(out, shapes) {
   }
 }
 // what each ground color turns into in shade
-const SHADE = { a: "c", b: "d", e: "c", f: "h", g: "h", i: "j", k: "l", m: "l", t: "s", u: "t" }
+const SHADE = { a: "c", b: "d", e: "c", f: "h", g: "h", i: "j", k: "l", m: "l", t: "s", u: "t", "(": ")", ")": "]", "[": ")", "{": "c", "}": "d", "|": "h", "/": "h", "`": "h", "?": "h", ",": "2", "~": "d" }
 const darken = (c, out) => { for (const i of out) { const x = i % W, y = (i - x) / W, d = SHADE[c.key(x, y)]; if (d) c.px(x, y, d) } }
 
 // ================================================================ things
-// trees: a trunk forking into branches under a crown of leafy puffs; the ipê in yellow bloom
+// Trees, drawn the way pixel-art trees are (the LPC trees in tropical/refs, Slynyrd's Pixelblog 15
+// and 44): the crown a few big masses, each a pile of leaf clumps of about one size, cauliflower-like:
+// serrated, lit on the upper left, dark underneath with a deep line along the lower edge, leaf strokes
+// radiating from the middle; piled from the bottom up so each clump's dark underside lies on the lit
+// top of the one below. The trunk forks under the crown so its limbs show going up into the masses;
+// wood shaded as a cylinder by the light, furrowed, rooted. No speckle: clusters under ~4 px are noise.
+const LEAF = [-0.6, -0.8]                                            // light from the upper left, on screen
+// A clump of leaves: a disc with a serrated rim; lit on the upper left (its brightest band just inside
+// the rim there), darker underneath with a deep line along its lower edge, and dark leaf strokes
+// radiating from its middle, the way a bunch of leaves seen from outside looks.
+function clump(c, x, y, R, base, ramp, r) {
+  const teeth = Math.max(5, Math.round(R * 1.2)), ph = r() * 6.28, top = ramp.length - 1
+  const edge = (a) => R * (0.86 + 0.14 * Math.abs(Math.sin((teeth * a) / 2 + ph)))
+  const k0 = (xx, yy) => {
+    const d = Math.hypot(xx, yy), a = Math.atan2(yy, xx), e = edge(a)
+    if (d > e + 0.3) return -1
+    const f = d ? (xx * LEAF[0] + yy * LEAF[1]) / d : 0
+    if (yy > 0 && d > e - 1.2) return 0                                // the deep line under it
+    let k = base
+    if (yy > R * 0.3 && d > R * 0.55) k = base - 1                      // its underside
+    if (f > 0.2 && d < e - 1) k = base + 1                              // the lit side
+    if (f > 0.55 && d > R * 0.45 && d < e - 0.5) k = Math.min(top, base + 2)   // the brightest band inside the rim
+    return Math.max(1, Math.min(top, k))
+  }
+  const px = []
+  for (let yy = -R - 1; yy <= R + 1; yy++) for (let xx = -R - 1; xx <= R + 1; xx++) { const k = k0(xx, yy); if (k >= 0) px.push([xx, yy, k]) }
+  for (const [xx, yy, k] of px) c.px(x + xx, y + yy, ramp[k])
+  if (R < 5) return
+  // leaf strokes from the middle out, a tone darker than what they cross
+  const n = Math.round(R * 0.9)
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + r() * 0.4, from = R * (0.15 + r() * 0.15), to = R * (0.5 + r() * 0.2)
+    for (let d = from; d < to; d += 0.7) {
+      const xx = Math.round(Math.cos(a) * d), yy = Math.round(Math.sin(a) * d), k = k0(xx, yy)
+      if (k > 0) c.px(x + xx, y + yy, ramp[Math.max(1, k - 1)])
+    }
+  }
+}
+
+// A tree: a trunk that forks into limbs reaching up into a few big masses; the masses are piles of
+// clumps, drawn from the bottom up so each clump's dark underside lies over the lit top of the one
+// below; each clump's tone set by where it sits on its mass and on the crown (lit up and left).
+function drawTree(c, { cx, cy, rx, ry, foot, seed, ramp = "=opqr", bark = ";lmn", airy = 0 }) {
+  const r = rng(seed), [fx, fy] = foot, R = Math.max(3, Math.min(12, Math.round(Math.min(rx, ry) * (airy ? 0.16 : 0.3))))
+  // the masses: a few big lobes around the crown's middle, the crown wider than tall
+  const nm = 3 + Math.floor(r() * 2), masses = [[cx, cy - ry * 0.25, rx * 0.55, ry * 0.55]]
+  for (let i = 0; i < nm; i++) {
+    const a = Math.PI + (i / (nm - 1)) * Math.PI + (r() - 0.5) * 0.4
+    masses.push([cx + Math.cos(a) * rx * 0.55, cy + Math.sin(a) * ry * 0.35 + ry * 0.15, rx * (0.38 + r() * 0.12), ry * (0.4 + r() * 0.12)])
+  }
+  // Trunk and limbs: tapered curves, each pixel shaded by where it sits across the limb (lit on the
+  // left, dark on the right, a deep edge), so forks and roots merge into one body of wood. The trunk
+  // forks under the crown, so the limbs show going up into it.
+  const tw = Math.max(2, rx * 0.2), wood = new Map()
+  const limb = (p0, p1, p2, w0, w1, prio = 1) => {
+    const n = Math.max(4, Math.round(Math.hypot(p2[0] - p0[0], p2[1] - p0[1]) * 1.5))
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, mt = 1 - t
+      const x = mt * mt * p0[0] + 2 * mt * t * p1[0] + t * t * p2[0], y = mt * mt * p0[1] + 2 * mt * t * p1[1] + t * t * p2[1]
+      let tx = 2 * mt * (p1[0] - p0[0]) + 2 * t * (p2[0] - p1[0]), ty = 2 * mt * (p1[1] - p0[1]) + 2 * t * (p2[1] - p1[1])
+      const tl = Math.hypot(tx, ty) || 1, nx = -ty / tl, ny = tx / tl, h = Math.max(0.5, (w0 + (w1 - w0) * t) / 2)
+      for (let yy = Math.floor(y - h - 1); yy <= Math.ceil(y + h + 1); yy++) for (let xx = Math.floor(x - h - 1); xx <= Math.ceil(x + h + 1); xx++) {
+        const dx = xx + 0.5 - x, dy = yy + 0.5 - y
+        if (dx * dx + dy * dy > h * h) continue
+        // across: how far from the middle of the limb; lit: how much the surface there faces the light
+        const across = Math.abs(dx * nx + dy * ny) / h, lit = (dx * LEAF[0] + dy * LEAF[1]) / h, key = xx + "," + yy, old = wood.get(key)
+        if (!old || prio > old.prio || (prio === old.prio && across < old.across)) wood.set(key, { x: xx, y: yy, across, lit, w: h * 2, prio })
+      }
+    }
+  }
+  const crownBottom = cy + ry * 0.55, fork = [fx + (cx - fx) * 0.4 + (r() - 0.5) * tw, crownBottom + (fy - crownBottom) * 0.35]
+  limb([fx, fy], [fx + (fork[0] - fx) * 0.3, (fy + fork[1]) / 2], fork, tw * 1.05, tw * 0.75, 2)
+  // a leader up into the middle mass, the side limbs leaving it one above another
+  const lead = [masses[0][0], masses[0][1] + ry * 0.1], ctl = [(fork[0] + lead[0]) / 2, (fork[1] + lead[1]) / 2]
+  limb(fork, ctl, lead, tw * 0.75, Math.max(1, tw * 0.3), 1)
+  masses.slice(1).forEach(([mx, my], i, rest) => {
+    const t = 0.08 + (i / Math.max(1, rest.length)) * 0.5, mt = 1 - t
+    const from = [mt * mt * fork[0] + 2 * mt * t * ctl[0] + t * t * lead[0], mt * mt * fork[1] + 2 * mt * t * ctl[1] + t * t * lead[1]], end = [mx, my + ry * 0.08]
+    limb(from, [(from[0] + end[0]) / 2, from[1] - (from[1] - end[1]) * 0.6], end, tw * (0.5 - t * 0.3), Math.max(1, tw * 0.2))
+  })
+  for (const sd of [-1, 1]) limb([fx + sd * tw * 0.2, fy - tw * 0.5], [fx + sd * tw * 0.7, fy - 0.5], [fx + sd * tw * (1.1 + r() * 0.4), fy + 0.5], tw * 0.45, 1, 0)
+  for (const { x, y, across, lit, w } of wood.values()) {
+    if (y > fy) continue                                                                                       // under the ground
+    let k = lit > 0.3 ? 3 : lit < -0.35 ? 1 : 2
+    if (w >= 4 && across > 0.8) k = 0
+    else if (w >= 5 && Math.abs(across - 0.38) < 0.12 && hash(x, Math.floor(y / 4)) < 0.75) k = Math.max(1, k - 1)   // furrows, long and broken
+    if (y < crownBottom + ry * 0.15) k = Math.max(0, k - 1)                                                    // in the crown's shade
+    c.px(x, y, bark[k])
+  }
+  // the clumps: on a jittered grid inside the masses
+  const clumps = []
+  for (const [mx, my, mrx, mry] of masses)
+    for (let y = -mry; y <= mry; y += R * 1.1) for (let x = -mrx; x <= mrx; x += R * 1.25) {
+      const jx = x + (r() - 0.5) * R * 0.6, jy = y + (r() - 0.5) * R * 0.5
+      if ((jx / mrx) ** 2 + (jy / mry) ** 2 > 1 || (airy && r() < 0.25)) continue
+      const onMass = 0.5 - 0.5 * ((jx / mrx) * -LEAF[0] * -1 + (jy / mry) * -LEAF[1] * -1), onCrown = 0.5 - 0.5 * (((mx + jx - cx) / rx) * -LEAF[0] * -1 + ((my + jy - cy) / ry) * -LEAF[1] * -1)
+      clumps.push([mx + jx, my + jy, Math.max(0, Math.min(0.99, onMass * 0.4 + onCrown * 0.6 + (r() - 0.5) * 0.1))])
+    }
+  clumps.sort((a, b) => b[1] - a[1])
+  for (const [x, y, v] of clumps) clump(c, Math.round(x), Math.round(y), R, 1 + Math.floor(v * 2.6), ramp, r)
+}
+
+// a tree in the park: drawn as above where it stands; its trunk, branches and crown (one dappled mass)
+// in meters for its shadow
 function tree(x, z, { tall = 7, crown = 2.6, ipe = false, seed = 1 } = {}) {
-  const r = rng(seed), keys = ipe ? ["t", "s"] : ["p", "o"], shapes = [stick([x, z, 0], [x + 0.1, z, tall * 0.45], 0.18 + tall * 0.012, "m")]
+  const r = rng(seed), shapes = [stick([x, z, 0], [x + 0.1, z, tall * 0.45], 0.18 + tall * 0.012, "m")]
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * Math.PI * 2 + r(), bx = x + Math.cos(a) * crown * 0.6, bz = z + Math.sin(a) * crown * 0.4
     shapes.push(stick([x + 0.1, z, tall * 0.42], [bx, bz, tall * 0.7], 0.07, "m"))
   }
-  for (let i = 0; i < 11; i++) {
-    const a = r() * Math.PI * 2, d = Math.sqrt(r()) * crown * 0.75, rx = crown * (0.4 + r() * 0.25)
-    shapes.push(blob([x + Math.cos(a) * d, z + Math.sin(a) * d * 0.7, tall * 0.72 + (r() - 0.4) * crown * 0.7], rx, rx * 0.8, keys[0], { leaves: true }))
-  }
-  // the crown as one mass for its shadow: shade with sun flecks
   shapes.push(blob([x, z, tall * 0.74], crown * 1.05, crown * 0.75, "p", { ghost: true, dapple: 0.82 }))
-  for (const q of shapes) if (q.e && !q.ghost) q.noShadow = true
-  return { d: ahead(x, z), shapes, ramps: ipe ? ["lmn", "stu"] : ["lmn", "opqr"], ipe, x, z, crown, tall, seed }
+  const paint = (c) => {
+    const s = P.scale(ahead(x, z)), [cx, cy] = at(x, z, tall * 0.72)
+    drawTree(c, { cx, cy, rx: Math.round(crown * s), ry: Math.round(crown * 0.85 * s), foot: at(x, z, 0), seed, ramp: ipe ? "-sttu" : "=opqr", airy: ipe ? 1 : 0 })
+  }
+  return { d: ahead(x, z), shapes, paint, ipe, x, z, crown, tall, seed }
 }
 // a park bench: slats on two iron legs, a backrest; `along` the axis it runs on, facing `+1` or `-1`
 function bench(x, z, along, face) {
@@ -235,7 +417,25 @@ function hedge(x0, z0, x1, z1, tall) {
   const out = [], along = x1 - x0 > z1 - z0, n = Math.ceil((along ? x1 - x0 : z1 - z0) / 1.5)
   for (let i = 0; i < n; i++) {
     const a = i / n, b = (i + 1) / n, bx = along ? [x0 + (x1 - x0) * a, z0, x0 + (x1 - x0) * b, z1] : [x0, z0 + (z1 - z0) * a, x1, z0 + (z1 - z0) * b]
-    out.push({ d: ahead((bx[0] + bx[2]) / 2, (bx[1] + bx[3]) / 2), shapes: [box([...bx, 0, tall], { top: "q", lit: "p", shade: "o" })], leafy: true })
+    const b3 = [...bx, 0, tall], keys = { top: "q", lit: "p", shade: "o" }, mx = (bx[0] + bx[2]) / 2, mz = (bx[1] + bx[3]) / 2
+    const paint = (c) => {
+      const s = P.scale(ahead(mx, mz)), r = rng(Math.round(mx * 17 + mz * 5)), rb = Math.max(2, Math.round(0.3 * s)), small = Math.max(2, Math.round(0.17 * s))
+      let lit = false
+      for (const [kind, pts] of faces(b3)) { c.poly(pts, keys[kind]); if (kind === "lit") lit = true }
+      const [fx0, fz0, fx1, fz1] = bx, near = along ? fz0 : fx0
+      const len = along ? fx1 - fx0 : fz1 - fz0
+      for (let i = 0; i < Math.round(len * tall * 2.2); i++) {
+        const a = r() * len, u = 0.2 + r() * (tall - 0.45)
+        const [px, py] = along ? at(fx0 + a, near, u) : at(near, fz0 + a, u)
+        clump(c, px, py, small, lit ? 2 : 1, "=opqr", r)
+      }
+      for (const [row, base] of [[along ? fz1 : fx1, 2], [near, 3]])
+        for (let a = 0; a <= (along ? fx1 - fx0 : fz1 - fz0); a += 0.45) {
+          const [px, py] = along ? at(fx0 + a, row, tall) : at(row, fz0 + a, tall)
+          clump(c, px, py, rb, base, "=opqr", r)
+        }
+    }
+    out.push({ d: ahead(mx, mz), shapes: [box(b3, keys)], paint })
   }
   return out
 }
@@ -471,9 +671,7 @@ function treeline(c) {
   crowns.sort((m, n) => ahead(n[0], n[1]) - ahead(m[0], m[1]))
   for (const [x, z, tall] of crowns) {
     const s = P.scale(ahead(x, z)), [cx, cy] = at(x, z, tall * 0.65)
-    c.line(...at(x, z, 0), cx, cy, "S", Math.max(1, Math.round(0.4 * s)))
-    c.ellipse(cx, cy, Math.round(3.4 * s), Math.round(2.8 * s), "S")
-    c.ellipse(cx - Math.round(0.8 * s), cy - Math.round(0.8 * s), Math.round(2.2 * s), Math.round(1.7 * s), "T")
+    drawTree(c, { cx, cy, rx: Math.max(4, Math.round(3.4 * s)), ry: Math.max(3, Math.round(2.8 * s)), foot: at(x, z, 0), seed: Math.round(x * 13 + z), ramp: "<<ST>", bark: "<<<S" })
   }
 }
 const CLOUDS = [[40, 18, 34, 7], [230, 12, 48, 9], [150, 34, 26, 5], [290, 40, 22, 5]]
@@ -517,6 +715,7 @@ sprite("_bg", { w: W, h: H },
   (c) => treeline(c),
   plane(P, (x, z) => ground(x + CX, z + CZ)),
   (c) => paving(c),
+  (c) => details(c),
   (c) => { const out = new Set(); for (const s of STATIC) cast(out, s.shapes); darken(c, out) },
   (c) => decals(c),
   (c) => hopscotch(c))
@@ -524,20 +723,11 @@ sprite("_bg", { w: W, h: H },
 // each still thing on a sprite of its own, lit once; the scene interleaves them with the moving ones
 for (const s of STATIC)
   sprite("_s" + s.id, { w: W, h: H }, (c) => {
+    if (s.paint) return s.paint(c)
     drawShapes(c, s.shapes.filter((q) => !q.umbrella && !q.poly), s.ramps)
     for (const q of s.shapes) {
       if (q.umbrella) umbrella(c, q.umbrella)
       if (q.poly) c.poly(q.poly.flatMap((p) => at(...p)), q.key)
-    }
-    if (s.leafy) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ("pqo".includes(c.key(x, y)) && hash(x, y + s.id * 31) < 0.12) c.px(x, y, c.key(x, y) === "o" ? "p" : "o")
-    // leaves: clumps darker toward the lower right of each puff, lit flecks on the upper left
-    for (const q of s.shapes) if (q.leaves) {
-      const sc = P.scale(ahead(q.e[0], q.e[1])), [cx, cy] = at(...q.e), rx = Math.round(q.rx * sc), ry = Math.round(q.ry * sc), r = rng(cx * 31 + cy)
-      for (let i = 0; i < rx * 3; i++) {
-        const px = cx + Math.round((r() * 2 - 1) * rx * 0.85), py = cy + Math.round((r() * 2 - 1) * ry * 0.85), k = c.key(px, py)
-        const lower = px - cx + (py - cy) * 1.5 > 0, dark = s.ipe ? "s" : "o", light = s.ipe ? "u" : "q"
-        if (k === (s.ipe ? "t" : "p")) c.hline(px, py, 2, lower ? dark : light)
-      }
     }
   })
 
@@ -546,7 +736,7 @@ anim("park", { w: W, h: H, frames: FRAMES, fps: FPS },
   (c) => {
     const moving = figures(c.frame), out = new Set()
     for (const m of moving) cast(out, m.shapes)
-    for (const i of out) { const x = i % W, y = (i - x) / W, k = c.key(x, y); if (SHADE[k] && !"cdhjl".includes(k)) c.px(x, y, SHADE[k]) }
+    for (const i of out) { const x = i % W, y = (i - x) / W, k = c.key(x, y); if (SHADE[k] && !"cdhjl]".includes(k)) c.px(x, y, SHADE[k]) }
     const all = [...STATIC.map((s) => ({ d: s.d, still: s })), ...moving].sort((m, n) => n.d - m.d)
     for (const m of all) {
       if (m.still) { c.stamp("_s" + m.still.id, 0, 0); continue }
