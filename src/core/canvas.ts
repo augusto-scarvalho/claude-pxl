@@ -466,6 +466,51 @@ export class Canvas {
    * eye, fov | focal, vp, yaw, pitch }; the width defaults to this canvas's. Stripes in x recede into the
    * vanishing point, stripes in z space out toward us; turned (yaw), each set meets at its own point.
    */
+  /**
+   * Land with relief seen in perspective: height(x, z) is the ground's height in meters (the eye stands
+   * `eye` m above height 0, at x 0, z 0); fn(x, z, u, t, col, row) gives the color of the point a pixel
+   * sees (u its height, t how far along the ray). Each column is marched from the bottom up, each row
+   * starting where the one below landed: seen without roll, land higher up the picture is never nearer.
+   * A pixel that sees no land within `far` is sky: opts.sky(col, row) colors it, or it's left. Below the
+   * horizon, one that runs out of distance takes the land at `far`. opts: far (m, 10000), top (the
+   * land's highest point: a ray rising above it is sky), bound(x, z) and margin (a cheap height the land
+   * is never more than `margin` m above: the march steps by it and asks height() only near the land).
+   */
+  terrain(view: Partial<View>, height: (x: number, z: number) => number, fn: (x: number, z: number, u: number, t: number, col: number, row: number) => string | null | undefined,
+    opts: { far?: number; top?: number; bound?: (x: number, z: number) => number; margin?: number; sky?: (col: number, row: number) => string | null | undefined } = {}): void {
+    const P = perspective({ ...view, w: view.w ?? this.img.w } as View), far = opts.far ?? 10000, top = opts.top ?? Infinity, margin = opts.margin ?? 0, bound = opts.bound ?? height, eye = P.eye;
+    const put = (col: number, row: number, k: string | null | undefined) => { if (k && k !== ".") this.px(col, row, k); };
+    const march = (col: number, row: number, t0: number): number | null => {
+      const [dx, dz, du] = P.ray(col, row);
+      let t = t0, prev = t0;
+      for (let i = 0; i < 4000 && t < far; i++) {
+        const x = dx * t, z = dz * t, u = eye + du * t;
+        if (du > 0 && u > top + 10) return null;
+        let d = u - bound(x, z) - margin;
+        if (d < 0) d = u - height(x, z);
+        if (d < 0) {
+          // between the last step and this one: halve in on the surface
+          let lo = prev, hi = t;
+          for (let k = 0; k < 8; k++) { const m = (lo + hi) / 2; if (eye + du * m < height(dx * m, dz * m)) hi = m; else lo = m; }
+          return hi;
+        }
+        prev = t;
+        // far off, a step needn't be finer than what a pixel covers there
+        t += Math.min(t * 0.03, Math.max(d * 0.6, t * 0.007, 0.05));
+      }
+      return null;
+    };
+    for (let col = -this.ox; col < this.img.w - this.ox; col++) {
+      let t0 = 0.5, open = false;
+      for (let row = this.img.h - this.oy - 1; row >= -this.oy; row--) {
+        const t = open ? null : march(col, row, t0), [dx, dz, du] = P.ray(col, row);
+        if (t !== null) { t0 = t * 0.98; put(col, row, fn(dx * t, dz * t, eye + du * t, t, col, row)); }
+        else if (row + 0.5 > P.horizon) put(col, row, fn(dx * far, dz * far, eye + du * far, far, col, row));
+        else { open = true; if (opts.sky) put(col, row, opts.sky(col, row)); }
+      }
+    }
+  }
+
   plane(view: Partial<View>, fn: (x: number, z: number) => string | null | undefined, where?: Region): void {
     const P = perspective({ ...view, w: view.w ?? this.img.w } as View), inside = where === undefined ? undefined : regionPred(where);
     for (let row = Math.max(-this.oy, Math.floor(P.horizon)); row < this.img.h - this.oy; row++) {
@@ -989,7 +1034,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

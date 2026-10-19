@@ -14,7 +14,7 @@ import { PALETTE_FILE, Palette, paletteFromFile } from "./palette.ts";
 import { type Motion, readJoints, readMotion } from "./pose.ts";
 import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
-import { globRe, rng } from "./util.ts";
+import { bayer, fbm, globRe, latticeHash, rng, vnoise } from "./util.ts";
 
 /**
  * Op signatures: name:type, "?" marks the first optional argument.
@@ -44,6 +44,7 @@ export const SIGNATURES: Record<string, string> = {
   relight: "?where:r opts:o",
   warp: "fn:f ?where:r",
   plane: "view:o fn:f ?where:r",
+  terrain: "view:o height:f fn:f ?opts:o",
   rampmap: "ramp:S ?opts:o",
   stamp: "name:s ?x:n y:n opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
@@ -427,6 +428,11 @@ export class Project implements BuildCtx {
       try { this.includeHook(path); } finally { if (!opts.palette) this.pal = pal; }
     };
     env.rng = (seed?: number) => rng(seed);
+    // procedural texture, the same in every file: hash(i, j), vnoise(x, y), fbm(x, y, octaves), bayer(x, y)
+    env.hash = latticeHash;
+    env.vnoise = vnoise;
+    env.fbm = fbm;
+    env.bayer = bayer;
     // perspective({ w, horizon, eye, fov | focal, vp, yaw, pitch }): ground(x, z, up), at(col, row), scale(z, x, up), vanish(angle), vertical()
     env.perspective = (view: unknown) => {
       try { return perspective(view as View); } catch (e) { throw wrap(e).within("perspective", this.callerLoc()); }

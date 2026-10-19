@@ -66,12 +66,6 @@ const ahead = (x, z) => (x - CX) * SIN + (z - CZ) * COS             // depth fro
 const SUN_FROM = [-0.894, 0.447], LONG = 1 / Math.tan((55 * Math.PI) / 180), SOX = -SUN_FROM[0] * LONG, SOZ = -SUN_FROM[1] * LONG
 const facesSun = (nx, nz) => nx * SUN_FROM[0] + nz * SUN_FROM[1] > 0
 const LIGHT = [-0.8, -1]                                           // on screen: from the upper left
-const hash = (i, j) => { let k = Math.imul(i, 374761393) + Math.imul(j, 668265263); k = Math.imul(k ^ (k >>> 13), 1274126177); return ((k ^ (k >>> 16)) >>> 0) / 4294967296 }
-const noise = (x, y) => {
-  const i = Math.floor(x), j = Math.floor(y), u = x - i, v = y - j, su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v)
-  const a = hash(i, j), b = hash(i + 1, j), c = hash(i, j + 1), d = hash(i + 1, j + 1)
-  return a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv
-}
 
 // ================================================================ ground
 const PATH_A = [6.4, 8.6], PATH_B = [5.2, 7.4], PLAZA = [4.4, 5.6, 8.2, 9.4], SAND = [10, 11, 23, 21]
@@ -92,7 +86,7 @@ const FEET = [[20, 9.05, 1.0, 0.35], [-2, 9.05, 1.0, 0.35]]
 const PITS = [[11.9, 12.8, 0.35, 0.9], [13.6, 12.8, 0.3, 0.7], [23.0, 13.45, 0.45, 0.4]]
 // a stretch of lawn the mower goes around, left to grow tall: an uneven oval, (x, z) and its radii
 const MEADOW = [2.0, 10.0, 1.1, 0.5]
-const inMeadow = (x, z) => ((x - MEADOW[0]) / MEADOW[2]) ** 2 + ((z - MEADOW[1]) / MEADOW[3]) ** 2 < 0.85 + 0.3 * noise(x * 2.5, z * 2.5)
+const inMeadow = (x, z) => ((x - MEADOW[0]) / MEADOW[2]) ** 2 + ((z - MEADOW[1]) / MEADOW[3]) ** 2 < 0.85 + 0.3 * vnoise(x * 2.5, z * 2.5)
 // How worn the grass is at (x, z), 0 to 1: under the big trees, in front of the benches
 function wear(x, z) {
   let w = 0
@@ -106,8 +100,8 @@ function wear(x, z) {
 function worn(x, z) {
   const w = wear(x, z)
   if (w < 0.25) return null
-  const v = w + (noise(x * 7, z * 7) - 0.5) * 0.35, clump = hash(Math.floor(x * 25), Math.floor(z * 25))
-  if (v > 0.72) { const n = noise(x * 4 + 3, z * 4); return n > 0.56 ? "[" : n < 0.24 ? ")" : "(" }
+  const v = w + (vnoise(x * 7, z * 7) - 0.5) * 0.35, clump = hash(Math.floor(x * 25), Math.floor(z * 25))
+  if (v > 0.72) { const n = vnoise(x * 4 + 3, z * 4); return n > 0.56 ? "[" : n < 0.24 ? ")" : "(" }
   if (v > 0.5) return clump < (v - 0.5) / 0.22 ? "(" : "~"
   if (v > 0.32 && clump < ((v - 0.32) / 0.18) * 0.8) return "~"
   return null
@@ -118,14 +112,14 @@ function worn(x, z) {
 function concrete(dd, tone, u, v, edge) {
   const base = tone < 0.14 ? "/" : tone > 0.9 ? "|" : "f", dark = { f: "/", "/": "g", "|": "f" }[base]
   if (dd > 8) return base
-  if (noise(u * 1.4 + 40, v * 1.4) > 0.6 + dd * 0.025) return dark
+  if (vnoise(u * 1.4 + 40, v * 1.4) > 0.6 + dd * 0.025) return dark
   if (edge < 0.06) return base
   return hash(Math.floor(u * 22) + 7, Math.floor(v * 22)) < 0.045 ? dark : base
 }
 // mowing stripes along z (they run to the left point), and in them large soft patches a shade lighter or
 // darker, where the grass grows thicker or thinner; far off, the stripes alone
 const lawn = (x, z) => {
-  const a = Math.floor(x / 2.5) & 1, n = ahead(x, z) < 45 ? noise(x / 4.5 + 31, z / 4.5) : 0.5
+  const a = Math.floor(x / 2.5) & 1, n = ahead(x, z) < 45 ? vnoise(x / 4.5 + 31, z / 4.5) : 0.5
   // a thicker patch lifts both stripes a step, a thinner one lowers both: the stripes stay, softer or stronger
   if (n > 0.64) return a ? "á" : "a"
   if (n < 0.3) return a ? "b" : "é"
@@ -138,18 +132,18 @@ function ground(x, z) {
     // the plaza: the same poured concrete, its panels cut by the paths' lines; one with the mark a puddle
     // left drying
     const i = GRID_X.findIndex((g) => g > x) - 1, j = GRID_Z.findIndex((g) => g > z) - 1
-    if (Math.hypot(x - 6.9, (z - 8.05) * 1.3) < 0.28 + 0.06 * noise(x * 9, z * 9)) return "/"
+    if (Math.hypot(x - 6.9, (z - 8.05) * 1.3) < 0.28 + 0.06 * vnoise(x * 9, z * 9)) return "/"
     const edge = Math.min(x - GRID_X[i], GRID_X[i + 1] - x, z - GRID_Z[j], GRID_Z[j + 1] - z)
     return concrete(dd, hash(i * 13 + 5, j * 7 + 3), x, z, edge)
   }
-  if (inMeadow(x, z)) return noise(x * 8, z * 8) > 0.55 ? "c" : "é"
+  if (inMeadow(x, z)) return vnoise(x * 8, z * 8) > 0.55 ? "c" : "é"
   const onA = z >= PATH_A[0] && z <= PATH_A[1], onB = x >= PATH_B[0] && x <= PATH_B[1]
   if (onA || onB) {
     // grass creeping over the slabs' edges, where it's near enough to see; slabs weathered each its own shade
     const edge = Math.min(onA ? Math.min(z - PATH_A[0], PATH_A[1] - z) : 9, onB ? Math.min(x - PATH_B[0], PATH_B[1] - x) : 9)
-    if (dd < 16 && edge < 0.1 && noise(x * 9, z * 9) > 0.45) return lawn(x, z)
+    if (dd < 16 && edge < 0.1 && vnoise(x * 9, z * 9) > 0.45) return lawn(x, z)
     // near, the soil that rain and the mower throw onto the slabs' edges by the lawn
-    if (dd < 10 && edge < 0.16 && noise(x * 7 + 5, z * 7) > 0.6) return edge < 0.07 && noise(x * 13, z * 13) > 0.62 ? "(" : "["
+    if (dd < 10 && edge < 0.16 && vnoise(x * 7 + 5, z * 7) > 0.6) return edge < 0.07 && vnoise(x * 13, z * 13) > 0.62 ? "(" : "["
     if (dd > 26) return "f"
     // poured concrete in square panels, two across the path, counted out from the plaza
     const along = onA ? x : z, across = onA ? z - PATH_A[0] : x - PATH_B[0], width = onA ? PATH_A[1] - PATH_A[0] : PATH_B[1] - PATH_B[0]

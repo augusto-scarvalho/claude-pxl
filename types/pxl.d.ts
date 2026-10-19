@@ -140,6 +140,11 @@ declare global {
     shoulderW: number; hipW: number;
   }
 
+  /** terrain()'s options: how far to look (m), the land's highest point, a cheap height it never rises more than `margin` above, the sky's color where a pixel sees no land. */
+  interface PxTerrainOpts {
+    far?: number; top?: number; bound?: (x: number, z: number) => number; margin?: number;
+    sky?: (col: number, row: number) => PxColor | null | undefined;
+  }
   /** A pinhole camera over flat ground, in meters: the horizon's row, the eye's height, a field of view. */
   interface PxView {
     w?: number; horizon: number; eye: number; fov?: number; focal?: number;
@@ -162,6 +167,10 @@ declare global {
     vanish(angle?: number): number;
     /** Where uprights meet, [col, row]: above the picture tilted up, below tilted down; null when level. */
     vertical(): [number, number] | null;
+    /** The way a pixel's middle looks, as a unit [x, z, up] in the world (sky by direction, marching a ray). */
+    ray(col: number, row: number): [number, number, number];
+    /** Where a direction [x, z, up] lands on screen, [col, row]: the sun, or where lines going that way meet; null behind the eye. */
+    toward(dir: [number, number, number]): [number, number] | null;
   }
 
   interface PxLamp { r?: number; color?: PxColor; power?: number; z?: number }
@@ -218,6 +227,8 @@ declare global {
     warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): void;
     /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away ("." or nothing: leave it). */
     plane(view: PxView | PxPerspective, fn: (x: number, z: number) => PxColor | null | undefined, where?: PxRegion): void;
+    /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
+    terrain(view: PxView | PxPerspective, height: (x: number, z: number) => number, fn: (x: number, z: number, u: number, t: number, col: number, row: number) => PxColor | null | undefined, opts?: PxTerrainOpts): void;
     recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): void;
     stamp(name: string, x?: number, y?: number, opts?: PxPlace): void;
     tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): void;
@@ -259,6 +270,14 @@ declare global {
   /** palette: true keeps the included file's use()/pal()/ramps() active afterwards. */
   function include(path: string, opts?: { palette?: boolean }): void;
   function rng(seed?: number): () => number;
+  /** A number in [0, 1) for a lattice point (integers): the same (i, j) always gives the same. */
+  function hash(i: number, j: number): number;
+  /** Smooth value noise in [0, 1], one unit a cell. */
+  function vnoise(x: number, y: number): number;
+  /** Octaves of vnoise, finer and fainter each, in [0, 1] (default 4): billows, clouds, rock. */
+  function fbm(x: number, y: number, octaves?: number): number;
+  /** Ordered-dither threshold in (0, 1) for pixel (x, y) (a 4x4 Bayer matrix). */
+  function bayer(x: number, y: number): number;
   /**
    * Hair, tails, scarves: a chain fixed at anchors[f] in frame f that follows with lag (inertia,
    * weight, a rest shape), simulated until the loop repeats. Returns per frame [anchor, p1, ...pN].
@@ -278,6 +297,8 @@ declare global {
   function perspective(view: PxView & { w: number }): PxPerspective;
   /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away. */
   function plane(view: PxView | PxPerspective, fn: (x: number, z: number) => PxColor | null | undefined, where?: PxRegion): PxOp;
+  /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees (u its height, t its distance). */
+  function terrain(view: PxView | PxPerspective, height: (x: number, z: number) => number, fn: (x: number, z: number, u: number, t: number, col: number, row: number) => PxColor | null | undefined, opts?: PxTerrainOpts): PxOp;
   /** The items drawn on a plate of their own, lit there with relight (only the plate's edges), and laid down. */
   function plate(opts: PxRelight, ...items: PxItem[]): PxOp;
   function plate(...items: PxItem[]): PxOp;

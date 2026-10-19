@@ -39,6 +39,10 @@ export interface Perspective extends Required<Omit<View, "fov">> {
   vanish(angle?: number): number;
   /** Where uprights meet, [col, row]: above the picture tilted up, below tilted down; null when level. */
   vertical(): [number, number] | null;
+  /** The way a pixel's middle looks, as a unit [x, z, up] in the world (sky by direction, marching a ray). */
+  ray(col: number, row: number): [number, number, number];
+  /** Where a direction [x, z, up] lands on screen, [col, row]: the sun, or where lines going that way meet; null behind the eye. */
+  toward(dir: [number, number, number]): [number, number] | null;
 }
 
 export function perspective(v: View): Perspective {
@@ -67,5 +71,13 @@ export function perspective(v: View): Perspective {
     scale: (z, x = 0, up = 0) => focal / cam(x, z, up)[2],
     vanish: (angle = 0) => vp + (focal * Math.tan(((angle - yaw) * Math.PI) / 180)) / cp,
     vertical: () => (pitch ? [vp, cy - (focal * cp) / sp] : null),
+    ray: (col, row) => {
+      const a = (col + 0.5 - vp) / focal, b = (cy - row - 0.5) / focal, h = cp - b * sp, u = sp + b * cp, l = Math.hypot(a, h, u);
+      return [(a * cos + h * sin) / l, (h * cos - a * sin) / l, u / l];
+    },
+    toward: ([x, z, up]) => {
+      const h = x * sin + z * cos, zc = h * cp + up * sp;
+      return zc > 1e-12 ? [vp + (focal * (x * cos - z * sin)) / zc, cy - (focal * (up * cp - h * sp)) / zc] : null;
+    },
   };
 }

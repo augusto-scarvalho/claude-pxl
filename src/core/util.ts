@@ -46,6 +46,27 @@ export function hash(a: number, b: number, seed: number): number {
   return (h ^ (h >>> 15)) >>> 0;
 }
 
+/** A number in [0, 1) for a lattice point: the same (i, j) always gives the same (procedural texture). */
+export function latticeHash(i: number, j: number): number {
+  let k = Math.imul(i, 374761393) + Math.imul(j, 668265263);
+  k = Math.imul(k ^ (k >>> 13), 1274126177);
+  return ((k ^ (k >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Smooth value noise in [0, 1]: one unit a cell, the corners' hashes blended with a smoothstep. */
+export function vnoise(x: number, y: number): number {
+  const i = Math.floor(x), j = Math.floor(y), u = x - i, v = y - j, su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v);
+  const a = latticeHash(i, j), b = latticeHash(i + 1, j), c = latticeHash(i, j + 1), d = latticeHash(i + 1, j + 1);
+  return a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv;
+}
+
+/** Octaves of vnoise, each finer (x2.03) and half as strong, summed and kept in [0, 1]: billows, clouds, rock. */
+export function fbm(x: number, y: number, octaves = 4): number {
+  let s = 0, a = 0.5, f = 1;
+  for (let i = 0; i < octaves; i++) { s += a * vnoise(x * f, y * f); a *= 0.5; f *= 2.03; }
+  return s / (1 - 0.5 ** octaves);
+}
+
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 /** Ordered-dither threshold in (0, 1) for pixel (x, y). */
 export function bayer(x: number, y: number): number {

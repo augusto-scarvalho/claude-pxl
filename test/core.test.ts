@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { art, failure, keys, PAL } from "./helpers.ts";
 import { perspective } from "../src/core/perspective.ts";
+import { bayer, fbm, latticeHash, vnoise } from "../src/core/util.ts";
 import { loadSource } from "../src/node/load.ts";
 import { compareSilhouettes, packSheet, sheetJson } from "../src/core/render.ts";
 import { pack } from "../src/core/color.ts";
@@ -561,4 +562,45 @@ test("perspective: tilted up, uprights meet at a third point above, the horizon 
   const [cx, cy] = T.ground(3, 7);
   near(T.at(cx - 0.5, cy - 0.5), [3, 7]);
   assert.throws(() => perspective({ ...env, pitch: 90 }), /pitch is how far the camera tilts/);
+});
+
+test("perspective: a pixel's ray and where a direction lands agree, and give the vanishing points", () => {
+  const near = (a: number[] | null, b: number[], eps = 1e-6) => assert.ok(a && a.every((v, i) => Math.abs(v - b[i]) < eps), `${a} ~ ${b}`);
+  const T = perspective({ w: 120, horizon: 70, eye: 1.4, fov: 80, yaw: 25, pitch: 15 });
+  for (const [col, row] of [[0, 0], [60, 40], [119, 89], [30, 75]]) near(T.toward(T.ray(col, row)), [col + 0.5, row + 0.5]);
+  near([Math.hypot(...T.ray(10, 20))], [1]);
+  const a = (40 * Math.PI) / 180;
+  near([T.toward([Math.sin(a), Math.cos(a), 0])![0]], [T.vanish(40)]);
+  near([T.toward([Math.sin(a), Math.cos(a), 0])![1]], [70]);
+  near(T.toward([0, 0, 1]), T.vertical()!);
+  assert.equal(T.toward([0, -1, -0.1]), null, "behind the eye");
+});
+
+test("terrain: flat land paints what plane does; a hill rises over the horizon; the rest is sky", () => {
+  const view = { w: 80, horizon: 30, eye: 2, fov: 90 };
+  const flat = loadSource(PAL + `scene("t", { w: 80, h: 50, bg: "k" }, terrain(${JSON.stringify(view)}, () => 0, () => "g", { sky: () => "w" }))
+scene("p", { w: 80, h: 50, bg: "w" }, plane(${JSON.stringify(view)}, () => "g"))`, "t.px.js");
+  assert.equal(keys(flat, "t"), keys(flat, "p"));
+  // a cone 300 m high, 1 km ahead: the middle columns see it above the horizon, the edges see sky
+  const hill = loadSource(PAL + `scene("h", { w: 80, h: 50, bg: "k" },
+  terrain(${JSON.stringify(view)}, (x, z) => Math.max(0, 300 - Math.hypot(x, z - 1000) * 0.6), (x, z, u) => (u > 1 ? "r" : "g"), { top: 300, sky: () => "w" }))`, "t.px.js");
+  const rows = keys(hill, "h").split("\n");
+  assert.equal(rows[20][40], "r", "the hill above the horizon in the middle");
+  assert.equal(rows[20][2], "w", "sky at the edge");
+  assert.equal(rows[45][40], "g", "the flat ground in front of it");
+});
+
+test("procedural texture: hash, vnoise and fbm stay in [0, 1], the same for the same input, with no seam between cells", () => {
+  const h = [latticeHash(3, 4), latticeHash(3, 4), latticeHash(4, 3)]
+  assert.equal(h[0], h[1]);
+  assert.notEqual(h[0], h[2]);
+  for (let i = 0; i < 200; i++) {
+    const x = i * 0.37 - 20, y = i * 0.61 - 30, n = vnoise(x, y), f = fbm(x, y, 5)
+    assert.ok(latticeHash(i, -i) >= 0 && latticeHash(i, -i) < 1 && n >= 0 && n <= 1 && f >= 0 && f <= 1)
+  }
+  assert.ok(Math.abs(vnoise(2.999999, 5.5) - vnoise(3, 5.5)) < 1e-4, "continuous across a cell's edge");
+  assert.ok([0, 1, 2, 3].every((x) => bayer(x, 0) > 0 && bayer(x, 0) < 1));
+  // and in an art file, under those names
+  const p = loadSource(PAL + `sprite("ok", { w: 1, h: 1 }, (c) => c.px(0, 0, hash(1, 2) < 1 && vnoise(0.5, 0.5) <= 1 && fbm(1, 1) <= 1 && bayer(0, 0) > 0 ? "r" : "g"))`, "t.px.js");
+  assert.equal(keys(p, "ok"), "r");
 });

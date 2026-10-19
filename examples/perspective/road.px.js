@@ -42,12 +42,6 @@ const ROAD_HALF = 3.6, PAINT_W = 0.12, FENCE_X = -6, POLE_X = 6.6
 const SR = 9, SUN_AZ = -6, SUNX = Math.round(P.vp + P.focal * Math.tan((SUN_AZ * Math.PI) / 180)), SUNY = P.horizon - 3, LONG = 1 / Math.tan((10 * Math.PI) / 180)
 const B4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], bayer = (x, y) => (B4[(y & 3) * 4 + (x & 3)] + 0.5) / 16
 // smooth noise, for the serras' ridges and the sandy patches (in meters, so it recedes like the rest)
-const hash = (i, j) => { let k = Math.imul(i, 374761393) + Math.imul(j, 668265263); k = Math.imul(k ^ (k >>> 13), 1274126177); return ((k ^ (k >>> 16)) >>> 0) / 4294967296 }
-const noise = (x, y) => {
-  const i = Math.floor(x), j = Math.floor(y), u = x - i, v = y - j, su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v)
-  const a = hash(i, j), b = hash(i + 1, j), c = hash(i, j + 1), d = hash(i + 1, j + 1)
-  return a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv
-}
 
 // ================================================================ sky
 // a gradient to the sun, the evening star, long thin clouds lit from underneath
@@ -107,9 +101,9 @@ function vultures(c) {
 // and the far ridge's edge catches the glow near the sun.
 const smooth = (a, b, t) => { const u = Math.max(0, Math.min(1, (t - a) / (b - a))); return u * u * (3 - 2 * u) }
 const RIDGES = [
-  [30000, "i", (X) => 1100 * (0.35 + 0.65 * noise(X / 6000, 3)) * smooth(1500, 7000, Math.abs(X))],
-  [12000, "I", (X) => Math.max(600 * smooth(-2600, -3000, X) * smooth(-10500, -9800, X) * (1 + 0.04 * noise(X / 300, 5)),
-    X > 1200 ? 420 * noise(X / 2200, 8) * smooth(1200, 3500, X) : 0)],
+  [30000, "i", (X) => 1100 * (0.35 + 0.65 * vnoise(X / 6000, 3)) * smooth(1500, 7000, Math.abs(X))],
+  [12000, "I", (X) => Math.max(600 * smooth(-2600, -3000, X) * smooth(-10500, -9800, X) * (1 + 0.04 * vnoise(X / 300, 5)),
+    X > 1200 ? 420 * vnoise(X / 2200, 8) * smooth(1200, 3500, X) : 0)],
 ]
 function serras(c) {
   for (const [Z, key, height] of RIDGES)
@@ -130,7 +124,7 @@ function ground(x, z) {
     return dash || Math.abs(ax - ROAD_HALF + 0.3) < paint ? PAINT[b] : ROAD[b]
   }
   if (ax < ROAD_HALF + 1) return SOIL[b][1]                                        // the gravel shoulder
-  return SOIL[b][z < 30 && noise(x / 6, z / 8) > 0.72 ? 1 : 0]                     // sand patches; far, one tone
+  return SOIL[b][z < 30 && vnoise(x / 6, z / 8) > 0.72 ? 1 : 0]                     // sand patches; far, one tone
 }
 
 // ---------------------------------------------------------------- the old asphalt

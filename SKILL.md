@@ -145,6 +145,9 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 - **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj` for tilemaps, `build --aseprite` for a
   person to keep editing in Aseprite.
 - **Light**: `shade:`/`light:` layers and `cast` shadows, `glow`, `lighting()` (lighting.md).
+- **In meters**: `perspective()` (one, two or three points: `yaw`, `pitch`), `plane()` for flat ground,
+  `terrain()` for hills and mountains; procedural texture with `hash`, `vnoise`, `fbm`, `bayer`
+  (scenes.md "True perspective", "Closing a loop").
 
 ## Examples
 
@@ -159,7 +162,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `isometric.px.js` | 2:1 blocks, back-to-front order, iso helpers |
 | `perspective/road.px.js` | true perspective: `perspective()` and `plane()`, props in meters whose parts also cast their shadows, a walker shrinking step by step with hand-drawn small sizes picked by `fit` |
 | `perspective/park.px.js` | two-point perspective (`yaw`) at 2 pm: boxes lit by the side they face, people and a dog posed in 3D by a gait (any heading, own shadows), moving things interleaved far to near with still ones, a loop closed by hiding behind hedges |
-| `perspective/extinction.px.js` | three-point perspective (`pitch`, `vertical()`), a worm's-eye view: a heightfield volcano ray-marched through the camera, lava rivers down the steepest way, uprights leaning to the third point, dinosaurs on a 3D run shaded round, sprites placed and sized by the camera |
+| `perspective/extinction.px.js` | three-point perspective (`pitch`, `vertical()`), a worm's-eye view: a volcano on a massif by `terrain()`, lava down the steepest way, the sun at `toward()`, a sky by `ray()`, uprights leaning to the third point, dinosaurs drawn from their profile on a 3D run, pterosaurs by hand placed by the camera |
 | `sidescroller/` | a game's art over several files: shared `palette.hex`, `wrap` tiles, `png` import, hit flash |
 | `shop.px.js`, `moon_bakery.px.js` | flat building facades from parts: tiles, signs, `wire` lights |
 | `moon_bakery_3d.px.js`, `tackle.px.js` | 3/4 buildings; weathering with a cause |

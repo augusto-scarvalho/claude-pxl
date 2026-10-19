@@ -381,3 +381,24 @@ one), and the art code itself (4% of the cost).
 - [x] Isometric `tilemap` (`iso: true`, one level).
 - [x] Export tilemaps to Tiled: `<asset>.tmj` + a tileset image per layer (isometric alignment unchecked in Tiled itself).
 - [x] Bitmap fonts: `font(name, sprite, { chars, w, h })` + `text(..., { font })`, and a ready 5x7 font in `examples/fonts/`.
+
+## Perspective scenes (from dogfooding road, park and extinction)
+
+- [x] **Three-point perspective**: `pitch` on `perspective()`, `vertical()` for the third point (fa5231e).
+- [x] **`ray(col, row)` and `toward(dir)`** on the camera: a pixel's direction, a direction's pixel
+  (the sun, where parallel lines meet). Extinction computed both by hand.
+- [x] **`terrain()`**: land with relief, ray-marched through the camera, column by column, with an
+  optional cheap bound and the sky's color for misses. Extinction's volcano had its own march.
+- [x] **`hash`, `vnoise`, `fbm`, `bayer` as globals**: all three perspective examples carried the same
+  hash and value noise, and extinction fbm and a Bayer dither.
+- [ ] **Shapes in meters**: sticks, blobs, boxes, cones (rings square to their axis), drawn far to near
+  and swept onto the ground for their shadows, from one sun. road and park each carry their own
+  (`stick`, `blob`, `box`, `cone`, `hull`, `cast`, `fillGround`, `drawShapes`); a module would let a
+  scene declare props and get both. Big: the two versions differ (road's are 2D in a plane).
+- [ ] **A capsule painted round**: `capsule(a, ra, b, rb, ramp, light)` (extinction's `paintCone`):
+  every pixel shaded by where it sits across it on screen, a rim on the lit side. Limbs, logs, pipes.
+- [ ] **Flames**: tongues that flicker with the frame, lean with a wind, white at the root to red at
+  the tip (extinction's `flame`, used for trees, logs, scrub, fronds). Fire is in many scenes.
+- [ ] **Where a build spends its time**: `pxl build --profile` (or time in `pxl steps`) naming the
+  slowest steps and lines; extinction went from 17 s to 1m43s without anyone seeing why until a CPU
+  profile was read by hand (a march, a sky recomputed per frame, a density thrice per pixel).

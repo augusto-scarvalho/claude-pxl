@@ -27,16 +27,7 @@ pal({
 
 const W = 320, H = 180, FPS = 10, FRAMES = 60
 const P = perspective({ w: W, horizon: 150, eye: 1.2, fov: 80, pitch: 18 })
-const RAD = Math.PI / 180, cp = Math.cos(P.pitch * RAD), sp = Math.sin(P.pitch * RAD), CY = P.horizon - P.focal * (sp / cp)
-const hash = (i, j) => { let k = Math.imul(i, 374761393) + Math.imul(j, 668265263); k = Math.imul(k ^ (k >>> 13), 1274126177); return ((k ^ (k >>> 16)) >>> 0) / 4294967296 }
-const noise = (x, y) => {
-  const i = Math.floor(x), j = Math.floor(y), u = x - i, v = y - j, su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v)
-  const a = hash(i, j), b = hash(i + 1, j), c = hash(i, j + 1), d = hash(i + 1, j + 1)
-  return a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv
-}
-const fbm = (x, y, n = 4) => { let s = 0, a = 0.5, f = 1; for (let i = 0; i < n; i++) { s += a * noise(x * f, y * f); a *= 0.5; f *= 2.03 } return s / (1 - 0.5 ** n) }
-// the ray through a pixel's middle, in the world: [across, ahead, up]
-const ray = (col, row) => { const a = (col + 0.5 - P.vp) / P.focal, b = (CY - row - 0.5) / P.focal, l = Math.hypot(a, 1, b); return [a / l, (cp - b * sp) / l, (sp + b * cp) / l] }
+const RAD = Math.PI / 180
 const at = (x, z, u = 0) => P.ground(x, z, u).map(Math.round)
 
 // ================================================================ the land
@@ -72,41 +63,19 @@ function bulk(x, z) {
 }
 function height(x, z) {
   const dx = x - VX, dz = z - VZ, r = Math.hypot(dx, dz)
-  const plain = 1.6 * (noise(x / 50, z / 50) - 0.5) + 5 * (noise(x / 380 + 7, z / 380) - 0.5) * Math.min(1, z / 300)
+  const plain = 1.6 * (vnoise(x / 50, z / 50) - 0.5) + 5 * (vnoise(x / 380 + 7, z / 380) - 0.5) * Math.min(1, z / 300)
   const b = bulk(x, z)
   if (b <= 0) return plain
   // gullies down the cone; ridges and ravines over the older mountain, running out from the summit
-  const ang = Math.atan2(dz, dx), s = Math.max(0, 1 - r / VR), gully = 1 - 0.07 * Math.abs(Math.sin(ang * 11 + noise(r / 250, ang * 2) * 3)) * s
-  const ridge = 1 - Math.abs(2 * noise(ang * 6 + 3, r / 380) - 1), ridge2 = 1 - Math.abs(2 * noise(x / 260 + 11, z / 260) - 1)
+  const ang = Math.atan2(dz, dx), s = Math.max(0, 1 - r / VR), gully = 1 - 0.07 * Math.abs(Math.sin(ang * 11 + vnoise(r / 250, ang * 2) * 3)) * s
+  const ridge = 1 - Math.abs(2 * vnoise(ang * 6 + 3, r / 380) - 1), ridge2 = 1 - Math.abs(2 * vnoise(x / 260 + 11, z / 260) - 1)
   const worn = 1 - (0.2 * (1 - ridge) ** 2 + 0.1 * (1 - ridge2) ** 2) * Math.min(1, Math.max(0, (r - CR * 2) / 500))
   return plain + b * gully * worn
-}
-// walk a pixel's ray out from `t0` until it goes under the land: [x, z, u, t], or null (the sky). In a
-// column each row up lands no nearer than the one below, so the march starts where that one landed.
-function march(col, row, t0) {
-  const [dx, dz, du] = ray(col, row)
-  let t = t0, prev = t0
-  for (let i = 0; i < 1500 && t < 9000; i++) {
-    const x = dx * t, z = dz * t, u = P.eye + du * t
-    if (du > 0 && u > VH + 10) return null
-    // far off, a step needn't be finer than what a pixel covers there
-    let d = u - bulk(x, z) - 4
-    if (d < 0) d = u - height(x, z)
-    if (d < 0) {
-      let lo = prev, hi = t
-      for (let k = 0; k < 8; k++) { const m = (lo + hi) / 2; if (P.eye + du * m < height(dx * m, dz * m)) hi = m; else lo = m }
-      return [dx * hi, dz * hi, P.eye + du * hi, hi]
-    }
-    prev = t
-    t += Math.min(t * 0.03, Math.max(d * 0.6, t * 0.007, 0.05))
-  }
-  return null
 }
 // the sun at four in the afternoon: low in the west-southwest, ahead and to the left
 const SUN_AZ = -30 * RAD, SUN_EL = 21 * RAD
 const SUN = [Math.sin(SUN_AZ) * Math.cos(SUN_EL), Math.cos(SUN_AZ) * Math.cos(SUN_EL), Math.sin(SUN_EL)]
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => v / 16 - 0.47)
-const dither = (col, row) => BAYER[(row & 3) * 4 + (col & 3)]
+const dither = (col, row) => bayer(col, row) - 0.5
 
 // Lava as it runs on real volcanoes (Semeru, Fuego, Fagradalsfjall, and the USGS on aa flows): a
 // channel narrow near the vent, widening downslope; hot (yellow, 1100 C) where it leaves, cooling to
@@ -175,14 +144,14 @@ const soot = (az, el) => { const x = az * 4.2, y = el * 6.5, w1 = fbm(x + 3, y, 
 // sun thins, then thickens again (what it's made of is kept per pixel; only how thin changes)
 const SOOT = new Map()
 function sky(col, row, breath = 0, a = 0) {
-  const [dx, dz, du] = ray(col, row), az = Math.atan2(dx, dz), el = Math.asin(du)
+  const [dx, dz, du] = P.ray(col, row), az = Math.atan2(dx, dz), el = Math.asin(du)
   const toSun = Math.acos(Math.max(-1, Math.min(1, dx * SUN[0] + dz * SUN[1] + du * SUN[2])))
   const key = row * W + col
   if (!SOOT.has(key)) { const d0 = soot(az, el); SOOT.set(key, [d0, d0 - soot(az - 0.03, el + 0.025), d0 - soot(az, el - 0.03)]) }
   const [d0, lit, belly] = SOOT.get(key), d = d0 - a * 0.2 * (0.5 - 0.5 * Math.cos(breath * Math.PI * 2)), thin = Math.max(0, 1 - toSun / 0.42) ** 1.6
   if (toSun < 0.022 && d < 0.62) return "I"
   if (toSun < 0.036 && d < 0.6) return "J"
-  const shaft = toSun < 0.9 && d < 0.52 && noise(Math.atan2(el - SUN_EL, az - SUN_AZ) * 11, 2) > 0.6 ? (1 - toSun / 0.9) * 0.22 : 0
+  const shaft = toSun < 0.9 && d < 0.52 && vnoise(Math.atan2(el - SUN_EL, az - SUN_AZ) * 11, 2) > 0.6 ? (1 - toSun / 0.9) * 0.22 : 0
   let v = 0.42 - el * 0.9 - (d - 0.5) * 1.8 + thin * 0.8 + (lit < -0.015 ? 0.18 : lit > 0.02 ? -0.1 : 0) + shaft + dither(col, row) * 0.12
   if (el < 0.3 && belly > 0.012 && d > 0.45) { const g = (0.3 - el) / 0.3 + (belly - 0.012) * 6 + dither(col, row) * 0.3; if (g > 0.6) return g > 1.0 ? "H" : "G" }
   if (v > 1.0 && thin > 0.2) return "K"
@@ -207,11 +176,11 @@ function plume(c) {
     if (cy + R < 0 || cy - R > H) continue
     for (let y = Math.floor(cy - R - 2); y <= Math.ceil(cy + R + 2); y++) for (let x = Math.floor(cx - R - 2); x <= Math.ceil(cx + R + 2); x++) {
       if (x < 0 || x >= W || y < 0 || y >= H) continue
-      const ox = x + 0.5 - cx, oy = y + 0.5 - cy, ang = Math.atan2(oy, ox), edge = R * (0.86 + 0.22 * noise(ang * 2.5 + b.k * 7, b.k))
+      const ox = x + 0.5 - cx, oy = y + 0.5 - cy, ang = Math.atan2(oy, ox), edge = R * (0.86 + 0.22 * vnoise(ang * 2.5 + b.k * 7, b.k))
       const dd = Math.hypot(ox, oy)
       if (dd > edge) continue
       // lit by the sun on its upper left, its belly red with the fire below, more the lower it is
-      const lit = (-ox * 0.6 - oy * 0.8) / edge, rim = dd / edge, v = lit * 0.7 + rim * 0.25 + (noise(x / 5 + b.k, y / 5) - 0.5) * 0.4 + dither(x, y) * 0.15
+      const lit = (-ox * 0.6 - oy * 0.8) / edge, rim = dd / edge, v = lit * 0.7 + rim * 0.25 + (vnoise(x / 5 + b.k, y / 5) - 0.5) * 0.4 + dither(x, y) * 0.15
       const belly = oy / edge + (1 - b.s / 1800) * 0.9 + dither(x, y) * 0.2
       if (belly > 0.75 && lit < 0.3) c.px(x, y, belly > 1.35 ? "H" : belly > 1.0 ? "G" : "Q")
       else c.px(x, y, v > 0.62 ? "E" : v > 0.3 ? "D" : v > 0.0 ? "C" : "B")
@@ -278,7 +247,7 @@ function steam(c, frame) {
     const life = (frame / FRAMES + S.ph) % 1, [bx, by] = P.ground(...S.p), sc = P.scale(S.p[1], S.p[0], S.p[2])
     const x = bx + life * 110 * sc, y = by - life * 200 * sc - 1, R = (1.5 + life * 5) * S.big
     for (let yy = Math.floor(y - R); yy <= Math.ceil(y + R); yy++) for (let xx = Math.floor(x - R); xx <= Math.ceil(x + R); xx++) {
-      const oy = (yy + 0.5 - y) / R, d = Math.hypot((xx + 0.5 - x) / R, oy) + (noise(xx / 2 + i * 7, yy / 2) - 0.5) * 0.4
+      const oy = (yy + 0.5 - y) / R, d = Math.hypot((xx + 0.5 - x) / R, oy) + (vnoise(xx / 2 + i * 7, yy / 2) - 0.5) * 0.4
       if (d > 1 || (life > 0.55 && (xx + yy) & 1) || (life > 0.85 && hash(xx, yy) < 0.5)) continue
       c.px(xx, yy, oy > 0.25 && life < 0.5 ? "G" : d < 0.55 ? "D" : "C")
     }
@@ -354,7 +323,7 @@ function column(c, a, b, r0, r1, burning) {
       const across = (x + 0.5 - q.s[0]) / Math.max(0.5, q.h)
       if (Math.abs(across) > 1 || x < 0 || x >= W) continue
       // bark in vertical plates, furrows between them
-      const furrow = Math.abs(noise(across * 5 + 9, q.u * 0.7) - 0.5) < 0.07, v = -across * 0.85 + dither(x, y) * 0.25
+      const furrow = Math.abs(vnoise(across * 5 + 9, q.u * 0.7) - 0.5) < 0.07, v = -across * 0.85 + dither(x, y) * 0.25
       if (burning) c.px(x, y, furrow ? (across > -0.2 ? "U" : "T") : across > 0.55 ? "l" : v > 0.45 ? "j" : v > -0.2 ? "i" : "h")
       else c.px(x, y, furrow ? "h" : v > 0.55 ? "k" : v > 0.05 ? "j" : v > -0.45 ? "i" : "h")
     }
@@ -371,7 +340,7 @@ function paintTree(c, T) {
     const [cx, cy] = P.ground(...q.p), R = Math.max(0.8, q.rad * P.scale(q.p[1], q.p[0], q.p[2]))
     for (let y = Math.floor(cy - R * 0.6); y <= Math.ceil(cy + R * 0.6); y++) for (let x = Math.floor(cx - R); x <= Math.ceil(cx + R); x++) {
       const ox = (x + 0.5 - cx) / R, oy = (y + 0.5 - cy) / (R * 0.6)
-      if (ox * ox + oy * oy > 1 + 0.35 * (noise(x * 0.9 + q.v * 50, y * 0.9) - 0.5)) continue
+      if (ox * ox + oy * oy > 1 + 0.35 * (vnoise(x * 0.9 + q.v * 50, y * 0.9) - 0.5)) continue
       c.px(x, y, q.burning ? (oy > 0.45 ? "T" : oy > 0.1 ? "S" : "h") : oy < -0.4 ? "g" : "f")
     }
   }
@@ -406,15 +375,10 @@ function treeFire(c, T, frame) {
 
 const SKY = new Uint8Array(W * H)
 sprite("_bg", { w: W, h: H }, (c) => {
-  for (let col = 0; col < W; col++) {
-    let t = 0.5, open = false
-    for (let row = H - 1; row >= 0; row--) {
-      const hit = open ? null : march(col, row, t)
-      if (hit) { t = hit[3] * 0.98; c.px(col, row, shadeLand(col, row, hit)) }
-      else if (row >= P.horizon) c.px(col, row, "f")
-      else { open = true; SKY[row * W + col] = 1; c.px(col, row, sky(col, row)) }
-    }
-  }
+  // the land ray-marched through the camera (bulk() a cheap bound it never rises 4 m above), the sky
+  // where a pixel sees none; which pixels are sky is kept for what passes behind the mountain
+  c.terrain(P, height, (x, z, u, t, col, row) => shadeLand(col, row, [x, z, u, t]),
+    { far: 9000, top: VH, bound: bulk, margin: 4, sky: (col, row) => { SKY[row * W + col] = 1; return sky(col, row) } })
   impact(c)
   lavaGlow(c)
   plume(c)
@@ -697,8 +661,8 @@ function impact(c) {
     const k = c.key(x, y)
     if (!"ABCDEFGHK".includes(k)) continue
     // the dust column: rising from the strike, leaning right with the wind, widening, ragged at its edges
-    const up = iy - y, axis = ix + up * 0.35, half = 5 + up * 0.22, off = (x + 0.5 - axis) / half, edge = 1 + 0.35 * (noise(y / 6, 3) - 0.5) + 0.25 * (noise(y / 3, x / 9) - 0.5)
-    if (up > 0 && Math.abs(off) < edge) { c.px(x, y, up < 14 ? (Math.abs(off) < 0.5 ? "V" : "H") : off < -0.6 * edge ? "D" : noise(x / 4, y / 4) > 0.55 ? "C" : "B"); continue }
+    const up = iy - y, axis = ix + up * 0.35, half = 5 + up * 0.22, off = (x + 0.5 - axis) / half, edge = 1 + 0.35 * (vnoise(y / 6, 3) - 0.5) + 0.25 * (vnoise(y / 3, x / 9) - 0.5)
+    if (up > 0 && Math.abs(off) < edge) { c.px(x, y, up < 14 ? (Math.abs(off) < 0.5 ? "V" : "H") : off < -0.6 * edge ? "D" : vnoise(x / 4, y / 4) > 0.55 ? "C" : "B"); continue }
     // the glow on the soot round it, strongest low and near, in dithered bands
     const d = Math.hypot((x - ix) / 150, (y - iy) / 95) + dither(x, y) * 0.12
     if (d < 0.32) c.px(x, y, d < 0.16 ? "W" : "V")
@@ -750,7 +714,7 @@ function smoke(c) {
   for (let y = 60; y < P.horizon + 4; y++) for (let x = 0; x < W; x++) {
     const k = c.key(x, y)
     if (!"ABCDEFGHKLMNOQ".includes(k)) continue
-    const rise = (P.horizon + 4 - y) / 90, wisp = noise(x / 34 - y / 9, y / 7) * (1 - rise) - rise * 0.25 + noise(x / 11, y / 5) * 0.25
+    const rise = (P.horizon + 4 - y) / 90, wisp = vnoise(x / 34 - y / 9, y / 7) * (1 - rise) - rise * 0.25 + vnoise(x / 11, y / 5) * 0.25
     if (wisp < 0.5) continue
     if (wisp < 0.58 && (x + y) & 1) continue
     c.px(x, y, y > P.horizon - 12 && wisp > 0.62 ? "G" : wisp > 0.7 ? "C" : "B")
@@ -766,7 +730,7 @@ function smoke(c) {
 // their edges lit where the sun is close behind them. A cloud's life is the loop, so it closes. They go
 // behind the mountain and the trees (only the sky's pixels take them), and as they pass the sun they
 // cover it now partly, now hardly, and its light dims with it, on the soot and on the mountain.
-const SUN_AT = (() => { const zc = SUN[1] * cp + SUN[2] * sp, yc = SUN[2] * cp - SUN[1] * sp; return [P.vp + (P.focal * SUN[0]) / zc, CY - (P.focal * yc) / zc] })()
+const SUN_AT = P.toward(SUN)
 const BREATHE = 46
 function breathe(c, frame) {
   for (let y = Math.floor(SUN_AT[1] - BREATHE); y <= SUN_AT[1] + BREATHE; y++) for (let x = Math.floor(SUN_AT[0] - BREATHE); x <= SUN_AT[0] + BREATHE; x++) {
@@ -800,7 +764,7 @@ function sootClouds(c, frame) {
     for (let y = Y0; y < Y0 + BH; y++) for (let x = X0; x < X0 + BW; x++) {
       if (x < 0 || x >= W || y < 0 || y >= H || !SKY[y * W + x]) continue
       const d = buf[(y - Y0) * BW + (x - X0)]
-      if (d < -0.15 || d + (noise(x / 6 + k * 9, y / 4) - 0.5) * 0.22 <= 0) continue
+      if (d < -0.15 || d + (vnoise(x / 6 + k * 9, y / 4) - 0.5) * 0.22 <= 0) continue
       if (m < 0.55 && d < 0.12 && (x + y) & 1) continue                                    // thinning: wisps, half there
       const [ux, uy, far] = toSun(x, y), rim = m > 0.5 && d > 0.03 && d < 0.22 && d - at2(x + ux * 3, y + uy * 3) > 0.12
       const under = d < 0.3 && d - at2(x, y + 2) > 0.12
@@ -845,11 +809,11 @@ const ROCKS = (() => {
 function log(c, L, frame) {
   const ca = Math.cos(L.a), sa = Math.sin(L.a), r = rng(L.seed * 17), breaks = L.breaks ?? []
   const pt = (f, piece) => { const side = 0.35 * Math.sin(f * 4 + L.seed) + piece * 0.3, x = L.x + ca * L.len * f - sa * side, z = L.z + sa * L.len * f + ca * side; return [x, z, height(x, z) + L.r * 0.9 - piece * 0.05] }
-  const rad = (f) => L.r * (1 - 0.2 * (f + 0.5)) * (1 + 0.14 * (noise(f * 7 + L.seed, 3) - 0.5) * 2)
+  const rad = (f) => L.r * (1 - 0.2 * (f + 0.5)) * (1 + 0.14 * (vnoise(f * 7 + L.seed, 3) - 0.5) * 2)
   // the root plate: a torn-up disc of roots and earth, standing on edge
   const A = pt(-0.5, 0), [ax, ay] = P.ground(...A), rp = L.r * 2.6 * P.scale(A[1], A[0], A[2])
   for (let y = -Math.ceil(rp); y <= Math.ceil(rp); y++) for (let x = -Math.ceil(rp * 0.45); x <= Math.ceil(rp * 0.45); x++) {
-    const d = Math.hypot(x / 0.45, y) / rp + (noise(x * 0.8 + L.seed, y * 0.8) - 0.5) * 0.5
+    const d = Math.hypot(x / 0.45, y) / rp + (vnoise(x * 0.8 + L.seed, y * 0.8) - 0.5) * 0.5
     if (d < 1 && y < rp * 0.6) c.px(Math.round(ax) + x, Math.round(ay) + y, d > 0.8 ? "c" : hash(x, y) < 0.2 ? "h" : "i")
   }
   // spikes of pale torn wood at an end, pointing `dir` (+1 toward the top, -1 back)

@@ -111,6 +111,24 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   each is lit or in shade by which way it faces the sun. People walking in such a scene: pose a body
   in meters (feet, knees by two-bone IK, arms against the legs) and project it, rather than drawing
   sprites per direction (`examples/perspective/park.px.js`).
+- Three-point: tilt the camera (`pitch`). Looking up (a worm's-eye view), the horizon drops low in the
+  picture and every upright leans in toward `vertical()` above it: trunks, poles, a tower; looking
+  down, they spread toward a point below. A moderate tilt (15-20°) shows it without warping
+  everything; the uprights near the picture's edges show it most, so put tall things there.
+- Mountains, hills, a volcano: `terrain()` with a height in meters, ray-marched through the same
+  camera, so its silhouette, its ravines and what stands on it all agree. Build the shape as an
+  old range first and the peak on it (a lone smooth cone reads as a drawing, not a mountain), then
+  cut ridges and ravines that only lower it (`bound` stays a true upper bound). Things on it stand at
+  `ground(x, z, height(x, z))`; flows go down the steepest way, step by step.
+- Anything far off sits on a direction, not a point: the sun at `toward(sunDir)`, a sky colored by
+  `ray(col, row)` (its height above the horizon and its angle from the sun). Things moving the same
+  way (meteors, birds in a flock) run along parallel lines, which meet at `toward(theirDirection)`.
+- Creatures in perspective: the big ones near (a tyrannosaur, a horse) as a profile in meters, their
+  top and bottom lines from tail to snout, projected and painted in slices across, the jaw its own
+  hinged piece, legs posed in 3D; round tubes and cones read as a fish with legs, and a head built
+  as a cone tapering to a point is a fish's. Between open jaws is air: what's behind shows through. The
+  small ones (pigeons, a flock overhead) drawn by hand in a few poses and sizes, placed and picked
+  by the camera: at 10-20 px a 3D body is a few lumps, and wings seen from below in 3D go edge-on.
 
 ## Slow motion in a short loop (clouds, mist, drifting things)
 
@@ -124,6 +142,18 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   light from the top down as it gains body (a white cap thickening row by row, then a gray
   underside); a thin streak can take its lit underside column by column. Examples:
   `examples/sunset/sunset.px.js` (streaks at sunset), `examples/rig/tournament.px.js` (daylight cumulus).
+
+## Closing a loop
+
+- Something crossing the picture: let it cover more than the picture's width (plus its own length) in
+  one loop (`x = ((x0 - v·t) mod L) - L/2`, L = v times the loop's length): it leaves on one side and
+  comes back on the other while it can't be seen. Or end its way behind something (a hedge, a cart, a
+  trunk) and start it behind something else.
+- Particles (embers, ash, rain): each goes round the picture a whole number of times in the loop.
+- A lane of clouds: each moves one slot along in the loop while turning into the next one's shape;
+  or each lives one loop (forms, drifts, thins away) as above; soot or mist that comes and goes:
+  thin it by `0.5 - 0.5·cos(2π·t)`, fading to nothing at the edge of the part that moves.
+- Gaits: a stride a whole number of frames, and the loop a multiple of every stride in it.
 
 ## Shadows and light
 
