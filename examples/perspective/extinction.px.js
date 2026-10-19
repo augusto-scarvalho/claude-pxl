@@ -134,13 +134,16 @@ function shadeLand(col, row, [x, z, u, t]) {
 // toward the sun, thinning around it; underneath, low in the sky, the fires' red on the billows'
 // bellies; shafts of sun fanning out through the thinner places.
 const soot = (az, el) => { const x = az * 4.2, y = el * 6.5, w1 = fbm(x + 3, y, 3), w2 = fbm(x, y + 5, 3); return fbm(x + w1 * 1.7, y * 1.25 + w2 * 1.7, 4) }
-function sky(col, row) {
+// `breath` (0 to 1 round the loop) and `a` (how much, 0 at the edge of what breathes): the soot over the
+// sun drifts a little and thins, then thickens again
+function sky(col, row, breath = 0, a = 0) {
   const [dx, dz, du] = ray(col, row), az = Math.atan2(dx, dz), el = Math.asin(du)
   const toSun = Math.acos(Math.max(-1, Math.min(1, dx * SUN[0] + dz * SUN[1] + du * SUN[2])))
-  const d = soot(az, el), thin = Math.max(0, 1 - toSun / 0.42) ** 1.6
+  const b = breath * Math.PI * 2, sootAt = (u, v) => soot(u + a * 0.04 * Math.cos(b), v + a * 0.025 * Math.sin(b)) - a * 0.16 * (0.5 - 0.5 * Math.cos(b))
+  const d = sootAt(az, el), thin = Math.max(0, 1 - toSun / 0.42) ** 1.6
   if (toSun < 0.022 && d < 0.62) return "I"
   if (toSun < 0.036 && d < 0.6) return "J"
-  const lit = d - soot(az - 0.03, el + 0.025), belly = d - soot(az, el - 0.03)
+  const lit = d - sootAt(az - 0.03, el + 0.025), belly = d - sootAt(az, el - 0.03)
   const shaft = toSun < 0.9 && d < 0.52 && noise(Math.atan2(el - SUN_EL, az - SUN_AZ) * 11, 2) > 0.6 ? (1 - toSun / 0.9) * 0.22 : 0
   let v = 0.42 - el * 0.9 - (d - 0.5) * 1.8 + thin * 0.8 + (lit < -0.015 ? 0.18 : lit > 0.02 ? -0.1 : 0) + shaft + dither(col, row) * 0.12
   if (el < 0.3 && belly > 0.012 && d > 0.45) { const g = (0.3 - el) / 0.3 + (belly - 0.012) * 6 + dither(col, row) * 0.3; if (g > 0.6) return g > 1.0 ? "H" : "G" }
@@ -640,36 +643,45 @@ function smoke(c) {
   }
 }
 
-// ================================================================ soot clouds across the sun
-// A lane of soot clouds blown right across the sun's height: black at their cores, ragged, pouches
-// hanging from their bellies (mammatus, a storm sky's), trailing wisps downwind, their edges lit only
-// where the sun is close behind them. Each moves one slot along
-// in the loop while turning into the next one's shape (as the park's clouds do), so the loop closes.
-// They go behind the mountain and the trees (only the sky's pixels take them). As they pass they
-// cover the sun now partly, now hardly, and its light dims with it, on the soot and on the mountain.
+// ================================================================ soot round the sun
+// The soot over the sun breathes: through the loop it drifts a little, thins until the sun shows
+// whole, and thickens over it again (fading into the still sky at the edge of the part that moves).
+// And soot clouds the volcano's hot air pushes away from it: each gathers out of the haze near the
+// mountain, drifts slowly left, away from it, and thins into wisps until it's gone, while others
+// gather; black at their cores, ragged, pouches hanging from their bellies (mammatus, a storm sky's),
+// their edges lit where the sun is close behind them. A cloud's life is the loop, so it closes. They go
+// behind the mountain and the trees (only the sky's pixels take them), and as they pass the sun they
+// cover it now partly, now hardly, and its light dims with it, on the soot and on the mountain.
 const SUN_AT = (() => { const zc = SUN[1] * cp + SUN[2] * sp, yc = SUN[2] * cp - SUN[1] * sp; return [P.vp + (P.focal * SUN[0]) / zc, CY - (P.focal * yc) / zc] })()
-const SLOT = 110, NSLOT = 4
-const SHAPES = Array.from({ length: NSLOT }, (_, i) => {
-  const r = rng(4100 + i), dy = [-10, -4, -12, -2][i]
-  return [...Array.from({ length: 7 }, () => [(r() - 0.5) * 44, dy - 2 + (r() - 0.5) * 8, 8 + r() * 9, 5 + r() * 4]),
-    ...Array.from({ length: 5 }, (_, k) => [-18 + k * 9 + (r() - 0.5) * 4, dy + 6 + r() * 3, 3 + r() * 1.6, 2.6 + r() * 1.4]),
-    ...Array.from({ length: 2 }, () => [20 + r() * 16, dy + (r() - 0.5) * 5, 12 + r() * 8, 1.5 + r() * 1.2])]
+const BREATHE = 46
+function breathe(c, frame) {
+  for (let y = Math.floor(SUN_AT[1] - BREATHE); y <= SUN_AT[1] + BREATHE; y++) for (let x = Math.floor(SUN_AT[0] - BREATHE); x <= SUN_AT[0] + BREATHE; x++) {
+    const r = Math.hypot(x - SUN_AT[0], y - SUN_AT[1]) / BREATHE
+    if (r >= 1 || x < 0 || y < 0 || !SKY[y * W + x]) continue
+    c.px(x, y, sky(x, y, frame / FRAMES, (1 - r) ** 1.5))
+  }
+}
+const CLOUDS = Array.from({ length: 6 }, (_, i) => {
+  const r = rng(4100 + i), dy = [-10, -3, -14, 0, -7, -12][i]
+  return { ph: i / 6, x0: 112 + r() * 60, dy, puffs: [...Array.from({ length: 6 }, () => [(r() - 0.5) * 34, dy - 2 + (r() - 0.5) * 7, 7 + r() * 7, 4.5 + r() * 3.5]),
+    ...Array.from({ length: 4 }, (_, k) => [-12 + k * 8 + (r() - 0.5) * 4, dy + 5 + r() * 3, 2.6 + r() * 1.4, 2.4 + r() * 1.2]),
+    ...Array.from({ length: 2 }, () => [-20 - r() * 12, dy + (r() - 0.5) * 5, 10 + r() * 7, 1.5 + r() * 1.1])] }
 })
 function sootClouds(c, frame) {
   const t = frame / FRAMES, toSun = (x, y) => { const dx = SUN_AT[0] - x, dy = SUN_AT[1] - y, l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l, l] }
   let covered = 0, disk = 0
-  for (let k = 0; k < NSLOT; k++) {
-    const A = SHAPES[k], B = SHAPES[(k + 1) % NSLOT], cx = -70 + (k + t) * SLOT, cy = SUN_AT[1]
-    const puffs = A.map((a, i) => a.map((v, j) => v + (B[i][j] - v) * t))
-    const dens = (x, y) => { let m = 0; for (const [px, py, rx, ry] of puffs) m = Math.max(m, 1 - Math.hypot((x - cx - px) / rx, (y - cy - py) / ry)); return m }
-    for (let y = Math.floor(cy - 26); y <= Math.ceil(cy + 26); y++) for (let x = Math.floor(cx - 50); x <= Math.ceil(cx + 66); x++) {
+  for (const [k, C] of CLOUDS.entries()) {
+    // its life: gathering, drifting away from the mountain, thinning out
+    const life = (t + C.ph) % 1, m = Math.sin(Math.PI * life), grow = 0.8 + 0.45 * life, cx = C.x0 - life * 55, cy = SUN_AT[1]
+    const dens = (x, y) => { let v = 0; for (const [px, py, rx, ry] of C.puffs) v = Math.max(v, 1 - Math.hypot((x - cx - px * grow) / (rx * grow), (y - cy - py) / (ry * grow))); return v - (1 - m) * 0.6 }
+    for (let y = Math.floor(cy - 28); y <= Math.ceil(cy + 28); y++) for (let x = Math.floor(cx - 60); x <= Math.ceil(cx + 40); x++) {
       if (x < 0 || x >= W || y < 0 || y >= H || !SKY[y * W + x]) continue
-      // the shape: puffs together, its outline ragged by a slow noise; inside, darkest at the core
       const d = dens(x, y)
       if (d + (noise(x / 6 + k * 9, y / 4) - 0.5) * 0.22 <= 0) continue
-      const [ux, uy, far] = toSun(x, y), rim = d < 0.22 && d - dens(x + ux * 3, y + uy * 3) > 0.12
+      if (m < 0.55 && d < 0.12 && (x + y) & 1) continue                                    // thinning: wisps, half there
+      const [ux, uy, far] = toSun(x, y), rim = m > 0.5 && d > 0.03 && d < 0.22 && d - dens(x + ux * 3, y + uy * 3) > 0.12
       const under = d < 0.3 && d - dens(x, y + 2) > 0.12
-      c.px(x, y, rim && far < 30 ? "J" : rim && far < 70 ? "F" : rim ? "D" : under ? "C" : d > 0.4 ? "A" : d > 0.12 ? "B" : "C")
+      c.px(x, y, rim && far < 30 ? "J" : rim && far < 70 ? "F" : rim ? "D" : under ? "C" : d > 0.4 && m > 0.6 ? "A" : d > 0.12 ? "B" : "C")
     }
   }
   // how much of the sun's disk is behind them; the light dims as much
@@ -688,7 +700,7 @@ function sootClouds(c, frame) {
 // each tree's still parts on a sprite of their own, cropped to what they draw
 for (const [i, T] of TREES.entries()) sprite("_tree" + i, { w: W, h: H, crop: true, pivot: [0, 0] }, (c) => paintTree(c, T))
 anim("extinction", { w: W, h: H, frames: FRAMES, fps: FPS }, stamp("_bg", 0, 0), (c) => {
-  meteors(c, c.frame); sootClouds(c, c.frame); lava(c, c.frame); crater(c, c.frame); frontFire(c, c.frame)
+  meteors(c, c.frame); breathe(c, c.frame); sootClouds(c, c.frame); lava(c, c.frame); crater(c, c.frame); frontFire(c, c.frame)
   const all = [...TREES.map((T, i) => ({ d: T.d, tree: i })), ...runners(c.frame), ...flyers(c.frame)].sort((m, n) => n.d - m.d)
   for (const m of all) {
     if (m.tree !== undefined) { c.stamp("_tree" + m.tree, 0, 0); treeFire(c, TREES[m.tree], c.frame); continue }
