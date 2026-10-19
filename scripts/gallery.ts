@@ -11,9 +11,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const out = join(root, "docs", "gallery");
 mkdirSync(out, { recursive: true });
 
-// [example file, asset, target width in px, every nth frame (long loops: each kept frame lasts n
-// times as long, so the loop still closes and the GIF stays a few MB)]
-const shots: [string, string, number, number?][] = [
+// [example file, asset, target width in px, every nth frame (each kept frame lasts n times as long, so
+// the loop still closes), the file's name when it isn't the asset's]
+const shots: [string, string, number, number?, string?][] = [
   ["no_magic.px.js", "no_magic_night", 768],
   ["shop.px.js", "comet_repair", 576],
   ["tackle.px.js", "gull_and_gill", 576],
@@ -23,20 +23,24 @@ const shots: [string, string, number, number?][] = [
   ["no_magic.px.js", "cat", 192],
   ["no_magic.px.js", "frog", 192],
   ["no_magic.px.js", "clock", 192],
-  ["cyberpunk/sodium_hour.px.js", "sodium_hour", 640, 3],
-  ["cyberpunk/pipeline/cyberpunk_city.px.js", "cyberpunk_city", 640, 3],
+  ["cyberpunk/sodium_hour.px.js", "sodium_hour", 640],
+  ["cyberpunk/pipeline/cyberpunk_city.px.js", "cyberpunk_city", 640],
   ["perspective/road.px.js", "road", 640],
   ["perspective/park.px.js", "park", 640],
+  ["sunset/sunset.px.js", "sunset", 640, 1, "sunset_cliff"],
+  ["rig/tournament.px.js", "tournament", 640],
+  ["halloween/party.px.js", "party", 640, 1, "halloween_party"],
+  ["tropical/forest.px.js", "forest", 640, 1, "tropical_forest"],
 ];
 
 const only = process.argv.slice(2);
-for (const [file, name, width, every = 1] of shots.filter(([, n]) => !only.length || only.includes(n))) {
+for (const [file, name, width, every = 1, as = name] of shots.filter(([, n, , , a]) => !only.length || only.includes(n) || only.includes(a ?? ""))) {
   const p = loadProject(join(root, "examples", file));
   const b = p.build(name);
   const s = Math.max(1, Math.floor(width / b.img.w));
   if (b.anim) {
     const frames = p.frames(name).filter((_, i) => i % every === 0).map((f) => ({ img: f.img.scale(s), ms: f.ms * every }));
-    writeFileSync(join(out, name + ".gif"), encodeGif(frames));
-  } else writeFileSync(join(out, name + ".png"), encodePng(b.img.scale(s)));
+    writeFileSync(join(out, as + ".gif"), encodeGif(frames));
+  } else writeFileSync(join(out, as + ".png"), encodePng(b.img.scale(s)));
   console.log(`${name} ${b.img.w}x${b.img.h} @${s}x`);
 }

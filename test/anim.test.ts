@@ -125,6 +125,22 @@ test("gif: frames decode back to the same pixels and delays", () => {
   assert.deepEqual(g.frames[1].rgba[8], 0x0000ff);
 });
 
+test("gif: a scene stores only what changed in each frame, and decodes back to every pixel", () => {
+  const frames = [0, 1, 2, 3].map((k) => {
+    const img = new Img(64, 32);
+    img.fill(pack(40, 120, 60));
+    for (let x = 0; x < 64; x++) img.data[10 * 64 + x] = pack(200, 200, 90);          // a still stripe
+    for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) img.data[(20 + y) * 64 + 5 + k * 9 + x] = pack(220, 40, 40);   // a moving dot
+    return { img, ms: 100 };
+  });
+  const buf = encodeGif(frames), g = decodeGif(buf);
+  assert.equal(g.frames.length, 4);
+  for (let k = 0; k < 4; k++) assert.deepEqual(g.frames[k].rgba, [...frames[k].img.data].map((c) => c >>> 8), `frame ${k}`);
+  const rects = g.frames.map((f) => (f as unknown as { rect: number[] }).rect);
+  assert.deepEqual(rects[0], [0, 0, 64, 32], "the first frame whole");
+  assert.deepEqual(rects[1], [5, 20, 12, 3], "the next only where the dot was and is");
+});
+
 test("gif: many colors are reduced to one palette and still decode", () => {
   const img = new Img(40, 40);
   for (let i = 0; i < img.data.length; i++) img.data[i] = pack(i % 256, (i * 7) % 256, (i * 13) % 256);
@@ -140,22 +156,30 @@ function decodeGif(buf: Buffer) {
   const gct: number[] = [];
   if (flags & 0x80) for (let i = 0; i < 2 << (flags & 7); i++, p += 3) gct.push((buf[p] << 16) | (buf[p + 1] << 8) | buf[p + 2]);
   const frames: { delay: number; rgba: number[] }[] = [];
-  let delay = 0, trans = -1;
+  let delay = 0, trans = -1, dispose = 0, canvas: number[] = new Array(w * h).fill(-1), lastDispose = 0;
   while (buf[p] !== 0x3b) {
     if (buf[p] === 0x21) {
       const label = buf[p + 1];
       p += 2;
-      if (label === 0xf9) { delay = buf.readUInt16LE(p + 2); trans = buf[p + 1] & 1 ? buf[p + 4] : -1; }
+      if (label === 0xf9) { delay = buf.readUInt16LE(p + 2); trans = buf[p + 1] & 1 ? buf[p + 4] : -1; dispose = (buf[p + 1] >> 2) & 7; }
       while (buf[p]) p += buf[p] + 1;
       p++;
     } else if (buf[p] === 0x2c) {
+      const fx = buf.readUInt16LE(p + 1), fy = buf.readUInt16LE(p + 3), fw = buf.readUInt16LE(p + 5), fh = buf.readUInt16LE(p + 7);
       p += 10;
       const min = buf[p++];
       const data: number[] = [];
       while (buf[p]) { for (let i = 1; i <= buf[p]; i++) data.push(buf[p + i]); p += buf[p] + 1; }
       p++;
-      const idx = unlzw(data, min, w * h);
-      frames.push({ delay, rgba: idx.map((i) => (i === trans ? -1 : gct[i])) });
+      if (lastDispose === 2) canvas = new Array(w * h).fill(-1);
+      const idx = unlzw(data, min, fw * fh);
+      for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) {
+        const i = idx[y * fw + x];
+        if (i !== trans) canvas[(y + fy) * w + x + fx] = gct[i];
+        else if (dispose === 2) canvas[(y + fy) * w + x + fx] = -1;
+      }
+      frames.push({ delay, rgba: [...canvas], rect: [fx, fy, fw, fh] } as { delay: number; rgba: number[] });
+      lastDispose = dispose;
     } else throw new Error("bad block " + buf[p]);
   }
   return { w, h, frames };

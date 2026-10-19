@@ -1,6 +1,9 @@
 // Animated GIF encoder (GIF89a, looping). One global palette for all frames; more than 256
 // colors (lit scenes) are reduced by median cut. Fully transparent pixels become the
-// transparent index. Identical consecutive frames are merged.
+// transparent index. Identical consecutive frames are merged. When no pixel is transparent (a
+// scene), each frame after the first stores only the rectangle that changed, its unchanged pixels
+// as the transparent index over the frame kept from before: in a scene where a few things move,
+// that's most of the file gone.
 import { TRANSPARENT } from "../core/color.ts";
 import type { Img } from "../core/image.ts";
 
@@ -26,10 +29,11 @@ export function encodeGif(frames: GifFrame[]): Buffer {
       counts.set(rgb, (counts.get(rgb) ?? 0) + 1);
     }
   }
-  const room = transparent ? 255 : 256;
+  // index 0 is kept for "transparent": a clear pixel in a sprite, or in a scene, "as before"
+  const room = 255;
   const pal = counts.size <= room ? [...counts.keys()] : medianCut(counts, room);
-  const colors = (transparent ? [0] : []).concat(pal);
-  const base = transparent ? 1 : 0;
+  const colors = [0, ...pal];
+  const base = 1;
   let bits = 1;
   while (1 << bits < colors.length) bits++;
   const exact = new Map<number, number>();
@@ -55,23 +59,41 @@ export function encodeGif(frames: GifFrame[]): Buffer {
   out.push(0x21, 0xff, 11, ...Buffer.from("NETSCAPE2.0"), 3, 1, 0, 0, 0);   // loop forever
 
   const minSize = Math.max(2, bits);
+  let prev: Uint8Array | undefined;
   for (const { img, ms } of merged) {
     const cs = Math.max(2, Math.round(ms / 10));
-    // Restore to background between frames when anything is transparent, so frames don't pile up.
-    out.push(0x21, 0xf9, 4, ((transparent ? 2 : 1) << 2) | (transparent ? 1 : 0));
-    u16(cs);
-    out.push(0, 0);
-    out.push(0x2c);
-    u16(0); u16(0); u16(w); u16(h);
-    out.push(0);
     const idx = new Uint8Array(w * h);
     for (let y = 0; y < img.h; y++)
       for (let x = 0; x < img.w; x++) {
         const c = img.data[y * img.w + x];
         idx[y * w + x] = isClear(c) ? 0 : indexOf(c >>> 8);
       }
+    // A sprite with clear pixels: whole frames, the area restored to background between them so they
+    // don't pile up. A scene: after the first frame, only the rectangle that changed, what stayed the
+    // same in it as index 0 (transparent), each frame left in place for the next to draw over.
+    let [x0, y0, x1, y1] = [0, 0, w - 1, h - 1];
+    if (!transparent && prev) {
+      [x0, y0, x1, y1] = [w, h, -1, -1];
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++)
+          if (idx[y * w + x] !== prev[y * w + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (x1 < 0) [x0, y0, x1, y1] = [0, 0, 0, 0];
+    }
+    const fw = x1 - x0 + 1, fh = y1 - y0 + 1, part = new Uint8Array(fw * fh);
+    for (let y = 0; y < fh; y++)
+      for (let x = 0; x < fw; x++) {
+        const i = (y + y0) * w + x + x0;
+        part[y * fw + x] = !transparent && prev && idx[i] === prev[i] ? 0 : idx[i];
+      }
+    out.push(0x21, 0xf9, 4, ((transparent ? 2 : 1) << 2) | (transparent || prev ? 1 : 0));
+    u16(cs);
+    out.push(0, 0);
+    out.push(0x2c);
+    u16(x0); u16(y0); u16(fw); u16(fh);
+    out.push(0);
+    prev = idx;
     out.push(minSize);
-    const data = lzw(idx, minSize);
+    const data = lzw(part, minSize);
     for (let i = 0; i < data.length; i += 255) {
       const n = Math.min(255, data.length - i);
       out.push(n);

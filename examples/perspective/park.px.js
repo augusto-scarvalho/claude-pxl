@@ -840,8 +840,9 @@ sprite("_bg", { w: W, h: H },
   (c) => hopscotch(c))
 
 // each still thing on a sprite of its own, lit once; the scene interleaves them with the moving ones
+// (cropped to what it draws, its pivot the canvas corner, so stamping it at 0, 0 copies only its pixels)
 for (const s of STATIC)
-  sprite("_s" + s.id, { w: W, h: H }, (c) => {
+  sprite("_s" + s.id, { w: W, h: H, crop: true, pivot: [0, 0] }, (c) => {
     if (s.paint) s.paint(c)
     else {
       drawShapes(c, s.shapes.filter((q) => !q.umbrella && !q.poly), s.ramps)

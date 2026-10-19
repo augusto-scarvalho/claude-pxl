@@ -118,8 +118,7 @@ palette, a plan with every part's box, light and timing, and the scene file; eig
 the sky, towers, freeway, shops, signs, street, traffic and crowd at once, each in its own file;
 a last fork put them together. The pipeline came out denser, with more people, cars and shops, but
 less coherent, and cost about five times the tokens and twice the time: worth offering for a big
-scene, not a default. Its plan is there to read (`pipeline/plan.md`). The GIFs keep every third
-frame.
+scene, not a default. Its plan is there to read (`pipeline/plan.md`).
 
 ## Showcase: true perspective
 
