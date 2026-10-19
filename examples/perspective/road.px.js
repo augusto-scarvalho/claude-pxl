@@ -9,7 +9,7 @@ pal({
   // haze, and the serras on the horizon (far, near)
   h: "#c98a6a", H: "#e6b089", i: "#8e5a6a", I: "#64405a",
   // dry red earth, near to far (the sandy patches one step up), and the shade on it, cooler
-  Z: "#251a26", z: "#352530", g: "#3b2824", G: "#4f3530", J: "#6b4738",
+  Z: "#170f19", z: "#251a24", g: "#3b2824", G: "#4f3530", J: "#6b4738",
   d: "#17141f", D: "#2a2130", e: "#4a3440", E: "#6e4a50",
   // the road and its paint
   a: "#221e28", A: "#3a3040", b: "#6a4c58", B: "#9a6a66", l: "#c9b796", L: "#8a6e6a",
@@ -39,8 +39,8 @@ const FAR = [10, 30, 90], NEAR = [18, 50, 130]                     // the ground
 const ROAD = "aAbB", SOIL = [["g", "G"], ["G", "J"], ["J", "E"], ["E", "h"]], PAINT = "llLL", POST = "kKjh"
 const HAZE = [null, null, "I", "i"]                                // what props turn into, far off
 const ROAD_HALF = 3.6, PAINT_W = 0.12, FENCE_X = -6, POLE_X = 6.6
-// the sun, low ahead: 7 degrees up, so a thing's shadow is 8 times its height, and 6 degrees left of the road
-const SR = 9, SUN_AZ = -6, SUNX = Math.round(P.vp + P.focal * Math.tan((SUN_AZ * Math.PI) / 180)), SUNY = P.horizon - 3, LONG = 1 / Math.tan((7 * Math.PI) / 180)
+// the sun, low ahead: 10 degrees up, so a thing's shadow is 5.7 times its height, and 6 degrees left of the road
+const SR = 9, SUN_AZ = -6, SUNX = Math.round(P.vp + P.focal * Math.tan((SUN_AZ * Math.PI) / 180)), SUNY = P.horizon - 3, LONG = 1 / Math.tan((10 * Math.PI) / 180)
 const B4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], bayer = (x, y) => (B4[(y & 3) * 4 + (x & 3)] + 0.5) / 16
 // smooth noise, for the serras' ridges and the sandy patches (in meters, so it recedes like the rest)
 const hash = (i, j) => { let k = Math.imul(i, 374761393) + Math.imul(j, 668265263); k = Math.imul(k ^ (k >>> 13), 1274126177); return ((k ^ (k >>> 16)) >>> 0) / 4294967296 }
@@ -131,7 +131,7 @@ function ground(x, z) {
     return dash || Math.abs(ax - ROAD_HALF + 0.3) < paint ? PAINT[b] : ROAD[b]
   }
   if (ax < ROAD_HALF + 1) return SOIL[b][1]                                        // the gravel shoulder
-  return SOIL[b][z < 45 && noise(x / 6, z / 8) > 0.64 ? 1 : 0]                     // sand patches; far, one tone
+  return SOIL[b][z < 30 && noise(x / 6, z / 8) > 0.72 ? 1 : 0]                     // sand patches; far, one tone
 }
 
 // ---------------------------------------------------------------- the old asphalt
@@ -244,7 +244,7 @@ function asphalt(c) {
 // up], rx, ry, key } (crowns, boulders). The same parts draw it and cast its shadow, so a mandacaru's
 // shadow has its arms, a shrub's has its twigs, the walker's has their legs.
 const stick = (x0, u0, x1, u1, half, key, z0 = 0, z1 = z0) => ({ a: [x0, z0, u0], b: [x1, z1, u1], half, key })
-const blob = (x, u, rx, ry, key, z = 0) => ({ e: [x, z, u], rx, ry, key })
+const blob = (x, u, rx, ry, key, z = 0) => ({ e: [x, z, u], rx, ry, key })   // + ghost: casts only; dapple: the share of its shadow that is shade
 
 // Real sizes: mandacaru 3-6 m, xique-xique under 1.2 m, catingueira and jurema 1.4-3.2 m, juazeiro
 // 5-7 m, boulders up to 3 m, a fence post 1.2-1.5 m, a pole 9 m, the windmill 9.5 m, the house 3.4 m.
@@ -260,7 +260,7 @@ const BUILD = {
       for (const [x, u] of bend) { parts.push(stick(px, pu, x, u, 0.15, "C")); [px, pu] = [x, u] }
       parts.push(stick(px, pu, px, top, 0.15, "C"))
     }
-    return { parts, height: h, ramp: "cCrR", ribs: true, spines: "r", fruit: true }
+    return { parts, height: h, foot: [0.45, 0.35], ramp: "cCrR", ribs: true, spines: "r", fruit: true }
   },
   // xique-xique: a low cactus sprawling from one root, its stems turning up at the ends, golden spines
   xique(p, r) {
@@ -269,10 +269,10 @@ const BUILD = {
       const dx = (r() * 2 - 1) * spread, dz = (r() * 2 - 1) * spread * 0.5, hs = 0.35 + r() * 0.8
       parts.push(stick(dx * 0.12, 0.05, dx, 0.14, 0.065, "C", 0, dz), stick(dx, 0.14, dx * 1.08, hs, 0.065, "C", dz))
     }
-    return { parts, height: 1.2, ramp: "cCrR", spines: "F" }
+    return { parts, height: 1.2, foot: [spread * 0.9, spread * 0.6], ramp: "cCrR", spines: "F" }
   },
   // coroa-de-frade: a cactus the size of a fist, with a red cap
-  coroa: () => ({ parts: [blob(0, 0.1, 0.13, 0.1, "C"), blob(0, 0.22, 0.06, 0.035, "f")], height: 0.26, ramp: "cCrR" }),
+  coroa: () => ({ parts: [blob(0, 0.1, 0.13, 0.1, "C"), blob(0, 0.22, 0.06, 0.035, "f")], height: 0.26, foot: [0.18, 0.14], ramp: "cCrR" }),
   // catingueira, jurema: leafless in the dry season, all twigs, a few dry leaves still hanging on
   shrub(p, r) {
     const h = 1.4 + p.v * 1.8, parts = []
@@ -285,7 +285,9 @@ const BUILD = {
     }
     const stems = 2 + Math.floor(r() * 2)
     for (let i = 0; i < stems; i++) grow((r() - 0.5) * 0.3, 0, 0, (i - (stems - 1) / 2) * 0.35 + (r() - 0.5) * 0.2, h * 0.38, 4)
-    return { parts, height: h, tuft: [h * 0.55, h * 0.42, h * 0.3], twigs: true }
+    // the tangle as a whole: not drawn, but it casts a dappled shadow, light through the twigs
+    parts.push({ ...blob(0, h * 0.62, h * 0.38, h * 0.3, "t"), ghost: true, dapple: 0.55 })
+    return { parts, height: h, foot: [h * 0.34, h * 0.24], tuft: [h * 0.55, h * 0.42, h * 0.3], twigs: true }
   },
   // juazeiro: green through the drought, a short trunk forking under a heavy round crown
   jua(p, r) {
@@ -295,23 +297,23 @@ const BUILD = {
       const a = (i / 9) * Math.PI * 2, rx = 1 + r() * 0.8
       parts.push(blob(Math.cos(a) * 1.7 * (0.6 + r() * 0.4), h * 0.7 + Math.sin(a) * 0.75, rx, rx * 0.72, "Q", (r() - 0.5) * 1.5))
     }
-    return { parts, height: h, ramp: "qQrR", leaves: true }
+    return { parts, height: h, foot: [1.2, 0.9], ramp: "qQrR", leaves: true }
   },
   // granite boulders, one or two together; now and then a long low lajedo
   rock(p) {
     const slab = p.v > 0.92, wd = slab ? 4 + p.v * 3 : 0.4 + p.v * p.v * 2.6, ht = slab ? 0.5 : wd * 0.6
     const parts = [blob(0, ht * 0.45, wd / 2, ht / 2, "X")]
     if (!slab && p.v > 0.45) parts.push(blob(wd * 0.45, ht * 0.3, wd * 0.28, ht * 0.3, "X", -0.2))
-    return { parts, height: ht, ramp: "xXVR", crack: wd > 1.2 }
+    return { parts, height: ht, foot: [wd * 0.6, wd * 0.4], ramp: "xXVR", crack: wd > 1.2 }
   },
   // a tuft of dry grass: curved blades, darker at the foot, their tips catching the sun
   grass(p, r) {
     const parts = [], n = 4 + Math.floor(p.v * 6)
     for (let i = 0; i < n; i++) {
       const lean = (r() * 2 - 1) * 0.14, hh = 0.16 + r() * 0.32, x0 = (r() - 0.5) * 0.06, z0 = (r() - 0.5) * 0.06
-      parts.push(stick(x0, 0, x0 + lean * 0.3, hh * 0.5, 0.008, "u", z0), stick(x0 + lean * 0.3, hh * 0.5, x0 + lean, hh, 0.008, "F", z0))
+      parts.push(stick(x0, 0, x0 + lean * 0.3, hh * 0.45, 0.008, "X", z0), stick(x0 + lean * 0.3, hh * 0.45, x0 + lean, hh, 0.008, "F", z0))
     }
-    return { parts, height: 0.48, tips: true }
+    return { parts, height: 0.48, foot: [0.14, 0.1], tips: true }
   },
   // a crooked stake, three strands of barbed wire to the next one, sagging a little
   post(p) {
@@ -321,7 +323,7 @@ const BUILD = {
       const dx = n.x - p.x, dz = n.z - p.z, w = p.z < 30 ? "K" : "j"
       parts.push(stick(0, up, dx / 2, up - 0.04, 0.004, w, 0, dz / 2), stick(dx / 2, up - 0.04, dx, up, 0.004, w, dz / 2, dz))
     }
-    return { parts, height: tall }
+    return { parts, height: tall, foot: [0.1, 0.08] }
   },
   // a wooden power pole with its crossarm, two wires sagging to the next
   pole(p) {
@@ -330,7 +332,7 @@ const BUILD = {
       const sag = (s) => 8.4 - 1.6 * s * (1 - s), s0 = i / 12, s1 = (i + 1) / 12, dz = n.z - p.z
       parts.push(stick(dx, sag(s0), dx, sag(s1), 0.004, POST[band(p.z + dz * s0, FAR)], dz * s0, dz * s1))
     }
-    return { parts, height: 9 }
+    return { parts, height: 9, foot: [0.3, 0.25] }
   },
   // a windmill pumping water: a lattice tower, the wheel of vanes, the tail
   mill(p) {
@@ -343,10 +345,10 @@ const BUILD = {
       parts.push(stick(0, 8.6, Math.cos(a) * 1.4, 8.6 + Math.sin(a) * 1.4, 0.03, key), stick(Math.cos(a) * 1.4, 8.6 + Math.sin(a) * 1.4, Math.cos(b) * 1.4, 8.6 + Math.sin(b) * 1.4, 0.04, key))
     }
     parts.push(stick(0, 8.6, 2.2, 8.7, 0.04, key), stick(2, 8.6, 2, 9.4, 0.3, key))
-    return { parts, height: 10 }
+    return { parts, height: 10, foot: [1.1, 0.9] }
   },
   // a mud-walled house far off, its window already lit (its walls drawn by hand, its parts cast the shadow)
-  house: () => ({ parts: [stick(0, 0, 0, 3.4, 3, "p")], height: 3.4, house: true }),
+  house: () => ({ parts: [stick(0, 0, 0, 3.4, 3, "p")], height: 3.4, foot: [3.4, 0.8], house: true }),
 }
 
 // Scattered as many to the square meter far as near (the far ones crowd into a line of scrub along the
@@ -362,10 +364,11 @@ const PROPS = []
       if (clear(x) && !(tall && inSun)) add(type, x, z, r())
     }
   }
-  scatter("mandacaru", 70, 10, 320); scatter("xique", 120, 4, 260); scatter("shrub", 240, 4, 350)
+  scatter("mandacaru", 70, 10, 320); scatter("xique", 110, 9, 260); scatter("shrub", 220, 12, 350)
   scatter("jua", 12, 24, 300); scatter("rock", 80, 3, 250)
-  // dry grass along the shoulders, near only: farther it would be under a pixel
-  for (let i = 0; i < 110; i++) add("grass", (r() < 0.5 ? -1 : 1) * (ROAD_HALF + 0.15 + r() * r() * 9), 3 + r() * 24, r())
+  // dry grass along the shoulders, near only (farther it would be under a pixel); between the plants the
+  // dry-season ground is bare, which is where the long shadows lie
+  for (let i = 0; i < 46; i++) add("grass", (r() < 0.5 ? -1 : 1) * (ROAD_HALF + 0.15 + r() * r() * 4), 3 + r() * 24, r())
   // the fence on the left: crooked stakes every ~3 m; the power line on the right
   const line = (type, x, z0, z1, step, jitter) => {
     const all = []
@@ -387,10 +390,12 @@ const PROPS = []
 }
 
 // ---------------------------------------------------------------- shadows
-// The sun is 7 degrees up and 6 to the left of the road: a point `up` m high falls up x LONG m back
+// The sun is 10 degrees up and 6 to the left of the road: a point `up` m high falls up x LONG m back
 // toward us and a little to the right. Each part is swept onto the ground in steps under a pixel;
-// the pixels go into one set, so where shadows cross the ground is no darker than in one; what is high
-// up goes soft (dithered), the way a long shadow's far end blurs. Wires and blades cast too little.
+// the pixels go into one set, so where shadows cross the ground is no darker than in one. The root of a
+// shadow, from the low parts, is solid; what the high parts cast thins out (dithered) toward the tip,
+// the way a long shadow's far end blurs, so each one reads as coming from its thing instead of the
+// field going dark. Wires and blades cast too little.
 const SHADE = { g: "Z", G: "z", J: "G", E: "J", h: "E", Z: "k", z: "Z", a: "k", A: "a", b: "A", B: "b", l: "L", L: "A" }
 const SX = Math.sin((-SUN_AZ * Math.PI) / 180) * LONG, SZ = Math.cos((SUN_AZ * Math.PI) / 180) * LONG
 function cast(out, ox, oz, parts, height) {
@@ -403,16 +408,35 @@ function cast(out, ox, oz, parts, height) {
     for (let i = 0; i <= n; i++) {
       const [gx, gz, u] = onGround(i / n)
       if (gz < 0.3) continue
-      const [sx, sy] = P.ground(gx, gz), rx = Math.max(0.71, half * P.scale(gz)), ry = Math.max(0.71, (half * P.focal * P.eye) / (gz * gz))
+      // the sun is half a degree wide: past 216 times its half-thickness from what casts it, a shadow
+      // has no dark core left, only penumbra. A twig's shadow ends a few meters out, a trunk's goes on.
+      if (u * LONG > 216 * half) continue
+      const soft = Math.max(0, (u / height - 0.45) / 0.4)
+      if (soft >= 1) continue
+      const [sx, sy] = P.ground(gx, gz), rx = half * P.scale(gz), ry = (half * P.focal * P.eye) / (gz * gz)
+      if (rx < 0.71 && ry < 0.71) {                                     // thinner than a pixel: one pixel
+        const x = Math.floor(sx), y = Math.floor(sy)
+        if (x >= 0 && x < W && y > P.horizon && y < H && !(soft && bayer(x, y) < soft)) out.add(y * W + x)
+        continue
+      }
       if (sy - ry > H || sx + rx < 0 || sx - rx > W) continue
-      const soft = u / height > 0.6 ? ((u / height - 0.6) / 0.4) * 0.6 : 0
       for (let y = Math.floor(sy - ry); y <= Math.ceil(sy + ry); y++) {
         if (y <= P.horizon || y >= H) continue
         for (let x = Math.max(0, Math.floor(sx - rx)); x <= Math.min(W - 1, Math.ceil(sx + rx)); x++)
-          if (((x + 0.5 - sx) / rx) ** 2 + ((y + 0.5 - sy) / ry) ** 2 <= 1 && !(soft && bayer(x, y) < soft)) out.add(y * W + x)
+          if (((x + 0.5 - sx) / rx) ** 2 + ((y + 0.5 - sy) / ry) ** 2 <= 1 && !(soft && bayer(x, y) < soft) && !(q.dapple && hash(x * 7 + y, y * 13 - x) > q.dapple)) out.add(y * W + x)
       }
     }
   }
+}
+// right under a thing, where the sky can't reach either: a pool of deeper shade around its foot,
+// leaning a little the way its shadow falls. It's what sets a thing on the ground.
+function pool(out, x, z, rx, rz) {
+  const cx = x + (rz * 0.4 * SX) / LONG, cz = z - rz * 0.4, [l] = at(cx - rx, cz), [r] = at(cx + rx, cz), top = at(cx, cz + rz)[1], bot = at(cx, cz - rz)[1]
+  for (let y = Math.max(top - 1, Math.ceil(P.horizon)); y <= Math.min(bot + 1, H - 1); y++)
+    for (let xx = Math.max(0, l - 1); xx <= Math.min(W - 1, r + 1); xx++) {
+      const [gx, gz] = P.at(xx, y)
+      if (((gx - cx) / rx) ** 2 + ((gz - cz) / rz) ** 2 <= 1) out.add(y * W + xx)
+    }
 }
 const darken = (c, out) => { for (const i of out) { const x = i % W, y = (i - x) / W, d = SHADE[c.key(x, y)]; if (d) c.px(x, y, d) } }
 
@@ -433,10 +457,11 @@ function paint(c, p) {
   if (t.tuft && s * t.height < 7) { const [u, rx, ry] = t.tuft; return c.ellipse(...at(p.x, p.z, u), Math.max(1, Math.round(rx * s)), Math.max(0, Math.round(ry * s)), key("t")) }
   const draw = () => {
     for (const q of t.parts)
-      if (q.e) c.ellipse(...end(q.e), Math.max(0, Math.round(q.rx * s)), Math.max(0, Math.round(q.ry * s)), key(q.key))
+      if (q.ghost) continue
+      else if (q.e) c.ellipse(...end(q.e), Math.max(0, Math.round(q.rx * s)), Math.max(0, Math.round(q.ry * s)), key(q.key))
       else c.line(...end(q.a), ...end(q.b), key(q.key), wide(q))
   }
-  const thick = Math.max(...t.parts.map((q) => (q.e ? 2 * q.rx : 2 * q.half))) * s
+  const thick = Math.max(...t.parts.filter((q) => !q.ghost).map((q) => (q.e ? 2 * q.rx : 2 * q.half))) * s
   if (t.ramp && b === 0 && thick >= 3) c.plate(draw, { light: [Math.max(-1, Math.min(1, (SUNX - bx) / 40)), -0.7], ramps: [t.ramp], strength: t.crack !== undefined ? 0.75 : 1 })
   else draw()
   if (b > 0) return
@@ -480,9 +505,13 @@ sprite("_land", { w: W, h: H },
   plane(P, ground),
   (c) => asphalt(c),
   (c) => {
-    const out = new Set()
-    for (const p of PROPS) if (p.z < 160 && P.scale(p.z) * p.thing.height >= 2) cast(out, p.x, p.z, p.thing.parts, p.thing.height)
-    darken(c, out)
+    const out = new Set(), deep = new Set()
+    for (const p of PROPS) {
+      if (p.z > 160 || P.scale(p.z) * p.thing.height < 1.5) continue
+      if (p.z < 70 && p.thing.height >= 0.8) cast(out, p.x, p.z, p.thing.parts, p.thing.height)
+      if (p.thing.foot) pool(deep, p.x, p.z, ...p.thing.foot)
+    }
+    darken(c, out); darken(c, deep)
   },
   (c) => { for (const p of PROPS) paint(c, p) })
 
