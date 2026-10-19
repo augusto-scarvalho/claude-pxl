@@ -335,6 +335,21 @@ one), and the art code itself (4% of the cost).
   agents checking at once ran the machine out of memory and their runs were stopped. Builds at
   time 0 stay cached; the timed ones keep only the latest 64. Same check: 309 MB, as fast.
 
+## From the pipeline experiments (proposals)
+
+- [ ] **`pxl check` of a long loop on all cores**: a 320x180 street with a 240- or 360-frame loop
+  takes ~24 s to check, each frame built in turn; the examples test went from ~35 s to ~91 s with
+  the two cyberpunk streets. Frames are independent: split them over worker threads.
+- [ ] **Preview GIFs of long loops**: `pxl build` writes a 6 MB GIF for each of those streets; the
+  README's needed every third frame (the gallery script's `every`). `build --every n`, or a note
+  when a preview GIF passes a few MB.
+- [ ] **Small lettering that misreads**: a pipeline's composer reported its 3x5 "PARK" reading as
+  "FASK". When `text()` uses a tiny font at scale 1 for a word, describe could say which letters
+  are ambiguous at that size (P/F, R/K, B/8) and point to the 5x7 font.
+- [ ] **Run the pipeline headless as a script** (dogfood tools): planner, forks in batches by free
+  memory, a run cut by the usage limit resumed, a JSON per run and `runcost.py` at the end. What
+  this round did by hand, for the next A/B.
+
 ## Later / niche
 
 - [x] Layer blend modes and opacity (`blend`, `opacity`, `palettize`), with the palette caveats in
