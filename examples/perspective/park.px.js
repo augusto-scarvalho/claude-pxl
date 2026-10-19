@@ -244,16 +244,15 @@ function paving(c) {
 // limbs, poles, bars), blobs { e: [x, z, u], rx, ry, key } (crowns, heads, wheels) and boxes
 // { box: [x0, z0, x1, z1, u0, u1], keys: { top, lit, shade } }. The same shapes draw a thing and cast
 // its shadow.
-const stick = (a, b, half, key) => ({ a, b, half, key })
+const stick = (a, b, half, key, extra) => ({ a, b, half, key, ...extra })
 const blob = (e, rx, ry, key, extra) => ({ e, rx, ry, key, ...extra })
 const box = (b, keys, extra) => ({ box: b, keys, ...extra })
 // and cones { cone: [a, ra, b, rb], key }: a round shape tapering from a to b (a torso, a skirt, a bin),
-// drawn as the hull of its two end rings, so it has the right outline from any side
+// drawn as the hull of its two end rings, so it has the right outline from any side; `wrap` adds rings
+// [[x, z, u], r] it has to go round (a skirt round the knees)
 const cone = (a, ra, b, rb, key, extra) => ({ cone: [a, ra, b, rb], key, ...extra })
-const rings = ([a, ra, b, rb], f) => [a, b].flatMap(([x, z, u], k) => Array.from({ length: 10 }, (_, i) => {
-  const t = (i / 10) * Math.PI * 2, r = k ? rb : ra
-  return f(x + Math.cos(t) * r, z + Math.sin(t) * r, u)
-}))
+const ring = ([x, z, u], r, f) => Array.from({ length: 10 }, (_, i) => f(x + Math.cos((i / 10) * Math.PI * 2) * r, z + Math.sin((i / 10) * Math.PI * 2) * r, u))
+const rings = ({ cone: [a, ra, b, rb], wrap = [] }, f) => [[a, ra], [b, rb], ...wrap].flatMap(([p, r]) => ring(p, r, f))
 
 // a box's faces the eye can see; a face turned to the sun is lit
 function faces(b) {
@@ -276,7 +275,7 @@ function drawShapes(c, shapes, ramps) {
     for (const q of [...shapes].sort((m, n) => depthOf(n) - depthOf(m))) {
       if (q.ghost) continue
       if (q.box) { for (const [kind, pts] of faces(q.box)) c.poly(pts, q.keys[kind] ?? q.keys.shade); continue }
-      if (q.cone) { c.poly(hull(rings(q.cone, (x, z, u) => P.ground(x - CX, z - CZ, u))).flat().map(Math.round), q.key); continue }
+      if (q.cone) { c.poly(hull(rings(q, (x, z, u) => P.ground(x - CX, z - CZ, u))).flat().map(Math.round), q.key); continue }
       if (q.poly) { c.poly(q.poly.flatMap((p) => at(...p)), q.key); continue }
       const s = P.scale(q.e ? ahead(q.e[0], q.e[1]) : ahead((q.a[0] + q.b[0]) / 2, (q.a[1] + q.b[1]) / 2))
       if (q.e) c.ellipse(...at(...q.e), Math.max(0, Math.round(q.rx * s)), Math.max(0, Math.round(q.ry * s)), q.key)
@@ -315,7 +314,7 @@ function cast(out, shapes) {
   for (const q of shapes) {
     if (q.noShadow) continue
     if (q.poly) { fillGround(out, hull(q.poly.map(([x, z, u]) => [x + u * SOX, z + u * SOZ]))); continue }
-    if (q.cone) { fillGround(out, hull(rings(q.cone, (x, z, u) => [x + u * SOX, z + u * SOZ]))); continue }
+    if (q.cone) { fillGround(out, hull(rings(q, (x, z, u) => [x + u * SOX, z + u * SOZ]))); continue }
     if (q.umbrella) {
       const [x, z, u, rad] = q.umbrella, ring = []
       for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; ring.push([x + Math.cos(a) * rad + u * SOX, z + Math.sin(a) * rad + u * SOZ]) }
@@ -694,8 +693,11 @@ function umbrella(c, [x, z, u, rad, apex]) {
 // ================================================================ people and the dog
 // A body in meters, posed by a gait computed in 3D (feet, knees by two-bone IK, arms against the
 // legs, bob and lean), placed at (x, z) facing `heading` and turned into shapes, so it looks right
-// from any angle the paths give it, at any distance, and casts its own shadow.
-const KID = { hip: 0.62, thigh: 0.3, shin: 0.3, torso: 0.36, shoulder: 0.13, hipw: 0.075, arm: 0.2, fore: 0.18, head: 0.115, neck: 0.13, limb: 0.045, body: 0.1 }
+// from any angle the paths give it, at any distance, and casts its own shadow. Its details are
+// shapes too, on the body where they belong: hands, socks, a shirt's stripes or collar, a dress's belt
+// and the folds falling from it, a hat's band, a bag; eyes on whichever side of the head is toward us,
+// once the head is big enough to hold them.
+const KID = { hip: 0.62, thigh: 0.3, shin: 0.3, torso: 0.36, shoulder: 0.13, hipw: 0.075, arm: 0.2, fore: 0.18, head: 0.12, neck: 0.13, limb: 0.045, body: 0.1 }
 const WOMAN = { hip: 0.86, thigh: 0.42, shin: 0.42, torso: 0.5, shoulder: 0.17, hipw: 0.09, arm: 0.28, fore: 0.25, head: 0.105, neck: 0.15, limb: 0.038, body: 0.115 }
 const MAN = { ...WOMAN, hip: 0.9, thigh: 0.44, shin: 0.44, torso: 0.54, shoulder: 0.2, body: 0.14, head: 0.11 }
 const GAITS = {
@@ -703,58 +705,103 @@ const GAITS = {
   walk: { reach: 0.3, lift: 0.12, bob: 0.018, lean: 0.02, swing: 0.4, elbow: 0.35 },
   stand: { reach: 0, lift: 0, bob: 0, lean: 0, swing: 0, elbow: 0.25 },
 }
-function person(b, { x, z, heading: [hx, hz], phase, gait, look, hat, tail, wave = 0 }) {
-  const g = GAITS[gait], th = phase * Math.PI * 2, L = b.thigh + b.shin, sh = []
-  const w3 = (f, r, u) => [x + f * hx + r * hz, z + f * hz - r * hx, u]
+const lerp3 = (a, b, t) => a.map((v, k) => v + (b[k] - v) * t)
+// does a point's outward direction (dx, dz) at (x, z) face the eye?
+const facing = (x, z, dx, dz) => (dx * (CX - x) + dz * (CZ - z)) / (Math.hypot(dx, dz) * Math.hypot(CX - x, CZ - z) || 1) > 0.2
+function person(b, { x, z, heading: [hx, hz], phase, gait, look, hat, tail, wave = 0, bag = null }) {
+  const g = GAITS[gait], th = phase * Math.PI * 2, L = b.thigh + b.shin, sh = [], wrap = [], px = P.scale(ahead(x, z))
+  const w3 = (f, r, u) => [x + f * hx + r * hz, z + f * hz - r * hx, u], fine = { noShadow: true }
   const hipU = b.hip + g.bob * Math.cos(2 * th) - (gait === "run" ? 0.04 : 0)
   for (const sd of [-1, 1]) {
     const t = th + (sd > 0 ? Math.PI : 0), ff = g.reach * L * Math.cos(t), lift = g.lift * L * Math.max(0, -Math.sin(t))
     const du = lift - hipU, d = Math.min(Math.hypot(ff, du), L - 0.002), ka = Math.atan2(du, ff) + Math.acos((b.thigh ** 2 + d * d - b.shin ** 2) / (2 * b.thigh * d))
     const hip = w3(0, sd * b.hipw, hipU), knee = w3(Math.cos(ka) * b.thigh, sd * b.hipw, hipU + Math.sin(ka) * b.thigh), ankle = w3(ff, sd * b.hipw, lift + 0.05)
-    sh.push(stick(hip, knee, b.limb * 1.25, look.thigh), stick(knee, ankle, b.limb, look.shin), stick(ankle, w3(ff + 0.12, sd * b.hipw, lift + 0.03), b.limb * 0.9, look.shoe))
-    // the arm on this side swings with the other leg
-    const top = hipU + b.torso, swing = g.swing * Math.cos(t + Math.PI) + (sd > 0 ? wave : 0), bend = g.elbow + (sd > 0 ? wave * 0.6 : 0)
+    // under a skirt the thigh never shows: the skirt goes round it instead, so its hem follows the stride
+    if (look.skirt) wrap.push([lerp3(hip, knee, 0.85), b.limb * 1.9])
+    else sh.push(stick(hip, knee, b.limb * 1.25, look.thigh))
+    sh.push(stick(knee, ankle, b.limb, look.shin), stick(ankle, w3(ff + 0.12, sd * b.hipw, lift + 0.03), b.limb * 0.9, look.shoe))
+    if (look.socks) sh.push(stick(ankle, lerp3(ankle, knee, 0.22), b.limb * 1.1, look.socks, { top: 1, ...fine }))
+    // the arm on this side swings with the other leg; with a bag, the hand on its strap
+    const top = hipU + b.torso, holds = bag && sd < 0
+    const swing = holds ? 0.15 : g.swing * Math.cos(t + Math.PI) + (sd > 0 ? wave : 0), bend = holds ? 1.4 : g.elbow + (sd > 0 ? wave * 0.6 : 0)
     const shoulder = w3(g.lean, sd * b.shoulder, top), elbow = w3(g.lean + Math.sin(swing) * b.arm, sd * (b.shoulder + 0.02), top - Math.cos(swing) * b.arm)
     const hand = w3(g.lean + Math.sin(swing) * b.arm + Math.sin(swing + bend) * b.fore, sd * (b.shoulder + 0.03), top - Math.cos(swing) * b.arm - Math.cos(swing + bend) * b.fore)
-    const cuff = [shoulder[0] + (elbow[0] - shoulder[0]) * 0.55, shoulder[1] + (elbow[1] - shoulder[1]) * 0.55, shoulder[2] + (elbow[2] - shoulder[2]) * 0.55]
-    sh.push(stick(shoulder, cuff, b.limb * 1.2, look.shirt), stick(cuff, elbow, b.limb, look.skin), stick(elbow, hand, b.limb * 0.9, look.skin))
+    const cuff = lerp3(shoulder, elbow, 0.55)
+    sh.push(stick(shoulder, cuff, b.limb * 1.2, look.shirt), stick(cuff, elbow, b.limb, look.skin), stick(elbow, hand, b.limb * 0.9, look.skin), blob(hand, b.limb * 1.15, b.limb * 1.15, look.skin))
+    if (look.cuffs) sh.push(stick(lerp3(shoulder, elbow, 0.45), cuff, b.limb * 1.25, look.cuffs, { top: 1, ...fine }))
     if (sd > 0) sh.hand = hand
   }
-  const top = hipU + b.torso
-  sh.push(cone(w3(0, 0, hipU + 0.04), b.body * 0.8, w3(g.lean * 0.9, 0, top - 0.07), b.body * 1.15, look.shirt),
-    stick(w3(g.lean, -b.shoulder, top - 0.03), w3(g.lean, b.shoulder, top - 0.03), b.limb * 1.3, look.shirt))
-  if (look.skirt) sh.push(cone(w3(0, 0, hipU + 0.07), b.body * 0.85, w3(0.04 * Math.cos(2 * th), 0, hipU - 0.36), b.body * 2.1, look.skirt, { top: 1 }))
-  else sh.push(cone(w3(0, 0, hipU - 0.1), b.hipw + b.limb * 1.1, w3(0, 0, hipU + 0.06), b.body * 0.85, look.waist ?? look.shirt))
+  const top = hipU + b.torso, waist = w3(0, 0, hipU + 0.04), chest = w3(g.lean * 0.9, 0, top - 0.07)
+  sh.push(cone(waist, b.body * 0.8, chest, b.body * 1.15, look.shirt), stick(w3(g.lean, -b.shoulder, top - 0.03), w3(g.lean, b.shoulder, top - 0.03), b.limb * 1.3, look.shirt))
+  // a band round the torso from f0 to f1 of the way up it (a stripe, a collar), just outside it
+  const band = (f0, f1, key) => sh.push(cone(lerp3(waist, chest, f0), b.body * (0.8 + 0.35 * f0) + 0.008, lerp3(waist, chest, f1), b.body * (0.8 + 0.35 * f1) + 0.008, key, { top: 1, ...fine }))
+  for (const f of look.stripes ? [0.18, 0.6] : []) band(f, f + 0.2, look.stripes)
+  if (look.collar) band(0.88, 1.05, look.collar)
+  if (look.skirt) {
+    const wst = w3(0, 0, hipU + 0.07), hem = w3(0.04 * Math.cos(2 * th), 0, hipU - 0.36)
+    sh.push(cone(wst, b.body * 0.85, hem, b.body * 2.1, look.skirt, { top: 1, wrap }))
+    // the folds falling from the waist on the side toward us, and the belt
+    if (px > 20) for (const a of [-1.15, -0.45, 0.3, 1.0]) {
+      const ang = Math.atan2(CZ - z, CX - x) + a, c = Math.cos(ang), s = Math.sin(ang)
+      sh.push(stick([wst[0] + c * b.body * 0.8, wst[1] + s * b.body * 0.8, wst[2] - 0.06], [hem[0] + c * b.body * 2.05, hem[1] + s * b.body * 2.05, hem[2] + 0.03], 0.005, look.fold, { top: 2, ...fine }))
+    }
+    if (look.belt) sh.push(cone(w3(0, 0, hipU + 0.05), b.body * 0.92, w3(0, 0, hipU + 0.1), b.body * 0.9, look.belt, { top: 2, ...fine }))
+  } else sh.push(cone(w3(0, 0, hipU - 0.1), b.hipw + b.limb * 1.1, w3(0, 0, hipU + 0.06), b.body * 0.85, look.waist ?? look.shirt))
+  // a bag on the left shoulder, hanging at the hip by its strap
+  if (bag) {
+    const [p, q] = [w3(-0.1, -(b.hipw + 0.17), 0), w3(0.12, -(b.hipw + 0.1), 0)]
+    sh.push(box([Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[0], q[0]), Math.max(p[1], q[1]), hipU - 0.14, hipU + 0.08], bag),
+      stick(w3(g.lean - 0.02, -b.shoulder * 0.8, top - 0.01), w3(0.01, -(b.hipw + 0.13), hipU + 0.08), 0.012, bag.shade, { top: 2 }))
+  }
   const head = w3(g.lean * 1.2, 0, top + b.neck), back = (k) => w3(g.lean * 1.2 - k * b.head, 0, top + b.neck + 0.35 * b.head)
-  sh.push(stick(w3(g.lean, 0, top - 0.02), head, b.limb * 0.9, look.skin), blob(head, b.head, b.head * 1.08, look.skin, { top: 2 }), blob(back(0.35), b.head * 0.95, b.head * 0.8, look.hair, { top: 3 }))
+  sh.push(stick(w3(g.lean, 0, top - 0.02), head, b.limb * 0.9, look.skin), blob(head, b.head, b.head * 1.08, look.skin, { top: 2 }),
+    blob(back(0.35), b.head * (look.curls ? 1.12 : 0.95), b.head * (look.curls ? 0.95 : 0.8), look.hair, { top: 3 }))
+  if (look.fringe) sh.push(blob(w3(g.lean * 1.2 + b.head * 0.55, 0, top + b.neck + b.head * 0.6), b.head * 0.7, b.head * 0.3, look.hair, { top: 4, ...fine }))
+  // the face, if it's toward us and big enough: eyes, a mouth open laughing; a moustache
+  if (b.head * px >= 2.4) for (const sd of [-1, 1]) {
+    const e = w3(g.lean * 1.2 + b.head * 0.88, sd * b.head * 0.42, top + b.neck - b.head * 0.05)
+    if (facing(e[0], e[1], e[0] - head[0], e[1] - head[1])) sh.push(blob(e, 0.003, 0.003, look.eyes ?? "0", { top: 5, ...fine }))
+  }
+  if (look.mouth && b.head * px >= 2.4 && facing(head[0], head[1], hx, hz)) sh.push(blob(w3(g.lean * 1.2 + b.head * 0.9, 0, top + b.neck - b.head * 0.5), 0.003, 0.003, look.mouth, { top: 5, ...fine }))
+  if (look.moustache && facing(head[0], head[1], hx, hz)) sh.push(blob(w3(g.lean * 1.2 + b.head * 0.95, 0, top + b.neck - b.head * 0.42), b.head * 0.4, b.head * 0.13, look.moustache, { top: 5, ...fine }))
   if (tail) sh.push(stick(back(0.8), w3(g.lean * 1.2 - b.head * 1.6, Math.sin(th * 2) * 0.04, top + b.neck - 0.12), 0.035, look.hair))
   if (hat) sh.push(blob(w3(g.lean * 1.2, 0, top + b.neck + b.head * 0.7), b.head * 2.1, b.head * 0.35, look.hat, { top: 4 }), blob(w3(g.lean * 1.2, 0, top + b.neck + b.head * 1.1), b.head * 1.05, b.head * 0.55, look.hat, { top: 5 }))
+  if (hat && look.band) sh.push(blob(w3(g.lean * 1.2, 0, top + b.neck + b.head * 0.88), b.head * 1.1, b.head * 0.17, look.band, { top: 6, ...fine }))
+  if (look.bell && wave) sh.push(blob(sh.hand, 0.035, 0.045, look.bell, { top: 6, ...fine }))
   return sh
 }
-// the dog, trotting: diagonal legs together, the tail up and wagging
+// the dog, trotting: diagonal legs together, the tail up and wagging; white paws, a collar, an eye
 function dog({ x, z, heading: [hx, hz], phase }) {
-  const th = phase * Math.PI * 2, w3 = (f, r, u) => [x + f * hx + r * hz, z + f * hz - r * hx, u], sh = []
+  const th = phase * Math.PI * 2, w3 = (f, r, u) => [x + f * hx + r * hz, z + f * hz - r * hx, u], sh = [], fine = { noShadow: true }
   for (const [f, sd, off] of [[0.22, -1, 0], [0.22, 1, 0.5], [-0.27, -1, 0.5], [-0.27, 1, 0]]) {
-    const t = th + off * Math.PI * 2, ff = 0.13 * Math.cos(t), lift = 0.08 * Math.max(0, -Math.sin(t))
-    sh.push(stick(w3(f, sd * 0.08, 0.4), w3(f + ff * 0.5 - (f < 0 ? 0.04 : 0), sd * 0.08, 0.2 + lift * 0.5), 0.045, f < 0 ? "$" : "%"), stick(w3(f + ff * 0.5 - (f < 0 ? 0.04 : 0), sd * 0.08, 0.2 + lift * 0.5), w3(f + ff, sd * 0.08, lift + 0.02), 0.035, "%"))
+    const t = th + off * Math.PI * 2, ff = 0.13 * Math.cos(t), lift = 0.08 * Math.max(0, -Math.sin(t)), knee = w3(f + ff * 0.5 - (f < 0 ? 0.04 : 0), sd * 0.08, 0.2 + lift * 0.5), paw = w3(f + ff, sd * 0.08, lift + 0.02)
+    sh.push(stick(w3(f, sd * 0.08, 0.4), knee, 0.045, f < 0 ? "$" : "%"), stick(knee, paw, 0.035, "%"), stick(lerp3(knee, paw, 0.7), paw, 0.036, "+", { top: 1, ...fine }))
   }
-  const bob = 0.015 * Math.cos(th * 2)
+  const bob = 0.015 * Math.cos(th * 2), muzzle = w3(0.62, 0, 0.6 + bob)
   sh.push(stick(w3(-0.3, 0, 0.44 + bob), w3(0.24, 0, 0.47 + bob), 0.11, "%"), blob(w3(0.24, 0, 0.42 + bob), 0.12, 0.13, "+"),
     stick(w3(0.26, 0, 0.5 + bob), w3(0.42, 0, 0.64 + bob), 0.06, "%"), blob(w3(0.45, 0, 0.66 + bob), 0.1, 0.09, "%", { top: 2 }),
-    stick(w3(0.5, 0, 0.64 + bob), w3(0.62, 0, 0.6 + bob), 0.045, "+", { top: 3 }))
-  for (const sd of [-1, 1]) sh.push(stick(w3(0.42, sd * 0.06, 0.72 + bob), w3(0.4, sd * 0.08, 0.82 + bob), 0.025, "$", { top: 3 }))
+    stick(w3(0.5, 0, 0.64 + bob), muzzle, 0.045, "+", { top: 3 }), blob(muzzle, 0.025, 0.022, "0", { top: 4, ...fine }),
+    stick(w3(0.3, 0, 0.53 + bob), w3(0.34, 0, 0.58 + bob), 0.068, "!", { top: 1, ...fine }))
+  for (const sd of [-1, 1]) {
+    sh.push(stick(w3(0.42, sd * 0.06, 0.72 + bob), w3(0.4, sd * 0.08, 0.82 + bob), 0.025, "$", { top: 3 }))
+    const e = w3(0.51, sd * 0.06, 0.69 + bob)
+    if (facing(e[0], e[1], sd * hz + hx * 0.5, -sd * hx + hz * 0.5)) sh.push(blob(e, 0.003, 0.003, "0", { top: 5, ...fine }))
+  }
   sh.push(stick(w3(-0.3, 0, 0.5 + bob), w3(-0.42, 0.06 * Math.sin(th * 4), 0.74 + bob), 0.03, "%"))
   sh.collar = w3(0.36, 0, 0.6 + bob)
   return sh
 }
 const LOOKS = {
-  runner: { skin: "7", shirt: "y", thigh: "U", waist: "U", shin: "7", shoe: "1", hair: "9" },
-  chaser: { skin: "6", shirt: "Z", thigh: "V", waist: "V", shin: "6", shoe: "1", hair: "8" },
+  // a Flamengo shirt, red and black, and navy shorts; the other a Brazil one: yellow, green collar and
+  // cuffs, blue shorts; white socks
+  runner: { skin: "7", shirt: "y", stripes: "0", thigh: "U", waist: "U", shin: "7", socks: "1", shoe: "1", hair: "9", curls: true, mouth: "x" },
+  chaser: { skin: "6", shirt: "Z", collar: "V", cuffs: "V", thigh: "v", waist: "v", shin: "6", socks: "1", shoe: "1", hair: "8", fringe: true, mouth: "x" },
   swinger: { skin: "5", shirt: "!", thigh: "!", waist: "!", shin: "5", shoe: "U", hair: "8" },
-  woman: { skin: "6", shirt: "X", skirt: "X", thigh: "6", shin: "6", shoe: "Y", hair: "9", hat: "@", sleeve: "6" },
-  vendor: { skin: "8", shirt: "1", waist: "1", thigh: "1", shin: "1", shoe: "0", hair: "9", hat: "y", sleeve: "1" },
+  // a coral sundress, its folds and a straw belt; a straw hat with a coral band
+  woman: { skin: "6", shirt: "X", skirt: "X", fold: "Y", belt: "&", thigh: "6", shin: "6", shoe: "Y", hair: "9", hat: "@", band: "Y" },
+  vendor: { skin: "8", shirt: "1", waist: "1", thigh: "1", shin: "1", shoe: "0", hair: "9", hat: "y", collar: "y", moustache: "9", bell: "z" },
 }
-const BODY_RAMPS = ["xy", "zZ", "0U", "WV", "YX", "&@", "876", "765", "65", "21", "$%+"]
+const BODY_RAMPS = ["xy", "zZ", "0U", "WV", "YX", "&@", "876", "765", "65", "21", "$%+", "98", "vw"]
 
 // ---------------------------------------------------------------- where they go
 // Tag: the runner comes down path B from behind the far hedge, turns at the crossing and runs off up
@@ -788,7 +835,7 @@ function figures(frame) {
   }
   // the woman, 1.46 m/s up path B, a stride a second; the dog trotting ahead on its leash
   const zw = 0.2 + 1.46 * t, wp = { x: 5.75, z: zw, heading: [0, 1] }
-  const woman = person(WOMAN, { ...wp, phase: (frame % 10) / 10, gait: "walk", look: LOOKS.woman, hat: true, tail: true })
+  const woman = person(WOMAN, { ...wp, phase: (frame % 10) / 10, gait: "walk", look: LOOKS.woman, hat: true, tail: true, bag: { top: "@", lit: "@", shade: "&" } })
   const pup = dog({ x: 6.45, z: zw + 1.5, heading: [0, 1], phase: (frame % 5) / 5 })
   const [hx, hy] = at(...woman.hand), [cx, cy] = at(...pup.collar)
   out.push({ d: ahead(5.75, zw), shapes: woman, leash: [hx, hy, cx, cy] }, { d: ahead(6.45, zw + 1.5), shapes: pup })
