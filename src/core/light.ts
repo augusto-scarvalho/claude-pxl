@@ -93,7 +93,8 @@ export function applyLighting(img: Img, masks: LightMasks, lamps: Lamp[], o: Lig
       }
     if (open.length) {
       const field = spread(gw, gh, solidCell, open, sky, cell / (o.skyReach ?? 24), keep, diag);
-      const [sx, sy] = o.skyDir ?? [0, -1], sd = unit(-sx, -sy, 1);
+      // where the sky light comes from, on screen (y down), as `light` is everywhere else
+      const [sx, sy] = o.skyDir ?? [0, -1], sd = unit(sx, sy, 1);
       mix(field, rgbOf(color(o.skyColor, "skyColor")), () => sd);
     }
   }

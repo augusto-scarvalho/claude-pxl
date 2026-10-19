@@ -2,7 +2,7 @@
 
 Read this before drawing a person. At these sizes, most failures come from proportion and
 construction, not from where single pixels go: a head that's the wrong size, a body that's too wide
-for it, a neck under the chin, arms like columns.
+for it, a neck under the chin, arms like columns. (`PXL` below is `node <pxl dir>/bin/pxl.js`.)
 
 Contents: 1 Pick a style · 2 Measure a reference · 3 Start from existing art · 4 Build order ·
 5 Faces · 6 3/4 and profile views · 7 Placing the pixels · 8 The same character, someone else ·
@@ -46,8 +46,9 @@ the top of the head to the soles.
   on the image upscaled 8× gives eyes, ears, shoulders, elbows, wrists, hips, knees, ankles, toes
   and heels. Save them as `{ name: [x, y, score] }` JSON and show them with
   `layer("pose", { ref: true }, pose("pose.json", { scale, x, y }))`.
-- **Read off the landmarks.** Import the reference with `sprite("ref", { png: "ref.png" })` and run
-  `PXL ascii` on it. Note the rows of the chin, shoulders, waist, hands, knees and soles, and the
+- **Read off the landmarks.** Import the reference with `sprite("ref", { png: "ref.png", palettize: true })`
+  and run `PXL ascii` on it (without `palettize`, colors off the palette print as `?`), or read the
+  image itself with `PXL describe ref.png`, which keys its own colors. Note the rows of the chin, shoulders, waist, hands, knees and soles, and the
   widths of the head and shoulders. Draw your silhouette on those rows.
 - **Take proportions, not costume.** Hair and clothes come from the character, not the reference.
   Hair tied in a bun hugs the skull, whatever volume the reference has.
@@ -67,7 +68,7 @@ the curves of the clothes exactly.
      looked flat. Count the keys with `PXL ascii`. If tones merged, drop `palettize` and map the
      colours onto ramps by brightness: `rampmap("Ggl", { hue: [70, 170] })` gives the greens the
      keys of "Ggl" dark to light (the hue range keeps the browns out for their own ramp), so no two
-     tones share a key. `recolor({ "#2c963c": "g" })` maps one colour by hand.
+     tones share a key (as long as there are no more tones than keys). `recolor({ "#2c963c": "g" })` maps one colour by hand.
    - **Restore volume with a light pass** if it is still flat. Step each pixel along its ramp by
      its place in the shape: up if it borders empty space above or to the left (lit edges), down if
      below or to the right (undersides), down where parts crowd together (the heart of a crown).
@@ -253,7 +254,7 @@ In pxl:
 ```js
 sprite("body", { pivot: [15, 26], sockets: { shoulder: [12, 14] } }, BODY)
 for (let i = 0; i < 8; i++) sprite(`arm_${i}`, { pivot: [1, 1] }, ARM[i])     // one drawing per pose
-anim("walk", { frames: 8, fps: 8, outline: "k" },
+anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   layer("parts", { sort: "z" }, (c) => {
     c.stamp("body", 16, 30 + BOB[c.frame])
     c.stamp(`arm_${c.frame}`, 0, 0, { at: "body.shoulder", z: ARM_Z[c.frame] })   // in front or behind
@@ -308,7 +309,8 @@ hand (`PXL describe` says "mirrored"). Give the rig `turn: "<name>_l"`: the same
 other way, the joints mirrored, each slot's part flipped unless you draw `<name>_l_<slot>` (a near
 limb seen from its own side), the retouch mirrored, and both side by side in `<name>_turnaround`.
 A flipped part carries its light to the other side, so draw each part as a flat shape and light it
-with `relight({ light, reach, glint })` after the flip (`part()` in the example does both versions);
+after it is turned: `plate({ light, reach, glint }, ...)` or `relight(null, { light, reach, glint })`.
+A `twin` does it for you (`part()` in the example makes each part and its twin);
 thin parts (a 2 px blade) want `reach: 1`, or each pixel sees open space on both sides. `far: 1`
 darkens the far side by depth, not by side: turned, the other leg darkens. In a side view a limb's
 drawing belongs to its depth more than to its side (the near arm drawn whole, the far one mostly
@@ -354,7 +356,7 @@ the arm and the blade in one line reads as a thrust: a slash lands with the wris
 still up and forward and the blade gone past it, down. On the frame it lands, a smear (the crescent
 the blade's outer part swept, thin at its tail, its last 100 degrees at most, the way round it went)
 says where it came from. `examples/rig/knight.px.js`
-(stages 4 and 5): twenty moves; two exchanges blade to blade, a cut from above taken on the shield
+(stages 4 and 5): twenty-two moves; two exchanges blade to blade, a cut from above taken on the shield
 each way, a clash that throws both back, a salute and the walk back to the marks.
 
 For the labels themselves, `PXL blind <file> <rig>` writes the parts unnamed and shuffled for a
@@ -383,6 +385,6 @@ hand (`on: "arm_l.hand"`), sits outside the arm (`out`: over the arm near, under
 straps run along the forearm (`parallel`): forearm level (on guard), the shield stands up; forearm
 hanging, it lies down; in between, it leans with it.
 
-`examples/rig/knight.px.js`: a 72 px knight in three stages (`knight_blocking`, `knight_parts`,
-`knight`), the same knight turned left, and both next to a flipped copy in a scene with a world
+`examples/rig/knight.px.js`: a 72 px knight in five stages (`knight_blocking`, `knight_parts`,
+`knight`, the poses, a bout), the same knight turned left, and both next to a flipped copy in a scene with a world
 scale, which `PXL describe` reads out.

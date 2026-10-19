@@ -602,7 +602,7 @@ test("pxl help: an index of the reference, or what it says about one name and wh
     assert.equal(await main(["help", "scater"]), 0);
   } finally { console.log = log; }
   const [index, wrap, typo] = lines;
-  assert.match(index, /Ops > Shapes: px rect box line curve/);
+  assert.match(index, /Ops > Shapes: px grid rect box line curve/);
   assert.match(index, /scenes\.md: Layout and scale \(\d\.\d\);/);
   assert.match(wrap, /\[reference\.md: Assets > Sprite \/ scene options\]\n\| `wrap: true/);
   assert.match(wrap, /\[examples: \d+ uses[^\]]*\]\n {2}examples\/[\w/]+\.px\.js:\d+:/);
@@ -618,7 +618,7 @@ test("pxl help is short: other mentions a line each, a guide section by its head
   };
   const stamp = await said("help", "stamp"), full = await said("help", "stamp", "--all");
   // the row that defines it whole; every other place one line, a few of them; three example uses
-  assert.match(stamp, /^\| `stamp\(name, x, y, opts\?\)` \|/m);
+  assert.match(stamp, /^\| `stamp\(name, x = 0, y = 0, opts\?\)` \|/m);
   assert.match(stamp, /^ {2}\(…\d+ more: pxl help stamp --all\)$/m);
   assert.match(stamp, /\[examples: \d+ uses, 3 shown\]/);
   assert.ok(stamp.length < 2500 && full.length > 2 * stamp.length, `${stamp.length} vs ${full.length}`);
@@ -632,5 +632,5 @@ test("pxl help is short: other mentions a line each, a guide section by its head
   assert.match(anim, /^\[reference\.md: Animation\]/m);
   assert.doesNotMatch(anim, /Small animals/);
   assert.match(await said("help", "glow"), /^\[reference\.md: Glow\][^]*`keep`/m);
-  assert.match(await said("help", "castBase"), /^\| `castBase: "column"` \|/m);
+  assert.match(await said("help", "castBase"), /^\| `castBase: "pivot" \\| "column"` \|/m);
 });

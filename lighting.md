@@ -21,7 +21,7 @@ sprite("torch", `
 scene("cabin", { w: 200, h: 130, bg: "n" },
   layer("sky", { unlit: true }, grad(0, 0, 200, 100, "nN")),  // backdrop: never lit
   layer("ground", { solid: true }, ...),                       // blocks light
-  layer("backwall", { wall: true }, ...),                      // light passes, sky light can't enter
+  layer("backwall", { wall: true }, ...),                      // light passes; sky light doesn't start here (it can spread in)
   layer("frame", { solid: true }, ...),                        // floors, roof, outer walls
   layer("props", stamp("torch", 70, 82), ...),
   lighting({ cell: 4, sky: 0.9, skyColor: "#d8ccf0", ambient: 0.03, emit: "yY" }),
@@ -34,13 +34,13 @@ Full demo: `examples/lighting.px.js`.
 
 A light source. It's an op, so it goes anywhere: in a sprite body (torches, chandeliers, lanterns,
 lava), in a layer, or in a function as `c.lamp(...)`. Lamps travel with their image through
-`stamp`, `tile`, `pattern`, `tilemap`, `scatter`, wire `hang`, `base`, flips and rotations. `mx`/`my`
+`stamp`, `tile`, `pattern`, `tilemap`, `scatter`, wire `hang`, `base`, flips and quarter turns (`rot`; any other `angle` drops them, see rotation.md). `mx`/`my`
 mirroring copies them too, so a symmetric chandelier needs one lamp. `r` is the reach in pixels
-through open space. `power` is the starting intensity: above 1 it overexposes near the source and
+through open space at power 1 (it scales with `power`). `power` is the starting intensity: above 1 it overexposes near the source and
 pushes further into blocks. `z` is the lamp's height above the picture, used only by normal maps:
 low (2–6) rakes across the relief, high (20+) lights it head-on.
 
-## lighting({ ... })
+## lighting({ ... }) options
 
 Goes directly in a sprite or scene body (not inside a layer) and lights everything drawn before it.
 It uses every lamp placed so far and consumes them, so a lit asset stamped elsewhere isn't lit
@@ -59,7 +59,7 @@ twice.
 | `emit` | — | Keys that ignore lighting: flames, glowing windows, lava (`"yYG"`). |
 | `shape` | `"round"` | `"diamond"` spreads to 4 neighbours only (diamond-shaped pools). |
 | `relief` | 1 | How strongly normal maps shape the light; 0 ignores them. |
-| `skyDir` | `[0, -1]` | Direction sky light travels from, for normal maps (`[1, -1]` = from the upper left). |
+| `skyDir` | `[0, -1]` | Where the sky light comes from, for normal maps, on screen like `light` elsewhere (`[0, -1]` above, `[-1, -1]` the upper left). |
 
 Overlapping lights combine by max per channel, so they don't blow out.
 
@@ -67,7 +67,7 @@ Overlapping lights combine by max per channel, so they don't blow out.
 
 | Flag | Effect |
 |---|---|
-| `solid: true` | Opaque pixels block light (a cell is solid when most of its pixels are). |
+| `solid: true` | Opaque pixels block light (a cell is solid when half or more of its pixels are). |
 | `wall: true` | Back walls: light passes through, but sky light doesn't start there. Without one, rooms open at the sides fill with sky light. |
 | `unlit: true` | Pixels this layer leaves visible are drawn as-is (sky, distant backdrop). Layers drawn on top of it are still lit. |
 
@@ -76,7 +76,7 @@ Overlapping lights combine by max per channel, so they don't blow out.
 Pixels can carry a surface direction. `lighting()` then brightens the sides that face each light
 and darkens the sides that face away, so bricks, domes and bevels catch the light as it moves.
 Flat or unmapped pixels light exactly as before. Normals travel with the pixels through stamps,
-flips, rotations and mirroring. A layer drawn on top without normals clears them where it covers.
+flips, quarter turns and mirroring (any other `angle` drops them). A layer drawn on top without normals clears them where it covers.
 
 ```js
 sprite("bricks", { w: 32, h: 24 }, pattern("_brick", 0, 0, 32, 24),

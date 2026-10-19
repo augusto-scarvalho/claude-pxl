@@ -84,6 +84,12 @@ export const OP_OPTS: Record<string, string[]> = {
   bump: ["w", "depth", "on", "where"],
   lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "shape", "relief", "skyDir"],
   glow: ["where", "r", "strength", "color", "bands", "ramp", "keep"],
+  terrain: ["far", "top", "bound", "margin", "sky"],
+  // one options object serves both: solids ignores shade, shadows ramps and light
+  solids: ["at", "sun", "scale", "ramps", "light", "shade"],
+  shadows: ["at", "sun", "scale", "shade", "ramps", "light"],
+  capsule: ["light", "rim"],
+  flame: ["wind", "period", "seed", "frame"],
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {

@@ -12,7 +12,7 @@ const body = (name: string): string => {
   let i = dts.indexOf("{", at), depth = 0;
   const start = i;
   do depth += dts[i] === "{" ? 1 : dts[i] === "}" ? -1 : 0; while (depth && ++i < dts.length);
-  const base = /extends (\w+)/.exec(dts.slice(at, start))?.[1];
+  const base = /extends (?:Omit<)?(\w+)/.exec(dts.slice(at, start))?.[1];
   return dts.slice(start, i) + (base ? body(base) : "");
 };
 const missing = (keys: string[], text: string, as: (k: string) => RegExp) => keys.filter((k) => !as(k).test(text));

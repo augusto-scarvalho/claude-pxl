@@ -71,6 +71,16 @@ scene("ref", { w: 20, h: 1, bg: "w" }, lamp(0, 0, { r: 40, z: 4 }), lighting({ c
   for (const x of [8, 9, 10]) assert.equal(red(off, "s", x), red(off, "ref", x));
 });
 
+test("lighting: sky light comes from above by default, from where skyDir says otherwise", () => {
+  // three pixels stacked: facing up, flat, facing down
+  const src = (dir: string) => `scene("s", { w: 1, h: 3, bg: "w" }, normals(0, 0, "8\\n5\\n2"), lighting({ cell: 1, sky: 1, ambient: 0${dir} }))`;
+  const red = (dir: string) => [0, 1, 2].map((y) => load(src(dir)).image("s").get(0, y) >>> 24);
+  const [up, , down] = red("");
+  assert.ok(up > down, `facing up ${up} > facing down ${down}`);
+  const [up2, , down2] = red(", skyDir: [0, 1]");
+  assert.ok(up2 < down2, "from below: the other way round");
+});
+
 test("normal map image: engine encoding with green up, flat where unset", () => {
   const p = load(`sprite("a", "rrr", normals(0, 0, "8.."))`);
   const img = normalImage(p.image("a"));

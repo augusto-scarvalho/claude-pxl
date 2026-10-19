@@ -140,16 +140,19 @@ its long shadow, so a mandacaru's shadow has its arms and the walker's walks wit
 holds their size for a whole step and shrinks only when the next foot lands; under 15 px they switch
 to sprites drawn by hand for each size (14, 12, 10 ... 5 px), picked by `stamp`'s `fit`.
 Below, [`park.px.js`](examples/perspective/park.px.js): the camera turned 40° (`yaw`), two vanishing points,
-at two in the afternoon. People and the dog are bodies in meters posed by a gait computed in 3D, so
+at two in the afternoon. Benches, hedges, trees and lamp posts are shapes in meters (`solid.box`,
+`stick`, `blob`, `cone`): `solids()` draws them far to near and `shadows()` sweeps the same shapes
+onto the ground from the one sun. People and the dog are bodies in meters posed by a gait computed in 3D, so
 they're right from any angle the paths give them and cast their own short shadows; the children run
 behind the ice-cream cart because everything is drawn far to near, and the loop closes because both
 paths end behind a hedge.
 Then [`extinction.px.js`](examples/perspective/extinction.px.js): the camera tilted up 18° (`pitch`), three
 vanishing points: the horizon drops to the bottom and the burning araucarias lean in toward a third
-point high above the picture (`vertical()`). The volcano is a heightfield ray-marched through the same
-camera; its lava rivers run down the steepest way; the dinosaurs are bodies in meters on a run
-worked out in 3D, shaded round, each covering more than the picture's width in the loop so their
-coming back is never seen.
+point high above the picture (`vertical()`). The volcano is `terrain()`, a heightfield ray-marched
+through the same camera; its lava rivers run down the steepest way; the dinosaurs are profiles in
+meters on a run worked out in 3D, their legs painted round by `capsule()`, each covering more than
+the picture's width in the loop so their coming back is never seen. Trees, logs and scrub burn with
+`flame()`, every fire leaning with the one wind.
 
 ## Quick start
 
@@ -194,22 +197,24 @@ out/_preview/*.png                                    upscaled previews with a p
 
 ## The live viewer
 
-`pxl serve art.px.js` opens a viewer that rebuilds on every save and replays the asset you edited
+`pxl serve art.px.js` starts a viewer at http://127.0.0.1:4321/ (open it in a browser) that rebuilds on every save and replays the asset you edited
 op by op, so you (or whoever is watching an agent work) can see the art being painted. It also
 writes the same `out/` files as `build`.
 
 ## Commands
 
 ```
-pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N]
+pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
 pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
-pxl ascii <art.px.js> <name>     print an asset as palette keys with x/y rulers
+pxl ascii <art.px.js> <name>     print an asset as palette keys with x/y rulers (--frame N: one frame)
 pxl list  <art.px.js>            a map of the file: each definition's lines, its comment, what it makes
 pxl describe <art.px.js> <name>  a whole scene as text: what is where, what covers it, how it moves
-pxl check <art.px.js>            every check describe makes, on every frame: warnings only (--readings: all)
+pxl check <art.px.js> [name...]  every check describe makes, on every frame: warnings only (--frame N, --readings)
 pxl shot <art.px.js> <name>      frames side by side, a region enlarged, --vs HEAD --diff; with several
                                  names, other files' or PNGs, a row each (--at again: a column each)
 pxl steps <art.px.js> <name>     how it was painted, step by step; --at x,y: what painted that pixel
+pxl compare <art.px.js> <name> <ref.png>  silhouette rows against a reference (--shrink N, --offset x,y)
+pxl blind <art.px.js> <name...>  facing labels checked by a reader who doesn't know them (--check answers.json)
 pxl help [name]                  what the reference says about an op or option, or a guide's section
 ```
 

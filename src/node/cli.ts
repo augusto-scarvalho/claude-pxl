@@ -48,7 +48,7 @@ const USAGE = `pxl — pixel-art DSL
       A map of the file (and what it includes): each top-level statement that defines assets, its
       line range, the comment above it and what it defines (a loop's many assets on one line); then
       groups and sheets. Read those lines instead of the whole file.
-  pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief]   (or: pxl describe <image.png> [...])
+  pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief] [--out DIR | --no-out]   (or: pxl describe <image.png> [...])
       A whole scene as text to read at once: what was painted (steps grouped by source line), what
       was placed where, cell maps (object on top, color before lighting, brightness after it), how
       each placement stands out from its surroundings; --at adds that region's exact pixels; --frame
@@ -63,16 +63,16 @@ const USAGE = `pxl — pixel-art DSL
       when there is any. --readings also lists what the lit-side rule read on every placement,
       warning or not, with a tally: to see where it agrees and where it can't tell.
   pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image.png> ...] [--frames a,b,c] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
-  pxl shot <image.png> [<image.png> ...] [--at x,y,w,h ...]
+  pxl shot <image.png> [<image.png> ...] [--at x,y,w,h ...] [--scale N] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
       to the region, side by side, enlarged, written to <out>/_shot/<name>.png. --vs puts the same
       shot of another version above it (a git revision takes the file itself from there; what it
       includes is read as it is now); --diff adds a row with the pixels that changed in red. It
       also prints what changed since the last shot of the same frames and region (one asset, one
       region: pixels, where) and the warnings pxl check finds on the asset at those frames: one call
-      per look. Several
-      names (another file's as other.px.js:name, or any PNG) make a row each, one under the other,
-      and several --at a column each: two versions, two agents' scenes, details of a big one.
+      per look. Several names (another file's as other.px.js:name, or any PNG) make a row each, one
+      under the other, and several --at a column each: two versions, two agents' scenes, details of
+      a big one.
       Give PNGs at 1x (out/scenes/x.png): rows are enlarged together.
   pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.

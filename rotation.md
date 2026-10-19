@@ -59,7 +59,7 @@ None of them invents colors: the palette stays the palette.
 | 26.57° / 63.43° (2:1), 18.43° / 71.57° (3:1) | good for straight edges | edges become the regular 2:1 / 3:1 stairs pixel artists draw by hand |
 | 22.5° / 67.5° | fine from ~12px up | irregular 2-3 pixel steps; the usual 16-direction set |
 | 30° / 60° | fine from ~12px up | irregular steps |
-| under ~12° | worst to resample | each edge gets one lone step that reads as crooked, not turned (a 5px line turned 15° shifts by a single pixel); `auto` shears instead |
+| under ~12° | worst to resample | each edge gets one lone step that reads as crooked, not turned (a 5px line turned 10° shifts by a single pixel); `auto` shears instead |
 
 Rules of thumb: 4 directions are free (quarter turns), 8 cost one rotation (45°, or none with a
 hand-drawn diagonal), 16 cost two for a symmetric sprite (22.5° and 45°). Rotate dithered or

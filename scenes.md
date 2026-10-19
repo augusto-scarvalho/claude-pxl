@@ -3,8 +3,8 @@
 Read this before building a scene, a level, a building or any environment.
 
 Contents: Layout and scale · Ground, paths and tiles · Texture without filler · Trees and big organic
-shapes · Water and things that land · Distance (aerial perspective) · Slow motion in a short loop ·
-Shadows and light · Blend modes · Checking a scene
+shapes · Water and things that land · Distance (aerial perspective) · True perspective · Slow motion
+in a short loop · Closing a loop · Shadows and light · Blend modes · Checking a scene
 
 ## Layout and scale
 
@@ -164,6 +164,8 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   from their base, `silhouette: "k"`): a pixel h px up lands h × (kx, ky) away. One sun, one
   `cast` for everything. `ky` says where the sun is in depth: negative, the shadows fall back (the
   sun in front of us: the fronts we see are lit), positive, toward us (backlit).
+  In true perspective, things built of `solid` shapes cast with `shadows()` instead: each shape
+  swept away from the sun in meters, so the shadow foreshortens with the ground.
 - Effects that give light or take none (sparks, smears, glows, flames drawn as shapes) go on a layer
   with `unlit: true`: describe doesn't read a lit side off them (a white smear with a gray rim
   reads as a thing lit from that side).

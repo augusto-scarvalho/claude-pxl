@@ -90,7 +90,7 @@ task needs before starting:
 | a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a scene, level, building or environment | [scenes.md](scenes.md), whole (~3k tokens) |
+| a scene, level, building or environment | [scenes.md](scenes.md), whole (~4.5k tokens) |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
 
@@ -163,8 +163,8 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `topdown.px.js` | overhead RPG island: corner-tile shore generated in code, `scatter`, cast shadows |
 | `isometric.px.js` | 2:1 blocks, back-to-front order, iso helpers |
 | `perspective/road.px.js` | true perspective: `perspective()` and `plane()`, props in meters whose parts also cast their shadows, a walker shrinking step by step with hand-drawn small sizes picked by `fit` |
-| `perspective/park.px.js` | two-point perspective (`yaw`) at 2 pm: boxes lit by the side they face, people and a dog posed in 3D by a gait (any heading, own shadows), moving things interleaved far to near with still ones, a loop closed by hiding behind hedges |
-| `perspective/extinction.px.js` | three-point perspective (`pitch`, `vertical()`), a worm's-eye view: a volcano on a massif by `terrain()`, lava down the steepest way, the sun at `toward()`, a sky by `ray()`, uprights leaning to the third point, dinosaurs drawn from their profile on a 3D run, pterosaurs by hand placed by the camera |
+| `perspective/park.px.js` | two-point perspective (`yaw`) at 2 pm: benches, trees and people as `solid` shapes drawn by `solids()` and cast by `shadows()`, boxes lit by the side they face, people and a dog posed in 3D by a gait (any heading, own shadows), moving things interleaved far to near with still ones, a loop closed by hiding behind hedges |
+| `perspective/extinction.px.js` | three-point perspective (`pitch`, `vertical()`), a worm's-eye view: a volcano on a massif by `terrain()`, lava down the steepest way, the sun at `toward()`, a sky by `ray()`, uprights leaning to the third point, dinosaurs drawn from their profile on a 3D run (legs by `capsule`), pterosaurs by hand placed by the camera, everything burning by `flame` |
 | `sidescroller/` | a game's art over several files: shared `palette.hex`, `wrap` tiles, `png` import, hit flash |
 | `shop.px.js`, `moon_bakery.px.js` | flat building facades from parts: tiles, signs, `wire` lights |
 | `moon_bakery_3d.px.js`, `tackle.px.js` | 3/4 buildings; weathering with a cause |

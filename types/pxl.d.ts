@@ -87,7 +87,8 @@ declare global {
     /** Flat side view: the ground's row; what has a height is checked for floating or sinking. */
     ground?: number;
   }
-  interface PxSceneOpts extends PxAssetOpts { w: number; h: number; bg?: PxColor; world?: PxWorld }
+  /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
+  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld }
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong" }
   interface PxFrame { ms?: number; hold?: number }
   interface PxLayerOpts {

@@ -22,7 +22,7 @@ Coordinates are 0-based from the top-left. Sizes are `w, h`. Colors are a single
 | `use("colors.hex")` | Palette file, path relative to the art file: `.hex` (Lospec), `.gpl` (GIMP, Aseprite), `.pal` (JASC), `.txt` (Paint.NET). A one-character word right after a color is its key, the rest of the line a comment (`1a1626 k ink`; in a `.gpl`, the color name): only named colors get keys then. A file without keys gets `0-9a-zA-Z` by index. Any color is reachable by index in `pal()`. The live viewer rebuilds when the file changes. |
 | `pal({ k: "#1b1630", g: 11, h: "k" })` | Add/override single-char keys: hex, palette index, or copy of another key. `. _ # space` are reserved. |
 | `ramps("kDdu", "kTtq")` | Light ramps, dark → light. `shade` steps a color left, `light` steps right. When a key is in several ramps, the first ramp that goes on from it wins: where two branch from it, `pxl check` warns when a step goes through it; `pxl steps --at x,y` names the ramps a step went along. |
-| `shades("HGgl", "#5aa040", { hue = 20, at })` | Define the keys (dark → light) as shades of one base color and add them as a ramp. The base sits exactly at key `at` (default the middle); darker shades turn toward blue-violet and lighter ones toward yellow, up to `hue` degrees at the ends (hue shifting; `hue: 0` for lightness only). One call per material. |
+| `shades("HGgl", "#5aa040", { hue = 20, at })` | Define the keys (dark → light) as shades of one base color and add them as a ramp. The base sits exactly at index `at` of the keys (0 the darkest; default the middle, floor(n / 2)); darker shades turn toward blue-violet and lighter ones toward yellow, up to `hue` degrees at the ends (hue shifting; `hue: 0` for lightness only). One call per material. |
 
 Every asset keeps the palette that was active where it was defined, so files with different
 palettes can be included and stamped together.
@@ -37,11 +37,12 @@ plate(relightOpts?, ...items)          // the items drawn and lit on their own, 
 group(name, ["a", "b", "rock_*", ...])  // random pick per placement; repeat a name to weight it
 sheet(name, ["slime*", "heart", groupName], { cols?, pad?, extrude? })  // extrude: repeat edge pixels n px out
 include("other.px.js")                  // path relative to the current file; included files share one scope: a const of one is seen by the other (name what they share, like a cue frame; each name declared once)
-directions("ship", 16, { from, outline?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
+directions("ship", 16, { from, outline?, outline8?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
 font(name, "glyph_sprite", { chars: "ABC...", w, h, cols? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional)
 include("palette.px.js", { palette: true })  // also take its use()/pal()/ramps() from here on
 rig(name, { w, h, facing, slots: { torso: { at, size }, arm: { at, size, side: "r" } }, parts?, guide? }, ...retouch)  // skeleton first: characters.md §11
-figure(h, heads?)                       // a standing figure's landmark rows: chin, shoulders, chest, waist, crotch, knees, ankles, sole; shoulderW
+figure(h, heads = 7.5)                  // a standing figure's landmark rows: head, eyes, chin, shoulders, chest, elbows, waist, crotch, wrists, knees, ankles, sole; widths headW, shoulderW, hipW
+rng(seed?)                              // a seeded random() for code at the top of a file: the same numbers every build
 ik(a, b, [x, y], bend?)                 // two bones from (0, 0) reaching for the point: [joint, end]; bend 1 (default) bends toward increasing angle (y down: an arm's elbow below, a leg's knee behind), -1 the other way
 has(name)                               // is there an asset or a group of that name yet (a generated part made once)
 ```
@@ -79,12 +80,16 @@ sheet globs.
 
 - **Grid string**: one char per pixel, drawn at 0,0. Rows are trimmed, blank edge rows dropped,
   short rows padded. `.`/space keep, `_` erases. Use template literals for multi-line grids.
+  `grid(x, y, str)` draws one at x, y: a patch over what's there (a frame's changed pixels, a fix).
   For figures wider than ~20 px, `runs()` (below) avoids counting dots.
 - **Op**: `rect(...)`, `stamp(...)`, ... (below).
 - **Function**: `(c) => { ... }` gets the canvas; call ops as methods (`c.rect(...)`), plus
   `c.w`, `c.h`, `c.is(x, y, "ab")` (pixel is one of these keys; `"*"` opaque, `"."` transparent),
   `c.key(x, y)`, `c.get(x, y)` (packed color), `c.rng(seed)` (deterministic, follows reseed),
   `c.size(name)` (`{ w, h }` of an asset as it would be placed, for layouts).
+  Three differ from their globals: `c.clip(region, () => { ... })` and `c.plate(() => { ... }, opts)`
+  take a function instead of items, and `c.pose(joints, opts)` a joints map instead of a file;
+  `lighting`, `glow` and `frame` are items only, never methods.
 - **Procedural texture** (globals, plain functions, the same in every file): `hash(i, j)` a number in
   [0, 1) for a lattice point (integers: the same i, j always give the same); `vnoise(x, y)` smooth
   value noise in [0, 1], one unit a cell; `fbm(x, y, octaves = 4)` octaves of it, each finer and
@@ -95,6 +100,9 @@ sheet globs.
 
 ### Sprite / scene options
 
+Scenes take `w`, `h`, `bg`, `world`, the transforms, the outlines, `crop`, `layers`, `pivot` and `wrap`;
+the rest are for sprites and anims (a scene refuses them by name), and `bg`/`world` for scenes only.
+
 | Option | Meaning |
 |---|---|
 | `w, h` | Canvas size. Sprites infer it from grid strings (including grids inside layers) when omitted; scenes require it. |
@@ -103,13 +111,13 @@ sheet globs.
 | `mx: true` | Mirror the left half onto the right after all items. Inferred width doubles (write half a row). `mx: "c"`: odd width, shared center column. `my` likewise vertically. |
 | `swap: { g: "r" }` | Recolor after drawing. |
 | `flip: "x" \| "y" \| "xy"`, `rot: 90 \| 180 \| 270` | Transform. |
-| `angle: deg`, `rotate: "auto" \| "rotsprite" \| "shear" \| "nearest"` | Any angle, clockwise, after `flip`/`rot` and before `outline` (the outline is drawn around the turned shape). `auto`: quarter turns exact, under 12° a shear (a lean that keeps every pixel), else RotSprite. No new colors. See [rotation.md](rotation.md) for which angles hold up. |
+| `angle: deg`, `rotate: "auto" \| "rotsprite" \| "shear" \| "nearest"` | Any angle, clockwise, after `flip`/`rot` and before `outline` (the outline is drawn around the turned shape). `auto`: quarter turns exact, within 12° of one a shear (a lean that keeps every pixel), else RotSprite. No new colors. See [rotation.md](rotation.md) for which angles hold up. |
 | `outline: "k"` | 1px outline around opaque pixels; **grows the canvas 1px on every side**. `outline8` also fills diagonals. |
 | `inline: "k"` | 1px line over the sprite's own edge pixels (Aseprite's inside outline): the canvas keeps its size. |
 | `inline: { color: "k", keep: "Kk12" }` | The same, but edge pixels in the `keep` keys stay as they are: closes only the gaps of an outline that is already there, such as the one left after shrinking an image (`shrink`), selective colors included. |
 | `selout: true \| n` | With `outline`/`outline8`/`inline`: each line pixel takes the sprite color it touches, `n` steps darker along the ramps (`true` = 2), so the line softens next to light colors; colors without a ramp keep the line color. Needs `ramps`. |
 | `crop: true` | Trim to opaque bounds. |
-| `layers: true` | Also export each layer as `out/<sprites\|scenes>/<name>/<layer>.png`. |
+| `layers: true` | Also export each layer as `out/<sprites\|scenes\|anims>/<name>/<layer>.png` (anims: frame 0's). |
 | `png: "file.png"` | Start from a PNG (path relative to the art file), like `base` starts from another asset: every option and item then works on it. In an `anim` with `frames: n`, frame k is the k-th of n equal slices of the image (a strip). The live viewer rebuilds when the file changes. Any PNG except interlaced ones. |
 | `area: [x, y, w, h]` | With `png`: only this part of the image (one sprite out of a sheet). |
 | `palettize: true` | With `png`: snap every color to the nearest keyed palette color, so `ascii`, `swap` and `recolor` see keys. |
@@ -124,21 +132,22 @@ sheet globs.
 | `world: { horizon, eye }` or `{ scale }` | Scene: the world's scale. Ground in perspective: the horizon's row and the eye's height in meters (a thing standing on row y is (y − horizon) / eye px per meter, as in `perspective()`); flat side view: `scale` px per meter. Used by describe with `height`. `light: [x, y]` (where the light comes from): describe reads each object's lit side off its rim and warns when it disagrees (a flipped copy is lit from the other side). `light: { at: [x, y] }`: a point light in the scene (a fire, a lamp): each object is checked against the way from its middle to that point, and the one it sits in isn't checked. `ground: y` (flat views): what has a `height` is checked for floating or sinking; with or without it, a thing whose feet aren't where it was stamped (its pivot below its sole) is called out. |
 | `sockets: { name: [x, y], ... }` | Named points in drawing coordinates (pixel corners) that other stamps attach to: `stamp("arm_3", 0, 0, { at: "body.shoulder" })` puts the arm's pivot on the body's `shoulder` socket, wherever and however the body was placed. They move with flip, rot, angle, outline and crop, like the pivot. For characters built from parts (characters.md §10). |
 
-Post-processing order: mirror → swap → flip → rot → outline → crop.
+Post-processing order: register → mirror → swap → flip → rot → angle → inline → outline → outline8 →
+crop; a `pivot: "bottom"` or `"center"` and `slice` are measured on the result.
 
 ### Layer options
 
 | Option | Meaning |
 |---|---|
 | `x, y` | Offset of every op in the layer. |
-| `sort: "y" \| "z"` | Draw the layer's `stamp`s and `scatter` picks sorted instead of in call order: `"y"` by the point they stand on (top-down scenes: what stands lower, nearer the viewer, covers what stands higher), `"z"` by their `z` option (default 0). Ties keep call order. Other ops in the layer draw at once, before the sorted stamps. |
+| `sort: "y" \| "z"` | Draw the layer's `stamp`s and `scatter` picks sorted instead of in call order: `"y"` by the point they stand on (top-down scenes: what stands lower, nearer the viewer, covers what stands higher), `"z"` by each `stamp`'s `z` option (default 0; scatter picks are always 0). Ties keep call order. Other ops in the layer draw at once, before the sorted stamps. |
 | `hidden: true` | Skip when compositing (still exported with `layers: true`). |
 | `outline: false` | The asset's `outline` / `outline8` / `inline` isn't drawn around this layer's pixels (1 px ropes, pegs, smears stay 1 px), through mirror, flip, rot and angle. Its pixels stay where they are in the drawing order. |
-| `ref: true \| 0..1` | Reference / guide layer: previews and the live viewer show it over the art (`true`: full color, so small marks stay visible; a number: that strength over drawn pixels, to see the art through a mannequin or a shrunk original); the exported PNG, sheets, `layers: true` and stamps of the asset leave it out. For drawing over a pose skeleton (`pose`), a mannequin or a shrunk original. It stays in drawing coordinates: an `outline`'s growth is followed, but mirror, flip, rot, angle and crop are refused. |
+| `ref: true \| (0, 1]` | Reference / guide layer: previews and the live viewer show it over the art (`true`: full color, so small marks stay visible; a number: that strength over drawn pixels, to see the art through a mannequin or a shrunk original); the exported PNG, sheets, `layers: true` and stamps of the asset leave it out. For drawing over a pose skeleton (`pose`), a mannequin or a shrunk original. It stays in drawing coordinates: an `outline`'s growth is followed, but mirror, flip, rot, angle and crop are refused. |
 | `shade: true \| n \| { m: "M" }` | Blend layer: not drawn. Wherever it is opaque, what's below steps darker along the ramps (`n` steps, or the given map). |
 | `light: ...` | Same, lighter. Cast shadows, light spills, glows. |
 | `density: 0..1` | Ordered-dither the layer (soft edges). Stack a low-density big shape and a full small one for falloff. |
-| `blend: "multiply" \| "screen" \| "add" \| "overlay"` | Color math with the pixels below, like an image editor's layer modes: `multiply` darkens (night, a tinted shadow), `screen`/`add` lighten (light, fire), `overlay` tints with contrast (color grading). **The results are new colors, off the palette.** Only opaque pixels below are touched. |
+| `blend: "multiply" \| "screen" \| "add" \| "overlay" \| "normal"` | Color math with the pixels below, like an image editor's layer modes: `multiply` darkens (night, a tinted shadow), `screen`/`add` lighten (light, fire), `overlay` tints with contrast (color grading). **The results are new colors, off the palette.** Only opaque pixels below are touched. |
 | `opacity: 0..1` | Real translucency (glass, water, fog) instead of `density`'s dither; with `blend`, how much of the blend shows. New colors too; over empty pixels the layer keeps that alpha. |
 | `palettize: true` | With `blend`/`opacity`: snap each result to the nearest keyed palette color. Works only when the palette has those tones; otherwise distinct colors collapse into one and shading is lost. For darkening inside the palette, use `shade`. |
 
@@ -150,6 +159,7 @@ Post-processing order: mirror → swap → flip → rot → outline → crop.
 | Op | Notes |
 |---|---|
 | `px(x, y, c)` | |
+| `grid(x, y, "str")` | a grid string drawn at (x, y) instead of 0,0: `.`/space keep, `_` erases. Frame patches (`frame(grid(...))`) and small fixes over what's drawn |
 | `rect(x, y, w, h, c)` · `box(x, y, w, h, c)` | filled · 1px border |
 | `line(x0, y0, x1, y1, c, width?)` | width > 1 = round brush (tubes, poles, thick strokes) |
 | `curve([x0, y0, x1, y1, ...], c, { width?, closed? })` | smooth curve **through** the points (Catmull-Rom, no hidden control points): tails, vines, hair, cables, handles. 1px wide it is pixel-perfect (no doubled L-corners); `width` > 1 = round brush; `closed: true` loops back to the first point (then `fill` inside). For linework; a small closed shape such as a leaf reads better drawn pixel by pixel in a grid |
@@ -169,7 +179,7 @@ Post-processing order: mirror → swap → flip → rot → outline → crop.
 |---|---|
 | `dither(x, y, w, h, c1, c2, density = 0.5)` | Bayer 4×4; c2 covers `density` |
 | `grad(x, y, w, h, "abc", dir = "v", soft = 0.5)` | bands with dithered seams; `"h"` horizontal; `"r"` radial, from the center out to the ellipse that fits the box (end on `"."` to leave the corners alone: suns, halos, vignettes); soft 0 = hard bands (crisp rings) |
-| `noise(x, y, w, h, "ab", density = 0.1, seed = 1, on?)` | deterministic speckle; `on: "g"` only touches those keys (`"*"` any opaque) |
+| `noise(x, y, w, h, "ab", density = 0.1, seed = 1, on?)` | deterministic speckle; `on` (the 8th argument, a string: `noise(0, 0, 32, 32, "ab", 0.1, 1, "g")`) only touches those keys (`"*"` any opaque) |
 | `shade(where?, steps = 1, density = 1)` · `light(...)` | step colors along ramps inside a region |
 | `rampmap(ramp, { where?, hue? })` | gradient map onto a ramp, kept in the palette: the distinct colors in the region, sorted dark to light by brightness, take the ramp's keys in that order, spread from its darkest to its lightest. Tones never merge while there are no more colors than keys (`palettize` snaps each color to its nearest key, and two can land on one). `hue: [from, to]` (degrees, wrapping past 360) takes only colors of that hue: the greens and the browns of an import go to their own ramps, `rampmap("Ggl", { hue: [70, 170] }), rampmap("bco", { hue: [10, 50] })` |
 | `relight(where?, { light?, reach?, strength?, ramps?, glint? })` | volume for flat art (a reduced import whose tones merged, a shape filled in one color): each pixel steps along its ramp by where it sits in the shape. An edge facing the light (empty space on that side, up to `reach` px away, default 1) gets lighter, one facing away darker. `glint: 1.5`: pixels at least that exposed (open above and toward the light) take their ramp's lightest key, so glints follow the light instead of being placed by hand. `light` is the direction it comes from, default `[-0.5, -1]` (top-left, mostly from above): a top edge +1, left +0.5, bottom -1, right -0.5, rounded, times `strength`. `ramps` defaults to the palette's. Then `shade` the occluded core (the heart of a crown) and low hanging parts by region |
@@ -181,37 +191,37 @@ rect, `[x0, y0, x1, y1, x2, y2, ...]` polygon, or `(x, y) => boolean`.
 ### Placing assets
 | Op | Notes |
 |---|---|
-| `stamp(name, x, y, opts?)` | puts the asset's `pivot` on (x, y); without one, its top-left corner |
-| `tile(name, x, y, cols, rows, opts?)` | grid of copies (each cell picks separately for groups) |
+| `stamp(name, x = 0, y = 0, opts?)` | puts the asset's `pivot` on (x, y); without one, its top-left corner |
+| `tile(name, x, y, cols = 1, rows = 1, opts?)` | grid of copies (each cell picks separately for groups) |
 | `pattern(name, x, y, w, h, opts?)` | fill an area with copies; edges cut to fit |
 | `panel(name, x, y, w, h, opts?)` | 9-slice: an asset with `slice` margins drawn at w×h. Corners stay as drawn; edges and center **repeat** (never stretch), so keep the center a flat fill or a seamless pattern. UI frames, buttons, dialog boxes |
-| `tilemap("gg\nd.", { map: { g: "grass", d: "dirt" }, size?, w?, h?, x?, y?, ...placement })` | character map; `.` empty. `corners: "#"` (or `true`: any char but `.`): the map marks tile **corners** instead, one more row and column than tiles, and each tile is picked by its corner mask, 1 top-left + 2 top-right + 4 bottom-left + 8 bottom-right: `map: { 15: "dirt_full", ... }`, or a name prefix, `map: "dirt_"` for `dirt_1` … `dirt_15` (mask 0 stays empty unless `dirt_0` exists); the way to lay paths, shores and patches with a terrain tileset (see Terrain tilesets below). `iso: true` with the floor diamond's `w`, `h` (e.g. 32×16): cells on an isometric grid, columns down-right and rows down-left, drawn back to front; a tile's top-left sits on its diamond's top-left, and a tile with a `pivot` stands on the diamond's center (props). One level; stacked heights take a loop (`examples/isometric.px.js`) |
+| `tilemap("gg\nd.", { map: { g: "grass", d: "dirt" }, size?, w?, h?, x?, y?, ...placement })` | character map; `.` empty. `corners: "#"` (or `true`: any char but `.` and space): the map marks tile **corners** instead, one more row and column than tiles, and each tile is picked by its corner mask, 1 top-left + 2 top-right + 4 bottom-left + 8 bottom-right: `map: { 15: "dirt_full", ... }`, or a name prefix, `map: "dirt_"` for `dirt_1` … `dirt_15` (mask 0 stays empty unless `dirt_0` exists); the way to lay paths, shores and patches with a terrain tileset (see Terrain tilesets below). `iso: true` with the floor diamond's `w`, `h` (e.g. 32×16): cells on an isometric grid, columns down-right and rows down-left, drawn back to front; a tile's top-left sits on its diamond's top-left, and a tile with a `pivot` stands on the diamond's center (props). One level; stacked heights take a loop (`examples/isometric.px.js`) |
 | `scatter(name, x, y, w, h, count, { on?, near?, within?, clip?, below?, even?, ...placement })` | brush: `count` picks centered (or pivoted) at random points; `near: "aAo", within: 3` = the center must also be within that many px (default 2) of those keys: grass along a path's edges, moss at the foot of rocks, foam along a shore; `on` = center must land on these keys (`.` = an empty pixel: around a shape, not on it); `clip` = paint only onto them; `below` = masks read the composite under this layer (a layer starts empty, so an `on` that places nothing is an error); `even` = one pick per cell of a grid sized to `count`, at a random spot in the cell: stones, pebbles and flowers spread evenly over the whole area, without the clumps and holes of pure random |
 | `warp((x, y) => [dx, dy], where?)` | move pixels by whole-pixel offsets without redrawing them: breathing, hair and tails swaying, a body sheared onto a slope. The function gives the offset at a pixel's **new** place (or nothing: it stays) and the pixel takes the color found that far behind it, so no hole opens and no color is made up; offsets are rounded; `where` limits it to a region. It moves what's on the canvas so far: in an anim built from a `sort` layer, put it as an item after that layer |
 | `chain(anchors, { links?, length?, gravity?, drag?, rest?, stiff?, follow?, step?, max?, move?, steps?, loops? })` | not an op: hair, tails, scarves and ropes that follow with lag. `follow: 1.6` follows the way Celeste's hair does: each frame a point covers 1/`follow` of the way to its place (the point before plus `step`, e.g. `[0.4, 2]`: a little behind and below) and never trails more than `max` from it; no inertia, so it trails and settles without bouncing (best for hair). Without `follow` it's physical: `anchors[f]` is where the chain is fixed in frame f; each of `links` points (default 5) stays `length` px (2) from the one before, with inertia (`drag`, 0.8 kept per step), weight (`gravity`, [0, 0.5]) and a shape it turns back toward (`rest` direction, [0, 1], by `stiff`, 0.15). `move` is the character's travel per frame in the world (walking left: `[-1, 0]`), so the chain trails behind. It's simulated over the loop until the motion repeats (`loops`, 24), so the anim loops without a jump, and returns per frame `[anchor, p1, ..., pN]` (floats). Draw discs along it in a layer under the body: `layer("hair", (c) => HAIR[c.frame].forEach(([x, y], i) => c.circ(Math.round(x), Math.round(y), R[i], "h")))` |
 | `motion("walk.json", { dir?, scale?, at? })` | not an op: called at the top of the art file, it reads a motion guide (`examples/motion/`: CC0 walk and run cycles, 8 directions × 8 frames) and returns one direction (`dir`: `N NE E SE S SW W NW`) as `{ ms, frames, depth, contact }`. `frames[i]` maps joint names to whole-pixel `[x, y]`, scaled by `scale` with the floor point moved to `at`; `depth[i]` says which joint is nearer the viewer; `contact[i]` is [left, right] foot down. Draw a frame with `pose()`, and use the numbers to place parts (examples/tropical/girl.px.js: a 32 px girl walking) |
 | `clip(region, ...items)` | run items with drawing restricted to the region (half domes, roof slopes, masked textures) |
 | `plate(relightOpts?, ...items)` | the items drawn on a plate of their own, lit there with `relight` (which then reads only the plate's edges), and laid down: a pauldron over its lames, a mass of stone, a crag, each taking the rim light and the shade on its own edges. Unlike a layer it goes anywhere, in a layer or another plate too; in a function: `c.plate(() => { ... }, opts)` |
-| `runs({ y: [[x, "chars"], ...], ... })` | pixels as runs at absolute x, row by row: `runs({ 30: [[19, "3H3"], [23, "deeR"]] })`. Same keys as a grid (`.` keeps, `_` erases), but each run starts where it says, so nothing is counted: for hand-drawn figures and patches over a shrunk or base image |
+| `runs({ y: [[x, "chars"], ...], ... })` | pixels as runs at absolute x, row by row: `runs({ 30: [[19, "3H3"], [23, "deeR"]] })`. Same keys as a grid (`.` keeps, but not a space; `_` erases), but each run starts where it says, so nothing is counted: for hand-drawn figures and patches over a shrunk or base image |
 | `pose("pose.json" \| joints, { x?, y?, scale?, color?, joint?, min?, bones?, sides? })` | a pose skeleton as a guide: bones as lines (`color`, default `"R"`), joints as dots (`joint`, default `"Y"`; `false` for none); `sides: true` colors the limbs by side (left arm magenta, right arm green, left leg orange, right leg cyan), so a limb that swaps sides between frames shows. Reads a pose detector's output (a `{ name: [x, y, score?] }` map, or OpenPose JSON in COCO-18 or BODY_25), placed at `(x * scale + x, y * scale + y)`; joints scoring under `min` are skipped. Names: `head`, `nose`, `neck`, `l_`/`r_` + `eye ear shoulder elbow wrist hip knee ankle big_toe heel`, `mid_hip`. In an anim, draw a motion guide's current frame: `layer("guide", { ref: true }, (c) => c.pose(walk.frames[c.frame], { sides: true }))`. Usually inside a `ref: true` layer. The detector runs outside pxl (e.g. rtmlib's DWPose on the image upscaled) |
 
 Any `name` may be a sprite, scene, group, or glob (`"tree_*"`). Placement options, for `stamp`,
-`tile`, `pattern`, `panel`, `scatter` and wire hangs (anims add `frame`, `delay`, `rdelay`; see
+`tile`, `pattern`, `panel`, `scatter`, `tilemap` and wire hangs (anims add `frame`, `delay`, `rdelay`; see
 Animation):
 
 | Option | Effect |
 |---|---|
 | `flip: "x"\|"y"\|"xy"`, `rot: 90\|180\|270` | mirror or turn this copy |
 | `swap: { g: "r" }` | recolor this copy |
-| `fit: px` | of a group or glob, the member whose drawing is nearest that height (the smaller on a tie): one thing drawn at several sizes, picked by how big it is where it stands. `stamp("walker_*", x, y, { fit: P.scale(z) * 1.75, frame })`: a figure far down a road takes the sprite drawn for its size instead of a scaled one |
+| `fit: px` | of a group or glob, the member whose drawing is nearest that height (the smaller on a tie): one thing drawn at several sizes, picked by how big it is where it stands. `stamp("walker_*", x, y, { fit: P.scale(z) * 1.75, frame: n })`: a figure far down a road takes the sprite drawn for its size instead of a scaled one |
 | `rflip: "x"\|"y"\|"xy"` | random flips, per copy |
 | `rswap: [{ g: "r" }, {}]` | a random recolor per copy (`{}` = none) |
 | `seed`, `reseed: true \| n` | `reseed` rebuilds the placed asset with its own random choices; `true` derives them from the position, so `tile("house", 0, 0, 4, 1, { reseed: true })` gives four different houses from one definition |
 | `silhouette: "w"` | every opaque pixel in that color: hit flashes, and cast shadows when placed in a `shade: true` layer |
-| `at: "id.socket"`, `id` | attach to a socket of a stamp placed earlier in the same asset, any layer: x, y become an offset from it; `id` names a placement (default: its asset name) |
-| `z` | its order in a `sort: "z"` layer |
-| `cast: [kx, ky]` | the asset laid flat on the ground as its shadow: a pixel h px above its base lands h × (kx, ky) from where it stands, e.g. `[0.6, 0.2]` for light from the top left. The base is the pivot's row, so give tall props `pivot: "bottom"`; it applies after `flip`, so a mirrored tree still throws its shadow the same way. In a `shade` layer: `stamp("palm", x, y, { cast: [0.6, 0.2] })` |
-| `castBase: "column"` | with `cast`: each column stands on its own lowest pixel instead of the pivot's row, for a base that isn't level (a tent seen at an angle, its hem higher at the back: from the pivot's row, what hangs below it would cast toward the sun) |
+| `at: "id.socket"`, `id` | (stamp only) attach to a socket of a stamp placed earlier in the same asset, any layer: x, y become an offset from it; `id` names a placement (default: its asset name) |
+| `z` | (stamp only) its order in a `sort: "z"` layer |
+| `cast: [kx, ky]` | the asset laid flat on the ground as its shadow: a pixel h px above its base lands h × (kx, ky) from where it stands, e.g. `[0.6, 0.2]` for light from the top left. The base is the pivot's row (the bottom edge without one), and the shadow is placed by that point, so an asset without a pivot gets a shadow that doesn't line up with it: give props `pivot: "bottom"`; it applies after `flip`, so a mirrored tree still throws its shadow the same way. In a `shade` layer: `stamp("palm", x, y, { cast: [0.6, 0.2] })` |
+| `castBase: "pivot" \| "column"` | with `cast` (default `"pivot"`): each column stands on its own lowest pixel instead of the pivot's row, for a base that isn't level (a tent seen at an angle, its hem higher at the back: from the pivot's row, what hangs below it would cast toward the sun) |
 
 Randomness is seeded from the placement position + `seed`, so builds are reproducible and moving
 one placement doesn't reshuffle the others. Change `seed` to reroll.
@@ -222,9 +232,9 @@ one placement doesn't reshuffle the others. Change `seed` to reroll.
 |---|---|
 | `perspective({ w, horizon, eye, fov?, focal?, vp?, yaw?, pitch? })` | not an op: a pinhole camera over flat ground, in meters. `eye` m above the ground, the horizon on row `horizon`, `fov` degrees across the `w` px picture (default 90) or the `focal` length in px, looking at column `vp` (default the middle), turned `yaw` degrees right of the world's z axis (default 0), tilted `pitch` degrees up, down if negative (default 0). Returns `ground(x, z, up?)`: where a point x m across, z m ahead and `up` m above the ground lands on screen (floats); `at(col, row)`: the ground point `[x, z]` seen through a pixel (null at the horizon and above); `scale(z, x?, up?)`: px per meter there; `vanish(angle?)`: the column where ground lines heading that many degrees right of z meet (0: the z lines, 90: the x lines); `vertical()`: `[col, row]` where uprights meet (null when level); `ray(col, row)`: the way a pixel's middle looks, a unit `[x, z, up]` (a sky colored by direction, a ray marched); `toward([x, z, up])`: where a direction lands, `[col, row]` (the sun, or where any parallel lines meet: falling meteors, a ramp; null behind the eye). With yaw 0, everything running straight ahead meets at `vp`: one-point perspective; turned, the world's x and z lines meet at two points: two-point; tilted up, the horizon sits lower (the camera looks `focal·tan(pitch)` px above it) and uprights lean in toward a third point above the picture: three-point (a worm's-eye view; tilted down, a bird's-eye one, meeting below). Level, the same model as `world: { horizon, eye }` |
 | `plane(view, (x, z) => key, where?)` | flat ground in perspective: the function gives the color of the ground point seen through each pixel under the horizon (`.` or nothing leaves it); `view` is a `perspective()` or its options (`w` defaults to the canvas's). Stripes in x run to the vanishing point, stripes in z space out toward the eye. A thin line sampled per pixel breaks into dots far away: keep it at least ~0.6 px wide there (`Math.max(width, z / P.focal * 0.6)`), or draw it as a `line` between two `ground()` points |
-| `terrain(view, height, fn, opts?)` | land with relief in perspective: `height(x, z)` is the ground's height in meters (the eye stands `eye` m above height 0 at x 0, z 0); `fn(x, z, u, t, col, row)` gives the color of the point each pixel sees (`u` its height, `t` its distance along the ray). Each column is ray-marched from the bottom up, every row starting where the one below landed, so a mountain range costs about a march per column. A pixel that sees no land within `far` is sky: `opts.sky(col, row)` colors it, or it's left. Options: `far` (m, 10000), `top` (the land's highest point: a ray rising above it is sky at once), `bound(x, z)` and `margin` (a cheap height the land never rises more than `margin` m above, e.g. the mountain without its ravines: the march steps by it and calls `height` only near the land). Shade by the slope (`height` a meter either side) and by the curvature (ridges catch the light, ravines hold the dark) (`examples/perspective/extinction.px.js`) |
-| `solids(view, shapes, opts?)` | things in meters drawn through the camera, far to near: `shapes` from the `solid` global, `solid.stick(a, b, half, key)` (a round stick from point a to b, `[x, z, up]`, `half` m thick either side: trunks, limbs, poles, bars), `solid.blob(at, rx, ry, key)` (an ellipse `rx` m across, `ry` up: crowns, heads, wheels), `solid.box([x0, z0, x1, z1, u0, u1], { top, lit, shade, under })` (benches, hedges, buildings: the faces the eye can see, `lit` the ones toward the sun), `solid.cone(a, ra, b, rb, key)` (round, standing roughly upright, as the hull of its two level end rings, plus `wrap: [[point, r], ...]` rings it must also go round: a torso, a skirt round the knees, a bin) and `solid.poly(points, key)` (a flat shape). Each takes extras last: `{ ghost: true }` casts but isn't drawn, `noShadow`, `top: n` (drawn n·2 cm nearer than its middle: a face over a head), `dapple: 0.6` (a blob's shadow lets the sun through). Options: `at: [x, z]` where the eye stands in the world (default 0, 0); `sun: { from: [x, z], up }` (the way toward the sun along the ground and its height in degrees: which box faces are lit); `scale(x, z)` px per meter (default the camera's); `ramps` and `light` to draw them on a plate lit along those ramps (`examples/perspective/park.px.js`) |
-| `shadows(view, shapes, { sun, shade, at? })` | the same shapes' shadows on the ground, each swept away from the sun (a point `up` m high falls `up / tan(sun.up)` m off), so a bench's shadow has its legs and a crowd's shadows never darken twice where they overlap. `shade: { g: "G", ... }`: what each ground color turns into; keys not in it are left (paint on them stays bright). Draw it after the ground and before `solids` |
+| `terrain(view, height, fn, { far?, top?, bound?, margin?, sky? })` | land with relief in perspective: `height(x, z)` is the ground's height in meters (the eye stands `eye` m above height 0 at x 0, z 0); `fn(x, z, u, t, col, row)` gives the color of the point each pixel sees (`u` its height, `t` its distance along the ray). Each column is ray-marched from the bottom up, every row starting where the one below landed, so a mountain range costs about a march per column. A pixel that sees no land within `far` is sky: `opts.sky(col, row)` colors it, or it's left. Options: `far` (m, 10000), `top` (the land's highest point: a ray rising above it is sky at once), `bound(x, z)` and `margin` (a cheap height the land never rises more than `margin` m above, e.g. the mountain without its ravines: the march steps by it and calls `height` only near the land). Shade by the slope (`height` a meter either side) and by the curvature (ridges catch the light, ravines hold the dark) (`examples/perspective/extinction.px.js`) |
+| `solids(view, shapes, { at?, sun?, scale?, ramps?, light? })` | things in meters drawn through the camera, far to near: `shapes` from the `solid` global, `solid.stick(a, b, half, key)` (a round stick from point a to b, `[x, z, up]`, `half` m thick either side: trunks, limbs, poles, bars), `solid.blob(at, rx, ry, key)` (an ellipse `rx` m across, `ry` up: crowns, heads, wheels), `solid.box([x0, z0, x1, z1, u0, u1], { top, lit, shade, under })` (benches, hedges, buildings: the faces the eye can see, `lit` the ones toward the sun), `solid.cone(a, ra, b, rb, key)` (round, standing roughly upright, as the hull of its two level end rings, plus `wrap: [[point, r], ...]` rings it must also go round: a torso, a skirt round the knees, a bin) and `solid.poly(points, key)` (a flat shape). Each takes extras last: `{ ghost: true }` casts but isn't drawn, `noShadow`, `top: n` (drawn n·2 cm nearer than its middle: a face over a head), `dapple: 0.6` (a blob's shadow lets the sun through). Options: `at: [x, z]` where the eye stands in the world (default 0, 0); `sun: { from: [x, z], up }` (the way toward the sun along the ground and its height in degrees: which box faces are lit); `scale(x, z)` px per meter (default the camera's); `ramps` and `light` to draw them on a plate lit along those ramps (`examples/perspective/park.px.js`) |
+| `shadows(view, shapes, { sun, shade, at?, scale? })` | the same shapes' shadows on the ground, each swept away from the sun (a point `up` m high falls `up / tan(sun.up)` m off), so a bench's shadow has its legs and a crowd's shadows never darken twice where they overlap. `shade: { g: "G", ... }`: what each ground color turns into; keys not in it are left (paint on them stays bright). Draw it after the ground and before `solids` |
 
 Things standing on the ground are placed at `ground(x, z)` and sized by `scale(z)`. A walker going away
 holds its scale for a whole step and changes it only at the next contact, when the pose changes anyway
@@ -259,7 +269,7 @@ draws the edges' dark rims across the terrain. `shrink: 2` takes 32px tiles to 1
 
 ## Lighting
 
-`lamp(x, y, { r, color, power })`, `lighting({ cell, sky, ambient, emit, ... })`, and the layer flags
+`lamp(x, y, { r, color, power, z })`, `lighting({ cell, sky, ambient, emit, ... })`, and the layer flags
 `solid`, `wall`, `unlit`: see [lighting.md](lighting.md). The same file covers normal maps:
 `bump("dome"|"bevel"|"luma", { w, depth, on, where })` and the numpad grid `normals(x, y, grid)`.
 
@@ -300,6 +310,7 @@ swaying loop once, not twice. Exports keep each drawn frame once and put the dir
 (Aseprite's `frameTags[].direction`); GIFs, previews and scenes play it.
 
 ```js
+pal({ k: 0, x: 7, l: 10, L: 9 })   // pico8's black, white, yellow, orange
 anim("candle", { outline: "k", fps: 5 }, `
   .l.
   lLl
@@ -313,6 +324,7 @@ anim("frog", { base: "frog_idle" }, frame({ ms: 2200 }), frame({ ms: 200 }, grid
 for loops that wrap seamlessly:
 
 ```js
+pal({ h: 9 })
 anim("fire", { w: 22, h: 23, frames: 6, fps: 10 }, (c) => {
   const k = c.phase * Math.PI * 2
   c.poly([2, 21, 10, 21 - Math.round(16 + Math.sin(k) * 2), 19, 21], "h")
@@ -368,9 +380,9 @@ warnings `check` finds on it at those frames. Several names make a row each, one
 (`other.px.js:name` takes another file's, and a PNG from anywhere is a row too), and several `--at`
 a column each: two versions of a scene, one scene from two agents, three details of a big one.
 Give PNGs at 1× (`out/scenes/x.png`, not an enlarged `_shot`): rows are enlarged together, so a big
-one leaves no room for the rest. `check --readings`
-also lists what the lit-side rule read on every placement, warning or not, with a tally.
-`check` runs them on every scene and rig of a file at every frame. A `build` of a
+one leaves no room for the rest. `check` makes every check `describe` can warn on, on every scene
+and rig of a file at every frame (exit 1 on a warning); `--readings` also lists what the lit-side
+rule read on every placement, warning or not, with a tally. A `build` of a
 whole file with more than 12 assets prints how many of each kind it wrote; `--list` or `--only`
 print a line each (a smaller file prints them anyway).
 A preview GIF past 4 MB says so; `--every N` keeps one frame in N in the previews (the GIFs in
@@ -437,7 +449,7 @@ order, with its file:line, the pixels it changed and where ("no change" = it pai
 each: which line painted it wrong. `--sheet` also writes `_preview/<name>_steps.png`, a numbered
 thumbnail per step (every k-th of a long build). Anims show frame 0.
 
-Outputs go to `<file dir>/out`: `sprites/<n>.png`, `scenes/<n>.png`, `<sheet>.png` + `<sheet>.json`
+Outputs go to `<file dir>/out`: `sprites/<n>.png`, `scenes/<n>.png`, `anims/<n>.png` (a strip; see Animation), `<sheet>.png` + `<sheet>.json`
 (TexturePacker hash format: Phaser, Godot importers, ...), `_preview/<n>.png` (upscaled to
 ~768px, checkerboard behind transparency, pixel grid at scale ≥ 6 with every 8th line darker).
 An asset that places tilemaps also gets `<n>.tmj`, a Tiled map with one tile layer per tilemap
