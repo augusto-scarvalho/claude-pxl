@@ -408,12 +408,14 @@ function grow(seed, { tall = 7, spread = 1, limbs = 4, depth = 3, side = [1, 0] 
   const r = rng(seed), wood = [], tips = []
   const trunk = tall * 0.36, lean = [(r() - 0.5) * 0.25, (r() - 0.5) * 0.25]
   const tr = 0.15 + tall * 0.02
-  // a limb in three pieces that bend a little each way, thinning as it goes
-  const piece = (p, e, r0, r1, gnarl, trunkPiece = false) => {
-    const len = Math.hypot(...e.map((c, i) => c - p[i])), pts = [p]
+  // a limb in three pieces that bend a little each way, thinning as it goes; `g` tells which limb a
+  // piece is of, so the limb is painted as one body; a main limb's first piece belongs to the fork
+  let g = 0
+  const piece = (p, e, r0, r1, gnarl, main = false) => {
+    const len = Math.hypot(...e.map((c, i) => c - p[i])), pts = [p], id = g++
     for (const t of [1 / 3, 2 / 3]) pts.push(p.map((c, i) => c + (e[i] - c) * t + (r() - 0.5) * len * gnarl))
     pts.push(e)
-    for (let i = 0; i < 3; i++) wood.push({ a: pts[i], b: pts[i + 1], r0: r0 + ((r1 - r0) * i) / 3, r1: r0 + ((r1 - r0) * (i + 1)) / 3, trunk: trunkPiece })
+    for (let i = 0; i < 3; i++) wood.push({ a: pts[i], b: pts[i + 1], r0: r0 + ((r1 - r0) * i) / 3, r1: r0 + ((r1 - r0) * (i + 1)) / 3, g: id, fork: main && i === 0 })
     return pts
   }
   // the trunk: one line, bending a little, drawn as one body (not pieces)
@@ -425,9 +427,9 @@ function grow(seed, { tall = 7, spread = 1, limbs = 4, depth = 3, side = [1, 0] 
     const out = tr * (2.3 + r() * 1.1), dir = [side[0] * sd + side[1] * spread2 * (r() + 0.5), side[1] * sd - side[0] * spread2 * (r() + 0.5)], l = Math.hypot(...dir)
     wood.push({ a: [0, 0, tr * 1.0], b: [(dir[0] / l) * out, (dir[1] / l) * out, -tr * 0.25], r0: tr * 0.6, r1: tr * 0.16, root: true })
   }
-  const branch = (p, d, len, rad, depth) => {
+  const branch = (p, d, len, rad, depth, main = false) => {
     const e = p.map((c, i) => c + d[i] * len)
-    piece(p, e, rad, rad * 0.7, 0.14)
+    piece(p, e, main ? rad * 1.25 : rad, rad * 0.7, 0.14, main)
     if (depth === 0) { tips.push(e); return }
     const n = 2 + (r() < 0.45 ? 1 : 0)
     for (let i = 0; i < n; i++) {
@@ -443,9 +445,9 @@ function grow(seed, { tall = 7, spread = 1, limbs = 4, depth = 3, side = [1, 0] 
   for (let i = 0; i < limbs; i++) {
     const az = i * 2.4 + r() * 0.6, el = (32 + r() * 28) * (Math.PI / 180), h = trunk * (0.82 + 0.5 * (i / limbs))
     const d = norm([Math.cos(el) * Math.cos(az) * spread, Math.cos(el) * Math.sin(az) * spread, Math.sin(el)])
-    branch([lean[0] * (h / trunk), lean[1] * (h / trunk), h], d, tall * 0.3, 0.06 + tall * 0.008, depth)
+    branch([lean[0] * (h / trunk), lean[1] * (h / trunk), h], d, tall * 0.3, tr * 0.48, depth, true)
   }
-  branch([lean[0], lean[1], trunk], norm([(r() - 0.5) * 0.3, (r() - 0.5) * 0.3, 1]), tall * 0.32, 0.07 + tall * 0.008, depth)
+  branch([lean[0], lean[1], trunk], norm([(r() - 0.5) * 0.3, (r() - 0.5) * 0.3, 1]), tall * 0.32, tr * 0.55, depth, true)
   return { wood, tips, trunk: { line, r: tr } }
 }
 function foliage(seed, tree, { size = 0.75, per = 6, reach = 0.85 }) {
@@ -478,66 +480,82 @@ function leafStamp(px, which) {
   STAMPS.set(key, out)
   return out
 }
-// A piece of wood as a capsule on screen, tapering from r0 to r1. Each pixel in it shaded by how much it
-// faces the light (upper left), like a cylinder: lit, mid, shade, a cool deep tone on the far shade
-// side, no outline on the lit side. On thick wood, bark furrows run along it, wavy and broken; above
-// the crown's lower part everything is in the crown's shade, pixel by pixel by height.
+// Wood painted as one body: samples along its lines, each with its radius on screen; every pixel takes
+// the sample whose surface reaches it furthest, so the shading runs on unbroken through a limb's bends
+// and where limbs leave the trunk. Each pixel is shaded by how much it faces the light (upper left),
+// like a cylinder: lit, mid, shade, a cool deep tone on the far shade side; thin wood only lit, mid and
+// shade. Bark furrows run along the trunk, wavy and broken; above the crown's lower part everything is
+// in the crown's shade, by height, a step at a time, each step coming in dithered. `foot`: no pixel
+// below that row (the trunk's foot).
 const LIT2 = norm([-0.75, -0.66])
-function limb(c, w, scr, s, C, R, bark) {
-  const [x0, y0] = scr(w.a), [x1, y1] = scr(w.b), h0 = Math.max(0.5, w.r0 * s), h1 = Math.max(0.5, w.r1 * s)
-  const dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy || 1, len = Math.sqrt(L2)
-  const shade = (u) => (u > C[2] - R * 0.25 ? 2 : u > C[2] - R * 0.62 ? 1 : 0)
-  if (h0 < 1.2 && h1 < 1.2) { c.line(Math.round(x0), Math.round(y0), Math.round(x1), Math.round(y1), bark[Math.max(0, 3 - shade((w.a[2] + w.b[2]) / 2))], 1); return }
-  const hm = Math.max(h0, h1)
-  for (let y = Math.floor(Math.min(y0, y1) - hm); y <= Math.ceil(Math.max(y0, y1) + hm); y++)
-    for (let x = Math.floor(Math.min(x0, x1) - hm); x <= Math.ceil(Math.max(x0, x1) + hm); x++) {
-      const px = x + 0.5, py = y + 0.5, t = Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / L2))
-      const ax = x0 + dx * t, ay = y0 + dy * t, h = h0 + (h1 - h0) * t, ox = px - ax, oy = py - ay
-      if (Math.hypot(ox, oy) > h) continue
-      const lit = (ox * LIT2[0] + oy * LIT2[1]) / h, across = ((ox * -dy + oy * dx) / len) / h
-      let k = lit > 0.68 && h >= 3 ? 5 : lit > 0.32 ? 4 : lit > -0.2 ? 3 : lit > -0.62 ? 2 : 1
-      if (h >= 2.5) for (const f of [-0.45, -0.05, 0.38]) if (Math.abs(across - f - 0.07 * Math.sin(t * len * 0.35 + f * 9)) < 0.09 && hash(Math.round(f * 10) + 7, Math.floor((t * len) / 4)) > 0.22) k = Math.max(1, k - 1)
-      c.px(x, y, bark[Math.max(0, k - shade(w.a[2] + (w.b[2] - w.a[2]) * t))])
+function woodBody(c, samples, C, R, bark, foot = Infinity) {
+  const hm = Math.max(...samples.map((q) => q.h))
+  if (hm < 1.2) {
+    for (let i = 1; i < samples.length; i++) c.line(...samples[i - 1].scr.map(Math.round), ...samples[i].scr.map(Math.round), bark[samples[i].u > C[2] - R * 0.62 ? 2 : 3], 1)
+    return
+  }
+  const xs = samples.map((q) => q.scr[0]), ys = samples.map((q) => q.scr[1])
+  for (let y = Math.floor(Math.min(...ys) - hm); y <= Math.min(foot, Math.ceil(Math.max(...ys) + hm)); y++)
+    for (let x = Math.floor(Math.min(...xs) - hm); x <= Math.ceil(Math.max(...xs) + hm); x++) {
+      let best = null, bd = Infinity
+      for (const q of samples) { const d = (x + 0.5 - q.scr[0]) ** 2 + (y + 0.5 - q.scr[1]) ** 2 - q.h * q.h; if (d < bd) { bd = d; best = q } }
+      if (bd > 0) continue
+      const ox = x + 0.5 - best.scr[0], oy = y + 0.5 - best.scr[1], h = best.h
+      const lit = (ox * LIT2[0] + oy * LIT2[1]) / h, across = (ox * -best.tan[1] + oy * best.tan[0]) / h
+      let k = h < 2.5 ? (lit > 0.3 ? 4 : lit > -0.45 ? 3 : 2) : lit > 0.62 && h >= 3 ? 5 : lit > 0.25 ? 4 : lit > -0.25 ? 3 : lit > -0.65 ? 2 : 1
+      if (best.furrows && h >= 3) for (const f of [-0.5, -0.08, 0.36]) if (Math.abs(across - f - 0.06 * Math.sin(best.along * 0.3 + f * 9)) < 0.09 && hash(Math.round(f * 10) + 7, Math.floor(best.along / 5)) > 0.2) k = Math.max(1, k - 1)
+      const v = (best.u - (C[2] - R * 0.62)) / (R * 0.37), step = (e) => (Math.abs(v - e) < 0.06 ? (x + y) & 1 : v > e ? 1 : 0)
+      c.px(x, y, bark[Math.max(0, k - step(0) - step(1))])
     }
 }
-// The trunk as one body: the line smoothed through its points, the radius flaring at the foot and
-// narrowing upward; every pixel takes its nearest point on the line, so the shading runs unbroken from
-// the ground to the fork, and the furrows run the whole length.
-function trunkBody(c, tk, scr, scaleAt, C, R, bark) {
+// samples along pieces of wood (in order, a limb's pieces end to end), about a pixel apart on screen
+function along(pieces, scr, scaleAt, from = 0) {
+  const out = []
+  let run = from
+  for (const w of pieces) {
+    const a = scr(w.a), b = scr(w.b), len = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(len / 0.7)), tan = [(b[0] - a[0]) / (len || 1), (b[1] - a[1]) / (len || 1)]
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, p = w.a.map((v, k) => v + (w.b[k] - v) * t)
+      out.push({ p, scr: scr(p), h: Math.max(0.5, (w.r0 + (w.r1 - w.r0) * t) * scaleAt(p)), u: p[2], tan, along: run + len * t })
+    }
+    run += len
+  }
+  return out
+}
+// The trunk and its fork as one body: the trunk's line smoothed through its points, the radius flaring
+// at the foot and narrowing upward, and going on without a seam into the first piece of each main
+// limb and of the leader, which leave it thick and flared. The furrows run the trunk's whole length.
+function trunkBody(c, tk, fork, scr, scaleAt, C, R, bark) {
   const cr = (p0, p1, p2, p3, t) => p1.map((_, k) => 0.5 * (2 * p1[k] + (p2[k] - p0[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t * t + (3 * p1[k] - p0[k] - 3 * p2[k] + p3[k]) * t * t * t))
   const L = tk.line, ext = [L[0], ...L, L[L.length - 1]], pts = []
   for (let i = 1; i < ext.length - 2; i++) for (let k = 0; k < 12; k++) pts.push(cr(ext[i - 1], ext[i], ext[i + 1], ext[i + 2], k / 12))
   pts.push(L[L.length - 1])
   const top = L[L.length - 1][2], samples = pts.map((p) => {
     const f = p[2] / top, rad = tk.r * (1.06 - 0.2 * f + 0.42 * Math.exp(-p[2] / (tk.r * 1.6)))
-    return { p, scr: scr(p), h: Math.max(0.6, rad * scaleAt(p)), u: p[2] }
+    return { p, scr: scr(p), h: Math.max(0.6, rad * scaleAt(p)), u: p[2], furrows: true }
   })
-  let along = 0
-  samples.forEach((q, i) => { if (i) along += Math.hypot(q.scr[0] - samples[i - 1].scr[0], q.scr[1] - samples[i - 1].scr[1]); q.along = along })
-  const xs = samples.map((q) => q.scr[0]), ys = samples.map((q) => q.scr[1]), hm = Math.max(...samples.map((q) => q.h))
-  for (let y = Math.floor(Math.min(...ys) - hm); y <= Math.ceil(Math.max(...ys) + 1); y++)
-    for (let x = Math.floor(Math.min(...xs) - hm); x <= Math.ceil(Math.max(...xs) + hm); x++) {
-      let best = null, bd = Infinity
-      for (const q of samples) { const d = (x + 0.5 - q.scr[0]) ** 2 + (y + 0.5 - q.scr[1]) ** 2 - q.h * q.h; if (d < bd) { bd = d; best = q } }
-      const ox = x + 0.5 - best.scr[0], oy = y + 0.5 - best.scr[1]
-      if (Math.hypot(ox, oy) > best.h || y > Math.ceil(samples[0].scr[1])) continue
-      const lit = (ox * LIT2[0] + oy * LIT2[1]) / best.h, across = ox / best.h
-      let k = lit > 0.62 && best.h >= 3 ? 5 : lit > 0.25 ? 4 : lit > -0.25 ? 3 : lit > -0.65 ? 2 : 1
-      for (const f of [-0.5, -0.08, 0.36]) if (best.h >= 2.5 && Math.abs(across - f - 0.06 * Math.sin(best.along * 0.3 + f * 9)) < 0.09 && hash(Math.round(f * 10) + 7, Math.floor(best.along / 5)) > 0.2) k = Math.max(1, k - 1)
-      if (best.u > C[2] - R * 0.25) k -= 2
-      else if (best.u > C[2] - R * 0.62) k -= 1
-      c.px(x, y, bark[Math.max(0, k)])
-    }
+  let run = 0
+  samples.forEach((q, i) => {
+    const o = samples[Math.max(0, i - 1)], n = samples[Math.min(samples.length - 1, i + 1)], len = Math.hypot(n.scr[0] - o.scr[0], n.scr[1] - o.scr[1]) || 1
+    q.tan = [(n.scr[0] - o.scr[0]) / len, (n.scr[1] - o.scr[1]) / len]
+    if (i) run += Math.hypot(q.scr[0] - samples[i - 1].scr[0], q.scr[1] - samples[i - 1].scr[1])
+    q.along = run
+  })
+  woodBody(c, [...samples, ...fork.flatMap((w) => along([w], scr, scaleAt, run))], C, R, bark, Math.ceil(samples[0].scr[1]))
 }
 
 // a grown tree standing at (tx, tz), drawn far to near through the camera
 function paintTree(c, tx, tz, t, ramp, bark) {
   const W3 = ([x, z, u]) => [tx + x, tz + z, u], scr = (p) => { const [x, z, u] = W3(p); return P.ground(x - CX, z - CZ, u) }
-  const items = [...t.wood.map((w) => ({ d: ahead(tx + (w.a[0] + w.b[0]) / 2, tz + (w.a[1] + w.b[1]) / 2) - (w.root ? 0.2 : 0), w })), { d: ahead(tx, tz) - 0.3, trunk: t.trunk }, ...t.leaves.map((q) => ({ d: ahead(tx + q.p[0], tz + q.p[1]), q }))].sort((a, b) => b.d - a.d)
+  const scaleAt = (p) => P.scale(ahead(tx + p[0], tz + p[1])), limbs = new Map()
+  for (const w of t.wood) if (!w.root && !w.fork) limbs.set(w.g, [...(limbs.get(w.g) ?? []), w])
+  const mid = (ws) => ahead(tx + ws.reduce((a, w) => a + w.a[0] + w.b[0], 0) / (2 * ws.length), tz + ws.reduce((a, w) => a + w.a[1] + w.b[1], 0) / (2 * ws.length))
+  const items = [...t.wood.filter((w) => w.root).map((w) => ({ d: mid([w]) - 0.2, wood: [w] })), ...[...limbs.values()].map((ws) => ({ d: mid(ws), wood: ws })),
+    { d: ahead(tx, tz) - 0.3, trunk: t.trunk }, ...t.leaves.map((q) => ({ d: ahead(tx + q.p[0], tz + q.p[1]), q }))].sort((a, b) => b.d - a.d)
   for (const it of items) {
     const s = P.scale(it.d)
-    if (it.trunk) { trunkBody(c, it.trunk, scr, (p) => P.scale(ahead(tx + p[0], tz + p[1])), t.C, t.R, bark); continue }
-    if (it.w) { limb(c, it.w, scr, s, t.C, t.R, bark); continue }
+    if (it.trunk) { trunkBody(c, it.trunk, t.wood.filter((w) => w.fork), scr, scaleAt, t.C, t.R, bark); continue }
+    if (it.wood) { woodBody(c, along(it.wood, scr, scaleAt), t.C, t.R, bark); continue }
     const q = it.q, px = Math.max(2, Math.min(10, Math.round(q.size * s))), [x, y] = scr(q.p)
     const base = Math.max(0, Math.min(ramp.length - 1, Math.floor(q.tone * ramp.length)))
     for (const [dx, dy, edge] of leafStamp(px, Math.floor(q.v * 4))) c.px(Math.round(x + dx), Math.round(y + dy), ramp[Math.max(0, Math.min(ramp.length - 1, base + edge))])
@@ -602,9 +620,18 @@ function bench(x, z, along, face) {
   }
   return { d: ahead(x, z), shapes: sh }
 }
-// a lamp post: a slim dark-green pole, a lantern
+// A park lamp post in dark iron: a plinth, a foot tapering into the pole, a ring at the foot and one
+// higher up, a lantern of frosted glass (the frame between its panes on the side toward us) widening
+// under its cap, a finial; lit on a plate, so it rounds.
 function lamp(x, z) {
-  return { d: ahead(x, z), shapes: [stick([x, z, 0], [x, z, 3.4], 0.05, "4"), stick([x, z, 0], [x, z, 0.3], 0.09, "0"), blob([x, z, 3.55], 0.16, 0.2, "2"), stick([x, z, 3.75], [x, z, 3.8], 0.12, "4")], fringe: around(x, z, 0.14, 6) }
+  const p = (u) => [x, z, u], toEye = Math.atan2(CZ - z, CX - x), pane = (a, r, u) => [x + Math.cos(toEye + a) * r, z + Math.sin(toEye + a) * r, u]
+  return { d: ahead(x, z), ramps: ["043", "21"], fringe: around(x, z, 0.14, 6), shapes: [
+    cone(p(0), 0.14, p(0.14), 0.12, "0"), cone(p(0.14), 0.1, p(0.6), 0.055, "4"), stick(p(0.6), p(3.14), 0.04, "4"),
+    cone(p(0.58), 0.075, p(0.64), 0.075, "0", { top: 1 }), cone(p(2.3), 0.065, p(2.36), 0.065, "0", { top: 1 }),
+    cone(p(3.1), 0.03, p(3.24), 0.12, "4"), cone(p(3.24), 0.12, p(3.7), 0.19, "2", { top: 1 }),
+    stick(pane(0, 0.12, 3.24), pane(0, 0.19, 3.7), 0.01, "4", { top: 2, noShadow: true }),
+    cone(p(3.68), 0.25, p(3.86), 0.05, "4", { top: 2 }), blob(p(3.92), 0.03, 0.05, "4", { top: 3 }),
+  ] }
 }
 const bin = (x, z) => ({ d: ahead(x, z), shapes: [stick([x, z, 0], [x, z, 0.8], 0.22, "V"), stick([x, z, 0.8], [x, z, 0.86], 0.24, "W")], fringe: around(x, z, 0.26, 7) })
 // hedges: boxes of trimmed bush, in short lengths so whoever walks behind one is drawn behind it
