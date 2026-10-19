@@ -51,10 +51,17 @@ For a big, busy scene (320×180 and up, many props, animated), ask the user firs
   assets with the part's name as prefix, box, pivot, where it is stamped, its light, one timing for
   every loop) and the scene file that includes the parts. Then one fork of yourself per part draws
   it in its own file with a `test_<part>` scene, all at once (in Claude Code: the Agent tool with
-  `subagent_type: "fork"`; headless: `claude -p --resume <your session> --fork-session`): forks start
-  from what you read and plan, out of your cache. When they report, you put the scene together.
-  The same street came out denser (more people, cars, shops) but less coherent, for ~5× the tokens
-  and ~2× the time.
+  `subagent_type: "fork"`; headless: `claude -p --resume <your session> --fork-session`). When they
+  report, you put the scene together. The same street came out denser (more people, cars, shops)
+  but less coherent, for ~5× the tokens and ~2× the time.
+
+  That ~5× was measured with the planner in a new session (~130k of context when it forked). A fork
+  carries everything in the session that makes it and rereads it on every step: forked from a long
+  conversation (500k and more), each of 8-10 forks carries all of it, many times the cost, enough to
+  run out a usage limit. So say how long this conversation is when you ask, and run a pipeline from
+  a new session that holds only the skill, the brief and the plan: write the brief to a file, then
+  `claude -p --session-id <new uuid> < plan_prompt.txt` plans, and each part is
+  `claude -p --resume <that uuid> --fork-session < part_prompt.txt`.
 
 Both are in `examples/cyberpunk/`; `pipeline/plan.md` is a plan whose parts fit. Included files
 share one scope, so every top-level name in a part starts with the part's name.
