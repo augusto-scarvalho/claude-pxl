@@ -345,20 +345,8 @@ function paintTree(c, T) {
     }
   }
 }
-// flames: tongues rising from what burns, flickering, leaning right with the wind, white-hot at the
-// root to red at the tip; smoke over them streams away right
-function flame(c, cx, cy, size, frame, seed) {
-  const r = rng(seed), n = Math.max(1, Math.round(size * 0.5))
-  for (let i = 0; i < n; i++) {
-    const ph = (frame / 6 + r()) % 1, h = size * (0.7 + 0.6 * Math.sin((ph + i * 0.3) * Math.PI * 2) ** 2) * (0.6 + r() * 0.6)
-    const x0 = cx + (r() - 0.5) * size * 0.8, w = Math.max(1, size * 0.22)
-    for (let k = 0; k < h; k++) {
-      const f = k / h, x = Math.round(x0 + f * f * h * 0.55 + Math.sin(f * 4 + ph * 6.28) * 0.6), y = Math.round(cy - k), ww = Math.max(0, Math.round(w * (1 - f)))
-      const key = f < 0.2 ? "X" : f < 0.45 ? "W" : f < 0.75 ? "V" : "U"
-      for (let j = -ww; j <= ww; j++) c.px(x + j, y, Math.abs(j) === ww && ww > 0 ? (f < 0.5 ? "V" : "T") : key)
-    }
-  }
-}
+// flames: pxl's flame(), white-hot at the root to red at the tip, leaning right with the wind
+const flame = (c, x, y, size, frame, seed) => c.flame(x, y, size, "XWVUT", { frame, seed })
 function treeFire(c, T, frame) {
   for (const [i, q] of T.tufts.entries()) {
     if (!q.burning || i % 2) continue
@@ -391,22 +379,11 @@ sprite("_bg", { w: W, h: H }, (c) => {
 // ================================================================ shapes
 const addv = (a, b) => a.map((v, k) => v + b[k]), mul = (a, s) => a.map((v) => v * s)
 const unit = (v) => { const l = Math.hypot(...v) || 1; return v.map((c) => c / l) }
-// A limb as a cone from a to b (radius ra to rb, in meters) painted round: every pixel in it shaded by
-// where it sits across it on screen, its upper side lit (the sun, and behind, the fires: a hot rim
-// along the top), its underside in shade. `ramp`: shade, hide, lit, rim.
+// A limb as a cone from a to b (radius ra to rb, in meters): pxl's capsule() where the camera puts it,
+// lit from above (the sun, and behind, the fires: a hot rim along the top). `ramp`: shade, hide, lit, rim.
 function paintCone(c, [a, ra, b, rb], ramp) {
-  const [ax, ay] = P.ground(...a), [bx, by] = P.ground(...b), sa = ra * P.scale(a[1], a[0], a[2]), sb = rb * P.scale(b[1], b[0], b[2])
-  const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy || 1, L = Math.sqrt(L2)
-  let nx = -dy / L, ny = dx / L
-  if (ny > 0) { nx = -nx; ny = -ny }
-  const m = Math.max(sa, sb) + 1
-  for (let y = Math.floor(Math.min(ay, by) - m); y <= Math.ceil(Math.max(ay, by) + m); y++) for (let x = Math.floor(Math.min(ax, bx) - m); x <= Math.ceil(Math.max(ax, bx) + m); x++) {
-    const px = x + 0.5 - ax, py = y + 0.5 - ay, t = Math.max(0, Math.min(1, (px * dx + py * dy) / L2)), R = sa + (sb - sa) * t
-    const ox = px - dx * t, oy = py - dy * t
-    if (Math.hypot(ox, oy) > R + 0.2) continue
-    const across = (ox * nx + oy * ny) / Math.max(0.6, R)
-    c.px(x, y, ramp[across > 0.78 ? 3 : across > 0.3 ? 2 : across > -0.4 ? 1 : 0])
-  }
+  const [ax, ay] = P.ground(...a), [bx, by] = P.ground(...b)
+  c.capsule(ax, ay, ra * P.scale(a[1], a[0], a[2]), bx, by, rb * P.scale(b[1], b[0], b[2]), ramp, { light: [0, -1] })
 }
 
 // ================================================================ the dinosaurs

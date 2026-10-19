@@ -61,9 +61,9 @@ const P = perspective({ w: W, horizon: 70, eye: 1.6, fov: 90, yaw: 40 })
 const CX = 2.2, CZ = 2.6, SIN = Math.sin((P.yaw * Math.PI) / 180), COS = Math.cos((P.yaw * Math.PI) / 180)
 const at = (x, z, u = 0) => P.ground(x - CX, z - CZ, u).map(Math.round)
 const ahead = (x, z) => (x - CX) * SIN + (z - CZ) * COS             // depth from the eye: what's farther is drawn first
-// the sun at two in the afternoon: 55 degrees up, from the left and a little ahead. A point u m up
-// throws its shadow (u * SOX, u * SOZ) along the ground: short, to the right and toward us.
-const SUN_FROM = [-0.894, 0.447], LONG = 1 / Math.tan((55 * Math.PI) / 180), SOX = -SUN_FROM[0] * LONG, SOZ = -SUN_FROM[1] * LONG
+// the sun at two in the afternoon: 55 degrees up, from the left and a little ahead; the shadows fall
+// short, to the right and toward us
+const SUN_FROM = [-0.894, 0.447]
 const facesSun = (nx, nz) => nx * SUN_FROM[0] + nz * SUN_FROM[1] > 0
 const LIGHT = [-0.8, -1]                                           // on screen: from the upper left
 
@@ -247,20 +247,16 @@ function paving(c) {
 }
 
 // ================================================================ shapes
-// Everything is made of three shapes in meters: sticks { a: [x, z, u], b, half, key } (round: trunks,
-// limbs, poles, bars), blobs { e: [x, z, u], rx, ry, key } (crowns, heads, wheels) and boxes
-// { box: [x0, z0, x1, z1, u0, u1], keys: { top, lit, shade } }. The same shapes draw a thing and cast
-// its shadow.
-const stick = (a, b, half, key, extra) => ({ a, b, half, key, ...extra })
-const blob = (e, rx, ry, key, extra) => ({ e, rx, ry, key, ...extra })
-const box = (b, keys, extra) => ({ box: b, keys, ...extra })
-// and cones { cone: [a, ra, b, rb], key }: a round shape tapering from a to b (a torso, a skirt, a bin),
-// drawn as the hull of its two end rings, so it has the right outline from any side; `wrap` adds rings
-// [[x, z, u], r] it has to go round (a skirt round the knees)
-const cone = (a, ra, b, rb, key, extra) => ({ cone: [a, ra, b, rb], key, ...extra })
-const ring = ([x, z, u], r, f) => Array.from({ length: 10 }, (_, i) => f(x + Math.cos((i / 10) * Math.PI * 2) * r, z + Math.sin((i / 10) * Math.PI * 2) * r, u))
-const rings = ({ cone: [a, ra, b, rb], wrap = [] }, f) => [[a, ra], [b, rb], ...wrap].flatMap(([p, r]) => ring(p, r, f))
-
+// Everything is made of pxl's shapes in meters (solid.*): sticks (round: trunks, limbs, poles, bars),
+// blobs (crowns, heads, wheels), boxes (benches, hedges), cones (a torso, a skirt; `wrap` adds rings
+// it has to go round, a skirt round the knees) and flat polygons. solids() draws them far to near,
+// shadows() sweeps the same shapes onto the ground away from the sun, so each shadow has its shape.
+const { stick, blob, box, cone } = solid
+// the sun for both: which faces of a box it lights, which way and how long the shadows fall
+const SUN = { from: SUN_FROM, up: 55 }
+// px per meter where a shape stands, as the park has always taken it: P.scale of its depth. That is
+// 1 / cos(yaw), 1.3 times, the camera's own (solids()' default): every width here was tuned to it.
+const SIZE = (x, z) => P.scale(ahead(x, z))
 // a box's faces the eye can see; a face turned to the sun is lit
 function faces(b) {
   const [x0, z0, x1, z1, u0, u1] = b, out = [], q = (pts) => pts.flatMap(([x, z, u]) => at(x, z, u))
@@ -272,87 +268,13 @@ function faces(b) {
   if (z1 < CZ) out.push([facesSun(0, 1) ? "lit" : "shade", q([[x0, z1, u0], [x1, z1, u0], [x1, z1, u1], [x0, z1, u1]]), "+z"])
   return out
 }
-const mid = (q) => (q.box ? [(q.box[0] + q.box[2]) / 2, (q.box[1] + q.box[3]) / 2] : q.e ? q.e : q.cone ? [(q.cone[0][0] + q.cone[2][0]) / 2, (q.cone[0][1] + q.cone[2][1]) / 2]
-  : q.poly ? [q.poly.reduce((s, p) => s + p[0], 0) / q.poly.length, q.poly.reduce((s, p) => s + p[1], 0) / q.poly.length] : [(q.a[0] + q.b[0]) / 2, (q.a[1] + q.b[1]) / 2])
-const depthOf = (q) => ahead(...mid(q)) - (q.top ?? 0) * 0.02
-
 // draw shapes far to near; `ramps` light them on a plate when they're big enough to show it
-function drawShapes(c, shapes, ramps) {
-  const go = () => {
-    for (const q of [...shapes].sort((m, n) => depthOf(n) - depthOf(m))) {
-      if (q.ghost) continue
-      if (q.box) { for (const [kind, pts] of faces(q.box)) c.poly(pts, q.keys[kind] ?? q.keys.shade); continue }
-      if (q.cone) { c.poly(hull(rings(q, (x, z, u) => P.ground(x - CX, z - CZ, u))).flat().map(Math.round), q.key); continue }
-      if (q.poly) { c.poly(q.poly.flatMap((p) => at(...p)), q.key); continue }
-      const s = P.scale(q.e ? ahead(q.e[0], q.e[1]) : ahead((q.a[0] + q.b[0]) / 2, (q.a[1] + q.b[1]) / 2))
-      if (q.e) c.ellipse(...at(...q.e), Math.max(0, Math.round(q.rx * s)), Math.max(0, Math.round(q.ry * s)), q.key)
-      else c.line(...at(...q.a), ...at(...q.b), q.key, Math.max(1, Math.round(2 * q.half * s)))
-    }
-  }
-  ramps ? c.plate(go, { light: LIGHT, ramps }) : go()
-}
-
-// ---------------------------------------------------------------- shadows
-// Each shape swept onto the ground away from the sun, in steps under a pixel; boxes by the hull of
-// their corners. Pixels go into a set, so where shadows overlap the ground is no darker than in one.
-// A blob with `dapple` lets light through (a crown's shade with sun flecks in it).
-function hull(pts) {
-  pts = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1])
-  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], hi = []
-  for (const p of pts) { while (lo.length > 1 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p) }
-  for (const p of pts.reverse()) { while (hi.length > 1 && cross(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p) }
-  return lo.slice(0, -1).concat(hi.slice(0, -1))
-}
-function fillGround(out, poly, dapple) {
-  if (poly.some(([x, z]) => ahead(x, z) < 0.4)) return
-  const sp = poly.map(([x, z]) => P.ground(x - CX, z - CZ))
-  const xs = sp.map((p) => p[0]), ys = sp.map((p) => p[1])
-  for (let y = Math.max(Math.ceil(P.horizon) + 1, Math.floor(Math.min(...ys))); y <= Math.min(H - 1, Math.ceil(Math.max(...ys))); y++)
-    for (let x = Math.max(0, Math.floor(Math.min(...xs))); x <= Math.min(W - 1, Math.ceil(Math.max(...xs))); x++) {
-      let inside = false
-      for (let i = 0, j = sp.length - 1; i < sp.length; j = i++) {
-        const [xi, yi] = sp[i], [xj, yj] = sp[j]
-        if (yi > y + 0.5 !== yj > y + 0.5 && x + 0.5 < ((xj - xi) * (y + 0.5 - yi)) / (yj - yi) + xi) inside = !inside
-      }
-      if (inside && !(dapple && hash(x * 7 + y, y * 13 - x) > dapple)) out.add(y * W + x)
-    }
-}
-function cast(out, shapes) {
-  for (const q of shapes) {
-    if (q.noShadow) continue
-    if (q.poly) { fillGround(out, hull(q.poly.map(([x, z, u]) => [x + u * SOX, z + u * SOZ]))); continue }
-    if (q.cone) { fillGround(out, hull(rings(q, (x, z, u) => [x + u * SOX, z + u * SOZ]))); continue }
-    if (q.umbrella) {
-      const [x, z, u, rad] = q.umbrella, ring = []
-      for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; ring.push([x + Math.cos(a) * rad + u * SOX, z + Math.sin(a) * rad + u * SOZ]) }
-      fillGround(out, hull(ring))
-      continue
-    }
-    if (q.box) {
-      const [x0, z0, x1, z1, u0, u1] = q.box, pts = []
-      for (const x of [x0, x1]) for (const z of [z0, z1]) for (const u of [u0, u1]) pts.push([x + u * SOX, z + u * SOZ])
-      fillGround(out, hull(pts))
-      continue
-    }
-    if (q.e) {
-      // an ellipsoid's shadow: points over its surface swept onto the ground, and their hull
-      const pts = []
-      for (let i = 0; i < 12; i++) for (let j = -2; j <= 2; j++) {
-        const a = (i / 12) * Math.PI * 2, b = (j / 2) * (Math.PI / 2), u = q.e[2] + Math.sin(b) * q.ry
-        pts.push([q.e[0] + Math.cos(b) * Math.cos(a) * q.rx + u * SOX, q.e[1] + Math.cos(b) * Math.sin(a) * q.rx + u * SOZ])
-      }
-      fillGround(out, hull(pts), q.dapple)
-      continue
-    }
-    if (q.half < 0.012) continue
-    const [ax, az, au] = q.a, [bx, bz, bu] = q.b, A = [ax + au * SOX, az + au * SOZ], B = [bx + bu * SOX, bz + bu * SOZ]
-    const dx = B[0] - A[0], dz = B[1] - A[1], len = Math.hypot(dx, dz) || 1, nx = (-dz / len) * q.half, nz = (dx / len) * q.half
-    fillGround(out, len < 0.02 ? [[A[0] - q.half, A[1] - q.half], [A[0] + q.half, A[1] - q.half], [A[0] + q.half, A[1] + q.half], [A[0] - q.half, A[1] + q.half]] : [[A[0] + nx, A[1] + nz], [B[0] + nx, B[1] + nz], [B[0] - nx, B[1] - nz], [A[0] - nx, A[1] - nz]])
-  }
-}
+const drawShapes = (c, shapes, ramps) => c.solids(P, shapes, { at: [CX, CZ], sun: SUN, scale: SIZE, ramps, light: LIGHT })
 // what each ground color turns into in shade
 const SHADE = { a: "c", b: "d", e: "c", f: "h", g: "h", i: "j", k: "l", m: "l", t: "s", u: "t", "(": ")", ")": "]", "[": ")", "{": "c", "}": "d", "|": "h", "/": "h", "`": "h", "?": "h", ",": "2", "~": "d", "á": "c", "é": "d", "ú": "c", "ó": "d" }
-const darken = (c, out) => { for (const i of out) { const x = i % W, y = (i - x) / W, d = SHADE[c.key(x, y)]; if (d) c.px(x, y, d) } }
+// their shadows on the ground; an umbrella casts as its disc
+const shadowsOf = (c, shapes) => c.shadows(P, shapes.flatMap((q) => (q.umbrella ? [solid.poly(Array.from({ length: 12 }, (_, i) => [q.umbrella[0] + Math.cos((i / 12) * Math.PI * 2) * q.umbrella[3], q.umbrella[1] + Math.sin((i / 12) * Math.PI * 2) * q.umbrella[3], q.umbrella[2]]), "", { ghost: true })] : [q])),
+  { at: [CX, CZ], sun: SUN, shade: SHADE })
 
 // ================================================================ things
 // Leaf clumps, for the hedges: serrated, lit on the upper left, dark underneath, leaf strokes from the middle.
@@ -1098,7 +1020,7 @@ sprite("_bg", { w: W, h: H },
   plane(P, (x, z) => ground(x + CX, z + CZ)),
   (c) => paving(c),
   (c) => details(c),
-  (c) => { const out = new Set(); for (const s of STATIC) cast(out, s.shapes); darken(c, out) },
+  (c) => shadowsOf(c, STATIC.flatMap((s) => s.shapes)),
   (c) => decals(c),
   (c) => hopscotch(c))
 
@@ -1126,9 +1048,8 @@ anim("park", { w: W, h: H, frames: FRAMES, fps: FPS },
   (c) => clouds(c, c.frame),
   stamp("_bg", 0, 0),
   (c) => {
-    const moving = figures(c.frame), out = new Set()
-    for (const m of moving) cast(out, m.shapes)
-    for (const i of out) { const x = i % W, y = (i - x) / W, k = c.key(x, y); if (SHADE[k] && !"cdhjl]".includes(k)) c.px(x, y, SHADE[k]) }
+    const moving = figures(c.frame)
+    shadowsOf(c, moving.flatMap((m) => m.shapes))
     const all = [...STATIC.map((s) => ({ d: s.d, still: s })), ...STATIC.filter((s) => s.weeds).map((s) => ({ d: s.d - 0.02, weeds: s.weeds })), ...WILD.map((w) => ({ d: ahead(w.x, w.z), weeds: [w] })), ...moving].sort((m, n) => n.d - m.d)
     for (const m of all) {
       if (m.still) { c.stamp("_s" + m.still.id, 0, 0); continue }

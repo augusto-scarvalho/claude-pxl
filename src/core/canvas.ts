@@ -6,6 +6,7 @@ import { glyph, lineWidth } from "./font.ts";
 import type { BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
 import { bump, dirOf, setNormal } from "./normals.ts";
 import { type View, perspective } from "./perspective.ts";
+import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
 import { bayer, colorList, gridRows, hash, inPoly, polyBounds, type Region, regionPred, rng } from "./util.ts";
 
@@ -508,6 +509,61 @@ export class Canvas {
         else if (row + 0.5 > P.horizon) put(col, row, fn(dx * far, dz * far, eye + du * far, far, col, row));
         else { open = true; if (opts.sky) put(col, row, opts.sky(col, row)); }
       }
+    }
+  }
+
+  /**
+   * A tapered capsule painted round, in px: from (x0, y0), r0 px thick either side, to (x1, y1), r1.
+   * Every pixel is shaded by where it sits across it toward the light (from where `light` points,
+   * default the upper left): `ramp` dark to light, its last key only along the lit edge (`rim`,
+   * default on). Limbs, logs, pipes, a snake.
+   */
+  capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts: { light?: [number, number]; rim?: boolean } = {}): void {
+    const keys = [...ramp], n = keys.length, rim = opts.rim !== false && n > 1, [lx, ly] = opts.light ?? [-0.5, -1], ll = Math.hypot(lx, ly) || 1;
+    const dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy || 1, m = Math.max(r0, r1) + 1;
+    for (let y = Math.floor(Math.min(y0, y1) - m); y <= Math.ceil(Math.max(y0, y1) + m); y++)
+      for (let x = Math.floor(Math.min(x0, x1) - m); x <= Math.ceil(Math.max(x0, x1) + m); x++) {
+        const px = x + 0.5 - x0, py = y + 0.5 - y0, t = Math.max(0, Math.min(1, (px * dx + py * dy) / L2)), R = r0 + (r1 - r0) * t, ox = px - dx * t, oy = py - dy * t;
+        if (Math.hypot(ox, oy) > R + 0.2) continue;
+        // -1 on the side away from the light, 1 on the side toward it
+        const lit = (ox * lx + oy * ly) / ll / Math.max(0.6, R);
+        const k = rim && lit > 0.78 ? n - 1 : Math.max(0, Math.min(rim ? n - 2 : n - 1, Math.floor(((lit + 1) / (rim ? 1.78 : 2)) * (rim ? n - 1 : n))));
+        this.px(x, y, keys[k]);
+      }
+  }
+
+  /**
+   * Flames rising from (x, y), about `size` px tall: a few tongues, each flickering to its own beat (a
+   * cycle of `period` frames, default 6), leaning with the wind (`wind` px across per px up at the
+   * tip, default 0.55; negative leans left), `keys` from the root, hottest, to the tip, the last one
+   * for their edges. Inside an anim it follows the frame; `seed` keeps two fires apart.
+   */
+  flame(x: number, y: number, size: number, keys: string, opts: { wind?: number; period?: number; seed?: number; frame?: number } = {}): void {
+    const k = [...keys], core = k.length > 1 ? k.slice(0, -1) : k, edge = k[k.length - 1], m = core.length;
+    const r = rng(opts.seed ?? 1), n = Math.max(1, Math.round(size * 0.5)), wind = opts.wind ?? 0.55, frame = opts.frame ?? this.frame, period = opts.period ?? 6;
+    for (let i = 0; i < n; i++) {
+      const ph = (frame / period + r()) % 1, h = size * (0.7 + 0.6 * Math.sin((ph + i * 0.3) * Math.PI * 2) ** 2) * (0.6 + r() * 0.6);
+      const x0 = x + (r() - 0.5) * size * 0.8, w = Math.max(1, size * 0.22);
+      for (let j = 0; j < h; j++) {
+        const f = j / h, cx = Math.round(x0 + f * f * h * wind + Math.sin(f * 4 + ph * 6.28) * 0.6), cy = Math.round(y - j), ww = Math.max(0, Math.round(w * (1 - f)));
+        const key = core[Math.min(m - 1, Math.floor(f * m))];
+        for (let d = -ww; d <= ww; d++) this.px(cx + d, cy, Math.abs(d) === ww && ww > 0 ? (f < 0.5 ? core[Math.min(2, m - 1)] : edge) : key);
+      }
+    }
+  }
+
+  /** Shapes in meters (sticks, blobs, boxes, cones, polygons: see solids.ts) drawn far to near through the camera. */
+  solids(view: Partial<View>, shapes: Solid[], opts: SolidOpts = {}): void {
+    drawSolids(this as unknown as SolidCanvas, perspective({ ...view, w: view.w ?? this.img.w } as View), shapes, opts);
+  }
+
+  /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade by opts.shade. */
+  shadows(view: Partial<View>, shapes: Solid[], opts: SolidOpts): void {
+    if (!opts?.shade || !opts.sun) throw new PxError("shadows(view, shapes, { sun: { from: [x, z], up: degrees }, shade: { ground: shade, ... } }): where the sun is and what each ground color turns into in shade");
+    const w = this.img.w, x0 = -this.ox, y0 = -this.oy;
+    for (const i of castSolids(perspective({ ...view, w: view.w ?? this.img.w } as View), shapes, opts, w, this.img.h, x0, y0)) {
+      const x = (i % w) + x0, y = Math.floor(i / w) + y0, d = opts.shade[this.key(x, y)];
+      if (d) this.px(x, y, d);
     }
   }
 
@@ -1034,7 +1090,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "capsule", "flame",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

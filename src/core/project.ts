@@ -3,6 +3,7 @@ import { type BuildCtx, type BuildOut, buildAsset, drawnFrames, gcd } from "./bu
 import { type Canvas, OPS } from "./canvas.ts";
 import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from "./rig.ts";
 import { type View, perspective } from "./perspective.ts";
+import { solid } from "./solids.ts";
 import { TRANSPARENT, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
@@ -45,6 +46,10 @@ export const SIGNATURES: Record<string, string> = {
   warp: "fn:f ?where:r",
   plane: "view:o fn:f ?where:r",
   terrain: "view:o height:f fn:f ?opts:o",
+  solids: "view:o shapes:a ?opts:o",
+  shadows: "view:o shapes:a opts:o",
+  capsule: "x0:n y0:n r0:n x1:n y1:n r1:n ramp:s ?opts:o",
+  flame: "x:n y:n size:n keys:s ?opts:o",
   rampmap: "ramp:S ?opts:o",
   stamp: "name:s ?x:n y:n opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
@@ -433,6 +438,8 @@ export class Project implements BuildCtx {
     env.vnoise = vnoise;
     env.fbm = fbm;
     env.bayer = bayer;
+    // shapes in meters for solids() and shadows(): solid.stick, blob, box, cone, poly
+    env.solid = solid;
     // perspective({ w, horizon, eye, fov | focal, vp, yaw, pitch }): ground(x, z, up), at(col, row), scale(z, x, up), vanish(angle), vertical()
     env.perspective = (view: unknown) => {
       try { return perspective(view as View); } catch (e) { throw wrap(e).within("perspective", this.callerLoc()); }

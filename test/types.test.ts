@@ -19,7 +19,8 @@ const missing = (keys: string[], text: string, as: (k: string) => RegExp) => key
 const opt = (k: string) => new RegExp(`\\b${k}\\?:`);
 
 test("types/pxl.d.ts declares every global, op and option the runtime accepts", () => {
-  assert.deepEqual(missing(Object.keys(new Project().env()), dts, (k) => new RegExp(`function ${k}\\(`)), [], "globals");
+  // globals: functions, or objects of them (solid.stick, ...) declared as consts
+  assert.deepEqual(missing(Object.keys(new Project().env()), dts, (k) => new RegExp(`(function ${k}\\(|const ${k}: )`)), [], "globals");
   assert.deepEqual(missing([...OPS, "plate", "clip"], body("PxCanvas"), (k) => new RegExp(`\\n {4}${k}\\(`)), [], "canvas methods");
   assert.deepEqual(missing(ASSET_OPTS.sprite, body("PxAssetOpts"), opt), [], "sprite options");
   assert.deepEqual(missing(ASSET_OPTS.scene, body("PxSceneOpts"), opt), [], "scene options");

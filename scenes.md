@@ -101,10 +101,10 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - Things on the ground stand at `ground(x, z)`, sized by `scale(z)`; poles, posts and fences are a
   loop over z. A figure walking into the distance changes size only at each step's contact, and under
   ~15 px takes a hand-drawn sprite for its size (`fit`): drawn by code that small, it is a blob.
-- Props on the ground (plants, stakes, rocks): build each once as parts in meters, sticks (trunk,
-  arm, twig, post) and blobs (crown, boulder), and use the same parts twice: projected and drawn, and
-  swept onto the ground away from the sun for its shadow, so the shadow has the thing's shape and
-  stays right as it recedes. Near ones on a plate with `relight` for the rim; far ones in the haze
+- Props on the ground (plants, stakes, rocks, benches): build each once as parts in meters with the
+  `solid` global, sticks (trunk, arm, twig, post), blobs (crown, boulder), boxes, cones, and use the
+  same parts twice: `solids()` projects and draws them, `shadows()` sweeps them onto the ground away
+  from the sun, so the shadow has the thing's shape and stays right as it recedes. Near ones on a plate with `relight` for the rim; far ones in the haze
   color; under a few px, a simple tuft.
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
   `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:
@@ -125,10 +125,13 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   way (meteors, birds in a flock) run along parallel lines, which meet at `toward(theirDirection)`.
 - Creatures in perspective: the big ones near (a tyrannosaur, a horse) as a profile in meters, their
   top and bottom lines from tail to snout, projected and painted in slices across, the jaw its own
-  hinged piece, legs posed in 3D; round tubes and cones read as a fish with legs, and a head built
+  hinged piece, legs posed in 3D and painted round with `capsule`; round tubes and cones read as a fish with legs, and a head built
   as a cone tapering to a point is a fish's. Between open jaws is air: what's behind shows through. The
   small ones (pigeons, a flock overhead) drawn by hand in a few poses and sizes, placed and picked
   by the camera: at 10-20 px a 3D body is a few lumps, and wings seen from below in 3D go edge-on.
+- Fire on what burns (trees, logs, grass): `flame()` at points along it, sized by `scale` there, all
+  leaning the same way with one wind, each with its own `seed`; the light it throws is a warm key on
+  the near faces, not a glow over everything (`examples/perspective/extinction.px.js`).
 
 ## Slow motion in a short loop (clouds, mist, drifting things)
 

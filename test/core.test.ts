@@ -604,3 +604,36 @@ test("procedural texture: hash, vnoise and fbm stay in [0, 1], the same for the 
   const p = loadSource(PAL + `sprite("ok", { w: 1, h: 1 }, (c) => c.px(0, 0, hash(1, 2) < 1 && vnoise(0.5, 0.5) <= 1 && fbm(1, 1) <= 1 && bayer(0, 0) > 0 ? "r" : "g"))`, "t.px.js");
   assert.equal(keys(p, "ok"), "r");
 });
+
+test("solids and shadows: a box drawn where the camera puts it, the face toward the sun lit, its shadow falling away from the sun; a ghost only casts", () => {
+  const V = JSON.stringify({ w: 80, horizon: 20, eye: 2, fov: 90 });
+  // a box 2 m wide, 1.5 m tall, 9-11 m ahead and 2 m right; the sun low on the left; a ghost ball on the left
+  const p = loadSource(PAL + `const shapes = [solid.box([2, 9, 4, 11, 0, 1.5], { top: "w", lit: "w", shade: "r" }), solid.blob([-8, 10, 1], 1, 1, "r", { ghost: true })]
+const opts = { sun: { from: [-1, 0], up: 30 }, shade: { g: "k" } }
+scene("s", { w: 80, h: 50, bg: "g" }, shadows(${V}, shapes, opts), solids(${V}, shapes, opts))`, "t.px.js");
+  const rows = keys(p, "s").split("\n");
+  assert.equal(rows[25][48], "w", "the left face, toward the sun");
+  assert.equal(rows[25][53], "r", "the front face, side-on to it");
+  assert.equal(rows[28][62], "k", "the box's shadow, right of it");
+  assert.equal(rows[28][40], "g", "none between them");
+  assert.equal(rows[24][8], "g", "the ghost isn't drawn");
+  assert.equal(rows[28][16], "k", "but casts");
+  assert.match(failure(PAL + `scene("s", { w: 8, h: 8 }, shadows(${V}, [], {}))`, "s").message, /where the sun is/);
+});
+
+test("capsule: shaded across toward the light, the last key only along the lit edge", () => {
+  const col = (s: string, x: number) => s.split("\n").map((r) => r[x]).join("");
+  eq(col(art(PAL + 'sprite("c", { w: 20, h: 12 }, capsule(3, 6, 4, 16, 6, 4, "krgw", { light: [0, -1] }))', "c"), 10), "..wggrrrkk..");
+});
+
+test("flame: hottest at the root, the tip's key only up top, flickering from frame to frame and leaning with the wind", () => {
+  const f = (o: string) => art(PAL + `sprite("f", { w: 24, h: 16 }, flame(12, 15, 10, "wrk", { ${o} }))`, "f").split("\n");
+  const [a, b, left] = [f("frame: 0"), f("frame: 3"), f("frame: 0, wind: -0.55")];
+  assert.notDeepEqual(a, b);
+  const painted = a.map((r, y) => [r, y] as const).filter(([r]) => /[wrk]/.test(r));
+  assert.match(painted.at(-1)![0], /w/, "white at the root");
+  assert.doesNotMatch(painted[0][0], /w/, "not at the tip");
+  // the same tongues blown the other way: the upper half sits further left
+  const mean = (rows: string[]) => { let s = 0, n = 0; rows.slice(0, 10).forEach((r) => [...r].forEach((k, x) => { if (k !== ".") { s += x; n++ } })); return s / n };
+  assert.ok(mean(left) < mean(a) - 2);
+});

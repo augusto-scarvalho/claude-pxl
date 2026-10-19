@@ -140,6 +140,33 @@ declare global {
     shoulderW: number; hipW: number;
   }
 
+  type PxV3 = [number, number, number];
+  /** A shape in meters (made by solid.*): which fields it has says what it is. */
+  interface PxSolid {
+    a?: PxV3; b?: PxV3; half?: number; e?: PxV3; rx?: number; ry?: number;
+    box?: [number, number, number, number, number, number]; keys?: Record<string, PxColor>;
+    cone?: [PxV3, number, PxV3, number]; wrap?: [PxV3, number][]; poly?: PxV3[]; key?: PxColor;
+    /** drawn a little nearer than its middle (a face over a head) */
+    top?: number;
+    /** casts a shadow but isn't drawn */
+    ghost?: boolean;
+    /** drawn but casts nothing */
+    noShadow?: boolean;
+    /** the share of its shadow that is shade (a crown with sun flecks) */
+    dapple?: number;
+  }
+  /** The sun: the way toward it along the ground [x, z], how high it stands in degrees. */
+  interface PxSun { from: [number, number]; up: number }
+  interface PxSolidOpts {
+    /** where the eye stands in the world [x, z] (default 0, 0) */
+    at?: [number, number];
+    sun?: PxSun;
+    /** px per meter at a world point (default the camera's own) */
+    scale?: (x: number, z: number) => number;
+    /** drawn on a plate lit along these ramps, the light from `light` on screen */
+    ramps?: string[]; light?: [number, number];
+    shade?: Record<string, PxColor>;
+  }
   /** terrain()'s options: how far to look (m), the land's highest point, a cheap height it never rises more than `margin` above, the sky's color where a pixel sees no land. */
   interface PxTerrainOpts {
     far?: number; top?: number; bound?: (x: number, z: number) => number; margin?: number;
@@ -227,6 +254,14 @@ declare global {
     warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): void;
     /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away ("." or nothing: leave it). */
     plane(view: PxView | PxPerspective, fn: (x: number, z: number) => PxColor | null | undefined, where?: PxRegion): void;
+    /** A tapered capsule painted round (px), shaded across toward the light along `ramp`, a rim on the lit edge. */
+    capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts?: { light?: [number, number]; rim?: boolean }): void;
+    /** Flames rising from (x, y), about `size` px tall, flickering with the frame, leaning with `wind`; `keys` root to tip, the last for edges. */
+    flame(x: number, y: number, size: number, keys: string, opts?: { wind?: number; period?: number; seed?: number; frame?: number }): void;
+    /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly). */
+    solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): void;
+    /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade. */
+    shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): void;
     /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
     terrain(view: PxView | PxPerspective, height: (x: number, z: number) => number, fn: (x: number, z: number, u: number, t: number, col: number, row: number) => PxColor | null | undefined, opts?: PxTerrainOpts): void;
     recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): void;
@@ -297,6 +332,27 @@ declare global {
   function perspective(view: PxView & { w: number }): PxPerspective;
   /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away. */
   function plane(view: PxView | PxPerspective, fn: (x: number, z: number) => PxColor | null | undefined, where?: PxRegion): PxOp;
+  /** A tapered capsule painted round (px): every pixel shaded across it toward the light along `ramp` (dark to light), a rim on the lit edge. */
+  function capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts?: { light?: [number, number]; rim?: boolean }): PxOp;
+  /** Flames rising from (x, y), about `size` px tall: tongues flickering with the frame, leaning with `wind`; `keys` from the root to the tip, the last for their edges. */
+  function flame(x: number, y: number, size: number, keys: string, opts?: { wind?: number; period?: number; seed?: number; frame?: number }): PxOp;
+  /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly); boxes' faces lit by the sun. */
+  function solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): PxOp;
+  /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade by `shade`. */
+  function shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): PxOp;
+  /** Shapes in meters for solids() and shadows(). Points are [x, z, up]. */
+  const solid: {
+    /** round, from a to b, `half` m thick either side: trunks, limbs, poles, bars */
+    stick(a: PxV3, b: PxV3, half: number, key: PxColor, extra?: Partial<PxSolid>): PxSolid;
+    /** around e, rx across and ry up: crowns, heads, wheels */
+    blob(e: PxV3, rx: number, ry: number, key: PxColor, extra?: Partial<PxSolid>): PxSolid;
+    /** [x0, z0, x1, z1, u0, u1], its faces' colors { top, lit, shade, under? } */
+    box(b: [number, number, number, number, number, number], keys: { top?: PxColor; lit?: PxColor; shade: PxColor; under?: PxColor }, extra?: Partial<PxSolid>): PxSolid;
+    /** round, tapering from a (radius ra) to b (rb), standing roughly upright: a torso, a skirt, a bin */
+    cone(a: PxV3, ra: number, b: PxV3, rb: number, key: PxColor, extra?: Partial<PxSolid>): PxSolid;
+    /** flat, through its points */
+    poly(points: PxV3[], key: PxColor, extra?: Partial<PxSolid>): PxSolid;
+  };
   /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees (u its height, t its distance). */
   function terrain(view: PxView | PxPerspective, height: (x: number, z: number) => number, fn: (x: number, z: number, u: number, t: number, col: number, row: number) => PxColor | null | undefined, opts?: PxTerrainOpts): PxOp;
   /** The items drawn on a plate of their own, lit there with relight (only the plate's edges), and laid down. */

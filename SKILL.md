@@ -147,7 +147,8 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   person to keep editing in Aseprite.
 - **Light**: `shade:`/`light:` layers and `cast` shadows, `glow`, `lighting()` (lighting.md).
 - **In meters**: `perspective()` (one, two or three points: `yaw`, `pitch`), `plane()` for flat ground,
-  `terrain()` for hills and mountains; procedural texture with `hash`, `vnoise`, `fbm`, `bayer`
+  `terrain()` for hills and mountains, `solids()`/`shadows()` for things built of `solid` shapes,
+  `capsule` for a limb painted round, `flame` for fire; procedural texture with `hash`, `vnoise`, `fbm`, `bayer`
   (scenes.md "True perspective", "Closing a loop").
 
 ## Examples

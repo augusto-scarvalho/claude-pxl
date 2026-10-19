@@ -391,14 +391,19 @@ one), and the art code itself (4% of the cost).
   optional cheap bound and the sky's color for misses. Extinction's volcano had its own march.
 - [x] **`hash`, `vnoise`, `fbm`, `bayer` as globals**: all three perspective examples carried the same
   hash and value noise, and extinction fbm and a Bayer dither.
-- [ ] **Shapes in meters**: sticks, blobs, boxes, cones (rings square to their axis), drawn far to near
-  and swept onto the ground for their shadows, from one sun. road and park each carry their own
-  (`stick`, `blob`, `box`, `cone`, `hull`, `cast`, `fillGround`, `drawShapes`); a module would let a
-  scene declare props and get both. Big: the two versions differ (road's are 2D in a plane).
-- [ ] **A capsule painted round**: `capsule(a, ra, b, rb, ramp, light)` (extinction's `paintCone`):
-  every pixel shaded by where it sits across it on screen, a rim on the lit side. Limbs, logs, pipes.
-- [ ] **Flames**: tongues that flicker with the frame, lean with a wind, white at the root to red at
-  the tip (extinction's `flame`, used for trees, logs, scrub, fronds). Fire is in many scenes.
+- [x] **Shapes in meters**: `solids(view, shapes, opts)` and `shadows(view, shapes, { sun, shade })`
+  over the `solid` global (`stick`, `blob`, `box`, `cone`, `poly`), drawn far to near and swept onto
+  the ground from one sun; the park's own, lifted out (src/core/solids.ts), and the park now uses
+  them. Cones stay the park's: the hull of level rings, for things standing roughly upright (a tilted
+  limb is a `capsule`). road keeps its own: its shapes are 2D in a plane. The park sizes its shapes
+  by `P.scale` of their depth, 1/cos(yaw) = 1.3 times the camera's, and every width there was tuned
+  to it, so it passes that as `scale` instead of the default.
+- [x] **A capsule painted round**: `capsule(x0, y0, r0, x1, y1, r1, ramp, { light, rim })`, in px:
+  every pixel shaded by where it sits across it toward the light, a rim on the lit side. extinction's
+  limbs use it through `P.ground`/`P.scale`.
+- [x] **Flames**: `flame(x, y, size, keys, { wind, period, seed, frame })`: tongues that flicker with
+  the frame and lean with the wind, the root's key hottest, the last key for the edges up top.
+  extinction's trees, logs, scrub and fronds burn with it.
 - [x] **Where a build spends its time**: `pxl build --profile` naming the slowest assets and the
   functions that spent the most time themselves, in the art file and in pxl, read off V8's
   profiler; extinction went from 17 s to 1m43s without anyone seeing why until a CPU profile was
