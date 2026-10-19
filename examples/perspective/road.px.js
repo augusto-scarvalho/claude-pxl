@@ -122,26 +122,120 @@ function serras(c) {
     }
 }
 
-// old cracks sealed with tar: thin wavy lines across the lanes every few meters, and some along them.
-// Like the paint, at least ~0.5 px wide wherever they are, so they recede without breaking into dots.
-const CRACK = "kaAb"
-function cracked(x, z) {
-  const wd = Math.max(0.035, (z / P.focal) * 0.5), k = Math.floor(z / 7), across = k * 7 + hash(k, 1) * 5
-  if (z < 90 && hash(k, 2) < 0.7 && Math.abs(z - across - 0.25 * Math.sin(x * 2.3 + k)) < wd * 1.6 && Math.abs(x - (hash(k, 3) - 0.5) * 3) < 1 + hash(k, 4) * 2.4) return true
-  const lane = Math.floor(z / 11), along = (hash(lane, 5) - 0.5) * 5
-  return z < 60 && hash(lane, 6) < 0.5 && Math.abs(x - along - 0.12 * Math.sin(z * 1.7)) < wd && z % 11 > 2 && z % 11 < 9
-}
 function ground(x, z) {
   if (z > 400) return "h"
   const b = band(z, FAR), ax = Math.abs(x), paint = Math.max(PAINT_W, (z / P.focal) * 0.6)
   if (ax < ROAD_HALF) {
-    if (cracked(x, z)) return CRACK[b]
     // the center dashes, 3.5 m in 12 and one worn away now and then; the edge lines
     const dash = ax < paint && z % 12 < 3.5 && Math.floor(z / 12) % 5 !== 3
     return dash || Math.abs(ax - ROAD_HALF + 0.3) < paint ? PAINT[b] : ROAD[b]
   }
   if (ax < ROAD_HALF + 1) return SOIL[b][1]                                        // the gravel shoulder
   return SOIL[b][z < 45 && noise(x / 6, z / 8) > 0.64 ? 1 : 0]                     // sand patches; far, one tone
+}
+
+// ---------------------------------------------------------------- the old asphalt
+// Wear with causes, after the FHWA distress manual, each where it happens on a road like this one:
+// - fatigue ("alligator") cracking in the wheel paths: a net of sharp-angled pieces under 0.3 m;
+// - transverse cracks across the lanes, kinking, with short branches; one sealed with tar, glossy;
+// - a crack along the paving joint at the center line;
+// - edge cracking, which only an unpaved shoulder gets: crescents within 0.6 m of the edge, some
+//   broken away so the edge is gnawed and the gravel shows;
+// - potholes, where alligatored asphalt came loose.
+// Every crack is a walk in meters, projected and drawn as 1 px lines, so it stays a clean line and
+// thins into the distance; none much past 20 m, where a crack across the road would flatten into a
+// stripe: from there on, only the edge's wear still reads.
+const CRACK = "kaAb", SEAL = "AbBB"
+// a crack: short steps that keep their heading but kink now and then, branching off at a slant.
+// The heading is in the ground plane: 0 runs across (+x), PI/2 runs ahead (+z).
+function walk(r, x, z, ang, len, out, depth = 0) {
+  const pts = [[x, z]], step = 0.07
+  let a = ang
+  for (let d = 0; d < len; d += step) {
+    a += (r() - 0.5) * 0.5 + (r() < 0.1 ? (r() - 0.5) * 1.6 : 0) + (ang - a) * 0.2
+    x += Math.cos(a) * step; z += Math.sin(a) * step
+    if (Math.abs(x) > ROAD_HALF - 0.03) break
+    pts.push([x, z])
+    if (depth < 2 && r() < 0.045) walk(r, x, z, a + (r() < 0.5 ? -1 : 1) * (0.7 + r() * 0.7), len * (0.1 + r() * 0.2), out, depth + 1)
+  }
+  out.push(pts)
+}
+const ASPHALT = (() => {
+  const r = rng(23), lines = [], sealed = [], holes = [], gnawed = []
+  // alligator cracking in the wheel paths: a jittered net of pieces, complete in the middle of the
+  // patch and breaking up toward its edges, with the long cracks it grew from running through it
+  for (const [x0, x1, z0, z1] of [[1.5, 2.8, 2.3, 4.6], [-2.9, -1.8, 7, 10]]) {
+    const cell = 0.3, nx = Math.round((x1 - x0) / cell), nz = Math.round((z1 - z0) / cell), node = []
+    for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) node[i * (nz + 1) + j] = [x0 + (i + (r() - 0.5) * 0.7) * cell, z0 + (j + (r() - 0.5) * 0.7) * cell]
+    const keep = (i, j) => { const u = (i / nx) * 2 - 1, v = (j / nz) * 2 - 1; return r() > 0.3 + 0.7 * (u * u + v * v) ** 2 }
+    for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) {
+      const a = node[i * (nz + 1) + j]
+      for (const [di, dj] of [[1, 0], [0, 1]]) {
+        if (i + di > nx || j + dj > nz || !keep(i, j)) continue
+        const b = node[(i + di) * (nz + 1) + j + dj], m = [(a[0] + b[0]) / 2 + (r() - 0.5) * 0.06, (a[1] + b[1]) / 2 + (r() - 0.5) * 0.06]
+        lines.push([a, m, b])
+      }
+    }
+    for (const x of [x0 + 0.25, x1 - 0.25]) walk(r, x, z0 - 0.4, Math.PI / 2, z1 - z0 + 0.8, lines)
+  }
+  // transverse cracks, from an edge across one lane or both
+  for (const [z, from, len] of [[3.4, -1, 3.3], [5.6, 1, 7.2], [9.6, -1, 3.4], [16.5, 1, 7.2]])
+    walk(r, from * (ROAD_HALF - 0.05), z, from > 0 ? Math.PI + (r() - 0.5) * 0.2 : (r() - 0.5) * 0.2, len, lines)
+  walk(r, -ROAD_HALF + 0.05, 13.4, 0.05, 7.2, sealed)                    // this one was sealed with tar
+  // along the joint between the two lanes, in pieces
+  for (const [z0, len] of [[4, 5], [12, 7]]) walk(r, 0.09, z0, Math.PI / 2, len, lines)
+  // edge cracking: crescents on both edges; some broken away to the gravel
+  for (const sd of [-1, 1]) for (let z = 2.4; z < 28; z += 1.2 + r() * 3) {
+    const len = 0.6 + r() * 1.2, deep = 0.15 + r() * 0.4, pts = []
+    for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push([sd * (ROAD_HALF - deep * Math.sin(Math.PI * t) * (0.8 + r() * 0.4)), z + len * t]) }
+    ;(r() < 0.4 ? gnawed : lines).push(pts)
+  }
+  // potholes: a ragged bowl, and the cracks running out from it
+  for (const [x, z, rad] of [[-1.5, 6.2, 0.36], [2.3, 14, 0.3]]) {
+    const rim = []
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2, d = rad * (0.75 + r() * 0.5); rim.push([x + Math.cos(a) * d, z + Math.sin(a) * d * 0.8]) }
+    holes.push(rim)
+    for (let i = 0; i < 4; i++) { const a = r() * Math.PI * 2; walk(r, x + Math.cos(a) * rad, z + Math.sin(a) * rad * 0.8, a, 0.3 + r() * 0.6, lines) }
+  }
+  return { lines, sealed, holes, gnawed }
+})()
+
+function asphalt(c) {
+  const key = (z, keys) => keys[band(z, FAR)], near = (pts) => pts.some(([, z]) => z < 25)
+  // broken edges first: the gravel shows where the crescent came away, a dark lip along the break
+  for (const pts of ASPHALT.gnawed) {
+    if (!near(pts)) continue
+    const z = pts[0][1], edge = Math.sign(pts[0][0]) * (ROAD_HALF + 0.05)
+    c.poly([...pts, [edge, pts[pts.length - 1][1]], [edge, z]].flatMap(([x, zz]) => at(x, zz)), SOIL[band(z, FAR)][1])
+    for (let i = 1; i < pts.length; i++) c.line(...at(...pts[i - 1]), ...at(...pts[i]), key(z, CRACK))
+  }
+  // sealed: a band of tar wider than the crack, glossy with the sky in it
+  for (const pts of ASPHALT.sealed)
+    for (let i = 1; i < pts.length; i++) {
+      const [a, b] = [at(...pts[i - 1]), at(...pts[i])], z = pts[i][1]
+      c.line(...a, ...b, key(z, SEAL), Math.max(1, Math.round(0.07 * P.scale(z))))
+    }
+  for (const pts of ASPHALT.lines) {
+    if (!near(pts)) continue
+    for (let i = 1; i < pts.length; i++) c.line(...at(...pts[i - 1]), ...at(...pts[i]), key(pts[i][1], CRACK))
+  }
+  // near, the crack's far lip catches the light: a broken line of lighter asphalt just above it
+  const lip = rng(31)
+  for (let y = at(0, 8)[1]; y < H; y++)
+    for (let x = 0; x < W; x++) if (c.key(x, y) === "k" && c.key(x, y - 1) === "a" && lip() < 0.5) c.px(x, y - 1, "A")
+  // potholes: the bowl dark, its far wall (the side facing us) a step up, loose gravel in the bottom
+  for (const rim of ASPHALT.holes) {
+    const z = rim.reduce((s, [, zz]) => s + zz, 0) / rim.length, pts = rim.map(([x, zz]) => at(x, zz))
+    c.poly(pts.flat(), "k")
+    const ys = pts.map(([, y]) => y), top = Math.min(...ys), bot = Math.max(...ys), xs = pts.map(([x]) => x)
+    for (let y = top; y < top + Math.max(1, Math.round((bot - top) * 0.3)); y++)
+      for (let x = Math.min(...xs); x <= Math.max(...xs); x++) if (c.key(x, y) === "k" && c.key(x, y - 1) !== "k") c.px(x, y, key(z, "Zzgg"))
+    const r = rng(Math.round(z * 100))
+    for (let i = 0; i < (bot - top) * 2; i++) {
+      const x = Math.round(Math.min(...xs) + r() * (Math.max(...xs) - Math.min(...xs))), y = Math.round(top + (0.45 + r() * 0.5) * (bot - top))
+      if (c.key(x, y) === "k") c.px(x, y, r() < 0.5 ? "Z" : "G")
+    }
+  }
 }
 
 // ---------------------------------------------------------------- things on the land
@@ -384,6 +478,7 @@ function paint(c, p) {
 sprite("_land", { w: W, h: H },
   (c) => serras(c),
   plane(P, ground),
+  (c) => asphalt(c),
   (c) => {
     const out = new Set()
     for (const p of PROPS) if (p.z < 160 && P.scale(p.z) * p.thing.height >= 2) cast(out, p.x, p.z, p.thing.parts, p.thing.height)
