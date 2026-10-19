@@ -427,7 +427,7 @@ export class Project implements BuildCtx {
       try { this.includeHook(path); } finally { if (!opts.palette) this.pal = pal; }
     };
     env.rng = (seed?: number) => rng(seed);
-    // perspective({ w, horizon, eye, fov | focal, vp, yaw }): ground(x, z, up), at(col, row), scale(z, x), vanish(angle)
+    // perspective({ w, horizon, eye, fov | focal, vp, yaw, pitch }): ground(x, z, up), at(col, row), scale(z, x, up), vanish(angle), vertical()
     env.perspective = (view: unknown) => {
       try { return perspective(view as View); } catch (e) { throw wrap(e).within("perspective", this.callerLoc()); }
     };

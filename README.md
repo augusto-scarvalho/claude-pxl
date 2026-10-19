@@ -128,6 +128,9 @@ scene, not a default. Its plan is there to read (`pipeline/plan.md`).
 <p>
   <img src="docs/gallery/park.gif" width="100%" alt="Animated pixel-art park at two in the afternoon in two-point perspective: two paths crossing in the middle, hedges, benches and lamp posts running to two vanishing points, pastel apartment blocks beyond with their windows doing the same; a playground with swings, a slide, a climbing frame and a seesaw, a yellow ipê in bloom, an ice-cream cart under a striped umbrella; two children playing tag come out from behind a hedge, turn at the crossing and run off behind the cart, a woman in a straw hat walks her caramel dog away up the other path until a hedge hides them, a girl swings, pigeons peck by a chalk hopscotch">
 </p>
+<p>
+  <img src="docs/gallery/extinction.gif" width="100%" alt="Animated pixel-art end of the Cretaceous in three-point perspective, seen from low down looking up: a huge volcano erupting, a fountain of lava from its crater and rivers of lava down its gullies, its ash column bent over by the wind; a soot-dark sky with the four o'clock sun breaking through, the glow of the big meteor's strike behind the mountain and smaller meteors still falling; burning araucarias whose trunks lean in toward a vanishing point above the picture; a tyrannosaur and a herd of gallimimus running left in front of a burning fire front, pterosaurs fleeing overhead, embers and ash blowing on the wind">
+</p>
 
 [`examples/perspective/road.px.js`](examples/perspective/road.px.js): the sertão at sunset, everything
 laid out in meters and projected by `perspective()`, so every cactus, stake and boulder is the size it
@@ -141,6 +144,12 @@ at two in the afternoon. People and the dog are bodies in meters posed by a gait
 they're right from any angle the paths give them and cast their own short shadows; the children run
 behind the ice-cream cart because everything is drawn far to near, and the loop closes because both
 paths end behind a hedge.
+Then [`extinction.px.js`](examples/perspective/extinction.px.js): the camera tilted up 18° (`pitch`), three
+vanishing points: the horizon drops to the bottom and the burning araucarias lean in toward a third
+point high above the picture (`vertical()`). The volcano is a heightfield ray-marched through the same
+camera; its lava rivers run down the steepest way; the dinosaurs are bodies in meters on a run
+worked out in 3D, shaded round, each covering more than the picture's width in the loop so their
+coming back is never seen.
 
 ## Quick start
 

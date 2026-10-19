@@ -463,7 +463,7 @@ export class Canvas {
   /**
    * Flat ground seen in perspective: fn(x, z) gives the color of the ground point seen through each
    * pixel under the horizon ("." or nothing leaves it). `view` is a perspective() or its { horizon,
-   * eye, fov | focal, vp, yaw }; the width defaults to this canvas's. Stripes in x recede into the
+   * eye, fov | focal, vp, yaw, pitch }; the width defaults to this canvas's. Stripes in x recede into the
    * vanishing point, stripes in z space out toward us; turned (yaw), each set meets at its own point.
    */
   plane(view: Partial<View>, fn: (x: number, z: number) => string | null | undefined, where?: Region): void {

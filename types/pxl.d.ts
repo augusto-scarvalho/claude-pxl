@@ -140,24 +140,28 @@ declare global {
     shoulderW: number; hipW: number;
   }
 
-  /** A level pinhole camera over flat ground, in meters: the horizon's row, the eye's height, a field of view. */
+  /** A pinhole camera over flat ground, in meters: the horizon's row, the eye's height, a field of view. */
   interface PxView {
     w?: number; horizon: number; eye: number; fov?: number; focal?: number;
     /** The column the camera looks at (default the middle). */
     vp?: number;
     /** Degrees the camera is turned right of the world's z axis: two-point perspective (default 0). */
     yaw?: number;
+    /** Degrees the camera is tilted up, down if negative: three-point perspective (default 0). */
+    pitch?: number;
   }
   interface PxPerspective {
-    readonly w: number; readonly horizon: number; readonly eye: number; readonly focal: number; readonly vp: number; readonly yaw: number;
+    readonly w: number; readonly horizon: number; readonly eye: number; readonly focal: number; readonly vp: number; readonly yaw: number; readonly pitch: number;
     /** Where a point x m across, z m ahead and up m above the ground lands on screen (not rounded). */
     ground(x: number, z: number, up?: number): [number, number];
     /** The ground point [x, z] seen through a pixel's center; null at the horizon and above. */
     at(col: number, row: number): [number, number] | null;
-    /** px per meter at a point z m ahead (and x m across, which matters once turned). */
-    scale(z: number, x?: number): number;
+    /** px per meter at a point z m ahead (and x m across, which matters once turned; up m high, once tilted). */
+    scale(z: number, x?: number, up?: number): number;
     /** The column where ground lines heading `angle` degrees right of z meet (0: z lines, 90: x lines). */
     vanish(angle?: number): number;
+    /** Where uprights meet, [col, row]: above the picture tilted up, below tilted down; null when level. */
+    vertical(): [number, number] | null;
   }
 
   interface PxLamp { r?: number; color?: PxColor; power?: number; z?: number }

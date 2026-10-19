@@ -542,3 +542,23 @@ scene("s", { w: 100, h: 60, bg: "k" }, plane(P, (x, z) => (z > 10 && z < 12 ? "w
   assert.ok(tops[0] > tops[2], "the near one stands lower on screen");
   assert.throws(() => perspective({ w: 100, horizon: 20, eye: 0 }), /perspective: \{ w, horizon, eye \}/);
 });
+
+test("perspective: tilted up, uprights meet at a third point above, the horizon drops, and pixels still find their ground", () => {
+  const near = (a: number[] | null, b: number[], eps = 1e-6) => assert.ok(a && a.every((v, i) => Math.abs(v - b[i]) < eps), `${a} ~ ${b}`);
+  const env = { w: 100, horizon: 80, eye: 1.5, fov: 90, yaw: 30 };
+  assert.equal(perspective(env).vertical(), null, "level: no third point");
+  const T = perspective({ ...env, pitch: 30 });
+  // the camera looks focal·tan(30°) above the horizon; the ground's far points still sit on it
+  near([T.ground(0, 1e7)[1]], [80], 1e-3);
+  // a pole 20 m tall: its foot, middle and top on one line through the third point, which is above
+  const [vx, vy] = T.vertical()!, pole = [0, 5, 12, 20].map((u) => T.ground(4, 15, u))
+  assert.ok(vy < 0, "above the picture");
+  for (const [x, y] of pole.slice(1)) assert.ok(Math.abs((x - vx) * (pole[0][1] - vy) - (y - vy) * (pole[0][0] - vx)) < 1e-6, "on the line to the third point");
+  assert.ok(Math.abs(pole[3][0] - pole[0][0]) > 1, "and it leans on screen");
+  // ground lines still meet on the horizon, now spread wider by 1/cos(pitch)
+  near([T.ground(1e7 * Math.sin((30 * Math.PI) / 180), 1e7 * Math.cos((30 * Math.PI) / 180))[0]], [T.vanish(30)], 1e-3);
+  // a ground point and the pixel it lands on agree both ways
+  const [cx, cy] = T.ground(3, 7);
+  near(T.at(cx - 0.5, cy - 0.5), [3, 7]);
+  assert.throws(() => perspective({ ...env, pitch: 90 }), /pitch is how far the camera tilts/);
+});
