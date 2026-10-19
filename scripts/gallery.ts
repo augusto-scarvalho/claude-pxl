@@ -1,5 +1,5 @@
 // Renders the README gallery (docs/gallery/) from the examples: clean nearest-neighbour upscales,
-// GIFs for animated assets. Run: node scripts/gallery.ts
+// GIFs for animated assets. Run: node scripts/gallery.ts [asset ...] (all, or only those)
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,9 +25,12 @@ const shots: [string, string, number, number?][] = [
   ["no_magic.px.js", "clock", 192],
   ["cyberpunk/sodium_hour.px.js", "sodium_hour", 640, 3],
   ["cyberpunk/pipeline/cyberpunk_city.px.js", "cyberpunk_city", 640, 3],
+  ["perspective/road.px.js", "road", 640],
+  ["perspective/road.px.js", "plaza", 640],
 ];
 
-for (const [file, name, width, every = 1] of shots) {
+const only = process.argv.slice(2);
+for (const [file, name, width, every = 1] of shots.filter(([, n]) => !only.length || only.includes(n))) {
   const p = loadProject(join(root, "examples", file));
   const b = p.build(name);
   const s = Math.max(1, Math.floor(width / b.img.w));

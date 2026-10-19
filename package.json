@@ -23,6 +23,7 @@
     "examples/tropical/refs/*.{png,txt,md}",
     "examples/halloween/*.{px.js,hex}",
     "examples/sunset/*.px.js",
+    "examples/perspective/*.px.js",
     "examples/rig/*.px.js",
     "examples/cyberpunk/*.px.js",
     "examples/cyberpunk/pipeline/*.{px.js,md}",

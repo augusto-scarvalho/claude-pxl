@@ -11,6 +11,8 @@ declare global {
   type PxItem = string | PxOp | PxLayer | ((c: PxCanvas) => void);
 
   interface PxPlace {
+    /** Of a group or glob, the member whose drawing is nearest this height in px (sizes of one thing). */
+    fit?: number;
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; swap?: Record<string, PxColor>;
     rflip?: "x" | "y" | "xy"; rswap?: Record<string, PxColor>[]; seed?: number; reseed?: boolean | number;
     /** Animated assets: freeze on frame n / start later (ms) / random start. */
@@ -138,6 +140,26 @@ declare global {
     shoulderW: number; hipW: number;
   }
 
+  /** A level pinhole camera over flat ground, in meters: the horizon's row, the eye's height, a field of view. */
+  interface PxView {
+    w?: number; horizon: number; eye: number; fov?: number; focal?: number;
+    /** The column the camera looks at (default the middle). */
+    vp?: number;
+    /** Degrees the camera is turned right of the world's z axis: two-point perspective (default 0). */
+    yaw?: number;
+  }
+  interface PxPerspective {
+    readonly w: number; readonly horizon: number; readonly eye: number; readonly focal: number; readonly vp: number; readonly yaw: number;
+    /** Where a point x m across, z m ahead and up m above the ground lands on screen (not rounded). */
+    ground(x: number, z: number, up?: number): [number, number];
+    /** The ground point [x, z] seen through a pixel's center; null at the horizon and above. */
+    at(col: number, row: number): [number, number] | null;
+    /** px per meter at a point z m ahead (and x m across, which matters once turned). */
+    scale(z: number, x?: number): number;
+    /** The column where ground lines heading `angle` degrees right of z meet (0: z lines, 90: x lines). */
+    vanish(angle?: number): number;
+  }
+
   interface PxLamp { r?: number; color?: PxColor; power?: number; z?: number }
   interface PxBump { w?: number; depth?: number; on?: string; where?: PxRegion }
   type PxBumpShape = "dome" | "bevel" | "luma";
@@ -190,6 +212,8 @@ declare global {
     rampmap(ramp: string | string[], opts?: { where?: PxRegion; hue?: [number, number] }): void;
     /** Move pixels by whole-pixel offsets: fn(x, y) gives [dx, dy] at a pixel's new place; it takes the color (dx, dy) behind it. */
     warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): void;
+    /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away ("." or nothing: leave it). */
+    plane(view: PxView | PxPerspective, fn: (x: number, z: number) => PxColor | null | undefined, where?: PxRegion): void;
     recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): void;
     stamp(name: string, x?: number, y?: number, opts?: PxPlace): void;
     tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): void;
@@ -246,6 +270,10 @@ declare global {
     name: string; dir: string; ms: number[]; frames: Record<string, [number, number]>[]; depth: Record<string, number>[]; contact: [number, number][];
   };
   function clip(where: PxRegion, ...items: PxItem[]): PxOp;
+  /** A level pinhole camera over flat ground: ground(x, z, up) -> screen, at(col, row) -> ground, scale(z), vanish(angle). */
+  function perspective(view: PxView & { w: number }): PxPerspective;
+  /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away. */
+  function plane(view: PxView | PxPerspective, fn: (x: number, z: number) => PxColor | null | undefined, where?: PxRegion): PxOp;
   /** The items drawn on a plate of their own, lit there with relight (only the plate's edges), and laid down. */
   function plate(opts: PxRelight, ...items: PxItem[]): PxOp;
   function plate(...items: PxItem[]): PxOp;

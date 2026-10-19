@@ -5,6 +5,7 @@ import { PxError } from "./errors.ts";
 import { glyph, lineWidth } from "./font.ts";
 import type { BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
 import { bump, dirOf, setNormal } from "./normals.ts";
+import { type View, perspective } from "./perspective.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
 import { bayer, colorList, gridRows, hash, inPoly, polyBounds, type Region, regionPred, rng } from "./util.ts";
 
@@ -460,6 +461,24 @@ export class Canvas {
   }
 
   /**
+   * Flat ground seen in perspective: fn(x, z) gives the color of the ground point seen through each
+   * pixel under the horizon ("." or nothing leaves it). `view` is a perspective() or its { horizon,
+   * eye, fov | focal, vp, yaw }; the width defaults to this canvas's. Stripes in x recede into the
+   * vanishing point, stripes in z space out toward us; turned (yaw), each set meets at its own point.
+   */
+  plane(view: Partial<View>, fn: (x: number, z: number) => string | null | undefined, where?: Region): void {
+    const P = perspective({ ...view, w: view.w ?? this.img.w } as View), inside = where === undefined ? undefined : regionPred(where);
+    for (let row = Math.max(-this.oy, Math.floor(P.horizon)); row < this.img.h - this.oy; row++) {
+      for (let col = -this.ox; col < this.img.w - this.ox; col++) {
+        const g = P.at(col, row);
+        if (!g || (inside && !inside(col, row))) continue;
+        const k = fn(g[0], g[1]);
+        if (k && k !== ".") this.px(col, row, k);
+      }
+    }
+  }
+
+  /**
    * Move pixels by whole-pixel offsets, for motion drawn once: breathing, hair and tails swaying, a
    * body following a slope. fn(x, y) gives the offset [dx, dy] at a pixel's new place (or nothing:
    * stays); the pixel takes the color found (dx, dy) behind it, so no hole opens and no color is
@@ -545,7 +564,14 @@ export class Canvas {
     let inner = this.seed;
     if (opts.reseed === true) inner += (hash(a, b, opts.seed ?? 0) % 99991) + 1;
     else if (typeof opts.reseed === "number") inner += opts.reseed;
-    const pick = list[Math.floor(r() * list.length)];
+    let pick = list[Math.floor(r() * list.length)];
+    if (opts.fit !== undefined) {
+      // of a group (sizes of one thing), the member whose drawing is nearest that height, the smaller
+      // on a tie: a figure far down a road takes the sprite drawn for its size
+      if (!(Number.isFinite(opts.fit) && opts.fit > 0)) throw new PxError(`fit is the height in px to pick the member of '${name}' by, got ${JSON.stringify(opts.fit)}`);
+      const tall = (m: string) => { const im = this.res.image(m, inner); return im.bounds()?.h ?? im.h; };
+      pick = list.map((m) => [m, tall(m)] as const).reduce((a, b) => (Math.abs(b[1] - opts.fit!) < Math.abs(a[1] - opts.fit!) || (Math.abs(b[1] - opts.fit!) === Math.abs(a[1] - opts.fit!) && b[1] < a[1]) ? b : a))[0];
+    }
     let t = this.t, track = true;
     if (opts.frame !== undefined || opts.delay || opts.rdelay) {
       const tl = this.res.timeline(pick, inner);
@@ -963,7 +989,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

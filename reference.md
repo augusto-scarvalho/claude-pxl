@@ -115,7 +115,7 @@ sheet globs.
 | `twin: "name_l"` | Also the asset facing the other way under that name: the same items drawn mirrored before they are lit, so `relight` lights it from where the light really is (a `flip` carries the light across); pivot, sockets and `facing` mirrored. Art functions see `c.mirrored` (for choices a mirror doesn't make, such as which edge of a hand-lit blade is the lit one). `text`, `bump` and `normals` refuse to run in a twin. |
 | `facing: "right" \| "left" \| "front" \| "back"` | Which way it faces as drawn ("front": toward us). Flips and turns carry it, and `PXL describe` says for each placement where it faces, which way its top points (upright, lying, upside down, leaning), which of its sides is toward us, and when it is a mirror image (a flip moves a sword to the other hand). Lettering is tracked even without `facing`: a mirrored sign gets a warning that it reads backwards. In a rig, a part whose `facing` differs from the rig's is called out. It is a label: pxl does not read the pixels to check it. |
 | `height: meters` | Its real height. In a scene with `world`, describe says how tall it should be where it stands, and how far off the drawing is. It measures the drawing's box, top to bottom: a thing seen at an angle (a tent, a cart, a log) has its far end higher on screen, which the box counts too, so judge its near end yourself (describe says so when a wide thing comes out too tall). |
-| `world: { horizon, eye }` or `{ scale }` | Scene: the world's scale. Ground in perspective: the horizon's row and the eye's height in meters (a thing standing on row y is (y − horizon) / eye px per meter); flat side view: `scale` px per meter. Used by describe with `height`. `light: [x, y]` (where the light comes from): describe reads each object's lit side off its rim and warns when it disagrees (a flipped copy is lit from the other side). `light: { at: [x, y] }`: a point light in the scene (a fire, a lamp): each object is checked against the way from its middle to that point, and the one it sits in isn't checked. `ground: y` (flat views): what has a `height` is checked for floating or sinking; with or without it, a thing whose feet aren't where it was stamped (its pivot below its sole) is called out. |
+| `world: { horizon, eye }` or `{ scale }` | Scene: the world's scale. Ground in perspective: the horizon's row and the eye's height in meters (a thing standing on row y is (y − horizon) / eye px per meter, as in `perspective()`); flat side view: `scale` px per meter. Used by describe with `height`. `light: [x, y]` (where the light comes from): describe reads each object's lit side off its rim and warns when it disagrees (a flipped copy is lit from the other side). `light: { at: [x, y] }`: a point light in the scene (a fire, a lamp): each object is checked against the way from its middle to that point, and the one it sits in isn't checked. `ground: y` (flat views): what has a `height` is checked for floating or sinking; with or without it, a thing whose feet aren't where it was stamped (its pivot below its sole) is called out. |
 | `sockets: { name: [x, y], ... }` | Named points in drawing coordinates (pixel corners) that other stamps attach to: `stamp("arm_3", 0, 0, { at: "body.shoulder" })` puts the arm's pivot on the body's `shoulder` socket, wherever and however the body was placed. They move with flip, rot, angle, outline and crop, like the pivot. For characters built from parts (characters.md §10). |
 
 Post-processing order: mirror → swap → flip → rot → outline → crop.
@@ -195,6 +195,7 @@ Animation):
 |---|---|
 | `flip: "x"\|"y"\|"xy"`, `rot: 90\|180\|270` | mirror or turn this copy |
 | `swap: { g: "r" }` | recolor this copy |
+| `fit: px` | of a group or glob, the member whose drawing is nearest that height (the smaller on a tie): one thing drawn at several sizes, picked by how big it is where it stands. `stamp("walker_*", x, y, { fit: P.scale(z) * 1.75, frame })`: a figure far down a road takes the sprite drawn for its size instead of a scaled one |
 | `rflip: "x"\|"y"\|"xy"` | random flips, per copy |
 | `rswap: [{ g: "r" }, {}]` | a random recolor per copy (`{}` = none) |
 | `seed`, `reseed: true \| n` | `reseed` rebuilds the placed asset with its own random choices; `true` derives them from the position, so `tile("house", 0, 0, 4, 1, { reseed: true })` gives four different houses from one definition |
@@ -206,6 +207,19 @@ Animation):
 
 Randomness is seeded from the placement position + `seed`, so builds are reproducible and moving
 one placement doesn't reshuffle the others. Change `seed` to reroll.
+
+### Perspective
+
+| Op | Notes |
+|---|---|
+| `perspective({ w, horizon, eye, fov?, focal?, vp?, yaw? })` | not an op: a level pinhole camera over flat ground, in meters. `eye` m above the ground, the horizon on row `horizon`, `fov` degrees across the `w` px picture (default 90) or the `focal` length in px, looking at column `vp` (default the middle), turned `yaw` degrees right of the world's z axis (default 0). Returns `ground(x, z, up?)`: where a point x m across, z m ahead and `up` m above the ground lands on screen (floats); `at(col, row)`: the ground point `[x, z]` seen through a pixel (null at the horizon and above); `scale(z, x?)`: px per meter there; `vanish(angle?)`: the column where ground lines heading that many degrees right of z meet (0: the z lines, 90: the x lines). With yaw 0, everything running straight ahead meets at `vp`: one-point perspective; turned, the world's x and z lines meet at two points: two-point. Same model as `world: { horizon, eye }` |
+| `plane(view, (x, z) => key, where?)` | flat ground in perspective: the function gives the color of the ground point seen through each pixel under the horizon (`.` or nothing leaves it); `view` is a `perspective()` or its options (`w` defaults to the canvas's). Stripes in x run to the vanishing point, stripes in z space out toward the eye. A thin line sampled per pixel breaks into dots far away: keep it at least ~0.6 px wide there (`Math.max(width, z / P.focal * 0.6)`), or draw it as a `line` between two `ground()` points |
+
+Things standing on the ground are placed at `ground(x, z)` and sized by `scale(z)`. A walker going away
+holds its scale for a whole step and changes it only at the next contact, when the pose changes anyway
+(no size flicker mid-step), with the planted foot where it landed; under ~15 px, a figure drawn by code
+at its exact size turns into a blob, so draw the small sizes by hand (`walker_14`, `walker_12` ...
+`walker_5`) and pick with `fit` (`examples/perspective/road.px.js`).
 
 ### Terrain tilesets
 

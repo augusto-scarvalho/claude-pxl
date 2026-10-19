@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { art, failure, PAL } from "./helpers.ts";
+import { art, failure, keys, PAL } from "./helpers.ts";
+import { perspective } from "../src/core/perspective.ts";
 import { loadSource } from "../src/node/load.ts";
 import { compareSilhouettes, packSheet, sheetJson } from "../src/core/render.ts";
 import { pack } from "../src/core/color.ts";
@@ -504,4 +505,40 @@ sprite("dot", "r")
 group("dots", ["dot"])
 if (!before && has("dot") && has("dots") && !has("nothing")) sprite("ok", "r")`, "t.px.js");
   assert.ok(p.assets.has("ok"));
+});
+
+test("perspective: ground points land on rays to the vanishing point; plane draws the ground row by row; fit picks a size", () => {
+  // a 90-degree view 100 px wide: focal 50 px; the eye 2 m up, the horizon on row 20
+  const p = loadSource(PAL + `const P = perspective({ w: 100, horizon: 20, eye: 2, fov: 90 })
+sprite("tall_8", { w: 3, h: 8 }, rect(1, 0, 1, 8, "r"))
+sprite("tall_4", { w: 3, h: 4 }, rect(1, 0, 1, 4, "r"))
+sprite("tall_2", { w: 3, h: 2 }, rect(1, 0, 1, 2, "r"))
+// stripes 2 m wide along the road and a crossing band 10-12 m away
+scene("s", { w: 100, h: 60, bg: "k" }, plane(P, (x, z) => (z > 10 && z < 12 ? "w" : Math.floor(x / 2) % 2 ? "g" : ".")),
+  (c) => { for (const [i, z] of [5, 10, 20].entries()) { const [x, y] = P.ground(0, z); c.stamp("tall_*", 10 + i * 10, Math.round(y), { fit: P.scale(z) * 1.6 }) } })`, "t.px.js");
+  const env = { w: 100, horizon: 20, eye: 2, fov: 90 };
+  const P = perspective(env);
+  assert.ok(Math.abs(P.focal - 50) < 1e-9);
+  assert.deepEqual(P.ground(0, 10), [50, 30]);           // straight ahead: the middle column, 10 rows down
+  assert.deepEqual(P.ground(4, 10), [70, 30]);           // 4 m across at 10 m: 20 px to the side
+  const near = (a: number[] | null, b: number[]) => assert.ok(a && a.every((v, i) => Math.abs(v - b[i]) < 1e-9), `${a} ~ ${b}`);
+  near(P.at(69.5, 29.5), [4, 10]);
+  assert.equal(P.at(50, 10), null, "above the horizon");
+  // turned 45 degrees: x and z lines meet one focal length either side; a ground point and the
+  // pixel it lands on agree both ways
+  const T = perspective({ ...env, yaw: 45 });
+  near([T.vanish(0), T.vanish(90)], [0, 100]);
+  const [cx, cy] = T.ground(3, 7);
+  near(T.at(cx - 0.5, cy - 0.5), [3, 7]);
+  assert.ok(Math.abs(T.scale(7, 3) - 50 / (3 * Math.SQRT1_2 + 7 * Math.SQRT1_2)) < 1e-9);
+  // the crossing band: rows whose depth is 10-12 m (row 30 is 10 m, row 28 about 12.5 m)
+  const rows = keys(p, "s").split("\n");
+  assert.match(rows[29], /^w+$/);
+  assert.notEqual(rows[35][0], "w");
+  // fit: 1.6 m is 16 px at 5 m and 8 px at 10 m (both take the 8 px drawing), 4 px at 20 m
+  const tops = [10, 20, 30].map((x) => rows.findIndex((r) => r[x + 1] === "r"));
+  const heights = [10, 20, 30].map((x) => rows.filter((r) => r[x + 1] === "r").length);
+  assert.deepEqual(heights, [8, 8, 4]);
+  assert.ok(tops[0] > tops[2], "the near one stands lower on screen");
+  assert.throws(() => perspective({ w: 100, horizon: 20, eye: 0 }), /perspective: \{ w, horizon, eye \}/);
 });

@@ -121,6 +121,21 @@ less coherent, and cost about five times the tokens and twice the time: worth of
 scene, not a default. Its plan is there to read (`pipeline/plan.md`). The GIFs keep every third
 frame.
 
+## Showcase: true perspective
+
+<p>
+  <img src="docs/gallery/road.gif" width="100%" alt="Animated pixel-art road running straight to the horizon at sunset in one-point perspective: dashes and edge lines, a fence and power poles receding into the vanishing point where the sun sits, and a backlit figure walking away down the road, getting smaller step by step until it dissolves into the light, its long shadow stretching back toward the viewer">
+</p>
+<p>
+  <img src="docs/gallery/plaza.png" width="100%" alt="A square at sunset in two-point perspective: a tower seen corner-on, its floor lines and the flagstone joints running to two vanishing points off the left and right of the picture, a low hall and a kiosk">
+</p>
+
+[`examples/perspective/road.px.js`](examples/perspective/road.px.js): everything laid out in meters and
+projected by `perspective()`, the ground drawn by `plane()` pixel by pixel from where each pixel looks.
+The walker holds its size for a whole step and shrinks only when the next foot lands; under 15 px it
+switches to sprites drawn by hand for each size (14, 12, 10 ... 5 px), picked by `stamp`'s `fit`.
+Below, the same camera turned 40° (`yaw`): two vanishing points.
+
 ## Quick start
 
 ```sh

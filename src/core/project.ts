@@ -2,6 +2,7 @@
 import { type BuildCtx, type BuildOut, buildAsset, drawnFrames, gcd } from "./build.ts";
 import { type Canvas, OPS } from "./canvas.ts";
 import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from "./rig.ts";
+import { type View, perspective } from "./perspective.ts";
 import { TRANSPARENT, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
@@ -42,6 +43,7 @@ export const SIGNATURES: Record<string, string> = {
   light: "?where:r steps:n density:n",
   relight: "?where:r opts:o",
   warp: "fn:f ?where:r",
+  plane: "view:o fn:f ?where:r",
   rampmap: "ramp:S ?opts:o",
   stamp: "name:s ?x:n y:n opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
@@ -425,6 +427,10 @@ export class Project implements BuildCtx {
       try { this.includeHook(path); } finally { if (!opts.palette) this.pal = pal; }
     };
     env.rng = (seed?: number) => rng(seed);
+    // perspective({ w, horizon, eye, fov | focal, vp, yaw }): ground(x, z, up), at(col, row), scale(z, x), vanish(angle)
+    env.perspective = (view: unknown) => {
+      try { return perspective(view as View); } catch (e) { throw wrap(e).within("perspective", this.callerLoc()); }
+    };
     env.ik = (a: unknown, b: unknown, target: unknown, bend: unknown = 1) => {
       try { return ik(a as number, b as number, target as [number, number], bend as number); } catch (e) { throw wrap(e).within("ik", this.callerLoc()); }
     };

@@ -218,6 +218,8 @@ export interface SheetDef {
 
 /** Options for stamp / tile / pattern / tilemap / scatter / wire hangs. */
 export interface PlaceOpts {
+  /** Of a group or glob, the member whose drawing is nearest this height in px (sizes of one thing). */
+  fit?: number;
   flip?: "x" | "y" | "xy";
   rot?: 90 | 180 | 270;
   swap?: Record<string, string>;
