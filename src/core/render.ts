@@ -84,8 +84,11 @@ export function onionSheet(frames: Img[]): Img {
       const c0 = frames[0].get(x, y);
       if (c0 !== TRANSPARENT && frames.every((f) => f.get(x, y) === c0)) motion.set(x, y, darken(c0, 0.55));
     }
-  // what moves: a gray body under each frame's contour in its own color
-  const moving = (f: Img, x: number, y: number) => f.get(x, y) !== TRANSPARENT && !frames.every((g) => g.get(x, y) === f.get(x, y));
+  // what moves: a gray body under each frame's contour in its own color (whether a pixel ever changes,
+  // worked out once: asked for every frame, it made a long loop's sheet cost frames squared)
+  const still = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c0 = frames[0].get(x, y); if (frames.every((g) => g.get(x, y) === c0)) still[y * w + x] = 1; }
+  const moving = (f: Img, x: number, y: number) => f.get(x, y) !== TRANSPARENT && !(x >= 0 && y >= 0 && x < w && y < h && still[y * w + x]);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) if (frames.some((f) => moving(f, x, y))) motion.set(x, y, MOVING);
   frames.forEach((f, i) => {

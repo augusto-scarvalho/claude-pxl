@@ -32,7 +32,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
 4. `PXL build art.px.js` writes the outputs: PNGs, sheets, GIFs, and previews in `out/_preview/`
    (checkerboard = transparent, pixel grid; anims also `<name>_onion.png`, a motion map + onion
    skin). `--only a,b` for some of them; a long loop's preview GIF runs to many MB, `--every 3`
-   keeps one frame in three.
+   keeps one frame in three. A build that has grown slow: `--profile` names the functions where
+   the time went, in your file and in pxl.
 5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
    rig of the file and every frame of an animated scene, warnings only, with the frames they happen
    at. Fix each or say why it's meant. Its last line says which rules ran: a rule runs only where

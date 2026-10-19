@@ -22,6 +22,7 @@ import { checkProject } from "./check.ts";
 import { cellRow, diffRow, frameTime, otherVersion, shotChanges, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
 import { listProject } from "./list.ts";
+import { profileReport, profiled } from "./profile.ts";
 
 const USAGE = `pxl — pixel-art DSL
 
@@ -29,14 +30,16 @@ const USAGE = `pxl — pixel-art DSL
       What the reference says about an op or option: the rows that define it, a line for each other
       mention, and a few uses in the examples (--all: everything in full). Words of a guide's
       heading print that section ("characters 9", "small animals"). No name: an index.
-  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N]
+  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
       previews (out/_preview; animated assets also get a .gif). A whole file of more than 12 assets
       prints a count of what it wrote; --only and --list print a line per asset (size, frames,
       preview scale). --every N: preview GIFs keep one frame in N (a long loop's runs to many MB).
       --aseprite also writes each asset as <name>.aseprite (layers, frames, tag, palette) to keep
-      editing in Aseprite; pxl
-      never reads it back and the next --aseprite build overwrites it, so copy it out of out/.
+      editing in Aseprite; pxl never reads it back and the next --aseprite build overwrites it, so
+      copy it out of out/. --profile: where the time went, read off the CPU profiler: the slowest
+      assets, then the functions that spent the most time themselves, in the art file (what to make
+      faster: work done again every frame, a noise called millions of times) and in pxl.
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
       Live viewer: rebuilds on save and replays each asset's painting steps.
   pxl ascii <art.px.js> <name> [--frame N]
@@ -95,6 +98,7 @@ interface Args {
   scale?: number;
   preview?: boolean;
   aseprite?: boolean;
+  profile?: boolean;
   port?: number;
   at?: number[];
   /** Every --at given (shot: a column each). */
@@ -155,6 +159,7 @@ function parse(argv: string[]): Args {
     else if (v === "--all") a.all = true;
     else if (v === "--every") a.every = Number(val());
     else if (v === "--readings") a.readings = true;
+    else if (v === "--profile") a.profile = true;
     else if (v === "-h" || v === "--help") a.cmd = "usage";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -181,8 +186,9 @@ export async function main(argv: string[]): Promise<number> {
   try {
     switch (a.cmd) {
       case "build": {
-        const p = loadProject(file);
-        const r = writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every });
+        const build = () => { const p = loadProject(file); return { p, r: writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every }) }; };
+        let report = "";
+        const { p, r } = a.profile ? await profiled(build).then(({ result, profile }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times); return result; }) : build();
         for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);
         if (a.only || a.list || r.lines.length <= 12) for (const l of r.lines) console.log(l);
         else {
@@ -194,6 +200,7 @@ export async function main(argv: string[]): Promise<number> {
           console.log(`${r.lines.length} written: ${[...kinds].map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(", ")} (--list: one line each)`);
         }
         for (const e of r.errors) console.error("error: " + e.message);
+        if (report) console.log(report);
         console.log(`-> ${outDir}${r.errors.length ? ` (${r.errors.length} error${r.errors.length > 1 ? "s" : ""})` : ""}`);
         return r.errors.length ? 1 : 0;
       }

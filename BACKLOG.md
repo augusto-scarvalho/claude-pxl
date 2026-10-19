@@ -399,6 +399,8 @@ one), and the art code itself (4% of the cost).
   every pixel shaded by where it sits across it on screen, a rim on the lit side. Limbs, logs, pipes.
 - [ ] **Flames**: tongues that flicker with the frame, lean with a wind, white at the root to red at
   the tip (extinction's `flame`, used for trees, logs, scrub, fronds). Fire is in many scenes.
-- [ ] **Where a build spends its time**: `pxl build --profile` (or time in `pxl steps`) naming the
-  slowest steps and lines; extinction went from 17 s to 1m43s without anyone seeing why until a CPU
-  profile was read by hand (a march, a sky recomputed per frame, a density thrice per pixel).
+- [x] **Where a build spends its time**: `pxl build --profile` naming the slowest assets and the
+  functions that spent the most time themselves, in the art file and in pxl, read off V8's
+  profiler; extinction went from 17 s to 1m43s without anyone seeing why until a CPU profile was
+  read by hand. Its first run found pxl's own: the onion sheet asked every pixel of every frame
+  whether it ever changes, frames squared; worked out once, the park's build went from 94 s to 17 s.

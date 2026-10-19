@@ -347,7 +347,7 @@ node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image
 node <pxl>/bin/pxl.js shot <image.png> [<image.png> ...] [--at x,y,w,h ...] [--scale N] [--out DIR]
 node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
-node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N]
+node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
 node <pxl>/bin/pxl.js ascii <file> <name> [--frame N]
 node <pxl>/bin/pxl.js list  <file>
@@ -370,7 +370,10 @@ also lists what the lit-side rule read on every placement, warning or not, with 
 whole file with more than 12 assets prints how many of each kind it wrote; `--list` or `--only`
 print a line each (a smaller file prints them anyway).
 A preview GIF past 4 MB says so; `--every N` keeps one frame in N in the previews (the GIFs in
-`out/` keep every frame).
+`out/` keep every frame). A build that has grown slow: `--profile` prints where the time went, read
+off the CPU profiler: the slowest assets, then the functions that spent the most time themselves,
+in the art file (work redone every frame that could be done once, a noise called millions of
+times, a per-pixel search) and in pxl.
 `list` maps a file: each top-level statement that defines assets, its line range, the comment
 above it and the assets it defines (a loop's or a helper's many on one line). `help` prints the
 rows that define a name in full and one line for each other place that mentions it (`--all`: in

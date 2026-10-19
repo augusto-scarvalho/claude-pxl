@@ -165,6 +165,20 @@ function tmpArt(src: string): { dir: string; file: string } {
   return { dir, file };
 }
 
+test("cli build --profile names the slow function in the art file and the slowest asset", async () => {
+  const { file } = tmpArt(`use("pico8")
+function slow(n) { let s = 0; for (let i = 0; i < n; i++) s += Math.sin(i) * Math.cos(i); return s }
+sprite("busy", { w: 4, h: 4 }, (c) => { if (slow(4e6) > -1e9) c.rect(0, 0, 4, 4, "8") })
+sprite("quick", "7")`);
+  const log = console.log;
+  const lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try { assert.equal(await main(["build", file, "--profile", "--no-preview"]), 0); } finally { console.log = log; }
+  const out = lines.join("\n");
+  assert.match(out, /profile: .* in all; slowest assets: busy/);
+  assert.match(out, /slow +a\.px\.js:2/);
+});
+
 test("cli build writes sprites, previews, layered exports and sheets", async () => {
   const { dir, file } = tmpArt(`use("pico8")
 sprite("dot", { outline: "0" }, "8")

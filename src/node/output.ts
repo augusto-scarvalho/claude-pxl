@@ -30,6 +30,8 @@ const BIG_GIF = 4e6;
 export interface OutputResult {
   lines: string[];
   errors: PxError[];
+  /** How long each asset took to build and write, in ms. */
+  times: [string, number][];
 }
 
 function write(path: string, data: string | Buffer): void {
@@ -43,7 +45,7 @@ export function writePng(path: string, img: Img): void {
 
 /** Build and write. Each asset fails independently; errors are collected, not thrown. */
 export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}): OutputResult {
-  const lines: string[] = [], errors: PxError[] = [];
+  const lines: string[] = [], errors: PxError[] = [], times: [string, number][] = [];
   const sheetNames = new Set(p.sheets.map((s) => s.name));
   if (opts.only)
     for (const n of opts.only)
@@ -60,7 +62,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
 
   const names = want ? p.order.filter((n) => want.has(n)) : p.exported();
   for (const n of names) {
-    const def = p.assets.get(n)!;
+    const def = p.assets.get(n)!, t0 = performance.now();
     try {
       const b = p.build(n);
       const dir = def.kind === "scene" ? "scenes" : def.kind === "anim" ? "anims" : "sprites";
@@ -124,6 +126,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
     } catch (e) {
       errors.push(wrap(e));
     }
+    times.push([n, performance.now() - t0]);
   }
 
   for (const s of p.sheets) {
@@ -146,5 +149,5 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       errors.push(wrap(e).within(`sheet '${s.name}'`, s.loc));
     }
   }
-  return { lines, errors };
+  return { lines, errors, times };
 }
