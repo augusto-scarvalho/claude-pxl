@@ -86,8 +86,14 @@ export const ASSET_OPTS: Record<AssetKind, string[]> = {
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
 const MAX_LOOP = 60000;
-/** How many builds at a time other than 0 the project keeps (see Project.timed). */
-const TIMED_BUILDS = 64;
+/** How many bytes of builds at a time other than 0 the project keeps (see Project.timed). */
+const TIMED_BYTES = 1 << 30;
+
+/** Roughly what a build holds in memory: its image, its layers' and the ones beside them. */
+function buildBytes(b: BuildOut): number {
+  const px = (i?: Img) => (i ? i.data.length : 0);
+  return 4 * (px(b.img) + px(b.guide) + px(b.under) + b.layers.reduce((s, l) => s + px(l.img), 0) + (b.refs ?? []).reduce((s, r) => s + px(r.img), 0)) + 64 * b.placements.length;
+}
 export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline"];
 const SHEET_OPTS = ["cols", "pad", "extrude"];
 
@@ -148,6 +154,8 @@ function checkItems(where: string, items: unknown[], loc?: string): Item[] {
 export interface ProjectOptions {
   /** Record painting traces for seed-0 builds (live viewer). */
   trace?: boolean;
+  /** Bytes of builds at times other than 0 to keep (default 1 GB; see Project.timed). */
+  timedBytes?: number;
 }
 
 export class Project implements BuildCtx {
@@ -201,11 +209,15 @@ export class Project implements BuildCtx {
 
   private cache = new Map<string, BuildOut>();
   /**
-   * Builds at a time other than 0 (a frame of an animated scene, an anim placed at that time): the
-   * most recent TIMED_BUILDS only. A long loop checked frame by frame made thousands of them (a
-   * 240-frame city kept 3803 builds, 2.7 GB), and once a frame is done they are rarely asked again.
+   * Builds at a time other than 0 (a frame of an animated scene, an anim placed at that time), the
+   * most recently used kept up to timedBudget bytes. Unbounded, a long loop checked frame by frame
+   * kept thousands of big ones used once (a 360-frame city: 3803 builds, 2.7 GB). The sunset's seven
+   * scenes reuse the same anims at the same times (~700 MB of them): a cap by count, or a smaller
+   * budget, threw those out between scenes and its check went from 14 s to 100 s and more.
    */
-  private timed = new Map<string, BuildOut>();
+  private timed = new Map<string, { out: BuildOut; bytes: number }>();
+  private timedBytes = 0;
+  private readonly timedBudget: number;
   /** Timelines gathered from animated assets placed by the builds in progress (innermost last). */
   private collect: Partial<Timeline>[] = [];
   private building = new Set<string>();
@@ -215,6 +227,7 @@ export class Project implements BuildCtx {
 
   constructor(opts: ProjectOptions = {}) {
     this.tracing = !!opts.trace;
+    this.timedBudget = opts.timedBytes ?? TIMED_BYTES;
   }
 
   // ---------------------------------------------------------------- locations
@@ -623,11 +636,11 @@ export class Project implements BuildCtx {
 
   private buildAt(name: string, seed: number, t: number, clock?: Timeline, again = false): BuildOut {
     const key = (seed === 0 ? name : `${name}@${seed}`) + (t ? `#${t}` : "");
-    const hit = this.cache.get(key) ?? this.timed.get(key);
-    if (hit && !again) {
+    const kept = this.cache.get(key), timed = kept ? undefined : this.timed.get(key);
+    if ((kept || timed) && !again) {
       // most recently used last, so the oldest goes first when the timed cache is full
-      if (t) { this.timed.delete(key); this.timed.set(key, hit); }
-      return hit;
+      if (timed) { this.timed.delete(key); this.timed.set(key, timed); }
+      return kept ?? timed!.out;
     }
     const def = this.assets.get(name);
     if (!def) {
@@ -647,8 +660,15 @@ export class Project implements BuildCtx {
       if (!out.anim && acc.loop) out.anim = { loop: acc.loop, step: acc.step!, ...(acc.capped ? { capped: true } : {}) };
       if (!t) this.cache.set(key, out);
       else {
-        this.timed.set(key, out);
-        if (this.timed.size > TIMED_BUILDS) this.timed.delete(this.timed.keys().next().value!);
+        const old = this.timed.get(key), bytes = buildBytes(out);
+        if (old) { this.timedBytes -= old.bytes; this.timed.delete(key); }
+        this.timed.set(key, { out, bytes });
+        this.timedBytes += bytes;
+        for (const [k, v] of this.timed) {
+          if (this.timedBytes <= this.timedBudget || this.timed.size <= 1) break;
+          this.timed.delete(k);
+          this.timedBytes -= v.bytes;
+        }
       }
       return out;
     } catch (e) {

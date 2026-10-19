@@ -191,14 +191,20 @@ test("gif: big noisy frames survive LZW table resets exactly", () => {
   for (let i = 0; i < img.data.length; i++) assert.equal(g.frames[0].rgba[i], img.data[i] >>> 8);
 });
 
-test("a long animated scene keeps a bounded number of frame builds", () => {
-  // 200 frames of a scene with an anim in it: each frame builds the scene and the anim at that
-  // time; the project keeps the builds at time 0 and only the latest timed ones
-  const p = loadSource(PAL + `anim("blink", { w: 1, h: 1, frames: 200, fps: 10 }, (c) => c.px(0, 0, c.frame % 2 ? "r" : "w"))
-scene("s", { w: 2, h: 2 }, stamp("blink", 0, 0))`, "t.px.js");
+test("builds at times other than 0 are kept up to a budget of bytes, the least recently used out first", () => {
+  // 200 frames of a scene with an anim in it: each frame builds the scene and the anim at that time;
+  // a 2x2 scene frame is ~16 bytes of image and ~100 with its layers and placements, so 2000 bytes
+  // keep the last dozen or so
+  const src = PAL + `anim("blink", { w: 1, h: 1, frames: 200, fps: 10 }, (c) => c.px(0, 0, c.frame % 2 ? "r" : "w"))
+scene("s", { w: 2, h: 2 }, stamp("blink", 0, 0))`;
+  const p = loadSource(src, "t.px.js", { timedBytes: 2000 });
   const shown = p.frames("s");
   assert.equal(shown.length, 200);
   assert.notEqual(shown[1].img.data[0], shown[0].img.data[0], "the frames still differ");
-  const held = p as unknown as { cache: Map<string, unknown>; timed: Map<string, unknown> };
-  assert.ok(held.timed.size <= 64 && held.cache.size <= 4, `${held.cache.size} + ${held.timed.size} builds kept`);
+  const held = p as unknown as { cache: Map<string, unknown>; timed: Map<string, unknown>; timedBytes: number };
+  assert.ok(held.timedBytes <= 2000 && held.timed.size < 100 && held.cache.size <= 4, `${held.cache.size} + ${held.timed.size} builds, ${held.timedBytes} bytes`);
+  // with the default budget the same frames all stay
+  const all = loadSource(src, "t.px.js");
+  all.frames("s");
+  assert.ok((all as unknown as { timed: Map<string, unknown> }).timed.size >= 300);
 });
