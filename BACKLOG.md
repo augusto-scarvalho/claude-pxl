@@ -358,9 +358,12 @@ one), and the art code itself (4% of the cost).
   row says what 3x5 is for and sends words that must read to the 5x7 or `scale: 2`. (That row was
   also split in two by a real line break where `
 ` was meant, so `pxl help text` showed half.)
-- [ ] **Run the pipeline headless as a script** (dogfood tools): planner, forks in batches by free
+- [x] **Run the pipeline headless as a script** (dogfood tools): planner, forks in batches by free
   memory, a run cut by the usage limit resumed, a JSON per run and `runcost.py` at the end. What
   this round did by hand, for the next A/B.
+  Shipped as `tools/pipeline.py` in the dogfood folder (with `--single` for the one-agent side,
+  `--batch`, `--resume` after a usage limit, `--dry`); tried on a stand-in `claude` that cuts a part
+  off once: the part resumed, the composer waited for it, the costs added up.
 
 ## Later / niche
 
