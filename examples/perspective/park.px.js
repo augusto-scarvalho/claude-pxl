@@ -92,6 +92,13 @@ function worn(x, z) {
 }
 // mowing stripes along z (they run to the left point), and in them large soft patches a shade lighter or
 // darker, where the grass grows thicker or thinner; far off, the stripes alone
+// Concrete as it is outside: an almost even gray, a panel here and there a shade lighter (one replaced)
+// or darker, and near, the faint grain of its aggregate
+function concrete(x, z, dd, tone) {
+  const base = tone < 0.14 ? "/" : tone > 0.9 ? "|" : "f"
+  if (dd < 8 && hash(Math.floor(x * 22), Math.floor(z * 22)) < 0.045) return base === "f" ? "/" : base === "/" ? "?" : "f"
+  return base
+}
 const lawn = (x, z) => {
   const a = Math.floor(x / 2.5) & 1, n = ahead(x, z) < 45 ? noise(x / 4.5 + 31, z / 4.5) : 0.5
   // a thicker patch lifts both stripes a step, a thinner one lowers both: the stripes stay, softer or stronger
@@ -103,10 +110,11 @@ function ground(x, z) {
   const dd = ahead(x, z)
   if (dd > 140) return "e"
   if (inRect(x, z, PLAZA)) {
-    // the plaza: a border of darker stone, inside squares of two stones in a checker
-    const [x0, z0, x1, z1] = PLAZA
-    if (x - x0 < 0.3 || x1 - x < 0.3 || z - z0 < 0.3 || z1 - z < 0.3) return "/"
-    return (Math.floor((x - x0 - 0.3) / 0.8) + Math.floor((z - z0 - 0.3) / 0.8)) & 1 ? "`" : "f"
+    // the plaza: the same poured concrete in square panels, three by three; one with the mark a puddle
+    // left drying
+    const [x0, z0, x1, z1] = PLAZA, SL = (x1 - x0) / 3, i = Math.floor((x - x0) / SL), j = Math.floor((z - z0) / SL)
+    if (i === 2 && j === 1 && Math.hypot(x - (x0 + SL * 2.45), (z - (z0 + SL * 1.4)) * 1.3) < 0.28 + 0.06 * noise(x * 9, z * 9)) return "/"
+    return concrete(x, z, dd, hash(i * 13 + 5, j * 7 + 3))
   }
   const onA = z >= PATH_A[0] && z <= PATH_A[1], onB = x >= PATH_B[0] && x <= PATH_B[1]
   if (onA || onB) {
@@ -114,7 +122,9 @@ function ground(x, z) {
     const edge = Math.min(onA ? Math.min(z - PATH_A[0], PATH_A[1] - z) : 9, onB ? Math.min(x - PATH_B[0], PATH_B[1] - x) : 9)
     if (dd < 16 && edge < 0.1 && noise(x * 9, z * 9) > 0.45) return lawn(x, z)
     if (dd > 26) return "f"
-    return ["f", "|", "/", "f"][Math.floor(hash(onA ? Math.floor(x / 1.5) : Math.floor(z / 1.5), onA ? 1 : 2) * 4)]
+    // poured concrete in panels 1.5 m long, two across the path, the way a sidewalk is laid
+    const along = onA ? x : z, across = onA ? z - PATH_A[0] : x - PATH_B[0], width = onA ? PATH_A[1] - PATH_A[0] : PATH_B[1] - PATH_B[0]
+    return concrete(x, z, dd, hash(Math.floor(along / 1.5) * 7 + (onA ? 1 : 2), across < width / 2 ? 0 : 1))
   }
   if (inRect(x, z, SAND)) {
     for (const [px, pz, rx, rz] of PITS) if (((x - px) / rx) ** 2 + ((z - pz) / rz) ** 2 < 1) return "j"
@@ -188,15 +198,35 @@ function seg(c, x0, z0, x1, z1, u, key) {
   c.line(...at(x0, z0, u), ...at(x1, z1, u), key)
 }
 // curbs along the paths, slab joints where they're near enough to be more than a stripe
+// The pavement's lines, as a sidewalk's are: thin dark joints between the panels (no highlight: a sawn
+// joint is a groove, not a bevel), the panels' edges against the soil, a crack across a panel here and
+// there, a weed come up in a joint by the lawn.
 function paving(c) {
   for (const z of PATH_A) seg(c, -30, z, 90, z, 0, "g")
   for (const x of PATH_B) seg(c, x, -30, x, 90, 0, "g")
-  for (let x = -6; x < 36; x += 1.5) if (!(x > PLAZA[0] && x < PLAZA[2])) seg(c, x, PATH_A[0], x, PATH_A[1], 0, "g")
-  for (let z = -2; z < 34; z += 1.5) if (!(z > PLAZA[1] && z < PLAZA[3])) seg(c, PATH_B[0], z, PATH_B[1], z, 0, "g")
-  const [x0, z0, x1, z1] = PLAZA
-  for (const [a, b, cc, d] of [[x0, z0, x1, z0], [x1, z0, x1, z1], [x1, z1, x0, z1], [x0, z1, x0, z0]]) seg(c, a, b, cc, d, 0, "h")
-  for (let x = x0 + 1.27; x < x1 - 0.1; x += 1.27) seg(c, x, z0, x, z1, 0, "g")
-  for (let z = z0 + 1.27; z < z1 - 0.1; z += 1.27) seg(c, x0, z, x1, z, 0, "g")
+  const [px0, pz0, px1, pz1] = PLAZA, mid = (a, b) => (a + b) / 2
+  for (let x = -6; x < 60; x += 1.5) if ((x < px0 || x > px1) && ahead(x, 7.5) < 26) seg(c, x, PATH_A[0], x, PATH_A[1], 0, "g")
+  for (let z = -2; z < 60; z += 1.5) if ((z < pz0 || z > pz1) && ahead(6.3, z) < 26) seg(c, PATH_B[0], z, PATH_B[1], z, 0, "g")
+  seg(c, -6, mid(...PATH_A), px0, mid(...PATH_A), 0, "g"); seg(c, px1, mid(...PATH_A), 40, mid(...PATH_A), 0, "g")
+  seg(c, mid(...PATH_B), -2, mid(...PATH_B), pz0, 0, "g"); seg(c, mid(...PATH_B), pz1, mid(...PATH_B), 40, 0, "g")
+  const SL = (px1 - px0) / 3
+  for (let k = 0; k <= 3; k++) { seg(c, px0 + SL * k, pz0, px0 + SL * k, pz1, 0, "g"); seg(c, px0, pz0 + SL * k, px1, pz0 + SL * k, 0, "g") }
+  // cracks: from an edge or a joint, wandering across part of a panel
+  for (let k = -4; k < 30; k++)
+    for (const onA of [true, false]) {
+      if (hash(k, onA ? 7 : 9) > 0.16) continue
+      const r = rng(k * 31 + (onA ? 1 : 2)), a0 = k * 1.5 + 0.2 + r() * 1.1, pts = onA ? [[a0, PATH_A[0]]] : [[PATH_B[0], a0]]
+      if (onA ? a0 > px0 - 0.3 && a0 < px1 + 0.3 : a0 > pz0 - 0.3 && a0 < pz1 + 0.3) continue
+      for (let i = 1; i <= 4; i++) { const [px, pz] = pts[i - 1]; pts.push(onA ? [px + (r() - 0.4) * 0.3, pz + 0.3 + r() * 0.15] : [px + 0.3 + r() * 0.15, pz + (r() - 0.4) * 0.3]) }
+      if (ahead(...pts[0]) < 14) for (let i = 1; i < pts.length; i++) seg(c, ...pts[i - 1], ...pts[i], 0, "?")
+    }
+  // a weed in a joint by the lawn, here and there
+  for (let k = -2; k < 20; k++) {
+    for (const [x, z] of [[k * 1.5, PATH_A[0] + 0.05], [k * 1.5, PATH_A[1] - 0.05], [PATH_B[0] + 0.05, k * 1.5], [PATH_B[1] - 0.05, k * 1.5]]) {
+      if (inRect(x, z, PLAZA) || ahead(x, z) > 12 || hash(Math.round(x * 10) + 3, Math.round(z * 10)) > 0.3) continue
+      tuft(c, ...at(x, z), 0.1 * P.scale(ahead(x, z)), 3, Math.round(x * 91 + z * 7))
+    }
+  }
 }
 
 // ================================================================ shapes
@@ -499,7 +529,34 @@ function tree(x, z, { tall = 7, crown = 2.6, ipe = false, seed = 1, limbs = 4 } 
     ...t.trunk.line.slice(1).map((b, i) => stick([x + t.trunk.line[i][0], z + t.trunk.line[i][1], t.trunk.line[i][2]], [x + b[0], z + b[1], b[2]], t.trunk.r, "m")),
     ...f.leaves.map((q) => blob([x + q.p[0], z + q.p[1], q.p[2]], q.size / 2, q.size / 2, "p", { ghost: true }))]
   const bare = BARE.find(([bx, bz]) => bx === x && bz === z), ring = bare ? bare[2] * 0.95 : (0.15 + tall * 0.02) * 3
-  return { d: ahead(x, z), shapes, paint: (c) => paintTree(c, x, z, body, ipe ? "-stu:" : "=opqr", "N;lmn'"), fringe: around(x, z, ring, 14), ipe, x, z, crown, tall, seed }
+  // tall grass and weeds where the mower doesn't go: against the trunk and at the ends of the roots,
+  // on the side toward us; they sway (see sway())
+  const r = rng(seed + 9), tr = t.trunk.r, spots = t.wood.filter((w) => w.root).map((w) => [x + w.b[0] * 0.8, z + w.b[1] * 0.8])
+  for (const [px, pz] of around(x, z, tr * 1.8, 9)) if (r() < 0.35) spots.push([px, pz])
+  for (const [px, pz] of around(x, z, ring * 0.9, 12)) if (r() < 0.25) spots.push([px, pz])
+  const weeds = spots.filter(([px, pz]) => !paved(px, pz)).map(([px, pz]) => {
+    const n = 5 + Math.floor(r() * 4)
+    return { x: px + (r() - 0.5) * 0.2, z: pz + (r() - 0.5) * 0.2, blades: Array.from({ length: n }, (_, i) => ({ h: 0.3 + r() * 0.35, lean: ((i + 0.5) / n - 0.5) * 0.7 + (r() - 0.5) * 0.2, ph: r() * 6.28, head: r() < 0.3, tip: r() })) }
+  })
+  return { d: ahead(x, z), shapes, paint: (c) => paintTree(c, x, z, body, ipe ? "-stu:" : "=opqr", "N;lmn'"), fringe: around(x, z, ring, 14), weeds, ipe, x, z, crown, tall, seed }
+}
+// Weeds swaying: each blade bends more at the tip than at the foot, the wind a slow wave crossing the
+// lawn (8 s, three to the loop), so neighbouring clumps lean in turn rather than all at once; a few
+// carry a seed head.
+function sway(c, weeds, frame) {
+  for (const w of weeds) {
+    const s = P.scale(ahead(w.x, w.z)), [bx, by] = at(w.x, w.z), gust = (frame / 80) * Math.PI * 2 - w.x * 0.6 - w.z * 0.35
+    for (const b of w.blades) {
+      const hp = Math.max(2, Math.round(b.h * s)), bend = (0.07 + 0.05 * Math.sin(gust * 0.5 + b.ph)) * s * (b.h / 0.5) * Math.sin(gust + b.ph * 0.25)
+      let ex = bx, ey = by
+      for (let k = 0; k < hp; k++) {
+        const f = k / (hp - 1)
+        ex = Math.round(bx + b.lean * hp * f * 0.6 + bend * f * f); ey = by - k
+        c.px(ex, ey, f < 0.3 ? "}" : f < 0.97 ? "{" : b.tip < 0.15 ? "ó" : b.tip < 0.5 ? "ú" : "{")
+      }
+      if (b.head && hp > 4) { c.px(ex, ey - 1, "@"); c.px(ex + (bend > 0 ? 1 : -1), ey, "&"); c.px(ex, ey + 1, "@") }
+    }
+  }
 }
 // Where a mower can't reach, the grass grows taller: points around a thing's foot on the side toward us
 // (the far side is hidden behind it anyway)
@@ -793,19 +850,41 @@ function treeline(c) {
     paintTree(c, x, z, { ...t, ...foliage(seed, t, opts) }, "<<ST>", "<<<SST")
   }
 }
-const CLOUDS = [[40, 18, 34, 7], [230, 12, 48, 9], [150, 34, 26, 5], [290, 40, 22, 5]]
-function sky(c) {
-  for (const [x, y, w, h] of CLOUDS) {
-    const r = rng(x)
-    for (let i = 0; i < 6; i++) { const px = x + (r() - 0.5) * w, py = y + (r() - 0.3) * h * 0.6, rr = h * (0.5 + r() * 0.5); c.ellipse(Math.round(px), Math.round(py), Math.round(rr * 1.3), Math.round(rr), "F") }
-    c.hline(x - w / 2, y + h * 0.4, w, "H")
-    for (let yy = y; yy < y + h; yy++) for (let xx = x - w; xx < x + w; xx++) if (c.key(xx, yy) === "F" && c.key(xx, yy + 1) !== "F" && c.key(xx, yy + 1) !== "G") c.px(xx, yy, "G")
+// Clouds, drifting: two lanes of cumulus, the far one lower, smaller, flatter and slower. A lane is a
+// row of slots S px apart; over the loop each slot drifts one slot over and its cloud slowly turns into
+// the next slot's cloud, so the sky at the end is the sky at the start and no cloud jumps.
+const LANES = [{ y: 22, S: 130, w: 66, h: 16, n: 4, seed: 3, x0: 0 }, { y: 45, S: 80, w: 30, h: 7, n: 3, seed: 8, x0: 41 }]
+const DESIGNS = LANES.map((L) => Array.from({ length: L.n }, (_, i) => {
+  const r = rng(L.seed * 31 + i)
+  return Array.from({ length: 7 }, () => [(r() - 0.5) * L.w * 0.85, -r() * L.h * 0.45, L.h * (0.32 + r() * 0.3)])
+}))
+function clouds(c, frame) {
+  const t = frame / FRAMES
+  LANES.forEach((L, li) => {
+    const D = DESIGNS[li], at = (j) => D[((j % L.n) + L.n) % L.n]
+    for (let j = -2; (j - 1) * L.S < W + L.w; j++) {
+      const a = at(j), b = at(j + 1)
+      cloud(c, L.x0 + (j + t) * L.S, L.y, a.map((p, k) => p.map((v, m) => v + (b[k][m] - v) * t)), L.h)
+    }
+  })
+}
+// a cumulus: puffs cut flat at its base; white where the sun is on it, a light gray lower down and
+// along its right side, a bluer gray along the base
+function cloud(c, cx, base, puffs, h) {
+  const px = new Map()
+  for (const [dx, dy, r] of puffs)
+    for (let y = Math.floor(base + dy - r); y <= base; y++)
+      for (let x = Math.floor(cx + dx - r); x <= Math.ceil(cx + dx + r); x++)
+        if (x >= 0 && x < W && y >= 0 && (x + 0.5 - cx - dx) ** 2 + (y + 0.5 - base - dy) ** 2 <= r * r) px.set(y * W + x, [x, y])
+  for (const [i, [x, y]] of px) {
+    const right = !px.has(i + 1), key = y >= base ? "H" : y >= base - h * 0.3 || right ? "G" : "F"
+    c.px(x, y, key)
   }
 }
 
 // a hopscotch chalked on the plaza: squares, pairs, and the sky at the end, every line on the axes
 function hopscotch(c) {
-  const x0 = 5.0, z0 = 5.9, sq = 0.45
+  const x0 = 5.6, z0 = 2.4, sq = 0.45
   const cell = (x, z) => { for (const [a, b, cc, d] of [[x, z, x + sq, z], [x + sq, z, x + sq, z + sq], [x + sq, z + sq, x, z + sq], [x, z + sq, x, z]]) seg(c, a, b, cc, d, 0, "1") }
   let z = z0
   for (const pair of [false, true, false, true, false, true]) {
@@ -815,8 +894,15 @@ function hopscotch(c) {
   const n = 8, pts = Array.from({ length: n + 1 }, (_, i) => [x0 + sq / 2 + sq / 2 + Math.cos((i / n) * Math.PI) * sq * 0.9, z + Math.sin((i / n) * Math.PI) * sq * 0.9])
   for (let i = 0; i < n; i++) seg(c, ...pts[i], ...pts[i + 1], 0, "1")
 }
-// fallen ipê flowers on the grass under their trees
+// fallen ipê flowers on the grass under their trees; leaves on the path under the big tree
 function decals(c) {
+  const r = rng(91)
+  for (let i = 0; i < 70; i++) {
+    const z = 13.5 + r() * 8, x = PATH_B[0] + 0.15 + r() * (PATH_B[1] - PATH_B[0] - 0.3), [px, py] = at(x, z)
+    if (ahead(x, z) > 22) continue
+    const k = r() < 0.5 ? "o" : r() < 0.6 ? "q" : "(", long = r() < 0.5
+    c.px(px, py, k); if (long) c.px(px + 1, py, k)
+  }
   for (const t of STATIC) {
     if (!t.ipe) continue
     const r = rng(t.seed + 50)
@@ -827,9 +913,9 @@ function decals(c) {
   }
 }
 
+// the sky on its own, the clouds drift over it each frame, the rest of the picture over them
+sprite("_sky", { w: W, h: P.horizon + 1 }, grad(0, 0, W, P.horizon + 1, "ABCDE", "v"))
 sprite("_bg", { w: W, h: H },
-  grad(0, 0, W, P.horizon + 1, "ABCDE", "v"),
-  (c) => sky(c),
   (c) => city(c),
   (c) => treeline(c),
   plane(P, (x, z) => ground(x + CX, z + CZ)),
@@ -859,14 +945,17 @@ for (const s of STATIC)
   })
 
 anim("park", { w: W, h: H, frames: FRAMES, fps: FPS },
+  stamp("_sky", 0, 0),
+  (c) => clouds(c, c.frame),
   stamp("_bg", 0, 0),
   (c) => {
     const moving = figures(c.frame), out = new Set()
     for (const m of moving) cast(out, m.shapes)
     for (const i of out) { const x = i % W, y = (i - x) / W, k = c.key(x, y); if (SHADE[k] && !"cdhjl]".includes(k)) c.px(x, y, SHADE[k]) }
-    const all = [...STATIC.map((s) => ({ d: s.d, still: s })), ...moving].sort((m, n) => n.d - m.d)
+    const all = [...STATIC.map((s) => ({ d: s.d, still: s })), ...STATIC.filter((s) => s.weeds).map((s) => ({ d: s.d - 0.02, weeds: s.weeds })), ...moving].sort((m, n) => n.d - m.d)
     for (const m of all) {
       if (m.still) { c.stamp("_s" + m.still.id, 0, 0); continue }
+      if (m.weeds) { sway(c, m.weeds, c.frame); continue }
       const big = P.scale(m.d) * 1.2 > 14
       drawShapes(c, m.shapes, big ? BODY_RAMPS : undefined)
       if (m.leash) { const [hx, hy, cx, cy] = m.leash, mx = Math.round((hx + cx) / 2), my = Math.round((hy + cy) / 2) + 1; c.line(hx, hy, mx, my, "!"); c.line(mx, my, cx, cy, "!") }
