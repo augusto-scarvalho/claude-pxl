@@ -25,7 +25,7 @@ pal({
   // bark: dark, mid, lit
   l: "#4a3426", m: "#6c4c34", n: "#90704c",
   // leaves: deep, mid, lit, glint
-  o: "#2c6232", p: "#3f8a3c", q: "#66ad4a", r: "#a6d468",
+  o: "#24572f", p: "#3b8034", q: "#6aac3e", r: "#b9d65c",
   // ipê amarelo in bloom: dark, mid, lit
   s: "#c8940e", t: "#f2c21e", u: "#ffe46a",
   // playground paint: blue, red, yellow, each dark and light
@@ -39,7 +39,7 @@ pal({
   // the dog, a caramelo: caramel, its shade, cream
   "%": "#cf8a3e", "$": "#97582a", "+": "#f0cf98",
   // foliage: the deep shade under a crown; the ipê's deepest and its glint; bark's deepest; the treeline's dark and light
-  "=": "#1d4428", "-": "#9a6c08", ":": "#fff4b0", ";": "#2e2018", "<": "#466f52", ">": "#a3c39e",
+  "=": "#1a3838", "-": "#9a6a12", ":": "#fff6c0", ";": "#2e2018", "<": "#466f52", ">": "#a3c39e",
   // worn earth, a darker patch of it, pebbles, earth in shade; grass blades in the sun and in their own shade; daisies
   "(": "#8f6d48", ")": "#6e5236", "[": "#b49a72", "]": "#4f3b2b", "{": "#98d25c", "}": "#5a9a3a", ",": "#fbfbef",
   // paving: slabs a shade lighter and darker, a crack; the plaza's warm stone
@@ -276,12 +276,7 @@ const SHADE = { a: "c", b: "d", e: "c", f: "h", g: "h", i: "j", k: "l", m: "l", 
 const darken = (c, out) => { for (const i of out) { const x = i % W, y = (i - x) / W, d = SHADE[c.key(x, y)]; if (d) c.px(x, y, d) } }
 
 // ================================================================ things
-// Trees, drawn the way pixel-art trees are (the LPC trees in tropical/refs, Slynyrd's Pixelblog 15
-// and 44): the crown a few big masses, each a pile of leaf clumps of about one size, cauliflower-like:
-// serrated, lit on the upper left, dark underneath with a deep line along the lower edge, leaf strokes
-// radiating from the middle; piled from the bottom up so each clump's dark underside lies on the lit
-// top of the one below. The trunk forks under the crown so its limbs show going up into the masses;
-// wood shaded as a cylinder by the light, furrowed, rooted. No speckle: clusters under ~4 px are noise.
+// Leaf clumps, for the hedges: serrated, lit on the upper left, dark underneath, leaf strokes from the middle.
 const LEAF = [-0.6, -0.8]                                            // light from the upper left, on screen
 // A clump of leaves: a disc with a serrated rim; lit on the upper left (its brightest band just inside
 // the rim there), darker underneath with a deep line along its lower edge, and dark leaf strokes
@@ -315,83 +310,107 @@ function clump(c, x, y, R, base, ramp, r) {
   }
 }
 
-// A tree: a trunk that forks into limbs reaching up into a few big masses; the masses are piles of
-// clumps, drawn from the bottom up so each clump's dark underside lies over the lit top of the one
-// below; each clump's tone set by where it sits on its mass and on the crown (lit up and left).
-function drawTree(c, { cx, cy, rx, ry, foot, seed, ramp = "=opqr", bark = ";lmn", airy = 0 }) {
-  const r = rng(seed), [fx, fy] = foot, R = Math.max(3, Math.min(12, Math.round(Math.min(rx, ry) * (airy ? 0.16 : 0.3))))
-  // the masses: a few big lobes around the crown's middle, the crown wider than tall
-  const nm = 3 + Math.floor(r() * 2), masses = [[cx, cy - ry * 0.25, rx * 0.55, ry * 0.55]]
-  for (let i = 0; i < nm; i++) {
-    const a = Math.PI + (i / (nm - 1)) * Math.PI + (r() - 0.5) * 0.4
-    masses.push([cx + Math.cos(a) * rx * 0.55, cy + Math.sin(a) * ry * 0.35 + ry * 0.15, rx * (0.38 + r() * 0.12), ry * (0.4 + r() * 0.12)])
-  }
-  // Trunk and limbs: tapered curves, each pixel shaded by where it sits across the limb (lit on the
-  // left, dark on the right, a deep edge), so forks and roots merge into one body of wood. The trunk
-  // forks under the crown, so the limbs show going up into it.
-  const tw = Math.max(2, rx * 0.2), wood = new Map()
-  const limb = (p0, p1, p2, w0, w1, prio = 1) => {
-    const n = Math.max(4, Math.round(Math.hypot(p2[0] - p0[0], p2[1] - p0[1]) * 1.5))
-    for (let i = 0; i <= n; i++) {
-      const t = i / n, mt = 1 - t
-      const x = mt * mt * p0[0] + 2 * mt * t * p1[0] + t * t * p2[0], y = mt * mt * p0[1] + 2 * mt * t * p1[1] + t * t * p2[1]
-      let tx = 2 * mt * (p1[0] - p0[0]) + 2 * t * (p2[0] - p1[0]), ty = 2 * mt * (p1[1] - p0[1]) + 2 * t * (p2[1] - p1[1])
-      const tl = Math.hypot(tx, ty) || 1, nx = -ty / tl, ny = tx / tl, h = Math.max(0.5, (w0 + (w1 - w0) * t) / 2)
-      for (let yy = Math.floor(y - h - 1); yy <= Math.ceil(y + h + 1); yy++) for (let xx = Math.floor(x - h - 1); xx <= Math.ceil(x + h + 1); xx++) {
-        const dx = xx + 0.5 - x, dy = yy + 0.5 - y
-        if (dx * dx + dy * dy > h * h) continue
-        // across: how far from the middle of the limb; lit: how much the surface there faces the light
-        const across = Math.abs(dx * nx + dy * ny) / h, lit = (dx * LEAF[0] + dy * LEAF[1]) / h, key = xx + "," + yy, old = wood.get(key)
-        if (!old || prio > old.prio || (prio === old.prio && across < old.across)) wood.set(key, { x: xx, y: yy, across, lit, w: h * 2, prio })
-      }
+// Trees, grown the way the r/aseprite tree generators grow them (pxl-dogfood/refs/reddit-aseprite/NOTES.md):
+// a skeleton in meters first (a trunk, main limbs leaving it at different heights all around, some toward
+// us and some away, forking into branches and twigs, thinner and shorter each time, bending up and out),
+// then leaf clusters at the twig ends, each a small ragged stamp whose tone comes from where it sits in 3D
+// against the sun: on top and toward the sun lit, deep inside and underneath dark, the deepest a cool
+// blue-green. Drawn far to near together with the wood, so the leaves behind a limb are hidden by it and
+// the ones in front hide it. The shadow is cast by the clusters and limbs themselves, so it comes out lacy.
+const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((c) => c / l) }
+const SUN3 = norm([SUN_FROM[0] * Math.cos((55 * Math.PI) / 180), SUN_FROM[1] * Math.cos((55 * Math.PI) / 180), Math.sin((55 * Math.PI) / 180)])   // x, z, up
+function grow(seed, { tall = 7, spread = 1, limbs = 4, depth = 3 }) {
+  const r = rng(seed), wood = [], tips = []
+  const trunk = tall * 0.36, lean = [(r() - 0.5) * 0.25, (r() - 0.5) * 0.25], tr = 0.11 + tall * 0.016
+  wood.push({ a: [0, 0, 0], b: [lean[0], lean[1], trunk], r: tr })
+  for (let i = 0; i < 3; i++) { const az = i * 2.1 + r(); wood.push({ a: [0, 0, 0.25], b: [Math.cos(az) * tr * 2.6, Math.sin(az) * tr * 2.6, 0], r: tr * 0.45 }) }
+  const branch = (p, d, len, rad, left) => {
+    const e = p.map((c, i) => c + d[i] * len)
+    wood.push({ a: p, b: e, r: rad })
+    if (left === 0) { tips.push(e); return }
+    const n = 2 + (r() < 0.45 ? 1 : 0)
+    for (let i = 0; i < n; i++) {
+      // turn away from the parent by 25-50 degrees around a random axis, with a pull up and outward
+      const side = norm([r() - 0.5, r() - 0.5, r() - 0.5]), turn = (25 + r() * 25) * (Math.PI / 180)
+      const cross = norm([d[1] * side[2] - d[2] * side[1], d[2] * side[0] - d[0] * side[2], d[0] * side[1] - d[1] * side[0]])
+      let nd = d.map((c, k) => c * Math.cos(turn) + cross[k] * Math.sin(turn))
+      nd = norm([nd[0] * (1 + 0.2 * spread), nd[1] * (1 + 0.2 * spread), nd[2] + 0.25])
+      const from = p.map((c, k) => c + d[k] * len * (0.45 + r() * 0.55))
+      branch(from, nd, len * (0.6 + r() * 0.15), Math.max(0.012, rad * 0.62), left - 1)
     }
   }
-  const crownBottom = cy + ry * 0.55, fork = [fx + (cx - fx) * 0.4 + (r() - 0.5) * tw, crownBottom + (fy - crownBottom) * 0.35]
-  limb([fx, fy], [fx + (fork[0] - fx) * 0.3, (fy + fork[1]) / 2], fork, tw * 1.05, tw * 0.75, 2)
-  // a leader up into the middle mass, the side limbs leaving it one above another
-  const lead = [masses[0][0], masses[0][1] + ry * 0.1], ctl = [(fork[0] + lead[0]) / 2, (fork[1] + lead[1]) / 2]
-  limb(fork, ctl, lead, tw * 0.75, Math.max(1, tw * 0.3), 1)
-  masses.slice(1).forEach(([mx, my], i, rest) => {
-    const t = 0.08 + (i / Math.max(1, rest.length)) * 0.5, mt = 1 - t
-    const from = [mt * mt * fork[0] + 2 * mt * t * ctl[0] + t * t * lead[0], mt * mt * fork[1] + 2 * mt * t * ctl[1] + t * t * lead[1]], end = [mx, my + ry * 0.08]
-    limb(from, [(from[0] + end[0]) / 2, from[1] - (from[1] - end[1]) * 0.6], end, tw * (0.5 - t * 0.3), Math.max(1, tw * 0.2))
-  })
-  for (const sd of [-1, 1]) limb([fx + sd * tw * 0.2, fy - tw * 0.5], [fx + sd * tw * 0.7, fy - 0.5], [fx + sd * tw * (1.1 + r() * 0.4), fy + 0.5], tw * 0.45, 1, 0)
-  for (const { x, y, across, lit, w } of wood.values()) {
-    if (y > fy) continue                                                                                       // under the ground
-    let k = lit > 0.3 ? 3 : lit < -0.35 ? 1 : 2
-    if (w >= 4 && across > 0.8) k = 0
-    else if (w >= 5 && Math.abs(across - 0.38) < 0.12 && hash(x, Math.floor(y / 4)) < 0.75) k = Math.max(1, k - 1)   // furrows, long and broken
-    if (y < crownBottom + ry * 0.15) k = Math.max(0, k - 1)                                                    // in the crown's shade
-    c.px(x, y, bark[k])
+  for (let i = 0; i < limbs; i++) {
+    const az = i * 2.4 + r() * 0.6, el = (32 + r() * 28) * (Math.PI / 180), h = trunk * (0.82 + 0.5 * (i / limbs))
+    const d = norm([Math.cos(el) * Math.cos(az) * spread, Math.cos(el) * Math.sin(az) * spread, Math.sin(el)])
+    branch([lean[0] * (h / trunk), lean[1] * (h / trunk), h], d, tall * 0.3, 0.06 + tall * 0.008, depth)
   }
-  // the clumps: on a jittered grid inside the masses
-  const clumps = []
-  for (const [mx, my, mrx, mry] of masses)
-    for (let y = -mry; y <= mry; y += R * 1.1) for (let x = -mrx; x <= mrx; x += R * 1.25) {
-      const jx = x + (r() - 0.5) * R * 0.6, jy = y + (r() - 0.5) * R * 0.5
-      if ((jx / mrx) ** 2 + (jy / mry) ** 2 > 1 || (airy && r() < 0.25)) continue
-      const onMass = 0.5 - 0.5 * ((jx / mrx) * -LEAF[0] * -1 + (jy / mry) * -LEAF[1] * -1), onCrown = 0.5 - 0.5 * (((mx + jx - cx) / rx) * -LEAF[0] * -1 + ((my + jy - cy) / ry) * -LEAF[1] * -1)
-      clumps.push([mx + jx, my + jy, Math.max(0, Math.min(0.99, onMass * 0.4 + onCrown * 0.6 + (r() - 0.5) * 0.1))])
-    }
-  clumps.sort((a, b) => b[1] - a[1])
-  for (const [x, y, v] of clumps) clump(c, Math.round(x), Math.round(y), R, 1 + Math.floor(v * 2.6), ramp, r)
+  branch([lean[0], lean[1], trunk], norm([(r() - 0.5) * 0.3, (r() - 0.5) * 0.3, 1]), tall * 0.32, 0.07 + tall * 0.008, depth)
+  return { wood, tips }
 }
-
-// a tree in the park: drawn as above where it stands; its trunk, branches and crown (one dappled mass)
-// in meters for its shadow
-function tree(x, z, { tall = 7, crown = 2.6, ipe = false, seed = 1 } = {}) {
-  const r = rng(seed), shapes = [stick([x, z, 0], [x + 0.1, z, tall * 0.45], 0.18 + tall * 0.012, "m")]
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2 + r(), bx = x + Math.cos(a) * crown * 0.6, bz = z + Math.sin(a) * crown * 0.4
-    shapes.push(stick([x + 0.1, z, tall * 0.42], [bx, bz, tall * 0.7], 0.07, "m"))
+function foliage(seed, tree, { size = 0.75, per = 6, reach = 0.85 }) {
+  const r = rng(seed + 1), out = []
+  for (const t of tree.tips) for (let i = 0; i < per; i++) {
+    const o = norm([r() - 0.5, r() - 0.5, r() - 0.3]), d = Math.cbrt(r()) * reach
+    out.push({ p: t.map((c, k) => c + o[k] * d), size: size * (0.7 + r() * 0.6), v: r() })
   }
-  shapes.push(blob([x, z, tall * 0.74], crown * 1.05, crown * 0.75, "p", { ghost: true, dapple: 0.82 }))
-  const paint = (c) => {
-    const s = P.scale(ahead(x, z)), [cx, cy] = at(x, z, tall * 0.72)
-    drawTree(c, { cx, cy, rx: Math.round(crown * s), ry: Math.round(crown * 0.85 * s), foot: at(x, z, 0), seed, ramp: ipe ? "-sttu" : "=opqr", airy: ipe ? 1 : 0 })
+  const C = [0, 1, 2].map((k) => out.reduce((s, q) => s + q.p[k], 0) / out.length)
+  const R = Math.max(...out.map((q) => Math.hypot(...q.p.map((c, k) => c - C[k])))) * 0.9
+  for (const q of out) {
+    const rel = q.p.map((c, k) => c - C[k]), rim = Math.min(1, Math.hypot(...rel) / R), n = norm(rel)
+    const facing = n[0] * SUN3[0] + n[1] * SUN3[1] + n[2] * SUN3[2]
+    q.tone = 0.5 + 0.38 * facing * (0.4 + 0.6 * rim) - 0.32 * (1 - rim) - 0.12 * (n[2] < -0.4 ? 1 : 0) + (q.v - 0.5) * 0.12
   }
-  return { d: ahead(x, z), shapes, paint, ipe, x, z, crown, tall, seed }
+  return { leaves: out, C, R }
+}
+// a leaf cluster stamp of about `px` pixels: a few leaflets in a ragged clump, lit along its top, dark
+// along its bottom; four shapes a size
+const STAMPS = new Map()
+function leafStamp(px, which) {
+  const key = px + ":" + which
+  if (STAMPS.has(key)) return STAMPS.get(key)
+  const r = rng(px * 97 + which * 13), pts = new Map(), rad = px / 2
+  const blobs = px <= 2 ? [[0, 0, 0.8]] : Array.from({ length: 3 + (px > 5 ? 2 : 0) }, () => [(r() - 0.5) * rad, (r() - 0.5) * rad, rad * (0.45 + r() * 0.3)])
+  for (const [bx, by, br] of blobs)
+    for (let y = Math.floor(by - br - 1); y <= Math.ceil(by + br + 1); y++) for (let x = Math.floor(bx - br - 1); x <= Math.ceil(bx + br + 1); x++)
+      if ((x + 0.5 - bx) ** 2 + (y + 0.5 - by) ** 2 <= br * br + 0.3) pts.set(x + "," + y, [x, y])
+  const out = [...pts.values()].map(([x, y]) => [x, y, px >= 4 && !pts.has(x + "," + (y - 1)) ? 1 : px >= 4 && !pts.has(x + "," + (y + 1)) ? -1 : 0])
+  STAMPS.set(key, out)
+  return out
+}
+// a grown tree standing at (tx, tz), drawn far to near through the camera
+function paintTree(c, tx, tz, t, ramp, bark) {
+  const W3 = ([x, z, u]) => [tx + x, tz + z, u], scr = (p) => { const [x, z, u] = W3(p); return P.ground(x - CX, z - CZ, u) }
+  const items = [...t.wood.map((w) => ({ d: ahead(tx + (w.a[0] + w.b[0]) / 2, tz + (w.a[1] + w.b[1]) / 2), w })), ...t.leaves.map((q) => ({ d: ahead(tx + q.p[0], tz + q.p[1]), q }))].sort((a, b) => b.d - a.d)
+  for (const it of items) {
+    const s = P.scale(it.d)
+    if (it.w) {
+      const { a, b, r } = it.w, [x0, y0] = scr(a), [x1, y1] = scr(b), w = Math.max(1, Math.round(2 * r * s))
+      const mid = a.map((v, k) => (v + b[k]) / 2), inside = Math.hypot(...mid.map((v, k) => v - t.C[k])) < t.R * 0.75
+      if (w <= 2) { c.line(Math.round(x0), Math.round(y0), Math.round(x1), Math.round(y1), bark[inside ? 1 : 2], w); continue }
+      // a thick limb: lit side, middle, shade side, by its screen normal against the light from the left
+      const len = Math.hypot(x1 - x0, y1 - y0) || 1, nx = -(y1 - y0) / len, ny = (x1 - x0) / len
+      for (let i = 0; i <= Math.ceil(len); i++) {
+        const f = i / Math.ceil(len), cx = x0 + (x1 - x0) * f, cy = y0 + (y1 - y0) * f
+        for (let k = -w / 2; k <= w / 2; k += 0.5) {
+          const across = (2 * k) / w, litSide = across * Math.sign(nx || 1) < 0
+          const key = Math.abs(across) > 0.75 ? 0 : litSide && Math.abs(across) > 0.2 ? 3 : !litSide && Math.abs(across) > 0.3 ? 1 : 2
+          c.px(Math.round(cx + nx * k), Math.round(cy + ny * k), bark[inside ? Math.max(0, key - 1) : key])
+        }
+      }
+      continue
+    }
+    const q = it.q, px = Math.max(2, Math.min(10, Math.round(q.size * s))), [x, y] = scr(q.p)
+    const base = Math.max(0, Math.min(ramp.length - 1, Math.floor(q.tone * ramp.length)))
+    for (const [dx, dy, edge] of leafStamp(px, Math.floor(q.v * 4))) c.px(Math.round(x + dx), Math.round(y + dy), ramp[Math.max(0, Math.min(ramp.length - 1, base + edge))])
+  }
+}
+// a tree in the park: grown, painted where it stands; its limbs and leaf clusters cast its shadow
+function tree(x, z, { tall = 7, crown = 2.6, ipe = false, seed = 1, limbs = 4 } = {}) {
+  const opts = { tall, spread: crown / 2.2, limbs, ...(ipe ? { size: 0.5, per: 12, reach: 0.75 } : {}) }
+  const t = grow(seed, opts), f = foliage(seed, t, opts), body = { ...t, ...f }
+  const shapes = [...t.wood.map((w) => stick([x + w.a[0], z + w.a[1], w.a[2]], [x + w.b[0], z + w.b[1], w.b[2]], w.r, "m")),
+    ...f.leaves.map((q) => blob([x + q.p[0], z + q.p[1], q.p[2]], q.size / 2, q.size / 2, "p", { ghost: true }))]
+  return { d: ahead(x, z), shapes, paint: (c) => paintTree(c, x, z, body, ipe ? "-stu:" : "=opqr", ";lmn"), ipe, x, z, crown, tall, seed }
 }
 // a park bench: slats on two iron legs, a backrest; `along` the axis it runs on, facing `+1` or `-1`
 function bench(x, z, along, face) {
@@ -632,7 +651,7 @@ function figures(frame) {
 
 // ================================================================ the scene
 const STATIC = [
-  tree(3, 17.3, { tall: 8, crown: 3.2, seed: 3 }), tree(8.6, 27, { tall: 7, crown: 2.6, ipe: true, seed: 5 }),
+  tree(3, 17.3, { tall: 8, crown: 3.2, seed: 3 }), tree(16, 31, { tall: 7, crown: 2.6, ipe: true, seed: 5 }),
   tree(25, 27, { tall: 8.5, crown: 3.4, seed: 7 }), tree(31, 13.5, { tall: 7.5, crown: 3, seed: 9 }), tree(-3.5, 31, { tall: 7, crown: 2.8, ipe: true, seed: 11 }),
   tree(40, 22, { tall: 8, crown: 3.2, seed: 13 }),
   ...hedge(4.4, 19, 5.0, 34, 1.8), ...hedge(30, 5.4, 44, 6.0, 1.5),
@@ -671,7 +690,8 @@ function treeline(c) {
   crowns.sort((m, n) => ahead(n[0], n[1]) - ahead(m[0], m[1]))
   for (const [x, z, tall] of crowns) {
     const s = P.scale(ahead(x, z)), [cx, cy] = at(x, z, tall * 0.65)
-    drawTree(c, { cx, cy, rx: Math.max(4, Math.round(3.4 * s)), ry: Math.max(3, Math.round(2.8 * s)), foot: at(x, z, 0), seed: Math.round(x * 13 + z), ramp: "<<ST>", bark: "<<<S" })
+    const seed = Math.round(x * 13 + z) & 0xffff, opts = { tall, spread: 1.3, depth: 2, size: 1.1, per: 4 }, t = grow(seed, opts)
+    paintTree(c, x, z, { ...t, ...foliage(seed, t, opts) }, "<<ST>", "<<<S")
   }
 }
 const CLOUDS = [[40, 18, 34, 7], [230, 12, 48, 9], [150, 34, 26, 5], [290, 40, 22, 5]]
