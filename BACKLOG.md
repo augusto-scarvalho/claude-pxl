@@ -320,6 +320,13 @@ one), and the art code itself (4% of the cost).
   rise read a lunging knight's back foot as a far end and still left the tent at 20%). Now a wide
   thing that comes out too tall gets told the box counts its far end, and `height` says so.
 
+## From the Night City runs
+
+- [x] **Builds of a long loop kept in memory**: the project cached every build at every time, so
+  `pxl check` of a 320x180 city with a 360-frame loop held 3803 builds and peaked at 2.7 GB; two
+  agents checking at once ran the machine out of memory and their runs were stopped. Builds at
+  time 0 stay cached; the timed ones keep only the latest 64. Same check: 309 MB, as fast.
+
 ## Later / niche
 
 - [x] Layer blend modes and opacity (`blend`, `opacity`, `palettize`), with the palette caveats in

@@ -86,6 +86,8 @@ export const ASSET_OPTS: Record<AssetKind, string[]> = {
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
 const MAX_LOOP = 60000;
+/** How many builds at a time other than 0 the project keeps (see Project.timed). */
+const TIMED_BUILDS = 64;
 export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline"];
 const SHEET_OPTS = ["cols", "pad", "extrude"];
 
@@ -198,6 +200,12 @@ export class Project implements BuildCtx {
   }
 
   private cache = new Map<string, BuildOut>();
+  /**
+   * Builds at a time other than 0 (a frame of an animated scene, an anim placed at that time): the
+   * most recent TIMED_BUILDS only. A long loop checked frame by frame made thousands of them (a
+   * 240-frame city kept 3803 builds, 2.7 GB), and once a frame is done they are rarely asked again.
+   */
+  private timed = new Map<string, BuildOut>();
   /** Timelines gathered from animated assets placed by the builds in progress (innermost last). */
   private collect: Partial<Timeline>[] = [];
   private building = new Set<string>();
@@ -615,8 +623,12 @@ export class Project implements BuildCtx {
 
   private buildAt(name: string, seed: number, t: number, clock?: Timeline, again = false): BuildOut {
     const key = (seed === 0 ? name : `${name}@${seed}`) + (t ? `#${t}` : "");
-    const hit = this.cache.get(key);
-    if (hit && !again) return hit;
+    const hit = this.cache.get(key) ?? this.timed.get(key);
+    if (hit && !again) {
+      // most recently used last, so the oldest goes first when the timed cache is full
+      if (t) { this.timed.delete(key); this.timed.set(key, hit); }
+      return hit;
+    }
     const def = this.assets.get(name);
     if (!def) {
       if (this.groups.has(name) || name.includes("*"))
@@ -633,7 +645,11 @@ export class Project implements BuildCtx {
       const out = buildAsset(this, def, seed, this.tracing && seed === 0 && t === 0 ? new Trace() : undefined, t, clock);
       // Anims keep their own frame timing; other assets are as animated as what they place.
       if (!out.anim && acc.loop) out.anim = { loop: acc.loop, step: acc.step!, ...(acc.capped ? { capped: true } : {}) };
-      this.cache.set(key, out);
+      if (!t) this.cache.set(key, out);
+      else {
+        this.timed.set(key, out);
+        if (this.timed.size > TIMED_BUILDS) this.timed.delete(this.timed.keys().next().value!);
+      }
       return out;
     } catch (e) {
       const err = wrap(e, (s) => this.locFromStack(s)).within(`${def.kind} '${name}'`, def.loc);
