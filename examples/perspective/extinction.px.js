@@ -310,34 +310,14 @@ sprite("_bg", { w: W, h: H }, (c) => {
 })
 
 // ================================================================ shapes
-// As in the park: sticks { a, b, half, key } and cones { cone: [a, ra, b, rb], key } in meters, here
-// with their rings square to their own axis (a body lying along, not standing up), drawn far to near
-// on a plate that gives them a rim of light.
-const stick = (a, b, half, key, extra) => ({ a, b, half, key, ...extra })
-const cone = (a, ra, b, rb, key, extra) => ({ cone: [a, ra, b, rb], key, ...extra })
-const sub = (a, b) => a.map((v, k) => v - b[k]), addv = (a, b) => a.map((v, k) => v + b[k]), mul = (a, s) => a.map((v) => v * s)
+const addv = (a, b) => a.map((v, k) => v + b[k]), mul = (a, s) => a.map((v) => v * s)
 const unit = (v) => { const l = Math.hypot(...v) || 1; return v.map((c) => c / l) }
-const crossv = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
-function hull(pts) {
-  pts = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1])
-  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], hi = []
-  for (const p of pts) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p) }
-  for (const p of pts.reverse()) { while (hi.length > 1 && cr(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p) }
-  return lo.slice(0, -1).concat(hi.slice(0, -1))
-}
-function rings([a, ra, b, rb]) {
-  const ax = unit(sub(b, a)), e1 = unit(Math.abs(ax[2]) < 0.9 ? crossv(ax, [0, 0, 1]) : crossv(ax, [1, 0, 0])), e2 = crossv(ax, e1), out = []
-  for (const [p, r] of [[a, ra], [b, rb]]) for (let i = 0; i < 12; i++) { const t = (i / 12) * Math.PI * 2; out.push(P.ground(...addv(p, addv(mul(e1, Math.cos(t) * r), mul(e2, Math.sin(t) * r))))) }
-  return out
-}
-const midOf = (q) => (q.cone ? mul(addv(q.cone[0], q.cone[2]), 0.5) : q.poly ? mul(q.poly.reduce(addv), 1 / q.poly.length) : mul(addv(q.a, q.b), 0.5))
-const depthOf = (q) => Math.hypot(midOf(q)[0], midOf(q)[1]) - (q.top ?? 0) * 0.05
-// A cone painted round: every pixel in it shaded by where it sits across the cone on screen, its upper
-// side lit (the sun, and behind, the fires: a hot rim along the top), its underside in shade; across
-// the back, darker bands. `ramp`: shade, hide, lit, rim.
-function paintCone(c, [a, ra, b, rb], ramp, bands) {
+// A limb as a cone from a to b (radius ra to rb, in meters) painted round: every pixel in it shaded by
+// where it sits across it on screen, its upper side lit (the sun, and behind, the fires: a hot rim
+// along the top), its underside in shade. `ramp`: shade, hide, lit, rim.
+function paintCone(c, [a, ra, b, rb], ramp) {
   const [ax, ay] = P.ground(...a), [bx, by] = P.ground(...b), sa = ra * P.scale(a[1], a[0], a[2]), sb = rb * P.scale(b[1], b[0], b[2])
-  const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy || 1, L = Math.sqrt(L2), len3 = Math.hypot(...sub(b, a))
+  const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy || 1, L = Math.sqrt(L2)
   let nx = -dy / L, ny = dx / L
   if (ny > 0) { nx = -nx; ny = -ny }
   const m = Math.max(sa, sb) + 1
@@ -345,75 +325,126 @@ function paintCone(c, [a, ra, b, rb], ramp, bands) {
     const px = x + 0.5 - ax, py = y + 0.5 - ay, t = Math.max(0, Math.min(1, (px * dx + py * dy) / L2)), R = sa + (sb - sa) * t
     const ox = px - dx * t, oy = py - dy * t
     if (Math.hypot(ox, oy) > R + 0.2) continue
-    const across = (ox * nx + oy * ny) / Math.max(0.6, R), band = bands && across > -0.1 && ((t * len3) / 0.9 + across * 0.4) % 1 < 0.32
-    const k = across > 0.78 ? 3 : across > 0.3 ? 2 : across > -0.4 ? 1 : 0
-    c.px(x, y, ramp[Math.max(0, k - (band && k < 3 ? 1 : 0))])
-  }
-}
-function drawShapes(c, shapes, ramp) {
-  for (const q of [...shapes].sort((m, n) => depthOf(n) - depthOf(m))) {
-    if (q.cone) { paintCone(c, q.cone, q.ramp ?? ramp, q.bands); continue }
-    if (q.poly) { c.poly(q.poly.flatMap((p) => at(...p)), q.key); continue }
-    const m = midOf(q), w = Math.max(1, Math.round(2 * q.half * P.scale(m[1], m[0], m[2])))
-    c.line(...at(...q.a), ...at(...q.b), q.key, w)
+    const across = (ox * nx + oy * ny) / Math.max(0.6, R)
+    c.px(x, y, ramp[across > 0.78 ? 3 : across > 0.3 ? 2 : across > -0.4 ? 1 : 0])
   }
 }
 
 // ================================================================ the dinosaurs
-// A biped, in meters, posed by a run worked out in 3D like the park's people: each toe on an oval
-// (back along the ground, then lifted forward), the ankle above it on the slanting foot, the knee by
-// two-bone IK, bent forward as a bird's is; the body level over the hips, balanced by the stiff tail;
-// neck and head forward, the jaws open. `heading` is the way it runs.
-const TREX = { hip: 2.9, thigh: 1.4, shin: 1.3, foot: 0.8, reach: 1.25, lift: 0.55, bob: 0.1, hipR: 0.75, chest: 2.2, chestUp: 0.25, belly: 0.95,
-  tail: 5.6, tailR: 0.62, tailUp: 0.35, neck: 0.9, neckUp: 0.45, neckR: 0.58, skull: 1.45, skullR: 0.46, snoutR: 0.26, gape: 0.5, arm: 0.6, legR: 0.34 }
-const GALLI = { hip: 1.45, thigh: 0.62, shin: 0.75, foot: 0.55, reach: 0.95, lift: 0.4, bob: 0.06, hipR: 0.3, chest: 0.85, chestUp: 0.15, belly: 0.36,
-  tail: 2.5, tailR: 0.24, tailUp: 0.2, neck: 1.15, neckUp: 1.0, neckR: 0.1, skull: 0.38, skullR: 0.1, snoutR: 0.035, gape: 0.25, arm: 0.55, legR: 0.11 }
-function biped(b, { x, z, heading: [hx, hz], phase, look }) {
-  const g = height(x, z), th = phase * Math.PI * 2, sh = []
-  const w3 = (f, r, u) => [x + f * hx + r * hz, z + f * hz - r * hx, g + u]
-  const hipU = b.hip + b.bob * Math.cos(2 * th), side = b.hipR * 0.75
-  for (const sd of [-1, 1]) {
-    const t = th + (sd > 0 ? Math.PI : 0), toeF = b.reach * Math.cos(t), lift = b.lift * Math.max(0, -Math.sin(t))
-    const ankle = [toeF - b.foot * 0.45, lift + b.foot * 0.8]
-    const dx = ankle[0], du = ankle[1] - hipU, d = Math.min(Math.hypot(dx, du), b.thigh + b.shin - 0.01)
-    const ka = Math.atan2(du, dx) + Math.acos((b.thigh ** 2 + d * d - b.shin ** 2) / (2 * b.thigh * d))
-    const hip = w3(0, sd * side, hipU), knee = w3(Math.cos(ka) * b.thigh, sd * side, hipU + Math.sin(ka) * b.thigh)
-    const an = w3(ankle[0], sd * side, ankle[1]), toe = w3(toeF + b.foot * 0.25, sd * side, lift)
-    const k = sd < 0 ? look.near : look.far
-    sh.push(cone(hip, b.legR * 1.5, knee, b.legR, k, { ramp: sd < 0 ? look.ramp : look.ramp[0] + look.ramp.slice(0, 3) }), stick(knee, an, b.legR * 0.55, k), stick(an, toe, b.legR * 0.4, k))
-  }
-  const body0 = w3(-0.3, 0, hipU + 0.05), chest = w3(b.chest, 0, hipU + b.chestUp)
-  const tailEnd = w3(-b.tail, 0.25 * Math.sin(th), hipU + b.tailUp)
-  const head = w3(b.chest + b.neck * Math.cos(b.neckUp), 0, hipU + b.chestUp + b.neck * Math.sin(b.neckUp))
-  const snout = w3(b.chest + b.neck * Math.cos(b.neckUp) + b.skull, 0, hipU + b.chestUp + b.neck * Math.sin(b.neckUp) - b.skull * 0.12)
-  const jaw = w3(b.chest + b.neck * Math.cos(b.neckUp) + b.skull * 0.85, 0, hipU + b.chestUp + b.neck * Math.sin(b.neckUp) - b.skull * (0.12 + b.gape))
-  const jaw0 = w3(b.chest + b.neck * Math.cos(b.neckUp) + 0.05, 0, hipU + b.chestUp + b.neck * Math.sin(b.neckUp) - b.skull * 0.18)
-  sh.push(cone(body0, b.hipR, chest, b.belly, look.body, { bands: true }), cone(w3(-0.2, 0, hipU + 0.1), b.tailR, tailEnd, 0.04, look.body, { bands: true }),
-    cone(chest, b.neckR, head, b.neckR * 0.8, look.body), cone(head, b.skullR, snout, b.snoutR, look.body, { top: 2 }),
-    { poly: [jaw0, w3(b.chest + b.neck * Math.cos(b.neckUp) + b.skull * 0.9, 0, hipU + b.chestUp + b.neck * Math.sin(b.neckUp) - b.skull * 0.16), jaw], key: "x", top: 1 },
-    cone(jaw0, b.snoutR * 0.8, jaw, b.snoutR * 0.55, look.body, { top: 1.5 }))
-  sh.teeth = [0.35, 0.55, 0.75].map((f) => w3(b.chest + b.neck * Math.cos(b.neckUp) + b.skull * f, -b.snoutR * 0.5, hipU + b.chestUp + b.neck * Math.sin(b.neckUp) - b.skull * (0.12 * f + 0.06) - b.snoutR * 0.6))
-  // the eye, the arms held in
-  for (const sd of [-1, 1]) sh.push(stick(w3(b.chest - 0.1, sd * b.belly * 0.6, hipU + b.chestUp - b.belly * 0.4), w3(b.chest + b.arm * 0.6, sd * b.belly * 0.5, hipU + b.chestUp - b.belly * 0.4 - b.arm * 0.6), Math.max(0.05, b.legR * 0.3), look.far, { top: sd < 0 ? 2 : -2 }))
-  sh.eye = w3(b.chest + b.neck * Math.cos(b.neckUp) + b.skull * 0.25, -b.skullR * 0.8, hipU + b.chestUp + b.neck * Math.sin(b.neckUp) + b.skullR * 0.35)
-  return sh
+// A biped in profile, in meters, as palaeoartists draw them side on (the tyrannosaur after
+// steveoc86's profile on Wikimedia Commons): its top and bottom lines from the tail's tip to the
+// snout, f m ahead of the hip joint, u m above it, smoothed. The tyrannosaur: the tail as deep as the
+// hips where it leaves them, thinning slowly to its tip; a deep body, the belly hanging between the
+// legs; a short thick neck in an S, as deep as the head; the head big and boxy, deepest behind the
+// eyes, the snout deep and blunt, the jaw line straight; the lower jaw its own piece, hinged and
+// dropped open. Legs posed by a run worked out in 3D like the park's people (each toe on an oval,
+// the knee by two-bone IK, bent forward as a bird's is), the big thigh merging into the body.
+const TREX = {
+  hip: 2.9, thigh: 1.4, shin: 1.3, foot: 0.8, reach: 1.25, lift: 0.55, bob: 0.1, side: 0.5, thighR: 0.62, shinR: 0.3, footR: 0.15,
+  upper: [[-6.7, 0.1], [-5.2, 0.32], [-3.4, 0.55], [-1.6, 0.8], [0, 0.95], [1.3, 0.88], [2.3, 0.78], [2.95, 0.98], [3.4, 1.35], [3.8, 1.55], [4.3, 1.55], [4.8, 1.4], [5.25, 1.14], [5.42, 0.95]],
+  lower: [[-6.7, 0.05], [-5.2, 0.04], [-3.4, -0.06], [-1.6, -0.3], [-0.5, -0.65], [0.6, -0.95], [1.6, -0.95], [2.35, -0.6], [2.9, -0.15], [3.45, 0.35], [3.75, 0.62], [4.3, 0.68], [5.42, 0.74]],
+  jaw: { at: [3.72, 0.62], len: 1.55, back: 0.38, front: 0.2, gape: 0.4 }, eye: [4.25, 1.3], nostril: [5.22, 1.02], arm: [2.25, -0.4],
+  teeth: [4.0, 4.35, 4.7, 5.05, 5.3], nod: 0.05,
 }
-const LOOK = { trex: { body: "n", near: "n", far: "m", ramp: "mnop" }, galli: { body: "s", near: "s", far: "r", ramp: "rstp" } }
+const GALLI = {
+  hip: 1.45, thigh: 0.62, shin: 0.75, foot: 0.55, reach: 0.95, lift: 0.4, bob: 0.06, side: 0.2, thighR: 0.24, shinR: 0.08, footR: 0.05,
+  upper: [[-3.1, 0.05], [-2, 0.16], [-0.9, 0.3], [0, 0.4], [0.7, 0.36], [1.05, 0.42], [1.45, 0.8], [1.8, 1.18], [2.0, 1.32], [2.22, 1.32], [2.55, 1.18]],
+  lower: [[-3.1, 0.0], [-2, -0.01], [-0.9, -0.12], [0, -0.32], [0.6, -0.4], [1.0, -0.2], [1.3, 0.3], [1.65, 0.84], [1.9, 1.12], [2.2, 1.15], [2.55, 1.15]],
+  eye: [2.08, 1.26], arm: [0.85, -0.2], nod: 0.04,
+}
+// a line through points, smoothed (Catmull-Rom), then read as u at any f
+function smooth(pts) {
+  const ext = [pts[0], ...pts, pts[pts.length - 1]], out = []
+  for (let i = 1; i < ext.length - 2; i++) for (let k = 0; k < 8; k++) {
+    const t = k / 8, [p0, p1, p2, p3] = [ext[i - 1], ext[i], ext[i + 1], ext[i + 2]]
+    out.push([0, 1].map((j) => 0.5 * (2 * p1[j] + (p2[j] - p0[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t * t + (3 * p1[j] - p0[j] - 3 * p2[j] + p3[j]) * t * t * t)))
+  }
+  out.push(pts[pts.length - 1])
+  return out
+}
+function along2(line, f) {
+  if (f <= line[0][0]) return line[0][1]
+  for (let i = 1; i < line.length; i++) if (f <= line[i][0]) { const [a, b] = [line[i - 1], line[i]], t = (f - a[0]) / (b[0] - a[0] || 1); return a[1] + (b[1] - a[1]) * t }
+  return line[line.length - 1][1]
+}
+for (const B of [TREX, GALLI]) { B.top = smooth(B.upper); B.bot = smooth(B.lower) }
+// Paint a body between its lines, in thin slices across it: each pixel shaded by how far down its
+// slice it is: a hot rim along the top (the fires behind), lit, hide, the underside in shade, the
+// belly's very edge catching the glow off the burning ground; darker bands across the back.
+function paintBody(c, B, w3, du, ramp, from, to) {
+  for (let f = from; f <= to; f += 0.035) {
+    const [tx, ty] = P.ground(...w3(f, 0, along2(B.top, f) + du(f))), [bx, by] = P.ground(...w3(f, 0, along2(B.bot, f) + du(f))), n = Math.max(1, Math.ceil(Math.hypot(bx - tx, by - ty)))
+    for (let i = 0; i <= n; i++) {
+      const q = i / n
+      let k = q < 0.1 ? 3 : q < 0.36 ? 2 : q < 0.76 ? 1 : q < 0.93 ? 0 : 1
+      if (q > 0.08 && q < 0.5 && (((f / 0.55) % 1) + 1) % 1 < 0.3) k = Math.max(0, k - 1)
+      c.px(Math.round(tx + (bx - tx) * q), Math.round(ty + (by - ty) * q), ramp[k])
+    }
+  }
+}
+function runner(B, { x, z, phase, ramp }) {
+  const g = height(x, z), th = phase * Math.PI * 2, hipU = B.hip + B.bob * Math.cos(2 * th)
+  const w3 = (f, r, u) => [x - f, z + r, g + hipU + u]                                    // running left: forward is -x, the near side -z
+  // the tail swings up and down a little with the stride, the head nods
+  const du = (f) => (f < -2 ? 0.12 * Math.sin(th * 2 + f * 0.6) * ((-2 - f) / 4.7) : 0) + (f > 2.6 ? B.nod * Math.sin(th * 2) * (f - 2.6) : 0)
+  const legs = [-1, 1].map((sd) => {
+    const t = th + (sd > 0 ? Math.PI : 0), toeF = B.reach * Math.cos(t), lift = B.lift * Math.max(0, -Math.sin(t))
+    const ankle = [toeF - B.foot * 0.45, lift + B.foot * 0.8], dx = ankle[0], dz = ankle[1] - hipU, d = Math.min(Math.hypot(dx, dz), B.thigh + B.shin - 0.01)
+    const ka = Math.atan2(dz, dx) + Math.acos((B.thigh ** 2 + d * d - B.shin ** 2) / (2 * B.thigh * d))
+    const at3 = (f, u) => [x - f, z + sd * B.side, g + u]
+    return { sd, hip: at3(0, hipU), knee: at3(Math.cos(ka) * B.thigh, hipU + Math.sin(ka) * B.thigh), ankle: at3(ankle[0], ankle[1]), toe: at3(toeF + B.foot * 0.3, lift + 0.02) }
+  })
+  const far = ramp[0] + ramp.slice(0, 3)
+  const leg = (L, rp) => {
+    paintCone(c_, [L.hip, B.thighR, L.knee, B.thighR * 0.5], rp)
+    paintCone(c_, [L.knee, B.shinR, L.ankle, B.shinR * 0.6], rp)
+    paintCone(c_, [L.ankle, B.footR, L.toe, B.footR * 0.7], rp)
+  }
+  let c_
+  return {
+    d: Math.hypot(x, z),
+    draw(c) {
+      c_ = c
+      leg(legs[1], far)
+      if (B.arm) c.line(...at(...w3(B.arm[0], 0.4, B.arm[1])), ...at(...w3(B.arm[0] + 0.35, 0.4, B.arm[1] - 0.3)), far[1])
+      paintBody(c, B, w3, du, ramp, B.upper[0][0], B.upper[B.upper.length - 1][0])
+      if (B.jaw) {
+        // the lower jaw, hinged behind and dropped open; the mouth red inside; teeth in both jaws
+        const J = B.jaw, rot = (l, dn) => [J.at[0] + l * Math.cos(J.gape) - dn * Math.sin(J.gape), J.at[1] - l * Math.sin(J.gape) - dn * Math.cos(J.gape)]
+        const P2 = (p) => at(...w3(p[0], -0.05, p[1] + du(p[0])))
+        c.poly([...P2(J.at), ...P2([B.lower[B.lower.length - 1][0] - 0.05, B.lower[B.lower.length - 1][1]]), ...P2(rot(J.len, 0))], "x")
+        for (let l = 0; l <= J.len; l += 0.03) {
+          const top = rot(l, 0), bot = rot(l, J.back + (J.front - J.back) * (l / J.len)), [tx, ty] = P2(top), [bx, by] = P2(bot), n = Math.max(1, Math.ceil(Math.hypot(bx - tx, by - ty)))
+          for (let i = 0; i <= n; i++) c.px(Math.round(tx + (bx - tx) * (i / n)), Math.round(ty + (by - ty) * (i / n)), ramp[i / n < 0.5 ? 1 : 0])
+        }
+        for (const f of B.teeth) { c.px(...P2([f, along2(B.bot, f) - 0.1]), "1"); const l = f - J.at[0] - 0.15; if (l > 0 && l < J.len) c.px(...P2(rot(l, -0.08)), "1") }
+      }
+      leg(legs[0], ramp)
+      if (B.arm) {
+        const s = w3(B.arm[0], -0.45, B.arm[1]), e = w3(B.arm[0] + 0.3, -0.5, B.arm[1] - 0.32), h = w3(B.arm[0] + 0.55, -0.5, B.arm[1] - 0.25)
+        c.line(...at(...s), ...at(...e), ramp[2], Math.max(1, Math.round(0.14 * P.scale(z, x)))); c.line(...at(...e), ...at(...h), ramp[1])
+      }
+      // the eye catching the fire under a dark brow; the nostril
+      const E = at(...w3(B.eye[0], -0.3, B.eye[1] + du(B.eye[0])))
+      c.px(E[0], E[1], "W"); c.px(E[0] - 1, E[1] - 1, ramp[0]); c.px(E[0], E[1] - 1, ramp[0]); c.px(E[0] + 1, E[1] - 1, ramp[0])
+      if (B.nostril) c.px(...at(...w3(B.nostril[0], -0.2, B.nostril[1] + du(B.nostril[0]))), ramp[0])
+    },
+  }
+}
+const RAMP = { trex: "mnop", galli: "rstp" }
 // Who runs where, a loop of 6 s: each runs left at its own speed and, gone off the left (or behind
 // the near trunk), comes back in on the right; the loop's length in meters is what each covers in it,
 // longer than the width it's seen across, so the coming back is never in sight.
 const RUNNERS = [
-  { b: TREX, look: LOOK.trex, z: 21, x0: 10, v: 13, cycle: 6 },
-  ...[[36, 10, 0], [41, 24, 2], [34, 40, 1], [45, 52, 3], [38, 66, 2], [43, 80, 0]].map(([z, x0, off]) => ({ b: GALLI, look: LOOK.galli, z, x0, v: 17.5, cycle: 4, off })),
+  { B: TREX, ramp: RAMP.trex, z: 21, x0: 10, v: 13, cycle: 6 },
+  ...[[36, 10, 0], [41, 24, 2], [34, 40, 1], [45, 52, 3], [38, 66, 2], [43, 80, 0]].map(([z, x0, off]) => ({ B: GALLI, ramp: RAMP.galli, z, x0, v: 17.5, cycle: 4, off })),
 ]
 function runners(frame) {
-  const t = frame / FPS, out = []
-  for (const R of RUNNERS) {
-    const L = R.v * (FRAMES / FPS), span = L / 2, x = ((((R.x0 - R.v * t) % L) + L) % L) - span * 0.95
-    const sh = biped(R.b, { x, z: R.z, heading: [-1, 0], phase: ((frame + (R.off ?? 0)) % R.cycle) / R.cycle, look: R.look })
-    out.push({ d: Math.hypot(x, R.z), shapes: sh, eye: sh.eye, teeth: R.b === TREX ? sh.teeth : null, ramp: R.look.ramp })
-  }
-  return out
+  const t = frame / FPS
+  return RUNNERS.map((R) => {
+    const L = R.v * (FRAMES / FPS), x = ((((R.x0 - R.v * t) % L) + L) % L) - (L / 2) * 0.95
+    return runner(R.B, { x, z: R.z, phase: ((frame + (R.off ?? 0)) % R.cycle) / R.cycle, ramp: R.ramp })
+  })
 }
 // Pterosaurs the size of a Quetzalcoatlus (11 m across), seen from below and ahead: drawn by hand,
 // wings up, level and down, in two sizes, their undersides lit by the fires; placed and sized by the
@@ -613,9 +644,7 @@ anim("extinction", { w: W, h: H, frames: FRAMES, fps: FPS }, stamp("_bg", 0, 0),
   for (const m of all) {
     if (m.tree !== undefined) { c.stamp("_tree" + m.tree, 0, 0); treeFire(c, TREES[m.tree], c.frame); continue }
     if (m.sprite) { c.stamp(m.sprite, m.x, m.y); continue }
-    drawShapes(c, m.shapes, m.ramp ?? "uvvw")
-    for (const t of m.teeth ?? []) c.px(...at(...t), "1")
-    if (m.eye) c.px(...at(...m.eye), "W")
+    m.draw(c)
   }
   nearFire(c, c.frame)
   fronds(c, c.frame)
