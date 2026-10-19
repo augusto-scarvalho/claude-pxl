@@ -156,6 +156,8 @@ export interface ProjectOptions {
   trace?: boolean;
   /** Bytes of builds at times other than 0 to keep (default 1 GB; see Project.timed). */
   timedBytes?: number;
+  /** For pxl check: skip the whole-image passes (lighting, glow), which no check reads. */
+  checksOnly?: boolean;
 }
 
 export class Project implements BuildCtx {
@@ -218,6 +220,8 @@ export class Project implements BuildCtx {
   private timed = new Map<string, { out: BuildOut; bytes: number }>();
   private timedBytes = 0;
   private readonly timedBudget: number;
+  /** Builds for checking only (see BuildCtx.checksOnly). */
+  readonly checksOnly: boolean;
   /** Timelines gathered from animated assets placed by the builds in progress (innermost last). */
   private collect: Partial<Timeline>[] = [];
   private building = new Set<string>();
@@ -228,6 +232,7 @@ export class Project implements BuildCtx {
   constructor(opts: ProjectOptions = {}) {
     this.tracing = !!opts.trace;
     this.timedBudget = opts.timedBytes ?? TIMED_BYTES;
+    this.checksOnly = !!opts.checksOnly;
   }
 
   // ---------------------------------------------------------------- locations

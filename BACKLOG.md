@@ -337,12 +337,19 @@ one), and the art code itself (4% of the cost).
 
 ## From the pipeline experiments (proposals)
 
-- [ ] **`pxl check` of a long loop on all cores**: a 320x180 street with a 240- or 360-frame loop
+- [x] **`pxl check` of a long loop on all cores**: a 320x180 street with a 240- or 360-frame loop
   takes ~24 s to check, each frame built in turn; the examples test went from ~35 s to ~91 s with
   the two cyberpunk streets. Frames are independent: split them over worker threads.
-- [ ] **Preview GIFs of long loops**: `pxl build` writes a 6 MB GIF for each of those streets; the
+  Shipped otherwise: workers gave the same text but little speed on this laptop's i5 (4 cores,
+  1 GHz base: 2 workers 21.8 s, 4 workers 19.8 s against 25.8 s) and lost the sunset's reuse across
+  its scenes (17 s to 62 s). A city frame spent 2/3 of its time in `lighting()` and `glow()`, which
+  no check reads: `pxl check` loads the file with `checksOnly` and skips them. The cities' checks
+  went from ~25 s to 11 s, the examples test from 174 s to 51 s, the suite from 91 s to 56 s.
+- [x] **Preview GIFs of long loops**: `pxl build` writes a 6 MB GIF for each of those streets; the
   README's needed every third frame (the gallery script's `every`). `build --every n`, or a note
   when a preview GIF passes a few MB.
+  Shipped both: past 4 MB the build line says so (the city's: 16.4 MB, 360 frames), and `--every 3`
+  makes it 5.5 MB; the GIFs in `out/` keep every frame.
 - [ ] **Small lettering that misreads**: a pipeline's composer reported its 3x5 "PARK" reading as
   "FASK". When `text()` uses a tiny font at scale 1 for a word, describe could say which letters
   are ambiguous at that size (P/F, R/K, B/8) and point to the 5x7 font.

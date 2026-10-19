@@ -25,7 +25,7 @@ test("pxl check on every example: the same warnings as kept", () => {
   const out: string[] = [];
   for (const f of files) {
     try {
-      const p = loadProject(join(root, "examples", f));
+      const p = loadProject(join(root, "examples", f), { checksOnly: true });
       // every frame of every animated scene (the bout's blows, the blocks, the last clash included)
       const r = checkProject(p, { file: basename(f) });
       out.push(`${f}: ${r.warnings} warning${r.warnings === 1 ? "" : "s"} (${r.checked})`, `  ${r.coverage}`, ...r.lines.map((l) => "  " + l));

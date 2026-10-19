@@ -208,3 +208,15 @@ scene("s", { w: 2, h: 2 }, stamp("blink", 0, 0))`;
   all.frames("s");
   assert.ok((all as unknown as { timed: Map<string, unknown> }).timed.size >= 300);
 });
+
+test("preview GIFs with every: one frame in n, each lasting n times as long; the out/ GIF keeps them all", () => {
+  const p = loadSource(PAL + `anim("blink", { w: 2, h: 2, frames: 6, fps: 10 }, (c) => c.rect(0, 0, 2, 2, c.frame % 2 ? "r" : "w"))`, "t.px.js");
+  const dir = mkdtempSync(join(tmpdir(), "pxl-"));
+  try {
+    writeOutputs(p, dir, { every: 3 });
+    const pv = decodeGif(readFileSync(join(dir, "_preview", "blink.gif"))), all = decodeGif(readFileSync(join(dir, "anims", "blink.gif")));
+    assert.equal(pv.frames.length, 2);
+    assert.equal(all.frames.length, 6);
+    assert.equal(pv.frames.reduce((s, f) => s + f.delay, 0), all.frames.reduce((s, f) => s + f.delay, 0), "the loop lasts as long");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

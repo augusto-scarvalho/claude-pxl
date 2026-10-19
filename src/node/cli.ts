@@ -28,10 +28,11 @@ const USAGE = `pxl — pixel-art DSL
       What the reference says about an op or option: the rows that define it, a line for each other
       mention, and a few uses in the examples (--all: everything in full). Words of a guide's
       heading print that section ("characters 9", "small animals"). No name: an index.
-  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list]
+  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
       previews (out/_preview; animated assets also get a .gif). A whole file prints a count of what
-      it wrote; --only and --list print a line per asset (size, frames, preview scale). --aseprite also writes each
+      it wrote; --only and --list print a line per asset (size, frames, preview scale). --every N:
+      preview GIFs keep one frame in N (a long loop's runs to many MB). --aseprite also writes each
       asset as <name>.aseprite (layers, frames, tag, palette) to keep editing in Aseprite; pxl
       never reads it back and the next --aseprite build overwrites it, so copy it out of out/.
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
@@ -100,6 +101,7 @@ interface Args {
   vs?: string;
   list?: boolean;
   all?: boolean;
+  every?: number;
 }
 
 function parse(argv: string[]): Args {
@@ -139,6 +141,7 @@ function parse(argv: string[]): Args {
     else if (v === "--vs") a.vs = val();
     else if (v === "--list") a.list = true;
     else if (v === "--all") a.all = true;
+    else if (v === "--every") a.every = Number(val());
     else if (v === "-h" || v === "--help") a.cmd = "usage";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -166,7 +169,7 @@ export async function main(argv: string[]): Promise<number> {
     switch (a.cmd) {
       case "build": {
         const p = loadProject(file);
-        const r = writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite });
+        const r = writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every });
         for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);
         if (a.only || a.list || r.lines.length <= 12) for (const l of r.lines) console.log(l);
         else {
@@ -299,7 +302,7 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case "check": {
-        const p = loadProject(file);
+        const p = loadProject(file, { checksOnly: true });
         const r = checkProject(p, { names: a.rest.length ? a.rest : undefined, frame: a.frame, file: basename(file) });
         for (const l of r.lines) console.log(l);
         console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"} (checked ${r.checked}${a.frame ? `, at frame ${a.frame}` : ""})`);

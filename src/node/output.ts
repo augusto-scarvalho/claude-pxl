@@ -20,7 +20,12 @@ export interface OutputOptions {
   scale?: number;
   /** Also write each asset as an .aseprite file (layers, frames, tag, palette). */
   aseprite?: boolean;
+  /** Preview GIFs keep one frame in this many, each lasting as long (long loops; default 1). */
+  every?: number;
 }
+
+/** A preview GIF past this size gets a note: a long loop enlarged makes many MB nobody opens. */
+const BIG_GIF = 4e6;
 
 export interface OutputResult {
   lines: string[];
@@ -101,7 +106,12 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         // Previews: anims show every frame side by side; anything animated also gets a GIF.
         const s = opts.scale ?? Math.max(1, Math.min(previewScale(b.img), Math.floor(2048 / shown.w)));
         writePng(join(out, "_preview", n + ".png"), preview(shown, s));
-        if (frames.length) write(join(out, "_preview", n + ".gif"), encodeGif(frames.map((f) => ({ img: preview(f.guide ?? f.img, s), ms: f.ms }))));
+        if (frames.length) {
+          const k = Math.max(1, Math.floor(opts.every ?? 1));
+          const gif = encodeGif(frames.filter((_, i) => i % k === 0).map((f) => ({ img: preview(f.guide ?? f.img, s), ms: f.ms * k })));
+          write(join(out, "_preview", n + ".gif"), gif);
+          if (gif.length > BIG_GIF && k === 1) info += ` -- preview GIF ${(gif.length / 1e6).toFixed(1)} MB (${frames.length} frames): --every 3 keeps one frame in three`;
+        }
         // Anims also get a review sheet: a motion map, then each frame over its neighbours' ghosts.
         if (def.kind === "anim" && frames.length > 1) {
           const sheet = onionSheet(frames.map((f) => f.img));

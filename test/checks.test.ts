@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadSource } from "../src/node/load.ts";
+import { checkProject } from "../src/node/check.ts";
 import { main } from "../src/node/cli.ts";
 import { frontWords, lightWords, litDir, rampSteps } from "../src/core/checks.ts";
 import { PAL } from "./helpers.ts";
@@ -185,4 +186,18 @@ sprite("below", { base: "lit", flip: "y" })`, "t.px.js");
   assert.equal(lightWords(p.image("lit"), [0.6, -1], st), "lit from the top right, as its light");
   // lit from below while the light is above: noise, not light, so nothing is claimed
   assert.equal(lightWords(p.image("below"), [0.6, -1], st), "");
+});
+
+test("checksOnly: the same check, without the whole-image passes no check reads", () => {
+  // a lamp-lit scene: lighting changes its pixels, not what was placed or how it reads
+  const src = PAL + `ramps("1d6")
+` + HEAD + `
+sprite("head_l", { base: "head", flip: "x" })
+scene("s", { w: 40, h: 14, bg: "d", world: { scale: 10, light: [0.6, -1] } },
+  stamp("head", 2, 2), stamp("head_l", 20, 2), lamp(10, 6, { r: 12 }), lighting({ cell: 1, ambient: 0.3 }), glow("6", { r: 3 }))`;
+  const full = loadSource(src, "t.px.js"), quick = loadSource(src, "t.px.js", { checksOnly: true });
+  assert.notDeepEqual([...quick.image("s").data], [...full.image("s").data], "the light isn't drawn");
+  const text = (p: ReturnType<typeof loadSource>) => { const r = checkProject(p); return [...r.lines, r.checked, r.coverage].join("\n"); };
+  assert.equal(text(quick), text(full));
+  assert.match(text(full), /head_l @-[^\n]*WARNING: lit from the top left/);
 });

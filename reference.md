@@ -325,7 +325,7 @@ painting replay ends ("animate" toggle).
 node <pxl>/bin/pxl.js shot <file> <name> [--frames a,b,c] [--at x,y,w,h] [--scale N] [--vs <git rev | file>] [--diff]
 node <pxl>/bin/pxl.js check <file> [name...] [--frame N]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
-node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list]
+node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
 node <pxl>/bin/pxl.js ascii <file> <name>
 node <pxl>/bin/pxl.js list  <file>
@@ -339,6 +339,8 @@ region, enlarged to about 600k px), what changed since the last shot of the same
 (pixels, and the box around them in the asset's coordinates), and the warnings `check` finds on it
 at those frames. `check` runs them on every scene and rig of a file at every frame. A `build` of a
 whole file prints how many assets of each kind it wrote; `--list` or `--only` print a line each.
+A preview GIF past 4 MB says so; `--every N` keeps one frame in N in the previews (the GIFs in
+`out/` keep every frame).
 `list` maps a file: each top-level statement that defines assets, its line range, the comment
 above it and the assets it defines (a loop's or a helper's many on one line). `help` prints the
 rows that define a name in full and one line for each other place that mentions it (`--all`: in

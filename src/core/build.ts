@@ -18,6 +18,8 @@ export interface BuildCtx extends Resolver {
   locFromStack(stack: string): string | undefined;
   /** Art-file location of the current call site. */
   callerLoc(): string | undefined;
+  /** Builds for checking only: the whole-image passes (lighting, glow) are skipped; no check reads them. */
+  readonly checksOnly?: boolean;
 }
 
 export interface LayerOut {
@@ -201,6 +203,8 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     return k;
   };
   const onPass: OnPass = (name, args, loc) => {
+    // the checks read what was placed and how, not the lit pixels: 2/3 of a lit city frame's time
+    if (ctx.checksOnly) return;
     if (name === "glow") {
       base.data.set(applyGlow(base, args[0] as string | string[], (args[1] ?? {}) as GlowOpts, pal, keyed()).data);
       snap?.("glow", loc);
