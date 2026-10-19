@@ -263,6 +263,27 @@ function lava(c, frame) {
     }
   }
 }
+// Steam and smoke off the lava (Semeru's flow smokes all the way down): puffs rising from the main
+// flow, its lobe and where the old flow meets the plain, red underneath from the lava, gray above,
+// growing and thinning as they rise and drift right with the wind; each lives a loop.
+const STEAM = (() => {
+  const out = [], main = FLOWS[0].strands[0], old = FLOWS[2].strands[0]
+  for (let i = 0; i < 8; i++) { const q = main[Math.floor(main.length * (0.3 + i * 0.09))]; if (q) out.push({ p: q.p, ph: (i * 0.37) % 1, big: 1 }) }
+  for (const k of [0, 1, 2]) { const q = main[main.length - 1]; if (q) out.push({ p: q.p, ph: k / 3 + 0.1, big: 1.6 }) }
+  for (const k of [0, 1]) { const q = old[old.length - 1]; if (q) out.push({ p: q.p, ph: k / 2 + 0.25, big: 1.3 }) }
+  return out
+})()
+function steam(c, frame) {
+  for (const [i, S] of STEAM.entries()) {
+    const life = (frame / FRAMES + S.ph) % 1, [bx, by] = P.ground(...S.p), sc = P.scale(S.p[1], S.p[0], S.p[2])
+    const x = bx + life * 110 * sc, y = by - life * 200 * sc - 1, R = (1.5 + life * 5) * S.big
+    for (let yy = Math.floor(y - R); yy <= Math.ceil(y + R); yy++) for (let xx = Math.floor(x - R); xx <= Math.ceil(x + R); xx++) {
+      const oy = (yy + 0.5 - y) / R, d = Math.hypot((xx + 0.5 - x) / R, oy) + (noise(xx / 2 + i * 7, yy / 2) - 0.5) * 0.4
+      if (d > 1 || (life > 0.55 && (xx + yy) & 1) || (life > 0.85 && hash(xx, yy) < 0.5)) continue
+      c.px(xx, yy, oy > 0.25 && life < 0.5 ? "G" : d < 0.55 ? "D" : "C")
+    }
+  }
+}
 // What the eruption throws out: bombs falling on the upper cone glow where they land and cool, white
 // to red to gone; rockfalls of hot debris slide down the gullies on the right, glowing (Fuego).
 const EJECTA = Array.from({ length: 46 }, (_, i) => { const r = rng(3000 + i), a = BREACH + (r() - 0.5) * 2.4, d = CR * 1.2 + r() ** 1.5 * 380; return { x: VX + Math.cos(a) * d, z: VZ + Math.sin(a) * d, ph: r(), period: [20, 30, 60][i % 3] } }).filter((q) => seen([q.x, q.z, height(q.x, q.z) + 2]))
@@ -400,6 +421,7 @@ sprite("_bg", { w: W, h: H }, (c) => {
   smoke(c)
   scrub(c)
   litter(c)
+  firelight(c)
 })
 
 // ================================================================ shapes
@@ -802,9 +824,9 @@ function sootClouds(c, frame) {
 // the cracks of their charcoal; snags left standing, broken off in spikes of pale wood, charred; volcanic
 // bombs and boulders, the freshest still red-hot and cracked; branches and embers everywhere.
 const LOGS = [
-  { x: 0.5, z: 13.5, a: -0.18, len: 9, r: 0.42, seed: 1, fire: true },
+  { x: 0.5, z: 13.5, a: -0.18, len: 9, r: 0.42, seed: 1, fire: true, breaks: [0.12] },
   { x: -7.5, z: 25, a: -0.5, len: 6.5, r: 0.32, seed: 2, fire: true },
-  { x: 17, z: 39, a: 2.6, len: 8, r: 0.38, seed: 3, fire: false },
+  { x: 17, z: 39, a: 2.6, len: 8, r: 0.38, seed: 3, fire: false, breaks: [-0.1] },
   { x: -19, z: 47, a: 0.9, len: 5, r: 0.28, seed: 4, fire: true },
 ]
 const SNAGS = [{ x: -3.2, z: 16, h: 4.2, r: 0.42, seed: 5, fire: true }, { x: 19, z: 28, h: 6.5, r: 0.5, seed: 6, fire: true }, { x: -15, z: 36, h: 3, r: 0.35, seed: 7, fire: false }, { x: 6, z: 54, h: 5, r: 0.4, seed: 8, fire: true }]
@@ -813,35 +835,42 @@ const ROCKS = (() => {
   for (let i = 0; i < 34; i++) { const z = 7 + r() ** 1.3 * 58, x = (r() - 0.5) * z * 1.7, hot = r() < 0.3; out.push({ x, z, s: hot ? 0.14 + r() * 0.2 : 0.16 + r() * 0.42, hot, seed: i }) }
   return out
 })()
-// a fallen tree: charcoal round it (shaded as a log lying in the light from the fires behind), cracks
-// glowing across it, broken branches sticking up, a splintered end, a root plate at the other
+// A fallen tree: the trunk lying in pieces where it broke as it fell, each a little crooked and
+// knotted (short lengths, the radius swelling and narrowing), charcoal round (shaded as a log lying in
+// the light from the fires behind), cracks glowing across it, broken branches sticking up; splintered
+// ends at each break and at the top; a torn-up root plate at the foot.
 function log(c, L, frame) {
-  const ca = Math.cos(L.a), sa = Math.sin(L.a), end = (f) => { const x = L.x + ca * L.len * f, z = L.z + sa * L.len * f; return [x, z, height(x, z) + L.r * 0.9] }
-  const A = end(-0.5), B = end(0.5), r = rng(L.seed * 17)
+  const ca = Math.cos(L.a), sa = Math.sin(L.a), r = rng(L.seed * 17), breaks = L.breaks ?? []
+  const pt = (f, piece) => { const side = 0.35 * Math.sin(f * 4 + L.seed) + piece * 0.3, x = L.x + ca * L.len * f - sa * side, z = L.z + sa * L.len * f + ca * side; return [x, z, height(x, z) + L.r * 0.9 - piece * 0.05] }
+  const rad = (f) => L.r * (1 - 0.2 * (f + 0.5)) * (1 + 0.14 * (noise(f * 7 + L.seed, 3) - 0.5) * 2)
   // the root plate: a torn-up disc of roots and earth, standing on edge
-  const [ax, ay] = P.ground(...A), rp = L.r * 2.6 * P.scale(A[1], A[0], A[2])
+  const A = pt(-0.5, 0), [ax, ay] = P.ground(...A), rp = L.r * 2.6 * P.scale(A[1], A[0], A[2])
   for (let y = -Math.ceil(rp); y <= Math.ceil(rp); y++) for (let x = -Math.ceil(rp * 0.45); x <= Math.ceil(rp * 0.45); x++) {
     const d = Math.hypot(x / 0.45, y) / rp + (noise(x * 0.8 + L.seed, y * 0.8) - 0.5) * 0.5
     if (d < 1 && y < rp * 0.6) c.px(Math.round(ax) + x, Math.round(ay) + y, d > 0.8 ? "c" : hash(x, y) < 0.2 ? "h" : "i")
   }
-  paintCone(c, [A, L.r, B, L.r * 0.8], "hijl")
-  const n = Math.ceil(L.len / 0.35)
-  for (let i = 1; i < n; i++) {
-    const p = end(-0.5 + i / n), [px, py] = P.ground(...p), sc = P.scale(p[1], p[0], p[2]), h = Math.max(1, Math.round(L.r * sc))
-    // the charcoal's cracks across the log, glowing (flickering) where it still burns
-    if (r() < 0.55) { const glow = L.fire && hash(i, Math.floor(frame / 3) + L.seed) < 0.75; c.line(Math.round(px), Math.round(py) - h + 1, Math.round(px + 0.5), Math.round(py), glow ? (r() < 0.4 ? "U" : "T") : "h") }
-    if (r() < 0.12) c.line(Math.round(px), Math.round(py) - h, Math.round(px + (r() - 0.3) * sc * 0.4), Math.round(py - h - sc * (0.3 + r() * 0.5)), "h", Math.max(1, Math.round(sc * 0.08)))
+  // spikes of pale torn wood at an end, pointing `dir` (+1 toward the top, -1 back)
+  const splinters = (f, piece, dir) => {
+    const p = pt(f, piece), q = pt(f + dir * 0.02, piece), [px, py] = P.ground(...p), [qx, qy] = P.ground(...q), l = Math.hypot(qx - px, qy - py) || 1, sc = P.scale(p[1], p[0], p[2])
+    for (let k = 0; k < 5; k++) {
+      const off = (k / 4 - 0.5) * rad(f) * 1.6 * sc, long = (0.25 + r() * 0.6) * sc
+      c.line(Math.round(px), Math.round(py + off), Math.round(px + ((qx - px) / l) * long), Math.round(py + off * 0.6 + ((qy - py) / l) * long), k % 2 ? "k" : "j")
+    }
   }
-  // the splintered end: spikes of pale torn wood
-  const [bx, by] = P.ground(...B), sb = P.scale(B[1], B[0], B[2]), dir = [Math.sign(ca) || 1, 0]
-  for (let k = 0; k < 5; k++) {
-    const off = (k / 4 - 0.5) * L.r * 1.6 * sb, long = (0.3 + r() * 0.7) * sb
-    c.line(Math.round(bx), Math.round(by + off), Math.round(bx + dir[0] * long), Math.round(by + off * 0.6 - long * 0.1), k % 2 ? "k" : "j")
-  }
-  if (L.fire) for (let i = 0; i < n; i += 2) {
-    if (hash(i, L.seed + 31) > 0.6) continue
-    const p = end(-0.45 + i / n), [px, py] = P.ground(...p), sc = P.scale(p[1], p[0], p[2])
-    flame(c, px, py - L.r * sc, Math.max(2, sc * (0.25 + 0.3 * hash(L.seed, i))), frame, L.seed * 300 + i)
+  const cuts = [-0.5, ...breaks.flatMap((b) => [b - 0.03, b + 0.03]), 0.5]
+  for (let piece = 0; piece < cuts.length / 2; piece++) {
+    const f0 = cuts[piece * 2], f1 = cuts[piece * 2 + 1], n = Math.max(2, Math.ceil(((f1 - f0) * L.len) / 0.8))
+    for (let k = 0; k < n; k++) { const a = f0 + ((f1 - f0) * k) / n, b = f0 + ((f1 - f0) * (k + 1)) / n; paintCone(c, [pt(a, piece), rad(a), pt(b, piece), rad(b)], "hijl") }
+    const m = Math.ceil(((f1 - f0) * L.len) / 0.35)
+    for (let i = 1; i < m; i++) {
+      const f = f0 + ((f1 - f0) * i) / m, p = pt(f, piece), [px, py] = P.ground(...p), sc = P.scale(p[1], p[0], p[2]), h = Math.max(1, Math.round(rad(f) * sc))
+      // the charcoal's cracks across the log, glowing (flickering) where it still burns
+      if (r() < 0.55) { const glow = L.fire && hash(i + piece * 50, Math.floor(frame / 3) + L.seed) < 0.75; c.line(Math.round(px), Math.round(py) - h + 1, Math.round(px + 0.5), Math.round(py), glow ? (r() < 0.4 ? "U" : "T") : "h") }
+      if (r() < 0.12) c.line(Math.round(px), Math.round(py) - h, Math.round(px + (r() - 0.3) * sc * 0.4), Math.round(py - h - sc * (0.3 + r() * 0.5)), "h", Math.max(1, Math.round(sc * 0.08)))
+      if (L.fire && i % 2 === 0 && hash(i + piece * 50, L.seed + 31) < 0.6) flame(c, px, py - rad(f) * sc, Math.max(2, sc * (0.25 + 0.3 * hash(L.seed, i + piece * 50))), frame, L.seed * 300 + i + piece * 50)
+    }
+    if (piece > 0) splinters(f0, piece, -1)
+    splinters(f1, piece, 1)
   }
 }
 // a snag: a trunk left standing, snapped off in spikes of pale wood
@@ -871,6 +900,18 @@ function rock(c, R) {
   for (let i = 1; i < n - 1; i++) c.poly([pts[i - 1], pts[i], [cx, cy - rad * 0.2]].flat().map(Math.round), R.hot ? (i === 2 ? "S" : "R") : i < 3 ? "d" : "c")
   if (R.hot) { c.line(Math.round(cx - rad * 0.6), Math.round(cy - rad * 0.3), Math.round(cx + rad * 0.4), Math.round(cy - rad * 0.6), "U"); c.px(Math.round(cx), Math.round(cy - rad * 0.4), "V") }
 }
+// the light of what burns near us, pooled on the ground round it, warm, fading out (dithered)
+function firelight(c) {
+  const pools = [...LOGS.filter((L) => L.fire).map((L) => [L.x, L.z, L.len * 0.55]), ...SNAGS.filter((S) => S.fire).map((S) => [S.x, S.z, 3]), ...NEAR.map((q) => [q.x, q.z, 1.6])]
+  for (const [x, z, R] of pools) {
+    const [cx, cy] = P.ground(x, z, height(x, z)), sc = P.scale(z, x), rx = R * sc, ry = R * sc * 0.32
+    for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let xx = Math.floor(cx - rx); xx <= Math.ceil(cx + rx); xx++) {
+      if (!"abcde".includes(c.key(xx, y))) continue
+      const d = Math.hypot((xx - cx) / rx, (y - cy) / ry) + dither(xx, y) * 0.35
+      if (d < 0.45) c.px(xx, y, "G"); else if (d < 0.8) c.px(xx, y, "Q")
+    }
+  }
+}
 // small things on the ground: broken branches, embers, a few still glowing (in the still picture)
 function litter(c) {
   const r = rng(6100)
@@ -884,7 +925,7 @@ function litter(c) {
 // each tree's still parts on a sprite of their own, cropped to what they draw
 for (const [i, T] of TREES.entries()) sprite("_tree" + i, { w: W, h: H, crop: true, pivot: [0, 0] }, (c) => paintTree(c, T))
 anim("extinction", { w: W, h: H, frames: FRAMES, fps: FPS }, stamp("_bg", 0, 0), (c) => {
-  meteors(c, c.frame); breathe(c, c.frame); sootClouds(c, c.frame); lava(c, c.frame); ejecta(c, c.frame); crater(c, c.frame); frontFire(c, c.frame)
+  meteors(c, c.frame); breathe(c, c.frame); sootClouds(c, c.frame); lava(c, c.frame); steam(c, c.frame); ejecta(c, c.frame); crater(c, c.frame); frontFire(c, c.frame)
   const wreck = [...LOGS.map((L) => ({ d: Math.hypot(L.x, L.z), draw: (c) => log(c, L, c.frame) })), ...SNAGS.map((S) => ({ d: Math.hypot(S.x, S.z), draw: (c) => snag(c, S, c.frame) })),
     ...ROCKS.map((R) => ({ d: Math.hypot(R.x, R.z), draw: (c) => rock(c, R) }))]
   const all = [...TREES.map((T, i) => ({ d: T.d, tree: i })), ...runners(c.frame), ...flyers(c.frame), ...wreck].sort((m, n) => n.d - m.d)
