@@ -157,7 +157,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `platformer.px.js` | a tileset laid out as a level: `tilemap`, `group` variety, tile `sheet`, `include` |
 | `topdown.px.js` | overhead RPG island: corner-tile shore generated in code, `scatter`, cast shadows |
 | `isometric.px.js` | 2:1 blocks, back-to-front order, iso helpers |
-| `perspective/road.px.js` | true perspective: `perspective()` and `plane()`, a walker shrinking step by step with hand-drawn small sizes picked by `fit`; two vanishing points (`yaw`) |
+| `perspective/road.px.js` | true perspective: `perspective()` and `plane()`, props in meters whose parts also cast their shadows, a walker shrinking step by step with hand-drawn small sizes picked by `fit`; two vanishing points (`yaw`) |
 | `sidescroller/` | a game's art over several files: shared `palette.hex`, `wrap` tiles, `png` import, hit flash |
 | `shop.px.js`, `moon_bakery.px.js` | flat building facades from parts: tiles, signs, `wire` lights |
 | `moon_bakery_3d.px.js`, `tackle.px.js` | 3/4 buildings; weathering with a cause |

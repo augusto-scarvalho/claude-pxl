@@ -101,6 +101,11 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - Things on the ground stand at `ground(x, z)`, sized by `scale(z)`; poles, posts and fences are a
   loop over z. A figure walking into the distance changes size only at each step's contact, and under
   ~15 px takes a hand-drawn sprite for its size (`fit`): drawn by code that small, it is a blob.
+- Props on the ground (plants, stakes, rocks): build each once as parts in meters, sticks (trunk,
+  arm, twig, post) and blobs (crown, boulder), and use the same parts twice: projected and drawn, and
+  swept onto the ground away from the sun for its shadow, so the shadow has the thing's shape and
+  stays right as it recedes. Near ones on a plate with `relight` for the rim; far ones in the haze
+  color; under a few px, a simple tuft.
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
   `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical.
 

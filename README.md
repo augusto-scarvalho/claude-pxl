@@ -124,16 +124,19 @@ frame.
 ## Showcase: true perspective
 
 <p>
-  <img src="docs/gallery/road.gif" width="100%" alt="Animated pixel-art road running straight to the horizon at sunset in one-point perspective: dashes and edge lines, a fence and power poles receding into the vanishing point where the sun sits, and a backlit figure walking away down the road, getting smaller step by step until it dissolves into the light, its long shadow stretching back toward the viewer">
+  <img src="docs/gallery/road.gif" width="100%" alt="Animated pixel-art road across the Brazilian sertão at sunset in one-point perspective: cracked asphalt with dashes and edge lines running to the horizon, mandacaru and xique-xique cacti, leafless catingueira shrubs, juazeiro trees, boulders and dry grass, a crooked barbed-wire fence, power poles and a windmill, a chapada on the horizon and the sun going down into a pass with vultures circling; a backlit walker in a leather hat with a pack and bedroll walks away down the road, getting smaller step by step until they dissolve into the light, their long shadow walking with them">
 </p>
 <p>
   <img src="docs/gallery/plaza.png" width="100%" alt="A square at sunset in two-point perspective: a tower seen corner-on, its floor lines and the flagstone joints running to two vanishing points off the left and right of the picture, a low hall and a kiosk">
 </p>
 
-[`examples/perspective/road.px.js`](examples/perspective/road.px.js): everything laid out in meters and
-projected by `perspective()`, the ground drawn by `plane()` pixel by pixel from where each pixel looks.
-The walker holds its size for a whole step and shrinks only when the next foot lands; under 15 px it
-switches to sprites drawn by hand for each size (14, 12, 10 ... 5 px), picked by `stamp`'s `fit`.
+[`examples/perspective/road.px.js`](examples/perspective/road.px.js): the sertão at sunset, everything
+laid out in meters and projected by `perspective()`, so every cactus, stake and boulder is the size it
+should be where it stands; the ground drawn by `plane()` pixel by pixel from where each pixel looks.
+Each thing is built once as parts (trunks, arms, twigs, crowns), and the same parts draw it and cast
+its long shadow, so a mandacaru's shadow has its arms and the walker's walks with them. The walker
+holds their size for a whole step and shrinks only when the next foot lands; under 15 px they switch
+to sprites drawn by hand for each size (14, 12, 10 ... 5 px), picked by `stamp`'s `fit`.
 Below, the same camera turned 40° (`yaw`): two vanishing points.
 
 ## Quick start

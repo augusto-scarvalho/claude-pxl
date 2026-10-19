@@ -1,137 +1,461 @@
-// True perspective. "road": a road to the horizon at sunset in one-point perspective, and someone
+// True perspective. "road": a road across the sertão at sunset in one-point perspective, and someone
 // walking away along it, getting smaller step by step. "plaza": the same camera turned 40 degrees,
-// two-point perspective. Everything on the ground is placed in meters (x across, z ahead) and
-// projected by perspective(); plane() draws the ground pixel by pixel from where each pixel looks.
+// two-point perspective. Everything is placed in meters (x across, z ahead, up) and projected by
+// perspective(), so a cactus, a fence post or a boulder is the size it should be where it stands;
+// plane() draws the ground pixel by pixel from where each pixel looks.
 pal({
-  N: "#1b1f4a", n: "#2e2a66", v: "#5b3a7a", m: "#a3466e", O: "#e0704a", o: "#f2a050", y: "#ffd27a", w: "#fff3c4",
-  h: "#c98a6a", H: "#e6b089",
+  // sky, top down to the sun
+  N: "#1b1f4a", n: "#2e2a66", v: "#5b3a7a", m: "#a3466e", O: "#e0704a", o: "#f2a050", y: "#ffd27a", Y: "#ffe9a8", w: "#fff3c4",
+  // haze, and the serras on the horizon (far, near)
+  h: "#c98a6a", H: "#e6b089", i: "#8e5a6a", I: "#64405a",
+  // dry red earth, near to far (the sandy patches one step up), and the shade on it, cooler
+  Z: "#251a26", z: "#352530", g: "#3b2824", G: "#4f3530", J: "#6b4738",
   d: "#17141f", D: "#2a2130", e: "#4a3440", E: "#6e4a50",
-  a: "#221e28", A: "#3a3040", b: "#6a4c58", B: "#9a6a66",
-  l: "#c9b796", L: "#8a6e6a",
+  // the road and its paint
+  a: "#221e28", A: "#3a3040", b: "#6a4c58", B: "#9a6a66", l: "#c9b796", L: "#8a6e6a",
+  // wood: posts, poles, the windmill, near to far
   k: "#120f1c", K: "#2e2438", j: "#5c4250",
-  S: "#140f1d", T: "#3a2c40", U: "#6c4c56",
+  // cactus (mandacaru, xique-xique), its red fruit; shrub twigs; juazeiro leaves; rock; dry grass
+  c: "#111a17", C: "#1f2e27", f: "#c23a3a", t: "#21171c", u: "#7a5646", q: "#142017", Q: "#22331f",
+  x: "#1c1519", X: "#2e2228", V: "#6e4a44", F: "#9a7840",
+  // the far house: walls, roof, the lit window
+  p: "#4a302c", "0": "#6a3a2e", W: "#ffcf6a",
+  // the walker drawn near: hat, skin, shirt, trousers, boots and hair, pack, bedroll, soles
+  1: "#33201a", 2: "#3d2526", 3: "#2a2638", 4: "#1a1624", 5: "#0f0c14", 6: "#3c2a22", 7: "#4a2228", U: "#6c4c56",
+  // the walker drawn small: body, pack, and far in the haze
+  S: "#140f1d", P: "#2c2024", T: "#3a2c40",
+  // rim light: the low sun on every edge that faces it
   r: "#f2a45c", R: "#ffd890",
 })
-ramps("NnvmOoyw")
+ramps("NnvmOoyYw")
 
-const W = 320, H = 180
+const W = 320, H = 180, FPS = 10, PER_STEP = 4, STEPS = 62, FRAMES = PER_STEP * STEPS
 // the eye 1.6 m above the road, the horizon on row 72, a 150 px focal length (about 94 degrees across)
 const P = perspective({ w: W, horizon: 72, eye: 1.6, focal: 150 })
 const at = (x, z, up = 0) => P.ground(x, z, up).map(Math.round)     // a point in meters, on screen
 // aerial perspective: the farther, the closer to the haze, one key per band of depth
 const band = (z, edges) => { let i = 0; while (i < edges.length && z >= edges[i]) i++; return i }
-const FAR = [10, 30, 90]
-const ROAD = "aAbB", FIELD = [["d", "D"], ["D", "e"], ["e", "E"], ["E", "h"]], PAINT = "llLL", POST = "kKjh"
-const ROAD_HALF = 3.6, PAINT_W = 0.12
+const FAR = [10, 30, 90], NEAR = [18, 50, 130]                     // the ground's bands; the props'
+const ROAD = "aAbB", SOIL = [["g", "G"], ["G", "J"], ["J", "E"], ["E", "h"]], PAINT = "llLL", POST = "kKjh"
+const HAZE = [null, null, "I", "i"]                                // what props turn into, far off
+const ROAD_HALF = 3.6, PAINT_W = 0.12, FENCE_X = -6, POLE_X = 6.6
+// the sun, low ahead: 7 degrees up, so a thing's shadow is 8 times its height, and 6 degrees left of the road
+const SR = 9, SUN_AZ = -6, SUNX = Math.round(P.vp + P.focal * Math.tan((SUN_AZ * Math.PI) / 180)), SUNY = P.horizon - 3, LONG = 1 / Math.tan((7 * Math.PI) / 180)
+const B4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], bayer = (x, y) => (B4[(y & 3) * 4 + (x & 3)] + 0.5) / 16
+// smooth noise, for the serras' ridges and the sandy patches (in meters, so it recedes like the rest)
+const hash = (i, j) => { let k = Math.imul(i, 374761393) + Math.imul(j, 668265263); k = Math.imul(k ^ (k >>> 13), 1274126177); return ((k ^ (k >>> 16)) >>> 0) / 4294967296 }
+const noise = (x, y) => {
+  const i = Math.floor(x), j = Math.floor(y), u = x - i, v = y - j, su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v)
+  const a = hash(i, j), b = hash(i + 1, j), c = hash(i, j + 1), d = hash(i + 1, j + 1)
+  return a + (b - a) * su + (c - a) * sv + (a - b - c + d) * su * sv
+}
 
-sprite("_road_bg", { w: W, h: H },
-  // the sky: a gradient to the sun, which sits on the vanishing point
+// ================================================================ sky
+// a gradient to the sun, the evening star, long thin clouds lit from underneath
+const CLOUDS = [[12, 17, 74, "n", "v"], [188, 24, 112, "v", "m"], [36, 37, 150, "v", "m"], [214, 45, 84, "m", "O"], [92, 53, 60, "m", "O"]]
+sprite("_sky", { w: W, h: P.horizon + 1 },
   grad(0, 0, W, P.horizon + 1, "NnvmOoy", "v"),
-  circ(P.vp, P.horizon - 2, 10, "w"),
-  glow("w", { r: 70, ramp: 3 }),
-  // the ground: dashes and edge lines along the road, crop rows beside it, all hazier with depth.
-  // A line stays at least ~0.6 px wide however far, so it thins into the distance without breaking up.
-  plane(P, (x, z) => {
-    if (z > 400) return "h"
-    const b = band(z, FAR), ax = Math.abs(x), paint = Math.max(PAINT_W, (z / P.focal) * 0.6)
-    if (ax < ROAD_HALF) return (ax < paint && z % 12 < 3.5) || Math.abs(ax - ROAD_HALF + 0.3) < paint ? PAINT[b] : ROAD[b]
-    return ax < ROAD_HALF + 1 ? FIELD[b][0] : FIELD[b][Math.floor(ax / 1.4) % 2]
-  }),
-  // far trees along the horizon, in haze
+  px(52, 8, "Y"), px(51, 8, "v"), px(53, 8, "v"), px(52, 7, "v"), px(118, 15, "v"), px(270, 6, "v"),
   (c) => {
-    const r = c.rng(7)
-    let top = 2
-    for (let x = 0; x < W; x++) {
-      if (r() < 0.25) top = Math.max(0, Math.min(5, top + (r() < 0.5 ? -1 : 1)))
-      if (Math.abs(x - P.vp) >= 9) c.vline(x, P.horizon - top, top + 1, "j")   // a gap where the road and the sun are
+    for (const [x, y, len, body, under] of CLOUDS) {
+      c.hline(x + Math.round(len * 0.3), y - 1, Math.round(len * 0.4), body)
+      c.hline(x, y, len, body)
+      c.hline(x + Math.round(len * 0.12), y + 1, Math.round(len * 0.7), under)
     }
-  },
-  // a fence on the left: a post every 3.5 m, 1.1 m tall, two rails
-  (c) => {
-    const X = -5.4, posts = []
-    for (let z = 2.5; z < 260; z += 3.5) posts.push(z)
-    posts.forEach((z, i) => {
-      const k = POST[band(z, FAR)], [x, y] = at(X, z), top = at(X, z, 1.1)[1], w = Math.max(1, Math.round(0.12 * P.scale(z)))
-      c.rect(x - (w >> 1), top, w, Math.max(1, y - top), k)
-      const n = posts[i + 1]
-      if (n) for (const up of [1.0, 0.55]) c.line(...at(X, z, up), ...at(X, n, up), k)
-    })
-  },
-  // power poles on the right: 9 m tall every 28 m, two wires sagging between them
-  (c) => {
-    const X = 6.2, poles = []
-    for (let z = 5; z < 600; z += 28) poles.push(z)
-    poles.forEach((z, i) => {
-      const k = POST[band(z, FAR)], [x, y] = at(X, z), top = at(X, z, 9)[1], w = Math.max(1, Math.round(0.25 * P.scale(z)))
-      c.rect(x - (w >> 1), top, w, y - top, k)
-      const [ax, ay] = at(X - 0.9, z, 8.4)
-      c.hline(ax, ay, Math.max(1, Math.round(1.8 * P.scale(z))), k)
-      const n = poles[i + 1]
-      if (!n) return
-      for (const dx of [-0.8, 0.8]) {
-        let prev
-        for (let s = 0; s <= 1.0001; s += 1 / 24) {
-          const zz = z + (n - z) * s, p = at(X + dx, zz, 8.4 - 1.6 * s * (1 - s))
-          if (prev) c.line(...prev, ...p, POST[band(zz, FAR)])
-          prev = p
-        }
-      }
-    })
   })
 
-// The walker: 1.75 m, 0.8 m a step, four poses a step (contact, down, passing, up) at 10 fps: 2 m/s.
+// the sun's aura: three faint halo rings, stepped, with a checker only on their 1 px edges; the outer
+// two breathe by under a pixel over the loop. A ring only ever lightens. (As in sunset/sunset.px.js.)
+const SKY_RAMP = "NnvmOoyYw"
+anim("_aura", { w: 240, h: 47, frames: FRAMES, fps: FPS }, grad(0, 0, 240, 94, "yoO.", "r"), (c) => {
+  const cx = 120, cy = 47, rings = [["Y", SR + 2, 0, true], ["y", SR + 6, 0.5], ["o", SR + 11, 0.75]]
+  for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) {
+    const d = Math.hypot(x - cx, (y - cy) * 1.3)                  // flattened: the glow spreads along the horizon
+    for (const [i, [k, r0, swell, checker]] of rings.entries()) {
+      const r = r0 + swell * Math.sin((c.phase - i * 0.12) * Math.PI * 2), on = (x + y) % 2 === 0
+      if (d < r + 0.5 && (on || (!checker && d < r - 0.5))) {
+        if (SKY_RAMP.indexOf(k) > SKY_RAMP.indexOf(c.key(x, y))) c.px(x, y, k)
+        break
+      }
+    }
+  }
+})
+
+// the sun, going down into a pass between the serras. The thin bands across it are clouds in front:
+// they drift and come and go.
+anim("_sun", { w: 60, h: 2 * SR + 3, frames: FRAMES, fps: FPS }, (c) => {
+  const cx = 30, cy = SR + 1                                       // the centre: (SUNX, SUNY)
+  c.circ(cx, cy, SR, "Y"); c.circ(cx - 1, cy - 1, SR - 4, "w")
+  ;[[-20, -5, 24, "o"], [-8, -2, 22, "o"], [6, 1, 16, "y"]].forEach(([dx, dy, len, key], i) => {
+    const age = (c.phase - i / 3 + 1) % 1, n = Math.round(len * Math.min(1, 1.5 * Math.sin(age * Math.PI)))
+    if (n > 0) c.hline(cx + dx - 12 + Math.floor(24 * age) + ((len - n) >> 1), cy + dy, n, key)
+  })
+})
+
+// urubus circling high over the road, twice a loop, now and then a wingbeat
+const BIRDS = [[90, 38, 14, 0], [108, 44, 10, 0.4], [76, 47, 12, 0.72]]
+function vultures(c) {
+  for (const [cx, cy, rad, ph] of BIRDS) {
+    const a = (2 * c.phase + ph) * 2 * Math.PI, x = Math.round(cx + rad * Math.cos(a)), y = Math.round(cy + rad * 0.35 * Math.sin(a))
+    c.grid(x - 2, y, (c.frame + Math.round(ph * 50)) % 50 < 3 ? ".kkk.\nk...k" : "k...k\n.kkk.")
+  }
+}
+
+// ================================================================ the land
+// Serras kilometers off, in meters like the rest: a long serra 30 km away, up to 1100 m (5 px over the
+// horizon), and nearer, 12 km off, a chapada: a table mountain 600 m high (7 px) with a flat top and
+// steep sides, on the left; rolling hills on the right. They part in a pass where the sun goes down,
+// and the far ridge's edge catches the glow near the sun.
+const smooth = (a, b, t) => { const u = Math.max(0, Math.min(1, (t - a) / (b - a))); return u * u * (3 - 2 * u) }
+const RIDGES = [
+  [30000, "i", (X) => 1100 * (0.35 + 0.65 * noise(X / 6000, 3)) * smooth(1500, 7000, Math.abs(X))],
+  [12000, "I", (X) => Math.max(600 * smooth(-2600, -3000, X) * smooth(-10500, -9800, X) * (1 + 0.04 * noise(X / 300, 5)),
+    X > 1200 ? 420 * noise(X / 2200, 8) * smooth(1200, 3500, X) : 0)],
+]
+function serras(c) {
+  for (const [Z, key, height] of RIDGES)
+    for (let col = 0; col < W; col++) {
+      const y = Math.round(P.horizon - (P.focal * height(((col + 0.5 - SUNX) * Z) / P.focal)) / Z)
+      if (y >= P.horizon) continue
+      c.vline(col, y, P.horizon - y + 1, key)
+      if (key === "i" && Math.abs(col - SUNX) < 60) c.px(col, y, "m")
+    }
+}
+
+// old cracks sealed with tar: thin wavy lines across the lanes every few meters, and some along them.
+// Like the paint, at least ~0.5 px wide wherever they are, so they recede without breaking into dots.
+const CRACK = "kaAb"
+function cracked(x, z) {
+  const wd = Math.max(0.035, (z / P.focal) * 0.5), k = Math.floor(z / 7), across = k * 7 + hash(k, 1) * 5
+  if (z < 90 && hash(k, 2) < 0.7 && Math.abs(z - across - 0.25 * Math.sin(x * 2.3 + k)) < wd * 1.6 && Math.abs(x - (hash(k, 3) - 0.5) * 3) < 1 + hash(k, 4) * 2.4) return true
+  const lane = Math.floor(z / 11), along = (hash(lane, 5) - 0.5) * 5
+  return z < 60 && hash(lane, 6) < 0.5 && Math.abs(x - along - 0.12 * Math.sin(z * 1.7)) < wd && z % 11 > 2 && z % 11 < 9
+}
+function ground(x, z) {
+  if (z > 400) return "h"
+  const b = band(z, FAR), ax = Math.abs(x), paint = Math.max(PAINT_W, (z / P.focal) * 0.6)
+  if (ax < ROAD_HALF) {
+    if (cracked(x, z)) return CRACK[b]
+    // the center dashes, 3.5 m in 12 and one worn away now and then; the edge lines
+    const dash = ax < paint && z % 12 < 3.5 && Math.floor(z / 12) % 5 !== 3
+    return dash || Math.abs(ax - ROAD_HALF + 0.3) < paint ? PAINT[b] : ROAD[b]
+  }
+  if (ax < ROAD_HALF + 1) return SOIL[b][1]                                        // the gravel shoulder
+  return SOIL[b][z < 45 && noise(x / 6, z / 8) > 0.64 ? 1 : 0]                     // sand patches; far, one tone
+}
+
+// ---------------------------------------------------------------- things on the land
+// A thing is built once as parts in meters from its foot: sticks { a: [x, z, up], b: [x, z, up], half,
+// key } (round, `half` m thick: trunks, arms, stems, twigs, blades, posts, wires) and blobs { e: [x, z,
+// up], rx, ry, key } (crowns, boulders). The same parts draw it and cast its shadow, so a mandacaru's
+// shadow has its arms, a shrub's has its twigs, the walker's has their legs.
+const stick = (x0, u0, x1, u1, half, key, z0 = 0, z1 = z0) => ({ a: [x0, z0, u0], b: [x1, z1, u1], half, key })
+const blob = (x, u, rx, ry, key, z = 0) => ({ e: [x, z, u], rx, ry, key })
+
+// Real sizes: mandacaru 3-6 m, xique-xique under 1.2 m, catingueira and jurema 1.4-3.2 m, juazeiro
+// 5-7 m, boulders up to 3 m, a fence post 1.2-1.5 m, a pole 9 m, the windmill 9.5 m, the house 3.4 m.
+const BUILD = {
+  // a columnar cactus: a trunk, arms curving out and up like a candelabra (ribs, spines, fruit: details)
+  mandacaru(p, r) {
+    const h = 3 + p.v * 3, parts = [stick(0, 0, 0, h, 0.21, "C")], arms = 1 + Math.floor(r() * 4)
+    for (let i = 0; i < arms; i++) {
+      // out from the trunk level, bending round, then straight up: the elbow is what says mandacaru
+      const sd = (i + p.seed) % 2 ? 1 : -1, hb = 1.2 + r() * h * 0.38, out = 0.6 + r() * 0.5 + i * 0.12, top = Math.min(h * 0.96, hb + 1 + r() * (h - hb - 1))
+      const bend = [[0.35, 0.02], [0.7, 0.1], [0.92, 0.28], [1, 0.5]].map(([a, u]) => [sd * out * a, hb + u * out])
+      let [px, pu] = [0, hb]
+      for (const [x, u] of bend) { parts.push(stick(px, pu, x, u, 0.15, "C")); [px, pu] = [x, u] }
+      parts.push(stick(px, pu, px, top, 0.15, "C"))
+    }
+    return { parts, height: h, ramp: "cCrR", ribs: true, spines: "r", fruit: true }
+  },
+  // xique-xique: a low cactus sprawling from one root, its stems turning up at the ends, golden spines
+  xique(p, r) {
+    const spread = 0.4 + p.v * 0.8, parts = [], n = 4 + Math.floor(r() * 4)
+    for (let i = 0; i < n; i++) {
+      const dx = (r() * 2 - 1) * spread, dz = (r() * 2 - 1) * spread * 0.5, hs = 0.35 + r() * 0.8
+      parts.push(stick(dx * 0.12, 0.05, dx, 0.14, 0.065, "C", 0, dz), stick(dx, 0.14, dx * 1.08, hs, 0.065, "C", dz))
+    }
+    return { parts, height: 1.2, ramp: "cCrR", spines: "F" }
+  },
+  // coroa-de-frade: a cactus the size of a fist, with a red cap
+  coroa: () => ({ parts: [blob(0, 0.1, 0.13, 0.1, "C"), blob(0, 0.22, 0.06, 0.035, "f")], height: 0.26, ramp: "cCrR" }),
+  // catingueira, jurema: leafless in the dry season, all twigs, a few dry leaves still hanging on
+  shrub(p, r) {
+    const h = 1.4 + p.v * 1.8, parts = []
+    const grow = (x, z, u, ang, len, depth) => {
+      const x1 = x + Math.sin(ang) * len, u1 = u + Math.cos(ang) * len, z1 = z + (r() - 0.5) * len * 0.6
+      parts.push(stick(x, u, x1, u1, 0.017 * (depth + 1), depth > 1 ? "t" : "u", z, z1))
+      if (depth === 0) { if (r() < 0.3) parts.push(blob(x1, u1, 0.07, 0.05, "F", z1)); return }
+      const n = 2 + (r() < 0.35 ? 1 : 0)
+      for (let i = 0; i < n; i++) grow(x1, z1, u1, ang + (i - (n - 1) / 2) * (0.5 + r() * 0.35) + (r() - 0.5) * 0.3, len * (0.62 + r() * 0.2), depth - 1)
+    }
+    const stems = 2 + Math.floor(r() * 2)
+    for (let i = 0; i < stems; i++) grow((r() - 0.5) * 0.3, 0, 0, (i - (stems - 1) / 2) * 0.35 + (r() - 0.5) * 0.2, h * 0.38, 4)
+    return { parts, height: h, tuft: [h * 0.55, h * 0.42, h * 0.3], twigs: true }
+  },
+  // juazeiro: green through the drought, a short trunk forking under a heavy round crown
+  jua(p, r) {
+    const h = 5 + p.v * 2, parts = [stick(0, 0, 0.1, h * 0.45, 0.17, "t")]
+    for (const sd of [-1, 1]) parts.push(stick(0.1, h * 0.42, sd * 1.2, h * 0.64, 0.08, "t"))
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2, rx = 1 + r() * 0.8
+      parts.push(blob(Math.cos(a) * 1.7 * (0.6 + r() * 0.4), h * 0.7 + Math.sin(a) * 0.75, rx, rx * 0.72, "Q", (r() - 0.5) * 1.5))
+    }
+    return { parts, height: h, ramp: "qQrR", leaves: true }
+  },
+  // granite boulders, one or two together; now and then a long low lajedo
+  rock(p) {
+    const slab = p.v > 0.92, wd = slab ? 4 + p.v * 3 : 0.4 + p.v * p.v * 2.6, ht = slab ? 0.5 : wd * 0.6
+    const parts = [blob(0, ht * 0.45, wd / 2, ht / 2, "X")]
+    if (!slab && p.v > 0.45) parts.push(blob(wd * 0.45, ht * 0.3, wd * 0.28, ht * 0.3, "X", -0.2))
+    return { parts, height: ht, ramp: "xXVR", crack: wd > 1.2 }
+  },
+  // a tuft of dry grass: curved blades, darker at the foot, their tips catching the sun
+  grass(p, r) {
+    const parts = [], n = 4 + Math.floor(p.v * 6)
+    for (let i = 0; i < n; i++) {
+      const lean = (r() * 2 - 1) * 0.14, hh = 0.16 + r() * 0.32, x0 = (r() - 0.5) * 0.06, z0 = (r() - 0.5) * 0.06
+      parts.push(stick(x0, 0, x0 + lean * 0.3, hh * 0.5, 0.008, "u", z0), stick(x0 + lean * 0.3, hh * 0.5, x0 + lean, hh, 0.008, "F", z0))
+    }
+    return { parts, height: 0.48, tips: true }
+  },
+  // a crooked stake, three strands of barbed wire to the next one, sagging a little
+  post(p) {
+    const tall = 1.2 + p.v * 0.3, lean = (p.v - 0.5) * 0.16, kink = lean * 0.4 + 0.03, key = POST[band(p.z, FAR)], n = p.next
+    const parts = [stick(0, 0, kink, tall * 0.55, 0.05, key), stick(kink, tall * 0.55, lean, tall, 0.045, key)]
+    if (n && p.z < 90) for (const up of [0.35, 0.75, 1.1]) {
+      const dx = n.x - p.x, dz = n.z - p.z, w = p.z < 30 ? "K" : "j"
+      parts.push(stick(0, up, dx / 2, up - 0.04, 0.004, w, 0, dz / 2), stick(dx / 2, up - 0.04, dx, up, 0.004, w, dz / 2, dz))
+    }
+    return { parts, height: tall }
+  },
+  // a wooden power pole with its crossarm, two wires sagging to the next
+  pole(p) {
+    const key = POST[band(p.z, FAR)], n = p.next, parts = [stick(0, 0, 0, 9, 0.125, key), stick(-0.9, 8.4, 0.9, 8.4, 0.05, key)]
+    if (n) for (const dx of [-0.8, 0.8]) for (let i = 0; i < 12; i++) {
+      const sag = (s) => 8.4 - 1.6 * s * (1 - s), s0 = i / 12, s1 = (i + 1) / 12, dz = n.z - p.z
+      parts.push(stick(dx, sag(s0), dx, sag(s1), 0.004, POST[band(p.z + dz * s0, FAR)], dz * s0, dz * s1))
+    }
+    return { parts, height: 9 }
+  },
+  // a windmill pumping water: a lattice tower, the wheel of vanes, the tail
+  mill(p) {
+    const key = POST[band(p.z, FAR)], parts = []
+    for (const sd of [-1, 1]) parts.push(stick(sd * 0.9, 0, sd * 0.15, 8.2, 0.05, key))
+    for (const u of [2.4, 4.8, 6.8]) { const half = 0.9 - (0.75 * u) / 8.2; parts.push(stick(-half, u, half, u, 0.03, key)) }
+    parts.push(stick(-0.6, 1.2, 0.45, 3.6, 0.03, key), stick(0.6, 3.6, -0.4, 5.8, 0.03, key))
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2, b = ((i + 1) / 12) * Math.PI * 2
+      parts.push(stick(0, 8.6, Math.cos(a) * 1.4, 8.6 + Math.sin(a) * 1.4, 0.03, key), stick(Math.cos(a) * 1.4, 8.6 + Math.sin(a) * 1.4, Math.cos(b) * 1.4, 8.6 + Math.sin(b) * 1.4, 0.04, key))
+    }
+    parts.push(stick(0, 8.6, 2.2, 8.7, 0.04, key), stick(2, 8.6, 2, 9.4, 0.3, key))
+    return { parts, height: 10 }
+  },
+  // a mud-walled house far off, its window already lit (its walls drawn by hand, its parts cast the shadow)
+  house: () => ({ parts: [stick(0, 0, 0, 3.4, 3, "p")], height: 3.4, house: true }),
+}
+
+// Scattered as many to the square meter far as near (the far ones crowd into a line of scrub along the
+// horizon, as they do), some placed by hand near the road where the walk passes them; drawn far to near.
+const PROPS = []
+{
+  const r = rng(11), clear = (x) => Math.abs(x) > ROAD_HALF + 1.4 && Math.abs(x - FENCE_X) > 0.7
+  const add = (type, x, z, v, extra) => PROPS.push({ type, x, z, v, seed: Math.floor(r() * 1e6), ...extra })
+  const scatter = (type, n, z0, z1) => {
+    for (let i = 0; i < n; i++) {
+      const z = Math.sqrt(z0 * z0 + (z1 * z1 - z0 * z0) * r()), x = (r() * 2 - 1) * (z * 1.1 + 8)
+      const tall = type === "mandacaru" || type === "jua", inSun = Math.abs(P.vp + (P.focal * x) / z - SUNX) < SR + 6   // nothing tall in front of the sun
+      if (clear(x) && !(tall && inSun)) add(type, x, z, r())
+    }
+  }
+  scatter("mandacaru", 70, 10, 320); scatter("xique", 120, 4, 260); scatter("shrub", 240, 4, 350)
+  scatter("jua", 12, 24, 300); scatter("rock", 80, 3, 250)
+  // dry grass along the shoulders, near only: farther it would be under a pixel
+  for (let i = 0; i < 110; i++) add("grass", (r() < 0.5 ? -1 : 1) * (ROAD_HALF + 0.15 + r() * r() * 9), 3 + r() * 24, r())
+  // the fence on the left: crooked stakes every ~3 m; the power line on the right
+  const line = (type, x, z0, z1, step, jitter) => {
+    const all = []
+    for (let z = z0; z < z1; z += step + r() * jitter) all.push({ type, x: x + (r() - 0.5) * 0.12, z, v: r(), seed: Math.floor(r() * 1e6) })
+    all.forEach((p, i) => { p.next = all[i + 1]; PROPS.push(p) })
+  }
+  line("post", FENCE_X, 2, 240, 2.6, 0.7)
+  line("pole", POLE_X, 6, 640, 32, 0)
+  // in view near the road: |x| under ~z, past the shoulder
+  for (const [type, x, z, v] of [
+    ["mandacaru", -8.5, 12, 0.95], ["mandacaru", 12, 26, 0.6], ["mandacaru", -15, 36, 0.4], ["mandacaru", 9.5, 52, 0.85],
+    ["shrub", 7.4, 9, 0.8], ["shrub", -10.5, 21, 0.55], ["shrub", 17, 31, 0.75], ["shrub", -7.4, 9.5, 0.35],
+    ["xique", 6.2, 6.8, 0.7], ["xique", -7.6, 8.4, 0.6], ["xique", 13, 15, 0.8],
+    ["rock", 8.4, 12, 0.85], ["rock", -9, 10.5, 0.6], ["rock", 5.2, 5.6, 0.4], ["coroa", 4.6, 4.6, 0.5], ["coroa", -4.8, 5.2, 0.5],
+    ["jua", -24, 44, 0.6], ["jua", 32, 64, 0.4], ["mill", 19, 42, 0.5], ["house", -36, 150, 0.5], ["jua", -42, 156, 0.8],
+  ]) add(type, x, z, v)
+  PROPS.sort((a, b) => b.z - a.z)
+  for (const p of PROPS) p.thing = BUILD[p.type](p, rng(p.seed))
+}
+
+// ---------------------------------------------------------------- shadows
+// The sun is 7 degrees up and 6 to the left of the road: a point `up` m high falls up x LONG m back
+// toward us and a little to the right. Each part is swept onto the ground in steps under a pixel;
+// the pixels go into one set, so where shadows cross the ground is no darker than in one; what is high
+// up goes soft (dithered), the way a long shadow's far end blurs. Wires and blades cast too little.
+const SHADE = { g: "Z", G: "z", J: "G", E: "J", h: "E", Z: "k", z: "Z", a: "k", A: "a", b: "A", B: "b", l: "L", L: "A" }
+const SX = Math.sin((-SUN_AZ * Math.PI) / 180) * LONG, SZ = Math.cos((SUN_AZ * Math.PI) / 180) * LONG
+function cast(out, ox, oz, parts, height) {
+  for (const q of parts) {
+    const [a, b, half] = q.e ? [[q.e[0], q.e[1], q.e[2] - q.ry], [q.e[0], q.e[1], q.e[2] + q.ry], q.rx] : [q.a, q.b, q.half]
+    if (half < 0.015) continue
+    const onGround = (t) => { const u = a[2] + (b[2] - a[2]) * t; return [ox + a[0] + (b[0] - a[0]) * t + u * SX, oz + a[1] + (b[1] - a[1]) * t - u * SZ, u] }
+    const ends = [onGround(0), onGround(1)].filter(([, z]) => z > 0.3).map(([x, z]) => P.ground(x, z))
+    const n = ends.length < 2 ? 60 : Math.min(400, Math.ceil(Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]) * 1.5) + 1)
+    for (let i = 0; i <= n; i++) {
+      const [gx, gz, u] = onGround(i / n)
+      if (gz < 0.3) continue
+      const [sx, sy] = P.ground(gx, gz), rx = Math.max(0.71, half * P.scale(gz)), ry = Math.max(0.71, (half * P.focal * P.eye) / (gz * gz))
+      if (sy - ry > H || sx + rx < 0 || sx - rx > W) continue
+      const soft = u / height > 0.6 ? ((u / height - 0.6) / 0.4) * 0.6 : 0
+      for (let y = Math.floor(sy - ry); y <= Math.ceil(sy + ry); y++) {
+        if (y <= P.horizon || y >= H) continue
+        for (let x = Math.max(0, Math.floor(sx - rx)); x <= Math.min(W - 1, Math.ceil(sx + rx)); x++)
+          if (((x + 0.5 - sx) / rx) ** 2 + ((y + 0.5 - sy) / ry) ** 2 <= 1 && !(soft && bayer(x, y) < soft)) out.add(y * W + x)
+      }
+    }
+  }
+}
+const darken = (c, out) => { for (const i of out) { const x = i % W, y = (i - x) / W, d = SHADE[c.key(x, y)]; if (d) c.px(x, y, d) } }
+
+// ---------------------------------------------------------------- drawing
+// Near and big enough, a thing is drawn on a plate of its own and lit there: the edges toward the sun
+// take the rim, the ones away from it a step darker. Then the details only near eyes see.
+function paint(c, p) {
+  const t = p.thing, s = P.scale(p.z), b = band(p.z, NEAR), [bx] = P.ground(p.x, p.z), r = rng(p.seed + 1)
+  if (s * t.height < 1) return
+  const key = (k) => HAZE[b] ?? k, end = (v) => at(p.x + v[0], p.z + v[1], v[2]), wide = (q) => Math.max(1, Math.round(2 * q.half * P.scale(p.z + (q.a[1] + q.b[1]) / 2)))
+  if (t.house) {
+    const [x, y] = at(p.x - 3, p.z, 2.6), [x1, y1] = at(p.x + 3, p.z, 0), roof = at(p.x - 3.4, p.z, 3.4)
+    c.rect(x, y, x1 - x, y1 - y, key("p")); c.rect(roof[0], roof[1], x1 - x + 1, y - roof[1], "0")
+    c.px(...at(p.x - 1.2, p.z, 1.4), "W"); c.vline(...at(p.x + 1.2, p.z, 1.9), y1 - at(p.x, p.z, 1.9)[1], "k")
+    return
+  }
+  // far, a shrub is a tuft: its twigs would be under a pixel
+  if (t.tuft && s * t.height < 7) { const [u, rx, ry] = t.tuft; return c.ellipse(...at(p.x, p.z, u), Math.max(1, Math.round(rx * s)), Math.max(0, Math.round(ry * s)), key("t")) }
+  const draw = () => {
+    for (const q of t.parts)
+      if (q.e) c.ellipse(...end(q.e), Math.max(0, Math.round(q.rx * s)), Math.max(0, Math.round(q.ry * s)), key(q.key))
+      else c.line(...end(q.a), ...end(q.b), key(q.key), wide(q))
+  }
+  const thick = Math.max(...t.parts.map((q) => (q.e ? 2 * q.rx : 2 * q.half))) * s
+  if (t.ramp && b === 0 && thick >= 3) c.plate(draw, { light: [Math.max(-1, Math.min(1, (SUNX - bx) / 40)), -0.7], ramps: [t.ramp], strength: t.crack !== undefined ? 0.75 : 1 })
+  else draw()
+  if (b > 0) return
+  const sun = SUNX > bx ? 1 : -1
+  for (const q of t.parts) {
+    if (q.e) {
+      const [cx, cy] = end(q.e), rx = Math.round(q.rx * s), ry = Math.round(q.ry * s)
+      // leaves: darker clumps in the lower part of each puff of the crown
+      if (t.leaves && rx >= 4) for (let i = 0; i < rx * 2; i++) {
+        const x = cx + Math.round((r() * 2 - 1) * rx * 0.8), y = cy + Math.round(r() * ry * 0.8)
+        if (c.key(x, y) === "Q" && c.key(x + 1, y) === "Q") c.hline(x, y, 2, "q")
+      }
+      // a crack down a boulder's face
+      if (t.crack && rx >= 4) {
+        let x = cx + Math.round((r() - 0.5) * rx), y = cy - Math.round(ry * 0.6)
+        for (let i = 0; i < ry * 1.2; i++, y++) { x += Math.round(r() * 2 - 1) * (r() < 0.4 ? 1 : 0); if (c.key(x, y) === "X") c.px(x, y, "x") }
+      }
+      continue
+    }
+    const [x0, y0] = end(q.a), [x1, y1] = end(q.b), w = wide(q)
+    // a column of a cactus: ribs down its face; spines along the edge toward the sun and over the top,
+    // glowing with the light behind them; now and then a red fruit by the tip
+    if (x0 === x1 && (t.ribs || t.spines)) {
+      const top = Math.min(y0, y1), bot = Math.max(y0, y1), half = w >> 1
+      if (t.ribs && w >= 5) for (let o = -half + 1; o < half; o += 2) c.vline(x0 + o, top + 2, bot - top - 2, "c")
+      if (t.spines && s >= 8) {
+        for (let y = top + 1; y < bot; y += 2) if (r() < 0.55) c.px(x0 + sun * (half + 1), y, t.spines)
+        if (q.b[2] === Math.max(q.a[2], q.b[2]) && q.b[2] > 0.5) for (const dx of [-1, 0, 1]) if (r() < 0.6) c.px(x0 + dx, top - 1, t.spines)
+      }
+      if (t.fruit && w >= 3 && q.b[2] > q.a[2] + 0.8 && r() < 0.4) c.px(x0 - sun * half, top + 1, "f")
+    }
+    // xique-xique stems: spines all along their tips
+    if (t.spines === "F" && s >= 10 && q.b[2] > 0.3) for (let i = 0; i < 3; i++) if (r() < 0.7) c.px(x1 + Math.round((r() * 2 - 1) * (w / 2 + 1)), y1 + Math.round(r() * 3) - 1, "F")
+    // backlit tips: grass blades and the outer twigs light up
+    if ((t.tips && s >= 20 && q.key === "F") || (t.twigs && s >= 12 && q.key === "u" && r() < 0.35)) c.px(x1, y1, "r")
+  }
+}
+
+sprite("_land", { w: W, h: H },
+  (c) => serras(c),
+  plane(P, ground),
+  (c) => {
+    const out = new Set()
+    for (const p of PROPS) if (p.z < 160 && P.scale(p.z) * p.thing.height >= 2) cast(out, p.x, p.z, p.thing.parts, p.thing.height)
+    darken(c, out)
+  },
+  (c) => { for (const p of PROPS) paint(c, p) })
+
+// heat over the far road: past ~150 m the asphalt mirrors the sky, shimmering
+function mirage(c) {
+  for (let row = Math.floor(P.horizon); row < P.horizon + 3; row++) {
+    const z = P.at(P.vp, row)?.[1]
+    if (!z || z < 150) continue
+    const half = P.scale(z) * ROAD_HALF
+    for (let col = Math.floor(P.vp - half); col <= Math.ceil(P.vp + half); col++) {
+      const v = Math.sin(c.phase * Math.PI * 12 + col * 0.9 + row * 2.1)
+      c.px(col, row, v > 0.55 ? "Y" : v > -0.3 ? "y" : "o")
+    }
+  }
+}
+
+// ================================================================ the walker
+// 1.82 m with the hat, 0.8 m a step, four poses a step (contact, down, passing, up) at 10 fps: 2 m/s.
 // Walked the way pixel art walks: the scale is held for the whole step and changes only at the next
 // contact, when the pose changes anyway, and the planted foot stays where it landed: no sliding, no
-// size flickering a pixel at a time mid-step. Near, it is drawn by code at its exact size; under 15 px
-// a figure drawn that way turns into a blob, so it takes the hand-drawn sprite nearest its height
-// (stamp's `fit`), flipped every other step to swap the legs.
-const FPS = 10, PER_STEP = 4, STEPS = 62, FRAMES = PER_STEP * STEPS, Z0 = 0.6, STRIDE = 0.8, LANE = 0.9, BIG = 15
+// size flickering a pixel at a time mid-step. Near, they are drawn by code at their exact size; under
+// 15 px a figure drawn that way turns into a blob, so they take the hand-drawn sprite nearest their
+// height (stamp's `fit`), flipped every other step to swap the legs.
+const Z0 = 0.6, STRIDE = 0.8, LANE = 0.9, BIG = 15, TALL = 1.82
 // dark against the glow all the way (at 50 m the haze is nothing yet); in the last 12 m the figure
 // and its shadow dissolve into the light, a 4x4 ordered dither taking more of it each step
-const BODY = "ST", BODY_FAR = [24], FADE = [38, 50]
-const B4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], bayer = (x, y) => (B4[(y & 3) * 4 + (x & 3)] + 0.5) / 16
-// the sun is low ahead of them: their shadow runs back toward us, ~25 m long
-const TALL = 1.75, SHADOW = TALL / Math.tan((4 * Math.PI) / 180), DARKER = { a: "k", A: "a", b: "A", B: "b", l: "L", L: "A" }
+const FADE = [38, 50], FAR_BODY = 24
 
 // Small sizes, seen from behind, the four poses side by side: contact (the back arm hangs lower),
 // down (the body a pixel lower), passing (the swinging foot lifted), up (it reaches ahead, the
-// other arm back). The rim is the sun catching the head and shoulders.
+// other arm back). The hat's brim and the bedroll on the pack are what still reads at 9 px; the rim
+// is the sun catching the hat and the bedroll.
 const MICRO = {
   14: `
     .rSr. ..... .rSr. .rSr.
-    .SSS. .rSr. .SSS. .SSS.
-    rSSSr .SSS. rSSSr rSSSr
-    SSSSS rSSSr SSSSS SSSSS
-    SSSSS SSSSS SSSSS SSSSS
-    SSSSS SSSSS SSSSS SSSSS
+    rSSSr .rSr. rSSSr rSSSr
+    .SSS. rSSSr .SSS. .SSS.
+    rPPPr .SSS. rPPPr rPPPr
+    SPPPS rPPPr SPPPS SPPPS
+    SPPPS SPPPS SPPPS SPPPS
+    SSSSS SPPPS SSSSS SSSSS
     SSSS. SSSSS .SSS. .SSSS
     .SSS. SSSS. .SSS. .SSS.
     .S.S. .SSS. .S.S. .S.S.
-    .S.S. .S.S. .S.S. .S.S.
     .S.S. .S.S. .S.S. .S.S.
     .S.S. .S.S. .S.S. .S.S.
     .S.S. .S.S. .S... .S.S.
     .S.S. .S.S. .S... .S...`,
   12: `
     .rSr. ..... .rSr. .rSr.
-    .SSS. .rSr. .SSS. .SSS.
-    rSSSr .SSS. rSSSr rSSSr
-    SSSSS rSSSr SSSSS SSSSS
-    SSSSS SSSSS SSSSS SSSSS
-    SSSS. SSSSS .SSS. .SSSS
+    rSSSr .rSr. rSSSr rSSSr
+    .SSS. rSSSr .SSS. .SSS.
+    rPPPr .SSS. rPPPr rPPPr
+    SPPPS rPPPr SPPPS SPPPS
+    SPPPS SPPPS SPPPS SPPPS
+    SSSS. SPPPS .SSS. .SSSS
     .SSS. SSSS. .SSS. .SSS.
     .S.S. .SSS. .S.S. .S.S.
-    .S.S. .S.S. .S.S. .S.S.
     .S.S. .S.S. .S.S. .S.S.
     .S.S. .S.S. .S... .S.S.
     .S.S. .S.S. .S... .S...`,
   10: `
     .S. ... .S. .S.
-    .S. .S. .S. .S.
     SSS .S. SSS SSS
-    SSS SSS SSS SSS
-    SSS SSS SSS SSS
     .S. SSS .S. .S.
+    SPS .S. SPS SPS
+    SPS SPS SPS SPS
+    .S. SPS .S. .S.
     S.S .S. S.S S.S
     S.S S.S S.S S.S
     S.S S.S S.. S.S
@@ -139,9 +463,9 @@ const MICRO = {
   9: `
     .S. ... .S. .S.
     SSS .S. SSS SSS
-    SSS SSS SSS SSS
-    SSS SSS SSS SSS
-    .S. SSS .S. .S.
+    SPS SSS SPS SPS
+    SPS SPS SPS SPS
+    .S. SPS .S. .S.
     S.S .S. S.S S.S
     S.S S.S S.S S.S
     S.S S.S S.. S.S
@@ -149,8 +473,8 @@ const MICRO = {
   8: `
     .S. ... .S. .S.
     SSS .S. SSS SSS
-    SSS SSS SSS SSS
-    SSS SSS SSS SSS
+    SPS SSS SPS SPS
+    SSS SPS SSS SSS
     .S. SSS .S. .S.
     S.S .S. S.S S.S
     S.S S.S S.S S.S
@@ -158,8 +482,8 @@ const MICRO = {
   7: `
     .S. ... .S. .S.
     SSS .S. SSS SSS
-    SSS SSS SSS SSS
-    .S. SSS .S. .S.
+    SPS SSS SPS SPS
+    .S. SPS .S. .S.
     S.S .S. S.S S.S
     S.S S.S S.S S.S
     S.S S.S S.. S.S`,
@@ -194,72 +518,104 @@ const POSES = [
 function walker(c, frame) {
   const k = Math.floor(frame / PER_STEP), pose = frame % PER_STEP, side = k % 2 ? 1 : -1
   const zk = Z0 + k * STRIDE, zh = zk + STRIDE / 2                // where this foot landed; the body's depth, held
-  const key = BODY[band(zk, BODY_FAR)], s = P.scale(zh)            // px per meter, held for the step
+  const s = P.scale(zh), tall = s * TALL                           // px per meter, held for the step
   const fade = Math.min(1, Math.max(0, (zk - FADE[0]) / (FADE[1] - FADE[0])))
   if (fade >= 1) return
   c.clip(fade > 0 ? (x, y) => bayer(x, y) >= fade : undefined, () => {
-    shadow(c, zk)
-    if (s * TALL >= BIG) draw(c, frame, POSES[pose], side, zk, zh, key, s)
-    else c.stamp("walker_*", ...at(LANE, zk), { fit: s * TALL, frame: pose, ...(side > 0 && { flip: "x" }), ...(key !== "S" && { swap: { S: key } }) })
+    shadow(c, frame, pose, side, zk)
+    if (tall >= BIG) draw(c, frame, POSES[pose], side, zk, zh, s)
+    else c.stamp("walker_*", ...at(LANE, zk), { fit: tall, frame: pose, ...(side > 0 && { flip: "x" }), ...(zk >= FAR_BODY && { swap: { S: "T", P: "T" } }) })
   })
 }
 
-// the shadow on the road: from the planted foot back toward the eye, a body's width tapering to a head's
-function shadow(c, zk) {
-  for (let row = at(LANE, zk)[1]; row < H; row++) {
-    const zz = P.at(0, row)[1]
-    if (zz > zk || zz < zk - SHADOW) continue
-    const half = 0.22 - (0.12 * (zk - zz)) / SHADOW
-    for (let col = Math.floor(P.ground(LANE - half, zz)[0]); col <= Math.ceil(P.ground(LANE + half, zz)[0]); col++) {
-      const d = DARKER[c.key(col, row)]
-      if (d && Math.abs(P.at(col, row)[0] - LANE) <= half) c.px(col, row, d)
-    }
-  }
+// the walker's shadow: their parts cast like everything else's, so it walks too, legs scissoring,
+// the hat's brim and the bedroll in its outline
+function walkerParts(pose, side, frame) {
+  const [hd, hu] = pose.hips, [fd, fu] = pose.foot, cx = -side * 0.11, bob = hu - 0.92, swingArm = [0, 1, 0, -1][frame % PER_STEP]
+  const knee = [-side * 0.2, (hd + fd) / 2 + 0.12, (hu + fu) / 2 + 0.05]
+  const parts = [
+    { a: [cx + side * 0.09, hd, hu], b: [0, 0, 0.1], half: 0.07 },                       // the planted leg
+    { a: [cx - side * 0.09, hd, hu], b: knee, half: 0.07 }, { a: knee, b: [-side * 0.22, fd, fu + 0.1], half: 0.06 },
+    { a: [cx, hd, hu], b: [cx, hd, 1.45 + bob], half: 0.2 },                               // body and pack
+    { a: [cx - 0.22, hd, 1.46 + bob], b: [cx + 0.22, hd, 1.46 + bob], half: 0.07 },        // bedroll
+    { e: [cx, hd, 1.63 + bob], rx: 0.1, ry: 0.1 },                                         // head
+    { a: [cx - 0.23, hd, 1.69 + bob], b: [cx + 0.23, hd, 1.69 + bob], half: 0.03 },        // brim, crown
+    { a: [cx, hd, 1.7 + bob], b: [cx, hd, 1.79 + bob], half: 0.09 },
+  ]
+  for (const [arm, sgn] of [[-1, side < 0 ? 1 : -1], [1, side < 0 ? -1 : 1]])
+    parts.push({ a: [cx + arm * 0.2, hd, 1.4 + bob], b: [cx + arm * 0.25, hd + sgn * swingArm * -0.2, 0.8 + bob], half: 0.045 })
+  return parts
+}
+function shadow(c, frame, pose, side, zk) {
+  const out = new Set()
+  cast(out, LANE + side * 0.11, zk, walkerParts(POSES[pose], side, frame), TALL)
+  darken(c, out)
 }
 
-function draw(c, frame, pose, side, zk, zh, key, s) {
-  // a point d m ahead of the planted foot and up m above the ground, x m to its side, on screen
+// Near, drawn from behind in meters: boots and trousers, the shirt, the arms swinging against the
+// legs, a pack with a bedroll strapped on top, the neck and hair, a leather hat. Backlit: all of it
+// in its own shade, and the sun wraps a warm rim round the hat, the bedroll, the shoulders and arms.
+const FIG = "1234567U"
+function draw(c, frame, pose, side, zk, zh, s) {
   const [ax, ay] = P.ground(LANE + side * 0.11, zk)
   const pt = (x, d, up) => [Math.round(ax + x * s), Math.round(ay - (P.focal * P.eye * d) / (zh * zh) - up * s)]
   const T = (m) => Math.max(1, Math.round(m * s))                  // a thickness in meters, in px
-  const [hd, hu] = pose.hips, cx = -side * 0.11                      // the body's middle, across
+  const big = s >= 30                                               // ~55 px tall and up: seams and buckles
+  const [hd, hu] = pose.hips, [fd, fu] = pose.foot, cx = -side * 0.11, bob = hu - 0.92
+  const up = (m) => m + bob                                         // what rides on the hips bobs with them
+  // legs: the planted one straight, the swinging one bent at the knee; boots below the ankle
   const hipL = pt(cx - 0.09, hd, hu), hipR = pt(cx + 0.09, hd, hu)
-  const planted = pt(0, 0, 0), swing = pt(-side * 0.22, pose.foot[0], pose.foot[1])
-  const hipP = side < 0 ? hipL : hipR, hipS = side < 0 ? hipR : hipL
-  // legs: the planted one straight, the swinging one bent at the knee, forward and up
-  const kneeS = pt(-side * 0.2, (hd + pose.foot[0]) / 2 + 0.12, (hu + pose.foot[1]) / 2 + 0.05)
-  c.line(hipS[0], hipS[1], kneeS[0], kneeS[1], key, T(0.14))
-  c.line(kneeS[0], kneeS[1], swing[0], swing[1], key, T(0.12))
-  c.line(hipP[0], hipP[1], planted[0], planted[1], key, T(0.14))
-  if (s * TALL >= 24) {
-    c.rect(planted[0] - T(0.07), planted[1] - T(0.05) + 1, T(0.14) + 1, T(0.05), key)
-    c.rect(swing[0] - T(0.07), swing[1] - T(0.05) + 1, T(0.14) + 1, T(0.05), pose.foot[1] > 0.05 ? "U" : key)
+  const hipP = side < 0 ? hipL : hipR, hipS = side < 0 ? hipR : hipL, swingX = -side * 0.22
+  const kneeS = pt(-side * 0.2, (hd + fd) / 2 + 0.12, (hu + fu) / 2 + 0.05), ankleS = pt(swingX, fd, fu + 0.12), ankleP = pt(0, 0, 0.12)
+  c.line(...hipS, ...kneeS, "4", T(0.15)); c.line(...kneeS, ...ankleS, "4", T(0.12)); c.line(...hipP, ...ankleP, "4", T(0.15))
+  for (const [ank, x, d, u] of [[ankleP, 0, 0, 0], [ankleS, swingX, fd, fu]]) {
+    const [fx, fy] = pt(x, d, u)
+    c.rect(fx - T(0.065), ank[1], T(0.13) + 1, Math.max(1, fy - ank[1]), "5")
+    if (u > 0.05) c.rect(fx - T(0.065), fy - T(0.03), T(0.13) + 1, T(0.03), "U")       // a lifted heel shows its sole
   }
-  // a back: sloping shoulders from the neck, the chest, narrower at the waist; arms swinging against the legs
-  const bob = hu - 0.92, sh = 1.45 + bob
-  const sL = pt(cx - 0.2, hd, sh), sR = pt(cx + 0.2, hd, sh), wL = pt(cx - 0.14, hd, hu + 0.05), wR = pt(cx + 0.14, hd, hu + 0.05)
-  const nL = pt(cx - 0.07, hd, sh + 0.07), nR = pt(cx + 0.07, hd, sh + 0.07), cL = pt(cx - 0.18, hd, sh - 0.28), cR = pt(cx + 0.18, hd, sh - 0.28)
-  c.poly([nL[0], nL[1], nR[0], nR[1], sR[0], sR[1], cR[0], cR[1], wR[0], wR[1], wL[0], wL[1], cL[0], cL[1], sL[0], sL[1]], key)
-  const swingArm = [0, 1, 0, -1][frame % PER_STEP]                    // the planted side's arm goes back on contact
+  // the shirt: sloping shoulders from the neck, narrower at the waist; a belt under it
+  const sh = up(1.45), sL = pt(cx - 0.2, hd, sh), sR = pt(cx + 0.2, hd, sh), wL = pt(cx - 0.15, hd, up(0.98)), wR = pt(cx + 0.15, hd, up(0.98))
+  const nL = pt(cx - 0.07, hd, sh + 0.07), nR = pt(cx + 0.07, hd, sh + 0.07), cL = pt(cx - 0.19, hd, sh - 0.28), cR = pt(cx + 0.19, hd, sh - 0.28)
+  c.poly([...nL, ...nR, ...sR, ...cR, ...wR, ...wL, ...cL, ...sL], "3")
+  if (big) c.line(...pt(cx - 0.15, hd, up(0.97)), ...pt(cx + 0.15, hd, up(0.97)), "5", T(0.035))
+  // arms: sleeves to the wrist, hands; the planted side's arm goes back on contact
+  const swingArm = [0, 1, 0, -1][frame % PER_STEP]
   for (const [arm, sp, sgn] of [[-1, sL, side < 0 ? 1 : -1], [1, sR, side < 0 ? -1 : 1]]) {
-    const hand = pt(cx + arm * 0.24, hd + sgn * swingArm * -0.2, 0.82 + bob + (sgn * swingArm < 0 ? 0.04 : 0))
-    c.line(sp[0], sp[1] + T(0.04), hand[0], hand[1], key, T(0.09))
+    const back = sgn * swingArm < 0, hand = pt(cx + arm * 0.25, hd + sgn * swingArm * -0.2, up(0.8) + (back ? 0.04 : 0))
+    const elbow = pt(cx + arm * 0.26, hd + sgn * swingArm * -0.08, up(1.12))
+    c.line(sp[0], sp[1] + T(0.04), ...elbow, "3", T(0.1)); c.line(...elbow, ...hand, "3", T(0.09))
+    c.ellipse(...hand, T(0.045), T(0.05), "2")
   }
-  // neck and head: hair, from behind
-  const neck = pt(cx, hd, sh + 0.03), head = pt(cx, hd, 1.63 + bob)
-  c.rect(neck[0] - T(0.04), head[1], T(0.08), Math.max(1, neck[1] - head[1] + 1), key)
-  c.ellipse(head[0], head[1], T(0.1), T(0.12), key)
-  // backlit: the sun ahead wraps a warm rim round the head, the shoulders and the tops of the arms
-  if (key !== "S") return
-  const body = (x, y) => x >= 0 && y >= 0 && x < W && y < H && "ST".includes(c.key(x, y))
-  const top = head[1] - T(0.13) - 1, chest = Math.max(cL[1], cR[1]), rim = []
+  // the pack, its flap and buckle, and the bedroll strapped across the top
+  c.poly([...pt(cx - 0.18, hd, up(1.05)), ...pt(cx + 0.18, hd, up(1.05)), ...pt(cx + 0.17, hd, up(1.4)), ...pt(cx - 0.17, hd, up(1.4))], "6")
+  if (big) { c.line(...pt(cx - 0.17, hd, up(1.27)), ...pt(cx + 0.17, hd, up(1.27)), "5", T(0.02)); c.rect(...pt(cx - 0.02, hd, up(1.27)), T(0.04), T(0.05), "U") }
+  c.line(...pt(cx - 0.2, hd, up(1.46)), ...pt(cx + 0.2, hd, up(1.46)), "7", T(0.14))
+  if (big) for (const tx of [-0.11, 0.11]) c.line(...pt(cx + tx, hd, up(1.53)), ...pt(cx + tx, hd, up(1.39)), "5", T(0.02))
+  // neck, hair under the hat, the hat: a wide brim and a round crown with a band
+  const neck = pt(cx - 0.045, hd, up(1.6))
+  c.rect(neck[0], neck[1], T(0.09), Math.max(1, pt(0, hd, up(1.52))[1] - neck[1]), "2")
+  c.ellipse(...pt(cx, hd, up(1.63)), T(0.095), T(0.085), "5")
+  c.poly([...pt(cx - 0.1, hd, up(1.69)), ...pt(cx + 0.1, hd, up(1.69)), ...pt(cx + 0.085, hd, up(1.8)), ...pt(cx - 0.085, hd, up(1.8))], "1")
+  c.ellipse(...pt(cx, hd, up(1.8)), T(0.085), T(0.025), "1")
+  c.ellipse(...pt(cx, hd, up(1.685)), T(0.23), T(0.028), "1")
+  if (big) c.line(...pt(cx - 0.095, hd, up(1.715)), ...pt(cx + 0.095, hd, up(1.715)), "5", T(0.02))
+  // backlit: the rim, on the edges the sun is behind, above the chest
+  const body = (x, y) => x >= 0 && y >= 0 && x < W && y < H && FIG.includes(c.key(x, y))
+  const top = pt(cx, hd, up(1.86))[1], chest = pt(cx, hd, up(1.2))[1], left = pt(cx - 0.6, hd, 0)[0], right = pt(cx + 0.6, hd, 0)[0], rim = []
   for (let y = top; y < chest; y++)
-    for (let x = Math.min(sL[0], wL[0]) - T(0.4); x <= Math.max(sR[0], wR[0]) + T(0.4); x++)
-      if (body(x, y) && (!body(x, y - 1) || !body(x - 1, y) || !body(x + 1, y))) rim.push([x, y])
-  for (const [x, y] of rim) c.px(x, y, y < sL[1] ? "R" : "r")
+    for (let x = left; x <= right; x++)
+      if (body(x, y) && (!body(x, y - 1) || !body(x - 1, y) || !body(x + 1, y))) rim.push([x, y, !body(x, y - 1)])
+  for (const [x, y, above] of rim) c.px(x, y, above ? "R" : "r")
 }
 
-anim("road", { w: W, h: H, frames: FRAMES, fps: FPS }, stamp("_road_bg", 0, 0), (c) => walker(c, c.frame))
+anim("road", { w: W, h: H, frames: FRAMES, fps: FPS },
+  stamp("_sky", 0, 0),
+  stamp("_aura", SUNX - 120, SUNY - 47),
+  stamp("_sun", SUNX - 30, SUNY - SR - 1),
+  (c) => vultures(c),
+  stamp("_land", 0, 0),
+  (c) => mirage(c),
+  (c) => walker(c, c.frame))
 
 // Two-point perspective: the camera turned 40 degrees to the right (yaw). The square, its flagstones
 // and the blocks on it are laid on the world's x and z axes, so every level edge runs to one of two
