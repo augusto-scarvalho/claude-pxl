@@ -350,9 +350,14 @@ one), and the art code itself (4% of the cost).
   when a preview GIF passes a few MB.
   Shipped both: past 4 MB the build line says so (the city's: 16.4 MB, 360 frames), and `--every 3`
   makes it 5.5 MB; the GIFs in `out/` keep every frame.
-- [ ] **Small lettering that misreads**: a pipeline's composer reported its 3x5 "PARK" reading as
+- [x] **Small lettering that misreads**: a pipeline's composer reported its 3x5 "PARK" reading as
   "FASK". When `text()` uses a tiny font at scale 1 for a word, describe could say which letters
   are ambiguous at that size (P/F, R/K, B/8) and point to the 5x7 font.
+  Shipped as docs, not a check: in the 3x5 font O/0 and S/5 are the same glyph, 21 pairs differ
+  by one pixel and 45 more by two, so a rule per word would flag nearly every sign. The `text()`
+  row says what 3x5 is for and sends words that must read to the 5x7 or `scale: 2`. (That row was
+  also split in two by a real line break where `
+` was meant, so `pxl help text` showed half.)
 - [ ] **Run the pipeline headless as a script** (dogfood tools): planner, forks in batches by free
   memory, a run cut by the usage limit resumed, a JSON per run and `runcost.py` at the end. What
   this round did by hand, for the next A/B.

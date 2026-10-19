@@ -154,8 +154,7 @@ Post-processing order: mirror → swap → flip → rot → outline → crop.
 | `poly([x0, y0, x1, y1, ...], c)` | filled; vertices on pixel corners (`[0,0, 4,0, 4,4, 0,4]` = `rect(0,0,4,4)`) |
 | `fill(x, y, c)` | 4-connected flood fill |
 | `wire(x0, y0, x1, y1, sag, c, { hang?, every = 6, start?, ...placement })` | sagging cable; `hang` stamps an asset/group under it every `every` px (string lights) |
-| `text(x, y, "str", c, { scale = 1, gap = 1, lead = 1, align: "l"\|"c"\|"r", shadow?, font? })` | built-in 3×5 font: A-Z 0-9 and common punctuation, `
-` for lines; `font` uses a `font()` instead (`examples/fonts/font5x7.px.js` is a ready 5×7 one to `include`) |
+| `text(x, y, "str", c, { scale = 1, gap = 1, lead = 1, align: "l"\|"c"\|"r", shadow?, font? })` | built-in 3×5 font: A-Z 0-9 and common punctuation, `\n` for lines; `font` uses a `font()` instead (`examples/fonts/font5x7.px.js` is a ready 5×7 one to `include`). The 3×5 is for numbers and short labels: O and 0, S and 5 are the same glyph, and 21 pairs differ by one pixel (C/E, H/K, K/X, I/1, G/6...). A reader sorts them out from the word, but not on a busy, lit sign: words that must read take the 5×7, or `scale: 2` |
 
 ### Texture and tone
 | Op | Notes |
