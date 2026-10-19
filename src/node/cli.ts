@@ -7,6 +7,7 @@ import { Img } from "../core/image.ts";
 import { type Snapshot, describe } from "../core/describe.ts";
 import type { BuildOut } from "../core/build.ts";
 import type { World } from "../core/model.ts";
+import type { Project } from "../core/project.ts";
 import { rigLines } from "../core/rig.ts";
 import { rampSteps } from "../core/checks.ts";
 import { ascii, compareSilhouettes, preview } from "../core/render.ts";
@@ -56,13 +57,14 @@ const USAGE = `pxl — pixel-art DSL
       warnings only, one line each. An animated scene is checked at every frame of its loop, each
       distinct placement once, and a warning says at which frames (--frame N: that one only). Exits 1
       when there is any.
-  pxl shot <art.px.js> <name> [--frames a,b,c] [--at x,y,w,h] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
+  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> ...] [--frames a,b,c] [--at x,y,w,h] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
       to the region, side by side, enlarged, written to <out>/_shot/<name>.png. --vs puts the same
       shot of another version above it (a git revision takes the file itself from there; what it
       includes is read as it is now); --diff adds a row with the pixels that changed in red. It
       also prints what changed since the last shot of the same frames and region (pixels, where)
-      and the warnings pxl check finds on the asset at those frames: one call per look.
+      and the warnings pxl check finds on the asset at those frames: one call per look. Several
+      names (another file's as other.px.js:name) make a row each, one under the other, to compare.
   pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
@@ -310,12 +312,32 @@ export async function main(argv: string[]): Promise<number> {
         return r.warnings ? 1 : 0;
       }
       case "shot": {
-        const name = a.rest[0];
-        if (!name) throw new PxError("shot needs an asset name: pxl shot <file> <name> [--frames a,b] [--at x,y,w,h] [--scale N] [--vs rev] [--diff]");
+        if (!a.rest.length) throw new PxError("shot needs an asset name: pxl shot <file> <name> [<name> | <other.px.js>:<name> ...] [--frames a,b] [--at x,y,w,h] [--scale N] [--vs rev] [--diff]");
         if (a.at && a.at.length !== 4) throw new PxError("shot --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
         if (a.diff && !a.vs) throw new PxError("shot --diff compares with another version: give it --vs <git rev | file>");
         const frames = a.frames ?? (a.frame !== undefined ? [a.frame] : [0]);
-        const p = loadProject(file), now = shotRow(p, name, frames, a.at);
+        // several assets, from this file or another (`other.px.js:name`): a row each, one under the other
+        const projects = new Map<string, Project>(), proj = (f: string) => projects.get(f) ?? projects.set(f, loadProject(f)).get(f)!;
+        const shots = a.rest.map((e) => {
+          const m = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(e);
+          return m ? { file: resolve(m[1]), name: m[2] } : { file, name: e };
+        });
+        if (shots.length > 1) {
+          if (a.vs) throw new PxError("shot --vs compares one asset with another version of it: give it one name");
+          const many = shots.map((s) => ({ ...s, row: shotRow(proj(s.file), s.name, frames, a.at) }));
+          const sheet = stack(many.map((s) => s.row)), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
+          const path = join(outDir, "_shot", many.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".png");
+          writePng(path, sheet.scale(k));
+          console.log(`-> ${path} (frames ${frames.join(",")}; rows, top down: ${a.rest.join(", ")}; ${k}x)`);
+          for (const s of many) {
+            const p = proj(s.file), r = checkProject(p, { names: [s.name], frames });
+            for (const l of r.lines) console.log(l);
+            if (r.warnings || p.assets.get(s.name)?.kind === "scene" || p.rigs.has(s.name))
+              console.log(`${s.name}: ${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
+          }
+          return 0;
+        }
+        const { name } = shots[0], p = proj(shots[0].file), now = shotRow(p, name, frames, a.at);
         const rows = [now];
         if (a.vs) {
           const o = otherVersion(file, a.vs);

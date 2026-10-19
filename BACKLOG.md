@@ -297,8 +297,10 @@ Wave 3: experiments, measured before anything is built.
   composer (88 turns) grew past it. Its scene came out denser (more people and cars, more shops, a
   hologram) but busier and off the brief's dusty-yellow palette; the single one more coherent. So
   a pipeline buys detail at ~5x the tokens and ~2x the time, a choice to offer, not a default.
-- [ ] **describe brief by default on busy scenes** (forest: 23k characters full), with a line
+- [x] **describe brief by default on busy scenes** (forest: 23k characters full), with a line
   saying how to get the full text.
+  Closed, not done: SKILL.md already says `--brief` on busy scenes and the A/B agents used it;
+  reading less early didn't move a run's cost, which the agent's own reasoning sets.
 
 Not worth it (measured): images (previews cap at 768 px, ~340 tokens each), a shorter CLI
 invocation (~12 tokens a call), new ops for helpers the examples repeat (at most 3 files share
@@ -358,6 +360,8 @@ one), and the art code itself (4% of the cost).
   row says what 3x5 is for and sends words that must read to the 5x7 or `scale: 2`. (That row was
   also split in two by a real line break where `
 ` was meant, so `pxl help text` showed half.)
+- [x] **`pxl shot` of several assets, other files' too** (`pxl shot a.px.js sodium_hour b.px.js:city`):
+  a row each, top down, and each one's warnings; what every A/B here was compared with, by hand.
 - [x] **Run the pipeline headless as a script** (dogfood tools): planner, forks in batches by free
   memory, a run cut by the usage limit resumed, a JSON per run and `runcost.py` at the end. What
   this round did by hand, for the next A/B.

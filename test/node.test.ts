@@ -322,6 +322,18 @@ scene("s", { w: 30, h: 30, bg: "1", world: { scale: 5, ground: 26 } }, stamp("ma
   assert.doesNotMatch(await said("shot", file, "s", "--at", "0,0,10,10"), /since the last shot/);
 });
 
+test("cli shot of several assets, one from another file: a row each, top down, and each one's warnings", async () => {
+  const { dir, file } = tmpArt(`use("pico8")\nsprite("a", { w: 3, h: 2 }, rect(0, 0, 3, 2, "8"))`);
+  const other = join(dir, "b.px.js");
+  writeFileSync(other, `use("pico8")\nsprite("b", { w: 3, h: 2 }, rect(0, 0, 3, 2, "c"))`);
+  const text = await said("shot", file, "a", `${other}:b`, "--scale", "1");
+  assert.match(text, /rows, top down: a, .*b\.px\.js:b; 1x\)/);
+  const png = decodePng(readFileSync(join(dir, "out", "_shot", "a+b.png")));
+  assert.deepEqual([png.w, png.h], [3, 2 + 2 + 2], "two rows of 2 with a 2 px gap");
+  assert.notEqual(png.data[0], png.data[4 * 3], "the second row is the other file's sprite");
+  await assert.rejects(main(["shot", file, "a", `${other}:b`, "--vs", "HEAD"]).then((c) => { if (c) throw new Error("refused"); }), /refused/);
+});
+
 test("pxl list maps a file: each statement that defines assets, its lines, the comment above, a loop's assets on one line", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
   writeFileSync(join(dir, "parts.px.js"), `use("pico8")\n// a dot\nsprite("dot", "8")\n`);
