@@ -40,21 +40,46 @@ const ray = (col, row) => { const a = (col + 0.5 - P.vp) / P.focal, b = (CY - ro
 const at = (x, z, u = 0) => P.ground(x, z, u).map(Math.round)
 
 // ================================================================ the land
-// A stratovolcano 1.8 km high, its foot 0.6 km off: steep near the top, spreading at the base, cut by
-// gullies running down its sides; a crater at the top. The plain around it rolls a little.
-const VX = 380, VZ = 2400, VH = 1850, VR = 1900, CR = 150, RIM = VH * (1 - CR / VR) ** 1.9
-// the mountain alone, smooth: cheap, what the march steps by (the full land is never more than 4 m above it)
+// A volcano on a massif, as most are (Fuego stands on one, Acatenango beside it): old worn mountain,
+// broad, its foot 0.6 km off, shouldering up to about a kilometer; out of it the young cone, steep,
+// 1.8 km high; a lower peak beside it to the right with a saddle between, a spur running out to the
+// left; ridges and ravines cut into all of it, gullies down the cone; a crater at the top whose lip
+// is breached on the side toward us, where the lava pours out. The plain around rolls a little.
+const VX = 380, VZ = 2400, VH = 1850, VR = 1150, CR = 120, RIM = VH * (1 - CR / VR) ** 1.5
+const BREACH = Math.atan2(-VZ, -VX)
+// the older mountains under and beside the cone: [x, z, height, radius across, radius along, turn, profile]
+const MASSIF = [[VX + 150, VZ + 350, 1000, 2500, 1800, 0.15, 1.25], [VX + 1350, VZ + 450, 1330, 950, 800, 0.4, 1.5], [VX - 1150, VZ - 120, 620, 1200, 650, -0.35, 1.4]]
+const MASSIF_ = MASSIF.map(([x, z, h, ra, rb, turn, k]) => [x, z, h, ra, rb, Math.cos(turn), Math.sin(turn), k])
+// two heights joined smoothly where they meet (a saddle, not a crease); where either is nothing, the other
+const smax = (a, b, k = 160) => { if (a <= 0 || b <= 0) return Math.max(a, b); const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.max(a, b) + h * h * k * 0.25 }
+// the mountains alone, smooth: cheap, what the march steps by (the full land is never more than 4 m above it)
 function bulk(x, z) {
   const r = Math.hypot(x - VX, z - VZ)
-  if (r >= VR) return 0
-  return r < CR ? RIM - 130 * (1 - (r / CR) ** 2) : VH * (1 - r / VR) ** 1.9
+  let h = 0
+  if (r < VR) {
+    h = r < CR ? RIM - 110 * (1 - (r / CR) ** 2) : VH * (1 - r / VR) ** 1.5
+    if (r < CR * 1.35) {
+      let da = Math.atan2(z - VZ, x - VX) - BREACH
+      da = Math.abs(Math.atan2(Math.sin(da), Math.cos(da)))
+      h -= 95 * Math.max(0, 1 - da / 0.42) * Math.min(1, Math.max(0, (CR * 1.35 - r) / (CR * 0.7)))
+    }
+  }
+  for (const [mx, mz, mh, ra, rb, ct, st, k] of MASSIF_) {
+    const dx = x - mx, dz = z - mz, u = (dx * ct + dz * st) / ra, v = (-dx * st + dz * ct) / rb, e = Math.hypot(u, v)
+    if (e < 1) h = smax(h, mh * (1 - e) ** k)
+  }
+  return h
 }
 function height(x, z) {
   const dx = x - VX, dz = z - VZ, r = Math.hypot(dx, dz)
   const plain = 1.6 * (noise(x / 50, z / 50) - 0.5) + 5 * (noise(x / 380 + 7, z / 380) - 0.5) * Math.min(1, z / 300)
-  if (r >= VR) return plain
-  const ang = Math.atan2(dz, dx), s = 1 - r / VR, gully = 1 - 0.06 * Math.abs(Math.sin(ang * 9 + noise(r / 300, ang * 2) * 3)) * s
-  return plain + bulk(x, z) * gully
+  const b = bulk(x, z)
+  if (b <= 0) return plain
+  // gullies down the cone; ridges and ravines over the older mountain, running out from the summit
+  const ang = Math.atan2(dz, dx), s = Math.max(0, 1 - r / VR), gully = 1 - 0.07 * Math.abs(Math.sin(ang * 11 + noise(r / 250, ang * 2) * 3)) * s
+  const ridge = 1 - Math.abs(2 * noise(ang * 6 + 3, r / 380) - 1), ridge2 = 1 - Math.abs(2 * noise(x / 260 + 11, z / 260) - 1)
+  const worn = 1 - (0.2 * (1 - ridge) ** 2 + 0.1 * (1 - ridge2) ** 2) * Math.min(1, Math.max(0, (r - CR * 2) / 500))
+  return plain + b * gully * worn
 }
 // walk a pixel's ray out from `t0` until it goes under the land: [x, z, u, t], or null (the sky). In a
 // column each row up lands no nearer than the one below, so the march starts where that one landed.
@@ -73,7 +98,7 @@ function march(col, row, t0) {
       return [dx * hi, dz * hi, P.eye + du * hi, hi]
     }
     prev = t
-    t += Math.min(t * 0.03, Math.max(d * 0.6, t * 0.004, 0.05))
+    t += Math.min(t * 0.03, Math.max(d * 0.6, t * 0.007, 0.05))
   }
   return null
 }
@@ -83,38 +108,50 @@ const SUN = [Math.sin(SUN_AZ) * Math.cos(SUN_EL), Math.cos(SUN_AZ) * Math.cos(SU
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => v / 16 - 0.47)
 const dither = (col, row) => BAYER[(row & 3) * 4 + (col & 3)]
 
-// Lava running down from the crater's lip: each river starts on the lip facing us and goes down the
-// steepest way, into the gullies, a little this way and that, slowing out on the plain into a lobe.
-// Kept as points in meters; the ones the mountain hides from us are dropped.
-const RIVERS = [-0.55, -0.3, -0.08, 0.2, 0.42].map((a, i) => {
-  const r = rng(31 + i), face = Math.atan2(-VZ, -VX) + a, pts = []
-  let x = VX + Math.cos(face) * CR * 1.02, z = VZ + Math.sin(face) * CR * 1.02
-  for (let k = 0; k < 160; k++) {
+// Lava as it runs on real volcanoes (Semeru, Fuego, Fagradalsfjall, and the USGS on aa flows): a
+// channel narrow near the vent, widening downslope; hot (yellow, 1100 C) where it leaves, cooling to
+// orange and red as it goes and crusting dark, the glow left in the channel's middle and in the
+// cracks. Each flow goes down the steepest way, into the gullies, wandering a little, and stops
+// where its lava runs out. Three: the main one out of the breach in the crater's lip, thin, zigzagging
+// down a ravine and spreading into a glowing lobe halfway down (Semeru); braided channels out of a
+// vent on the left flank, splitting and joining (Fagradalsfjall); and an older flow, crusted black,
+// glowing only in its cracks, that has reached the plain and set it alight. Kept as points in
+// meters with how hot they are; the ones the mountain hides from us are dropped.
+function flow(seed, x, z, { len, wob, hot, cold }) {
+  const r = rng(seed), pts = []
+  let run = 0
+  for (let k = 0; k < 400 && run < len; k++) {
     const e = 4, gx = (height(x + e, z) - height(x - e, z)) / (2 * e), gz = (height(x, z + e) - height(x, z - e)) / (2 * e), g = Math.hypot(gx, gz) || 1
-    const out = Math.hypot(x - VX, z - VZ) > VR * 0.93, step = out ? 8 : 24, wob = (r() - 0.5) * (out ? 1.4 : 0.5)
-    const dx = -gx / g, dz = -gz / g
-    x += (dx * Math.cos(wob) - dz * Math.sin(wob)) * step; z += (dz * Math.cos(wob) + dx * Math.sin(wob)) * step
-    pts.push([x, z, height(x, z) + 2])
-    if (out && r() < 0.14) break
+    const out = bulk(x, z) < 25, step = out ? 8 : 14, w = (r() - 0.5) * wob * (out ? 2 : 1), dx = -gx / g, dz = -gz / g
+    x += (dx * Math.cos(w) - dz * Math.sin(w)) * step; z += (dz * Math.cos(w) + dx * Math.sin(w)) * step; run += step
+    pts.push({ p: [x, z, height(x, z) + 2], heat: hot + (cold - hot) * (run / len), run })
   }
   return pts
-})
+}
+const lip = (a, f = 1.02) => [VX + Math.cos(BREACH + a) * CR * f, VZ + Math.sin(BREACH + a) * CR * f]
+const FLOWS = [
+  { kind: "main", strands: [flow(31, ...lip(0), { len: 820, wob: 1.1, hot: 1, cold: 0.45 })] },
+  { kind: "braid", strands: [0, 1, 2].map((k) => flow(40 + k, VX + Math.cos(BREACH - 0.62) * 430, VZ + Math.sin(BREACH - 0.62) * 430, { len: 900, wob: 1.4, hot: 0.8, cold: 0.42 })) },
+  { kind: "old", strands: [flow(52, ...lip(0.38, 1.1), { len: 3400, wob: 0.7, hot: 0.3, cold: 0.22 })] },
+]
 // is a point in sight, or behind the land? march toward it and see where the ray lands
 function seen([x, z, u]) {
   const d = Math.hypot(x, z, u - P.eye), dir = [x / d, z / d, (u - P.eye) / d]
   for (let t = 20; t < d - 15; t += Math.max(4, t * 0.01)) if (P.eye + dir[2] * t < height(dir[0] * t, dir[1] * t)) return false
   return true
 }
-for (const R of RIVERS) R.splice(0, R.length, ...R.filter(seen))
+for (const F of FLOWS) for (const S of F.strands) S.splice(0, S.length, ...S.filter((q) => seen(q.p)))
 
 // ================================================================ the land
 function shadeLand(col, row, [x, z, u, t]) {
   const e = 2, hx = (height(x + e, z) - height(x - e, z)) / (2 * e), hz = (height(x, z + e) - height(x, z - e)) / (2 * e)
   const n = [-hx, -hz, 1], l = Math.hypot(...n), sun = Math.max(0, (n[0] * SUN[0] + n[1] * SUN[1] + n[2] * SUN[2]) / l)
   const r = Math.hypot(x - VX, z - VZ)
-  if (r < VR * 0.97) {
-    // rock: the faces turned to the sun take its dim orange light, the rest in soot-shade; scree in streaks down the slope
-    const streak = fbm(Math.atan2(z - VZ, x - VX) * 40, r / 120, 3), v = sun * 1.05 + (streak - 0.5) * 0.45 + dither(col, row) * 0.12
+  if (bulk(x, z) > 20) {
+    // rock: the faces turned to the sun take its dim orange light, the rest in soot-shade; ridges catch
+    // what light there is, ravines hold the dark; scree in streaks down the slope
+    const k = 30, curv = (4 * height(x, z) - height(x + k, z) - height(x - k, z) - height(x, z + k) - height(x, z - k)) / 4
+    const streak = fbm(Math.atan2(z - VZ, x - VX) * 40, r / 120, 3), v = sun * 1.05 + Math.max(-0.35, Math.min(0.35, curv / 14)) + (streak - 0.5) * 0.4 + dither(col, row) * 0.12
     if (r < CR * 1.15) return v > 0.4 ? "Q" : "M"
     return v > 0.78 ? "K" : v > 0.58 ? "O" : v > 0.36 ? "N" : v > 0.14 ? "M" : "L"
   }
@@ -135,15 +172,16 @@ function shadeLand(col, row, [x, z, u, t]) {
 // bellies; shafts of sun fanning out through the thinner places.
 const soot = (az, el) => { const x = az * 4.2, y = el * 6.5, w1 = fbm(x + 3, y, 3), w2 = fbm(x, y + 5, 3); return fbm(x + w1 * 1.7, y * 1.25 + w2 * 1.7, 4) }
 // `breath` (0 to 1 round the loop) and `a` (how much, 0 at the edge of what breathes): the soot over the
-// sun drifts a little and thins, then thickens again
+// sun thins, then thickens again (what it's made of is kept per pixel; only how thin changes)
+const SOOT = new Map()
 function sky(col, row, breath = 0, a = 0) {
   const [dx, dz, du] = ray(col, row), az = Math.atan2(dx, dz), el = Math.asin(du)
   const toSun = Math.acos(Math.max(-1, Math.min(1, dx * SUN[0] + dz * SUN[1] + du * SUN[2])))
-  const b = breath * Math.PI * 2, sootAt = (u, v) => soot(u + a * 0.04 * Math.cos(b), v + a * 0.025 * Math.sin(b)) - a * 0.16 * (0.5 - 0.5 * Math.cos(b))
-  const d = sootAt(az, el), thin = Math.max(0, 1 - toSun / 0.42) ** 1.6
+  const key = row * W + col
+  if (!SOOT.has(key)) { const d0 = soot(az, el); SOOT.set(key, [d0, d0 - soot(az - 0.03, el + 0.025), d0 - soot(az, el - 0.03)]) }
+  const [d0, lit, belly] = SOOT.get(key), d = d0 - a * 0.2 * (0.5 - 0.5 * Math.cos(breath * Math.PI * 2)), thin = Math.max(0, 1 - toSun / 0.42) ** 1.6
   if (toSun < 0.022 && d < 0.62) return "I"
   if (toSun < 0.036 && d < 0.6) return "J"
-  const lit = d - sootAt(az - 0.03, el + 0.025), belly = d - sootAt(az, el - 0.03)
   const shaft = toSun < 0.9 && d < 0.52 && noise(Math.atan2(el - SUN_EL, az - SUN_AZ) * 11, 2) > 0.6 ? (1 - toSun / 0.9) * 0.22 : 0
   let v = 0.42 - el * 0.9 - (d - 0.5) * 1.8 + thin * 0.8 + (lit < -0.015 ? 0.18 : lit > 0.02 ? -0.1 : 0) + shaft + dither(col, row) * 0.12
   if (el < 0.3 && belly > 0.012 && d > 0.45) { const g = (0.3 - el) / 0.3 + (belly - 0.012) * 6 + dither(col, row) * 0.3; if (g > 0.6) return g > 1.0 ? "H" : "G" }
@@ -182,14 +220,63 @@ function plume(c) {
 }
 
 // ================================================================ lava
-// The rivers: hot in the middle, cooling to crust at the edges, the rock beside them red from them;
-// a pulse of fresh lava running down each, so they flow.
+// Heat to color (USGS: yellow ~1100 C, orange ~900, red ~700; solid crust black), and the rock beside
+// a flow red with its light (drawn once, under it).
+const HEAT = (h) => (h > 0.9 ? "X" : h > 0.72 ? "W" : h > 0.56 ? "V" : h > 0.42 ? "U" : h > 0.3 ? "T" : h > 0.2 ? "S" : "R")
+function lavaGlow(c) {
+  for (const F of FLOWS) for (const S of F.strands) for (let k = 1; k < S.length; k++) {
+    if (F.kind === "old" && hash(k, 3) > 0.3) continue
+    const [ax, ay] = P.ground(...S[k - 1].p), [bx, by] = P.ground(...S[k].p)
+    c.line(Math.round(ax), Math.round(ay), Math.round(bx), Math.round(by), "Q", 3)
+  }
+}
+// Each frame: the channel, its middle hot and its edges a step cooler, pulses of fresher lava
+// running down it; the old flow's crust black with glowing cracks; where the main flow stops, its lobe
+// glowing, flickering. The cooled lobes and the scree below them gray.
 function lava(c, frame) {
-  for (const [i, R] of RIVERS.entries()) for (let k = 1; k < R.length; k++) {
-    const [ax, ay] = P.ground(...R[k - 1]), [bx, by] = P.ground(...R[k]), wide = Math.max(1, (k / R.length < 0.8 ? 12 : 20) * P.scale(R[k][1], R[k][0], R[k][2]))
-    const flow = ((k / R.length - frame / FRAMES - i * 0.23) % 1 + 1) % 1, hot = flow < 0.08 ? "W" : flow < 0.2 ? "V" : "U"
-    c.line(Math.round(ax), Math.round(ay), Math.round(bx), Math.round(by), wide > 2.2 ? "T" : hot, Math.round(wide))
-    if (wide > 2.2) c.line(Math.round(ax), Math.round(ay), Math.round(bx), Math.round(by), hot, Math.max(1, Math.round(wide * 0.45)))
+  const t = frame / FRAMES
+  for (const [fi, F] of FLOWS.entries()) for (const [si, S] of F.strands.entries()) {
+    for (let k = 1; k < S.length; k++) {
+      const q = S[k], [ax, ay] = P.ground(...S[k - 1].p), [bx, by] = P.ground(...q.p), sc = P.scale(q.p[1], q.p[0], q.p[2])
+      const pulse = (((q.run / 400 - t * 2 - si * 0.3 - fi * 0.17) % 1) + 1) % 1, hotter = pulse < 0.12 ? 0.18 : 0
+      if (F.kind === "old") {
+        const crack = hash(k * 7 + si, Math.floor(t * 6 + k * 0.37)) < 0.18
+        c.line(Math.round(ax), Math.round(ay), Math.round(bx), Math.round(by), crack ? "T" : "R", Math.max(1, Math.round(16 * sc)))
+        continue
+      }
+      const w = Math.max(1, Math.round((6 + q.run * 0.012) * sc)), heat = q.heat + hotter
+      if (w > 1) c.line(Math.round(ax), Math.round(ay), Math.round(bx), Math.round(by), HEAT(heat - 0.22), w)
+      c.line(Math.round(ax), Math.round(ay), Math.round(bx), Math.round(by), HEAT(heat), 1)
+    }
+    if (F.kind === "main" && S.length > 3) {
+      // the lobe: a fan of lava spreading where the flow stops, hot in the middle, crusting at its rim
+      const end = S[S.length - 1], [ex, ey] = P.ground(...end.p), [px, py] = P.ground(...S[S.length - 4].p), R = Math.max(2, 26 * P.scale(end.p[1], end.p[0], end.p[2]))
+      const ux = (ex - px) / (Math.hypot(ex - px, ey - py) || 1), uy = (ey - py) / (Math.hypot(ex - px, ey - py) || 1)
+      for (let y = -Math.ceil(R * 1.6); y <= Math.ceil(R * 1.6); y++) for (let x = -Math.ceil(R * 1.6); x <= Math.ceil(R * 1.6); x++) {
+        const along = x * ux + y * uy, across = -x * uy + y * ux, d = Math.hypot(along / (R * 1.5), across / R) + (hash(x + frame * 3, y) - 0.5) * 0.3
+        if (d < 1 && along > -R * 0.4) c.px(Math.round(ex) + x, Math.round(ey) + y, d < 0.3 ? "V" : d < 0.6 ? "U" : d < 0.82 ? "T" : "S")
+      }
+    }
+    if (F.kind === "old" && S.length) {
+      const end = S[S.length - 1], [ex, ey] = P.ground(...end.p)
+      for (let x = -4; x <= 4; x++) c.px(Math.round(ex) + x, Math.round(ey), Math.abs(x) < 2 ? "V" : "T")
+    }
+  }
+}
+// What the eruption throws out: bombs falling on the upper cone glow where they land and cool, white
+// to red to gone; rockfalls of hot debris slide down the gullies on the right, glowing (Fuego).
+const EJECTA = Array.from({ length: 46 }, (_, i) => { const r = rng(3000 + i), a = BREACH + (r() - 0.5) * 2.4, d = CR * 1.2 + r() ** 1.5 * 380; return { x: VX + Math.cos(a) * d, z: VZ + Math.sin(a) * d, ph: r(), period: [20, 30, 60][i % 3] } }).filter((q) => seen([q.x, q.z, height(q.x, q.z) + 2]))
+const FALLS = [0.55, 0.85, 1.1].map((a, i) => flow(70 + i, ...lip(a, 1.15), { len: 520, wob: 0.6, hot: 0.8, cold: 0.4 }).filter((q) => seen(q.p)))
+function ejecta(c, frame) {
+  for (const q of EJECTA) {
+    const age = (((frame / q.period + q.ph) % 1) + 1) % 1
+    if (age > 0.7) continue
+    c.px(...at(q.x, q.z, height(q.x, q.z) + 2), age < 0.08 ? "X" : age < 0.2 ? "W" : age < 0.35 ? "V" : age < 0.5 ? "U" : "T")
+  }
+  for (const [i, S] of FALLS.entries()) {
+    if (S.length < 6) continue
+    const head = Math.floor((((frame / 30 + i * 0.37) % 1) * S.length))
+    for (let k = Math.max(0, head - 5); k <= head && k < S.length; k++) c.px(...at(...S[k].p), k === head ? "W" : k > head - 3 ? "V" : "T")
   }
 }
 // the crater: a glow on its lip, the lava fountaining out of it, bombs flung up and falling back
@@ -308,9 +395,11 @@ sprite("_bg", { w: W, h: H }, (c) => {
     }
   }
   impact(c)
+  lavaGlow(c)
   plume(c)
   smoke(c)
   scrub(c)
+  litter(c)
 })
 
 // ================================================================ shapes
@@ -644,8 +733,8 @@ function smoke(c) {
 }
 
 // ================================================================ soot round the sun
-// The soot over the sun breathes: through the loop it drifts a little, thins until the sun shows
-// whole, and thickens over it again (fading into the still sky at the edge of the part that moves).
+// The soot over the sun breathes: through the loop it thins until the sun shows whole, and thickens
+// over it again (fading into the still sky at the edge of the part that moves).
 // And soot clouds the volcano's hot air pushes away from it: each gathers out of the haze near the
 // mountain, drifts slowly left, away from it, and thins into wisps until it's gone, while others
 // gather; black at their cores, ragged, pouches hanging from their bellies (mammatus, a storm sky's),
@@ -673,14 +762,23 @@ function sootClouds(c, frame) {
   for (const [k, C] of CLOUDS.entries()) {
     // its life: gathering, drifting away from the mountain, thinning out
     const life = (t + C.ph) % 1, m = Math.sin(Math.PI * life), grow = 0.8 + 0.45 * life, cx = C.x0 - life * 55, cy = SUN_AT[1]
-    const dens = (x, y) => { let v = 0; for (const [px, py, rx, ry] of C.puffs) v = Math.max(v, 1 - Math.hypot((x - cx - px * grow) / (rx * grow), (y - cy - py) / (ry * grow))); return v - (1 - m) * 0.6 }
-    for (let y = Math.floor(cy - 28); y <= Math.ceil(cy + 28); y++) for (let x = Math.floor(cx - 60); x <= Math.ceil(cx + 40); x++) {
+    // the density into a buffer, each puff only over its own box
+    const X0 = Math.floor(cx - 60), Y0 = Math.floor(cy - 28), BW = 104, BH = 60, buf = new Float32Array(BW * BH).fill(-1)
+    for (const [px, py, rx, ry] of C.puffs) {
+      const ex = cx + px * grow, ey = cy + py, ax = rx * grow, ay = ry * grow
+      for (let y = Math.max(Y0, Math.floor(ey - ay)); y <= Math.min(Y0 + BH - 1, Math.ceil(ey + ay)); y++) for (let x = Math.max(X0, Math.floor(ex - ax)); x <= Math.min(X0 + BW - 1, Math.ceil(ex + ax)); x++) {
+        const v = 1 - Math.hypot((x - ex) / ax, (y - ey) / ay) - (1 - m) * 0.6, i = (y - Y0) * BW + (x - X0)
+        if (v > buf[i]) buf[i] = v
+      }
+    }
+    const at2 = (x, y) => { const i = Math.round(x) - X0, j = Math.round(y) - Y0; return i < 0 || j < 0 || i >= BW || j >= BH ? -1 : buf[j * BW + i] }
+    for (let y = Y0; y < Y0 + BH; y++) for (let x = X0; x < X0 + BW; x++) {
       if (x < 0 || x >= W || y < 0 || y >= H || !SKY[y * W + x]) continue
-      const d = dens(x, y)
-      if (d + (noise(x / 6 + k * 9, y / 4) - 0.5) * 0.22 <= 0) continue
+      const d = buf[(y - Y0) * BW + (x - X0)]
+      if (d < -0.15 || d + (noise(x / 6 + k * 9, y / 4) - 0.5) * 0.22 <= 0) continue
       if (m < 0.55 && d < 0.12 && (x + y) & 1) continue                                    // thinning: wisps, half there
-      const [ux, uy, far] = toSun(x, y), rim = m > 0.5 && d > 0.03 && d < 0.22 && d - dens(x + ux * 3, y + uy * 3) > 0.12
-      const under = d < 0.3 && d - dens(x, y + 2) > 0.12
+      const [ux, uy, far] = toSun(x, y), rim = m > 0.5 && d > 0.03 && d < 0.22 && d - at2(x + ux * 3, y + uy * 3) > 0.12
+      const under = d < 0.3 && d - at2(x, y + 2) > 0.12
       c.px(x, y, rim && far < 30 ? "J" : rim && far < 70 ? "F" : rim ? "D" : under ? "C" : d > 0.4 && m > 0.6 ? "A" : d > 0.12 ? "B" : "C")
     }
   }
@@ -697,11 +795,99 @@ function sootClouds(c, frame) {
   }
 }
 
+
+// ================================================================ the ground's wreckage
+// The fire front has passed over the ground near us and left it strewn: trees snapped and thrown down,
+// one end splintered, the other a torn-up root plate, still burning along their tops and glowing in
+// the cracks of their charcoal; snags left standing, broken off in spikes of pale wood, charred; volcanic
+// bombs and boulders, the freshest still red-hot and cracked; branches and embers everywhere.
+const LOGS = [
+  { x: 0.5, z: 13.5, a: -0.18, len: 9, r: 0.42, seed: 1, fire: true },
+  { x: -7.5, z: 25, a: -0.5, len: 6.5, r: 0.32, seed: 2, fire: true },
+  { x: 17, z: 39, a: 2.6, len: 8, r: 0.38, seed: 3, fire: false },
+  { x: -19, z: 47, a: 0.9, len: 5, r: 0.28, seed: 4, fire: true },
+]
+const SNAGS = [{ x: -3.2, z: 16, h: 4.2, r: 0.42, seed: 5, fire: true }, { x: 19, z: 28, h: 6.5, r: 0.5, seed: 6, fire: true }, { x: -15, z: 36, h: 3, r: 0.35, seed: 7, fire: false }, { x: 6, z: 54, h: 5, r: 0.4, seed: 8, fire: true }]
+const ROCKS = (() => {
+  const r = rng(5000), out = []
+  for (let i = 0; i < 34; i++) { const z = 7 + r() ** 1.3 * 58, x = (r() - 0.5) * z * 1.7, hot = r() < 0.3; out.push({ x, z, s: hot ? 0.14 + r() * 0.2 : 0.16 + r() * 0.42, hot, seed: i }) }
+  return out
+})()
+// a fallen tree: charcoal round it (shaded as a log lying in the light from the fires behind), cracks
+// glowing across it, broken branches sticking up, a splintered end, a root plate at the other
+function log(c, L, frame) {
+  const ca = Math.cos(L.a), sa = Math.sin(L.a), end = (f) => { const x = L.x + ca * L.len * f, z = L.z + sa * L.len * f; return [x, z, height(x, z) + L.r * 0.9] }
+  const A = end(-0.5), B = end(0.5), r = rng(L.seed * 17)
+  // the root plate: a torn-up disc of roots and earth, standing on edge
+  const [ax, ay] = P.ground(...A), rp = L.r * 2.6 * P.scale(A[1], A[0], A[2])
+  for (let y = -Math.ceil(rp); y <= Math.ceil(rp); y++) for (let x = -Math.ceil(rp * 0.45); x <= Math.ceil(rp * 0.45); x++) {
+    const d = Math.hypot(x / 0.45, y) / rp + (noise(x * 0.8 + L.seed, y * 0.8) - 0.5) * 0.5
+    if (d < 1 && y < rp * 0.6) c.px(Math.round(ax) + x, Math.round(ay) + y, d > 0.8 ? "c" : hash(x, y) < 0.2 ? "h" : "i")
+  }
+  paintCone(c, [A, L.r, B, L.r * 0.8], "hijl")
+  const n = Math.ceil(L.len / 0.35)
+  for (let i = 1; i < n; i++) {
+    const p = end(-0.5 + i / n), [px, py] = P.ground(...p), sc = P.scale(p[1], p[0], p[2]), h = Math.max(1, Math.round(L.r * sc))
+    // the charcoal's cracks across the log, glowing (flickering) where it still burns
+    if (r() < 0.55) { const glow = L.fire && hash(i, Math.floor(frame / 3) + L.seed) < 0.75; c.line(Math.round(px), Math.round(py) - h + 1, Math.round(px + 0.5), Math.round(py), glow ? (r() < 0.4 ? "U" : "T") : "h") }
+    if (r() < 0.12) c.line(Math.round(px), Math.round(py) - h, Math.round(px + (r() - 0.3) * sc * 0.4), Math.round(py - h - sc * (0.3 + r() * 0.5)), "h", Math.max(1, Math.round(sc * 0.08)))
+  }
+  // the splintered end: spikes of pale torn wood
+  const [bx, by] = P.ground(...B), sb = P.scale(B[1], B[0], B[2]), dir = [Math.sign(ca) || 1, 0]
+  for (let k = 0; k < 5; k++) {
+    const off = (k / 4 - 0.5) * L.r * 1.6 * sb, long = (0.3 + r() * 0.7) * sb
+    c.line(Math.round(bx), Math.round(by + off), Math.round(bx + dir[0] * long), Math.round(by + off * 0.6 - long * 0.1), k % 2 ? "k" : "j")
+  }
+  if (L.fire) for (let i = 0; i < n; i += 2) {
+    if (hash(i, L.seed + 31) > 0.6) continue
+    const p = end(-0.45 + i / n), [px, py] = P.ground(...p), sc = P.scale(p[1], p[0], p[2])
+    flame(c, px, py - L.r * sc, Math.max(2, sc * (0.25 + 0.3 * hash(L.seed, i))), frame, L.seed * 300 + i)
+  }
+}
+// a snag: a trunk left standing, snapped off in spikes of pale wood
+function snag(c, S, frame) {
+  const g = height(S.x, S.z), r = rng(S.seed * 23)
+  column(c, [S.x, S.z, g - 0.3], [S.x, S.z, g + S.h], S.r, S.r * 0.85, S.fire)
+  for (let k = 0; k < 4; k++) {
+    const a = (k / 3 - 0.5) * 1.6, base = [S.x + Math.sin(a) * S.r * 0.8, S.z - Math.cos(a) * S.r * 0.3, g + S.h], tip = [base[0] + (r() - 0.5) * 0.2, base[1], base[2] + 0.3 + r() * 1.1]
+    const [x0, y0] = P.ground(...base), [x1, y1] = P.ground(...tip), w = Math.max(1, Math.round(S.r * 0.5 * P.scale(S.z, S.x)))
+    for (let i = 0; i <= Math.ceil(Math.abs(y1 - y0)); i++) { const f = i / Math.max(1, Math.abs(y1 - y0)), half = Math.round((w * (1 - f)) / 1.5); c.line(Math.round(x0 + (x1 - x0) * f) - half, Math.round(y0 + (y1 - y0) * f), Math.round(x0 + (x1 - x0) * f) + half, Math.round(y0 + (y1 - y0) * f), k % 2 ? "k" : "j") }
+  }
+  if (!S.fire) return
+  for (let u = 0.2; u < S.h; u += 0.4) {
+    if (hash(Math.round(u * 10), S.seed) > 0.55) continue
+    const p = [S.x + S.r * 0.7, S.z, g + u], [px, py] = P.ground(...p), sc = P.scale(p[1], p[0], p[2])
+    flame(c, px, py, Math.max(2, sc * (0.2 + 0.35 * hash(S.seed, Math.round(u * 10)))), frame, S.seed * 500 + Math.round(u * 10))
+  }
+}
+// a boulder or a volcanic bomb: an angular lump sitting on the ground, its facets lit on top and dark
+// below, a shadow where it meets the ground; a fresh bomb black-crusted, red-hot in its cracks
+function rock(c, R) {
+  const g = height(R.x, R.z), [cx, cy] = P.ground(R.x, R.z, g), rad = Math.max(1, R.s * P.scale(R.z, R.x)), r = rng(R.seed * 41 + 7)
+  const n = 6, pts = Array.from({ length: n }, (_, i) => { const a = Math.PI + (i / (n - 1)) * Math.PI, k = 0.7 + r() * 0.45; return [cx + Math.cos(a) * rad * 1.25 * k, cy + Math.sin(a) * rad * k] })
+  c.line(Math.round(cx - rad * 1.3), Math.round(cy), Math.round(cx + rad * 1.5), Math.round(cy), "a")
+  c.poly([...pts.flat(), Math.round(cx + rad * 1.2), Math.round(cy)].map(Math.round), R.hot ? "R" : "b")
+  // the upper facets: from the top points toward the middle, lit
+  for (let i = 1; i < n - 1; i++) c.poly([pts[i - 1], pts[i], [cx, cy - rad * 0.2]].flat().map(Math.round), R.hot ? (i === 2 ? "S" : "R") : i < 3 ? "d" : "c")
+  if (R.hot) { c.line(Math.round(cx - rad * 0.6), Math.round(cy - rad * 0.3), Math.round(cx + rad * 0.4), Math.round(cy - rad * 0.6), "U"); c.px(Math.round(cx), Math.round(cy - rad * 0.4), "V") }
+}
+// small things on the ground: broken branches, embers, a few still glowing (in the still picture)
+function litter(c) {
+  const r = rng(6100)
+  for (let i = 0; i < 90; i++) {
+    const z = 6 + r() ** 1.5 * 60, x = (r() - 0.5) * z * 1.7, g = height(x, z), sc = P.scale(z, x), [px, py] = P.ground(x, z, g)
+    if (r() < 0.55) { const a = r() * Math.PI, len = (0.4 + r() * 1.2) * sc; c.line(Math.round(px), Math.round(py), Math.round(px + Math.cos(a) * len), Math.round(py + Math.sin(a) * len * 0.25), r() < 0.25 ? "T" : "h") }
+    else c.px(Math.round(px), Math.round(py), r() < 0.5 ? "T" : "S")
+  }
+}
+
 // each tree's still parts on a sprite of their own, cropped to what they draw
 for (const [i, T] of TREES.entries()) sprite("_tree" + i, { w: W, h: H, crop: true, pivot: [0, 0] }, (c) => paintTree(c, T))
 anim("extinction", { w: W, h: H, frames: FRAMES, fps: FPS }, stamp("_bg", 0, 0), (c) => {
-  meteors(c, c.frame); breathe(c, c.frame); sootClouds(c, c.frame); lava(c, c.frame); crater(c, c.frame); frontFire(c, c.frame)
-  const all = [...TREES.map((T, i) => ({ d: T.d, tree: i })), ...runners(c.frame), ...flyers(c.frame)].sort((m, n) => n.d - m.d)
+  meteors(c, c.frame); breathe(c, c.frame); sootClouds(c, c.frame); lava(c, c.frame); ejecta(c, c.frame); crater(c, c.frame); frontFire(c, c.frame)
+  const wreck = [...LOGS.map((L) => ({ d: Math.hypot(L.x, L.z), draw: (c) => log(c, L, c.frame) })), ...SNAGS.map((S) => ({ d: Math.hypot(S.x, S.z), draw: (c) => snag(c, S, c.frame) })),
+    ...ROCKS.map((R) => ({ d: Math.hypot(R.x, R.z), draw: (c) => rock(c, R) }))]
+  const all = [...TREES.map((T, i) => ({ d: T.d, tree: i })), ...runners(c.frame), ...flyers(c.frame), ...wreck].sort((m, n) => n.d - m.d)
   for (const m of all) {
     if (m.tree !== undefined) { c.stamp("_tree" + m.tree, 0, 0); treeFire(c, TREES[m.tree], c.frame); continue }
     if (m.sprite) { c.stamp(m.sprite, m.x, m.y); continue }
