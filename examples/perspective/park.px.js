@@ -73,6 +73,13 @@ const noise = (x, y) => {
 // ================================================================ ground
 const PATH_A = [6.4, 8.6], PATH_B = [5.2, 7.4], PLAZA = [4.4, 5.6, 8.2, 9.4], SAND = [10, 11, 23, 21]
 const inRect = (x, z, [x0, z0, x1, z1]) => x >= x0 && x <= x1 && z >= z0 && z <= z1
+// Square panels half a path wide, as a sidewalk's are laid (joints as far apart as the slab is wide):
+// on the paths, their joints run on from the plaza's edges; on the plaza, the paths' edges and middles
+// run on across it, so every joint lines up with another
+const SLAB = 1.1
+const joints = (lo, hi) => [...Array.from({ length: 10 }, (_, k) => lo - (k + 1) * SLAB), ...Array.from({ length: 50 }, (_, k) => hi + (k + 1) * SLAB)]
+const JOINTS_A = joints(PLAZA[0], PLAZA[2]), JOINTS_B = joints(PLAZA[1], PLAZA[3])
+const GRID_X = [PLAZA[0], PATH_B[0], (PATH_B[0] + PATH_B[1]) / 2, PATH_B[1], PLAZA[2]], GRID_Z = [PLAZA[1], PATH_A[0], (PATH_A[0] + PATH_A[1]) / 2, PATH_A[1], PLAZA[3]]
 const paved = (x, z) => (z >= PATH_A[0] && z <= PATH_A[1]) || (x >= PATH_B[0] && x <= PATH_B[1]) || inRect(x, z, PLAZA)
 // Worn earth, each where something wore the grass away: a shortcut cut across the corner by the
 // crossing, bare ground in the deep shade under the big trees, in front of the benches on the lawn;
@@ -116,12 +123,12 @@ function ground(x, z) {
   const dd = ahead(x, z)
   if (dd > 140) return "e"
   if (inRect(x, z, PLAZA)) {
-    // the plaza: the same poured concrete in square panels, three by three; one with the mark a puddle
+    // the plaza: the same poured concrete, its panels cut by the paths' lines; one with the mark a puddle
     // left drying
-    const [x0, z0, x1, z1] = PLAZA, SL = (x1 - x0) / 3, i = Math.floor((x - x0) / SL), j = Math.floor((z - z0) / SL)
-    if (i === 2 && j === 1 && Math.hypot(x - (x0 + SL * 2.45), (z - (z0 + SL * 1.4)) * 1.3) < 0.28 + 0.06 * noise(x * 9, z * 9)) return "/"
-    const fx = x - x0 - i * SL, fz = z - z0 - j * SL
-    return concrete(dd, hash(i * 13 + 5, j * 7 + 3), x, z, Math.min(fx, SL - fx, fz, SL - fz))
+    const i = GRID_X.findIndex((g) => g > x) - 1, j = GRID_Z.findIndex((g) => g > z) - 1
+    if (Math.hypot(x - 6.9, (z - 8.05) * 1.3) < 0.28 + 0.06 * noise(x * 9, z * 9)) return "/"
+    const edge = Math.min(x - GRID_X[i], GRID_X[i + 1] - x, z - GRID_Z[j], GRID_Z[j + 1] - z)
+    return concrete(dd, hash(i * 13 + 5, j * 7 + 3), x, z, edge)
   }
   if (inMeadow(x, z)) return noise(x * 8, z * 8) > 0.55 ? "c" : "é"
   const onA = z >= PATH_A[0] && z <= PATH_A[1], onB = x >= PATH_B[0] && x <= PATH_B[1]
@@ -135,10 +142,11 @@ function ground(x, z) {
     const tracked = Math.min(...SHORTCUT.map(([ex, ez]) => (onA ? Math.hypot(x - ex, (z - ez) * 1.6) : Math.hypot((x - ex) * 1.6, z - ez))))
     if (dd < 12 && tracked < 1.1 && noise(x * 10, z * 10) > 0.38 + tracked * 0.5) return tracked < 0.4 && noise(x * 4, z * 4) > 0.5 ? "[" : "/"
     if (dd > 26) return "f"
-    // poured concrete in panels 1.5 m long, two across the path, the way a sidewalk is laid
+    // poured concrete in square panels, two across the path, counted out from the plaza
     const along = onA ? x : z, across = onA ? z - PATH_A[0] : x - PATH_B[0], width = onA ? PATH_A[1] - PATH_A[0] : PATH_B[1] - PATH_B[0]
-    const fa = along - Math.floor(along / 1.5) * 1.5, joint = Math.min(fa, 1.5 - fa, Math.abs(across - width / 2), edge)
-    return concrete(dd, hash(Math.floor(along / 1.5) * 7 + (onA ? 1 : 2), across < width / 2 ? 0 : 1), along, across, joint)
+    const q = (along - (along < (onA ? PLAZA[0] : PLAZA[1]) ? (onA ? PLAZA[0] : PLAZA[1]) : (onA ? PLAZA[2] : PLAZA[3]))) / SLAB, k = Math.floor(q)
+    const fa = (q - k) * SLAB, joint = Math.min(fa, SLAB - fa, Math.abs(across - width / 2), edge)
+    return concrete(dd, hash(k * 7 + (onA ? 1 : 2), across < width / 2 ? 0 : 1), along, across, joint)
   }
   if (inRect(x, z, SAND)) {
     for (const [px, pz, rx, rz] of PITS) if (((x - px) / rx) ** 2 + ((z - pz) / rz) ** 2 < 1) return "j"
@@ -147,9 +155,6 @@ function ground(x, z) {
   if (dd > 70) return "e"
   return worn(x, z) ?? lawn(x, z)
 }
-// near the eye, what a flat color can't say: grass blades standing up out of the lawn, some catching
-// the sun, some in their own shade; a daisy here and there; roots across the bare earth under the
-// trees; a crack across a slab now and then
 // A tuft of grass at (x, y) on screen, its blades about `len` px: a few, fanning out from a dark foot,
 // the body a step lighter than the lawn, the tips in the sun (some yellow) or catching the sky (a few
 // bluish). Under 2 px a tuft is a tick.
@@ -166,7 +171,7 @@ function tuft(c, x, y, len, n, seed) {
   }
 }
 // near the eye, what a flat color can't say: tufts of grass over the lawn and a daisy here and there,
-// farther only a tick now and then; roots across the bare earth under the trees; a crack across a slab
+// farther only a tick now and then; roots across the bare earth under the trees
 function details(c) {
   for (let y = H - 1; y > P.horizon + 6; y--) {
     const dd = (P.focal * P.eye) / (y + 0.5 - P.horizon), len = (0.08 * P.focal) / dd
@@ -189,18 +194,6 @@ function details(c) {
     const r = rng(Math.round(tx * 7 + tz))
     for (let i = 0; i < 6; i++) { const a = r() * Math.PI * 2, len = rad * (0.45 + r() * 0.45); seg(c, tx, tz, tx + Math.cos(a) * len, tz + Math.sin(a) * len * 0.9, 0, i % 2 ? "m" : "l") }
   }
-  for (let k = 1; k < 14; k++) {
-    if (hash(k, 9) < 0.35) {                                           // path A, slab k
-      const x0 = k * 1.5, r = rng(k * 31), pts = [[x0 + 0.2 + r() * 0.4, PATH_A[0] + 0.05]]
-      for (let i = 1; i <= 3; i++) pts.push([pts[i - 1][0] + (r() - 0.3) * 0.35, PATH_A[0] + (i / 3) * (PATH_A[1] - PATH_A[0] - 0.1)])
-      for (let i = 1; i < pts.length; i++) seg(c, ...pts[i - 1], ...pts[i], 0, "?")
-    }
-    if (hash(k, 11) < 0.3) {                                           // path B, slab k
-      const z0 = k * 1.5, r = rng(k * 47), pts = [[PATH_B[0] + 0.05, z0 + 0.2 + r() * 0.4]]
-      for (let i = 1; i <= 3; i++) pts.push([PATH_B[0] + (i / 3) * (PATH_B[1] - PATH_B[0] - 0.1), pts[i - 1][1] + (r() - 0.3) * 0.35])
-      for (let i = 1; i < pts.length; i++) seg(c, ...pts[i - 1], ...pts[i], 0, "?")
-    }
-  }
 }
 // a level line on the ground (or u m up), cut where it would pass behind the eye
 function seg(c, x0, z0, x1, z1, u, key) {
@@ -216,33 +209,34 @@ function seg(c, x0, z0, x1, z1, u, key) {
 // joint is a groove, not a bevel), the panels' edges against the soil, a crack across a panel here and
 // there, a weed come up in a joint by the lawn.
 function paving(c) {
-  for (const z of PATH_A) seg(c, -30, z, 90, z, 0, "g")
-  for (const x of PATH_B) seg(c, x, -30, x, 90, 0, "g")
+  // the paths' edges and middles, straight on across the plaza; its own edges; the joints across
+  for (const z of GRID_Z.slice(1, 4)) seg(c, -30, z, 90, z, 0, "g")
+  for (const x of GRID_X.slice(1, 4)) seg(c, x, -30, x, 90, 0, "g")
   const [px0, pz0, px1, pz1] = PLAZA, mid = (a, b) => (a + b) / 2
-  for (let x = -6; x < 60; x += 1.5) if ((x < px0 || x > px1) && ahead(x, 7.5) < 26) seg(c, x, PATH_A[0], x, PATH_A[1], 0, "g")
-  for (let z = -3; z < 60; z += 1.5) if ((z < pz0 || z > pz1) && ahead(6.3, z) < 26) seg(c, PATH_B[0], z, PATH_B[1], z, 0, "g")
-  seg(c, -6, mid(...PATH_A), px0, mid(...PATH_A), 0, "g"); seg(c, px1, mid(...PATH_A), 40, mid(...PATH_A), 0, "g")
-  seg(c, mid(...PATH_B), -2, mid(...PATH_B), pz0, 0, "g"); seg(c, mid(...PATH_B), pz1, mid(...PATH_B), 40, 0, "g")
-  const SL = (px1 - px0) / 3
-  for (let k = 0; k <= 3; k++) { seg(c, px0 + SL * k, pz0, px0 + SL * k, pz1, 0, "g"); seg(c, px0, pz0 + SL * k, px1, pz0 + SL * k, 0, "g") }
-  // cracks: from an edge or a joint, wandering across part of a panel
-  for (let k = -4; k < 30; k++)
-    for (const onA of [true, false]) {
-      if (hash(k, onA ? 7 : 9) > 0.16) continue
-      const r = rng(k * 31 + (onA ? 1 : 2)), a0 = k * 1.5 + 0.2 + r() * 1.1, pts = onA ? [[a0, PATH_A[0]]] : [[PATH_B[0], a0]]
-      if (onA ? a0 > px0 - 0.3 && a0 < px1 + 0.3 : a0 > pz0 - 0.3 && a0 < pz1 + 0.3) continue
-      for (let i = 1; i <= 4; i++) { const [px, pz] = pts[i - 1]; pts.push(onA ? [px + (r() - 0.4) * 0.3, pz + 0.3 + r() * 0.15] : [px + 0.3 + r() * 0.15, pz + (r() - 0.4) * 0.3]) }
+  for (const x of [px0, px1]) seg(c, x, pz0, x, pz1, 0, "g")
+  for (const z of [pz0, pz1]) seg(c, px0, z, px1, z, 0, "g")
+  for (const x of JOINTS_A) if (ahead(x, 7.5) < 26) seg(c, x, PATH_A[0], x, PATH_A[1], 0, "g")
+  for (const z of JOINTS_B) if (ahead(6.3, z) < 26) seg(c, PATH_B[0], z, PATH_B[1], z, 0, "g")
+  // cracks: across a half panel, from the edge by the lawn to the middle joint, wandering a little
+  for (const [onA, list] of [[true, JOINTS_A], [false, JOINTS_B]])
+    for (const a of list) for (const side of [0, 1]) {
+      const h = onA ? PATH_A : PATH_B, r = rng(Math.round(a * 10) * 7 + side * 3 + (onA ? 1 : 2))
+      if (r() > 0.18) continue
+      const lo = a < (onA ? px0 : pz0) ? a : a - SLAB, start = side ? h[1] : h[0], dir = side ? -1 : 1, pts = []
+      let along = lo + 0.2 + r() * (SLAB - 0.4)
+      for (let i = 0; i <= 4; i++) {
+        pts.push(onA ? [along, start + dir * (i / 4) * (SLAB - 0.02)] : [start + dir * (i / 4) * (SLAB - 0.02), along])
+        along = Math.max(lo + 0.06, Math.min(lo + SLAB - 0.06, along + (r() - 0.5) * 0.3))
+      }
       if (ahead(...pts[0]) < 14) for (let i = 1; i < pts.length; i++) seg(c, ...pts[i - 1], ...pts[i], 0, "?")
     }
   // a weed in a joint by the lawn, here and there; near, one where the joints cross mid-path
-  for (let k = -2; k < 20; k++) {
-    for (const [x, z] of [[k * 1.5, PATH_A[0] + 0.05], [k * 1.5, PATH_A[1] - 0.05], [PATH_B[0] + 0.05, k * 1.5], [PATH_B[1] - 0.05, k * 1.5]]) {
-      if (inRect(x, z, PLAZA) || ahead(x, z) > 12 || hash(Math.round(x * 10) + 3, Math.round(z * 10)) > 0.3) continue
-      tuft(c, ...at(x, z), 0.1 * P.scale(ahead(x, z)), 3, Math.round(x * 91 + z * 7))
-    }
-    for (const [x, z] of [[k * 1.5, mid(...PATH_A)], [mid(...PATH_B), k * 1.5]])
-      if (!inRect(x, z, PLAZA) && ahead(x, z) > 1 && ahead(x, z) < 8 && hash(k + 7, Math.round(z)) < 0.5) tuft(c, ...at(x, z), 0.06 * P.scale(ahead(x, z)), 4, k * 13 + 5)
+  for (const [x, z] of [...JOINTS_A.flatMap((x) => [[x, PATH_A[0] + 0.05], [x, PATH_A[1] - 0.05]]), ...JOINTS_B.flatMap((z) => [[PATH_B[0] + 0.05, z], [PATH_B[1] - 0.05, z]])]) {
+    if (ahead(x, z) > 12 || hash(Math.round(x * 10) + 3, Math.round(z * 10)) > 0.3) continue
+    tuft(c, ...at(x, z), 0.1 * P.scale(ahead(x, z)), 3, Math.round(x * 91 + z * 7))
   }
+  for (const [x, z] of [...JOINTS_A.map((x) => [x, mid(...PATH_A)]), ...JOINTS_B.map((z) => [mid(...PATH_B), z])])
+    if (ahead(x, z) > 1 && ahead(x, z) < 8 && hash(Math.round(x * 10) + 7, Math.round(z * 10)) < 0.5) tuft(c, ...at(x, z), 0.06 * P.scale(ahead(x, z)), 4, Math.round(x * 13 + z * 5))
 }
 
 // ================================================================ shapes
@@ -851,11 +845,11 @@ const WILD = (() => {
   // path, which edge, which panel); and a clump at a joint now and then
   const edges = [(a) => [a, PATH_A[0] - 0.08], (a) => [a, PATH_A[1] + 0.08], (a) => [PATH_B[0] - 0.08, a], (a) => [PATH_B[1] + 0.08, a]]
   const spot = (x, z) => ahead(x, z) > 3 && ahead(x, z) < 14 && !paved(x, z) && !inRect(x, z, SAND) && !worn(x, z) && distSeg(x, z, SHORTCUT) > 0.6
-  for (const [e, k] of [[1, 2], [0, 6], [3, 2], [3, 8], [1, 7]])
-    for (let a = 0.08; a < 1.5; a += 0.17) { const [x, z] = edges[e](k * 1.5 + a); if (spot(x, z)) out.push(weed(r, x, z, 0.45, 1.2)) }
-  for (let k = -2; k < 20; k++) for (const e of [0, 1, 2, 3]) {
-    const [x, z] = edges[e](k * 1.5)
-    if (spot(x, z) && !(e === 2 && z > 10 && z < 18) && hash(k + 40, e) < 0.3) out.push(weed(r, x, z, 0.5, 1.4))
+  for (const [e, from] of [[1, JOINTS_A[0]], [0, JOINTS_A[10]], [3, JOINTS_B[1]], [3, JOINTS_B[11]], [1, JOINTS_A[11]]])
+    for (let a = 0.08; a < SLAB; a += 0.17) { const [x, z] = edges[e](from + a); if (spot(x, z)) out.push(weed(r, x, z, 0.45, 1.2)) }
+  for (const e of [0, 1, 2, 3]) for (const j of e < 2 ? JOINTS_A : JOINTS_B) {
+    const [x, z] = edges[e](j)
+    if (spot(x, z) && !(e === 2 && z > 10 && z < 18) && hash(Math.round(j * 10) + 40, e) < 0.3) out.push(weed(r, x, z, 0.5, 1.4))
   }
   return out
 })()
