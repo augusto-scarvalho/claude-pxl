@@ -10,7 +10,11 @@ import { PxError } from "../core/errors.ts";
 import { frameTime } from "./shot.ts";
 
 /** `coverage`: which rules ran and on how many, and those that couldn't (nothing to check them on) */
-export interface CheckResult { lines: string[]; warnings: number; checked: string; coverage: string }
+export interface CheckResult {
+  lines: string[]; warnings: number; checked: string; coverage: string;
+  /** With `readings`: every placement's lit side against the scene's light, warning or not, and a tally (to tune the rule). */
+  readings?: string[]; tally?: string;
+}
 
 const hash = (d: Uint32Array) => { let h = 2166136261; for (let i = 0; i < d.length; i++) h = Math.imul(h ^ d[i], 16777619); return h >>> 0; };
 /** 3, 4, 5, 9 -> "3-5, 9" */
@@ -26,7 +30,8 @@ const ranges = (fs: number[]) => fs.reduce<[number, number][]>((r, f) => {
  * that name (not those it includes), unless `names` are given. `frame` / `frames`: those frames of
  * each animated scene only, instead of all of them.
  */
-export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string } = {}): CheckResult {
+export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string; readings?: boolean } = {}): CheckResult {
+  const reads = new Set<string>(), tally = { agree: 0, against: 0, unclear: 0 };
   const lines: string[] = [];
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
@@ -84,6 +89,12 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
           seen.set(key, ws);
           if (q.img.sockets?.front && o?.f) ran.front++;
           if (wo?.light && !dark) { ran.light++; if (all.some((w) => /^(WARNING: )?lit (from|on)/.test(w))) ran.read++; }
+          if (opts.readings && wo?.light && !dark) {
+            // what the rule read, kept or not: to see where it agrees, where it warns, where it can't tell
+            const r = all.find((w) => /^(WARNING: )?lit (from|on)/.test(w)) ?? "no clear reading";
+            tally[r.startsWith("WARNING") ? "against" : /as its light|toward the light/.test(r) ? "agree" : "unclear"]++;
+            reads.add(`${name} › ${q.name} @${q.layer ?? "-"} › ${r}`);
+          }
           if (q.img.meters) { ran.feet++; if (wo?.ground !== undefined) ran.ground++; }
           if (o?.text) ran.text++;
         }
@@ -113,7 +124,8 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   }
   if (ran.text) run.push(`lettering on ${ran.text}`);
   if (rigs) run.push(`rig parts ${ran.parts}`);
-  return { lines, warnings: lines.length,
+  const readings = opts.readings ? { readings: [...reads], tally: `${tally.agree + tally.against + tally.unclear} placements read: ${tally.agree} lit as their light, ${tally.against} against it, ${tally.unclear} with no side to tell` } : {};
+  return { ...readings, lines, warnings: lines.length,
     coverage: `ran: ${run.join(", ") || "nothing"}${not.length ? `; not run: ${not.join(", ")}` : ""}`,
     checked: `${n(scenes, "scene")} (${n(frames, "frame")}, ${n(distinct, "distinct placement")}), ${n(rigs, "rig")}, ${n(others, "other asset")} with a front marker` };
 }

@@ -21,16 +21,25 @@ const GAP = 2, GAP_C = 0x1b1b22ff, EMPTY = 0x4a4a55ff;
 
 /** The frames side by side (gaps between), cropped to `at`; transparent shows as a flat gray. */
 export function shotRow(p: Project, name: string, frames: number[], at?: number[]): Img {
-  const imgs = frames.map((f) => p.build(name, 0, frameTime(p, name, f)).img);
-  const [x0, y0, w, h] = at ?? [0, 0, imgs[0].w, imgs[0].h];
-  const row = new Img(imgs.length * (w + GAP) - GAP, h).fill(GAP_C);
-  imgs.forEach((im, i) => {
+  return cellRow(frames.map((f) => p.build(name, 0, frameTime(p, name, f)).img), [at]);
+}
+
+/**
+ * Each image cropped to each region (the whole image without one), side by side in that order, the
+ * regions of one image together; a gap between, transparent as a flat gray.
+ */
+export function cellRow(imgs: Img[], regions: (number[] | undefined)[]): Img {
+  const cells = imgs.flatMap((im) => regions.map((r) => ({ im, r: r ?? [0, 0, im.w, im.h] })));
+  const row = new Img(cells.reduce((s, c) => s + c.r[2], 0) + GAP * (cells.length - 1), Math.max(...cells.map((c) => c.r[3]))).fill(GAP_C);
+  let at = 0;
+  for (const { im, r: [x0, y0, w, h] } of cells) {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const sx = x0 + x, sy = y0 + y;
       const c = sx < im.w && sy < im.h && sx >= 0 && sy >= 0 ? im.data[sy * im.w + sx] : TRANSPARENT;
-      row.data[y * row.w + i * (w + GAP) + x] = c === TRANSPARENT ? EMPTY : c;
+      row.data[y * row.w + at + x] = c === TRANSPARENT ? EMPTY : c;
     }
-  });
+    at += w + GAP;
+  }
   return row;
 }
 

@@ -362,6 +362,10 @@ one), and the art code itself (4% of the cost).
 ` was meant, so `pxl help text` showed half.)
 - [x] **`pxl shot` of several assets, other files' too** (`pxl shot a.px.js sodium_hour b.px.js:city`):
   a row each, top down, and each one's warnings; what every A/B here was compared with, by hand.
+- [x] **The last image and light tools of the dogfood folder, into pxl**: `pxl shot` takes PNGs from
+  anywhere and `--at` more than once, a column per region (what crop, hcat, stack and grid did), and
+  `pxl check --readings` lists the lit-side rule's reading on every placement with a tally (what
+  light_readings did, to tune the rule). The dogfood folder keeps only the measuring tools.
 - [x] **Run the pipeline headless as a script** (dogfood tools): planner, forks in batches by free
   memory, a run cut by the usage limit resumed, a JSON per run and `runcost.py` at the end. What
   this round did by hand, for the next A/B.

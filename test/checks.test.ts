@@ -201,3 +201,14 @@ scene("s", { w: 40, h: 14, bg: "d", world: { scale: 10, light: [0.6, -1] } },
   assert.equal(text(quick), text(full));
   assert.match(text(full), /head_l @-[^\n]*WARNING: lit from the top left/);
 });
+
+test("check --readings: what the lit-side rule read on every placement, warning or not, and a tally", () => {
+  const src = PAL + `ramps("1d6")
+` + HEAD + `
+sprite("head_l", { base: "head", flip: "x" })
+scene("s", { w: 60, h: 14, bg: "d", world: { scale: 10, light: [0.6, -1] } }, stamp("head", 2, 2), stamp("head_l", 30, 2))`;
+  const r = checkProject(loadSource(src, "t.px.js"), { readings: true });
+  assert.deepEqual(r.readings, ["s › head @- › lit from the top right, as its light", "s › head_l @- › WARNING: lit from the top left, but its light comes from the top right (a flipped drawing carries its light to the other side)"]);
+  assert.equal(r.tally, "2 placements read: 1 lit as their light, 1 against it, 0 with no side to tell");
+  assert.equal(checkProject(loadSource(src, "t.px.js")).readings, undefined, "only when asked");
+});

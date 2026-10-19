@@ -321,8 +321,8 @@ painting replay ends ("animate" toggle).
 ## CLI
 
 ```
-node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> ...] [--frames a,b,c] [--at x,y,w,h] [--scale N] [--vs <git rev | file>] [--diff]
-node <pxl>/bin/pxl.js check <file> [name...] [--frame N]
+node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image.png> ...] [--frames a,b,c] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff]
+node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
 node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
@@ -337,7 +337,9 @@ node <pxl>/bin/pxl.js compare <file> <name> <ref.png> [--shrink N] [--offset x,y
 region, enlarged to about 600k px), what changed since the last shot of the same frames and region
 (pixels, and the box around them in the asset's coordinates), and the warnings `check` finds on it
 at those frames. Several names make a row each, one under the other (`other.px.js:name` takes
-another file's): two versions of a scene, or one scene from two agents, side by side.
+another file's, and a PNG from anywhere is a row too), and several `--at` a column each: two
+versions of a scene, one scene from two agents, three details of a big one. `check --readings`
+also lists what the lit-side rule read on every placement, warning or not, with a tally.
 `check` runs them on every scene and rig of a file at every frame. A `build` of a
 whole file prints how many assets of each kind it wrote; `--list` or `--only` print a line each.
 A preview GIF past 4 MB says so; `--every N` keeps one frame in N in the previews (the GIFs in

@@ -334,6 +334,19 @@ test("cli shot of several assets, one from another file: a row each, top down, a
   await assert.rejects(main(["shot", file, "a", `${other}:b`, "--vs", "HEAD"]).then((c) => { if (c) throw new Error("refused"); }), /refused/);
 });
 
+test("cli shot of PNGs from anywhere, several regions: a row per image, a column per region", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), a = join(dir, "a.png"), b = join(dir, "b.png");
+  const img = (c: number) => { const i = new Img(8, 6); i.fill(c); return i; };
+  writePng(a, img(pack(255, 0, 0)));
+  writePng(b, img(pack(0, 0, 255)));
+  const text = await said("shot", a, b, "--at", "0,0,4,3", "--at", "4,3,2,2", "--scale", "1");
+  assert.match(text, /rows, top down: a\.png, b\.png; columns: 0,0,4,3 \| 4,3,2,2; 1x\)/);
+  const png = decodePng(readFileSync(join(dir, "out", "_shot", "a+b.png")));
+  // two cells a row (4 wide, a gap of 2, then 2), two rows of 3 with a gap of 2
+  assert.deepEqual([png.w, png.h], [4 + 2 + 2, 3 + 2 + 3]);
+  assert.deepEqual([png.data[0], png.data[5 * 8]], [pack(255, 0, 0), pack(0, 0, 255)]);
+});
+
 test("pxl list maps a file: each statement that defines assets, its lines, the comment above, a loop's assets on one line", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
   writeFileSync(join(dir, "parts.px.js"), `use("pico8")\n// a dot\nsprite("dot", "8")\n`);
