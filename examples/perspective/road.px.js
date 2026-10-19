@@ -1,6 +1,5 @@
-// True perspective. "road": a road across the sertão at sunset in one-point perspective, and someone
-// walking away along it, getting smaller step by step. "plaza": the same camera turned 40 degrees,
-// two-point perspective. Everything is placed in meters (x across, z ahead, up) and projected by
+// True perspective, one point: a road across the sertão at sunset, and someone walking away along it,
+// getting smaller step by step (two-point perspective: park.px.js). Everything is placed in meters (x across, z ahead, up) and projected by
 // perspective(), so a cactus, a fence post or a boulder is the size it should be where it stands;
 // plane() draws the ground pixel by pixel from where each pixel looks.
 pal({
@@ -740,59 +739,3 @@ anim("road", { w: W, h: H, frames: FRAMES, fps: FPS },
   stamp("_land", 0, 0),
   (c) => mirage(c),
   (c) => walker(c, c.frame))
-
-// Two-point perspective: the camera turned 40 degrees to the right (yaw). The square, its flagstones
-// and the blocks on it are laid on the world's x and z axes, so every level edge runs to one of two
-// vanishing points on the horizon: Q.vanish(0) for the edges along z, Q.vanish(90) for those along x.
-// Verticals stay vertical (the camera is level). The joints are drawn as lines, not per pixel by
-// plane(): a line stays one clean pixel wide however far it runs.
-const Q = perspective({ w: W, horizon: 84, eye: 1.6, fov: 90, yaw: 40 })
-const SQUARE = [-24, -6, 36, 54], STONE = 3                    // x0, z0, x1, z1 in meters; 3 m flagstones
-// [x0, z0, x1, z1, height]: a tower with its corner toward us, a low hall, a kiosk
-const BLOCKS = [[10, 20, 22, 32, 12], [-8, 34, 2, 44, 5], [15, 5, 17.5, 7.5, 2.6]]
-const q = (x, z, up = 0) => Q.ground(x, z, up).map(Math.round)
-// a level segment on screen, cut where it would pass behind the eye
-function seg(c, x0, z0, x1, z1, up, key) {
-  const zc = (x, z) => x * Math.sin((Q.yaw * Math.PI) / 180) + z * Math.cos((Q.yaw * Math.PI) / 180), a = zc(x0, z0), b = zc(x1, z1), near = 0.5
-  if (a < near && b < near) return
-  const t = (near - a) / (b - a)
-  if (a < near) [x0, z0] = [x0 + (x1 - x0) * t, z0 + (z1 - z0) * t]
-  else if (b < near) [x1, z1] = [x0 + (x1 - x0) * t, z0 + (z1 - z0) * t]
-  c.line(...q(x0, z0, up), ...q(x1, z1, up), key)
-}
-
-function block(c, [x0, z0, x1, z1, tall]) {
-  // a face from corner a to corner b, with a 3 m grid on it: floors run to a vanishing point, posts stay upright
-  const face = (a, b, key) => {
-    c.poly([...q(...a), ...q(...b), ...q(...b, tall), ...q(...a, tall)], key)
-    for (let up = 3; up < tall; up += 3) seg(c, ...a, ...b, up, "d")
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1])
-    for (let s = 3; s < len; s += 3) {
-      const t = s / len, x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t
-      c.line(...q(x, z), ...q(x, z, tall), "d")
-    }
-  }
-  // the faces turned toward the eye: the front (-z) and the side the eye is on
-  if (x0 > 0) face([x0, z1], [x0, z0], "D")
-  if (x1 < 0) face([x1, z0], [x1, z1], "D")
-  face([x0, z0], [x1, z0], "e")
-  for (const x of [x0, x1]) c.line(...q(x, z0), ...q(x, z0, tall), "E")   // the front corners catch the light
-}
-
-scene("plaza", { w: W, h: H },
-  grad(0, 0, W, Q.horizon + 1, "NnvmOoy", "v"),
-  circ(Q.vanish(0) + 60, Q.horizon - 3, 8, "w"),
-  glow("w", { r: 60, ramp: 3 }),
-  // the square, and beyond it open ground hazing toward the horizon
-  plane(Q, (x, z) => {
-    const [x0, z0, x1, z1] = SQUARE
-    if (x >= x0 && x <= x1 && z >= z0 && z <= z1) return "A"
-    return "DeEh"[band(Math.hypot(x, z), [80, 160, 300])]
-  }),
-  (c) => {
-    const [x0, z0, x1, z1] = SQUARE
-    for (let x = x0 + STONE / 2; x < x1; x += STONE) seg(c, x, z0, x, z1, 0, "a")   // joints along z
-    for (let z = z0 + STONE / 2; z < z1; z += STONE) seg(c, x0, z, x1, z, 0, "a")   // and along x
-  },
-  // far to near, so nearer blocks cover farther ones
-  (c) => BLOCKS.slice().sort((a, b) => Math.hypot(b[0], b[1]) - Math.hypot(a[0], a[1])).forEach((b) => block(c, b)))

@@ -26,7 +26,7 @@ const shots: [string, string, number, number?][] = [
   ["cyberpunk/sodium_hour.px.js", "sodium_hour", 640, 3],
   ["cyberpunk/pipeline/cyberpunk_city.px.js", "cyberpunk_city", 640, 3],
   ["perspective/road.px.js", "road", 640],
-  ["perspective/road.px.js", "plaza", 640],
+  ["perspective/park.px.js", "park", 640],
 ];
 
 const only = process.argv.slice(2);

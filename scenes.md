@@ -107,7 +107,10 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   stays right as it recedes. Near ones on a plate with `relight` for the rim; far ones in the haze
   color; under a few px, a simple tuft.
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
-  `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical.
+  `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:
+  each is lit or in shade by which way it faces the sun. People walking in such a scene: pose a body
+  in meters (feet, knees by two-bone IK, arms against the legs) and project it, rather than drawing
+  sprites per direction (`examples/perspective/park.px.js`).
 
 ## Slow motion in a short loop (clouds, mist, drifting things)
 

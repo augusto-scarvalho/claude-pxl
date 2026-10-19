@@ -127,7 +127,7 @@ frame.
   <img src="docs/gallery/road.gif" width="100%" alt="Animated pixel-art road across the Brazilian sertão at sunset in one-point perspective: cracked asphalt with dashes and edge lines running to the horizon, mandacaru and xique-xique cacti, leafless catingueira shrubs, juazeiro trees, boulders and dry grass, a crooked barbed-wire fence, power poles and a windmill, a chapada on the horizon and the sun going down into a pass with vultures circling; a backlit walker in a leather hat with a pack and bedroll walks away down the road, getting smaller step by step until they dissolve into the light, their long shadow walking with them">
 </p>
 <p>
-  <img src="docs/gallery/plaza.png" width="100%" alt="A square at sunset in two-point perspective: a tower seen corner-on, its floor lines and the flagstone joints running to two vanishing points off the left and right of the picture, a low hall and a kiosk">
+  <img src="docs/gallery/park.gif" width="100%" alt="Animated pixel-art park at two in the afternoon in two-point perspective: two paths crossing in the middle, hedges, benches and lamp posts running to two vanishing points, pastel apartment blocks beyond with their windows doing the same; a playground with swings, a slide, a climbing frame and a seesaw, a yellow ipê in bloom, an ice-cream cart under a striped umbrella; two children playing tag come out from behind a hedge, turn at the crossing and run off behind the cart, a woman in a straw hat walks her caramel dog away up the other path until a hedge hides them, a girl swings, pigeons peck by a chalk hopscotch">
 </p>
 
 [`examples/perspective/road.px.js`](examples/perspective/road.px.js): the sertão at sunset, everything
@@ -137,7 +137,11 @@ Each thing is built once as parts (trunks, arms, twigs, crowns), and the same pa
 its long shadow, so a mandacaru's shadow has its arms and the walker's walks with them. The walker
 holds their size for a whole step and shrinks only when the next foot lands; under 15 px they switch
 to sprites drawn by hand for each size (14, 12, 10 ... 5 px), picked by `stamp`'s `fit`.
-Below, the same camera turned 40° (`yaw`): two vanishing points.
+Below, [`park.px.js`](examples/perspective/park.px.js): the camera turned 40° (`yaw`), two vanishing points,
+at two in the afternoon. People and the dog are bodies in meters posed by a gait computed in 3D, so
+they're right from any angle the paths give them and cast their own short shadows; the children run
+behind the ice-cream cart because everything is drawn far to near, and the loop closes because both
+paths end behind a hedge.
 
 ## Quick start
 
