@@ -168,8 +168,13 @@ test("study takes an animation apart: what is carried, what animates in place, a
     for (let y = 60; y < 80; y++) for (let x = 110; x < 140; x++) img.set(x, y, latticeHash(x * 7 + f, y * 3 - f) < 0.5 ? pack(40, 120, 200) : pack(160, 210, 240));
     return img;
   });
-  const text = study({ name: "pieces", frames, ms: frames.map(() => 100), kind: "test" }).text.join("\n");
+  const r = study({ name: "pieces", frames, ms: frames.map(() => 100), kind: "test" }), text = r.text.join("\n");
   const piece = (x: number, y: number) => text.split("\n").find((l) => l.includes(` at ${x},${y},`));
+  // the box carried is isolated and followed: its box in each of the 32 frames, 2 px on each time
+  const carried = (r.pieces!.json as { pieces: { kind: string; track: number[][] }[] }).pieces.find((p) => p.kind === "carried")!;
+  assert.equal(carried.track.length, 32);
+  assert.ok(carried.track.every((e, i) => e[1] === 10 + 2 * i && e[3] === 8), JSON.stringify(carried.track.slice(0, 4)));
+  assert.ok(r.pieces!.sheet.w > 0);
   assert.match(piece(10, 10) ?? text, /going right at 2\.00 px\/frame: one drawing carried along a path/);
   assert.match(piece(20, 40) ?? text, /animated in place: an anim of its drawings/);
   assert.match(piece(70, 40) ?? text, /lighter and darker all at once: a light/);

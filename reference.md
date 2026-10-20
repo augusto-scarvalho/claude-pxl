@@ -458,8 +458,13 @@ another (traffic, a crowd: sprites along a lane, or `scroll()` for a lane at one
 place, read from the pixels that change there: a cycle of drawings (`anim`), parts moving against a
 body that stays (a rig, or a frame per pose), changing all over without repeating with neighbors
 changing at odds (fire, water, smoke: `flame()`, `plume()`, `warp()`), or lighter and darker all at
-once with the hue kept (a light: `glow()`, a lamp, colors swapped per frame). Things that touch
-read as one piece (a crowd of dancers is one rig of many parts). Videos are read `--seconds` (8) from `--from` at their own
+once with the hue kept (a light: `glow()`, a lamp, colors swapped per frame). Each object is
+isolated from the others: the changing pixels in fragments that touch, put back together only when
+they are near each other, change in the same rhythm and share colors (one dancer's arm and leg, not
+two dancers side by side; dancers moving together in step still come out as one). The pieces are
+numbered; `_study/<name>_pieces.png` has a row for each, it alone cut out across the clip (by its
+own box in each frame when it goes somewhere), and `<name>_pieces.json` its kind, drawings, cycle,
+speed and its box in every frame it shows in (its track, `[frame, x, y, w, h]`). Videos are read `--seconds` (8) from `--from` at their own
 rate up to 30 fps (`--fps`); big frames are brought down as they are read (to 1x when they are pixel
 art, else to 640 px). PNG and GIF are read by pxl; JPEG, WebP, BMP and video need ffmpeg on PATH.
 

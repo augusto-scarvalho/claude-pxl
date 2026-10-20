@@ -423,6 +423,11 @@ one), and the art code itself (4% of the cost).
   pulsing light, the road's walker going away with its limbs moving and the windmill a rig, the
   park's people walking nearer, the tournament's clouds drifting. Still one piece where things touch
   (the party's dancers, a street's traffic). A test takes a synthetic clip apart.
+  Then each object isolated (asked next): fragments that touch, regrouped only when near, in the same
+  rhythm and sharing colors; numbered, each cut out across the clip in `_pieces.png`, and its box in
+  every frame in `_pieces.json`. The party now comes apart into the witch at her cauldron, the
+  pumpkins, the lanterns, the ghost, the mirror ball, the fire, groups of dancers; the road into the
+  walker shrinking as it goes, the windmill, the vultures, the lit window.
 - [x] **More of what the papers measure**: a sprite's light from its rim (Johnson and Farid, 2005);
   banding by Pixel Logic's rule as the Pixel Fixer paper (TU Delft, 2025) states it; pillow shading;
   the translation of a photo by superpixels after Gerstner et al. (NPAR 2012), which keeps edges.

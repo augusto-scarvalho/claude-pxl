@@ -255,9 +255,11 @@ export async function main(argv: string[]): Promise<number> {
         mkdirSync(dir, { recursive: true });
         const pic = join(dir, `${name}${r.pixelArt ? "_1x" : "_px"}.png`), sheetPath = join(dir, `${name}.png`), hexPath = join(dir, `${name}.hex`);
         writePng(sheetPath, r.sheet); writePng(pic, r.picture);
+        const piecesPng = join(dir, `${name}_pieces.png`), piecesJson = join(dir, `${name}_pieces.json`);
+        if (r.pieces) { writePng(piecesPng, r.pieces.sheet); writeFileSync(piecesJson, JSON.stringify(r.pieces.json)); }
         writeFileSync(hexPath, r.palette.map((c) => toHex(c).slice(1, 7)).join("\n") + "\n");
         for (const l of r.text) console.log(l);
-        for (const l of ["", "FILES", `  ${sheetPath}: the sheet (the picture; ${r.pixelArt ? "its techniques marked; " : ""}its edges and vanishing points; the ramps${m.frames.length > 1 ? "; frames; the flow" : ""})`, `  ${pic}: ${r.pixelArt ? "the drawing at 1x" : "the translation, to draw over"}`, `  ${hexPath}: the palette, ramp by ramp, dark to light`]) console.log(l);
+        for (const l of ["", "FILES", `  ${sheetPath}: the sheet (the picture; ${r.pixelArt ? "its techniques marked; " : ""}its edges and vanishing points; the ramps${m.frames.length > 1 ? "; frames; the flow" : ""})`, `  ${pic}: ${r.pixelArt ? "the drawing at 1x" : "the translation, to draw over"}`, `  ${hexPath}: the palette, ramp by ramp, dark to light`, ...(r.pieces ? [`  ${piecesPng}: each piece alone, numbered as in PIECES, cut out across the clip`, `  ${piecesJson}: each piece's kind and its box in every frame (its track)`] : [])]) console.log(l);
         return 0;
       }
       case "list": {
