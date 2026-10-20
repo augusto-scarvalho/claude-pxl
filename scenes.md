@@ -115,6 +115,11 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   with `perspective()` (reference: Perspective). The ground is a `plane()`: each pixel gets the color
   of the ground point it sees, so stripes and rows run to the vanishing point by themselves. Long thin
   lines (joints, rails, wires) draw better as `line`s between two `ground()` points than per pixel.
+- A road that bends: `perspective({ ..., bend })`, its curvature in 1/m (a point z m ahead sits
+  bend·z²/2 to the side). Lay everything in meters along the road and across it as if it were
+  straight; the camera bends it, the ground, the things on it and their shadows alike. A bend that
+  changes as you go is a new camera each frame, and the heading turns with it: the far things
+  (the sun, the ranges) slide across by `focal · heading` px (`examples/perspective/race.px.js`).
 - Things on the ground stand at `ground(x, z)`, sized by `scale(z, x)` (and `up` when tilted); poles, posts and fences are a
   loop over z. A figure walking into the distance changes size only at each step's contact, and under
   ~15 px takes a hand-drawn sprite for its size (`fit`): drawn by code that small, it is a blob.

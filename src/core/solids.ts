@@ -4,7 +4,7 @@
 // as the hull of its level end rings) and flat polygons. The same shapes draw a thing, far to near
 // through the camera, and cast its shadow: each swept onto the ground away from the sun, so the
 // shadow has the thing's shape and stays right as it recedes.
-import type { Perspective } from "./perspective.ts";
+import { type Perspective, perspective } from "./perspective.ts";
 import { latticeHash } from "./util.ts";
 
 export type V3 = [number, number, number];
@@ -112,10 +112,13 @@ export function drawSolids(c: SolidCanvas, P: Perspective, shapes: Solid[], o: S
  * darker than in one. A blob with `dapple` lets light through (a crown's shade with sun flecks).
  */
 export function castSolids(P: Perspective, shapes: Solid[], o: SolidOpts, w: number, h: number, x0 = 0, y0 = 0): Set<number> {
-  const F = frame(P, o), out = new Set<number>(), drop = ([x, z, u]: V3): number[] => [x + u * F.sox, z + u * F.soz];
+  // the sun's way is the world's: on a bending way (P.bend), each point is moved to where the bend
+  // puts it first, swept from there, and the shadow projected through the camera without the bend
+  const F = frame(P, o), out = new Set<number>(), B = P.bend, S = B ? perspective({ ...P, bend: 0 }) : P;
+  const drop = ([x, z, u]: V3): number[] => [x + (B ? (B * (z - F.az) ** 2) / 2 : 0) + u * F.sox, z + u * F.soz];
   const fill = (poly: number[][], dapple?: number) => {
     if (poly.some(([x, z]) => F.ahead(x, z) < 0.4)) return;
-    const sp = poly.map(([x, z]) => P.ground(x - F.ax, z - F.az)), xs = sp.map((p) => p[0]), ys = sp.map((p) => p[1]);
+    const sp = poly.map(([x, z]) => S.ground(x - F.ax, z - F.az)), xs = sp.map((p) => p[0]), ys = sp.map((p) => p[1]);
     for (let y = Math.max(Math.ceil(P.horizon) + 1, Math.floor(Math.min(...ys)), y0); y <= Math.min(y0 + h - 1, Math.ceil(Math.max(...ys))); y++)
       for (let x = Math.max(x0, Math.floor(Math.min(...xs))); x <= Math.min(x0 + w - 1, Math.ceil(Math.max(...xs))); x++) {
         let inside = false;

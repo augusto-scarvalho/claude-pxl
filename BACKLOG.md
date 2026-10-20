@@ -454,8 +454,13 @@ one), and the art code itself (4% of the cost).
 - [x] **The race built in ~90 s**: `--profile` put it in the art, not in pxl: the sleeves' cloth
   shading worked out its folds for every pixel of the arm's bounding box (48%). Skipping the pixels
   off the sleeve first: 72 s, pixel for pixel the same. The ground's colour function is the rest.
-- Considered: a curved road in `perspective()` (`bend`: the offset kappa·d²/2 the race works out
-  itself, in its `cx()`): one scene's so far; worth it if another road bends.
+- [x] **A road that bends, in `perspective()`**: the race worked out the offset kappa·d²/2 itself
+  (`cx()` for its things, `roadU()` back for its ground, the same again with the sign turned for both
+  mirrors). Now `bend` on the camera: `ground()`, `at()`, `scale()` take and give places on the way,
+  so `plane`, `solids`, `mesh` and `terrain` follow it; `shadows` sweep along the sun's straight way
+  and then project; directions don't bend. `plane`'s function also gets the pixel's column and row
+  (the race's sun glitter needed the column). The race's three cameras use it: 67 px of 230k changed
+  over four frames (a rival's shadow now follows the bend along its length, a few glints).
 - [x] **A mesh op**: the cockpit (`examples/perspective/cockpit.px.js`) is modelled in 3D and carried
   its own renderer, `render3d`: flat faces in meters through the road's camera, the nearest face kept
   per pixel, each face toned along its material's ramp by how it lies to the light, an outline where a

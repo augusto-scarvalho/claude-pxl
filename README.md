@@ -174,8 +174,8 @@ the speed of the ground, so the last frame runs into the first.
 </p>
 
 [`examples/perspective/race.px.js`](examples/perspective/race.px.js): a street race from the driver's
-seat. The road is drawn by `plane()` through a camera at 1 m, bending with a curvature that turns
-right and then left over the loop; the rivals are drawn by hand from behind at seven sizes, the camera
+seat. The road is drawn by `plane()` through a camera at 1 m that bends with it (`bend`: a curvature that turns
+right and then left over the loop); the rivals are drawn by hand from behind at seven sizes, the camera
 picking the one nearest the height each should be (`fit`), near and off to one side, the whole car drawn in perspective instead (its side, the top of its tail, its back) so it runs off toward the vanishing point as it draws level;
 one is overtaken about every four seconds (one in our lane, so we weave), their long shadows thrown by
 `shadows()` from the low sun. The sun,

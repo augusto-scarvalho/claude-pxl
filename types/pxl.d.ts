@@ -199,9 +199,11 @@ declare global {
     yaw?: number;
     /** Degrees the camera is tilted up, down if negative: three-point perspective (default 0). */
     pitch?: number;
+    /** The way's curvature (1/m): its z lines bend right (left if negative), a point z m along bend·z²/2 m to the side (default 0). */
+    bend?: number;
   }
   interface PxPerspective {
-    readonly w: number; readonly horizon: number; readonly eye: number; readonly focal: number; readonly vp: number; readonly yaw: number; readonly pitch: number;
+    readonly w: number; readonly horizon: number; readonly eye: number; readonly focal: number; readonly vp: number; readonly yaw: number; readonly pitch: number; readonly bend: number;
     /** Where a point x m across, z m ahead and up m above the ground lands on screen (not rounded). */
     ground(x: number, z: number, up?: number): [number, number];
     /** The ground point [x, z] seen through a pixel's center; null at the horizon and above. */
@@ -271,7 +273,7 @@ declare global {
     /** Move pixels by whole-pixel offsets: fn(x, y) gives [dx, dy] at a pixel's new place; it takes the color (dx, dy) behind it. */
     warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): void;
     /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away ("." or nothing: leave it). */
-    plane(view: PxView | PxPerspective, fn: (x: number, z: number) => PxColor | null | undefined, where?: PxRegion): void;
+    plane(view: PxView | PxPerspective, fn: (x: number, z: number, col: number, row: number) => PxColor | null | undefined, where?: PxRegion): void;
     /** A tapered capsule painted round (px), shaded across toward the light along `ramp`, a rim on the lit edge. */
     capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts?: { light?: [number, number]; rim?: boolean }): void;
     /** Flames rising from (x, y), about `size` px tall, flickering with the frame, leaning with `wind`; `keys` root to tip, the last for edges. */
@@ -357,7 +359,7 @@ declare global {
   /** A pinhole camera over flat ground, turned (yaw) and tilted (pitch): ground(x, z, up) -> screen, at(col, row) -> ground, scale(z), vanish(angle), vertical(), ray(col, row), toward(dir). */
   function perspective(view: PxView & { w: number }): PxPerspective;
   /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away. */
-  function plane(view: PxView | PxPerspective, fn: (x: number, z: number) => PxColor | null | undefined, where?: PxRegion): PxOp;
+  function plane(view: PxView | PxPerspective, fn: (x: number, z: number, col: number, row: number) => PxColor | null | undefined, where?: PxRegion): PxOp;
   /** A tapered capsule painted round (px): every pixel shaded across it toward the light along `ramp` (dark to light), a rim on the lit edge. */
   function capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts?: { light?: [number, number]; rim?: boolean }): PxOp;
   /** Flames rising from (x, y), about `size` px tall: tongues flickering with the frame, leaning with `wind`; `keys` from the root to the tip, the last for their edges. */

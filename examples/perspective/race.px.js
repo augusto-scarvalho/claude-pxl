@@ -47,7 +47,7 @@ const W = 320, H = 180, FPS = 16, FRAMES = 192, SECONDS = FRAMES / FPS
 const TAU = Math.PI * 2
 const SPEED = 56, LOOP_M = SPEED * SECONDS                          // 672 m a loop
 const HORIZON = 70, EYE = 1.05
-const P = perspective({ w: W, horizon: HORIZON, eye: EYE, fov: 76 })
+const VIEW = { w: W, horizon: HORIZON, eye: EYE, fov: 76 }, P = perspective(VIEW)          // the sun, the far things
 // the road's bend, and our heading: a right-hander, then a left-hander
 const BEND = 0.0022
 const kappa = (f) => BEND * Math.sin((TAU * f) / FRAMES)
@@ -74,10 +74,11 @@ const gearAt = (s) => ease((s - SHIFTS[0] - 0.4) / 0.2) - ease((s - SHIFTS[1] - 
 // passing the one in the left lane; smooth changes between
 const LANE = 1.75
 const ourX = (f) => { const s = (f / FRAMES) * SECONDS; return -LANE + 2 * LANE * (ease((s - 3) / 1.5) - ease((s - 7.5) / 1.5)) }
-// a road point to the camera's frame: across, and how far ahead
-const cx = (u, d, f) => u - ourX(f) + (kappa(f) * d * d) / 2
-const roadU = (x, z, f) => x + ourX(f) - (kappa(f) * z * z) / 2
-const at = (x, z, up = 0) => P.ground(x, z, up).map(Math.round)
+// the camera along the road at a frame, bent with it (a point d ahead sits kappa·d²/2 to the side),
+// and a place across the road from our lane
+let wayAt = -1, wayCam = null
+const way = (f) => (f === wayAt ? wayCam : ((wayAt = f), (wayCam = perspective({ ...VIEW, bend: kappa(f) }))))
+const cx = (u, f) => u - ourX(f)
 
 // ---------------------------------------------------------------- the sky
 sprite("_sky", { w: W, h: HORIZON + 2 }, (c) => {
@@ -173,9 +174,9 @@ function far(c, f) {
 const EDGE = 3.5, SHOULDER = 4.8, RAIL_U = -5.4, BEACH = -7, SEA = -10, FOREST = 13
 function ground(f) {
   const s = travelled(f), k = kappa(f), sunCol = P.toward(sunDir(f))[0], ox = ourX(f)
-  return (x, z) => {
-    const u = x + ox - (k * z * z) / 2, along = (z + s) % LOOP_M, wide = Math.max(0.07, (z / P.focal) * 0.8)
-    const col = P.vp + (P.focal * x) / z, far = z > 90
+  return (x, z, px) => {
+    const u = x + ox, along = (z + s) % LOOP_M, wide = Math.max(0.07, (z / P.focal) * 0.8)
+    const col = px + 0.5, far = z > 90
     if (u < SEA) {
       // the sea: darker near, lighter toward the horizon; lines of swell, and the sun's path glittering
       const near = Math.abs(col - sunCol) < 4 + 900 / z
@@ -219,30 +220,34 @@ const SIGN = { p: 300, u: 6.4 }
 // a palm: where its foot and top are on the road's ground, and how big it is there (null when out of
 // the picture); drawn by hand after the things in meters, far to near
 function palmAt(it, f) {
+  const P = way(f)
   const d = along(it.p, f)
   if (d < 2 || d > 260) return null
-  const bx = cx(it.u, d, f), sc = P.scale(d, bx)
+  const bx = cx(it.u, f), sc = P.scale(d, bx)
   return { d, base: P.ground(bx, d, 0), top: P.ground(bx + it.lean, d, it.tall), sc, seed: it.seed }
 }
 function pole(it, f) {
+  const P = way(f)
   const d = along(it.p, f)
   if (d < 2 || d > 260) return []
-  const x = cx(it.u, d, f), arm = cx(it.u - 2.2, d, f), { stick, box } = solid
+  const x = cx(it.u, f), arm = cx(it.u - 2.2, f), { stick, box } = solid
   const g = { ghost: true }
   return [stick([x, d, 0], [x, d, 9], 0.09, "n", g), stick([x, d, 9], [arm, d, 9.3], 0.06, "n", g), box([arm - 0.4, d - 0.15, arm + 0.1, d + 0.15, 9.0, 9.25], { top: "n", lit: "l", shade: "l", under: "l" }, g)]
 }
 function chevron(it, f) {
+  const P = way(f)
   const d = along(it.p, f)
   if (d < 2 || d > 200) return []
   // on the outside of the bend
-  const side = kappa(f) >= 0 ? -1 : 1, x = cx(side * 5.2, d, f), { stick, box } = solid
+  const side = kappa(f) >= 0 ? -1 : 1, x = cx(side * 5.2, f), { stick, box } = solid
   const g = { ghost: true }
   return [stick([x, d, 0], [x, d, 1.2], 0.04, "p", g), box([x - 0.35, d, x + 0.35, d + 0.05, 1.2, 1.75], { lit: "Z", shade: "Z", top: "k" }, g)]
 }
 function sign(f) {
+  const P = way(f)
   const d = along(SIGN.p, f)
   if (d < 2 || d > 240) return []
-  const x = cx(SIGN.u, d, f), { stick, box } = solid
+  const x = cx(SIGN.u, f), { stick, box } = solid
   const g = { ghost: true }
   return [stick([x - 1.2, d, 0], [x - 1.2, d, 2.2], 0.05, "n", g), stick([x + 1.2, d, 0], [x + 1.2, d, 2.2], 0.05, "n", g), box([x - 1.6, d, x + 1.6, d + 0.08, 2.2, 3.8], { lit: "E", shade: "E", top: "E" }, g)]
 }
@@ -451,11 +456,12 @@ const RV = [["64", 66, 36], ["48", 50, 28], ["34", 36, 21], ["24", 26, 15], ["16
 // drawing from behind, which bobs a pixel now and then on its springs when it is near; the red
 // one's pipes backfire
 function rival(c, r, z, f) {
-  const x = cx(r.lane, z + 0.2, f), sc = P.scale(z + 0.2, x), [sx, sy] = P.ground(x, z + 0.2).map(Math.round), w = 1.9 * sc
+  const P = way(f)
+  const x = cx(r.lane, f), sc = P.scale(z + 0.2, x), [sx, sy] = P.ground(x, z + 0.2).map(Math.round), w = 1.9 * sc
   const [name, dw, dh] = RV.reduce((a, b) => (Math.abs(b[2] - 1.07 * sc) < Math.abs(a[2] - 1.07 * sc) ? b : a))
   c.ellipse(sx, sy, Math.round(w * 0.56), Math.max(1, Math.round(w * 0.05)), "Q")
   const bob = sc > 18 && (f + r.pass * 5) % 8 < 2 ? 1 : 0
-  if (sc > 13 && Math.abs(cx(r.lane, z + 2.3, f)) > 1.3) carInPerspective(c, r, z, f, bob)
+  if (sc > 13 && Math.abs(cx(r.lane, f)) > 1.3) carInPerspective(c, r, z, f, bob)
   else c.stamp(`_rv_${r.color}_${name}`, sx, sy + 1 - bob)
   backfire(c, sx, sy, w, r, f)
 }
@@ -473,8 +479,9 @@ const PAINT = { y: ["D", "j", "J", "g"], r: [",", "&", "K", ";"], b: ["$", "u", 
 const BODY_SIDE = [[0, 0.2], [0, 0.72], [0.4, 0.77], [1.25, 0.79], [1.6, 0.77], [2.9, 0.71], [3.7, 0.63], [4.2, 0.53], [4.25, 0.36], [4.2, 0.2]]
 const WHEELS = [0.85, 3.55]
 function carInPerspective(c, r, z, f, bob) {
-  const xc = cx(r.lane, z + 2.3, f), s = xc > 0 ? -1 : 1, lit = s < 0, ramp = PAINT[r.color], R = Math.round
-  const pt = (u, h, o) => { const zz = z + 0.2 + u, [x, y] = P.ground(cx(r.lane + o, zz, f), zz, h); return [x, y - bob] }
+  const P = way(f)
+  const xc = cx(r.lane, f), s = xc > 0 ? -1 : 1, lit = s < 0, ramp = PAINT[r.color], R = Math.round
+  const pt = (u, h, o) => { const zz = z + 0.2 + u, [x, y] = P.ground(cx(r.lane + o, f), zz, h); return [x, y - bob] }
   const fill = (pts, k) => c.poly(pts.flatMap(([u, h, o]) => pt(u, h, o)).map(R), k)
   const line = (a, b, k) => { const [x0, y0] = pt(...a), [x1, y1] = pt(...b); c.line(R(x0), R(y0), R(x1), R(y1), k) }
   const S = (o) => s * o                                                   // across, toward the side we see
@@ -689,7 +696,8 @@ function banana(c, x, y, h, seed) {
 // tall grass and weeds in clumps, backlit by the low sun on the left: each blade dark, its sunward
 // edge glowing toward the tip; some carry a seed head; all bend with a gust that runs through them
 function tallGrass(c, u, d, f, seed) {
-  const x = cx(u, d, f), [gx, gy] = P.ground(x, d, 0), sc = P.scale(d, x), R = Math.round
+  const P = way(f)
+  const x = cx(u, f), [gx, gy] = P.ground(x, d, 0), sc = P.scale(d, x), R = Math.round
   if (sc < 2) return
   const n = Math.max(4, Math.min(20, R(sc * 0.7))), k = (TAU * f) / FRAMES * 6
   for (let i = 0; i < n; i++) {
@@ -714,9 +722,10 @@ function tallGrass(c, u, d, f, seed) {
 // a thick black arrow round the bend. The guide sign is green in a white rim on two posts, its lower
 // part a tone darker, the light along its top, the town and the distance on it.
 function lampPost(c, it, f) {
+  const P = way(f)
   const d = along(it.p, f)
   if (d < 2 || d > 260) return
-  const x = cx(it.u, d, f), arm = cx(it.u - 2.2, d, f), sc = P.scale(d, x), R = Math.round
+  const x = cx(it.u, f), arm = cx(it.u - 2.2, f), sc = P.scale(d, x), R = Math.round
   const [bx, by] = P.ground(x, d, 0), [tx, ty] = P.ground(x, d, 8.7), w = Math.max(0.5, 0.11 * sc)
   for (let y = R(ty); y <= R(by); y++) {
     const t = (y - ty) / Math.max(1, by - ty), hw = w * (0.6 + 0.5 * t), xx = tx + (bx - tx) * t
@@ -740,9 +749,10 @@ function lampPost(c, it, f) {
   c.hline(R(lx - lw * 0.7), R(ly + lh * 0.5) + 1, Math.max(1, R(lw * 1.4)), "9")
 }
 function chevronSign(c, it, f) {
+  const P = way(f)
   const d = along(it.p, f)
   if (d < 2 || d > 200) return
-  const side = kappa(f) >= 0 ? -1 : 1, x = cx(side * 5.2, d, f), dir = -side, sc = P.scale(d, x), R = Math.round
+  const side = kappa(f) >= 0 ? -1 : 1, x = cx(side * 5.2, f), dir = -side, sc = P.scale(d, x), R = Math.round
   const [px0, py0] = P.ground(x, d, 0), [, py1] = P.ground(x, d, 1.2), pw = Math.max(1, R(0.06 * sc))
   c.rect(R(px0 - pw / 2), R(py1), pw, Math.max(1, R(py0 - py1)), "p"); if (pw > 1) c.line(R(px0 - pw / 2), R(py1), R(px0 - pw / 2), R(py0), "R")
   const [ax, ay] = P.ground(x - 0.36, d, 1.76), [bx, by] = P.ground(x + 0.36, d, 1.18), bw = R(bx - ax), bh = R(by - ay)
@@ -755,9 +765,10 @@ function chevronSign(c, it, f) {
   }
 }
 function guideSign(c, f) {
+  const P = way(f)
   const d = along(SIGN.p, f)
   if (d < 2 || d > 240) return
-  const x = cx(SIGN.u, d, f), sc = P.scale(d, x), R = Math.round
+  const x = cx(SIGN.u, f), sc = P.scale(d, x), R = Math.round
   for (const o of [-1.2, 1.2]) {
     const [px0, py0] = P.ground(x + o, d, 0), [, py1] = P.ground(x + o, d, 2.3), pw = Math.max(1, R(0.08 * sc))
     c.rect(R(px0 - pw / 2), R(py1), pw, Math.max(1, R(py0 - py1)), "p"); if (pw > 1) c.line(R(px0 - pw / 2), R(py1), R(px0 - pw / 2), R(py0), "R")
@@ -823,10 +834,11 @@ function view(c, f) {
   c.scroll("_clouds", 8, 0, { x: Math.round(P.vp - FAR_W * 0.6 - P.focal * heading(f)) })
   sun(c, f)
   far(c, f)
-  c.plane(P, ground(f))
+  const V = way(f), at = (x, z, up = 0) => V.ground(x, z, up).map(Math.round)
+  c.plane(V, ground(f))
   // the forest along the right: a dark body under a row of round crowns (drawn with the rest below)
   const wall = []
-  for (let d = 240; d >= 4; d -= 4) { const p = (travelled(f) + d) % LOOP_M; wall.push([cx(FOREST, d, f), d, 7 + 4 * hash(Math.floor(p / 8), 2)]) }
+  for (let d = 240; d >= 4; d -= 4) { const p = (travelled(f) + d) % LOOP_M; wall.push([cx(FOREST, f), d, 7 + 4 * hash(Math.floor(p / 8), 2)]) }
   for (let i = 0; i + 1 < wall.length; i++) {
     const [x0, d0, h0] = wall[i], [x1, d1, h1] = wall[i + 1]
     c.poly([...at(x0, d0, 0), ...at(x0, d0, h0), ...at(x1, d1, h1), ...at(x1, d1, 0)], "F")
@@ -834,21 +846,21 @@ function view(c, f) {
   // its face: foliage down to the ground, darker low down, a trunk or two in the gaps near us, the
   // undergrowth along its foot
   for (let i = 0; i < wall.length; i++) {
-    const [x0, d0, h0] = wall[i], sc = P.scale(d0, x0), pm = Math.floor((travelled(f) + d0) % LOOP_M)
+    const [x0, d0, h0] = wall[i], sc = V.scale(d0, x0), pm = Math.floor((travelled(f) + d0) % LOOP_M)
     if (d0 < 70) for (const k of [0, 1]) {
-      const tu = hash(pm, 40 + k) * 3, [tx, ty] = at(cx(FOREST - 0.2, d0 + tu, f), d0 + tu, 0), [, tt] = at(cx(FOREST - 0.2, d0 + tu, f), d0 + tu, h0 * 0.7)
-      const tw = Math.max(1, Math.round(0.25 * P.scale(d0 + tu, x0)))
+      const tu = hash(pm, 40 + k) * 3, [tx, ty] = at(cx(FOREST - 0.2, f), d0 + tu, 0), [, tt] = at(cx(FOREST - 0.2, f), d0 + tu, h0 * 0.7)
+      const tw = Math.max(1, Math.round(0.25 * V.scale(d0 + tu, x0)))
       c.rect(tx - tw, tt, tw * 2, ty - tt, "P"); c.line(tx - tw, tt, tx - tw, ty, "H")
     }
     for (let k = 0; k < 3; k++) {
-      const h = h0 * (0.15 + 0.25 * k + 0.1 * hash(pm, 50 + k)), du = hash(pm, 60 + k) * 4, [qx, qy] = at(cx(FOREST - 0.1, d0 + du, f), d0 + du, h)
+      const h = h0 * (0.15 + 0.25 * k + 0.1 * hash(pm, 50 + k)), du = hash(pm, 60 + k) * 4, [qx, qy] = at(cx(FOREST - 0.1, f), d0 + du, h)
       clump(c, qx, qy, (1.1 + 0.6 * hash(pm, 70 + k)) * sc, pm * 7 + k, false, hash(pm, 80 + k) < 0.45)
     }
   }
   // tufts of grass standing up along the edge of the asphalt, near us: a few blades each, a tip warm
   for (let p = Math.floor((travelled(f) + 30) / 1.3) * 1.3; p > travelled(f) + 2.5; p -= 1.3) {
     const d = p - travelled(f), pm = Math.floor(p * 10), u = SHOULDER + 0.3 + hash(pm, 91) * 1.5
-    const [gx, gy] = at(cx(u, d, f), d, 0), sc = P.scale(d, cx(u, d, f)), hgt = (0.2 + 0.25 * hash(pm, 92)) * sc
+    const [gx, gy] = at(cx(u, f), d, 0), sc = V.scale(d, cx(u, f)), hgt = (0.2 + 0.25 * hash(pm, 92)) * sc
     if (hgt < 2) continue
     for (let b = 0; b < 4; b++) {
       const lean = (hash(pm, 93 + b) - 0.5) * hgt * 0.8, bx = gx + (b - 1.5) * Math.max(1, sc * 0.05)
@@ -860,28 +872,28 @@ function view(c, f) {
   for (let d = 200; d >= 4; d -= 4) {
     const p = d - (travelled(f) % 4)
     if (p < 3) continue
-    const [ax, ay] = at(cx(RAIL_U, p, f), p, 0.8), [bx, by] = at(cx(RAIL_U, p + 4, f), p + 4, 0.8), [px0, py0] = at(cx(RAIL_U, p, f), p, 0)
-    const [ax2, ay2] = at(cx(RAIL_U, p, f), p, 0.5), [bx2, by2] = at(cx(RAIL_U, p + 4, f), p + 4, 0.5)
+    const [ax, ay] = at(cx(RAIL_U, f), p, 0.8), [bx, by] = at(cx(RAIL_U, f), p + 4, 0.8), [px0, py0] = at(cx(RAIL_U, f), p, 0)
+    const [ax2, ay2] = at(cx(RAIL_U, f), p, 0.5), [bx2, by2] = at(cx(RAIL_U, f), p + 4, 0.5)
     c.poly([ax, ay, bx, by, bx2, by2, ax2, ay2], "R"); c.line(ax, ay, bx, by, "r"); c.line(px0, py0, ax, ay, "p")
   }
   // shadows of everything, long toward us with the sun so low; then the things, far to near
   // the forest's crowns along its top, far to near, each a clump of clumps
   for (let p = Math.floor((travelled(f) + 240) / 5) * 5; p > travelled(f) + 3; p -= 5) {
     const d = p - travelled(f), pm = p % LOOP_M, rm = 2.2 + 1.2 * hash(Math.floor(pm / 5), 4)
-    const [qx, qy] = P.ground(cx(FOREST + 0.5, d, f), d, 7 + 4 * hash(Math.floor(pm / 8), 2)), sc = P.scale(d, cx(FOREST + 0.5, d, f))
+    const [qx, qy] = V.ground(cx(FOREST + 0.5, f), d, 7 + 4 * hash(Math.floor(pm / 8), 2)), sc = V.scale(d, cx(FOREST + 0.5, f))
     crown(c, qx, qy, rm * sc, Math.floor(pm / 5) + 17)
   }
   for (let p = Math.floor((travelled(f) + 200) / 7) * 7; p > travelled(f) + 12; p -= 7) {
     const d = p - travelled(f), pm = Math.round(p % LOOP_M)
-    if (hash(pm, 81) < 0.55) { const x = cx(FOREST - 0.6, d, f), [px, py] = P.ground(x, d, 0); tree(c, px, py, (10 + 4 * hash(pm, 82)) * P.scale(d, x), pm) }
-    if (hash(pm, 84) < 0.7) { const x = cx(FOREST - 1.6, d - 2.5, f), [px, py] = P.ground(x, d - 2.5, 0); banana(c, px, py, 2.6 * P.scale(d - 2.5, x), pm + 3) }
+    if (hash(pm, 81) < 0.55) { const x = cx(FOREST - 0.6, f), [px, py] = V.ground(x, d, 0); tree(c, px, py, (10 + 4 * hash(pm, 82)) * V.scale(d, x), pm) }
+    if (hash(pm, 84) < 0.7) { const x = cx(FOREST - 1.6, f), [px, py] = V.ground(x, d - 2.5, 0); banana(c, px, py, 2.6 * V.scale(d - 2.5, x), pm + 3) }
   }
   const things = [...POLES.flatMap((it) => pole(it, f)), ...CHEVRONS.flatMap((it) => chevron(it, f)), ...sign(f)]
   // a rival nearer than 4 m is beside us, behind the pillar and the door
   const cars = RIVALS.map((r) => ({ r, z: rivalZ(r, f) })).filter((o) => o.z > 4 && o.z < 200)
-  const carParts = cars.flatMap(({ r, z }) => carShapes(cx(r.lane, z, f), z, r.keys))
-  c.shadows(P, [...things, ...carParts], { sun: SUN(f), shade: SHADE })
-  c.solids(P, things, { sun: SUN(f) })
+  const carParts = cars.flatMap(({ r, z }) => carShapes(cx(r.lane, f), z, r.keys))
+  c.shadows(V, [...things, ...carParts], { sun: SUN(f), shade: SHADE })
+  c.solids(V, things, { sun: SUN(f) })
   // the palms, far to near: the trunk, then its crown
   for (const it of [...PALMS].sort((a, b) => along(b.p, f) - along(a.p, f))) {
     const pa = palmAt(it, f)
@@ -906,14 +918,14 @@ function view(c, f) {
 // What's behind, flipped: dusk on that side of the sky, the road running back to its own vanishing
 // point, the rivals we passed falling away with their headlights on.
 const MW = 62, MH = 12
-const PM = perspective({ w: MW, horizon: 5, eye: EYE, fov: 48 })
+const MIRROR = { w: MW, horizon: 5, eye: EYE, fov: 48 }
 anim("_mirror", { w: MW, h: MH, frames: FRAMES, fps: FPS }, rect(0, 0, MW, 3, "2"), rect(0, 3, MW, 3, "3"),
   (c) => {
-    const f = c.frame, k = kappa(f), ox = ourX(f)
+    const f = c.frame, ox = ourX(f)
     // behind, the bend goes the other way; in the mirror left stays left
-    const mu = (x, z) => x + ox + (k * z * z) / 2
+    const PM = perspective({ ...MIRROR, bend: -kappa(f) })
     c.plane(PM, (x, z) => {
-      const u = mu(x, z)
+      const u = x + ox
       if (u < RAIL_U) return u < BEACH ? "S" : "x"
       if (u > SHOULDER) return "v"
       if (Math.abs(Math.abs(u) - 0.1) < Math.max(0.04, (z / PM.focal) * 0.5)) return "y"
@@ -923,7 +935,7 @@ anim("_mirror", { w: MW, h: MH, frames: FRAMES, fps: FPS }, rect(0, 0, MW, 3, "2
     for (const r of RIVALS) {
       const z = -rivalZ(r, f) - 4.4
       if (z < 1 || z > 60) continue
-      const x = r.lane - ourX(f) - (k * z * z) / 2, sc = PM.scale(z), [px, py] = PM.ground(x, z, 0).map(Math.round)
+      const x = r.lane - ox, sc = PM.scale(z), [px, py] = PM.ground(x, z, 0).map(Math.round)
       const lw = Math.max(1, Math.round(0.55 * sc)), [gx, gy] = PM.ground(x, z - 2.5, 0).map(Math.round)
       if (sc > 2.5) for (const sd of [-1, 1]) c.ellipse(gx + sd * lw, gy, Math.max(1, Math.round(sc * 0.35)), Math.max(1, Math.round(sc * 0.12)), "A")
       c.stamp(`_rf_${r.color}_*`, px, py + 1, { fit: Math.max(3, Math.round(1.07 * sc)) })
@@ -937,13 +949,13 @@ anim("_mirror", { w: MW, h: MH, frames: FRAMES, fps: FPS }, rect(0, 0, MW, 3, "2
 // on the left coming on behind, its lights lit; and, along the mirror's inner edge, our own car's flank
 // (a silver A80), the sunset's glow along its shoulder. In a mirror left stays left.
 const SMW = 30, SMH = 20
-const PS = perspective({ w: SMW, horizon: 8, eye: 1.0, fov: 42, vp: 16 })
+const SIDE = { w: SMW, horizon: 8, eye: 1.0, fov: 42, vp: 16 }
 anim("_sidemirror", { w: SMW, h: SMH, frames: FRAMES, fps: FPS }, rect(0, 0, SMW, 3, "1"), rect(0, 3, SMW, 3, "2"), rect(0, 6, SMW, 2, "3"), rect(0, 7, SMW, 1, "4"),
   (c) => {
-    const f = c.frame, k = kappa(f), cam = ourX(f) - 1.1, s = travelled(f), R = Math.round
-    const mu = (x, z) => cam + x + (k * z * z) / 2
+    const f = c.frame, cam = ourX(f) - 1.1, s = travelled(f), R = Math.round
+    const PS = perspective({ ...SIDE, bend: -kappa(f) })
     c.plane(PS, (x, z) => {
-      const u = mu(x, z), back = ((s - z) % LOOP_M + LOOP_M) % LOOP_M
+      const u = cam + x, back = ((s - z) % LOOP_M + LOOP_M) % LOOP_M
       if (u < SEA) return z > 40 ? "L" : z > 15 ? "s" : "S"
       if (u < BEACH) return Math.floor(back / 6) % 2 ? "b" : "B"
       if (u < RAIL_U) return "x"
@@ -956,7 +968,7 @@ anim("_sidemirror", { w: SMW, h: SMH, frames: FRAMES, fps: FPS }, rect(0, 0, SMW
     for (let i = 0; i < 16; i++) {
       const z = 2 + i * 4 - ((s % 4) + 4) % 4
       if (z < 1.5) continue
-      const x = RAIL_U - cam - (k * z * z) / 2, [bx, by] = PS.ground(x, z, 0), [tx, ty] = PS.ground(x, z, 0.8)
+      const x = RAIL_U - cam, [bx, by] = PS.ground(x, z, 0), [tx, ty] = PS.ground(x, z, 0.8)
       c.line(R(bx), R(by), R(tx), R(ty), "p")
       if (prev) c.line(prev[0], prev[1], R(tx), R(ty), "r")
       prev = [R(tx), R(ty)]
@@ -965,7 +977,7 @@ anim("_sidemirror", { w: SMW, h: SMH, frames: FRAMES, fps: FPS }, rect(0, 0, SMW
     for (const r of RIVALS) {
       const z = -rivalZ(r, f) - 4.4
       if (z < 2 || z > 60) continue
-      const x = r.lane - cam - (k * z * z) / 2, sc = PS.scale(z), [px, py] = PS.ground(x, z, 0).map(R)
+      const x = r.lane - cam, sc = PS.scale(z), [px, py] = PS.ground(x, z, 0).map(R)
       c.stamp(`_rf_${r.color}_*`, px, py + 1, { fit: Math.max(3, R(1.07 * sc)) })
     }
     // our own flank along the inner edge, running back toward the vanishing point

@@ -494,7 +494,11 @@ export class Canvas {
    */
   terrain(view: Partial<View>, height: (x: number, z: number) => number, fn: (x: number, z: number, u: number, t: number, col: number, row: number) => string | null | undefined,
     opts: { far?: number; top?: number; bound?: (x: number, z: number) => number; margin?: number; sky?: (col: number, row: number) => string | null | undefined } = {}): void {
-    const P = perspective({ ...view, w: view.w ?? this.img.w } as View), far = opts.far ?? 10000, top = opts.top ?? Infinity, margin = opts.margin ?? 0, bound = opts.bound ?? height, eye = P.eye;
+    const P = perspective({ ...view, w: view.w ?? this.img.w } as View), far = opts.far ?? 10000, top = opts.top ?? Infinity, margin = opts.margin ?? 0, eye = P.eye;
+    // the march goes straight; on a bending way, the land is asked for where the bend puts that point
+    const bent = <A extends unknown[]>(g: (x: number, z: number, ...a: A) => any) => (P.bend ? (x: number, z: number, ...a: A) => g(x - (P.bend * z * z) / 2, z, ...a) : g);
+    height = bent(height); fn = bent(fn);
+    const bound = opts.bound ? bent(opts.bound) : height;
     const put = (col: number, row: number, k: string | null | undefined) => { if (k && k !== ".") this.px(col, row, k); };
     const march = (col: number, row: number, t0: number): number | null => {
       const [dx, dz, du] = P.ray(col, row);
@@ -666,13 +670,13 @@ export class Canvas {
     drawMesh(this as unknown as MeshCanvas, view, faces, mats, opts);
   }
 
-  plane(view: Partial<View>, fn: (x: number, z: number) => string | null | undefined, where?: Region): void {
+  plane(view: Partial<View>, fn: (x: number, z: number, col: number, row: number) => string | null | undefined, where?: Region): void {
     const P = perspective({ ...view, w: view.w ?? this.img.w } as View), inside = where === undefined ? undefined : regionPred(where);
     for (let row = Math.max(-this.oy, Math.floor(P.horizon)); row < this.img.h - this.oy; row++) {
       for (let col = -this.ox; col < this.img.w - this.ox; col++) {
         const g = P.at(col, row);
         if (!g || (inside && !inside(col, row))) continue;
-        const k = fn(g[0], g[1]);
+        const k = fn(g[0], g[1], col, row);
         if (k && k !== ".") this.px(col, row, k);
       }
     }

@@ -576,6 +576,26 @@ test("perspective: a pixel's ray and where a direction lands agree, and give the
   assert.equal(T.toward([0, -1, -0.1]), null, "behind the eye");
 });
 
+test("perspective with a bend: places on the way land bend·z²/2 to the side, at() gives them back, directions don't bend; plane and terrain follow it", () => {
+  const near = (a: number[] | null, b: number[], eps = 1e-6) => assert.ok(a && a.every((v, i) => Math.abs(v - b[i]) < eps), `${a} ~ ${b}`);
+  const view = { w: 80, horizon: 30, eye: 2, fov: 90 }, S = perspective(view), B = perspective({ ...view, bend: 0.01 });
+  near(B.ground(0, 20), S.ground(2, 20), 1e-9);
+  near([B.scale(20, 0)], [S.scale(20, 2)]);
+  for (const [col, row] of [[10, 40], [60, 33], [40, 49]]) { const g = B.at(col, row)!; near(B.ground(g[0], g[1]), [col + 0.5, row + 0.5]); }
+  near(B.toward([0, 1, 0])!, S.toward([0, 1, 0])!);
+  assert.match(failure(PAL + `perspective({ ...${JSON.stringify(view)}, bend: "x" })`).message, /bend \(the way's curvature/);
+  // a line down the middle of a way that bends right: farther up the picture it runs right of the middle; terrain draws the same
+  const line = `(x, z) => (Math.abs(x) < 0.3 ? "r" : "g")`, bent = JSON.stringify({ ...view, bend: 0.01 });
+  const p = loadSource(PAL + `scene("p", { w: 80, h: 50, bg: "k" }, plane(${bent}, ${line}))
+scene("t", { w: 80, h: 50, bg: "k" }, terrain(${bent}, () => 0, ${line}))
+scene("c", { w: 80, h: 50, bg: "k" }, plane(${JSON.stringify(view)}, (x, z, col, row) => (col === 7 && row === 40 ? "w" : "g")))`, "t.px.js");
+  const rows = keys(p, "p").split("\n");
+  assert.equal(rows[45].indexOf("r"), 39, "near: in the middle");
+  assert.ok(rows[31].indexOf("r") > 46, "far: off to the right");
+  assert.equal(keys(p, "t"), keys(p, "p"));
+  assert.equal(keys(p, "c").split("\n")[40][7], "w", "plane gives the pixel's column and row");
+});
+
 test("terrain: flat land paints what plane does; a hill rises over the horizon; the rest is sky", () => {
   const view = { w: 80, horizon: 30, eye: 2, fov: 90 };
   const flat = loadSource(PAL + `scene("t", { w: 80, h: 50, bg: "k" }, terrain(${JSON.stringify(view)}, () => 0, () => "g", { sky: () => "w" }))
