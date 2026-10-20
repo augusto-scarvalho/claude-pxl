@@ -233,22 +233,29 @@ sprite("_near", { w: NEAR_W, h: 60, wrap: "x" }, (c) => {
 // the embankment, a clump of bamboo, banana plants, an ipê-roxo in flower, a cutting of red earth,
 // the ballast with the sleepers' ends.
 const SIDE_Y = 60, SIDE_W = 1280
-sprite("_side", { w: SIDE_W, h: 104, wrap: "x" }, (c) => {
+sprite("_side", { w: SIDE_W, h: 110, wrap: "x" }, (c) => {
   const r = rng(23), G0 = 80                                         // the embankment's top, in the strip
   const bank = (x) => G0 + Math.round(waves(x, SIDE_W, [[4, 2, 0.5], [13, 1.2, 2]]))
   // a cutting of red earth where the line goes through a rise
   const cut = (x) => (x > 700 && x < 860 ? Math.max(0, 22 - Math.abs(x - 780) * 0.28) : 0)
   for (let x = 0; x < SIDE_W; x++) {
     const t0 = bank(x) - Math.round(cut(x))
-    for (let y = t0; y < 104; y++) {
+    for (let y = t0; y < 110; y++) {
       const d = y - t0, inCut = cut(x) > 0 && y < bank(x)
       const k = inCut ? (d < 2 ? "g" : (x + d * 2) % 7 === 0 ? "n" : "e") : d < 1 ? "z" : d < 4 ? "g" : "Q"
       c.px(x, y, k)
     }
   }
-  // ballast: gravel under the rails, and the sleepers' ends every 8 px
-  for (let y = 90; y < 104; y++) for (let x = 0; x < SIDE_W; x++) c.px(x, y, hash(x, y) < 0.3 || y === 90 ? "P" : "p")
-  for (let x = 0; x < SIDE_W; x += 8) c.rect(x, 96, 4, 3, "s")
+  // ballast: stones under the rails, the odd one catching the light; the sleepers' ends every 8 px
+  // just under the rail's foot; the shoulder of stones running down into the grass, blades reaching
+  // up over its edge
+  const shoulder = (x) => 105 + Math.round(waves(x, SIDE_W, [[23, 1, 0.3], [57, 0.8, 1]]))
+  for (let x = 0; x < SIDE_W; x++) for (let y = 90; y < 110; y++) {
+    const h = hash(x, y)
+    c.px(x, y, y >= shoulder(x) ? (h < 0.2 ? "g" : "Q") : y === 90 || h < 0.28 ? "P" : h > 0.94 ? "/" : "p")
+  }
+  for (let x = 0; x < SIDE_W; x += 8) { c.rect(x, 101, 5, 3, "s"); c.hline(x, 103, 5, "]") }
+  for (let x = 0; x < SIDE_W; x++) if (hash(x, 31) < 0.5) { const h = 1 + Math.floor(hash(x, 32) * 3); c.vline(x, shoulder(x) - h, h, h > 2 ? "g" : "Q") }
   // grass at the ballast's edge, and the odd weed come up through the stones
   for (let x = 0; x < SIDE_W; x++) if (hash(x, 11) < 0.55) { const h = 1 + Math.floor(hash(x, 12) * 3); c.vline(x, 90 - h, h + 1, h > 2 ? "Q" : "g") }
   for (let i = 0; i < 70; i++) { const x = Math.floor(r() * SIDE_W), y = 92 + Math.floor(r() * 3); c.px(x, y, "g"); c.px(x + 1, y - 1, "Q"); c.px(x - 1, y - 1, "g") }
@@ -315,22 +322,19 @@ sprite("_side", { w: SIDE_W, h: 104, wrap: "x" }, (c) => {
 // then, flowers as a dash of color.
 const FG_W = 640
 sprite("_fg", { w: FG_W, h: 30, wrap: "x" }, (c) => {
-  const r = rng(31), edge = (x) => 9 + Math.round(waves(x, FG_W, [[6, 1, 0], [17, 0.8, 1]]))
-  // the bank: lit along its top, darker down
-  for (let x = 0; x < FG_W; x++) { const e = edge(x); c.vline(x, e, 2, "l"); c.vline(x, e + 2, 4, "T"); c.vline(x, e + 6, 30 - e - 6, "t") }
-  // its edge against the ballast: blades sticking up, a px or two, more of them and taller in clumps
-  for (let x = 0; x < FG_W; x++) {
-    const clump = waves(x, FG_W, [[23, 1, 0], [41, 0.7, 2]]) > 0.6, h = hash(x, 5) < (clump ? 0.8 : 0.35) ? 1 + Math.floor(hash(x, 7) * (clump ? 5 : 2.5)) : 0
-    if (h) { c.vline(x, edge(x) - h, h, "T"); c.px(x, edge(x) - h, "l") }
+  const r = rng(31), edge = (x) => 5 + Math.round(waves(x, FG_W, [[6, 1.2, 0], [17, 0.9, 1], [43, 0.6, 2]]))
+  for (let x = 0; x < FG_W; x++) { const e = edge(x); c.vline(x, e, 2, "T"); c.vline(x, e + 2, 30 - e - 2, "t") }
+  // blades: thin strokes in three greens, short and close in the bank and longer along its edge,
+  // leaning back a little with the speed
+  for (let i = 0; i < 2400; i++) {
+    const x = Math.floor(r() * FG_W), e = edge(x), y = e + Math.floor(r() * (30 - e)), len = 2 + Math.floor(r() * (y < e + 4 ? 6 : 3))
+    c.line(x, y, x - Math.round(len * 0.3), y - len, y < e + 3 ? (r() < 0.5 ? "l" : "T") : r() < 0.25 ? "l" : r() < 0.6 ? "T" : ":")
   }
-  // what's in the grass, smeared along by the speed: blades catching the light, darker hollows,
-  // flowers as dashes of color (white, yellow, the pink of the maria-sem-vergonha)
-  for (let i = 0; i < 160; i++) { const x = Math.floor(r() * FG_W), y = 13 + Math.floor(r() * 16); c.hline(x, y, 4 + Math.floor(r() * 12), y < 18 ? "l" : r() < 0.6 ? "T" : "l") }
-  for (let i = 0; i < 90; i++) { const x = Math.floor(r() * FG_W), y = 16 + Math.floor(r() * 13); c.hline(x, y, 3 + Math.floor(r() * 8), ":") }
-  for (let i = 0; i < 40; i++) { const x = Math.floor(r() * FG_W), y = 11 + Math.floor(r() * 14), k = r() < 0.4 ? "K" : r() < 0.6 ? "L" : "+"; c.hline(x, y, 2 + Math.floor(r() * 4), k); if (r() < 0.5) c.hline(x + 1, y + 1, 2, "T") }
+  // flowers: a dot of white, yellow or the maria-sem-vergonha's pink
+  for (let i = 0; i < 50; i++) { const x = Math.floor(r() * FG_W), y = edge(x) + Math.floor(r() * 12); c.px(x, y, r() < 0.4 ? "K" : r() < 0.6 ? "L" : "+"); if (r() < 0.5) c.px(x + 1, y, "K") }
   // a clump of tall grass now and then, its seed heads dry and pale, below the wheels' hubs
   for (let i = 0; i < 12; i++) {
-    const x0 = Math.floor(r() * FG_W), n = 5 + Math.floor(r() * 6), tall = 6 + r() * 8
+    const x0 = Math.floor(r() * FG_W), n = 5 + Math.floor(r() * 6), tall = 6 + r() * 6
     for (let k = 0; k < n; k++) {
       const tx = Math.round(x0 + k + (k / n - 0.5) * 6), ty = Math.round(edge(x0) - tall * (0.6 + r() * 0.4))
       c.line(x0 + k, edge(x0) + 1, tx, ty, k % 3 ? "T" : "l")
@@ -354,19 +358,33 @@ const DRIVERS = [238, 252, 266, 280], AXLE = RAIL - 7
 // a driving wheel: black tire, red center with spokes and a counterweight opposite the crank pin
 function drivingWheel(c, cx, cy, th) {
   c.circ(cx, cy, 6, "k"); c.circ(cx, cy, 5, "1")
-  for (let i = 0; i < 8; i++) { const a = th + (i / 8) * TAU; c.line(cx, cy, Math.round(cx + Math.cos(a) * 4), Math.round(cy + Math.sin(a) * 4), "2") }
-  for (let i = -3; i <= 3; i++) { const a = th + Math.PI + i * 0.24; c.line(Math.round(cx + Math.cos(a) * 2), Math.round(cy + Math.sin(a) * 2), Math.round(cx + Math.cos(a) * 4), Math.round(cy + Math.sin(a) * 4), "2") }
-  c.px(cx, cy, "a"); c.px(cx - 4, cy - 4, "d"); c.px(cx - 5, cy - 2, "d")
+  for (let i = 0; i < 10; i++) { const a = th + (i / 10) * TAU; c.line(cx, cy, Math.round(cx + Math.cos(a) * 4), Math.round(cy + Math.sin(a) * 4), "2") }
+  // the counterweight: a solid crescent opposite the pin
+  const ca = th + Math.PI
+  for (let y = cy - 5; y <= cy + 5; y++) for (let x = cx - 5; x <= cx + 5; x++) {
+    const dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy)
+    if (d <= 4.6 && d >= 1.5 && dx * Math.cos(ca) + dy * Math.sin(ca) > 1.8) c.px(x, y, "2")
+  }
+  c.rect(cx - 1, cy - 1, 3, 3, "k"); c.px(cx, cy, "a")
+  // the steel tire, lit along its top
+  c.px(cx - 1, cy - 6, "a"); c.px(cx - 2, cy - 6, "d"); c.px(cx - 4, cy - 5, "d"); c.px(cx - 5, cy - 4, "d")
 }
 function smallWheel(c, cx, cy, th) {
   c.circ(cx, cy, 4, "k"); c.circ(cx, cy, 3, "c")
   for (let i = 0; i < 4; i++) { const a = th + (i / 4) * TAU; c.px(Math.round(cx + Math.cos(a) * 2), Math.round(cy + Math.sin(a) * 2), "d") }
-  c.px(cx, cy, "a"); c.px(cx - 3, cy - 2, "d")
+  c.px(cx - 1, cy - 4, "a"); c.px(cx - 2, cy - 4, "d"); c.px(cx - 3, cy - 3, "d")
 }
-// a truck: two small wheels under a frame with its leaf spring
+// a truck after the old arch-bar ones: the side frame outside the wheels, its axle boxes over their
+// hubs, an arch bar over the boxes and a tie bar under them, the bolster riding on springs in the
+// middle with the car resting on its center plate
 function truck(c, x, th) {
-  smallWheel(c, x, RAIL - 4, th); smallWheel(c, x + 11, RAIL - 4, th + 1)
-  c.rect(x - 2, AXLE - 2, 16, 2, "k"); c.hline(x + 2, AXLE - 3, 8, "c"); c.px(x + 5, AXLE - 1, "d")
+  const ay = RAIL - 4
+  smallWheel(c, x, ay, th); smallWheel(c, x + 11, ay, th + 1)
+  c.line(x - 1, ay - 2, x + 2, ay - 5, "k"); c.hline(x + 2, ay - 5, 8, "k"); c.line(x + 9, ay - 5, x + 12, ay - 2, "k"); c.hline(x + 2, ay - 6, 8, "d")
+  c.hline(x - 1, ay + 2, 14, "k")
+  for (const bx of [x, x + 11]) { c.rect(bx - 2, ay - 2, 4, 4, "k"); c.hline(bx - 2, ay - 2, 4, "d"); c.px(bx - 1, ay, "c") }
+  c.rect(x + 4, ay - 4, 3, 6, "k"); c.px(x + 4, ay - 3, "a"); c.px(x + 5, ay - 2, "a"); c.px(x + 4, ay - 1, "a")
+  c.rect(x + 2, ay - 7, 8, 2, "k")
 }
 
 // ---- people. A head is 4 px across; `skin` is [light, shade], `hair` a key; they look out at us.
@@ -461,13 +479,14 @@ function tender(c, f) {
 function engine(c, f) {
   const th = (f / FRAMES) * DRIVE * TAU, ths = (f / FRAMES) * SMALL * TAU
   // the cab: black planking, the window framed in red, the number plate edged in white, the roof
-  c.rect(208, 102, 31, 39, "k"); for (let x = 211; x < 238; x += 4) c.vline(x, 122, 18, "c")
-  c.vline(208, 102, 39, "c"); c.vline(209, 102, 39, "d")
-  c.rect(221, 106, 15, 15, "1"); c.rect(222, 107, 13, 13, "9")
-  c.rect(213, 125, 21, 8, "o"); c.rect(214, 126, 19, 6, "k"); c.text(219, 126, "41", "o")
+  c.rect(208, 102, 31, 39, "k"); for (let x = 219; x < 237; x += 4) c.vline(x, 133, 7, "c")
+  c.rect(210, 106, 7, 35, "9"); c.vline(209, 104, 37, "d"); c.vline(217, 106, 35, "c")
+  c.vline(238, 103, 38, "c"); c.vline(237, 104, 36, "d")
+  c.rect(221, 106, 15, 15, "1"); c.rect(222, 107, 13, 13, "9"); c.hline(221, 120, 15, "2")
+  c.rect(219, 123, 19, 8, "o"); c.rect(220, 124, 17, 6, "k"); c.text(224, 124, "41", "o")
   c.hline(207, 97, 33, "c"); c.hline(205, 98, 37, "a"); c.rect(204, 99, 39, 2, "k"); c.hline(204, 101, 39, "c")
   c.rect(219, 95, 7, 2, "c"); c.hline(219, 95, 7, "d")
-  c.vline(210, 141, 7, "c"); c.hline(209, 144, 3, "c"); c.hline(209, 147, 3, "c")
+  c.vline(210, 141, 7, "c"); c.hline(209, 144, 3, "c"); c.hline(209, 147, 3, "c"); c.vline(208, 108, 30, "a")
   // inside: the fireman feeding the firebox, its door opening on an orange glow; the driver at the
   // window, looking ahead with his arm on the sill
   fireman(c, f); engineer(c)
@@ -499,16 +518,22 @@ function engine(c, f) {
   c.rect(301, 112, 7, 3, "1"); c.px(303, 113, "o"); c.px(305, 113, "o")
   // running board with its red valance; steam chest and cylinder; buffer beam and the pilot
   c.rect(212, 133, 93, 2, "c"); c.hline(212, 133, 93, "d"); c.hline(226, 135, 79, "1")
-  c.rect(289, 135, 16, 4, "k"); c.hline(289, 135, 16, "d")
-  c.rect(288, 139, 17, 9, "k"); c.hline(288, 139, 17, "d"); c.vline(288, 139, 9, "a"); c.vline(304, 139, 9, "a"); c.hline(289, 147, 15, "c")
-  c.rect(305, 138, 9, 6, "1"); c.hline(305, 138, 9, "6"); c.rect(313, 140, 3, 2, "c")
-  for (let i = 0; i < 6; i++) c.line(305 + i * 2, 144, 306 + i * 3, RAIL - 1, i % 2 ? "2" : "1")
-  c.hline(305, RAIL - 1, 15, "2")
+  // under the smokebox: the saddle, the steam chest on the cylinder, its covers bright, lagging bands
+  c.rect(290, 134, 15, 4, "k"); c.hline(290, 134, 15, "c")
+  c.rect(289, 138, 16, 4, "k"); c.hline(289, 138, 16, "d")
+  c.rect(287, 142, 18, 7, "k"); c.hline(287, 142, 18, "d"); c.hline(288, 148, 16, "c")
+  for (const x of [292, 299]) c.vline(x, 143, 5, "c")
+  c.vline(287, 142, 7, "/"); c.vline(304, 141, 8, "/"); c.px(304, 143, "a"); c.px(304, 146, "a")
+  // the buffer beam in red with its coupler; the pilot sloping down to the rails in red slats
+  c.rect(305, 137, 10, 7, "1"); c.hline(305, 137, 10, "6"); c.hline(305, 143, 10, "2"); c.rect(315, 139, 3, 3, "c"); c.px(317, 140, "a")
+  c.poly([305, 144, 314, 144, 320, RAIL - 1, 304, RAIL - 1], "1")
+  for (let x = 306; x < 320; x += 2) { const top = x <= 314 ? 145 : Math.ceil(144 + ((x - 314) * (RAIL - 145)) / 6) + 1; c.vline(x, top, RAIL - 1 - top, "2") }
+  c.line(314, 144, 320, RAIL - 1, "6"); c.hline(304, RAIL - 1, 16, "2")
   // the frame behind the wheels, filling down from the running board: leaf springs over the drivers,
   // the ash pan under the cab; the pony wheel, then the drivers and their rods
   c.rect(226, 136, 64, 9, "k"); c.rect(208, 141, 31, 4, "k"); c.hline(212, 144, 26, "c")
   for (const x of DRIVERS) { c.hline(x - 4, 139, 9, "c"); c.px(x - 4, 140, "d"); c.px(x + 4, 140, "d"); c.vline(x, 140, 3, "c") }
-  smallWheel(c, 298, RAIL - 4, ths)
+  smallWheel(c, 298, RAIL - 4, ths); c.line(286, 146, 296, 152, "k"); c.rect(296, 152, 4, 4, "k"); c.hline(296, 152, 4, "d")
   for (const x of DRIVERS) drivingWheel(c, x, AXLE, th)
   const pin = (x) => [Math.round(x + Math.cos(th) * 3), Math.round(AXLE + Math.sin(th) * 3)]
   const pins = DRIVERS.map(pin)
@@ -523,12 +548,13 @@ function engine(c, f) {
 // the fireman: every 48 frames he stoops for a log from the tender and swings it into the firebox,
 // whose door lets out an orange glow while it is open
 function fireman(c, f) {
-  const t = f % 48, open = t >= 22 && t < 34
-  if (open) { c.rect(222, 113, 6, 7, "@"); c.rect(222, 116, 3, 4, f % 2 ? "%" : "@") }
-  const low = t < 12 ? 3 : t < 22 ? 1 : 0, x = 223, y = 109 + low, lit = open ? "@" : "S"
-  c.rect(x, y, 3, 3, "S"); c.px(x + 2, y + 1, lit); c.hline(x, y - 1, 3, "k")
-  c.rect(x - 1, y + 3, 5, 120 - y - 3, "y"); c.vline(x + 3, y + 3, 120 - y - 3, open ? "@" : "c")
-  if (t >= 12 && t < 26) { c.rect(x + 1, y + 3, 4, 2, "u"); c.px(x + 4, y + 3, "8") }
+  const t = f % 48, glow = t >= 22 && t < 34 ? (f % 2 ? "%" : "@") : null
+  const x = 211, y = 111 + (t < 12 ? 5 : t < 22 ? 2 : 0)
+  if (glow) { c.rect(214, 122, 3, 14, "@"); c.vline(216, 124, 10, glow) }
+  c.rect(x + 1, y, 3, 3, "S"); c.px(x + 3, y + 1, glow ? "@" : "U"); c.hline(x, y - 1, 4, "k"); c.px(x + 3, y - 1, "c")
+  c.rect(x, y + 3, 5, 140 - y - 3, "y"); c.vline(x + 4, y + 3, 140 - y - 3, glow ? "@" : "c")
+  // the log, from the tender to the firebox
+  if (t >= 12 && t < 28) { c.rect(x + 2, y + 4, 5, 2, "u"); c.px(x + 6, y + 4, "8") }
 }
 // the driver at the window, looking ahead: grey hair and mustache, khaki shirt, an arm on the sill
 function engineer(c) {
@@ -564,6 +590,15 @@ function smoke(c, f) {
 }
 
 // ---------------------------------------------------------------- the loop
+// under the train the ballast lies in its shade, between the wheels
+const SHADE = { p: "P", P: "y", "/": "p", s: "]", g: "Q", Q: "q", z: "g" }
+function underTrain(c) { for (let y = 150; y < RAIL; y++) for (let x = 0; x < 312; x++) { const k = SHADE[c.key(x, y)]; if (k) c.px(x, y, k) } }
+// the rails stand still with the train: the head lit on top, the web, the foot; their joints go by
+// with the land, a bolted plate every 80 px
+function rails(c, f) {
+  c.rect(0, RAIL, W, 1, "i"); c.rect(0, RAIL + 1, W, 1, "a"); c.rect(0, RAIL + 2, W, 1, "I"); c.rect(0, RAIL + 3, W, 1, "d")
+  for (let x = -(moved(f, 1280) % 80); x < W + 4; x += 80) { c.rect(x - 3, RAIL + 1, 7, 3, "c"); c.px(x - 2, RAIL + 2, "a"); c.px(x + 2, RAIL + 2, "a"); c.vline(x, RAIL, 2, "I") }
+}
 // each plane: its strip placed at its offset, and again a strip-width on, so it always covers
 const strip = (c, name, w, per, y, f) => { const o = moved(f, per) % w; for (let x = -o; x < W; x += w) c.stamp(name, x, y) }
 anim("train", { w: W, h: H, frames: FRAMES, fps: FPS },
@@ -573,8 +608,8 @@ anim("train", { w: W, h: H, frames: FRAMES, fps: FPS },
   (c) => strip(c, "_hills", W, 320, HILLS_Y, c.frame),
   (c) => strip(c, "_near", NEAR_W, 640, NEAR_Y, c.frame),
   (c) => strip(c, "_side", SIDE_W, 1280, SIDE_Y, c.frame),
-  // the rails stand still with the train: head and web
-  rect(0, RAIL, W, 1, "i"), rect(0, RAIL + 1, W, 1, "I"),
+  (c) => underTrain(c),
+  (c) => rails(c, c.frame),
   (c) => { coach(c, -COACH, c.frame, [...PEOPLE].reverse()); coach(c, 14, c.frame, PEOPLE); conductor(c, 8); tender(c, c.frame); engine(c, c.frame) },
   (c) => smoke(c, c.frame),
-  (c) => strip(c, "_fg", FG_W, 1920, H - 30 + 8, c.frame))
+  (c) => strip(c, "_fg", FG_W, 1920, 164, c.frame))
