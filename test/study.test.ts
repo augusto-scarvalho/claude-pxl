@@ -275,11 +275,13 @@ test("study takes an editor's transparency checker for clear, and tells a reflec
 });
 
 test("study reads an attack: poses played once, in place, with a smear on the frames the blade sweeps", () => {
-  // 16 frames on clear: a body that dips a pixel as it swings an axe through 200 degrees once; a cream
-  // crescent swept on 3 of them
+  // 16 frames on clear: a body that dips a pixel as it swings an axe through 200 degrees once (or stands
+  // still while its arm swings it: the arm keeps its shoulder, so it isn't carried); a cream crescent
+  // swept on 3 of them
+  for (const dips of [true, false]) {
   const W = 96, H = 72, n = 16, ink = pack(15, 15, 20), robe = pack(40, 80, 170), steel = pack(150, 160, 175), wood = pack(120, 80, 40), cream = pack(255, 250, 228);
   const frames = Array.from({ length: n }, (_, f) => {
-    const img = new Img(W, H), dip = f >= 4 && f <= 12 ? 1 : 0;
+    const img = new Img(W, H), dip = dips && f >= 4 && f <= 12 ? 1 : 0;
     for (let y = 30; y < 58; y++) for (let x = 34; x < 46; x++) img.set(x, y + dip, x === 34 || x === 45 || y === 30 || y === 57 ? ink : (x + y) % 3 ? robe : pack(30, 60, 140));
     const a = (-100 + (f * 200) / n) * (Math.PI / 180), cx = 47, cy = 40 + dip;
     for (let r = 0; r < 18; r++) for (const w of [-1, 0, 1]) img.set(Math.round(cx + Math.cos(a) * r - Math.sin(a) * w), Math.round(cy + Math.sin(a) * r + Math.cos(a) * w), w ? ink : wood);
@@ -294,4 +296,5 @@ test("study reads an attack: poses played once, in place, with a smear on the fr
   assert.ok(!attack!.speed, "in place");
   assert.deepEqual(attack!.smears?.frames, [7, 8, 9]);
   assert.match(text, /Smears on frames 7-9 \(#fffae4/);
+  }
 });

@@ -124,6 +124,13 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     cs.forEach((c, j) => { if (!tookC.has(j)) live.push({ comps: [c], vx: 0, vy: 0, lost: 0 }); });
   }
   const tracks = new Map([...ended, ...live].map((f, i) => { for (const c of f.comps) c.id = i; return [i, f.comps] as const; }));
+  // swung about a point rather than carried (an axe on an arm, a flag on its pole): one pixel in it, or
+  // beside it, in every frame
+  const swung = (sets: number[][]) => {
+    const hits = new Uint16Array(WH);
+    sets.forEach((pix, k) => { for (const p of pix) { const x = p % W, y = Math.floor(p / W); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy, q = yy * W + xx; if (xx >= 0 && yy >= 0 && xx < W && yy < H && hits[q] === k) hits[q] = k + 1; } } });
+    return sets.length > 0 && hits.some((v) => v === sets.length);
+  };
   const going = F0.map(() => new Uint8Array(WH));
   for (const tr of tracks.values()) {
     const size = median(tr.map((c) => Math.max(c.x1 - c.x0 + 1, c.y1 - c.y0 + 1)));
@@ -136,7 +143,7 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       const g = tr[i].t - tr[i - 1].t || 1, sx = (tr[i].cx - tr[i - 1].cx) / g, sy = (tr[i].cy - tr[i - 1].cy) / g;
       if (Math.hypot(sx - vx, sy - vy) <= Math.max(1.5, 0.75 * sp)) steady++;
     }
-    if (tr.length >= 6 && travel >= Math.max(8, 0.8 * size) && travel >= 0.6 * path && sp <= Math.max(2, 0.5 * size) && steady >= 0.7 * (tr.length - 1)) {
+    if (tr.length >= 6 && travel >= Math.max(8, 0.8 * size) && travel >= 0.6 * path && sp <= Math.max(2, 0.5 * size) && steady >= 0.7 * (tr.length - 1) && !swung(tr.map((c) => c.pix))) {
       // carried along: one drawing, or changing drawings (the thing cut out by its difference, bottom-centered)
       const cut = tr.map((c) => cutout(F0[c.t], fg0[c.t], c, W));
       const { poses, cycle } = posesOf(cut, differ);
@@ -283,15 +290,17 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     // thing traces: half a turn is 0.64 of its path), most of its own size at least (a swing's smear
     // moves the middle of what changes a way, the body stays)
     const own = median(sizes);
-    let along: [number, number] | null = null, longest = 0;
+    let along: [number, number] | null = null, longest = 0, stretch = [0, 0];
     for (let a = 0; a < mids.length; a++) {
       let path = 0;
       for (let b = a + 1; b < mids.length; b++) {
         path += Math.hypot(mids[b][1] - mids[b - 1][1], mids[b][2] - mids[b - 1][2]);
         const ddx = mids[b][1] - mids[a][1], ddy = mids[b][2] - mids[a][2], net = Math.hypot(ddx, ddy), span = mids[b][0] - mids[a][0];
-        if (b - a >= 6 && span > longest && net >= Math.max(8, 0.8 * own) && net >= 0.8 * path && net >= 0.2 * span) { longest = span; along = [ddx / span, ddy / span]; }
+        if (b - a >= 6 && span > longest && net >= Math.max(8, 0.8 * own) && net >= 0.8 * path && net >= 0.2 * span) { longest = span; along = [ddx / span, ddy / span]; stretch = [mids[a][0], mids[b][0]]; }
       }
     }
+    // (a stretch that keeps a point, swung round it, goes nowhere)
+    if (along && swung(track.filter((e) => e[0] >= stretch[0] && e[0] <= stretch[1]).map((e) => pix.filter((p) => fg[e[0]][p])))) along = null;
     // round a loop (birds circling, a swing): a long way gone, back where it started, no jump (a jump is
     // the next one starting over)
     let total = 0, jump = 0;
@@ -307,8 +316,9 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const right = mv.filter((f) => f.dx > 2 * Math.abs(f.dy)).length, left = mv.filter((f) => -f.dx > 2 * Math.abs(f.dy)).length;
     const stream = !along && mv.length >= 6 && mv.length >= 0.3 * inside.length && Math.max(right, left) >= 0.7 * mv.length;
     // a run of poses played once (an attack, a jump): many drawings, none coming back, and a body that
-    // moves (its blocks found again a step on), not changing all over like fire
-    const action = !along && !cycle && poses >= 0.5 * N && inside.length >= 4 && mv.length >= 0.4 * inside.length;
+    // moves (its blocks found again a step on, or turning about a joint it keeps), not changing all over
+    // like fire
+    const action = !along && !cycle && poses >= 0.5 * N && ((inside.length >= 4 && mv.length >= 0.4 * inside.length) || swung(track.map((e) => pix.filter((p) => fg[e[0]][p]))));
     const kind: Kind = along || round ? (poses >= 3 ? "walk" : "carried")
       : stream ? "stream"
       : coherent >= 0.85 && tone >= 0.6 && !moves ? "light"
