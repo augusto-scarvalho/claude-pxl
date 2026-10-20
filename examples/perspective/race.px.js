@@ -363,18 +363,54 @@ sprite("_rv_y_6", { mx: true, pivot: "bottom" }, `
   gJJ
   j!!
   -00`)
-sprite("_rf_y_12", { mx: true, pivot: "bottom" }, `
-  ...ggg
-  ..Jzzz
-  .JJJJJ
-  J99JJJ
-  -jjjjj
-  0-....`)
-sprite("_rf_y_8", { mx: true, pivot: "bottom" }, `
-  ..gg
-  .Jzz
-  J9JJ
-  -0..`)
+// the rivals as the mirror shows them, coming on behind: from the front, the left half drawn and
+// mirrored: the roof, the windshield dark with the dusk in it, the hood, the pop-up headlights lit
+// (white at their middle, the glow round them), the bumper with its intake, the tyres; five sizes,
+// the camera picking the one nearest the height each should be
+sprite("_rf_y_14", { mx: true, pivot: "bottom" }, `
+  .......00000
+  .....00ggggg
+  ....0zzzzzzz
+  ...0zzCzzzzz
+  ..0zzzzcCzzz
+  .0jjjjjjjjjj
+  0JJJJJJJJJJJ
+  0gJJJJJJJJJJ
+  0798J0JJJJJJ
+  07997jjjjjjj
+  0DDDDDDDDDDD
+  0D-000000000
+  00D0.0-----0
+  .000.0000000`)
+sprite("_rf_y_10", { mx: true, pivot: "bottom" }, `
+  .....0000
+  ...00zzzz
+  ..0zzCzzz
+  .0jjjjjjj
+  0JgJJJJJJ
+  0798JJJJJ
+  07jjjjjjj
+  0DDDDDDDD
+  00D0.0---
+  .00..0000`)
+sprite("_rf_y_7", { mx: true, pivot: "bottom" }, `
+  ...000
+  ..0zzz
+  .0jjjj
+  0gJJJJ
+  098JJJ
+  0D0---
+  .0.000`)
+sprite("_rf_y_5", { mx: true, pivot: "bottom" }, `
+  .0zz
+  0JJJ
+  98JJ
+  0D-0
+  .0..`)
+sprite("_rf_y_3", { mx: true, pivot: "bottom" }, `
+  0J
+  98
+  0.`)
 const RED = { D: ",", j: "&", J: "K", g: ";" }, BLUE = { D: "$", j: "u", J: "U", g: "|" }
 // the blue one wears twin white racing stripes down its middle, over the paint only (not the glass,
 // the lights or the plate): bands either side of its centre line, at each size
@@ -385,76 +421,7 @@ for (const n of ["64", "48", "34", "24", "16", "10", "6"]) {
   const st = STRIPES[n]
   sprite("_rv_b_" + n, { base: "_rv_y_" + n, swap: BLUE }, ...(st ? [paintWhite(st[0], st[2]), paintWhite(st[1], st[2])] : []))
 }
-for (const n of ["12", "8"]) { sprite("_rf_r_" + n, { base: "_rf_y_" + n, swap: RED }); sprite("_rf_b_" + n, { base: "_rf_y_" + n, swap: BLUE }) }
-// the flank, for when one draws level: the haunch lit along its shoulder, the side intakes' strakes,
-// the rear wheel seen from the side, rim and hub; drawn for the car's left side, flipped for its right
-sprite("_rs_y_64", { pivot: "bottom" }, `
-  ............
-  ............
-  ............
-  ............
-  ............
-  ............
-  ............
-  ............
-  ............
-  ............
-  ............
-  ............
-  ............
-  ............
-  000000000000
-  0ggggggggggg
-  0JJJJJJJJJJJ
-  0JDDDDDDDJJJ
-  0JJJJJJJJJJJ
-  0JDDDDDDDJJJ
-  0jjjjjjjjjjj
-  0jDDDDDDDjjj
-  0jjj0000jjjj
-  0jj0----0jjj
-  0j0-WWWW-0jj
-  0D0W~--~W0DD
-  0D0W-ww-W0DD
-  0D0W-ww-W0DD
-  0D0W~--~W0DD
-  0D0-WWWW-0DD
-  .00------000
-  ..0------0..
-  ..0------0..
-  ...0----0...
-  ....0000....
-  ............`)
-sprite("_rs_y_48", { pivot: "bottom" }, `
-  .........
-  .........
-  .........
-  .........
-  .........
-  .........
-  .........
-  .........
-  .........
-  .........
-  .........
-  .........
-  000000000
-  0gggggggg
-  0JJJJJJJJ
-  0JDDDDDJJ
-  0jjjjjjjj
-  0jDDDDDjj
-  0jj000jjj
-  0j0---0jj
-  0D0WWW0DD
-  0D0WwW0DD
-  0D0W-W0DD
-  0D0WWW0DD
-  .00---000
-  ..0---0..
-  ...000...
-  .........`)
-for (const n of ["64", "48"]) { sprite("_rs_r_" + n, { base: "_rs_y_" + n, swap: RED }); sprite("_rs_b_" + n, { base: "_rs_y_" + n, swap: BLUE }) }
+for (const n of ["14", "10", "7", "5", "3"]) { sprite("_rf_r_" + n, { base: "_rf_y_" + n, swap: RED }); sprite("_rf_b_" + n, { base: "_rf_y_" + n, swap: BLUE }) }
 
 // Each 4.4 m long and 1.9 wide, drawn from behind (above); in meters only to throw its long shadow.
 // In the loop each goes from 200 m ahead to 40 m behind us, 240 m in 12 s, and is overtaken at 2, 6
@@ -472,20 +439,100 @@ function carShapes(x, zr, [lit, shade]) {
 // the drawings' sizes as stamped (outline included): the camera picks the one nearest the height the
 // car should be where it is
 const RV = [["64", 66, 36], ["48", 50, 28], ["34", 36, 21], ["24", 26, 15], ["16", 16, 9], ["10", 10, 6], ["6", 6, 4]]
-// a rival on the road: the shade right under it; the flank on the side we see when it is near and off to
-// one side; then the drawing, which bobs a pixel now and then on its springs when it is near; the red
+// a rival on the road: the shade right under it; near and off to a side, the car in perspective; else the
+// drawing from behind, which bobs a pixel now and then on its springs when it is near; the red
 // one's pipes backfire
 function rival(c, r, z, f) {
   const x = cx(r.lane, z + 0.2, f), sc = P.scale(z + 0.2, x), [sx, sy] = P.ground(x, z + 0.2).map(Math.round), w = 1.9 * sc
   const [name, dw, dh] = RV.reduce((a, b) => (Math.abs(b[2] - 1.07 * sc) < Math.abs(a[2] - 1.07 * sc) ? b : a))
   c.ellipse(sx, sy, Math.round(w * 0.56), Math.max(1, Math.round(w * 0.05)), "Q")
   const bob = sc > 18 && (f + r.pass * 5) % 8 < 2 ? 1 : 0
-  if ((name === "64" || name === "48") && Math.abs(x) > 1.2 && Math.abs(x) / Math.max(1, z) > 0.2) {
-    const sw = name === "64" ? 12 : 9, side = x > 0 ? -1 : 1
-    c.stamp(`_rs_${r.color}_${name}`, sx + side * (Math.floor(dw / 2) + sw / 2 - 1), sy + 1 - bob, side > 0 ? { flip: "x" } : undefined)
-  }
-  c.stamp(`_rv_${r.color}_${name}`, sx, sy + 1 - bob)
+  if (sc > 13 && Math.abs(cx(r.lane, z + 2.3, f)) > 1.3) carInPerspective(c, r, z, f, bob)
+  else c.stamp(`_rv_${r.color}_${name}`, sx, sy + 1 - bob)
   backfire(c, sx, sy, w, r, f)
+}
+// A rival near and off to a side is drawn whole in perspective: the side it shows us, the top of its
+// tail, its back, each in meters along the car (u from the tail), up from the road (h) and across it
+// (o, the left side at -0.95), put where the camera puts them, so the car runs off toward the vanishing
+// point as a car does when it draws level. A low wedge: the haunch high over the rear wheel, the
+// glasshouse set back and in from the sides, the strakes over the side intake, the wheels with their
+// five-spoke rims, the door's seams and handle, the mirror; on the tail the louvred engine cover, the
+// rear window, the wing on its end plates, and on its back the black band of the tail lights, the
+// plate, the twin pipes and the diffuser. The side toward the low sun (a car's left) is lit, the other
+// in shade, the back in its paint as the drawing from behind has it, the tops take the sky; it follows the road's bend. Far off or straight ahead, the drawing
+// from behind stands in for it.
+const PAINT = { y: ["D", "j", "J", "g"], r: [",", "&", "K", ";"], b: ["$", "u", "U", "|"] }
+const BODY_SIDE = [[0, 0.2], [0, 0.72], [0.4, 0.77], [1.25, 0.79], [1.6, 0.77], [2.9, 0.71], [3.7, 0.63], [4.2, 0.53], [4.25, 0.36], [4.2, 0.2]]
+const WHEELS = [0.85, 3.55]
+function carInPerspective(c, r, z, f, bob) {
+  const xc = cx(r.lane, z + 2.3, f), s = xc > 0 ? -1 : 1, lit = s < 0, ramp = PAINT[r.color], R = Math.round
+  const pt = (u, h, o) => { const zz = z + 0.2 + u, [x, y] = P.ground(cx(r.lane + o, zz, f), zz, h); return [x, y - bob] }
+  const fill = (pts, k) => c.poly(pts.flatMap(([u, h, o]) => pt(u, h, o)).map(R), k)
+  const line = (a, b, k) => { const [x0, y0] = pt(...a), [x1, y1] = pt(...b); c.line(R(x0), R(y0), R(x1), R(y1), k) }
+  const S = (o) => s * o                                                   // across, toward the side we see
+  const body = lit ? ramp[2] : ramp[1], high = lit ? ramp[3] : ramp[2], low = lit ? ramp[1] : ramp[0]
+  const side = (pts, k, out = 0) => fill(pts.map(([u, h]) => [u, h, S(0.95 + out)]), k)
+  // the side: its outline, the paint, the lower band in shade, the sill
+  side(BODY_SIDE, "0")
+  side([[0.03, 0.22], [0.03, 0.7], [0.4, 0.75], [1.25, 0.77], [1.6, 0.75], [2.9, 0.69], [3.7, 0.61], [4.17, 0.52], [4.21, 0.37], [4.17, 0.22]], body)
+  side([[0.03, 0.22], [0.03, 0.36], [4.2, 0.36], [4.17, 0.22]], low)
+  const sl = (a, b, k) => line([a[0], a[1], S(0.95)], [b[0], b[1], S(0.95)], k)
+  sl([0.05, 0.21], [4.15, 0.21], "0")
+  // the shoulder line in the light, the strakes over the intake, the door's seams and handle
+  sl([0.08, 0.72], [1.25, 0.75], high); sl([1.6, 0.73], [2.9, 0.67], high)
+  for (let k = 0; k < 5; k++) { const h = 0.44 + k * 0.055; sl([1.0, h], [2.55, h - 0.01], ramp[0]); sl([1.0, h + 0.022], [2.55, h + 0.012], high) }
+  sl([1.45, 0.24], [1.45, 0.77], ramp[0]); sl([3.05, 0.24], [3.05, 0.71], ramp[0]); sl([1.55, 0.69], [1.7, 0.69], "0")
+  // the top of the body: the shoulder over the side, the engine cover over the tail with its louvres
+  fill([[0.1, 0.74, S(0.95)], [1.25, 0.78, S(0.95)], [2.9, 0.7, S(0.95)], [3.7, 0.62, S(0.95)], [3.7, 0.66, S(0.7)], [2.9, 0.79, S(0.71)], [1.25, 0.83, S(0.73)], [0.1, 0.8, S(0.75)]], high)
+  fill([[0, 0.74, -0.95], [0, 0.74, 0.95], [1.1, 0.8, 0.95], [1.1, 0.8, -0.95]], ramp[2])
+  for (let k = 1; k < 6; k++) line([0.1 + k * 0.16, 0.755 + k * 0.008, -0.6], [0.1 + k * 0.16, 0.755 + k * 0.008, 0.6], ramp[1])
+  // the glasshouse: its side set in, the glass with the sky in it, the roof's edge; its back window
+  const cab = (pts, k) => fill(pts.map(([u, h]) => [u, h, S(0.71)]), k)
+  cab([[1.05, 0.81], [1.55, 1.13], [2.75, 1.14], [3.3, 0.8]], "0")
+  cab([[1.18, 0.83], [1.6, 1.1], [2.72, 1.11], [3.18, 0.82]], "z")
+  line([1.55, 1.13, S(0.71)], [2.75, 1.14, S(0.71)], high)
+  line([1.5, 0.9, S(0.71)], [1.9, 1.08, S(0.71)], "c"); line([1.9, 0.86, S(0.71)], [2.2, 1.0, S(0.71)], "C")
+  fill([[1.08, 0.8, -0.71], [1.08, 0.8, 0.71], [1.55, 1.13, 0.67], [1.55, 1.13, -0.67]], "0")
+  fill([[1.12, 0.82, -0.64], [1.12, 0.82, 0.64], [1.5, 1.1, 0.6], [1.5, 1.1, -0.6]], "z")
+  line([1.15, 0.86, -0.5], [1.45, 1.06, -0.2], "C")
+  // the wheels on the side we see: arch, tyre, the rim and its five spokes, the hub
+  for (const wu of WHEELS) {
+    const ring = (rr, n = 20) => Array.from({ length: n }, (_, i) => { const t = (TAU * i) / n; return [wu + rr * Math.cos(t), 0.32 + rr * Math.sin(t), S(0.96)] })
+    fill(ring(0.37), "0"); fill(ring(0.3), "-"); fill(ring(0.2), "W"); fill(ring(0.16), "^")
+    for (let k = 0; k < 5; k++) { const t = (TAU * k) / 5 + z * 2; line([wu + 0.04 * Math.cos(t), 0.32 + 0.04 * Math.sin(t), S(0.97)], [wu + 0.18 * Math.cos(t), 0.32 + 0.18 * Math.sin(t), S(0.97)], "w") }
+    fill(ring(0.05, 8), "~")
+  }
+  // the mirror out from the door's front corner; the side marker lights
+  fill([[3.0, 0.8, S(0.95)], [3.0, 0.8, S(1.09)], [2.86, 0.8, S(1.09)], [2.86, 0.88, S(1.05)]], "0")
+  line([3.0, 0.8, S(1.09)], [2.86, 0.88, S(1.05)], high)
+  { const [a, b] = pt(0.1, 0.55, S(0.96)), [d, e] = pt(4.1, 0.45, S(0.96)); c.px(R(a), R(b), "!"); c.px(R(d), R(e), ")") }
+  // the back, in shade: the panel, the black band of the tail lights lit, the plate, the diffuser and
+  // its fins, the twin pipes; the rear tyres under it
+  const back = (pts, k) => fill(pts.map(([o, h]) => [0, h, o]), k)
+  back([[-0.95, 0.18], [-0.95, 0.75], [0.95, 0.75], [0.95, 0.18]], "0")
+  back([[-0.92, 0.21], [-0.92, 0.72], [0.92, 0.72], [0.92, 0.21]], ramp[2])
+  back([[-0.92, 0.21], [-0.92, 0.33], [0.92, 0.33], [0.92, 0.21]], ramp[1])
+  line([-0.9, 0.715, 0], [0.9, 0.715, 0], ramp[3])
+  back([[-0.88, 0.47], [-0.88, 0.62], [0.88, 0.62], [0.88, 0.47]], "0")
+  // the lights: two round ones each side, red round a core lit to white; a red strip between
+  const lamp = (o, rr, k) => fill(Array.from({ length: 14 }, (_, i) => { const t = (TAU * i) / 14; return [0, 0.545 + rr * Math.sin(t), o + rr * Math.cos(t)] }), k)
+  for (const o of [-0.77, -0.58, 0.58, 0.77]) { lamp(o, 0.068, "("); lamp(o, 0.045, "!"); lamp(o, 0.02, "@") }
+  back([[-0.45, 0.535], [-0.45, 0.555], [0.45, 0.555], [0.45, 0.535]], "&")
+  back([[-0.2, 0.3], [-0.2, 0.41], [0.2, 0.41], [0.2, 0.3]], "0"); back([[-0.18, 0.32], [-0.18, 0.39], [0.18, 0.39], [0.18, 0.32]], "w")
+  for (const o of [-0.12, -0.04, 0.04, 0.12]) line([0, 0.345, o], [0, 0.365, o], "0")
+  back([[-0.92, 0.18], [-0.92, 0.27], [0.92, 0.27], [0.92, 0.18]], "0")
+  for (const o of [-0.6, -0.3, 0.3, 0.6]) line([0, 0.19, o], [0, 0.26, o], "-")
+  for (const sd of [-1, 1]) { const ring = (rr) => Array.from({ length: 12 }, (_, i) => { const t = (TAU * i) / 12; return [0, 0.25 + rr * Math.sin(t), sd * 0.35 + rr * Math.cos(t)] }); fill(ring(0.055), "0"); fill(ring(0.035), "~") }
+  for (const sd of [-1, 1]) back([[sd * 0.95, 0], [sd * 0.95, 0.19], [sd * 0.7, 0.19], [sd * 0.7, 0]], "0")
+  // the wing over the tail on its end plates
+  for (const sd of [-1, 1]) fill([[0.12, 0.76, sd * 0.85], [0.12, 0.93, sd * 0.85], [0.35, 0.93, sd * 0.85], [0.35, 0.78, sd * 0.85]], "0")
+  fill([[0.08, 0.93, -0.92], [0.08, 0.93, 0.92], [0.4, 0.96, 0.92], [0.4, 0.96, -0.92]], "0")
+  fill([[0.1, 0.94, -0.9], [0.1, 0.94, 0.9], [0.38, 0.955, 0.9], [0.38, 0.955, -0.9]], high)
+  // the blue one's white stripes, down its middle over the tail
+  if (r.color === "b") for (const o of [-0.16, 0.08]) {
+    fill([[0, 0.745, o], [0, 0.745, o + 0.08], [1.1, 0.805, o + 0.08], [1.1, 0.805, o]], "w")
+    back([[o, 0.62], [o, 0.72], [o + 0.08, 0.72], [o + 0.08, 0.62]], "W")
+  }
 }
 // the red one backfires as we come up on it: a short burst of flame from each pipe
 function backfire(c, sx, sy, w, r, f) {
@@ -563,7 +610,9 @@ anim("_mirror", { w: MW, h: MH, frames: FRAMES, fps: FPS }, rect(0, 0, MW, 3, "2
       const z = -rivalZ(r, f) - 4.4
       if (z < 1 || z > 60) continue
       const x = r.lane - ourX(f) - (k * z * z) / 2, sc = PM.scale(z), [px, py] = PM.ground(x, z, 0).map(Math.round)
-      c.stamp(`_rf_${r.color}_*`, px, py + 1, { fit: Math.max(2, Math.round(1.07 * sc)) })
+      const lw = Math.max(1, Math.round(0.55 * sc)), [gx, gy] = PM.ground(x, z - 2.5, 0).map(Math.round)
+      if (sc > 2.5) for (const sd of [-1, 1]) c.ellipse(gx + sd * lw, gy, Math.max(1, Math.round(sc * 0.35)), Math.max(1, Math.round(sc * 0.12)), "A")
+      c.stamp(`_rf_${r.color}_*`, px, py + 1, { fit: Math.max(3, Math.round(1.07 * sc)) })
     }
   })
 
