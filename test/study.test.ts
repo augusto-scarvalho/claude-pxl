@@ -9,7 +9,7 @@ import { encodeGif } from "../src/node/gif.ts";
 import { decodeGif } from "../src/node/gifread.ts";
 import { writePng } from "../src/node/output.ts";
 import { main } from "../src/node/cli.ts";
-import { findGrid } from "../src/core/vision.ts";
+import { areaDown, findGrid, pixelate } from "../src/core/vision.ts";
 import { latticeHash } from "../src/core/util.ts";
 import { study } from "../src/core/study.ts";
 
@@ -95,4 +95,62 @@ test("cli study writes the sheet, the picture at 1x and the palette", async () =
   const text = await said("study", file, "--out", dir);
   assert.match(text, /^Kind: pixel art, drawn at 3x/m);
   for (const f of ["ref.png", "ref_1x.png", "ref.hex"]) assert.ok(existsSync(join(dir, "_study", f)), f);
+});
+
+test("study: two-point perspective, its lens and its turn, from lines meeting on one horizon either side", () => {
+  // a camera turned 40° with a 90° lens: the world's z lines meet at 26,70 and its x lines at 351,70
+  const W = 320, H = 180, img = new Img(W, H);
+  img.fill(pack(40, 44, 60));
+  const ink = pack(230, 220, 160);
+  const draw = (x0: number, y0: number, vx: number, vy: number, t1: number) => { for (let t = 0; t <= t1; t += 0.002) { const x = Math.round(x0 + (vx - x0) * t), y = Math.round(y0 + (vy - y0) * t); if (img.inside(x, y)) { img.set(x, y, ink); if (img.inside(x, y + 1)) img.set(x, y + 1, ink); } } };
+  for (const [x0, y0] of [[200, 179], [260, 179], [319, 160], [319, 120], [300, 179], [150, 179]]) draw(x0, y0, 26, 70, 0.7);
+  for (const [x0, y0] of [[0, 179], [40, 179], [0, 130], [100, 179], [0, 100], [150, 179]]) draw(x0, y0, 351, 70, 0.7);
+  const text = study({ name: "two", frames: [img], ms: [100], kind: "test" }).text.join("\n");
+  const m = /Two-point perspective: the horizon at row (\d+);.*\(fov ~(\d+)°\)/.exec(text), y = /yaw: (\d+)/.exec(text);
+  assert.ok(m && y, text.slice(text.indexOf("PERSPECTIVE")));
+  assert.ok(Math.abs(+m![1] - 70) <= 4 && Math.abs(+m![2] - 90) <= 8 && Math.abs(+y![1] - 40) <= 4, `${m![0]} ${y![0]}`);
+});
+
+test("study: a sprite's light read off its rim, pillow shading, banding", () => {
+  // a disc shaded from the upper left: light on the rim from there, no pillow
+  const lit = new Img(32, 32), rings = new Img(32, 32), ramp = [pack(30, 30, 60), pack(70, 70, 140), pack(120, 130, 210), pack(190, 200, 250)];
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+    const dx = x - 15.5, dy = y - 15.5, d = Math.hypot(dx, dy);
+    if (d >= 13) continue;
+    const n = [dx / 13, dy / 13], l = Math.max(0, -0.6 * n[0] - 0.8 * n[1]);
+    lit.set(x, y, ramp[Math.min(3, Math.floor(l * 3.2 + 0.4))]);
+    rings.set(x, y, ramp[d < 4 ? 3 : d < 8 ? 2 : d < 11 ? 1 : 0]);                // concentric: pillow shaded
+  }
+  const a = study({ name: "lit", frames: [lit], ms: [100], kind: "test" }).text.join("\n");
+  assert.match(a, /Light on the silhouette .*: from the upper left/);
+  assert.doesNotMatch(a, /Pillow shading/);
+  const b = study({ name: "rings", frames: [rings], ms: [100], kind: "test" }).text.join("\n");
+  assert.match(b, /Pillow shading: lighter the farther in from the edge all round/);
+  assert.doesNotMatch(b, /three-point/, "a disc's edges meet at its middle: not uprights");
+  // a box shaded in stripes whose ends line up: banding
+  const box = new Img(24, 16);
+  for (let y = 2; y < 14; y++) for (let x = 4; x < 20; x++) box.set(x, y, ramp[Math.min(3, Math.floor((y - 2) / 3))]);
+  assert.match(study({ name: "box", frames: [box], ms: [100], kind: "test" }).text.join("\n"), /Banding .*: [1-9]\d* pairs?/);
+});
+
+test("pixelate keeps an edge where a box average blurs it", () => {
+  // black and white, the edge off the 4 px grid: superpixels follow it, boxes average across it
+  const img = new Img(200, 100);
+  for (let y = 0; y < 100; y++) for (let x = 0; x < 200; x++) img.set(x, y, x < 101 ? pack(0, 0, 0) : pack(255, 255, 255));
+  const grey = (o: Img) => [...o.data].filter((c) => c !== pack(0, 0, 0) && c !== pack(255, 255, 255)).length;
+  assert.equal(grey(pixelate(img, 50, 25)), 0);
+  assert.ok(grey(areaDown(img, 50, 25)) > 0);
+});
+
+test("study reads pxl's own gallery back as it was made", async () => {
+  // the train: four planes scrolled 320, 640, 1280 and 1920 px over its 192 frames
+  const train = await said("study", "docs/gallery/parallax_train.gif", "--no-out");
+  const speeds = [...train.matchAll(/at (\d+\.\d+) px\/frame left/g)].map((m) => +m[1]);
+  for (const [i, v] of [320, 640, 1280, 1920].entries()) assert.ok(Math.abs(speeds[i] - v / 192) < 0.1, `plane ${i}: ${speeds[i]} for ${v / 192}`);
+  assert.match(train, /No lines meet|no third point|parallel in the picture/);
+  // the park: perspective({ horizon: 70, fov: 90, yaw: 40 })
+  const park = await said("study", "docs/gallery/park.gif", "--no-out");
+  const m = /Two-point perspective: the horizon at row (\d+);.*\(fov ~(\d+)°\)/.exec(park), y = /yaw: (\d+)/.exec(park);
+  assert.ok(m && y, park);
+  assert.ok(Math.abs(+m![1] - 70) <= 6 && Math.abs(+m![2] - 90) <= 8 && Math.abs(+y![1] - 40) <= 4, `${m![0]} ${y![0]}`);
 });

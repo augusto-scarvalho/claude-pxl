@@ -239,8 +239,14 @@ export interface Techniques {
   orphans: number;
   /** where the lighter tones of each ramp lie: the way toward the light on screen (x right, y down) and how consistently */
   light: { ramp: number; dir: [number, number]; sure: number; n: number }[];
-  /** per pixel: 1 in a checker, 2 a thin dark line, 4 an in-between tone */
+  /** per pixel: 1 in a checker, 2 a thin dark line, 4 an in-between tone, 8 in a banding pair */
   mask: Uint8Array;
+  /** a sprite's light read off its rim (Johnson and Farid): the way toward it, and how well lightness follows the outward normal (r²) */
+  rim: { dir: [number, number]; r2: number; n: number } | null;
+  /** pairs of runs of two colors side by side with the same ends (banding, Pixel Logic / Pixel Fixer), and per 1000 pixels */
+  banding: { pairs: number; per1000: number };
+  /** a sprite lit as if from the front: lighter the farther in from its edge all round (pillow shading), how strongly */
+  pillow: number | null;
 }
 export function techniques(img: Img, ramps: Ramp[]): Techniques {
   const W = img.w, H = img.h, at = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? TRANSPARENT : img.data[y * W + x]);
@@ -309,12 +315,102 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
     else en++;
   }
   if (sprite && eb + es + en >= 8) edge = { black: eb, selective: es, none: en };
+  // the light along a sprite's rim, after Johnson and Farid ("Exposing digital forgeries by detecting
+  // inconsistencies in lighting", 2005) and Nillius and Eklundh: on the silhouette the surface turns
+  // away from us, its normal in the picture's plane, pointing out; with one distant light, lightness
+  // there is ambient + light . normal. A least-squares fit over the rim (two pixels in, past an outline)
+  let rim: Techniques["rim"] = null;
+  if (sprite) {
+    const rows: [number, number, number][] = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (clear(at(x, y))) continue;
+      let nx = 0, ny = 0, edgeP = false;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if ((dx || dy) && clear(at(x + dx, y + dy))) { nx += dx; ny += dy; if (Math.abs(dx) + Math.abs(dy) === 1) edgeP = true; }
+      if (!edgeP || !(nx || ny)) continue;
+      const l = Math.hypot(nx, ny), ux = nx / l, uy = ny / l;
+      const c = at(Math.round(x - 2 * ux), Math.round(y - 2 * uy));
+      if (clear(c)) continue;
+      rows.push([ux, uy, lch(c).L]);
+    }
+    if (rows.length >= 16) {
+      // normal equations for L = a + bx nx + by ny
+      const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], B = [0, 0, 0];
+      for (const [ux, uy, L] of rows) { const v = [1, ux, uy]; for (let i = 0; i < 3; i++) { B[i] += v[i] * L; for (let j = 0; j < 3; j++) A[i][j] += v[i] * v[j]; } }
+      const sol = solve3(A, B);
+      if (sol) {
+        const [a, bx, by] = sol, mean = rows.reduce((s, r) => s + r[2], 0) / rows.length;
+        let ss = 0, se = 0;
+        for (const [ux, uy, L] of rows) { ss += (L - mean) ** 2; se += (L - a - bx * ux - by * uy) ** 2; }
+        const m = Math.hypot(bx, by);
+        if (m > 1e-6) rim = { dir: [bx / m, by / m], r2: ss > 0 ? 1 - se / ss : 0, n: rows.length };
+      }
+    }
+  }
+  // banding (Pixel Logic; Pixel Fixer, TU Delft 2025): two runs of 2+ pixels of different colors side
+  // by side whose ends line up, which shows the grid; a run as wide as most of the picture (a band of
+  // sky) is left out
+  let bandPairs = 0;
+  const runs = (horiz: boolean) => {
+    const out: Map<number, [number, number, Color][]> = new Map();
+    const A = horiz ? H : W, Bn = horiz ? W : H;
+    for (let a = 0; a < A; a++) {
+      const list: [number, number, Color][] = [];
+      let s0 = 0;
+      for (let b = 1; b <= Bn; b++) {
+        const c0 = horiz ? at(s0, a) : at(a, s0), c = b < Bn ? (horiz ? at(b, a) : at(a, b)) : -1;
+        if (c !== c0) { if (b - s0 >= 2 && !clear(c0) && b - s0 < 0.9 * Bn) list.push([s0, b - 1, c0]); s0 = b; }
+      }
+      out.set(a, list);
+    }
+    return out;
+  };
+  for (const horiz of [true, false]) {
+    const R = runs(horiz);
+    for (const [a, list] of R) {
+      const next = R.get(a + 1);
+      if (!next) continue;
+      const ends = new Map(next.map((r) => [`${r[0]},${r[1]}`, r[2]]));
+      for (const [s0, s1, c] of list) {
+        const d = ends.get(`${s0},${s1}`);
+        if (d === undefined || d === c) continue;
+        bandPairs++;
+        for (let b = s0; b <= s1; b++) for (const aa of [a, a + 1]) mask[horiz ? aa * W + b : b * W + aa] |= 8;
+      }
+    }
+  }
+  // pillow shading: lightness rising with the distance in from the edge, all the way round
+  let pillow: number | null = null;
+  if (sprite) {
+    const dist = new Int32Array(W * H).fill(-1), q: number[] = [];
+    for (let i = 0; i < W * H; i++) if (clear(img.data[i])) { dist[i] = 0; q.push(i); }
+    for (let h = 0; h < q.length; h++) { const p = q[h], x = p % W, y = Math.floor(p / W); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x + dx, yy = y + dy, r = yy * W + xx; if (xx >= 0 && yy >= 0 && xx < W && yy < H && dist[r] < 0) { dist[r] = dist[p] + 1; q.push(r); } } }
+    const ds: number[] = [], ls: number[] = [];
+    for (let i = 0; i < W * H; i++) {
+      if (dist[i] < 2) continue;                                           // past the outline
+      const x = i % W, y = Math.floor(i / W), edgeD = Math.min(dist[i], x + 1, y + 1, W - x, H - y);
+      ds.push(Math.min(edgeD, 6)); ls.push(lch(img.data[i]).L);
+    }
+    if (ds.length >= 30) {
+      const md = ds.reduce((s, v) => s + v, 0) / ds.length, ml = ls.reduce((s, v) => s + v, 0) / ls.length;
+      let c = 0, vd = 0, vl = 0;
+      for (let i = 0; i < ds.length; i++) { c += (ds[i] - md) * (ls[i] - ml); vd += (ds[i] - md) ** 2; vl += (ls[i] - ml) ** 2; }
+      pillow = vd > 0 && vl > 0 ? c / Math.sqrt(vd * vl) : 0;
+    }
+  }
   let ditherN = 0, r0 = H, r1 = -1;
   for (let i = 0; i < inDither.length; i++) if (inDither[i]) { ditherN++; mask[i] |= 1; const y = Math.floor(i / W); r0 = Math.min(r0, y); r1 = Math.max(r1, y); }
   const ditherPairs = [...pairs].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => { const [a, b] = k.split(",").map(Number); return [a, b, n] as [Color, Color, number]; });
   const light = vec.map(([vx, vy, n], ramp) => ({ ramp, dir: [n ? vx / n : 0, n ? vy / n : 0] as [number, number], sure: n ? Math.hypot(vx, vy) / n : 0, n }))
     .filter((l) => l.n >= 30).sort((a, b) => b.n - a.n);
-  return { pixels, dither: ditherN, ditherPairs, ditherRows: r1 >= 0 ? [r0, r1] : null, lines, selective, black, edge, aa, orphans, light, mask };
+  return { pixels, dither: ditherN, ditherPairs, ditherRows: r1 >= 0 ? [r0, r1] : null, lines, selective, black, edge, aa, orphans, light, mask, rim, banding: { pairs: bandPairs, per1000: (1000 * bandPairs) / Math.max(1, pixels) }, pillow };
+}
+
+/** A 3x3 linear system by Cramer's rule; null when singular. */
+function solve3(A: number[][], b: number[]): number[] | null {
+  const det = (m: number[][]) => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+  const d = det(A);
+  if (Math.abs(d) < 1e-12) return null;
+  return [0, 1, 2].map((k) => det(A.map((row, i) => row.map((v, j) => (j === k ? b[i] : v)))) / d);
 }
 
 /** The tile size and offset whose cells repeat most, and how much (1 - distinct / cells). */
@@ -342,64 +438,75 @@ export function findTiles(img: Img): { size: number; ox: number; oy: number; cel
 
 // ---------------------------------------------------------------- lines and where they meet
 export interface Segment { x0: number; y0: number; x1: number; y1: number; len: number; a: number; n: [number, number, number] }
-/** Straight edges: Sobel on lightness, a Hough transform voting near each edge's own direction, each peak kept as the longest run of edge pixels along it. */
-export function findSegments(img: Img): Segment[] {
-  const W = img.w, H = img.h, L = new Float32Array(W * H);
+/**
+ * Straight edges, after LSD (Grompone von Gioi, Jakubowicz, Morel and Randall, "LSD: a Line Segment
+ * Detector", IPOL 2012): the level-line angle at every pixel (a 2x2 gradient); seeds taken strongest
+ * first; each grows over its eight neighbors whose level-line angle is within 22.5° of the region's;
+ * the region's rectangle (its center and main axis by its moments) kept when it is long enough and
+ * most of the rectangle (70%) is the region. Unlike a Hough transform it doesn't add up texture into
+ * lines, and a faint joint between paving stones is found as well as a strong outline. Pixel art is
+ * blurred a little first (`smooth`), so a staircase of pixels reads as the line it draws.
+ */
+export function findSegments(img: Img, smooth = false): Segment[] {
+  const W = img.w, H = img.h;
+  let L = new Float32Array(W * H);
   for (let i = 0; i < L.length; i++) L[i] = clear(img.data[i]) ? 0 : lab(img.data[i])[0];
+  // a separable blur: [1 4 6 4 1] for pixel art, [1 2 1] otherwise (LSD's Gaussian, roughly)
+  const k = smooth ? [1, 4, 6, 4, 1] : [1, 2, 1], hk = k.length >> 1, ks = k.reduce((a, b) => a + b, 0);
+  for (const horiz of [true, false]) {
+    const o = new Float32Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let v = 0;
+      for (let t = -hk; t <= hk; t++) { const xx = horiz ? Math.min(W - 1, Math.max(0, x + t)) : x, yy = horiz ? y : Math.min(H - 1, Math.max(0, y + t)); v += k[t + hk] * L[yy * W + xx]; }
+      o[y * W + x] = v / ks;
+    }
+    L = o;
+  }
+  // the 2x2 gradient and the level-line angle (along the edge, oriented: the lighter side on one hand)
   const mag = new Float32Array(W * H), ang = new Float32Array(W * H);
-  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
-    const p = (dx: number, dy: number) => L[(y + dy) * W + x + dx];
-    const gx = p(1, -1) + 2 * p(1, 0) + p(1, 1) - p(-1, -1) - 2 * p(-1, 0) - p(-1, 1);
-    const gy = p(-1, 1) + 2 * p(0, 1) + p(1, 1) - p(-1, -1) - 2 * p(0, -1) - p(1, -1);
-    mag[y * W + x] = Math.hypot(gx, gy); ang[y * W + x] = Math.atan2(gy, gx);
+  for (let y = 0; y + 1 < H; y++) for (let x = 0; x + 1 < W; x++) {
+    const a = L[y * W + x], b = L[y * W + x + 1], c = L[(y + 1) * W + x], d = L[(y + 1) * W + x + 1];
+    const gx = (b + d - a - c) / 2, gy = (c + d - a - b) / 2;
+    mag[y * W + x] = Math.hypot(gx, gy); ang[y * W + x] = Math.atan2(gx, -gy);
   }
-  const sorted = Float32Array.from(mag).sort(), thr = Math.max(0.12, sorted[Math.floor(sorted.length * 0.85)]);
-  const edges: number[] = [];
-  for (let i = 0; i < mag.length; i++) if (mag[i] > thr) edges.push(i);
-  const diag = Math.ceil(Math.hypot(W, H)), R = 2 * diag + 1, acc = new Int32Array(180 * R);
-  for (const i of edges) {
-    const x = i % W, y = Math.floor(i / W), t0 = Math.round(((ang[i] * 180) / Math.PI + 360) % 180);
-    for (let dt = -6; dt <= 6; dt++) {
-      const t = (t0 + dt + 180) % 180, th = (t * Math.PI) / 180, r = Math.round(x * Math.cos(th) + y * Math.sin(th)) + diag;
-      acc[t * R + r]++;
+  const rho = 0.02, tau = Math.PI / 8, minLen = Math.max(8, Math.round(0.06 * Math.min(W, H)));
+  const order = Array.from({ length: W * H }, (_, i) => i).filter((i) => mag[i] > rho).sort((p, q) => mag[q] - mag[p]);
+  const used = new Uint8Array(W * H), segs: Segment[] = [];
+  const diff = (a: number, b: number) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
+  for (const seed of order) {
+    if (used[seed]) continue;
+    const region = [seed];
+    used[seed] = 1;
+    let sx = Math.cos(ang[seed]), sy = Math.sin(ang[seed]), th = ang[seed];
+    for (let r = 0; r < region.length; r++) {
+      const p = region[r], x = p % W, y = Math.floor(p / W);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy, q = yy * W + xx;
+        if (xx < 0 || yy < 0 || xx >= W - 1 || yy >= H - 1 || used[q] || mag[q] <= rho || diff(ang[q], th) > tau) continue;
+        used[q] = 1; region.push(q); sx += Math.cos(ang[q]); sy += Math.sin(ang[q]); th = Math.atan2(sy, sx);
+      }
     }
+    if (region.length < minLen / 2) continue;
+    // the rectangle: center of mass and main axis, weighted by the gradient
+    let w = 0, mx = 0, my = 0;
+    for (const p of region) { const m = mag[p]; w += m; mx += m * ((p % W) + 1); my += m * (Math.floor(p / W) + 1); }
+    mx /= w; my /= w;
+    let sxx = 0, syy = 0, sxy = 0;
+    for (const p of region) { const m = mag[p], ex = (p % W) + 1 - mx, ey = Math.floor(p / W) + 1 - my; sxx += m * ex * ex; syy += m * ey * ey; sxy += m * ex * ey; }
+    let a = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    if (Math.abs(diff(a, th)) > Math.PI / 2) a += Math.PI;                 // the axis the way the edge runs
+    const ux = Math.cos(a), uy = Math.sin(a);
+    let t0 = Infinity, t1 = -Infinity, w0 = Infinity, w1 = -Infinity;
+    for (const p of region) { const ex = (p % W) + 1 - mx, ey = Math.floor(p / W) + 1 - my, t = ex * ux + ey * uy, o = -ex * uy + ey * ux; t0 = Math.min(t0, t); t1 = Math.max(t1, t); w0 = Math.min(w0, o); w1 = Math.max(w1, o); }
+    const len = t1 - t0, width = Math.max(1, w1 - w0);
+    if (len < minLen || region.length < 0.7 * len * Math.min(width, 3)) continue;
+    const x0 = mx + ux * t0, y0 = my + uy * t0, x1 = mx + ux * t1, y1 = my + uy * t1, nx = -uy, ny = ux;
+    segs.push({ x0, y0, x1, y1, len, a: ((Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI + 180) % 180, n: [nx, ny, -(nx * mx + ny * my)] });
   }
-  const minLen = Math.max(8, Math.round(0.1 * Math.min(W, H)));
-  const peaks: [number, number, number][] = [];
-  for (let t = 0; t < 180; t++) for (let r = 0; r < R; r++) {
-    const v = acc[t * R + r];
-    if (v < minLen) continue;
-    let top = true;
-    for (let dt = -3; dt <= 3 && top; dt++) for (let dr = -3; dr <= 3; dr++) {
-      const tt = (t + dt + 180) % 180, rr = r + (t + dt < 0 || t + dt >= 180 ? -(r - diag) * 2 + dr : dr);
-      if ((dt || dr) && rr >= 0 && rr < R && acc[tt * R + rr] > v) { top = false; break; }
-    }
-    if (top) peaks.push([v, t, r - diag]);
-  }
-  peaks.sort((a, b) => b[0] - a[0]);
-  const segs: Segment[] = [];
-  for (const [, t, r] of peaks.slice(0, 60)) {
-    const th = (t * Math.PI) / 180, c = Math.cos(th), s = Math.sin(th), along: number[] = [];
-    for (const i of edges) {
-      const x = i % W, y = Math.floor(i / W);
-      if (Math.abs(x * c + y * s - r) > 1.2) continue;
-      const da = Math.abs((((ang[i] * 180) / Math.PI - t) % 180 + 180) % 180);
-      if (Math.min(da, 180 - da) > 18) continue;
-      along.push(-x * s + y * c);
-    }
-    along.sort((a, b) => a - b);
-    let bs = 0, be = -1, s0 = 0;
-    for (let k = 1; k <= along.length; k++) if (k === along.length || along[k] - along[k - 1] > 3) { if (along[k - 1] - along[s0] > (be >= 0 ? along[be] - along[bs] : -1)) { bs = s0; be = k - 1; } s0 = k; }
-    if (be < 0 || along[be] - along[bs] < minLen) continue;
-    const p0 = [r * c - along[bs] * s, r * s + along[bs] * c], p1 = [r * c - along[be] * s, r * s + along[be] * c];
-    const a = ((Math.atan2(p1[1] - p0[1], p1[0] - p0[0]) * 180) / Math.PI + 180) % 180;
-    if (segs.some((q) => Math.min(Math.abs(q.a - a), 180 - Math.abs(q.a - a)) < 2 && Math.abs(q.n[0] * (p0[0] + p1[0]) / 2 + q.n[1] * (p0[1] + p1[1]) / 2 + q.n[2]) < 3)) continue;
-    segs.push({ x0: p0[0], y0: p0[1], x1: p1[0], y1: p1[1], len: along[be] - along[bs], a, n: [c, s, -r] });
-  }
-  return segs.sort((p, q) => q.len - p.len).slice(0, 40);
+  return segs.sort((p, q) => q.len - p.len).slice(0, 60);
 }
 
-export interface Vanish { x: number; y: number; far: boolean; dir: [number, number]; lines: Segment[]; weight: number }
+export interface Vanish { x: number; y: number; far: boolean; dir: [number, number]; lines: Segment[]; weight: number; fan: number }
 /**
  * Where the lines meet: every crossing of two of them is a candidate, scored by the length of all the
  * lines that point at it (each within 1.5°); the best is refined, its lines taken out, and so on. A
@@ -413,7 +520,10 @@ export function findVanishing(segs: Segment[], W: number, H: number): Vanish[] {
     // p homogeneous: the way from the segment's middle to it, against the segment's own
     const vx = p[0] - mx * p[2], vy = p[1] - my * p[2], l = Math.hypot(vx, vy) * Math.hypot(dx, dy);
     if (!l) return false;
-    return Math.abs(vx * dy - vy * dx) / l < Math.sin((1.5 * Math.PI) / 180);
+    if (Math.abs(vx * dy - vy * dx) / l >= Math.sin((1.5 * Math.PI) / 180)) return false;
+    // a point the segment runs through fits it whatever the point: it must lie beyond its ends
+    if (Math.abs(p[2]) > 1e-9) { const t = (Math.abs((p[0] / p[2] - mx) * dx + (p[1] / p[2] - my) * dy) / Math.hypot(dx, dy)); if (t < s.len / 2 + 2) return false; }
+    return true;
   };
   for (let round = 0; round < 3 && left.length >= 3; round++) {
     let best: number[] | null = null, bw = 0;
@@ -440,8 +550,34 @@ export function findVanishing(segs: Segment[], W: number, H: number): Vanish[] {
     const mean = ((Math.atan2(sx2, cx2) * 180) / Math.PI / 2 + 180) % 180, th = (mean * Math.PI) / 180;
     const fan = Math.max(...lines.map((q) => { const d = Math.abs(q.a - mean) % 180; return Math.min(d, 180 - d); }));
     if (fan < 4) far = true;
-    out.push({ x, y, far, dir: [Math.cos(th), Math.sin(th)], lines, weight: bw });
+    out.push({ x, y, far, dir: [Math.cos(th), Math.sin(th)], lines, weight: bw, fan });
     left = left.filter((s) => !lines.includes(s));
+    // a level point found: the second of a two-point view lies on the same horizon, so look along that
+    // row for where the rest of the lines cross it (beyond their ends), the way the first was found
+    if (round === 0 && !far && Math.abs(Math.cos(th)) > 0.3) {
+      // each line's crossing of the row, give or take what 1.5° of its angle makes there (much, for a
+      // shallow line drawn out from far); the point most of their length covers
+      const hits: { x: number; e: number; s: Segment }[] = [];
+      for (const q of left) {
+        const dx = q.x1 - q.x0, dy = q.y1 - q.y0;
+        if (Math.abs(dy) < 1e-6 || Math.abs(dx) < 1e-6) continue;
+        const t = (y - q.y0) / dy, hx = q.x0 + t * dx;
+        if (t > -0.05 && t < 1.05) continue;                              // the row crosses the segment itself
+        if (Math.abs(hx - W / 2) > 6 * W) continue;
+        const reach = Math.max(Math.abs(t), Math.abs(t - 1)) * q.len, sinA = Math.abs(dy) / q.len;
+        hits.push({ x: hx, e: Math.max(3, (reach * Math.tan((1.5 * Math.PI) / 180)) / sinA), s: q });
+      }
+      let best2: { x: number; ls: Segment[]; w: number } | null = null;
+      for (const h of hits) {
+        const ls = hits.filter((o) => Math.abs(o.x - h.x) <= o.e).map((o) => o.s), w2 = ls.reduce((a, q) => a + q.len, 0);
+        if (ls.length >= 4 && (!best2 || w2 > best2.w)) best2 = { x: h.x, ls, w: w2 };
+      }
+      if (best2 && best2.w >= 0.2 * bw && Math.abs(best2.x - x) > 0.3 * W) {
+        const ls = best2.ls, hx = hits.filter((o) => ls.includes(o.s)).reduce((a, o) => a + o.x * o.s.len, 0) / best2.w;
+        out.push({ x: hx, y, far: false, dir: [1, 0], lines: ls, weight: best2.w, fan: 0 });
+        left = left.filter((q) => !ls.includes(q));
+      }
+    }
   }
   return out;
 }
@@ -549,5 +685,60 @@ export function bandShifts(a: Float32Array, b: Float32Array, W: number, H: numbe
     const still = sad(0);
     out.push({ y: y0, dx: bs, gain: still > 0 ? (still - best) / still : 0 });
   }
+  return out;
+}
+
+/**
+ * A photo, painting or render brought down to w x h by superpixels, after Gerstner, Decarlo, Alexa,
+ * Finkelstein, Gingold and Nealen, "Pixelated Image Abstraction" (NPAR 2012): one superpixel per output
+ * pixel, its center starting on the grid; each source pixel joins the nearest center among the
+ * neighboring cells by color and place (SLIC); the centers move to their members and are pulled back
+ * toward their neighbors' (a grid, not a jumble), a few times over. An output pixel is its
+ * superpixel's mean, so an edge stays an edge instead of the blur a box average makes of it.
+ */
+export function pixelate(img: Img, w: number, h: number): Img {
+  // work on at most four source pixels per output pixel each way
+  const src = img.w > w * 4 || img.h > h * 4 ? areaDown(img, Math.min(img.w, w * 4), Math.min(img.h, h * 4)) : img;
+  const W = src.w, H = src.h, sx = W / w, sy = H / h, n = w * h;
+  const P = new Float32Array(W * H * 3), ok = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) { const c = src.data[i]; if (clear(c)) continue; ok[i] = 1; const [L, a, b] = lab(c); P[3 * i] = L; P[3 * i + 1] = a; P[3 * i + 2] = b; }
+  const cx = new Float32Array(n), cy = new Float32Array(n), cl = new Float32Array(n * 3);
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const k = j * w + i; cx[k] = (i + 0.5) * sx; cy[k] = (j + 0.5) * sy; const p = Math.min(H - 1, Math.floor(cy[k])) * W + Math.min(W - 1, Math.floor(cx[k])); cl.set(P.subarray(3 * p, 3 * p + 3), 3 * k); }
+  const owner = new Int32Array(W * H).fill(-1), m = 0.45, S = Math.max(sx, sy);
+  for (let it = 0; it < 6; it++) {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const p = y * W + x;
+      if (!ok[p]) continue;
+      const gi = Math.min(w - 1, Math.floor(x / sx)), gj = Math.min(h - 1, Math.floor(y / sy));
+      let best = -1, bd = Infinity;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const i = gi + di, j = gj + dj;
+        if (i < 0 || j < 0 || i >= w || j >= h) continue;
+        const k = j * w + i, dl = P[3 * p] - cl[3 * k], da = P[3 * p + 1] - cl[3 * k + 1], db = P[3 * p + 2] - cl[3 * k + 2];
+        const d = dl * dl + da * da + db * db + m * m * (((x - cx[k]) ** 2 + (y - cy[k]) ** 2) / (S * S));
+        if (d < bd) { bd = d; best = k; }
+      }
+      owner[p] = best;
+    }
+    const sum = new Float64Array(n * 6);
+    for (let p = 0; p < W * H; p++) { const k = owner[p]; if (k < 0) continue; sum[6 * k] += p % W; sum[6 * k + 1] += Math.floor(p / W); sum[6 * k + 2] += P[3 * p]; sum[6 * k + 3] += P[3 * p + 1]; sum[6 * k + 4] += P[3 * p + 2]; sum[6 * k + 5]++; }
+    const nx = new Float32Array(n), ny = new Float32Array(n);
+    for (let k = 0; k < n; k++) {
+      const c = sum[6 * k + 5];
+      if (!c) { nx[k] = cx[k]; ny[k] = cy[k]; continue; }
+      nx[k] = sum[6 * k] / c; ny[k] = sum[6 * k + 1] / c;
+      cl[3 * k] = sum[6 * k + 2] / c; cl[3 * k + 1] = sum[6 * k + 3] / c; cl[3 * k + 2] = sum[6 * k + 4] / c;
+    }
+    // pulled back toward the mean of the neighbors' centers (a Laplacian smoothing, as the paper does)
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      const k = j * w + i, nb = [[i - 1, j], [i + 1, j], [i, j - 1], [i, j + 1]].filter(([a, b]) => a >= 0 && b >= 0 && a < w && b < h);
+      const ax = nb.reduce((s, [a, b]) => s + nx[b * w + a], 0) / nb.length, ay = nb.reduce((s, [a, b]) => s + ny[b * w + a], 0) / nb.length;
+      cx[k] = 0.6 * nx[k] + 0.4 * ax; cy[k] = 0.6 * ny[k] + 0.4 * ay;
+    }
+  }
+  // each output pixel: its members' mean in sRGB
+  const rgb = new Float64Array(n * 4), out = new Img(w, h);
+  for (let p = 0; p < W * H; p++) { const k = owner[p]; if (k < 0) continue; const [r, g, b] = channels(src.data[p]); rgb[4 * k] += r; rgb[4 * k + 1] += g; rgb[4 * k + 2] += b; rgb[4 * k + 3]++; }
+  for (let k = 0; k < n; k++) if (rgb[4 * k + 3]) out.data[k] = pack(Math.round(rgb[4 * k] / rgb[4 * k + 3]), Math.round(rgb[4 * k + 1] / rgb[4 * k + 3]), Math.round(rgb[4 * k + 2] / rgb[4 * k + 3]));
   return out;
 }

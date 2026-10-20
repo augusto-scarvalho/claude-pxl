@@ -23,7 +23,7 @@ export function readMedia(path: string, o: MediaOpts = {}): Media {
   if (ext === ".png") { const img = decodePng(readFileSync(path)); read = [() => img]; ms = [100]; kind = "PNG"; }
   else if (ext === ".gif") {
     const g = decodeGif(readFileSync(path));
-    const from = Math.floor(((o.from ?? 0) * 1000) / (g.frames[0]?.ms || 100)), part = g.frames.slice(from, from + max);
+    const from = Math.floor(((o.from ?? 0) * 1000) / (g.frames[0]?.ms || 100)), part = g.frames.slice(from, o.seconds ? from + Math.ceil((o.seconds * 1000) / (g.frames[0]?.ms || 100)) : undefined);
     read = part.map((f) => () => f.img); ms = part.map((f) => f.ms);
     kind = `GIF${g.frames.length > part.length ? `, frames ${from}-${from + part.length - 1} of ${g.frames.length}` : ""}`;
   } else ({ read, ms, kind, cleanup } = viaFfmpeg(path, ext, o, max));

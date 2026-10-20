@@ -15,9 +15,9 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
 1. Read the [example](#examples) closest to what you're making (`PXL list <file>` maps it: read the
    lines you need) and start from the template below. Given a reference or art to learn from (a
    PNG, GIF, JPEG or video, pixel art or not): `PXL study ref.gif` first. It reports what the piece
-   is made of (palette and ramps, outlines, dithering, light; perspective and vanishing points;
-   cycle, loop, parallax planes and their speeds) and what to use in pxl for it, with a sheet and
-   the palette in `out/_study/`.
+   is made of (palette and ramps, outlines, dithering, light, banding and pillow shading; perspective,
+   vanishing points, lens and tilt; cycle, loop, parallax planes and their speeds) and what to use in
+   pxl for it, with a sheet and the palette in `out/_study/`.
 2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
    `out/_shot/<name>.png` (read it). Its text says what changed since your last shot of it (pixels
    and where, so an edit that did nothing shows) and the warnings `check` finds on it.

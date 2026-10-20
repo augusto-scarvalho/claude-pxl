@@ -13,7 +13,7 @@
 // point it moves toward, the parts that move while the rest stands still).
 import { type Color, pack, toHex } from "./color.ts";
 import { Img } from "./image.ts";
-import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Vanish, areaDown, bandShifts, blockFlow, colorCounts, dE, findGrid, findRamps, findSegments, findTiles, findVanishing, focusOfExpansion, frameDiff, lab, lch, lumaOf, mergeNear, quantize, techniques, toNative } from "./vision.ts";
+import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Vanish, areaDown, bandShifts, blockFlow, colorCounts, dE, findGrid, findRamps, findSegments, findTiles, findVanishing, focusOfExpansion, frameDiff, lab, lch, lumaOf, mergeNear, pixelate, quantize, techniques, toNative } from "./vision.ts";
 
 /** frames as read; `drawnAt`: they were already brought down from that grid as they were read (big animations) */
 export interface StudyInput { name: string; frames: Img[]; ms: number[]; kind: string; drawnAt?: Grid }
@@ -49,8 +49,9 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     text.push(`Kind: pixel art${up ? `, drawn at ${g.sx === g.sy ? `${+g.sx.toFixed(2)}x` : `${+g.sx.toFixed(2)}x${+g.sy.toFixed(2)}`} (each pixel ${+g.sx.toFixed(2)}x${+g.sy.toFixed(2)} px, the grid from ${+g.ox.toFixed(1)},${+g.oy.toFixed(1)})${Number.isInteger(g.sx) ? "" : ": blurred or scaled by a fraction, read in the middle of each pixel"}` : " at 1x"}: ${picture.w}x${picture.h} as drawn, ${nColors} colors.`);
   } else {
     const [tw, th] = opts.to ?? fit(first.w, first.h, 160);
+    // the values read off a plain average; the translation by superpixels (Gerstner et al. 2012), which keeps edges
     avg = areaDown(first, tw, th);
-    const q = quantize(avg, opts.colors ?? 16);
+    const q = quantize(pixelate(first, tw, th), opts.colors ?? 16);
     picture = q.img; scale = tw / first.w;
     text.push(`Kind: not pixel art (a photo, painting or render: ${nColors} colors after folding near ones, ${pct(smooth * 100, 100)} of the steps between neighbors gentle). Read for its masses, colors and light, and translated into a ${tw}x${th} picture in ${q.palette.length} colors to draw over (--to WxH, --colors N).`);
   }
@@ -78,11 +79,15 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     text.push(tech.lines > total * 0.01
       ? `  Inner lines: thin dark lines between lighter neighbors on ${pct(tech.lines, total)} of the pixels: ${pct(tech.selective, tech.lines)} a darker shade of what they border (selective), ${pct(tech.black, tech.lines)} near-black.`
       : `  Inner lines: hardly any (${pct(tech.lines, total)}): shapes meet by their tones, not by lines.`);
-    text.push(tech.dither > total * 0.005
+    text.push(tech.dither > total * 0.015
       ? `  Dithering: 2x2 checkers on ${pct(tech.dither, total)} of the pixels${tech.ditherRows ? `, rows ${tech.ditherRows[0]}-${tech.ditherRows[1]}` : ""}, mostly ${tech.ditherPairs.map(([a, b]) => `${hex(a)}/${hex(b)}`).join(", ")}: a blend between two tones.`
       : `  Dithering: none to speak of (${pct(tech.dither, total)}).`);
     text.push(`  Anti-aliasing: in-between tones on the steps of edges on ${pct(tech.aa, total)} of the pixels${tech.aa > total * 0.01 ? " (edges smoothed by hand)" : " (hard edges)"}.`);
     text.push(`  Clusters: ${pct(tech.orphans, total)} of the pixels stand alone (none of their four neighbors share their color)${tech.orphans > total * 0.12 ? ": a busy, noisy texture" : tech.orphans < total * 0.03 ? ": clean clusters" : ""}.`);
+    if (tech.rim && tech.rim.r2 >= 0.15) text.push(`  Light on the silhouette (its rim's lightness fit to one light, after Johnson and Farid): from ${way(tech.rim.dir)}, r² ${tech.rim.r2.toFixed(2)} over ${tech.rim.n} rim pixels.`);
+    const b = tech.banding;
+    text.push(`  Banding (runs of two colors side by side with their ends lined up, marked red on the sheet): ${b.pairs} pair${b.pairs === 1 ? "" : "s"}, ${b.per1000.toFixed(1)} per 1000 px${b.per1000 < 1 ? ": hardly any" : b.per1000 > 6 && b.pairs >= 12 ? ": much (it shows the grid; stagger the ends)" : ""}.`);
+    if (tech.pillow !== null && tech.pillow > 0.4) text.push(`  Pillow shading: lighter the farther in from the edge all round (${tech.pillow.toFixed(2)})${tech.rim && tech.rim.r2 >= 0.3 ? ", though lit from one side too" : ": lit as if from the front, which flattens the form; shade from one side instead"}.`);
     const tiles = findTiles(picture);
     if (tiles) text.push(`  Tiles: ${tiles.size}x${tiles.size} cells from ${tiles.ox},${tiles.oy} repeat: ${tiles.distinct} distinct of ${tiles.cells} (${pct(tiles.cells - tiles.distinct, tiles.cells)} repeats).`);
   }
@@ -99,7 +104,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     motion = motionOf(frames, input.ms);
   }
   const P = pixelArt ? picture : areaDown(first, ...fit(first.w, first.h, 480));
-  const segs = findSegments(P), vps = findVanishing(segs, P.w, P.h), k = picture.w / P.w;
+  const segs = findSegments(P, pixelArt), vps = findVanishing(segs, P.w, P.h), k = picture.w / P.w;
   const foe = motion?.foe && motion.forward ? { x: (motion.foe.x * P.w) / motion.W, y: (motion.foe.y * P.w) / motion.W } : null;
   text.push("", "PERSPECTIVE");
   const persp = perspectiveLines(segs, vps, P.w, P.h, k, picture.w, foe);
@@ -113,8 +118,9 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     text.push(`  A picture ${picture.w}x${picture.h} at 1x.`);
     if (tech.edge && tech.edge.black > tech.edge.selective) text.push(`  Its outline: outline: "<near-black key>".`);
     else if (tech.edge && tech.edge.selective > tech.edge.none) text.push(`  Its outline: selout: "<dark key>" (the outline takes a dark shade of what it touches).`);
-    if (tech.dither > total * 0.005) text.push("  Its blends: dither() between two keys, or bayer(x, y) in a function for a gradient.");
-    if (tech.light[0] && tech.light[0].sure > 0.15) text.push(`  Its light, from ${way(tech.light[0].dir)}: relight / plate with light: [${tech.light[0].dir.map((v) => (v / Math.hypot(...tech.light[0].dir)).toFixed(1)).join(", ")}], capsule's light the same.`);
+    if (tech.dither > total * 0.015) text.push("  Its blends: dither() between two keys, or bayer(x, y) in a function for a gradient.");
+    const lit = tech.rim && tech.rim.r2 >= 0.25 ? tech.rim.dir : overallLight(tech);
+    if (lit) text.push(`  Its light, from ${way(lit)} (the ramps together): relight / plate with light: [${lit.map((v) => v.toFixed(1)).join(", ")}], capsule's light the same.`);
   } else text.push(`  The translation (${input.name}_px.png) as a guide: sprite("ref", { png: "${input.name}_px.png" }) in a layer with ref: true, drawn over in the palette; the masses and the light are the lesson, not its pixels.`);
   if (persp.pxl) text.push(`  ${persp.pxl}`);
   if (motion) text.push(...motion.pxl.map((l) => `  ${l}`));
@@ -150,6 +156,18 @@ function shiftWords(r: Ramp): string {
   if (Math.abs(dh) < 8) return "; one hue throughout";
   const toward = (h: number) => hueName(h).split(" ")[0];
   return `; hue shifts ${Math.round(Math.abs(dh))}° from ${toward(d.h)} in the shade to ${toward(l.h)} in the light${l.C < d.C * 0.75 ? ", paler in the light" : l.C > d.C * 1.3 ? ", richer in the light" : ""}`;
+}
+
+/** The ramps' readings of the light together, weighted by how many steps each read, leaving out the ones lighter straight downward (a sky toward its horizon); null when they don't agree. */
+function overallLight(t: Techniques): [number, number] | null {
+  let x = 0, y = 0, n = 0, len = 0;
+  for (const l of t.light) {
+    if (l.sure < 0.12 || (l.dir[1] > 0.6 * l.sure && Math.abs(l.dir[0]) < 0.5 * l.sure)) continue;
+    x += l.dir[0] * l.n; y += l.dir[1] * l.n; n += l.n; len += l.sure * l.n;
+  }
+  if (!n || Math.hypot(x, y) < 0.6 * len) return null;
+  const m = Math.hypot(x, y);
+  return [x / m, y / m];
 }
 
 function lightLines(t: Techniques, ramps: Ramp[], pixelArt: boolean): string[] {
@@ -192,12 +210,15 @@ function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, 
   if (segs.length < 3) return { lines: ["  Few straight edges: no perspective to read (organic shapes, or a flat side-on view)."], pxl: null, horizon: null };
   const total = segs.reduce((s, q) => s + q.len, 0), out = [`  ${segs.length} straight edges${k !== 1 ? ` (read at ${W}x${H}; places below in the ${PW}-wide picture)` : ""}.`];
   let pxl: string | null = null, horizon: number | null = null;
+  // a third point: uprights that fan out (not a degree or two off parallel) and meet within a few heights
+  // and on the column the camera looks along (a tilted camera's uprights meet straight above or below it)
+  const third = (v: Vanish) => !v.far && Math.abs(v.dir[1]) > 0.9 && v.lines.length >= 5 && v.fan >= 3 && Math.abs(v.y - H / 2) < 4 * H && (v.y < -0.1 * H || v.y > 1.1 * H) && Math.abs(v.x - W / 2) < 0.25 * W;
   const finite = vps.filter((v) => !v.far), near = finite.filter((v) => Math.abs(v.x - W / 2) < 1.5 * W && v.y > -H && v.y < 2 * H);
   for (const v of vps) {
     const share = pct(v.lines.reduce((s, q) => s + q.len, 0), total);
     const verticalish = Math.abs(v.dir[1]) > 0.9;
     if (v.far) out.push(`  - ${v.lines.length} lines parallel in the picture (${share} of their length), ${verticalish ? "upright: uprights stay upright (no third point)" : Math.abs(v.dir[0]) > 0.9 ? "level: lines across stay level" : `at ${Math.round((Math.atan2(v.dir[1], v.dir[0]) * 180) / Math.PI)}°: an oblique set (isometric or a side view)`}.`);
-    else out.push(`  - ${v.lines.length} lines meet at ${Math.round(v.x * k)},${Math.round(v.y * k)} (${share} of their length)${verticalish ? `: uprights converge ${v.y < H / 2 ? "above" : "below"} (three-point, the camera tilted ${v.y < H / 2 ? "up" : "down"})` : ""}.`);
+    else out.push(`  - ${v.lines.length} lines meet at ${Math.round(v.x * k)},${Math.round(v.y * k)} (${share} of their length)${verticalish ? (third(v) ? `: uprights converge ${v.y < H / 2 ? "above" : "below"} (three-point, the camera tilted ${v.y < H / 2 ? "up" : "down"})` : ": uprights nearly parallel (no third point to speak of)") : ""}.`);
   }
   const level = finite.filter((v) => Math.abs(v.dir[1]) <= 0.9), cx = W / 2, cy = H / 2;
   // two-point: two level points on one horizon, either side of the middle, square to each other through a believable lens
@@ -205,16 +226,30 @@ function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, 
   for (let i = 0; i < level.length && !two; i++) for (let j = i + 1; j < level.length; j++) {
     const a = level[i], b = level[j], f2 = -((a.x - cx) * (b.x - cx) + (a.y - cy) * (b.y - cy));
     const fov = f2 > 0 ? (2 * Math.atan(W / 2 / Math.sqrt(f2)) * 180) / Math.PI : 180;
-    if (Math.abs(a.y - b.y) < 0.12 * H && (a.x - cx) * (b.x - cx) < 0 && fov > 20 && fov < 120) { two = a.x < b.x ? [a, b, Math.sqrt(f2)] : [b, a, Math.sqrt(f2)]; break; }
+    const share2 = (a.weight + b.weight) / total;
+    if (Math.abs(a.y - b.y) < 0.12 * H && (a.x - cx) * (b.x - cx) < 0 && fov >= 35 && fov <= 120 && a.lines.length >= 4 && b.lines.length >= 4 && share2 >= 0.25) { two = a.x < b.x ? [a, b, Math.sqrt(f2)] : [b, a, Math.sqrt(f2)]; break; }
   }
   // one-point: the level point inside the picture's reach the motion opens out from, else the one most lines meet at
-  const inside = near.filter((v) => Math.abs(v.dir[1]) <= 0.9);
+  const fanOf = (v: Vanish) => { const as = v.lines.map((q) => q.a); let best = 0; for (const a of as) for (const b of as) { const d = Math.abs(a - b) % 180; best = Math.max(best, Math.min(d, 180 - d)); } return best; };
+  const inside = near.filter((v) => Math.abs(v.dir[1]) <= 0.9 && fanOf(v) >= 15 && v.lines.reduce((s, q) => s + q.len, 0) >= 0.15 * total);
   const byFoe = foe ? inside.filter((v) => Math.hypot(v.x - foe.x, v.y - foe.y) < 0.2 * W).sort((a, b) => Math.hypot(a.x - foe.x, a.y - foe.y) - Math.hypot(b.x - foe.x, b.y - foe.y))[0] : undefined;
-  if (two) {
+  // three points: uprights meeting above or below, with the horizon of the level points: the lens from
+  // the two (square to each other through the middle), and the tilt from where the horizon is
+  const up = vps.find(third), cx2 = W / 2, cy2 = H / 2;
+  const level0 = two ? (two[0].y + two[1].y) / 2 : (byFoe ?? inside[0] ?? level.slice().sort((a, b) => b.weight - a.weight)[0])?.y;
+  const f3 = up && level0 !== undefined ? -(up.y - cy2) * (level0 - cy2) : -1;
+  // uprights that meet (strictly tested above) outweigh a pair of level points that disagree with them
+  if (up && level0 !== undefined && f3 > 0 && Math.sign(up.y - cy2) !== Math.sign(level0 - cy2)) {
+    const f = Math.sqrt(f3), pitch = (Math.atan((level0 - cy2) / f) * 180) / Math.PI;
+    horizon = level0;
+    out.push(`  Three-point perspective: uprights meet at ${Math.round(up.x * k)},${Math.round(up.y * k)}, the horizon at row ${Math.round(level0 * k)}: a lens of ~${Math.round(f * k)} px (fov ~${Math.round((2 * Math.atan(W / 2 / f) * 180) / Math.PI)}°), the camera tilted ${pitch > 0 ? "up" : "down"} ~${Math.round(Math.abs(pitch))}°.`);
+    pxl = `perspective({ w: ${PW}, horizon: ${Math.round(level0 * k)}, eye: <m>, focal: ${Math.round(f * k)}, pitch: ${Math.round(pitch)} }): vertical() should land near ${Math.round(up.x * k)},${Math.round(up.y * k)}.`;
+  } else if (two) {
     const [a, b, f] = two, hy = (a.y + b.y) / 2;
     horizon = hy;
     out.push(`  Two-point perspective: the horizon at row ${Math.round(hy * k)}; if the two sets are square to each other, a focal length of ~${Math.round(f * k)} px (fov ~${Math.round((2 * Math.atan(W / 2 / f) * 180) / Math.PI)}°).`);
-    pxl = `perspective({ w: ${PW}, horizon: ${Math.round(hy * k)}, eye: <m>, yaw: <deg>, focal: ${Math.round(f * k)} }): turn yaw until vanish(0) and vanish(90) land near ${Math.round(a.x * k)} and ${Math.round(b.x * k)}.`;
+    const yaw = Math.round((Math.atan((W / 2 - a.x) / f) * 180) / Math.PI);
+    pxl = `perspective({ w: ${PW}, horizon: ${Math.round(hy * k)}, eye: <m>, focal: ${Math.round(f * k)}, yaw: ${yaw} }): vanish(0) and vanish(90) then land near ${Math.round(a.x * k)} and ${Math.round(b.x * k)}.`;
   } else if (byFoe || inside.length) {
     const v = byFoe ?? inside.sort((a, b) => b.weight - a.weight)[0];
     horizon = v.y;
@@ -233,10 +268,10 @@ function motionOf(frames: Img[], ms: number[]) {
   const delays = [...new Set(ms)];
   lines.push(`  Timing: ${n} frames, ${delays.length === 1 ? `${delays[0]} ms each (${fps.toFixed(fps < 10 ? 1 : 0)} fps)` : `${Math.min(...delays)}-${Math.max(...delays)} ms (held poses differ)`}; ${held} repeat the frame before (holds).`);
   const seam = frameDiff(L[n - 1], L[0]);
-  lines.push(`  Loop: ${seam <= Math.max(1.6 * med, 0.002) ? "the last frame runs into the first (a loop that closes)" : `the last frame jumps to the first (${(seam / (med || 1e-9)).toFixed(1)}x a usual step): not a closed loop, or a clip from a longer one`}.`);
+  lines.push(`  Loop: ${seam <= Math.max(2 * med, 0.002) ? "the last frame runs into the first (a loop that closes)" : `the last frame jumps to the first (${(seam / (med || 1e-9)).toFixed(1)}x a usual step): not a closed loop, or a clip from a longer one`}.`);
   // a cycle: the shortest shift after which frames repeat
   let cycle = 0;
-  for (let p = 2; p <= Math.min(n - 1, 120) && med > 0; p++) {
+  for (let p = 2; p <= Math.min(Math.floor(n / 2), 120) && med > 0; p++) {
     let s = 0, c = 0;
     for (let i = 0; i + p < n && c < 40; i += Math.max(1, Math.floor((n - p) / 40))) { s += frameDiff(L[i], L[i + p]); c++; }
     if (c && s / c < 0.35 * med) { cycle = p; break; }
@@ -252,9 +287,17 @@ function motionOf(frames: Img[], ms: number[]) {
   const foe = focusOfExpansion(flows);
   lines.push(`  Flow: ${flows.length} textured blocks matched over ${pairs.length} pairs of frames: ${pct(still, flows.length)} stand still, ${pct(moving.length, flows.length)} move.`);
   let bands: { y0: number; y1: number; v: number }[] = [];
-  // a camera moving forward moves much of the picture, most of it straight out from one point
-  const forward = !!foe && foe.n >= 25 && foe.agree >= 0.4 && moving.length >= 0.15 * flows.length;
-  if (forward) {
+  // a camera moving forward moves much of the picture straight out from one point, on both sides of it
+  // and across the picture: a pan carries everything one way (a point far off to one side fits it
+  // too), and things moving on a still picture keep to their places
+  let forward = !!foe && foe.n >= 25 && foe.agree >= 0.4 && moving.length >= 0.15 * flows.length;
+  if (forward && foe) {
+    const F = foe;
+    const ins = moving.filter((f) => { const rx = f.x - F.x, ry = f.y - F.y, c = (rx * f.dx + ry * f.dy) / (Math.hypot(rx, ry) * Math.hypot(f.dx, f.dy) || 1); return F.out ? c > 0.9 : c < -0.9; });
+    const left = ins.filter((f) => f.x < F.x).length, xs = ins.map((f) => f.x);
+    forward = Math.min(left, ins.length - left) >= 0.2 * ins.length && Math.max(...xs) - Math.min(...xs) >= 0.5 * W;
+  }
+  if (forward && foe) {
     lines.push(`  Camera: the scene ${foe.out ? "opens out from" : "closes in to"} ${Math.round(foe.x)},${Math.round(foe.y)} (${pct(foe.agree * 100, 100)} of the moving blocks agree): ${foe.out ? "moving forward toward that point, the vanishing point of the motion" : "moving backward from it"}; things near it move least, things at the edges most.`);
     pxl.push(`perspective({ ..., vp: ${Math.round(foe.x)}, horizon: ${Math.round(foe.y)} }) and a ground that goes by along z: plane() reading the distance travelled.`);
   }
@@ -319,7 +362,7 @@ function blobs(count: Uint16Array, W: number, H: number, min: number) {
 // ---------------------------------------------------------------- the sheet
 /**
  * One picture to look at, panels top to bottom: the picture studied (1x or the translation); its
- * techniques marked over it in grey (checkers magenta, dark lines cyan, in-between tones yellow); its
+ * techniques marked over it in grey (banding red, checkers magenta, dark lines cyan, in-between tones yellow); its
  * straight edges colored by where they meet (red, green, blue; the rest yellow), the vanishing points
  * and the horizon (cyan); the ramps, one row each, dark to light; for an animation, frames across
  * the clip, and the flow (white ticks along each block's motion, the point it opens out from in
@@ -331,7 +374,7 @@ function sheet(pic: Img, t: Techniques, pixelArt: boolean, P: Img, segs: Segment
   panels.push(pic.scale(s));
   if (pixelArt) {
     const g = grey(pic);
-    for (let i = 0; i < t.mask.length; i++) { const k = t.mask[i]; if (k & 1) g.data[i] = pack(230, 60, 220); else if (k & 2) g.data[i] = pack(60, 220, 230); else if (k & 4) g.data[i] = pack(240, 220, 60); }
+    for (let i = 0; i < t.mask.length; i++) { const k = t.mask[i]; if (k & 8) g.data[i] = pack(240, 60, 50); else if (k & 1) g.data[i] = pack(230, 60, 220); else if (k & 2) g.data[i] = pack(60, 220, 230); else if (k & 4) g.data[i] = pack(240, 220, 60); }
     panels.push(g.scale(s));
   }
   const ps = Wd / P.w, pg = grey(P).scale(Math.max(1, Math.round(ps)));

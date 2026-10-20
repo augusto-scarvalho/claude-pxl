@@ -93,10 +93,11 @@ const USAGE = `pxl — pixel-art DSL
   pxl study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--out DIR | --no-out]
       Learn from finished art or a reference: what it is made of and what to use in pxl to make the
       same. Pixel art (an upscale found by its grid, blurred or not) is read at 1x: its palette and
-      ramps (hue shifts), outlines (black, selective), dithering, anti-aliasing, clusters, where the
-      light comes from, tiles. Anything else (a photo, a painting, a render) is read for its masses
-      of light and dark, its colors as ramps, the light's color against the shadows', the haze with
-      distance, and translated into a small picture in few colors to draw over (--to, --colors).
+      ramps (hue shifts), outlines (black, selective), dithering, anti-aliasing, clusters, banding,
+      pillow shading, where the light comes from, tiles. Anything else (a photo, a painting, a
+      render) is read for its masses of light and dark, its colors as ramps, the light's color
+      against the shadows', the haze with distance, and translated by superpixels into a small
+      picture in few colors to draw over (--to, --colors).
       Both: straight edges and where they meet (one, two or three points, the horizon). Animated
       (a GIF, a video): timing, a cycle, whether it loops, planes going by and their speeds
       (parallax), a scene opening out from the point it moves toward, the parts that move on a still

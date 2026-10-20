@@ -418,22 +418,31 @@ sections.
 `study` learns from finished art or a reference (a PNG, a GIF, a JPEG or WebP, a video): a report of
 what it is made of, with what to use in pxl to make the same (palette, `outline`/`selout`, `dither`,
 the light for `relight`, `perspective({ horizon, vp })`, `scroll` per plane, `anim` frames), and in
-`<out>/_study/` a sheet to look at (the picture; its techniques marked: checkers magenta, dark lines
-cyan, in-between tones yellow; its straight edges colored by where they meet, the horizon cyan; the
-ramps; frames and the flow), the picture and `<name>.hex`. It reads two kinds of picture two ways.
+`<out>/_study/` a sheet to look at (the picture; its techniques marked: banding red, checkers
+magenta, dark lines cyan, in-between tones yellow; its straight edges colored by where they meet, the
+horizon cyan; the ramps; frames and the flow), the picture and `<name>.hex`. It reads two kinds of
+picture two ways.
 Pixel art (few colors, hard steps between them, often drawn at 2x and up) is read as drawn: its grid
 found (an exact upscale, or a blurred, compressed or fractional one: a video of a game, a JPEG,
 2.5x) and the picture taken back to 1x, so its palette, ramps (and how their hue shifts from shade
 to light), outlines (near-black, a darker shade of what they border, or none), 2x2 dithering,
 in-between tones on edges (anti-aliasing), lone pixels, the light (where each ramp's lighter tones
-lie) and repeating tiles are counted on the artist's own pixels. Anything else (a photo, a painting,
-a render) has no pixels to read that way: it is read for what a pixel artist takes from it (the
-masses of dark, middle and light, the colors reduced to `--colors` (16) as ramps, the light's color
-against the shadows', contrast and color by band for the haze of distance) and translated into a
-`--to` (160 px wide) picture in those colors, to draw over in a `ref: true` layer: the lesson is in
-its masses and light, not its pixels. Both are read for their perspective (Sobel edges, Hough lines,
-where they meet: one point on the horizon, two either side of the middle with the lens they imply,
-uprights meeting above or below) and, animated, for their motion: the frames' timing and holds, a
+lie; on a sprite also its rim's lightness fit to one light, after Johnson and Farid), banding (runs of
+two colors side by side whose ends line up, as Pixel Logic and the Pixel Fixer paper define it),
+pillow shading (lighter the farther in from the edge all round) and repeating tiles are counted on
+the artist's own pixels. Anything else (a photo, a painting, a render) has no pixels to read that
+way: it is read for what a pixel artist takes from it (the masses of dark, middle and light, the
+colors reduced to `--colors` (16) as ramps, the light's color against the shadows', contrast and
+color by band for the haze of distance) and translated into a `--to` (160 px wide) picture in those
+colors by superpixels (after Gerstner et al., "Pixelated Image Abstraction", 2012: edges stay edges
+where a box average blurs them), to draw over in a `ref: true` layer: the lesson is in its masses
+and light, not its pixels. Both are read for their perspective: straight edges found by region
+growing on the level-line angle (after LSD, Grompone von Gioi et al. 2012), where they meet (each
+crossing of two a candidate, scored by the lines pointing at it from beyond their ends), a second
+point looked for along the first one's horizon; one point; two either side of the middle with the
+lens and the turn they imply (`focal`, `yaw`); uprights meeting above or below, off the picture and
+on its middle column, with the horizon giving the lens and the tilt (`pitch`). Animated, for their
+motion: the frames' timing and holds, a
 cycle (the shortest shift after which frames repeat), whether the last frame runs into the first,
 bands of rows carried across together and their speeds to a fraction of a pixel (parallax planes:
 `scroll`'s `per` is the speed times the loop's frames), the point the motion opens out from (a camera

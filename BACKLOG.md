@@ -398,6 +398,25 @@ one), and the art code itself (4% of the cost).
   px/frame (made at 1.67, 3.33, 6.67, 10); the race at 2x, one-point with the horizon on row 72 and
   the camera on column 150 (made at 70 and 160) and the motion opening out from 169,58; a game
   video at 800x392 found drawn at 3.23x, 22 colors once folded; a road photo translated at 160x120.
+- [x] **Read back what pxl made, and fix what reads wrong**: every gallery GIF studied against its
+  source. First pass: a 360-frame loop cut at 240 (and called open), a pan, a sunset's grass and a
+  bout taken for a camera moving forward, a 96-frame loop called a cycle of 95, vanishing points in
+  flat scenes (a cave, a shop, a street front) out of texture lines, the park's two points missed and
+  its lens 34° (made at 90°), the volcano's tilt missed. Then, from the literature: straight edges
+  by LSD-style region growing (Grompone von Gioi et al., IPOL 2012) instead of a Hough transform; a
+  point must lie beyond its lines' ends; a second point sought along the first's horizon; a third
+  only for uprights fanning out, meeting off the picture on its middle column, with the lens and the
+  tilt from the horizon (after the orthogonality the 2-line and Manhattan methods use: Lu et al.,
+  WACV 2017; Zhang et al., IJCV 2016); forward motion only with vectors either side of its point.
+  Now: the race one-point at 160,70 (made at 160,70), the road at 159,71 (160,72), the park two-point
+  with fov 89° and yaw 39° (90°, 40°), the volcano three-point with fov 75° and a tilt of 21° (80°,
+  18°), no point in the flat scenes, every loop closed; a test reads the train and the park back.
+- [x] **More of what the papers measure**: a sprite's light from its rim (Johnson and Farid, 2005);
+  banding by Pixel Logic's rule as the Pixel Fixer paper (TU Delft, 2025) states it; pillow shading;
+  the translation of a photo by superpixels after Gerstner et al. (NPAR 2012), which keeps edges.
+  Studied and left: a contrario validation (NFA) of segments and points (the length and density
+  tests do here), RANSAC for the points (the crossings are few enough to try them all), deep
+  vanishing-point nets, Wang and Adelson's affine layers (bands of rows serve for parallax planes).
 
 ## Perspective scenes (from dogfooding road, park and extinction)
 
