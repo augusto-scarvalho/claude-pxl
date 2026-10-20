@@ -43,7 +43,6 @@ pal({
   // the gloves' sheen
   "'": "#aaa2be",
 })
-ramps("-=]}'")                          // the gloves, dark to light: their shade() and light()
 const W = 320, H = 180, FPS = 16, FRAMES = 192, SECONDS = FRAMES / FPS
 const TAU = Math.PI * 2
 const SPEED = 56, LOOP_M = SPEED * SECONDS                          // 672 m a loop
@@ -598,57 +597,27 @@ sprite("_cockpit", { w: W, h: H }, (c) => {
 
 // ---------------------------------------------------------------- the driver
 // The wheel, small as a racing car's, turns with the bend and with every change of lane; the hands
-// go round with it at a quarter to three, gripping as drivers do: the back of the glove toward us,
-// the palm on the rim, the thumbs on top of it pointing in, the fingers wrapped round it. The forearms
-// come up from the corners in the blue suit with its white stripes, a knit cuff at each wrist. The
-// gauges' needles: the revs flutter, the speed holds about 200; the ribbons from the mirror swing
-// against the turn.
+// go round with it at ten to two, gripping as drivers do: the back of the glove up and toward us, the palm down on
+// the rim, the fingers curled forward over it, the thumbs pointing in. The forearms come up from the
+// corners in the blue suit with its white stripes, a knit cuff at each wrist. The gauges' needles:
+// the revs flutter, the speed holds about 200; the ribbons from the mirror swing against the turn.
 //
-// The hand is a puppet: each part drawn on its own, then stamped at its joint in the hand's frame
-// (32 x 42: the left hand, the rim running up through the fist at x 15..22; the right hand is its
-// mirror). As the reference pictures have it, the thumb lies along the rim on top of it, its tip up
-// and in; the knuckles run down the inner edge of the back, and the fingers from them wrap round the
-// rim, seen end on as bands stacked along it, the index under the thumb and the pinky lowest.
-// a finger, from its knuckle (left, open into the back of the hand) to its bend round the rim
-sprite("_h_finger", `
-  00000000..
-  ''}}}}]]0.
-  }}]]]]]]-0
-  ]]]]]]]--0
-  ]]]]]]--0.
-  000000000.`)
-sprite("_h_pinky", `
-  0000000..
-  '}}}}]]0.
-  }]]]]]--0
-  ]]]]]--0.
-  00000000.`)
+// The hand is a puppet, put together every frame on the rim from its joints. A left hand gripping
+// at ten o'clock, the back of the glove up and toward us: the fingers lie side by side along the rim,
+// each across it, from its knuckle inside the rim's near edge, over the rim, to its bend just past
+// the far edge, so the rim goes into the fist and out of it; the back of the hand hangs from the
+// knuckles to the wrist; the thumb lies under the rim on its inner side, pointing in. The right hand
+// is the mirror image. The fingers are painted round (capsule) at whatever angle the rim has there,
+// the back is a plate lit on its own edges, the thumb a small drawing.
 sprite("_h_thumb", `
-  .........000.
-  ........0''}0
-  .......0''}]0
-  .......0'}]-0
-  ......0'}]]-0
-  .....0'}}]-0.
-  ....0}}]]-0..
-  ...0}}]]-0...
-  ..0}}]]]-0...
-  ..0}]]]-0....
-  .0}}]]]-0....
-  0}}]]]-0.....
-  0]]]]--0.....`)
-// the back of the hand, from the knuckles out and down to the wrist: a plate, lit on its own edges,
-sprite("_h_back", { w: 22, h: 30, outline: "0" },
-  plate({ light: [-0.5, -1], reach: 3, ramps: ["-=]}'"] }, poly([2, 6, 8, 2, 13, 1, 19, 3, 21, 10, 21, 20, 19, 25, 14, 29, 6, 29, 1, 24, 0, 14], "]")),
-  light([3, 7, 9, 3, 14, 3, 7, 11, 3, 17], 1), shade([3, 21, 16, 8], 1))      // its sheen along the top, darker to the wrist
-// assembled: the back, the fingers index to pinky (each over the one above), the thumb on top. Its
-// pivot is where the rim goes into the fist, under the index; turned with the wheel by RotSprite.
-const GRIP = [18, 12], WRIST = [9, 38]
-sprite("_hand_l", { w: 32, h: 42, pivot: GRIP },
-  stamp("_h_back", 1, 9),
-  stamp("_h_finger", 20, 9), stamp("_h_finger", 20, 14), stamp("_h_finger", 20, 19), stamp("_h_pinky", 20, 24),
-  stamp("_h_thumb", 11, 0))
-for (let d = -15; d <= 15; d += 5) sprite("_hand_l_" + d, { base: "_hand_l", angle: d })
+  .......000.
+  ....000''}0
+  ..00''}}]-0
+  .0''}}]]-0.
+  0}}]]]]-0..
+  0]]]]--0...
+  .00000.....`)
+const HAND = { a: Math.PI * 0.76, step: 0.115 }   // the left index finger's angle on the rim; between fingers
 const steer = (f) => {
   const s = (f / FRAMES) * SECONDS, h = 0.02
   const lat = (ourX(((s + h) / SECONDS) * FRAMES) - 2 * ourX(f) + ourX(((s - h) / SECONDS) * FRAMES)) / (h * h)
@@ -683,13 +652,25 @@ function wheel(c, f) {
   }
   for (let i = -4; i <= 4; i++) { const a = Math.PI / 2 - turn + i * 0.014, [x, y] = onRim(a), [xi, yi] = onRim(a, rimT(a)); c.line(R(x), R(y), R(xi), R(yi), i === 0 ? "@" : "(") }
   // the arms: each forearm from its corner up to the wrist, the hand gripping the rim, the cuff
-  const deg = Math.max(-15, Math.min(15, R((turn * 180) / Math.PI / 5) * 5)), co = Math.cos(turn), si = Math.sin(turn)
   for (const side of [1, -1]) {
-    const a = side > 0 ? Math.PI * 0.91 : Math.PI * 0.09, [gx, gy] = onRim(a - turn, rimT(a) / 2)
-    const ox = (WRIST[0] - GRIP[0]) * side, oy = WRIST[1] - GRIP[1], wrist = [gx + ox * co - oy * si, gy + ox * si + oy * co]
-    const elbow = side > 0 ? [44, 214] : [276, 214]
+    // the fingers' places on the rim, pinky first (the others lie over it), and their knuckles
+    const fingers = [3, 2, 1, 0].map((i) => {
+      const a = (side > 0 ? HAND.a + i * HAND.step : Math.PI - HAND.a - i * HAND.step) - turn, t = rimT(a)
+      const [x, y] = onRim(a, t / 2), [ox, oy] = onRim(a), [ix, iy] = onRim(a, t), L = Math.hypot(ix - ox, iy - oy)
+      return { i, x, y, t, nx: (ix - ox) / L, ny: (iy - oy) / L }
+    })
+    const [px, py] = [fingers[0].x, fingers[0].y + 6], [ix, iy] = [fingers[3].x, fingers[3].y + 6]
+    const wrist = [(px + ix) / 2 - 3 * side, Math.max(py, iy) + 17], elbow = side > 0 ? [44, 214] : [276, 214]
     forearm(c, elbow, wrist, side)
-    c.stamp(`_hand_l_${side > 0 ? deg : -deg}`, R(gx), R(gy), side > 0 ? undefined : { flip: "x" })
+    c.plate(() => c.poly([px - side, py - 1, ix + 4 * side, iy - 2, ix + 9 * side, iy + 7, wrist[0] + 8 * side, wrist[1], wrist[0] - 8 * side, wrist[1], px - 3 * side, py + 8].map(R), "]"),
+      { light: [-0.5 * side, -1], reach: 3, ramps: ["-=]}'"] })
+    c.stamp("_h_thumb", R(ix + (side > 0 ? 2 : -12)), R(iy + 2), side > 0 ? undefined : { flip: "x" })
+    // each finger: an outline first, so it lies over the one before with a dark line between
+    for (const { i, x, y, t, nx, ny } of fingers) {
+      const r = i === 3 ? 2.1 : 2.6, k = [x + nx * (t / 2 + 2.5), y + ny * (t / 2 + 2.5)], tip = [x - nx * (t / 2 + 1.2), y - ny * (t / 2 + 1.2)]
+      c.capsule(k[0], k[1], r + 1, tip[0], tip[1], r + 0.8, "0")
+      c.capsule(k[0], k[1], r, tip[0], tip[1], r - 0.2, "-=]}'", { light: [-0.5 * side, -1] })
+    }
     cuff(c, elbow, wrist)
   }
 }
