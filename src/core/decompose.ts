@@ -19,7 +19,7 @@ import { dE, lab } from "./vision.ts";
 import { type Relight, lightColor, relight } from "./relight.ts";
 
 export interface Band { y0: number; y1: number; v: number }
-export type Kind = "carried" | "walk" | "stream" | "anim" | "rig" | "effect" | "light";
+export type Kind = "carried" | "walk" | "stream" | "anim" | "rig" | "action" | "effect" | "light";
 export interface Piece {
   kind: Kind;
   /** where it is: its box over the clip (x, y, w, h) */
@@ -42,6 +42,8 @@ export interface Piece {
   fill: number;
   /** a light: about where it shines from, how many times brighter at its brightest than at its dimmest, its color */
   source?: [number, number]; strength?: number; tint?: Color;
+  /** smears: the frames a shape swept by something fast shows in (its colors there for a moment only) */
+  smears?: { frames: number[]; colors: Color[] };
 }
 
 type Blob = { x0: number; y0: number; x1: number; y1: number; n: number; cx: number; cy: number; pix: number[] };
@@ -278,7 +280,8 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const moves = differs > 0 && shifted >= 0.6 * differs;
     // a thing carried along in pieces (legs and body apart, so no one piece was followed): the longest
     // stretch in which the middle of what changes goes steadily one way, straight (not the arc a turning
-    // thing traces: half a turn is 0.64 of its path)
+    // thing traces: half a turn is 0.64 of its path), most of its own size at least (a swing's smear
+    // moves the middle of what changes a way, the body stays)
     const own = median(sizes);
     let along: [number, number] | null = null, longest = 0;
     for (let a = 0; a < mids.length; a++) {
@@ -286,7 +289,7 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       for (let b = a + 1; b < mids.length; b++) {
         path += Math.hypot(mids[b][1] - mids[b - 1][1], mids[b][2] - mids[b - 1][2]);
         const ddx = mids[b][1] - mids[a][1], ddy = mids[b][2] - mids[a][2], net = Math.hypot(ddx, ddy), span = mids[b][0] - mids[a][0];
-        if (b - a >= 6 && span > longest && net >= Math.max(8, 0.3 * own) && net >= 0.8 * path && net >= 0.2 * span) { longest = span; along = [ddx / span, ddy / span]; }
+        if (b - a >= 6 && span > longest && net >= Math.max(8, 0.8 * own) && net >= 0.8 * path && net >= 0.2 * span) { longest = span; along = [ddx / span, ddy / span]; }
       }
     }
     // round a loop (birds circling, a swing): a long way gone, back where it started, no jump (a jump is
@@ -300,11 +303,16 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const round = (!!along || about) && total >= 2 * Math.max(bw, bh) && back < 0.5 * Math.max(bw, bh) && jump < Math.max(4, 0.5 * own);
     // things going across one after another (traffic, a crowd): most of the flow in it moves, sideways
     const inside = flows.filter((f) => f.x >= x0 && f.x <= x1 && f.y >= y0 && f.y <= y1), mv = inside.filter((f) => f.dx || f.dy);
-    const across = mv.filter((f) => Math.abs(f.dx) > 2 * Math.abs(f.dy)).length;
-    const stream = !along && mv.length >= 6 && mv.length >= 0.3 * inside.length && across >= 0.7 * mv.length;
+    // (one way: an axe swung goes both ways)
+    const right = mv.filter((f) => f.dx > 2 * Math.abs(f.dy)).length, left = mv.filter((f) => -f.dx > 2 * Math.abs(f.dy)).length;
+    const stream = !along && mv.length >= 6 && mv.length >= 0.3 * inside.length && Math.max(right, left) >= 0.7 * mv.length;
+    // a run of poses played once (an attack, a jump): many drawings, none coming back, and a body that
+    // moves (its blocks found again a step on), not changing all over like fire
+    const action = !along && !cycle && poses >= 0.5 * N && inside.length >= 4 && mv.length >= 0.4 * inside.length;
     const kind: Kind = along || round ? (poses >= 3 ? "walk" : "carried")
       : stream ? "stream"
       : coherent >= 0.85 && tone >= 0.6 && !moves ? "light"
+      : action ? "action"
       : !cycle && poses >= 0.5 * N && coherent < 0.8 ? "effect"
       : parts.length >= 2 && share < 0.6 ? "rig" : "anim";
     // its captures, the background taken away: in place, its body's box (room for what of it stays
@@ -317,7 +325,8 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const capture = (e: [number, number, number, number, number]): Cut => (about ? { t: e[0], b: box, keep: carriedCut(own1(e[0]), box, W) } : { t: e[0], b: boxAt(e), keep: matte(F[e[0]], fg[e[0]], boxAt(e), mine, model, W, tol, mode).keep });
     const steps = track.filter((e, i) => i === 0 || e[0] === track[i - 1][0] + 1);
     pieces.push({
-      kind, box: along || about || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle, parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), track,
+      kind, box: along || about || kind === "action" || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle, parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), track,
+      ...(kind === "action" || kind === "walk" ? smearsOf(F, roomy(x0, y0, bw, bh, 2), W) : {}),
       ...captures(cycle >= 2 && steps.length >= cycle ? steps.slice(0, cycle) : spread(track, 8), spread(track, 8), capture, F0),
     });
   }
@@ -386,6 +395,37 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
 }
 
 const bboxBlob = (px: number[], W: number) => { const [x0, y0, w, h] = bboxOf(px, W); return { x0, y0, x1: x0 + w - 1, y1: y0 + h - 1 }; };
+const iouBox = (a: number[], b: number[]) => { const w = Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])), h = Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1])); return (w * h) / (a[2] * a[3] + b[2] * b[3] - w * h || 1); };
+
+/**
+ * A thing's smears (the shape a blade or a limb sweeps, drawn on the frames it moves fastest): colors
+ * it shows a lot of on a few frames only (12 px at least, eight times their usual, on half the frames at
+ * most), and the frames they show in as a long thin piece (2.5 times as long as it is wide, or filling a
+ * third of its box at most).
+ */
+function smearsOf(F: Img[], b: Box, W: number): { smears?: { frames: number[]; colors: Color[] } } {
+  const N = F.length, per = new Map<Color, number[]>();
+  F.forEach((f, t) => { for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) { const c = f.data[y * W + x]; if ((c & 255) < 128) continue; const n = per.get(c) ?? per.set(c, new Array(N).fill(0)).get(c)!; n[t]++; } });
+  const colors = [...per].filter(([, n]) => { const q = n.slice().sort((a, b) => a - b), peak = q[N - 1], usual = q[N >> 1]; return peak >= 12 && peak >= 8 * Math.max(1, usual) && n.filter((v) => v >= 0.5 * peak).length <= 0.5 * N; }).map(([c]) => c);
+  if (!colors.length) return {};
+  // a frame's smear: a piece of those colors long and thin (a crescent); a smear's colors are mostly in
+  // such pieces (the back of a cloak turned shows for a few frames too, but whole)
+  const thinIn = (set: Set<Color>, t: number) => {
+    const f = F[t], m = new Uint8Array(W * f.h);
+    for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) if (set.has(f.data[y * W + x])) m[y * W + x] = 1;
+    return label(m, W, f.h, 1).filter((c) => { const cw = c.x1 - c.x0 + 1, ch = c.y1 - c.y0 + 1; return c.n >= 12 && (Math.max(cw, ch) >= 2.5 * Math.min(cw, ch) || c.n <= 0.35 * cw * ch); });
+  };
+  const thin = new Map<Color, number>(), all = new Map<Color, number>(), set0 = new Set(colors);
+  for (let t = 0; t < N; t++) {
+    for (const c of thinIn(set0, t)) for (const p of c.pix) thin.set(F[t].data[p], (thin.get(F[t].data[p]) ?? 0) + 1);
+    for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) { const c = F[t].data[y * W + x]; if (set0.has(c)) all.set(c, (all.get(c) ?? 0) + 1); }
+  }
+  const smear = colors.filter((c) => (thin.get(c) ?? 0) >= 0.5 * (all.get(c) ?? 1)).sort((x, y) => (thin.get(y) ?? 0) - (thin.get(x) ?? 0));
+  if (!smear.length) return {};
+  const set = new Set(smear), frames = F.map((_, t) => t).filter((t) => thinIn(set, t).length > 0);
+  return frames.length && frames.length <= 0.6 * N ? { smears: { frames, colors: smear.slice(0, 4) } } : {};
+}
+
 const bboxOf = (px: number[], W: number): [number, number, number, number] => {
   let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
   for (const p of px) { const x = p % W, y = Math.floor(p / W); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }

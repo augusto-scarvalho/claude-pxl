@@ -97,12 +97,14 @@ const USAGE = `pxl — pixel-art DSL
       pillow shading, where the light comes from, tiles. Anything else (a photo, a painting, a
       render) is read for its masses of light and dark, its colors as ramps, the light's color
       against the shadows', the haze with distance, and translated by superpixels into a small
-      picture in few colors to draw over (--to, --colors).
+      picture in few colors to draw over (--to, --colors). An editor's transparency checker exported
+      with it is taken for clear; a reflection under it is told (its row and opacity) and set aside.
       Both: straight edges and where they meet (one, two or three points, the horizon). Animated
       (a GIF, a video): timing, a cycle, whether it loops, planes going by and their speeds
       (parallax), a scene opening out from the point it moves toward; and its pieces, each with what to
       build it with: the backdrop, sprites carried along a path, walks, things going across, anims in
-      place, rigs (parts moving against a still body), effects (fire, water), and the lights (told
+      place, rigs (parts moving against a still body), actions (an attack, with the frames of its
+      smears), effects (fire, water), and the lights (told
       apart first: where each shines from, how strongly, its color). Writes _study/<name>.png (a sheet
       to look at), the picture at 1x (or the translation) and <name>.hex; animated, each piece cut out
       of its background (<name>_pieces.png, a strip each in <name>_piece<N>.png, the tracks in

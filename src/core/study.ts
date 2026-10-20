@@ -14,7 +14,7 @@
 import { type Color, pack, toHex } from "./color.ts";
 import { Img } from "./image.ts";
 import { type Piece, decompose } from "./decompose.ts";
-import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Vanish, areaDown, bandShifts, blockFlow, colorCounts, dE, findGrid, findRamps, findSegments, findTiles, findVanishing, focusOfExpansion, frameDiff, lab, lch, lumaOf, mergeNear, pixelate, quantize, techniques, toNative } from "./vision.ts";
+import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Vanish, areaDown, bandShifts, blockFlow, clearChecker, clearReflection, colorCounts, dE, findChecker, findGrid, findReflection, findRamps, findSegments, findTiles, findVanishing, focusOfExpansion, frameDiff, lab, lch, lumaOf, mergeNear, pixelate, quantize, techniques, toNative } from "./vision.ts";
 
 /** frames as read; `drawnAt`: they were already brought down from that grid as they were read (big animations) */
 export interface StudyInput { name: string; frames: Img[]; ms: number[]; kind: string; drawnAt?: Grid }
@@ -36,13 +36,22 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   const pre = !!input.drawnAt, g = input.drawnAt ?? findGrid(first), up = g.sx > 1 || g.sy > 1;
   // a copy that was blurred, compressed or scaled by a fraction has its colors smeared: fold them harder
   const smeared = !Number.isInteger(g.sx) || /JPG|JPEG|WEBP|video/i.test(input.kind);
-  const native = up && !pre ? toNative(first, g) : first, folded = mergeNear(native, smeared ? 0.07 : 0.03);
+  // the checker an editor shows for clear, exported with it: taken for clear before anything is read
+  const raw = up && !pre ? toNative(first, g) : first, checker = smeared ? null : findChecker(raw);
+  const unchecker = (f: Img) => (checker ? clearChecker(f, checker) : f);
   // pixel art: few colors and hard steps between them, once a copy's noise is folded away; a grid
   // found under the noise says so too
-  const nColors = colorCounts(folded).size, smooth = smoothShare(folded);
-  const pixelArt = nColors <= 256 && (up || smooth < 0.35);
+  const folded0 = mergeNear(unchecker(raw), smeared ? 0.07 : 0.03), smooth = smoothShare(folded0);
+  const pixelArt = colorCounts(folded0).size <= 256 && (up || smooth < 0.35);
+  // and a reflection under it (a floor that shines): told and left out of the rest
+  const raws = input.frames.map((f, i) => (i ? (pixelArt && up && !pre ? toNative(f, g) : f) : raw));
+  const reflection = pixelArt && !smeared ? findReflection(raws, checker) : null;
+  const clear = (f: Img) => (reflection ? clearReflection(unchecker(f), reflection, checker) : unchecker(f));
+  const native = clear(raw), folded = reflection ? mergeNear(native, smeared ? 0.07 : 0.03) : folded0, nColors = colorCounts(folded).size;
   const dur = input.ms.reduce((s, v) => s + v, 0);
   text.push(`${input.name}: ${pre ? `${Math.round(first.w * g.sx)}x${Math.round(first.h * g.sy)}` : `${first.w}x${first.h}`}${input.frames.length > 1 ? `, ${input.frames.length} frames over ${(dur / 1000).toFixed(1)} s` : ""} (${input.kind})`);
+  if (checker) text.push(`Clear: the transparency checker (${hex(checker.a)} and ${hex(checker.b)} in ${checker.size} px squares, as an editor shows what is clear) was exported with it: taken for clear, so it isn't read as the picture's colors.`);
+  if (reflection) text.push(`Reflection: below row ${reflection.axis}, what is above it mirrored over what's behind at about ${Math.round(reflection.alpha * 100)}% (a floor that shines, still water; ${pct(reflection.share * 100, 100)} of what is below it): the same drawing stamped flipped (flip: "y") in a layer with opacity: ${reflection.alpha.toFixed(2)}; left out of the rest of this reading.`);
 
   // the picture studied: the drawing at 1x, or a translation of the rest into few colors
   let picture: Img, scale = 1, avg: Img;
@@ -102,7 +111,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   // ---------------------------------------------------------------- motion, then perspective
   let motion: ReturnType<typeof motionOf> | null = null;
   if (input.frames.length > 1) {
-    const frames = input.frames.map((f) => (pixelArt ? (up && !pre ? toNative(f, g) : f) : areaDown(f, ...fit(f.w, f.h, 320))));
+    const frames = input.frames.map((f, i) => (pixelArt ? clear(raws[i]) : areaDown(f, ...fit(f.w, f.h, 320))));
     motion = motionOf(frames, input.ms, smeared);
   }
   const P = pixelArt ? picture : areaDown(first, ...fit(first.w, first.h, 480));
@@ -346,21 +355,25 @@ const WHAT: Record<Piece["kind"], string> = {
   stream: "things going across one after another (traffic, a crowd): each a sprite stamped along its lane, back at the start when it leaves (a whole lane at one speed: scroll())",
   anim: "animated in place: an anim of its drawings",
   rig: "parts moving against a body that stays: a rig (rig(), its parts at sockets), or an anim with a frame per pose",
+  action: "a run of poses played once (an attack, a jump, a fall): an anim with a frame per pose (for many, a rig posed by ik: rig/knight.px.js), its timing in how many frames each part takes",
   effect: "changing all over without repeating (fire, water, smoke, sparkle): an effect in code: flame(), plume(), warp() or noise drawn per frame",
   light: "lighter and darker all at once: a light: glow(), a lamp, or colors swapped per frame",
 };
+/** Frame numbers as runs: 3-5, 8, 15-18. */
+const spans = (v: number[]) => { const out: string[] = []; for (let i = 0; i < v.length; ) { let j = i; while (j + 1 < v.length && v[j + 1] === v[j] + 1) j++; out.push(j > i ? `${v[i]}-${v[j]}` : `${v[i]}`); i = j + 1; } return out.join(", "); };
 /** The pieces told and drawn: the 16 biggest things, then the 8 biggest lights. */
 const shown = (pieces: Piece[]) => [...pieces.filter((p) => p.kind !== "light").slice(0, 16), ...pieces.filter((p) => p.kind === "light").slice(0, 8)];
 function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: number; v: number }[], forward: boolean): string[] {
   const out = [`  Backdrop: ${pct(d.still * 100, 100)} of the picture never changes${d.still > 0.2 ? ": one picture (a sprite or the scene's still layers) under everything else" : ""}.`];
   if (bands.length && !forward) out.push(`  Planes: ${bands.length} band${bands.length > 1 ? "s" : ""} of rows going by (see MOTION): each a strip that wraps, scroll().`);
-  if (d.relit) out.push("  Light: where only the light changes (a lamp pulsing, a fire on the walls) was told apart first and taken away before looking for things, so what it lights isn't taken for a thing; the lights are pieces of their own (each capture shows the light itself, its color as strong as its change).");
+  if (d.relit && d.pieces.some((p) => p.kind === "light")) out.push("  Light: where only the light changes (a lamp pulsing, a fire on the walls) was told apart first and taken away before looking for things, so what it lights isn't taken for a thing; the lights are pieces of their own (each capture shows the light itself, its color as strong as its change).");
   const where = (b: number[]) => `${b[2]}x${b[3]} at ${b[0]},${b[1]}`;
   const dir = (v: [number, number]) => `${Math.abs(v[0]) >= Math.abs(v[1]) ? (v[0] < 0 ? "left" : "right") : v[1] < 0 ? "up" : "down"} at ${Math.hypot(v[0], v[1]).toFixed(2)} px/frame`;
   for (const [i, p] of shown(d.pieces).entries()) {
     const draw = `${p.poses} drawing${p.poses === 1 ? "" : "s"}${p.cycle ? `, a cycle of ${p.cycle} frames` : ""}`;
-    const extra = p.round ? `, going round a loop (circling, swinging)` : p.kind === "carried" || p.kind === "walk" ? `, going ${dir(p.speed!)}${p.grow && Math.abs(p.grow - 1) > 0.2 ? `, ${p.grow > 1 ? "growing" : "shrinking"} x${p.grow.toFixed(1)} (${p.grow > 1 ? "coming nearer" : "going away"}: sizes picked by fit)` : ""}${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving (limbs: a rig, or a drawing per pose)` : ""}` : p.kind === "rig" ? `, ${p.parts} parts moving` : p.source ? `, shining from about ${p.source[0]},${p.source[1]}, x${p.strength!.toFixed(1)} from its dimmest to its brightest, its light ${hex(p.tint!)}` : "";
-    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}: ${WHAT[p.kind]}.`);
+    const extra = p.round ? `, going round a loop (circling, swinging)` : p.kind === "carried" || p.kind === "walk" ? `, going ${dir(p.speed!)}${p.grow && Math.abs(p.grow - 1) > 0.2 ? `, ${p.grow > 1 ? "growing" : "shrinking"} x${p.grow.toFixed(1)} (${p.grow > 1 ? "coming nearer" : "going away"}: sizes picked by fit)` : ""}${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving (limbs: a rig, or a drawing per pose)` : ""}` : p.kind === "rig" ? `, ${p.parts} parts moving` : p.kind === "action" ? `${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving` : ""}` : p.source ? `, shining from about ${p.source[0]},${p.source[1]}, x${p.strength!.toFixed(1)} from its dimmest to its brightest, its light ${hex(p.tint!)}` : "";
+    const sm = p.smears ? ` Smears on frames ${spans(p.smears.frames)} (${p.smears.colors.map(hex).join(", ")}: there a moment only): the shape the swing sweeps, on the frames it goes fastest, arc(cx, cy, r, from, to, c, { inner, taper }) in a layer with unlit: true, outline: false (characters.md: its last 100 degrees at most, thin at its tail).` : "";
+    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}: ${WHAT[p.kind]}.${sm}`);
   }
   const things = d.pieces.filter((p) => p.kind !== "light").length, lights = d.pieces.length - things;
   if (things > 16 || lights > 8) out.push(`  ... and ${[things > 16 ? `${things - 16} smaller things` : "", lights > 8 ? `${lights - 8} smaller lights` : ""].filter(Boolean).join(" and ")}.`);
@@ -398,7 +411,7 @@ function piecesOut(d: ReturnType<typeof decompose>, ms: number[]): { sheet: Img;
   }
   const json = {
     frames: d.frames, ms: Math.round(ms.reduce((a, v) => a + v, 0) / ms.length), backdrop: +d.still.toFixed(3),
-    pieces: list.map((p, i) => ({ id: i + 1, kind: p.kind, box: p.box, frames: p.frames, drawings: p.poses, cycle: p.cycle, ...(p.speed ? { speed: p.speed.map((v) => +v.toFixed(3)) } : {}), ...(p.grow !== undefined ? { grow: +p.grow.toFixed(2) } : {}), ...(p.parts ? { parts: p.parts } : {}), ...(p.round ? { round: true } : {}), ...(p.source ? { source: p.source, strength: +p.strength!.toFixed(2), tint: hex(p.tint!) } : {}), fill: +p.fill.toFixed(2), strip: { file: `_piece${i + 1}.png`, frames: p.stripFrames, w: p.strip.w / p.stripFrames, h: p.strip.h }, track: p.track })),
+    pieces: list.map((p, i) => ({ id: i + 1, kind: p.kind, box: p.box, frames: p.frames, drawings: p.poses, cycle: p.cycle, ...(p.speed ? { speed: p.speed.map((v) => +v.toFixed(3)) } : {}), ...(p.grow !== undefined ? { grow: +p.grow.toFixed(2) } : {}), ...(p.parts ? { parts: p.parts } : {}), ...(p.round ? { round: true } : {}), ...(p.smears ? { smears: { frames: p.smears.frames, colors: p.smears.colors.map(hex) } } : {}), ...(p.source ? { source: p.source, strength: +p.strength!.toFixed(2), tint: hex(p.tint!) } : {}), fill: +p.fill.toFixed(2), strip: { file: `_piece${i + 1}.png`, frames: p.stripFrames, w: p.strip.w / p.stripFrames, h: p.strip.h }, track: p.track })),
   };
   return { sheet: out, json, strips: list.map((p) => p.strip) };
 }
@@ -466,7 +479,7 @@ function sheet(pic: Img, t: Techniques, pixelArt: boolean, P: Img, segs: Segment
     for (const b of m.bands) for (let y = Math.max(0, b.y0 * fs); y < Math.min(fl.h, b.y1 * fs); y++) for (let x = 0; x < Math.max(2, Math.round((Math.abs(b.v) / top) * 24)); x++) fl.set(x, y, pack(240, 200, 60));
     panels.push(fl);
     if (m.layers) {
-      const PC: Record<Piece["kind"], Color> = { carried: pack(70, 220, 230), walk: pack(80, 230, 90), stream: pack(90, 140, 255), anim: pack(240, 220, 60), rig: pack(240, 150, 60), effect: pack(230, 60, 220), light: pack(250, 250, 250) };
+      const PC: Record<Piece["kind"], Color> = { carried: pack(70, 220, 230), walk: pack(80, 230, 90), stream: pack(90, 140, 255), anim: pack(240, 220, 60), rig: pack(240, 150, 60), effect: pack(230, 60, 220), action: pack(255, 110, 110), light: pack(250, 250, 250) };
       const pp = grey(m.frames[0]).scale(fs);
       for (const [i, p] of shown(m.layers.pieces).entries()) {
         const [x, y, w, h] = p.box.map((v) => v * fs), c = PC[p.kind];

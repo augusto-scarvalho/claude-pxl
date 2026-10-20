@@ -256,3 +256,42 @@ test("study follows two things through where they cross, each by its own speed",
   assert.ok(right && left, JSON.stringify(going.map((p) => [p.speed, p.track.length])));
   assert.ok(right!.track.length >= 40 && left!.track.length >= 40, `${right!.track.length} ${left!.track.length}`);
 });
+
+test("study takes an editor's transparency checker for clear, and tells a reflection under the sprite", () => {
+  // a 64x64 sprite on Aseprite's checker (two greys in 8 px squares), its reflection below it at 30%
+  const W = 64, H = 64, g1 = pack(72, 70, 77), g2 = pack(84, 81, 89), ink = pack(10, 10, 14), blue = pack(30, 100, 200), skin = pack(220, 160, 110);
+  const chk = (x: number, y: number) => ((Math.floor(x / 8) + Math.floor(y / 8)) % 2 ? g2 : g1);
+  const img = new Img(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) img.set(x, y, chk(x, y));
+  const sprite = (x: number, y: number) => (y < 6 ? (Math.abs(x - 31.5) < 3.5 ? skin : null) : Math.abs(x - 31.5) < 6 ? (Math.abs(x - 31.5) >= 5 || y === 29 ? ink : blue) : null);
+  for (let y = 4; y < 30; y++) for (let x = 20; x < 44; x++) { const c = sprite(x, y - 4); if (c !== null) img.set(x, y, c); }
+  const mix = (a: number, b: number, k: number) => pack(...([24, 16, 8].map((s) => Math.round(((a >>> s) & 255) * (1 - k) + ((b >>> s) & 255) * k)) as [number, number, number]));
+  for (let y = 30; y < 56; y++) for (let x = 20; x < 44; x++) { const c = sprite(x, 59 - y - 4); if (c !== null) img.set(x, y, mix(chk(x, y), c, 0.3)); }
+  const text = study({ name: "checker", frames: [img], ms: [100], kind: "test" }).text.join("\n");
+  assert.match(text, /Clear: the transparency checker \(#484[0-9a-f]{3} and #54515[0-9a-f] in 8 px squares/);
+  assert.match(text, /Reflection: below row 30, .* at about 30%/);
+  // the checker's greys and the reflection's blends aren't read as the picture's colors
+  assert.doesNotMatch(text.split("PALETTE AND RAMPS")[1].split("TECHNIQUES")[0], /#48464d|#545159/);
+});
+
+test("study reads an attack: poses played once, in place, with a smear on the frames the blade sweeps", () => {
+  // 16 frames on clear: a body that dips a pixel as it swings an axe through 200 degrees once; a cream
+  // crescent swept on 3 of them
+  const W = 96, H = 72, n = 16, ink = pack(15, 15, 20), robe = pack(40, 80, 170), steel = pack(150, 160, 175), wood = pack(120, 80, 40), cream = pack(255, 250, 228);
+  const frames = Array.from({ length: n }, (_, f) => {
+    const img = new Img(W, H), dip = f >= 4 && f <= 12 ? 1 : 0;
+    for (let y = 30; y < 58; y++) for (let x = 34; x < 46; x++) img.set(x, y + dip, x === 34 || x === 45 || y === 30 || y === 57 ? ink : (x + y) % 3 ? robe : pack(30, 60, 140));
+    const a = (-100 + (f * 200) / n) * (Math.PI / 180), cx = 47, cy = 40 + dip;
+    for (let r = 0; r < 18; r++) for (const w of [-1, 0, 1]) img.set(Math.round(cx + Math.cos(a) * r - Math.sin(a) * w), Math.round(cy + Math.sin(a) * r + Math.cos(a) * w), w ? ink : wood);
+    for (let r = 14; r < 20; r++) for (let w = 2; w < 7; w++) img.set(Math.round(cx + Math.cos(a) * r - Math.sin(a) * w), Math.round(cy + Math.sin(a) * r + Math.cos(a) * w), (r + w) % 2 ? steel : ink);
+    if (f >= 7 && f <= 9) for (let d = -60; d <= 0; d += 2) { const b = a + (d * Math.PI) / 180; for (const r of [21, 22, 23]) img.set(Math.round(cx + Math.cos(b) * r), Math.round(cy + Math.sin(b) * r), cream); }
+    return img;
+  });
+  const r = study({ name: "attack", frames, ms: frames.map(() => 90), kind: "test" }), text = r.text.join("\n");
+  const pieces = (r.pieces!.json as { pieces: { kind: string; speed?: number[]; smears?: { frames: number[]; colors: string[] } }[] }).pieces;
+  const attack = pieces.find((p) => p.kind === "action");
+  assert.ok(attack, JSON.stringify(pieces.map((p) => p.kind)));
+  assert.ok(!attack!.speed, "in place");
+  assert.deepEqual(attack!.smears?.frames, [7, 8, 9]);
+  assert.match(text, /Smears on frames 7-9 \(#fffae4/);
+});

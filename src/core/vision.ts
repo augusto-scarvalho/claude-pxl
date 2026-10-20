@@ -413,6 +413,134 @@ function solve3(A: number[][], b: number[]): number[] | null {
   return [0, 1, 2].map((k) => det(A.map((row, i) => row.map((v, j) => (j === k ? b[i] : v)))) / d);
 }
 
+
+/** A transparency checker baked into a picture: two colors in squares of `size`, from `ox`,`oy`. */
+export interface Checker { a: Color; b: Color; size: number; ox: number; oy: number }
+/** The checker's color at a pixel. */
+export const checkerAt = (k: Checker, x: number, y: number): Color => ((Math.floor((x - k.ox) / k.size) + Math.floor((y - k.oy) / k.size)) % 2 === 0 ? k.a : k.b);
+
+/**
+ * The checker an editor shows behind what is clear, when it was exported with the picture (a GIF saved
+ * from a screen, a sprite posted with Aseprite's backdrop): the two commonest colors, in squares of the
+ * commonest length of their runs along rows, where they fall as a checker would have them nearly always
+ * and over a quarter of the picture at least.
+ */
+export function findChecker(img: Img): Checker | null {
+  const W = img.w, H = img.h, n = colorCounts(img), top = [...n].filter(([c]) => (c & 255) >= 128).sort((x, y) => y[1] - x[1]);
+  if (top.length < 2 || top[0][1] + top[1][1] < 0.25 * W * H || top[1][1] < 0.4 * top[0][1]) return null;
+  const A = top[0][0], B = top[1][0], two = (c: Color) => c === A || c === B;
+  // the squares' size: the commonest length of a run of one of the two between the other two (rows and columns)
+  const runs = new Map<number, number>(), starts: [number, number, Color][] = [];
+  for (let y = 0; y < H; y++) {
+    let x = 0;
+    while (x < W) {
+      const c = img.data[y * W + x];
+      let e = x;
+      while (e < W && img.data[y * W + e] === c) e++;
+      if (two(c) && x > 0 && e < W && two(img.data[y * W + x - 1]) && two(img.data[y * W + e])) { runs.set(e - x, (runs.get(e - x) ?? 0) + 1); starts.push([x, y, c]); }
+      x = e;
+    }
+  }
+  const size = [...runs].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (!size || size < 2) return null;
+  // where the squares start: the commonest start of a run that long, modulo its length
+  const off = new Map<number, number>();
+  for (const [x, , ] of starts) off.set(x % size, (off.get(x % size) ?? 0) + 1);
+  const ox = [...off].sort((a, b) => b[1] - a[1])[0][0];
+  let best: Checker | null = null, bestHit = 0;
+  for (let oy = 0; oy < size; oy++) for (const [a, b] of [[A, B], [B, A]]) {
+    const k = { a, b, size, ox, oy };
+    let hit = 0, of = 0;
+    for (let y = 0; y < H; y += 1) for (let x = 0; x < W; x += 1) { const c = img.data[y * W + x]; if (!two(c)) continue; of++; if (c === checkerAt(k, x, y)) hit++; }
+    if (hit / of > bestHit) { bestHit = hit / of; best = k; }
+  }
+  if (!best || bestHit < 0.95) return null;
+  let on = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (img.data[y * W + x] === checkerAt(best, x, y)) on++;
+  return on >= 0.25 * W * H ? best : null;
+}
+
+/** A reflection: what is above row `axis` mirrored below it (row axis + d is row axis - 1 - d + `gap`), over what was behind it at `alpha`. */
+export interface Reflection { axis: number; gap: 0 | 1; alpha: number; share: number }
+
+/**
+ * A floor that shines, water: below a row, what is above it mirrored, laid over what was behind (the
+ * checker, or nothing: then the pixel's own alpha) at one opacity throughout. The row and the opacity
+ * where it explains most of what is below, a third of it at least.
+ */
+export function findReflection(frames: Img[], k: Checker | null): Reflection | null {
+  const W = frames[0].w, H = frames[0].h, sample = frames.filter((_, i) => i % Math.max(1, Math.floor(frames.length / 12)) === 0);
+  const ch = (c: Color) => [(c >>> 24) & 255, (c >>> 16) & 255, (c >>> 8) & 255];
+  // the opacity a pixel below takes its mirror at, or -1 when it isn't one
+  const fit = (below: Color, above: Color, x: number, y: number) => {
+    if ((above & 255) < 250) return -1;
+    if ((below & 255) < 250) {
+      const a = (below & 255) / 255;
+      return a > 0.08 && dE(below | 255, above) < 0.06 ? a : -1;
+    }
+    if (!k) return -1;
+    const b = ch(below), t = ch(above), g = ch(checkerAt(k, x, y)), as: number[] = [];
+    for (let c = 0; c < 3; c++) if (Math.abs(t[c] - g[c]) >= 24) as.push((b[c] - g[c]) / (t[c] - g[c]));
+    if (!as.length) return -1;
+    as.sort((p, q) => p - q);
+    const a = as[as.length >> 1];
+    if (a < 0.1 || a > 0.9) return -1;
+    let off = 0;
+    for (let c = 0; c < 3; c++) off += Math.abs(b[c] - (g[c] + a * (t[c] - g[c])));
+    return off / 3 <= 14 ? a : -1;
+  };
+  let best: Reflection | null = null, bestN = 0;
+  for (let axis = Math.floor(H / 4); axis < H - 2; axis++) for (const gap of [0, 1] as const) {
+    const alphas: number[] = [];
+    let below = 0;
+    for (const f of sample) for (let y = axis; y < H; y++) {
+      const m = 2 * axis - 1 - y + gap;
+      if (m < 0) break;
+      for (let x = 0; x < W; x++) {
+        // (the checker, where it shows, is what's behind: nothing of it)
+        const c = f.data[y * W + x], above = f.data[m * W + x];
+        if ((c & 255) < 20 || (k && c === checkerAt(k, x, y))) continue;
+        below++;
+        const a = k && above === checkerAt(k, x, m) ? -1 : fit(c, above, x, y);
+        if (a >= 0) alphas.push(a);
+      }
+    }
+    if (alphas.length > bestN && alphas.length >= 0.33 * below && alphas.length >= 30) {
+      bestN = alphas.length;
+      alphas.sort((p, q) => p - q);
+      best = { axis, gap, alpha: alphas[alphas.length >> 1], share: alphas.length / below };
+    }
+  }
+  return best;
+}
+
+/** The picture with its reflection taken away: each pixel below the row that is its mirror over what was behind it, made clear. */
+export function clearReflection(img: Img, r: Reflection, k: Checker | null): Img {
+  const out = img.copy(), W = img.w;
+  for (let y = r.axis; y < img.h; y++) {
+    const m = 2 * r.axis - 1 - y + r.gap;
+    if (m < 0) break;
+    for (let x = 0; x < W; x++) {
+      const c = img.data[y * W + x];
+      if ((c & 255) < 20) continue;
+      const a = img.data[m * W + x];
+      if ((a & 255) < 20 && k) { if (dE(c, checkerAt(k, x, y)) < 0.12) out.data[y * W + x] = TRANSPARENT; continue; }
+      if ((a & 255) < 250) { if ((c & 255) < 250 || (k && dE(c, checkerAt(k, x, y)) < 0.12)) out.data[y * W + x] = TRANSPARENT; continue; }
+      const want = k && (c & 255) >= 250 ? mix(checkerAt(k, x, y), a, r.alpha) : a;
+      if (dE(c | 255, want) < 0.08 || ((c & 255) < 250 && dE(c | 255, a) < 0.08)) out.data[y * W + x] = TRANSPARENT;
+    }
+  }
+  return out;
+}
+const mix = (under: Color, over: Color, a: number) => pack(...([24, 16, 8].map((s) => Math.round(((under >>> s) & 255) * (1 - a) + ((over >>> s) & 255) * a)) as [number, number, number]));
+
+/** The picture with the checker taken for clear: each pixel the checker's own color there made transparent. */
+export function clearChecker(img: Img, k: Checker): Img {
+  const out = img.copy();
+  for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) if (img.data[y * img.w + x] === checkerAt(k, x, y)) out.data[y * img.w + x] = TRANSPARENT;
+  return out;
+}
+
 /** The tile size and offset whose cells repeat most, and how much (1 - distinct / cells). */
 export function findTiles(img: Img): { size: number; ox: number; oy: number; cells: number; distinct: number } | null {
   let best: { size: number; ox: number; oy: number; cells: number; distinct: number } | null = null;

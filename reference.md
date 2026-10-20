@@ -420,8 +420,11 @@ what it is made of, with what to use in pxl to make the same (palette, `outline`
 the light for `relight`, `perspective({ horizon, vp })`, `scroll` per plane, `anim` frames), and in
 `<out>/_study/` a sheet to look at (the picture; its techniques marked: banding red, checkers
 magenta, dark lines cyan, in-between tones yellow; its straight edges colored by where they meet, the
-horizon cyan; the ramps; frames and the flow), the picture and `<name>.hex`. It reads two kinds of
-picture two ways.
+horizon cyan; the ramps; frames and the flow), the picture and `<name>.hex`. An editor's transparency
+checker exported with it (two colors in big squares, a GIF saved with Aseprite's backdrop) is taken for
+clear first; a reflection under it (below a row, what is above mirrored over what's behind at one
+opacity: a floor that shines, still water) is told, row and opacity, as `flip: "y"` in a layer with
+that `opacity`, and left out of the rest. It reads two kinds of picture two ways.
 Pixel art (few colors, hard steps between them, often drawn at 2x and up) is read as drawn: its grid
 found (an exact upscale, or a blurred, compressed or fractional one: a video of a game, a JPEG,
 2.5x) and the picture taken back to 1x, so its palette, ramps (and how their hue shifts from shade
@@ -463,9 +466,12 @@ stamped where the path puts it; growing or shrinking when it comes nearer or goe
 stamped along its path, its limbs a rig when parts of it move); things going across one after
 another (traffic, a crowd: sprites along a lane, or `scroll()` for a lane at one speed); and in
 place, read from the pixels that change there: a cycle of drawings (`anim`), parts moving against a
-body that stays (a rig, or a frame per pose), changing all over without repeating with neighbors
-changing at odds (fire, water, smoke: `flame()`, `plume()`, `warp()`), or a thing wandering about
-its box (a bird circling: going round a loop). Each object is isolated from the others: the changing
+body that stays (a rig, or a frame per pose), a run of poses played once with its body moving (an
+attack, a jump: an action, an anim with a frame per pose, a rig posed by `ik` for many; its smears
+told, the frames a long thin shape in colors there a moment only shows in, and their colors, for
+`arc()`), changing all over without repeating with neighbors changing at odds (fire, water, smoke:
+`flame()`, `plume()`, `warp()`), or a thing wandering about its box (a bird circling: going round a
+loop). Each object is isolated from the others: the changing
 pixels in fragments of pixels that differ in the same frames (a knight riding past, not the crowd
 waving behind him), put back together when they touch and change in the same rhythm or in turns (a
 bird lighting one side of its loop, then the other) and share colors, or have the same still body

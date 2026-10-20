@@ -466,6 +466,17 @@ one), and the art code itself (4% of the cost).
   tournament 36 to 41. Lower: cave 50 to 33 (a mushroom at the line), sunset 31 to 21, where clouds and
   tall grass come apart and its old big pieces held them by luck; headlights going with their cars are
   no longer taken for light (cyberpunk's light found 41 to 32%, as right).
+- [x] **A sprite posted with its editor's backdrop** (asked next, from an attack GIF on r/aseprite: a
+  warrior's three-blow axe combo, 38 frames, the checker and a reflection exported with it). The checker
+  is taken for clear (two colors in squares, where they fall as a checker would nearly always); a
+  reflection told (the row and opacity where what's below is what's above mirrored over what was
+  behind: here row 112 at 24%, 98% of it) and set aside; then the palette is the sprite's, its outline
+  read against the clear (58% near-black). The warrior is an action (many poses, none coming back, its
+  blocks found again a step on: not fire), not an effect, not a walk (going somewhere is most of its
+  size: a smear moves the middle of what changes as far); its smears told (colors that show a lot on a
+  few frames, mostly in long thin pieces: #fffae4 and #9dcfce on frames 3-5, 8-12, 15-18, 24-28), not
+  the cloak's back turned. Still: a part swung about a still body (an axe on a body that doesn't move)
+  is followed as carried; telling a swing by its pivot would part them.
 - [ ] **Still weak in study's pieces**: big animated things touching (the tournament's two knights in
   their bout and the stands behind, one piece: every pixel changes often, rhythm and common fate can't
   part them; their colors could, the armor and the crowd's); soft clouds drifting slowly read as light
