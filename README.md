@@ -316,7 +316,7 @@ Tip: ask the agent to start `pxl serve` so you can watch it paint in your browse
 npm install        # dev only: typescript, @types/node
 npm run check      # type check + tests
 node scripts/gallery.ts   # regenerate docs/gallery
-node scripts/calibrate.ts [asset ...] [-v] [--map DIR]   # pxl study against the examples' own source
+node scripts/calibrate.ts [asset ...] [--summary] [--vs <rev>]   # pxl study against the examples' own source
 ```
 
 ```

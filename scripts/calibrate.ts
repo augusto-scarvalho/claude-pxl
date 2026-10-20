@@ -7,7 +7,10 @@
 // in a box not four times its size: its shadow with it); a thing found in pieces, or
 // a piece over several things, is counted; its captures are compared with the thing's own pixels (mask
 // IoU, and how much of each is the other's).
-// Run: node scripts/calibrate.ts [asset ...] [--map DIR] (all, or only those; --map draws where the light
+// Run: node scripts/calibrate.ts [asset ...] [--summary] [--save FILE.json] [--vs <git rev | FILE.json>] [--map DIR]
+// (all, or only those; --summary a line a scene; --save keeps the run; --vs compares with a kept run or
+// with this harness run on another revision, the scenes' lines before -> now and the things whose score
+// moved; --map draws where the light
 // was found right (green), what a thing changed taken for light (red), a shadow or effect taken for it
 // (amber), light missed (blue), things (gray), shadows and effects (brown); -v lists every thing)
 import { dirname, join } from "node:path";
@@ -21,7 +24,9 @@ import { study } from "../src/core/study.ts";
 import { dE } from "../src/core/vision.ts";
 import { loadProject } from "../src/node/load.ts";
 import { encodePng } from "../src/node/png.ts";
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const scenes: [string, string][] = [
@@ -59,7 +64,13 @@ const mode = (frames: Img[]) => {
 const frames0 = (n: number, size: number) => Array.from({ length: n }, () => new Uint8Array(size));
 const pct = (a: number, b: number) => `${b ? Math.round((100 * a) / b) : 0}%`;
 
-const args = process.argv.slice(2), verbose = args.includes("-v") && !!args.splice(args.indexOf("-v"), 1), mi0 = args.indexOf("--map"), mapDir = mi0 >= 0 ? args.splice(mi0, 2)[1] : undefined, only = args;
+const args = process.argv.slice(2), flag = (f: string) => args.includes(f) && !!args.splice(args.indexOf(f), 1);
+const opt = (f: string) => { const i = args.indexOf(f); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
+const verbose = flag("-v"), summary = flag("--summary"), mapDir = opt("--map"), saveTo = opt("--save"), vs = opt("--vs"), only = args;
+// what a run measured, a scene each: its line's numbers and each thing's score (to save, or compare)
+type Result = { name: string; things: number; frames: number; found: number; lights: number; loose: number; P: number; R: number; lightR?: number; lightP?: number; items: Record<string, [number, number]> };
+const results: Result[] = [];
+const share = (a: number, b: number) => (b ? Math.round((100 * a) / b) : 0);
 for (const [file, name] of scenes.filter(([, n]) => !only.length || only.includes(n))) {
   // the frame before lighting needs a trace of every frame (slow: every painting step kept), so only
   // where the scene lights itself
@@ -221,6 +232,8 @@ for (const [file, name] of scenes.filter(([, n]) => !only.length || only.include
     writeFileSync(join(mapDir, `${name}_light.png`), encodePng(img));
   }
   if (gl || rl) out.push(`  light: ${pct(gl, N * WH)} of the pixels change only with the light; found ${pct(hit, gl)} of those; of what was taken for light, ${pct(hit, rl)} is light, ${pct(otherRel, rl)} a shadow cast or an effect, ${pct(lost, rl)} things${still ? `, ${pct(still, rl)} nothing changed` : ""}; ${pct(lost, thing)} of what things change was taken for light`);
+  results.push({ name, things: moving.length, frames: share(span(found), span(best)), found: found.length, lights: asLight, loose: loose.length, P: share(mp, mn), R: share(mr, mn),
+    ...(gl || rl ? { lightR: share(hit, gl), lightP: share(hit, rl) } : {}), items: Object.fromEntries(best.map((b) => [b.k, [b.m.size, +b.score.toFixed(2)]])) });
   if (verbose) for (const b of best) { const bx = boxOf([...b.m.values()].flat()), q = pieces[b.i]; out.push(`    ${b.k} ${bx[2]}x${bx[3]} at ${bx[0]},${bx[1]} in ${b.m.size} frames: ${q ? `#${b.i + 1} ${q.kind} ${q.box[2]}x${q.box[3]} at ${q.box[0]},${q.box[1]}, IoU ${b.score.toFixed(2)}` : "none"}`); }
   const missed = best.filter((b) => b.score < 0.2).sort((a, b) => b.m.size - a.m.size).slice(0, 6);
   if (missed.length) out.push(`  missed: ${missed.map((b) => { const bx = boxOf([...b.m.values()].flat()); return `${b.k} (${bx[2]}x${bx[3]} at ${bx[0]},${bx[1]}, best IoU ${b.score.toFixed(2)})`; }).join("; ")}`);
@@ -228,5 +241,36 @@ for (const [file, name] of scenes.filter(([, n]) => !only.length || only.include
   if (splits.length) out.push(`  in pieces: ${splits.map((b) => b.k).join(", ")}`);
   const many = [...merged].filter(([, v]) => v.length > 1).slice(0, 4);
   if (many.length) out.push(`  together in one piece: ${many.map(([i, v]) => `${pieces[i].box[2]}x${pieces[i].box[3]} at ${pieces[i].box[0]},${pieces[i].box[1]}: ${v.join(", ")}`).join("; ")}`);
-  console.log(out.join("\n"));
+  if (!summary) console.log(out.join("\n"));
 }
+
+// a line a scene: things, the share of their frames found, found (as lights) + loosely, masks, light
+const line = (r: Result, was?: Result) => {
+  const d = (a: number, b?: number, unit = "%") => (b === undefined ? `${a}${unit}` : `${b}${unit} -> ${a}${unit}`);
+  return `${r.name.padEnd(15)} things ${String(r.things).padStart(4)}  frames found ${d(r.frames, was?.frames).padStart(was ? 12 : 4)}  found ${d(r.found, was?.found, "").padStart(was ? 8 : 3)} (${r.lights} as light) + ${r.loose} loose  masks P ${d(r.P, was?.P)} R ${d(r.R, was?.R)}${r.lightR !== undefined ? `  light R ${d(r.lightR, was?.lightR)} P ${d(r.lightP!, was?.lightP)}` : ""}`;
+};
+if (saveTo) writeFileSync(saveTo, JSON.stringify(results));
+if (vs) {
+  // the other run: a saved one, or this harness run on another revision (its own worktree, so the ground
+  // truth is measured the same way on both sides)
+  let other: Result[];
+  if (existsSync(vs)) other = JSON.parse(readFileSync(vs, "utf8"));
+  else {
+    const dir = mkdtempSync(join(tmpdir(), "pxl-calibrate-")), wt = join(dir, "tree"), json = join(dir, "run.json"), git = (...a: string[]) => execFileSync("git", a, { cwd: root, stdio: "pipe" });
+    try {
+      git("worktree", "add", "--detach", wt, vs);
+      copyFileSync(fileURLToPath(import.meta.url), join(wt, "scripts", "calibrate.ts"));
+      execFileSync(process.execPath, [join(wt, "scripts", "calibrate.ts"), ...only, "--summary", "--save", json], { stdio: "pipe", maxBuffer: 1 << 26 });
+      other = JSON.parse(readFileSync(json, "utf8"));
+    } finally { try { git("worktree", "remove", "--force", wt); } catch { /* left for git worktree prune */ } }
+  }
+  console.log(`against ${vs}:`);
+  for (const r of results) {
+    const was = other.find((o) => o.name === r.name);
+    console.log(line(r, was));
+    if (!was) continue;
+    // the things whose score moved most, the longest-lived first
+    const moved = Object.entries(r.items).map(([k, [n, v]]) => [k, n, was.items[k]?.[1] ?? 0, v] as const).filter(([, , a, b]) => Math.abs(b - a) >= 0.15).sort((x, y) => y[1] - x[1]).slice(0, 6);
+    for (const [k, n, a, b] of moved) console.log(`    ${k} (${n} frames): ${a.toFixed(2)} -> ${b.toFixed(2)}`);
+  }
+} else if (summary) for (const r of results) console.log(line(r));
