@@ -446,8 +446,20 @@ motion: the frames' timing and holds, a
 cycle (the shortest shift after which frames repeat), whether the last frame runs into the first,
 bands of rows carried across together and their speeds to a fraction of a pixel (parallax planes:
 `scroll`'s `per` is the speed times the loop's frames), the point the motion opens out from (a camera
-moving forward: the vanishing point of the motion, which picks the road's among the still ones), and
-the parts that move on a still picture. Videos are read `--seconds` (8) from `--from` at their own
+moving forward: the vanishing point of the motion, which picks the road's among the still ones). And
+taken apart into PIECES, each with what to build it with (after layered motion, Wang and Adelson
+1994): the backdrop (each pixel's commonest color over the clip: what never differs from it is one
+picture); the planes; then what differs from them, followed from frame to frame, a piece of about
+the same size a plausible step on: one drawing carried along a path at a steady speed (a sprite
+stamped where the path puts it; growing or shrinking when it comes nearer or goes away: sizes by
+`fit`); changing drawings carried along (a walk, a run, a drifting cloud: an anim of its drawings
+stamped along its path, its limbs a rig when parts of it move); things going across one after
+another (traffic, a crowd: sprites along a lane, or `scroll()` for a lane at one speed); and in
+place, read from the pixels that change there: a cycle of drawings (`anim`), parts moving against a
+body that stays (a rig, or a frame per pose), changing all over without repeating with neighbors
+changing at odds (fire, water, smoke: `flame()`, `plume()`, `warp()`), or lighter and darker all at
+once with the hue kept (a light: `glow()`, a lamp, colors swapped per frame). Things that touch
+read as one piece (a crowd of dancers is one rig of many parts). Videos are read `--seconds` (8) from `--from` at their own
 rate up to 30 fps (`--fps`); big frames are brought down as they are read (to 1x when they are pixel
 art, else to 640 px). PNG and GIF are read by pxl; JPEG, WebP, BMP and video need ffmpeg on PATH.
 

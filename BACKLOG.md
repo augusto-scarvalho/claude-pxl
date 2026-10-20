@@ -411,6 +411,18 @@ one), and the art code itself (4% of the cost).
   Now: the race one-point at 160,70 (made at 160,70), the road at 159,71 (160,72), the park two-point
   with fov 89° and yaw 39° (90°, 40°), the volcano three-point with fov 75° and a tilt of 21° (80°,
   18°), no point in the flat scenes, every loop closed; a test reads the train and the park back.
+- [x] **Pieces: what moves how, and what to build it with**: asked after the read-back (is it a
+  sprite, an animated rig, which parts move?). The backdrop by each pixel's commonest color; planes
+  carried by their own measured step (1.67 px/frame goes by in steps of 1 and 2); the rest followed
+  frame to frame (a piece of about the same size, a plausible step on) and, where pieces don't hold
+  together, read as a region: the longest stretch in which what changes there goes steadily one way
+  (a walker in parts, a cloud), flow mostly sideways (traffic), neighbors brightening together with
+  the hue kept (a light) or changing at odds without repeating (an effect), separate parts against a
+  still body (a rig), else a cycle in place. On the gallery: the tropical forest's animals in place
+  and its water an effect, the party's lights at a 4-frame cycle and its dancers a rig, the cave a
+  pulsing light, the road's walker going away with its limbs moving and the windmill a rig, the
+  park's people walking nearer, the tournament's clouds drifting. Still one piece where things touch
+  (the party's dancers, a street's traffic). A test takes a synthetic clip apart.
 - [x] **More of what the papers measure**: a sprite's light from its rim (Johnson and Farid, 2005);
   banding by Pixel Logic's rule as the Pixel Fixer paper (TU Delft, 2025) states it; pillow shading;
   the translation of a photo by superpixels after Gerstner et al. (NPAR 2012), which keeps edges.

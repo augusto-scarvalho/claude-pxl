@@ -154,3 +154,24 @@ test("study reads pxl's own gallery back as it was made", async () => {
   assert.ok(m && y, park);
   assert.ok(Math.abs(+m![1] - 70) <= 6 && Math.abs(+m![2] - 90) <= 8 && Math.abs(+y![1] - 40) <= 4, `${m![0]} ${y![0]}`);
 });
+
+test("study takes an animation apart: what is carried, what animates in place, a light that pulses, an effect", () => {
+  // 32 frames on a still backdrop: a box carried right 2 px a frame; a 4-frame blinker in place; a
+  // patch brightening and darkening all at once; a patch of noise that never repeats
+  const W = 160, H = 90, n = 32, back = drawing(W, H, 3), ink = pack(250, 250, 250);
+  const frames = Array.from({ length: n }, (_, f) => {
+    const img = back.copy();
+    for (let y = 10; y < 18; y++) for (let x = 0; x < 8; x++) img.set(10 + 2 * f + x, y, x === 0 || y === 10 ? pack(20, 20, 20) : pack(220, 60, 60));
+    for (let y = 40; y < 48; y++) for (let x = 20; x < 28; x++) img.set(x, y, (x + y + Math.floor(f / 2)) % 4 === 0 ? ink : pack(30, 30, 90));
+    const v = 120 + 60 * Math.round(Math.sin((f * Math.PI) / 4));
+    for (let y = 40; y < 52; y++) for (let x = 70; x < 82; x++) img.set(x, y, pack(v, v, Math.round(v * 0.6)));
+    for (let y = 60; y < 80; y++) for (let x = 110; x < 140; x++) img.set(x, y, latticeHash(x * 7 + f, y * 3 - f) < 0.5 ? pack(40, 120, 200) : pack(160, 210, 240));
+    return img;
+  });
+  const text = study({ name: "pieces", frames, ms: frames.map(() => 100), kind: "test" }).text.join("\n");
+  const piece = (x: number, y: number) => text.split("\n").find((l) => l.includes(` at ${x},${y},`));
+  assert.match(piece(10, 10) ?? text, /going right at 2\.00 px\/frame: one drawing carried along a path/);
+  assert.match(piece(20, 40) ?? text, /animated in place: an anim of its drawings/);
+  assert.match(piece(70, 40) ?? text, /lighter and darker all at once: a light/);
+  assert.match(piece(110, 60) ?? text, /changing all over without repeating/);
+});

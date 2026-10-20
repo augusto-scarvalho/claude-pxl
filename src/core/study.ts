@@ -13,6 +13,7 @@
 // point it moves toward, the parts that move while the rest stands still).
 import { type Color, pack, toHex } from "./color.ts";
 import { Img } from "./image.ts";
+import { type Piece, decompose } from "./decompose.ts";
 import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Vanish, areaDown, bandShifts, blockFlow, colorCounts, dE, findGrid, findRamps, findSegments, findTiles, findVanishing, focusOfExpansion, frameDiff, lab, lch, lumaOf, mergeNear, pixelate, quantize, techniques, toNative } from "./vision.ts";
 
 /** frames as read; `drawnAt`: they were already brought down from that grid as they were read (big animations) */
@@ -101,7 +102,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   let motion: ReturnType<typeof motionOf> | null = null;
   if (input.frames.length > 1) {
     const frames = input.frames.map((f) => (pixelArt ? (up && !pre ? toNative(f, g) : f) : areaDown(f, ...fit(f.w, f.h, 320))));
-    motion = motionOf(frames, input.ms);
+    motion = motionOf(frames, input.ms, smeared);
   }
   const P = pixelArt ? picture : areaDown(first, ...fit(first.w, first.h, 480));
   const segs = findSegments(P, pixelArt), vps = findVanishing(segs, P.w, P.h), k = picture.w / P.w;
@@ -110,6 +111,8 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   const persp = perspectiveLines(segs, vps, P.w, P.h, k, picture.w, foe);
   text.push(...persp.lines);
   if (motion) text.push("", "MOTION", ...motion.lines);
+  if (motion?.layers) text.push("", "PIECES (what moves how, and what to build it with)", ...pieceLines(motion.layers, motion.bands, motion.forward));
+  else if (motion?.forward) text.push("", "PIECES", "  The whole view moves (a camera going forward): build it in meters through a camera (perspective, plane, things along the way), not as pieces on a still picture.");
 
   // ---------------------------------------------------------------- in pxl
   text.push("", "IN PXL");
@@ -259,7 +262,7 @@ function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, 
   return { lines: out, pxl, horizon };
 }
 
-function motionOf(frames: Img[], ms: number[]) {
+function motionOf(frames: Img[], ms: number[], smeared = false) {
   const lines: string[] = [], pxl: string[] = [];
   const W = frames[0].w, H = frames[0].h, L = frames.map(lumaOf), n = frames.length;
   const fps = 1000 / (ms.reduce((s, v) => s + v, 0) / ms.length);
@@ -329,15 +332,34 @@ function motionOf(frames: Img[], ms: number[]) {
     lines.push(`  Planes going by (bands of rows carried across together): ${bands.map((b) => `rows ${b.y0}-${b.y1} at ${Math.abs(b.v).toFixed(2)} px/frame ${b.v < 0 ? "left" : "right"} (${(Math.abs(b.v) * fps).toFixed(0)} px/s)`).join("; ")}.${bands.length > 1 ? ` Parallax: ${sorted.length} speeds from ${Math.abs(sorted[0].v).toFixed(2)} to ${Math.abs(sorted[sorted.length - 1].v).toFixed(2)} px/frame, each its own plane, the faster the nearer.` : ""}`);
     pxl.push(`scroll(name, y, per) for each plane, per = its speed x the loop's frames (here ${bands.map((b) => Math.round(Math.abs(b.v) * n)).join(", ")} px over ${n} frames), a whole number of each strip's widths.`);
   }
-  // the parts that move while the rest stands still
-  if (still > moving.length) {
-    const count = new Uint16Array(W * H);
-    for (let i = 0; i + 1 < n; i++) for (let p = 0; p < W * H; p++) if (Math.abs(L[i][p] - L[i + 1][p]) > 0.04) count[p]++;
-    const regions = blobs(count, W, H, Math.max(1, Math.floor((n - 1) * 0.1)));
-    if (regions.length) lines.push(`  Moving parts on a still picture: ${regions.slice(0, 5).map((b) => `${b.w}x${b.h} at ${b.x},${b.y} (changing in ${pct(b.rate, n - 1)} of the steps)`).join("; ")}.`);
-  }
+  // the pieces: what moves how on what stays (not when the whole view moves toward its point)
+  const layers = forward ? null : decompose(frames, bands, smeared ? 0.08 : 0.05, flows);
   if (moving.length && moving.every((f) => Number.isInteger(f.dx) && Number.isInteger(f.dy))) lines.push("  Steps are whole pixels at 1x (as measured: block matching moves whole pixels).");
-  return { lines, pxl, flows, foe, forward, bands, frames, W, H };
+  return { lines, pxl, flows, foe, forward, bands, frames, W, H, layers };
+}
+
+const WHAT: Record<Piece["kind"], string> = {
+  carried: "one drawing carried along a path: a sprite stamped where the path puts it each frame",
+  walk: "changing drawings carried along a path (a walk, a run, a cloud drifting and changing shape): an anim of its drawings (a cycle when it has one), stamped along its path",
+  stream: "things going across one after another (traffic, a crowd): each a sprite stamped along its lane, back at the start when it leaves (a whole lane at one speed: scroll())",
+  anim: "animated in place: an anim of its drawings",
+  rig: "parts moving against a body that stays: a rig (rig(), its parts at sockets), or an anim with a frame per pose",
+  effect: "changing all over without repeating (fire, water, smoke, sparkle): an effect in code: flame(), plume(), warp() or noise drawn per frame",
+  light: "lighter and darker all at once: a light: glow(), a lamp, or colors swapped per frame",
+};
+function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: number; v: number }[], forward: boolean): string[] {
+  const out = [`  Backdrop: ${pct(d.still * 100, 100)} of the picture never changes${d.still > 0.2 ? ": one picture (a sprite or the scene's still layers) under everything else" : ""}.`];
+  if (bands.length && !forward) out.push(`  Planes: ${bands.length} band${bands.length > 1 ? "s" : ""} of rows going by (see MOTION): each a strip that wraps, scroll().`);
+  const where = (b: number[]) => `${b[2]}x${b[3]} at ${b[0]},${b[1]}`;
+  const dir = (v: [number, number]) => `${Math.abs(v[0]) >= Math.abs(v[1]) ? (v[0] < 0 ? "left" : "right") : v[1] < 0 ? "up" : "down"} at ${Math.hypot(v[0], v[1]).toFixed(2)} px/frame`;
+  for (const p of d.pieces.slice(0, 12)) {
+    const draw = `${p.poses} drawing${p.poses === 1 ? "" : "s"}${p.cycle ? `, a cycle of ${p.cycle} frames` : ""}`;
+    const extra = p.kind === "carried" || p.kind === "walk" ? `, going ${dir(p.speed!)}${p.grow && Math.abs(p.grow - 1) > 0.2 ? `, ${p.grow > 1 ? "growing" : "shrinking"} x${p.grow.toFixed(1)} (${p.grow > 1 ? "coming nearer" : "going away"}: sizes picked by fit)` : ""}${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving (limbs: a rig, or a drawing per pose)` : ""}` : p.kind === "rig" ? `, ${p.parts} parts moving` : "";
+    out.push(`  - ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}: ${WHAT[p.kind]}.`);
+  }
+  if (d.pieces.length > 12) out.push(`  ... and ${d.pieces.length - 12} smaller pieces.`);
+  if (!d.pieces.length) out.push("  Nothing moves on its own: the picture is still apart from its planes.");
+  return out;
 }
 
 function blobs(count: Uint16Array, W: number, H: number, min: number) {
@@ -366,7 +388,8 @@ function blobs(count: Uint16Array, W: number, H: number, min: number) {
  * straight edges colored by where they meet (red, green, blue, orange; the rest yellow), the vanishing points
  * and the horizon (cyan); the ramps, one row each, dark to light; for an animation, frames across
  * the clip, and the flow (white ticks along each block's motion, the point it opens out from in
- * magenta, the planes as bars down the left in their speeds' order).
+ * magenta, the planes as bars down the left in their speeds' order); the pieces, boxed by kind
+ * (carried cyan, walk green, stream blue, in place yellow, rig orange, effect magenta hatched, light white).
  */
 function sheet(pic: Img, t: Techniques, pixelArt: boolean, P: Img, segs: Segment[], vps: Vanish[], horizon: number | null, ramps: Ramp[], m: ReturnType<typeof motionOf> | null): Img {
   const s = Math.max(1, Math.min(8, Math.floor(480 / pic.w))), Wd = pic.w * s, panels: Img[] = [];
@@ -401,6 +424,16 @@ function sheet(pic: Img, t: Techniques, pixelArt: boolean, P: Img, segs: Segment
     const top = Math.max(1, ...m.bands.map((b) => Math.abs(b.v)));
     for (const b of m.bands) for (let y = Math.max(0, b.y0 * fs); y < Math.min(fl.h, b.y1 * fs); y++) for (let x = 0; x < Math.max(2, Math.round((Math.abs(b.v) / top) * 24)); x++) fl.set(x, y, pack(240, 200, 60));
     panels.push(fl);
+    if (m.layers) {
+      const PC: Record<Piece["kind"], Color> = { carried: pack(70, 220, 230), walk: pack(80, 230, 90), stream: pack(90, 140, 255), anim: pack(240, 220, 60), rig: pack(240, 150, 60), effect: pack(230, 60, 220), light: pack(250, 250, 250) };
+      const pp = grey(m.frames[0]).scale(fs);
+      for (const p of m.layers.pieces) {
+        const [x, y, w, h] = p.box.map((v) => v * fs), c = PC[p.kind];
+        line(pp, x, y, x + w - 1, y, c); line(pp, x, y + h - 1, x + w - 1, y + h - 1, c); line(pp, x, y, x, y + h - 1, c); line(pp, x + w - 1, y, x + w - 1, y + h - 1, c);
+        if (p.kind === "effect") for (let k = 0; k < w + h; k += 4) line(pp, x + Math.max(0, k - h), y + Math.min(h - 1, k), x + Math.min(w - 1, k), y + Math.max(0, k - w), c);
+      }
+      panels.push(pp);
+    }
   }
   const gap = 6, W = Math.max(...panels.map((p) => p.w)), H = panels.reduce((a, p) => a + p.h + gap, gap), out = new Img(W + 2 * gap, H);
   out.fill(pack(24, 22, 30));

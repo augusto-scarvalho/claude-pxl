@@ -100,8 +100,9 @@ const USAGE = `pxl — pixel-art DSL
       picture in few colors to draw over (--to, --colors).
       Both: straight edges and where they meet (one, two or three points, the horizon). Animated
       (a GIF, a video): timing, a cycle, whether it loops, planes going by and their speeds
-      (parallax), a scene opening out from the point it moves toward, the parts that move on a still
-      picture. Writes _study/<name>.png (a sheet to look at), the picture at 1x (or the translation)
+      (parallax), a scene opening out from the point it moves toward; and its pieces, each with what to
+      build it with: the backdrop, sprites carried along a path, walks, things going across, anims in
+      place, rigs (parts moving against a still body), effects (fire, water), lights that pulse. Writes _study/<name>.png (a sheet to look at), the picture at 1x (or the translation)
       and <name>.hex. PNG and GIF are read by pxl; JPEG, WebP and video through ffmpeg if on PATH.
 
 Art files may be .js or .ts. Default out dir: <art file dir>/out.`;
