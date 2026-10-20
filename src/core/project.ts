@@ -4,6 +4,7 @@ import { type Canvas, OPS } from "./canvas.ts";
 import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from "./rig.ts";
 import { type View, perspective } from "./perspective.ts";
 import { solid } from "./solids.ts";
+import { model } from "./mesh.ts";
 import { TRANSPARENT, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
@@ -20,7 +21,7 @@ import { bayer, fbm, globRe, latticeHash, rng, vnoise, seamless } from "./util.t
 /**
  * Op signatures: name:type, "?" marks the first optional argument.
  * n number, c color, s string, t text (string|number), S colors ("abc" or array),
- * a point array, r region, o object, b boolean, f function, I items (rest).
+ * a point array, r region, o object, b boolean, f function, v a camera (object or function), I items (rest).
  */
 export const SIGNATURES: Record<string, string> = {
   px: "x:n y:n c:c",
@@ -48,6 +49,7 @@ export const SIGNATURES: Record<string, string> = {
   terrain: "view:o height:f fn:f ?opts:o",
   solids: "view:o shapes:a ?opts:o",
   shadows: "view:o shapes:a opts:o",
+  mesh: "view:v faces:a mats:o ?opts:o",
   capsule: "x0:n y0:n r0:n x1:n y1:n r1:n ramp:s ?opts:o",
   flame: "x:n y:n size:n keys:s ?opts:o",
   scroll: "name:s y:n per:n ?opts:o",
@@ -103,6 +105,7 @@ export const OP_OPTS: Record<string, string[]> = {
   // one options object serves both: solids ignores shade, shadows ramps and light
   solids: ["at", "sun", "scale", "ramps", "light", "shade"],
   shadows: ["at", "sun", "scale", "shade", "ramps", "light"],
+  mesh: ["light"],
   capsule: ["light", "rim"],
   flame: ["wind", "period", "seed", "frame"],
   scroll: ["x", "frame"],
@@ -155,6 +158,7 @@ function checkArgs(name: string, args: unknown[]): void {
       case "o": if (typeof v !== "object" || v === null || Array.isArray(v)) bad("an options object"); break;
       case "b": if (typeof v !== "boolean") bad("true/false"); break;
       case "f": if (typeof v !== "function") bad("a function"); break;
+      case "v": if (typeof v !== "function" && (typeof v !== "object" || v === null || Array.isArray(v))) bad("a camera: perspective(...) or its { w, horizon, eye, ... }, or a function from a point to [col, row, depth]"); break;
     }
   });
 }
@@ -465,6 +469,8 @@ export class Project implements BuildCtx {
     env.seamless = seamless;
     // shapes in meters for solids() and shadows(): solid.stick, blob, box, cone, poly
     env.solid = solid;
+    // a model for mesh(): faces, strips, lofts and boxes in meters, each of a material
+    env.model = model;
     // perspective({ w, horizon, eye, fov | focal, vp, yaw, pitch }): ground(x, z, up), at(col, row), scale(z, x, up), vanish(angle), vertical()
     env.perspective = (view: unknown) => {
       try { return perspective(view as View); } catch (e) { throw wrap(e).within("perspective", this.callerLoc()); }
@@ -518,7 +524,7 @@ export class Project implements BuildCtx {
         const loc = this.callerLoc();
         try {
           checkArgs(name, args);
-          const o = args[args.length - 1];
+          const o = name === "mesh" ? args[3] : args[args.length - 1];
           if (OP_OPTS[name] && isPlainObject(o)) checkKeys(name, o, OP_OPTS[name]);
         } catch (e) { throw wrap(e).within(name, loc); }
         if (name === "clip") checkItems("clip", args.slice(1), loc);

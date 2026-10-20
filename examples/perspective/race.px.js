@@ -1034,7 +1034,7 @@ function wheel(c, f) {
   const turn = steer(f), R = Math.round, s = (f / FRAMES) * SECONDS, reach = reachAt(s), g = gearAt(s)
   const lever = LEVER.fifth.map((v, i) => v + (LEVER.fourth[i] - v) * g)
   // the wheel in 3D, lit as the cockpit is, its stitching and badge over it
-  render3d(c, wheelFaces(turn), WHEEL_MATS); wheelDetails(c, turn)
+  c.mesh(eye, wheelFaces(turn), WHEEL_MATS, LIT); wheelDetails(c, turn)
   // the arms: each forearm from its corner up to the wrist, then the hand on the rim (all its parts
   // outlined first and filled after, so they read as one glove, a crease between the fingers), then
   // the knit cuff over the join

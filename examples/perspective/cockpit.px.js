@@ -1,92 +1,29 @@
 // The cockpit of a mid-nineties Japanese sports coupe (after the Supra A80's: the dash wrapped round
 // the driver, three gauges under one hood, the centre stack turned toward him, a flat dash on the
 // passenger's side with the glovebox lid), left-hand drive. It is built in 3D, in meters, from the
-// driver's eye (x right, y up, z ahead), and drawn through the same camera as the road: each surface
-// a few flat faces, every pixel keeping the nearest face; a face takes its material's tone by how it
+// driver's eye (x right, y up, z ahead) as a model() of flat faces, and drawn by mesh() through the
+// same lens as the road: every pixel keeps the nearest face; a face takes its material's tone by how it
 // lies to the light (the low sun ahead and to the left, through the glass, and the sky above), and a
 // line is drawn where one surface ends in front of another or two faces meet at an edge. The details
 // (gauges, vents, buttons, stitching) are painted over it where the camera puts them.
 
-// ---------------------------------------------------------------- the camera and the renderer
+// ---------------------------------------------------------------- the camera and the light
 const CAM = { f: 204.8, pitch: Math.atan((H / 2 - HORIZON) / 204.8) }
 const CP = Math.cos(CAM.pitch), SP = Math.sin(CAM.pitch)
 // a point from the driver's eye to the picture: [x, y, depth]
 const eye = ([x, y, z]) => { const yc = y * CP + z * SP, zc = z * CP - y * SP; return [W / 2 + (CAM.f * x) / zc, H / 2 - (CAM.f * yc) / zc, zc] }
-const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 const unit3 = (a) => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l] }
 const SUNDIR = unit3([-0.45, 0.5, 0.75])                              // toward the sun: ahead, left, low
-// a model: faces (flat polygons, 3 or 4 corners) with a material each
-function model() {
-  const faces = []
-  const face = (mat, ...pts) => { faces.push({ mat, pts }); return faces.length - 1 }
-  // a strip between two lines of points (a loft): quads between neighbours
-  const strip = (mat, a, b) => { for (let i = 0; i + 1 < a.length; i++) face(mat, a[i], a[i + 1], b[i + 1], b[i]) }
-  // a grid of sections, each a line of points: quads between neighbouring sections
-  const loft = (mat, secs) => { for (let j = 0; j + 1 < secs.length; j++) strip(mat, secs[j], secs[j + 1]) }
-  const box = (mat, [x0, y0, z0], [x1, y1, z1]) => {
-    const p = (i, j, k) => [i ? x1 : x0, j ? y1 : y0, k ? z1 : z0]
-    face(mat, p(0, 1, 0), p(1, 1, 0), p(1, 1, 1), p(0, 1, 1)); face(mat, p(0, 0, 0), p(1, 0, 0), p(1, 1, 0), p(0, 1, 0))
-    face(mat, p(0, 0, 0), p(0, 1, 0), p(0, 1, 1), p(0, 0, 1)); face(mat, p(1, 0, 0), p(1, 0, 1), p(1, 1, 1), p(1, 1, 0))
-    face(mat, p(0, 0, 0), p(0, 0, 1), p(1, 0, 1), p(1, 0, 0))
-  }
-  return { faces, face, strip, loft, box }
-}
-// draws a model: depth per pixel, the nearest face's tone, lines at its edges. MATS: per material its
-// tones dark to light, the key of its outline, `top` for its lit top edge, `smooth` for a round surface
-// (no crease between its faces)
-function render3d(c, faces, MATS, x0 = 0, y0 = 0) {
-  const n = W * H, depth = new Float32Array(n).fill(1e9), who = new Int32Array(n).fill(-1)
-  faces.forEach((F, k) => {
-    const N = unit3(cross3(sub3(F.pts[1], F.pts[0]), sub3(F.pts[2], F.pts[0])))
-    const mid = F.pts.reduce((s, p) => [s[0] + p[0] / F.pts.length, s[1] + p[1] / F.pts.length, s[2] + p[2] / F.pts.length], [0, 0, 0])
-    const toward = mid[0] * N[0] + mid[1] * N[1] + mid[2] * N[2] > 0 ? -1 : 1   // the side we see
-    F.n = N.map((v) => v * toward)
-    const sun = Math.max(0, F.n[0] * SUNDIR[0] + F.n[1] * SUNDIR[1] + F.n[2] * SUNDIR[2]), sky = Math.max(0, F.n[1])
-    const glass = Math.max(0, -F.n[2] * 0.4 + F.n[1] * 0.3)                   // the glow off the windshield and the sky
+// the light on a face (mesh() steps it along the material's ramp): the low sun through the glass, the
+// sky above, the glow off the windshield on what faces it, more toward the glass, less down by the knees
+const LIT = {
+  light: (n, mid, F) => {
+    const sun = Math.max(0, n[0] * SUNDIR[0] + n[1] * SUNDIR[1] + n[2] * SUNDIR[2]), sky = Math.max(0, n[1])
+    const glass = Math.max(0, -n[2] * 0.4 + n[1] * 0.3)
     const toGlass = Math.max(0, Math.min(1, (mid[2] - 0.72) / 0.25)), low = Math.max(0, Math.min(1, (-0.3 - mid[1]) / 0.3))
-    F.light = 0.22 + (MATS_BIAS[F.mat] ?? 0) + 0.55 * sun + 0.25 * sky + 0.2 * glass + 0.14 * toGlass - 0.22 * low
-    const P = F.pts.map(eye)
-    if (P.some((p) => p[2] < 0.05)) return
-    for (let t = 1; t + 1 < P.length; t++) {
-      const [a, b, d] = [P[0], P[t], P[t + 1]]
-      const area = (b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0])
-      if (Math.abs(area) < 1e-6) continue
-      const xa = Math.max(0, Math.floor(Math.min(a[0], b[0], d[0]))), xb = Math.min(W - 1, Math.ceil(Math.max(a[0], b[0], d[0])))
-      const ya = Math.max(0, Math.floor(Math.min(a[1], b[1], d[1]))), yb = Math.min(H - 1, Math.ceil(Math.max(a[1], b[1], d[1])))
-      for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) {
-        const px = x + 0.5, py = y + 0.5
-        const w1 = ((d[0] - a[0]) * (py - a[1]) - (d[1] - a[1]) * (px - a[0])) / -area, w2 = ((b[0] - a[0]) * (py - a[1]) - (b[1] - a[1]) * (px - a[0])) / area
-        const w0 = 1 - w1 - w2
-        if (w0 < -1e-4 || w1 < -1e-4 || w2 < -1e-4) continue
-        const z = 1 / (w0 / a[2] + w1 / b[2] + w2 / d[2]), i = y * W + x
-        if (z < depth[i]) { depth[i] = z; who[i] = k }
-      }
-    }
-  })
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const i = y * W + x, k = who[i]
-    if (k < 0) continue
-    const F = faces[k], M = MATS[F.mat]
-    // an outline where this surface is in front of another or of nothing; a crease where faces meet
-    let line = null
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const xx = x + dx, yy = y + dy
-      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue
-      const j = yy * W + xx, k2 = who[j]
-      if (k2 === k) continue
-      if (k2 < 0 || depth[j] > depth[i] * 1.06) { line = M.edge; break }
-      const F2 = faces[k2]
-      if (F2.mat !== F.mat && depth[j] >= depth[i]) line = line ?? M.edge
-      else if (F2.mat === F.mat && !M.smooth && F.n[0] * F2.n[0] + F.n[1] * F2.n[1] + F.n[2] * F2.n[2] < 0.82 && depth[j] >= depth[i]) line = line ?? M.ramp[0]
-    }
-    const r = M.ramp, lv = Math.max(0, Math.min(r.length - 1, Math.floor(F.light * r.length + (bayer(x, y) - 0.5) * (M.dither ?? 0))))
-    // the top edge of a surface, just under its outline, catches the light: a step lighter
-    const up1 = y > 0 ? who[i - W] : -1, up2 = y > 1 ? who[i - 2 * W] : -1
-    const rim = !line && up1 === k && (up2 < 0 || (up2 !== k && depth[i - 2 * W] > depth[i] * 1.06)) && F.n[1] > -0.3
-    const tw = M.weave && !line && !rim && (x + y * 2) % 7 === 0 ? -1 : 0                // cloth: a twill a shade darker
-    c.px(x + x0, y + y0, line ?? (rim ? M.top ?? r[Math.min(r.length - 1, lv + 1)] : r[Math.max(0, lv + tw)]))
-  }
-  return { depth, who }
+    return 0.22 + (MATS_BIAS[F.mat] ?? 0) + 0.55 * sun + 0.25 * sky + 0.2 * glass + 0.14 * toGlass - 0.22 * low
+  },
 }
 
 // ---------------------------------------------------------------- the model, in meters
@@ -98,7 +35,7 @@ const STACK_TURN = 0.24                                                 // how f
 const backZ = (x) => (x < 0.24 ? 0.74 : x < 0.58 ? 0.7 + (x - 0.24) * STACK_TURN : 0.7 + 0.34 * STACK_TURN + (x - 0.58) * 0.08)
 const backY = (x) => (x < 0.24 ? -0.21 : -0.205)
 const COCKPIT = (() => {
-  const m = model(), { face, strip, loft, box } = m
+  const m = model(), { face, strip, loft } = m
   const COWL = [-0.17, 1.0]                                             // the windshield's foot: height, distance
   // the dash top, from the glass to its back edge and over its rounded lip, the left end to the far right
   const xs = [-0.44, -0.36, -0.3, -0.25, 0.25, 0.3, 0.36, 0.44, 0.52, 0.58, 0.66, 0.76, 0.9]
@@ -149,7 +86,7 @@ const COCKPIT_MATS = {
   gauge: { ramp: ["0", "0"], edge: "0" },
   door: { ramp: ["0", "-", "=", "~", "^"], edge: "0" },
   trim: { ramp: ["-", "=", "~", "^"], edge: "0" },
-  cloth: { ramp: ["-", "=", "]", "}"], edge: "0", weave: true },
+  cloth: { ramp: ["-", "=", "]", "}"], edge: "0", texture: (x, y) => ((x + y * 2) % 7 === 0 ? -1 : 0) },   // a twill a shade darker
   cup: { ramp: ["0", "0", "-"], edge: "0" },
   chrome: { ramp: ["^", "W", "w"], edge: "0", smooth: true },
   sail: { ramp: ["0", "-", "=", "~"], edge: "0", top: "^" },
@@ -327,7 +264,7 @@ function cockpitDetails(c) {
   c.line(44, 84, 47, 88, "~"); c.line(20, 82, 43, 81, "~")
 }
 
-sprite("_cockpit", { w: W, h: H }, (c) => { render3d(c, COCKPIT, COCKPIT_MATS); cockpitDetails(c) })
+sprite("_cockpit", { w: W, h: H }, (c) => { c.mesh(eye, COCKPIT, COCKPIT_MATS, LIT); cockpitDetails(c) })
 
 // ---------------------------------------------------------------- the steering wheel
 // The car's own wheel, the A80 RZ-S's: a thick leather rim; four spokes, the two across wide and nearly

@@ -621,6 +621,28 @@ scene("s", { w: 80, h: 50, bg: "g" }, shadows(${V}, shapes, opts), solids(${V}, 
   assert.match(failure(PAL + `scene("s", { w: 8, h: 8 }, shadows(${V}, [], {}))`, "s").message, /where the sun is/);
 });
 
+test("mesh: the nearest face per pixel, toned along its material's ramp by the light, outlined where it ends in front of another; a camera of one's own", () => {
+  const V = JSON.stringify({ w: 40, horizon: 10, eye: 1, fov: 90 });
+  // a wall 12 m ahead, a box 2 m wide and tall 4 m ahead in front of it: its front face spans columns 15-25, rows 5-15
+  const p = loadSource(PAL + `const m = model()
+m.face("wall", [-20, 12, 0], [20, 12, 0], [20, 12, 12], [-20, 12, 12])
+m.box("box", [-1, 4, 0], [1, 6, 2])
+scene("s", { w: 40, h: 30, bg: "k" }, mesh(${V}, m.faces, { wall: { ramp: "gg" }, box: { ramp: "rw", edge: "k" } }))`, "t.px.js");
+  const rows = keys(p, "s").split("\n");
+  assert.equal(rows[10][20], "w", "the box's front face, half toward the light: the ramp's lighter tone");
+  assert.equal(rows[3][20], "g", "the wall above it");
+  assert.equal(rows[10][15], "k", "the box's outline against the wall behind");
+  assert.equal(rows[10][14], "g", "no line on the wall's side");
+  // a camera of one's own, x right, y up, z ahead from the eye; a light of one's own
+  const own = (light: number) => art(PAL + `const m = model(); m.face("a", [-1, -1, 4], [1, -1, 4], [1, 1, 4], [-1, 1, 4])
+sprite("s", { w: 20, h: 20 }, mesh((p) => [10 + (20 * p[0]) / p[2], 10 - (20 * p[1]) / p[2], p[2]], m.faces, { a: { ramp: "krgw" } }, { light: () => ${light} }))`, "s").split("\n");
+  assert.equal(own(0.99)[10][10], "w");
+  assert.equal(own(0.4)[10][10], "r");
+  assert.equal(own(0.4)[10][5], "k", "its edge, in the ramp's darkest by default");
+  assert.match(failure(PAL + `const m = model(); m.face("a", [0, 1, 0], [1, 1, 0], [1, 1, 1])
+sprite("s", { w: 8, h: 8 }, mesh(${V}, m.faces, { b: { ramp: "rw" } }))`, "s").message, /material 'a', which mats doesn't have/);
+});
+
 test("capsule: shaded across toward the light, the last key only along the lit edge", () => {
   const col = (s: string, x: number) => s.split("\n").map((r) => r[x]).join("");
   eq(col(art(PAL + 'sprite("c", { w: 20, h: 12 }, capsule(3, 6, 4, 16, 6, 4, "krgw", { light: [0, -1] }))', "c"), 10), "..wggrrrkk..");

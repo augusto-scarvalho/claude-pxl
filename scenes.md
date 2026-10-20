@@ -106,6 +106,14 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   same parts twice: `solids()` projects and draws them, `shadows()` sweeps them onto the ground away
   from the sun, so the shadow has the thing's shape and stays right as it recedes. Near ones on a plate with `relight` for the rim; far ones in the haze
   color; under a few px, a simple tuft.
+- Something you are inside of or that wraps round itself (a car's dash round the driver, a wheel's
+  rim in front of its own spokes, a ship's bridge, a room): `solids()` sorts whole shapes, so it
+  draws those in the wrong order. Model it as flat faces in meters with `model()` (faces, strips
+  between two lines of points, lofts through sections, boxes, each of a material) and draw it with
+  `mesh()`: a depth per pixel, each face toned along its material's ramp by how it lies to the light,
+  outlined where a surface ends in front of another. A dozen sections per surface is plenty; paint
+  the small parts (dials, vents, buttons, stitching) over it by hand where the camera puts them
+  (`examples/perspective/cockpit.px.js`).
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
   `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:
   each is lit or in shade by which way it faces the sun. People walking in such a scene: pose a body

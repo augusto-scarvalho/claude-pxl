@@ -7,6 +7,7 @@ import type { BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, ScatterOpts,
 import { bump, dirOf, setNormal } from "./normals.ts";
 import { type View, perspective } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
+import { type Face, type Material, type MeshCanvas, type MeshOpts, drawMesh } from "./mesh.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
 import { bayer, colorList, gridRows, hash, inPoly, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
 
@@ -660,6 +661,11 @@ export class Canvas {
     }
   }
 
+  /** Flat faces in meters (model()) drawn through the camera, the nearest kept per pixel, toned along their material's ramp: see mesh.ts. */
+  mesh(view: Partial<View> | ((p: [number, number, number]) => [number, number, number]), faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}): void {
+    drawMesh(this as unknown as MeshCanvas, view, faces, mats, opts);
+  }
+
   plane(view: Partial<View>, fn: (x: number, z: number) => string | null | undefined, where?: Region): void {
     const P = perspective({ ...view, w: view.w ?? this.img.w } as View), inside = where === undefined ? undefined : regionPred(where);
     for (let row = Math.max(-this.oy, Math.floor(P.horizon)); row < this.img.h - this.oy; row++) {
@@ -1183,7 +1189,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "capsule", "flame", "scroll", "clouds", "plume",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "capsule", "flame", "scroll", "clouds", "plume",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

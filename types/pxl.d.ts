@@ -177,6 +177,14 @@ declare global {
     ramps?: string[]; light?: [number, number];
     shade?: Record<string, PxColor>;
   }
+  /** A flat face of a model, its corners in meters. */
+  interface PxFace { mat: string; pts: PxV3[] }
+  /** How a material is drawn by mesh(): its tones dark to light, the outline, the lit top edge, no creases on a round surface, a lift to its light, a dither between tones, a texture stepping the tone per pixel. */
+  interface PxMaterial { ramp: string | PxColor[]; edge?: PxColor; top?: PxColor; smooth?: boolean; bias?: number; dither?: number; texture?: (x: number, y: number) => number }
+  /** mesh()'s light: the way toward it in the points' frame, or a face's light (0 dark, 1 lit) from its normal toward the eye, its middle, the face. */
+  interface PxMeshOpts { light?: PxV3 | ((normal: PxV3, middle: PxV3, face: PxFace) => number) }
+  /** A camera of one's own for mesh(): a point in the camera's frame (x right, y up, z ahead, from the eye) to [col, row, depth]. */
+  type PxProject = (p: PxV3) => [number, number, number];
   /** terrain()'s options: how far to look (m), the land's highest point, a cheap height it never rises more than `margin` above, the sky's color where a pixel sees no land. */
   interface PxTerrainOpts {
     far?: number; top?: number; bound?: (x: number, z: number) => number; margin?: number;
@@ -276,6 +284,8 @@ declare global {
     plume(x: number, y: number, keys: string, opts?: PxPlume): void;
     /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly). */
     solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): void;
+    /** Flat faces in meters (model()) through the camera, the nearest per pixel, toned along their material's ramp, outlined where a surface ends. */
+    mesh(view: PxView | PxPerspective | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): void;
     /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade. */
     shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): void;
     /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
@@ -361,6 +371,16 @@ declare global {
   function solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): PxOp;
   /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade by `shade`. */
   function shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): PxOp;
+  /** Flat faces in meters drawn through the camera with a depth per pixel (a dash round a driver, a wheel in front of its spokes): each toned along its material's ramp by how it lies to the light, outlined where a surface ends in front of another, creased where two faces of one material meet, its top edge a step lighter. Through perspective() points are [x, z, up]; a function camera takes [x right, y up, z ahead] from the eye. */
+  function mesh(view: PxView | PxPerspective | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): PxOp;
+  /** A model for mesh(): face(mat, ...points), strip(mat, a, b) between two lines of points, loft(mat, sections), box(mat, corner, corner); faces holds them. */
+  function model(): {
+    faces: PxFace[];
+    face(mat: string, ...pts: PxV3[]): number;
+    strip(mat: string, a: PxV3[], b: PxV3[]): void;
+    loft(mat: string, sections: PxV3[][]): void;
+    box(mat: string, a: PxV3, b: PxV3): void;
+  };
   /** Shapes in meters for solids() and shadows(). Points are [x, z, up]. */
   const solid: {
     /** round, from a to b, `half` m thick either side: trunks, limbs, poles, bars */
