@@ -602,22 +602,38 @@ sprite("_cockpit", { w: W, h: H }, (c) => {
 // corners in the blue suit with its white stripes, a knit cuff at each wrist. The gauges' needles:
 // the revs flutter, the speed holds about 200; the ribbons from the mirror swing against the turn.
 //
-// The hand is a puppet, put together every frame on the rim from its joints. A left hand gripping
-// at ten o'clock, the back of the glove up and toward us: the fingers lie side by side along the rim,
-// each across it, from its knuckle inside the rim's near edge, over the rim, to its bend just past
-// the far edge, so the rim goes into the fist and out of it; the back of the hand hangs from the
-// knuckles to the wrist; the thumb lies under the rim on its inner side, pointing in. The right hand
-// is the mirror image. The fingers are painted round (capsule) at whatever angle the rim has there,
-// the back is a plate lit on its own edges, the thumb a small drawing.
-sprite("_h_thumb", `
-  .......000.
-  ....000''}0
-  ..00''}}]-0
-  .0''}}]]-0.
-  0}}]]]]-0..
-  0]]]]--0...
-  .00000.....`)
-const HAND = { a: Math.PI * 0.76, step: 0.115 }   // the left index finger's angle on the rim; between fingers
+// The hand is a puppet: a skeleton of joints in the hand's own frame, read off photographs of a
+// left hand gripping, taken from its owner's eyes as the driver sees his, then set on the rim every
+// frame so that the line the rim takes under the palm lies on the rim, turning with it. Seen so, the
+// back of the glove is toward us and covers the rim; the rim goes under the palm on a slant, from the
+// outer edge of the hand a third of the way down its back to between the index finger and the
+// thumb; the fingers go up from the knuckles and curl forward over it; the thumb comes up from below
+// and holds it from underneath. The right hand is the mirror image. Each part is painted at its
+// joints: the back of the hand a plate, the fingers and the thumb round (capsule), the forearm round
+// with its stripes, the knit cuff ribbed along the arm.
+// In px, x across the knuckles toward the index, y up the back of the hand, the left hand.
+const HAND = {
+  a: Math.PI * 0.8, size: 0.85,                                                // where on the rim; how big
+  rim: [[-13, -8.6], [17.2, -2.3]],                                             // the rim's line under the palm
+  back: [[-12.5, 0.5], [-8.4, 1.8], [-3.8, 3], [2.5, 3.6], [8.4, 2.4], [11.5, 1], [14.5, -14], [4.2, -25.4], [-12.6, -14]],
+  knuckle: [[-8.4, 0.2], [-3.8, 1.5], [2.5, 2.3], [8.4, 1]],                    // pinky to index
+  bend: [[-8, 4.6], [-1.3, 9], [5.5, 12.4], [13.6, 10.7]],                      // the middle joints, curled over
+  tip: [[-5.9, 4.2], [0.8, 6.8], [8.8, 10], [17.4, 7.6]],                       // as far as the fingers show
+  thumb: [[13.4, -15], [17.6, -10.7], [16.6, -7.8]],
+  tendons: [[[-6, -1], [-6.5, -9]], [[-0.5, 0], [-1.5, -11]], [[5.5, -0.5], [2.5, -13]]],
+  wrist: [-4.2, -19.7],
+}
+// the hand's frame on the rim at its angle: a function from the frame to the picture
+function handOn(side, turn) {
+  const a = (side > 0 ? HAND.a : Math.PI - HAND.a) - turn, t = rimT(a)
+  const [gx, gy] = onRim(a, t / 2), [x1, y1] = onRim(a - 0.01 * side, t / 2), [x0, y0] = onRim(a + 0.01 * side, t / 2)
+  const mir = ([x, y]) => [x * side, y], [L, Q] = HAND.rim.map(mir)
+  const th = Math.atan2(y0 - y1, x1 - x0) - Math.atan2(Q[1] - L[1], Q[0] - L[0]), co = Math.cos(th), si = Math.sin(th)
+  const mx = (L[0] + Q[0]) / 2, my = (L[1] + Q[1]) / 2
+  const k = HAND.size
+  return (p) => { const [x, y] = mir(p), dx = (x - mx) * k, dy = (y - my) * k; return [gx + dx * co - dy * si, gy - (dx * si + dy * co)] }
+}
+const GLOVE = "=]}}'"
 const steer = (f) => {
   const s = (f / FRAMES) * SECONDS, h = 0.02
   const lat = (ourX(((s + h) / SECONDS) * FRAMES) - 2 * ourX(f) + ourX(((s - h) / SECONDS) * FRAMES)) / (h * h)
@@ -651,27 +667,27 @@ function wheel(c, f) {
     if (up > 0.35 && Math.cos(a) < -0.2) { const [xl, yl] = onRim(a, 0.5); c.px(R(xl), R(yl), "%") }
   }
   for (let i = -4; i <= 4; i++) { const a = Math.PI / 2 - turn + i * 0.014, [x, y] = onRim(a), [xi, yi] = onRim(a, rimT(a)); c.line(R(x), R(y), R(xi), R(yi), i === 0 ? "@" : "(") }
-  // the arms: each forearm from its corner up to the wrist, the hand gripping the rim, the cuff
+  // the arms: each forearm from its corner up to the wrist, the cuff, then the hand on the rim: all its
+  // parts outlined first and filled after, so they read as one glove, a crease between the fingers
   for (const side of [1, -1]) {
-    // the fingers' places on the rim, pinky first (the others lie over it), and their knuckles
-    const fingers = [3, 2, 1, 0].map((i) => {
-      const a = (side > 0 ? HAND.a + i * HAND.step : Math.PI - HAND.a - i * HAND.step) - turn, t = rimT(a)
-      const [x, y] = onRim(a, t / 2), [ox, oy] = onRim(a), [ix, iy] = onRim(a, t), L = Math.hypot(ix - ox, iy - oy)
-      return { i, x, y, t, nx: (ix - ox) / L, ny: (iy - oy) / L }
-    })
-    const [px, py] = [fingers[0].x, fingers[0].y + 6], [ix, iy] = [fingers[3].x, fingers[3].y + 6]
-    const wrist = [(px + ix) / 2 - 3 * side, Math.max(py, iy) + 17], elbow = side > 0 ? [44, 214] : [276, 214]
+    const S = handOn(side, turn), wrist = S(HAND.wrist), elbow = side > 0 ? [44, 214] : [276, 214]
     forearm(c, elbow, wrist, side)
-    c.plate(() => c.poly([px - side, py - 1, ix + 4 * side, iy - 2, ix + 9 * side, iy + 7, wrist[0] + 8 * side, wrist[1], wrist[0] - 8 * side, wrist[1], px - 3 * side, py + 8].map(R), "]"),
-      { light: [-0.5 * side, -1], reach: 3, ramps: ["-=]}'"] })
-    c.stamp("_h_thumb", R(ix + (side > 0 ? 2 : -12)), R(iy + 2), side > 0 ? undefined : { flip: "x" })
-    // each finger: an outline first, so it lies over the one before with a dark line between
-    for (const { i, x, y, t, nx, ny } of fingers) {
-      const r = i === 3 ? 2.1 : 2.6, k = [x + nx * (t / 2 + 2.5), y + ny * (t / 2 + 2.5)], tip = [x - nx * (t / 2 + 1.2), y - ny * (t / 2 + 1.2)]
-      c.capsule(k[0], k[1], r + 1, tip[0], tip[1], r + 0.8, "0")
-      c.capsule(k[0], k[1], r, tip[0], tip[1], r - 0.2, "-=]}'", { light: [-0.5 * side, -1] })
-    }
     cuff(c, elbow, wrist)
+    const bones = []
+    for (let i = 0; i < 4; i++) {
+      const r = i === 0 ? 1.8 : 2.2
+      bones.push([S(HAND.knuckle[i]), S(HAND.bend[i]), r, r], [S(HAND.bend[i]), S(HAND.tip[i]), r, r - 0.3])
+    }
+    bones.push([S(HAND.thumb[0]), S(HAND.thumb[1]), 2.6, 2.3], [S(HAND.thumb[1]), S(HAND.thumb[2]), 2.3, 2])
+    for (const [[x0, y0], [x1, y1], r0, r1] of bones) c.capsule(x0, y0, r0 + 1, x1, y1, r1 + 1, "0")
+    c.poly(HAND.back.map(S).flat().map(R), "0")
+    c.plate(() => c.poly(HAND.back.map(S).flat().map(R), "]"), { light: [-0.5, -1], reach: 3, ramps: [GLOVE] })
+    for (const [[x0, y0], [x1, y1], r0, r1] of bones) c.capsule(x0, y0, r0, x1, y1, r1, GLOVE, { light: [-0.5, -1] })
+    for (let i = 0; i < 3; i++) {
+      const m = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], [x0, y0] = S(m(HAND.knuckle[i], HAND.knuckle[i + 1])), [x1, y1] = S(m(HAND.bend[i], HAND.bend[i + 1]))
+      c.line(R(x0), R(y0), R(x1), R(y1), "-")
+    }
+    for (const [p, q] of HAND.tendons) { const [x0, y0] = S(p), [x1, y1] = S(q); c.line(R(x0), R(y0), R(x1), R(y1), "=") }
   }
 }
 // a forearm in the suit: painted round, lit from the upper left, two white stripes running along it
