@@ -6,6 +6,9 @@ GIFs, and a live browser viewer that replays the painting step by step as you sa
 Built for AI agents (it ships as a ready-made [agent skill](#use-it-with-an-ai-agent)) and pleasant
 for people too. No runtime dependencies, no build step: just Node ≥ 22.18.
 
+> This is a fork of [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl).
+> **[Fork differences](docs/fork-differences.md)**: what it adds, in one page.
+
 <p>
   <img src="docs/gallery/no_magic_night.gif" width="100%" alt="Animated witch's cottage at night: bubbling cauldron, fireplace, cat and frog">
 </p>
