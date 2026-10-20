@@ -64,48 +64,89 @@ const at = (x, z, up = 0) => P.ground(x, z, up).map(Math.round)
 
 // ---------------------------------------------------------------- the sky
 sprite("_sky", { w: W, h: HORIZON + 2 }, (c) => {
-  const bands = [["1", 0], ["2", 10], ["3", 22], ["4", 34], ["5", 44], ["6", 53], ["7", 61], ["8", 67]]
-  for (const [k, y0] of bands) c.rect(0, y0, W, HORIZON + 2 - y0, k)
-  for (const [k, y0] of bands.slice(1)) for (let x = 0; x < W; x++) for (let r = 1; r <= 4; r++) if (1 - r / 5 > bayer(x, y0 - r)) c.px(x, y0 - r, k)
+  for (const [k, y0] of SKY_BANDS) c.rect(0, y0, W, HORIZON + 2 - y0, k)
+  for (const [k, y0] of SKY_BANDS.slice(1)) for (let x = 0; x < W; x++) for (let r = 1; r <= 4; r++) if (1 - r / 5 > bayer(x, y0 - r)) c.px(x, y0 - r, k)
 })
-// the sun on the sea, 4 degrees up, 14 degrees left of the road where the loop starts; it swings
-// across as we turn. A soft halo, then the disc.
+// the sun on the sea, 3 degrees up, 14 degrees left of the road where the loop starts; it swings
+// across as we turn. Its glow lifts the sky round it a few tones, softest at the edge (dithered),
+// over the sky only, so the clouds keep their own colours; the disc is a little flattened by the low
+// air, ringed, and the slits of haze cross its lower half.
 const SUN_AZ = -14, SUN_UP = 3
 const sunDir = (f) => { const a = ((SUN_AZ * Math.PI) / 180) - heading(f); return [Math.sin(a), Math.cos(a), Math.tan((SUN_UP * Math.PI) / 180)] }
+const SKY_BANDS = [["1", 0], ["2", 10], ["3", 22], ["4", 34], ["5", 44], ["6", 53], ["7", 61], ["8", 67]]
 function sun(c, f) {
-  const [sx, sy] = P.toward(sunDir(f))
-  for (let r = 22; r > 9; r -= 4) c.ellipse(Math.round(sx), Math.round(sy), r + 6, r, r > 17 ? "7" : "8")
-  c.circ(Math.round(sx), Math.round(sy), 8, "9")
+  const [sx, sy] = P.toward(sunDir(f)).map(Math.round), R = Math.round
+  for (let y = Math.max(0, sy - 30); y <= HORIZON; y++) for (let x = Math.max(0, sx - 56); x <= Math.min(W - 1, sx + 56); x++) {
+    const k = c.key(x, y), i = "12345678".indexOf(k)
+    if (i < 0) continue
+    const d = Math.hypot((x - sx) / 56, (y - sy) / 30)
+    if (d >= 1) continue
+    const lift = Math.floor(2.6 * (1 - d) ** 1.8 + bayer(x, y) - 0.3)
+    if (lift > 0) c.px(x, y, String(Math.min(8, i + 1 + lift)))
+  }
+  c.ellipse(sx, sy, 11, 10, "8")
+  c.ellipse(sx, sy, 9, 8, "9")
+  for (const [dy, w] of [[3, 1], [5, 1], [7, 1]]) for (let x = -9; x <= 9; x++) if ((x / 9) ** 2 + ((dy) / 8) ** 2 < 1) c.px(sx + x, sy + dy, dy === 3 ? "8" : "7")
+  c.px(sx - 3, sy - 4, "9")
 }
 
-// ---------------------------------------------------------------- far off: islands and the serra
-// One strip that wraps, far enough to move only as we turn: the islands out at sea on the left, the
-// Serra do Mar on the right, hazy; then the nearer ridge, which moves a little more (parallax).
+// ---------------------------------------------------------------- far off: the islands and the serra
+// Strips that wrap, far enough to move only as we turn, in layers that pale with distance (the air
+// between): the farthest serra pink and hazy, nearly the sky's colour; the middle one darker; the
+// near ridge darkest, the forest's tops along its crest. Each rises out of the sea at a headland and
+// goes back down at its far end, never a cut; the slopes that face the low sun to the left are a tone
+// lighter, the crest catches its light, and haze fills the foot of each. The islands out on the sea to
+// the left pale the same way, the one under the sun dark against it.
 const FAR_W = 960
-const farRidge = seamless((x, y) => fbm(x / 40, y, 3), FAR_W)
-sprite("_far", { w: FAR_W, h: 30, wrap: "x" }, (c) => {
-  for (let x = 0; x < FAR_W; x++) {
-    // islands: low humps on the sea; the serra: a long range, higher toward the right
-    const isl = Math.max(0, 7 * Math.sin((x / FAR_W) * TAU * 7) - 3 + 8 * (farRidge(x, 0) - 0.5))
-    const serra = 10 + 14 * farRidge(x, 3) + 6 * Math.sin((x / FAR_W) * TAU * 2 + 1)
-    const onLand = x > FAR_W * 0.5 && x < FAR_W * 0.95
-    const hgt = Math.round(onLand ? serra : isl)
-    for (let y = 30 - hgt; y < 30; y++) c.px(x, y, onLand ? (y < 30 - hgt + 2 ? "m" : "M") : "I")
+const farRidge = seamless((x, y) => fbm(x / 40, y, 4), FAR_W)
+const ridged = (x, y) => 1 - Math.abs(2 * farRidge(x, y) - 1)
+const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t) }
+// a range: its height along the strip, the keys from the haze at its foot to its lit crest
+function range(name, h, height, keys, { detail = 0, forest = false } = {}) {
+  const [haze, body, lit, rim] = keys
+  sprite(name, { w: FAR_W, h, wrap: "x" }, (c) => {
+    for (let x = 0; x < FAR_W; x++) {
+      const hx = height(x)
+      if (hx < 0.5) continue
+      const top = Math.round(h - hx), slope = height(x + 2) - height(x - 2)
+      const trees = forest ? (hash(x, 31) < 0.55 ? 1 : 0) + (hash(Math.floor(x / 3), 32) < 0.3 ? 1 : 0) : 0
+      for (let y = top - trees; y < h; y++) {
+        const d = y - top, foot = h - y
+        let k = slope > 0.4 && d < 2 + slope * 2.5 ? lit : body
+        if (d <= 0 && slope > -0.2) k = rim
+        if (detail >= 1 && ridged(x * 3.1, y * 0.7 + 5) > 0.93 && d > 2) k = slope > 0 ? lit : body
+        if (detail >= 2 && d > 1) { const cx = Math.floor(x / 4), cy = Math.floor((y + (cx % 2) * 2) / 4), u = x - cx * 4, v = y + (cx % 2) * 2 - cy * 4
+          if (hash(cx, cy * 7 + 3) < 0.6 && u + v < 3 && u < 2) k = lit }                  // a crown's lit side
+        if (foot <= 4 && bayer(x, y) * 4 > foot - 0.5) k = haze
+        c.px(x, y, k)
+      }
+    }
+  })
+}
+range("_serra_far", 30, (x) => smooth(590, 670, x) * (1 - smooth(870, 950, x)) * (13 + 14 * ridged(x, 3) + 4 * Math.sin((x / FAR_W) * TAU * 3)), ["5", "4", "c", "c"])
+range("_serra_mid", 24, (x) => smooth(625, 700, x) * (1 - smooth(860, 925, x)) * (8 + 12 * ridged(x * 1.3, 7) + 3 * Math.sin((x / FAR_W) * TAU * 5 + 2)), ["4", "3", "I", "i"], { detail: 1 })
+range("_serra_near", 20, (x) => smooth(660, 720, x) * (1 - smooth(850, 905, x)) * (6 + 9 * ridged(x * 1.7, 9) + 2 * Math.sin((x / FAR_W) * TAU * 6)), ["m", "M", "m", "i"], { detail: 2, forest: true })
+// the islands: humps of rock on the sea, the far ones small and pale, the near ones darker
+const ISLANDS = [[300, 22, 3, "far"], [352, 34, 5, "far"], [430, 16, 3, "far"], [470, 40, 7, "mid"], [522, 26, 4, "near"], [560, 30, 6, "mid"]]
+sprite("_islands", { w: FAR_W, h: 12, wrap: "x" }, (c) => {
+  for (const [cx0, w, hh, depth] of ISLANDS) {
+    const [haze, body, rim] = depth === "far" ? ["5", "4", "c"] : depth === "mid" ? ["4", "3", "i"] : ["3", "M", "e"]
+    for (let x = Math.round(cx0 - w / 2); x <= cx0 + w / 2; x++) {
+      const t = (x - (cx0 - w / 2)) / w, hx = hh * Math.sin(Math.PI * t) ** 0.7 * (0.75 + 0.5 * farRidge(x * 2, 13))
+      if (hx < 0.5) continue
+      const top = Math.round(12 - hx)
+      for (let y = top; y < 12; y++) c.px(x, y, y === top && t < 0.6 ? rim : 12 - y <= 1 && bayer(x, y) > 0.5 ? haze : body)
+    }
   }
 })
-sprite("_near_ridge", { w: FAR_W, h: 26, wrap: "x" }, (c) => {
-  for (let x = 0; x < FAR_W; x++) {
-    if (x < FAR_W * 0.55 || x > FAR_W * 0.92) continue
-    const hgt = Math.round(8 + 12 * farRidge(x * 1.7, 9) + 4 * Math.sin((x / FAR_W) * TAU * 5))
-    for (let y = 26 - hgt; y < 26; y++) c.px(x, y, "N")
-  }
-})
-// the far strip's 0 lands on the road's vanishing point where the loop starts; then it slides by
-// the heading (the near ridge a quarter more)
+// the strips' 0 lands on the road's vanishing point where the loop starts; then they slide by the
+// heading, the nearer ranges a little more (parallax)
 function far(c, f) {
-  const shift = P.focal * heading(f)
-  c.scroll("_far", HORIZON - 29, 0, { x: Math.round(P.vp - FAR_W * 0.6 - shift) })
-  c.scroll("_near_ridge", HORIZON - 25, 0, { x: Math.round(P.vp - FAR_W * 0.6 - shift * 1.25) })
+  const shift = P.focal * heading(f), x0 = P.vp - FAR_W * 0.6
+  c.scroll("_serra_far", HORIZON - 29, 0, { x: Math.round(x0 - shift) })
+  c.scroll("_islands", HORIZON - 11, 0, { x: Math.round(x0 - shift) })
+  c.scroll("_serra_mid", HORIZON - 23, 0, { x: Math.round(x0 - shift * 1.1) })
+  c.scroll("_serra_near", HORIZON - 19, 0, { x: Math.round(x0 - shift * 1.25) })
 }
 
 // ---------------------------------------------------------------- the road and what's by it
