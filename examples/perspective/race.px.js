@@ -37,10 +37,13 @@ pal({
   // red stitching; the gauges' orange numbers and red needles
   0: "#0b090e", "-": "#15121a", "=": "#221d29", "~": "#332b39", "^": "#4c4150", "%": "#9a6048", "(": "#c4303a", ")": "#ffb060", "[": "#ff4a30",
   // the driver: gloves (black, red cuffs, lit knuckles), the blue suit's sleeves
-  "]": "#27222d", "{": "#b8282e", "}": "#5c5466", ">": "#2a4aa0", "/": "#4a6ad0", "<": "#18264e",
+  "]": "#3b3546", "{": "#b8282e", "}": "#6c6480", ">": "#2a4aa0", "/": "#4a6ad0", "<": "#18264e",
   // the Bonfim ribbons
   X: "#2ea04a", ":": "#e06aa0",
+  // the gloves' sheen
+  "'": "#aaa2be",
 })
+ramps("-=]}'")                          // the gloves, dark to light: their shade() and light()
 const W = 320, H = 180, FPS = 16, FRAMES = 192, SECONDS = FRAMES / FPS
 const TAU = Math.PI * 2
 const SPEED = 56, LOOP_M = SPEED * SECONDS                          // 672 m a loop
@@ -525,8 +528,12 @@ anim("_mirror", { w: MW, h: MH, frames: FRAMES, fps: FPS }, rect(0, 0, MW, 3, "2
   })
 
 // ---------------------------------------------------------------- the cockpit
-// The roof's edge with the sun visor down, the A-pillars, the dash with its hood over the gauges, the
-// door on the left and the console on the right. The glass is left empty: the view shows through.
+// After pixel-art cockpits seen from the driver's seat: the dash across under the glass, its top
+// catching the sun; the hood over the gauges, which show through the wheel; round vents ringed in metal
+// and a strip of brushed aluminium; the radio's red display and the hazard button in the console; the
+// doors with their handles, switches and speakers; the side mirrors out past the side glass, the sunset
+// in them. The glass is left empty: the view shows through.
+const GAUGES = [[142, 125], [178, 125]]
 sprite("_cockpit", { w: W, h: H }, (c) => {
   // roof liner and the visor down on the driver's side
   c.rect(0, 0, W, 6, "-"); c.hline(0, 6, W, "="); c.hline(0, 7, W, "0")
@@ -535,81 +542,181 @@ sprite("_cockpit", { w: W, h: H }, (c) => {
   c.rect(156, 0, 8, 4, "-"); c.rect(125, 3, 70, 16, "0"); c.rect(126, 4, 68, 14, "-"); c.hline(127, 4, 66, "~")
   c.rect(128, 5, MW + 2, MH + 2, "0"); c.rect(129, 6, MW, MH, "_")
   // A-pillars, wide at the foot; beyond them the side windows, whose sills run down to the doors
-  c.poly([0, 0, 22, 0, 52, 106, 36, 112, 0, 112], "=") ; c.poly([0, 0, 14, 0, 36, 104, 0, 104], "_")
+  c.poly([0, 0, 22, 0, 52, 106, 36, 112, 0, 112], "="); c.poly([0, 0, 14, 0, 36, 104, 0, 104], "_")
   c.poly([22, 0, 26, 0, 54, 104, 52, 106], "~")
   c.poly([W, 0, W - 22, 0, W - 52, 106, W - 36, 112, W, 112], "="); c.poly([W, 0, W - 14, 0, W - 36, 104, W, 104], "_")
   c.poly([W - 22, 0, W - 26, 0, W - 54, 104, W - 52, 106], "~")
-  // the doors: the window's sill, the panel, the handle; the console on the right with its vents
-  c.poly([0, 100, 36, 104, 40, H, 0, H], "-"); c.hline(0, 100, 36, "^"); c.rect(8, 128, 18, 3, "~"); c.rect(10, 129, 14, 1, "0")
-  c.poly([W, 100, W - 36, 104, W - 40, H, W, H], "-"); c.hline(W - 36, 100, 36, "^")
-  // the dash: across under the glass, its top edge catching the sun, the hood over the gauges
-  c.poly([30, 112, 112, 106, 124, 99, 196, 99, 208, 106, 290, 112, W - 30, H, 30, H], "-")
-  c.hline(36, 111, 76, "%"); c.hline(208, 106, 0, "%"); c.line(112, 106, 124, 99, "%"); c.hline(124, 99, 73, "%"); c.line(196, 99, 208, 106, "%"); c.line(208, 106, 290, 112, "%")
-  c.line(36, 112, 112, 107, "~"); c.line(208, 107, 288, 113, "~"); c.hline(125, 100, 71, "~")
-  // the binnacle: dark under its hood, the two gauges and the readout between
-  c.rect(122, 101, 76, 26, "0")
-  for (const gx of [139, 181]) {
-    c.circ(gx, 115, 12, "-"); c.ring(gx, 115, 12, "~"); c.circ(gx, 115, 10, "0")
-    for (let i = 0; i <= 8; i++) { const a = Math.PI * (0.8 + (i / 8) * 1.4), r0 = i % 2 ? 8 : 7; c.line(Math.round(gx + Math.cos(a) * r0), Math.round(115 + Math.sin(a) * r0), Math.round(gx + Math.cos(a) * 9), Math.round(115 + Math.sin(a) * 9), ")") }
-    c.px(gx + 7, 117, "(")
+  // the side mirrors, out beyond the side glass: a dark housing, the sunset and the road in the glass
+  for (const s of [1, -1]) {
+    const X = (x) => (s > 0 ? x : W - 1 - x)
+    c.poly([X(0), 84, X(25), 83, X(30), 95, X(27), 103, X(0), 104], "-")
+    c.poly([X(0), 86, X(23), 85, X(27), 95, X(24), 101, X(0), 102], "6")
+    c.poly([X(0), 90, X(25), 89, X(27), 95, X(24), 101, X(0), 102], "5"); c.poly([X(0), 96, X(26), 96, X(24), 101, X(0), 102], "a")
+    c.line(X(4), 87, X(14), 86, "8"); c.line(X(25), 83, X(30), 95, "~")
   }
-  c.rect(152, 106, 16, 14, "-"); c.rect(153, 107, 14, 12, "0")
-  // the console, the vents, the start button
-  c.rect(228, 118, 40, 20, "-"); for (let y = 121; y < 135; y += 3) c.hline(231, y, 34, "0"); c.circ(250, 146, 3, "("); c.px(249, 145, ")")
-  // stitching along the dash
-  for (let x = 40; x < 280; x += 4) if (x < 120 || x > 200) c.px(x, x < 160 ? 116 - Math.round((x - 40) / 16) : 111 + Math.round((x - 200) / 16), "(")
+  // the doors: the sill, the armrest, the handle in chrome, the window switches, a speaker
+  for (const s of [1, -1]) {
+    const X = (x) => (s > 0 ? x : W - 1 - x)
+    c.poly([X(0), 103, X(36), 106, X(44), H, X(0), H], "-"); c.line(X(0), 103, X(36), 106, "^")
+    c.poly([X(0), 138, X(38), 136, X(40), 144, X(0), 147], "="); c.line(X(0), 138, X(38), 136, "~")
+    c.rect(Math.min(X(8), X(24)), 122, 17, 4, "0"); c.hline(Math.min(X(9), X(23)), 122, 15, "W"); c.hline(Math.min(X(10), X(22)), 123, 13, "w")
+    c.circ(X(18), 164, 9, "0"); for (let y = 157; y <= 171; y += 2) for (let x = -8; x <= 8; x += 2) if (x * x + (y - 164) ** 2 < 64) c.px(X(18) + x, y, "=")
+    if (s > 0) for (const x of [10, 20]) { c.rect(x, 139, 7, 3, "0"); c.hline(x + 1, 139, 5, "~") }
+  }
+  // the dash across, its top catching the sun; the hood over the gauges
+  c.poly([30, 112, 70, 108, 118, 105, 124, 96, 196, 96, 202, 105, 250, 108, 290, 112, W - 30, H, 30, H], "-")
+  c.line(36, 111, 70, 108, "%"); c.line(70, 108, 118, 105, "%"); c.line(118, 105, 124, 96, "%"); c.hline(124, 96, 73, "%"); c.line(196, 96, 202, 105, "%"); c.line(202, 105, 250, 108, "%"); c.line(250, 108, 288, 112, "%")
+  c.line(37, 112, 118, 106, "~"); c.line(202, 106, 288, 113, "~"); c.hline(125, 97, 71, "~")
+  c.rect(124, 98, 73, 4, "0")
+  // the brushed aluminium strip, the vents ringed in it, round with their slats
+  c.rect(40, 117, 240, 3, "W"); c.hline(40, 117, 240, "w"); c.hline(40, 120, 240, "0")
+  for (const vx of [74, 246]) {
+    c.circ(vx, 129, 9, "W"); c.circ(vx, 129, 8, "0"); c.ring(vx, 129, 8, "w")
+    for (let y = 124; y <= 134; y += 2) c.hline(vx - Math.round(Math.sqrt(Math.max(0, 49 - (y - 129) ** 2))), y, 2 * Math.round(Math.sqrt(Math.max(0, 49 - (y - 129) ** 2))) + 1, "~")
+    c.circ(vx, 129, 2, "=")
+  }
+  // the gauges under the hood: dark faces, metal rings, the numbers, the red zone
+  c.rect(124, 102, 72, 34, "0")
+  for (const [gx, gy] of GAUGES) {
+    c.circ(gx, gy, 12, "W"); c.circ(gx, gy, 11, "0"); c.ring(gx, gy, 11, "w")
+    for (let i = 0; i <= 10; i++) { const a = Math.PI * (0.8 + (i / 10) * 1.4), r0 = i % 2 ? 9 : 8; c.line(Math.round(gx + Math.cos(a) * r0), Math.round(gy + Math.sin(a) * r0), Math.round(gx + Math.cos(a) * 10), Math.round(gy + Math.sin(a) * 10), i > 8 ? "(" : ")") }
+  }
+  c.rect(153, 112, 14, 20, "-"); c.rect(154, 113, 12, 18, "0")
+  // red stitching along the dash's front edge, either side of the hood
+  for (let x = 40; x < 282; x += 3) if (x < 116 || x > 204) c.px(x, Math.round(x < 160 ? 113 - (x - 40) * 0.05 : 108 + (x - 204) * 0.05), "(")
+  // carbon fibre on the passenger's side above the console: its weave in two dark tones
+  for (let y = 108; y < 116; y++) for (let x = 210; x < 280; x++) if (y > 107 + (x - 202) * 0.07) c.px(x, y, ((x >> 1) + (y >> 1)) % 2 ? "-" : "=")
+  // the console: the radio with its red display, the buttons, the hazard switch
+  c.poly([250, 120, 300, 122, 312, H, 252, H], "="); c.line(250, 120, 300, 122, "~")
+  c.rect(258, 128, 40, 9, "0"); c.rect(260, 130, 36, 5, "!"); c.hline(260, 130, 36, "@"); for (const x of [264, 272, 280, 288]) c.px(x, 132, "9")
+  for (const x of [260, 268, 276, 284, 292]) { c.rect(x, 140, 5, 3, "0"); c.hline(x, 140, 5, "~") }
+  c.rect(272, 147, 12, 8, "0"); c.poly([274, 153, 278, 148, 282, 153], "("); c.px(278, 151, "0")
+  // the gear lever, sequential: its boot and knob low on the console
+  c.poly([290, H, 296, 160, 308, 160, 314, H], "0"); for (let y = 164; y < H; y += 3) c.hline(296, y, 14, "=")
+  c.rect(298, 150, 8, 10, "-"); c.rect(299, 151, 6, 4, "~"); c.hline(299, 151, 6, "W"); c.px(301, 156, "(")
 })
 
 // ---------------------------------------------------------------- the driver
-// The wheel turns with the bend and with every change of lane; the hands go round with it at ten to
-// two, the forearms in the blue suit painted round. The gauges' needles: the revs flutter, the speed
-// holds about 200; the ribbons from the mirror swing against the turn.
+// The wheel, small as a racing car's, turns with the bend and with every change of lane; the hands
+// go round with it at a quarter to three, gripping as drivers do: the back of the glove toward us,
+// the palm on the rim, the thumbs on top of it pointing in, the fingers wrapped round it. The forearms
+// come up from the corners in the blue suit with its white stripes, a knit cuff at each wrist. The
+// gauges' needles: the revs flutter, the speed holds about 200; the ribbons from the mirror swing
+// against the turn.
+//
+// The hand is a puppet: each part drawn on its own, then stamped at its joint in the hand's frame
+// (32 x 42: the left hand, the rim running up through the fist at x 15..22; the right hand is its
+// mirror). As the reference pictures have it, the thumb lies along the rim on top of it, its tip up
+// and in; the knuckles run down the inner edge of the back, and the fingers from them wrap round the
+// rim, seen end on as bands stacked along it, the index under the thumb and the pinky lowest.
+// a finger, from its knuckle (left, open into the back of the hand) to its bend round the rim
+sprite("_h_finger", `
+  00000000..
+  ''}}}}]]0.
+  }}]]]]]]-0
+  ]]]]]]]--0
+  ]]]]]]--0.
+  000000000.`)
+sprite("_h_pinky", `
+  0000000..
+  '}}}}]]0.
+  }]]]]]--0
+  ]]]]]--0.
+  00000000.`)
+sprite("_h_thumb", `
+  .........000.
+  ........0''}0
+  .......0''}]0
+  .......0'}]-0
+  ......0'}]]-0
+  .....0'}}]-0.
+  ....0}}]]-0..
+  ...0}}]]-0...
+  ..0}}]]]-0...
+  ..0}]]]-0....
+  .0}}]]]-0....
+  0}}]]]-0.....
+  0]]]]--0.....`)
+// the back of the hand, from the knuckles out and down to the wrist: a plate, lit on its own edges,
+sprite("_h_back", { w: 22, h: 30, outline: "0" },
+  plate({ light: [-0.5, -1], reach: 3, ramps: ["-=]}'"] }, poly([2, 6, 8, 2, 13, 1, 19, 3, 21, 10, 21, 20, 19, 25, 14, 29, 6, 29, 1, 24, 0, 14], "]")),
+  light([3, 7, 9, 3, 14, 3, 7, 11, 3, 17], 1), shade([3, 21, 16, 8], 1))      // its sheen along the top, darker to the wrist
+// assembled: the back, the fingers index to pinky (each over the one above), the thumb on top. Its
+// pivot is where the rim goes into the fist, under the index; turned with the wheel by RotSprite.
+const GRIP = [18, 12], WRIST = [9, 38]
+sprite("_hand_l", { w: 32, h: 42, pivot: GRIP },
+  stamp("_h_back", 1, 9),
+  stamp("_h_finger", 20, 9), stamp("_h_finger", 20, 14), stamp("_h_finger", 20, 19), stamp("_h_pinky", 20, 24),
+  stamp("_h_thumb", 11, 0))
+for (let d = -15; d <= 15; d += 5) sprite("_hand_l_" + d, { base: "_hand_l", angle: d })
 const steer = (f) => {
   const s = (f / FRAMES) * SECONDS, h = 0.02
   const lat = (ourX(((s + h) / SECONDS) * FRAMES) - 2 * ourX(f) + ourX(((s - h) / SECONDS) * FRAMES)) / (h * h)
-  return kappa(f) * 90 + lat * 0.05
+  return (kappa(f) * 90 + lat * 0.05) * 0.45
 }
-const WHEEL = { x: 160, y: 188, rx: 82, ry: 60 }
+const WHEEL = { x: 160, y: 146, rx: 52, ry: 44 }
 const onRim = (a, inset = 0) => [WHEEL.x + (WHEEL.rx - inset) * Math.cos(a), WHEEL.y - (WHEEL.ry - inset) * Math.sin(a)]
+// the rim's thickness: thinner at the top, which is farther from the eye
+const rimT = (a) => 6 + 3 * Math.max(0, -Math.sin(a)) + 1.5 * (1 - Math.abs(Math.sin(a)))
 function wheel(c, f) {
-  const turn = steer(f), R = (v) => Math.round(v)
-  // the spokes from the hub to the rim, left, right and down; the hub with its badge
-  for (const a of [Math.PI + 0.2, -0.2, -Math.PI / 2]) {
-    const [x0, y0] = onRim(a - turn, 60), [x1, y1] = onRim(a - turn, 6)
-    c.line(R(x0), R(y0), R(x1), R(y1), "=", 9); c.line(R(x0), R(y0) - 3, R(x1), R(y1) - 3, "~", 2)
+  const turn = steer(f), R = Math.round
+  // three spokes, left, right and down, drilled with holes, from the hub to the rim
+  for (const a of [Math.PI + 0.12, -0.12, -Math.PI / 2]) {
+    const aa = a - turn, [x0, y0] = onRim(aa, 36), [x1, y1] = onRim(aa, 7), nx = -Math.sin(aa) * 0.6, ny = -Math.cos(aa) * 0.6
+    c.poly([x0 + nx * 8, y0 + ny * 8, x1 + nx * 5, y1 + ny * 5, x1 - nx * 5, y1 - ny * 5, x0 - nx * 8, y0 - ny * 8].map(R), "=")
+    c.line(R(x0 + nx * 7), R(y0 + ny * 7), R(x1 + nx * 4), R(y1 + ny * 4), "~")
+    for (const t of [0.35, 0.6, 0.85]) c.circ(R(x0 + (x1 - x0) * t), R(y0 + (y1 - y0) * t), 1, "0")
   }
-  c.ellipse(WHEEL.x, WHEEL.y, 20, 14, "-"); c.ellipse(WHEEL.x, WHEEL.y - 1, 16, 10, "="); c.ellipse(WHEEL.x, WHEEL.y - 3, 5, 3, "(")
-  // the rim, 9 px of leather: dark under, lit on top, the red mark at the top
-  for (let i = 0; i < 720; i++) {
-    const a = (i / 720) * TAU, [x, y] = onRim(a), [xi, yi] = onRim(a, 9), up = Math.sin(a)
-    c.line(R(x), R(y), R(xi), R(yi), up > 0.3 ? "=" : "-")
-    if (up > 0.15) { const [xl, yl] = onRim(a, 2); c.px(R(xl), R(yl), up > 0.6 ? "^" : "~") }
+  // the hub: padded, its badge in red
+  c.ellipse(WHEEL.x, WHEEL.y, 17, 12, "0"); c.ellipse(WHEEL.x, WHEEL.y, 16, 11, "-"); c.ellipse(WHEEL.x, WHEEL.y - 2, 13, 8, "="); c.ellipse(WHEEL.x - 3, WHEEL.y - 5, 6, 2, "~")
+  c.ellipse(WHEEL.x, WHEEL.y - 2, 4, 3, "("); c.px(WHEEL.x - 1, WHEEL.y - 4, "@")
+  // the rim, leather: lit along its top and toward the sun, dark under, outlined; the mark at the top
+  for (let i = 0; i < 900; i++) {
+    const a = (i / 900) * TAU, t = rimT(a), [x, y] = onRim(a, -1), [xi, yi] = onRim(a, t + 1)
+    c.line(R(x), R(y), R(xi), R(yi), "0")
   }
-  for (let i = -6; i <= 6; i++) { const a = Math.PI / 2 - turn + i * 0.011, [x, y] = onRim(a), [xi, yi] = onRim(a, 9); c.line(R(x), R(y), R(xi), R(yi), "(") }
-  // the hands at ten to two, gripping the rim: the forearms first, then the gloves over the rim
-  for (const [a0, toward] of [[Math.PI * 0.8, [18, 200]], [Math.PI * 0.2, [302, 200]]]) {
-    const [x, y] = onRim(a0 - turn, 4)
-    c.capsule(toward[0], toward[1], 18, x, y + 8, 8, "<>/", { light: [0.3, -1] })
-    const mx = (toward[0] + x) / 2, my = (toward[1] + y) / 2
-    c.line(R(toward[0] + (x - toward[0]) * 0.15), R(toward[1] - 10 + (y - toward[1]) * 0.15), R(x + (toward[0] - x) * 0.1), R(y + 2), "w", 2)
-    c.line(R(mx - 5), R(my + 2), R(mx + 3), R(my - 4), "<")
-    c.rect(R(x) - 9, R(y) + 6, 18, 5, "{"); c.hline(R(x) - 9, R(y) + 6, 18, "(")
-    c.ellipse(R(x), R(y), 12, 9, "]"); c.ellipse(R(x) - 1, R(y) - 2, 9, 5, "}"); c.ellipse(R(x), R(y) - 1, 9, 5, "]")
-    c.hline(R(x) - 8, R(y) + 1, 17, "{")
-    for (let k = 0; k < 4; k++) {
-      const fx = R(x) - 8 + k * 5
-      c.rect(fx, R(y) - 8, 4, 4, "]"); c.hline(fx, R(y) - 8, 4, "}"); c.vline(fx + 4, R(y) - 8, 4, "0")
-    }
-    c.rect(R(x) + (a0 > Math.PI / 2 ? 9 : -12), R(y) - 3, 4, 6, "]"); c.px(R(x) + (a0 > Math.PI / 2 ? 10 : -11), R(y) - 3, "}")
+  for (let i = 0; i < 900; i++) {
+    const a = (i / 900) * TAU, t = rimT(a), [x, y] = onRim(a), [xi, yi] = onRim(a, t), up = Math.sin(a)
+    c.line(R(x), R(y), R(xi), R(yi), up > 0.2 ? "=" : "-")
+    if (up > 0.1) { const [xl, yl] = onRim(a, 1.5); c.px(R(xl), R(yl), up > 0.55 ? "^" : "~") }
+    if (up > 0.35 && Math.cos(a) < -0.2) { const [xl, yl] = onRim(a, 0.5); c.px(R(xl), R(yl), "%") }
+  }
+  for (let i = -4; i <= 4; i++) { const a = Math.PI / 2 - turn + i * 0.014, [x, y] = onRim(a), [xi, yi] = onRim(a, rimT(a)); c.line(R(x), R(y), R(xi), R(yi), i === 0 ? "@" : "(") }
+  // the arms: each forearm from its corner up to the wrist, the hand gripping the rim, the cuff
+  const deg = Math.max(-15, Math.min(15, R((turn * 180) / Math.PI / 5) * 5)), co = Math.cos(turn), si = Math.sin(turn)
+  for (const side of [1, -1]) {
+    const a = side > 0 ? Math.PI * 0.91 : Math.PI * 0.09, [gx, gy] = onRim(a - turn, rimT(a) / 2)
+    const ox = (WRIST[0] - GRIP[0]) * side, oy = WRIST[1] - GRIP[1], wrist = [gx + ox * co - oy * si, gy + ox * si + oy * co]
+    const elbow = side > 0 ? [44, 214] : [276, 214]
+    forearm(c, elbow, wrist, side)
+    c.stamp(`_hand_l_${side > 0 ? deg : -deg}`, R(gx), R(gy), side > 0 ? undefined : { flip: "x" })
+    cuff(c, elbow, wrist)
+  }
+}
+// a forearm in the suit: painted round, lit from the upper left, two white stripes running along it
+function forearm(c, [ex, ey], [wx, wy], side) {
+  const R = Math.round
+  c.capsule(ex, ey, 20, wx, wy, 10, "<>/", { light: [-0.5, -1] })
+  const dx = wx - ex, dy = wy - ey, L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L
+  for (const o of [3, 6]) c.line(R(ex + nx * o * 2 * side), R(ey + ny * o * 2 * side), R(wx + nx * o * side), R(wy + ny * o * side), "w")
+}
+// the knit cuff over the wrist: a band across the arm, ribbed along it
+function cuff(c, [ex, ey], [wx, wy]) {
+  const R = Math.round, dx = wx - ex, dy = wy - ey, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L
+  for (let y = R(wy) - 14; y <= R(wy) + 14; y++) for (let x = R(wx) - 14; x <= R(wx) + 14; x++) {
+    const t = (x - wx) * ux + (y - wy) * uy, o = -(x - wx) * uy + (y - wy) * ux
+    if (t < -7 || t > 2 || Math.abs(o) > 10.5) continue
+    const edge = Math.abs(o) > 9.5 || t > 1 || t < -6
+    c.px(x, y, edge ? "0" : Math.floor(o / 1.5) % 2 ? "-" : t < -4.5 ? "=" : "~")
   }
 }
 function needles(c, f) {
   const rev = 0.72 + 0.04 * Math.sin((TAU * f * 52) / FRAMES) + 0.06 * Math.sin((TAU * f * 3) / FRAMES), kmh = 200 + 4 * Math.sin((TAU * f) / FRAMES * 2)
-  for (const [gx, v] of [[139, rev], [181, kmh / 300]]) {
+  for (const [[gx, gy], v] of [[GAUGES[0], rev], [GAUGES[1], kmh / 300]]) {
     const a = Math.PI * (0.8 + v * 1.4)
-    c.line(gx, 115, Math.round(gx + Math.cos(a) * 9), Math.round(115 + Math.sin(a) * 9), "["); c.px(gx, 115, "~")
+    c.line(gx, gy, Math.round(gx + Math.cos(a) * 9), Math.round(gy + Math.sin(a) * 9), "["); c.circ(gx, gy, 1, "~")
   }
-  c.text(154, 109, String(Math.round(kmh)), ")"); c.text(158, 116, "6", "(")
+  c.text(155, 119, String(Math.round(kmh)), ")"); c.text(158, 126, "6", "(")
 }
 // the ribbons tied to the mirror: they hang and swing against the turn
 function ribbons(c, f) {
