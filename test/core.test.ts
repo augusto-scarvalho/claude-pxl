@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { art, failure, keys, PAL } from "./helpers.ts";
 import { perspective } from "../src/core/perspective.ts";
-import { bayer, fbm, latticeHash, vnoise } from "../src/core/util.ts";
+import { bayer, fbm, latticeHash, seamless, vnoise } from "../src/core/util.ts";
 import { loadSource } from "../src/node/load.ts";
 import { compareSilhouettes, packSheet, sheetJson } from "../src/core/render.ts";
 import { pack } from "../src/core/color.ts";
@@ -636,4 +636,10 @@ test("flame: hottest at the root, the tip's key only up top, flickering from fra
   // the same tongues blown the other way: the upper half sits further left
   const mean = (rows: string[]) => { let s = 0, n = 0; rows.slice(0, 10).forEach((r) => [...r].forEach((k, x) => { if (k !== ".") { s += x; n++ } })); return s / n };
   assert.ok(mean(left) < mean(a) - 2);
+});
+
+test("seamless: a function made to close over a width (and a height) runs into itself", () => {
+  const f = seamless((x, y) => fbm(x / 7, y / 7), 20), g = seamless((x, y) => fbm(x / 7, y / 7), 20, 12);
+  assert.ok(Math.abs(f(0, 3) - f(20, 3)) < 1e-9 && Math.abs(f(19.999, 3) - f(20, 3)) < 1e-3);
+  assert.ok(Math.abs(g(5, 0) - g(5, 12)) < 1e-9 && Math.abs(g(5, 11.999) - g(5, 12)) < 1e-3);
 });

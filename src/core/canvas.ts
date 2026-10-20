@@ -8,7 +8,7 @@ import { bump, dirOf, setNormal } from "./normals.ts";
 import { type View, perspective } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
-import { bayer, colorList, gridRows, hash, inPoly, polyBounds, type Region, regionPred, rng } from "./util.ts";
+import { bayer, colorList, gridRows, hash, inPoly, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
 
 /** How a canvas reaches other assets. */
 export interface Resolver {
@@ -552,6 +552,82 @@ export class Canvas {
     }
   }
 
+  /**
+   * A strip that wraps (a sprite with `wrap: "x"`) going by: placed at its offset for the frame, and
+   * again a strip-width on until the canvas is covered; `per` px a loop, leftward (negative: right).
+   * `per` is a whole number of the strip's widths, so the last frame runs into the first. A parallax
+   * plane in one call.
+   */
+  scroll(name: string, y: number, per: number, opts: { x?: number; frame?: number } = {}): void {
+    const w = this.size(name).w, f = opts.frame ?? this.frame;
+    if (!w) return;
+    if (this.frames > 1 && per % w !== 0) throw new PxError(`scroll: '${name}' is ${w} px wide, so per (${per}) must be a whole number of ${w}s for the loop to close (e.g. ${w * Math.max(1, Math.round(Math.abs(per) / w))})`);
+    let x = (opts.x ?? 0) - ((((Math.floor((f * per) / this.frames)) % w) + w) % w);
+    while (x > -this.ox) x -= w;
+    for (; x < this.img.w - this.ox; x += w) this.stamp(name, x, y);
+  }
+
+  /**
+   * A lane of cumulus drifting across in a loop that closes: clouds `gap` px apart, each moving one
+   * slot along over the loop while it turns into the next slot's cloud. `n` designs from `seed`, `w`
+   * across and `h` tall, `sizes` scaling each; a slot in `empty` holds none, so a cloud forms out of
+   * nothing or thins away there. Cut flat at the base on row `y`. `keys`: the lit top, the gray low
+   * down and on the shaded right, the base.
+   */
+  clouds(opts: { y: number; gap: number; w: number; h: number; n?: number; seed?: number; keys?: string; x?: number; empty?: number[]; sizes?: number[]; frame?: number }): void {
+    if (!opts || [opts.y, opts.gap, opts.w, opts.h].some((v) => typeof v !== "number")) throw new PxError("clouds({ y, gap, w, h, n?, seed?, keys?, x?, empty?, sizes? }): the base row, the px between clouds, a cloud's width and height");
+    const { y, gap, w, h, n = 4, seed = 1, keys = "Wwv", x = 0 } = opts, [top, mid, base] = [...keys];
+    const t = opts.frame === undefined ? this.phase : (((opts.frame % this.frames) + this.frames) % this.frames) / this.frames;
+    const designs = Array.from({ length: n }, (_, i) => {
+      const r = rng(seed * 31 + i), s = opts.sizes?.[i] ?? 1, none = opts.empty?.includes(i);
+      return Array.from({ length: 7 }, () => [(r() - 0.5) * w * s * 0.85, -r() * h * s * 0.45, none ? 0 : h * s * (0.32 + r() * 0.3)]);
+    });
+    const at = (j: number) => designs[((j % n) + n) % n], right = this.img.w - this.ox;
+    for (let j = -2; (j - 1) * gap < right + w; j++) {
+      const a = at(j), b = at(j + 1);
+      // the puffs of one cumulus, cut flat at the base: lit on top, gray low down and on the right
+      const cx = x + (j + t) * gap, px = new Map<number, [number, number]>();
+      for (let k = 0; k < a.length; k++) {
+        const [dx, dy, r] = a[k].map((v, m) => v + (b[k][m] - v) * t);
+        if (r < 0.6) continue;
+        for (let yy = Math.floor(y + dy - r); yy <= y; yy++)
+          for (let xx = Math.floor(cx + dx - r); xx <= Math.ceil(cx + dx + r); xx++)
+            if (xx >= -this.ox && xx < right && yy >= -this.oy && (xx + 0.5 - cx - dx) ** 2 + (yy + 0.5 - y - dy) ** 2 <= r * r) px.set(yy * 4096 + xx, [xx, yy]);
+      }
+      for (const [i, [xx, yy]] of px) this.px(xx, yy, yy >= y ? base : yy >= y - h * 0.3 || !px.has(i + 1) ? mid : top);
+    }
+  }
+
+  /**
+   * Smoke, steam or dust rising from (x, y) in a loop that closes: a puff every `every` frames (2),
+   * each living `life` frames (36), rising `rise` px (24), quickly at first, and carried `wind` px a
+   * frame ([x, y], or a number for x), which it takes on over its first `inertia` frames (0: at once;
+   * smoke from a moving engine keeps the stack's speed a while). It swells from `size[0]` to `size[1]`
+   * px in radius ([2, 8]) and thins out in dither. `keys`: lit, middle, shaded; `young`: lit and shaded
+   * while it is fresh (dark smoke at a stack). Lit from `light` (default the upper left).
+   */
+  plume(x: number, y: number, keys: string, opts: { every?: number; life?: number; rise?: number; wind?: number | [number, number]; inertia?: number; size?: [number, number]; young?: string; seed?: number; frame?: number; light?: [number, number] } = {}): void {
+    const every = Math.max(1, opts.every ?? 2), life = opts.life ?? 36, rise = opts.rise ?? 24, tau = opts.inertia ?? 0, [s0, s1] = opts.size ?? [2, 8];
+    const [wx, wy] = typeof opts.wind === "number" ? [opts.wind, 0] : opts.wind ?? [0, 0], f = opts.frame ?? this.frame, frames = this.frames;
+    const [lit, mid, shade] = [...keys], young = opts.young ? [...opts.young] : null, [lx, ly] = opts.light ?? [-0.6, -0.8], ll = Math.hypot(lx, ly) || 1;
+    const carried = (age: number) => (tau > 0 ? age - tau * (1 - Math.exp(-age / tau)) : age);
+    for (let age = life - 1; age >= 0; age--) {
+      const born = f - age;
+      if (((born % every) + every) % every) continue;
+      const id = ((born % frames) + frames) % frames, r = rng((opts.seed ?? 1) * 7919 + id);
+      const cx = x + wx * carried(age) + (r() - 0.5) * 5, cy = y + wy * carried(age) - rise * (1 - Math.exp(-age / (life * 0.37))) - r() * 4 + 2;
+      const rad = s0 + ((s1 - s0) * age) / life + r() * 2, fade = 1 - age / life;
+      for (let yy = Math.floor(cy - rad); yy <= cy + rad; yy++)
+        for (let xx = Math.floor(cx - rad); xx <= cx + rad; xx++) {
+          const dx = (xx + 0.5 - cx) / rad, dy = (yy + 0.5 - cy) / rad;
+          const edge = 1 - dx * dx - dy * dy + (vnoise(xx * 0.3 + id * 1.7, yy * 0.3) - 0.5) * 0.6;
+          if (edge <= 0 || Math.min(1, 2 * fade ** 1.4) * Math.min(1, edge * 2.5) < bayer(xx, yy)) continue;
+          const l = (dx * lx + dy * ly) / ll, fresh = young && age < life * 0.18;
+          this.px(xx, yy, fresh ? (l > 0.3 ? young[0] : young[1]) : l > 0.3 ? lit : l > -0.3 ? mid : young && age < life * 0.47 ? young[1] : shade);
+        }
+    }
+  }
+
   /** Shapes in meters (sticks, blobs, boxes, cones, polygons: see solids.ts) drawn far to near through the camera. */
   solids(view: Partial<View>, shapes: Solid[], opts: SolidOpts = {}): void {
     drawSolids(this as unknown as SolidCanvas, perspective({ ...view, w: view.w ?? this.img.w } as View), shapes, opts);
@@ -1090,7 +1166,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "capsule", "flame",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "capsule", "flame", "scroll", "clouds", "plume",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

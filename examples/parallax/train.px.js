@@ -4,13 +4,13 @@
 // front a blur. Every plane is a strip that wraps in x and goes round a whole number of times in the
 // loop, so the last frame runs into the first.
 //
-// planes, far to near (px a loop; the loop is 192 frames, 12 s):
+// planes, far to near (px a loop; the loop is 192 frames, 12 s), each a scroll():
 //   sky       still
-//   clouds    slots 48 px apart, each cloud drifting one slot while it turns into the next one's shape
+//   clouds    pxl's clouds(): slots 48 px apart, each drifting one slot while it turns into the next
 //   ridge     32: too slow for a strip to go round, so its outline drifts one step and crossfades
 //   hills     320 (one strip, once round)       pasture   640      trackside 1280      grass 1920
-// the train: drivers that turn a whole number of times, rods on their crank pins, smoke puffs that
-// each live 38 frames and fall behind, as the air they're in stays put. In the cab the driver looks
+// the train: drivers that turn a whole number of times, rods on their crank pins, its smoke a
+// plume() left behind at the ground's speed, as the air it's in stays put. In the cab the driver looks
 // ahead and the fireman feeds the firebox; at the windows people lean out, a child waves.
 pal({
   A: "#5f9fd9", B: "#78b0e0", C: "#97c4e8", D: "#b9d8ee",                          // sky, top to horizon
@@ -57,33 +57,6 @@ sprite("_sky", { w: W, h: 96 }, (c) => {
   for (const [k, y0] of bands) c.rect(0, y0, W, 96 - y0, k)
   for (let x = 0; x < W; x++) for (const [k, y0] of bands.slice(1)) seam(c, x, y0 - 3, 3, k)
 })
-// a lane of slots 48 px apart; over the loop each cloud drifts one slot along and turns into the next
-// slot's cloud; empty slots let a cloud form out of nothing or thin away, so the sky stays sparse
-const CLOUD_S = 48
-const CLOUDS = Array.from({ length: 9 }, (_, i) => {
-  const r = rng(40 + i), big = [0, 3, 5].includes(i), none = [2, 7].includes(i)
-  const w = big ? 46 : 22, h = big ? 11 : 6
-  return { y: 28 + (big ? 0 : 7), h, puffs: Array.from({ length: 7 }, () => [(r() - 0.5) * w * 0.85, -r() * h * 0.45, none ? 0 : h * (0.35 + r() * 0.3)]) }
-})
-function clouds(c, f) {
-  const t = f / FRAMES, n = CLOUDS.length, at = (j) => CLOUDS[((j % n) + n) % n]
-  for (let j = -2; (j - 1) * CLOUD_S < W + 40; j++) {
-    const a = at(j), b = at(j + 1), mix = (p, q) => p + (q - p) * t
-    cloud(c, 10 + (j + t) * CLOUD_S, mix(a.y, b.y), a.puffs.map((p, k) => p.map((v, m) => mix(v, b.puffs[k][m]))), mix(a.h, b.h))
-  }
-}
-// a morning cumulus: puffs cut flat at the base, white on top, a light gray low down and on the right
-function cloud(c, cx, base, puffs, h) {
-  const px = new Map()
-  for (const [dx, dy, r] of puffs) {
-    if (r < 0.6) continue
-    for (let y = Math.floor(base + dy - r); y <= base; y++)
-      for (let x = Math.floor(cx + dx - r); x <= Math.ceil(cx + dx + r); x++)
-        if (x >= 0 && x < W && (x + 0.5 - cx - dx) ** 2 + (y + 0.5 - base - dy) ** 2 <= r * r) px.set(y * W + x, [x, y])
-  }
-  for (const [i, [x, y]] of px) c.px(x, y, y >= base ? "v" : y >= base - h * 0.3 || !px.has(i + 1) ? "w" : "W")
-}
-
 // ---------------------------------------------------------------- the far ridge
 // A long stone ridge, blue with distance. It should hardly move, slower than any strip can go round,
 // so its outline drifts RIDGE_S px over the loop while crossfading into itself one step on: at the
@@ -155,13 +128,13 @@ sprite("_house", `
   ..oobboooobbooob..
   ..oooooooooooobb..
   ..PPPPPPPPPPPPPPP.`)
-// noise that closes over a strip `w` wide: its far end blended into its start
-const loopNoise = (x, y, w, scale) => { const t = x / w; return (1 - t) * fbm(x / scale, y / scale, 3) + t * fbm((x - w) / scale, y / scale, 3) }
 // a round crown seen from the side: dark, lit on its upper left, a dark rim underneath
 function crown(c, x, y, r) {
   c.circ(x, y, r, "q"); c.circ(x - 1, y - 1, Math.max(1, r - 1), "Q"); c.hline(x - r + 1, y + r, r * 2 - 1, ":")
   c.px(x - r + 1, y - r + 2, "g"); if (r > 2) c.px(x - 1, y - r + 1, "g")
 }
+// the pasture's patches: noise made to close over the strip, so its end runs into its start
+const pastureNoise = seamless((x, y) => fbm(x / 34, y / 34, 3), NEAR_W)
 sprite("_near", { w: NEAR_W, h: 60, wrap: "x" }, (c) => {
   const topF = (x) => 16 + waves(x, NEAR_W, [[2, 5, 0.9], [5, 3, 2.1], [11, 1.2, 0.4]]), top = (x) => Math.round(topF(x))
   const r = rng(13)
@@ -171,7 +144,7 @@ sprite("_near", { w: NEAR_W, h: 60, wrap: "x" }, (c) => {
   for (let x = 0; x < NEAR_W; x++) {
     const t0 = top(x), slope = topF(x + 2) - topF(x - 2)
     for (let y = t0; y < 60; y++) {
-      const depth = y - t0, n = loopNoise(x, y * 4, NEAR_W, 34)
+      const depth = y - t0, n = pastureNoise(x, y * 4)
       let k = n > 0.64 ? "^" : n < 0.36 ? "G" : "g"
       if ((slope > 0.6 && depth < 16) || depth > 28) k = dark[k]
       c.px(x, y, depth === 0 ? "z" : k)
@@ -565,51 +538,24 @@ function engineer(c) {
   c.hline(x + 1, 120, 8, "-"); c.hline(x + 6, 120, 3, ";"); c.px(x + 8, 119, ";")
 }
 
-// ---------------------------------------------------------------- smoke
-// A puff every frame from the stack. Its air doesn't move, so it falls behind as the train goes on:
-// at first it keeps some of the stack's speed, then trails at the train's. It rises, swells and thins
-// out in dither; dark and dense near the stack, pale where it has spread.
-const SPEED = 1280 / FRAMES, LIFE = 38
-function smoke(c, f) {
-  for (let age = LIFE - 1; age >= 0; age--) {
-    const id = (((f - age) % FRAMES) + FRAMES) % FRAMES, rr = rng(500 + id)
-    const back = SPEED * (age - 5 * (1 - Math.exp(-age / 5))), rise = 30 * (1 - Math.exp(-age / 14)) + rr() * 4
-    const p = { x: 296 - back + (rr() - 0.5) * 5, y: 89 - rise - (rr() - 0.5) * 4, r: 3 + age * 0.26 + rr() * 2, age, id }
-    const fade = 1 - age / LIFE
-    for (let y = Math.floor(p.y - p.r); y <= p.y + p.r; y++)
-      for (let x = Math.floor(p.x - p.r); x <= p.x + p.r; x++) {
-        if (x < 0 || x >= W || y < 0) continue
-        const dx = (x + 0.5 - p.x) / p.r, dy = (y + 0.5 - p.y) / p.r
-        const edge = 1 - dx * dx - dy * dy + (vnoise(x * 0.3 + id * 1.7, y * 0.3) - 0.5) * 0.6
-        if (edge <= 0 || Math.min(1, 2 * fade ** 1.4) * Math.min(1, edge * 2.5) < bayer(x, y)) continue
-        // lit from the upper left; dark while fresh near the stack
-        const lit = -dx * 0.6 - dy * 0.8
-        c.px(x, y, age < 7 ? (lit > 0.3 ? "=" : "$") : lit > 0.3 ? "Y" : lit > -0.3 ? "V" : age < 18 ? "$" : "=")
-      }
-  }
-}
-
 // ---------------------------------------------------------------- the loop
-// under the train the ballast lies in its shade, between the wheels
-const SHADE = { p: "P", P: "y", "/": "p", s: "]", g: "Q", Q: "q", z: "g" }
-function underTrain(c) { for (let y = 150; y < RAIL; y++) for (let x = 0; x < 312; x++) { const k = SHADE[c.key(x, y)]; if (k) c.px(x, y, k) } }
 // the rails stand still with the train: the head lit on top, the web, the foot; their joints go by
 // with the land, a bolted plate every 80 px
 function rails(c, f) {
   c.rect(0, RAIL, W, 1, "i"); c.rect(0, RAIL + 1, W, 1, "a"); c.rect(0, RAIL + 2, W, 1, "I"); c.rect(0, RAIL + 3, W, 1, "d")
   for (let x = -(moved(f, 1280) % 80); x < W + 4; x += 80) { c.rect(x - 3, RAIL + 1, 7, 3, "c"); c.px(x - 2, RAIL + 2, "a"); c.px(x + 2, RAIL + 2, "a"); c.vline(x, RAIL, 2, "I") }
 }
-// each plane: its strip placed at its offset, and again a strip-width on, so it always covers
-const strip = (c, name, w, per, y, f) => { const o = moved(f, per) % w; for (let x = -o; x < W; x += w) c.stamp(name, x, y) }
 anim("train", { w: W, h: H, frames: FRAMES, fps: FPS },
   (c) => c.stamp("_sky", 0, 0),
-  (c) => clouds(c, c.frame),
+  clouds({ y: 30, gap: 48, w: 46, h: 11, n: 9, seed: 4, sizes: [1, 0.5, 1, 1, 0.5, 1, 0.5, 1, 0.5], empty: [2, 7], keys: "Wwv" }),
   (c) => farRidge(c, c.frame),
-  (c) => strip(c, "_hills", W, 320, HILLS_Y, c.frame),
-  (c) => strip(c, "_near", NEAR_W, 640, NEAR_Y, c.frame),
-  (c) => strip(c, "_side", SIDE_W, 1280, SIDE_Y, c.frame),
-  (c) => underTrain(c),
+  scroll("_hills", HILLS_Y, 320),
+  scroll("_near", NEAR_Y, 640),
+  scroll("_side", SIDE_Y, 1280),
+  // under the train the ballast lies in its shade, between the wheels
+  recolor({ p: "P", P: "y", "/": "p", s: "]", g: "Q", Q: "q", z: "g" }, [0, 150, 312, RAIL - 150]),
   (c) => rails(c, c.frame),
   (c) => { coach(c, -COACH, c.frame, [...PEOPLE].reverse()); coach(c, 14, c.frame, PEOPLE); conductor(c, 8); tender(c, c.frame); engine(c, c.frame) },
-  (c) => smoke(c, c.frame),
-  (c) => strip(c, "_fg", FG_W, 1920, 164, c.frame))
+  // smoke: a puff every frame from the stack, dark while fresh, left behind at the ground's speed
+  plume(296, 89, "YV=", { every: 1, life: 38, rise: 30, wind: -1280 / FRAMES, inertia: 5, size: [3, 13], young: "=$", seed: 5 }),
+  scroll("_fg", 164, 1920))

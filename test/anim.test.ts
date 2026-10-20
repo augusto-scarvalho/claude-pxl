@@ -244,3 +244,26 @@ test("preview GIFs with every: one frame in n, each lasting n times as long; the
     assert.equal(pv.frames.reduce((s, f) => s + f.delay, 0), all.frames.reduce((s, f) => s + f.delay, 0), "the loop lasts as long");
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("scroll: a strip that wraps goes by a whole number of its widths in the loop; anything else is refused", () => {
+  const strip = `sprite("s", { w: 4, h: 1, wrap: "x" }, "rwgk")\n`;
+  const p = load(strip + `anim("go", { w: 6, h: 1, frames: 4, fps: 4 }, scroll("s", 0, 4))`);
+  assert.deepEqual(frameKeys(p, "go"), ["rwgkrw", "wgkrwg", "gkrwgk", "krwgkr"]);
+  assert.match(failure(PAL + strip + `anim("go", { w: 6, h: 1, frames: 4 }, scroll("s", 0, 6))`, "go").message, /whole number of 4s/);
+});
+
+test("clouds: cut flat at the base row, lit on top; empty slots hold none", () => {
+  const sky = (o: string) => `anim("sky", { w: 60, h: 20, frames: 4, fps: 4 }, rect(0, 0, 60, 20, "g"), clouds({ y: 15, gap: 20, w: 14, h: 8, n: 3, seed: 2, keys: "wrk"${o} }))`;
+  const rows = frameKeys(load(sky("")), "sky")[1].split("\n");
+  assert.match(rows[15], /k/, "the base on its row");
+  assert.ok(rows.slice(16).every((r) => /^g+$/.test(r)), "nothing below it");
+  assert.ok(rows.slice(0, 15).some((r) => r.includes("w")), "a lit top");
+  assert.ok(frameKeys(load(sky(", empty: [0, 1, 2]")), "sky").every((f) => /^[g\n]+$/.test(f)), "no cloud in empty slots");
+});
+
+test("plume: puffs born before the loop starts are there on its first frame, and they move", () => {
+  const p = load(`anim("smoke", { w: 30, h: 24, frames: 8, fps: 8 }, rect(0, 0, 30, 24, "g"), plume(10, 20, "wrk", { every: 2, life: 8, rise: 10, wind: 1, size: [2, 4] }))`);
+  const fr = frameKeys(p, "smoke");
+  assert.match(fr[0], /[wrk]/);
+  assert.notEqual(fr[0], fr[1]);
+});

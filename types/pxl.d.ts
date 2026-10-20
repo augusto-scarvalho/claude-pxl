@@ -158,6 +158,15 @@ declare global {
   }
   /** The sun: the way toward it along the ground [x, z], how high it stands in degrees. */
   interface PxSun { from: [number, number]; up: number }
+  interface PxClouds {
+    /** The base row, the px between clouds, a cloud's width and height. */
+    y: number; gap: number; w: number; h: number;
+    n?: number; seed?: number; keys?: string; x?: number; empty?: number[]; sizes?: number[]; frame?: number;
+  }
+  interface PxPlume {
+    every?: number; life?: number; rise?: number; wind?: number | [number, number]; inertia?: number;
+    size?: [number, number]; young?: string; seed?: number; frame?: number; light?: [number, number];
+  }
   interface PxSolidOpts {
     /** where the eye stands in the world [x, z] (default 0, 0) */
     at?: [number, number];
@@ -259,6 +268,12 @@ declare global {
     capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts?: { light?: [number, number]; rim?: boolean }): void;
     /** Flames rising from (x, y), about `size` px tall, flickering with the frame, leaning with `wind`; `keys` root to tip, the last for edges. */
     flame(x: number, y: number, size: number, keys: string, opts?: { wind?: number; period?: number; seed?: number; frame?: number }): void;
+    /** A strip that wraps going by, `per` px a loop (a whole number of its widths): a parallax plane. */
+    scroll(name: string, y: number, per: number, opts?: { x?: number; frame?: number }): void;
+    /** A lane of cumulus drifting one slot a loop while each turns into the next. */
+    clouds(opts: PxClouds): void;
+    /** Smoke, steam or dust from a point, in a loop that closes. */
+    plume(x: number, y: number, keys: string, opts?: PxPlume): void;
     /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly). */
     solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): void;
     /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade. */
@@ -337,6 +352,11 @@ declare global {
   function capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts?: { light?: [number, number]; rim?: boolean }): PxOp;
   /** Flames rising from (x, y), about `size` px tall: tongues flickering with the frame, leaning with `wind`; `keys` from the root to the tip, the last for their edges. */
   function flame(x: number, y: number, size: number, keys: string, opts?: { wind?: number; period?: number; seed?: number; frame?: number }): PxOp;
+  function scroll(name: string, y: number, per: number, opts?: { x?: number; frame?: number }): PxOp;
+  function clouds(opts: PxClouds): PxOp;
+  function plume(x: number, y: number, keys: string, opts?: PxPlume): PxOp;
+  /** A function of (x, y) made to close over w (and h): for noise on strips and tiles that wrap. */
+  function seamless(fn: (x: number, y: number) => number, w: number, h?: number): (x: number, y: number) => number;
   /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly); boxes' faces lit by the sun. */
   function solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): PxOp;
   /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade by `shade`. */

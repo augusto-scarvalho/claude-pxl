@@ -153,24 +153,26 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   comes back on the other while it can't be seen. Or end its way behind something (a hedge, a cart, a
   trunk) and start it behind something else.
 - Particles (embers, ash, rain): each goes round the picture a whole number of times in the loop.
-- A lane of clouds: each moves one slot along in the loop while turning into the next one's shape;
-  or each lives one loop (forms, drifts, thins away) as above; soot or mist that comes and goes:
+- A lane of clouds: each moves one slot along in the loop while turning into the next one's shape
+  (`clouds()`, with `empty` slots for a sky where they form and thin away); smoke and steam rising
+  from a point: `plume()`; soot or mist that comes and goes:
   thin it by `0.5 - 0.5·cos(2π·t)`, fading to nothing at the edge of the part that moves.
 - Gaits: a stride a whole number of frames, and the loop a multiple of every stride in it.
 
 ## Parallax (planes going by at their own speeds)
 
-- Each plane is a sprite drawn once as a strip with `wrap: "x"`, placed every frame at its offset and
-  again a strip-width on: `for (let x = -o; x < W; x += w) c.stamp(strip, x, y)`. The nearer, the
-  faster; each goes round a whole number of times in the loop (its px a loop are its width times
-  that), so the last frame runs into the first. A strip at least as wide as the picture doesn't show
-  its repeat; a wide one (1280 px) costs nothing per frame.
+- Each plane is a sprite drawn once as a strip with `wrap: "x"`, going by with
+  `scroll(name, y, per)`: `per` px a loop, the nearer the more, each a whole number of the strip's
+  widths so the last frame runs into the first. A strip at least as wide as the picture doesn't show
+  its repeat; a wide one (1280 px) costs nothing per frame. Noise on a strip: `seamless()` makes it
+  close over the strip's width.
 - The loop's length comes from the slowest plane that must go round once. Anything slower (a ridge on
   the horizon, which should hardly move): drift it a few px over the loop while crossfading its
   outline into itself one step on, as the cloud slots do.
 - What the camera follows stands still: its wheels turn a whole number of times a loop (about the
   distance gone by over their circumference), and its smoke or dust is left behind at the speed of
-  the ground beside it, keeping a little of its own at first.
+  the ground beside it, keeping a little of its own at first: `plume()` with `wind` the ground's
+  speed backward and an `inertia`.
 - Mist or haze at the foot of each far plane keeps them apart; the plane nearest the eye goes by too
   fast for detail: streaks along the motion (`examples/parallax/train.px.js`).
 

@@ -15,7 +15,7 @@ import { PALETTE_FILE, Palette, paletteFromFile } from "./palette.ts";
 import { type Motion, readJoints, readMotion } from "./pose.ts";
 import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
-import { bayer, fbm, globRe, latticeHash, rng, vnoise } from "./util.ts";
+import { bayer, fbm, globRe, latticeHash, rng, vnoise, seamless } from "./util.ts";
 
 /**
  * Op signatures: name:type, "?" marks the first optional argument.
@@ -50,6 +50,9 @@ export const SIGNATURES: Record<string, string> = {
   shadows: "view:o shapes:a opts:o",
   capsule: "x0:n y0:n r0:n x1:n y1:n r1:n ramp:s ?opts:o",
   flame: "x:n y:n size:n keys:s ?opts:o",
+  scroll: "name:s y:n per:n ?opts:o",
+  clouds: "opts:o",
+  plume: "x:n y:n keys:s ?opts:o",
   rampmap: "ramp:S ?opts:o",
   stamp: "name:s ?x:n y:n opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
@@ -90,6 +93,9 @@ export const OP_OPTS: Record<string, string[]> = {
   shadows: ["at", "sun", "scale", "shade", "ramps", "light"],
   capsule: ["light", "rim"],
   flame: ["wind", "period", "seed", "frame"],
+  scroll: ["x", "frame"],
+  clouds: ["y", "gap", "w", "h", "n", "seed", "keys", "x", "empty", "sizes", "frame"],
+  plume: ["every", "life", "rise", "wind", "inertia", "size", "young", "seed", "frame", "light"],
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
@@ -444,6 +450,7 @@ export class Project implements BuildCtx {
     env.vnoise = vnoise;
     env.fbm = fbm;
     env.bayer = bayer;
+    env.seamless = seamless;
     // shapes in meters for solids() and shadows(): solid.stick, blob, box, cone, poly
     env.solid = solid;
     // perspective({ w, horizon, eye, fov | focal, vp, yaw, pitch }): ground(x, z, up), at(col, row), scale(z, x, up), vanish(angle), vertical()

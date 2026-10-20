@@ -67,6 +67,19 @@ export function fbm(x: number, y: number, octaves = 4): number {
   return s / (1 - 0.5 ** octaves);
 }
 
+/**
+ * A function of (x, y) made to close over `w` (and `h`): its value at x blended with its value one
+ * width back, so the end of a strip runs into its start. Noise for strips and tiles that wrap.
+ */
+export function seamless(fn: (x: number, y: number) => number, w: number, h?: number): (x: number, y: number) => number {
+  return (x: number, y: number) => {
+    const xm = ((x % w) + w) % w, tx = xm / w, row = (yy: number) => (1 - tx) * fn(xm, yy) + tx * fn(xm - w, yy);
+    if (!h) return row(y);
+    const ym = ((y % h) + h) % h, ty = ym / h;
+    return (1 - ty) * row(ym) + ty * row(ym - h);
+  };
+}
+
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 /** Ordered-dither threshold in (0, 1) for pixel (x, y). */
 export function bayer(x: number, y: number): number {

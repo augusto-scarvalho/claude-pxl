@@ -95,7 +95,9 @@ sheet globs.
   value noise in [0, 1], one unit a cell; `fbm(x, y, octaves = 4)` octaves of it, each finer and
   fainter, for billows, clouds, rock; `bayer(x, y)` the ordered-dither threshold in (0, 1) for a pixel
   (add `bayer(x, y) - 0.5` times a little to a value before thresholding it into tones: soft edges
-  without noise).
+  without noise); `seamless(fn, w, h?)` the function `(x, y) => number` made to close over `w` (and
+  `h`), its value at x blended with its value a width back, for noise on strips and tiles that wrap:
+  `const n = seamless((x, y) => fbm(x / 30, y / 30), 640)`.
 - **Layer**: drawn on its own image, then blended in at its place in the list.
 
 ### Sprite / scene options
@@ -241,6 +243,16 @@ holds its scale for a whole step and changes it only at the next contact, when t
 (no size flicker mid-step), with the planted foot where it landed; under ~15 px, a figure drawn by code
 at its exact size turns into a blob, so draw the small sizes by hand (`walker_14`, `walker_12` ...
 `walker_5`) and pick with `fit` (`examples/perspective/road.px.js`).
+
+### Going by in a loop
+
+In an anim (or a scene animated by what it places), these follow its frame and close over its loop.
+
+| Op | Notes |
+|---|---|
+| `scroll(name, y, per, { x?, frame? })` | a strip that wraps (a sprite with `wrap: "x"`) going by: placed at its offset for the frame and again a strip-width on until the canvas is covered, `per` px a loop leftward (negative: rightward). `per` must be a whole number of the strip's widths, or it is refused, so the last frame runs into the first. One call a parallax plane: the nearer, the more px a loop (`examples/parallax/train.px.js`) |
+| `clouds({ y, gap, w, h, n?, seed?, keys?, x?, empty?, sizes? })` | a lane of cumulus: clouds `gap` px apart, each drifting one slot along over the loop while it turns into the next slot's cloud, so the sky closes on itself however slowly it goes. `n` designs (4) from `seed`, `w` across and `h` tall, `sizes` scaling each; slots listed in `empty` hold none, so clouds form out of nothing and thin away there (a sparse sky). Cut flat at the base on row `y`; `keys` the lit top, the gray low down and on the shaded right, the base (`"Wwv"`). Two lanes, the far one lower, smaller and with a smaller `gap`, read as depth (`examples/perspective/park.px.js`) |
+| `plume(x, y, keys, { every?, life?, rise?, wind?, inertia?, size?, young?, seed?, light? })` | smoke, steam or dust from (x, y): a puff every `every` frames (2), each living `life` frames (36), rising `rise` px (24), quickly at first, and carried by `wind` px a frame (`[x, y]`, or a number for x), which it takes on over its first `inertia` frames (0: at once). It swells from `size[0]` to `size[1]` px in radius (`[2, 8]`) and thins out in dither. `keys` lit, middle and shaded; `young` the lit and shaded keys while it is fresh (dark smoke at a stack). Puffs born before the loop's start are there on its first frame. A chimney: a small `wind`; a moving engine's stack: `wind` minus the ground's speed and an `inertia` of a few frames, so the smoke keeps the stack's speed a moment and then falls behind |
 
 ### Terrain tilesets
 

@@ -410,3 +410,23 @@ one), and the art code itself (4% of the cost).
   profiler; extinction went from 17 s to 1m43s without anyone seeing why until a CPU profile was
   read by hand. Its first run found pxl's own: the onion sheet asked every pixel of every frame
   whether it ever changes, frames squared; worked out once, the park's build went from 94 s to 17 s.
+
+## Parallax (from dogfooding the train)
+
+- [x] **A strip going by**: `scroll(name, y, per)`, the train's own `strip()` + `moved()`: a sprite
+  that wraps placed at its offset for the frame and again a width on, refusing a `per` that isn't a
+  whole number of widths (the loop wouldn't close). Each of the train's planes is one call.
+- [x] **A lane of clouds**: `clouds({ y, gap, w, h, n, seed, keys, empty, sizes })`, the slot-morph
+  lane the park and the train each carried (the same code twice). The park's sky comes out pixel for
+  pixel the same through it; `empty` slots give the train's sparse sky, clouds forming and thinning.
+- [x] **Smoke that closes over the loop**: `plume(x, y, keys, { every, life, rise, wind, inertia,
+  size, young })`, the train's smoke: puffs born before the loop's start present on its first frame,
+  carried by a wind they take on over `inertia` frames (an engine's smoke falling behind). The
+  street's steam and the volcano's are the same idea, written by hand.
+- [x] **Noise that closes over a strip**: `seamless(fn, w, h?)`, the train's `loopNoise`: any
+  function of (x, y) blended with itself a width back, for strips and tiles that wrap.
+- Considered, left in the example: `waves()` (a few sines of whole cycles over a strip: one line of
+  JS), the far ridge's crossfading drift (one scene's trick, written up in scenes.md), the trucks,
+  wheels and people (one train's). The shade under the train was a hand loop; `recolor` with a
+  region does it. Reference photos come as JPEG, which pxl doesn't read: they were cropped and
+  sheeted with an outside tool, as they should be (study, not input).

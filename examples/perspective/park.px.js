@@ -889,37 +889,10 @@ function treeline(c) {
     paintTree(c, x, z, { ...t, ...foliage(seed, t, opts) }, "<<ST>", "<<<SST")
   }
 }
-// Clouds, drifting: two lanes of cumulus, the far one lower, smaller, flatter and slower. A lane is a
-// row of slots S px apart; over the loop each slot drifts one slot over and its cloud slowly turns into
-// the next slot's cloud, so the sky at the end is the sky at the start and no cloud jumps.
-const LANES = [{ y: 22, S: 130, w: 66, h: 16, n: 4, seed: 3, x0: 0 }, { y: 45, S: 80, w: 30, h: 7, n: 3, seed: 8, x0: 41 }]
-const DESIGNS = LANES.map((L) => Array.from({ length: L.n }, (_, i) => {
-  const r = rng(L.seed * 31 + i)
-  return Array.from({ length: 7 }, () => [(r() - 0.5) * L.w * 0.85, -r() * L.h * 0.45, L.h * (0.32 + r() * 0.3)])
-}))
-function clouds(c, frame) {
-  const t = frame / FRAMES
-  LANES.forEach((L, li) => {
-    const D = DESIGNS[li], at = (j) => D[((j % L.n) + L.n) % L.n]
-    for (let j = -2; (j - 1) * L.S < W + L.w; j++) {
-      const a = at(j), b = at(j + 1)
-      cloud(c, L.x0 + (j + t) * L.S, L.y, a.map((p, k) => p.map((v, m) => v + (b[k][m] - v) * t)), L.h)
-    }
-  })
-}
-// a cumulus: puffs cut flat at its base; white where the sun is on it, a light gray lower down and
-// along its right side, a bluer gray along the base
-function cloud(c, cx, base, puffs, h) {
-  const px = new Map()
-  for (const [dx, dy, r] of puffs)
-    for (let y = Math.floor(base + dy - r); y <= base; y++)
-      for (let x = Math.floor(cx + dx - r); x <= Math.ceil(cx + dx + r); x++)
-        if (x >= 0 && x < W && y >= 0 && (x + 0.5 - cx - dx) ** 2 + (y + 0.5 - base - dy) ** 2 <= r * r) px.set(y * W + x, [x, y])
-  for (const [i, [x, y]] of px) {
-    const right = !px.has(i + 1), key = y >= base ? "H" : y >= base - h * 0.3 || right ? "G" : "F"
-    c.px(x, y, key)
-  }
-}
+// Clouds, drifting: two lanes of cumulus, the far one lower, smaller, flatter and slower. pxl's
+// clouds(): each drifts one slot over in the loop while it turns into the next slot's cloud, so the
+// sky at the end is the sky at the start and no cloud jumps.
+const skyClouds = (c) => { c.clouds({ y: 22, gap: 130, w: 66, h: 16, n: 4, seed: 3, keys: "FGH" }); c.clouds({ y: 45, gap: 80, w: 30, h: 7, n: 3, seed: 8, keys: "FGH", x: 41 }) }
 
 // a hopscotch chalked on the plaza: squares, pairs, and the sky at the end, every line on the axes
 function hopscotch(c) {
@@ -1044,7 +1017,7 @@ for (const s of STATIC)
 
 anim("park", { w: W, h: H, frames: FRAMES, fps: FPS },
   stamp("_sky", 0, 0),
-  (c) => clouds(c, c.frame),
+  skyClouds,
   stamp("_bg", 0, 0),
   (c) => {
     const moving = figures(c.frame)
