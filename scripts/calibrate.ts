@@ -241,7 +241,7 @@ for (const [file, name] of scenes.filter(([, n]) => !only.length || only.include
   if (splits.length) out.push(`  in pieces: ${splits.map((b) => b.k).join(", ")}`);
   const many = [...merged].filter(([, v]) => v.length > 1).slice(0, 4);
   if (many.length) out.push(`  together in one piece: ${many.map(([i, v]) => `${pieces[i].box[2]}x${pieces[i].box[3]} at ${pieces[i].box[0]},${pieces[i].box[1]}: ${v.join(", ")}`).join("; ")}`);
-  if (!summary) console.log(out.join("\n"));
+  if (!summary && !vs) console.log(out.join("\n"));
 }
 
 // a line a scene: things, the share of their frames found, found (as lights) + loosely, masks, light
