@@ -28,6 +28,7 @@ const shots: [string, string, number, number?, string?][] = [
   ["perspective/road.px.js", "road", 640],
   ["perspective/park.px.js", "park", 640],
   ["perspective/extinction.px.js", "extinction", 640],
+  ["parallax/train.px.js", "train", 640, 1, "parallax_train"],
   ["sunset/sunset.px.js", "sunset", 640, 1, "sunset_cliff"],
   ["rig/tournament.px.js", "tournament", 640],
   ["halloween/party.px.js", "party", 640, 1, "halloween_party"],

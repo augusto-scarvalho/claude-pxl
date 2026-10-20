@@ -165,6 +165,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `perspective/road.px.js` | true perspective: `perspective()` and `plane()`, props in meters whose parts also cast their shadows, a walker shrinking step by step with hand-drawn small sizes picked by `fit` |
 | `perspective/park.px.js` | two-point perspective (`yaw`) at 2 pm: benches, trees and people as `solid` shapes drawn by `solids()` and cast by `shadows()`, boxes lit by the side they face, people and a dog posed in 3D by a gait (any heading, own shadows), moving things interleaved far to near with still ones, a loop closed by hiding behind hedges |
 | `perspective/extinction.px.js` | three-point perspective (`pitch`, `vertical()`), a worm's-eye view: a volcano on a massif by `terrain()`, lava down the steepest way, the sun at `toward()`, a sky by `ray()`, uprights leaning to the third point, dinosaurs drawn from their profile on a 3D run (legs by `capsule`), pterosaurs by hand placed by the camera, everything burning by `flame` |
+| `parallax/train.px.js` | parallax: planes as strips that wrap, each going round a whole number of times a loop, a far ridge that drifts by crossfading, a steam engine standing still with its wheels, rods and smoke |
 | `sidescroller/` | a game's art over several files: shared `palette.hex`, `wrap` tiles, `png` import, hit flash |
 | `shop.px.js`, `moon_bakery.px.js` | flat building facades from parts: tiles, signs, `wire` lights |
 | `moon_bakery_3d.px.js`, `tackle.px.js` | 3/4 buildings; weathering with a cause |

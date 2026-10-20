@@ -38,6 +38,8 @@ normals.px.js: 0 warnings (2 scenes (2 frames, 14 distinct placements), 0 rigs, 
   ran: nothing; not run: front marker (nothing has one), lit side (no scene declares world.light), feet and size (nothing placed has a height)
 outpost.px.js: 0 warnings (1 scene (1 frame, 12 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one), lit side (no scene declares world.light), feet and size (nothing placed has a height)
+parallax/train.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: nothing; not run: front marker (nothing has one)
 perspective/extinction.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one)
 perspective/park.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)

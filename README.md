@@ -154,6 +154,21 @@ meters on a run worked out in 3D, their legs painted round by `capsule()`, each 
 the picture's width in the loop so their coming back is never seen. Trees, logs and scrub burn with
 `flame()`, every fire leaning with the one wind.
 
+## Showcase: parallax
+
+<p>
+  <img src="docs/gallery/parallax_train.gif" width="100%" alt="Animated pixel-art steam train crossing the hills of Minas Gerais on a misty morning, seen from beside the line: a black maria-fumaça with red wheels and a brass dome pulling a wood tender and two maroon and cream coaches with passengers at the windows, a child waving; its smoke streams back over the coaches. Behind it the land runs past at six speeds: a blue stone ridge on the horizon barely moving, hills with araucárias and mist in the valleys, pasture with cattle trails, cows and a white farmhouse, then telegraph poles, a bamboo clump, banana plants and a pink ipê along the embankment, and the grass in front a green blur.">
+</p>
+
+[`examples/parallax/train.px.js`](examples/parallax/train.px.js): the camera rides along with the train,
+so the train stands still and the land runs past behind it. Each plane is a strip drawn once with
+`wrap: "x"` and placed every frame further along: in the 12 s loop the hills go by 320 px, the
+pasture 640, the trackside 1280 and the grass in front 1920, each strip round a whole number of times;
+the ridge on the horizon, too slow to go round, drifts a few pixels while its outline crossfades into
+itself. The drivers turn a whole
+number of times a loop with the rods on their crank pins, and every puff of smoke is left behind at
+the speed of the ground, so the last frame runs into the first.
+
 ## Quick start
 
 ```sh

@@ -4,7 +4,7 @@ Read this before building a scene, a level, a building or any environment.
 
 Contents: Layout and scale · Ground, paths and tiles · Texture without filler · Trees and big organic
 shapes · Water and things that land · Distance (aerial perspective) · True perspective · Slow motion
-in a short loop · Closing a loop · Shadows and light · Blend modes · Checking a scene
+in a short loop · Closing a loop · Parallax · Shadows and light · Blend modes · Checking a scene
 
 ## Layout and scale
 
@@ -157,6 +157,22 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   or each lives one loop (forms, drifts, thins away) as above; soot or mist that comes and goes:
   thin it by `0.5 - 0.5·cos(2π·t)`, fading to nothing at the edge of the part that moves.
 - Gaits: a stride a whole number of frames, and the loop a multiple of every stride in it.
+
+## Parallax (planes going by at their own speeds)
+
+- Each plane is a sprite drawn once as a strip with `wrap: "x"`, placed every frame at its offset and
+  again a strip-width on: `for (let x = -o; x < W; x += w) c.stamp(strip, x, y)`. The nearer, the
+  faster; each goes round a whole number of times in the loop (its px a loop are its width times
+  that), so the last frame runs into the first. A strip at least as wide as the picture doesn't show
+  its repeat; a wide one (1280 px) costs nothing per frame.
+- The loop's length comes from the slowest plane that must go round once. Anything slower (a ridge on
+  the horizon, which should hardly move): drift it a few px over the loop while crossfading its
+  outline into itself one step on, as the cloud slots do.
+- What the camera follows stands still: its wheels turn a whole number of times a loop (about the
+  distance gone by over their circumference), and its smoke or dust is left behind at the speed of
+  the ground beside it, keeping a little of its own at first.
+- Mist or haze at the foot of each far plane keeps them apart; the plane nearest the eye goes by too
+  fast for detail: streaks along the motion (`examples/parallax/train.px.js`).
 
 ## Shadows and light
 
