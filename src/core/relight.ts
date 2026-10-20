@@ -47,14 +47,15 @@ export const lightColor = (r: number[]) => { const top = Math.max(...r); return 
 
 /**
  * The light's changes over a clip, against its background (each pixel's commonest color). `still`
- * says which rows hold still (planes going by are compared frame to frame, not here); `differ` is when
+ * says which rows hold still (planes going by are compared frame to frame, not here); `skip`, each frame's
+ * pixels where something goes by (followed as it goes: a light doesn't travel); `differ` is when
  * two colors count as different. A pixel's change is like the light's when it is within `tol` (log) of
  * most of its changed neighbors'; a run of such pixels is a light unless more than a third of the edge where
- * its change stops is a step of more than `hard` (log) on a flat background, or nearly all of it is the
+ * its change stops is a step of more than `hard` (log) and twice the background's own step there, or nearly all of it is the
  * background moved a step (a thing moving a pixel or two), or it is under 8 px, or its pixels change out
  * of step with their neighbors over the clip (a thing going by).
  */
-export function relight(F: Img[], bg: Uint32Array, still: (y: number) => boolean, differ: (a: Color, b: Color) => boolean, tol = 0.3, hard = 0.9): Relight {
+export function relight(F: Img[], bg: Uint32Array, still: (y: number) => boolean, differ: (a: Color, b: Color) => boolean, skip?: Uint8Array[], tol = 0.3, hard = 0.9): Relight {
   const W = F[0].w, H = F[0].h, WH = W * H;
   const relit: Uint8Array[] = [], flat: Img[] = [], lit: { p: Int32Array; r: Float32Array }[] = [];
   let any = false;
@@ -82,7 +83,7 @@ export function relight(F: Img[], bg: Uint32Array, still: (y: number) => boolean
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy, q = yy * W + xx; if ((dx || dy) && xx >= 0 && yy >= 0 && xx < W && yy < H && moves[q]) { s += corr(p, q); n++; } }
     together[p] = n ? s / n : 0;
   }
-  for (const f of F) {
+  for (const [t, f] of F.entries()) {
     const ok = (p: number) => still(Math.floor(p / W)) && (bg[p] & 255) >= 128 && (f.data[p] & 255) >= 128;
     const lr = new Float32Array(WH * 3), changed = new Uint8Array(WH);
     for (let p = 0; p < WH; p++) {
@@ -104,7 +105,7 @@ export function relight(F: Img[], bg: Uint32Array, still: (y: number) => boolean
         n++;
         if (Math.max(Math.abs(lr[3 * p] - lr[3 * q]), Math.abs(lr[3 * p + 1] - lr[3 * q + 1]), Math.abs(lr[3 * p + 2] - lr[3 * q + 2])) < tol) same++;
       }
-      if (n && same >= n / 2) like[p] = 1;
+      if (n && same >= n / 2 && !skip?.[t][p]) like[p] = 1;
     }
     // runs of them (diagonals join: a glow dithered), each a light unless its change stops hard on a flat background
     const mine = new Uint8Array(WH), seen = new Uint8Array(WH);
@@ -124,7 +125,10 @@ export function relight(F: Img[], bg: Uint32Array, still: (y: number) => boolean
           const xx = x + dx, yy = y + dy, q = yy * W + xx;
           if (xx < 0 || yy < 0 || xx >= W || yy >= H || changed[q] || !ok(q)) continue;
           edge++;
-          if (Math.max(Math.abs(lr[3 * p]), Math.abs(lr[3 * p + 1]), Math.abs(lr[3 * p + 2])) > hard && !differ(bg[p], bg[q])) steep++;
+          // a step far bigger than the background's own there (a silhouette on a dithered sky; not a
+          // window lit up to its frame)
+          const jump = Math.max(Math.abs(lr[3 * p]), Math.abs(lr[3 * p + 1]), Math.abs(lr[3 * p + 2])), a = logLin(bg[p]), b = logLin(bg[q]);
+          if (jump > hard && jump > 2 * Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]))) steep++;
         }
       }
       // a thing moved a pixel or two (a ghost bobbing: its shading shifts as softly as a light): nearly

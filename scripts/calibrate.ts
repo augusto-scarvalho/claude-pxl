@@ -1,7 +1,10 @@
 // How well `pxl study` takes apart pxl's own animations, measured against what their source says:
-// each thing stamped (its box and the pixels that are its own, frame by frame), and the light (what
+// each thing stamped (a piece of a stamp's own pixels, gaps of a pixel joined, followed from frame to
+// frame whatever its asset's name: its box and pixels each frame; 12 px and 4 frames at least), and the
+// light (what
 // changes only because the light does: the frame before lighting didn't change there). Each piece study
-// finds is matched to the thing it covers best, frame by frame (box IoU); a thing found in pieces, or
+// finds is matched to one thing at most, the best pairs first, frame by frame (box IoU, or holding it
+// in a box not four times its size: its shadow with it); a thing found in pieces, or
 // a piece over several things, is counted; its captures are compared with the thing's own pixels (mask
 // IoU, and how much of each is the other's).
 // Run: node scripts/calibrate.ts [asset ...] [--map DIR] (all, or only those; --map draws where the light
@@ -76,29 +79,60 @@ for (const [file, name] of scenes.filter(([, n]) => !only.length || only.include
     if (b.trace) replay(b.trace, (s, im) => { if (!lit && (s.label === "light map" || s.label === "lighting")) { lit = true; if (prev) out = prev; } if (s.w === W && s.h === H) prev = im.copy(); });
     return out;
   });
-  // the things in the source: each stamp (by asset, layer and its turn among the same) with the pixels it owns in each frame
-  const things = new Map<string, Map<number, number[]>>(), stamps = new Map<string, Set<string>>(), glowAt = frames0(builds.length, WH);
+  // the things in the source: each piece of a stamp's own pixels (a stamp of birds is a bird each),
+  // followed from frame to frame by where it is and its size in its layer, whatever its name (a pigeon
+  // pecking is another asset than the pigeon walking); its drawing read off the stamp, not the lit frame
+  type Blob = { name: string; layer: string; px: number[]; box: Box; sig: string; track: number };
+  const glowAt = frames0(builds.length, WH), blobs: Blob[][] = [];
+  const boxOf = (px: number[]): Box => { let x0 = W, y0 = H, x1 = -1, y1 = -1; for (const q of px) { const x = q % W, y = Math.floor(q / W); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } return [x0, y0, x1 - x0 + 1, y1 - y0 + 1]; };
   builds.forEach((b, t) => {
-    const blended = new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name)), owner = new Int32Array(WH).fill(-1), turn = new Map<string, number>();
-    const keys = b.placements.map((pl) => { const k = `${pl.name}@${pl.layer ?? ""}`, i = turn.get(k) ?? 0; turn.set(k, i + 1); return `${k}#${i + 1}`; });
-    b.placements.forEach((pl, i) => { const sig = `${pl.x},${pl.y},${pl.img.data.reduce((a, c) => (a * 31 + c) >>> 0, 7)}`; (stamps.get(keys[i]) ?? stamps.set(keys[i], new Set()).get(keys[i])!).add(sig); });
+    const blended = new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name)), owner = new Int32Array(WH).fill(-1), ink = new Uint32Array(WH);
     b.placements.forEach((pl, i) => {
-      if (blended.has(pl.layer ?? "")) { for (let y = 0; y < pl.img.h; y++) for (let x = 0; x < pl.img.w; x++) { const X = pl.x + x, Y = pl.y + y; if (X >= 0 && Y >= 0 && X < W && Y < H && pl.img.data[y * pl.img.w + x] !== TRANSPARENT) glowAt[t][Y * W + X] = 1; } return; }
+      const glow = blended.has(pl.layer ?? "");
       for (let y = 0; y < pl.img.h; y++) for (let x = 0; x < pl.img.w; x++) {
-        const X = pl.x + x, Y = pl.y + y;
-        if (X >= 0 && Y >= 0 && X < W && Y < H && pl.img.data[y * pl.img.w + x] !== TRANSPARENT) owner[Y * W + X] = i;
+        const X = pl.x + x, Y = pl.y + y, c = pl.img.data[y * pl.img.w + x];
+        if (X < 0 || Y < 0 || X >= W || Y >= H || c === TRANSPARENT) continue;
+        if (glow) glowAt[t][Y * W + X] = 1;
+        else { owner[Y * W + X] = i; ink[Y * W + X] = c; }
       }
     });
-    for (let q = 0; q < WH; q++) if (owner[q] >= 0) { const k = keys[owner[q]], m = things.get(k) ?? things.set(k, new Map()).get(k)!; (m.get(t) ?? m.set(t, []).get(t)!).push(q); }
+    const seen = new Uint8Array(WH), list: Blob[] = [];
+    for (let q0 = 0; q0 < WH; q0++) {
+      if (owner[q0] < 0 || seen[q0]) continue;
+      const px = [q0];
+      seen[q0] = 1;
+      for (let k = 0; k < px.length; k++) { const q = px[k], x = q % W, y = Math.floor(q / W); for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const xx = x + dx, yy = y + dy, r = yy * W + xx; if (xx >= 0 && yy >= 0 && xx < W && yy < H && !seen[r] && owner[r] === owner[q0]) { seen[r] = 1; px.push(r); } } }
+      if (px.length < 5) continue;
+      const pl = b.placements[owner[q0]], box = boxOf(px);
+      list.push({ name: pl.name, layer: pl.layer ?? "", px, box, sig: px.map((q) => `${q - (box[1] * W + box[0])}:${ink[q]}`).join(","), track: -1 });
+    }
+    blobs.push(list);
   });
-  const boxOf = (px: number[]): Box => { let x0 = W, y0 = H, x1 = -1, y1 = -1; for (const q of px) { const x = q % W, y = Math.floor(q / W); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } return [x0, y0, x1 - x0 + 1, y1 - y0 + 1]; };
-  // the ones that move or change (not the backdrop): stamped somewhere else or as another drawing from
-  // frame to frame, or not in every frame (a thing passing in front of another doesn't make it move)
-  const moving = [...things].filter(([k, m]) => {
+  // followed: each blob the one in the frame before in its layer, of about its size, that overlaps it
+  // most or is nearest (one each)
+  let next = 0;
+  blobs.forEach((list, t) => {
+    const prev = t ? blobs[t - 1] : [], pairs: [number, number, number][] = [];
+    list.forEach((c, i) => prev.forEach((pv, j) => {
+      if (pv.layer !== c.layer || c.px.length > 2.5 * pv.px.length || pv.px.length > 2.5 * c.px.length) return;
+      const d = Math.hypot(c.box[0] + c.box[2] / 2 - pv.box[0] - pv.box[2] / 2, c.box[1] + c.box[3] / 2 - pv.box[1] - pv.box[3] / 2), lim = Math.max(4, 0.6 * Math.max(c.box[2], c.box[3]));
+      const o = iou(c.box, pv.box);
+      if (o >= 0.2 || d <= lim) pairs.push([o + (pv.name === c.name ? 0.2 : 0) + 0.1 * (1 - Math.min(1, d / lim)), i, j]);
+    }));
+    const taken = new Set<number>();
+    for (const [, i, j] of pairs.sort((a, b) => b[0] - a[0])) if (list[i].track < 0 && !taken.has(j)) { list[i].track = prev[j].track; taken.add(j); }
+    for (const c of list) if (c.track < 0) c.track = next++;
+  });
+  const things = new Map<number, { name: string; m: Map<number, number[]>; sigs: Set<string> }>();
+  blobs.forEach((list, t) => { for (const c of list) { const th = things.get(c.track) ?? things.set(c.track, { name: `${c.name}@${c.layer}`, m: new Map(), sigs: new Set() }).get(c.track)!; th.m.set(t, c.px); th.sigs.add(c.sig); } });
+  // the ones that move or change (not the backdrop): drawn otherwise or somewhere else from frame to
+  // frame, or not in every frame; 12 px and 4 frames at least (not a spark, a star, a blade of grass)
+  const moving = [...things.values()].filter(({ m, sigs }) => {
     const sizes = [...m.values()].map((px) => px.length).sort((a, b) => a - b);
-    if (sizes[sizes.length >> 1] < 6 || [...m.values()].some((px) => px.length > WH / 2)) return false;
-    return stamps.get(k)!.size > 1 || m.size < N;
-  });
+    if (sizes[sizes.length >> 1] < 12 || m.size < Math.min(4, N) || [...m.values()].some((px) => px.length > WH / 2)) return false;
+    const at = new Set([...m.values()].map((px) => px[0]));
+    return sigs.size > 1 || at.size > 1 || m.size < N;
+  }).map((th, i): [string, Map<number, number[]>] => [`${th.name}~${i + 1}`, th.m]);
   const r = study({ name, frames, ms: times.map((_, i) => (times[i + 1] ?? tl.loop) - times[i]), kind: "pxl" }), d = r.layers;
   if (!d) { console.log(`${name}: no decomposition (study read the whole view as moving)`); continue; }
   const pieces = d.pieces;
@@ -111,18 +145,25 @@ for (const [file, name] of scenes.filter(([, n]) => !only.length || only.include
     return { all: false, at };
   };
   const tracks = pieces.map(boxesOf);
-  // each thing's best piece: mean box IoU over the frames it shows in (in place: those it was captured in)
-  const best = moving.map(([k, m]) => {
-    const scores = tracks.map(({ all, at }) => { let s = 0, n = 0; for (const [t, px] of m) { const b = at.get(t); if (b) { s += iou(boxOf(px), b); n++; } else if (all) n++; } return n ? s / n : 0; });
-    const i = scores.reduce((b, v, j) => (v > scores[b] ? j : b), 0);
-    return { k, m, i, score: scores[i] ?? 0, scores };
+  // how well a piece holds a thing, frame by frame: box IoU, or 0.5 when it holds most of it in a box
+  // at most four times its size (its shadow with it); the mean over the frames the thing shows in (in
+  // place: those the piece was captured in)
+  const inside = (a: Box, b: Box) => { const w = Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])), h = Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1])); return (w * h) / (a[2] * a[3] || 1); };
+  const fit = (a: Box, b: Box) => Math.max(iou(a, b), inside(a, b) >= 0.7 && b[2] * b[3] <= 4 * a[2] * a[3] ? 0.5 : 0);
+  const scored = moving.map(([k, m]) => {
+    const scores = tracks.map(({ all, at }) => { let s = 0, n = 0; for (const [t, px] of m) { const b = at.get(t); if (b) { s += fit(boxOf(px), b); n++; } else if (all) n++; } return n ? s / n : 0; });
+    return { k, m, scores };
   });
+  // one piece a thing, the best pairs first
+  const pairs = scored.flatMap((th, a) => th.scores.map((v, i) => [v, a, i] as const)).filter(([v]) => v >= 0.2).sort((x, y) => y[0] - x[0]);
+  const thingOf = new Map<number, number>(), pieceOf = new Map<number, number>();
+  for (const [, a, i] of pairs) if (!thingOf.has(i) && !pieceOf.has(a)) { thingOf.set(i, a); pieceOf.set(a, i); }
+  const best = scored.map((th, a) => { const i = pieceOf.get(a) ?? th.scores.reduce((b, v, j) => (v > th.scores[b] ? j : b), 0); return { ...th, i, score: pieceOf.has(a) ? th.scores[i] : 0, top: Math.max(0, ...th.scores) }; });
   const found = best.filter((b) => b.score >= 0.5), loose = best.filter((b) => b.score >= 0.2 && b.score < 0.5);
   // split: more than one piece mostly inside a thing; merged: a piece that is the best of several things
-  const inside = (a: Box, b: Box) => { const w = Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])), h = Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1])); return (w * h) / (a[2] * a[3] || 1); };
   const split = best.filter(({ m }) => { const all = boxOf([...m.values()].flat()); return pieces.filter((q) => inside(q.box, all) >= 0.6 && q.box[2] * q.box[3] < all[2] * all[3]).length >= 2; });
   const merged = new Map<number, string[]>();
-  for (const b of best) if (b.score >= 0.2) (merged.get(b.i) ?? merged.set(b.i, []).get(b.i)!).push(b.k);
+  for (const b of best) { const i = b.scores.reduce((x, v, j) => (v > b.scores[x] ? j : x), 0); if (b.top >= 0.2) (merged.get(i) ?? merged.set(i, []).get(i)!).push(b.k); }
   // masks: each capture of a thing's piece against the thing's own pixels that frame
   let mi = 0, mn = 0, mp = 0, mr = 0;
   for (const b of [...found, ...loose]) {
@@ -140,10 +181,12 @@ for (const [file, name] of scenes.filter(([, n]) => !only.length || only.include
     if (b.score >= 0.5) continue;
     // a thing that shines (a pumpkin, a glowing mushroom): a light round it, from it, over most of it
     const bx = boxOf([...b.m.values()].flat()), j = lamps.findIndex((q) => q.source![0] >= bx[0] - 3 && q.source![0] < bx[0] + bx[2] + 3 && q.source![1] >= bx[1] - 3 && q.source![1] < bx[1] + bx[3] + 3 && iou(q.box, bx) * (q.box[2] * q.box[3] + bx[2] * bx[3]) / (1 + iou(q.box, bx)) >= 0.5 * bx[2] * bx[3]);
-    if (j >= 0) { b.i = pieces.indexOf(lamps[j]); b.score = 0.5; found.push(b); const l = loose.indexOf(b); if (l >= 0) loose.splice(l, 1); }
+    if (j >= 0 && !thingOf.has(pieces.indexOf(lamps[j]))) { b.i = pieces.indexOf(lamps[j]); thingOf.set(b.i, -1); b.score = 0.5; found.push(b); const l = loose.indexOf(b); if (l >= 0) loose.splice(l, 1); }
   }
   const asLight = found.filter((b) => pieces[b.i].kind === "light").length;
-  const out = [`${name}: ${N} frames ${W}x${H}; ${moving.length} things move in the source: ${found.length} found (box IoU >= 0.5${asLight ? `, or ${asLight} as lights shining from them` : ""}), ${loose.length} loosely (0.2-0.5), ${moving.length - found.length - loose.length} missed; mean box IoU of those found ${(found.reduce((a, b) => a + b.score, 0) / (found.length || 1)).toFixed(2)}; ${split.length} in several pieces; ${[...merged.values()].filter((v) => v.length > 1).length} pieces over several things; masks IoU ${(mi / (mn || 1)).toFixed(2)} (${pct(mp, mn)} of a capture is the thing, ${pct(mr, mn)} of the thing is in it) over ${mn} captures; ${pieces.length} pieces found in all`];
+  // by how long each shows: a thing in every frame weighs more than one passing in four
+  const span = (bs: typeof best) => bs.reduce((a, b) => a + b.m.size, 0), weighed = pct(span(found), span(best));
+  const out = [`${name}: ${N} frames ${W}x${H}; ${moving.length} things move in the source (${weighed} of their frames found): ${found.length} found (a piece each, box IoU >= 0.5 or holding it${asLight ? `, or ${asLight} as lights shining from them` : ""}), ${loose.length} loosely (0.2-0.5), ${moving.length - found.length - loose.length} missed; mean box IoU of those found ${(found.reduce((a, b) => a + b.score, 0) / (found.length || 1)).toFixed(2)}; ${split.length} in several pieces; ${[...merged.values()].filter((v) => v.length > 1).length} pieces over several things; masks IoU ${(mi / (mn || 1)).toFixed(2)} (${pct(mp, mn)} of a capture is the thing, ${pct(mr, mn)} of the thing is in it) over ${mn} captures; ${pieces.length} pieces found in all`];
   // the light: what changes only because the light does, against what study took for light
   // each changed pixel's cause: a thing (a moving stamp is there, or was and has gone), the light alone
   // (the frame before lighting didn't change), or neither (a shadow cast, an effect drawn in code)

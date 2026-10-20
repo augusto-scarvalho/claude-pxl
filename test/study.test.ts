@@ -244,3 +244,15 @@ test("study tells the light apart before looking for things: a lamp pulsing on a
   const blob = pieces.find((p) => p.box[0] <= 84 && p.box[0] + p.box[2] >= 86 && p.box[1] <= 20 && p.box[1] + p.box[3] >= 22);
   assert.ok(blob && blob.kind !== "light", JSON.stringify(pieces));
 });
+
+test("study follows two things through where they cross, each by its own speed", () => {
+  // 48 frames: a red box going right 2 px a frame and a blue one going left, crossing in the middle
+  const W = 120, H = 60, n = 48, back = drawing(W, H, 5), ink = pack(20, 20, 20);
+  const box = (img: Img, x0: number, y0: number, c: number) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) img.set(x0 + x, y0 + y, x === 0 || y === 0 || x === 7 || y === 7 ? ink : c); };
+  const frames = Array.from({ length: n }, (_, f) => { const img = back.copy(); box(img, 104 - 2 * f, 26, pack(60, 90, 220)); box(img, 8 + 2 * f, 24, pack(220, 60, 60)); return img; });
+  const r = study({ name: "cross", frames, ms: frames.map(() => 100), kind: "test" });
+  const going = (r.pieces!.json as { pieces: { kind: string; speed?: number[]; track: number[][] }[] }).pieces.filter((p) => p.speed);
+  const right = going.find((p) => p.speed![0] > 1.5), left = going.find((p) => p.speed![0] < -1.5);
+  assert.ok(right && left, JSON.stringify(going.map((p) => [p.speed, p.track.length])));
+  assert.ok(right!.track.length >= 40 && left!.track.length >= 40, `${right!.track.length} ${left!.track.length}`);
+});

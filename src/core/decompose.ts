@@ -9,9 +9,10 @@
 // the background is each pixel's commonest color over the clip, a plane's expected pixel the one its
 // own step carries from the frame before, and what differs from them is the objects. A thing that goes
 // somewhere is followed piece by piece (the piece in the next frame of about its size a plausible step
-// on); the rest is isolated where it changes: fragments that touch, put back together into one object
-// when they are near each other, change in the same rhythm and share colors (one dancer's arm and leg,
-// not two dancers side by side).
+// on); the rest is isolated where it changes: fragments of pixels that differ in the same frames (a
+// knight riding past, not the crowd waving behind him), put back together into one object when they are
+// near each other, change in the same rhythm and share colors (one dancer's arm and leg, not two
+// dancers side by side), or have the same still body.
 import { type Color, channels, pack } from "./color.ts";
 import { Img } from "./image.ts";
 import { dE, lab } from "./vision.ts";
@@ -61,12 +62,9 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     for (let i = 1; i <= vals.length; i++) { if (i < vals.length && vals[i] === vals[i - 1]) cur++; else { if (cur > run) { run = cur; best = vals[i - 1]; } cur = 1; } }
     bg[p] = best;
   }
-  // the light's changes first, taken away: what differs after is things, not the light falling round them
-  const light = relight(F0, bg, (y) => !rowV[y], differ), F = light.any ? light.flat : F0;
-  if (process.env.PXL_RELIGHT) (globalThis as Record<string, unknown>).__relight = { light, bg, F: F0, differ };
   // a plane's step each frame: the whole number of pixels that carries its rows best (a speed of 1.67
   // px/frame goes by in steps of 1 and 2)
-  const stepOf = (t: number, b: Band) => {
+  const stepOf = (F: Img[], t: number, b: Band) => {
     let best = 0, bd = Infinity;
     for (const d of new Set([Math.floor(b.v), Math.ceil(b.v), Math.floor(b.v) - 1, Math.ceil(b.v) + 1])) {
       let n = 0;
@@ -76,8 +74,8 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     return best;
   };
   // what differs: from the background in still rows; from the frame before carried by its step in a plane's
-  const fg = F.map((f, t) => {
-    const m = new Uint8Array(WH), steps = t ? bands.map((b) => stepOf(t, b)) : [];
+  const fgOf = (F: Img[]) => F.map((f, t) => {
+    const m = new Uint8Array(WH), steps = t ? bands.map((b) => stepOf(F, t, b)) : [];
     for (let y = 0; y < H; y++) {
       const v = rowV[y];
       if (!v) { for (let x = 0; x < W; x++) if (differ(f.data[y * W + x], bg[y * W + x])) m[y * W + x] = 1; continue; }
@@ -87,26 +85,44 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     }
     return m;
   });
-  const pieces: Piece[] = [];
+  const pieces: Piece[] = [], fg0 = fgOf(F0);
   // ---------------------------------------------------------------- things that go somewhere
-  // each frame's pieces of difference, followed: the piece in the frame before of about the same size
-  // (two things merging or one splitting starts over) a plausible step away
-  const comps: Comp[][] = fg.map((m, t) => label(m, W, H, 2).filter((c) => c.n >= 4).map((c) => ({ ...c, t, id: -1 })));
-  let next = 0;
-  const tracks = new Map<number, Comp[]>();
-  for (let t = 0; t < N; t++) for (const c of comps[t]) {
-    let link: Comp | null = null, best = 0;
-    if (t) for (const p of comps[t - 1]) {
-      if (c.n > 2.5 * p.n || p.n > 2.5 * c.n) continue;
-      const ov = Math.max(0, Math.min(c.x1, p.x1) - Math.max(c.x0, p.x0) + 1) * Math.max(0, Math.min(c.y1, p.y1) - Math.max(c.y0, p.y0) + 1);
-      const near = Math.hypot(c.cx - p.cx, c.cy - p.cy) <= Math.max(6, 0.75 * Math.max(c.x1 - c.x0, c.y1 - c.y0));
-      const score = near ? ov + 0.5 : 0;
-      if (score > best && tracks.get(p.id)!.at(-1)!.t !== t) { best = score; link = p; }
+  // first, in the frames as they are (a light doesn't travel: a cloud drifting changes as softly as one,
+  // and would be taken for it): each frame's pieces of difference, followed (after SORT, Bewley et al.
+  // 2016, its prediction a steady speed): where each followed thing should be now, carried on by its
+  // speed, matched to the piece of about its size that overlaps that most or is nearest; one with none
+  // (hidden behind another, or one with it as they pass) carried on by its speed for up to 8 frames
+  const comps: Comp[][] = fg0.map((m, t) => label(m, W, H, 2).filter((c) => c.n >= 4).map((c) => ({ ...c, t, id: -1 })));
+  type Follow = { comps: Comp[]; vx: number; vy: number; lost: number };
+  const live: Follow[] = [], ended: Follow[] = [];
+  for (let t = 0; t < N; t++) {
+    const cs = comps[t], pairs: [number, number, number, number][] = [];
+    live.forEach((f, i) => {
+      const l = f.comps.at(-1)!, g = t - l.t, w = l.x1 - l.x0 + 1, h = l.y1 - l.y0 + 1, x = l.x0 + f.vx * g, y = l.y0 + f.vy * g, reach = Math.max(6, 0.75 * Math.max(w, h));
+      cs.forEach((c, j) => {
+        if (c.n > 2.5 * l.n || l.n > 2.5 * c.n) return;
+        const ow = Math.max(0, Math.min(x + w, c.x1 + 1) - Math.max(x, c.x0)), oh = Math.max(0, Math.min(y + h, c.y1 + 1) - Math.max(y, c.y0));
+        const d = Math.hypot(c.cx - l.cx - f.vx * g, c.cy - l.cy - f.vy * g), o = (ow * oh) / (w * h + (c.x1 - c.x0 + 1) * (c.y1 - c.y0 + 1) - ow * oh);
+        if (o > 0 || d <= reach) pairs.push([o + 0.5 * (1 - Math.min(1, d / reach)), i, j, o]);
+      });
+    });
+    // two passing, one piece where both should be, bigger than either: neither takes it, both go on
+    const both = new Set<number>();
+    cs.forEach((c, j) => { const over = pairs.filter((q) => q[2] === j && q[3] > 0 && c.n >= 1.4 * live[q[1]].comps.at(-1)!.n); if (over.length >= 2) both.add(j); });
+    const tookF = new Set<number>(), tookC = new Set<number>(both);
+    for (const [, i, j] of pairs.sort((a, b) => b[0] - a[0])) {
+      if (tookF.has(i) || tookC.has(j)) continue;
+      tookF.add(i); tookC.add(j);
+      const f = live[i], l = f.comps.at(-1)!, g = t - l.t, c = cs[j], sx = (c.cx - l.cx) / g, sy = (c.cy - l.cy) / g;
+      // its speed from pieces of its size (not from one it shares a moment with another)
+      if (c.n <= 1.5 * l.n && l.n <= 1.5 * c.n) [f.vx, f.vy] = f.comps.length > 1 ? [(f.vx + sx) / 2, (f.vy + sy) / 2] : [sx, sy];
+      f.comps.push(c); f.lost = 0;
     }
-    c.id = link ? link.id : next++;
-    (tracks.get(c.id) ?? tracks.set(c.id, []).get(c.id)!).push(c);
+    for (let i = live.length - 1; i >= 0; i--) if (!tookF.has(i) && ++live[i].lost > 8) ended.push(...live.splice(i, 1));
+    cs.forEach((c, j) => { if (!tookC.has(j)) live.push({ comps: [c], vx: 0, vy: 0, lost: 0 }); });
   }
-  const inPlace = new Uint16Array(WH);
+  const tracks = new Map([...ended, ...live].map((f, i) => { for (const c of f.comps) c.id = i; return [i, f.comps] as const; }));
+  const going = F0.map(() => new Uint8Array(WH));
   for (const tr of tracks.values()) {
     const size = median(tr.map((c) => Math.max(c.x1 - c.x0 + 1, c.y1 - c.y0 + 1)));
     const dx = tr.at(-1)!.cx - tr[0].cx, dy = tr.at(-1)!.cy - tr[0].cy, travel = Math.hypot(dx, dy);
@@ -120,20 +136,31 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     }
     if (tr.length >= 6 && travel >= Math.max(8, 0.8 * size) && travel >= 0.6 * path && sp <= Math.max(2, 0.5 * size) && steady >= 0.7 * (tr.length - 1)) {
       // carried along: one drawing, or changing drawings (the thing cut out by its difference, bottom-centered)
-      const cut = tr.map((c) => cutout(F[c.t], fg[c.t], c, W));
+      const cut = tr.map((c) => cutout(F0[c.t], fg0[c.t], c, W));
       const { poses, cycle } = posesOf(cut, differ);
       const first = median(tr.slice(0, 3).map((c) => c.y1 - c.y0 + 1)), last = median(tr.slice(-3).map((c) => c.y1 - c.y0 + 1));
       const x0 = Math.min(...tr.map((c) => c.x0)), y0 = Math.min(...tr.map((c) => c.y0)), x1 = Math.max(...tr.map((c) => c.x1)), y1 = Math.max(...tr.map((c) => c.y1));
       pieces.push({
         kind: poses >= 3 ? "walk" : "carried", box: [x0, y0, x1 - x0 + 1, y1 - y0 + 1], frames: tr.length, poses, cycle, speed: [vx, vy], grow: last / first,
-        track: tr.map((c) => [c.t, c.x0, c.y0, c.x1 - c.x0 + 1, c.y1 - c.y0 + 1]), ...captures(cycle >= 2 && tr.length >= cycle ? tr.slice(0, cycle) : spread(tr, 8), spread(tr, 8), (c) => ({ t: c.t, b: c, keep: carriedCut(fg[c.t], c, W) }), F0),
+        track: tr.map((c) => [c.t, c.x0, c.y0, c.x1 - c.x0 + 1, c.y1 - c.y0 + 1]), ...captures(cycle >= 2 && tr.length >= cycle ? tr.slice(0, cycle) : spread(tr, 8), spread(tr, 8), (c) => ({ t: c.t, b: c, keep: carriedCut(fg0[c.t], c, W) }), F0),
       });
-    } else for (const c of tr) for (const p of c.pix) inPlace[p]++;
+      // where it is each frame, a pixel wider
+      for (const c of tr) for (const p of c.pix) { const x = p % W, y = Math.floor(p / W); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < W && yy < H) going[c.t][yy * W + xx] = 1; } }
+    }
   }
+  // then the light's changes, told apart where nothing goes by and taken away: what differs after is
+  // things, not the light falling round them
+  const light = relight(F0, bg, (y) => !rowV[y], differ, going), F = light.any ? light.flat : F0, fg = light.any ? fgOf(F) : fg0;
+  // what's left differing where nothing goes by, in pieces of a few pixels at least
+  const inPlace = new Uint16Array(WH);
+  fg.forEach((m, t) => {
+    const rest = m.map((v, p) => v & (1 - going[t][p]));
+    for (const c of label(rest, W, H, 2)) if (c.n >= 4) for (const p of c.pix) inPlace[p]++;
+  });
   // ---------------------------------------------------------------- things in place, each isolated
   const busy = new Uint8Array(WH);
   for (let p = 0; p < WH; p++) if (inPlace[p] >= Math.max(2, 0.05 * N)) busy[p] = 1;
-  const frags = label(busy, W, H, 1).filter((c) => c.n >= 4);
+  const frags = inStep(busy, fg, W, H).filter((c) => c.n >= 4);
   // each fragment's rhythm (how much of it differs in each frame) and its colors over the clip, each with
   // its share (counted by share, the ghost's white in its top against the sky and in its body against
   // the ground weighs more than the few colors of what is behind each)
@@ -146,9 +173,13 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
   for (let i = 0; i < frags.length; i++) for (let j = i + 1; j < frags.length; j++) {
     const a = frags[i], b = frags[j];
     const gap = Math.max(0, Math.max(a.x0, b.x0) - Math.min(a.x1, b.x1) - 1, Math.max(a.y0, b.y0) - Math.min(a.y1, b.y1) - 1);
-    if (gap > 4) continue;
+    if (gap > 1) continue;
     const shared = alike(colors[i], colors[j]);
-    if (corr(rhythm[i], rhythm[j]) >= 0.5 && shared >= 0.25) parent[root(i)] = root(j);
+    if (shared < 0.25) continue;
+    // touching, in the same rhythm, or in turns: together steadier than either alone (a bird going round
+    // lights one side of its loop, then the other; an arm up, then down). Farther apart, only by the same
+    // body (two dancers in step a few pixels apart on one lawn are two)
+    if (corr(rhythm[i], rhythm[j]) >= 0.5 || cv(rhythm[i].map((v, t) => v * a.n + rhythm[j][t] * b.n)) <= 0.6 * Math.min(cv(rhythm[i]), cv(rhythm[j]))) parent[root(i)] = root(j);
   }
   const groups = new Map<number, Blob[]>();
   frags.forEach((f, i) => (groups.get(root(i)) ?? groups.set(root(i), []).get(root(i))!).push(f));
@@ -337,8 +368,16 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
   for (let p = 0; p < WH; p++) { let any = false; for (let t = 0; t < N && !any; t++) if (fg[t][p]) any = true; if (!any && !rowV[Math.floor(p / W)]) still++; }
   // one thing found twice (two tracks of it, or a region left over from it): the one followed longest
   const iou = (a: number[], b: number[]) => { const w = Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])), h = Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1])); return (w * h) / (a[2] * a[3] + b[2] * b[3] - w * h); };
+  // (two going somewhere: in the same place in the frames both show in, not two crossing the same stretch)
+  const twice = (a: Piece, b: Piece) => {
+    if (!a.speed || !b.speed) return iou(a.box, b.box) > 0.6;
+    const at = new Map(a.track.map((e) => [e[0], e.slice(1)]));
+    let s = 0, n = 0;
+    for (const e of b.track) { const o = at.get(e[0]); if (o) { s += iou(o, e.slice(1)); n++; } }
+    return n >= 0.5 * Math.min(a.track.length, b.track.length) && s / n > 0.5;
+  };
   pieces.sort((a, b) => Number(b.grow !== undefined) - Number(a.grow !== undefined) || b.frames - a.frames);
-  for (let i = pieces.length - 1; i >= 0; i--) if (pieces.slice(0, i).some((q) => iou(q.box, pieces[i].box) > 0.6)) pieces.splice(i, 1);
+  for (let i = pieces.length - 1; i >= 0; i--) if (pieces.slice(0, i).some((q) => twice(q, pieces[i]))) pieces.splice(i, 1);
   // things first, then lights; the bigger first
   pieces.sort((a, b) => Number(a.kind === "light") - Number(b.kind === "light") || b.box[2] * b.box[3] - a.box[2] * a.box[3]);
   return { pieces, still: still / WH, frames: N, relit: light.any, light };
@@ -350,6 +389,8 @@ const bboxOf = (px: number[], W: number): [number, number, number, number] => {
   for (const p of px) { const x = p % W, y = Math.floor(p / W); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
   return [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
 };
+/** How much a series varies against its mean (0: steady). */
+const cv = (v: number[]) => { const m = v.reduce((a, x) => a + x, 0) / v.length; return m ? Math.sqrt(v.reduce((a, x) => a + (x - m) ** 2, 0) / v.length) / m : 0; };
 const median = (v: number[]) => { const q = v.slice().sort((a, b) => a - b); return q[q.length >> 1] ?? 0; };
 const corr = (a: number[], b: number[]) => {
   const n = a.length, ma = a.reduce((s, v) => s + v, 0) / n, mb = b.reduce((s, v) => s + v, 0) / n;
@@ -361,6 +402,37 @@ const corr = (a: number[], b: number[]) => {
 function spread<T>(list: T[], k: number): T[] {
   if (list.length <= k) return list;
   return Array.from({ length: k }, (_, i) => list[Math.floor((i * (list.length - 1)) / (k - 1))]);
+}
+
+/**
+ * Pieces of a mask by common fate: neighbors joined when they differ in the same frames (the phi
+ * coefficient of the two over the clip at least 0.2). A knight riding past lights the pixels on his way
+ * one after another, each with the next; the crowd waving behind him changes to its own beat, so one
+ * patch of change holds both apart.
+ */
+function inStep(m: Uint8Array, fg: Uint8Array[], W: number, H: number): Blob[] {
+  const N = fg.length, idx = new Int32Array(W * H).fill(-1), at: number[] = [];
+  for (let p = 0; p < W * H; p++) if (m[p]) { idx[p] = at.length; at.push(p); }
+  const series = new Uint8Array(at.length * N), ones = new Int32Array(at.length);
+  at.forEach((p, i) => { for (let t = 0; t < N; t++) if (fg[t][p]) { series[i * N + t] = 1; ones[i]++; } });
+  const phi = (i: number, j: number) => {
+    let both = 0;
+    for (let t = 0; t < N; t++) both += series[i * N + t] & series[j * N + t];
+    const a = ones[i], b = ones[j], d = Math.sqrt(a * (N - a) * b * (N - b));
+    return d ? (N * both - a * b) / d : a === b ? 1 : 0;
+  };
+  const up = at.map((_, i) => i), top = (i: number): number => (up[i] === i ? i : (up[i] = top(up[i])));
+  at.forEach((p, i) => {
+    const x = p % W, y = Math.floor(p / W);
+    for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [-1, 1]]) { const xx = x + dx, yy = y + dy, j = xx >= 0 && xx < W && yy < H ? idx[yy * W + xx] : -1; if (j >= 0 && phi(i, j) >= 0.2) up[top(i)] = top(j); }
+  });
+  const by = new Map<number, number[]>();
+  at.forEach((p, i) => (by.get(top(i)) ?? by.set(top(i), []).get(top(i))!).push(p));
+  return [...by.values()].map((pix) => {
+    let x0 = W, y0 = H, x1 = 0, y1 = 0, sx = 0, sy = 0;
+    for (const p of pix) { const x = p % W, y = Math.floor(p / W); sx += x; sy += y; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    return { x0, y0, x1, y1, n: pix.length, cx: sx / pix.length, cy: sy / pix.length, pix };
+  });
 }
 
 /** Pieces of a mask: pixels within `r` of each other joined; each piece's box, count, middle and pixels. */

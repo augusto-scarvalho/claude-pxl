@@ -454,8 +454,10 @@ a fire on the walls isn't taken for a thing (a change of light multiplies every 
 it changes smoothly from pixel to pixel, fades out or stops at an edge the picture already had, and
 in step with its neighbors over the clip; a thing changes hard where the picture had no edge, is the
 background moved a step, or changes its neighbors one after another; after Weiss 2001, Matsushita et
-al. 2004 and Koppal and Narasimhan 2006); then what differs from them, followed from frame to frame, a piece of about
-the same size a plausible step on: one drawing carried along a path at a steady speed (a sprite
+al. 2004 and Koppal and Narasimhan 2006; not where a thing goes by: a light doesn't travel); then
+what differs from them, followed from frame to frame (after SORT, Bewley et al. 2016: where each
+thing should be by its own speed, the piece of about its size there; two passing, one piece where
+both should be, each carried on by its speed until they part): one drawing carried along a path at a steady speed (a sprite
 stamped where the path puts it; growing or shrinking when it comes nearer or goes away: sizes by
 `fit`); changing drawings carried along (a walk, a run, a drifting cloud: an anim of its drawings
 stamped along its path, its limbs a rig when parts of it move); things going across one after
@@ -464,9 +466,11 @@ place, read from the pixels that change there: a cycle of drawings (`anim`), par
 body that stays (a rig, or a frame per pose), changing all over without repeating with neighbors
 changing at odds (fire, water, smoke: `flame()`, `plume()`, `warp()`), or a thing wandering about
 its box (a bird circling: going round a loop). Each object is isolated from the others: the changing
-pixels in fragments that touch, put back together when they are near each other, change in the same
-rhythm and share colors (one dancer's arm and leg, not two dancers side by side), or have the same
-still body (two arms waving either side of it: a rig). Each light is a piece too: where it shines from,
+pixels in fragments of pixels that differ in the same frames (a knight riding past, not the crowd
+waving behind him), put back together when they touch and change in the same rhythm or in turns (a
+bird lighting one side of its loop, then the other) and share colors, or have the same still body
+(two arms waving either side of it: a rig; two dancers in step a few pixels apart on one lawn stay
+two). Each light is a piece too: where it shines from,
 how many times brighter at its brightest than at its dimmest, its color (`glow()` in that color, a
 lamp in `lighting()`, colors swapped per frame); two pools side by side pulsing to their own rhythms
 are two lights. Each piece is cut out of its background in every capture (after GrabCut's idea,

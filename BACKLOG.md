@@ -449,12 +449,28 @@ one), and the art code itself (4% of the cost).
   holding 74-80% of it. Weak: the perspective scenes (road, park, sodium_hour, tournament), where a
   figure is many stamps or drawn by `solids()` (the harness counts parts) and walkers are lost; sunset
   and cyberpunk, unlit, where what's taken for light is mostly things (backlit people).
-- [ ] **Next for study's pieces**, from the papers (Wang and Adelson 1994; Jojic and Frey 2001;
-  Deformable Sprites, Ye et al. 2022): group fragments by their best whole-pixel shift, not only by
-  rhythm and color (dancers in step on one lawn stay apart); a light as a few basis images times a
-  curve each (NMF on the ratio to the background, Oya et al. 2020), the rest things; the harness to
-  group a rig's stamps into one thing and score sprites the way Fast Sprite Decomposition (Suzuki et
-  al., ECCV 2024) does (each sprite alone, matched by the best assignment).
+- [x] **The weak points, measured and attacked** (asked next). The harness first: its things were
+  wrong (a stamp's name and turn: the "first car" was another car each frame, a pigeon pecking another
+  asset than the pigeon walking, a stamp of birds one thing); now each piece of a stamp's own pixels,
+  followed frame to frame whatever its name, 12 px and 4 frames at least, its drawing read off the
+  stamp; one piece a thing (the best pairs first, as Fast Sprite Decomposition matches); the share of
+  the things' frames found. Then study: fragments by common fate (pixels that differ in the same
+  frames: phi of their two series); touching fragments joined in the same rhythm or in turns (together
+  steadier than either), farther ones only by the same body; things that go somewhere followed first,
+  in the frames as they are, by a SORT-like tracker (each carried on by its speed, two passing coast
+  through the piece they share), and the light not looked for where they go; a hard edge for the light
+  is one far bigger than the background's own step there (a silhouette on a dithered sky); two going
+  opposite ways over one stretch aren't one found twice. Things' frames found: party 32 to 41%, forest
+  32 to 40, tournament 33 to 38, cyberpunk 3 to 6 (17 to 32 cars and people), park 0 to 33. Lower:
+  sunset 30 to 20, where clouds and tall grass come apart and its old big pieces held them by luck.
+- [ ] **Still weak in study's pieces**: big animated things touching (the tournament's two knights in
+  their bout and the stands behind, one piece: every pixel changes often, rhythm and common fate can't
+  part them; their colors could, the armor and the crowd's); soft clouds drifting slowly read as light
+  (a pulsing glow's rings shift a pixel too, arc by arc each its own way: telling them apart needs the
+  drift to agree over the whole cloud); traffic crossing at speed (cyberpunk 6%). Tried and dropped: a
+  light as the frame a few before moved a step (took the party's glows for clouds). Not done: a light as
+  a few basis images times a curve (NMF, Oya et al. 2020): where scenes light themselves the light is
+  already 71-99% right, and the misses are clouds and backlit people, not lamps it could model better.
 - [x] **More of what the papers measure**: a sprite's light from its rim (Johnson and Farid, 2005);
   banding by Pixel Logic's rule as the Pixel Fixer paper (TU Delft, 2025) states it; pillow shading;
   the translation of a photo by superpixels after Gerstner et al. (NPAR 2012), which keeps edges.
