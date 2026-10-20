@@ -124,7 +124,7 @@ the rest are for sprites and anims (a scene refuses them by name), and `bg`/`wor
 | `png: "file.png"` | Start from a PNG (path relative to the art file), like `base` starts from another asset: every option and item then works on it. In an `anim` with `frames: n`, frame k is the k-th of n equal slices of the image (a strip). The live viewer rebuilds when the file changes. Any PNG except interlaced ones. |
 | `area: [x, y, w, h]` | With `png`: only this part of the image (one sprite out of a sheet). |
 | `palettize: true` | With `png`: snap every color to the nearest keyed palette color, so `ascii`, `swap` and `recolor` see keys. |
-| `shrink: n` | With `png`: shrink by a whole factor, after `area`. Each n×n block becomes its most common opaque color (ties: the first, scanning the block column by column), or transparent when fewer than half of its pixels are opaque. Keeps silhouettes and the curves of shapes far better than sampling one pixel per block: the start for a smaller version of finished art (then redraw what it breaks; see characters.md). |
+| `shrink: n` | With `png`: shrink by a whole factor (1 leaves it as it is), after `area`. Each n×n block becomes its most common opaque color (ties: the first, scanning the block column by column), or transparent when fewer than half of its pixels are opaque. Keeps silhouettes and the curves of shapes far better than sampling one pixel per block: the start for a smaller version of finished art (then redraw what it breaks; see characters.md). |
 | `slice: n \| [left, top, right, bottom]` | 9-slice margins of the final image (outline included) for `panel()`; flips and rotations turn them; sheets export them as Aseprite `meta.slices` (bounds + center). |
 | `wrap: true \| "x" \| "y"` | Seamless tile (Aseprite's tiled mode): drawing, stamps, fills and reads past those edges continue on the opposite side, and the preview lays the tile out 3×3 (3×1, 1×3) so seams show. For tiles that repeat themselves; random variants placed side by side don't line up across edges. |
 | `pivot: "bottom" \| "center" \| [x, y]` | The point `stamp`, `scatter` and wire hangs put on the given position. `"bottom"` is the middle of the final image's bottom edge, so `stamp("tree", x, groundY)` stands it on row `groundY` whatever its size. `[x, y]` is in drawing coordinates (pixel corners) and moves with flip, rot, outline and crop, here and in placements. A `base` variant starts with its base's pivot. Sheets export it as a normalized `pivot` (0.5, 1 = bottom center). |
@@ -396,7 +396,7 @@ warnings `check` finds on it at those frames. Several names make a row each, one
 a column each: two versions of a scene, one scene from two agents, three details of a big one.
 Give PNGs at 1× (`out/scenes/x.png`, not an enlarged `_shot`): rows are enlarged together, so a big
 one leaves no room for the rest. `--vs <rev | file>` puts the same shot of another version above (one
-name, one region); `--diff` with it adds a row with the pixels that changed, in red. `check` makes every check `describe` can warn on, on every scene
+name, one region; at a git revision, the file and the art files it includes as they were there); `--diff` with it adds a row with the pixels that changed, in red. `check` makes every check `describe` can warn on, on every scene
 and rig of a file at every frame (exit 1 on a warning); `--readings` also lists what the lit-side
 rule read on every placement, warning or not, with a tally. A `build` of a
 whole file with more than 12 assets prints how many of each kind it wrote; `--list` or `--only`
@@ -406,8 +406,10 @@ A preview GIF past 4 MB says so; `--every N` keeps one frame in N in the preview
 off the CPU profiler: the slowest assets, then the functions that spent the most time themselves,
 in the art file (work redone every frame that could be done once, a noise called millions of
 times, a per-pixel search) and in pxl.
-`list` maps a file: each top-level statement that defines assets, its line range, the comment
-above it and the assets it defines (a loop's or a helper's many on one line). `help` prints the
+`list` maps a file: each top-level statement that defines assets, each function and each const of
+5 lines or more, its line range, the comment above it and what it defines (a loop's or a helper's
+many assets on one line). A file that doesn't run on its own (one meant to be included) is mapped
+from its text, without the assets its loops make. `help` prints the
 rows that define a name in full, one line for each other place that mentions it and a few uses in the
 examples (`--all`: everything in full); a guide's name with numbers or words of a heading prints those
 sections.

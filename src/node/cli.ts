@@ -21,7 +21,7 @@ import { serve } from "./server.ts";
 import { checkProject } from "./check.ts";
 import { cellRow, diffRow, frameTime, otherVersion, shotChanges, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
-import { listProject } from "./list.ts";
+import { listProject, listText } from "./list.ts";
 import { profileReport, profiled } from "./profile.ts";
 
 const USAGE = `pxl — pixel-art DSL
@@ -45,9 +45,10 @@ const USAGE = `pxl — pixel-art DSL
   pxl ascii <art.px.js> <name> [--frame N]
       Print an asset as palette keys with x/y rulers (anims: every frame; --frame N: that one).
   pxl list  <art.px.js>
-      A map of the file (and what it includes): each top-level statement that defines assets, its
-      line range, the comment above it and what it defines (a loop's many assets on one line); then
-      groups and sheets. Read those lines instead of the whole file.
+      A map of the file (and what it includes): each top-level statement that defines assets, each
+      function and each const of 5 lines or more, its line range, the comment above it and what it
+      defines (a loop's many assets on one line); then groups and sheets. A file that doesn't run on
+      its own (one meant to be included) is mapped from its text. Read those lines, not the file.
   pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief] [--out DIR | --no-out]   (or: pxl describe <image.png> [...])
       A whole scene as text to read at once: what was painted (steps grouped by source line), what
       was placed where, cell maps (object on top, color before lighting, brightness after it), how
@@ -66,8 +67,8 @@ const USAGE = `pxl — pixel-art DSL
   pxl shot <image.png> [<image.png> ...] [--at x,y,w,h ...] [--scale N] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
       to the region, side by side, enlarged, written to <out>/_shot/<name>.png. --vs puts the same
-      shot of another version above it (a git revision takes the file itself from there; what it
-      includes is read as it is now); --diff adds a row with the pixels that changed in red. It
+      shot of another version above it (at a git revision, the file and what it includes as they
+      were there); --diff adds a row with the pixels that changed in red. It
       also prints what changed since the last shot of the same frames and region (one asset, one
       region: pixels, where) and the warnings pxl check finds on the asset at those frames: one call
       per look. Several names (another file's as other.px.js:name, or any PNG) make a row each, one
@@ -216,7 +217,9 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case "list": {
-        for (const l of listProject(loadProject(file))) console.log(l);
+        let lines: string[];
+        try { lines = listProject(loadProject(file)); } catch (e) { lines = listText(file, (e as Error).message.split("\n")[0]); }
+        for (const l of lines) console.log(l);
         return 0;
       }
       case "describe": {
@@ -373,7 +376,7 @@ export async function main(argv: string[]): Promise<number> {
         if (a.vs) {
           const o = otherVersion(file, a.vs);
           let was: Img;
-          try { was = shotRow(loadProject(o.path), name, frames, a.at); } finally { o.done(); }
+          try { was = shotRow(loadProject(o.path, {}, o.read), name, frames, a.at); } catch (e) { throw wrap(e).within(`--vs ${a.vs}`); }
           rows.unshift(was);
           if (a.diff) {
             const d = diffRow(was, now);
@@ -408,7 +411,7 @@ export async function main(argv: string[]): Promise<number> {
         let r: Img;
         try { r = decodePng(readFileSync(resolve(ref))); } catch (e) { throw new PxError(`${ref}: ${(e as Error).message}`); }
         if (a.shrink !== undefined) {
-          if (!(Number.isInteger(a.shrink) && a.shrink >= 2)) throw new PxError(`--shrink must be a whole factor >= 2, got ${a.shrink}`);
+          if (!(Number.isInteger(a.shrink) && a.shrink >= 1)) throw new PxError(`--shrink must be a whole factor >= 1, got ${a.shrink}`);
           r = r.shrink(a.shrink);
         }
         console.log(`${name} (${img.w}x${img.h}) against ${ref} (${r.w}x${r.h}${a.shrink ? `, shrunk ${a.shrink}x` : ""}${a.offset ? ` at ${a.offset.join(",")}` : ""})`);

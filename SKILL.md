@@ -43,7 +43,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    what the rule read on every placement. Then look as a critic. Replacing approved art: keep
    `name_old` beside the new one and show both, `PXL shot art.px.js name name_old`, for the user to
    choose. Matching a reference: `PXL compare art.px.js <name> ref.png [--shrink N]` lists each
-   row's extents side by side.
+   row's extents side by side. Which way a rig's parts face: `PXL blind art.px.js <rig>` shows them
+   unnamed to a reader who doesn't know the labels (characters.md §11).
 6. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL.
 
 Errors name file:line:col and the asset/layer/op, and suggest fixes. One broken asset doesn't stop
@@ -90,12 +91,13 @@ task needs before starting:
 | a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a scene, level, building or environment | [scenes.md](scenes.md), whole (~5k tokens) |
+| a scene, level, building or environment | [scenes.md](scenes.md), whole (~6k tokens) |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
 
-An example, or your own file after many edits: `PXL list <file>` maps it (each definition's line
-range, the comment above it, what a loop makes on one line). Read those lines, not the file.
+An example, or your own file after many edits: `PXL list <file>` maps it (each asset definition and
+function with its line range and the comment above it, what a loop makes on one line; a file meant
+to be included is mapped from its text). Read those lines, not the file.
 
 ## Template
 

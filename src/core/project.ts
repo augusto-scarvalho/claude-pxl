@@ -235,9 +235,9 @@ export class Project implements BuildCtx {
         img = img.sub(a[0], a[1], a[2], a[3]);
       }
       if (o.shrink !== undefined) {
-        if (!(Number.isInteger(o.shrink) && o.shrink >= 2 && o.shrink <= Math.min(img.w, img.h)))
-          throw new PxError(`shrink must be a whole factor from 2 to ${Math.min(img.w, img.h)}, got ${JSON.stringify(o.shrink)}`);
-        img = img.shrink(o.shrink);
+        if (!(Number.isInteger(o.shrink) && o.shrink >= 1 && o.shrink <= Math.min(img.w, img.h)))
+          throw new PxError(`shrink must be a whole factor from 1 (as it is) to ${Math.min(img.w, img.h)}, got ${JSON.stringify(o.shrink)}`);
+        if (o.shrink > 1) img = img.shrink(o.shrink);
       }
       return img;
     } catch (e) {

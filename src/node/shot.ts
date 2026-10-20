@@ -1,8 +1,8 @@
 // pxl shot: frames of an asset, cropped, side by side, enlarged; under another version of the file
 // for a before/after, and the pixels that changed.
 import { execFileSync } from "node:child_process";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import type { Project } from "../core/project.ts";
 import { Img } from "../core/image.ts";
 import { TRANSPARENT } from "../core/color.ts";
@@ -86,22 +86,25 @@ export function stack(rows: Img[]): Img {
 }
 
 /**
- * Another version of an art file to load: a path, or a git revision (the file as it was there,
- * written next to it so what it includes resolves the same; the files it includes are read as they
- * are now). `done()` removes what it wrote.
+ * Another version of an art file to load: a path, or a git revision. At a revision the file and every
+ * art file it includes are read as they were there (one the revision doesn't have, as it is now).
  */
-export function otherVersion(file: string, vs: string): { path: string; done: () => void } {
-  if (existsSync(resolve(vs))) return { path: resolve(vs), done: () => {} };
-  const dir = dirname(file);
-  let src: string, rel = "";
+export function otherVersion(file: string, vs: string): { path: string; read?: (abs: string) => string } {
+  if (existsSync(resolve(vs))) return { path: resolve(vs) };
+  let root = "", rel = "";
+  const show = (r: string) => execFileSync("git", ["show", `${vs}:${r}`], { cwd: root, encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] });
   try {
-    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: dir, encoding: "utf8" }).trim();
+    root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: dirname(file), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
     rel = relative(root, file).split(sep).join("/");
-    src = execFileSync("git", ["show", `${vs}:${rel}`], { cwd: root, encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] });
+    show(rel);
   } catch {
     throw new PxError(`--vs ${vs}: not a file here, and git has no ${rel || basename(file)} at '${vs}'`);
   }
-  const path = join(dir, `._vs_${basename(file)}`);
-  writeFileSync(path, src);
-  return { path, done: () => rmSync(path, { force: true }) };
+  return {
+    path: file,
+    read: (abs) => {
+      const r = relative(root, abs).split(sep).join("/");
+      try { return show(r); } catch { return readFileSync(abs, "utf8"); }
+    },
+  };
 }

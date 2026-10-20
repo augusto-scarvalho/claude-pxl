@@ -1097,7 +1097,7 @@ function forearm(c, [ex, ey], [wx, wy], side, from = 5, to = Infinity) {
     // the mouth of the sleeve, bunched over the cuff: wider, its rim rounded
     const mouth = Math.max(0, 1 - (t - from) / 4), h = 8.5 + t * 0.08 + mouth * 1.6
     const rim = from + 1.2 * (o / h) ** 2
-    if (t < rim) continue
+    if (t < rim || Math.abs(o) > h) continue                                // off the sleeve: no folds to work out
     const here = cloth(t, o, h), edge = h - here.pinch
     if (Math.abs(o) > edge) continue
     const oc = (v) => Math.max(-h, Math.min(h, v))

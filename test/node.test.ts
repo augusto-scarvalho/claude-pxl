@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { crc32, deflateSync, inflateSync } from "node:zlib";
 import { Img } from "../src/core/image.ts";
 import { pack } from "../src/core/color.ts";
@@ -132,6 +133,8 @@ sprite("guided", { w: 2, h: 1 }, "R", layer("guide", { ref: true }, ".B"))`);
   writeFileSync(join(dir, "pose.json"), JSON.stringify({ a: [0, 2, 0.9], b: [6, 2, 0.8] }));
   const p = loadProject(file);
   assert.deepEqual([...p.image("small").data], [pack(255, 0, 0), 0], "majority per 2x2 block; a quarter-filled block is empty");
+  writeFileSync(join(dir, "same.px.js"), `sprite("same", { png: "big.png", shrink: 1 })`);
+  assert.equal(loadProject(join(dir, "same.px.js")).image("same").w, 4, "shrink 1: as it is");
   assert.deepEqual([...p.image("posed").data].slice(4, 8), [pack(255, 255, 255), pack(255, 0, 0), pack(255, 0, 0), pack(255, 255, 255)]);
   assert.ok(p.files.some((f) => f.endsWith("pose.json")), "watched for live rebuilds");
   assert.deepEqual([...p.image("guided").data], [pack(255, 0, 0), 0], "the art leaves the reference layer out");
@@ -141,7 +144,7 @@ sprite("guided", { w: 2, h: 1 }, "R", layer("guide", { ref: true }, ".B"))`);
   assert.equal(decodePng(readFileSync(join(out, "_preview", "guided.png"))).data[1], pack(0, 0, 255), "the preview shows it");
 
   const bad = (src: string, re: RegExp) => { const t = tmpArt(src); writeFileSync(join(t.dir, "big.png"), encodePng(big)); assert.throws(() => loadProject(t.file), re); };
-  bad(`sprite("a", { png: "big.png", shrink: 3 })`, /shrink must be a whole factor from 2 to 2/);
+  bad(`sprite("a", { png: "big.png", shrink: 3 })`, /shrink must be a whole factor from 1 \(as it is\) to 2/);
   bad(`sprite("a", pose("missing.json"))`, /cannot read .*missing\.json/);
 });
 
@@ -348,6 +351,18 @@ test("cli shot of several assets, one from another file: a row each, top down, a
   await assert.rejects(main(["shot", file, "a", `${other}:b`, "--vs", "HEAD"]).then((c) => { if (c) throw new Error("refused"); }), /refused/);
 });
 
+test("cli shot --vs a revision reads what the file includes as it was there too", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js"), part = join(dir, "part.px.js");
+  writeFileSync(file, `use("pico8")
+include("part.px.js")
+sprite("a", { w: 2, h: 2 }, rect(0, 0, 2, 2, KEY))`);
+  writeFileSync(part, `const KEY = "8"`);
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, stdio: "ignore" });
+  git("init", "-q"); git("add", "."); git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "a");
+  writeFileSync(part, `const KEY = "c"`);
+  assert.match(await said("shot", file, "a", "--vs", "HEAD", "--diff"), /^4 px changed$/m);
+});
+
 test("cli shot of PNGs from anywhere, several regions: a row per image, a column per region", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), a = join(dir, "a.png"), b = join(dir, "b.png");
   const img = (c: number) => { const i = new Img(8, 6); i.fill(c); return i; };
@@ -381,6 +396,13 @@ test("pxl list maps a file: each statement that defines assets, its lines, the c
   assert.match(text, /^ {2}5-6 +sprite x5: gem_r, gem_g, gem_b, gem_y \(\+1\) {2}\/\/ the gems: one per color$/m);
   assert.match(text, /^ {2}7-7 +sprite: slash$/m);
   assert.match(text, /^ {2}8-8 +scene: s$/m);
+  // functions too; and a file meant to be included, which doesn't run alone, is mapped from its text
+  const part = join(dir, "part.px.js");
+  writeFileSync(part, `// the gem's shine\nfunction shine(c) {\n  c.px(0, 0, KEY)\n}\nsprite("gem", { w: 1, h: 1 }, (c) => shine(c))\nconst KEY = W > 2 ? "7" : "8"`);
+  const alone = await said("list", part);
+  assert.match(alone, /^part\.px\.js \(6 lines; not run on its own \(.*W is not defined\)/m);
+  assert.match(alone, /^ {2}2-4 +function: shine {2}\/\/ the gem's shine$/m);
+  assert.match(alone, /^ {2}5-5 +sprite: gem$/m);
 });
 
 test("cli build reports per-asset errors and still writes the rest", async () => {

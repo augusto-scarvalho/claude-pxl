@@ -441,6 +441,19 @@ one), and the art code itself (4% of the cost).
 - [x] **Loops along a way**: things picked by `hash()` of where they stand along the road jumped at
   the loop's seam until taken modulo the loop's distance; written up in scenes.md, with flutters as
   whole cycles of the loop.
+- [x] **`pxl list` of a file meant to be included**: it ran the file alone and stopped at the first
+  name the includer defines (`H is not defined`), and its map named assets only, so the race's 1155
+  lines (wheel, hands, sleeves, vegetation: all functions) were found with grep. Now a file that
+  doesn't run alone is mapped from its text, and every map also has each function and each const of
+  5 lines or more (the race: 29 lines to 72; the knight: 22 to 32).
+- [x] **`shot --vs <rev>` read the included files as they are now**: comparing the cockpit before and
+  after the mesh op failed (`render3d is not defined`: the old race with the new cockpit). At a
+  revision the file and every art file it includes are now read from git (nothing written beside it).
+- [x] **`shrink: 1`** was refused ("a whole factor from 2"): importing art already at 1:1 for study
+  needed the option removed. 1 now leaves the image as it is (and `compare --shrink 1`).
+- [x] **The race built in ~90 s**: `--profile` put it in the art, not in pxl: the sleeves' cloth
+  shading worked out its folds for every pixel of the arm's bounding box (48%). Skipping the pixels
+  off the sleeve first: 72 s, pixel for pixel the same. The ground's colour function is the rest.
 - Considered: a curved road in `perspective()` (`bend`: the offset kappa·d²/2 the race works out
   itself, in its `cx()`): one scene's so far; worth it if another road bends.
 - [x] **A mesh op**: the cockpit (`examples/perspective/cockpit.px.js`) is modelled in 3D and carried

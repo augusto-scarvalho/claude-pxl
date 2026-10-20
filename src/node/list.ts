@@ -82,48 +82,75 @@ export function statements(src: string): [number, number][] {
 }
 
 const lineOf = (src: string, off: number) => src.slice(0, off).split("\n").length;
+type Def = { kind: string; name: string; line: number; col: number };
+
+/**
+ * One file's map: a line per statement that defines assets (those a loop makes on one line), per
+ * function, and per const that runs 5 lines or more (a model, a table), in order, each with the first
+ * line of the comment right above it.
+ */
+function mapFile(short: string, src: string, defs: Def[], header = ""): string[] {
+  const lines = src.split("\n"), starts = [0];
+  for (let i = 0; i < src.length; i++) if (src[i] === "\n") starts.push(i + 1);
+  const spans = src ? statements(src) : [];
+  const groups = new Map<number, Def[]>();
+  for (const d of defs) {
+    const off = (starts[d.line - 1] ?? 0) + d.col - 1, s = spans.findIndex(([a, b]) => off >= a && off < b);
+    (groups.get(s) ?? groups.set(s, []).get(s)!).push(d);
+  }
+  // the code between: functions, and consts long enough to be worth finding
+  spans.forEach(([a, b], s) => {
+    if (groups.has(s)) return;
+    const m = /^(?:export\s+)?(?:async\s+)?(function)\s*\*?\s*([\w$]+)|^(?:export\s+)?(?:const|let|var)\s+([\w$]+)\s*=/.exec(src.slice(a, a + 200));
+    if (m && (m[1] || lineOf(src, b) - lineOf(src, a) >= 4)) groups.set(s, [{ kind: m[1] ? "function" : "const", name: m[2] ?? m[3], line: lineOf(src, a), col: 1 }]);
+  });
+  const isComment = (i: number) => i >= 0 && /^\s*\/\//.test(lines[i] ?? "");
+  const rows = [...groups].map(([s, g]) => {
+    const [a, b] = spans[s] ?? [-1, -1];
+    const from = a >= 0 ? lineOf(src, a) : g[0].line, to = b >= 0 ? lineOf(src, b) : g[0].line;
+    // the comment right above it: its first line
+    let k = from - 2, note = "";
+    if (isComment(k)) {
+      while (isComment(k - 1)) k--;
+      note = lines[k].trim().replace(/^\/\/\s*/, "").replace(/^[-=\s]+|[-=\s]+$/g, "").slice(0, 90);
+    }
+    const kinds = [...new Set(g.map((d) => d.kind))].map((kd) => {
+      const c = g.filter((d) => d.kind === kd).length;
+      return c > 1 ? `${kd} x${c}` : kd;
+    }).join(", ");
+    const names = g.length > 4 ? `${g.slice(0, 4).map((d) => d.name).join(", ")} (+${g.length - 4})` : g.map((d) => d.name).join(", ");
+    return { from, text: `  ${`${from}-${to}`.padEnd(9)} ${kinds}: ${names}${note ? `  // ${note}` : ""}` };
+  });
+  return [`${short} (${lines.length} lines${header})`, ...rows.sort((x, y) => x.from - y.from).map((r) => r.text)];
+}
 
 /** The map, one line per statement that defines something, under a line per file. */
 export function listProject(p: Project): string[] {
   const out: string[] = [];
-  const byFile = new Map<string, { kind: string; name: string; line: number; col: number }[]>();
+  const byFile = new Map<string, Def[]>();
   for (const n of p.order) {
     const d = p.assets.get(n)!, m = /^(.*):(\d+):(\d+)$/.exec(d.top ?? d.loc ?? "");
     if (!m) continue;
     (byFile.get(m[1]) ?? byFile.set(m[1], []).get(m[1])!).push({ kind: d.kind, name: n, line: +m[2], col: +m[3] });
   }
-  for (const [short, defs] of byFile) {
-    const path = p.files.find((f) => f.replace(/^.*[\\/]/, "") === short);
+  for (const f of p.files) {
+    const short = f.replace(/^.*[\\/]/, "");
+    if (!/\.px\.[jt]s$|\.[cm]?[jt]s$/.test(short)) continue;
     let src = "";
-    try { src = path ? readFileSync(path, "utf8") : ""; } catch { /* listed without ranges */ }
-    const lines = src.split("\n"), starts = [0];
-    for (let i = 0; i < src.length; i++) if (src[i] === "\n") starts.push(i + 1);
-    const spans = src ? statements(src) : [];
-    out.push(`${short} (${lines.length} lines)`);
-    const groups = new Map<number, typeof defs>();
-    for (const d of defs) {
-      const off = (starts[d.line - 1] ?? 0) + d.col - 1, s = spans.findIndex(([a, b]) => off >= a && off < b);
-      (groups.get(s) ?? groups.set(s, []).get(s)!).push(d);
-    }
-    for (const [s, g] of groups) {
-      const [a, b] = spans[s] ?? [-1, -1];
-      const from = a >= 0 ? lineOf(src, a) : g[0].line, to = b >= 0 ? lineOf(src, b) : g[0].line;
-      // the comment right above it: its first line
-      const isComment = (i: number) => i >= 0 && /^\s*\/\//.test(lines[i] ?? "");
-      let k = from - 2, note = "";
-      if (isComment(k)) {
-        while (isComment(k - 1)) k--;
-        note = lines[k].trim().replace(/^\/\/\s*/, "").replace(/^[-=\s]+|[-=\s]+$/g, "").slice(0, 90);
-      }
-      const kinds = [...new Set(g.map((d) => d.kind))].map((kd) => {
-        const c = g.filter((d) => d.kind === kd).length;
-        return c > 1 ? `${kd} x${c}` : kd;
-      }).join(", ");
-      const names = g.length > 4 ? `${g.slice(0, 4).map((d) => d.name).join(", ")} (+${g.length - 4})` : g.map((d) => d.name).join(", ");
-      out.push(`  ${`${from}-${to}`.padEnd(9)} ${kinds}: ${names}${note ? `  // ${note}` : ""}`);
-    }
+    try { src = readFileSync(f, "utf8"); } catch { /* listed without ranges */ }
+    out.push(...mapFile(short, src, byFile.get(short) ?? []));
   }
   for (const g of p.groups.values()) out.push(`group ${g.name} ${g.loc ?? ""}  [${g.members.join(" ")}]`);
   for (const s of p.sheets) out.push(`sheet ${s.name} ${s.loc ?? ""}`);
   return out;
+}
+
+/** A file that doesn't run on its own (one meant to be included): mapped from its text alone. */
+export function listText(path: string, why: string): string[] {
+  const src = readFileSync(path, "utf8"), defs: Def[] = [];
+  for (const [a] of statements(src)) {
+    const m = /^(sprite|anim|scene|rig|font|group|sheet)\s*\(\s*["'`]([^"'`]+)/.exec(src.slice(a, a + 200));
+    if (m) defs.push({ kind: m[1], name: m[2], line: lineOf(src, a), col: a - src.lastIndexOf("\n", a - 1) });
+  }
+  return mapFile(path.replace(/^.*[\\/]/, ""), src, defs, `; not run on its own (${why}): mapped from its text, so what loops make isn't named`);
 }

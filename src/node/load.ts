@@ -13,8 +13,11 @@ function compile(code: string, file: string): string {
   return /\.[cm]?ts$/.test(file) ? stripTypeScriptTypes(code, { mode: "strip" }) : code;
 }
 
-/** Load an art file from disk. Throws PxError with a file:line:col location on failure. */
-export function loadProject(file: string, opts: ProjectOptions = {}): Project {
+/**
+ * Load an art file from disk. Throws PxError with a file:line:col location on failure. `read` reads
+ * the art files (this one and what it includes): another version of them, e.g. at a git revision.
+ */
+export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs: string) => readFileSync(abs, "utf8")): Project {
   const p = new Project(opts);
   const ctx = vm.createContext({ ...p.env(), console });
   const stack: string[] = [];
@@ -22,7 +25,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}): Project {
     const abs = resolve(path);
     if (stack.includes(abs)) throw new PxError(`include cycle: ${[...stack, abs].join(" -> ")}`);
     let code: string;
-    try { code = readFileSync(abs, "utf8"); } catch {
+    try { code = read(abs); } catch {
       throw new PxError(`cannot read art file '${abs}'`, p.callerLoc());
     }
     p.addFile(abs);
