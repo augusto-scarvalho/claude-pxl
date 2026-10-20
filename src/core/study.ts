@@ -363,7 +363,7 @@ function blobs(count: Uint16Array, W: number, H: number, min: number) {
 /**
  * One picture to look at, panels top to bottom: the picture studied (1x or the translation); its
  * techniques marked over it in grey (banding red, checkers magenta, dark lines cyan, in-between tones yellow); its
- * straight edges colored by where they meet (red, green, blue; the rest yellow), the vanishing points
+ * straight edges colored by where they meet (red, green, blue, orange; the rest yellow), the vanishing points
  * and the horizon (cyan); the ramps, one row each, dark to light; for an animation, frames across
  * the clip, and the flow (white ticks along each block's motion, the point it opens out from in
  * magenta, the planes as bars down the left in their speeds' order).
@@ -378,7 +378,7 @@ function sheet(pic: Img, t: Techniques, pixelArt: boolean, P: Img, segs: Segment
     panels.push(g.scale(s));
   }
   const ps = Wd / P.w, pg = grey(P).scale(Math.max(1, Math.round(ps)));
-  const z = pg.w / P.w, col = [pack(240, 70, 70), pack(80, 230, 90), pack(90, 140, 255)];
+  const z = pg.w / P.w, col = [pack(240, 70, 70), pack(80, 230, 90), pack(90, 140, 255), pack(240, 150, 60)];
   for (const sg of segs) { const i = vps.findIndex((v) => v.lines.includes(sg)); line(pg, sg.x0 * z, sg.y0 * z, sg.x1 * z, sg.y1 * z, i >= 0 ? col[i] : pack(230, 210, 60)); }
   for (const [i, v] of vps.entries()) if (!v.far) {
     const x = v.x * z, y = v.y * z;
