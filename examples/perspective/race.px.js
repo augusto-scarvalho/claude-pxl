@@ -533,7 +533,7 @@ include("cockpit.px.js")
 // go round with it at ten to two, gripping as drivers do: the back of the glove up and toward us, the palm down on
 // the rim, the fingers curled forward over it, the thumbs pointing in. The forearms come up from the
 // corners in the blue suit with its white stripes, a knit cuff at each wrist. The gauges' needles:
-// the revs flutter, the speed holds about 200; the ribbons from the mirror swing against the turn.
+// the revs flutter, the speed holds about 200 km/h; the ribbons from the mirror swing against the turn.
 //
 // The hand is a puppet: a skeleton of joints in the hand's own frame, read off photographs of a
 // left hand gripping, taken from its owner's eyes as the driver sees his, then set on the rim every
@@ -558,8 +558,8 @@ const HAND = {
 }
 // the hand's frame on the rim at its angle: a function from the frame to the picture
 function handOn(side, turn) {
-  const a = (side > 0 ? HAND.a : Math.PI - HAND.a) - turn, t = rimT(a)
-  const [gx, gy] = onRim(a, t / 2), [x1, y1] = onRim(a - 0.01 * side, t / 2), [x0, y0] = onRim(a + 0.01 * side, t / 2)
+  const a = (side > 0 ? HAND.a : Math.PI - HAND.a) - turn
+  const [gx, gy] = rimMid(a), [x1, y1] = rimMid(a - 0.01 * side), [x0, y0] = rimMid(a + 0.01 * side)
   const mir = ([x, y]) => [x * side, y], [L, Q] = HAND.rim.map(mir)
   const th = Math.atan2(y0 - y1, x1 - x0) - Math.atan2(Q[1] - L[1], Q[0] - L[0]), co = Math.cos(th), si = Math.sin(th)
   const mx = (L[0] + Q[0]) / 2, my = (L[1] + Q[1]) / 2
@@ -572,34 +572,10 @@ const steer = (f) => {
   const lat = (ourX(((s + h) / SECONDS) * FRAMES) - 2 * ourX(f) + ourX(((s - h) / SECONDS) * FRAMES)) / (h * h)
   return (kappa(f) * 90 + lat * 0.05) * 0.45
 }
-const WHEEL = { x: 160, y: 146, rx: 52, ry: 44 }
-const onRim = (a, inset = 0) => [WHEEL.x + (WHEEL.rx - inset) * Math.cos(a), WHEEL.y - (WHEEL.ry - inset) * Math.sin(a)]
-// the rim's thickness: thinner at the top, which is farther from the eye
-const rimT = (a) => 6 + 3 * Math.max(0, -Math.sin(a)) + 1.5 * (1 - Math.abs(Math.sin(a)))
 function wheel(c, f) {
   const turn = steer(f), R = Math.round
-  // three spokes, left, right and down, drilled with holes, from the hub to the rim
-  for (const a of [Math.PI + 0.12, -0.12, -Math.PI / 2]) {
-    const aa = a - turn, [x0, y0] = onRim(aa, 36), [x1, y1] = onRim(aa, 7), nx = -Math.sin(aa) * 0.6, ny = -Math.cos(aa) * 0.6
-    c.poly([x0 + nx * 8, y0 + ny * 8, x1 + nx * 5, y1 + ny * 5, x1 - nx * 5, y1 - ny * 5, x0 - nx * 8, y0 - ny * 8].map(R), "=")
-    c.line(R(x0 + nx * 7), R(y0 + ny * 7), R(x1 + nx * 4), R(y1 + ny * 4), "~")
-    for (const t of [0.35, 0.6, 0.85]) c.circ(R(x0 + (x1 - x0) * t), R(y0 + (y1 - y0) * t), 1, "0")
-  }
-  // the hub: padded, its badge in red
-  c.ellipse(WHEEL.x, WHEEL.y, 17, 12, "0"); c.ellipse(WHEEL.x, WHEEL.y, 16, 11, "-"); c.ellipse(WHEEL.x, WHEEL.y - 2, 13, 8, "="); c.ellipse(WHEEL.x - 3, WHEEL.y - 5, 6, 2, "~")
-  c.ellipse(WHEEL.x, WHEEL.y - 2, 4, 3, "("); c.px(WHEEL.x - 1, WHEEL.y - 4, "@")
-  // the rim, leather: lit along its top and toward the sun, dark under, outlined; the mark at the top
-  for (let i = 0; i < 900; i++) {
-    const a = (i / 900) * TAU, t = rimT(a), [x, y] = onRim(a, -1), [xi, yi] = onRim(a, t + 1)
-    c.line(R(x), R(y), R(xi), R(yi), "0")
-  }
-  for (let i = 0; i < 900; i++) {
-    const a = (i / 900) * TAU, t = rimT(a), [x, y] = onRim(a), [xi, yi] = onRim(a, t), up = Math.sin(a)
-    c.line(R(x), R(y), R(xi), R(yi), up > 0.2 ? "=" : "-")
-    if (up > 0.1) { const [xl, yl] = onRim(a, 1.5); c.px(R(xl), R(yl), up > 0.55 ? "^" : "~") }
-    if (up > 0.35 && Math.cos(a) < -0.2) { const [xl, yl] = onRim(a, 0.5); c.px(R(xl), R(yl), "%") }
-  }
-  for (let i = -4; i <= 4; i++) { const a = Math.PI / 2 - turn + i * 0.014, [x, y] = onRim(a), [xi, yi] = onRim(a, rimT(a)); c.line(R(x), R(y), R(xi), R(yi), i === 0 ? "@" : "(") }
+  // the wheel in 3D, lit as the cockpit is, its stitching and badge over it
+  render3d(c, wheelFaces(turn), WHEEL_MATS); wheelDetails(c, turn)
   // the arms: each forearm from its corner up to the wrist, then the hand on the rim (all its parts
   // outlined first and filled after, so they read as one glove, a crease between the fingers), then
   // the knit cuff over the join
@@ -698,8 +674,6 @@ function needles(c, f) {
     const v = g.kind === "revs" ? rev : g.kind === "speed" ? kmh / 280 : 0.62, a = Math.PI * (1.25 - 1.5 * v), R = Math.round
     c.line(R(g.x), R(g.y), R(g.x + Math.cos(a) * g.rp * 0.82), R(g.y - Math.sin(a) * g.rp * 0.82), "["); c.px(R(g.x), R(g.y), "~")
   }
-  const t = GAUGES[1]
-  c.text(Math.round(t.x) - 5, Math.round(t.y + t.rp * 0.3), String(Math.round(kmh)), ")")
 }
 // the ribbons tied to the mirror: they hang and swing against the turn
 function ribbons(c, f) {

@@ -32,7 +32,8 @@ function model() {
   return { faces, face, strip, loft, box }
 }
 // draws a model: depth per pixel, the nearest face's tone, lines at its edges. MATS: per material its
-// tones dark to light, and the key of its outline
+// tones dark to light, the key of its outline, `top` for its lit top edge, `smooth` for a round surface
+// (no crease between its faces)
 function render3d(c, faces, MATS, x0 = 0, y0 = 0) {
   const n = W * H, depth = new Float32Array(n).fill(1e9), who = new Int32Array(n).fill(-1)
   faces.forEach((F, k) => {
@@ -76,13 +77,13 @@ function render3d(c, faces, MATS, x0 = 0, y0 = 0) {
       if (k2 < 0 || depth[j] > depth[i] * 1.06) { line = M.edge; break }
       const F2 = faces[k2]
       if (F2.mat !== F.mat && depth[j] >= depth[i]) line = line ?? M.edge
-      else if (F2.mat === F.mat && F.n[0] * F2.n[0] + F.n[1] * F2.n[1] + F.n[2] * F2.n[2] < 0.82 && depth[j] >= depth[i]) line = line ?? M.ramp[0]
+      else if (F2.mat === F.mat && !M.smooth && F.n[0] * F2.n[0] + F.n[1] * F2.n[1] + F.n[2] * F2.n[2] < 0.82 && depth[j] >= depth[i]) line = line ?? M.ramp[0]
     }
     const r = M.ramp, lv = Math.max(0, Math.min(r.length - 1, Math.floor(F.light * r.length + (bayer(x, y) - 0.5) * (M.dither ?? 0))))
     // the top edge of a surface, just under its outline, catches the light: a step lighter
     const up1 = y > 0 ? who[i - W] : -1, up2 = y > 1 ? who[i - 2 * W] : -1
     const rim = !line && up1 === k && (up2 < 0 || (up2 !== k && depth[i - 2 * W] > depth[i] * 1.06)) && F.n[1] > -0.3
-    const tw = M.weave && !line && !rim && (x + y * 2) % 5 === 0 ? -1 : 0                // cloth: a twill a shade darker
+    const tw = M.weave && !line && !rim && (x + y * 2) % 7 === 0 ? -1 : 0                // cloth: a twill a shade darker
     c.px(x + x0, y + y0, line ?? (rim ? M.top ?? r[Math.min(r.length - 1, lv + 1)] : r[Math.max(0, lv + tw)]))
   }
   return { depth, who }
@@ -123,7 +124,14 @@ const COCKPIT = (() => {
   loft("dash", [[[-0.26, -0.27, 0.69], [-0.24, -0.36, 0.7], [-0.24, -0.6, 0.73]], [[0.26, -0.27, 0.69], [0.24, -0.36, 0.7], [0.24, -0.6, 0.73]]])
   // the left door: its sill under the side glass, the panel, the armrest
   loft("door", [[[-0.5, -0.135, 1.0], [-0.42, -0.14, 1.0], [-0.41, -0.2, 1.0], [-0.41, -0.75, 0.98]], [[-0.5, -0.135, 0.2], [-0.42, -0.14, 0.2], [-0.41, -0.2, 0.2], [-0.41, -0.75, 0.2]]])
+  loft("door", [[[-0.41, -0.185, 0.97], [-0.4, -0.19, 0.97], [-0.4, -0.205, 0.96]], [[-0.41, -0.185, 0.3], [-0.4, -0.19, 0.3], [-0.4, -0.205, 0.3]]])
   loft("cloth", [[[-0.407, -0.205, 0.95], [-0.407, -0.335, 0.93]], [[-0.407, -0.205, 0.3], [-0.407, -0.335, 0.3]]])
+  // the handle's cup, set into the cloth, and the chrome lever across it
+  loft("cup", [[[-0.406, -0.228, 0.7], [-0.418, -0.245, 0.69], [-0.406, -0.28, 0.7]], [[-0.406, -0.228, 0.53], [-0.418, -0.245, 0.535], [-0.406, -0.28, 0.53]]])
+  loft("chrome", [[[-0.404, -0.24, 0.68], [-0.394, -0.246, 0.68], [-0.404, -0.253, 0.68]], [[-0.404, -0.24, 0.56], [-0.394, -0.246, 0.56], [-0.404, -0.253, 0.56]]])
+  // the left mirror's foot: a black sail in the window's front corner, its adjusting lever
+  face("sail", [-0.49, -0.135, 0.98], [-0.47, -0.05, 0.96], [-0.47, -0.135, 0.86])
+  face("sail", [-0.47, -0.05, 0.96], [-0.455, -0.05, 0.955], [-0.455, -0.135, 0.86], [-0.47, -0.135, 0.86])
   loft("trim", [[[-0.41, -0.335, 0.7], [-0.36, -0.33, 0.7], [-0.34, -0.345, 0.69], [-0.34, -0.42, 0.69]], [[-0.41, -0.335, 0.2], [-0.36, -0.33, 0.2], [-0.34, -0.345, 0.2], [-0.34, -0.42, 0.2]]])
   // the left pillar, from the windshield's foot up to the roof, rounded on its inside
   const pil = (t) => { const a = [-0.5, COWL[0] + 0.005, 0.99], b = [-0.405, 0.165, 0.56]; return a.map((v, i) => v + (b[i] - v) * t) }
@@ -132,7 +140,7 @@ const COCKPIT = (() => {
   loft("liner", [[[-0.42, 0.165, 0.56], [-0.42, 0.18, 0.45]], [[1.0, 0.165, 0.56], [1.0, 0.18, 0.45]]])
   return m.faces
 })()
-const MATS_BIAS = { cloth: 0.38, trim: 0.12 }
+const MATS_BIAS = { cloth: 0.38, trim: 0.12, rim: 0.22, spoke: 0.14, hub: 0.1, chrome: 0.5 }
 const COCKPIT_MATS = {
   dash: { ramp: ["0", "-", "=", "~", "^"], edge: "0", top: "%" },
   stack: { ramp: ["0", "-", "=", "~", "^"], edge: "0" },
@@ -142,6 +150,9 @@ const COCKPIT_MATS = {
   door: { ramp: ["0", "-", "=", "~", "^"], edge: "0" },
   trim: { ramp: ["-", "=", "~", "^"], edge: "0" },
   cloth: { ramp: ["-", "=", "]", "}"], edge: "0", weave: true },
+  cup: { ramp: ["0", "0", "-"], edge: "0" },
+  chrome: { ramp: ["^", "W", "w"], edge: "0", smooth: true },
+  sail: { ramp: ["0", "-", "=", "~"], edge: "0", top: "^" },
   pillar: { ramp: ["0", "-", "=", "~"], edge: "0" },
   liner: { ramp: ["-", "=", "~", "^"], edge: "0" },
 }
@@ -176,14 +187,6 @@ sprite("_rocker", `
   0=-=0
   00000`)
 
-// the door's handle: a chrome lever in its dark recess, seen along the door
-sprite("_handle", `
-  ...........00000.
-  ........000wwwW0.
-  .....000^WWWW^^0.
-  ...00^^^000000-0.
-  .00-=000.....00..
-  0--00............`)
 
 // ---------------------------------------------------------------- the details, where the camera puts them
 const seen = (p) => { const [x, y] = eye(p); return [x, y] }
@@ -269,7 +272,8 @@ function cockpitDetails(c) {
   put("_hazard", onStack(0.4, -0.262), 7, 7)
   const lcd = [onStack(0.355, -0.296), onStack(0.445, -0.296), onStack(0.445, -0.326), onStack(0.355, -0.326)].map(seen)
   fillPts(c, lcd, "0"); fillPts(c, lcd.map(([x, y], i) => [x + (i === 0 || i === 3 ? 1 : -1), y + (i < 2 ? 1 : -1)]), "-")
-  digits(c, "1:24", seen(onStack(0.362, -0.302)), seen(onStack(0.438, -0.302)), "y")
+  const [l0, l1] = [seen(onStack(0.355, -0.302)), seen(onStack(0.445, -0.302))], wide = l1[0] - l0[0], sl = (l1[1] - l0[1]) / wide, x0 = (wide - 18) / 2
+  digits(c, "18:24", [l0[0] + x0, l0[1] + x0 * sl], l1, "y")
   for (const x of [0.3, 0.4, 0.5]) put("_dial", onStack(x, -0.35), 11, 11)
   const radio = [onStack(0.27, -0.385), onStack(0.55, -0.385), onStack(0.55, -0.46), onStack(0.27, -0.46)].map(seen)
   fillPts(c, radio, "0"); fillPts(c, radio.map(([x, y], i) => [x + (i === 0 || i === 3 ? 1 : -1), y + (i < 2 ? 1 : -1)]), "~")
@@ -282,7 +286,6 @@ function cockpitDetails(c) {
   const pv = [[0.6, -0.245, 0.842], [0.72, -0.245, 0.852], [0.72, -0.295, 0.852], [0.6, -0.295, 0.842]].map(seen)
   fillPts(c, pv, "0"); for (let k = 1; k < 6; k++) lineAt(c, [0.605, -0.245 - k * 0.0085, 0.842], [0.715, -0.245 - k * 0.0085, 0.852], k % 2 ? "~" : "-")
   // the door: the handle in the cloth, the window switches on the armrest
-  put("_handle", [-0.406, -0.255, 0.62], 17, 6)
   for (const z of [0.6, 0.53]) put("_rocker", [-0.36, -0.332, z], 5, 4)
   // a lighter cap along the door under the sill
   lineAt(c, [-0.409, -0.155, 0.98], [-0.409, -0.155, 0.3], "~"); lineAt(c, [-0.409, -0.162, 0.98], [-0.409, -0.162, 0.3], "=")
@@ -313,10 +316,87 @@ function cockpitDetails(c) {
   // the rear-view mirror: housing, stem, the glass left empty for the mirror's own view
   c.rect(156, 0, 8, 4, "-"); c.rect(125, 3, 70, 16, "0"); c.rect(126, 4, 68, 14, "-"); c.hline(127, 4, 66, "~")
   c.rect(128, 5, MW + 2, MH + 2, "0"); c.rect(129, 6, MW, MH, "_")
-  // the left mirror out past the side glass: a dark housing, the sunset in the glass
-  c.poly([0, 84, 25, 83, 30, 95, 27, 103, 0, 104], "-")
-  c.poly([0, 86, 23, 85, 27, 95, 24, 101, 0, 102], "6"); c.poly([0, 90, 25, 89, 27, 95, 24, 101, 0, 102], "5"); c.poly([0, 96, 26, 96, 24, 101, 0, 102], "a")
-  c.line(4, 87, 14, 86, "8"); c.line(25, 83, 30, 95, "~")
+  // the left mirror, out past the side glass by the window's front corner: its foot there (a black
+  // sail with its adjusting lever), a short arm, the housing round the glass, the sunset in the glass
+  c.poly([48, 99, 60, 96, 62, 104, 50, 105], "0"); c.poly([49, 100, 59, 97, 60, 103, 51, 104], "-"); c.line(50, 100, 59, 97, "~")
+  const [lx, ly] = seen([-0.462, -0.115, 0.9]); c.rect(Math.round(lx) - 1, Math.round(ly) - 1, 3, 2, "^"); c.px(Math.round(lx) - 1, Math.round(ly) - 1, "W")
+  c.poly([14, 86, 20, 82, 44, 81, 48, 86, 47, 100, 42, 104, 18, 105, 13, 100], "0")
+  c.poly([15, 87, 20, 83, 43, 82, 47, 87, 46, 99, 42, 103, 18, 104, 14, 99], "-")
+  c.poly([17, 88, 21, 85, 42, 84, 44, 88, 44, 98, 41, 101, 19, 102, 16, 98], "6")
+  c.poly([16, 92, 44, 91, 44, 98, 41, 101, 19, 102, 16, 98], "5"); c.poly([16, 97, 44, 96, 41, 101, 19, 102, 16, 98], "a")
+  c.line(19, 87, 30, 86, "8"); c.line(44, 84, 47, 88, "~"); c.line(20, 82, 43, 81, "~")
 }
 
 sprite("_cockpit", { w: W, h: H }, (c) => { render3d(c, COCKPIT, COCKPIT_MATS); cockpitDetails(c) })
+
+// ---------------------------------------------------------------- the steering wheel
+// After the wheel of the later A80s: a leather rim round as a tube, three spokes dished back to a
+// padded hub with its badge, the column behind going down into the dash with the stalks for the
+// lights and the wipers either side. Fitted so its rim falls where the hands were set on it: 0.62 m
+// out toward the picture's (160, 140), leaning back 55°, 15 cm round its outside. It turns: the
+// spokes and the mark at the top go round with it, the column stays.
+const lookAt = (sx, sy) => { const k = -(sy - H / 2) / CAM.f; return unit3([(sx - W / 2) / CAM.f, k * CP - SP, k * SP + CP]) }
+const WHEEL3 = (() => {
+  const t = (55 * Math.PI) / 180, C = lookAt(160, 140).map((v) => v * 0.62)
+  return { C, U: [1, 0, 0], V: [0, Math.cos(t), Math.sin(t)], N: [0, Math.sin(t), -Math.cos(t)], R: 0.15, RHO: 0.014, PX: eye(C)[2] / CAM.f }
+})()
+const rimDir = (a) => add3(add3([0, 0, 0], WHEEL3.U, Math.cos(a)), WHEEL3.V, Math.sin(a))
+// a point on the wheel's face, `inset` px in from the rim's outside, and the rim's middle line
+const onRim = (a, inset = 0) => seen(add3(WHEEL3.C, rimDir(a), WHEEL3.R - inset * WHEEL3.PX))
+const rimMid = (a) => seen(add3(add3(WHEEL3.C, rimDir(a), WHEEL3.R - WHEEL3.RHO), WHEEL3.N, WHEEL3.RHO * 0.5))
+function wheelFaces(turn) {
+  const m = model(), { face } = m, { C, U, V, N, R, RHO } = WHEEL3, RC = R - RHO
+  const at3 = (a, r, n) => add3(add3(C, rimDir(a), r), N, n)
+  // the rim: a tube right round, the mark at its top going round with it
+  const K = 64, J = 8
+  for (let i = 0; i < K; i++) for (let j = 0; j < J; j++) {
+    const a0 = (TAU * i) / K, a1 = (TAU * (i + 1)) / K, p0 = (TAU * j) / J, p1 = (TAU * (j + 1)) / J
+    const own = ((a0 + a1) / 2 + turn - Math.PI / 2 + 3 * TAU) % TAU, mark = own < 0.07 || own > TAU - 0.07
+    const q = (a, p) => at3(a, RC + RHO * Math.cos(p), RHO * Math.sin(p))
+    face(mark ? "marker" : "rim", q(a0, p0), q(a1, p0), q(a1, p1), q(a0, p1))
+  }
+  // three spokes from the hub, set back, out to the rim's inside
+  for (const [own, w] of [[Math.PI + 0.15, 0.04], [-0.15, 0.04], [-Math.PI / 2, 0.05]]) {
+    const a = own - turn, side = add3(add3([0, 0, 0], U, -Math.sin(a)), V, Math.cos(a))
+    const sec = (r, n, ww) => [-1, 1].flatMap((s) => [add3(at3(a, r, n), side, s * ww)])
+    const A = sec(0.055, -0.026, w * 0.95), B = sec(RC - RHO * 0.5, -0.002, w * 0.7)
+    const up = (p) => add3(p, N, 0.006), dn = (p) => add3(p, N, -0.006)
+    face("spoke", up(A[0]), up(A[1]), up(B[1]), up(B[0])); face("spoke", dn(A[0]), dn(A[1]), dn(B[1]), dn(B[0]))
+    face("spoke", up(A[0]), up(B[0]), dn(B[0]), dn(A[0])); face("spoke", up(A[1]), up(B[1]), dn(B[1]), dn(A[1]))
+  }
+  // the hub: a padded boss, its face domed toward the driver
+  const hub = add3(C, N, -0.03), rings = [[0.068, 0], [0.066, 0.012], [0.058, 0.022], [0.034, 0.029], [0.001, 0.03]], S = 20
+  for (let k = 0; k + 1 < rings.length; k++) for (let i = 0; i < S; i++) {
+    const p = (r, n, t) => add3(add3(hub, rimDir((TAU * t) / S), r), N, n), [r0, n0] = rings[k], [r1, n1] = rings[k + 1]
+    face("hub", p(r0, n0, i), p(r0, n0, i + 1), p(r1, n1, i + 1), p(r1, n1, i))
+  }
+  // the column, into the dash, and its stalks either side
+  const col = (t, du, dv) => add3(add3(add3(C, N, -0.04 - t), U, du), V, dv - 0.02)
+  for (const [a, b] of [[[-1, 1], [1, 1]], [[1, 1], [1, -1]], [[1, -1], [-1, -1]], [[-1, -1], [-1, 1]]])
+    face("column", col(0, a[0] * 0.045, a[1] * 0.035), col(0, b[0] * 0.045, b[1] * 0.035), col(0.3, b[0] * 0.05, b[1] * 0.04), col(0.3, a[0] * 0.05, a[1] * 0.04))
+  for (const s of [-1, 1]) {
+    const p0 = col(0.06, s * 0.045, 0.005), p1 = add3(add3(p0, U, s * 0.085), N, 0.03), w = 0.006
+    for (const [du, dn] of [[[0, 1], [0, 1]]]) void du, void dn
+    face("stalk", add3(p0, V, w), add3(p1, V, w), add3(p1, V, -w), add3(p0, V, -w))
+    face("stalk", add3(p0, N, w), add3(p1, N, w), add3(p1, N, -w), add3(p0, N, -w))
+  }
+  return m.faces
+}
+const WHEEL_MATS = {
+  rim: { ramp: ["0", "-", "=", "~", "^"], edge: "0", top: "%", smooth: true },
+  marker: { ramp: ["&", "{", "(", "["], edge: "0", smooth: true },
+  spoke: { ramp: ["0", "-", "=", "~", "^"], edge: "0" },
+  hub: { ramp: ["0", "-", "=", "~"], edge: "0", top: "^", smooth: true },
+  column: { ramp: ["0", "0", "-", "="], edge: "0" },
+  stalk: { ramp: ["0", "-", "=", "^"], edge: "0", top: "W" },
+}
+// over it: the red stitching along the rim's inside, the badge on the hub
+function wheelDetails(c, turn) {
+  const R = Math.round, { C, N, R: RR, RHO } = WHEEL3
+  for (let i = 0; i < 90; i++) {
+    const a = (TAU * i) / 90, [x, y] = seen(add3(add3(C, rimDir(a), RR - RHO * 1.75), N, RHO * 0.75))
+    if (i % 3 === 0) c.px(R(x), R(y), "&")
+  }
+  const [bx, by] = seen(add3(C, N, -0.002))
+  c.ellipse(R(bx), R(by) - 1, 5, 4, "0"); c.ellipse(R(bx), R(by) - 1, 4, 3, "("); c.ellipse(R(bx), R(by) - 1, 2, 1, "["); c.px(R(bx) - 2, R(by) - 3, "@")
+}
