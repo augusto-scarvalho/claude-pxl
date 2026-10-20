@@ -169,7 +169,17 @@ function ground(f) {
     if (u < BEACH) return u > BEACH - 0.6 && hash(Math.floor(along / 2), 3) < 0.6 ? "o" : (Math.floor(along / 6) % 2 ? "b" : "B")
     if (u < RAIL_U) return "x"
     if (u > FOREST) return "x"
-    if (u > SHOULDER) return Math.floor(along / 16) % 2 ? "v" : "V"
+    if (u > SHOULDER) {
+      // the verge: grass in clumps of two greens, the forest's shade along its foot; near us its blades
+      // (a dark stroke, a tip warm in the sun) and a few flowers
+      const clumpy = hash(Math.floor(u * 1.4), Math.floor(along * 1.1)), fine = hash(Math.floor(u * 9), Math.floor(along * 7))
+      if (u > FOREST - 1.3) return clumpy < 0.6 ? "x" : "F"
+      if (z < 28 && fine < 0.012) return ":"
+      if (z < 28 && fine > 0.99) return "y"
+      if (z < 18 && fine < 0.13) return "x"
+      if (z < 18 && fine > 0.9) return "H"
+      return (Math.floor(along / 16) % 2 ? clumpy > 0.35 : clumpy > 0.65) ? "V" : "v"
+    }
     // the asphalt, the paint and the studs
     if (Math.abs(Math.abs(u) - EDGE) < wide) return far ? "W" : "w"
     if (Math.abs(u) > EDGE) return "a"
@@ -189,55 +199,35 @@ const PALMS = Array.from({ length: 14 }, (_, i) => ({ p: i * 48 + 9 + hash(i, 5)
 const POLES = Array.from({ length: 12 }, (_, i) => ({ p: i * 56 + 30, u: 6 }))
 const CHEVRONS = [100, 112, 124, 136, 420, 432, 444].map((p) => ({ p }))
 const SIGN = { p: 300, u: 6.4 }
-// a palm in meters: a curving trunk and fronds drooping from its crown
-function palm(c, it, f) {
+// a palm: where its foot and top are on the road's ground, and how big it is there (null when out of
+// the picture); drawn by hand after the things in meters, far to near
+function palmAt(it, f) {
   const d = along(it.p, f)
-  if (d < 2 || d > 260) return []
-  const base = [cx(it.u, d, f), d], top = [base[0] + it.lean, d], shapes = [], { stick } = solid
-  shapes.push(stick([base[0], d, 0], [base[0] + it.lean * 0.3, d, it.tall * 0.5], 0.18, "B"), stick([base[0] + it.lean * 0.3, d, it.tall * 0.5], [top[0], d, it.tall], 0.15, "B"))
-  // the fronds: long leaves arching out and drooping, each a flat blade from the crown to its tip
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * TAU + it.seed, dx = Math.cos(a), dz = Math.sin(a) * 0.7, side = [-dz * 0.45, dx * 0.45]
-    const mid = [top[0] + dx * 1.8, d + dz * 1.8, it.tall + 0.5], tip = [top[0] + dx * 3.6, d + dz * 3.6, it.tall - 1.4]
-    shapes.push(solid.poly([[top[0], d, it.tall], [mid[0] + side[0], mid[1] + side[1], mid[2]], tip, [mid[0] - side[0], mid[1] - side[1], mid[2] - 0.2]], dx < 0 ? "V" : "v"))
-  }
-  return shapes
+  if (d < 2 || d > 260) return null
+  const bx = cx(it.u, d, f), sc = P.scale(d, bx)
+  return { d, base: P.ground(bx, d, 0), top: P.ground(bx + it.lean, d, it.tall), sc, seed: it.seed }
 }
 function pole(it, f) {
   const d = along(it.p, f)
   if (d < 2 || d > 260) return []
   const x = cx(it.u, d, f), arm = cx(it.u - 2.2, d, f), { stick, box } = solid
-  return [stick([x, d, 0], [x, d, 9], 0.09, "n"), stick([x, d, 9], [arm, d, 9.3], 0.06, "n"), box([arm - 0.4, d - 0.15, arm + 0.1, d + 0.15, 9.0, 9.25], { top: "n", lit: "l", shade: "l", under: "l" })]
+  const g = { ghost: true }
+  return [stick([x, d, 0], [x, d, 9], 0.09, "n", g), stick([x, d, 9], [arm, d, 9.3], 0.06, "n", g), box([arm - 0.4, d - 0.15, arm + 0.1, d + 0.15, 9.0, 9.25], { top: "n", lit: "l", shade: "l", under: "l" }, g)]
 }
 function chevron(it, f) {
   const d = along(it.p, f)
   if (d < 2 || d > 200) return []
   // on the outside of the bend
   const side = kappa(f) >= 0 ? -1 : 1, x = cx(side * 5.2, d, f), { stick, box } = solid
-  return [stick([x, d, 0], [x, d, 1.2], 0.04, "p"), box([x - 0.35, d, x + 0.35, d + 0.05, 1.2, 1.75], { lit: "Z", shade: "Z", top: "k" })]
-}
-// a chevron's black arrow on its board, pointing round the bend
-function chevronArrow(c, it, f) {
-  const d = along(it.p, f)
-  if (d < 2 || d > 120) return
-  const side = kappa(f) >= 0 ? -1 : 1, x = cx(side * 5.2, d, f), dir = -side, sc = P.scale(d, x)
-  const pts = [[-0.15 * dir, 1.68], [0.15 * dir, 1.475], [-0.15 * dir, 1.27]].map(([u, h]) => at(x + u, d - 0.01, h))
-  const wd = Math.max(1, Math.round(0.09 * sc))
-  c.line(...pts[0], ...pts[1], "k", wd); c.line(...pts[1], ...pts[2], "k", wd)
-}
-// the road sign's border and words once it is near enough to read
-function signWords(c, f) {
-  const d = along(SIGN.p, f), x = cx(SIGN.u, d, f), sc = P.scale(d, x)
-  if (d < 2 || d > 240 || sc < 5) return
-  const [x0, y0] = at(x - 1.5, d - 0.01, 3.7), [x1, y1] = at(x + 1.5, d - 0.01, 2.3)
-  c.box(x0, y0, x1 - x0, y1 - y0, "w")
-  if (sc > 14) { const sz = Math.max(1, Math.floor(sc / 16)); c.text(Math.round((x0 + x1) / 2), y0 + 2 * sz, "PARATY", "w", { scale: sz, align: "c" }); c.text(Math.round((x0 + x1) / 2), y0 + 9 * sz, "18 km", "w", { scale: sz, align: "c" }) }
+  const g = { ghost: true }
+  return [stick([x, d, 0], [x, d, 1.2], 0.04, "p", g), box([x - 0.35, d, x + 0.35, d + 0.05, 1.2, 1.75], { lit: "Z", shade: "Z", top: "k" }, g)]
 }
 function sign(f) {
   const d = along(SIGN.p, f)
   if (d < 2 || d > 240) return []
   const x = cx(SIGN.u, d, f), { stick, box } = solid
-  return [stick([x - 1.2, d, 0], [x - 1.2, d, 2.2], 0.05, "n"), stick([x + 1.2, d, 0], [x + 1.2, d, 2.2], 0.05, "n"), box([x - 1.6, d, x + 1.6, d + 0.08, 2.2, 3.8], { lit: "E", shade: "E", top: "E" })]
+  const g = { ghost: true }
+  return [stick([x - 1.2, d, 0], [x - 1.2, d, 2.2], 0.05, "n", g), stick([x + 1.2, d, 0], [x + 1.2, d, 2.2], 0.05, "n", g), box([x - 1.6, d, x + 1.6, d + 0.08, 2.2, 3.8], { lit: "E", shade: "E", top: "E" }, g)]
 }
 
 // ---------------------------------------------------------------- the rivals
@@ -486,15 +476,17 @@ function carInPerspective(c, r, z, f, bob) {
   fill([[0.1, 0.74, S(0.95)], [1.25, 0.78, S(0.95)], [2.9, 0.7, S(0.95)], [3.7, 0.62, S(0.95)], [3.7, 0.66, S(0.7)], [2.9, 0.79, S(0.71)], [1.25, 0.83, S(0.73)], [0.1, 0.8, S(0.75)]], high)
   fill([[0, 0.74, -0.95], [0, 0.74, 0.95], [1.1, 0.8, 0.95], [1.1, 0.8, -0.95]], ramp[2])
   for (let k = 1; k < 6; k++) line([0.1 + k * 0.16, 0.755 + k * 0.008, -0.6], [0.1 + k * 0.16, 0.755 + k * 0.008, 0.6], ramp[1])
-  // the glasshouse: its side set in, the glass with the sky in it, the roof's edge; its back window
+  // the glasshouse, set in from the sides, its pillars in the paint as on the car: the side glass with
+  // the sky in it, the roof's rail along its top; at its back the rear window between the buttresses
   const cab = (pts, k) => fill(pts.map(([u, h]) => [u, h, S(0.71)]), k)
-  cab([[1.05, 0.81], [1.55, 1.13], [2.75, 1.14], [3.3, 0.8]], "0")
-  cab([[1.18, 0.83], [1.6, 1.1], [2.72, 1.11], [3.18, 0.82]], "z")
-  line([1.55, 1.13, S(0.71)], [2.75, 1.14, S(0.71)], high)
-  line([1.5, 0.9, S(0.71)], [1.9, 1.08, S(0.71)], "c"); line([1.9, 0.86, S(0.71)], [2.2, 1.0, S(0.71)], "C")
-  fill([[1.08, 0.8, -0.71], [1.08, 0.8, 0.71], [1.55, 1.13, 0.67], [1.55, 1.13, -0.67]], "0")
-  fill([[1.12, 0.82, -0.64], [1.12, 0.82, 0.64], [1.5, 1.1, 0.6], [1.5, 1.1, -0.6]], "z")
-  line([1.15, 0.86, -0.5], [1.45, 1.06, -0.2], "C")
+  cab([[1.05, 0.8], [1.55, 1.13], [2.75, 1.14], [3.3, 0.79]], body)
+  cab([[1.3, 0.84], [1.66, 1.09], [2.68, 1.1], [3.1, 0.82]], "z")
+  line([1.5, 1.13, S(0.71)], [2.78, 1.14, S(0.71)], high)
+  line([1.62, 0.92, S(0.71)], [1.9, 1.06, S(0.71)], "c"); line([1.95, 0.88, S(0.71)], [2.2, 1.0, S(0.71)], "C")
+  fill([[1.06, 0.8, -0.72], [1.06, 0.8, 0.72], [1.55, 1.13, 0.68], [1.55, 1.13, -0.68]], ramp[2])
+  fill([[1.12, 0.83, -0.56], [1.12, 0.83, 0.56], [1.5, 1.1, 0.52], [1.5, 1.1, -0.52]], "z")
+  line([1.15, 0.87, -0.42], [1.42, 1.06, -0.18], "C")
+  line([1.55, 1.13, -0.68], [1.55, 1.13, 0.68], high)
   // the wheels on the side we see: arch, tyre, the rim and its five spokes, the hub
   for (const wu of WHEELS) {
     const ring = (rr, n = 20) => Array.from({ length: n }, (_, i) => { const t = (TAU * i) / n; return [wu + rr * Math.cos(t), 0.32 + rr * Math.sin(t), S(0.96)] })
@@ -524,10 +516,10 @@ function carInPerspective(c, r, z, f, bob) {
   for (const o of [-0.6, -0.3, 0.3, 0.6]) line([0, 0.19, o], [0, 0.26, o], "-")
   for (const sd of [-1, 1]) { const ring = (rr) => Array.from({ length: 12 }, (_, i) => { const t = (TAU * i) / 12; return [0, 0.25 + rr * Math.sin(t), sd * 0.35 + rr * Math.cos(t)] }); fill(ring(0.055), "0"); fill(ring(0.035), "~") }
   for (const sd of [-1, 1]) back([[sd * 0.95, 0], [sd * 0.95, 0.19], [sd * 0.7, 0.19], [sd * 0.7, 0]], "0")
-  // the wing over the tail on its end plates
-  for (const sd of [-1, 1]) fill([[0.12, 0.76, sd * 0.85], [0.12, 0.93, sd * 0.85], [0.35, 0.93, sd * 0.85], [0.35, 0.78, sd * 0.85]], "0")
-  fill([[0.08, 0.93, -0.92], [0.08, 0.93, 0.92], [0.4, 0.96, 0.92], [0.4, 0.96, -0.92]], "0")
-  fill([[0.1, 0.94, -0.9], [0.1, 0.94, 0.9], [0.38, 0.955, 0.9], [0.38, 0.955, -0.9]], high)
+  // the wing over the tail on its end plates, in the paint, its top in the light
+  for (const sd of [-1, 1]) fill([[0.14, 0.76, sd * 0.78], [0.14, 0.92, sd * 0.78], [0.33, 0.92, sd * 0.78], [0.33, 0.78, sd * 0.78]], ramp[1])
+  fill([[0.1, 0.92, -0.86], [0.1, 0.92, 0.86], [0.38, 0.95, 0.86], [0.38, 0.95, -0.86]], ramp[1])
+  line([0.1, 0.925, -0.86], [0.1, 0.925, 0.86], ramp[3])
   // the blue one's white stripes, down its middle over the tail
   if (r.color === "b") for (const o of [-0.16, 0.08]) {
     fill([[0, 0.745, o], [0, 0.745, o + 0.08], [1.1, 0.805, o + 0.08], [1.1, 0.805, o]], "w")
@@ -541,12 +533,276 @@ function backfire(c, sx, sy, w, r, f) {
   for (const side of [-1, 1]) c.flame(Math.round(sx + side * 0.15 * w), Math.round(sy - 0.19 * 0.56 * w), Math.max(3, 0.3 * w), "98767", { seed: 4 + side, frame: t, wind: 0 })
 }
 
+// Foliage as a pixel artist builds it, in the dusk: clumps of leaves, each a dark body with its cap
+// toward the low sun (ahead and to the left) a tone lighter, its shadow cast down to the right over
+// what is behind it, a few leaves' gaps and glints speckling the big ones; the sun's warm rim only
+// where a clump's edge shows against the sky; on the forest's face, which the low sun grazes, some clumps
+// lit a tone more with their left edge warm. Those lower and nearer are drawn over those behind.
+const LEAVES = new Set(["F", "f", "x", "v", "H", "P"])
+function clump(c, x, y, rc, seed, rim = true, glint = false) {
+  const R = Math.round, rx = Math.max(1, R(rc)), ry = Math.max(1, R(rc * 0.82)), kx = R(x), ky = R(y)
+  if (rc > 1.5) c.ellipse(R(x + rc * 0.25), R(y + rc * 0.3), rx, ry, "F")          // its shadow on what is behind
+  c.ellipse(kx, ky, rx, ry, "f")
+  if (rc > 2.2) c.ellipse(R(x - rc * 0.25), R(y - rc * 0.3), Math.max(1, R(rc * 0.55)), Math.max(1, R(rc * 0.4)), glint ? "v" : "x")
+  // a face the low sun grazes: its left edge warm
+  if (glint && rc > 2.2) for (let t = 2.5; t < 3.9; t += 0.7 / rc) c.px(R(x + Math.cos(t) * rc * 0.92), R(y + Math.sin(t) * rc * 0.75), hash(R(t * 10), seed) < 0.6 ? "H" : "V")
+  if (rc > 4) for (let i = 0; i < rc * 1.4; i++) {
+    const a = hash(seed + i, kx) * TAU, d = hash(ky, seed + i) * rc * 0.85
+    c.px(R(x + Math.cos(a) * d), R(y + Math.sin(a) * d * 0.8), i % 4 ? "F" : "v")
+  }
+  if (rim) for (let t = 3.0; t < 4.8; t += 0.5 / Math.max(1, rc)) {
+    const px = R(x + Math.cos(t) * rc), py = R(y + Math.sin(t) * rc * 0.82)
+    if (!LEAVES.has(c.key(px - 1, py - 1)) || !LEAVES.has(c.key(px - 1, py))) c.px(px, py, "H")
+  }
+}
+// a tree's crown: a handful of clumps in a dome; far off, one dark lump with its rim
+function crown(c, x, y, r, seed) {
+  const n = Math.max(1, Math.min(14, Math.round(r / 2)))
+  const clumps = Array.from({ length: n }, (_, i) => {
+    const a = hash(seed, i * 3) * TAU, d = n > 1 ? Math.sqrt(hash(seed, i * 3 + 1)) * 0.6 : 0
+    return { x: x + Math.cos(a) * d * r, y: y + Math.sin(a) * d * r * 0.75, rc: n > 1 ? r * (0.34 + 0.2 * hash(seed, i * 3 + 2)) : r }
+  }).sort((p, q) => p.y - q.y)
+  for (const k of clumps) clump(c, k.x, k.y, k.rc, seed + Math.round(k.x))
+}
+
+// ---------------------------------------------------------------- trees, palms, big leaves, tall grass
+// Drawn in code after the tropical example's trees, palm and big leaves (free pixel art there:
+// "[LPC] Jungle" and Sevarihk's palm), studied for how they are built, in the evening's colours:
+// a tree's trunk twisting up from a flared foot and splitting into branches; its crown a dark mass
+// heaped with clumps, each lit on its upper left, mid below, dark under, deep shade between them, its
+// outline lumpy, the warm rim of the low sun where it shows against the sky. A palm's ringed trunk
+// curving up; its fronds broad and drooping, lit on top, dark under, their edges cut by the leaflets.
+// A banana's paddle leaves round a midrib, torn at the edges.
+function tree(c, x, y, h, seed) {
+  const R = Math.round
+  if (h < 7) { crown(c, x, y - h * 0.62, h * 0.38, seed); return }
+  const lean = (hash(seed, 1) - 0.5) * h * 0.14, base = h * 0.045, split = y - h * 0.5
+  // the trunk, flared at its foot, its left edge in the light, bark lines down it
+  for (let yy = R(y); yy >= R(split); yy--) {
+    const t = (y - yy) / (y - split), xx = x + lean * t * t, w = Math.max(0.6, base * (1.25 - 0.45 * t) + (t < 0.12 ? base * (0.12 - t) * 9 : 0))
+    c.hline(R(xx - w), yy, Math.max(1, R(2 * w)), "T")
+    c.px(R(xx - w), yy, "B")
+    if (w > 2 && (yy + seed) % 3 === 0) c.px(R(xx + (hash(seed, yy) - 0.3) * w), yy, "P")
+  }
+  // branches up into the crown
+  for (const sd of [-1, 1, 0]) {
+    const x0 = x + lean, x1 = x0 + sd * h * 0.2, y1 = split - h * (sd === 0 ? 0.22 : 0.14), w = Math.max(1, R(base * 0.8))
+    for (let k = 0; k < w; k++) c.line(R(x0 + k - w / 2), R(split), R(x1 + k - w / 2), R(y1), k === 0 ? "B" : "T")
+  }
+  // the crown: a dark mass, heaped with clumps (the upper ones first, the lower over them)
+  const cx0 = x + lean, cy = y - h * 0.7, cw = h * 0.4, chh = h * 0.3
+  c.ellipse(R(cx0), R(cy), R(cw), R(chh), "F")
+  const n = Math.max(6, Math.min(48, R(h / 2.2)))
+  const clumps = Array.from({ length: n }, (_, i) => {
+    const a = hash(seed, 10 + i) * TAU, d = Math.sqrt(hash(seed, 40 + i))
+    return { x: cx0 + Math.cos(a) * d * cw * 0.92, y: cy + Math.sin(a) * d * chh * 0.92, rc: h * (0.05 + 0.035 * hash(seed, 70 + i)) }
+  }).sort((p, q) => p.y - q.y)
+  for (const k of clumps) leafClump(c, k.x, k.y, k.rc, seed + R(k.x * 3), (k.y - cy) / chh)
+}
+// one clump of leaves: dark under, mid body, lit cap on its upper left with a few bright leaves, a
+// shade toward the bottom of the crown; the sun's warm rim where its edge shows against the sky
+function leafClump(c, x, y, rc, seed, low = 0) {
+  const R = Math.round, rx = Math.max(1, R(rc)), ry = Math.max(1, R(rc * 0.8))
+  c.ellipse(R(x + rc * 0.2), R(y + rc * 0.28), rx, ry, "F")
+  c.ellipse(R(x), R(y), rx, ry, low > 0.4 ? "x" : "f")
+  if (rc > 2) c.ellipse(R(x - rc * 0.22), R(y - rc * 0.26), Math.max(1, R(rc * 0.6)), Math.max(1, R(rc * 0.45)), low > 0.4 ? "f" : "v")
+  if (rc > 3.5) for (let i = 0; i < rc; i++) {
+    const a = 3.4 + hash(seed, i) * 1.6, d = rc * (0.35 + 0.4 * hash(i, seed))
+    c.px(R(x + Math.cos(a) * d * 0.7), R(y + Math.sin(a) * d * 0.6), i % 3 ? "V" : "F")
+  }
+  for (let t = 3.0; t < 4.8; t += 0.5 / Math.max(1, rc)) {
+    const px = R(x + Math.cos(t) * rc), py = R(y + Math.sin(t) * rc * 0.8)
+    if (!LEAVES.has(c.key(px - 1, py - 1)) || !LEAVES.has(c.key(px - 1, py))) c.px(px, py, "H")
+  }
+}
+// a palm's crown: broad fronds fanning from its top and drooping, the upper ones behind; each lit on
+// its top, dark under, its lower edge cut by the leaflets; the nuts at the heart
+function palmCrown(c, x, y, s, seed) {
+  const R = Math.round, n = 9, steps = Math.max(5, R(s / 1.2))
+  const fronds = Array.from({ length: n }, (_, i) => -Math.PI * (0.03 + (0.94 * i) / (n - 1)) + (hash(seed, i) - 0.5) * 0.3)
+  fronds.sort((a, b) => Math.abs(Math.sin(b)) - Math.abs(Math.sin(a)))
+  for (const [i, a] of fronds.entries()) {
+    const len = s * (0.8 + 0.3 * hash(seed, 20 + i)), droop = 0.6 + 0.3 * hash(seed, 40 + i), toSun = Math.cos(a) < 0
+    const at = (t) => [x + Math.cos(a) * len * t, y + Math.sin(a) * len * t + droop * len * t * t]
+    for (let k = 1; k <= steps; k++) {
+      const t = k / steps, [px, py] = at(t), [qx, qy] = at(t - 1 / steps), tx = px - qx, ty = py - qy, tl = Math.hypot(tx, ty) || 1
+      const wdt = len * 0.13 * Math.sin(Math.PI * Math.min(1, t * 1.15)) + 0.6, nx = -ty / tl, ny = tx / tl, up = ny < 0 ? 1 : -1
+      // the blade across the rib: its upper half lit, its lower half dark, a leaflet's notch now and then
+      for (let o = -wdt; o <= wdt; o += 0.5) {
+        const ex = R(px + nx * o), ey = R(py + ny * o), upper = o * up > 0, edge = Math.abs(o) > wdt - 0.7
+        if (edge && !upper && (k + i) % 2) continue
+        c.px(ex, ey, edge ? (upper && toSun ? "H" : "F") : upper ? (toSun ? "v" : "x") : "f")
+      }
+      c.line(R(qx), R(qy), R(px), R(py), toSun ? "V" : "x")
+    }
+  }
+  for (let k = 0; k < 5; k++) c.px(R(x + (hash(seed, 60 + k) - 0.5) * s * 0.12), R(y + 1 + hash(seed, 70 + k) * s * 0.07), "T")
+}
+// a palm's trunk: dark against the light, its left edge warm, the rings of its old leaves across it
+function palmTrunk(c, base, top, w) {
+  const R = Math.round, [bx, by] = base, [tx, ty] = top, L = Math.hypot(tx - bx, ty - by) || 1
+  for (let i = 0; i <= L; i++) {
+    const t = i / L, x = bx + (tx - bx) * t + Math.sin(t * Math.PI) * w * 1.5, y = by + (ty - by) * t, hw = Math.max(0.5, w * (1 - 0.35 * t))
+    c.hline(R(x - hw), R(y), Math.max(1, R(hw * 2)), "T")
+    // the rings: bands of old leaf bases, uneven, lit on the sun's side, a dark notch under each
+    const ring = Math.max(3, R(w * 1.6)), ph = (i + R(hash(Math.floor(i / ring), 9) * 2)) % ring
+    if (ph === 0) c.hline(R(x - hw), R(y), Math.max(1, R(hw * 2)), "P")
+    else if (ph === 1) c.hline(R(x - hw), R(y), Math.max(1, R(hw * 1.1)), "B")
+    c.px(R(x - hw), R(y), ph === 0 ? "B" : "H")
+  }
+}
+// a banana plant at the forest's foot: paddle leaves round their midribs, lit on top, torn at the edge
+function banana(c, x, y, h, seed) {
+  const R = Math.round
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI * (0.15 + 0.7 * hash(seed, i)), len = h * (0.55 + 0.35 * hash(seed, 10 + i)), wid = len * 0.22
+    const ax = Math.cos(a), ay = Math.sin(a), sx = x, sy = y - h * 0.25
+    for (let t = 0.15; t <= 1; t += 0.5 / Math.max(4, len)) {
+      const px = sx + ax * len * t, py = sy + ay * len * t + len * 0.35 * t * t, w = wid * Math.sin(Math.PI * t)
+      for (let o = -w; o <= w; o += 0.5) {
+        const ex = R(px - ay * o), ey = R(py + ax * o), torn = Math.abs(o) > w - 1 && hash(R(t * 40), seed + i) < 0.35
+        if (!torn) c.px(ex, ey, o < 0 ? "v" : "f")
+      }
+      c.px(R(px), R(py), "x")
+    }
+  }
+  c.line(R(x), R(y), R(x), R(y - h * 0.3), "x")
+}
+// tall grass and weeds in clumps, backlit by the low sun on the left: each blade dark, its sunward
+// edge glowing toward the tip; some carry a seed head; all bend with a gust that runs through them
+function tallGrass(c, u, d, f, seed) {
+  const x = cx(u, d, f), [gx, gy] = P.ground(x, d, 0), sc = P.scale(d, x), R = Math.round
+  if (sc < 2) return
+  const n = Math.max(4, Math.min(20, R(sc * 0.7))), k = (TAU * f) / FRAMES * 6
+  for (let i = 0; i < n; i++) {
+    const x0 = gx + (hash(seed, i) - 0.5) * sc * 1.1, h = (0.25 + 0.45 * hash(seed, 20 + i)) * sc
+    const lean = (hash(seed, 40 + i) - 0.45) * h * 0.9 + Math.sin(k - x0 * 0.15) * h * 0.12
+    let lx = null
+    for (let s = 0; s <= h; s++) {
+      const t = s / h, bx = R(x0 + lean * t ** 1.8), by = R(gy - s)
+      c.px(bx, by, t < 0.45 ? "F" : "x")
+      if (t > 0.6 && bx !== lx) c.px(bx - 1, by, t > 0.85 ? "H" : "v")
+      lx = bx
+    }
+    if (hash(seed, 60 + i) < 0.25 && h > 6) { const tx = R(x0 + lean), ty = R(gy - h); c.px(tx, ty - 1, "H"); c.px(tx - 1, ty, "b") }
+  }
+}
+
+// ---------------------------------------------------------------- lamp posts, chevrons, the sign
+// Their shapes in meters still throw the long shadows (ghosts: they cast, they are not drawn); each is
+// drawn by hand where the camera puts it. A lamp post tapers up, dark against the dusk with its sunward
+// edge lit, a swan neck carrying the lamp out over the road, its lens lit for the evening and its glow
+// round it. A chevron is a yellow board in a black rim on a grey post, its top edge catching the light,
+// a thick black arrow round the bend. The guide sign is green in a white rim on two posts, its lower
+// part a tone darker, the light along its top, the town and the distance on it.
+function lampPost(c, it, f) {
+  const d = along(it.p, f)
+  if (d < 2 || d > 260) return
+  const x = cx(it.u, d, f), arm = cx(it.u - 2.2, d, f), sc = P.scale(d, x), R = Math.round
+  const [bx, by] = P.ground(x, d, 0), [tx, ty] = P.ground(x, d, 8.7), w = Math.max(0.5, 0.11 * sc)
+  for (let y = R(ty); y <= R(by); y++) {
+    const t = (y - ty) / Math.max(1, by - ty), hw = w * (0.6 + 0.5 * t), xx = tx + (bx - tx) * t
+    c.hline(R(xx - hw), y, Math.max(1, R(hw * 2)), "p"); if (hw > 1) c.px(R(xx - hw), y, "R")
+  }
+  if (w > 1.5) { const [qx, qy] = P.ground(x, d, 0.5); c.rect(R(qx - w * 1.4), R(qy), R(w * 2.8), Math.max(1, R(by - qy)), "n"); c.hline(R(qx - w * 1.4), R(qy), R(w * 2.8), "R") }
+  // the swan neck: up from the top and round over the road
+  let prev = null
+  for (let k = 0; k <= 12; k++) {
+    const t = k / 12, u = x + (arm + 0.2 - x) * t * t, h = 8.7 + 0.8 * Math.sin(Math.PI * Math.min(1, t * 1.3)) * (1 - t * 0.4), pt = P.ground(u, d, h)
+    if (prev) { c.line(R(prev[0]), R(prev[1]), R(pt[0]), R(pt[1]), "p"); if (w > 1) c.line(R(prev[0]), R(prev[1]) - 1, R(pt[0]), R(pt[1]) - 1, "R") }
+    prev = pt
+  }
+  // the lamp: its head, the lens under it lit, the glow round it
+  const [lx, ly] = P.ground(arm, d, 9.25), lw = Math.max(1, 0.38 * sc), lh = Math.max(1, 0.13 * sc)
+  for (let y = -R(lw * 1.6); y <= R(lw * 1.6); y++) for (let xx = -R(lw * 2.2); xx <= R(lw * 2.2); xx++) {
+    const g = 1 - Math.hypot(xx / (lw * 2.2), y / (lw * 1.6))
+    if (g > 0 && bayer(R(lx) + xx, R(ly) + y) < g * g * 0.7) c.px(R(lx) + xx, R(ly) + y + R(lh), g > 0.6 ? "8" : "l")
+  }
+  c.ellipse(R(lx), R(ly), R(lw), R(lh), "n"); c.hline(R(lx - lw), R(ly) - R(lh), R(lw * 2), "R")
+  c.hline(R(lx - lw * 0.7), R(ly + lh * 0.5) + 1, Math.max(1, R(lw * 1.4)), "9")
+}
+function chevronSign(c, it, f) {
+  const d = along(it.p, f)
+  if (d < 2 || d > 200) return
+  const side = kappa(f) >= 0 ? -1 : 1, x = cx(side * 5.2, d, f), dir = -side, sc = P.scale(d, x), R = Math.round
+  const [px0, py0] = P.ground(x, d, 0), [, py1] = P.ground(x, d, 1.2), pw = Math.max(1, R(0.06 * sc))
+  c.rect(R(px0 - pw / 2), R(py1), pw, Math.max(1, R(py0 - py1)), "p"); if (pw > 1) c.line(R(px0 - pw / 2), R(py1), R(px0 - pw / 2), R(py0), "R")
+  const [ax, ay] = P.ground(x - 0.36, d, 1.76), [bx, by] = P.ground(x + 0.36, d, 1.18), bw = R(bx - ax), bh = R(by - ay)
+  c.rect(R(ax), R(ay), Math.max(1, bw), Math.max(1, bh), "k")
+  if (bw > 3 && bh > 3) {
+    c.rect(R(ax) + 1, R(ay) + 1, bw - 2, bh - 2, "Z"); c.hline(R(ax) + 1, R(ay) + 1, bw - 2, "t")
+    const pts = [[-0.17 * dir, 1.66], [0.13 * dir, 1.47], [-0.17 * dir, 1.28]].map(([u, h]) => P.ground(x + u, d - 0.01, h).map(R))
+    const wd = Math.max(1, R(0.1 * sc))
+    for (let k = 0; k < wd; k++) { c.line(pts[0][0] + k * dir, pts[0][1], pts[1][0] + k * dir, pts[1][1], "k"); c.line(pts[1][0] + k * dir, pts[1][1], pts[2][0] + k * dir, pts[2][1], "k") }
+  }
+}
+function guideSign(c, f) {
+  const d = along(SIGN.p, f)
+  if (d < 2 || d > 240) return
+  const x = cx(SIGN.u, d, f), sc = P.scale(d, x), R = Math.round
+  for (const o of [-1.2, 1.2]) {
+    const [px0, py0] = P.ground(x + o, d, 0), [, py1] = P.ground(x + o, d, 2.3), pw = Math.max(1, R(0.08 * sc))
+    c.rect(R(px0 - pw / 2), R(py1), pw, Math.max(1, R(py0 - py1)), "p"); if (pw > 1) c.line(R(px0 - pw / 2), R(py1), R(px0 - pw / 2), R(py0), "R")
+  }
+  const [x0, y0] = P.ground(x - 1.6, d, 3.8).map(R), [x1, y1] = P.ground(x + 1.6, d, 2.2).map(R)
+  c.rect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0), "E")
+  if (sc < 3) return
+  c.rect(x0, R(y0 + (y1 - y0) * 0.6), x1 - x0, R((y1 - y0) * 0.4), "D".length ? "E" : "E")
+  for (let yy = R(y0 + (y1 - y0) * 0.65); yy < y1; yy++) for (let xx = x0; xx < x1; xx++) if ((xx + yy) % 2 === 0) c.px(xx, yy, "x")
+  c.box(x0, y0, x1 - x0, y1 - y0, "k")
+  if (sc >= 5) c.box(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2, "w")
+  c.hline(x0 + 2, y0 + 2, Math.max(1, x1 - x0 - 4), "X")
+  if (sc > 14) {
+    const sz = Math.max(1, Math.floor(sc / 16)), mx = R((x0 + x1) / 2)
+    c.text(mx, y0 + 3 * sz, "PARATY", "w", { scale: sz, align: "c" }); c.text(mx, y0 + 10 * sz, "18 km", "w", { scale: sz, align: "c" })
+    c.line(mx + 14 * sz, y0 + 5 * sz, mx + 18 * sz, y0 + 5 * sz, "w"); c.line(mx + 16 * sz, y0 + 3 * sz, mx + 18 * sz, y0 + 5 * sz, "w"); c.line(mx + 16 * sz, y0 + 7 * sz, mx + 18 * sz, y0 + 5 * sz, "w")
+  }
+}
+
+// ---------------------------------------------------------------- the clouds
+// Sunset clouds on a strip that wraps round the sky and turns with us as the sun does: high puffy
+// banks, each a heap of rounded puffs with a flat base, their tops in the purple of the dusk and their
+// undersides lit from below by the sun under the horizon, gold near it and pink away from it, their
+// edges soft; long thin streaks low down, lit along their bottoms. The sun sits at the strip's x 525.
+const CLOUD_RAMP = ["2", "C", "3", "c", "5", "e", "7", "8"]
+sprite("_clouds", { w: FAR_W, h: 46, wrap: "x" }, (c) => {
+  const R = Math.round, SUNX = 525
+  const near = (x) => Math.max(0, 1 - Math.min(Math.abs(x - SUNX), FAR_W - Math.abs(x - SUNX)) / 260)
+  const puff = (px, py, rx, ry) => {
+    for (let y = R(py - ry); y <= R(py + ry); y++) for (let x = R(px - rx); x <= R(px + rx); x++) {
+      const nx = (x - px) / rx, ny = (y - py) / ry, r = nx * nx + ny * ny
+      if (r > 1) continue
+      const soft = r > 0.72 && ny < 0.3 && bayer(x, y) < (r - 0.72) * 3.5
+      if (soft) continue
+      const lit = (ny + 1) / 2 * 2.2 + near(x) * 3.6 + (bayer(x, y) - 0.5) * 0.9 + (ny > 0.55 ? 1 : 0)
+      c.px(((x % FAR_W) + FAR_W) % FAR_W, y, CLOUD_RAMP[Math.max(0, Math.min(7, Math.floor(lit)))])
+    }
+  }
+  // the banks: a row of puffs over a flat base, the middle ones higher
+  for (let i = 0; i < 9; i++) {
+    const cx0 = 40 + i * 107 + hash(i, 3) * 40, base = 14 + hash(i, 4) * 10, w = 22 + hash(i, 5) * 34, n = 4 + R(hash(i, 6) * 4)
+    for (let k = 0; k < n; k++) {
+      const t = (k + 0.5) / n, rx = w * (0.22 + 0.12 * hash(i, 10 + k)), ry = rx * 0.55
+      puff(cx0 + (t - 0.5) * w * 1.6, base - Math.sin(Math.PI * t) * w * 0.18 - ry * 0.4, rx, ry)
+    }
+    for (let x = R(cx0 - w * 0.8); x <= R(cx0 + w * 0.8); x++) c.px(((x % FAR_W) + FAR_W) % FAR_W, R(base), CLOUD_RAMP[Math.min(7, 4 + R(near(x) * 3))])
+  }
+  // the streaks low down, thin and long, lit along their bottoms
+  for (let i = 0; i < 14; i++) {
+    const x0 = hash(i, 30) * FAR_W, y0 = 33 + hash(i, 31) * 11, len = 30 + hash(i, 32) * 90
+    for (let x = R(x0); x < x0 + len; x++) {
+      const t = (x - x0) / len, th = Math.sin(Math.PI * t) * (1.2 + hash(i, 33) * 1.4)
+      for (let y = R(y0 - th); y <= R(y0); y++) c.px(((x % FAR_W) + FAR_W) % FAR_W, y, CLOUD_RAMP[Math.max(1, Math.min(7, R(2 + (y === R(y0) ? 2 : 0) + near(x) * 3.5)))])
+    }
+  }
+})
+
 // ---------------------------------------------------------------- the view through the glass
 const SUN = (f) => { const [sx, sz] = sunDir(f); return { from: [sx, sz], up: SUN_UP + 6 } }
 const SHADE = { a: "q", A: "q", q: "Q", w: "W", y: "Y", t: "Y", v: "x", V: "x", W: "q" }
 function view(c, f) {
   c.stamp("_sky", 0, 0)
-  c.clouds({ y: 26, gap: 70, w: 54, h: 10, n: 5, seed: 11, keys: "Cce", empty: [2], x: -Math.round(P.focal * heading(f)) })
+  c.scroll("_clouds", 8, 0, { x: Math.round(P.vp - FAR_W * 0.6 - P.focal * heading(f)) })
   sun(c, f)
   far(c, f)
   c.plane(P, ground(f))
@@ -557,6 +813,31 @@ function view(c, f) {
     const [x0, d0, h0] = wall[i], [x1, d1, h1] = wall[i + 1]
     c.poly([...at(x0, d0, 0), ...at(x0, d0, h0), ...at(x1, d1, h1), ...at(x1, d1, 0)], "F")
   }
+  // its face: foliage down to the ground, darker low down, a trunk or two in the gaps near us, the
+  // undergrowth along its foot
+  for (let i = 0; i < wall.length; i++) {
+    const [x0, d0, h0] = wall[i], sc = P.scale(d0, x0), pm = Math.floor((travelled(f) + d0) % LOOP_M)
+    if (d0 < 70) for (const k of [0, 1]) {
+      const tu = hash(pm, 40 + k) * 3, [tx, ty] = at(cx(FOREST - 0.2, d0 + tu, f), d0 + tu, 0), [, tt] = at(cx(FOREST - 0.2, d0 + tu, f), d0 + tu, h0 * 0.7)
+      const tw = Math.max(1, Math.round(0.25 * P.scale(d0 + tu, x0)))
+      c.rect(tx - tw, tt, tw * 2, ty - tt, "P"); c.line(tx - tw, tt, tx - tw, ty, "H")
+    }
+    for (let k = 0; k < 3; k++) {
+      const h = h0 * (0.15 + 0.25 * k + 0.1 * hash(pm, 50 + k)), du = hash(pm, 60 + k) * 4, [qx, qy] = at(cx(FOREST - 0.1, d0 + du, f), d0 + du, h)
+      clump(c, qx, qy, (1.1 + 0.6 * hash(pm, 70 + k)) * sc, pm * 7 + k, false, hash(pm, 80 + k) < 0.45)
+    }
+  }
+  // tufts of grass standing up along the edge of the asphalt, near us: a few blades each, a tip warm
+  for (let p = Math.floor((travelled(f) + 30) / 1.3) * 1.3; p > travelled(f) + 2.5; p -= 1.3) {
+    const d = p - travelled(f), pm = Math.floor(p * 10), u = SHOULDER + 0.3 + hash(pm, 91) * 1.5
+    const [gx, gy] = at(cx(u, d, f), d, 0), sc = P.scale(d, cx(u, d, f)), hgt = (0.2 + 0.25 * hash(pm, 92)) * sc
+    if (hgt < 2) continue
+    for (let b = 0; b < 4; b++) {
+      const lean = (hash(pm, 93 + b) - 0.5) * hgt * 0.8, bx = gx + (b - 1.5) * Math.max(1, sc * 0.05)
+      c.line(Math.round(bx), gy, Math.round(bx + lean), Math.round(gy - hgt * (0.6 + 0.4 * hash(pm, 97 + b))), b % 2 ? "v" : "x")
+      c.px(Math.round(bx + lean), Math.round(gy - hgt * (0.6 + 0.4 * hash(pm, 97 + b))), "H")
+    }
+  }
   // the guardrail on the left: two lines along the posts, a post every 4 m
   for (let d = 200; d >= 4; d -= 4) {
     const p = d - (travelled(f) % 4)
@@ -566,25 +847,40 @@ function view(c, f) {
     c.poly([ax, ay, bx, by, bx2, by2, ax2, ay2], "R"); c.line(ax, ay, bx, by, "r"); c.line(px0, py0, ax, ay, "p")
   }
   // shadows of everything, long toward us with the sun so low; then the things, far to near
-  const crowns = []
-  for (let p = Math.ceil(travelled(f) / 5) * 5; p < travelled(f) + 240; p += 5) {
-    const d = p - travelled(f), pm = p % LOOP_M, r = 2.2 + 1.2 * hash(Math.floor(pm / 5), 4)
-    if (d > 3) crowns.push(solid.blob([cx(FOREST + 0.5, d, f), d, 7 + 4 * hash(Math.floor(pm / 8), 2)], r, r * 0.8, hash(Math.floor(pm / 5), 5) < 0.5 ? "f" : "F", { noShadow: true }))
+  // the forest's crowns along its top, far to near, each a clump of clumps
+  for (let p = Math.floor((travelled(f) + 240) / 5) * 5; p > travelled(f) + 3; p -= 5) {
+    const d = p - travelled(f), pm = p % LOOP_M, rm = 2.2 + 1.2 * hash(Math.floor(pm / 5), 4)
+    const [qx, qy] = P.ground(cx(FOREST + 0.5, d, f), d, 7 + 4 * hash(Math.floor(pm / 8), 2)), sc = P.scale(d, cx(FOREST + 0.5, d, f))
+    crown(c, qx, qy, rm * sc, Math.floor(pm / 5) + 17)
   }
-  const things = [...crowns, ...PALMS.flatMap((it) => palm(c, it, f)), ...POLES.flatMap((it) => pole(it, f)), ...CHEVRONS.flatMap((it) => chevron(it, f)), ...sign(f)]
+  for (let p = Math.floor((travelled(f) + 200) / 7) * 7; p > travelled(f) + 12; p -= 7) {
+    const d = p - travelled(f), pm = Math.round(p % LOOP_M)
+    if (hash(pm, 81) < 0.55) { const x = cx(FOREST - 0.6, d, f), [px, py] = P.ground(x, d, 0); tree(c, px, py, (10 + 4 * hash(pm, 82)) * P.scale(d, x), pm) }
+    if (hash(pm, 84) < 0.7) { const x = cx(FOREST - 1.6, d - 2.5, f), [px, py] = P.ground(x, d - 2.5, 0); banana(c, px, py, 2.6 * P.scale(d - 2.5, x), pm + 3) }
+  }
+  const things = [...POLES.flatMap((it) => pole(it, f)), ...CHEVRONS.flatMap((it) => chevron(it, f)), ...sign(f)]
   // a rival nearer than 4 m is beside us, behind the pillar and the door
   const cars = RIVALS.map((r) => ({ r, z: rivalZ(r, f) })).filter((o) => o.z > 4 && o.z < 200)
   const carParts = cars.flatMap(({ r, z }) => carShapes(cx(r.lane, z, f), z, r.keys))
   c.shadows(P, [...things, ...carParts], { sun: SUN(f), shade: SHADE })
   c.solids(P, things, { sun: SUN(f) })
-  // the crowns' rims toward the road and the low sun
-  for (const q of crowns) {
-    const [ex, ey] = P.ground(q.e[0], q.e[1], q.e[2]), sc = P.scale(q.e[1], q.e[0]), rx = q.rx * sc, ry = q.ry * sc
-    if (rx < 2 || rx > 22) continue
-    for (let a = 1.75; a < 3.0; a += 0.6 / rx) c.px(Math.round(ex + Math.cos(a) * rx * 0.94), Math.round(ey - Math.sin(a) * ry * 0.94), "H")
+  // the palms, far to near: the trunk, then its crown
+  for (const it of [...PALMS].sort((a, b) => along(b.p, f) - along(a.p, f))) {
+    const pa = palmAt(it, f)
+    if (!pa) continue
+    palmTrunk(c, pa.base, pa.top, 0.17 * pa.sc)
+    palmCrown(c, pa.top[0], pa.top[1], 3.4 * pa.sc, pa.seed * 13 + 5)
   }
-  for (const it of CHEVRONS) chevronArrow(c, it, f)
-  signWords(c, f)
+  // tall grass and weeds along both verges, far to near
+  for (let p = Math.floor((travelled(f) + 70) / 2.2) * 2.2; p > travelled(f) + 2; p -= 2.2) {
+    const d = p - travelled(f), pm = Math.floor(p * 3)
+    tallGrass(c, SHOULDER + 0.6 + hash(pm, 3) * 2.2, d, f, pm)
+    if (hash(pm, 4) < 0.6) tallGrass(c, RAIL_U - 0.5 - hash(pm, 5) * 1.0, d + 1.1, f, pm + 999)
+  }
+  // the lamp posts, the chevrons and the sign, far to near
+  for (const it of [...POLES].sort((a, b) => along(b.p, f) - along(a.p, f))) lampPost(c, it, f)
+  for (const it of [...CHEVRONS].sort((a, b) => along(b.p, f) - along(a.p, f))) chevronSign(c, it, f)
+  guideSign(c, f)
   for (const { r, z } of cars.sort((a, b) => b.z - a.z)) rival(c, r, z, f)
 }
 

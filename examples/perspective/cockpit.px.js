@@ -330,11 +330,13 @@ function cockpitDetails(c) {
 sprite("_cockpit", { w: W, h: H }, (c) => { render3d(c, COCKPIT, COCKPIT_MATS); cockpitDetails(c) })
 
 // ---------------------------------------------------------------- the steering wheel
-// After the wheel of the later A80s: a leather rim round as a tube, three spokes dished back to a
-// padded hub with its badge, the column behind going down into the dash with the stalks for the
-// lights and the wipers either side. Fitted so its rim falls where the hands were set on it: 0.62 m
-// out toward the picture's (160, 140), leaning back 55°, 15 cm round its outside. It turns: the
-// spokes and the mark at the top go round with it, the column stays.
+// The car's own wheel, the A80 RZ-S's: a thick leather rim; four spokes, the two across wide and nearly
+// level with the horn's marks on them, the two below narrower, splayed down to the rim; the airbag's
+// big padded boss in the middle, a rounded box a little wider at its top, its seam across it and the
+// oval badge on it; behind, the column going down into the dash with the stalks for the lights and the
+// wipers. Fitted so its rim falls where the hands were set on it: 0.62 m out toward the picture's
+// (160, 140), leaning back 55°, 15 cm round its outside. It turns: the boss and the spokes go round
+// with it, the column stays.
 const lookAt = (sx, sy) => { const k = -(sy - H / 2) / CAM.f; return unit3([(sx - W / 2) / CAM.f, k * CP - SP, k * SP + CP]) }
 const WHEEL3 = (() => {
   const t = (55 * Math.PI) / 180, C = lookAt(160, 140).map((v) => v * 0.62)
@@ -347,28 +349,29 @@ const rimMid = (a) => seen(add3(add3(WHEEL3.C, rimDir(a), WHEEL3.R - WHEEL3.RHO)
 function wheelFaces(turn) {
   const m = model(), { face } = m, { C, U, V, N, R, RHO } = WHEEL3, RC = R - RHO
   const at3 = (a, r, n) => add3(add3(C, rimDir(a), r), N, n)
-  // the rim: a tube right round, the mark at its top going round with it
+  // the rim: a tube right round
   const K = 64, J = 8
   for (let i = 0; i < K; i++) for (let j = 0; j < J; j++) {
     const a0 = (TAU * i) / K, a1 = (TAU * (i + 1)) / K, p0 = (TAU * j) / J, p1 = (TAU * (j + 1)) / J
-    const own = ((a0 + a1) / 2 + turn - Math.PI / 2 + 3 * TAU) % TAU, mark = own < 0.07 || own > TAU - 0.07
     const q = (a, p) => at3(a, RC + RHO * Math.cos(p), RHO * Math.sin(p))
-    face(mark ? "marker" : "rim", q(a0, p0), q(a1, p0), q(a1, p1), q(a0, p1))
+    face("rim", q(a0, p0), q(a1, p0), q(a1, p1), q(a0, p1))
   }
-  // three spokes from the hub, set back, out to the rim's inside
-  for (const [own, w] of [[Math.PI + 0.15, 0.04], [-0.15, 0.04], [-Math.PI / 2, 0.05]]) {
+  // four spokes from the boss, set back, out to the rim's inside: two across, two splayed below
+  for (const [own, w] of [[Math.PI + 0.08, 0.056], [-0.08, 0.056], [-2.32, 0.036], [-0.82, 0.036]]) {
     const a = own - turn, side = add3(add3([0, 0, 0], U, -Math.sin(a)), V, Math.cos(a))
     const sec = (r, n, ww) => [-1, 1].flatMap((s) => [add3(at3(a, r, n), side, s * ww)])
-    const A = sec(0.055, -0.026, w * 0.95), B = sec(RC - RHO * 0.5, -0.002, w * 0.7)
+    const A = sec(0.07, -0.024, w * 0.95), B = sec(RC - RHO * 0.5, -0.002, w * 0.7)
     const up = (p) => add3(p, N, 0.006), dn = (p) => add3(p, N, -0.006)
     face("spoke", up(A[0]), up(A[1]), up(B[1]), up(B[0])); face("spoke", dn(A[0]), dn(A[1]), dn(B[1]), dn(B[0]))
     face("spoke", up(A[0]), up(B[0]), dn(B[0]), dn(A[0])); face("spoke", up(A[1]), up(B[1]), dn(B[1]), dn(A[1]))
   }
-  // the hub: a padded boss, its face domed toward the driver
-  const hub = add3(C, N, -0.03), rings = [[0.068, 0], [0.066, 0.012], [0.058, 0.022], [0.034, 0.029], [0.001, 0.03]], S = 20
+  // the airbag's boss: a rounded box (a superellipse) a little wider at its top, domed toward the driver
+  const hub = add3(C, N, -0.03), ux = rimDir(-turn), vy = rimDir(Math.PI / 2 - turn), S = 28
+  const box = (a, b, n, t) => { const c0 = Math.cos(t), s0 = Math.sin(t), x = a * Math.sign(c0) * Math.abs(c0) ** 0.5, y = b * Math.sign(s0) * Math.abs(s0) ** 0.5; return add3(add3(add3(hub, ux, x * (1 + (0.07 * y) / b)), vy, y), N, n) }
+  const rings = [[0.088, 0.068, 0], [0.086, 0.066, 0.012], [0.078, 0.059, 0.022], [0.052, 0.04, 0.03], [0.002, 0.002, 0.032]]
   for (let k = 0; k + 1 < rings.length; k++) for (let i = 0; i < S; i++) {
-    const p = (r, n, t) => add3(add3(hub, rimDir((TAU * t) / S), r), N, n), [r0, n0] = rings[k], [r1, n1] = rings[k + 1]
-    face("hub", p(r0, n0, i), p(r0, n0, i + 1), p(r1, n1, i + 1), p(r1, n1, i))
+    const [a0, b0, n0] = rings[k], [a1, b1, n1] = rings[k + 1], t0 = (TAU * i) / S, t1 = (TAU * (i + 1)) / S
+    face("hub", box(a0, b0, n0, t0), box(a0, b0, n0, t1), box(a1, b1, n1, t1), box(a1, b1, n1, t0))
   }
   // the column, into the dash, and its stalks either side
   const col = (t, du, dv) => add3(add3(add3(C, N, -0.04 - t), U, du), V, dv - 0.02)
@@ -384,19 +387,22 @@ function wheelFaces(turn) {
 }
 const WHEEL_MATS = {
   rim: { ramp: ["0", "-", "=", "~", "^"], edge: "0", top: "%", smooth: true },
-  marker: { ramp: ["&", "{", "(", "["], edge: "0", smooth: true },
   spoke: { ramp: ["0", "-", "=", "~", "^"], edge: "0" },
   hub: { ramp: ["0", "-", "=", "~"], edge: "0", top: "^", smooth: true },
   column: { ramp: ["0", "0", "-", "="], edge: "0" },
   stalk: { ramp: ["0", "-", "=", "^"], edge: "0", top: "W" },
 }
-// over it: the red stitching along the rim's inside, the badge on the hub
+// over it: the stitching along the rim's inside, dark as the leather; on the boss its seam across and
+// the oval badge; the horn's marks on the spokes across
 function wheelDetails(c, turn) {
-  const R = Math.round, { C, N, R: RR, RHO } = WHEEL3
+  const R = Math.round, { C, N, R: RR, RHO } = WHEEL3, hub = add3(C, N, 0.002)
   for (let i = 0; i < 90; i++) {
     const a = (TAU * i) / 90, [x, y] = seen(add3(add3(C, rimDir(a), RR - RHO * 1.75), N, RHO * 0.75))
-    if (i % 3 === 0) c.px(R(x), R(y), "&")
+    if (i % 3 === 0) c.px(R(x), R(y), "=")
   }
-  const [bx, by] = seen(add3(C, N, -0.002))
-  c.ellipse(R(bx), R(by) - 1, 5, 4, "0"); c.ellipse(R(bx), R(by) - 1, 4, 3, "("); c.ellipse(R(bx), R(by) - 1, 2, 1, "["); c.px(R(bx) - 2, R(by) - 3, "@")
+  const ux = rimDir(-turn), vy = rimDir(Math.PI / 2 - turn), on = (x, y) => seen(add3(add3(hub, ux, x), vy, y))
+  { const [a0, a1] = [on(-0.07, 0.012), on(0.07, 0.012)]; c.line(R(a0[0]), R(a0[1]), R(a1[0]), R(a1[1]), "-") }
+  const badge = Array.from({ length: 16 }, (_, i) => { const t = (TAU * i) / 16; return on(0.022 * Math.cos(t), 0.004 + 0.014 * Math.sin(t)) })
+  c.poly(badge.flat().map(R), "0"); c.poly(badge.map(([x, y]) => [(x - on(0, 0.004)[0]) * 0.6 + on(0, 0.004)[0], (y - on(0, 0.004)[1]) * 0.6 + on(0, 0.004)[1]]).flat().map(R), "^")
+  for (const sd of [-1, 1]) { const [hx, hy] = seen(add3(add3(C, N, -0.02), rimDir((sd < 0 ? Math.PI + 0.08 : -0.08) - turn), 0.105)); c.px(R(hx), R(hy), "^"); c.px(R(hx) + 1, R(hy), "~") }
 }
