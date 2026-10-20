@@ -17,9 +17,10 @@ pal({
   F: "#9bb0ca", f: "#b2c4da", E: "#889fbd",                                         // far ridge
   M: "#dbe7ef", m: "#cbdbe7",                                                       // mist
   H: "#86a796", h: "#9dbaa6", J: "#6f927f", j: "#5b7f6d",                           // hills, woods, araucárias
-  G: "#8fbd5c", g: "#76a74c", Q: "#5f8e3f", q: "#4c7633", z: "#acd36e",             // pasture
+  G: "#8fbd5c", g: "#76a74c", Q: "#5f8e3f", q: "#4c7633", z: "#acd36e", ":": "#3a5e2b", // pasture, woods
+  "^": "#b2c16a", "~": "#94a654",                                                   // dry grass, in shade
   o: "#f1eee6", O: "#2e2924", u: "#8d5c3b", R: "#b65a33", r: "#87401f", b: "#3e6cb4", // cows, farmhouse
-  "+": "#d2629e", "&": "#efa1c8",                                                   // ipê-roxo
+  "+": "#c9449f", "&": "#ec8ccb", "!": "#86307f",                                   // ipê-roxo
   e: "#a95b36", n: "#7c4226", p: "#958f88", P: "#6f6a65", s: "#4b3627",             // earth, ballast, sleepers
   i: "#d3d7db", I: "#5c6067",                                                       // rail head, web
   x: "#6b4b34", X: "#4d3726", y: "#3b3b42",                                         // poles, wires
@@ -129,8 +130,10 @@ sprite("_hills", { w: W, h: 46, wrap: "x" }, (c) => {
 })
 
 // ---------------------------------------------------------------- pasture (640 a loop)
-// Near hills of pasture with the cattle's terracing trails across the slopes, a fence, cows, a
-// farmhouse with a blue door under a mango tree, a hillside of coffee.
+// Near hills of pasture as in the hills of Minas: patches of drier grass and greener, the cattle's
+// trails stepping along the slopes, woods filling the folds between the hills, a tree alone here and
+// there with its shade, a fence, cows, a farmhouse with a blue door under a mango tree, coffee planted
+// along the contour.
 const NEAR_Y = 80, NEAR_W = 640
 sprite("_cow", `
   .oo.....
@@ -148,29 +151,73 @@ sprite("_house", `
   ..oobboooobbooob..
   ..oooooooooooobb..
   ..PPPPPPPPPPPPPPP.`)
+// noise that closes over a strip `w` wide: its far end blended into its start
+const loopNoise = (x, y, w, scale) => { const t = x / w; return (1 - t) * fbm(x / scale, y / scale, 3) + t * fbm((x - w) / scale, y / scale, 3) }
+// a round crown seen from the side: dark, lit on its upper left, a dark rim underneath
+function crown(c, x, y, r) {
+  c.circ(x, y, r, "q"); c.circ(x - 1, y - 1, Math.max(1, r - 1), "Q"); c.hline(x - r + 1, y + r, r * 2 - 1, ":")
+  c.px(x - r + 1, y - r + 2, "g"); if (r > 2) c.px(x - 1, y - r + 1, "g")
+}
 sprite("_near", { w: NEAR_W, h: 60, wrap: "x" }, (c) => {
-  const top = (x) => Math.round(16 + waves(x, NEAR_W, [[2, 5, 0.9], [5, 3, 2.1], [11, 1.2, 0.4]]))
+  const topF = (x) => 16 + waves(x, NEAR_W, [[2, 5, 0.9], [5, 3, 2.1], [11, 1.2, 0.4]]), top = (x) => Math.round(topF(x))
+  const r = rng(13)
+  // the pasture: patches of drier grass and greener, lit on the faces turned left (toward the sun),
+  // darker on those turned away and down in the folds, the crest a lit edge
+  const dark = { "^": "~", G: "g", g: "Q" }
   for (let x = 0; x < NEAR_W; x++) {
-    const t0 = top(x), slope = top(x + 3) - top(x - 3)
+    const t0 = top(x), slope = topF(x + 2) - topF(x - 2)
     for (let y = t0; y < 60; y++) {
-      const depth = y - t0
-      // the light on the crest and on slopes turned left, then the pasture, darker down in the fold
-      let k = depth < 1 ? "z" : slope > 1 && depth < 9 ? "G" : depth > 30 ? "Q" : "g"
-      // cattle trails: thin terraces following the slope, a few px apart
-      if (depth > 3 && depth < 34 && (depth + Math.round(slope * 0.6) + Math.floor(x / 50)) % 5 === 0 && hash(Math.floor(x / 9), depth) < 0.7) k = "Q"
-      c.px(x, y, k)
+      const depth = y - t0, n = loopNoise(x, y * 4, NEAR_W, 34)
+      let k = n > 0.64 ? "^" : n < 0.36 ? "G" : "g"
+      if ((slope > 0.6 && depth < 16) || depth > 28) k = dark[k]
+      c.px(x, y, depth === 0 ? "z" : k)
     }
   }
-  // coffee: rows of round bushes down one hillside
-  for (let row = 0; row < 7; row++) for (let x = 470 + row * 3; x < 560 - row * 2; x += 4) {
-    const y = top(x) + 3 + row * 3
-    c.px(x, y, "q"); c.px(x + 1, y, "q"); c.px(x, y - 1, "Q")
+  // cattle trails on the steeper slopes: terraces running along the hill parallel to its crest, a
+  // shadowed step under a lit lip, in pieces that bunch and wander
+  for (let d = 3; d < 30; d += 3) for (let x = 0; x < NEAR_W; x++) {
+    const slope = topF(x + 3) - topF(x - 3)
+    if (Math.abs(slope) < 0.5 || hash(Math.floor((x + d * 13) / (9 + (d % 7))), d) > 0.66) continue
+    const y = top(x) + d + Math.round(Math.sin(x / 9 + d * 1.7) * 0.8), k = c.key(x, y)
+    c.px(x, y, k === "^" || k === "~" ? "~" : k === "G" ? "g" : "Q")
+    if (slope < 0 && hash(x, d) < 0.5) c.px(x, y - 1, k === "^" ? "^" : "G")
   }
-  // a fence along the slope: posts every 9 px, a wire between them
-  for (let x = 0; x < NEAR_W; x += 9) { const y = top(x) + 9; c.vline(x, y - 4, 5, "x"); c.line(x, y - 3, x + 9, top(x + 9) + 6, "X") }
+  // grass: short dashes of the darker tone here and there
+  for (let i = 0; i < 260; i++) {
+    const x = Math.floor(r() * NEAR_W), y = top(x) + 2 + Math.floor(r() * 30), k = c.key(x, y)
+    if (dark[k]) c.hline(x, y, 2, dark[k])
+  }
+  // woods filling the folds between the hills, and a few trees alone in the pasture with their shade
+  for (let x = 0; x < NEAR_W; x++) {
+    const v = topF(x)
+    if (![-24, -12, -6, 6, 12, 24].every((k) => topF(x + k) <= v)) continue
+    const crowns = Array.from({ length: 12 }, () => { const cx = x + (r() - 0.5) * 44; return [Math.round(cx), Math.round(topF(cx) - 1 + r() * 7), 2 + Math.floor(r() * 3)] })
+    for (const [cx, cy, cr] of crowns.sort((a, b) => a[1] - b[1])) crown(c, cx, cy, cr)
+  }
+  for (const tx of [130, 210, 430, 585]) {
+    const ty = top(tx) + 6
+    c.hline(tx + 1, ty + 1, 9, "Q"); c.hline(tx + 3, ty + 2, 6, "Q")
+    c.vline(tx, ty - 3, 4, "X"); crown(c, tx, ty - 6, 4); crown(c, tx + 3, ty - 4, 3)
+  }
+  // coffee planted along the contour: rows of bushes touching each other, lit along their tops, a
+  // notch where one bush meets the next, the pasture showing in the alleys between the rows
+  for (let row = 0; row < 7; row++) for (let x = 470 + row * 3; x < 560 - row * 2; x++) {
+    const y = top(x) + 4 + row * 3
+    c.px(x, y, "q"); c.px(x, y - 1, (x + row * 2) % 5 === 0 ? "q" : "Q"); if ((x + row) % 7 === 0) c.px(x, y - 1, "g")
+  }
+  // a fence along the slope: posts every 9 px, a wire between them; it stops where the woods are
+  const wood = (x, y) => ["q", "Q", ":"].includes(c.key(x, y))
+  for (let x = 0; x < NEAR_W; x += 9) {
+    const y = top(x) + 9
+    if (wood(x, y - 3) || wood(x + 9, top(x + 9) + 6)) continue
+    c.vline(x, y - 4, 5, "x"); c.line(x, y - 3, x + 9, top(x + 9) + 6, "X")
+  }
   // cows grazing up near the crest, where they show over the train
-  for (const [x, flip, brown] of [[60, false, false], [74, true, true], [250, false, true], [380, true, false], [600, false, false], [612, true, true]])
+  for (const [x0, flip, brown] of [[40, false, false], [54, true, true], [250, false, true], [380, true, false], [560, false, false], [574, true, true]]) {
+    let x = x0
+    while (["q", "Q", ":"].includes(c.key(x + 4, top(x + 4) + 3))) x += 7
     c.stamp(brown ? "_cow_b" : "_cow", x, top(x + 4) + 2, { flip: flip ? "x" : undefined })
+  }
   // the farmhouse on the crest, a mango tree beside it
   const hx = 300, hy = top(hx + 8) - 6
   c.rect(hx - 2, hy + 7, 22, 3, "g"); c.stamp("_house", hx, hy)
@@ -198,6 +245,12 @@ sprite("_side", { w: SIDE_W, h: 104, wrap: "x" }, (c) => {
   // ballast: gravel under the rails, and the sleepers' ends every 8 px
   for (let y = 90; y < 104; y++) for (let x = 0; x < SIDE_W; x++) c.px(x, y, hash(x, y) < 0.3 || y === 90 ? "P" : "p")
   for (let x = 0; x < SIDE_W; x += 8) c.rect(x, 96, 4, 3, "s")
+  // grass at the ballast's edge, and the odd weed come up through the stones
+  for (let x = 0; x < SIDE_W; x++) if (hash(x, 11) < 0.55) { const h = 1 + Math.floor(hash(x, 12) * 3); c.vline(x, 90 - h, h + 1, h > 2 ? "Q" : "g") }
+  for (let i = 0; i < 70; i++) { const x = Math.floor(r() * SIDE_W), y = 92 + Math.floor(r() * 3); c.px(x, y, "g"); c.px(x + 1, y - 1, "Q"); c.px(x - 1, y - 1, "g") }
+  // the embankment's grass: short dark dashes, a few flowers
+  for (let i = 0; i < 500; i++) { const x = Math.floor(r() * SIDE_W), y = bank(x) + 3 + Math.floor(r() * 7); if (c.key(x, y) === "Q") c.hline(x, y, 2, r() < 0.3 ? "g" : "q") }
+  for (let i = 0; i < 60; i++) { const x = Math.floor(r() * SIDE_W), y = bank(x) + 2 + Math.floor(r() * 6); if (c.key(x, y) === "Q") c.px(x, y, r() < 0.4 ? "K" : r() < 0.6 ? "L" : "+") }
   // bushes along the embankment
   for (let i = 0; i < 60; i++) {
     const x = Math.floor(r() * SIDE_W), y = bank(x) - Math.round(cut(x)), rr = 2 + Math.floor(r() * 4)
@@ -228,12 +281,21 @@ sprite("_side", { w: SIDE_W, h: 104, wrap: "x" }, (c) => {
       c.line(x0, y0 - 16, x0 + dx, y0 - 16 + dy, "z", 2); c.line(x0 + Math.round(dx / 2), y0 - 15 + Math.round(dy / 2), x0 + dx, y0 - 14 + dy, "g")
     }
   }
-  // an ipê-roxo in flower: a crooked trunk and clusters of pink with no leaves
-  const ix = 250, iy = bank(ix)
-  c.line(ix, iy, ix - 2, iy - 22, "X", 2); c.line(ix - 2, iy - 20, ix - 10, iy - 32, "X"); c.line(ix - 1, iy - 21, ix + 9, iy - 34, "X")
-  for (let i = 0; i < 26; i++) {
-    const a = r() * TAU, d = Math.sqrt(r()), cx = ix + Math.cos(a) * d * 16, cy = iy - 36 + Math.sin(a) * d * 9
-    c.circ(Math.round(cx), Math.round(cy), 2, "+"); c.px(Math.round(cx) - 1, Math.round(cy) - 1, "&")
+  // an ipê-roxo in flower, bare of leaves: a trunk forking into dark branches that open like an
+  // umbrella, the flowers in small clusters at their tips, the sky showing between them
+  const ix = 250, iy = bank(ix), tips = []
+  const branch = (x, y, a, len, depth) => {
+    const ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len
+    c.line(Math.round(x), Math.round(y), Math.round(ex), Math.round(ey), "X", depth > 2 ? 2 : 1)
+    if (depth === 0) { tips.push([ex, ey]); return }
+    for (const da of [-0.45 - r() * 0.2, 0.4 + r() * 0.25]) branch(ex, ey, a + da, len * (0.62 + r() * 0.12), depth - 1)
+    if (depth < 3) tips.push([ex, ey])
+  }
+  c.line(ix, iy, ix - 1, iy - 14, "X", 2)
+  for (const a of [-2.3, -1.85, -1.3, -0.85]) branch(ix - 1, iy - 14, a + (r() - 0.5) * 0.2, 9 + r() * 3, 3)
+  for (const [tx, ty] of tips) for (let k = 0; k < 5; k++) {
+    const x = Math.round(tx + (r() - 0.5) * 4), y = Math.round(ty + (r() - 0.5) * 3)
+    c.px(x, y, "+"); c.px(x + 1, y, "+"); c.px(x, y + 1, "!"); if (r() < 0.5) c.px(x - 1, y - 1, "&")
   }
   // telegraph poles every 160 px: crossarm, white insulators, wires sagging to the next pole
   for (let x = 40; x < SIDE_W + 40; x += 160) {
@@ -249,16 +311,27 @@ sprite("_side", { w: SIDE_W, h: 104, wrap: "x" }, (c) => {
 // then, flowers as a dash of color.
 const FG_W = 640
 sprite("_fg", { w: FG_W, h: 30, wrap: "x" }, (c) => {
-  const r = rng(31)
-  c.rect(0, 8, FG_W, 22, "t")
-  for (let x = 0; x < FG_W; x++) { const y = 8 + Math.round(waves(x, FG_W, [[6, 1, 0], [17, 0.8, 1]])); c.px(x, y, "l"); c.px(x, y + 1, "T") }
-  // streaks: the grass smeared along by the speed
-  for (let i = 0; i < 240; i++) { const x = Math.floor(r() * FG_W), y = 11 + Math.floor(r() * 18); c.hline(x, y, 6 + Math.floor(r() * 18), y < 16 ? "T" : r() < 0.5 ? "T" : "l") }
-  for (let i = 0; i < 18; i++) { const x = Math.floor(r() * FG_W), y = 10 + Math.floor(r() * 16); c.hline(x, y, 4 + Math.floor(r() * 6), r() < 0.5 ? "L" : "K") }
-  // a clump of tall grass now and then, below the wheels' hubs
-  for (let i = 0; i < 9; i++) {
-    const x0 = Math.floor(r() * FG_W), n = 5 + Math.floor(r() * 5), tall = 5 + r() * 6
-    for (let k = 0; k < n; k++) c.line(x0 + k, 10, Math.round(x0 + k + (k / n - 0.5) * 5), Math.round(10 - tall * (0.6 + r() * 0.4)), k % 3 ? "T" : "l")
+  const r = rng(31), edge = (x) => 9 + Math.round(waves(x, FG_W, [[6, 1, 0], [17, 0.8, 1]]))
+  // the bank: lit along its top, darker down
+  for (let x = 0; x < FG_W; x++) { const e = edge(x); c.vline(x, e, 2, "l"); c.vline(x, e + 2, 4, "T"); c.vline(x, e + 6, 30 - e - 6, "t") }
+  // its edge against the ballast: blades sticking up, a px or two, more of them and taller in clumps
+  for (let x = 0; x < FG_W; x++) {
+    const clump = waves(x, FG_W, [[23, 1, 0], [41, 0.7, 2]]) > 0.6, h = hash(x, 5) < (clump ? 0.8 : 0.35) ? 1 + Math.floor(hash(x, 7) * (clump ? 5 : 2.5)) : 0
+    if (h) { c.vline(x, edge(x) - h, h, "T"); c.px(x, edge(x) - h, "l") }
+  }
+  // what's in the grass, smeared along by the speed: blades catching the light, darker hollows,
+  // flowers as dashes of color (white, yellow, the pink of the maria-sem-vergonha)
+  for (let i = 0; i < 160; i++) { const x = Math.floor(r() * FG_W), y = 13 + Math.floor(r() * 16); c.hline(x, y, 4 + Math.floor(r() * 12), y < 18 ? "l" : r() < 0.6 ? "T" : "l") }
+  for (let i = 0; i < 90; i++) { const x = Math.floor(r() * FG_W), y = 16 + Math.floor(r() * 13); c.hline(x, y, 3 + Math.floor(r() * 8), ":") }
+  for (let i = 0; i < 40; i++) { const x = Math.floor(r() * FG_W), y = 11 + Math.floor(r() * 14), k = r() < 0.4 ? "K" : r() < 0.6 ? "L" : "+"; c.hline(x, y, 2 + Math.floor(r() * 4), k); if (r() < 0.5) c.hline(x + 1, y + 1, 2, "T") }
+  // a clump of tall grass now and then, its seed heads dry and pale, below the wheels' hubs
+  for (let i = 0; i < 12; i++) {
+    const x0 = Math.floor(r() * FG_W), n = 5 + Math.floor(r() * 6), tall = 6 + r() * 8
+    for (let k = 0; k < n; k++) {
+      const tx = Math.round(x0 + k + (k / n - 0.5) * 6), ty = Math.round(edge(x0) - tall * (0.6 + r() * 0.4))
+      c.line(x0 + k, edge(x0) + 1, tx, ty, k % 3 ? "T" : "l")
+      if (r() < 0.35) { c.px(tx, ty - 1, "^"); c.px(tx, ty - 2, "~") }
+    }
   }
 })
 

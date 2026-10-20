@@ -157,7 +157,7 @@ the picture's width in the loop so their coming back is never seen. Trees, logs 
 ## Showcase: parallax
 
 <p>
-  <img src="docs/gallery/parallax_train.gif" width="100%" alt="Animated pixel-art steam train crossing the hills of Minas Gerais on a misty morning, seen from beside the line: a black maria-fumaça with red wheels and a brass dome pulling a wood tender and two maroon and cream coaches with passengers at the windows, a child waving; its smoke streams back over the coaches. Behind it the land runs past at six speeds: a blue stone ridge on the horizon barely moving, hills with araucárias and mist in the valleys, pasture with cattle trails, cows and a white farmhouse, then telegraph poles, a bamboo clump, banana plants and a pink ipê along the embankment, and the grass in front a green blur.">
+  <img src="docs/gallery/parallax_train.gif" width="100%" alt="Animated pixel-art steam train crossing the hills of Minas Gerais on a misty morning, seen from beside the line: a black maria-fumaça with red wheels and a brass dome pulling a wood tender and two maroon and cream coaches with passengers at the windows, a child waving; its smoke streams back over the coaches. Behind it the land runs past at six speeds: a blue stone ridge on the horizon barely moving, hills with araucárias and mist in the valleys, pasture in patches of drier and greener grass with cattle trails along the slopes, woods in the folds, coffee rows, cows and a white farmhouse, then telegraph poles, a bamboo clump, banana plants and an ipê-roxo in bloom along the embankment, and the grass in front a blur of blades and flowers.">
 </p>
 
 [`examples/parallax/train.px.js`](examples/parallax/train.px.js): the camera rides along with the train,
