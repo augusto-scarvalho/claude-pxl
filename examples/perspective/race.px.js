@@ -29,7 +29,9 @@ pal({
   // signs: the chevrons' yellow and black, the green of the road signs
   Z: "#f2c230", k: "#121016", E: "#1f7a4a",
   // the rivals: yellow, red and blue bodies (lit, shade), their black, glass and its sky, tail lights
-  J: "#f2c22e", j: "#a8801a", K: "#e03a3e", "&": "#8a1e2a", U: "#3e6ce0", u: "#233c8a",
+  D: "#5e4510", j: "#a8801a", J: "#f2c22e", g: "#ffe68a",                          // the yellow one, dark to light
+  ",": "#4a1020", "&": "#8a1e2a", K: "#e03a3e", ";": "#ff8a80",                   // the red one
+  "$": "#141e48", u: "#233c8a", U: "#3e6ce0", "|": "#9ab8ff",                     // the blue one
   d: "#16121c", z: "#1c1a2a", "+": "#a06a8e", "!": "#ff2e2e", "@": "#ff9a6a",
   // the cockpit: black plastic and leather, near black to its lit edges; the low sun warm on the dash;
   // red stitching; the gauges' orange numbers and red needles
@@ -196,51 +198,257 @@ function sign(f) {
 }
 
 // ---------------------------------------------------------------- the rivals
-// Each 4.4 m long and 1.9 wide: the body, the glasshouse, the wing, the tyres; seen from behind at
-// sunset their backs are in shade, their tops catch the sky. In the loop each goes from 200 m ahead
-// to 40 m behind us, 240 m in 12 s, and is overtaken at 2, 6 and 10 s.
+// The rivals, drawn by hand from behind at seven sizes (the left half; pxl mirrors it), the camera
+// picking the one nearest the height it should be. Body D j J g, the glass z with the sky across it
+// (i, +), the tail lights ( ! @ 9 out to white-hot, the plate, the diffuser and the exhaust, the tyres.
+// Red and blue are the yellow one with its four tones swapped.
+sprite("_rv_y_64", { mx: true, pivot: "bottom", outline: "0" }, `
+  ............gggggggggggggggggggg
+  ...........gJJJJJJJJJJJJJJJJJJJJ
+  ...........JJJzzzzzzzzzzzzzzz(!!
+  ...........JJzziiiiiiiiiiiiiiiii
+  ..........JJJzzz+zz+zz+zz+zz+zzz
+  ...ggggg..JJzzzzzzzzzzzzzzzzzzzz
+  ...gJJJJ-.JJzzzzzzzzzzzzzzzzzzzz
+  ...DjjjD--JJzzzzzzzzzzzzzzzzzzzz
+  ..........JJzzzzzzzzzzzzzzzzzzzz
+  .......ggggJJJJJJJJJJJJJJJJJJJJw
+  --....gJJjJJjJJjJJjJJjJJjJJjJJjJ
+  -ggggggggggggggggggggggggggggggg
+  -JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ
+  -DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
+  --.ggggggggggggggg--gggggggggggg
+  .gJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ
+  gjJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ
+  jj000000000000000000000000000000
+  jj-(!!!!(-(!!!!(-(((((((((((((((
+  jj-!@99@!-!@99@!-!!!!!!!!!!!!!!!
+  jj-(!!!!(-(!!!!(-(((((((((((((((
+  jj000000000000000000000000000000
+  ~-jjjjjjjjjjjjjjjjjjjjjjj=======
+  ~-jjjjjjjjjjjjjjjjjjjjjjj=wwwwww
+  ~-jjjjjjjjjjjjjjjjjjjjjjj=w=ww=w
+  ~-DDDDDDDDDDDDDDDDDDDDDDD=======
+  ~-------00--=--=--=--wWW--=--=--
+  ~=======00--=--=--=-W000W-=--=--
+  ~-------00--=--=--=-W000W-=--=--
+  ~=======00--=--=--=--WWW--=--=--
+  ~-------000000000000000000000000
+  ~=======000000000000000000000000
+  ~-------........................
+  -000000-........................`)
+sprite("_rv_y_48", { mx: true, pivot: "bottom", outline: "0" }, `
+  .........ggggggggggggggg
+  ........gJJJJJJJJJJJJJJJ
+  ........JJzzzzzzzzzzz(!!
+  ........JJziiiiiiiiiiiii
+  ..gggg.JJzz+zz+zz+zz+zzz
+  ..DjjD-JJzzzzzzzzzzzzzzz
+  .......JJzzzzzzzzzzzzzzz
+  .....gggJJJJJJJJJJJJJJJw
+  -....gJjJJjJJjJJjJJjJJjJ
+  -ggggggggggggggggggggggg
+  -JJJJJJJJJJJJJJJJJJJJJJJ
+  -DDDDDDDDDDDDDDDDDDDDDDD
+  -.gggggggggggg-ggggggggg
+  gjJJJJJJJJJJJJJJJJJJJJJJ
+  jj0000000000000000000000
+  jj(!!!(-(!!!(-((((((((((
+  jj!@9@!-!@9@!-!!!!!!!!!!
+  jj0000000000000000000000
+  ~-jjjjjjjjjjjjjjjjj=====
+  ~-jjjjjjjjjjjjjjjjj=w=ww
+  ~-DDDDDDDDDDDDDDDDD=====
+  ~-----00-=-=-=-wWW-=-=-=
+  ~=====00-=-=-=-W0W-=-=-=
+  ~-----00-=-=-=-WWW-=-=-=
+  ~=====000000000000000000
+  -0000-..................`)
+sprite("_rv_y_34", { mx: true, pivot: "bottom", outline: "0" }, `
+  ......ggggggggggg
+  ......JJzzzzzzz(!
+  ......Jziiiiiiiii
+  .ggg.JJzzzzzzzzzz
+  .Djj-JJzzzzzzzzzz
+  ....ggJJJJJJJJJJw
+  -gggggggggggggggg
+  -JJJJJJJJJJJJJJJJ
+  -DDDDDDDDDDDDDDDD
+  gJJJJJJJJJ-JJJJJJ
+  j0000000000000000
+  j(!!(-(!!(-((((((
+  j!@@!-!@@!-!!!!!!
+  j0000000000000000
+  ~-jjjjjjjjjjj====
+  ~-DDDDDDDDDDD=w=w
+  ~===00-=-=-WW-=-=
+  ~---0000000000000
+  -000-............`)
+sprite("_rv_y_24", { mx: true, pivot: "bottom", outline: "0" }, `
+  ....gggggggg
+  ....Jzzzzz(!
+  ..g.Jziiiiii
+  ..Dj-Jzzzzzz
+  ...gJJJJJJJw
+  -ggggggggggg
+  -DDDDDDDDDDD
+  gJJJJJJJ-JJJ
+  j00000000000
+  j(@!(-(@!(-!
+  ~-jjjjjjj=w=
+  ~==0-=-=WW-=
+  -00-00000000`)
+sprite("_rv_y_16", { mx: true, pivot: "bottom" }, `
+  ...ggggg
+  ...Jzz(!
+  .g.Jiiii
+  -ggggggg
+  -DDDDDDD
+  jJJJJJJJ
+  j(!(-!!!
+  ~-jjjj=w
+  -0-00000`)
+sprite("_rv_y_10", { mx: true, pivot: "bottom" }, `
+  ..ggg
+  ..Jzz
+  -gggg
+  jJJJJ
+  j!(!!
+  -0000`)
+sprite("_rv_y_6", { mx: true, pivot: "bottom" }, `
+  .gg
+  gJJ
+  j!!
+  -00`)
+sprite("_rf_y_12", { mx: true, pivot: "bottom" }, `
+  ...ggg
+  ..Jzzz
+  .JJJJJ
+  J99JJJ
+  -jjjjj
+  0-....`)
+sprite("_rf_y_8", { mx: true, pivot: "bottom" }, `
+  ..gg
+  .Jzz
+  J9JJ
+  -0..`)
+const RED = { D: ",", j: "&", J: "K", g: ";" }, BLUE = { D: "$", j: "u", J: "U", g: "|" }
+// the blue one wears twin white racing stripes down its middle, over the paint only (not the glass,
+// the lights or the plate): bands either side of its centre line, at each size
+const STRIPES = { 64: [27, 36, 4], 48: [20, 28, 3], 34: [14, 20, 2], 24: [10, 15, 1] }
+const paintWhite = (x, w) => recolor({ J: "w", g: "w", j: "W", D: "W" }, [x, 0, w, 40])
+for (const n of ["64", "48", "34", "24", "16", "10", "6"]) {
+  sprite("_rv_r_" + n, { base: "_rv_y_" + n, swap: RED })
+  const st = STRIPES[n]
+  sprite("_rv_b_" + n, { base: "_rv_y_" + n, swap: BLUE }, ...(st ? [paintWhite(st[0], st[2]), paintWhite(st[1], st[2])] : []))
+}
+for (const n of ["12", "8"]) { sprite("_rf_r_" + n, { base: "_rf_y_" + n, swap: RED }); sprite("_rf_b_" + n, { base: "_rf_y_" + n, swap: BLUE }) }
+// the flank, for when one draws level: the haunch lit along its shoulder, the side intakes' strakes,
+// the rear wheel seen from the side, rim and hub; drawn for the car's left side, flipped for its right
+sprite("_rs_y_64", { pivot: "bottom" }, `
+  ............
+  ............
+  ............
+  ............
+  ............
+  ............
+  ............
+  ............
+  ............
+  ............
+  ............
+  ............
+  ............
+  ............
+  000000000000
+  0ggggggggggg
+  0JJJJJJJJJJJ
+  0JDDDDDDDJJJ
+  0JJJJJJJJJJJ
+  0JDDDDDDDJJJ
+  0jjjjjjjjjjj
+  0jDDDDDDDjjj
+  0jjj0000jjjj
+  0jj0----0jjj
+  0j0-WWWW-0jj
+  0D0W~--~W0DD
+  0D0W-ww-W0DD
+  0D0W-ww-W0DD
+  0D0W~--~W0DD
+  0D0-WWWW-0DD
+  .00------000
+  ..0------0..
+  ..0------0..
+  ...0----0...
+  ....0000....
+  ............`)
+sprite("_rs_y_48", { pivot: "bottom" }, `
+  .........
+  .........
+  .........
+  .........
+  .........
+  .........
+  .........
+  .........
+  .........
+  .........
+  .........
+  .........
+  000000000
+  0gggggggg
+  0JJJJJJJJ
+  0JDDDDDJJ
+  0jjjjjjjj
+  0jDDDDDjj
+  0jj000jjj
+  0j0---0jj
+  0D0WWW0DD
+  0D0WwW0DD
+  0D0W-W0DD
+  0D0WWW0DD
+  .00---000
+  ..0---0..
+  ...000...
+  .........`)
+for (const n of ["64", "48"]) { sprite("_rs_r_" + n, { base: "_rs_y_" + n, swap: RED }); sprite("_rs_b_" + n, { base: "_rs_y_" + n, swap: BLUE }) }
+
+// Each 4.4 m long and 1.9 wide, drawn from behind (above); in meters only to throw its long shadow.
+// In the loop each goes from 200 m ahead to 40 m behind us, 240 m in 12 s, and is overtaken at 2, 6
+// and 10 s.
 const RIVALS = [
-  { lane: LANE, pass: 2, keys: ["J", "j"] },
-  { lane: -LANE, pass: 6, keys: ["K", "&"] },
-  { lane: LANE, pass: 10, keys: ["U", "u"] },
+  { lane: LANE, pass: 2, color: "y", keys: ["J", "j"] },
+  { lane: -LANE, pass: 6, color: "r", keys: ["K", "&"] },
+  { lane: LANE, pass: 10, color: "b", keys: ["U", "u"] },
 ]
 const rivalZ = (r, f) => { const t = (f / FRAMES) * SECONDS, z = 20 * (r.pass - t); return ((((z + 40) % 240) + 240) % 240) - 40 }
 function carShapes(x, zr, [lit, shade]) {
   const { box } = solid
-  return [
-    box([x - 0.95, zr + 0.2, x + 0.95, zr + 4.4, 0.22, 0.72], { top: lit, lit, shade }),
-    box([x - 0.72, zr + 1.4, x + 0.72, zr + 3.1, 0.72, 1.16], { top: shade, lit: "z", shade: "z" }),
-    box([x - 0.9, zr + 0.05, x + 0.9, zr + 0.4, 0.92, 0.98], { top: lit, lit: shade, shade: "d" }),
-    box([x - 0.98, zr + 0.5, x - 0.7, zr + 1.2, 0, 0.6], { top: "d", lit: "d", shade: "d" }),
-    box([x + 0.7, zr + 0.5, x + 0.98, zr + 1.2, 0, 0.6], { top: "d", lit: "d", shade: "d" }),
-    box([x - 0.98, zr + 3.2, x - 0.7, zr + 3.9, 0, 0.6], { top: "d", lit: "d", shade: "d" }),
-    box([x + 0.7, zr + 3.2, x + 0.98, zr + 3.9, 0, 0.6], { top: "d", lit: "d", shade: "d" }),
-  ]
+  return [box([x - 0.95, zr + 0.2, x + 0.95, zr + 4.4, 0, 0.72], { top: lit, lit, shade }), box([x - 0.72, zr + 1.4, x + 0.72, zr + 3.1, 0.72, 1.16], { top: shade, lit: "z", shade: "z" })]
 }
-// the tail lights across the back, and a glow round them; the plate between
-function tailLights(c, x, zr) {
-  if (zr < 1) return
-  const q = (u0, u1, h0, h1) => [at(x + u0, zr + 0.2, h0), at(x + u1, zr + 0.2, h0), at(x + u1, zr + 0.2, h1), at(x + u0, zr + 0.2, h1)].flat()
-  c.poly(q(-0.9, -0.4, 0.55, 0.68), "!"); c.poly(q(0.4, 0.9, 0.55, 0.68), "!")
-  c.poly(q(-0.18, 0.18, 0.3, 0.42), "w")
-  if (zr < 40) { const [lx, ly] = at(x - 0.65, zr + 0.2, 0.62), [rx, ry] = at(x + 0.65, zr + 0.2, 0.62); c.px(lx, ly - 1, "@"); c.px(rx, ry - 1, "@") }
-}
-
-// close by: the side we see (the left one when the car is to our right, and so on) gets its wheels,
-// round, with bright rims; the back its twin pipes
-function nearDetail(c, x, zr, r) {
-  const sx = x > 0 ? x - 0.98 : x + 0.98, sc = P.scale(zr + 2, sx)
-  for (const az of [zr + 0.85, zr + 3.55]) {
-    const [wx, wy] = P.ground(sx, az, 0.32), rx = Math.max(1, 0.34 * P.scale(az, sx) * 0.45), ry = 0.32 * P.scale(az, sx)
-    c.ellipse(Math.round(wx), Math.round(wy), Math.round(rx), Math.round(ry), "d"); c.ellipse(Math.round(wx), Math.round(wy), Math.max(0, Math.round(rx * 0.55)), Math.max(1, Math.round(ry * 0.55)), "W")
+// the drawings' sizes as stamped (outline included): the camera picks the one nearest the height the
+// car should be where it is
+const RV = [["64", 66, 36], ["48", 50, 28], ["34", 36, 21], ["24", 26, 15], ["16", 16, 9], ["10", 10, 6], ["6", 6, 4]]
+// a rival on the road: the shade right under it; the flank on the side we see when it is near and off to
+// one side; then the drawing, which bobs a pixel now and then on its springs when it is near; the red
+// one's pipes backfire
+function rival(c, r, z, f) {
+  const x = cx(r.lane, z + 0.2, f), sc = P.scale(z + 0.2, x), [sx, sy] = P.ground(x, z + 0.2).map(Math.round), w = 1.9 * sc
+  const [name, dw, dh] = RV.reduce((a, b) => (Math.abs(b[2] - 1.07 * sc) < Math.abs(a[2] - 1.07 * sc) ? b : a))
+  c.ellipse(sx, sy, Math.round(w * 0.56), Math.max(1, Math.round(w * 0.05)), "Q")
+  const bob = sc > 18 && (f + r.pass * 5) % 8 < 2 ? 1 : 0
+  if ((name === "64" || name === "48") && Math.abs(x) > 1.2 && Math.abs(x) / Math.max(1, z) > 0.2) {
+    const sw = name === "64" ? 12 : 9, side = x > 0 ? -1 : 1
+    c.stamp(`_rs_${r.color}_${name}`, sx + side * (Math.floor(dw / 2) + sw / 2 - 1), sy + 1 - bob, side > 0 ? { flip: "x" } : undefined)
   }
-  if (zr > 1) for (const ex of [-0.5, 0.5]) { const [px, py] = at(x + ex, zr + 0.15, 0.25); c.ellipse(px, py, Math.max(1, Math.round(0.07 * P.scale(zr, x))), Math.max(1, Math.round(0.05 * P.scale(zr, x))), "d") }
+  c.stamp(`_rv_${r.color}_${name}`, sx, sy + 1 - bob)
+  backfire(c, sx, sy, w, r, f)
 }
-// the red one backfires as we come up on it: a short tongue of flame from each pipe
-function backfire(c, x, zr, r, f) {
+// the red one backfires as we come up on it: a short burst of flame from each pipe
+function backfire(c, sx, sy, w, r, f) {
   const t = f - 76
-  if (r.keys[0] !== "K" || t < 0 || t >= 6 || zr < 1) return
-  for (const ex of [-0.5, 0.5]) { const [px, py] = at(x + ex, zr + 0.1, 0.25); c.flame(px, py + 1, Math.max(3, 0.6 * P.scale(zr, x)), "98767", { seed: 3 + ex * 4, frame: t, wind: 0 }) }
+  if (r.color !== "r" || t < 0 || t >= 6) return
+  for (const side of [-1, 1]) c.flame(Math.round(sx + side * 0.15 * w), Math.round(sy - 0.19 * 0.56 * w), Math.max(3, 0.3 * w), "98767", { seed: 4 + side, frame: t, wind: 0 })
 }
 
 // ---------------------------------------------------------------- the view through the glass
@@ -274,7 +482,8 @@ function view(c, f) {
     if (d > 3) crowns.push(solid.blob([cx(FOREST + 0.5, d, f), d, 7 + 4 * hash(Math.floor(pm / 8), 2)], r, r * 0.8, hash(Math.floor(pm / 5), 5) < 0.5 ? "f" : "F", { noShadow: true }))
   }
   const things = [...crowns, ...PALMS.flatMap((it) => palm(c, it, f)), ...POLES.flatMap((it) => pole(it, f)), ...CHEVRONS.flatMap((it) => chevron(it, f)), ...sign(f)]
-  const cars = RIVALS.map((r) => ({ r, z: rivalZ(r, f) })).filter((o) => o.z > 1.5 && o.z < 200)
+  // a rival nearer than 4 m is beside us, behind the pillar and the door
+  const cars = RIVALS.map((r) => ({ r, z: rivalZ(r, f) })).filter((o) => o.z > 4 && o.z < 200)
   const carParts = cars.flatMap(({ r, z }) => carShapes(cx(r.lane, z, f), z, r.keys))
   c.shadows(P, [...things, ...carParts], { sun: SUN(f), shade: SHADE })
   c.solids(P, things, { sun: SUN(f) })
@@ -286,13 +495,7 @@ function view(c, f) {
   }
   for (const it of CHEVRONS) chevronArrow(c, it, f)
   signWords(c, f)
-  for (const { r, z } of cars.sort((a, b) => b.z - a.z)) {
-    const x = cx(r.lane, z, f)
-    c.solids(P, carShapes(x, z, r.keys), { sun: SUN(f) })
-    tailLights(c, x, z)
-    if (z < 18) nearDetail(c, x, z, r)
-    backfire(c, x, z, r, f)
-  }
+  for (const { r, z } of cars.sort((a, b) => b.z - a.z)) rival(c, r, z, f)
 }
 
 // ---------------------------------------------------------------- the rear-view mirror
@@ -317,9 +520,7 @@ anim("_mirror", { w: MW, h: MH, frames: FRAMES, fps: FPS }, rect(0, 0, MW, 3, "2
       const z = -rivalZ(r, f) - 4.4
       if (z < 1 || z > 60) continue
       const x = r.lane - ourX(f) - (k * z * z) / 2, sc = PM.scale(z), [px, py] = PM.ground(x, z, 0).map(Math.round)
-      const hw = Math.max(1, Math.round(0.95 * sc)), hh = Math.max(1, Math.round(1.15 * sc))
-      c.rect(px - hw, py - hh, hw * 2 + 1, hh, r.keys[1]); c.rect(px - Math.round(hw * 0.7), py - hh, Math.round(hw * 1.4) + 1, Math.max(1, Math.round(hh * 0.4)), "z")
-      c.px(px - hw + 1, py - 2, "9"); c.px(px + hw - 1, py - 2, "9")
+      c.stamp(`_rf_${r.color}_*`, px, py + 1, { fit: Math.max(2, Math.round(1.07 * sc)) })
     }
   })
 
