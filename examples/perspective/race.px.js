@@ -471,13 +471,23 @@ function rival(c, r, z, f) {
 // point as a car does when it draws level. A low wedge: the haunch high over the rear wheel, the
 // glasshouse set back and in from the sides, the strakes over the side intake, the wheels with their
 // five-spoke rims, the door's seams and handle, the mirror; on the tail the louvred engine cover, the
-// rear window, the wing on its end plates, and on its back the black band of the tail lights, the
-// plate, the twin pipes and the diffuser. The side toward the low sun (a car's left) is lit, the other
+// rear window, the wing on its posts and end plates, and its back, curved (see BACK): lit over its
+// top, a tone down under the tail lights' black band, its corners turning away, the bumper standing
+// out, the plate, the twin pipes and the diffuser, the tyres under it; edged where it meets the side
+// in the paint's darkest, not in black. The side toward the low sun (a car's left) is lit, the other
 // in shade, the back in its paint as the drawing from behind has it, the tops take the sky; it follows the road's bend. Far off or straight ahead, the drawing
 // from behind stands in for it.
 const PAINT = { y: ["D", "j", "J", "g"], r: [",", "&", "K", ";"], b: ["$", "u", "U", "|"] }
-const BODY_SIDE = [[0, 0.2], [0, 0.72], [0.4, 0.77], [1.25, 0.79], [1.6, 0.77], [2.9, 0.71], [3.7, 0.63], [4.2, 0.53], [4.25, 0.36], [4.2, 0.2]]
+const BODY_SIDE = [[0.1, 0.2], [0.01, 0.38], [0, 0.5], [0.04, 0.66], [0.1, 0.76], [0.4, 0.78], [1.25, 0.79], [1.6, 0.77], [2.9, 0.71], [3.7, 0.63], [4.2, 0.53], [4.25, 0.36], [4.2, 0.2]]
 const WHEELS = [0.85, 3.55]
+// The back's outer edge, across (o) and up (h), after the drawings from behind and the games' cars seen
+// from behind: from the diffuser's edge round the bumper's corner, out to the haunch at its widest by
+// the lights, in to the chamfered top corner and along the deck; and how far its face leans in from the
+// tail at each height, tucked under at the bottom and leaning forward over the top, so it isn't a
+// slab: its bands of light come from that curve.
+const BACK = [[0.74, 0.2], [0.88, 0.25], [0.94, 0.35], [0.97, 0.5], [0.95, 0.64], [0.88, 0.73], [0.74, 0.775], [0, 0.785]]
+const backW = (h) => { for (let i = 1; i < BACK.length; i++) if (h <= BACK[i][1]) { const [o0, h0] = BACK[i - 1], [o1, h1] = BACK[i]; return o0 + ((o1 - o0) * (h - h0)) / (h1 - h0) } return 0 }
+const backLean = (h) => 0.1 * ((h - 0.5) / 0.29) ** 2
 function carInPerspective(c, r, z, f, bob) {
   const P = way(f)
   const xc = cx(r.lane, f), s = xc > 0 ? -1 : 1, lit = s < 0, ramp = PAINT[r.color], R = Math.round
@@ -489,8 +499,8 @@ function carInPerspective(c, r, z, f, bob) {
   const side = (pts, k, out = 0) => fill(pts.map(([u, h]) => [u, h, S(0.95 + out)]), k)
   // the side: its outline, the paint, the lower band in shade, the sill
   side(BODY_SIDE, "0")
-  side([[0.03, 0.22], [0.03, 0.7], [0.4, 0.75], [1.25, 0.77], [1.6, 0.75], [2.9, 0.69], [3.7, 0.61], [4.17, 0.52], [4.21, 0.37], [4.17, 0.22]], body)
-  side([[0.03, 0.22], [0.03, 0.36], [4.2, 0.36], [4.17, 0.22]], low)
+  side([[0.12, 0.22], [0.04, 0.38], [0.03, 0.5], [0.06, 0.66], [0.12, 0.74], [0.4, 0.76], [1.25, 0.77], [1.6, 0.75], [2.9, 0.69], [3.7, 0.61], [4.17, 0.52], [4.21, 0.37], [4.17, 0.22]], body)
+  side([[0.12, 0.22], [0.04, 0.36], [4.2, 0.36], [4.17, 0.22]], low)
   const sl = (a, b, k) => line([a[0], a[1], S(0.95)], [b[0], b[1], S(0.95)], k)
   sl([0.05, 0.21], [4.15, 0.21], "0")
   // the shoulder line in the light, the strakes over the intake, the door's seams and handle
@@ -499,7 +509,7 @@ function carInPerspective(c, r, z, f, bob) {
   sl([1.45, 0.24], [1.45, 0.77], ramp[0]); sl([3.05, 0.24], [3.05, 0.71], ramp[0]); sl([1.55, 0.69], [1.7, 0.69], "0")
   // the top of the body: the shoulder over the side, the engine cover over the tail with its louvres
   fill([[0.1, 0.74, S(0.95)], [1.25, 0.78, S(0.95)], [2.9, 0.7, S(0.95)], [3.7, 0.62, S(0.95)], [3.7, 0.66, S(0.7)], [2.9, 0.79, S(0.71)], [1.25, 0.83, S(0.73)], [0.1, 0.8, S(0.75)]], high)
-  fill([[0, 0.74, -0.95], [0, 0.74, 0.95], [1.1, 0.8, 0.95], [1.1, 0.8, -0.95]], ramp[2])
+  fill([[0.1, 0.78, -0.76], [0.1, 0.78, 0.76], [1.1, 0.8, 0.95], [1.1, 0.8, -0.95]], ramp[2])
   for (let k = 1; k < 6; k++) line([0.1 + k * 0.16, 0.755 + k * 0.008, -0.6], [0.1 + k * 0.16, 0.755 + k * 0.008, 0.6], ramp[1])
   // the glasshouse, set in from the sides, its pillars in the paint as on the car: the side glass with
   // the sky in it, the roof's rail along its top; at its back the rear window between the buttresses
@@ -523,32 +533,62 @@ function carInPerspective(c, r, z, f, bob) {
   fill([[3.0, 0.8, S(0.95)], [3.0, 0.8, S(1.09)], [2.86, 0.8, S(1.09)], [2.86, 0.88, S(1.05)]], "0")
   line([3.0, 0.8, S(1.09)], [2.86, 0.88, S(1.05)], high)
   { const [a, b] = pt(0.1, 0.55, S(0.96)), [d, e] = pt(4.1, 0.45, S(0.96)); c.px(R(a), R(b), "!"); c.px(R(d), R(e), ")") }
-  // the back, in shade: the panel, the black band of the tail lights lit, the plate, the diffuser and
-  // its fins, the twin pipes; the rear tyres under it
-  const back = (pts, k) => fill(pts.map(([o, h]) => [0, h, o]), k)
-  back([[-0.95, 0.18], [-0.95, 0.75], [0.95, 0.75], [0.95, 0.18]], "0")
-  back([[-0.92, 0.21], [-0.92, 0.72], [0.92, 0.72], [0.92, 0.21]], ramp[2])
-  back([[-0.92, 0.21], [-0.92, 0.33], [0.92, 0.33], [0.92, 0.21]], ramp[1])
-  line([-0.9, 0.715, 0], [0.9, 0.715, 0], ramp[3])
-  back([[-0.88, 0.47], [-0.88, 0.62], [0.88, 0.62], [0.88, 0.47]], "0")
-  // the lights: two round ones each side, red round a core lit to white; a red strip between
+  // the rear tyres under the back: their treads toward us, grooved, the top caught by the light
+  for (const sd of [-1, 1]) {
+    fill([[0.2, 0, sd * 0.95], [0.2, 0.2, sd * 0.95], [0.2, 0.2, sd * 0.68], [0.2, 0, sd * 0.68]], "0")
+    for (const h of [0.05, 0.1, 0.15]) line([0.2, h, sd * 0.92], [0.2, h, sd * 0.71], "-")
+    line([0.2, 0.19, sd * 0.92], [0.2, 0.19, sd * 0.71], "=")
+  }
+  // the back, curved after BACK: a band at a time, from its outline in, each following the curve
+  const band = (h0, h1, k, inset = 0, n = 12) => {
+    const hs = Array.from({ length: n + 1 }, (_, i) => h0 + ((h1 - h0) * i) / n)
+    fill([...hs.map((h) => [backLean(h), h, backW(h) - inset]), ...hs.reverse().map((h) => [backLean(h), h, -(backW(h) - inset)])], k)
+  }
+  const across = (h, k, inset = 0.03) => line([backLean(h), h, -(backW(h) - inset)], [backLean(h), h, backW(h) - inset], k)
+  band(0.2, 0.785, ramp[0], -0.015)                                        // its edge in the paint's darkest, not black: it meets the side
+  band(0.215, 0.77, ramp[2], 0.02)
+  // the panel lit by the sky over its top, which leans back toward it; a tone down under the lights,
+  // where it faces down as it tucks under, darkest at the bottom; its corners darker where they turn away
+  band(0.69, 0.77, ramp[3], 0.04); across(0.765, ramp[3], 0.12)
+  band(0.215, 0.456, ramp[1], 0.02)
+  band(0.215, 0.255, ramp[0], 0.03)
+  for (const sd of [-1, 1]) {
+    const hs = Array.from({ length: 9 }, (_, i) => 0.27 + (0.42 * i) / 8)
+    fill([...hs.map((h) => [backLean(h), h, sd * (backW(h) - 0.02)]), ...hs.reverse().map((h) => [backLean(h), h, sd * (backW(h) - 0.11)])], ramp[1])
+  }
+  // the bumper standing out a little: its top edge catching the light over a dark crease
+  across(0.36, "0", 0.06); across(0.35, ramp[2], 0.07)
+  // the tail lights in a black band set into the panel, wrapping round its corners: the lip over it
+  // lit, under it a shade; a grille of slats between the lamps
+  band(0.462, 0.628, "0", 0.04); across(0.636, ramp[3], 0.05); across(0.456, ramp[0], 0.05)
+  for (const h of [0.49, 0.6]) line([0, h, -0.45], [0, h, 0.45], "-")
   const lamp = (o, rr, k) => fill(Array.from({ length: 14 }, (_, i) => { const t = (TAU * i) / 14; return [0, 0.545 + rr * Math.sin(t), o + rr * Math.cos(t)] }), k)
-  for (const o of [-0.77, -0.58, 0.58, 0.77]) { lamp(o, 0.068, "("); lamp(o, 0.045, "!"); lamp(o, 0.02, "@") }
-  back([[-0.45, 0.535], [-0.45, 0.555], [0.45, 0.555], [0.45, 0.535]], "&")
-  back([[-0.2, 0.3], [-0.2, 0.41], [0.2, 0.41], [0.2, 0.3]], "0"); back([[-0.18, 0.32], [-0.18, 0.39], [0.18, 0.39], [0.18, 0.32]], "w")
-  for (const o of [-0.12, -0.04, 0.04, 0.12]) line([0, 0.345, o], [0, 0.365, o], "0")
-  back([[-0.92, 0.18], [-0.92, 0.27], [0.92, 0.27], [0.92, 0.18]], "0")
-  for (const o of [-0.6, -0.3, 0.3, 0.6]) line([0, 0.19, o], [0, 0.26, o], "-")
-  for (const sd of [-1, 1]) { const ring = (rr) => Array.from({ length: 12 }, (_, i) => { const t = (TAU * i) / 12; return [0, 0.25 + rr * Math.sin(t), sd * 0.35 + rr * Math.cos(t)] }); fill(ring(0.055), "0"); fill(ring(0.035), "~") }
-  for (const sd of [-1, 1]) back([[sd * 0.95, 0], [sd * 0.95, 0.19], [sd * 0.7, 0.19], [sd * 0.7, 0]], "0")
-  // the wing over the tail on its end plates, in the paint, its top in the light
-  for (const sd of [-1, 1]) fill([[0.14, 0.76, sd * 0.78], [0.14, 0.92, sd * 0.78], [0.33, 0.92, sd * 0.78], [0.33, 0.78, sd * 0.78]], ramp[1])
-  fill([[0.1, 0.92, -0.86], [0.1, 0.92, 0.86], [0.38, 0.95, 0.86], [0.38, 0.95, -0.86]], ramp[1])
-  line([0.1, 0.925, -0.86], [0.1, 0.925, 0.86], ramp[3])
+  for (const o of [-0.77, -0.58, 0.58, 0.77]) { lamp(o, 0.07, "("); lamp(o, 0.046, "!"); lamp(o, 0.02, "@") }
+  fill([[0, 0.535, -0.45], [0, 0.535, 0.45], [0, 0.555, 0.45], [0, 0.555, -0.45]], "&")
+  // the plate in its recess on the bumper, lit from over it
+  fill([[0.01, 0.27, -0.21], [0.01, 0.27, 0.21], [0.01, 0.42, 0.21], [0.01, 0.42, -0.21]], "0")
+  fill([[0.01, 0.29, -0.18], [0.01, 0.29, 0.18], [0.01, 0.395, 0.18], [0.01, 0.395, -0.18]], "w")
+  for (const o of [-0.12, -0.04, 0.04, 0.12]) line([0.01, 0.325, o], [0.01, 0.36, o], "0")
+  line([0.01, 0.405, -0.1], [0.01, 0.405, 0.1], "W")
+  // under it the diffuser, black, its fins, the twin pipes through it
+  fill([[0.08, 0.17, -0.74], [0.08, 0.17, 0.74], [0.06, 0.25, 0.8], [0.06, 0.25, -0.8]], "0")
+  for (const o of [-0.6, -0.3, 0.3, 0.6]) line([0.07, 0.18, o], [0.07, 0.24, o], "-")
+  for (const sd of [-1, 1]) { const ring = (rr) => Array.from({ length: 12 }, (_, i) => { const t = (TAU * i) / 12; return [0.05, 0.24 + rr * Math.sin(t), sd * 0.35 + rr * Math.cos(t)] }); fill(ring(0.06), "0"); fill(ring(0.042), "~"); fill(ring(0.022), "0") }
+  // the wing over the tail: two posts, the end plates outlined, the blade thick enough to show its
+  // edge toward us dark and its top in the light
+  for (const sd of [-1, 1]) fill([[0.18, 0.78, sd * 0.42], [0.18, 0.93, sd * 0.42], [0.24, 0.93, sd * 0.42], [0.24, 0.78, sd * 0.42]], "0")
+  for (const sd of [-1, 1]) {
+    fill([[0.12, 0.74, sd * 0.8], [0.12, 0.97, sd * 0.8], [0.36, 0.97, sd * 0.8], [0.36, 0.76, sd * 0.8]], "0")
+    fill([[0.14, 0.76, sd * 0.8], [0.14, 0.95, sd * 0.8], [0.34, 0.95, sd * 0.8], [0.34, 0.78, sd * 0.8]], ramp[1])
+  }
+  fill([[0.1, 0.915, -0.88], [0.1, 0.915, 0.88], [0.1, 0.975, 0.88], [0.4, 0.965, 0.88], [0.4, 0.965, -0.88], [0.1, 0.975, -0.88]], "0")
+  fill([[0.11, 0.955, -0.86], [0.11, 0.955, 0.86], [0.38, 0.958, 0.86], [0.38, 0.958, -0.86]], ramp[3])
+  fill([[0.1, 0.925, -0.86], [0.1, 0.925, 0.86], [0.1, 0.952, 0.86], [0.1, 0.952, -0.86]], ramp[1])
   // the blue one's white stripes, down its middle over the tail
   if (r.color === "b") for (const o of [-0.16, 0.08]) {
-    fill([[0, 0.745, o], [0, 0.745, o + 0.08], [1.1, 0.805, o + 0.08], [1.1, 0.805, o]], "w")
-    back([[o, 0.62], [o, 0.72], [o + 0.08, 0.72], [o + 0.08, 0.62]], "W")
+    fill([[0.1, 0.78, o], [0.1, 0.78, o + 0.08], [1.1, 0.805, o + 0.08], [1.1, 0.805, o]], "w")
+    fill([[backLean(0.64), 0.64, o], [backLean(0.64), 0.64, o + 0.08], [backLean(0.69), 0.69, o + 0.08], [backLean(0.69), 0.69, o]], "W")
+    fill([[backLean(0.69), 0.69, o], [backLean(0.69), 0.69, o + 0.08], [backLean(0.77), 0.77, o + 0.08], [backLean(0.77), 0.77, o]], "w")
   }
 }
 // the red one backfires as we come up on it: a short burst of flame from each pipe
