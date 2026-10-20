@@ -170,7 +170,7 @@ number of times a loop with the rods on their crank pins, and every puff of smok
 the speed of the ground, so the last frame runs into the first.
 
 <p>
-  <img src="docs/gallery/race_cockpit.gif" width="100%" alt="Animated pixel-art street race at sunset on the Rio-Santos coastal highway, seen from the driver's seat of a sports car: the road running to its vanishing point and bending right then left, a double yellow line with studs, the sea and the setting sun on the left with islands and the sun's path glittering, the Serra do Mar and a forest wall on the right with palms and lamp posts, yellow and black chevrons on the bends and a green sign for Paraty. Three rival sports cars drawn as pixel-art sprites from behind, a yellow one, a red one and a blue one with white racing stripes, with their wings, glowing round tail lights, plates and twin exhausts, are overtaken one after another, their flanks and rear wheels showing as they draw level, their long shadows on the road, the red one backfiring flames; the cockpit has a dashboard with an orange-lit rev counter and speedometer reading about 200 km/h, a leather steering wheel turning with the bends, gloved hands gripping it at ten to two as the driver sees them, the backs of the gloves toward us, the fingers curled over the rim and the thumbs holding it from underneath, in a blue track jacket with white stripes, its sleeves creased in folds, knit cuffs at the wrists, Bonfim ribbons hanging from the rear-view mirror, which shows the cars falling behind.">
+  <img src="docs/gallery/race_cockpit.gif" width="100%" alt="Animated pixel-art street race at sunset on the Rio-Santos coastal highway, seen from the driver's seat of a sports car: the road running to its vanishing point and bending right then left, a double yellow line with studs, the sea and the setting sun on the left with islands and the sun's path glittering, the Serra do Mar and a forest wall on the right with palms and lamp posts, yellow and black chevrons on the bends and a green sign for Paraty. Three rival sports cars drawn as pixel-art sprites from behind, a yellow one, a red one and a blue one with white racing stripes, with their wings, glowing round tail lights, plates and twin exhausts, are overtaken one after another, their flanks and rear wheels showing as they draw level, their long shadows on the road, the red one backfiring flames; the cockpit of a nineties Japanese sports coupe, modelled in 3D: the dash wrapped round the driver with the tachometer showing through the wheel at about 200 km/h, round vents set in perspective, an amber clock and climate dials on the centre stack, the radio's red display, a grey cloth door panel with its chrome handle, the dotted ceramic band along the windshield's edge, a leather steering wheel turning with the bends, gloved hands gripping it at ten to two as the driver sees them, the backs of the gloves toward us, the fingers curled over the rim and the thumbs holding it from underneath, in a blue track jacket with white stripes, its sleeves creased in folds, knit cuffs at the wrists, Bonfim ribbons hanging from the rear-view mirror, which shows the cars falling behind.">
 </p>
 
 [`examples/perspective/race.px.js`](examples/perspective/race.px.js): a street race from the driver's
@@ -179,9 +179,14 @@ right and then left over the loop; the rivals are drawn by hand from behind at s
 picking the one nearest the height each should be (`fit`), a flank drawn for when one draws level;
 one is overtaken every four seconds (one in our lane, so we weave), their long shadows thrown by
 `shadows()` from the low sun. The sun,
-the islands and the serra move only as the heading turns, the near ridge a little more. The cockpit is
-a sprite whose glass is left empty; the rear-view mirror is a second camera looking back, in a small
-anim of its own. Each hand is a puppet: a skeleton of joints read off photographs of a left hand
+the islands and the serra move only as the heading turns, the near ridge a little more. The cockpit, after a
+Supra A80's (the dash wrapped round the driver, three gauges under one hood, the centre stack turned
+toward him), is modelled in 3D in meters and drawn through the same camera
+([`cockpit.px.js`](examples/perspective/cockpit.px.js)): each face toned along its material's ramp
+by how it lies to the low sun, outlined where it ends in front of another, its top edge a step
+lighter; the vents are tubes set into their faces, the clock's digits sheared onto the stack, and the
+small parts (dials, hazard switch, door handle) drawn by hand and put where the camera puts them. Its
+glass is left empty; the rear-view mirror is a second camera looking back, in a small anim of its own. Each hand is a puppet: a skeleton of joints read off photographs of a left hand
 gripping, taken from its owner's eyes, set on the rim every frame so that the line the rim takes
 under the palm lies on it; the back of the glove a plate, the fingers and the thumb painted round
 (`capsule`) between their joints. The hand keeps its grip and turns with the wheel; the arms follow.

@@ -443,3 +443,11 @@ one), and the art code itself (4% of the cost).
   whole cycles of the loop.
 - Considered: a curved road in `perspective()` (`bend`: the offset kappa·d²/2 the race works out
   itself, in its `cx()`): one scene's so far; worth it if another road bends.
+- [ ] **A mesh op** (proposal): the cockpit (`examples/perspective/cockpit.px.js`) is modelled in 3D
+  and carries its own renderer, `render3d`: flat faces in meters through the road's camera, the
+  nearest face kept per pixel, each face toned along its material's ramp by how it lies to the sun
+  and the sky, an outline where a surface ends in front of another, a crease where two faces of one
+  material meet, the top edge of every surface a step lighter. `solids()` could not make it: it
+  sorts whole shapes, and its boxes are square to the ground, so a dash wrapped round the driver
+  draws in the wrong order. If a second scene wants one (a car, a ship's bridge, a room), move it
+  into pxl as `c.mesh(view, faces, mats)` with a builder for lofts and boxes.

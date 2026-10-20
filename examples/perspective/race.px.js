@@ -526,74 +526,7 @@ anim("_mirror", { w: MW, h: MH, frames: FRAMES, fps: FPS }, rect(0, 0, MW, 3, "2
     }
   })
 
-// ---------------------------------------------------------------- the cockpit
-// After pixel-art cockpits seen from the driver's seat: the dash across under the glass, its top
-// catching the sun; the hood over the gauges, which show through the wheel; round vents ringed in metal
-// and a strip of brushed aluminium; the radio's red display and the hazard button in the console; the
-// doors with their handles, switches and speakers; the side mirrors out past the side glass, the sunset
-// in them. The glass is left empty: the view shows through.
-const GAUGES = [[142, 125], [178, 125]]
-sprite("_cockpit", { w: W, h: H }, (c) => {
-  // roof liner and the visor down on the driver's side
-  c.rect(0, 0, W, 6, "-"); c.hline(0, 6, W, "="); c.hline(0, 7, W, "0")
-  c.poly([24, 0, 132, 0, 128, 15, 30, 13], "~"); c.poly([30, 13, 128, 15, 128, 16, 30, 14], "-"); c.hline(34, 2, 90, "=")
-  // the mirror: housing, stem, glass (empty here: the mirror's view goes under)
-  c.rect(156, 0, 8, 4, "-"); c.rect(125, 3, 70, 16, "0"); c.rect(126, 4, 68, 14, "-"); c.hline(127, 4, 66, "~")
-  c.rect(128, 5, MW + 2, MH + 2, "0"); c.rect(129, 6, MW, MH, "_")
-  // A-pillars, wide at the foot; beyond them the side windows, whose sills run down to the doors
-  c.poly([0, 0, 22, 0, 52, 106, 36, 112, 0, 112], "="); c.poly([0, 0, 14, 0, 36, 104, 0, 104], "_")
-  c.poly([22, 0, 26, 0, 54, 104, 52, 106], "~")
-  c.poly([W, 0, W - 22, 0, W - 52, 106, W - 36, 112, W, 112], "="); c.poly([W, 0, W - 14, 0, W - 36, 104, W, 104], "_")
-  c.poly([W - 22, 0, W - 26, 0, W - 54, 104, W - 52, 106], "~")
-  // the side mirrors, out beyond the side glass: a dark housing, the sunset and the road in the glass
-  for (const s of [1, -1]) {
-    const X = (x) => (s > 0 ? x : W - 1 - x)
-    c.poly([X(0), 84, X(25), 83, X(30), 95, X(27), 103, X(0), 104], "-")
-    c.poly([X(0), 86, X(23), 85, X(27), 95, X(24), 101, X(0), 102], "6")
-    c.poly([X(0), 90, X(25), 89, X(27), 95, X(24), 101, X(0), 102], "5"); c.poly([X(0), 96, X(26), 96, X(24), 101, X(0), 102], "a")
-    c.line(X(4), 87, X(14), 86, "8"); c.line(X(25), 83, X(30), 95, "~")
-  }
-  // the doors: the sill, the armrest, the handle in chrome, the window switches, a speaker
-  for (const s of [1, -1]) {
-    const X = (x) => (s > 0 ? x : W - 1 - x)
-    c.poly([X(0), 103, X(36), 106, X(44), H, X(0), H], "-"); c.line(X(0), 103, X(36), 106, "^")
-    c.poly([X(0), 138, X(38), 136, X(40), 144, X(0), 147], "="); c.line(X(0), 138, X(38), 136, "~")
-    c.rect(Math.min(X(8), X(24)), 122, 17, 4, "0"); c.hline(Math.min(X(9), X(23)), 122, 15, "W"); c.hline(Math.min(X(10), X(22)), 123, 13, "w")
-    c.circ(X(18), 164, 9, "0"); for (let y = 157; y <= 171; y += 2) for (let x = -8; x <= 8; x += 2) if (x * x + (y - 164) ** 2 < 64) c.px(X(18) + x, y, "=")
-    if (s > 0) for (const x of [10, 20]) { c.rect(x, 139, 7, 3, "0"); c.hline(x + 1, 139, 5, "~") }
-  }
-  // the dash across, its top catching the sun; the hood over the gauges
-  c.poly([30, 112, 70, 108, 118, 105, 124, 96, 196, 96, 202, 105, 250, 108, 290, 112, W - 30, H, 30, H], "-")
-  c.line(36, 111, 70, 108, "%"); c.line(70, 108, 118, 105, "%"); c.line(118, 105, 124, 96, "%"); c.hline(124, 96, 73, "%"); c.line(196, 96, 202, 105, "%"); c.line(202, 105, 250, 108, "%"); c.line(250, 108, 288, 112, "%")
-  c.line(37, 112, 118, 106, "~"); c.line(202, 106, 288, 113, "~"); c.hline(125, 97, 71, "~")
-  c.rect(124, 98, 73, 4, "0")
-  // the brushed aluminium strip, the vents ringed in it, round with their slats
-  c.rect(40, 117, 240, 3, "W"); c.hline(40, 117, 240, "w"); c.hline(40, 120, 240, "0")
-  for (const vx of [74, 246]) {
-    c.circ(vx, 129, 9, "W"); c.circ(vx, 129, 8, "0"); c.ring(vx, 129, 8, "w")
-    for (let y = 124; y <= 134; y += 2) c.hline(vx - Math.round(Math.sqrt(Math.max(0, 49 - (y - 129) ** 2))), y, 2 * Math.round(Math.sqrt(Math.max(0, 49 - (y - 129) ** 2))) + 1, "~")
-    c.circ(vx, 129, 2, "=")
-  }
-  // the gauges under the hood: dark faces, metal rings, the numbers, the red zone
-  c.rect(124, 102, 72, 34, "0")
-  for (const [gx, gy] of GAUGES) {
-    c.circ(gx, gy, 12, "W"); c.circ(gx, gy, 11, "0"); c.ring(gx, gy, 11, "w")
-    for (let i = 0; i <= 10; i++) { const a = Math.PI * (0.8 + (i / 10) * 1.4), r0 = i % 2 ? 9 : 8; c.line(Math.round(gx + Math.cos(a) * r0), Math.round(gy + Math.sin(a) * r0), Math.round(gx + Math.cos(a) * 10), Math.round(gy + Math.sin(a) * 10), i > 8 ? "(" : ")") }
-  }
-  c.rect(153, 112, 14, 20, "-"); c.rect(154, 113, 12, 18, "0")
-  // red stitching along the dash's front edge, either side of the hood
-  for (let x = 40; x < 282; x += 3) if (x < 116 || x > 204) c.px(x, Math.round(x < 160 ? 113 - (x - 40) * 0.05 : 108 + (x - 204) * 0.05), "(")
-  // carbon fibre on the passenger's side above the console: its weave in two dark tones
-  for (let y = 108; y < 116; y++) for (let x = 210; x < 280; x++) if (y > 107 + (x - 202) * 0.07) c.px(x, y, ((x >> 1) + (y >> 1)) % 2 ? "-" : "=")
-  // the console: the radio with its red display, the buttons, the hazard switch
-  c.poly([250, 120, 300, 122, 312, H, 252, H], "="); c.line(250, 120, 300, 122, "~")
-  c.rect(258, 128, 40, 9, "0"); c.rect(260, 130, 36, 5, "!"); c.hline(260, 130, 36, "@"); for (const x of [264, 272, 280, 288]) c.px(x, 132, "9")
-  for (const x of [260, 268, 276, 284, 292]) { c.rect(x, 140, 5, 3, "0"); c.hline(x, 140, 5, "~") }
-  c.rect(272, 147, 12, 8, "0"); c.poly([274, 153, 278, 148, 282, 153], "("); c.px(278, 151, "0")
-  // the gear lever, sequential: its boot and knob low on the console
-  c.poly([290, H, 296, 160, 308, 160, 314, H], "0"); for (let y = 164; y < H; y += 3) c.hline(296, y, 14, "=")
-  c.rect(298, 150, 8, 10, "-"); c.rect(299, 151, 6, 4, "~"); c.hline(299, 151, 6, "W"); c.px(301, 156, "(")
-})
+include("cockpit.px.js")
 
 // ---------------------------------------------------------------- the driver
 // The wheel, small as a racing car's, turns with the bend and with every change of lane; the hands
@@ -761,11 +694,12 @@ function cuff(c, [ex, ey], [wx, wy], side) {
 }
 function needles(c, f) {
   const rev = 0.72 + 0.04 * Math.sin((TAU * f * 52) / FRAMES) + 0.06 * Math.sin((TAU * f * 3) / FRAMES), kmh = 200 + 4 * Math.sin((TAU * f) / FRAMES * 2)
-  for (const [[gx, gy], v] of [[GAUGES[0], rev], [GAUGES[1], kmh / 300]]) {
-    const a = Math.PI * (0.8 + v * 1.4)
-    c.line(gx, gy, Math.round(gx + Math.cos(a) * 9), Math.round(gy + Math.sin(a) * 9), "["); c.circ(gx, gy, 1, "~")
+  for (const g of GAUGES) {
+    const v = g.kind === "revs" ? rev : g.kind === "speed" ? kmh / 280 : 0.62, a = Math.PI * (1.25 - 1.5 * v), R = Math.round
+    c.line(R(g.x), R(g.y), R(g.x + Math.cos(a) * g.rp * 0.82), R(g.y - Math.sin(a) * g.rp * 0.82), "["); c.px(R(g.x), R(g.y), "~")
   }
-  c.text(155, 119, String(Math.round(kmh)), ")"); c.text(158, 126, "6", "(")
+  const t = GAUGES[1]
+  c.text(Math.round(t.x) - 5, Math.round(t.y + t.rp * 0.3), String(Math.round(kmh)), ")")
 }
 // the ribbons tied to the mirror: they hang and swing against the turn
 function ribbons(c, f) {
