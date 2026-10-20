@@ -180,3 +180,67 @@ test("study takes an animation apart: what is carried, what animates in place, a
   assert.match(piece(70, 40) ?? text, /lighter and darker all at once: a light/);
   assert.match(piece(110, 60) ?? text, /changing all over without repeating/);
 });
+
+test("study cuts each piece out of its background: a body that stays between its moving arms, a bird circling over a patch", () => {
+  // 24 frames on a dithered lawn: a figure waving both arms (its body, outlined, never moves); a bird
+  // going twice round a small loop over a yellow patch that doesn't reach the edge of its box
+  const W = 120, H = 80, n = 24, g1 = pack(70, 140, 70), g2 = pack(90, 170, 80), soil = pack(120, 90, 50), ink = pack(20, 20, 30), red = pack(220, 60, 60), sun = pack(240, 220, 80);
+  const lawn = new Img(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) lawn.set(x, y, latticeHash(x, y) < 0.1 ? soil : (x + y) % 2 ? g1 : g2);
+  for (let y = 18; y < 23; y++) for (let x = 88; x < 93; x++) lawn.set(x, y, sun);
+  const frames = Array.from({ length: n }, (_, f) => {
+    const img = lawn.copy();
+    for (let y = 28; y < 42; y++) for (let x = 40; x < 48; x++) img.set(x, y, x === 40 || x === 47 || y === 28 || y === 41 ? ink : red);
+    const up = f % 4 >= 3;
+    for (const x of [37, 48]) for (let y = up ? 24 : 32; y < (up ? 31 : 39); y++) for (let dx = 0; dx < 3; dx++) img.set(x + dx, y, dx === 1 ? red : ink);
+    const a = (f * 4 * Math.PI) / n, bx = 89 + Math.round(3 * Math.cos(a)), by = 19 + Math.round(3 * Math.sin(a));
+    for (let y = 0; y < 2; y++) for (let x = 0; x < 3; x++) img.set(bx + x, by + y, ink);
+    return img;
+  });
+  const r = study({ name: "matte", frames, ms: frames.map(() => 100), kind: "test" });
+  const json = r.pieces!.json as { pieces: { box: number[]; round?: boolean; strip: { frames: number; w: number; h: number } }[] };
+  const at = (x: number, y: number) => json.pieces.findIndex((p) => p.box[0] <= x && x < p.box[0] + p.box[2] && p.box[1] <= y && y < p.box[1] + p.box[3]);
+  const counts = (i: number) => {
+    const s = r.pieces!.strips[i], { frames: k, w } = json.pieces[i].strip;
+    return Array.from({ length: k }, (_, j) => { const c = new Map<number, number>(); for (let y = 0; y < s.h; y++) for (let x = j * w; x < (j + 1) * w; x++) { const v = s.get(x, y); if ((v & 255) >= 128) c.set(v, (c.get(v) ?? 0) + 1); } return c; });
+  };
+  // the figure: all of its body kept in every frame (6x12 red inside the outline, and the arms'), no lawn
+  const fig = at(38, 34);
+  assert.ok(fig >= 0, JSON.stringify(json.pieces.map((p) => p.box)));
+  for (const c of counts(fig)) {
+    assert.ok((c.get(red) ?? 0) >= 72, `body kept: ${c.get(red)}`);
+    assert.equal((c.get(g1) ?? 0) + (c.get(g2) ?? 0) + (c.get(soil) ?? 0), 0, "no lawn");
+  }
+  // the bird: going round; only the bird in each frame, not the patch it flies over
+  const bird = at(89, 17);
+  assert.ok(bird >= 0 && json.pieces[bird].round, JSON.stringify(json.pieces));
+  for (const c of counts(bird)) {
+    assert.ok((c.get(ink) ?? 0) >= 4, `bird kept: ${c.get(ink)}`);
+    assert.equal(c.get(sun) ?? 0, 0, "no patch");
+  }
+});
+
+test("study tells the light apart before looking for things: a lamp pulsing on a floor, a pale blob bobbing on a dark sky", () => {
+  // 16 frames: a warm lamp at 30,56 brightening and dimming a dithered floor round it; a flat pale blob
+  // (no outline, so its edges change as softly as a light) bobbing a pixel up and down on a flat sky
+  const W = 120, H = 80, n = 16, sky = pack(30, 34, 70), pale = pack(220, 230, 250), f1 = pack(70, 60, 50), f2 = pack(90, 80, 64);
+  const frames = Array.from({ length: n }, (_, f) => {
+    const img = new Img(W, H), k = 0.5 + 0.5 * Math.sin((2 * Math.PI * f) / n);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (y < 40) { img.set(x, y, sky); continue; }
+      const c = (x + y) % 2 ? f1 : f2, d = Math.hypot(x - 30, y - 56), g = 1 + 0.9 * k * Math.max(0, 1 - d / 16);
+      img.set(x, y, pack(Math.min(255, Math.round(((c >>> 24) & 255) * g)), Math.min(255, Math.round(((c >>> 16) & 255) * g * 0.9)), Math.min(255, Math.round(((c >>> 8) & 255) * g * 0.6))));
+    }
+    const dy = f % 4 < 2 ? 0 : 1;
+    for (let y = 0; y < 12; y++) for (let x = 0; x < 10; x++) if (Math.hypot(x - 4.5, y - 5.5) < 5.5) img.set(80 + x, 14 + y + dy, pale);
+    return img;
+  });
+  const r = study({ name: "relight", frames, ms: frames.map(() => 100), kind: "test" }), text = r.text.join("\n");
+  const pieces = (r.pieces!.json as { pieces: { kind: string; box: number[]; source?: number[]; tint?: string }[] }).pieces;
+  assert.match(text, /Light: where only the light changes/);
+  const lamp = pieces.find((p) => p.source);
+  assert.ok(lamp && Math.hypot(lamp.source![0] - 30, lamp.source![1] - 56) <= 8, JSON.stringify(pieces));
+  assert.ok(parseInt(lamp!.tint!.slice(1, 3), 16) > parseInt(lamp!.tint!.slice(5, 7), 16), `warm: ${lamp!.tint}`);
+  const blob = pieces.find((p) => p.box[0] <= 84 && p.box[0] + p.box[2] >= 86 && p.box[1] <= 20 && p.box[1] + p.box[3] >= 22);
+  assert.ok(blob && blob.kind !== "light", JSON.stringify(pieces));
+});

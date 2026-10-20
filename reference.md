@@ -449,7 +449,12 @@ bands of rows carried across together and their speeds to a fraction of a pixel 
 moving forward: the vanishing point of the motion, which picks the road's among the still ones). And
 taken apart into PIECES, each with what to build it with (after layered motion, Wang and Adelson
 1994): the backdrop (each pixel's commonest color over the clip: what never differs from it is one
-picture); the planes; then what differs from them, followed from frame to frame, a piece of about
+picture); the planes; the light, told apart before anything else is looked for, so a lamp pulsing or
+a fire on the walls isn't taken for a thing (a change of light multiplies every color under it alike:
+it changes smoothly from pixel to pixel, fades out or stops at an edge the picture already had, and
+in step with its neighbors over the clip; a thing changes hard where the picture had no edge, is the
+background moved a step, or changes its neighbors one after another; after Weiss 2001, Matsushita et
+al. 2004 and Koppal and Narasimhan 2006); then what differs from them, followed from frame to frame, a piece of about
 the same size a plausible step on: one drawing carried along a path at a steady speed (a sprite
 stamped where the path puts it; growing or shrinking when it comes nearer or goes away: sizes by
 `fit`); changing drawings carried along (a walk, a run, a drifting cloud: an anim of its drawings
@@ -457,14 +462,22 @@ stamped along its path, its limbs a rig when parts of it move); things going acr
 another (traffic, a crowd: sprites along a lane, or `scroll()` for a lane at one speed); and in
 place, read from the pixels that change there: a cycle of drawings (`anim`), parts moving against a
 body that stays (a rig, or a frame per pose), changing all over without repeating with neighbors
-changing at odds (fire, water, smoke: `flame()`, `plume()`, `warp()`), or lighter and darker all at
-once with the hue kept (a light: `glow()`, a lamp, colors swapped per frame). Each object is
-isolated from the others: the changing pixels in fragments that touch, put back together only when
-they are near each other, change in the same rhythm and share colors (one dancer's arm and leg, not
-two dancers side by side; dancers moving together in step still come out as one). The pieces are
-numbered; `_study/<name>_pieces.png` has a row for each, it alone cut out across the clip (by its
-own box in each frame when it goes somewhere), and `<name>_pieces.json` its kind, drawings, cycle,
-speed and its box in every frame it shows in (its track, `[frame, x, y, w, h]`). Videos are read `--seconds` (8) from `--from` at their own
+changing at odds (fire, water, smoke: `flame()`, `plume()`, `warp()`), or a thing wandering about
+its box (a bird circling: going round a loop). Each object is isolated from the others: the changing
+pixels in fragments that touch, put back together when they are near each other, change in the same
+rhythm and share colors (one dancer's arm and leg, not two dancers side by side), or have the same
+still body (two arms waving either side of it: a rig). Each light is a piece too: where it shines from,
+how many times brighter at its brightest than at its dimmest, its color (`glow()` in that color, a
+lamp in `lighting()`, colors swapped per frame); two pools side by side pulsing to their own rhythms
+are two lights. Each piece is cut out of its background in every capture (after GrabCut's idea,
+Rother et al. 2004: the background's colors, read round its box, flood in from the box's edge and stop
+at its outline; what is left touching what moves is it, its holes filled; in place, in a box grown
+round its whole body); a light's capture is the light itself, its color as strong as its change. The
+pieces are numbered, things first, then lights; `_study/<name>_pieces.png` has a row for each, it
+alone across the clip; `_piece<N>.png` its frames in a strip (a whole cycle when it has one), clear
+behind it, to look at or draw over; and `<name>_pieces.json` its kind, drawings, cycle, speed, a
+light's source, strength and color, and its box in every frame it shows in (its track,
+`[frame, x, y, w, h]`). Videos are read `--seconds` (8) from `--from` at their own
 rate up to 30 fps (`--fps`); big frames are brought down as they are read (to 1x when they are pixel
 art, else to 640 px). PNG and GIF are read by pxl; JPEG, WebP, BMP and video need ffmpeg on PATH.
 

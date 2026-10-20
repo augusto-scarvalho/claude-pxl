@@ -428,6 +428,33 @@ one), and the art code itself (4% of the cost).
   every frame in `_pieces.json`. The party now comes apart into the witch at her cauldron, the
   pumpkins, the lanterns, the ghost, the mirror ball, the fire, groups of dancers; the road into the
   walker shrinking as it goes, the windmill, the vultures, the lit window.
+  Then each capture cut out of its background (asked next): the background's colors, read round the
+  piece's box (that frame's, when it goes somewhere), flood in from the edge and stop at its outline;
+  what's left touching what moves is it, holes filled; the rule decided once a piece so its frames
+  agree; a thing in place in a box grown round its whole body (closed, at most ten times what moves);
+  a thing wandering about its box (a bird circling) cut by its own difference, and reported as going
+  round. Groups with the same still body are one thing (two arms either side of it: a rig). A strip a
+  piece, `_piece<N>.png`.
+  Then the light told apart first (asked next, after Weiss 2001, Matsushita et al. 2004, Koppal and
+  Narasimhan 2006): a change smooth from pixel to pixel, stopping softly or at an edge the picture had,
+  not the background moved a step, in step with its neighbors over the clip, is the light's; taken
+  away before things are looked for; each light a piece (where it shines from, how strong, its color),
+  pools pulsing to their own rhythm apart. The dancers the green light round the cauldron glued
+  together came apart. Dividing the light out of things' colors was tried and dropped: against the
+  source it made them worse (0.052 to 0.091 OKLab off on the party's dancers under the mirror ball).
+  Measured with `scripts/calibrate.ts` against the examples' own source (each stamp's box and pixels
+  per frame; the frame before `lighting()`): light found 69-76% and right 73-99% where a scene lights
+  itself (party, cave, no_magic); things found by box or as the light they shine about half the time
+  in place (party 6 of 21 and 4 loosely, forest 3 of 10 and 4 loosely), captures 65-69% the thing and
+  holding 74-80% of it. Weak: the perspective scenes (road, park, sodium_hour, tournament), where a
+  figure is many stamps or drawn by `solids()` (the harness counts parts) and walkers are lost; sunset
+  and cyberpunk, unlit, where what's taken for light is mostly things (backlit people).
+- [ ] **Next for study's pieces**, from the papers (Wang and Adelson 1994; Jojic and Frey 2001;
+  Deformable Sprites, Ye et al. 2022): group fragments by their best whole-pixel shift, not only by
+  rhythm and color (dancers in step on one lawn stay apart); a light as a few basis images times a
+  curve each (NMF on the ratio to the background, Oya et al. 2020), the rest things; the harness to
+  group a rig's stamps into one thing and score sprites the way Fast Sprite Decomposition (Suzuki et
+  al., ECCV 2024) does (each sprite alone, matched by the best assignment).
 - [x] **More of what the papers measure**: a sprite's light from its rim (Johnson and Farid, 2005);
   banding by Pixel Logic's rule as the Pixel Fixer paper (TU Delft, 2025) states it; pillow shading;
   the translation of a photo by superpixels after Gerstner et al. (NPAR 2012), which keeps edges.

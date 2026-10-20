@@ -20,7 +20,7 @@ import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Va
 export interface StudyInput { name: string; frames: Img[]; ms: number[]; kind: string; drawnAt?: Grid }
 export interface StudyOpts { colors?: number; to?: [number, number] }
 /** pieces: each object of an animation alone (a row of cutouts each) and its box in every frame */
-export interface StudyOut { text: string[]; sheet: Img; picture: Img; pixelArt: boolean; palette: Color[]; pieces?: { sheet: Img; json: unknown } }
+export interface StudyOut { text: string[]; sheet: Img; picture: Img; pixelArt: boolean; palette: Color[]; pieces?: { sheet: Img; json: unknown; strips: Img[] }; layers?: ReturnType<typeof decompose> }
 
 const pct = (a: number, b: number) => `${b ? Math.round((100 * a) / b) : 0}%`;
 const hex = (c: Color) => toHex(c).slice(0, 7);
@@ -131,7 +131,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
 
   const palette = ramps.flatMap((r) => r.colors);
   const pieces = motion?.layers && motion.layers.pieces.length ? piecesOut(motion.layers, input.ms) : undefined;
-  return { text, sheet: sheet(picture, tech, pixelArt, P, segs, vps, persp.horizon, ramps, motion), picture, pixelArt, palette, pieces };
+  return { text, sheet: sheet(picture, tech, pixelArt, P, segs, vps, persp.horizon, ramps, motion), picture, pixelArt, palette, pieces, ...(motion?.layers ? { layers: motion.layers } : {}) };
 }
 
 const fit = (w: number, h: number, long: number): [number, number] => {
@@ -349,18 +349,22 @@ const WHAT: Record<Piece["kind"], string> = {
   effect: "changing all over without repeating (fire, water, smoke, sparkle): an effect in code: flame(), plume(), warp() or noise drawn per frame",
   light: "lighter and darker all at once: a light: glow(), a lamp, or colors swapped per frame",
 };
+/** The pieces told and drawn: the 16 biggest things, then the 8 biggest lights. */
+const shown = (pieces: Piece[]) => [...pieces.filter((p) => p.kind !== "light").slice(0, 16), ...pieces.filter((p) => p.kind === "light").slice(0, 8)];
 function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: number; v: number }[], forward: boolean): string[] {
   const out = [`  Backdrop: ${pct(d.still * 100, 100)} of the picture never changes${d.still > 0.2 ? ": one picture (a sprite or the scene's still layers) under everything else" : ""}.`];
   if (bands.length && !forward) out.push(`  Planes: ${bands.length} band${bands.length > 1 ? "s" : ""} of rows going by (see MOTION): each a strip that wraps, scroll().`);
+  if (d.relit) out.push("  Light: where only the light changes (a lamp pulsing, a fire on the walls) was told apart first and taken away before looking for things, so what it lights isn't taken for a thing; the lights are pieces of their own (each capture shows the light itself, its color as strong as its change).");
   const where = (b: number[]) => `${b[2]}x${b[3]} at ${b[0]},${b[1]}`;
   const dir = (v: [number, number]) => `${Math.abs(v[0]) >= Math.abs(v[1]) ? (v[0] < 0 ? "left" : "right") : v[1] < 0 ? "up" : "down"} at ${Math.hypot(v[0], v[1]).toFixed(2)} px/frame`;
-  for (const [i, p] of d.pieces.slice(0, 16).entries()) {
+  for (const [i, p] of shown(d.pieces).entries()) {
     const draw = `${p.poses} drawing${p.poses === 1 ? "" : "s"}${p.cycle ? `, a cycle of ${p.cycle} frames` : ""}`;
-    const extra = p.round ? `, going round a loop (circling, swinging): stamped along its loop each frame` : p.kind === "carried" || p.kind === "walk" ? `, going ${dir(p.speed!)}${p.grow && Math.abs(p.grow - 1) > 0.2 ? `, ${p.grow > 1 ? "growing" : "shrinking"} x${p.grow.toFixed(1)} (${p.grow > 1 ? "coming nearer" : "going away"}: sizes picked by fit)` : ""}${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving (limbs: a rig, or a drawing per pose)` : ""}` : p.kind === "rig" ? `, ${p.parts} parts moving` : "";
+    const extra = p.round ? `, going round a loop (circling, swinging)` : p.kind === "carried" || p.kind === "walk" ? `, going ${dir(p.speed!)}${p.grow && Math.abs(p.grow - 1) > 0.2 ? `, ${p.grow > 1 ? "growing" : "shrinking"} x${p.grow.toFixed(1)} (${p.grow > 1 ? "coming nearer" : "going away"}: sizes picked by fit)` : ""}${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving (limbs: a rig, or a drawing per pose)` : ""}` : p.kind === "rig" ? `, ${p.parts} parts moving` : p.source ? `, shining from about ${p.source[0]},${p.source[1]}, x${p.strength!.toFixed(1)} from its dimmest to its brightest, its light ${hex(p.tint!)}` : "";
     out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}: ${WHAT[p.kind]}.`);
   }
-  if (d.pieces.length > 16) out.push(`  ... and ${d.pieces.length - 16} smaller pieces.`);
-  if (d.pieces.length) out.push("  Each one alone, a row of it cut out across the clip: _pieces.png; its box in every frame (its track): _pieces.json.");
+  const things = d.pieces.filter((p) => p.kind !== "light").length, lights = d.pieces.length - things;
+  if (things > 16 || lights > 8) out.push(`  ... and ${[things > 16 ? `${things - 16} smaller things` : "", lights > 8 ? `${lights - 8} smaller lights` : ""].filter(Boolean).join(" and ")}.`);
+  if (d.pieces.length) out.push(`  Each one alone, its background taken away: a row of it across the clip in _pieces.png; its frames in a strip of its own, one whole cycle when it has one, in _piece<N>.png (to look at, or to draw over); its box in every frame (its track) in _pieces.json.`);
   if (!d.pieces.length) out.push("  Nothing moves on its own: the picture is still apart from its planes.");
   return out;
 }
@@ -372,8 +376,8 @@ function number(img: Img, x: number, y: number, n: number, c: Color, s = 1) {
 }
 
 /** Each piece alone: a row of its cutouts across the clip (on a dark checker where it's clear), numbered; and the tracks as data. */
-function piecesOut(d: ReturnType<typeof decompose>, ms: number[]): { sheet: Img; json: unknown } {
-  const list = d.pieces.slice(0, 16), cell = 48, gap = 4, label = 18;
+function piecesOut(d: ReturnType<typeof decompose>, ms: number[]): { sheet: Img; json: unknown; strips: Img[] } {
+  const list = shown(d.pieces), cell = 48, gap = 4, label = 18;
   const fit = (im: Img) => Math.max(1, Math.min(4, Math.floor(cell / Math.max(im.w, im.h))));
   const rows = list.map((p) => { const s = Math.min(...p.cuts.map(fit)); return { p, s, h: Math.max(...p.cuts.map((c) => c.h)) * s, w: p.cuts.reduce((a, c) => a + c.w * s + gap, 0) }; });
   const W = Math.max(120, ...rows.map((r) => label + r.w + gap)), H = rows.reduce((a, r) => a + Math.max(12, r.h) + gap, gap);
@@ -394,9 +398,9 @@ function piecesOut(d: ReturnType<typeof decompose>, ms: number[]): { sheet: Img;
   }
   const json = {
     frames: d.frames, ms: Math.round(ms.reduce((a, v) => a + v, 0) / ms.length), backdrop: +d.still.toFixed(3),
-    pieces: list.map((p, i) => ({ id: i + 1, kind: p.kind, box: p.box, frames: p.frames, drawings: p.poses, cycle: p.cycle, ...(p.speed ? { speed: p.speed.map((v) => +v.toFixed(3)) } : {}), ...(p.grow !== undefined ? { grow: +p.grow.toFixed(2) } : {}), ...(p.parts ? { parts: p.parts } : {}), ...(p.round ? { round: true } : {}), track: p.track })),
+    pieces: list.map((p, i) => ({ id: i + 1, kind: p.kind, box: p.box, frames: p.frames, drawings: p.poses, cycle: p.cycle, ...(p.speed ? { speed: p.speed.map((v) => +v.toFixed(3)) } : {}), ...(p.grow !== undefined ? { grow: +p.grow.toFixed(2) } : {}), ...(p.parts ? { parts: p.parts } : {}), ...(p.round ? { round: true } : {}), ...(p.source ? { source: p.source, strength: +p.strength!.toFixed(2), tint: hex(p.tint!) } : {}), fill: +p.fill.toFixed(2), strip: { file: `_piece${i + 1}.png`, frames: p.stripFrames, w: p.strip.w / p.stripFrames, h: p.strip.h }, track: p.track })),
   };
-  return { sheet: out, json };
+  return { sheet: out, json, strips: list.map((p) => p.strip) };
 }
 
 function blobs(count: Uint16Array, W: number, H: number, min: number) {
@@ -464,7 +468,7 @@ function sheet(pic: Img, t: Techniques, pixelArt: boolean, P: Img, segs: Segment
     if (m.layers) {
       const PC: Record<Piece["kind"], Color> = { carried: pack(70, 220, 230), walk: pack(80, 230, 90), stream: pack(90, 140, 255), anim: pack(240, 220, 60), rig: pack(240, 150, 60), effect: pack(230, 60, 220), light: pack(250, 250, 250) };
       const pp = grey(m.frames[0]).scale(fs);
-      for (const [i, p] of m.layers.pieces.slice(0, 16).entries()) {
+      for (const [i, p] of shown(m.layers.pieces).entries()) {
         const [x, y, w, h] = p.box.map((v) => v * fs), c = PC[p.kind];
         number(pp, x + 1, Math.max(0, y - 6), i + 1, c);
         line(pp, x, y, x + w - 1, y, c); line(pp, x, y + h - 1, x + w - 1, y + h - 1, c); line(pp, x, y, x, y + h - 1, c); line(pp, x + w - 1, y, x + w - 1, y + h - 1, c);

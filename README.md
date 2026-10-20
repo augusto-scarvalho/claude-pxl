@@ -313,6 +313,7 @@ Tip: ask the agent to start `pxl serve` so you can watch it paint in your browse
 npm install        # dev only: typescript, @types/node
 npm run check      # type check + tests
 node scripts/gallery.ts   # regenerate docs/gallery
+node scripts/calibrate.ts [asset ...] [-v] [--map DIR]   # pxl study against the examples' own source
 ```
 
 ```
@@ -320,7 +321,7 @@ src/core/     engine, no Node APIs: image, palette + ramps, canvas ops, build, t
 src/node/     vm sandbox loader, PNG/GIF encoders, outputs, CLI, live server
 src/viewer/   browser viewer (served type-stripped; no bundler)
 types/        pxl.d.ts globals for editor support in .px.ts files
-scripts/      build.js (dist/ for npm installs), gallery.ts
+scripts/      build.js (dist/ for npm installs), gallery.ts, calibrate.ts
 examples/     example art files
 test/         node:test suites
 ```

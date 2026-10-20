@@ -17,9 +17,9 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    PNG, GIF, JPEG or video, pixel art or not): `PXL study ref.gif` first. It reports what the piece
    is made of (palette and ramps, outlines, dithering, light, banding and pillow shading; perspective,
    vanishing points, lens and tilt; cycle, loop, parallax planes and their speeds; animated, its
-   pieces: the backdrop, sprites carried along, walks, anims in place, rigs, effects, lights, each
-   isolated with its box in every frame) and what to use in pxl for each, with a sheet, the palette
-   and each piece cut out in `out/_study/`.
+   pieces: the backdrop, sprites carried along, walks, anims in place, rigs, effects, and the lights
+   told apart first, each isolated with its box in every frame) and what to use in pxl for each, with
+   a sheet, the palette and each piece cut out of its background in `out/_study/`.
 2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
    `out/_shot/<name>.png` (read it). Its text says what changed since your last shot of it (pixels
    and where, so an edit that did nothing shows) and the warnings `check` finds on it.
