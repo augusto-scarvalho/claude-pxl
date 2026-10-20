@@ -10,7 +10,8 @@
 //   ridge     32: too slow for a strip to go round, so its outline drifts one step and crossfades
 //   hills     320 (one strip, once round)       pasture   640      trackside 1280      grass 1920
 // the train: drivers that turn a whole number of times, rods on their crank pins, smoke puffs that
-// each live 38 frames and fall behind, as the air they're in stays put.
+// each live 38 frames and fall behind, as the air they're in stays put. In the cab the driver looks
+// ahead and the fireman feeds the firebox; at the windows people lean out, a child waves.
 pal({
   A: "#5f9fd9", B: "#78b0e0", C: "#97c4e8", D: "#b9d8ee",                          // sky, top to horizon
   W: "#ffffff", w: "#e4edf3", v: "#c0d2e0",                                         // clouds
@@ -30,6 +31,9 @@ pal({
   5: "#7b2b35", 6: "#9b3c46", 7: "#ead9b1", 8: "#c3ae87", 9: "#23252d", 0: "#8fb7cf", // coach, window, glass
   S: "#c98b5f", U: "#8b5a39", N: "#3a2a20",                                         // skin, hair
   Y: "#f4f4f1", V: "#d4d4d7", "=": "#a9a9b1", $: "#7d7d87",                         // smoke
+  "(": "#cf6e36", ")": "#b0542a", "[": "#86391b", "]": "#5a2611", "{": "#3a2017", "}": "#9fbfa0", // coach wood, inside, far windows
+  "<": "#c97a3c", ">": "#5d616a", "/": "#8b8f99",                                   // copper, graphite
+  ";": "#eab892", "|": "#bcbcc2", "-": "#b9a676", ",": "#8b7b4f", "'": "#e2c47c", "@": "#ff9b3c", // skin, gray hair, khaki, straw, firelight
 })
 const W = 320, H = 180, FPS = 16, FRAMES = 192
 const RAIL = 158                      // the rails' top row
@@ -336,94 +340,203 @@ sprite("_fg", { w: FG_W, h: 30, wrap: "x" }, (c) => {
 })
 
 // ---------------------------------------------------------------- the train
-// Engine, tender and two coaches, facing right. The drivers turn DRIVE times a loop, about as far as
-// the land goes by (1280 px for wheels 7 px across the radius); the small wheels SMALL times.
-const DRIVE = 29, SMALL = 51
-const DRIVERS = [236, 252, 268], AXLE = RAIL - 8
+// After the Oeste de Minas engines (Baldwin 2-8-0s on the 76 cm gauge, in black with red wheels and
+// polished rods): a tall straight stack on a graphite smokebox, the headlamp with its red
+// number plate, two round domes and a bell, a handrail and copper pipes along the boiler, four coupled
+// drivers and a pony wheel, a red slatted pilot; the cab's window framed in red, its number plate
+// edged in white. The tender: firewood behind a railing, the number big in white in a framed panel,
+// two trucks. The coaches: varnished wood, a small pane over each window, the windows let down, the
+// far side's windows showing through, boarding below, a monogram, truss rods under the frame.
+// The drivers turn DRIVE times a loop, about the 1280 px the land goes by over their 6 px radius; the
+// small wheels SMALL times.
+const DRIVE = 34, SMALL = 51
+const DRIVERS = [238, 252, 266, 280], AXLE = RAIL - 7
 // a driving wheel: black tire, red center with spokes and a counterweight opposite the crank pin
-function driver(c, cx, cy, th) {
-  c.circ(cx, cy, 7, "k"); c.circ(cx, cy, 6, "1")
-  for (let i = 0; i < 8; i++) { const a = th + (i / 8) * TAU; c.line(cx, cy, Math.round(cx + Math.cos(a) * 5), Math.round(cy + Math.sin(a) * 5), "2") }
-  for (let i = -3; i <= 3; i++) { const a = th + Math.PI + i * 0.22; c.line(Math.round(cx + Math.cos(a) * 3), Math.round(cy + Math.sin(a) * 3), Math.round(cx + Math.cos(a) * 5), Math.round(cy + Math.sin(a) * 5), "2") }
-  c.px(cx, cy, "3"); c.px(cx - 5, cy - 5, "d"); c.px(cx - 6, cy - 3, "d")
+function drivingWheel(c, cx, cy, th) {
+  c.circ(cx, cy, 6, "k"); c.circ(cx, cy, 5, "1")
+  for (let i = 0; i < 8; i++) { const a = th + (i / 8) * TAU; c.line(cx, cy, Math.round(cx + Math.cos(a) * 4), Math.round(cy + Math.sin(a) * 4), "2") }
+  for (let i = -3; i <= 3; i++) { const a = th + Math.PI + i * 0.24; c.line(Math.round(cx + Math.cos(a) * 2), Math.round(cy + Math.sin(a) * 2), Math.round(cx + Math.cos(a) * 4), Math.round(cy + Math.sin(a) * 4), "2") }
+  c.px(cx, cy, "a"); c.px(cx - 4, cy - 4, "d"); c.px(cx - 5, cy - 2, "d")
 }
 function smallWheel(c, cx, cy, th) {
   c.circ(cx, cy, 4, "k"); c.circ(cx, cy, 3, "c")
   for (let i = 0; i < 4; i++) { const a = th + (i / 4) * TAU; c.px(Math.round(cx + Math.cos(a) * 2), Math.round(cy + Math.sin(a) * 2), "d") }
   c.px(cx, cy, "a"); c.px(cx - 3, cy - 2, "d")
 }
-function coach(c, x0, f, seed) {
-  const r = rng(seed), x1 = x0 + 90, th = (f / FRAMES) * SMALL * TAU
-  for (const bx of [x0 + 10, x0 + 70]) { c.rect(bx - 2, AXLE + 1, 16, 3, "k"); smallWheel(c, bx, RAIL - 4, th); smallWheel(c, bx + 11, RAIL - 4, th + 1) }
-  // the body: maroon planking, a cream band with the windows, the roof rounded at its ends
-  c.rect(x0, 118, 90, 30, "5"); c.hline(x0, 133, 90, "6")
-  for (let x = x0 + 3; x < x1; x += 4) c.vline(x, 135, 12, "2")
-  c.rect(x0, 120, 90, 13, "7"); c.hline(x0, 120, 90, "8"); c.hline(x0, 132, 90, "8")
-  c.rect(x0 - 1, 112, 92, 6, "c"); c.hline(x0, 111, 90, "d"); c.hline(x0 + 2, 110, 86, "a"); c.hline(x0 - 2, 117, 94, "k")
-  c.rect(x0, 146, 90, 3, "k")
-  // end platforms with railings and steps
-  for (const px of [x0 - 6, x1]) { c.rect(px, 144, 6, 2, "k"); c.vline(px + (px < x0 ? 0 : 5), 129, 15, "k"); c.hline(px, 131, 6, "k"); c.vline(px + 2, 146, 6, "c") }
-  // windows: dark glass with someone at most of them, the sky's glint at the top corner
-  for (let i = 0; i < 8; i++) {
-    const wx = x0 + 4 + i * 11
-    c.rect(wx, 122, 7, 9, "9"); c.px(wx + 5, 122, "0"); c.px(wx + 6, 123, "0")
-    if (r() < 0.8) {
-      const skin = r() < 0.5 ? "S" : "U"
-      c.rect(wx + 2, 125, 3, 3, skin); c.hline(wx + 2, 124, 3, r() < 0.5 ? "N" : "k"); c.rect(wx + 1, 128, 5, 3, r() < 0.5 ? "b" : r() < 0.5 ? "1" : "o")
-    }
+// a truck: two small wheels under a frame with its leaf spring
+function truck(c, x, th) {
+  smallWheel(c, x, RAIL - 4, th); smallWheel(c, x + 11, RAIL - 4, th + 1)
+  c.rect(x - 2, AXLE - 2, 16, 2, "k"); c.hline(x + 2, AXLE - 3, 8, "c"); c.px(x + 5, AXLE - 1, "d")
+}
+
+// ---- people. A head is 4 px across; `skin` is [light, shade], `hair` a key; they look out at us.
+const SKINS = [[";", "S"], ["S", "U"], ["u", "n"], ["U", "n"]]
+function head(c, x, y, skin, hair, { long = false, hat = false, flutter = 0 } = {}) {
+  c.rect(x, y, 4, 4, skin[0]); c.vline(x + 3, y + 1, 3, skin[1])
+  c.px(x + 1, y + 1, "k"); c.px(x + 3, y + 1, "k")                                       // eyes
+  c.hline(x, y - 1, 4, hair); c.px(x, y, hair)
+  if (long) { c.vline(x - 1, y, 5 + flutter, hair); c.vline(x - 2, y + 1, 2 + flutter, hair); if (flutter) c.px(x - 3, y + 2, hair) }
+  if (hat) { c.hline(x - 2, y - 1, 8, "'"); c.rect(x, y - 3, 4, 2, "'"); c.hline(x, y - 2, 4, "4") }
+}
+// someone at a window, leaning on the sill (y): shoulders, the forearms along the sill
+function passenger(c, x, sill, p, f) {
+  const [skin, hair, shirt] = [SKINS[p.skin], p.hair, p.shirt]
+  if (p.kid) {
+    // a child, head out over the sill, waving if asked
+    head(c, x + 2, sill - 5, skin, hair)
+    c.rect(x + 1, sill - 1, 6, 2, shirt)
+    if (p.wave) { const up = Math.floor(f / 4) % 2; c.vline(x + 7, sill - 5 - up * 2, 4, skin[0]); c.px(x + 8, sill - 6 - up * 2, skin[0]) }
+    return
+  }
+  head(c, x + 2, sill - 9, skin, hair, { long: p.long, hat: p.hat, flutter: p.long ? Math.floor(f / 3) % 2 : 0 })
+  c.rect(x + 1, sill - 5, 7, 5, shirt); if (p.stripes) for (let y = sill - 4; y < sill; y += 2) c.hline(x + 1, y, 7, p.stripes)
+  c.vline(x + 7, sill - 5, 5, p.shade ?? "k")
+  c.hline(x, sill, 9, skin[0]); c.px(x + 8, sill, skin[1])                                // forearms
+}
+// the coaches' people, window by window (null: nobody at it)
+const PEOPLE = [
+  { skin: 1, hair: "k", shirt: "o", stripes: "b" }, null, { pair: [{ skin: 0, hair: "8", shirt: "&" }, { skin: 2, hair: "k", shirt: "g" }] },
+  { kid: true, wave: true, skin: 0, hair: "N", shirt: "L" }, { skin: 3, hair: "k", shirt: "1", long: true }, { skin: 0, hair: "|", shirt: "o", hat: true },
+  null, { skin: 2, hair: "N", shirt: "&", long: true }, { kid: true, skin: 1, hair: "k", shirt: "b" }, { skin: 0, hair: "N", shirt: "b", shade: "y" },
+]
+
+// ---- a wooden coach, x0 to x0 + 124
+const COACH = 124
+function coach(c, x0, f, people) {
+  const x1 = x0 + COACH, th = (f / FRAMES) * SMALL * TAU
+  // under the frame: the trucks, and truss rods sagging between them
+  for (const bx of [x0 + 8, x0 + 104]) truck(c, bx, th)
+  c.line(x0 + 26, 151, x0 + 42, 154, "c"); c.hline(x0 + 42, 154, 40, "c"); c.line(x0 + 82, 154, x0 + 98, 151, "c")
+  c.vline(x0 + 42, 151, 3, "k"); c.vline(x0 + 82, 151, 3, "k"); c.rect(x0 + 1, 149, COACH - 2, 2, "k")
+  // the roof: pale, rounded at its edge, its eaves overhanging; the lamp vents on top
+  c.hline(x0 + 6, 115, COACH - 12, "8"); c.hline(x0 + 2, 116, COACH - 4, "7"); c.rect(x0, 117, COACH, 3, "7")
+  c.hline(x0 - 1, 120, COACH + 2, "8"); c.hline(x0 - 2, 121, COACH + 4, "]")
+  for (let x = x0 + 14; x < x1 - 10; x += 32) { c.rect(x, 113, 3, 2, "8"); c.px(x + 1, 112, "d") }
+  // the body: letterboard, the window band, the belt rail, boarding below
+  c.rect(x0, 122, COACH, 27, ")"); c.hline(x0, 122, COACH, "(")
+  c.hline(x0, 138, COACH, "("); c.hline(x0, 139, COACH, "[")
+  for (let x = x0 + 2; x < x1; x += 3) c.vline(x, 141, 7, "[")
+  c.hline(x0, 148, COACH, "]"); c.vline(x0, 122, 27, "("); c.vline(x1 - 1, 122, 27, "[")
+  // the monogram, in yellow, in the middle of the boarding
+  const mx = x0 + COACH / 2 - 2
+  c.rect(mx, 141, 5, 5, ")"); c.ring(mx + 2, 143, 2, "L"); c.vline(mx + 2, 142, 3, "L"); c.px(mx + 1, 142, "L"); c.px(mx + 3, 142, "L")
+  // ten windows: a small pane above, the window let down, someone leaning on the sill or the far
+  // side's windows showing through
+  for (let i = 0; i < 10; i++) {
+    const wx = x0 + 3 + i * 12, p = people[i]
+    c.rect(wx, 124, 9, 3, "0"); c.hline(wx, 124, 9, "/"); c.hline(wx, 127, 9, "[")
+    c.rect(wx, 128, 9, 10, "{"); c.rect(wx + 2, 129, 5, 4, "}"); c.vline(wx + 8, 128, 10, "]")
+    if (!p) continue
+    if (p.pair) { passenger(c, wx - 1, 137, p.pair[0], f); passenger(c, wx + 3, 137, p.pair[1], f) } else passenger(c, wx, 137, p, f)
+  }
+  // open end platforms: floor, railing, steps
+  for (const px of [x0 - 7, x1]) {
+    c.rect(px, 147, 7, 2, "k"); c.hline(px, 133, 7, "k"); for (const dx of [0, 3, 6]) c.vline(px + dx, 133, 14, dx === 3 ? "c" : "k")
+    c.vline(px + (px < x0 ? 1 : 5), 149, 6, "c"); c.hline(px + (px < x0 ? 0 : 4), 152, 3, "c"); c.hline(px + (px < x0 ? 0 : 4), 155, 3, "c")
   }
 }
-// a child at a window waving: a hand going up and down, 8 frames a wave
-function waver(c, x, f) {
-  const up = Math.floor(f / 4) % 2
-  c.vline(x + 6, 124 - up * 2, 4, "S"); c.px(x + 6, 123 - up * 2, "S")
+// the conductor on the platform: cap, blue coat, a hand on the rail
+function conductor(c, x) {
+  c.rect(x, 128, 4, 4, ";"); c.vline(x + 3, 129, 3, "S"); c.px(x + 2, 129, "k")
+  c.rect(x - 1, 126, 5, 2, "b"); c.hline(x - 1, 127, 6, "k"); c.px(x + 1, 126, "3")
+  c.rect(x - 1, 132, 6, 10, "b"); c.vline(x + 4, 132, 10, "y"); c.vline(x + 1, 133, 6, "3")
+  c.rect(x, 142, 2, 5, "y"); c.rect(x + 3, 142, 2, 5, "y"); c.px(x + 5, 134, ";")
 }
-// the balloon stack of a wood burner, a cone wide at the top over a pipe
-const STACK = [[0, 7, 5], [1, 7, 6], [2, 7, 7], [3, 7, 7], [4, 7, 7], [5, 7, 6], [6, 7, 5], [7, 7, 4], [8, 8, 3]]
+
+// ---- the engine and its tender
+function tender(c, f) {
+  const ths = (f / FRAMES) * SMALL * TAU
+  truck(c, 152, ths); truck(c, 183, ths)
+  // the tank: black, its top edge lit, a white panel with the number, a step at each end
+  c.rect(146, 124, 57, 25, "k"); c.hline(146, 124, 57, "a"); c.hline(146, 125, 57, "d"); c.hline(146, 148, 57, "c")
+  c.box(151, 129, 47, 15, "o")
+  c.text(165, 132, "41", "o", { scale: 2 })
+  for (let x = 149; x < 202; x += 5) c.px(x, 146, "d")
+  // firewood heaped behind a railing on top
+  for (let i = 0; i < 17; i++) { const lx = 148 + i * 3, ly = 113 + Math.round(1.5 * Math.sin(i * 1.9)); c.rect(lx, ly, 3, 124 - ly, i % 2 ? "u" : "r"); c.px(lx + 1, ly, "8"); if (i % 3 === 0) c.px(lx + 1, ly + 3, "8") }
+  c.hline(147, 116, 55, "k"); c.hline(147, 115, 55, "d"); for (let x = 148; x < 202; x += 6) c.vline(x, 115, 9, "k")
+  // the hand-brake wheel at the front, and the plate across to the cab
+  c.vline(200, 112, 12, "c"); c.hline(198, 112, 5, "a"); c.rect(201, 140, 8, 2, "c")
+}
 function engine(c, f) {
   const th = (f / FRAMES) * DRIVE * TAU, ths = (f / FRAMES) * SMALL * TAU
-  // tender: a black tank with red lining, firewood heaped on it, two trucks
-  for (const bx of [186, 202]) { c.rect(bx - 2, AXLE + 1, 15, 3, "k"); smallWheel(c, bx, RAIL - 4, ths); smallWheel(c, bx + 10, RAIL - 4, ths + 1) }
-  c.rect(180, 124, 37, 24, "k"); c.hline(180, 124, 37, "a"); c.hline(180, 125, 37, "d"); c.rect(182, 129, 33, 1, "1"); c.rect(182, 143, 33, 1, "1")
-  for (let i = 0; i < 12; i++) { const lx = 181 + i * 3, ly = 118 + Math.round(2 * Math.sin(i * 1.7)); c.rect(lx, ly, 3, 124 - ly, i % 2 ? "u" : "r"); c.px(lx + 1, ly, "8") }
-  c.rect(176, 140, 5, 2, "c")
-  // the cab: black, a red stripe, a brass plate, a window with the driver, the roof overhanging
-  c.rect(220, 112, 30, 34, "k"); c.vline(220, 112, 34, "c"); c.rect(220, 137, 30, 2, "1")
-  c.rect(226, 116, 13, 11, "9"); c.px(237, 116, "0"); c.px(238, 117, "0")
-  c.rect(230, 120, 4, 3, "S"); c.hline(229, 119, 6, "b"); c.hline(230, 118, 4, "b"); c.rect(229, 123, 6, 4, "b"); c.px(234, 124, "S")
-  c.rect(228, 130, 11, 4, "4"); c.hline(228, 130, 11, "3")
-  c.hline(219, 106, 33, "d"); c.hline(218, 107, 35, "a"); c.rect(217, 108, 37, 2, "c"); c.hline(218, 110, 35, "k")
-  c.vline(250, 103, 4, "3"); c.px(250, 102, "4")
-  // the boiler: a black cylinder lit along its top, brass bands, the domes and the bell
-  const shade = ["k", "d", "a", "d", "c", "c", "c", "k", "k", "k", "k", "k", "k", "k", "k", "k", "c", "c", "k"]
-  shade.forEach((k, i) => c.hline(250, 121 + i, 41, k))
-  for (const bx of [260, 276, 288]) { c.vline(bx, 121, 19, "4"); c.px(bx, 123, "3") }
-  c.rect(266, 113, 9, 8, "3"); c.rect(267, 112, 7, 1, "3"); c.vline(274, 113, 8, "4"); c.hline(265, 120, 11, "4"); c.px(268, 114, "%")
-  c.rect(255, 116, 6, 5, "k"); c.hline(256, 115, 4, "c"); c.px(256, 116, "d"); c.hline(254, 120, 8, "c")
-  c.rect(281, 116, 3, 4, "3"); c.px(282, 115, "4"); c.px(281, 116, "%"); c.hline(280, 120, 5, "4")
-  // smokebox: the front, a little wider; the headlamp on it; the balloon stack
-  c.rect(291, 119, 13, 22, "k"); c.hline(291, 120, 13, "d"); c.hline(291, 121, 13, "a"); c.vline(303, 121, 19, "c")
-  for (const y of [124, 130, 136]) c.px(292, y, "d")
-  c.rect(297, 111, 8, 8, "k"); c.rect(305, 112, 2, 6, "%"); c.hline(297, 111, 8, "3"); c.hline(296, 110, 10, "4"); c.vline(297, 112, 7, "c")
-  for (const [dy, x0, w] of STACK) c.hline(292 - (w - 3), 94 + dy, w * 2, "k")
-  c.rect(293, 103, 6, 16, "k"); c.vline(293, 103, 16, "d")
-  c.hline(287, 93, 14, "c"); c.hline(286, 94, 16, "d"); for (const [dy] of STACK.slice(1, 6)) c.px(287 + Math.abs(dy - 3) - 1, 94 + dy, "d")
-  // running board, cylinder, buffer beam and the cowcatcher
-  c.rect(244, 140, 62, 2, "c"); c.hline(244, 142, 62, "1")
-  c.rect(291, 143, 13, 7, "k"); c.hline(291, 143, 13, "d"); c.vline(291, 143, 7, "4"); c.vline(303, 143, 7, "4")
-  c.rect(304, 139, 8, 5, "1"); c.hline(304, 139, 8, "6")
-  for (let i = 0; i < 5; i++) c.line(304 + i * 2, 144, 306 + i * 3, RAIL - 1, i % 2 ? "2" : "1")
-  c.hline(304, RAIL - 1, 15, "2")
-  // pony wheel, then the drivers and their rods
+  // the cab: black planking, the window framed in red, the number plate edged in white, the roof
+  c.rect(208, 102, 31, 39, "k"); for (let x = 211; x < 238; x += 4) c.vline(x, 122, 18, "c")
+  c.vline(208, 102, 39, "c"); c.vline(209, 102, 39, "d")
+  c.rect(221, 106, 15, 15, "1"); c.rect(222, 107, 13, 13, "9")
+  c.rect(213, 125, 21, 8, "o"); c.rect(214, 126, 19, 6, "k"); c.text(219, 126, "41", "o")
+  c.hline(207, 97, 33, "c"); c.hline(205, 98, 37, "a"); c.rect(204, 99, 39, 2, "k"); c.hline(204, 101, 39, "c")
+  c.rect(219, 95, 7, 2, "c"); c.hline(219, 95, 7, "d")
+  c.vline(210, 141, 7, "c"); c.hline(209, 144, 3, "c"); c.hline(209, 147, 3, "c")
+  // inside: the fireman feeding the firebox, its door opening on an orange glow; the driver at the
+  // window, looking ahead with his arm on the sill
+  fireman(c, f); engineer(c)
+  // the boiler: a black cylinder lit along its top, brass bands, the handrail on its stanchions
+  const shade = ["k", "c", "d", "a", "d", "c", "k", "k", "k", "k", "k", "k", "k", "k", "k", "c", "c", "d", "k"]
+  shade.forEach((k, i) => c.hline(239, 114 + i, 52, k))
+  for (const bx of [247, 262, 277]) { c.vline(bx, 115, 17, "c"); c.px(bx, 116, "4"); c.px(bx, 117, "3"); c.px(bx, 118, "4") }
+  c.hline(240, 119, 64, "a"); for (const x of [244, 258, 272, 286, 300]) c.px(x, 120, "c")
+  // copper: a pipe along the boiler's foot
+  c.hline(241, 131, 46, "<")
+  // the domes: sand ahead, steam behind with its brass safety valves and whistle; the bell between
+  const dome = (x0, w, top) => {
+    c.rect(x0, top + 2, w, 115 - top - 2, "k"); c.hline(x0 + 1, top + 1, w - 2, "k"); c.hline(x0 + 2, top, w - 4, "k")
+    c.vline(x0 + 1, top + 2, 111 - top, "d"); c.px(x0 + 2, top + 1, "a"); c.hline(x0 - 1, 113, w + 2, "c")
+  }
+  dome(250, 10, 103); dome(271, 9, 105)
+  c.rect(254, 100, 2, 3, "3"); c.px(254, 99, "%"); c.rect(257, 101, 2, 2, "4"); c.vline(252, 97, 6, "3"); c.px(252, 96, "%")
+  c.rect(264, 108, 4, 4, "3"); c.hline(263, 111, 6, "4"); c.px(264, 108, "%"); c.vline(265, 106, 2, "k")
+  // the air pump on the boiler's side
+  c.rect(283, 121, 4, 11, "k"); c.vline(283, 121, 11, "d"); c.hline(283, 120, 4, "3")
+  // smokebox in graphite, rivets round its front; the stack tall and straight with its cap
+  const graphite = ["c", "/", "/", ">", ">", ">", ">", ">", "d", "d", "d", "d", "d", "d", "d", "d", "d", "d", ">", ">", "c", "k"]
+  graphite.forEach((k, i) => c.hline(290, 112 + i, 16, k)); c.vline(305, 113, 21, "c"); c.vline(290, 112, 22, "c")
+  for (const y of [116, 120, 124, 128]) c.px(303, y, "/")
+  c.rect(293, 94, 7, 18, "k"); c.vline(293, 94, 18, "d"); c.vline(294, 95, 16, "c")
+  c.hline(291, 91, 11, "/"); c.rect(291, 92, 11, 2, "a"); c.hline(292, 94, 9, "c")
+  // the headlamp on the smokebox's front, its number plate in red under it
+  c.rect(300, 103, 8, 9, "k"); c.hline(300, 103, 8, "3"); c.vline(300, 104, 8, "c"); c.rect(308, 105, 2, 5, "%"); c.px(303, 102, "c")
+  c.rect(301, 112, 7, 3, "1"); c.px(303, 113, "o"); c.px(305, 113, "o")
+  // running board with its red valance; steam chest and cylinder; buffer beam and the pilot
+  c.rect(212, 133, 93, 2, "c"); c.hline(212, 133, 93, "d"); c.hline(226, 135, 79, "1")
+  c.rect(289, 135, 16, 4, "k"); c.hline(289, 135, 16, "d")
+  c.rect(288, 139, 17, 9, "k"); c.hline(288, 139, 17, "d"); c.vline(288, 139, 9, "a"); c.vline(304, 139, 9, "a"); c.hline(289, 147, 15, "c")
+  c.rect(305, 138, 9, 6, "1"); c.hline(305, 138, 9, "6"); c.rect(313, 140, 3, 2, "c")
+  for (let i = 0; i < 6; i++) c.line(305 + i * 2, 144, 306 + i * 3, RAIL - 1, i % 2 ? "2" : "1")
+  c.hline(305, RAIL - 1, 15, "2")
+  // the frame behind the wheels, filling down from the running board: leaf springs over the drivers,
+  // the ash pan under the cab; the pony wheel, then the drivers and their rods
+  c.rect(226, 136, 64, 9, "k"); c.rect(208, 141, 31, 4, "k"); c.hline(212, 144, 26, "c")
+  for (const x of DRIVERS) { c.hline(x - 4, 139, 9, "c"); c.px(x - 4, 140, "d"); c.px(x + 4, 140, "d"); c.vline(x, 140, 3, "c") }
   smallWheel(c, 298, RAIL - 4, ths)
-  for (const x of DRIVERS) driver(c, x, AXLE, th)
-  const pin = (x) => [Math.round(x + Math.cos(th) * 4), Math.round(AXLE + Math.sin(th) * 4)]
-  const [p0, p1, p2] = DRIVERS.map(pin)
-  c.line(...p0, ...p2, "a", 2); c.line(...p0, ...p2, "d")
-  // the main rod from the crosshead, sliding along its guide, to the front driver's pin
-  const chx = p2[0] + 18
-  c.hline(280, AXLE - 3, 11, "a"); c.line(...p2, chx, AXLE - 2, "d", 2); c.line(...p2, chx, AXLE - 2, "a"); c.rect(chx - 1, AXLE - 4, 3, 4, "c")
-  for (const p of [p0, p1, p2]) c.px(...p, "3")
+  for (const x of DRIVERS) drivingWheel(c, x, AXLE, th)
+  const pin = (x) => [Math.round(x + Math.cos(th) * 3), Math.round(AXLE + Math.sin(th) * 3)]
+  const pins = DRIVERS.map(pin)
+  c.line(...pins[0], ...pins[3], "d", 2); c.line(...pins[0], ...pins[3], "a")
+  // the main rod from the crosshead, sliding along its guide, to the third driver's pin; the
+  // eccentric rod from that pin back to the link
+  const p2 = pins[2], chx = p2[0] + 20
+  c.hline(279, AXLE - 4, 10, "a"); c.line(...p2, chx, AXLE - 3, "d", 2); c.line(...p2, chx, AXLE - 3, "/"); c.rect(chx - 1, AXLE - 5, 3, 4, "a")
+  c.line(...p2, 272, AXLE - 9, "c"); c.rect(271, AXLE - 11, 2, 4, "k")
+  for (const p of pins) c.px(...p, "3")
+}
+// the fireman: every 48 frames he stoops for a log from the tender and swings it into the firebox,
+// whose door lets out an orange glow while it is open
+function fireman(c, f) {
+  const t = f % 48, open = t >= 22 && t < 34
+  if (open) { c.rect(222, 113, 6, 7, "@"); c.rect(222, 116, 3, 4, f % 2 ? "%" : "@") }
+  const low = t < 12 ? 3 : t < 22 ? 1 : 0, x = 223, y = 109 + low, lit = open ? "@" : "S"
+  c.rect(x, y, 3, 3, "S"); c.px(x + 2, y + 1, lit); c.hline(x, y - 1, 3, "k")
+  c.rect(x - 1, y + 3, 5, 120 - y - 3, "y"); c.vline(x + 3, y + 3, 120 - y - 3, open ? "@" : "c")
+  if (t >= 12 && t < 26) { c.rect(x + 1, y + 3, 4, 2, "u"); c.px(x + 4, y + 3, "8") }
+}
+// the driver at the window, looking ahead: grey hair and mustache, khaki shirt, an arm on the sill
+function engineer(c) {
+  const x = 229, y = 109
+  c.rect(x, y, 4, 4, ";"); c.px(x + 4, y + 1, ";"); c.vline(x, y + 1, 3, "S")
+  c.hline(x, y - 1, 4, "|"); c.vline(x - 1, y, 3, "|"); c.px(x + 3, y + 1, "k"); c.hline(x + 2, y + 3, 3, "|")
+  c.rect(x - 2, y + 4, 7, 7, "-"); c.vline(x - 2, y + 4, 7, ","); c.hline(x - 1, y + 6, 4, ",")
+  c.hline(x + 1, 120, 8, "-"); c.hline(x + 6, 120, 3, ";"); c.px(x + 8, 119, ";")
 }
 
 // ---------------------------------------------------------------- smoke
@@ -435,7 +548,7 @@ function smoke(c, f) {
   for (let age = LIFE - 1; age >= 0; age--) {
     const id = (((f - age) % FRAMES) + FRAMES) % FRAMES, rr = rng(500 + id)
     const back = SPEED * (age - 5 * (1 - Math.exp(-age / 5))), rise = 30 * (1 - Math.exp(-age / 14)) + rr() * 4
-    const p = { x: 294 - back + (rr() - 0.5) * 5, y: 92 - rise - (rr() - 0.5) * 4, r: 3 + age * 0.26 + rr() * 2, age, id }
+    const p = { x: 296 - back + (rr() - 0.5) * 5, y: 89 - rise - (rr() - 0.5) * 4, r: 3 + age * 0.26 + rr() * 2, age, id }
     const fade = 1 - age / LIFE
     for (let y = Math.floor(p.y - p.r); y <= p.y + p.r; y++)
       for (let x = Math.floor(p.x - p.r); x <= p.x + p.r; x++) {
@@ -462,6 +575,6 @@ anim("train", { w: W, h: H, frames: FRAMES, fps: FPS },
   (c) => strip(c, "_side", SIDE_W, 1280, SIDE_Y, c.frame),
   // the rails stand still with the train: head and web
   rect(0, RAIL, W, 1, "i"), rect(0, RAIL + 1, W, 1, "I"),
-  (c) => { coach(c, -14, c.frame, 3); coach(c, 82, c.frame, 7); waver(c, 82 + 4 + 6 * 11, c.frame); engine(c, c.frame) },
+  (c) => { coach(c, -COACH, c.frame, [...PEOPLE].reverse()); coach(c, 14, c.frame, PEOPLE); conductor(c, 8); tender(c, c.frame); engine(c, c.frame) },
   (c) => smoke(c, c.frame),
   (c) => strip(c, "_fg", FG_W, 1920, H - 30 + 8, c.frame))
