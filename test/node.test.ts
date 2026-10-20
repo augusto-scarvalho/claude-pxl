@@ -8,9 +8,10 @@ import { crc32, deflateSync, inflateSync } from "node:zlib";
 import { Img } from "../src/core/image.ts";
 import { pack } from "../src/core/color.ts";
 import { decodePng, encodePng } from "../src/node/png.ts";
-import { medianCut } from "../src/node/gif.ts";
+import { encodeGif, medianCut } from "../src/node/gif.ts";
 import { main } from "../src/node/cli.ts";
 import { loadProject } from "../src/node/load.ts";
+import { latticeHash } from "../src/core/util.ts";
 import { writeOutputs, writePng } from "../src/node/output.ts";
 import { serve } from "../src/node/server.ts";
 
@@ -655,4 +656,23 @@ test("pxl help is short: other mentions a line each, a guide section by its head
   assert.doesNotMatch(anim, /Small animals/);
   assert.match(await said("help", "glow"), /^\[reference\.md: Glow\][^]*`keep`/m);
   assert.match(await said("help", "castBase"), /^\| `castBase: "pivot" \\| "column"` \|/m);
+});
+
+test("cli shot of a GIF: drawn larger, read at 1x; all its frames in rows of 12; a range picks some", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), gif = join(dir, "clip.gif");
+  const colors = [pack(200, 40, 40), pack(40, 160, 60), pack(40, 60, 200), pack(230, 210, 60), pack(20, 20, 30)];
+  const frames = Array.from({ length: 14 }, (_, f) => {
+    // big enough to show its grid: eight of its pixels a side at least
+    const img = new Img(16, 12);
+    for (let y = 0; y < 12; y++) for (let x = 0; x < 16; x++) img.set(x, y, colors[(Math.floor(latticeHash(Math.floor(x / (1 + ((y * 7) % 3))), y) * 5) + f) % 5]);
+    return { img: img.scale(3), ms: 100 };
+  });
+  writeFileSync(gif, encodeGif(frames));
+  const text = await said("shot", gif, "--scale", "1");
+  assert.match(text, /clip\.gif: GIF, drawn at 3x, shown at 1x, frames all 14/);
+  const png = decodePng(readFileSync(join(dir, "out", "_shot", "clip.png")));
+  assert.deepEqual([png.w, png.h], [12 * 16 + 11 * 2, 12 + 2 + 12], "two rows: 12 frames, then 2");
+  assert.match(await said("shot", gif, "--frames", "2-4", "--scale", "1"), /frames 2,3,4/);
+  const some = decodePng(readFileSync(join(dir, "out", "_shot", "clip.png")));
+  assert.deepEqual([some.w, some.h], [3 * 16 + 2 * 2, 12]);
 });

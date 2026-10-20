@@ -374,8 +374,8 @@ painting replay ends ("animate" toggle).
 ## CLI
 
 ```
-node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image.png> ...] [--frames a,b,c] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
-node <pxl>/bin/pxl.js shot <image.png> [<image.png> ...] [--at x,y,w,h ...] [--scale N] [--out DIR]
+node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
+node <pxl>/bin/pxl.js shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--out DIR]
 node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
 node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
@@ -392,9 +392,12 @@ node <pxl>/bin/pxl.js study <picture | gif | video> [--at x,y,w,h] [--from S] [-
 `shot` is the look while iterating: the asset built at those frames (side by side, cropped to the
 region, enlarged to about 600k px, at most 16x and 1568 px on the longer side), what changed since the last shot of the same frames and region
 (pixels, and the box around them in the asset's coordinates; for one asset and one region), and the
-warnings `check` finds on it at those frames. Several names make a row each, one under the other
-(`other.px.js:name` takes another file's, and a PNG from anywhere is a row too), and several `--at`
-a column each: two versions of a scene, one scene from two agents, three details of a big one.
+warnings `check` finds on it at those frames. `--frames` takes numbers, ranges (`0-17`, `0-3,12`) or
+`all`. Several names make a row each, one under the other (`other.px.js:name` takes another file's,
+and a picture or a clip from anywhere is a row too), and several `--at` a column each: two versions of
+a scene, one scene from two agents, three details of a big one. A clip (a GIF, a video, read as
+`study` reads them) shows all its frames unless `--frames` picks some, drawn larger it is shown at 1×,
+and more than 12 frames go on in rows of 12: a reference's whole animation on one sheet.
 Give PNGs at 1× (`out/scenes/x.png`, not an enlarged `_shot`): rows are enlarged together, so a big
 one leaves no room for the rest. `--vs <rev | file>` puts the same shot of another version above (one
 name, one region; at a git revision, the file and the art files it includes as they were there); `--diff` with it adds a row with the pixels that changed, in red. `check` makes every check `describe` can warn on, on every scene

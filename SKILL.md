@@ -24,9 +24,9 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
 2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
    `out/_shot/<name>.png` (read it). Its text says what changed since your last shot of it (pixels
    and where, so an edit that did nothing shows) and the warnings `check` finds on it.
-   `--frames 0,12,30` puts frames side by side, `--at x,y,w,h` enlarges a part (again for another
-   part, a column each); more names (another file's as `other.px.js:name`, or any PNG at 1×) make a
-   row each, to compare. Exact pixels: `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an
+   `--frames 0,12,30` (or `0-17`, `all`) puts frames side by side, `--at x,y,w,h` enlarges a part
+   (again for another part, a column each); more names (another file's as `other.px.js:name`, any
+   PNG at 1×, or a reference GIF or video: all its frames, at 1×) make a row each, to compare. Exact pixels: `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an
    image). Scenes: `PXL describe art.px.js <scene>` (`--brief` when busy) gives each object's
    position, gaps, cover, contrast and motion as text: answer layout questions from it, not by
    eyeballing (`--frame N` for another frame).

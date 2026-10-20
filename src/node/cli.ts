@@ -66,8 +66,8 @@ const USAGE = `pxl — pixel-art DSL
       distinct placement once, and a warning says at which frames (--frame N: that one only). Exits 1
       when there is any. --readings also lists what the lit-side rule read on every placement,
       warning or not, with a tally: to see where it agrees and where it can't tell.
-  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image.png> ...] [--frames a,b,c] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
-  pxl shot <image.png> [<image.png> ...] [--at x,y,w,h ...] [--scale N] [--out DIR]
+  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
+  pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
       to the region, side by side, enlarged, written to <out>/_shot/<name>.png. --vs puts the same
       shot of another version above it (at a git revision, the file and what it includes as they
@@ -135,6 +135,7 @@ interface Args {
   check?: string;
   frame?: number;
   frames?: number[];
+  allFrames?: boolean;
   vs?: string;
   list?: boolean;
   all?: boolean;
@@ -181,7 +182,7 @@ function parse(argv: string[]): Args {
     else if (v === "--brief") a.brief = true;
     else if (v === "--check") a.check = val();
     else if (v === "--frame") a.frame = Number(val());
-    else if (v === "--frames") a.frames = val().split(",").map((s) => Number(s.trim()));
+    else if (v === "--frames") { const f = val().trim(); if (f === "all") a.allFrames = true; else a.frames = framesFrom(f); }
     else if (v === "--vs") a.vs = val();
     else if (v === "--list") a.list = true;
     else if (v === "--all") a.all = true;
@@ -205,6 +206,21 @@ function parse(argv: string[]): Args {
   }
   return a;
 }
+
+/** `--frames 0,4,8` or `0-17` or both (`0-3,12`), as frame numbers. */
+function framesFrom(spec: string): number[] {
+  return spec.split(",").flatMap((part) => {
+    const m = /^\s*(\d+)\s*-\s*(\d+)\s*$/.exec(part);
+    if (m) { const [a, b] = [Number(m[1]), Number(m[2])]; return Array.from({ length: Math.abs(b - a) + 1 }, (_, i) => (a <= b ? a + i : a - i)); }
+    const n = Number(part.trim());
+    if (!Number.isInteger(n) || n < 0) throw new PxError(`--frames takes frame numbers, ranges or all (e.g. --frames 0,4,8 or 0-17): not "${part.trim()}"`);
+    return [n];
+  });
+}
+// a picture or a clip given to shot instead of an asset: read like study reads it
+const MEDIA = /\.(png|gif|jpe?g|webp|bmp|mp4|webm|mov|mkv|avi)$/i;
+/** Cells in rows of `cols` at most: a long clip as lines of frames, not one strip. */
+const wrapRow = (imgs: Img[], regions: (number[] | undefined)[], cols = 12) => (imgs.length <= cols || regions.length > 1 ? cellRow(imgs, regions) : stack(Array.from({ length: Math.ceil(imgs.length / cols) }, (_, r) => cellRow(imgs.slice(r * cols, (r + 1) * cols), regions))));
 
 export async function main(argv: string[]): Promise<number> {
   let a: Args;
@@ -385,15 +401,17 @@ export async function main(argv: string[]): Promise<number> {
         return r.warnings ? 1 : 0;
       }
       case "shot": {
-        // what to shoot: assets of this file, another's (`other.px.js:name`), or any PNG (`a.png`)
-        const png = /\.png$/i.test(file), entries = png ? [file, ...a.rest] : a.rest;
-        if (!entries.length) throw new PxError("shot needs an asset name: pxl shot <file> <name> [<name> | <other.px.js>:<name> | <image.png> ...] [--frames a,b] [--at x,y,w,h ...] [--scale N] [--vs rev] [--diff]");
+        // what to shoot: assets of this file, another's (`other.px.js:name`), or any picture or clip
+        // (`a.png`, `ref.gif`, a JPEG, a video: a clip shows all its frames, drawn larger it is read at 1x)
+        const png = MEDIA.test(file), entries = png ? [file, ...a.rest] : a.rest;
+        if (!entries.length) throw new PxError("shot needs an asset name: pxl shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs rev] [--diff]");
         if (a.ats.some((r) => r.length !== 4)) throw new PxError("shot --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
         if (a.diff && !a.vs) throw new PxError("shot --diff compares with another version: give it --vs <git rev | file>");
-        const frames = a.frames ?? (a.frame !== undefined ? [a.frame] : [0]), regions = a.ats.length ? a.ats : [undefined];
+        const regions = a.ats.length ? a.ats : [undefined];
+        const framesFor = (p: Project, name: string) => (a.allFrames ? Array.from({ length: Math.max(1, p.frames(name).length) }, (_, i) => i) : a.frames ?? (a.frame !== undefined ? [a.frame] : [0]));
         const projects = new Map<string, Project>(), proj = (f: string) => projects.get(f) ?? projects.set(f, loadProject(f)).get(f)!;
         const shots = entries.map((e) => {
-          if (/\.png$/i.test(e)) return { png: resolve(e), name: basename(e).replace(/\.png$/i, "") };
+          if (MEDIA.test(e)) return { png: resolve(e), name: basename(e).replace(MEDIA, "") };
           const m = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(e);
           return m ? { file: resolve(m[1]), name: m[2] } : { file, name: e };
         });
@@ -402,27 +420,29 @@ export async function main(argv: string[]): Promise<number> {
           if (a.vs) throw new PxError("shot --vs compares one asset with another version of it: give it one name and one region");
           const many = shots.map((s) => {
             if ("png" in s) {
-              let img: Img;
-              try { img = decodePng(readFileSync(s.png!)); } catch (e) { throw new PxError(`${s.png}: ${(e as Error).message}`); }
-              return { ...s, row: cellRow([img], regions) };
+              const m = readMedia(s.png!), pick = a.allFrames || (!a.frames && m.frames.length > 1) ? m.frames.map((_, i) => i) : (a.frames ?? [0]).filter((f) => f < m.frames.length);
+              if (!pick.length) throw new PxError(`${s.png}: it has ${m.frames.length} frame${m.frames.length === 1 ? "" : "s"} (0-${m.frames.length - 1})`);
+              return { ...s, row: wrapRow(pick.map((f) => m.frames[f]), regions), note: m.frames.length > 1 || m.drawnAt ? `${basename(s.png!)}: ${m.kind}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, shown at 1x` : ""}${m.frames.length > 1 ? `, frames ${pick.length === m.frames.length ? `all ${m.frames.length}` : pick.join(",")}` : ""}` : "" };
             }
-            const p = proj(s.file);
-            return { ...s, row: cellRow(frames.map((f) => p.build(s.name, 0, frameTime(p, s.name, f)).img), regions) };
+            const p = proj(s.file), frames = framesFor(p, s.name);
+            return { ...s, row: wrapRow(frames.map((f) => p.build(s.name, 0, frameTime(p, s.name, f)).img), regions), frames };
           });
           const sheet = stack(many.map((s) => s.row)), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
           const path = join(outDir, "_shot", many.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".png");
           writePng(path, sheet.scale(k));
-          console.log(`-> ${path} (${png ? "" : `frames ${frames.join(",")}; `}rows, top down: ${entries.map((e) => (/\.png$/i.test(e) ? basename(e) : e)).join(", ")}${regions.length > 1 ? `; columns: ${a.ats.map((r) => r.join(",")).join(" | ")}` : ""}; ${k}x)`);
+          const asset = many.find((s) => "frames" in s) as { frames: number[] } | undefined;
+          console.log(`-> ${path} (${asset ? `frames ${asset.frames.join(",")}; ` : ""}rows, top down: ${entries.map((e) => (MEDIA.test(e) ? basename(e) : e)).join(", ")}${regions.length > 1 ? `; columns: ${a.ats.map((r) => r.join(",")).join(" | ")}` : ""}; ${k}x)`);
+          for (const s of many) if ("note" in s && s.note) console.log(s.note);
           for (const s of many) {
             if (!("file" in s)) continue;
-            const p = proj(s.file!), r = checkProject(p, { names: [s.name], frames });
+            const p = proj(s.file!), r = checkProject(p, { names: [s.name], frames: framesFor(p, s.name) });
             for (const l of r.lines) console.log(l);
             if (r.warnings || p.assets.get(s.name)?.kind === "scene" || p.rigs.has(s.name))
               console.log(`${s.name}: ${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
           }
           return 0;
         }
-        const { name } = shots[0], p = proj(shots[0].file!), now = shotRow(p, name, frames, a.at);
+        const { name } = shots[0], p = proj(shots[0].file!), frames = framesFor(p, name), now = shotRow(p, name, frames, a.at);
         const rows = [now];
         if (a.vs) {
           const o = otherVersion(file, a.vs);
