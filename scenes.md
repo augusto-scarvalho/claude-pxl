@@ -38,7 +38,7 @@ in a short loop · Closing a loop · Parallax · Shadows and light · Blend mode
   `tilemap(..., { corners })` and a terrain tileset (drawn in code, or reduced from a free LPC-style
   one): `examples/topdown.px.js`, `examples/tropical/trail.px.js`. A `curve` or `poly` stroke of dirt
   reads as paint on top of the grass.
-- Tiles that repeat get `wrap: true` (or `"x"`/`"y"`): the preview shows them 3×3, so seams show,
+- Tiles that repeat get `wrap: true` (or `"x"`/`"y"`): the preview shows them 3×3 (3×1, 1×3), so seams show,
   and drawing past an edge continues on the other side.
 - Keep small details that dot an area (pebbles, flowers, tufts) out of tiles: baked in, they repeat
   as a pattern. Lay plain tiles, then `scatter(..., { even: true })` the details over them.
@@ -98,7 +98,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   with `perspective()` (reference: Perspective). The ground is a `plane()`: each pixel gets the color
   of the ground point it sees, so stripes and rows run to the vanishing point by themselves. Long thin
   lines (joints, rails, wires) draw better as `line`s between two `ground()` points than per pixel.
-- Things on the ground stand at `ground(x, z)`, sized by `scale(z)`; poles, posts and fences are a
+- Things on the ground stand at `ground(x, z)`, sized by `scale(z, x)` (and `up` when tilted); poles, posts and fences are a
   loop over z. A figure walking into the distance changes size only at each step's contact, and under
   ~15 px takes a hand-drawn sprite for its size (`fit`): drawn by code that small, it is a blob.
 - Props on the ground (plants, stakes, rocks, benches): build each once as parts in meters with the
@@ -111,8 +111,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   each is lit or in shade by which way it faces the sun. People walking in such a scene: pose a body
   in meters (feet, knees by two-bone IK, arms against the legs) and project it, rather than drawing
   sprites per direction (`examples/perspective/park.px.js`).
-- Three-point: tilt the camera (`pitch`). Looking up (a worm's-eye view), the horizon drops low in the
-  picture and every upright leans in toward `vertical()` above it: trunks, poles, a tower; looking
+- Three-point: tilt the camera (`pitch`). Looking up (a worm's-eye view), put the horizon low in the
+  picture yourself (`horizon` near the bottom: pitch keeps it on that row and looks above it), and
+  every upright leans in toward `vertical()` above it: trunks, poles, a tower; looking
   down, they spread toward a point below. A moderate tilt (15-20°) shows it without warping
   everything; the uprights near the picture's edges show it most, so put tall things there.
 - Mountains, hills, a volcano: `terrain()` with a height in meters, ray-marched through the same
@@ -137,8 +138,8 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 
 - Scrolling a strip that wraps makes the loop as long as its width over the speed: slow clouds
   then need half a minute or more. Instead give each cloud a life of one loop: it forms, drifts in
-  one piece (a whole pixel at even intervals: `Math.floor(drift * age)`, with `drift` a divisor of
-  the loop), and thins away where it started; start each at its own moment so only one or two are
+  one piece (a whole pixel at even intervals: `Math.floor(drift * age)`, `drift` px a loop and a
+  divisor of its frames, `age` the cloud's phase 0-1; `clouds()` does this), and thins away where it started; start each at its own moment so only one or two are
   forming or fading at a time. Make the loop a multiple of the scene's other loops.
 - Thin, a cloud is a long pale wisp in a tone close to the sky's (puffs losing their height faster
   than their length, a flat base joining them), not a row of small blobs. A heaped cloud takes its
@@ -149,7 +150,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 ## Closing a loop
 
 - Something crossing the picture: let it cover more than the picture's width (plus its own length) in
-  one loop (`x = ((x0 - v·t) mod L) - L/2`, L = v times the loop's length): it leaves on one side and
+  one loop (`x = ((x0 - v·t) mod L) - L/2` from the picture's middle, L = v times the loop's length): it leaves on one side and
   comes back on the other while it can't be seen. Or end its way behind something (a hedge, a cart, a
   trunk) and start it behind something else.
 - Particles (embers, ash, rain): each goes round the picture a whole number of times in the loop.
@@ -162,17 +163,18 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 ## Parallax (planes going by at their own speeds)
 
 - Each plane is a sprite drawn once as a strip with `wrap: "x"`, going by with
-  `scroll(name, y, per)`: `per` px a loop, the nearer the more, each a whole number of the strip's
+  `scroll(name, y, per)` (in an anim, or a scene that stamps one: in a still scene it stands still): `per` px a loop, the nearer the more, each a whole number of the strip's
   widths so the last frame runs into the first. A strip at least as wide as the picture doesn't show
   its repeat; a wide one (1280 px) costs nothing per frame. Noise on a strip: `seamless()` makes it
-  close over the strip's width.
+  close over the strip's width. `describe` sees a scrolled strip as one object shifting across, not as
+  motion: look at the planes with `shot --frames`.
 - The loop's length comes from the slowest plane that must go round once. Anything slower (a ridge on
-  the horizon, which should hardly move): drift it a few px over the loop while crossfading its
+  the horizon, which should hardly move): drift it a little over the loop (the train's ridge: 32 px in 12 s) while crossfading its
   outline into itself one step on, as the cloud slots do.
 - What the camera follows stands still: its wheels turn a whole number of times a loop (about the
   distance gone by over their circumference), and its smoke or dust is left behind at the speed of
   the ground beside it, keeping a little of its own at first: `plume()` with `wind` the ground's
-  speed backward and an `inertia`.
+  speed backward in px a frame (`-per / frames` of the plane beside it) and an `inertia`.
 - Mist or haze at the foot of each far plane keeps them apart; the plane nearest the eye goes by too
   fast for detail: streaks along the motion (`examples/parallax/train.px.js`).
 
@@ -235,6 +237,8 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   (`--brief` for busy scenes); after an edit, `--diff` lists what moved, was redrawn or recolored.
 - `PXL check <file>` before handing over: every frame of the loop; its last line says which rules
   ran, and `--readings` shows what the lit-side rule read on each thing when a warning looks wrong.
+  Checks and `world` rules cover `scene()`s (and rigs): a picture made as an `anim()` gets none, so
+  for checks make it a scene that stamps its moving parts (as `sunset` and `tournament` do).
 - A scene built from separate maps (terrain, props): `throw` in the placement loop when a prop lands
   on the wrong ground; it catches the drift before anyone sees it.
 - Before handing over, look as a critic: tiles repeating into a visible grid, props floating or on

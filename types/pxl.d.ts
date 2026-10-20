@@ -344,7 +344,7 @@ declare global {
     name: string; dir: string; ms: number[]; frames: Record<string, [number, number]>[]; depth: Record<string, number>[]; contact: [number, number][];
   };
   function clip(where: PxRegion, ...items: PxItem[]): PxOp;
-  /** A level pinhole camera over flat ground: ground(x, z, up) -> screen, at(col, row) -> ground, scale(z), vanish(angle). */
+  /** A pinhole camera over flat ground, turned (yaw) and tilted (pitch): ground(x, z, up) -> screen, at(col, row) -> ground, scale(z), vanish(angle), vertical(), ray(col, row), toward(dir). */
   function perspective(view: PxView & { w: number }): PxPerspective;
   /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away. */
   function plane(view: PxView | PxPerspective, fn: (x: number, z: number) => PxColor | null | undefined, where?: PxRegion): PxOp;
@@ -365,7 +365,7 @@ declare global {
   const solid: {
     /** round, from a to b, `half` m thick either side: trunks, limbs, poles, bars */
     stick(a: PxV3, b: PxV3, half: number, key: PxColor, extra?: Partial<PxSolid>): PxSolid;
-    /** around e, rx across and ry up: crowns, heads, wheels */
+    /** around e, rx m either side and ry m above and below: crowns, heads, wheels */
     blob(e: PxV3, rx: number, ry: number, key: PxColor, extra?: Partial<PxSolid>): PxSolid;
     /** [x0, z0, x1, z1, u0, u1], its faces' colors { top, lit, shade, under? } */
     box(b: [number, number, number, number, number, number], keys: { top?: PxColor; lit?: PxColor; shade: PxColor; under?: PxColor }, extra?: Partial<PxSolid>): PxSolid;

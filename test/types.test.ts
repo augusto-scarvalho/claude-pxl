@@ -26,5 +26,5 @@ test("types/pxl.d.ts declares every global, op and option the runtime accepts", 
   assert.deepEqual(missing(ASSET_OPTS.scene, body("PxSceneOpts"), opt), [], "scene options");
   assert.deepEqual(missing(ASSET_OPTS.anim, body("PxAnimOpts"), opt), [], "anim options");
   assert.deepEqual(missing(LAYER_OPTS, body("PxLayerOpts"), opt), [], "layer options");
-  assert.deepEqual(missing(Object.values(OP_OPTS).flat(), dts, opt), [], "op options");
+  assert.deepEqual(missing(Object.values(OP_OPTS).flat(), dts, (k) => new RegExp(`\\b${k}\\??:`)), [], "op options");
 });

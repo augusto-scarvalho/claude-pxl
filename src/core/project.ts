@@ -72,13 +72,25 @@ export const SIGNATURES: Record<string, string> = {
   glow: "keys:S ?opts:o",
 };
 
-/** Does any item draw with a function (top level, in layers, frames, clips, plates)? */
+/** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
+const CLOCKED = new Set(["flame", "scroll", "clouds", "plume"]);
+/** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
 function drawsWithFunctions(items: Item[]): boolean {
-  return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && drawsWithFunctions(v.args as Item[])));
+  return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
 }
 
+/** Options every placement takes (stamp, tile, pattern, panel, scatter, tilemap, wire hangs). */
+const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "silhouette", "cast", "castBase", "at", "id", "z", "seed", "reseed", "frame", "delay", "rdelay"];
 /** Allowed option keys of ops whose last argument is an options object. */
 export const OP_OPTS: Record<string, string[]> = {
+  stamp: PLACE,
+  tile: PLACE,
+  pattern: PLACE,
+  panel: PLACE,
+  scatter: [...PLACE, "on", "clip", "below", "even", "near", "within"],
+  tilemap: [...PLACE, "map", "corners", "iso", "size", "w", "h", "x", "y"],
+  wire: [...PLACE, "hang", "every", "start"],
+  text: ["scale", "gap", "lead", "align", "shadow", "font"],
   lamp: ["r", "color", "power", "z"],
   curve: ["width", "closed"],
   arc: ["inner", "taper"],

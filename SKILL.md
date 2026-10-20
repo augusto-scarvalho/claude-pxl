@@ -35,8 +35,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    keeps one frame in three. A build that has grown slow: `--profile` names the functions where
    the time went, in your file and in pxl.
 5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
-   rig of the file and every frame of an animated scene, warnings only, with the frames they happen
-   at. Fix each or say why it's meant. Its last line says which rules ran: a rule runs only where
+   rig of the file and every frame of an animated scene (not `anim()`s: a picture made as one gets no
+   checks), warnings only, with the frames they happen at. Fix each or say why it's meant. Its last line says which rules ran: a rule runs only where
    the art says what it needs (`world.light`, `world.ground`, `height`, a `front` socket), so "no
    warnings" with "not run: lit side" checked nothing about the light (a scene lit by a fire or a
    lamp: `world: { light: { at: [x, y] } }`). A lit-side warning that looks wrong: `--readings` shows
@@ -90,7 +90,7 @@ task needs before starting:
 | a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a scene, level, building or environment | [scenes.md](scenes.md), whole (~4.5k tokens) |
+| a scene, level, building or environment | [scenes.md](scenes.md), whole (~5k tokens) |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
 
@@ -100,11 +100,11 @@ range, the comment above it, what a loop makes on one line). Read those lines, n
 ## Template
 
 ```js
-pal({ k: "#1b1630", l: "#c8f0a0", g: "#8ccf63", G: "#4c8a44", t: "#2a5560", w: "#fff6e0", r: "#e2585e", R: "#a63a4c" })
-ramps("ktGgl", "kRr")                  // dark -> light, drives shade()/light(); a key in one ramp only (ends shared)
+pal({ k: "#1b1630", l: "#c8f0a0", g: "#8ccf63", G: "#4c8a44", t: "#2a5560", w: "#fff6e0", r: "#e2585e", R: "#a63a4c", D: "#6b2a44" })
+ramps("ktGgl", "kDRr")                  // dark -> light, drives shade()/light(); a key in one ramp only (ends shared)
 
 // Symmetric: write the left half, mirror it, outline it. The shine is a light green (l), not white.
-sprite("slime", { mx: true, outline: "k" }, `
+sprite("slime", { mx: true, outline: "k", pivot: "bottom" }, `
   ....ggg
   ..gglgg
   .gglllg
@@ -120,7 +120,7 @@ sprite("chest", { w: 16, h: 12, outline: "k" },
 
 scene("meadow", { w: 160, h: 96, bg: "w" },
   layer("ground", { y: 64 }, rect(0, 0, 160, 32, "G")),
-  layer("props", { sort: "y" }, stamp("slime", 40, 54), stamp("slime_red", 70, 54, { flip: "x" })),
+  layer("props", { sort: "y" }, stamp("slime", 40, 64), stamp("slime_red", 70, 64, { flip: "x" })),
   layer("shadow", { shade: true }, poly([38, 64, 88, 64, 92, 67, 34, 67], "k")))   // cast shadow
 
 sheet("chars", ["slime*", "chest"], { pad: 1 })
@@ -132,16 +132,16 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   "sweetie16" | "endesga32" | "palette.hex")` (Lospec files; `1a1626 k ink` gives a color its key);
   `shades("HGgl", "#5aa040")` makes a hue-shifted ramp from one color.
 - **Order**: grid strings, ops, `(c) => { ... }` functions and `layer(...)`s run in order; then
-  mirror → swap → flip → rot → outline (grows 1px) → crop.
+  mirror → swap → flip → rot → angle → inline/outline (grows 1px) → crop.
 - **Regions** (`where`, `clip(region, ...items)`): `[cx, cy, r]`, `[x, y, w, h]`, a polygon's points,
   or `(x, y) => bool`. Shading: `shade`/`light(region, steps, density)` step colors along the ramps;
-  a second pass at `density: 0.5` softens the edge.
+  a second pass, `shade(region, 1, 0.5)`, softens the edge.
 - **Reuse**: variants are `base` + `swap`; repeated details `_parts` + `stamp`; families a `group` or a
   loop; props get `pivot: "bottom"`; texture is `scatter` of tiny parts; areas are `tilemap`/`pattern`.
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` and functions reading `c.phase`;
   `dir: "pingpong"`; stamping an anim animates the scene, and the scene's own functions then get its
-  loop (`c.frame`, `c.frames`, `c.phase`, `c.t`). Things going by in a loop that closes: `scroll()`
-  (parallax planes), `clouds()`, `plume()` (smoke, steam). Limbs, walks, hair: `PXL help "characters 9 10"`.
+  loop (`c.frame`, `c.frames`, `c.phase`, `c.t`). Things going by in a loop that closes (in an anim, or a scene
+  that stamps one): `scroll()` (parallax planes), `clouds()`, `plume()` (smoke, steam). Limbs, walks, hair: `PXL help "characters 9 10"`.
 - **Existing art**: `sprite("x", { png, area, shrink, palettize })`, `anim(..., { png, frames })`;
   `rampmap` maps imported tones onto a ramp without merging them.
 - **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj` for tilemaps, `build --aseprite` for a
@@ -149,8 +149,8 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 - **Light**: `shade:`/`light:` layers and `cast` shadows, `glow`, `lighting()` (lighting.md).
 - **In meters**: `perspective()` (one, two or three points: `yaw`, `pitch`), `plane()` for flat ground,
   `terrain()` for hills and mountains, `solids()`/`shadows()` for things built of `solid` shapes,
-  `capsule` for a limb painted round, `flame` for fire; procedural texture with `hash`, `vnoise`, `fbm`, `bayer`
-  (scenes.md "True perspective", "Closing a loop").
+  `capsule` for a limb painted round, `flame` for fire (scenes.md "True perspective"); procedural
+  texture with `hash`, `vnoise`, `fbm`, `bayer`, `seamless` (`PXL help vnoise`).
 
 ## Examples
 
@@ -174,7 +174,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `lighting.px.js`, `outpost.px.js` | `lighting()` scenes: lamps, `solid`/`wall` layers |
 | `normals.px.js` | normal maps: `bump` vs painted `normals` |
 | `cave.px.js`, `grotto.px.js` | animated glow scenes: pulsing lamps, waterfall, particles |
-| `tropical/` | 320×240 animated forest: imported trees, river, trail tileset, animals, a walking girl |
+| `tropical/` | 320×240 animated forest: imported trees, river, trail tileset, animals, a girl on the trail (her walk cycle in `girl.px.js`) |
 | `halloween/` | 320×180 night party: `lighting()` with many lamps, point-light `cast` shadows, dancing monsters (bones drawn between joints, a cape polygon, `warp`) |
 | `no_magic.px.js` | the largest interior: character anims, fire, many props |
 | `sunset/` | 320×180 backlit scene: long shadows toward us, glowing edges, a tent lit through, a sky that loops slower than the rest |

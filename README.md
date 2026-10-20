@@ -147,7 +147,7 @@ they're right from any angle the paths give them and cast their own short shadow
 behind the ice-cream cart because everything is drawn far to near, and the loop closes because both
 paths end behind a hedge.
 Then [`extinction.px.js`](examples/perspective/extinction.px.js): the camera tilted up 18° (`pitch`), three
-vanishing points: the horizon drops to the bottom and the burning araucarias lean in toward a third
+vanishing points: the horizon set low (row 150 of 180) and the burning araucarias lean in toward a third
 point high above the picture (`vertical()`). The volcano is `terrain()`, a heightfield ray-marched
 through the same camera; its lava rivers run down the steepest way; the dinosaurs are profiles in
 meters on a run worked out in 3D, their legs painted round by `capsule()`, each covering more than
@@ -164,8 +164,8 @@ the picture's width in the loop so their coming back is never seen. Trees, logs 
 so the train stands still and the land runs past behind it. Each plane is a strip drawn once with
 `wrap: "x"` and placed every frame further along: in the 12 s loop the hills go by 320 px, the
 pasture 640, the trackside 1280 and the grass in front 1920, each strip round a whole number of times;
-the ridge on the horizon, too slow to go round, drifts a few pixels while its outline crossfades into
-itself. The drivers turn a whole
+the ridge on the horizon, too slow to go round, drifts 32 px in the loop while its outline crossfades
+into itself. The drivers turn a whole
 number of times a loop with the rods on their crank pins, and every puff of smoke is left behind at
 the speed of the ground, so the last frame runs into the first.
 
@@ -257,8 +257,9 @@ Full API: [`reference.md`](reference.md). Agent workflow and essentials: [`SKILL
 
 ## Use it with an AI agent
 
-This repository is an agent skill: `SKILL.md` teaches the workflow (write → build → look at the
-preview → patch), `reference.md` holds the full API, and `lighting.md` is loaded only when needed.
+This repository is an agent skill: `SKILL.md` teaches the workflow (write → `shot` → fix → `check`;
+`build` for the files), `reference.md` holds the full API, and the guides (`scenes.md`,
+`characters.md`, `lighting.md`, `rotation.md`) are read in parts with `pxl help` when a task needs them.
 
 **Claude Code**: clone it into your skills folder, then ask Claude to draw something.
 

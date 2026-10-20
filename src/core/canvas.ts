@@ -569,7 +569,8 @@ export class Canvas {
 
   /**
    * A lane of cumulus drifting across in a loop that closes: clouds `gap` px apart, each moving one
-   * slot along over the loop while it turns into the next slot's cloud. `n` designs from `seed`, `w`
+   * slot along over the loop (rightward; a negative `gap`, leftward) while it turns into the next slot's
+   * cloud. `n` designs from `seed`, `w`
    * across and `h` tall, `sizes` scaling each; a slot in `empty` holds none, so a cloud forms out of
    * nothing or thins away there. Cut flat at the base on row `y`. `keys`: the lit top, the gray low
    * down and on the shaded right, the base.
@@ -582,8 +583,10 @@ export class Canvas {
       const r = rng(seed * 31 + i), s = opts.sizes?.[i] ?? 1, none = opts.empty?.includes(i);
       return Array.from({ length: 7 }, () => [(r() - 0.5) * w * s * 0.85, -r() * h * s * 0.45, none ? 0 : h * s * (0.32 + r() * 0.3)]);
     });
-    const at = (j: number) => designs[((j % n) + n) % n], right = this.img.w - this.ox;
-    for (let j = -2; (j - 1) * gap < right + w; j++) {
+    const at = (j: number) => designs[((j % n) + n) % n], right = this.img.w - this.ox, g = Math.abs(gap) || 1;
+    // every slot whose cloud can reach the canvas over the loop, rightward from j = -2 as ever
+    const [j0, j1] = gap > 0 ? [-2, Math.ceil((right + w - x) / g) + 1] : [Math.floor((x - right - w) / g) - 1, Math.ceil((x + w + this.ox) / g) + 1];
+    for (let j = j0; j < j1; j++) {
       const a = at(j), b = at(j + 1);
       // the puffs of one cumulus, cut flat at the base: lit on top, gray low down and on the right
       const cx = x + (j + t) * gap, px = new Map<number, [number, number]>();

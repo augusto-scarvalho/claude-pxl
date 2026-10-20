@@ -267,3 +267,17 @@ test("plume: puffs born before the loop starts are there on its first frame, and
   assert.match(fr[0], /[wrk]/);
   assert.notEqual(fr[0], fr[1]);
 });
+
+test("clocked ops in a scene animated by what it places draw its first frame on its loop, as functions do", () => {
+  const smoke = `plume(10, 20, "wrk", { every: 2, life: 8, rise: 10, size: [2, 4] })`, tick = `anim("tick", { w: 1, h: 1, frames: 12, fps: 12 }, (c) => c.px(0, 0, c.frame % 2 ? "r" : "w"))\n`;
+  const p = load(tick + `scene("s", { w: 30, h: 24, bg: "g" }, stamp("tick", 0, 0), ${smoke})
+anim("a", { w: 30, h: 24, frames: 12, fps: 12 }, rect(0, 0, 30, 24, "g"), stamp("tick", 0, 0), ${smoke})`);
+  assert.equal(frameKeys(p, "s")[0], frameKeys(p, "a")[0]);
+});
+
+test("clouds: a negative gap drifts them leftward; placements refuse options they don't take", () => {
+  const p = load(`anim("sky", { w: 60, h: 12, frames: 4, fps: 4 }, rect(0, 0, 60, 12, "g"), clouds({ y: 9, gap: -20, w: 10, h: 5, n: 1, keys: "wrk" }))`);
+  const [a, b] = frameKeys(p, "sky").map((f) => f.split("\n")[9]);
+  assert.equal(b.slice(0, 55), a.slice(5, 60), "five px left a frame");
+  assert.match(failure(PAL + `sprite("x", "r")\nsprite("s", { w: 4, h: 4 }, stamp("x", 0, 0, { rlip: "x" }))`, "s").message, /rlip/);
+});

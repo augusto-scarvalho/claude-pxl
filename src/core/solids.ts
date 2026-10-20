@@ -11,7 +11,7 @@ export type V3 = [number, number, number];
 export interface Solid {
   /** a stick from a to b, `half` m thick either side */
   a?: V3; b?: V3; half?: number;
-  /** a blob around e, rx across, ry up */
+  /** a blob around e, rx m either side, ry m above and below */
   e?: V3; rx?: number; ry?: number;
   /** a box [x0, z0, x1, z1, u0, u1], its faces' colors { top, lit, shade, under } */
   box?: [number, number, number, number, number, number]; keys?: Record<string, string>;
