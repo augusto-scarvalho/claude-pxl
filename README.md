@@ -252,7 +252,7 @@ writes the same `out/` files as `build`.
 pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
 pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
 pxl ascii <art.px.js> <name>     print an asset as palette keys with x/y rulers (--frame N: one frame)
-pxl list  <art.px.js>            a map of the file: each definition's lines, its comment, what it makes
+pxl list  <art.px.js>            a map of the file: each asset and function's lines, its comment, what it makes
 pxl describe <art.px.js> <name>  a whole scene as text: what is where, what covers it, how it moves
 pxl check <art.px.js> [name...]  every check describe makes, on every frame: warnings only (--frame N, --readings)
 pxl shot <art.px.js> <name>      frames side by side, a region enlarged, --vs HEAD --diff; with several
@@ -260,6 +260,8 @@ pxl shot <art.px.js> <name>      frames side by side, a region enlarged, --vs HE
 pxl steps <art.px.js> <name>     how it was painted, step by step; --at x,y: what painted that pixel
 pxl compare <art.px.js> <name> <ref.png>  silhouette rows against a reference (--shrink N, --offset x,y)
 pxl blind <art.px.js> <name...>  facing labels checked by a reader who doesn't know them (--check answers.json)
+pxl study <picture|gif|video>    learn from finished art or a reference: palette, ramps, outlines, dithering,
+                                 light, perspective, parallax and motion, and what to use in pxl for each
 pxl help [name]                  what the reference says about an op or option, or a guide's section
 ```
 

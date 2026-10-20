@@ -8,7 +8,7 @@
 // layout (ARC: LLMs and the Abstraction and Reasoning Corpus, arXiv 2305.18354).
 import type { BuildOut } from "./build.ts";
 import type { Placement } from "./canvas.ts";
-import { type Color, TRANSPARENT, toHex } from "./color.ts";
+import { type Color, TRANSPARENT, oklab, toHex } from "./color.ts";
 import { Img, type Orient } from "./image.ts";
 import type { World } from "./model.ts";
 import { type Steps, dirWords, frontWords, lightWords, rampSteps } from "./checks.ts";
@@ -48,15 +48,6 @@ export interface Snapshot {
 const SYMBOLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$%&*+=?";
 const lum = (c: Color) => (0.2126 * ((c >>> 24) & 255) + 0.7152 * ((c >>> 16) & 255) + 0.0722 * ((c >>> 8) & 255)) / 255;
 const digit = (v: number) => String(Math.max(0, Math.min(9, Math.floor(v * 10))));
-/** OKLab (perceptual): distances between colors read like what the eye sees. */
-const oklab = (c: Color): [number, number, number] => {
-  const f = (v: number) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-  const r = f((c >>> 24) & 255), g = f((c >>> 16) & 255), b = f((c >>> 8) & 255);
-  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
-  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
-  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
-};
 const mean3 = (cs: Color[]): [number, number, number] => {
   const t = [0, 0, 0];
   for (const c of cs) { const o = oklab(c); t[0] += o[0]; t[1] += o[1]; t[2] += o[2]; }

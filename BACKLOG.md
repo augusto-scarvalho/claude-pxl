@@ -382,6 +382,23 @@ one), and the art code itself (4% of the cost).
 - [x] Export tilemaps to Tiled: `<asset>.tmj` + a tileset image per layer (isometric alignment unchecked in Tiled itself).
 - [x] Bitmap fonts: `font(name, sprite, { chars, w, h })` + `text(..., { font })`, and a ready 5x7 font in `examples/fonts/`.
 
+## Learning from references (`pxl study`)
+
+- [x] **Read a finished piece or a reference for what it is made of**, PNG, GIF, JPEG/WebP and
+  video, pixel art or not, and say what to use in pxl for it. Asked for after the race, where every
+  reference (Top Gear, Out Run, photos of the Rio-Santos, a game's video) was cropped, scaled and
+  read by eye. Two ways in: pixel art is read as drawn (its grid found, exact or blurred and
+  fractional, the picture taken back to 1x; then palette, ramps and their hue shifts, outlines,
+  dithering, anti-aliasing, lone pixels, light, tiles counted on its own pixels); anything else is
+  read for masses, colors as ramps, the light's color, haze, and translated into a small picture in
+  few colors. Both: perspective (Hough lines, vanishing points, the horizon, two-point lens) and
+  motion (timing, cycle, loop, parallax bands to a fraction of a pixel, the focus of expansion,
+  moving parts). A native GIF decoder (LZW, disposal, interlace); ffmpeg on PATH for the rest.
+  Measured on art whose numbers are known: the train's four planes at 1.63, 3.38, 6.63 and 10.00
+  px/frame (made at 1.67, 3.33, 6.67, 10); the race at 2x, one-point with the horizon on row 72 and
+  the camera on column 150 (made at 70 and 160) and the motion opening out from 169,58; a game
+  video at 800x392 found drawn at 3.23x, 22 colors once folded; a road photo translated at 160x120.
+
 ## Perspective scenes (from dogfooding road, park and extinction)
 
 - [x] **Three-point perspective**: `pitch` on `perspective()`, `vertical()` for the third point (fa5231e).

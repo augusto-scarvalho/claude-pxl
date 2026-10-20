@@ -386,6 +386,7 @@ node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--sheet] [--out DIR]
 node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief] [--out DIR | --no-out]     (or describe <image.png>)
 node <pxl>/bin/pxl.js compare <file> <name> <ref.png> [--shrink N] [--offset x,y]
 node <pxl>/bin/pxl.js blind <file> <name...> [--out DIR]   |   blind <file> --check answers.json
+node <pxl>/bin/pxl.js study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--out DIR | --no-out]
 ```
 
 `shot` is the look while iterating: the asset built at those frames (side by side, cropped to the
@@ -413,6 +414,33 @@ from its text, without the assets its loops make. `help` prints the
 rows that define a name in full, one line for each other place that mentions it and a few uses in the
 examples (`--all`: everything in full); a guide's name with numbers or words of a heading prints those
 sections.
+
+`study` learns from finished art or a reference (a PNG, a GIF, a JPEG or WebP, a video): a report of
+what it is made of, with what to use in pxl to make the same (palette, `outline`/`selout`, `dither`,
+the light for `relight`, `perspective({ horizon, vp })`, `scroll` per plane, `anim` frames), and in
+`<out>/_study/` a sheet to look at (the picture; its techniques marked: checkers magenta, dark lines
+cyan, in-between tones yellow; its straight edges colored by where they meet, the horizon cyan; the
+ramps; frames and the flow), the picture and `<name>.hex`. It reads two kinds of picture two ways.
+Pixel art (few colors, hard steps between them, often drawn at 2x and up) is read as drawn: its grid
+found (an exact upscale, or a blurred, compressed or fractional one: a video of a game, a JPEG,
+2.5x) and the picture taken back to 1x, so its palette, ramps (and how their hue shifts from shade
+to light), outlines (near-black, a darker shade of what they border, or none), 2x2 dithering,
+in-between tones on edges (anti-aliasing), lone pixels, the light (where each ramp's lighter tones
+lie) and repeating tiles are counted on the artist's own pixels. Anything else (a photo, a painting,
+a render) has no pixels to read that way: it is read for what a pixel artist takes from it (the
+masses of dark, middle and light, the colors reduced to `--colors` (16) as ramps, the light's color
+against the shadows', contrast and color by band for the haze of distance) and translated into a
+`--to` (160 px wide) picture in those colors, to draw over in a `ref: true` layer: the lesson is in
+its masses and light, not its pixels. Both are read for their perspective (Sobel edges, Hough lines,
+where they meet: one point on the horizon, two either side of the middle with the lens they imply,
+uprights meeting above or below) and, animated, for their motion: the frames' timing and holds, a
+cycle (the shortest shift after which frames repeat), whether the last frame runs into the first,
+bands of rows carried across together and their speeds to a fraction of a pixel (parallax planes:
+`scroll`'s `per` is the speed times the loop's frames), the point the motion opens out from (a camera
+moving forward: the vanishing point of the motion, which picks the road's among the still ones), and
+the parts that move on a still picture. Videos are read `--seconds` (8) from `--from` at their own
+rate up to 30 fps (`--fps`); big frames are brought down as they are read (to 1x when they are pixel
+art, else to 640 px). PNG and GIF are read by pxl; JPEG, WebP, BMP and video need ffmpeg on PATH.
 
 `compare` checks a silhouette against a reference image: for every row, the opaque runs of the
 reference (shrunk by N first, placed at x,y in the asset's coordinates) and of the asset, and how

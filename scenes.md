@@ -6,6 +6,10 @@ Contents: Layout and scale · Ground, paths and tiles · Texture without filler 
 shapes · Water and things that land · Distance (aerial perspective) · True perspective · Slow motion
 in a short loop · Closing a loop · Parallax · Shadows and light · Blend modes · Checking a scene
 
+A reference scene (a screenshot, a photo of the place, a GIF or a video of a game): `PXL study` gives
+its horizon and vanishing points, its planes and their speeds, its palette and its light, and for a
+photo a small translation in few colors to draw over.
+
 ## Layout and scale
 
 - **Size buildings from the characters.** A door is a little taller than the tallest figure that

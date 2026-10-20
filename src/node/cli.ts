@@ -12,7 +12,8 @@ import { rigLines } from "../core/rig.ts";
 import { rampSteps } from "../core/checks.ts";
 import { ascii, compareSilhouettes, preview } from "../core/render.ts";
 import { mapPixel, replay, stepSheet } from "../core/steps.ts";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { loadProject } from "./load.ts";
 import { decodePng } from "./png.ts";
 import { reduceColors } from "./gif.ts";
@@ -22,6 +23,8 @@ import { checkProject } from "./check.ts";
 import { cellRow, diffRow, frameTime, otherVersion, shotChanges, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
 import { listProject, listText } from "./list.ts";
+import { readMedia } from "./media.ts";
+import { study } from "../core/study.ts";
 import { profileReport, profiled } from "./profile.ts";
 
 const USAGE = `pxl — pixel-art DSL
@@ -87,6 +90,18 @@ const USAGE = `pxl — pixel-art DSL
   pxl compare <art.px.js> <name> <ref.png> [--shrink N] [--offset x,y]
       Silhouette check: each row's opaque extents in the asset and in a reference image (shrunk
       by N first, placed at x,y), and how many px wider the asset is on each side.
+  pxl study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--out DIR | --no-out]
+      Learn from finished art or a reference: what it is made of and what to use in pxl to make the
+      same. Pixel art (an upscale found by its grid, blurred or not) is read at 1x: its palette and
+      ramps (hue shifts), outlines (black, selective), dithering, anti-aliasing, clusters, where the
+      light comes from, tiles. Anything else (a photo, a painting, a render) is read for its masses
+      of light and dark, its colors as ramps, the light's color against the shadows', the haze with
+      distance, and translated into a small picture in few colors to draw over (--to, --colors).
+      Both: straight edges and where they meet (one, two or three points, the horizon). Animated
+      (a GIF, a video): timing, a cycle, whether it loops, planes going by and their speeds
+      (parallax), a scene opening out from the point it moves toward, the parts that move on a still
+      picture. Writes _study/<name>.png (a sheet to look at), the picture at 1x (or the translation)
+      and <name>.hex. PNG and GIF are read by pxl; JPEG, WebP and video through ffmpeg if on PATH.
 
 Art files may be .js or .ts. Default out dir: <art file dir>/out.`;
 
@@ -118,6 +133,11 @@ interface Args {
   all?: boolean;
   every?: number;
   readings?: boolean;
+  colors?: number;
+  to?: [number, number];
+  from?: number;
+  seconds?: number;
+  fps?: number;
 }
 
 function parse(argv: string[]): Args {
@@ -161,6 +181,15 @@ function parse(argv: string[]): Args {
     else if (v === "--every") a.every = Number(val());
     else if (v === "--readings") a.readings = true;
     else if (v === "--profile") a.profile = true;
+    else if (v === "--colors") a.colors = Number(val());
+    else if (v === "--to") {
+      const m = /^(\d+)x(\d+)$/.exec(val().trim());
+      if (!m) throw new PxError("--to needs WxH (e.g. --to 320x180)");
+      a.to = [Number(m[1]), Number(m[2])];
+    }
+    else if (v === "--from") a.from = Number(val());
+    else if (v === "--seconds") a.seconds = Number(val());
+    else if (v === "--fps") a.fps = Number(val());
     else if (v === "-h" || v === "--help") a.cmd = "usage";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -175,7 +204,7 @@ export async function main(argv: string[]): Promise<number> {
   try { a = parse(argv); } catch (e) { console.error(wrap(e).message); return 2; }
   if (a.cmd === "help") {
     // the reference looked up, not read: an index, or what it says about one name
-    console.log(help(a.file, { all: a.all }) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | check | shot | compare | blind | help (pxl --help for their options)"));
+    console.log(help(a.file, { all: a.all }) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | check | shot | compare | blind | study | help (pxl --help for their options)"));
     return 0;
   }
   if (!a.cmd || a.cmd === "usage" || !a.file) {
@@ -214,6 +243,19 @@ export async function main(argv: string[]): Promise<number> {
         else if (p.assets.get(name)?.kind === "anim")
           p.drawn(name).forEach((f, i) => console.log(`frame ${i} (${f.ms}ms)\n${ascii(f.img, pal)}\n`));
         else console.log(ascii(p.image(name), pal));
+        return 0;
+      }
+      case "study": {
+        const m = readMedia(file, { at: a.at, from: a.from, seconds: a.seconds, fps: a.fps });
+        const name = basename(file).replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "_");
+        const r = study({ name, frames: m.frames, ms: m.ms, kind: m.kind, drawnAt: m.drawnAt }, { colors: a.colors, to: a.to });
+        const dir = join(a.out === false ? tmpdir() : (a.out ?? join(dirname(file), "out")), "_study");
+        mkdirSync(dir, { recursive: true });
+        const pic = join(dir, `${name}${r.pixelArt ? "_1x" : "_px"}.png`), sheetPath = join(dir, `${name}.png`), hexPath = join(dir, `${name}.hex`);
+        writePng(sheetPath, r.sheet); writePng(pic, r.picture);
+        writeFileSync(hexPath, r.palette.map((c) => toHex(c).slice(1, 7)).join("\n") + "\n");
+        for (const l of r.text) console.log(l);
+        for (const l of ["", "FILES", `  ${sheetPath}: the sheet (the picture; ${r.pixelArt ? "its techniques marked; " : ""}its edges and vanishing points; the ramps${m.frames.length > 1 ? "; frames; the flow" : ""})`, `  ${pic}: ${r.pixelArt ? "the drawing at 1x" : "the translation, to draw over"}`, `  ${hexPath}: the palette, ramp by ramp, dark to light`]) console.log(l);
         return 0;
       }
       case "list": {
