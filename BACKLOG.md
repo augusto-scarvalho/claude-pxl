@@ -430,3 +430,16 @@ one), and the art code itself (4% of the cost).
   wheels and people (one train's). The shade under the train was a hand loop; `recolor` with a
   region does it. Reference photos come as JPEG, which pxl doesn't read: they were cropped and
   sheeted with an outside tool, as they should be (study, not input).
+
+## From the street race (a cockpit view)
+
+- [x] **Shapes far off the picture were drawn pixel by pixel anyway**: `poly` and `ellipse` walked
+  their whole bounding box, so a forest wall or a crown with a vertex near the camera (screen x in
+  the thousands) cost millions of invisible pixels: the race built in 47 minutes. They now walk
+  only what can land on the image (all of it along an edge that wraps): 31 seconds, every example
+  pixel for pixel the same.
+- [x] **Loops along a way**: things picked by `hash()` of where they stand along the road jumped at
+  the loop's seam until taken modulo the loop's distance; written up in scenes.md, with flutters as
+  whole cycles of the loop.
+- Considered: a curved road in `perspective()` (`bend`: the offset kappa·d²/2 the race works out
+  itself, in its `cx()`): one scene's so far; worth it if another road bends.

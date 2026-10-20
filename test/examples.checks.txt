@@ -44,6 +44,8 @@ perspective/extinction.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placeme
   ran: nothing; not run: front marker (nothing has one)
 perspective/park.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one)
+perspective/race.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: nothing; not run: front marker (nothing has one)
 perspective/road.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one)
 platformer.px.js: 0 warnings (1 scene (1 frame, 8 distinct placements), 0 rigs, 0 other assets with a front marker)

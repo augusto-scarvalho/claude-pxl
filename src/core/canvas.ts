@@ -126,6 +126,16 @@ export class Canvas {
     return ix >= 0 && iy >= 0 && ix < w && iy < h ? iy * w + ix : -1;
   }
 
+  /**
+   * The rows (axis "y") or columns ("x") of [lo, hi) that can land on the image: all of them along an
+   * edge that wraps, else only those inside. A shape far off the picture then costs nothing.
+   */
+  span(lo: number, hi: number, axis: "x" | "y"): [number, number] {
+    if (this.wrap?.[axis]) return [lo, hi];
+    const o = axis === "x" ? this.ox : this.oy, n = axis === "x" ? this.img.w : this.img.h;
+    return [Math.max(lo, -o), Math.min(hi, n - o)];
+  }
+
   get(x: number, y: number): Color {
     const i = this.index(x, y);
     return i < 0 ? TRANSPARENT : this.img.data[i];
@@ -289,8 +299,11 @@ export class Canvas {
     const col = this.color(c);
     const ax = rx + 0.5, ay = ry + 0.5;
     const inside = (x: number, y: number) => (x / ax) ** 2 + (y / ay) ** 2 <= 1;
-    for (let y = -ry; y <= ry; y++)
-      for (let x = -rx; x <= rx; x++)
+    // only the offsets that can land on the image, still stepping from -r as ever
+    const [ylo, yhi] = this.span(-Infinity, Infinity, "y"), [xlo, xhi] = this.span(-Infinity, Infinity, "x");
+    const ys = -ry + Math.max(0, Math.floor(ylo - cy + ry) - 1), xs = -rx + Math.max(0, Math.floor(xlo - cx + rx) - 1);
+    for (let y = ys; y <= ry && cy + y < yhi + 1; y++)
+      for (let x = xs; x <= rx && cx + x < xhi + 1; x++)
         if (inside(x, y) && (!ring || !(inside(x - 1, y) && inside(x + 1, y) && inside(x, y - 1) && inside(x, y + 1))))
           this.plot(cx + x, cy + y, col);
   }
@@ -323,8 +336,9 @@ export class Canvas {
   poly(pts: number[], c: string): void {
     if (!Array.isArray(pts) || pts.length < 6 || pts.length % 2) throw new PxError("poly needs [x0,y0, x1,y1, x2,y2, ...]");
     const col = this.color(c), inside = inPoly(pts), b = polyBounds(pts);
-    for (let y = Math.floor(b.y0); y < Math.ceil(b.y1); y++)
-      for (let x = Math.floor(b.x0); x < Math.ceil(b.x1); x++) if (inside(x, y)) this.plot(x, y, col);
+    const [y0, y1] = this.span(Math.floor(b.y0), Math.ceil(b.y1), "y"), [x0, x1] = this.span(Math.floor(b.x0), Math.ceil(b.x1), "x");
+    for (let y = y0; y < y1; y++)
+      for (let x = x0; x < x1; x++) if (inside(x, y)) this.plot(x, y, col);
   }
 
   /** 4-connected flood fill of the region containing (x, y). */

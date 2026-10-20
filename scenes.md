@@ -154,6 +154,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   comes back on the other while it can't be seen. Or end its way behind something (a hedge, a cart, a
   trunk) and start it behind something else.
 - Particles (embers, ash, rain): each goes round the picture a whole number of times in the loop.
+- Anything picked by where it is along a way that goes by (`hash(p)` of a crown, a patch, a stone):
+  take `p` modulo the distance gone in the loop, or the first frame picks other ones than the last.
+  Every flutter (`sin(f · k)`) a whole number of cycles in the loop: `sin(2π · f / frames · n)`.
 - A lane of clouds: each moves one slot along in the loop while turning into the next one's shape
   (`clouds()`, with `empty` slots for a sky where they form and thin away); smoke and steam rising
   from a point: `plume()`; soot or mist that comes and goes:
@@ -175,6 +178,10 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   distance gone by over their circumference), and its smoke or dust is left behind at the speed of
   the ground beside it, keeping a little of its own at first: `plume()` with `wind` the ground's
   speed backward in px a frame (`-per / frames` of the plane beside it) and an `inertia`.
+- Seen from inside something moving (a car's cockpit, a train's window): draw the world through the
+  camera, then the inside as a sprite whose glass is left empty; a mirror is a second camera in a
+  small anim stamped where the glass is (`examples/perspective/race.px.js`). The far things there
+  move only as the heading turns (`focal · heading` px), the nearer ridge a little more.
 - Mist or haze at the foot of each far plane keeps them apart; the plane nearest the eye goes by too
   fast for detail: streaks along the motion (`examples/parallax/train.px.js`).
 

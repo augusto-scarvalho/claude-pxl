@@ -643,3 +643,8 @@ test("seamless: a function made to close over a width (and a height) runs into i
   assert.ok(Math.abs(f(0, 3) - f(20, 3)) < 1e-9 && Math.abs(f(19.999, 3) - f(20, 3)) < 1e-3);
   assert.ok(Math.abs(g(5, 0) - g(5, 12)) < 1e-9 && Math.abs(g(5, 11.999) - g(5, 12)) < 1e-3);
 });
+
+test("shapes far off the picture cost only the pixels they can reach: a vertex millions away, a huge circle", () => {
+  eq(art(PAL + 'sprite("t", { w: 4, h: 2 }, poly([0, 0, 1e7, 0, 0, 1e7], "r"))', "t"), "rrrr\nrrrr");
+  eq(art(PAL + 'sprite("c", { w: 4, h: 2 }, circ(2, 1e6, 1e6 + 1, "w"))', "c"), "wwww\nwwww");
+});
