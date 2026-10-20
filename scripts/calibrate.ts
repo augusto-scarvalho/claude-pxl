@@ -86,16 +86,18 @@ for (const [file, name] of scenes.filter(([, n]) => !only.length || only.include
   const glowAt = frames0(builds.length, WH), blobs: Blob[][] = [];
   const boxOf = (px: number[]): Box => { let x0 = W, y0 = H, x1 = -1, y1 = -1; for (const q of px) { const x = q % W, y = Math.floor(q / W); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } return [x0, y0, x1 - x0 + 1, y1 - y0 + 1]; };
   builds.forEach((b, t) => {
-    const blended = new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name)), owner = new Int32Array(WH).fill(-1), ink = new Uint32Array(WH);
+    const blended = new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name)), owner = new Int32Array(WH).fill(-1);
     b.placements.forEach((pl, i) => {
       const glow = blended.has(pl.layer ?? "");
       for (let y = 0; y < pl.img.h; y++) for (let x = 0; x < pl.img.w; x++) {
         const X = pl.x + x, Y = pl.y + y, c = pl.img.data[y * pl.img.w + x];
         if (X < 0 || Y < 0 || X >= W || Y >= H || c === TRANSPARENT) continue;
         if (glow) glowAt[t][Y * W + X] = 1;
-        else { owner[Y * W + X] = i; ink[Y * W + X] = c; }
+        else owner[Y * W + X] = i;
       }
     });
+    // each stamp's drawing and place (what it shows changes when something passes in front: not it)
+    const stamp = b.placements.map((pl) => `${pl.x},${pl.y},${pl.img.data.reduce((a, c) => (a * 31 + c) >>> 0, 7)}`);
     const seen = new Uint8Array(WH), list: Blob[] = [];
     for (let q0 = 0; q0 < WH; q0++) {
       if (owner[q0] < 0 || seen[q0]) continue;
@@ -104,7 +106,7 @@ for (const [file, name] of scenes.filter(([, n]) => !only.length || only.include
       for (let k = 0; k < px.length; k++) { const q = px[k], x = q % W, y = Math.floor(q / W); for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const xx = x + dx, yy = y + dy, r = yy * W + xx; if (xx >= 0 && yy >= 0 && xx < W && yy < H && !seen[r] && owner[r] === owner[q0]) { seen[r] = 1; px.push(r); } } }
       if (px.length < 5) continue;
       const pl = b.placements[owner[q0]], box = boxOf(px);
-      list.push({ name: pl.name, layer: pl.layer ?? "", px, box, sig: px.map((q) => `${q - (box[1] * W + box[0])}:${ink[q]}`).join(","), track: -1 });
+      list.push({ name: pl.name, layer: pl.layer ?? "", px, box, sig: stamp[owner[q0]], track: -1 });
     }
     blobs.push(list);
   });
@@ -125,13 +127,13 @@ for (const [file, name] of scenes.filter(([, n]) => !only.length || only.include
   });
   const things = new Map<number, { name: string; m: Map<number, number[]>; sigs: Set<string> }>();
   blobs.forEach((list, t) => { for (const c of list) { const th = things.get(c.track) ?? things.set(c.track, { name: `${c.name}@${c.layer}`, m: new Map(), sigs: new Set() }).get(c.track)!; th.m.set(t, c.px); th.sigs.add(c.sig); } });
-  // the ones that move or change (not the backdrop): drawn otherwise or somewhere else from frame to
-  // frame, or not in every frame; 12 px and 4 frames at least (not a spark, a star, a blade of grass)
+  // the ones that move or change (not the backdrop): its stamp drawn otherwise or somewhere else from
+  // frame to frame, or not in every frame; 12 px and 4 frames at least (not a spark, a star, a blade of
+  // grass)
   const moving = [...things.values()].filter(({ m, sigs }) => {
     const sizes = [...m.values()].map((px) => px.length).sort((a, b) => a - b);
     if (sizes[sizes.length >> 1] < 12 || m.size < Math.min(4, N) || [...m.values()].some((px) => px.length > WH / 2)) return false;
-    const at = new Set([...m.values()].map((px) => px[0]));
-    return sigs.size > 1 || at.size > 1 || m.size < N;
+    return sigs.size > 1 || m.size < N;
   }).map((th, i): [string, Map<number, number[]>] => [`${th.name}~${i + 1}`, th.m]);
   const r = study({ name, frames, ms: times.map((_, i) => (times[i + 1] ?? tl.loop) - times[i]), kind: "pxl" }), d = r.layers;
   if (!d) { console.log(`${name}: no decomposition (study read the whole view as moving)`); continue; }

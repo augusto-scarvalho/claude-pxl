@@ -193,7 +193,7 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const mine = new Uint8Array(WH);
     for (const f of parts) for (const p of f.pix) mine[p] = 1;
     const x0 = Math.min(...parts.map((f) => f.x0)), y0 = Math.min(...parts.map((f) => f.y0)), bw = Math.max(...parts.map((f) => f.x1)) - x0 + 1, bh = Math.max(...parts.map((f) => f.y1)) - y0 + 1;
-    let m = Math.max(3, Math.round(0.2 * Math.max(bw, bh))), b = roomy(x0, y0, bw, bh, m), keep: Uint8Array = new Uint8Array(0), first: [Box, Uint8Array] | null = null;
+    let m = Math.max(3, Math.round(0.2 * Math.max(bw, bh))), b = roomy(x0, y0, bw, bh, m), keep: Uint8Array = new Uint8Array(0), first: [Box, Uint8Array] | null = null, closed = false;
     for (;;) {
       b = roomy(x0, y0, bw, bh, m);
       const model = colorsOf(F, fg, S8.map((t) => [t, b]), mine, W, tol), w = b.x1 - b.x0 + 1, h = b.y1 - b.y0 + 1;
@@ -203,26 +203,28 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       // (the picture's edge too: what runs out of the picture with the ground hasn't closed)
       for (let i = 0; i < w * h && !edge; i++) { const x = i % w, y = Math.floor(i / w); if (keep[i] && !mine[(b.y0 + y) * W + b.x0 + x] && (x === 0 || y === 0 || x === w - 1 || y === h - 1)) edge = true; }
       // closed round one thing: its still body up to ten times what moves of it (a ghost bobbing moves
-      // only at its edges); one far bigger is the
-      // ground round several things the flood couldn't tell from them)
+      // only at its edges); one far bigger is the ground round several things the flood couldn't tell
+      // from them
       const kept = keep.reduce((a, v) => a + v, 0), moving = parts.reduce((a, f) => a + f.n, 0);
-      if (!edge && kept <= 10 * moving) break;
+      if (!edge && kept <= 10 * moving) { closed = true; break; }
       if (m >= Math.max(bw, bh) || kept > 10 * moving) { [b, keep] = first; break; }
       m = Math.min(2 * m, Math.max(bw, bh));
     }
     const px: number[] = [], w = b.x1 - b.x0 + 1;
     keep.forEach((v, i) => v && px.push((b.y0 + Math.floor(i / w)) * W + b.x0 + (i % w)));
-    return { mine, b, px };
+    return { mine, b, px, closed };
   };
   // groups with the same body are one thing (two arms waving either side of it: a rig); the same, not
-  // overlapping (a few pixels between two dancers would join them)
+  // overlapping (a few pixels between two dancers would join them); and one that moves inside another's
+  // closed body is part of it (a ghost's top bobbing over a gravestone)
   const gs = [...groups.values()].filter((parts) => parts.reduce((a, f) => a + f.n, 0) >= 6), bodies = gs.map(bodyOf);
   const up = gs.map((_, i) => i), top = (i: number): number => (up[i] === i ? i : (up[i] = top(up[i])));
   for (let i = 0; i < gs.length; i++) for (let j = i + 1; j < gs.length; j++) {
     const a = bodies[i], b = bodies[j];
     if (a.b.x0 > b.b.x1 || b.b.x0 > a.b.x1 || a.b.y0 > b.b.y1 || b.b.y0 > a.b.y1) continue;
     const inA = new Set(a.px), both = b.px.filter((p) => inA.has(p)).length;
-    if (both >= 0.5 * (a.px.length + b.px.length - both)) up[top(i)] = top(j);
+    const within = (g: Blob[], body: Set<number>) => { const px = g.flatMap((f) => f.pix); return px.filter((p) => body.has(p)).length >= 0.7 * px.length; };
+    if (both >= 0.5 * (a.px.length + b.px.length - both) || (b.closed && within(gs[i], new Set(b.px))) || (a.closed && within(gs[j], inA))) up[top(i)] = top(j);
   }
   const things = new Map<number, Blob[]>();
   gs.forEach((parts, i) => (things.get(top(i)) ?? things.set(top(i), []).get(top(i))!).push(...parts));

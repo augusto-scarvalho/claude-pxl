@@ -470,7 +470,7 @@ pixels in fragments of pixels that differ in the same frames (a knight riding pa
 waving behind him), put back together when they touch and change in the same rhythm or in turns (a
 bird lighting one side of its loop, then the other) and share colors, or have the same still body
 (two arms waving either side of it: a rig; two dancers in step a few pixels apart on one lawn stay
-two). Each light is a piece too: where it shines from,
+two), or move inside another's closed body (part of it). Each light is a piece too: where it shines from,
 how many times brighter at its brightest than at its dimmest, its color (`glow()` in that color, a
 lamp in `lighting()`, colors swapped per frame); two pools side by side pulsing to their own rhythms
 are two lights. Each piece is cut out of its background in every capture (after GrabCut's idea,

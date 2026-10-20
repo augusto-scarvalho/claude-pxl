@@ -452,22 +452,27 @@ one), and the art code itself (4% of the cost).
 - [x] **The weak points, measured and attacked** (asked next). The harness first: its things were
   wrong (a stamp's name and turn: the "first car" was another car each frame, a pigeon pecking another
   asset than the pigeon walking, a stamp of birds one thing); now each piece of a stamp's own pixels,
-  followed frame to frame whatever its name, 12 px and 4 frames at least, its drawing read off the
-  stamp; one piece a thing (the best pairs first, as Fast Sprite Decomposition matches); the share of
+  followed frame to frame whatever its name, 12 px and 4 frames at least, moving when its stamp is
+  drawn otherwise or elsewhere (not when something passes in front of it); one piece a thing (the best pairs first, as Fast Sprite Decomposition matches); the share of
   the things' frames found. Then study: fragments by common fate (pixels that differ in the same
   frames: phi of their two series); touching fragments joined in the same rhythm or in turns (together
   steadier than either), farther ones only by the same body; things that go somewhere followed first,
   in the frames as they are, by a SORT-like tracker (each carried on by its speed, two passing coast
   through the piece they share), and the light not looked for where they go; a hard edge for the light
   is one far bigger than the background's own step there (a silhouette on a dithered sky); two going
-  opposite ways over one stretch aren't one found twice. Things' frames found: party 32 to 41%, forest
-  32 to 40, tournament 33 to 38, cyberpunk 3 to 6 (17 to 32 cars and people), park 0 to 33. Lower:
-  sunset 30 to 20, where clouds and tall grass come apart and its old big pieces held them by luck.
+  opposite ways over one stretch aren't one found twice; a group moving inside another's closed body
+  is part of it. Things' frames found, both measured with the harness as it is now: party 33 to 44%,
+  road 0 to 22, forest 42 to 53, cyberpunk 6 to 11 (17 to 32 cars and people), park 0 to 33,
+  tournament 36 to 41. Lower: cave 50 to 33 (a mushroom at the line), sunset 31 to 21, where clouds and
+  tall grass come apart and its old big pieces held them by luck; headlights going with their cars are
+  no longer taken for light (cyberpunk's light found 41 to 32%, as right).
 - [ ] **Still weak in study's pieces**: big animated things touching (the tournament's two knights in
   their bout and the stands behind, one piece: every pixel changes often, rhythm and common fate can't
   part them; their colors could, the armor and the crowd's); soft clouds drifting slowly read as light
   (a pulsing glow's rings shift a pixel too, arc by arc each its own way: telling them apart needs the
-  drift to agree over the whole cloud); traffic crossing at speed (cyberpunk 6%). Tried and dropped: a
+  drift to agree over the whole cloud); traffic crossing at speed (cyberpunk 11%); a ghost's top bobbing over a
+  gravestone still a piece of its own beside the ghost (its body, read in one frame, misses where the top
+  goes in others; letting it 2 px wider chained the dancers again). Tried and dropped: a
   light as the frame a few before moved a step (took the party's glows for clouds). Not done: a light as
   a few basis images times a curve (NMF, Oya et al. 2020): where scenes light themselves the light is
   already 71-99% right, and the misses are clouds and backlit people, not lamps it could model better.
