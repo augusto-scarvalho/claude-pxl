@@ -170,7 +170,7 @@ number of times a loop with the rods on their crank pins, and every puff of smok
 the speed of the ground, so the last frame runs into the first.
 
 <p>
-  <img src="docs/gallery/race_cockpit.gif" width="100%" alt="Animated pixel-art street race at sunset on the Rio-Santos coastal highway, seen from the driver's seat of a sports car: the road running to its vanishing point and bending right then left, a double yellow line with studs, the sea and the setting sun on the left with islands and the sun's path glittering, the Serra do Mar and a forest wall on the right with palms and lamp posts, yellow and black chevrons on the bends and a green sign for Paraty. Three rival sports cars drawn as pixel-art sprites from behind, a yellow one, a red one and a blue one with white racing stripes, with their wings, glowing round tail lights, plates and twin exhausts, are overtaken one after another, their flanks and rear wheels showing as they draw level, their long shadows on the road, the red one backfiring flames; the cockpit has a dashboard with an orange-lit rev counter and speedometer reading about 200 km/h, a leather steering wheel turning with the bends, gloved hands gripping it at ten to two as the driver sees them, the backs of the gloves toward us, the fingers curled over the rim and the thumbs holding it from underneath, in a blue racing suit with knit cuffs, Bonfim ribbons hanging from the rear-view mirror, which shows the cars falling behind.">
+  <img src="docs/gallery/race_cockpit.gif" width="100%" alt="Animated pixel-art street race at sunset on the Rio-Santos coastal highway, seen from the driver's seat of a sports car: the road running to its vanishing point and bending right then left, a double yellow line with studs, the sea and the setting sun on the left with islands and the sun's path glittering, the Serra do Mar and a forest wall on the right with palms and lamp posts, yellow and black chevrons on the bends and a green sign for Paraty. Three rival sports cars drawn as pixel-art sprites from behind, a yellow one, a red one and a blue one with white racing stripes, with their wings, glowing round tail lights, plates and twin exhausts, are overtaken one after another, their flanks and rear wheels showing as they draw level, their long shadows on the road, the red one backfiring flames; the cockpit has a dashboard with an orange-lit rev counter and speedometer reading about 200 km/h, a leather steering wheel turning with the bends, gloved hands gripping it at ten to two as the driver sees them, the backs of the gloves toward us, the fingers curled over the rim and the thumbs holding it from underneath, in a blue track jacket with white stripes, its sleeves creased in folds, knit cuffs at the wrists, Bonfim ribbons hanging from the rear-view mirror, which shows the cars falling behind.">
 </p>
 
 [`examples/perspective/race.px.js`](examples/perspective/race.px.js): a street race from the driver's
@@ -185,6 +185,8 @@ anim of its own. Each hand is a puppet: a skeleton of joints read off photograph
 gripping, taken from its owner's eyes, set on the rim every frame so that the line the rim takes
 under the palm lies on it; the back of the glove a plate, the fingers and the thumb painted round
 (`capsule`) between their joints. The hand keeps its grip and turns with the wheel; the arms follow.
+The sleeves are shaded as cloth: a tube with a V-shaped trough along each fold, every pixel lit by
+the slope there in three flat tones, so they break into the facets of a crumpled sleeve.
 
 ## Quick start
 

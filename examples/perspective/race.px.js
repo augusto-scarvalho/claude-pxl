@@ -614,7 +614,7 @@ sprite("_cockpit", { w: W, h: H }, (c) => {
 // In px, x across the knuckles toward the index, y up the back of the hand, the left hand.
 const HAND = {
   a: Math.PI * 0.8, size: 0.85,                                                // where on the rim; how big
-  rim: [[-13, -8.6], [17.2, -2.3]],                                             // the rim's line under the palm
+  rim: [[-13, -3.9], [17.2, 2.4]],                                              // the rim's line under the palm
   back: [[-12.5, 0.5], [-8.4, 1.8], [-3.8, 3], [2.5, 3.6], [8.4, 2.4], [11.5, 1], [14.5, -14], [4.2, -25.4], [-12.6, -14]],
   knuckle: [[-8.4, 0.2], [-3.8, 1.5], [2.5, 2.3], [8.4, 1]],                    // pinky to index
   bend: [[-8, 4.6], [-1.3, 9], [5.5, 12.4], [13.6, 10.7]],                      // the middle joints, curled over
@@ -667,12 +667,12 @@ function wheel(c, f) {
     if (up > 0.35 && Math.cos(a) < -0.2) { const [xl, yl] = onRim(a, 0.5); c.px(R(xl), R(yl), "%") }
   }
   for (let i = -4; i <= 4; i++) { const a = Math.PI / 2 - turn + i * 0.014, [x, y] = onRim(a), [xi, yi] = onRim(a, rimT(a)); c.line(R(x), R(y), R(xi), R(yi), i === 0 ? "@" : "(") }
-  // the arms: each forearm from its corner up to the wrist, the cuff, then the hand on the rim: all its
-  // parts outlined first and filled after, so they read as one glove, a crease between the fingers
+  // the arms: each forearm from its corner up to the wrist, then the hand on the rim (all its parts
+  // outlined first and filled after, so they read as one glove, a crease between the fingers), then
+  // the knit cuff over the join
   for (const side of [1, -1]) {
     const S = handOn(side, turn), wrist = S(HAND.wrist), elbow = side > 0 ? [44, 214] : [276, 214]
     forearm(c, elbow, wrist, side)
-    cuff(c, elbow, wrist)
     const bones = []
     for (let i = 0; i < 4; i++) {
       const r = i === 0 ? 1.8 : 2.2
@@ -688,24 +688,76 @@ function wheel(c, f) {
       c.line(R(x0), R(y0), R(x1), R(y1), "-")
     }
     for (const [p, q] of HAND.tendons) { const [x0, y0] = S(p), [x1, y1] = S(q); c.line(R(x0), R(y0), R(x1), R(y1), "=") }
+    cuff(c, elbow, wrist, side)
   }
 }
-// a forearm in the suit: painted round, lit from the upper left, two white stripes running along it
-function forearm(c, [ex, ey], [wx, wy], side) {
-  const R = Math.round
-  c.capsule(ex, ey, 20, wx, wy, 10, "<>/", { light: [-0.5, -1] })
-  const dx = wx - ex, dy = wy - ey, L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L
-  for (const o of [3, 6]) c.line(R(ex + nx * o * 2 * side), R(ey + ny * o * 2 * side), R(wx + nx * o * side), R(wy + ny * o * side), "w")
-}
-// the knit cuff over the wrist: a band across the arm, ribbed along it
-function cuff(c, [ex, ey], [wx, wy]) {
-  const R = Math.round, dx = wx - ex, dy = wy - ey, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L
-  for (let y = R(wy) - 14; y <= R(wy) + 14; y++) for (let x = R(wx) - 14; x <= R(wx) + 14; x++) {
-    const t = (x - wx) * ux + (y - wy) * uy, o = -(x - wx) * uy + (y - wy) * ux
-    if (t < -7 || t > 2 || Math.abs(o) > 10.5) continue
-    const edge = Math.abs(o) > 9.5 || t > 1 || t < -6
-    c.px(x, y, edge ? "0" : Math.floor(o / 1.5) % 2 ? "-" : t < -4.5 ? "=" : "~")
+// The sleeve of a track jacket, shaded as cloth in flat facets, after a pixel-art cockpit whose
+// driver wears one: in the arm's own frame (t back from the wrist along the arm, o across it, -h its
+// outer edge, +h the inner), its surface is a tube with a V-shaped trough along each fold, steep on
+// one wall and shallow on the other, deepest at the edge the fold starts from and dying away across.
+// Every pixel is lit by the slope there (the sun from the upper left and a little in front) and
+// takes one of three tones, so the cloth breaks into the facets of a crumpled sleeve: zigzag folds
+// where it bunches at the cuff, long spiralling ones down the forearm, none repeating the last one's
+// direction or size. The folds pinch the outline where they reach it; a seam runs along the inside,
+// and the two white stripes along the outside zigzag with the cloth. The sleeve starts behind the
+// cuff; its mouth, bunched, is painted over the cuff after.
+// each fold: where along the arm, its slant, the stretch of the width it runs, how deep
+const FOLDS = [[7, 1, 0.1, 1, 2.2], [11, -0.9, -1, -0.2, 2.4], [15, 1.1, -0.1, 1, 2], [24, 0.9, -0.7, 1, 3],
+  [38, -1.2, -1, 0.3, 3.2], [52, 1.3, -0.5, 1, 3], [69, -1, -1, 0, 3.4], [86, 1.1, -0.3, 1, 3]]
+const SUIT = "$<>/U"                                                     // deep shade, shade, cloth, lit, sheen
+function cloth(t, o, h) {
+  let z = h * Math.sqrt(Math.max(0, 1 - (o / h) ** 2)), pinch = 0, sway = 0
+  for (const [tf, sl, f0, f1, depth] of FOLDS) {
+    const u = o / h, from = f1 >= 1 ? 1 : -1, reach = Math.max(0, Math.min(1, 1 - ((u - from) * -from) / (f1 - f0)))
+    if (reach <= 0) continue
+    const d = t - (tf + sl * o + 0.03 * o * o), v = 1.5 * depth * reach * Math.max(0, d < 0 ? 1 + d / 1.6 : 1 - d / 4.5)
+    z -= v; sway += v * Math.sign(sl) * 0.45
+    if (Math.abs(u) > 0.75 && Math.sign(u) === from) pinch = Math.max(pinch, v * 0.5)
   }
+  return { z, pinch, sway }
+}
+function forearm(c, [ex, ey], [wx, wy], side, from = 5, to = Infinity) {
+  const dx = wx - ex, dy = wy - ey, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L, nx = -uy, ny = ux
+  // the light in the arm's frame: along it, across it, out of the picture
+  const lt = 0.45 * ux + 0.89 * uy, lo = (-0.45 * nx - 0.89 * ny) * side, lz = 0.8, ll = Math.hypot(lt, lo, lz)
+  const x0 = Math.max(0, Math.floor(Math.min(ex, wx) - 24)), x1 = Math.min(W - 1, Math.ceil(Math.max(ex, wx) + 24))
+  const y0 = Math.max(0, Math.floor(Math.min(ey, wy) - 24)), y1 = Math.min(H - 1, Math.ceil(Math.max(ey, wy) + 24))
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const t = -((x + 0.5 - wx) * ux + (y + 0.5 - wy) * uy), o = ((x + 0.5 - wx) * nx + (y + 0.5 - wy) * ny) * side
+    if (t < from || t > Math.min(L, to)) continue
+    // the mouth of the sleeve, bunched over the cuff: wider, its rim rounded
+    const mouth = Math.max(0, 1 - (t - from) / 4), h = 8.5 + t * 0.08 + mouth * 1.6
+    const rim = from + 1.2 * (o / h) ** 2
+    if (t < rim) continue
+    const here = cloth(t, o, h), edge = h - here.pinch
+    if (Math.abs(o) > edge) continue
+    const oc = (v) => Math.max(-h, Math.min(h, v))
+    const zt = (cloth(t + 0.7, o, h).z - cloth(t - 0.7, o, h).z) / 1.4, zo = (cloth(t, oc(o + 0.7), h).z - cloth(t, oc(o - 0.7), h).z) / 1.4
+    const lit = (-zt * lt - zo * lo + lz) / Math.hypot(zt, zo, 1) / ll
+    let k = lit < 0.3 ? 1 : lit < 0.72 ? 2 : 3
+    if (lit < 0.05) k = 0
+    if (Math.abs(o - h * 0.22) < 0.5) k = Math.max(0, k - 1)                // the seam
+    let key = SUIT[k]
+    for (const st of [-0.34, -0.66]) if (Math.abs(o - h * st - here.sway) < 0.95) key = k <= 1 ? "W" : "w"
+    c.px(x, y, Math.abs(o) > edge - 1 || t < rim + 0.8 ? "0" : t < rim + 1.8 && o < 0 && k >= 2 ? "U" : key)
+  }
+}
+// the knit cuff over the wrist, where the glove goes into the sleeve: a band wider than the arm, its
+// edge toward the hand curved round the wrist and catching the light, ribbed along the arm
+function cuff(c, [ex, ey], [wx, wy], side) {
+  const R = Math.round, dx = wx - ex, dy = wy - ey, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L, nx = -uy, ny = ux
+  for (let y = R(wy) - 16; y <= R(wy) + 16; y++) for (let x = R(wx) - 16; x <= R(wx) + 16; x++) {
+    const t = -((x + 0.5 - wx) * ux + (y + 0.5 - wy) * uy), o = ((x + 0.5 - wx) * nx + (y + 0.5 - wy) * ny) * side, hc = 10, q = (o / hc) ** 2
+    const front = -3 + 1.6 * q, back = 8
+    if (Math.abs(o) > hc || t < front || t > back) continue
+    const lit = -o / hc, rib = Math.floor((o + 30) / 1.5) % 2
+    let key = lit < -0.5 ? "=" : lit > 0.3 ? "^" : "~"
+    if (rib) key = key === "^" ? "~" : key === "~" ? "=" : "-"
+    if (t < front + 1.2 && lit > -0.3) key = "^"
+    if (Math.abs(o) > hc - 1 || t < front + 0.6) key = "0"
+    c.px(x, y, key)
+  }
+  forearm(c, [ex, ey], [wx, wy], side, 5, 9)
 }
 function needles(c, f) {
   const rev = 0.72 + 0.04 * Math.sin((TAU * f * 52) / FRAMES) + 0.06 * Math.sin((TAU * f * 3) / FRAMES), kmh = 200 + 4 * Math.sin((TAU * f) / FRAMES * 2)
