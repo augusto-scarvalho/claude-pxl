@@ -53,11 +53,11 @@ const BEND = 0.0022
 const kappa = (f) => BEND * Math.sin((TAU * f) / FRAMES)
 const heading = (f) => ((BEND * SPEED * SECONDS) / TAU) * (1 - Math.cos((TAU * f) / FRAMES))
 // our speed over the loop: steady in fifth; at 2.2 s the right hand goes down to the gear lever and
-// drops to fourth (the revs jump), and from 3.4 s we pull away, nearly a third faster by 4.4 s; at
+// drops to fourth (the revs jump), and from 3.4 s we pull away, 60% faster by 4.4 s; at
 // 5 s the hand goes down again, back up to fifth (the revs fall), and from 5.6 s we ease off, back to
 // the steady speed by 7.2 s. Each ramp is half a cosine; the steady speed is set so the loop still
-// covers LOOP_M (about 190 km/h steady, 245 at the height).
-const BOOST = { a: 3.4, b: 4.4, c: 5.6, d: 7.2, up: 0.3 }
+// covers LOOP_M (about 180 km/h steady, 285 at the height).
+const BOOST = { a: 3.4, b: 4.4, c: 5.6, d: 7.2, up: 0.6 }
 const ease = (t) => 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, t)))
 const eased = (t) => (t <= 0 ? 0 : t >= 1 ? t - 0.5 : t / 2 - Math.sin(Math.PI * t) / (2 * Math.PI))   // ease's integral from 0 to t
 const boostAt = (s) => ease((s - BOOST.a) / (BOOST.b - BOOST.a)) - ease((s - BOOST.c) / (BOOST.d - BOOST.c))
@@ -1130,7 +1130,7 @@ function cuff(c, [ex, ey], [wx, wy], side) {
 }
 function needles(c, f) {
   const kmh = speedAt(f) * 3.6 + 3 * Math.sin((TAU * f) / FRAMES * 2), g = gearAt((f / FRAMES) * SECONDS)
-  const rev = kmh / (315 + (270 - 315) * g) + 0.03 * Math.sin((TAU * f * 52) / FRAMES) + 0.02 * Math.sin((TAU * f * 3) / FRAMES)
+  const rev = kmh / (358 + (296 - 358) * g) + 0.03 * Math.sin((TAU * f * 52) / FRAMES) + 0.02 * Math.sin((TAU * f * 3) / FRAMES)
   for (const g of GAUGES) {
     const v = g.kind === "revs" ? rev : g.kind === "speed" ? kmh / 300 : 0.62, a = Math.PI * (1.25 - 1.5 * v), R = Math.round
     c.line(R(g.x), R(g.y), R(g.x + Math.cos(a) * g.rp * 0.82), R(g.y - Math.sin(a) * g.rp * 0.82), "["); c.px(R(g.x), R(g.y), "~")
