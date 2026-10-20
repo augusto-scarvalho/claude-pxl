@@ -68,6 +68,19 @@ it, so ask the user first. `sprite("palm", { png: "palm.png", shrink: 2 })`, the
 `rampmap` when tones merged, `relight` when it came out flat (`examples/tropical/trees.px.js`;
 characters.md §3 has the steps).
 
+When the trees must take the scene's light and palette, vary by the dozen and shrink with distance
+(a roadside going by), draw them in code, but only after studying how such art is built (open
+it, don't import it):
+- A crown is a dark mass heaped with clumps, the upper ones first: each clump dark under, mid in
+  its body, lit on its cap toward the sun, a few bright leaves on it; deep shade between clumps;
+  the outline lumpy; the sun's warm rim only where a clump's edge shows against the sky.
+- A trunk flares at its foot, twists and splits into branches that go up into the crown.
+- A palm's trunk is ringed unevenly (even rings read as a ladder); its fronds are broad and droop,
+  lit on top, dark under, their lower edge cut by the leaflets.
+- Tall grass is thin blades that curve and lean, dark with their sunward edge lit toward the tip;
+  straight upright stalks read as cacti.
+(`examples/perspective/race.px.js`: `leafClump`, `tree`, `palmCrown`, `palmTrunk`, `tallGrass`.)
+
 ## Water and things that land
 
 A waterfall that ends in a strip of foam over still water looks pasted on: spread churning foam to
@@ -91,6 +104,10 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - Detail far things before veiling them (a hill with woods, fields and a road reads as a place; a
   flat shape stays flat under any haze), and keep them visible: a castle hidden behind the
   foreground's tents is wasted; open a gap in the foreground for it.
+- Ranges in palette steps rather than a veil: each farther range lighter and nearer the sky's color,
+  with less detail (the far one plain in the haze, the near one dark with the forest's crowns on
+  it). A range whose strip ends sharp reads as a cutout: let each run out of the picture, or come
+  down to the sea or the plain at a headland (`examples/perspective/race.px.js`: `range`).
 
 ## True perspective (vanishing points)
 
@@ -101,6 +118,10 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - Things on the ground stand at `ground(x, z)`, sized by `scale(z, x)` (and `up` when tilted); poles, posts and fences are a
   loop over z. A figure walking into the distance changes size only at each step's contact, and under
   ~15 px takes a hand-drawn sprite for its size (`fit`): drawn by code that small, it is a blob.
+  A vehicle overtaken: far, its hand-drawn sprite from behind picked by size; near and off to one
+  side, where its flank shows, draw the whole of it in perspective (side, top, back) instead. A side
+  glued onto the sprite from behind reads as two pictures. Pillars and wing end plates in the body's
+  color: a black frame reads as a hole through the car.
 - Props on the ground (plants, stakes, rocks, benches): build each once as parts in meters with the
   `solid` global, sticks (trunk, arm, twig, post), blobs (crown, boulder), boxes, cones, and use the
   same parts twice: `solids()` projects and draws them, `shadows()` sweeps them onto the ground away
@@ -165,6 +186,13 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - Anything picked by where it is along a way that goes by (`hash(p)` of a crown, a patch, a stone):
   take `p` modulo the distance gone in the loop, or the first frame picks other ones than the last.
   Every flutter (`sin(f · k)`) a whole number of cycles in the loop: `sin(2π · f / frames · n)`.
+- A speed that changes in the loop (a burst, a stop at a light): write the speed as a profile in
+  time (steady, eased up, held, eased down; a half-cosine ramp has an integral in closed form) and
+  move everything by its integral, the distance gone. Set the steady speed so that integral over the
+  loop is the loop's distance and the loop still closes. What is keyed to the way (things along it,
+  a rival's place, a backfire as a gap closes) reads the distance, not the time; far things move
+  only as the heading turns, so they don't speed up (`examples/perspective/race.px.js`:
+  `travelled()`).
 - A lane of clouds: each moves one slot along in the loop while turning into the next one's shape
   (`clouds()`, with `empty` slots for a sky where they form and thin away); smoke and steam rising
   from a point: `plume()`; soot or mist that comes and goes:
@@ -187,9 +215,13 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   the ground beside it, keeping a little of its own at first: `plume()` with `wind` the ground's
   speed backward in px a frame (`-per / frames` of the plane beside it) and an `inertia`.
 - Seen from inside something moving (a car's cockpit, a train's window): draw the world through the
-  camera, then the inside as a sprite whose glass is left empty; a mirror is a second camera in a
-  small anim stamped where the glass is (`examples/perspective/race.px.js`). The far things there
-  move only as the heading turns (`focal · heading` px), the nearer ridge a little more.
+  camera, then the inside as a sprite whose glass is left empty (`mesh()` for a cockpit modelled in
+  meters). Each mirror is another camera looking back, in a small anim stamped where its glass is:
+  what is behind at its distance behind, x mirrored so left stays left, and a slice of the car itself
+  along the glass's inner edge in a side mirror (`examples/perspective/race.px.js`). The far things
+  move only as the heading turns (`focal · heading` px), the nearer ridge a little more. Speed
+  lines fanning from the vanishing point over a scene drawn as it looks read as rain: show a burst
+  of speed by the motion itself, and by the gauges.
 - Mist or haze at the foot of each far plane keeps them apart; the plane nearest the eye goes by too
   fast for detail: streaks along the motion (`examples/parallax/train.px.js`).
 

@@ -279,6 +279,14 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   stride down (her feet move a pixel or two, not the guide's length), show a step forward as the
   foot lower on screen as much as to the side, keep the legs from crossing, and let the body rise
   a pixel in the passing frames. Review it as pairs, frames 0–3 above 4–7.
+- **A hand on something that moves** (a wheel that turns, a lever): at 30–60 px a hand is a puppet,
+  a few joints in the hand's own frame read off a photo of the grip, set every frame by a transform
+  (where, which way, how big) that lays the line the grip takes across the hand on the line the
+  thing takes on screen, each part painted between its joints (`capsule`, a plate for the back). To
+  take it somewhere else (off the wheel to the gear lever and back), ease the transform's place and
+  angle, not each point (that shrinks the hand on the way), and draw the forearm from its elbow to
+  wherever the wrist is now; turn the hand on the way so its wrist points at the elbow, or the arm
+  leaves the picture before the hand does (`examples/perspective/race.px.js`: `handOn`, `reachAt`).
 
 ## 11. Big pieces: rig first
 
