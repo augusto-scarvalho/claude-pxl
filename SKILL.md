@@ -191,6 +191,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `sunset/` | 320×180 backlit scene: long shadows toward us, glowing edges, a tent lit through, a sky that loops slower than the rest |
 | `rig/tournament.px.js` | the knights in a scene: ground in perspective with every height checked, a 96-frame bout with trumpeters and marshal on named cues, pavilions, ground shadows from one sun, distance haze |
 | `rig/knight.px.js` | a 72 px knight built skeleton first: `rig`, `figure`, stand-ins, `plate`-lit parts, `twin` parts for the turned rig; poses from `ik`, slashes with `arc` smears; `facing` and `world` read out by describe |
+| `rig/warden.px.js` | an attack in 18 frames, a pose a row of numbers: legs and arms from their joints (`ik`, `capsule`), an axe at any angle, a wind-up, a slash and a chop with `arc` smears, sparks and dust, a cape trailing the move; its reflection on a polished floor (`flip: "y"`, `opacity`) |
 | `cyberpunk/` | a 320×180 animated city street at dusk made two ways: by one agent (`sodium_hour.px.js`) and by a pipeline (`pipeline/`: the plan, the palette, eight part files, the scene) |
 | `fonts/font5x7.px.js` | a 5×7 font for titles: `include` it, `text(..., { font: "5x7" })` |
 

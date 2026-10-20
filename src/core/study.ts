@@ -51,7 +51,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   const dur = input.ms.reduce((s, v) => s + v, 0);
   text.push(`${input.name}: ${pre ? `${Math.round(first.w * g.sx)}x${Math.round(first.h * g.sy)}` : `${first.w}x${first.h}`}${input.frames.length > 1 ? `, ${input.frames.length} frames over ${(dur / 1000).toFixed(1)} s` : ""} (${input.kind})`);
   if (checker) text.push(`Clear: the transparency checker (${hex(checker.a)} and ${hex(checker.b)} in ${checker.size} px squares, as an editor shows what is clear) was exported with it: taken for clear, so it isn't read as the picture's colors.`);
-  if (reflection) text.push(`Reflection: below row ${reflection.axis}, what is above it mirrored over what's behind at about ${Math.round(reflection.alpha * 100)}% (a floor that shines, still water; ${pct(reflection.share * 100, 100)} of what is below it): the same drawing stamped flipped (flip: "y") in a layer with opacity: ${reflection.alpha.toFixed(2)}; left out of the rest of this reading.`);
+  if (reflection) text.push(`Reflection: below row ${reflection.axis}, what is above it mirrored over ${reflection.floor !== undefined ? `the floor (${hex(reflection.floor)})` : "what's behind"} at about ${Math.round(reflection.alpha * 100)}% (a floor that shines, still water; ${pct(reflection.share * 100, 100)} of what is below it): the same drawing stamped flipped (flip: "y") in a layer with opacity: ${reflection.alpha.toFixed(2)}; left out of the rest of this reading.`);
 
   // the picture studied: the drawing at 1x, or a translation of the rest into few colors
   let picture: Img, scale = 1, avg: Img;

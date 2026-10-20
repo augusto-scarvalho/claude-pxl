@@ -460,26 +460,30 @@ export function findChecker(img: Img): Checker | null {
   return on >= 0.25 * W * H ? best : null;
 }
 
-/** A reflection: what is above row `axis` mirrored below it (row axis + d is row axis - 1 - d + `gap`), over what was behind it at `alpha`. */
-export interface Reflection { axis: number; gap: 0 | 1; alpha: number; share: number }
+/** A reflection: what is above row `axis` mirrored below it (row axis + d is row axis - 1 - d + `gap`), over what was behind it at `alpha`; over a plain floor, its color (`floor`). */
+export interface Reflection { axis: number; gap: 0 | 1; alpha: number; share: number; floor?: Color }
 
 /**
- * A floor that shines, water: below a row, what is above it mirrored, laid over what was behind (the
- * checker, or nothing: then the pixel's own alpha) at one opacity throughout. The row and the opacity
- * where it explains most of what is below, a third of it at least.
+ * A floor that shines, still water: below a row, what is above it mirrored, laid over what was behind (the
+ * checker; a plain floor, the commonest color below the row; or nothing: then the pixel's own alpha) at
+ * one opacity throughout. The row and the opacity where it explains most of what is below (a third of it
+ * at least over the checker, three quarters over a plain floor) and most of what is above has its copy.
  */
 export function findReflection(frames: Img[], k: Checker | null): Reflection | null {
   const W = frames[0].w, H = frames[0].h, sample = frames.filter((_, i) => i % Math.max(1, Math.floor(frames.length / 12)) === 0);
   const ch = (c: Color) => [(c >>> 24) & 255, (c >>> 16) & 255, (c >>> 8) & 255];
   // the opacity a pixel below takes its mirror at, or -1 when it isn't one
+  let floor: Color | undefined, wall: Color | undefined;
+  const behind = (x: number, y: number) => (k ? checkerAt(k, x, y) : floor);
   const fit = (below: Color, above: Color, x: number, y: number) => {
     if ((above & 255) < 250) return -1;
     if ((below & 255) < 250) {
       const a = (below & 255) / 255;
       return a > 0.08 && dE(below | 255, above) < 0.06 ? a : -1;
     }
-    if (!k) return -1;
-    const b = ch(below), t = ch(above), g = ch(checkerAt(k, x, y)), as: number[] = [];
+    const under = behind(x, y);
+    if (under === undefined || below === under || above === under) return -1;
+    const b = ch(below), t = ch(above), g = ch(under), as: number[] = [];
     for (let c = 0; c < 3; c++) if (Math.abs(t[c] - g[c]) >= 24) as.push((b[c] - g[c]) / (t[c] - g[c]));
     if (!as.length) return -1;
     as.sort((p, q) => p - q);
@@ -491,32 +495,52 @@ export function findReflection(frames: Img[], k: Checker | null): Reflection | n
   };
   let best: Reflection | null = null, bestN = 0;
   for (let axis = Math.floor(H / 4); axis < H - 2; axis++) for (const gap of [0, 1] as const) {
+    // a plain floor: the color most of what is below the row has (the first frame), a half of it at least
+    if (!k) {
+      const n = new Map<Color, number>();
+      let all = 0;
+      for (let y = axis; y < H; y++) for (let x = 0; x < W; x++) { const c = sample[0].data[y * W + x]; if ((c & 255) >= 250) { n.set(c, (n.get(c) ?? 0) + 1); all++; } }
+      const top = [...n].sort((a, b) => b[1] - a[1])[0];
+      floor = top && top[1] >= 0.5 * all ? top[0] : undefined;
+      // and the wall behind what stands over it, the same way above the row
+      const w = new Map<Color, number>();
+      let up = 0;
+      for (let y = Math.max(0, 2 * axis - H); y < axis; y++) for (let x = 0; x < W; x++) { const c = sample[0].data[y * W + x]; if ((c & 255) >= 250) { w.set(c, (w.get(c) ?? 0) + 1); up++; } }
+      const back = [...w].sort((a, b) => b[1] - a[1])[0];
+      wall = back && back[1] >= 0.5 * up ? back[0] : undefined;
+    }
     const alphas: number[] = [];
-    let below = 0;
+    let below = 0, shown = 0;
     for (const f of sample) for (let y = axis; y < H; y++) {
       const m = 2 * axis - 1 - y + gap;
       if (m < 0) break;
       for (let x = 0; x < W; x++) {
         // (the checker, where it shows, is what's behind: nothing of it)
-        const c = f.data[y * W + x], above = f.data[m * W + x];
-        if ((c & 255) < 20 || (k && c === checkerAt(k, x, y))) continue;
+        const c = f.data[y * W + x], above = f.data[m * W + x], clear = (above & 255) < 20 || above === (k ? checkerAt(k, x, m) : floor) || above === wall;
+        if (!clear) shown++;
+        if ((c & 255) < 20 || c === behind(x, y)) continue;
         below++;
-        const a = k && above === checkerAt(k, x, m) ? -1 : fit(c, above, x, y);
+        const a = clear ? -1 : fit(c, above, x, y);
         if (a >= 0) alphas.push(a);
       }
     }
-    if (alphas.length > bestN && alphas.length >= 0.33 * below && alphas.length >= 30) {
-      bestN = alphas.length;
-      alphas.sort((p, q) => p - q);
-      best = { axis, gap, alpha: alphas[alphas.length >> 1], share: alphas.length / below };
+    // one opacity: what is near the middle one counts (over a near-black floor any darker copy of a
+    // pixel fits some opacity); over a plain floor, three quarters at least (its one color is easy to
+    // match by chance); and most of what is above has its copy below (a shop over an empty street
+    // has none)
+    alphas.sort((p, q) => p - q);
+    const mid = alphas[alphas.length >> 1], held = alphas.filter((a) => Math.abs(a - mid) <= 0.1).length;
+    if (held > bestN && held >= (k ? 0.33 : 0.75) * below && held >= 0.4 * shown && held >= 30) {
+      bestN = held;
+      best = { axis, gap, alpha: mid, share: held / below, ...(!k && floor !== undefined ? { floor } : {}) };
     }
   }
   return best;
 }
 
-/** The picture with its reflection taken away: each pixel below the row that is its mirror over what was behind it, made clear. */
+/** The picture with its reflection taken away: each pixel below the row that is its mirror over what was behind it, made clear (over a plain floor, the floor again). */
 export function clearReflection(img: Img, r: Reflection, k: Checker | null): Img {
-  const out = img.copy(), W = img.w;
+  const out = img.copy(), W = img.w, gone = r.floor ?? TRANSPARENT;
   for (let y = r.axis; y < img.h; y++) {
     const m = 2 * r.axis - 1 - y + r.gap;
     if (m < 0) break;
@@ -524,10 +548,11 @@ export function clearReflection(img: Img, r: Reflection, k: Checker | null): Img
       const c = img.data[y * W + x];
       if ((c & 255) < 20) continue;
       const a = img.data[m * W + x];
+      const under = k ? checkerAt(k, x, y) : r.floor;
       if ((a & 255) < 20 && k) { if (dE(c, checkerAt(k, x, y)) < 0.12) out.data[y * W + x] = TRANSPARENT; continue; }
-      if ((a & 255) < 250) { if ((c & 255) < 250 || (k && dE(c, checkerAt(k, x, y)) < 0.12)) out.data[y * W + x] = TRANSPARENT; continue; }
-      const want = k && (c & 255) >= 250 ? mix(checkerAt(k, x, y), a, r.alpha) : a;
-      if (dE(c | 255, want) < 0.08 || ((c & 255) < 250 && dE(c | 255, a) < 0.08)) out.data[y * W + x] = TRANSPARENT;
+      if ((a & 255) < 250 || (r.floor !== undefined && a === r.floor)) { if ((c & 255) < 250 || (under !== undefined && dE(c, under) < 0.12)) out.data[y * W + x] = gone; continue; }
+      const want = under !== undefined && (c & 255) >= 250 ? mix(under, a, r.alpha) : a;
+      if (dE(c | 255, want) < 0.08 || ((c & 255) < 250 && dE(c | 255, a) < 0.08)) out.data[y * W + x] = gone;
     }
   }
   return out;
