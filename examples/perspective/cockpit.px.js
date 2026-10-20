@@ -317,14 +317,14 @@ function cockpitDetails(c) {
   c.rect(156, 0, 8, 4, "-"); c.rect(125, 3, 70, 16, "0"); c.rect(126, 4, 68, 14, "-"); c.hline(127, 4, 66, "~")
   c.rect(128, 5, MW + 2, MH + 2, "0"); c.rect(129, 6, MW, MH, "_")
   // the left mirror, out past the side glass by the window's front corner: its foot there (a black
-  // sail with its adjusting lever), a short arm, the housing round the glass, the sunset in the glass
+  // sail with its adjusting lever), a short arm, the housing round the glass, left empty for the mirror's
+  // own view behind
   c.poly([48, 99, 60, 96, 62, 104, 50, 105], "0"); c.poly([49, 100, 59, 97, 60, 103, 51, 104], "-"); c.line(50, 100, 59, 97, "~")
   const [lx, ly] = seen([-0.462, -0.115, 0.9]); c.rect(Math.round(lx) - 1, Math.round(ly) - 1, 3, 2, "^"); c.px(Math.round(lx) - 1, Math.round(ly) - 1, "W")
   c.poly([14, 86, 20, 82, 44, 81, 48, 86, 47, 100, 42, 104, 18, 105, 13, 100], "0")
   c.poly([15, 87, 20, 83, 43, 82, 47, 87, 46, 99, 42, 103, 18, 104, 14, 99], "-")
-  c.poly([17, 88, 21, 85, 42, 84, 44, 88, 44, 98, 41, 101, 19, 102, 16, 98], "6")
-  c.poly([16, 92, 44, 91, 44, 98, 41, 101, 19, 102, 16, 98], "5"); c.poly([16, 97, 44, 96, 41, 101, 19, 102, 16, 98], "a")
-  c.line(19, 87, 30, 86, "8"); c.line(44, 84, 47, 88, "~"); c.line(20, 82, 43, 81, "~")
+  c.poly([17, 88, 21, 85, 42, 84, 44, 88, 44, 98, 41, 101, 19, 102, 16, 98], "_")
+  c.line(44, 84, 47, 88, "~"); c.line(20, 82, 43, 81, "~")
 }
 
 sprite("_cockpit", { w: W, h: H }, (c) => { render3d(c, COCKPIT, COCKPIT_MATS); cockpitDetails(c) })

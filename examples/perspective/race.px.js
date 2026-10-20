@@ -52,10 +52,27 @@ const P = perspective({ w: W, horizon: HORIZON, eye: EYE, fov: 76 })
 const BEND = 0.0022
 const kappa = (f) => BEND * Math.sin((TAU * f) / FRAMES)
 const heading = (f) => ((BEND * SPEED * SECONDS) / TAU) * (1 - Math.cos((TAU * f) / FRAMES))
-const travelled = (f) => (LOOP_M * f) / FRAMES
+// our speed over the loop: steady in fifth; at 2.2 s the right hand goes down to the gear lever and
+// drops to fourth (the revs jump), and from 3.4 s we pull away, nearly a third faster by 4.4 s; at
+// 5 s the hand goes down again, back up to fifth (the revs fall), and from 5.6 s we ease off, back to
+// the steady speed by 7.2 s. Each ramp is half a cosine; the steady speed is set so the loop still
+// covers LOOP_M (about 190 km/h steady, 245 at the height).
+const BOOST = { a: 3.4, b: 4.4, c: 5.6, d: 7.2, up: 0.3 }
+const ease = (t) => 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, t)))
+const eased = (t) => (t <= 0 ? 0 : t >= 1 ? t - 0.5 : t / 2 - Math.sin(Math.PI * t) / (2 * Math.PI))   // ease's integral from 0 to t
+const boostAt = (s) => ease((s - BOOST.a) / (BOOST.b - BOOST.a)) - ease((s - BOOST.c) / (BOOST.d - BOOST.c))
+const boostSum = (s) => (BOOST.b - BOOST.a) * eased((s - BOOST.a) / (BOOST.b - BOOST.a)) - (BOOST.d - BOOST.c) * eased((s - BOOST.c) / (BOOST.d - BOOST.c))
+const V0 = LOOP_M / (SECONDS + BOOST.up * boostSum(SECONDS))
+const speedAt = (f) => V0 * (1 + BOOST.up * boostAt((f / FRAMES) * SECONDS))
+const travelled = (f) => { const s = (f / FRAMES) * SECONDS; return V0 * (s + BOOST.up * boostSum(s)) }
+// the gear changes: the hand leaves the wheel at each SHIFTS time, is at the lever 0.3 s later, moves it
+// from 0.4 s to 0.6 s, lets go at 0.75 s and is back on the wheel at 1.05 s; GEAR is 1 in fourth
+const SHIFTS = [2.2, 5.0]
+const reachAt = (s) => Math.max(...SHIFTS.map((s0) => { const t = s - s0; return t < 0.3 ? ease(t / 0.3) : 1 - ease((t - 0.75) / 0.3) }))
+const gearAt = (s) => ease((s - SHIFTS[0] - 0.4) / 0.2) - ease((s - SHIFTS[1] - 0.4) / 0.2)
 // our lane: the left one (-1.75) while passing the rivals in the right lane, the right one while
 // passing the one in the left lane; smooth changes between
-const LANE = 1.75, ease = (a) => 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, a)))
+const LANE = 1.75
 const ourX = (f) => { const s = (f / FRAMES) * SECONDS; return -LANE + 2 * LANE * (ease((s - 3) / 1.5) - ease((s - 7.5) / 1.5)) }
 // a road point to the camera's frame: across, and how far ahead
 const cx = (u, d, f) => u - ourX(f) + (kappa(f) * d * d) / 2
@@ -421,7 +438,8 @@ const RIVALS = [
   { lane: -LANE, pass: 6, color: "r", keys: ["K", "&"] },
   { lane: LANE, pass: 10, color: "b", keys: ["U", "u"] },
 ]
-const rivalZ = (r, f) => { const t = (f / FRAMES) * SECONDS, z = 20 * (r.pass - t); return ((((z + 40) % 240) + 240) % 240) - 40 }
+const RIVAL_V = (LOOP_M - 240) / SECONDS                               // 36 m/s: they fall 240 m behind a loop
+const rivalZ = (r, f) => { const t = (f / FRAMES) * SECONDS, z = (SPEED - RIVAL_V) * r.pass - (travelled(f) - RIVAL_V * t); return ((((z + 40) % 240) + 240) % 240) - 40 }
 function carShapes(x, zr, [lit, shade]) {
   const { box } = solid
   return [box([x - 0.95, zr + 0.2, x + 0.95, zr + 4.4, 0, 0.72], { top: lit, lit, shade }), box([x - 0.72, zr + 1.4, x + 0.72, zr + 3.1, 0.72, 1.16], { top: shade, lit: "z", shade: "z" })]
@@ -528,7 +546,7 @@ function carInPerspective(c, r, z, f, bob) {
 }
 // the red one backfires as we come up on it: a short burst of flame from each pipe
 function backfire(c, sx, sy, w, r, f) {
-  const t = f - 76
+  const t = Math.floor((22 - rivalZ(r, f)) * 0.7)
   if (r.color !== "r" || t < 0 || t >= 6) return
   for (const side of [-1, 1]) c.flame(Math.round(sx + side * 0.15 * w), Math.round(sy - 0.19 * 0.56 * w), Math.max(3, 0.3 * w), "98767", { seed: 4 + side, frame: t, wind: 0 })
 }
@@ -898,7 +916,7 @@ anim("_mirror", { w: MW, h: MH, frames: FRAMES, fps: FPS }, rect(0, 0, MW, 3, "2
       const u = mu(x, z)
       if (u < RAIL_U) return u < BEACH ? "S" : "x"
       if (u > SHOULDER) return "v"
-      if (Math.abs(Math.abs(u) - 0.12) < Math.max(0.06, z / PM.focal)) return "y"
+      if (Math.abs(Math.abs(u) - 0.1) < Math.max(0.04, (z / PM.focal) * 0.5)) return "y"
       if (Math.abs(Math.abs(u) - EDGE) < Math.max(0.07, z / PM.focal)) return "W"
       return "a"
     })
@@ -912,6 +930,52 @@ anim("_mirror", { w: MW, h: MH, frames: FRAMES, fps: FPS }, rect(0, 0, MW, 3, "2
     }
   })
 
+// ---------------------------------------------------------------- the left mirror
+// A third camera, at the left mirror a meter out from our seat, looking back: the dusk behind us (the
+// sky darker that way, a pink glow low down), the road going away to its own vanishing point with its
+// lines, the guardrail's posts falling behind, the rock strip, the beach and the sea; a rival we passed
+// on the left coming on behind, its lights lit; and, along the mirror's inner edge, our own car's flank
+// (a silver A80), the sunset's glow along its shoulder. In a mirror left stays left.
+const SMW = 30, SMH = 20
+const PS = perspective({ w: SMW, horizon: 8, eye: 1.0, fov: 42, vp: 16 })
+anim("_sidemirror", { w: SMW, h: SMH, frames: FRAMES, fps: FPS }, rect(0, 0, SMW, 3, "1"), rect(0, 3, SMW, 3, "2"), rect(0, 6, SMW, 2, "3"), rect(0, 7, SMW, 1, "4"),
+  (c) => {
+    const f = c.frame, k = kappa(f), cam = ourX(f) - 1.1, s = travelled(f), R = Math.round
+    const mu = (x, z) => cam + x + (k * z * z) / 2
+    c.plane(PS, (x, z) => {
+      const u = mu(x, z), back = ((s - z) % LOOP_M + LOOP_M) % LOOP_M
+      if (u < SEA) return z > 40 ? "L" : z > 15 ? "s" : "S"
+      if (u < BEACH) return Math.floor(back / 6) % 2 ? "b" : "B"
+      if (u < RAIL_U) return "x"
+      if (Math.abs(Math.abs(u) - 0.1) < Math.max(0.04, (z / PS.focal) * 0.5)) return "y"
+      if (Math.abs(Math.abs(u) - EDGE) < Math.max(0.07, z / PS.focal)) return "W"
+      return u > SHOULDER ? "v" : "a"
+    })
+    // the guardrail's posts going away behind, the rail along their tops
+    let prev = null
+    for (let i = 0; i < 16; i++) {
+      const z = 2 + i * 4 - ((s % 4) + 4) % 4
+      if (z < 1.5) continue
+      const x = RAIL_U - cam - (k * z * z) / 2, [bx, by] = PS.ground(x, z, 0), [tx, ty] = PS.ground(x, z, 0.8)
+      c.line(R(bx), R(by), R(tx), R(ty), "p")
+      if (prev) c.line(prev[0], prev[1], R(tx), R(ty), "r")
+      prev = [R(tx), R(ty)]
+    }
+    // a rival behind on our left
+    for (const r of RIVALS) {
+      const z = -rivalZ(r, f) - 4.4
+      if (z < 2 || z > 60) continue
+      const x = r.lane - cam - (k * z * z) / 2, sc = PS.scale(z), [px, py] = PS.ground(x, z, 0).map(R)
+      c.stamp(`_rf_${r.color}_*`, px, py + 1, { fit: Math.max(3, R(1.07 * sc)) })
+    }
+    // our own flank along the inner edge, running back toward the vanishing point
+    c.poly([SMW, 6, 22, 9, 21, 11, 22, 13, SMW, SMH], "0")
+    c.poly([SMW, 7, 23, 9.5, 22.5, 11, 23.5, 12.5, SMW, SMH - 1], "r")
+    c.poly([SMW, 14, 23.5, 12.5, SMW, SMH - 1], "R")
+    c.line(23, 10, SMW - 1, 8, "e"); c.line(24, 11, SMW - 1, 10, "W")
+    c.line(26, 15, 27, 18, "0")
+  })
+
 include("cockpit.px.js")
 
 // ---------------------------------------------------------------- the driver
@@ -919,7 +983,7 @@ include("cockpit.px.js")
 // go round with it at ten to two, gripping as drivers do: the back of the glove up and toward us, the palm down on
 // the rim, the fingers curled forward over it, the thumbs pointing in. The forearms come up from the
 // corners in the blue suit with its white stripes, a knit cuff at each wrist. The gauges' needles:
-// the revs flutter, the speed holds about 200 km/h; the ribbons from the mirror swing against the turn.
+// the revs flutter and follow the speed and the gear; the ribbons from the mirror swing against the turn.
 //
 // The hand is a puppet: a skeleton of joints in the hand's own frame, read off photographs of a
 // left hand gripping, taken from its owner's eyes as the driver sees his, then set on the rim every
@@ -943,15 +1007,23 @@ const HAND = {
   wrist: [-4.2, -19.7],
 }
 // the hand's frame on the rim at its angle: a function from the frame to the picture
-function handOn(side, turn) {
+// (reach 0), or on its way to the gear lever below the picture at `to` (reach 1), turned a little
+function handOn(side, turn, reach = 0, to = LEVER.at) {
   const a = (side > 0 ? HAND.a : Math.PI - HAND.a) - turn
-  const [gx, gy] = rimMid(a), [x1, y1] = rimMid(a - 0.01 * side), [x0, y0] = rimMid(a + 0.01 * side)
+  let [gx, gy] = rimMid(a)
+  const [x1, y1] = rimMid(a - 0.01 * side), [x0, y0] = rimMid(a + 0.01 * side)
   const mir = ([x, y]) => [x * side, y], [L, Q] = HAND.rim.map(mir)
-  const th = Math.atan2(y0 - y1, x1 - x0) - Math.atan2(Q[1] - L[1], Q[0] - L[0]), co = Math.cos(th), si = Math.sin(th)
+  let th = Math.atan2(y0 - y1, x1 - x0) - Math.atan2(Q[1] - L[1], Q[0] - L[0])
+  gx += (to[0] - gx) * reach; gy += (to[1] - gy) * reach; th += LEVER.turn * reach
+  const co = Math.cos(th), si = Math.sin(th)
   const mx = (L[0] + Q[0]) / 2, my = (L[1] + Q[1]) / 2
   const k = HAND.size
   return (p) => { const [x, y] = mir(p), dx = (x - mx) * k, dy = (y - my) * k; return [gx + dx * co - dy * si, gy - (dx * si + dy * co)] }
 }
+// the gear lever's knob under the centre stack, out of the picture: in fifth up and to the right, in
+// fourth back toward us and to the left; the elbow drops back as the hand goes down to it
+const LEVER = { fifth: [262, 202], fourth: [257, 207], turn: -0.6, elbow: [292, 226] }
+LEVER.at = LEVER.fifth
 const GLOVE = "=]}}'"
 const steer = (f) => {
   const s = (f / FRAMES) * SECONDS, h = 0.02
@@ -959,14 +1031,16 @@ const steer = (f) => {
   return (kappa(f) * 90 + lat * 0.05) * 0.45
 }
 function wheel(c, f) {
-  const turn = steer(f), R = Math.round
+  const turn = steer(f), R = Math.round, s = (f / FRAMES) * SECONDS, reach = reachAt(s), g = gearAt(s)
+  const lever = LEVER.fifth.map((v, i) => v + (LEVER.fourth[i] - v) * g)
   // the wheel in 3D, lit as the cockpit is, its stitching and badge over it
   render3d(c, wheelFaces(turn), WHEEL_MATS); wheelDetails(c, turn)
   // the arms: each forearm from its corner up to the wrist, then the hand on the rim (all its parts
   // outlined first and filled after, so they read as one glove, a crease between the fingers), then
   // the knit cuff over the join
   for (const side of [1, -1]) {
-    const S = handOn(side, turn), wrist = S(HAND.wrist), elbow = side > 0 ? [44, 214] : [276, 214]
+    const r = side > 0 ? 0 : reach, S = handOn(side, turn, r, lever), wrist = S(HAND.wrist)
+    const elbow = side > 0 ? [44, 214] : [276 + (LEVER.elbow[0] - 276) * r, 214 + (LEVER.elbow[1] - 214) * r]
     forearm(c, elbow, wrist, side)
     const bones = []
     for (let i = 0; i < 4; i++) {
@@ -1055,9 +1129,10 @@ function cuff(c, [ex, ey], [wx, wy], side) {
   forearm(c, [ex, ey], [wx, wy], side, 5, 9)
 }
 function needles(c, f) {
-  const rev = 0.72 + 0.04 * Math.sin((TAU * f * 52) / FRAMES) + 0.06 * Math.sin((TAU * f * 3) / FRAMES), kmh = 200 + 4 * Math.sin((TAU * f) / FRAMES * 2)
+  const kmh = speedAt(f) * 3.6 + 3 * Math.sin((TAU * f) / FRAMES * 2), g = gearAt((f / FRAMES) * SECONDS)
+  const rev = kmh / (315 + (270 - 315) * g) + 0.03 * Math.sin((TAU * f * 52) / FRAMES) + 0.02 * Math.sin((TAU * f * 3) / FRAMES)
   for (const g of GAUGES) {
-    const v = g.kind === "revs" ? rev : g.kind === "speed" ? kmh / 280 : 0.62, a = Math.PI * (1.25 - 1.5 * v), R = Math.round
+    const v = g.kind === "revs" ? rev : g.kind === "speed" ? kmh / 300 : 0.62, a = Math.PI * (1.25 - 1.5 * v), R = Math.round
     c.line(R(g.x), R(g.y), R(g.x + Math.cos(a) * g.rp * 0.82), R(g.y - Math.sin(a) * g.rp * 0.82), "["); c.px(R(g.x), R(g.y), "~")
   }
 }
@@ -1074,5 +1149,6 @@ function ribbons(c, f) {
 anim("race", { w: W, h: H, frames: FRAMES, fps: FPS },
   (c) => view(c, c.frame),
   stamp("_mirror", 129, 6),
+  stamp("_sidemirror", 15, 83),
   stamp("_cockpit", 0, 0),
   (c) => { ribbons(c, c.frame); needles(c, c.frame); wheel(c, c.frame) })
