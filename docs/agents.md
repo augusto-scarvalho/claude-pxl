@@ -42,7 +42,7 @@ sheets. To be sure it is used, name it: "use the pxl skill to draw ...".
 Every turn of a conversation rereads everything said before it, so what an agent reads early it pays
 for again on every later turn. pxl is laid out so the agent reads little:
 
-- **`SKILL.md`** (about 4.7k tokens) is loaded when the task matches: the workflow, a template, the
+- **`SKILL.md`** (about 5k tokens) is loaded when the task matches: the workflow, a template, the
   essentials of the DSL, and a table of which example to copy.
 - **The guides** ([scenes](../scenes.md), [characters](../characters.md), [lighting](../lighting.md),
   [rotation](../rotation.md)) are read by section: `pxl help "characters 1 4 5"` prints those
