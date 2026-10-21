@@ -757,7 +757,7 @@ test("stamp sub: half a pixel along with nothing to show it is a warning (over t
   const src = 'pal({ k: "#1b1630", r: "#e2585e", R: "#a63a4c" }); ramps("kRr"); sprite("dot", "rr"); sprite("_o", { outline: "k" }, "rr")\n';
   const bare = loadSource(src + 'sprite("a", { w: 6, h: 3 }, stamp("dot", 1.5, 1, { sub: true }))', "t.px.js");
   bare.image("a");
-  assert.match(bare.warnings[0]?.msg ?? "", /half a pixel along drew no in-between tone/);
+  assert.match(bare.warnings[0]?.msg ?? "", /^'a': a stamp half a pixel along drew no in-between tone/);
   const lined = loadSource(src + 'sprite("a", { w: 8, h: 5 }, stamp("_o", 1.5, 1, { sub: true }))', "t.px.js");
   lined.image("a");
   assert.equal(lined.warnings.length, 0, "an outline to push into: the in-between shows");

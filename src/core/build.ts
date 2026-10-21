@@ -190,6 +190,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     c.frames = tick?.frames ?? frames;
     c.inAnim = !!tl;
     c.mirrored = !!def.mirror;
+    c.owner = { name: def.name, loc: def.loc };
     return c;
   };
   const main = timed(new Canvas(base, pal, ctx, 0, 0, seed));

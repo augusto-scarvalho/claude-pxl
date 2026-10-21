@@ -43,14 +43,18 @@ export function readMedia(path: string, o: MediaOpts = {}): Media {
           if (g.sx > 1 || g.sy > 1) {
             const [x, y, w, h] = o.at;
             at = [Math.round(g.ox + x * g.sx), Math.round(g.oy + y * g.sy), Math.round(w * g.sx), Math.round(h * g.sy)];
+            if (!(w > 0 && h > 0 && at[0] + at[2] <= f.w && at[1] + at[3] <= f.h)) throw new PxError(`--at ${o.at.join(",")} isn't inside the picture, ${Math.floor(f.w / g.sx)}x${Math.floor(f.h / g.sy)} as drawn (${f.w}x${f.h} in the file, drawn at ${+g.sx.toFixed(2)}x)`);
             kind += `, the region ${o.at.join(",")} at 1x (${at.join(",")} of the file)`;
+            // the whole picture's grid read the crop: a plain corner of it would find none of its own
+            const cg: Grid = { sx: g.sx, sy: g.sy, ox: g.ox + x * g.sx - at[0], oy: g.oy + y * g.sy - at[1] };
+            drawnAt = cg; shrink = (img) => toNative(img, cg);
           }
         }
         const [x, y, w, h] = at;
-        if (!(w > 0 && h > 0 && x + w <= f.w && y + h <= f.h)) throw new PxError(`--at ${o.at.join(",")} isn't inside the ${f.w}x${f.h} picture${at !== o.at ? ` (${at.join(",")} of the file)` : ""}`);
+        if (!(w > 0 && h > 0 && x + w <= f.w && y + h <= f.h)) throw new PxError(`--at ${o.at.join(",")} isn't inside the ${f.w}x${f.h} picture`);
         f = f.sub(x, y, w, h);
       }
-      if (i === 0 && read.length > 1) {
+      if (i === 0 && read.length > 1 && !drawnAt) {
         const g = findGrid(f, o.px);
         if (g.sx > 1 || g.sy > 1) { drawnAt = g; shrink = (img) => toNative(img, g); }
         else if (Math.max(f.w, f.h) > 640) {

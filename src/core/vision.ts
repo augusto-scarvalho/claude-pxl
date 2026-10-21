@@ -323,9 +323,11 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
     // beyond the picture is clear for a sprite (something with clear pixels), not for an opaque scene
     const out = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].filter(([u, v]) => sprite || (u >= 0 && v >= 0 && u < W && v < H));
     if (!out.some(([u, v]) => clear(at(u, v)))) continue;
-    const inner = out.map(([u, v]) => at(x + (x - u), y + (y - v))).find((n) => !clear(n));
+    // what is inside it: past the line itself (at an outline's corner the line goes on inward)
+    const inner = out.map(([u, v]) => { const n = at(x + (x - u), y + (y - v)); return n === c ? at(x + 2 * (x - u), y + 2 * (y - v)) : n; }).find((n) => !clear(n) && n !== c);
     const k = lch(c);
-    if (k.C < 0.04 && k.L < 0.3) eb++;
+    // an ink line: dark and nearly grey (pxl's own ink is a deep purple, chroma 0.05)
+    if (k.C < 0.08 && k.L < 0.3) eb++;
     else if (inner !== undefined && lch(inner).L - k.L > 0.08) es++;
     else en++;
     // lighter than a dark line just inside it: anti-aliasing toward a background that isn't there

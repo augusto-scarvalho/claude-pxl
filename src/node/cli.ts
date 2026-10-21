@@ -298,7 +298,7 @@ export async function main(argv: string[]): Promise<number> {
       case "study": {
         const m = readMedia(file, { at: a.at, from: a.from, seconds: a.seconds, fps: a.fps, px: a.px });
         const name = basename(file).replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "_");
-        const r = study({ name, frames: m.frames, ms: m.ms, kind: m.kind, drawnAt: m.drawnAt }, { colors: a.colors, to: a.to, px: a.px, region: !!a.at });
+        const r = study({ name, frames: m.frames, ms: m.ms, kind: m.kind, drawnAt: m.drawnAt }, { colors: a.colors, to: a.to, px: a.px, region: a.at ? [a.at[0], a.at[1]] : undefined });
         // --no-out: the text only, no files written
         if (a.out === false) { for (const l of r.text) console.log(l); return 0; }
         const dir = join(a.out ?? join(dirname(file), "out"), "_study");

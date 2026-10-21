@@ -87,6 +87,8 @@ export class Canvas {
   onOp?: (name: string, args: unknown[]) => void;
   /** Art-file location of the op item currently running (set by the builder). */
   loc?: string;
+  /** The asset drawn on it and where it is defined: a warning from inside a function still says where. */
+  owner?: { name: string; loc?: string };
   private clipPred?: Pred;
   /** Nesting depth of op calls (internal). */
   _depth = 0;
@@ -978,7 +980,7 @@ export class Canvas {
     }
     for (const [i, j, m] of set.values()) this.plot(bx + i, by + j, m);
     // half a pixel along and nothing to show it: it would read as standing still
-    if (!set.size) this.res.warn?.("a stamp half a pixel along drew no in-between tone: the part has no outline to push into and spills over the clear, or no key lies between its colors and what it meets (a ramp through both); give it an outline or a ramp, or stamp it at a whole pixel", this.loc);
+    if (!set.size) this.res.warn?.(`'${this.owner?.name ?? "?"}': a stamp half a pixel along drew no in-between tone: the part has no outline to push into and spills over the clear, or no key lies between its colors and what it meets (a ramp through both); give it an outline or a ramp, or stamp it at a whole pixel`, this.loc ?? this.owner?.loc);
   }
 
   /**

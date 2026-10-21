@@ -11,14 +11,15 @@
 pal({
   a: "#4f5d7a", k: "#191524",
   G: "#8a8ea0", w: "#eef0f4",                               // the block, its ramp toward the outline
-  H: "#244f44", h: "#2f6b5a", j: "#4f9a72",                     // the hood and cloak, dark to light
+  I: "#1f3a33", H: "#244f44", h: "#2f6b5a", j: "#4f9a72",       // the hood and cloak, dark to light (I: the
+                                                            // half step's tone between the ink and the hood's edge)
   S: "#a8644e", s: "#e2a07a", z: "#f4c8a0", e: "#2a1c1c",   // skin, eyes
   R: "#5a2a2e", r: "#7a3b3b", q: "#a8584a",                      // the robe
   b: "#3a2a22", B: "#6a4a36",                               // boots
   Y: "#f2c45a",                                             // the clasp
 })
 // the tones a half step takes are each ramp's own, between its outline and its fill
-ramps("kGw", "kHhj", "kSsz", "kRrq", "kbB")
+ramps("kGw", "kIHhj", "kSsz", "kRrq", "kbB")
 
 // the keeper, in parts: what moves (head, chest) apart from what stays (robe, boots)
 sprite("_head", { outline: "k" }, `

@@ -18,7 +18,7 @@ import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Va
 
 /** frames as read; `drawnAt`: they were already brought down from that grid as they were read (big animations) */
 export interface StudyInput { name: string; frames: Img[]; ms: number[]; kind: string; drawnAt?: Grid }
-export interface StudyOpts { colors?: number; to?: [number, number]; /** the size of a pixel, when the grid found is wrong */ px?: number; /** the clip is a region asked for (--at): follow what moves in it */ region?: boolean }
+export interface StudyOpts { colors?: number; to?: [number, number]; /** the size of a pixel, when the grid found is wrong */ px?: number; /** the clip is a region asked for (--at, its corner at 1x): follow what moves in it */ region?: [number, number] }
 /** pieces: each object of an animation alone (a row of cutouts each) and its box in every frame */
 export interface StudyOut { text: string[]; sheet: Img; picture: Img; pixelArt: boolean; palette: Color[]; pieces?: { sheet: Img; json: unknown; strips: Img[] }; layers?: ReturnType<typeof decompose> }
 
@@ -73,11 +73,12 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
 
   // ---------------------------------------------------------------- palette and ramps
   text.push("", "PALETTE AND RAMPS (dark to light; % of the picture)");
-  const total = tech.pixels;
+  // (the ramps are counted over the whole picture, a flat backdrop too; the techniques without it)
+  const total = tech.pixels, painted = picture.data.filter((c) => (c & 255) >= 128).length;
   ramps.slice(0, 12).forEach((r, i) => {
     const share = r.counts.reduce((s, v) => s + v, 0);
-    if (share < total * 0.004 && i > 3) return;
-    text.push(`  ${i + 1}. ${r.neutral ? "greys" : hueName(lch(r.colors[Math.floor(r.colors.length / 2)]).h)}, ${r.colors.length} tone${r.colors.length > 1 ? "s" : ""}, ${pct(share, total)}: ${r.colors.slice(0, 10).map(hex).join(" ")}${r.colors.length > 10 ? " ..." : ""}${shiftWords(r)}`);
+    if (share < painted * 0.004 && i > 3) return;
+    text.push(`  ${i + 1}. ${r.neutral ? "greys" : hueName(lch(r.colors[Math.floor(r.colors.length / 2)]).h)}, ${r.colors.length} tone${r.colors.length > 1 ? "s" : ""}, ${pct(share, painted)}: ${r.colors.slice(0, 10).map(hex).join(" ")}${r.colors.length > 10 ? " ..." : ""}${shiftWords(r)}`);
   });
   if (ramps.length > 12) text.push(`  ... ${ramps.length - 12} more, small`);
   const sizes = ramps.filter((r) => r.colors.length > 1).map((r) => r.colors.length).sort((a, b) => a - b);
@@ -140,7 +141,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   const persp = perspectiveLines(segs, vps, P.w, P.h, k, picture.w, foe);
   text.push(...persp.lines);
   if (motion) text.push("", "MOTION", ...motion.lines);
-  if (opts.region && input.frames.length > 1) text.push("", "THE REGION (what moves in it, frame by frame)", ...regionLines(input.frames.map((f, i) => (pixelArt ? clear(raws[i]) : f))));
+  if (opts.region && input.frames.length > 1) text.push("", "THE REGION (what moves in it, frame by frame)", ...regionLines(input.frames.map((f, i) => (pixelArt ? clear(raws[i]) : f)), opts.region));
   if (motion?.layers) text.push("", "PIECES (what moves how, and what to build it with)", ...pieceLines(motion.layers, motion.bands, motion.forward));
   else if (motion?.forward) text.push("", "PIECES", "  The whole view moves (a camera going forward): build it in meters through a camera (perspective, plane, things along the way), not as pieces on a still picture.");
 
@@ -342,7 +343,7 @@ function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, 
  * What moves in a region asked for (--at), read as the tutorials' readers measured it by hand: each
  * frame, the box of its pixels, then its spacing and squash. One thing moving in the region reads best.
  */
-export function regionLines(frames: Img[]): string[] {
+export function regionLines(frames: Img[], origin: [number, number] = [0, 0]): string[] {
   const W = frames[0].w, H = frames[0].h, n = frames.length;
   // the mover: colors rare in the region over the clip (the ground's are common), on pixels that don't
   // keep one color all through (a still detail does): where it rests counts, where it left doesn't
@@ -363,7 +364,8 @@ export function regionLines(frames: Img[]): string[] {
     if (k >= 2) track.push([t, x0, y0, x1 - x0 + 1, y1 - y0 + 1]);
   }
   if (track.length < 2) return ["  Nothing in it differs from its usual look on more than one frame."];
-  const boxes = track.slice(0, 24).map(([t, x, y, w, h]) => `${t}: ${x},${y} ${w}x${h}`).join("; ");
+  // (where they are in the whole picture, as --at and shot give places)
+  const boxes = track.slice(0, 24).map(([t, x, y, w, h]) => `${t}: ${x + origin[0]},${y + origin[1]} ${w}x${h}`).join("; ");
   const sp = spacingWords(track);
   // an effect played once: it shows, flashes near-white early, then shrinks and is gone (Saint11's
   // explosion: dark, white, blast, fade)
