@@ -128,11 +128,13 @@ build overwrites it); `--every 3` keeps one frame in three in the preview GIFs o
 | the exact pixels as text | `pxl ascii art.px.js slime` |
 | know what is where in a scene, what covers what | `pxl describe art.px.js meadow` (`--brief` when busy) |
 | find which line painted a pixel | `pxl steps art.px.js slime --at 3,2` |
-| check before calling it done | `pxl check art.px.js` (a scene's facing, feet on the ground and lit side at every frame; and, to look at, the lines of sprites drawn by hand) |
+| check before calling it done | `pxl check art.px.js` (a scene's facing, feet on the ground and lit side at every frame; and, to look at, the lines of sprites drawn by hand; `pxl shot` rings those pixels in `<name>_look.png`) |
+| post it | `pxl build art.px.js --share 4`: every asset 4 times bigger in `out/share/`, clean, a GIF when it moves |
 | get around a long file | `pxl list art.px.js` (each definition's line range and comment) |
 | look up an op or option | `pxl help <name>`; `pxl help` alone for the index |
 | match a reference sprite's silhouette | `pxl compare art.px.js hero ref.png --shrink 2` |
 | learn from finished art or a reference | `pxl study ref.gif` |
+| measure one thing moving in a reference | `pxl study ref.gif --at x,y,w,h` (its box every frame, its spacing; the region in the drawing's own pixels, as `shot` shows it) |
 
 `pxl` alone prints every command with all its options.
 
@@ -156,8 +158,9 @@ goes to `out/_study/` next to the picture: a sheet to look at, the palette as `.
 as a strip.
 
 What the tutorials teach about lines, anti-aliasing, clusters and timing is in
-[characters.md](../characters.md) §4, §7 and §10, and `pxl check` points at a hand-drawn sprite's
-doubled steps and jaggies to look at.
+[characters.md](../characters.md) §4, §7, §10 and §12 (frame counts measured on Saint11's cards),
+effects in [scenes.md](../scenes.md) "One-shot effects", and `pxl check` points at a hand-drawn
+sprite's doubled steps and jaggies to look at.
 
 ## Where to read next
 

@@ -27,7 +27,7 @@ page lists what the fork adds. Every commit is in
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus `scripts/calibrate.ts` |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 51 |
-| Tests | 59 | 213 |
+| Tests | 59 | 220 |
 
 ## Looking and checking
 
@@ -37,7 +37,7 @@ look, in text where text is cheaper than an image.
 | Command | What it gives |
 | --- | --- |
 | `pxl describe` | A whole scene as text: each object's position, gaps, what covers it, contrast, motion, which way it faces, the light. `--diff` against the last look, `--brief`, `--frame N`; works on plain PNGs too. |
-| `pxl shot` | One asset built and written as a PNG to look at, with what changed since the last shot. Frames side by side (`0-17`, `all`), zoomed regions, several assets or other files in rows, `--vs HEAD --diff` against the committed version. A reference GIF or video too: all its frames on one sheet, at 1×. |
+| `pxl shot` | One asset built and written as a PNG to look at, with what changed since the last shot and the check's lines (LOOK pixels ringed in `<name>_look.png`). Frames side by side (`0-17`, `all`), zoomed regions, several assets or other files in rows, `--vs HEAD --diff` against the committed version. A reference GIF or video too: all its frames on one sheet, at 1×. |
 | `pxl check` | Every check `describe` makes, over every scene, rig and frame, and, to look at without failing it, the 1 px lines of every sprite drawn by hand (L-corners, jaggies), and which rules actually ran, so "no warnings" can't hide a check that never applied. `--readings` shows each light reading. |
 | `pxl steps` | The painting log as text; `--at x,y` names the source line that painted a pixel. |
 | `pxl list` | A file as a map: each definition's line range and comment, so an agent reads only the lines it needs. |
@@ -135,7 +135,10 @@ of and what to use in pxl to make the same.
     its pivot every frame, and a thing carried never stays over one point.
   - Each capture is cut out of its background, GrabCut-style. Files: a sheet, a strip, and a box per
     frame for every piece.
-- **Timing per drawing**, and "on twos" or "threes" when every drawing is held alike.
+- **Timing per drawing**, and "on twos" or "threes" when every drawing is held alike; per piece too.
+- **A region asked for** (`--at` on a clip): what moves in it followed frame by frame, its box,
+  spacing and squash, and an effect played once (where it flashes, peaks and fades).
+- **Cycles**: a second half that is the first flipped (draw half), and the bob.
 - **Spacing:** for a thing carried, an action or a jump, its steps frame to frame: speeding up, slowing, even,
   holds, a move back first (anticipation), past its rest and back (overshoot), a box squashing and
   stretching with its area.

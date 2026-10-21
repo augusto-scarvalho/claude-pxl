@@ -137,7 +137,8 @@ pxl help [name]                  what the reference says about an op or option, 
   gradients, dithering, noise, pixel fonts (a 3×5 built in, a 5×7 to include, `mono` for a score),
   `scatter` brushes, tilemaps, random groups with reproducible seeds.
 - **Scenes**: layers, cast-shadow and light layers, per-layer PNG export.
-- **Animation**: frames as patches over a base sprite → strips + JSON tags + GIF; parts half a pixel along
+- **Animation**: frames as patches over a base sprite → strips + JSON tags + GIF; motion blur
+  (`stamp(..., { smear })`); parts half a pixel along
   (`stamp(..., { sub: true })`) for an idle without the single-pixel bob.
 - **Characters**: `rig()` skeleton first (slots, stand-ins, parts ordered by facing, turned with
   `twin` parts), `ik` for poses, `register` by the pelvis (see [`characters.md`](characters.md)).

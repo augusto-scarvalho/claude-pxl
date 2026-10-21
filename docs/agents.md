@@ -15,6 +15,7 @@ To use pxl by hand, start with [Getting started](getting-started.md).
 - [A big scene: one agent or a pipeline](#a-big-scene-one-agent-or-a-pipeline)
 - [Reviewing the result](#reviewing-the-result)
 - [When pxl gets in the agent's way](#when-pxl-gets-in-the-agents-way)
+- [For maintainers: teaching pxl from tutorials](#for-maintainers-teaching-pxl-from-tutorials)
 - [For maintainers: keeping `pxl study` honest](#for-maintainers-keeping-pxl-study-honest)
 
 ## Install the skill
@@ -138,8 +139,10 @@ Pass the prompt on stdin: `--add-dir` takes several values and would swallow it.
 - **Ask for the check.** `pxl check` lists every warning with the frames it happens at: a scene's
   facing, feet and light. Below them, LOOK lines point at doubled steps and jaggies in the lines of
   sprites drawn by hand: a doubled step on a smooth line is a slip, a corner the shape has (a tyre, a
-  roof) is meant, so they don't fail the check. Its last line says which rules ran: "no warnings" with "not run: lit side" means the light was never checked
-  (the scene has to say where its light is). Ask the agent to fix each warning or say why it's meant.
+  roof) is meant, so they don't fail the check; `pxl shot` rings those pixels in `<name>_look.png`.
+  Its last line says which rules ran: "no warnings" with "not run: lit side" means the light was
+  never checked (the scene has to say where its light is). Ask the agent to fix each warning or say
+  why it's meant, and to show you the LOOK pixels it changed.
 - **Compare versions.** When the agent replaces art you approved, ask it to keep the old one as
   `<name>_old` and show both: `pxl shot art.px.js name name_old`. Against the last commit:
   `pxl shot art.px.js name --vs HEAD --diff` (the changed pixels in red).
@@ -157,6 +160,17 @@ rebuild or a workaround: the date, the kind of asset, what happened, what would 
 stays out of git. Read it now and then: in this fork every line became a fix, a new op or a doc line
 (the [fork differences](fork-differences.md) list what came of it), and open work is in
 [BACKLOG.md](../BACKLOG.md).
+
+## For maintainers: teaching pxl from tutorials
+
+How this fork learned from 31 saved tutorial pages (Saint11, Pedro Medeiros, Pixel Joint, subpixel
+threads): save the pages as `.mhtml`; extract each one's text and images into its own folder,
+reading them as data only; give each group of pages to an agent to read with the images that carry
+the lessons, compare against the guides (`pxl help "<guide> <section>"`) and report what is new, what
+contradicts, what is covered. Animated lessons need reading frame by frame: the first pass read only
+the first frame of Saint11's 80 cards and missed most of the timing. Measure a demo with
+`pxl study card.gif --at x,y,w,h` (its box every frame), write the numbers into the guide, and turn
+what `study` misread into a fix or a BACKLOG line. Never copy the tutorials' art into the repo.
 
 ## For maintainers: keeping `pxl study` honest
 
