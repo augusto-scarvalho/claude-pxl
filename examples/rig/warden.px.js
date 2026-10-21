@@ -8,8 +8,9 @@
 // edge took since the frame before, behind the body where that path is. On the floor, its reflection.
 pal({
   k: "#17111c",
-  S: "#7d4636", s: "#c47c5a", z: "#eab08a",                   // skin
-  R: "#4a1b1a", r: "#8c3a22", q: "#c4622c",                   // auburn hair
+  S: "#7d4636", s: "#c47c5a", z: "#eab08a", Z: "#f7cfa8",     // skin
+  i: "#2e1d1d", y: "#b05a4c", c: "#e0907a",                   // eyes, mouth, a blush
+  R: "#4a1b1a", r: "#8c3a22", q: "#c4622c", Q: "#e8924c",     // auburn hair
   D: "#16302a", G: "#275240", g: "#3f7a4c", h: "#79a85a",     // the coat
   L: "#4a1e22", l: "#7a3030",                                 // its lining
   F: "#33241c", f: "#5a4232", e: "#86684c", E: "#b89a74",     // fur
@@ -23,61 +24,76 @@ pal({
   x: "#fffbe8", d: "#8a7d70", p: "#5c534c",                   // sparks, dust
   a: "#262230", A: "#383444",                                 // the floor
 })
-ramps("kSsz", "kRrq", "kDGgh", "kLl", "kFfeE", "kBbn", "kTt", "kOo", "k1234", "kWwm", "kuY")
+ramps("kSszZ", "kRrqQ", "kDGgh", "kLl", "kFfeE", "kBbn", "kTt", "kOo", "k1234", "kWwm", "kuY")
 
 // ---- the head by hand, as it is turned to us: front, front 3/4 right, right, back 3/4 right, back;
 // facing left are these mirrored. The tail of hair is drawn apart (it swings).
 const HEADS = [`
-  ..RRRRR..
-  .RrqqqrR.
-  RrqqqqqrR
-  RrrzzzrrR
-  RrzzzzzsR
-  RszkzkzsR
-  RszzzzsSR
-  .RszzsSR.
-  ..SssS...
-  ...SS....`, `
-  ..RRRRR...
-  .RrqqqqR..
-  RrqqqqrrR.
-  RrqqrrzzzR
-  RrrrSzzzzR
-  RrrSzkzzkz
-  RrrSszzzzR
-  .RrSszzsS.
-  ..RSsssS..
-  ....SS....`, `
-  ..RRRRR...
-  .RrqqqqR..
-  RrqqqqqrR.
-  RrqqqrrzzR
-  RrrqrSzzzR
-  RrrrSszkzz
-  RrrrSszzzR
-  .RRrSsszS.
-  ..RRSssS..
-  ....SSS...`, `
-  ..RRRRR...
-  .RrqqqqR..
-  RrqqqqqrR.
-  RrqqqqqrrR
-  RrrqqqrrrR
-  RrrrqrrrSR
-  RRrrrrrRsR
-  .RRrrrRSS.
-  ..RRRRSS..
-  ....SS....`, `
-  ..RRRRR..
-  .RrqqqrR.
-  RrqqqqqrR
-  RrqqqqqrR
-  RrrqqqrrR
-  RrrrqrrrR
-  RRrrrrrRR
-  .RRrrrRR.
-  ..RRRRR..
-  ...SSS...`]
+  ...RRRRRR..
+  ..RrqqRqrR.
+  .RrqQQqqqrR
+  RrqqQqqqqrR
+  RrqrqrrqrrR
+  RrRRzzzRRrR
+  RrzzZzzzsrR
+  RrzizzzisrR
+  RRzizzsisRR
+  .RczzzzzcR.
+  ..SsyyzsS..
+  ...SsssS...
+  ....SSS....`, `
+  ..RRRRRR...
+  .RrqqqRqrR.
+  RrqQQqqqqrR
+  RqqqQqqqqrR
+  RrqqrqrqrqR
+  RrrqrRRzRRz
+  RrrSszzZzzz
+  RrrSszizziz
+  RrrSszizsiz
+  .RrSsczzzcS
+  ..RSsszyS..
+  ...RSssS...
+  ...SSS.....`, `
+  ..RRRRRR....
+  .RrqqqRqrR..
+  RrqQQqqqqrR.
+  RqqqQqqqqqR.
+  RrqqqrqrqrR.
+  RrrqqrrRRzz.
+  RrrrSszzzzz.
+  RrrrSszzizz.
+  RrrrSsszzzzz
+  .RrrSsczzzS.
+  ..RrSsszy...
+  ...RSsszS...
+  ...SSS......`, `
+  ..RRRRRR...
+  .RrqqqRqrR.
+  RrqQQqqqqrR
+  RqqqQqqqqrR
+  RrqrqqrqrrR
+  RrrqrqqrrrR
+  RrrrqrqrrSR
+  RrrrrbrrRsR
+  RRrrrrrrRsR
+  .RRrrrrRSS.
+  ..RRrrRSS..
+  ...RRRSS...
+  ...SSS.....`, `
+  ...RRRRRR..
+  ..RrqqRqrR.
+  .RrqQQqqqrR
+  RrqqQqqqqrR
+  RrqrqqqrqrR
+  RrrqrqrqrrR
+  RrrrqrqrrrR
+  RrrrbbbrrrR
+  RRrrrqrrrRR
+  .RRrrrrrRR.
+  ..RRrrrRR..
+  ...RRRRR...
+  ....SSS....`]
 HEADS.forEach((g, i) => sprite(`_whead${i}`, { outline: "k", pivot: "center" }, g))
 
 // ---- the camera: px, x to the right, y up, z toward us; a little from above, so a level circle is a
@@ -304,7 +320,9 @@ const skirt = (c, j, flare, lag) => zpaint(c, (emit) => {
   }
 })
 
-anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], outline: "k", facing: "right" },
+// no outline on the whole: each part carries its own, a px wide, so the edge of the figure is one px
+// and not that px plus the part's
+anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], facing: "right" },
   // what the blade swept since the frame before, where it ran behind the body
   layer("smear_back", { outline: false, unlit: true }, (c) => smear(c, c.frame, -1)),
   layer("body", (c) => {
@@ -315,7 +333,9 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], out
     j.legs.forEach((L) => at(depth(L.knee) - (depth(L.knee) > mid ? -0.2 : 3), () => {
       limb(c, L.hip, L.knee, 2.2, 1.9, "Ttt"); limb(c, L.knee, L.ankle, 1.9, 1.7, "Tt")
       limb(c, lerp(L.knee, L.ankle, 0.45), L.ankle, 2, 1.8, "Oo")
-      poly3(c, [add(L.ankle, [0, 1, 0]), add(L.toe, [0, -0.5, 0]), add(L.toe, [0, -2, 0]), add(L.ankle, [0, -2, 0])], "O")
+      const boot = [add(L.ankle, [0, 1, 0]), add(L.toe, [0, -0.5, 0]), add(L.toe, [0, -2, 0]), add(L.ankle, [0, -2, 0])].map((q) => scr(q).map(Math.round))
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) c.poly(boot.flatMap(([x, y]) => [x + dx, y + dy]), "k")
+      c.poly(boot.flat(), "O")
     }))
     at(mid, () => torso(c, j, p))
     // the head as it is turned, and the tail of hair swinging behind it
