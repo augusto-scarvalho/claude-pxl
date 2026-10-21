@@ -82,10 +82,10 @@ function drawsWithFunctions(items: Item[]): boolean {
 }
 
 /** Options every placement takes (stamp, tile, pattern, panel, scatter, tilemap, wire hangs). */
-const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "silhouette", "cast", "castBase", "at", "id", "z", "seed", "reseed", "frame", "delay", "rdelay"];
+const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay"];
 /** Allowed option keys of ops whose last argument is an options object. */
 export const OP_OPTS: Record<string, string[]> = {
-  stamp: [...PLACE, "sub"],
+  stamp: [...PLACE, "sub", "at", "id", "z"],
   tile: PLACE,
   pattern: PLACE,
   panel: PLACE,

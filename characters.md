@@ -139,8 +139,8 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
 4. **Drop the lines the shading draws** (Pedro Medeiros). Once the forms are shaded, delete each
    inner line whose edge a shadow already makes (a muscle, the jaw); keep the silhouette, the eyes
    and the darkest pockets. Lines plus shading is a step on the way, not the finish.
-5. **Clean up last:** lone pixels, L-corners and jaggies (§7), then anti-aliasing. `PXL study` on
-   the built PNG names the corners and jaggies with their positions.
+5. **Clean up last:** lone pixels, L-corners and jaggies (§7), then anti-aliasing. `PXL check` (and
+   `PXL shot`) names the corners and jaggies of what you drew by hand, with their positions.
 
 ## 5. Faces
 
@@ -222,7 +222,8 @@ Look at the result at 1× too. Something that reads as cute at 12× can turn to 
   flat, never 2 1 3. Fixing corners can leave jaggies: corners first, then runs. Tight curves (a
   radius of 4 px and less) collect both; look there first.
 - `line()`, `curve()`, `wire()` and `outline` draw clean lines; grids and `runs` are as clean as you
-  write them. `PXL study` on the built PNG lists both faults with their positions.
+  write them: `PXL check` and `PXL shot` list both faults with their positions (`PXL study` does the
+  same on any picture).
 - **Square lines,** every step joined by an L, are a style: chunkier, a 1 px line reads about 1.5 px.
   `outline8` draws an outline so; draw the inner lines the same way.
 - **Inner lines take color.** Keep the near-black for the silhouette and where very different forms
@@ -234,7 +235,8 @@ Look at the result at 1× too. Something that reads as cute at 12× can turn to 
   on steps of 2 px and more: a strip about half the step's length, at its end (a 4 px step takes
   2 px). None on 1:1 diagonals or straight lines, and none on the silhouette against clear (it
   shows as a halo on any other ground). Too much reads as blur. On a curving outline, one shadow
-  tone in the inside elbow of a step softens it; sparingly.
+  tone in the inside elbow of a step softens it; sparingly. `aa: true` on a sprite lays these strips
+  for you in the key between the two colors (a ramp through both): a start to fix by hand.
 - **Clusters:** no 1 px islands of a color inside a form; make the detail a small shape (1×2, a
   diagonal pair, 2×2, an L). A lone pixel is for a point of light, a particle, AA or texture.
 

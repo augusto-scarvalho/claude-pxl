@@ -18,11 +18,13 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    with `PXL shot ref.gif` (a clip's frames on one sheet at 1×) and run `PXL study ref.gif`. Study
    says what the piece is made of and what to use in pxl for each part, and writes a sheet, the
    palette and each piece cut out of its background to `out/_study/`:
-   - a picture: palette and ramps, outlines, dithering, light, banding, pillow shading, perspective
-     (vanishing points, lens, tilt);
+   - a picture: palette and ramps (hue shifting, near twins), outlines, a line's L-corners and
+     jaggies, dithering, anti-aliasing, clusters, light, banding, pillow shading, tiles, perspective
+     (vanishing points, lens, tilt); read at the wrong pixel size (a blurred copy), `--px N`;
    - a clip: timing, cycle and loop, subpixel motion, parallax planes and their speeds, and its
      pieces (the backdrop, sprites carried along, walks, anims in place, rigs, actions with their
-     smears, effects, and the lights, told apart first), each with its box in every frame.
+     smears, effects, and the lights, told apart first), each with its box in every frame, and the
+     spacing of what travels (easing, anticipation, overshoot, squash and stretch).
 
    An editor's transparency checker exported with it is taken for clear; a reflection under it is
    told (row, opacity) and set aside.
@@ -48,9 +50,10 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    keeps one frame in three. A build that has grown slow: `--profile` names the functions where
    the time went, in your file and in pxl.
 5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
-   rig of the file and every frame of an animated scene (not `anim()`s: a picture made as one gets no
-   checks), and the 1 px lines of every sprite drawn by hand (L-corners, jaggies), warnings only,
-   with the frames they happen at. Fix each or say why it's meant. Its last
+   rig of the file and every frame of an animated scene (a picture made as an `anim()` gets none of
+   those), and the 1 px lines of every sprite and part drawn by hand (grid strings, `grid()`,
+   `runs()`; not variants or `outline8`): L-corners, jaggies. Warnings only, with the frames they
+   happen at. Fix each or say why it's meant. Its last
    line says which rules ran: a rule runs only where the art says what it needs (`world.light`,
    `world.ground`, `height`, a `front` socket), so "no warnings" with "not run: lit side" checked
    nothing about the light (a scene lit by a fire or a lamp: `world: { light: { at: [x, y] } }`).
@@ -106,7 +109,7 @@ task needs before starting:
 | a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a scene, level, building or environment | [scenes.md](scenes.md), whole (~6k tokens) |
+| a scene, level, building or environment | [scenes.md](scenes.md), whole (~7k tokens) |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
 
@@ -147,9 +150,9 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 
 - **Colors**: one-char keys from `pal`; `"#hex"`; `"."` skip; `"_"` erase. Palettes: `use("pico8" |
   "sweetie16" | "endesga32" | "palette.hex")` (Lospec files; `1a1626 k ink` gives a color its key);
-  `shades("HGgl", "#5aa040")` makes a hue-shifted ramp from one color.
+  `shades("HGgl", "#5aa040", { sat? })` makes a hue-shifted ramp from one color.
 - **Order**: grid strings, ops, `(c) => { ... }` functions and `layer(...)`s run in order; then
-  mirror → swap → flip → rot → angle → inline/outline (grows 1px) → crop.
+  mirror → swap → flip → rot → angle → aa → inline/outline/outline8 (grows 1px) → crop.
 - **Regions** (`where`, `clip(region, ...items)`): `[cx, cy, r]`, `[x, y, w, h]`, a polygon's points,
   or `(x, y) => bool`. Shading: `shade`/`light(region, steps, density)` step colors along the ramps;
   a second pass, `shade(region, 1, 0.5)`, softens the edge of a round form's shadow (a cast shadow
@@ -166,7 +169,10 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   `rampmap` maps imported tones onto a ramp without merging them.
 - **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj` for tilemaps, `build --aseprite` for a
   person to keep editing in Aseprite.
-- **Light**: `shade:`/`light:` layers and `cast` shadows, `glow`, `lighting()` (lighting.md).
+- **Light**: `shade:`/`light:` layers and `cast` shadows, `relight`/`plate()` for a part lit on its
+  own edges, `glow`, `lighting()` (lighting.md).
+- **Text**: `text()` in the 3×5 built in, or `include("<skill dir>/examples/fonts/font5x7.px.js")`
+  for `{ font: "5x7" }` (lowercase too) or `"5x7 mono"` (a score, a timer).
 - **In meters**: `perspective()` (one, two or three points: `yaw`, `pitch`), `plane()` for flat ground,
   `terrain()` for hills and mountains, `solids()`/`shadows()` for things built of `solid` shapes,
   `mesh()` for what you are inside of or that wraps round itself (faces in meters from `model()`),
@@ -214,7 +220,7 @@ comet_repair --out <scratch dir>`.
 ## Habits that give better art
 
 - Write half of anything symmetric (`mx`) and let `outline` draw outlines (`selout` takes a dark
-  shade of what it touches, `inline` stays inside). Shine is a lighter tone of the color, not white.
+  shade of what it touches, `inline` stays inside, `outline8` squares the steps). Shine is a lighter tone of the color, not white.
   Something on one side only (a shine, a shadow side): mirror a `_part`, stamp it, then draw it.
 - Small organic shapes (a face, a leaf, an item icon) are grids, pixel by pixel; primitives are for
   structure, large areas and long lines. Never big hand grids.
@@ -222,7 +228,7 @@ comet_repair --out <scratch dir>`.
 - 2–4 shades per material, mnemonic keys (`g`/`G`). Light from one side: a flat face is one tone,
   a round form changes only along its curve, never darker all round its rim (pillow shading).
 - Lines step diagonally, without L-corners, their runs in order (`PXL help "characters 7"`);
-  at 16 px and under, drop the outline.
+  anti-alias by hand, or `aa: true` on a sprite as a start; at 16 px and under, drop the outline.
 - Look with `shot` while iterating; `build` when you need the files.
 
 ## When pxl gets in your way

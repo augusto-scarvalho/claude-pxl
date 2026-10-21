@@ -152,6 +152,11 @@ test("study reads a 1 px line's flaws: L-corners where it steps, a jaggy where i
   assert.deepEqual(lineFlaws(runs([1, 1, 2, 3, 2, 4, 6, 8])).jaggies, [[8, 5]], "a dip in a rising curve");
   assert.equal(lineFlaws(runs([1, 1, 2, 2, 4, 2, 2, 1, 1])).jaggies.length, 0, "grows and shrinks steadily: an S");
   assert.equal(lineFlaws(runs([2, 3, 2, 3, 2, 3, 2, 3])).jaggies.length, 0, "a straight slope");
+  // a 1:1 diagonal with one pixel doubled beside it
+  const diag = page(18, 18);
+  for (let i = 0; i < 16; i++) diag.set(i + 1, i + 1, ink);
+  diag.set(7, 8, ink);
+  assert.deepEqual(lineFlaws(diag).corners, [[7, 8]]);
   // a diagonal drawn 4-connected: every step doubled
   const stairs = page(32, 24);
   for (let i = 0; i < 20; i++) { stairs.set(4 + i, 2 + i, ink); stairs.set(5 + i, 2 + i, ink); }

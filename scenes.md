@@ -320,7 +320,8 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   (`--brief` for busy scenes); after an edit, `--diff` lists what moved, was redrawn or recolored.
 - `PXL check <file>` before handing over: every frame of the loop; its last line says which rules
   ran, and `--readings` shows what the lit-side rule read on each thing when a warning looks wrong.
-  Checks and `world` rules cover `scene()`s (and rigs): a picture made as an `anim()` gets none, so
+  Checks and `world` rules cover `scene()`s (and rigs): a picture made as an `anim()` gets none of
+  them (only the line rule, when it is drawn by hand), so
   for checks make it a scene that stamps its moving parts (as `sunset` and `tournament` do).
 - A scene built from separate maps (terrain, props): `throw` in the placement loop when a prop lands
   on the wrong ground; it catches the drift before anyone sees it.

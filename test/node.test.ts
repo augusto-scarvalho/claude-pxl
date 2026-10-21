@@ -548,7 +548,7 @@ scene("s", { w: 32, h: 20, bg: "g" }, layer("props", stamp("rock", 2, 2), stamp(
     writeFileSync(file, art(13, "#7cc053"));
     assert.equal(await main(["describe", file, "s", "--diff"]), 0);
   } finally { console.log = log; }
-  assert.ok(existsSync(join(dir, "out", "_describe", "s.json")));
+  assert.ok(existsSync(join(dir, "out", "_describe", "a.s.json")));   // kept by file and name: two files' "s" in one out dir don't mix
   const diff = lines[1];
   assert.match(diff, /recolor: #8ccf63 -> g=#7cc053 on \d+ px/);
   assert.match(diff, /region x 10-14, y 10-11: 8 px \([^)]*rock #2 4px[^)]*\)/);   // where it left and where it went

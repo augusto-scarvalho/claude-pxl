@@ -229,6 +229,8 @@ function framesFrom(spec: string): number[] {
 }
 // a picture or a clip given to shot instead of an asset: read like study reads it
 const MEDIA = /\.(png|gif|jpe?g|webp|bmp|mp4|webm|mov|mkv|avi)$/i;
+/** An art file's name, for what a look keeps for the next one (two files' "meadow" in one out dir). */
+const fileTag = (f: string) => basename(f).replace(/\.(px\.)?[jt]s$/, "").replace(/[^\w.-]/g, "_");
 /** Cells in rows of `cols` at most: a long clip as lines of frames, not one strip. */
 const wrapRow = (imgs: Img[], regions: (number[] | undefined)[], cols = 12) => (imgs.length <= cols || regions.length > 1 ? cellRow(imgs, regions) : stack(Array.from({ length: Math.ceil(imgs.length / cols) }, (_, r) => cellRow(imgs.slice(r * cols, (r + 1) * cols), regions))));
 
@@ -334,7 +336,7 @@ export async function main(argv: string[]): Promise<number> {
           frames = b.anim ? p.frames(name, 0, 64).map((f) => p.build(name, 0, f.t)) : undefined;
         }
         // each describe keeps what it saw in <out>/_describe; --diff compares with the last one
-        const keep = join(outDir, "_describe", name.replace(/[^\w.-]/g, "_"));
+        const keep = join(outDir, "_describe", `${fileTag(file)}.${name.replace(/[^\w.-]/g, "_")}`);
         let prev: Snapshot | undefined;
         if (a.diff) {
           if (!existsSync(keep + ".json")) console.log(`(no earlier describe of ${name} in ${join(outDir, "_describe")}: this one is kept for the next --diff)\n`);
@@ -468,15 +470,15 @@ export async function main(argv: string[]): Promise<number> {
         // as big as ~600k px allow (an image costs ~w*h/750 tokens: about what a preview costs), never
         // past the 1568 px a model is shown
         const sheet = stack(rows), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
-        const base = join(outDir, "_shot", name.replace(/[^\w.-]/g, "_")), path = base + ".png";
+        const base = join(outDir, "_shot", name.replace(/[^\w.-]/g, "_")), path = base + ".png", last = join(outDir, "_shot", `${fileTag(file)}.${name.replace(/[^\w.-]/g, "_")}`);
         writePng(path, sheet.scale(k));
         console.log(`-> ${path} (frames ${frames.join(",")}${a.vs ? `; above: ${a.vs}` : ""}${a.diff ? "; below: what changed" : ""}; ${k}x)`);
         // against the last shot of the same frames and region: did the edit change anything, and where
         const key = JSON.stringify({ frames, at: a.at ?? null });
-        if (existsSync(base + ".last.json") && readFileSync(base + ".last.json", "utf8") === key)
-          console.log(`since the last shot: ${shotChanges(decodePng(readFileSync(base + ".last.png")), now, frames, a.at)}`);
-        writePng(base + ".last.png", now);
-        writeFileSync(base + ".last.json", key);
+        if (existsSync(last + ".last.json") && readFileSync(last + ".last.json", "utf8") === key)
+          console.log(`since the last shot: ${shotChanges(decodePng(readFileSync(last + ".last.png")), now, frames, a.at)}`);
+        writePng(last + ".last.png", now);
+        writeFileSync(last + ".last.json", key);
         // what pxl check finds on it at these frames, so a look needs no other call
         const r = checkProject(p, { names: [name], frames });
         for (const l of r.lines) console.log(l);
@@ -548,7 +550,7 @@ export async function main(argv: string[]): Promise<number> {
         });
         writeFileSync(join(dir, "key.json"), JSON.stringify(key, null, 1) + "\n");
         console.log(`${key.length} images in ${dir} (1.png ... ${key.length}.png), the labels in key.json.`);
-        console.log(`Give a reader only the images (not the art file, not key.json) and ask, for each: which way does it face: right, left, front (toward us) or back? Save the answers as {"1": "right", ...} and run: pxl blind ${a.file} --check answers.json`);
+        console.log(`Give a reader only the images (not the art file, not key.json) and ask, for each: which way does it face: right, left, front (toward us) or back? Save the answers as {"1": "right", ...} and run: pxl blind ${a.file} --check answers.json${a.out ? ` --out ${a.out}` : ""}`);
         return 0;
       }
       case "serve": {

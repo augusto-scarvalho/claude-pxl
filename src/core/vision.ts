@@ -421,7 +421,8 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
 
 /**
  * What the tutorials (Pedro Medeiros, Saint11) fix in a 1 px line, any color: L-corners, the elbow of three pixels
- * in an L where the line steps (it thickens the line there; where two lines meet, both going on, it's meant); and
+ * in an L where the line steps or a diagonal doubles (it thickens the line there; where two lines meet, both going
+ * on, it's meant); and
  * jaggies, along one stretch of a line (one way of stepping), a run of pixels out of order:
  * runs grow or shrink steadily (1 1 2 3), or alternate n and n+1 on a straight slope, with one turn at most (an S).
  * Lines are the pixels in no 2x2 block of their color, in a piece 8 px long or more (a letter's strokes, an eye,
@@ -475,7 +476,9 @@ export function lineFlaws(img: Img): { line: number; corners: [number, number][]
     // lines meet, both arms going on, is meant); nothing across the corner from the arms; of a staircase of
     // them, every other one (taking one away fixes the next)
     const step = (same(x - sx, y + sy, c) && !same(x, y + 2 * sy, c)) || (same(x + sx, y - sy, c) && !same(x + 2 * sx, y, c));
-    if (!step || same(x - sx, y - sy, c)) continue;
+    // (or a diagonal with a pixel doubled: both arms go on diagonally, away from it)
+    const diag = same(x + 2 * sx, y - sy, c) && same(x - sx, y + 2 * sy, c);
+    if (!(step || diag) || same(x - sx, y - sy, c)) continue;
     if ((x > 0 && gone[y * W + x - 1]) || (y > 0 && gone[(y - 1) * W + x])) continue;
     gone[y * W + x] = 1; corners.push([x, y]);
   }

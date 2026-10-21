@@ -35,6 +35,7 @@ function entries(): Entry[] {
       continue;
     }
     if (!line.trim() || line.startsWith("|") || line.startsWith("#")) { flush(); continue; }
+    if (line.startsWith("- ")) flush();               // a bullet is an entry of its own
     para.push(line);
   }
   flush();
@@ -98,12 +99,9 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
   const esc = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const word = new RegExp(`\\b${esc}\\b`, "i"), inCode = new RegExp("`[^`]*\\b" + esc + "\\b[^`]*`", "i");
   // reference: the rows that document it, whole
-  const own = all.filter((e) => e.row && e.names.some((n) => n.toLowerCase() === low));
-  let last = "";
-  for (const e of own) {
-    if (e.section !== last) { out.push(`[reference.md: ${e.section}]`); last = e.section; }
-    out.push(e.text);
-  }
+  let own = all.filter((e) => e.row && e.names.some((n) => n.toLowerCase() === low)), last = "";
+  const print = (es: Entry[]) => { for (const e of es) { if (e.section !== last) { out.push(`[reference.md: ${e.section}]`); last = e.section; } out.push(e.text); } };
+  print(own);
   // guide sections whose file and heading have every word of the term: whole when the term is no
   // op or option (a topic: "small animals", "characters 9"), else named so they can be asked for
   const words = low.split(/[^a-z0-9§]+/).map((w) => w.replace(/^§/, "")).filter((w) => w.length > 1 || /\d/.test(w));
@@ -115,7 +113,8 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
   const secs = sections().filter((s) => {
     const i = words.indexOf(s.file.replace(".md", "")), rest = words.filter((_, j) => j !== i);
     if (!rest.length) return i >= 0;
-    return nums ? (i >= 0 || !words.some((w) => GUIDES.includes(`${w}.md`))) && rest.some((w) => inHead(w, s)) : rest.every((w) => inHead(w, s));
+    const numbered = (w: string) => /^\d+$/.test(w) ? /^(\d+)\./.exec(s.head)?.[1] === w : inHead(w, s);
+    return nums ? (i >= 0 || !words.some((w) => GUIDES.includes(`${w}.md`))) && rest.some(numbered) : rest.every((w) => inHead(w, s));
   });
   // a section of the reference itself whose heading starts with its words ("glow": Glow, "anim":
   // Animation) is where a name with no row of its own is defined: that one whole, the guides named
@@ -124,6 +123,9 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
   const refWhole = refs.length <= 2 ? refs : [];
   for (const s of refWhole) out.push(`[reference.md: ${s.head}]`, s.text);
   if (refs.length > refWhole.length) out.push(`[reference.md: ${refs.length} sections]`, ...refs.slice(0, 8).map((s) => `  pxl help "${s.head}" (${k(s.text.length)})`));
+  // a name with no row or section of its own, defined in a bullet as a call (`vnoise(x, y)` in
+  // "Procedural texture"): that bullet whole
+  if (!own.length && !refs.length) print((own = all.filter((e) => !e.row && e.text.startsWith("- ") && e.text.includes("`" + t + "("))));
   const whole = !own.length && !refWhole.length && (secs.length <= 2 || nums) ? secs : [];
   for (const s of whole) out.push(`[${s.file}]`, s.text);
   if (secs.length > whole.length) {

@@ -138,7 +138,7 @@ the rest are for sprites and anims (a scene refuses them by name), and `bg`/`wor
 | `world: { horizon, eye }` or `{ scale }` | Scene: the world's scale. Ground in perspective: the horizon's row and the eye's height in meters (a thing standing on row y is (y − horizon) / eye px per meter, as in `perspective()`); flat side view: `scale` px per meter. Used by describe with `height`. `light: [x, y]` (where the light comes from): describe reads each object's lit side off its rim and warns when it disagrees (a flipped copy is lit from the other side). `light: { at: [x, y] }`: a point light in the scene (a fire, a lamp): each object is checked against the way from its middle to that point, and the one it sits in isn't checked. `ground: y` (flat views): what has a `height` is checked for floating or sinking; with or without it, a thing whose feet aren't where it was stamped (its pivot below its sole) is called out. |
 | `sockets: { name: [x, y], ... }` | Named points in drawing coordinates (pixel corners) that other stamps attach to: `stamp("arm_3", 0, 0, { at: "body.shoulder" })` puts the arm's pivot on the body's `shoulder` socket, wherever and however the body was placed. They move with flip, rot, angle, outline and crop, like the pivot. For characters built from parts (characters.md §10). |
 
-Post-processing order: register → mirror → swap → flip → rot → angle → inline → outline → outline8 →
+Post-processing order: register → mirror → swap → flip → rot → angle → aa → inline → outline → outline8 →
 crop; a `pivot: "bottom"` or `"center"` and `slice` are measured on the result.
 
 ### Layer options
@@ -177,7 +177,7 @@ crop; a `pivot: "bottom"` or `"center"` and `slice` are measured on the result.
 | `flame(x, y, size, keys, { wind?, period?, seed?, frame? })` | fire rising from (x, y), about `size` px tall: `size / 2` tongues, each flickering to its own beat (`period` frames per cycle, default 6), bending with the wind toward the tip (`wind` px across per px up, default 0.55; negative leans left). `keys` from the root, hottest, to the tip; the last one only for the tongues' edges up top (extinction's `"XWVUT"`: white, yellow, amber, orange, and red for the edges). Follows the canvas's frame inside an anim (or `frame`): keep the frame count a multiple of `period` so it loops. Its tongues come from `seed` alone (default 1): two fires without their own `seed` flicker alike. Burning trees, logs, grass, torches |
 | `poly([x0, y0, x1, y1, ...], c)` | filled; vertices on pixel corners (`[0,0, 4,0, 4,4, 0,4]` = `rect(0,0,4,4)`) |
 | `fill(x, y, c)` | 4-connected flood fill |
-| `wire(x0, y0, x1, y1, sag, c, { hang?, every = 6, start?, ...placement })` | sagging cable; `hang` stamps an asset/group under it every `every` px (string lights) |
+| `wire(x0, y0, x1, y1, sag, c, { hang?, every = 6, start?, ...placement })` | sagging cable, drawn pixel-perfect (no doubled steps), symmetric when level; `hang` stamps an asset/group under it every `every` px (string lights) |
 | `text(x, y, "str", c, { scale = 1, gap = 1, lead = 1, align: "l"\|"c"\|"r", shadow?, font? })` | built-in 3×5 font: A-Z 0-9 and common punctuation, `\n` for lines; `font` uses a `font()` instead (`examples/fonts/font5x7.px.js` is a ready 5×7 one to `include`). The 3×5 is for numbers and short labels: O and 0, S and 5 are the same glyph, and 21 pairs differ by one pixel (C/E, H/K, K/X, I/1, G/6...). A reader sorts them out from the word, but not on a busy, lit sign: words that must read take the 5×7. `scale: 2` puts 2× pixels beside 1× art: keep it for a UI made as its own asset |
 
 ### Texture and tone
@@ -390,7 +390,7 @@ node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--sheet] [--out DIR]
 node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief] [--out DIR | --no-out]     (or describe <image.png>)
 node <pxl>/bin/pxl.js compare <file> <name> <ref.png> [--shrink N] [--offset x,y]
 node <pxl>/bin/pxl.js blind <file> <name...> [--out DIR]   |   blind <file> --check answers.json
-node <pxl>/bin/pxl.js study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--out DIR | --no-out]
+node <pxl>/bin/pxl.js study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--px N] [--out DIR | --no-out]
 ```
 
 `shot` is the look while iterating: the asset built at those frames (side by side, cropped to the
@@ -405,7 +405,9 @@ and more than 12 frames go on in rows of 12: a reference's whole animation on on
 Give PNGs at 1× (`out/scenes/x.png`, not an enlarged `_shot`): rows are enlarged together, so a big
 one leaves no room for the rest. `--vs <rev | file>` puts the same shot of another version above (one
 name, one region; at a git revision, the file and the art files it includes as they were there); `--diff` with it adds a row with the pixels that changed, in red. `check` makes every check `describe` can warn on, on every scene
-and rig of a file at every frame (exit 1 on a warning); `--readings` also lists what the lit-side
+and rig of a file at every frame, and reads the 1 px lines of every sprite and part drawn by hand
+(grid strings, `grid()`, `runs()`; not variants or `outline8`) for L-corners and jaggies (exit 1 on
+a warning); `--readings` also lists what the lit-side
 rule read on every placement, warning or not, with a tally. A `build` of a
 whole file with more than 12 assets prints how many of each kind it wrote; `--list` or `--only`
 print a line each (a smaller file prints them anyway).
@@ -434,8 +436,11 @@ opacity: a floor that shines, still water) is told, row and opacity, as `flip: "
 that `opacity`, and left out of the rest. It reads two kinds of picture two ways.
 Pixel art (few colors, hard steps between them, often drawn at 2x and up) is read as drawn: its grid
 found (an exact upscale, or a blurred, compressed or fractional one: a video of a game, a JPEG,
-2.5x) and the picture taken back to 1x, so its palette, ramps (and how their hue shifts from shade
-to light), outlines (near-black, a darker shade of what they border, or none), 2x2 dithering,
+2.5x; `--px N` gives the size when a blurred copy is read at a harmonic of it) and the picture taken
+back to 1x, so its palette (near twins: colors under 0.03 apart in OKLab, ramp steps too close to
+read), ramps (and how their hue shifts from shade to light, counted over the ramps: warmer in the
+light, cooler, or one hue), outlines (near-black, a darker shade of what they border, or none), a
+1 px dark line's L-corners and jaggies (with positions, ringed on the sheet), 2x2 dithering,
 in-between tones on edges (anti-aliasing), lone pixels, the light (where each ramp's lighter tones
 lie; on a sprite also its rim's lightness fit to one light, after Johnson and Farid), banding (runs of
 two colors side by side whose ends line up, as Pixel Logic and the Pixel Fixer paper define it),
@@ -479,7 +484,9 @@ stamped along its path, its limbs a rig when parts of it move); things going acr
 another (traffic, a crowd: sprites along a lane, or `scroll()` for a lane at one speed); and in
 place, read from the pixels that change there: a cycle of drawings (`anim`), parts moving against a
 body that stays (a rig, or a frame per pose), a run of poses played once with its body moving (an
-attack, a jump: an action, an anim with a frame per pose, a rig posed by `ik` for many; its smears
+attack, a jump: an action, an anim with a frame per pose, a rig posed by `ik` for many; for an action
+or a thing carried, its spacing: the steps frame to frame, speeding up, slowing, holds, a move back
+first, past its rest and back, a box squashing and stretching; its smears
 told, the frames a long thin shape in colors there a moment only shows in, and their colors, for
 `arc()`), changing all over without repeating with neighbors changing at odds (fire, water, smoke:
 `flame()`, `plume()`, `warp()`), or a thing wandering about its box (a bird circling: going round a

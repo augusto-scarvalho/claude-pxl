@@ -62,9 +62,9 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     }
     if (def.kind !== "scene") {
       // a part or a prop: its own front marker (its light and its feet are read where it's placed), and
-      // its 1 px lines where it's drawn by hand (not a variant, not a part, not drawn square on purpose)
+      // its 1 px lines where it's drawn by hand, parts too (not a variant, not drawn square on purpose)
       const img = p.image(name);
-      if (!name.startsWith("_") && !def.opts.base && !def.opts.outline8 && byHand(def.items)) {
+      if (!def.opts.base && !def.opts.outline8 && byHand(def.items)) {
         ran.lines++;
         const fl = (def.kind === "anim" ? p.frames(name).map((f) => f.img) : [img]).map((im) => lineFlaws(im));
         const ats = (k: "corners" | "jaggies") => [...new Set(fl.flatMap((f) => f[k].map(([x, y]) => `${x},${y}`)))];
@@ -136,7 +136,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.front + others) run.push(`front marker on ${ran.front + others}`); else not.push("front marker (nothing has one)");
   if (scenes) {
     if (lightSaid) run.push(`lit side on ${ran.light} (a clear reading on ${ran.read})`); else not.push("lit side (no scene declares world.light)");
-    if (ran.feet) run.push(`feet on ${ran.feet}${groundSaid ? ` (against the ground row on ${ran.ground})` : ""}`); else not.push("feet and size (nothing placed has a height)");
+    if (ran.feet) run.push(`feet on ${ran.feet}${groundSaid ? ` (against the ground row on ${ran.ground})` : ""}`); else not.push("feet (nothing placed has a height)");
   }
   if (ran.text) run.push(`lettering on ${ran.text}`);
   if (ran.lines) run.push(`lines on ${ran.lines}`);

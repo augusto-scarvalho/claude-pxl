@@ -219,8 +219,9 @@ test("check: a hand-drawn sprite's 1 px lines, L-corners and jaggies with where;
   const rows = ["kk..............", "..kk............", "....kkk.........", "......kkk.......", ".........kkk....", "............kkkk"].join("\n");
   const p = loadSource(PAL + `sprite("hand", \`\n${rows}\`)
 sprite("ruled", { w: 16, h: 6 }, line(0, 0, 15, 5, "k"))
-sprite("square", { outline8: "k" }, \`\n${rows}\`)`, "t.px.js");
+sprite("square", { outline8: "k" }, \`\n${rows}\`)
+sprite("_part", \`\n${rows}\`)`, "t.px.js");
   const r = checkProject(p);
-  assert.deepEqual(r.lines.map((l) => l.slice(0, l.indexOf(":", l.indexOf("WARNING") + 8))), ["hand › WARNING: 1 L-corner in its 1 px lines (at 6,2)"]);
-  assert.match(r.coverage, /lines on 1;/, "only the hand-drawn one is read");
+  assert.deepEqual(r.lines.map((l) => l.slice(0, l.indexOf(":", l.indexOf("WARNING") + 8))), ["hand › WARNING: 1 L-corner in its 1 px lines (at 6,2)", "_part › WARNING: 1 L-corner in its 1 px lines (at 6,2)"]);
+  assert.match(r.coverage, /lines on 2;/, "the hand-drawn ones, a part too");
 });
