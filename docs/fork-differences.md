@@ -27,7 +27,7 @@ page lists what the fork adds. Every commit is in
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus `scripts/calibrate.ts` |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 51 |
-| Tests | 59 | 208 |
+| Tests | 59 | 213 |
 
 ## Looking and checking
 
@@ -58,10 +58,10 @@ moved into the DSL where every scene can use it.
 | Palettes and color | Palette files (`.hex`, `.gpl`, `.pal`, `.txt`) that carry their own keys; `shades()` for a hue-shifted ramp from one color (`sat` for Saint11's saturated lights, a negative `hue` for metals); `rampmap` so imported tones never merge; radial gradients; layer blend modes and real opacity; included files keep their own palette. |
 | Shapes and strokes | `curve()` through points, `arc()` for slashes and smears, `capsule` for limbs, `flame`, 9-slice panels for UI, bitmap fonts with a ready 5×7 (lowercase too; `mono` for a score or a timer); `wire()` and `curve()` pixel-perfect. |
 | Outlines and light | `aa: true` anti-aliases inner edges as by hand (a strip half the step long, in the key between); `inline` and `selout` outlines, `relight` and `plate()` for lit parts, cast shadows (also from a point light: a fire, a lamp), `glow` that keeps what glows as drawn. |
-| Placing things | `pivot` (which point a stamp lands on), `sub` stamps half a pixel along (subpixel motion, edges in the in-between key), `wrap` for seamless tiles, `scatter` with `even` and `near` (along the edge of a color), sockets and sorted layers, `register` for frames aligned on a marked point. |
+| Placing things | `pivot` (which point a stamp lands on), `smear` (motion blur: the silhouette swept from where it was), `sub` stamps half a pixel along (subpixel motion, edges in the in-between key), `wrap` for seamless tiles, `scatter` with `even` and `near` (along the edge of a color), sockets and sorted layers, `register` for frames aligned on a marked point. |
 | Tiles and maps | Tilemap corner tiles, isometric tilemaps, export to Tiled (`.tmj`), sheet extrude against texture bleeding. |
 | Rotation | Free angles, `directions()` for 8 or 16 views, RotSprite checked on real sprites, and a rotation guide. |
-| Import and export | PNG import (`shrink`, `palettize` to the nearest key in OKLab), Aseprite export (layers, frames, tags, palette, slices), GIFs that keep small figures' colors in lit scenes. |
+| Import and export | `build --share N` (each asset N times bigger, clean, to post), PNG import (`shrink`, `palettize` to the nearest key in OKLab), Aseprite export (layers, frames, tags, palette, slices), GIFs that keep small figures' colors in lit scenes. |
 | Procedural | `hash`, `vnoise`, `fbm`, `bayer`, `seamless`; `scroll()` for parallax planes, `clouds()`, `plume()` for smoke and steam. |
 
 ## Characters, animation and rigs
@@ -113,7 +113,9 @@ of and what to use in pxl to make the same.
   - Outlines against the clear, dithering, anti-aliasing, clusters, banding, pillow shading.
   - A line's faults, after Pedro Medeiros and Saint11: L-corners (a doubled step) and jaggies (runs out
     of order), with positions, or the lines named as drawn square. Near-twin colors and ramp steps too
-    close to read. Lone pixels counted without a dither's or anti-aliasing's. On the sheet the line's
+    close to read, a tone that glares (eyeburn), dither pairs too far apart in a ramp, a halo outside the
+    outline, the value range. Lone pixels counted without a dither's or anti-aliasing's, split into
+    specks (noise) and points (glints). A flat backdrop is taken for clear. On the sheet the line's
     faults are ringed.
   - The light's direction off the rim (after Johnson and Farid), tiles, values, color temperature.
   - A photo or painting translated by superpixels into a small picture to draw over.
@@ -133,7 +135,8 @@ of and what to use in pxl to make the same.
     its pivot every frame, and a thing carried never stays over one point.
   - Each capture is cut out of its background, GrabCut-style. Files: a sheet, a strip, and a box per
     frame for every piece.
-- **Spacing:** for a thing carried or an action, its steps frame to frame: speeding up, slowing, even,
+- **Timing per drawing**, and "on twos" or "threes" when every drawing is held alike.
+- **Spacing:** for a thing carried, an action or a jump, its steps frame to frame: speeding up, slowing, even,
   holds, a move back first (anticipation), past its rest and back (overshoot), a box squashing and
   stretching with its area.
 - **Subpixel:** edges moving by part of a pixel through in-between tones are told from whole-pixel

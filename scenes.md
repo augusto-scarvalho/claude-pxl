@@ -78,6 +78,16 @@ a dark base, separate light areas, dense shadow, the lumps broken apart, a far l
 sky, specular points, a few blades. A ruin is checked as a black silhouette: its outline itself must
 look broken, not just carry cracks; repeat a prop at different levels of damage.
 
+| Material | How it takes light (Saint11, Pixel Joint) |
+|---|---|
+| Matte (stone, cloth, wood) | no shine spot; wood and rock never pillow-shaded |
+| Plastic, varnish, wet | one small sharp highlight (white allowed) |
+| Metal, chrome | extreme contrast, the horizon or the sky reflected in it; lights colder and less saturated, darks warmer (`shades` with a negative `hue`) |
+| Gems | a long ramp (about 7 tones), facets flat, a lighter bounce inside the shadow |
+| Velvet, fur | a lighter rim where it turns away |
+| Fabric | folds parallel where it's pulled tight, radiating from where it bunches |
+| Plants | about half the ramp light tones, warm light and cold shadow; detailed borders, a calm inside |
+
 Flat color is fine; a clean wall beats a dotted one. `noise` is for granular materials (gravel,
 sand, asphalt, rough stone), sparse. `dither` over a whole area reads as a checkerboard: use it where
 two tones meet, between neighbors in a ramp. On faces drawn at an angle (3/4), marks follow the

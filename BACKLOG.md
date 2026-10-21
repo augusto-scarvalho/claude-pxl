@@ -664,6 +664,8 @@ Saint11's, read from his page, and not kept in the repository):
   (0, 1, 2, 2, 1, 0 px) not reported.
 - [ ] **A runner in place read as a camera moving forward**: require the backdrop to move first.
 - [ ] **How long each piece's drawings are held**, per piece (the clip's own holds are said now).
+- [ ] **Banding across a 1 px gap**, and 45° runs whose ends step together (Pixel Joint): study's
+  banding counts only runs side by side.
 
 Left out, with why: a `check` rule for a far plane with more colors than a near one (no reliable way
 to tell which layer is nearer), a warning for a ramp whose light end is cooler (the guides now
