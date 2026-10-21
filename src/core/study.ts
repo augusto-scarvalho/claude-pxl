@@ -18,7 +18,7 @@ import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Va
 
 /** frames as read; `drawnAt`: they were already brought down from that grid as they were read (big animations) */
 export interface StudyInput { name: string; frames: Img[]; ms: number[]; kind: string; drawnAt?: Grid }
-export interface StudyOpts { colors?: number; to?: [number, number]; /** the size of a pixel, when the grid found is wrong */ px?: number }
+export interface StudyOpts { colors?: number; to?: [number, number]; /** the size of a pixel, when the grid found is wrong */ px?: number; /** the clip is a region asked for (--at): follow what moves in it */ region?: boolean }
 /** pieces: each object of an animation alone (a row of cutouts each) and its box in every frame */
 export interface StudyOut { text: string[]; sheet: Img; picture: Img; pixelArt: boolean; palette: Color[]; pieces?: { sheet: Img; json: unknown; strips: Img[] }; layers?: ReturnType<typeof decompose> }
 
@@ -140,6 +140,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   const persp = perspectiveLines(segs, vps, P.w, P.h, k, picture.w, foe);
   text.push(...persp.lines);
   if (motion) text.push("", "MOTION", ...motion.lines);
+  if (opts.region && input.frames.length > 1) text.push("", "THE REGION (what moves in it, frame by frame)", ...regionLines(input.frames.map((f, i) => (pixelArt ? clear(raws[i]) : f))));
   if (motion?.layers) text.push("", "PIECES (what moves how, and what to build it with)", ...pieceLines(motion.layers, motion.bands, motion.forward));
   else if (motion?.forward) text.push("", "PIECES", "  The whole view moves (a camera going forward): build it in meters through a camera (perspective, plane, things along the way), not as pieces on a still picture.");
 
@@ -335,6 +336,32 @@ function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, 
     pxl = `perspective({ w: ${PW}, horizon: ${Math.round(v.y * k)}, vp: ${Math.round(v.x * k)}, eye: <m>, fov: <deg> }): the eye's height and the lens aren't in the picture: choose them by how big things there are.`;
   } else if (!finite.length) out.push("  No lines meet: a flat, side-on or orthographic view.");
   return { lines: out, pxl, horizon };
+}
+
+/**
+ * What moves in a region asked for (--at), read as the tutorials' readers measured it by hand: each
+ * frame, the box of its pixels, then its spacing and squash. One thing moving in the region reads best.
+ */
+export function regionLines(frames: Img[]): string[] {
+  const W = frames[0].w, H = frames[0].h, n = frames.length;
+  // the mover: colors rare in the region over the clip (the ground's are common), on pixels that don't
+  // keep one color all through (a still detail does): where it rests counts, where it left doesn't
+  const count = new Map<Color, number>();
+  for (const f of frames) for (const c of f.data) if ((c & 255) >= 128) count.set(c, (count.get(c) ?? 0) + 1);
+  const rare = (c: Color) => (c & 255) >= 128 && (count.get(c) ?? 0) < 0.12 * W * H * n;
+  const still = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) still[i] = frames.every((f) => f.data[i] === frames[0].data[i]) ? 1 : 0;
+  const track: [number, number, number, number, number][] = [];
+  for (let t = 0; t < n; t++) {
+    let x0 = W, y0 = H, x1 = -1, y1 = -1, k = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!still[y * W + x] && rare(frames[t].data[y * W + x])) { k++; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    if (k >= 2) track.push([t, x0, y0, x1 - x0 + 1, y1 - y0 + 1]);
+  }
+  if (track.length < 2) return ["  Nothing in it differs from its usual look on more than one frame."];
+  const boxes = track.slice(0, 24).map(([t, x, y, w, h]) => `${t}: ${x},${y} ${w}x${h}`).join("; ");
+  const sp = spacingWords(track);
+  return [`  Its box (the colors rare in the region, where they come and go), frame: x,y wxh: ${boxes}${track.length > 24 ? "; ..." : ""}.`, ...(sp ? [`  ${sp}.`] : []),
+    `  In ${track.length} of ${n} frames${track.length < n ? ` (absent in ${n - track.length})` : ""}; a smear or an effect in the region adds to the box, and a mover in the ground's own colors is missed.`];
 }
 
 function motionOf(frames: Img[], ms: number[], smeared = false) {

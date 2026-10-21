@@ -113,7 +113,9 @@ const USAGE = `pxl — pixel-art DSL
       to look at), the picture at 1x (or the translation) and <name>.hex; animated, each piece cut out
       of its background (<name>_pieces.png, a strip each in <name>_piece<N>.png, the tracks in
       <name>_pieces.json); --no-out prints the text only. --at is in the drawing's own pixels, as
-      shot's and the positions study prints are (a 2x picture's 10,10 is its file's 20,20). PNG and
+      shot's and the positions study prints are (a 2x picture's 10,10 is its file's 20,20); on a
+      clip it also follows what moves in that region, its box every frame, its spacing (one mover
+      in the region reads best). PNG and
       GIF are read by pxl; JPEG, WebP and video through ffmpeg if on PATH.
 
 Art files may be .js or .ts. Default out dir: <art file dir>/out.`;
@@ -292,7 +294,7 @@ export async function main(argv: string[]): Promise<number> {
       case "study": {
         const m = readMedia(file, { at: a.at, from: a.from, seconds: a.seconds, fps: a.fps, px: a.px });
         const name = basename(file).replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "_");
-        const r = study({ name, frames: m.frames, ms: m.ms, kind: m.kind, drawnAt: m.drawnAt }, { colors: a.colors, to: a.to, px: a.px });
+        const r = study({ name, frames: m.frames, ms: m.ms, kind: m.kind, drawnAt: m.drawnAt }, { colors: a.colors, to: a.to, px: a.px, region: !!a.at });
         // --no-out: the text only, no files written
         if (a.out === false) { for (const l of r.text) console.log(l); return 0; }
         const dir = join(a.out ?? join(dirname(file), "out"), "_study");

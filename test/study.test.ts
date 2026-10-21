@@ -11,7 +11,7 @@ import { writePng } from "../src/node/output.ts";
 import { main } from "../src/node/cli.ts";
 import { areaDown, findGrid, lineFlaws, pixelate } from "../src/core/vision.ts";
 import { latticeHash } from "../src/core/util.ts";
-import { hueShifting, spacingWords, study } from "../src/core/study.ts";
+import { hueShifting, regionLines, spacingWords, study } from "../src/core/study.ts";
 import { loadSource } from "../src/node/load.ts";
 
 // a 1x drawing in a handful of colors: runs of 1-3 px, a different length on each row, so no grid
@@ -202,6 +202,15 @@ test("study: a clip on twos, its drawings each held 200 ms, loops like any other
   const t = study({ name: "twos", frames, ms: frames.map(() => 100), kind: "test" }).text.join("\n");
   assert.match(t, /4 drawings held 200 ms each \(on twos\)/);
   assert.match(t, /Loop: the last frame runs into the first/);
+});
+
+test("study --at: the region's mover followed frame by frame by what differs from its usual look, eased in", () => {
+  // a 4x4 box over a textured ground, slow in then fast: 1 1 1 5 6 px a frame
+  const back = drawing(60, 12, 3), ink = pack(250, 250, 250), xs = [2, 3, 4, 5, 10, 16];
+  const frames = xs.map((x) => { const img = back.copy(); for (let y = 4; y < 8; y++) for (let i = 0; i < 4; i++) img.set(x + i, y, ink); return img; });
+  const lines = regionLines(frames).join("\n");
+  assert.match(lines, /0: 2,4 4x4; 1: 3,4 4x4/);
+  assert.match(lines, /spacing, px a frame: right 1 1 1 5 6, speeding up/);
 });
 
 test("pixelate keeps an edge where a box average blurs it", () => {
