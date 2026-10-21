@@ -58,13 +58,13 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
   const differ = (a: Color, b: Color) => a !== b && ((a & 255) < 128 !== (b & 255) < 128 || dE(a, b) > tol);
   // the background: each pixel's commonest color over frames spread across the clip
   const S = Array.from({ length: Math.min(N, 48) }, (_, i) => Math.floor((i * N) / Math.min(N, 48)));
-  const bg = new Uint32Array(WH), vals = new Uint32Array(S.length);
+  const bg = new Uint32Array(WH), votes = new Uint8Array(WH), vals = new Uint32Array(S.length);
   for (let p = 0; p < WH; p++) {
     S.forEach((t, i) => (vals[i] = F0[t].data[p]));
     vals.sort();
     let best = vals[0], run = 0, cur = 1;
     for (let i = 1; i <= vals.length; i++) { if (i < vals.length && vals[i] === vals[i - 1]) cur++; else { if (cur > run) { run = cur; best = vals[i - 1]; } cur = 1; } }
-    bg[p] = best;
+    bg[p] = best; votes[p] = run;
   }
   // a plane's step each frame: the whole number of pixels that carries its rows best (a speed of 1.67
   // px/frame goes by in steps of 1 and 2)
@@ -89,7 +89,33 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     }
     return m;
   });
-  const pieces: Piece[] = [], fg0 = fgOf(F0);
+  const pieces: Piece[] = [];
+  // a thing at rest most of the clip is the background there, and once it has gone the place it left
+  // reads as a thing (a lamp going off): a piece whose background is what another piece of that frame
+  // shows is that place, and the ground it shows the background. (On a flat ground the other piece's
+  // background is this one's ground too: the place left is the one whose background won by fewer frames;
+  // and it was left whole, the other a size of it away: not the edges a thing shifted by a pixel leaves.)
+  let fg0 = fgOf(F0), left = 0;
+  const mean = (c: Blob) => c.pix.reduce((s, p) => s + votes[p], 0) / c.n;
+  fg0.forEach((m, t) => {
+    const cs = label(m, W, H, 2).filter((c) => c.n >= 8 && c.x1 - c.x0 >= 2 && c.y1 - c.y0 >= 2 && !rowV[c.y0]), f = F0[t].data;
+    for (const c of cs) for (const d of cs) {
+      if (d === c || d.n > 1.5 * c.n || c.n > 1.5 * d.n || mean(c) >= mean(d) || Math.hypot(d.cx - c.cx, d.cy - c.cy) < Math.max(c.x1 - c.x0, c.y1 - c.y0) + 1) continue;
+      const ox = d.x0 - c.x0, oy = d.y0 - c.y0;
+      let hit = 0;
+      for (const p of c.pix) { const x = p % W + ox, y = Math.floor(p / W) + oy; if (x >= 0 && y >= 0 && x < W && y < H && !differ(bg[p], f[y * W + x])) hit++; }
+      if (hit < 0.9 * c.n) continue;
+      // (the other on ground that is nearly always there, and the ground shown here the same whenever
+      // the place isn't the background: not two of a crowd always going by)
+      let same = 0, gone = 0;
+      for (const p of c.pix) { gone += S.length - votes[p]; for (const s of S) if (F0[s].data[p] === f[p]) same++; }
+      if (mean(d) < 0.7 * S.length || same < 0.9 * gone) continue;
+      for (const p of c.pix) bg[p] = f[p];
+      left++;
+      break;
+    }
+  });
+  if (left) fg0 = fgOf(F0);
   // ---------------------------------------------------------------- things that go somewhere
   // first, in the frames as they are (a light doesn't travel: a cloud drifting changes as softly as one,
   // and would be taken for it): each frame's pieces of difference, followed (after SORT, Bewley et al.

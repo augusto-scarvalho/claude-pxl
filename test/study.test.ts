@@ -262,6 +262,18 @@ test("study follows a dash through its leap: 4 px a frame, two strides of 30, th
   assert.match(t, /spacing, px a frame: right 4 4 4 30 30 4 4 4 4 4 4/);
 });
 
+test("study follows a thing at rest most of the clip, then leaping: the place it left isn't a light", () => {
+  // at rest 7 frames of 12 (the background has it there), on a flat ground and on a dotted one
+  for (const dots of [false, true]) {
+    const xs = [10, 10, 10, 10, 10, 10, 10, 40, 70, 100, 119, 119], bg = pack(40, 50, 60), dk = pack(120, 60, 40), ink = pack(240, 200, 120);
+    const frames = xs.map((x) => { const img = new Img(160, 40); for (let y = 0; y < 40; y++) for (let i = 0; i < 160; i++) img.set(i, y, dots && (i * 7 + y * 3) % 11 === 0 ? dk : bg); for (let y = 14; y < 26; y++) for (let i = 0; i < 10; i++) img.set(x + i, y, ink); return img; });
+    const t = study({ name: "rest", frames, ms: frames.map(() => 80), kind: "test" }).text.join("\n");
+    assert.match(t, /#1 119x12 at 10,14, in 12 of 12 frames, 1 drawing, going right .*carried along a path/);
+    assert.match(t, /spacing, px a frame: holds 6; right 30 30 30 19/);
+    assert.doesNotMatch(t, /#2 /);
+  }
+});
+
 test("study: an explosion played once over a ground is an effect, not an attack", () => {
   const ground = (x: number, y: number) => ((x * 7 + y * 13) % 17 < 3 ? pack(70, 90, 60) : (x + y) % 9 === 0 ? pack(50, 70, 40) : pack(110, 140, 90));
   // nothing, a dark disc, a white one, an orange blast growing, smoke thinning to nothing, then empty

@@ -660,8 +660,14 @@ Saint11's, read from his page, and not kept in the repository):
   takes the one piece left over near it (4 times its size), of about its size, going on the way it
   went and not at the picture's edge, when each is the other's only choice; and a thing going one way
   all along is carried with its speed changing. A dash read 4 4 4 30 30 4 4; the cyberpunk street's
-  traffic found 31 -> 34, masks P 39 -> 42%, R 43 -> 47%; the tournament's frames found 44 -> 43%. A
-  flat thing resting where the background is it, then leaping, still reads as a light.
+  traffic found 31 -> 34, masks P 39 -> 42%, R 43 -> 47%; the tournament's frames found 44 -> 43%.
+  And a thing at rest most of the clip, then leaping (the background has it where it rested): a piece
+  whose background is what another piece of that frame shows, a size of it away over ground nearly
+  always there, with the same ground showing whenever the place isn't the background, is the place it
+  left, and that ground the background. A box resting 7 frames of 12 read "holds 6; right 30 30 30 19"
+  where it read as two lights; the calibration as it was. Tried first: a light keeping its hue (cost
+  the cave's glowing fungi, whose light turns the rock's hue, and the leap's ground has too little
+  color for it anyway).
 - [ ] **A smear inflates the box**: spacing and squash read off the bounding box, which a smear
   stretches. Track the pixels present every frame apart from those that come and go. Tried: the
   middle of its pixels instead of its box's: a smear joined to the body pulls it as much; and the box
