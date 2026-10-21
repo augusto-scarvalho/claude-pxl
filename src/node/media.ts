@@ -31,12 +31,23 @@ export function readMedia(path: string, o: MediaOpts = {}): Media {
     if (!read.length) throw new PxError(`${path}: no frames in it`);
     // each frame: the region asked for, then down to its own pixels (or to 640 px) when it moves
     let drawnAt: Grid | undefined, shrink: ((f: Img) => Img) | null = null;
+    let at = o.at ?? [];
     const frames: Img[] = [];
     for (const [i, get] of read.entries()) {
       let f = get();
       if (o.at) {
-        const [x, y, w, h] = o.at;
-        if (!(w > 0 && h > 0 && x + w <= f.w && y + h <= f.h)) throw new PxError(`--at ${o.at.join(",")} isn't inside the ${f.w}x${f.h} picture`);
+        // in the drawing's own pixels, as shot and study's positions are: a 2x picture's 10,10 is the
+        // file's 20,20 (its grid read on the whole first frame)
+        if (i === 0) {
+          const g = findGrid(f, o.px);
+          if (g.sx > 1 || g.sy > 1) {
+            const [x, y, w, h] = o.at;
+            at = [Math.round(g.ox + x * g.sx), Math.round(g.oy + y * g.sy), Math.round(w * g.sx), Math.round(h * g.sy)];
+            kind += `, the region ${o.at.join(",")} at 1x (${at.join(",")} of the file)`;
+          }
+        }
+        const [x, y, w, h] = at;
+        if (!(w > 0 && h > 0 && x + w <= f.w && y + h <= f.h)) throw new PxError(`--at ${o.at.join(",")} isn't inside the ${f.w}x${f.h} picture${at !== o.at ? ` (${at.join(",")} of the file)` : ""}`);
         f = f.sub(x, y, w, h);
       }
       if (i === 0 && read.length > 1) {

@@ -13,7 +13,6 @@ import { rampSteps } from "../core/checks.ts";
 import { ascii, compareSilhouettes, preview } from "../core/render.ts";
 import { mapPixel, replay, stepSheet } from "../core/steps.ts";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { loadProject } from "./load.ts";
 import { decodePng } from "./png.ts";
 import { reduceColors } from "./gif.ts";
@@ -113,7 +112,9 @@ const USAGE = `pxl — pixel-art DSL
       apart first: where each shines from, how strongly, its color). Writes _study/<name>.png (a sheet
       to look at), the picture at 1x (or the translation) and <name>.hex; animated, each piece cut out
       of its background (<name>_pieces.png, a strip each in <name>_piece<N>.png, the tracks in
-      <name>_pieces.json). PNG and GIF are read by pxl; JPEG, WebP and video through ffmpeg if on PATH.
+      <name>_pieces.json); --no-out prints the text only. --at is in the drawing's own pixels, as
+      shot's and the positions study prints are (a 2x picture's 10,10 is its file's 20,20). PNG and
+      GIF are read by pxl; JPEG, WebP and video through ffmpeg if on PATH.
 
 Art files may be .js or .ts. Default out dir: <art file dir>/out.`;
 
@@ -292,7 +293,9 @@ export async function main(argv: string[]): Promise<number> {
         const m = readMedia(file, { at: a.at, from: a.from, seconds: a.seconds, fps: a.fps, px: a.px });
         const name = basename(file).replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "_");
         const r = study({ name, frames: m.frames, ms: m.ms, kind: m.kind, drawnAt: m.drawnAt }, { colors: a.colors, to: a.to, px: a.px });
-        const dir = join(a.out === false ? tmpdir() : (a.out ?? join(dirname(file), "out")), "_study");
+        // --no-out: the text only, no files written
+        if (a.out === false) { for (const l of r.text) console.log(l); return 0; }
+        const dir = join(a.out ?? join(dirname(file), "out"), "_study");
         mkdirSync(dir, { recursive: true });
         const pic = join(dir, `${name}${r.pixelArt ? "_1x" : "_px"}.png`), sheetPath = join(dir, `${name}.png`), hexPath = join(dir, `${name}.hex`);
         writePng(sheetPath, r.sheet); writePng(pic, r.picture);

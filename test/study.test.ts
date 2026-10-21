@@ -194,6 +194,16 @@ test("study --px: the size given is used, its offset found", () => {
   assert.match(study({ name: "t", frames: [img], ms: [100], kind: "test" }, { px: 3 }).text.join("\n"), /drawn at 3x/);
 });
 
+test("study: a clip on twos, its drawings each held 200 ms, loops like any other", () => {
+  // a box stepping right and back over 3 drawings, each shown 2 frames of 100 ms
+  const back = drawing(48, 32, 7), ink = pack(240, 240, 240);
+  const pose = (x: number) => { const img = back.copy(); for (let y = 10; y < 18; y++) for (let i = 0; i < 8; i++) img.set(x + i, y, ink); return img; };
+  const frames = [10, 10, 14, 14, 18, 18, 14, 14].map(pose);
+  const t = study({ name: "twos", frames, ms: frames.map(() => 100), kind: "test" }).text.join("\n");
+  assert.match(t, /4 drawings held 200 ms each \(on twos\)/);
+  assert.match(t, /Loop: the last frame runs into the first/);
+});
+
 test("pixelate keeps an edge where a box average blurs it", () => {
   // black and white, the edge off the 4 px grid: superpixels follow it, boxes average across it
   const img = new Img(200, 100);

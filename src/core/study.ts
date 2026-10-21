@@ -342,9 +342,16 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
   const W = frames[0].w, H = frames[0].h, L = frames.map(lumaOf), n = frames.length;
   const fps = 1000 / (ms.reduce((s, v) => s + v, 0) / ms.length);
   const consec = L.slice(1).map((l, i) => frameDiff(L[i], l)), held = consec.filter((d) => d === 0).length;
-  const med = consec.slice().sort((a, b) => a - b)[consec.length >> 1] || 0;
+  // a usual step: of the frames that change (a clip on twos repeats every other frame: no step at all)
+  const changing = consec.filter((d) => d > 0).sort((a, b) => a - b), med = changing[changing.length >> 1] || 0;
   const delays = [...new Set(ms)];
-  lines.push(`  Timing: ${n} frames, ${delays.length === 1 ? `${delays[0]} ms each (${fps.toFixed(fps < 10 ? 1 : 0)} fps)` : `${Math.min(...delays)}-${Math.max(...delays)} ms (held poses differ)`}; ${held} repeat the frame before (holds).`);
+  // each drawing and how long it shows: the frames it repeats over, their times added
+  const held_ms: number[] = [];
+  for (let i = 0; i < n; i++) if (i && consec[i - 1] === 0) held_ms[held_ms.length - 1] += ms[i]; else held_ms.push(ms[i]);
+  const on = held_ms.length > 1 && delays.length === 1 && held_ms.every((t) => t === held_ms[0]) ? held_ms[0] / delays[0] : 1;
+  const drawn = held_ms.length === n ? "" : on > 1 ? `; ${held_ms.length} drawings held ${held_ms[0]} ms each (on ${["", "", "twos", "threes", "fours"][on] ?? `${on}s`})`
+    : `; ${held_ms.length} drawings held ${held_ms.slice(0, 16).join(", ")}${held_ms.length > 16 ? ", ..." : ""} ms`;
+  lines.push(`  Timing: ${n} frames, ${delays.length === 1 ? `${delays[0]} ms each (${fps.toFixed(fps < 10 ? 1 : 0)} fps)` : `${Math.min(...delays)}-${Math.max(...delays)} ms (held poses differ)`}; ${held} repeat the frame before (holds)${drawn}.`);
   const seam = frameDiff(L[n - 1], L[0]), loops = seam <= Math.max(2 * med, 0.002);
   lines.push(`  Loop: ${loops ? "the last frame runs into the first (a loop that closes)" : `the last frame jumps to the first (${(seam / (med || 1e-9)).toFixed(1)}x a usual step): not a closed loop, or a clip from a longer one`}.`);
   // a cycle: the shortest shift after which frames repeat
