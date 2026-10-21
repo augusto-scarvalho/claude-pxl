@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**276 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**280 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–21, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -27,7 +27,7 @@ page lists what the fork adds. Every commit is in
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus `scripts/calibrate.ts` |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 52 |
-| Tests | 59 | 224 |
+| Tests | 59 | 226 |
 
 ## Looking and checking
 
@@ -183,7 +183,8 @@ a tracker that carries hidden things on, and no light looked for where something
 on one mushroom at the line; the sunset's clouds now come apart one by one. The last round, on what
 breaks a track (leaps, a dash's crouch, smears, a long rest), found the cyberpunk street's cars 31 to
 33 with its masks 39/43% to 42/47% (precision/recall), each frame's share a point lower; Saint11's
-squash card's dash now reads in one piece.
+squash card's dash and the parallax card's hopping ball now read in one piece, and smeared leaps
+over a still floor no longer read as a plane going by or a loop that closes.
 
 ## Examples
 
@@ -210,7 +211,7 @@ references until it read right.
 - Timed builds are cached within a budget of bytes, so a long loop no longer fills memory.
 - `build --profile` names where the time went; `build --every N` keeps long previews small; the onion
   sheet no longer costs frames squared.
-- Tests went from 59 to 224. One keeps the editor types in step with what the runtime accepts, and
+- Tests went from 59 to 226. One keeps the editor types in step with what the runtime accepts, and
   another keeps the guides in step with the CLI: every command, flag and section they cite exists.
 
 ## How it was built

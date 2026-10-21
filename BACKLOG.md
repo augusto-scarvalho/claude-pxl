@@ -713,6 +713,16 @@ Saint11's, read from his page, and not kept in the repository):
   What it needs: the body followed by its float, each of its own pixels compared over the frames as
   different things pass behind it (the change in it against the change behind gives the share), and
   added light told from a glow by its silhouette moving, not its brightness.
+  Measured since, and not enough alone: (1) edges behind kept through the body while it moves: 1% of
+  the changing side-by-side pairs in both ghosts, as in opaque movers (0-4%): a ghost floating a pixel
+  or two changes only at its edges, its middle stays, behind and its own drawing alike; (2) each
+  pixel's darkest color against the others it shows: pxl's ghost at opacity converges on one color
+  (median 0.7 off the lines) where an opaque slime's lines meet at the floor behind it (the mixed
+  color has to lie past what covers); Saint11's added ghost goes one way, 73% within 20 degrees of one
+  blue, and so does the cave's light (74%): by color an added body is a light. Telling them apart
+  takes the motion: two layers, one still and one following the body's float, added (Szeliski,
+  Avidan and Anandan, "Layer extraction from multiple images containing reflections and
+  transparency", CVPR 2000), the share where the body's edge crosses what is behind.
 - [x] **A runner in place read as a camera moving forward**: require the backdrop to move first.
   Done another way: the opening out has to hold frame after frame (a runner spreads its limbs and
   draws them in by turns); the race still reads as a camera going forward.
