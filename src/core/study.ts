@@ -106,7 +106,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     if (tech.edge && tech.edge.halo >= Math.max(3, 0.05 * (tech.edge.black + tech.edge.selective + tech.edge.none))) text.push(`  Halo: ${tech.edge.halo} edge pixels outside the dark outline, lighter than it: anti-aliased toward a background the sprite doesn't have, they fringe on any other ground; keep the outline outermost.`);
     if (tech.rim && tech.rim.r2 >= 0.15) text.push(`  Light on the silhouette (its rim's lightness fit to one light, after Johnson and Farid): from ${way(tech.rim.dir)}, r² ${tech.rim.r2.toFixed(2)} over ${tech.rim.n} rim pixels.`);
     const b = tech.banding;
-    text.push(`  Banding (runs of two colors side by side with their ends lined up, marked red on the sheet): ${b.pairs} pair${b.pairs === 1 ? "" : "s"}, ${b.per1000.toFixed(1)} per 1000 px${b.per1000 < 1 ? ": hardly any" : b.per1000 > 6 && b.pairs >= 12 ? ": much (it shows the grid; stagger the ends)" : ""}.`);
+    text.push(`  Banding (runs of two colors side by side with their ends lined up, or a row apart, or both ends stepping together at 45°; marked red on the sheet): ${b.pairs} pair${b.pairs === 1 ? "" : "s"}, ${b.per1000.toFixed(1)} per 1000 px${b.per1000 < 1 ? ": hardly any" : b.per1000 > 6 && b.pairs >= 12 ? ": much (it shows the grid; stagger the ends)" : ""}.`);
     // (in a palette someone chose: a lit scene's blended tones make shapes, not lines)
     lf = nColors <= 64 ? lineFlaws(picture) : null;
     if (lf && lf.line >= 20) {
@@ -392,9 +392,9 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
   else lines.push("  Cycle: no shorter cycle repeats within the clip.");
   // the flow between a few pairs of frames spread over the clip
   const pairs = Array.from({ length: Math.min(10, n - 1) }, (_, i) => Math.floor((i * (n - 1)) / Math.min(10, n - 1)));
-  const flows: Flow[] = [];
+  const flows: Flow[] = [], each: Flow[][] = [];
   const r = Math.min(12, Math.floor(Math.min(W, H) / 6));
-  for (const i of pairs) if (consec[i] > 0) flows.push(...blockFlow(L[i], L[i + 1], W, H, 8, r));
+  for (const i of pairs) if (consec[i] > 0) { const f = blockFlow(L[i], L[i + 1], W, H, 8, r); each.push(f); flows.push(...f); }
   const moving = flows.filter((f) => f.dx || f.dy), still = flows.length - moving.length;
   const foe = focusOfExpansion(flows);
   lines.push(`  Flow: ${flows.length} textured blocks matched over ${pairs.length} pairs of frames: ${pct(still, flows.length)} stand still, ${pct(moving.length, flows.length)} move.`);
@@ -408,6 +408,10 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
     const ins = moving.filter((f) => { const rx = f.x - F.x, ry = f.y - F.y, c = (rx * f.dx + ry * f.dy) / (Math.hypot(rx, ry) * Math.hypot(f.dx, f.dy) || 1); return F.out ? c > 0.9 : c < -0.9; });
     const left = ins.filter((f) => f.x < F.x).length, xs = ins.map((f) => f.x);
     forward = Math.min(left, ins.length - left) >= 0.2 * ins.length && Math.max(...xs) - Math.min(...xs) >= 0.5 * W;
+    // and the same way frame after frame: a runner in place spreads its limbs out and draws them in by
+    // turns, a camera going forward opens out every frame
+    const said = each.map((f) => focusOfExpansion(f)).filter((e) => e !== null);
+    if (said.length >= 2) forward &&= said.filter((e) => e!.out === F.out && Math.hypot(e!.x - F.x, e!.y - F.y) <= 0.25 * W).length >= 0.6 * said.length;
   }
   if (forward && foe) {
     lines.push(`  Camera: the scene ${foe.out ? "opens out from" : "closes in to"} ${Math.round(foe.x)},${Math.round(foe.y)} (${pct(foe.agree * 100, 100)} of the moving blocks agree): ${foe.out ? "moving forward toward that point, the vanishing point of the motion" : "moving backward from it"}; things near it move least, things at the edges most.`);
@@ -613,7 +617,9 @@ function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: nu
   const where = (b: number[]) => `${b[2]}x${b[3]} at ${b[0]},${b[1]}`;
   const dir = (v: [number, number]) => `${Math.abs(v[0]) >= Math.abs(v[1]) ? (v[0] < 0 ? "left" : "right") : v[1] < 0 ? "up" : "down"} at ${Math.hypot(v[0], v[1]).toFixed(2)} px/frame`;
   for (const [i, p] of shown(d.pieces).entries()) {
-    const draw = `${p.poses} drawing${p.poses === 1 ? "" : "s"}${p.cycle ? `, a cycle of ${p.cycle} frames` : ""}`;
+    // a cycle twice (three times) as long as its drawings are many: each held 2 (3) frames
+    const on = p.cycle && p.poses > 1 && p.cycle % p.poses === 0 ? p.cycle / p.poses : 1;
+    const draw = `${p.poses} drawing${p.poses === 1 ? "" : "s"}${p.cycle ? `, a cycle of ${p.cycle} frames` : ""}${on > 1 ? ` (each drawing held about ${on} frames: on ${["", "", "twos", "threes", "fours"][on] ?? `${on}s`})` : ""}`;
     const extra = p.round ? `, going round a loop (circling, swinging)` : p.kind === "carried" || p.kind === "walk" ? `, going ${dir(p.speed!)}${p.grow && Math.abs(p.grow - 1) > 0.2 ? `, ${p.grow > 1 ? "growing" : "shrinking"} x${p.grow.toFixed(1)} (${p.grow > 1 ? "coming nearer" : "going away"}: sizes picked by fit)` : ""}${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving (limbs: a rig, or a drawing per pose)` : ""}` : p.kind === "rig" ? `, ${p.parts} parts moving` : p.kind === "action" ? `${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving` : ""}` : p.source ? `, shining from about ${p.source[0]},${p.source[1]}, x${p.strength!.toFixed(1)} from its dimmest to its brightest, its light ${hex(p.tint!)}` : "";
     const sm = p.smears ? ` Smears on frames ${spans(p.smears.frames)} (${p.smears.colors.map(hex).join(", ")}: there a moment only): the shape the swing sweeps, on the frames it goes fastest, arc(cx, cy, r, from, to, c, { inner, taper }) in a layer with unlit: true, outline: false (characters.md: its last 100 degrees at most, thin at its tail).` : "";
     const sub = p.sub ? `, moving by part of a pixel (subpixel: its parts stamped with { sub: true } at half-pixel places)` : "";

@@ -662,10 +662,13 @@ Saint11's, read from his page, and not kept in the repository):
 - [ ] **A walk's flipped half** (top-down: frames 3-5 are 0-2 mirrored) and the body's bob per frame.
 - [ ] **A see-through body** (a ghost): what changes behind it read as lights; its whole-body float
   (0, 1, 2, 2, 1, 0 px) not reported.
-- [ ] **A runner in place read as a camera moving forward**: require the backdrop to move first.
-- [ ] **How long each piece's drawings are held**, per piece (the clip's own holds are said now).
-- [ ] **Banding across a 1 px gap**, and 45° runs whose ends step together (Pixel Joint): study's
-  banding counts only runs side by side.
+- [x] **A runner in place read as a camera moving forward**: require the backdrop to move first.
+  Done another way: the opening out has to hold frame after frame (a runner spreads its limbs and
+  draws them in by turns); the race still reads as a camera going forward.
+- [x] **How long each piece's drawings are held**, per piece (the clip's own holds are said now).
+  Done when its cycle is a whole number of times its drawings: "each held about 2 frames: on twos".
+- [x] **Banding across a 1 px gap**, and 45° runs whose ends step together (Pixel Joint): study's
+  banding counts only runs side by side. Done: the gallery's facades read about 1.7 times the pairs.
 
 Left out, with why: a `check` rule for a far plane with more colors than a near one (no reliable way
 to tell which layer is nearer), a warning for a ramp whose light end is cooler (the guides now

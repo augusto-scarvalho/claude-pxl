@@ -387,8 +387,11 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
       const next = R.get(a + 1);
       if (!next) continue;
       const ends = new Map(next.map((r) => [`${r[0]},${r[1]}`, r[2]]));
+      // (Pixel Joint's too: the same ends across a row of something else between, and two runs
+      // stepping together, both ends a pixel along, a 45° pair of bands)
+      const far = new Map((R.get(a + 2) ?? []).map((r) => [`${r[0]},${r[1]}`, r[2]]));
       for (const [s0, s1, c] of list) {
-        const d = ends.get(`${s0},${s1}`);
+        const d = ends.get(`${s0},${s1}`) ?? (ends.has(`${s0},${s1}`) ? undefined : far.get(`${s0},${s1}`) ?? ends.get(`${s0 + 1},${s1 + 1}`) ?? ends.get(`${s0 - 1},${s1 - 1}`));
         if (d === undefined || d === c) continue;
         bandPairs++;
         for (let b = s0; b <= s1; b++) for (const aa of [a, a + 1]) mask[horiz ? aa * W + b : b * W + aa] |= 8;
