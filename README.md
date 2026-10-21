@@ -108,16 +108,16 @@ pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
 pxl ascii <art.px.js> <name>     print an asset as palette keys with x/y rulers (--frame N: one frame)
 pxl list  <art.px.js>            a map of the file: each asset and function's lines, its comment, what it makes
 pxl describe <art.px.js> <name>  a whole scene as text: what is where, what covers it, how it moves
-pxl check <art.px.js> [name...]  every check describe makes, on every frame: warnings only (--frame N, --readings)
+pxl check <art.px.js> [name...]  every check describe makes, on every frame, and hand-drawn lines: warnings only
 pxl shot <art.px.js> <name>      frames side by side, a region enlarged, --vs HEAD --diff; with several
                                  names, other files', PNGs or clips, a row each (--at again: a column each)
 pxl shot <ref.gif | video>       a reference's frames on one sheet, at 1x (--frames 0-11 for some)
 pxl steps <art.px.js> <name>     how it was painted, step by step; --at x,y: what painted that pixel
 pxl compare <art.px.js> <name> <ref.png>  silhouette rows against a reference (--shrink N, --offset x,y)
 pxl blind <art.px.js> <name...>  facing labels checked by a reader who doesn't know them (--check answers.json)
-pxl study <picture|gif|video>    learn from finished art or a reference: palette, ramps, outlines, dithering,
-                                 light, perspective, parallax, its moving pieces cut out, and what to use
-                                 in pxl for each
+pxl study <picture|gif|video>    learn from finished art or a reference: palette, ramps, outlines, the faults
+                                 of its lines, light, perspective, parallax, its moving pieces cut out with
+                                 their spacing, and what to use in pxl for each (--px N: its pixel size)
 pxl help [name]                  what the reference says about an op or option, or a guide's section
 ```
 
@@ -129,11 +129,13 @@ pxl help [name]                  what the reference says about an op or option, 
 ## What's in the DSL
 
 - **Palettes and ramps**: one-character color keys, built-in palettes (pico8, sweetie16, endesga32…),
-  dark→light ramps that drive `shade()` / `light()`.
-- **Sprites**: text grids, mirroring, auto-outline, palette-swap variants, flips/rotations, reusable
-  `_parts`, `stamp`.
-- **Primitives and brushes**: rects, lines, circles, polygons, gradients, dithering, noise, a built-in
-  pixel font, `scatter` brushes, tilemaps, random groups with reproducible seeds.
+  Lospec files, dark→light ramps that drive `shade()` / `light()`, `shades()` for a hue-shifted ramp
+  from one color.
+- **Sprites**: text grids, mirroring, auto-outline (plain, selective, inside), palette-swap variants,
+  flips and rotations by any angle, reusable `_parts`, `stamp`, anti-aliasing as by hand (`aa`).
+- **Primitives and brushes**: rects, lines and curves drawn pixel-perfect, circles, polygons,
+  gradients, dithering, noise, pixel fonts (a 3×5 built in, a 5×7 to include, `mono` for a score),
+  `scatter` brushes, tilemaps, random groups with reproducible seeds.
 - **Scenes**: layers, cast-shadow and light layers, per-layer PNG export.
 - **Animation**: frames as patches over a base sprite → strips + JSON tags + GIF; parts half a pixel along
   (`stamp(..., { sub: true })`) for an idle without the single-pixel bob.
@@ -146,6 +148,11 @@ pxl help [name]                  what the reference says about an op or option, 
 - **Going by in a loop**: parallax planes (`scroll()`), `clouds()`, smoke and steam (`plume()`).
 - **Out**: sprite sheets with JSON tags, GIFs, Tiled maps (`.tmj`), Aseprite files to keep editing.
 - **Errors** point at `file:line:col` and the asset/layer/op path, with "did you mean…" hints.
+
+And around the DSL, tools to look with (an agent's eyes, cheap in text): `shot` builds one asset
+and writes a picture with what changed, `describe` reads a scene as text, `check` warns before you
+hand over, `steps` names the line that painted a pixel, and `study` reads a reference back into
+pxl's terms. What they say is in [Getting started](docs/getting-started.md#which-command-when).
 
 ## Documentation
 
@@ -313,34 +320,21 @@ number of times a loop with the rods on their crank pins, and every puff of smok
 the speed of the ground, so the last frame runs into the first.
 
 <p>
-  <img src="docs/gallery/race_cockpit.gif" width="100%" alt="Animated pixel-art street race at sunset on the Rio-Santos coastal highway, seen from the driver's seat of a sports car: the road running to its vanishing point and bending right then left, a double yellow line with studs, the sea and the setting sun on the left, its glow lifting the sky round it and haze slits across its disc, islands paling with distance and the sun's path glittering, the Serra do Mar rising from the coast in three ranges that pale with distance, and on the right the Atlantic forest: trees with twisting trunks and crowns heaped with clumps of leaves lit on the sun's side, banana plants at its foot, palms with ringed trunks and drooping fronds, tall grass and weeds along both verges bending in the wind, wild flowers, lamp posts with swan-neck arms and their lamps lit, yellow chevron boards on the bends and a green sign for Paraty; sunset clouds lit gold and pink from below. Three rival sports cars drawn as pixel-art sprites from behind, a yellow one, a red one and a blue one with white racing stripes, with their wings, glowing round tail lights, plates and twin exhausts, are overtaken one after another, drawn whole in perspective as they draw level (the side with its strakes and both wheels, the glasshouse set in, the louvred engine cover, the wing, a rounded back with the round tail lights set into it), their long shadows on the road, the red one backfiring flames; the cockpit of a nineties Japanese sports coupe, modelled in 3D: the dash wrapped round the driver with the tachometer showing through the wheel, round vents set in perspective, an amber clock reading 18:24 and climate dials on the centre stack, the radio's red display, a grey cloth door panel with its chrome handle in a cup, the left mirror on its black foot in the window's corner, showing the road, the guardrail, the beach and a rival going by behind with the car's own silver flank along its edge, the dotted ceramic band along the windshield's edge, the car's own four-spoke wheel with its big padded airbag boss and its column, turning with the bends, gloved hands gripping it at ten to two as the driver sees them, the backs of the gloves toward us, the fingers curled over the rim and the thumbs holding it from underneath, in a blue track jacket with white stripes, its sleeves creased in folds, knit cuffs at the wrists, Bonfim ribbons hanging from the rear-view mirror, which shows the cars falling behind with their pop-up headlights lit. Before a burst of speed the driver's right hand drops to the gear lever below the picture and changes down, the revs jump and the car pulls away 60% faster, the needles climbing; then the hand goes down again, changes up, and the car eases back to its steady speed.">
+  <img src="docs/gallery/race_cockpit.gif" width="100%" alt="Animated street race at sunset on a coastal highway, seen from the driver's seat of a nineties sports coupe: the road bending to its vanishing point, the sea and the setting sun on the left, mountain ranges paling with distance, Atlantic forest, palms and lamp posts on the right; three rival cars overtaken one after another, drawn in perspective as they draw level; the 3D-modelled dash, gauges and mirrors, gloved hands on a turning wheel, the right hand dropping to change gear before a burst of speed">
 </p>
 
 [`examples/perspective/race.px.js`](examples/perspective/race.px.js): a street race from the driver's
-seat. The road is drawn by `plane()` through a camera at 1 m that bends with it (`bend`: a curvature that turns
-right and then left over the loop); the rivals are drawn by hand from behind at seven sizes, the camera
-picking the one nearest the height each should be (`fit`), near and off to one side, the whole car drawn in perspective instead (its side, the top of its tail, its back) so it runs off toward the vanishing point as it draws level;
-one is overtaken about every four seconds (one in our lane, so we weave), their long shadows thrown by
-`shadows()` from the low sun. The sun,
-the islands and the serra move only as the heading turns, the nearer ranges a little more; the serra
-is three ranges that pale with distance (the far one pink and plain in the haze, the near one dark,
-the forest's crowns over it), each rising out of the sea at a headland, and the sun's glow lifts the
-sky round it a few tones, dithered at its edge. The cockpit, after a
-Supra A80's (the dash wrapped round the driver, three gauges under one hood, the centre stack turned
-toward him), is modelled in 3D in meters and drawn through the same camera
-([`cockpit.px.js`](examples/perspective/cockpit.px.js)): each face toned along its material's ramp
-by how it lies to the low sun, outlined where it ends in front of another, its top edge a step
-lighter; the vents are tubes set into their faces, the clock's digits sheared onto the stack, and the
-small parts (dials, hazard switch) drawn by hand and put where the camera puts them. The steering
-wheel is modelled the same way and drawn every frame as it turns: a leather rim round as a tube, four
-spokes dished back to a big padded boss, the column going down into the dash; it is fitted to where the
-hands grip, and the hands are set on its rim. The
-mirrors' glass is left empty; each mirror is another camera looking back, in a small anim of its own (the left one with our own flank along its edge). Our speed is a profile in time (steady, a burst, steady again) whose integral moves everything, so the loop still closes; the right hand leaves the wheel to change gear before the burst and again before easing off, and the revs follow the speed and the gear. Each hand is a puppet: a skeleton of joints read off photographs of a left hand
-gripping, taken from its owner's eyes, set on the rim every frame so that the line the rim takes
-under the palm lies on it; the back of the glove a plate, the fingers and the thumb painted round
-(`capsule`) between their joints. The hand keeps its grip and turns with the wheel; the arms follow.
-The sleeves are shaded as cloth: a tube with a V-shaped trough along each fold, every pixel lit by
-the slope there in three flat tones, so they break into the facets of a crumpled sleeve.
+seat. The road is `plane()` through a camera at 1 m that bends with it (`bend`). The rivals are drawn
+by hand from behind at seven sizes, the camera picking the nearest (`fit`), and drawn whole in
+perspective as they draw level, their long shadows thrown by `shadows()` from the low sun; the serra
+is three ranges paling with distance, each rising out of the sea at a headland. The cockpit, after a
+Supra A80's, and its steering wheel are modelled in 3D in meters and drawn through the same camera by
+`mesh()` ([`cockpit.px.js`](examples/perspective/cockpit.px.js)): each face toned by how it lies to
+the sun, outlined where it ends in front of another. Each mirror is another camera looking back. Our
+speed is a profile in time whose integral moves everything, so the loop still closes; before the burst
+the right hand leaves the wheel to change gear. Each hand is a puppet of joints read off photographs
+of a hand gripping, set on the rim every frame, its fingers painted round by `capsule`; the sleeves
+are shaded as crumpled cloth.
 
 ## Development
 

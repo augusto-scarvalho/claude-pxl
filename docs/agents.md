@@ -42,7 +42,7 @@ sheets. To be sure it is used, name it: "use the pxl skill to draw ...".
 Every turn of a conversation rereads everything said before it, so what an agent reads early it pays
 for again on every later turn. pxl is laid out so the agent reads little:
 
-- **`SKILL.md`** (about 4.5k tokens) is loaded when the task matches: the workflow, a template, the
+- **`SKILL.md`** (about 4.7k tokens) is loaded when the task matches: the workflow, a template, the
   essentials of the DSL, and a table of which example to copy.
 - **The guides** ([scenes](../scenes.md), [characters](../characters.md), [lighting](../lighting.md),
   [rotation](../rotation.md)) are read by section: `pxl help "characters 1 4 5"` prints those
@@ -61,11 +61,12 @@ The agent can measure, check and compare, but it can't guess what you meant. Say
 - **Palette.** A Lospec name (`pico8`, `sweetie16`, `endesga32`), a `.hex` file, or "pick one and
   keep to it".
 - **Motion.** Still or animated; for a loop, its length (a 2 s idle, a 12 s scene) and what moves.
-- **Style.** Outlined or not, how many shades per material, what to avoid (dithering as texture,
-  pillow shading).
+- **Style.** Outlined or not, how many shades per material, clean lines or square ones, anti-aliased or
+  hard-edged, what to avoid (dithering as texture, pillow shading).
 - **References.** As files the agent can open, not links: a PNG, a GIF or a video. The agent looks at
   them with `pxl shot ref.gif` (a clip's frames on one sheet) and reads them with `pxl study ref.gif`
-  (palette, ramps, outlines, light, perspective, timing, and each moving piece cut out).
+  (palette, ramps, outlines, the faults of its lines, light, perspective, timing and spacing, and each
+  moving piece cut out).
 - **Where it goes.** The file's folder, asset names an engine expects, a sprite sheet's layout.
 
 Say what you'll do with it (a game's tiles, a banner, a GIF to post): that decides sheets, sizes and
@@ -134,8 +135,9 @@ Pass the prompt on stdin: `--add-dir` takes several values and would swallow it.
 
 - **Look at the previews.** `out/_preview/` has every asset enlarged with a pixel grid (a
   checkerboard is transparent); an animation also has `<name>_onion.png`, its motion and onion skin.
-- **Ask for the check.** `pxl check` lists every warning with the frames it happens at. Its last line
-  says which rules ran: "no warnings" with "not run: lit side" means the light was never checked
+- **Ask for the check.** `pxl check` lists every warning with the frames it happens at: a scene's
+  facing, feet and light, and the doubled steps and jaggies in the lines of sprites drawn by hand. Its
+  last line says which rules ran: "no warnings" with "not run: lit side" means the light was never checked
   (the scene has to say where its light is). Ask the agent to fix each warning or say why it's meant.
 - **Compare versions.** When the agent replaces art you approved, ask it to keep the old one as
   `<name>_old` and show both: `pxl shot art.px.js name name_old`. Against the last commit:

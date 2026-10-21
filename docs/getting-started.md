@@ -125,7 +125,7 @@ build overwrites it); `--every 3` keeps one frame in three in the preview GIFs o
 | the exact pixels as text | `pxl ascii art.px.js slime` |
 | know what is where in a scene, what covers what | `pxl describe art.px.js meadow` (`--brief` when busy) |
 | find which line painted a pixel | `pxl steps art.px.js slime --at 3,2` |
-| check a scene before calling it done | `pxl check art.px.js` (facing, feet on the ground, lit side, every frame) |
+| check before calling it done | `pxl check art.px.js` (a scene's facing, feet on the ground and lit side at every frame; the lines of sprites drawn by hand) |
 | get around a long file | `pxl list art.px.js` (each definition's line range and comment) |
 | look up an op or option | `pxl help <name>`; `pxl help` alone for the index |
 | match a reference sprite's silhouette | `pxl compare art.px.js hero ref.png --shrink 2` |
@@ -143,18 +143,26 @@ pxl study ref.gif           # what it is made of, and what to use in pxl for eac
 ```
 
 `study` reads pixel art back at 1× (even when it was posted enlarged or blurred) for its palette,
-ramps, outlines, dithering, banding and light; a photo or painting for its masses of light and dark
-and its colors, translated into a small picture to draw over. It finds the perspective (horizon,
-vanishing points), and in a clip the timing, the loop, parallax planes and each moving piece (walks,
-things carried, anims in place, attacks with their smears, effects, lights), cut out of the
-background. Everything goes to `out/_study/` next to the picture: a sheet to look at, the palette as
-`.hex`, and each piece as a strip.
+ramps and their hue shifts, outlines, dithering, anti-aliasing, banding, the faults of its lines
+(L-corners, jaggies) and its light; a photo or painting for its masses of light and dark and its
+colors, translated into a small picture to draw over. It finds the perspective (horizon, vanishing
+points), and in a clip the timing, the loop, parallax planes and each moving piece (walks, things
+carried, anims in place, attacks with their smears, effects, lights), cut out of the background,
+with the spacing of what travels (easing, anticipation, overshoot, squash and stretch). Everything
+goes to `out/_study/` next to the picture: a sheet to look at, the palette as `.hex`, and each piece
+as a strip.
+
+What the tutorials teach about lines, anti-aliasing, clusters and timing is in
+[characters.md](../characters.md) §4, §7 and §10, and `pxl check` warns about a hand-drawn sprite's
+doubled steps and jaggies.
 
 ## Where to read next
 
 - [reference.md](../reference.md): every op and option. Search it with `pxl help <name>`.
-- [scenes.md](../scenes.md): layout, ground, distance, true perspective, parallax, shadows.
-- [characters.md](../characters.md): proportions, faces, views, animating with parts, rigs.
+- [scenes.md](../scenes.md): layout, ground, texture, distance, true perspective, parallax, shadows,
+  one-shot effects.
+- [characters.md](../characters.md): proportions, faces, views, clean lines and anti-aliasing,
+  animating with parts (timing an action, squash and stretch, walks), rigs.
 - [lighting.md](../lighting.md): lamps, light blocked by walls, normal maps, glow.
 - [rotation.md](../rotation.md): turning sprites by any angle, 8 or 16 directions.
 - [`examples/`](../examples): finished files to copy the structure of. [SKILL.md](../SKILL.md) has a
@@ -169,6 +177,8 @@ completion.
   broken asset doesn't stop the others from building.
 - **`node: bad option` or a syntax error inside pxl.** Your Node is older than 22.18.
 - **A video or JPEG won't open.** Install `ffmpeg` and make sure `ffmpeg -version` runs.
+- **`study` reads a reference at the wrong size** (its `Kind:` line says 8x where you count 16 screen
+  pixels to an art pixel; it happens on blurred copies). Give the size: `pxl study ref.png --px 16`.
 - **A preview GIF is many MB.** Build with `--every 3`; the GIFs in `out/` keep every frame.
 - **Running an example filled the repository with `out/` folders.** Commands write next to the art
   file; pass `--out <some scratch folder>`. `out/` is ignored by git.

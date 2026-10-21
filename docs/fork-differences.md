@@ -1,8 +1,8 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**211 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
-and none behind. The work spans October 16–20, 2026. Everything the original does still works; this
+**240 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+and none behind. The work spans October 16–21, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
 
@@ -21,13 +21,13 @@ page lists what the fork adds. Every commit is in
 
 ## At a glance
 
-| | Original (Oct 14) | This fork (Oct 20) |
+| | Original (Oct 14) | This fork (Oct 21) |
 | --- | --- | --- |
 | Commands | 4: `build`, `serve`, `ascii`, `list` | 12: adds `describe`, `shot`, `check`, `steps`, `help`, `compare`, `blind`, `study` |
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus `scripts/calibrate.ts` |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
-| Example files | 13 | 50 |
-| Tests | 59 | 196 |
+| Example files | 13 | 51 |
+| Tests | 59 | 208 |
 
 ## Looking and checking
 
@@ -38,7 +38,7 @@ look, in text where text is cheaper than an image.
 | --- | --- |
 | `pxl describe` | A whole scene as text: each object's position, gaps, what covers it, contrast, motion, which way it faces, the light. `--diff` against the last look, `--brief`, `--frame N`; works on plain PNGs too. |
 | `pxl shot` | One asset built and written as a PNG to look at, with what changed since the last shot. Frames side by side (`0-17`, `all`), zoomed regions, several assets or other files in rows, `--vs HEAD --diff` against the committed version. A reference GIF or video too: all its frames on one sheet, at 1×. |
-| `pxl check` | Every check `describe` makes, over every scene, rig and frame, and which rules actually ran, so "no warnings" can't hide a check that never applied. `--readings` shows each light reading. |
+| `pxl check` | Every check `describe` makes, over every scene, rig and frame, and the 1 px lines of every sprite drawn by hand (L-corners, jaggies), and which rules actually ran, so "no warnings" can't hide a check that never applied. `--readings` shows each light reading. |
 | `pxl steps` | The painting log as text; `--at x,y` names the source line that painted a pixel. |
 | `pxl list` | A file as a map: each definition's line range and comment, so an agent reads only the lines it needs. |
 | `pxl help` | Every op and option by section; `help <name>` prints the reference text and where the examples use it; guide sections on demand. |
@@ -55,13 +55,13 @@ moved into the DSL where every scene can use it.
 
 | Area | Added |
 | --- | --- |
-| Palettes and color | Palette files (`.hex`, `.gpl`, `.pal`, `.txt`) that carry their own keys; `shades()` for a hue-shifted ramp from one color; `rampmap` so imported tones never merge; radial gradients; layer blend modes and real opacity; included files keep their own palette. |
-| Shapes and strokes | `curve()` through points, `arc()` for slashes and smears, `capsule` for limbs, `flame`, 9-slice panels for UI, bitmap fonts with a ready 5×7. |
-| Outlines and light | `inline` and `selout` outlines, `relight` and `plate()` for lit parts, cast shadows (also from a point light: a fire, a lamp), `glow` that keeps what glows as drawn. |
+| Palettes and color | Palette files (`.hex`, `.gpl`, `.pal`, `.txt`) that carry their own keys; `shades()` for a hue-shifted ramp from one color (`sat` for Saint11's saturated lights, a negative `hue` for metals); `rampmap` so imported tones never merge; radial gradients; layer blend modes and real opacity; included files keep their own palette. |
+| Shapes and strokes | `curve()` through points, `arc()` for slashes and smears, `capsule` for limbs, `flame`, 9-slice panels for UI, bitmap fonts with a ready 5×7 (lowercase too; `mono` for a score or a timer); `wire()` and `curve()` pixel-perfect. |
+| Outlines and light | `aa: true` anti-aliases inner edges as by hand (a strip half the step long, in the key between); `inline` and `selout` outlines, `relight` and `plate()` for lit parts, cast shadows (also from a point light: a fire, a lamp), `glow` that keeps what glows as drawn. |
 | Placing things | `pivot` (which point a stamp lands on), `sub` stamps half a pixel along (subpixel motion, edges in the in-between key), `wrap` for seamless tiles, `scatter` with `even` and `near` (along the edge of a color), sockets and sorted layers, `register` for frames aligned on a marked point. |
 | Tiles and maps | Tilemap corner tiles, isometric tilemaps, export to Tiled (`.tmj`), sheet extrude against texture bleeding. |
 | Rotation | Free angles, `directions()` for 8 or 16 views, RotSprite checked on real sprites, and a rotation guide. |
-| Import and export | PNG import (`shrink`, `palettize`), Aseprite export (layers, frames, tags, palette, slices), GIFs that keep small figures' colors in lit scenes. |
+| Import and export | PNG import (`shrink`, `palettize` to the nearest key in OKLab), Aseprite export (layers, frames, tags, palette, slices), GIFs that keep small figures' colors in lit scenes. |
 | Procedural | `hash`, `vnoise`, `fbm`, `bayer`, `seamless`; `scroll()` for parallax planes, `clouds()`, `plume()` for smoke and steam. |
 
 ## Characters, animation and rigs
@@ -106,12 +106,15 @@ Give `pxl study` a PNG, GIF, JPEG, WebP or video, pixel art or not. It reports w
 of and what to use in pxl to make the same.
 
 - **Reading the picture**
-  - The pixel grid of an upscale (exact, blurred, or scaled by a fraction), read at 1×.
-  - Palette and ramps with their hue shifts.
+  - The pixel grid of an upscale (exact, blurred, or scaled by a fraction), read at 1×; `--px N` when
+    a blurred copy is read at a harmonic of its pixel.
+  - Palette and ramps with their hue shifts, counted over the ramps: warmer in the light, cooler, or one
+    hue (value only).
   - Outlines against the clear, dithering, anti-aliasing, clusters, banding, pillow shading.
   - A line's faults, after Pedro Medeiros and Saint11: L-corners (a doubled step) and jaggies (runs out
     of order), with positions, or the lines named as drawn square. Near-twin colors and ramp steps too
-    close to read. Lone pixels counted without a dither's or anti-aliasing's.
+    close to read. Lone pixels counted without a dither's or anti-aliasing's. On the sheet the line's
+    faults are ringed.
   - The light's direction off the rim (after Johnson and Farid), tiles, values, color temperature.
   - A photo or painting translated by superpixels into a small picture to draw over.
 - **Perspective:** straight edges (LSD) and where they meet: one, two or three vanishing points, with
@@ -130,6 +133,9 @@ of and what to use in pxl to make the same.
     its pivot every frame, and a thing carried never stays over one point.
   - Each capture is cut out of its background, GrabCut-style. Files: a sheet, a strip, and a box per
     frame for every piece.
+- **Spacing:** for a thing carried or an action, its steps frame to frame: speeding up, slowing, even,
+  holds, a move back first (anticipation), past its rest and back (overshoot), a box squashing and
+  stretching with its area.
 - **Subpixel:** edges moving by part of a pixel through in-between tones are told from whole-pixel
   moves, with the tones a clip uses and between which colors; a piece moving so (an idle) is marked and not
   taken for an attack or a fire (after ApplefatGOV's How-to-subpixel).
@@ -196,7 +202,7 @@ references until it read right.
 ## How it was built
 
 Every change was made by Claude while drawing real scenes, and reviewed by a person on a curation page:
-195 entries, each with its picture and the note that asked for it.
+213 entries, each with its picture and the note that asked for it.
 
 - **Dogfooding:** each scene was drawn with pxl itself; every friction went to `FEEDBACK.md` and became
   a fix or a doc line. Work first done in throwaway scripts (camera math, noise, shadow sweeps) moved
