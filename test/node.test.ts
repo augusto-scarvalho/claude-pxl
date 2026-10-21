@@ -626,7 +626,7 @@ test("pxl help: an index of the reference, or what it says about one name and wh
   } finally { console.log = log; }
   const [index, wrap, typo] = lines;
   assert.match(index, /Ops > Shapes: px grid rect box line curve/);
-  assert.match(index, /scenes\.md: Layout and scale \(\d\.\d\);/);
+  assert.match(index, /scenes\.md: 1\. Layout and scale \(\d\.\d\);/);
   assert.match(wrap, /\[reference\.md: Assets > Sprite \/ scene options\]\n\| `wrap: true/);
   assert.match(wrap, /\[examples: \d+ uses[^\]]*\]\n {2}examples\/[\w/]+\.px\.js:\d+:/);
   assert.match(typo, /nothing about 'scater'.*did you mean 'scatter'/);
@@ -649,7 +649,7 @@ test("pxl help is short: other mentions a line each, a guide section by its head
   assert.match(await said("help", "small animals"), /^\[characters\.md\]\n## 9\. Small animals\n/);
   assert.match(await said("help", "characters 9"), /^\[characters\.md\]\n## 9\. Small animals\n/);
   // a name that is an op: its rows, and the sections that share its words named, not printed
-  assert.match(await said("help", "light"), /\[guides: 2 sections\]\n {2}pxl help "scenes Shadows and light"/);
+  assert.match(await said("help", "light"), /\[guides: 2 sections\]\n {2}pxl help "scenes 11. Shadows and light"/);
   // heading words are whole words: "anim" is the reference's Animation, not "Small animals"
   const anim = await said("help", "anim");
   assert.match(anim, /^\[reference\.md: Animation\]/m);

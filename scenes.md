@@ -12,7 +12,7 @@ pieces that move (each cut out, with its track and what to build it with), and f
 translation in few colors to draw over. `PXL shot ref.gif` puts a clip's frames on one sheet to
 look at (`--frames 0-11` for some).
 
-## Layout and scale
+## 1. Layout and scale
 
 - **Size buildings from the characters.** A door is a little taller than the tallest figure that
   could walk through it (figures of 26–34 px: a 34 px door). A crypt whose door was shorter than its
@@ -43,7 +43,7 @@ look at (`--frames 0-11` for some).
 - Figures need a few px of air to read. `PXL describe <file> <scene>` gives the gap between objects
   (`nearest: witch 3px left`); two figures at 1 px read as one shape.
 
-## Ground, paths and tiles
+## 2. Ground, paths and tiles
 
 - **Paths, roads, shores and patches of ground are laid with tiles**, marked at tile corners with
   `tilemap(..., { corners })` and a terrain tileset (drawn in code, or reduced from a free LPC-style
@@ -61,7 +61,7 @@ look at (`--frames 0-11` for some).
   Along an edge (grass on a path's border, moss at a rock's foot): `scatter(..., { on: "g", near:
   "<path keys>", within: 3 })`.
 
-## Texture without filler
+## 3. Texture without filler
 
 Don't sprinkle `noise` over walls, floors or plaster to make them "less flat": it reads as random
 dots. Every mark needs a cause you could name, where that cause would put it:
@@ -96,7 +96,7 @@ shadow and are sharpest where the light turns (in the Pixel Joint texture thread
 half its colors and gained volume so). Detail the borders of a mass (foliage, a rock's rim) and keep
 its inside calm. Leaves gather in clumps along bands wrapped round the crown, not spread evenly.
 
-## Trees and big organic shapes
+## 4. Trees and big organic shapes
 
 Code drawing fails worst here (lobes read as broccoli, fronds as combs). Start from free art:
 CC0 or CC-BY, credited in the file; share-alike (CC-BY-SA) puts its license on everything built with
@@ -117,7 +117,7 @@ it, don't import it):
   straight upright stalks read as cacti.
 (`examples/perspective/race.px.js`: `leafClump`, `tree`, `palmCrown`, `palmTrunk`, `tallGrass`.)
 
-## Water and things that land
+## 5. Water and things that land
 
 A waterfall that ends in a strip of foam over still water looks pasted on: spread churning foam to
 the sides and forward, send rings out, and let a wake ride the current downstream. A figure walks
@@ -131,7 +131,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - **A falling leaf** is 2–3 px redrawn every frame through three turns, ~5 px down per 120 ms frame,
   swaying 3 px each way; on water, a ring grows 2 frames, then breaks into dashes and dots over 3.
 
-## Distance (aerial perspective)
+## 6. Distance (aerial perspective)
 
 - The air between the viewer and far things lowers their contrast and cools them toward the
   horizon's sky, more at their foot, where it is denser. Lay a veil of the horizon color over the
@@ -156,7 +156,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   it). A range whose strip ends sharp reads as a cutout: let each run out of the picture, or come
   down to the sea or the plain at a headland (`examples/perspective/race.px.js`: `range`).
 
-## True perspective (vanishing points)
+## 7. True perspective (vanishing points)
 
 - A road, rails, a corridor, a square seen from the ground: lay everything in meters and project it
   with `perspective()` (reference: Perspective). The ground is a `plane()`: each pixel gets the color
@@ -215,7 +215,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   leaning the same way with one wind, each with its own `seed`; the light it throws is a warm key on
   the near faces, not a glow over everything (`examples/perspective/extinction.px.js`).
 
-## Slow motion in a short loop (clouds, mist, drifting things)
+## 8. Slow motion in a short loop (clouds, mist, drifting things)
 
 - Scrolling a strip that wraps makes the loop as long as its width over the speed: slow clouds
   then need half a minute or more. Instead give each cloud a life of one loop: it forms, drifts in
@@ -233,7 +233,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   underside); a thin streak can take its lit underside column by column. Examples:
   `examples/sunset/sunset.px.js` (streaks at sunset), `examples/rig/tournament.px.js` (daylight cumulus).
 
-## Closing a loop
+## 9. Closing a loop
 
 - Something crossing the picture: let it cover more than the picture's width (plus its own length) in
   one loop (`x = ((x0 - v·t) mod L) - L/2` from the picture's middle, L = v times the loop's length): it leaves on one side and
@@ -256,7 +256,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   thin it by `0.5 - 0.5·cos(2π·t)`, fading to nothing at the edge of the part that moves.
 - Gaits: a stride a whole number of frames, and the loop a multiple of every stride in it.
 
-## Parallax (planes going by at their own speeds)
+## 10. Parallax (planes going by at their own speeds)
 
 - Each plane is a sprite drawn once as a strip with `wrap: "x"`, going by with
   `scroll(name, y, per)` (in an anim, or a scene that stamps one: in a still scene it stands still): `per` px a loop, the nearer the more, each a whole number of the strip's
@@ -282,7 +282,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - Mist or haze at the foot of each far plane keeps them apart; the plane nearest the eye goes by too
   fast for detail: streaks along the motion (`examples/parallax/train.px.js`).
 
-## Shadows and light
+## 11. Shadows and light
 
 - Cast shadows: a `shade: true` layer, with tall things stamped there by `cast: [kx, ky]` (laid flat
   from their base, `silhouette: "k"`): a pixel h px up lands h × (kx, ky) away. One sun, one
@@ -323,7 +323,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   moon, or an `emit` key.
 - Flat art gets its volume back with `relight()`.
 
-## One-shot effects (explosions, sparks, hits)
+## 12. One-shot effects (explosions, sparks, hits)
 
 From Saint11's effect cards, read frame by frame (80 ms frames unless said); each one an `anim`
 played once, stamped where it happens. An effect often outlives the pose that made it, and one thing
@@ -377,7 +377,7 @@ happens after another, never all at once.
   as a blurred disc, its art never rotated. A thruster's 5-frame loop at 60 ms: a round burst
   (lighting the ship's rear), a long thin flame, the mass thrown back, wider and darker, smallest.
 
-## Blend modes leave the palette
+## 13. Blend modes leave the palette
 
 A layer with `blend: "multiply" | "screen" | "add" | "overlay"` or `opacity` does color math with
 what is below: one deep-blue `rect` at `{ blend: "multiply", opacity: 0.7 }` turns a scene to night.
@@ -386,7 +386,7 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
 `lighting()`); use blend modes for whole-scene grading or true translucency, and tell the user.
 `palettize: true` snaps results back only when the palette already has those tones.
 
-## Checking a scene
+## 14. Checking a scene
 
 - `PXL shot <file> <scene>`: the look, with what changed since the last shot and the warnings on
   it; `--at x,y,w,h` again and again for details side by side, `--frames` for moments of the loop,

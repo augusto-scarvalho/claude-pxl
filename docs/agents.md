@@ -43,11 +43,12 @@ sheets. To be sure it is used, name it: "use the pxl skill to draw ...".
 Every turn of a conversation rereads everything said before it, so what an agent reads early it pays
 for again on every later turn. pxl is laid out so the agent reads little:
 
-- **`SKILL.md`** (about 5k tokens) is loaded when the task matches: the workflow, a template, the
+- **`SKILL.md`** (about 6k tokens) is loaded when the task matches: the workflow, a template, the
   essentials of the DSL, and a table of which example to copy.
 - **The guides** ([scenes](../scenes.md), [characters](../characters.md), [lighting](../lighting.md),
-  [rotation](../rotation.md)) are read by section: `pxl help "characters 1 4 5"` prints those
-  sections, and `pxl help` lists every section with its size.
+  [rotation](../rotation.md)) are read by section: `pxl help "characters 1 4 5"` or
+  `pxl help "scenes 1 3 11 14"` prints those sections, and `pxl help` lists every section with its
+  size.
 - **The reference** is never read whole: `pxl help <op>` prints what it says about one op and where
   the examples use it.
 - **The examples** are mapped first: `pxl list <file>` gives each definition's lines and comment, and
@@ -97,14 +98,35 @@ Measured on fresh agents given only the skill:
 - The same brief by a pipeline (a planner and eight forked agents, one per part) came out denser but
   less coherent, for about **5× the tokens and 2× the time**.
 
+Where the tokens go, read from the transcripts of three single-agent sessions that drew a 320×180
+night scene (about 70 turns each; cost in input-token units, a cache read a tenth of one, an output
+token five):
+
+- **The model's thinking: about two thirds.** It is paid as output, then stays in the conversation and
+  is read again on every later turn. The context grew from 22k tokens to about 260k; of the 725k it
+  grew by over the three, 384k was thinking.
+- **What the tools returned and what the agent wrote: about a fifth.** Most of it reading: guides and
+  examples dumped whole with `cat` or `sed` (a third of all that was re-read), and the art file
+  written whole again ten times (a quarter). What pxl itself prints is small: a `shot` is 70-200
+  tokens of text and about 550 of image, a `check` about 100, a `describe --brief` about 2k.
+- **The fixed context** (system prompt, tools, the skill's line in the list): 6%.
+
 What keeps a session cheap:
 
-- **One look per call.** `shot` builds only the asset it shows; `ascii` and `describe` answer in text,
-  which is cheaper than an image.
-- **All the fixes in one turn.** Parallel edits are one turn; an edit per turn rereads the whole
-  conversation each time.
+- **Fewer turns.** Every turn re-reads all of it and thinks again: one look per call (`shot` builds
+  only the asset it shows; `ascii` and `describe` answer in text, cheaper than an image), and all the
+  fixes one look showed in one turn (parallel edits are one turn).
+- **Edit, don't rewrite.** After the first write, change the art file with edits: a file written
+  whole again stays in the conversation.
+- **Read by section.** `pxl help "scenes 1 3 11 14"` is about 2.7k tokens where `scenes.md` whole is
+  9k; `pxl help <op>` instead of the reference; `pxl list` before reading an example, then only those
+  lines.
 - **Short sessions.** One big asset per conversation. Start a new one for the next asset rather than
   carrying a long history.
+- **Less thinking where the work is routine.** Claude Code's `--effort low|medium|high|xhigh|max`
+  sets how much the model thinks, the biggest share above. A pipeline's parts can run lower than its
+  planner (`claude -p --resume <uuid> --fork-session --effort medium ...`). How it changes the art
+  hasn't been measured here: try it on one part and compare the two with `pxl shot`.
 
 ## A big scene: one agent or a pipeline
 

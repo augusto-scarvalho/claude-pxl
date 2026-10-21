@@ -42,7 +42,9 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    eyeballing (`--frame N` for another frame).
 3. Fix everything one look showed, then look again: send all the edits in the same message
    (parallel tool calls are one turn, and every turn re-reads the whole conversation, so a turn
-   per edit is what makes a long session expensive). `PXL describe ... --diff` lists the objects an
+   per edit is what makes a long session expensive). After the first write, change the file with
+   Edit, not by writing it whole again: each rewrite stays in the conversation (in measured
+   sessions, rewrites were a quarter of all that was re-read). `PXL describe ... --diff` lists the objects an
    edit moved, redrew or recolored; `PXL shot ... --vs HEAD --diff` shows the last
    committed version above and the pixels that changed below. A wrong pixel: `PXL steps art.px.js
    <name> --at x,y` names the line that painted it.
@@ -101,8 +103,9 @@ share one scope, so every top-level name in a part starts with the part's name.
 
 ## Looking things up
 
-Don't read reference.md or characters.md whole: what you read early is paid again on every later
-turn (scenes.md and lighting.md are short enough to read whole).
+What you read early is paid again on every later turn: in measured sessions, guides and examples
+dumped whole (`cat`, `sed -n 1,200p`) were a third of all that was re-read. Read the reference and
+the guides by section, through `PXL help`, never whole; this file is already in your context.
 `PXL help` lists every op and option by section, and each guide's sections with their size;
 `PXL help <name>` prints what the reference says about it and where the examples use it;
 `PXL help "<guide> <numbers or words of a heading>"` prints those sections. Read the ones your
@@ -113,8 +116,8 @@ task needs before starting:
 | a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate, 12 for an action's or a cycle's frame counts |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a scene, level, building or environment | [scenes.md](scenes.md), whole (~9k tokens) |
-| lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2k tokens) |
+| a scene, level, building or environment | `PXL help "scenes 1 3 11 14"` (layout, texture, shadows and light, checking); then what it needs: 2 ground and tiles, 4 trees, 5 water, 6 distance, 7 true perspective, 8-10 loops and parallax, 12 effects |
+| lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2.5k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
 
 An example, or your own file after many edits: `PXL list <file>` maps it (each asset definition and
@@ -181,7 +184,7 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 - **In meters**: `perspective()` (one, two or three points: `yaw`, `pitch`), `plane()` for flat ground,
   `terrain()` for hills and mountains, `solids()`/`shadows()` for things built of `solid` shapes,
   `mesh()` for what you are inside of or that wraps round itself (faces in meters from `model()`),
-  `capsule` for a limb painted round, `flame` for fire (scenes.md "True perspective"); procedural
+  `capsule` for a limb painted round, `flame` for fire (`PXL help "scenes 7"`); procedural
   texture with `hash`, `vnoise`, `fbm`, `bayer`, `seamless` (`PXL help vnoise`).
 
 ## Examples

@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**280 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**283 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–21, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -207,6 +207,9 @@ references until it read right.
 ## Speed, size and reliability
 
 - GIFs store only what changed in each frame: the gallery went from 34.5 MB to 8.5 MB.
+- The tests run in about a minute (they took nearly two): the examples' check in worker threads, the
+  longest first; `study` reads a long clip a third faster (the train's 192 frames, 34 to 23 s) and
+  `check` runs two to three times faster on the heaviest scenes, every output the same.
 - Lit scenes keep small figures' colors in GIFs (a weighted median cut refined by k-means).
 - Timed builds are cached within a budget of bytes, so a long loop no longer fills memory.
 - `build --profile` names where the time went; `build --every N` keeps long previews small; the onion
