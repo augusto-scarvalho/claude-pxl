@@ -1,8 +1,10 @@
 // A 5x7 pixel font, for titles and UI where the built-in 3x5 is too small. Include it from any art
 // file and write text(x, y, "HELLO", c, { font: "5x7" }); its palette stays its own and the text
-// takes your color. Glyphs are trimmed to their ink, so the font is proportional; lowercase uses
-// the capitals. To make another font: draw the glyphs in cells (or import a PNG with png:), then
-// font(name, sprite, { chars, w, h }).
+// takes your color. Glyphs are trimmed to their ink, so the font is proportional; "5x7 mono" is the
+// same glyphs all as wide as the widest, for a score or a timer that mustn't jitter as it counts.
+// Lowercase sits in the cell's lower five rows, g j p q y squeezed into them (a 5x7 has no room
+// below the line). To make another font: draw the glyphs in cells (or import a PNG with png:),
+// then font(name, sprite, { chars, w, h }).
 pal({ k: "#000" })
 
 const GLYPHS = {
@@ -31,6 +33,19 @@ const GLYPHS = {
   "(": "...#. ..#.. .#... .#... .#... ..#.. ...#.", ")": ".#... ..#.. ...#. ...#. ...#. ..#.. .#...",
   "'": "..#.. ..#.. .#... ..... ..... ..... .....", "=": "..... ..... ##### ..... ##### ..... .....",
   "%": "##... ##..# ...#. ..#.. .#... #..## ...##",
+  a: "..... ..... .###. ....# .#### #...# .####", b: "#.... #.... ####. #...# #...# #...# ####.",
+  c: "..... ..... .###. #.... #.... #.... .###.", d: "....# ....# .#### #...# #...# #...# .####",
+  e: "..... ..... .###. #...# ##### #.... .###.", f: "..##. .#... .#... ###.. .#... .#... .#...",
+  g: "..... ..... .#### #...# .#### ....# .###.", h: "#.... #.... ####. #...# #...# #...# #...#",
+  i: "..#.. ..... .##.. ..#.. ..#.. ..#.. .###.", j: "...#. ..... ..##. ...#. ...#. #..#. .##..",
+  k: "#.... #.... #..#. #.#.. ##... #.#.. #..#.", l: ".##.. ..#.. ..#.. ..#.. ..#.. ..#.. .###.",
+  m: "..... ..... ##.#. #.#.# #.#.# #.#.# #.#.#", n: "..... ..... ####. #...# #...# #...# #...#",
+  o: "..... ..... .###. #...# #...# #...# .###.", p: "..... ..... ####. #...# ####. #.... #....",
+  q: "..... ..... .#### #...# .#### ....# ....#", r: "..... ..... #.##. ##..# #.... #.... #....",
+  s: "..... ..... .#### #.... .###. ....# ####.", t: ".#... .#... ###.. .#... .#... .#..# ..##.",
+  u: "..... ..... #...# #...# #...# #..## .##.#", v: "..... ..... #...# #...# #...# .#.#. ..#..",
+  w: "..... ..... #...# #...# #.#.# #.#.# .#.#.", x: "..... ..... #...# .#.#. ..#.. .#.#. #...#",
+  y: "..... ..... #...# #...# .#### ....# .###.", z: "..... ..... ##### ...#. ..#.. .#... #####",
 }
 const CHARS = Object.keys(GLYPHS).join("")
 
@@ -38,8 +53,10 @@ const CHARS = Object.keys(GLYPHS).join("")
 sprite("_font5x7", { w: CHARS.length * 5, h: 7 }, (c) =>
   [...CHARS].forEach((ch, i) => c.grid(i * 5, 0, GLYPHS[ch].split(" ").join("\n").replace(/#/g, "k"))))
 font("5x7", "_font5x7", { chars: CHARS, w: 5, h: 7 })
+font("5x7 mono", "_font5x7", { chars: CHARS, w: 5, h: 7, mono: true })
 
-scene("font_demo", { w: 120, h: 44, bg: "#2a2550" },
-  text(60, 4, "PIXEL FONT", "#ffe070", { font: "5x7", align: "c", scale: 2, shadow: "#1b1630" }),
-  text(4, 24, "5X7: Score 012,345!", "#fff6e0", { font: "5x7" }),
-  text(4, 34, "3X5 BUILT-IN: SCORE 012,345!", "#b4b8cf"))
+scene("font_demo", { w: 150, h: 54, bg: "#2a2550" },
+  text(75, 4, "PIXEL FONT", "#ffe070", { font: "5x7", align: "c", scale: 2, shadow: "#1b1630" }),
+  text(4, 24, "5x7: Quick fox, 012,345!", "#fff6e0", { font: "5x7" }),
+  text(4, 34, "Mono: 011,111 / 088,888", "#9fe0ff", { font: "5x7 mono" }),
+  text(4, 44, "3X5 BUILT-IN: SCORE 012,345!", "#b4b8cf"))

@@ -37,9 +37,11 @@ export function darken(c: Color, k: number): Color {
 /**
  * `n` shades of `base`, dark to light, with `base` itself at index `at`. Darker shades turn their
  * hue toward blue-violet and lighter ones toward yellow, up to `hue` degrees at the ends (hue
- * shifting: shadows get cooler, highlights warmer, instead of only darker and lighter).
+ * shifting: shadows get cooler, highlights warmer, instead of only darker and lighter). By default the
+ * darks gain a little saturation and the lights lose some toward white; `sat` instead makes the lights
+ * that much more saturated at the end and the darks that much less (Saint11's ramps: `sat: 0.3`).
  */
-export function shadeRamp(base: Color, n: number, at: number, hue = 20): Color[] {
+export function shadeRamp(base: Color, n: number, at: number, hue = 20, sat?: number): Color[] {
   const [r, g, b] = channels(base), [h, s, l] = rgbToHsl(r, g, b);
   const toward = (target: number, amount: number) => {
     const diff = ((target - h + 540) % 360) - 180;
@@ -49,7 +51,7 @@ export function shadeRamp(base: Color, n: number, at: number, hue = 20): Color[]
     if (i === at) return base;
     const dark = i < at, k = dark ? (at - i) / at : (i - at) / (n - 1 - at);
     const L = dark ? l - l * 0.6 * k : l + (1 - l) * 0.55 * k;
-    const S = dark ? Math.min(1, s * (1 + 0.1 * k)) : s * (1 - 0.35 * k);
+    const S = Math.min(1, Math.max(0, sat === undefined ? (dark ? s * (1 + 0.1 * k) : s * (1 - 0.35 * k)) : s * (1 + (dark ? -sat : sat) * k)));
     return pack(...hslToRgb(toward(dark ? 250 : 60, hue * k), S, L));
   });
 }

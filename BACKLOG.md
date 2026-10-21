@@ -612,18 +612,22 @@ wrong way warned, and the lessons in characters §1, §4, §7, §9, §10 and sce
 
 - [ ] **`aa` on an asset**, opt-in: inner edges only, steps of 2 px and more, a strip about half the
   step long in the in-between key `sub` picks. Hand AA beats automatic AA, so never by default.
-- [ ] **`check` on sprites** for the line faults study finds (L-corners, jaggies in a 1 px line),
-  so a hand grid gets them before it's built; a sprite drawn square (`outline8`) is exempt.
+- [x] **`check` on sprites** for the line faults study finds (L-corners, jaggies in a 1 px line),
+  so a hand grid gets them before it's built; a sprite drawn square (`outline8`) is exempt. Only
+  sprites drawn by hand (a grid string, `grid()`, `runs()`; not variants, not parts): the knight's
+  posed parts and the big pictures made as anims gave 1000s of warnings that said nothing. Over every
+  example, one: the bromeliad's outline going into a notch between leaves, kept.
 - [ ] **study: spacing of each moving piece** (from `_pieces.json`): eased, linear, anticipation
   (back first), overshoot (past its rest and back), holds; and squash and stretch as the box's
   w×h and its area. For an action, the frames per phase.
-- [ ] **`font(..., { mono: true })`**: every glyph its cell's width, so a score or a timer doesn't
-  jitter as it counts. And one font with lowercase.
-- [ ] **`shades(..., { sat })`**: shadows less saturated, lights more (Saint11's ramps), beside
-  `hue`.
-- [ ] **`palettize` in OKLab** rather than RGB distance, so a reference's darks don't fold into the
-  wrong hue.
-- [ ] **`build --share N`**: one scale for every preview and GIF of a file, so a set shown together
-  matches (Saint11: one base resolution, whole multiples).
+- [x] **`font(..., { mono: true })`**: every glyph its cell's width, so a score or a timer doesn't
+  jitter as it counts. And one font with lowercase. Done: `mono` centers each glyph in the widest
+  one's width; `examples/fonts/font5x7.px.js` has lowercase and a "5x7 mono".
+- [x] **`shades(..., { sat })`**: shadows less saturated, lights more (Saint11's ramps), beside
+  `hue`. The default stays (darks a little more saturated, lights less toward white).
+- [x] **`palettize` in OKLab** rather than RGB distance, so a reference's darks don't fold into the
+  wrong hue. The tropical trees' trunks came out with darker, browner shadows.
+- [x] **`build --share N`**: one scale for every preview and GIF of a file, so a set shown together
+  matches (Saint11: one base resolution, whole multiples). Already there: `build --scale N`.
 - [ ] **Shading-shift detection** in study: a hue that turns toward the light's color in the lights
   and away from it in the shadows, named as hue shifting, or its absence ("value only: muddy").

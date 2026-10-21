@@ -7,6 +7,12 @@ import { MANY, orientWords, placementChecks } from "../core/describe.ts";
 import { rigLines } from "../core/rig.ts";
 import { frontWords, rampSteps } from "../core/checks.ts";
 import { PxError } from "../core/errors.ts";
+import { lineFlaws } from "../core/vision.ts";
+import type { Item } from "../core/model.ts";
+
+/** Drawn by hand somewhere: a grid string, grid() or runs(), here or in a layer (line(), curve() and code draw their own lines clean, or as they mean to). */
+const byHand = (items: Item[]): boolean => items.some((i) => typeof i === "string"
+  || (typeof i === "object" && i !== null && ("__layer" in i ? byHand((i as { items: Item[] }).items) : "__op" in i && ["grid", "runs"].includes((i as { name: string }).name))));
 import { frameTime } from "./shot.ts";
 
 /** `coverage`: which rules ran and on how many, and those that couldn't (nothing to check them on) */
@@ -36,7 +42,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0 };
   let lightSaid = false, groundSaid = false;
   // by default what the file itself defines (what it includes is checked where it's defined)
   const own = (n: string) => !opts.file || (p.assets.get(n)?.loc ?? "").split(":")[0] === opts.file;
@@ -55,8 +61,18 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       continue;
     }
     if (def.kind !== "scene") {
-      // a part or a prop: only its own front marker (its light and its feet are read where it's placed)
+      // a part or a prop: its own front marker (its light and its feet are read where it's placed), and
+      // its 1 px lines where it's drawn by hand (not a variant, not a part, not drawn square on purpose)
       const img = p.image(name);
+      if (!name.startsWith("_") && !def.opts.base && !def.opts.outline8 && byHand(def.items)) {
+        ran.lines++;
+        const fl = (def.kind === "anim" ? p.frames(name).map((f) => f.img) : [img]).map((im) => lineFlaws(im));
+        const ats = (k: "corners" | "jaggies") => [...new Set(fl.flatMap((f) => f[k].map(([x, y]) => `${x},${y}`)))];
+        const corners = fl.some((f) => f.corners.length < f.line * 0.1) ? ats("corners") : [], jaggies = ats("jaggies");
+        const list = (v: string[]) => `at ${v.slice(0, 4).join("; ")}${v.length > 4 ? "; ..." : ""}`;
+        if (corners.length) lines.push(`${name} › WARNING: ${corners.length} L-corner${corners.length > 1 ? "s" : ""} in its 1 px lines (${list(corners)}): the elbow of three pixels in an L where a line steps doubles it there; delete it, unless the shape turns a corner (PXL help "characters 7")`);
+        if (jaggies.length) lines.push(`${name} › WARNING: ${jaggies.length} jagg${jaggies.length > 1 ? "ies" : "y"} in its 1 px lines (${list(jaggies)}): a run out of order along a line (3 2 4 where 2 3 4 reads smooth); let the runs grow or shrink steadily (PXL help "characters 7")`);
+      }
       if (!img.sockets?.front) continue;
       others++;
       const w = frontWords(img);
@@ -123,6 +139,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     if (ran.feet) run.push(`feet on ${ran.feet}${groundSaid ? ` (against the ground row on ${ran.ground})` : ""}`); else not.push("feet and size (nothing placed has a height)");
   }
   if (ran.text) run.push(`lettering on ${ran.text}`);
+  if (ran.lines) run.push(`lines on ${ran.lines}`);
   if (rigs) run.push(`rig parts ${ran.parts}`);
   const readings = opts.readings ? { readings: [...reads], tally: `${tally.agree + tally.against + tally.unclear} placements read: ${tally.agree} lit as their light, ${tally.against} against it, ${tally.unclear} with no side to tell` } : {};
   return { ...readings, lines, warnings: lines.length,

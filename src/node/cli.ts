@@ -61,7 +61,8 @@ const USAGE = `pxl — pixel-art DSL
   pxl check <art.px.js> [name...] [--frame N] [--readings]
       Every check describe makes that can warn (facing, front marker, lit side, parallel parts, feet
       on the ground, lettering), on every scene and rig the file defines (not those it includes, or
-      just the named assets) and the front marker of any other asset that has one, from one load: the
+      just the named assets), the front marker of any other asset that has one, and the 1 px lines
+      of every sprite drawn by hand (grids, runs(): L-corners and jaggies), from one load: the
       warnings only, one line each. An animated scene is checked at every frame of its loop, each
       distinct placement once, and a warning says at which frames (--frame N: that one only). Exits 1
       when there is any. --readings also lists what the lit-side rule read on every placement,

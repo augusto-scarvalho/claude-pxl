@@ -438,7 +438,8 @@ export function lineFlaws(img: Img): { line: number; corners: [number, number][]
       x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
       for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
         const d = at(x + dx, y + dy);
-        if (d !== c) { lift += clear(d) ? 0.3 : lch(d).L - L; sides++; }
+        // (against the clear only a dark line is an outline; a light band at the edge is a shape's rim)
+        if (d !== c) { lift += clear(d) ? (L < 0.5 ? 0.3 : 0) : lch(d).L - L; sides++; }
       }
       for (const [dx, dy] of N8) {
         const k = (y + dy) * W + x + dx;

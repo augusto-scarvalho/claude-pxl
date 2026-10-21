@@ -318,7 +318,7 @@ declare global {
   function pal(keys: Record<string, string | number>): void;
   function ramps(...darkToLight: string[]): void;
   /** Define keys (dark to light) as hue-shifted shades of `base` and add them as a ramp; base sits at `at` (default the middle). */
-  function shades(keys: string, base: PxColor, opts?: { hue?: number; at?: number }): void;
+  function shades(keys: string, base: PxColor, opts?: { hue?: number; at?: number; sat?: number }): void;
   function sprite(name: string, opts: PxAssetOpts, ...items: PxItem[]): void;
   function sprite(name: string, ...items: PxItem[]): void;
   function scene(name: string, opts: PxSceneOpts, ...items: PxItem[]): void;
@@ -331,7 +331,7 @@ declare global {
   function group(name: string, members: string[]): void;
   function sheet(name: string, entries: string[], opts?: { cols?: number; pad?: number; extrude?: number }): void;
   /** A bitmap font from glyphs drawn in w x h cells on a sprite, in the order of `chars`; use it with text(..., { font }). */
-  function font(name: string, sprite: string, opts: { chars: string; w: number; h: number; cols?: number }): void;
+  function font(name: string, sprite: string, opts: { chars: string; w: number; h: number; cols?: number; mono?: boolean }): void;
   /** n directions (sprites name_0.. + group name) from a pose pointing up, via exact quarter turns and diagonal mirrors where possible. See rotation.md. */
   function directions(name: string, n: number, opts: { from: string; outline?: PxColor; outline8?: PxColor; symmetric?: boolean; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; draw?: Record<string, string>; pivot?: "bottom" | "center" | [number, number] }): void;
   /** palette: true keeps the included file's use()/pal()/ramps() active afterwards. */

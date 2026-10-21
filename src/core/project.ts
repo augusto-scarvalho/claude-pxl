@@ -352,17 +352,18 @@ export class Project implements BuildCtx {
     env.pal = (aliases: Record<string, string | number>) => {
       try { this.pal = this.pal.extend(aliases); } catch (e) { throw wrap(e).within("pal", this.callerLoc()); }
     };
-    env.shades = (keys: unknown, base: unknown, opts: { hue?: number; at?: number } = {}) => {
+    env.shades = (keys: unknown, base: unknown, opts: { hue?: number; at?: number; sat?: number } = {}) => {
       const loc = this.callerLoc();
       try {
         const ks = typeof keys === "string" ? [...keys] : [];
         if (ks.length < 2) throw new PxError('shades("HGgl", "#5aa040"): two or more keys, dark to light, then the base color');
-        checkKeys("shades", opts, ["hue", "at"]);
+        checkKeys("shades", opts, ["hue", "at", "sat"]);
+        if (opts.sat !== undefined && !(typeof opts.sat === "number" && opts.sat >= -1 && opts.sat <= 1)) throw new PxError(`sat is how much more saturated the lights get (the darks as much less), -1..1, got ${JSON.stringify(opts.sat)}`);
         const c = this.pal.resolve(base);
         if (c === null || c === TRANSPARENT) throw new PxError(`shades needs a visible base color, got ${JSON.stringify(base)}`);
         const at = opts.at ?? Math.floor(ks.length / 2);
         if (!(Number.isInteger(at) && at >= 0 && at < ks.length)) throw new PxError(`at must be a key index 0..${ks.length - 1}, got ${at}`);
-        const cols = shadeRamp(c, ks.length, at, opts.hue ?? 20);
+        const cols = shadeRamp(c, ks.length, at, opts.hue ?? 20, opts.sat);
         this.pal = this.pal.extend(Object.fromEntries(ks.map((k, i) => [k, toHex(cols[i])]))).withRamps([ks.join("")]);
       } catch (e) { throw wrap(e).within("shades", loc); }
     };
@@ -442,13 +443,13 @@ export class Project implements BuildCtx {
     };
     env.font = (name: unknown, asset: unknown, opts: Partial<FontDef> = {}) => {
       const loc = this.callerLoc();
-      if (typeof name !== "string" || typeof asset !== "string") throw new PxError('font("name", "glyph_sprite", { chars, w, h, cols? })', loc);
-      checkKeys(`font '${name}'`, opts, ["chars", "w", "h", "cols"], loc);
-      const { chars, w, h, cols } = opts;
+      if (typeof name !== "string" || typeof asset !== "string") throw new PxError('font("name", "glyph_sprite", { chars, w, h, cols?, mono? })', loc);
+      checkKeys(`font '${name}'`, opts, ["chars", "w", "h", "cols", "mono"], loc);
+      const { chars, w, h, cols, mono } = opts;
       if (typeof chars !== "string" || !chars || !(Number.isInteger(w) && w! > 0 && Number.isInteger(h) && h! > 0))
         throw new PxError(`font '${name}' needs { chars: "ABC...", w, h }: the glyph cell size and the characters in cell order`, loc);
       if (this.fonts.has(name)) throw new PxError(`font '${name}' is already defined at ${this.fonts.get(name)!.loc}`, loc);
-      this.fonts.set(name, { name, asset, chars, w: w!, h: h!, cols, loc });
+      this.fonts.set(name, { name, asset, chars, w: w!, h: h!, cols, mono: !!mono, loc });
     };
     env.sheet = (name: unknown, entries: unknown, opts: SheetOpts = {}) => {
       const loc = this.callerLoc();
@@ -581,7 +582,8 @@ export class Project implements BuildCtx {
 
   /**
    * A font's glyphs as rows of "#" / ".", cut from its asset once. Each glyph is trimmed to its
-   * opaque columns (a proportional font); a space not in `chars` is half a cell wide.
+   * opaque columns (a proportional font); a space not in `chars` is half a cell wide. `mono`: every
+   * glyph centered in the widest one's width, so a score or a timer keeps its place as it counts.
    */
   glyphs(font: string): (ch: string) => string[] {
     const hit = this.glyphCache.get(font);
@@ -597,6 +599,11 @@ export class Project implements BuildCtx {
       if (used.length) rows = rows.map((r) => r.slice(used[0], used[used.length - 1] + 1));
       map.set(ch, rows);
     });
+    if (f.mono) {
+      const m = Math.max(...[...map.values()].map((r) => r[0].length));
+      for (const [ch, rows] of map) { const l = (m - rows[0].length) >> 1; map.set(ch, rows.map((r) => ".".repeat(l) + r + ".".repeat(m - rows[0].length - l))); }
+      if (!map.has(" ")) map.set(" ", Array(f.h).fill(".".repeat(m)));
+    }
     if (!map.has(" ")) map.set(" ", Array(f.h).fill(".".repeat(Math.ceil(f.w / 2))));
     const g = (ch: string) => {
       const rows = map.get(ch) ?? map.get(ch.toUpperCase()) ?? map.get(ch.toLowerCase());

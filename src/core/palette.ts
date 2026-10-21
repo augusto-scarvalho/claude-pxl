@@ -1,4 +1,4 @@
-import { type Color, parseHex, TRANSPARENT, toHex } from "./color.ts";
+import { type Color, oklab, parseHex, TRANSPARENT, toHex } from "./color.ts";
 import { PxError, didYouMean } from "./errors.ts";
 
 export const INDEX_KEYS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -209,12 +209,14 @@ export class Palette {
   /** Map each of `colors` to the nearest keyed color (redmean distance); transparent stays. */
   snapMap(colors: Iterable<Color>): Map<Color, Color> {
     const keyed = [...new Set(this.keys.values())].filter((c) => c !== TRANSPARENT), m = new Map<Color, Color>();
+    const lab = new Map(keyed.map((k) => [k, oklab(k)]));
     for (const c of colors) {
       if (c === TRANSPARENT || m.has(c)) continue;
+      // nearest as the eye sees it (OKLab): an RGB distance folds dark tones into the wrong hue
       let best = c, bd = Infinity;
+      const p = oklab(c);
       for (const k of keyed) {
-        const rm = ((c >>> 24) + (k >>> 24)) / 2, dr = (c >>> 24) - (k >>> 24), dg = ((c >>> 16) & 255) - ((k >>> 16) & 255), db = ((c >>> 8) & 255) - ((k >>> 8) & 255);
-        const d = (2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db;
+        const q = lab.get(k)!, d = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
         if (d < bd) { bd = d; best = k; }
       }
       m.set(c, best);

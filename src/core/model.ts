@@ -431,6 +431,8 @@ export interface FontDef {
   h: number;
   /** Cells per row on the asset (default: as many as fit its width). */
   cols?: number;
+  /** Every glyph as wide as the widest (centered), not trimmed to its own ink. */
+  mono?: boolean;
   loc?: string;
 }
 

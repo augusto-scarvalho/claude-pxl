@@ -49,7 +49,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    the time went, in your file and in pxl.
 5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
    rig of the file and every frame of an animated scene (not `anim()`s: a picture made as one gets no
-   checks), warnings only, with the frames they happen at. Fix each or say why it's meant. Its last
+   checks), and the 1 px lines of every sprite drawn by hand (L-corners, jaggies), warnings only,
+   with the frames they happen at. Fix each or say why it's meant. Its last
    line says which rules ran: a rule runs only where the art says what it needs (`world.light`,
    `world.ground`, `height`, a `front` socket), so "no warnings" with "not run: lit side" checked
    nothing about the light (a scene lit by a fire or a lamp: `world: { light: { at: [x, y] } }`).

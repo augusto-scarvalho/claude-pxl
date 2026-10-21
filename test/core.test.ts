@@ -134,6 +134,11 @@ test("shades: keys from one base color, dark to light, hue-shifted, registered a
   assert.deepEqual([...p.image("s").data], [a, a, b], "the keys form a ramp: shade() steps down it");
   assert.match(failure('shades("a", "#fff")').message, /two or more keys/);
   assert.match(failure('shades("ab", "#fff", { at: 2 })').message, /at must be a key index 0..1/);
+  // sat: the light end more saturated than by default, the dark end less
+  const chroma = (v: number) => Math.max(...rgb(v)) - Math.min(...rgb(v));
+  const [sa, , sc] = loadSource('shades("abc", "#5aa040", { sat: 0.3 }); sprite("t", "abc")', "t.px.js").image("t").data;
+  assert.ok(chroma(sc) > chroma(c) && chroma(sa) < chroma(a), `${chroma(sc)} > ${chroma(c)}, ${chroma(sa)} < ${chroma(a)}`);
+  assert.match(failure('shades("ab", "#fff", { sat: 2 })').message, /sat is how much more saturated the lights get/);
 });
 
 test("curve: through the points, pixel-perfect at 1px, closed loops", () => {
@@ -214,6 +219,9 @@ test("font: glyphs cut from a sprite, trimmed to their ink (proportional), used 
   assert.match(failure(F + 'sprite("t", { w: 4, h: 4 }, text(0, 0, "Z", "w", { font: "tiny" }))', "t").message, /font 'tiny' has no glyph for 'Z'/);
   assert.match(failure(F + 'sprite("t", { w: 4, h: 4 }, text(0, 0, "A", "w", { font: "tinny" }))', "t").message, /unknown font 'tinny'.*tiny/);
   assert.match(failure(PAL + 'font("x", "_f", { chars: "A" })').message, /needs \{ chars: "ABC\.\.\.", w, h \}/);
+  // mono: the "i" centered in the "A"'s width, so "AiA" and "AAA" are as wide
+  const M = PAL + 'sprite("_f", "rrr.r.\\nr.r.r."); font("tiny", "_f", { chars: "Ai", w: 3, h: 2, mono: true }); ';
+  eq(art(M + 'sprite("t", { w: 11, h: 2 }, text(0, 0, "AiA", "w", { font: "tiny" }))', "t"), "www..w..www\nw.w..w..w.w");
 });
 
 test("panel: 9-slice, corners stay, edges and center repeat; flips turn the margins; sheets export them", () => {

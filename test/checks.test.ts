@@ -212,3 +212,15 @@ scene("s", { w: 60, h: 14, bg: "d", world: { scale: 10, light: [0.6, -1] } }, st
   assert.equal(r.tally, "2 placements read: 1 lit as their light, 1 against it, 0 with no side to tell");
   assert.equal(checkProject(loadSource(src, "t.px.js")).readings, undefined, "only when asked");
 });
+
+test("check: a hand-drawn sprite's 1 px lines, L-corners and jaggies with where; line() and outline8 aren't asked", () => {
+  // a shallow line by hand, one step doubled (x 6), the others clean; the same by line(); a grid
+  // drawn square on purpose
+  const rows = ["kk..............", "..kk............", "....kkk.........", "......kkk.......", ".........kkk....", "............kkkk"].join("\n");
+  const p = loadSource(PAL + `sprite("hand", \`\n${rows}\`)
+sprite("ruled", { w: 16, h: 6 }, line(0, 0, 15, 5, "k"))
+sprite("square", { outline8: "k" }, \`\n${rows}\`)`, "t.px.js");
+  const r = checkProject(p);
+  assert.deepEqual(r.lines.map((l) => l.slice(0, l.indexOf(":", l.indexOf("WARNING") + 8))), ["hand › WARNING: 1 L-corner in its 1 px lines (at 6,2)"]);
+  assert.match(r.coverage, /lines on 1;/, "only the hand-drawn one is read");
+});
