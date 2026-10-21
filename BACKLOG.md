@@ -675,6 +675,9 @@ Saint11's, read from his page, and not kept in the repository):
   draws them in by turns); the race still reads as a camera going forward.
 - [x] **How long each piece's drawings are held**, per piece (the clip's own holds are said now).
   Done when its cycle is a whole number of times its drawings: "each held about 2 frames: on twos".
+- [ ] **A ball crossing a still backdrop** read as a plane going by ("nothing moves on its own"), and
+  a one-way move that jumps back to its start read as "a loop that closes" (the seam measured
+  against the steps, which are as big): found by the second audit.
 - [x] **Banding across a 1 px gap**, and 45° runs whose ends step together (Pixel Joint): study's
   banding counts only runs side by side. Done: the gallery's facades read about 1.7 times the pairs.
 
