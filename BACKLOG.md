@@ -618,9 +618,11 @@ wrong way warned, and the lessons in characters §1, §4, §7, §9, §10 and sce
   sprites drawn by hand (a grid string, `grid()`, `runs()`; not variants, not parts): the knight's
   posed parts and the big pictures made as anims gave 1000s of warnings that said nothing. Over every
   example, one: the bromeliad's outline going into a notch between leaves, kept.
-- [ ] **study: spacing of each moving piece** (from `_pieces.json`): eased, linear, anticipation
+- [x] **study: spacing of each moving piece** (from `_pieces.json`): eased, linear, anticipation
   (back first), overshoot (past its rest and back), holds; and squash and stretch as the box's
-  w×h and its area. For an action, the frames per phase.
+  w×h and its area. For an action, the frames per phase. Done for things carried (4 drawings at
+  most) and actions over 24 frames at most: elsewhere a box's steps were its drawings changing (a
+  rig's limbs, an anim in place), noise over the whole gallery. Frames per phase not done.
 - [x] **`font(..., { mono: true })`**: every glyph its cell's width, so a score or a timer doesn't
   jitter as it counts. And one font with lowercase. Done: `mono` centers each glyph in the widest
   one's width; `examples/fonts/font5x7.px.js` has lowercase and a "5x7 mono".
@@ -630,5 +632,7 @@ wrong way warned, and the lessons in characters §1, §4, §7, §9, §10 and sce
   wrong hue. The tropical trees' trunks came out with darker, browner shadows.
 - [x] **`build --share N`**: one scale for every preview and GIF of a file, so a set shown together
   matches (Saint11: one base resolution, whole multiples). Already there: `build --scale N`.
-- [ ] **Shading-shift detection** in study: a hue that turns toward the light's color in the lights
+- [x] **Shading-shift detection** in study: a hue that turns toward the light's color in the lights
   and away from it in the shadows, named as hue shifting, or its absence ("value only: muddy").
+  Done as a count of the colored ramps: warmer in the light, cooler in the light, one hue. By pixels
+  a sky's gradient outvoted every material, so a ramp is a vote.

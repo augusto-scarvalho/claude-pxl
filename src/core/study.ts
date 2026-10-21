@@ -79,6 +79,8 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   if (ramps.length > 12) text.push(`  ... ${ramps.length - 12} more, small`);
   const sizes = ramps.filter((r) => r.colors.length > 1).map((r) => r.colors.length).sort((a, b) => a - b);
   if (sizes.length) text.push(`  ${ramps.length} ramps; a ramp's tones: ${sizes[0]} to ${sizes[sizes.length - 1]}, most ${sizes[sizes.length >> 1]}.`);
+  const shift = hueShifting(ramps);
+  if (shift) text.push(`  ${shift}`);
   // (a palette someone chose: a lit scene's thousands of blended tones aren't one)
   if (pixelArt && nColors <= 64) for (const line of paletteSanity(smeared ? null : native, ramps, nColors)) text.push(line);
 
@@ -172,6 +174,32 @@ function smoothShare(img: Img): number {
     if (dE(a, b) < 0.04) gentle++;
   }
   return all ? gentle / all : 0;
+}
+
+/**
+ * The ramps' hue shifting counted, a ramp each (a sky's many pixels are one material): lights turning
+ * warmer and shadows cooler (what shades() does), the other way (a cold light: the moon, metal), or one
+ * hue from dark to light (value only, what Saint11 calls dull and muddy). Null with fewer than two
+ * colored ramps of three tones.
+ */
+export function hueShifting(ramps: Ramp[]): string | null {
+  const ang = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180);
+  const tally = { warm: 0, cold: 0, flat: 0 };
+  let n = 0;
+  for (const r of ramps) {
+    if (r.neutral || r.colors.length < 3) continue;
+    const d = lch(r.colors[0]), l = lch(r.colors[r.colors.length - 1]), w = 1;
+    // warmer: nearer yellow-orange (70°); a ramp of one hue moves under 8°
+    const toward = ang(d.h, 70) - ang(l.h, 70);
+    tally[ang(d.h, l.h) < 8 ? "flat" : toward > 0 ? "warm" : "cold"] += w;
+    n++;
+  }
+  const all = tally.warm + tally.cold + tally.flat;
+  if (n < 2 || !all) return null;
+  const parts = [tally.warm ? `${tally.warm} warmer in the light and cooler in the shade (what shades() makes)` : "",
+    tally.cold ? `${tally.cold} cooler in the light (a cold light: the moon, metal; shades() with a negative hue)` : "",
+    tally.flat ? `${tally.flat} one hue from dark to light (value only: Saint11's dull and muddy)` : ""].filter(Boolean);
+  return `Hue shifting, of ${all} colored ramps: ${parts.join(", ")}.`;
 }
 
 function shiftWords(r: Ramp): string {
@@ -477,6 +505,45 @@ const WHAT: Record<Piece["kind"], string> = {
 const spans = (v: number[]) => { const out: string[] = []; for (let i = 0; i < v.length; ) { let j = i; while (j + 1 < v.length && v[j + 1] === v[j] + 1) j++; out.push(j > i ? `${v[i]}-${v[j]}` : `${v[i]}`); i = j + 1; } return out.join(", "); };
 /** The pieces told and drawn: the 16 biggest things, then the 8 biggest lights. */
 const shown = (pieces: Piece[]) => [...pieces.filter((p) => p.kind !== "light").slice(0, 16), ...pieces.filter((p) => p.kind === "light").slice(0, 8)];
+/**
+ * How a piece moves frame to frame (Saint11: the spacing between drawings is the speed): its steps along
+ * the way it travels most, each run of them speeding up, slowing or even, holds, a move back first
+ * (anticipation), past its rest and back (overshoot); and its box squashing and stretching.
+ */
+export function spacingWords(track: [number, number, number, number, number][]): string | null {
+  if (track.length < 4) return null;
+  const c = track.map(([, x, y, w, h]) => [x + w / 2, y + h / 2]), out: string[] = [];
+  const range = (k: number) => Math.max(...c.map((p) => p[k])) - Math.min(...c.map((p) => p[k]));
+  const ax = range(0) >= range(1) ? 0 : 1;
+  if (range(ax) >= 3) {
+    const d = c.slice(1).map((p, i) => Math.round(p[ax] - c[i][ax]));
+    if (Math.max(...d.map(Math.abs)) <= 1) return null;
+    // runs of steps one way (a hold, 0, is a run of its own)
+    const runs: number[][] = [];
+    for (const v of d) { const r = runs[runs.length - 1]; if (r && Math.sign(r[0]) === Math.sign(v)) r.push(v); else runs.push([v]); }
+    const word = (r: number[]) => {
+      if (!r[0]) return `holds ${r.length}`;
+      const m = r.map(Math.abs), way = ax ? (r[0] < 0 ? "up" : "down") : r[0] < 0 ? "left" : "right";
+      const up = m.every((v, i) => !i || v >= m[i - 1]), down = m.every((v, i) => !i || v <= m[i - 1]);
+      const how = m.length < 2 ? "" : up && down ? ", even" : up ? ", speeding up" : down ? ", slowing" : m.indexOf(Math.max(...m)) > 0 && m.lastIndexOf(Math.max(...m)) < m.length - 1 ? ", easing in and out" : ", uneven";
+      return `${way} ${m.join(" ")}${how}`;
+    };
+    const moving = runs.filter((r) => r[0]), travel = (r: number[]) => Math.abs(r.reduce((s, v) => s + v, 0));
+    const notes: string[] = [];
+    if (moving.length >= 2 && travel(moving[0]) * 3 <= travel(moving[1]) && Math.sign(moving[0][0]) !== Math.sign(moving[1][0])) notes.push("a move back first (anticipation)");
+    const n = moving.length;
+    if (n >= 2 && travel(moving[n - 1]) * 3 <= travel(moving[n - 2]) && Math.sign(moving[n - 1][0]) !== Math.sign(moving[n - 2][0])) notes.push("past its rest and back (overshoot)");
+    out.push(`spacing, px a frame: ${runs.slice(0, 8).map(word).join("; ")}${runs.length > 8 ? "; ..." : ""}${notes.length ? `: ${notes.join(", ")}` : ""}`);
+  }
+  // squash and stretch: wider as it gets shorter, about the same area
+  const W = track.map((t) => t[3]), H = track.map((t) => t[4]), A = track.map((t) => t[3] * t[4]);
+  const spread = (v: number[]) => Math.max(...v) / Math.max(1, Math.min(...v));
+  const mw = W.reduce((s, v) => s + v, 0) / W.length, mh = H.reduce((s, v) => s + v, 0) / H.length;
+  const cov = W.reduce((s, w, i) => s + (w - mw) * (H[i] - mh), 0);
+  if (spread(W) >= 1.15 && spread(H) >= 1.15 && cov < 0) out.push(`squash and stretch: ${Math.min(...W)}-${Math.max(...W)} wide as ${Math.max(...H)}-${Math.min(...H)} tall, the area within ${Math.round((spread(A) - 1) * 100)}%`);
+  return out.length ? out.join("; ") : null;
+}
+
 function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: number; v: number }[], forward: boolean): string[] {
   const out = [`  Backdrop: ${pct(d.still * 100, 100)} of the picture never changes${d.still > 0.2 ? ": one picture (a sprite or the scene's still layers) under everything else" : ""}.`];
   if (bands.length && !forward) out.push(`  Planes: ${bands.length} band${bands.length > 1 ? "s" : ""} of rows going by (see MOTION): each a strip that wraps, scroll().`);
@@ -489,6 +556,10 @@ function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: nu
     const sm = p.smears ? ` Smears on frames ${spans(p.smears.frames)} (${p.smears.colors.map(hex).join(", ")}: there a moment only): the shape the swing sweeps, on the frames it goes fastest, arc(cx, cy, r, from, to, c, { inner, taper }) in a layer with unlit: true, outline: false (characters.md: its last 100 degrees at most, thin at its tail).` : "";
     const sub = p.sub ? `, moving by part of a pixel (subpixel: its parts stamped with { sub: true } at half-pixel places)` : "";
     out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}${sub}: ${WHAT[p.kind]}.${sm}`);
+    // (a thing going somewhere, or an action, over a short clip: elsewhere a box's steps are its drawings
+    // changing, a limb reaching out, not the thing moving)
+    const sp = (p.kind === "carried" && p.poses <= 4) || p.kind === "action" ? (p.track.length <= 24 ? spacingWords(p.track) : null) : null;
+    if (sp) out.push(`     ${sp}`);
   }
   const things = d.pieces.filter((p) => p.kind !== "light").length, lights = d.pieces.length - things;
   if (things > 16 || lights > 8) out.push(`  ... and ${[things > 16 ? `${things - 16} smaller things` : "", lights > 8 ? `${lights - 8} smaller lights` : ""].filter(Boolean).join(" and ")}.`);

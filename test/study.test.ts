@@ -11,7 +11,7 @@ import { writePng } from "../src/node/output.ts";
 import { main } from "../src/node/cli.ts";
 import { areaDown, findGrid, lineFlaws, pixelate } from "../src/core/vision.ts";
 import { latticeHash } from "../src/core/util.ts";
-import { study } from "../src/core/study.ts";
+import { hueShifting, spacingWords, study } from "../src/core/study.ts";
 import { loadSource } from "../src/node/load.ts";
 
 // a 1x drawing in a handful of colors: runs of 1-3 px, a different length on each row, so no grid
@@ -160,6 +160,25 @@ test("study reads a 1 px line's flaws: L-corners where it steps, a jaggy where i
   const own = lineFlaws(p.image("s"));
   assert.ok(own.line > 60, `${own.line} px of line`);
   assert.deepEqual([own.corners, own.jaggies], [[], []]);
+});
+
+test("spacing: a bounce slowing to the top, held, speeding down; a move back first and past the rest; a squash keeping its area", () => {
+  const at = (ys: number[], xs?: number[], ws?: number[], hs?: number[]) => ys.map((y, f) => [f, (xs?.[f] ?? 40) - (ws?.[f] ?? 8) / 2, y - (hs?.[f] ?? 8) / 2, ws?.[f] ?? 8, hs?.[f] ?? 8] as [number, number, number, number, number]);
+  assert.equal(spacingWords(at([40, 32, 26, 22, 20, 20, 22, 26, 32, 40])), "spacing, px a frame: up 8 6 4 2, slowing; holds 1; down 2 4 6 8, speeding up");
+  // a punch: back 2, out 4 8 8, past its rest by 3 and back
+  assert.match(spacingWords(at([9, 9, 9, 9, 9, 9, 9], [20, 18, 22, 30, 38, 41, 38]))!, /left 2; right 4 8 8 3, easing in and out; left 3: a move back first \(anticipation\)/);
+  assert.match(spacingWords(at([9, 9, 9, 9, 9, 9], [20, 30, 40, 50, 53, 50]))!, /past its rest and back \(overshoot\)/);
+  assert.match(spacingWords(at([30, 30, 30, 30], undefined, [8, 12, 8, 6], [8, 5, 8, 11]))!, /squash and stretch: 6-12 wide as 11-5 tall, the area within \d+%/);
+  assert.equal(spacingWords(at([9, 9, 10])), null, "too short");
+});
+
+test("hue shifting counted ramp by ramp: warmer lights from shades(), one hue, a cold light", () => {
+  const P = (src: string) => loadSource(src + '; sprite("t", "abc")', "t.px.js").image("t").data;
+  const ramp = (cs: Uint32Array) => ({ colors: [...cs], counts: [1, 1, 1], neutral: false });
+  const warm = P('shades("abc", "#5aa040")'), red = P('shades("abc", "#c04040")'), flat = P('shades("abc", "#4060c0", { hue: 0 })');
+  const cold = P('shades("abc", "#c08040", { hue: -30 })');
+  assert.equal(hueShifting([ramp(warm), ramp(red), ramp(flat), ramp(cold)]), "Hue shifting, of 4 colored ramps: 2 warmer in the light and cooler in the shade (what shades() makes), 1 cooler in the light (a cold light: the moon, metal; shades() with a negative hue), 1 one hue from dark to light (value only: Saint11's dull and muddy).");
+  assert.equal(hueShifting([ramp(warm)]), null, "one ramp says nothing");
 });
 
 test("pixelate keeps an edge where a box average blurs it", () => {
