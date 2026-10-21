@@ -664,9 +664,10 @@ Saint11's, read from his page, and not kept in the repository):
   flat thing resting where the background is it, then leaping, still reads as a light.
 - [ ] **A smear inflates the box**: spacing and squash read off the bounding box, which a smear
   stretches. Track the pixels present every frame apart from those that come and go. Tried: the
-  middle of its pixels instead of its box's: a smear joined to the body pulls it as much. What's left
-  is telling the smear's pixels apart (its colors a frame or two only, `smearsOf`), on carried things
-  too, and measuring without them.
+  middle of its pixels instead of its box's: a smear joined to the body pulls it as much; and the box
+  without the colors `smearsOf` finds: it changed nothing on the attack cards, whose smears are in the
+  body's own whites (`smearsOf` asks for colors of their own). What's left is telling a smear by its
+  shape: a thin crescent there one to three frames, beside the part that moves.
 - [x] **Effects as effects**: an explosion (dark, white, blast, fade) read as an attack with an
   anticipation; read its value and area per frame instead, and "plays once, then N frames empty".
   Done in `study --at`'s region reading (its area and lightness per frame, "played once"), and in the
