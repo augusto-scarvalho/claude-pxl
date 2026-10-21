@@ -124,6 +124,23 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       if (c.n <= 1.5 * l.n && l.n <= 1.5 * c.n) [f.vx, f.vy] = f.comps.length > 1 ? [(f.vx + sx) / 2, (f.vy + sy) / 2] : [sx, sy];
       f.comps.push(c); f.lost = 0;
     }
+    // a second chance for a thing that changed speed (a leap, a dash, a brake): a track left without a
+    // match takes the one piece left over near it, of about its size, when each is the other's only
+    // choice (in a crowd there are several and nothing is joined)
+    const leftC = cs.map((_, j) => j).filter((j) => !tookC.has(j)), leftF = live.map((_, i) => i).filter((i) => !tookF.has(i) && live[i].lost === 0);
+    // (going on the way it went, and not where things come in and leave: a picture's edge)
+    const near = (i: number, j: number) => {
+      const f = live[i], l = f.comps.at(-1)!, c = cs[j], size = Math.max(l.x1 - l.x0 + 1, l.y1 - l.y0 + 1);
+      const ahead = (c.cx - l.cx) * f.vx + (c.cy - l.cy) * f.vy >= 0, inside = c.x0 > 0 && c.y0 > 0 && c.x1 < W - 1 && c.y1 < H - 1;
+      return ahead && inside && c.n <= 2 * l.n && l.n <= 2 * c.n && Math.hypot(c.cx - l.cx, c.cy - l.cy) <= Math.max(12, 4 * size);
+    };
+    for (const i of leftF) {
+      const js = leftC.filter((j) => near(i, j));
+      if (js.length !== 1 || leftF.filter((k) => near(k, js[0])).length !== 1) continue;
+      const f = live[i], l = f.comps.at(-1)!, c = cs[js[0]], g = t - l.t;
+      [f.vx, f.vy] = [(c.cx - l.cx) / g, (c.cy - l.cy) / g];
+      f.comps.push(c); f.lost = 0; tookF.add(i); tookC.add(js[0]);
+    }
     for (let i = live.length - 1; i >= 0; i--) if (!tookF.has(i) && ++live[i].lost > 8) ended.push(...live.splice(i, 1));
     cs.forEach((c, j) => { if (!tookC.has(j)) live.push({ comps: [c], vx: 0, vy: 0, lost: 0 }); });
   }
@@ -147,8 +164,12 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       const g = tr[i].t - tr[i - 1].t || 1, sx = (tr[i].cx - tr[i - 1].cx) / g, sy = (tr[i].cy - tr[i - 1].cy) / g;
       if (Math.hypot(sx - vx, sy - vy) <= Math.max(1.5, 0.75 * sp)) steady++;
     }
-    // (faster than half its size a frame only when it keeps one speed nearly all the way: a ball crossing)
-    if (tr.length >= 6 && travel >= Math.max(8, 0.8 * size) && travel >= 0.6 * path && (sp <= Math.max(2, 0.5 * size) || steady >= 0.9 * (tr.length - 1)) && steady >= 0.7 * (tr.length - 1) && !swung(tr.map((c) => c.pix))) {
+    // (faster than half its size a frame only when it keeps one speed nearly all the way, a ball crossing;
+    // or when it goes one way all along, its speed changing, a dash: speeding up, a leap, braking)
+    let back = 0;
+    for (let i = 1; i < tr.length; i++) if ((tr[i].cx - tr[i - 1].cx) * dx + (tr[i].cy - tr[i - 1].cy) * dy < 0) back++;
+    const oneWay = back === 0 && path <= 1.1 * travel;
+    if (tr.length >= 6 && travel >= Math.max(8, 0.8 * size) && travel >= 0.6 * path && (sp <= Math.max(2, 0.5 * size) || steady >= 0.9 * (tr.length - 1) || oneWay) && (steady >= 0.7 * (tr.length - 1) || oneWay) && !swung(tr.map((c) => c.pix))) {
       // carried along: one drawing, or changing drawings (the thing cut out by its difference, bottom-centered)
       const cut = tr.map((c) => cutout(F0[c.t], fg0[c.t], c, W));
       const { poses, cycle } = posesOf(cut, differ);

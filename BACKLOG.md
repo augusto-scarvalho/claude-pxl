@@ -648,7 +648,7 @@ Four agents read the 80 cards and ran `pxl study` on their demos; what got fixed
 goes no longer called a light in words, spacing on jumps and squash in place). Open (the cards are
 Saint11's, read from his page, and not kept in the repository):
 
-- [ ] **Tracks break on leaps**: the follower accepts a match only near a prediction that starts at
+- [x] **Tracks break on leaps**: the follower accepts a match only near a prediction that starts at
   rest, so a thing that launches (a jump's takeoff, a dash at 28 px a frame, a shard at 8-15) loses
   its track on the frames that teach the most. Join a track that ends at t to one that starts at t+1
   or t+2 in the same colors, wherever it is. Fast small things (a 2 px marker at 11 px a frame) are
@@ -656,7 +656,12 @@ Saint11's, read from his page, and not kept in the repository):
   about its size, left the calibration as it was and made a box leaping mid-dash worse (one drawing
   carried at 4 px a frame became a walk of 8). The deeper fault is the light pass: a flat thing on a
   flat ground, where it rests the background is it, and its leaving reads as a lamp going off. For
-  now `study --at` on the region follows it (THE REGION).
+  now `study --at` on the region follows it (THE REGION). Done after all: a track left without a match
+  takes the one piece left over near it (4 times its size), of about its size, going on the way it
+  went and not at the picture's edge, when each is the other's only choice; and a thing going one way
+  all along is carried with its speed changing. A dash read 4 4 4 30 30 4 4; the cyberpunk street's
+  traffic found 31 -> 34, masks P 39 -> 42%, R 43 -> 47%; the tournament's frames found 44 -> 43%. A
+  flat thing resting where the background is it, then leaping, still reads as a light.
 - [ ] **A smear inflates the box**: spacing and squash read off the bounding box, which a smear
   stretches. Track the pixels present every frame apart from those that come and go.
 - [ ] **Effects as effects**: an explosion (dark, white, blast, fade) read as an attack with an

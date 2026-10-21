@@ -253,6 +253,14 @@ test("study: a ball crossing one way at 8 px a frame is carried, not a plane, an
   }
 });
 
+test("study follows a dash through its leap: 4 px a frame, two strides of 30, then 4 again", () => {
+  const xs = [10, 14, 18, 22, 52, 82, 86, 90, 94, 98, 102, 106], bg = pack(40, 50, 60), dk = pack(120, 60, 40), ink = pack(240, 200, 120);
+  const frames = xs.map((x) => { const img = new Img(160, 40); for (let y = 0; y < 40; y++) for (let i = 0; i < 160; i++) img.set(i, y, (i * 7 + y * 3) % 11 === 0 ? dk : bg); for (let y = 14; y < 26; y++) for (let i = 0; i < 10; i++) img.set(x + i, y, ink); return img; });
+  const t = study({ name: "dash", frames, ms: frames.map(() => 80), kind: "test" }).text.join("\n");
+  assert.match(t, /in 12 of 12 frames, 1 drawing, going right .*carried along a path/);
+  assert.match(t, /spacing, px a frame: right 4 4 4 30 30 4 4 4 4 4 4/);
+});
+
 test("pixelate keeps an edge where a box average blurs it", () => {
   // black and white, the edge off the 4 px grid: superpixels follow it, boxes average across it
   const img = new Img(200, 100);
