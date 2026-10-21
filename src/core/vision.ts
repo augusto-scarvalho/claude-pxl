@@ -8,7 +8,8 @@ import { Img } from "./image.ts";
 
 const LAB = new Map<Color, [number, number, number]>();
 export const lab = (c: Color) => { let v = LAB.get(c); if (!v) { if (LAB.size > 200000) LAB.clear(); v = oklab(c); LAB.set(c, v); } return v; };
-export const dE = (a: Color, b: Color) => { const p = lab(a), q = lab(b); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+// (sqrt, not Math.hypot: hypot guards against overflow these never reach, at several times the cost)
+export const dE = (a: Color, b: Color) => { const p = lab(a), q = lab(b), x = p[0] - q[0], y = p[1] - q[1], z = p[2] - q[2]; return Math.sqrt(x * x + y * y + z * z); };
 /** OKLCH: lightness 0..1, chroma, hue in degrees (red ~30, yellow ~110, green ~145, cyan ~195, blue ~265, magenta ~330). */
 export const lch = (c: Color) => { const [L, a, b] = lab(c); return { L, C: Math.hypot(a, b), h: ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360 }; };
 const clear = (c: Color) => (c & 255) < 128;
@@ -102,6 +103,32 @@ export function toNative(img: Img, g: Grid): Img {
     const a = o + i * s + (s >= 2.5 ? 0.25 * s : 0), b = o + (i + 1) * s - (s >= 2.5 ? 0.25 * s : 0);
     return [Math.ceil(a - 0.5), Math.max(Math.ceil(a - 0.5), Math.floor(b - 0.5))];
   };
+  // a whole grid of small cells (an upscale by 2, 3 or 4): each cell's commonest color counted in place,
+  // with no map per cell (the read of a long clip did a map for each of millions of cells)
+  if (whole && g.sx * g.sy <= 16) {
+    const cell = new Uint32Array(g.sx * g.sy);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let n = 0, gone = 0;
+      for (let yy = g.oy + y * g.sy; yy < g.oy + (y + 1) * g.sy; yy++) for (let xx = g.ox + x * g.sx; xx < g.ox + (x + 1) * g.sx; xx++) {
+        const c = img.data[yy * img.w + xx];
+        if (clear(c)) gone++; else cell[n++] = c;
+      }
+      if (gone * 2 > gone + n || !n) continue;
+      // the commonest, the first of them on a tie (as the map kept them)
+      let best = cell[0], top = 0;
+      for (let i = 0; i < n; i++) {
+        let k = 0;
+        for (let j = 0; j < n; j++) if (cell[j] === cell[i]) k++;
+        if (k > top) { top = k; best = cell[i]; }
+      }
+      if (top * 2 < n) {
+        const med = (s: number) => { const v: number[] = []; for (let i = 0; i < n; i++) v.push((cell[i] >>> s) & 255); v.sort((a, b) => a - b); return v[v.length >> 1]; };
+        best = pack(med(24), med(16), med(8));
+      }
+      out.data[y * W + x] = best;
+    }
+    return out;
+  }
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const count = new Map<Color, number>(), cs: Color[] = [];
     let gone = 0, n = 0;

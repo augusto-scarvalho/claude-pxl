@@ -156,6 +156,15 @@ export class Img {
   blit(src: Img, dx: number, dy: number): void {
     dx = Math.floor(dx);
     dy = Math.floor(dy);
+    if (!src.norm && !this.norm) {
+      // (no normals either side: just the overlap, row by row)
+      const xa = Math.max(0, -dx), xb = Math.min(src.w, this.w - dx), s = src.data, d = this.data;
+      for (let y = Math.max(0, -dy); y < Math.min(src.h, this.h - dy); y++) {
+        const so = y * src.w, to = (dy + y) * this.w + dx;
+        for (let x = xa; x < xb; x++) { const c = s[so + x]; if (c !== TRANSPARENT) d[to + x] = c; }
+      }
+      return;
+    }
     for (let y = 0; y < src.h; y++) {
       const ty = dy + y;
       if (ty < 0 || ty >= this.h) continue;
@@ -232,16 +241,20 @@ export class Img {
 
   /** Bounding box of opaque pixels, or undefined when empty. */
   bounds(): { x: number; y: number; w: number; h: number } | undefined {
-    let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
-    for (let y = 0; y < this.h; y++)
-      for (let x = 0; x < this.w; x++)
-        if (this.data[y * this.w + x] !== TRANSPARENT) {
-          if (x < x0) x0 = x;
-          if (x > x1) x1 = x;
-          if (y < y0) y0 = y;
-          y1 = y;
-        }
-    return x1 < 0 ? undefined : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+    // the first and last rows with anything in them, then each row in between only as far in from
+    // either side as the box hasn't reached yet
+    const { w, h, data } = this, any = (y: number) => { for (let i = y * w; i < (y + 1) * w; i++) if (data[i] !== TRANSPARENT) return true; return false; };
+    let y0 = 0, y1 = h - 1;
+    while (y0 < h && !any(y0)) y0++;
+    if (y0 === h) return undefined;
+    while (!any(y1)) y1--;
+    let x0 = w, x1 = -1;
+    for (let y = y0; y <= y1; y++) {
+      const r = y * w;
+      for (let x = 0; x < x0; x++) if (data[r + x] !== TRANSPARENT) { x0 = x; break; }
+      for (let x = w - 1; x > x1; x--) if (data[r + x] !== TRANSPARENT) { x1 = x; break; }
+    }
+    return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
   }
 
   sub(x: number, y: number, w: number, h: number): Img {

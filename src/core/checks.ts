@@ -44,18 +44,22 @@ export function litDir(img: Img, steps?: Steps): LitReading | undefined {
   const sides: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   // the outline: the color most of the edge pixels share, or (a selective outline, each line pixel
   // a darker shade of what it touches) a ring of edge pixels nearly all darker than the pixel inside
-  const edge = new Map<Color, number>(), ring = new Set<number>();
+  const edge = new Map<Color, number>(), ring = new Uint8Array(W * H);
   let n = 0, darker = 0;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const c = at(x, y), out = sides.find(([dx, dy]) => at(x + dx, y + dy) === TRANSPARENT);
-    if (c === TRANSPARENT || !out) continue;
-    edge.set(c, (edge.get(c) ?? 0) + 1); n++; ring.add(y * W + x);
+    const c = at(x, y);
+    if (c === TRANSPARENT) continue;
+    // (the first side open, in sides' order)
+    const k = at(x + 1, y) === TRANSPARENT ? 0 : at(x - 1, y) === TRANSPARENT ? 1 : at(x, y + 1) === TRANSPARENT ? 2 : at(x, y - 1) === TRANSPARENT ? 3 : -1;
+    if (k < 0) continue;
+    const out = sides[k];
+    edge.set(c, (edge.get(c) ?? 0) + 1); n++; ring[y * W + x] = 1;
     const inner = at(x - out[0], y - out[1]);
     if (inner !== TRANSPARENT && lum(inner) > lum(c) + 0.03) darker++;
   }
   if (!n) return undefined;
   const [ink, inkN] = [...edge].sort((a, b) => b[1] - a[1])[0], outline = inkN > n * 0.6 ? ink : undefined, selout = !outline && darker >= n * 0.7;
-  const open = (x: number, y: number) => { const c = at(x, y); return c === TRANSPARENT || c === outline || (selout && ring.has(y * W + x)); };
+  const open = (x: number, y: number) => { const c = at(x, y); return c === TRANSPARENT || c === outline || (selout && ring[y * W + x] === 1); };
   // the rim: each pixel open on some side, how it faces (e), and how much lighter it is than the
   // material up to 3 px inward, against e (b)
   const rim: { ex: number; ey: number; b: number }[] = [];

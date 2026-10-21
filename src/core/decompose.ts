@@ -774,8 +774,9 @@ function cutout(f: Img, m: Uint8Array, c: Blob, W: number): { w: number; h: numb
  * its pixels differ) and the shortest number of frames after which the sequence repeats (0: it doesn't).
  */
 function posesOf(seq: (Color[] | { w: number; h: number; px: Color[] })[], differ: (a: Color, b: Color) => boolean): { poses: number; cycle: number } {
-  const frac = (a: Color[] | { w: number; h: number; px: Color[] }, b: Color[] | { w: number; h: number; px: Color[] }) => {
-    if (Array.isArray(a) && Array.isArray(b)) { let d = 0; for (let i = 0; i < a.length; i++) if (differ(a[i], b[i])) d++; return d / Math.max(1, a.length); }
+  // (past `stop` it stops counting: whether two are the same drawing is settled by then)
+  const frac = (a: Color[] | { w: number; h: number; px: Color[] }, b: Color[] | { w: number; h: number; px: Color[] }, stop = Infinity) => {
+    if (Array.isArray(a) && Array.isArray(b)) { const most = stop * a.length; let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i] && differ(a[i], b[i]) && ++d > most) break; return d / Math.max(1, a.length); }
     const A = a as { w: number; h: number; px: Color[] }, B = b as { w: number; h: number; px: Color[] };
     // bottom-centered: compare where both are, count the rest as different
     const w = Math.max(A.w, B.w), h = Math.max(A.h, B.h);
@@ -790,13 +791,15 @@ function posesOf(seq: (Color[] | { w: number; h: number; px: Color[] })[], diffe
     return d / Math.max(1, n);
   };
   const reps: typeof seq = [];
-  for (const s of seq) if (!reps.some((r) => frac(r, s) < 0.03)) { reps.push(s); if (reps.length > 64) break; }
+  for (const s of seq) if (!reps.some((r) => frac(r, s, 0.03) < 0.03)) { reps.push(s); if (reps.length > 64) break; }
   let cycle = 0;
   const step = seq.length > 1 ? seq.slice(1).reduce((a, s, i) => a + frac(seq[i], s), 0) / (seq.length - 1) : 0;
   for (let p = 2; p <= Math.floor(seq.length / 2) && step > 0.01; p++) {
+    // (a period is out once its sum passes what its comparisons may add up to)
+    const most = 0.3 * step * Math.min(24, seq.length - p);
     let s = 0, c = 0;
-    for (let i = 0; i + p < seq.length && c < 24; i++) { s += frac(seq[i], seq[i + p]); c++; }
-    if (c && s / c < 0.3 * step) { cycle = p; break; }
+    for (let i = 0; i + p < seq.length && c < 24 && s < most; i++) { s += frac(seq[i], seq[i + p], most - s); c++; }
+    if (c && s < most && s / c < 0.3 * step) { cycle = p; break; }
   }
   return { poses: reps.length, cycle };
 }

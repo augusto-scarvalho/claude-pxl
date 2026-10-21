@@ -632,7 +632,9 @@ function mix(img: Img, limg: Img, l: LayerOpts, pal: Palette): void {
   if (!f) throw new PxError(`layer blend must be ${Object.keys(MIXES).map((k) => `"${k}"`).join(", ")}, got ${JSON.stringify(l.blend)}`);
   const op = l.opacity ?? 1, density = l.density ?? 1;
   if (!(op >= 0 && op <= 1)) throw new PxError(`layer opacity must be 0..1, got ${l.opacity}`);
-  const out = new Map<number, Color>();
+  // (the pixels mixed are kept only to be snapped back to the palette: a map of every pixel of every
+  // such layer of every frame was most of a long scene's check)
+  const out = l.palettize ? new Map<number, Color>() : undefined;
   for (let i = 0; i < img.data.length; i++) {
     const s = limg.data[i];
     if (s === TRANSPARENT || (density < 1 && bayer(i % img.w, Math.floor(i / img.w)) >= density)) continue;
@@ -641,14 +643,11 @@ function mix(img: Img, limg: Img, l: LayerOpts, pal: Palette): void {
       if (!l.blend || l.blend === "normal") img.data[i] = op >= 1 ? s : ((s & ~255) | Math.round((s & 255) * op)) >>> 0;
       continue;
     }
-    const ch = (sh: number) => {
-      const sv = (s >>> sh) & 255, dv = (d >>> sh) & 255;
-      return Math.round(dv + (f(sv, dv) - dv) * op);
-    };
-    img.data[i] = pack(ch(24), ch(16), ch(8), d & 255);
-    out.set(i, img.data[i]);
+    const sr = s >>> 24, sg = (s >>> 16) & 255, sb = (s >>> 8) & 255, dr = d >>> 24, dg = (d >>> 16) & 255, db = (d >>> 8) & 255;
+    img.data[i] = pack(Math.round(dr + (f(sr, dr) - dr) * op), Math.round(dg + (f(sg, dg) - dg) * op), Math.round(db + (f(sb, db) - db) * op), d & 255);
+    out?.set(i, img.data[i]);
   }
-  if (l.palettize) {
+  if (out) {
     const snap = pal.snapMap(out.values());
     for (const [i, c] of out) img.data[i] = snap.get(c) ?? c;
   }

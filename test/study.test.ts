@@ -378,19 +378,6 @@ test("pixelate keeps an edge where a box average blurs it", () => {
   assert.ok(grey(areaDown(img, 50, 25)) > 0);
 });
 
-test("study reads pxl's own gallery back as it was made", async () => {
-  // the train: four planes scrolled 320, 640, 1280 and 1920 px over its 192 frames
-  const train = await said("study", "docs/gallery/parallax_train.gif", "--no-out");
-  const speeds = [...train.matchAll(/at (\d+\.\d+) px\/frame left/g)].map((m) => +m[1]);
-  for (const [i, v] of [320, 640, 1280, 1920].entries()) assert.ok(Math.abs(speeds[i] - v / 192) < 0.1, `plane ${i}: ${speeds[i]} for ${v / 192}`);
-  assert.match(train, /No lines meet|no third point|parallel in the picture/);
-  // the park: perspective({ horizon: 70, fov: 90, yaw: 40 })
-  const park = await said("study", "docs/gallery/park.gif", "--no-out");
-  const m = /Two-point perspective: the horizon at row (\d+);.*\(fov ~(\d+)°\)/.exec(park), y = /yaw: (\d+)/.exec(park);
-  assert.ok(m && y, park);
-  assert.ok(Math.abs(+m![1] - 70) <= 6 && Math.abs(+m![2] - 90) <= 8 && Math.abs(+y![1] - 40) <= 4, `${m![0]} ${y![0]}`);
-});
-
 test("study takes an animation apart: what is carried, what animates in place, a light that pulses, an effect", () => {
   // 32 frames on a still backdrop: a box carried right 2 px a frame; a 4-frame blinker in place; a
   // patch brightening and darkening all at once; a patch of noise that never repeats

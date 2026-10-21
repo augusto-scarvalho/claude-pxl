@@ -9,7 +9,7 @@ import { type View, perspective } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
 import { type Face, type Material, type MeshCanvas, type MeshOpts, drawMesh } from "./mesh.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
-import { bayer, colorList, gridRows, hash, inPoly, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
+import { bayer, colorList, gridRows, hash, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
 
 /** How a canvas reaches other assets. */
 export interface Resolver {
@@ -355,10 +355,27 @@ export class Canvas {
   /** Filled polygon [x0,y0, x1,y1, ...] with vertices on pixel corners. */
   poly(pts: number[], c: string): void {
     if (!Array.isArray(pts) || pts.length < 6 || pts.length % 2) throw new PxError("poly needs [x0,y0, x1,y1, x2,y2, ...]");
-    const col = this.color(c), inside = inPoly(pts), b = polyBounds(pts);
+    const col = this.color(c), b = polyBounds(pts), n = pts.length / 2;
     const [y0, y1] = this.span(Math.floor(b.y0), Math.ceil(b.y1), "y"), [x0, x1] = this.span(Math.floor(b.x0), Math.ceil(b.x1), "x");
-    for (let y = y0; y < y1; y++)
-      for (let x = x0; x < x1; x++) if (inside(x, y)) this.plot(x, y, col);
+    // a row at a time: where its middle crosses the edges, worked out as inPoly does, sorted; a pixel is
+    // inside when an odd number of them lie right of its middle (inPoly's answer, without asking every
+    // edge for every pixel)
+    const at: number[] = [];
+    for (let y = y0; y < y1; y++) {
+      const yc = y + 0.5;
+      at.length = 0;
+      for (let i = 0, j = n - 1; i < n; j = i++) {
+        const xi = pts[2 * i], yi = pts[2 * i + 1], xj = pts[2 * j], yj = pts[2 * j + 1];
+        if (yi > yc !== yj > yc) at.push(((xj - xi) * (yc - yi)) / (yj - yi) + xi);
+      }
+      if (!at.length) continue;
+      at.sort((p, q) => p - q);
+      let k = 0;
+      for (let x = x0; x < x1; x++) {
+        while (k < at.length && at[k] <= x + 0.5) k++;
+        if ((at.length - k) % 2) this.plot(x, y, col);
+      }
+    }
   }
 
   /** 4-connected flood fill of the region containing (x, y). */

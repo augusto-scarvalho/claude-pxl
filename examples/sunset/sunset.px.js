@@ -101,13 +101,14 @@ const SKY_RAMP = "NnVvMmOoyYw"
 anim("_aura", { w: 260, h: 45, frames: LOOP, fps: FPS }, grad(0, 0, 260, 88, "yoO.", "r"), (c) => {
   // key, radius, swell, and whether it's all checker: the corona right round the disc is, so the solid
   // disc keeps its edge against it
+  // each ring's radius this frame, worked out once a frame, not once a pixel
   const cx = 130, cy = 45, rings = [["Y", SR + 2, 0, true], ["y", SR + 6, 0.5], ["o", SR + 11, 0.75]]
+    .map(([k, r0, swell, checker], i) => ({ k, rank: SKY_RAMP.indexOf(k), checker, r: r0 + swell * Math.sin((c.phase - i * 0.12) * Math.PI * 2) }))
   for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) {
-    const d = Math.hypot(x - cx, (y - cy) * 1.3)                  // flattened: the glow spreads along the horizon
-    for (const [i, [k, r0, swell, checker]] of rings.entries()) {
-      const r = r0 + swell * Math.sin((c.phase - i * 0.12) * Math.PI * 2), on = (x + y) % 2 === 0
-      if (d < r + 0.5 && (on || (!checker && d < r - 0.5))) {
-        if (SKY_RAMP.indexOf(k) > SKY_RAMP.indexOf(c.key(x, y))) c.px(x, y, k)
+    const d = Math.hypot(x - cx, (y - cy) * 1.3), on = (x + y) % 2 === 0   // flattened: the glow spreads along the horizon
+    for (const g of rings) {
+      if (d < g.r + 0.5 && (on || (!g.checker && d < g.r - 0.5))) {
+        if (g.rank > SKY_RAMP.indexOf(c.key(x, y))) c.px(x, y, g.k)
         break
       }
     }

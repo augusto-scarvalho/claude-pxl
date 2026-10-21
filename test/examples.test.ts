@@ -11,29 +11,33 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { availableParallelism } from "node:os";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadProject } from "../src/node/load.ts";
-import { checkProject } from "../src/node/check.ts";
+import { Worker } from "node:worker_threads";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SNAP = join(root, "test", "examples.checks.txt");
 
-test("pxl check on every example: the same warnings as kept", () => {
+test("pxl check on every example: the same warnings as kept", async () => {
   const files = (readdirSync(join(root, "examples"), { recursive: true }) as string[])
     .map((f) => f.split("\\").join("/")).filter((f) => f.endsWith(".px.js") && !f.split("/").some((s) => s.startsWith("_") || s === "out") && !/(^|\/)pipeline\/part_/.test(f)).sort();
-  const out: string[] = [];
-  for (const f of files) {
-    try {
-      const p = loadProject(join(root, "examples", f), { checksOnly: true });
-      // every frame of every animated scene (the bout's blows, the blocks, the last clash included)
-      const r = checkProject(p, { file: basename(f) });
-      out.push(`${f}: ${r.warnings} warning${r.warnings === 1 ? "" : "s"} (${r.checked})`, `  ${r.coverage}`, ...[...r.lines, ...r.notes].map((l) => "  " + l));
-    } catch {
-      out.push(`${f}: included only (doesn't build on its own: its palette comes from the file including it)`);
-    }
+  // each example checked in one of a few threads (check.worker.ts), handed out as they finish, the most
+  // frames (as the kept file counts them) first: the longest doesn't start last
+  const kept = existsSync(SNAP) ? readFileSync(SNAP, "utf8") : "", frames = (f: string) => +(new RegExp(`^${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}: .*?\\((\\d+) frames`, "m").exec(kept)?.[1] ?? 1e9);
+  const said = new Map<string, string[]>(), queue = [...files].sort((a, b) => frames(b) - frames(a));
+  const workers = Array.from({ length: Math.max(1, Math.min(files.length, availableParallelism())) }, () => new Worker(new URL("./check.worker.ts", import.meta.url)));
+  try {
+    await Promise.all(workers.map((w) => new Promise<void>((done, fail) => {
+      const next = () => { const f = queue.shift(); if (f === undefined) done(); else w.postMessage({ root, f }); };
+      w.on("message", ({ f, out }: { f: string; out: string[] }) => { said.set(f, out); next(); });
+      w.on("error", fail);
+      next();
+    })));
+  } finally {
+    await Promise.all(workers.map((w) => w.terminate()));
   }
-  const text = out.join("\n") + "\n";
+  const text = files.flatMap((f) => said.get(f)!).join("\n") + "\n";
   if (process.env.PXL_UPDATE || !existsSync(SNAP)) writeFileSync(SNAP, text);
   assert.equal(text, readFileSync(SNAP, "utf8"));
 });
