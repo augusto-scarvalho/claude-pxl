@@ -610,6 +610,38 @@ export function spacingWords(track: [number, number, number, number, number][], 
   return out.length ? out.join("; ") : null;
 }
 
+/**
+ * A cycle's halves (Saint11's top-down walk: the second half is the first flipped, so draw half) and
+ * its bob: the top of its box frame by frame over one cycle.
+ */
+function cycleWords(p: Piece): string | null {
+  const c = p.cycle, out: string[] = [];
+  if (!c || c < 4 || c > 24) return null;
+  if (c % 2 === 0 && p.stripFrames === c) {
+    const W = p.strip.w / c, H = p.strip.h, cell = (i: number, x: number, y: number) => (x < 0 || x >= W ? 0 : p.strip.data[y * p.strip.w + i * W + x]);
+    let mirrored = 0;
+    for (let i = 0; i < c / 2; i++) {
+      let best = 0;
+      for (let o = -4; o <= 4; o++) {
+        let same = 0, any = 0;
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+          const a = cell(i, x, y), b = cell(i + c / 2, W - 1 - x + o, y), oa = (a & 255) >= 128, ob = (b & 255) >= 128;
+          if (oa || ob) { any++; if (oa && ob && a === b) same++; }
+        }
+        best = Math.max(best, any ? same / any : 0);
+      }
+      if (best >= 0.8) mirrored++;
+    }
+    if (mirrored >= 0.6 * (c / 2)) out.push(`the second half of its cycle is the first flipped (flip: "x"): draw ${c / 2} frames, redraw only what isn't symmetric`);
+  }
+  const first = p.track.filter((e) => e[0] < p.track[0][0] + c);
+  if (first.length === c) {
+    const top = Math.min(...first.map((e) => e[2])), bob = first.map((e) => e[2] - top);
+    if (Math.max(...bob) >= 1 && Math.max(...bob) <= 4) out.push(`its top over the cycle, px down: ${bob.join(" ")} (the bob)`);
+  }
+  return out.length ? out.join("; ") : null;
+}
+
 function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: number; v: number }[], forward: boolean): string[] {
   const out = [`  Backdrop: ${pct(d.still * 100, 100)} of the picture never changes${d.still > 0.2 ? ": one picture (a sprite or the scene's still layers) under everything else" : ""}.`];
   if (bands.length && !forward) out.push(`  Planes: ${bands.length} band${bands.length > 1 ? "s" : ""} of rows going by (see MOTION): each a strip that wraps, scroll().`);
@@ -637,6 +669,8 @@ function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: nu
     const sp = p.track.length > 24 ? null : (p.kind === "carried" && p.poses <= 4) || p.kind === "action" || (p.kind === "walk" && varied) ? spacingWords(p.track)
       : (p.kind === "anim" || p.kind === "rig") && grounded ? spacingWords(p.track, true) : null;
     if (sp) out.push(`     ${sp}`);
+    const half = p.kind === "light" ? null : cycleWords(p);
+    if (half) out.push(`     ${half}`);
   }
   const things = d.pieces.filter((p) => p.kind !== "light").length, lights = d.pieces.length - things;
   if (things > 16 || lights > 8) out.push(`  ... and ${[things > 16 ? `${things - 16} smaller things` : "", lights > 8 ? `${lights - 8} smaller lights` : ""].filter(Boolean).join(" and ")}.`);

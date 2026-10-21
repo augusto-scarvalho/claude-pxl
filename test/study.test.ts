@@ -213,6 +213,24 @@ test("study --at: the region's mover followed frame by frame by what differs fro
   assert.match(lines, /spacing, px a frame: right 1 1 1 5 6, speeding up/);
 });
 
+test("study: a cycle whose second half is its first flipped (Saint11's top-down walk): draw half", () => {
+  const bg = pack(40, 50, 60), ink = pack(240, 200, 120), dk = pack(120, 60, 40);
+  // an asymmetric figure (an eye on one side, a leg and an arm forward), then the same three flipped
+  const draw = (legL: number, legR: number, flip: boolean) => {
+    const img = new Img(40, 32);
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 40; x++) img.set(x, y, bg);
+    const put = (x: number, y: number, c: number) => img.set(flip ? 39 - x : x, y, c);
+    for (let y = 6; y < 20; y++) for (let x = 15; x < 24; x++) put(x, y, ink);
+    put(16, 8, dk); put(17, 8, dk);
+    for (let y = 20; y < 20 + legL; y++) { put(16, y, dk); put(17, y, dk); }
+    for (let y = 20; y < 20 + legR; y++) { put(21, y, dk); put(22, y, dk); }
+    for (let x = 24; x < 24 + legL; x++) put(x, 12, ink);
+    return img;
+  };
+  const one = [draw(8, 4, false), draw(6, 6, false), draw(4, 8, false), draw(8, 4, true), draw(6, 6, true), draw(4, 8, true)], frames = [...one, ...one];
+  assert.match(study({ name: "walk", frames, ms: frames.map(() => 100), kind: "test" }).text.join("\n"), /the second half of its cycle is the first flipped \(flip: "x"\): draw 3 frames/);
+});
+
 test("pixelate keeps an edge where a box average blurs it", () => {
   // black and white, the edge off the 4 px grid: superpixels follow it, boxes average across it
   const img = new Img(200, 100);

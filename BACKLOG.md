@@ -659,7 +659,9 @@ Saint11's, read from his page, and not kept in the repository):
   anticipation; read its value and area per frame instead, and "plays once, then N frames empty".
   Relabelling lights ten times stronger as effects in the decomposer cost the tournament's masks
   (precision 48% to 42%): it needs captures cut from the frame difference, not the light.
-- [ ] **A walk's flipped half** (top-down: frames 3-5 are 0-2 mirrored) and the body's bob per frame.
+- [x] **A walk's flipped half** (top-down: frames 3-5 are 0-2 mirrored) and the body's bob per frame.
+  Done for a piece whose cycle study finds; on the card itself the goblin seen from the front is
+  symmetric, so its flipped half repeats the first and the clip reads as a cycle of 3.
 - [ ] **A see-through body** (a ghost): what changes behind it read as lights; its whole-body float
   (0, 1, 2, 2, 1, 0 px) not reported.
 - [x] **A runner in place read as a camera moving forward**: require the backdrop to move first.
