@@ -24,6 +24,7 @@
     "examples/halloween/*.{px.js,hex}",
     "examples/sunset/*.px.js",
     "examples/perspective/*.px.js",
+    "examples/parallax/*.px.js",
     "examples/rig/*.px.js",
     "examples/cyberpunk/*.px.js",
     "examples/cyberpunk/pipeline/*.{px.js,md}",
