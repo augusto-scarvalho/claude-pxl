@@ -2,9 +2,9 @@
 // round (front, back, front again) with the coat flaring out, a thrust, a second wind-up overhead, a
 // turn into a chop to the floor with sparks and dust, and back to idle. The body is a skeleton in 3D,
 // in px: it turns about its upright, the shoulders twist against the hips, the knees bend, and each
-// part is drawn where the skeleton puts it and as it is turned to us, far to near. The axe's haft is
-// drawn in 3D from the fist; its edge always faces the way the cut goes (worked out from the motion),
-// and its head is drawn side on, the blade reaching out that way on screen; its smear is the path the
+// part is drawn where the skeleton puts it and as it is turned to us, far to near. The axe is drawn in
+// 3D from the fist, its head as an axe is made (the edge a long curve from toe to heel along the haft);
+// the edge faces the way each cut goes (worked out from the motion), and its smear is the path the
 // edge took since the frame before, behind the body where that path is. On the floor, its reflection.
 pal({
   k: "#17111c",
@@ -124,8 +124,8 @@ const KEYS = [
   { t: 5, twist: -35, head: 25, crouch: 2, lean: 6, hand: [-3, 4, 6], axe: [-0.5, 0.3, 0.8], off: [6, -1, -4] },
   { t: 6, twist: -55, head: 40, crouch: 3, lean: 8, hand: [-5, 5, 8], axe: [-0.6, 0.35, 0.7], off: [8, -1, -2], feet: [[1, -5], [-2, 5]] },
   // the whirl: low, the arm out level, the axe pointing out, its edge leading; the free arm tucked
-  { t: 7, yaw: 115, twist: 10, head: 15, crouch: 5, lean: 12, hand: [4, 14, 3], axe: [0.25, 1, 0.3], off: [3, 3, -6], smear: 1 },
-  { t: 8, yaw: 185, twist: 25, head: 20, hand: [3, 14, 6], axe: [0.2, 1, 0.5], smear: 1 },
+  { t: 7, yaw: 115, twist: 10, head: 15, crouch: 5, lean: 12, hand: [4, 14, 0], axe: [0.25, 1, 0.05], off: [3, 3, -6], smear: 1 },
+  { t: 8, yaw: 185, twist: 25, head: 20, smear: 1 },
   { t: 9, yaw: 255, twist: 25, head: 20, hand: [4, 14, 1], axe: [0.25, 1, 0.1], smear: 1 },
   { t: 10, yaw: 325, twist: 25, head: 15, hand: [5, 14, 3], axe: [0.3, 1, 0.3], smear: 1 },
   // out of the turn, a cut falling across to the front: the arm straight, the weight on the front foot
@@ -136,10 +136,10 @@ const KEYS = [
   { t: 15, yaw: 400, twist: -45, head: 35, crouch: 1, lean: 2, hand: [-1, 3, 13], axe: [-0.2, 0.15, 1], off: [5, -2, 2], feet: [[1, -5], [-2, 5]] },
   { t: 16, twist: -60, head: 45, crouch: 2 },
   // a turn and the chop: round once, the axe coming over and down into the floor
-  { t: 17, yaw: 480, twist: -10, head: 20, crouch: 4, lean: 10, hand: [3, 12, 4], axe: [0.3, 1, 0.3], off: [3, 3, -5], smear: 1 },
-  { t: 18, yaw: 560, twist: 15, head: 15, hand: [3, 12, 7], axe: [0.25, 1, 0.55], smear: 1 },
-  { t: 19, yaw: 640, twist: 20, hand: [4, 12, 0], axe: [0.3, 1, -0.2], smear: 1 },
-  { t: 20, yaw: 720, twist: 10, head: 10, crouch: 2, lean: 4, hand: [2, 3, 12], axe: [0.4, 0.1, 1], smear: 1 },
+  { t: 17, yaw: 480, twist: -10, head: 20, crouch: 4, lean: 10, hand: [3, 12, 2], axe: [0.3, 1, 0.1], off: [3, 3, -5], smear: 1 },
+  { t: 18, yaw: 560, twist: 15, head: 15, smear: 1 },
+  { t: 19, yaw: 640, twist: 20, smear: 1 },
+  { t: 20, yaw: 720, twist: 10, head: 10, crouch: 2, lean: 4, hand: [2, 3, 12], axe: [0.4, 0.1, 1] },
   { t: 20.5, yaw: 750, crouch: 4, lean: 12, hand: [9, 3, 6], axe: [1, 0.05, 0.5], smear: 1 },
   { t: 21, yaw: 780, twist: 0, head: 0, crouch: 7, lean: 22, hand: [10, 2, -9], axe: [0.95, 0.05, -0.5], off: [-2, -4, -8], feet: [[-5, -5], [6, 4]], smear: 1, spark: 1 },
   { t: 22, crouch: 7, spark: 2 },
@@ -196,30 +196,27 @@ for (let i = 0; i < FRAMES / STEP; i++) {
 }
 const wayAt = (t) => {
   const n = WAY.length, i = ((Math.round(t / STEP) % n) + n) % n
-  if (WAY[i].fast) return WAY[i].v
-  for (let d = 1; d <= NEAR / STEP; d++) for (const k of [i - d, i + d]) { const w = WAY[((k % n) + n) % n]; if (w.fast) return w.v }
+  if (WAY[i].fast) return { v: WAY[i].v, cut: true }
+  for (let d = 1; d <= NEAR / STEP; d++) for (const k of [i - d, i + d]) { const w = WAY[((k % n) + n) % n]; if (w.fast) return { v: w.v } }
   return null
 }
 const skeleton = (p) => {
-  const j = bones(p), way = wayAt(p.t) ?? j.sh.f, sq = sub(way, mul(j.axe, dot(way, j.axe)))
+  // held (wound up, or after a cut), the blade is turned to show its side to us, its edge still on
+  // the way the cut goes as we see it; in a cut it turns as the cut does
+  const w = wayAt(p.t), j = bones(p), seen = (v) => (w?.cut ? v : sub(v, mul(VIEW, dot(v, VIEW))))
+  const way = seen(w?.v ?? j.sh.f), sq = sub(way, mul(j.axe, dot(way, j.axe)))
   const fall = sub(j.sh.f, mul(j.axe, dot(j.sh.f, j.axe)))                 // the haft along the cut: its forward
   return { ...j, edge: unit(len(sq) > 0.35 * len(way) ? sq : fall) }
 }
 // a point of the axe: t along the haft from the hand, s along the edge's way
 const axeAt = (j, t, s) => add(j.hand, add(mul(j.axe, t), mul(j.edge, s)))
-// The head is drawn in profile on screen, whatever way it is turned: along the haft where the camera
-// puts it, the blade reaching out the way the edge goes on screen. Seen true, a level cut would show
-// the blade edge on, a sliver that says nothing about where it cuts; a pixel artist draws the head
-// side on. (t along the haft, s out toward the edge, in px.)
-const BLADE = [[11, 0], [16.5, 0], [18, 4], [17.5, 9], [14.5, 8], [12.5, 6], [11, 3]]
-const head2 = (j) => {
-  const a = scr(axeAt(j, 0, 0)), b = scr(axeAt(j, HAFT, 0)), e = sub(scr(add(axeAt(j, HAFT, 0), j.edge)), b)
-  let hd = sub(b, a), hl = Math.hypot(...hd)
-  hd = hl > 3 ? mul(hd, 1 / hl) : unit(e)
-  let side = [-hd[1], hd[0]]; if (side[0] * e[0] + side[1] * e[1] < 0) side = mul(side, -1)
-  if (hl <= 3) hd = [-side[1], side[0]]
-  return (t, s) => add(scr(axeAt(j, Math.min(t, HAFT), 0)), add(mul(hd, Math.max(0, t - HAFT)), mul(side, s)))
-}
+// The head as an axe is made, in 3D on the haft (t along it from the hand, s out to the bit, px): the
+// eye round the haft's top; the bit out on the edge's side, its edge a long curve running from the toe
+// (its top corner) down to the heel at the tip of the beard, along the haft, not across it; the poll on
+// the other side. Turned level in a whirl it shows edge on, as a real one would.
+const BIT = [[17.5, 0], [18.6, 3], [19.6, 6.5], [18.4, 8.4], [15.5, 9.1], [12.6, 8.5], [10.3, 6.8], [11.3, 4.9], [13.4, 2.2], [14.5, 0]]
+const EDGE = [[19.6, 6.5], [18.4, 8.4], [15.5, 9.1], [12.6, 8.5], [10.3, 6.8]]
+const CHEEK = [[17.5, 0], [18.4, 2.6], [13.6, 2.6], [14.5, 0]], POLL = [[17.5, 0], [17.5, -2.6], [14.6, -2.6], [14.6, 0]]
 
 // how fast the body turns (deg a frame), and the coat's flare and the hair's swing that follow it a
 // frame late: worked out over the loop twice, so the first frame already has the last one's
@@ -335,14 +332,12 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], out
     at((depth(j.shoulders[1]) + depth(j.elbow)) / 2, () => limb(c, j.shoulders[1], j.elbow, 2, 1.7, "DGgh"))
     at(depth(axeAt(j, 9, 2)), () => {
       limb(c, axeAt(j, -3, 0), axeAt(j, HAFT, 0), 0.9, 0.9, "Wwm")
-      const at = head2(j), pt = (q) => at(...q).map(Math.round)
-      c.poly(BLADE.flatMap(pt), "k")                                                   // its outline, a px out
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) c.poly(BLADE.flatMap((q) => add(pt(q), [dx, dy])), "k")
-      c.poly(BLADE.flatMap(pt), "3")
-      c.poly([[11, 0], [16.5, 0], [16.5, 2.5], [11, 2.5]].flatMap(pt), "2")             // the cheek by the haft, darker
-      const edge = [[18, 4], [17.5, 9], [14.5, 8]].map(pt)
-      c.line(...edge[0], ...edge[1], "4"); c.line(...edge[1], ...edge[2], "4")          // the edge, bright
-      c.poly([[13, 0], [15.5, 0], [14.5, -3.5]].flatMap(pt), "1")                         // the back spike
+      const pt = ([t, s]) => scr(axeAt(j, t, s)).map(Math.round)
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const q of [BIT, POLL]) c.poly(q.flatMap((v) => add(pt(v), [dx, dy])), "k")
+      const n = cross(j.axe, j.edge), face = dot(n, VIEW), lit = dot(n, SUN) * Math.sign(face || 1)
+      c.poly(BIT.flatMap(pt), lit > 0.1 ? "3" : "2"); c.poly(CHEEK.flatMap(pt), lit > 0.1 ? "2" : "1"); c.poly(POLL.flatMap(pt), "1")
+      EDGE.slice(1).forEach((q, i) => c.line(...pt(EDGE[i]), ...pt(q), "4"))            // the edge, bright, toe to heel
+
     })
     at(Math.max(depth(j.elbow), depth(j.hand)) + 0.2, () => { limb(c, j.elbow, j.hand, 1.7, 1.4, "Bbn"); fist(c, j.hand, "s") })
     parts.sort((a, b) => a.d - b.d).forEach((q) => q.draw())
