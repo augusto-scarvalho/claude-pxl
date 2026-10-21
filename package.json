@@ -62,10 +62,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/crsolver/claude-pxl.git"
+    "url": "git+https://github.com/augusto-scarvalho/claude-pxl.git"
   },
-  "homepage": "https://github.com/crsolver/claude-pxl#readme",
+  "homepage": "https://github.com/augusto-scarvalho/claude-pxl#readme",
   "bugs": {
-    "url": "https://github.com/crsolver/claude-pxl/issues"
+    "url": "https://github.com/augusto-scarvalho/claude-pxl/issues"
   }
 }

@@ -205,7 +205,7 @@ the slope there in three flat tones, so they break into the facets of a crumpled
 ## Quick start
 
 ```sh
-git clone https://github.com/crsolver/claude-pxl.git
+git clone https://github.com/augusto-scarvalho/claude-pxl.git
 cd claude-pxl
 node bin/pxl.js serve examples/shop.px.js     # live viewer at http://127.0.0.1:4321/
 ```
@@ -213,7 +213,7 @@ node bin/pxl.js serve examples/shop.px.js     # live viewer at http://127.0.0.1:
 Or run it without cloning:
 
 ```sh
-npx github:crsolver/claude-pxl build art.px.js
+npx github:augusto-scarvalho/claude-pxl build art.px.js
 ```
 
 Write `art.px.js`:
@@ -270,7 +270,7 @@ pxl help [name]                  what the reference says about an op or option, 
 
 `pxl` alone prints every command with its options.
 
-`pxl` means `node bin/pxl.js` in a clone, or `npx github:crsolver/claude-pxl`. Art files can be `.js` or
+`pxl` means `node bin/pxl.js` in a clone, or `npx github:augusto-scarvalho/claude-pxl`. Art files can be `.js` or
 `.ts` (`types/pxl.d.ts` gives editor completion).
 
 ## What's in the DSL
@@ -300,9 +300,9 @@ This repository is an agent skill: `SKILL.md` teaches the workflow (write → `s
 
 ```sh
 # all projects
-git clone https://github.com/crsolver/claude-pxl.git ~/.claude/skills/pxl-pixel-art
+git clone https://github.com/augusto-scarvalho/claude-pxl.git ~/.claude/skills/pxl-pixel-art
 # or just one project
-git clone https://github.com/crsolver/claude-pxl.git .claude/skills/pxl-pixel-art
+git clone https://github.com/augusto-scarvalho/claude-pxl.git .claude/skills/pxl-pixel-art
 ```
 
 **Other agents** (Codex, Cursor, …): point them at `SKILL.md` and tell them the CLI is
