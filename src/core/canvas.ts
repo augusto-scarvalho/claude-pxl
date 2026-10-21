@@ -977,6 +977,8 @@ export class Canvas {
       if (m !== null && !set.has(`${i + sx},${j + sy}`)) set.set(`${i + sx},${j + sy}`, [i + sx, j + sy, m]);
     }
     for (const [i, j, m] of set.values()) this.plot(bx + i, by + j, m);
+    // half a pixel along and nothing to show it: it would read as standing still
+    if (!set.size) this.res.warn?.("a stamp half a pixel along drew no in-between tone: the part has no outline to push into and spills over the clear, or no key lies between its colors and what it meets (a ramp through both); give it an outline or a ramp, or stamp it at a whole pixel", this.loc);
   }
 
   /**

@@ -640,3 +640,34 @@ wrong way warned, and the lessons in characters §1, §4, §7, §9, §10 and sce
   and away from it in the shadows, named as hue shifting, or its absence ("value only: muddy").
   Done as a count of the colored ramps: warmer in the light, cooler in the light, one hue. By pixels
   a sky's gradient outvoted every material, so a ramp is a vote.
+
+## From Saint11's cards read frame by frame (study on them)
+
+Four agents read the 80 cards and ran `pxl study` on their demos; what got fixed is in the commits
+(timing per drawing and on twos, the loop check, `--at` in 1x pixels, `--no-out`, paint that comes and
+goes no longer called a light in words, spacing on jumps and squash in place). Open (the cards are
+Saint11's, read from his page, and not kept in the repository):
+
+- [ ] **Tracks break on leaps**: the follower accepts a match only near a prediction that starts at
+  rest, so a thing that launches (a jump's takeoff, a dash at 28 px a frame, a shard at 8-15) loses
+  its track on the frames that teach the most. Join a track that ends at t to one that starts at t+1
+  or t+2 in the same colors, wherever it is. Fast small things (a 2 px marker at 11 px a frame) are
+  never found.
+- [ ] **A smear inflates the box**: spacing and squash read off the bounding box, which a smear
+  stretches. Track the pixels present every frame apart from those that come and go.
+- [ ] **Effects as effects**: an explosion (dark, white, blast, fade) read as an attack with an
+  anticipation; read its value and area per frame instead, and "plays once, then N frames empty".
+  Relabelling lights ten times stronger as effects in the decomposer cost the tournament's masks
+  (precision 48% to 42%): it needs captures cut from the frame difference, not the light.
+- [ ] **A walk's flipped half** (top-down: frames 3-5 are 0-2 mirrored) and the body's bob per frame.
+- [ ] **A see-through body** (a ghost): what changes behind it read as lights; its whole-body float
+  (0, 1, 2, 2, 1, 0 px) not reported.
+- [ ] **A runner in place read as a camera moving forward**: require the backdrop to move first.
+- [ ] **How long each piece's drawings are held**, per piece (the clip's own holds are said now).
+
+Left out, with why: a `check` rule for a far plane with more colors than a near one (no reliable way
+to tell which layer is nearer), a warning for a ramp whose light end is cooler (the guides now
+recommend that for metals), anti-aliasing quality (study's in-between detection already requires a
+tone between the two), `relight`'s reflected light (it pushes toward pillow shading), an oblique
+camera note for `mesh` (a camera function culls faces from an eye at the origin: a cabinet view
+shows only its front; `mesh` would need an eye for a camera of one's own).

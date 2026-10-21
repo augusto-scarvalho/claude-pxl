@@ -146,7 +146,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     }
   }
   // what building found on the way (a shade step that left its ramp), where it was asked for
-  for (const w of p.warnings) lines.push(`ramps${w.loc ? ` (${w.loc})` : ""} › WARNING: ${w.msg}`);
+  for (const w of p.warnings) lines.push(`${w.msg.startsWith("a stamp half a pixel") ? "sub" : "ramps"}${w.loc ? ` (${w.loc})` : ""} › WARNING: ${w.msg}`);
   const n = (k: number, w: string) => `${k} ${w}${k === 1 ? "" : "s"}`;
   const run: string[] = [], not: string[] = [];
   if (ran.front + others) run.push(`front marker on ${ran.front + others}`); else not.push("front marker (nothing has one)");
