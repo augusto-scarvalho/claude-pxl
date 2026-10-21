@@ -134,6 +134,15 @@ test("study: a sprite's light read off its rim, pillow shading, banding", () => 
   assert.match(study({ name: "box", frames: [box], ms: [100], kind: "test" }).text.join("\n"), /Banding .*: [1-9]\d* pairs?/);
 });
 
+test("study names near twins in a palette, once each, and not in a clean one", () => {
+  const clean = drawing(40, 30), twin = drawing(40, 30);
+  for (let x = 0; x < 40; x += 3) twin.set(x, 5, pack(34, 34, 52));                  // beside 30,30,46: one tone read
+  for (let x = 1; x < 40; x += 3) twin.set(x, 9, (pack(34, 34, 52) & ~255) | 128);    // the same, half clear: no new pair
+  const a = (img: Img) => study({ name: "t", frames: [img], ms: [100], kind: "test" }).text.join("\n");
+  assert.doesNotMatch(a(clean), /Near twins/);
+  assert.match(a(twin), /Near twins: 1 pair of colors .*: #1e1e2e\/#222234\./);
+});
+
 test("pixelate keeps an edge where a box average blurs it", () => {
   // black and white, the edge off the 4 px grid: superpixels follow it, boxes average across it
   const img = new Img(200, 100);

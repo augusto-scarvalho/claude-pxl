@@ -79,6 +79,8 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   if (ramps.length > 12) text.push(`  ... ${ramps.length - 12} more, small`);
   const sizes = ramps.filter((r) => r.colors.length > 1).map((r) => r.colors.length).sort((a, b) => a - b);
   if (sizes.length) text.push(`  ${ramps.length} ramps; a ramp's tones: ${sizes[0]} to ${sizes[sizes.length - 1]}, most ${sizes[sizes.length >> 1]}.`);
+  // (a palette someone chose: a lit scene's thousands of blended tones aren't one)
+  if (pixelArt && nColors <= 64) for (const line of paletteSanity(smeared ? null : native, ramps, nColors)) text.push(line);
 
   // ---------------------------------------------------------------- techniques
   if (pixelArt) {
@@ -426,6 +428,29 @@ function subpixel(frames: Img[]): { share: number; changed: number; tones: { mid
     }
   }
   return { share: changed ? partial / changed : 0, changed, tones: [...tones.values()].sort((p, q) => q.n - p.n) };
+}
+
+// What a palette lessons warn of (Pixel Joint's critiques, Saint11): colors so near they read as one
+// (on a lossless picture, where they are the artist's, not noise: study folds them for the rest of its
+// reading, and says which), and ramps whose steps are too close to read as steps.
+function paletteSanity(drawn: Img | null, ramps: Ramp[], folded: number): string[] {
+  const out: string[] = [];
+  // (colors that differ in their alpha only are one; and a flood of near tones is a lossy copy's noise,
+  // not choices: only when folding took a few away)
+  const cols = drawn ? [...new Map([...colorCounts(drawn).keys()].map((c) => [hex(c), c])).values()] : [];
+  if (drawn && cols.length <= folded * 1.5 + 4) {
+    const twins: [Color, Color][] = [];
+    for (let i = 0; i < cols.length; i++) for (let j = i + 1; j < cols.length; j++) if (dE(cols[i], cols[j]) < 0.03) twins.push([cols[i], cols[j]]);
+    if (twins.length) out.push(`  Near twins: ${twins.length} pair${twins.length > 1 ? "s" : ""} of colors too close to tell apart (under 0.03 in OKLab), read as one here: ${twins.slice(0, 5).map(([a, b]) => `${hex(a)}/${hex(b)}`).join(", ")}${twins.length > 5 ? " ..." : ""}. Merge each pair, or spread it if both are meant: every tone you keep should earn its place.`);
+  }
+  // (the whole difference, hue and saturation too: two tones of a lightness but hues apart read apart)
+  const tight = ramps.filter((r) => r.colors.length > 1).map((r, i) => {
+    let at = -1, step = Infinity;
+    for (let k = 1; k < r.colors.length; k++) { const d = dE(r.colors[k], r.colors[k - 1]); if (d < step) { step = d; at = k; } }
+    return { i, at, step, r };
+  }).filter((t) => t.step < 0.045);
+  if (tight.length) out.push(`  Steps too close: ${tight.slice(0, 4).map((t) => `ramp ${t.i + 1}'s ${hex(t.r.colors[t.at - 1])} to ${hex(t.r.colors[t.at])} (${t.step.toFixed(3)} apart in OKLab)`).join(", ")}${tight.length > 4 ? " ..." : ""}: neighbors in a ramp read as steps from about 0.05 apart (pxl's shades() spaces its own by about 0.1); merge them or spread the ramp.`);
+  return out;
 }
 
 const WHAT: Record<Piece["kind"], string> = {
