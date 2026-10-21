@@ -727,3 +727,9 @@ test("stamp sub: half a pixel along, it stays where it comes from and its edges 
   assert.equal(on(pal, '(c) => c.subpixel(0, 0.5, () => c.rect(2, 2, 2, 2, "w"))'), rows("rrrrrr", "rrrrrr", "rrwwrr", "rrwwrr", "rrffrr", "rrrrrr"));
   assert.equal(on(pal, '(c) => c.subpixel(1, 1, () => c.rect(1, 1, 2, 2, "w"))'), on(pal, 'rect(2, 2, 2, 2, "w")'));
 });
+
+test("ramps: one written light to dark gets a warning (shade and light would swap); dark to light none", () => {
+  const p = loadSource('pal({ k: "#000000", d: "#404040", l: "#c0c0c0" }); ramps("kdl", "ldk"); sprite("a", { w: 1, h: 1 }, px(0, 0, "d"))', "t.px.js");
+  p.image("a");
+  assert.deepEqual(p.warnings.map((w) => w.msg.match(/ramp "(\w+)" isn't dark to light/)?.[1]), ["ldk"]);
+});

@@ -5,7 +5,7 @@ import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from 
 import { type View, perspective } from "./perspective.ts";
 import { solid } from "./solids.ts";
 import { model } from "./mesh.ts";
-import { TRANSPARENT, shadeRamp, toHex } from "./color.ts";
+import { TRANSPARENT, oklab, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
 import {
@@ -368,6 +368,12 @@ export class Project implements BuildCtx {
     };
     env.ramps = (...ramps: string[]) => {
       try { this.pal = this.pal.withRamps(ramps); } catch (e) { throw wrap(e).within("ramps", this.callerLoc()); }
+      // a ramp runs dark to light: written the other way, shade() lightens and light() darkens
+      for (const r of ramps) {
+        const L = [...r].map((k) => oklab(this.pal.keys.get(k)!)[0]);
+        const at = L.findIndex((l, i) => i > 0 && l < L[i - 1] - 0.02);
+        if (at > 0) this.warn(`ramp "${r}" isn't dark to light: '${r[at - 1]}' to '${r[at]}' gets darker (lightness ${L[at - 1].toFixed(2)} to ${L[at].toFixed(2)}); shade() steps toward a ramp's start and light() toward its end, so write it darkest first`, this.callerLoc());
+      }
     };
     env.sprite = (name: unknown, ...rest: unknown[]) => define("sprite", name, rest);
     env.anim = (name: unknown, ...rest: unknown[]) => define("anim", name, rest);

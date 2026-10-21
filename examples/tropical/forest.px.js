@@ -9,7 +9,7 @@ include("trail.px.js")    // the trail's tileset, drawn in code
 include("trees.px.js")    // trees, palms and big leaves reduced from CC-BY art (credits inside)
 include("fauna.px.js")    // the jaguar and the monkey
 include("girl.px.js")     // the girl, with her own palette
-ramps("DHGglL", "nNmM", "qQOoa", "BbcC", "WwvVF", "Ssr", "KkD")
+ramps("DHGglL", "nNmM", "qQOoa", "BbcC", "WwvVF", "Ssr", "kD")
 
 const T = 16, W = 320, H = 240
 

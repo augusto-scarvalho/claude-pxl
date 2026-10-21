@@ -160,7 +160,12 @@ function parse(argv: string[]): Args {
     if (v === "--out") a.out = val();
     else if (v === "--no-out") a.out = false;
     else if (v === "--only") a.only = val().split(",").map((s) => s.trim()).filter(Boolean);
-    else if (v === "--scale") a.scale = Number(val());
+    else if (v === "--scale") {
+      // pixel art scales by whole numbers only: 2.5x makes its pixels 2 and 3 px wide by turns
+      const n = Number(val());
+      if (!Number.isInteger(n) || n < 1) throw new PxError(`--scale is a whole number of times (1, 2, 3...): at a fraction some pixels come out a px wider than others; got ${argv[i]}`);
+      a.scale = n;
+    }
     else if (v === "--port") a.port = Number(val());
     else if (v === "--no-preview") a.preview = false;
     else if (v === "--aseprite") a.aseprite = true;

@@ -3,7 +3,7 @@
 // left and top faces are lit and right and bottom faces sit in shade. Big shapes are primitives and
 // procedural fronds; small organic bits (leaf clumps, flowers) are hand-placed pixels.
 use("palette.hex")
-ramps("DHGglL", "nNmM", "qQOoa", "BbcC", "WwvVF", "Ssr", "KkD")
+ramps("DHGglL", "nNmM", "qQOoa", "BbcC", "WwvVF", "Ssr", "kD")
 
 // ---------------------------------------------------------------- leaf lobes
 // A canopy is a heap of lobes. Each lobe is shaded like a sphere lit from the top left, with a

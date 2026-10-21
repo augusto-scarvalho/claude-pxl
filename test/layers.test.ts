@@ -81,7 +81,7 @@ const cli = async (src: string, ...args: string[]) => {
   try { await main([args[0], file, ...args.slice(1)]); } finally { console.log = log; }
   return lines.join("\n");
 };
-const GREENS = `pal({ k: "#14101c", E: "#2a5a2a", G: "#3e8a3a", g: "#6ab04a", P: "#3a1a5a", p: "#7a3ad0", S: "#3d3a4c", s: "#5a5770", B: "#8a7a68", C: "#b8a890" })
+const GREENS = `pal({ k: "#14101c", E: "#2a5a2a", G: "#3e8a3a", g: "#6ab04a", P: "#3a1a5a", p: "#4a2a70", S: "#3d3a4c", s: "#5a5770", B: "#8a7a68", C: "#b8a890" })
 `;
 
 test("ramps that branch at a key: a light stepping through it is a warning in pxl check", async () => {

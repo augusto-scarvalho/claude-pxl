@@ -682,3 +682,12 @@ test("package.json ships every example folder (the skill points to them all)", (
   const dirs = execFileSync("git", ["ls-files", "examples"], { cwd: root, encoding: "utf8" }).split("\n").filter((f) => f.split("/").length > 2).map((f) => f.split("/")[1]);
   for (const d of new Set(dirs)) assert.ok(files.some((f) => f.startsWith(`examples/${d}/`)), `examples/${d}/ is not in package.json files`);
 });
+
+test("--scale is a whole number: at 2.5x a picture's pixels would come out 2 and 3 px wide by turns", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-scale-")), file = join(dir, "a.px.js");
+  writeFileSync(file, 'pal({ k: "#000000" }); sprite("a", { w: 2, h: 2 }, rect(0, 0, 2, 2, "k"))');
+  const err = console.error, said: string[] = [];
+  console.error = (s: string) => said.push(String(s));
+  try { await main(["build", file, "--scale", "2.5", "--out", join(dir, "out")]); } catch (e) { said.push(String((e as Error).message)); } finally { console.error = err; }
+  assert.match(said.join("\n"), /--scale is a whole number/);
+});
