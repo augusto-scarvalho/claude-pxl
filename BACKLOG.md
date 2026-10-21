@@ -477,16 +477,24 @@ one), and the art code itself (4% of the cost).
   few frames, mostly in long thin pieces: #fffae4 and #9dcfce on frames 3-5, 8-12, 15-18, 24-28), not
   the cloak's back turned. Still: a part swung about a still body (an axe on a body that doesn't move)
   is followed as carried; telling a swing by its pivot would part them.
-- [ ] **Still weak in study's pieces**: big animated things touching (the tournament's two knights in
-  their bout and the stands behind, one piece: every pixel changes often, rhythm and common fate can't
-  part them; their colors could, the armor and the crowd's); soft clouds drifting slowly read as light
-  (a pulsing glow's rings shift a pixel too, arc by arc each its own way: telling them apart needs the
-  drift to agree over the whole cloud); traffic crossing at speed (cyberpunk 11%); a ghost's top bobbing over a
-  gravestone still a piece of its own beside the ghost (its body, read in one frame, misses where the top
-  goes in others; letting it 2 px wider chained the dancers again). Tried and dropped: a
-  light as the frame a few before moved a step (took the party's glows for clouds). Not done: a light as
-  a few basis images times a curve (NMF, Oya et al. 2020): where scenes light themselves the light is
-  already 71-99% right, and the misses are clouds and backlit people, not lamps it could model better.
+- [x] **A part swung about a still body** (an axe on an arm, the body not moving) was followed as a thing
+  carried: it passes over its pivot every frame, and a thing carried never stays over one point, so
+  neither the tracker nor the in-place stretch takes it for carried now, and turning about a joint it
+  keeps makes a run of poses an action. Measured: no scene of the gallery worse.
+- [ ] **Still weak in study's pieces**, each tried this round against the calibration and dropped:
+  - Big animated things touching (the tournament's knights in their bout against the stands): joining
+    neighbors only when the colors they show when they differ are alike moved the tournament not at all
+    (44%) and cost the road's and the cave's masks.
+  - Soft clouds drifting slowly read as light: a light whose middle drifts one way over the clip given
+    back to the frames left the sunset as it was and cost the party things (44% to 39%) and the
+    cyberpunk street its headlights (light found 32% to 25%): a glow going with a dancer or a car drifts
+    too.
+  - A ghost's top bobbing over a gravestone is a piece of its own: its body read over four frames in a
+    row (a short cycle's every pose) chained the dancers into one piece again.
+  - Traffic crossing at speed (cyberpunk 11%): the tracker carries hidden things on; more needs telling
+    cars apart where they overlap.
+  - Not done: a light as a few basis images times a curve (NMF, Oya et al. 2020): where scenes light
+    themselves the light is already 71-99% right, and the misses are clouds and backlit people.
 - [x] **More of what the papers measure**: a sprite's light from its rim (Johnson and Farid, 2005);
   banding by Pixel Logic's rule as the Pixel Fixer paper (TU Delft, 2025) states it; pillow shading;
   the translation of a photo by superpixels after Gerstner et al. (NPAR 2012), which keeps edges.
