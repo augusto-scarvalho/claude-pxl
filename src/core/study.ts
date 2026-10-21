@@ -281,8 +281,8 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
   const med = consec.slice().sort((a, b) => a - b)[consec.length >> 1] || 0;
   const delays = [...new Set(ms)];
   lines.push(`  Timing: ${n} frames, ${delays.length === 1 ? `${delays[0]} ms each (${fps.toFixed(fps < 10 ? 1 : 0)} fps)` : `${Math.min(...delays)}-${Math.max(...delays)} ms (held poses differ)`}; ${held} repeat the frame before (holds).`);
-  const seam = frameDiff(L[n - 1], L[0]);
-  lines.push(`  Loop: ${seam <= Math.max(2 * med, 0.002) ? "the last frame runs into the first (a loop that closes)" : `the last frame jumps to the first (${(seam / (med || 1e-9)).toFixed(1)}x a usual step): not a closed loop, or a clip from a longer one`}.`);
+  const seam = frameDiff(L[n - 1], L[0]), loops = seam <= Math.max(2 * med, 0.002);
+  lines.push(`  Loop: ${loops ? "the last frame runs into the first (a loop that closes)" : `the last frame jumps to the first (${(seam / (med || 1e-9)).toFixed(1)}x a usual step): not a closed loop, or a clip from a longer one`}.`);
   // a cycle: the shortest shift after which frames repeat
   let cycle = 0;
   for (let p = 2; p <= Math.min(Math.floor(n / 2), 120) && med > 0; p++) {
@@ -345,8 +345,45 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
   }
   // the pieces: what moves how on what stays (not when the whole view moves toward its point)
   const layers = forward ? null : decompose(frames, bands, smeared ? 0.08 : 0.05, flows);
-  if (moving.length && moving.every((f) => Number.isInteger(f.dx) && Number.isInteger(f.dy))) lines.push("  Steps are whole pixels at 1x (as measured: block matching moves whole pixels).");
+  const sub = subpixel(frames);
+  if (sub.changed >= 12 && sub.share >= 0.25) {
+    lines.push(`  Subpixel: ${pct(sub.share * 100, 100)} of what changes from frame to frame is a pixel going between a color and the in-between tone of it and its neighbor: edges moving by part of a pixel. A part goes half a pixel when its edge takes that tone, then the next whole pixel (on a breathing idle, the body's parts by turns while the feet stay: no single-pixel bob that crushes the legs).`);
+    pxl.push("Subpixel steps: in the frames between two whole-pixel places, paint the edge the part moves toward (or leaves) in the key between its color and its neighbor's (a ramp's middle tone); move parts at their own frames, not all at once.");
+  } else if (moving.length && moving.every((f) => Number.isInteger(f.dx) && Number.isInteger(f.dy))) lines.push("  Steps are whole pixels at 1x (as measured: block matching moves whole pixels).");
   return { lines, pxl, flows, foe, forward, bands, frames, W, H, layers };
+}
+
+// Subpixel motion: in-between tones coming and going. Of the pixels that change between neighboring
+// frames, the share that goes between a color and a tone lying between it and a neighbor of another
+// color across it (an edge's cover changing, not the edge moving a whole pixel).
+function subpixel(frames: Img[]): { share: number; changed: number } {
+  const W = frames[0].w, H = frames[0].h, clear = (c: Color) => (c & 255) < 128;
+  const ends = (f: Img, x: number, y: number): [Color, Color] | null => {
+    const c = f.get(x, y);
+    if (clear(c)) return null;
+    for (const [dx, dy] of [[1, 0], [0, 1]]) {
+      if (x < dx || y < dy || x + dx >= W || y + dy >= H) continue;
+      const p = f.get(x - dx, y - dy), q = f.get(x + dx, y + dy);
+      if (clear(p) || clear(q) || p === q || p === c || q === c) continue;
+      const A = lab(p), B = lab(q), P = lab(c), ab = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], n2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2;
+      if (n2 < 0.15 ** 2) continue;
+      const t = ((P[0] - A[0]) * ab[0] + (P[1] - A[1]) * ab[1] + (P[2] - A[2]) * ab[2]) / n2;
+      if (t > 0.2 && t < 0.8 && Math.hypot(P[0] - A[0] - t * ab[0], P[1] - A[1] - t * ab[1], P[2] - A[2] - t * ab[2]) < 0.3 * Math.sqrt(n2)) return [p, q];
+    }
+    return null;
+  };
+  let changed = 0, partial = 0;
+  for (let i = 0; i + 1 < frames.length; i++) {
+    const a = frames[i], b = frames[i + 1];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const ca = a.get(x, y), cb = b.get(x, y);
+      if (ca === cb) continue;
+      changed++;
+      const ea = ends(a, x, y), eb = ends(b, x, y);
+      if ((eb && (ca === eb[0] || ca === eb[1])) || (ea && (cb === ea[0] || cb === ea[1]))) partial++;
+    }
+  }
+  return { share: changed ? partial / changed : 0, changed };
 }
 
 const WHAT: Record<Piece["kind"], string> = {

@@ -270,6 +270,9 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       for (let i = 0; i < bw * bh; i++) if (dir[i]) for (const j of [i + 1, i + bw]) if (j < bw * bh && dir[j] && (j !== i + 1 || (i + 1) % bw)) { pairs++; if (dir[i] === dir[j]) same++; }
     }
     const coherent = pairs ? same / pairs : 0, tone = changed ? lightOnly / changed : 0, share = pix.length / (bw * bh);
+    // its edges moving by part of a pixel: what changes goes mostly between a color and the in-between
+    // tone of it and its neighbor (subpixel: a breath, an idle; less than a pixel of motion)
+    const partial = partialOf(F, pix, W, H), small = partial >= 0.3;
     // how much of what differs is the background a step away, the best step each frame: a thing moving a
     // pixel or two (a ghost bobbing brightens and darkens at its edges all at once too), not a light
     let shifted = 0, differs = 0;
@@ -316,14 +319,14 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const right = mv.filter((f) => f.dx > 2 * Math.abs(f.dy)).length, left = mv.filter((f) => -f.dx > 2 * Math.abs(f.dy)).length;
     const stream = !along && mv.length >= 6 && mv.length >= 0.3 * inside.length && Math.max(right, left) >= 0.7 * mv.length;
     // a run of poses played once (an attack, a jump): many drawings, none coming back, and a body that
-    // moves (its blocks found again a step on, or turning about a joint it keeps), not changing all over
-    // like fire
-    const action = !along && !cycle && poses >= 0.5 * N && ((inside.length >= 4 && mv.length >= 0.4 * inside.length) || swung(track.map((e) => pix.filter((p) => fg[e[0]][p]))));
+    // moves (its blocks found again a step on, or turning about a joint it keeps), more than a pixel,
+    // not changing all over like fire
+    const action = !along && !cycle && !small && poses >= 0.5 * N && ((inside.length >= 4 && mv.length >= 0.4 * inside.length) || swung(track.map((e) => pix.filter((p) => fg[e[0]][p]))));
     const kind: Kind = along || round ? (poses >= 3 ? "walk" : "carried")
       : stream ? "stream"
       : coherent >= 0.85 && tone >= 0.6 && !moves ? "light"
       : action ? "action"
-      : !cycle && poses >= 0.5 * N && coherent < 0.8 ? "effect"
+      : !cycle && !small && poses >= 0.5 * N && coherent < 0.8 ? "effect"
       : parts.length >= 2 && share < 0.6 ? "rig" : "anim";
     // its captures, the background taken away: in place, its body's box (room for what of it stays
     // still); going somewhere, each frame's own box
@@ -662,4 +665,33 @@ function posesOf(seq: (Color[] | { w: number; h: number; px: Color[] })[], diffe
     if (c && s / c < 0.3 * step) { cycle = p; break; }
   }
   return { poses: reps.length, cycle };
+}
+
+// the share of what changes in these pixels that goes between a color and the in-between tone of it and
+// a neighbor of another color across it: an edge's cover changing (subpixel motion)
+function partialOf(F: Img[], pix: number[], W: number, H: number): number {
+  const clear = (c: number) => (c & 255) < 128;
+  const ends = (f: Img, p: number): [number, number] | null => {
+    const x = p % W, y = Math.floor(p / W), c = f.data[p];
+    if (clear(c)) return null;
+    for (const [dx, dy] of [[1, 0], [0, 1]]) {
+      if (x < dx || y < dy || x + dx >= W || y + dy >= H) continue;
+      const a = f.data[p - dx - dy * W], b = f.data[p + dx + dy * W];
+      if (clear(a) || clear(b) || a === b || a === c || b === c) continue;
+      const A = lab(a), B = lab(b), P = lab(c), ab = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], n2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2;
+      if (n2 < 0.15 ** 2) continue;
+      const t = ((P[0] - A[0]) * ab[0] + (P[1] - A[1]) * ab[1] + (P[2] - A[2]) * ab[2]) / n2;
+      if (t > 0.2 && t < 0.8 && Math.hypot(P[0] - A[0] - t * ab[0], P[1] - A[1] - t * ab[1], P[2] - A[2] - t * ab[2]) < 0.3 * Math.sqrt(n2)) return [a, b];
+    }
+    return null;
+  };
+  let changed = 0, partial = 0;
+  for (let t = 1; t < F.length; t++) for (const p of pix) {
+    const a = F[t - 1].data[p], b = F[t].data[p];
+    if (a === b) continue;
+    changed++;
+    const ea = ends(F[t - 1], p), eb = ends(F[t], p);
+    if ((eb && (a === eb[0] || a === eb[1])) || (ea && (b === ea[0] || b === ea[1]))) partial++;
+  }
+  return changed ? partial / changed : 0;
 }

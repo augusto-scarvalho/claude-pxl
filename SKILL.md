@@ -20,9 +20,9 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    palette and each piece cut out of its background to `out/_study/`:
    - a picture: palette and ramps, outlines, dithering, light, banding, pillow shading, perspective
      (vanishing points, lens, tilt);
-   - a clip: timing, cycle and loop, parallax planes and their speeds, and its pieces (the backdrop,
-     sprites carried along, walks, anims in place, rigs, actions with their smears, effects, and the
-     lights, told apart first), each with its box in every frame.
+   - a clip: timing, cycle and loop, subpixel motion, parallax planes and their speeds, and its
+     pieces (the backdrop, sprites carried along, walks, anims in place, rigs, actions with their
+     smears, effects, and the lights, told apart first), each with its box in every frame.
 
    An editor's transparency checker exported with it is taken for clear; a reflection under it is
    told (row, opacity) and set aside.
@@ -51,13 +51,14 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    rig of the file and every frame of an animated scene (not `anim()`s: a picture made as one gets no
    checks), warnings only, with the frames they happen at. Fix each or say why it's meant. Its last
    line says which rules ran: a rule runs only where the art says what it needs (`world.light`,
-   `world.ground`, `height`, a `front` socket), so "no warnings" with "not run: lit side" checked nothing about the light (a scene lit by a fire or a
-   lamp: `world: { light: { at: [x, y] } }`). A lit-side warning that looks wrong: `--readings` shows
-   what the rule read on every placement. Then look as a critic. Replacing approved art: keep
-   `name_old` beside the new one and show both, `PXL shot art.px.js name name_old`, for the user to
-   choose. Matching a reference: `PXL compare art.px.js <name> ref.png [--shrink N]` lists each
-   row's extents side by side. Which way a rig's parts face: `PXL blind art.px.js <rig>` shows them
-   unnamed to a reader who doesn't know the labels (characters.md §11).
+   `world.ground`, `height`, a `front` socket), so "no warnings" with "not run: lit side" checked
+   nothing about the light (a scene lit by a fire or a lamp: `world: { light: { at: [x, y] } }`).
+   A lit-side warning that looks wrong: `--readings` shows what the rule read on every placement.
+   Then look as a critic. Replacing approved art: keep `name_old` beside the new one and show
+   both, `PXL shot art.px.js name name_old`, for the user to choose. Matching a reference:
+   `PXL compare art.px.js <name> ref.png [--shrink N]` lists each row's extents side by side. Which
+   way a rig's parts face: `PXL blind art.px.js <rig>` shows them unnamed to a reader who doesn't
+   know the labels (characters.md §11).
 6. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL.
 
 Errors name file:line:col and the asset/layer/op, and suggest fixes. One broken asset doesn't stop

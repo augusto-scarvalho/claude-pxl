@@ -450,6 +450,9 @@ lens and the turn they imply (`focal`, `yaw`); uprights meeting above or below, 
 on its middle column, with the horizon giving the lens and the tilt (`pitch`). Animated, for their
 motion: the frames' timing and holds, a
 cycle (the shortest shift after which frames repeat), whether the last frame runs into the first,
+edges moving by part of a pixel through in-between tones (subpixel motion: a part halfway between
+two places takes the tone between its color and its neighbor's at its edge; a piece moving so is
+not taken for an attack or an effect),
 bands of rows carried across together and their speeds to a fraction of a pixel (parallax planes:
 `scroll`'s `per` is the speed times the loop's frames), the point the motion opens out from (a camera
 moving forward: the vanishing point of the motion, which picks the road's among the still ones). And

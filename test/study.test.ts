@@ -298,3 +298,25 @@ test("study reads an attack: poses played once, in place, with a smear on the fr
   assert.match(text, /Smears on frames 7-9 \(#fffae4/);
   }
 });
+
+test("study reads subpixel motion: a body breathing by half pixels through in-between tones, its feet still; looped, no attack", () => {
+  // a pale body over dark legs on a flat ground: down a half pixel (its edges in the tone between it
+  // and the ground), down a whole one, back a half, back; the legs never move
+  const BG = pack(158, 78, 84), T = pack(240, 240, 240), M = pack(199, 159, 162), D = pack(24, 22, 34);
+  const frame = (top: number, half: boolean) => {
+    const img = new Img(40, 40);
+    for (let y = 0; y < 40; y++) for (let x = 0; x < 40; x++) img.set(x, y, BG);
+    for (let y = 30; y < 37; y++) for (const x of [16, 17, 22, 23]) img.set(x, y, D);
+    for (let y = top; y < top + 9; y++) for (let x = 15; x < 24; x++) img.set(x, y, half && y === top ? M : T);
+    if (half) for (let x = 15; x < 24; x++) img.set(x, top + 9, M);
+    return img.scale(3);
+  };
+  const breath = [frame(18, false), frame(18, true), frame(19, false), frame(18, true)];
+  const text = study({ name: "breath", frames: breath, ms: breath.map(() => 110), kind: "test" }).text.join("\n");
+  assert.match(text, /Subpixel: \d+% of what changes/);
+  assert.doesNotMatch(text, /Steps are whole pixels/);
+  assert.doesNotMatch(text, /played once/);
+  // the same breath in whole pixels: no subpixel to tell
+  const bob = [frame(18, false), frame(19, false), frame(18, false), frame(19, false)];
+  assert.doesNotMatch(study({ name: "bob", frames: bob, ms: bob.map(() => 110), kind: "test" }).text.join("\n"), /Subpixel/);
+});
