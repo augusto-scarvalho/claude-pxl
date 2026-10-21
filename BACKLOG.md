@@ -667,7 +667,14 @@ Saint11's, read from his page, and not kept in the repository):
   left, and that ground the background. A box resting 7 frames of 12 read "holds 6; right 30 30 30 19"
   where it read as two lights; the calibration as it was. Tried first: a light keeping its hue (cost
   the cave's glowing fungi, whose light turns the rock's hue, and the leap's ground has too little
-  color for it anyway).
+  color for it anyway). Checked on a made-up clip only: on Saint11's squash card the dasher rests 7
+  frames of 19 (not the background), and a GIF made by pxl merges a still rest into one frame.
+  On the card itself, the dash was followed through its leap but broke in two: crouching moved its
+  middle back under a pixel, so it wasn't "one way". Done: a little back before it sets off or once it
+  has arrived doesn't count, when it is found in every frame of its way (anywhere, or with frames
+  missing, cost the party's light 75% -> 69%); a track barely moving, a tenth of its size a frame, has
+  no way to keep. The card reads "holds 4; right 1 1 34 27 20 14 2 1; holds 1; right 2 4 4 1" in 19
+  of 19 frames; the calibration as it was.
 - [x] **A smear inflates the box**: spacing and squash read off the bounding box, which a smear
   stretches. Track the pixels present every frame apart from those that come and go. Tried: the
   middle of its pixels instead of its box's: a smear joined to the body pulls it as much; and the box
@@ -680,7 +687,10 @@ Saint11's, read from his page, and not kept in the repository):
   (85% of its pixels in the same colors, a step of half its size at least, the rest of the piece
   behind it on the way it came) is it, and the rest its smear, out of its box: "right 3 3 3 20 20 3",
   "Smears on frames 4-5", with `stamp`'s `smear` as the way to draw it. The calibration as it was (the
-  cyberpunk street's traffic found 34 -> 33, its masks the same).
+  cyberpunk street's traffic found 34 -> 33, its masks the same). Checked on pxl's own `smear` too (a
+  slime dashing over a dotted floor, built and read back from its GIF): three pieces before, one
+  after, "right 3 3 3 22 22 3". No card read has a thing carried with a smear (the punch's and the
+  slash's are in place).
 - [x] **Effects as effects**: an explosion (dark, white, blast, fade) read as an attack with an
   anticipation; read its value and area per frame instead, and "plays once, then N frames empty".
   Done in `study --at`'s region reading (its area and lightness per frame, "played once"), and in the
@@ -692,15 +702,17 @@ Saint11's, read from his page, and not kept in the repository):
 - [x] **A walk's flipped half** (top-down: frames 3-5 are 0-2 mirrored) and the body's bob per frame.
   Done for a piece whose cycle study finds; on the card itself the goblin seen from the front is
   symmetric, so its flipped half repeats the first and the clip reads as a cycle of 3.
-- [x] **A see-through body** (a ghost): what changes behind it read as lights; its whole-body float
-  (0, 1, 2, 2, 1, 0 px) not reported. Done: where it comes and goes each pixel shows two colors, what
-  is behind and that mixed toward one color by one share, so the lines from each to its mix meet at
-  that color (a light's change grows from its source: no one share; a body dithered and shifting a
-  pixel pairs its own two colors only). Its float is read off its edges, column by column; its head
-  and hem, floating alike, are one piece. A ghost at 50% over a dotted ground read "mixed 50% toward
-  #ecf0ff (a layer with opacity: 0.50)", "its float: 0 1 2 2 1 0", where it read as a light and a rig
-  moving by half pixels. The calibration as it was; none of eight example scenes reads one. A body
-  swaying sideways gets no float.
+- [ ] **A see-through body** (a ghost): what changes behind it read as lights; its whole-body float
+  (0, 1, 2, 2, 1, 0 px) not reported. Tried and taken out: the pixels where it comes and goes, each
+  showing two colors, what is behind and that mixed toward one color by one share (the lines from
+  each to its mix meeting at that color). It read a made-up ghost over a dotted ground, and nothing
+  real: Saint11's ghost is added to what is behind ("additive color blend": its tones in one blue
+  direction at two strengths, snapped to the palette), its hair and hem move (a pixel shows three
+  colors or more), and pxl's own ghost at `opacity: 0.6` over a night sky, its hem waving, wasn't read
+  either: over one flat color a body seen through can't be told from an opaque one of the mixed color.
+  What it needs: the body followed by its float, each of its own pixels compared over the frames as
+  different things pass behind it (the change in it against the change behind gives the share), and
+  added light told from a glow by its silhouette moving, not its brightness.
 - [x] **A runner in place read as a camera moving forward**: require the backdrop to move first.
   Done another way: the opening out has to hold frame after frame (a runner spreads its limbs and
   draws them in by turns); the race still reads as a camera going forward.
@@ -713,6 +725,10 @@ Saint11's, read from his page, and not kept in the repository):
   its size a frame is carried when it keeps one speed nearly all the way; a plane has to move all
   across its band each frame; the seam has to span no farther than a usual step. The calibration:
   the cyberpunk street's traffic found 31 to 33, its masks 39/43% to 41/46%, the rest as it was.
+  Both come back when a smear makes the change wide: pxl's slime resting (one frame in the GIF), then
+  three smeared leaps, read as a plane going by at 16 px a frame and a loop that closes. And Saint11's
+  parallax card's ball (4 px, bouncing, passing behind a tree) breaks into three pieces, at the tree
+  and at the bounce (the prediction goes on down; a bounce turns it). Open.
 - [x] **Banding across a 1 px gap**, and 45° runs whose ends step together (Pixel Joint): study's
   banding counts only runs side by side. Done: the gallery's facades read about 1.7 times the pairs.
 

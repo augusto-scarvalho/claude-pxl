@@ -684,11 +684,10 @@ function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: nu
     const sm = !p.smears ? "" : p.kind === "carried" ? ` Smears on frames ${spans(p.smears.frames)} (${p.smears.colors.map(hex).join(", ")}: there a moment only): a streak behind it on the frames it goes fastest, stamp(name, x, y, { smear: [fromX, fromY] }) (its box and spacing measured without it).`
       : ` Smears on frames ${spans(p.smears.frames)} (${p.smears.colors.map(hex).join(", ")}: there a moment only): the shape the swing sweeps, on the frames it goes fastest, arc(cx, cy, r, from, to, c, { inner, taper }) in a layer with unlit: true, outline: false (characters.md: its last 100 degrees at most, thin at its tail).`;
     const sub = p.sub ? `, moving by part of a pixel (subpixel: its parts stamped with { sub: true } at half-pixel places)` : "";
-    const thru = p.through ? `, seen through: what's behind it mixed ${pct(p.through.alpha * 100, 100)} toward ${hex(p.through.color)} (a layer with opacity: ${p.through.alpha.toFixed(2)}; its edges change as a light's would)` : "";
     // ten times brighter at its brightest than at its dimmest is more than light does to what is there:
     // paint that comes and goes (a flash, a smear, sparks, a limb drawn light then dark)
     const paint = p.kind === "light" && (p.strength ?? 0) > 10;
-    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}${sub}${thru}: ${paint ? `read as a light, but more likely paint that comes and goes (a flash, a smear, sparks, a part drawn light then dark): ${WHAT.effect}` : WHAT[p.kind]}.${sm}`);
+    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}${sub}: ${paint ? `read as a light, but more likely paint that comes and goes (a flash, a smear, sparks, a part drawn light then dark): ${WHAT.effect}` : WHAT[p.kind]}.${sm}`);
     // (a thing going somewhere, or an action, over a short clip: elsewhere a box's steps are its drawings
     // changing, a limb reaching out, not the thing moving)
     // a walk whose steps vary (a jump, a dash) is read too; in place, a body squashing on a ground that
@@ -699,9 +698,7 @@ function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: nu
     const sp = p.track.length > 24 ? null : (p.kind === "carried" && p.poses <= 4) || p.kind === "action" || (p.kind === "walk" && varied) ? spacingWords(p.track)
       : (p.kind === "anim" || p.kind === "rig") && grounded ? spacingWords(p.track, true) : null;
     if (sp) out.push(`     ${sp}`);
-    // (seen through, its box is where its edges change: its float is read off them instead)
-    if (p.through?.float) out.push(`     its float, px down from its highest, each frame: ${p.through.float.join(" ")}`);
-    const half = p.kind === "light" || p.through ? null : cycleWords(p);
+    const half = p.kind === "light" ? null : cycleWords(p);
     if (half) out.push(`     ${half}`);
   }
   const things = d.pieces.filter((p) => p.kind !== "light").length, lights = d.pieces.length - things;

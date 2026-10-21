@@ -46,8 +46,6 @@ export interface Piece {
   source?: [number, number]; strength?: number; tint?: Color;
   /** smears: the frames a shape swept by something fast shows in (its colors there for a moment only) */
   smears?: { frames: number[]; colors: Color[] };
-  /** seen through: what's behind mixed toward its color by its share; its float, px down from its highest, each frame */
-  through?: { alpha: number; color: Color; float?: number[] };
 }
 
 type Blob = { x0: number; y0: number; x1: number; y1: number; n: number; cx: number; cy: number; pix: number[] };
@@ -321,15 +319,6 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
   // closed body is part of it (a ghost's top bobbing over a gravestone)
   const gs = [...groups.values()].filter((parts) => parts.reduce((a, f) => a + f.n, 0) >= 6), bodies = gs.map(bodyOf);
   const up = gs.map((_, i) => i), top = (i: number): number => (up[i] === i ? i : (up[i] = top(up[i])));
-  // (and two seen through in one color and share, touching, or floating alike a size of them apart: a
-  // ghost's head and its hem, its still middle between them)
-  const thrus = gs.map((g) => seeThrough(F0, g.flatMap((f) => f.pix), W)), boxOf = (g: Blob[]) => ({ x0: Math.min(...g.map((f) => f.x0)), y0: Math.min(...g.map((f) => f.y0)), x1: Math.max(...g.map((f) => f.x1)), y1: Math.max(...g.map((f) => f.y1)) });
-  for (let i = 0; i < gs.length; i++) for (let j = i + 1; j < gs.length; j++) {
-    const s = thrus[i], u = thrus[j], a = boxOf(gs[i]), b = boxOf(gs[j]);
-    if (!s || !u || Math.abs(s.alpha - u.alpha) > 0.1 || dE(s.color, u.color) > 0.1) continue;
-    const gap = Math.max(a.x0 - b.x1, b.x0 - a.x1, a.y0 - b.y1, b.y0 - a.y1), size = Math.max(a.x1 - a.x0, a.y1 - a.y0, b.x1 - b.x0, b.y1 - b.y0) + 1;
-    if (gap <= 2 || (gap <= size && s.float && u.float && s.float.join() === u.float.join())) up[top(i)] = top(j);
-  }
   for (let i = 0; i < gs.length; i++) for (let j = i + 1; j < gs.length; j++) {
     const a = bodies[i], b = bodies[j];
     if (a.b.x0 > b.b.x1 || b.b.x0 > a.b.x1 || a.b.y0 > b.b.y1 || b.b.y0 > a.b.y1) continue;
@@ -376,9 +365,7 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     // in it goes between a color and the in-between tone of it and its neighbor, not with a whole-pixel
     // move (an idle, a stance's sway or a breath; less than a pixel of motion, so no attack, no fire)
     // (in such a clip a part pushing into its outline measures 0.1, its single-pixel bob 0.01)
-    // seen through (a ghost): what's behind it shows in it, so its edges change as a light's would
-    const thru = seeThrough(F0, pix, W);
-    const small = !thru && subClip && partialOf(F, pix, W, H) >= 0.06;
+    const small = subClip && partialOf(F, pix, W, H) >= 0.06;
     // how much of what differs is the background a step away, the best step each frame: a thing moving a
     // pixel or two (a ghost bobbing brightens and darkens at its edges all at once too), not a light
     let shifted = 0, differs = 0;
@@ -436,7 +423,6 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const once = shown.length >= 3 && gone < N - 1 && area[gone] <= 0.5 * area[peak] && [born, born + 1, born + 2].some((t) => t < N && whiteAt(t));
     const kind: Kind = along || round ? (poses >= 3 ? "walk" : "carried")
       : stream ? "stream"
-      : thru ? "anim"
       : coherent >= 0.85 && tone >= 0.6 && !moves ? "light"
       : once ? "effect"
       : action ? "action"
@@ -452,7 +438,7 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const capture = (e: [number, number, number, number, number]): Cut => (about ? { t: e[0], b: box, keep: carriedCut(own1(e[0]), box, W) } : { t: e[0], b: boxAt(e), keep: matte(F[e[0]], fg[e[0]], boxAt(e), mine, model, W, tol, mode).keep });
     const steps = track.filter((e, i) => i === 0 || e[0] === track[i - 1][0] + 1);
     pieces.push({
-      kind, box: along || about || kind === "action" || once || thru || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle, parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), ...(small ? { sub: true } : {}), ...(thru ? { through: thru } : {}), track,
+      kind, box: along || about || kind === "action" || once || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle, parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), ...(small ? { sub: true } : {}), track,
       ...(kind === "action" || kind === "walk" ? smearsOf(F, roomy(x0, y0, bw, bh, 2), W, fg) : {}),
       ...captures(cycle >= 2 && steps.length >= cycle ? steps.slice(0, cycle) : spread(track, 8), spread(track, 8), capture, F0),
     });
@@ -530,69 +516,6 @@ const iouBox = (a: number[], b: number[]) => { const w = Math.max(0, Math.min(a[
  * most), and the frames they show in as a long thin piece (2.5 times as long as it is wide, or filling a
  * third of its box at most).
  */
-/**
- * A body seen through (a ghost, glass, a shadow at part opacity): where it comes and goes each pixel shows
- * two colors, what is behind and that mixed toward one color by one share, so the lines from each to its
- * mix all meet at that color (a light's change grows smoothly from its source: no one share). Its float:
- * in each column, how far its top edge (seen through below, not above) and its bottom edge are from where
- * they are highest, each frame. (Only up and down: a body swaying sideways gets no float.)
- */
-function seeThrough(F: Img[], pix: number[], W: number): { alpha: number; color: Color; float?: number[] } | null {
-  const N = F.length, two: { p: number; u: number[]; v: number[]; d: number[] }[] = [];
-  for (const p of pix) {
-    const a = F[0].data[p];
-    let b = a, ok = true;
-    for (let t = 1; t < N && ok; t++) { const c = F[t].data[p]; if (c !== a) { if (b === a) b = c; else if (c !== b) ok = false; } }
-    if (!ok || b === a || (a & 255) < 128 || (b & 255) < 128) continue;
-    const u = channels(a).slice(0, 3), v = channels(b).slice(0, 3), d = [v[0] - u[0], v[1] - u[1], v[2] - u[2]], l = Math.hypot(d[0], d[1], d[2]);
-    two.push({ p, u, v, d: d.map((x) => x / l) });
-  }
-  if (two.length < 12) return null;
-  // the point nearest all the lines: sum (I - d d') C = sum (I - d d') u
-  const M = new Array(9).fill(0), r = [0, 0, 0];
-  for (const { u, d } of two) for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { const m = (i === j ? 1 : 0) - d[i] * d[j]; M[3 * i + j] += m; r[i] += m * u[j]; }
-  const det3 = (m: number[]) => m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6]) + m[2] * (m[3] * m[7] - m[4] * m[6]);
-  const det = det3(M);
-  // (lines all one way, from one color behind, meet nowhere)
-  if (Math.abs(det) < 1e-3 * two.length ** 3) return null;
-  const C = [0, 1, 2].map((k) => det3(M.map((v, i) => (i % 3 === k ? r[Math.floor(i / 3)] : v))) / det);
-  if (C.some((v) => v < -10 || v > 265)) return null;
-  // each pair's mix: the one of its two nearer that color, and the share it goes toward it
-  const fit = two.map(({ p, u, v, d }) => {
-    const s = (C[0] - u[0]) * d[0] + (C[1] - u[1]) * d[1] + (C[2] - u[2]) * d[2], off = Math.hypot(...[0, 1, 2].map((k) => C[k] - u[k] - s * d[k]));
-    const l = Math.hypot(v[0] - u[0], v[1] - u[1], v[2] - u[2]), mixV = Math.hypot(...[0, 1, 2].map((k) => C[k] - v[k])) < Math.hypot(...[0, 1, 2].map((k) => C[k] - u[k]));
-    return { p, off, alpha: mixV ? l / s : l / (l - s), mix: mixV ? v : u, behind: mixV ? u : v };
-  });
-  const alpha = median(fit.map((f) => f.alpha)), good = fit.filter((f) => f.off <= 8 && Math.abs(f.alpha - alpha) <= 0.1);
-  if (alpha < 0.15 || alpha > 0.85 || median(fit.map((f) => f.off)) > 6 || good.length < 0.75 * fit.length) return null;
-  // what's behind shows through in it: two colors behind at least, each its own mix (a body drawn
-  // dithered and shifting a pixel pairs its own two colors over and over)
-  const behind = new Set(good.map((f) => f.behind.join())), mixes = new Set(good.map((f) => f.mix.join()));
-  if (behind.size < 2 || mixes.size < 2) return null;
-  const color = pack(...(C.map((v) => Math.max(0, Math.min(255, Math.round(v)))) as [number, number, number]));
-  // its float: each column's runs of these pixels, the mix at the bottom of a run (a top edge) or at its top
-  const mixed = new Map(good.map((f) => [f.p, pack(...(f.mix as [number, number, number]))]));
-  const cols = new Map<number, number[]>();
-  for (const f of good) { const x = f.p % W; (cols.get(x) ?? cols.set(x, []).get(x)!).push(f.p); }
-  const per: number[][] = Array.from({ length: N }, () => []);
-  for (const ps of cols.values()) {
-    ps.sort((a, b) => a - b);
-    for (let i = 0; i < ps.length;) {
-      let j = i + 1;
-      while (j < ps.length && ps[j] === ps[j - 1] + W) j++;
-      const run = ps.slice(i, j), L = run.length, k = F.map((f) => run.filter((p) => f.data[p] === mixed.get(p)).length);
-      let top = 0, bottom = 0;
-      F.forEach((f, t) => { if (k[t] > 0 && k[t] < L) { if (run.slice(L - k[t]).every((p) => f.data[p] === mixed.get(p))) top++; else if (run.slice(0, k[t]).every((p) => f.data[p] === mixed.get(p))) bottom++; } });
-      if (top && !bottom) k.forEach((v, t) => per[t].push(L - v));
-      else if (bottom && !top) k.forEach((v, t) => per[t].push(v));
-      i = j;
-    }
-  }
-  if (!per[0].length) return { alpha, color };
-  const at = per.map((v) => median(v)), low = Math.min(...at), float = at.map((v) => Math.round(v - low));
-  return { alpha, color, ...(Math.max(...float) >= 1 ? { float } : {}) };
-}
-
 export function smearsOf(F: Img[], b: Box, W: number, fg?: Uint8Array[]): { smears?: { frames: number[]; colors: Color[] } } {
   const byColor = smearsByColor(F, b, W);
   return byColor.smears || !fg ? byColor : smearsByShape(F, b, W, fg);

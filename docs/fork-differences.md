@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**273 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**276 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–21, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -126,7 +126,7 @@ of and what to use in pxl to make the same.
 - **Pieces:** an animation taken apart, each piece with what to build it with.
   - Kinds: the backdrop, planes, things carried along a path, walks, traffic, anims in place, rigs,
     actions (an attack, with the frames of its smears), effects (fire, water, an explosion played
-    once), lights, and bodies seen through (a ghost: its color and opacity, its float frame by frame).
+    once), lights.
   - Light is told apart first (after Weiss 2001, Matsushita 2004, Koppal and Narasimhan 2006), so a
     lamp pulsing isn't taken for a thing. Each light gets its source, strength and color.
   - Each object is isolated: pixels that change in the same frames, joined by rhythm or by a shared
@@ -181,8 +181,9 @@ that comparison.
 What moved it: a ground truth that follows each stamp whatever its name, pixels grouped by common fate,
 a tracker that carries hidden things on, and no light looked for where something goes by. The cave fell
 on one mushroom at the line; the sunset's clouds now come apart one by one. The last round, on what
-breaks a track (leaps, smears, a long rest), found the cyberpunk street's cars 31 to 33 with its masks
-39/43% to 42/47% (precision/recall), each frame's share a point lower.
+breaks a track (leaps, a dash's crouch, smears, a long rest), found the cyberpunk street's cars 31 to
+33 with its masks 39/43% to 42/47% (precision/recall), each frame's share a point lower; Saint11's
+squash card's dash now reads in one piece.
 
 ## Examples
 

@@ -306,25 +306,6 @@ test("study follows a ball through its smear: the streak isn't in its box or its
   assert.doesNotMatch(t, /#2 /);
 });
 
-test("study reads a see-through ghost floating: its color and share, its float, not a light", () => {
-  // half its color, half the ground's, floating 0 1 2 2 1 0 px over a textured ground
-  const ground = (x: number, y: number) => ((x * 7 + y * 13) % 17 < 3 ? [70, 90, 60] : (x + y) % 9 === 0 ? [50, 70, 40] : [110, 140, 90]);
-  const frames = [0, 1, 2, 2, 1, 0].map((b) => {
-    const img = new Img(60, 50);
-    for (let y = 0; y < 50; y++) for (let x = 0; x < 60; x++) {
-      const gy = y - 14 - b, gx = x - 22, g = ground(x, y);
-      const inside = gy >= 0 && gy < 20 && gx >= 0 && gx < 16 && (gy >= 8 ? gy < 17 + ((gx >> 2) % 2) * 2 : Math.hypot(gx - 7.5, gy - 8) < 8.2);
-      const c = gy >= 6 && gy <= 8 && (gx === 5 || gx === 10) ? [20, 20, 40] : [235, 240, 255];
-      img.set(x, y, pack(...((inside ? g.map((v, i) => Math.round(0.5 * v + 0.5 * c[i])) : g) as [number, number, number])));
-    }
-    return img;
-  });
-  const t = study({ name: "ghost", frames, ms: frames.map(() => 120), kind: "test" }).text.join("\n");
-  assert.match(t, /#1 16x21 at 22,14, .*seen through: what's behind it mixed 50% toward #e[b-d]f0ff/);
-  assert.match(t, /its float, px down from its highest, each frame: 0 1 2 2 1 0/);
-  assert.doesNotMatch(t, /#2 |a light:/);
-});
-
 test("study: an explosion played once over a ground is an effect, not an attack", () => {
   const ground = (x: number, y: number) => ((x * 7 + y * 13) % 17 < 3 ? pack(70, 90, 60) : (x + y) % 9 === 0 ? pack(50, 70, 40) : pack(110, 140, 90));
   // nothing, a dark disc, a white one, an orange blast growing, smoke thinning to nothing, then empty
