@@ -274,7 +274,7 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const coherent = pairs ? same / pairs : 0, tone = changed ? lightOnly / changed : 0, share = pix.length / (bw * bh);
     // its edges moving by part of a pixel, in a clip that moves so (subpixelClip): much of what changes
     // in it goes between a color and the in-between tone of it and its neighbor, not with a whole-pixel
-    // move (a breath, an idle; less than a pixel of motion, so no attack, no fire)
+    // move (an idle, a stance's sway or a breath; less than a pixel of motion, so no attack, no fire)
     const small = subClip && partialOf(F, pix, W, H) >= 0.15;
     // how much of what differs is the background a step away, the best step each frame: a thing moving a
     // pixel or two (a ghost bobbing brightens and darkens at its edges all at once too), not a light

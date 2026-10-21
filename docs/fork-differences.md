@@ -128,7 +128,7 @@ of and what to use in pxl to make the same.
   - Each capture is cut out of its background, GrabCut-style. Files: a sheet, a strip, and a box per
     frame for every piece.
 - **Subpixel:** edges moving by part of a pixel through in-between tones are told from whole-pixel
-  moves, with the tones a clip uses and between which colors; a piece breathing so is marked and not
+  moves, with the tones a clip uses and between which colors; a piece moving so (an idle) is marked and not
   taken for an attack or a fire (after ApplefatGOV's How-to-subpixel).
 - **Cleaning the input:** an editor's transparency checker exported with a sprite is taken for clear.
   A reflection under it, over the checker or a plain floor, is told (its row and opacity) and set

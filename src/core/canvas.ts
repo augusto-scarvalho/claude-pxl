@@ -210,8 +210,8 @@ export class Canvas {
 
   /**
    * Run `fn` drawing onto a sheet of its own, then lay it down moved by (dx, dy), which may fall
-   * between pixels: what `stamp`'s `sub` does for an asset, for parts drawn in code (a chest breathing
-   * half a pixel). The edge it moves toward spills half a pixel in the palette's key between.
+   * between pixels: what `stamp`'s `sub` does for an asset, for parts drawn in code (a body swaying
+   * half a pixel at a time). The edge it moves toward spills half a pixel in the palette's key between.
    */
   subpixel(dx: number, dy: number, fn: () => void): void {
     if (!Number.isFinite(dx) || !Number.isFinite(dy)) throw new PxError(`subpixel(dx, dy, fn): dx and dy are numbers of px, got ${JSON.stringify([dx, dy])}`);

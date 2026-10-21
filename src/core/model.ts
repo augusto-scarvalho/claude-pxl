@@ -253,7 +253,7 @@ export interface PlaceOpts {
   rdelay?: boolean;
   /**
    * stamp only: x and y may fall between pixels; an edge covering part of a pixel over something
-   * painted takes the palette's key between the two (subpixel motion: a breath by half pixels).
+   * painted takes the palette's key between the two (subpixel motion: an idle by half pixels).
    */
   sub?: boolean;
 }

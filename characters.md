@@ -277,18 +277,20 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   that swings an axe round a body that stays in profile reads as a puppet. Posed as a skeleton in 3D
   and turned about its upright, the views come by themselves (`examples/rig/warden.px.js`: the head
   drawn in five views, picked by the turn).
-- **Subpixel: less than a pixel of motion** (after ApplefatGOV's How-to-subpixel, r/PixelArt). A
-  breathing idle doesn't need the whole body to drop a pixel: that single-pixel bob crushes the legs
-  and jolts the face. Keep the feet planted and move each part half a pixel at a time: in the frame
-  between two whole-pixel places, the edge the part moves toward takes the tone between its color and
-  its neighbor's (a ramp's middle key); then the part moves the whole pixel, and the edge it leaves
-  takes that tone on the way back. It works up and down, sideways, round a small circle, and for
-  growing and shrinking. Move the parts by turns (the head, then the shoulders and sleeves, the hem
-  last), so a six-frame breath carries one pixel of real travel. In pxl: draw the parts apart and
-  stamp each with `{ sub: true }` (or draw it in `c.subpixel(dx, dy, () => ...)`) at its place of the
-  frame (`y + 0.5` is half a pixel down); the palette needs a key between each part's colors and what
-  it moves over (`examples/subpixel.px.js` makes them as mixes of the two; `examples/rig/warden.px.js`
-  breathes so at rest). `pxl study` tells it in a clip ("Subpixel: ..."), with the tones it takes.
+- **Subpixel: less than a pixel of motion** (after ApplefatGOV's How-to-subpixel, r/PixelArt). An idle
+  doesn't need the whole body to drop a pixel (the tutorial's is a fighting stance in its beat, a
+  boxer finding his rhythm, about a second a sway; a breath is slower, three or four seconds a cycle):
+  that single-pixel bob crushes the legs and jolts the face. Keep the feet planted and move each part
+  half a pixel at a time: in the frame between two whole-pixel places, the edge the part moves toward
+  takes the tone between its color and its neighbor's (a ramp's middle key); then the part moves the
+  whole pixel, and the edge it leaves takes that tone on the way back. It works up and down, sideways,
+  round a small circle, and for growing and shrinking. Move the parts by turns (the head, then the
+  shoulders and sleeves, the hem last), so a six-frame idle carries one pixel of real travel. In pxl:
+  draw the parts apart and stamp each with `{ sub: true }` (or draw it in `c.subpixel(dx, dy, () =>
+  ...)`) at its place of the frame (`y + 0.5` is half a pixel down); the palette needs a key between
+  each part's colors and what it moves over (`examples/subpixel.px.js` makes them as mixes of the two;
+  `examples/rig/warden.px.js` sways so at rest, a fighting stance from foot to foot). `pxl study`
+  tells it in a clip ("Subpixel: ..."), with the tones it takes.
 - **Register the whole figure by one point**, the pelvis: move the entire frame so it lands on the
   same x every frame, with one constant y offset per cycle for the bob. Never centre frames on
   their bounding box (an arm reaching out moves it), and never pin head and feet separately (the

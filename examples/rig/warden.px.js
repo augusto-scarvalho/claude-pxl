@@ -151,13 +151,10 @@ const THIGH = 10, SHIN = 10, UPPER = 8, FORE = 8, HAFT = 17
 // from the pelvis on the floor; hand: the axe hand from its shoulder, [forward, right, up]; axe: which
 // way the haft points from it (the edge's way is worked out from the motion, below); off: the other hand from its
 // shoulder; smear: draw what the blade swept since the frame before; spark: the chop's hit
-const REST = { look: "calm", breath: 0, yaw: 60, twist: 0, head: 0, lean: 2, crouch: 0, feet: [[-1, -4], [1, 4]], hand: [2, 2, -15], axe: [0.6, 0.15, -1], off: [0, -1, -15] }
+const REST = { look: "calm", yaw: 60, twist: 0, head: 0, lean: 2, crouch: 0, feet: [[-1, -4], [1, 4]], hand: [2, 2, -15], axe: [0.6, 0.15, -1], off: [0, -1, -15] }
 const KEYS = [
   { t: 0, ...REST },
-  // the breath at rest, by half pixels (subpixel): the head down a pixel and back, the chest a frame
-  // behind it, the hips, the skirt and the feet still (no single-pixel bob onto shortened legs)
-  { t: 2, breath: 1 },
-  { t: 4, breath: 0 },
+  { t: 4 },                                                   // at rest till the wind-up (the stance below)
   // the wind-up: the shoulders coil back, the axe up behind the head, the free hand forward
   { t: 5, look: "grit", twist: -35, head: 25, crouch: 2, lean: 6, hand: [-3, 4, 6], axe: [-0.5, 0.3, 0.8], off: [6, -1, -4] },
   { t: 6, twist: -55, head: 40, crouch: 3, lean: 8, hand: [-5, 5, 8], axe: [-0.6, 0.35, 0.7], off: [8, -1, -2], feet: [[1, -5], [-2, 5]] },
@@ -185,10 +182,19 @@ const KEYS = [
   // up again, the axe let down to the side
   { t: 25, look: "calm", yaw: 760, crouch: 3, lean: 8, hand: [6, 3, -11], axe: [0.8, 0.2, -0.7], off: [0, -2, -14], feet: [[-2, -5], [3, 4]] },
   { t: 28, yaw: 780, twist: 0, head: 0, crouch: 0, lean: 2, ...{ hand: REST.hand, axe: REST.axe, off: REST.off, feet: REST.feet } },
-  { t: 31, breath: 1 },
-  { t: 33, breath: 0 },
 ]
 const FRAMES = 34
+// The fighting stance at rest, in its beat (a boxer finding his rhythm, about a second a sway): the
+// weight going from foot to foot, the body over the planted feet a pixel and a half either way, dipping
+// nearly a pixel as it passes the middle (the knees giving), the head a frame behind; all by half pixels
+// (subpixel), the legs and feet still. [right, down] in px on screen, at a frame of the loop.
+const IDLE = [28, 29, 30, 31, 32, 33, 0, 1, 2, 3, 4]
+const stance = (f) => {
+  const k = IDLE.indexOf(((f % FRAMES) + FRAMES) % FRAMES)
+  if (k < 0) return [0, 0]
+  const a = Math.sin((2 * Math.PI * k) / IDLE.length)
+  return [1.5 * a, 0.8 * (1 - Math.abs(a))]
+}
 // each key takes what it doesn't say from the one before; between keys, eased in and out
 KEYS.forEach((k, i) => { if (i) for (const n in KEYS[i - 1]) if (!(n in k) && n !== "smear" && n !== "spark") k[n] = KEYS[i - 1][n] })
 const pose = (t) => {
@@ -384,12 +390,13 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
   layer("body", (c) => {
     const p = pose(c.frame), j = skeleton(p), parts = [], mid = depth(j.chest)
     const at = (d, draw) => parts.push({ d, draw })
-    // what breathes: the head by the breath of the frame, the chest, arms and axe by the frame before's
-    const bHead = p.breath, bChest = pose((c.frame + FRAMES - 1) % FRAMES).breath
-    const chest = (draw) => () => c.subpixel(0, bChest, draw), head = (draw) => () => c.subpixel(0, bHead, draw)
+    // the stance sways all but the legs: the body (skirt, chest, arms, axe) by the frame's, the head
+    // and its tail of hair by the frame before's
+    const [sx, sy] = stance(c.frame), [hx, hy] = stance(c.frame - 1)
+    const chest = (draw) => () => c.subpixel(sx, sy, draw), head = (draw) => () => c.subpixel(hx, hy, draw)
     const sk = skirt(j, FLARE[c.frame], rad(Math.max(-32, Math.min(32, -TAIL[c.frame] * 0.4))))
-    at(mid - 2.5, () => zfill(c, sk, (front) => !front))
-    at(mid + 0.6, () => zfill(c, sk, (front) => front))
+    at(mid - 2.5, chest(() => zfill(c, sk, (front) => !front)))
+    at(mid + 0.6, chest(() => zfill(c, sk, (front) => front)))
     // the legs, the far one first, inside the skirt
     j.legs.forEach((L, side) => at(mid - 1.5 + 0.01 * depth(L.knee), () => {
       limb(c, L.hip, L.knee, 2.2, 1.9, "Ttt"); limb(c, L.knee, L.ankle, 1.9, 1.7, "Tt")
@@ -398,7 +405,7 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
     at(mid, chest(() => torso(c, j, p)))
     // the head as it is turned, and the tail of hair swinging behind it
     const look = (((p.yaw + p.twist + p.head) % 360) + 360) % 360, view = Math.round(look / 45) % 8
-    at(depth(j.head) + 1, () => { const [x, y] = scr(j.head).map(Math.round); const v = view > 4 ? 8 - view : view; c.stamp(`_whead${v}${v <= 2 && p.look !== "calm" ? "_" + p.look : ""}`, x, y + bHead, { sub: true, ...(view > 4 ? { flip: "x" } : {}) }) })
+    at(depth(j.head) + 1, () => { const [x, y] = scr(j.head).map(Math.round); const v = view > 4 ? 8 - view : view; c.stamp(`_whead${v}${v <= 2 && p.look !== "calm" ? "_" + p.look : ""}`, x + hx, y + hy, { sub: true, ...(view > 4 ? { flip: "x" } : {}) }) })
     const tailYaw = rad(p.yaw + p.twist + p.head + 180 - Math.max(-70, Math.min(70, TAIL[c.frame] * 0.8))), lift = Math.min(1, Math.abs(TAIL[c.frame]) / 60)
     const tdir = unit([Math.sin(tailYaw) * (0.3 + lift), -1 + lift * 0.8, Math.cos(tailYaw) * (0.3 + lift)])
     const t0 = local(j.head, j.hd, [-3.5, 0, 0]), t1 = add(t0, mul(tdir, 5)), t2 = add(t1, mul(unit(add(tdir, [0, -0.6, 0])), 4))

@@ -2,7 +2,7 @@
 // moves over, then the part moves the whole pixel (after ApplefatGOV's How-to-subpixel, r/PixelArt).
 // Above, a block moved four ways with stamp(..., { sub: true }): up and down, across, round, and
 // growing (two halves moving apart). Below, the same idle twice: on the left the single-pixel bob,
-// the whole body dropping a pixel at once onto legs that get a pixel shorter; on the right a breath by
+// the whole body dropping a pixel at once onto legs that get a pixel shorter; on the right the same by
 // half pixels, the head first and the chest a frame behind it, the feet never moving.
 const hex = (c) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")
 const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
@@ -54,7 +54,8 @@ sprite("_block", { w: 3, h: 3 }, rect(0, 0, 3, 3, "w"))
 sprite("_half", { w: 2, h: 3 }, rect(0, 0, 2, 3, "w"))
 
 const F = 12
-// the breath, a frame each: how far down the head and the chest are, in px (the chest a frame behind)
+// the idle by half pixels, a frame each: how far down the head and the chest are, in px (the chest a
+// frame behind)
 const HEAD = [0, 0.5, 1, 1, 1, 0.5, 0, 0, 0, 0, 0, 0]
 const CHEST = [0, 0, 0.5, 1, 1, 1, 0.5, 0, 0, 0, 0, 0]
 // the single-pixel bob: the whole body down at once

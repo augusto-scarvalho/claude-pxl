@@ -322,13 +322,13 @@ test("study reads subpixel motion: a body breathing by half pixels through in-be
   assert.doesNotMatch(study({ name: "bob", frames: bob, ms: bob.map(() => 110), kind: "test" }).text.join("\n"), /Subpixel/);
 });
 
-test("study reads back what stamp's sub draws: the subpixel breath of examples/subpixel.px.js, and not its single-pixel bob", () => {
+test("study reads back what stamp's sub draws: the subpixel idle of examples/subpixel.px.js, and not its single-pixel bob", () => {
   const p = loadSource(readFileSync(join(import.meta.dirname, "../examples/subpixel.px.js"), "utf8"), "subpixel.px.js");
   const frames = p.frames("subpixel").map((f) => f.img);
   const text = study({ name: "subpixel", frames, ms: frames.map(() => 111), kind: "test" }).text.join("\n");
   assert.match(text, /Subpixel: \d+% of what changes/);
   assert.match(text, /stamp\(part, x, y \+ 0\.5, \{ sub: true \}\)/);
-  // the keeper breathing by half pixels (right) is moving by part of a pixel; the one bobbing (left) isn't
+  // the keeper moving by half pixels (right) is moving by part of a pixel; the one bobbing (left) isn't
   const pieces = text.split("\n").filter((l) => /^ {2}#\d/.test(l));
   assert.ok(pieces.some((l) => / at 8\d,\d+,.*by part of a pixel/.test(l)), pieces.join("\n"));
   assert.ok(!pieces.some((l) => / at 2\d,\d+,.*by part of a pixel/.test(l)), pieces.join("\n"));
