@@ -261,6 +261,21 @@ test("study follows a dash through its leap: 4 px a frame, two strides of 30, th
   assert.match(t, /spacing, px a frame: right 4 4 4 30 30 4 4 4 4 4 4/);
 });
 
+test("study: an explosion played once over a ground is an effect, not an attack", () => {
+  const ground = (x: number, y: number) => ((x * 7 + y * 13) % 17 < 3 ? pack(70, 90, 60) : (x + y) % 9 === 0 ? pack(50, 70, 40) : pack(110, 140, 90));
+  // nothing, a dark disc, a white one, an orange blast growing, smoke thinning to nothing, then empty
+  const R = [0, 5, 6, 9, 10, 8, 6, 4, 2, 0, 0, 0, 0, 0], C = [0, pack(20, 10, 30), pack(255, 255, 255), pack(250, 140, 40), pack(250, 120, 40), pack(120, 90, 130), pack(100, 80, 110), pack(90, 70, 100), pack(80, 70, 90)];
+  const frames = R.map((r, f) => {
+    const img = new Img(60, 50);
+    for (let y = 0; y < 50; y++) for (let x = 0; x < 60; x++) img.set(x, y, ground(x, y));
+    if (r) for (let y = 0; y < 50; y++) for (let x = 0; x < 60; x++) if (Math.hypot(x - 30, y - 25) <= r && ((x + y + f) % 3 !== 0 || f < 4)) img.set(x, y, C[Math.min(f, C.length - 1)]);
+    return img;
+  });
+  const t = study({ name: "boom", frames, ms: frames.map(() => 80), kind: "test" }).text.join("\n");
+  assert.match(t, /#1 19x19 at 21,16, in 8 of 14 frames, .*: changing all over without repeating, or paint that comes and goes/);
+  assert.doesNotMatch(t, /an attack/);
+});
+
 test("pixelate keeps an edge where a box average blurs it", () => {
   // black and white, the edge off the 4 px grid: superpixels follow it, boxes average across it
   const img = new Img(200, 100);

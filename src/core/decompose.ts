@@ -350,9 +350,16 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     // moves (its blocks found again a step on, or turning about a joint it keeps), more than a pixel,
     // not changing all over like fire
     const action = !along && !cycle && !small && poses >= 0.5 * N && ((inside.length >= 4 && mv.length >= 0.4 * inside.length) || swung(track.map((e) => pix.filter((p) => fg[e[0]][p]))));
+    // played once and gone, flashing near-white early (Saint11's explosion: dark, white, blast, fading):
+    // an effect, not an attack, however much it moves
+    const area = F.map((_, t) => pix.filter((p) => fg[t][p]).length), shown = area.map((a, t) => (a >= 4 ? t : -1)).filter((t) => t >= 0);
+    const born = shown[0] ?? 0, gone = shown.at(-1) ?? 0, peak = area.indexOf(Math.max(...area));
+    const whiteAt = (t: number) => { const px = pix.filter((p) => fg[t][p]); return px.length > 0 && px.filter((p) => lab(F[t].data[p])[0] > 0.9).length >= 0.3 * px.length; };
+    const once = shown.length >= 3 && gone < N - 1 && area[gone] <= 0.5 * area[peak] && [born, born + 1, born + 2].some((t) => t < N && whiteAt(t));
     const kind: Kind = along || round ? (poses >= 3 ? "walk" : "carried")
       : stream ? "stream"
       : coherent >= 0.85 && tone >= 0.6 && !moves ? "light"
+      : once ? "effect"
       : action ? "action"
       : !cycle && !small && poses >= 0.5 * N && coherent < 0.8 ? "effect"
       : parts.length >= 2 && share < 0.6 ? "rig" : "anim";
@@ -366,7 +373,7 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const capture = (e: [number, number, number, number, number]): Cut => (about ? { t: e[0], b: box, keep: carriedCut(own1(e[0]), box, W) } : { t: e[0], b: boxAt(e), keep: matte(F[e[0]], fg[e[0]], boxAt(e), mine, model, W, tol, mode).keep });
     const steps = track.filter((e, i) => i === 0 || e[0] === track[i - 1][0] + 1);
     pieces.push({
-      kind, box: along || about || kind === "action" || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle, parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), ...(small ? { sub: true } : {}), track,
+      kind, box: along || about || kind === "action" || once || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle, parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), ...(small ? { sub: true } : {}), track,
       ...(kind === "action" || kind === "walk" ? smearsOf(F, roomy(x0, y0, bw, bh, 2), W) : {}),
       ...captures(cycle >= 2 && steps.length >= cycle ? steps.slice(0, cycle) : spread(track, 8), spread(track, 8), capture, F0),
     });

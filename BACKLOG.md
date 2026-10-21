@@ -663,11 +663,16 @@ Saint11's, read from his page, and not kept in the repository):
   traffic found 31 -> 34, masks P 39 -> 42%, R 43 -> 47%; the tournament's frames found 44 -> 43%. A
   flat thing resting where the background is it, then leaping, still reads as a light.
 - [ ] **A smear inflates the box**: spacing and squash read off the bounding box, which a smear
-  stretches. Track the pixels present every frame apart from those that come and go.
-- [ ] **Effects as effects**: an explosion (dark, white, blast, fade) read as an attack with an
+  stretches. Track the pixels present every frame apart from those that come and go. Tried: the
+  middle of its pixels instead of its box's: a smear joined to the body pulls it as much. What's left
+  is telling the smear's pixels apart (its colors a frame or two only, `smearsOf`), on carried things
+  too, and measuring without them.
+- [x] **Effects as effects**: an explosion (dark, white, blast, fade) read as an attack with an
   anticipation; read its value and area per frame instead, and "plays once, then N frames empty".
-  Done in `study --at`'s region reading (its area and lightness per frame, "played once"); the
-  automatic pieces still read it as an action.
+  Done in `study --at`'s region reading (its area and lightness per frame, "played once"), and in the
+  automatic pieces: one that shows, flashes near-white in its first frames and shrinks to nothing
+  before the clip ends is an effect, its whole box (Saint11's explosion card read as one; the
+  calibration as it was).
   Relabelling lights ten times stronger as effects in the decomposer cost the tournament's masks
   (precision 48% to 42%): it needs captures cut from the frame difference, not the light.
 - [x] **A walk's flipped half** (top-down: frames 3-5 are 0-2 mirrored) and the body's bob per frame.
