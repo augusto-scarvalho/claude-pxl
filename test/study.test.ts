@@ -231,6 +231,13 @@ test("study: a cycle whose second half is its first flipped (Saint11's top-down 
   assert.match(study({ name: "walk", frames, ms: frames.map(() => 100), kind: "test" }).text.join("\n"), /the second half of its cycle is the first flipped \(flip: "x"\): draw 3 frames/);
 });
 
+test("study --at: an effect played once, dark, white, a blast fading to nothing, then empty", () => {
+  const back = drawing(40, 40, 9), disc = (img: Img, r: number, c: number) => { for (let y = 0; y < 40; y++) for (let x = 0; x < 40; x++) if (Math.hypot(x - 20, y - 20) <= r) img.set(x, y, c); return img; };
+  const dark = pack(20, 10, 30), white = pack(255, 255, 255), fire = pack(250, 140, 40), smoke = pack(90, 60, 110);
+  const frames = [back.copy(), disc(back.copy(), 5, dark), disc(back.copy(), 6, white), disc(back.copy(), 9, fire), disc(back.copy(), 7, smoke), disc(back.copy(), 4, smoke), disc(back.copy(), 2, smoke), back.copy(), back.copy()];
+  assert.match(regionLines(frames).join("\n"), /Played once, an effect: it shows at frame 1, flashes near-white at 2, is biggest at 3, and fades over 3 frames to nothing by 7, then 2 empty/);
+});
+
 test("pixelate keeps an edge where a box average blurs it", () => {
   // black and white, the edge off the 4 px grid: superpixels follow it, boxes average across it
   const img = new Img(200, 100);

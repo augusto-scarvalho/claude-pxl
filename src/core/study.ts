@@ -351,16 +351,27 @@ export function regionLines(frames: Img[]): string[] {
   const rare = (c: Color) => (c & 255) >= 128 && (count.get(c) ?? 0) < 0.12 * W * H * n;
   const still = new Uint8Array(W * H);
   for (let i = 0; i < W * H; i++) still[i] = frames.every((f) => f.data[i] === frames[0].data[i]) ? 1 : 0;
-  const track: [number, number, number, number, number][] = [];
+  const track: [number, number, number, number, number][] = [], area: number[] = [], light: number[] = [];
   for (let t = 0; t < n; t++) {
-    let x0 = W, y0 = H, x1 = -1, y1 = -1, k = 0;
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!still[y * W + x] && rare(frames[t].data[y * W + x])) { k++; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    let x0 = W, y0 = H, x1 = -1, y1 = -1, k = 0, l = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const c = frames[t].data[y * W + x];
+      if (still[y * W + x] || !rare(c)) continue;
+      k++; l += lab(c)[0]; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    area.push(k); light.push(k ? l / k : 0);
     if (k >= 2) track.push([t, x0, y0, x1 - x0 + 1, y1 - y0 + 1]);
   }
   if (track.length < 2) return ["  Nothing in it differs from its usual look on more than one frame."];
   const boxes = track.slice(0, 24).map(([t, x, y, w, h]) => `${t}: ${x},${y} ${w}x${h}`).join("; ");
   const sp = spacingWords(track);
-  return [`  Its box (the colors rare in the region, where they come and go), frame: x,y wxh: ${boxes}${track.length > 24 ? "; ..." : ""}.`, ...(sp ? [`  ${sp}.`] : []),
+  // an effect played once: it shows, flashes near-white early, then shrinks and is gone (Saint11's
+  // explosion: dark, white, blast, fade)
+  const shown = area.map((a, t) => [t, a] as const).filter(([, a]) => a >= 2), born = shown[0]?.[0] ?? 0, last = shown[shown.length - 1]?.[0] ?? 0;
+  const peak = area.indexOf(Math.max(...area)), flash = light.findIndex((l, t) => t >= born && t <= born + 3 && l > 0.85);
+  const once = shown.length >= 3 && flash >= 0 && last < n - 1 && area[last] < 0.5 * area[peak];
+  const fx = once ? [`  Played once, an effect: it shows at frame ${born}, flashes near-white at ${flash}, is biggest at ${peak}, and fades over ${last - peak} frames to nothing by ${last + 1}, then ${n - 1 - last} empty. Its area, px: ${area.slice(born, last + 2).join(" ")}; its lightness: ${light.slice(born, last + 1).map((l) => l.toFixed(2)).join(" ")}.`] : [];
+  return [...fx, `  Its box (the colors rare in the region, where they come and go), frame: x,y wxh: ${boxes}${track.length > 24 ? "; ..." : ""}.`, ...(sp ? [`  ${sp}.`] : []),
     `  In ${track.length} of ${n} frames${track.length < n ? ` (absent in ${n - track.length})` : ""}; a smear or an effect in the region adds to the box, and a mover in the ground's own colors is missed.`];
 }
 

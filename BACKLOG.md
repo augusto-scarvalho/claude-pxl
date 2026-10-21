@@ -652,11 +652,17 @@ Saint11's, read from his page, and not kept in the repository):
   rest, so a thing that launches (a jump's takeoff, a dash at 28 px a frame, a shard at 8-15) loses
   its track on the frames that teach the most. Join a track that ends at t to one that starts at t+1
   or t+2 in the same colors, wherever it is. Fast small things (a 2 px marker at 11 px a frame) are
-  never found.
+  never found. Tried: joining the only track that ends at t to the only one that starts by t+2, of
+  about its size, left the calibration as it was and made a box leaping mid-dash worse (one drawing
+  carried at 4 px a frame became a walk of 8). The deeper fault is the light pass: a flat thing on a
+  flat ground, where it rests the background is it, and its leaving reads as a lamp going off. For
+  now `study --at` on the region follows it (THE REGION).
 - [ ] **A smear inflates the box**: spacing and squash read off the bounding box, which a smear
   stretches. Track the pixels present every frame apart from those that come and go.
 - [ ] **Effects as effects**: an explosion (dark, white, blast, fade) read as an attack with an
   anticipation; read its value and area per frame instead, and "plays once, then N frames empty".
+  Done in `study --at`'s region reading (its area and lightness per frame, "played once"); the
+  automatic pieces still read it as an action.
   Relabelling lights ten times stronger as effects in the decomposer cost the tournament's masks
   (precision 48% to 42%): it needs captures cut from the frame difference, not the light.
 - [x] **A walk's flipped half** (top-down: frames 3-5 are 0-2 mirrored) and the body's bob per frame.
