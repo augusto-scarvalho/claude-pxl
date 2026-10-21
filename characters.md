@@ -272,9 +272,8 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   follows the weight down; a coat and hair come a frame late, and the head leads a turn. A blade's
   edge faces the way the cut goes, every frame of it (a backswing keeps it on its target; edge up or
   the flat leading, an axe reads as a club), and its head is drawn side on even when a level cut would
-  show it edge on. An arm that
-  swings an axe round a body that stays in profile reads as a puppet. Posed as a skeleton in 3D and
-  turned about its upright, the views come by themselves (`examples/rig/warden.px.js`: the head
+  show it edge on. An arm that swings an axe round a body that stays in profile reads as a puppet.
+  Posed as a skeleton in 3D and turned about its upright, the views come by themselves (`examples/rig/warden.px.js`: the head
   drawn in five views, picked by the turn).
 - **Register the whole figure by one point**, the pelvis: move the entire frame so it lands on the
   same x every frame, with one constant y offset per cycle for the bob. Never centre frames on
