@@ -181,6 +181,14 @@ test("hue shifting counted ramp by ramp: warmer lights from shades(), one hue, a
   assert.equal(hueShifting([ramp(warm)]), null, "one ramp says nothing");
 });
 
+test("study --px: the size given is used, its offset found", () => {
+  // drawn at 6x from 3,2: found by itself; told 6, the same; told 3 (a harmonic), read at 3
+  const img = new Img(40 * 6 + 3, 30 * 6 + 2), d = drawing(40, 30);
+  for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) img.set(x, y, d.get(Math.max(0, Math.floor((x - 3) / 6)), Math.max(0, Math.floor((y - 2) / 6))));
+  assert.deepEqual(findGrid(img, 6), { sx: 6, sy: 6, ox: 3, oy: 2 });
+  assert.match(study({ name: "t", frames: [img], ms: [100], kind: "test" }, { px: 3 }).text.join("\n"), /drawn at 3x/);
+});
+
 test("pixelate keeps an edge where a box average blurs it", () => {
   // black and white, the edge off the 4 px grid: superpixels follow it, boxes average across it
   const img = new Img(200, 100);

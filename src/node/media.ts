@@ -13,7 +13,7 @@ import { decodeGif } from "./gifread.ts";
 import { decodePng } from "./png.ts";
 
 export interface Media { frames: Img[]; ms: number[]; kind: string; drawnAt?: Grid }
-export interface MediaOpts { at?: number[]; from?: number; seconds?: number; fps?: number; max?: number }
+export interface MediaOpts { at?: number[]; from?: number; seconds?: number; fps?: number; max?: number; px?: number }
 
 const STILL = new Set([".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"]);
 
@@ -40,7 +40,7 @@ export function readMedia(path: string, o: MediaOpts = {}): Media {
         f = f.sub(x, y, w, h);
       }
       if (i === 0 && read.length > 1) {
-        const g = findGrid(f);
+        const g = findGrid(f, o.px);
         if (g.sx > 1 || g.sy > 1) { drawnAt = g; shrink = (img) => toNative(img, g); }
         else if (Math.max(f.w, f.h) > 640) {
           const s = 640 / Math.max(f.w, f.h), w = Math.round(f.w * s), h = Math.round(f.h * s);

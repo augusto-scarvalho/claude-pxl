@@ -24,7 +24,7 @@ export interface Grid { sx: number; sy: number; ox: number; oy: number }
  * much of the change as the best one does: the drawing's pixel, not a harmonic of it (4 px, where 2
  * would do as well) or a beat (5, where 2.5 takes every line).
  */
-export function findGrid(img: Img): Grid {
+export function findGrid(img: Img, size?: number): Grid {
   const big = (a: Color, b: Color) => { if (clear(a) !== clear(b)) return true; const p = channels(a), q = channels(b); return Math.max(Math.abs(p[0] - q[0]), Math.abs(p[1] - q[1]), Math.abs(p[2] - q[2])) > 24; };
   const cols = new Float64Array(img.w), rows = new Float64Array(img.h);
   for (let y = 0; y < img.h; y++) for (let x = 0; x + 1 < img.w; x++) if (big(img.data[y * img.w + x], img.data[y * img.w + x + 1])) cols[x + 1]++;
@@ -40,6 +40,19 @@ export function findGrid(img: Img): Grid {
     }
     return [1, 0];
   };
+  if (size) {
+    // a size given (a blurred copy read at a harmonic of its pixel): the offset whose lines catch the most change
+    const off = (prof: Float64Array) => {
+      let bo = 0, bv = -1;
+      for (let o = 0; o < size; o += 0.25) {
+        let v = 0;
+        for (let x = 0; x < prof.length; x++) { const ph = (((x - o) % size) + size) % size, d = Math.min(ph, size - ph); if (d < 0.5) v += prof[x] * (0.5 - d); }
+        if (v > bv) { bv = v; bo = o; }
+      }
+      return bo;
+    };
+    return { sx: size, sy: size, ox: off(cols), oy: off(rows) };
+  }
   let [sx, ox] = exact(cols), [sy, oy] = exact(rows);
   if (sx > 1 && sy > 1) return { sx, sy, ox, oy };
   // the change in lightness between neighbors, column by column and row by row

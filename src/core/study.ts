@@ -18,7 +18,7 @@ import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Va
 
 /** frames as read; `drawnAt`: they were already brought down from that grid as they were read (big animations) */
 export interface StudyInput { name: string; frames: Img[]; ms: number[]; kind: string; drawnAt?: Grid }
-export interface StudyOpts { colors?: number; to?: [number, number] }
+export interface StudyOpts { colors?: number; to?: [number, number]; /** the size of a pixel, when the grid found is wrong */ px?: number }
 /** pieces: each object of an animation alone (a row of cutouts each) and its box in every frame */
 export interface StudyOut { text: string[]; sheet: Img; picture: Img; pixelArt: boolean; palette: Color[]; pieces?: { sheet: Img; json: unknown; strips: Img[] }; layers?: ReturnType<typeof decompose> }
 
@@ -33,7 +33,7 @@ const hueName = (h: number) => (h < 15 || h >= 350 ? "pinks and reds" : h < 55 ?
 
 export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   const first = input.frames[0], text: string[] = [];
-  const pre = !!input.drawnAt, g = input.drawnAt ?? findGrid(first), up = g.sx > 1 || g.sy > 1;
+  const pre = !!input.drawnAt, g = input.drawnAt ?? findGrid(first, opts.px), up = g.sx > 1 || g.sy > 1;
   // a copy that was blurred, compressed or scaled by a fraction has its colors smeared: fold them harder
   const smeared = !Number.isInteger(g.sx) || /JPG|JPEG|WEBP|video/i.test(input.kind);
   // the checker an editor shows for clear, exported with it: taken for clear before anything is read
@@ -85,6 +85,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   if (pixelArt && nColors <= 64) for (const line of paletteSanity(smeared ? null : native, ramps, nColors)) text.push(line);
 
   // ---------------------------------------------------------------- techniques
+  let lf: ReturnType<typeof lineFlaws> | null = null;
   if (pixelArt) {
     text.push("", "TECHNIQUES");
     if (tech.edge) {
@@ -103,14 +104,14 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     const b = tech.banding;
     text.push(`  Banding (runs of two colors side by side with their ends lined up, marked red on the sheet): ${b.pairs} pair${b.pairs === 1 ? "" : "s"}, ${b.per1000.toFixed(1)} per 1000 px${b.per1000 < 1 ? ": hardly any" : b.per1000 > 6 && b.pairs >= 12 ? ": much (it shows the grid; stagger the ends)" : ""}.`);
     // (in a palette someone chose: a lit scene's blended tones make shapes, not lines)
-    const lf = nColors <= 64 ? lineFlaws(picture) : null;
+    lf = nColors <= 64 ? lineFlaws(picture) : null;
     if (lf && lf.line >= 20) {
       const at = (v: [number, number][]) => (v.length ? ` (at 1x: ${v.slice(0, 5).map(([x, y]) => `${x},${y}`).join("; ")}${v.length > 5 ? "; ..." : ""})` : "");
       const k = lf.corners.length, j = lf.jaggies.length, square = k >= lf.line * 0.1;
       const corners = square ? `drawn square, ${k} L-corners${at(lf.corners)}: an L at each step, a line that reads thicker and chunkier, a style (outline8 draws an outline so)`
         : k ? `${k} L-corner${k === 1 ? "" : "s"}${at(lf.corners)}: the elbow of three pixels in an L where the line could step diagonally, thickening it there; on a smooth line delete it (a box's corner stays)` : "no L-corners";
       const jaggies = j ? `${j} jagg${j === 1 ? "y" : "ies"}${at(lf.jaggies)}: a run of pixels out of order along a line (1 3 2 4 where 1 2 3 4 reads smooth); runs grow or shrink steadily, or alternate n and n+1 on a straight slope` : "no jaggies";
-      text.push(`  Lines (dark, 1 px wide: ${lf.line} px): ${k + j ? `${corners}; ${jaggies}. pxl's line(), curve() and outline draw without either.` : "pixel-perfect, every step diagonal and the runs in order: clean."}`);
+      text.push(`  Lines (dark, 1 px wide: ${lf.line} px): ${k + j ? `${corners}; ${jaggies}. On the sheet, L-corners are ringed orange and jaggies blue. pxl's line(), curve(), wire() and outline draw without either.` : "pixel-perfect, every step diagonal and the runs in order: clean."}`);
     }
     if (tech.pillow !== null && tech.pillow > 0.4) text.push(`  Pillow shading: lighter the farther in from the edge all round (${tech.pillow.toFixed(2)})${tech.rim && tech.rim.r2 >= 0.3 ? ", though lit from one side too" : ": lit as if from the front, which flattens the form; shade from one side instead"}.`);
     const tiles = findTiles(picture);
@@ -154,7 +155,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
 
   const palette = ramps.flatMap((r) => r.colors);
   const pieces = motion?.layers && motion.layers.pieces.length ? piecesOut(motion.layers, input.ms) : undefined;
-  return { text, sheet: sheet(picture, tech, pixelArt, P, segs, vps, persp.horizon, ramps, motion), picture, pixelArt, palette, pieces, ...(motion?.layers ? { layers: motion.layers } : {}) };
+  return { text, sheet: sheet(picture, tech, pixelArt, P, segs, vps, persp.horizon, ramps, motion, lf), picture, pixelArt, palette, pieces, ...(motion?.layers ? { layers: motion.layers } : {}) };
 }
 
 const fit = (w: number, h: number, long: number): [number, number] => {
@@ -624,21 +625,27 @@ function blobs(count: Uint16Array, W: number, H: number, min: number) {
 // ---------------------------------------------------------------- the sheet
 /**
  * One picture to look at, panels top to bottom: the picture studied (1x or the translation); its
- * techniques marked over it in grey (banding red, checkers magenta, dark lines cyan, in-between tones yellow); its
+ * techniques marked over it in grey (banding red, checkers magenta, dark lines cyan, in-between tones yellow; a
+ * line's L-corners ringed orange, its jaggies blue); its
  * straight edges colored by where they meet (red, green, blue, orange; the rest yellow), the vanishing points
  * and the horizon (cyan); the ramps, one row each, dark to light; for an animation, frames across
  * the clip, and the flow (white ticks along each block's motion, the point it opens out from in
  * magenta, the planes as bars down the left in their speeds' order); the pieces, boxed by kind
  * (carried cyan, walk green, stream blue, in place yellow, rig orange, effect magenta hatched, light white).
  */
-function sheet(pic: Img, t: Techniques, pixelArt: boolean, P: Img, segs: Segment[], vps: Vanish[], horizon: number | null, ramps: Ramp[], m: ReturnType<typeof motionOf> | null): Img {
+function sheet(pic: Img, t: Techniques, pixelArt: boolean, P: Img, segs: Segment[], vps: Vanish[], horizon: number | null, ramps: Ramp[], m: ReturnType<typeof motionOf> | null, lf: ReturnType<typeof lineFlaws> | null): Img {
   const s = Math.max(1, Math.min(8, Math.floor(480 / pic.w))), Wd = pic.w * s, panels: Img[] = [];
   const grey = (img: Img) => { const o = new Img(img.w, img.h); for (let i = 0; i < img.data.length; i++) { const c = img.data[i]; if ((c & 255) < 128) continue; const v = Math.round(40 + 90 * lab(c)[0]); o.data[i] = pack(v, v, v); } return o; };
   panels.push(pic.scale(s));
   if (pixelArt) {
     const g = grey(pic);
     for (let i = 0; i < t.mask.length; i++) { const k = t.mask[i]; if (k & 8) g.data[i] = pack(240, 60, 50); else if (k & 1) g.data[i] = pack(230, 60, 220); else if (k & 2) g.data[i] = pack(60, 220, 230); else if (k & 4) g.data[i] = pack(240, 220, 60); }
-    panels.push(g.scale(s));
+    const gs = g.scale(s);
+    // a line's flaws ringed, so they can be found: L-corners orange, jaggies blue (the pixel itself when small)
+    const ring = (x: number, y: number, c: Color) => { if (s < 3) { gs.set(x * s, y * s, c); return; } for (let i = 0; i < s; i++) for (const [u, v] of [[i, 0], [i, s - 1], [0, i], [s - 1, i]]) gs.set(x * s + u, y * s + v, c); };
+    for (const [x, y] of lf?.corners ?? []) ring(x, y, pack(255, 140, 20));
+    for (const [x, y] of lf?.jaggies ?? []) ring(x, y, pack(40, 120, 255));
+    panels.push(gs);
   }
   const ps = Wd / P.w, pg = grey(P).scale(Math.max(1, Math.round(ps)));
   const z = pg.w / P.w, col = [pack(240, 70, 70), pack(80, 230, 90), pack(90, 140, 255), pack(240, 150, 60)];

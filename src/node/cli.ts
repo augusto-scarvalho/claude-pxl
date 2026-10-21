@@ -91,11 +91,13 @@ const USAGE = `pxl — pixel-art DSL
   pxl compare <art.px.js> <name> <ref.png> [--shrink N] [--offset x,y]
       Silhouette check: each row's opaque extents in the asset and in a reference image (shrunk
       by N first, placed at x,y), and how many px wider the asset is on each side.
-  pxl study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--out DIR | --no-out]
+  pxl study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--px N] [--out DIR | --no-out]
       Learn from finished art or a reference: what it is made of and what to use in pxl to make the
-      same. Pixel art (an upscale found by its grid, blurred or not) is read at 1x: its palette and
-      ramps (hue shifts), outlines (black, selective), dithering, anti-aliasing, clusters, banding,
-      pillow shading, where the light comes from, tiles. Anything else (a photo, a painting, a
+      same. Pixel art (an upscale found by its grid, blurred or not; --px N when the size it finds
+      is wrong, as on a blurred copy read at half its pixel) is read at 1x: its palette and ramps
+      (hue shifts), near twins, outlines (black, selective), a line's L-corners and jaggies,
+      dithering, anti-aliasing, clusters, banding, pillow shading, where the light comes from,
+      tiles. Anything else (a photo, a painting, a
       render) is read for its masses of light and dark, its colors as ramps, the light's color
       against the shadows', the haze with distance, and translated by superpixels into a small
       picture in few colors to draw over (--to, --colors). An editor's transparency checker exported
@@ -147,6 +149,7 @@ interface Args {
   from?: number;
   seconds?: number;
   fps?: number;
+  px?: number;
 }
 
 function parse(argv: string[]): Args {
@@ -204,6 +207,7 @@ function parse(argv: string[]): Args {
     else if (v === "--from") a.from = Number(val());
     else if (v === "--seconds") a.seconds = Number(val());
     else if (v === "--fps") a.fps = Number(val());
+    else if (v === "--px") { a.px = Number(val()); if (!(Number.isInteger(a.px) && a.px >= 2 && a.px <= 64)) throw new PxError(`--px is the size of a pixel in the picture, a whole number 2..64, got ${a.px}`); }
     else if (v === "-h" || v === "--help") a.cmd = "usage";
     else if (v.startsWith("--")) throw new PxError(`unknown flag ${v}\n\n${USAGE}`);
     else if (!a.cmd) a.cmd = v;
@@ -275,9 +279,9 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case "study": {
-        const m = readMedia(file, { at: a.at, from: a.from, seconds: a.seconds, fps: a.fps });
+        const m = readMedia(file, { at: a.at, from: a.from, seconds: a.seconds, fps: a.fps, px: a.px });
         const name = basename(file).replace(/\.[^.]+$/, "").replace(/[^\w.-]+/g, "_");
-        const r = study({ name, frames: m.frames, ms: m.ms, kind: m.kind, drawnAt: m.drawnAt }, { colors: a.colors, to: a.to });
+        const r = study({ name, frames: m.frames, ms: m.ms, kind: m.kind, drawnAt: m.drawnAt }, { colors: a.colors, to: a.to, px: a.px });
         const dir = join(a.out === false ? tmpdir() : (a.out ?? join(dirname(file), "out")), "_study");
         mkdirSync(dir, { recursive: true });
         const pic = join(dir, `${name}${r.pixelArt ? "_1x" : "_px"}.png`), sheetPath = join(dir, `${name}.png`), hexPath = join(dir, `${name}.hex`);
