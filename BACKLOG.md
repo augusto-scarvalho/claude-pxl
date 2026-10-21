@@ -480,7 +480,8 @@ one), and the art code itself (4% of the cost).
 - [x] **A part swung about a still body** (an axe on an arm, the body not moving) was followed as a thing
   carried: it passes over its pivot every frame, and a thing carried never stays over one point, so
   neither the tracker nor the in-place stretch takes it for carried now, and turning about a joint it
-  keeps makes a run of poses an action. Measured: no scene of the gallery worse.
+  keeps makes a run of poses an action. Measured: no scene finds fewer of its things' frames; the sunset
+  finds two more clouds, its masks a little looser (precision 41% to 37%).
 - [ ] **Still weak in study's pieces**, each tried this round against the calibration and dropped:
   - Big animated things touching (the tournament's knights in their bout against the stands): joining
     neighbors only when the colors they show when they differ are alike moved the tournament not at all

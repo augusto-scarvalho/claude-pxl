@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**199 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**211 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–20, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -25,9 +25,9 @@ page lists what the fork adds. Every commit is in
 | --- | --- | --- |
 | Commands | 4: `build`, `serve`, `ascii`, `list` | 12: adds `describe`, `shot`, `check`, `steps`, `help`, `compare`, `blind`, `study` |
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus `scripts/calibrate.ts` |
-| Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [BACKLOG](../BACKLOG.md) |
-| Example files | 13 | 51 |
-| Tests | 59 | 191 |
+| Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
+| Example files | 13 | 50 |
+| Tests | 59 | 196 |
 
 ## Looking and checking
 
@@ -37,7 +37,7 @@ look, in text where text is cheaper than an image.
 | Command | What it gives |
 | --- | --- |
 | `pxl describe` | A whole scene as text: each object's position, gaps, what covers it, contrast, motion, which way it faces, the light. `--diff` against the last look, `--brief`, `--frame N`; works on plain PNGs too. |
-| `pxl shot` | One asset built and written as a PNG to look at, with what changed since the last shot. Frames side by side, zoomed regions, several assets or other files in rows, `--vs HEAD --diff` against the committed version. |
+| `pxl shot` | One asset built and written as a PNG to look at, with what changed since the last shot. Frames side by side (`0-17`, `all`), zoomed regions, several assets or other files in rows, `--vs HEAD --diff` against the committed version. A reference GIF or video too: all its frames on one sheet, at 1×. |
 | `pxl check` | Every check `describe` makes, over every scene, rig and frame, and which rules actually ran, so "no warnings" can't hide a check that never applied. `--readings` shows each light reading. |
 | `pxl steps` | The painting log as text; `--at x,y` names the source line that painted a pixel. |
 | `pxl list` | A file as a map: each definition's line range and comment, so an agent reads only the lines it needs. |
@@ -123,6 +123,8 @@ of and what to use in pxl to make the same.
   - Each object is isolated: pixels that change in the same frames, joined by rhythm or by a shared
     still body.
   - Each object is followed by a SORT-like tracker that carries hidden things on by their speed.
+  - A part swung about a still body (an axe on an arm) is told from a thing carried: it passes over
+    its pivot every frame, and a thing carried never stays over one point.
   - Each capture is cut out of its background, GrabCut-style. Files: a sheet, a strip, and a box per
     frame for every piece.
 - **Cleaning the input:** an editor's transparency checker exported with a sprite is taken for clear.
@@ -148,13 +150,18 @@ Share of each scene's moving things' frames that study finds, before and after t
 | Road (sertão) | 0% | **22%** |
 | Cyberpunk street | 6% | **11%** |
 
+`--summary` prints a line a scene, `--save` keeps a run, and `--vs <revision | saved run>` runs the
+same harness on another revision (in its own git worktree) and prints each scene before → now, with
+the things whose score moved most. Every change to study in the last rounds was kept or dropped on
+that comparison.
+
 What moved it: a ground truth that follows each stamp whatever its name, pixels grouped by common fate,
 a tracker that carries hidden things on, and no light looked for where something goes by. The cave fell
 on one mushroom at the line; the sunset's clouds now come apart one by one.
 
 ## Examples
 
-38 new example files are finished scenes an agent copies the structure of; each was curated against
+37 new example files are finished scenes an agent copies the structure of; each was curated against
 references until it read right.
 
 | Example | What it teaches |
@@ -177,12 +184,13 @@ references until it read right.
 - Timed builds are cached within a budget of bytes, so a long loop no longer fills memory.
 - `build --profile` names where the time went; `build --every N` keeps long previews small; the onion
   sheet no longer costs frames squared.
-- Tests went from 59 to 191, and a test keeps the editor types in step with what the runtime accepts.
+- Tests went from 59 to 196. One keeps the editor types in step with what the runtime accepts, and
+  another keeps the guides in step with the CLI: every command, flag and section they cite exists.
 
 ## How it was built
 
 Every change was made by Claude while drawing real scenes, and reviewed by a person on a curation page:
-188 entries, each with its picture and the note that asked for it.
+195 entries, each with its picture and the note that asked for it.
 
 - **Dogfooding:** each scene was drawn with pxl itself; every friction went to `FEEDBACK.md` and became
   a fix or a doc line. Work first done in throwaway scripts (camera math, noise, shadow sweeps) moved
@@ -190,7 +198,7 @@ Every change was made by Claude while drawing real scenes, and reviewed by a per
 - **Measured agent runs:** fresh agents were given only the skill and timed. A 320×180 animated street
   took one agent 85 turns and 31 minutes. A planner with eight forked agents made a denser street for
   about five times the tokens and twice the time. The skill now asks which to use on a big scene.
-- **Docs checked against the code:** three full reviews of the written skill, every tool and option
+- **Docs checked against the code:** four full reviews of the written skill, every tool and option
   tried, with fixes where the docs and the code disagreed.
 - **Calibration against the source:** for `pxl study`, the gallery scenes' own code is the ground truth
   ([above](#calibration)).
@@ -200,10 +208,10 @@ Every change was made by Claude while drawing real scenes, and reviewed by a per
 The gaps that remain are in `pxl study`, and they are measured, not guessed.
 
 - Big animated things that touch, like the tournament's two knights in their bout against the stands,
-  come out as one piece. Their colors could part them; that is the next idea.
+  come out as one piece. Parting them by their colors was tried and measured: no better.
 - Soft clouds drifting slowly still read as light, because a pulsing glow's rings shift a pixel too.
+  Telling them apart by drift cost the party and the cyberpunk street more than it gave.
 - Fast traffic crossing itself is followed only in part (the cyberpunk street, lowest in the table).
-- A part swung about a body that doesn't move (an axe on a still body) is followed as if carried.
 - Two scenes scored lower in the last round, the cave and the sunset ([the table](#calibration)).
 - Not done: modelling the light as a few basis images (NMF). Where scenes light themselves the light is
   already 71–99% right, and the misses are clouds and backlit people.
