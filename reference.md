@@ -382,7 +382,7 @@ node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image
 node <pxl>/bin/pxl.js shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--out DIR]
 node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
-node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
+node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
 node <pxl>/bin/pxl.js ascii <file> <name> [--frame N]
 node <pxl>/bin/pxl.js list  <file>

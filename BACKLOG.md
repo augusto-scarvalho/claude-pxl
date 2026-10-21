@@ -633,7 +633,9 @@ wrong way warned, and the lessons in characters §1, §4, §7, §9, §10 and sce
 - [x] **`palettize` in OKLab** rather than RGB distance, so a reference's darks don't fold into the
   wrong hue. The tropical trees' trunks came out with darker, browner shadows.
 - [x] **`build --share N`**: one scale for every preview and GIF of a file, so a set shown together
-  matches (Saint11: one base resolution, whole multiples). Already there: `build --scale N`.
+  matches (Saint11: one base resolution, whole multiples). First closed as `build --scale N`, wrongly:
+  the previews carry a checker and a grid. Done as `out/share/`: each asset N times bigger, nearest
+  neighbour, clear kept, nothing over it, a GIF when it moves.
 - [x] **Shading-shift detection** in study: a hue that turns toward the light's color in the lights
   and away from it in the shadows, named as hue shifting, or its absence ("value only: muddy").
   Done as a count of the colored ramps: warmer in the light, cooler in the light, one hue. By pixels

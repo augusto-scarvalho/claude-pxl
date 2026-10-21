@@ -22,6 +22,8 @@ export interface OutputOptions {
   aseprite?: boolean;
   /** Preview GIFs keep one frame in this many, each lasting as long (long loops; default 1). */
   every?: number;
+  /** Also write out/share/<name>.png (and .gif when it moves) at this whole scale: no checker, no grid, clear kept, to post. */
+  share?: number;
 }
 
 /** A preview GIF past this size gets a note: a long loop enlarged makes many MB nobody opens. */
@@ -89,6 +91,11 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         write(join(out, dir, n + ".gif"), encodeGif(frames));
         const play = p.direction(n);
         info = play === "forward" ? ` (${frames.length} frames, ${b.anim!.loop}ms)` : ` (${p.drawn(n).length} frames ${play}, ${b.anim!.loop}ms)`;
+      }
+      if (opts.share) {
+        // to post: the art itself enlarged by a whole number, nearest neighbour, nothing drawn over it
+        writePng(join(out, "share", n + ".png"), (def.kind === "anim" ? packSheet(p.drawn(n).map((f, i) => ({ name: `${n}_${i}`, img: f.img })), p.drawn(n).length).sheet : b.img).scale(opts.share));
+        if (frames.length) write(join(out, "share", n + ".gif"), encodeGif(frames.map((f) => ({ img: f.img.scale(opts.share!), ms: f.ms }))));
       }
       if (def.opts.layers) for (const l of b.layers) writePng(join(out, dir, n, l.name + ".png"), l.img);
       if (b.tilemaps) {

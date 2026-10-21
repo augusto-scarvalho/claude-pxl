@@ -108,9 +108,12 @@ out/scenes/<name>.png             each scene (+ a GIF when it moves, a folder of
                                   a Tiled .tmj when it holds tilemaps)
 out/<sheet>.png .json             each sheet() and its JSON (frames, tags)
 out/_preview/                     enlarged previews; anims also get <name>_onion.png (onion skin)
+out/share/                        with --share N: each asset N times bigger, clean (no grid), to post
 ```
 
-Useful options: `--only a,b` builds some assets; `--out DIR` writes elsewhere; `--aseprite` also
+Useful options: `--only a,b` builds some assets; `--out DIR` writes elsewhere; `--share 4` writes
+each asset 4 times bigger in `out/share/`, clean for posting (a whole number: pixel art at 2.5× has
+pixels of two sizes); `--aseprite` also
 writes each asset as an `.aseprite` file to keep editing by hand (copy it out of `out/`: the next
 build overwrites it); `--every 3` keeps one frame in three in the preview GIFs of a long loop;
 `--profile` says where a slow build spends its time.

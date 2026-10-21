@@ -62,7 +62,6 @@ rig/tournament.px.js: 0 warnings (1 scene (96 frames, 339 distinct placements), 
   ran: front marker on 9, lit side on 310 (a clear reading on 179), feet on 109
 rig/warden.px.js: 0 warnings (1 scene (34 frames, 68 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 11; not run: front marker (nothing has one), lit side (no scene declares world.light), feet (nothing placed has a height)
-  _whead3 › LOOK: 3 L-corners in its 1 px lines (at 2,11; 3,12; 4,13): where a smooth line steps, the elbow of three pixels in an L doubles it; delete that one. A corner the shape has (a tyre, a roof, a tip) stays (PXL help "characters 7")
 shop.px.js: 0 warnings (1 scene (1 frame, 13 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lettering on 1, lines on 22; not run: front marker (nothing has one), lit side (no scene declares world.light), feet (nothing placed has a height)
 sidescroller/duel.px.js: 0 warnings (1 scene (80 frames, 6 distinct placements), 0 rigs, 0 other assets with a front marker)

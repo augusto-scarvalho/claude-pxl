@@ -691,3 +691,19 @@ test("--scale is a whole number: at 2.5x a picture's pixels would come out 2 and
   try { await main(["build", file, "--scale", "2.5", "--out", join(dir, "out")]); } catch (e) { said.push(String((e as Error).message)); } finally { console.error = err; }
   assert.match(said.join("\n"), /--scale is a whole number/);
 });
+
+test("build --share N: each asset N times bigger in out/share, clear kept, a GIF when it moves; a whole number only", async () => {
+  const { dir, file } = tmpArt(`pal({ k: "#1b1630", g: "#8ccf63" })
+sprite("dot", "gk\\n.g")
+anim("blink", { w: 2, h: 1, frames: 2, fps: 4 }, (c) => c.px(c.frame, 0, "g"))`);
+  const log = console.log;
+  console.log = () => {};
+  try { assert.equal(await main(["build", file, "--share", "3"]), 0); } finally { console.log = log; }
+  const dot = decodePng(readFileSync(join(dir, "out", "share", "dot.png")));
+  assert.deepEqual([dot.w, dot.h, dot.get(1, 4) & 255, dot.get(4, 4) & 255], [6, 6, 0, 255]);   // the clear corner stays clear
+  assert.ok(existsSync(join(dir, "out", "share", "blink.gif")));
+  const err = console.error, said: string[] = [];
+  console.error = (s: string) => said.push(String(s));
+  try { await main(["build", file, "--share", "2.5"]); } catch (e) { said.push(String((e as Error).message)); } finally { console.error = err; }
+  assert.match(said.join("\n"), /--share is a whole number/);
+});

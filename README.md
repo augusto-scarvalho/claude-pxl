@@ -103,7 +103,7 @@ one agent or a pipeline for a big scene, and reviewing what it made.
 ## Commands
 
 ```
-pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
+pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
 pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
 pxl ascii <art.px.js> <name>     print an asset as palette keys with x/y rulers (--frame N: one frame)
 pxl list  <art.px.js>            a map of the file: each asset and function's lines, its comment, what it makes

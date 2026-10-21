@@ -33,9 +33,11 @@ const USAGE = `pxl — pixel-art DSL
       What the reference says about an op or option: the rows that define it, a line for each other
       mention, and a few uses in the examples (--all: everything in full). Words of a guide's
       heading print that section ("characters 9", "small animals"). No name: an index.
-  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
+  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
-      previews (out/_preview; animated assets also get a .gif). A whole file of more than 12 assets
+      previews (out/_preview; animated assets also get a .gif). --share N also writes out/share/:
+      each asset N times bigger, nearest neighbour, clear kept, no checker or grid (and a GIF when
+      it moves), to post. A whole file of more than 12 assets
       prints a count of what it wrote; --only and --list print a line per asset (size, frames,
       preview scale). --every N: preview GIFs keep one frame in N (a long loop's runs to many MB).
       --aseprite also writes each asset as <name>.aseprite (layers, frames, tag, palette) to keep
@@ -122,6 +124,7 @@ interface Args {
   out?: string | false;
   only?: string[];
   scale?: number;
+  share?: number;
   preview?: boolean;
   aseprite?: boolean;
   profile?: boolean;
@@ -169,6 +172,11 @@ function parse(argv: string[]): Args {
       const n = Number(val());
       if (!Number.isInteger(n) || n < 1) throw new PxError(`--scale is a whole number of times (1, 2, 3...): at a fraction some pixels come out a px wider than others; got ${argv[i]}`);
       a.scale = n;
+    }
+    else if (v === "--share") {
+      const n = Number(val());
+      if (!Number.isInteger(n) || n < 1) throw new PxError(`--share is a whole number of times (1, 2, 3...), as pixel art only scales so; got ${argv[i]}`);
+      a.share = n;
     }
     else if (v === "--port") a.port = Number(val());
     else if (v === "--no-preview") a.preview = false;
@@ -251,7 +259,7 @@ export async function main(argv: string[]): Promise<number> {
   try {
     switch (a.cmd) {
       case "build": {
-        const build = () => { const p = loadProject(file); return { p, r: writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every }) }; };
+        const build = () => { const p = loadProject(file); return { p, r: writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every, share: a.share }) }; };
         let report = "";
         const { p, r } = a.profile ? await profiled(build).then(({ result, profile }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times); return result; }) : build();
         for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);

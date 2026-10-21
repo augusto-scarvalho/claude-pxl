@@ -83,9 +83,9 @@ const HEADS = [`
   RrrrrbrrRsR
   RRrrrrrrRsR
   RRrrrrrrRsR
-  .RRrrrrRSS.
-  ..RRrrRSS..
-  ...RRRSS...
+  .rRrrrrRSS.
+  ..rRrrRSS..
+  ...rRRSS...
   ...SSS.....`, `
   ...RRRRRR..
   ..RrqqRqrR.
