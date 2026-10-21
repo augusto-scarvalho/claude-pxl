@@ -253,16 +253,22 @@ const poly3 = (c, pts, key) => c.poly(pts.flatMap((q) => scr(q)).map(Math.round)
 const fist = (c, q, key) => { const [x, y] = scr(q).map(Math.round); c.rect(x - 2, y - 2, 4, 4, "k"); c.rect(x - 1, y - 1, 2, 2, key) }
 // a surface sampled point by point: each pixel takes the nearest sample's key, and a pixel round it
 // the outline, so the part stands off whatever it's drawn over
-const zpaint = (c, sample) => {
+const zbuffer = (sample) => {
   const best = new Map()
-  sample((q, key) => {
+  sample((q, key, tag) => {
     if (!key) return
     const [x, y] = scr(q).map(Math.round), d = depth(q), k = y * 4096 + x, b = best.get(k)
-    if (!b || d > b[0]) best.set(k, [d, key, x, y])
+    if (!b || d > b[0]) best.set(k, [d, key, x, y, tag])
   })
-  for (const [, , x, y] of best.values()) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!best.has((y + dy) * 4096 + x + dx)) c.px(x + dx, y + dy, "k")
-  for (const [, key, x, y] of best.values()) c.px(x, y, key)
+  return best
 }
+// paint the pixels whose sample `keep` takes, each with the outline where the surface ends
+const zfill = (c, best, keep = () => true) => {
+  const mine = [...best.values()].filter((b) => keep(b[4]))
+  for (const [, , x, y] of mine) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!best.has((y + dy) * 4096 + x + dx)) c.px(x + dx, y + dy, "k")
+  for (const [, key, x, y] of mine) c.px(x, y, key)
+}
+const zpaint = (c, sample) => zfill(c, zbuffer(sample))
 // the light, in the world: from the upper left and in front
 const SUN = unit([-0.6, 0.65, 0.45])
 const tone = (n, ramp, bias = 0) => { const l = dot(n, SUN) + bias; return ramp[l > 0.55 ? 3 : l > 0.12 ? 2 : l > -0.3 ? 1 : 0] ?? ramp[ramp.length - 1] }
@@ -297,25 +303,28 @@ const torso = (c, j, p) => zpaint(c, (emit) => {
   }
 })
 
-// the coat's skirt, open at the front: from the belt it hangs out at an angle that grows with the turn
-// (a frame late), so it flares into a bell, its hem trailing round behind the hips; pleats; inside, the
-// lining shows where it turns away from us; fur along the hem, like the collar
+// the coat's skirt, closed round the legs, its front edge lapped over: from the belt it hangs out at an
+// angle that grows with the turn (a frame late), so it flares into a bell, its hem trailing round
+// behind the hips; pleats; inside, the lining shows where it turns away from us; fur along the hem,
+// like the collar. Its half behind the legs and its half in front are painted apart, the legs between,
+// so only shins and boots show below the hem
 const SKIRTL = 12, WAIST = 4.3
-const skirt = (c, j, flare, lag) => zpaint(c, (emit) => {
+const skirt = (j, flare, lag) => zbuffer((emit) => {
   const w = add(j.pelvis, [0, 1.5, 0]), fall = rad(8 + 44 * flare)
   for (let si = 0; si <= 22; si++) {
-    const s = si / 22, open = 0.32 + 0.3 * s
+    const s = si / 22, axis = add(w, mul(UP, -s * SKIRTL * Math.cos(fall)))
     for (let ti = 0; ti < 96; ti++) {
       const th = (ti / 96) * Math.PI * 2 - Math.PI
-      if (Math.abs(th) < open) continue
       const at = th - lag * s, dir = add(mul(j.hips.f, Math.cos(at)), mul(j.hips.r, Math.sin(at)))
       const pleat = Math.sin(th * 7) * 0.45, out = unit(add(dir, mul(cross(UP, dir), pleat)))
       const q = add(w, add(mul(dir, WAIST + s * SKIRTL * Math.sin(fall)), mul(UP, -s * SKIRTL * Math.cos(fall))))
       const n = unit(add(mul(out, Math.cos(fall)), mul(UP, Math.sin(fall))))
       const fold = ((((th * 9) / (2 * Math.PI)) % 1) + 1) % 1 < 0.14 ? -0.4 : 0          // a fold every 40 degrees
       const outside = dot(n, VIEW) > -0.05
+      const front = depth(q) > depth(axis)
       emit(q, si >= 20 ? (outside ? tone(n, "Ffe", (ti % 3 === 0 ? -0.4 : 0)) : "F")               // the fur at the hem
-        : outside ? tone(n, "DGgh", fold - 0.2) : tone(mul(n, -1), "LLll", -0.2))
+        : Math.abs(th) < 0.07 && outside ? "D"                                                   // the lapped front edge
+        : outside ? tone(n, "DGgh", fold - 0.2) : tone(mul(n, -1), "LLll", -0.2), front)
     }
   }
 })
@@ -328,9 +337,11 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
   layer("body", (c) => {
     const p = pose(c.frame), j = skeleton(p), parts = [], mid = depth(j.chest)
     const at = (d, draw) => parts.push({ d, draw })
-    at(mid - 2.5, () => skirt(c, j, FLARE[c.frame], rad(Math.max(-32, Math.min(32, -TAIL[c.frame] * 0.4)))))
-    // the legs, the far one first; the near one in the coat's opening
-    j.legs.forEach((L) => at(depth(L.knee) - (depth(L.knee) > mid ? -0.2 : 3), () => {
+    const sk = skirt(j, FLARE[c.frame], rad(Math.max(-32, Math.min(32, -TAIL[c.frame] * 0.4))))
+    at(mid - 2.5, () => zfill(c, sk, (front) => !front))
+    at(mid + 0.6, () => zfill(c, sk, (front) => front))
+    // the legs, the far one first, inside the skirt
+    j.legs.forEach((L) => at(mid - 1.5 + 0.01 * depth(L.knee), () => {
       limb(c, L.hip, L.knee, 2.2, 1.9, "Ttt"); limb(c, L.knee, L.ankle, 1.9, 1.7, "Tt")
       limb(c, lerp(L.knee, L.ankle, 0.45), L.ankle, 2, 1.8, "Oo")
       const boot = [add(L.ankle, [0, 1, 0]), add(L.toe, [0, -0.5, 0]), add(L.toe, [0, -2, 0]), add(L.ankle, [0, -2, 0])].map((q) => scr(q).map(Math.round))
