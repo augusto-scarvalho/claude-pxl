@@ -293,20 +293,28 @@ const zpaint = (c, sample) => zfill(c, zbuffer(sample))
 const SUN = unit([-0.6, 0.65, 0.45])
 const tone = (n, ramp, bias = 0) => { const l = dot(n, SUN) + bias; return ramp[l > 0.55 ? 3 : l > 0.12 ? 2 : l > -0.3 ? 1 : 0] ?? ramp[ramp.length - 1] }
 
-// a boot's foot on the floor, the way `f` points: from the heel behind the ankle to a round toe, as
-// wide as the ankle, its instep falling from the ankle to the toe cap; its sole a dark band
-const bootFoot = (ankle, f) => zbuffer((emit) => {
-  const r = unit(cross(f, UP)), base = [ankle[0], 0, ankle[2]]
+// a boot, one surface so it has one outline and one light: the shaft round up the shin, its cuff
+// turned down at the top (a shadow under it, not a line), and at the ankle, as wide as the shaft, the
+// foot on the floor the way `f` points: the heel behind, the instep falling to a round toe cap that
+// catches the light, a dark sole
+const boot = (L, f) => zbuffer((emit) => {
+  const r = unit(cross(f, UP)), base = [L.ankle[0], 0, L.ankle[2]]
   for (let u = -1.5; u <= 4.3; u += 0.2) {
     const toe = u > 2.7 ? Math.sqrt(Math.max(0, 1 - ((u - 2.7) / 1.6) ** 2)) : 1, heel = u < -0.5 ? Math.sqrt(Math.max(0, 1 - ((u + 0.5) / 1) ** 2)) : 1
-    const wid = 1.5 * Math.min(toe, heel), hgt = (u < 0.5 ? 3 : 3 - (u - 0.5) * 0.45) * Math.min(1, 0.35 + toe, 0.35 + heel)
+    const wid = (u < 1 ? 1.8 : 1.8 - (u - 1) * 0.15) * Math.min(toe, heel), hgt = (u < 0.5 ? 3 : 3 - (u - 0.5) * 0.45) * Math.min(1, 0.35 + toe, 0.35 + heel)
     const end = u > 2.7 ? (u - 2.7) * 0.9 : u < -0.5 ? (u + 0.5) * 0.9 : 0             // the toe and the heel face out
     for (let a = 0; a <= Math.PI; a += Math.PI / 16) {
       const cs = Math.cos(a), sn = Math.sin(a), up = hgt * sn
       const q = add(base, add(mul(f, u), add(mul(r, wid * cs), mul(UP, up))))
       const n = unit(add(add(mul(r, cs / Math.max(wid, 0.3)), mul(UP, sn / Math.max(hgt, 0.3))), mul(f, end)))
-      emit(q, up < 0.7 ? "O" : tone(n, "OOob", u > 2.3 ? 0.2 : -0.15))                 // the toe cap catches the light
+      emit(q, up < 0.7 ? "O" : tone(n, "OOob", u > 2.3 ? 0.2 : -0.15))
     }
+  }
+  const top = lerp(L.knee, L.ankle, 0.38), ad = unit(sub(L.ankle, top)), al = len(sub(L.ankle, top)) + 1
+  const e1 = unit(cross(ad, Math.abs(ad[1]) < 0.9 ? UP : [1, 0, 0])), e2 = cross(ad, e1)
+  for (let t = 0; t <= 1; t += 0.04) for (let k = 0; k < 28; k++) {
+    const a = (k / 28) * Math.PI * 2, n = add(mul(e1, Math.cos(a)), mul(e2, Math.sin(a))), cuff = t < 0.22
+    emit(add(add(top, mul(ad, t * al)), mul(n, cuff ? 2.4 : 2 - 0.2 * t)), cuff ? tone(n, "Obbn") : t < 0.3 ? "O" : tone(n, "OOob", -0.1))
   }
 })
 
@@ -380,9 +388,7 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
     // the legs, the far one first, inside the skirt
     j.legs.forEach((L, side) => at(mid - 1.5 + 0.01 * depth(L.knee), () => {
       limb(c, L.hip, L.knee, 2.2, 1.9, "Ttt"); limb(c, L.knee, L.ankle, 1.9, 1.7, "Tt")
-      limb(c, lerp(L.knee, L.ankle, 0.42), L.ankle, 2.1, 1.9, "OOo")                       // the boot's shaft
-      limb(c, lerp(L.knee, L.ankle, 0.38), lerp(L.knee, L.ankle, 0.5), 2.5, 2.4, "bbn")     // its cuff, turned down
-      zfill(c, bootFoot(L.ankle, unit(add(j.hips.f, mul(j.hips.r, side ? 0.3 : -0.3)))))     // toes turned out a little
+      zfill(c, boot(L, unit(add(j.hips.f, mul(j.hips.r, side ? 0.3 : -0.3)))))           // toes turned out a little
     }))
     at(mid, () => torso(c, j, p))
     // the head as it is turned, and the tail of hair swinging behind it
