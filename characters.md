@@ -266,6 +266,13 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   }))
 ```
 
+- **A swing moves the body, not only the weapon.** Before it the shoulders coil back against the
+  hips; through it the hips turn and the shoulders after them (a whirl shows the back), the knees
+  bend, the arm reaches its full length at the release and the free arm tucks in; after it the body
+  follows the weight down; a coat and hair come a frame late, and the head leads a turn. An arm that
+  swings an axe round a body that stays in profile reads as a puppet. Posed as a skeleton in 3D and
+  turned about its upright, the views come by themselves (`examples/rig/warden.px.js`: the head
+  drawn in five views, picked by the turn).
 - **Register the whole figure by one point**, the pelvis: move the entire frame so it lands on the
   same x every frame, with one constant y offset per cycle for the bob. Never centre frames on
   their bounding box (an arm reaching out moves it), and never pin head and feet separately (the

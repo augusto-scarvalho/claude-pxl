@@ -171,7 +171,7 @@ references until it read right.
 | [`tropical/`](../examples/tropical) | A 320×240 animated forest: imported trees, river, trail tileset, animals, a girl walking with hair that swings. |
 | [`halloween/`](../examples/halloween) | A night party: many lamps, point-light shadows, eight dancing monsters. |
 | [`sunset/`](../examples/sunset) | A backlit cliff at sunset: long shadows toward us, glowing edges, a tent lit through. |
-| [`rig/`](../examples/rig) | A 72 px knight built skeleton first, two knights fighting a bout at a tournament, and a warden's axe combo with smears and a floor reflection. |
+| [`rig/`](../examples/rig) | A 72 px knight built skeleton first, two knights fighting a bout at a tournament, and a warden's whirling axe combo on a skeleton in 3D, the body turning with the swing, with smears and a floor reflection. |
 | [`cyberpunk/`](../examples/cyberpunk) | One city street made two ways: by one agent, and by a planner with eight forked agents. |
 | [`perspective/`](../examples/perspective) | The sertão road, the park at 2 pm, the end of the Cretaceous, a street race from the cockpit. |
 | [`parallax/`](../examples/parallax) | A steam train crossing the hills of Minas Gerais, planes going by at their own speeds. |
