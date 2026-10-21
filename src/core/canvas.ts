@@ -41,6 +41,19 @@ export type Placement = { name: string; x: number; y: number; w: number; h: numb
  * Drawing surface over an image. Coordinates are relative to (ox, oy); colors are palette
  * keys, "#hex", "." (skip) or "_" (erase). All writes go through plot(), which honours clip().
  */
+/** Adds a point to a path drawn a pixel at a time, pixel-perfect: the corner of an L (the middle of three pixels
+ * whose ends touch diagonally) is dropped, as it would thicken the line there. */
+function addPerfect(path: [number, number][], x: number, y: number): void {
+  const p: [number, number] = [Math.round(x), Math.round(y)], q = path[path.length - 1];
+  if (q && q[0] === p[0] && q[1] === p[1]) return;
+  path.push(p);
+  while (path.length >= 3) {
+    const [a, b, d] = path.slice(-3);
+    if (Math.abs(a[0] - d[0]) === 1 && Math.abs(a[1] - d[1]) === 1 && (b[0] === a[0] || b[1] === a[1]) && (b[0] === d[0] || b[1] === d[1])) path.splice(-2, 1);
+    else break;
+  }
+}
+
 export class Canvas {
   img: Img;
   pal: Palette;
@@ -280,18 +293,7 @@ export class Canvas {
     for (let i = 0; i < pts.length; i += 2) P.push([pts[i], pts[i + 1]]);
     const n = P.length, closed = !!opts.closed && n > 2;
     const at = (i: number) => P[closed ? (i + n) % n : Math.max(0, Math.min(n - 1, i))];
-    const path: [number, number][] = [];
-    const add = (x: number, y: number) => {
-      const p: [number, number] = [Math.round(x), Math.round(y)], q = path[path.length - 1];
-      if (q && q[0] === p[0] && q[1] === p[1]) return;
-      path.push(p);
-      // Pixel-perfect: drop the corner of an L (the middle of three pixels whose ends touch diagonally).
-      while (path.length >= 3) {
-        const [a, b, d] = path.slice(-3);
-        if (Math.abs(a[0] - d[0]) === 1 && Math.abs(a[1] - d[1]) === 1 && (b[0] === a[0] || b[1] === a[1]) && (b[0] === d[0] || b[1] === d[1])) path.splice(-2, 1);
-        else break;
-      }
-    };
+    const path: [number, number][] = [], add = (x: number, y: number) => addPerfect(path, x, y);
     for (let s = 0; s < (closed ? n : n - 1); s++) {
       const [p0, p1, p2, p3] = [at(s - 1), at(s), at(s + 1), at(s + 2)];
       const steps = Math.max(1, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) * 4));
@@ -1171,14 +1173,18 @@ export class Canvas {
   /** Hanging cable sagging `sag` px; `hang` stamps an asset/group under it every `every` px. */
   wire(x0: number, y0: number, x1: number, y1: number, sag: number, c: string, opts: WireOpts = {}): void {
     const at = (t: number): [number, number] => [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t + sag * 4 * t * (1 - t)];
-    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) + Math.abs(sag) * 2 + 1;
-    let px = x0, py = y0;
-    for (let i = 1; i <= n; i++) {
-      const [fx, fy] = at(i / n);
-      const qx = Math.round(fx), qy = Math.round(fy);
-      this.line(px, py, qx, qy, c);
-      px = qx; py = qy;
-    }
+    // sampled finer than a pixel, so the path steps one pixel at a time; from each end to the middle, a half
+    // rounding toward it, so a level wire comes out symmetric
+    const n = 2 * (Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) + Math.abs(sag) * 2 + 1), mid = (x0 + x1) / 2;
+    const half = (from: number) => {
+      const p: [number, number][] = [];
+      for (let i = 0; i <= n; i++) { const [fx, fy] = at(from + ((0.5 - from) * i) / n); addPerfect(p, fx < mid ? Math.round(fx) : -Math.round(-fx), fy); }
+      return p;
+    };
+    const path = half(0);
+    for (const [x, y] of half(1).reverse()) addPerfect(path, x, y);
+    const col = this.color(c);
+    for (const [x, y] of path) this.plot(x, y, col);
     if (!opts.hang || x1 === x0) return;
     const every = opts.every ?? 6, span = Math.abs(x1 - x0), dir = Math.sign(x1 - x0);
     for (let d = opts.start ?? Math.floor(every / 2); d < span; d += every) {

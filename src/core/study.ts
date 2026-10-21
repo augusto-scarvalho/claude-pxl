@@ -14,7 +14,7 @@
 import { type Color, pack, toHex } from "./color.ts";
 import { Img } from "./image.ts";
 import { type Piece, decompose } from "./decompose.ts";
-import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Vanish, areaDown, bandShifts, blockFlow, clearChecker, clearReflection, colorCounts, dE, findChecker, findGrid, findReflection, findRamps, findSegments, findTiles, findVanishing, focusOfExpansion, frameDiff, lab, lch, lumaOf, mergeNear, pixelate, quantize, techniques, toNative } from "./vision.ts";
+import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Vanish, areaDown, bandShifts, blockFlow, clearChecker, clearReflection, colorCounts, dE, findChecker, findGrid, findReflection, findRamps, findSegments, findTiles, findVanishing, focusOfExpansion, frameDiff, lab, lch, lineFlaws, lumaOf, mergeNear, pixelate, quantize, techniques, toNative } from "./vision.ts";
 
 /** frames as read; `drawnAt`: they were already brought down from that grid as they were read (big animations) */
 export interface StudyInput { name: string; frames: Img[]; ms: number[]; kind: string; drawnAt?: Grid }
@@ -96,10 +96,20 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
       ? `  Dithering: 2x2 checkers on ${pct(tech.dither, total)} of the pixels${tech.ditherRows ? `, rows ${tech.ditherRows[0]}-${tech.ditherRows[1]}` : ""}, mostly ${tech.ditherPairs.map(([a, b]) => `${hex(a)}/${hex(b)}`).join(", ")}: a blend between two tones.`
       : `  Dithering: none to speak of (${pct(tech.dither, total)}).`);
     text.push(`  Anti-aliasing: in-between tones on the steps of edges on ${pct(tech.aa, total)} of the pixels${tech.aa > total * 0.01 ? " (edges smoothed by hand)" : " (hard edges)"}.`);
-    text.push(`  Clusters: ${pct(tech.orphans, total)} of the pixels stand alone (none of their four neighbors share their color)${tech.orphans > total * 0.12 ? ": a busy, noisy texture" : tech.orphans < total * 0.03 ? ": clean clusters" : ""}.`);
+    text.push(`  Clusters: ${pct(tech.orphans, total)} of the pixels stand alone (none of their four neighbors share their color; a dither's and anti-aliasing's left out)${tech.orphans > total * 0.12 ? ": a busy, noisy texture" : tech.orphans < total * 0.03 ? ": clean clusters" : ""}.`);
     if (tech.rim && tech.rim.r2 >= 0.15) text.push(`  Light on the silhouette (its rim's lightness fit to one light, after Johnson and Farid): from ${way(tech.rim.dir)}, r² ${tech.rim.r2.toFixed(2)} over ${tech.rim.n} rim pixels.`);
     const b = tech.banding;
     text.push(`  Banding (runs of two colors side by side with their ends lined up, marked red on the sheet): ${b.pairs} pair${b.pairs === 1 ? "" : "s"}, ${b.per1000.toFixed(1)} per 1000 px${b.per1000 < 1 ? ": hardly any" : b.per1000 > 6 && b.pairs >= 12 ? ": much (it shows the grid; stagger the ends)" : ""}.`);
+    // (in a palette someone chose: a lit scene's blended tones make shapes, not lines)
+    const lf = nColors <= 64 ? lineFlaws(picture) : null;
+    if (lf && lf.line >= 30) {
+      const at = (v: [number, number][]) => (v.length ? ` (at 1x: ${v.slice(0, 5).map(([x, y]) => `${x},${y}`).join("; ")}${v.length > 5 ? "; ..." : ""})` : "");
+      const k = lf.corners.length, j = lf.jaggies.length, square = k >= lf.line * 0.1;
+      const corners = square ? `drawn square, ${k} L-corners${at(lf.corners)}: an L at each step, a line that reads thicker and chunkier, a style (outline8 draws an outline so)`
+        : k ? `${k} L-corner${k === 1 ? "" : "s"}${at(lf.corners)}: the elbow of three pixels in an L where the line could step diagonally, thickening it there; on a smooth line delete it (a box's corner stays)` : "no L-corners";
+      const jaggies = j ? `${j} jagg${j === 1 ? "y" : "ies"}${at(lf.jaggies)}: a run of pixels out of order along a line (1 3 2 4 where 1 2 3 4 reads smooth); runs grow or shrink steadily, or alternate n and n+1 on a straight slope` : "no jaggies";
+      text.push(`  Lines (dark, 1 px wide: ${lf.line} px): ${k + j ? `${corners}; ${jaggies}. pxl's line(), curve() and outline draw without either.` : "pixel-perfect, every step diagonal and the runs in order: clean."}`);
+    }
     if (tech.pillow !== null && tech.pillow > 0.4) text.push(`  Pillow shading: lighter the farther in from the edge all round (${tech.pillow.toFixed(2)})${tech.rim && tech.rim.r2 >= 0.3 ? ", though lit from one side too" : ": lit as if from the front, which flattens the form; shade from one side instead"}.`);
     const tiles = findTiles(picture);
     if (tiles) text.push(`  Tiles: ${tiles.size}x${tiles.size} cells from ${tiles.ox},${tiles.oy} repeat: ${tiles.distinct} distinct of ${tiles.cells} (${pct(tiles.cells - tiles.distinct, tiles.cells)} repeats).`);

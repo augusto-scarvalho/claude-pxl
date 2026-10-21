@@ -9,7 +9,7 @@ import { encodeGif } from "../src/node/gif.ts";
 import { decodeGif } from "../src/node/gifread.ts";
 import { writePng } from "../src/node/output.ts";
 import { main } from "../src/node/cli.ts";
-import { areaDown, findGrid, pixelate } from "../src/core/vision.ts";
+import { areaDown, findGrid, lineFlaws, pixelate } from "../src/core/vision.ts";
 import { latticeHash } from "../src/core/util.ts";
 import { study } from "../src/core/study.ts";
 import { loadSource } from "../src/node/load.ts";
@@ -141,6 +141,24 @@ test("study names near twins in a palette, once each, and not in a clean one", (
   const a = (img: Img) => study({ name: "t", frames: [img], ms: [100], kind: "test" }).text.join("\n");
   assert.doesNotMatch(a(clean), /Near twins/);
   assert.match(a(twin), /Near twins: 1 pair of colors .*: #1e1e2e\/#222234\./);
+});
+
+test("study reads a 1 px line's flaws: L-corners where it steps, a jaggy where its runs go out of order; pxl's curve and wire have neither", () => {
+  const ink = pack(30, 20, 40), paper = pack(240, 230, 210);
+  const page = (w: number, h: number) => { const img = new Img(w, h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) img.set(x, y, paper); return img; };
+  // a shallow line from its runs, one row each
+  const runs = (r: number[]) => { const img = page(r.reduce((s, v) => s + v, 2), r.length + 2); let x = 1; r.forEach((n, y) => { for (let i = 0; i < n; i++) img.set(x++, y + 1, ink); }); return img; };
+  assert.deepEqual(lineFlaws(runs([1, 2, 2, 1, 5, 2, 1, 2, 1])).jaggies, [[6, 4]], "the 1 before the 5");
+  assert.equal(lineFlaws(runs([1, 1, 2, 2, 4, 2, 2, 1, 1])).jaggies.length, 0, "grows and shrinks steadily: an S");
+  assert.equal(lineFlaws(runs([2, 3, 2, 3, 2, 3, 2, 3])).jaggies.length, 0, "a straight slope");
+  // a diagonal drawn 4-connected: every step doubled
+  const stairs = page(32, 24);
+  for (let i = 0; i < 20; i++) { stairs.set(4 + i, 2 + i, ink); stairs.set(5 + i, 2 + i, ink); }
+  assert.match(study({ name: "t", frames: [stairs], ms: [100], kind: "test" }).text.join("\n"), /Lines \(dark, 1 px wide: 40 px\): drawn square, 19 L-corners \(at 1x: 5,2; 6,3;/);
+  const p = loadSource('use("pico8"); pal({ k: 0, w: 7 })\nsprite("s", { w: 40, h: 24 }, rect(0, 0, 40, 24, "w"), curve([1, 22, 8, 6, 20, 2, 38, 1], "k"), wire(2, 4, 38, 10, 9, "k"))', "t.px.js");
+  const own = lineFlaws(p.image("s"));
+  assert.ok(own.line > 60, `${own.line} px of line`);
+  assert.deepEqual([own.corners, own.jaggies], [[], []]);
 });
 
 test("pixelate keeps an edge where a box average blurs it", () => {

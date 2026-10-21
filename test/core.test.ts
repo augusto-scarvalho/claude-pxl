@@ -269,7 +269,7 @@ test("ramps: shade/light step along, regions and density", () => {
 
 test("wire with hangs, text", () => {
   eq(art(PAL + 'sprite("_b", "w"); sprite("a", { w: 9, h: 4 }, wire(0, 0, 8, 0, 2, "r", { hang: "_b", every: 4, start: 4 }))', "a"),
-    "r.......r\n.rr...rr.\n..rrrrr..\n....w....");
+    "r.......r\n.r.....r.\n..rrrrr..\n....w....");                       // pixel-perfect and symmetric
   eq(art(PAL + 'sprite("a", { w: 3, h: 5 }, text(0, 0, "L", "r"))', "a"), "r..\nr..\nr..\nr..\nrrr");
 });
 

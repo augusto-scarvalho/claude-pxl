@@ -235,7 +235,7 @@ export interface Techniques {
   edge: { black: number; selective: number; none: number } | null;
   /** in-between tones on a step between two colors (manual anti-aliasing) */
   aa: number;
-  /** pixels whose color none of their four neighbors share */
+  /** pixels whose color none of their four neighbors share, but for a dither's and anti-aliasing's (meant so) */
   orphans: number;
   /** where the lighter tones of each ramp lie: the way toward the light on screen (x right, y down) and how consistently */
   light: { ramp: number; dir: [number, number]; sure: number; n: number }[];
@@ -253,7 +253,7 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
   const rampOf = new Map<Color, number>();
   ramps.forEach((r, i) => r.colors.forEach((c) => rampOf.set(c, i)));
   let pixels = 0, lines = 0, selective = 0, black = 0, aa = 0, orphans = 0;
-  const inDither = new Uint8Array(W * H), mask = new Uint8Array(W * H), pairs = new Map<string, number>();
+  const inDither = new Uint8Array(W * H), mask = new Uint8Array(W * H), lone = new Uint8Array(W * H), pairs = new Map<string, number>();
   let edge: Techniques["edge"] = null;
   const vec = ramps.map(() => [0, 0, 0]);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -261,7 +261,7 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
     if (clear(c)) continue;
     pixels++;
     const L = lch(c).L, nb = [at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1)];
-    if (nb.every((n) => n !== c)) orphans++;
+    if (nb.every((n) => n !== c)) lone[y * W + x] = 1;
     // a checker: a b / b a
     const b = at(x + 1, y);
     if (!clear(b) && b !== c && at(x + 1, y + 1) === c && at(x, y + 1) === b) {
@@ -399,10 +399,116 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
   }
   let ditherN = 0, r0 = H, r1 = -1;
   for (let i = 0; i < inDither.length; i++) if (inDither[i]) { ditherN++; mask[i] |= 1; const y = Math.floor(i / W); r0 = Math.min(r0, y); r1 = Math.max(r1, y); }
+  for (let i = 0; i < lone.length; i++) if (lone[i] && !(mask[i] & 5)) orphans++;
   const ditherPairs = [...pairs].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => { const [a, b] = k.split(",").map(Number); return [a, b, n] as [Color, Color, number]; });
   const light = vec.map(([vx, vy, n], ramp) => ({ ramp, dir: [n ? vx / n : 0, n ? vy / n : 0] as [number, number], sure: n ? Math.hypot(vx, vy) / n : 0, n }))
     .filter((l) => l.n >= 30).sort((a, b) => b.n - a.n);
   return { pixels, dither: ditherN, ditherPairs, ditherRows: r1 >= 0 ? [r0, r1] : null, lines, selective, black, edge, aa, orphans, light, mask, rim, banding: { pairs: bandPairs, per1000: (1000 * bandPairs) / Math.max(1, pixels) }, pillow };
+}
+
+/**
+ * What the tutorials (Pedro Medeiros, Saint11) fix in a 1 px line, any color: L-corners, the elbow of three pixels
+ * in an L where the line steps (it thickens the line there; where two lines meet, both going on, it's meant); and
+ * jaggies, along one stretch of a line (one way of stepping), a run of pixels out of order:
+ * runs grow or shrink steadily (1 1 2 3), or alternate n and n+1 on a straight slope, with one turn at most (an S).
+ * Lines are the pixels in no 2x2 block of their color, in a piece 8 px long or more (a letter's strokes, an eye,
+ * turn where they mean to) darker than what it borders (a band of a middle tone between a light and a dark is
+ * shading, not a line); positions at 1x.
+ */
+export function lineFlaws(img: Img): { line: number; corners: [number, number][]; jaggies: [number, number][] } {
+  const W = img.w, H = img.h, at = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? TRANSPARENT : img.data[y * W + x]);
+  const same = (x: number, y: number, c: Color) => at(x, y) === c;
+  const thin = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = at(x, y);
+    if (clear(c)) continue;
+    let block = false;
+    for (const [ox, oy] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) if (same(x + ox, y + oy, c) && same(x + ox + 1, y + oy, c) && same(x + ox, y + oy + 1, c) && same(x + ox + 1, y + oy + 1, c)) block = true;
+    if (!block) thin[y * W + x] = 1;
+  }
+  const N8 = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+  // pieces of a color's thin pixels, 8-connected: only those of 6 and more are lines
+  const piece = new Int32Array(W * H).fill(-1), size: number[] = [];
+  for (let i = 0; i < W * H; i++) {
+    if (!thin[i] || piece[i] >= 0) continue;
+    const c = img.data[i], L = lch(c).L, stack = [i];
+    piece[i] = size.length; let n = 0, lift = 0, sides = 0, x0 = W, x1 = 0, y0 = H, y1 = 0;
+    while (stack.length) {
+      const j = stack.pop()!, x = j % W, y = (j - x) / W; n++;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const d = at(x + dx, y + dy);
+        if (d !== c) { lift += clear(d) ? 0.3 : lch(d).L - L; sides++; }
+      }
+      for (const [dx, dy] of N8) {
+        const k = (y + dy) * W + x + dx;
+        if (same(x + dx, y + dy, c) && thin[k] && piece[k] < 0) { piece[k] = size.length; stack.push(k); }
+      }
+    }
+    size.push(lift >= 0.1 * sides && Math.max(x1 - x0, y1 - y0) >= 7 ? n : 0);
+  }
+  const isLine = (x: number, y: number, c: Color) => same(x, y, c) && thin[y * W + x] === 1 && size[piece[y * W + x]] >= 8;
+  let line = 0;
+  const corners: [number, number][] = [], gone = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = at(x, y);
+    if (!isLine(x, y, c)) continue;
+    line++;
+    const l = same(x - 1, y, c), r = same(x + 1, y, c), u = same(x, y - 1, c), d = same(x, y + 1, c);
+    if (l === r || u === d) continue;
+    const sx = r ? 1 : -1, sy = d ? 1 : -1;
+    // one arm is a step: past it the line goes on alongside the other arm, away from it (a corner where two
+    // lines meet, both arms going on, is meant); nothing across the corner from the arms; of a staircase of
+    // them, every other one (taking one away fixes the next)
+    const step = (same(x - sx, y + sy, c) && !same(x, y + 2 * sy, c)) || (same(x + sx, y - sy, c) && !same(x + 2 * sx, y, c));
+    if (!step || same(x - sx, y - sy, c)) continue;
+    if ((x > 0 && gone[y * W + x - 1]) || (y > 0 && gone[(y - 1) * W + x])) continue;
+    gone[y * W + x] = 1; corners.push([x, y]);
+  }
+  // the lines without their corners traced end to end (a fork ends them), each cut into stretches that step one
+  // way, each stretch into runs
+  const node = (x: number, y: number, c: Color) => isLine(x, y, c) && !gone[y * W + x];
+  const nbrs = (x: number, y: number, c: Color) => N8.map(([dx, dy]) => [x + dx, y + dy] as [number, number]).filter(([u, v]) => node(u, v, c));
+  const seen = new Uint8Array(W * H), jaggies: [number, number][] = [];
+  const trace = (x0: number, y0: number) => {
+    const c = at(x0, y0), pts: [number, number][] = [[x0, y0]];
+    seen[y0 * W + x0] = 1;
+    for (;;) {
+      const [x, y] = pts[pts.length - 1], next = nbrs(x, y, c).filter(([u, v]) => !seen[v * W + u] && nbrs(u, v, c).length <= 2);
+      if (next.length !== 1) break;
+      seen[next[0][1] * W + next[0][0]] = 1; pts.push(next[0]);
+    }
+    if (pts.length < 8) return;
+    let axis: number[] | null = null, diag: number[] | null = null, run = { n: 1, at: pts[0] }, cur: (typeof run)[] = [];
+    const stretches = [cur];
+    for (let i = 1; i < pts.length; i++) {
+      const dx = pts[i][0] - pts[i - 1][0], dy = pts[i][1] - pts[i - 1][1], slant = dx !== 0 && dy !== 0;
+      const fits = slant ? (!diag || (diag[0] === dx && diag[1] === dy)) && (!axis || (axis[0] ? axis[0] === dx : axis[1] === dy))
+        : (!axis || (axis[0] === dx && axis[1] === dy)) && (!diag || (dx ? diag[0] === dx : diag[1] === dy));
+      if (!fits) { cur.push(run); stretches.push((cur = [])); axis = diag = null; run = { n: 1, at: pts[i - 1] }; }
+      if (slant) { diag = [dx, dy]; cur.push(run); run = { n: 1, at: pts[i] }; } else { axis = [dx, dy]; run.n++; }
+    }
+    cur.push(run);
+    for (const s of stretches) {
+      // the runs at either end may go on past the cut: only the ones between are judged; equal neighbors are one
+      const v = s.slice(1, -1).filter((r, i, a) => !i || r.n !== a[i - 1].n);
+      const odd: { r: (typeof run); off: number }[] = [];
+      for (let i = 1; i + 1 < v.length; i++) {
+        const a = v[i - 1].n, m = v[i].n, b = v[i + 1].n;
+        if (((m < a && m < b) || (m > a && m > b)) && !(a === b && Math.abs(m - a) === 1)) odd.push({ r: v[i], off: Math.abs(m - (a + b) / 2) });
+      }
+      // the biggest is where an S turns
+      odd.sort((p, q) => q.off - p.off).slice(1).forEach((o) => jaggies.push(o.r.at));
+    }
+  };
+  // from an end, or beside a fork; then what is left, loops
+  for (const ends of [true, false]) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = at(x, y);
+    if (seen[y * W + x] || !node(x, y, c)) continue;
+    const n = nbrs(x, y, c);
+    if (n.length <= 2 && (!ends || n.length === 1 || n.some(([u, v]) => nbrs(u, v, c).length > 2))) trace(x, y);
+  }
+  return { line, corners, jaggies };
 }
 
 /** A 3x3 linear system by Cramer's rule; null when singular. */
