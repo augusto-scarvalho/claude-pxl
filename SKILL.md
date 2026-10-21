@@ -13,21 +13,27 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
 ## Workflow
 
 1. Read the [example](#examples) closest to what you're making (`PXL list <file>` maps it: read the
-   lines you need) and start from the template below. Given a reference or art to learn from (a
-   PNG, GIF, JPEG or video, pixel art or not): `PXL study ref.gif` first. It reports what the piece
-   is made of (palette and ramps, outlines, dithering, light, banding and pillow shading; perspective,
-   vanishing points, lens and tilt; cycle, loop, parallax planes and their speeds; animated, its
-   pieces: the backdrop, sprites carried along, walks, anims in place, rigs, actions (an attack, with
-   its smears), effects, and the lights told apart first, each isolated with its box in every frame;
-   an editor's checker exported with it taken for clear, a reflection under it told and set aside) and what to use in pxl for each, with
-   a sheet, the palette and each piece cut out of its background in `out/_study/`.
+   lines you need) and start from the template below.
+   Given a reference or art to learn from (a PNG, GIF, JPEG or video, pixel art or not), look at it
+   with `PXL shot ref.gif` (a clip's frames on one sheet at 1×) and run `PXL study ref.gif`. Study
+   says what the piece is made of and what to use in pxl for each part, and writes a sheet, the
+   palette and each piece cut out of its background to `out/_study/`:
+   - a picture: palette and ramps, outlines, dithering, light, banding, pillow shading, perspective
+     (vanishing points, lens, tilt);
+   - a clip: timing, cycle and loop, parallax planes and their speeds, and its pieces (the backdrop,
+     sprites carried along, walks, anims in place, rigs, actions with their smears, effects, and the
+     lights, told apart first), each with its box in every frame.
+
+   An editor's transparency checker exported with it is taken for clear; a reflection under it is
+   told (row, opacity) and set aside.
 2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
    `out/_shot/<name>.png` (read it). Its text says what changed since your last shot of it (pixels
    and where, so an edit that did nothing shows) and the warnings `check` finds on it.
    `--frames 0,12,30` (or `0-17`, `all`) puts frames side by side, `--at x,y,w,h` enlarges a part
    (again for another part, a column each); more names (another file's as `other.px.js:name`, any
-   PNG at 1×, or a reference GIF or video: all its frames, at 1×) make a row each, to compare. Exact pixels: `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an
-   image). Scenes: `PXL describe art.px.js <scene>` (`--brief` when busy) gives each object's
+   PNG at 1×, a reference GIF or video) make a row each, to compare. Exact pixels:
+   `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an image). Scenes:
+   `PXL describe art.px.js <scene>` (`--brief` when busy) gives each object's
    position, gaps, cover, contrast and motion as text: answer layout questions from it, not by
    eyeballing (`--frame N` for another frame).
 3. Fix everything one look showed, then look again: send all the edits in the same message
@@ -43,9 +49,9 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    the time went, in your file and in pxl.
 5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
    rig of the file and every frame of an animated scene (not `anim()`s: a picture made as one gets no
-   checks), warnings only, with the frames they happen at. Fix each or say why it's meant. Its last line says which rules ran: a rule runs only where
-   the art says what it needs (`world.light`, `world.ground`, `height`, a `front` socket), so "no
-   warnings" with "not run: lit side" checked nothing about the light (a scene lit by a fire or a
+   checks), warnings only, with the frames they happen at. Fix each or say why it's meant. Its last
+   line says which rules ran: a rule runs only where the art says what it needs (`world.light`,
+   `world.ground`, `height`, a `front` socket), so "no warnings" with "not run: lit side" checked nothing about the light (a scene lit by a fire or a
    lamp: `world: { light: { at: [x, y] } }`). A lit-side warning that looks wrong: `--readings` shows
    what the rule read on every placement. Then look as a critic. Replacing approved art: keep
    `name_old` beside the new one and show both, `PXL shot art.px.js name name_old`, for the user to

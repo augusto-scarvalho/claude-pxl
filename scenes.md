@@ -7,8 +7,10 @@ shapes · Water and things that land · Distance (aerial perspective) · True pe
 in a short loop · Closing a loop · Parallax · Shadows and light · Blend modes · Checking a scene
 
 A reference scene (a screenshot, a photo of the place, a GIF or a video of a game): `PXL study` gives
-its horizon and vanishing points, its planes and their speeds, its palette and its light, and for a
-photo a small translation in few colors to draw over.
+its horizon and vanishing points, its planes and their speeds, its palette and its light, the
+pieces that move (each cut out, with its track and what to build it with), and for a photo a small
+translation in few colors to draw over. `PXL shot ref.gif` puts a clip's frames on one sheet to
+look at (`--frames 0-11` for some).
 
 ## Layout and scale
 
@@ -288,7 +290,8 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
 
 - `PXL shot <file> <scene>`: the look, with what changed since the last shot and the warnings on
   it; `--at x,y,w,h` again and again for details side by side, `--frames` for moments of the loop,
-  another version as a second name (`old.px.js:scene`) for a before and after.
+  another version as a second name (`old.px.js:scene`) for a before and after, or `--vs HEAD --diff`
+  for the last commit above and the changed pixels in red below.
 - `PXL describe <file> <scene>`: every object's visible ranges, gaps, cover, contrast and motion
   (`--brief` for busy scenes); after an edit, `--diff` lists what moved, was redrawn or recolored.
 - `PXL check <file>` before handing over: every frame of the loop; its last line says which rules
