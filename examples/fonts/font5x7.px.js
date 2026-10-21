@@ -54,9 +54,3 @@ sprite("_font5x7", { w: CHARS.length * 5, h: 7 }, (c) =>
   [...CHARS].forEach((ch, i) => c.grid(i * 5, 0, GLYPHS[ch].split(" ").join("\n").replace(/#/g, "k"))))
 font("5x7", "_font5x7", { chars: CHARS, w: 5, h: 7 })
 font("5x7 mono", "_font5x7", { chars: CHARS, w: 5, h: 7, mono: true })
-
-scene("font_demo", { w: 150, h: 54, bg: "#2a2550" },
-  text(75, 4, "PIXEL FONT", "#ffe070", { font: "5x7", align: "c", scale: 2, shadow: "#1b1630" }),
-  text(4, 24, "5x7: Quick fox, 012,345!", "#fff6e0", { font: "5x7" }),
-  text(4, 34, "Mono: 011,111 / 088,888", "#9fe0ff", { font: "5x7 mono" }),
-  text(4, 44, "3X5 BUILT-IN: SCORE 012,345!", "#b4b8cf"))

@@ -21,10 +21,12 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    - a picture: palette and ramps (hue shifting, near twins), outlines, a line's L-corners and
      jaggies, dithering, anti-aliasing, clusters, light, banding, pillow shading, tiles, perspective
      (vanishing points, lens, tilt); read at the wrong pixel size (a blurred copy), `--px N`;
-   - a clip: timing, cycle and loop, subpixel motion, parallax planes and their speeds, and its
-     pieces (the backdrop, sprites carried along, walks, anims in place, rigs, actions with their
-     smears, effects, and the lights, told apart first), each with its box in every frame, and the
-     spacing of what travels (easing, anticipation, overshoot, squash and stretch).
+   - a clip: timing per drawing (on twos), cycle and loop, subpixel motion, parallax planes and their
+     speeds, and its pieces (the backdrop, sprites carried along, walks, anims in place, rigs, actions
+     with their smears, effects, and the lights, told apart first), each with its box in every frame,
+     and the spacing of what travels (easing, anticipation, overshoot, squash and stretch). To measure
+     one thing moving: `PXL study ref.gif --at x,y,w,h` (the region in the drawing's own pixels, as
+     `shot` shows it) follows it frame by frame. `--no-out` prints the text only.
 
    An editor's transparency checker exported with it is taken for clear; a reflection under it is
    told (row, opacity) and set aside.
@@ -53,8 +55,9 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    rig of the file and every frame of an animated scene (a picture made as an `anim()` gets none of
    those): warnings only, with the frames they happen at. Fix each or say why it's meant. It also
    lists, as LOOK lines that don't fail it, the L-corners and jaggies in the 1 px lines of every
-   sprite and part drawn by hand: look at each, delete a doubled step on a smooth line, keep a corner
-   the shape has (a tyre, a roof, a wingtip). Its last
+   sprite and part drawn by hand, and tones side by side too close to tell apart (`PXL shot` rings
+   those pixels in `<name>_look.png`): look at each, delete a doubled step on a smooth line, keep a
+   corner the shape has (a tyre, a roof, a wingtip). Its last
    line says which rules ran: a rule runs only where the art says what it needs (`world.light`,
    `world.ground`, `height`, a `front` socket), so "no warnings" with "not run: lit side" checked
    nothing about the light (a scene lit by a fire or a lamp: `world: { light: { at: [x, y] } }`).
@@ -110,7 +113,7 @@ task needs before starting:
 | a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate, 12 for an action's or a cycle's frame counts |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a scene, level, building or environment | [scenes.md](scenes.md), whole (~7k tokens) |
+| a scene, level, building or environment | [scenes.md](scenes.md), whole (~9k tokens) |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
 
@@ -161,7 +164,8 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 - **Reuse**: variants are `base` + `swap`; repeated details `_parts` + `stamp`; families a `group` or a
   loop; props get `pivot: "bottom"`; texture is `scatter` of tiny parts; areas are `tilemap`/`pattern`.
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` and functions reading `c.phase`;
-  `dir: "pingpong"`; a part half a pixel along: `stamp(name, x, y + 0.5, { sub: true })`
+  `dir: "pingpong"`; motion blur, `stamp(name, x, y, { smear: [fromX, fromY] })`; a part half a
+  pixel along: `stamp(name, x, y + 0.5, { sub: true })`
   (subpixel, `PXL help "characters 10"`); stamping an anim animates the scene, and the scene's own
   functions then get its loop (`c.frame`, `c.frames`, `c.phase`, `c.t`). Things going by in a loop
   that closes (in an anim, or a scene that stamps one): `scroll()` (parallax planes), `clouds()`,
@@ -169,11 +173,11 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 - **Existing art**: `sprite("x", { png, area, shrink, palettize })`, `anim(..., { png, frames })`;
   `rampmap` maps imported tones onto a ramp without merging them.
 - **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj` for tilemaps, `build --aseprite` for a
-  person to keep editing in Aseprite.
+  person to keep editing in Aseprite, `build --share 4` for clean enlarged PNGs and GIFs to post.
 - **Light**: `shade:`/`light:` layers and `cast` shadows, `relight`/`plate()` for a part lit on its
   own edges, `glow`, `lighting()` (lighting.md).
 - **Text**: `text()` in the 3×5 built in, or `include("<skill dir>/examples/fonts/font5x7.px.js")`
-  for `{ font: "5x7" }` (lowercase too) or `"5x7 mono"` (a score, a timer).
+  for `{ font: "5x7" }` (lowercase too) or `"5x7 mono"` (a score, a timer); `fonts/font_demo.px.js` uses them.
 - **In meters**: `perspective()` (one, two or three points: `yaw`, `pitch`), `plane()` for flat ground,
   `terrain()` for hills and mountains, `solids()`/`shadows()` for things built of `solid` shapes,
   `mesh()` for what you are inside of or that wraps round itself (faces in meters from `model()`),

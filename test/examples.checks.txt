@@ -10,7 +10,9 @@ cyberpunk/sodium_hour.px.js: 0 warnings (1 scene (360 frames, 1128 distinct plac
   ran: lit side on 1128 (a clear reading on 581), lettering on 4, lines on 9; not run: front marker (nothing has one), feet (nothing placed has a height)
   _palmhead › LOOK: 1 pair of tones side by side too close to tell apart (under 0.03 in OKLab): 'K' #4e3c2e and 'U' #5c3c2a (0.027); merge each, or spread it if both are meant
   _hvan › LOOK: 1 L-corner in its 1 px lines (at 9,0): where a smooth line steps, the elbow of three pixels in an L doubles it; delete that one. A corner the shape has (a tyre, a roof, a tip) stays (PXL help "characters 7")
-fonts/font5x7.px.js: 0 warnings (1 scene (1 frame, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+fonts/font5x7.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: nothing; not run: front marker (nothing has one)
+fonts/font_demo.px.js: 0 warnings (1 scene (1 frame, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one), lit side (no scene declares world.light), feet (nothing placed has a height)
 grotto.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 14; not run: front marker (nothing has one)

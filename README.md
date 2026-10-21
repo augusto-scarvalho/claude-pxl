@@ -108,7 +108,7 @@ pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
 pxl ascii <art.px.js> <name>     print an asset as palette keys with x/y rulers (--frame N: one frame)
 pxl list  <art.px.js>            a map of the file: each asset and function's lines, its comment, what it makes
 pxl describe <art.px.js> <name>  a whole scene as text: what is where, what covers it, how it moves
-pxl check <art.px.js> [name...]  every check describe makes, on every frame, and hand-drawn lines: warnings only
+pxl check <art.px.js> [name...]  every check describe makes, on every frame: warnings; and hand-drawn lines to look at
 pxl shot <art.px.js> <name>      frames side by side, a region enlarged, --vs HEAD --diff; with several
                                  names, other files', PNGs or clips, a row each (--at again: a column each)
 pxl shot <ref.gif | video>       a reference's frames on one sheet, at 1x (--frames 0-11 for some)

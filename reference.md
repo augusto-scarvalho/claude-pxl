@@ -228,7 +228,7 @@ Animation); an option a placement doesn't take is an error, not ignored:
 | `z` | (stamp only) its order in a `sort: "z"` layer |
 | `cast: [kx, ky]` | the asset laid flat on the ground as its shadow: a pixel h px above its base lands h × (kx, ky) from where it stands, e.g. `[0.6, 0.2]` for light from the top left. The base is the pivot's row (the bottom edge without one), and the shadow is placed by that point, so an asset without a pivot gets a shadow that doesn't line up with it: give props `pivot: "bottom"`; it applies after `flip`, so a mirrored tree still throws its shadow the same way. In a `shade` layer: `stamp("palm", x, y, { cast: [0.6, 0.2] })` |
 | `castBase: "pivot" \| "column"` | with `cast` (default `"pivot"`): each column stands on its own lowest pixel instead of the pivot's row, for a base that isn't level (a tent seen at an angle, its hem higher at the back: from the pivot's row, what hangs below it would cast toward the sun) |
-| `sub: [dx, dy] \| true` | `stamp` only: x and y may fall between pixels (subpixel motion), `[dx, dy]` the way it moves (1 right or down, -1 left or up; `true` is `[1, 1]`). From a third to two thirds of the way it stays crisp at the place it comes from and its edges move: with an outline it pushes into it, the outline ahead taking the key between it and the fill and the fill behind the outline it leaves the same, the silhouette unchanged (so it works on a game sprite on clear); without one, half a pixel of it spills past its edge ahead over what's painted there. The key: one between the two in a ramp that holds both (the ink ends every ramp), else the palette's color nearest their middle, of the keys the file chose (`pal()`, `use()`); none, nothing changes. Nearer a whole place it's there. In a function, `c.subpixel(dx, dy, () => { ... }, [dirX, dirY])` moves what's drawn in it so. `characters.md` §10, `examples/subpixel.px.js` |
+| `sub: [dx, dy] \| true` | `stamp` only (a half step that draws no in-between tone, over the clear with no outline or with no key between, is a warning in build, shot and a scene's check): x and y may fall between pixels (subpixel motion), `[dx, dy]` the way it moves (1 right or down, -1 left or up; `true` is `[1, 1]`). From a third to two thirds of the way it stays crisp at the place it comes from and its edges move: with an outline it pushes into it, the outline ahead taking the key between it and the fill and the fill behind the outline it leaves the same, the silhouette unchanged (so it works on a game sprite on clear); without one, half a pixel of it spills past its edge ahead over what's painted there. The key: one between the two in a ramp that holds both (the ink ends every ramp), else the palette's color nearest their middle, of the keys the file chose (`pal()`, `use()`); none, nothing changes. Nearer a whole place it's there. In a function, `c.subpixel(dx, dy, () => { ... }, [dirX, dirY])` moves what's drawn in it so. `characters.md` §10, `examples/subpixel.px.js` |
 | `smear: [x, y] \| { from: [x, y], c? }` | `stamp` only: motion blur, the asset's silhouette swept from where it was (`[x, y]` as this stamp's x, y) to here, under it, in one key (`c`, default its lightest color): a dash's trail, a ball crossing in one frame as a capsule. Saint11's smear lasts 2 frames, the first full and light, the second thinner and darker (`PXL help "scenes One-shot effects"`); a blade's arc is `arc()`. Not with `sub`. |
 
 Randomness is seeded from the placement position + `seed`, so builds are reproducible and moving
@@ -394,6 +394,11 @@ node <pxl>/bin/pxl.js blind <file> <name...> [--out DIR]   |   blind <file> --ch
 node <pxl>/bin/pxl.js study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--px N] [--out DIR | --no-out]
 ```
 
+`build --share N` also writes `out/share/`: each asset N times bigger, nearest neighbour, clear kept,
+no checker or grid, a GIF when it moves: to post. `shot` writes `<name>_look.png` when its check has
+LOOK lines (the pixels they name ringed: L-corners orange, jaggies blue), and a clip's note gives each
+shown frame's ms.
+
 `shot` is the look while iterating: the asset built at those frames (side by side, cropped to the
 region, enlarged to about 600k px, at most 16x and 1568 px on the longer side), what changed since the last shot of the same frames and region
 (pixels, and the box around them in the asset's coordinates; for one asset and one region), and the
@@ -408,7 +413,8 @@ one leaves no room for the rest. `--vs <rev | file>` puts the same shot of anoth
 name, one region; at a git revision, the file and the art files it includes as they were there); `--diff` with it adds a row with the pixels that changed, in red. `check` makes every check `describe` can warn on, on every scene
 and rig of a file at every frame (exit 1 on a warning), and lists as LOOK lines (not warnings: a
 corner is often meant) the L-corners and jaggies in the 1 px lines of every sprite and part drawn by
-hand (grid strings, `grid()`, `runs()`; not variants or `outline8`); `--readings` also lists what the lit-side
+hand (grid strings, `grid()`, `runs()`; not variants or `outline8`, nor a line whose steps are nearly
+all L's: drawn square on purpose), and tones side by side too close to tell apart; `--readings` also lists what the lit-side
 rule read on every placement, warning or not, with a tally. A `build` of a
 whole file with more than 12 assets prints how many of each kind it wrote; `--list` or `--only`
 print a line each (a smaller file prints them anyway).
@@ -424,6 +430,12 @@ from its text, without the assets its loops make. `help` prints the
 rows that define a name in full, one line for each other place that mentions it and a few uses in the
 examples (`--all`: everything in full); a guide's name with numbers or words of a heading prints those
 sections.
+
+`study --at x,y,w,h` reads a region, in the drawing's own pixels (as `shot`'s and the places study
+prints are); on a clip it also follows what moves in it (THE REGION: the colors rare in it, where they
+come and go, their box every frame in the whole picture's pixels, the spacing and squash; an effect
+played once, where it flashes, peaks and fades). Timing is said per drawing ("on twos" when each is held
+alike). `--no-out` prints the text only; `--px N` gives the pixel size when the grid found is wrong.
 
 `study` learns from finished art or a reference (a PNG, a GIF, a JPEG or WebP, a video): a report of
 what it is made of, with what to use in pxl to make the same (palette, `outline`/`selout`, `dither`,

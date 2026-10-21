@@ -233,7 +233,8 @@ and fix dither and shading. Upscaled, round off the big square blocks and redraw
   radius of 4 px and less) collect both; look there first.
 - `line()`, `curve()`, `wire()` and `outline` draw clean lines; grids and `runs` are as clean as you
   write them: `PXL check` and `PXL shot` list both faults with their positions (`PXL study` does the
-  same on any picture).
+  same on any picture). A line whose steps are nearly all L's reads as drawn square, a style: no LOOK
+  line for it.
 - **Square lines,** every step joined by an L, are a style: chunkier, a 1 px line reads about 1.5 px.
   `outline8` draws an outline so; draw the inner lines the same way.
 - **Inner lines take color.** Keep the near-black for the silhouette and where very different forms
@@ -558,7 +559,7 @@ frame: it lands sooner and hits harder.
 | Walk | 12 at 100 ms; at 6, keep contact, lowest and passing for each leg at 200 ms each, so it stays 1.2 s; the lowest 2 frames after contact |
 | Run | 8 at 160 ms or 16 at 80: the same 1.28 s stride; dust at contact 2–3 frames |
 | Top-down walk | 6 poses at 200 ms, the second half the first flipped; the head drops 0, 1, 2 px seen from the front (popping back at the flip), 0, 1, 1 from behind, 0, 2, 1 from the side; the arm on the forward leg's side swings back |
-| Top-down run | 2 drawings and their flips at 100 ms; the legs held 3 frames airborne and 2 at the lowest (`frame({ hold })`) while hair and clothes keep moving |
+| Top-down run | 2 drawings and their flips at 100 ms; the legs held 3 frames airborne and 2 at the lowest while hair and clothes keep moving (the legs' drawing picked by a slower count than `c.frame`, the hair by `c.frame`; `frame({ hold })` would hold everything) |
 | Four legs | 8 at 100 ms, a foot down every 2 (back right, front right, back left, front left) |
 | Wings, hovering | 7 at 80 ms: falling 1 px a frame for 3 (wings rising), the flap up 3 px then 1 (wings down, almost touching), 1 down; after ~10 flaps a glide that moves below a pixel (`sub`); an insect's 3-frame loop doubles its wings as a blur |
 | Ghost float | 0, 1, 2, 2, 1, 0 px over 6 frames (a sine with its ends held); a hologram doesn't bob: it flickers between two brightnesses on alternate frames, a scan band running over it now and then |

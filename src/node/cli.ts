@@ -67,7 +67,9 @@ const USAGE = `pxl — pixel-art DSL
       warnings only, one line each. An animated scene is checked at every frame of its loop, each
       distinct placement once, and a warning says at which frames (--frame N: that one only). Exits 1
       when there is any. LOOK lines, which don't fail it: the L-corners and jaggies in the 1 px
-      lines of every sprite drawn by hand (grids, runs()), a doubled step or a corner the shape has. --readings also lists what the lit-side rule read on every placement,
+      lines of every sprite drawn by hand (grids, runs()), a doubled step or a corner the shape has
+      (a line whose steps are nearly all L's is drawn square on purpose: none), and tones side by side
+      too close to tell apart. --readings also lists what the lit-side rule read on every placement,
       warning or not, with a tally: to see where it agrees and where it can't tell.
   pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
   pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--out DIR]

@@ -19,6 +19,7 @@ declare global {
     frame?: number; delay?: number; rdelay?: boolean;
     /** stamp only: x, y between pixels (subpixel); [dx, dy] the way it moves (1 right/down, -1 left/up). */
     sub?: boolean | [number, number];
+    /** stamp only: motion blur, the silhouette swept from where it was ([x, y]) to here, under it, in one key (default its lightest). */
     smear?: [number, number] | { from: [number, number]; c?: PxColor };
     /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
     silhouette?: PxColor;

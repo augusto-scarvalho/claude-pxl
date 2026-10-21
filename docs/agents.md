@@ -138,7 +138,7 @@ Pass the prompt on stdin: `--add-dir` takes several values and would swallow it.
   checkerboard is transparent); an animation also has `<name>_onion.png`, its motion and onion skin.
 - **Ask for the check.** `pxl check` lists every warning with the frames it happens at: a scene's
   facing, feet and light. Below them, LOOK lines point at doubled steps and jaggies in the lines of
-  sprites drawn by hand: a doubled step on a smooth line is a slip, a corner the shape has (a tyre, a
+  sprites drawn by hand, and at tones side by side too close to tell apart: a doubled step on a smooth line is a slip, a corner the shape has (a tyre, a
   roof) is meant, so they don't fail the check; `pxl shot` rings those pixels in `<name>_look.png`.
   Its last line says which rules ran: "no warnings" with "not run: lit side" means the light was
   never checked (the scene has to say where its light is). Ask the agent to fix each warning or say

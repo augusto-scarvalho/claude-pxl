@@ -128,7 +128,7 @@ build overwrites it); `--every 3` keeps one frame in three in the preview GIFs o
 | the exact pixels as text | `pxl ascii art.px.js slime` |
 | know what is where in a scene, what covers what | `pxl describe art.px.js meadow` (`--brief` when busy) |
 | find which line painted a pixel | `pxl steps art.px.js slime --at 3,2` |
-| check before calling it done | `pxl check art.px.js` (a scene's facing, feet on the ground and lit side at every frame; and, to look at, the lines of sprites drawn by hand; `pxl shot` rings those pixels in `<name>_look.png`) |
+| check before calling it done | `pxl check art.px.js` (a scene's facing, feet on the ground and lit side at every frame; and, to look at, the lines and near-identical tones of sprites drawn by hand; `pxl shot` rings those pixels in `<name>_look.png`) |
 | post it | `pxl build art.px.js --share 4`: every asset 4 times bigger in `out/share/`, clean, a GIF when it moves |
 | get around a long file | `pxl list art.px.js` (each definition's line range and comment) |
 | look up an op or option | `pxl help <name>`; `pxl help` alone for the index |
