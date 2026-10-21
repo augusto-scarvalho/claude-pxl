@@ -33,6 +33,11 @@ the top of the head to the soles.
   0.85–1.4 with the arms.
 - **Chibi height:** below the chin, the body is about 1.3–1.6 head heights. The hands end at the
   hips, and the legs are about 1/4 to 1/3 of the height.
+- **Very low resolution, 16 px and under** (Saint11): drop the outline first (it costs 2 px of
+  width; contrasting solid shapes carry the silhouette), keep 2–4 features that say who it is (a
+  beard, a scarf, a 1 px lean for the posture), one light and few contrasting colors, 90° corners
+  and a pixel's corner for a point, nothing loose near the face. A subject that won't fit is
+  cropped: the dragon's head breathing fire, not the whole dragon.
 
 ## 2. Measure a reference before drawing
 
@@ -131,6 +136,11 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
    anything that sticks out: the head on the neck, a sash on the robe, sleeves on the sides, a hem
    on the legs.
 3. **Clothes.** Add them one piece at a time. The face goes last.
+4. **Drop the lines the shading draws** (Pedro Medeiros). Once the forms are shaded, delete each
+   inner line whose edge a shadow already makes (a muscle, the jaw); keep the silhouette, the eyes
+   and the darkest pockets. Lines plus shading is a step on the way, not the finish.
+5. **Clean up last:** lone pixels, L-corners and jaggies (§7), then anti-aliasing. `PXL study` on
+   the built PNG names the corners and jaggies with their positions.
 
 ## 5. Faces
 
@@ -197,6 +207,37 @@ sprite("hero", { w: 62, h: 62, outline: "k" }, grid(18, 0, HEAD), runs(BODY))
 
 Look at the result at 1× too. Something that reads as cute at 12× can turn to mush at its real size.
 
+**Lines** (Pedro Medeiros, Saint11):
+
+- **No L-corners.** A 1 px line steps diagonally, its pixels touching at the corners. The elbow of
+  three pixels in an L doubles it there: delete it, unless the shape has a corner there.
+
+  ```
+  ###.....      ##......
+  ..####..  ->  ..###...
+  .....###      .....###
+  ```
+- **Runs in order.** Straight lines read clean at 1:1, 2:1 and 3:1 (every run the same); between,
+  alternate n and n+1 evenly (2 3 2 3). A curve's runs grow or shrink steadily, 1 1 2 3 4 into the
+  flat, never 2 1 3. Fixing corners can leave jaggies: corners first, then runs. Tight curves (a
+  radius of 4 px and less) collect both; look there first.
+- `line()`, `curve()`, `wire()` and `outline` draw clean lines; grids and `runs` are as clean as you
+  write them. `PXL study` on the built PNG lists both faults with their positions.
+- **Square lines,** every step joined by an L, are a style: chunkier, a 1 px line reads about 1.5 px.
+  `outline8` draws an outline so; draw the inner lines the same way.
+- **Inner lines take color.** Keep the near-black for the silhouette and where very different forms
+  meet (chin on neck, collar on hair). Inside, a line takes the darkest tone of the ramp it borders:
+  still the darkest value there, only the hue moves (`selout` does it for the outline). A soft
+  crease (a nose, a cheek) is a mid shadow and shorter; lips are a dark shape with no frame. A rim
+  light is a 1 px line just inside the outline, never over it.
+- **Anti-aliasing:** a tone between the line's and its neighbor's (value matters, hue hardly). Only
+  on steps of 2 px and more: a strip about half the step's length, at its end (a 4 px step takes
+  2 px). None on 1:1 diagonals or straight lines, and none on the silhouette against clear (it
+  shows as a halo on any other ground). Too much reads as blur. On a curving outline, one shadow
+  tone in the inside elbow of a step softens it; sparingly.
+- **Clusters:** no 1 px islands of a color inside a form; make the detail a small shape (1×2, a
+  diagonal pair, 2×2, an L). A lone pixel is for a point of light, a particle, AA or texture.
+
 ## 8. The same character, someone else
 
 To turn a character into another person (another people, age or job), keep the head, face and
@@ -243,6 +284,10 @@ offset points back to, so nothing tears open and no color is made up.
   stretching the hair a pixel only when the body rose read as a twitch (the ends must lag both ways),
   and four drawn hair poses swapped per frame still read as stepping, not swinging.
 
+- **Four legs walking** (Saint11): two biped cycles a little out of step, the front pair ahead and
+  the head trailing it by a frame. Each leg goes contact, drag (back along the ground), rise,
+  forward, the front paw snapping forward at the end; in a trot a foot lands every 2 frames.
+
 ## 10. Animating with parts
 
 How a previous studio pipeline (Smack Studio rigs, Warp pin meshes, mocap guides) got to animation
@@ -277,6 +322,23 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   that swings an axe round a body that stays in profile reads as a puppet. Posed as a skeleton in 3D
   and turned about its upright, the views come by themselves (`examples/rig/warden.px.js`: the head
   drawn in five views, picked by the turn).
+- **Timing an action** (Saint11): anticipation, strike, overshoot, recovery. The anticipation coils
+  the other way and holds longest; the strike is 1–2 frames, the first already at full reach with its
+  smear; the overshoot passes the end pose; the recovery is the longest part and takes another arc.
+  A player's own attack drops the anticipation (it reads as input lag): about 3 frames out and 4
+  back, the last passing idle by a pixel. A hit: one frame frozen before it, then one strong frame.
+- **Squash and stretch keep the area:** 2 px flatter is about 2 px wider, and stiff parts don't
+  deform. Squash on contact and in the anticipation (against the coming move), stretch on the
+  fastest frames. A bounce's spacing shrinks toward the top, 4, 3, 2, 1 px a frame, holds a frame
+  and comes back. Redraw those frames (or `warp` them), never scale them.
+- **A 2-frame idle** works when its down frame is a squash: the knees bend and the arms open, so the
+  body widens as much as it drops (a plain one-pixel bob doesn't; see the next point).
+- **Walk and run key poses** (Saint11): a walk goes contact, down (lowest, just after contact, the
+  arms widest), passing, up (highest); 6 frames at low resolution, 12 for fluid; the arms swing
+  against the legs and the planted foot moves back every frame. A run step is 4 poses: airborne
+  (highest), fall, contact on a straight front leg, recover (lowest). Top-down, a front or back walk
+  is half the cycle and the same half flipped (`flip: "x"`), redrawing only what isn't symmetric,
+  with less bob walking up.
 - **Subpixel: less than a pixel of motion** (after ApplefatGOV's How-to-subpixel and 2D Will Never
   Die's: "animate the anti-aliasing"). An idle doesn't need the whole body to drop a pixel (the
   tutorial's is a fighting stance in its beat, a boxer finding his rhythm, about a second a sway; a

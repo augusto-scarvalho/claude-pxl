@@ -109,6 +109,9 @@ of and what to use in pxl to make the same.
   - The pixel grid of an upscale (exact, blurred, or scaled by a fraction), read at 1×.
   - Palette and ramps with their hue shifts.
   - Outlines against the clear, dithering, anti-aliasing, clusters, banding, pillow shading.
+  - A line's faults, after Pedro Medeiros and Saint11: L-corners (a doubled step) and jaggies (runs out
+    of order), with positions, or the lines named as drawn square. Near-twin colors and ramp steps too
+    close to read. Lone pixels counted without a dither's or anti-aliasing's.
   - The light's direction off the rim (after Johnson and Farid), tiles, values, color temperature.
   - A photo or painting translated by superpixels into a small picture to draw over.
 - **Perspective:** straight edges (LSD) and where they meet: one, two or three vanishing points, with
@@ -201,6 +204,10 @@ Every change was made by Claude while drawing real scenes, and reviewed by a per
 - **Measured agent runs:** fresh agents were given only the skill and timed. A 320×180 animated street
   took one agent 85 turns and 31 minutes. A planner with eight forked agents made a denser street for
   about five times the tokens and twice the time. The skill now asks which to use on a big scene.
+- **Tutorials read:** 31 saved pages (Saint11, Pedro Medeiros, Pixel Joint, the subpixel threads) gave
+  the outline push for subpixel motion, the line, palette and cluster readings in study, a pixel-perfect
+  `wire()` (study found its doubled steps) and the lessons on lines, anti-aliasing, timing an action,
+  very low resolution and one-shot effects in the guides.
 - **Docs checked against the code:** four full reviews of the written skill, every tool and option
   tried, with fixes where the docs and the code disagreed.
 - **Calibration against the source:** for `pxl study`, the gallery scenes' own code is the ground truth

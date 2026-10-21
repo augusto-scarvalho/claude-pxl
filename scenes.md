@@ -34,7 +34,9 @@ look at (`--frames 0-11` for some).
   scene, give its place instead, `light: { at: [x, y] }` (the flames' middle): each object is then
   checked against the way from it to the fire, so what stands on either side of it can be right.
 - What stands on the ground goes in a `sort: "y"` layer, so the lower (nearer) thing draws in front.
-  Give props `pivot: "bottom"` and stamp them at the ground's y.
+  Give props `pivot: "bottom"` and stamp them at the ground's y. Top-down, something floating or
+  hanging sorts at the point on the ground under it (its pivot there), and an L-shaped or tall thing
+  is cut into pieces, each sorted on its own base.
 - Figures need a few px of air to read. `PXL describe <file> <scene>` gives the gap between objects
   (`nearest: witch 3px left`); two figures at 1 px read as one shape.
 
@@ -64,7 +66,11 @@ dots. Every mark needs a cause you could name, where that cause would put it:
 
 Flat color is fine; a clean wall beats a dotted one. `noise` is for granular materials (gravel,
 sand, asphalt, rough stone), sparse. `dither` over a whole area reads as a checkerboard: use it where
-two tones meet. On faces drawn at an angle (3/4), marks follow the face's slant.
+two tones meet, between neighbors in a ramp. On faces drawn at an angle (3/4), marks follow the
+face's slant. Draw a texture's marks first, then shade them with the form: they fade into the
+shadow and are sharpest where the light turns (in the Pixel Joint texture thread, an ice cream lost
+half its colors and gained volume so). Detail the borders of a mass (foliage, a rock's rim) and keep
+its inside calm.
 
 ## Trees and big organic shapes
 
@@ -110,6 +116,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - Detail far things before veiling them (a hill with woods, fields and a road reads as a place; a
   flat shape stays flat under any haze), and keep them visible: a castle hidden behind the
   foreground's tents is wasted; open a gap in the foreground for it.
+- Farther planes also take less saturation and fewer colors (Saint11: a sky in 2, the far
+  background in 3), the near props the most saturated and contrasted. Indoors too: a muted room, a
+  saturated thing in it.
 - Ranges in palette steps rather than a veil: each farther range lighter and nearer the sky's color,
   with less detail (the far one plain in the haze, the near one dark with the forest's crowns on
   it). A range whose strip ends sharp reads as a cutout: let each run out of the picture, or come
@@ -276,6 +285,21 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   read only by the outline. Give them light (a lamp, a mirror ball), a rim on the side facing the
   moon, or an `emit` key.
 - Flat art gets its volume back with `relight()`.
+
+## One-shot effects (explosions, sparks, hits)
+
+From Saint11's effect lessons; each one an `anim` played once, stamped where it happens:
+
+- **An explosion:** a dark contrast frame, then a white flash (`silhouette: "w"` of the blast's
+  shape), then a sharp blast with no noise; the fire fades fast and the smoke slowly, over 4 frames
+  and more, its middle hottest.
+- **Particles** (sparks, debris, magic) start fast and slow down, shrinking and darkening; they start
+  pointed and joined, and break into lone pixels only on the last frames. Keep one piece the eye can
+  follow.
+- **Electricity** alternates with blank frames, a new sharp bolt each time, gone fast; sparks last 3
+  frames. **Fire:** a new wave every 2–3 frames, bright at the base. **Smoke:** one puff at a time.
+- **A bullet or bolt:** a warm bright core with cool edges, stretched along its way.
+- **A hit:** the first frame strongest; a small enemy squashes and flashes (`recolor({ "*": "w" })`).
 
 ## Blend modes leave the palette
 

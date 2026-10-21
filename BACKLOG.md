@@ -602,3 +602,28 @@ one), and the art code itself (4% of the cost).
   own (a function to `[col, row, depth]`), `light` a direction or a function of the face; per material
   `ramp`, `edge`, `top`, `smooth`, `bias`, `dither`, `texture` (the cloth's weave). The cockpit and the
   wheel use it, pixel for pixel the same (0 px changed over four frames of the race).
+
+## From the tutorials (Saint11, Pedro Medeiros, Pixel Joint, the subpixel threads)
+
+Shipped from them: `stamp`'s `sub` and `c.subpixel` (the outline push), study's subpixel reading,
+near-twin colors and ramp steps too close, a line's L-corners and jaggies, lone pixels without a
+dither's or AA's, `wire()` drawn pixel-perfect, `--scale` whole numbers only, a ramp going the
+wrong way warned, and the lessons in characters §1, §4, §7, §9, §10 and scenes.md. Still open:
+
+- [ ] **`aa` on an asset**, opt-in: inner edges only, steps of 2 px and more, a strip about half the
+  step long in the in-between key `sub` picks. Hand AA beats automatic AA, so never by default.
+- [ ] **`check` on sprites** for the line faults study finds (L-corners, jaggies in a 1 px line),
+  so a hand grid gets them before it's built; a sprite drawn square (`outline8`) is exempt.
+- [ ] **study: spacing of each moving piece** (from `_pieces.json`): eased, linear, anticipation
+  (back first), overshoot (past its rest and back), holds; and squash and stretch as the box's
+  w×h and its area. For an action, the frames per phase.
+- [ ] **`font(..., { mono: true })`**: every glyph its cell's width, so a score or a timer doesn't
+  jitter as it counts. And one font with lowercase.
+- [ ] **`shades(..., { sat })`**: shadows less saturated, lights more (Saint11's ramps), beside
+  `hue`.
+- [ ] **`palettize` in OKLab** rather than RGB distance, so a reference's darks don't fold into the
+  wrong hue.
+- [ ] **`build --share N`**: one scale for every preview and GIF of a file, so a set shown together
+  matches (Saint11: one base resolution, whole multiples).
+- [ ] **Shading-shift detection** in study: a hue that turns toward the light's color in the lights
+  and away from it in the shadows, named as hue shifting, or its absence ("value only: muddy").

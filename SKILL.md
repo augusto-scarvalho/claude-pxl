@@ -151,7 +151,8 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   mirror → swap → flip → rot → angle → inline/outline (grows 1px) → crop.
 - **Regions** (`where`, `clip(region, ...items)`): `[cx, cy, r]`, `[x, y, w, h]`, a polygon's points,
   or `(x, y) => bool`. Shading: `shade`/`light(region, steps, density)` step colors along the ramps;
-  a second pass, `shade(region, 1, 0.5)`, softens the edge.
+  a second pass, `shade(region, 1, 0.5)`, softens the edge of a round form's shadow (a cast shadow
+  and a flat face's edge stay sharp).
 - **Reuse**: variants are `base` + `swap`; repeated details `_parts` + `stamp`; families a `group` or a
   loop; props get `pivot: "bottom"`; texture is `scatter` of tiny parts; areas are `tilemap`/`pattern`.
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` and functions reading `c.phase`;
@@ -217,7 +218,10 @@ comet_repair --out <scratch dir>`.
 - Small organic shapes (a face, a leaf, an item icon) are grids, pixel by pixel; primitives are for
   structure, large areas and long lines. Never big hand grids.
 - Every mark on a surface needs a cause (seams, weathering, story): no filler `noise` or `dither`.
-- 2–4 shades per material, mnemonic keys (`g`/`G`).
+- 2–4 shades per material, mnemonic keys (`g`/`G`). Light from one side: a flat face is one tone,
+  a round form changes only along its curve, never darker all round its rim (pillow shading).
+- Lines step diagonally, without L-corners, their runs in order (`PXL help "characters 7"`);
+  at 16 px and under, drop the outline.
 - Look with `shot` while iterating; `build` when you need the files.
 
 ## When pxl gets in your way
