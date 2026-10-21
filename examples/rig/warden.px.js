@@ -151,7 +151,7 @@ const THIGH = 10, SHIN = 10, UPPER = 8, FORE = 8, HAFT = 17
 // from the pelvis on the floor; hand: the axe hand from its shoulder, [forward, right, up]; axe: which
 // way the haft points from it (the edge's way is worked out from the motion, below); off: the other hand from its
 // shoulder; smear: draw what the blade swept since the frame before; spark: the chop's hit
-const REST = { look: "calm", yaw: 60, twist: 0, head: 0, lean: 2, crouch: 0, feet: [[-1, -4], [1, 4]], hand: [2, 2, -15], axe: [0.35, 0.15, -1], off: [0, -1, -15] }
+const REST = { look: "calm", yaw: 60, twist: 0, head: 0, lean: 2, crouch: 0, feet: [[-1, -4], [1, 4]], hand: [2, 2, -15], axe: [0.6, 0.15, -1], off: [0, -1, -15] }
 const KEYS = [
   { t: 0, ...REST },
   { t: 2, crouch: 1 },
@@ -293,6 +293,23 @@ const zpaint = (c, sample) => zfill(c, zbuffer(sample))
 const SUN = unit([-0.6, 0.65, 0.45])
 const tone = (n, ramp, bias = 0) => { const l = dot(n, SUN) + bias; return ramp[l > 0.55 ? 3 : l > 0.12 ? 2 : l > -0.3 ? 1 : 0] ?? ramp[ramp.length - 1] }
 
+// a boot's foot on the floor, the way `f` points: from the heel behind the ankle to a round toe, as
+// wide as the ankle, its instep falling from the ankle to the toe cap; its sole a dark band
+const bootFoot = (ankle, f) => zbuffer((emit) => {
+  const r = unit(cross(f, UP)), base = [ankle[0], 0, ankle[2]]
+  for (let u = -1.5; u <= 4.3; u += 0.2) {
+    const toe = u > 2.7 ? Math.sqrt(Math.max(0, 1 - ((u - 2.7) / 1.6) ** 2)) : 1, heel = u < -0.5 ? Math.sqrt(Math.max(0, 1 - ((u + 0.5) / 1) ** 2)) : 1
+    const wid = 1.5 * Math.min(toe, heel), hgt = (u < 0.5 ? 3 : 3 - (u - 0.5) * 0.45) * Math.min(1, 0.35 + toe, 0.35 + heel)
+    const end = u > 2.7 ? (u - 2.7) * 0.9 : u < -0.5 ? (u + 0.5) * 0.9 : 0             // the toe and the heel face out
+    for (let a = 0; a <= Math.PI; a += Math.PI / 16) {
+      const cs = Math.cos(a), sn = Math.sin(a), up = hgt * sn
+      const q = add(base, add(mul(f, u), add(mul(r, wid * cs), mul(UP, up))))
+      const n = unit(add(add(mul(r, cs / Math.max(wid, 0.3)), mul(UP, sn / Math.max(hgt, 0.3))), mul(f, end)))
+      emit(q, up < 0.7 ? "O" : tone(n, "OOob", u > 2.3 ? 0.2 : -0.15))                 // the toe cap catches the light
+    }
+  }
+})
+
 // the tunic from the belt to the shoulders, an ellipse round that turns with the hips at the belt and
 // with the shoulders at the top (the twist between them shows); the belt and its buckle, the coat's
 // front edge with its toggles, and the fur mantle over the shoulders, its lower edge in tufts
@@ -361,12 +378,11 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
     at(mid - 2.5, () => zfill(c, sk, (front) => !front))
     at(mid + 0.6, () => zfill(c, sk, (front) => front))
     // the legs, the far one first, inside the skirt
-    j.legs.forEach((L) => at(mid - 1.5 + 0.01 * depth(L.knee), () => {
+    j.legs.forEach((L, side) => at(mid - 1.5 + 0.01 * depth(L.knee), () => {
       limb(c, L.hip, L.knee, 2.2, 1.9, "Ttt"); limb(c, L.knee, L.ankle, 1.9, 1.7, "Tt")
-      limb(c, lerp(L.knee, L.ankle, 0.45), L.ankle, 2, 1.8, "Oo")
-      const boot = [add(L.ankle, [0, 1, 0]), add(L.toe, [0, -0.5, 0]), add(L.toe, [0, -2, 0]), add(L.ankle, [0, -2, 0])].map((q) => scr(q).map(Math.round))
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) c.poly(boot.flatMap(([x, y]) => [x + dx, y + dy]), "k")
-      c.poly(boot.flat(), "O")
+      limb(c, lerp(L.knee, L.ankle, 0.42), L.ankle, 2.1, 1.9, "OOo")                       // the boot's shaft
+      limb(c, lerp(L.knee, L.ankle, 0.38), lerp(L.knee, L.ankle, 0.5), 2.5, 2.4, "bbn")     // its cuff, turned down
+      zfill(c, bootFoot(L.ankle, unit(add(j.hips.f, mul(j.hips.r, side ? 0.3 : -0.3)))))     // toes turned out a little
     }))
     at(mid, () => torso(c, j, p))
     // the head as it is turned, and the tail of hair swinging behind it
