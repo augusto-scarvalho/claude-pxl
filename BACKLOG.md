@@ -730,7 +730,12 @@ Saint11's, read from his page, and not kept in the repository):
   carries its texture, the edges in its rows meeting again where its step puts them more than where
   they were (the floor's dots stay); and a loop doesn't close when what differs from the clip's
   commonest frame goes one way every step and back at the seam over more than any step ("back 66 px
-  against the way every step went"). The examples' planes and loops read as they did. And Saint11's
+  against the way every step went"). The examples' planes and loops read as they did. Its pieces too:
+  the slime was an action and three lights; a smeared piece is now cut to its drawing as soon as it is
+  taken (not only when it is left over), a track of one frame finds its drawing in the next, and a
+  track all through a short clip (4 or 5 frames) can be carried: "right 24 24 16 2, slowing", smears
+  on frames 1-3. Cutting for one-frame tracks in the first pass too cost the cyberpunk street a car
+  (33 -> 32). And Saint11's
   parallax card's ball (4 px, bouncing, passing behind a tree) breaks into three pieces, at the tree
   and at the bounce (the prediction goes on down; a bounce turns it). Open.
 - [x] **Banding across a 1 px gap**, and 45° runs whose ends step together (Pixel Joint): study's

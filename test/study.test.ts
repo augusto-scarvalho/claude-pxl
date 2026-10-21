@@ -275,6 +275,9 @@ test("study: smeared leaps over a dotted floor aren't a plane going by, nor a lo
   const t = study({ name: "leaps", frames, ms: [800, 100, 100, 100, 100], kind: "test" }).text.join("\n");
   assert.doesNotMatch(t, /Planes going by/);
   assert.match(t, /Loop: the last frame jumps to the first \(back \d+ px against the way every step went\)/);
+  // and it is one thing carried through its smears, all five frames, the smears out of its box
+  assert.match(t, /#1 \S+ at 6,9, in 5 of 5 frames, .*carried along a path.*Smears on frames 1-3/);
+  assert.match(t, /spacing, px a frame: right 24 24 16 2/);
 });
 
 test("study follows a dash that crouches first: its middle shifting back under a pixel isn't going back", () => {
