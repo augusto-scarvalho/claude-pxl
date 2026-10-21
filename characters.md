@@ -140,7 +140,8 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
    inner line whose edge a shadow already makes (a muscle, the jaw); keep the silhouette, the eyes
    and the darkest pockets. Lines plus shading is a step on the way, not the finish.
 5. **Clean up last:** lone pixels, L-corners and jaggies (§7), then anti-aliasing. `PXL check` (and
-   `PXL shot`) names the corners and jaggies of what you drew by hand, with their positions.
+   `PXL shot`) points at the corners and jaggies of what you drew by hand (LOOK lines): delete a
+   doubled step on a smooth line, keep a corner the shape has.
 
 ## 5. Faces
 

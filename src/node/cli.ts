@@ -61,11 +61,11 @@ const USAGE = `pxl — pixel-art DSL
   pxl check <art.px.js> [name...] [--frame N] [--readings]
       Every check describe makes that can warn (facing, front marker, lit side, parallel parts, feet
       on the ground, lettering), on every scene and rig the file defines (not those it includes, or
-      just the named assets), the front marker of any other asset that has one, and the 1 px lines
-      of every sprite drawn by hand (grids, runs(): L-corners and jaggies), from one load: the
+      just the named assets) and the front marker of any other asset that has one, from one load: the
       warnings only, one line each. An animated scene is checked at every frame of its loop, each
       distinct placement once, and a warning says at which frames (--frame N: that one only). Exits 1
-      when there is any. --readings also lists what the lit-side rule read on every placement,
+      when there is any. LOOK lines, which don't fail it: the L-corners and jaggies in the 1 px
+      lines of every sprite drawn by hand (grids, runs()), a doubled step or a corner the shape has. --readings also lists what the lit-side rule read on every placement,
       warning or not, with a tally: to see where it agrees and where it can't tell.
   pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
   pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--out DIR]
@@ -406,8 +406,8 @@ export async function main(argv: string[]): Promise<number> {
       case "check": {
         const p = loadProject(file, { checksOnly: true });
         const r = checkProject(p, { names: a.rest.length ? a.rest : undefined, frame: a.frame, file: basename(file), readings: a.readings });
-        for (const l of r.lines) console.log(l);
-        console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"} (checked ${r.checked}${a.frame ? `, at frame ${a.frame}` : ""})`);
+        for (const l of [...r.lines, ...r.notes]) console.log(l);
+        console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}${r.notes.length ? `, ${r.notes.length} to look at` : ""} (checked ${r.checked}${a.frame ? `, at frame ${a.frame}` : ""})`);
         console.log(r.coverage);
         if (r.readings) console.log(["", "readings (each placement's lit side against world.light, warning or not):", ...r.readings.map((l) => "  " + l), r.tally].join("\n"));
         return r.warnings ? 1 : 0;
@@ -448,7 +448,7 @@ export async function main(argv: string[]): Promise<number> {
           for (const s of many) {
             if (!("file" in s)) continue;
             const p = proj(s.file!), r = checkProject(p, { names: [s.name], frames: framesFor(p, s.name) });
-            for (const l of r.lines) console.log(l);
+            for (const l of [...r.lines, ...r.notes]) console.log(l);
             if (r.warnings || p.assets.get(s.name)?.kind === "scene" || p.rigs.has(s.name))
               console.log(`${s.name}: ${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
           }
@@ -481,7 +481,7 @@ export async function main(argv: string[]): Promise<number> {
         writeFileSync(last + ".last.json", key);
         // what pxl check finds on it at these frames, so a look needs no other call
         const r = checkProject(p, { names: [name], frames });
-        for (const l of r.lines) console.log(l);
+        for (const l of [...r.lines, ...r.notes]) console.log(l);
         if (r.warnings || p.assets.get(name)?.kind === "scene" || p.rigs.has(name))
           console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
         return 0;

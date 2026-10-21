@@ -18,6 +18,8 @@ import { frameTime } from "./shot.ts";
 /** `coverage`: which rules ran and on how many, and those that couldn't (nothing to check them on) */
 export interface CheckResult {
   lines: string[]; warnings: number; checked: string; coverage: string;
+  /** Things to look at, not wrong for sure: a hand-drawn line's L-corners and jaggies (a corner is often meant). No exit code. */
+  notes: string[];
   /** With `readings`: every placement's lit side against the scene's light, warning or not, and a tally (to tune the rule). */
   readings?: string[]; tally?: string;
 }
@@ -38,7 +40,7 @@ const ranges = (fs: number[]) => fs.reduce<[number, number][]>((r, f) => {
  */
 export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string; readings?: boolean } = {}): CheckResult {
   const reads = new Set<string>(), tally = { agree: 0, against: 0, unclear: 0 };
-  const lines: string[] = [];
+  const lines: string[] = [], notes: string[] = [];
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
@@ -70,8 +72,9 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         const ats = (k: "corners" | "jaggies") => [...new Set(fl.flatMap((f) => f[k].map(([x, y]) => `${x},${y}`)))];
         const corners = fl.some((f) => f.corners.length < f.line * 0.1) ? ats("corners") : [], jaggies = ats("jaggies");
         const list = (v: string[]) => `at ${v.slice(0, 4).join("; ")}${v.length > 4 ? "; ..." : ""}`;
-        if (corners.length) lines.push(`${name} › WARNING: ${corners.length} L-corner${corners.length > 1 ? "s" : ""} in its 1 px lines (${list(corners)}): the elbow of three pixels in an L where a line steps doubles it there; delete it, unless the shape turns a corner (PXL help "characters 7")`);
-        if (jaggies.length) lines.push(`${name} › WARNING: ${jaggies.length} jagg${jaggies.length > 1 ? "ies" : "y"} in its 1 px lines (${list(jaggies)}): a run out of order along a line (3 2 4 where 2 3 4 reads smooth); let the runs grow or shrink steadily (PXL help "characters 7")`);
+        // (a note, not a warning: a tyre's corner, a roof's, a wingtip are L-corners meant as one)
+        if (corners.length) notes.push(`${name} › LOOK: ${corners.length} L-corner${corners.length > 1 ? "s" : ""} in its 1 px lines (${list(corners)}): where a smooth line steps, the elbow of three pixels in an L doubles it; delete that one. A corner the shape has (a tyre, a roof, a tip) stays (PXL help "characters 7")`);
+        if (jaggies.length) notes.push(`${name} › LOOK: ${jaggies.length} jagg${jaggies.length > 1 ? "ies" : "y"} in its 1 px lines (${list(jaggies)}): a run out of order along a curve (3 2 4 where 2 3 4 reads smooth); unless the shape bumps there, let the runs grow or shrink steadily (PXL help "characters 7")`);
       }
       if (!img.sockets?.front) continue;
       others++;
@@ -142,7 +145,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.lines) run.push(`lines on ${ran.lines}`);
   if (rigs) run.push(`rig parts ${ran.parts}`);
   const readings = opts.readings ? { readings: [...reads], tally: `${tally.agree + tally.against + tally.unclear} placements read: ${tally.agree} lit as their light, ${tally.against} against it, ${tally.unclear} with no side to tell` } : {};
-  return { ...readings, lines, warnings: lines.length,
+  return { ...readings, lines, notes, warnings: lines.length,
     coverage: `ran: ${run.join(", ") || "nothing"}${not.length ? `; not run: ${not.join(", ")}` : ""}`,
     checked: `${n(scenes, "scene")} (${n(frames, "frame")}, ${n(distinct, "distinct placement")}), ${n(rigs, "rig")}, ${n(others, "other asset")} with a front marker` };
 }

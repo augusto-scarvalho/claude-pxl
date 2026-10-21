@@ -616,8 +616,10 @@ wrong way warned, and the lessons in characters §1, §4, §7, §9, §10 and sce
 - [x] **`check` on sprites** for the line faults study finds (L-corners, jaggies in a 1 px line),
   so a hand grid gets them before it's built; a sprite drawn square (`outline8`) is exempt. Only
   sprites drawn by hand (a grid string, `grid()`, `runs()`; not variants, not parts): the knight's
-  posed parts and the big pictures made as anims gave 1000s of warnings that said nothing. Over every
-  example, one: the bromeliad's outline going into a notch between leaves, kept.
+  posed parts and the big pictures made as anims gave 1000s of warnings that said nothing. Parts too,
+  after an audit (faces and leaves are parts). Then over the examples nearly every one was a corner
+  meant (a tyre, a van's roof, a wingtip, an outline into a notch), and the skill says fix every
+  warning: they are LOOK lines now, not warnings, and don't fail the check.
 - [x] **study: spacing of each moving piece** (from `_pieces.json`): eased, linear, anticipation
   (back first), overshoot (past its rest and back), holds; and squash and stretch as the box's
   w×h and its area. For an action, the frames per phase. Done for things carried (4 drawings at

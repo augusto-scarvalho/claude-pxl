@@ -51,9 +51,10 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    the time went, in your file and in pxl.
 5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
    rig of the file and every frame of an animated scene (a picture made as an `anim()` gets none of
-   those), and the 1 px lines of every sprite and part drawn by hand (grid strings, `grid()`,
-   `runs()`; not variants or `outline8`): L-corners, jaggies. Warnings only, with the frames they
-   happen at. Fix each or say why it's meant. Its last
+   those): warnings only, with the frames they happen at. Fix each or say why it's meant. It also
+   lists, as LOOK lines that don't fail it, the L-corners and jaggies in the 1 px lines of every
+   sprite and part drawn by hand: look at each, delete a doubled step on a smooth line, keep a corner
+   the shape has (a tyre, a roof, a wingtip). Its last
    line says which rules ran: a rule runs only where the art says what it needs (`world.light`,
    `world.ground`, `height`, a `front` socket), so "no warnings" with "not run: lit side" checked
    nothing about the light (a scene lit by a fire or a lamp: `world: { light: { at: [x, y] } }`).

@@ -405,9 +405,9 @@ and more than 12 frames go on in rows of 12: a reference's whole animation on on
 Give PNGs at 1× (`out/scenes/x.png`, not an enlarged `_shot`): rows are enlarged together, so a big
 one leaves no room for the rest. `--vs <rev | file>` puts the same shot of another version above (one
 name, one region; at a git revision, the file and the art files it includes as they were there); `--diff` with it adds a row with the pixels that changed, in red. `check` makes every check `describe` can warn on, on every scene
-and rig of a file at every frame, and reads the 1 px lines of every sprite and part drawn by hand
-(grid strings, `grid()`, `runs()`; not variants or `outline8`) for L-corners and jaggies (exit 1 on
-a warning); `--readings` also lists what the lit-side
+and rig of a file at every frame (exit 1 on a warning), and lists as LOOK lines (not warnings: a
+corner is often meant) the L-corners and jaggies in the 1 px lines of every sprite and part drawn by
+hand (grid strings, `grid()`, `runs()`; not variants or `outline8`); `--readings` also lists what the lit-side
 rule read on every placement, warning or not, with a tally. A `build` of a
 whole file with more than 12 assets prints how many of each kind it wrote; `--list` or `--only`
 print a line each (a smaller file prints them anyway).
