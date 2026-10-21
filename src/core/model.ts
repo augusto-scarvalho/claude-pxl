@@ -259,6 +259,8 @@ export interface PlaceOpts {
    * comes from and its edges move: it pushes into its own outline, or spills over what's painted.
    */
   sub?: boolean | [number, number];
+  /** Motion blur: the silhouette swept from where it was ([x, y], as this stamp's x, y) to here, in one key (default its lightest color), under it. */
+  smear?: [number, number] | { from: [number, number]; c?: string };
 }
 
 export interface ScatterOpts extends PlaceOpts {

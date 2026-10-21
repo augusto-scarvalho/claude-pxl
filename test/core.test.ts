@@ -699,6 +699,13 @@ test("shapes far off the picture cost only the pixels they can reach: a vertex m
   eq(art(PAL + 'sprite("c", { w: 4, h: 2 }, circ(2, 1e6, 1e6 + 1, "w"))', "c"), "wwww\nwwww");
 });
 
+test("stamp smear: the silhouette swept from where it was, in one key under it (its lightest by default)", () => {
+  const P = 'pal({ k: "#1b1630", r: "#e2585e", w: "#fff6e0" }); sprite("dot", "rr\\nrk"); ';
+  assert.equal(art(P + 'sprite("t", { w: 10, h: 2 }, stamp("dot", 6, 0, { smear: { from: [0, 0], c: "w" } }))', "t"), "wwwwwwrr..\nwwwwwwrk..");
+  assert.equal(art(P + 'sprite("t", { w: 10, h: 2 }, stamp("dot", 2, 0, { smear: [6, 0] }))', "t"), "..rrrrrr..\n..rkrrrr..", "from the right, in its lightest color (r)");
+  assert.throws(() => loadSource(P + 'sprite("t", { w: 4, h: 2 }, stamp("dot", 0, 0, { smear: 3 }))', "t.px.js").image("t"), /smear is \[x, y\] where it was/);
+});
+
 test("aa: a strip half the step long on the lighter side, in the key between; none on a 1:1 step, against the clear, or without a key between", () => {
   const P = 'pal({ k: "#1b1630", K: "#6a5a7c", w: "#e8dcc0", r: "#c83a3a" }); ramps("kKw"); ';
   // a 4 px step of light over dark: its first 2 px take the key between

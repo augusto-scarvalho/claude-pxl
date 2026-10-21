@@ -889,7 +889,36 @@ export class Canvas {
     const sub = opts?.sub;
     if (sub !== undefined && sub !== true && sub !== false && !(Array.isArray(sub) && sub.length === 2 && sub.every(Number.isFinite)))
       throw new PxError(`sub is true, or [dx, dy] the way the part moves (1 right / down, -1 left / up), got ${JSON.stringify(sub)}`);
+    if (opts?.smear !== undefined) {
+      if (sub) throw new PxError("smear and sub don't go together: a smear is a move of more than a pixel");
+      return this.place(this.smeared(src, opts.smear, x, y), x, y, [0, 0], undefined, opts?.z, name);
+    }
     this.place(src, x, y, [0, 0], undefined, opts?.z, name, sub ? (Array.isArray(sub) ? (sub as [number, number]) : [1, 1]) : undefined);
+  }
+
+  /**
+   * `src` with its smear under it (Saint11's motion blur: the silhouette swept from where it was to where
+   * it is, in one light key), as one image whose pivot stays on `src`'s, so a sorted layer orders it as one.
+   */
+  private smeared(src: Img, smear: unknown, x: number, y: number): Img {
+    const spec = Array.isArray(smear) ? { from: smear } : smear as { from?: unknown; c?: unknown };
+    const from = spec?.from;
+    if (!(Array.isArray(from) && from.length === 2 && from.every(Number.isFinite)) || (spec.c !== undefined && typeof spec.c !== "string"))
+      throw new PxError(`smear is [x, y] where it was (as the stamp's x, y), or { from: [x, y], c: "key" }, got ${JSON.stringify(smear)}`);
+    const dx = Math.round(from[0] - x), dy = Math.round(from[1] - y);
+    // the key: the one given, else the sprite's lightest color
+    let col: Color | null = spec.c !== undefined ? this.color(spec.c as string) : null;
+    if (col === null) for (const c of src.data) if ((c & 255) >= 128 && (col === null || oklab(c)[0] > oklab(col)[0])) col = c;
+    const cx = Math.max(0, -dx), cy = Math.max(0, -dy), out = new Img(src.w + Math.abs(dx), src.h + Math.abs(dy));
+    const n = Math.max(1, 2 * Math.max(Math.abs(dx), Math.abs(dy)));
+    for (let s = 0; s <= n; s++) {
+      const ox = cx + Math.round((dx * (n - s)) / n), oy = cy + Math.round((dy * (n - s)) / n);
+      for (let j = 0; j < src.h; j++) for (let i = 0; i < src.w; i++) if ((src.data[j * src.w + i] & 255) >= 128) out.data[(oy + j) * out.w + ox + i] = col!;
+    }
+    for (let j = 0; j < src.h; j++) for (let i = 0; i < src.w; i++) { const c = src.data[j * src.w + i]; if ((c & 255) >= 128) out.data[(cy + j) * out.w + cx + i] = c; }
+    const [px, py] = src.pivot ?? [0, 0];
+    out.pivot = [px + cx, py + cy];
+    return out;
   }
 
   /**

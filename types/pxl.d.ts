@@ -19,6 +19,7 @@ declare global {
     frame?: number; delay?: number; rdelay?: boolean;
     /** stamp only: x, y between pixels (subpixel); [dx, dy] the way it moves (1 right/down, -1 left/up). */
     sub?: boolean | [number, number];
+    smear?: [number, number] | { from: [number, number]; c?: PxColor };
     /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
     silhouette?: PxColor;
     /** Lay the asset flat on the ground as its cast shadow: a pixel h above the base lands h * [kx, ky] away. */
