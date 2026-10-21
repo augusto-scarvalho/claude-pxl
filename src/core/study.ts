@@ -400,8 +400,17 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
     return x1 < 0 ? 0 : Math.max(x1 - x0, y1 - y0) + 1;
   };
   const spans = L.slice(1).map((l, i) => span(L[i], l)).filter((v) => v > 0).sort((a, b) => a - b), wide = spans[Math.floor(spans.length * 0.9)] ?? 0;
-  const seam = frameDiff(L[n - 1], L[0]), much = seam <= Math.max(2 * med, 0.002), far = span(L[n - 1], L[0]), near = far <= Math.max(8, 1.5 * wide), loops = much && near;
-  lines.push(`  Loop: ${loops ? "the last frame runs into the first (a loop that closes)" : `the last frame jumps to the first (${!much ? `${(seam / (med || 1e-9)).toFixed(1)}x a usual step` : `across ${far} px, where a usual step spans ${wide}`}): not a closed loop, or a clip from a longer one`}.`);
+  // (nor back against the way it went: what differs from the clip's commonest frame going one way every
+  // step, then back over more than any step at the seam, a dash whose smears make every step as wide)
+  const S = Array.from({ length: Math.min(n, 16) }, (_, i) => Math.floor((i * n) / Math.min(n, 16))), usual = new Float32Array(W * H), col = new Float32Array(S.length);
+  for (let p = 0; p < W * H; p++) { S.forEach((t, i) => (col[i] = L[t][p])); col.sort(); usual[p] = col[col.length >> 1]; }
+  const mids = L.map((l) => { let sx = 0, sy = 0, c = 0; for (let p = 0; p < W * H; p++) if (Math.abs(l[p] - usual[p]) > 0.02) { sx += p % W; sy += Math.floor(p / W); c++; } return c ? [sx / c, sy / c] : null; });
+  const step = (a: number[] | null, b: number[] | null) => (a && b ? [b[0] - a[0], b[1] - a[1]] : null);
+  const steps = mids.slice(1).map((m, i) => step(mids[i], m)), way = steps.reduce<number[]>((s, d) => (d ? [s[0] + d[0], s[1] + d[1]] : s), [0, 0]), wl = Math.hypot(way[0], way[1]) || 1;
+  const along = (d: number[]) => (d[0] * way[0] + d[1] * way[1]) / wl, back = step(mids[n - 1], mids[0]);
+  const oneWay = n >= 3 && steps.every((d) => d && along(d) >= -1) && !!back && along(back) < -Math.max(...steps.map((d) => Math.abs(along(d!))), 4);
+  const seam = frameDiff(L[n - 1], L[0]), much = seam <= Math.max(2 * med, 0.002), far = span(L[n - 1], L[0]), near = far <= Math.max(8, 1.5 * wide), loops = much && near && !oneWay;
+  lines.push(`  Loop: ${loops ? "the last frame runs into the first (a loop that closes)" : `the last frame jumps to the first (${!much ? `${(seam / (med || 1e-9)).toFixed(1)}x a usual step` : !near ? `across ${far} px, where a usual step spans ${wide}` : `back ${Math.round(-along(back!))} px against the way every step went`}): not a closed loop, or a clip from a longer one`}.`);
   // a cycle: the shortest shift after which frames repeat
   let cycle = 0;
   for (let p = 2; p <= Math.min(Math.floor(n / 2), 120) && med > 0; p++) {
@@ -467,7 +476,21 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
     for (let x = 0; x < W; x++) for (let y = b.y0; y < Math.min(H, b.y1); y++) if (Math.abs(L[i][y * W + x] - L[i + 1][y * W + x]) > 0.02) { c++; break; }
     return c / W;
   }));
-  bands = bands.filter((b) => Math.abs(b.v) >= 0.1 && across(b) >= 0.4);
+  // and its texture goes with it: the edges in its rows meet again where the band's step puts them, more
+  // than where they were (a thing going by with a smear over a dotted floor moves as much of the rows,
+  // but the dots stay)
+  const carries = (b: { y0: number; y1: number; v: number }) => median(pairs.filter((i) => i + k < n).map((i) => {
+    const s = Math.round(b.v * k);
+    let at0 = 0, atS = 0;
+    for (let y = b.y0; y < Math.min(H, b.y1); y++) for (let x = Math.max(0, -s); x < Math.min(W - 1, W - s); x++) {
+      const p = y * W + x;
+      if (Math.abs(L[i][p] - L[i][p + 1]) <= 0.02) continue;
+      if (Math.abs(L[i][p] - L[i + k][p]) <= 0.02) at0++;
+      if (Math.abs(L[i][p] - L[i + k][p + s]) <= 0.02) atS++;
+    }
+    return atS - at0;
+  })) > 0;
+  bands = bands.filter((b) => Math.abs(b.v) >= 0.1 && across(b) >= 0.4 && carries(b));
   if (bands.length) {
     const sorted = bands.slice().sort((a, b) => Math.abs(a.v) - Math.abs(b.v));
     lines.push(`  Planes going by (bands of rows carried across together): ${bands.map((b) => `rows ${b.y0}-${b.y1} at ${Math.abs(b.v).toFixed(2)} px/frame ${b.v < 0 ? "left" : "right"} (${(Math.abs(b.v) * fps).toFixed(0)} px/s)`).join("; ")}.${bands.length > 1 ? ` Parallax: ${sorted.length} speeds from ${Math.abs(sorted[0].v).toFixed(2)} to ${Math.abs(sorted[sorted.length - 1].v).toFixed(2)} px/frame, each its own plane, the faster the nearer.` : ""}`);

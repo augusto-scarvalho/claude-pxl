@@ -262,6 +262,21 @@ test("study follows a dash through its leap: 4 px a frame, two strides of 30, th
   assert.match(t, /spacing, px a frame: right 4 4 4 30 30 4 4 4 4 4 4/);
 });
 
+test("study: smeared leaps over a dotted floor aren't a plane going by, nor a loop that closes", () => {
+  // a slime at rest (one frame, as a GIF keeps a hold), three leaps with a smear from where it was, a stop
+  const xs = [6, 30, 54, 70, 72], bg = pack(44, 42, 58), dot = pack(61, 58, 82), cream = pack(255, 246, 224), green = pack(140, 207, 99), ink = pack(27, 22, 48);
+  const frames = xs.map((x, f) => {
+    const img = new Img(96, 24), prev = f ? xs[f - 1] : x;
+    for (let y = 0; y < 24; y++) for (let i = 0; i < 96; i++) img.set(i, y, (i * 7 + y * 3) % 11 === 0 ? dot : bg);
+    if (x - prev > 8) for (let y = 10; y < 16; y++) for (let i = prev; i < x; i++) img.set(i, y, cream);
+    for (let y = 9; y < 16; y++) for (let i = x; i < x + 12; i++) img.set(i, y, i === x || i === x + 11 || y === 9 || y === 15 ? ink : green);
+    return img;
+  });
+  const t = study({ name: "leaps", frames, ms: [800, 100, 100, 100, 100], kind: "test" }).text.join("\n");
+  assert.doesNotMatch(t, /Planes going by/);
+  assert.match(t, /Loop: the last frame jumps to the first \(back \d+ px against the way every step went\)/);
+});
+
 test("study follows a dash that crouches first: its middle shifting back under a pixel isn't going back", () => {
   // Saint11's squash card: standing, crouching (narrower and lower, its middle half a pixel back),
   // stretched along the dash, braking low, standing again
