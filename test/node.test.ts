@@ -707,3 +707,13 @@ anim("blink", { w: 2, h: 1, frames: 2, fps: 4 }, (c) => c.px(c.frame, 0, "g"))`)
   try { await main(["build", file, "--share", "2.5"]); } catch (e) { said.push(String((e as Error).message)); } finally { console.error = err; }
   assert.match(said.join("\n"), /--share is a whole number/);
 });
+
+test("shot: a hand-drawn sprite's LOOK lines, their pixels ringed in <name>_look.png", async () => {
+  const rows = ["kk..............", "..kk............", "....kkk.........", "......kkk.......", ".........kkk....", "............kkkk"];
+  const { dir, file } = tmpArt(`pal({ k: "#1b1630" }); sprite("hand", ${JSON.stringify(rows.join("\n"))})`);
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(String(s));
+  try { await main(["shot", file, "hand"]); } finally { console.log = log; }
+  assert.match(lines.join("\n"), /hand › LOOK: 1 L-corner/);
+  assert.ok(existsSync(join(dir, "out", "_shot", "hand_look.png")));
+});

@@ -1,7 +1,8 @@
 // pxl command line.
 import { basename, dirname, join, resolve } from "node:path";
 import { PxError, wrap } from "../core/errors.ts";
-import { type Color, TRANSPARENT, toHex } from "../core/color.ts";
+import { type Color, TRANSPARENT, pack, toHex } from "../core/color.ts";
+import { lineFlaws } from "../core/vision.ts";
 import { Palette } from "../core/palette.ts";
 import { Img } from "../core/image.ts";
 import { type Snapshot, describe } from "../core/describe.ts";
@@ -75,8 +76,9 @@ const USAGE = `pxl — pixel-art DSL
       shot of another version above it (at a git revision, the file and what it includes as they
       were there); --diff adds a row with the pixels that changed in red. It
       also prints what changed since the last shot of the same frames and region (one asset, one
-      region: pixels, where) and the warnings pxl check finds on the asset at those frames: one call
-      per look. Several names (another file's as other.px.js:name, or any PNG) make a row each, one
+      region: pixels, where) and the warnings pxl check finds on the asset at those frames (its
+      LOOK lines too, the pixels they name ringed in <name>_look.png): one call per look. A clip's
+      note gives each shown frame's ms. Several names (another file's as other.px.js:name, or any PNG) make a row each, one
       under the other, and several --at a column each: two versions, two agents' scenes, details of
       a big one.
       Give PNGs at 1x (out/scenes/x.png): rows are enlarged together.
@@ -240,6 +242,8 @@ function framesFrom(spec: string): number[] {
 }
 // a picture or a clip given to shot instead of an asset: read like study reads it
 const MEDIA = /\.(png|gif|jpe?g|webp|bmp|mp4|webm|mov|mkv|avi)$/i;
+/** 100, 100, 100, 300 -> "100x3, 300": a clip's frame times, as a row of them reads. */
+const runs = (v: number[]) => v.reduce<[number, number][]>((r, x) => { const l = r[r.length - 1]; if (l && l[0] === x) l[1]++; else r.push([x, 1]); return r; }, []).map(([x, k]) => (k > 1 ? `${x}x${k}` : `${x}`)).join(", ");
 /** An art file's name, for what a look keeps for the next one (two files' "meadow" in one out dir). */
 const fileTag = (f: string) => basename(f).replace(/\.(px\.)?[jt]s$/, "").replace(/[^\w.-]/g, "_");
 /** Cells in rows of `cols` at most: a long clip as lines of frames, not one strip. */
@@ -447,7 +451,7 @@ export async function main(argv: string[]): Promise<number> {
             if ("png" in s) {
               const m = readMedia(s.png!), pick = a.allFrames || (!a.frames && m.frames.length > 1) ? m.frames.map((_, i) => i) : (a.frames ?? [0]).filter((f) => f < m.frames.length);
               if (!pick.length) throw new PxError(`${s.png}: it has ${m.frames.length} frame${m.frames.length === 1 ? "" : "s"} (0-${m.frames.length - 1})`);
-              return { ...s, row: wrapRow(pick.map((f) => m.frames[f]), regions), note: m.frames.length > 1 || m.drawnAt ? `${basename(s.png!)}: ${m.kind}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, shown at 1x` : ""}${m.frames.length > 1 ? `, frames ${pick.length === m.frames.length ? `all ${m.frames.length}` : pick.join(",")}` : ""}` : "" };
+              return { ...s, row: wrapRow(pick.map((f) => m.frames[f]), regions), note: m.frames.length > 1 || m.drawnAt ? `${basename(s.png!)}: ${m.kind}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, shown at 1x` : ""}${m.frames.length > 1 ? `, frames ${pick.length === m.frames.length ? `all ${m.frames.length}` : pick.join(",")}, ms ${runs(pick.map((f) => m.ms[f]))}` : ""}` : "" };
             }
             const p = proj(s.file), frames = framesFor(p, s.name);
             return { ...s, row: wrapRow(frames.map((f) => p.build(s.name, 0, frameTime(p, s.name, f)).img), regions), frames };
@@ -495,6 +499,16 @@ export async function main(argv: string[]): Promise<number> {
         // what pxl check finds on it at these frames, so a look needs no other call
         const r = checkProject(p, { names: [name], frames });
         for (const l of [...r.lines, ...r.notes]) console.log(l);
+        // the line faults the LOOK lines name, ringed on the asset (corners orange, jaggies blue)
+        if (r.notes.some((l) => / LOOK: \d+ (L-corner|jagg)/.test(l))) {
+          const img = p.image(name), f = lineFlaws(img), s = Math.max(4, k), out = img.scale(s);
+          const ring = (x: number, y: number, c: Color) => { for (let i = 0; i < s; i++) for (const [u, v] of [[i, 0], [i, s - 1], [0, i], [s - 1, i]]) out.set(x * s + u, y * s + v, c); };
+          for (const [x, y] of f.corners) ring(x, y, pack(255, 140, 20));
+          for (const [x, y] of f.jaggies) ring(x, y, pack(40, 120, 255));
+          const lookPath = base + "_look.png";
+          writePng(lookPath, out);
+          console.log(`-> ${lookPath} (the LOOK lines' pixels ringed: L-corners orange, jaggies blue)`);
+        }
         if (r.warnings || p.assets.get(name)?.kind === "scene" || p.rigs.has(name))
           console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
         return 0;
