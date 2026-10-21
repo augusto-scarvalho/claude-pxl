@@ -262,6 +262,22 @@ test("study follows a dash through its leap: 4 px a frame, two strides of 30, th
   assert.match(t, /spacing, px a frame: right 4 4 4 30 30 4 4 4 4 4 4/);
 });
 
+test("study follows a dash that crouches first: its middle shifting back under a pixel isn't going back", () => {
+  // Saint11's squash card: standing, crouching (narrower and lower, its middle half a pixel back),
+  // stretched along the dash, braking low, standing again
+  const poses: [number, number, number, number][] = [[10, 4, 10, 24], [10, 4, 10, 24], [10, 4, 10, 24], [10, 4, 10, 24], [9, 8, 11, 20], [9, 10, 11, 18], [40, 14, 26, 12], [68, 14, 26, 12], [92, 15, 24, 11], [104, 16, 14, 12], [108, 16, 14, 12], [110, 12, 12, 16], [112, 6, 10, 22], [112, 4, 10, 24]];
+  const bg = pack(30, 70, 140), dk = pack(50, 90, 160), body = pack(240, 120, 40), ink = pack(30, 20, 20);
+  const frames = poses.map(([x, y, w, h]) => {
+    const img = new Img(140, 32);
+    for (let yy = 0; yy < 32; yy++) for (let xx = 0; xx < 140; xx++) img.set(xx, yy, (xx * 5 + yy * 3) % 13 < 2 ? dk : bg);
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) img.set(xx, yy, xx === x || yy === y || xx === x + w - 1 || yy === y + h - 1 ? ink : body);
+    return img;
+  });
+  const t = study({ name: "crouch", frames, ms: frames.map(() => 80), kind: "test" }).text.join("\n");
+  assert.match(t, /#1 \S+ at 9,4, in 14 of 14 frames, .*going right .*carried along a path/);
+  assert.doesNotMatch(t, /#2 /);
+});
+
 test("study follows a thing at rest most of the clip, then leaping: the place it left isn't a light", () => {
   // at rest 7 frames of 12 (the background has it there), on a flat ground and on a dotted one
   for (const dots of [false, true]) {

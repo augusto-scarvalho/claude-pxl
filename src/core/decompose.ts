@@ -160,7 +160,8 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     // (going on the way it went, and not where things come in and leave: a picture's edge)
     const near = (i: number, j: number) => {
       const f = live[i], l = f.comps.at(-1)!, c = cs[j], size = Math.max(l.x1 - l.x0 + 1, l.y1 - l.y0 + 1);
-      const ahead = (c.cx - l.cx) * f.vx + (c.cy - l.cy) * f.vy >= 0, inside = c.x0 > 0 && c.y0 > 0 && c.x1 < W - 1 && c.y1 < H - 1;
+      // (one barely moving, a tenth of its size a frame, a crouch before a leap, has no way to keep)
+      const ahead = Math.hypot(f.vx, f.vy) < Math.max(1, 0.1 * size) || (c.cx - l.cx) * f.vx + (c.cy - l.cy) * f.vy >= 0, inside = c.x0 > 0 && c.y0 > 0 && c.x1 < W - 1 && c.y1 < H - 1;
       return ahead && inside && c.n <= 2 * l.n && l.n <= 2 * c.n && Math.hypot(c.cx - l.cx, c.cy - l.cy) <= Math.max(12, 4 * size);
     };
     for (const i of leftF) {
@@ -224,9 +225,16 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       if (Math.hypot(sx - vx, sy - vy) <= Math.max(1.5, 0.75 * sp)) steady++;
     }
     // (faster than half its size a frame only when it keeps one speed nearly all the way, a ball crossing;
-    // or when it goes one way all along, its speed changing, a dash: speeding up, a leap, braking)
-    let back = 0;
-    for (let i = 1; i < tr.length; i++) if ((tr[i].cx - tr[i - 1].cx) * dx + (tr[i].cy - tr[i - 1].cy) * dy < 0) back++;
+    // or when it goes one way all along, its speed changing, a dash: speeding up, a leap, braking; a
+    // little back before it sets off or once it has arrived, a crouch before the leap, a settling, isn't
+    // going back, when it is found in every frame of its way)
+    let back = 0, gone = 0;
+    const whole = tr.length === tr.at(-1)!.t - tr[0].t + 1;
+    for (let i = 1; i < tr.length; i++) {
+      const s = ((tr[i].cx - tr[i - 1].cx) * dx + (tr[i].cy - tr[i - 1].cy) * dy) / (travel || 1);
+      if (s < 0 && (!whole || (gone > 0.1 * travel && gone < 0.9 * travel) || s < -0.15 * travel)) back++;
+      gone += s;
+    }
     const oneWay = back === 0 && path <= 1.1 * travel;
     if (tr.length >= 6 && travel >= Math.max(8, 0.8 * size) && travel >= 0.6 * path && (sp <= Math.max(2, 0.5 * size) || steady >= 0.9 * (tr.length - 1) || oneWay) && (steady >= 0.7 * (tr.length - 1) || oneWay) && !swung(tr.map((c) => c.pix))) {
       // carried along: one drawing, or changing drawings (the thing cut out by its difference, bottom-centered)
