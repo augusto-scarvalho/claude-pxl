@@ -492,13 +492,16 @@ export function lineFlaws(img: Img): { line: number; corners: [number, number][]
     for (const s of stretches) {
       // the runs at either end may go on past the cut: only the ones between are judged; equal neighbors are one
       const v = s.slice(1, -1).filter((r, i, a) => !i || r.n !== a[i - 1].n);
-      const odd: { r: (typeof run); off: number }[] = [];
+      const odd: { r: (typeof run); off: number; within: boolean }[] = [];
       for (let i = 1; i + 1 < v.length; i++) {
         const a = v[i - 1].n, m = v[i].n, b = v[i + 1].n;
-        if (((m < a && m < b) || (m > a && m > b)) && !(a === b && Math.abs(m - a) === 1)) odd.push({ r: v[i], off: Math.abs(m - (a + b) / 2) });
+        if (!((m < a && m < b) || (m > a && m > b)) || (a === b && Math.abs(m - a) === 1)) continue;
+        // a dip or a bump in a trend that goes on the same way after it (1 2 [1] 3 4)
+        const within = i >= 2 && i + 2 < v.length && Math.sign(a - v[i - 2].n) === Math.sign(v[i + 2].n - b);
+        odd.push({ r: v[i], off: Math.abs(m - (a + b) / 2), within });
       }
-      // the biggest is where an S turns
-      odd.sort((p, q) => q.off - p.off).slice(1).forEach((o) => jaggies.push(o.r.at));
+      // of the others, the biggest is where an S turns
+      odd.sort((p, q) => q.off - p.off).forEach((o, k) => { if (o.within || k > 0) jaggies.push(o.r.at); });
     }
   };
   // from an end, or beside a fork; then what is left, loops

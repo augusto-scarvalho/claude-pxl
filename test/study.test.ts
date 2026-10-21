@@ -148,7 +148,8 @@ test("study reads a 1 px line's flaws: L-corners where it steps, a jaggy where i
   const page = (w: number, h: number) => { const img = new Img(w, h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) img.set(x, y, paper); return img; };
   // a shallow line from its runs, one row each
   const runs = (r: number[]) => { const img = page(r.reduce((s, v) => s + v, 2), r.length + 2); let x = 1; r.forEach((n, y) => { for (let i = 0; i < n; i++) img.set(x++, y + 1, ink); }); return img; };
-  assert.deepEqual(lineFlaws(runs([1, 2, 2, 1, 5, 2, 1, 2, 1])).jaggies, [[6, 4]], "the 1 before the 5");
+  assert.deepEqual(lineFlaws(runs([1, 2, 2, 1, 5, 2, 1, 2, 1])).jaggies, [[7, 5], [6, 4]], "the 5 in a falling trend, the 1 before it");
+  assert.deepEqual(lineFlaws(runs([1, 1, 2, 3, 2, 4, 6, 8])).jaggies, [[8, 5]], "a dip in a rising curve");
   assert.equal(lineFlaws(runs([1, 1, 2, 2, 4, 2, 2, 1, 1])).jaggies.length, 0, "grows and shrinks steadily: an S");
   assert.equal(lineFlaws(runs([2, 3, 2, 3, 2, 3, 2, 3])).jaggies.length, 0, "a straight slope");
   // a diagonal drawn 4-connected: every step doubled

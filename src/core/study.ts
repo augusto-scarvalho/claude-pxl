@@ -102,7 +102,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     text.push(`  Banding (runs of two colors side by side with their ends lined up, marked red on the sheet): ${b.pairs} pair${b.pairs === 1 ? "" : "s"}, ${b.per1000.toFixed(1)} per 1000 px${b.per1000 < 1 ? ": hardly any" : b.per1000 > 6 && b.pairs >= 12 ? ": much (it shows the grid; stagger the ends)" : ""}.`);
     // (in a palette someone chose: a lit scene's blended tones make shapes, not lines)
     const lf = nColors <= 64 ? lineFlaws(picture) : null;
-    if (lf && lf.line >= 30) {
+    if (lf && lf.line >= 20) {
       const at = (v: [number, number][]) => (v.length ? ` (at 1x: ${v.slice(0, 5).map(([x, y]) => `${x},${y}`).join("; ")}${v.length > 5 ? "; ..." : ""})` : "");
       const k = lf.corners.length, j = lf.jaggies.length, square = k >= lf.line * 0.1;
       const corners = square ? `drawn square, ${k} L-corners${at(lf.corners)}: an L at each step, a line that reads thicker and chunkier, a style (outline8 draws an outline so)`
