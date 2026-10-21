@@ -13,6 +13,7 @@ import { areaDown, findGrid, lineFlaws, pixelate } from "../src/core/vision.ts";
 import { latticeHash } from "../src/core/util.ts";
 import { hueShifting, regionLines, spacingWords, study } from "../src/core/study.ts";
 import { loadSource } from "../src/node/load.ts";
+import { smearsOf } from "../src/core/decompose.ts";
 
 // a 1x drawing in a handful of colors: runs of 1-3 px, a different length on each row, so no grid
 const PALETTE = [pack(30, 30, 46), pack(60, 90, 150), pack(110, 160, 220), pack(200, 120, 60), pack(240, 220, 160), pack(70, 140, 70)];
@@ -274,6 +275,21 @@ test("study: an explosion played once over a ground is an effect, not an attack"
   const t = study({ name: "boom", frames, ms: frames.map(() => 80), kind: "test" }).text.join("\n");
   assert.match(t, /#1 19x19 at 21,16, in 8 of 14 frames, .*: changing all over without repeating, or paint that comes and goes/);
   assert.doesNotMatch(t, /an attack/);
+});
+
+test("a smear in the body's own white is told by its shape: thin, there two frames", () => {
+  // a body with a white highlight, and a white crescent beside it on frames 4 and 5
+  const W = 40, H = 30, white = pack(250, 250, 250), body = pack(120, 80, 60), ground = pack(40, 50, 60);
+  const F = Array.from({ length: 10 }, (_, t) => {
+    const img = new Img(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) img.set(x, y, ground);
+    for (let y = 10; y < 22; y++) for (let x = 8; x < 14; x++) img.set(x, y, body);
+    for (let y = 12; y < 15; y++) for (let x = 9; x < 13; x++) img.set(x, y, white);   // its highlight: 12 px of white each frame, so the smear's white isn't a color of its own
+    if (t === 4 || t === 5) for (let a = -70; a <= 70; a += 4) { const r = 12, x = Math.round(11 + r * Math.cos((a * Math.PI) / 180)), y = Math.round(16 + r * Math.sin((a * Math.PI) / 180)); img.set(x, y, white); img.set(x + 1, y, white); }
+    return img;
+  });
+  const fg = F.map((f) => Uint8Array.from(f.data, (c, i) => (c !== F[0].data[i] || (i % W >= 8 && i % W < 14 && Math.floor(i / W) >= 10 && Math.floor(i / W) < 22) ? 1 : 0)));
+  assert.deepEqual(smearsOf(F, { x0: 0, y0: 0, x1: W - 1, y1: H - 1 }, W, fg).smears?.frames, [4, 5]);
 });
 
 test("pixelate keeps an edge where a box average blurs it", () => {

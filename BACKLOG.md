@@ -666,8 +666,10 @@ Saint11's, read from his page, and not kept in the repository):
   stretches. Track the pixels present every frame apart from those that come and go. Tried: the
   middle of its pixels instead of its box's: a smear joined to the body pulls it as much; and the box
   without the colors `smearsOf` finds: it changed nothing on the attack cards, whose smears are in the
-  body's own whites (`smearsOf` asks for colors of their own). What's left is telling a smear by its
-  shape: a thin crescent there one to three frames, beside the part that moves.
+  body's own whites (`smearsOf` asks for colors of their own). Smears are now also told by their
+  shape (thin, there three frames at most): the punch card's on frames 1-2 of each cycle, the slash's
+  on 4-5. Measuring the body without them on those frames changed none of the cards' spacing lines,
+  so it isn't in.
 - [x] **Effects as effects**: an explosion (dark, white, blast, fade) read as an attack with an
   anticipation; read its value and area per frame instead, and "plays once, then N frames empty".
   Done in `study --at`'s region reading (its area and lightness per frame, "played once"), and in the

@@ -374,7 +374,7 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const steps = track.filter((e, i) => i === 0 || e[0] === track[i - 1][0] + 1);
     pieces.push({
       kind, box: along || about || kind === "action" || once || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle, parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), ...(small ? { sub: true } : {}), track,
-      ...(kind === "action" || kind === "walk" ? smearsOf(F, roomy(x0, y0, bw, bh, 2), W) : {}),
+      ...(kind === "action" || kind === "walk" ? smearsOf(F, roomy(x0, y0, bw, bh, 2), W, fg) : {}),
       ...captures(cycle >= 2 && steps.length >= cycle ? steps.slice(0, cycle) : spread(track, 8), spread(track, 8), capture, F0),
     });
   }
@@ -451,7 +451,31 @@ const iouBox = (a: number[], b: number[]) => { const w = Math.max(0, Math.min(a[
  * most), and the frames they show in as a long thin piece (2.5 times as long as it is wide, or filling a
  * third of its box at most).
  */
-function smearsOf(F: Img[], b: Box, W: number): { smears?: { frames: number[]; colors: Color[] } } {
+export function smearsOf(F: Img[], b: Box, W: number, fg?: Uint8Array[]): { smears?: { frames: number[]; colors: Color[] } } {
+  const byColor = smearsByColor(F, b, W);
+  return byColor.smears || !fg ? byColor : smearsByShape(F, b, W, fg);
+}
+
+/**
+ * A smear in the body's own colors (a blade's white swept, Saint11's cards): pixels there in three
+ * frames at most of the clip, in thin pieces (a crescent, a streak) of a dozen pixels and more.
+ */
+function smearsByShape(F: Img[], b: Box, W: number, fg: Uint8Array[]): { smears?: { frames: number[]; colors: Color[] } } {
+  const N = F.length, H = F[0].h, seen = new Uint8Array(W * H);
+  for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) { let k = 0; for (let t = 0; t < N; t++) k += fg[t][y * W + x]; seen[y * W + x] = k; }
+  const frames: number[] = [], colors = new Map<Color, number>();
+  for (let t = 0; t < N; t++) {
+    const m = new Uint8Array(W * H);
+    for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) { const p = y * W + x; if (fg[t][p] && seen[p] <= 3) m[p] = 1; }
+    const thin = label(m, W, H, 1).filter((c) => { const cw = c.x1 - c.x0 + 1, ch = c.y1 - c.y0 + 1; return c.n >= 12 && (Math.max(cw, ch) >= 2.5 * Math.min(cw, ch) || c.n <= 0.35 * cw * ch); });
+    if (!thin.length) continue;
+    frames.push(t);
+    for (const c of thin) for (const p of c.pix) colors.set(F[t].data[p], (colors.get(F[t].data[p]) ?? 0) + 1);
+  }
+  return frames.length && frames.length <= Math.max(3, 0.3 * N) ? { smears: { frames, colors: [...colors].sort((x, y) => y[1] - x[1]).slice(0, 4).map(([c]) => c) } } : {};
+}
+
+function smearsByColor(F: Img[], b: Box, W: number): { smears?: { frames: number[]; colors: Color[] } } {
   const N = F.length, per = new Map<Color, number[]>();
   F.forEach((f, t) => { for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) { const c = f.data[y * W + x]; if ((c & 255) < 128) continue; const n = per.get(c) ?? per.set(c, new Array(N).fill(0)).get(c)!; n[t]++; } });
   const colors = [...per].filter(([, n]) => { const q = n.slice().sort((a, b) => a - b), peak = q[N - 1], usual = q[N >> 1]; return peak >= 12 && peak >= 8 * Math.max(1, usual) && n.filter((v) => v >= 0.5 * peak).length <= 0.5 * N; }).map(([c]) => c);
