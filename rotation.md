@@ -11,12 +11,14 @@ Turning pixel art by an arbitrary angle always costs something: pixels get dropp
 2. **Rotate the body, outline after.** Turn the sprite without its outline and give the outline to
    the turned variant: `sprite("arrow_30", { base: "_arrow", angle: 30, outline: "k" })`. A turned
    outline comes out 1px in places and 2px in others; a fresh one is even.
-3. **Shapes, not surfaces.** No rotation keeps a checker dither a checker, and texture or
+3. **A thing spinning on its upright** needs only half a turn drawn: the frames from 180° on are the
+   first half flipped (`flip: "x"`); block the turn out with `model()`/`mesh()` in a `ref: true` layer.
+4. **Shapes, not surfaces.** No rotation keeps a checker dither a checker, and texture or
    highlight pixels move unpredictably. Turn the flat shape, then add dither, texture and
    highlights to the turned variant.
-4. **Mind the angle** (table below). Small angles are the worst for resampling: `auto` shears them
+5. **Mind the angle** (table below). Small angles are the worst for resampling: `auto` shears them
    into a lean instead.
-5. **Draw what matters by hand.** Small sprites (under ~12px), faces and 1px features rarely
+6. **Draw what matters by hand.** Small sprites (under ~12px), faces and 1px features rarely
    survive a resample. For a direction set, draw the in-between poses yourself and pass them as
    `draw: { 22.5: "_ship_22" }`: every direction derived from them inherits the hand quality.
 

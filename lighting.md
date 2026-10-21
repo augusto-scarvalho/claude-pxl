@@ -143,3 +143,11 @@ own, or whatever shares them near the fire stays unlit too).
 - Too dark? Raise the lamp's `r` before `power`. Light reaching too far into the ground? Raise `block`
   (0.5–0.6). Want more Terraria-style glow through dirt? Lower it (0.25–0.3).
 - Smaller `cell` for small sprites and close-ups, 4–8 for scenes.
+- Three lights on a sprite (Saint11): a warm key that makes the bright side, a hard terminator and the
+  specular; a weak fill on the other side lifting the shadow one step; a rim, only a 1 px line in a
+  cool color on the far edge (a `relight` of its own, or a lamp of another color behind). Light from
+  below reads as horror; a cone of light needs dust in it and a bright core; put a dark background
+  behind the lit side. In the dark, let the darks merge into one background color, keep a strong
+  rim, and find each shadow's edge with lines from the light tangent to the thing.
+- A flame's flicker stays in its own few pixels, not on the wall it lights; a quiet room's loop can
+  run 5 s and more.

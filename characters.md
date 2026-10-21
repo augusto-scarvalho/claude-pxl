@@ -135,7 +135,9 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
 2. **Body light.** Light comes from above, so the bottoms of forms are darker. Put a shadow under
    anything that sticks out: the head on the neck, a sash on the robe, sleeves on the sides, a hem
    on the legs.
-3. **Clothes.** Add them one piece at a time. The face goes last.
+3. **Clothes.** Add them one piece at a time. The face goes last. Change the pose while it is still a
+   silhouette, and look at the silhouette again at the end; an animation's motion is blocked first
+   as flat dark shapes over the finished parts, colored once the timing works.
 4. **Drop the lines the shading draws** (Pedro Medeiros). Once the forms are shaded, delete each
    inner line whose edge a shadow already makes (a muscle, the jaw); keep the silhouette, the eyes
    and the darkest pockets. Lines plus shading is a step on the way, not the finish.
@@ -144,6 +146,10 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
    doubled step on a smooth line, keep a corner the shape has.
 
 ## 5. Faces
+
+(A portrait: the eyes at half the head's height; quarter lines for the hairline, the eyes and the tip
+of the nose; the corners of the mouth straight below the pupils.)
+
 
 - **16 px:**
   - Eyes are 2×2, right under the bangs. Leave one row of skin between the bangs and the eyes.
@@ -207,6 +213,9 @@ sprite("hero", { w: 62, h: 62, outline: "k" }, grid(18, 0, HEAD), runs(BODY))
 ```
 
 Look at the result at 1× too. Something that reads as cute at 12× can turn to mush at its real size.
+Shrinking a reference to sprite size (§3), enlarge and regularize what makes it read (the eyes, the
+mouth) and drop the specular and the small detail; then fix the outline, redraw what the resize lost,
+and fix dither and shading. Upscaled, round off the big square blocks and redraw broken lines.
 
 **Lines** (Pedro Medeiros, Saint11):
 
@@ -239,7 +248,10 @@ Look at the result at 1× too. Something that reads as cute at 12× can turn to 
   tone in the inside elbow of a step softens it; sparingly. `aa: true` on a sprite lays these strips
   for you in the key between the two colors (a ramp through both): a start to fix by hand.
 - **Clusters:** no 1 px islands of a color inside a form; make the detail a small shape (1×2, a
-  diagonal pair, 2×2, an L). A lone pixel is for a point of light, a particle, AA or texture.
+  diagonal pair, 2×2, an L). A lone pixel is for a point of light, a particle, AA or texture. No
+  2×2 squares of one color along a line or a band by accident: lay clusters staggered, like bricks.
+- **A line's end** tapers by lightening its last pixels toward what is round it (hair strands,
+  whiskers, a crease that fades).
 
 ## 8. The same character, someone else
 
@@ -287,9 +299,11 @@ offset points back to, so nothing tears open and no color is made up.
   stretching the hair a pixel only when the body rose read as a twitch (the ends must lag both ways),
   and four drawn hair poses swapped per frame still read as stepping, not swinging.
 
-- **Four legs walking** (Saint11): two biped cycles a little out of step, the front pair ahead and
-  the head trailing it by a frame. Each leg goes contact, drag (back along the ground), rise,
-  forward, the front paw snapping forward at the end; in a trot a foot lands every 2 frames.
+- **Four legs walking** (Saint11): two biped cycles out of step, each hind foot landing before the
+  fore on its side (back right, front right, back left, front left), a foot down every 2 frames of
+  8; the head trails the front pair by a frame. Each leg goes contact, drag (back along the ground),
+  rise, forward: the front elbow moves fast on contact and release and the paw snaps forward, the
+  back thigh moves steadily and the paw lags. Frame counts for wings and other cycles: §12.
 
 ## 10. Animating with parts
 
@@ -326,22 +340,24 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   and turned about its upright, the views come by themselves (`examples/rig/warden.px.js`: the head
   drawn in five views, picked by the turn).
 - **Timing an action** (Saint11): anticipation, strike, overshoot, recovery. The anticipation coils
-  the other way and holds longest; the strike is 1–2 frames, the first already at full reach with its
-  smear; the overshoot passes the end pose; the recovery is the longest part and takes another arc.
-  A player's own attack drops the anticipation (it reads as input lag): about 3 frames out and 4
-  back, the last passing idle by a pixel. A hit: one frame frozen before it, then one strong frame.
+  the other way, its first frame held longest; the strike is 1–2 frames, the first already at full
+  reach with its smear; the overshoot passes the end pose; the recovery is the longest phase and
+  takes another arc. A player's own attack drops the anticipation (it reads as input lag): about 3
+  frames out and 4 back, the last passing idle by a pixel. Measured frame counts: §12.
 - **Squash and stretch keep the area:** 2 px flatter is about 2 px wider, and stiff parts don't
-  deform. Squash on contact and in the anticipation (against the coming move), stretch on the
-  fastest frames. A bounce's spacing shrinks toward the top, 4, 3, 2, 1 px a frame, holds a frame
-  and comes back. Redraw those frames (or `warp` them), never scale them.
+  deform. Squash in the anticipation (against the coming move) and hardest on contact, stretch on
+  the fastest frames (the takeoff). A jump's takeoff frame carries most of the rise and the steps
+  about halve to the top, which holds 1–3 frames; the fall speeds up to the ground. Redraw those
+  frames (or `warp` them), never scale them.
 - **A 2-frame idle** works when its down frame is a squash: the knees bend and the arms open, so the
-  body widens as much as it drops (a plain one-pixel bob doesn't; see the next point).
+  body widens as much as it drops (a plain one-pixel bob doesn't; see the next point). More frames
+  go to overlap in the same cycle (the head leads, then the arms, then the hair), not to a longer one.
 - **Walk and run key poses** (Saint11): a walk goes contact, down (lowest, just after contact, the
   arms widest), passing, up (highest); 6 frames at low resolution, 12 for fluid; the arms swing
   against the legs and the planted foot moves back every frame. A run step is 4 poses: airborne
   (highest), fall, contact on a straight front leg, recover (lowest). Top-down, a front or back walk
   is half the cycle and the same half flipped (`flip: "x"`), redrawing only what isn't symmetric,
-  with less bob walking up.
+  with less bob walking up. In-betweens halve each frame's time, so the cycle keeps its length.
 - **Subpixel: less than a pixel of motion** (after ApplefatGOV's How-to-subpixel and 2D Will Never
   Die's: "animate the anti-aliasing"). An idle doesn't need the whole body to drop a pixel (the
   tutorial's is a fighting stance in its beat, a boxer finding his rhythm, about a second a sway; a
@@ -396,6 +412,10 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   leaves the picture before the hand does (`examples/perspective/race.px.js`: `handOn`, `reachAt`).
 
 ## 11. Big pieces: rig first
+
+(Saint11's modular boss: a joint in another material, a ring or a band, hides the seam where two
+parts meet; a chain's far joints come a frame later each, which reads as weight: tails, undead limbs.)
+
 
 A figure or prop past ~48 px is too much to draw in one go: the proportions drift, a limb lands on
 the wrong side, and fixing one thing breaks another. Build it as a rig, in stages:
@@ -503,3 +523,44 @@ hanging, it lies down; in between, it leans with it.
 `examples/rig/knight.px.js`: a 72 px knight in five stages (`knight_blocking`, `knight_parts`,
 `knight`, the poses, a bout), the same knight turned left, and both next to a flipped copy in a scene with a world
 scale, which `PXL describe` reads out.
+
+## 12. Timing in numbers
+
+Measured frame by frame on Saint11's animated tutorial cards (frames of 60–120 ms; 80 ms is
+12.5 fps). Block an action as a flat silhouette at its final timing in a `ref: true` layer before
+drawing it (keys held 200 ms, in-betweens 100, the idle 300), and check every highlight cluster in
+a guide color: it keeps its size every frame, bending, never popping.
+
+| Action | Frames |
+|---|---|
+| Player attack | no anticipation; the strike at full reach with its smear on frame 1; 2 frames at reach while the smear shrinks to a hook at the tip (the blade overshooting); 4 back, the last past idle by a pixel; the idle before it 300 ms |
+| Slash (an enemy's, top-down) | wind-up 2–3 (the first held longest, ~240 ms); slash 3: the biggest smear, a smaller one, none (held 1.5×); recovery on another arc, about 3× the wind-up |
+| Hit taken | the head jumps the whole way in 1 frame, over half comes back the next, the rest eases over 3; the face takes ~10 more; the target stretches on the hit frame and squashes the next |
+| Freeze before an impact | 1–2 frames, drawn: a white silhouette over a dark band; then the contact flash, a burst bigger than the thing, sparks 2–3 |
+| Death | impact 1 → thrown back, a spark breaking over 3 → 1–2 trying to recover → the knees give → down, head and arms lagging → 1 frame a pixel below rest → an arm bounces → rest |
+| Small enemy dies | stretched taller 1 → shrinking 2 → white 1 → burst 3–4 |
+| Jump | squash growing over 2–3; takeoff 1 stretched frame carrying most of the rise, then the steps about halving (12, 5, 3, 0.5 px); apex held 1–3; the fall speeding up (1, 3, 7, 10), stretched at most just before contact; the landing squash the biggest of all (55–65% of the height, 1 frame); the recovery is the squash backwards. A player's jump starts on the stretch |
+| Dash | squash 3 (area kept) → 3 travel frames longer than the body, dust left at the takeoff → brake low and squashed (15, 3, 1, 0 px), dust kicked forward → 3 to stand, the last held double |
+| Wall slide and kick | contact squashed against the wall, the arm up it; the slide 1 px a step, a speck rising; the kick with no anticipation, out at full extension on frame 1, a crescent of dust at the wall breaking into specks over 3–4 |
+| Roll | hands down 1 → 4 drawings of a quarter turn each (redrawn, not rotated) → overshoot 1 → recover 1 |
+| Whirl | crouch 1; the wind arcs at full size 4 frames on a ring round the body (front bright, back grey), breaking up over ~10 more while the pose holds: an effect outlives its pose |
+
+**Easing** (one marker at 80 ms): linear is the same step every frame (it reads as a robot); slow
+in and out goes 1 1 1 5 6, one smear frame across the gap, 8 5 2 2 1; back in and out moves back a
+little first, then one smear frame, overshoots 4 then 2 and settles. The fastest in-between is a
+smear spanning the gap from the last drawing to the next (on a body, the whole figure blurred, not
+only the weapon); cutting frames, a fast move's in-betweens become one smear frame and one squash
+frame: it lands sooner and hits harder.
+
+| Cycle | Frames |
+|---|---|
+| Idle | one cycle of ~600 ms: 2 drawings at 300 ms (down 1 px and 2 px wider); 3 at 200 (the extra one slows the fall); 6 at 100 (the extra ones for overlap: the head leads, the arms, then the hair). A slime's face follows its body 200 ms late |
+| Walk | 12 at 100 ms; at 6, keep contact, lowest and passing for each leg at 200 ms each, so it stays 1.2 s; the lowest 2 frames after contact |
+| Run | 8 at 160 ms or 16 at 80: the same 1.28 s stride; dust at contact 2–3 frames |
+| Top-down walk | 6 poses at 200 ms, the second half the first flipped; the head drops 0, 1, 2 px seen from the front (popping back at the flip), 0, 1, 1 from behind, 0, 2, 1 from the side; the arm on the forward leg's side swings back |
+| Top-down run | 2 drawings and their flips at 100 ms; the legs held 3 frames airborne and 2 at the lowest (`frame({ hold })`) while hair and clothes keep moving |
+| Four legs | 8 at 100 ms, a foot down every 2 (back right, front right, back left, front left) |
+| Wings, hovering | 7 at 80 ms: falling 1 px a frame for 3 (wings rising), the flap up 3 px then 1 (wings down, almost touching), 1 down; after ~10 flaps a glide that moves below a pixel (`sub`); an insect's 3-frame loop doubles its wings as a blur |
+| Ghost float | 0, 1, 2, 2, 1, 0 px over 6 frames (a sine with its ends held); a hologram doesn't bob: it flickers between two brightnesses on alternate frames, a scan band running over it now and then |
+| Metal idle | the body a pixel on alternate frames, the rigid plates and the highlights on the frames between; reflections slide along a blade |
+| Less than a pixel | move a part in two steps at most (more reads as bent); slide a line's kink along it to tilt it; a new line grows from its middle or fades in over 3–4 frames; a liquid's surface moves as a 1 px step travelling across it |

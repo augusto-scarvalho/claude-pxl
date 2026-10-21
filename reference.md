@@ -121,7 +121,7 @@ the rest are for sprites and anims (a scene refuses them by name), and `bg`/`wor
 | `inline: "k"` | 1px line over the sprite's own edge pixels (Aseprite's inside outline): the canvas keeps its size. |
 | `inline: { color: "k", keep: "Kk12" }` | The same, but edge pixels in the `keep` keys stay as they are: closes only the gaps of an outline that is already there, such as the one left after shrinking an image (`shrink`), selective colors included. |
 | `aa: true` | Anti-alias the edges between two colors inside the sprite, as by hand: on each step of 2 px and more, a strip half its length from the corner, on the lighter side, in the key between the two (a ramp through both, or a chosen color near their middle; none, no strip). Nothing against the clear, on 1:1 diagonals or straight edges. Before the outline. Hand AA reads better: use it on lines and big round shapes, then fix by hand. |
-| `selout: true \| n` | With `outline`/`outline8`/`inline`: each line pixel takes the sprite color it touches, `n` steps darker along the ramps (`true` = 2), so the line softens next to light colors; colors without a ramp keep the line color. Needs `ramps`. |
+| `selout: true \| n` | With `outline`/`outline8`/`inline`: each line pixel takes the sprite color it touches, `n` steps darker along the ramps (`true` = 2), so the line softens next to light colors; colors without a ramp keep the line color. Needs `ramps`. (On Pixel Joint "sel-out" is something else: an outline lightened toward the fill, which they call bad anti-aliasing except over a known dark ground; keep the silhouette's outer line dark on light or busy grounds.) |
 | `crop: true` | Trim to opaque bounds. |
 | `layers: true` | Also export each layer as `out/<sprites\|scenes\|anims>/<name>/<layer>.png` (anims: frame 0's). |
 | `png: "file.png"` | Start from a PNG (path relative to the art file), like `base` starts from another asset: every option and item then works on it. In an `anim` with `frames: n`, frame k is the k-th of n equal slices of the image (a strip). The live viewer rebuilds when the file changes. Any PNG except interlaced ones. |
@@ -183,7 +183,7 @@ crop; a `pivot: "bottom"` or `"center"` and `slice` are measured on the result.
 ### Texture and tone
 | Op | Notes |
 |---|---|
-| `dither(x, y, w, h, c1, c2, density = 0.5)` | Bayer 4×4; c2 covers `density` |
+| `dither(x, y, w, h, c1, c2, density = 0.5)` | Bayer 4×4; c2 covers `density`. Dither between neighboring tones of one ramp (two far apart make a harsh checker); a sprite under about 32 px rarely needs any |
 | `grad(x, y, w, h, "abc", dir = "v", soft = 0.5)` | bands with dithered seams; `"h"` horizontal; `"r"` radial, from the center out to the ellipse that fits the box (end on `"."` to leave the corners alone: suns, halos, vignettes); soft 0 = hard bands (crisp rings) |
 | `noise(x, y, w, h, "ab", density = 0.1, seed = 1, on?)` | deterministic speckle; `on` (the 8th argument, a string: `noise(0, 0, 32, 32, "ab", 0.1, 1, "g")`) only touches those keys (`"*"` any opaque) |
 | `shade(where?, steps = 1, density = 1)` · `light(...)` | step colors along ramps inside a region |

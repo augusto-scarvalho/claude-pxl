@@ -18,6 +18,9 @@ look at (`--frames 0-11` for some).
   could walk through it (figures of 26–34 px: a 34 px door). A crypt whose door was shorter than its
   monsters turned a werewolf on its roof into a giant.
 - Flat side views and top-down maps have no perspective: things do not shrink with distance.
+  Top-down, two buildings' fake-perspective walls side by side splay into a V; square vertical
+  footers at their base corners straighten the outline. A thing's collider is its footprint (an
+  ellipse at its feet), not what overhangs.
 - **Give things a real size, and the scene a world.** `height: 1.8` (meters) on an asset, and on the
   scene `world: { horizon, eye }` (ground in perspective: a thing standing on row y is
   (y − horizon) / eye px per meter) or `world: { scale }` (flat: px per meter). `PXL describe` then
@@ -50,6 +53,10 @@ look at (`--frames 0-11` for some).
   and drawing past an edge continues on the other side.
 - Keep small details that dot an area (pebbles, flowers, tufts) out of tiles: baked in, they repeat
   as a pattern. Lay plain tiles, then `scatter(..., { even: true })` the details over them.
+- A tileset (Saint11): draw the master tile, offset it by half (`wrap: true` shows the seams) and fix
+  the cross in the middle; draw the edge tiles from the middle tile's edge strips; variants change
+  only the middle. A full set: a single tile, tubes, a T for each turn, a cross, inner corners, and a
+  wildcard tile.
 - Organic texture (leaves, grass, stones, rust): 2–3 tiny brush parts + `scatter` with `on`/`clip`.
   Along an edge (grass on a path's border, moss at a rock's foot): `scatter(..., { on: "g", near:
   "<path keys>", within: 3 })`.
@@ -64,13 +71,20 @@ dots. Every mark needs a cause you could name, where that cause would put it:
   rust runs under brackets, paint flaking along the boards, moss creeping up from steps;
 - clutter that tells the story: posters, pipes, vents, cracks from a corner.
 
+Build a material in order (Saint11's cards): planks go flat, board lines, staggered joints, a lit
+bevel on top and a dark lower edge, grain, then the darkest accents at the joints and nails; rock goes
+silhouette, the base shadow, softer layered shadows, highlights, a cool back light, then crumbs; a bush
+a dark base, separate light areas, dense shadow, the lumps broken apart, a far layer tinted toward the
+sky, specular points, a few blades. A ruin is checked as a black silhouette: its outline itself must
+look broken, not just carry cracks; repeat a prop at different levels of damage.
+
 Flat color is fine; a clean wall beats a dotted one. `noise` is for granular materials (gravel,
 sand, asphalt, rough stone), sparse. `dither` over a whole area reads as a checkerboard: use it where
 two tones meet, between neighbors in a ramp. On faces drawn at an angle (3/4), marks follow the
 face's slant. Draw a texture's marks first, then shade them with the form: they fade into the
 shadow and are sharpest where the light turns (in the Pixel Joint texture thread, an ice cream lost
 half its colors and gained volume so). Detail the borders of a mass (foliage, a rock's rim) and keep
-its inside calm.
+its inside calm. Leaves gather in clumps along bands wrapped round the crown, not spread evenly.
 
 ## Trees and big organic shapes
 
@@ -98,6 +112,14 @@ it, don't import it):
 A waterfall that ends in a strip of foam over still water looks pasted on: spread churning foam to
 the sides and forward, send rings out, and let a wake ride the current downstream. A figure walks
 on the ground, not over it: tufts at the edges of paths and at the foot of trees and rocks.
+
+- **A water surface** is two layers (Saint11, an 8-frame loop at 100 ms): on top a net of highlights
+  round cells that grow and shrink but never move more than 1 px; under it a layer sliding at one
+  speed. Bubbles rise wobbling a pixel, grow, flatten at the surface and pop into a small splash.
+- **A thick drip** bulges wide, then taller and thinner over ~6 frames, hangs ~5 creeping a pixel or
+  two, falls 10, 22, 41 px a frame as a streak and splats over 5; the thicker, the longer it hangs.
+- **A falling leaf** is 2–3 px redrawn every frame through three turns, ~5 px down per 120 ms frame,
+  swaying 3 px each way; on water, a ring grows 2 frames, then breaks into dashes and dots over 3.
 
 ## Distance (aerial perspective)
 
@@ -190,6 +212,11 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   one piece (a whole pixel at even intervals: `Math.floor(drift * age)`, `drift` px a loop and a
   divisor of its frames, `age` the cloud's phase 0-1; `clouds()` does this), and thins away where it started; start each at its own moment so only one or two are
   forming or fading at a time. Make the loop a multiple of the scene's other loops.
+- Parts of one scene loop at their own lengths, each a divisor of the loop (4, 8, 16 frames: the
+  GIF stays short), and start at different frames (`delay`, `rdelay`): loops that all restart
+  together show the seam. A flag waves as a `warp` whose phase is the frame over 5: the crest runs
+  pole to tip, its fold shadow riding just behind it, the swing growing toward the tip. Stars: only
+  some twinkle, out of step, a 4-frame cycle at 120 ms (a step of shade, or a dot growing to a plus).
 - Thin, a cloud is a long pale wisp in a tone close to the sky's (puffs losing their height faster
   than their length, a flat base joining them), not a row of small blobs. A heaped cloud takes its
   light from the top down as it gains body (a white cap thickening row by row, then a gray
@@ -288,18 +315,57 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 
 ## One-shot effects (explosions, sparks, hits)
 
-From Saint11's effect lessons; each one an `anim` played once, stamped where it happens:
+From Saint11's effect cards, read frame by frame (80 ms frames unless said); each one an `anim`
+played once, stamped where it happens. An effect often outlives the pose that made it, and one thing
+happens after another, never all at once.
 
-- **An explosion:** a dark contrast frame, then a white flash (`silhouette: "w"` of the blast's
-  shape), then a sharp blast with no noise; the fire fades fast and the smoke slowly, over 4 frames
-  and more, its middle hottest.
-- **Particles** (sparks, debris, magic) start fast and slow down, shrinking and darkening; they start
-  pointed and joined, and break into lone pixels only on the last frames. Keep one piece the eye can
-  follow.
-- **Electricity** alternates with blank frames, a new sharp bolt each time, gone fast; sparks last 3
-  frames. **Fire:** a new wave every 2–3 frames, bright at the base. **Smoke:** one puff at a time.
-- **A bullet or bolt:** a warm bright core with cool edges, stretched along its way.
-- **A hit:** the first frame strongest; a small enemy squashes and flashes (`recolor({ "*": "w" })`).
+- **Explosion:** a dark disc 1 frame (the flash's size and place), a white disc 1, a sharp blast 1,
+  fire with sparks 1, the fire breaking into rings 2–3 as smoke appears (a dark cool purple, not
+  grey), the smoke breaking into scattered pixels over 4–5, then an empty hold (~600 ms). The flash
+  may hold 3 frames with light lines; against a wall the blast hugs wall and floor; in a chain each
+  starts a frame after the last, at another size. A puff of smoke is at its largest the frame after
+  the flash, splits into 4–5 that hollow (round, a crescent, dots) as they drift up, ~10 frames.
+- **Magic:** light: a dark disc, a white one as big with a colored rim, hollowing into two crescents,
+  then tongues, bits, sparks drifting 600 ms and more; round shapes, no smoke; drawn on threes (210 ms
+  a drawing). Dark: black 1 frame, white 1, bolts with blank frames between, then a splat in a
+  complementary color and smoke fading in spirals over ~10.
+- **Electricity:** a charge of 2 frames (a small arc, a glow at the source), a contrast frame, the
+  bolt 3 frames, each a new shape (thick cyan with a burst at the source, thin white, thin cyan),
+  then its pieces curl round the electrodes 4–5 frames and fade; sparks last 3.
+- **Particles and debris** start pointed and joined, spread into ribbons 2–3 frames, break into bits
+  that fall with gravity, and are lone pixels only at the end (~8 frames); a jet starts as a straight
+  cone, bends, then falls. A falling drop: a dot, a streak from where it was to where it is, a dot
+  where it lands.
+- **Breaking:** the impact frame shows the thing still whole, with flash rays; most pieces are gone in
+  2–3 frames and one is followed to rest: a steady sideways speed in the air, rising steps shrinking
+  to the top and falling ones growing, one small bounce, then sliding 3, 2, 1, 0 px. Heavy pieces arc
+  and bounce, light ones zig-zag, fast ones go straight. It falls in 1 frame; dust and sparks run 4+.
+- **Smears** (motion blur): 2 frames, the first full and light, the second thinner and darker or in
+  another hue (a yellow crescent, then a magenta one), then a 1-frame sliver; a wedge, a crescent, a
+  line along the edge, ghost copies. A dashing body leaves a dark trail back to where it was; a ball
+  crossing in one frame is a capsule spanning the gap (`stamp`'s `smear`; a blade's, `arc()`).
+- **Shine:** a rest of 0.6–0.8 s, then a sweep in 4 frames: a corner glint, a short slanted band, a
+  long band, the far corner (`clip` the item, a slanted `poly`); on a ring a crescent following the
+  curve; a gem lights facet by facet until it is all lit 1 frame, then dark at once; ice, flat white
+  shards sliding 4 frames, resting ten times as long. A moving glint may be white for 1–2 frames.
+- **Hits:** on what doesn't break, a dark ellipse, a white 4-point star, a white disk, then a cyan and
+  a yellow crescent, no shrapnel; a shield's edge stays lit ~4 frames after its white flash; armor
+  flashes white and a white crescent sweeps across it over 4. A small enemy squashes and flashes
+  (`recolor({ "*": "w" })`); frame counts for hits and deaths: `PXL help "characters 12"`.
+- **Bullets:** a warm bright core with cool edges, stretched along its way; a fast one moves more than
+  its length a frame, its impact shrinking to a third each frame (152, 55, 21, 11, 7 px); slow ones
+  blink bright and dark every frame; a hitscan's flash darkens the scene and lights the shooter, the
+  impact comes the next frame, debris ~6.
+- **Fire:** one wave lives ~10 frames: a thin bright line at the base, swelling, rising wavy, a curled
+  tongue that detaches and breaks into 2–3 bits near the top, reddening and gone; slow at the base,
+  fastest midway; a new wave every 2–3 frames, 3–4 at once. `flame()` flickers its tongues in place; a
+  big close fire wants waves that travel up. A torch's base keeps its volume as its shape changes.
+- **Glitch:** a different mix every frame with nearly clean frames between; a noise frame, a blank one
+  and a white one 1 frame each; strips shifted a few px, colors bled 1 px to the right.
+- **Loops that warn** (hazards): spikes peek out 5 frames (the tell), are up 4 and go back in 3 steps;
+  a laser aims a thin line 4 frames and fires 2; a flame jet burns bright 2 and smokes ~6; a saw spins
+  as a blurred disc, its art never rotated. A thruster's 5-frame loop at 60 ms: a round burst
+  (lighting the ship's rear), a long thin flame, the mass thrown back, wider and darker, smallest.
 
 ## Blend modes leave the palette
 

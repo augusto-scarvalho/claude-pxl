@@ -107,7 +107,7 @@ task needs before starting:
 
 | Making | Read |
 |---|---|
-| a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate |
+| a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate, 12 for an action's or a cycle's frame counts |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
 | a scene, level, building or environment | [scenes.md](scenes.md), whole (~7k tokens) |
@@ -221,12 +221,15 @@ comet_repair --out <scratch dir>`.
 ## Habits that give better art
 
 - Write half of anything symmetric (`mx`) and let `outline` draw outlines (`selout` takes a dark
-  shade of what it touches, `inline` stays inside, `outline8` squares the steps). Shine is a lighter tone of the color, not white.
+  shade of what it touches, `inline` stays inside, `outline8` squares the steps). Shine is a lighter tone of the color, not white (a moving glint or a wet, glossy spot may be white for a frame or two).
   Something on one side only (a shine, a shadow side): mirror a `_part`, stamp it, then draw it.
 - Small organic shapes (a face, a leaf, an item icon) are grids, pixel by pixel; primitives are for
   structure, large areas and long lines. Never big hand grids.
 - Every mark on a surface needs a cause (seams, weathering, story): no filler `noise` or `dither`.
-- 2–4 shades per material, mnemonic keys (`g`/`G`). Light from one side: a flat face is one tone,
+- 2–4 shades per material, mnemonic keys (`g`/`G`); reuse a tone across materials (one's shadow is
+  another's light) before adding a color. Light and shadow are two families: the step across the
+  terminator is bigger than any within them, and light bounced into a shadow is a duller, darker
+  step, never as bright as the lit side. Light from one side: a flat face is one tone,
   a round form changes only along its curve, never darker all round its rim (pillow shading).
 - Lines step diagonally, without L-corners, their runs in order (`PXL help "characters 7"`);
   anti-alias by hand, or `aa: true` on a sprite as a start; at 16 px and under, drop the outline.
