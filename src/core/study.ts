@@ -344,19 +344,32 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
     pxl.push(`scroll(name, y, per) for each plane, per = its speed x the loop's frames (here ${bands.map((b) => Math.round(Math.abs(b.v) * n)).join(", ")} px over ${n} frames), a whole number of each strip's widths.`);
   }
   // the pieces: what moves how on what stays (not when the whole view moves toward its point)
-  const layers = forward ? null : decompose(frames, bands, smeared ? 0.08 : 0.05, flows);
-  const sub = subpixel(frames);
-  if (sub.changed >= 12 && sub.share >= 0.25) {
-    lines.push(`  Subpixel: ${pct(sub.share * 100, 100)} of what changes from frame to frame is a pixel going between a color and the in-between tone of it and its neighbor: edges moving by part of a pixel. A part goes half a pixel when its edge takes that tone, then the next whole pixel (on a breathing idle, the body's parts by turns while the feet stay: no single-pixel bob that crushes the legs).`);
-    pxl.push("Subpixel steps: in the frames between two whole-pixel places, paint the edge the part moves toward (or leaves) in the key between its color and its neighbor's (a ramp's middle tone); move parts at their own frames, not all at once.");
+  // subpixel motion: in the tutorial it took 18-22% of what changes, in pxl's gallery under 4%
+  const sub = subpixel(frames), subClip = sub.share >= 0.1 && sub.share * sub.changed >= 12;
+  const layers = forward ? null : decompose(frames, bands, smeared ? 0.08 : 0.05, flows, subClip);
+  if (subClip) {
+    const top = sub.tones.slice(0, 4).map((t) => `${hex(t.mid)} between ${hex(t.a)} and ${hex(t.b)}`);
+    lines.push(`  Subpixel: ${pct(sub.share * 100, 100)} of what changes from frame to frame is a pixel going between a color and the in-between tone of it and its neighbor: edges moving by part of a pixel. A part goes half a pixel when its edge takes that tone, then the next whole pixel (on a breathing idle, the body's parts by turns while the feet stay: no single-pixel bob that crushes the legs). The tones it takes: ${top.join("; ")}.`);
+    pxl.push(`Subpixel: stamp(part, x, y + 0.5, { sub: true }) puts a part half a pixel along: crisp where it's past, half a pixel of it past its edge in the palette's key between its color and what's under it, so the palette needs those keys (here ${sub.tones.slice(0, 4).map((t) => hex(t.mid)).join(", ")}); a breath: each part's place a frame behind the one above it (examples/subpixel.px.js).`);
   } else if (moving.length && moving.every((f) => Number.isInteger(f.dx) && Number.isInteger(f.dy))) lines.push("  Steps are whole pixels at 1x (as measured: block matching moves whole pixels).");
   return { lines, pxl, flows, foe, forward, bands, frames, W, H, layers };
+}
+
+// Did the picture move a whole pixel at (x, y) from a to b: what's here now was a step back, and what
+// was here is now a step on?
+export function shifted(a: Img, b: Img, x: number, y: number): boolean {
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const px = x - dx, py = y - dy, nx = x + dx, ny = y + dy;
+    if (px < 0 || py < 0 || nx < 0 || ny < 0 || px >= a.w || nx >= a.w || py >= a.h || ny >= a.h) continue;
+    if (b.get(x, y) === a.get(px, py) && b.get(nx, ny) === a.get(x, y)) return true;
+  }
+  return false;
 }
 
 // Subpixel motion: in-between tones coming and going. Of the pixels that change between neighboring
 // frames, the share that goes between a color and a tone lying between it and a neighbor of another
 // color across it (an edge's cover changing, not the edge moving a whole pixel).
-function subpixel(frames: Img[]): { share: number; changed: number } {
+function subpixel(frames: Img[]): { share: number; changed: number; tones: { mid: Color; a: Color; b: Color; n: number }[] } {
   const W = frames[0].w, H = frames[0].h, clear = (c: Color) => (c & 255) < 128;
   const ends = (f: Img, x: number, y: number): [Color, Color] | null => {
     const c = f.get(x, y);
@@ -373,17 +386,21 @@ function subpixel(frames: Img[]): { share: number; changed: number } {
     return null;
   };
   let changed = 0, partial = 0;
+  const tones = new Map<string, { mid: Color; a: Color; b: Color; n: number }>();
+  const note = (mid: Color, [a, b]: [Color, Color]) => { const k = `${mid},${Math.min(a, b)},${Math.max(a, b)}`, t = tones.get(k); if (t) t.n++; else tones.set(k, { mid, a, b, n: 1 }); };
   for (let i = 0; i + 1 < frames.length; i++) {
     const a = frames[i], b = frames[i + 1];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const ca = a.get(x, y), cb = b.get(x, y);
       if (ca === cb) continue;
       changed++;
-      const ea = ends(a, x, y), eb = ends(b, x, y);
-      if ((eb && (ca === eb[0] || ca === eb[1])) || (ea && (cb === ea[0] || cb === ea[1]))) partial++;
+      // (not where the picture moved a whole pixel round it: a ramp's middle tone carried along)
+      const ea = ends(a, x, y), eb = ends(b, x, y), whole = shifted(a, b, x, y);
+      if (eb && (ca === eb[0] || ca === eb[1]) && !whole) { partial++; note(cb, eb); }
+      else if (ea && (cb === ea[0] || cb === ea[1]) && !whole) { partial++; note(ca, ea); }
     }
   }
-  return { share: changed ? partial / changed : 0, changed };
+  return { share: changed ? partial / changed : 0, changed, tones: [...tones.values()].sort((p, q) => q.n - p.n) };
 }
 
 const WHAT: Record<Piece["kind"], string> = {
@@ -410,7 +427,8 @@ function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: nu
     const draw = `${p.poses} drawing${p.poses === 1 ? "" : "s"}${p.cycle ? `, a cycle of ${p.cycle} frames` : ""}`;
     const extra = p.round ? `, going round a loop (circling, swinging)` : p.kind === "carried" || p.kind === "walk" ? `, going ${dir(p.speed!)}${p.grow && Math.abs(p.grow - 1) > 0.2 ? `, ${p.grow > 1 ? "growing" : "shrinking"} x${p.grow.toFixed(1)} (${p.grow > 1 ? "coming nearer" : "going away"}: sizes picked by fit)` : ""}${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving (limbs: a rig, or a drawing per pose)` : ""}` : p.kind === "rig" ? `, ${p.parts} parts moving` : p.kind === "action" ? `${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving` : ""}` : p.source ? `, shining from about ${p.source[0]},${p.source[1]}, x${p.strength!.toFixed(1)} from its dimmest to its brightest, its light ${hex(p.tint!)}` : "";
     const sm = p.smears ? ` Smears on frames ${spans(p.smears.frames)} (${p.smears.colors.map(hex).join(", ")}: there a moment only): the shape the swing sweeps, on the frames it goes fastest, arc(cx, cy, r, from, to, c, { inner, taper }) in a layer with unlit: true, outline: false (characters.md: its last 100 degrees at most, thin at its tail).` : "";
-    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}: ${WHAT[p.kind]}.${sm}`);
+    const sub = p.sub ? `, moving by part of a pixel (subpixel: its parts stamped with { sub: true } at half-pixel places)` : "";
+    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}${sub}: ${WHAT[p.kind]}.${sm}`);
   }
   const things = d.pieces.filter((p) => p.kind !== "light").length, lights = d.pieces.length - things;
   if (things > 16 || lights > 8) out.push(`  ... and ${[things > 16 ? `${things - 16} smaller things` : "", lights > 8 ? `${lights - 8} smaller lights` : ""].filter(Boolean).join(" and ")}.`);

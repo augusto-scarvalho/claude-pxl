@@ -194,7 +194,7 @@ rect, `[x0, y0, x1, y1, x2, y2, ...]` polygon, or `(x, y) => boolean`.
 ### Placing assets
 | Op | Notes |
 |---|---|
-| `stamp(name, x = 0, y = 0, opts?)` | puts the asset's `pivot` on (x, y); without one, its top-left corner |
+| `stamp(name, x = 0, y = 0, opts?)` | puts the asset's `pivot` on (x, y); without one, its top-left corner. `sub: true`: x and y may fall between pixels (subpixel motion). From a third to two thirds of the way the asset stays crisp at the place it's past, and half a pixel of it shows past its edge on the side it goes toward (right, down), each pixel there in the palette's key between its color and what's under it, of the keys the file chose (`pal()`, `use()`); nearer a whole place it's there. Over clear (a silhouette: no half-clear in pixel art), or with no such key, nothing spills. Move a part half a pixel, then the whole one: `characters.md` §10, `examples/subpixel.px.js` |
 | `tile(name, x, y, cols = 1, rows = 1, opts?)` | grid of copies (each cell picks separately for groups) |
 | `pattern(name, x, y, w, h, opts?)` | fill an area with copies; edges cut to fit |
 | `panel(name, x, y, w, h, opts?)` | 9-slice: an asset with `slice` margins drawn at w×h. Corners stay as drawn; edges and center **repeat** (never stretch), so keep the center a flat fill or a seamless pattern. UI frames, buttons, dialog boxes |
@@ -451,8 +451,10 @@ on its middle column, with the horizon giving the lens and the tilt (`pitch`). A
 motion: the frames' timing and holds, a
 cycle (the shortest shift after which frames repeat), whether the last frame runs into the first,
 edges moving by part of a pixel through in-between tones (subpixel motion: a part halfway between
-two places takes the tone between its color and its neighbor's at its edge; a piece moving so is
-not taken for an attack or an effect),
+two places takes the tone between its color and its neighbor's at its edge, not carried along with a
+whole-pixel move; the tones it takes and between which colors are listed, the palette's keys to
+draw it with `stamp(..., { sub: true })`; a piece moving so is marked, and not taken for an attack
+or an effect),
 bands of rows carried across together and their speeds to a fraction of a pixel (parallax planes:
 `scroll`'s `per` is the speed times the loop's frames), the point the motion opens out from (a camera
 moving forward: the vanishing point of the motion, which picks the road's among the still ones). And

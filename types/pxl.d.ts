@@ -17,6 +17,8 @@ declare global {
     rflip?: "x" | "y" | "xy"; rswap?: Record<string, PxColor>[]; seed?: number; reseed?: boolean | number;
     /** Animated assets: freeze on frame n / start later (ms) / random start. */
     frame?: number; delay?: number; rdelay?: boolean;
+    /** stamp only: x, y between pixels; edges over painted pixels take the key between the two (subpixel). */
+    sub?: boolean;
     /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
     silhouette?: PxColor;
     /** Lay the asset flat on the ground as its cast shadow: a pixel h above the base lands h * [kx, ky] away. */

@@ -482,12 +482,14 @@ one), and the art code itself (4% of the cost).
   neither the tracker nor the in-place stretch takes it for carried now, and turning about a joint it
   keeps makes a run of poses an action. Measured: no scene finds fewer of its things' frames; the sunset
   finds two more clouds, its masks a little looser (precision 41% to 37%).
-- [ ] **Subpixel in the DSL.** Studied from ApplefatGOV's How-to-subpixel (r/PixelArt): a part moves
+- [x] **Subpixel in the DSL.** Studied from ApplefatGOV's How-to-subpixel (r/PixelArt): a part moves
   half a pixel when its edge takes the tone between its color and its neighbor's, and a breathing idle
   keeps the feet still and moves its parts by turns. `pxl study` tells it in a clip now, but pxl draws it
   only by hand: a stamp at a fractional offset whose edges take the in-between keys from the ramps
   (palette-safe; on a transparent sprite only inner edges have a neighbor to blend with) would let a
-  breath or a slow drift move by half pixels without a drawing per frame.
+  breath or a slow drift move by half pixels without a drawing per frame. Done: `stamp(..., { sub: true })`
+  (the part crisp where it's past, half a pixel of it past its edge in the key between, of the keys the
+  file chose), `examples/subpixel.px.js`; study lists the tones a clip takes and marks the pieces.
 - [ ] **Still weak in study's pieces**, each tried this round against the calibration and dropped:
   - Big animated things touching (the tournament's knights in their bout against the stands): joining
     neighbors only when the colors they show when they differ are alike moved the tournament not at all

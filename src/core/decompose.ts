@@ -32,6 +32,8 @@ export interface Piece {
   parts?: number;
   /** carried round a loop (circling, swinging) rather than one way */
   round?: boolean;
+  /** moving by part of a pixel: most of what changes in it goes between a color and an in-between tone */
+  sub?: boolean;
   /** its box in each frame it shows in: [frame, x, y, w, h] */
   track: [number, number, number, number, number][];
   /** it alone, its background taken away, in a few frames across the clip; and where each is: [frame, x, y] */
@@ -49,7 +51,7 @@ export interface Piece {
 type Blob = { x0: number; y0: number; x1: number; y1: number; n: number; cx: number; cy: number; pix: number[] };
 type Comp = Blob & { t: number; id: number };
 
-export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: number; y: number; dx: number; dy: number }[] = []): { pieces: Piece[]; still: number; frames: number; relit: boolean; light: Relight } {
+export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: number; y: number; dx: number; dy: number }[] = [], subClip = false): { pieces: Piece[]; still: number; frames: number; relit: boolean; light: Relight } {
   const N = Math.min(frames.length, 400), F0 = frames.slice(0, N), W = F0[0].w, H = F0[0].h, WH = W * H;
   const rowV = new Float32Array(H);
   for (const b of bands) for (let y = Math.max(0, b.y0); y < Math.min(H, b.y1); y++) rowV[y] = b.v;
@@ -270,9 +272,10 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       for (let i = 0; i < bw * bh; i++) if (dir[i]) for (const j of [i + 1, i + bw]) if (j < bw * bh && dir[j] && (j !== i + 1 || (i + 1) % bw)) { pairs++; if (dir[i] === dir[j]) same++; }
     }
     const coherent = pairs ? same / pairs : 0, tone = changed ? lightOnly / changed : 0, share = pix.length / (bw * bh);
-    // its edges moving by part of a pixel: what changes goes mostly between a color and the in-between
-    // tone of it and its neighbor (subpixel: a breath, an idle; less than a pixel of motion)
-    const partial = partialOf(F, pix, W, H), small = partial >= 0.3;
+    // its edges moving by part of a pixel, in a clip that moves so (subpixelClip): much of what changes
+    // in it goes between a color and the in-between tone of it and its neighbor, not with a whole-pixel
+    // move (a breath, an idle; less than a pixel of motion, so no attack, no fire)
+    const small = subClip && partialOf(F, pix, W, H) >= 0.15;
     // how much of what differs is the background a step away, the best step each frame: a thing moving a
     // pixel or two (a ghost bobbing brightens and darkens at its edges all at once too), not a light
     let shifted = 0, differs = 0;
@@ -338,7 +341,7 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const capture = (e: [number, number, number, number, number]): Cut => (about ? { t: e[0], b: box, keep: carriedCut(own1(e[0]), box, W) } : { t: e[0], b: boxAt(e), keep: matte(F[e[0]], fg[e[0]], boxAt(e), mine, model, W, tol, mode).keep });
     const steps = track.filter((e, i) => i === 0 || e[0] === track[i - 1][0] + 1);
     pieces.push({
-      kind, box: along || about || kind === "action" || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle, parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), track,
+      kind, box: along || about || kind === "action" || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle, parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), ...(small ? { sub: true } : {}), track,
       ...(kind === "action" || kind === "walk" ? smearsOf(F, roomy(x0, y0, bw, bh, 2), W) : {}),
       ...captures(cycle >= 2 && steps.length >= cycle ? steps.slice(0, cycle) : spread(track, 8), spread(track, 8), capture, F0),
     });
@@ -670,6 +673,14 @@ function posesOf(seq: (Color[] | { w: number; h: number; px: Color[] })[], diffe
 // the share of what changes in these pixels that goes between a color and the in-between tone of it and
 // a neighbor of another color across it: an edge's cover changing (subpixel motion)
 function partialOf(F: Img[], pix: number[], W: number, H: number): number {
+  const shifted = (a: Img, b: Img, x: number, y: number) => {
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const px = x - dx, py = y - dy, nx = x + dx, ny = y + dy;
+      if (px < 0 || py < 0 || nx < 0 || ny < 0 || px >= W || nx >= W || py >= H || ny >= H) continue;
+      if (b.data[y * W + x] === a.data[py * W + px] && b.data[ny * W + nx] === a.data[y * W + x]) return true;
+    }
+    return false;
+  };
   const clear = (c: number) => (c & 255) < 128;
   const ends = (f: Img, p: number): [number, number] | null => {
     const x = p % W, y = Math.floor(p / W), c = f.data[p];
@@ -690,8 +701,9 @@ function partialOf(F: Img[], pix: number[], W: number, H: number): number {
     const a = F[t - 1].data[p], b = F[t].data[p];
     if (a === b) continue;
     changed++;
-    const ea = ends(F[t - 1], p), eb = ends(F[t], p);
-    if ((eb && (a === eb[0] || a === eb[1])) || (ea && (b === ea[0] || b === ea[1]))) partial++;
+    // (not where the picture moved a whole pixel round it: a ramp's middle tone carried along)
+    const ea = ends(F[t - 1], p), eb = ends(F[t], p), whole = shifted(F[t - 1], F[t], p % W, Math.floor(p / W));
+    if (!whole && ((eb && (a === eb[0] || a === eb[1])) || (ea && (b === ea[0] || b === ea[1])))) partial++;
   }
   return changed ? partial / changed : 0;
 }

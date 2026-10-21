@@ -66,6 +66,8 @@ sidescroller/forest.px.js: 0 warnings (1 scene (4 frames, 12 distinct placements
   ran: nothing; not run: front marker (nothing has one), lit side (no scene declares world.light), feet and size (nothing placed has a height)
 sidescroller/palette.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one)
+subpixel.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: nothing; not run: front marker (nothing has one)
 sunset/sunset.px.js: 0 warnings (7 scenes (1344 frames, 1815 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 663 (a clear reading on 75); not run: front marker (nothing has one), feet and size (nothing placed has a height)
 tackle.px.js: 0 warnings (1 scene (1 frame, 16 distinct placements), 0 rigs, 0 other assets with a front marker)

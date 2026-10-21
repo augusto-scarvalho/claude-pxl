@@ -58,7 +58,7 @@ moved into the DSL where every scene can use it.
 | Palettes and color | Palette files (`.hex`, `.gpl`, `.pal`, `.txt`) that carry their own keys; `shades()` for a hue-shifted ramp from one color; `rampmap` so imported tones never merge; radial gradients; layer blend modes and real opacity; included files keep their own palette. |
 | Shapes and strokes | `curve()` through points, `arc()` for slashes and smears, `capsule` for limbs, `flame`, 9-slice panels for UI, bitmap fonts with a ready 5×7. |
 | Outlines and light | `inline` and `selout` outlines, `relight` and `plate()` for lit parts, cast shadows (also from a point light: a fire, a lamp), `glow` that keeps what glows as drawn. |
-| Placing things | `pivot` (which point a stamp lands on), `wrap` for seamless tiles, `scatter` with `even` and `near` (along the edge of a color), sockets and sorted layers, `register` for frames aligned on a marked point. |
+| Placing things | `pivot` (which point a stamp lands on), `sub` stamps half a pixel along (subpixel motion, edges in the in-between key), `wrap` for seamless tiles, `scatter` with `even` and `near` (along the edge of a color), sockets and sorted layers, `register` for frames aligned on a marked point. |
 | Tiles and maps | Tilemap corner tiles, isometric tilemaps, export to Tiled (`.tmj`), sheet extrude against texture bleeding. |
 | Rotation | Free angles, `directions()` for 8 or 16 views, RotSprite checked on real sprites, and a rotation guide. |
 | Import and export | PNG import (`shrink`, `palettize`), Aseprite export (layers, frames, tags, palette, slices), GIFs that keep small figures' colors in lit scenes. |
@@ -127,6 +127,9 @@ of and what to use in pxl to make the same.
     its pivot every frame, and a thing carried never stays over one point.
   - Each capture is cut out of its background, GrabCut-style. Files: a sheet, a strip, and a box per
     frame for every piece.
+- **Subpixel:** edges moving by part of a pixel through in-between tones are told from whole-pixel
+  moves, with the tones a clip uses and between which colors; a piece breathing so is marked and not
+  taken for an attack or a fire (after ApplefatGOV's How-to-subpixel).
 - **Cleaning the input:** an editor's transparency checker exported with a sprite is taken for clear.
   A reflection under it, over the checker or a plain floor, is told (its row and opacity) and set
   aside.

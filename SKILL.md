@@ -155,9 +155,11 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 - **Reuse**: variants are `base` + `swap`; repeated details `_parts` + `stamp`; families a `group` or a
   loop; props get `pivot: "bottom"`; texture is `scatter` of tiny parts; areas are `tilemap`/`pattern`.
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` and functions reading `c.phase`;
-  `dir: "pingpong"`; stamping an anim animates the scene, and the scene's own functions then get its
-  loop (`c.frame`, `c.frames`, `c.phase`, `c.t`). Things going by in a loop that closes (in an anim, or a scene
-  that stamps one): `scroll()` (parallax planes), `clouds()`, `plume()` (smoke, steam). Limbs, walks, hair: `PXL help "characters 9 10"`.
+  `dir: "pingpong"`; a part half a pixel along: `stamp(name, x, y + 0.5, { sub: true })`
+  (subpixel, `PXL help "characters 10"`); stamping an anim animates the scene, and the scene's own
+  functions then get its loop (`c.frame`, `c.frames`, `c.phase`, `c.t`). Things going by in a loop
+  that closes (in an anim, or a scene that stamps one): `scroll()` (parallax planes), `clouds()`,
+  `plume()` (smoke, steam). Limbs, walks, hair: `PXL help "characters 9 10"`.
 - **Existing art**: `sprite("x", { png, area, shrink, palettize })`, `anim(..., { png, frames })`;
   `rampmap` maps imported tones onto a ramp without merging them.
 - **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj` for tilemaps, `build --aseprite` for a
@@ -184,6 +186,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `perspective/park.px.js` | two-point perspective (`yaw`) at 2 pm: benches, trees and people as `solid` shapes drawn by `solids()` and cast by `shadows()`, boxes lit by the side they face, people and a dog posed in 3D by a gait (any heading, own shadows), moving things interleaved far to near with still ones, a loop closed by hiding behind hedges |
 | `perspective/extinction.px.js` | three-point perspective (`pitch`, `vertical()`), a worm's-eye view: a volcano on a massif by `terrain()`, lava down the steepest way, the sun at `toward()`, a sky by `ray()`, uprights leaning to the third point, dinosaurs drawn from their profile on a 3D run (legs by `capsule`), pterosaurs by hand placed by the camera, everything burning by `flame` |
 | `perspective/race.px.js` | a view from the driver's seat: a road that bends in perspective, rivals drawn by hand from behind at seven sizes picked by the camera, overtaken one by one, their long shadows, the far things swinging by the heading (parallax), a cockpit modelled in 3D with `model()` and drawn by `mesh()` (faces toned by material ramps, outlined, details put where the camera puts them; `cockpit.px.js`), more cameras in the mirrors, a burst of speed whose integral moves everything, the wheel turning with the hands on it, each hand a puppet: a skeleton of joints read off photos, set on the rim every frame, its parts painted between the joints (`capsule`, a plate) |
+| `subpixel.px.js` | subpixel motion: a block moved half a pixel four ways with `stamp(..., { sub: true })`, and the same idle as a single-pixel bob and as a breath by half pixels, part by part, the feet still |
 | `parallax/train.px.js` | parallax: planes as strips that wrap going by with `scroll`, a far ridge that drifts by crossfading, `clouds`, a steam engine standing still with its wheels and rods, its smoke a `plume`, people at the windows |
 | `sidescroller/` | a game's art over several files: shared `palette.hex`, `wrap` tiles, `png` import, hit flash |
 | `shop.px.js`, `moon_bakery.px.js` | flat building facades from parts: tiles, signs, `wire` lights |

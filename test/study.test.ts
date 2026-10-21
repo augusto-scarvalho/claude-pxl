@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Img } from "../src/core/image.ts";
@@ -12,6 +12,7 @@ import { main } from "../src/node/cli.ts";
 import { areaDown, findGrid, pixelate } from "../src/core/vision.ts";
 import { latticeHash } from "../src/core/util.ts";
 import { study } from "../src/core/study.ts";
+import { loadSource } from "../src/node/load.ts";
 
 // a 1x drawing in a handful of colors: runs of 1-3 px, a different length on each row, so no grid
 const PALETTE = [pack(30, 30, 46), pack(60, 90, 150), pack(110, 160, 220), pack(200, 120, 60), pack(240, 220, 160), pack(70, 140, 70)];
@@ -319,4 +320,16 @@ test("study reads subpixel motion: a body breathing by half pixels through in-be
   // the same breath in whole pixels: no subpixel to tell
   const bob = [frame(18, false), frame(19, false), frame(18, false), frame(19, false)];
   assert.doesNotMatch(study({ name: "bob", frames: bob, ms: bob.map(() => 110), kind: "test" }).text.join("\n"), /Subpixel/);
+});
+
+test("study reads back what stamp's sub draws: the subpixel breath of examples/subpixel.px.js, and not its single-pixel bob", () => {
+  const p = loadSource(readFileSync(join(import.meta.dirname, "../examples/subpixel.px.js"), "utf8"), "subpixel.px.js");
+  const frames = p.frames("subpixel").map((f) => f.img);
+  const text = study({ name: "subpixel", frames, ms: frames.map(() => 111), kind: "test" }).text.join("\n");
+  assert.match(text, /Subpixel: \d+% of what changes/);
+  assert.match(text, /stamp\(part, x, y \+ 0\.5, \{ sub: true \}\)/);
+  // the keeper breathing by half pixels (right) is moving by part of a pixel; the one bobbing (left) isn't
+  const pieces = text.split("\n").filter((l) => /^ {2}#\d/.test(l));
+  assert.ok(pieces.some((l) => / at 8\d,\d+,.*by part of a pixel/.test(l)), pieces.join("\n"));
+  assert.ok(!pieces.some((l) => / at 2\d,\d+,.*by part of a pixel/.test(l)), pieces.join("\n"));
 });

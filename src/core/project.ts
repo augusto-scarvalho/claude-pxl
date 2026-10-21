@@ -85,7 +85,7 @@ function drawsWithFunctions(items: Item[]): boolean {
 const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "silhouette", "cast", "castBase", "at", "id", "z", "seed", "reseed", "frame", "delay", "rdelay"];
 /** Allowed option keys of ops whose last argument is an options object. */
 export const OP_OPTS: Record<string, string[]> = {
-  stamp: PLACE,
+  stamp: [...PLACE, "sub"],
   tile: PLACE,
   pattern: PLACE,
   panel: PLACE,
@@ -213,7 +213,7 @@ export class Project implements BuildCtx {
   private glyphCache = new Map<string, (ch: string) => string[]>();
   /** Art files loaded so far (absolute paths or virtual names), for locations and watching. */
   readonly files: string[] = [];
-  pal: Palette = Palette.builtin("pico8");
+  pal: Palette = Palette.builtin("pico8").asDefault();
   /** Set by a loader to support include(). */
   includeHook?: (path: string) => void;
   /** Set by a loader to support palette files in use(): the file's text, path relative to the art file. */

@@ -68,13 +68,31 @@ export class Palette {
   readonly order: readonly string[];
   readonly aliases: ReadonlySet<string>;
   readonly ramps: readonly string[];
+  /** The default a file starts with and never named with use(): its colors aren't the file's choice. */
+  readonly implicit: boolean;
 
-  constructor(keys: Map<string, Color>, list: Color[], order: string[], aliases: Set<string>, ramps: string[]) {
+  constructor(keys: Map<string, Color>, list: Color[], order: string[], aliases: Set<string>, ramps: string[], implicit = false) {
     this.keys = keys;
     this.list = list;
     this.order = order;
     this.aliases = aliases;
     this.ramps = ramps;
+    this.implicit = implicit;
+  }
+
+  /** This palette as the default a file starts with (see `implicit`). */
+  asDefault(): Palette {
+    return new Palette(new Map(this.keys), [...this.list], [...this.order], new Set(this.aliases), [...this.ramps], true);
+  }
+
+  /**
+   * The colors the file chose: the palette it named with use() and every key it set; on the default
+   * it never named, only the keys it set with pal(). What a subpixel edge may take between two colors.
+   */
+  chosen(): Color[] {
+    const set = new Set([...this.aliases].map((k) => this.keys.get(k)!));
+    if (!this.implicit) for (const c of [...this.list, ...this.keys.values()]) set.add(c);
+    return [...set];
   }
 
   static fromColors(colors: (string | number)[]): Palette {
@@ -117,7 +135,7 @@ export class Palette {
       keys.set(k, c);
       al.add(k);
     }
-    return new Palette(keys, [...this.list], order, al, [...this.ramps]);
+    return new Palette(keys, [...this.list], order, al, [...this.ramps], this.implicit);
   }
 
   /**
@@ -165,7 +183,7 @@ export class Palette {
   withRamps(ramps: string[]): Palette {
     for (const r of ramps)
       for (const k of r) if (!this.keys.has(k)) throw new PxError(`ramp "${r}" uses unknown key '${k}'${didYouMean(k, this.order)}`);
-    return new Palette(new Map(this.keys), [...this.list], [...this.order], new Set(this.aliases), [...this.ramps, ...ramps]);
+    return new Palette(new Map(this.keys), [...this.list], [...this.order], new Set(this.aliases), [...this.ramps, ...ramps], this.implicit);
   }
 
   /** Key char, "#hex", "." (skip -> null) or "_" (erase -> transparent). */

@@ -690,3 +690,26 @@ test("shapes far off the picture cost only the pixels they can reach: a vertex m
   eq(art(PAL + 'sprite("t", { w: 4, h: 2 }, poly([0, 0, 1e7, 0, 0, 1e7], "r"))', "t"), "rrrr\nrrrr");
   eq(art(PAL + 'sprite("c", { w: 4, h: 2 }, circ(2, 1e6, 1e6 + 1, "w"))', "c"), "wwww\nwwww");
 });
+
+test("stamp sub: half a pixel along, the part stays crisp and spills half a pixel past its edge in the key between; else it rounds", () => {
+  const pal = 'pal({ k: "#17111c", r: "#9e4e54", w: "#f0f0f0", f: "#c79fa2", d: "#202030" }); sprite("b", { w: 2, h: 2 }, rect(0, 0, 2, 2, "w")); ';
+  const on = (src: string, st: string) => art(src + `scene("s", { w: 6, h: 6, bg: "r" }, ${st})`, "s");
+  // half a pixel down: crisp where it's past, and below its edge f, the key between w and r
+  const rows = (...r: string[]) => r.join("\n");
+  assert.equal(on(pal, 'stamp("b", 2, 2.5, { sub: true })'), rows("rrrrrr", "rrrrrr", "rrwwrr", "rrwwrr", "rrffrr", "rrrrrr"));
+  // across, and both ways (the corner too)
+  assert.equal(on(pal, 'stamp("b", 2.5, 2, { sub: true })'), rows("rrrrrr", "rrrrrr", "rrwwfr", "rrwwfr", "rrrrrr", "rrrrrr"));
+  assert.equal(on(pal, 'stamp("b", 2.5, 2.5, { sub: true })'), rows("rrrrrr", "rrrrrr", "rrwwfr", "rrwwfr", "rrfffr", "rrrrrr"));
+  // nearer a whole place it's there; a whole place is a plain stamp
+  assert.equal(on(pal, 'stamp("b", 2, 2.25, { sub: true })'), on(pal, 'stamp("b", 2, 2)'));
+  assert.equal(on(pal, 'stamp("b", 2, 2.75, { sub: true })'), on(pal, 'stamp("b", 2, 3)'));
+  // an eye half a pixel along in a face: the skin past it takes the key between
+  assert.equal(art(pal + 'sprite("eye", { w: 1, h: 1 }, px(0, 0, "d")); sprite("s", { w: 4, h: 1 }, rect(0, 0, 4, 1, "w"), stamp("eye", 1.5, 0, { sub: true }))', "s"), "wdfw");
+  // no key between w and r in the file's palette (pico8's own colors don't count when it never said
+  // use("pico8")), or on clear: nothing spills
+  const bare = 'pal({ r: "#9e4e54", w: "#f0f0f0" }); sprite("b", { w: 2, h: 2 }, rect(0, 0, 2, 2, "w")); ';
+  assert.equal(on(bare, 'stamp("b", 2, 2.5, { sub: true })'), on(bare, 'stamp("b", 2, 2)'));
+  assert.equal(art(pal + 'sprite("s", { w: 6, h: 6 }, stamp("b", 2, 2.5, { sub: true }))', "s"), art(pal + 'sprite("s", { w: 6, h: 6 }, stamp("b", 2, 2))', "s"));
+  // an option only stamp takes
+  assert.throws(() => art(pal + 'sprite("s", { w: 6, h: 6 }, tile("b", 0, 0, 2, 2, { sub: true }))', "s"), /sub/);
+});

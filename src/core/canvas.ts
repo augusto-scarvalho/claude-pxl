@@ -1,4 +1,4 @@
-import { type Color, TRANSPARENT } from "./color.ts";
+import { type Color, TRANSPARENT, oklab } from "./color.ts";
 import { Img } from "./image.ts";
 import type { Palette, Resolved } from "./palette.ts";
 import { PxError } from "./errors.ts";
@@ -857,9 +857,10 @@ export class Canvas {
   }
 
   /** Draw `src` with its pivot (default: `def`, as a fraction of its size) on (x, y). */
-  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string): void {
+  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string, sub = false): void {
     const [px, py] = src.pivot ?? [src.w * def[0], src.h * def[1]];
-    this.put(src, x - Math.floor(px), y - Math.floor(py), ok);
+    if (sub) this.subPut(src, x - Math.floor(px), y - Math.floor(py));
+    else this.put(src, x - Math.floor(px), y - Math.floor(py), ok);
     // logged where it was drawn: blit floors a fractional position (stamp("p", 282 + 8 * 0.88, y))
     if (name) this.log?.push({ name, x: Math.floor(this.ox + x - Math.floor(px)), y: Math.floor(this.oy + y - Math.floor(py)), w: src.w, h: src.h, layer: this.layerName, img: src });
   }
@@ -868,22 +869,53 @@ export class Canvas {
     if (opts?.at !== undefined) [x, y] = this.socketAt(opts.at, x, y);
     const src = this.asset(name, opts, x, y), [px, py] = src.pivot ?? [0, 0];
     this.placed?.set(opts?.id ?? name, { x: this.ox + x - Math.floor(px), y: this.oy + y - Math.floor(py), sockets: src.sockets });
-    this.place(src, x, y, [0, 0], undefined, opts?.z, name);
+    this.place(src, x, y, [0, 0], undefined, opts?.z, name, !!opts?.sub);
+  }
+
+  /**
+   * Put `src` at a place between pixels (sub: true), as a pixel artist draws a part half a pixel
+   * along: from a third to two thirds of the way, the part stays crisp at the place it's past, and
+   * past its own edge on the side it goes toward (right, down) half a pixel of it shows, each pixel
+   * there in the palette's key between its color and what it moves over. Nearer a whole place, it's
+   * there. Over nothing (a silhouette on clear: no half-clear in pixel art), or with no key between
+   * the two, nothing spills.
+   */
+  private subPut(src: Img, x: number, y: number): void {
+    const fx = x - Math.floor(x), fy = y - Math.floor(y), mx = fx >= 1 / 3 && fx <= 2 / 3, my = fy >= 1 / 3 && fy <= 2 / 3;
+    const bx = mx ? Math.floor(x) : Math.round(x), by = my ? Math.floor(y) : Math.round(y);
+    this.put(src, bx, by);
+    if (!mx && !my) return;
+    const opaque = (c: Color) => (c & 255) >= 128, own = (i: number, j: number) => i >= 0 && j >= 0 && i < src.w && j < src.h && opaque(src.data[j * src.w + i]);
+    const spill = new Map<number, Color>();
+    for (let j = 0; j < src.h; j++) for (let i = 0; i < src.w; i++) {
+      if (!own(i, j)) continue;
+      for (const [dx, dy] of [[mx ? 1 : 0, 0], [0, my ? 1 : 0], [mx ? 1 : 0, my ? 1 : 0]]) {
+        if ((!dx && !dy) || own(i + dx, j + dy) || (dx && dy && (own(i + 1, j) || own(i, j + 1)))) continue;
+        const k = (j + dy) * (src.w + 1) + i + dx;
+        if (!spill.has(k)) spill.set(k, src.data[j * src.w + i]);
+      }
+    }
+    for (const [k, c] of spill) {
+      const X = bx + (k % (src.w + 1)), Y = by + Math.floor(k / (src.w + 1)), at = this.index(X, Y);
+      const under = at < 0 ? TRANSPARENT : this.img.data[at];
+      const m = opaque(under) ? betweenKey(this.pal, c, under) : null;
+      if (m !== null) this.plot(X, Y, m);
+    }
   }
 
   /**
    * Put a placed asset's pivot on (x, y): drawn now, or in a sorted layer queued and drawn on
    * flush() by y (where it stands) or z.
    */
-  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string): void {
-    if (!this.sorted) return this.putAt(src, x, y, def, ok, name);
+  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string, sub = false): void {
+    if (!this.sorted) return this.putAt(src, x, y, def, ok, name, sub);
     if (!Number.isFinite(z)) throw new PxError(`z must be a number, got ${JSON.stringify(z)}`);
     // Drawn later, in order: keep the clip that was active at the call.
     const clip = this.clipPred, q = this.sorted.queue;
     q.push({ key: this.sorted.by === "y" ? y : z, seq: q.length, draw: () => {
       const prev = this.clipPred;
       this.clipPred = clip;
-      try { this.putAt(src, x, y, def, ok, name); } finally { this.clipPred = prev; }
+      try { this.putAt(src, x, y, def, ok, name, sub); } finally { this.clipPred = prev; }
     } });
   }
 
@@ -1266,4 +1298,27 @@ function cornerTiles(str: string, opts: TilemapOpts, known: (name: string) => bo
 function anyIn(ok: (x: number, y: number) => boolean, x: number, y: number, w: number, h: number): boolean {
   for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) if (ok(xx, yy)) return true;
   return false;
+}
+
+// The palette's color between two, nearest their middle (in OKLab): on the line from one to the other,
+// a fifth to four fifths of the way and close to it (closer than study asks of a hand-picked one), of
+// the colors the file chose; null when none is.
+const BETWEEN = new WeakMap<Palette, { list: Color[]; memo: Map<string, Color | null> }>();
+export function betweenKey(pal: Palette, a: Color, b: Color): Color | null {
+  let entry = BETWEEN.get(pal);
+  if (!entry) BETWEEN.set(pal, (entry = { list: pal.chosen(), memo: new Map() }));
+  const { list, memo } = entry;
+  const key = a < b ? `${a},${b}` : `${b},${a}`;
+  if (memo.has(key)) return memo.get(key)!;
+  const A = oklab(a), B = oklab(b), ab = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], n2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2;
+  let best: Color | null = null, near = Infinity;
+  if (n2 >= 0.15 ** 2) for (const c of list) {
+    if (c === a || c === b || (c & 255) < 128) continue;
+    const P = oklab(c), t = ((P[0] - A[0]) * ab[0] + (P[1] - A[1]) * ab[1] + (P[2] - A[2]) * ab[2]) / n2;
+    const off = Math.hypot(P[0] - A[0] - t * ab[0], P[1] - A[1] - t * ab[1], P[2] - A[2] - t * ab[2]);
+    const mid = Math.hypot(P[0] - (A[0] + B[0]) / 2, P[1] - (A[1] + B[1]) / 2, P[2] - (A[2] + B[2]) / 2);
+    if (t > 0.2 && t < 0.8 && off < Math.min(0.15 * Math.sqrt(n2), 0.08) && mid < near) { near = mid; best = c; }
+  }
+  memo.set(key, best);
+  return best;
 }
