@@ -23,7 +23,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
      (vanishing points, lens, tilt); read at the wrong pixel size (a blurred copy), `--px N`;
    - a clip: timing per drawing (on twos), cycle and loop, subpixel motion, parallax planes and their
      speeds, and its pieces (the backdrop, sprites carried along, walks, anims in place, rigs, actions
-     with their smears, effects, and the lights, told apart first), each with its box in every frame,
+     with their smears, effects, bodies seen through with their opacity, and the lights, told apart
+     first), each with its box in every frame,
      and the spacing of what travels (easing, anticipation, overshoot, squash and stretch). To measure
      one thing moving: `PXL study ref.gif --at x,y,w,h` (the region in the drawing's own pixels, as
      `shot` shows it) follows it frame by frame. `--no-out` prints the text only.

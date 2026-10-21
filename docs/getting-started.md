@@ -152,8 +152,9 @@ ramps and their hue shifts, outlines, dithering, anti-aliasing, banding, the fau
 (L-corners, jaggies) and its light; a photo or painting for its masses of light and dark and its
 colors, translated into a small picture to draw over. It finds the perspective (horizon, vanishing
 points), and in a clip the timing, the loop, parallax planes and each moving piece (walks, things
-carried, anims in place, attacks with their smears, effects, lights), cut out of the background,
-with the spacing of what travels (easing, anticipation, overshoot, squash and stretch). Everything
+carried, anims in place, attacks with their smears, effects, ghosts seen through, lights), cut out
+of the background, with the spacing of what travels (easing, anticipation, overshoot, squash and
+stretch). Everything
 goes to `out/_study/` next to the picture: a sheet to look at, the palette as `.hex`, and each piece
 as a strip.
 

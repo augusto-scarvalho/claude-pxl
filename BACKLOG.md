@@ -687,8 +687,15 @@ Saint11's, read from his page, and not kept in the repository):
 - [x] **A walk's flipped half** (top-down: frames 3-5 are 0-2 mirrored) and the body's bob per frame.
   Done for a piece whose cycle study finds; on the card itself the goblin seen from the front is
   symmetric, so its flipped half repeats the first and the clip reads as a cycle of 3.
-- [ ] **A see-through body** (a ghost): what changes behind it read as lights; its whole-body float
-  (0, 1, 2, 2, 1, 0 px) not reported.
+- [x] **A see-through body** (a ghost): what changes behind it read as lights; its whole-body float
+  (0, 1, 2, 2, 1, 0 px) not reported. Done: where it comes and goes each pixel shows two colors, what
+  is behind and that mixed toward one color by one share, so the lines from each to its mix meet at
+  that color (a light's change grows from its source: no one share; a body dithered and shifting a
+  pixel pairs its own two colors only). Its float is read off its edges, column by column; its head
+  and hem, floating alike, are one piece. A ghost at 50% over a dotted ground read "mixed 50% toward
+  #ecf0ff (a layer with opacity: 0.50)", "its float: 0 1 2 2 1 0", where it read as a light and a rig
+  moving by half pixels. The calibration as it was; none of eight example scenes reads one. A body
+  swaying sideways gets no float.
 - [x] **A runner in place read as a camera moving forward**: require the backdrop to move first.
   Done another way: the opening out has to hold frame after frame (a runner spreads its limbs and
   draws them in by turns); the race still reads as a camera going forward.

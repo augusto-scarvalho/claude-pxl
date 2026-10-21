@@ -502,8 +502,10 @@ or a thing carried, its spacing: the steps frame to frame, speeding up, slowing,
 first, past its rest and back, a box squashing and stretching; its smears
 told, the frames a long thin shape in colors there a moment only shows in, and their colors, for
 `arc()`), changing all over without repeating with neighbors changing at odds (fire, water, smoke:
-`flame()`, `plume()`, `warp()`), or a thing wandering about its box (a bird circling: going round a
-loop). Each object is isolated from the others: the changing
+`flame()`, `plume()`, `warp()`), a thing wandering about its box (a bird circling: going round a
+loop), or a body seen through (a ghost, glass: where it comes and goes each pixel shows what is behind
+and that mixed toward one color by one share; the color and share, `opacity` in a layer, and its float
+up and down each frame, read off its edges). Each object is isolated from the others: the changing
 pixels in fragments of pixels that differ in the same frames (a knight riding past, not the crowd
 waving behind him), put back together when they touch and change in the same rhythm or in turns (a
 bird lighting one side of its loop, then the other) and share colors, or have the same still body
