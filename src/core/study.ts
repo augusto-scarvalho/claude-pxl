@@ -532,7 +532,7 @@ const WHAT: Record<Piece["kind"], string> = {
   anim: "animated in place: an anim of its drawings",
   rig: "parts moving against a body that stays: a rig (rig(), its parts at sockets), or an anim with a frame per pose",
   action: "a run of poses played once (an attack, a jump, a fall): an anim with a frame per pose (for many, a rig posed by ik: rig/knight.px.js), its timing in how many frames each part takes",
-  effect: "changing all over without repeating (fire, water, smoke, sparkle): an effect in code: flame(), plume(), warp() or noise drawn per frame",
+  effect: "changing all over without repeating, or paint that comes and goes (fire, water, smoke, sparkle, a flash, a smear): an effect in code (flame(), plume(), warp(), noise drawn per frame), or an anim of its drawings played once (a smear: stamp's smear, arc())",
   light: "lighter and darker all at once: a light: glow(), a lamp, or colors swapped per frame",
 };
 /** Frame numbers as runs: 3-5, 8, 15-18. */
@@ -544,12 +544,12 @@ const shown = (pieces: Piece[]) => [...pieces.filter((p) => p.kind !== "light").
  * the way it travels most, each run of them speeding up, slowing or even, holds, a move back first
  * (anticipation), past its rest and back (overshoot); and its box squashing and stretching.
  */
-export function spacingWords(track: [number, number, number, number, number][]): string | null {
+export function spacingWords(track: [number, number, number, number, number][], squashOnly = false): string | null {
   if (track.length < 4) return null;
   const c = track.map(([, x, y, w, h]) => [x + w / 2, y + h / 2]), out: string[] = [];
   const range = (k: number) => Math.max(...c.map((p) => p[k])) - Math.min(...c.map((p) => p[k]));
   const ax = range(0) >= range(1) ? 0 : 1;
-  if (range(ax) >= 3) {
+  if (!squashOnly && range(ax) >= 3) {
     const d = c.slice(1).map((p, i) => Math.round(p[ax] - c[i][ax]));
     if (Math.max(...d.map(Math.abs)) <= 1) return null;
     // runs of steps one way (a hold, 0, is a run of its own)
@@ -574,7 +574,8 @@ export function spacingWords(track: [number, number, number, number, number][]):
   const spread = (v: number[]) => Math.max(...v) / Math.max(1, Math.min(...v));
   const mw = W.reduce((s, v) => s + v, 0) / W.length, mh = H.reduce((s, v) => s + v, 0) / H.length;
   const cov = W.reduce((s, w, i) => s + (w - mw) * (H[i] - mh), 0);
-  if (spread(W) >= 1.15 && spread(H) >= 1.15 && cov < 0) out.push(`squash and stretch: ${Math.min(...W)}-${Math.max(...W)} wide as ${Math.max(...H)}-${Math.min(...H)} tall, the area within ${Math.round((spread(A) - 1) * 100)}%`);
+  // (the area kept, as a squash keeps it: a box that grows and shrinks is a limb reaching out)
+  if (spread(W) >= 1.15 && spread(H) >= 1.15 && cov < 0 && spread(A) <= 1.35) out.push(`squash and stretch: ${Math.min(...W)}-${Math.max(...W)} wide as ${Math.max(...H)}-${Math.min(...H)} tall, the area within ${Math.round((spread(A) - 1) * 100)}%`);
   return out.length ? out.join("; ") : null;
 }
 
@@ -589,10 +590,19 @@ function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: nu
     const extra = p.round ? `, going round a loop (circling, swinging)` : p.kind === "carried" || p.kind === "walk" ? `, going ${dir(p.speed!)}${p.grow && Math.abs(p.grow - 1) > 0.2 ? `, ${p.grow > 1 ? "growing" : "shrinking"} x${p.grow.toFixed(1)} (${p.grow > 1 ? "coming nearer" : "going away"}: sizes picked by fit)` : ""}${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving (limbs: a rig, or a drawing per pose)` : ""}` : p.kind === "rig" ? `, ${p.parts} parts moving` : p.kind === "action" ? `${p.parts && p.parts >= 2 ? `, ${p.parts} parts of it moving` : ""}` : p.source ? `, shining from about ${p.source[0]},${p.source[1]}, x${p.strength!.toFixed(1)} from its dimmest to its brightest, its light ${hex(p.tint!)}` : "";
     const sm = p.smears ? ` Smears on frames ${spans(p.smears.frames)} (${p.smears.colors.map(hex).join(", ")}: there a moment only): the shape the swing sweeps, on the frames it goes fastest, arc(cx, cy, r, from, to, c, { inner, taper }) in a layer with unlit: true, outline: false (characters.md: its last 100 degrees at most, thin at its tail).` : "";
     const sub = p.sub ? `, moving by part of a pixel (subpixel: its parts stamped with { sub: true } at half-pixel places)` : "";
-    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}${sub}: ${WHAT[p.kind]}.${sm}`);
+    // ten times brighter at its brightest than at its dimmest is more than light does to what is there:
+    // paint that comes and goes (a flash, a smear, sparks, a limb drawn light then dark)
+    const paint = p.kind === "light" && (p.strength ?? 0) > 10;
+    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}${sub}: ${paint ? `read as a light, but more likely paint that comes and goes (a flash, a smear, sparks, a part drawn light then dark): ${WHAT.effect}` : WHAT[p.kind]}.${sm}`);
     // (a thing going somewhere, or an action, over a short clip: elsewhere a box's steps are its drawings
     // changing, a limb reaching out, not the thing moving)
-    const sp = (p.kind === "carried" && p.poses <= 4) || p.kind === "action" ? (p.track.length <= 24 ? spacingWords(p.track) : null) : null;
+    // a walk whose steps vary (a jump, a dash) is read too; in place, a body squashing on a ground that
+    // stays (its bottom row) gets the squash alone
+    const steps = p.track.slice(1).map((e, k) => Math.hypot(e[1] + e[3] / 2 - p.track[k][1] - p.track[k][3] / 2, e[2] + e[4] / 2 - p.track[k][2] - p.track[k][4] / 2)).filter((v) => v >= 1);
+    const varied = steps.length >= 3 && Math.max(...steps) > 3 * Math.min(...steps);
+    const grounded = p.track.every((e) => Math.abs(e[2] + e[4] - p.track[0][2] - p.track[0][4]) <= 1);
+    const sp = p.track.length > 24 ? null : (p.kind === "carried" && p.poses <= 4) || p.kind === "action" || (p.kind === "walk" && varied) ? spacingWords(p.track)
+      : (p.kind === "anim" || p.kind === "rig") && grounded ? spacingWords(p.track, true) : null;
     if (sp) out.push(`     ${sp}`);
   }
   const things = d.pieces.filter((p) => p.kind !== "light").length, lights = d.pieces.length - things;
