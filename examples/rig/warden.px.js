@@ -127,10 +127,10 @@ const KEYS = [
   { t: 7, yaw: 115, twist: 10, head: 15, crouch: 5, lean: 12, hand: [4, 14, 3], axe: [0.25, 1, 0.3], off: [3, 3, -6], smear: 1 },
   { t: 8, yaw: 185, twist: 25, head: 20, hand: [3, 14, 6], axe: [0.2, 1, 0.5], smear: 1 },
   { t: 9, yaw: 255, twist: 25, head: 20, hand: [4, 14, 1], axe: [0.25, 1, 0.1], smear: 1 },
-  { t: 10, yaw: 325, twist: 25, head: 15, hand: [5, 14, -3], axe: [0.3, 1, -0.35], smear: 1 },
-  // out of the turn into a thrust: the arm straight forward, the weight on the front foot
-  { t: 11, yaw: 390, twist: 15, head: 0, crouch: 4, lean: 14, hand: [13, 3, 1], axe: [1, 0.15, 0.05], off: [-3, -2, -8], feet: [[-4, -5], [5, 4]], smear: 1 },
-  { t: 12, yaw: 420, twist: 5, crouch: 3, lean: 10, hand: [14, 2, 0], axe: [1, 0.05, -0.05], smear: 0 },
+  { t: 10, yaw: 325, twist: 25, head: 15, hand: [5, 14, 3], axe: [0.3, 1, 0.3], smear: 1 },
+  // out of the turn, a cut falling across to the front: the arm straight, the weight on the front foot
+  { t: 11, yaw: 390, twist: 15, head: 0, crouch: 4, lean: 14, hand: [13, 3, -3], axe: [1, 0.1, -0.45], off: [-3, -2, -8], feet: [[-4, -5], [5, 4]], smear: 1 },
+  { t: 12, yaw: 420, twist: 5, crouch: 3, lean: 10, hand: [14, 2, -5], axe: [1, 0.05, -0.55], smear: 0 },
   { t: 13, twist: 0 },
   // the second wind-up: the axe straight up, the body coiled the other way round
   { t: 15, yaw: 400, twist: -45, head: 35, crouch: 1, lean: 2, hand: [-1, 3, 13], axe: [-0.2, 0.15, 1], off: [5, -2, 2], feet: [[1, -5], [-2, 5]] },
