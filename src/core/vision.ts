@@ -663,8 +663,9 @@ export function findReflection(frames: Img[], k: Checker | null): Reflection | n
   };
   let best: Reflection | null = null, bestN = 0;
   // (a reflection is a band, not the last few rows: a framed picture's bottom edge mirrors nothing)
-  for (let axis = Math.floor(H / 4); axis < H - Math.max(3, Math.ceil(H / 10)); axis++) for (const gap of [0, 1] as const) {
+  for (let axis = Math.floor(H / 4); axis < H - Math.max(3, Math.ceil(H / 10)); axis++) {
     // a plain floor: the color most of what is below the row has (the first frame), a half of it at least
+    // (once a row, for both gaps)
     if (!k) {
       const n = new Map<Color, number>();
       let all = 0;
@@ -678,6 +679,7 @@ export function findReflection(frames: Img[], k: Checker | null): Reflection | n
       const back = [...w].sort((a, b) => b[1] - a[1])[0];
       wall = back && back[1] >= 0.5 * up ? back[0] : undefined;
     }
+    for (const gap of [0, 1] as const) {
     const alphas: number[] = [];
     let below = 0, shown = 0;
     for (const f of sample) for (let y = axis; y < H; y++) {
@@ -702,6 +704,7 @@ export function findReflection(frames: Img[], k: Checker | null): Reflection | n
     if (held > bestN && held >= (k ? 0.33 : 0.75) * below && held >= 0.4 * shown && held >= 30) {
       bestN = held;
       best = { axis, gap, alpha: mid, share: held / below, ...(!k && floor !== undefined ? { floor } : {}) };
+    }
     }
   }
   return best;

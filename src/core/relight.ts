@@ -66,22 +66,38 @@ export function relight(F: Img[], bg: Uint32Array, still: (y: number) => boolean
   const T = Array.from({ length: Math.min(F.length, 48) }, (_, i) => Math.floor((i * F.length) / Math.min(F.length, 48)));
   const curve = new Float32Array(WH * T.length), moves = new Uint8Array(WH);
   T.forEach((t, k) => { const f = F[t]; for (let p = 0; p < WH; p++) if (still(Math.floor(p / W)) && (bg[p] & 255) >= 128 && (f.data[p] & 255) >= 128 && f.data[p] !== bg[p] && differ(f.data[p], bg[p])) { const a = logLin(f.data[p]), b = logLin(bg[p]); curve[p * T.length + k] = (a[0] - b[0] + a[1] - b[1] + a[2] - b[2]) / 3; moves[p] = 1; } });
+  // (each pixel's mean and spread worked out once, and each pair once: the same sums, in the same order)
+  const n = T.length, mean = new Float64Array(WH), vari = new Float64Array(WH);
+  for (let p = 0; p < WH; p++) {
+    if (!moves[p]) continue;
+    let m = 0, v = 0;
+    for (let k = 0; k < n; k++) m += curve[p * n + k];
+    m /= n;
+    for (let k = 0; k < n; k++) { const x = curve[p * n + k] - m; v += x * x; }
+    mean[p] = m; vari[p] = v;
+  }
   const corr = (p: number, q: number) => {
-    const n = T.length, a = p * n, b = q * n;
-    let ma = 0, mb = 0;
-    for (let k = 0; k < n; k++) { ma += curve[a + k]; mb += curve[b + k]; }
-    ma /= n; mb /= n;
-    let c = 0, va = 0, vb = 0;
-    for (let k = 0; k < n; k++) { const x = curve[a + k] - ma, y = curve[b + k] - mb; c += x * y; va += x * x; vb += y * y; }
+    const a = p * n, b = q * n, ma = mean[p], mb = mean[q], va = vari[p], vb = vari[q];
+    let c = 0;
+    for (let k = 0; k < n; k++) c += (curve[a + k] - ma) * (curve[b + k] - mb);
     return va && vb ? c / Math.sqrt(va * vb) : va === vb ? 1 : 0;
   };
+  // a pair's correlation is the same either way: kept by direction (0..7 round the pixel) for its other end
+  const pair = new Float64Array(WH * 8).fill(NaN);
   const together = new Float32Array(WH);
   for (let p = 0; p < WH; p++) {
     if (!moves[p]) continue;
     const x = p % W, y = Math.floor(p / W);
-    let s = 0, n = 0;
-    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy, q = yy * W + xx; if ((dx || dy) && xx >= 0 && yy >= 0 && xx < W && yy < H && moves[q]) { s += corr(p, q); n++; } }
-    together[p] = n ? s / n : 0;
+    let s = 0, m = 0, d = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const xx = x + dx, yy = y + dy, q = yy * W + xx, k = d++;
+      if (xx < 0 || yy < 0 || xx >= W || yy >= H || !moves[q]) continue;
+      let r = pair[p * 8 + k];
+      if (Number.isNaN(r)) { r = corr(p, q); pair[q * 8 + (7 - k)] = r; }
+      s += r; m++;
+    }
+    together[p] = m ? s / m : 0;
   }
   for (const [t, f] of F.entries()) {
     const ok = (p: number) => still(Math.floor(p / W)) && (bg[p] & 255) >= 128 && (f.data[p] & 255) >= 128;
