@@ -238,6 +238,21 @@ test("study --at: an effect played once, dark, white, a blast fading to nothing,
   assert.match(regionLines(frames).join("\n"), /Played once, an effect: it shows at frame 1, flashes near-white at 2, is biggest at 3, and fades over 3 frames to nothing by 7, then 2 empty/);
 });
 
+test("study: a ball crossing one way at 8 px a frame is carried, not a plane, and doesn't loop", () => {
+  const ball = (flat: boolean) => Array.from({ length: 12 }, (_, f) => {
+    const img = new Img(120, 40), bx = 6 + 8 * f;
+    for (let y = 0; y < 40; y++) for (let x = 0; x < 120; x++) img.set(x, y, flat ? pack(40, 44, 60) : (x * 7 + y * 13) % 17 < 3 ? pack(70, 90, 60) : (x + y) % 9 === 0 ? pack(50, 70, 40) : pack(110, 140, 90));
+    for (let y = 16; y < 22; y++) for (let x = bx; x < bx + 6; x++) if (Math.hypot(x - bx - 2.5, y - 18.5) < 3.2) img.set(x, y, pack(230, 60, 60));
+    return img;
+  });
+  for (const flat of [false, true]) {
+    const frames = ball(flat), t = study({ name: "ball", frames, ms: frames.map(() => 80), kind: "test" }).text.join("\n");
+    assert.match(t, /going right at 8\.00 px\/frame: one drawing carried along a path/, flat ? "on a flat ground" : "on a textured one");
+    assert.doesNotMatch(t, /Planes going by/);
+    assert.match(t, /Loop: the last frame jumps to the first \(across 94 px, where a usual step spans 14\)/);
+  }
+});
+
 test("pixelate keeps an edge where a box average blurs it", () => {
   // black and white, the edge off the 4 px grid: superpixels follow it, boxes average across it
   const img = new Img(200, 100);

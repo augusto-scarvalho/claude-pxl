@@ -102,7 +102,9 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
   for (let t = 0; t < N; t++) {
     const cs = comps[t], pairs: [number, number, number, number][] = [];
     live.forEach((f, i) => {
-      const l = f.comps.at(-1)!, g = t - l.t, w = l.x1 - l.x0 + 1, h = l.y1 - l.y0 + 1, x = l.x0 + f.vx * g, y = l.y0 + f.vy * g, reach = Math.max(6, 0.75 * Math.max(w, h));
+      // (a track just begun has no speed yet to predict by: its next step may be a stride of a few of
+      // its sizes, a ball crossing, a leap from rest)
+      const l = f.comps.at(-1)!, g = t - l.t, w = l.x1 - l.x0 + 1, h = l.y1 - l.y0 + 1, x = l.x0 + f.vx * g, y = l.y0 + f.vy * g, reach = Math.max(6, (f.comps.length === 1 ? 2.5 : 0.75) * Math.max(w, h));
       cs.forEach((c, j) => {
         if (c.n > 2.5 * l.n || l.n > 2.5 * c.n) return;
         const ow = Math.max(0, Math.min(x + w, c.x1 + 1) - Math.max(x, c.x0)), oh = Math.max(0, Math.min(y + h, c.y1 + 1) - Math.max(y, c.y0));
@@ -145,7 +147,8 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       const g = tr[i].t - tr[i - 1].t || 1, sx = (tr[i].cx - tr[i - 1].cx) / g, sy = (tr[i].cy - tr[i - 1].cy) / g;
       if (Math.hypot(sx - vx, sy - vy) <= Math.max(1.5, 0.75 * sp)) steady++;
     }
-    if (tr.length >= 6 && travel >= Math.max(8, 0.8 * size) && travel >= 0.6 * path && sp <= Math.max(2, 0.5 * size) && steady >= 0.7 * (tr.length - 1) && !swung(tr.map((c) => c.pix))) {
+    // (faster than half its size a frame only when it keeps one speed nearly all the way: a ball crossing)
+    if (tr.length >= 6 && travel >= Math.max(8, 0.8 * size) && travel >= 0.6 * path && (sp <= Math.max(2, 0.5 * size) || steady >= 0.9 * (tr.length - 1)) && steady >= 0.7 * (tr.length - 1) && !swung(tr.map((c) => c.pix))) {
       // carried along: one drawing, or changing drawings (the thing cut out by its difference, bottom-centered)
       const cut = tr.map((c) => cutout(F0[c.t], fg0[c.t], c, W));
       const { poses, cycle } = posesOf(cut, differ);

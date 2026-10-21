@@ -675,9 +675,13 @@ Saint11's, read from his page, and not kept in the repository):
   draws them in by turns); the race still reads as a camera going forward.
 - [x] **How long each piece's drawings are held**, per piece (the clip's own holds are said now).
   Done when its cycle is a whole number of times its drawings: "each held about 2 frames: on twos".
-- [ ] **A ball crossing a still backdrop** read as a plane going by ("nothing moves on its own"), and
+- [x] **A ball crossing a still backdrop** read as a plane going by ("nothing moves on its own"), and
   a one-way move that jumps back to its start read as "a loop that closes" (the seam measured
-  against the steps, which are as big): found by the second audit.
+  against the steps, which are as big): found by the second audit. Done: a track just begun reaches
+  2.5 times its size for its next step (it has no speed to predict by yet); a thing faster than half
+  its size a frame is carried when it keeps one speed nearly all the way; a plane has to move all
+  across its band each frame; the seam has to span no farther than a usual step. The calibration:
+  the cyberpunk street's traffic found 31 to 33, its masks 39/43% to 41/46%, the rest as it was.
 - [x] **Banding across a 1 px gap**, and 45° runs whose ends step together (Pixel Joint): study's
   banding counts only runs side by side. Done: the gallery's facades read about 1.7 times the pairs.
 

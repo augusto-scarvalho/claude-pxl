@@ -392,8 +392,16 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
   const drawn = held_ms.length === n ? "" : on > 1 ? `; ${held_ms.length} drawings held ${held_ms[0]} ms each (on ${["", "", "twos", "threes", "fours"][on] ?? `${on}s`})`
     : `; ${held_ms.length} drawings held ${held_ms.slice(0, 16).join(", ")}${held_ms.length > 16 ? ", ..." : ""} ms`;
   lines.push(`  Timing: ${n} frames, ${delays.length === 1 ? `${delays[0]} ms each (${fps.toFixed(fps < 10 ? 1 : 0)} fps)` : `${Math.min(...delays)}-${Math.max(...delays)} ms (held poses differ)`}; ${held} repeat the frame before (holds)${drawn}.`);
-  const seam = frameDiff(L[n - 1], L[0]), loops = seam <= Math.max(2 * med, 0.002);
-  lines.push(`  Loop: ${loops ? "the last frame runs into the first (a loop that closes)" : `the last frame jumps to the first (${(seam / (med || 1e-9)).toFixed(1)}x a usual step): not a closed loop, or a clip from a longer one`}.`);
+  // (as much change as a usual step, and no farther across: a ball that crossed and is back at its
+  // start changes as much as one stride, but over the whole way it went)
+  const span = (a: Float32Array, b: Float32Array) => {
+    let x0 = W, x1 = -1, y0 = H, y1 = -1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (Math.abs(a[y * W + x] - b[y * W + x]) > 0.02) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    return x1 < 0 ? 0 : Math.max(x1 - x0, y1 - y0) + 1;
+  };
+  const spans = L.slice(1).map((l, i) => span(L[i], l)).filter((v) => v > 0).sort((a, b) => a - b), wide = spans[Math.floor(spans.length * 0.9)] ?? 0;
+  const seam = frameDiff(L[n - 1], L[0]), much = seam <= Math.max(2 * med, 0.002), far = span(L[n - 1], L[0]), near = far <= Math.max(8, 1.5 * wide), loops = much && near;
+  lines.push(`  Loop: ${loops ? "the last frame runs into the first (a loop that closes)" : `the last frame jumps to the first (${!much ? `${(seam / (med || 1e-9)).toFixed(1)}x a usual step` : `across ${far} px, where a usual step spans ${wide}`}): not a closed loop, or a clip from a longer one`}.`);
   // a cycle: the shortest shift after which frames repeat
   let cycle = 0;
   for (let p = 2; p <= Math.min(Math.floor(n / 2), 120) && med > 0; p++) {
@@ -452,7 +460,14 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
     if (last && last.y1 === y && Math.abs(last.v - v) <= Math.max(0.3, Math.abs(v) * 0.15)) { last.v = (last.v * (last.y1 - last.y0) + v * 8) / (last.y1 - last.y0 + 8); last.y1 = y + 8; }
     else bands.push({ y0: y, y1: y + 8, v });
   }
-  bands = bands.filter((b) => Math.abs(b.v) >= 0.1);
+  // and the band goes by all across, each frame: a ball crossing a flat ground moves its rows too, but a
+  // small part of their width at a time
+  const across = (b: { y0: number; y1: number }) => median(pairs.filter((i) => i + 1 < n).map((i) => {
+    let c = 0;
+    for (let x = 0; x < W; x++) for (let y = b.y0; y < Math.min(H, b.y1); y++) if (Math.abs(L[i][y * W + x] - L[i + 1][y * W + x]) > 0.02) { c++; break; }
+    return c / W;
+  }));
+  bands = bands.filter((b) => Math.abs(b.v) >= 0.1 && across(b) >= 0.4);
   if (bands.length) {
     const sorted = bands.slice().sort((a, b) => Math.abs(a.v) - Math.abs(b.v));
     lines.push(`  Planes going by (bands of rows carried across together): ${bands.map((b) => `rows ${b.y0}-${b.y1} at ${Math.abs(b.v).toFixed(2)} px/frame ${b.v < 0 ? "left" : "right"} (${(Math.abs(b.v) * fps).toFixed(0)} px/s)`).join("; ")}.${bands.length > 1 ? ` Parallax: ${sorted.length} speeds from ${Math.abs(sorted[0].v).toFixed(2)} to ${Math.abs(sorted[sorted.length - 1].v).toFixed(2)} px/frame, each its own plane, the faster the nearer.` : ""}`);
