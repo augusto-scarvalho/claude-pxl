@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**240 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**245 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–21, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -202,7 +202,7 @@ references until it read right.
 ## How it was built
 
 Every change was made by Claude while drawing real scenes, and reviewed by a person on a curation page:
-213 entries, each with its picture and the note that asked for it.
+214 entries, each with its picture and the note that asked for it.
 
 - **Dogfooding:** each scene was drawn with pxl itself; every friction went to `FEEDBACK.md` and became
   a fix or a doc line. Work first done in throwaway scripts (camera math, noise, shadow sweeps) moved
