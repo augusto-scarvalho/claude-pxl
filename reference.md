@@ -87,7 +87,9 @@ sheet globs.
 - **Function**: `(c) => { ... }` gets the canvas; call ops as methods (`c.rect(...)`), plus
   `c.w`, `c.h`, `c.is(x, y, "ab")` (pixel is one of these keys; `"*"` opaque, `"."` transparent),
   `c.key(x, y)`, `c.get(x, y)` (packed color), `c.rng(seed)` (deterministic, follows reseed),
-  `c.size(name)` (`{ w, h }` of an asset as it would be placed, for layouts).
+  `c.size(name)` (`{ w, h }` of an asset as it would be placed, for layouts),
+  `c.subpixel(dx, dy, () => { ... })` (what the function draws, laid down moved by dx, dy, between
+  pixels too, as `stamp`'s `sub` lays an asset: subpixel motion for parts drawn in code).
   Three differ from their globals: `c.clip(region, () => { ... })` and `c.plate(() => { ... }, opts)`
   take a function instead of items, and `c.pose(joints, opts)` a joints map instead of a file;
   `lighting`, `glow` and `frame` are items only, never methods.

@@ -251,6 +251,8 @@ declare global {
     clip(where: PxRegion, fn: () => void): void;
     /** Draw on a plate of its own, lit there with relight's opts, then lay it down. */
     plate(fn: () => void, opts?: PxRelight): void;
+    /** Draw `fn` on a sheet of its own and lay it down moved by (dx, dy), between pixels too (subpixel). */
+    subpixel(dx: number, dy: number, fn: () => void): void;
     px(x: number, y: number, c: PxColor): void;
     rect(x: number, y: number, w: number, h: number, c: PxColor): void;
     box(x: number, y: number, w: number, h: number, c: PxColor): void;

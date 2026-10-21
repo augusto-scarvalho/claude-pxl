@@ -56,7 +56,7 @@ rig/knight.px.js: 1 warning (3 scenes (98 frames, 123 distinct placements), 69 r
   knights › knight @knights, feet 100,84 › WARNING: lit from the top left, but its light comes from the top right (a flipped drawing carries its light to the other side)
 rig/tournament.px.js: 0 warnings (1 scene (96 frames, 339 distinct placements), 0 rigs, 1 other asset with a front marker)
   ran: front marker on 9, lit side on 310 (a clear reading on 179), feet on 109
-rig/warden.px.js: 0 warnings (1 scene (34 frames, 66 distinct placements), 0 rigs, 0 other assets with a front marker)
+rig/warden.px.js: 0 warnings (1 scene (34 frames, 68 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one), lit side (no scene declares world.light), feet and size (nothing placed has a height)
 shop.px.js: 0 warnings (1 scene (1 frame, 13 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lettering on 1; not run: front marker (nothing has one), lit side (no scene declares world.light), feet and size (nothing placed has a height)

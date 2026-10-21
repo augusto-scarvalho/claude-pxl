@@ -285,10 +285,10 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   takes that tone on the way back. It works up and down, sideways, round a small circle, and for
   growing and shrinking. Move the parts by turns (the head, then the shoulders and sleeves, the hem
   last), so a six-frame breath carries one pixel of real travel. In pxl: draw the parts apart and
-  stamp each with `{ sub: true }` at its place of the frame (`y + 0.5` is half a pixel down); the
-  palette needs a key between each part's colors and what it moves over (`examples/subpixel.px.js`
-  makes them as mixes of the two). `pxl study` tells it in a clip ("Subpixel: ..."), with the tones it
-  takes.
+  stamp each with `{ sub: true }` (or draw it in `c.subpixel(dx, dy, () => ...)`) at its place of the
+  frame (`y + 0.5` is half a pixel down); the palette needs a key between each part's colors and what
+  it moves over (`examples/subpixel.px.js` makes them as mixes of the two; `examples/rig/warden.px.js`
+  breathes so at rest). `pxl study` tells it in a clip ("Subpixel: ..."), with the tones it takes.
 - **Register the whole figure by one point**, the pelvis: move the entire frame so it lands on the
   same x every frame, with one constant y offset per cycle for the bob. Never centre frames on
   their bounding box (an arm reaching out moves it), and never pin head and feet separately (the

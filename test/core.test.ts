@@ -712,4 +712,7 @@ test("stamp sub: half a pixel along, the part stays crisp and spills half a pixe
   assert.equal(art(pal + 'sprite("s", { w: 6, h: 6 }, stamp("b", 2, 2.5, { sub: true }))', "s"), art(pal + 'sprite("s", { w: 6, h: 6 }, stamp("b", 2, 2))', "s"));
   // an option only stamp takes
   assert.throws(() => art(pal + 'sprite("s", { w: 6, h: 6 }, tile("b", 0, 0, 2, 2, { sub: true }))', "s"), /sub/);
+  // drawn in code: c.subpixel moves what it draws the same way
+  assert.equal(on(pal, '(c) => c.subpixel(0, 0.5, () => c.rect(2, 2, 2, 2, "w"))'), rows("rrrrrr", "rrrrrr", "rrwwrr", "rrwwrr", "rrffrr", "rrrrrr"));
+  assert.equal(on(pal, '(c) => c.subpixel(1, 1, () => c.rect(1, 1, 2, 2, "w"))'), on(pal, 'rect(2, 2, 2, 2, "w")'));
 });

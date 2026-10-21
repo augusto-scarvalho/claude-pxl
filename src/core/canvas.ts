@@ -208,6 +208,21 @@ export class Canvas {
     under.blit(plate, 0, 0);
   }
 
+  /**
+   * Run `fn` drawing onto a sheet of its own, then lay it down moved by (dx, dy), which may fall
+   * between pixels: what `stamp`'s `sub` does for an asset, for parts drawn in code (a chest breathing
+   * half a pixel). The edge it moves toward spills half a pixel in the palette's key between.
+   */
+  subpixel(dx: number, dy: number, fn: () => void): void {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) throw new PxError(`subpixel(dx, dy, fn): dx and dy are numbers of px, got ${JSON.stringify([dx, dy])}`);
+    const under = this.img, sorted = this.sorted, sheet = new Img(under.w, under.h);
+    this.img = sheet;
+    this.sorted = undefined;
+    try { fn(); } finally { this.img = under; this.sorted = sorted; }
+    if (sheet.orient?.text) this.lettered();
+    this.subPut(sheet, dx - this.ox, dy - this.oy);
+  }
+
   /** Run `fn` with drawing restricted to `region` (nests by intersection). */
   clip(region: Region, fn: () => void): void {
     const prev = this.clipPred, p = regionPred(region);

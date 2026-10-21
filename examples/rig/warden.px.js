@@ -151,11 +151,13 @@ const THIGH = 10, SHIN = 10, UPPER = 8, FORE = 8, HAFT = 17
 // from the pelvis on the floor; hand: the axe hand from its shoulder, [forward, right, up]; axe: which
 // way the haft points from it (the edge's way is worked out from the motion, below); off: the other hand from its
 // shoulder; smear: draw what the blade swept since the frame before; spark: the chop's hit
-const REST = { look: "calm", yaw: 60, twist: 0, head: 0, lean: 2, crouch: 0, feet: [[-1, -4], [1, 4]], hand: [2, 2, -15], axe: [0.6, 0.15, -1], off: [0, -1, -15] }
+const REST = { look: "calm", breath: 0, yaw: 60, twist: 0, head: 0, lean: 2, crouch: 0, feet: [[-1, -4], [1, 4]], hand: [2, 2, -15], axe: [0.6, 0.15, -1], off: [0, -1, -15] }
 const KEYS = [
   { t: 0, ...REST },
-  { t: 2, crouch: 1 },
-  { t: 4, crouch: 0 },
+  // the breath at rest, by half pixels (subpixel): the head down a pixel and back, the chest a frame
+  // behind it, the hips, the skirt and the feet still (no single-pixel bob onto shortened legs)
+  { t: 2, breath: 1 },
+  { t: 4, breath: 0 },
   // the wind-up: the shoulders coil back, the axe up behind the head, the free hand forward
   { t: 5, look: "grit", twist: -35, head: 25, crouch: 2, lean: 6, hand: [-3, 4, 6], axe: [-0.5, 0.3, 0.8], off: [6, -1, -4] },
   { t: 6, twist: -55, head: 40, crouch: 3, lean: 8, hand: [-5, 5, 8], axe: [-0.6, 0.35, 0.7], off: [8, -1, -2], feet: [[1, -5], [-2, 5]] },
@@ -183,8 +185,8 @@ const KEYS = [
   // up again, the axe let down to the side
   { t: 25, look: "calm", yaw: 760, crouch: 3, lean: 8, hand: [6, 3, -11], axe: [0.8, 0.2, -0.7], off: [0, -2, -14], feet: [[-2, -5], [3, 4]] },
   { t: 28, yaw: 780, twist: 0, head: 0, crouch: 0, lean: 2, ...{ hand: REST.hand, axe: REST.axe, off: REST.off, feet: REST.feet } },
-  { t: 31, crouch: 1 },
-  { t: 33, crouch: 0 },
+  { t: 31, breath: 1 },
+  { t: 33, breath: 0 },
 ]
 const FRAMES = 34
 // each key takes what it doesn't say from the one before; between keys, eased in and out
@@ -382,6 +384,9 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
   layer("body", (c) => {
     const p = pose(c.frame), j = skeleton(p), parts = [], mid = depth(j.chest)
     const at = (d, draw) => parts.push({ d, draw })
+    // what breathes: the head by the breath of the frame, the chest, arms and axe by the frame before's
+    const bHead = p.breath, bChest = pose((c.frame + FRAMES - 1) % FRAMES).breath
+    const chest = (draw) => () => c.subpixel(0, bChest, draw), head = (draw) => () => c.subpixel(0, bHead, draw)
     const sk = skirt(j, FLARE[c.frame], rad(Math.max(-32, Math.min(32, -TAIL[c.frame] * 0.4))))
     at(mid - 2.5, () => zfill(c, sk, (front) => !front))
     at(mid + 0.6, () => zfill(c, sk, (front) => front))
@@ -390,29 +395,28 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
       limb(c, L.hip, L.knee, 2.2, 1.9, "Ttt"); limb(c, L.knee, L.ankle, 1.9, 1.7, "Tt")
       zfill(c, boot(L, unit(add(j.hips.f, mul(j.hips.r, side ? 0.3 : -0.3)))))           // toes turned out a little
     }))
-    at(mid, () => torso(c, j, p))
+    at(mid, chest(() => torso(c, j, p)))
     // the head as it is turned, and the tail of hair swinging behind it
     const look = (((p.yaw + p.twist + p.head) % 360) + 360) % 360, view = Math.round(look / 45) % 8
-    at(depth(j.head) + 1, () => { const [x, y] = scr(j.head).map(Math.round); const v = view > 4 ? 8 - view : view; c.stamp(`_whead${v}${v <= 2 && p.look !== "calm" ? "_" + p.look : ""}`, x, y, view > 4 ? { flip: "x" } : {}) })
+    at(depth(j.head) + 1, () => { const [x, y] = scr(j.head).map(Math.round); const v = view > 4 ? 8 - view : view; c.stamp(`_whead${v}${v <= 2 && p.look !== "calm" ? "_" + p.look : ""}`, x, y + bHead, { sub: true, ...(view > 4 ? { flip: "x" } : {}) }) })
     const tailYaw = rad(p.yaw + p.twist + p.head + 180 - Math.max(-70, Math.min(70, TAIL[c.frame] * 0.8))), lift = Math.min(1, Math.abs(TAIL[c.frame]) / 60)
     const tdir = unit([Math.sin(tailYaw) * (0.3 + lift), -1 + lift * 0.8, Math.cos(tailYaw) * (0.3 + lift)])
     const t0 = local(j.head, j.hd, [-3.5, 0, 0]), t1 = add(t0, mul(tdir, 5)), t2 = add(t1, mul(unit(add(tdir, [0, -0.6, 0])), 4))
-    at(depth(t1) - 0.5, () => { limb(c, t0, t1, 1.5, 1.2, "Rrq"); limb(c, t1, t2, 1.2, 0.6, "Rr") })
+    at(depth(t1) - 0.5, head(() => { limb(c, t0, t1, 1.5, 1.2, "Rrq"); limb(c, t1, t2, 1.2, 0.6, "Rr") }))
     // the arms: the free one, and the axe arm with the axe in its fist
-    at((depth(j.shoulders[0]) + depth(j.off)) / 2, () => {
+    at((depth(j.shoulders[0]) + depth(j.off)) / 2, chest(() => {
       limb(c, j.shoulders[0], j.offElbow, 2, 1.7, "DGg"); limb(c, j.offElbow, j.off, 1.7, 1.4, "Bbn"); fist(c, j.off, "s")
-    })
-    at((depth(j.shoulders[1]) + depth(j.elbow)) / 2, () => limb(c, j.shoulders[1], j.elbow, 2, 1.7, "DGgh"))
-    at(depth(axeAt(j, 9, 2)), () => {
+    }))
+    at((depth(j.shoulders[1]) + depth(j.elbow)) / 2, chest(() => limb(c, j.shoulders[1], j.elbow, 2, 1.7, "DGgh")))
+    at(depth(axeAt(j, 9, 2)), chest(() => {
       limb(c, axeAt(j, -3, 0), axeAt(j, HAFT, 0), 0.9, 0.9, "Wwm")
       const pt = ([t, s]) => scr(axeAt(j, t, s)).map(Math.round)
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const q of [BIT, POLL]) c.poly(q.flatMap((v) => add(pt(v), [dx, dy])), "k")
       const n = cross(j.axe, j.edge), face = dot(n, VIEW), lit = dot(n, SUN) * Math.sign(face || 1)
       c.poly(BIT.flatMap(pt), lit > 0.1 ? "3" : "2"); c.poly(CHEEK.flatMap(pt), lit > 0.1 ? "2" : "1"); c.poly(POLL.flatMap(pt), "1")
       EDGE.slice(1).forEach((q, i) => c.line(...pt(EDGE[i]), ...pt(q), "4"))            // the edge, bright, toe to heel
-
-    })
-    at(Math.max(depth(j.elbow), depth(j.hand)) + 0.2, () => { limb(c, j.elbow, j.hand, 1.7, 1.4, "Bbn"); fist(c, j.hand, "s") })
+    }))
+    at(Math.max(depth(j.elbow), depth(j.hand)) + 0.2, chest(() => { limb(c, j.elbow, j.hand, 1.7, 1.4, "Bbn"); fist(c, j.hand, "s") }))
     parts.sort((a, b) => a.d - b.d).forEach((q) => q.draw())
   }),
   layer("smear", { outline: false, unlit: true }, (c) => {
