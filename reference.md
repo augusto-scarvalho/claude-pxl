@@ -501,7 +501,7 @@ attack, a jump: an action, an anim with a frame per pose, a rig posed by `ik` fo
 or a thing carried, its spacing: the steps frame to frame, speeding up, slowing, holds, a move back
 first, past its rest and back, a box squashing and stretching; its smears
 told, the frames a long thin shape in colors there a moment only shows in, and their colors, for
-`arc()`), changing all over without repeating with neighbors changing at odds (fire, water, smoke:
+`arc()`; a thing carried, the streak behind it cut off its box, for `stamp`'s `smear`), changing all over without repeating with neighbors changing at odds (fire, water, smoke:
 `flame()`, `plume()`, `warp()`), a thing wandering about its box (a bird circling: going round a
 loop), or a body seen through (a ghost, glass: where it comes and goes each pixel shows what is behind
 and that mixed toward one color by one share; the color and share, `opacity` in a layer, and its float

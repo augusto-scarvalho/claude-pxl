@@ -274,6 +274,22 @@ test("study follows a thing at rest most of the clip, then leaping: the place it
   }
 });
 
+test("study follows a ball through its smear: the streak isn't in its box or its spacing", () => {
+  // 3 px a frame, then 20 on two frames with its lightest color swept from where it was, then 3 again
+  const xs = [6, 9, 12, 15, 35, 55, 58, 61, 64, 67, 70, 73], bg = pack(40, 50, 60), dk = pack(120, 60, 40), ink = pack(20, 20, 30), red = pack(220, 70, 60), lite = pack(250, 170, 150);
+  const frames = xs.map((x, f) => {
+    const img = new Img(100, 30), prev = f ? xs[f - 1] : x;
+    for (let y = 0; y < 30; y++) for (let i = 0; i < 100; i++) img.set(i, y, (i * 7 + y * 3) % 11 ? bg : dk);
+    if (x - prev > 8) for (let y = 13; y < 19; y++) for (let i = prev + 4; i < x; i++) img.set(i, y, lite);
+    for (let y = 11; y < 19; y++) for (let i = x; i < x + 8; i++) { const dx = i - x - 3.5, dy = y - 14.5, r = Math.hypot(dx, dy); if (r < 4.3) img.set(i, y, r > 3.2 ? ink : dx < -1 && dy < -1 ? lite : red); }
+    return img;
+  });
+  const t = study({ name: "smeared", frames, ms: frames.map(() => 80), kind: "test" }).text.join("\n");
+  assert.match(t, /#1 75x8 at 6,11, in 12 of 12 frames, 1 drawing, going right .*Smears on frames 4-5 \(#faaa96.*stamp\(name, x, y, \{ smear/);
+  assert.match(t, /spacing, px a frame: right 3 3 3 20 20 3 3 3 3 3 3/);
+  assert.doesNotMatch(t, /#2 /);
+});
+
 test("study reads a see-through ghost floating: its color and share, its float, not a light", () => {
   // half its color, half the ground's, floating 0 1 2 2 1 0 px over a textured ground
   const ground = (x: number, y: number) => ((x * 7 + y * 13) % 17 < 3 ? [70, 90, 60] : (x + y) % 9 === 0 ? [50, 70, 40] : [110, 140, 90]);

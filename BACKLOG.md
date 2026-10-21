@@ -668,14 +668,19 @@ Saint11's, read from his page, and not kept in the repository):
   where it read as two lights; the calibration as it was. Tried first: a light keeping its hue (cost
   the cave's glowing fungi, whose light turns the rock's hue, and the leap's ground has too little
   color for it anyway).
-- [ ] **A smear inflates the box**: spacing and squash read off the bounding box, which a smear
+- [x] **A smear inflates the box**: spacing and squash read off the bounding box, which a smear
   stretches. Track the pixels present every frame apart from those that come and go. Tried: the
   middle of its pixels instead of its box's: a smear joined to the body pulls it as much; and the box
   without the colors `smearsOf` finds: it changed nothing on the attack cards, whose smears are in the
   body's own whites (`smearsOf` asks for colors of their own). Smears are now also told by their
   shape (thin, there three frames at most): the punch card's on frames 1-2 of each cycle, the slash's
   on 4-5. Measuring the body without them on those frames changed none of the cards' spacing lines,
-  so it isn't in.
+  so it isn't in. Done for a thing carried: a ball smeared on its two fast frames (stamp's smear)
+  broke into three pieces, the piece there too big to follow. Now its drawing found in that piece
+  (85% of its pixels in the same colors, a step of half its size at least, the rest of the piece
+  behind it on the way it came) is it, and the rest its smear, out of its box: "right 3 3 3 20 20 3",
+  "Smears on frames 4-5", with `stamp`'s `smear` as the way to draw it. The calibration as it was (the
+  cyberpunk street's traffic found 34 -> 33, its masks the same).
 - [x] **Effects as effects**: an explosion (dark, white, blast, fade) read as an attack with an
   anticipation; read its value and area per frame instead, and "plays once, then N frames empty".
   Done in `study --at`'s region reading (its area and lightness per frame, "played once"), and in the

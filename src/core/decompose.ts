@@ -51,7 +51,8 @@ export interface Piece {
 }
 
 type Blob = { x0: number; y0: number; x1: number; y1: number; n: number; cx: number; cy: number; pix: number[] };
-type Comp = Blob & { t: number; id: number };
+// (smear: the colors of a smear cut off it, stamp's)
+type Comp = Blob & { t: number; id: number; smear?: Color[] };
 
 export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: number; y: number; dx: number; dy: number }[] = [], subClip = false): { pieces: Piece[]; still: number; frames: number; relit: boolean; light: Relight } {
   const N = Math.min(frames.length, 400), F0 = frames.slice(0, N), W = F0[0].w, H = F0[0].h, WH = W * H;
@@ -169,6 +170,36 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       [f.vx, f.vy] = [(c.cx - l.cx) / g, (c.cy - l.cy) / g];
       f.comps.push(c); f.lost = 0; tookF.add(i); tookC.add(js[0]);
     }
+    // a thing smeared (stamp's smear, a streak behind it on its fastest frames): the piece where it went
+    // is it and its smear, too big to take; its drawing found in that piece, the same colors on 85% of
+    // its pixels at least, is it, and the rest of the piece (the smear) is left out of its box
+    for (const i of live.map((_, i) => i).filter((i) => !tookF.has(i) && live[i].lost === 0 && live[i].comps.length >= 2)) {
+      const f = live[i], l = f.comps.at(-1)!, lw = l.x1 - l.x0, lh = l.y1 - l.y0, was = F0[l.t].data, now = F0[t].data;
+      let best: { miss: number; ox: number; oy: number; j: number } | null = null;
+      for (const j of cs.map((_, j) => j).filter((j) => !tookC.has(j))) {
+        const c = cs[j];
+        if (c.n < 1.5 * l.n || c.x1 - c.x0 < lw || c.y1 - c.y0 < lh || (c.x1 - c.x0 + 1) * (c.y1 - c.y0 + 1) > 16 * (lw + 1) * (lh + 1)) continue;
+        for (let oy = c.y0 - l.y0; oy <= c.y1 - l.y1; oy++) for (let ox = c.x0 - l.x0; ox <= c.x1 - l.x1; ox++) {
+          if (Math.hypot(ox, oy) > Math.max(12, 4 * Math.max(lw, lh)) || ox * f.vx + oy * f.vy < 0) continue;
+          let miss = 0;
+          for (const p of l.pix) if (was[p] !== now[p + oy * W + ox] && ++miss > 0.15 * l.n) break;
+          if (miss <= 0.15 * l.n && (!best || miss < best.miss)) best = { miss, ox, oy, j };
+        }
+      }
+      if (!best) continue;
+      const { ox, oy, j } = best, g = t - l.t;
+      const c: Comp = { x0: l.x0 + ox, y0: l.y0 + oy, x1: l.x1 + ox, y1: l.y1 + oy, n: l.n, cx: l.cx + ox, cy: l.cy + oy, pix: l.pix.map((p) => p + oy * W + ox), t, id: -1 };
+      // (a smear is behind it, on the way it came, a step of half its size at least: not another
+      // thing it met)
+      const at = new Set(c.pix), rest = cs[j].pix.filter((p) => !at.has(p)), sx0 = Math.min(l.x0, c.x0), sx1 = Math.max(l.x1, c.x1), sy0 = Math.min(l.y0, c.y0), sy1 = Math.max(l.y1, c.y1);
+      const behind = rest.filter((p) => { const x = p % W, y = Math.floor(p / W); return x >= sx0 && x <= sx1 && y >= sy0 && y <= sy1; }).length;
+      if (Math.hypot(ox, oy) < 0.5 * Math.max(lw, lh) || behind < 0.8 * rest.length) continue;
+      const tally = new Map<Color, number>();
+      for (const p of rest) tally.set(now[p], (tally.get(now[p]) ?? 0) + 1);
+      c.smear = [...tally].filter(([, k]) => k >= 0.2 * rest.length).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+      [f.vx, f.vy] = [ox / g, oy / g];
+      f.comps.push(c); f.lost = 0; tookF.add(i); tookC.add(j);
+    }
     for (let i = live.length - 1; i >= 0; i--) if (!tookF.has(i) && ++live[i].lost > 8) ended.push(...live.splice(i, 1));
     cs.forEach((c, j) => { if (!tookC.has(j)) live.push({ comps: [c], vx: 0, vy: 0, lost: 0 }); });
   }
@@ -204,7 +235,7 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
       const first = median(tr.slice(0, 3).map((c) => c.y1 - c.y0 + 1)), last = median(tr.slice(-3).map((c) => c.y1 - c.y0 + 1));
       const x0 = Math.min(...tr.map((c) => c.x0)), y0 = Math.min(...tr.map((c) => c.y0)), x1 = Math.max(...tr.map((c) => c.x1)), y1 = Math.max(...tr.map((c) => c.y1));
       pieces.push({
-        kind: poses >= 3 ? "walk" : "carried", box: [x0, y0, x1 - x0 + 1, y1 - y0 + 1], frames: tr.length, poses, cycle, speed: [vx, vy], grow: last / first,
+        kind: poses >= 3 ? "walk" : "carried", box: [x0, y0, x1 - x0 + 1, y1 - y0 + 1], frames: tr.length, poses, cycle, speed: [vx, vy], grow: last / first, ...(tr.some((c) => c.smear) ? { smears: { frames: tr.filter((c) => c.smear).map((c) => c.t), colors: [...new Set(tr.flatMap((c) => c.smear ?? []))] } } : {}),
         track: tr.map((c) => [c.t, c.x0, c.y0, c.x1 - c.x0 + 1, c.y1 - c.y0 + 1]), ...captures(cycle >= 2 && tr.length >= cycle ? tr.slice(0, cycle) : spread(tr, 8), spread(tr, 8), (c) => ({ t: c.t, b: c, keep: carriedCut(fg0[c.t], c, W) }), F0),
       });
       // where it is each frame, a pixel wider
