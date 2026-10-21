@@ -231,16 +231,18 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     }
     // (faster than half its size a frame only when it keeps one speed nearly all the way, a ball crossing;
     // or when it goes one way all along, its speed changing, a dash: speeding up, a leap, braking; a
-    // little back before it sets off or once it has arrived, a crouch before the leap, a settling, isn't
-    // going back, when it is found in every frame of its way)
+    // little back before it sets off or once it has arrived, a crouch before the leap, a settling, or
+    // under half a pixel on the way, its drawing changing, isn't going back, when it is found in every
+    // frame of its way)
     let back = 0, gone = 0;
     const whole = tr.length === tr.at(-1)!.t - tr[0].t + 1;
     for (let i = 1; i < tr.length; i++) {
       const s = ((tr[i].cx - tr[i - 1].cx) * dx + (tr[i].cy - tr[i - 1].cy) * dy) / (travel || 1);
-      if (s < 0 && (!whole || (gone > 0.1 * travel && gone < 0.9 * travel) || s < -0.15 * travel)) back++;
+      if (whole ? s < -0.5 && ((gone > 0.1 * travel && gone < 0.9 * travel) || s < -0.15 * travel) : s < 0) back++;
       gone += s;
     }
-    const oneWay = back === 0 && path <= 1.1 * travel;
+    // (up and down on the way, a ball bouncing as it goes, but never back)
+    const oneWay = back === 0 && path <= 1.3 * travel;
     // (six frames at least, or all of a short clip: a GIF keeps a hold as one frame)
     if ((tr.length >= 6 || (tr.length === N && N >= 4)) && travel >= Math.max(8, 0.8 * size) && travel >= 0.6 * path && (sp <= Math.max(2, 0.5 * size) || steady >= 0.9 * (tr.length - 1) || oneWay) && (steady >= 0.7 * (tr.length - 1) || oneWay) && !swung(tr.map((c) => c.pix))) {
       // carried along: one drawing, or changing drawings (the thing cut out by its difference, bottom-centered)

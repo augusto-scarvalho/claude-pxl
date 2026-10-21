@@ -280,6 +280,21 @@ test("study: smeared leaps over a dotted floor aren't a plane going by, nor a lo
   assert.match(t, /spacing, px a frame: right 24 24 16 2/);
 });
 
+test("study follows a ball rolling at an uneven speed and hopping as one thing", () => {
+  // Saint11's parallax card: a small ball rolls right, 0 to 4 px a frame, hops once in an arc
+  const n = 34, dxs = Array.from({ length: n }, (_, f) => (f ? [1, 4, 0, 2][f % 4] : 0)), xs = dxs.map((_, f) => 2 + dxs.slice(0, f + 1).reduce((a, b) => a + b, 0));
+  const ys = Array.from({ length: n }, (_, f) => [18, 14, 11, 9, 8, 8, 9, 11, 14][f - 12] ?? 18);
+  const frames = xs.map((x, f) => {
+    const img = new Img(90, 30), y = ys[f];
+    for (let yy = 0; yy < 30; yy++) for (let xx = 0; xx < 90; xx++) img.set(xx, yy, (xx * 5 + yy * 3) % 13 < 2 ? pack(30, 90, 160) : pack(40, 120, 200));
+    for (let yy = y; yy < y + 6; yy++) for (let xx = x; xx < x + 6; xx++) { const r = Math.hypot(xx - x - 2.5, yy - y - 2.5); if (r < 3.2) img.set(xx, yy, r > 2.2 ? pack(40, 20, 30) : pack(220, 50, 50)); }
+    return img;
+  });
+  const t = study({ name: "ball", frames, ms: frames.map(() => 80), kind: "test" }).text.join("\n");
+  assert.match(t, /#1 \S+ at 2,8, in 34 of 34 frames, 1 drawing, going right .*carried along a path/);
+  assert.doesNotMatch(t, /#2 /);
+});
+
 test("study follows a dash that crouches first: its middle shifting back under a pixel isn't going back", () => {
   // Saint11's squash card: standing, crouching (narrower and lower, its middle half a pixel back),
   // stretched along the dash, braking low, standing again

@@ -736,8 +736,14 @@ Saint11's, read from his page, and not kept in the repository):
   track all through a short clip (4 or 5 frames) can be carried: "right 24 24 16 2, slowing", smears
   on frames 1-3. Cutting for one-frame tracks in the first pass too cost the cyberpunk street a car
   (33 -> 32). And Saint11's
-  parallax card's ball (4 px, bouncing, passing behind a tree) breaks into three pieces, at the tree
-  and at the bounce (the prediction goes on down; a bounce turns it). Open.
+  parallax card's ball (4 px, bouncing, passing behind a tree) broke into three pieces. Its track was
+  whole (the follower kept it through the tree and the hop); what turned it down was a step of -0.03
+  px counted as going back, and its way 1.27 times as long as how far it went (it hops) where 1.1 was
+  allowed, at an uneven speed. Done: on a track found in every frame, a step back under half a pixel
+  doesn't count, and a way up to 1.3 times as long is still one way. The card reads one piece, 35 of
+  64 frames (it rolls out and the panel is empty after). 1.5 cost no_magic's light 76% -> 73%, and
+  half a pixel on a track with frames missing cost the party's 75% -> 69%; the cyberpunk street found
+  33 -> 34, its masks' precision 42% -> 41%.
 - [x] **Banding across a 1 px gap**, and 45° runs whose ends step together (Pixel Joint): study's
   banding counts only runs side by side. Done: the gallery's facades read about 1.7 times the pairs.
 
