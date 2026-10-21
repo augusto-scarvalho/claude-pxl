@@ -9,7 +9,7 @@
 pal({
   k: "#17111c",
   S: "#7d4636", s: "#c47c5a", z: "#eab08a", Z: "#f7cfa8",     // skin
-  i: "#2e1d1d", y: "#b05a4c", c: "#e0907a",                   // eyes, mouth, a blush
+  i: "#2e1d1d", y: "#b05a4c", c: "#e0907a", U: "#f4ece0",     // eyes, mouth, a blush, teeth
   R: "#4a1b1a", r: "#8c3a22", q: "#c4622c", Q: "#e8924c",     // auburn hair
   D: "#16302a", G: "#275240", g: "#3f7a4c", h: "#79a85a",     // the coat
   L: "#4a1e22", l: "#7a3030",                                 // its lining
@@ -27,7 +27,9 @@ pal({
 ramps("kSszZ", "kRrqQ", "kDGgh", "kLl", "kFfeE", "kBbn", "kTt", "kOo", "k1234", "kWwm", "kuY")
 
 // ---- the head by hand, as it is turned to us: front, front 3/4 right, right, back 3/4 right, back;
-// facing left are these mirrored. The tail of hair is drawn apart (it swings).
+// facing left are these mirrored. The tail of hair is drawn apart (it swings). The face is round and
+// a row taller than it needs at rest, to hold its expressions: calm; brows down and drawn together
+// over a hard mouth when winding up; and a shout, the jaw dropped, in the cut.
 const HEADS = [`
   ...RRRRRR..
   ..RrqqRqrR.
@@ -37,9 +39,10 @@ const HEADS = [`
   RrRRzzzRRrR
   RrzzZzzzsrR
   RrzizzzisrR
-  RRzizzsisRR
-  .RczzzzzcR.
-  ..SsyyzsS..
+  RrzizzzisrR
+  RRczzzszcRR
+  .RszzyzzsR.
+  ..SszzzsS..
   ...SsssS...
   ....SSS....`, `
   ..RRRRRR...
@@ -50,10 +53,11 @@ const HEADS = [`
   RrrqrRRzRRz
   RrrSszzZzzz
   RrrSszizziz
-  RrrSszizsiz
-  .RrSsczzzcS
-  ..RSsszyS..
-  ...RSssS...
+  RrrSszizziz
+  .RrSczzzscz
+  .RrSszzyzz.
+  ..RSsszzzS.
+  ...RSsssS..
   ...SSS.....`, `
   ..RRRRRR....
   .RrqqqRqrR..
@@ -63,10 +67,11 @@ const HEADS = [`
   RrrqqrrRRzz.
   RrrrSszzzzz.
   RrrrSszzizz.
-  RrrrSsszzzzz
-  .RrrSsczzzS.
-  ..RrSsszy...
-  ...RSsszS...
+  RrrrSszzizzz
+  RrrrSsczzzS.
+  .RrrSszzyz..
+  ..RrSsszzS..
+  ...RSsssS...
   ...SSS......`, `
   ..RRRRRR...
   .RrqqqRqrR.
@@ -76,6 +81,7 @@ const HEADS = [`
   RrrqrqqrrrR
   RrrrqrqrrSR
   RrrrrbrrRsR
+  RRrrrrrrRsR
   RRrrrrrrRsR
   .RRrrrrRSS.
   ..RRrrRSS..
@@ -90,11 +96,25 @@ const HEADS = [`
   RrrrqrqrrrR
   RrrrbbbrrrR
   RRrrrqrrrRR
+  RRrrrrrrrRR
   .RRrrrrrRR.
   ..RRrrrRR..
   ...RRRRR...
   ....SSS....`]
+// the expressions, as the rows of a face they change (front, 3/4, profile)
+const GRIT = [
+  { 5: "RrzzZzzzzrR", 6: "RrRRzzzRRrR", 7: "RrziRzRisrR", 8: "RrzizzzisrR", 10: ".RszSSSzsR." },
+  { 5: "RrrqrRzzzRz", 6: "RrrSszRzRzz", 7: "RrrSszizziz", 8: "RrrSszizziz", 10: ".RrSszSSSz." },
+  { 5: "RrrqqrrRzzz.", 6: "RrrrSszzRzz.", 7: "RrrrSszzizz.", 8: "RrrrSszzizzz", 10: ".RrrSszzSS.." },
+]
+const SHOUT = [
+  { ...GRIT[0], 10: ".RsziiizsR.", 11: "..SsiyisS..", 12: "...SszsS..." },
+  { ...GRIT[1], 10: ".RrSsziiiz.", 11: "..RSssiyiS.", 12: "...RSszsS.." },
+  { ...GRIT[2], 10: ".RrrSszzii..", 11: "..RrSsszyi..", 12: "...RSssS...." },
+]
+const face = (g, rows) => g.split("\n").map((l, n) => (rows[n - 1] ? "  " + rows[n - 1] : l)).join("\n")
 HEADS.forEach((g, i) => sprite(`_whead${i}`, { outline: "k", pivot: "center" }, g))
+for (const [name, set] of [["grit", GRIT], ["shout", SHOUT]]) set.forEach((rows, i) => sprite(`_whead${i}_${name}`, { outline: "k", pivot: "center" }, face(HEADS[i], rows)))
 
 // ---- the camera: px, x to the right, y up, z toward us; a little from above, so a level circle is a
 // flat ellipse (the smear of a level cut)
@@ -131,28 +151,28 @@ const THIGH = 10, SHIN = 10, UPPER = 8, FORE = 8, HAFT = 17
 // from the pelvis on the floor; hand: the axe hand from its shoulder, [forward, right, up]; axe: which
 // way the haft points from it (the edge's way is worked out from the motion, below); off: the other hand from its
 // shoulder; smear: draw what the blade swept since the frame before; spark: the chop's hit
-const REST = { yaw: 60, twist: 0, head: 0, lean: 2, crouch: 0, feet: [[-1, -4], [1, 4]], hand: [2, 2, -15], axe: [0.35, 0.15, -1], off: [0, -1, -15] }
+const REST = { look: "calm", yaw: 60, twist: 0, head: 0, lean: 2, crouch: 0, feet: [[-1, -4], [1, 4]], hand: [2, 2, -15], axe: [0.35, 0.15, -1], off: [0, -1, -15] }
 const KEYS = [
   { t: 0, ...REST },
   { t: 2, crouch: 1 },
   { t: 4, crouch: 0 },
   // the wind-up: the shoulders coil back, the axe up behind the head, the free hand forward
-  { t: 5, twist: -35, head: 25, crouch: 2, lean: 6, hand: [-3, 4, 6], axe: [-0.5, 0.3, 0.8], off: [6, -1, -4] },
+  { t: 5, look: "grit", twist: -35, head: 25, crouch: 2, lean: 6, hand: [-3, 4, 6], axe: [-0.5, 0.3, 0.8], off: [6, -1, -4] },
   { t: 6, twist: -55, head: 40, crouch: 3, lean: 8, hand: [-5, 5, 8], axe: [-0.6, 0.35, 0.7], off: [8, -1, -2], feet: [[1, -5], [-2, 5]] },
   // the whirl: low, the arm out level, the axe pointing out, its edge leading; the free arm tucked
-  { t: 7, yaw: 115, twist: 10, head: 15, crouch: 5, lean: 12, hand: [4, 14, 0], axe: [0.25, 1, 0.05], off: [3, 3, -6], smear: 1 },
+  { t: 7, look: "shout", yaw: 115, twist: 10, head: 15, crouch: 5, lean: 12, hand: [4, 14, 0], axe: [0.25, 1, 0.05], off: [3, 3, -6], smear: 1 },
   { t: 8, yaw: 185, twist: 25, head: 20, smear: 1 },
   { t: 9, yaw: 255, twist: 25, head: 20, hand: [4, 14, 1], axe: [0.25, 1, 0.1], smear: 1 },
   { t: 10, yaw: 325, twist: 25, head: 15, hand: [5, 14, 3], axe: [0.3, 1, 0.3], smear: 1 },
   // out of the turn, a cut falling across to the front: the arm straight, the weight on the front foot
   { t: 11, yaw: 390, twist: 15, head: 0, crouch: 4, lean: 14, hand: [13, 3, -3], axe: [1, 0.1, -0.45], off: [-3, -2, -8], feet: [[-4, -5], [5, 4]], smear: 1 },
   { t: 12, yaw: 420, twist: 5, crouch: 3, lean: 10, hand: [14, 2, -5], axe: [1, 0.05, -0.55], smear: 0 },
-  { t: 13, twist: 0 },
+  { t: 13, look: "grit", twist: 0 },
   // the second wind-up: the axe straight up, the body coiled the other way round
   { t: 15, yaw: 400, twist: -45, head: 35, crouch: 1, lean: 2, hand: [-1, 3, 13], axe: [-0.2, 0.15, 1], off: [5, -2, 2], feet: [[1, -5], [-2, 5]] },
   { t: 16, twist: -60, head: 45, crouch: 2 },
   // a turn and the chop: round once, the axe coming over and down into the floor
-  { t: 17, yaw: 480, twist: -10, head: 20, crouch: 4, lean: 10, hand: [3, 12, 2], axe: [0.3, 1, 0.1], off: [3, 3, -5], smear: 1 },
+  { t: 17, look: "shout", yaw: 480, twist: -10, head: 20, crouch: 4, lean: 10, hand: [3, 12, 2], axe: [0.3, 1, 0.1], off: [3, 3, -5], smear: 1 },
   { t: 18, yaw: 560, twist: 15, head: 15, smear: 1 },
   { t: 19, yaw: 640, twist: 20, smear: 1 },
   { t: 20, yaw: 720, twist: 10, head: 10, crouch: 2, lean: 4, hand: [2, 3, 12], axe: [0.4, 0.1, 1] },
@@ -161,7 +181,7 @@ const KEYS = [
   { t: 22, crouch: 7, spark: 2 },
   { t: 23, crouch: 6, spark: 3 },
   // up again, the axe let down to the side
-  { t: 25, yaw: 760, crouch: 3, lean: 8, hand: [6, 3, -11], axe: [0.8, 0.2, -0.7], off: [0, -2, -14], feet: [[-2, -5], [3, 4]] },
+  { t: 25, look: "calm", yaw: 760, crouch: 3, lean: 8, hand: [6, 3, -11], axe: [0.8, 0.2, -0.7], off: [0, -2, -14], feet: [[-2, -5], [3, 4]] },
   { t: 28, yaw: 780, twist: 0, head: 0, crouch: 0, lean: 2, ...{ hand: REST.hand, axe: REST.axe, off: REST.off, feet: REST.feet } },
   { t: 31, crouch: 1 },
   { t: 33, crouch: 0 },
@@ -175,7 +195,7 @@ const pose = (t) => {
   if (i < 0) return { ...KEYS[KEYS.length - 1], t }
   const a = KEYS[i - 1], b = KEYS[i], s = (t - a.t) / (b.t - a.t), e = b.t - a.t > 1 ? s * s * (3 - 2 * s) : s
   const p = { t }
-  for (const n in b) if (n !== "t" && n !== "smear" && n !== "spark") p[n] = Array.isArray(b[n]) ? b[n].map((v, j) => lerp(a[n][j], v, e)) : lerp(a[n], b[n], e)
+  for (const n in b) if (n !== "t" && n !== "smear" && n !== "spark") p[n] = typeof b[n] === "string" ? (t >= b.t ? b[n] : a[n]) : Array.isArray(b[n]) ? b[n].map((v, j) => lerp(a[n][j], v, e)) : lerp(a[n], b[n], e)
   if (t === b.t) { p.smear = b.smear; p.spark = b.spark } else if (t === a.t) { p.smear = a.smear; p.spark = a.spark }
   return p
 }
@@ -351,7 +371,7 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
     at(mid, () => torso(c, j, p))
     // the head as it is turned, and the tail of hair swinging behind it
     const look = (((p.yaw + p.twist + p.head) % 360) + 360) % 360, view = Math.round(look / 45) % 8
-    at(depth(j.head) + 1, () => { const [x, y] = scr(j.head).map(Math.round); c.stamp(`_whead${view > 4 ? 8 - view : view}`, x, y, view > 4 ? { flip: "x" } : {}) })
+    at(depth(j.head) + 1, () => { const [x, y] = scr(j.head).map(Math.round); const v = view > 4 ? 8 - view : view; c.stamp(`_whead${v}${v <= 2 && p.look !== "calm" ? "_" + p.look : ""}`, x, y, view > 4 ? { flip: "x" } : {}) })
     const tailYaw = rad(p.yaw + p.twist + p.head + 180 - Math.max(-70, Math.min(70, TAIL[c.frame] * 0.8))), lift = Math.min(1, Math.abs(TAIL[c.frame]) / 60)
     const tdir = unit([Math.sin(tailYaw) * (0.3 + lift), -1 + lift * 0.8, Math.cos(tailYaw) * (0.3 + lift)])
     const t0 = local(j.head, j.hd, [-3.5, 0, 0]), t1 = add(t0, mul(tdir, 5)), t2 = add(t1, mul(unit(add(tdir, [0, -0.6, 0])), 4))
