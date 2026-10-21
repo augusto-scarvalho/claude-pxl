@@ -699,6 +699,16 @@ test("shapes far off the picture cost only the pixels they can reach: a vertex m
   eq(art(PAL + 'sprite("c", { w: 4, h: 2 }, circ(2, 1e6, 1e6 + 1, "w"))', "c"), "wwww\nwwww");
 });
 
+test("aa: a strip half the step long on the lighter side, in the key between; none on a 1:1 step, against the clear, or without a key between", () => {
+  const P = 'pal({ k: "#1b1630", K: "#6a5a7c", w: "#e8dcc0", r: "#c83a3a" }); ramps("kKw"); ';
+  // a 4 px step of light over dark: its first 2 px take the key between
+  assert.equal(art(P + 'sprite("t", { aa: true }, "kkkkwwww\\nkkkkkkkk")', "t"), "kkkkKKww\nkkkkkkkk");
+  assert.equal(art(P + 'sprite("t", { aa: true }, "kwww\\nkkww\\nkkkw")', "t"), "kwww\nkkww\nkkkw", "1:1");
+  assert.equal(art(P + 'sprite("t", { aa: true }, "....wwww\\nkkkkkkkk")', "t"), "....wwww\nkkkkkkkk", "the clear isn't a color");
+  assert.equal(art(P + 'sprite("t", { aa: true }, "kkkkrrrr\\nkkkkkkkk")', "t"), "kkkkrrrr\nkkkkkkkk", "no key between k and r");
+  assert.throws(() => loadSource(P + 'sprite("t", { aa: 1 }, "kw")', "t.px.js").image("t"), /aa is true or false/);
+});
+
 test("stamp sub: half a pixel along, it stays where it comes from and its edges move: into its own outline, or spilling over paint; else it rounds", () => {
   const pal = 'pal({ k: "#17111c", r: "#9e4e54", w: "#f0f0f0", f: "#c79fa2", d: "#202030" }); sprite("b", { w: 2, h: 2 }, rect(0, 0, 2, 2, "w")); ';
   const on = (src: string, st: string) => art(src + `scene("s", { w: 6, h: 6, bg: "r" }, ${st})`, "s");

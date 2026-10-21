@@ -59,7 +59,7 @@ declare global {
      * those keys alone (closes only the gaps of an outline already there). selout: the line takes
      * the color it touches, n steps darker (true = 2).
      */
-    inline?: PxColor | { color: PxColor; keep?: string }; selout?: boolean | number;
+    inline?: PxColor | { color: PxColor; keep?: string }; selout?: boolean | number; aa?: boolean;
     /** Point that stamp / scatter / wire hangs place: "bottom" / "center" of the final image, or [x, y] in drawing coords. */
     pivot?: "bottom" | "center" | [number, number];
     /** Named points in drawing coords (they travel with flips, turns and the outline) that other stamps attach to with { at: "id.socket" }. */

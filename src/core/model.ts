@@ -80,6 +80,8 @@ export interface AssetOpts {
   inline?: string | { color: string; keep?: string };
   /** The outline/inline takes the color it touches, n steps darker along the ramps (true = 2). */
   selout?: boolean | number;
+  /** Anti-alias the inner edges: on each step of 2 px and more, a strip half its length in the key between. */
+  aa?: boolean;
   crop?: boolean;
   /** Also export each layer as its own PNG. */
   layers?: boolean;

@@ -1,7 +1,7 @@
 // Turns an asset definition into an image: base -> items (ops, grids, functions, layers)
 // -> post-processing (mirror, swap, flip, rot, outline, crop). Optionally traced.
-import { Canvas, type Placed, type Placement, type Resolver } from "./canvas.ts";
-import { type Color, TRANSPARENT, pack } from "./color.ts";
+import { Canvas, type Placed, type Placement, type Resolver, betweenKey } from "./canvas.ts";
+import { type Color, TRANSPARENT, oklab, pack } from "./color.ts";
 import { PxError, wrap } from "./errors.ts";
 import { Img } from "./image.ts";
 import { applyGlow } from "./glow.ts";
@@ -475,6 +475,8 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
   // Any angle, before the outline so the line is drawn fresh around the turned shape.
   if (o.angle) step(`angle ${o.angle}${o.rotate ? ` (${o.rotate})` : ""}`, () => rotate(img, o.angle!, o.rotate), (k) => rotate(k, o.angle!, o.rotate));
   else if (o.rotate) throw new PxError("rotate picks how `angle` turns the sprite: add angle: degrees");
+  if (o.aa !== undefined && typeof o.aa !== "boolean") throw new PxError(`aa is true or false, got ${fmtArgs([o.aa])}`);
+  if (o.aa) step("aa", () => antialias(img, pal));
   // selout: the line takes the color it touches, `selout` steps darker along the ramps (colors
   // without a ramp keep the line color).
   const sel = o.selout ? seloutPick(pal, o.selout === true ? 2 : o.selout) : undefined;
@@ -525,6 +527,44 @@ function solid(pal: Palette, spec: string): Color {
 }
 
 /** Mark an image as having lettering (a mirror would turn it backwards). */
+
+/**
+ * Hand-style anti-aliasing of the edges between two colors inside a sprite (Saint11, Pixel Joint): on
+ * every step of a staircase 2 px long and more, a strip half the step's length, along it from the
+ * corner, on the lighter color's side, in the key between the two (as `stamp`'s `sub` picks it).
+ * Nothing against the clear, nothing on 1:1 diagonals or straight edges.
+ */
+export function antialias(img: Img, pal: Palette): Img {
+  const out = img.copy(), set = new Set<number>();
+  const L = (c: Color) => oklab(c)[0];
+  // the same reading across rows and, turned, across columns: (u, v) along and across
+  const pass = (W: number, H: number, at: (u: number, v: number) => Color, idx: (u: number, v: number) => number) => {
+    const px = (u: number, v: number) => (u < 0 || v < 0 || u >= W || v >= H ? TRANSPARENT : at(u, v));
+    for (let v = 0; v + 1 < H; v++) for (let u = 0; u < W; ) {
+      const U = px(u, v), D = px(u, v + 1);
+      if (U === D || (U & 255) < 128 || (D & 255) < 128) { u++; continue; }
+      let e = u;
+      while (e + 1 < W && px(e + 1, v) === U && px(e + 1, v + 1) === D) e++;
+      const n = e - u + 1, k = n >> 1, M = n >= 2 ? betweenKey(pal, U, D) : null;
+      if (M !== null) {
+        const strip = (row: number, from: number, dir: number, want: Color) => {
+          for (let j = 0; j < k; j++) { const i = idx(from + dir * j, row); if (!set.has(i) && img.data[i] === want) { set.add(i); out.data[i] = M; } }
+        };
+        const upLight = L(U) > L(D);
+        // a step at either end: the lower color going on up, or the upper going on down
+        if (px(u - 1, v) === D && upLight) strip(v, u, 1, U);
+        if (px(u - 1, v + 1) === U && !upLight) strip(v + 1, u, 1, D);
+        if (px(e + 1, v) === D && upLight) strip(v, e, -1, U);
+        if (px(e + 1, v + 1) === U && !upLight) strip(v + 1, e, -1, D);
+      }
+      u = e + 1;
+    }
+  };
+  pass(img.w, img.h, (u, v) => img.data[v * img.w + u], (u, v) => v * img.w + u);
+  pass(img.h, img.w, (u, v) => img.data[u * img.w + v], (u, v) => u * img.w + v);
+  return out;
+}
+
 export function lettered(img: Img): void {
   (img.orient ??= { u: [0, -1, 0], mirrored: false, text: false }).text = true;
 }

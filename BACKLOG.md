@@ -610,8 +610,9 @@ near-twin colors and ramp steps too close, a line's L-corners and jaggies, lone 
 dither's or AA's, `wire()` drawn pixel-perfect, `--scale` whole numbers only, a ramp going the
 wrong way warned, and the lessons in characters §1, §4, §7, §9, §10 and scenes.md. Still open:
 
-- [ ] **`aa` on an asset**, opt-in: inner edges only, steps of 2 px and more, a strip about half the
+- [x] **`aa` on an asset**, opt-in: inner edges only, steps of 2 px and more, a strip about half the
   step long in the in-between key `sub` picks. Hand AA beats automatic AA, so never by default.
+  Done: `aa: true`, the strip on the lighter side of each step, before the outline.
 - [x] **`check` on sprites** for the line faults study finds (L-corners, jaggies in a 1 px line),
   so a hand grid gets them before it's built; a sprite drawn square (`outline8`) is exempt. Only
   sprites drawn by hand (a grid string, `grid()`, `runs()`; not variants, not parts): the knight's
