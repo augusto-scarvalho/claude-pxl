@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**265 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**273 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–21, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -27,7 +27,7 @@ page lists what the fork adds. Every commit is in
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus `scripts/calibrate.ts` |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 52 |
-| Tests | 59 | 217 |
+| Tests | 59 | 224 |
 
 ## Looking and checking
 
@@ -125,12 +125,17 @@ of and what to use in pxl to make the same.
   to a fraction of a pixel, a camera moving forward.
 - **Pieces:** an animation taken apart, each piece with what to build it with.
   - Kinds: the backdrop, planes, things carried along a path, walks, traffic, anims in place, rigs,
-    actions (an attack, with the frames of its smears), effects (fire, water), lights.
+    actions (an attack, with the frames of its smears), effects (fire, water, an explosion played
+    once), lights, and bodies seen through (a ghost: its color and opacity, its float frame by frame).
   - Light is told apart first (after Weiss 2001, Matsushita 2004, Koppal and Narasimhan 2006), so a
     lamp pulsing isn't taken for a thing. Each light gets its source, strength and color.
   - Each object is isolated: pixels that change in the same frames, joined by rhythm or by a shared
     still body.
-  - Each object is followed by a SORT-like tracker that carries hidden things on by their speed.
+  - Each object is followed by a SORT-like tracker that carries hidden things on by their speed, and
+    through what breaks a track: a leap or a dash (a thing just set off reaches farther; one left
+    without a match takes the one piece near it, ahead), a smear (its drawing found in the bigger
+    piece, the streak left out of its box), and a long rest (the place it left isn't taken for a lamp
+    going off).
   - A part swung about a still body (an axe on an arm) is told from a thing carried: it passes over
     its pivot every frame, and a thing carried never stays over one point.
   - Each capture is cut out of its background, GrabCut-style. Files: a sheet, a strip, and a box per
@@ -161,12 +166,12 @@ Share of each scene's moving things' frames that study finds, before and after t
 | --- | ---: | ---: |
 | Tropical forest | 42% | **53%** |
 | Halloween party | 33% | **44%** |
-| Tournament | 36% | **44%** |
+| Tournament | 36% | **43%** |
 | Park | 0% | **33%** |
 | Cave | 50% | 33% |
 | Sunset cliff | 31% | 25% |
 | Road (sertão) | 0% | **22%** |
-| Cyberpunk street | 6% | **11%** |
+| Cyberpunk street | 6% | **10%** |
 
 `--summary` prints a line a scene, `--save` keeps a run, and `--vs <revision | saved run>` runs the
 same harness on another revision (in its own git worktree) and prints each scene before → now, with
@@ -175,7 +180,9 @@ that comparison.
 
 What moved it: a ground truth that follows each stamp whatever its name, pixels grouped by common fate,
 a tracker that carries hidden things on, and no light looked for where something goes by. The cave fell
-on one mushroom at the line; the sunset's clouds now come apart one by one.
+on one mushroom at the line; the sunset's clouds now come apart one by one. The last round, on what
+breaks a track (leaps, smears, a long rest), found the cyberpunk street's cars 31 to 33 with its masks
+39/43% to 42/47% (precision/recall), each frame's share a point lower.
 
 ## Examples
 
@@ -202,7 +209,7 @@ references until it read right.
 - Timed builds are cached within a budget of bytes, so a long loop no longer fills memory.
 - `build --profile` names where the time went; `build --every N` keeps long previews small; the onion
   sheet no longer costs frames squared.
-- Tests went from 59 to 196. One keeps the editor types in step with what the runtime accepts, and
+- Tests went from 59 to 224. One keeps the editor types in step with what the runtime accepts, and
   another keeps the guides in step with the CLI: every command, flag and section they cite exists.
 
 ## How it was built
