@@ -244,12 +244,14 @@ export interface Techniques {
   dither: number; ditherPairs: [Color, Color, number][]; ditherRows: [number, number] | null;
   /** thin dark lines between lighter neighbors on both sides, and how many of them are a dark shade of what they border (selective) or a neutral near-black */
   lines: number; selective: number; black: number;
-  /** a sprite's edge against the clear: black, a darker shade of the inside, or none */
-  edge: { black: number; selective: number; none: number } | null;
+  /** a sprite's edge against the clear: black, a darker shade of the inside, or none; and the edge pixels lighter than a dark outline inside them (a halo) */
+  edge: { black: number; selective: number; none: number; halo: number } | null;
   /** in-between tones on a step between two colors (manual anti-aliasing) */
   aa: number;
   /** pixels whose color none of their four neighbors share, but for a dither's and anti-aliasing's (meant so) */
   orphans: number;
+  /** of those, the ones a tone or two off what is round them (noise), not standing out (a star, a glint) */
+  specks: [number, number][];
   /** where the lighter tones of each ramp lie: the way toward the light on screen (x right, y down) and how consistently */
   light: { ramp: number; dir: [number, number]; sure: number; n: number }[];
   /** per pixel: 1 in a checker, 2 a thin dark line, 4 an in-between tone, 8 in a banding pair */
@@ -313,7 +315,7 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
     }
   }
   // a sprite's edge
-  let eb = 0, es = 0, en = 0;
+  let eb = 0, es = 0, en = 0, halo = 0;
   const sprite = img.data.some((c) => clear(c));
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const c = at(x, y);
@@ -326,8 +328,10 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
     if (k.C < 0.04 && k.L < 0.3) eb++;
     else if (inner !== undefined && lch(inner).L - k.L > 0.08) es++;
     else en++;
+    // lighter than a dark line just inside it: anti-aliasing toward a background that isn't there
+    if (inner !== undefined && lch(inner).L < 0.35 && k.L - lch(inner).L > 0.12) halo++;
   }
-  if (sprite && eb + es + en >= 8) edge = { black: eb, selective: es, none: en };
+  if (sprite && eb + es + en >= 8) edge = { black: eb, selective: es, none: en, halo };
   // the light along a sprite's rim, after Johnson and Farid ("Exposing digital forgeries by detecting
   // inconsistencies in lighting", 2005) and Nillius and Eklundh: on the silhouette the surface turns
   // away from us, its normal in the picture's plane, pointing out; with one distant light, lightness
@@ -412,11 +416,17 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
   }
   let ditherN = 0, r0 = H, r1 = -1;
   for (let i = 0; i < inDither.length; i++) if (inDither[i]) { ditherN++; mask[i] |= 1; const y = Math.floor(i / W); r0 = Math.min(r0, y); r1 = Math.max(r1, y); }
-  for (let i = 0; i < lone.length; i++) if (lone[i] && !(mask[i] & 5)) orphans++;
+  const specks: [number, number][] = [];
+  for (let i = 0; i < lone.length; i++) if (lone[i] && !(mask[i] & 5)) {
+    orphans++;
+    // standing out from every neighbor (a star, a glint), or a speck a tone or two off them
+    const x = i % W, y = (i - x) / W, near = [at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1)].filter((n) => !clear(n));
+    if (near.length && Math.min(...near.map((n) => dE(n, img.data[i]))) < 0.2) specks.push([x, y]);
+  }
   const ditherPairs = [...pairs].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => { const [a, b] = k.split(",").map(Number); return [a, b, n] as [Color, Color, number]; });
   const light = vec.map(([vx, vy, n], ramp) => ({ ramp, dir: [n ? vx / n : 0, n ? vy / n : 0] as [number, number], sure: n ? Math.hypot(vx, vy) / n : 0, n }))
     .filter((l) => l.n >= 30).sort((a, b) => b.n - a.n);
-  return { pixels, dither: ditherN, ditherPairs, ditherRows: r1 >= 0 ? [r0, r1] : null, lines, selective, black, edge, aa, orphans, light, mask, rim, banding: { pairs: bandPairs, per1000: (1000 * bandPairs) / Math.max(1, pixels) }, pillow };
+  return { pixels, dither: ditherN, ditherPairs, ditherRows: r1 >= 0 ? [r0, r1] : null, lines, selective, black, edge, aa, orphans, specks, light, mask, rim, banding: { pairs: bandPairs, per1000: (1000 * bandPairs) / Math.max(1, pixels) }, pillow };
 }
 
 /**
@@ -620,7 +630,8 @@ export function findReflection(frames: Img[], k: Checker | null): Reflection | n
     return off / 3 <= 14 ? a : -1;
   };
   let best: Reflection | null = null, bestN = 0;
-  for (let axis = Math.floor(H / 4); axis < H - 2; axis++) for (const gap of [0, 1] as const) {
+  // (a reflection is a band, not the last few rows: a framed picture's bottom edge mirrors nothing)
+  for (let axis = Math.floor(H / 4); axis < H - Math.max(3, Math.ceil(H / 10)); axis++) for (const gap of [0, 1] as const) {
     // a plain floor: the color most of what is below the row has (the first frame), a half of it at least
     if (!k) {
       const n = new Map<Color, number>();

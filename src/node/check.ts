@@ -7,7 +7,8 @@ import { MANY, orientWords, placementChecks } from "../core/describe.ts";
 import { rigLines } from "../core/rig.ts";
 import { frontWords, rampSteps } from "../core/checks.ts";
 import { PxError } from "../core/errors.ts";
-import { lineFlaws } from "../core/vision.ts";
+import { dE, lineFlaws } from "../core/vision.ts";
+import { toHex } from "../core/color.ts";
 import type { Item } from "../core/model.ts";
 
 /** Drawn by hand somewhere: a grid string, grid() or runs(), here or in a layer (line(), curve() and code draw their own lines clean, or as they mean to). */
@@ -74,6 +75,18 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         const list = (v: string[]) => `at ${v.slice(0, 4).join("; ")}${v.length > 4 ? "; ..." : ""}`;
         // (a note, not a warning: a tyre's corner, a roof's, a wingtip are L-corners meant as one)
         if (corners.length) notes.push(`${name} › LOOK: ${corners.length} L-corner${corners.length > 1 ? "s" : ""} in its 1 px lines (${list(corners)}): where a smooth line steps, the elbow of three pixels in an L doubles it; delete that one. A corner the shape has (a tyre, a roof, a tip) stays (PXL help "characters 7")`);
+        // two tones too close to tell apart, side by side in it (Pixel Joint's commonest critique)
+        const near = new Map<string, number>(), W = img.w, at = (i: number) => img.data[i];
+        for (let i = 0; i < img.data.length; i++) for (const j of [i + 1, i + W]) {
+          if ((j === i + 1 && (i + 1) % W === 0) || j >= img.data.length) continue;
+          const a = at(i), b = at(j);
+          if (a === b || (a & 255) < 128 || (b & 255) < 128) continue;
+          const k = a < b ? `${a},${b}` : `${b},${a}`;
+          if (!near.has(k)) near.set(k, dE(a, b));
+        }
+        const key = (c: number) => [...def.pal.keys].find(([, v]) => v === c)?.[0];
+        const twins = [...near].filter(([, d]) => d < 0.03).map(([k, d]) => { const [a, b] = k.split(",").map(Number); return `${key(a) ? `'${key(a)}' ` : ""}${toHex(a)} and ${key(b) ? `'${key(b)}' ` : ""}${toHex(b)} (${d.toFixed(3)})`; });
+        if (twins.length) notes.push(`${name} › LOOK: ${twins.length} pair${twins.length > 1 ? "s" : ""} of tones side by side too close to tell apart (under 0.03 in OKLab): ${twins.slice(0, 3).join(", ")}${twins.length > 3 ? " ..." : ""}; merge each, or spread it if both are meant`);
         if (jaggies.length) notes.push(`${name} › LOOK: ${jaggies.length} jagg${jaggies.length > 1 ? "ies" : "y"} in its 1 px lines (${list(jaggies)}): a run out of order along a curve (3 2 4 where 2 3 4 reads smooth); unless the shape bumps there, let the runs grow or shrink steadily (PXL help "characters 7")`);
       }
       if (!img.sockets?.front) continue;

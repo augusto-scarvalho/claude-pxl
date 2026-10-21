@@ -11,7 +11,7 @@
 // in few colors to draw over. Both are read for their perspective (straight edges and where they
 // meet) and, moving, for their motion (a cycle, a loop, planes going by, a scene opening out from the
 // point it moves toward, the parts that move while the rest stands still).
-import { type Color, pack, toHex } from "./color.ts";
+import { type Color, TRANSPARENT, pack, toHex } from "./color.ts";
 import { Img } from "./image.ts";
 import { type Piece, decompose } from "./decompose.ts";
 import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Vanish, areaDown, bandShifts, blockFlow, clearChecker, clearReflection, colorCounts, dE, findChecker, findGrid, findReflection, findRamps, findSegments, findTiles, findVanishing, focusOfExpansion, frameDiff, lab, lch, lineFlaws, lumaOf, mergeNear, pixelate, quantize, techniques, toNative } from "./vision.ts";
@@ -66,7 +66,10 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     picture = q.img; scale = tw / first.w;
     text.push(`Kind: not pixel art (a photo, painting or render: ${nColors} colors after folding near ones, ${pct(smooth * 100, 100)} of the steps between neighbors gentle). Read for its masses, colors and light, and translated into a ${tw}x${th} picture in ${q.palette.length} colors to draw over (--to WxH, --colors N).`);
   }
-  const ramps = findRamps(picture), tech = techniques(picture, ramps);
+  // a sprite on a flat backdrop (a tutorial's panel): the color all round the border is taken for clear
+  // by the techniques (its edge, rim, pillow, halo) and left out of the temperature
+  const backdrop = pixelArt ? flatBackdrop(picture) : null;
+  const ramps = findRamps(picture), tech = techniques(backdrop === null ? picture : picture.remap(new Map([[backdrop, TRANSPARENT]])), ramps);
 
   // ---------------------------------------------------------------- palette and ramps
   text.push("", "PALETTE AND RAMPS (dark to light; % of the picture)");
@@ -96,10 +99,11 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
       ? `  Inner lines: thin dark lines between lighter neighbors on ${pct(tech.lines, total)} of the pixels: ${pct(tech.selective, tech.lines)} a darker shade of what they border (selective), ${pct(tech.black, tech.lines)} near-black.`
       : `  Inner lines: hardly any (${pct(tech.lines, total)}): shapes meet by their tones, not by lines.`);
     text.push(tech.dither > total * 0.015
-      ? `  Dithering: 2x2 checkers on ${pct(tech.dither, total)} of the pixels${tech.ditherRows ? `, rows ${tech.ditherRows[0]}-${tech.ditherRows[1]}` : ""}, mostly ${tech.ditherPairs.map(([a, b]) => `${hex(a)}/${hex(b)}`).join(", ")}: a blend between two tones.`
+      ? `  Dithering: 2x2 checkers on ${pct(tech.dither, total)} of the pixels${tech.ditherRows ? `, rows ${tech.ditherRows[0]}-${tech.ditherRows[1]}` : ""}, mostly ${tech.ditherPairs.map(([a, b]) => `${hex(a)}/${hex(b)}${ditherGap(a, b, ramps)}`).join(", ")}: a blend between two tones.`
       : `  Dithering: none to speak of (${pct(tech.dither, total)}).`);
     text.push(`  Anti-aliasing: in-between tones on the steps of edges on ${pct(tech.aa, total)} of the pixels${tech.aa > total * 0.01 ? " (edges smoothed by hand)" : " (hard edges)"}.`);
-    text.push(`  Clusters: ${pct(tech.orphans, total)} of the pixels stand alone (none of their four neighbors share their color; a dither's and anti-aliasing's left out)${tech.orphans > total * 0.12 ? ": a busy, noisy texture" : tech.orphans < total * 0.03 ? ": clean clusters" : ""}.`);
+    text.push(`  Clusters: ${pct(tech.orphans, total)} of the pixels stand alone (none of their four neighbors share their color; a dither's and anti-aliasing's left out)${tech.orphans > total * 0.12 ? ": a busy, noisy texture" : tech.orphans < total * 0.03 ? ": clean clusters" : ""}${tech.orphans ? `; ${tech.specks.length} speck${tech.specks.length === 1 ? "" : "s"} (a tone or two off what is round them: noise, merged into a neighbor or grown into a 2-3 px shape${tech.specks.length ? `; at ${tech.specks.slice(0, 4).map(([x, y]) => `${x},${y}`).join("; ")}${tech.specks.length > 4 ? "; ..." : ""}` : ""}), ${tech.orphans - tech.specks.length} point${tech.orphans - tech.specks.length === 1 ? "" : "s"} (standing out: a star, a glint, an eye)` : ""}.`);
+    if (tech.edge && tech.edge.halo >= Math.max(3, 0.05 * (tech.edge.black + tech.edge.selective + tech.edge.none))) text.push(`  Halo: ${tech.edge.halo} edge pixels outside the dark outline, lighter than it: anti-aliased toward a background the sprite doesn't have, they fringe on any other ground; keep the outline outermost.`);
     if (tech.rim && tech.rim.r2 >= 0.15) text.push(`  Light on the silhouette (its rim's lightness fit to one light, after Johnson and Farid): from ${way(tech.rim.dir)}, r² ${tech.rim.r2.toFixed(2)} over ${tech.rim.n} rim pixels.`);
     const b = tech.banding;
     text.push(`  Banding (runs of two colors side by side with their ends lined up, marked red on the sheet): ${b.pairs} pair${b.pairs === 1 ? "" : "s"}, ${b.per1000.toFixed(1)} per 1000 px${b.per1000 < 1 ? ": hardly any" : b.per1000 > 6 && b.pairs >= 12 ? ": much (it shows the grid; stagger the ends)" : ""}.`);
@@ -121,7 +125,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
 
   // ---------------------------------------------------------------- values, color, distance
   text.push("", "VALUES AND COLOR");
-  text.push(...valueLines(avg));
+  text.push(...valueLines(avg, backdrop));
 
   // ---------------------------------------------------------------- motion, then perspective
   let motion: ReturnType<typeof motionOf> | null = null;
@@ -233,18 +237,37 @@ function lightLines(t: Techniques, ramps: Ramp[], pixelArt: boolean): string[] {
   return [`  Light${pixelArt ? "" : " (in the translation)"}, read off where each ramp's lighter tones lie (1 = always): ${words.join("; ")}.${sure.some((l) => l.dir[1] > 0.5 * l.sure && Math.abs(l.dir[0]) < 0.3 * l.sure) ? " Lighter downward is often a sky toward its horizon." : ""}`];
 }
 
-function valueLines(img: Img): string[] {
+/** How far apart two dithered tones sit: neighbors in a ramp blend; tones further apart, or of two ramps, make a harsh checker. */
+function ditherGap(a: Color, b: Color, ramps: Ramp[]): string {
+  const r = ramps.find((r) => r.colors.includes(a) && r.colors.includes(b));
+  if (!r) return " (two ramps: harsh)";
+  const k = Math.abs(r.colors.indexOf(a) - r.colors.indexOf(b));
+  return k > 1 ? ` (${k} steps apart in a ramp: harsh; neighbors blend)` : "";
+}
+
+/** The color that fills nearly all of a picture's border (a flat backdrop), when it has no clear pixels. */
+function flatBackdrop(img: Img): Color | null {
+  if (img.data.some((c) => (c & 255) < 128)) return null;
+  const n = new Map<Color, number>();
+  let all = 0;
+  for (let x = 0; x < img.w; x++) for (const y of [0, img.h - 1]) { n.set(img.data[y * img.w + x], (n.get(img.data[y * img.w + x]) ?? 0) + 1); all++; }
+  for (let y = 1; y < img.h - 1; y++) for (const x of [0, img.w - 1]) { n.set(img.data[y * img.w + x], (n.get(img.data[y * img.w + x]) ?? 0) + 1); all++; }
+  const top = [...n].sort((a, b) => b[1] - a[1])[0];
+  return top && top[1] >= 0.8 * all ? top[0] : null;
+}
+
+function valueLines(img: Img, backdrop: Color | null = null): string[] {
   const L: number[] = [], out: string[] = [];
   let bx = 0, by = 0, bn = 0;
   for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) { const c = img.data[y * img.w + x]; if ((c & 255) >= 128) L.push(lab(c)[0]); }
   if (!L.length) return out;
-  const sorted = L.slice().sort((a, b) => a - b), top = sorted[Math.floor(sorted.length * 0.98)];
+  const sorted = L.slice().sort((a, b) => a - b), top = sorted[Math.floor(sorted.length * 0.98)], low = sorted[Math.floor(sorted.length * 0.02)];
   const mean = L.reduce((s, v) => s + v, 0) / L.length, sd = Math.sqrt(L.reduce((s, v) => s + (v - mean) ** 2, 0) / L.length);
   const dark = L.filter((v) => v < 0.4).length, light = L.filter((v) => v > 0.7).length;
   for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) { const c = img.data[y * img.w + x]; if ((c & 255) >= 128 && lab(c)[0] >= top) { bx += x; by += y; bn++; } }
-  out.push(`  Values: ${mean < 0.4 ? "low key (dark)" : mean > 0.65 ? "high key (light)" : "mid key"}, mean lightness ${mean.toFixed(2)}, contrast ${sd.toFixed(2)}; dark ${pct(dark, L.length)}, middle ${pct(L.length - dark - light, L.length)}, light ${pct(light, L.length)}. The brightest 2% gather around ${Math.round(bx / bn)},${Math.round(by / bn)} of ${img.w}x${img.h}.`);
+  out.push(`  Values: ${mean < 0.4 ? "low key (dark)" : mean > 0.65 ? "high key (light)" : "mid key"}, mean lightness ${mean.toFixed(2)}, contrast ${sd.toFixed(2)}; dark ${pct(dark, L.length)}, middle ${pct(L.length - dark - light, L.length)}, light ${pct(light, L.length)}. The brightest 2% gather around ${Math.round(bx / bn)},${Math.round(by / bn)} of ${img.w}x${img.h}. Range ${low.toFixed(2)} to ${top.toFixed(2)}${low > 0.2 && top < 0.85 ? ": neither end reached (pushing the darkest toward black and the lightest toward white frees the middle tones for the forms)" : low > 0.2 ? ": no near-black" : top < 0.85 ? ": no near-white" : ": from near-black to near-white"}.`);
   // the light's color against the shadows': the lightest fifth against the darkest
-  const cs = [...img.data].filter((c) => (c & 255) >= 128).map((c) => lab(c)).sort((p, q) => p[0] - q[0]);
+  const cs = [...img.data].filter((c) => (c & 255) >= 128 && c !== backdrop).map((c) => lab(c)).sort((p, q) => p[0] - q[0]);
   const fifth = Math.max(1, Math.floor(cs.length / 5)), m = (arr: number[][], i: number) => arr.reduce((s, v) => s + v[i], 0) / arr.length;
   const lo = cs.slice(0, fifth), hi = cs.slice(-fifth), warm = (m(hi, 2) - m(lo, 2)) + 0.5 * (m(hi, 1) - m(lo, 1));
   out.push(`  Temperature: the lights are ${warm > 0.02 ? "warmer (toward yellow and orange) than the shadows" : warm < -0.02 ? "cooler (toward blue) than the shadows" : "about as warm as the shadows"}.`);
@@ -488,6 +511,9 @@ function paletteSanity(drawn: Img | null, ramps: Ramp[], folded: number): string
     for (let k = 1; k < r.colors.length; k++) { const d = dE(r.colors[k], r.colors[k - 1]); if (d < step) { step = d; at = k; } }
     return { i, at, step, r };
   }).filter((t) => t.step < 0.045);
+  // a tone far more saturated than its ramp neighbors glares (eyeburn)
+  const burn = ramps.filter((r) => r.colors.length >= 3).flatMap((r) => r.colors.slice(1, -1).map((c, i) => ({ c, C: lch(c).C, a: lch(r.colors[i]).C, b: lch(r.colors[i + 2]).C }))).filter((t) => t.C > 0.15 && t.C > 1.6 * Math.max(t.a, t.b));
+  if (burn.length) out.push(`  Eyeburn: ${burn.slice(0, 3).map((t) => `${hex(t.c)} (chroma ${t.C.toFixed(2)} between ${t.a.toFixed(2)} and ${t.b.toFixed(2)})`).join(", ")}: far more saturated than its ramp neighbors, it glares; pull it toward them.`);
   if (tight.length) out.push(`  Steps too close: ${tight.slice(0, 4).map((t) => `ramp ${t.i + 1}'s ${hex(t.r.colors[t.at - 1])} to ${hex(t.r.colors[t.at])} (${t.step.toFixed(3)} apart in OKLab)`).join(", ")}${tight.length > 4 ? " ..." : ""}: neighbors in a ramp read as steps from about 0.05 apart (pxl's shades() spaces its own by about 0.1); merge them or spread the ramp.`);
   return out;
 }

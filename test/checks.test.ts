@@ -227,3 +227,12 @@ sprite("_part", \`\n${rows}\`)`, "t.px.js");
   assert.equal(r.warnings, 0);
   assert.match(r.coverage, /lines on 2;/, "the hand-drawn ones, a part too");
 });
+
+test("check: two tones side by side too close to tell apart, in a sprite drawn by hand, to look at", () => {
+  const p = loadSource(`pal({ k: "#1b1630", g: "#8ccf63", h: "#8ad066", r: "#e2585e" })
+sprite("leaf", "gh\\ngg")
+sprite("apart", "gr\\nrh")`, "t.px.js");
+  const r = checkProject(p);
+  assert.deepEqual(r.notes, ["leaf › LOOK: 1 pair of tones side by side too close to tell apart (under 0.03 in OKLab): 'h' #8ad066 and 'g' #8ccf63 (0.003); merge each, or spread it if both are meant"]);
+  assert.equal(r.warnings, 0);
+});
