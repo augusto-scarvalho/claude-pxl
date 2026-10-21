@@ -691,7 +691,7 @@ test("shapes far off the picture cost only the pixels they can reach: a vertex m
   eq(art(PAL + 'sprite("c", { w: 4, h: 2 }, circ(2, 1e6, 1e6 + 1, "w"))', "c"), "wwww\nwwww");
 });
 
-test("stamp sub: half a pixel along, the part stays crisp and spills half a pixel past its edge in the key between; else it rounds", () => {
+test("stamp sub: half a pixel along, it stays where it comes from and its edges move: into its own outline, or spilling over paint; else it rounds", () => {
   const pal = 'pal({ k: "#17111c", r: "#9e4e54", w: "#f0f0f0", f: "#c79fa2", d: "#202030" }); sprite("b", { w: 2, h: 2 }, rect(0, 0, 2, 2, "w")); ';
   const on = (src: string, st: string) => art(src + `scene("s", { w: 6, h: 6, bg: "r" }, ${st})`, "s");
   // half a pixel down: crisp where it's past, and below its edge f, the key between w and r
@@ -712,6 +712,17 @@ test("stamp sub: half a pixel along, the part stays crisp and spills half a pixe
   assert.equal(art(pal + 'sprite("s", { w: 6, h: 6 }, stamp("b", 2, 2.5, { sub: true }))', "s"), art(pal + 'sprite("s", { w: 6, h: 6 }, stamp("b", 2, 2))', "s"));
   // an option only stamp takes
   assert.throws(() => art(pal + 'sprite("s", { w: 6, h: 6 }, tile("b", 0, 0, 2, 2, { sub: true }))', "s"), /sub/);
+  // with an outline, over clear too (a game sprite): it pushes into its own outline, the silhouette
+  // stays: the outline ahead takes the key between it and the fill (its ramp's), the fill behind the
+  // outline it leaves the same; moving up ([0, -1]) it's still where it comes from, the other way round
+  const ring = 'pal({ k: "#17111c", G: "#7a7a86", w: "#f0f0f0" }); ramps("kGw"); sprite("o", { w: 4, h: 4 }, rect(0, 0, 4, 4, "k"), rect(1, 1, 2, 2, "w")); ';
+  const clear = (st: string) => art(ring + `sprite("s", { w: 6, h: 8 }, ${st})`, "s");
+  assert.equal(clear('stamp("o", 1, 2.5, { sub: true })'), rows("......", "......", ".kkkk.", ".kGGk.", ".kwwk.", ".kGGk.", "......", "......"));
+  assert.equal(clear('stamp("o", 1, 2.5, { sub: [0, -1] })'), rows("......", "......", "......", ".kGGk.", ".kwwk.", ".kGGk.", ".kkkk.", "......"));
+  // the key from the part's own ramp, though another ramp's key lies nearer the middle of the two
+  const reds = 'pal({ k: "#000000", D: "#7a1414", R: "#c03030", B: "#5c2a24" }); ramps("kDR", "kB"); sprite("r", { w: 2, h: 2 }, rect(0, 0, 2, 2, "R")); ';
+  assert.equal(art(reds + 'scene("s", { w: 4, h: 4, bg: "k" }, stamp("r", 1, 0.5, { sub: true }))', "s"), rows("kRRk", "kRRk", "kDDk", "kkkk"));
+  assert.throws(() => clear('stamp("o", 1, 2.5, { sub: "down" })'), /sub is true, or \[dx, dy\]/);
   // drawn in code: c.subpixel moves what it draws the same way
   assert.equal(on(pal, '(c) => c.subpixel(0, 0.5, () => c.rect(2, 2, 2, 2, "w"))'), rows("rrrrrr", "rrrrrr", "rrwwrr", "rrwwrr", "rrffrr", "rrrrrr"));
   assert.equal(on(pal, '(c) => c.subpixel(1, 1, () => c.rect(1, 1, 2, 2, "w"))'), on(pal, 'rect(2, 2, 2, 2, "w")'));

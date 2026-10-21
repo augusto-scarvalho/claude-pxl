@@ -393,7 +393,10 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
     // the stance sways all but the legs: the body (skirt, chest, arms, axe) by the frame's, the head
     // and its tail of hair by the frame before's
     const [sx, sy] = stance(c.frame), [hx, hy] = stance(c.frame - 1)
-    const chest = (draw) => () => c.subpixel(sx, sy, draw), head = (draw) => () => c.subpixel(hx, hy, draw)
+    // which way each goes (a half step stays where it comes from and pushes into its outline ahead)
+    const way = (f) => { const [a, b] = stance(f), [p0, q0] = stance(f - 1); return [a < p0 ? -1 : 1, b < q0 ? -1 : 1] }
+    const bodyWay = way(c.frame), headWay = way(c.frame - 1)
+    const chest = (draw) => () => c.subpixel(sx, sy, draw, bodyWay), head = (draw) => () => c.subpixel(hx, hy, draw, headWay)
     const sk = skirt(j, FLARE[c.frame], rad(Math.max(-32, Math.min(32, -TAIL[c.frame] * 0.4))))
     at(mid - 2.5, chest(() => zfill(c, sk, (front) => !front)))
     at(mid + 0.6, chest(() => zfill(c, sk, (front) => front)))
@@ -405,7 +408,7 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
     at(mid, chest(() => torso(c, j, p)))
     // the head as it is turned, and the tail of hair swinging behind it
     const look = (((p.yaw + p.twist + p.head) % 360) + 360) % 360, view = Math.round(look / 45) % 8
-    at(depth(j.head) + 1, () => { const [x, y] = scr(j.head).map(Math.round); const v = view > 4 ? 8 - view : view; c.stamp(`_whead${v}${v <= 2 && p.look !== "calm" ? "_" + p.look : ""}`, x + hx, y + hy, { sub: true, ...(view > 4 ? { flip: "x" } : {}) }) })
+    at(depth(j.head) + 1, () => { const [x, y] = scr(j.head).map(Math.round); const v = view > 4 ? 8 - view : view; c.stamp(`_whead${v}${v <= 2 && p.look !== "calm" ? "_" + p.look : ""}`, x + hx, y + hy, { sub: headWay, ...(view > 4 ? { flip: "x" } : {}) }) })
     const tailYaw = rad(p.yaw + p.twist + p.head + 180 - Math.max(-70, Math.min(70, TAIL[c.frame] * 0.8))), lift = Math.min(1, Math.abs(TAIL[c.frame]) / 60)
     const tdir = unit([Math.sin(tailYaw) * (0.3 + lift), -1 + lift * 0.8, Math.cos(tailYaw) * (0.3 + lift)])
     const t0 = local(j.head, j.hd, [-3.5, 0, 0]), t1 = add(t0, mul(tdir, 5)), t2 = add(t1, mul(unit(add(tdir, [0, -0.6, 0])), 4))

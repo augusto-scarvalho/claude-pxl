@@ -344,13 +344,14 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
     pxl.push(`scroll(name, y, per) for each plane, per = its speed x the loop's frames (here ${bands.map((b) => Math.round(Math.abs(b.v) * n)).join(", ")} px over ${n} frames), a whole number of each strip's widths.`);
   }
   // the pieces: what moves how on what stays (not when the whole view moves toward its point)
-  // subpixel motion: in the tutorial it took 18-22% of what changes, in pxl's gallery under 4%
+  // subpixel motion: in the tutorial it took 26% of what changes, examples/subpixel 15%, pxl's lit
+  // scenes under 2%
   const sub = subpixel(frames), subClip = sub.share >= 0.1 && sub.share * sub.changed >= 12;
   const layers = forward ? null : decompose(frames, bands, smeared ? 0.08 : 0.05, flows, subClip);
   if (subClip) {
-    const top = sub.tones.slice(0, 4).map((t) => `${hex(t.mid)} between ${hex(t.a)} and ${hex(t.b)}`);
-    lines.push(`  Subpixel: ${pct(sub.share * 100, 100)} of what changes from frame to frame is a pixel going between a color and the in-between tone of it and its neighbor: edges moving by part of a pixel. A part goes half a pixel when its edge takes that tone, then the next whole pixel (on an idle, a fighting stance swaying in its beat or a slow breath, the body's parts by turns while the feet stay: no single-pixel bob that crushes the legs). The tones it takes: ${top.join("; ")}.`);
-    pxl.push(`Subpixel: stamp(part, x, y + 0.5, { sub: true }) puts a part half a pixel along: crisp where it's past, half a pixel of it past its edge in the palette's key between its color and what's under it, so the palette needs those keys (here ${sub.tones.slice(0, 4).map((t) => hex(t.mid)).join(", ")}); an idle: each part a frame behind the one it hangs from (examples/subpixel.px.js).`);
+    const tones = sub.tones.filter((t, k) => sub.tones.findIndex((u) => u.mid === t.mid) === k).slice(0, 4);
+    lines.push(`  Subpixel: ${pct(sub.share * 100, 100)} of what changes from frame to frame is a pixel going between a color and the in-between tone of it and its neighbor: edges moving by part of a pixel. A part goes half a pixel when its edge takes that tone (the outline it pushes into lightening, the fill behind darkening; or a tone past its edge), then the next whole pixel. The tones it takes: ${tones.map((t) => `${hex(t.mid)} between ${hex(t.a)} and ${hex(t.b)}`).join("; ")}.`);
+    pxl.push(`Subpixel: stamp(part, x, y + 0.5, { sub: [dx, dy] }) (or c.subpixel for what's drawn in code) puts a part half a pixel along the way [dx, dy]: it stays where it comes from and pushes into its own outline, in its ramp's tone between outline and fill, so the ramps need those steps (here ${tones.map((t) => hex(t.mid)).join(", ")}); parts by turns, each a frame behind the one it hangs from (examples/subpixel.px.js).`);
   } else if (moving.length && moving.every((f) => Number.isInteger(f.dx) && Number.isInteger(f.dy))) lines.push("  Steps are whole pixels at 1x (as measured: block matching moves whole pixels).");
   return { lines, pxl, flows, foe, forward, bands, frames, W, H, layers };
 }
@@ -385,6 +386,27 @@ function subpixel(frames: Img[]): { share: number; changed: number; tones: { mid
     }
     return null;
   };
+  // or a pixel gone part of the way from its color toward a neighbor's, one of the two dark (an outline
+  // a part pushes into, lightening toward the fill; the fill darkening toward the outline it leaves):
+  // [from, that neighbor]
+  // (it alone: the neighbor it goes toward and the one across stay as they were, where a light
+  // changes a patch together)
+  const toward = (f: Img, g: Img, x: number, y: number, from: Color): [Color, Color] | null => {
+    const c = f.get(x, y);
+    if (clear(c) || clear(from)) return null;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (x - dx < 0 || y - dy < 0 || x + dx < 0 || y + dy < 0 || x + dx >= W || y + dy >= H || x - dx >= W || y - dy >= H) continue;
+      const q = f.get(x + dx, y + dy);
+      if (clear(q) || q === c || q === from || g.get(x + dx, y + dy) !== q || g.get(x - dx, y - dy) !== f.get(x - dx, y - dy)) continue;
+      // one of the two an outline (dark): a light flickering moves tones toward their neighbors too
+      if (Math.min(lab(from)[0], lab(q)[0]) > 0.3) continue;
+      const A = lab(from), B = lab(q), P = lab(c), ab = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], n2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2;
+      if (n2 < 0.15 ** 2) continue;
+      const t = ((P[0] - A[0]) * ab[0] + (P[1] - A[1]) * ab[1] + (P[2] - A[2]) * ab[2]) / n2;
+      if (t > 0.2 && t < 0.8 && Math.hypot(P[0] - A[0] - t * ab[0], P[1] - A[1] - t * ab[1], P[2] - A[2] - t * ab[2]) < 0.3 * Math.sqrt(n2)) return [from, q];
+    }
+    return null;
+  };
   let changed = 0, partial = 0;
   const tones = new Map<string, { mid: Color; a: Color; b: Color; n: number }>();
   const note = (mid: Color, [a, b]: [Color, Color]) => { const k = `${mid},${Math.min(a, b)},${Math.max(a, b)}`, t = tones.get(k); if (t) t.n++; else tones.set(k, { mid, a, b, n: 1 }); };
@@ -396,8 +418,11 @@ function subpixel(frames: Img[]): { share: number; changed: number; tones: { mid
       changed++;
       // (not where the picture moved a whole pixel round it: a ramp's middle tone carried along)
       const ea = ends(a, x, y), eb = ends(b, x, y), whole = shifted(a, b, x, y);
-      if (eb && (ca === eb[0] || ca === eb[1]) && !whole) { partial++; note(cb, eb); }
-      else if (ea && (cb === ea[0] || cb === ea[1]) && !whole) { partial++; note(ca, ea); }
+      if (whole) continue;
+      if (eb && (ca === eb[0] || ca === eb[1])) { partial++; note(cb, eb); continue; }
+      if (ea && (cb === ea[0] || cb === ea[1])) { partial++; note(ca, ea); continue; }
+      const tb = toward(b, a, x, y, ca), ta = tb ? null : toward(a, b, x, y, cb);
+      if (tb) { partial++; note(cb, tb); } else if (ta) { partial++; note(ca, ta); }
     }
   }
   return { share: changed ? partial / changed : 0, changed, tones: [...tones.values()].sort((p, q) => q.n - p.n) };

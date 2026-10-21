@@ -211,16 +211,16 @@ export class Canvas {
   /**
    * Run `fn` drawing onto a sheet of its own, then lay it down moved by (dx, dy), which may fall
    * between pixels: what `stamp`'s `sub` does for an asset, for parts drawn in code (a body swaying
-   * half a pixel at a time). The edge it moves toward spills half a pixel in the palette's key between.
+   * half a pixel at a time); `dir` the way it moves, as `sub`'s.
    */
-  subpixel(dx: number, dy: number, fn: () => void): void {
+  subpixel(dx: number, dy: number, fn: () => void, dir: [number, number] = [1, 1]): void {
     if (!Number.isFinite(dx) || !Number.isFinite(dy)) throw new PxError(`subpixel(dx, dy, fn): dx and dy are numbers of px, got ${JSON.stringify([dx, dy])}`);
     const under = this.img, sorted = this.sorted, sheet = new Img(under.w, under.h);
     this.img = sheet;
     this.sorted = undefined;
     try { fn(); } finally { this.img = under; this.sorted = sorted; }
     if (sheet.orient?.text) this.lettered();
-    this.subPut(sheet, dx - this.ox, dy - this.oy);
+    this.subPut(sheet, dx - this.ox, dy - this.oy, dir);
   }
 
   /** Run `fn` with drawing restricted to `region` (nests by intersection). */
@@ -872,9 +872,9 @@ export class Canvas {
   }
 
   /** Draw `src` with its pivot (default: `def`, as a fraction of its size) on (x, y). */
-  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string, sub = false): void {
+  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string, sub?: [number, number]): void {
     const [px, py] = src.pivot ?? [src.w * def[0], src.h * def[1]];
-    if (sub) this.subPut(src, x - Math.floor(px), y - Math.floor(py));
+    if (sub) this.subPut(src, x - Math.floor(px), y - Math.floor(py), sub);
     else this.put(src, x - Math.floor(px), y - Math.floor(py), ok);
     // logged where it was drawn: blit floors a fractional position (stamp("p", 282 + 8 * 0.88, y))
     if (name) this.log?.push({ name, x: Math.floor(this.ox + x - Math.floor(px)), y: Math.floor(this.oy + y - Math.floor(py)), w: src.w, h: src.h, layer: this.layerName, img: src });
@@ -884,45 +884,75 @@ export class Canvas {
     if (opts?.at !== undefined) [x, y] = this.socketAt(opts.at, x, y);
     const src = this.asset(name, opts, x, y), [px, py] = src.pivot ?? [0, 0];
     this.placed?.set(opts?.id ?? name, { x: this.ox + x - Math.floor(px), y: this.oy + y - Math.floor(py), sockets: src.sockets });
-    this.place(src, x, y, [0, 0], undefined, opts?.z, name, !!opts?.sub);
+    const sub = opts?.sub;
+    if (sub !== undefined && sub !== true && sub !== false && !(Array.isArray(sub) && sub.length === 2 && sub.every(Number.isFinite)))
+      throw new PxError(`sub is true, or [dx, dy] the way the part moves (1 right / down, -1 left / up), got ${JSON.stringify(sub)}`);
+    this.place(src, x, y, [0, 0], undefined, opts?.z, name, sub ? (Array.isArray(sub) ? (sub as [number, number]) : [1, 1]) : undefined);
   }
 
   /**
-   * Put `src` at a place between pixels (sub: true), as a pixel artist draws a part half a pixel
-   * along: from a third to two thirds of the way, the part stays crisp at the place it's past, and
-   * past its own edge on the side it goes toward (right, down) half a pixel of it shows, each pixel
-   * there in the palette's key between its color and what it moves over. Nearer a whole place, it's
-   * there. Over nothing (a silhouette on clear: no half-clear in pixel art), or with no key between
-   * the two, nothing spills.
+   * Put `src` at a place between pixels (sub: true), as pixel artists draw a part half a pixel
+   * along. From a third to two thirds of the way it stays at the place it comes from (`dir`, the way
+   * it moves: [1, 1] right and down, -1 left or up), and its edges move instead of it:
+   * - with an outline (its edge pixel unlike the one behind it), it pushes into its own outline: the
+   *   outline ahead takes the key between it and the fill, the fill behind the outline it leaves
+   *   takes the key between it and that outline; the silhouette stays (works on clear, as a game
+   *   sprite is drawn);
+   * - without one, half a pixel of it spills past its edge ahead over what's painted there, in the key
+   *   between the two (nothing over clear).
+   * The keys: a key between the two in a ramp that holds both, else the palette's nearest their
+   * middle (see betweenKey). Nearer a whole place, it's there.
    */
-  private subPut(src: Img, x: number, y: number): void {
+  private subPut(src: Img, x: number, y: number, dir: [number, number] = [1, 1]): void {
+    const sx = dir[0] < 0 ? -1 : 1, sy = dir[1] < 0 ? -1 : 1;
     const fx = x - Math.floor(x), fy = y - Math.floor(y), mx = fx >= 1 / 3 && fx <= 2 / 3, my = fy >= 1 / 3 && fy <= 2 / 3;
-    const bx = mx ? Math.floor(x) : Math.round(x), by = my ? Math.floor(y) : Math.round(y);
+    // in the middle it's at the place it comes from: the lower one moving right or down, the higher one moving left or up
+    const bx = mx ? (sx > 0 ? Math.floor(x) : Math.ceil(x)) : Math.round(x), by = my ? (sy > 0 ? Math.floor(y) : Math.ceil(y)) : Math.round(y);
     this.put(src, bx, by);
     if (!mx && !my) return;
     const opaque = (c: Color) => (c & 255) >= 128, own = (i: number, j: number) => i >= 0 && j >= 0 && i < src.w && j < src.h && opaque(src.data[j * src.w + i]);
-    const spill = new Map<number, Color>();
+    const at = (i: number, j: number) => src.data[j * src.w + i];
+    const set = new Map<string, [number, number, Color]>();
+    const steps: [number, number][] = [];
+    if (mx) steps.push([sx, 0]);
+    if (my) steps.push([0, sy]);
     for (let j = 0; j < src.h; j++) for (let i = 0; i < src.w; i++) {
       if (!own(i, j)) continue;
-      for (const [dx, dy] of [[mx ? 1 : 0, 0], [0, my ? 1 : 0], [mx ? 1 : 0, my ? 1 : 0]]) {
-        if ((!dx && !dy) || own(i + dx, j + dy) || (dx && dy && (own(i + 1, j) || own(i, j + 1)))) continue;
-        const k = (j + dy) * (src.w + 1) + i + dx;
-        if (!spill.has(k)) spill.set(k, src.data[j * src.w + i]);
+      const c = at(i, j);
+      for (const [dx, dy] of steps) {
+        // its edge ahead: an outline it pushes into, or nothing, where it spills
+        if (!own(i + dx, j + dy)) {
+          if (own(i - dx, j - dy) && at(i - dx, j - dy) !== c) {
+            const m = betweenKey(this.pal, c, at(i - dx, j - dy));
+            if (m !== null) set.set(`${i},${j}`, [i, j, m]);
+          } else if (!set.has(`${i + dx},${j + dy}`)) {
+            const X = bx + i + dx, Y = by + j + dy, k = this.index(X, Y), under = k < 0 ? TRANSPARENT : this.img.data[k];
+            const m = opaque(under) ? betweenKey(this.pal, c, under) : null;
+            if (m !== null) set.set(`${i + dx},${j + dy}`, [i + dx, j + dy, m]);
+          }
+        }
+        // the outline behind, that it leaves: the fill next to it darkens toward it
+        if (!own(i - dx, j - dy) && own(i + dx, j + dy) && at(i + dx, j + dy) !== c) {
+          const m = betweenKey(this.pal, at(i + dx, j + dy), c);
+          if (m !== null && !set.has(`${i + dx},${j + dy}`)) set.set(`${i + dx},${j + dy}`, [i + dx, j + dy, m]);
+        }
       }
     }
-    for (const [k, c] of spill) {
-      const X = bx + (k % (src.w + 1)), Y = by + Math.floor(k / (src.w + 1)), at = this.index(X, Y);
-      const under = at < 0 ? TRANSPARENT : this.img.data[at];
-      const m = opaque(under) ? betweenKey(this.pal, c, under) : null;
-      if (m !== null) this.plot(X, Y, m);
+    // going both ways, a convex corner of a part that spills: its corner pixel too
+    if (mx && my) for (let j = 0; j < src.h; j++) for (let i = 0; i < src.w; i++) {
+      if (!own(i, j) || own(i + sx, j) || own(i, j + sy) || own(i + sx, j + sy) || (own(i - sx, j) && at(i - sx, j) !== at(i, j))) continue;
+      const X = bx + i + sx, Y = by + j + sy, k = this.index(X, Y), under = k < 0 ? TRANSPARENT : this.img.data[k];
+      const m = opaque(under) ? betweenKey(this.pal, at(i, j), under) : null;
+      if (m !== null && !set.has(`${i + sx},${j + sy}`)) set.set(`${i + sx},${j + sy}`, [i + sx, j + sy, m]);
     }
+    for (const [i, j, m] of set.values()) this.plot(bx + i, by + j, m);
   }
 
   /**
    * Put a placed asset's pivot on (x, y): drawn now, or in a sorted layer queued and drawn on
    * flush() by y (where it stands) or z.
    */
-  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string, sub = false): void {
+  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string, sub?: [number, number]): void {
     if (!this.sorted) return this.putAt(src, x, y, def, ok, name, sub);
     if (!Number.isFinite(z)) throw new PxError(`z must be a number, got ${JSON.stringify(z)}`);
     // Drawn later, in order: keep the clip that was active at the call.
@@ -1315,7 +1345,9 @@ function anyIn(ok: (x: number, y: number) => boolean, x: number, y: number, w: n
   return false;
 }
 
-// The palette's color between two, nearest their middle (in OKLab): on the line from one to the other,
+// The key between two colors: in a ramp that holds both (a part's own shade toward its outline: the
+// ink ends every ramp), the key halfway between them, or none when they're next to each other there;
+// in no ramp, the palette's color nearest their middle (in OKLab), on the line from one to the other,
 // a fifth to four fifths of the way and close to it (closer than study asks of a hand-picked one), of
 // the colors the file chose; null when none is.
 const BETWEEN = new WeakMap<Palette, { list: Color[]; memo: Map<string, Color | null> }>();
@@ -1325,6 +1357,13 @@ export function betweenKey(pal: Palette, a: Color, b: Color): Color | null {
   const { list, memo } = entry;
   const key = a < b ? `${a},${b}` : `${b},${a}`;
   if (memo.has(key)) return memo.get(key)!;
+  for (const r of pal.ramps) {
+    const cs = [...r].map((k) => pal.keys.get(k)), ia = cs.indexOf(a), ib = cs.indexOf(b);
+    if (ia < 0 || ib < 0) continue;
+    const lo = Math.min(ia, ib), hi = Math.max(ia, ib), mid = hi - lo > 1 ? cs[Math.floor((lo + hi) / 2)]! : null;
+    memo.set(key, mid);
+    return mid;
+  }
   const A = oklab(a), B = oklab(b), ab = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], n2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2;
   let best: Color | null = null, near = Infinity;
   if (n2 >= 0.15 ** 2) for (const c of list) {

@@ -17,8 +17,8 @@ declare global {
     rflip?: "x" | "y" | "xy"; rswap?: Record<string, PxColor>[]; seed?: number; reseed?: boolean | number;
     /** Animated assets: freeze on frame n / start later (ms) / random start. */
     frame?: number; delay?: number; rdelay?: boolean;
-    /** stamp only: x, y between pixels; edges over painted pixels take the key between the two (subpixel). */
-    sub?: boolean;
+    /** stamp only: x, y between pixels (subpixel); [dx, dy] the way it moves (1 right/down, -1 left/up). */
+    sub?: boolean | [number, number];
     /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
     silhouette?: PxColor;
     /** Lay the asset flat on the ground as its cast shadow: a pixel h above the base lands h * [kx, ky] away. */
@@ -252,7 +252,7 @@ declare global {
     /** Draw on a plate of its own, lit there with relight's opts, then lay it down. */
     plate(fn: () => void, opts?: PxRelight): void;
     /** Draw `fn` on a sheet of its own and lay it down moved by (dx, dy), between pixels too (subpixel). */
-    subpixel(dx: number, dy: number, fn: () => void): void;
+    subpixel(dx: number, dy: number, fn: () => void, dir?: [number, number]): void;
     px(x: number, y: number, c: PxColor): void;
     rect(x: number, y: number, w: number, h: number, c: PxColor): void;
     box(x: number, y: number, w: number, h: number, c: PxColor): void;

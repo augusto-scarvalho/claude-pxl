@@ -277,20 +277,32 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   that swings an axe round a body that stays in profile reads as a puppet. Posed as a skeleton in 3D
   and turned about its upright, the views come by themselves (`examples/rig/warden.px.js`: the head
   drawn in five views, picked by the turn).
-- **Subpixel: less than a pixel of motion** (after ApplefatGOV's How-to-subpixel, r/PixelArt). An idle
-  doesn't need the whole body to drop a pixel (the tutorial's is a fighting stance in its beat, a
-  boxer finding his rhythm, about a second a sway; a breath is slower, three or four seconds a cycle):
-  that single-pixel bob crushes the legs and jolts the face. Keep the feet planted and move each part
-  half a pixel at a time: in the frame between two whole-pixel places, the edge the part moves toward
-  takes the tone between its color and its neighbor's (a ramp's middle key); then the part moves the
-  whole pixel, and the edge it leaves takes that tone on the way back. It works up and down, sideways,
-  round a small circle, and for growing and shrinking. Move the parts by turns (the head, then the
-  shoulders and sleeves, the hem last), so a six-frame idle carries one pixel of real travel. In pxl:
-  draw the parts apart and stamp each with `{ sub: true }` (or draw it in `c.subpixel(dx, dy, () =>
-  ...)`) at its place of the frame (`y + 0.5` is half a pixel down); the palette needs a key between
-  each part's colors and what it moves over (`examples/subpixel.px.js` makes them as mixes of the two;
-  `examples/rig/warden.px.js` sways so at rest, a fighting stance from foot to foot). `pxl study`
-  tells it in a clip ("Subpixel: ..."), with the tones it takes.
+- **Subpixel: less than a pixel of motion** (after ApplefatGOV's How-to-subpixel and 2D Will Never
+  Die's: "animate the anti-aliasing"). An idle doesn't need the whole body to drop a pixel (the
+  tutorial's is a fighting stance in its beat, a boxer finding his rhythm, about a second a sway; a
+  breath is slower, three or four seconds a cycle): that single-pixel bob crushes the legs and jolts
+  the face. Keep the feet planted and move each part half a pixel at a time, the parts by turns (the
+  head, then the shoulders and sleeves, the hem last), so a six-frame idle carries one pixel of real
+  travel.
+  - **How a half step looks.** The part stays where it comes from and pushes into its own outline: the
+    outline ahead lightens to the part's ramp step between it and the fill, the fill behind the
+    outline it leaves darkens the same, and the silhouette doesn't move (Metal Slug's sprites do
+    this). The tones come from the part's own ramp toward its outline, never from a background: a
+    sprite crosses many backgrounds. One tone per edge is the norm; finer steps need more of the ramp.
+  - **Two ways without new colors.** The smear: on the in-between frame the part fills both its old
+    and its new place in its own color, a pixel wider for a frame. The stagger: one color boundary
+    moves per frame, so a part of N colors takes N+1 frames per pixel of travel.
+  - **Move the light, not the shape.** Inside a form, a breath can be the shading's edge moving: a
+    `shade`/`light` region whose center moves by a fraction of a pixel flips edge pixels one at a time
+    while the outline stays.
+  - **When.** Hair, cloth, idles and breaths, a quiet scene, mid-size sprites (40 to 100 px) with
+    enough colors. Not on icons or emotes (noise), in a busy scene, or high contrast against black (it
+    flickers): look at it at game scale. Keep eyes and faces crisp, moved by whole pixels.
+  - **In pxl:** stamp each part with `{ sub: [dx, dy] }` at its place of the frame, `[dx, dy]` the way
+    it goes (or draw it in `c.subpixel(dx, dy, () => ..., [dx, dy])`); give each ramp its steps toward
+    the ink (`examples/subpixel.px.js`; `examples/rig/warden.px.js` sways so at rest, a fighting
+    stance from foot to foot). `pxl study` tells it in a clip ("Subpixel: ..."), with the tones it
+    takes.
 - **Register the whole figure by one point**, the pelvis: move the entire frame so it lands on the
   same x every frame, with one constant y offset per cycle for the bob. Never centre frames on
   their bounding box (an arm reaching out moves it), and never pin head and feet separately (the

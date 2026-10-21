@@ -252,10 +252,11 @@ export interface PlaceOpts {
   /** Animated assets: random start time per placement (true), seeded like other picks. */
   rdelay?: boolean;
   /**
-   * stamp only: x and y may fall between pixels; an edge covering part of a pixel over something
-   * painted takes the palette's key between the two (subpixel motion: an idle by half pixels).
+   * stamp only: x and y may fall between pixels (subpixel motion: an idle by half pixels); [dx, dy]
+   * the way the part moves (1 right / down, -1 left / up; true: [1, 1]). Halfway it stays where it
+   * comes from and its edges move: it pushes into its own outline, or spills over what's painted.
    */
-  sub?: boolean;
+  sub?: boolean | [number, number];
 }
 
 export interface ScatterOpts extends PlaceOpts {

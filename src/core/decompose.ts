@@ -275,7 +275,8 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     // its edges moving by part of a pixel, in a clip that moves so (subpixelClip): much of what changes
     // in it goes between a color and the in-between tone of it and its neighbor, not with a whole-pixel
     // move (an idle, a stance's sway or a breath; less than a pixel of motion, so no attack, no fire)
-    const small = subClip && partialOf(F, pix, W, H) >= 0.15;
+    // (in such a clip a part pushing into its outline measures 0.1, its single-pixel bob 0.01)
+    const small = subClip && partialOf(F, pix, W, H) >= 0.06;
     // how much of what differs is the background a step away, the best step each frame: a thing moving a
     // pixel or two (a ghost bobbing brightens and darkens at its edges all at once too), not a light
     let shifted = 0, differs = 0;
@@ -696,14 +697,32 @@ function partialOf(F: Img[], pix: number[], W: number, H: number): number {
     }
     return null;
   };
+  // or gone part of the way from its color toward a neighbor's, one of them dark (an outline pushed
+  // into, a fill darkening toward it)
+  // (it alone: the neighbor it goes toward and the one across as they were)
+  const toward = (f: Img, g: Img, p: number, from: number) => {
+    const x = p % W, y = Math.floor(p / W), c = f.data[p];
+    if (clear(c) || clear(from)) return false;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (x - dx < 0 || y - dy < 0 || x + dx < 0 || y + dy < 0 || x + dx >= W || y + dy >= H || x - dx >= W || y - dy >= H) continue;
+      const q = f.data[p + dx + dy * W], o = p - dx - dy * W;
+      if (clear(q) || q === c || q === from || Math.min(lab(from)[0], lab(q)[0]) > 0.3 || g.data[p + dx + dy * W] !== q || g.data[o] !== f.data[o]) continue;
+      const A = lab(from), B = lab(q), P = lab(c), ab = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], n2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2;
+      if (n2 < 0.15 ** 2) continue;
+      const t = ((P[0] - A[0]) * ab[0] + (P[1] - A[1]) * ab[1] + (P[2] - A[2]) * ab[2]) / n2;
+      if (t > 0.2 && t < 0.8 && Math.hypot(P[0] - A[0] - t * ab[0], P[1] - A[1] - t * ab[1], P[2] - A[2] - t * ab[2]) < 0.3 * Math.sqrt(n2)) return true;
+    }
+    return false;
+  };
   let changed = 0, partial = 0;
   for (let t = 1; t < F.length; t++) for (const p of pix) {
     const a = F[t - 1].data[p], b = F[t].data[p];
     if (a === b) continue;
     changed++;
     // (not where the picture moved a whole pixel round it: a ramp's middle tone carried along)
-    const ea = ends(F[t - 1], p), eb = ends(F[t], p), whole = shifted(F[t - 1], F[t], p % W, Math.floor(p / W));
-    if (!whole && ((eb && (a === eb[0] || a === eb[1])) || (ea && (b === ea[0] || b === ea[1])))) partial++;
+    if (shifted(F[t - 1], F[t], p % W, Math.floor(p / W))) continue;
+    const ea = ends(F[t - 1], p), eb = ends(F[t], p);
+    if ((eb && (a === eb[0] || a === eb[1])) || (ea && (b === ea[0] || b === ea[1])) || toward(F[t], F[t - 1], p, a) || toward(F[t - 1], F[t], p, b)) partial++;
   }
   return changed ? partial / changed : 0;
 }

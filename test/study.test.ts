@@ -327,7 +327,7 @@ test("study reads back what stamp's sub draws: the subpixel idle of examples/sub
   const frames = p.frames("subpixel").map((f) => f.img);
   const text = study({ name: "subpixel", frames, ms: frames.map(() => 111), kind: "test" }).text.join("\n");
   assert.match(text, /Subpixel: \d+% of what changes/);
-  assert.match(text, /stamp\(part, x, y \+ 0\.5, \{ sub: true \}\)/);
+  assert.match(text, /stamp\(part, x, y \+ 0\.5, \{ sub: \[dx, dy\] \}\)/);
   // the keeper moving by half pixels (right) is moving by part of a pixel; the one bobbing (left) isn't
   const pieces = text.split("\n").filter((l) => /^ {2}#\d/.test(l));
   assert.ok(pieces.some((l) => / at 8\d,\d+,.*by part of a pixel/.test(l)), pieces.join("\n"));
