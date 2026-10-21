@@ -271,10 +271,12 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   arm reaches its full length at the release and the free arm tucks in; after it the body follows the
   weight down; a coat and hair come a frame late, and the head leads a turn. A blade's edge faces the
   way the cut goes, every frame of it (a backswing keeps it on its target; edge up or the flat
-  leading, an axe reads as a club), and its head is drawn side on even when a level cut would show it
-  edge on. An arm that swings an axe round a body that stays in profile reads as a puppet. Posed as a
-  skeleton in 3D and turned about its upright, the views come by themselves
-  (`examples/rig/warden.px.js`: the head drawn in five views, picked by the turn).
+  leading, an axe reads as a club). An axe's edge is the long curve at the end of the bit, from its
+  top corner (the toe) down to the heel, running along the haft, never across its top; the poll is on
+  the other side. Held, show the blade's side; in a level whirl it turns edge on, as it would. An arm
+  that swings an axe round a body that stays in profile reads as a puppet. Posed as a skeleton in 3D
+  and turned about its upright, the views come by themselves (`examples/rig/warden.px.js`: the head
+  drawn in five views, picked by the turn).
 - **Register the whole figure by one point**, the pelvis: move the entire frame so it lands on the
   same x every frame, with one constant y offset per cycle for the bob. Never centre frames on
   their bounding box (an arm reaching out moves it), and never pin head and feet separately (the
