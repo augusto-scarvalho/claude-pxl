@@ -35,7 +35,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   const first = input.frames[0], text: string[] = [];
   const pre = !!input.drawnAt, g = input.drawnAt ?? findGrid(first, opts.px), up = g.sx > 1 || g.sy > 1;
   // a copy that was blurred, compressed or scaled by a fraction has its colors smeared: fold them harder
-  const smeared = !Number.isInteger(g.sx) || /JPG|JPEG|WEBP|video/i.test(input.kind);
+  const smeared = !Number.isInteger(g.sx) || (/JPG|JPEG|WEBP|video/i.test(input.kind) && !/lossless/.test(input.kind));
   // the checker an editor shows for clear, exported with it: taken for clear before anything is read
   const raw = up && !pre ? toNative(first, g) : first, checker = smeared ? null : findChecker(raw);
   const unchecker = (f: Img) => (checker ? clearChecker(f, checker) : f);

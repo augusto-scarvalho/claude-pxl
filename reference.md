@@ -526,6 +526,8 @@ light's source, strength and color, and its box in every frame it shows in (its 
 `[frame, x, y, w, h]`). Videos are read `--seconds` (8) from `--from` at their own
 rate up to 30 fps (`--fps`); big frames are brought down as they are read (to 1x when they are pixel
 art, else to 640 px). PNG and GIF are read by pxl; JPEG, WebP, BMP and video need ffmpeg on PATH.
+An animated WebP (what a saved web page often makes of a GIF) is read frame by frame, each with its
+own time; a lossless one's pixels are taken as exact, a lossy one's as a JPEG's.
 
 `compare` checks a silhouette against a reference image: for every row, the opaque runs of the
 reference (shrunk by N first, placed at x,y in the asset's coordinates) and of the asset, and how

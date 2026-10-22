@@ -8,6 +8,7 @@ import { pack } from "../src/core/color.ts";
 import { encodeGif } from "../src/node/gif.ts";
 import { decodeGif } from "../src/node/gifread.ts";
 import { writePng } from "../src/node/output.ts";
+import { webpInfo } from "../src/node/media.ts";
 import { main } from "../src/node/cli.ts";
 import { areaDown, findGrid, lineFlaws, pixelate } from "../src/core/vision.ts";
 import { latticeHash } from "../src/core/util.ts";
@@ -563,4 +564,15 @@ test("study reads back what stamp's sub draws: the subpixel idle of examples/sub
   const pieces = text.split("\n").filter((l) => /^ {2}#\d/.test(l));
   assert.ok(pieces.some((l) => / at 8\d,\d+,.*by part of a pixel/.test(l)), pieces.join("\n"));
   assert.ok(!pieces.some((l) => / at 2\d,\d+,.*by part of a pixel/.test(l)), pieces.join("\n"));
+});
+
+test("a WebP's chunks: an animated one's frame times, and whether its pixels are exact", () => {
+  // RIFF....WEBP, then chunks: a fourcc, a little-endian size, the payload (padded to even)
+  const chunk = (tag: string, body: number[]) => [...tag].map((c) => c.charCodeAt(0)).concat([body.length & 255, (body.length >> 8) & 255, 0, 0], body, body.length & 1 ? [0] : []);
+  const riff = (chunks: number[][]) => { const body = [..."WEBP"].map((c) => c.charCodeAt(0)).concat(...chunks); return new Uint8Array([..."RIFF"].map((c) => c.charCodeAt(0)).concat([body.length & 255, (body.length >> 8) & 255, 0, 0], body)); };
+  // an ANMF: x, y, w-1, h-1 (3 bytes each), the duration (3), flags (1), then the frame's own chunk
+  const frame = (ms: number, inner: string) => chunk("ANMF", [0, 0, 0, 0, 0, 0, 9, 0, 0, 9, 0, 0, ms & 255, (ms >> 8) & 255, 0, 0, ...chunk(inner, [1, 2, 3])]);
+  assert.deepEqual(webpInfo(riff([chunk("VP8X", new Array(10).fill(0)), chunk("ANIM", [0, 0, 0, 0, 0, 0]), frame(120, "VP8L"), frame(600, "VP8L")])), { ms: [120, 600], lossless: true });
+  assert.deepEqual(webpInfo(riff([chunk("VP8 ", [1, 2, 3, 4])])), { ms: [], lossless: false });
+  assert.equal(webpInfo(new Uint8Array([1, 2, 3])), null);
 });

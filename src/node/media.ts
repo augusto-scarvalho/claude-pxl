@@ -1,5 +1,5 @@
-// Pictures, GIFs and videos read as frames for `pxl study`. PNG and GIF are read here; JPEG, WebP,
-// BMP and video go through ffmpeg when it is on PATH (pxl needs nothing else). Each frame is brought
+// Pictures, GIFs and videos read as frames for `pxl study`. PNG and GIF are read here; JPEG, WebP
+// (animated too), BMP and video go through ffmpeg when it is on PATH (pxl needs nothing else). Each frame is brought
 // down as it is read: pixel art drawn at 2x and up to its own pixels (the grid found on the first
 // frame), anything else to 640 px on its long side, so a minute of video doesn't fill the memory.
 import { spawnSync } from "node:child_process";
@@ -17,6 +17,28 @@ export interface MediaOpts { at?: number[]; from?: number; seconds?: number; fps
 
 const STILL = new Set([".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"]);
 
+/** A WebP's RIFF chunks: each frame's ms when it is animated (ANIM, ANMF), and whether its pixels are
+ * exact (VP8L, lossless) rather than compressed like a JPEG's (VP8). Saved web pages turn GIFs into
+ * animated WebPs. */
+export function webpInfo(buf: Uint8Array): { ms: number[]; lossless: boolean } | null {
+  const tag = (o: number) => String.fromCharCode(buf[o], buf[o + 1], buf[o + 2], buf[o + 3]);
+  const u32 = (o: number) => buf[o] | (buf[o + 1] << 8) | (buf[o + 2] << 16) | (buf[o + 3] << 24);
+  if (buf.length < 20 || tag(0) !== "RIFF" || tag(8) !== "WEBP") return null;
+  const ms: number[] = [];
+  let vp8 = 0, vp8l = 0;
+  const walk = (from: number, to: number) => {
+    for (let o = from; o + 8 <= to;) {
+      const t = tag(o), n = u32(o + 4) >>> 0;
+      if (t === "ANMF") { ms.push((buf[o + 20] | (buf[o + 21] << 8) | (buf[o + 22] << 16)) || 100); walk(o + 24, Math.min(to, o + 8 + n)); }
+      else if (t === "VP8L") vp8l++;
+      else if (t === "VP8 ") vp8++;
+      o += 8 + n + (n & 1);
+    }
+  };
+  walk(12, buf.length);
+  return { ms, lossless: vp8l > 0 && vp8 === 0 };
+}
+
 export function readMedia(path: string, o: MediaOpts = {}): Media {
   const ext = extname(path).toLowerCase(), max = o.max ?? 240;
   let read: (() => Img)[], ms: number[], kind: string, cleanup = () => {};
@@ -26,7 +48,7 @@ export function readMedia(path: string, o: MediaOpts = {}): Media {
     const from = Math.floor(((o.from ?? 0) * 1000) / (g.frames[0]?.ms || 100)), part = g.frames.slice(from, o.seconds ? from + Math.ceil((o.seconds * 1000) / (g.frames[0]?.ms || 100)) : undefined);
     read = part.map((f) => () => f.img); ms = part.map((f) => f.ms);
     kind = `GIF${g.frames.length > part.length ? `, frames ${from}-${from + part.length - 1} of ${g.frames.length}` : ""}`;
-  } else ({ read, ms, kind, cleanup } = viaFfmpeg(path, ext, o, max));
+  } else ({ read, ms, kind, cleanup } = viaFfmpeg(path, ext, o, max, ext === ".webp" ? webpInfo(readFileSync(path)) : null));
   try {
     if (!read.length) throw new PxError(`${path}: no frames in it`);
     // each frame: the region asked for, then down to its own pixels (or to 640 px) when it moves
@@ -68,7 +90,7 @@ export function readMedia(path: string, o: MediaOpts = {}): Media {
   } finally { cleanup(); }
 }
 
-function viaFfmpeg(path: string, ext: string, o: MediaOpts, max: number) {
+function viaFfmpeg(path: string, ext: string, o: MediaOpts, max: number, webp: { ms: number[]; lossless: boolean } | null) {
   const run = (cmd: string, args: string[]) => {
     const r = spawnSync(cmd, args, { encoding: "buffer", maxBuffer: 1 << 26 });
     if (r.error && (r.error as NodeJS.ErrnoException).code === "ENOENT")
@@ -76,9 +98,10 @@ function viaFfmpeg(path: string, ext: string, o: MediaOpts, max: number) {
     if (r.status !== 0) throw new PxError(`ffmpeg couldn't read ${path}: ${r.stderr.toString().trim().split("\n").pop()}`);
     return r.stdout.toString();
   };
-  const still = STILL.has(ext);
+  // an animated WebP: every frame as it is, each with its own ms from the file
+  const anim = webp && webp.ms.length > 1 ? webp.ms : null, still = STILL.has(ext) && !anim;
   let fps = 1, native = 0;
-  if (!still) {
+  if (!still && !anim) {
     const [a, b] = run("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", path]).trim().split("/").map(Number);
     native = b ? a / b : a || 30;
     fps = o.fps ?? Math.min(native, 30);
@@ -88,11 +111,13 @@ function viaFfmpeg(path: string, ext: string, o: MediaOpts, max: number) {
     const args = ["-v", "error"];
     if (!still && o.from) args.push("-ss", String(o.from));
     args.push("-i", path);
-    if (!still) args.push("-t", String(o.seconds ?? 8), "-vf", `fps=${fps}`);
+    if (anim) args.push("-fps_mode", "passthrough");
+    else if (!still) args.push("-t", String(o.seconds ?? 8), "-vf", `fps=${fps}`);
     args.push("-frames:v", String(still ? 1 : max), join(dir, "f%05d.png"));
     run("ffmpeg", args);
   } catch (e) { cleanup(); throw e; }
   const files = readdirSync(dir).filter((f) => f.endsWith(".png")).sort();
-  const kind = still ? `${ext.slice(1).toUpperCase()}, through ffmpeg` : `video through ffmpeg, ${files.length} frames at ${+fps.toFixed(2)} fps${native && fps < native ? ` (of ${+native.toFixed(2)})` : ""} from ${o.from ?? 0} s`;
-  return { read: files.map((f) => () => decodePng(readFileSync(join(dir, f)))), ms: files.map(() => Math.round(1000 / fps)), kind, cleanup };
+  const exact = webp?.lossless ? " (lossless)" : "";
+  const kind = anim ? `animated WebP${exact} through ffmpeg, ${files.length} frames` : still ? `${ext.slice(1).toUpperCase()}${exact}, through ffmpeg` : `video through ffmpeg, ${files.length} frames at ${+fps.toFixed(2)} fps${native && fps < native ? ` (of ${+native.toFixed(2)})` : ""} from ${o.from ?? 0} s`;
+  return { read: files.map((f) => () => decodePng(readFileSync(join(dir, f)))), ms: files.map((_, i) => anim ? anim[i] ?? 100 : Math.round(1000 / fps)), kind, cleanup };
 }
