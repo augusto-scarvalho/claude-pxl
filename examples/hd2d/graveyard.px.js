@@ -3,11 +3,11 @@
 // path to the back, headstones either side of it, a picket fence round the top, a dead tree, the wood
 // all round and hills fading into the mist. Built in meters with mesh() (blocks of the kit, textures
 // laid a texel to a pixel where the camera looks; the grass reaching over the path's margins laid on
-// them, its clear texels holes the stones show through; the fence of boxes), the people, trees, stones and plants as sprites standing in it,
+// them, its clear texels holes the stones show through; the fence of boxes), the people (traveler.px.js), trees, stones and plants as sprites standing in it,
 // a low sun behind on the left. Its ground, plants and stones are drawn after the games' sheets (pxl
 // study) and SLYNYRD's, Saint11's and final boss blues' tutorials. `graveyard` is the art at its own
 // size, the one checked; `graveyard_hd` the same four times as big through post().
-include("../topdown_hero/hero.px.js")
+include("traveler.px.js")
 include("kit.px.js", { palette: true })
 
 
@@ -132,13 +132,13 @@ for (const [x0, n] of [[-6.1, 3], [-3.2, 2], [2.4, 2], [4.9, 3]]) {
   tufts(x0 + n * 0.62 + 0.2, Z - 2.75, 0, 2)
 }
 
-// The scene's clock: 16 frames of 210 ms. One hero walks up the path and back down it; another
-// stands at a grave, his back to us.
+// The scene's clock: 16 frames of 210 ms. The traveler walks up the path and back down it; the
+// mourner stands at a grave, her back to us, breathing.
 const walker = (f) => {
   const down = f >= 8, z = Z - 1.6 + 0.25 * (down ? 16 - f : f)
-  return { name: down ? "walk_down" : "walk_up", at: [0.2, z, TOP + 0.02], frame: f % 4 }
+  return { name: down ? "tr_walk_sw" : "tr_walk_nw", at: [0.2, z, TOP + 0.02], frame: f % 8 }
 }
-const people = (f) => [...things, walker(f), { name: "idle_up", at: [-3.4, Z + 2.5, TOP], frame: 0 }]
+const people = (f) => [...things, walker(f), { name: "mo_idle_nw", at: [-2.75, Z + 2.45, TOP], frame: Math.floor(f / 2) % 4 }]
 const CLOCK = { frames: 16, fps: 1000 / 210 }
 // Morning: the sun behind on the left (the shadows fall toward us and to the right), warm; the sky's
 // light violet in the shade.

@@ -136,6 +136,33 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
 - **Licence:** whatever you paint over the base is a derivative of it. With a CC-BY-SA base, the
   result has to credit its author and be shared under CC-BY-SA, so tell the user.
 
+### A 3D reference: pre-render the body, draw the head
+
+When no base exists in the view you need (a figure turned to a diagonal, walking), render one from a
+rigged 3D figure, as Dead Cells did and as Saint11 teaches; drawing a turned, walking body pixel by
+pixel by eye is where code drawing fails worst (proportions drift, the near and far limbs swap, every
+fix breaks something else). What worked for `examples/hd2d/traveler.px.js` (its `traveler/` folder
+holds both scripts):
+
+1. A rigged figure with its moves (Quaternius' Universal Animation Library: a mannequin and its
+   Idle_Loop, Walk_Loop, CC0), made chibi by scaling its bones (the head 3x, the thighs and upper
+   arms 0.6-0.8 long, the chest a little broader), the scale channels taken out of its actions so the
+   scales hold. Hair and garments as simple shapes riding the bones (a sphere for the hair, its front
+   cut open for the face; a cone for a cloak, open in front, its radius waving toward the hem so the
+   light draws folds).
+2. A sprite's camera: orthographic, nearly level (20 degrees down, not the floor's 38: a billboard is
+   drawn as seen from the front), the figure turned 25 degrees off the diagonal (it reads as facing
+   it, and wider than at 45), framed on its rest pose so the feet sit on the bottom row through every
+   frame. Light from the upper left.
+3. Two renders a frame at 4x (72x136 for an 18x34 sprite), on the CPU (Cycles, a few seconds for a
+   whole set): the regions in flat colors (emission) and the light alone (everything white).
+4. Down 4x by blocks: each pixel the region most of its block shows (clear under 7 of 16), a tone of
+   that region's ramp by how lit the block is, with hard steps (cel shading) over the frame's own
+   range of light. Averaging the plain render down instead gives mud: thin, blurred figures.
+5. The head by hand: the 3D head is cleared and where it was printed per frame; a drawn head (the
+   face, the hair's tufts, the eyes: what makes the figure someone) is stamped there. A recolor of
+   the same frames (`base` + `swap` on the palettized PNGs) is another person.
+
 ## 4. Build order
 
 1. **Silhouette.** Draw the figure in flat colours, then check it as one shape with a
@@ -213,6 +240,39 @@ of the nose; the corners of the mouth straight below the pupils.)
   shoulders rise into the head's rows (2 px above the chin) and the waist curves: a flat front view
   on a top-down map looks pasted on. A front view of even width has no middle column: `mx: "c"` for
   one, or break the symmetry on purpose (one brow longer).
+- **Turned to a diagonal** (tactics games and HD-2D: FFT, FFTA, Tactics Ogre, Triangle Strategy,
+  Octopath; down-left, up-left, the other two flipped). Facing down and to the left, the figure has
+  turned to its right: its left side comes toward us, so the near arm and the near foot are on the
+  screen's right, the far ones on the left (every game measured agrees); facing up and to the left,
+  the near side is on the left. Get this wrong and the face says one diagonal and the body another,
+  and it reads as a box facing front. Measured standing (Cyrus, Olberic, Serenoa, Ramza, Denam):
+  - 34-38 px, the head 11-16 rows (38-44%) and 13-16 px wide; the shoulders about 0.7 of the head's
+    width (9-11 px); the figure widest at the hands or the hem, never at the shoulders (Cyrus by row:
+    9-10, 12, 14, then 15-16 with the cloak's tail; the legs 9).
+  - The face on the leading side, 6-7 px wide, a lock of hair framing it on the left, the back of the
+    head the right 5-6 px. The near eye on the head's middle column, about 2 px (a dark lid, the iris,
+    the glint); the far eye 1 px wide, 2 px further left by the face's edge; the ear 1-2 px right of
+    the near eye; the eyes low, 1-3 rows above the chin; brows a dark row over them.
+  - The front's middle line (buttons, an opening, a buckle) a third of the torso's width from its
+    leading edge; belt and hem curved, their ends a pixel higher.
+  - The far arm a sliver (Octopath) or a narrow arm set off by a dark line (Triangle Strategy), its
+    hand 3-5 rows higher than the near one; the near arm 3-5 px over the torso's trailing edge, on the
+    shadow side under a light from the upper left. The near foot lower and toward the trailing side
+    (4 px lower and 7-8 right from above: Triangle Strategy, FFT; 1 px from Octopath's lower camera),
+    the far foot showing its side, toe out.
+  - A cloak or coat hangs as a trapezoid, 9-10 px at the shoulders to 15-16 at the hem: the opening
+    on the leading third, widening down; the lining 2-3 px of a darker color past the near arm, ending
+    in a tail 1-2 px further out; the hem shorter in front, longer at the tail; two or three
+    horizontal accents (collar, waist, hem trim), a fold or two, little detail in the darks.
+  - Seen from behind (up-left): the same head filled with hair, lit only at the crown, darkest at the
+    nape, resting on the collar (no neck); of the face only a sliver of cheek and jaw on the left edge
+    (1-2 px, 2-3 rows); the collar the lightest band of the back, the belt curving across it, a dark
+    line parting the near arm from the back.
+  - Walking on the diagonal: the feet part 8-9 px at the contact (Octopath; FFTA 5 to 9 along the
+    2:1 diagonal), the leading heel a pixel up, the body a pixel lower there and tallest passing (a
+    triangle wave); the arms the other way round, the far one showing only at its extremes; a cloak's
+    tail and the hair a frame late. Feet moved 1 px each way never part and read as shuffling.
+  `examples/hd2d/traveler.px.js` stands on these numbers (its body from a 3D figure, §3).
 - **Profile (side view):** everything says which way the figure faces. The far arm and far leg hide
   behind the near ones or show as a darker sliver on the same side (moving, keep them a ramp step
   darker in every frame, so crossing legs never swap; a far leg all shadow, with near-black under it,
@@ -667,7 +727,8 @@ figure and pick its build by the game whose look you're after.
 
 A 16-bit sprite keeps to a palette of 16, its sixteenth clear: 15 colors at most to a sprite (the
 SNES and GBA rows). HD-2D's figures stand taller (32–38 px) and take more colors (22–54: ramps of
-four to six tones, softer shading), the black outline kept.
+four to six tones, softer shading), the black outline kept: `examples/hd2d/traveler.px.js` (34 px, its
+body pre-rendered from a 3D figure, §3, its head drawn).
 
 How they play, and the same in pxl:
 
