@@ -274,7 +274,8 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
   });
   // ---------------------------------------------------------------- things in place, each isolated
   const busy = new Uint8Array(WH);
-  for (let p = 0; p < WH; p++) if (inPlace[p] >= Math.max(2, 0.05 * N)) busy[p] = 1;
+  // (in a clip of 4 frames or fewer a part may change in one: a walk of 4 swings each hand once)
+  for (let p = 0; p < WH; p++) if (inPlace[p] >= Math.max(N <= 4 ? 1 : 2, 0.05 * N)) busy[p] = 1;
   const frags = inStep(busy, fg, W, H).filter((c) => c.n >= 4);
   // each fragment's rhythm (how much of it differs in each frame) and its colors over the clip, each with
   // its share (counted by share, the ghost's white in its top against the sky and in its body against
@@ -360,9 +361,10 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     }
     // what changes from frame to frame in it; whether neighbors change the same way (a light brightening
     // shades everything round it alike; water or fire changes pixel by pixel), and in lightness only
-    let same = 0, pairs = 0, lightOnly = 0, changed = 0;
+    let same = 0, pairs = 0, lightOnly = 0, changed = 0, oneWay = 0, ways = 0;
     for (let t = 1; t < N; t++) {
       const dir = new Int8Array(bw * bh);
+      let up = 0, down = 0;
       for (let i = 0; i < bw * bh; i++) {
         const x = x0 + (i % bw), y = y0 + Math.floor(i / bw);
         if (!mine[y * W + x]) continue;
@@ -370,10 +372,12 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
         if (!differ(a, b) || (a & 255) < 128 || (b & 255) < 128) continue;
         const A = lab(a), B = lab(b);
         dir[i] = B[0] > A[0] ? 1 : -1;
+        if (dir[i] > 0) up++; else down++;
         changed++;
         if (Math.hypot(B[1] - A[1], B[2] - A[2]) < 0.6 * Math.abs(B[0] - A[0]) + 0.01) lightOnly++;
       }
       for (let i = 0; i < bw * bh; i++) if (dir[i]) for (const j of [i + 1, i + bw]) if (j < bw * bh && dir[j] && (j !== i + 1 || (i + 1) % bw)) { pairs++; if (dir[i] === dir[j]) same++; }
+      if (up + down) { oneWay += Math.max(up, down) / (up + down); ways++; }
     }
     const coherent = pairs ? same / pairs : 0, tone = changed ? lightOnly / changed : 0, share = pix.length / (bw * bh);
     // its edges moving by part of a pixel, in a clip that moves so (subpixelClip): much of what changes
@@ -445,9 +449,10 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const once = shown.length >= 3 && gone < N - 1 && area[gone] <= 0.5 * area[peak] && [born, born + 1, born + 2].some((t) => t < N && whiteAt(t));
     const kind: Kind = along || round ? (poses >= 3 ? "walk" : "carried")
       : stream ? "stream"
-      // (a light changes in one or two places; a flat figure running changes only in lightness too, but
-      // in many parts at once)
-      : coherent >= 0.85 && tone >= 0.6 && !moves && parts.length <= 3 ? "light"
+      // (a light changes in one or two places, all of it brighter or all darker from one frame to the
+      // next; a flat figure running changes only in lightness too, but in many parts at once, and its
+      // front edge lightens while its back edge darkens: about half each way)
+      : coherent >= 0.85 && tone >= 0.6 && !moves && parts.length <= 3 && oneWay >= 0.7 * Math.max(1, ways) ? "light"
       : once ? "effect"
       : action ? "action"
       : !cyc && !small && poses >= 0.5 * N && coherent < 0.8 ? "effect"

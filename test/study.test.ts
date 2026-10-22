@@ -616,3 +616,21 @@ test("study: a ramp whose hue turns one way all along stays one ramp past 55°; 
   for (let y = 0; y < 24; y++) for (let x = 0; x < 24; x++) field.set(x, y, (x >> 2) % 2 ? grass[y % 3] : dirt[(y + 1) % 3]);
   assert.ok(findRamps(field).filter((r) => r.colors.length > 1).length >= 2);
 });
+
+test("study: planes that share rows (a far texture showing between a near one's blocks) are each found by their blocks' speed", () => {
+  // the far plane a texture everywhere going 1 px a frame; the near one blocks of another texture,
+  // 16 px of every 32, going 3 px a frame, in the same rows
+  const NL = String.fromCharCode(10), W = 128, H = 64, P = [pack(40, 60, 90), pack(70, 100, 140), pack(120, 150, 190), pack(200, 120, 70), pack(240, 180, 110), pack(150, 80, 50)];
+  const frames = Array.from({ length: 8 }, (_, t) => {
+    const img = new Img(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const fx = (x + 3 * t) % 256, bx = (x + t) % 256;
+      img.set(x, y, fx % 32 < 16 ? P[3 + Math.floor(latticeHash(fx, y) * 3)] : P[Math.floor(latticeHash(bx + 999, y) * 3)]);
+    }
+    return img;
+  });
+  const text = study({ name: "planes", frames, ms: frames.map(() => 80), kind: "test" }).text.join(NL);
+  const planes = text.split(NL).filter((l) => /Planes (going by|sharing rows)/.test(l)).join(NL);
+  assert.match(planes, /1(\.00)? px\/frame left/, planes || text.slice(text.indexOf("MOTION"), text.indexOf("MOTION") + 800));
+  assert.match(planes, /3(\.00)? px\/frame left/, planes);
+});

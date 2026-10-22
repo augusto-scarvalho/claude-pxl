@@ -502,6 +502,22 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
     lines.push(`  Planes going by (bands of rows carried across together): ${bands.map((b) => `rows ${b.y0}-${b.y1} at ${Math.abs(b.v).toFixed(2)} px/frame ${b.v < 0 ? "left" : "right"} (${(Math.abs(b.v) * fps).toFixed(0)} px/s)`).join("; ")}.${bands.length > 1 ? ` Parallax: ${sorted.length} speeds from ${Math.abs(sorted[0].v).toFixed(2)} to ${Math.abs(sorted[sorted.length - 1].v).toFixed(2)} px/frame, each its own plane, the faster the nearer.` : ""}${uneven.length ? ` Uneven: ${uneven.map((b) => `rows ${b.y0}-${b.y1}`).join(", ")} go${uneven.length === 1 ? "es" : ""} a fraction of a px a frame, stepping by turns a pixel more and less, which judders: a plane goes a whole number of px a frame, or 1 px every so many frames.` : ""}`);
     pxl.push(`scroll(name, y, per) for each plane, per = its speed x the loop's frames (here ${bands.map((b) => Math.round(Math.abs(b.v) * n)).join(", ")} px over ${n} frames), a whole number of each strip's widths, at a whole number of px a frame.`);
   }
+  // planes that share rows (a city's far blocks behind its near ones, trees in front of both): the
+  // textured blocks matched going across at one whole speed, over most of the picture's width, in most
+  // pairs of frames, a good share of all that moves (a figure walking, knights fighting, sparks drifting
+  // are in one place, or now and then), at a speed no band of rows has
+  // (not at the search's edge, where a faster thing's match is cut short; and in more than one pair of
+  // frames, not one moment of something)
+  if (!forward) {
+    const bySpeed = new Map<number, Flow[]>(), pairsOf = new Map<number, Set<number>>(), known = new Set(bands.map((b) => Math.round(b.v)));
+    each.forEach((fl, k) => { for (const f of fl) if (!f.dy && f.dx && Math.abs(f.dx) < r) { (bySpeed.get(f.dx) ?? bySpeed.set(f.dx, []).get(f.dx)!).push(f); (pairsOf.get(f.dx) ?? pairsOf.set(f.dx, new Set()).get(f.dx)!).add(k); } });
+    const shared = [...bySpeed].filter(([v, fs]) => !known.has(v) && pairsOf.get(v)!.size >= Math.max(2, 0.6 * each.length) && fs.length >= Math.max(6, 0.1 * moving.length) && Math.max(...fs.map((f) => f.x)) - Math.min(...fs.map((f) => f.x)) >= 0.6 * W)
+      .sort((x, y) => Math.abs(x[0]) - Math.abs(y[0]));
+    if (shared.length) {
+      lines.push(`  Planes sharing rows (blocks going across at one speed all over the picture's width, among others at other speeds): ${shared.map(([v, fs]) => `${Math.abs(v)} px/frame ${v < 0 ? "left" : "right"} in rows ${Math.min(...fs.map((f) => f.y)) - 4}-${Math.max(...fs.map((f) => f.y)) + 4}`).join("; ")}. Each a strip of its own, drawn with what is clear between its things, stacked far to near.`);
+      pxl.push(`scroll() each plane sharing rows too, its strip clear where the planes behind show (${shared.map(([v]) => Math.round(Math.abs(v) * n)).join(", ")} px over ${n} frames), the farthest first.`);
+    }
+  }
   // the pieces: what moves how on what stays (not when the whole view moves toward its point)
   // subpixel motion: in the tutorial it took 26% of what changes, examples/subpixel 15%, pxl's lit
   // scenes under 2%

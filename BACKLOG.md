@@ -781,12 +781,21 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   scrolling past"). The calibration as it was on every scene.
 - [ ] **A waterfall read as a camera going forward**: its splash spreads out from where the water
   lands (44% of the moving blocks agree), as a cockpit's view does (42%); what tells them apart
-  isn't found yet (blocks coming toward the point: the cockpit has more).
-- [ ] **A flat figure running in place read as a light** (SLYNYRD's run demo, a run of 2 parts on
-  threes): lightness-only change, in step, no shift of 2 px explaining it. A shape test (the changed
-  pixels staying in place) failed: flickering lights move more than it does.
-- [ ] **A 16 px walk read as nothing moving** (Final Fantasy's 4-frame walk at 300 ms), and its
-  shading swapping with the legs read as subpixel motion (18%).
+  isn't found yet (blocks coming toward the point: the cockpit has more; speed growing with the
+  distance from the point, as going forward should: the cockpit's correlates -0.17).
+- [x] **A flat figure running in place read as a light** (SLYNYRD's run demo): a light changes all
+  brighter or all darker from one frame to the next (70% one way and more: the party's lanterns 73-100%),
+  a flat figure moving lightens at its front and darkens at its back (56-60%). The calibration as it
+  was (the party's masks 64% -> 63% precise, 71% -> 74% whole).
+- [x] **A 16 px walk read as nothing moving** (Final Fantasy's 4 frames at 300 ms): in a clip of 4
+  frames or fewer a part may change in one (each hand swings once), so it counts; the walk is now one
+  cycle in place played there and back. Its shading swapping with the legs still reads as subpixel
+  motion (18%): not told apart.
+- [x] **Planes study misses** (SLYNYRD's parallax cards): planes sharing rows (a city's far blocks behind
+  its near ones) now come from the block flow, a whole speed over most of the width in most pairs and a
+  good share of all that moves, at a speed no band has: the 96 px card gains its 8 px plane, the 192 px
+  one goes from 1 speed to 4 (1, 3, 4, 6); no gallery clip gains a false one. Left: planes of 16-32 px a
+  frame (a farther band search found nothing reliable), 0.5 px a frame, a vertical scroll's columns.
 - [x] **`caps` on an outline** (So You Want To Be A Pixel Artist, ch. 12): done, `caps: true | n` on
   a sprite or anim: each straight run of the edge's line ends `n` steps darker where the line steps on
   diagonally (after `outline`/`selout`; without an outline, the sprite's own edge). 1:1 diagonals stay.
@@ -799,5 +808,3 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   row's) and counts them off the clock, building nothing; `sheet(..., { rows: "tag" })` puts each
   animation on a row of its own. A pivot that moves with a stamp's `flip` is meant (a joint mirrors
   about itself) and documented: no change.
-- [ ] **Planes study misses** (SLYNYRD's parallax cards): planes of 16-32 px a frame, 0.5 px a frame
-  (read as lights), planes sharing rows, a vertical scroll; a clip with 9 known speeds found 1.
