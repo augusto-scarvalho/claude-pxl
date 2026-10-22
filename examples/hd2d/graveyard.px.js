@@ -11,22 +11,6 @@ include("traveler.px.js")
 include("kit.px.js", { palette: true })
 
 
-// Weathered wood for the fence's boxes: grain running along it.
-// The fence's wood, drawn at the picture's HD size (a texel to its pixel, 96 to the meter): weathered
-// boards, their grain in long broken lines along them, a knot, the edge toward the light a step
-// lighter and the other a step darker; one with the grain running up (pickets, posts), one across
-// (rails). Warm, the trunks' browns.
-const board = (name, w, h, across) => sprite(name, { w, h }, (c) => {
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const a = across ? y : x, b = across ? x : y, n = across ? h : w
-    const grain = (a === 2 || a === 5) && Math.floor(hash(a, b >> 1) * 5) !== 0
-    c.px(x, y, a === 0 ? "f" : a === n - 1 ? "s" : grain ? "s" : Math.floor(hash(a * 3, b) * 9) === 0 ? "f" : "d")
-  }
-  const kx = across ? 9 : 3, ky = across ? 3 : 10
-  for (const [dx, dy, k] of [[0, 0, "a"], [1, 0, "a"], [0, -1, "s"], [1, 1, "s"], [-1, 0, "s"]]) c.px(kx + dx, ky + dy, k)
-})
-board("_plank_up", 8, 24, false)
-board("_plank_across", 24, 8, true)
 // Where the grass meets the path: blades reaching over the stones' edge 1-5 px, in clumps, their tips
 // lit, the blue dark under some; laid over the path's margins (anchored to the strip, its clear texels
 // letting the stones show), the grass's side at its left; flipped for the other margin. 48 rows, so it
@@ -92,6 +76,12 @@ const boulder = (name, w, h, lobes) => sprite(name, { w, h, pivot: "bottom" }, (
 boulder("_boulder", 28, 16, [[11, 8, 9, 7], [19, 10, 7.5, 5.5], [8, 12, 6, 3]])
 boulder("_boulder_b", 21, 12, [[9, 6, 7, 5.5], [14.5, 8, 5.5, 4]])
 
+// A small dead leaf tumbling in the wind: face on, turning, edge on, turned the other way; brown, or
+// yellow.
+anim("_leaf", { w: 3, h: 3, frames: 4, fps: 1000 / 110, pivot: "bottom" },
+  frame({}, ".dd\nsd.\n..."), frame({}, "..d\n.d.\ns.."), frame({}, "...\nsdd\n..."), frame({}, ".d.\n.d.\n.s."))
+anim("_leaf_y", { base: "_leaf", swap: { d: "O", s: "f" } })
+
 // Headstones, drawn at the scene's scale (24 px to the meter), seen from 38 degrees up: the front in the
 // shade (the sun is behind them), the slab's top above it in the sun, its front edge a 1 px cream rim;
 // the left edge catching the light; a cross or lines cut in the front (the cut's upper wall dark, its
@@ -138,7 +128,10 @@ const M = model(), block = (...a) => hd2dBlock(M, ...a)
 const MATS = {
   grass: { tex: "_grass", texel: CAM.floor }, turf: { tex: "_turf", texel: CAM.floor }, flags: { tex: "_flags", texel: CAM.floor },
   rampart: { tex: "_rampart", texel: [CAM.wall[0], 1.5 / 29] }, riser: { tex: "_riser", anchor: "face", texel: CAM.wall },
-  wood: { tex: "_plank_up", texel: [1 / 96, 1 / 96] }, rail: { tex: "_plank_across", texel: [1 / 96, 1 / 96] },
+  // the fence's weathered wood in the trunks' browns, a tone to each face by its light (in the HD picture
+  // in blocks of the sprites' pixel, its outline on the shaded side: pixel art as they are), the grain
+  // in dashes a step darker
+  wood: { ramp: "basdf", edge: "b", bias: 0.08, texture: (x, y) => (hash(x, y >> 2) < 0.18 ? -1 : 0) }, rail: { ramp: "basdf", edge: "b", bias: 0.08, texture: (x, y) => (hash(x >> 2, y) < 0.2 ? -1 : 0) },
   edge: { tex: "_edge", anchor: "face", texel: CAM.floor }, edge_r: { tex: "_edge_r", anchor: "face", texel: CAM.floor },
 }
 const TOP = 1.5                                                     // the hill's top
@@ -201,27 +194,27 @@ FENCE.forEach((a, k) => {
   const b = FENCE[k + 1]
   if (!b) return
   const len = Math.hypot(b[0] - a[0], b[1] - a[1]), d = [(b[0] - a[0]) / len, (b[1] - a[1]) / len], at = (s, off = 0) => [a[0] + d[0] * s - d[1] * off, a[1] + d[1] * s + d[0] * off]
-  for (const u of [0.22, 0.52]) turnedBox("rail", at(len / 2, 0.06), d, len + 0.06, 0.05, TOP + u, TOP + u + 0.08)
+  for (const u of [0.22, 0.52]) turnedBox("rail", at(len / 2, 0.06), d, len + 0.06, 0.05, TOP + u, TOP + u + 2 / 24)
   for (let s = 0.12; s < len - 0.06; s += 0.25) {
     const kk = Math.floor(hash(picket++, 7) * 7), top = TOP + (kk === 1 ? 0.48 : 0.62)
     if (!kk) continue
-    turnedBox("wood", at(s), d, 0.11, 0.04, TOP, top)
+    turnedBox("wood", at(s), d, 3 / 24, 1 / 24, TOP, top)
     // its head: a wedge rising to a point over its middle, its slopes catching the light from above
     const P = (sa, sb, u) => { const [x, z] = at(s + sa, sb); return [x, z, u] }
-    const L = P(-0.055, -0.02, top), Rr = P(0.055, -0.02, top), L2 = P(-0.055, 0.02, top), R2 = P(0.055, 0.02, top), T = P(0, -0.02, top + 0.1), T2 = P(0, 0.02, top + 0.1)
+    const L = P(-1.5 / 24, -0.5 / 24, top), Rr = P(1.5 / 24, -0.5 / 24, top), L2 = P(-1.5 / 24, 0.5 / 24, top), R2 = P(1.5 / 24, 0.5 / 24, top), T = P(0, -0.5 / 24, top + 2 / 24), T2 = P(0, 0.5 / 24, top + 2 / 24)
     M.face("wood", L, Rr, T); M.face("wood", L2, R2, T2); M.face("wood", L, T, T2, L2); M.face("wood", Rr, T, T2, R2)
   }
   // posts on the straight runs only, at their ends and halfway along the long ones (the arcs' short
   // runs between have none, or the corners bristle)
   const posts = len < 1 ? [] : len > 2.4 ? [0, len / 2, len] : [0, len]
-  for (const s of posts) { turnedBox("wood", at(s), d, 0.16, 0.16, TOP, TOP + 0.85); turnedBox("rail", at(s), d, 0.21, 0.21, TOP + 0.85, TOP + 0.9) }
+  for (const s of posts) { turnedBox("wood", at(s), d, 4 / 24, 4 / 24, TOP, TOP + 0.85); turnedBox("rail", at(s), d, 6 / 24, 6 / 24, TOP + 0.85, TOP + 0.85 + 1 / 24) }
 })
 // hills behind, far enough for the mist to take them
 for (const [x0, x1, z0, h] of [[-40, -8, 30, 7], [-12, 14, 36, 9], [10, 40, 28, 6]]) block("turf", "turf", x0, Z + z0, x1, Z + z0 + 8, 0, h)
 
 // The wood, the tree, and what grows on the hill: placed once, seeded. The detail goes on the hill's
 // top; the wood round it is quieter, and the far trees are hazed.
-const R = rng(13), things = [{ name: "_deadtree", at: [-4.6, Z + 4.9, TOP] }]
+const R = rng(13), things = [{ name: "_snag", at: [-4.6, Z + 4.9, TOP] }]
 const tufts = (x, z, u, n) => { for (let k = 0; k < n; k++) things.push({ name: ["_tuft_a", "_tuft_b", "_tuft_c"][Math.floor(R() * 3)], at: [x + (R() - 0.5) * 0.7, z - R() * 0.15, u], shadow: 0 }) }
 // the headstones either side of the path, tufts at their feet, flowers by some
 for (const [x, dz, name, flowers] of [[-3.4, 3.2, "_grave_arch", "_flowers_w"], [-2, 4.6, "_grave_cross", ""], [-4.4, 0.8, "_grave_old", ""], [2.6, 3.8, "_grave_arch", "_flowers_p"], [3.9, 1.6, "_grave_slab", ""], [2.1, 0.4, "_grave_old", "_flowers_w"]]) {
@@ -232,7 +225,7 @@ for (const [x, dz, name, flowers] of [[-3.4, 3.2, "_grave_arch", "_flowers_w"], 
 for (let k = 0; k < 170; k++) {
   const x = -16 + R() * 32, z = Z - 9 + R() * 34, h = R()
   if (Math.abs(x) < 7.5 && z > Z - 4.5 && z < Z + 7.5) continue   // not on the hill or at its foot
-  things.push({ name: z > Z + 13 ? "_pine_far" : h < 0.3 ? "_pine_s" : h < 0.65 ? "_pine_m" : "_pine", at: [x, z] })
+  things.push({ name: z > Z + 13 ? "_spruce_far" : h < 0.3 ? "_spruce_s" : h < 0.65 ? "_spruce_m" : "_spruce", at: [x, z] })
 }
 for (const [x, z] of [[-1.6, 1], [1.7, 2.6], [-5.6, 3.5], [5.3, 0.2], [-0.9, 5.4]]) things.push({ name: R() < 0.5 ? "_rock" : "_rock_small", at: [x, Z + z, TOP], shadow: 0 })
 for (const x of [-5.8, -3.6, -1.6, 2, 4.4, 5.9]) tufts(x, Z - 2.25, TOP, 2)                 // along the fence
@@ -263,7 +256,17 @@ const walker = (f) => {
   const down = f >= 32, z = Z - 1.6 + STEP * (down ? 64 - f : f)
   return { name: down ? "tr_walk_s" : "tr_walk_n", at: [0.2, z, TOP + 0.02], frame: f % 8 }
 }
-const people = (f) => [...things, walker(f), { name: "mo_idle_nw", at: [-2.75, Z + 2.45, TOP], frame: Math.floor((f * 110) / 250) % 4 }]
+// The wind from the left: the pines sway with it (a frame of theirs every 2 of the scene's, two sways a
+// loop), the gust reaching the ones on the left first; and it brings small dead leaves in from the left
+// and carries them off to the right, tumbling, rising and falling, each crossing once a loop (5 m/s) at
+// its own height over the hill and the fence and its own depth, its shadow running on the ground below.
+const sway = (t, f) => (t.name.startsWith("_spruce") || t.name === "_snag" ? { ...t, frame: (((Math.floor(f / 2) - Math.round(t.at[0] * 0.6)) % 16) + 16) % 16 } : t)
+const LEAVES = Array.from({ length: 14 }, (_, i) => ({ x0: hash(i, 41) * 36, z: Z - 7 + hash(i, 42) * 17, u: TOP + 0.5 + hash(i, 43) * 2.2, ph: hash(i, 44) * 6.28, name: hash(i, 45) < 0.55 ? "_leaf" : "_leaf_y" }))
+const leaves = (f) => LEAVES.map((l, i) => {
+  const s = f / 64, w = 2 * Math.PI * s
+  return { name: l.name, at: [-18 + ((l.x0 + 36 * s) % 36), l.z + 0.4 * Math.sin(2 * w + l.ph), l.u + 0.45 * Math.sin(3 * w + l.ph)], frame: (f + i) % 4, shadow: 0 }
+})
+const people = (f) => [...things.map((t) => sway(t, f)), ...leaves(f), walker(f), { name: "mo_idle_nw", at: [-2.75, Z + 2.45, TOP], frame: Math.floor((f * 110) / 250) % 4 }]
 const CLOCK = { frames: 64, fps: 1000 / 110 }
 // Morning: the sun behind on the left (the shadows fall toward us and to the right), warm; the sky's
 // light violet in the shade.
@@ -273,5 +276,5 @@ scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK }, (c) => c.mesh(view(1), M.f
 // Four times the size (1920x1080) and through the camera: the hill's top sharp, the wood below and
 // the hills behind blurred and taken by a warm mist, a bloom, darker corners.
 scene("graveyard_hd", { w: W * 4, h: H * 4, bg: "q", ...CLOCK, check: false },
-  (c) => c.mesh(view(4), M.faces, MATS, { sprites: people(c.frame), pixel: 4, ...LIGHT }),
+  (c) => c.mesh(view(4), M.faces, { ...MATS, wood: { ...MATS.wood, block: 4 }, rail: { ...MATS.rail, block: 4 } }, { sprites: people(c.frame), pixel: 4, ...LIGHT }),
   post({ blur: 36, focus: [W * 2, H * 2.2], sharp: 2.5, soft: [3, 8], fog: { color: "#dcdccc", from: DIST + 2, to: DIST + 26, max: 0.7 }, bloom: { strength: 0.6, r: 40 }, vignette: 0.35 }))

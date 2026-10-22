@@ -46,6 +46,14 @@ export interface Material {
    * on its face, a fence's top along the rail). Its clear pixels are holes: nothing there, no shadow.
    */
   anchor?: "world" | "face";
+  /**
+   * px to one of its pixels: its faces drawn in blocks of block x block px, each block one point of the
+   * face (its middle): its light, its tone. Pixel art among HD faces, the size of a sprite's pixel drawn
+   * at pixel: 4 (a fence, a crate in an HD diorama). Its outline a block thick, and only under it and on
+   * the side away from the light (a selective outline): a board 3 blocks wide stays lit edge, board,
+   * shade, where an outline all round would leave one block of it
+   */
+  block?: number;
 }
 export interface MeshSprite {
   /** an asset's name (an animation plays on the scene's clock) */
@@ -153,6 +161,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
   const lightOf = typeof opts.light === "function" ? opts.light : (n: V3) => 0.3 + 0.6 * Math.max(0, dot(n, sunDir));
   const ramps: Record<string, string[]> = {};
   for (const [name, M] of Object.entries(mats)) {
+    if (M?.block !== undefined && !(Number.isInteger(M.block) && M.block >= 1)) throw new PxError(`mesh: material '${name}' has block ${JSON.stringify(M.block)}: how many px to one of its pixels, a whole number from 1`);
     if (M?.tex !== undefined) {
       const t = M.texel;
       if (!(t === undefined || (typeof t === "number" && t > 0) || (Array.isArray(t) && t.length === 2 && t[0] > 0 && t[1] > 0)))
@@ -170,6 +179,8 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
   // otherwise; per textured face, the coordinates its texture runs across and down (a floor across and
   // away, a wall across and down), where it starts, and whether it has holes
   const UP = cam.up[2] ? 2 : 1, AHEAD = UP === 2 ? 1 : 2;
+  // which way on the picture is away from the light (a block material's outline is on that side)
+  const camRight: V3 = cam.P ? [Math.cos((cam.P.yaw * Math.PI) / 180), -Math.sin((cam.P.yaw * Math.PI) / 180), 0] : [1, 0, 0], away = dot(sunDir, camRight) < 0 ? 1 : -1;
   const texOf: ({ T: Img; su: number; sv: number; ua: number; va: number; u0: number; v0: number; holes: boolean } | undefined)[] = [];
   const holed = new Map<Img, boolean>();
   const texel = (t: NonNullable<(typeof texOf)[number]>, X: number, Y: number, Z: number) => {
@@ -194,7 +205,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       const [tu, tv] = Array.isArray(M.texel) ? M.texel : [M.texel ?? 1 / 16, M.texel ?? 1 / 16];
       texOf[k] = { T, su: 1 / tu, sv: 1 / tv, ua, va, u0: face ? Math.min(...F.pts.map((p) => p[ua])) : 0, v0: face ? Math.min(...F.pts.map((p) => -p[va])) : 0, holes: holed.get(T)! };
     }
-    const tk = texOf[k];
+    const tk = texOf[k], Bk = M.block ?? 1;
     let pts = F.pts, P = pts.map(cam.project);
     if (P.some((p) => p[2] < NEAR)) [pts, P] = clipNear(pts, P, cam.project);
     for (let t = 1; t + 1 < P.length; t++) {
@@ -202,10 +213,12 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       const Az = A.map((v) => v / a[2]), Bz = B.map((v) => v / b[2]), Dz = D.map((v) => v / d[2]);
       const area = (b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0]);
       if (Math.abs(area) < 1e-6) continue;
-      const xa = Math.max(x0, Math.floor(Math.min(a[0], b[0], d[0]))), xb = Math.min(x0 + W - 1, Math.ceil(Math.max(a[0], b[0], d[0])));
-      const ya = Math.max(y0, Math.floor(Math.min(a[1], b[1], d[1]))), yb = Math.min(y0 + H - 1, Math.ceil(Math.max(a[1], b[1], d[1])));
+      // (in blocks: every pixel of a block whose middle the face covers)
+      const lo = (v: number) => Math.floor(Math.floor(v) / Bk) * Bk, hi = (v: number) => Math.ceil((Math.ceil(v) + 1) / Bk) * Bk - 1;
+      const xa = Math.max(x0, lo(Math.min(a[0], b[0], d[0]))), xb = Math.min(x0 + W - 1, hi(Math.max(a[0], b[0], d[0])));
+      const ya = Math.max(y0, lo(Math.min(a[1], b[1], d[1]))), yb = Math.min(y0 + H - 1, hi(Math.max(a[1], b[1], d[1])));
       for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) {
-        const px = x + 0.5, py = y + 0.5;
+        const px = Bk > 1 ? Math.floor(x / Bk) * Bk + Bk / 2 : x + 0.5, py = Bk > 1 ? Math.floor(y / Bk) * Bk + Bk / 2 : y + 0.5;
         const w1 = ((d[0] - a[0]) * (py - a[1]) - (d[1] - a[1]) * (px - a[0])) / -area, w2 = ((b[0] - a[0]) * (py - a[1]) - (b[1] - a[1]) * (px - a[0])) / area;
         const w0 = 1 - w1 - w2;
         if (w0 < -1e-4 || w1 < -1e-4 || w2 < -1e-4) continue;
@@ -258,23 +271,27 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x, k = who[i];
     if (k < 0) continue;
-    const F = faces[k], M = mats[F.mat], r = ramps[F.mat], N = normals[k];
-    if (M.tex !== undefined && M.edge === undefined) {
-      // a floor reads the texture across and away, a wall across and down; light steps each texel along its ramp
+    const F = faces[k], M = mats[F.mat], r = ramps[F.mat], N = normals[k], B = M.block ?? 1, bx = Math.floor((x + x0) / B), by = Math.floor((y + y0) / B);
+    // a floor reads the texture across and away, a wall across and down; light steps each texel along its ramp
+    const texCol = () => {
       const tk = texOf[k]!, lit = L ? tk.T.data : litTex(k, tk.T);
       let col = lit[texel(tk, pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2])];
-      if (col === TRANSPARENT) continue;
-      if (L) {
+      if (col !== TRANSPARENT && L) {
         const px = pos[i * 3], py = pos[i * 3 + 1], pz = pos[i * 3 + 2], facing = dot(N, L.dir);
         col = shine(col, N, px, py, pz, L, facing > 0 && (!sunMap || sunMap.sees(px, py, pz, k, facing)), 0);
       }
+      return col;
+    };
+    if (M.tex !== undefined && M.edge === undefined) {
+      const col = texCol();
+      if (col === TRANSPARENT) continue;
       if (c.raw) c.raw[i] = col;
       else c.plot(x + x0, y + y0, col);
       continue;
     }
     // an outline where this surface is in front of another or of nothing; a crease where faces meet
     let line: string | null = null;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    for (const [dx, dy] of B > 1 ? [[away * B, 0], [0, B]] : [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const xx = x + dx, yy = y + dy;
       if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
       const j = yy * W + xx, k2 = who[j];
@@ -285,14 +302,16 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       else if (F2.mat === F.mat && !M.smooth && dot(N, normals[k2]) < 0.82 && depth[j] >= depth[i]) line = line ?? r[0];
     }
     if (M.tex !== undefined) {
+      // its outline, and inside it the texture
       if (line) c.px(x + x0, y + y0, line);
+      else { const col = texCol(); if (col !== TRANSPARENT) c.plot(x + x0, y + y0, col); }
       continue;
     }
-    const lv = Math.max(0, Math.min(r.length - 1, Math.floor(lights[k] * r.length + (bayer(x + x0, y + y0) - 0.5) * (M.dither ?? 0))));
+    const lv = Math.max(0, Math.min(r.length - 1, Math.floor(lights[k] * r.length + (bayer(bx, by) - 0.5) * (M.dither ?? 0))));
     // the top edge of a surface, just under its outline, catches the light: a step lighter
-    const up1 = y > 0 ? who[i - W] : -1, up2 = y > 1 ? who[i - 2 * W] : -1;
-    const rim = !line && up1 === k && (up2 < 0 || (up2 !== k && depth[i - 2 * W] > depth[i] * 1.06)) && dot(N, cam.up) > -0.3;
-    const tx = M.texture && !line && !rim ? Math.round(M.texture(x + x0, y + y0)) : 0;
+    const up1 = y >= B ? who[i - B * W] : -1, up2 = y >= 2 * B ? who[i - 2 * B * W] : -1;
+    const rim = !line && up1 === k && (up2 < 0 || (up2 !== k && depth[i - 2 * B * W] > depth[i] * 1.06)) && dot(N, cam.up) > -0.3;
+    const tx = M.texture && !line && !rim ? Math.round(M.texture(B > 1 ? bx : x + x0, B > 1 ? by : y + y0)) : 0;
     c.px(x + x0, y + y0, line ?? (rim ? M.top ?? r[Math.min(r.length - 1, lv + 1)] : r[Math.max(0, Math.min(r.length - 1, lv + tx))]));
   }
   const keep = () => {

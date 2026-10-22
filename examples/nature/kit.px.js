@@ -3,7 +3,7 @@
 // scenery). The rules each piece follows, with their sources and the numbers measured on the games'
 // sheets, are in the environment guide (pxl help "environment"): SLYNYRD's Pixelblog, Saint11, final
 // boss blues, So You Want To Be A Pixel Artist, and pxl study on Chrono Trigger, CrossCode, Terranigma,
-// Final Fantasy Tactics Advance and others. Builders make more of a kind (grassTile, pine, bush,
+// Final Fantasy Tactics Advance and others. Builders make more of a kind (grassTile, pine, pineVolume, deadTreeVolume, bush,
 // rampart); the sprites made here are the defaults. The light comes from the upper left (the sun behind
 // on the left in the hd2d graveyard); the textures tile and are drawn a texel to a pixel.
 // grass: a yellow-green base, its darks turning blue, its light yellow (SLYNYRD's lush grass)
@@ -101,6 +101,119 @@ pine("_pine_m", 60, 5)
 pine("_pine_s", 52, 9)
 // The same pine far off, the haze between: lighter, greyer, its hues nearer the sky's.
 sprite("_pine_far", { base: "_pine_m", swap: { Z: "#3b4260", z: "#405468", x: "#4b6866", c: "#567763", v: "#6a8865", V: "#879d6c", J: "#b6bc8c" } })
+// A pine built as volumes in 3D, as the traveler's body is (characters §3), each pixel the nearest
+// surface a ray from it meets: a trunk (a cylinder narrowing up), tiers of branches, each a core round
+// the trunk and clumps around it, ellipsoids reaching out and drooping more toward the top, and a spire;
+// lit by the sun behind on the left (the upper left contour rimmed), the tiers above shading the ones
+// below where the light can't reach and darkening what hangs just under them, a sky light from above,
+// darker in toward the trunk and on the far side; needles in strokes along each branch, the hems
+// hanging in points; the normals the surfaces really have, so mesh()'s sun lights it as it is. Seen
+// from 20 degrees up, as a billboard is drawn. Swaying in a wind from the left: the trunk bending with
+// the square of the height, the gust coming and going over the loop, each branch's tip fluttering
+// twice as fast. h: its height in px; frames of the sway at fps.
+const pineVolume = (name, h, seed, { frames = 16, fps = 1000 / 220, sway = 1.6 } = {}) => {
+  const W = 42, OX = 21, OY = h - 1, P = (20 * Math.PI) / 180, CP = Math.cos(P), SP = Math.sin(P)
+  const unit = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l) }
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+  const SUN = unit([-0.55, 0.62, -0.55]), D = [0, SP, CP]               // toward the sun; toward us
+  const Hw = (h - 1.5) / CP, y0 = 0.17 * Hw, T = Math.max(4, Math.round(h / 12)), Rmax = 19
+  const bend = (y, g) => g * Math.pow(Math.max(0, y) / Hw, 2)             // the trunk's lean at height y
+  // the parts at one moment of the sway: g the gust (px at the top), ph the flutter's phase
+  const partsAt = (g, ph) => {
+    const r = rng(seed), parts = []
+    const ell = (C, e1, e2, rr, tier, clump, R) => { e1 = unit(e1); e2 = unit(e2); C = [C[0] + bend(C[1], g), C[1], C[2]]; parts.push({ C, E: [e1, e2, cross(e1, e2)], rr, tier, clump, R, reach: Math.max(...rr) }) }
+    for (let t = 0; t < T; t++) {
+      const f = t / T, sp = ((Hw * 0.84 - y0) * 0.95) / T, yb = y0 + sp * t, th = sp * 1.3, R = 3.5 + (Rmax - 3.5) * Math.pow(1 - f, 1.1)
+      ell([0, yb + th * 0.5, 0], [1, 0, 0], [0, 0, 1], [R * (0.45 - 0.15 * f), R * (0.45 - 0.15 * f), th * 0.55], t, false, R)
+      const K = Math.round(5 + R / 2.4), a0 = r() * 6.28
+      for (let k = 0; k < K; k++) {
+        const a = a0 + (k * 6.28) / K + (r() - 0.5) * 0.4, out = [Math.sin(a), 0, Math.cos(a)], rho = R * (0.5 + r() * 0.08), flick = r() * 6.28
+        const droop = 0.5 + 0.8 * f * f + r() * 0.15, e1 = [out[0], -droop, out[2]], tang = [Math.cos(a), 0, -Math.sin(a)]
+        const flut = 0.35 * Math.sin(2 * ph + flick)
+        ell([out[0] * rho + flut, yb + th * 0.32 - droop * rho * 0.3, out[2] * rho], e1, tang, [R * 0.55, Math.max(1.5, ((3.14 * rho) / K) * 1.15), th * 0.28], t, true, R)
+      }
+    }
+    // the spire: a narrow cone of three, the leader at its tip
+    for (const [y, rad, hh] of [[Hw * 0.86, 3.4, 4.5], [Hw * 0.93, 2.2, 3.5], [Hw - 1.8, 0.9, 2.2]]) ell([0, y, 0], [1, 0, 0], [0, 0, 1], [rad, rad, hh], T, false, rad * 2)
+    return parts
+  }
+  const hit = (o, d, p) => {                                             // where the ray o + t d meets p: t (the far root) and t2
+    const v = [o[0] - p.C[0], o[1] - p.C[1], o[2] - p.C[2]], b0 = dot(v, d)
+    if (dot(v, v) - b0 * b0 > p.reach * p.reach) return null              // misses its bounding sphere
+    const q0 = p.E.map((e, i) => dot(v, e) / p.rr[i]), qd = p.E.map((e, i) => dot(d, e) / p.rr[i])
+    const a = dot(qd, qd), b = 2 * dot(q0, qd), c = dot(q0, q0) - 1, disc = b * b - 4 * a * c
+    if (disc < 0) return null
+    return { t: (-b + Math.sqrt(disc)) / (2 * a), t2: (-b - Math.sqrt(disc)) / (2 * a), q0, qd }
+  }
+  const trunkR = (y) => 1.7 - (0.9 * y) / Hw + (y < 1.5 ? 1 : 0)
+  const keys = "ZzxcvVJ"
+  const dir = (n) => {                                                   // a normal as the numpad grid takes it
+    const sx = n[0], sy = n[1] * CP - n[2] * SP, l = Math.hypot(sx, sy)
+    if (l < 0.3) return "5"
+    const k = Math.round(((Math.atan2(sy, sx) + 2 * Math.PI) % (2 * Math.PI)) / (Math.PI / 4)) % 8
+    return (l < 0.7 ? "dewqazxc" : "69874123")[k]
+  }
+  const render = (g, ph) => {
+    const parts = partsAt(g, ph), grid = Array.from({ length: h }, () => Array(W).fill(null))
+    for (let sy = 0; sy < h; sy++) for (let sx = 0; sx < W; sx++) {
+      const o = [sx + 0.5 - OX, CP * (OY - sy - 0.5), -SP * (OY - sy - 0.5)]   // on the screen's plane through the foot
+      let best = null
+      for (const p of parts) {
+        const H = hit(o, D, p)
+        if (H && (!best || H.t > best.t)) {
+          const q = H.q0.map((v, i) => v + H.t * H.qd[i]), n = unit(p.E.reduce((s, e, i) => [s[0] + (e[0] * q[i]) / p.rr[i], s[1] + (e[1] * q[i]) / p.rr[i], s[2] + (e[2] * q[i]) / p.rr[i]], [0, 0, 0]))
+          best = { t: H.t, n, p, q, at: o.map((v, i) => v + H.t * D[i]) }
+        }
+      }
+      // the trunk, leaning with the crown, where the crown doesn't hide it
+      const x = o[0] - bend(o[1], g), tr = trunkR(Math.max(0, o[1]))
+      if (Math.abs(x) < tr) {
+        const z = Math.sqrt(tr * tr - x * x), t = (z - o[2]) / CP, y = o[1] + SP * t
+        if (y >= 0 && y < Hw * 0.8 && (!best || t > best.t)) best = { t, n: [x / tr, 0, z / tr], trunk: true, at: [x, y, z] }
+      }
+      if (!best) continue
+      const { n, at } = best
+      let sun = Math.max(0, dot(n, SUN))
+      if (sun > 0) for (const p of parts) { if (p === best.p) continue; const H = hit(at, SUN, p); if (H && H.t > 0.6 && H.t2 > 0.6) { sun *= 0.25; break } }
+      let L = 0.33 + 0.28 * n[1] + 0.5 * sun - 0.12 * Math.max(0, n[0])
+      if (best.p) {
+        L -= 0.22 * Math.min(1, best.p.R / 8) * Math.max(0, 1 - Math.hypot(at[0] - bend(at[1], g), at[2]) / (0.6 * best.p.R))      // in toward the trunk
+        for (const p of parts) { if (p.tier <= best.p.tier) continue; const H = hit(at, [0, 1, 0], p); if (H && H.t2 > 0.3 && H.t2 < 4) { L -= 0.12; break } }   // just under the tier above
+        if (best.p.clump && sun > 0.15 && L < 0.85 && ((Math.floor(best.q[1] * best.p.rr[1] + best.p.tier * 1.7) % 4) + 4) % 4 === 0) L += 0.09   // needles in strokes along the branch
+      }
+      grid[sy][sx] = { L, n, trunk: !!best.trunk, tier: best.p ? best.p.tier : -1 }
+    }
+    // the hems: needles hanging in points under each tier where nothing is below
+    for (let sy = h - 2; sy >= 0; sy--) for (let sx = 0; sx < W; sx++) {
+      const g0 = grid[sy][sx]
+      if (!g0 || g0.trunk || grid[sy + 1][sx] || (sx + g0.tier + seed) % 2 !== 0) continue
+      for (let d = 1; d <= 1 + ((sx + seed) % 2) && sy + d < h - 2 && !grid[sy + d][sx]; d++) grid[sy + d][sx] = { ...g0, L: g0.L - 0.12 * d }
+    }
+    const px = []
+    for (let sy = 0; sy < h; sy++) for (let sx = 0; sx < W; sx++) {
+      const g0 = grid[sy][sx]
+      if (!g0) continue
+      const open = (dx, dy) => !(grid[sy + dy] && grid[sy + dy][sx + dx])
+      let L = g0.L
+      if (!g0.trunk && open(-1, 0) && open(-2, 0) && open(0, -1) && sx < OX - 2) L = Math.max(L + 0.25, 0.85)   // the outer rim the sun behind lights
+      else if (!g0.trunk && (open(1, 0) || open(0, 1)) && sx >= OX) L -= 0.1              // the shaded contour
+      px.push([sx, sy, g0.trunk ? (g0.n[0] < -0.3 ? "s" : g0.n[0] < 0.4 ? "d" : "a") : keys[Math.max(0, Math.min(6, Math.round(L * 6)))]])
+    }
+    return { px, normals: grid.map((row) => row.map((g0) => (g0 ? dir(g0.n) : ".")).join("")).join("\n") }
+  }
+  const memo = new Map()
+  return anim(name, { w: W, h, pivot: "bottom", frames, fps }, (c) => {
+    const f = c.frame % frames
+    if (!memo.has(f)) { const ph = (2 * Math.PI * f) / frames; memo.set(f, render(sway * (0.45 + 0.55 * Math.sin(ph)), ph)) }
+    const { px, normals: nm } = memo.get(f)
+    for (const [x, y, k] of px) c.px(x, y, k)
+    c.normals(0, 0, nm)
+  })
+}
+pineVolume("_spruce", 68, 3)
+pineVolume("_spruce_m", 60, 5)
+pineVolume("_spruce_s", 52, 9)
+anim("_spruce_far", { base: "_spruce_m", swap: { Z: "#3b4260", z: "#405468", x: "#4b6866", c: "#567763", v: "#6a8865", V: "#879d6c", J: "#b6bc8c" } })
 // Bushes after SLYNYRD (Pixelblog 44, 51) and Saint11: lobes of leaf clusters (2x2, or 3 px in an L),
 // each lobe on a fill of its dark, a dark crescent on its shadow side and a step lighter toward its lit
 // one, the light tone kept to a pixel or two (they stand in the wall's shade), the back lobes a step
@@ -263,5 +376,106 @@ sprite("_deadtree", { w: 60, h: 74, pivot: "bottom" }, (c) => {
   for (const [x, y] of [[30, 64], [30, 65], [31, 58], [31, 59], [29, 53], [29, 54]]) c.px(x, y, "b")
   c.px(31, 61, "b"); c.px(32, 61, "B"); c.px(31, 60, "i")
 }, bump("hybrid"))
+// A dead tree built as limbs in 3D, as the pine is: a trunk that kinks every 4-6 px and splits in one
+// to three limbs at angles of their own all round it (toward us and away too), each kinking and
+// splitting again, tapering to a pixel; each limb a tube, each pixel the nearest tube a ray from it
+// meets, lit by the sun behind on the left (the upper left rimmed), bark in dashes a step darker on
+// the trunk and the big limbs, the thin ones one tone, the darkest only as their outline on the
+// shaded side; two roots. Swaying a little in the wind, the trunk with the square of the height, the
+// thin limbs trembling twice as fast, more toward their tips. h: its height in px.
+const deadTreeVolume = (name, h, seed, { frames = 16, fps = 1000 / 220, sway = 1 } = {}) => {
+  const W = 76, OX = 38, OY = h - 1, P = (20 * Math.PI) / 180, CP = Math.cos(P), SP = Math.sin(P)
+  const unit = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l) }
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+  const add = (a, b) => a.map((v, i) => v + b[i]), mul = (a, k) => a.map((v) => v * k)
+  const SUN = unit([-0.55, 0.62, -0.55]), D = [0, SP, CP], Hw = (h - 1.5) / CP
+  // turn v about the unit axis k by angle a
+  const turn = (v, k, a) => add(add(mul(v, Math.cos(a)), mul(cross(k, v), Math.sin(a))), mul(k, dot(k, v) * (1 - Math.cos(a))))
+  // the skeleton, once: segments [A, B, radius, how many splits from the trunk]
+  const r = rng(seed), segs = []
+  const limb = (p, d, len, rad, lvl) => {
+    for (let done = 0; done < len - 0.5; ) {
+      const l = Math.min(4 + r() * 2, len - done), q = add(p, mul(d, l)), r1 = Math.max(0.55, rad * (1 - (0.35 * (done + l)) / len))
+      segs.push([p, q, Math.max(0.55, rad * (1 - (0.35 * done) / len)), r1, lvl])
+      p = q
+      const side = unit(cross(d, [r() - 0.5, r() - 0.5, r() - 0.5]))
+      d = unit(turn(d, side, (r() - 0.5) * 0.45))
+      done += l
+    }
+    if (rad < 0.9 || lvl > 3) return
+    // splits that stay apart: from the trunk one each way across the picture (and now and then one on
+    // up); from a limb one carrying on its way, a little thicker, and one bending further out from the
+    // trunk, never back over it (limbs crossing at a fork, or one going off behind the trunk, read as a
+    // tangle). Each turned in the picture's plane, with a little depth of its own.
+    const out = lvl === 0 ? 1 : Math.sign(p[0]) || 1
+    const ways = lvl === 0 ? [[0.5 + r() * 0.35, 0.68], [-(0.4 + r() * 0.3), 0.62], ...(r() < 0.6 ? [[0.08, 0.55]] : [])] : [[0.15 * (r() - 0.5), 0.74], [0.55 + r() * 0.3, 0.6]]
+    for (const [a, k] of ways) {
+      const nd = unit(add(turn(d, [0, 0, 1], -out * (a + (r() - 0.5) * 0.15)), [0, 0.1, (r() - 0.5) * 0.25]))
+      limb(p, nd, Math.min(len * (0.7 + r() * 0.15), rad < 1.4 ? 6 : 99), rad * (k + r() * 0.06), lvl + 1)
+    }
+  }
+  limb([0, 0, 0], unit([0.04, 1, 0.02]), Hw * 0.3, 3.4, 0)
+  for (const a of [Math.PI + 0.3, -0.35]) segs.push([[0, 0.6, 0], [Math.cos(a) * 4, -0.4, Math.sin(a) * 1.5 + 0.8], 1.2, 0.6, 0])   // roots
+  const top = Math.max(...segs.map((s) => s[1][1]))
+  const dir = (n) => {
+    const sx = n[0], sy = n[1] * CP - n[2] * SP, l = Math.hypot(sx, sy)
+    if (l < 0.3) return "5"
+    const k = Math.round(((Math.atan2(sy, sx) + 2 * Math.PI) % (2 * Math.PI)) / (Math.PI / 4)) % 8
+    return (l < 0.7 ? "dewqazxc" : "69874123")[k]
+  }
+  const render = (g, ph) => {
+    // the limbs at this moment of the sway
+    const moved = segs.map(([A, B, ra, rb, lvl], k) => {
+      const shift = (p) => [p[0] + g * Math.pow(Math.max(0, p[1]) / top, 2) + (lvl > 1 ? 0.25 * lvl * Math.sin(2 * ph + k) * (p[1] / top) : 0), p[1], p[2]]
+      return [shift(A), shift(B), ra, rb, lvl]
+    })
+    const grid = Array.from({ length: h }, () => Array(W).fill(null))
+    for (let sy = 0; sy < h; sy++) for (let sx = 0; sx < W; sx++) {
+      const o = [sx + 0.5 - OX, CP * (OY - sy - 0.5), -SP * (OY - sy - 0.5)]
+      let best = null
+      for (const [A, B, ra, rb, lvl] of moved) {
+        // the ray's nearest approach to the limb's axis, and whether it passes within the limb's radius there
+        const u = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], w = [o[0] - A[0], o[1] - A[1], o[2] - A[2]]
+        const uu = dot(u, u), ud = dot(u, D), uw = dot(u, w), dw = dot(D, w), den = uu - ud * ud
+        let s = den > 1e-9 ? (uw - ud * dw) / den : 0
+        s = Math.max(0, Math.min(1, s))
+        const Q = add(A, mul(u, s)), t = dot([Q[0] - o[0], Q[1] - o[1], Q[2] - o[2]], D), v = add(o, mul(D, t)), off = [v[0] - Q[0], v[1] - Q[1], v[2] - Q[2]]
+        const rad = ra + (rb - ra) * s, d2 = dot(off, off)
+        if (d2 >= rad * rad) continue
+        const th = t + Math.sqrt(rad * rad - d2)
+        if (best && th <= best.t) continue
+        const at = add(o, mul(D, th)), n = unit([at[0] - Q[0], at[1] - Q[1], at[2] - Q[2]])
+        best = { t: th, n, rad, s, len: Math.sqrt(uu), lvl, Q }
+      }
+      if (!best) continue
+      const sun = Math.max(0, dot(best.n, SUN))
+      let L = 0.52 + 0.25 * best.n[1] + 0.5 * sun - 0.15 * Math.max(0, best.n[0])
+      if (best.lvl === 0 && best.rad > 1.8 && hash(Math.floor(best.Q[1] / 2.5), Math.floor(Math.atan2(best.n[2], best.n[0]) * 2)) < 0.2) L -= 0.22   // bark, on the trunk
+      grid[sy][sx] = { L, n: best.n, thin: best.rad < 0.9 }
+    }
+    const px = []
+    for (let sy = 0; sy < h; sy++) for (let sx = 0; sx < W; sx++) {
+      const g0 = grid[sy][sx]
+      if (!g0) continue
+      const open = (dx, dy) => !(grid[sy + dy] && grid[sy + dy][sx + dx])
+      let k
+      if (g0.thin) k = "B"
+      else if (open(1, 0) || open(0, 1)) k = "b"                                    // the outline, on the shaded side
+      else if (open(-1, 0)) k = g0.n[1] > -0.2 ? "I" : "i"                         // the edge toward the sun, lit
+      else k = "bBiI"[Math.max(0, Math.min(3, Math.round(g0.L * 3)))]
+      px.push([sx, sy, k])
+    }
+    return { px, normals: grid.map((row) => row.map((g0) => (g0 ? dir(g0.n) : ".")).join("")).join("\n") }
+  }
+  const memo = new Map()
+  return anim(name, { w: W, h, pivot: "bottom", frames, fps }, (c) => {
+    const f = c.frame % frames
+    if (!memo.has(f)) { const ph = (2 * Math.PI * f) / frames; memo.set(f, render(sway * (0.4 + 0.6 * Math.sin(ph)), ph)) }
+    const { px, normals: nm } = memo.get(f)
+    for (const [x, y, k] of px) c.px(x, y, k)
+    c.normals(0, 0, nm)
+  })
+}
+deadTreeVolume("_snag", 76, 4)
 // All of it on one sheet, to look at (pxl build writes it).
 sheet("nature", ["_grass", "_turf", "_pine", "_pine_m", "_pine_s", "_pine_far", "_bush", "_bush_b", "_bush_c", "_rock", "_rock_small", "_tuft_a", "_tuft_b", "_tuft_c", "_flowers_w", "_flowers_p", "_deadtree", "_rampart", "_riser", "_flags"], { pad: 2 })

@@ -23,7 +23,7 @@ halloween/party.px.js: 1 warning (1 scene (16 frames, 124 distinct placements), 
   ran: lit side on 124 (a clear reading on 29), lettering on 2; not run: front marker (nothing has one), feet (nothing placed has a height)
   party › crypt @back, feet 44,127 › WARNING: lit from the top left, but its light comes from the top right (a flipped drawing carries its light to the other side) (frames 0-15)
 halloween/props.px.js: included only (doesn't build on its own: its palette comes from the file including it)
-hd2d/graveyard.px.js: 0 warnings (1 scene (64 frames, 100 distinct placements), 0 rigs, 0 other assets with a front marker)
+hd2d/graveyard.px.js: 0 warnings (1 scene (64 frames, 498 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 3; not run: front marker (nothing has one), lit side (no scene declares world.light), feet (nothing placed has a height)
   graveyard_hd › not checked (check: false)
 hd2d/kit.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)

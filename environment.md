@@ -86,11 +86,30 @@ round it.
   of needles 2-3 px deep every 3-4 px; 2 rows in the shadow of the tier above, then a few lit on the
   sun's side; the far side indigo (hue 230-260); fronds as strips 2 px thick running down and out. A
   frond: a 1 px spine 20-30° down with needle strokes every 2 px (SLYNYRD).
+- A conifer built as volumes in 3D (`pineVolume`, §10; the graveyard's wood), each pixel the nearest
+  surface a ray from it meets, lit as the scene is, its tiers shading the ones below: a cylinder for
+  the trunk; per tier a core round it and 6-12 ellipsoid clumps reaching out and drooping, more
+  toward the top; a spire of three narrowing ellipsoids. What it took: tiers spaced so the dark
+  under each shows (overlapping them by 1.7 made one round bush); the clumps no wider than the
+  circle shares them out (a wide minimum made the top tiers flat caps, a pagoda); darkening in
+  toward the trunk scaled by the tier's size (the small top tiers went black); the sun's rim only
+  on the outer contour and needle strokes only on the sun's side (on every clump they read as
+  noise at the HD size); the normals the surfaces have, given to `normals()`, so the scene's sun
+  lights it as it is. Wind: the trunk bending with the square of the height, the gust coming and
+  going over the loop (16 frames at 220 ms, two sways in the graveyard's 7 s), each clump's tip
+  fluttering twice as fast; each tree's frame offset by where it stands, the gust reaching one side
+  first.
 - A trunk darker than the crown, planted: seen from above, cut at the ground (SLYNYRD); seen from
   the side or at an angle, its foot flared 2-3 px with a root or two. Bark in 1 px stripes, widest
   apart in the middle; a knot. Laying top-down crowns from one clump, importing trees: scenes §4.
 - A dead tree: limbs that kink every 4-6 px and split in one to three, tapering 5, 3, 2, 1 px, the
   last no longer than 5 px; the lightest tone only on the upper left of the trunk and big limbs.
+  Built in 3D (`deadTreeVolume`, §10), each limb a tube a ray meets, its splits kept apart: from the
+  trunk one each way across the picture at angles of their own (and now and then one on up); from a
+  limb one carrying on its way and one bending further out, never back over the trunk (limbs coming
+  toward us, going off behind the trunk or bending back read as a tangle at the fork); three levels
+  of them, not four (in 3D the fourth's twigs overlap into a bush); bark on the trunk only; the lit
+  edge the whole side toward the sun, not the corners of its steps (dots).
 - Variety: 2-3 heights and a color swap or two (a far one hazier); symmetric trees may repeat in
   staggered rows, asymmetric ones are focal points, used once. Don't mirror a tree lit from one side.
 - Backlit (the sun behind): the fronts lose detail and contrast, and a 1 px rim of the lightest tone
@@ -159,10 +178,18 @@ Flagstones of mixed sizes, moss in no more than a third of the joints. Low contr
   darker behind; one picket in seven short, leaning or missing. In a diorama, built of boxes turned
   along each straight run of the ground's outline (depth, a shadow from its foot): pickets about 11 cm
   every 25 cm with a pointed head, a post with a cap only where a run is long (its ends, its middle
-  past 2.4 m; a post at every point of a curve reads as a palisade), rails behind, on the inside. The
-  wood drawn at the picture's size, not a few px stretched (that reads as sticks): weathered boards,
-  grain in long broken lines along them, a knot, the edge toward the light a step lighter; the grain
-  up the pickets, across the rails.
+  past 2.4 m; a post at every point of a curve reads as a palisade), rails behind, on the inside.
+  Its pieces sized in whole pixels of the sprites (a picket 3, a post 4, a rail 2) and drawn in
+  blocks of that pixel (`block: 4` on its materials in an HD picture), a tone of weathered wood to
+  each face by its light, the grain in dashes a step darker, the outline only under it and on the
+  shaded side. Drawn at the HD picture's own pixel instead (a texture of 96 to the meter), it read
+  as a 3D render among pixel-art sprites, not as pixel art; a texture of the sprites' size on faces
+  in perspective striped the pickets (its texels and the blocks don't line up).
+
+- Leaves on the wind (the graveyard): 3x3 px tumbling in four frames (face on, turning, edge on,
+  turned the other way), two colors; each crosses once a loop (about 5 m/s, coming in and leaving
+  past the picture's edges), above what stands there, rising and falling a whole number of times a
+  loop so it closes, its shadow running on the ground below.
 
 ## 9. Light, depth and placement
 
@@ -186,6 +213,8 @@ Flagstones of mixed sizes, moss in no more than a third of the joints. Low contr
 |---|---|
 | `grassTile(name, { lush, seed })` | a 64x48 grass tile (§2): `_grass` lush, `_turf` the wood's quieter floor |
 | `pine(name, h, seed)` | a conifer h px tall (§3): `_pine` 68, `_pine_m` 60, `_pine_s` 52, `_pine_far` hazed |
+| `deadTreeVolume(name, h, seed, { frames, fps, sway })` | the dead tree built as limbs in 3D, swaying a little (§3): `_snag` |
+| `pineVolume(name, h, seed, { frames, fps, sway })` | the same conifer built as volumes in 3D and swaying in the wind (§3): `_spruce` 68, `_spruce_m` 60, `_spruce_s` 52, `_spruce_far` hazed; a scene picks each one's `frame` |
 | `bush(name, w, lobes, seed)` | a bush of lobes `[x, y, r, back]` (§4): `_bush`, `_bush_b`, `_bush_c` |
 | `rampart(name, overhang)` | a 48x29 stone wall face (§6): `_rampart` with grass over its head, `_riser` without |
 | `_flags` | 48x48 flagstones (§7) |

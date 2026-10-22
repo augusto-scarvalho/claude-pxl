@@ -123,3 +123,21 @@ scene("a", { w: 40, h: 40, bg: "k" }, (c) => c.mesh(V, M.faces, { f: { tex: "_wh
   assert.equal(fence(`anchor: "face", texel: [0.5, 1]`)[18][11], "r");
   assert.throws(() => fence(`texel: [0.5]`), /texel \[0\.5\].*or two, across and down/);
 });
+
+test("mesh block: a material drawn in blocks of N px, its outline only under it and away from the light; a texture with an edge", () => {
+  const r = rows(`const M = model(); M.box("b", [-1, 3, 0], [1, 3.6, 1.2])
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { b: { ramp: "kgw", block: 4 } }))`);
+  // every 4 x 4 block of the picture one key
+  for (let y = 0; y < 40; y += 4) for (let x = 0; x < 40; x += 4) {
+    const keysIn = new Set(Array.from({ length: 16 }, (_, i) => r[y + (i >> 2)][x + (i & 3)]));
+    assert.equal(keysIn.size, 1, `block at ${x},${y}: ${[...keysIn].join("")}`);
+  }
+  // the light from the upper left: the outline (the ramp's darkest) on its right, not on its left
+  const row = r.find((l) => l.replace(/\./g, "").length >= 12)!, ink = row.replace(/^\.+|\.+$/g, "");
+  assert.equal(ink.at(-1), "k");
+  assert.notEqual(ink[0], "k");
+  // a textured face with an edge: the outline where it ends, the texture inside it
+  const t = rows(`const M = model(); M.box("b", [-1, 3, 0], [1, 3.6, 1.2])
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { b: { tex: "_white", edge: "k" } }))`).join("");
+  assert.ok(t.includes("k") && t.includes("g"), "edge and texture (stepped down by its light) both drawn");
+});

@@ -1,5 +1,5 @@
 // Project: the registry an art file fills in, plus the lazy, cached, cycle-checked resolver.
-import { type BuildCtx, type BuildOut, buildAsset, drawnFrames, gcd } from "./build.ts";
+import { type BuildCtx, type BuildOut, animTimeline, buildAsset, drawnFrames, gcd } from "./build.ts";
 import { type Canvas, OPS } from "./canvas.ts";
 import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from "./rig.ts";
 import { type View, perspective } from "./perspective.ts";
@@ -325,6 +325,13 @@ export class Project implements BuildCtx {
       if (prev) throw new PxError(`'${name}' is already defined at ${prev.loc}`, loc);
       const opts = (isPlainObject(rest[0]) ? rest.shift() : {}) as AssetOpts;
       checkKeys(`${kind} '${name}'`, opts, ASSET_OPTS[kind], loc);
+      // a variant of an anim (base + swap) plays as it does: its clock and pivot, unless it says
+      // otherwise (it drew one frame at 8 fps, still, where its base moved)
+      const from = kind === "anim" && typeof opts.base === "string" ? this.assets.get(opts.base) : undefined;
+      if (from?.kind === "anim" && !rest.some((v) => isOp(v) && v.name === "frame")) {
+        for (const k of ["fps", "frames", "loop", "dir", "pivot"] as const) if (opts[k] === undefined && from.opts[k] !== undefined) (opts as Record<string, unknown>)[k] = from.opts[k];
+        if (opts.frames === undefined) opts.frames = animTimeline(from).durations!.length;
+      }
       const light = opts.world?.light, pair = (v: unknown) => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
       if (light !== undefined && !pair(light) && !(isPlainObject(light) && pair((light as { at?: unknown }).at)))
         throw new PxError(`${kind} '${name}': world.light is where the light comes from, [x, y] (e.g. [0.6, -1]: the top right), or a point light in the scene, { at: [x, y] }; got ${JSON.stringify(light)}`, loc);

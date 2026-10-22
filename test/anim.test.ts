@@ -323,3 +323,15 @@ test("clouds: a negative gap drifts them leftward; placements refuse options the
   assert.equal(b.slice(0, 55), a.slice(5, 60), "five px left a frame");
   assert.match(failure(PAL + `sprite("x", "r")\nsprite("s", { w: 4, h: 4 }, stamp("x", 0, 0, { rlip: "x" }))`, "s").message, /rlip/);
 });
+
+test("an anim's variant (base + swap) plays as its base does: its frames, fps and pivot", () => {
+  const p = loadSource(PAL + `anim("a", { w: 1, h: 1, frames: 3, fps: 10, pivot: "bottom" }, (c) => c.px(0, 0, c.frame ? "r" : "w"))
+anim("b", { base: "a", swap: { r: "g" } })
+anim("c", { frames: 2, fps: 4 }, frame({}, "w"), frame({}, "r"))
+anim("d", { base: "c", swap: { r: "g" } })`, "t.px.js");
+  assert.deepEqual(p.timeline("b")!.durations, [100, 100, 100]);
+  assert.equal(p.assets.get("b")!.opts.pivot, "bottom");
+  assert.equal(keys(p, "b"), "w");
+  assert.deepEqual(p.timeline("d")!.durations, [250, 250]);
+  assert.equal(p.image("d", 0, 250).get(0, 0), pack(0, 228, 54));   // its second frame, recolored
+});
