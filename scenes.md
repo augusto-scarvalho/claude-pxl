@@ -261,9 +261,17 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - Each plane is a sprite drawn once as a strip with `wrap: "x"`, going by with
   `scroll(name, y, per)` (in an anim, or a scene that stamps one: in a still scene it stands still): `per` px a loop, the nearer the more, each a whole number of the strip's
   widths so the last frame runs into the first. A strip at least as wide as the picture doesn't show
-  its repeat; a wide one (1280 px) costs nothing per frame. Noise on a strip: `seamless()` makes it
+  its repeat; a wide one (1536 px) costs nothing per frame. Noise on a strip: `seamless()` makes it
   close over the strip's width. `describe` sees a scrolled strip as one object shifting across, not as
   motion: look at the planes with `shot --frames`.
+- **Every plane goes a whole number of px a frame** (1, 2, 3, 4, 6, 8...), the same step every
+  frame: 1.67 px a frame steps 2, 2, 1 and the plane judders. Slower than 1 px a frame, 1 px every 2
+  (or 3, 4) frames. So `per` = px a frame × the loop's frames, and each strip is as wide as a
+  number that divides its `per`: a loop of 96 or 192 frames, with many divisors, gives the most
+  speeds (the train: 192 frames, strips of 384, 768 and 1536 px at 2, 4 and 8 px a frame, the grass
+  at 10). A plane far off goes 1 px a frame, or slower; anything inside a plane that moves on its own
+  (a car's wheels) loops in a divisor of the loop. `pxl check` warns at a plane that doesn't, with
+  an even `per`; `pxl study` says which planes of a clip go unevenly.
 - The loop's length comes from the slowest plane that must go round once. Anything slower (a ridge on
   the horizon, which should hardly move): drift it a little over the loop (the train's ridge: 32 px in 12 s) while crossfading its
   outline into itself one step on, as the cloud slots do.

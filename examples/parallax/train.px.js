@@ -2,13 +2,15 @@
 // the train, so the train stands still and the land runs past behind it, each plane at its own speed:
 // the far ridge barely moves, the hills a little, the pasture more, the trackside fast, the grass in
 // front a blur. Every plane is a strip that wraps in x and goes round a whole number of times in the
-// loop, so the last frame runs into the first.
+// loop, so the last frame runs into the first, and goes a whole number of px every frame (1.67 px a
+// frame would step 2, 2, 1 and judder): each strip is as wide as its px a frame times the frames.
 //
 // planes, far to near (px a loop; the loop is 192 frames, 12 s), each a scroll():
 //   sky       still
 //   clouds    pxl's clouds(): slots 48 px apart, each drifting one slot while it turns into the next
+//             (1 px every 4 frames)
 //   ridge     32: too slow for a strip to go round, so its outline drifts one step and crossfades
-//   hills     320 (one strip, once round)       pasture   640      trackside 1280      grass 1920
+//   hills     384 (2 px a frame)   pasture 768 (4)   trackside 1536 (8)   grass 1920 (10)
 // the train: drivers that turn a whole number of times, rods on their crank pins, its smoke a
 // plume() left behind at the ground's speed, as the air it's in stays put. In the cab the driver looks
 // ahead and the fireman feeds the firebox; at the windows people lean out, a child waves.
@@ -75,10 +77,10 @@ function farRidge(c, f) {
   }
 }
 
-// ---------------------------------------------------------------- hills (320 a loop)
+// ---------------------------------------------------------------- hills (384 a loop)
 // Rolling hills with clumps of woods and araucárias along the crests, mist lying at their foot. Drawn
 // once as a strip that wraps; the frames place it.
-const HILLS_Y = 62
+const HILLS_Y = 62, HILLS_W = 384
 // an araucária far off: a bare trunk under a flat crown with its tips turned up
 function araucaria(c, x, y, tall, key) {
   const cw = tall > 8 ? 3 : 2, top = y - tall
@@ -86,32 +88,32 @@ function araucaria(c, x, y, tall, key) {
   c.hline(x - cw, top + 1, cw * 2 + 1, key); c.hline(x - cw + 1, top + 2, cw * 2 - 1, key)
   c.px(x - cw, top, key); c.px(x + cw, top, key); if (cw > 2) c.px(x, top, key)
 }
-sprite("_hills", { w: W, h: 46, wrap: "x" }, (c) => {
-  const top = (x) => Math.round(18 + waves(x, W, [[1, 4, 0.3], [3, 3.5, 1.1], [7, 1.4, 2]]))
-  for (let x = 0; x < W; x++) {
+sprite("_hills", { w: HILLS_W, h: 46, wrap: "x" }, (c) => {
+  const top = (x) => Math.round(18 + waves(x, HILLS_W, [[1, 4, 0.3], [3, 3.5, 1.1], [7, 1.4, 2]]))
+  for (let x = 0; x < HILLS_W; x++) {
     const t0 = top(x), lit = top(x + 2) > top(x - 2)
     for (let y = t0; y < 46; y++) c.px(x, y, lit && y < t0 + 4 ? "h" : "H")
   }
   // woods: clumps of round crowns just under the crests, lit on top
   const r = rng(7)
-  for (let i = 0; i < 12; i++) {
-    const cx = Math.floor(r() * W), n = 3 + Math.floor(r() * 5)
+  for (let i = 0; i < 14; i++) {
+    const cx = Math.floor(r() * HILLS_W), n = 3 + Math.floor(r() * 5)
     for (let k = 0; k < n; k++) {
-      const x = cx + k * 3 - n, y = top(((x % W) + W) % W) + 2 + Math.floor(r() * 4), rr = 1 + Math.floor(r() * 2)
+      const x = cx + k * 3 - n, y = top(((x % HILLS_W) + HILLS_W) % HILLS_W) + 2 + Math.floor(r() * 4), rr = 1 + Math.floor(r() * 2)
       c.circ(x, y, rr, "J"); c.px(x, y + rr, "j"); c.px(x - rr + 1, y - rr + 1, "h")
     }
   }
-  for (let i = 0; i < 18; i++) { const x = Math.floor(r() * W); araucaria(c, x, top(x) + 1, 6 + Math.floor(r() * 5), "j") }
+  for (let i = 0; i < 22; i++) { const x = Math.floor(r() * HILLS_W); araucaria(c, x, top(x) + 1, 6 + Math.floor(r() * 5), "j") }
   // mist at their foot: a soft top edge, then solid
-  for (let x = 0; x < W; x++) mist(c, x, 33, W, 13)
+  for (let x = 0; x < HILLS_W; x++) mist(c, x, 33, HILLS_W, 13)
 })
 
-// ---------------------------------------------------------------- pasture (640 a loop)
+// ---------------------------------------------------------------- pasture (768 a loop)
 // Near hills of pasture as in the hills of Minas: patches of drier grass and greener, the cattle's
 // trails stepping along the slopes, woods filling the folds between the hills, a tree alone here and
 // there with its shade, a fence, cows, a farmhouse with a blue door under a mango tree, coffee planted
 // along the contour.
-const NEAR_Y = 80, NEAR_W = 640
+const NEAR_Y = 80, NEAR_W = 768
 sprite("_cow", `
   .oo.....
   OooOooo.
@@ -160,7 +162,7 @@ sprite("_near", { w: NEAR_W, h: 60, wrap: "x" }, (c) => {
     if (slope < 0 && hash(x, d) < 0.5) c.px(x, y - 1, k === "^" ? "^" : "G")
   }
   // grass: short dashes of the darker tone here and there
-  for (let i = 0; i < 260; i++) {
+  for (let i = 0; i < 312; i++) {
     const x = Math.floor(r() * NEAR_W), y = top(x) + 2 + Math.floor(r() * 30), k = c.key(x, y)
     if (dark[k]) c.hline(x, y, 2, dark[k])
   }
@@ -182,12 +184,13 @@ sprite("_near", { w: NEAR_W, h: 60, wrap: "x" }, (c) => {
     const y = top(x) + 4 + row * 3
     c.px(x, y, "q"); c.px(x, y - 1, (x + row * 2) % 5 === 0 ? "q" : "Q"); if ((x + row) % 7 === 0) c.px(x, y - 1, "g")
   }
-  // a fence along the slope: posts every 9 px, a wire between them; it stops where the woods are
+  // a fence along the slope: posts every 8 px (a step that divides the strip, so the fence runs on
+  // over its seam), a wire between them; it stops where the woods are
   const wood = (x, y) => ["q", "Q", ":"].includes(c.key(x, y))
-  for (let x = 0; x < NEAR_W; x += 9) {
+  for (let x = 0; x < NEAR_W; x += 8) {
     const y = top(x) + 9
-    if (wood(x, y - 3) || wood(x + 9, top(x + 9) + 6)) continue
-    c.vline(x, y - 4, 5, "x"); c.line(x, y - 3, x + 9, top(x + 9) + 6, "X")
+    if (wood(x, y - 3) || wood(x + 8, top(x + 8) + 6)) continue
+    c.vline(x, y - 4, 5, "x"); c.line(x, y - 3, x + 8, top(x + 8) + 6, "X")
   }
   // cows grazing up near the crest, where they show over the train
   for (const [x0, flip, brown] of [[40, false, false], [54, true, true], [250, false, true], [380, true, false], [560, false, false], [574, true, true]]) {
@@ -201,11 +204,11 @@ sprite("_near", { w: NEAR_W, h: 60, wrap: "x" }, (c) => {
   c.vline(hx + 26, hy + 3, 6, "X"); c.circ(hx + 26, hy, 6, "q"); c.circ(hx + 25, hy - 1, 4, "Q"); c.px(hx + 23, hy - 4, "g")
 })
 
-// ---------------------------------------------------------------- trackside (1280 a loop)
-// The near edge of the line: telegraph poles every 160 px with their wires sagging between, bushes on
+// ---------------------------------------------------------------- trackside (1536 a loop)
+// The near edge of the line: telegraph poles every 192 px with their wires sagging between, bushes on
 // the embankment, a clump of bamboo, banana plants, an ipê-roxo in flower, a cutting of red earth,
 // the ballast with the sleepers' ends.
-const SIDE_Y = 60, SIDE_W = 1280
+const SIDE_Y = 60, SIDE_W = 1536
 sprite("_side", { w: SIDE_W, h: 110, wrap: "x" }, (c) => {
   const r = rng(23), G0 = 80                                         // the embankment's top, in the strip
   const bank = (x) => G0 + Math.round(waves(x, SIDE_W, [[4, 2, 0.5], [13, 1.2, 2]]))
@@ -231,12 +234,12 @@ sprite("_side", { w: SIDE_W, h: 110, wrap: "x" }, (c) => {
   for (let x = 0; x < SIDE_W; x++) if (hash(x, 31) < 0.5) { const h = 1 + Math.floor(hash(x, 32) * 3); c.vline(x, shoulder(x) - h, h, h > 2 ? "g" : "Q") }
   // grass at the ballast's edge, and the odd weed come up through the stones
   for (let x = 0; x < SIDE_W; x++) if (hash(x, 11) < 0.55) { const h = 1 + Math.floor(hash(x, 12) * 3); c.vline(x, 90 - h, h + 1, h > 2 ? "Q" : "g") }
-  for (let i = 0; i < 70; i++) { const x = Math.floor(r() * SIDE_W), y = 92 + Math.floor(r() * 3); c.px(x, y, "g"); c.px(x + 1, y - 1, "Q"); c.px(x - 1, y - 1, "g") }
+  for (let i = 0; i < 84; i++) { const x = Math.floor(r() * SIDE_W), y = 92 + Math.floor(r() * 3); c.px(x, y, "g"); c.px(x + 1, y - 1, "Q"); c.px(x - 1, y - 1, "g") }
   // the embankment's grass: short dark dashes, a few flowers
-  for (let i = 0; i < 500; i++) { const x = Math.floor(r() * SIDE_W), y = bank(x) + 3 + Math.floor(r() * 7); if (c.key(x, y) === "Q") c.hline(x, y, 2, r() < 0.3 ? "g" : "q") }
-  for (let i = 0; i < 60; i++) { const x = Math.floor(r() * SIDE_W), y = bank(x) + 2 + Math.floor(r() * 6); if (c.key(x, y) === "Q") c.px(x, y, r() < 0.4 ? "K" : r() < 0.6 ? "L" : "+") }
+  for (let i = 0; i < 600; i++) { const x = Math.floor(r() * SIDE_W), y = bank(x) + 3 + Math.floor(r() * 7); if (c.key(x, y) === "Q") c.hline(x, y, 2, r() < 0.3 ? "g" : "q") }
+  for (let i = 0; i < 72; i++) { const x = Math.floor(r() * SIDE_W), y = bank(x) + 2 + Math.floor(r() * 6); if (c.key(x, y) === "Q") c.px(x, y, r() < 0.4 ? "K" : r() < 0.6 ? "L" : "+") }
   // bushes along the embankment
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 72; i++) {
     const x = Math.floor(r() * SIDE_W), y = bank(x) - Math.round(cut(x)), rr = 2 + Math.floor(r() * 4)
     c.circ(x, y, rr, "q"); c.circ(x - 1, y - 1, rr - 1, "Q"); if (rr > 3) c.px(x - rr + 2, y - rr + 1, "g")
   }
@@ -281,12 +284,12 @@ sprite("_side", { w: SIDE_W, h: 110, wrap: "x" }, (c) => {
     const x = Math.round(tx + (r() - 0.5) * 4), y = Math.round(ty + (r() - 0.5) * 3)
     c.px(x, y, "+"); c.px(x + 1, y, "+"); c.px(x, y + 1, "!"); if (r() < 0.5) c.px(x - 1, y - 1, "&")
   }
-  // telegraph poles every 160 px: crossarm, white insulators, wires sagging to the next pole
-  for (let x = 40; x < SIDE_W + 40; x += 160) {
+  // telegraph poles every 192 px: crossarm, white insulators, wires sagging to the next pole
+  for (let x = 40; x < SIDE_W + 40; x += 192) {
     const y0 = bank(x)
     c.rect(x, 4, 2, y0 - 4, "x"); c.vline(x + 1, 4, y0 - 4, "X")
     c.hline(x - 6, 8, 14, "X"); for (const dx of [-5, -1, 3, 7]) c.px(x + dx, 7, "o")
-    for (const dx of [-5, 3]) c.wire(x + dx, 8, x + 160 + dx, 8, 7, "y")
+    for (const dx of [-5, 3]) c.wire(x + dx, 8, x + 192 + dx, 8, 7, "y")
   }
 })
 
@@ -324,9 +327,9 @@ sprite("_fg", { w: FG_W, h: 30, wrap: "x" }, (c) => {
 // edged in white. The tender: firewood behind a railing, the number big in white in a framed panel,
 // two trucks. The coaches: varnished wood, a small pane over each window, the windows let down, the
 // far side's windows showing through, boarding below, a monogram, truss rods under the frame.
-// The drivers turn DRIVE times a loop, about the 1280 px the land goes by over their 6 px radius; the
+// The drivers turn DRIVE times a loop, about the 1536 px the land goes by over their 6 px radius; the
 // small wheels SMALL times.
-const DRIVE = 34, SMALL = 51
+const DRIVE = 41, SMALL = 61
 const DRIVERS = [238, 252, 266, 280], AXLE = RAIL - 7
 // a driving wheel: black tire, red center with spokes and a counterweight opposite the crank pin
 function drivingWheel(c, cx, cy, th) {
@@ -540,22 +543,22 @@ function engineer(c) {
 
 // ---------------------------------------------------------------- the loop
 // the rails stand still with the train: the head lit on top, the web, the foot; their joints go by
-// with the land, a bolted plate every 80 px
+// with the land, a bolted plate every 96 px (a step that divides the trackside's 1536)
 function rails(c, f) {
   c.rect(0, RAIL, W, 1, "i"); c.rect(0, RAIL + 1, W, 1, "a"); c.rect(0, RAIL + 2, W, 1, "I"); c.rect(0, RAIL + 3, W, 1, "d")
-  for (let x = -(moved(f, 1280) % 80); x < W + 4; x += 80) { c.rect(x - 3, RAIL + 1, 7, 3, "c"); c.px(x - 2, RAIL + 2, "a"); c.px(x + 2, RAIL + 2, "a"); c.vline(x, RAIL, 2, "I") }
+  for (let x = -(moved(f, SIDE_W) % 96); x < W + 4; x += 96) { c.rect(x - 3, RAIL + 1, 7, 3, "c"); c.px(x - 2, RAIL + 2, "a"); c.px(x + 2, RAIL + 2, "a"); c.vline(x, RAIL, 2, "I") }
 }
 anim("train", { w: W, h: H, frames: FRAMES, fps: FPS },
   (c) => c.stamp("_sky", 0, 0),
   clouds({ y: 30, gap: 48, w: 46, h: 11, n: 9, seed: 4, sizes: [1, 0.5, 1, 1, 0.5, 1, 0.5, 1, 0.5], empty: [2, 7], keys: "Wwv" }),
   (c) => farRidge(c, c.frame),
-  scroll("_hills", HILLS_Y, 320),
-  scroll("_near", NEAR_Y, 640),
-  scroll("_side", SIDE_Y, 1280),
+  scroll("_hills", HILLS_Y, HILLS_W),
+  scroll("_near", NEAR_Y, NEAR_W),
+  scroll("_side", SIDE_Y, SIDE_W),
   // under the train the ballast lies in its shade, between the wheels
   recolor({ p: "P", P: "y", "/": "p", s: "]", g: "Q", Q: "q", z: "g" }, [0, 150, 312, RAIL - 150]),
   (c) => rails(c, c.frame),
   (c) => { coach(c, -COACH, c.frame, [...PEOPLE].reverse()); coach(c, 14, c.frame, PEOPLE); conductor(c, 8); tender(c, c.frame); engine(c, c.frame) },
   // smoke: a puff every frame from the stack, dark while fresh, left behind at the ground's speed
-  plume(296, 89, "YV=", { every: 1, life: 38, rise: 30, wind: -1280 / FRAMES, inertia: 5, size: [3, 13], young: "=$", seed: 5 }),
+  plume(296, 89, "YV=", { every: 1, life: 38, rise: 30, wind: -SIDE_W / FRAMES, inertia: 5, size: [3, 13], young: "=$", seed: 5 }),
   scroll("_fg", 164, 1920))

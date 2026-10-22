@@ -155,7 +155,8 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   // what building found on the way (a shade step that left its ramp), where it was asked for
   for (const w of p.warnings) {
     const sub = /^'([^']*)': (a stamp half a pixel.*)$/.exec(w.msg);
-    lines.push(sub ? `${sub[1]}${w.loc ? ` (${w.loc})` : ""} › WARNING: ${sub[2]}` : `ramps${w.loc ? ` (${w.loc})` : ""} › WARNING: ${w.msg}`);
+    const op = /^([a-z]+): /.exec(w.msg)?.[1] ?? "ramps";
+    lines.push(sub ? `${sub[1]}${w.loc ? ` (${w.loc})` : ""} › WARNING: ${sub[2]}` : `${op}${w.loc ? ` (${w.loc})` : ""} › WARNING: ${w.msg}`);
   }
   const n = (k: number, w: string) => `${k} ${w}${k === 1 ? "" : "s"}`;
   const run: string[] = [], not: string[] = [];

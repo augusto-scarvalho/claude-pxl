@@ -493,8 +493,10 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
   bands = bands.filter((b) => Math.abs(b.v) >= 0.1 && across(b) >= 0.4 && carries(b));
   if (bands.length) {
     const sorted = bands.slice().sort((a, b) => Math.abs(a.v) - Math.abs(b.v));
-    lines.push(`  Planes going by (bands of rows carried across together): ${bands.map((b) => `rows ${b.y0}-${b.y1} at ${Math.abs(b.v).toFixed(2)} px/frame ${b.v < 0 ? "left" : "right"} (${(Math.abs(b.v) * fps).toFixed(0)} px/s)`).join("; ")}.${bands.length > 1 ? ` Parallax: ${sorted.length} speeds from ${Math.abs(sorted[0].v).toFixed(2)} to ${Math.abs(sorted[sorted.length - 1].v).toFixed(2)} px/frame, each its own plane, the faster the nearer.` : ""}`);
-    pxl.push(`scroll(name, y, per) for each plane, per = its speed x the loop's frames (here ${bands.map((b) => Math.round(Math.abs(b.v) * n)).join(", ")} px over ${n} frames), a whole number of each strip's widths.`);
+    // a plane at 1.67 px a frame steps 2, 2, 1 and judders; whole px a frame or 1 px every k frames don't
+    const uneven = bands.filter((b) => { const a = Math.abs(b.v); return Math.abs(a - Math.round(a)) > 0.08 && (a >= 1 || Math.abs(1 / a - Math.round(1 / a)) > 0.15); });
+    lines.push(`  Planes going by (bands of rows carried across together): ${bands.map((b) => `rows ${b.y0}-${b.y1} at ${Math.abs(b.v).toFixed(2)} px/frame ${b.v < 0 ? "left" : "right"} (${(Math.abs(b.v) * fps).toFixed(0)} px/s)`).join("; ")}.${bands.length > 1 ? ` Parallax: ${sorted.length} speeds from ${Math.abs(sorted[0].v).toFixed(2)} to ${Math.abs(sorted[sorted.length - 1].v).toFixed(2)} px/frame, each its own plane, the faster the nearer.` : ""}${uneven.length ? ` Uneven: ${uneven.map((b) => `rows ${b.y0}-${b.y1}`).join(", ")} go${uneven.length === 1 ? "es" : ""} a fraction of a px a frame, stepping by turns a pixel more and less, which judders: a plane goes a whole number of px a frame, or 1 px every so many frames.` : ""}`);
+    pxl.push(`scroll(name, y, per) for each plane, per = its speed x the loop's frames (here ${bands.map((b) => Math.round(Math.abs(b.v) * n)).join(", ")} px over ${n} frames), a whole number of each strip's widths, at a whole number of px a frame.`);
   }
   // the pieces: what moves how on what stays (not when the whole view moves toward its point)
   // subpixel motion: in the tutorial it took 26% of what changes, examples/subpixel 15%, pxl's lit

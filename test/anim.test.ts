@@ -267,6 +267,19 @@ test("scroll: a strip that wraps goes by a whole number of its widths in the loo
   assert.match(failure(PAL + strip + `anim("go", { w: 6, h: 1, frames: 4 }, scroll("s", 0, 6))`, "go").message, /whole number of 4s/);
 });
 
+test("scroll: a plane that goes a fraction of a px a frame judders, and pxl check says so with an even per", () => {
+  const strip = `sprite("s", { w: 4, h: 1, wrap: "x" }, "rwgk")\n`, warned = (per: number, frames: number) => {
+    const p = load(strip + `anim("go", { w: 6, h: 1, frames: ${frames}, fps: 4 }, scroll("s", 0, ${per}))`);
+    p.frames("go");
+    return p.warnings.map((w) => w.msg).join("\n");
+  };
+  // 12 px over 8 frames: 1.5 px a frame, steps of 1 and 2 by turns
+  assert.match(warned(12, 8), /goes 1\.5 px a frame .* steps of 1 and 2 px .* per = 2 × 8 = 16/);
+  // 8 px over 8 frames (1 a frame) and 4 over 8 (1 px every 2 frames) are even
+  assert.equal(warned(8, 8), "");
+  assert.equal(warned(4, 8), "");
+});
+
 test("clouds: cut flat at the base row, lit on top; empty slots hold none", () => {
   const sky = (o: string) => `anim("sky", { w: 60, h: 20, frames: 4, fps: 4 }, rect(0, 0, 60, 20, "g"), clouds({ y: 15, gap: 20, w: 14, h: 8, n: 3, seed: 2, keys: "wrk"${o} }))`;
   const rows = frameKeys(load(sky("")), "sky")[1].split("\n");

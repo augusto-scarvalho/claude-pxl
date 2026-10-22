@@ -12,9 +12,10 @@ test("study reads pxl's own gallery back as it was made", async () => {
   // both read at once, each in a process of its own (two long clips: tens of seconds one after the other)
   const run = (gif: string) => promisify(execFile)(process.execPath, ["bin/pxl.js", "study", gif, "--no-out"], { cwd: root, maxBuffer: 1 << 24 }).then((r) => r.stdout);
   const [train, park] = await Promise.all([run("docs/gallery/parallax_train.gif"), run("docs/gallery/park.gif")]);
-  // the train: four planes scrolled 320, 640, 1280 and 1920 px over its 192 frames
+  // the train: four planes scrolled 384, 768, 1536 and 1920 px over its 192 frames, whole px a frame
   const speeds = [...train.matchAll(/at (\d+\.\d+) px\/frame left/g)].map((m) => +m[1]);
-  for (const [i, v] of [320, 640, 1280, 1920].entries()) assert.ok(Math.abs(speeds[i] - v / 192) < 0.1, `plane ${i}: ${speeds[i]} for ${v / 192}`);
+  for (const [i, v] of [384, 768, 1536, 1920].entries()) assert.ok(Math.abs(speeds[i] - v / 192) < 0.1, `plane ${i}: ${speeds[i]} for ${v / 192}`);
+  assert.doesNotMatch(train, /Uneven:/);
   assert.match(train, /No lines meet|no third point|parallel in the picture/);
   // the park: perspective({ horizon: 70, fov: 90, yaw: 40 })
   const m = /Two-point perspective: the horizon at row (\d+);.*\(fov ~(\d+)°\)/.exec(park), y = /yaw: (\d+)/.exec(park);

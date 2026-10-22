@@ -617,6 +617,16 @@ export class Canvas {
     const w = this.size(name).w, f = opts.frame ?? this.frame;
     if (!w) return;
     if (this.frames > 1 && per % w !== 0) throw new PxError(`scroll: '${name}' is ${w} px wide, so per (${per}) must be a whole number of ${w}s for the loop to close (e.g. ${w * Math.max(1, Math.round(Math.abs(per) / w))})`);
+    // a plane that goes 1.67 px a frame steps 2, 2, 1 and judders: whole px a frame, or 1 px every k frames
+    const v = Math.abs(per) / this.frames;
+    if (this.frames > 1 && v > 0 && !Number.isInteger(v) && !Number.isInteger(1 / v)) {
+      const n = Math.max(1, Math.round(v)), even = n * this.frames;
+      // the strip width nearest this one that divides the even per
+      let fit = 1;
+      for (let d = 1; d <= even; d++) if (even % d === 0 && Math.abs(d - w) < Math.abs(fit - w)) fit = d;
+      const steps = v > 1 ? `steps of ${Math.floor(v)} and ${Math.ceil(v)} px` : `1 px every ${Math.floor(1 / v)} or ${Math.ceil(1 / v)} frames`;
+      this.res.warn?.(`scroll: '${name}' goes ${+v.toFixed(2)} px a frame (${per} over ${this.frames} frames), in ${steps} by turns, and judders; a plane goes a whole number of px a frame, or 1 px every so many frames: per = ${n} × ${this.frames} = ${even}${even % w ? `, with the strip ${fit} px wide (its width has to divide per)` : ""}`, this.loc);
+    }
     let x = (opts.x ?? 0) - ((((Math.floor((f * per) / this.frames)) % w) + w) % w);
     while (x > -this.ox) x -= w;
     for (; x < this.img.w - this.ox; x += w) this.stamp(name, x, y);
