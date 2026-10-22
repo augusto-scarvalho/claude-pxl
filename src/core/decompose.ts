@@ -26,6 +26,11 @@ export interface Piece {
   box: [number, number, number, number];
   /** how many frames it shows in, the distinct drawings of it, the frames after which they repeat (0: none) */
   frames: number; poses: number; cycle: number;
+  /** the clip is one cycle of it, in place: played there and back, its second half its first with the
+   * limbs swapped (a run), or a breath (nothing going more than a few px a frame) */
+  loop?: "pingpong" | "halves" | "breath";
+  /** the same thing going by again and again (a wave's crests): how many times, how many frames apart */
+  again?: { times: number; every: number };
   /** carried: px a frame, and how much bigger it gets from first to last (perspective) */
   speed?: [number, number]; grow?: number;
   /** the separate parts of it that move (more than one: limbs against a body, a rig) */
@@ -424,7 +429,13 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     // a run of poses played once (an attack, a jump): many drawings, none coming back, and a body that
     // moves (its blocks found again a step on, or turning about a joint it keeps), more than a pixel,
     // not changing all over like fire
-    const action = !along && !cycle && !small && poses >= 0.5 * N && ((inside.length >= 4 && mv.length >= 0.4 * inside.length) || swung(track.map((e) => pix.filter((p) => fg[e[0]][p]))));
+    // one cycle of a loop that stays where it is (a tutorial's idle, a run on the spot: the clip is its
+    // whole cycle, so nothing repeats inside it): its last frame runs into its first as its neighbors
+    // do, and it goes there and back (an idle's ping-pong), or its second half is its first with near
+    // and far limbs swapped (a run: the same silhouette half a cycle on), or nothing in it goes more than
+    // a few px a frame (a breath) - not an attack reaching out. (Nor is a speck of a few px an attack.)
+    const loop = !along && !cycle && N >= 4 ? loopInPlace(patches, differ, bw, mv) : null, cyc = cycle || (loop ? N : 0);
+    const action = !along && !cyc && !small && Math.min(bw, bh) >= 4 && poses >= 0.5 * N && ((inside.length >= 4 && mv.length >= 0.4 * inside.length) || swung(track.map((e) => pix.filter((p) => fg[e[0]][p]))));
     // played once and gone, flashing near-white early (Saint11's explosion: dark, white, blast, fading):
     // an effect, not an attack, however much it moves
     const area = F.map((_, t) => pix.filter((p) => fg[t][p]).length), shown = area.map((a, t) => (a >= 4 ? t : -1)).filter((t) => t >= 0);
@@ -433,10 +444,12 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const once = shown.length >= 3 && gone < N - 1 && area[gone] <= 0.5 * area[peak] && [born, born + 1, born + 2].some((t) => t < N && whiteAt(t));
     const kind: Kind = along || round ? (poses >= 3 ? "walk" : "carried")
       : stream ? "stream"
-      : coherent >= 0.85 && tone >= 0.6 && !moves ? "light"
+      // (a light changes in one or two places; a flat figure running changes only in lightness too, but
+      // in many parts at once)
+      : coherent >= 0.85 && tone >= 0.6 && !moves && parts.length <= 3 ? "light"
       : once ? "effect"
       : action ? "action"
-      : !cycle && !small && poses >= 0.5 * N && coherent < 0.8 ? "effect"
+      : !cyc && !small && poses >= 0.5 * N && coherent < 0.8 ? "effect"
       : parts.length >= 2 && share < 0.6 ? "rig" : "anim";
     // its captures, the background taken away: in place, its body's box (room for what of it stays
     // still); going somewhere, each frame's own box
@@ -448,9 +461,9 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     const capture = (e: [number, number, number, number, number]): Cut => (about ? { t: e[0], b: box, keep: carriedCut(own1(e[0]), box, W) } : { t: e[0], b: boxAt(e), keep: matte(F[e[0]], fg[e[0]], boxAt(e), mine, model, W, tol, mode).keep });
     const steps = track.filter((e, i) => i === 0 || e[0] === track[i - 1][0] + 1);
     pieces.push({
-      kind, box: along || about || kind === "action" || once || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle, parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), ...(small ? { sub: true } : {}), track,
+      kind, box: along || about || kind === "action" || once || !body.px.length ? [x0, y0, bw, bh] : bboxOf(body.px, W), frames: track.length, poses, cycle: cyc, ...(loop ? { loop } : {}), parts: parts.length, ...(along ? { speed: along } : {}), ...(round ? { round } : {}), ...(small ? { sub: true } : {}), track,
       ...(kind === "action" || kind === "walk" ? smearsOf(F, roomy(x0, y0, bw, bh, 2), W, fg) : {}),
-      ...captures(cycle >= 2 && steps.length >= cycle ? steps.slice(0, cycle) : spread(track, 8), spread(track, 8), capture, F0),
+      ...captures(cyc >= 2 && steps.length >= cyc ? steps.slice(0, cyc) : spread(track, 8), spread(track, 8), capture, F0),
     });
   }
   // ---------------------------------------------------------------- lights
@@ -512,6 +525,22 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
   };
   pieces.sort((a, b) => Number(b.grow !== undefined) - Number(a.grow !== undefined) || b.frames - a.frames);
   for (let i = pieces.length - 1; i >= 0; i--) if (pieces.slice(0, i).some((q) => twice(q, pieces[i]))) pieces.splice(i, 1);
+  // the same thing going by again and again (a wave's crests, a waterfall's bands, a texture scrolling
+  // past): followed a few frames each time, the same box and speed, one after another at a steady beat.
+  // One piece, with how many times and how many frames apart
+  const again = (a: Piece, b: Piece) => !!a.speed && !!b.speed && a.kind === b.kind && iou(a.box, b.box) > 0.7 && Math.hypot(a.speed[0] - b.speed[0], a.speed[1] - b.speed[1]) <= 0.25 * Math.hypot(...a.speed) + 0.2;
+  for (let i = 0; i < pieces.length; i++) {
+    const p = pieces[i], same = pieces.filter((q, j) => j > i && again(p, q));
+    if (same.length < 2) continue;
+    const runs = [p, ...same].sort((a, b) => a.track[0][0] - b.track[0][0]), starts = runs.map((q) => q.track[0][0]), gaps = starts.slice(1).map((s, k) => s - starts[k]);
+    // (a texture's come at a steady beat, a wave's crests overlapping, each born and gone inside the
+    // picture; traffic comes in and goes out at its edges)
+    const inner = (e: [number, number, number, number, number]) => e[1] >= 2 && e[2] >= 2 && e[1] + e[3] <= W - 2 && e[2] + e[4] <= H - 2;
+    if (Math.max(...gaps) > 1.25 * Math.min(...gaps) || !runs.every((q) => inner(q.track[0]) && inner(q.track.at(-1)!))) continue;
+    p.again = { times: runs.length, every: median(gaps) };
+    p.frames = runs.reduce((a, q) => a + q.frames, 0);
+    for (const q of same) pieces.splice(pieces.indexOf(q), 1);
+  }
   // things first, then lights; the bigger first
   pieces.sort((a, b) => Number(a.kind === "light") - Number(b.kind === "light") || b.box[2] * b.box[3] - a.box[2] * a.box[3]);
   return { pieces, still: still / WH, frames: N, relit: light.any, light };
@@ -754,6 +783,35 @@ function carriedCut(m: Uint8Array, c: Box, W: number): Uint8Array {
   for (let i = 0; i < n; i++) { const x = i % w, y = Math.floor(i / w); if ((x === 0 || y === 0 || x === w - 1 || y === h - 1) && !inMask(i)) { out[i] = 1; st.push(i); } }
   while (st.length) { const i = st.pop()!, x = i % w, y = Math.floor(i / w); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x + dx, yy = y + dy, j = yy * w + xx; if (xx >= 0 && yy >= 0 && xx < w && yy < h && !out[j] && !inMask(j)) { out[j] = 1; st.push(j); } } }
   return out.map((v) => 1 - v);
+}
+
+/** One cycle of a loop that stays in place, the clip its whole cycle (see where it's called): how it
+ * goes, or null. `seq` its box in each frame, `w` the box's width, `mv` the moving blocks in it. */
+export function loopInPlace(seq: Color[][], differ: (a: Color, b: Color) => boolean, w: number, mv: { dx: number; dy: number }[]): "pingpong" | "halves" | "breath" | null {
+  const N = seq.length, d = (a: Color[], b: Color[]) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i] && differ(a[i], b[i])) n++; return n / Math.max(1, a.length); };
+  const steps = seq.map((s, i) => d(s, seq[(i + 1) % N])), inner = steps.slice(0, N - 1), mean = inner.reduce((a, v) => a + v, 0) / inner.length;
+  // its last frame runs into its first as its neighbors do
+  if (!(mean > 0.002) || steps[N - 1] > 1.5 * Math.max(...inner)) return null;
+  // there and back: the frames mirrored in time about one of them (or between two)
+  for (let c = 0; c < N; c++) {
+    let ok = true;
+    for (let i = 0; i < N && ok; i++) if (d(seq[i], seq[(((c - i) % N) + N) % N]) > 0.25 * mean) ok = false;
+    if (ok) return "pingpong";
+  }
+  // the silhouette against the backdrop (the commonest color round the box's edge) half a cycle on
+  // nearly the same, and more like it than the next frame's (near and far limbs swapped)
+  const h = seq[0].length / w, edge = new Map<Color, number>();
+  for (let i = 0; i < seq[0].length; i++) { const x = i % w, y = Math.floor(i / w); if (!x || !y || x === w - 1 || y === h - 1) edge.set(seq[0][i], (edge.get(seq[0][i]) ?? 0) + 1); }
+  const back = [...edge].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0, sil = seq.map((s) => s.map((c) => (c & 255) >= 128 && c !== back && differ(c, back)));
+  const iou = (a: boolean[], b: boolean[]) => { let i = 0, u = 0; for (let k = 0; k < a.length; k++) { if (a[k] && b[k]) i++; if (a[k] || b[k]) u++; } return u ? i / u : 1; };
+  if (N >= 6 && N % 2 === 0) {
+    const half = sil.reduce((a, s, i) => a + iou(s, sil[(i + N / 2) % N]), 0) / N, next = sil.reduce((a, s, i) => a + iou(s, sil[(i + 1) % N]), 0) / N;
+    if (half >= 0.7 && half >= next + 0.08) return "halves";
+  }
+  // a breath: nothing in it goes more than a few px a frame
+  // (the 80th percentile: a block matched wrong goes far)
+  const sizes = mv.map((f) => Math.hypot(f.dx, f.dy)).sort((a, b) => a - b), most = sizes[Math.floor(0.8 * (sizes.length - 1))] ?? 0;
+  return mv.length && most <= 3 ? "breath" : null;
 }
 
 const crop = (f: Img, b: { x0: number; y0: number; x1: number; y1: number }, W: number) => {

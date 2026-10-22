@@ -763,3 +763,29 @@ recommend that for metals), anti-aliasing quality (study's in-between detection 
 tone between the two), `relight`'s reflected light (it pushes toward pillow shading), an oblique
 camera note for `mesh` (a camera function culls faces from an eye at the origin: a cabinet view
 shows only its front; `mesh` would need an eye for a camera of one's own).
+
+## From the second batch of tutorials (SLYNYRD's Pixelblog, final boss blues, Les Forges, So You Want To Be A Pixel Artist, Make Games, Pixelation)
+
+Read by ten agents, each item checked against the guides; what came of it so far: parallax planes a
+whole px a frame (the train fixed, `scroll` warns), a game's timings in characters 10 and 12, a
+sprite the game flips lit from straight above (and study no longer calls it pillow-shaded), animated
+WebP read frame by frame, one cycle of a loop in place read as such.
+
+- [x] **One cycle of a loop in place** (an idle, a run on the spot, the clip its whole cycle): study
+  read it as "a run of poses played once" with smears and lights that weren't. Now its last frame
+  running into its first, with the clip played there and back, its second half its first with the
+  limbs swapped, or nothing going more than a few px a frame, is a cycle of its own ("one cycle in
+  place ... dir: "pingpong"" or "draw half, then copy it and swap the limbs"); a light changes in one
+  to three parts, not many; a wave's crests followed a few frames at a time, again and again at a
+  steady beat, are one piece ("the same going by 33 times, a new one every 6 frames: a texture
+  scrolling past"). The calibration as it was on every scene.
+- [ ] **A waterfall read as a camera going forward**: its splash spreads out from where the water
+  lands (44% of the moving blocks agree), as a cockpit's view does (42%); what tells them apart
+  isn't found yet (blocks coming toward the point: the cockpit has more).
+- [ ] **A flat figure running in place read as a light** (SLYNYRD's run demo, a run of 2 parts on
+  threes): lightness-only change, in step, no shift of 2 px explaining it. A shape test (the changed
+  pixels staying in place) failed: flickering lights move more than it does.
+- [ ] **A 16 px walk read as nothing moving** (Final Fantasy's 4-frame walk at 300 ms), and its
+  shading swapping with the legs read as subpixel motion (18%).
+- [ ] **Planes study misses** (SLYNYRD's parallax cards): planes of 16-32 px a frame, 0.5 px a frame
+  (read as lights), planes sharing rows, a vertical scroll; a clip with 9 known speeds found 1.

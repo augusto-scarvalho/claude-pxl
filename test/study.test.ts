@@ -14,7 +14,7 @@ import { areaDown, findGrid, lineFlaws, pixelate } from "../src/core/vision.ts";
 import { latticeHash } from "../src/core/util.ts";
 import { hueShifting, regionLines, spacingWords, study } from "../src/core/study.ts";
 import { loadSource } from "../src/node/load.ts";
-import { smearsOf } from "../src/core/decompose.ts";
+import { loopInPlace, smearsOf } from "../src/core/decompose.ts";
 
 // a 1x drawing in a handful of colors: runs of 1-3 px, a different length on each row, so no grid
 const PALETTE = [pack(30, 30, 46), pack(60, 90, 150), pack(110, 160, 220), pack(200, 120, 60), pack(240, 220, 160), pack(70, 140, 70)];
@@ -575,4 +575,21 @@ test("a WebP's chunks: an animated one's frame times, and whether its pixels are
   assert.deepEqual(webpInfo(riff([chunk("VP8X", new Array(10).fill(0)), chunk("ANIM", [0, 0, 0, 0, 0, 0]), frame(120, "VP8L"), frame(600, "VP8L")])), { ms: [120, 600], lossless: true });
   assert.deepEqual(webpInfo(riff([chunk("VP8 ", [1, 2, 3, 4])])), { ms: [], lossless: false });
   assert.equal(webpInfo(new Uint8Array([1, 2, 3])), null);
+});
+
+test("study: one cycle of a loop in place, the clip its whole cycle (an idle, a run on the spot), isn't an attack", () => {
+  const B = pack(20, 20, 30), X = pack(200, 120, 60), Y = pack(90, 60, 40), w = 12, differ = (a: number, b: number) => a !== b;
+  const box = (at: (x: number, y: number) => number) => Array.from({ length: w * 12 }, (_, i) => at(i % w, Math.floor(i / w)));
+  const bar = (h: number) => box((x, y) => (x >= 4 && x < 8 && y >= 12 - h ? X : B));
+  // there and back: heights 6 to 9 and down again
+  assert.equal(loopInPlace([6, 7, 8, 9, 8, 7].map(bar), differ, w, [{ dx: 0, dy: 1 }]), "pingpong");
+  // a run: the legs spread and gather, the near one (X) and the far one (Y) swapped half a cycle on
+  const legs = (s: number, near: number, far: number) => box((x, y) => (y >= 6 && x === 5 - s ? near : y >= 6 && x === 6 + s ? far : y >= 2 && y < 6 && x >= 4 && x < 8 ? X : B));
+  assert.equal(loopInPlace([0, 2, 4].map((s) => legs(s, X, Y)).concat([0, 2, 4].map((s) => legs(s, Y, X))), differ, w, [{ dx: 3, dy: 0 }]), "halves");
+  // a breath: not mirrored, but nothing goes more than a few px a frame; with a part flung far, not
+  const breath = [6, 7, 9, 8, 7, 5].map(bar);
+  assert.equal(loopInPlace(breath, differ, w, [{ dx: 0, dy: 1 }, { dx: 1, dy: 1 }]), "breath");
+  assert.equal(loopInPlace(breath, differ, w, [{ dx: 0, dy: 9 }, { dx: 8, dy: 0 }]), null);
+  // the last frame jumping back to the first: not a loop
+  assert.equal(loopInPlace([2, 3, 4, 5, 6, 12].map(bar), differ, w, [{ dx: 0, dy: 1 }]), null);
 });

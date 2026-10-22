@@ -713,10 +713,16 @@ function pieceLines(d: ReturnType<typeof decompose>, bands: { y0: number; y1: nu
     const sm = !p.smears ? "" : p.kind === "carried" ? ` Smears on frames ${spans(p.smears.frames)} (${p.smears.colors.map(hex).join(", ")}: there a moment only): a streak behind it on the frames it goes fastest, stamp(name, x, y, { smear: [fromX, fromY] }) (its box and spacing measured without it).`
       : ` Smears on frames ${spans(p.smears.frames)} (${p.smears.colors.map(hex).join(", ")}: there a moment only): the shape the swing sweeps, on the frames it goes fastest, arc(cx, cy, r, from, to, c, { inner, taper }) in a layer with unlit: true, outline: false (characters.md: its last 100 degrees at most, thin at its tail).`;
     const sub = p.sub ? `, moving by part of a pixel (subpixel: its parts stamped with { sub: true } at half-pixel places)` : "";
+    // one cycle in place, the clip its whole loop
+    const loop = p.loop === "pingpong" ? `, one cycle in place played there and back (its drawings out, then the same back: dir: "pingpong")`
+      : p.loop === "halves" ? `, one cycle in place whose second half is its first with the near and far limbs swapped (a run, a walk: draw half, then copy it and swap the limbs)`
+      : p.loop === "breath" ? `, one cycle in place, nothing in it going more than a few px a frame (an idle, a breath)` : "";
+    // (one followed a few frames at a time, again and again: a texture going by, not things)
+    const rep = p.again ? `; the same going by ${p.again.times} times, a new one every ${p.again.every} frames: a texture scrolling past (a wave's crests, a waterfall's bands), not separate things: a strip that wraps, scroll() (or the frames of one cycle of ${p.again.every}), its period the distance it goes in ${p.again.every} frames, ${Math.round(Math.hypot(...p.speed!) * p.again.every)} px` : "";
     // ten times brighter at its brightest than at its dimmest is more than light does to what is there:
     // paint that comes and goes (a flash, a smear, sparks, a limb drawn light then dark)
     const paint = p.kind === "light" && (p.strength ?? 0) > 10;
-    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}${sub}: ${paint ? `read as a light, but more likely paint that comes and goes (a flash, a smear, sparks, a part drawn light then dark): ${WHAT.effect}` : WHAT[p.kind]}.${sm}`);
+    out.push(`  #${i + 1} ${where(p.box)}, in ${p.frames} of ${d.frames} frames, ${draw}${extra}${loop}${rep}${sub}: ${paint ? `read as a light, but more likely paint that comes and goes (a flash, a smear, sparks, a part drawn light then dark): ${WHAT.effect}` : WHAT[p.kind]}.${sm}`);
     // (a thing going somewhere, or an action, over a short clip: elsewhere a box's steps are its drawings
     // changing, a limb reaching out, not the thing moving)
     // a walk whose steps vary (a jump, a dash) is read too; in place, a body squashing on a ground that
