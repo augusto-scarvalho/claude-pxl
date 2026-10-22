@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { PxError, didYouMean, wrap } from "../core/errors.ts";
 import type { Img } from "../core/image.ts";
 import type { Project } from "../core/project.ts";
-import { type FrameTag, onionSheet, packSheet, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
+import { type FrameTag, onionSheet, packSheet, playAll, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
 import { normalImage } from "../core/normals.ts";
 import { tiledMap } from "../core/tiled.ts";
 import { encodeAseprite } from "./aseprite.ts";
@@ -154,6 +154,12 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       writePng(join(out, s.name + ".png"), sheet);
       write(join(out, s.name + ".json"), sheetJson(s.name + ".png", sheet, frames, tags));
       lines.push(`sheet ${s.name} ${sheet.w}x${sheet.h} (${frames.length} frames)${prev(s.name, sheet)}`);
+      // a sheet of animations also plays them all at once in its preview, each in a cell of its own at
+      // its own timing (a character's moves side by side, to judge them together)
+      if (tags.length && opts.preview !== false) {
+        const play = playAll(tags, items), k = opts.scale ?? previewScale(play[0].img);
+        write(join(out, "_preview", s.name + ".gif"), encodeGif(play.map((f) => ({ img: preview(f.img, k), ms: f.ms }))));
+      }
     } catch (e) {
       errors.push(wrap(e).within(`sheet '${s.name}'`, s.loc));
     }

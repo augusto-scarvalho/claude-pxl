@@ -4,7 +4,7 @@ import { art, failure, keys, PAL } from "./helpers.ts";
 import { perspective } from "../src/core/perspective.ts";
 import { bayer, fbm, latticeHash, seamless, vnoise } from "../src/core/util.ts";
 import { loadSource } from "../src/node/load.ts";
-import { compareSilhouettes, packSheet, sheetJson } from "../src/core/render.ts";
+import { compareSilhouettes, packSheet, playAll, sheetJson } from "../src/core/render.ts";
 import { pack } from "../src/core/color.ts";
 import { readJoints, readMotion, sideColor } from "../src/core/pose.ts";
 import { chain } from "../src/core/chain.ts";
@@ -269,6 +269,16 @@ test("caps: a line's straight runs end a step darker where they step on diagonal
   const diag = new Img(4, 4);
   for (let i = 0; i < 4; i++) diag.set(i, i, l);
   assert.ok([0, 1, 2, 3].every((i) => capEnds(diag, new Map([[l, d]]), 1).get(i, i) === l));
+});
+
+test("playAll: a sheet's animations playing at once, each at its own timing, in cells of a grid", () => {
+  const dot = (c: number) => { const i = new Img(2, 2); i.fill(c); return i; }, r = pack(255, 0, 0), w = pack(255, 255, 255), g = pack(0, 255, 0);
+  // a blink of two frames at 100 ms, a still of one at 300: a clock of 100 ms steps, 300 ms long
+  const play = playAll([{ name: "blink", from: 0, to: 1 }, { name: "still", from: 2, to: 2 }], [{ img: dot(r), ms: 100 }, { img: dot(w), ms: 100 }, { img: dot(g), ms: 300 }]);
+  assert.deepEqual(play.map((f) => f.ms), [100, 100, 100]);
+  const at = (f: number, x: number) => play[f].img.get(x, 1);
+  assert.deepEqual([at(0, 1), at(1, 1), at(2, 1)], [r, w, r]);
+  assert.ok(play.every((f) => f.img.data.includes(g)), "the still one shows every frame");
 });
 
 test("grad seam lines: the next band's tone comes in by whole rows, farther apart then closer, not a checker", () => {

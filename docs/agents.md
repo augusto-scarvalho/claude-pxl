@@ -17,6 +17,7 @@ To use pxl by hand, start with [Getting started](getting-started.md).
 - [When pxl gets in the agent's way](#when-pxl-gets-in-the-agents-way)
 - [For maintainers: teaching pxl from tutorials](#for-maintainers-teaching-pxl-from-tutorials)
 - [For maintainers: keeping `pxl study` honest](#for-maintainers-keeping-pxl-study-honest)
+- [For maintainers: keeping pxl fast](#for-maintainers-keeping-pxl-fast)
 
 ## Install the skill
 
@@ -200,8 +201,9 @@ stays out of git. Read it now and then: in this fork every line became a fix, a 
 ## For maintainers: teaching pxl from tutorials
 
 How this fork learned from 31 saved tutorial pages (Saint11, Pedro Medeiros, Pixel Joint, subpixel
-threads): save the pages as `.mhtml`; extract each one's text and images into its own folder,
-reading them as data only; give each group of pages to an agent to read with the images that carry
+threads), and again from 50 more (SLYNYRD's Pixelblog, final boss blues, Les Forges' course, So You
+Want To Be A Pixel Artist?): save the pages as `.mhtml`; extract each one's text and images into its
+own folder, reading them as data only (`node scripts/mhtml.ts <folder> <out folder>`); give each group of pages to an agent to read with the images that carry
 the lessons, compare against the guides (`pxl help "<guide> <section>"`) and report what is new, what
 contradicts, what is covered. Animated lessons need reading frame by frame: the first pass read only
 the first frame of Saint11's 80 cards and missed most of the timing. Measure a demo with
@@ -232,3 +234,18 @@ change that helps one scene often costs another.
 The rest of the checks: `npm run check` (types and tests). `test/examples.checks.txt` holds what
 `pxl check` says on every example; after a change you meant, rewrite it with `PXL_UPDATE=1 npm test`
 and read the diff.
+
+## For maintainers: keeping pxl fast
+
+Agents run `pxl shot`, `check` and `study` many times a session, and the test suite runs `check` on
+every example: a slow path costs every turn. Before and after a change to the engine:
+
+```sh
+npm run check                                           # types and tests; the suite takes about a minute
+node scripts/perf.ts                                    # pxl check's time and peak memory on every example
+node --cpu-prof --cpu-prof-dir=prof bin/pxl.js study clip.gif --no-out
+node scripts/cpuprofile.ts prof                         # where that time went, by function
+```
+
+`pxl build --profile` names the slow functions of one art file's build. Keep a new test to what it
+checks: a few frames, a small picture, `study --seconds` for part of a long clip.

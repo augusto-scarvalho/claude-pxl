@@ -129,6 +129,38 @@ export interface FrameTag {
 }
 
 /**
+ * Every animation of a sheet playing at once, each in a cell of its own (a grid near square), at its
+ * own timing and in its own direction, their pivots (else their bottom middles) on one line: frames of
+ * one clock, `step` ms apart (the frames' common divisor, 20 ms at least), as long as the longest loop
+ * (6 s at most). For a sheet's preview.
+ */
+export function playAll(tags: FrameTag[], items: { img: Img; ms?: number }[]): { img: Img; ms: number }[] {
+  const anims = tags.map((g) => {
+    const fr = items.slice(g.from, g.to + 1), n = fr.length;
+    const order = g.direction === "reverse" ? fr.map((_, i) => n - 1 - i) : g.direction === "pingpong" && n > 2 ? [...fr.keys(), ...fr.slice(1, -1).map((_, i) => n - 2 - i)] : [...fr.keys()];
+    return order.map((i) => ({ img: fr[i].img, ms: Math.max(1, Math.round(fr[i].ms ?? 100)) }));
+  });
+  const imgs = anims.flat().map((f) => f.img), px = (im: Img) => im.pivot ? im.pivot[0] : im.w / 2, py = (im: Img) => im.pivot ? im.pivot[1] : im.h;
+  // the cell: room left and right of the pivot, above and below it, for every frame
+  const left = Math.ceil(Math.max(...imgs.map(px))), right = Math.ceil(Math.max(...imgs.map((im) => im.w - px(im))));
+  const up = Math.ceil(Math.max(...imgs.map(py))), down = Math.ceil(Math.max(...imgs.map((im) => im.h - py(im))));
+  const cw = left + right + 2, ch = up + down + 2, cols = Math.max(1, Math.min(anims.length, Math.round(Math.sqrt((anims.length * ch) / cw)))), rows = Math.ceil(anims.length / cols);
+  const loops = anims.map((a) => a.reduce((s, f) => s + f.ms, 0));
+  const step = Math.max(20, anims.flat().map((f) => f.ms).reduce((a, b) => { while (b) [a, b] = [b, a % b]; return a; }));
+  const length = Math.min(6000, Math.max(...loops)), out: { img: Img; ms: number }[] = [];
+  for (let t = 0; t < length; t += step) {
+    const sheet = new Img(cols * cw, rows * ch);
+    anims.forEach((a, k) => {
+      let at = t % loops[k], f = a[0];
+      for (const g of a) { if (at < g.ms) { f = g; break; } at -= g.ms; }
+      sheet.blit(f.img, (k % cols) * cw + 1 + left - Math.round(px(f.img)), Math.floor(k / cols) * ch + 1 + up - Math.round(py(f.img)));
+    });
+    out.push({ img: sheet, ms: step });
+  }
+  return out;
+}
+
+/**
  * Shelf packing: `cols` frames per row, `pad` px between them. `extrude` repeats each frame's edge
  * pixels that many px outward (the frame rect stays the same), so engines that filter or round
  * texture coordinates bleed the frame's own colors instead of a neighbour's.

@@ -36,7 +36,7 @@ scene(name, { w, h, bg?, ... }, ...items)
 layer(name, layerOpts?, ...items)      // only as an item of a sprite or scene (layers don't nest)
 plate(relightOpts?, ...items)          // the items drawn and lit on their own, then laid down: anywhere
 group(name, ["a", "b", "rock_*", ...])  // random pick per placement; repeat a name to weight it
-sheet(name, ["slime*", "heart", groupName], { cols?, pad?, extrude?, rows? })  // extrude: repeat edge pixels n px out; rows: "tag", each animation on a row of its own
+sheet(name, ["slime*", "heart", groupName], { cols?, pad?, extrude?, rows? })  // extrude: repeat edge pixels n px out; rows: "tag", each animation on a row of its own; a sheet of animations also plays them all at once in _preview/<sheet>.gif
 include("other.px.js")                  // path relative to the current file; included files share one scope: a const of one is seen by the other (name what they share, like a cue frame; each name declared once)
 directions("ship", 16, { from, outline?, outline8?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
 font(name, "glyph_sprite", { chars: "ABC...", w, h, cols?, mono? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional), or all as wide as the widest with mono: true (a score, a timer)
