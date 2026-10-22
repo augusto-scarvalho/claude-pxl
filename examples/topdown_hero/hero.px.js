@@ -162,15 +162,18 @@ const POSE = {
 // angular crescent, a narrower one, a thin hook), the follow-through a pixel further with no smear
 // (100), the recovery (50). The first smear already reaches the target. Per frame: the blade's
 // angle (degrees clockwise from pointing right), where its smear starts and how wide it gets, the
-// upper body's lean, the hand's distance from the swing's center. Facing down or up the swing is
-// level, a circle on the ground seen from above (squashed by k): in front of him facing down, past
-// his head and behind him facing up. In profile it is an overhead cut in the near hand, so the
-// flipped side swings it left-handed: the mirror moves the sword to the other hand (nothing else he
-// wears is one-sided, so nothing else gives the flip away).
+// upper body's lean, the hand's distance from the swing's center. In every view it is one move, a
+// level swing round him at waist height: a circle seen from above, squashed by k (the near side of
+// it low on the screen, the far side high). Facing down it sweeps its front half, facing up its back
+// half, past his head and behind him. Facing right it is a forehand in the near hand: the blade held
+// back low on his near side, behind his hip, then out to the right at waist height and round to his
+// far side, behind him past his far shoulder (the ")" of smears to his right, bottom to top, behind
+// him from the second on). The flipped side swings it left-handed: the mirror moves the sword to
+// the other hand (nothing else he wears is one-sided, so nothing else gives the flip away).
 const SWING = {
   d: { o: [7, 20], k: 0.75, sh: [2, 16], behind: [true], keys: [[225, , , [0, -1]], [90, 210, 7], [45, 130, 4], [15, 60, 2], [5, , , [0, 1]], [60, , , [0, 0], 4]] },
   u: { o: [7, 12], k: 0.75, sh: [12, 16], behind: [true, true, true, true, true, true], keys: [[30, , , [0, 1]], [-90, -10, 7], [-135, -60, 4], [-165, -120, 2], [-175, , , [0, -1]], [150, , , [0, 0], 4]] },
-  s: { o: [7, 16], k: 1, sh: [7, 16], behind: [], keys: [[230, , , [-1, 0]], [360, 250, 7], [395, 330, 4], [420, 380, 2], [425, , , [1, 0]], [440, , , [0, 0], 4]] },
+  s: { o: [7, 19], k: 0.5, sh: [7, 16], behind: [false, false, true, true, true], keys: [[140, , , [-1, 0]], [0, 110, 7], [-35, 40, 4], [-70, -20, 2], [-125, , , [1, 0]], [60, , , [0, 0], 4]] },
 }
 const MOVES = {
   // top-down idle: the head down 0, 1, 2 px, the arms a frame behind it, the extremes held
