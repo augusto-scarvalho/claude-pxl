@@ -10,7 +10,7 @@ import { decodeGif } from "../src/node/gifread.ts";
 import { writePng } from "../src/node/output.ts";
 import { webpInfo } from "../src/node/media.ts";
 import { main } from "../src/node/cli.ts";
-import { areaDown, findGrid, lineFlaws, pixelate } from "../src/core/vision.ts";
+import { areaDown, findGrid, findRamps, lineFlaws, pixelate } from "../src/core/vision.ts";
 import { latticeHash } from "../src/core/util.ts";
 import { hueShifting, regionLines, spacingWords, study } from "../src/core/study.ts";
 import { loadSource } from "../src/node/load.ts";
@@ -592,4 +592,21 @@ test("study: one cycle of a loop in place, the clip its whole cycle (an idle, a 
   assert.equal(loopInPlace(breath, differ, w, [{ dx: 0, dy: 9 }, { dx: 8, dy: 0 }]), null);
   // the last frame jumping back to the first: not a loop
   assert.equal(loopInPlace([2, 3, 4, 5, 6, 12].map(bar), differ, w, [{ dx: 0, dy: 1 }]), null);
+});
+
+test("study: a ramp whose hue turns one way all along stays one ramp past 55°; two materials side by side don't join", () => {
+  const hex = (h: string) => pack(parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16));
+  // a sphere in SLYNYRD's five tones, red-brown in the shade to pale yellow in the light (81° of hue)
+  const tones = ["#73342e", "#99592e", "#b3912d", "#c2cc52", "#f2f2aa"].map(hex), ball = new Img(32, 32);
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+    const dx = x - 15.5, dy = y - 15.5, r = Math.hypot(dx, dy);
+    if (r < 14) ball.set(x, y, tones[Math.min(4, Math.floor(Math.max(0, (-0.6 * dx - 0.7 * dy) / 14 * 0.7 + Math.sqrt(1 - (r / 14) ** 2) * 0.45) * 5))]);
+  }
+  const ramps = findRamps(ball).filter((r) => r.colors.length > 1);
+  assert.equal(ramps.length, 1, ramps.map((r) => r.colors.length).join(","));
+  assert.equal(ramps[0].colors.length, new Set(ball.data.filter((c) => c)).size, "every tone the sphere uses in it");
+  // grass and dirt in stripes: greens and browns of like lightness, touching all along, stay two ramps
+  const grass = ["#2f5a2a", "#4c8a3c", "#78b84e"].map(hex), dirt = ["#4a3020", "#7a5530", "#a8804a"].map(hex), field = new Img(24, 24);
+  for (let y = 0; y < 24; y++) for (let x = 0; x < 24; x++) field.set(x, y, (x >> 2) % 2 ? grass[y % 3] : dirt[(y + 1) % 3]);
+  assert.ok(findRamps(field).filter((r) => r.colors.length > 1).length >= 2);
 });

@@ -243,8 +243,16 @@ export function findRamps(img: Img): Ramp[] {
   const grey = (c: Color) => lch(c).C < 0.035;
   // a ramp spans no more than ~55° of hue: joining two that would together, a chain of neighbors
   // drifting from greens to yellows to oranges, is two materials, not one
-  const hues = new Map<Color, number[]>([...counts.keys()].map((c) => [c, [lch(c).h]]));
+  const hues = new Map<Color, number[]>([...counts.keys()].map((c) => [c, [lch(c).h]])), members = new Map<Color, Color[]>([...counts.keys()].map((c) => [c, [c]]));
   const span = (hs: number[]) => { const v = hs.slice().sort((p, q) => p - q); let gap = 360 - v[v.length - 1] + v[0]; for (let i = 1; i < v.length; i++) gap = Math.max(gap, v[i] - v[i - 1]); return 360 - gap; };
+  // unless, dark to light, its hue turns one way all along, in steps of 40° at most (SLYNYRD's ramps turn
+  // 20° a tone, 160° over nine): one material lit warmer or cooler. Two materials side by side, sorted
+  // by lightness, turn back and forth
+  const oneWay = (cs: Color[]) => {
+    const v = cs.map(lch).sort((p, q) => p.L - q.L), d = v.slice(1).map((c, i) => ((c.h - v[i].h + 540) % 360) - 180);
+    const up = d.filter((x) => x > 6).length, down = d.filter((x) => x < -6).length;
+    return d.every((x) => Math.abs(x) <= 40) && Math.min(up, down) === 0 && Math.abs(d.reduce((s, x) => s + x, 0)) <= 200;
+  };
   for (const [key, n] of [...touch].sort((a, b) => b[1] - a[1])) {
     const [a, b] = key.split(",").map(Number), A = lch(a), B = lch(b);
     const dh = Math.min(Math.abs(A.h - B.h), 360 - Math.abs(A.h - B.h));
@@ -252,9 +260,9 @@ export function findRamps(img: Img): Ramp[] {
     if (!alike || n < Math.max(3, 0.02 * Math.min(counts.get(a)!, counts.get(b)!))) continue;
     const ra = root(a), rb = root(b);
     if (ra === rb) continue;
-    const both = [...hues.get(ra)!, ...hues.get(rb)!];
-    if (!grey(a) && span(both) > 55) continue;
-    parent.set(ra, rb); hues.set(rb, both);
+    const both = [...hues.get(ra)!, ...hues.get(rb)!], all = [...members.get(ra)!, ...members.get(rb)!];
+    if (!grey(a) && span(both) > 55 && !oneWay(all)) continue;
+    parent.set(ra, rb); hues.set(rb, both); members.set(rb, all);
   }
   const groups = new Map<Color, Color[]>();
   for (const c of counts.keys()) (groups.get(root(c)) ?? groups.set(root(c), []).get(root(c))!).push(c);
@@ -306,9 +314,11 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
     pixels++;
     const L = lch(c).L, nb = [at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1)];
     if (nb.every((n) => n !== c)) lone[y * W + x] = 1;
-    // a checker: a b / b a
+    // a checker: a b / b a, and going on a pixel more one way or another (a 1 px line on a 45° slope
+    // makes a b / b a too, but stops there)
     const b = at(x + 1, y);
-    if (!clear(b) && b !== c && at(x + 1, y + 1) === c && at(x, y + 1) === b) {
+    if (!clear(b) && b !== c && at(x + 1, y + 1) === c && at(x, y + 1) === b
+      && ((at(x + 2, y) === c && at(x + 2, y + 1) === b) || (at(x - 1, y) === b && at(x - 1, y + 1) === c) || (at(x, y + 2) === c && at(x + 1, y + 2) === b) || (at(x, y - 1) === b && at(x + 1, y - 1) === c))) {
       for (const i of [y * W + x, y * W + x + 1, (y + 1) * W + x, (y + 1) * W + x + 1]) inDither[i] = 1;
       const key = c < b ? `${c},${b}` : `${b},${c}`;
       pairs.set(key, (pairs.get(key) ?? 0) + 1);
@@ -396,8 +406,10 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
   }
   // banding (Pixel Logic; Pixel Fixer, TU Delft 2025): two runs of 2+ pixels of different colors side
   // by side whose ends line up, which shows the grid; a run as wide as most of the picture (a band of
-  // sky) is left out
+  // sky) is left out, and so is a sprite's outline (a run every pixel of which touches the clear): the
+  // fill inside it lines up with it by nature (Helm's banding is a band, a shade hugging the outline)
   let bandPairs = 0;
+  const onRim = (x: number, y: number) => clear(at(x - 1, y)) || clear(at(x + 1, y)) || clear(at(x, y - 1)) || clear(at(x, y + 1));
   const runs = (horiz: boolean) => {
     const out: Map<number, [number, number, Color][]> = new Map();
     const A = horiz ? H : W, Bn = horiz ? W : H;
@@ -406,7 +418,12 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
       let s0 = 0;
       for (let b = 1; b <= Bn; b++) {
         const c0 = horiz ? at(s0, a) : at(a, s0), c = b < Bn ? (horiz ? at(b, a) : at(a, b)) : -1;
-        if (c !== c0) { if (b - s0 >= 2 && !clear(c0) && b - s0 < 0.9 * Bn) list.push([s0, b - 1, c0]); s0 = b; }
+        if (c !== c0) {
+          let outline = true;
+          for (let k = s0; k < b && outline; k++) if (!(horiz ? onRim(k, a) : onRim(a, k))) outline = false;
+          if (b - s0 >= 2 && !clear(c0) && b - s0 < 0.9 * Bn && !outline) list.push([s0, b - 1, c0]);
+          s0 = b;
+        }
       }
       out.set(a, list);
     }

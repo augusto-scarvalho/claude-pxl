@@ -70,6 +70,11 @@ export function readMedia(path: string, o: MediaOpts = {}): Media {
             // the whole picture's grid read the crop: a plain corner of it would find none of its own
             const cg: Grid = { sx: g.sx, sy: g.sy, ox: g.ox + x * g.sx - at[0], oy: g.oy + y * g.sy - at[1] };
             drawnAt = cg; shrink = (img) => toNative(img, cg);
+          } else if (read.length > 1 && Math.max(f.w, f.h) > 640) {
+            // a clip read at 640 px on its long side: the region in those pixels, as shot shows it
+            const s = 640 / Math.max(f.w, f.h), [x, y, w, h] = o.at;
+            at = [Math.round(x / s), Math.round(y / s), Math.round(w / s), Math.round(h / s)];
+            kind += `, the region ${o.at.join(",")} of the clip read at ${Math.round(f.w * s)}x${Math.round(f.h * s)} (${at.join(",")} of the file)`;
           }
         }
         const [x, y, w, h] = at;

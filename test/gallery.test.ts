@@ -9,9 +9,10 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("..", import.meta.url));
 
 test("study reads pxl's own gallery back as it was made", async () => {
-  // both read at once, each in a process of its own (two long clips: tens of seconds one after the other)
-  const run = (gif: string) => promisify(execFile)(process.execPath, ["bin/pxl.js", "study", gif, "--no-out"], { cwd: root, maxBuffer: 1 << 24 }).then((r) => r.stdout);
-  const [train, park] = await Promise.all([run("docs/gallery/parallax_train.gif"), run("docs/gallery/park.gif")]);
+  // both read at once, each in a process of its own, and only as much of each clip as tells it (3 s of
+  // the train's planes, 2 s of the park's lines): the whole of both took over a minute in the suite
+  const run = (gif: string, seconds: number) => promisify(execFile)(process.execPath, ["bin/pxl.js", "study", gif, "--seconds", String(seconds), "--no-out"], { cwd: root, maxBuffer: 1 << 24 }).then((r) => r.stdout);
+  const [train, park] = await Promise.all([run("docs/gallery/parallax_train.gif", 3), run("docs/gallery/park.gif", 2)]);
   // the train: four planes scrolled 384, 768, 1536 and 1920 px over its 192 frames, whole px a frame
   const speeds = [...train.matchAll(/at (\d+\.\d+) px\/frame left/g)].map((m) => +m[1]);
   for (const [i, v] of [384, 768, 1536, 1920].entries()) assert.ok(Math.abs(speeds[i] - v / 192) < 0.1, `plane ${i}: ${speeds[i]} for ${v / 192}`);

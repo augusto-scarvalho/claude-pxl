@@ -434,7 +434,8 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     // do, and it goes there and back (an idle's ping-pong), or its second half is its first with near
     // and far limbs swapped (a run: the same silhouette half a cycle on), or nothing in it goes more than
     // a few px a frame (a breath) - not an attack reaching out. (Nor is a speck of a few px an attack.)
-    const loop = !along && !cycle && N >= 4 ? loopInPlace(patches, differ, bw, mv) : null, cyc = cycle || (loop ? N : 0);
+    // (a clip of one such cycle is short: a long one isn't looked at, which keeps it cheap)
+    const loop = !along && !cycle && N >= 4 && N <= 64 ? loopInPlace(patches, differ, bw, mv) : null, cyc = cycle || (loop ? N : 0);
     const action = !along && !cyc && !small && Math.min(bw, bh) >= 4 && poses >= 0.5 * N && ((inside.length >= 4 && mv.length >= 0.4 * inside.length) || swung(track.map((e) => pix.filter((p) => fg[e[0]][p]))));
     // played once and gone, flashing near-white early (Saint11's explosion: dark, white, blast, fading):
     // an effect, not an attack, however much it moves
