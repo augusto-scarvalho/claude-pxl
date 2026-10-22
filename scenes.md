@@ -57,6 +57,16 @@ look at (`--frames 0-11` for some).
   the cross in the middle; draw the edge tiles from the middle tile's edge strips; variants change
   only the middle. A full set: a single tile, tubes, a T for each turn, a cross, inner corners, and a
   wildcard tile.
+- **A tileset someone lays out in an editor** (Tiled, an engine) can't be scattered over afterwards:
+  the details go in the tiles, as variants (plain, sparse, medium and dense grass, flowers; SLYNYRD's
+  16 px grass: a flat base, about 9 light hooks of 2–3 px, a few mid dashes, dark 1×2 strokes). In
+  each: no spot that draws the eye (it repeats as a grid), clusters crossing the edges, a few key
+  clusters repeated but never touching edge to edge, little contrast; never a busy texture beside
+  another busy one. Mirror a tile for the other sides only under a light from straight above.
+- Each terrain is a corner tileset of its own over a base, clear where the base shows (a
+  `tilemap(..., { corners })` per terrain), not a tile for each pair of terrains: draw the patch whole,
+  3×3 tiles, and cut the edge tiles from it, the inner corners from a hole in it. Each terrain gets
+  its own marks: dirt recolored from the grass tile reads as painted grass.
 - Organic texture (leaves, grass, stones, rust): 2–3 tiny brush parts + `scatter` with `on`/`clip`.
   Along an edge (grass on a path's border, moss at a rock's foot): `scatter(..., { on: "g", near:
   "<path keys>", within: 3 })`.
@@ -84,13 +94,24 @@ look broken, not just carry cracks; repeat a prop at different levels of damage.
 | Plastic, varnish, wet | one small sharp highlight (white allowed) |
 | Metal, chrome | extreme contrast, the horizon or the sky reflected in it; lights colder and less saturated, darks warmer (`shades` with a negative `hue`) |
 | Gems | a long ramp (about 7 tones), facets flat, a lighter bounce inside the shadow |
-| Velvet, fur | a lighter rim where it turns away |
+| Velvet, fur | a lighter rim where it turns away; fur in locks, its highlights short strokes along the lie, strands of the lit tone hanging into the shadow |
+| Glass, a drop | a big highlight and a second, smaller and dimmer one inside, low on the opposite side |
+| Copper, brass | a white highlight; the darks turn olive |
+| Steel | black to white, tinted (blue), never a neutral grey |
+| Clay, granite | clay in clusters of 2×2, 4–5 tones; granite's pits as tiny dark and light pairs |
 | Fabric | folds parallel where it's pulled tight, radiating from where it bunches |
 | Plants | about half the ramp light tones, warm light and cold shadow; detailed borders, a calm inside |
 
 Flat color is fine; a clean wall beats a dotted one. `noise` is for granular materials (gravel,
 sand, asphalt, rough stone), sparse. `dither` over a whole area reads as a checkerboard: use it where
-two tones meet, between neighbors in a ramp. On faces drawn at an angle (3/4), marks follow the
+two tones meet, between neighbors in a ramp: a 50% checker first, then 25%, then a few lone pixels,
+never more dithered than solid; the smaller the art, the less. Where 2–4 colors are all there are
+(NES, Game Boy), dither is the texture. A patch reads lighter, higher or nearer by having more of its
+light tone, not another tone; the darkest is an accent of a few percent, inside the darks (without
+it dirt goes flat and merges with the grass). Brick and stone go in groups at the corners, ledges
+and openings, the rest of the wall plain and no outline round each brick; on a rough wall a few
+bricks take a lit top or a dark lower edge (with 1 px of mortar, bricks that tile 16 px are 15, 7, 3
+or 1 px). Bands of shading that line up show the grid: characters §7. On faces drawn at an angle (3/4), marks follow the
 face's slant. Draw a texture's marks first, then shade them with the form: they fade into the
 shadow and are sharpest where the light turns (in the Pixel Joint texture thread, an ice cream lost
 half its colors and gained volume so). Detail the borders of a mass (foliage, a rock's rim) and keep
@@ -98,7 +119,7 @@ its inside calm. Leaves gather in clumps along bands wrapped round the crown, no
 
 ## 4. Trees and big organic shapes
 
-Code drawing fails worst here (lobes read as broccoli, fronds as combs). Start from free art:
+Code drawing fails worst here, at a side view's size (lobes read as broccoli, fronds as combs). Start from free art:
 CC0 or CC-BY, credited in the file; share-alike (CC-BY-SA) puts its license on everything built with
 it, so ask the user first. `sprite("palm", { png: "palm.png", shrink: 2 })`, then fix it:
 `rampmap` when tones merged, `relight` when it came out flat (`examples/tropical/trees.px.js`;
@@ -117,6 +138,14 @@ it, don't import it):
   straight upright stalks read as cacti.
 (`examples/perspective/race.px.js`: `leafClump`, `tree`, `palmCrown`, `palmTrunk`, `tallGrass`.)
 
+**Top-down**, a crown is one clump stamped 8–12 times (SLYNYRD), which code does well: a round clump
+of 16–24 px drawn from one leaf shape and shaded as a sphere (`shade()` a crescent away from the
+light, `light()` a disc toward it), variants a ramp step darker and lighter (`base` + `swap`), heaped
+dark ones low and away from the light, light ones on top toward it. A crown that won't come clean is
+a bad clump. Ball trees in staggered, overlapping rows make a forest. Plant the trunk (cut at the
+ground, no roots spreading), tint its ramp toward the foliage's, shade it under the crown, and judge
+the tree on its ground tile.
+
 ## 5. Water and things that land
 
 A waterfall that ends in a strip of foam over still water looks pasted on: spread churning foam to
@@ -130,6 +159,19 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   two, falls 10, 22, 41 px a frame as a streak and splats over 5; the thicker, the longer it hangs.
 - **A falling leaf** is 2–3 px redrawn every frame through three turns, ~5 px down per 120 ms frame,
   swaying 3 px each way; on water, a ring grows 2 frames, then breaks into dashes and dots over 3.
+- **Waves** (SLYNYRD): a chain of ovals, round for short deep waves, wide for shallow ones, the
+  crests sharper than the troughs; a strip that wraps going by 2 px a frame, ~24 px a wave over 12
+  frames (`scroll()`), what floats riding the crest under it.
+- **A waterfall's** water: 1 px bands 6 px apart going down 1 px a frame (6 frames at 100 ms),
+  straight and pale at the lip, sagging into a U and darker as they fall, breaking up at the foot,
+  drops popping at a wide base in time with them. A river: dots growing into 3–5 short dashes along
+  the current and shrinking back, 4 frames at 200 ms, off the grid.
+- **Still water** takes the colors of what stands over it (its reflection `flip: "y"`, darker and
+  cooler, rippled a pixel or two) and darkens in bands with depth that follow the shore; it must
+  read in grey alone. Top-down, a pond at rest is two drawings (the second the first turned or
+  flipped) at 500 ms with a 50% mix of them for 300 between (`density` keeps the palette); a hard cut
+  suits 8-bit. Wet sand is one flat tone with a 1 px lighter line at its edge; a quay's courses
+  darken toward the water, which overlaps the lowest one.
 
 ## 6. Distance (aerial perspective)
 
@@ -154,7 +196,17 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - Ranges in palette steps rather than a veil: each farther range lighter and nearer the sky's color,
   with less detail (the far one plain in the haze, the near one dark with the forest's crowns on
   it). A range whose strip ends sharp reads as a cutout: let each run out of the picture, or come
-  down to the sea or the plain at a headland (`examples/perspective/race.px.js`: `range`).
+  down to the sea or the plain at a headland (`examples/perspective/race.px.js`: `range`). A range is
+  its silhouette in one mid value, ridges branching down from each peak, each lit on one side and
+  dark on the other, the snow last: 4 tones.
+- Texture shrinks with distance (SLYNYRD's landscapes): near grass in 1 px streaks several px tall,
+  the next plane in 1–2 px clusters, then none, each plane's marks in the next one's tones; the
+  ground's bands taller toward us (4, 6, 11, 61 px). Only the nearest plane takes the darkest tone; a
+  farther copy of a building drops its darkest tone and its highlight.
+- Far things turn toward the color of the light behind them (a forest lit from its far edge warms
+  into the distance). In space or a dungeon the far planes go darker, toward black.
+- A sky's bands meet by whole rows of the next tone at shrinking gaps (a band, rows 2 apart, then
+  1), not by a checker.
 
 ## 7. True perspective (vanishing points)
 
@@ -226,7 +278,16 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   GIF stays short), and start at different frames (`delay`, `rdelay`): loops that all restart
   together show the seam. A flag waves as a `warp` whose phase is the frame over 5: the crest runs
   pole to tip, its fold shadow riding just behind it, the swing growing toward the tip. Stars: only
-  some twinkle, out of step, a 4-frame cycle at 120 ms (a step of shade, or a dot growing to a plus).
+  some twinkle, out of step, a 4-frame cycle at 120 ms (a step of shade, or a dot growing to a plus),
+  or rarely, 3, 5, 7, 5, 3 px at 50 ms then 1.6–2 s at rest; a shooting star 6 frames at 50 ms, ~6 px
+  a frame, growing to 15 px and shrinking.
+- **Wind** (SLYNYRD): a flag's crests 12 px apart going 2 px a frame (a 6-frame loop), the waves
+  growing toward the free end, in 2 tones; its strength is the pose and the frames (drooping 8, half
+  raised 6, straight out 4). A tree's clumps of leaves each on their own, moving up-right 1, down 1,
+  left 1, one after another, one wave a loop at 200 ms a drawing; rustling, each leaf in 2–4 places,
+  a dip handed to the next leaf downwind a frame later. A gust's swirl: a 1 px line over 10 frames
+  at 80 ms (dot, dash, longer dash, a curve, a loop, a hook, dash, dot, ~25 px). Dust kicked up: one
+  flat color from the ground, a teardrop leaning downwind, a comma, bits, dots, 16 frames at 80 ms.
 - Thin, a cloud is a long pale wisp in a tone close to the sky's (puffs losing their height faster
   than their length, a flat base joining them), not a row of small blobs. A heaped cloud takes its
   light from the top down as it gains body (a white cap thickening row by row, then a gray
@@ -333,6 +394,8 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   scene drawn flat on, it sweeps across the picture, shortening and widening as it turns toward us;
   swung out on a diagonal it brings a perspective nothing else in the picture has. It runs out of
   the picture or fades into the haze or the rain, never ending in mid-air or short of the edge.
+- The weather sets a cast shadow's edge: under a clear sky crisp and dark, in haze or overcast soft
+  and faint, in space long and razor sharp.
 - Flat art gets its volume back with `relight()`.
 
 ## 12. One-shot effects (explosions, sparks, hits)
@@ -347,6 +410,10 @@ happens after another, never all at once.
   may hold 3 frames with light lines; against a wall the blast hugs wall and floor; in a chain each
   starts a frame after the last, at another size. A puff of smoke is at its largest the frame after
   the flash, splits into 4–5 that hollow (round, a crescent, dots) as they drift up, ~10 frames.
+  Seen from above in a shooter (SLYNYRD, 60 ms frames): circles thinning into rings blocked in a
+  `ref: true` layer (`ring()`), then blobs over them, white 27 px, cream with an orange rim 36, yellow
+  with cracks 43, a grey shockwave ring 46, orange blobs, brown, warm grey smoke rising; the ship hit
+  flashing cream on alternate frames first.
 - **Magic:** light: a dark disc, a white one as big with a colored rim, hollowing into two crescents,
   then tongues, bits, sparks drifting 600 ms and more; round shapes, no smoke; drawn on threes (210 ms
   a drawing). Dark: black 1 frame, white 1, bolts with blank frames between, then a splat in a
@@ -373,15 +440,20 @@ happens after another, never all at once.
 - **Hits:** on what doesn't break, a dark ellipse, a white 4-point star, a white disk, then a cyan and
   a yellow crescent, no shrapnel; a shield's edge stays lit ~4 frames after its white flash; armor
   flashes white and a white crescent sweeps across it over 4. A small enemy squashes and flashes
-  (`recolor({ "*": "w" })`); frame counts for hits and deaths: `PXL help "characters 12"`.
+  (`recolor({ "*": "w" })`); frame counts for hits and deaths: `PXL help "characters 12"`. Without a
+  new color: the enemy hit takes the player's palette for ~160 ms (`base` + `swap`), or a red tint
+  alternating with its inverse. A heavy blow shakes the whole picture 1 px on its impact frame.
 - **Bullets:** a warm bright core with cool edges, stretched along its way; a fast one moves more than
   its length a frame, its impact shrinking to a third each frame (152, 55, 21, 11, 7 px); slow ones
   blink bright and dark every frame; a hitscan's flash darkens the scene and lights the shooter, the
-  impact comes the next frame, debris ~6.
+  impact comes the next frame, debris ~6. An enemy's shots: bright, in its own color, with an outline
+  nothing else has (white, or bright inside and dark outside), in a hue the scene doesn't use,
+  pulsing or spinning over 2–4 frames at 50 ms; a flare as they leave is the tell.
 - **Fire:** one wave lives ~10 frames: a thin bright line at the base, swelling, rising wavy, a curled
   tongue that detaches and breaks into 2–3 bits near the top, reddening and gone; slow at the base,
   fastest midway; a new wave every 2–3 frames, 3–4 at once. `flame()` flickers its tongues in place; a
-  big close fire wants waves that travel up. A torch's base keeps its volume as its shape changes.
+  big close fire wants waves that travel up. A torch's base keeps its volume as its shape changes. A
+  small fire: 6 drawings at 100 ms, its white core changing every 50.
 - **Glitch:** a different mix every frame with nearly clean frames between; a noise frame, a blank one
   and a white one 1 frame each; strips shifted a few px, colors bled 1 px to the right.
 - **Loops that warn** (hazards): spikes peek out 5 frames (the tell), are up 4 and go back in 3 steps;
@@ -415,3 +487,48 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   on the wrong ground; it catches the drift before anyone sees it.
 - Before handing over, look as a critic: tiles repeating into a visible grid, props floating or on
   the wrong ground, big flat areas with no detail, dither as texture.
+
+## 15. A game's screen
+
+Where a player must find their character and what can hurt it, the picture serves that first
+(SLYNYRD, final boss blues, So You Want To Be A Pixel Artist?):
+
+- The ground figures walk on stays quiet: its tones close in value (a floor that works: 0.05 apart in
+  lightness; one that hid the hero: 0.15), its own palette in the characters' hues, so the figures
+  carry the most contrast, and the near-black outline, the backdrop none. `PXL describe` gives each
+  figure's contrast against what is round it.
+- The planes behind the playfield are paler, less saturated and less contrasted than it (about −20
+  saturation, −15 contrast, +15 lightness); every top a figure can stand on has the brightest 1 px
+  line on screen, and the solid layer is more saturated than the backdrop. An RPG's backdrop can stay
+  rich.
+- Hit boxes: the player's a small circle at its middle, never past its pixels; a pickup's bigger.
+- Sizes in tiles: a screen of 320×180, 480×270 or 640×360 (1080p a whole multiple), tiles of 8 or
+  16 px, figures 1×1, 1×2 or 2×2 tiles (22–27 px tall in a 16×32 frame), moves sized to the grid (a
+  jump 2 tiles, stairs 8 px a step). Items idle by kind (`PXL help "characters 12"`); an engine flips
+  sprites, so they are lit from straight above (characters §11).
+
+## 16. A game's projections (top-down 3/4, side 3/4, isometric)
+
+Pick one and keep everything in it (a 45° oblique bridge among isometric blocks clashed):
+
+- **Top-down 3/4** (RPGs): what is level is seen from straight above at its true shape (a barrel's lid
+  a circle, floor tiles square), what stands faces us flat, at full height or a little less (a crate
+  is 8 px of top over 7 of front in a 16 px tile); nothing shrinks. A house: its facade as seen from
+  the front, the side walls cut to about half their height, the roof's slopes at their front view's
+  45°, its planes seen from above. The footprint stays on the grid and only the top overhangs (more
+  breaks the draw order). A room shows the back wall's face, two tiles tall; the side and front walls
+  only as a top edge, black beyond.
+- **Side 3/4** (a corner toward us): the gable end about half its width, the 45° roof kept, the
+  overhang even. **Oblique** (cabinet): x and y flat, every depth edge at one slope (1:1 or 2:1), the
+  same in every tile.
+- **Isometric**: 2:1 lines (26.57°, not 30°: two across, one down); a level circle a 2:1 ellipse
+  (32×16), an upright one sheared along the slope; a cylinder two such ellipses joined by uprights;
+  foliage ovals about 3:2 in any projection. Outline every part on its own, hidden lines too, then
+  fill; a cube's vertex run is 4 px without an outline, 3 with one; a lit 1 px lip along its top's
+  near edges; a subtle outline breaking into dots along the 2:1 edges (`examples/isometric.px.js`,
+  `tilemap(..., { iso })`).
+- Light each face one tone, from one light at a top corner: the edge toward the light a 1 px strip a
+  tone lighter, the edge turning away and the row where a face meets the ground a 1 px strip of the
+  darkest tone, between two walls an optional 1 px strip of the mid tone (`plate()` per face, or
+  `relight` with `reach: 1`). Shadows short and pointing nowhere in particular, on a layer of their
+  own, a tile long at most.

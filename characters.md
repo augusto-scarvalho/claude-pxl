@@ -22,9 +22,14 @@ the top of the head to the soles.
 | Eldiran soldier (CC0) | 32×35 | SW | 41% (14 of 34) | 17 | – | 1.2 (armour) |
 | LPC female base (CC-BY-SA) | 64×64 | front | 40% (19 of 47) | 20 | 1.0 | 1.4 |
 | Pixilart "How to Draw a Person" | 96 tall | front | 37% | 30 | 0.93 | 1.2–1.33 |
+| Final Fantasy IV map sprite | 16×16 | front | 62% (10 of 16: torso 3, legs 3) | – | – | – |
+| final boss blues RPG base | 24×40 | front | 40% (16 of 40) | 16 | 1.25 | 1.5 |
 
-- **Chibi:** the head is 36–56% of the height. Realistic figures are 6–7 heads tall, so the head is
-  13–18%.
+- **Chibi:** the head is 36–56% of the height (Final Fantasy IV's 16 px map sprites 62%: 10 rows of
+  head, 3 of torso, 3 of legs; eyes 1×2, 2 apart). Realistic figures are 6–8 heads tall, so the head
+  is 12–18% (SLYNYRD's 8 heads: the crotch at half the height, the elbows at the navel, the wrists at
+  the groin; a faceless action figure of 16 px works too, its head 3 of 16). A fighting game's are
+  about 100 px (76×87 to 116×111), with no fixed box.
 - **Avoid the middle**, a head at 25–33% of the height. It reads as a big head on an adult body, and
   people call it "strange" before they can say why.
 - **At 16–32 px** only chibi leaves room for a face. **At 64 px**, LPC proportions (40%) are the
@@ -198,8 +203,17 @@ of the nose; the corners of the mouth straight below the pupils.)
   - The waist is no wider than the chest, and a skirt flares 1 px a side at most.
   - Forearms and wrists are narrower than the sleeves above them.
   - Shoulders slope down from the neck. Flat shoulders read as shoulder pads.
+- **Four views of one figure** (final boss blues' RPG base): shared guide rows in a `ref: true` layer
+  (the top, the soles, the shoulders, the chin, the crotch, the ankles); the back view starts as a
+  copy of the front's silhouette; the side view about 0.6 of the front's width (15 of 24), drawn
+  without arms first, the arm a part of its own for the walk. Seen from above (top-down) the
+  shoulders rise into the head's rows (2 px above the chin) and the waist curves: a flat front view
+  on a top-down map looks pasted on. A front view of even width has no middle column: `mx: "c"` for
+  one, or break the symmetry on purpose (one brow longer).
 - **Profile (side view):** everything says which way the figure faces. The far arm and far leg hide
-  behind the near ones or show as a darker sliver on the same side; a far arm drawn out on the back
+  behind the near ones or show as a darker sliver on the same side (moving, keep them a ramp step
+  darker in every frame, so crossing legs never swap; a far leg all shadow, with near-black under it,
+  or it reads as raised; an RPG's side idle may spread both legs for a solid stance); a far arm drawn out on the back
   with a tail beside it made a werewolf's body read as facing away from its head. Fix one part at a
   time against the facing; when fixes start contradicting each other, go back to the last version
   that read right.
@@ -250,7 +264,12 @@ and fix dither and shading. Upscaled, round off the big square blocks and redraw
   meet (chin on neck, collar on hair). Inside, a line takes the darkest tone of the ramp it borders:
   still the darkest value there, only the hue moves (`selout` does it for the outline). A soft
   crease (a nose, a cheek) is a mid shadow and shorter; lips are a dark shape with no frame. A rim
-  light is a 1 px line just inside the outline, never over it.
+  light is a 1 px line just inside the outline, never over it. Near-black pulls the eye: keep most of
+  it on the face and the silhouette, and a line that competes with the face takes the material's
+  darkest tone; outline what sticks out of the silhouette, divide what lies flat on it by color.
+  At 16–24 px leave the outline open where the side lines already close the shape (under the soles,
+  a helmet's top, a hair parting: that row in a layer with `outline: false`). 1 px of pure white on
+  a dark field reads 2 px and glows: thin trim takes a light tone below white.
 - **Anti-aliasing:** a tone between the line's and its neighbor's (value matters, hue hardly). Only
   on steps of 2 px and more: a strip about half the step's length, at its end (a 4 px step takes
   2 px). None on 1:1 diagonals or straight lines, and none on the silhouette against clear (it
@@ -260,6 +279,15 @@ and fix dither and shading. Upscaled, round off the big square blocks and redraw
 - **Clusters:** no 1 px islands of a color inside a form; make the detail a small shape (1×2, a
   diagonal pair, 2×2, an L). A lone pixel is for a point of light, a particle, AA or texture. No
   2×2 squares of one color along a line or a band by accident: lay clusters staggered, like bricks.
+  Swapping which tones cover the planes and which are 1–2 px buffers between them makes a material
+  lighter or darker with no new color. A part crossing the body in the same material (a hand over
+  the torso): darken the body behind it a step.
+- **Banding** (Helm, Pixelation): two clusters whose edges run side by side and end at the same place
+  read as one fat line and show the grid: a band of shade following the outline all along, bands
+  repeating one staircase a pixel apart, two rows of AA along one edge, AA lined up with the next
+  row's step, clusters lined up across a 1 px gap or along 45°. Vary a band's width along its length,
+  end neighbouring runs at different places, let a band thin out before the outline turns. Fix it
+  freely on rocks and tiles; on a small face accept a little. `PXL study` marks the pairs in red.
 - **A line's end** tapers by lightening its last pixels toward what is round it (hair strands,
   whiskers, a crease that fades).
 
@@ -379,6 +407,13 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   recover (lowest); a game's run, 3 (§12). Top-down, a front or back walk
   is half the cycle and the same half flipped (`flip: "x"`), redrawing only what isn't symmetric,
   with less bob walking up. In-betweens halve each frame's time, so the cycle keeps its length.
+- **Animate a dummy first** (SLYNYRD, final boss blues): the figure in flat parts, each in its own
+  color (the head, the torso, the near limbs light, the far ones dark), through every move; then
+  paint the costume over it frame by frame. One leg first (4 keys, then 8 frames), the other the same
+  cycle half a cycle later; then re-time the bob (once per step, not per cycle); the arms last, the
+  idle arm in both passing frames, the elbow bent only on the forward swing. Gear on a layer of its
+  own (it stays in one hand). To move while shooting, split the legs from the torso and place the
+  torso's shooting drawings over every leg frame (3 over an 8-frame run: 24 torsos).
 - **Subpixel: less than a pixel of motion** (after ApplefatGOV's How-to-subpixel and 2D Will Never
   Die's: "animate the anti-aliasing"). An idle doesn't need the whole body to drop a pixel (the
   tutorial's is a fighting stance in its beat, a boxer finding his rhythm, about a second a sway; a

@@ -21,6 +21,12 @@ Turning pixel art by an arbitrary angle always costs something: pixels get dropp
 6. **Draw what matters by hand.** Small sprites (under ~12px), faces and 1px features rarely
    survive a resample. For a direction set, draw the in-between poses yourself and pass them as
    `draw: { 22.5: "_ship_22" }`: every direction derived from them inherits the hand quality.
+7. **What isn't turned** (SLYNYRD). A side-view craft moving up and down banks instead of pitching
+   (rotation breaks its clusters, and its guns stay level): 5 drawings, level and 2 rolls each way,
+   the shallow roll shown ~200 ms going in and out; side-lit, each side its own drawing, not a
+   mirror. A rotor of N blades repeats every 360/N degrees: 4 drawings of a 4-blade rotor, 22.5°
+   apart, at 50 ms, its blades a light blur. A 3/4 top-down sprite is never flipped upside down to
+   face the other way: it is redrawn.
 
 ## API
 

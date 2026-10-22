@@ -116,7 +116,7 @@ task needs before starting:
 | a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate, 12 for an action's or a cycle's frame counts |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a scene, level, building or environment | `PXL help "scenes 1 3 11 14"` (layout, texture, shadows and light, checking); then what it needs: 2 ground and tiles, 4 trees, 5 water, 6 distance, 7 true perspective, 8-10 loops and parallax, 12 effects |
+| a scene, level, building or environment | `PXL help "scenes 1 3 11 14"` (layout, texture, shadows and light, checking); then what it needs: 2 ground and tiles, 4 trees, 5 water, 6 distance, 7 true perspective, 8-10 loops and parallax, 12 effects; for a game, 15 its screen and 16 its projections (top-down 3/4, isometric) |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2.5k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
 
@@ -228,7 +228,7 @@ comet_repair --out <scratch dir>`.
 ## Habits that give better art
 
 - Write half of anything symmetric (`mx`) and let `outline` draw outlines (`selout` takes a dark
-  shade of what it touches, `inline` stays inside, `outline8` squares the steps). Shine is a lighter tone of the color, not white (a moving glint or a wet, glossy spot may be white for a frame or two).
+  shade of what it touches, `inline` stays inside, `outline8` squares the steps). Shine is a lighter tone of the color, not white (a glint on metal or a gem, a wet spot, magic may be white; pure black only as an outline, never in a shadow).
   Something on one side only (a shine, a shadow side): mirror a `_part`, stamp it, then draw it.
 - Small organic shapes (a face, a leaf, an item icon) are grids, pixel by pixel; primitives are for
   structure, large areas and long lines. Never big hand grids.
@@ -239,7 +239,9 @@ comet_repair --out <scratch dir>`.
   step, never as bright as the lit side. Light from one side: a flat face is one tone,
   a round form changes only along its curve, never darker all round its rim (pillow shading). A
   sprite the game will flip (a side or top-down character, its tiles) is lit from straight above, a
-  touch toward the viewer (`light: [0, -1]`), so its mirror keeps the light where it was.
+  touch toward the viewer (`light: [0, -1]`), so its mirror keeps the light where it was. Ramps can
+  share their ends (one darkest under all, one lightest over all: `ramps("kGgY", "kRrY")`):
+  the palette mixes like paint.
 - Lines step diagonally, without L-corners, their runs in order (`PXL help "characters 7"`);
   anti-alias by hand, or `aa: true` on a sprite as a start; at 16 px and under, drop the outline
   (unless it's 8-bit: few colors and a busy ground keep it, in the shared black).
