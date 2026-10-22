@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by Antigravity, Gemini 4 Argon at high effort, its first run (its draft); its file as it left it.
 // Storm Beacon — 160x120 animated pixel-art scene
 // A lighthouse on a rocky headland on a stormy night: sweeping lamp beam through slanting rain,
 // waves breaking on the rocks below with wind-whipped spray, a keeper in a yellow oilskin on the

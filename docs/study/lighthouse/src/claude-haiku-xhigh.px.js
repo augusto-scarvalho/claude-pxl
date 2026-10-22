@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by Claude Code, Haiku 5.5 at xhigh effort; its file as it left it.
 // The Turning Light: a lighthouse on a rocky headland on a stormy night.
 // One loop = one full turn of the lamp (40 frames at 80 ms). Every moving part is periodic in N:
 // the beam angle, the rain (each drop wraps the picture 1x in x and 2x in y), the swell and spray,

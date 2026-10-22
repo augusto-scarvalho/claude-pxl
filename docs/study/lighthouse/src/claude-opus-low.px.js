@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by Claude Code, Opus 5.5 at low effort; its file as it left it.
 // "The Keeper's Watch": lighthouse on a headland, storm night. One light: the lamp at (LX, LY),
 // its beam sweeping round; everything it touches steps up a tone. 32-frame loop.
 pal({

@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by the Codex CLI, gpt-6.1-sol at low effort; its file as it left it.
 // The Last Watch — original 160 × 120 pixel art. 48 frames / 12 fps.
 // Primary light: the Fresnel lamp at (113, 27); secondary: keeper's lantern (99, 43).
 pal({k:'#090f1d',n:'#101a2d',s:'#19283c',c:'#23394c',d:'#304e60',e:'#42677a',f:'#6b919d',g:'#a1bcc0',w:'#d3ddd0',b:'#172f43',t:'#23495b',u:'#326375',v:'#538a96',r:'#242b37',R:'#394451',S:'#505d66',m:'#67777b',a:'#8e8570',A:'#b9ad85',y:'#d1a447',Y:'#edc763',L:'#fff0b0',o:'#896039',h:'#493b36',B:'#504837',C:'#77705b'});

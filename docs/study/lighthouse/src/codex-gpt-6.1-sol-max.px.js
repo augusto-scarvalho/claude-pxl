@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by the Codex CLI, gpt-6.1-sol at max effort; its file as it left it.
 // BRINEWATCH / THE LAST WATCH — original pixel art, 160 x 120.
 // 96 drawings x 80 ms = 7.68 s. Wind travels from upper left to lower right.
 // The principal light is the Fresnel lamp at (120, 30) inside the lantern room.

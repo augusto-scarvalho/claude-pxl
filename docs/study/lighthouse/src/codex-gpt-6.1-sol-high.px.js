@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by the Codex CLI, gpt-6.1-sol at high effort; its file as it left it.
 // THE LAST WATCH — original pixel art, 160 × 120, 64 frames / 6.4 seconds.
 // Every moving system is periodic on 64 frames. Wind travels from right to left.
 // Primary light: the Fresnel lamp at (110, 28). Secondary: keeper's hand lantern.

@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by Claude Code, Sonnet 5.5 at xhigh effort; its file as it left it.
 // STORM LIGHT: a lighthouse on a rocky headland in a gale. 160x120, 48 frames at 10 fps, loops seamlessly.
 //
 // WHERE THE LIGHT COMES FROM: the lamp in the lantern room, at (LX, LY). Its two beams (a lens turning half a

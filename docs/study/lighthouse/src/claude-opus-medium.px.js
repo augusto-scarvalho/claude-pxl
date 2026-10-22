@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by Claude Code, Opus 5.5 at medium effort; its file as it left it.
 // Gale Light: a lighthouse on a headland in a night storm, 160x120, a 64-frame loop at 12 fps.
 // The light comes from the lamp at the top of the tower (LX, LY): two beams 180° apart turn half a
 // turn in the loop, so a beam crosses each side once a loop. The beam lights what it passes through

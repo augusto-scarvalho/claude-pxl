@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by Claude Code, Fable 5.1 at high effort; its file as it left it.
 // "Gannet Point" — a lighthouse on a rocky headland, stormy night. 160x120, 60 frames at 12 fps (5 s), loops.
 // The lamp at (LX, LY) is the light: its beam turns once a loop (sideways at phase 0 and 0.5, straight at
 // us at 0.25, away at 0.75); the keeper's lantern is the second, small and warm. Wind from the right:

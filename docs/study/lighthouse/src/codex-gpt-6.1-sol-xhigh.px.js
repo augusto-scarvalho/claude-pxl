@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by the Codex CLI, gpt-6.1-sol at xhigh effort; its file as it left it.
 // LAST LIGHT AT BRINE HEAD — original pixel art, 160 x 120, 48 drawings / 4.8 s.
 // The Fresnel lamp at (124,30) is the key light. The keeper carries a small,
 // shielded lantern; the sky is overcast, with no moon or lightning source.

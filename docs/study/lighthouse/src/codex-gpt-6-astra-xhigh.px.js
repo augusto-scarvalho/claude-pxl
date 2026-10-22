@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by the Codex CLI, gpt-6-astra at xhigh effort; its file as it left it.
 // THE UNBROKEN WATCH — original pixel composition, 160 × 120.
 // Key light: the rotating Fresnel lamp at (115, 32), inside the lantern room.
 // Secondary practical: the keeper's tiny hand lantern, (94, 39).

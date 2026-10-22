@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by Claude Code, Opus 5.5 at max effort; its file as it left it.
 // The Keeper's Watch: a lighthouse on a rocky headland on a stormy night. 160x120, 96 frames at
 // 80 ms (7.68 s): one turn of the lens per loop.
 //

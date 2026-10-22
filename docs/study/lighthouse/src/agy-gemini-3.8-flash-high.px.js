@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by Antigravity, Gemini 3.8 Flash at high effort; its file as it left it.
 // tempest_light.px.js — A lighthouse on a rocky headland on a stormy night.
 // 160x120 animated pixel-art scene.
 // Loop: 24 frames at 8 fps (3.0s seamless loop).

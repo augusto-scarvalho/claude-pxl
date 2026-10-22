@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by Claude Code, Opus 5.5 at xhigh effort; its file as it left it.
 // Storm Light: a lighthouse on a rocky headland, a stormy night. 160x120, 96 frames at 10 fps (9.6 s loop).
 // The one light is the lamp, its lens at (110, 19): the glass glows, a halo hangs in the rain round it, and two
 // opposed beams turn once a loop, so one sweeps past us every 4.8 s and flashes. The keeper's hand lantern is a

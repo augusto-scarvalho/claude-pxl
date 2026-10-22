@@ -23,10 +23,11 @@ law.
 ## Contents
 
 - [The brief](#the-brief)
+- [Every run at a glance](#every-run-at-a-glance)
+- [The art](#the-art), every GIF with who made it and what it cost
 - [How it was run](#how-it-was-run)
-- [The results](#the-results)
+- [Claude Code: the numbers](#claude-code-the-numbers)
 - [The curator's review](#the-curators-review)
-- [The art](#the-art)
 - [What the numbers say](#what-the-numbers-say)
 - [Where the tokens went](#where-the-tokens-went)
 - [The same brief in Codex](#the-same-brief-in-codex)
@@ -50,6 +51,243 @@ and a loop ([`study/lighthouse/brief.txt`](study/lighthouse/brief.txt), word for
 Each agent was told to use the pxl skill, to keep its files in its own folder, not to spawn agents
 and not to ask questions.
 
+## Every run at a glance
+
+One row per run, in the order of [the art](#the-art) below. Each run's GIF and source are named by
+who made it: `claude-<model>-<effort>`, `codex-<model>-<effort>`, `agy-<model>-<effort>`, in
+[`study/lighthouse/`](study/lighthouse) (the source's first line says it too).
+
+| Tool | Model | Effort | Art | Cost | Time | Turns | Blind, of 8 | Blind, of 14 | Curator | pxl |
+|---|---|---|---|---:|---:|---:|---|---|---|---|
+| Claude Code | Opus 5.5 | low | [gif](study/lighthouse/claude-opus-low.gif), [src](study/lighthouse/src/claude-opus-low.px.js) | $0.54 | 2 min | 14 | 3, 8th | 4, 12th | | `5929a59` |
+| Claude Code | Opus 5.5 | medium | [gif](study/lighthouse/claude-opus-medium.gif), [src](study/lighthouse/src/claude-opus-medium.px.js) | $2.17 | 9 min | 42 | 5, 5th | 5, 8th | | `5929a59` |
+| Claude Code | Opus 5.5 | high | [gif](study/lighthouse/claude-opus-high.gif), [src](study/lighthouse/src/claude-opus-high.px.js) | $4.71 | 22 min | 75 | **7, 2nd** | 6, 5th | 3rd | `5929a59` |
+| Claude Code | Opus 5.5 | xhigh | [gif](study/lighthouse/claude-opus-xhigh.gif), [src](study/lighthouse/src/claude-opus-xhigh.px.js) | $9.62 | 34 min | 122 | **7, 1st** | 7, 4th | **2nd, the sweet spot** | `5929a59` |
+| Claude Code | Opus 5.5 | max | [gif](study/lighthouse/claude-opus-max.gif), [src](study/lighthouse/src/claude-opus-max.px.js) | $20.01 | 68 min | 187 | 6, 3rd | 5, 10th | **1st** | `5929a59` |
+| Claude Code | Sonnet 5.5 | xhigh | [gif](study/lighthouse/claude-sonnet-xhigh.gif), [src](study/lighthouse/src/claude-sonnet-xhigh.px.js) | $5.32 | 31 min | 100 | 6, 4th | 4, 11th | | `5929a59` |
+| Claude Code | Haiku 5.5 | xhigh | [gif](study/lighthouse/claude-haiku-xhigh.gif), [src](study/lighthouse/src/claude-haiku-xhigh.px.js) | $0.37 | 9 min | 45 | 4, 6th | 3, 13th | | `5929a59` |
+| Claude Code | Fable 5.1 | high | [gif](study/lighthouse/claude-fable-high.gif), [src](study/lighthouse/src/claude-fable-high.px.js) | $7.05 | 17 min | 41 | 4, 7th | 3, 14th | | `5929a59` |
+| Codex CLI | gpt-6.1-sol | low | [gif](study/lighthouse/codex-gpt-6.1-sol-low.gif), [src](study/lighthouse/src/codex-gpt-6.1-sol-low.px.js) | ≈ $0.16 | 1.3 min | 9 | | 6, 6th | below Claude's | `0e8f7cb` |
+| Codex CLI | gpt-6.1-sol | medium | [gif](study/lighthouse/codex-gpt-6.1-sol-medium.gif), [src](study/lighthouse/src/codex-gpt-6.1-sol-medium.px.js) | ≈ $0.18 | 1.7 min | 9 | | 6, 7th | below Claude's | `0e8f7cb` |
+| Codex CLI | gpt-6.1-sol | high | [gif](study/lighthouse/codex-gpt-6.1-sol-high.gif), [src](study/lighthouse/src/codex-gpt-6.1-sol-high.px.js) | ≈ $0.36 | 3.6 min | 15 | | **8, 2nd** | below Claude's | `0e8f7cb` |
+| Codex CLI | gpt-6.1-sol | xhigh | [gif](study/lighthouse/codex-gpt-6.1-sol-xhigh.gif), [src](study/lighthouse/src/codex-gpt-6.1-sol-xhigh.px.js) | ≈ $0.66 | 7.2 min | 28 | | 5, 9th | below Claude's | `0e8f7cb` |
+| Codex CLI | gpt-6.1-sol | max | [gif](study/lighthouse/codex-gpt-6.1-sol-max.gif), [src](study/lighthouse/src/codex-gpt-6.1-sol-max.px.js) | ≈ $0.84 | 10.2 min | 32 | | 7, 3rd | below Claude's | `0e8f7cb` |
+| Codex CLI | gpt-6-astra | xhigh | [gif](study/lighthouse/codex-gpt-6-astra-xhigh.gif), [src](study/lighthouse/src/codex-gpt-6-astra-xhigh.px.js) | ≈ $3.24 | 5.6 min | 22 | | **8, 1st** | below Claude's | `0e8f7cb` |
+| Antigravity | Gemini 3.8 Flash | high | [gif](study/lighthouse/agy-gemini-3.8-flash-high.gif), [src](study/lighthouse/src/agy-gemini-3.8-flash-high.px.js) | ≈ $1.62 | 42 min | | | | not yet | `99127e2` |
+| Antigravity | Gemini 4 Argon | high, 1st run | [gif](study/lighthouse/agy-gemini-4-argon-high-run1.gif), [src](study/lighthouse/src/agy-gemini-4-argon-high-run1.px.js) | ≈ $0.65 | 41 min | | | | not yet | `3eecf9f` |
+| Antigravity | Gemini 4 Argon | high, 2nd run | [gif](study/lighthouse/agy-gemini-4-argon-high.gif), [src](study/lighthouse/src/agy-gemini-4-argon-high.px.js) | ≈ $3.15 | 42 min | | | | not yet | `34bdd04` |
+
+- **Cost:** Claude Code's own figure for each session, at list prices. **≈** is an estimate, not a
+  bill: Codex ran on a ChatGPT plan and Antigravity on a Google plan, both reporting tokens only,
+  priced here at each one's published API rates (see their sections).
+- **Time:** the wall clock. The Claude runs went four at a time on one laptop; Argon's first run
+  spent 31 of its 41 minutes waiting on a check that would never end (see
+  [its section](#the-same-brief-in-antigravity)).
+- **Turns:** Claude Code's turns; for Codex, its calls to the model. Antigravity counts a whole
+  run as one turn, so there is none to give.
+- **Blind:** an agent's score out of 10 and its place, judging eight stills of each loop without
+  knowing who made it: first the eight Claude runs, then those with the six Codex runs, fourteen in
+  all. The Antigravity runs came later and weren't in either.
+- **Curator:** the person who ran the study, watching the loops. Of the Claude runs they ranked the
+  top three only; every Codex run they found well below Claude's; the Antigravity runs they haven't
+  judged yet.
+- **pxl:** the commit of this repository the agent read the skill from (see
+  [which pxl each run used](#which-pxl-each-run-used)).
+
+## The art
+
+Every run's loop at 3× (`pxl build --share 3`), in the order of the table, with what the reviews
+said of it. "Blind" is the agent that judged stills without knowing who made what; "curator" is the
+person who watched the loops.
+
+### Claude Code: Opus 5.5, low
+
+$0.54 · 2 min · 14 turns · blind 3 (8th of 8), 4 (12th of 14) ·
+[source](study/lighthouse/src/claude-opus-low.px.js)
+
+<img src="study/lighthouse/claude-opus-low.gif" width="480" alt="Claude Code, Opus 5.5 at low effort: a red and white lighthouse on a hatched rock; a checkered beam sweeps across; spray and rain sparse">
+
+Done in 14 turns and two minutes, as one `anim` drawn in code: a clear silhouette and a horizontal
+sweep; but flat rendering (a rock filled with hatching, a harsh checkerboard beam) and a keeper of
+two or three pixels.
+
+### Claude Code: Opus 5.5, medium
+
+$2.17 · 9 min · 42 turns · blind 5 (5th of 8), 5 (8th of 14) ·
+[source](study/lighthouse/src/claude-opus-medium.px.js)
+
+<img src="study/lighthouse/claude-opus-medium.gif" width="480" alt="Claude Code, Opus 5.5 at medium effort: a striped lighthouse on a cobbled headland at the right; a translucent beam sweeps the sky; a keeper in yellow on the gallery">
+
+A good layout, the tower on the right third over a cobbled headland, the keeper at the right size
+with a lantern glow; but the beam ends cut square in mid-air and the sea is one repeating pattern.
+
+### Claude Code: Opus 5.5, high
+
+$4.71 · 22 min · 75 turns · blind 7 (2nd of 8), 6 (5th of 14) · curator: 3rd ·
+[source](study/lighthouse/src/claude-opus-high.px.js)
+
+<img src="study/lighthouse/claude-opus-high.gif" width="480" alt="Claude Code, Opus 5.5 at high effort: a striped lighthouse at the left of a dark headland; the beam sweeps over the sea, lighting the rain and the gulls; a wave throws spray over a rock">
+
+The most correct sweep (right, a glow as it faces us, left, dark), gulls lit as the beam passes, a
+wave bursting into real spray against a rock. The keeper is a yellow speck, right for the scale but
+hard to read, and the storm is quiet. The curator: a good result a step down, the ground drawn badly
+and the beam ending short of the picture's edges.
+
+### Claude Code: Opus 5.5, xhigh
+
+$9.62 · 34 min · 122 turns · blind 7 (1st of 8), 7 (4th of 14) · curator: 2nd, the sweet spot ·
+[source](study/lighthouse/src/claude-opus-xhigh.px.js)
+
+<img src="study/lighthouse/claude-opus-xhigh.gif" width="480" alt="Claude Code, Opus 5.5 at xhigh effort: a striped lighthouse on a stone headland with sea stacks at night; the beam swings toward the viewer through lit rain; a small keeper in yellow with a lantern on the gallery">
+
+Every part of the brief is there and reads: a stone headland with grass on top, sea stacks, spray
+bursting on them, rain lit inside the beam, a keeper with a lantern at the right size for the door
+and the rail. The beam turns in perspective, coming toward us; the blind reviewer found it tilted
+too steeply, near pointing up, and the curator, at odds with a picture drawn flat on. The curator's
+sweet spot: very good, a little below max.
+
+### Claude Code: Opus 5.5, max
+
+$20.01 · 68 min · 187 turns · blind 6 (3rd of 8), 5 (10th of 14) · curator: 1st ·
+[source](study/lighthouse/src/claude-opus-max.px.js)
+
+<img src="study/lighthouse/claude-opus-max.gif" width="480" alt="Claude Code, Opus 5.5 at max effort: a plain tower on a dark headland; a wide soft beam full of glinting rain sweeps the sky; the sea below in the dark">
+
+The best beam of all, a wide soft cone with the rain glinting in it, and a strong, gloomy mood; but
+darker and plainer than xhigh (an unstriped tower, a small keeper, modest spray), and one frame aims
+the beam low. The curator's first: the beam, the ground and the waves the best of the eight, the
+darker picture the better one, the quiet tower no fault; too dear for what it adds.
+
+### Claude Code: Sonnet 5.5, xhigh
+
+$5.32 · 31 min · 100 turns · blind 6 (4th of 8), 4 (11th of 14) ·
+[source](study/lighthouse/src/claude-sonnet-xhigh.px.js)
+
+<img src="study/lighthouse/claude-sonnet-xhigh.gif" width="480" alt="Claude Code, Sonnet 5.5 at xhigh effort: a close striped lighthouse with a very large keeper in yellow beside the lantern; heavy rain, white-capped waves breaking on rocks">
+
+The best storm, with heavy slanting rain, a white-capped sea and waves breaking on the rocks, and
+rain lit yellow by the beam; but a keeper as big as the lantern room, wider than the door, and a
+beam pointing straight up in one frame.
+
+### Claude Code: Haiku 5.5, xhigh
+
+$0.37 · 9 min · 45 turns · blind 4 (6th of 8), 3 (13th of 14) ·
+[source](study/lighthouse/src/claude-haiku-xhigh.px.js)
+
+<img src="study/lighthouse/claude-haiku-xhigh.gif" width="480" alt="Claude Code, Haiku 5.5 at xhigh effort: a lighthouse on a smooth dark rock with a keeper in yellow; the beam turns in the picture plane, at times pointing down into the rock">
+
+The best-read keeper (yellow, a glowing lantern) and good rain; but the beam turns like a clock
+hand, down through the tower into the rock and straight up: the scene's space was never worked out.
+Drawn as one `anim` in code.
+
+### Claude Code: Fable 5.1, high
+
+$7.05 · 17 min · 41 turns · blind 4 (7th of 8), 3 (14th of 14) ·
+[source](study/lighthouse/src/claude-fable-high.px.js)
+
+<img src="study/lighthouse/claude-fable-high.gif" width="480" alt="Claude Code, Fable 5.1 at high effort: a lighthouse in the top left corner on a dark headland; a thin beam sweeps across; light rain and a dark sea">
+
+A clean, simple sweep and some atmosphere (a haze at the horizon, a glow round the lamp); but the
+tower is jammed into the top corner, the headland is a dark mass and the storm is weak, the spray a
+tiny crown.
+
+### Codex CLI: gpt-6.1-sol, low
+
+≈ $0.16 · 1.3 min · 9 calls · blind 6 (6th of 14) · curator: well below Claude's ·
+[source](study/lighthouse/src/codex-gpt-6.1-sol-low.px.js)
+
+<img src="study/lighthouse/codex-gpt-6.1-sol-low.gif" width="480" alt="Codex CLI, gpt-6.1-sol at low effort: a squat grey lighthouse with a rusty band on a dark rock at the right; a keeper in yellow at the gallery, the coat streaming; a short level beam; a dark sea">
+
+A squat tower with a rusty band, a short level beam, and a keeper whose coat visibly streams in
+the wind, as the brief asked; the blind reviewer scored its storm the lowest of the Codex runs.
+
+### Codex CLI: gpt-6.1-sol, medium
+
+≈ $0.18 · 1.7 min · 9 calls · blind 6 (7th of 14) · curator: well below Claude's ·
+[source](study/lighthouse/src/codex-gpt-6.1-sol-medium.px.js)
+
+<img src="study/lighthouse/codex-gpt-6.1-sol-medium.gif" width="480" alt="Codex CLI, gpt-6.1-sol at medium effort: a white lighthouse with a red band on a dark rock at the right; a keeper in yellow beside the lamp room; a short level beam; swells and a small splash">
+
+A white tower with a red band on a dark rock, a short level beam, the keeper beside the lamp room,
+swells and a small splash on the rocks.
+
+### Codex CLI: gpt-6.1-sol, high
+
+≈ $0.36 · 3.6 min · 15 calls · blind 8 (2nd of 14) · curator: well below Claude's ·
+[source](study/lighthouse/src/codex-gpt-6.1-sol-high.px.js)
+
+<img src="study/lighthouse/codex-gpt-6.1-sol-high.gif" width="480" alt="Codex CLI, gpt-6.1-sol at high effort: a lighthouse on a headland over a rough sea of layered swells breaking into foam; a keeper in yellow with a lantern at the end of the gallery; a soft level beam">
+
+The blind reviewer's "best sea: layered swells breaking on the rocks", and a keeper with a lantern
+at the end of the gallery; its beam faint.
+
+### Codex CLI: gpt-6.1-sol, xhigh
+
+≈ $0.66 · 7.2 min · 28 calls · blind 5 (9th of 14) · curator: well below Claude's ·
+[source](study/lighthouse/src/codex-gpt-6.1-sol-xhigh.px.js)
+
+<img src="study/lighthouse/codex-gpt-6.1-sol-xhigh.gif" width="480" alt="Codex CLI, gpt-6.1-sol at xhigh effort: a lighthouse with a red band on a rock at the right; a dull beam to the left; a keeper in yellow at the gallery rail; a curling wave and a small spray">
+
+A keeper at the rail and a curling wave; the beam stops short and comes apart into blobs.
+
+### Codex CLI: gpt-6.1-sol, max
+
+≈ $0.84 · 10.2 min · 32 calls · blind 7 (3rd of 14) · curator: well below Claude's ·
+[source](study/lighthouse/src/codex-gpt-6.1-sol-max.px.js)
+
+<img src="study/lighthouse/codex-gpt-6.1-sol-max.gif" width="480" alt="Codex CLI, gpt-6.1-sol at max effort: a squat lighthouse on dark faceted rocks; a wave bursts in a tall spray against them; a keeper in yellow with a lantern on the gallery; the beam lights the rain">
+
+The blind reviewer's "best breaking wave and spray of the set"; a squat tower, and a keeper too big
+for it.
+
+### Codex CLI: gpt-6-astra, xhigh
+
+≈ $3.24 · 5.6 min · 22 calls · blind 8 (1st of 14) · curator: well below Claude's ·
+[source](study/lighthouse/src/codex-gpt-6-astra-xhigh.px.js)
+
+<img src="study/lighthouse/codex-gpt-6-astra-xhigh.gif" width="480" alt="Codex CLI, gpt-6-astra at xhigh effort: a lighthouse with a red cap on faceted rocks at the right; a level beam sweeps left through lit rain; a curling wave breaks on the rocks; a keeper in yellow with a lantern at the gallery rail">
+
+"Every element of the brief present and in proportion", the blind reviewer's first: faceted rocks,
+a curling wave breaking on them, a keeper with a lantern at the rail; its beam a dull olive and
+faint.
+
+### Antigravity: Gemini 3.8 Flash, high
+
+≈ $1.62 · 42 min · not yet reviewed ·
+[source](study/lighthouse/src/agy-gemini-3.8-flash-high.px.js)
+
+<img src="study/lighthouse/agy-gemini-3.8-flash-high.gif" width="480" alt="Antigravity, Gemini 3.8 Flash at high effort: a red and white lighthouse on a headland drawn like a brick wall; a wide beam lights the slanting rain; a wave bursts into a large white plume; a keeper in yellow with a lantern on the gallery">
+
+A striped tower with the keeper in yellow at the right size, a lantern in hand; a wide beam that
+lights the rain in yellow streaks, and a wave bursting into a big white plume against the headland,
+the strongest thing in the scene. Its faults: in one frame the beam swings down onto the rocks (the
+turn in the picture plane that Haiku made), with a lens flare at the lamp; the headland is drawn as
+a wall of bricks, not rock; and the loop is short, 24 frames.
+
+### Antigravity: Gemini 4 Argon, high, first run
+
+≈ $0.65 · 41 min (31 of them waiting) · not yet reviewed ·
+[source](study/lighthouse/src/agy-gemini-4-argon-high-run1.px.js)
+
+<img src="study/lighthouse/agy-gemini-4-argon-high-run1.gif" width="480" alt="Antigravity, Gemini 4 Argon at high effort, first run (its draft): a striped stone lighthouse with a glowing lamp and a keeper's cottage with a red roof on a faceted headland; a level beam lights the rain; spray drawn as pale blobs">
+
+Its first draft, never looked at again: the run fell into a trap in pxl, since fixed (see
+[its section](#the-same-brief-in-antigravity)); built on the fixed pxl, as here, it loops 24
+frames. A good start: a stone tower with a halo at the lamp, a keeper's cottage with lit windows the
+brief didn't ask for, a level beam lighting the rain and the gulls; spray drawn as blobs, and the
+lighthouse, the keeper and the gull standing still.
+
+### Antigravity: Gemini 4 Argon, high, second run
+
+≈ $3.15 · 42 min · not yet reviewed ·
+[source](study/lighthouse/src/agy-gemini-4-argon-high.px.js)
+
+<img src="study/lighthouse/agy-gemini-4-argon-high.gif" width="480" alt="Antigravity, Gemini 4 Argon at high effort, second run: a tall red and white lighthouse with a glowing halo on a blocky headland; a level golden beam lights the slanting rain; the keeper in yellow at the gallery; spray bursts on the rocks; gulls">
+
+On the fixed pxl, its 42 minutes worked through: a tall striped tower with a halo round the lamp and
+the keeper in yellow at the gallery rail, a level golden beam full of lit rain, gulls, spray
+bursting on the rocks; the rocks are flat blocks and the sea is plain.
+
 ## How it was run
 
 Eight headless Claude Code sessions, one per configuration, each in an empty folder, with the skill
@@ -64,7 +302,8 @@ claude -p --model <haiku|sonnet|opus|fable> --effort <low|medium|high|xhigh|max>
 ([`scripts/model-study.sh`](../scripts/model-study.sh) runs one.) Four ran at a time on one laptop,
 with no budget and no time limit. The models were `claude-haiku-5-5`, `claude-sonnet-5-5`,
 `claude-opus-5-5` and `claude-fable-5-1`. Each scene was then checked (`pxl check`), read back (`pxl
-study`, for its loop) and judged blind (below).
+study`, for its loop) and judged blind (below). The Codex and Antigravity runs went the same way,
+one at a time or three at once; their commands are in their sections.
 
 ### Which pxl each run used
 
@@ -75,14 +314,15 @@ commits; `scripts/model-study.sh` now writes the commit into each run's folder):
 | Runs | pxl at | What the agent read that differs |
 |---|---|---|
 | Claude Code, all eight | `5929a59` | the scenes guide without the two lessons on a beam |
-| Codex, all six; Antigravity's Gemini 3.8 Flash; Gemini 4 Argon's first run | `0e8f7cb`, `99127e2`, `3eecf9f` | the same pxl in all three commits: the scenes guide (11) now says a beam is drawn in the picture's own projection and runs out of it or fades (four lines, from the curator's review of the Claude runs) |
+| Codex, all six | `0e8f7cb` | the scenes guide (11) now says a beam is drawn in the picture's own projection and runs out of it or fades (four lines, from the curator's review of the Claude runs) |
+| Gemini 3.8 Flash; Gemini 4 Argon's first run | `99127e2`; `3eecf9f` | the same as Codex: the commits between changed this study, the token script and the install notes, nothing the agent reads |
 | Gemini 4 Argon's second run | `34bdd04` | as above, and an anim of one frame no longer sets the scene's clock, with a warning when its code reads its frame; `check` stops at 600 frames of a loop cut at 60 s |
 
 So the Codex and Antigravity runs were told one thing about the beam that the Claude runs weren't;
 the Codex scenes still came out below Claude's in the curator's eyes, but read the comparison with
 that in mind.
 
-## The results
+## Claude Code: the numbers
 
 | Model | Effort | Turns | Time | Cost | Output (of it thinking) | Cache reads | Made as | Loop | Blind score | Rank |
 |---|---|---:|---:|---:|---:|---:|---|---|---:|---:|
@@ -153,63 +393,6 @@ beam short. Both put xhigh at or near the top. The two faults the curator named 
 scenes guide (`pxl help "scenes 11"`): a beam drawn in the picture's own projection, and a beam that
 reaches the picture's edge or fades into the haze, not one that ends in mid-air.
 
-## The art
-
-Each at 3× (`pxl build --share 3`), in the blind ranking's order, with what the curator said of the
-top three. The sources are in [`study/lighthouse/src/`](study/lighthouse/src).
-
-**Opus, xhigh** ($9.62): every part of the brief is there and reads: a stone headland with grass on
-top, sea stacks, spray bursting on them, rain lit inside the beam, a keeper with a lantern at the
-right size for the door and the rail. The beam turns in perspective, coming toward us; the reviewer
-found it tilted too steeply, near pointing up, and the curator, at odds with a picture drawn flat
-on. The curator's sweet spot.
-
-<img src="study/lighthouse/opus-xhigh.gif" width="480" alt="Opus at xhigh effort: a striped lighthouse on a stone headland with sea stacks at night; the beam swings toward the viewer through lit rain; a small keeper in yellow with a lantern on the gallery">
-
-**Opus, high** ($4.71): the most correct sweep (right, a glow as it faces us, left, dark), gulls lit
-as the beam passes, a wave bursting into real spray against a rock. The keeper is a yellow speck,
-right for the scale but hard to read, and the storm is quiet. The curator found the ground drawn
-badly and the beam ending short of the picture's edges.
-
-<img src="study/lighthouse/opus-high.gif" width="480" alt="Opus at high effort: a striped lighthouse at the left of a dark headland; the beam sweeps over the sea, lighting the rain and the gulls; a wave throws spray over a rock">
-
-**Opus, max** ($20.01): the best beam of all, a wide soft cone with the rain glinting in it, and a
-strong, gloomy mood; but darker and plainer than xhigh (an unstriped tower, a small keeper, modest
-spray), and one frame aims the beam low. The curator's first: the beam, the ground and the waves the
-best of the eight, the darker picture the better one, the quiet tower no fault.
-
-<img src="study/lighthouse/opus-max.gif" width="480" alt="Opus at max effort: a plain tower on a dark headland; a wide soft beam full of glinting rain sweeps the sky; the sea below in the dark">
-
-**Sonnet, xhigh** ($5.32): the best storm, with heavy slanting rain, a white-capped sea and waves
-breaking on the rocks, and rain lit yellow by the beam; but a keeper as big as the lantern room,
-wider than the door, and a beam pointing straight up in one frame.
-
-<img src="study/lighthouse/sonnet-xhigh.gif" width="480" alt="Sonnet at xhigh effort: a close striped lighthouse with a very large keeper in yellow beside the lantern; heavy rain, white-capped waves breaking on rocks">
-
-**Opus, medium** ($2.17): a good layout, the tower on the right third over a cobbled headland, the
-keeper at the right size with a lantern glow; but the beam ends cut square in mid-air and the sea is
-one repeating pattern.
-
-<img src="study/lighthouse/opus-medium.gif" width="480" alt="Opus at medium effort: a striped lighthouse on a cobbled headland at the right; a translucent beam sweeps the sky; a keeper in yellow on the gallery">
-
-**Haiku, xhigh** ($0.37): the best-read keeper (yellow, a glowing lantern) and good rain; but the
-beam turns like a clock hand, down through the tower into the rock and straight up: the scene's
-space was never worked out.
-
-<img src="study/lighthouse/haiku-xhigh.gif" width="480" alt="Haiku at xhigh effort: a lighthouse on a smooth dark rock with a keeper in yellow; the beam turns in the picture plane, at times pointing down into the rock">
-
-**Fable, high** ($7.05): a clean, simple sweep and some atmosphere (a haze at the horizon, a glow
-round the lamp); but the tower is jammed into the top corner, the headland is a dark mass and the
-storm is weak, the spray a tiny crown.
-
-<img src="study/lighthouse/fable-high.gif" width="480" alt="Fable at high effort: a lighthouse in the top left corner on a dark headland; a thin beam sweeps across; light rain and a dark sea">
-
-**Opus, low** ($0.54): done in 14 turns and two minutes, a clear silhouette and a horizontal sweep;
-but flat rendering (a rock filled with hatching, a harsh checkerboard beam) and a keeper of two or
-three pixels.
-
-<img src="study/lighthouse/opus-low.gif" width="480" alt="Opus at low effort: a red and white lighthouse on a hatched rock; a checkered beam sweeps across; spray and rain sparse">
-
 ## What the numbers say
 
 - **On Opus, the cost doubles at every step of effort; the art gains less at each.** $0.54, $2.17,
@@ -278,12 +461,12 @@ scene of parts; every loop closes; `pxl check` finds no warnings in any.
 
 | Model | Effort | Model calls | Time | Input (of it cached) | Output (of it reasoning) | At API prices | Loop |
 |---|---|---:|---:|---:|---:|---:|---|
-| gpt-6-astra | xhigh | 22 | 5.6 min | 1.49M (1.40M) | 19k (6k) | $3.24 | 96 frames |
-| gpt-6.1-sol | max | 32 | 10.2 min | 2.84M (2.77M) | 42k (18k) | $0.84 | 96 frames |
-| gpt-6.1-sol | xhigh | 28 | 7.2 min | 2.08M (1.99M) | 27k (11k) | $0.66 | 48 frames |
-| gpt-6.1-sol | high | 15 | 3.6 min | 898k (830k) | 14k (4k) | $0.36 | 64 frames |
-| gpt-6.1-sol | medium | 9 | 1.7 min | 403k (361k) | 6k (1k) | $0.18 | 48 frames |
 | gpt-6.1-sol | low | 9 | 1.3 min | 402k (360k) | 4k (0) | $0.16 | 48 frames |
+| gpt-6.1-sol | medium | 9 | 1.7 min | 403k (361k) | 6k (1k) | $0.18 | 48 frames |
+| gpt-6.1-sol | high | 15 | 3.6 min | 898k (830k) | 14k (4k) | $0.36 | 64 frames |
+| gpt-6.1-sol | xhigh | 28 | 7.2 min | 2.08M (1.99M) | 27k (11k) | $0.66 | 48 frames |
+| gpt-6.1-sol | max | 32 | 10.2 min | 2.84M (2.77M) | 42k (18k) | $0.84 | 96 frames |
+| gpt-6-astra | xhigh | 22 | 5.6 min | 1.49M (1.40M) | 19k (6k) | $3.24 | 96 frames |
 
 For scale, Opus at xhigh in Claude Code took 122 turns and 34 minutes, read 20.3M tokens of cache,
 wrote 172k tokens of output and cost $9.62; astra at xhigh took 22 calls and under six minutes,
@@ -315,23 +498,9 @@ craft), all fourteen scenes shuffled under new letters, one reviewer:
 The reviewer: the top four "give the storm real mass", waves that break against the rocks and throw
 spray, on ground drawn as faceted or textured rock, beams that stay level and reach the frame's
 edge, and a keeper that reads as a yellow figure with a lantern at the rail; the rest each fail one
-of those. Its notes on the Codex scenes: astra xhigh has "every element of the brief present and in
-proportion" (its beam a dull olive and faint); sol high "the best sea: layered swells breaking on
-the rocks" (its beam faint); sol max "the best breaking wave and spray of the set" (a squat tower
-and a keeper too big for it); sol xhigh's beam stops short and comes apart into blobs. Beside the
-new ones, the Claude scenes scored a point lower than in the first review, and moved a little among
-themselves: Opus max fell level with medium, Opus low rose level with Sonnet.
-
-<img src="study/lighthouse/codex-gpt-6-astra-xhigh.gif" width="480" alt="Codex, gpt-6-astra at xhigh: a lighthouse with a red cap on faceted rocks at the right; a level beam sweeps left through lit rain; a curling wave breaks on the rocks; a keeper in yellow with a lantern at the gallery rail">
-
-<img src="study/lighthouse/codex-gpt-6.1-sol-high.gif" width="480" alt="Codex, gpt-6.1-sol at high: a lighthouse on a headland over a rough sea of layered swells breaking into foam; a keeper in yellow with a lantern at the end of the gallery; a soft level beam">
-
-<img src="study/lighthouse/codex-gpt-6.1-sol-max.gif" width="480" alt="Codex, gpt-6.1-sol at max: a squat lighthouse on dark faceted rocks; a wave bursts in a tall spray against them; a keeper in yellow with a lantern on the gallery; the beam lights the rain">
-
-The other three Codex runs: [sol xhigh](study/lighthouse/codex-gpt-6.1-sol-xhigh.gif), [sol
-medium](study/lighthouse/codex-gpt-6.1-sol-medium.gif), [sol
-low](study/lighthouse/codex-gpt-6.1-sol-low.gif) (the one keeper whose coat visibly streams in the
-wind). Their sources are in [`study/lighthouse/src/`](study/lighthouse/src) as `codex-*.px.js`.
+of those. Its notes on each Codex scene are under [the art](#the-art). Beside the new ones, the
+Claude scenes scored a point lower than in the first review, and moved a little among themselves:
+Opus max fell level with medium, Opus low rose level with Sonnet.
 
 What it says:
 
@@ -368,45 +537,27 @@ agy -p "$(cat brief.txt)" --model gemini-3.8-flash-high --effort high \
 | Model | Time | Read from cache | Input | Output (of it thinking) | At API prices | Loop |
 |---|---:|---:|---:|---:|---:|---|
 | Gemini 3.8 Flash, high | 42 min | 9.53M | 426k | 156k (45k) | $1.62 | 24 frames |
-| Gemini 4 Argon, high, first run | 10 min of work (40 waiting) | 647k | 98k | 39k (22k) | $0.65 | stopped at its draft |
+| Gemini 4 Argon, high, first run | 41 min (10 working, 31 waiting) | 647k | 98k | 39k (22k) | $0.65 | stopped at its draft |
 | Gemini 4 Argon, high, second run | 42 min | 6.76M | 343k | 179k (51k) | $3.15 | 24 frames |
 
 Priced at Google's rates per million tokens, both introductory and doubling later: Gemini 3.8 Flash
 $0.75 input, $0.075 cached input, $3.75 output (until the end of 2026); Gemini 4 Argon $2, $0.10,
 $10 (until November 30, 2026). If thinking is billed on top of the output, add $0.17 to Flash's run
-and $0.51 to Argon's second. Every scene closes its loop and `pxl check` finds no warnings.
-
-What it drew: a striped tower with the keeper in yellow at the right size, a lantern in hand; a wide
-beam that lights the rain in yellow streaks, and a wave bursting into a big white plume against the
-headland, the strongest thing in the scene. Its faults: in one frame the beam swings down onto the
-rocks (the turn in the picture plane that Haiku made), with a lens flare at the lamp; the headland
-is drawn as a wall of bricks, not rock; and the loop is short, 24 frames. It took as long as any run
-but Opus at max (42 minutes, as Argon's second did), for about a third of Opus at high's price. The
-curator hasn't judged it yet.
-
-<img src="study/lighthouse/agy-gemini-3.8-flash-high.gif" width="480" alt="Antigravity, Gemini 3.8 Flash at high: a red and white lighthouse on a headland drawn like a brick wall; a wide beam lights the slanting rain; a wave bursts into a large white plume; a keeper in yellow with a lantern on the gallery">
+and $0.51 to Argon's second. Every scene closes its loop and `pxl check` finds no warnings. Flash
+took as long as any run but Opus at max (42 minutes, as Argon's second did), for about a third of
+Opus at high's price. The curator hasn't judged these three yet; what each drew is under
+[the art](#the-art).
 
 **Gemini 4 Argon's first run fell into a trap in pxl.** Its scene ran at 12 fps (83 ms frames) and
 stamped a lighthouse, a keeper and a gull drawn as anims with no `frames:`, one frame each at the
 default 8 fps (125 ms). pxl joined the two clocks: the scene's loop became their least common
 multiple, cut at 60 s, at a 1 ms step, 60,000 frames. The agent drew its first draft in ten minutes,
 started `pxl check` in the background and waited; the check would have run for hours, and after 30
-minutes Antigravity gave up on it and ended the run, with the draft never looked at again. The draft
-itself is a good start (a stone tower with a halo at the lamp, a keeper's cottage with lit windows
-the brief didn't ask for, a level beam lighting the rain and the gulls; spray drawn as blobs), but
-its lighthouse, keeper and gull never move: their code reads `c.frame`, and with one frame they draw
+minutes Antigravity gave up on it and ended the run, with the draft never looked at again. Its
+lighthouse, keeper and gull never move: their code reads `c.frame`, and with one frame they draw
 frame 0 only. pxl now keeps an anim of one frame out of the scene's clock, warns when such an anim's
 code reads its frame, and stops `check` at 600 frames of a loop cut at 60 s (`34bdd04`); built now,
-the draft loops its 24 frames.
-
-<img src="study/lighthouse/agy-gemini-4-argon-high-run1.gif" width="480" alt="Antigravity, Gemini 4 Argon at high, first run (its draft): a striped stone lighthouse with a glowing lamp and a keeper's cottage with a red roof on a faceted headland; a level beam lights the rain; spray drawn as pale blobs">
-
-**The second run, on the fixed pxl,** worked its 42 minutes through: a tall striped tower with a
-halo round the lamp and the keeper in yellow at the gallery rail, a level golden beam full of lit
-rain, gulls, spray bursting on the rocks; the rocks are flat blocks and the sea is plain. The
-curator hasn't judged either Argon run yet.
-
-<img src="study/lighthouse/agy-gemini-4-argon-high.gif" width="480" alt="Antigravity, Gemini 4 Argon at high, second run: a tall red and white lighthouse with a glowing halo on a blocky headland; a level golden beam lights the slanting rain; the keeper in yellow at the gallery; spray bursts on the rocks; gulls">
+the draft loops its 24 frames. The second run, on the fixed pxl, worked its 42 minutes through.
 
 ## What to use
 
@@ -438,8 +589,11 @@ With Claude Code: `claude --model opus --effort xhigh`, or `/model` and `--effor
   who knew which was which, watching the loops. Within Claude's runs both put Opus xhigh at or near
   the top and part on max and high; across the two tools they disagree outright, the agent ranking
   Codex first and the curator Claude. Take the curator's.
-- **Two tools, two meters.** Claude Code reports each session's cost; Codex, on a ChatGPT plan,
-  reports tokens only: its prices here are estimates from OpenAI's published API rates, not a bill.
+- **Three tools, three meters.** Claude Code reports each session's cost; Codex and Antigravity, on
+  plans, report tokens only: their prices here are estimates from the published API rates, not a
+  bill.
+- **Not quite the same pxl.** The Codex and Antigravity runs read a lesson on the beam the Claude
+  runs didn't ([which pxl each run used](#which-pxl-each-run-used)).
 - **Wall times on a shared laptop.** Four sessions ran at once; the turns and the tokens are the
   fairer measure of effort.
 
@@ -450,11 +604,14 @@ With Claude Code: `claude --model opus --effort xhigh`, or `/model` and `--effor
 for c in "opus medium" "opus high" "sonnet xhigh" "haiku xhigh"; do
   scripts/model-study.sh docs/study/lighthouse/brief.txt runs $c &
 done; wait
-# the same in Codex (the skill linked into ~/.codex/skills first)
+# the same in Codex (the skill linked into ~/.codex/skills first) and in Antigravity
 scripts/model-study.sh docs/study/lighthouse/brief.txt runs gpt-6.1-sol high codex
+scripts/model-study.sh docs/study/lighthouse/brief.txt runs gemini-4-argon high agy
 # where one session's tokens went (its transcript, by the session_id in result.json)
 node scripts/tokens.ts ~/.claude/projects/<the run's folder>/<session_id>.jsonl
 # its scene checked, and its loop read back
 pxl check runs/opus-high/<file>.px.js
 pxl study runs/opus-high/out/scenes/<scene>.gif --no-out
 ```
+
+Each run's folder keeps `pxl.txt` (the commit it read), its start and end times and its exit code.

@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by Claude Code, Opus 5.5 at high effort; its file as it left it.
 // "Keeper's Watch": a lighthouse on a rocky headland on a stormy night. The one light is the lamp in
 // the lantern room (42, 22): its beam turns once every 4 s (48 frames), lighting the rain and the
 // cloud it passes through, and flares when it swings toward us. The keeper, in a yellow oilskin, stands

@@ -1,3 +1,4 @@
+// Made for the model study (docs/model-study.md) by Antigravity, Gemini 4 Argon at high effort, its second run; its file as it left it.
 // Stormy Night at Headland Light: a 160x120 animated scene looping seamlessly in 24 frames (2.4 s at 10 fps).
 // Gale-force wind blows from the sea on the left onto the rocky headland on the right:
 // - The lighthouse lamp at (122, 24) sweeps its twin-beam Fresnel optic through the slanting rain.

@@ -3,7 +3,7 @@
 # in a folder of its own, with the skill as it is installed; what it made stays there, with its start
 # and end times and what the agent reports of it.
 #
-#   scripts/model-study.sh <brief.txt> <runs folder> <model> <effort> [claude|codex]
+#   scripts/model-study.sh <brief.txt> <runs folder> <model> <effort> [claude|codex|agy]
 #
 # claude (the default): Claude Code, its result as result.json (turns, cost, tokens, the session's id
 # for scripts/tokens.ts). codex: the Codex CLI, its events as events.jsonl (each turn's token usage)
