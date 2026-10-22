@@ -1,0 +1,179 @@
+# pxl environment: the ground and what grows and lies on it
+
+How 16-bit games draw grass, trees, bushes, rocks, walls, paths and the small things on them, as
+rules you can draw from and numbers you can check against. Taken from SLYNYRD's Pixelblog (posts 2,
+3, 6, 11, 13, 15, 20, 21, 43, 44, 45, 51), Saint11's tutorials (clusters, shading, vegetation, rock,
+ruins, city), final boss blues (Tiling Tiles, Form and Light), So You Want To Be A Pixel Artist
+(ch. 1-6), the OpenGameArt / Les Forges course (ch. 3, 4, 7, 8), Pixel Joint's tutorials and the
+Pixelation knowledge repository, and from `pxl study` on the sheets of Chrono Trigger, CrossCode,
+Terranigma, Final Fantasy Tactics Advance, Tactics Ogre, A Link to the Past and Sword of Mana.
+
+Each piece here is in the nature kit, `examples/nature/kit.px.js`: include it
+(`include("<path>/nature/kit.px.js", { palette: true })`) and use its sprites, or call its builders
+for more of a kind (§10). `examples/hd2d/graveyard.px.js` puts it all in a scene.
+
+## 1. Learning from a game's sheet
+
+Before drawing a kind of thing you haven't drawn, read how a game draws it. `pxl study sheet.png`
+takes a sheet apart and, under OBJECTS, says how its biggest things are built (one OBJECT for a
+single sprite on clear); study your own drawing the same way (a sprite written at 1x as a PNG) and
+compare. What each number means:
+
+- **tones**: colors in it. **patches**: the size of its one-color areas (median, and 90% under);
+  **single pixels**: the share of patches one pixel big. Far above the games' share reads as noise.
+- **lights at / darks at**: where its lightest and darkest fifths sit from its middle (the light's
+  side; a dark outline pulls the darks to the middle).
+- **outline turns in 10 px**: lobes and tufts make many, a cut shape few.
+- **deep shadow**: the share of its inside in its two darkest tones.
+- **strokes**: which way neighbours of one color run (diagonals: leaves, needles; down: blades,
+  streaks; across: strata, planks).
+- **hue turns**: from its darkest tone to its lightest, and whether warmer (shadows cool, lights
+  toward yellow).
+
+What the games' foliage measured (trees, crowns, bushes):
+
+| Game | Tones | Patches (90% under) | Single px | Deep shadow | Hue turn |
+|---|---|---|---|---|---|
+| CrossCode trees (60x89) | 8-27 | 1-2 (7-15) | 40-60% | 6-15% | 19-142°, warm |
+| Chrono Trigger forests | 11-48 | 1-2 (5-14) | 41-61% | 1-31% | 23-173°, warm |
+| Terranigma conifers | 7-16 | 1 (6-8) | 51-56% | 43-51% | 102°, warm |
+| FFTA towns and trees | 16-23 | 1-2 (6-10) | 47-52% | 4-7% | 131°, warm |
+| Tactics Ogre (painted) | 55-66 | 1 (3) | 74-76% | 3-4% | 33-47°, warm |
+
+So a 16-bit tree or bush: 8-20 tones, patches of 1-2 px with 90% under 6-15, 40-60% single pixels,
+5-15% deep shadow (up to half in a dark conifer wood), strokes on the diagonals, the hue turning
+warm from shade to light by tens of degrees. The kit's pine reads 10 tones, 52% single, 5% deep,
+171° warm. A whole map, or sprites touching, gives no OBJECTS: crop one thing to a PNG with clear
+round it.
+
+## 2. Ground and grass
+
+- The ground is felt, not looked at: lower contrast than the characters and props on it (final boss
+  blues, So You Want ch. 6, OpenGameArt ch. 8).
+- 3-5 tones, about 18 apart in lightness (0-255); the base 40-70% of the tile; the darks turning
+  blue (hue 180-210), the light yellow (hue 65). SLYNYRD's lush grass: base hue 84 at 60%
+  brightness, two lights 9 and 16 brighter, the darks hue 135 then 209.
+- Mostly bare base, a tone darker in broad blobs 10-30 px with ragged edges.
+- Clumps, not noise: fans of 3-5 blades, 5-7 px wide and 3-5 tall, tips a tone up (one clump in
+  four with a lit tip), the blue dark at their foot; between them small marks of 2-3 px a tone down.
+  No two clumps touching (corners may). Single pixels only as glints.
+- Density varies: flat ground, then slender strokes (1x2, 1x3), then lush clumps, set by a broad
+  field; busy next to busy tires the eye, so leave quiet areas.
+- A tile of 16-32 px (64x48 in the kit, for less repetition): draw what wraps its edges first, let
+  clusters cross them, lay it out as a map and remove lines of aligned bright dots. Four variants
+  and decals (flowers, tall grass, dirt) beat one tile.
+- Far off: near grass has blades, the middle plane 1-2 px clusters, the far plane none; farther is
+  lighter, less saturated, its hue nearer the sky's. Under trees: darker and browner, so the open
+  ground where the player is draws the eye.
+- Tiles laid in a map, details scattered over them, corner tilesets: scenes §2.
+- On a floor seen at an angle (`mesh()`, `plane()`), lay the texture a texel to a pixel where the
+  camera looks (`texel: [1 / ppm, 1 / (ppm * sin pitch)]`): at a fixed texel the camera squashes
+  it and upright blades come out lying down.
+
+## 3. Trees
+
+- The silhouette reads without color; detail on its borders, the inside left as rest; one leaf mark
+  repeated, no orphan pixels (Saint11).
+- A crown of leaf bundles about 26 px round, 4-5 colors each, in three variants a ramp step apart,
+  layered by the light: a dark crescent on the shadow side, a lighter disc on the lit side; no even
+  bands. About 5 greens, half of them light, from a warm light to a cold shadow; in SLYNYRD's ramp
+  the middle tones keep one brightness and the hue does the shading (81, 117, 170, 207, 244, 261).
+  Clumps part by a jump from light to dark, not by an outline. Build: silhouette, big clumps, the
+  shadows under them, lights, leaves last.
+- A conifer: tiers overhanging the one below by 2-3 px (5-6 notches a side); a tier's hem in points
+  of needles 2-3 px deep every 3-4 px; 2 rows in the shadow of the tier above, then a few lit on the
+  sun's side; the far side indigo (hue 230-260); fronds as strips 2 px thick running down and out. A
+  frond: a 1 px spine 20-30° down with needle strokes every 2 px (SLYNYRD).
+- A trunk darker than the crown, planted: seen from above, cut at the ground (SLYNYRD); seen from
+  the side or at an angle, its foot flared 2-3 px with a root or two. Bark in 1 px stripes, widest
+  apart in the middle; a knot. Laying top-down crowns from one clump, importing trees: scenes §4.
+- A dead tree: limbs that kink every 4-6 px and split in one to three, tapering 5, 3, 2, 1 px, the
+  last no longer than 5 px; the lightest tone only on the upper left of the trunk and big limbs.
+- Variety: 2-3 heights and a color swap or two (a far one hazier); symmetric trees may repeat in
+  staggered rows, asymmetric ones are focal points, used once. Don't mirror a tree lit from one side.
+- Backlit (the sun behind): the fronts lose detail and contrast, and a 1 px rim of the lightest tone
+  runs along the contour on the sun's side.
+
+## 4. Bushes
+
+Lobes of leaf clusters (2x2, or 3 px in an L) on a fill of their dark; the back lobes a step darker;
+each lobe darker on its shadow side; 4-5 tones from teal to yellow-green; in shade, the light tone a
+pixel or two a lobe. The outline a shade of what it touches (`outline` + `selout`), never black.
+Two or three shapes, set in groups of 2-3 at uneven gaps.
+
+## 5. Rocks
+
+- Flat planes, one tone each; only a flat top is bright, the sides switch to darker at once; no
+  gradients, no concentric bands (a rock shaded by its normal reads as a bun).
+- The lightest tone a 1 px rim (about 2% of it); the darkest only as lines: the undercut, the shaded
+  side. A ledge: a 1-2 px light band over a 1 px dark undercut.
+- 6-7 tones, the hue moving 20-40° a step and the brightness 9-13, saturation 10-30: SLYNYRD's 28 px
+  rock runs from hue 79 at full brightness to hue 270 at 52%. It shares the ground's hues.
+- Edges in 90° and 45° steps, small jagged corners; a crack of 1 px; grass blades over its foot.
+- Small ones blocked in with color; big ones from an outline cut into planes, the outline then
+  dropped.
+
+## 6. Walls, cliffs and steps
+
+- Bricks with 1 px of mortar dividing a 16 px tile: 15, 7, 3 or 1 wide; or courses and blocks of
+  their own sizes. The mortar a step under the stone: 33% of a face in dark mortar reads as a grid.
+- A block's lip lit along 50-80% of its top from its left, some none; a corner chipped off one block
+  in four, a pit in one in three, one branching crack in 32 px; the joint solid along the bottom,
+  broken toward the middle; a few blocks pushed in or out.
+- Darker toward the ground, moss climbing from the foot; old stone lower in contrast, rounded,
+  overgrown. Grass of the top hanging over the head; the steps' risers without it.
+- The wall's top much brighter than its face, the face's bricks shorter than the top's. Every tile
+  used a lot gets a variant (a crack, a stained block). Cliffs: strata or blocks lit on top, dark
+  undersides.
+
+## 7. Paths and floors
+
+Cobbles of 6-9 px (SLYNYRD) or 10-16 x 6-8 (final boss blues), 4 tones; the gap 1 px of a darker
+shade of the ground's hue; one dash of 2-4 px lit on each stone's lit edge, not a lit outline.
+Flagstones of mixed sizes, moss in no more than a third of the joints. Low contrast.
+
+## 8. Small things
+
+- Tufts: fans on a tapering base, asymmetric, three sizes, set in twos to fours at the feet of
+  things (stones, posts, a wall's foot).
+- Flowers: one color to a clump, blooms of 2-3 px, or SLYNYRD's 5x5 (petals round a 1 px center of
+  a contrasting color), 3x3 pluses and 2 px buds, in groups of 3-6 within about 12 px, a shadow pixel
+  under each.
+- Props standing on the ground (a headstone, a post, a sign) are sprites at the scene's scale, not
+  textured boxes: the top in the sun, the front toward us in the shade when the sun is behind, a
+  1 px rim on the top's front edge; cuts with their upper wall dark and their floor lit; wear with a
+  cause (pockmarks, lichen in clusters of 2-3 px, moss in lumps from the foot, a chipped corner, a
+  crack, a lean); the darkest tone only down the shaded side.
+- Fences: the picket faces toward us in the shade, light only on the point and the top 3 px, rails
+  darker behind; one picket in seven short, leaning or missing.
+
+## 9. Light, depth and placement
+
+- Lights toward yellow, shadows toward blue or violet, never black. Outlines only a little darker
+  than what they border, round things, never round the ground.
+- Top-down with the light from above (SLYNYRD): the top face the second lightest tone, the rim
+  facing the light the lightest (1 px), the face toward the viewer the second darkest, the corner
+  away from the light the darkest.
+- Cast shadows: short (a tile at most), one flat cool tone, the same length and way for everything;
+  a low sun's long shadows run together into stripes.
+- Near: more saturation, contrast and detail; far: fewer, colder, lighter.
+- The detail goes where the player is (the focus); round it, quieter.
+- Repetition: variants, color swaps, groups at uneven gaps.
+- Dithering only at the tapering edge of a cluster, not as a field; single pixels only as glints.
+
+## 10. The kit
+
+`examples/nature/kit.px.js`, its light from the upper left, its textures tiling, a texel to a pixel:
+
+| Builder / sprite | Makes |
+|---|---|
+| `grassTile(name, { lush, seed })` | a 64x48 grass tile (§2): `_grass` lush, `_turf` the wood's quieter floor |
+| `pine(name, h, seed)` | a conifer h px tall (§3): `_pine` 68, `_pine_m` 60, `_pine_s` 52, `_pine_far` hazed |
+| `bush(name, w, lobes, seed)` | a bush of lobes `[x, y, r, back]` (§4): `_bush`, `_bush_b`, `_bush_c` |
+| `rampart(name, overhang)` | a 48x29 stone wall face (§6): `_rampart` with grass over its head, `_riser` without |
+| `_flags` | 48x48 flagstones (§7) |
+| `_rock`, `_rock_small` | rocks in planes (§5) |
+| `_tuft_a/b/c`, `_flowers_w/p` | tufts and flowers (§8) |
+| `_deadtree` | a dead tree, 4 m (§3) |
+
+`pxl build examples/nature/kit.px.js` writes them all on one sheet, `nature.png`.

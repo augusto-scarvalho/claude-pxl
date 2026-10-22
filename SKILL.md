@@ -116,7 +116,7 @@ task needs before starting:
 | a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate, 12 for an action's or a cycle's frame counts, 13 for a game's look (its figures' heights and colors, how it builds and flips them) |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a scene, level, building or environment | `PXL help "scenes 1 3 11 14"` (layout, texture, shadows and light, checking); then what it needs: 2 ground and tiles, 4 trees, 5 water, 6 distance, 7 true perspective, 8-10 loops and parallax, 12 effects; for a game, 15 its screen and 16 its projections (top-down 3/4, isometric) |
+| a scene, level, building or environment | `PXL help "scenes 1 3 11 14"` (layout, texture, shadows and light, checking); then what it needs: 2 ground and tiles, 4 trees, 5 water, 6 distance, 7 true perspective, 8-10 loops and parallax, 12 effects; for a game, 15 its screen and 16 its projections (top-down 3/4, isometric); for its grass, trees, bushes, rocks, walls and paths, `PXL help "environment 1"` and the section of each (2-9), starting from `examples/nature/kit.px.js` |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2.5k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
 
@@ -222,6 +222,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `rig/knight.px.js` | a 72 px knight built skeleton first: `rig`, `figure`, stand-ins, `plate`-lit parts, `twin` parts for the turned rig; poses from `ik`, slashes with `arc` smears; `facing` and `world` read out by describe |
 | `rig/warden.px.js` | a whirling axe combo on a skeleton in 3D: the body turns about its upright with the swing (front, back, front again), the shoulders coil against the hips, the knees bend, the arm reaches full length; the head drawn by hand in five views picked by the turn, the torso and a coat that flares with the turn sampled as surfaces, the hair a frame late; at rest a fighting stance sways from foot to foot by half pixels, the head a frame behind, the feet still (`stamp`'s `sub`, `c.subpixel`); the axe drawn in 3D and its smear the path its blade took, behind the body where that path ran; a reflection on a polished floor (`flip: "y"`, `opacity`) |
 | `cyberpunk/` | a 320×180 animated city street at dusk made two ways: by one agent (`sodium_hour.px.js`) and by a pipeline (`pipeline/`: the plan, the palette, eight part files, the scene) |
+| `nature/kit.px.js` | grass tiles, pines, bushes, rocks, walls, flagstones, tufts, flowers, a dead tree, drawn to the environment guide; builders for more (`grassTile`, `pine`, `bush`, `rampart`); `include` it |
 | `hd2d/graveyard.px.js` | an HD-2D graveyard on a hill, drawn after the games' sheets (`pxl study`): grass of blades laid a texel to a pixel, flagstones, a mossy rampart, headstones and rocks as sprites at the scene's scale, festooned pines; a fence whose clear texels are holes (`anchor: "face"`), a low sun behind, mist |
 | `hd2d/plaza.px.js` | an HD-2D diorama: a camera high up through a long lens, boxes in meters tiled with pixel-art textures by `mesh()`, the topdown hero, pines and lamps standing among them in one depth (`sprites`, on contact shadows); a late sun, sky and lamps with the sun's shadows (`sun`, `lamps`, `emit`, sprites lit through `bump("hybrid")`); the same at 1920x1080 (`pixel: 4`) with `post()`: depth of field, haze, bloom, vignette |
 | `fonts/font5x7.px.js` | a 5×7 font for titles: `include` it, `text(..., { font: "5x7" })` |
@@ -239,6 +240,9 @@ comet_repair --out <scratch dir>`.
 - Small organic shapes (a face, a leaf, an item icon) are grids, pixel by pixel; primitives are for
   structure, large areas and long lines. Never big hand grids.
 - Every mark on a surface needs a cause (seams, weathering, story): no filler `noise` or `dither`.
+- Drawing a kind of thing new to you (a tree, a rock, a wall): `PXL study` a game's sheet of it and
+  your drawing, and hold your numbers (tones, patch sizes, single pixels, deep shadow, the hue's turn)
+  against the game's (environment §1).
 - 2–4 shades per material, mnemonic keys (`g`/`G`); reuse a tone across materials (one's shadow is
   another's light) before adding a color. Light and shadow are two families: the step across the
   terminator is bigger than any within them, and light bounced into a shadow is a duller, darker

@@ -485,7 +485,8 @@ whether a sprite's mirror image is on the sheet too (drawn both ways) or none is
 flipped when played); a ripper's labels (small marks of a color or two side by side), boxes drawn round
 frames and one-hue silhouettes (masks) are left out, its panels taken for ground (a color an eighth of
 the sheet, much of it in one field), and no perspective is read off it. How its biggest things are
-built (OBJECTS, up to six; OBJECT for the one thing a sprite on clear is), to draw a tree or a rock
+built (OBJECTS, up to six; OBJECT for the one thing a sprite on clear is; none for a map, a screen of it
+and up), to draw a tree or a rock
 against: its tones, the patches of one color it is painted in (their size, its single pixels), where its
 lights and darks sit from its middle, how often its outline turns in 10 px (lobes, tufts), the share of
 deep shadow inside, which way its strokes run, and how its hue turns from its darkest tone to its

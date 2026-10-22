@@ -1,130 +1,69 @@
 // HD-2D: a graveyard on a hill in a pine wood, morning mist, as Octopath Traveler lays out its
 // dioramas: a plateau of grass held up by a mossy stone wall, stone steps up its front, a flagstone
-// path to the back, gravestones either side of it, a picket fence round the top, a dead tree, the
-// wood all round and hills fading into the mist. Built in meters with mesh() (blocks of the kit,
-// textures anchored on their faces where a face carries one drawing: a gravestone's front, a
-// fence's pickets, whose clear pixels are holes the sun shines through), the people and the trees
-// as sprites standing in it, a low sun behind on the left. `graveyard` is the art at its own size,
-// the one checked; `graveyard_hd` the same four times as big through post().
+// path to the back, headstones either side of it, a picket fence round the top, a dead tree, the wood
+// all round and hills fading into the mist. Built in meters with mesh() (blocks of the kit, textures
+// laid a texel to a pixel where the camera looks; the fence's pickets anchored on its faces, their clear
+// pixels holes the sun shines through), the people, trees, stones and plants as sprites standing in it,
+// a low sun behind on the left. Its ground, plants and stones are drawn after the games' sheets (pxl
+// study) and SLYNYRD's, Saint11's and final boss blues' tutorials. `graveyard` is the art at its own
+// size, the one checked; `graveyard_hd` the same four times as big through post().
 include("../topdown_hero/hero.px.js")
 include("kit.px.js", { palette: true })
 
-pal({ D: "#2c2c40", t: "#4a4c60", T: "#6b6c7c", u: "#8e8c90", U: "#bdb39c", E: "#e6dcbd" })   // stone: blue-violet in the shade
-ramps("DtTuUE")                                                                               // to cream in the sun
-shades("mMnN", "#6f8a3a")   // moss
-shades("bBiI", "#6b5a4c")   // dead wood
-pal({ p: "#e7a3c2", o: "#f1ece0", O: "#e8cf6c", 9: "#7a6048", 0: "#55432f" })   // flowers; earth
 
-// The rampart's face: courses of their own heights, blocks of their own widths (each course's 16 in
-// all, so it tiles), each block lit along its top, its joint dark below and to the right, a block in
-// three a shade off; the grass of the top hanging over it in clumps, some drips longer.
-sprite("_rampart", { w: 16, h: 32 }, (c) => {
-  const H = [4, 5, 4, 6, 4, 5, 4], W = [[6, 5, 5], [4, 7, 5], [5, 6, 5], [7, 4, 5], [5, 5, 6], [6, 6, 4], [4, 6, 6]]
-  let y = 0
-  H.forEach((h, row) => {
-    let x = (row * 3) % 16
-    W[row].forEach((w, b) => {
-      const tone = Math.floor(hash(row, b) * 3) ? "7" : "6"
-      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++)
-        c.px((x + i) % 16, y + j, j === h - 1 || i === w - 1 ? "5" : j === 0 ? "8" : i === w - 2 && j === h - 2 ? "6" : tone)
-      x += w
-    })
-    y += h
-  })
-  for (let X = 0; X < 16; X++) {
-    const len = 2 + Math.round(1.5 + 1.5 * Math.sin((Math.PI * 2 * X) / 16 * 2 + 1)) + (Math.floor(hash(X, 3) * 5) === 0 ? 3 : 0)
-    for (let Y = 0; Y < len; Y++) c.px(X, Y, Y === len - 1 ? "m" : Y === 0 ? "N" : (X + Y) % 3 ? "n" : "M")
-  }
-})
-// Flagstones: irregular slabs, each the texels nearest one of six points (measured round the tile,
-// so it tiles), moss where two slabs meet; a slab lit along its top, less along its left, dark along
-// its lower right, a tone of its own.
-sprite("_flags", { w: 16, h: 16 }, (c) => {
-  const P = [[3, 3], [11, 2], [7, 8], [14, 10], [2, 11], [10, 14]]
-  const near = (X, Y) => {
-    let a = [9e9, -1], b = 9e9
-    P.forEach(([x, y], k) => {
-      const dx = Math.min(Math.abs(X - x), 16 - Math.abs(X - x)), dy = Math.min(Math.abs(Y - y), 16 - Math.abs(Y - y)), d = Math.hypot(dx, dy * 1.2)
-      if (d < a[0]) { b = a[0]; a = [d, k] } else if (d < b) b = d
-    })
-    return { k: a[1], gap: b - a[0] < 0.9 }
-  }
-  const at = (X, Y) => near((X + 16) % 16, (Y + 16) % 16)
-  for (let Y = 0; Y < 16; Y++) for (let X = 0; X < 16; X++) {
-    const { k, gap } = at(X, Y)
-    if (gap) { c.px(X, Y, Math.floor(hash(X, Y) * 3) ? "M" : "m"); continue }
-    const up = at(X, Y - 1), lf = at(X - 1, Y), dn = at(X, Y + 1), rt = at(X + 1, Y)
-    c.px(X, Y, up.gap ? "U" : lf.gap ? "u" : dn.gap || rt.gap ? "t" : Math.floor(hash(k, 5) * 3) ? "T" : "u")
-  }
-})
-// Pickets, 12 rows high (0.75 m): a picket every 4 px, 2 px wide and pointed, two rails across.
-sprite("_fence", { w: 16, h: 12 }, (c) => {
-  for (let X = 0; X < 16; X++) for (let Y = 0; Y < 12; Y++) {
-    const p = X % 4, picket = p < 2 && (Y > 0 || p === 0), rail = Y === 4 || Y === 9
-    if (picket) c.px(X, Y, p === 0 ? "f" : "d")
-    else if (rail) c.px(X, Y, Y === 4 ? "d" : "s")
-  }
-})
-
-// A dead tree, 4 m: a trunk splitting into branches that split again, thinner each time, drawn from
-// the ground up; dark on the right.
-sprite("_deadtree", { w: 56, h: 72, pivot: "bottom" }, (c) => {
-  const r = rng(8)
-  const limb = (x, y, a, len, w) => {
-    const steps = Math.ceil(len)
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps, X = x + Math.cos(a) * len * t, Y = y - Math.sin(a) * len * t, ww = w * (1 - 0.4 * t)
-      for (let d = -ww / 2; d <= ww / 2; d += 0.5) c.px(Math.round(X + d), Math.round(Y), d > 0 ? "b" : d < -ww / 4 ? "I" : "B")
+// Pickets of weathered wood (the dead tree's grey), a picket every 6 px, its face toward us in the shade,
+// light only on its point and top 3 px, two rails darker behind; 48 px (3 m) to the tile, one picket
+// short, one leaning, one missing.
+sprite("_fence", { w: 48, h: 12 }, (c) => {
+  for (const Y of [4, 9]) for (let X = 0; X < 48; X++) c.px(X, Y, "b")
+  for (let p = 0; p < 8; p++) {
+    if (p === 5) continue
+    const x0 = p * 6 + 1, lean = p === 2 ? 1 : 0, y0 = p === 6 ? 3 : 0
+    for (let Y = y0; Y < 12; Y++) for (let i = 0; i < 2; i++) {
+      if (Y === y0 && i === 1) continue
+      c.px(x0 + i + (lean && Y < 5 ? 1 : 0), Y, Y < y0 + 3 ? (i === 0 ? "I" : "i") : i === 0 ? "i" : "B")
     }
-    const ex = x + Math.cos(a) * len, ey = y - Math.sin(a) * len
-    if (w > 1.2) for (const da of [-0.5 - r() * 0.3, 0.45 + r() * 0.3]) limb(ex, ey, a + da, len * (0.62 + r() * 0.15), w * 0.62)
   }
-  limb(28, 71, Math.PI / 2 + 0.05, 24, 6)
-}, bump("hybrid"))
-sprite("_flowers", { w: 7, h: 4, pivot: "bottom" }, ".p...o.\npOp.oOo\n.q.p.q.\n.q.q.q.")
-sprite("_gytuft", { w: 7, h: 5, pivot: "bottom" }, "..e.e..\n.ew.we.\new.e.we\nwqwqwqw\nqqqqqqq")
-// Rocks as CrossCode draws them: two or three masses, each in flat facets (its normal rounded to a few
-// directions), the tops in the sun, the fronts in the shade, the darkest tone an outline on the shaded
-// side only; moss along the foot here and there.
-const rock = (name, w, h, lobes) => sprite(name, { w, h, pivot: "bottom", outline: "D", selout: true }, (c) => {
-  for (const [x, y, rx, ry] of lobes) for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) {
-    const nx = (X + 0.5 - x) / rx, ny = (Y + 0.5 - y) / ry
-    if (nx * nx + ny * ny > 1) continue
-    const L = 0.7 - 0.45 * (Math.round(nx * 2) / 2) - 0.55 * (Math.round(ny * 2) / 2)
-    c.px(X, Y, "tTuUE"[Math.max(0, Math.min(4, Math.round(L * 4)))])
-  }
-  for (let X = 0; X < w; X++) if (c.get(X, h - 1) && Math.floor(hash(X, w) * 3) === 0) c.px(X, h - 1, "m")
-}, bump("hybrid"))
-rock("_rock", 15, 10, [[5.5, 5, 5, 4], [10.5, 6.5, 3.5, 3]])
-rock("_rock_small", 9, 7, [[4.5, 4, 4, 3]])
+})
 
-// Headstones, drawn at the scene's scale (24 px to the meter) as the games draw them, seen from 38
-// degrees up: the front in the shade (the sun is behind them), the slab's top above it in the sun, its
-// front edge brightest; the left edge catching the light, the right dark; a cross or lines cut in the
-// front (the cut's upper wall dark, its floor lit); rain streaks down from the top, lichen in spots,
-// moss climbing unevenly from the foot.
-// The old ones lean (lean: px at the top).
-const headstone = (name, w, h, inside, cut, lean = 0) => sprite(name, { w: w + 2 + Math.abs(lean), h: h + 3, pivot: "bottom", outline: "D", selout: true }, (c) => {
-  const face = (x, y) => x >= 0 && x < w && y >= 0 && y < h && inside(x + 0.5 - w / 2, y)
-  const groove = (x, y) => face(x, y) && cut(x + 0.5 - w / 2, y)
-  const put = (x, y, k) => c.px(1 + Math.max(0, -lean) + x + Math.round((lean * (h - 1 - y)) / h), y + 3, k)
-  for (let y = -3; y < h; y++) for (let x = 0; x < w; x++) {
-    if (!face(x, y)) {
-      if (face(x, y + 1)) put(x, y, "E")
-      else if (face(x, y + 2) || face(x, y + 3)) put(x, y, "U")
-      continue
+
+// Headstones, drawn at the scene's scale (24 px to the meter), seen from 38 degrees up: the front in the
+// shade (the sun is behind them), the slab's top above it in the sun, its front edge a 1 px cream rim;
+// the left edge catching the light; a cross or lines cut in the front (the cut's upper wall dark, its
+// floor lit); a pair of pockmarks, lichen in clusters of 2-3 px, moss in lumps 2-3 px wide climbing from
+// the foot; the old ones chipped at a corner, cracked, leaning (lean: px at the top); the darkest tone
+// only down the right side.
+const headstone = (name, w, h, inside, cut, { lean = 0, seed = 1, chip = 0, crack = false } = {}) =>
+  sprite(name, { w: w + 3 + Math.abs(lean), h: h + 3, pivot: "bottom" }, (c) => {
+    const r = rng(seed), first = []
+    const shape = (x, y) => x >= 0 && x < w && y >= 0 && y < h && inside(x + 0.5 - w / 2, y)
+    for (let x = 0; x < w; x++) { let y = 0; while (y < h && !shape(x, y)) y++; first[x] = y }
+    const face = (x, y) => shape(x, y) && !(chip && w - 1 - x < chip && y - first[x] < chip - (w - 1 - x))
+    const groove = (x, y) => face(x, y) && cut(x + 0.5 - w / 2, y)
+    const put = (x, y, k) => c.px(1 + Math.max(0, -lean) + x + Math.round((lean * (h - 1 - y)) / h), y + 3, k)
+    const marks = new Map(), mark = (x, y, k) => face(x, y) && marks.set(x + y * 99, k)
+    for (let n = 0; n < 2; n++) { const x = 2 + Math.floor(r() * (w - 5)), y = 5 + Math.floor(r() * (h - 10)); mark(x, y, "t"); mark(x + 1, y + 1, "U") }
+    for (let n = 0; n < 2; n++) { const x = 1 + Math.floor(r() * (w - 3)), y = 3 + Math.floor(r() * (h - 8)); mark(x, y, "M"); mark(x + 1, y, "M"); mark(x, y + 1, "m") }
+    if (crack) { const x = w - 4; [[0, 0], [0, 1], [-1, 2], [-1, 3]].forEach(([dx, dy]) => mark(x + dx, first[x] + 1 + dy, "D")) }
+    const moss = []
+    for (let x = 0; x < w; ) { const n = 2 + Math.floor(r() * 2), m = Math.floor(r() * 4); for (let i = 0; i < n; i++) moss[x + i] = m; x += n }
+    for (let y = -3; y < h; y++) for (let x = 0; x < w; x++) {
+      if (!face(x, y)) {
+        if (face(x, y + 1)) put(x, y, "E")
+        else if (face(x, y + 2) || face(x, y + 3)) put(x, y, "U")
+        continue
+      }
+      put(x, y, groove(x, y) ? (!groove(x, y - 1) ? "D" : !groove(x, y + 1) ? "u" : "t")
+        : y >= h - moss[x] ? (y === h - moss[x] ? "M" : "m")
+        : marks.get(x + y * 99) ?? (!face(x - 1, y) ? "U" : !face(x + 1, y) ? "t" : !face(x, y - 1) ? "U" : "u"))
+      if (!face(x + 1, y)) put(x + 1, y, "D")
     }
-    const moss = 1 + ((hash(x >> 1, w) * 7) >> 0) % 3 + (x % 3 === 1 ? 1 : 0), streak = Math.floor(hash(x, w + 1) * 4) === 0 && y < 4 + (Math.floor(hash(x, w) * 5))
-    put(x, y, groove(x, y) ? (!groove(x, y - 1) ? "D" : !groove(x, y + 1) ? "u" : "t")
-      : y >= h - moss ? (y === h - moss ? "M" : "m")
-      : !face(x - 1, y) ? "U" : !face(x + 1, y) ? "t" : !face(x, y - 1) ? "U" : streak ? "T" : Math.floor(hash(x * 3 + w, y) * 40) === 0 ? "M" : "u")
-  }
-}, bump("hybrid"))
+  }, bump("hybrid"))
 const arch = (w) => (x, y) => y >= (w / 2) * 0.75 * (1 - Math.sqrt(Math.max(0, 1 - ((2 * x) / w) ** 2)))
-headstone("_grave_arch", 15, 22, arch(15), (x, y) => (Math.abs(x) < 1 && y >= 5 && y <= 15) || (Math.abs(x) < 4 && y >= 8 && y <= 9))
-headstone("_grave_slab", 14, 18, (x, y) => y >= (Math.abs(x) > 5.5 ? 1 : 0), (x, y) => Math.abs(x) < 4.5 && (y === 4 || y === 5 || y === 8 || y === 9 || ((y === 12 || y === 13) && Math.abs(x) < 2.5)), 1)
-headstone("_grave_cross", 13, 24, (x, y) => Math.abs(x) < 2.5 || (y >= 5 && y <= 8) || (y >= 20 && Math.abs(x) < 5.5), () => false)
-headstone("_grave_old", 13, 16, arch(13), () => false, -2)
+headstone("_grave_arch", 15, 22, arch(15), (x, y) => (Math.abs(x) < 1 && y >= 5 && y <= 15) || (Math.abs(x) < 4 && y >= 8 && y <= 9), { seed: 1 })
+headstone("_grave_slab", 14, 18, (x, y) => y >= (Math.abs(x) > 5.5 ? 1 : 0), (x, y) => Math.abs(x) < 4.5 && (y === 4 || y === 5 || y === 8 || y === 9 || ((y === 12 || y === 13) && Math.abs(x) < 2.5)), { lean: 1, seed: 2, chip: 2, crack: true })
+headstone("_grave_cross", 13, 24, (x, y) => Math.abs(x) < 2.5 || (y >= 5 && y <= 8) || (y >= 20 && Math.abs(x) < 5.5), () => false, { seed: 3 })
+headstone("_grave_old", 13, 16, arch(13), () => false, { lean: -2, seed: 4, chip: 3, crack: true })
 
 // The camera: 24 px to the meter, 38 degrees down, 30 across; the hill centred (Z, 1.6 m behind where it
 // looks, is the hill's middle).
@@ -132,38 +71,45 @@ const W = 480, H = 270, CAM = hd2dCamera({ w: W, h: H, pitch: -38, fov: 30, ppm:
 const M = model(), block = (...a) => hd2dBlock(M, ...a)
 // The textures a texel to a pixel where the camera looks: the floors foreshortened, the walls a little.
 const MATS = {
-  grass: { tex: "_grass", texel: CAM.floor }, flags: { tex: "_flags", texel: CAM.floor },
-  rampart: { tex: "_rampart", anchor: "face", texel: CAM.wall }, fence: { tex: "_fence", anchor: "face" },
+  grass: { tex: "_grass", texel: CAM.floor }, turf: { tex: "_turf", texel: CAM.floor }, flags: { tex: "_flags", texel: CAM.floor },
+  rampart: { tex: "_rampart", anchor: "face", texel: CAM.wall }, riser: { tex: "_riser", anchor: "face", texel: CAM.wall },
+  fence: { tex: "_fence", anchor: "face" },
 }
 const TOP = 1.5                                                     // the hill's top
-M.face("grass", [-40, Z - 25, 0], [40, Z - 25, 0], [40, Z + 60, 0], [-40, Z + 60, 0])
+M.face("turf", [-40, Z - 25, 0], [40, Z - 25, 0], [40, Z + 60, 0], [-40, Z + 60, 0])
 block("grass", "rampart", -6.5, Z - 2.5, 6.5, Z + 6, 0, TOP)
 // the steps: four of 0.3 m up the wall's front, 0.35 m deep
-for (let i = 0; i < 4; i++) block("flags", "rampart", -1, Z - 2.5 - 0.35 * (i + 1), 1, Z - 2.5 - 0.35 * i, 0, TOP - 0.3 * (i + 1))
+for (let i = 0; i < 4; i++) block("flags", "riser", -1, Z - 2.5 - 0.35 * (i + 1), 1, Z - 2.5 - 0.35 * i, 0, TOP - 0.3 * (i + 1))
 block("flags", "flags", -0.9, Z - 2.5, 0.9, Z + 5.2, TOP, TOP + 0.02)   // the path
 // the fence round the top, open at the steps
 const fence = (a, b) => M.face("fence", [...a, TOP], [...b, TOP], [...b, TOP + 0.75], [...a, TOP + 0.75])
 fence([-6.2, Z + 5.7], [6.2, Z + 5.7]); fence([-6.2, Z - 2.2], [-6.2, Z + 5.7]); fence([6.2, Z - 2.2], [6.2, Z + 5.7])
 fence([-6.2, Z - 2.2], [-1.3, Z - 2.2]); fence([1.3, Z - 2.2], [6.2, Z - 2.2])
 // hills behind, far enough for the mist to take them
-for (const [x0, x1, z0, h] of [[-40, -8, 30, 7], [-12, 14, 36, 9], [10, 40, 28, 6]]) block("grass", "grass", x0, Z + z0, x1, Z + z0 + 8, 0, h)
+for (const [x0, x1, z0, h] of [[-40, -8, 30, 7], [-12, 14, 36, 9], [10, 40, 28, 6]]) block("turf", "turf", x0, Z + z0, x1, Z + z0 + 8, 0, h)
 
-// The wood, the tree, and what grows on the hill: placed once, seeded.
+// The wood, the tree, and what grows on the hill: placed once, seeded. The detail goes on the hill's
+// top; the wood round it is quieter, and the far trees are hazed.
 const R = rng(13), things = [{ name: "_deadtree", at: [-4.6, Z + 4.9, TOP] }]
-// the gravestones either side of the path
-for (const [x, dz, name] of [[-3.4, 3.2, "_grave_arch"], [-2, 4.6, "_grave_cross"], [-4.4, 0.8, "_grave_old"], [2.6, 3.8, "_grave_arch"], [3.9, 1.6, "_grave_slab"], [2.1, 0.4, "_grave_old"]])
+const tufts = (x, z, u, n) => { for (let k = 0; k < n; k++) things.push({ name: ["_tuft_a", "_tuft_b", "_tuft_c"][Math.floor(R() * 3)], at: [x + (R() - 0.5) * 0.7, z - R() * 0.15, u], shadow: 0 }) }
+// the headstones either side of the path, tufts at their feet, flowers by some
+for (const [x, dz, name, flowers] of [[-3.4, 3.2, "_grave_arch", "_flowers_w"], [-2, 4.6, "_grave_cross", ""], [-4.4, 0.8, "_grave_old", ""], [2.6, 3.8, "_grave_arch", "_flowers_p"], [3.9, 1.6, "_grave_slab", ""], [2.1, 0.4, "_grave_old", "_flowers_w"]]) {
   things.push({ name, at: [x, Z + dz, TOP] })
-for (let k = 0; k < 160; k++) {
-  const x = -16 + R() * 32, z = Z - 9 + R() * 34
+  tufts(x, Z + dz - 0.04, TOP, 2 + Math.floor(R() * 2))
+  if (flowers) things.push({ name: flowers, at: [x + 0.45, Z + dz - 0.25, TOP], shadow: 0 })
+}
+for (let k = 0; k < 170; k++) {
+  const x = -16 + R() * 32, z = Z - 9 + R() * 34, h = R()
   if (Math.abs(x) < 7.5 && z > Z - 4.5 && z < Z + 7.5) continue   // not on the hill or at its foot
-  things.push({ name: "_pine", at: [x, z] })
+  things.push({ name: z > Z + 13 ? "_pine_far" : h < 0.3 ? "_pine_s" : h < 0.65 ? "_pine_m" : "_pine", at: [x, z] })
 }
-for (let k = 0; k < 26; k++) {
-  const x = -6 + R() * 12, z = Z - 2 + R() * 7.5
-  if (Math.abs(x) < 1.1) continue                                  // not on the path
-  things.push({ name: R() < 0.35 ? "_flowers" : R() < 0.7 ? "_gytuft" : R() < 0.5 ? "_rock" : "_rock_small", at: [x, z, TOP], shadow: 0 })
+for (const [x, z] of [[-1.6, 1], [1.7, 2.6], [-5.6, 3.5], [5.3, 0.2], [-0.9, 5.4]]) things.push({ name: R() < 0.5 ? "_rock" : "_rock_small", at: [x, Z + z, TOP], shadow: 0 })
+for (const x of [-5.8, -3.6, -1.6, 2, 4.4, 5.9]) tufts(x, Z - 2.25, TOP, 2)                 // along the fence
+// bushes in twos and threes at the wall's foot, tufts between
+for (const [x0, n] of [[-6.1, 3], [-3.2, 2], [2.4, 2], [4.9, 3]]) {
+  for (let k = 0; k < n; k++) things.push({ name: ["_bush", "_bush_b", "_bush_c"][Math.floor(R() * 3)], at: [x0 + k * 0.62 + R() * 0.2, Z - 2.7 - R() * 0.15] })
+  tufts(x0 + n * 0.62 + 0.2, Z - 2.75, 0, 2)
 }
-for (let x = -6; x <= 6; x += 1.5) if (Math.abs(x) > 1.4) things.push({ name: "_bush", at: [x + R() * 0.4, Z - 2.75] })
 
 // The scene's clock: 16 frames of 210 ms. One hero walks up the path and back down it; another
 // stands at a grave, his back to us.
@@ -173,9 +119,9 @@ const walker = (f) => {
 }
 const people = (f) => [...things, walker(f), { name: "idle_up", at: [-3.4, Z + 2.5, TOP], frame: 0 }]
 const CLOCK = { frames: 16, fps: 1000 / 210 }
-// Morning: the sun low behind on the left (the shadows fall toward us and to the right), warm; the
-// sky's light cool in the shade.
-const LIGHT = { light: [-0.6, 0.65, 0.5], sun: { color: "#ffe2b4", strength: 1.3 }, sky: { color: "#a9b9d6", strength: 0.45 } }
+// Morning: the sun behind on the left (the shadows fall toward us and to the right), warm; the sky's
+// light violet in the shade.
+const LIGHT = { light: [-0.55, 0.6, 0.72], sun: { color: "#ffe2b4", strength: 1.3 }, sky: { color: "#a4a6d8", strength: 0.45 } }
 scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK }, (c) => c.mesh(view(1), M.faces, MATS, { sprites: people(c.frame), ...LIGHT }))
 
 // Four times the size (1920x1080) and through the camera: the hill's top sharp, the wood below and

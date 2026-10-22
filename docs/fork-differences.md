@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**322 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**323 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–22, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -25,7 +25,7 @@ page lists what the fork adds. Every commit is in
 | --- | --- | --- |
 | Commands | 4: `build`, `serve`, `ascii`, `list` | 12: adds `describe`, `shot`, `check`, `steps`, `help`, `compare`, `blind`, `study` |
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
-| Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
+| Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [environment](../environment.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 54 |
 | Tests | 59 | 258 |
 
@@ -63,6 +63,7 @@ moved into the DSL where every scene can use it.
 | Rotation | Free angles, `directions()` for 8 or 16 views, RotSprite checked on real sprites, and a rotation guide. |
 | Import and export | `build --share N` (each asset N times bigger, clean, to post), PNG import (`shrink`, `palettize` to the nearest key in OKLab), Aseprite export (layers, frames, tags, palette, slices), GIFs that keep small figures' colors in lit scenes. |
 | Procedural | `hash`, `vnoise`, `fbm`, `bayer`, `seamless`; `scroll()` for parallax planes, `clouds()`, `plume()` for smoke and steam. |
+| The ground and what grows on it | An [environment guide](../environment.md): grass, trees, bushes, rocks, walls, paths and small things as 16-bit games draw them, from SLYNYRD's, Saint11's and final boss blues' tutorials and `pxl study` on seven games' sheets, with the numbers to check a drawing against; and a [nature kit](../examples/nature/kit.px.js) to include, with builders for more (`grassTile`, `pine`, `bush`, `rampart`). |
 
 ## Characters, animation and rigs
 
@@ -212,6 +213,7 @@ references until it read right.
 | [`rig/`](../examples/rig) | A 72 px knight built skeleton first, two knights fighting a bout at a tournament, and a warden's whirling axe combo on a skeleton in 3D, the body turning with the swing, with smears and a floor reflection. |
 | [`cyberpunk/`](../examples/cyberpunk) | One city street made two ways: by one agent, and by a planner with eight forked agents. |
 | [`perspective/`](../examples/perspective) | The sertão road, the park at 2 pm, the end of the Cretaceous, a street race from the cockpit. |
+| [`nature/`](../examples/nature) | The nature kit: grass tiles, pines, bushes, rocks, a wall, flagstones, tufts, flowers, a dead tree. |
 | [`hd2d/`](../examples/hd2d) | HD-2D dioramas: a plaza in a pine wood at the end of the afternoon, textured boxes, the hero walking behind a low wall, long shadows, lit lamps; and a graveyard on a hill in the morning mist, its grass, stones, headstones and pines drawn after the games' sheets; each at 1920x1080 through `post()`. |
 | [`parallax/`](../examples/parallax) | A steam train crossing the hills of Minas Gerais, planes going by at their own speeds. |
 | [`fonts/`](../examples/fonts) | A 5×7 font for titles. |

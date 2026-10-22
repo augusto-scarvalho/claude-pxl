@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { didYouMean } from "../core/errors.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const GUIDES = ["scenes.md", "characters.md", "lighting.md", "rotation.md"];
+const GUIDES = ["scenes.md", "characters.md", "environment.md", "lighting.md", "rotation.md"];
 /** Mentions, guide lines and example uses shown before "(…N more)". */
 const FEW = { mention: 5, guide: 2, example: 3 };
 

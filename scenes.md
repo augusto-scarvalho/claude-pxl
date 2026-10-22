@@ -70,6 +70,8 @@ look at (`--frames 0-11` for some).
 - Organic texture (leaves, grass, stones, rust): 2–3 tiny brush parts + `scatter` with `on`/`clip`.
   Along an edge (grass on a path's border, moss at a rock's foot): `scatter(..., { on: "g", near:
   "<path keys>", within: 3 })`.
+- How to draw the grass, the cobbles and flagstones, a wall's stones, with the games' numbers:
+  environment §2, §6, §7 (`pxl help "environment 2"`), and `examples/nature/kit.px.js` to include.
 
 ## 3. Texture without filler
 
@@ -144,7 +146,8 @@ light, `light()` a disc toward it), variants a ramp step darker and lighter (`ba
 dark ones low and away from the light, light ones on top toward it. A crown that won't come clean is
 a bad clump. Ball trees in staggered, overlapping rows make a forest. Plant the trunk (cut at the
 ground, no roots spreading), tint its ramp toward the foliage's, shade it under the crown, and judge
-the tree on its ground tile.
+the tree on its ground tile. Conifers, bushes, dead trees and rocks, with the games' numbers:
+environment §3-5; the kit's `pine`, `bush`.
 
 ## 5. Water and things that land
 
@@ -256,14 +259,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   headstone, a rock) is a sprite drawn at the scene's scale, its top in the sun and its front in the
   shade when the sun is behind; drawn as a textured box it comes out blurred into the stone round it
   (`examples/hd2d/graveyard.px.js`).
-- The ground and what grows on it, as 16-bit games draw them (`pxl study` on their sheets): grass is
-  blades in clumps all over a quiet ground, its tones close together, a lighter or darker patch broad,
-  few bright tips (from above they read as dots); a crown or a bush is clusters of 2-3 px each lit on
-  its upper left, an outline in lobes, little deep shadow, the shade bluer and the light yellower; a
-  conifer is tiers whose hems hang in festoons; a rock is two or three masses in flat facets, cream in
-  the sun and blue-violet in the shade, its outline dark on the shaded side only; flagstones are
-  irregular, lit on their upper edge, moss in the joints; a wall's blocks of their own sizes, each lit
-  on top, grass hanging over its head. An outline goes round things, never round the ground.
+- The ground and what grows and lies on it (grass, trees, bushes, rocks, walls, paths, tufts,
+  flowers), as 16-bit games draw them: the environment guide (`pxl help "environment"`, by section)
+  and its kit, `examples/nature/kit.px.js`, to include.
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
   `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:
   each is lit or in shade by which way it faces the sun. People walking in such a scene: pose a body

@@ -175,7 +175,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     const src = sheetRead && whole && !up ? whole : picture, grounds = sheetRead?.grounds ?? new Set<number>(), seen = (c: number) => (c & 255) >= 128 && !grounds.has(c) && c !== backdrop;
     const boxes = sheetRead
       ? [...sheetRead.sprites].filter((b) => b.x1 - b.x0 >= 19 && b.y1 - b.y0 >= 19 && b.x1 - b.x0 < Math.max(160, 0.3 * src.w) && b.y1 - b.y0 < Math.max(160, 0.3 * src.h)).sort((a, b) => b.n - a.n).slice(0, 6)
-      : picture.data.some((c) => (c & 255) < 128) || backdrop !== null ? [(() => { const b = picture.bounds(); return b ? { x0: b.x, y0: b.y, x1: b.x + b.w - 1, y1: b.y + b.h - 1 } : null; })()].filter((b) => b !== null) : [];
+      : picture.data.some((c) => (c & 255) < 128) || backdrop !== null ? [(() => { const b = picture.bounds(); return b ? { x0: b.x, y0: b.y, x1: b.x + b.w - 1, y1: b.y + b.h - 1 } : null; })()].filter((b) => b !== null && (b.x1 - b.x0 + 1) * (b.y1 - b.y0 + 1) < 50000) : [];   // a screen of it and up (50k px): a map, not a thing
     const lines = boxes.flatMap((b) => { const c = craft(src, b!.x0, b!.y0, b!.x1, b!.y1, seen); return c ? [`  at ${b!.x0},${b!.y0}: ${craftLine(c)}`] : []; });
     if (lines.length) text.push("", sheetRead ? "OBJECTS (the biggest, how each is built)" : "OBJECT (how it is built)", ...lines);
   }

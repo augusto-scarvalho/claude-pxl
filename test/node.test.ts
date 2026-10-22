@@ -672,7 +672,7 @@ test("pxl help is short: other mentions a line each, a guide section by its head
   assert.match(await said("help", "small animals"), /^\[characters\.md\]\n## 9\. Small animals\n/);
   assert.match(await said("help", "characters 9"), /^\[characters\.md\]\n## 9\. Small animals\n/);
   // a name that is an op: its rows, and the sections that share its words named, not printed
-  assert.match(await said("help", "light"), /\[guides: 2 sections\]\n {2}pxl help "scenes 11. Shadows and light"/);
+  assert.match(await said("help", "light"), /\[guides: 3 sections\]\n {2}pxl help "scenes 11. Shadows and light"/);
   // heading words are whole words: "anim" is the reference's Animation, not "Small animals"
   const anim = await said("help", "anim");
   assert.match(anim, /^\[reference\.md: Animation\]/m);
