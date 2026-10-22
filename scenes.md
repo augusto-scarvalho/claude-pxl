@@ -247,7 +247,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   meter where it looks, so a texel and a sprite's pixel come out the same size. The look is the
   camera's: the same scene four times as big (the view's `w` and `horizon` x4, `pixel: 4` for the
   sprites) with `post()` after it, a band of depth in focus and the rest blurred, haze far off, a
-  bloom, darker corners; `check: false` on that one, the small one is what's checked
+  bloom, darker corners; `check: false` on that one, the small one is what's checked. And light in
+  the world on `mesh()`: a warm `sun` low and a little behind (its shadows fall toward us), a cool
+  `sky`, `lamps` with `emit` on their glass, `bump("hybrid")` on the sprites so they take it
   (`examples/hd2d/plaza.px.js`).
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
   `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:

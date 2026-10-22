@@ -45,7 +45,7 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { floor: { tex: "_white" 
 test("mesh sprites: errors say what a sprite is and where sprites can stand", () => {
   const scene = (sprites: string, view = "V") => PAL + STAGE + `scene("a", { w: 40, h: 40 }, (c) => c.mesh(${view}, [], {}, { sprites: ${sprites} }))`;
   assert.match(failure(scene(`[{ name: "s", at: [0] }]`), "a").message, /sprite 0 is \{ name, at: \[x, z\] or \[x, z, up\]/);
-  assert.match(failure(scene(`[{ name: "s", at: [0, 4] }]`, "(p) => [p[0], p[1], p[2]]"), "a").message, /sprites stand in a perspective view/);
+  assert.match(failure(scene(`[{ name: "s", at: [0, 4] }]`, "(p) => [p[0], p[1], p[2]]"), "a").message, /sprites need a perspective view/);
   assert.match(failure(scene(`[]`).replace("{}, { sprites: [] }", '{ m: { tex: "_white", texel: 0 } }, {}'), "a").message, /texel 0: a texel's size in m/);
 });
 
@@ -74,4 +74,27 @@ test("post: errors; a sprite's pixel can be K x K; a scene saying check: false i
   const { checkProject } = await import("../src/node/check.ts");
   const p = loadSource(PAL + STAGE + FLOOR + `scene("a", { w: 40, h: 40, check: false }, floor)`, "t.px.js", { checksOnly: true });
   assert.match(checkProject(p).notes.join("\n"), /a › not checked \(check: false\)/);
+});
+
+// light in the world over a white floor, a 1 m block at x 0..0.3, z 3..4, the sun low on the left
+const LIT = `const B = model()
+B.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0]); B.box("f", [0, 3, 0], [0.3, 4, 1])
+sprite("_ball", { w: 8, h: 8, pivot: "bottom" }, circ(3, 3, 3, "w"), bump("hybrid"))
+const lit = (o) => (c) => c.mesh(V, B.faces, { f: { tex: "_white" } }, { light: [-1, 0, 0.8], sun: "w", sky: { color: "w", strength: 0.2 }, ...o })
+`;
+const red = (body: string, x: number, y: number, opts = {}) => loadSource(PAL + STAGE + LIT + body, "t.px.js", opts).image("a").get(x, y) >>> 24;
+
+test("mesh light: the sun's shadow, a lamp's pool, what gives light, a sprite's normals; none when only checking", () => {
+  // the floor at x 0.6, z 3.5 (column 27, row 21) is behind the block from the sun, at x -0.6 (column 13) it isn't
+  const scene = (o: string) => `scene("a", { w: 40, h: 40 }, lit(${o}))`;
+  assert.ok(red(scene("{}"), 13, 21) > red(scene("{}"), 27, 21) + 40, "in the block's shadow");
+  assert.equal(red(scene("{ shadows: false }"), 27, 21), red(scene("{ shadows: false }"), 13, 21), "no shadows: lit alike");
+  // a lamp at x -1, z 5, 2 m: the floor under it (column 12, row 18) against beyond its reach (column 30)
+  const lamp = `{ sun: { color: "w", strength: 0 }, lamps: [{ at: [-1, 5, 0.5], color: "w", r: 2, strength: 2 }] }`;
+  assert.ok(red(scene(lamp), 12, 18) > red(scene(lamp), 30, 18) + 40, "the lamp's pool");
+  assert.equal(rows(LIT + scene(`{ emit: "w" }`))[21][27], "w", "what gives light is drawn as it is, shadow or not");
+  // a ball with a normal map standing at z 4 (columns 16..23, rows 12..19): its side toward the sun lighter
+  const ball = `scene("a", { w: 40, h: 40 }, lit({ shadows: false, sprites: [{ name: "_ball", at: [0, 4], shadow: 0 }] }))`;
+  assert.ok(red(ball, 17, 16) > red(ball, 22, 16) + 20, "lit on its left");
+  assert.equal(red(scene("{}"), 27, 21, { checksOnly: true }), red(`scene("a", { w: 1, h: 1, bg: "w" })`, 0, 0), "only checking: as drawn");
 });

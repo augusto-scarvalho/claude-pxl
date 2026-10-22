@@ -188,7 +188,12 @@ declare global {
   /** A sprite standing among mesh()'s faces: its feet at [x, z] or [x, z, up] m, the contact shadow's radius in m (0: none). */
   interface PxMeshSprite { name: string; at: [number, number] | PxV3; flip?: "x"; frame?: number; shadow?: number }
   /** mesh()'s light: the way toward it in the points' frame, or a face's light (0 dark, 1 lit) from its normal toward the eye, its middle, the face; sprites standing among the faces (a perspective view). */
-  interface PxMeshOpts { light?: PxV3 | ((normal: PxV3, middle: PxV3, face: PxFace) => number); sprites?: PxMeshSprite[]; /** px to a sprite's pixel (an HD picture: 4) */ pixel?: number }
+  interface PxMeshOpts {
+    light?: PxV3 | ((normal: PxV3, middle: PxV3, face: PxFace) => number); sprites?: PxMeshSprite[]; /** px to a sprite's pixel (an HD picture: 4) */ pixel?: number;
+    /** Light in the world (textured faces and sprites, through their normal maps): the sun's color (`light` the way to it), the sky's, lamps, keys that give light, the sun's shadows (default on). */
+    sun?: PxColor | { color: PxColor; strength?: number }; sky?: PxColor | { color: PxColor; strength?: number };
+    lamps?: { at: PxV3; color: PxColor; r?: number; strength?: number }[]; emit?: string; shadows?: boolean;
+  }
   /** A camera of one's own for mesh(): a point in the camera's frame (x right, y up, z ahead, from the eye) to [col, row, depth]. */
   type PxProject = (p: PxV3) => [number, number, number];
   /** terrain()'s options: how far to look (m), the land's highest point, a cheap height it never rises more than `margin` above, the sky's color where a pixel sees no land. */

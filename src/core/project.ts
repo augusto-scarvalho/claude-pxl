@@ -112,7 +112,7 @@ export const OP_OPTS: Record<string, string[]> = {
   // one options object serves both: solids ignores shade, shadows ramps and light
   solids: ["at", "sun", "scale", "ramps", "light", "shade"],
   shadows: ["at", "sun", "scale", "shade", "ramps", "light"],
-  mesh: ["light", "sprites", "pixel"],
+  mesh: ["light", "sprites", "pixel", "sun", "sky", "lamps", "emit", "shadows"],
   capsule: ["light", "rim"],
   flame: ["wind", "period", "seed", "frame"],
   scroll: ["x", "y", "frame", "axis"],

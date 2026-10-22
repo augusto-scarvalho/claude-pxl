@@ -1,4 +1,4 @@
-import { type Color, TRANSPARENT, oklab } from "./color.ts";
+import { type Color, LIN, TRANSPARENT, oklab } from "./color.ts";
 import { Img } from "./image.ts";
 import type { Palette, Resolved } from "./palette.ts";
 import { PxError } from "./errors.ts";
@@ -8,6 +8,7 @@ import { bump, dirOf, setNormal } from "./normals.ts";
 import { type View, perspective } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
 import { type Face, type Material, type MeshCanvas, type MeshOpts, drawMesh } from "./mesh.ts";
+import type { Lit } from "./sunlight.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
 import { bayer, colorList, gridRows, hash, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
 
@@ -754,9 +755,30 @@ export class Canvas {
       memo.set(key, s);
       return s;
     };
+    // the light in the world: its colors in linear light, times their strengths (see sunlight.ts)
+    // (not when only checking: the checks read what was placed, not the light on it, as with lighting())
+    let lit: Lit | undefined;
+    if (opts.sun !== undefined && !(this.res as { checksOnly?: boolean }).checksOnly) {
+      const rgb = (v: unknown, what: string): [number, number, number] => {
+        const o = (typeof v === "string" ? { color: v } : v) as { color?: unknown; strength?: unknown } | undefined;
+        const c = typeof o?.color === "string" ? this.color(o.color) : null, k = o?.strength ?? 1;
+        if (c === null || c === TRANSPARENT || typeof k !== "number" || !(k >= 0))
+          throw new PxError(`mesh: ${what} is a color, or { color, strength } (a strength from 0), got ${JSON.stringify(v)}`);
+        return [LIN[c >>> 24] * k, LIN[(c >>> 16) & 255] * k, LIN[(c >>> 8) & 255] * k];
+      };
+      if (typeof opts.light === "function") throw new PxError("mesh: with a sun, light is the way toward it, [x, z, up], not a function");
+      const sun = rgb(opts.sun, "sun"), sky = opts.sky !== undefined ? rgb(opts.sky, "sky") : ([sun[0] * 0.28, sun[1] * 0.32, sun[2] * 0.4] as [number, number, number]);
+      const lamps = (opts.lamps ?? []).map((l, k) => {
+        if (!Array.isArray(l?.at) || l.at.length !== 3 || !l.at.every(Number.isFinite) || !(l.r === undefined || l.r > 0))
+          throw new PxError(`mesh: lamp ${k} is { at: [x, z, up], color, r? (its reach in m), strength? }, got ${JSON.stringify(l)}`);
+        return { at: l.at, rgb: rgb(l, `lamp ${k}`), r: l.r ?? 4 };
+      });
+      const emit = new Set([...(opts.emit ?? "")].map((k) => this.color(k)).filter((c): c is Color => c !== null));
+      lit = { sun, sky, dir: [0, 0, 1], lamps, emit, shadows: opts.shadows !== false };
+    }
     // straight into the pixels when nothing stands between (a clip, a twin's mirror, a wrapped edge)
     const mc = Object.assign(Object.create(this) as MeshCanvas, { raw: this.clipPred || this.mirrored || this.wrap ? undefined : this.img.data });
-    for (const p of drawMesh(mc, view, faces, mats, opts, { tex, sprites, step }))
+    for (const p of drawMesh(mc, view, faces, mats, opts, { tex, sprites, step, lit }))
       this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img });
   }
 

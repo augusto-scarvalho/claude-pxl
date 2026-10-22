@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**316 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**317 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–22, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -27,7 +27,7 @@ page lists what the fork adds. Every commit is in
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 54 |
-| Tests | 59 | 252 |
+| Tests | 59 | 253 |
 
 ## Looking and checking
 
@@ -95,7 +95,7 @@ follows from it.
 | `terrain()` | Hills and mountains from a height function, lit and fading with distance. |
 | `solids()`, `shadows()` | Things built of solid shapes, each face lit by the side it faces, casting its shadow from one sun. |
 | `ray()`, `toward()` | Where a screen point lands in the world, and where the sun or any direction sits in the picture. |
-| `mesh()`, `model()` | Flat faces in meters drawn with a depth per pixel, like the race's car interior, modelled after a Supra A80; materials tiled with pixel-art textures, and sprites standing among the faces in the same depth, on contact shadows (HD-2D's dioramas). |
+| `mesh()`, `model()` | Flat faces in meters drawn with a depth per pixel, like the race's car interior, modelled after a Supra A80; materials tiled with pixel-art textures, and sprites standing among the faces in the same depth, on contact shadows (HD-2D's dioramas); light in the world on them: a sun with shadows (sprites throw theirs, turned to it), a sky, lamps, sprites lit through their normal maps. |
 | `post()` | What the camera does after: depth of field by `mesh()`'s depth (the tilt-shift look of HD-2D), haze, bloom, vignette, in linear light, at 1920x1080 in about a second a frame. |
 
 Five scenes are built on this: a road across the sertão, a park at 2 pm in two-point perspective, the
@@ -203,7 +203,7 @@ references until it read right.
 | [`rig/`](../examples/rig) | A 72 px knight built skeleton first, two knights fighting a bout at a tournament, and a warden's whirling axe combo on a skeleton in 3D, the body turning with the swing, with smears and a floor reflection. |
 | [`cyberpunk/`](../examples/cyberpunk) | One city street made two ways: by one agent, and by a planner with eight forked agents. |
 | [`perspective/`](../examples/perspective) | The sertão road, the park at 2 pm, the end of the Cretaceous, a street race from the cockpit. |
-| [`hd2d/`](../examples/hd2d) | An HD-2D diorama: a plaza in a pine wood seen from high up through a long lens, textured boxes, the hero walking behind a low wall; the same at 1920x1080 through `post()`. |
+| [`hd2d/`](../examples/hd2d) | An HD-2D diorama: a plaza in a pine wood seen from high up through a long lens at the end of the afternoon, textured boxes, the hero walking behind a low wall, long shadows, lit lamps; the same at 1920x1080 through `post()`. |
 | [`parallax/`](../examples/parallax) | A steam train crossing the hills of Minas Gerais, planes going by at their own speeds. |
 | [`fonts/`](../examples/fonts) | A 5×7 font for titles. |
 

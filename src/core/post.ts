@@ -4,7 +4,7 @@
 // round what is bright; darker corners. Depth is mesh()'s (Img.depth): what it didn't draw (a sky
 // painted under it) is far away. In linear light; the blurs at a fraction of the picture's size
 // (they are smooth) and brought back up bilinearly. It leaves the palette: colors mix.
-import { type Color, TRANSPARENT } from "./color.ts";
+import { type Color, LIN, TRANSPARENT, fromLinear } from "./color.ts";
 import { PxError } from "./errors.ts";
 import type { Img } from "./image.ts";
 import { blur } from "./normals.ts";
@@ -26,8 +26,6 @@ export interface PostOpts {
   vignette?: number;
 }
 
-const LIN = Float64Array.from({ length: 256 }, (_, v) => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
-const SRGB = Uint8Array.from({ length: 4096 }, (_, i) => { const l = i / 4095; return Math.round(255 * (l <= 0.0031308 ? 12.92 * l : 1.055 * l ** (1 / 2.4) - 0.055)); });
 /** The last vignette's factor per pixel: an animation's frames share one. */
 const VIGNETTE = new Map<string, Float32Array>();
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -179,7 +177,6 @@ export function applyPost(img: Img, o: PostOpts, fogColor: Color | null): void {
   for (let i = 0; i < n; i++) {
     const c = data[i];
     if (c === TRANSPARENT) continue;
-    const r = R[i], g = G[i], b = B[i];
-    data[i] = (((r >= 1 ? 255 : r <= 0 ? 0 : SRGB[(r * 4095 + 0.5) | 0]) << 24) | ((g >= 1 ? 255 : g <= 0 ? 0 : SRGB[(g * 4095 + 0.5) | 0]) << 16) | ((b >= 1 ? 255 : b <= 0 ? 0 : SRGB[(b * 4095 + 0.5) | 0]) << 8) | (c & 255)) >>> 0;
+    data[i] = fromLinear(R[i], G[i], B[i], c);
   }
 }

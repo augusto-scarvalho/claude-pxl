@@ -3,6 +3,13 @@ export type Color = number;
 
 export const TRANSPARENT: Color = 0;
 
+/** A channel byte in linear light, and back: SRGB[round(linear * 4095)] (exact both ways for every byte). */
+export const LIN = Float64Array.from({ length: 256 }, (_, v) => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
+export const SRGB = Uint8Array.from({ length: 4096 }, (_, i) => { const l = i / 4095; return Math.round(255 * (l <= 0.0031308 ? 12.92 * l : 1.055 * l ** (1 / 2.4) - 0.055)); });
+/** A color from linear channels (clipped to 0..1), its alpha a. */
+export const fromLinear = (r: number, g: number, b: number, a: number): Color =>
+  (((r >= 1 ? 255 : r <= 0 ? 0 : SRGB[(r * 4095 + 0.5) | 0]) << 24) | ((g >= 1 ? 255 : g <= 0 ? 0 : SRGB[(g * 4095 + 0.5) | 0]) << 16) | ((b >= 1 ? 255 : b <= 0 ? 0 : SRGB[(b * 4095 + 0.5) | 0]) << 8) | (a & 255)) >>> 0;
+
 export function pack(r: number, g: number, b: number, a = 255): Color {
   return (((r & 255) << 24) | ((g & 255) << 16) | ((b & 255) << 8) | (a & 255)) >>> 0;
 }

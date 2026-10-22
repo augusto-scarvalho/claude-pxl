@@ -8,10 +8,11 @@
 // walls and floors, HD-2D's dioramas), each pixel stepped along its ramp by the face's light; and
 // sprites can stand among the faces, upright and turned to the camera, in the same depth, so a wall
 // hides a figure's legs and not its head. Each sprite gets a contact shadow on what it stands on.
-import { type Color, TRANSPARENT } from "./color.ts";
+import { type Color, LIN, TRANSPARENT, fromLinear } from "./color.ts";
 import { PxError } from "./errors.ts";
 import type { Img } from "./image.ts";
 import { type Perspective, type View, perspective } from "./perspective.ts";
+import { type Lit, SunMap, shine } from "./sunlight.ts";
 import { bayer } from "./util.ts";
 
 export type V3 = [number, number, number];
@@ -53,6 +54,19 @@ export interface MeshOpts {
   sprites?: MeshSprite[];
   /** px to a sprite's pixel (default 1): 4 draws them four times as big, for a picture four times as big (HD) */
   pixel?: number;
+  /**
+   * Light in the world (a perspective view, textured faces and sprites; see sunlight.ts): the sun's
+   * color (`light` is the way to it), or { color, strength }. With it, colors leave the palette.
+   */
+  sun?: string | { color: string; strength?: number };
+  /** the light everywhere, from the sky (default a third of the sun's, a little blue) */
+  sky?: string | { color: string; strength?: number };
+  /** point lights: where, their color, how far they reach in m (default 4), how strong (default 1) */
+  lamps?: { at: V3; color: string; r?: number; strength?: number }[];
+  /** keys that give light instead of taking it (a lamp's glass, a window at night): drawn as they are */
+  emit?: string;
+  /** the sun's shadows (default true with a sun) */
+  shadows?: boolean;
 }
 export interface MeshCanvas {
   img: { w: number; h: number; depth?: Float32Array };
@@ -69,6 +83,8 @@ export interface MeshWorld {
   tex: Record<string, Img>;
   sprites: { name: string; img: Img; at: V3; shadow?: number }[];
   step(c: Color, n: number): Color;
+  /** the light, its colors resolved (with `sun`) */
+  lit?: Lit;
 }
 type Project = (p: V3) => [number, number, number];
 
@@ -172,6 +188,24 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       }
     }
   });
+  // the light in the world: what the sun sees, every face and every sprite turned to it, over what
+  // the camera sees (a point in four of the picture's, and the sprites' feet)
+  const L = world?.lit, K = opts.pixel ?? 1;
+  if (L) L.dir = sunDir;
+  if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`mesh: pixel is how many px a sprite's pixel takes, a whole number from 1, got ${K}`);
+  if ((L || world?.sprites.length) && !cam.P) throw new PxError(`mesh: ${L ? "a sun" : "sprites"} need a perspective view ({ w, horizon, eye, ... }), not a camera function`);
+  const feet = (world?.sprites ?? []).map((s) => cam.project(s.at)), perM = feet.map((f) => cam.P!.focal / f[2]);
+  let sunMap: SunMap | undefined;
+  if (L?.shadows) {
+    const seen = (visit: (x: number, y: number, z: number) => void) => {
+      for (let i = 0; i < n; i += 4) if (who[i] >= 0) visit(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
+      for (const s of world!.sprites) visit(...s.at);
+    };
+    // a cell to every two px of the picture: an HD-2D picture's pixel of art
+    sunMap = new SunMap(L.dir, seen, Math.min(1024, Math.max(256, Math.max(W, H) / 2)));
+    faces.forEach((F, k) => { for (let t = 1; t + 1 < F.pts.length; t++) sunMap!.tri(F.pts[0], F.pts[t], F.pts[t + 1], k); });
+    world!.sprites.forEach((s, k) => sunMap!.sprite(s.img, s.at, K / perM[k], -2 - k));
+  }
   // which coordinate is up, and which runs away from the camera: [x, z, up] through perspective(), [x, y up, z ahead]
   // otherwise; per face, the coordinates a texture runs across and down: a floor across and away, a wall across and down
   const UP = cam.up[2] ? 2 : 1, AHEAD = UP === 2 ? 1 : 2;
@@ -194,9 +228,13 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     const F = faces[k], M = mats[F.mat], r = ramps[F.mat], N = normals[k];
     if (M.tex !== undefined && M.edge === undefined) {
       // a floor reads the texture across and away, a wall across and down; light steps each texel along its ramp
-      const T = world!.tex[F.mat], s = 1 / (M.texel ?? 1 / 16), [ua, va] = uv[k], lit = litTex(k, T);
-      const col = lit[mod(Math.floor(-pos[i * 3 + va] * s), T.h) * T.w + mod(Math.floor(pos[i * 3 + ua] * s), T.w)];
+      const T = world!.tex[F.mat], s = 1 / (M.texel ?? 1 / 16), [ua, va] = uv[k], lit = L ? T.data : litTex(k, T);
+      let col = lit[mod(Math.floor(-pos[i * 3 + va] * s), T.h) * T.w + mod(Math.floor(pos[i * 3 + ua] * s), T.w)];
       if (col === TRANSPARENT) continue;
+      if (L) {
+        const px = pos[i * 3], py = pos[i * 3 + 1], pz = pos[i * 3 + 2], facing = dot(N, L.dir);
+        col = shine(col, N, px, py, pz, L, facing > 0 && (!sunMap || sunMap.sees(px, py, pz, -1, facing)), 0);
+      }
       if (c.raw) c.raw[i] = col;
       else c.plot(x + x0, y + y0, col);
       continue;
@@ -230,15 +268,12 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     for (let i = 0; i < n; i++) if (who[i] !== -1 && depth[i] < d[i]) d[i] = depth[i];
   };
   if (!world?.sprites.length) { keep(); return []; }
-  if (!cam.P) throw new PxError("mesh: sprites stand in a perspective view ({ w, horizon, eye, ... }), not a camera function");
-  const focal = cam.P.focal, K = opts.pixel ?? 1, placed: { name: string; x: number; y: number; img: Img }[] = [];
-  if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`mesh: pixel is how many px a sprite's pixel takes, a whole number from 1, got ${K}`);
+  const placed: { name: string; x: number; y: number; img: Img }[] = [];
   // contact shadows: what each sprite stands on, two steps darker in the middle and one out to the
   // radius (the darkest where two overlap)
   const shade = new Uint8Array(n);
-  const feet = world.sprites.map((s) => cam.project(s.at));
   world.sprites.forEach((s, k) => {
-    const [fx, fz, fu] = s.at, R = s.shadow ?? (s.img.w * K) / 2.5 / (focal / feet[k][2]);
+    const [fx, fz, fu] = s.at, R = s.shadow ?? (s.img.w * K) / 2.5 / perM[k];
     if (!(R > 0)) return;
     const box = [[fx - R, fz - R], [fx + R, fz - R], [fx - R, fz + R], [fx + R, fz + R]].map(([x, z]) => cam.project([x, z, fu]));
     const xa = Math.max(0, Math.floor(Math.min(...box.map((b) => b[0]))) - x0), xb = Math.min(W - 1, Math.ceil(Math.max(...box.map((b) => b[0]))) - x0);
@@ -248,23 +283,41 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       if (who[i] >= 0 && Math.abs(pos[i * 3 + 2] - fu) < 0.05 && r <= R) shade[i] = Math.max(shade[i], r <= 0.6 * R ? 2 : 1);
     }
   });
-  for (let i = 0; i < n; i++) if (shade[i]) { const x = (i % W) + x0, y = Math.floor(i / W) + y0; c.plot(x, y, world.step(c.get(x, y), -shade[i])); }
+  // (in the world's light, a share of the light taken away instead of ramp steps)
+  for (let i = 0; i < n; i++) {
+    if (!shade[i]) continue;
+    const x = (i % W) + x0, y = Math.floor(i / W) + y0, col = c.get(x, y), f = shade[i] === 2 ? 0.55 : 0.75;
+    c.plot(x, y, L ? fromLinear(LIN[col >>> 24] * f, LIN[(col >>> 16) & 255] * f, LIN[(col >>> 8) & 255] * f, col) : world.step(col, -shade[i]));
+  }
+  // a sprite's right, the world's up, and its face (toward the camera, level): its normal map turned into the world
+  const yaw = (cam.P!.yaw * Math.PI) / 180, right: V3 = [Math.cos(yaw), -Math.sin(yaw), 0], front: V3 = [-Math.sin(yaw), -Math.cos(yaw), 0];
   // the sprites: upright at their feet, a pixel to K x K px, each row as deep as that height above the
   // feet; a pixel less than half opaque is cut (it neither shows nor hides what's behind)
   world.sprites.forEach((s, k) => {
-    const { img } = s, [px, py] = img.pivot ?? [img.w / 2, img.h], perM = focal / feet[k][2];
+    const { img } = s, [px, py] = img.pivot ?? [img.w / 2, img.h], m = K / perM[k];
     const X0 = Math.round(feet[k][0] - px * K), Y0 = Math.round(feet[k][1] - py * K);
+    // in the world's light, each of its pixels lit the first time it shows: where it stands on the
+    // sprite's plane, which way it faces (0: not lit yet; a lit color is never 0, its alpha isn't)
+    const lit = L ? new Uint32Array(img.data.length) : undefined, nm = img.norm;
+    const colorAt = (q: number, i: number, j: number) => {
+      if (!lit) return img.data[q];
+      if (lit[q]) return lit[q];
+      const col = img.data[q], a = (i + 0.5 - px) * m, X = s.at[0] + right[0] * a, Y = s.at[1] + right[1] * a, U = s.at[2] + (py - j - 0.5) * m;
+      const has = nm && nm[q * 3 + 2] > 0, nx = has ? nm![q * 3] / 127 : 0, ny = has ? nm![q * 3 + 1] / 127 : 0, nz = has ? nm![q * 3 + 2] / 127 : 1;
+      const N = unit([nx * right[0] + nz * front[0], nx * right[1] + nz * front[1], -ny]), facing = dot(N, L!.dir);
+      return (lit[q] = shine(col, N, X, Y, U, L!, facing > -0.5 && (!sunMap || sunMap.sees(X, Y, U, -2 - k, Math.max(0.2, facing))), 0.5));
+    };
     for (let j = 0; j < img.h * K; j++) {
       const yi = Y0 + j - y0;
       if (yi < 0 || yi >= H) continue;
       // a hair nearer than the feet, so a figure against a wall stays in front of it
-      const d = cam.project([s.at[0], s.at[1], s.at[2] + (py * K - j - 0.5) / perM])[2] - 0.02, row = Math.floor(j / K) * img.w;
+      const d = cam.project([s.at[0], s.at[1], s.at[2] + (py * K - j - 0.5) / perM[k]])[2] - 0.02, row = Math.floor(j / K) * img.w;
       for (let i = 0; i < img.w * K; i++) {
-        const col = img.data[row + Math.floor(i / K)], xi = X0 + i - x0, q = yi * W + xi;
+        const si = Math.floor(i / K), col = img.data[row + si], xi = X0 + i - x0, q = yi * W + xi;
         if ((col & 255) < 128 || xi < 0 || xi >= W || d >= depth[q]) continue;
         depth[q] = d;
         who[q] = -2;
-        c.plot(X0 + i, Y0 + j, col);
+        c.plot(X0 + i, Y0 + j, colorAt(row + si, si, Math.floor(j / K)));
       }
     }
     placed.push({ name: s.name, x: X0, y: Y0, img: K > 1 ? img.scale(K) : img });

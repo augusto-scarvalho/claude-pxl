@@ -3,9 +3,9 @@
 // faces are tiled with pixel-art textures, 16 texels to the meter; the hero from topdown_hero, the
 // pines, bushes and lamps stand in it as flat sprites turned to the camera. One mesh() draws them all
 // with a depth per pixel, so the low wall hides the legs of the hero walking behind it and not his
-// head, the crate half hides another, and each stands on a contact shadow. The sun is mesh()'s own,
-// from the upper left behind us: tops as the textures are drawn, faces toward us a step darker,
-// faces to the right two. `plaza` is the art at its own size, the one checked; `plaza_hd` the same
+// head, the crate half hides another, and each stands on a contact shadow. Light in the world: a
+// late sun with its shadows (the wall's, the people's, the pines'), a cool sky, two lamps (LIGHT).
+// `plaza` is the art at its own size, the one checked (check builds it unlit); `plaza_hd` the same
 // four times as big, with what the camera does to it: post().
 include("../topdown_hero/hero.px.js")
 
@@ -71,8 +71,8 @@ sprite("_pine", { w: 29, h: 60, pivot: "bottom" }, (c) => {
     }
   }
   for (let y = 52; y < 60; y++) for (let x = 13; x <= 15; x++) c.px(x, y, x === 13 ? "d" : "s")
-})
-sprite("_bush", { w: 13, h: 8, pivot: "bottom", outline: "k" }, ellipse(6, 4, 5, 3, "h"), ellipse(5, 3, 3, 2, "j"), px(4, 2, "l"), hline(2, 7, 9, "g"))
+}, bump("hybrid"))
+sprite("_bush", { w: 13, h: 8, pivot: "bottom", outline: "k" }, ellipse(6, 4, 5, 3, "h"), ellipse(5, 3, 3, 2, "j"), px(4, 2, "l"), hline(2, 7, 9, "g"), bump("hybrid"))
 // A lamp: a pole of dark iron, a lantern of glass on top under a cap.
 sprite("_lamp", { w: 7, h: 30, pivot: "bottom" }, rect(3, 8, 1, 22, "k"), rect(1, 28, 5, 2, "k"),
   rect(1, 1, 5, 1, "k"), rect(1, 2, 5, 5, "Y"), rect(2, 3, 3, 3, "y"), rect(0, 7, 7, 1, "k"))
@@ -128,12 +128,19 @@ for (let k = 0; k < 90; k++) {
 for (let x = -5.5; x <= 5.5; x += 1.6) around.push({ name: "_bush", at: [x + R() * 0.4, Z - 4.4] })
 around.push({ name: "_lamp", at: [-5.6, Z - 3.6, UP] }, { name: "_lamp", at: [5.6, Z - 3.6, UP] })
 const CLOCK = { frames: 16, fps: 1000 / 210 }
-scene("plaza", { w: W, h: H, bg: "q", ...CLOCK }, (c) => c.mesh(view(1), M.faces, MATS, { sprites: people(c.frame) }))
+// Late afternoon: a warm sun low on the left and a little behind the plaza, so the shadows of the
+// wall, the pines and the people fall toward us; a cool sky in the shade; the lamps lit, their
+// glass giving light, not taking it. The pines and bushes take it through their normal maps.
+const LIGHT = {
+  light: [-0.75, 0.45, 0.5], sun: { color: "#ffd49a", strength: 1.35 }, sky: { color: "#8aa2d0", strength: 0.42 }, emit: "yY",
+  lamps: [-5.6, 5.6].map((x) => ({ at: [x, Z - 3.6, UP + 1.15], color: "#ffbe6a", r: 3.5, strength: 1.6 })),
+}
+scene("plaza", { w: W, h: H, bg: "q", ...CLOCK }, (c) => c.mesh(view(1), M.faces, MATS, { sprites: people(c.frame), ...LIGHT }))
 
 // The same at four times the size (1920x1080), each pixel of art 4x4, and what the camera does to
 // it: the band of depth where the people stand sharp and the rest blurred, from a camera this high
 // up the look of a model (DIST is the depth at the picture's middle, where post() focuses); the far
 // grass hazed; a bloom on what is bright; darker corners. Checked at its own size, above.
 scene("plaza_hd", { w: W * 4, h: H * 4, bg: "q", ...CLOCK, check: false },
-  (c) => c.mesh(view(4), M.faces, MATS, { sprites: people(c.frame), pixel: 4 }),
+  (c) => c.mesh(view(4), M.faces, MATS, { sprites: people(c.frame), pixel: 4, ...LIGHT }),
   post({ blur: 32, sharp: 1, soft: 4, fog: { color: "#c8d4dc", from: DIST + 4, to: DIST + 20, max: 0.5 }, bloom: { strength: 0.9, r: 40 }, vignette: 0.35 }))
