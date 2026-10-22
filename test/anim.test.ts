@@ -267,6 +267,13 @@ test("scroll: a strip that wraps goes by a whole number of its widths in the loo
   assert.match(failure(PAL + strip + `anim("go", { w: 6, h: 1, frames: 4 }, scroll("s", 0, 6))`, "go").message, /whole number of 4s/);
 });
 
+test("scroll down: a strip that wraps in y goes down a whole number of its heights in the loop", () => {
+  const strip = `sprite("s", { w: 1, h: 4, wrap: "y" }, "r\\nw\\ng\\nk")\n`;
+  const p = load(strip + `anim("go", { w: 1, h: 6, frames: 4, fps: 4 }, scroll("s", 0, 4, { axis: "y" }))`);
+  assert.deepEqual(frameKeys(p, "go"), ["r\nw\ng\nk\nr\nw", "k\nr\nw\ng\nk\nr", "g\nk\nr\nw\ng\nk", "w\ng\nk\nr\nw\ng"]);
+  assert.match(failure(PAL + strip + `anim("go", { w: 1, h: 6, frames: 4 }, scroll("s", 0, 6, { axis: "y" }))`, "go").message, /6\) must be a whole number of 4s/);
+});
+
 test("scroll: a plane that goes a fraction of a px a frame judders, and pxl check says so with an even per", () => {
   const strip = `sprite("s", { w: 4, h: 1, wrap: "x" }, "rwgk")\n`, warned = (per: number, frames: number) => {
     const p = load(strip + `anim("go", { w: 6, h: 1, frames: ${frames}, fps: 4 }, scroll("s", 0, ${per}))`);

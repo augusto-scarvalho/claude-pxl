@@ -269,7 +269,7 @@ declare global {
     curve(points: number[], c: PxColor, opts?: { width?: number; closed?: boolean }): void;
     fill(x: number, y: number, c: PxColor): void;
     dither(x: number, y: number, w: number, h: number, c1: PxColor, c2: PxColor, density?: number): void;
-    grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h" | "r", soft?: number): void;
+    grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h" | "r", soft?: number, seam?: "dither" | "lines"): void;
     noise(x: number, y: number, w: number, h: number, colors: string | string[], density?: number, seed?: number, on?: string): void;
     shade(where?: PxRegion, steps?: number, density?: number): void;
     light(where?: PxRegion, steps?: number, density?: number): void;
@@ -285,7 +285,7 @@ declare global {
     /** Flames rising from (x, y), about `size` px tall, flickering with the frame, leaning with `wind`; `keys` root to tip, the last for edges. */
     flame(x: number, y: number, size: number, keys: string, opts?: { wind?: number; period?: number; seed?: number; frame?: number }): void;
     /** A strip that wraps going by, `per` px a loop (a whole number of its widths): a parallax plane. */
-    scroll(name: string, y: number, per: number, opts?: { x?: number; frame?: number }): void;
+    scroll(name: string, y: number, per: number, opts?: { x?: number; y?: number; frame?: number; axis?: "x" | "y" }): void;
     /** A lane of cumulus drifting one slot a loop while each turns into the next. */
     clouds(opts: PxClouds): void;
     /** Smoke, steam or dust from a point, in a loop that closes. */
@@ -370,7 +370,7 @@ declare global {
   function capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts?: { light?: [number, number]; rim?: boolean }): PxOp;
   /** Flames rising from (x, y), about `size` px tall: tongues flickering with the frame, leaning with `wind`; `keys` from the root to the tip, the last for their edges. */
   function flame(x: number, y: number, size: number, keys: string, opts?: { wind?: number; period?: number; seed?: number; frame?: number }): PxOp;
-  function scroll(name: string, y: number, per: number, opts?: { x?: number; frame?: number }): PxOp;
+  function scroll(name: string, y: number, per: number, opts?: { x?: number; y?: number; frame?: number; axis?: "x" | "y" }): PxOp;
   function clouds(opts: PxClouds): PxOp;
   function plume(x: number, y: number, keys: string, opts?: PxPlume): PxOp;
   /** A function of (x, y) made to close over w (and h): for noise on strips and tiles that wrap. */
@@ -432,7 +432,7 @@ declare global {
   function curve(points: number[], c: PxColor, opts?: { width?: number; closed?: boolean }): PxOp;
   function fill(x: number, y: number, c: PxColor): PxOp;
   function dither(x: number, y: number, w: number, h: number, c1: PxColor, c2: PxColor, density?: number): PxOp;
-  function grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h" | "r", soft?: number): PxOp;
+  function grad(x: number, y: number, w: number, h: number, colors: string | string[], dir?: "v" | "h" | "r", soft?: number, seam?: "dither" | "lines"): PxOp;
   function noise(x: number, y: number, w: number, h: number, colors: string | string[], density?: number, seed?: number, on?: string): PxOp;
   function shade(where?: PxRegion, steps?: number, density?: number): PxOp;
   function light(where?: PxRegion, steps?: number, density?: number): PxOp;

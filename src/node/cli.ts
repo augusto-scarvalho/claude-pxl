@@ -20,7 +20,7 @@ import { reduceColors } from "./gif.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 import { checkProject } from "./check.ts";
-import { cellRow, diffRow, frameTime, otherVersion, shotChanges, shotRow, stack } from "./shot.ts";
+import { cellRow, diffRow, frameTime, greyRow, otherVersion, shotChanges, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
 import { listProject, listText } from "./list.ts";
 import { readMedia } from "./media.ts";
@@ -71,12 +71,13 @@ const USAGE = `pxl — pixel-art DSL
       (a line whose steps are nearly all L's is drawn square on purpose: none), and tones side by side
       too close to tell apart. --readings also lists what the lit-side rule read on every placement,
       warning or not, with a tally: to see where it agrees and where it can't tell.
-  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
-  pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--out DIR]
+  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--out DIR]
+  pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
       to the region, side by side, enlarged, written to <out>/_shot/<name>.png. --vs puts the same
       shot of another version above it (at a git revision, the file and what it includes as they
-      were there); --diff adds a row with the pixels that changed in red. It
+      were there); --diff adds a row with the pixels that changed in red; --grey adds it all again in
+      values only (each pixel's lightness), to see the planes read before the color. It
       also prints what changed since the last shot of the same frames and region (one asset, one
       region: pixels, where) and the warnings pxl check finds on the asset at those frames (its
       LOOK lines too, the pixels they name ringed in <name>_look.png): one call per look. A clip's
@@ -141,6 +142,7 @@ interface Args {
   ats: number[][];
   cell?: number;
   diff?: boolean;
+  grey?: boolean;
   brief?: boolean;
   sheet?: boolean;
   shrink?: number;
@@ -203,6 +205,7 @@ function parse(argv: string[]): Args {
     }
     else if (v === "--cell") a.cell = Number(val());
     else if (v === "--diff") a.diff = true;
+    else if (v === "--grey" || v === "--gray") a.grey = true;
     else if (v === "--brief") a.brief = true;
     else if (v === "--check") a.check = val();
     else if (v === "--frame") a.frame = Number(val());
@@ -458,7 +461,7 @@ export async function main(argv: string[]): Promise<number> {
             const p = proj(s.file), frames = framesFor(p, s.name);
             return { ...s, row: wrapRow(frames.map((f) => p.build(s.name, 0, frameTime(p, s.name, f)).img), regions), frames };
           });
-          const sheet = stack(many.map((s) => s.row)), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
+          const sheet = a.grey ? stack([stack(many.map((s) => s.row)), greyRow(stack(many.map((s) => s.row)))]) : stack(many.map((s) => s.row)), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
           const path = join(outDir, "_shot", many.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".png");
           writePng(path, sheet.scale(k));
           const asset = many.find((s) => "frames" in s) as { frames: number[] } | undefined;
@@ -488,10 +491,11 @@ export async function main(argv: string[]): Promise<number> {
         }
         // as big as ~600k px allow (an image costs ~w*h/750 tokens: about what a preview costs), never
         // past the 1568 px a model is shown
+        if (a.grey) rows.push(greyRow(stack(rows)));
         const sheet = stack(rows), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
         const base = join(outDir, "_shot", name.replace(/[^\w.-]/g, "_")), path = base + ".png", last = join(outDir, "_shot", `${fileTag(file)}.${name.replace(/[^\w.-]/g, "_")}`);
         writePng(path, sheet.scale(k));
-        console.log(`-> ${path} (frames ${frames.join(",")}${a.vs ? `; above: ${a.vs}` : ""}${a.diff ? "; below: what changed" : ""}; ${k}x)`);
+        console.log(`-> ${path} (frames ${frames.join(",")}${a.vs ? `; above: ${a.vs}` : ""}${a.diff ? "; below: what changed" : ""}${a.grey ? "; at the bottom: its values, each pixel's lightness as a grey" : ""}; ${k}x)`);
         // against the last shot of the same frames and region: did the edit change anything, and where
         const key = JSON.stringify({ frames, at: a.at ?? null });
         if (existsSync(last + ".last.json") && readFileSync(last + ".last.json", "utf8") === key)

@@ -787,5 +787,11 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   pixels staying in place) failed: flickering lights move more than it does.
 - [ ] **A 16 px walk read as nothing moving** (Final Fantasy's 4-frame walk at 300 ms), and its
   shading swapping with the legs read as subpixel motion (18%).
+- [ ] **`caps` on an outline** (So You Want To Be A Pixel Artist, ch. 12): the end pixel of each run
+  of the outline, where it steps, n steps darker (or the outline's key); without an outline, the
+  sprite's own edge runs' ends (Capcom vs SNK's look, no new colors). Short 1:1 diagonals darkened
+  whole, long ones left. In characters 7 as a rule to follow by hand until someone needs the op.
+- [x] **`shot --grey`, a vertical `scroll`, sky seams by whole rows** (three batches asked for a
+  values view; SLYNYRD's shooters and skies): done.
 - [ ] **Planes study misses** (SLYNYRD's parallax cards): planes of 16-32 px a frame, 0.5 px a frame
   (read as lights), planes sharing rows, a vertical scroll; a clip with 9 known speeds found 1.

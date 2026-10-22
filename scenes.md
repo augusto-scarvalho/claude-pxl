@@ -206,7 +206,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - Far things turn toward the color of the light behind them (a forest lit from its far edge warms
   into the distance). In space or a dungeon the far planes go darker, toward black.
 - A sky's bands meet by whole rows of the next tone at shrinking gaps (a band, rows 2 apart, then
-  1), not by a checker.
+  1), not by a checker: `grad(x, y, w, h, "abc", "v", 0.5, "lines")`.
 
 ## 7. True perspective (vanishing points)
 
@@ -496,7 +496,7 @@ Where a player must find their character and what can hurt it, the picture serve
 - The ground figures walk on stays quiet: its tones close in value (a floor that works: 0.05 apart in
   lightness; one that hid the hero: 0.15), its own palette in the characters' hues, so the figures
   carry the most contrast, and the near-black outline, the backdrop none. `PXL describe` gives each
-  figure's contrast against what is round it.
+  figure's contrast against what is round it; `PXL shot ... --grey` shows the values alone.
 - The planes behind the playfield are paler, less saturated and less contrasted than it (about −20
   saturation, −15 contrast, +15 lightness); every top a figure can stand on has the brightest 1 px
   line on screen, and the solid layer is more saturated than the backdrop. An RPG's backdrop can stay

@@ -38,7 +38,7 @@ export const SIGNATURES: Record<string, string> = {
   curve: "points:a c:c ?opts:o",
   fill: "x:n y:n c:c",
   dither: "x:n y:n w:n h:n c1:c c2:c ?density:n",
-  grad: "x:n y:n w:n h:n colors:S ?dir:s soft:n",
+  grad: "x:n y:n w:n h:n colors:S ?dir:s soft:n seam:s",
   noise: "x:n y:n w:n h:n colors:S ?density:n seed:n on:s",
   recolor: "map:o ?where:r density:n",
   shade: "?where:r steps:n density:n",
@@ -113,7 +113,7 @@ export const OP_OPTS: Record<string, string[]> = {
   mesh: ["light"],
   capsule: ["light", "rim"],
   flame: ["wind", "period", "seed", "frame"],
-  scroll: ["x", "frame"],
+  scroll: ["x", "y", "frame", "axis"],
   clouds: ["y", "gap", "w", "h", "n", "seed", "keys", "x", "empty", "sizes", "frame"],
   plume: ["every", "life", "rise", "wind", "inertia", "size", "young", "seed", "frame", "light"],
 };

@@ -377,6 +377,19 @@ test("cli shot of PNGs from anywhere, several regions: a row per image, a column
   assert.deepEqual([png.data[0], png.data[5 * 8]], [pack(255, 0, 0), pack(0, 0, 255)]);
 });
 
+test("cli shot --grey: under the picture, the same in values only (each pixel's lightness as a grey)", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), a = join(dir, "a.png"), img = new Img(2, 1);
+  img.set(0, 0, pack(255, 255, 255)); img.set(1, 0, pack(0, 0, 255));
+  writePng(a, img);
+  assert.match(await said("shot", a, "--grey", "--scale", "1"), /a\.png/);
+  const png = decodePng(readFileSync(join(dir, "out", "_shot", "a.png")));
+  // the picture, a gap of 2, its values: white stays white, a pure blue is a dark grey (OKLab L 0.45)
+  assert.deepEqual([png.w, png.h], [2, 1 + 2 + 1]);
+  assert.equal(png.data[3 * 2], pack(255, 255, 255));
+  const v = (png.data[3 * 2 + 1] >>> 24) & 255;
+  assert.ok(v > 100 && v < 130 && ((png.data[3 * 2 + 1] >>> 8) & 255) === v, `blue's value ${v}`);
+});
+
 test("pxl list maps a file: each statement that defines assets, its lines, the comment above, a loop's assets on one line", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
   writeFileSync(join(dir, "parts.px.js"), `use("pico8")\n// a dot\nsprite("dot", "8")\n`);

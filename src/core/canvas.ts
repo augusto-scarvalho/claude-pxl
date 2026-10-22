@@ -409,11 +409,15 @@ export class Canvas {
   }
 
   /** Banded gradient through colors with dithered seams. dir "v" (default) or "h"; soft 0..1. */
-  grad(x: number, y: number, w: number, h: number, colors: string | string[], dir: "v" | "h" | "r" = "v", soft = 0.5): void {
+  grad(x: number, y: number, w: number, h: number, colors: string | string[], dir: "v" | "h" | "r" = "v", soft = 0.5, seam: "dither" | "lines" = "dither"): void {
     const cols = colorList(colors).map((c) => this.color(c));
     const n = cols.length;
     if (!n) throw new PxError("grad needs at least one color");
     if (dir !== "v" && dir !== "h" && dir !== "r") throw new PxError(`grad direction must be "v", "h" or "r" (radial), got ${JSON.stringify(dir)}`);
+    if (seam !== "dither" && seam !== "lines") throw new PxError(`grad's seam must be "dither" or "lines", got ${JSON.stringify(seam)}`);
+    // "lines": the next band's tone comes in by whole rows (columns for "h"), farther apart, then
+    // closer (SLYNYRD's skies): a 1D ordered threshold along the gradient instead of the 2D checker
+    const LINES = [0, 0.5, 0.25, 0.75];
     const len = dir === "h" ? w : h;
     for (let yy = 0; yy < h; yy++)
       for (let xx = 0; xx < w; xx++) {
@@ -427,7 +431,8 @@ export class Canvas {
         else {
           let t = f - i;
           t = soft > 0 ? (t - 0.5) / soft + 0.5 : t >= 0.5 ? 1 : 0;
-          col = bayer(x + xx, y + yy) < t ? cols[i + 1] : cols[i];
+          const th = seam === "lines" && dir !== "r" ? LINES[((dir === "h" ? x + xx : y + yy) % 4 + 4) % 4] : bayer(x + xx, y + yy);
+          col = th < t ? cols[i + 1] : cols[i];
         }
         this.plot(x + xx, y + yy, col);
       }
@@ -611,9 +616,11 @@ export class Canvas {
    * A strip that wraps (a sprite with `wrap: "x"`) going by: placed at its offset for the frame, and
    * again a strip-width on until the canvas is covered; `per` px a loop, leftward (negative: right).
    * `per` is a whole number of the strip's widths, so the last frame runs into the first. A parallax
-   * plane in one call.
+   * plane in one call. `axis: "y"`: a strip that wraps in y going down (negative: up), `y` then the
+   * column it stands at (a shooter's backdrop scrolling under the player).
    */
-  scroll(name: string, y: number, per: number, opts: { x?: number; frame?: number } = {}): void {
+  scroll(name: string, y: number, per: number, opts: { x?: number; y?: number; frame?: number; axis?: "x" | "y" } = {}): void {
+    if (opts.axis === "y") return this.scrollY(name, y, per, opts);
     const w = this.size(name).w, f = opts.frame ?? this.frame;
     if (!w) return;
     if (this.frames > 1 && per % w !== 0) throw new PxError(`scroll: '${name}' is ${w} px wide, so per (${per}) must be a whole number of ${w}s for the loop to close (e.g. ${w * Math.max(1, Math.round(Math.abs(per) / w))})`);
@@ -630,6 +637,19 @@ export class Canvas {
     let x = (opts.x ?? 0) - ((((Math.floor((f * per) / this.frames)) % w) + w) % w);
     while (x > -this.ox) x -= w;
     for (; x < this.img.w - this.ox; x += w) this.stamp(name, x, y);
+  }
+
+  /** scroll() down the picture: the strip a whole number of its heights a loop, `x` its column. */
+  private scrollY(name: string, x: number, per: number, opts: { y?: number; frame?: number }): void {
+    const h = this.size(name).h, f = opts.frame ?? this.frame;
+    if (!h) return;
+    if (this.frames > 1 && per % h !== 0) throw new PxError(`scroll: '${name}' is ${h} px tall, so per (${per}) must be a whole number of ${h}s for the loop to close (e.g. ${h * Math.max(1, Math.round(Math.abs(per) / h))})`);
+    const v = Math.abs(per) / this.frames;
+    if (this.frames > 1 && v > 0 && !Number.isInteger(v) && !Number.isInteger(1 / v))
+      this.res.warn?.(`scroll: '${name}' goes ${+v.toFixed(2)} px a frame (${per} over ${this.frames} frames) and judders; a plane goes a whole number of px a frame, or 1 px every so many frames: per = ${Math.max(1, Math.round(v))} × ${this.frames}, the strip's height dividing it`, this.loc);
+    let y = (opts.y ?? 0) + ((((Math.floor((f * per) / this.frames)) % h) + h) % h);
+    while (y > -this.oy) y -= h;
+    for (; y < this.img.h - this.oy; y += h) this.stamp(name, x, y);
   }
 
   /**

@@ -251,6 +251,14 @@ test("grad r: radial from the center to the ellipse that fits the box; c.size() 
   assert.match(failure(PAL + 'sprite("t", { w: 2, h: 2 }, grad(0, 0, 2, 2, "rw", "d"))', "t").message, /grad direction must be "v", "h" or "r"/);
 });
 
+test("grad seam lines: the next band's tone comes in by whole rows, farther apart then closer, not a checker", () => {
+  const rows = (seam: string) => art(PAL + `sprite("t", { w: 4, h: 12 }, grad(0, 0, 4, 12, "rw", "v", 1${seam}))`, "t").split("\n");
+  const lined = rows(', "lines"'), dithered = rows("");
+  assert.ok(lined.every((r) => r === "rrrr" || r === "wwww"), lined.join("|"));
+  assert.deepEqual([lined[0], lined.at(-1)], ["rrrr", "wwww"]);
+  assert.ok(dithered.some((r) => r.includes("r") && r.includes("w")), "the default seam is a checker");
+});
+
 test("wrap: drawing, stamps, fills and reads continue across the wrapped edges", () => {
   eq(art(PAL + 'sprite("t", { w: 4, h: 1, wrap: "x" }, rect(3, 0, 2, 1, "r"))', "t"), "r..r");
   eq(art(PAL + 'sprite("t", { w: 2, h: 3, wrap: "x" }, rect(0, 2, 1, 2, "r"))', "t"), "..\n..\nr.");     // "x" only: y clips

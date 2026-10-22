@@ -7,6 +7,7 @@ import type { Project } from "../core/project.ts";
 import { Img } from "../core/image.ts";
 import { TRANSPARENT } from "../core/color.ts";
 import { PxError } from "../core/errors.ts";
+import { lab } from "../core/vision.ts";
 
 /** Frame n of an asset's loop, as `frames()` numbers them (a scene: each step of its clock): its time. */
 export function frameTime(p: Project, name: string, n: number): number {
@@ -74,6 +75,22 @@ export function shotChanges(was: Img, now: Img, frames: number[], at?: number[])
     const what = n ? `${n} px changed in ${ox + x0},${oy + y0} ${x1 - x0 + 1}x${y1 - y0 + 1}` : "no change";
     return frames.length > 1 ? `frame ${f}: ${what}` : what;
   }).join("; ");
+}
+
+/**
+ * The picture in values only: each pixel's OKLab lightness as a grey, clear left clear, the gaps
+ * between frames as they are. To check that the values and the planes read before the color does
+ * (the squint test the tutorials ask for), and that the ground stays quieter than the figures.
+ */
+export function greyRow(img: Img): Img {
+  const out = new Img(img.w, img.h);
+  for (let i = 0; i < img.data.length; i++) {
+    const c = img.data[i];
+    if ((c & 255) === 0 || c === GAP_C) { out.data[i] = c; continue; }
+    const v = Math.max(0, Math.min(255, Math.round(lab(c)[0] * 255)));
+    out.data[i] = ((v << 24) | (v << 16) | (v << 8) | (c & 255)) >>> 0;
+  }
+  return out;
 }
 
 /** Rows stacked, a gap between. */
