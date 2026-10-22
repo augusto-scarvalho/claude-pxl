@@ -289,6 +289,8 @@ export interface Techniques {
   banding: { pairs: number; per1000: number };
   /** a sprite lit as if from the front: lighter the farther in from its edge all round (pillow shading), how strongly */
   pillow: number | null;
+  /** mean lightness 2-3 px in from the edges facing up and facing down, and of the inside: tells a sprite lit from straight above from pillow shading */
+  pillowFacing: { top: number; bottom: number; inner: number } | null;
 }
 export function techniques(img: Img, ramps: Ramp[]): Techniques {
   const W = img.w, H = img.h, at = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? TRANSPARENT : img.data[y * W + x]);
@@ -428,7 +430,7 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
     }
   }
   // pillow shading: lightness rising with the distance in from the edge, all the way round
-  let pillow: number | null = null;
+  let pillow: number | null = null, facing: { top: number; bottom: number; inner: number } | null = null;
   if (sprite) {
     const dist = new Int32Array(W * H).fill(-1), q: number[] = [];
     for (let i = 0; i < W * H; i++) if (clear(img.data[i])) { dist[i] = 0; q.push(i); }
@@ -445,6 +447,21 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
       for (let i = 0; i < ds.length; i++) { c += (ds[i] - md) * (ls[i] - ml); vd += (ds[i] - md) ** 2; vl += (ls[i] - ml) ** 2; }
       pillow = vd > 0 && vl > 0 ? c / Math.sqrt(vd * vl) : 0;
     }
+    // a sprite lit from straight above (one that mirrors, final boss blues' RPG bases) is also darker
+    // at its rim than inside, but not all round: its top edges are lit. 2-3 px in, by which way the
+    // edge faces (the way the distance from the clear falls), against the inside 4 px and more in
+    const sums = { top: [0, 0], bottom: [0, 0], inner: [0, 0] };
+    const d = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? 0 : dist[y * W + x]);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const di = dist[y * W + x];
+      if (di < 2) continue;
+      const L = lch(img.data[y * W + x]).L;
+      if (di >= 4) { sums.inner[0] += L; sums.inner[1]++; continue; }
+      const gx = d(x + 1, y) - d(x - 1, y), gy = d(x, y + 1) - d(x, y - 1), g = Math.hypot(gx, gy);
+      if (!g) continue;
+      if (gy / g > 0.6) { sums.top[0] += L; sums.top[1]++; } else if (gy / g < -0.6) { sums.bottom[0] += L; sums.bottom[1]++; }
+    }
+    if (sums.top[1] >= 8 && sums.bottom[1] >= 8 && sums.inner[1] >= 8) facing = { top: sums.top[0] / sums.top[1], bottom: sums.bottom[0] / sums.bottom[1], inner: sums.inner[0] / sums.inner[1] };
   }
   let ditherN = 0, r0 = H, r1 = -1;
   for (let i = 0; i < inDither.length; i++) if (inDither[i]) { ditherN++; mask[i] |= 1; const y = Math.floor(i / W); r0 = Math.min(r0, y); r1 = Math.max(r1, y); }
@@ -458,7 +475,7 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
   const ditherPairs = [...pairs].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => { const [a, b] = k.split(",").map(Number); return [a, b, n] as [Color, Color, number]; });
   const light = vec.map(([vx, vy, n], ramp) => ({ ramp, dir: [n ? vx / n : 0, n ? vy / n : 0] as [number, number], sure: n ? Math.hypot(vx, vy) / n : 0, n }))
     .filter((l) => l.n >= 30).sort((a, b) => b.n - a.n);
-  return { pixels, dither: ditherN, ditherPairs, ditherRows: r1 >= 0 ? [r0, r1] : null, lines, selective, black, edge, aa, orphans, specks, light, mask, rim, banding: { pairs: bandPairs, per1000: (1000 * bandPairs) / Math.max(1, pixels) }, pillow };
+  return { pixels, dither: ditherN, ditherPairs, ditherRows: r1 >= 0 ? [r0, r1] : null, lines, selective, black, edge, aa, orphans, specks, light, mask, rim, banding: { pairs: bandPairs, per1000: (1000 * bandPairs) / Math.max(1, pixels) }, pillow, pillowFacing: facing };
 }
 
 /**

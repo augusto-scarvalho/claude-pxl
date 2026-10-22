@@ -129,6 +129,15 @@ test("study: a sprite's light read off its rim, pillow shading, banding", () => 
   const b = study({ name: "rings", frames: [rings], ms: [100], kind: "test" }).text.join("\n");
   assert.match(b, /Pillow shading: lighter the farther in from the edge all round/);
   assert.doesNotMatch(b, /three-point/, "a disc's edges meet at its middle: not uprights");
+  // a disc darker at its rim but lit from straight above (a sprite that mirrors): not pillow shading
+  const above = new Img(32, 32);
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+    const d = Math.hypot(x - 15.5, y - 15.5);
+    if (d < 13) above.set(x, y, ramp[Math.max(0, Math.min(3, Math.floor((0.55 * (1 - d / 13) + 0.45 * (0.5 - (y - 15.5) / 26)) * 4.4)))]);
+  }
+  const c = study({ name: "above", frames: [above], ms: [100], kind: "test" }).text.join("\n");
+  assert.match(c, /Lit from straight above: .* the edges facing up lighter than those facing down/);
+  assert.doesNotMatch(c, /Pillow shading/);
   // a box shaded in stripes whose ends line up: banding
   const box = new Img(24, 16);
   for (let y = 2; y < 14; y++) for (let x = 4; x < 20; x++) box.set(x, y, ramp[Math.min(3, Math.floor((y - 2) / 3))]);

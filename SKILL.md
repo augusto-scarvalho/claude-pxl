@@ -237,7 +237,9 @@ comet_repair --out <scratch dir>`.
   another's light) before adding a color. Light and shadow are two families: the step across the
   terminator is bigger than any within them, and light bounced into a shadow is a duller, darker
   step, never as bright as the lit side. Light from one side: a flat face is one tone,
-  a round form changes only along its curve, never darker all round its rim (pillow shading).
+  a round form changes only along its curve, never darker all round its rim (pillow shading). A
+  sprite the game will flip (a side or top-down character, its tiles) is lit from straight above, a
+  touch toward the viewer (`light: [0, -1]`), so its mirror keeps the light where it was.
 - Lines step diagonally, without L-corners, their runs in order (`PXL help "characters 7"`);
   anti-alias by hand, or `aa: true` on a sprite as a start; at 16 px and under, drop the outline
   (unless it's 8-bit: few colors and a busy ground keep it, in the shared black).

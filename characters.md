@@ -136,8 +136,15 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
    over your pixels, the export leaves it out.
 2. **Body light.** Light comes from above, so the bottoms of forms are darker. Put a shadow under
    anything that sticks out: the head on the neck, a sash on the robe, sleeves on the sides, a hem
-   on the legs.
-3. **Clothes.** Add them one piece at a time. The face goes last. Change the pose while it is still a
+   on the legs. A limb's light follows its angle: hanging, it takes the mid and dark tones; swung
+   toward level, its top catches the light and the mid band thins to nothing; pointing up, mid and
+   dark again; a part under another (a shin under a raised thigh) is in its shadow. So a limb that
+   moves is lit again in every frame (`capsule` with `light` does it). Shade the shadow side first,
+   then a lighter soft shadow where the form turns and takes bounce, the highlights last and much
+   smaller than the shadows (drawn first, they come out too big).
+3. **Clothes.** Add them one piece at a time, each as a new flat shape over the body, standing off
+   the skin where cloth hangs (sleeves, a hem curving down in a top-down view), then shaded as its
+   own form: clothes made by recoloring the skin look painted on. The face goes last. Change the pose while it is still a
    silhouette, and look at the silhouette again at the end; an animation's motion is blocked first
    as flat dark shapes over the finished parts, colored once the timing works.
 4. **Drop the lines the shading draws** (Pedro Medeiros). Once the forms are shaded, delete each
@@ -459,6 +466,12 @@ other way, the joints mirrored, each slot's part flipped unless you draw `<name>
 limb seen from its own side), the retouch mirrored, and both side by side in `<name>_turnaround`.
 A flipped part carries its light to the other side, so draw each part as a flat shape and light it
 after it is turned: `plate({ light, reach, glint }, ...)` or `relight(null, { light, reach, glint })`.
+A game sprite is the other case: the engine flips it to face left, whatever you draw. Light it from
+straight above, a touch toward the viewer (`light: [0, -1]` in `relight`, `plate`, `capsule`; the
+default `[-0.5, -1]` is from the upper left), so the flip keeps the lit side (So You Want To Be A
+Pixel Artist, final boss blues; SLYNYRD mirrors his tiles only under a light from above), and keep
+one-sided gear and lettering off it, or accept the swap. `pxl study` reads such a sprite as lit from
+straight above, not as pillow shading.
 A `twin` does it for you (`part()` in the example makes each part and its twin);
 thin parts (a 2 px blade) want `reach: 1`, or each pixel sees open space on both sides. `far: 1`
 darkens the far side by depth, not by side: turned, the other leg darkens. In a side view a limb's

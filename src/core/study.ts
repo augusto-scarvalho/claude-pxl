@@ -118,7 +118,11 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
       const jaggies = j ? `${j} jagg${j === 1 ? "y" : "ies"}${at(lf.jaggies)}: a run of pixels out of order along a line (1 3 2 4 where 1 2 3 4 reads smooth); runs grow or shrink steadily, or alternate n and n+1 on a straight slope` : "no jaggies";
       text.push(`  Lines (dark, 1 px wide: ${lf.line} px): ${k + j ? `${corners}; ${jaggies}. On the sheet, L-corners are ringed orange and jaggies blue. pxl's line(), curve(), wire() and outline draw without either.` : "pixel-perfect, every step diagonal and the runs in order: clean."}`);
     }
-    if (tech.pillow !== null && tech.pillow > 0.4) text.push(`  Pillow shading: lighter the farther in from the edge all round (${tech.pillow.toFixed(2)})${tech.rim && tech.rim.r2 >= 0.3 ? ", though lit from one side too" : ": lit as if from the front, which flattens the form; shade from one side instead"}.`);
+    // lit from straight above, the top edges keep their light (a sprite that mirrors): not pillow shading
+    const f = tech.pillowFacing, fromAbove = !!f && f.top - f.bottom >= 0.05 && f.top - f.bottom >= 0.35 * Math.max(0.01, f.inner - f.bottom);
+    if (tech.pillow !== null && tech.pillow > 0.4) text.push(fromAbove
+      ? `  Lit from straight above: darker toward the edges (${tech.pillow.toFixed(2)}) but not all round, the edges facing up lighter than those facing down (lightness ${f!.top.toFixed(2)} to ${f!.bottom.toFixed(2)}, the inside ${f!.inner.toFixed(2)}): the light of a sprite that mirrors (a top-down character, its flip keeping the lit side), not pillow shading.`
+      : `  Pillow shading: lighter the farther in from the edge all round (${tech.pillow.toFixed(2)})${tech.rim && tech.rim.r2 >= 0.3 ? ", though lit from one side too" : ": lit as if from the front, which flattens the form; shade from one side instead"}.`);
     const tiles = findTiles(picture);
     if (tiles) text.push(`  Tiles: ${tiles.size}x${tiles.size} cells from ${tiles.ox},${tiles.oy} repeat: ${tiles.distinct} distinct of ${tiles.cells} (${pct(tiles.cells - tiles.distinct, tiles.cells)} repeats).`);
   }
