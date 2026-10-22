@@ -40,7 +40,12 @@ sheets. To be sure it is used, name it: "use the pxl skill to draw ...".
 it when you ask for pixel art. In the [model study](model-study.md) it drew far cheaper and faster
 than Claude Code, and the curator found its scenes well below Claude's.
 
-**Other agents** (Cursor, Gemini, …): tell them to read `SKILL.md` and that the CLI is
+**Antigravity's CLI** (`agy`) reads skills from `~/.gemini/config/` but doesn't follow a link there:
+name your clone in `~/.gemini/config/skills.json` instead, `{"entries": [{"path": "<the folder
+holding your clone>", "include_only": ["<your clone's folder name>"]}]}`, and `agy` lists
+`pxl-pixel-art` among its skills.
+
+**Other agents** (Cursor, …): tell them to read `SKILL.md` and that the CLI is
 `node <path to pxl>/bin/pxl.js`. Everything the skill asks for is shell commands and files.
 
 ## What the agent reads

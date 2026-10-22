@@ -1,10 +1,11 @@
-# Which model, how much effort: one scene, fourteen ways
+# Which model, how much effort: one scene, fifteen ways
 
-One brief given to fourteen fresh agents with the pxl skill, each on a different model or effort
+One brief given to fifteen fresh agents with the pxl skill, each on a different model or effort
 level, to see what more thinking buys in pixel art and what it costs: eight in Claude Code, six in
-the Codex CLI. Run on 2026-10-21; every number below comes from the runs themselves (Claude Code's
-result for each session, its transcript read by [`scripts/tokens.ts`](../scripts/tokens.ts); Codex's
-events and session log), and the art was judged blind.
+the Codex CLI, one in Antigravity. Run on 2026-10-21; every number below comes from the runs
+themselves (Claude Code's result for each session, its transcript read by
+[`scripts/tokens.ts`](../scripts/tokens.ts); Codex's events and session log; Antigravity's result),
+and the art was judged blind and by the curator.
 
 **In short:** on Opus, the cost doubled at every step of effort ($0.54, $2.17, $4.71, $9.62,
 $20.01). The curator, watching the loops, put max first, xhigh close behind and high a step down:
@@ -14,7 +15,8 @@ Haiku was the cheapest by far and got the scene's space wrong; Fable at high cos
 high and scored lower. **In Codex**, six runs cost $0.16 to $3.24 at OpenAI's API prices, in minutes
 each; the curator found every one of them well below the Claude scenes, while the blind agent ranked
 two of them first. The agent judging stills got it the wrong way round: the review that counts is a
-person watching the loops. One run each, one brief: read it as a first measure, not a law.
+person watching the loops. Gemini 3.8 Flash at high, through Antigravity, took 42 minutes for about
+$1.62. One run each, one brief: read it as a first measure, not a law.
 
 ## Contents
 
@@ -26,6 +28,7 @@ person watching the loops. One run each, one brief: read it as a first measure, 
 - [What the numbers say](#what-the-numbers-say)
 - [Where the tokens went](#where-the-tokens-went)
 - [The same brief in Codex](#the-same-brief-in-codex)
+- [The same brief in Antigravity](#the-same-brief-in-antigravity)
 - [What to use](#what-to-use)
 - [What this doesn't show](#what-this-doesnt-show)
 - [Doing it again](#doing-it-again)
@@ -250,10 +253,10 @@ codex exec -m <gpt-6-astra|gpt-6.1-sol> -c model_reasoning_effort=<low|...|max> 
 ```
 
 Codex reports tokens, not dollars (it ran on a ChatGPT plan), so its runs are compared by tokens,
-calls to the model (counted in its session log) and time, and priced at OpenAI's published API
-rates per million tokens: gpt-6.1-sol $2 input, $0.10 cached input, $10 output; gpt-6-astra $10,
-$1, $50 (reasoning counts as output; no call passed the 272k-token long-context tier). Every one
-made a scene of parts; every loop closes; `pxl check` finds no warnings in any.
+calls to the model (counted in its session log) and time, and priced at OpenAI's published API rates
+per million tokens: gpt-6.1-sol $2 input, $0.10 cached input, $10 output; gpt-6-astra $10, $1, $50
+(reasoning counts as output; no call passed the 272k-token long-context tier). Every one made a
+scene of parts; every loop closes; `pxl check` finds no warnings in any.
 
 | Model | Effort | Model calls | Time | Input (of it cached) | Output (of it reasoning) | At API prices | Loop |
 |---|---|---:|---:|---:|---:|---:|---|
@@ -329,6 +332,38 @@ What it says:
   both the cost and, by the curator's eye, the quality went.
 - **On sol, more effort grew the calls and tokens** (9 to 32 calls, 0.4M to 2.8M input) without the
   blind score following it past high.
+
+## The same brief in Antigravity
+
+One more run of the same brief: Antigravity's CLI (`agy` 1.4.4) with Gemini 3.8 Flash at high effort
+(`gemini-3.8-flash-high`, the only Gemini 3.8 it offers). The skill was registered in
+`~/.gemini/config/skills.json` (Antigravity doesn't follow a link in its skills folder, so the
+repository is named there; see [Working with an agent](agents.md#install-the-skill)), and the run
+went through `scripts/model-study.sh ... agy`:
+
+```sh
+agy -p "$(cat brief.txt)" --model gemini-3.8-flash-high --effort high \
+  --dangerously-skip-permissions --output-format json > result.json
+```
+
+| Model | Time | Read from cache | Input | Output (of it thinking) | At API prices | Loop |
+|---|---:|---:|---:|---:|---:|---|
+| Gemini 3.8 Flash, high | 42 min | 9.53M | 426k | 156k (45k) | $1.62 | 24 frames |
+
+Priced at Google's rates for Gemini 3.8 Flash per million tokens: $0.75 input, $0.075 cached input,
+$3.75 output, introductory until the end of 2026 and twice that after ($1.79 if thinking is billed
+on top of the output; about $3.24 at the later rates). The scene closes its loop and `pxl check`
+finds no warnings; its file is 922 lines.
+
+What it drew: a striped tower with the keeper in yellow at the right size, a lantern in hand; a wide
+beam that lights the rain in yellow streaks, and a wave bursting into a big white plume against the
+headland, the strongest thing in the scene. Its faults: in one frame the beam swings down onto the
+rocks (the turn in the picture plane that Haiku made), with a lens flare at the lamp; the headland
+is drawn as a wall of bricks, not rock; and the loop is short, 24 frames. It took the longest of all
+fifteen runs but Opus at max, for about a sixth of Opus at high's price. The curator hasn't judged
+it yet.
+
+<img src="study/lighthouse/agy-gemini-3.8-flash-high.gif" width="480" alt="Antigravity, Gemini 3.8 Flash at high: a red and white lighthouse on a headland drawn like a brick wall; a wide beam lights the slanting rain; a wave bursts into a large white plume; a keeper in yellow with a lantern on the gallery">
 
 ## What to use
 
