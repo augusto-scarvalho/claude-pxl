@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**319 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**320 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–22, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -123,7 +123,7 @@ of and what to use in pxl to make the same.
   - A sheet of sprites apart (a game's ripped sheet) taken apart: sprites by row, their sizes (a
     figure's height), each move's frames, spacing, colors to a sprite, parts to build frames from,
     sides drawn or flipped; labels, boxes, masks and normal maps told apart. Read on 38 sheets of
-    seventeen games, from A Link to the Past to Triangle Strategy, in [characters.md §13](../characters.md).
+    twenty games, from A Link to the Past to Triangle Strategy, in [characters.md §13](../characters.md).
 - **Perspective:** straight edges (LSD) and where they meet: one, two or three vanishing points, with
   the lens, the turn and the tilt they imply; an isometric picture by its two sets of parallel lines
   (2:1 or 30°).
