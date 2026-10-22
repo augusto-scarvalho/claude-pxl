@@ -81,6 +81,8 @@ tackle.px.js: 0 warnings (1 scene (1 frame, 16 distinct placements), 0 rigs, 0 o
   ran: lettering on 3, lines on 14; not run: front marker (nothing has one), lit side (no scene declares world.light), feet (nothing placed has a height)
 topdown.px.js: 0 warnings (1 scene (1 frame, 10 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 10 (a clear reading on 5), lines on 4; not run: front marker (nothing has one), feet (nothing placed has a height)
+topdown_hero/hero.px.js: 0 warnings (1 scene (248 frames, 37 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: lit side on 37 (a clear reading on 28), lines on 17; not run: front marker (nothing has one), feet (nothing placed has a height)
 tropical/fauna.px.js: 0 warnings (1 scene (4 frames, 6 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 1; not run: front marker (nothing has one), lit side (no scene declares world.light), feet (nothing placed has a height)
 tropical/forest.px.js: 0 warnings (3 scenes (17 frames, 135 distinct placements), 0 rigs, 0 other assets with a front marker)

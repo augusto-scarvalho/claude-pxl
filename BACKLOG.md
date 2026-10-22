@@ -793,5 +793,12 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   whole, long ones left. In characters 7 as a rule to follow by hand until someone needs the op.
 - [x] **`shot --grey`, a vertical `scroll`, sky seams by whole rows** (three batches asked for a
   values view; SLYNYRD's shooters and skies): done.
+- [ ] **Notes from drawing `examples/topdown_hero`** (a fresh agent, 98 tool calls): a scene has no
+  clock of its own (to pick frames by time it stamped an empty 1x1 anim of 248 frames at 10 ms; a
+  `scene({ loop, step })` would say it directly); `shot` hides `ref: true` layers, so the guide rows
+  showed only in a build's previews; `shot --frames all` with several names takes the first one's
+  frame count (a still first: every row frame 0 only); a limb with a pivot stamped with `flip: "x"`
+  lands off by the mirrored pivot (documented; a hint in `shot` would catch it); `sheet` has no
+  option for one row per tag (16x32 and 32x40 frames shared rows).
 - [ ] **Planes study misses** (SLYNYRD's parallax cards): planes of 16-32 px a frame, 0.5 px a frame
   (read as lights), planes sharing rows, a vertical scroll; a clip with 9 known speeds found 1.
