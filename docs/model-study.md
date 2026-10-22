@@ -64,6 +64,22 @@ with no budget and no time limit. The models were `claude-haiku-5-5`, `claude-so
 `claude-opus-5-5` and `claude-fable-5-1`. Each scene was then checked (`pxl check`), read back (`pxl
 study`, for its loop) and judged blind (below).
 
+### Which pxl each run used
+
+Every agent read the skill from this repository as it stood when its run began, and pxl changed
+between the runs, so not every run had the same pxl (worked out from each run's start time and the
+commits; `scripts/model-study.sh` now writes the commit into each run's folder):
+
+| Runs | pxl at | What the agent read that differs |
+|---|---|---|
+| Claude Code, all eight | `5929a59` | the scenes guide without the two lessons on a beam |
+| Codex, all six; Antigravity's Gemini 3.8 Flash; Gemini 4 Argon's first run | `0e8f7cb`, `99127e2`, `3eecf9f` | the same pxl in all three commits: the scenes guide (11) now says a beam is drawn in the picture's own projection and runs out of it or fades (four lines, from the curator's review of the Claude runs) |
+| Gemini 4 Argon's second run | `34bdd04` | as above, and an anim of one frame no longer sets the scene's clock, with a warning when its code reads its frame; `check` stops at 600 frames of a loop cut at 60 s |
+
+So the Codex and Antigravity runs were told one thing about the beam that the Claude runs weren't;
+the Codex scenes still came out below Claude's in the curator's eyes, but read the comparison with
+that in mind.
+
 ## The results
 
 | Model | Effort | Turns | Time | Cost | Output (of it thinking) | Cache reads | Made as | Loop | Blind score | Rank |
