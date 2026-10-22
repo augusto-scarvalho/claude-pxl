@@ -207,6 +207,26 @@ of the nose; the corners of the mouth straight below the pupils.)
   - Brows sit 2 rows above the eyes. The mouth is small.
   - Whites and brows look more natural here than chibi eyes that are all dark. Offer both if
     unsure.
+- **A face turned three quarters, at a head of 13-16 px** (Octopath, Triangle Strategy, FFT, Tactics
+  Ogre, measured; `examples/hd2d/traveler.px.js`):
+  - The face 5-7 px wide and 5-7 rows from the lids to the chin, low in the head (the eyes about
+    two thirds down); the fringe over all but 3-5 px of forehead, one row of skin over the lids.
+  - No brows: the lids' dark row is one. The near eye on the head's middle: a dark lid 2 px wide over
+    a navy iris with the white on its back side (toward the ear: the gaze goes the way the face
+    turns) and a lighter iris under the navy (Octopath; Triangle Strategy 2x2: navy and white over
+    blue and white). The far eye 1 px wide, lid over navy, at the face's edge; 2 px of skin between
+    the eyes, never more (3 reads as a face seen from the front).
+  - No nose line: the skin's lightest tone, 1-2 px under the gap between the eyes, is the nose and
+    the cheek. A mouth, if any, 1-2 px of the skin's shadow on the last row above the jaw, never
+    black (black reads as open). The turned cheek a step darker toward the ear, the ear 2 px past
+    the eye's white.
+  - The face's edge and the jaw in a dark warm brown, not the outline's black; the hair meets the face
+    by color alone. The eyes are the face's only black and the one place its darkest and lightest
+    meet: that is the appeal. Equal black dots for eyes, flat skin, a dark mouth and a bare forehead
+    make it plain.
+  - Expressions move the lids: closed, a 2 px dark line; alert, more white; angry, the near lid's
+    inner end lower; sad, its outer end lower; surprised, the lids up a row and a black mouth. A
+    blink: one frame of 100-150 ms with the lids down, every 2-4 s.
 - **Pupils:** keep at least 1 px of skin between a pupil and the outline, or it reads as a crease.
 - **How eyes read:**
   - Both irises shifted the same way reads as a glance.
