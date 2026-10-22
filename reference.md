@@ -476,7 +476,13 @@ horizon cyan; the ramps; frames and the flow), the picture and `<name>.hex`. An 
 checker exported with it (two colors in big squares, a GIF saved with Aseprite's backdrop) is taken for
 clear first; a reflection under it (below a row, what is above mirrored over what's behind at one
 opacity: a floor that shines, still water) is told, row and opacity, as `flip: "y"` in a layer with
-that `opacity`, and left out of the rest. It reads two kinds of picture two ways.
+that `opacity`, and left out of the rest. A sheet of sprites apart on clear or a flat ground (a game's
+ripped sheet, a set of frames) is taken apart (SHEET): its sprites by row, left to right, their sizes
+grouped by height (a figure's, in px), the rows whose sprites are one size (a move's frames), the
+spacing between them and between rows, the colors a sprite gets; a ripper's labels (small marks of a
+color or two side by side) and boxes drawn round frames are left out, and no perspective is read off
+it. An isometric picture is told by its lines, two sets rising and falling at one angle and meeting
+nowhere: 26.6° (2:1, pixel art's) or 30° (true isometric). It reads two kinds of picture two ways.
 Pixel art (few colors, hard steps between them, often drawn at 2x and up) is read as drawn: its grid
 found (an exact upscale, or a blurred, compressed or fractional one: a video of a game, a JPEG,
 2.5x; `--px N` gives the size when a blurred copy is read at a harmonic of it) and the picture taken

@@ -634,3 +634,27 @@ test("study: planes that share rows (a far texture showing between a near one's 
   assert.match(planes, /1(\.00)? px\/frame left/, planes || text.slice(text.indexOf("MOTION"), text.indexOf("MOTION") + 800));
   assert.match(planes, /3(\.00)? px\/frame left/, planes);
 });
+
+test("study takes a sheet apart: its sprites by row, their sizes and colors; labels and boxes left out", () => {
+  // two rows of four 10x14 sprites on clear, a label of three letters, a box drawn round nothing
+  const img = new Img(160, 80), ink = pack(30, 20, 40), fill = pack(200, 120, 60), white = pack(250, 250, 250);
+  for (const y0 of [4, 40]) for (let i = 0; i < 4; i++) for (let y = 0; y < 14; y++) for (let x = 0; x < 10; x++)
+    img.set(4 + i * 20 + x, y0 + y, x === 0 || y === 0 || x === 9 || y === 13 ? ink : fill);
+  for (let k = 0; k < 3; k++) for (let y = 0; y < 5; y++) for (let x = 0; x < 3; x++) if ((x + y + k) % 2 === 0 || y === 0) img.set(4 + k * 4 + x, 26 + y, white);
+  for (let t = 0; t < 24; t++) for (const [x, y] of [[130 + t, 2], [130 + t, 25], [130, 2 + t], [153, 2 + t]]) img.set(x, y, white);
+  const text = study({ name: "s", frames: [img], ms: [100], kind: "test" }).text.join("\n");
+  assert.match(text, /8 sprites apart on clear, in 2 rows; 3 label marks \(text\) and 1 box drawn round frames left out/, text);
+  assert.match(text, /Sizes \(their ink, w x h\): 8 of 10 x 14\. Height: median 14 px/);
+  assert.match(text, /Rows, top down: 4, 4; in 2 of them the sprites are one size/);
+  assert.match(text, /Spacing: 10 px between sprites in a row \(median\), 22 px between rows/);
+  assert.match(text, /A sheet of sprites apart: no one view to read/);
+});
+
+test("study reads an isometric picture: lines rising and falling 2:1, parallel, none meeting", () => {
+  const img = new Img(160, 100), line = pack(220, 210, 170);
+  img.fill(pack(40, 50, 60));
+  for (let c = -80; c < 180; c += 16) for (let x = 0; x < 160; x++) for (const y of [Math.floor(c + x / 2), Math.floor(c - x / 2)]) if (img.inside(x, y)) img.set(x, y, line);
+  const text = study({ name: "i", frames: [img], ms: [100], kind: "test" }).text.join("\n");
+  assert.match(text, /Isometric: lines rising and falling at 2\d\.\d° \(2:1/, text.slice(text.indexOf("PERSPECTIVE")));
+  assert.match(text, /Isometric 2:1: build it with the iso blocks/);
+});

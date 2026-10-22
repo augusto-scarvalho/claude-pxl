@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**317 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**318 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–22, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -27,7 +27,7 @@ page lists what the fork adds. Every commit is in
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 54 |
-| Tests | 59 | 253 |
+| Tests | 59 | 255 |
 
 ## Looking and checking
 
@@ -120,8 +120,11 @@ of and what to use in pxl to make the same.
     faults are ringed.
   - The light's direction off the rim (after Johnson and Farid), tiles, values, color temperature.
   - A photo or painting translated by superpixels into a small picture to draw over.
+  - A sheet of sprites apart (a game's ripped sheet) taken apart: sprites by row, their sizes (a
+    figure's height), each move's frames, spacing, colors to a sprite; labels and boxes left out.
 - **Perspective:** straight edges (LSD) and where they meet: one, two or three vanishing points, with
-  the lens, the turn and the tilt they imply.
+  the lens, the turn and the tilt they imply; an isometric picture by its two sets of parallel lines
+  (2:1 or 30°).
 - **Motion:** timing and holds, the cycle, whether the loop closes, parallax planes and their speeds
   to a fraction of a pixel, a camera moving forward.
 - **Pieces:** an animation taken apart, each piece with what to build it with.

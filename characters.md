@@ -50,8 +50,10 @@ the top of the head to the soles.
 
 `PXL study ref.png` reads a reference for its palette and ramps, its outline (black, selective or
 none), its dithering and where its light comes from, at 1x even when it was posted enlarged or
-blurred; a GIF of an animation also for its timing and cycle. It doesn't measure a figure's
-proportions: for those, the steps below.
+blurred; a GIF of an animation also for its timing and cycle; a sheet of many sprites apart (a
+game's ripped sheet) also for each sprite's size, by row: a figure's height in px, the frames of each
+move, the spacing, the colors a sprite gets (SHEET). It doesn't measure a figure's proportions
+inside it: for those, the steps below.
 
 - **Get a reference.** Use one finished sprite of the same size and view: ask the user, or use a
   free pack. Tiny Tactics, Puny Characters and Eldiran's sprites are CC0; the LPC bases and the SC

@@ -14,6 +14,7 @@
 import { type Color, TRANSPARENT, pack, toHex } from "./color.ts";
 import { Img } from "./image.ts";
 import { type Piece, decompose } from "./decompose.ts";
+import { sheetLines, sliceSheet } from "./slice.ts";
 import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Vanish, areaDown, bandShifts, blockFlow, clearChecker, clearReflection, colorCounts, dE, findChecker, findGrid, findReflection, findRamps, findSegments, findTiles, findVanishing, focusOfExpansion, frameDiff, lab, lch, lineFlaws, lumaOf, mergeNear, pixelate, quantize, techniques, toNative } from "./vision.ts";
 
 /** frames as read; `drawnAt`: they were already brought down from that grid as they were read (big animations) */
@@ -128,6 +129,10 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   }
   text.push(...lightLines(tech, ramps, pixelArt));
 
+  // ---------------------------------------------------------------- a sheet: its sprites apart
+  const sheetRead = pixelArt && input.frames.length === 1 ? sliceSheet(picture, backdrop) : null, sheetOut = sheetRead ? sheetLines(sheetRead, nColors) : null;
+  if (sheetOut) text.push("", "SHEET (its sprites apart, each measured)", ...sheetOut.lines);
+
   // ---------------------------------------------------------------- values, color, distance
   text.push("", "VALUES AND COLOR");
   text.push(...valueLines(avg, backdrop));
@@ -139,10 +144,11 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     motion = motionOf(frames, input.ms, smeared);
   }
   const P = pixelArt ? picture : areaDown(first, ...fit(first.w, first.h, 480));
-  const segs = findSegments(P, pixelArt), vps = findVanishing(segs, P.w, P.h), k = picture.w / P.w;
+  // (a sheet's straight edges are each sprite's own, not one view's)
+  const segs = sheetRead ? [] : findSegments(P, pixelArt), vps = findVanishing(segs, P.w, P.h), k = picture.w / P.w;
   const foe = motion?.foe && motion.forward ? { x: (motion.foe.x * P.w) / motion.W, y: (motion.foe.y * P.w) / motion.W } : null;
   text.push("", "PERSPECTIVE");
-  const persp = perspectiveLines(segs, vps, P.w, P.h, k, picture.w, foe);
+  const persp = sheetRead ? { lines: ["  A sheet of sprites apart: no one view to read."], pxl: null, horizon: null, iso: null } : perspectiveLines(segs, vps, P.w, P.h, k, picture.w, foe);
   text.push(...persp.lines);
   if (motion) text.push("", "MOTION", ...motion.lines);
   if (opts.region && input.frames.length > 1) text.push("", "THE REGION (what moves in it, frame by frame)", ...regionLines(input.frames.map((f, i) => (pixelArt ? clear(raws[i]) : f)), opts.region));
@@ -161,6 +167,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     if (lit) text.push(`  Its light, from ${way(lit)} (the ramps together): relight / plate with light: [${lit.map((v) => v.toFixed(1)).join(", ")}], capsule's light the same.`);
   } else text.push(`  The translation (${input.name}_px.png) as a guide: sprite("ref", { png: "${input.name}_px.png" }) in a layer with ref: true, drawn over in the palette; the masses and the light are the lesson, not its pixels.`);
   if (persp.pxl) text.push(`  ${persp.pxl}`);
+  if (sheetOut) text.push(...sheetOut.pxl.map((l) => `  ${l}`));
   if (motion) text.push(...motion.pxl.map((l) => `  ${l}`));
 
   const palette = ramps.flatMap((r) => r.colors);
@@ -290,8 +297,8 @@ function valueLines(img: Img, backdrop: Color | null = null): string[] {
   return out;
 }
 
-function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, k: number, PW: number, foe: { x: number; y: number } | null): { lines: string[]; pxl: string | null; horizon: number | null } {
-  if (segs.length < 3) return { lines: ["  Few straight edges: no perspective to read (organic shapes, or a flat side-on view)."], pxl: null, horizon: null };
+function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, k: number, PW: number, foe: { x: number; y: number } | null): { lines: string[]; pxl: string | null; horizon: number | null; iso: number | null } {
+  if (segs.length < 3) return { lines: ["  Few straight edges: no perspective to read (organic shapes, or a flat side-on view)."], pxl: null, horizon: null, iso: null };
   const total = segs.reduce((s, q) => s + q.len, 0), out = [`  ${segs.length} straight edges${k !== 1 ? ` (read at ${W}x${H}; places below in the ${PW}-wide picture)` : ""}.`];
   let pxl: string | null = null, horizon: number | null = null;
   // a third point: uprights that fan out (not a degree or two off parallel) and meet within a few heights
@@ -340,7 +347,18 @@ function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, 
     out.push(`  One-point perspective: the horizon at row ${Math.round(v.y * k)}, the camera looking at column ${Math.round(v.x * k)}${byFoe ? " (where the motion opens out from too)" : ""}.${inside.length > 1 ? " The other points are other things' own (a box turned another way, an interior's lines)." : ""}`);
     pxl = `perspective({ w: ${PW}, horizon: ${Math.round(v.y * k)}, vp: ${Math.round(v.x * k)}, eye: <m>, fov: <deg> }): the eye's height and the lens aren't in the picture: choose them by how big things there are.`;
   } else if (!finite.length) out.push("  No lines meet: a flat, side-on or orthographic view.");
-  return { lines: out, pxl, horizon };
+  // isometric: two sets of parallel lines, one rising and one falling at the same angle, both of weight
+  const deg = (v: Vanish) => { const a = (Math.atan2(v.dir[1], v.dir[0]) * 180) / Math.PI; return a > 90 ? a - 180 : a <= -90 ? a + 180 : a; };
+  const sets = vps.filter((v) => v.far && v.lines.reduce((s2, q) => s2 + q.len, 0) >= 0.08 * total && Math.abs(Math.abs(deg(v)) - 28) <= 6);
+  const rise = sets.find((v) => deg(v) < 0), fall = sets.find((v) => deg(v) > 0);
+  let iso: number | null = null;
+  if (rise && fall && Math.abs(Math.abs(deg(rise)) - Math.abs(deg(fall))) <= 3) {
+    iso = (Math.abs(deg(rise)) + Math.abs(deg(fall))) / 2;
+    const two = Math.abs(iso - 26.57) <= Math.abs(iso - 30);
+    out.push(`  Isometric: lines rising and falling at ${iso.toFixed(1)}° (${two ? "2:1, two px across to one up, the pixel-art isometric: clean steps" : "30°, true isometric: uneven steps"}), parallel, none meeting: an orthographic view from above at an angle.`);
+    pxl = `Isometric ${two ? "2:1" : "30°"}: build it with the iso blocks of examples/isometric.px.js (back to front by row), not perspective().`;
+  }
+  return { lines: out, pxl, horizon, iso };
 }
 
 /**
