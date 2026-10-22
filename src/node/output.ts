@@ -77,6 +77,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         const { sheet, frames: fr } = packSheet(drawn.map((f, i) => ({ name: `${n}_${i}`, img: f.img, ms: f.ms })), drawn.length);
         writePng(join(out, dir, n + ".png"), sheet);
         write(join(out, dir, n + ".json"), sheetJson(n + ".png", sheet, fr, [{ name: n, from: 0, to: fr.length - 1, direction: p.direction(n) }]));
+        if (drawn.some((f) => f.img.norm)) writePng(join(out, dir, n + "_n.png"), packSheet(drawn.map((f) => ({ name: "", img: normalImage(f.img) })), drawn.length).sheet); // laid out as the art
         // previews show reference layers (guides) over each frame, like still assets do
         shown = packSheet(frames.map((f) => ({ name: "", img: f.guide ?? f.img })), frames.length, 1).sheet;
       } else {
@@ -153,6 +154,8 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       const { sheet, frames } = packSheet(items, s.opts.cols, s.opts.pad, s.opts.extrude, rows);
       writePng(join(out, s.name + ".png"), sheet);
       write(join(out, s.name + ".json"), sheetJson(s.name + ".png", sheet, frames, tags));
+      // the normal maps in the same rectangles, for engine lights (the art's json serves both)
+      if (items.some((it) => it.img.norm)) writePng(join(out, s.name + "_n.png"), packSheet(items.map((it) => ({ ...it, img: normalImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet);
       lines.push(`sheet ${s.name} ${sheet.w}x${sheet.h} (${frames.length} frames)${prev(s.name, sheet)}`);
       // a sheet of animations also plays them all at once in its preview, each in a cell of its own at
       // its own timing (a character's moves side by side, to judge them together)

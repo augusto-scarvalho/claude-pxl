@@ -225,8 +225,12 @@ declare global {
   }
 
   interface PxLamp { r?: number; color?: PxColor; power?: number; z?: number }
-  interface PxBump { w?: number; depth?: number; on?: string; where?: PxRegion }
-  type PxBumpShape = "dome" | "bevel" | "luma";
+  interface PxBump {
+    w?: number; depth?: number; on?: string; where?: PxRegion;
+    /** "hybrid" only, Sprite Fusion's settings: defaults 4, 1.15, 1.15, 6, 0.6. */
+    shapeRadius?: number; shapeStrength?: number; shapeSoftness?: number; detailStrength?: number; detailScale?: number;
+  }
+  type PxBumpShape = "dome" | "bevel" | "luma" | "hybrid";
   interface PxLighting {
     cell?: number; ambient?: number; ambientColor?: PxColor; sky?: number; skyColor?: PxColor; skyReach?: number;
     block?: number; smooth?: boolean; emit?: string; shape?: "round" | "diamond";

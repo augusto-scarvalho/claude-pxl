@@ -64,3 +64,11 @@ anim("relief", { w: 96, h: 40, fps: 8, frames: 16 }, ...props(),
 // Side by side: the same lamp with relief (normals on) and without.
 scene("lit", { w: 96, h: 40 }, ...props(), (c) => lantern(c, 30, 12), lighting({ cell: 1, ambient: 0.12, emit: "y" }))
 scene("flat", { w: 96, h: 40 }, ...props(), (c) => lantern(c, 30, 12), lighting({ cell: 1, ambient: 0.12, emit: "y", relief: 0 }))
+
+// One shaded rock four ways, each under its own lamp up and to its left: no normals, dome (the
+// silhouette), luma (the shading), hybrid (both, the way Sprite Fusion makes them).
+for (const [way, ...b] of [["flat"], ["dome", bump("dome")], ["luma", bump("luma", { depth: 2 })], ["hybrid", bump("hybrid")]])
+  sprite(`_rock_${way}`, { w: 14, h: 10 }, ellipse(7, 6, 6, 4, "s"), ellipse(5, 4, 3, 2, "S"), px(9, 7, "K"), ...b)
+scene("ways", { w: 96, h: 18, bg: "K" },
+  ...["flat", "dome", "luma", "hybrid"].flatMap((way, i) => [stamp(`_rock_${way}`, 5 + i * 24, 5), lamp(4 + i * 24, 3, { r: 20, color: "#ffd9a0", z: 6 })]),
+  lighting({ cell: 1, ambient: 0.12 }))

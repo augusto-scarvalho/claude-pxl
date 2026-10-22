@@ -365,12 +365,18 @@ export interface LampOpts {
 }
 
 export interface BumpOpts {
-  /** "dome" (default): blobs bulge; "bevel": edges slope over `w` px; "luma": brighter = higher. */
-  shape?: "dome" | "bevel" | "luma";
+  /** "dome" (default): blobs bulge; "bevel": edges slope over `w` px; "luma": brighter = higher; "hybrid": the silhouette's volume plus the shading, as Sprite Fusion makes them. */
+  shape?: "dome" | "bevel" | "luma" | "hybrid";
   /** Bevel width in px (default 2). */
   w?: number;
-  /** Steepness multiplier (default 1). */
+  /** Steepness multiplier (default 1; hybrid 1.5, Sprite Fusion's normal strength). */
   depth?: number;
+  /** hybrid only, as Sprite Fusion names them: px over which the volume levels off (default 4), its height (1.15), its blur in px (1.15), the shading's weight (6) and blur in px (0.6). */
+  shapeRadius?: number;
+  shapeStrength?: number;
+  shapeSoftness?: number;
+  detailStrength?: number;
+  detailScale?: number;
   /** Only these keys ("*" any opaque, default): other keys act as the edges (bevel each brick). */
   on?: string;
   /** Only pixels in this region. */

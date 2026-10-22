@@ -212,7 +212,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `moon_bakery_3d.px.js`, `tackle.px.js` | 3/4 buildings; weathering with a cause |
 | `neon_noodle_3d.px.js` | night street: neon, reflections, steam |
 | `lighting.px.js`, `outpost.px.js` | `lighting()` scenes: lamps, `solid`/`wall` layers |
-| `normals.px.js` | normal maps: `bump` vs painted `normals` |
+| `normals.px.js` | normal maps: the four `bump` shapes on one rock (`hybrid` as Sprite Fusion makes them), painted `normals` |
 | `cave.px.js`, `grotto.px.js` | animated glow scenes: pulsing lamps, waterfall, particles |
 | `tropical/` | 320×240 animated forest: imported trees, river, trail tileset, animals, a girl on the trail (her walk cycle in `girl.px.js`) |
 | `halloween/` | 320×180 night party: `lighting()` with many lamps, point-light `cast` shadows, dancing monsters (bones drawn between joints, a cape polygon, `warp`) |

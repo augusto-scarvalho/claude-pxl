@@ -292,7 +292,8 @@ draws the edges' dark rims across the terrain. `shrink: 2` takes 32px tiles to 1
 
 `lamp(x, y, { r, color, power, z })`, `lighting({ cell, sky, ambient, emit, ... })`, and the layer flags
 `solid`, `wall`, `unlit`: see [lighting.md](lighting.md). The same file covers normal maps:
-`bump("dome"|"bevel"|"luma", { w, depth, on, where })` and the numpad grid `normals(x, y, grid)`.
+`bump("dome"|"bevel"|"luma"|"hybrid", { w, depth, on, where })` (hybrid also reads Sprite Fusion's
+`shapeRadius`, `shapeStrength`, `shapeSoftness`, `detailStrength`, `detailScale`) and the numpad grid `normals(x, y, grid)`.
 
 ## Glow
 

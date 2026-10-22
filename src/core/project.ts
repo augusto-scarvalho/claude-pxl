@@ -103,7 +103,7 @@ export const OP_OPTS: Record<string, string[]> = {
   arc: ["inner", "taper"],
   relight: ["light", "reach", "strength", "ramps", "glint"],
   rampmap: ["where", "hue"],
-  bump: ["w", "depth", "on", "where"],
+  bump: ["w", "depth", "on", "where", "shapeRadius", "shapeStrength", "shapeSoftness", "detailStrength", "detailScale"],
   lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "shape", "relief", "skyDir"],
   glow: ["where", "r", "strength", "color", "bands", "ramp", "keep"],
   terrain: ["far", "top", "bound", "margin", "sky"],

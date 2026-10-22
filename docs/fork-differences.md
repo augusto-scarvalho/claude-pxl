@@ -1,8 +1,8 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**313 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
-and none behind. The work spans October 16–21, 2026. Everything the original does still works; this
+**314 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+and none behind. The work spans October 16–22, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
 
@@ -27,7 +27,7 @@ page lists what the fork adds. Every commit is in
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 53 |
-| Tests | 59 | 241 |
+| Tests | 59 | 247 |
 
 ## Looking and checking
 
@@ -57,7 +57,7 @@ moved into the DSL where every scene can use it.
 | --- | --- |
 | Palettes and color | Palette files (`.hex`, `.gpl`, `.pal`, `.txt`) that carry their own keys; `shades()` for a hue-shifted ramp from one color (`sat` for Saint11's saturated lights, a negative `hue` for metals); `rampmap` so imported tones never merge; radial gradients; layer blend modes and real opacity; included files keep their own palette. |
 | Shapes and strokes | `curve()` through points, `arc()` for slashes and smears, `capsule` for limbs, `flame`, 9-slice panels for UI, bitmap fonts with a ready 5×7 (lowercase too; `mono` for a score or a timer); `wire()` and `curve()` pixel-perfect. |
-| Outlines and light | `aa: true` anti-aliases inner edges as by hand (a strip half the step long, in the key between); `inline` and `selout` outlines, `relight` and `plate()` for lit parts, cast shadows (also from a point light: a fire, a lamp), `glow` that keeps what glows as drawn. |
+| Outlines and light | `aa: true` anti-aliases inner edges as by hand (a strip half the step long, in the key between); `inline` and `selout` outlines, `relight` and `plate()` for lit parts, cast shadows (also from a point light: a fire, a lamp), `glow` that keeps what glows as drawn; `bump("hybrid")`, normal maps made the way Sprite Fusion makes them (the outline's volume plus the shading; its settings, its file format), and normal atlases laid out like every animation and sheet. |
 | Placing things | `pivot` (which point a stamp lands on), `smear` (motion blur: the silhouette swept from where it was), `sub` stamps half a pixel along (subpixel motion, edges in the in-between key), `wrap` for seamless tiles, `scatter` with `even` and `near` (along the edge of a color), sockets and sorted layers, `register` for frames aligned on a marked point. |
 | Tiles and maps | Tilemap corner tiles, isometric tilemaps, export to Tiled (`.tmj`), sheet extrude against texture bleeding. |
 | Rotation | Free angles, `directions()` for 8 or 16 views, RotSprite checked on real sprites, and a rotation guide. |

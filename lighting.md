@@ -83,6 +83,7 @@ sprite("bricks", { w: 32, h: 24 }, pattern("_brick", 0, 0, 32, 24),
   bump("bevel", { on: "b", w: 1 }))                        // each 3px brick bevelled; mortar is the edge
 sprite("slime", ..., bump("dome", { depth: 1.5 }))          // the blob bulges like a pillow
 sprite("rock", ..., bump("luma", { depth: 2 }))             // the existing shading becomes relief
+sprite("hero", ..., bump("hybrid"))                         // both: volume from the outline plus the shading
 sprite("crate", `...`, normals(0, 0, `
   7888889
   4555556
@@ -97,6 +98,7 @@ opaque pixels:
 | `"dome"` | Each connected blob bulges, steep at the rim and flat at the top (barrels, slimes, fruit). |
 | `"bevel"` | Edges slope over `w` px (default 2), with a flat top (bricks, panels, buttons, tiles). Keep `w` under half the shape's smallest side: a 3px-tall brick needs `w: 1`, or it has no flat top and reads as a hole under a near lamp. |
 | `"luma"` | Brightness: lighter pixels are higher. Good for art that's already shaded. |
+| `"hybrid"` | Both: a volume rising from each 8-connected island's edge (exact distance, leveling off past `shapeRadius`), plus the shading's lightness (Oklab), each blurred a little. The way [Sprite Fusion](https://github.com/Hugo-Dz/spritefusion-sprite-normals) makes them, with its settings and defaults: `shapeRadius` 4, `shapeStrength` 1.15, `shapeSoftness` 1.15, `detailStrength` 6 (0 for the volume alone), `detailScale` 0.6, and `depth` as its normal strength (1.5). Characters and props drawn with shading: a painted highlight still reads as a bump, so lower `detailStrength` on white cloth or shiny metal. |
 
 `on` limits it to some keys, and the other keys act as edges, so `on: "b"` bevels every brick
 separately. The image border counts as an edge too. `depth` sets the steepness.
@@ -105,13 +107,16 @@ separately. The image border counts as an edge too. `depth` sets the steepness.
 right, `7 9 1 3` the diagonals, `5` straight at the viewer. `q w e / a s d / z x c` are the same
 directions with a gentler tilt. `0` clears a normal and `.` skips.
 
-`pxl build` also writes `<name>_n.png` for every sprite or scene that has normals. It uses the
-usual engine encoding (RGB = normal × 0.5 + 0.5, green pointing up, flat = `#8080ff`), so Godot,
-Unity and similar engines can light the sprite with it. The viewer shows a **normal map** frame
+`pxl build` also writes `<name>_n.png` for every sprite or scene that has normals, and for every
+animation and sheet a frame of which has them, laid out in the same rectangles as the art (its JSON
+serves both). It uses the usual engine encoding (RGB = normal × 0.5 + 0.5, green pointing up, flat =
+`#8080ff`, the art's own alpha), the one Sprite Fusion writes, so Godot, Unity and similar engines
+can light the sprite with it, and a hybrid map matches Sprite Fusion's to within a level. The viewer shows a **normal map** frame
 before the light map.
 
 Full demo: `examples/normals.px.js` (`relief` animates a lantern swinging past; `lit` and `flat`
-compare the same lamp with and without relief).
+compare the same lamp with and without relief; `ways` lights one rock flat, `dome`, `luma` and
+`hybrid`).
 
 ## Glow on top of the light
 

@@ -1,7 +1,7 @@
 // Normal maps: per-pixel surface directions that make lighting() rake across relief (bricks,
 // domes, bevels) instead of lighting everything flat. Generated from shape (bump) or painted
 // with numpad direction grids (normals); stored on the image (Img.norm) so they travel with it.
-import { TRANSPARENT, pack } from "./color.ts";
+import { TRANSPARENT, oklab, pack } from "./color.ts";
 import { PxError } from "./errors.ts";
 import { Img } from "./image.ts";
 import type { BumpOpts } from "./model.ts";
@@ -40,11 +40,15 @@ export function dirOf(ch: string): [number, number, number] | null | "none" {
  * - "bevel": edges slope down over `w` px, flat top (bricks, panels, buttons)
  * - "dome": each connected blob bulges like a pillow / sphere (barrels, fruit, rocks)
  * - "luma": brighter = higher, from the art's own shading (hand-shaded sprites)
+ * - "hybrid": the silhouette's volume plus the painting's shading (see hybrid())
  * Pixels outside the mask (and outside the image) count as height 0 for bevel/dome.
  */
 export function bump(img: Img, mask: Uint8Array, o: BumpOpts): void {
   const { w, h } = img, n = w * h;
   const shape = o.shape ?? "dome", depth = o.depth ?? 1;
+  if (shape === "hybrid") return hybrid(img, mask, o);
+  const own = HYBRID_OPTS.filter((k) => o[k] !== undefined);
+  if (own.length) throw new PxError(`bump: ${own.join(", ")} only shape "hybrid" reads; "${shape}" ignores it`);
   const ht = new Float32Array(n);
   if (shape === "luma") {
     for (let i = 0; i < n; i++) {
@@ -79,7 +83,7 @@ export function bump(img: Img, mask: Uint8Array, o: BumpOpts): void {
         ht[i] = (R + 0.5) * Math.sqrt(Math.max(0, 1 - t * t));
       }
     }
-  } else throw new PxError(`bump shape must be "bevel", "dome" or "luma", got '${shape}'`);
+  } else throw new PxError(`bump shape must be "bevel", "dome", "luma" or "hybrid", got '${shape}'`);
 
   const nm = img.normals();
   const at = (x: number, y: number, i: number) => {
@@ -114,18 +118,161 @@ function distance(mask: Uint8Array, w: number, h: number): Float32Array {
   return d;
 }
 
+/** What only "hybrid" reads: [default, min, max], Sprite Fusion's. */
+const HYBRID: Record<string, [number, number, number]> = {
+  shapeRadius: [4, 0.5, 512], shapeStrength: [1.15, 0, 8], shapeSoftness: [1.15, 0, 8], detailStrength: [6, 0, 8], detailScale: [0.6, 0.6, 8],
+};
+const HYBRID_OPTS = Object.keys(HYBRID) as (keyof BumpOpts)[];
+
 /**
- * The normal map as an image in the common game-engine encoding (Godot, Unity, LDtk...):
- * RGB = normal * 0.5 + 0.5 with green pointing up; flat (128, 128, 255) where none was set.
+ * The way Sprite Fusion's sprite normals makes them (github.com/Hugo-Dz/spritefusion-sprite-normals,
+ * MIT, read at d14b067), written again here with its settings and defaults, so a map made here
+ * matches one made there to within a level (pxl keeps normals in 8 bits). Each 8-connected island
+ * apart, in a field padded so no blur reaches a neighbour: a volume rising from the edge (the exact
+ * distance in, eased by a log so it levels off past `shapeRadius`, blurred by `shapeSoftness`), plus
+ * the shading (Oklab lightness about its middle, blurred by opacity at `detailScale` and twice that)
+ * times `detailStrength`; Sobel slopes steepened by `depth` (its normal strength).
+ */
+function hybrid(img: Img, mask: Uint8Array, o: BumpOpts): void {
+  const v: Record<string, number> = {};
+  for (const [k, [def, lo, hi]] of Object.entries(HYBRID)) {
+    const x = (o as Record<string, unknown>)[k] ?? def;
+    if (typeof x !== "number" || !(x >= lo && x <= hi)) throw new PxError(`bump hybrid: ${k} must be between ${lo} and ${hi}, got ${x}`);
+    v[k] = x;
+  }
+  const depth = o.depth ?? 1.5;
+  if (!(depth >= 0 && depth <= 8)) throw new PxError(`bump hybrid: depth must be between 0 and 8, got ${depth}`);
+  const { w } = img, nm = img.normals(), pad = Math.ceil(3 * Math.max(v.shapeSoftness, 2 * v.detailScale)) + 3;
+  // a pixel of 3% opacity or less is no surface (Sprite Fusion's alpha threshold)
+  const solid = mask.map((m, i) => (m && (img.data[i] & 255) > 0.03 * 255 ? 1 : 0));
+  for (const part of islands(solid, w, img.h)) {
+    let x0 = Infinity, y0 = Infinity, x1 = 0, y1 = 0;
+    for (const i of part) {
+      const x = i % w, y = (i - x) / w;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+    const W = x1 - x0 + 1 + 2 * pad, H = y1 - y0 + 1 + 2 * pad, N = W * H;
+    const at = (i: number) => ((i - (i % w)) / w - y0 + pad) * W + (i % w) - x0 + pad;
+    const inside = new Uint8Array(N), alpha = new Float64Array(N), lum = new Float64Array(N);
+    let lo = 1, hi = 0;
+    for (const i of part) {
+      const j = at(i), c = img.data[i];
+      inside[j] = 1; alpha[j] = (c & 255) / 255; lum[j] = oklab(c)[0];
+      lo = Math.min(lo, lum[j]); hi = Math.max(hi, lum[j]);
+    }
+    // a height the same everywhere has no slope: centring it keeps flat art clear of rounding noise
+    for (const i of part) lum[at(i)] -= (lo + hi) / 2;
+    const f = edt(inside, W, H), R = v.shapeRadius;
+    for (let j = 0; j < N; j++) f[j] = v.shapeStrength * R * Math.log1p(Math.max(0, f[j] - 0.5) / R);
+    const field = blur(f, W, H, v.shapeSoftness), fine = blurBy(lum, alpha, W, H, v.detailScale), broad = blurBy(lum, alpha, W, H, 2 * v.detailScale);
+    for (let j = 0; j < N; j++) field[j] += v.detailStrength * (0.7 * fine[j] + 0.3 * broad[j]);
+    for (const i of part) {
+      const j = at(i), F = field;
+      const gx = (F[j - W + 1] + 2 * F[j + 1] + F[j + W + 1] - F[j - W - 1] - 2 * F[j - 1] - F[j + W - 1]) / 8;
+      const gy = (F[j + W - 1] + 2 * F[j + W] + F[j + W + 1] - F[j - W - 1] - 2 * F[j - W] - F[j - W + 1]) / 8;
+      setNormal(nm, i, -gx * depth, -gy * depth, 1);
+    }
+  }
+}
+
+/** Each 8-connected island of `m` (a diagonal pixel-art stroke stays one), as its pixels' indices. */
+function islands(m: Uint8Array, w: number, h: number): number[][] {
+  const seen = new Uint8Array(m.length), out: number[][] = [];
+  for (let s = 0; s < m.length; s++) {
+    if (!m[s] || seen[s]) continue;
+    const part = [s];
+    seen[s] = 1;
+    for (let k = 0; k < part.length; k++) {
+      const x = part[k] % w, y = (part[k] - x) / w;
+      for (let yy = Math.max(0, y - 1); yy <= Math.min(h - 1, y + 1); yy++)
+        for (let xx = Math.max(0, x - 1); xx <= Math.min(w - 1, x + 1); xx++) {
+          const j = yy * w + xx;
+          if (m[j] && !seen[j]) { seen[j] = 1; part.push(j); }
+        }
+    }
+    out.push(part);
+  }
+  return out;
+}
+
+/**
+ * Exact distance from each pixel to the nearest one outside `inside` (Felzenszwalb and Huttenlocher,
+ * "Distance transforms of sampled functions", 2012): the lower envelope of parabolas along each row,
+ * then along each column. A row or column with nothing outside reads far (1e10).
+ */
+export function edt(inside: Uint8Array, w: number, h: number): Float64Array {
+  const out = new Float64Array(w * h), n = Math.max(w, h);
+  const f = new Float64Array(n), d = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
+  const line = (len: number) => {
+    const cut = (q: number, p: number) => (f[q] + q * q - f[p] - p * p) / (2 * (q - p));
+    let k = 0;
+    v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
+    for (let q = 1; q < len; q++) {
+      let s = cut(q, v[k]);
+      while (s <= z[k]) s = cut(q, v[--k]);
+      v[++k] = q; z[k] = s; z[k + 1] = Infinity;
+    }
+    k = 0;
+    for (let q = 0; q < len; q++) {
+      while (z[k + 1] < q) k++;
+      d[q] = (q - v[k]) ** 2 + f[v[k]];
+    }
+  };
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) f[x] = inside[y * w + x] ? 1e20 : 0;
+    line(w);
+    for (let x = 0; x < w; x++) out[y * w + x] = d[x];
+  }
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) f[y] = out[y * w + x];
+    line(h);
+    for (let y = 0; y < h; y++) out[y * w + x] = Math.sqrt(d[y]);
+  }
+  return out;
+}
+
+/** Gaussian blur, rows then columns, nothing past the edges; under 0.05 px, a copy. */
+function blur(src: Float64Array, w: number, h: number, sigma: number): Float64Array {
+  if (sigma < 0.05) return src.slice();
+  const r = Math.ceil(3 * sigma), k = new Float64Array(2 * r + 1);
+  let sum = 0;
+  for (let t = -r; t <= r; t++) sum += k[t + r] = Math.exp(-0.5 * (t / sigma) ** 2);
+  for (let t = 0; t < k.length; t++) k[t] /= sum;
+  const rows = new Float64Array(w * h), out = new Float64Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      let a = 0;
+      for (let t = Math.max(-r, -x); t <= Math.min(r, w - 1 - x); t++) a += k[t + r] * src[y * w + x + t];
+      rows[y * w + x] = a;
+    }
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      let a = 0;
+      for (let t = Math.max(-r, -y); t <= Math.min(r, h - 1 - y); t++) a += k[t + r] * rows[(y + t) * w + x];
+      out[y * w + x] = a;
+    }
+  return out;
+}
+
+/** Blurred in proportion to `weight`: what has none (transparent, hidden) adds nothing. */
+function blurBy(src: Float64Array, weight: Float64Array, w: number, h: number, sigma: number): Float64Array {
+  const num = blur(src.map((x, i) => x * weight[i]), w, h, sigma), den = blur(weight, w, h, sigma);
+  for (let i = 0; i < num.length; i++) num[i] /= Math.max(den[i], 1e-8);
+  return num;
+}
+
+/**
+ * The normal map as an image in the common game-engine encoding (Godot, Unity, LDtk...), the one
+ * Sprite Fusion writes: RGB = normal * 0.5 + 0.5 with green pointing up, flat (128, 128, 255) where
+ * none was set, and the art's own alpha (a transparent pixel is flat and clear).
  */
 export function normalImage(img: Img): Img {
   const out = new Img(img.w, img.h), n = img.norm;
+  const b = (v: number) => Math.min(255, Math.max(0, Math.round((v * 0.5 + 0.5) * 255)));
   for (let i = 0; i < img.data.length; i++) {
-    if (img.data[i] === TRANSPARENT) continue;
-    const has = n && n[i * 3 + 2] > 0;
+    const a = img.data[i] & 255, has = a > 0 && n && n[i * 3 + 2] > 0;
     const nx = has ? n![i * 3] / 127 : 0, ny = has ? n![i * 3 + 1] / 127 : 0, nz = has ? n![i * 3 + 2] / 127 : 1;
-    const b = (v: number) => Math.min(255, Math.max(0, Math.round((v * 0.5 + 0.5) * 255)));
-    out.data[i] = pack(b(nx), b(-ny), b(nz), 255);
+    out.data[i] = pack(b(nx), b(-ny), b(nz), a);
   }
   return out;
 }
