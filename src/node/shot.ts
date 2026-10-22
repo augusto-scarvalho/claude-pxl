@@ -9,6 +9,12 @@ import { TRANSPARENT } from "../core/color.ts";
 import { PxError } from "../core/errors.ts";
 import { lab } from "../core/vision.ts";
 
+/** How many frames an asset's loop has, as `frames()` numbers them, read off its clock (nothing drawn). */
+export function frameCount(p: Project, name: string): number {
+  const tl = p.timeline(name);
+  return !tl ? 1 : tl.durations ? tl.durations.length : Math.max(1, Math.round(tl.loop / tl.step));
+}
+
 /** Frame n of an asset's loop, as `frames()` numbers them (a scene: each step of its clock): its time. */
 export function frameTime(p: Project, name: string, n: number): number {
   const tl = p.timeline(name);
@@ -21,8 +27,14 @@ export function frameTime(p: Project, name: string, n: number): number {
 const GAP = 2, GAP_C = 0x1b1b22ff, EMPTY = 0x4a4a55ff;
 
 /** The frames side by side (gaps between), cropped to `at`; transparent shows as a flat gray. */
-export function shotRow(p: Project, name: string, frames: number[], at?: number[]): Img {
-  return cellRow(frames.map((f) => p.build(name, 0, frameTime(p, name, f)).img), [at]);
+export function shotRow(p: Project, name: string, frames: number[], at?: number[], ref = false): Img {
+  return cellRow(frames.map((f) => shotFrame(p, name, f, ref)), [at]);
+}
+
+/** Frame f of an asset as shot shows it: with its `ref: true` layers over it (guide rows, a skeleton) when asked. */
+export function shotFrame(p: Project, name: string, f: number, ref = false): Img {
+  const b = p.build(name, 0, frameTime(p, name, f));
+  return ref && b.guide ? b.guide : b.img;
 }
 
 /**

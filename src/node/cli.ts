@@ -20,7 +20,7 @@ import { reduceColors } from "./gif.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 import { checkProject } from "./check.ts";
-import { cellRow, diffRow, frameTime, greyRow, otherVersion, shotChanges, shotRow, stack } from "./shot.ts";
+import { cellRow, diffRow, frameCount, frameTime, greyRow, otherVersion, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
 import { listProject, listText } from "./list.ts";
 import { readMedia } from "./media.ts";
@@ -71,13 +71,14 @@ const USAGE = `pxl — pixel-art DSL
       (a line whose steps are nearly all L's is drawn square on purpose: none), and tones side by side
       too close to tell apart. --readings also lists what the lit-side rule read on every placement,
       warning or not, with a tally: to see where it agrees and where it can't tell.
-  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--out DIR]
+  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--out DIR]
   pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
       to the region, side by side, enlarged, written to <out>/_shot/<name>.png. --vs puts the same
       shot of another version above it (at a git revision, the file and what it includes as they
       were there); --diff adds a row with the pixels that changed in red; --grey adds it all again in
-      values only (each pixel's lightness), to see the planes read before the color. It
+      values only (each pixel's lightness), to see the planes read before the color; --ref draws
+      the asset's ref: true layers over it (guide rows, a skeleton), as the build's previews do. It
       also prints what changed since the last shot of the same frames and region (one asset, one
       region: pixels, where) and the warnings pxl check finds on the asset at those frames (its
       LOOK lines too, the pixels they name ringed in <name>_look.png): one call per look. A clip's
@@ -143,6 +144,7 @@ interface Args {
   cell?: number;
   diff?: boolean;
   grey?: boolean;
+  ref?: boolean;
   brief?: boolean;
   sheet?: boolean;
   shrink?: number;
@@ -206,6 +208,7 @@ function parse(argv: string[]): Args {
     else if (v === "--cell") a.cell = Number(val());
     else if (v === "--diff") a.diff = true;
     else if (v === "--grey" || v === "--gray") a.grey = true;
+    else if (v === "--ref") a.ref = true;
     else if (v === "--brief") a.brief = true;
     else if (v === "--check") a.check = val();
     else if (v === "--frame") a.frame = Number(val());
@@ -442,7 +445,13 @@ export async function main(argv: string[]): Promise<number> {
         if (a.ats.some((r) => r.length !== 4)) throw new PxError("shot --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
         if (a.diff && !a.vs) throw new PxError("shot --diff compares with another version: give it --vs <git rev | file>");
         const regions = a.ats.length ? a.ats : [undefined];
-        const framesFor = (p: Project, name: string) => (a.allFrames ? Array.from({ length: Math.max(1, p.frames(name).length) }, (_, i) => i) : a.frames ?? (a.frame !== undefined ? [a.frame] : [0]));
+        // each name its own frames: all of its loop, or those asked for that it has (a still sprite in a
+        // row of anims shows its one frame)
+        const framesFor = (p: Project, name: string) => {
+          const n = frameCount(p, name), asked = a.allFrames ? Array.from({ length: n }, (_, i) => i) : a.frames ?? (a.frame !== undefined ? [a.frame] : [0]);
+          const have = asked.filter((f) => f < n);
+          return have.length ? have : [0];
+        };
         const projects = new Map<string, Project>(), proj = (f: string) => projects.get(f) ?? projects.set(f, loadProject(f)).get(f)!;
         const shots = entries.map((e) => {
           if (MEDIA.test(e)) return { png: resolve(e), name: basename(e).replace(MEDIA, "") };
@@ -459,13 +468,16 @@ export async function main(argv: string[]): Promise<number> {
               return { ...s, row: wrapRow(pick.map((f) => m.frames[f]), regions), note: m.frames.length > 1 || m.drawnAt ? `${basename(s.png!)}: ${m.kind}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, shown at 1x` : ""}${m.frames.length > 1 ? `, frames ${pick.length === m.frames.length ? `all ${m.frames.length}` : pick.join(",")}, ms ${runs(pick.map((f) => m.ms[f]))}` : ""}` : "" };
             }
             const p = proj(s.file), frames = framesFor(p, s.name);
-            return { ...s, row: wrapRow(frames.map((f) => p.build(s.name, 0, frameTime(p, s.name, f)).img), regions), frames };
+            return { ...s, row: wrapRow(frames.map((f) => shotFrame(p, s.name, f, a.ref)), regions), frames };
           });
           const sheet = a.grey ? stack([stack(many.map((s) => s.row)), greyRow(stack(many.map((s) => s.row)))]) : stack(many.map((s) => s.row)), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
           const path = join(outDir, "_shot", many.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".png");
           writePng(path, sheet.scale(k));
-          const asset = many.find((s) => "frames" in s) as { frames: number[] } | undefined;
-          console.log(`-> ${path} (${asset ? `frames ${asset.frames.join(",")}; ` : ""}rows, top down: ${entries.map((e) => (MEDIA.test(e) ? basename(e) : e)).join(", ")}${regions.length > 1 ? `; columns: ${a.ats.map((r) => r.join(",")).join(" | ")}` : ""}; ${k}x)`);
+          // each row's frames (they differ when a still sprite sits among anims)
+          const span = (f: number[]) => (f.length > 2 && f.every((v, i) => v === f[0] + i) ? `${f[0]}-${f.at(-1)}` : f.join(","));
+          const rowsFrames = many.filter((s) => "frames" in s).map((s) => [s.name, span((s as { frames: number[] }).frames)]);
+          const sameFrames = new Set(rowsFrames.map((r) => r[1])).size <= 1;
+          console.log(`-> ${path} (${rowsFrames.length ? `frames ${sameFrames ? rowsFrames[0][1] : rowsFrames.map(([n, f]) => `${n} ${f}`).join(", ")}; ` : ""}rows, top down: ${entries.map((e) => (MEDIA.test(e) ? basename(e) : e)).join(", ")}${regions.length > 1 ? `; columns: ${a.ats.map((r) => r.join(",")).join(" | ")}` : ""}; ${k}x)`);
           for (const s of many) if ("note" in s && s.note) console.log(s.note);
           for (const s of many) {
             if (!("file" in s)) continue;
@@ -476,12 +488,12 @@ export async function main(argv: string[]): Promise<number> {
           }
           return 0;
         }
-        const { name } = shots[0], p = proj(shots[0].file!), frames = framesFor(p, name), now = shotRow(p, name, frames, a.at);
+        const { name } = shots[0], p = proj(shots[0].file!), frames = framesFor(p, name), now = shotRow(p, name, frames, a.at, a.ref);
         const rows = [now];
         if (a.vs) {
           const o = otherVersion(file, a.vs);
           let was: Img;
-          try { was = shotRow(loadProject(o.path, {}, o.read), name, frames, a.at); } catch (e) { throw wrap(e).within(`--vs ${a.vs}`); }
+          try { was = shotRow(loadProject(o.path, {}, o.read), name, frames, a.at, a.ref); } catch (e) { throw wrap(e).within(`--vs ${a.vs}`); }
           rows.unshift(was);
           if (a.diff) {
             const d = diffRow(was, now);

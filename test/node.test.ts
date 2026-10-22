@@ -377,6 +377,16 @@ test("cli shot of PNGs from anywhere, several regions: a row per image, a column
   assert.deepEqual([png.data[0], png.data[5 * 8]], [pack(255, 0, 0), pack(0, 0, 255)]);
 });
 
+test("cli shot --ref: the asset's ref: true layers drawn over it (guide rows), as the previews have them", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
+  writeFileSync(file, `pal({ r: "#ff0000", w: "#ffffff" })
+sprite("a", { w: 2, h: 1 }, px(0, 0, "r"), layer("guide", { ref: true }, px(1, 0, "w")))
+`);
+  const at = async (...flags: string[]) => { await said("shot", file, "a", "--scale", "1", ...flags); return decodePng(readFileSync(join(dir, "out", "_shot", "a.png"))).data[1]; };
+  assert.notEqual(await at(), pack(255, 255, 255));
+  assert.equal(await at("--ref"), pack(255, 255, 255));
+});
+
 test("cli shot --grey: under the picture, the same in values only (each pixel's lightness as a grey)", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), a = join(dir, "a.png"), img = new Img(2, 1);
   img.set(0, 0, pack(255, 255, 255)); img.set(1, 0, pack(0, 0, 255));

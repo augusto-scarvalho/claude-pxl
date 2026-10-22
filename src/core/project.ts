@@ -120,7 +120,7 @@ export const OP_OPTS: Record<string, string[]> = {
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
   sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "facing", "height", "twin", "register"],
-  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world"],
+  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world", "frames", "fps"],
   anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir", "facing", "height", "twin", "register"],
 };
 const FRAME_OPTS = ["ms", "hold"];
@@ -135,7 +135,7 @@ function buildBytes(b: BuildOut): number {
   return 4 * (px(b.img) + px(b.guide) + px(b.under) + b.layers.reduce((s, l) => s + px(l.img), 0) + (b.refs ?? []).reduce((s, r) => s + px(r.img), 0)) + 64 * b.placements.length;
 }
 export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline"];
-const SHEET_OPTS = ["cols", "pad", "extrude"];
+const SHEET_OPTS = ["cols", "pad", "extrude", "rows"];
 
 function checkArgs(name: string, args: unknown[]): void {
   const sig = SIGNATURES[name];
@@ -732,6 +732,13 @@ export class Project implements BuildCtx {
     if (this.building.has(name)) throw new PxError(`reference cycle through '${name}'`);
     this.building.add(name);
     const acc: Partial<Timeline> = {};
+    // a scene may keep a clock of its own, as an anim does ({ frames, fps }): its functions read it
+    // (c.t, c.frame), and the anims it stamps join it (one stamped at a frame it picks doesn't)
+    if (def.kind === "scene" && def.opts.frames !== undefined) {
+      const fps = def.opts.fps ?? 8, n = Math.floor(def.opts.frames);
+      if (!(fps > 0) || !(n >= 1)) throw new PxError(`scene '${name}': frames must be 1 or more and fps above 0, got frames ${def.opts.frames}, fps ${fps}`);
+      acc.step = Math.round(1000 / fps); acc.loop = n * acc.step;
+    }
     this.collect.push(acc);
     try {
       const out = buildAsset(this, def, seed, this.tracing && seed === 0 && t === 0 ? new Trace() : undefined, t, clock);

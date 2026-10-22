@@ -251,6 +251,14 @@ test("grad r: radial from the center to the ellipse that fits the box; c.size() 
   assert.match(failure(PAL + 'sprite("t", { w: 2, h: 2 }, grad(0, 0, 2, 2, "rw", "d"))', "t").message, /grad direction must be "v", "h" or "r"/);
 });
 
+test("packSheet: with rows starting at given items (sheet rows: \"tag\"), each animation on a row of its own", () => {
+  const one = new Img(2, 2).fill(pack(255, 0, 0)), items = [0, 1, 2, 3, 4].map((i) => ({ name: String(i), img: one }));
+  // a 2-frame animation, a 3-frame one: two rows, as wide as the longest
+  const { sheet, frames } = packSheet(items, undefined, 0, 0, new Set([0, 2]));
+  assert.deepEqual([sheet.w, sheet.h], [6, 4]);
+  assert.deepEqual(frames.map((f) => [f.x, f.y]), [[0, 0], [2, 0], [0, 2], [2, 2], [4, 2]]);
+});
+
 test("grad seam lines: the next band's tone comes in by whole rows, farther apart then closer, not a checker", () => {
   const rows = (seam: string) => art(PAL + `sprite("t", { w: 4, h: 12 }, grad(0, 0, 4, 12, "rw", "v", 1${seam}))`, "t").split("\n");
   const lined = rows(', "lines"'), dithered = rows("");

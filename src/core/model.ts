@@ -209,6 +209,8 @@ export interface SheetOpts {
   pad?: number;
   /** Repeat each frame's edge pixels this many px outward (texture bleeding in engines). */
   extrude?: number;
+  /** "tag": each animation starts a row of its own (`cols` still wraps a long one). */
+  rows?: "tag";
 }
 
 export interface SheetDef {

@@ -148,7 +148,9 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         fr.forEach((f, i) => items.push({ name: `${name}_${i}`, img: f.img, ms: f.ms }));
       }
       if (!items.length) throw new PxError("sheet is empty (no entries matched)");
-      const { sheet, frames } = packSheet(items, s.opts.cols, s.opts.pad, s.opts.extrude);
+      if (s.opts.rows !== undefined && s.opts.rows !== "tag") throw new PxError(`rows can only be "tag" (each animation on a row of its own), got ${JSON.stringify(s.opts.rows)}`);
+      const rows = s.opts.rows === "tag" ? new Set(tags.flatMap((g) => [g.from, g.to + 1])) : undefined;
+      const { sheet, frames } = packSheet(items, s.opts.cols, s.opts.pad, s.opts.extrude, rows);
       writePng(join(out, s.name + ".png"), sheet);
       write(join(out, s.name + ".json"), sheetJson(s.name + ".png", sheet, frames, tags));
       lines.push(`sheet ${s.name} ${sheet.w}x${sheet.h} (${frames.length} frames)${prev(s.name, sheet)}`);

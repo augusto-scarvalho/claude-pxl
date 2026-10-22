@@ -278,23 +278,21 @@ sprite("views", { w: 64, h: 64 },
   layer("guides", { ref: 0.5 }, ...Object.values(ROWS).flatMap((y) => [hline(0, y + 1, 64, "#ff3d8b"), hline(0, y + 33, 64, "#ff3d8b")])))
 
 // For the game: every move and direction, tagged idle_down, walk_up, run_side, attack_down, ...
-sheet("hero", ["idle_*", "walk_*", "run_*", "attack_*"], { cols: 8, pad: 1 })
+sheet("hero", ["idle_*", "walk_*", "run_*", "attack_*"], { rows: "tag", pad: 1 })   // a move and a direction a row
 
 // ---------------------------------------------------------------- test_hero
 // The hero on the grass he'll walk on, a short loop: a walk to the right, a swing, the walk back
 // flipped (the fourth direction, as the game shows it), a swing to the left. The ground stays quiet
-// (tones close in value); the hero carries the contrast. The scene picks his frames by its clock, an
-// empty anim that gives it a 2.48 s loop in 10 ms steps (both the walk's 210 and the swing's 50 fall
+// (tones close in value); the hero carries the contrast. The scene picks his frames by its own
+// clock, a 2.48 s loop in 10 ms steps (frames: 248, fps: 100: the walk's 210 and the swing's 50 fall
 // on them); stamping his anims as they are would loop the scene over their least common multiple.
 sprite("_tuft", "M.M\noMo")
-anim("_clock", { w: 1, h: 1, frames: 248, fps: 100 })
 const frameAt = (ms, t) => { let i = 0; while (t >= ms[i]) t -= ms[i++]; return i }
 const hero = (t) => t < 840 ? ["walk_side", frameAt(MOVES.walk.ms, t), 36 + Math.floor(t / 70), false]
   : t < 1240 ? ["attack_side", frameAt(MOVES.attack.ms, t - 840), 48, false]
   : t < 2080 ? ["walk_side", frameAt(MOVES.walk.ms, t - 1240), 48 - Math.floor((t - 1240) / 70), true]
   : ["attack_side", frameAt(MOVES.attack.ms, t - 2080), 36, true]
-scene("test_hero", { w: 96, h: 64, bg: "m", world: { light: [0, -1] } },
-  stamp("_clock", 0, 0),
+scene("test_hero", { w: 96, h: 64, bg: "m", frames: 248, fps: 100, world: { light: [0, -1] } },
   scatter("_tuft", 0, 0, 96, 64, 22, { even: true }),
   layer("shadow", { shade: 1 }, (c) => c.ellipse(hero(c.t)[2], 46, 5, 1, "k")),
   layer("hero", (c) => {

@@ -267,6 +267,13 @@ test("scroll: a strip that wraps goes by a whole number of its widths in the loo
   assert.match(failure(PAL + strip + `anim("go", { w: 6, h: 1, frames: 4 }, scroll("s", 0, 6))`, "go").message, /whole number of 4s/);
 });
 
+test("a scene's own clock (frames, fps): its functions read it; an anim it stamps joins it", () => {
+  const p = load(`anim("tick", { w: 1, h: 1, frames: 2, fps: 4 }, (c) => c.px(0, 0, c.frame ? "w" : "r"))
+scene("s", { w: 2, h: 1, frames: 4, fps: 4 }, (c) => c.px(1, 0, c.frame === 3 ? "g" : "k"), stamp("tick", 0, 0))`);
+  assert.deepEqual(frameKeys(p, "s"), ["rk", "wk", "rk", "wg"]);
+  assert.equal(p.timeline("s")!.loop, 1000);
+});
+
 test("scroll down: a strip that wraps in y goes down a whole number of its heights in the loop", () => {
   const strip = `sprite("s", { w: 1, h: 4, wrap: "y" }, "r\\nw\\ng\\nk")\n`;
   const p = load(strip + `anim("go", { w: 1, h: 6, frames: 4, fps: 4 }, scroll("s", 0, 4, { axis: "y" }))`);

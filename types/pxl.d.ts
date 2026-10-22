@@ -92,7 +92,7 @@ declare global {
     ground?: number;
   }
   /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
-  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld }
+  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number }
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong" }
   interface PxFrame { ms?: number; hold?: number }
   interface PxLayerOpts {
@@ -331,7 +331,7 @@ declare global {
   function layer(name: string, opts: PxLayerOpts, ...items: PxItem[]): PxLayer;
   function layer(name: string, ...items: PxItem[]): PxLayer;
   function group(name: string, members: string[]): void;
-  function sheet(name: string, entries: string[], opts?: { cols?: number; pad?: number; extrude?: number }): void;
+  function sheet(name: string, entries: string[], opts?: { cols?: number; pad?: number; extrude?: number; /** each animation on a row of its own */ rows?: "tag" }): void;
   /** A bitmap font from glyphs drawn in w x h cells on a sprite, in the order of `chars`; use it with text(..., { font }). */
   function font(name: string, sprite: string, opts: { chars: string; w: number; h: number; cols?: number; mono?: boolean }): void;
   /** n directions (sprites name_0.. + group name) from a pose pointing up, via exact quarter turns and diagonal mirrors where possible. See rotation.md. */

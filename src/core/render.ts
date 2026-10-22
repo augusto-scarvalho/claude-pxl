@@ -133,14 +133,16 @@ export interface FrameTag {
  * pixels that many px outward (the frame rect stays the same), so engines that filter or round
  * texture coordinates bleed the frame's own colors instead of a neighbour's.
  */
-export function packSheet(items: { name: string; img: Img; ms?: number }[], cols?: number, pad = 0, extrude = 0): { sheet: Img; frames: SheetFrame[] } {
+export function packSheet(items: { name: string; img: Img; ms?: number }[], cols?: number, pad = 0, extrude = 0, newRowAt?: Set<number>): { sheet: Img; frames: SheetFrame[] } {
   if (!items.length) throw new Error("sheet is empty");
   if (!(Number.isInteger(extrude) && extrude >= 0)) throw new Error(`extrude must be a whole number of px >= 0, got ${extrude}`);
-  const perRow = cols ?? Math.ceil(Math.sqrt(items.length));
+  // (`newRowAt`: items that start a row of their own, each animation's first frame with rows: "tag")
+  const perRow = cols ?? (newRowAt ? Infinity : Math.ceil(Math.sqrt(items.length)));
   const frames: SheetFrame[] = [], e = extrude;
-  let x = 0, y = 0, rowH = 0, W = 0;
+  let x = 0, y = 0, rowH = 0, W = 0, col = 0;
   items.forEach((it, i) => {
-    if (i > 0 && i % perRow === 0) { x = 0; y += rowH + pad; rowH = 0; }
+    if (i > 0 && (col === perRow || newRowAt?.has(i))) { x = 0; y += rowH + pad; rowH = 0; col = 0; }
+    col++;
     frames.push({ ...it, x: x + e, y: y + e });
     W = Math.max(W, x + it.img.w + 2 * e);
     x += it.img.w + 2 * e + pad;
