@@ -23,6 +23,8 @@ export interface StudyOpts { colors?: number; to?: [number, number]; /** the siz
 /** pieces: each object of an animation alone (a row of cutouts each) and its box in every frame */
 export interface StudyOut { text: string[]; sheet: Img; picture: Img; pixelArt: boolean; palette: Color[]; pieces?: { sheet: Img; json: unknown; strips: Img[] }; layers?: ReturnType<typeof decompose> }
 
+/** The most pixels a still is read in whole: past that, its top rows (sheets and maps of games run to millions). */
+const READ_PX = 2_000_000;
 const pct = (a: number, b: number) => `${b ? Math.round((100 * a) / b) : 0}%`;
 const hex = (c: Color) => toHex(c).slice(0, 7);
 const way = ([x, y]: [number, number]) => {
@@ -32,8 +34,41 @@ const way = ([x, y]: [number, number]) => {
 };
 const hueName = (h: number) => (h < 15 || h >= 350 ? "pinks and reds" : h < 55 ? "reds and oranges" : h < 95 ? "oranges and browns" : h < 125 ? "yellows" : h < 165 ? "greens" : h < 215 ? "teals and cyans" : h < 290 ? "blues" : "purples and magentas");
 
+/**
+ * Normal maps laid out beside the art (an HD-2D game's sheet: each frame's color, then the same frames
+ * as normals): pixels whose color reads as a unit vector facing out (RGB = normal x 0.5 + 0.5), where
+ * the flat one, #8080ff, is common too. Null when there are hardly any.
+ */
+function normalMaps(img: Img): { mask: Uint8Array; share: number } | null {
+  const mask = new Uint8Array(img.w * img.h);
+  let k = 0, flat = 0, all = 0;
+  for (let i = 0; i < mask.length; i++) {
+    const c = img.data[i];
+    if ((c & 255) < 128) continue;
+    all++;
+    const x = (c >>> 24) / 127.5 - 1, y = ((c >>> 16) & 255) / 127.5 - 1, z = ((c >>> 8) & 255) / 127.5 - 1;
+    if (z > 0.2 && Math.abs(x * x + y * y + z * z - 1) < 0.15) { mask[i] = 1; k++; if (Math.abs(x) < 0.02 && Math.abs(y) < 0.02) flat++; }
+  }
+  return all && k >= 0.1 * all && flat >= 0.03 * all ? { mask, share: k / all } : null;
+}
+
 export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
-  const first = input.frames[0], text: string[] = [];
+  const text: string[] = [];
+  // normal maps beside the art are taken out first: they aren't colors to read
+  const normals = input.frames.length === 1 && !input.drawnAt ? normalMaps(input.frames[0]) : null;
+  if (normals) {
+    const f = input.frames[0].copy();
+    for (let i = 0; i < f.data.length; i++) if (normals.mask[i]) f.data[i] = TRANSPARENT;
+    input = { ...input, frames: [f] };
+  }
+  // a big still (a game's whole sheet, 1024x8832) is read for its look on its top rows, so it takes
+  // seconds, not minutes; its sprites are still counted over all of it
+  let whole: Img | null = null;
+  if (input.frames.length === 1 && input.frames[0].w * input.frames[0].h > READ_PX) {
+    whole = input.frames[0];
+    input = { ...input, frames: [whole.sub(0, 0, whole.w, Math.max(1, Math.floor(READ_PX / whole.w)))] };
+  }
+  const first = input.frames[0];
   const pre = !!input.drawnAt, g = input.drawnAt ?? findGrid(first, opts.px), up = g.sx > 1 || g.sy > 1;
   // a copy that was blurred, compressed or scaled by a fraction has its colors smeared: fold them harder
   const smeared = !Number.isInteger(g.sx) || (/JPG|JPEG|WEBP|video/i.test(input.kind) && !/lossless/.test(input.kind));
@@ -51,6 +86,8 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   const native = clear(raw), folded = reflection ? mergeNear(native, smeared ? 0.07 : 0.03) : folded0, nColors = colorCounts(folded).size;
   const dur = input.ms.reduce((s, v) => s + v, 0);
   text.push(`${input.name}: ${pre ? `${Math.round(first.w * g.sx)}x${Math.round(first.h * g.sy)}` : `${first.w}x${first.h}`}${input.frames.length > 1 ? `, ${input.frames.length} frames over ${(dur / 1000).toFixed(1)} s` : ""} (${input.kind})`);
+  if (whole) text.push(`Big: ${whole.w}x${whole.h}; its palette, techniques and lines read on its top ${first.h} rows (--at x,y,w,h reads another part), its sprites counted over all of it.`);
+  if (normals) text.push(`Normal maps: ${pct(normals.share * 100, 100)} of the picture is normal maps (RGB the way each pixel faces, flat #8080ff), laid out beside the art: its sprites are lit pixel by pixel, each frame with its own map in the same place (Triangle Strategy's way). Taken out, the rest read as the art. In pxl: bump("hybrid") or normals() on each frame, mesh()'s sun and lamps to light them, and the _n.png atlas a build writes in the same rectangles.`);
   if (checker) text.push(`Clear: the transparency checker (${hex(checker.a)} and ${hex(checker.b)} in ${checker.size} px squares, as an editor shows what is clear) was exported with it: taken for clear, so it isn't read as the picture's colors.`);
   if (reflection) text.push(`Reflection: below row ${reflection.axis}, what is above it mirrored over ${reflection.floor !== undefined ? `the floor (${hex(reflection.floor)})` : "what's behind"} at about ${Math.round(reflection.alpha * 100)}% (a floor that shines, still water; ${pct(reflection.share * 100, 100)} of what is below it): the same drawing stamped flipped (flip: "y") in a layer with opacity: ${reflection.alpha.toFixed(2)}; left out of the rest of this reading.`);
 
@@ -130,7 +167,7 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   text.push(...lightLines(tech, ramps, pixelArt));
 
   // ---------------------------------------------------------------- a sheet: its sprites apart
-  const sheetRead = pixelArt && input.frames.length === 1 ? sliceSheet(picture, backdrop) : null, sheetOut = sheetRead ? sheetLines(sheetRead, nColors) : null;
+  const sheetRead = pixelArt && input.frames.length === 1 ? sliceSheet(whole && !up ? whole : picture, backdrop) : null, sheetOut = sheetRead ? sheetLines(sheetRead, nColors) : null;
   if (sheetOut) text.push("", "SHEET (its sprites apart, each measured)", ...sheetOut.lines);
 
   // ---------------------------------------------------------------- values, color, distance

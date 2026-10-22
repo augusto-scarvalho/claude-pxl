@@ -6,7 +6,8 @@ for it, a neck under the chin, arms like columns. (`PXL` below is `node <pxl dir
 
 Contents: 1 Pick a style · 2 Measure a reference · 3 Start from existing art · 4 Build order ·
 5 Faces · 6 3/4 and profile views · 7 Placing the pixels · 8 The same character, someone else ·
-9 Small animals (warp, hair) · 10 Animating with parts (sockets, motion guides) · 11 Big pieces: rig first
+9 Small animals (warp, hair) · 10 Animating with parts (sockets, motion guides) · 11 Big pieces: rig first ·
+12 Timing in numbers · 13 How games build and play their sprites
 
 ## 1. Pick a style and stay in it
 
@@ -642,3 +643,60 @@ frame: it lands sooner and hits harder.
 | Pickup | 6–7 frames: currency sparkles where it was (a dot, a plus, a star with rays, dots); a stat item puts its effect over the one who took it (an arrow rising from the feet, red to orange to pale, breaking up); one shared element (a radial flash) ties them together |
 | Metal idle | the body a pixel on alternate frames, the rigid plates and the highlights on the frames between; reflections slide along a blade |
 | Less than a pixel | move a part in two steps at most (more reads as bent); slide a line's kink along it to tilt it; a new line grows from its middle or fades in over 3–4 frames; a liquid's surface moves as a 1 px step travelling across it |
+
+## 13. How games build and play their sprites
+
+Read off sheets ripped from the games with `PXL study` (each figure's height in its ink, the colors
+a sprite gets, its outline, whether a side is drawn or flipped) and from what the games' own data
+say (Final Fantasy Tactics' SHP and SEQ files, Pokémon Mystery Dungeon's sprite sheets). Size a
+figure and pick its build by the game whose look you're after.
+
+| Game (platform) | Figure (ink) | Colors a sprite | Outline (of its edge) | The other side |
+|---|---|---|---|---|
+| A Link to the Past (SNES), The Minish Cap (GBA) | 22 px | 13 | black 16–59%, the rest by tones | flipped |
+| Secret of Mana, Trials of Mana, Terranigma, Chrono Trigger (SNES) | 30–33 px | 12–16 | black 40–97% | flipped: down, up and one side drawn |
+| Sword of Mana (GBA) | 30 px | 15 | black and selective, near half each | flipped |
+| Pokémon Mystery Dungeon (GBA, DS) | 25 px | 7 | | all 8 directions drawn |
+| CrossCode (PC) | 29 px | 13 | selective 46% (a dark shade of what it touches), black 9% | flipped |
+| Final Fantasy Tactics (PS1) | 34–37 px, from parts | 10 | selective 42%, black 22% | flipped: front and back drawn |
+| Final Fantasy Tactics Advance (GBA) | 29 px | 10 | | flipped |
+| Tactics Ogre (PSP) | 25 px | 29 | black 53% | flipped |
+| Octopath Traveler (Switch) | 33–34 px (a child 28) | 22–30 | black 79–84% | both kept in its atlas |
+| Octopath Traveler 0, Champions of the Continent | 32–34 px | 30–44 | black 61–80% | flipped |
+| Triangle Strategy | 37 px | 54 | black 85% | flipped; each frame with a normal map and a mask |
+
+A 16-bit sprite keeps to a palette of 16, its sixteenth clear: 15 colors at most to a sprite (the
+SNES and GBA rows). HD-2D's figures stand taller (32–38 px) and take more colors (22–54: ramps of
+four to six tones, softer shading), the black outline kept.
+
+How they play, and the same in pxl:
+
+- **Frames from parts (FFT).** Its SHP file crops pieces of the sheet (a head, arms, the torso, a
+  weapon) and sets them at offsets for each frame; its SEQ strings frames together, a delay to each.
+  In pxl: each piece a `_part` sprite, each frame a `frame()` stamping the parts at its offsets (or a
+  `rig` with them in its slots), the delays as `ms`. `study` says "Parts" of such a sheet.
+- **Directions.** The 16-bit games and the tactics games draw down, up and one side (the tactics
+  games front and back, on a diagonal) and flip the other: `stamp(..., { flip: "x" })`, or `twin` for
+  a sprite lit from one side. Pokémon Mystery Dungeon draws all eight, a row each (down, down-right,
+  right, up-right, up, up-left, left, down-left); `rows: "tag"` lays a sheet out a move to a row the
+  same way, and `directions()` turns one drawing into 8 or 16 where it can be turned. `study` says
+  "Mirrors: none" where a side is flipped, "drawn both ways" where it isn't.
+- **A game's frames for time.** Pokémon Mystery Dungeon counts durations in 60ths of a second (a walk
+  8, 10, 8, 10: 133 and 167 ms): `ms` is that x 1000 / 60, or a scene clock of `fps: 60` counted in
+  frames.
+- **Points on the figure.** Pokémon Mystery Dungeon marks, on a sheet laid out like the frames, the
+  head, both hands and the body's middle of every frame with a pixel each in its own color (black,
+  green, red, blue), and on another where the shadow goes and how big (three nested sizes); an attack
+  names the frames it rushes, hits and returns on. In pxl: `sockets` on each frame, an ellipse under
+  the pivot for the shadow, and a hit effect cued on the hit frame.
+- **Lit sprites (Triangle Strategy).** Every frame has a normal map and a mask (a silhouette) laid out
+  like the art, and the game lights each sprite pixel by pixel in its 3D scene. In pxl: `bump("hybrid")`
+  or `normals()` on each frame, `mesh()`'s `sun` and `lamps` to light it, and the `_n.png` atlas a
+  build writes beside the art. `study` takes such maps out of a sheet and says "Normal maps".
+- **Maps of few tiles.** A 16-bit map is 8x8 tiles used over and over: Secret of Mana's Potos, 832x832,
+  is 534 distinct tiles (95% of its cells repeat one), a Chrono Trigger forest repeats 78%, The Minish
+  Cap's town 69%; isometric tactics maps repeat less (Final Fantasy Tactics Advance's, about half).
+  `study` counts a map's tiles; `tilemap` builds one the same way.
+
+The sheets were read and measured, not copied; FFT's files after the FFHacktics wiki, Pokémon Mystery
+Dungeon's after PMDCollab's SpriteCollab (AnimData.xml and its sheets).

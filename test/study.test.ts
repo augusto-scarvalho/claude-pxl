@@ -658,3 +658,23 @@ test("study reads an isometric picture: lines rising and falling 2:1, parallel, 
   assert.match(text, /Isometric: lines rising and falling at 2\d\.\d° \(2:1/, text.slice(text.indexOf("PERSPECTIVE")));
   assert.match(text, /Isometric 2:1: build it with the iso blocks/);
 });
+
+test("study takes normal maps laid beside the art out, leaves one-hue masks and a ripper's two-color panels out of a sheet", () => {
+  // eight sprites on white panels with teal between, a row of their masks (magenta fading to black at
+  // the edge), and a block of normal maps (flat #8080ff, a dome's normals on each)
+  const img = new Img(200, 150), teal = pack(0, 128, 128), white = pack(255, 255, 255);
+  img.fill(teal);
+  for (let y = 4; y < 56; y++) for (let x = 4; x < 196; x++) img.set(x, y, white);
+  const ink = pack(40, 30, 50), fill = pack(210, 140, 80), skin = pack(240, 200, 160);
+  for (let i = 0; i < 8; i++) for (let y = 0; y < 16; y++) for (let x = 0; x < 10; x++) img.set(8 + i * 22 + x, 10 + y, x === 0 || x === 9 || y === 0 || y === 15 ? ink : y < 5 ? skin : fill);
+  for (let i = 0; i < 8; i++) for (let y = 0; y < 16; y++) for (let x = 0; x < 10; x++) img.set(8 + i * 22 + x, 34 + y, x === 0 || x === 9 ? pack(120, 0, 120) : pack(255, 0, 255));
+  for (let y = 60; y < 150; y++) for (let x = 0; x < 200; x++) {
+    const dx = ((x % 20) - 10) / 10, dy = ((y % 20) - 10) / 10, r2 = dx * dx + dy * dy, nz = Math.sqrt(Math.max(0, 1 - Math.min(1, r2)));
+    const [nx, ny, z] = r2 < 0.8 ? [dx, -dy, nz] : [0, 0, 1], l = Math.hypot(nx, ny, z);
+    img.set(x, y, pack(Math.round((nx / l * 0.5 + 0.5) * 255), Math.round((ny / l * 0.5 + 0.5) * 255), Math.round((z / l * 0.5 + 0.5) * 255)));
+  }
+  const text = study({ name: "n", frames: [img], ms: [100], kind: "test" }).text.join("\n");
+  assert.match(text, /Normal maps: \d+% of the picture is normal maps/, text.slice(0, 600));
+  // (the masks, and maybe a scrap the maps leave at a dome's rim)
+  assert.match(text, /8 sprites apart on clear, in 1 row; (8|9) one-color silhouettes \(masks of where each sprite is\) left out/, text.slice(text.indexOf("SHEET")));
+});

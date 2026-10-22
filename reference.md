@@ -479,9 +479,15 @@ opacity: a floor that shines, still water) is told, row and opacity, as `flip: "
 that `opacity`, and left out of the rest. A sheet of sprites apart on clear or a flat ground (a game's
 ripped sheet, a set of frames) is taken apart (SHEET): its sprites by row, left to right, their sizes
 grouped by height (a figure's, in px), the rows whose sprites are one size (a move's frames), the
-spacing between them and between rows, the colors a sprite gets; a ripper's labels (small marks of a
-color or two side by side) and boxes drawn round frames are left out, and no perspective is read off
-it. An isometric picture is told by its lines, two sets rising and falling at one angle and meeting
+spacing between them and between rows, the colors a sprite gets; whether most of them are parts (pieces
+under half a figure's height, to build frames from, FFT's way), a tileset's pieces on an 8 px grid, and
+whether a sprite's mirror image is on the sheet too (drawn both ways) or none is (one side drawn, the other
+flipped when played); a ripper's labels (small marks of a color or two side by side), boxes drawn round
+frames and one-hue silhouettes (masks) are left out, its panels taken for ground (a color an eighth of
+the sheet, much of it in one field), and no perspective is read off it. Normal maps laid out beside
+the art (an HD-2D game's sheet: each frame's normals in the same place) are told and taken out before
+the rest is read. A still of more than two million pixels is read for its look on its top rows (its
+sprites still counted over all of it). An isometric picture is told by its lines, two sets rising and falling at one angle and meeting
 nowhere: 26.6° (2:1, pixel art's) or 30° (true isometric). It reads two kinds of picture two ways.
 Pixel art (few colors, hard steps between them, often drawn at 2x and up) is read as drawn: its grid
 found (an exact upscale, or a blurred, compressed or fractional one: a video of a game, a JPEG,

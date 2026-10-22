@@ -696,24 +696,46 @@ export function findReflection(frames: Img[], k: Checker | null): Reflection | n
     return off / 3 <= 14 ? a : -1;
   };
   let best: Reflection | null = null, bestN = 0;
+  // a plain floor: the color most of what is below the row has (the first frame), a half of it at least;
+  // and the wall behind what stands over it, the same way above the row as far up as the mirror reaches.
+  // Counted as the row rises, from the bottom: a row more below each time, the window above sliding
+  // (a row out at its bottom, one or two in at its top), so it costs a pass over the picture, not one an axis
+  const f0 = sample[0].data, rowAdd = (m: Map<Color, number>, y: number, d: number) => {
+    let n = 0;
+    for (let x = 0; x < W; x++) { const c = f0[y * W + x]; if ((c & 255) >= 250) { m.set(c, (m.get(c) ?? 0) + d); n += d; } }
+    return n;
+  };
+  const most = (m: Map<Color, number>, all: number) => { let bc: Color | undefined, bn = 0; for (const [c, v] of m) if (v > bn) { bn = v; bc = c; } return all > 0 && bn >= 0.5 * all ? bc : undefined; };
   // (a reflection is a band, not the last few rows: a framed picture's bottom edge mirrors nothing)
-  for (let axis = Math.floor(H / 4); axis < H - Math.max(3, Math.ceil(H / 10)); axis++) {
-    // a plain floor: the color most of what is below the row has (the first frame), a half of it at least
-    // (once a row, for both gaps)
+  const lo = Math.floor(H / 4), hi = H - Math.max(3, Math.ceil(H / 10));
+  const belowN = new Map<Color, number>(), aboveN = new Map<Color, number>();
+  let allBelow = 0, allAbove = 0, wTop = hi - 1, wBot = hi - 1;
+  if (!k) for (let y = H - 1; y >= hi; y--) allBelow += rowAdd(belowN, y, 1);
+  for (let axis = hi - 1; axis >= lo; axis--) {
     if (!k) {
-      const n = new Map<Color, number>();
-      let all = 0;
-      for (let y = axis; y < H; y++) for (let x = 0; x < W; x++) { const c = sample[0].data[y * W + x]; if ((c & 255) >= 250) { n.set(c, (n.get(c) ?? 0) + 1); all++; } }
-      const top = [...n].sort((a, b) => b[1] - a[1])[0];
-      floor = top && top[1] >= 0.5 * all ? top[0] : undefined;
-      // and the wall behind what stands over it, the same way above the row
-      const w = new Map<Color, number>();
-      let up = 0;
-      for (let y = Math.max(0, 2 * axis - H); y < axis; y++) for (let x = 0; x < W; x++) { const c = sample[0].data[y * W + x]; if ((c & 255) >= 250) { w.set(c, (w.get(c) ?? 0) + 1); up++; } }
-      const back = [...w].sort((a, b) => b[1] - a[1])[0];
-      wall = back && back[1] >= 0.5 * up ? back[0] : undefined;
+      allBelow += rowAdd(belowN, axis, 1);
+      floor = most(belowN, allBelow);
+      const t = Math.max(0, 2 * axis - H);
+      while (wBot > axis) allAbove += rowAdd(aboveN, --wBot, -1);
+      while (wTop > t) allAbove += rowAdd(aboveN, --wTop, 1);
+      wall = most(aboveN, allAbove);
     }
     for (const gap of [0, 1] as const) {
+    // a look at the first rows under it first: a reflection starts at the row, so where none of them
+    // has its copy there is none to find further down
+    // (as far down as it takes to have something to judge: a sheet's empty rows say nothing)
+    let probe = 0, fits = 0;
+    for (let y = axis; y < Math.min(H, axis + 48) && (probe < 24 || y < axis + 4); y++) {
+      const m = 2 * axis - 1 - y + gap;
+      if (m < 0) break;
+      for (let x = 0; x < W; x++) {
+        const c = f0[y * W + x], above = f0[m * W + x];
+        if ((c & 255) < 20 || c === behind(x, y) || (above & 255) < 20 || above === (k ? checkerAt(k, x, m) : floor) || above === wall) continue;
+        probe++;
+        if (fit(c, above, x, y) >= 0) fits++;
+      }
+    }
+    if (probe >= 12 && fits < 0.2 * probe) continue;
     const alphas: number[] = [];
     let below = 0, shown = 0;
     for (const f of sample) for (let y = axis; y < H; y++) {
