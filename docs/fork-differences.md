@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**311 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**313 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–21, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -21,13 +21,13 @@ page lists what the fork adds. Every commit is in
 
 ## At a glance
 
-| | Original (Oct 14) | This fork (Oct 21) |
+| | Original (Oct 14) | This fork (Oct 22) |
 | --- | --- | --- |
 | Commands | 4: `build`, `serve`, `ascii`, `list` | 12: adds `describe`, `shot`, `check`, `steps`, `help`, `compare`, `blind`, `study` |
-| Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus `scripts/calibrate.ts` |
+| Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
-| Example files | 13 | 52 |
-| Tests | 59 | 226 |
+| Example files | 13 | 53 |
+| Tests | 59 | 241 |
 
 ## Looking and checking
 
@@ -188,7 +188,7 @@ over a still floor no longer read as a plane going by or a loop that closes.
 
 ## Examples
 
-37 new example files are finished scenes an agent copies the structure of; each was curated against
+38 new example files are finished scenes an agent copies the structure of; each was curated against
 references until it read right.
 
 | Example | What it teaches |
@@ -215,7 +215,7 @@ references until it read right.
 - Timed builds are cached within a budget of bytes, so a long loop no longer fills memory.
 - `build --profile` names where the time went; `build --every N` keeps long previews small; the onion
   sheet no longer costs frames squared.
-- Tests went from 59 to 226. One keeps the editor types in step with what the runtime accepts, and
+- Tests went from 59 to 241. One keeps the editor types in step with what the runtime accepts, and
   another keeps the guides in step with the CLI: every command, flag and section they cite exists.
 
 ## How it was built

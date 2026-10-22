@@ -1,9 +1,10 @@
 # Getting started
 
 pxl turns a short JavaScript file into pixel art: PNGs, sprite sheets with JSON, animated GIFs, Tiled
-maps and Aseprite files. This page takes you from nothing to a sprite, an animation and a scene, then
-shows where each command fits. For the full API see [reference.md](../reference.md); to have an AI
-agent draw for you, see [Working with an agent](agents.md).
+maps and Aseprite files. This page is for drawing by hand. It takes you from nothing to a sprite, an
+animation and a scene, then shows where each command fits. For the full API see
+[reference.md](../reference.md); to have an AI agent draw for you, see
+[Working with an agent](agents.md).
 
 ## Contents
 
@@ -11,6 +12,7 @@ agent draw for you, see [Working with an agent](agents.md).
 - [Your first sprite](#your-first-sprite)
 - [Watch it while you edit](#watch-it-while-you-edit)
 - [An animation and a scene](#an-animation-and-a-scene)
+- [Loops, clocks and sheets](#loops-clocks-and-sheets)
 - [What a build writes](#what-a-build-writes)
 - [Which command, when](#which-command-when)
 - [Starting from a reference](#starting-from-a-reference)
@@ -99,6 +101,20 @@ scene("meadow", { w: 160, h: 96, bg: "w" },
 `pxl help anim` and `pxl help scene` print what the reference says about each, and where the
 examples use them.
 
+## Loops, clocks and sheets
+
+- **A scene's clock.** A scene runs on the clock of the animations it stamps. When its own functions
+  pick what to draw by time (a hero who walks, then swings), give it a clock of its own:
+  `scene("test", { w, h, frames: 48, fps: 12 }, ...)`. Otherwise its loop is the least common
+  multiple of its animations' loops. [`examples/topdown_hero/`](../examples/topdown_hero) does this.
+- **Things going by.** `scroll()` moves a strip that wraps across the picture, one call per parallax
+  plane; `axis: "y"` moves it down instead (a shooter's backdrop). A plane should move a whole number
+  of px a frame, or 1 px every so many frames: otherwise it judders, and pxl warns and names a speed
+  that doesn't. `clouds()` and `plume()` (smoke, steam) close their loops too
+  (`pxl help "scenes 8 9 10"`).
+- **Sheets for a game.** `sheet("hero", ["idle_*", "walk_*"], { rows: "tag" })` puts each animation
+  on a row of its own, and the sheet's preview GIF plays every animation in it at once.
+
 ## What a build writes
 
 ```
@@ -107,16 +123,20 @@ out/anims/<name>.png .json .gif   a strip of the frames, Aseprite-style JSON (ta
 out/scenes/<name>.png             each scene (+ a GIF when it moves, a folder of layers with layers: true,
                                   a Tiled .tmj when it holds tilemaps)
 out/<sheet>.png .json             each sheet() and its JSON (frames, tags)
-out/_preview/                     enlarged previews; anims also get <name>_onion.png (onion skin)
+out/_preview/                     enlarged previews; anims also get <name>_onion.png (onion skin), and a
+                                  sheet that holds animations a GIF playing them all
 out/share/                        with --share N: each asset N times bigger, clean (no grid), to post
 ```
 
-Useful options: `--only a,b` builds some assets; `--out DIR` writes elsewhere; `--share 4` writes
-each asset 4 times bigger in `out/share/`, clean for posting (a whole number: pixel art at 2.5× has
-pixels of two sizes); `--aseprite` also
-writes each asset as an `.aseprite` file to keep editing by hand (copy it out of `out/`: the next
-build overwrites it); `--every 3` keeps one frame in three in the preview GIFs of a long loop;
-`--profile` says where a slow build spends its time.
+Useful options:
+
+- `--only a,b` builds some assets; `--out DIR` writes elsewhere.
+- `--share 4` writes each asset 4 times bigger in `out/share/`, clean for posting. Use a whole
+  number: pixel art at 2.5× has pixels of two sizes.
+- `--aseprite` also writes each asset as an `.aseprite` file to keep editing by hand. Copy it out of
+  `out/`: the next build overwrites it.
+- `--every 3` keeps one frame in three in the preview GIFs of a long loop.
+- `--profile` says where a slow build spends its time.
 
 ## Which command, when
 
@@ -124,11 +144,13 @@ build overwrites it); `--every 3` keeps one frame in three in the preview GIFs o
 | --- | --- |
 | see one asset now, without building everything | `pxl shot art.px.js slime` writes `out/_shot/slime.png` |
 | see some frames side by side, or a part enlarged | `pxl shot art.px.js slime_hop --frames all --at 0,0,8,8` |
+| check the values (lights and darks) without the color | `pxl shot art.px.js meadow --grey` adds the same picture in greys |
+| see the guide layers (`ref: true`: guide rows, a skeleton) over the art | `pxl shot art.px.js meadow --ref` |
 | compare two versions | `pxl shot art.px.js slime slime_old`, or `--vs HEAD --diff` against your last commit |
 | the exact pixels as text | `pxl ascii art.px.js slime` |
 | know what is where in a scene, what covers what | `pxl describe art.px.js meadow` (`--brief` when busy) |
 | find which line painted a pixel | `pxl steps art.px.js slime --at 3,2` |
-| check before calling it done | `pxl check art.px.js` (a scene's facing, feet on the ground and lit side at every frame; and, to look at, the lines and near-identical tones of sprites drawn by hand; `pxl shot` rings those pixels in `<name>_look.png`) |
+| check before calling it done | `pxl check art.px.js` (see below) |
 | post it | `pxl build art.px.js --share 4`: every asset 4 times bigger in `out/share/`, clean, a GIF when it moves |
 | get around a long file | `pxl list art.px.js` (each definition's line range and comment) |
 | look up an op or option | `pxl help <name>`; `pxl help` alone for the index |
@@ -136,11 +158,15 @@ build overwrites it); `--every 3` keeps one frame in three in the preview GIFs o
 | learn from finished art or a reference | `pxl study ref.gif` |
 | measure one thing moving in a reference | `pxl study ref.gif --at x,y,w,h` (its box every frame, its spacing; the region in the drawing's own pixels, as `shot` shows it) |
 
-`pxl` alone prints every command with all its options.
+`pxl check` makes every check `describe` can warn on (facing, feet on the ground, lit side,
+lettering, and more) on every scene at every frame, and exits 1 when it finds anything. Its LOOK lines don't fail it: they point at the L-corners and jaggies of
+sprites drawn by hand and at tones side by side too close to tell apart. `pxl shot` rings those
+pixels in `<name>_look.png`. Delete a doubled step on a smooth line; keep a corner the shape has.
 
 ## Starting from a reference
 
-Give pxl the picture you want to learn from, a PNG, GIF, JPEG, WebP or video, pixel art or not:
+Give pxl the picture you want to learn from, a PNG, GIF, JPEG, WebP (animated too) or video, pixel
+art or not:
 
 ```sh
 pxl shot ref.gif            # every frame of the clip on one sheet, at 1x
@@ -149,30 +175,36 @@ pxl study ref.gif           # what it is made of, and what to use in pxl for eac
 
 `study` reads pixel art back at 1× (even when it was posted enlarged or blurred) for its palette,
 ramps and their hue shifts, outlines, dithering, anti-aliasing, banding, the faults of its lines
-(L-corners, jaggies) and its light; a photo or painting for its masses of light and dark and its
-colors, translated into a small picture to draw over. It finds the perspective (horizon, vanishing
-points), and in a clip the timing, the loop, parallax planes and each moving piece (walks, things
-carried, anims in place, attacks with their smears, effects, lights), cut out of the background,
-with the spacing of what travels (easing, anticipation, overshoot, squash and stretch). Everything
-goes to `out/_study/` next to the picture: a sheet to look at, the palette as `.hex`, and each piece
-as a strip.
+(L-corners, jaggies) and its light. It reads a photo or painting for its masses of light and dark
+and its colors, translated into a small picture to draw over. It finds the perspective (horizon,
+vanishing points). In a clip it also finds:
 
-What the tutorials teach about lines, anti-aliasing, clusters and timing is in
-[characters.md](../characters.md) §4, §7, §10 and §12 (frame counts measured on Saint11's cards),
-effects in [scenes.md](../scenes.md) "One-shot effects", and `pxl check` points at a hand-drawn
-sprite's doubled steps and jaggies to look at.
+- the timing, the cycle and whether the loop closes; a GIF of exactly one cycle of an idle or a run
+  in place is read as that cycle;
+- the parallax planes and their speeds, as bands of rows or as planes that share rows (a city's far
+  blocks behind its near ones);
+- each moving piece (walks, things carried, anims in place, attacks with their smears, effects,
+  lights), cut out of the background, with the spacing of what travels (easing, anticipation,
+  overshoot, squash and stretch).
+
+Everything goes to `out/_study/` next to the picture: a sheet to look at, the palette as `.hex`, and
+each piece as a strip. `--no-out` prints the text only.
 
 ## Where to read next
 
 - [reference.md](../reference.md): every op and option. Search it with `pxl help <name>`.
 - [scenes.md](../scenes.md): layout, ground, texture, distance, true perspective, parallax, shadows,
-  one-shot effects.
+  one-shot effects, a game's screen and projections.
 - [characters.md](../characters.md): proportions, faces, views, clean lines and anti-aliasing,
-  animating with parts (timing an action, squash and stretch, walks), rigs.
+  animating with parts (timing an action, squash and stretch, walks), rigs. What the tutorials teach
+  about lines, anti-aliasing, clusters and timing is in §4, §7, §10 and §12 (frame counts measured
+  on Saint11's cards).
 - [lighting.md](../lighting.md): lamps, light blocked by walls, normal maps, glow.
 - [rotation.md](../rotation.md): turning sprites by any angle, 8 or 16 directions.
-- [`examples/`](../examples): finished files to copy the structure of. [SKILL.md](../SKILL.md) has a
-  table of which example teaches what.
+- [`examples/`](../examples): finished files to copy the structure of. Start with `basics.px.js`;
+  for a game, `platformer.px.js` and `topdown.px.js` (tilesets laid out as levels) and
+  [`topdown_hero/`](../examples/topdown_hero) (a character in four directions, a tagged sheet).
+  [SKILL.md](../SKILL.md#examples) has a table of which example teaches what.
 
 Art files can be `.ts`: add `/// <reference path="<pxl>/types/pxl.d.ts" />` at the top for editor
 completion.
@@ -182,9 +214,11 @@ completion.
 - **An error.** It names `file:line:col`, the asset, layer and op, and often suggests a fix. One
   broken asset doesn't stop the others from building.
 - **`node: bad option` or a syntax error inside pxl.** Your Node is older than 22.18.
-- **A video or JPEG won't open.** Install `ffmpeg` and make sure `ffmpeg -version` runs.
+- **A video, JPEG or WebP won't open.** Install `ffmpeg` and make sure `ffmpeg -version` runs.
 - **`study` reads a reference at the wrong size** (its `Kind:` line says 8x where you count 16 screen
   pixels to an art pixel; it happens on blurred copies). Give the size: `pxl study ref.png --px 16`.
+- **A plane judders, or a warning says it does.** Give `scroll()` a `per` that moves it a whole
+  number of px a frame; the warning names one.
 - **A preview GIF is many MB.** Build with `--every 3`; the GIFs in `out/` keep every frame.
 - **Running an example filled the repository with `out/` folders.** Commands write next to the art
   file; pass `--out <some scratch folder>`. `out/` is ignored by git.

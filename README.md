@@ -1,10 +1,12 @@
 # pxl
 
-**Pixel art as code.** Write a compact `.px.js` file; get PNGs, sprite sheets with JSON, animated
-GIFs, and a live browser viewer that replays the painting step by step as you save.
+**Pixel art as code.** You write a short `.px.js` file. pxl turns it into PNGs, sprite sheets with
+JSON, animated GIFs, Tiled maps and Aseprite files, and a live browser viewer replays the painting
+step by step each time you save.
 
-Built for AI agents (it ships as a ready-made [agent skill](#use-it-with-an-ai-agent)) and pleasant
-for people too. No runtime dependencies, no build step: just Node ≥ 22.18.
+pxl was made for AI agents to draw with: it ships as an [agent skill](#use-it-with-an-ai-agent), and
+its commands let an agent look at its own art in one call. It works by hand too. It has no runtime
+dependencies and no build step: you need Node 22.18 or newer.
 
 > This is a fork of [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl).
 > **[Fork differences](docs/fork-differences.md)**: what it adds, in one page.
@@ -27,10 +29,19 @@ for people too. No runtime dependencies, no build step: just Node ≥ 22.18.
 
 Every image above is generated from a file in [`examples/`](examples).
 
-**[Getting started](docs/getting-started.md)** · **[Working with an agent](docs/agents.md)** ·
-[Reference](reference.md) · [All docs](#documentation) · [Showcases](#showcases)
+## Contents
 
-## Quick start
+- [Install](#install)
+- [A first file](#a-first-file)
+- [Use it with an AI agent](#use-it-with-an-ai-agent)
+- [Commands](#commands)
+- [What's in the DSL](#whats-in-the-dsl)
+- [Documentation](#documentation): [Getting started](docs/getting-started.md) (by hand),
+  [Working with an agent](docs/agents.md), [the reference](reference.md)
+- [Showcases](#showcases)
+- [Development](#development)
+
+## Install
 
 ```sh
 git clone https://github.com/augusto-scarvalho/claude-pxl.git
@@ -43,6 +54,11 @@ Or run it without cloning:
 ```sh
 npx github:augusto-scarvalho/claude-pxl build art.px.js
 ```
+
+Below, `pxl` means `node bin/pxl.js` in a clone, or `npx github:augusto-scarvalho/claude-pxl`.
+Reading JPEG, WebP or video (only `pxl study` and `pxl shot` do) needs `ffmpeg` on your PATH.
+
+## A first file
 
 Write `art.px.js`:
 
@@ -71,104 +87,92 @@ out/chars.png          out/chars.json                 sprite sheet + TexturePack
 out/_preview/*.png                                    upscaled previews with a pixel grid
 ```
 
-`pxl serve` opens a viewer that rebuilds on every save and replays the asset you edited op by op, so
-you (or whoever is watching an agent work) can see the art being painted. It also writes the same
-`out/` files as `build`.
+`pxl serve art.px.js` opens a viewer that rebuilds on every save and replays the asset you edited op
+by op, so you (or whoever is watching an agent work) can see the art being painted. It writes the
+same `out/` files as `build`. Art files can also be `.ts`: `types/pxl.d.ts` gives editor completion.
 
 [Getting started](docs/getting-started.md) goes on from here: an animation, a scene, what a build
 writes, which command to use when, and learning from a reference.
 
 ## Use it with an AI agent
 
-This repository is an agent skill. `SKILL.md` teaches the workflow (write, look with `shot`, fix
-everything in one turn, `check`, `build`); the reference and the guides are read a section at a time
-with `pxl help`, so the agent pays only for what the task needs.
+This repository is an agent skill. `SKILL.md` teaches the agent the workflow: write the file, look
+with `pxl shot`, fix everything one look showed in one turn, `pxl check`, `pxl build`. The agent reads
+the reference and the guides a section at a time through `pxl help`, so it pays only for what the
+task needs.
 
-**Claude Code**: clone it into your skills folder, then ask Claude to draw something.
+For Claude Code, clone pxl into your skills folder, then ask Claude to draw something:
 
 ```sh
-# all projects
 git clone https://github.com/augusto-scarvalho/claude-pxl.git ~/.claude/skills/pxl-pixel-art
-# or just one project
-git clone https://github.com/augusto-scarvalho/claude-pxl.git .claude/skills/pxl-pixel-art
 ```
 
-**Codex CLI**: clone it to `~/.codex/skills/pxl-pixel-art` instead; Codex loads skills from there.
-
-**Antigravity (`agy`)**: name your clone in `~/.gemini/config/skills.json` (see
-[Working with an agent](docs/agents.md#install-the-skill)).
-
-**Other agents** (Cursor, …): point them at `SKILL.md` and tell them the CLI is
-`node <path to pxl>/bin/pxl.js`.
-
-Ask the agent to start `pxl serve` so you can watch it paint in your browser.
-[Working with an agent](docs/agents.md) covers writing a brief, what a session costs (measured),
-one agent or a pipeline for a big scene, and reviewing what it made.
+The Codex CLI, Antigravity's `agy` and other agents install it differently: see
+[Install the skill](docs/agents.md#install-the-skill). [Working with an agent](docs/agents.md) also
+covers which model and effort to pick (in the [model study](docs/model-study.md), Opus at xhigh was
+the sweet spot), writing a brief, what a session costs and how to keep it cheap, and reviewing the
+result.
 
 ## Commands
 
 ```
-pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
-pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
-pxl ascii <art.px.js> <name>     print an asset as palette keys with x/y rulers (--frame N: one frame)
-pxl list  <art.px.js>            a map of the file: each asset and function's lines, its comment, what it makes
-pxl describe <art.px.js> <name>  a whole scene as text: what is where, what covers it, how it moves
-pxl check <art.px.js> [name...]  every check describe makes, on every frame: warnings; and hand-drawn lines to look at
-pxl shot <art.px.js> <name>      frames side by side, a region enlarged, --vs HEAD --diff; with several
-                                 names, other files', PNGs or clips, a row each (--at again: a column each)
-pxl shot <ref.gif | video>       a reference's frames on one sheet, at 1x (--frames 0-11 for some)
-pxl steps <art.px.js> <name>     how it was painted, step by step; --at x,y: what painted that pixel
-pxl compare <art.px.js> <name> <ref.png>  silhouette rows against a reference (--shrink N, --offset x,y)
-pxl blind <art.px.js> <name...>  facing labels checked by a reader who doesn't know them (--check answers.json)
-pxl study <picture|gif|video>    learn from finished art or a reference: palette, ramps, outlines, the faults
-                                 of its lines, light, perspective, parallax, its moving pieces cut out with
-                                 their spacing, and what to use in pxl for each (--px N: its pixel size)
-pxl help [name]                  what the reference says about an op or option, or a guide's section
+pxl build <art.px.js>             PNGs, sheets + JSON, GIFs and previews in out/ (--only a,b, --share N, --aseprite)
+pxl serve <art.px.js>             the live viewer: rebuilds on save and replays the painting
+pxl shot <art.px.js> <name>       one asset as a picture to look at: frames side by side, a region enlarged,
+                                  values only (--grey), guide layers over it (--ref), the last commit above
+                                  and the pixels that changed (--vs HEAD --diff); a reference GIF, WebP or video too
+pxl ascii <art.px.js> <name>      an asset as palette keys with x/y rulers
+pxl describe <art.px.js> <name>   a whole scene as text: what is where, what covers it, how it moves
+pxl check <art.px.js>             warnings on every scene and frame; LOOK lines on hand-drawn lines
+pxl steps <art.px.js> <name>      how it was painted; --at x,y names the line that painted that pixel
+pxl list <art.px.js>              a map of the file: each definition's lines and comment
+pxl compare <art.px.js> <name> <ref.png>   silhouette rows against a reference
+pxl blind <art.px.js> <name...>   facing labels checked by a reader who doesn't know them
+pxl study <picture or clip>       learn from finished art or a reference, and what to use in pxl for each part
+pxl help [name]                   the reference on an op or option, or a guide's section
 ```
 
-`pxl` alone prints every command with its options.
-
-`pxl` means `node bin/pxl.js` in a clone, or `npx github:augusto-scarvalho/claude-pxl`. Art files can be `.js` or
-`.ts` (`types/pxl.d.ts` gives editor completion).
+`pxl` alone prints every command with all its options. [Which command, when](docs/getting-started.md#which-command-when)
+says which to reach for.
 
 ## What's in the DSL
 
 - **Palettes and ramps**: one-character color keys, built-in palettes (pico8, sweetie16, endesga32…),
   Lospec files, dark→light ramps that drive `shade()` / `light()`, `shades()` for a hue-shifted ramp
   from one color.
-- **Sprites**: text grids, mirroring, auto-outline (plain, selective, inside), palette-swap variants,
-  flips and rotations by any angle, reusable `_parts`, `stamp`, anti-aliasing as by hand (`aa`).
+- **Sprites**: text grids, mirroring, auto-outline (plain, selective, inside, with dark `caps` where a
+  line steps), palette-swap variants, flips and rotations by any angle, reusable `_parts`, `stamp`,
+  anti-aliasing as by hand (`aa`).
 - **Primitives and brushes**: rects, lines and curves drawn pixel-perfect, circles, polygons,
-  gradients, dithering, noise, pixel fonts (a 3×5 built in, a 5×7 to include, `mono` for a score),
-  `scatter` brushes, tilemaps, random groups with reproducible seeds.
+  gradients (dithered, or by whole rows: `grad(..., "lines")`), dithering, noise, pixel fonts (a 3×5
+  built in, a 5×7 to include, `mono` for a score), `scatter` brushes, tilemaps, random groups with
+  reproducible seeds.
 - **Scenes**: layers, cast-shadow and light layers, per-layer PNG export.
 - **Animation**: frames as patches over a base sprite → strips + JSON tags + GIF; motion blur
-  (`stamp(..., { smear })`); parts half a pixel along
-  (`stamp(..., { sub: true })`) for an idle without the single-pixel bob.
+  (`stamp(..., { smear })`); parts half a pixel along (`stamp(..., { sub: true })`) for an idle
+  without the single-pixel bob. A scene runs on the clock of what it stamps, or on its own:
+  `scene(..., { frames, fps })`.
 - **Characters**: `rig()` skeleton first (slots, stand-ins, parts ordered by facing, turned with
   `twin` parts), `ik` for poses, `register` by the pelvis (see [`characters.md`](characters.md)).
 - **Lighting** (optional): lamps, glow, normal-based relief (see [`lighting.md`](lighting.md)).
 - **In meters**: a camera with one, two or three vanishing points (`perspective()`), ground
   (`plane()`), hills (`terrain()`), things built of solid shapes and their shadows (`solids()`,
   `shadows()`), faces you are inside of (`mesh()`); see [`scenes.md`](scenes.md).
-- **Going by in a loop**: parallax planes (`scroll()`), `clouds()`, smoke and steam (`plume()`).
-- **Out**: sprite sheets with JSON tags, GIFs, Tiled maps (`.tmj`), Aseprite files to keep editing.
+- **Going by in a loop**: parallax planes (`scroll()`, across or, with `axis: "y"`, down the
+  picture; pxl warns when a plane would judder), `clouds()`, smoke and steam (`plume()`).
+- **Out**: sprite sheets with JSON tags (`rows: "tag"`: an animation a row; the sheet's preview GIF
+  plays them all), GIFs, Tiled maps (`.tmj`), Aseprite files to keep editing.
 - **Errors** point at `file:line:col` and the asset/layer/op path, with "did you mean…" hints.
-
-And around the DSL, tools to look with (an agent's eyes, cheap in text): `shot` builds one asset
-and writes a picture with what changed, `describe` reads a scene as text, `check` warns before you
-hand over, `steps` names the line that painted a pixel, and `study` reads a reference back into
-pxl's terms. What they say is in [Getting started](docs/getting-started.md#which-command-when).
 
 ## Documentation
 
 | For | Read |
 | --- | --- |
-| a first sprite, an animation and a scene by hand | [docs/getting-started.md](docs/getting-started.md) |
-| running an agent with pxl: briefs, costs, pipelines, review | [docs/agents.md](docs/agents.md) |
+| a first sprite, an animation and a scene by hand; which command when | [docs/getting-started.md](docs/getting-started.md) |
+| running an agent: install, model and effort, briefs, costs, review | [docs/agents.md](docs/agents.md) |
 | which model and effort to draw with: one scene, seventeen runs | [docs/model-study.md](docs/model-study.md) |
 | every op and option | [reference.md](reference.md), or `pxl help <name>` |
-| the agent's workflow and the examples table | [SKILL.md](SKILL.md) |
+| the agent's workflow, and which example teaches what | [SKILL.md](SKILL.md) |
 | scenes, perspective, parallax, shadows | [scenes.md](scenes.md) |
 | characters, animation with parts, rigs | [characters.md](characters.md) |
 | lamps, walls that block light, normal maps | [lighting.md](lighting.md) |
@@ -179,7 +183,10 @@ pxl's terms. What they say is in [Getting started](docs/getting-started.md#which
 ## Showcases
 
 Long projects made with pxl by agents, most over rounds of a curator's notes. Each is a folder in
-[`examples/`](examples) to read and copy.
+[`examples/`](examples) to read and copy. Smaller files to start from (the starter
+`basics.px.js`, tilesets, a top-down game character with idle, walk, run and a sword attack in four
+directions in [`examples/topdown_hero/`](examples/topdown_hero)) are in the
+[examples table](SKILL.md#examples) of `SKILL.md`.
 
 ### A tropical forest
 
@@ -319,12 +326,12 @@ the picture's width in the loop so their coming back is never seen. Trees, logs 
 
 [`examples/parallax/train.px.js`](examples/parallax/train.px.js): the camera rides along with the train,
 so the train stands still and the land runs past behind it. Each plane is a strip drawn once with
-`wrap: "x"` and placed every frame further along: in the 12 s loop the hills go by 320 px, the
-pasture 640, the trackside 1280 and the grass in front 1920, each strip round a whole number of times;
-the ridge on the horizon, too slow to go round, drifts 32 px in the loop while its outline crossfades
-into itself. The drivers turn a whole
-number of times a loop with the rods on their crank pins, and every puff of smoke is left behind at
-the speed of the ground, so the last frame runs into the first.
+`wrap: "x"` and placed every frame further along: in the 12 s loop of 192 frames the hills go by
+384 px, the pasture 768, the trackside 1536 and the grass in front 1920, each strip round a whole
+number of times and a whole number of px every frame, so no plane judders. The ridge on the horizon,
+too slow to go round, drifts 32 px in the loop while its outline crossfades into itself. The drivers
+turn a whole number of times a loop with the rods on their crank pins, and every puff of smoke is
+left behind at the speed of the ground, so the last frame runs into the first.
 
 <p>
   <img src="docs/gallery/race_cockpit.gif" width="100%" alt="Animated street race at sunset on a coastal highway, seen from the driver's seat of a nineties sports coupe: the road bending to its vanishing point, the sea and the setting sun on the left, mountain ranges paling with distance, Atlantic forest, palms and lamp posts on the right; three rival cars overtaken one after another, drawn in perspective as they draw level; the 3D-modelled dash, gauges and mirrors, gloved hands on a turning wheel, the right hand dropping to change gear before a burst of speed">
@@ -347,20 +354,31 @@ are shaded as crumpled cloth.
 
 ```sh
 npm install        # dev only: typescript, @types/node
-npm run check      # type check + tests
-node scripts/gallery.ts   # regenerate docs/gallery
-node scripts/calibrate.ts [asset ...] [--summary] [--vs <rev>]   # pxl study against the examples' own source
+npm run check      # type check + tests (about a minute)
 ```
 
 ```
-src/core/     engine, no Node APIs: image, palette + ramps, canvas ops, build, trace, project
+src/core/     engine, no Node APIs: image, palette + ramps, canvas ops, build, trace, project, study
 src/node/     vm sandbox loader, PNG/GIF encoders, outputs, CLI, live server
 src/viewer/   browser viewer (served type-stripped; no bundler)
 types/        pxl.d.ts globals for editor support in .px.ts files
-scripts/      build.js (dist/ for npm installs), gallery.ts, calibrate.ts
+scripts/      the maintainers' scripts, below
 examples/     example art files
 test/         node:test suites
 ```
+
+| Script | What it does |
+| --- | --- |
+| `scripts/build.js` | writes `dist/` for npm installs |
+| `scripts/gallery.ts` | regenerates `docs/gallery/` from the examples |
+| `scripts/calibrate.ts` | scores `pxl study` against the examples' own source |
+| `scripts/perf.ts` | `pxl check`'s time and peak memory on every example |
+| `scripts/cpuprofile.ts` | a CPU profile of any pxl command, summed by function |
+| `scripts/tokens.ts` | where a Claude Code session's tokens went, read from its transcript |
+| `scripts/model-study.sh` | one run of the [model study](docs/model-study.md): a brief to a new Claude Code, Codex or `agy` session |
+| `scripts/mhtml.ts` | saved web pages (`.mhtml`) opened as text and images, to read tutorials |
+
+How to use them is in [Working with an agent](docs/agents.md#for-maintainers).
 
 In a clone the CLI runs the TypeScript sources directly. When installed as a package it runs
 `dist/`, which `npm install` / `npm pack` generate via `scripts/build.js` (Node won't strip types
