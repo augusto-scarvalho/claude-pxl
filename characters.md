@@ -68,8 +68,9 @@ inside it: for those, the steps below.
   `layer("pose", { ref: true }, pose("pose.json", { scale, x, y }))`.
 - **Read off the landmarks.** Import the reference with `sprite("ref", { png: "ref.png", palettize: true })`
   and run `PXL ascii` on it (without `palettize`, colors off the palette print as `?`), or read the
-  image itself with `PXL describe ref.png`, which keys its own colors. Note the rows of the chin, shoulders, waist, hands, knees and soles, and the
-  widths of the head and shoulders. Draw your silhouette on those rows.
+  image itself with `PXL describe ref.png`, which keys its own colors; `PXL compare ref.png` lists
+  each row's opaque extents and width. Note the rows of the chin, shoulders, waist, hands, knees and
+  soles, and the widths of the head and shoulders. Draw your silhouette on those rows.
 - **Take proportions, not costume.** Hair and clothes come from the character, not the reference.
   Hair tied in a bun hugs the skull, whatever volume the reference has.
 
@@ -136,35 +137,49 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
 - **Licence:** whatever you paint over the base is a derivative of it. With a CC-BY-SA base, the
   result has to credit its author and be shared under CC-BY-SA, so tell the user.
 
-### A 3D reference: pre-render the body, draw the head
+### A body that turns and walks: a skeleton in 3D, a head per view
 
-When no base exists in the view you need, render one from a rigged 3D figure, as Dead Cells did and
-as Saint11 teaches; drawing a turned, walking body pixel by pixel by eye is where code drawing fails
-worst (proportions drift, the near and far limbs swap, every fix breaks something else). Two ways:
-pxl's own skeleton in 3D (§11: `examples/rig/warden.px.js`, `examples/hd2d/traveler.px.js`, the body
-blocked out in flat parts and its motion judged before it is painted, a head drawn per view), which
-turns to any of 8 directions with one walk and is what a field sprite wants; or a pre-render from a 3D
-package, below (tried on the traveler: the structure came out right, its borrowed walk read stiff on
-a chibi, and its turns were stuck on the diagonals it was rendered at):
+When no base exists in the view you need, build the body on a skeleton in 3D: drawing a turned,
+walking body pixel by pixel by eye is where code drawing fails worst (proportions drift, the near and
+far limbs swap, every fix breaks something else). In pxl itself (§11; `examples/rig/warden.px.js`,
+`examples/hd2d/traveler.px.js`, its 8 directions walking and idle):
 
-1. A rigged figure with its moves (Quaternius' Universal Animation Library: a mannequin and its
-   Idle_Loop, Walk_Loop, CC0), made chibi by scaling its bones (the head 3x, the thighs and upper
-   arms 0.6-0.8 long, the chest a little broader), the scale channels taken out of its actions so the
-   scales hold. Hair and garments as simple shapes riding the bones (a sphere for the hair, its front
-   cut open for the face; a cone for a cloak, open in front, its radius waving toward the hem so the
-   light draws folds).
-2. A sprite's camera: orthographic, nearly level (20 degrees down, not the floor's 38: a billboard is
-   drawn as seen from the front), the figure turned 25 degrees off the diagonal (it reads as facing
-   it, and wider than at 45), framed on its rest pose so the feet sit on the bottom row through every
-   frame. Light from the upper left.
-3. Two renders a frame at 4x (72x136 for an 18x34 sprite), on the CPU (Cycles, a few seconds for a
-   whole set): the regions in flat colors (emission) and the light alone (everything white).
-4. Down 4x by blocks: each pixel the region most of its block shows (clear under 7 of 16), a tone of
-   that region's ramp by how lit the block is, with hard steps (cel shading) over the frame's own
-   range of light. Averaging the plain render down instead gives mud: thin, blurred figures.
-5. The head by hand: the 3D head is cleared and where it was printed per frame; a drawn head (the
-   face, the hair's tufts, the eyes: what makes the figure someone) is stamped there. A recolor of
-   the same frames (`base` + `swap` on the palettized PNGs) is another person.
+1. Joints as points in px (x right, y up, z toward us), each limb placed by a two-bone IK from its
+   root to its end; the camera a field sprite's, nearly level (20 degrees down: a billboard is drawn
+   as seen from the front). The body turned by one angle about its upright: one skeleton and one set
+   of moves give every direction.
+2. Blocks first: each part a flat color (a tube between two joints, a ball, a surface swept round
+   the upright for a torso, a tunic, a cloak) into one z-buffer, the nearest wins. Judge the
+   proportions and the motion on a GIF of all the directions before painting anything.
+3. Paint: each surface toned along its ramp by how it faces the light, the light from above and
+   toward us (a mirrored view keeps it, §6); the outlines round each part after the colors, so they
+   stay.
+4. The head by hand, a grid per view: front, front 3/4, profile, back 3/4, back; the other three
+   their mirrors (`x' = 2*hx - x - (w - 1)` round the head's anchor column hx). The crown, chin and
+   anchor on the same rows in every view; one haircut seen from each side (§5).
+5. The walk by the view (§6): facing us or away the feet lift in their own columns, in profile a
+   long stride, on the diagonals between.
+
+What the first tries of the traveler (34 px) got wrong, and the fix:
+- A big head: 11 rows of 34, a third; 13 read as a big head on a small body.
+- Stick limbs: legs as tubes about 1.5 px in radius, arms about 1 px; thinner read as a stick figure.
+- A hunch: the chest straight over the hips; leaning it forward read as a hunched back.
+- Front view, a body-builder: broad shoulders over a narrow waist and thick arms. The body a little
+  barrel (the waist about as wide as the chest), the arms slim and close to it, the hands at the
+  crotch, the shoulders set a little forward and out so the arms show beside the tunic.
+- Underwear over the trousers: a light band at the hips over darker legs. The tunic's short skirt
+  flaring over the trousers' top, the belt narrow and dark above it.
+- A cloak fixed in the world while the body moves: hang it from the shoulders, its hem trailing the
+  motion and swaying a frame late.
+- Front, the face merging with the clothes: a dark row under the chin (the jaw's shadow) parts them.
+- Profile, the face jutting forward: the head over the neck, the face no further out than the chest.
+- A fix to one view changed another the user had approved: keep approved views, edit the rest.
+
+A pre-render from a 3D package (Blender, a CC0 mannequin made chibi, cel shading by blocks, the head
+drawn per frame) was tried on the traveler and dropped: the structure came out right, but the
+borrowed walk read stiff on a chibi, the turns were stuck at the angles rendered, and each proportion
+fix was a round trip through another program. Averaging a plain render down gives mud; reduce by
+blocks, a region per block and hard tone steps, if you go that way.
 
 ## 4. Build order
 
@@ -340,7 +355,7 @@ of the nose; the corners of the mouth straight below the pupils.)
     2:1 diagonal), the leading heel a pixel up, the body a pixel lower there and tallest passing (a
     triangle wave); the arms the other way round, the far one showing only at its extremes; a cloak's
     tail and the hair a frame late. Feet moved 1 px each way never part and read as shuffling.
-  `examples/hd2d/traveler.px.js` stands on these numbers (its body from a 3D figure, §3).
+  `examples/hd2d/traveler.px.js` stands on these numbers (its body a skeleton in 3D, §3).
 - **Profile (side view):** everything says which way the figure faces. The far arm and far leg hide
   behind the near ones or show as a darker sliver on the same side (moving, keep them a ramp step
   darker in every frame, so crossing legs never swap; a far leg all shadow, with near-black under it,

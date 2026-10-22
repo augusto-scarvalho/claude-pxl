@@ -4,15 +4,27 @@
 JSON, animated GIFs, Tiled maps and Aseprite files, and a live browser viewer replays the painting
 step by step each time you save.
 
-pxl was made for AI agents to draw with: it ships as an [agent skill](#use-it-with-an-ai-agent), and
-its commands let an agent look at its own art in one call. It works by hand too. It has no runtime
-dependencies and no build step: you need Node 22.18 or newer.
+pxl was made for AI agents to draw with: an agent looks at its own art in one call and fixes it. It
+works by hand too. Three ways to use it:
+
+- **As a Claude Code skill.** The repository is the skill: clone it (or link a clone) into
+  `~/.claude/skills/pxl-pixel-art`, then ask Claude to draw something.
+  [Use it with an AI agent](#use-it-with-an-ai-agent) has the details.
+- **As a CLI.** `node bin/pxl.js build art.px.js` in a clone. You need Node 22.18 or newer, and
+  nothing else: no install, no build step, no runtime dependencies.
+- **With a live preview.** `node bin/pxl.js serve art.px.js` opens a viewer at
+  http://127.0.0.1:4321/ that rebuilds on every save and replays the painting op by op, to draw by
+  hand or to watch an agent work.
 
 > This is a fork of [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl).
 > **[Fork differences](docs/fork-differences.md)**: what it adds, in one page.
 
 <p>
   <img src="docs/gallery/no_magic_night.gif" width="100%" alt="Animated witch's cottage at night: bubbling cauldron, fireplace, cat and frog">
+</p>
+<p>
+  <img src="docs/gallery/sunset_cliff.gif" width="49%" alt="Animated sunset on a sea cliff: an adventurer watches the sun go down beside a glowing tent and a campfire">
+  <img src="docs/gallery/tournament.gif" width="49%" alt="Animated tournament: two armored knights fight on foot in a sand arena before a cheering grandstand">
 </p>
 <p>
   <img src="docs/gallery/comet_repair.png" width="49%" alt="Comet Repair shop scene">
@@ -27,7 +39,8 @@ dependencies and no build step: you need Node 22.18 or newer.
   <img src="docs/gallery/clock.gif" height="128" alt="Animated clock">
 </p>
 
-Every image above is generated from a file in [`examples/`](examples).
+Every image above is generated from a file in [`examples/`](examples). The long projects are under
+[Showcases](#showcases).
 
 ## Contents
 
@@ -97,9 +110,9 @@ writes, which command to use when, and learning from a reference.
 ## Use it with an AI agent
 
 This repository is an agent skill. `SKILL.md` teaches the agent the workflow: write the file, look
-with `pxl shot`, fix everything one look showed in one turn, `pxl check`, `pxl build`. The agent reads
-the reference and the guides a section at a time through `pxl help`, so it pays only for what the
-task needs.
+with `pxl shot` (and read a scene as text with `pxl describe`), fix everything one look showed in one
+turn, `pxl check`, `pxl build`. The agent reads the reference and the guides a section at a time
+through `pxl help`, so it pays only for what the task needs.
 
 For Claude Code, clone pxl into your skills folder, then ask Claude to draw something:
 
@@ -107,11 +120,14 @@ For Claude Code, clone pxl into your skills folder, then ask Claude to draw some
 git clone https://github.com/augusto-scarvalho/claude-pxl.git ~/.claude/skills/pxl-pixel-art
 ```
 
+`git pull` there updates it. If you already have a clone, make `~/.claude/skills/pxl-pixel-art` a
+link to it instead. To be sure the skill is used, name it: "use the pxl skill to draw ...".
+
 The Codex CLI, Antigravity's `agy` and other agents install it differently: see
 [Install the skill](docs/agents.md#install-the-skill). [Working with an agent](docs/agents.md) also
 covers which model and effort to pick (in the [model study](docs/model-study.md), Opus at xhigh was
-the sweet spot), writing a brief, what a session costs and how to keep it cheap, and reviewing the
-result.
+the sweet spot), writing a brief, how the agent works and what a session costs, one agent or a
+pipeline for a big scene, and reviewing the result.
 
 ## Commands
 
@@ -157,7 +173,8 @@ says which to reach for.
 - **Lighting** (optional): lamps, glow, normal-based relief (see [`lighting.md`](lighting.md)).
 - **In meters**: a camera with one, two or three vanishing points (`perspective()`), ground
   (`plane()`), hills (`terrain()`), things built of solid shapes and their shadows (`solids()`,
-  `shadows()`), faces you are inside of (`mesh()`); see [`scenes.md`](scenes.md).
+  `shadows()`), faces you are inside of (`mesh()`), and after a `mesh()` a camera's depth of field,
+  haze and bloom (`post()`, the HD-2D look); see [`scenes.md`](scenes.md).
 - **Going by in a loop**: parallax planes (`scroll()`, across or, with `axis: "y"`, down the
   picture; pxl warns when a plane would judder), `clouds()`, smoke and steam (`plume()`).
 - **Out**: sprite sheets with JSON tags (`rows: "tag"`: an animation a row; the sheet's preview GIF
@@ -169,7 +186,7 @@ says which to reach for.
 | For | Read |
 | --- | --- |
 | a first sprite, an animation and a scene by hand; which command when | [docs/getting-started.md](docs/getting-started.md) |
-| running an agent: install, model and effort, briefs, costs, review | [docs/agents.md](docs/agents.md) |
+| running an agent: install, model and effort, briefs, how it works, costs, review; tests for contributors | [docs/agents.md](docs/agents.md) |
 | which model and effort to draw with: one scene, seventeen runs | [docs/model-study.md](docs/model-study.md) |
 | every op and option | [reference.md](reference.md), or `pxl help <name>` |
 | the agent's workflow, and which example teaches what | [SKILL.md](SKILL.md) |
@@ -185,7 +202,8 @@ says which to reach for.
 Long projects made with pxl by agents, most over rounds of a curator's notes. Each is a folder in
 [`examples/`](examples) to read and copy. Smaller files to start from (the starter
 `basics.px.js`, tilesets, a top-down game character with idle, walk, run and a sword attack in four
-directions in [`examples/topdown_hero/`](examples/topdown_hero)) are in the
+directions in [`examples/topdown_hero/`](examples/topdown_hero), and an HD-2D figure in eight
+directions, a graveyard and a diorama in [`examples/hd2d/`](examples/hd2d)) are in the
 [examples table](SKILL.md#examples) of `SKILL.md`.
 
 ### A tropical forest
@@ -284,6 +302,20 @@ a last fork put them together. The pipeline came out denser, with more people, c
 less coherent, and cost about five times the tokens and twice the time: worth offering for a big
 scene, not a default. Its plan is there to read (`pipeline/plan.md`).
 
+### An HD-2D graveyard, and a traveler in eight directions
+
+<p>
+  <img src="docs/gallery/hd2d_graveyard.gif" width="100%" alt="Animated HD-2D diorama in pixel art: a graveyard on a grassy hill in a pine wood, morning mist, seen from high up through a long lens; a rounded hill held up by a mossy stone wall, stone steps up its front, a flagstone path between headstones, a wooden picket fence following the hill's edge, a dead tree, boulders at the corners; a young traveler in a green cloak walks up the path and back down while a grey-haired mourner stands by a grave; the near and far edges soft with depth of field">
+</p>
+
+The sixth, in [`examples/hd2d/`](examples/hd2d): the look of Octopath Traveler's dioramas. The
+ground is built in meters with `mesh()` (textured boxes laid a texel to a pixel, a hill with a
+rounded, uneven outline, a fence of real boards) and the people, trees and stones stand in it as
+sprites, shadows cast by one sun, then `post()` adds the camera's depth of field. The traveler is a
+34 px figure in all eight directions, walking and idle, built on a skeleton in 3D inside pxl with a
+head drawn by hand per view; [`characters.md`](characters.md) §3 keeps what the user's notes on
+each try taught (a big head, stick limbs, a hunch, a cloak fixed in the world).
+
 ### True perspective
 
 <p>
@@ -353,8 +385,10 @@ are shaded as crumpled cloth.
 ## Development
 
 ```sh
-npm install        # dev only: typescript, @types/node
-npm run check      # type check + tests (about a minute)
+npm install                     # dev only: typescript, @types/node
+node --test test/docs.test.ts   # one test file, while you iterate
+npm run test:quick              # every test but the two slowest (~20 s): before a push of small changes
+npm run check                   # type check + every test (~45 s), once before a commit
 ```
 
 ```
@@ -373,12 +407,14 @@ test/         node:test suites
 | `scripts/gallery.ts` | regenerates `docs/gallery/` from the examples |
 | `scripts/calibrate.ts` | scores `pxl study` against the examples' own source |
 | `scripts/perf.ts` | `pxl check`'s time and peak memory on every example |
+| `scripts/hashes.ts` | a hash of every asset of the files given, to diff before and after an engine change that shouldn't move a pixel |
 | `scripts/cpuprofile.ts` | a CPU profile of any pxl command, summed by function |
 | `scripts/tokens.ts` | where a Claude Code session's tokens went, read from its transcript |
 | `scripts/model-study.sh` | one run of the [model study](docs/model-study.md): a brief to a new Claude Code, Codex or `agy` session |
 | `scripts/mhtml.ts` | saved web pages (`.mhtml`) opened as text and images, to read tutorials |
 
-How to use them is in [Working with an agent](docs/agents.md#for-maintainers).
+How to use them, and how to update the examples' snapshot after a change you meant, is in
+[Working with an agent](docs/agents.md#for-contributors).
 
 In a clone the CLI runs the TypeScript sources directly. When installed as a package it runs
 `dist/`, which `npm install` / `npm pack` generate via `scripts/build.js` (Node won't strip types

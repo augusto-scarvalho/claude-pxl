@@ -14,13 +14,15 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
 
 1. Read the [example](#examples) closest to what you're making (`PXL list <file>` maps it: read the
    lines you need) and start from the template below.
-   Given a reference or art to learn from (a PNG, GIF, JPEG, WebP or video, pixel art or not), look at it
-   with `PXL shot ref.gif` (a clip's frames on one sheet at 1×) and run `PXL study ref.gif`. Study
-   says what the piece is made of and what to use in pxl for each part, and writes a sheet, the
-   palette and each piece cut out of its background to `out/_study/`:
+   Given a reference or art to learn from (a PNG or GIF; JPEG, WebP or video with ffmpeg on PATH;
+   pixel art or not), look at it with `PXL shot ref.gif` (a clip's frames on one sheet at 1×) and
+   run `PXL study ref.gif`. Study says what the piece is made of and what to use in pxl for each
+   part, and writes a sheet, the palette and each piece cut out of its background to `out/_study/`:
    - a picture: palette and ramps (hue shifting, near twins), outlines, a line's L-corners and
      jaggies, dithering, anti-aliasing, clusters, light, banding, pillow shading, tiles, perspective
-     (vanishing points, lens, tilt); read at the wrong pixel size (a blurred copy), `--px N`;
+     (vanishing points, lens, tilt); read at the wrong pixel size (a blurred copy), `--px N`; a photo
+     or painting: its masses of light and dark, its colors as ramps, and a small picture in few
+     colors to draw over (`--to WxH`, `--colors N`);
    - a clip: timing per drawing (on twos), cycle and loop, subpixel motion, parallax planes and their
      speeds (bands of rows, and planes sharing rows), and its pieces (the backdrop, sprites carried along, walks, anims in place, rigs, actions
      with their smears, effects, and the lights, told apart first), each with its box in every frame,
@@ -35,7 +37,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    and where, so an edit that did nothing shows) and the warnings `check` finds on it.
    `--frames 0,12,30` (or `0-17`, `all`) puts frames side by side, `--grey` adds the same in values only (the squint test), `--ref` draws its guide layers over it, `--at x,y,w,h` enlarges a part
    (again for another part, a column each); more names (another file's as `other.px.js:name`, any
-   PNG at 1×, a reference GIF or video) make a row each, to compare. Exact pixels:
+   PNG at 1×, a reference GIF or video) make a row each, to compare; `--gif` plays them side by
+   side instead (a walk in 8 directions, two versions moving). Exact pixels:
    `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an image). Scenes:
    `PXL describe art.px.js <scene>` (`--brief` when busy) gives each object's
    position, gaps, cover, contrast and motion as text: answer layout questions from it, not by
@@ -66,7 +69,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    A lit-side warning that looks wrong: `--readings` shows what the rule read on every placement.
    Then look as a critic. Replacing approved art: keep `name_old` beside the new one and show
    both, `PXL shot art.px.js name name_old`, for the user to choose. Matching a reference:
-   `PXL compare art.px.js <name> ref.png [--shrink N]` lists each row's extents side by side. Which
+   `PXL compare art.px.js <name> ref.png [--shrink N]` lists each row's extents side by side
+   (`PXL compare ref.png` alone: the reference's own rows, to draw to). Which
    way a rig's parts face: `PXL blind art.px.js <rig>` shows them unnamed to a reader who doesn't
    know the labels (characters.md §11).
 6. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL.
@@ -116,7 +120,8 @@ task needs before starting:
 | a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate, 12 for an action's or a cycle's frame counts, 13 for a game's look (its figures' heights and colors, how it builds and flips them) |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a scene, level, building or environment | `PXL help "scenes 1 3 11 14"` (layout, texture, shadows and light, checking); then what it needs: 2 ground and tiles, 4 trees, 5 water, 6 distance, 7 true perspective, 8-10 loops and parallax, 12 effects; for a game, 15 its screen and 16 its projections (top-down 3/4, isometric); for its grass, trees, bushes, rocks, walls and paths, `PXL help "environment 1"` and the section of each (2-9), starting from `examples/nature/kit.px.js` |
+| a figure that turns to 4 or 8 directions and walks (a field sprite) | `PXL help "characters 3 5 6 10"` (a skeleton in 3D and a head per view, and what went wrong on the traveler; faces and hair; the views; the walk) |
+| a scene, level, building or environment | `PXL help "scenes 1 3 11 14"` (layout, texture, shadows and light, checking); then what it needs: 2 ground and tiles, 4 trees, 5 water, 6 distance, 7 true perspective and HD-2D dioramas, 8-10 loops and parallax, 12 effects; for a game, 15 its screen and 16 its projections (top-down 3/4, isometric); for its grass, trees, bushes, rocks, walls and paths, `PXL help "environment 1"` and the section of each (2-9), starting from `examples/nature/kit.px.js` |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2.5k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
 
@@ -185,9 +190,11 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   for `{ font: "5x7" }` (lowercase too) or `"5x7 mono"` (a score, a timer); `fonts/font_demo.px.js` uses them.
 - **In meters**: `perspective()` (one, two or three points: `yaw`, `pitch`), `plane()` for flat ground,
   `terrain()` for hills and mountains, `solids()`/`shadows()` for things built of `solid` shapes,
-  `mesh()` for what you are inside of or that wraps round itself (faces in meters from `model()`),
-  `capsule` for a limb painted round, `flame` for fire (`PXL help "scenes 7"`); procedural
-  texture with `hash`, `vnoise`, `fbm`, `bayer`, `seamless` (`PXL help vnoise`).
+  `mesh()` for faces in meters from `model()` (what you are inside of or that wraps round itself; an
+  HD-2D diorama: textured boxes, sprites standing in them, `sun`, `lamps`), then `post()` in the
+  same body for depth of field, haze, bloom; `capsule` for a limb painted round, `flame` for fire
+  (`PXL help "scenes 7"`); procedural texture with `hash`, `vnoise`, `fbm`, `bayer`, `seamless`
+  (`PXL help vnoise`).
 
 ## Examples
 
@@ -225,7 +232,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `nature/kit.px.js` | grass tiles, pines, bushes, rocks, walls, flagstones, tufts, flowers, a dead tree, drawn to the environment guide; builders for more (`grassTile`, `pine`, `bush`, `rampart`); `include` it |
 | `hd2d/traveler.px.js` | an HD-2D figure in the 8 directions (S, SW, W, NW, N and their mirrors), walking and idle: a skeleton in 3D as the warden's, blocked out first, painted part by part (trousers, boots, a tunic with its belt, a cloak hung from the shoulders that trails and sways), a head drawn per view; a walk of its own per view; a second figure recolored |
 | `hd2d/graveyard.px.js` | an HD-2D graveyard on a hill, drawn after the games' sheets (`pxl study`): grass of blades laid a texel to a pixel, flagstones, a mossy rampart, headstones and rocks as sprites at the scene's scale, festooned pines; a fence whose clear texels are holes (`anchor: "face"`), a low sun behind, mist |
-| `hd2d/plaza.px.js` | an HD-2D diorama: a camera high up through a long lens, boxes in meters tiled with pixel-art textures by `mesh()`, the topdown hero, pines and lamps standing among them in one depth (`sprites`, on contact shadows); a late sun, sky and lamps with the sun's shadows (`sun`, `lamps`, `emit`, sprites lit through `bump("hybrid")`); the same at 1920x1080 (`pixel: 4`) with `post()`: depth of field, haze, bloom, vignette |
+| `hd2d/plaza.px.js` | an HD-2D diorama: a camera high up through a long lens, boxes in meters tiled with pixel-art textures by `mesh()`, the topdown hero, pines and lamps standing among them in one depth (`sprites`, on contact shadows); a late sun, sky and lamps with the sun's shadows (`sun`, `lamps`, `emit`, sprites lit through `bump("hybrid")`); the same at 1920x1080 (`pixel: 4`) with `post()`: depth of field, haze, bloom, vignette; the camera, blocks and textures it shares with the graveyard in `kit.px.js` |
 | `fonts/font5x7.px.js` | a 5×7 font for titles: `include` it, `text(..., { font: "5x7" })` |
 
 Every command run on an example writes an `out/` next to it (build, shot, describe): give it

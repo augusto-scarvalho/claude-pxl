@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**330 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**331 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–22, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -37,12 +37,12 @@ look, in text where text is cheaper than an image.
 | Command | What it gives |
 | --- | --- |
 | `pxl describe` | A whole scene as text: each object's position, gaps, what covers it, contrast, motion, which way it faces, the light. `--diff` against the last look, `--brief`, `--frame N`; works on plain PNGs too. |
-| `pxl shot` | One asset built and written as a PNG to look at, with what changed since the last shot and the check's lines (LOOK pixels ringed in `<name>_look.png`). Frames side by side (`0-17`, `all`), zoomed regions, several assets or other files in rows, `--vs HEAD --diff` against the committed version. A reference GIF or video too: all its frames on one sheet, at 1×. |
+| `pxl shot` | One asset built and written as a PNG to look at, with what changed since the last shot and the check's lines (LOOK pixels ringed in `<name>_look.png`). Frames side by side (`0-17`, `all`), zoomed regions, several assets or other files in rows, `--vs HEAD --diff` against the committed version. A reference GIF or video too: all its frames on one sheet, at 1×. `--gif` plays several side by side, each its own loop (a walk in 8 directions). |
 | `pxl check` | Every check `describe` makes, over every scene, rig and frame, and, to look at without failing it, the 1 px lines of every sprite drawn by hand (L-corners, jaggies), and which rules actually ran, so "no warnings" can't hide a check that never applied. `--readings` shows each light reading. |
 | `pxl steps` | The painting log as text; `--at x,y` names the source line that painted a pixel. |
 | `pxl list` | A file as a map: each definition's line range and comment, so an agent reads only the lines it needs. |
 | `pxl help` | Every op and option by section; `help <name>` prints the reference text and where the examples use it; guide sections on demand. |
-| `pxl compare` | An asset against a reference image, row by row. |
+| `pxl compare` | An asset against a reference image, row by row; a picture alone, its own rows' extents to draw to. |
 | `pxl blind` | A rig's parts unnamed and shuffled, for a second reader to label; `--check` scores them. |
 
 These were tuned on measured runs of fresh agents: one call per look, all fixes in one turn, short
@@ -221,8 +221,9 @@ references until it read right.
 ## Speed, size and reliability
 
 - GIFs store only what changed in each frame: the gallery went from 34.5 MB to 8.5 MB.
-- The tests run in about a minute (they took nearly two): the examples' check in worker threads, the
-  longest first; `study` reads a long clip a third faster (the train's 192 frames, 34 to 23 s) and
+- The tests run in about 45 s (they took nearly two): the examples' check in worker threads, the
+  longest first, the study's tests in two files that run at once; `npm run test:quick` leaves out the
+  two slowest (every example's check, the gallery's study) for about 20 s while iterating; `study` reads a long clip a third faster (the train's 192 frames, 34 to 23 s) and
   `check` runs two to three times faster on the heaviest scenes, every output the same.
 - Lit scenes keep small figures' colors in GIFs (a weighted median cut refined by k-means).
 - Timed builds are cached within a budget of bytes, so a long loop no longer fills memory.

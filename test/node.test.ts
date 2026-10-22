@@ -9,6 +9,7 @@ import { Img } from "../src/core/image.ts";
 import { pack } from "../src/core/color.ts";
 import { decodePng, encodePng } from "../src/node/png.ts";
 import { encodeGif, medianCut } from "../src/node/gif.ts";
+import { decodeGif } from "../src/node/gifread.ts";
 import { main } from "../src/node/cli.ts";
 import { loadProject } from "../src/node/load.ts";
 import { latticeHash } from "../src/core/util.ts";
@@ -375,6 +376,28 @@ test("cli shot of PNGs from anywhere, several regions: a row per image, a column
   // two cells a row (4 wide, a gap of 2, then 2), two rows of 3 with a gap of 2
   assert.deepEqual([png.w, png.h], [4 + 2 + 2, 3 + 2 + 3]);
   assert.deepEqual([png.data[0], png.data[5 * 8]], [pack(255, 0, 0), pack(0, 0, 255)]);
+});
+
+test("cli shot --gif: animations side by side, each its own loop on one clock as long as the longest", async () => {
+  const { dir, file } = tmpArt(`use("pico8")
+anim("a", { w: 2, h: 2, frames: 2, fps: 10 }, (c) => c.rect(0, 0, 2, 2, c.phase < 0.5 ? "8" : "7"))
+anim("b", { w: 2, h: 2, frames: 3, fps: 10 }, (c) => c.rect(0, 0, 2, 2, ["8", "7", "9"][Math.round(c.phase * 3)]))`);
+  const text = await said("shot", file, "a", "b", "--gif", "--scale", "1");
+  assert.match(text, /a\+b\.gif \(3 frames, a loop of 300 ms: 200, 300 ms each, the shorter starting over; across: a, b; 1x\)/);
+  const g = decodeGif(readFileSync(join(dir, "out", "_shot", "a+b.gif")));
+  assert.deepEqual([g.w, g.h, g.frames.map((f) => f.ms)], [2 + 2 + 2, 2, [100, 100, 100]]);
+  // the third: a over again (red), b on its third (orange)
+  assert.deepEqual([g.frames[2].img.get(0, 0), g.frames[2].img.get(4, 0)], [g.frames[0].img.get(0, 0), pack(255, 163, 0)]);
+});
+
+test("cli compare with a picture alone: each row's opaque extents and width", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), f = join(dir, "ref.png"), img = new Img(6, 4);
+  for (const [x, y] of [[2, 0], [3, 0], [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [5, 2], [1, 3], [4, 3]]) img.set(x, y, pack(9, 9, 9));
+  writePng(f, img);
+  const text = await said("compare", f), rows = text.split("\n").filter((l) => /^ +\d+  /.test(l)).map((l) => l.trim().split(/ {2,}/));
+  assert.match(text, /ref\.png \(6x4\)/);
+  assert.deepEqual(rows, [["0", "2-3", "2"], ["2", "0-5", "6"], ["3", "1 4", "4"]]);
+  assert.match(text, /opaque from row 0 to 3: 4 rows/);
 });
 
 test("cli shot --ref: the asset's ref: true layers drawn over it (guide rows), as the previews have them", async () => {

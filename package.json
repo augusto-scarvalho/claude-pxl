@@ -48,6 +48,7 @@
     "build": "node scripts/build.js",
     "prepare": "node scripts/build.js",
     "test": "node --test --disable-warning=ExperimentalWarning \"test/**/*.test.ts\"",
+    "test:quick": "node --test --disable-warning=ExperimentalWarning --test-skip-pattern=\"every example|own gallery\" \"test/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json",
     "check": "npm run typecheck && npm test"
   },

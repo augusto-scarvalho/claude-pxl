@@ -34,6 +34,7 @@ const shots: [string, string, number, number?, string?][] = [
   ["rig/tournament.px.js", "tournament", 640],
   ["halloween/party.px.js", "party", 640, 1, "halloween_party"],
   ["tropical/forest.px.js", "forest", 640, 1, "tropical_forest"],
+  ["hd2d/graveyard.px.js", "graveyard_hd", 640, 1, "hd2d_graveyard"],
 ];
 
 const only = process.argv.slice(2);

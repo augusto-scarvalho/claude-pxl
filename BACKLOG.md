@@ -783,6 +783,12 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   lands (44% of the moving blocks agree), as a cockpit's view does (42%); what tells them apart
   isn't found yet (blocks coming toward the point: the cockpit has more; speed growing with the
   distance from the point, as going forward should: the cockpit's correlates -0.17).
+  Tried next: the share of the moving blocks above the point that move away from it (up), which a
+  waterfall's falling water should lack: on SLYNYRD's card of bobbing enemy units, read as a camera
+  going forward too, 345 of 503 do, as in the cockpit (452 of 668). Not it. What that sweep of some 300
+  tutorial clips did find: 6 misread as a camera moving with the point off the picture (his shooter
+  scrolling down, cards of tiles and sprites); done, the point must be in view (a starfield and the
+  cockpit keep theirs).
 - [x] **A flat figure running in place read as a light** (SLYNYRD's run demo): a light changes all
   brighter or all darker from one frame to the next (70% one way and more: the party's lanterns 73-100%),
   a flat figure moving lightens at its front and darkens at its back (56-60%). The calibration as it

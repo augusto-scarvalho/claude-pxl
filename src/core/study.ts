@@ -500,8 +500,11 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
   let bands: { y0: number; y1: number; v: number }[] = [];
   // a camera moving forward moves much of the picture straight out from one point, on both sides of it
   // and across the picture: a pan carries everything one way (a point far off to one side fits it
-  // too), and things moving on a still picture keep to their places
-  let forward = !!foe && foe.n >= 25 && foe.agree >= 0.4 && moving.length >= 0.15 * flows.length;
+  // too), and things moving on a still picture keep to their places. The point it goes toward is in
+  // view: a scroll, or things falling or rising together, fit a point off the picture (SLYNYRD's
+  // shooter scrolling down, his cards with bobbing sprites), a starfield and a cockpit one inside it
+  const inView = !!foe && foe.x >= -0.05 * W && foe.x <= 1.05 * W && foe.y >= -0.05 * H && foe.y <= 1.05 * H;
+  let forward = !!foe && inView && foe.n >= 25 && foe.agree >= 0.4 && moving.length >= 0.15 * flows.length;
   if (forward && foe) {
     const F = foe;
     const ins = moving.filter((f) => { const rx = f.x - F.x, ry = f.y - F.y, c = (rx * f.dx + ry * f.dy) / (Math.hypot(rx, ry) * Math.hypot(f.dx, f.dy) || 1); return F.out ? c > 0.9 : c < -0.9; });

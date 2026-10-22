@@ -236,6 +236,21 @@ function rowRuns(img: Img, y: number, dx = 0): { text: string; l?: number; r?: n
   return { text: parts.join(" "), l, r };
 }
 
+/** Each row's opaque runs and width in one picture: a reference measured on its own (chin, shoulders, hands, soles). */
+export function rowExtents(img: Img): string {
+  const out = [`row  ${"opaque".padEnd(22)} width`];
+  let top = -1, bottom = -1;
+  for (let y = 0; y < img.h; y++) {
+    const r = rowRuns(img, y);
+    if (!r.text) continue;
+    if (top < 0) top = y;
+    bottom = y;
+    out.push(`${String(y).padStart(3)}  ${r.text.padEnd(22)} ${r.r! - r.l! + 1}`);
+  }
+  out.push("", top < 0 ? "nothing opaque" : `opaque from row ${top} to ${bottom}: ${bottom - top + 1} rows`);
+  return out.join("\n");
+}
+
 /**
  * Row-by-row silhouette check of an asset against a reference image (placed at ox, oy in the
  * asset's coordinates): each row's opaque runs side by side and how much wider the asset is on

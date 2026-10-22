@@ -123,8 +123,9 @@ out/anims/<name>.png .json .gif   a strip of the frames, Aseprite-style JSON (ta
 out/scenes/<name>.png             each scene (+ a GIF when it moves, a folder of layers with layers: true,
                                   a Tiled .tmj when it holds tilemaps)
 out/<sheet>.png .json             each sheet() and its JSON (frames, tags)
-out/_preview/                     enlarged previews; anims also get <name>_onion.png (onion skin), and a
-                                  sheet that holds animations a GIF playing them all
+out/_preview/                     enlarged previews (a GIF too for what moves); anims also get
+                                  <name>_onion.png (onion skin), and a sheet that holds animations a GIF
+                                  playing them all
 out/share/                        with --share N: each asset N times bigger, clean (no grid), to post
 ```
 
@@ -144,6 +145,7 @@ Useful options:
 | --- | --- |
 | see one asset now, without building everything | `pxl shot art.px.js slime` writes `out/_shot/slime.png` |
 | see some frames side by side, or a part enlarged | `pxl shot art.px.js slime_hop --frames all --at 0,0,8,8` |
+| watch several animations play side by side | `pxl shot art.px.js walk_s walk_w walk_n --gif` writes one GIF |
 | check the values (lights and darks) without the color | `pxl shot art.px.js meadow --grey` adds the same picture in greys |
 | see the guide layers (`ref: true`: guide rows, a skeleton) over the art | `pxl shot art.px.js meadow --ref` |
 | compare two versions | `pxl shot art.px.js slime slime_old`, or `--vs HEAD --diff` against your last commit |
@@ -154,7 +156,7 @@ Useful options:
 | post it | `pxl build art.px.js --share 4`: every asset 4 times bigger in `out/share/`, clean, a GIF when it moves |
 | get around a long file | `pxl list art.px.js` (each definition's line range and comment) |
 | look up an op or option | `pxl help <name>`; `pxl help` alone for the index |
-| match a reference sprite's silhouette | `pxl compare art.px.js hero ref.png --shrink 2` |
+| match a reference sprite's silhouette | `pxl compare art.px.js hero ref.png --shrink 2`; `pxl compare ref.png` alone measures its rows |
 | learn from finished art or a reference | `pxl study ref.gif` |
 | measure one thing moving in a reference | `pxl study ref.gif --at x,y,w,h` (its box every frame, its spacing; the region in the drawing's own pixels, as `shot` shows it) |
 

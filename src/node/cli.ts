@@ -11,12 +11,12 @@ import type { World } from "../core/model.ts";
 import type { Project } from "../core/project.ts";
 import { rigLines } from "../core/rig.ts";
 import { rampSteps } from "../core/checks.ts";
-import { ascii, compareSilhouettes, preview } from "../core/render.ts";
+import { ascii, compareSilhouettes, preview, rowExtents } from "../core/render.ts";
 import { mapPixel, replay, stepSheet } from "../core/steps.ts";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { loadProject } from "./load.ts";
 import { decodePng } from "./png.ts";
-import { reduceColors } from "./gif.ts";
+import { encodeGif, reduceColors } from "./gif.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 import { checkProject } from "./check.ts";
@@ -71,8 +71,8 @@ const USAGE = `pxl — pixel-art DSL
       (a line whose steps are nearly all L's is drawn square on purpose: none), and tones side by side
       too close to tell apart. --readings also lists what the lit-side rule read on every placement,
       warning or not, with a tally: to see where it agrees and where it can't tell.
-  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--out DIR]
-  pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--out DIR]
+  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif] [--out DIR]
+  pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
       to the region, side by side, enlarged, written to <out>/_shot/<name>.png. --vs puts the same
       shot of another version above it (at a git revision, the file and what it includes as they
@@ -86,6 +86,8 @@ const USAGE = `pxl — pixel-art DSL
       under the other, and several --at a column each: two versions, two agents' scenes, details of
       a big one.
       Give PNGs at 1x (out/scenes/x.png): rows are enlarged together.
+      --gif plays them instead, side by side (8 to a row), each its own loop on one clock, to
+      <out>/_shot/<names>.gif: a walk in 8 directions, two versions of a scene moving.
   pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
@@ -96,8 +98,10 @@ const USAGE = `pxl — pixel-art DSL
       labels to key.json. Show only the images to the reader, ask which way each one faces (right,
       left, front = toward us, back), save the answers as {"1": "right", ...}; --check compares.
   pxl compare <art.px.js> <name> <ref.png> [--shrink N] [--offset x,y]
+  pxl compare <picture or clip> [--frame N] [--shrink N]
       Silhouette check: each row's opaque extents in the asset and in a reference image (shrunk
-      by N first, placed at x,y), and how many px wider the asset is on each side.
+      by N first, placed at x,y), and how many px wider the asset is on each side. A picture alone:
+      its own rows' extents and widths (an upscale read at 1x), the rows to draw a figure to.
   pxl study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--px N] [--out DIR | --no-out]
       Learn from finished art or a reference: what it is made of and what to use in pxl to make the
       same. Pixel art (an upscale found by its grid, blurred or not; --px N when the size it finds
@@ -144,6 +148,7 @@ interface Args {
   cell?: number;
   diff?: boolean;
   grey?: boolean;
+  gif?: boolean;
   ref?: boolean;
   brief?: boolean;
   sheet?: boolean;
@@ -208,6 +213,7 @@ function parse(argv: string[]): Args {
     else if (v === "--cell") a.cell = Number(val());
     else if (v === "--diff") a.diff = true;
     else if (v === "--grey" || v === "--gray") a.grey = true;
+    else if (v === "--gif") a.gif = true;
     else if (v === "--ref") a.ref = true;
     else if (v === "--brief") a.brief = true;
     else if (v === "--check") a.check = val();
@@ -458,6 +464,26 @@ export async function main(argv: string[]): Promise<number> {
           const m = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(e);
           return m ? { file: resolve(m[1]), name: m[2] } : { file, name: e };
         });
+        // --gif: the same things playing side by side (8 to a row), each its own loop on one clock as long
+        // as the longest, a shorter one starting over; a cell per thing, its regions together in it
+        if (a.gif) {
+          if (a.vs) throw new PxError("shot --gif plays things side by side: --vs isn't for it (shoot the two versions as other.px.js:name)");
+          const clips = shots.map((s) => {
+            if ("png" in s) { const m = readMedia(s.png!); return { imgs: m.frames, ms: m.ms }; }
+            const p = proj(s.file), n = frameCount(p, s.name), tl = p.timeline(s.name), t = Array.from({ length: n }, (_, f) => frameTime(p, s.name, f));
+            return { imgs: t.map((_, f) => shotFrame(p, s.name, f, a.ref)), ms: t.map((v, f) => (f + 1 < n ? t[f + 1] : (tl?.loop ?? 1000)) - v) };
+          });
+          const loops = clips.map((c) => c.ms.reduce((x, y) => x + y, 0)), T = Math.max(...loops);
+          const cuts = [...new Set(clips.flatMap((c, i) => { const out: number[] = []; for (let s = 0; s < T; s += loops[i]) { let t = s; for (const m of c.ms) { if (t < T) out.push(t); t += m; } } return out; }))].sort((x, y) => x - y);
+          const at = (i: number, t: number) => { let r = t % loops[i], f = 0; while (r >= clips[i].ms[f] && f < clips[i].ms.length - 1) r -= clips[i].ms[f++]; return f; };
+          const sheets = cuts.map((t) => wrapRow(clips.map((c, i) => cellRow([c.imgs[at(i, t)]], regions)), [undefined], 8));
+          const k = a.scale ?? Math.max(1, Math.min(8, Math.floor(1024 / Math.max(sheets[0].w, sheets[0].h))));
+          const path = join(outDir, "_shot", shots.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".gif");
+          mkdirSync(dirname(path), { recursive: true });
+          writeFileSync(path, encodeGif(sheets.map((img, i) => ({ img: img.scale(k), ms: (cuts[i + 1] ?? T) - cuts[i] }))));
+          console.log(`-> ${path} (${cuts.length} frames, a loop of ${T} ms${new Set(loops).size > 1 ? `: ${loops.join(", ")} ms each, the shorter starting over` : ""}; across: ${shots.map((s) => s.name).join(", ")}; ${k}x)`);
+          return 0;
+        }
         // several things, or several regions: a row each, one under the other, a column per region
         if (shots.length > 1 || regions.length > 1 || png) {
           if (a.vs) throw new PxError("shot --vs compares one asset with another version of it: give it one name and one region");
@@ -532,16 +558,23 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case "compare": {
+        if (a.shrink !== undefined && !(Number.isInteger(a.shrink) && a.shrink >= 1)) throw new PxError(`--shrink must be a whole factor >= 1, got ${a.shrink}`);
+        // a picture alone: its rows measured, to draw to (an upscale read at 1x, a clip's --frame N)
+        if (MEDIA.test(file)) {
+          const m = readMedia(file), f = a.frame ?? 0;
+          if (!m.frames[f]) throw new PxError(`${basename(file)}: it has ${m.frames.length} frame${m.frames.length === 1 ? "" : "s"} (0-${m.frames.length - 1})`);
+          const r = a.shrink ? m.frames[f].shrink(a.shrink) : m.frames[f];
+          console.log(`${basename(file)} (${r.w}x${r.h}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, read at 1x` : ""}${a.shrink ? `, shrunk ${a.shrink}x` : ""}${m.frames.length > 1 ? `, frame ${f} of ${m.frames.length}` : ""})`);
+          console.log(rowExtents(r));
+          return 0;
+        }
         const [name, ref] = a.rest;
         if (!name || !ref) throw new PxError("compare needs an asset and a reference PNG: pxl compare <file> <name> <ref.png> [--shrink N] [--offset x,y]");
         const p = loadProject(file);
         const img = p.image(name);
         let r: Img;
         try { r = decodePng(readFileSync(resolve(ref))); } catch (e) { throw new PxError(`${ref}: ${(e as Error).message}`); }
-        if (a.shrink !== undefined) {
-          if (!(Number.isInteger(a.shrink) && a.shrink >= 1)) throw new PxError(`--shrink must be a whole factor >= 1, got ${a.shrink}`);
-          r = r.shrink(a.shrink);
-        }
+        if (a.shrink !== undefined) r = r.shrink(a.shrink);
         console.log(`${name} (${img.w}x${img.h}) against ${ref} (${r.w}x${r.h}${a.shrink ? `, shrunk ${a.shrink}x` : ""}${a.offset ? ` at ${a.offset.join(",")}` : ""})`);
         console.log(compareSilhouettes(img, r, ...(a.offset ?? [0, 0])));
         return 0;

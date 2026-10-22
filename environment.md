@@ -127,6 +127,12 @@ Two or three shapes, set in groups of 2-3 at uneven gaps.
 - The wall's top much brighter than its face, the face's bricks shorter than the top's. Every tile
   used a lot gets a variant (a crack, a stained block). Cliffs: strata or blocks lit on top, dark
   undersides.
+- A raised plot in a diorama (a hill, a terrace: `examples/hd2d/graveyard.px.js`) is not a box. Its
+  outline a rectangle with rounded corners (about a quarter of its short side), the edges wandering a
+  few cm in and out (smooth noise), straight only where steps meet it; the wall a face for each piece
+  of the outline, so each turn takes the light its own way, its texture anchored to the world
+  (`anchor: "world"`) so it runs on round the turns. Small light clumps of grass spill over the top
+  edge at uneven gaps (a dark, unbroken band reads as a hedge of its own); a boulder breaks a corner.
 
 ## 7. Paths and floors
 
@@ -147,7 +153,13 @@ Flagstones of mixed sizes, moss in no more than a third of the joints. Low contr
   cause (pockmarks, lichen in clusters of 2-3 px, moss in lumps from the foot, a chipped corner, a
   crack, a lean); the darkest tone only down the shaded side.
 - Fences: the picket faces toward us in the shade, light only on the point and the top 3 px, rails
-  darker behind; one picket in seven short, leaning or missing.
+  darker behind; one picket in seven short, leaning or missing. In a diorama, built of boxes turned
+  along each straight run of the ground's outline (depth, a shadow from its foot): pickets about 11 cm
+  every 25 cm with a pointed head, a post with a cap only where a run is long (its ends, its middle
+  past 2.4 m; a post at every point of a curve reads as a palisade), rails behind, on the inside. The
+  wood drawn at the picture's size, not a few px stretched (that reads as sticks): weathered boards,
+  grain in long broken lines along them, a knot, the edge toward the light a step lighter; the grain
+  up the pickets, across the rails.
 
 ## 9. Light, depth and placement
 
