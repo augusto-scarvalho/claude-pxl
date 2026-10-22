@@ -132,7 +132,10 @@ Two or three shapes, set in groups of 2-3 at uneven gaps.
   few cm in and out (smooth noise), straight only where steps meet it; the wall a face for each piece
   of the outline, so each turn takes the light its own way, its texture anchored to the world
   (`anchor: "world"`) so it runs on round the turns. Small light clumps of grass spill over the top
-  edge at uneven gaps (a dark, unbroken band reads as a hedge of its own); a boulder breaks a corner.
+  edge at uneven gaps (a dark, unbroken band reads as a hedge of its own); a boulder breaks a corner,
+  against the wall where it turns: drawn as the rocks of §5 (a flat foot, grass over it; one with a
+  round bottom, a moss cap and an outline all round read as a cushion floating, out of the scene),
+  and placed where there is ground (rounding the corners left the old corner points in the air).
 
 ## 7. Paths and floors
 
