@@ -12,7 +12,21 @@ include("kit.px.js", { palette: true })
 
 
 // Weathered wood for the fence's boxes: grain running along it.
-sprite("_wood", { w: 4, h: 8 }, (c) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 4; x++) c.px(x, y, x === 1 && y % 3 ? "i" : x === 3 && y % 4 === 1 ? "B" : "I") })
+// The fence's wood, drawn at the picture's HD size (a texel to its pixel, 96 to the meter): weathered
+// boards, their grain in long broken lines along them, a knot, the edge toward the light a step
+// lighter and the other a step darker; one with the grain running up (pickets, posts), one across
+// (rails). Warm, the trunks' browns.
+const board = (name, w, h, across) => sprite(name, { w, h }, (c) => {
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const a = across ? y : x, b = across ? x : y, n = across ? h : w
+    const grain = (a === 2 || a === 5) && Math.floor(hash(a, b >> 1) * 5) !== 0
+    c.px(x, y, a === 0 ? "f" : a === n - 1 ? "s" : grain ? "s" : Math.floor(hash(a * 3, b) * 9) === 0 ? "f" : "d")
+  }
+  const kx = across ? 9 : 3, ky = across ? 3 : 10
+  for (const [dx, dy, k] of [[0, 0, "a"], [1, 0, "a"], [0, -1, "s"], [1, 1, "s"], [-1, 0, "s"]]) c.px(kx + dx, ky + dy, k)
+})
+board("_plank_up", 8, 24, false)
+board("_plank_across", 24, 8, true)
 // Where the grass meets the path: blades reaching over the stones' edge 1-5 px, in clumps, their tips
 // lit, the blue dark under some; laid over the path's margins (anchored to the strip, its clear texels
 // letting the stones show), the grass's side at its left; flipped for the other margin. 48 rows, so it
@@ -27,6 +41,41 @@ sprite("_edge", { w: 8, h: 48 }, (c) => {
 })
 sprite("_edge_r", { base: "_edge", flip: "x" })
 
+
+// Grass spilling over an edge: a few blades standing up, lit at their tips, the clump hanging a row or
+// two over the edge in the shade, the blue dark at its lowest blades. Small, three shapes.
+sprite("_lip_a", { pivot: "bottom" }, `
+  ..e.r..e..
+  .ewewwewe.
+  ewwqwwqwwe
+  qwqQqqwqqw
+  .q.Qq.qQ..
+  ...Q...q..`)
+sprite("_lip_b", { pivot: "bottom" }, `
+  .e..r...
+  ewwewe..
+  wqwwqwe.
+  qQqqQqq.
+  .Q.q..Q.`)
+sprite("_lip_c", { pivot: "bottom" }, `
+  ...e..e..r..
+  .eewwewweww.
+  ewqwwqwwqwwe
+  qwqqQqqwqqQq
+  .Qq..Qq..q..
+  ..Q...Q.....`)
+// Boulders for the hill's corners: two or three masses in flat facets (the light from above), moss over
+// what faces up, the darkest tone an outline on the shaded side.
+const boulder = (name, w, h, lobes) => sprite(name, { w, h, pivot: "bottom", outline: "D", selout: true }, (c) => {
+  for (const [x, y, rx, ry] of lobes) for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) {
+    const nx = (X + 0.5 - x) / rx, ny = (Y + 0.5 - y) / ry
+    if (nx * nx + ny * ny > 1) continue
+    const fx = Math.round(nx * 2) / 2, fy = Math.round(ny * 2) / 2, L = 0.55 - 0.2 * fx - 0.6 * fy
+    c.px(X, Y, fy < -0.4 ? (Math.floor(hash(X >> 1, Y) * 3) ? "M" : "n") : "tTuU"[Math.max(0, Math.min(3, Math.round(L * 3)))])
+  }
+}, bump("hybrid"))
+boulder("_boulder", 26, 18, [[9, 10, 8.5, 7.5], [17.5, 11.5, 7.5, 6.2], [12.5, 13.5, 8, 4.4]])
+boulder("_boulder_b", 20, 14, [[8, 8, 7, 5.8], [13.5, 9.5, 6, 4.4]])
 
 // Headstones, drawn at the scene's scale (24 px to the meter), seen from 38 degrees up: the front in the
 // shade (the sun is behind them), the slab's top above it in the sun, its front edge a 1 px cream rim;
@@ -73,13 +122,38 @@ const M = model(), block = (...a) => hd2dBlock(M, ...a)
 // The textures a texel to a pixel where the camera looks: the floors foreshortened, the walls a little.
 const MATS = {
   grass: { tex: "_grass", texel: CAM.floor }, turf: { tex: "_turf", texel: CAM.floor }, flags: { tex: "_flags", texel: CAM.floor },
-  rampart: { tex: "_rampart", anchor: "face", texel: CAM.wall }, riser: { tex: "_riser", anchor: "face", texel: CAM.wall },
-  wood: { tex: "_wood", texel: [1 / 64, 1 / 64] },
+  rampart: { tex: "_rampart", texel: [CAM.wall[0], 1.5 / 29] }, riser: { tex: "_riser", anchor: "face", texel: CAM.wall },
+  wood: { tex: "_plank_up", texel: [1 / 96, 1 / 96] }, rail: { tex: "_plank_across", texel: [1 / 96, 1 / 96] },
   edge: { tex: "_edge", anchor: "face", texel: CAM.floor }, edge_r: { tex: "_edge_r", anchor: "face", texel: CAM.floor },
 }
 const TOP = 1.5                                                     // the hill's top
 M.face("turf", [-40, Z - 25, 0], [40, Z - 25, 0], [40, Z + 60, 0], [-40, Z + 60, 0])
-block("grass", "rampart", -6.5, Z - 2.5, 6.5, Z + 6, 0, TOP)
+// The hill: not a box. Its outline a rectangle with rounded corners (1.6 m), its edges wandering a few
+// cm in and out (smooth noise along them), the front straight where the steps meet it; its top one
+// floor of grass (a fan of triangles from its middle), its wall a face for each piece of the outline,
+// so each turn takes the light its own way.
+const OUTLINE = (() => {
+  const x0 = -6.5, x1 = 6.5, z0 = Z - 2.5, z1 = Z + 6, r = 1.6, pts = []
+  const corners = [[x1 - r, z0 + r, -Math.PI / 2], [x1 - r, z1 - r, 0], [x0 + r, z1 - r, Math.PI / 2], [x0 + r, z0 + r, Math.PI]]
+  const sides = [[[x0 + r, z0], [x1 - r, z0]], [[x1, z0 + r], [x1, z1 - r]], [[x1 - r, z1], [x0 + r, z1]], [[x0, z1 - r], [x0, z0 + r]]]
+  sides.forEach(([a, b], k) => {
+    const n = Math.max(2, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.45))
+    for (let i = 0; i < n; i++) pts.push([a[0] + ((b[0] - a[0]) * i) / n, a[1] + ((b[1] - a[1]) * i) / n])
+    const [cx, cz, a0] = corners[k]
+    for (let i = 0; i < 6; i++) { const t = a0 + (i * Math.PI) / 12; pts.push([cx + r * Math.cos(t), cz + r * Math.sin(t)]) }
+  })
+  const mid = [0, (z0 + z1) / 2]
+  return pts.map(([x, z], i) => {
+    if (z === z0 && Math.abs(x) < 1.4) return [x, z]                     // where the steps meet it
+    const d = 0.1 * (vnoise(i * 0.7, 3) - 0.5) * 2, out = [x - mid[0], z - mid[1]], l = Math.hypot(...out)
+    return [x + (out[0] / l) * d, z + (out[1] / l) * d]
+  })
+})()
+OUTLINE.forEach((a, i) => {
+  const b = OUTLINE[(i + 1) % OUTLINE.length]
+  M.face("grass", [0, Z + 1.75, TOP], [a[0], a[1], TOP], [b[0], b[1], TOP])
+  M.face("rampart", [a[0], a[1], TOP], [b[0], b[1], TOP], [b[0], b[1], 0], [a[0], a[1], 0])
+})
 // the steps: four of 0.3 m up the wall's front, 0.35 m deep
 for (let i = 0; i < 4; i++) block("flags", "riser", -1, Z - 2.5 - 0.35 * (i + 1), 1, Z - 2.5 - 0.35 * i, 0, TOP - 0.3 * (i + 1))
 block("flags", "flags", -0.9, Z - 2.5, 0.9, Z + 5.2, TOP, TOP + 0.02)   // the path
@@ -87,25 +161,46 @@ block("flags", "flags", -0.9, Z - 2.5, 0.9, Z + 5.2, TOP, TOP + 0.02)   // the p
 const EDGE = 8 * CAM.floor[0], PU = TOP + 0.025
 M.face("edge", [-0.9, Z + 5.2, PU], [-0.9 + EDGE, Z + 5.2, PU], [-0.9 + EDGE, Z - 2.5, PU], [-0.9, Z - 2.5, PU])
 M.face("edge_r", [0.9 - EDGE, Z + 5.2, PU], [0.9, Z + 5.2, PU], [0.9, Z - 2.5, PU], [0.9 - EDGE, Z - 2.5, PU])
-// The fence round the top, open at the steps, as boxes, so it stands on the ground with depth and throws
-// its shadow from its foot: pickets 9 cm wide every 25 cm (their tops and the sides toward the sun lit),
-// one in seven missing or shorter; a post every 2 m, a head taller; two rails behind the pickets.
-// `inside`: which way the hill's top is from the run (the rails go that side).
-const fenceRun = ([ax, az], [bx, bz], inside, seed) => {
-  const len = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / len, dz = (bz - az) / len, nx = -dz * inside, nz = dx * inside
-  const box = (s, along, across, u0, u1, off = 0) => {
-    const x = ax + dx * s + nx * off, z = az + dz * s + nz * off, hx = (Math.abs(dx) * along + Math.abs(nx) * across) / 2, hz = (Math.abs(dz) * along + Math.abs(nz) * across) / 2
-    M.box("wood", [x - hx, z - hz, u0], [x + hx, z + hz, u1])
-  }
-  for (const u of [0.2, 0.5]) box(len / 2, len, 0.04, TOP + u, TOP + u + 0.06, 0.05)
-  for (let s = 0.12, i = 0; s < len - 0.05; s += 0.25, i++) {
-    const k = Math.floor(hash(i, seed) * 7)
-    if (k) box(s, 0.09, 0.05, TOP, TOP + (k === 1 ? 0.5 : 0.7))
-  }
-  for (let s = 0; s <= len + 0.01; s += Math.min(2, len)) box(s, 0.13, 0.13, TOP, TOP + 0.85)
+// The fence round the top, open at the steps, following the hill's rounded outline 0.3 m in (straight
+// runs between the points of its arcs), built of boxes of weathered boards turned along each run, so
+// it stands on the ground with depth and throws its shadow from its foot: pickets 11 cm wide every
+// 25 cm, each with a pointed head, one in seven missing or shorter; a post at each end of a straight
+// run and halfway along a long one, a head taller and thicker, a flat cap a little wider than it; two rails of boards behind the
+// pickets (on the hill's side).
+const FENCE = (() => {
+  const x0 = -6.2, x1 = 6.2, z0 = Z - 2.2, z1 = Z + 5.7, r = 1.3, pts = [[1.3, z0]]
+  const arc = (cx, cz, a0) => { for (let i = 0; i <= 4; i++) { const t = a0 + (i * Math.PI) / 8; pts.push([cx + r * Math.cos(t), cz + r * Math.sin(t)]) } }
+  arc(x1 - r, z0 + r, -Math.PI / 2); arc(x1 - r, z1 - r, 0); arc(x0 + r, z1 - r, Math.PI / 2); arc(x0 + r, z0 + r, Math.PI)
+  pts.push([-1.3, z0])
+  return pts
+})()
+// a box of `mat` centred on (x, z), `along` the way (dx, dz) and `across` it, from u0 up to u1
+const turnedBox = (mat, [x, z], [dx, dz], along, across, u0, u1) => {
+  const c = (a, b, u) => [x + dx * a - dz * b, z + dz * a + dx * b, u], A = along / 2, B = across / 2
+  const q = [c(-A, -B, u0), c(A, -B, u0), c(A, B, u0), c(-A, B, u0)], t = q.map(([px, pz]) => [px, pz, u1])
+  M.face(mat, ...t)
+  for (let i = 0; i < 4; i++) M.face(mat, q[i], q[(i + 1) % 4], t[(i + 1) % 4], t[i])
 }
-fenceRun([-6.2, Z + 5.7], [6.2, Z + 5.7], -1, 1); fenceRun([-6.2, Z - 2.2], [-6.2, Z + 5.7], -1, 2); fenceRun([6.2, Z - 2.2], [6.2, Z + 5.7], 1, 3)
-fenceRun([-6.2, Z - 2.2], [-1.3, Z - 2.2], 1, 4); fenceRun([1.3, Z - 2.2], [6.2, Z - 2.2], 1, 5)
+let picket = 0
+FENCE.forEach((a, k) => {
+  const b = FENCE[k + 1]
+  if (!b) return
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]), d = [(b[0] - a[0]) / len, (b[1] - a[1]) / len], at = (s, off = 0) => [a[0] + d[0] * s - d[1] * off, a[1] + d[1] * s + d[0] * off]
+  for (const u of [0.22, 0.52]) turnedBox("rail", at(len / 2, 0.06), d, len + 0.06, 0.05, TOP + u, TOP + u + 0.08)
+  for (let s = 0.12; s < len - 0.06; s += 0.25) {
+    const kk = Math.floor(hash(picket++, 7) * 7), top = TOP + (kk === 1 ? 0.48 : 0.62)
+    if (!kk) continue
+    turnedBox("wood", at(s), d, 0.11, 0.04, TOP, top)
+    // its head: a wedge rising to a point over its middle, its slopes catching the light from above
+    const P = (sa, sb, u) => { const [x, z] = at(s + sa, sb); return [x, z, u] }
+    const L = P(-0.055, -0.02, top), Rr = P(0.055, -0.02, top), L2 = P(-0.055, 0.02, top), R2 = P(0.055, 0.02, top), T = P(0, -0.02, top + 0.1), T2 = P(0, 0.02, top + 0.1)
+    M.face("wood", L, Rr, T); M.face("wood", L2, R2, T2); M.face("wood", L, T, T2, L2); M.face("wood", Rr, T, T2, R2)
+  }
+  // posts on the straight runs only, at their ends and halfway along the long ones (the arcs' short
+  // runs between have none, or the corners bristle)
+  const posts = len < 1 ? [] : len > 2.4 ? [0, len / 2, len] : [0, len]
+  for (const s of posts) { turnedBox("wood", at(s), d, 0.16, 0.16, TOP, TOP + 0.85); turnedBox("rail", at(s), d, 0.21, 0.21, TOP + 0.85, TOP + 0.9) }
+})
 // hills behind, far enough for the mist to take them
 for (const [x0, x1, z0, h] of [[-40, -8, 30, 7], [-12, 14, 36, 9], [10, 40, 28, 6]]) block("turf", "turf", x0, Z + z0, x1, Z + z0 + 8, 0, h)
 
@@ -126,6 +221,15 @@ for (let k = 0; k < 170; k++) {
 }
 for (const [x, z] of [[-1.6, 1], [1.7, 2.6], [-5.6, 3.5], [5.3, 0.2], [-0.9, 5.4]]) things.push({ name: R() < 0.5 ? "_rock" : "_rock_small", at: [x, Z + z, TOP], shadow: 0 })
 for (const x of [-5.8, -3.6, -1.6, 2, 4.4, 5.9]) tufts(x, Z - 2.25, TOP, 2)                 // along the fence
+// grass spilling over the wall's top along its front and sides (the hill's edge isn't a line), small
+// clumps at uneven gaps, a little out from it; mossy boulders at its corners, breaking them
+OUTLINE.forEach(([x, z], i) => {
+  if (z > Z + 5.5 || (z < Z - 2.4 && Math.abs(x) < 1.4) || hash(i, 31) < 0.4) return
+  const out = [x, z - (Z + 1.75)], l = Math.hypot(...out)
+  things.push({ name: ["_lip_a", "_lip_b", "_lip_c"][Math.floor(hash(i, 32) * 3)], at: [x + (out[0] / l) * 0.05, z + (out[1] / l) * 0.05, TOP - 0.07], shadow: 0 })
+})
+for (const [x, z, u, name] of [[-6.55, Z - 2.55, 0, "_boulder"], [6.5, Z - 2.6, 0, "_boulder_b"], [-6.1, Z + 5.7, TOP, "_boulder_b"], [6.05, Z + 5.75, TOP, "_boulder"]])
+  things.push({ name, at: [x, z, u] })
 // bushes in twos and threes at the wall's foot, tufts between
 for (const [x0, n] of [[-6.1, 3], [-3.2, 2], [2.4, 2], [4.9, 3]]) {
   for (let k = 0; k < n; k++) things.push({ name: ["_bush", "_bush_b", "_bush_c"][Math.floor(R() * 3)], at: [x0 + k * 0.62 + R() * 0.2, Z - 2.7 - R() * 0.15] })
