@@ -671,10 +671,15 @@ four to six tones, softer shading), the black outline kept.
 
 How they play, and the same in pxl:
 
-- **Frames from parts (FFT).** Its SHP file crops pieces of the sheet (a head, arms, the torso, a
-  weapon) and sets them at offsets for each frame; its SEQ strings frames together, a delay to each.
-  In pxl: each piece a `_part` sprite, each frame a `frame()` stamping the parts at its offsets (or a
-  `rig` with them in its slots), the delays as `ms`. `study` says "Parts" of such a sheet.
+- **Frames from parts (FFT).** Its SHP lists each frame's pieces, four bytes a piece: where to cut it
+  from the sheet (on an 8 px grid), its size (one of sixteen, 8x8 to 56x56), where to set it (x and y
+  each -128 to 127 from the frame's origin) and whether it's flipped across or upside down; the list
+  is drawn last to first, so the first piece ends on top. A weapon's or an effect's frame turns, in
+  256ths of a turn. Its SEQ plays a move as pairs, a frame's number and how long it holds in 60ths of
+  a second, with commands between (0xFF and a code: move the unit, turn it, loop) that the frames
+  don't see; moves share frames. In pxl: each piece a `_part` sprite (`png` and `area` cut it from a
+  sheet), each frame a `frame()` stamping the parts at its offsets with `flip` (or a `rig` with them
+  in its slots), its hold as `ms` (60ths x 1000 / 60). `study` says "Parts" of such a sheet.
 - **Directions.** The 16-bit games and the tactics games draw down, up and one side (the tactics
   games front and back, on a diagonal) and flip the other: `stamp(..., { flip: "x" })`, or `twin` for
   a sprite lit from one side. Pokémon Mystery Dungeon draws all eight, a row each (down, down-right,
@@ -698,5 +703,7 @@ How they play, and the same in pxl:
   Cap's town 69%; isometric tactics maps repeat less (Final Fantasy Tactics Advance's, about half).
   `study` counts a map's tiles; `tilemap` builds one the same way.
 
-The sheets were read and measured, not copied; FFT's files after the FFHacktics wiki, Pokémon Mystery
-Dungeon's after PMDCollab's SpriteCollab (AnimData.xml and its sheets).
+The sheets were read and measured, not copied; FFT's files as FFTPatcher's sprite editor
+(ShishiSpriteEditor: its Frame, Tile and Sequence readers) and the FFHacktics wiki read them, Pokémon
+Mystery Dungeon's as PMDCollab's SpriteCollab lays them out (AnimData.xml and its sheets, the rows
+checked on Pikachu's walk).
