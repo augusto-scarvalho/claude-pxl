@@ -1,11 +1,11 @@
-# Which model, how much effort: one scene, fifteen ways
+# Which model, how much effort: one scene, seventeen runs
 
-One brief given to fifteen fresh agents with the pxl skill, each on a different model or effort
-level, to see what more thinking buys in pixel art and what it costs: eight in Claude Code, six in
-the Codex CLI, one in Antigravity. Run on 2026-10-21; every number below comes from the runs
-themselves (Claude Code's result for each session, its transcript read by
-[`scripts/tokens.ts`](../scripts/tokens.ts); Codex's events and session log; Antigravity's result),
-and the art was judged blind and by the curator.
+One brief given to fresh agents with the pxl skill, each on a different model or effort level, to
+see what more thinking buys in pixel art and what it costs: eight in Claude Code, six in the Codex
+CLI, three in Antigravity (Gemini 3.8 Flash, and Gemini 4 Argon twice). Run on 2026-10-21; every
+number below comes from the runs themselves (Claude Code's result for each session, its transcript
+read by [`scripts/tokens.ts`](../scripts/tokens.ts); Codex's events and session log; Antigravity's
+result), and the art was judged blind and by the curator.
 
 **In short:** on Opus, the cost doubled at every step of effort ($0.54, $2.17, $4.71, $9.62,
 $20.01). The curator, watching the loops, put max first, xhigh close behind and high a step down:
@@ -15,8 +15,10 @@ Haiku was the cheapest by far and got the scene's space wrong; Fable at high cos
 high and scored lower. **In Codex**, six runs cost $0.16 to $3.24 at OpenAI's API prices, in minutes
 each; the curator found every one of them well below the Claude scenes, while the blind agent ranked
 two of them first. The agent judging stills got it the wrong way round: the review that counts is a
-person watching the loops. Gemini 3.8 Flash at high, through Antigravity, took 42 minutes for about
-$1.62. One run each, one brief: read it as a first measure, not a law.
+person watching the loops. Through Antigravity, Gemini 3.8 Flash at high took 42 minutes for about
+$1.62, and Gemini 4 Argon at high 42 minutes for about $3.15, once a trap in pxl it fell into the
+first time (fixed) was out of the way. One run each, one brief: read it as a first measure, not a
+law.
 
 ## Contents
 
@@ -351,11 +353,12 @@ What it says:
 
 ## The same brief in Antigravity
 
-One more run of the same brief: Antigravity's CLI (`agy` 1.4.4) with Gemini 3.8 Flash at high effort
-(`gemini-3.8-flash-high`, the only Gemini 3.8 it offers). The skill was registered in
-`~/.gemini/config/skills.json` (Antigravity doesn't follow a link in its skills folder, so the
-repository is named there; see [Working with an agent](agents.md#install-the-skill)), and the run
-went through `scripts/model-study.sh ... agy`:
+The same brief in Antigravity's CLI (`agy` 1.4.4), with two of Google's models at high effort:
+Gemini 3.8 Flash (`gemini-3.8-flash-high`, the only Gemini 3.8 it offers), and Gemini 4 Argon
+(`gemini-4-argon-high`), run twice. The skill was registered in `~/.gemini/config/skills.json`
+(Antigravity doesn't follow a link in its skills folder, so the repository is named there; see
+[Working with an agent](agents.md#install-the-skill)), and the run went through
+`scripts/model-study.sh ... agy`:
 
 ```sh
 agy -p "$(cat brief.txt)" --model gemini-3.8-flash-high --effort high \
@@ -365,21 +368,45 @@ agy -p "$(cat brief.txt)" --model gemini-3.8-flash-high --effort high \
 | Model | Time | Read from cache | Input | Output (of it thinking) | At API prices | Loop |
 |---|---:|---:|---:|---:|---:|---|
 | Gemini 3.8 Flash, high | 42 min | 9.53M | 426k | 156k (45k) | $1.62 | 24 frames |
+| Gemini 4 Argon, high, first run | 10 min of work (40 waiting) | 647k | 98k | 39k (22k) | $0.65 | stopped at its draft |
+| Gemini 4 Argon, high, second run | 42 min | 6.76M | 343k | 179k (51k) | $3.15 | 24 frames |
 
-Priced at Google's rates for Gemini 3.8 Flash per million tokens: $0.75 input, $0.075 cached input,
-$3.75 output, introductory until the end of 2026 and twice that after ($1.79 if thinking is billed
-on top of the output; about $3.24 at the later rates). The scene closes its loop and `pxl check`
-finds no warnings; its file is 922 lines.
+Priced at Google's rates per million tokens, both introductory and doubling later: Gemini 3.8 Flash
+$0.75 input, $0.075 cached input, $3.75 output (until the end of 2026); Gemini 4 Argon $2, $0.10,
+$10 (until November 30, 2026). If thinking is billed on top of the output, add $0.17 to Flash's run
+and $0.51 to Argon's second. Every scene closes its loop and `pxl check` finds no warnings.
 
 What it drew: a striped tower with the keeper in yellow at the right size, a lantern in hand; a wide
 beam that lights the rain in yellow streaks, and a wave bursting into a big white plume against the
 headland, the strongest thing in the scene. Its faults: in one frame the beam swings down onto the
 rocks (the turn in the picture plane that Haiku made), with a lens flare at the lamp; the headland
-is drawn as a wall of bricks, not rock; and the loop is short, 24 frames. It took the longest of all
-fifteen runs but Opus at max, for about a sixth of Opus at high's price. The curator hasn't judged
-it yet.
+is drawn as a wall of bricks, not rock; and the loop is short, 24 frames. It took as long as any run
+but Opus at max (42 minutes, as Argon's second did), for about a third of Opus at high's price. The
+curator hasn't judged it yet.
 
 <img src="study/lighthouse/agy-gemini-3.8-flash-high.gif" width="480" alt="Antigravity, Gemini 3.8 Flash at high: a red and white lighthouse on a headland drawn like a brick wall; a wide beam lights the slanting rain; a wave bursts into a large white plume; a keeper in yellow with a lantern on the gallery">
+
+**Gemini 4 Argon's first run fell into a trap in pxl.** Its scene ran at 12 fps (83 ms frames) and
+stamped a lighthouse, a keeper and a gull drawn as anims with no `frames:`, one frame each at the
+default 8 fps (125 ms). pxl joined the two clocks: the scene's loop became their least common
+multiple, cut at 60 s, at a 1 ms step, 60,000 frames. The agent drew its first draft in ten minutes,
+started `pxl check` in the background and waited; the check would have run for hours, and after 30
+minutes Antigravity gave up on it and ended the run, with the draft never looked at again. The draft
+itself is a good start (a stone tower with a halo at the lamp, a keeper's cottage with lit windows
+the brief didn't ask for, a level beam lighting the rain and the gulls; spray drawn as blobs), but
+its lighthouse, keeper and gull never move: their code reads `c.frame`, and with one frame they draw
+frame 0 only. pxl now keeps an anim of one frame out of the scene's clock, warns when such an anim's
+code reads its frame, and stops `check` at 600 frames of a loop cut at 60 s (`34bdd04`); built now,
+the draft loops its 24 frames.
+
+<img src="study/lighthouse/agy-gemini-4-argon-high-run1.gif" width="480" alt="Antigravity, Gemini 4 Argon at high, first run (its draft): a striped stone lighthouse with a glowing lamp and a keeper's cottage with a red roof on a faceted headland; a level beam lights the rain; spray drawn as pale blobs">
+
+**The second run, on the fixed pxl,** worked its 42 minutes through: a tall striped tower with a
+halo round the lamp and the keeper in yellow at the gallery rail, a level golden beam full of lit
+rain, gulls, spray bursting on the rocks; the rocks are flat blocks and the sea is plain. The
+curator hasn't judged either Argon run yet.
+
+<img src="study/lighthouse/agy-gemini-4-argon-high.gif" width="480" alt="Antigravity, Gemini 4 Argon at high, second run: a tall red and white lighthouse with a glowing halo on a blocky headland; a level golden beam lights the slanting rain; the keeper in yellow at the gallery; spray bursts on the rocks; gulls">
 
 ## What to use
 
