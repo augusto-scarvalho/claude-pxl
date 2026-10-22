@@ -239,7 +239,8 @@ comet_repair --out <scratch dir>`.
   step, never as bright as the lit side. Light from one side: a flat face is one tone,
   a round form changes only along its curve, never darker all round its rim (pillow shading).
 - Lines step diagonally, without L-corners, their runs in order (`PXL help "characters 7"`);
-  anti-alias by hand, or `aa: true` on a sprite as a start; at 16 px and under, drop the outline.
+  anti-alias by hand, or `aa: true` on a sprite as a start; at 16 px and under, drop the outline
+  (unless it's 8-bit: few colors and a busy ground keep it, in the shared black).
 - Look with `shot` while iterating; `build` when you need the files.
 
 ## When pxl gets in your way

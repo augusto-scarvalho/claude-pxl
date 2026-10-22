@@ -37,7 +37,9 @@ the top of the head to the soles.
   width; contrasting solid shapes carry the silhouette), keep 2–4 features that say who it is (a
   beard, a scarf, a 1 px lean for the posture), one light and few contrasting colors, 90° corners
   and a pixel's corner for a point, nothing loose near the face. A subject that won't fit is
-  cropped: the dragon's head breathing fire, not the whole dragon.
+  cropped: the dragon's head breathing fire, not the whole dragon. The 8-bit look is the exception:
+  with 3 colors and a shared black (NES), on busy ground, the outline stays and is the black
+  (SLYNYRD's 8 px figures, Final Fantasy's 16 px ones at 98% near-black).
 
 ## 2. Measure a reference before drawing
 
@@ -343,20 +345,31 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
 - **Timing an action** (Saint11): anticipation, strike, overshoot, recovery. The anticipation coils
   the other way, its first frame held longest; the strike is 1–2 frames, the first already at full
   reach with its smear; the overshoot passes the end pose; the recovery is the longest phase and
-  takes another arc. A player's own attack drops the anticipation (it reads as input lag): about 3
-  frames out and 4 back, the last passing idle by a pixel. Measured frame counts: §12.
+  takes another arc. A player's light attack (a jab, a platformer's quick slash) drops the
+  anticipation (it reads as input lag): about 3 frames out and 4 back, the last passing idle by a
+  pixel. A heavy one keeps a single wind-up frame, held longer the heavier the weapon (SLYNYRD's
+  sword 100 ms, spear 200, hammer 250), while its smears stay 50 ms each: the weight is in the holds
+  before and after, not in the swing. A smear goes only on frames that move toward the strike: never
+  on the wind-up (unless it already moves that way, as a kick's load does) or the recovery. Measured
+  frame counts: §12.
 - **Squash and stretch keep the area:** 2 px flatter is about 2 px wider, and stiff parts don't
   deform. Squash in the anticipation (against the coming move) and hardest on contact, stretch on
   the fastest frames (the takeoff). A jump's takeoff frame carries most of the rise and the steps
   about halve to the top, which holds 1–3 frames; the fall speeds up to the ground. Redraw those
   frames (or `warp` them), never scale them.
 - **A 2-frame idle** works when its down frame is a squash: the knees bend and the arms open, so the
-  body widens as much as it drops (a plain one-pixel bob doesn't; see the next point). More frames
-  go to overlap in the same cycle (the head leads, then the arms, then the hair), not to a longer one.
+  body widens as much as it drops (a plain one-pixel bob doesn't; see the next point), or when it is
+  slow: 800 ms a drawing carries a plain bob on a small sprite (SLYNYRD). More frames go to overlap
+  in the same cycle (the head leads, then the arms, then the hair), not to a longer one. Under about
+  24 px wide a pixel is 5% of the body and a breath reads as a spasm: move one axis only, or give it a
+  rare idle action instead (a look round, a stretch).
 - **Walk and run key poses** (Saint11): a walk goes contact, down (lowest, just after contact, the
   arms widest), passing, up (highest); 6 frames at low resolution, 12 for fluid; the arms swing
-  against the legs and the planted foot moves back every frame. A run step is 4 poses: airborne
-  (highest), fall, contact on a straight front leg, recover (lowest). Top-down, a front or back walk
+  against the legs and the planted foot moves back every frame. A game's walk keeps to 8 frames or
+  fewer (final boss blues: 4 keys at 200 ms, or 8 at 100–150; SLYNYRD's 8 at 140 ms, its passing
+  frame the highest: the head 0, 0, +2, +1 px from contact), and its bob is a triangle (1 px a step),
+  never a sine. A run step is 4 poses: airborne (highest), fall, contact on a straight front leg,
+  recover (lowest); a game's run, 3 (§12). Top-down, a front or back walk
   is half the cycle and the same half flipped (`flip: "x"`), redrawing only what isn't symmetric,
   with less bob walking up. In-betweens halve each frame's time, so the cycle keeps its length.
 - **Subpixel: less than a pixel of motion** (after ApplefatGOV's How-to-subpixel and 2D Will Never
@@ -528,19 +541,24 @@ scale, which `PXL describe` reads out.
 ## 12. Timing in numbers
 
 Measured frame by frame on Saint11's animated tutorial cards (frames of 60–120 ms; 80 ms is
-12.5 fps). Block an action as a flat silhouette at its final timing in a `ref: true` layer before
+12.5 fps), and on the moves of game sprites in SLYNYRD's Pixelblog, final boss blues and Capcom's
+fighters (as taken apart in "So You Want To Be A Pixel Artist?"). Where they differ, both are here:
+Saint11's cards move slower, drawn to be watched; a game's moves answer a button. Block an action as a flat silhouette at its final timing in a `ref: true` layer before
 drawing it (keys held 200 ms, in-betweens 100, the idle 300), and check every highlight cluster in
 a guide color: it keeps its size every frame, bending, never popping.
 
 | Action | Frames |
 |---|---|
-| Player attack | no anticipation; the strike at full reach with its smear on frame 1; 2 frames at reach while the smear shrinks to a hook at the tip (the blade overshooting); 4 back, the last past idle by a pixel; the idle before it 300 ms |
+| Player attack, light | no anticipation; the strike at full reach with its smear on frame 1; 2 frames at reach while the smear shrinks to a hook at the tip (the blade overshooting); 4 back, the last past idle by a pixel; the idle before it 300 ms |
+| Melee with weight (SLYNYRD, top-down, 8 directions) | wind-up 1 → 3 smears of 50 ms (an angular crescent, a narrower one, a thin hook) → follow-through 1 px further into the target, no smear → recover 1. Sword 100, 50, 50, 50, 100, 50 ms; spear 200, …, 150, 50; hammer 250, …, 300, 100, with a rebound frame and the whole picture 1 px down-right on the impact frame. An angular smear reads heavier than a curved one |
+| Punch and kick (SLYNYRD, side view) | jab: smear 50, hit 100, then 50, 50, 50 back; cross or round kick: load 50, pull 50, smear 50, hit 100, follow-through 100, recover 50, overshoot 50 (idle frame 1 a pixel back). The smear frame is already the strike pose: the limb stretched plus 2–3 thin streaks in its own darker tone; the hit is that pose without them, leaning 1 px more. Sparks 2 frames on a jab, 3 on a cross |
+| Fighting-game normal (Capcom) | stance 200–300 ms; 1–3 startup drawings at 40–60, the last the shortest (30–40) so the path reads straight; contact 40 for a jab, 80–260 for a heavy; one follow-through frame where only cloth, hair and hands move; back through the startup drawings in reverse only when the limb returns along its path (a kick; a straight punch reversed reads as an elbow drawn back). The body and legs shift even on a jab |
 | Slash (an enemy's, top-down) | wind-up 2–3 (the first held longest, ~240 ms); slash 3: the biggest smear, a smaller one, none (held 1.5×); recovery on another arc, about 3× the wind-up |
 | Hit taken | the head jumps the whole way in 1 frame, over half comes back the next, the rest eases over 3; the face takes ~10 more; the target stretches on the hit frame and squashes the next |
 | Freeze before an impact | 1–2 frames, drawn: a white silhouette over a dark band; then the contact flash, a burst bigger than the thing, sparks 2–3 |
 | Death | impact 1 → thrown back, a spark breaking over 3 → 1–2 trying to recover → the knees give → down, head and arms lagging → 1 frame a pixel below rest → an arm bounces → rest |
 | Small enemy dies | stretched taller 1 → shrinking 2 → white 1 → burst 3–4 |
-| Jump | squash growing over 2–3; takeoff 1 stretched frame carrying most of the rise, then the steps about halving (12, 5, 3, 0.5 px); apex held 1–3; the fall speeding up (1, 3, 7, 10), stretched at most just before contact; the landing squash the biggest of all (55–65% of the height, 1 frame); the recovery is the squash backwards. A player's jump starts on the stretch |
+| Jump | squash growing over 2–3; takeoff 1 stretched frame carrying most of the rise, then the steps about halving (12, 5, 3, 0.5 px); apex held 1–3; the fall speeding up (1, 3, 7, 10), stretched at most just before contact; the landing squash the biggest of all (55–65% of the height, 1 frame); the recovery is the squash backwards. A player's jump starts on the stretch. A game's simplest (SLYNYRD's run 'n gun): no anticipation, one up pose and one down, rising 6, 5, 3, 2, 1 px, the apex held 2 frames, falling 2, 3, 4, 5, 6 at 60 ms; the landing is the crouch pose with the head 1 px low, 1 frame. A cartoon ball or slime squashes further, to a third of its height (only 1.36× wider), and flattens at the top of the bounce too |
 | Dash | squash 3 (area kept) → 3 travel frames longer than the body, dust left at the takeoff → brake low and squashed (15, 3, 1, 0 px), dust kicked forward → 3 to stand, the last held double |
 | Wall slide and kick | contact squashed against the wall, the arm up it; the slide 1 px a step, a speck rising; the kick with no anticipation, out at full extension on frame 1, a crescent of dust at the wall breaking into specks over 3–4 |
 | Roll | hands down 1 → 4 drawings of a quarter turn each (redrawn, not rotated) → overshoot 1 → recover 1 |
@@ -555,13 +573,17 @@ frame: it lands sooner and hits harder.
 
 | Cycle | Frames |
 |---|---|
-| Idle | one cycle of ~600 ms: 2 drawings at 300 ms (down 1 px and 2 px wider); 3 at 200 (the extra one slows the fall); 6 at 100 (the extra ones for overlap: the head leads, the arms, then the hair). A slime's face follows its body 200 ms late |
-| Walk | 12 at 100 ms; at 6, keep contact, lowest and passing for each leg at 200 ms each, so it stays 1.2 s; the lowest 2 frames after contact |
-| Run | 8 at 160 ms or 16 at 80: the same 1.28 s stride; dust at contact 2–3 frames |
+| Idle | one cycle of ~600 ms: 2 drawings at 300 ms (down 1 px and 2 px wider); 3 at 200 (the extra one slows the fall); 6 at 100 (the extra ones for overlap: the head leads, the arms, then the hair). A slime's face follows its body 200 ms late. Slower and calmer (SLYNYRD): 2 drawings at 800 ms (a plain 1 px bob, for a small sprite), 4 at 400, 6 at 200 (1.2 s, the arms and weapon moving), 8 at 200 (1.6 s); top-down, 6 at 200, 200, 400, 200, 200, 400 (the head down 0, 1, 2 px, the extremes held double) |
+| Fighting stance (80–110 px) | 4 drawings there and back in 6 frames (`dir: "pingpong"`), the upper body 2 px then 1 into each extreme, the feet planted, the extremes held twice the passes (200/100 ms); or 8 frames, 4 at 100 ms and 4 at 50, so it falls fast and turns slowly. The amplitude grows outward (the torso 1 px a step, the elbows 2, the fists 2–4), the head held level at the turns, the fists a frame behind the torso on the drop; the knees cause it (out 1 px a step, the heels lifting at the top). Fast in, slow out reads winded; the reverse, calm |
+| Walk | 12 at 100 ms; at 6, keep contact, lowest and passing for each leg at 200 ms each, so it stays 1.2 s; the lowest 2 frames after contact. A game's (8 at most): SLYNYRD's 8 at 140 ms (1.12 s), contact, down, passing, swing per leg, the head 0, 0, +2, +1 px; 6 drops the swings (~190 ms each), 4 keeps contact and passing (280). final boss blues: 4 keys at 200 ms or 8 at 100–150 (0.8–1.2 s), the head 0, 1, 2, 1 px a step, lowest at contact; step, idle, step, idle at 200 is jerky above about 16 px |
+| Run | a game's: 6 drawings at 100–120 ms (a 0.6–0.72 s stride, every one measured: Capcom's, SLYNYRD's), 3 per step: passing (lowest, legs gathered), push-off (highest, ~12% of the height up), contact; frames 4–6 are 1–3 with the near and far limbs swapped, not flipped (draw 3, copy, swap, touch up). 8 at 80 adds a recoil per step (0.64 s); 4 at 160 drops the highs; a small fast hero 6 at 50 (0.3 s); a bulky one 8, with more recoil; the widest strides can hold 1.5×. Saint11's cards run slower, a run to watch: 8 at 160 ms or 16 at 80 (1.28 s). Dust at contact 2–3 frames |
 | Top-down walk | 6 poses at 200 ms, the second half the first flipped; the head drops 0, 1, 2 px seen from the front (popping back at the flip), 0, 1, 1 from behind, 0, 2, 1 from the side; the arm on the forward leg's side swings back |
+| Top-down walk and run from one set (SLYNYRD) | 5 drawings a direction: the run A B C B A D E D at 70 ms (0.56 s), the walk A B A D at 210 ms (0.84 s), the run without its full strides; or a run of 6 at 100 ms, the head down 1, down 1, up 2 a stride |
 | Top-down run | 2 drawings and their flips at 100 ms; the legs held 3 frames airborne and 2 at the lowest while hair and clothes keep moving (the legs' drawing picked by a slower count than `c.frame`, the hair by `c.frame`; `frame({ hold })` would hold everything) |
-| Four legs | 8 at 100 ms, a foot down every 2 (back right, front right, back left, front left) |
-| Wings, hovering | 7 at 80 ms: falling 1 px a frame for 3 (wings rising), the flap up 3 px then 1 (wings down, almost touching), 1 down; after ~10 flaps a glide that moves below a pixel (`sub`); an insect's 3-frame loop doubles its wings as a blur |
+| Four legs | 8 at 100 ms, a foot down every 2 (back right, front right, back left, front left); the hips and the shoulders each bob 1 px twice a stride, the shoulders a frame ahead; front and back legs take equal strides, or the body concertinas |
+| Wings, hovering | 7 at 80 ms: falling 1 px a frame for 3 (wings rising), the flap up 3 px then 1 (wings down, almost touching), 1 down; after ~10 flaps a glide that moves below a pixel (`sub`); an insect's 3-frame loop doubles its wings as a blur. Flapping along (SLYNYRD's bird): 8 at 80 ms, wings up, an in-between, a smear on the downstroke, wings down, then 4 for the upstroke folded at a marked wrist; the body bobs ~3 px |
 | Ghost float | 0, 1, 2, 2, 1, 0 px over 6 frames (a sine with its ends held); a hologram doesn't bob: it flickers between two brightnesses on alternate frames, a scan band running over it now and then |
+| Item idles (16 px, 80 ms a frame) | one idle per kind of item: currency spins, power-ups bob, what floats bobs and what lies on the ground bounces. A coin's spin 6 frames, its width 16, 14, 8, 2, 8, 14 (bigger steps near edge-on); a bob 8 frames over 6 px, steps 1, 2, 2, 1 each way; a bounce 12: squashed 18×12, a stretched takeoff, up 1, 4, 2, 1 to 8 px, down 1, 2, 2, 3, the biggest squash on landing, a 2 px rebound hop. A heart pulses in 2 drawings, a gem turns in 4, at 100 ms |
+| Pickup | 6–7 frames: currency sparkles where it was (a dot, a plus, a star with rays, dots); a stat item puts its effect over the one who took it (an arrow rising from the feet, red to orange to pale, breaking up); one shared element (a radial flash) ties them together |
 | Metal idle | the body a pixel on alternate frames, the rigid plates and the highlights on the frames between; reflections slide along a blade |
 | Less than a pixel | move a part in two steps at most (more reads as bent); slide a line's kink along it to tilt it; a new line grows from its middle or fades in over 3–4 frames; a liquid's surface moves as a 1 px step travelling across it |
