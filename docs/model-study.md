@@ -1,16 +1,20 @@
-# Which model, how much effort: one scene, eight ways
+# Which model, how much effort: one scene, fourteen ways
 
-One brief given to eight fresh agents with the pxl skill, each on a different model or effort level,
-to see what more thinking buys in pixel art and what it costs. Run on 2026-10-21 with Claude Code;
-every number below comes from the runs themselves (Claude Code's result for each session, its
-transcript read by [`scripts/tokens.ts`](../scripts/tokens.ts)), and the art was judged blind.
+One brief given to fourteen fresh agents with the pxl skill, each on a different model or effort
+level, to see what more thinking buys in pixel art and what it costs: eight in Claude Code, six in
+the Codex CLI. Run on 2026-10-21; every number below comes from the runs themselves (Claude Code's
+result for each session, its transcript read by [`scripts/tokens.ts`](../scripts/tokens.ts); Codex's
+events and session log), and the art was judged blind.
 
 **In short:** on Opus, the cost doubled at every step of effort ($0.54, $2.17, $4.71, $9.62,
 $20.01). The curator, watching the loops, put max first, xhigh close behind and high a step down:
 **xhigh is the sweet spot**, nearly max's art at half its cost. A blind agent judging stills put
 xhigh and high together at the top. Sonnet at xhigh cost as much as Opus at high and scored lower;
 Haiku was the cheapest by far and got the scene's space wrong; Fable at high cost more than Opus at
-high and scored lower. One run each, one brief: read it as a first measure, not a law.
+high and scored lower. **In Codex**, gpt-6-astra at xhigh and gpt-6.1-sol at high scored above every
+Claude run in a blind review of all fourteen, each in minutes and with a fraction of the tokens
+(astra at xhigh read 1.5M tokens and wrote 19k, where Opus at xhigh read 20.6M and wrote 172k); on
+sol, effort past high didn't help. One run each, one brief: read it as a first measure, not a law.
 
 ## Contents
 
@@ -21,6 +25,7 @@ high and scored lower. One run each, one brief: read it as a first measure, not 
 - [The art](#the-art)
 - [What the numbers say](#what-the-numbers-say)
 - [Where the tokens went](#where-the-tokens-went)
+- [The same brief in Codex](#the-same-brief-in-codex)
 - [What to use](#what-to-use)
 - [What this doesn't show](#what-this-doesnt-show)
 - [Doing it again](#doing-it-again)
@@ -187,8 +192,8 @@ three pixels.
 ## What the numbers say
 
 - **On Opus, the cost doubles at every step of effort; the art gains less at each.** $0.54, $2.17,
-  $4.71, $9.62 and $20.01. By the blind agent (low 3, medium 5, high 7, xhigh 7, max 6) it stops
-  at high; by the curator it goes on to max, with xhigh close behind for half max's cost.
+  $4.71, $9.62 and $20.01. By the blind agent (low 3, medium 5, high 7, xhigh 7, max 6) it stops at
+  high; by the curator it goes on to max, with xhigh close behind for half max's cost.
 - **More effort means more turns.** 14, 42, 75, 122, 187: a higher effort keeps the agent looking
   and fixing for longer more than it makes each turn deeper. Since every turn reads the whole
   conversation again, the cache reads grow faster still (0.6M to 50.6M), and the thinking from 1k
@@ -232,6 +237,86 @@ section through `pxl help`. The reference was still read in blocks with `sed` no
 Sonnet and three times by Opus at max (about 3k tokens a block), once or twice in a few lines by
 Haiku and Opus at high.
 
+## The same brief in Codex
+
+The same brief, word for word, given to six headless sessions of the Codex CLI (0.162.1), with the
+skill installed the same way (`~/.codex/skills/pxl-pixel-art` linked to this repository), each in an
+empty folder and its workspace-write sandbox (`scripts/model-study.sh ... codex` runs one):
+
+```sh
+codex exec -m <gpt-6-astra|gpt-6.1-sol> -c model_reasoning_effort=<low|...|max>   --sandbox workspace-write --skip-git-repo-check --json - < brief.txt > events.jsonl
+```
+
+Codex reports tokens, not dollars (it ran on a ChatGPT plan), so its runs are compared by tokens,
+calls to the model (counted in its session log) and time. Every one made a scene of parts; every
+loop closes; `pxl check` finds no warnings in any.
+
+| Model | Effort | Model calls | Time | Input (of it cached) | Output (of it reasoning) | Loop |
+|---|---|---:|---:|---:|---:|---|
+| gpt-6-astra | xhigh | 22 | 5.6 min | 1.49M (1.40M) | 19k (6k) | 96 frames |
+| gpt-6.1-sol | max | 32 | 10.2 min | 2.84M (2.77M) | 42k (18k) | 96 frames |
+| gpt-6.1-sol | xhigh | 28 | 7.2 min | 2.08M (1.99M) | 27k (11k) | 48 frames |
+| gpt-6.1-sol | high | 15 | 3.6 min | 898k (830k) | 14k (4k) | 64 frames |
+| gpt-6.1-sol | medium | 9 | 1.7 min | 403k (361k) | 6k (1k) | 48 frames |
+| gpt-6.1-sol | low | 9 | 1.3 min | 402k (360k) | 4k (0) | 48 frames |
+
+For scale, Opus at xhigh in Claude Code took 122 turns and 34 minutes, read 20.3M tokens of cache
+and wrote 172k tokens of output; astra at xhigh took 22 calls and under six minutes, 1.49M and 19k.
+
+**All fourteen judged together.** A new blind review, the same criteria (with a beam drawn in the
+picture's own projection and reaching its edge added to the light, and a ground drawn well to the
+craft), all fourteen scenes shuffled under new letters, one reviewer:
+
+| Rank | Run | Reads | Light | Storm | Keeper | Craft | Overall |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 1 | Codex, astra xhigh | 4 | 4 | 4 | 4 | 4 | **8** |
+| 2 | Codex, sol high | 4 | 4 | 4 | 4 | 4 | **8** |
+| 3 | Codex, sol max | 4 | 4 | 5 | 3 | 4 | 7 |
+| 4 | Claude, Opus xhigh | 4 | 3 | 4 | 3 | 4 | 7 |
+| 5 | Claude, Opus high | 4 | 4 | 4 | 2 | 3 | 6 |
+| 6 | Codex, sol low | 4 | 4 | 2 | 3 | 3 | 6 |
+| 7 | Codex, sol medium | 4 | 4 | 3 | 3 | 3 | 6 |
+| 8 | Claude, Opus medium | 4 | 2 | 3 | 3 | 3 | 5 |
+| 9 | Codex, sol xhigh | 4 | 2 | 3 | 3 | 3 | 5 |
+| 10 | Claude, Opus max | 3 | 3 | 3 | 2 | 3 | 5 |
+| 11 | Claude, Sonnet xhigh | 3 | 2 | 4 | 1 | 3 | 4 |
+| 12 | Claude, Opus low | 3 | 3 | 3 | 1 | 2 | 4 |
+| 13 | Claude, Haiku xhigh | 3 | 1 | 3 | 2 | 2 | 3 |
+| 14 | Claude, Fable high | 2 | 2 | 2 | 1 | 2 | 3 |
+
+The reviewer: the top four "give the storm real mass", waves that break against the rocks and throw
+spray, on ground drawn as faceted or textured rock, beams that stay level and reach the frame's
+edge, and a keeper that reads as a yellow figure with a lantern at the rail; the rest each fail one
+of those. Its notes on the Codex scenes: astra xhigh has "every element of the brief present and in
+proportion" (its beam a dull olive and faint); sol high "the best sea: layered swells breaking on
+the rocks" (its beam faint); sol max "the best breaking wave and spray of the set" (a squat tower
+and a keeper too big for it); sol xhigh's beam stops short and comes apart into blobs. Beside the
+new ones, the Claude scenes scored a point lower than in the first review, and moved a little among
+themselves: Opus max fell level with medium, Opus low rose level with Sonnet.
+
+<img src="study/lighthouse/codex-gpt-6-astra-xhigh.gif" width="480" alt="Codex, gpt-6-astra at xhigh: a lighthouse with a red cap on faceted rocks at the right; a level beam sweeps left through lit rain; a curling wave breaks on the rocks; a keeper in yellow with a lantern at the gallery rail">
+
+<img src="study/lighthouse/codex-gpt-6.1-sol-high.gif" width="480" alt="Codex, gpt-6.1-sol at high: a lighthouse on a headland over a rough sea of layered swells breaking into foam; a keeper in yellow with a lantern at the end of the gallery; a soft level beam">
+
+<img src="study/lighthouse/codex-gpt-6.1-sol-max.gif" width="480" alt="Codex, gpt-6.1-sol at max: a squat lighthouse on dark faceted rocks; a wave bursts in a tall spray against them; a keeper in yellow with a lantern on the gallery; the beam lights the rain">
+
+The other three Codex runs: [sol xhigh](study/lighthouse/codex-gpt-6.1-sol-xhigh.gif), [sol
+medium](study/lighthouse/codex-gpt-6.1-sol-medium.gif), [sol
+low](study/lighthouse/codex-gpt-6.1-sol-low.gif) (the one keeper whose coat visibly streams in the
+wind). Their sources are in [`study/lighthouse/src/`](study/lighthouse/src) as `codex-*.px.js`.
+
+What it says:
+
+- **Codex drew as well or better with a fraction of the tokens and the time.** Its two best runs
+  scored above every Claude run, each in minutes, with 14k-19k tokens of output where Claude's best
+  wrote 82k-310k.
+- **On sol, more effort didn't mean better art:** high 8, max 7, xhigh 5, medium and low 6. Effort
+  grew its calls and tokens (9 to 32 calls, 0.4M to 2.8M input) but not its score past high.
+- **The difference is in how long they work.** Codex runs a few commands at a time and stops once
+  the scene checks and loops; Claude's runs at high effort and up kept looking and fixing for dozens
+  of turns more, re-reading a growing conversation each time.
+- **The curator hasn't seen the Codex scenes yet:** this ranking is the blind agent's alone.
+
 ## What to use
 
 - **A scene, one agent: Opus at xhigh.** The sweet spot: at or near the top in both reviews, the
@@ -245,8 +330,11 @@ Haiku and Opus at high.
   perspective, scale against a door): the smaller models got the flat parts right and the space
   wrong, and Fable scored lower at a higher price.
 - **A pipeline's parts** (docs/agents.md) at high each, the planner at xhigh.
+- **In Codex: gpt-6.1-sol at high, or gpt-6-astra at xhigh.** The two best scenes of all fourteen in
+  the blind review, each in a few minutes; on sol, max and xhigh cost more and scored no better.
 
 With Claude Code: `claude --model opus --effort xhigh`, or `/model` and `--effort` for a session.
+With Codex: `codex -m gpt-6.1-sol -c model_reasoning_effort=high`.
 
 ## What this doesn't show
 
@@ -258,6 +346,9 @@ With Claude Code: `claude --model opus --effort xhigh`, or `/model` and `--effor
   each loop (not the motion; and a model may favor art made the way it would make it), and the
   curator, who knew which was which, watching the loops and judging the top three. Both put xhigh at
   or near the top; they part on max and high.
+- **Two tools, two meters.** Claude Code reports each session's cost; Codex, on a ChatGPT plan,
+  reports tokens only, and the two price tokens differently: compare their tokens and times, not a
+  dollar figure. The curator has reviewed only the Claude runs.
 - **Wall times on a shared laptop.** Four sessions ran at once; the turns and the tokens are the
   fairer measure of effort.
 
@@ -268,6 +359,8 @@ With Claude Code: `claude --model opus --effort xhigh`, or `/model` and `--effor
 for c in "opus medium" "opus high" "sonnet xhigh" "haiku xhigh"; do
   scripts/model-study.sh docs/study/lighthouse/brief.txt runs $c &
 done; wait
+# the same in Codex (the skill linked into ~/.codex/skills first)
+scripts/model-study.sh docs/study/lighthouse/brief.txt runs gpt-6.1-sol high codex
 # where one session's tokens went (its transcript, by the session_id in result.json)
 node scripts/tokens.ts ~/.claude/projects/<the run's folder>/<session_id>.jsonl
 # its scene checked, and its loop read back

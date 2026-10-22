@@ -35,7 +35,11 @@ folder a link to that clone, so the agent always uses your working copy.
 The skill's description makes Claude pick it for sprites, characters, animations, tiles, scenes and
 sheets. To be sure it is used, name it: "use the pxl skill to draw ...".
 
-**Other agents** (Codex, Cursor, Gemini, …): tell them to read `SKILL.md` and that the CLI is
+**The Codex CLI** loads skills from `~/.codex/skills/` the same way: clone pxl to
+`~/.codex/skills/pxl-pixel-art` (or link that folder to your clone) and it lists the skill and reads
+it when you ask for pixel art. It drew the [model study](model-study.md)'s best scenes.
+
+**Other agents** (Cursor, Gemini, …): tell them to read `SKILL.md` and that the CLI is
 `node <path to pxl>/bin/pxl.js`. Everything the skill asks for is shell commands and files.
 
 ## What the agent reads

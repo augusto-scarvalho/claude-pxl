@@ -93,7 +93,9 @@ git clone https://github.com/augusto-scarvalho/claude-pxl.git ~/.claude/skills/p
 git clone https://github.com/augusto-scarvalho/claude-pxl.git .claude/skills/pxl-pixel-art
 ```
 
-**Other agents** (Codex, Cursor, …): point them at `SKILL.md` and tell them the CLI is
+**Codex CLI**: clone it to `~/.codex/skills/pxl-pixel-art` instead; Codex loads skills from there.
+
+**Other agents** (Cursor, …): point them at `SKILL.md` and tell them the CLI is
 `node <path to pxl>/bin/pxl.js`.
 
 Ask the agent to start `pxl serve` so you can watch it paint in your browser.
@@ -161,7 +163,7 @@ pxl's terms. What they say is in [Getting started](docs/getting-started.md#which
 | --- | --- |
 | a first sprite, an animation and a scene by hand | [docs/getting-started.md](docs/getting-started.md) |
 | running an agent with pxl: briefs, costs, pipelines, review | [docs/agents.md](docs/agents.md) |
-| which model and effort to draw with: one scene, eight ways | [docs/model-study.md](docs/model-study.md) |
+| which model and effort to draw with: one scene, fourteen ways | [docs/model-study.md](docs/model-study.md) |
 | every op and option | [reference.md](reference.md), or `pxl help <name>` |
 | the agent's workflow and the examples table | [SKILL.md](SKILL.md) |
 | scenes, perspective, parallax, shadows | [scenes.md](scenes.md) |
