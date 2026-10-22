@@ -132,14 +132,17 @@ for (const [x0, n] of [[-6.1, 3], [-3.2, 2], [2.4, 2], [4.9, 3]]) {
   tufts(x0 + n * 0.62 + 0.2, Z - 2.75, 0, 2)
 }
 
-// The scene's clock: 16 frames of 210 ms. The traveler walks up the path and back down it; the
-// mourner stands at a grave, her back to us, breathing.
+// The scene's clock: 64 frames of 110 ms, the walk's own. The traveler walks up the path and back
+// down it, his feet planted: he goes on as far as his steps cover (two of 6.4 px a cycle of 8 frames,
+// at 24 px to the meter: 0.067 m a frame), no faster, or they slide; the mourner stands at a grave,
+// her back to us, breathing (a frame of hers every 250 ms).
+const STEP = (4 * 3.2) / 24 / 8
 const walker = (f) => {
-  const down = f >= 8, z = Z - 1.6 + 0.25 * (down ? 16 - f : f)
-  return { name: down ? "tr_walk_sw" : "tr_walk_nw", at: [0.2, z, TOP + 0.02], frame: f % 8 }
+  const down = f >= 32, z = Z - 1.6 + STEP * (down ? 64 - f : f)
+  return { name: down ? "tr_walk_s" : "tr_walk_n", at: [0.2, z, TOP + 0.02], frame: f % 8 }
 }
-const people = (f) => [...things, walker(f), { name: "mo_idle_nw", at: [-2.75, Z + 2.45, TOP], frame: Math.floor(f / 2) % 4 }]
-const CLOCK = { frames: 16, fps: 1000 / 210 }
+const people = (f) => [...things, walker(f), { name: "mo_idle_nw", at: [-2.75, Z + 2.45, TOP], frame: Math.floor((f * 110) / 250) % 4 }]
+const CLOCK = { frames: 64, fps: 1000 / 110 }
 // Morning: the sun behind on the left (the shadows fall toward us and to the right), warm; the sky's
 // light violet in the shade.
 const LIGHT = { light: [-0.55, 0.6, 0.72], sun: { color: "#ffe2b4", strength: 1.3 }, sky: { color: "#a4a6d8", strength: 0.45 } }

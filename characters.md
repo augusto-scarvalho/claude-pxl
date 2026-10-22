@@ -138,11 +138,14 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
 
 ### A 3D reference: pre-render the body, draw the head
 
-When no base exists in the view you need (a figure turned to a diagonal, walking), render one from a
-rigged 3D figure, as Dead Cells did and as Saint11 teaches; drawing a turned, walking body pixel by
-pixel by eye is where code drawing fails worst (proportions drift, the near and far limbs swap, every
-fix breaks something else). What worked for `examples/hd2d/traveler.px.js` (its `traveler/` folder
-holds both scripts):
+When no base exists in the view you need, render one from a rigged 3D figure, as Dead Cells did and
+as Saint11 teaches; drawing a turned, walking body pixel by pixel by eye is where code drawing fails
+worst (proportions drift, the near and far limbs swap, every fix breaks something else). Two ways:
+pxl's own skeleton in 3D (§11: `examples/rig/warden.px.js`, `examples/hd2d/traveler.px.js`, the body
+blocked out in flat parts and its motion judged before it is painted, a head drawn per view), which
+turns to any of 8 directions with one walk and is what a field sprite wants; or a pre-render from a 3D
+package, below (tried on the traveler: the structure came out right, its borrowed walk read stiff on
+a chibi, and its turns were stuck on the diagonals it was rendered at):
 
 1. A rigged figure with its moves (Quaternius' Universal Animation Library: a mannequin and its
    Idle_Loop, Walk_Loop, CC0), made chibi by scaling its bones (the head 3x, the thighs and upper
@@ -260,6 +263,32 @@ of the nose; the corners of the mouth straight below the pupils.)
   shoulders rise into the head's rows (2 px above the chin) and the waist curves: a flat front view
   on a top-down map looks pasted on. A front view of even width has no middle column: `mx: "c"` for
   one, or break the symmetry on purpose (one brow longer).
+- **Facing us, in profile, from behind** (the cardinal views; 16 games' field sprites measured: Octopath,
+  Mana, Terranigma, Chrono Trigger, the Zeldas, CrossCode, Moonlighter, Sword of Mana; final boss
+  blues' four directions). Every view keeps the same rows for the head's top, the chin, the
+  shoulders, the hands, the crotch and the soles, and the same head width; the head about a third of
+  the height (11 rows of 34: more reads as a big head), the body under it a little barrel (the waist
+  about as wide as the chest, the arms slim and close along it, the hands at the crotch; broad
+  shoulders over a narrow waist read as a body-builder).
+  - Facing us: the face the head's lower 5-6 rows under a fringe, 2x2 eyes (a dark lid over the white
+    outside and the iris inside), 2-3 px between the irises, a dark line where the chin meets the
+    clothes (or face and collar run together); the legs 3-6 px each, touching or parted by a dark line,
+    7-9 rows of them under the hem; the feet 5-7 px, toes out a pixel.
+  - In profile: the head as deep as it is wide from the front; the face its front 4-6 columns, the eye
+    1-2 px behind its edge (the iris in front, the white behind), a nose of a pixel past it, the ear
+    just behind the head's middle; the face no further forward than the chest's front (ahead of it
+    the head reads thrust out); the body 55-85% of its width from the front, the near arm over the
+    middle of it, the far one hidden, one foot.
+  - From behind: the front's silhouette row for row, the hair lit at the crown and darkest at the nape
+    (tapering), an ear's pixel each side, the heels dark.
+  - Walking facing us or away, the feet step in their own columns: the planted one still, the other up
+    1, 3, 1 px and back, the hand across from it coming forward and up 1-3 px, the body down a pixel at
+    each contact (Octopath, Sword of Mana, Minish Cap). In profile the stride is long (14-20 px toe to
+    heel at contact), the body a 2 px triangle (lowest at the contacts), the far leg drawn a step darker,
+    the hands 2-5 px ahead and behind at the contacts and hanging straight passing.
+  - A sprite the game mirrors for the other side (E from W, NE from NW, SE from SW) is lit from above
+    and toward us, hair and body alike: lit from the upper left, its mirror takes the light to the
+    right while the scene's stays left.
 - **Turned to a diagonal** (tactics games and HD-2D: FFT, FFTA, Tactics Ogre, Triangle Strategy,
   Octopath; down-left, up-left, the other two flipped). Facing down and to the left, the figure has
   turned to its right: its left side comes toward us, so the near arm and the near foot are on the

@@ -33,7 +33,6 @@
     "examples/topdown_hero/*.px.js",
     "examples/hd2d/*.px.js",
     "examples/nature/*.px.js",
-    "examples/hd2d/traveler/*",
     "SKILL.md",
     "characters.md",
     "environment.md",
