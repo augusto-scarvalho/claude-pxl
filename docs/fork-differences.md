@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**283 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**284 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–21, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -220,7 +220,7 @@ references until it read right.
 ## How it was built
 
 Every change was made by Claude while drawing real scenes, and reviewed by a person on a curation page:
-223 entries, each with its picture and the note that asked for it.
+228 entries, each with its picture and the note that asked for it.
 
 - **Dogfooding:** each scene was drawn with pxl itself; every friction went to `FEEDBACK.md` and became
   a fix or a doc line. Work first done in throwaway scripts (camera math, noise, shadow sweeps) moved
@@ -228,6 +228,12 @@ Every change was made by Claude while drawing real scenes, and reviewed by a per
 - **Measured agent runs:** fresh agents were given only the skill and timed. A 320×180 animated street
   took one agent 85 turns and 31 minutes. A planner with eight forked agents made a denser street for
   about five times the tokens and twice the time. The skill now asks which to use on a big scene.
+  One new scene drawn by eight models and effort levels ([the model study](model-study.md)): on Opus
+  the art got better up to high effort and no further, while the cost doubled at every step.
+- **Tokens measured:** the agent sessions' transcripts show two thirds of the cost is the model's
+  thinking, kept and read again every turn; guides dumped whole and art files rewritten whole were
+  most of the rest that could go. The skill now reads guides by section and edits instead of
+  rewriting ([what it costs](agents.md#what-it-costs)); `scripts/tokens.ts` reads any session.
 - **Tutorials read:** 31 saved pages (Saint11, Pedro Medeiros, Pixel Joint, the subpixel threads) gave
   the outline push for subpixel motion, the line, palette and cluster readings in study, a pixel-perfect
   `wire()` (study found its doubled steps) and the lessons on lines, anti-aliasing, timing an action,

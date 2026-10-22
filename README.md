@@ -161,6 +161,7 @@ pxl's terms. What they say is in [Getting started](docs/getting-started.md#which
 | --- | --- |
 | a first sprite, an animation and a scene by hand | [docs/getting-started.md](docs/getting-started.md) |
 | running an agent with pxl: briefs, costs, pipelines, review | [docs/agents.md](docs/agents.md) |
+| which model and effort to draw with: one scene, eight ways | [docs/model-study.md](docs/model-study.md) |
 | every op and option | [reference.md](reference.md), or `pxl help <name>` |
 | the agent's workflow and the examples table | [SKILL.md](SKILL.md) |
 | scenes, perspective, parallax, shadows | [scenes.md](scenes.md) |

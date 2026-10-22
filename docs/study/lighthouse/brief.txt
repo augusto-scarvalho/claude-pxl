@@ -1,0 +1,10 @@
+Use the pxl skill (pxl-pixel-art) to make this piece of pixel art.
+
+Rules for this run:
+- Put every file you make in OUTDIR (the current folder). Don't read anything outside the skill's folder and OUTDIR.
+- Don't edit anything inside the skill's folder (don't write its FEEDBACK.md either).
+- Don't spawn agents, and don't ask questions: decide and go on.
+
+The brief: a 160x120 animated pixel-art scene: a lighthouse on a rocky headland on a stormy night. The lamp's beam sweeps through the slanting rain; waves break on the rocks below and throw up spray; a keeper in a yellow oilskin stands on the gallery holding a lantern, the coat flapping in the wind; a few gulls struggle against the wind. The lamp is the light: say where it comes from. Loop it seamlessly. Original art.
+
+Work until you would show it to a pixel-art curator, then reply with the art file's path, the scene's name, and two lines on what you'd improve next.
