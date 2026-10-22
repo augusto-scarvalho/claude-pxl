@@ -586,10 +586,16 @@ test("study: one cycle of a loop in place, the clip its whole cycle (an idle, a 
   // a run: the legs spread and gather, the near one (X) and the far one (Y) swapped half a cycle on
   const legs = (s: number, near: number, far: number) => box((x, y) => (y >= 6 && x === 5 - s ? near : y >= 6 && x === 6 + s ? far : y >= 2 && y < 6 && x >= 4 && x < 8 ? X : B));
   assert.equal(loopInPlace([0, 2, 4].map((s) => legs(s, X, Y)).concat([0, 2, 4].map((s) => legs(s, Y, X))), differ, w, [{ dx: 3, dy: 0 }]), "halves");
-  // a breath: not mirrored, but nothing goes more than a few px a frame; with a part flung far, not
-  const breath = [6, 7, 9, 8, 7, 5].map(bar);
+  // a breath: the body bobbing a pixel, not mirrored, nothing going more than a few px a frame, its
+  // silhouette the same size; with a part flung far, not
+  const bob = (dy: number) => box((x, y) => (x >= 4 && x < 8 && y >= 3 + dy && y < 9 + dy ? X : B));
+  const breath = [0, 1, 1, 2, 1, 0].map(bob);
   assert.equal(loopInPlace(breath, differ, w, [{ dx: 0, dy: 1 }, { dx: 1, dy: 1 }]), "breath");
   assert.equal(loopInPlace(breath, differ, w, [{ dx: 0, dy: 9 }, { dx: 8, dy: 0 }]), null);
+  // a swing: the same small moves, but a smear shows for two frames and the silhouette grows with it
+  const swing = [0, 1, 1, 2, 1, 0].map(bob);
+  for (const k of [2, 3]) swing[k] = swing[k].map((c, i) => (i % w < 4 && Math.floor(i / w) >= 3 ? Y : c));
+  assert.equal(loopInPlace(swing, differ, w, [{ dx: 0, dy: 1 }, { dx: 1, dy: 1 }]), null);
   // the last frame jumping back to the first: not a loop
   assert.equal(loopInPlace([2, 3, 4, 5, 6, 12].map(bar), differ, w, [{ dx: 0, dy: 1 }]), null);
 });

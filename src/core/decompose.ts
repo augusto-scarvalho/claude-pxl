@@ -535,9 +535,11 @@ export function decompose(frames: Img[], bands: Band[], tol = 0.05, flows: { x: 
     if (same.length < 2) continue;
     const runs = [p, ...same].sort((a, b) => a.track[0][0] - b.track[0][0]), starts = runs.map((q) => q.track[0][0]), gaps = starts.slice(1).map((s, k) => s - starts[k]);
     // (a texture's come at a steady beat, a wave's crests overlapping, each born and gone inside the
-    // picture; traffic comes in and goes out at its edges)
+    // picture; traffic comes in and goes out at its edges; and a clip that is one cycle played over
+    // shows each of its things again a cycle on: that's the clip repeating, not a texture)
     const inner = (e: [number, number, number, number, number]) => e[1] >= 2 && e[2] >= 2 && e[1] + e[3] <= W - 2 && e[2] + e[4] <= H - 2;
-    if (Math.max(...gaps) > 1.25 * Math.min(...gaps) || !runs.every((q) => inner(q.track[0]) && inner(q.track.at(-1)!))) continue;
+    const g = median(gaps), clipRepeats = N > g && [0, 1, 2].every((k) => { const a = F0[k].data, b = F0[k + g]?.data; return !!b && a.every((c, i) => c === b[i]); });
+    if (Math.max(...gaps) > 1.25 * Math.min(...gaps) || !runs.every((q) => inner(q.track[0]) && inner(q.track.at(-1)!)) || clipRepeats) continue;
     p.again = { times: runs.length, every: median(gaps) };
     p.frames = runs.reduce((a, q) => a + q.frames, 0);
     for (const q of same) pieces.splice(pieces.indexOf(q), 1);
@@ -809,10 +811,12 @@ export function loopInPlace(seq: Color[][], differ: (a: Color, b: Color) => bool
     const half = sil.reduce((a, s, i) => a + iou(s, sil[(i + N / 2) % N]), 0) / N, next = sil.reduce((a, s, i) => a + iou(s, sil[(i + 1) % N]), 0) / N;
     if (half >= 0.7 && half >= next + 0.08) return "halves";
   }
-  // a breath: nothing in it goes more than a few px a frame
-  // (the 80th percentile: a block matched wrong goes far)
+  // a breath: nothing in it goes more than a few px a frame (the 80th percentile: a block matched
+  // wrong goes far), and its silhouette keeps its size, its parts only moving (a smear or a blur
+  // showing up for a few frames grows it: a swing, not a breath)
   const sizes = mv.map((f) => Math.hypot(f.dx, f.dy)).sort((a, b) => a - b), most = sizes[Math.floor(0.8 * (sizes.length - 1))] ?? 0;
-  return mv.length && most <= 3 ? "breath" : null;
+  const areas = sil.map((s) => s.reduce((n, v) => n + (v ? 1 : 0), 0));
+  return mv.length && most <= 3 && Math.max(...areas) <= 1.3 * Math.max(1, Math.min(...areas)) ? "breath" : null;
 }
 
 const crop = (f: Img, b: { x0: number; y0: number; x1: number; y1: number }, W: number) => {
