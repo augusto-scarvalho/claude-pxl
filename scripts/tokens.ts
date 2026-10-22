@@ -3,8 +3,9 @@
 //
 //   node scripts/tokens.ts <session.jsonl> [more.jsonl ...]
 //
-// It prints the cost in input-token units (an input token 1, a cache write 1.25, a cache read 0.1, an
-// output token 5: the ratio of Claude's prices) split by what it paid for, then each kind of tool
+// It prints the cost in input-token units (an input token 1, a cache read 0.1, an output token 5, a
+// cache write 1.25 to the 5-minute cache or 2 to the 1-hour one, as each reply's usage says: the ratio
+// of Claude's prices) split by what it paid for, then each kind of tool
 // result and of the agent's own message by how much of the context it took and how often later turns
 // read it again (every turn re-reads the whole conversation). Text is counted at 3.6 characters a token,
 // an image by its pixels after the API's resize (w*h/750). Thinking leaves no text in the transcript:
@@ -44,7 +45,14 @@ const kindOf = (name: string, input: Record<string, unknown>): string => {
   return name;
 };
 
-type Turn = { ctx: number; cr: number; cw: number; out: number; inp: number; shown: number; results: number };
+// what a token written to the cache cost a reply: 1.25 to the 5-minute cache, 2 to the 1-hour one
+// (Claude Code's), as its usage splits them; 1.25 when it doesn't say
+const writeWeight = (u: { cache_creation_input_tokens?: number; cache_creation?: { ephemeral_5m_input_tokens?: number; ephemeral_1h_input_tokens?: number } }) => {
+  const m5 = u.cache_creation?.ephemeral_5m_input_tokens ?? 0, h1 = u.cache_creation?.ephemeral_1h_input_tokens ?? 0;
+  return m5 + h1 ? (1.25 * m5 + 2 * h1) / (m5 + h1) : 1.25;
+};
+// (w: what a token written to the cache cost this turn)
+type Turn = { ctx: number; cr: number; cw: number; w: number; out: number; inp: number; shown: number; results: number };
 const kinds = new Map<string, { n: number; tokens: number; reread: number }>();
 let cost = 0, fixedRead = 0, shownWrite = 0, shownRead = 0, thinkOut = 0, shownOut = 0, think = 0, turnsAll = 0, sessions = 0;
 for (const f of files) {
@@ -70,7 +78,7 @@ for (const f of files) {
       if (m.usage && !seen.has(m.id)) {
         seen.add(m.id);
         const u = m.usage;
-        turns.push({ ctx: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0), cr: u.cache_read_input_tokens ?? 0, cw: u.cache_creation_input_tokens ?? 0, out: u.output_tokens ?? 0, inp: u.input_tokens ?? 0, shown, results: 0 });
+        turns.push({ ctx: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0), cr: u.cache_read_input_tokens ?? 0, cw: u.cache_creation_input_tokens ?? 0, w: writeWeight(u), out: u.output_tokens ?? 0, inp: u.input_tokens ?? 0, shown, results: 0 });
       } else if (turns.length) turns[turns.length - 1].shown += shown;
     } else if (e.type === "user" && Array.isArray(m.content) && turns.length) {
       for (const c of m.content) {
@@ -89,9 +97,9 @@ for (const f of files) {
   turns.forEach((t, i) => {
     const thought = Math.max(0, t.out - t.shown), after = n - 1 - i;
     think += thought;
-    cost += t.inp + 1.25 * t.cw + 0.1 * t.cr + 5 * t.out;
+    cost += t.inp + t.w * t.cw + 0.1 * t.cr + 5 * t.out;
     fixedRead += 0.1 * Math.min(fixed, t.cr);
-    shownWrite += 1.25 * (t.shown + t.results); shownRead += 0.1 * (t.shown + t.results) * after;
+    shownWrite += t.w * (t.shown + t.results); shownRead += 0.1 * (t.shown + t.results) * after;
     thinkOut += 5 * thought; shownOut += 5 * t.shown;
   });
   for (const a of added) { const k = kinds.get(a.kind) ?? { n: 0, tokens: 0, reread: 0 }; k.n++; k.tokens += a.tokens; k.reread += a.tokens * Math.max(0, n - 1 - a.turn); kinds.set(a.kind, k); }

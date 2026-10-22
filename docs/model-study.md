@@ -215,21 +215,22 @@ three pixels.
 ## Where the tokens went
 
 Each session's transcript read by `scripts/tokens.ts` (cost in input-token units: an input token 1,
-a cache write 1.25, a cache read 0.1, an output token 5):
+a cache read 0.1, an output token 5, a token written to the cache 2, as each of these sessions wrote
+to Claude Code's one-hour cache):
 
 | Run | Thinking, as output | Thinking kept and re-read, and cache rewrites | Tool results and what it wrote | The fixed context | Most re-read |
 |---|---:|---:|---:|---:|---|
-| Opus low | 16% | 35% | 10% | 28% | its one Write (39%) |
-| Opus medium | 24% | 32% | 18% | 18% | `pxl help` (40%) |
-| Opus high | 21% | 37% | 21% | 14% | `pxl help` (36%) |
-| Opus xhigh | 23% | 47% | 17% | 9% | `pxl help` (32%) |
-| Opus max | 19% | 52% | 20% | 6% | its own scripts, written and run (34%) |
-| Sonnet xhigh | 26% | 47% | 16% | 8% | `pxl help` (24%) |
-| Haiku xhigh | 40% | 35% | 11% | 9% | `pxl help` (61%) |
-| Fable high | 28% | 31% | 18% | 14% | `pxl help` (35%) |
+| Opus low | 13% | 42% | 11% | 23% | its one Write (39%) |
+| Opus medium | 22% | 35% | 20% | 16% | `pxl help` (40%) |
+| Opus high | 20% | 39% | 22% | 13% | `pxl help` (36%) |
+| Opus xhigh | 22% | 49% | 17% | 9% | `pxl help` (32%) |
+| Opus max | 18% | 52% | 21% | 6% | its own scripts, written and run (34%) |
+| Sonnet xhigh | 24% | 48% | 16% | 7% | `pxl help` (24%) |
+| Haiku xhigh | 36% | 39% | 13% | 8% | `pxl help` (61%) |
+| Fable high | 25% | 34% | 20% | 13% | `pxl help` (35%) |
 
-(What the agent wrote as output, 3-11%, makes up the rest.) The longer the session, the more of its
-cost is thinking kept in the conversation and read again: 32% at medium, 52% at max. All eight
+(What the agent wrote as output, 3-10%, makes up the rest.) The longer the session, the more of its
+cost is thinking kept in the conversation and read again: 35% at medium, 52% at max. All eight
 followed the skill's rules on reading and writing (from [the tokenomics
 study](agents.md#what-it-costs)): each wrote its art file once and changed it with edits after
 (three earlier sessions had written theirs whole ten times between them), and read the guides by

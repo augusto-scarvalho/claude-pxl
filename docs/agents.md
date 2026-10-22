@@ -103,13 +103,13 @@ Measured on fresh agents given only the skill:
   less coherent, for about **5× the tokens and 2× the time**.
 
 Where the tokens go, read from the transcripts of three single-agent sessions that drew a 320×180
-night scene (about 70 turns each; cost in input-token units, a cache read a tenth of one, an output
-token five):
+night scene (about 70 turns each; cost in input-token units: a cache read a tenth of one, an output
+token five, a token written to the cache two, as Claude Code keeps its cache an hour):
 
 - **The model's thinking: about two thirds.** It is paid as output, then stays in the conversation and
   is read again on every later turn. The context grew from 22k tokens to about 260k; of the 725k it
   grew by over the three, 384k was thinking.
-- **What the tools returned and what the agent wrote: about a fifth.** Most of it reading: guides and
+- **What the tools returned and what the agent wrote: nearly a quarter.** Most of it reading: guides and
   examples dumped whole with `cat` or `sed` (a third of all that was re-read), and the art file
   written whole again ten times (a quarter). What pxl itself prints is small: a `shot` is 70-200
   tokens of text and about 550 of image, a `check` about 100, a `describe --brief` about 2k.
