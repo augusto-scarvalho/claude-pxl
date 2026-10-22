@@ -230,6 +230,25 @@ of the nose; the corners of the mouth straight below the pupils.)
   - Expressions move the lids: closed, a 2 px dark line; alert, more white; angry, the near lid's
     inner end lower; sad, its outer end lower; surprised, the lids up a row and a black mouth. A
     blink: one frame of 100-150 ms with the lids down, every 2-4 s.
+- **Hair on a small head** (11-13 rows; Octopath, the Manas, Terranigma, Chrono Trigger, CrossCode,
+  FFT, Tactics Ogre, Sword of Mana measured; final boss blues', SLYNYRD's and Saint11's tutorials):
+  - Never a circle. Either a flat top (a run of 4-8 px reaching full width in 2-3 rows: Sword of Mana's
+    hero, Randi) or a narrow top widest at the eyes, where tufts stand out at the temples (Olberic: 6,
+    8, 10, 10, 12, 12, 14, 12, 10, 10, 9 px). Break the dome with a parting (a 1 px notch off the
+    middle), a tuft 1-3 rows above the mass, or lock tips 1-2 px out at the sides every 2-3 rows.
+    Short hair stands 1-2 rows over the skull and 0-1 px out at the sides.
+  - The face narrower than the hair (7-9 px under 13-16), side locks 2-3 px wide hanging to the jaw,
+    the jaw closing in about 2 px a row over its last 2-3 rows: what keeps the head from being a ball.
+    A fringe of 3-4 pointed locks ending on the brow or the eyes, skin between their tips.
+  - 3-4 tones and a highlight, in about equal amounts, a small step between tones (Octopath's 4-5).
+    The light only in the upper third, as short strokes along the strands (a broken band, mirrored
+    pairs on two lobes), never dots in a checker or a column-by-column alternation; from behind a ring
+    round the crown; the nape the darkest everywhere. Outline it in its own darkest tone, the lit top
+    edge in a mid or dark hair tone, no black between hair and skin (a black ring round the whole head
+    with a lighter ring inside it is pillow shading).
+  - In profile the mass reaches 2-3 px behind the skull and the fringe overhangs the brow a pixel;
+    from behind it keeps the front's top and narrows to a nape of 4-6 px ending in points, the ears
+    peeking out a pixel. One haircut, the same locks seen from every side.
 - **Pupils:** keep at least 1 px of skin between a pupil and the outline, or it reads as a crease.
 - **How eyes read:**
   - Both irises shifted the same way reads as a glance.

@@ -11,21 +11,25 @@
 pal({
   k: "#1c1418",                                                   // outline
   L: "#fde6c6", S: "#f0c79e", s: "#d2966f", z: "#9c5b45",         // skin, its lightest only on the nose
-  Y: "#c9934f", h: "#7d4a2a", j: "#4a2716", J: "#24110b",         // chestnut hair
+  Y: "#c9934f", H: "#a56c3a", h: "#7d4a2a", j: "#4a2716", J: "#24110b",   // chestnut hair
   E: "#1f2f55", e: "#3a6aa2", G: "#f4f0e6",                       // the iris (navy, lighter under), the eye's white
   C: "#77a068", c: "#4c7652", n: "#30503d", N: "#1c2e27",         // a green travel cloak
   W: "#d8c69e", w: "#a68f6c", v: "#6f5c4a",                       // linen
   p: "#66637a", P: "#423f53", R: "#2e2b3c",                       // trousers
   l: "#83542f", d: "#4b2e1e", D: "#2e1a10", g: "#f0cc62",         // leather: boots, belt; a buckle
 })
-ramps("kzsSL", "kJjhY", "kNncC", "kvwW", "kRPp", "kDdl")
+ramps("kzsSL", "kJjhHY", "kNncC", "kvwW", "kRPp", "kDdl")
 // in a block: its names stay its own when a scene includes the file
 {
 // ---------------------------------------------------------------- the heads, by hand
-// 11 rows, the same hair in every view (spiky at the top, tufts lit a pixel or two over its dark, as
-// the faces already approved for the diagonals have it; those are 16 wide, a few rows of hair taken off
-// their top, the face as it was); front, profile and back 15 wide (odd: the middle column on the
-// body's), lit from above: front, the face's lower 6 rows under a fringe, 2x2 eyes (the dark lid over the white
+// 11 rows. One haircut seen from each side (characters §5, hair): short and tousled, parted just left
+// of the middle as we see it, a 2 px tuft on one side of the parting and a 4 px lobe on the other, each
+// lobe lit by a pair of short strokes along its strands (an arc over the crown, not dots), the top edge
+// in the hair's dark and not the outline's black, the darkest at the nape; three locks of fringe ending
+// on the brow, side locks 2-3 px wide hanging to the jaw, so the face is narrower than the hair and the
+// jaw closes the shape (no ball); in profile a forelock over the brow and the back flicking out, from
+// behind the mass narrowing to points at the nape. The diagonals keep the faces already approved (16
+// wide); front, profile and back are 15 wide (odd: the middle column on the body's). Lit from above: front, the face's lower 6 rows under a fringe, 2x2 eyes (the dark lid over the white
 // outside and the iris inside), 3 px between the irises, the nose the skin's lightest pixel, a pixel
 // of mouth in the chin row; front 3/4 (down and to the left), the face on the leading side, the far eye
 // a pixel at its edge, the ear past the near eye's white; profile (left), the eye 1 px behind the face's
@@ -33,65 +37,65 @@ ramps("kzsSL", "kJjhY", "kNncC", "kvwW", "kRPp", "kDdl")
 // middle; back 3/4 and back, all hair, lit at the crown, darkest at the nape, an ear's sliver.
 const HEADS = {
   s: `
-  ....JY.Y.YJ....
-  ..JYjhYjYhjYJ..
-  .JYjhjjYjjhjYJ.
-  JjhYjhjYjhjYhjJ
-  JjhSjhSSShjShjJ
-  JjSSSSSSSSSSSjJ
-  JjSSkkSSSkkSSjJ
-  JjSSGESSSEGSSjJ
-  .JsSSSSLSSSSsJ.
-  ..JsSSSzSSSsJ..
-  ....JJsssJJ....`,
+  .....jh.jhhj...
+  ...jhHYjhYHj...
+  ..jhHYHhjHYHj..
+  .jhHHhhhjHHhhj.
+  .JhhhjhHhjhhhJ.
+  JhhjSShhjSSjhhJ
+  JjjSkkSSSkkSjjJ
+  .JjSGESSSEGSjJ.
+  .JjsSSSLSSSsjJ.
+  ..jJsSSzSSsJj..
+  .....JsssJ.....`,
   sw: `
-  .....JY.YJ......
-  ..JYjhYjhjYjJjJ.
-  .JYjhjjYjjhjjYjJ
-  .JjhYjhjYjjhjJjJ
-  .JjhSjhSSjjhjjJ.
-  .jjSSSSSSjhjjYjJ
+  ......jh.jhhj...
+  ....jhHYjhYHj...
+  ...jhHYHhjHYHhj.
+  ..jhHHhjhhHHhhjJ
+  .jhhSjhSShjhhhjJ
+  .jjSSSSSShjhjjhJ
   ..hSkSSkkjhjjjJ.
-  ..jSESSEGjsjjJ..
-  ..JSSLLeSjzjJ...
-  ...JSSzSsjjJ....
+  ..jSESSEGjsjhjJ.
+  ..JSSLLeSjzjjJ..
+  ...JSSzSsjjJjJ..
   ....JsssjJ......`,
   w: `
-  .....JY.YJ.....
-  ...JYjhYjhjYJ..
-  ..JYjhjjYjjhjYJ
-  .JjhYjhjYjjhjJJ
-  jhShjhSjhjjhYjJ
-  .SSSSSjhjjjhjjJ
-  .SkkSSsjjjjjjJ.
-  .SEGSSzjjjjjJ..
-  SLSSSsjjjjjJ...
-  .zSSsjjjjJ.....
-  ..JzsJJJJ......`,
+  .......jh......
+  .....jhHYhj....
+  ...jhHYHHhhj...
+  ..jhHHhhhjhhj..
+  .jhhhhjhhhjhhjJ
+  jhSSShhjhhhjhhJ
+  .SkkSSsjhhjjjJ.
+  .SEGSSzjjhjjjJ.
+  SLSSSsjjjjjjjJ.
+  .zSSsJjjjJjjJ..
+  ..JzsJ.JJ.JJ...`,
   nw: `
-  .....JY.YJ......
-  ..JYjYYjhYjjJjJ.
-  .JYjYhjYjhjjjjjJ
-  .JjYhjhjjhjjjjjJ
-  .JjhjjhjjjjhjjjJ
-  .JhjjhjjjhjjjjJ.
-  .Jsjjhjjjjhjjjj.
-  .Jzjjjjjjjjjjj..
-  ..JzJjjJjjJjjJ..
-  ..JzJJjJJjJJjJ..
-  ...JJ.JJ.JJ.J...`,
+  .....jhhj.jh....
+  ....jhHYHYHhj...
+  ...jhHYHjHYHhj..
+  ..jhHHYhjhYHHhj.
+  .jhhhHHhhhHHhhjJ
+  .JjhhhhhhhhhhjjJ
+  .Jsjhhjhhhjhhjj.
+  .Jzjjhjjjhjjjj..
+  ..JzjjjjhjjjJ...
+  ..JzJjjJjjJjJ...
+  ...JJ.zJjJz.....`,
   n: `
-  ....JY.Y.YJ....
-  ..JYjhYjYhjYJ..
-  .JYjhjjYjjhjYJ.
-  JjhYjhjYjhjYhjJ
-  JjYhjYjhjYjhYjJ
-  JjhjYjhjhjYjhjJ
-  JjjhjjhjhjjhjjJ
-  sJjjhjjjjjhjjJs
-  zJjjjjhjhjjjjJz
-  .JJjjjjjjjjjJJ.
-  ...JJjJjJjJJ...`,
+  ...jhhj.hj.....
+  ...jhHYHYHhj...
+  ..jhHYHjHYHhj..
+  .jhHHYhjhYHHhj.
+  .JhhHHhhhHHhhJ.
+  JhjhhhhhhhhhjjJ
+  JjjhhjhhhjhhjjJ
+  .sJjhhjjjhhjJs.
+  .zJjjjjhjjjjJz.
+  ...JjjJjJjjJ...
+  .....zJjJz.....`,
 }
 for (const [v, g] of Object.entries(HEADS)) sprite(`_tr_head_${v}`, g)
 const GRID = Object.fromEntries(Object.entries(HEADS).map(([v, g]) => [v, g.trim().split("\n").map((r) => r.trim())]))
@@ -118,7 +122,7 @@ const ik3 = (a, b, l1, l2, hint) => {
 }
 // the body in px over the sole: the head 11 rows, the shoulders under it, the torso 10 to the crotch,
 // the legs about a third of the height
-const HIP = 11.5, TORSO = 10, NECK = 1.6, HEADR = 5.5, HIPW = 2, SHW = 3.7
+const HIP = 11.5, TORSO = 10, NECK = 1.6, HEADR = 5.5, HIPW = 2, SHW = 4.3
 const THIGH = 5.3, SHIN = 5, UPPER = 3.4, FORE = 3.2, CLOAK = 13   // the cloak from the shoulders to mid-thigh
 
 // ---------------------------------------------------------------- the moves
@@ -133,7 +137,7 @@ const walk = (i, yaw) => {
   if (a < 0.1) {   // facing us or away
     const up = (k) => FRONT.lift[k][i] * 1.07, fwd = [up(0) > 0 ? 1 : 0, up(1) > 0 ? 1 : 0]
     return { feet: [[0.6 * sn, -HIPW], [-0.6 * sn, HIPW]], lift: [up(0), up(1)], down: FRONT.down[i], lean: 2, trail: 0.4, sway: sn,
-      hands: [fwd[1] ? [0.8, -0.8, -5.6] : [-0.5, -0.8, -7], fwd[0] ? [0.8, 0.8, -5.6] : [-0.5, 0.8, -7]] }
+      hands: [fwd[1] ? [0.8, -1, -5.6] : [-0.4, -1, -7], fwd[0] ? [0.8, 1, -5.6] : [-0.4, 1, -7]] }
   }
   const stride = a > 0.9 ? 4.6 : 3.4, lift = a > 0.9 ? 2.5 : 1.8, hand = (s) => (s > 0 ? [4.4 * s, 0, -7 + 1.4 * s] : [3.6 * s, 0, -7 - 0.3 * s])
   const hl = hand(-sn), hr = hand(sn)
@@ -142,7 +146,7 @@ const walk = (i, yaw) => {
     hands: [[hl[0], -0.8 + 0.6 * a, hl[2]], [hr[0], 0.8 - 0.6 * a, hr[2]]] }
 }
 const idle = (i) => ({ feet: [[0, -HIPW - 0.3], [0, HIPW + 0.3]], lift: [0, 0], down: [0, 1, 1, 0][i], lean: 1, trail: 0.15, sway: 0,
-  hands: [[0, -0.8, -7], [0, 0.8, -7]] })
+  hands: [[0, -1, -7], [0, 1, -7]] })
 const MOVES = { walk: { ms: 110, frames: 8, f: walk }, idle: { ms: 250, frames: 4, f: idle } }
 
 const bones = (p, yaw) => {
@@ -153,7 +157,7 @@ const bones = (p, yaw) => {
     return { hip, ankle, knee: ik3(hip, ankle, THIGH, SHIN, add(fr.f, [0, 0.3, 0])) }
   })
   const arms = [0, 1].map((i) => {
-    const sh = local(chest, fr, [0, i ? SHW : -SHW, -1]), hand = local(sh, fr, p.hands[i])
+    const sh = local(chest, fr, [0.5, i ? SHW : -SHW, -1]), hand = local(sh, fr, p.hands[i])
     return { sh, hand, elbow: ik3(sh, hand, UPPER, FORE, local([0, 0, 0], fr, [-0.4, i ? 0.5 : -0.5, -1])) }
   })
   return { fr, spine, pelvis, chest, head, legs, arms }
@@ -254,7 +258,7 @@ const DIRS = { s: [0, "s"], sw: [-45, "sw"], w: [-90, "w"], nw: [-135, "nw"], n:
 const HEADVIEW = Object.fromEntries(Object.values(DIRS).map(([yaw, v]) => [yaw, v]))
 // The mourner: grey hair, a shawl of dark violet, grey linen.
 const MOURNER = {
-  Y: "#bdb8ae", h: "#8f8a84", j: "#625e5c", J: "#383536",
+  Y: "#bdb8ae", H: "#a6a199", h: "#8f8a84", j: "#625e5c", J: "#383536",
   C: "#7a6c8c", c: "#56496a", n: "#3a3150", N: "#231d33", W: "#a8a196", w: "#7f786f", v: "#58534e",
 }
 for (const v of Object.keys(HEADS)) sprite(`_mo_head_${v}`, { base: `_tr_head_${v}`, swap: MOURNER })
