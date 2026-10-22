@@ -256,8 +256,8 @@ With Claude Code: `claude --model opus --effort xhigh`, or `/model` and `--effor
   may favor the smaller models more.
 - **Two reviews, apart at the top.** An Opus agent, blind to who made what, judging eight frames of
   each loop (not the motion; and a model may favor art made the way it would make it), and the
-  curator, who knew which was which, watching the loops. They agree on the bottom five and on xhigh;
-  they part on max and high.
+  curator, who knew which was which, watching the loops and judging the top three. Both put xhigh at
+  or near the top; they part on max and high.
 - **Wall times on a shared laptop.** Four sessions ran at once; the turns and the tokens are the
   fairer measure of effort.
 
