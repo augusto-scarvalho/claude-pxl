@@ -9,6 +9,7 @@
 // size, the one checked; `graveyard_hd` the same four times as big through post().
 include("traveler.px.js")
 include("kit.px.js", { palette: true })
+include("../fonts/font5x7.px.js")
 
 
 // Where the grass meets the path: blades reaching over the stones' edge 1-5 px, in clumps, their tips
@@ -247,34 +248,131 @@ for (const [x0, n] of [[-6.1, 3], [-3.2, 2], [2.4, 2], [4.9, 3]]) {
   tufts(x0 + n * 0.62 + 0.2, Z - 2.75, 0, 2)
 }
 
-// The scene's clock: 64 frames of 110 ms, the walk's own. The traveler walks up the path and back
-// down it, his feet planted: he goes on as far as his steps cover (two of 6.4 px a cycle of 8 frames,
-// at 24 px to the meter: 0.067 m a frame), no faster, or they slide; the mourner stands at a grave,
-// her back to us, breathing (a frame of hers every 250 ms).
-const STEP = (4 * 3.2) / 24 / 8
-const walker = (f) => {
-  const down = f >= 32, z = Z - 1.6 + STEP * (down ? 64 - f : f)
-  return { name: down ? "tr_walk_s" : "tr_walk_n", at: [0.2, z, TOP + 0.02], frame: f % 8 }
+// The traveler's visit, on the scene's clock (80 ms a frame): he comes in from the near left through a
+// gap in the wood, climbs the steps, stops at the old grave with flowers, crosses to the mourner and
+// asks if she's all right; she turns to him and answers; he goes back down and away. Each leg walked
+// in one of the 8 directions, so every one of them shows, at the walk's own pace (two steps of 6.4 px a
+// cycle of 8 frames, 24 px to the meter: 0.067 m a frame), no faster, or the feet slide; his feet on
+// the ground, each step, the path. A wait before he comes makes the loop a whole number of the pines'
+// sways (44 frames).
+const PACE = (4 * 3.2) / 24 / 8, MS = 80
+const feetAt = (x, z) => {                         // how high the ground is under (x, z): the hill, its steps, the wood
+  const dz = Z - 2.5 - z
+  if (dz <= 0) return TOP + (Math.abs(x) < 0.9 ? 0.02 : 0)
+  if (dz < 1.4 && Math.abs(x) < 1) return TOP - 0.3 * (Math.floor(dz / 0.35) + 1)
+  return 0
 }
-// The wind from the left: the pines sway with it (a frame of theirs every 2 of the scene's, two sways a
-// loop), the gust reaching the ones on the left first; and it brings small dead leaves in from the left
-// and carries them off to the right, tumbling, rising and falling, each crossing once a loop (5 m/s) at
-// its own height over the hill and the fence and its own depth, its shadow running on the ground below.
-const sway = (t, f) => (t.name.startsWith("_spruce") || t.name === "_snag" ? { ...t, frame: (((Math.floor(f / 2) - Math.round(t.at[0] * 0.6)) % 16) + 16) % 16 } : t)
+const LEGS = [
+  ["ne", [-3.4, -8.6], [-0.2, -5.4]],              // in from the near left
+  ["n", [-0.2, -5.4], [-0.2, 0.4]],                // up the steps and the path
+  ["e", [-0.2, 0.4], [1.45, 0.4]],                 // to the old grave with flowers, beside it
+  ["e", 22, "grave"],                              // stands looking at it (in front, he'd hide it)
+  ["nw", [1.45, 0.4], [-0.2, 2.05]],
+  ["w", [-0.2, 2.05], [-1.95, 2.05]],              // to the mourner's side
+  ["w", 76, "talk"],
+  ["se", [-1.95, 2.05], [-0.2, 0.3]],
+  ["s", [-0.2, 0.3], [-0.2, -5.4]],                // back down
+  ["sw", [-0.2, -5.4], [-3.4, -8.6]],              // and away
+].map(([dir, a, b]) => (Array.isArray(a) ? { dir, a, b, n: Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / PACE) } : { dir, n: a, what: b }))
+const BUSY = LEGS.reduce((n, l) => n + l.n, 0), FRAMES = Math.ceil(BUSY / 44) * 44, WAIT = FRAMES - BUSY
+const TALK = WAIT + LEGS.slice(0, 6).reduce((n, l) => n + l.n, 0)       // the frame he stops by her
+// the gap in the wood he comes and goes by: no pine within a meter of his way
+const nearWay = ([x, z]) => LEGS.some(({ a, b }) => {
+  if (!a) return false
+  const [ax, az] = [a[0], Z + a[1]], [bx, bz] = [b[0], Z + b[1]], dx = bx - ax, dz = bz - az
+  const k = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)))
+  return Math.hypot(x - ax - dx * k, z - az - dz * k) < 1
+})
+const wood = things.filter((t) => !(t.name.startsWith("_spruce") && nearWay(t.at)))
+// where he is and what he does at frame f; the mourner's turn to him and back
+const traveler = (f) => {
+  let t = f - WAIT, at = LEGS[0].a
+  if (t < 0) return null
+  for (const L of LEGS) {
+    if (L.a && t < L.n) {
+      const k = t / L.n, x = L.a[0] + (L.b[0] - L.a[0]) * k, z = Z + L.a[1] + (L.b[1] - L.a[1]) * k
+      return { name: `tr_walk_${L.dir}`, at: [x, z, feetAt(x, z)], frame: f % 8 }
+    }
+    if (!L.a && t < L.n) return { name: `tr_idle_${L.dir}`, at: [at[0], Z + at[1], feetAt(at[0], Z + at[1])], frame: Math.floor((f * MS) / 250) % 4 }
+    if (L.a) at = L.b
+    t -= L.n
+  }
+  return null
+}
+const TURN = ["nw", "n", "ne", "e"]
+const mourner = (f) => {
+  const t = f - TALK, k = t < 12 ? 0 : t < 76 ? Math.min(3, Math.floor((t - 12) / 2) + 1) : Math.max(0, 3 - Math.floor((t - 80) / 2) - 1)
+  return { name: `mo_idle_${TURN[t < 76 || t >= 80 ? k : 3]}`, at: [-2.75, Z + 2.45, TOP], frame: Math.floor((f * MS) / 250) % 4 }
+}
+const SAYS = [
+  [4, 32, "Alden", ["Are you all right?"], () => [-1.95, Z + 2.05, TOP], 1],
+  [36, 74, "Edith", ["I will be.", "Thank you for asking."], () => [-2.75, Z + 2.45, TOP], -1],
+]
+// A dialogue box as HD-2D games draw theirs (Triangle Strategy above all): parchment, its corners cut;
+// a warm beige with faint fibers running across it, darker toward its edges as old paper is, a light
+// line just inside its thin brown outline; the speaker's name at its top over a rule that starts at a
+// small diamond and fades out; the words below in the 5x7 letters, a dark sepia; a short tail from its
+// lower edge down to the speaker's head; a blue-grey mark at its lower right corner that more is
+// coming. Over the speaker and off to one side (side: 1 right, -1 left), in pixels finer than the
+// art's (3 of the picture's to the art's 4), as a game's interface is.
+const bubble = (c, K, v, [x, z, u], name, lines, side) => {
+  const U = Math.max(1, Math.round(K * 0.75)), pad = 7, lineH = 10, ch = 5
+  const tw = Math.max(name.length * 6 + 16, ...lines.map((l) => l.length * 6)), w = tw + 2 * pad + 8, h = pad + 7 + 6 + lines.length * lineH + pad - 2
+  const [hx, hy] = v.ground(x, z, u + 1.5), tail = 9
+  const X0 = Math.round(hx - (side > 0 ? 0.22 : 0.78) * w * U), Y0 = Math.round(hy - (h + tail) * U) - 2 * U
+  const sx = Math.max(ch + 5, Math.min(w - ch - 6, Math.round((hx - X0) / U))), tip = Math.round((hx - X0) / U)
+  const cells = new Set(), key = (i, j) => i + "," + j, has = (i, j) => cells.has(key(i, j))
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++)
+    if (i + j >= ch && w - 1 - i + j >= ch && i + h - 1 - j >= ch && w - 1 - i + h - 1 - j >= ch) cells.add(key(i, j))
+  for (let r = 0; r <= tail; r++) { const k = r / tail, cx = sx + (tip - sx) * k, half = 4 * (1 - k); for (let i = Math.round(cx - half); i <= Math.round(cx + half); i++) cells.add(key(i, h - 1 + r)) }
+  const R = (i, j, ww, hh, col) => c.rect(X0 + i * U, Y0 + j * U, ww * U, hh * U, col)
+  for (const cell of cells) {
+    const [i, j] = cell.split(",").map(Number)
+    let d = 1                                                                      // how far in from its edge
+    while (d < 5 && [[d, 0], [-d, 0], [0, d], [0, -d]].every(([dx, dy]) => has(i + dx, j + dy))) d++
+    const fiber = hash(i >> 3, j) < 0.12 || hash(i >> 1, j * 7) < 0.06
+    R(i, j, 1, 1, d === 1 ? "#6e5a43" : d === 2 ? "#f4ecda" : d <= 4 ? (fiber ? "#d8c6a2" : "#dfcfae") : fiber ? "#e3d5b8" : "#ebdfc4")
+  }
+  c.text(X0 + (pad + 4) * U, Y0 + pad * U, name, "#4a3a2c", { font: "5x7", scale: U })
+  // the rule under the name: a diamond, then a line fading out
+  R(pad, pad + 9, 1, 1, "#8c7457"); R(pad + 1, pad + 8, 1, 3, "#8c7457"); R(pad + 2, pad + 9, 1, 1, "#8c7457")
+  const rule = Math.round(tw * 0.62)
+  R(pad + 3, pad + 9, Math.round(rule * 0.6), 1, "#8c7457"); R(pad + 3 + Math.round(rule * 0.6), pad + 9, Math.round(rule * 0.4), 1, "#b9a483")
+  lines.forEach((l, k) => c.text(X0 + (pad + 6) * U, Y0 + (pad + 14 + k * lineH) * U, l, "#3a2f27", { font: "5x7", scale: U }))
+  // more is coming: a small triangle pointing down, outlined, over a short rule
+  const mx = w - pad - 10, my = h - pad - 5
+  R(mx, my, 7, 1, "#4f6382"); R(mx + 1, my + 1, 1, 1, "#4f6382"); R(mx + 5, my + 1, 1, 1, "#4f6382"); R(mx + 2, my + 2, 1, 1, "#4f6382"); R(mx + 4, my + 2, 1, 1, "#4f6382"); R(mx + 3, my + 3, 1, 1, "#4f6382")
+  R(mx + 2, my + 1, 3, 1, "#9db0cc"); R(mx + 3, my + 2, 1, 1, "#9db0cc"); R(mx, my + 5, 7, 1, "#4f6382")
+}
+const talk = (c, K) => {
+  const t = c.frame - TALK, v = perspective(view(K))
+  for (const [t0, t1, name, lines, who, side] of SAYS) if (t >= t0 && t < t1) bubble(c, K, v, who(), name, lines, side)
+}
+// The wind from the left: the pines and the dead tree sway with it (16 frames of 220 ms, a whole number
+// of sways a loop), the gust reaching the ones on the left first; and it brings small dead leaves in
+// from the left and carries them off to the right, tumbling, rising and falling, each crossing six
+// times a loop (5 m/s) at its own height over the hill and the fence and its own depth, its shadow
+// running on the ground below.
+const sway = (t, f) => (t.name.startsWith("_spruce") || t.name === "_snag" ? { ...t, frame: (((Math.floor((f * MS) / 220) - Math.round(t.at[0] * 0.6)) % 16) + 16) % 16 } : t)
 const LEAVES = Array.from({ length: 14 }, (_, i) => ({ x0: hash(i, 41) * 36, z: Z - 7 + hash(i, 42) * 17, u: TOP + 0.5 + hash(i, 43) * 2.2, ph: hash(i, 44) * 6.28, name: hash(i, 45) < 0.55 ? "_leaf" : "_leaf_y" }))
 const leaves = (f) => LEAVES.map((l, i) => {
-  const s = f / 64, w = 2 * Math.PI * s
-  return { name: l.name, at: [-18 + ((l.x0 + 36 * s) % 36), l.z + 0.4 * Math.sin(2 * w + l.ph), l.u + 0.45 * Math.sin(3 * w + l.ph)], frame: (f + i) % 4, shadow: 0 }
+  const s = f / FRAMES, w = 2 * Math.PI * s
+  return { name: l.name, at: [-18 + ((l.x0 + 36 * 6 * s) % 36), l.z + 0.4 * Math.sin(8 * w + l.ph), l.u + 0.45 * Math.sin(12 * w + l.ph)], frame: (f + i) % 4, shadow: 0 }
 })
-const people = (f) => [...things.map((t) => sway(t, f)), ...leaves(f), walker(f), { name: "mo_idle_nw", at: [-2.75, Z + 2.45, TOP], frame: Math.floor((f * 110) / 250) % 4 }]
-const CLOCK = { frames: 64, fps: 1000 / 110 }
+const people = (f) => [...wood.map((t) => sway(t, f)), ...leaves(f), mourner(f), ...[traveler(f)].filter(Boolean)]
+const CLOCK = { frames: FRAMES, fps: 1000 / MS }
 // Morning: the sun behind on the left (the shadows fall toward us and to the right), warm; the sky's
 // light violet in the shade.
 const LIGHT = { light: [-0.55, 0.6, 0.72], sun: { color: "#ffe2b4", strength: 1.3 }, sky: { color: "#a4a6d8", strength: 0.45 } }
-scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK }, (c) => c.mesh(view(1), M.faces, MATS, { sprites: people(c.frame), ...LIGHT }))
+scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 8 } }, (c) => c.mesh(view(1), M.faces, MATS, { sprites: people(c.frame), ...LIGHT }), (c) => talk(c, 1))
 
-// Four times the size (1920x1080) and through the camera: the hill's top sharp, the wood below and
-// the hills behind blurred and taken by a warm mist, a bloom, darker corners.
-scene("graveyard_hd", { w: W * 4, h: H * 4, bg: "q", ...CLOCK, check: false },
-  (c) => c.mesh(view(4), M.faces, { ...MATS, wood: { ...MATS.wood, block: 4 }, rail: { ...MATS.rail, block: 4 } }, { sprites: people(c.frame), pixel: 4, ...LIGHT }),
-  post({ blur: 36, focus: [W * 2, H * 2.2], sharp: 2.5, soft: [3, 8], fog: { color: "#dcdccc", from: DIST + 2, to: DIST + 26, max: 0.7 }, bloom: { strength: 0.6, r: 40 }, vignette: 0.35 }))
+// K times the size and through the camera: the hill's top sharp, the wood below and the hills behind
+// blurred and taken by a warm mist, a bloom, darker corners; the fence in blocks of a sprite's pixel.
+// `graveyard_hd` four times (1920x1080); `graveyard_md` twice (960x540: the gallery's GIF, its 46 s a
+// quarter of the pixels to draw and to store).
+const camera = (name, K) => scene(name, { w: W * K, h: H * K, bg: "q", ...CLOCK, check: false },
+  (c) => c.mesh(view(K), M.faces, { ...MATS, wood: { ...MATS.wood, block: K }, rail: { ...MATS.rail, block: K } }, { sprites: people(c.frame), pixel: K, ...LIGHT }),
+  post({ blur: 9 * K, focus: [(W * K) / 2, H * K * 0.55], sharp: 2.5, soft: [3, 8], fog: { color: "#dcdccc", from: DIST + 2, to: DIST + 26, max: 0.7 }, bloom: { strength: 0.6, r: 10 * K }, vignette: 0.35 }),
+  (c) => talk(c, K))
+camera("graveyard_hd", 4)
+camera("graveyard_md", 2)

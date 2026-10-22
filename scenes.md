@@ -258,7 +258,19 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   blades drawn upright come out lying down. What stands on the ground and is smaller than a person (a
   headstone, a rock) is a sprite drawn at the scene's scale, its top in the sun and its front in the
   shade when the sun is behind; drawn as a textured box it comes out blurred into the stone round it
-  (`examples/hd2d/graveyard.px.js`).
+  (`examples/hd2d/graveyard.px.js`). A box drawn in meters at the HD picture's own pixel (a fence)
+  reads as a 3D render among the sprites: give its materials `block: 4`, faces in blocks of a
+  sprite's pixel, a tone each, the outline only on the shaded side.
+- A story in a diorama (the graveyard's visit): legs walked in a direction each, at the walk's own
+  pace (a cycle's two steps over its frames; faster, the feet slide), the feet at the height of what
+  is under them (ground, each step, a path); holds between them in an idle; the other figure turning
+  to whoever speaks, a direction every two frames. Stand a figure beside what it looks at, not in
+  front of it: from above and in front its body hides a headstone it faces. Clear what stands in its
+  way (no tree within a meter of its walk). Dialogue as HD-2D games draw it (Triangle Strategy):
+  parchment with cut corners, fibers, darker toward its edges, a light line inside a thin brown
+  outline, the name over a rule from a small diamond, the words in a 5x7 font, a short tail to the
+  speaker, a mark that more is coming; drawn after `post()`, so it stays sharp, in pixels finer than
+  the art's. A loop that long checked one frame in eight: `check: { every: 8 }`.
 - The ground and what grows and lies on it (grass, trees, bushes, rocks, walls, paths, tufts,
   flowers), as 16-bit games draw them: the environment guide (`pxl help "environment"`, by section)
   and its kit, `examples/nature/kit.px.js`, to include.

@@ -109,8 +109,8 @@ export interface AssetOpts {
   shrink?: number;
   /** Scene background color. */
   bg?: string;
-  /** Scene: false and check skips it (an HD render of a scene checked at its own size). */
-  check?: boolean;
+  /** Scene: false and check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story). */
+  check?: boolean | { every: number };
   /** anim: default frame rate (frames per second, default 8). */
   fps?: number;
   /** anim: frame count when there are no frame() items (procedural, via c.frame / c.phase). */

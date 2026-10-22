@@ -246,3 +246,10 @@ sprite("apart", "gr\\nrh")`, "t.px.js");
   assert.deepEqual(r.notes, ["leaf › LOOK: 1 pair of tones side by side too close to tell apart (under 0.03 in OKLab): 'h' #8ad066 and 'g' #8ccf63 (0.003); merge each, or spread it if both are meant"]);
   assert.equal(r.warnings, 0);
 });
+
+test("check: { every: n } checks one frame in n of a long scene; a bad n is said", () => {
+  const src = `anim("a", { w: 2, h: 2, frames: 8, fps: 10 }, (c) => c.rect(0, 0, 2, 2, "r"))
+scene("s", { w: 8, h: 8, frames: 8, fps: 10, check: { every: 4 } }, (c) => c.stamp("a", c.frame % 6, 2))`;
+  assert.match(checkProject(loadSource(PAL + src, "t.px.js"), {}).checked, /1 scene \(2 frames/);
+  assert.throws(() => checkProject(loadSource(PAL + src.replace("every: 4", "every: 0"), "t.px.js"), {}), /check: \{ every \}/);
+});

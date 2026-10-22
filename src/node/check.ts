@@ -109,8 +109,12 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     const count = tl?.capped ? Math.min(all, CAPPED_FRAMES) : all;
     if (tl?.capped) lines.push(`${name} › WARNING: its loop doesn't close within 60 s: its anims' frame times don't line up (a ${tl.step} ms step, ${all} frames); checked its first ${count} frames only. Give every anim the same fps (4, 5 or 10, or ms in 100s)`);
     const seen = new Map<string, string[]>(), found = new Map<string, Set<number>>(), at = new Map<string, Set<string>>();
-    const only = opts.frames ?? (opts.frame !== undefined ? [opts.frame] : undefined);
-    for (const f of only && tl ? only : [...Array(count).keys()]) {
+    const only = opts.frames ?? (opts.frame !== undefined ? [opts.frame] : undefined), co = def.opts.check;
+    // a long story checked one frame in n (check: { every: n }): what moves through it is still seen
+    // at every few steps, at the cost of a short loop
+    const every = typeof co === "object" && co ? co.every : 1;
+    if (!(Number.isInteger(every) && every >= 1)) throw new PxError(`scene '${name}': check: { every } is how many frames apart the checked ones are, a whole number from 1, got ${JSON.stringify(every)}`);
+    for (const f of only && tl ? only : [...Array(count).keys()].filter((k) => k % every === 0)) {
       const b = p.build(name, 0, tl ? frameTime(p, name, f) : 0);
       const unlit = new Set(b.layers.filter((l) => l.unlit).map((l) => l.name));
       frames++;
