@@ -57,6 +57,8 @@ One row per run, in the order of [the art](#the-art) below. Each run's GIF and s
 who made it: `claude-<model>-<effort>`, `codex-<model>-<effort>`, `agy-<model>-<effort>`, in
 [`study/lighthouse/`](study/lighthouse) (the source's first line says it too).
 
+<img src="study/lighthouse/glance.png" width="640" alt="All seventeen runs, one still each, labeled with tool, model, effort and cost: the eight Claude Code runs in the first two rows, the six Codex runs in the next two, the three Antigravity runs in the last">
+
 | Tool | Model | Effort | Art | Cost | Time | Turns | Blind, of 8 | Blind, of 14 | Curator | pxl |
 |---|---|---|---|---:|---:|---:|---|---|---|---|
 | Claude Code | Opus 5.5 | low | [gif](study/lighthouse/claude-opus-low.gif), [src](study/lighthouse/src/claude-opus-low.px.js) | $0.54 | 2 min | 14 | 3, 8th | 4, 12th | | `5929a59` |
