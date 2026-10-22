@@ -6,8 +6,11 @@
 // its face toward the camera; without a map it is that flat face. A sprite's light wraps round it
 // (half again past the edge), as painted figures take it, so its dark side isn't black.
 // The sun's shadows come from a map of what it sees (the depth of the nearest thing along its rays,
-// in a grid across them): every face, and every sprite as a cut-out turned to face the sun, so a
-// figure or a tree throws its silhouette. What a pixel is tested against is the map at the same
+// in a grid across them): every face, and every sprite as a cut-out standing where it is drawn, facing
+// the camera (a billboard's shadow, as HD-2D games cast them): its shadow starts all along its foot and
+// runs away from the sun as a slanted copy of its silhouette. (A cut-out turned to the sun would throw
+// a fuller shadow, but its foot would cross the drawn one, and the shadow would leave a gap of ground
+// beside the thing on one side.) What a pixel is tested against is the map at the same
 // place across the sun's rays: the nearer thing there, if any, shades it.
 import { type Color, LIN, fromLinear } from "./color.ts";
 import type { Img } from "./image.ts";
@@ -60,11 +63,13 @@ export class SunMap {
       if (z < this.depth[i]) { this.depth[i] = z; this.who[i] = id; }
     }
   }
-  /** A sprite as a cut-out turned to face the sun, its feet at `at`, `m` m to its pixel. */
-  sprite(img: Img, at: V3, m: number, id: number): void {
-    const h = unit([this.S[0], this.S[1], 0]), right: V3 = Math.abs(this.S[2]) > 0.999 ? [1, 0, 0] : [-h[1], h[0], 0];
+  /** A sprite as a cut-out where it stands, its feet at `at`, `m` m to its pixel, `right` its right in the world (the camera's). */
+  sprite(img: Img, at: V3, m: number, id: number, right: V3): void {
     const [px, py] = img.pivot ?? [img.w / 2, img.h];
-    const corner = (i: number, j: number): V3 => [at[0] + right[0] * (i - px) * m, at[1] + right[1] * (i - px) * m, at[2] + (py - j) * m];
+    // moved toward the sun by what the ground it stands on is let off (sees()), so its shadow there
+    // starts right at its foot, not that far beyond it (it doesn't shade itself: its own id)
+    const b = this.lee(this.S[2]) * 1.25, o: V3 = [at[0] + this.S[0] * b, at[1] + this.S[1] * b, at[2] + this.S[2] * b];
+    const corner = (i: number, j: number): V3 => [o[0] + right[0] * (i - px) * m, o[1] + right[1] * (i - px) * m, o[2] + (py - j) * m];
     const tl = corner(0, 0), tr = corner(img.w, 0), bl = corner(0, img.h), br = corner(img.w, img.h);
     // the cell's place on the sprite from the triangle's weights, and whether the sprite is there
     const solid = (i: number, j: number) => i >= 0 && j >= 0 && i < img.w && j < img.h && (img.data[(j | 0) * img.w + (i | 0)] & 255) >= 128;
@@ -76,8 +81,13 @@ export class SunMap {
     const { e1, e2, S } = this, x = (px * e1[0] + py * e1[1] + pz * e1[2] - this.u0) / this.cell, y = (px * e2[0] + py * e2[1] + pz * e2[2] - this.v0) / this.cell;
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return true;
     const i = Math.floor(y) * this.w + Math.floor(x), z = -(px * S[0] + py * S[1] + pz * S[2]);
-    return !(this.depth[i] < z - this.cell * (1 + 2 / Math.max(0.2, slope)) - 0.02) || this.who[i] === self;
+    // the depth a surface spans across one cell, turned from the sun by `slope`, and a little more: no
+    // nearer than that is a shadow (the surface's own cells don't shade it, so this can stay small and
+    // a shadow starts at the foot of what throws it)
+    return !(this.depth[i] < z - this.lee(slope)) || this.who[i] === self;
   }
+  /** How much nearer the sun something must be than a surface turned `slope` from it to shade it. */
+  lee(slope: number): number { return this.cell * (0.5 + 1 / Math.max(0.2, slope)) + 0.005; }
 }
 
 /** How much of a light a surface takes, its cosine to it `d`, the light wrapping `wrap` past the edge. */

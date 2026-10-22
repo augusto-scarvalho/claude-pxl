@@ -25,14 +25,14 @@ pal({ p: "#e7a3c2", o: "#f1ece0", O: "#e8cf6c" })   // flowers
 // Grass after SLYNYRD (Pixelblog 2, 20, 43) and final boss blues (Tiling Tiles), for a floor laid a
 // texel to a pixel (camera.floor): mostly bare ground, a tone darker in broad ragged blobs; where a
 // second, broader field says it grows tall, clumps: fans of three to five blades 5-7 px wide, their tips
-// a tone up (one clump in four with a lit left tip, the sun behind catching it), the blue dark at their
-// foot; between them small marks a tone down; no two touching (corners may), some crossing the tile's
+// a tone up (one clump in four with a lit left tip, the sun behind catching it), a short shadow of 2 px
+// a tone down at their foot, away from the light (a whole row of the darkest there reads as a dash); between them small marks a tone down; no two touching (corners may), some crossing the tile's
 // edges so its seams don't show. 64x48, its fields made seamless over it. `lush: false` for the wood's
 // floor: no clumps, fewer marks.
 const CLUMPS = [
-  ["e..r..e", ".e.e.e.", ".e.e.e.", "..eee..", ".QQQQQ."],
-  ["r.e..", ".ee.e", ".eee.", "QQQQ."],
-  [".e..e.", "e.ee.r", ".eeee.", ".QQQ.."],
+  ["e..r..e", ".e.e.e.", ".e.e.e.", "..eee..", "...qq.."],
+  ["r.e..", ".ee.e", ".eee.", "..qq."],
+  [".e..e.", "e.ee.r", ".eeee.", "...qq."],
 ]
 const grassTile = (name, { lush = true, seed = 11 } = {}) => sprite(name, { w: 64, h: 48 }, (c) => {
   const r = rng(seed), W = 64, H = 48, wx = (v) => ((v % W) + W) % W, wy = (v) => ((v % H) + H) % H, K = "Qqwer"
@@ -50,7 +50,7 @@ const grassTile = (name, { lush = true, seed = 11 } = {}) => sprite(name, { w: 6
       C.forEach((row, j) => [...row].forEach((k, i) => {
         if (k === ".") return
         const X = x + (flip ? row.length - 1 - i : i), up = K[b + 1], tip = lit ? K[b + 2] : up
-        pts.push([X, y + j, k === "Q" ? "Q" : k === "r" ? tip : up])
+        pts.push([X, y + j, k === "q" ? K[b - 1] : k === "r" ? tip : up])
       }))
       place(pts)
     } else if (g > (lush ? 0.4 : 0.5) && r() < 0.35) {
@@ -193,11 +193,11 @@ sprite("_flags", { w: 48, h: 48 }, (c) => {
     }
   }
 })
-// Tufts: fans of blades on a base that tapers, lit tips, the blue dark under them; three sizes, never
+// Tufts: fans of blades on a base that tapers, lit tips, a short shadow a tone down under them; three sizes, never
 // symmetric, set in twos to fours at the feet of things.
-sprite("_tuft_a", { w: 7, h: 5, pivot: "bottom" }, ".r...e.\n..e.e..\n.e.ee.e\n..eww..\n..QQQ..")
-sprite("_tuft_b", { w: 5, h: 4, pivot: "bottom" }, "r..e.\n.e.e.\n.ewe.\n.QQ..")
-sprite("_tuft_c", { w: 9, h: 6, pivot: "bottom" }, "..r.....e\ne..e..e..\n.e.e.e.e.\n..eewee..\n...www...\n...QQQ...")
+sprite("_tuft_a", { w: 7, h: 5, pivot: "bottom" }, ".r...e.\n..e.e..\n.e.ee.e\n..eww..\n...qq..")
+sprite("_tuft_b", { w: 5, h: 4, pivot: "bottom" }, "r..e.\n.e.e.\n.ewe.\n..qq.")
+sprite("_tuft_c", { w: 9, h: 6, pivot: "bottom" }, "..r.....e\ne..e..e..\n.e.e.e.e.\n..eewee..\n...www...\n....qq...")
 // Flowers: blooms of 2-3 px, one color to a clump, a shadow pixel under some.
 sprite("_flowers_w", { w: 9, h: 5, pivot: "bottom" }, ".o....o..\noo..o.oo.\n.e.oo..e.\n.e..e..e.\n..Q.e.Q..")
 sprite("_flowers_p", { w: 8, h: 5, pivot: "bottom" }, "..p.....\n.pp..pp.\n..e.p.e.\np.e.e.e.\nQ.Q.Q...")

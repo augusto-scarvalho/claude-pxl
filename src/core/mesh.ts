@@ -232,8 +232,9 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       for (let i = 0; i < n; i += 4) if (who[i] >= 0) visit(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
       for (const s of world!.sprites) visit(...s.at);
     };
-    // a cell to every two px of the picture: an HD-2D picture's pixel of art
-    sunMap = new SunMap(L.dir, seen, Math.min(1024, Math.max(256, Math.max(W, H) / 2)));
+    // 1024 cells across what is seen (2048 for a picture that big): a few cm on a diorama, so a shadow
+    // starts at the foot of what throws it
+    sunMap = new SunMap(L.dir, seen, Math.min(2048, Math.max(1024, Math.max(W, H) / 2)));
     faces.forEach((F, k) => {
       const tk = texOf[k];
       for (let t = 1; t + 1 < F.pts.length; t++) {
@@ -242,7 +243,8 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
         sunMap!.tri(A, B, D, k, tk?.holes ? (w0, w1, w2) => (tk.T.data[texel(tk, w0 * A[0] + w1 * B[0] + w2 * D[0], w0 * A[1] + w1 * B[1] + w2 * D[1], w0 * A[2] + w1 * B[2] + w2 * D[2])] & 255) >= 128 : undefined);
       }
     });
-    world!.sprites.forEach((s, k) => sunMap!.sprite(s.img, s.at, K / perM[k], -2 - k));
+    const yaw = (cam.P!.yaw * Math.PI) / 180, right: V3 = [Math.cos(yaw), -Math.sin(yaw), 0];
+    world!.sprites.forEach((s, k) => sunMap!.sprite(s.img, s.at, K / perM[k], -2 - k, right));
   }
   // each face's texture stepped once by its light (the faces of a material in one light share it)
   const lits = new Map<string, Uint32Array>(), litOf: Uint32Array[] = [];
@@ -264,7 +266,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       if (col === TRANSPARENT) continue;
       if (L) {
         const px = pos[i * 3], py = pos[i * 3 + 1], pz = pos[i * 3 + 2], facing = dot(N, L.dir);
-        col = shine(col, N, px, py, pz, L, facing > 0 && (!sunMap || sunMap.sees(px, py, pz, -1, facing)), 0);
+        col = shine(col, N, px, py, pz, L, facing > 0 && (!sunMap || sunMap.sees(px, py, pz, k, facing)), 0);
       }
       if (c.raw) c.raw[i] = col;
       else c.plot(x + x0, y + y0, col);

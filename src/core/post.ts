@@ -14,8 +14,11 @@ export interface PostOpts {
   focus?: [number, number];
   /** m of depth either side of the focus that stay sharp (default 1) */
   sharp?: number;
-  /** m past that over which the blur grows to full (default 4) */
-  soft?: number;
+  /**
+   * m past that over which the blur grows to full (default 4), or two, [nearer, farther] (Unreal's near
+   * and far transition regions); it grows slowly at first, faster in the middle, and eases into full
+   */
+  soft?: number | [number, number];
   /** the most blur, about its radius in px (default 0: none) */
   blur?: number;
   /** a glow round what is brighter than `above` (0..1, default 0.75), `r` px out (default 1/40 of the width), at `strength` (default 0.6); a number is the strength */
@@ -52,7 +55,9 @@ const num = (v: unknown, lo: number, hi: number) => typeof v === "number" && v >
 
 export function applyPost(img: Img, o: PostOpts, fogColor: Color | null): void {
   const { w, h } = img, n = w * h, D = img.depth;
-  for (const [k, lo, hi] of [["sharp", 0, Infinity], ["soft", 1e-6, Infinity], ["blur", 0, Infinity], ["vignette", 0, 1]] as const)
+  if (Array.isArray(o.soft) && !(o.soft.length === 2 && o.soft.every((v) => num(v, 1e-6, Infinity))))
+    throw new PxError(`post: soft is m over which the blur grows to full, above 0, or two of them [nearer, farther], got ${JSON.stringify(o.soft)}`);
+  for (const [k, lo, hi] of [["sharp", 0, Infinity], ...(Array.isArray(o.soft) ? [] : [["soft", 1e-6, Infinity] as const]), ["blur", 0, Infinity], ["vignette", 0, 1]] as const)
     if (o[k] !== undefined && !num(o[k], lo, hi)) throw new PxError(`post: ${k} must be a number from ${lo === 1e-6 ? "above 0" : lo}${hi < Infinity ? ` to ${hi}` : ""}, got ${JSON.stringify(o[k])}`);
   if ((o.blur || o.fog) && !D) throw new PxError("post: blur and fog go by the depth mesh() draws: put post() after a mesh() in the same sprite or scene (not in a layer)");
   const R = new Float32Array(n), G = new Float32Array(n), B = new Float32Array(n);
@@ -74,13 +79,14 @@ export function applyPost(img: Img, o: PostOpts, fogColor: Color | null): void {
     if (!(Number.isFinite(fc) && Number.isFinite(fr))) throw new PxError(`post: focus is the pixel [col, row] whose depth is sharp, got ${JSON.stringify(o.focus)}`);
     const fd = D![Math.max(0, Math.min(h - 1, Math.floor(fr))) * w + Math.max(0, Math.min(w - 1, Math.floor(fc)))];
     if (!(fd < Infinity)) throw new PxError(`post: mesh() drew nothing at the focus [${fc}, ${fr}]: focus on a pixel of its ground or things`);
-    const sharp = o.sharp ?? 1, soft = o.soft ?? 4;
+    const sharp = o.sharp ?? 1, [softN, softF] = Array.isArray(o.soft) ? o.soft : [o.soft ?? 4, o.soft ?? 4];
     // each pixel's blur, 0 sharp to 1 full; nothing drawn there is as far as it gets
     const coc = new Float32Array(n), near = new Uint8Array(n);
     for (let i = 0; i < n; i++) {
       const d = D![i];
       if (!(d < Infinity)) { coc[i] = 1; continue; }
-      coc[i] = clamp01((Math.abs(d - fd) - sharp) / soft);
+      const t = clamp01((Math.abs(d - fd) - sharp) / (d < fd ? softN : softF));
+      coc[i] = t * t * (3 - 2 * t);   // weak at first, eased into full
       near[i] = d < fd ? 1 : 0;
     }
     // at 1/f of the size, colors weighted by their own blur (a sharp pixel adds nothing, so no halo of

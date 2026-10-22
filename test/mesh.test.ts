@@ -97,6 +97,14 @@ test("mesh light: the sun's shadow, a lamp's pool, what gives light, a sprite's 
   const ball = `scene("a", { w: 40, h: 40 }, lit({ shadows: false, sprites: [{ name: "_ball", at: [0, 4], shadow: 0 }] }))`;
   assert.ok(red(ball, 17, 16) > red(ball, 22, 16) + 20, "lit on its left");
   assert.equal(red(scene("{}"), 27, 21, { checksOnly: true }), red(`scene("a", { w: 1, h: 1, bg: "w" })`, 0, 0), "only checking: as drawn");
+  // a slab 2 m wide and 1 m tall drawn at z 4 (columns 10..29, its foot on row 20), the sun behind on
+  // the left: its shadow starts all along its foot, on the left too (column 12, just in front of it),
+  // and runs past its right (column 31); the floor far to its left (column 3) is lit
+  const slab = `sprite("_slab", { w: 20, h: 10, pivot: "bottom" }, rect(0, 0, 20, 10, "r"))
+const F = model(); F.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0])
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, F.faces, { f: { tex: "_white" } }, { light: [-1, 1, 0.8], sun: "w", sky: { color: "w", strength: 0.2 }, sprites: [{ name: "_slab", at: [0, 4], shadow: 0 }] }))`;
+  assert.ok(red(slab, 12, 20) + 40 < red(slab, 3, 20), "in its shadow right in front of its foot, on its left");
+  assert.ok(red(slab, 31, 20) + 40 < red(slab, 3, 20), "and past its right");
 });
 
 test("mesh textures: their clear pixels are holes; anchored to the face they start at its top left", () => {

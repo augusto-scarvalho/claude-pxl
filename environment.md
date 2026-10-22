@@ -55,7 +55,9 @@ round it.
   brightness, two lights 9 and 16 brighter, the darks hue 135 then 209.
 - Mostly bare base, a tone darker in broad blobs 10-30 px with ragged edges.
 - Clumps, not noise: fans of 3-5 blades, 5-7 px wide and 3-5 tall, tips a tone up (one clump in
-  four with a lit tip), the blue dark at their foot; between them small marks of 2-3 px a tone down.
+  four with a lit tip), a short shadow of 2 px a tone down at their foot, away from the light (a whole
+  row of the darkest tone under a clump reads from afar as a dark dash, not a shadow); between them
+  small marks of 2-3 px a tone down.
   No two clumps touching (corners may). Single pixels only as glints.
 - Density varies: flat ground, then slender strokes (1x2, 1x3), then lush clumps, set by a broad
   field; busy next to busy tires the eye, so leave quiet areas.

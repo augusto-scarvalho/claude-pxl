@@ -2,8 +2,8 @@
 // dioramas: a plateau of grass held up by a mossy stone wall, stone steps up its front, a flagstone
 // path to the back, headstones either side of it, a picket fence round the top, a dead tree, the wood
 // all round and hills fading into the mist. Built in meters with mesh() (blocks of the kit, textures
-// laid a texel to a pixel where the camera looks; the fence's pickets anchored on its faces, their clear
-// pixels holes the sun shines through), the people, trees, stones and plants as sprites standing in it,
+// laid a texel to a pixel where the camera looks; the grass reaching over the path's margins laid on
+// them, its clear texels holes the stones show through; the fence of boxes), the people, trees, stones and plants as sprites standing in it,
 // a low sun behind on the left. Its ground, plants and stones are drawn after the games' sheets (pxl
 // study) and SLYNYRD's, Saint11's and final boss blues' tutorials. `graveyard` is the art at its own
 // size, the one checked; `graveyard_hd` the same four times as big through post().
@@ -11,20 +11,21 @@ include("../topdown_hero/hero.px.js")
 include("kit.px.js", { palette: true })
 
 
-// Pickets of weathered wood (the dead tree's grey), a picket every 6 px, its face toward us in the shade,
-// light only on its point and top 3 px, two rails darker behind; 48 px (3 m) to the tile, one picket
-// short, one leaning, one missing.
-sprite("_fence", { w: 48, h: 12 }, (c) => {
-  for (const Y of [4, 9]) for (let X = 0; X < 48; X++) c.px(X, Y, "b")
-  for (let p = 0; p < 8; p++) {
-    if (p === 5) continue
-    const x0 = p * 6 + 1, lean = p === 2 ? 1 : 0, y0 = p === 6 ? 3 : 0
-    for (let Y = y0; Y < 12; Y++) for (let i = 0; i < 2; i++) {
-      if (Y === y0 && i === 1) continue
-      c.px(x0 + i + (lean && Y < 5 ? 1 : 0), Y, Y < y0 + 3 ? (i === 0 ? "I" : "i") : i === 0 ? "i" : "B")
-    }
+// Weathered wood for the fence's boxes: grain running along it.
+sprite("_wood", { w: 4, h: 8 }, (c) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 4; x++) c.px(x, y, x === 1 && y % 3 ? "i" : x === 3 && y % 4 === 1 ? "B" : "I") })
+// Where the grass meets the path: blades reaching over the stones' edge 1-5 px, in clumps, their tips
+// lit, the blue dark under some; laid over the path's margins (anchored to the strip, its clear texels
+// letting the stones show), the grass's side at its left; flipped for the other margin. 48 rows, so it
+// tiles along the path.
+sprite("_edge", { w: 8, h: 48 }, (c) => {
+  const T = Math.PI * 2
+  for (let y = 0; y < 48; y++) {
+    const reach = Math.max(1, Math.round(2.4 + 1.6 * Math.sin((T * 4 * y) / 48) + 1.2 * Math.sin((T * 11 * y) / 48 + 2)))
+    for (let x = 0; x < reach; x++) c.px(x, y, x === reach - 1 ? (y % 5 ? "e" : "r") : (x + y) % 4 ? "w" : "q")
+    if (y % 2) c.px(reach, y, "Q")
   }
 })
+sprite("_edge_r", { base: "_edge", flip: "x" })
 
 
 // Headstones, drawn at the scene's scale (24 px to the meter), seen from 38 degrees up: the front in the
@@ -73,7 +74,8 @@ const M = model(), block = (...a) => hd2dBlock(M, ...a)
 const MATS = {
   grass: { tex: "_grass", texel: CAM.floor }, turf: { tex: "_turf", texel: CAM.floor }, flags: { tex: "_flags", texel: CAM.floor },
   rampart: { tex: "_rampart", anchor: "face", texel: CAM.wall }, riser: { tex: "_riser", anchor: "face", texel: CAM.wall },
-  fence: { tex: "_fence", anchor: "face" },
+  wood: { tex: "_wood", texel: [1 / 64, 1 / 64] },
+  edge: { tex: "_edge", anchor: "face", texel: CAM.floor }, edge_r: { tex: "_edge_r", anchor: "face", texel: CAM.floor },
 }
 const TOP = 1.5                                                     // the hill's top
 M.face("turf", [-40, Z - 25, 0], [40, Z - 25, 0], [40, Z + 60, 0], [-40, Z + 60, 0])
@@ -81,10 +83,29 @@ block("grass", "rampart", -6.5, Z - 2.5, 6.5, Z + 6, 0, TOP)
 // the steps: four of 0.3 m up the wall's front, 0.35 m deep
 for (let i = 0; i < 4; i++) block("flags", "riser", -1, Z - 2.5 - 0.35 * (i + 1), 1, Z - 2.5 - 0.35 * i, 0, TOP - 0.3 * (i + 1))
 block("flags", "flags", -0.9, Z - 2.5, 0.9, Z + 5.2, TOP, TOP + 0.02)   // the path
-// the fence round the top, open at the steps
-const fence = (a, b) => M.face("fence", [...a, TOP], [...b, TOP], [...b, TOP + 0.75], [...a, TOP + 0.75])
-fence([-6.2, Z + 5.7], [6.2, Z + 5.7]); fence([-6.2, Z - 2.2], [-6.2, Z + 5.7]); fence([6.2, Z - 2.2], [6.2, Z + 5.7])
-fence([-6.2, Z - 2.2], [-1.3, Z - 2.2]); fence([1.3, Z - 2.2], [6.2, Z - 2.2])
+// the grass reaching over its margins (8 texels of the floor each)
+const EDGE = 8 * CAM.floor[0], PU = TOP + 0.025
+M.face("edge", [-0.9, Z + 5.2, PU], [-0.9 + EDGE, Z + 5.2, PU], [-0.9 + EDGE, Z - 2.5, PU], [-0.9, Z - 2.5, PU])
+M.face("edge_r", [0.9 - EDGE, Z + 5.2, PU], [0.9, Z + 5.2, PU], [0.9, Z - 2.5, PU], [0.9 - EDGE, Z - 2.5, PU])
+// The fence round the top, open at the steps, as boxes, so it stands on the ground with depth and throws
+// its shadow from its foot: pickets 9 cm wide every 25 cm (their tops and the sides toward the sun lit),
+// one in seven missing or shorter; a post every 2 m, a head taller; two rails behind the pickets.
+// `inside`: which way the hill's top is from the run (the rails go that side).
+const fenceRun = ([ax, az], [bx, bz], inside, seed) => {
+  const len = Math.hypot(bx - ax, bz - az), dx = (bx - ax) / len, dz = (bz - az) / len, nx = -dz * inside, nz = dx * inside
+  const box = (s, along, across, u0, u1, off = 0) => {
+    const x = ax + dx * s + nx * off, z = az + dz * s + nz * off, hx = (Math.abs(dx) * along + Math.abs(nx) * across) / 2, hz = (Math.abs(dz) * along + Math.abs(nz) * across) / 2
+    M.box("wood", [x - hx, z - hz, u0], [x + hx, z + hz, u1])
+  }
+  for (const u of [0.2, 0.5]) box(len / 2, len, 0.04, TOP + u, TOP + u + 0.06, 0.05)
+  for (let s = 0.12, i = 0; s < len - 0.05; s += 0.25, i++) {
+    const k = Math.floor(hash(i, seed) * 7)
+    if (k) box(s, 0.09, 0.05, TOP, TOP + (k === 1 ? 0.5 : 0.7))
+  }
+  for (let s = 0; s <= len + 0.01; s += Math.min(2, len)) box(s, 0.13, 0.13, TOP, TOP + 0.85)
+}
+fenceRun([-6.2, Z + 5.7], [6.2, Z + 5.7], -1, 1); fenceRun([-6.2, Z - 2.2], [-6.2, Z + 5.7], -1, 2); fenceRun([6.2, Z - 2.2], [6.2, Z + 5.7], 1, 3)
+fenceRun([-6.2, Z - 2.2], [-1.3, Z - 2.2], 1, 4); fenceRun([1.3, Z - 2.2], [6.2, Z - 2.2], 1, 5)
 // hills behind, far enough for the mist to take them
 for (const [x0, x1, z0, h] of [[-40, -8, 30, 7], [-12, 14, 36, 9], [10, 40, 28, 6]]) block("turf", "turf", x0, Z + z0, x1, Z + z0 + 8, 0, h)
 
@@ -128,4 +149,4 @@ scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK }, (c) => c.mesh(view(1), M.f
 // the hills behind blurred and taken by a warm mist, a bloom, darker corners.
 scene("graveyard_hd", { w: W * 4, h: H * 4, bg: "q", ...CLOCK, check: false },
   (c) => c.mesh(view(4), M.faces, MATS, { sprites: people(c.frame), pixel: 4, ...LIGHT }),
-  post({ blur: 36, focus: [W * 2, H * 2.2], sharp: 1.2, soft: 3, fog: { color: "#dcdccc", from: DIST + 2, to: DIST + 26, max: 0.7 }, bloom: { strength: 0.6, r: 40 }, vignette: 0.35 }))
+  post({ blur: 36, focus: [W * 2, H * 2.2], sharp: 2.5, soft: [3, 8], fog: { color: "#dcdccc", from: DIST + 2, to: DIST + 26, max: 0.7 }, bloom: { strength: 0.6, r: 40 }, vignette: 0.35 }))
