@@ -12,6 +12,7 @@
 pal({
   k: "#1c1418",                                                   // outline
   L: "#fde6c6", S: "#f0c79e", s: "#d2966f", z: "#9c5b45",         // skin, its lightest only on the cheek and the nose
+  B: "#e3a383",                                                   // a blush, smiling
   Y: "#c9934f", h: "#7d4a2a", j: "#4a2716", J: "#24110b",         // chestnut hair
   E: "#1f2f55", e: "#3a6aa2", G: "#f4f0e6",                       // the iris (navy at its top), the eye's white
   C: "#77a068", c: "#4c7652", n: "#30503d", N: "#1c2e27",         // a green travel cloak
@@ -50,6 +51,30 @@ sprite("_tr_head_sw_blink", { base: "_tr_head_sw" }, grid(0, 9, `
   ..hSSSSSSjhjjjJ.
   ..jSkSSkkjsjjJ..
   ..JSSLLSSjzjJ...`))
+// Expressions, the lids and the mouth moved (characters §5): a smile (the cheek up over the lower iris,
+// a blush, the mouth 2 px), calm (the lids lowered), surprised (the lids up a row, a black mouth),
+// angry (the near lid's inner end lower). For a scene that needs them; the graveyard keeps him neutral.
+sprite("_tr_head_sw_smile", { base: "_tr_head_sw" }, grid(0, 9, `
+  ..hSkSSkkjhjjjJ.
+  ..jSESSEGjsjjJ..
+  ..JSSLLSBjzjJ...
+  ...JSzzSBjjJ....
+  ....JsssjJ......`))
+sprite("_tr_head_sw_calm", { base: "_tr_head_sw" }, grid(0, 9, `
+  ..hSSSSSSjhjjjJ.
+  ..jSkSSkkjsjjJ..
+  ..JSELLeGjzjJ...`))
+sprite("_tr_head_sw_surprised", { base: "_tr_head_sw" }, grid(0, 8, `
+  .jjSkSSkkjhjjYjJ
+  ..hSSSSSSjhjjjJ.
+  ..jSESSEGjsjjJ..
+  ..JSeLLeSjzjJ...
+  ...JSSkSsjjJ....`))
+sprite("_tr_head_sw_angry", { base: "_tr_head_sw" }, grid(0, 9, `
+  ..hSkSSSkjhjjjJ.
+  ..jSESkkGjsjjJ..
+  ..JSSLLeSjzjJ...
+  ...JSzzSsjjJ....`))
 // Facing NW all hair, lit only at the crown, darkest at the nape, the ear and a sliver of jaw on the left.
 sprite("_tr_head_nw", `
   .....JY.YJ......
@@ -70,8 +95,8 @@ sprite("_tr_head_nw", `
 // its 4 frames twice at 250 ms, a blink of 130 ms between the last two (once every 2 s); the walk its 8
 // at 110.
 const HEAD = {
-  sw_idle: [[0, 7], [0, 7], [0, 7], [0, 7]], sw_walk: [[0, 8], [1, 7], [0, 8], [0, 8], [1, 8], [0, 8], [0, 7], [0, 7]],
-  nw_idle: [[0, 8], [1, 9], [0, 8], [1, 9]], nw_walk: [[1, 8], [0, 7], [0, 7], [0, 7], [1, 8], [0, 8], [0, 8], [0, 8]],
+  sw_idle: [[0, 8], [0, 8], [0, 8], [0, 8]], sw_walk: [[0, 7], [0, 7], [0, 8], [0, 8], [1, 8], [0, 8], [0, 8], [0, 7]],
+  nw_idle: [[0, 8], [1, 8], [0, 8], [1, 8]], nw_walk: [[1, 8], [1, 8], [0, 7], [0, 7], [1, 7], [1, 7], [0, 8], [0, 8]],
 }
 // The mourner: grey hair, a shawl of dark violet, grey linen.
 const MOURNER = {
