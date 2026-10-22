@@ -273,8 +273,8 @@ and fix dither and shading. Upscaled, round off the big square blocks and redraw
   that holds on any ground (So You Want To Be A Pixel Artist's fighters): where the light fill meets
   the line it takes the mid tone, where the mid meets it the dark, and every run of the lighter line
   ends in a dark pixel where it steps (light runs with dark caps, never dark runs with light caps);
-  with no outline at all, darken only those run ends. Check it at 1x on black, white and a
-  saturated ground.
+  with no outline at all, darken only those run ends (`caps: true` on the sprite does it). Check it
+  at 1x on black, white and a saturated ground.
 - **Anti-aliasing:** a tone between the line's and its neighbor's (value matters, hue hardly). Only
   on steps of 2 px and more: a strip about half the step's length, at its end (a 4 px step takes
   2 px). None on 1:1 diagonals or straight lines, and none on the silhouette against clear (it

@@ -787,10 +787,9 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   pixels staying in place) failed: flickering lights move more than it does.
 - [ ] **A 16 px walk read as nothing moving** (Final Fantasy's 4-frame walk at 300 ms), and its
   shading swapping with the legs read as subpixel motion (18%).
-- [ ] **`caps` on an outline** (So You Want To Be A Pixel Artist, ch. 12): the end pixel of each run
-  of the outline, where it steps, n steps darker (or the outline's key); without an outline, the
-  sprite's own edge runs' ends (Capcom vs SNK's look, no new colors). Short 1:1 diagonals darkened
-  whole, long ones left. In characters 7 as a rule to follow by hand until someone needs the op.
+- [x] **`caps` on an outline** (So You Want To Be A Pixel Artist, ch. 12): done, `caps: true | n` on
+  a sprite or anim: each straight run of the edge's line ends `n` steps darker where the line steps on
+  diagonally (after `outline`/`selout`; without an outline, the sprite's own edge). 1:1 diagonals stay.
 - [x] **`shot --grey`, a vertical `scroll`, sky seams by whole rows** (three batches asked for a
   values view; SLYNYRD's shooters and skies): done.
 - [x] **Notes from drawing `examples/topdown_hero`** (a fresh agent, 98 tool calls). A scene has a

@@ -498,6 +498,15 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
   }
   if (o.outline) step(`outline ${o.outline}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline!); return img.outline(c, false, as(c), skip()); }, (k) => k.pad(1));
   if (o.outline8) step(`outline8 ${o.outline8}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline8!); return img.outline(c, true, as(c), skip()); }, (k) => k.pad(1));
+  // caps (So You Want To Be A Pixel Artist's fighters): where a run of the line along the edge ends and
+  // steps on diagonally, its end pixel goes `caps` steps darker along its ramp, so a light selective
+  // outline holds on any ground; with no outline, the sprite's own edge (Capcom vs SNK's look)
+  if (o.caps !== undefined && o.caps !== false) {
+    const n = o.caps === true ? 1 : o.caps;
+    if (!(Number.isInteger(n) && n >= 1)) throw new PxError(`caps is true or a number of steps >= 1, got ${fmtArgs([o.caps])}`);
+    if (!pal.ramps.length) throw new PxError('caps darkens along the ramps: add ramps("kDdu", ...) first');
+    step(`caps ${n}`, () => capEnds(img, pal.stepMap(-1), n));
+  }
   if (o.crop) step("crop", () => img.crop());
   if (pv === "bottom" || pv === "center") img.pivot = [img.w / 2, pv === "bottom" ? img.h : img.h / 2];
   if (o.slice !== undefined) {
@@ -519,6 +528,29 @@ function seloutPick(pal: Palette, steps: number): (touching: Color, line: Color)
     for (let i = 0; i < steps; i++) c = dark.get(c) ?? c;
     return c === t ? line : c;
   };
+}
+
+/**
+ * The end pixel of each straight run of the edge (pixels touching the clear) where the line steps on
+ * diagonally, `n` steps darker along `dark` (a ramp's one step down). A 1:1 diagonal (no run) stays.
+ */
+export function capEnds(img: Img, dark: Map<Color, Color>, n: number): Img {
+  const W = img.w, H = img.h, at = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? TRANSPARENT : img.get(x, y));
+  const edge = (x: number, y: number) => at(x, y) !== TRANSPARENT && [at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1)].some((c) => c === TRANSPARENT);
+  const out = img.copy();
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!edge(x, y)) continue;
+    const four = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => edge(x + dx, y + dy));
+    if (four.length !== 1) continue;
+    // the line goes on diagonally from here, not through its run's other pixel
+    const [rx, ry] = four[0];
+    const steps = [[1, 1], [1, -1], [-1, 1], [-1, -1]].some(([dx, dy]) => edge(x + dx, y + dy) && !(dx === rx || dy === ry));
+    if (!steps) continue;
+    let c = img.get(x, y);
+    for (let i = 0; i < n; i++) c = dark.get(c) ?? c;
+    out.set(x, y, c);
+  }
+  return out;
 }
 
 function solid(pal: Palette, spec: string): Color {

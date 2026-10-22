@@ -80,6 +80,8 @@ export interface AssetOpts {
   inline?: string | { color: string; keep?: string };
   /** The outline/inline takes the color it touches, n steps darker along the ramps (true = 2). */
   selout?: boolean | number;
+  /** each straight run of the edge's line ends a step darker where it steps on diagonally (true: 1 step) */
+  caps?: boolean | number;
   /** Anti-alias the inner edges: on each step of 2 px and more, a strip half its length in the key between. */
   aa?: boolean;
   crop?: boolean;

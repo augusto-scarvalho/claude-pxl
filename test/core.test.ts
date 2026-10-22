@@ -259,6 +259,18 @@ test("packSheet: with rows starting at given items (sheet rows: \"tag\"), each a
   assert.deepEqual(frames.map((f) => [f.x, f.y]), [[0, 0], [2, 0], [0, 2], [2, 2], [4, 2]]);
 });
 
+test("caps: a line's straight runs end a step darker where they step on diagonally; its loose ends and 1:1 diagonals stay", async () => {
+  const { capEnds } = await import("../src/core/build.ts");
+  const l = pack(220, 150, 130), d = pack(90, 60, 80), line = new Img(6, 3);
+  // a 2:1 staircase: runs of two, each stepping down to the next
+  for (const [x, y] of [[0, 0], [1, 0], [2, 1], [3, 1], [4, 2], [5, 2]]) line.set(x, y, l);
+  const out = capEnds(line, new Map([[l, d]]), 1);
+  assert.deepEqual([[0, 0], [1, 0], [2, 1], [3, 1], [4, 2], [5, 2]].map(([x, y]) => out.get(x, y) === d), [false, true, true, true, true, false]);
+  const diag = new Img(4, 4);
+  for (let i = 0; i < 4; i++) diag.set(i, i, l);
+  assert.ok([0, 1, 2, 3].every((i) => capEnds(diag, new Map([[l, d]]), 1).get(i, i) === l));
+});
+
 test("grad seam lines: the next band's tone comes in by whole rows, farther apart then closer, not a checker", () => {
   const rows = (seam: string) => art(PAL + `sprite("t", { w: 4, h: 12 }, grad(0, 0, 4, 12, "rw", "v", 1${seam}))`, "t").split("\n");
   const lined = rows(', "lines"'), dithered = rows("");
