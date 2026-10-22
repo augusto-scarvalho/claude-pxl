@@ -229,7 +229,8 @@ Every change was made by Claude while drawing real scenes, and reviewed by a per
   took one agent 85 turns and 31 minutes. A planner with eight forked agents made a denser street for
   about five times the tokens and twice the time. The skill now asks which to use on a big scene.
   One new scene drawn by eight models and effort levels ([the model study](model-study.md)): on Opus
-  the art got better up to high effort and no further, while the cost doubled at every step.
+  the cost doubled at every step of effort, and xhigh was the sweet spot, nearly max's art at half
+  its cost.
 - **Tokens measured:** the agent sessions' transcripts show two thirds of the cost is the model's
   thinking, kept and read again every turn; guides dumped whole and art files rewritten whole were
   most of the rest that could go. The skill now reads guides by section and edits instead of

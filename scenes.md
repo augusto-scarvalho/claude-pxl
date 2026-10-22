@@ -321,6 +321,10 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   figures in `PXL describe`: `stands out: brightness 1 vs 1 around` means as dark as the ground,
   read only by the outline. Give them light (a lamp, a mirror ball), a rim on the side facing the
   moon, or an `emit` key.
+- A beam (a lighthouse's, a searchlight's, headlights) is drawn in the picture's own projection: in a
+  scene drawn flat on, it sweeps across the picture, shortening and widening as it turns toward us;
+  swung out on a diagonal it brings a perspective nothing else in the picture has. It runs out of
+  the picture or fades into the haze or the rain, never ending in mid-air or short of the edge.
 - Flat art gets its volume back with `relight()`.
 
 ## 12. One-shot effects (explosions, sparks, hits)

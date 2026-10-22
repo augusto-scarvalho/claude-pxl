@@ -125,11 +125,12 @@ What keeps a session cheap:
   carrying a long history.
 - **The right model and effort.** Claude Code's `--effort low|medium|high|xhigh|max` sets how much
   the model thinks, the biggest share above. One scene drawn eight ways
-  ([the model study](model-study.md)): on Opus the art got better up to high and no further, while
-  the cost doubled at every step ($2.17 at medium, $4.71 at high, $9.62 at xhigh, $20 at max); Sonnet
-  at xhigh cost as much as Opus at high for a lower score, and Haiku got the scene's space wrong.
-  Opus at high for a scene, medium for drafts and small fixes; a pipeline's parts at medium or high
-  (`claude -p --resume <uuid> --fork-session --effort medium ...`).
+  ([the model study](model-study.md)): on Opus the cost doubled at every step ($2.17 at medium,
+  $4.71 at high, $9.62 at xhigh, $20 at max); the curator put max first and xhigh close behind, the
+  sweet spot; Sonnet at xhigh cost as much as Opus at high for a lower score, and Haiku got the
+  scene's space wrong. Opus at xhigh for a scene, high when the cost matters more, medium for drafts
+  and small fixes; a pipeline's parts at high (`claude -p --resume <uuid> --fork-session --effort
+  high ...`).
 
 ## A big scene: one agent or a pipeline
 

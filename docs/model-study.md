@@ -5,17 +5,19 @@ to see what more thinking buys in pixel art and what it costs. Run on 2026-10-21
 every number below comes from the runs themselves (Claude Code's result for each session, its
 transcript read by [`scripts/tokens.ts`](../scripts/tokens.ts)), and the art was judged blind.
 
-**In short:** on Opus, the art got better from low effort to high and then stopped getting better,
-while the cost doubled at every step. High was the best value: the top score at half the cost of
-xhigh and a quarter of max. Sonnet at xhigh cost as much as Opus at high and scored lower; Haiku was
-the cheapest by far and got the scene's space wrong; Fable at high cost more than Opus at high and
-scored lower. One run each, one brief: read the numbers as a first measure, not a law.
+**In short:** on Opus, the cost doubled at every step of effort ($0.54, $2.17, $4.71, $9.62,
+$20.01). The curator, watching the loops, put max first, xhigh close behind and high a step down:
+**xhigh is the sweet spot**, nearly max's art at half its cost. A blind agent judging stills put
+xhigh and high together at the top. Sonnet at xhigh cost as much as Opus at high and scored lower;
+Haiku was the cheapest by far and got the scene's space wrong; Fable at high cost more than Opus at
+high and scored lower. One run each, one brief: read it as a first measure, not a law.
 
 ## Contents
 
 - [The brief](#the-brief)
 - [How it was run](#how-it-was-run)
 - [The results](#the-results)
+- [The curator's review](#the-curators-review)
 - [The art](#the-art)
 - [What the numbers say](#what-the-numbers-say)
 - [Where the tokens went](#where-the-tokens-went)
@@ -104,27 +106,51 @@ to 5 on five criteria, then 1 to 10 overall. It knew nothing of the models or th
 
 </details>
 
+## The curator's review
+
+The person who ran the study watched the eight loops and judged the top three apart from the blind
+review, which saw only stills:
+
+- **Opus max is the best, if not for its price.** The beam's effect, the way the ground is drawn,
+  the waves: the best of the eight. The tower stands out little, but that isn't a mistake.
+- **Opus xhigh is very good, a little below max** (max's darker picture is the better one). Its one
+  fault: the beam now and then swings out on a diagonal, in a perspective the rest of the picture
+  doesn't share, and the two don't agree.
+- **Opus high is a good result, a step down:** its ground is drawn badly, and its beam seems to end
+  short of the picture's edges.
+- **The sweet spot is xhigh;** max is great but too dear; high is fine.
+
+Where the two reviews part: the blind agent ranked high level with xhigh and max below both, scoring
+what each frame shows (every part of the brief there and readable); the curator ranked by how the
+whole loop looks and feels (the light, the ground, the mood), and found high's ground ugly and its
+beam short. Both put xhigh at or near the top. The two faults the curator named are now in the
+scenes guide (`pxl help "scenes 11"`): a beam drawn in the picture's own projection, and a beam that
+reaches the picture's edge or fades into the haze, not one that ends in mid-air.
+
 ## The art
 
-Each at 3× (`pxl build --share 3`), best first by the blind ranking. The sources are in
-[`study/lighthouse/src/`](study/lighthouse/src).
+Each at 3× (`pxl build --share 3`), in the blind ranking's order, with what the curator said of the
+top three. The sources are in [`study/lighthouse/src/`](study/lighthouse/src).
 
 **Opus, xhigh** ($9.62): every part of the brief is there and reads: a stone headland with grass on
 top, sea stacks, spray bursting on them, rain lit inside the beam, a keeper with a lantern at the
 right size for the door and the rail. The beam turns in perspective, coming toward us; the reviewer
-found it tilted too steeply, near pointing up.
+found it tilted too steeply, near pointing up, and the curator, at odds with a picture drawn flat
+on. The curator's sweet spot.
 
 <img src="study/lighthouse/opus-xhigh.gif" width="480" alt="Opus at xhigh effort: a striped lighthouse on a stone headland with sea stacks at night; the beam swings toward the viewer through lit rain; a small keeper in yellow with a lantern on the gallery">
 
 **Opus, high** ($4.71): the most correct sweep (right, a glow as it faces us, left, dark), gulls lit
 as the beam passes, a wave bursting into real spray against a rock. The keeper is a yellow speck,
-right for the scale but hard to read, and the storm is quiet.
+right for the scale but hard to read, and the storm is quiet. The curator found the ground drawn
+badly and the beam ending short of the picture's edges.
 
 <img src="study/lighthouse/opus-high.gif" width="480" alt="Opus at high effort: a striped lighthouse at the left of a dark headland; the beam sweeps over the sea, lighting the rain and the gulls; a wave throws spray over a rock">
 
 **Opus, max** ($20.01): the best beam of all, a wide soft cone with the rain glinting in it, and a
 strong, gloomy mood; but darker and plainer than xhigh (an unstriped tower, a small keeper, modest
-spray), and one frame aims the beam low.
+spray), and one frame aims the beam low. The curator's first: the beam, the ground and the waves the
+best of the eight, the darker picture the better one, the quiet tower no fault.
 
 <img src="study/lighthouse/opus-max.gif" width="480" alt="Opus at max effort: a plain tower on a dark headland; a wide soft beam full of glinting rain sweeps the sky; the sea below in the dark">
 
@@ -160,9 +186,9 @@ three pixels.
 
 ## What the numbers say
 
-- **On Opus, quality rises to high and then stops; cost doubles at every step.** Low 3, medium 5,
-  high 7, xhigh 7, max 6, for $0.54, $2.17, $4.71, $9.62 and $20.01. High scored as well as xhigh
-  for half its cost, and better than max for a quarter.
+- **On Opus, the cost doubles at every step of effort; the art gains less at each.** $0.54, $2.17,
+  $4.71, $9.62 and $20.01. By the blind agent (low 3, medium 5, high 7, xhigh 7, max 6) it stops
+  at high; by the curator it goes on to max, with xhigh close behind for half max's cost.
 - **More effort means more turns.** 14, 42, 75, 122, 187: a higher effort keeps the agent looking
   and fixing for longer more than it makes each turn deeper. Since every turn reads the whole
   conversation again, the cache reads grow faster still (0.6M to 50.6M), and the thinking from 1k
@@ -208,18 +234,19 @@ Haiku and Opus at high.
 
 ## What to use
 
-- **A scene, one agent: Opus at high.** The best score for its cost here.
+- **A scene, one agent: Opus at xhigh.** The sweet spot: at or near the top in both reviews, the
+  only run with every part of the brief readable, half the cost of max.
+- **Opus at high when the cost matters more:** about half of xhigh, a good result a step down.
+- **Opus at max for a piece where the cost doesn't matter:** the curator's best, at twice xhigh and
+  four times high.
 - **A draft, a small asset, a quick fix: Opus at medium.** A good layout at under half the cost of
   high, with flaws a round of notes can fix.
-- **xhigh when completeness matters** and twice the cost of high is fine: it was the only run with
-  every part of the brief readable.
-- **Not max for art.** Twice the cost of xhigh and four times high, for a lower score.
 - **Opus over Sonnet, Haiku and Fable for scenes** with space in them (a beam that turns,
   perspective, scale against a door): the smaller models got the flat parts right and the space
   wrong, and Fable scored lower at a higher price.
-- **A pipeline's parts** (docs/agents.md) at medium or high each, the planner at high.
+- **A pipeline's parts** (docs/agents.md) at high each, the planner at xhigh.
 
-With Claude Code: `claude --model opus --effort high`, or `/model` and `--effort` for a session.
+With Claude Code: `claude --model opus --effort xhigh`, or `/model` and `--effort` for a session.
 
 ## What this doesn't show
 
@@ -227,8 +254,10 @@ With Claude Code: `claude --model opus --effort high`, or `/model` and `--effort
   within what a second run could change. Repeat it before generalizing.
 - **One brief.** A scene with space, light and weather; small sprites, tiles or a character sheet
   may favor the smaller models more.
-- **One reviewer, from stills.** An Opus agent, blind to who made what, judging eight frames of each
-  loop, not the motion; and a model may favor art made the way it would make it.
+- **Two reviews, apart at the top.** An Opus agent, blind to who made what, judging eight frames of
+  each loop (not the motion; and a model may favor art made the way it would make it), and the
+  curator, who knew which was which, watching the loops. They agree on the bottom five and on xhigh;
+  they part on max and high.
 - **Wall times on a shared laptop.** Four sessions ran at once; the turns and the tokens are the
   fairer measure of effort.
 
