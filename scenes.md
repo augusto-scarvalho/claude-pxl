@@ -239,6 +239,13 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   outlined where a surface ends in front of another. A dozen sections per surface is plenty; paint
   the small parts (dials, vents, buttons, stitching) over it by hand where the camera puts them
   (`examples/perspective/cockpit.px.js`).
+- A diorama (HD-2D, as Octopath Traveler and Triangle Strategy): a camera high up through a long lens
+  (`pitch` -30 to -50, `fov` 20 to 35), the ground, steps and walls as `model()` boxes whose
+  materials are textures (`{ tex: "_cobble" }`, 16 px tiles to the meter), and the characters as
+  `sprites` of the same `mesh()` call, upright in the one depth: a wall hides the legs of who walks
+  close behind it. From that high a wall hides only what is near it. Pick the camera by px to the
+  meter where it looks, so a texel and a sprite's pixel come out the same size
+  (`examples/hd2d/plaza.px.js`).
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
   `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:
   each is lit or in shade by which way it faces the sun. People walking in such a scene: pose a body

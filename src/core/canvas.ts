@@ -733,7 +733,23 @@ export class Canvas {
 
   /** Flat faces in meters (model()) drawn through the camera, the nearest kept per pixel, toned along their material's ramp: see mesh.ts. */
   mesh(view: Partial<View> | ((p: [number, number, number]) => [number, number, number]), faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}): void {
-    drawMesh(this as unknown as MeshCanvas, view, faces, mats, opts);
+    const tex: Record<string, Img> = {};
+    for (const [k, M] of Object.entries(mats ?? {})) if (M?.tex !== undefined) tex[k] = this.asset(M.tex);
+    const sprites = (opts.sprites ?? []).map((s, k) => {
+      const at = s?.at;
+      if (!s || typeof s.name !== "string" || !Array.isArray(at) || (at.length !== 2 && at.length !== 3) || !at.every(Number.isFinite))
+        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, shadow? }, got ${JSON.stringify(s)}`);
+      return { name: s.name, img: this.asset(s.name, { flip: s.flip, frame: s.frame }), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow };
+    });
+    // looked up on first use: a palette without ramps has nothing to step (and needs nothing stepped without textures or sprites)
+    let maps: Map<Color, Color>[] | undefined;
+    const step = (c: Color, n: number) => {
+      maps ??= [this.pal.stepMap(-1), this.pal.stepMap(1)];
+      for (let s = 0; s < Math.abs(n); s++) c = maps[n < 0 ? 0 : 1].get(c) ?? c;
+      return c;
+    };
+    for (const p of drawMesh(this as unknown as MeshCanvas, view, faces, mats, opts, { tex, sprites, step }))
+      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img });
   }
 
   plane(view: Partial<View>, fn: (x: number, z: number, col: number, row: number) => string | null | undefined, where?: Region): void {

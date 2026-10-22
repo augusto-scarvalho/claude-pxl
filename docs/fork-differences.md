@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**314 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**315 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–22, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -26,8 +26,8 @@ page lists what the fork adds. Every commit is in
 | Commands | 4: `build`, `serve`, `ascii`, `list` | 12: adds `describe`, `shot`, `check`, `steps`, `help`, `compare`, `blind`, `study` |
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
-| Example files | 13 | 53 |
-| Tests | 59 | 247 |
+| Example files | 13 | 54 |
+| Tests | 59 | 250 |
 
 ## Looking and checking
 
@@ -95,10 +95,10 @@ follows from it.
 | `terrain()` | Hills and mountains from a height function, lit and fading with distance. |
 | `solids()`, `shadows()` | Things built of solid shapes, each face lit by the side it faces, casting its shadow from one sun. |
 | `ray()`, `toward()` | Where a screen point lands in the world, and where the sun or any direction sits in the picture. |
-| `mesh()`, `model()` | Flat faces in meters drawn with a depth per pixel, like the race's car interior, modelled after a Supra A80. |
+| `mesh()`, `model()` | Flat faces in meters drawn with a depth per pixel, like the race's car interior, modelled after a Supra A80; materials tiled with pixel-art textures, and sprites standing among the faces in the same depth, on contact shadows (HD-2D's dioramas). |
 
-Four scenes are built on this: a road across the sertão, a park at 2 pm in two-point perspective, the
-end of the Cretaceous in three-point, and a street race from the driver's seat.
+Five scenes are built on this: a road across the sertão, a park at 2 pm in two-point perspective, the
+end of the Cretaceous in three-point, a street race from the driver's seat, and a first HD-2D plaza.
 
 ## `pxl study`: learning from finished art
 
@@ -188,7 +188,7 @@ over a still floor no longer read as a plane going by or a loop that closes.
 
 ## Examples
 
-38 new example files are finished scenes an agent copies the structure of; each was curated against
+39 new example files are finished scenes an agent copies the structure of; each was curated against
 references until it read right.
 
 | Example | What it teaches |
@@ -202,6 +202,7 @@ references until it read right.
 | [`rig/`](../examples/rig) | A 72 px knight built skeleton first, two knights fighting a bout at a tournament, and a warden's whirling axe combo on a skeleton in 3D, the body turning with the swing, with smears and a floor reflection. |
 | [`cyberpunk/`](../examples/cyberpunk) | One city street made two ways: by one agent, and by a planner with eight forked agents. |
 | [`perspective/`](../examples/perspective) | The sertão road, the park at 2 pm, the end of the Cretaceous, a street race from the cockpit. |
+| [`hd2d/`](../examples/hd2d) | A first HD-2D diorama: a plaza seen from high up through a long lens, textured boxes, the hero walking behind a low wall. |
 | [`parallax/`](../examples/parallax) | A steam train crossing the hills of Minas Gerais, planes going by at their own speeds. |
 | [`fonts/`](../examples/fonts) | A 5×7 font for titles. |
 
