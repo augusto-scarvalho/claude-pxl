@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**287 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**289 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–21, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -230,8 +230,8 @@ Every change was made by Claude while drawing real scenes, and reviewed by a per
   about five times the tokens and twice the time. The skill now asks which to use on a big scene.
   One new scene drawn by fourteen models and effort levels in Claude Code and the Codex CLI
   ([the model study](model-study.md)): on Opus the cost doubled at every step of effort, and xhigh
-  was the sweet spot; in Codex, gpt-6-astra at xhigh and gpt-6.1-sol at high drew the best scenes of
-  all, in minutes and with a fraction of the tokens.
+  was the sweet spot; Codex drew each scene for under $3.25 in minutes, and the curator found them
+  all well below Claude's (a blind agent judging stills had ranked two of them first).
 - **Tokens measured:** the agent sessions' transcripts show two thirds of the cost is the model's
   thinking, kept and read again every turn; guides dumped whole and art files rewritten whole were
   most of the rest that could go. The skill now reads guides by section and edits instead of

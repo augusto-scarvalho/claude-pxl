@@ -11,10 +11,10 @@ $20.01). The curator, watching the loops, put max first, xhigh close behind and 
 **xhigh is the sweet spot**, nearly max's art at half its cost. A blind agent judging stills put
 xhigh and high together at the top. Sonnet at xhigh cost as much as Opus at high and scored lower;
 Haiku was the cheapest by far and got the scene's space wrong; Fable at high cost more than Opus at
-high and scored lower. **In Codex**, gpt-6-astra at xhigh and gpt-6.1-sol at high scored above every
-Claude run in a blind review of all fourteen, each in minutes and with a fraction of the tokens
-(astra at xhigh read 1.5M tokens and wrote 19k, where Opus at xhigh read 20.6M and wrote 172k); on
-sol, effort past high didn't help. One run each, one brief: read it as a first measure, not a law.
+high and scored lower. **In Codex**, six runs cost $0.16 to $3.24 at OpenAI's API prices, in minutes
+each; the curator found every one of them well below the Claude scenes, while the blind agent ranked
+two of them first. The agent judging stills got it the wrong way round: the review that counts is a
+person watching the loops. One run each, one brief: read it as a first measure, not a law.
 
 ## Contents
 
@@ -245,24 +245,30 @@ skill installed the same way (`~/.codex/skills/pxl-pixel-art` linked to this rep
 empty folder and its workspace-write sandbox (`scripts/model-study.sh ... codex` runs one):
 
 ```sh
-codex exec -m <gpt-6-astra|gpt-6.1-sol> -c model_reasoning_effort=<low|...|max>   --sandbox workspace-write --skip-git-repo-check --json - < brief.txt > events.jsonl
+codex exec -m <gpt-6-astra|gpt-6.1-sol> -c model_reasoning_effort=<low|...|max> \
+  --sandbox workspace-write --skip-git-repo-check --json - < brief.txt > events.jsonl
 ```
 
 Codex reports tokens, not dollars (it ran on a ChatGPT plan), so its runs are compared by tokens,
-calls to the model (counted in its session log) and time. Every one made a scene of parts; every
-loop closes; `pxl check` finds no warnings in any.
+calls to the model (counted in its session log) and time, and priced at OpenAI's published API
+rates per million tokens: gpt-6.1-sol $2 input, $0.10 cached input, $10 output; gpt-6-astra $10,
+$1, $50 (reasoning counts as output; no call passed the 272k-token long-context tier). Every one
+made a scene of parts; every loop closes; `pxl check` finds no warnings in any.
 
-| Model | Effort | Model calls | Time | Input (of it cached) | Output (of it reasoning) | Loop |
-|---|---|---:|---:|---:|---:|---|
-| gpt-6-astra | xhigh | 22 | 5.6 min | 1.49M (1.40M) | 19k (6k) | 96 frames |
-| gpt-6.1-sol | max | 32 | 10.2 min | 2.84M (2.77M) | 42k (18k) | 96 frames |
-| gpt-6.1-sol | xhigh | 28 | 7.2 min | 2.08M (1.99M) | 27k (11k) | 48 frames |
-| gpt-6.1-sol | high | 15 | 3.6 min | 898k (830k) | 14k (4k) | 64 frames |
-| gpt-6.1-sol | medium | 9 | 1.7 min | 403k (361k) | 6k (1k) | 48 frames |
-| gpt-6.1-sol | low | 9 | 1.3 min | 402k (360k) | 4k (0) | 48 frames |
+| Model | Effort | Model calls | Time | Input (of it cached) | Output (of it reasoning) | At API prices | Loop |
+|---|---|---:|---:|---:|---:|---:|---|
+| gpt-6-astra | xhigh | 22 | 5.6 min | 1.49M (1.40M) | 19k (6k) | $3.24 | 96 frames |
+| gpt-6.1-sol | max | 32 | 10.2 min | 2.84M (2.77M) | 42k (18k) | $0.84 | 96 frames |
+| gpt-6.1-sol | xhigh | 28 | 7.2 min | 2.08M (1.99M) | 27k (11k) | $0.66 | 48 frames |
+| gpt-6.1-sol | high | 15 | 3.6 min | 898k (830k) | 14k (4k) | $0.36 | 64 frames |
+| gpt-6.1-sol | medium | 9 | 1.7 min | 403k (361k) | 6k (1k) | $0.18 | 48 frames |
+| gpt-6.1-sol | low | 9 | 1.3 min | 402k (360k) | 4k (0) | $0.16 | 48 frames |
 
-For scale, Opus at xhigh in Claude Code took 122 turns and 34 minutes, read 20.3M tokens of cache
-and wrote 172k tokens of output; astra at xhigh took 22 calls and under six minutes, 1.49M and 19k.
+For scale, Opus at xhigh in Claude Code took 122 turns and 34 minutes, read 20.3M tokens of cache,
+wrote 172k tokens of output and cost $9.62; astra at xhigh took 22 calls and under six minutes,
+1.49M and 19k, $3.24; sol at high, $0.36 where Opus at high was $4.71.
+
+**The curator's review of the Codex scenes:** every one of them well below the scenes Claude drew.
 
 **All fourteen judged together.** A new blind review, the same criteria (with a beam drawn in the
 picture's own projection and reaching its edge added to the light, and a ground drawn well to the
@@ -308,15 +314,21 @@ wind). Their sources are in [`study/lighthouse/src/`](study/lighthouse/src) as `
 
 What it says:
 
-- **Codex drew as well or better with a fraction of the tokens and the time.** Its two best runs
-  scored above every Claude run, each in minutes, with 14k-19k tokens of output where Claude's best
-  wrote 82k-310k.
-- **On sol, more effort didn't mean better art:** high 8, max 7, xhigh 5, medium and low 6. Effort
-  grew its calls and tokens (9 to 32 calls, 0.4M to 2.8M input) but not its score past high.
+- **Codex is far cheaper and faster; the curator found its art far worse.** $0.16 to $3.24 a scene
+  in minutes, against $0.54 to $20 in Claude Code; but every Codex scene came out well below
+  Claude's in the curator's eyes.
+- **The blind agent got it the wrong way round.** Judging eight still frames of each loop, it put
+  astra xhigh and sol high first and every Codex run above most of Claude's; the curator, watching
+  the loops, put them all below. What the agent scored (every part of the brief present, level
+  beams, readable silhouettes) is a checklist the Codex scenes passed; what the curator saw (the
+  light, the ground, the mood, how the loop moves) is where they fell short. An agent's review from
+  stills is a check, not a verdict: a person watching the loops decides.
 - **The difference is in how long they work.** Codex runs a few commands at a time and stops once
-  the scene checks and loops; Claude's runs at high effort and up kept looking and fixing for dozens
-  of turns more, re-reading a growing conversation each time.
-- **The curator hasn't seen the Codex scenes yet:** this ranking is the blind agent's alone.
+  the scene checks and loops (9 to 32 calls); Claude's runs at high effort and up kept looking and
+  fixing for dozens of turns more, re-reading a growing conversation each time, and that is where
+  both the cost and, by the curator's eye, the quality went.
+- **On sol, more effort grew the calls and tokens** (9 to 32 calls, 0.4M to 2.8M input) without the
+  blind score following it past high.
 
 ## What to use
 
@@ -331,11 +343,11 @@ What it says:
   perspective, scale against a door): the smaller models got the flat parts right and the space
   wrong, and Fable scored lower at a higher price.
 - **A pipeline's parts** (docs/agents.md) at high each, the planner at xhigh.
-- **In Codex: gpt-6.1-sol at high, or gpt-6-astra at xhigh.** The two best scenes of all fourteen in
-  the blind review, each in a few minutes; on sol, max and xhigh cost more and scored no better.
+- **Claude Code over Codex for art you will show.** Codex draws a passable scene for well under a
+  dollar in a few minutes (gpt-6.1-sol at high, $0.36), good for a quick draft or a layout to judge;
+  the curator found all of its scenes well below Claude's.
 
 With Claude Code: `claude --model opus --effort xhigh`, or `/model` and `--effort` for a session.
-With Codex: `codex -m gpt-6.1-sol -c model_reasoning_effort=high`.
 
 ## What this doesn't show
 
@@ -343,13 +355,13 @@ With Codex: `codex -m gpt-6.1-sol -c model_reasoning_effort=high`.
   within what a second run could change. Repeat it before generalizing.
 - **One brief.** A scene with space, light and weather; small sprites, tiles or a character sheet
   may favor the smaller models more.
-- **Two reviews, apart at the top.** An Opus agent, blind to who made what, judging eight frames of
-  each loop (not the motion; and a model may favor art made the way it would make it), and the
-  curator, who knew which was which, watching the loops and judging the top three. Both put xhigh at
-  or near the top; they part on max and high.
+- **Two reviews that disagree.** An Opus agent, blind to who made what, judging eight frames of each
+  loop (not the motion; and a model may favor art made the way it would make it), and the curator,
+  who knew which was which, watching the loops. Within Claude's runs both put Opus xhigh at or near
+  the top and part on max and high; across the two tools they disagree outright, the agent ranking
+  Codex first and the curator Claude. Take the curator's.
 - **Two tools, two meters.** Claude Code reports each session's cost; Codex, on a ChatGPT plan,
-  reports tokens only, and the two price tokens differently: compare their tokens and times, not a
-  dollar figure. The curator has reviewed only the Claude runs.
+  reports tokens only: its prices here are estimates from OpenAI's published API rates, not a bill.
 - **Wall times on a shared laptop.** Four sessions ran at once; the turns and the tokens are the
   fairer measure of effort.
 

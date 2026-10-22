@@ -37,7 +37,8 @@ sheets. To be sure it is used, name it: "use the pxl skill to draw ...".
 
 **The Codex CLI** loads skills from `~/.codex/skills/` the same way: clone pxl to
 `~/.codex/skills/pxl-pixel-art` (or link that folder to your clone) and it lists the skill and reads
-it when you ask for pixel art. It drew the [model study](model-study.md)'s best scenes.
+it when you ask for pixel art. In the [model study](model-study.md) it drew far cheaper and faster
+than Claude Code, and the curator found its scenes well below Claude's.
 
 **Other agents** (Cursor, Gemini, …): tell them to read `SKILL.md` and that the CLI is
 `node <path to pxl>/bin/pxl.js`. Everything the skill asks for is shell commands and files.
