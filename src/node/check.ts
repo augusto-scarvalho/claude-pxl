@@ -27,6 +27,9 @@ export interface CheckResult {
 
 const hash = (d: Uint32Array) => { let h = 2166136261; for (let i = 0; i < d.length; i++) h = Math.imul(h ^ d[i], 16777619); return h >>> 0; };
 /** 3, 4, 5, 9 -> "3-5, 9" */
+/** The most frames of a scene whose loop was cut at 60 s that check reads. */
+const CAPPED_FRAMES = 600;
+
 const ranges = (fs: number[]) => fs.reduce<[number, number][]>((r, f) => {
   const last = r[r.length - 1];
   if (last && f === last[1] + 1) last[1] = f; else r.push([f, f]);
@@ -99,7 +102,11 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     const wo = def.opts.world;
     lightSaid ||= !!wo?.light;
     groundSaid ||= wo?.ground !== undefined;
-    const tl = p.timeline(name), count = !tl ? 1 : tl.durations ? tl.durations.length : Math.max(1, Math.round(tl.loop / tl.step));
+    const tl = p.timeline(name), all = !tl ? 1 : tl.durations ? tl.durations.length : Math.max(1, Math.round(tl.loop / tl.step));
+    // a loop cut at 60 s (its anims' frame times don't line up) can run to tens of thousands of frames:
+    // say so, and check its first frames only, not for hours
+    const count = tl?.capped ? Math.min(all, CAPPED_FRAMES) : all;
+    if (tl?.capped) lines.push(`${name} › WARNING: its loop doesn't close within 60 s: its anims' frame times don't line up (a ${tl.step} ms step, ${all} frames); checked its first ${count} frames only. Give every anim the same fps (4, 5 or 10, or ms in 100s)`);
     const seen = new Map<string, string[]>(), found = new Map<string, Set<number>>(), at = new Map<string, Set<string>>();
     const only = opts.frames ?? (opts.frame !== undefined ? [opts.frame] : undefined);
     for (const f of only && tl ? only : [...Array(count).keys()]) {

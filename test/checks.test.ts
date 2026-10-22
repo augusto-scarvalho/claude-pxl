@@ -24,6 +24,16 @@ const run = async (src: string, ...args: string[]) => {
 const HEAD = `sprite("head", { w: 11, h: 9, facing: "right", outline: "k", sockets: { front: [11, 4] } },
   rect(0, 0, 9, 9, "d"), rect(9, 2, 2, 4, "d"), relight(undefined, { light: [0.6, -1], reach: 2, ramps: ["1d6"] }))`;
 
+test("check: a scene whose loop is cut at 60 s is said so, and only its first 600 frames are checked", () => {
+  // 167 ms and 250 ms frames: a 1 ms step over 60 s, 60,000 frames; checked whole, it took hours
+  const p = loadSource(PAL + `anim("a", { fps: 6, frames: 4, w: 1, h: 1 }, (c) => c.px(0, 0, "w"))
+anim("b", { fps: 4, frames: 2, w: 1, h: 1 }, (c) => c.px(0, 0, "r"))
+scene("s", { w: 2, h: 1 }, stamp("a", 0, 0), stamp("b", 1, 0))`, "t.px.js");
+  const r = checkProject(p, { names: ["s"] });
+  assert.match(r.lines.join("\n"), /s › WARNING: its loop doesn't close within 60 s: .*60000 frames\); checked its first 600 frames only/);
+  assert.match(r.checked, /\(600 frames/);
+});
+
 test("front marker: on the half the label faces; off the drawing or on the back half is called out", () => {
   const p = loadSource(PAL + HEAD + `
 sprite("head_wrong", { base: "head", facing: "left" })

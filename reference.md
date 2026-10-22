@@ -327,7 +327,10 @@ the k-th `frame()` only runs on frame k, so frames are **patches** over the shar
 or `ms`, or `hold` × that. `loop: false` plays once and holds the last frame. `dir: "pingpong"`
 plays the drawn frames there and back (0 1 2 3 2 1), `"reverse"` backwards: draw a breathing or
 swaying loop once, not twice. Exports keep each drawn frame once and put the direction in the tag
-(Aseprite's `frameTags[].direction`); GIFs, previews and scenes play it.
+(Aseprite's `frameTags[].direction`); GIFs, previews and scenes play it. An anim with no `frames:`
+and no `frame()` items has one frame: it is still, and doesn't set the clock of the scene that
+stamps it; code in it that reads `c.frame` or `c.phase` draws frame 0 only (a warning says so): give
+a gull meant to flap `frames: N` and the scene's `fps`.
 
 ```js
 pal({ k: 0, x: 7, l: 10, L: 9 })   // pico8's black, white, yellow, orange

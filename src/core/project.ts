@@ -81,6 +81,11 @@ function drawsWithFunctions(items: Item[]): boolean {
   return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
 }
 
+/** A function among these items whose code reads its canvas's frame or phase (c.frame, c.phase). */
+function readsClock(items: Item[]): boolean {
+  return items.some((v) => (typeof v === "function" && /\b[a-zA-Z_$][\w$]*\.(frame|phase)\b/.test(String(v))) || (isLayer(v) && readsClock(v.items)));
+}
+
 /** Options every placement takes (stamp, tile, pattern, panel, scatter, tilemap, wire hangs). */
 const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay"];
 /** Allowed option keys of ops whose last argument is an options object. */
@@ -653,7 +658,13 @@ export class Project implements BuildCtx {
     // animated by what it places: its functions run on that loop. The loop is known once built, so a
     // first frame drawn by functions is drawn again knowing it (c.frames)
     if (tl && def && def.kind !== "anim" && !first.clocked && drawsWithFunctions(def.items)) first = this.buildAt(name, seed, 0, tl, true);
-    if (tl && track && this.collect.length) {
+    // an anim of one frame is still: its clock (8 fps unless it says) doesn't join the loop of what
+    // places it (with a scene at 12 fps, 125 ms and 83 ms made a 1 ms step and a 60,000-frame loop);
+    // and if its code reads its frame or phase, it was meant to move: say so
+    const oneFrame = !!tl && def?.kind === "anim" && Math.round(tl.loop / tl.step) <= 1 && (tl.durations?.length ?? 1) <= 1;
+    if (oneFrame && def && readsClock(def.items))
+      this.warn(`anim '${name}' has one frame (no frames: and no frame() items) but its code reads c.frame or c.phase: it draws frame 0 only and never moves; give it frames: N and the fps of the loop it belongs to (the scene's other anims')`, def.loc);
+    if (tl && !oneFrame && track && this.collect.length) {
       const acc = this.collect[this.collect.length - 1];
       if (tl.capped || (acc.loop && lcm(acc.loop, tl.loop) > MAX_LOOP)) acc.capped = true;
       acc.loop = acc.loop ? Math.min(MAX_LOOP, lcm(acc.loop, tl.loop)) : tl.loop;

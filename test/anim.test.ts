@@ -47,6 +47,21 @@ scene("s", { w: 1, h: 1 }, stamp("a", 0, 0, { frame: 2 }))`, "t.px.js");
   assert.match(failure(PAL + `anim("x", { dir: "yoyo" }, "r")`, "x").message, /dir must be "forward", "reverse" or "pingpong"/);
 });
 
+test("anim: one frame is still: it doesn't set the scene's clock, and code reading its frame is warned", () => {
+  // a scene at 12 fps (83 ms) with anims of one frame at the default 8 fps (125 ms) made a 1 ms step
+  // and a 60,000-frame loop; the gull's code reads its frame, so it was meant to move and never does
+  const p = loadSource(PAL + `anim("sky", { fps: 12, frames: 24, w: 2, h: 1 }, (c) => c.px(c.frame % 2, 0, "w"))
+anim("gull", { w: 1, h: 1 }, (c) => c.px(0, 0, c.frame % 2 ? "w" : "r"))
+anim("rock", { w: 1, h: 1 }, (c) => c.px(0, 0, "r"))
+scene("s", { w: 4, h: 1 }, stamp("sky", 0, 0), stamp("gull", 2, 0), stamp("rock", 3, 0))`, "t.px.js");
+  const t = p.timeline("s")!;
+  assert.equal(Math.round(t.loop / t.step), 24);
+  assert.equal(t.capped, undefined);
+  const said = p.warnings.map((w) => w.msg).join("\n");
+  assert.match(said, /anim 'gull' has one frame .*reads c\.frame or c\.phase/);
+  assert.doesNotMatch(said, /anim 'rock'/);
+});
+
 test("anim: loops that don't line up are cut at 60s and the build line says why", () => {
   const p = loadSource(PAL + `anim("a", { fps: 6, frames: 4, w: 1, h: 1 }, (c) => c.px(0, 0, "w"))
 anim("b", { fps: 4, frames: 2, w: 1, h: 1 }, (c) => c.px(0, 0, "r"))
