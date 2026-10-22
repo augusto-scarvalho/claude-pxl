@@ -250,7 +250,20 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   bloom, darker corners; `check: false` on that one, the small one is what's checked. And light in
   the world on `mesh()`: a warm `sun` low and a little behind (its shadows fall toward us), a cool
   `sky`, `lamps` with `emit` on their glass, `bump("hybrid")` on the sprites so they take it
-  (`examples/hd2d/plaza.px.js`).
+  (`examples/hd2d/plaza.px.js`). Lay the floor's texture a texel to a pixel where the camera looks
+  (`texel: [1 / ppm, 1 / (ppm * sin pitch)]`): at a 16-to-the-meter texel the camera squashes it, and
+  blades drawn upright come out lying down. What stands on the ground and is smaller than a person (a
+  headstone, a rock) is a sprite drawn at the scene's scale, its top in the sun and its front in the
+  shade when the sun is behind; drawn as a textured box it comes out blurred into the stone round it
+  (`examples/hd2d/graveyard.px.js`).
+- The ground and what grows on it, as 16-bit games draw them (`pxl study` on their sheets): grass is
+  blades in clumps all over a quiet ground, its tones close together, a lighter or darker patch broad,
+  few bright tips (from above they read as dots); a crown or a bush is clusters of 2-3 px each lit on
+  its upper left, an outline in lobes, little deep shadow, the shade bluer and the light yellower; a
+  conifer is tiers whose hems hang in festoons; a rock is two or three masses in flat facets, cream in
+  the sun and blue-violet in the shade, its outline dark on the shaded side only; flagstones are
+  irregular, lit on their upper edge, moss in the joints; a wall's blocks of their own sizes, each lit
+  on top, grass hanging over its head. An outline goes round things, never round the ground.
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
   `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:
   each is lit or in shade by which way it faces the sun. People walking in such a scene: pose a body

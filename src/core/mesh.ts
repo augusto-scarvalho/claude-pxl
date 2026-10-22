@@ -34,8 +34,18 @@ export interface Material {
   texture?: (x: number, y: number) => number;
   /** an asset whose pixels tile the faces, lying on the floor or standing on a wall by which way the face looks */
   tex?: string;
-  /** a texel's size in m (default 1/16: a 16 px tile to the meter) */
-  texel?: number;
+  /**
+   * a texel's size in m (default 1/16: a 16 px tile to the meter); two, across and down, to lay the
+   * texture one texel to a pixel on a floor or wall the camera foreshortens (a floor seen from 38 degrees
+   * up: [1 / ppm, 1 / (ppm * sin 38)]), so it reads drawn on the screen and not squashed
+   */
+  texel?: number | [number, number];
+  /**
+   * where the texture starts: "world" (default) tiles it from the world's origin, so neighbouring faces
+   * carry on one another's; "face" starts it at each face's own top left (a gravestone's whole drawing
+   * on its face, a fence's top along the rail). Its clear pixels are holes: nothing there, no shadow.
+   */
+  anchor?: "world" | "face";
 }
 export interface MeshSprite {
   /** an asset's name (an animation plays on the scene's clock) */
@@ -144,7 +154,9 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
   const ramps: Record<string, string[]> = {};
   for (const [name, M] of Object.entries(mats)) {
     if (M?.tex !== undefined) {
-      if (!(M.texel === undefined || M.texel > 0)) throw new PxError(`mesh: material '${name}' has texel ${M.texel}: a texel's size in m, above 0 (1/16: a 16 px tile to the meter)`);
+      const t = M.texel;
+      if (!(t === undefined || (typeof t === "number" && t > 0) || (Array.isArray(t) && t.length === 2 && t[0] > 0 && t[1] > 0)))
+        throw new PxError(`mesh: material '${name}' has texel ${JSON.stringify(t)}: a texel's size in m, above 0 (1/16: a 16 px tile to the meter), or two, across and down`);
       ramps[name] = M.ramp ? [...M.ramp] : [];
       continue;
     }
@@ -154,6 +166,16 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
   // per pixel: the nearest face's depth and index, and the point of it seen there (textures, shadows)
   const n = W * H, depth = new Float32Array(n).fill(1e9), who = new Int32Array(n).fill(-1), pos = new Float32Array(n * 3);
   const normals: V3[] = [], lights: number[] = [];
+  // which coordinate is up, and which runs away from the camera: [x, z, up] through perspective(), [x, y up, z ahead]
+  // otherwise; per textured face, the coordinates its texture runs across and down (a floor across and
+  // away, a wall across and down), where it starts, and whether it has holes
+  const UP = cam.up[2] ? 2 : 1, AHEAD = UP === 2 ? 1 : 2;
+  const texOf: ({ T: Img; su: number; sv: number; ua: number; va: number; u0: number; v0: number; holes: boolean } | undefined)[] = [];
+  const holed = new Map<Img, boolean>();
+  const texel = (t: NonNullable<(typeof texOf)[number]>, X: number, Y: number, Z: number) => {
+    const P = [X, Y, Z], u = (P[t.ua] - t.u0) * t.su + 1e-6, v = (-P[t.va] - t.v0) * t.sv + 1e-6;
+    return mod(Math.floor(v), t.T.h) * t.T.w + mod(Math.floor(u), t.T.w);
+  };
   faces.forEach((F, k) => {
     if (!F || !Array.isArray(F.pts) || F.pts.length < 3) throw new PxError(`mesh: face ${k} needs a material and 3 or more corners, { mat, pts: [[x, y, z], ...] } (model().face(mat, ...points))`);
     const M = mats[F.mat];
@@ -164,6 +186,15 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     const toward = dot(sub(mid, eye), N) > 0 ? -1 : 1;
     normals[k] = N.map((v) => v * toward) as V3;
     lights[k] = lightOf(normals[k], mid, F) + (M.bias ?? 0);
+    if (M.tex !== undefined) {
+      const T = world!.tex[F.mat], a = [0, 1, 2].reduce((m, e) => (Math.abs(N[e]) > Math.abs(N[m]) ? e : m), 0);
+      const [ua, va] = a === UP ? [0, AHEAD] : [a === 0 ? AHEAD : 0, UP], face = M.anchor === "face";
+      if (M.anchor !== undefined && M.anchor !== "face" && M.anchor !== "world") throw new PxError(`mesh: material '${F.mat}' has anchor ${JSON.stringify(M.anchor)}: "world" (tiled from the world's origin) or "face" (from each face's top left)`);
+      if (!holed.has(T)) holed.set(T, T.data.some((c) => (c & 255) < 128));
+      const [tu, tv] = Array.isArray(M.texel) ? M.texel : [M.texel ?? 1 / 16, M.texel ?? 1 / 16];
+      texOf[k] = { T, su: 1 / tu, sv: 1 / tv, ua, va, u0: face ? Math.min(...F.pts.map((p) => p[ua])) : 0, v0: face ? Math.min(...F.pts.map((p) => -p[va])) : 0, holes: holed.get(T)! };
+    }
+    const tk = texOf[k];
     let pts = F.pts, P = pts.map(cam.project);
     if (P.some((p) => p[2] < NEAR)) [pts, P] = clipNear(pts, P, cam.project);
     for (let t = 1; t + 1 < P.length; t++) {
@@ -180,11 +211,11 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
         if (w0 < -1e-4 || w1 < -1e-4 || w2 < -1e-4) continue;
         const z = 1 / (w0 / a[2] + w1 / b[2] + w2 / d[2]), i = (y - y0) * W + (x - x0);
         if (z >= depth[i]) continue;
+        // the point seen, interpolated in perspective; through a hole in its texture, not this face
+        const X = (w0 * Az[0] + w1 * Bz[0] + w2 * Dz[0]) * z, Y = (w0 * Az[1] + w1 * Bz[1] + w2 * Dz[1]) * z, Z = (w0 * Az[2] + w1 * Bz[2] + w2 * Dz[2]) * z;
+        if (tk?.holes && (tk.T.data[texel(tk, X, Y, Z)] & 255) < 128) continue;
         depth[i] = z; who[i] = k;
-        // the point seen, interpolated in perspective
-        pos[i * 3] = (w0 * Az[0] + w1 * Bz[0] + w2 * Dz[0]) * z;
-        pos[i * 3 + 1] = (w0 * Az[1] + w1 * Bz[1] + w2 * Dz[1]) * z;
-        pos[i * 3 + 2] = (w0 * Az[2] + w1 * Bz[2] + w2 * Dz[2]) * z;
+        pos[i * 3] = X; pos[i * 3 + 1] = Y; pos[i * 3 + 2] = Z;
       }
     }
   });
@@ -203,12 +234,16 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     };
     // a cell to every two px of the picture: an HD-2D picture's pixel of art
     sunMap = new SunMap(L.dir, seen, Math.min(1024, Math.max(256, Math.max(W, H) / 2)));
-    faces.forEach((F, k) => { for (let t = 1; t + 1 < F.pts.length; t++) sunMap!.tri(F.pts[0], F.pts[t], F.pts[t + 1], k); });
+    faces.forEach((F, k) => {
+      const tk = texOf[k];
+      for (let t = 1; t + 1 < F.pts.length; t++) {
+        const [A, B, D] = [F.pts[0], F.pts[t], F.pts[t + 1]];
+        // (a texture's holes let the sun through)
+        sunMap!.tri(A, B, D, k, tk?.holes ? (w0, w1, w2) => (tk.T.data[texel(tk, w0 * A[0] + w1 * B[0] + w2 * D[0], w0 * A[1] + w1 * B[1] + w2 * D[1], w0 * A[2] + w1 * B[2] + w2 * D[2])] & 255) >= 128 : undefined);
+      }
+    });
     world!.sprites.forEach((s, k) => sunMap!.sprite(s.img, s.at, K / perM[k], -2 - k));
   }
-  // which coordinate is up, and which runs away from the camera: [x, z, up] through perspective(), [x, y up, z ahead]
-  // otherwise; per face, the coordinates a texture runs across and down: a floor across and away, a wall across and down
-  const UP = cam.up[2] ? 2 : 1, AHEAD = UP === 2 ? 1 : 2;
   // each face's texture stepped once by its light (the faces of a material in one light share it)
   const lits = new Map<string, Uint32Array>(), litOf: Uint32Array[] = [];
   const litTex = (k: number, T: Img) => {
@@ -218,18 +253,14 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     if (!t) lits.set(key, (t = T.data.map((col) => (col === TRANSPARENT ? col : world!.step(col, n)))));
     return (litOf[k] = t);
   };
-  const uv = normals.map((N) => {
-    const a = [0, 1, 2].reduce((m, e) => (Math.abs(N[e]) > Math.abs(N[m]) ? e : m), 0);
-    return a === UP ? [0, AHEAD] : [a === 0 ? AHEAD : 0, UP];
-  });
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x, k = who[i];
     if (k < 0) continue;
     const F = faces[k], M = mats[F.mat], r = ramps[F.mat], N = normals[k];
     if (M.tex !== undefined && M.edge === undefined) {
       // a floor reads the texture across and away, a wall across and down; light steps each texel along its ramp
-      const T = world!.tex[F.mat], s = 1 / (M.texel ?? 1 / 16), [ua, va] = uv[k], lit = L ? T.data : litTex(k, T);
-      let col = lit[mod(Math.floor(-pos[i * 3 + va] * s), T.h) * T.w + mod(Math.floor(pos[i * 3 + ua] * s), T.w)];
+      const tk = texOf[k]!, lit = L ? tk.T.data : litTex(k, tk.T);
+      let col = lit[texel(tk, pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2])];
       if (col === TRANSPARENT) continue;
       if (L) {
         const px = pos[i * 3], py = pos[i * 3 + 1], pz = pos[i * 3 + 2], facing = dot(N, L.dir);

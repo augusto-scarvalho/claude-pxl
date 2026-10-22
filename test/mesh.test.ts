@@ -98,3 +98,20 @@ test("mesh light: the sun's shadow, a lamp's pool, what gives light, a sprite's 
   assert.ok(red(ball, 17, 16) > red(ball, 22, 16) + 20, "lit on its left");
   assert.equal(red(scene("{}"), 27, 21, { checksOnly: true }), red(`scene("a", { w: 1, h: 1, bg: "w" })`, 0, 0), "only checking: as drawn");
 });
+
+test("mesh textures: their clear pixels are holes; anchored to the face they start at its top left", () => {
+  // a fence 1 m high at z 3, x -0.9 to 1.1, of bars 0.25 m wide (red, then clear), over a white floor
+  const fence = (anchor: string) => rows(`sprite("_bars", "r.")
+const M = model()
+M.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0]); M.face("b", [-0.9, 3, 0], [1.1, 3, 0], [1.1, 3, 1], [-0.9, 3, 1])
+scene("a", { w: 40, h: 40, bg: "k" }, (c) => c.mesh(V, M.faces, { f: { tex: "_white" }, b: { tex: "_bars", texel: 0.25, ${anchor} } }))`);
+  // x -0.8 (column 9) is in the first bar either way; x -0.7 (column 10) in it only from the face's edge
+  const face = fence(`anchor: "face"`), world = fence(`anchor: "world"`);
+  assert.equal(face[18][9], "r");
+  assert.equal(face[18][10], "r", "the bars start at the face's left");
+  assert.equal(world[18][10], "w", "tiled from the world's origin, a hole there: the floor behind shows through");
+  // two texels, across and down: the bars 0.5 m wide (x -0.6, 0.3 m in, is in the first)
+  assert.equal(face[18][11], "w");
+  assert.equal(fence(`anchor: "face", texel: [0.5, 1]`)[18][11], "r");
+  assert.throws(() => fence(`texel: [0.5]`), /texel \[0\.5\].*or two, across and down/);
+});

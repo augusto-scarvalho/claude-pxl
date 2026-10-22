@@ -7,7 +7,7 @@ import { type Color, TRANSPARENT } from "./color.ts";
 import type { Img } from "./image.ts";
 
 export interface Box { x0: number; y0: number; x1: number; y1: number; n: number; colors: number; /** the share of its commonest color */ main?: number; /** its pixels, as drawn and mirrored */ hash?: number; flipped?: number }
-export interface SheetRead { sprites: Box[]; rows: Box[][]; labels: number; boxes: number; masks: number; ground: Color }
+export interface SheetRead { sprites: Box[]; rows: Box[][]; labels: number; boxes: number; masks: number; ground: Color; /** every color taken for ground */ grounds: Set<Color> }
 
 const W = (b: Box) => b.x1 - b.x0 + 1, H = (b: Box) => b.y1 - b.y0 + 1;
 
@@ -106,7 +106,7 @@ export function sliceSheet(img: Img, ground: Color | null): SheetRead | null {
     if (row) row.push(s); else rows.push([s]);
   }
   for (const r of rows) r.sort((a, b) => a.x0 - b.x0);
-  return { sprites: real, rows, labels, boxes, masks, ground: bg };
+  return { sprites: real, rows, labels, boxes, masks, ground: bg, grounds };
 }
 
 /** Groups of numbers no more than `gap` apart (and within 15% of each other), each [low, high, count]. */

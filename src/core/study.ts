@@ -15,6 +15,7 @@ import { type Color, TRANSPARENT, pack, toHex } from "./color.ts";
 import { Img } from "./image.ts";
 import { type Piece, decompose } from "./decompose.ts";
 import { sheetLines, sliceSheet } from "./slice.ts";
+import { craft, craftLine } from "./craft.ts";
 import { type Flow, type Grid, type Ramp, type Segment, type Techniques, type Vanish, areaDown, bandShifts, blockFlow, clearChecker, clearReflection, colorCounts, dE, findChecker, findGrid, findReflection, findRamps, findSegments, findTiles, findVanishing, focusOfExpansion, frameDiff, lab, lch, lineFlaws, lumaOf, mergeNear, pixelate, quantize, techniques, toNative } from "./vision.ts";
 
 /** frames as read; `drawnAt`: they were already brought down from that grid as they were read (big animations) */
@@ -169,6 +170,15 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   // ---------------------------------------------------------------- a sheet: its sprites apart
   const sheetRead = pixelArt && input.frames.length === 1 ? sliceSheet(whole && !up ? whole : picture, backdrop) : null, sheetOut = sheetRead ? sheetLines(sheetRead, nColors) : null;
   if (sheetOut) text.push("", "SHEET (its sprites apart, each measured)", ...sheetOut.lines);
+  // how the things in it are built: its biggest (a tree, a house), or the one thing a sprite on clear is
+  if (pixelArt) {
+    const src = sheetRead && whole && !up ? whole : picture, grounds = sheetRead?.grounds ?? new Set<number>(), seen = (c: number) => (c & 255) >= 128 && !grounds.has(c) && c !== backdrop;
+    const boxes = sheetRead
+      ? [...sheetRead.sprites].filter((b) => b.x1 - b.x0 >= 19 && b.y1 - b.y0 >= 19 && b.x1 - b.x0 < Math.max(160, 0.3 * src.w) && b.y1 - b.y0 < Math.max(160, 0.3 * src.h)).sort((a, b) => b.n - a.n).slice(0, 6)
+      : picture.data.some((c) => (c & 255) < 128) || backdrop !== null ? [(() => { const b = picture.bounds(); return b ? { x0: b.x, y0: b.y, x1: b.x + b.w - 1, y1: b.y + b.h - 1 } : null; })()].filter((b) => b !== null) : [];
+    const lines = boxes.flatMap((b) => { const c = craft(src, b!.x0, b!.y0, b!.x1, b!.y1, seen); return c ? [`  at ${b!.x0},${b!.y0}: ${craftLine(c)}`] : []; });
+    if (lines.length) text.push("", sheetRead ? "OBJECTS (the biggest, how each is built)" : "OBJECT (how it is built)", ...lines);
+  }
 
   // ---------------------------------------------------------------- values, color, distance
   text.push("", "VALUES AND COLOR");

@@ -13,6 +13,7 @@ import { main } from "../src/node/cli.ts";
 import { areaDown, findGrid, findRamps, lineFlaws, pixelate } from "../src/core/vision.ts";
 import { latticeHash } from "../src/core/util.ts";
 import { hueShifting, regionLines, spacingWords, study } from "../src/core/study.ts";
+import { craft } from "../src/core/craft.ts";
 import { loadSource } from "../src/node/load.ts";
 import { loopInPlace, smearsOf } from "../src/core/decompose.ts";
 
@@ -677,4 +678,21 @@ test("study takes normal maps laid beside the art out, leaves one-hue masks and 
   assert.match(text, /Normal maps: \d+% of the picture is normal maps/, text.slice(0, 600));
   // (the masks, and maybe a scrap the maps leave at a dome's rim)
   assert.match(text, /8 sprites apart on clear, in 1 row; (8|9) one-color silhouettes \(masks of where each sprite is\) left out/, text.slice(text.indexOf("SHEET")));
+});
+
+test("study tells how a thing is built: its tones, where its lights and darks sit, its hue's turn", async () => {
+  // a ball 30 px across on clear, lit from the upper left in four tones from a blue shade to a yellow light
+  const img = new Img(34, 34), T = [pack(40, 50, 90), pack(60, 110, 80), pack(120, 170, 70), pack(220, 220, 120)];
+  for (let y = 0; y < 34; y++) for (let x = 0; x < 34; x++) {
+    const dx = (x - 16.5) / 15, dy = (y - 16.5) / 15;
+    if (dx * dx + dy * dy <= 1) img.set(x, y, T[Math.max(0, Math.min(3, Math.round(1.6 - (1.6 * (dx + dy)) / 1.4)))]);
+  }
+  const c = craft(img, 0, 0, 33, 33, (k) => (k & 255) >= 128)!;
+  assert.equal(c.tones, 4);
+  assert.ok(c.light[0] < 0 && c.light[1] < 0, "its lights at its upper left");
+  assert.ok(c.dark[0] > 0 && c.dark[1] > 0, "its darks at its lower right");
+  assert.equal(c.warm, true, "shadows cool, lights toward yellow");
+  const dir = mkdtempSync(join(tmpdir(), "pxl-craft-"));
+  writePng(join(dir, "ball.png"), img);
+  assert.match(await said("study", join(dir, "ball.png"), "--no-out"), /OBJECT \(how it is built\)\n  at \d+,\d+: \d+x\d+, 4 tones/);
 });
