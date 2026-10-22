@@ -14,7 +14,7 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
 
 1. Read the [example](#examples) closest to what you're making (`PXL list <file>` maps it: read the
    lines you need) and start from the template below.
-   Given a reference or art to learn from (a PNG, GIF, JPEG or video, pixel art or not), look at it
+   Given a reference or art to learn from (a PNG, GIF, JPEG, WebP or video, pixel art or not), look at it
    with `PXL shot ref.gif` (a clip's frames on one sheet at 1×) and run `PXL study ref.gif`. Study
    says what the piece is made of and what to use in pxl for each part, and writes a sheet, the
    palette and each piece cut out of its background to `out/_study/`:
@@ -22,7 +22,7 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
      jaggies, dithering, anti-aliasing, clusters, light, banding, pillow shading, tiles, perspective
      (vanishing points, lens, tilt); read at the wrong pixel size (a blurred copy), `--px N`;
    - a clip: timing per drawing (on twos), cycle and loop, subpixel motion, parallax planes and their
-     speeds, and its pieces (the backdrop, sprites carried along, walks, anims in place, rigs, actions
+     speeds (bands of rows, and planes sharing rows), and its pieces (the backdrop, sprites carried along, walks, anims in place, rigs, actions
      with their smears, effects, and the lights, told apart first), each with its box in every frame,
      and the spacing of what travels (easing, anticipation, overshoot, squash and stretch). To measure
      one thing moving: `PXL study ref.gif --at x,y,w,h` (the region in the drawing's own pixels, as
@@ -170,12 +170,14 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   `dir: "pingpong"`; motion blur, `stamp(name, x, y, { smear: [fromX, fromY] })`; a part half a
   pixel along: `stamp(name, x, y + 0.5, { sub: true })`
   (subpixel, `PXL help "characters 10"`); stamping an anim animates the scene, and the scene's own
-  functions then get its loop (`c.frame`, `c.frames`, `c.phase`, `c.t`). Things going by in a loop
+  functions then get its loop (`c.frame`, `c.frames`, `c.phase`, `c.t`), or a clock of its own,
+  `scene(..., { frames, fps })`, when they pick what to draw by time. Things going by in a loop
   that closes (in an anim, or a scene that stamps one): `scroll()` (parallax planes), `clouds()`,
   `plume()` (smoke, steam). Limbs, walks, hair: `PXL help "characters 9 10"`.
 - **Existing art**: `sprite("x", { png, area, shrink, palettize })`, `anim(..., { png, frames })`;
   `rampmap` maps imported tones onto a ramp without merging them.
-- **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj` for tilemaps, `build --aseprite` for a
+- **Out**: `sheet()` (+ JSON with tags; `rows: "tag"` a row per animation; its preview GIF plays them
+  all at once), GIFs, Tiled `.tmj` for tilemaps, `build --aseprite` for a
   person to keep editing in Aseprite, `build --share 4` for clean enlarged PNGs and GIFs to post.
 - **Light**: `shade:`/`light:` layers and `cast` shadows, `relight`/`plate()` for a part lit on its
   own edges, `glow`, `lighting()` (lighting.md).
@@ -229,7 +231,8 @@ comet_repair --out <scratch dir>`.
 ## Habits that give better art
 
 - Write half of anything symmetric (`mx`) and let `outline` draw outlines (`selout` takes a dark
-  shade of what it touches, `inline` stays inside, `outline8` squares the steps). Shine is a lighter tone of the color, not white (a glint on metal or a gem, a wet spot, magic may be white; pure black only as an outline, never in a shadow).
+  shade of what it touches, `inline` stays inside, `outline8` squares the steps, `caps` darkens each
+  run's end where it steps). Shine is a lighter tone of the color, not white (a glint on metal or a gem, a wet spot, magic may be white; pure black only as an outline, never in a shadow).
   Something on one side only (a shine, a shadow side): mirror a `_part`, stamp it, then draw it.
 - Small organic shapes (a face, a leaf, an item icon) are grids, pixel by pixel; primitives are for
   structure, large areas and long lines. Never big hand grids.
