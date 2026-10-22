@@ -232,7 +232,7 @@ export function edt(inside: Uint8Array, w: number, h: number): Float64Array {
 }
 
 /** Gaussian blur, rows then columns, nothing past the edges; under 0.05 px, a copy. */
-function blur(src: Float64Array, w: number, h: number, sigma: number): Float64Array {
+export function blur(src: Float64Array, w: number, h: number, sigma: number): Float64Array {
   if (sigma < 0.05) return src.slice();
   const r = Math.ceil(3 * sigma), k = new Float64Array(2 * r + 1);
   let sum = 0;

@@ -42,6 +42,11 @@ export class Img {
    */
   norm?: Int8Array;
   /**
+   * Per-pixel distance from the camera along its axis, in m, where mesh() drew (Infinity elsewhere):
+   * what post() blurs and hazes by. Only the image mesh() drew into has it; it doesn't travel.
+   */
+  depth?: Float32Array;
+  /**
    * The point placements line up with (stamp's x, y), in pixel-corner coords: [w / 2, h] is the
    * middle of the bottom edge. Set from the asset's `pivot`; travels through transforms.
    */

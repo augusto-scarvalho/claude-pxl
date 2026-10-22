@@ -8,6 +8,7 @@ import { applyGlow } from "./glow.ts";
 import { applyLighting } from "./light.ts";
 import { rotate } from "./rotate.ts";
 import { normalImage } from "./normals.ts";
+import { type PostOpts, applyPost } from "./post.ts";
 import { type AssetDef, type FrameOpts, type GlowOpts, type Item, type Layer, type LayerOpts, type LightingOpts, type Op, type RelightOpts, type TileLayer, type Timeline, isLayer, isOp } from "./model.ts";
 import type { Palette } from "./palette.ts";
 import { Trace } from "./trace.ts";
@@ -206,6 +207,12 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   const onPass: OnPass = (name, args, loc) => {
     // the checks read what was placed and how, not the lit pixels: 2/3 of a lit city frame's time
     if (ctx.checksOnly) return;
+    if (name === "post") {
+      const o = (args[0] ?? {}) as PostOpts;
+      applyPost(base, o, o.fog ? pal.resolve(o.fog.color) : null);
+      snap?.("post", loc);
+      return;
+    }
     if (name === "glow") {
       base.data.set(applyGlow(base, args[0] as string | string[], (args[1] ?? {}) as GlowOpts, pal, keyed()).data);
       snap?.("glow", loc);
@@ -346,7 +353,7 @@ function register(base: Img, refs: Img[], spec: string | { key: string; x?: numb
 }
 
 /** Whole-image passes (lighting, glow) that run on everything drawn before them. */
-type OnPass = (name: "lighting" | "glow", args: unknown[], loc?: string) => void;
+type OnPass = (name: "lighting" | "glow" | "post", args: unknown[], loc?: string) => void;
 
 /** Run body items in order on a canvas. Layers go to `onLayer` (not allowed inside layers). */
 function runItems(
@@ -375,7 +382,7 @@ function runItems(
           const o = (isFrameOpts(item.args[0]) ? item.args[0] : {}) as RelightOpts;
           const inner = (isFrameOpts(item.args[0]) ? item.args.slice(1) : item.args) as Item[];
           c.plate(() => runItems(ctx, inner, c, item.loc, undefined, undefined, inFrame), o);
-        } else if (item.name === "lighting" || item.name === "glow") {
+        } else if (item.name === "lighting" || item.name === "glow" || item.name === "post") {
           if (!onPass) throw new PxError(`${item.name}() goes directly in a sprite or scene, after what it affects, not inside a layer or clip`);
           onPass(item.name, item.args, item.loc);
         } else {

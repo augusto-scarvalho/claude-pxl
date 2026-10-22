@@ -92,7 +92,7 @@ declare global {
     ground?: number;
   }
   /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
-  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number }
+  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size) */ check?: boolean }
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong" }
   interface PxFrame { ms?: number; hold?: number }
   interface PxLayerOpts {
@@ -188,7 +188,7 @@ declare global {
   /** A sprite standing among mesh()'s faces: its feet at [x, z] or [x, z, up] m, the contact shadow's radius in m (0: none). */
   interface PxMeshSprite { name: string; at: [number, number] | PxV3; flip?: "x"; frame?: number; shadow?: number }
   /** mesh()'s light: the way toward it in the points' frame, or a face's light (0 dark, 1 lit) from its normal toward the eye, its middle, the face; sprites standing among the faces (a perspective view). */
-  interface PxMeshOpts { light?: PxV3 | ((normal: PxV3, middle: PxV3, face: PxFace) => number); sprites?: PxMeshSprite[] }
+  interface PxMeshOpts { light?: PxV3 | ((normal: PxV3, middle: PxV3, face: PxFace) => number); sprites?: PxMeshSprite[]; /** px to a sprite's pixel (an HD picture: 4) */ pixel?: number }
   /** A camera of one's own for mesh(): a point in the camera's frame (x right, y up, z ahead, from the eye) to [col, row, depth]. */
   type PxProject = (p: PxV3) => [number, number, number];
   /** terrain()'s options: how far to look (m), the land's highest point, a cheap height it never rises more than `margin` above, the sky's color where a pixel sees no land. */
@@ -237,6 +237,13 @@ declare global {
     cell?: number; ambient?: number; ambientColor?: PxColor; sky?: number; skyColor?: PxColor; skyReach?: number;
     block?: number; smooth?: boolean; emit?: string; shape?: "round" | "diamond";
     relief?: number; skyDir?: [number, number];
+  }
+  /** post(): a depth of field from mesh()'s depth (the pixel in focus, m kept sharp, m to full blur, the blur's radius in px), a bloom, a haze by depth, darker corners. */
+  interface PxPost {
+    focus?: [number, number]; sharp?: number; soft?: number; blur?: number;
+    bloom?: number | { above?: number; r?: number; strength?: number };
+    fog?: { color: PxColor; from: number; to: number; max?: number };
+    vignette?: number;
   }
   interface PxGlow {
     where?: PxRegion; r?: number; strength?: number; color?: PxColor; bands?: number; ramp?: number;
@@ -468,4 +475,6 @@ declare global {
   function normals(x: number, y: number, str: string): PxOp;
   function lighting(opts?: PxLighting): PxOp;
   function glow(keys: string | string[], opts?: PxGlow): PxOp;
+  /** The camera's after-effects on the whole picture (HD-2D): depth of field by mesh()'s depth, bloom, haze, vignette. After the mesh(), in the sprite or scene itself. */
+  function post(opts?: PxPost): PxOp;
 }

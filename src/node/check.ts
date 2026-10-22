@@ -98,6 +98,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       if (w.startsWith("WARNING")) lines.push(`${name} › ${w}`);
       continue;
     }
+    if (def.opts.check === false) { notes.push(`${name} › not checked (check: false)`); continue; }
     scenes++;
     const wo = def.opts.world;
     lightSaid ||= !!wo?.light;

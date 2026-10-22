@@ -48,3 +48,30 @@ test("mesh sprites: errors say what a sprite is and where sprites can stand", ()
   assert.match(failure(scene(`[{ name: "s", at: [0, 4] }]`, "(p) => [p[0], p[1], p[2]]"), "a").message, /sprites stand in a perspective view/);
   assert.match(failure(scene(`[]`).replace("{}, { sprites: [] }", '{ m: { tex: "_white", texel: 0 } }, {}'), "a").message, /texel 0: a texel's size in m/);
 });
+
+// post() over a checkered floor from z 1.5 out: row 10 + 40 / z, so row 30 is 2 m away, row 12 is 20
+const FLOOR = `sprite("_check", "kw\\nwk")
+const M = model(); M.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0])
+const floor = (c) => c.mesh(V, M.faces, { f: { tex: "_check", texel: 0.25 } })
+`;
+test("post: the depth in focus stays as drawn, in the palette; farther is blurred, hazed, and off it", () => {
+  const r = rows(FLOOR + `scene("a", { w: 40, h: 40 }, floor, post({ blur: 3, focus: [20, 30], sharp: 0.3, soft: 0.5, fog: { color: "r", from: 10, to: 20, max: 0.5 } }))`);
+  assert.ok(!r[30].includes("?"), `in focus: ${r[30]}`);
+  assert.ok([...r[12]].filter((k) => k === "?").length > 30, `far: ${r[12]}`);
+  const p = loadSource(PAL + STAGE + FLOOR + `scene("a", { w: 40, h: 40 }, floor, post({ fog: { color: "r", from: 10, to: 20 } }))`, "t.px.js");
+  const far = p.image("a").get(5, 12);
+  assert.ok(far >>> 24 > ((far >>> 16) & 255) + 40, "far away, the haze's red");
+  assert.ok(!keys(p, "a").split(String.fromCharCode(10))[30].includes("?"), "near, untouched");
+});
+
+test("post: errors; a sprite's pixel can be K x K; a scene saying check: false isn't checked", async () => {
+  assert.match(failure(PAL + STAGE + `scene("a", { w: 40, h: 40, bg: "w" }, post({ blur: 3 }))`, "a").message, /put post\(\) after a mesh\(\)/);
+  assert.match(failure(PAL + STAGE + FLOOR + `scene("a", { w: 40, h: 40 }, floor, post({ blur: 3, focus: [20, 2] }))`, "a").message, /drew nothing at the focus \[20, 2\]/);
+  const big = rows(`scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, [], {}, { sprites: [{ name: "_white", at: [0, 4], shadow: 0 }], pixel: 3 }))`);
+  const at = big.flatMap((l, y) => [...l].flatMap((k, x) => (k === "w" ? [[x, y]] : [])));
+  assert.equal(at.length, 9, "one pixel, 3 x 3");
+  assert.deepEqual([0, 1].map((e) => Math.max(...at.map((p) => p[e])) - Math.min(...at.map((p) => p[e]))), [2, 2]);
+  const { checkProject } = await import("../src/node/check.ts");
+  const p = loadSource(PAL + STAGE + FLOOR + `scene("a", { w: 40, h: 40, check: false }, floor)`, "t.px.js", { checksOnly: true });
+  assert.match(checkProject(p).notes.join("\n"), /a › not checked \(check: false\)/);
+});

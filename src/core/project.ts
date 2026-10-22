@@ -72,6 +72,7 @@ export const SIGNATURES: Record<string, string> = {
   normals: "x:n y:n str:s",
   lighting: "?opts:o",
   glow: "keys:S ?opts:o",
+  post: "?opts:o",
 };
 
 /** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
@@ -106,11 +107,12 @@ export const OP_OPTS: Record<string, string[]> = {
   bump: ["w", "depth", "on", "where", "shapeRadius", "shapeStrength", "shapeSoftness", "detailStrength", "detailScale"],
   lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "shape", "relief", "skyDir"],
   glow: ["where", "r", "strength", "color", "bands", "ramp", "keep"],
+  post: ["focus", "sharp", "soft", "blur", "bloom", "fog", "vignette"],
   terrain: ["far", "top", "bound", "margin", "sky"],
   // one options object serves both: solids ignores shade, shadows ramps and light
   solids: ["at", "sun", "scale", "ramps", "light", "shade"],
   shadows: ["at", "sun", "scale", "shade", "ramps", "light"],
-  mesh: ["light", "sprites"],
+  mesh: ["light", "sprites", "pixel"],
   capsule: ["light", "rim"],
   flame: ["wind", "period", "seed", "frame"],
   scroll: ["x", "y", "frame", "axis"],
@@ -120,7 +122,7 @@ export const OP_OPTS: Record<string, string[]> = {
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
   sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "facing", "height", "twin", "register"],
-  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world", "frames", "fps"],
+  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check"],
   anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir", "facing", "height", "twin", "register"],
 };
 const FRAME_OPTS = ["ms", "hold"];
@@ -531,7 +533,7 @@ export class Project implements BuildCtx {
       define("sprite", `${name}_turnaround`, [{ w: 2 * W + 4, h: H }, (c: Canvas) => { c.put(c.asset(name), 0, 0); c.put(c.asset(tn), W + 4, 0); }]);
     };
 
-    for (const name of [...OPS, "clip", "lighting", "glow"]) {
+    for (const name of [...OPS, "clip", "lighting", "glow", "post"]) {
       env[name] = (...args: unknown[]): Op => {
         const loc = this.callerLoc();
         try {

@@ -51,14 +51,18 @@ export interface MeshOpts {
   light?: V3 | ((normal: V3, middle: V3, face: Face) => number);
   /** sprites standing among the faces (a perspective view only) */
   sprites?: MeshSprite[];
+  /** px to a sprite's pixel (default 1): 4 draws them four times as big, for a picture four times as big (HD) */
+  pixel?: number;
 }
 export interface MeshCanvas {
-  img: { w: number; h: number };
+  img: { w: number; h: number; depth?: Float32Array };
   ox: number;
   oy: number;
   px(x: number, y: number, c: string): void;
   plot(x: number, y: number, c: Color): boolean;
   get(x: number, y: number): Color;
+  /** the image's pixels, to write straight into when nothing (a clip, a mirror, a wrap) stands between */
+  raw?: Uint32Array;
 }
 /** What the canvas looked up for drawMesh: the textures by material, the sprites' images, a color stepped along its ramp. */
 export interface MeshWorld {
@@ -148,6 +152,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     if (P.some((p) => p[2] < NEAR)) [pts, P] = clipNear(pts, P, cam.project);
     for (let t = 1; t + 1 < P.length; t++) {
       const [a, b, d] = [P[0], P[t], P[t + 1]], [A, B, D] = [pts[0], pts[t], pts[t + 1]];
+      const Az = A.map((v) => v / a[2]), Bz = B.map((v) => v / b[2]), Dz = D.map((v) => v / d[2]);
       const area = (b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0]);
       if (Math.abs(area) < 1e-6) continue;
       const xa = Math.max(x0, Math.floor(Math.min(a[0], b[0], d[0]))), xb = Math.min(x0 + W - 1, Math.ceil(Math.max(a[0], b[0], d[0])));
@@ -161,23 +166,39 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
         if (z >= depth[i]) continue;
         depth[i] = z; who[i] = k;
         // the point seen, interpolated in perspective
-        for (let e = 0; e < 3; e++) pos[i * 3 + e] = (w0 * A[e] / a[2] + w1 * B[e] / b[2] + w2 * D[e] / d[2]) * z;
+        pos[i * 3] = (w0 * Az[0] + w1 * Bz[0] + w2 * Dz[0]) * z;
+        pos[i * 3 + 1] = (w0 * Az[1] + w1 * Bz[1] + w2 * Dz[1]) * z;
+        pos[i * 3 + 2] = (w0 * Az[2] + w1 * Bz[2] + w2 * Dz[2]) * z;
       }
     }
   });
-  // which coordinate is up, and which runs away from the camera: [x, z, up] through perspective(), [x, y up, z ahead] otherwise
+  // which coordinate is up, and which runs away from the camera: [x, z, up] through perspective(), [x, y up, z ahead]
+  // otherwise; per face, the coordinates a texture runs across and down: a floor across and away, a wall across and down
   const UP = cam.up[2] ? 2 : 1, AHEAD = UP === 2 ? 1 : 2;
+  // each face's texture stepped once by its light (the faces of a material in one light share it)
+  const lits = new Map<string, Uint32Array>(), litOf: Uint32Array[] = [];
+  const litTex = (k: number, T: Img) => {
+    if (litOf[k]) return litOf[k];
+    const n = Math.round((lights[k] - 0.75) * 5), key = faces[k].mat + "|" + n;
+    let t = lits.get(key);
+    if (!t) lits.set(key, (t = T.data.map((col) => (col === TRANSPARENT ? col : world!.step(col, n)))));
+    return (litOf[k] = t);
+  };
+  const uv = normals.map((N) => {
+    const a = [0, 1, 2].reduce((m, e) => (Math.abs(N[e]) > Math.abs(N[m]) ? e : m), 0);
+    return a === UP ? [0, AHEAD] : [a === 0 ? AHEAD : 0, UP];
+  });
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const i = y * W + x, k = who[i];
     if (k < 0) continue;
     const F = faces[k], M = mats[F.mat], r = ramps[F.mat], N = normals[k];
     if (M.tex !== undefined && M.edge === undefined) {
       // a floor reads the texture across and away, a wall across and down; light steps each texel along its ramp
-      const T = world!.tex[F.mat], s = 1 / (M.texel ?? 1 / 16), p = [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
-      const a = [0, 1, 2].reduce((m, e) => (Math.abs(N[e]) > Math.abs(N[m]) ? e : m), 0);
-      const [u, v] = a === UP ? [p[0], -p[AHEAD]] : [a === 0 ? p[AHEAD] : p[0], -p[UP]];
-      const col = T.data[mod(Math.floor(v * s), T.h) * T.w + mod(Math.floor(u * s), T.w)];
-      if (col !== TRANSPARENT) c.plot(x + x0, y + y0, world!.step(col, Math.round((lights[k] - 0.75) * 5)));
+      const T = world!.tex[F.mat], s = 1 / (M.texel ?? 1 / 16), [ua, va] = uv[k], lit = litTex(k, T);
+      const col = lit[mod(Math.floor(-pos[i * 3 + va] * s), T.h) * T.w + mod(Math.floor(pos[i * 3 + ua] * s), T.w)];
+      if (col === TRANSPARENT) continue;
+      if (c.raw) c.raw[i] = col;
+      else c.plot(x + x0, y + y0, col);
       continue;
     }
     // an outline where this surface is in front of another or of nothing; a crease where faces meet
@@ -203,15 +224,21 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     const tx = M.texture && !line && !rim ? Math.round(M.texture(x + x0, y + y0)) : 0;
     c.px(x + x0, y + y0, line ?? (rim ? M.top ?? r[Math.min(r.length - 1, lv + 1)] : r[Math.max(0, Math.min(r.length - 1, lv + tx))]));
   }
-  if (!world?.sprites.length) return [];
+  const keep = () => {
+    // the depth stays on the image for post(); a second mesh() keeps the nearer of the two
+    const d = (c.img.depth ??= new Float32Array(n).fill(Infinity));
+    for (let i = 0; i < n; i++) if (who[i] !== -1 && depth[i] < d[i]) d[i] = depth[i];
+  };
+  if (!world?.sprites.length) { keep(); return []; }
   if (!cam.P) throw new PxError("mesh: sprites stand in a perspective view ({ w, horizon, eye, ... }), not a camera function");
-  const focal = cam.P.focal, placed: { name: string; x: number; y: number; img: Img }[] = [];
+  const focal = cam.P.focal, K = opts.pixel ?? 1, placed: { name: string; x: number; y: number; img: Img }[] = [];
+  if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`mesh: pixel is how many px a sprite's pixel takes, a whole number from 1, got ${K}`);
   // contact shadows: what each sprite stands on, two steps darker in the middle and one out to the
   // radius (the darkest where two overlap)
   const shade = new Uint8Array(n);
   const feet = world.sprites.map((s) => cam.project(s.at));
   world.sprites.forEach((s, k) => {
-    const [fx, fz, fu] = s.at, R = s.shadow ?? s.img.w / 2.5 / (focal / feet[k][2]);
+    const [fx, fz, fu] = s.at, R = s.shadow ?? (s.img.w * K) / 2.5 / (focal / feet[k][2]);
     if (!(R > 0)) return;
     const box = [[fx - R, fz - R], [fx + R, fz - R], [fx - R, fz + R], [fx + R, fz + R]].map(([x, z]) => cam.project([x, z, fu]));
     const xa = Math.max(0, Math.floor(Math.min(...box.map((b) => b[0]))) - x0), xb = Math.min(W - 1, Math.ceil(Math.max(...box.map((b) => b[0]))) - x0);
@@ -222,24 +249,26 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     }
   });
   for (let i = 0; i < n; i++) if (shade[i]) { const x = (i % W) + x0, y = Math.floor(i / W) + y0; c.plot(x, y, world.step(c.get(x, y), -shade[i])); }
-  // the sprites: upright at their feet, a pixel to a pixel, each row as deep as that height above the feet;
-  // a pixel less than half opaque is cut (it neither shows nor hides what's behind)
+  // the sprites: upright at their feet, a pixel to K x K px, each row as deep as that height above the
+  // feet; a pixel less than half opaque is cut (it neither shows nor hides what's behind)
   world.sprites.forEach((s, k) => {
     const { img } = s, [px, py] = img.pivot ?? [img.w / 2, img.h], perM = focal / feet[k][2];
-    const X0 = Math.round(feet[k][0] - px), Y0 = Math.round(feet[k][1] - py);
-    for (let j = 0; j < img.h; j++) {
+    const X0 = Math.round(feet[k][0] - px * K), Y0 = Math.round(feet[k][1] - py * K);
+    for (let j = 0; j < img.h * K; j++) {
       const yi = Y0 + j - y0;
       if (yi < 0 || yi >= H) continue;
       // a hair nearer than the feet, so a figure against a wall stays in front of it
-      const d = cam.project([s.at[0], s.at[1], s.at[2] + (py - j - 0.5) / perM])[2] - 0.02;
-      for (let i = 0; i < img.w; i++) {
-        const col = img.data[j * img.w + i], xi = X0 + i - x0, q = yi * W + xi;
+      const d = cam.project([s.at[0], s.at[1], s.at[2] + (py * K - j - 0.5) / perM])[2] - 0.02, row = Math.floor(j / K) * img.w;
+      for (let i = 0; i < img.w * K; i++) {
+        const col = img.data[row + Math.floor(i / K)], xi = X0 + i - x0, q = yi * W + xi;
         if ((col & 255) < 128 || xi < 0 || xi >= W || d >= depth[q]) continue;
         depth[q] = d;
+        who[q] = -2;
         c.plot(X0 + i, Y0 + j, col);
       }
     }
-    placed.push({ name: s.name, x: X0, y: Y0, img });
+    placed.push({ name: s.name, x: X0, y: Y0, img: K > 1 ? img.scale(K) : img });
   });
+  keep();
   return placed;
 }

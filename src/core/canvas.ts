@@ -743,12 +743,20 @@ export class Canvas {
     });
     // looked up on first use: a palette without ramps has nothing to step (and needs nothing stepped without textures or sprites)
     let maps: Map<Color, Color>[] | undefined;
+    const memo = new Map<number, Color>();
     const step = (c: Color, n: number) => {
+      if (!n) return c;
+      const key = c * 16 + n + 8, got = memo.get(key);
+      if (got !== undefined) return got;
       maps ??= [this.pal.stepMap(-1), this.pal.stepMap(1)];
-      for (let s = 0; s < Math.abs(n); s++) c = maps[n < 0 ? 0 : 1].get(c) ?? c;
-      return c;
+      let s = c;
+      for (let k = 0; k < Math.abs(n); k++) s = maps[n < 0 ? 0 : 1].get(s) ?? s;
+      memo.set(key, s);
+      return s;
     };
-    for (const p of drawMesh(this as unknown as MeshCanvas, view, faces, mats, opts, { tex, sprites, step }))
+    // straight into the pixels when nothing stands between (a clip, a twin's mirror, a wrapped edge)
+    const mc = Object.assign(Object.create(this) as MeshCanvas, { raw: this.clipPred || this.mirrored || this.wrap ? undefined : this.img.data });
+    for (const p of drawMesh(mc, view, faces, mats, opts, { tex, sprites, step }))
       this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img });
   }
 
