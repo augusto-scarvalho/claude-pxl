@@ -5,7 +5,7 @@ import { Img } from "../core/image.ts";
 
 export interface GifRead { w: number; h: number; frames: { img: Img; ms: number }[] }
 
-export function decodeGif(b: Uint8Array): GifRead {
+export function decodeGif(b: Uint8Array, max = Infinity): GifRead {
   const sig = String.fromCharCode(...b.subarray(0, 6));
   if (sig !== "GIF87a" && sig !== "GIF89a") throw new Error("not a GIF");
   const u16 = (i: number) => b[i] | (b[i + 1] << 8);
@@ -16,7 +16,8 @@ export function decodeGif(b: Uint8Array): GifRead {
   const canvas = new Img(w, h), frames: { img: Img; ms: number }[] = [];
   let delay = 100, transparent = -1, disposal = 0;
   const blocks = () => { const parts: Uint8Array[] = []; while (p < b.length && b[p]) { parts.push(b.subarray(p + 1, p + 1 + b[p])); p += b[p] + 1; } p++; return parts; };
-  while (p < b.length) {
+  // (`max`: stop after that many frames: a study of a long clip's first seconds needn't decode the rest)
+  while (p < b.length && frames.length < max) {
     const k = b[p++];
     if (k === 0x3b) break;
     if (k === 0x21) {

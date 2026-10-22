@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { Project } from "../src/core/project.ts";
 import { OPS } from "../src/core/canvas.ts";
+import { main } from "../src/node/cli.ts";
 
 const root = join(import.meta.dirname, "..");
 const read = (f: string) => readFileSync(join(root, f), "utf8");
@@ -38,8 +39,10 @@ test("docs: every command and flag the guides cite is in pxl's usage", () => {
   assert.deepEqual(bad, []);
 });
 
-test("docs: every guide section SKILL.md sends the agent to prints", () => {
-  for (const [, q] of read("SKILL.md").matchAll(/PXL help "([^"<]+)"/g)) assert.match(pxl("help", q), /^## /m, `pxl help "${q}" prints no section`);
+test("docs: every guide section SKILL.md sends the agent to prints", async () => {
+  // in this process, not a node each (ten of those took 16 s of the suite)
+  const help = async (q: string) => { const log = console.log, out: string[] = []; console.log = (s: string) => out.push(String(s)); try { await main(["help", q]); } finally { console.log = log; } return out.join("\n"); };
+  for (const [, q] of read("SKILL.md").matchAll(/PXL help "([^"<]+)"/g)) assert.match(await help(q), /^## /m, `pxl help "${q}" prints no section`);
 });
 
 test("docs: every op and DSL global is in the reference, and every example SKILL.md lists exists", () => {

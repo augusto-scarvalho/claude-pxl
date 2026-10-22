@@ -44,10 +44,12 @@ export function readMedia(path: string, o: MediaOpts = {}): Media {
   let read: (() => Img)[], ms: number[], kind: string, cleanup = () => {};
   if (ext === ".png") { const img = decodePng(readFileSync(path)); read = [() => img]; ms = [100]; kind = "PNG"; }
   else if (ext === ".gif") {
-    const g = decodeGif(readFileSync(path));
+    // (a clip read from its start for some seconds: decoded only that far, the first frame's ms the measure)
+    const buf = readFileSync(path), head = o.seconds && !o.from ? decodeGif(buf, 1).frames[0]?.ms || 100 : 0;
+    const g = decodeGif(buf, head ? Math.ceil((o.seconds! * 1000) / head) + 1 : Infinity);
     const from = Math.floor(((o.from ?? 0) * 1000) / (g.frames[0]?.ms || 100)), part = g.frames.slice(from, o.seconds ? from + Math.ceil((o.seconds * 1000) / (g.frames[0]?.ms || 100)) : undefined);
     read = part.map((f) => () => f.img); ms = part.map((f) => f.ms);
-    kind = `GIF${g.frames.length > part.length ? `, frames ${from}-${from + part.length - 1} of ${g.frames.length}` : ""}`;
+    kind = `GIF${g.frames.length > part.length || head ? `, frames ${from}-${from + part.length - 1}${head ? "" : ` of ${g.frames.length}`}` : ""}`;
   } else ({ read, ms, kind, cleanup } = viaFfmpeg(path, ext, o, max, ext === ".webp" ? webpInfo(readFileSync(path)) : null));
   try {
     if (!read.length) throw new PxError(`${path}: no frames in it`);

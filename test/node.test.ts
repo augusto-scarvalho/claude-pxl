@@ -172,7 +172,7 @@ function tmpArt(src: string): { dir: string; file: string } {
 test("cli build --profile names the slow function in the art file and the slowest asset", async () => {
   const { file } = tmpArt(`use("pico8")
 function slow(n) { let s = 0; for (let i = 0; i < n; i++) s += Math.sin(i) * Math.cos(i); return s }
-sprite("busy", { w: 4, h: 4 }, (c) => { if (slow(4e6) > -1e9) c.rect(0, 0, 4, 4, "8") })
+sprite("busy", { w: 4, h: 4 }, (c) => { if (slow(1e6) > -1e9) c.rect(0, 0, 4, 4, "8") })
 sprite("quick", "7")`);
   const log = console.log;
   const lines: string[] = [];
