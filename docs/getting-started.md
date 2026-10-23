@@ -24,7 +24,7 @@ animation and a scene, then shows where each command fits. For the full API see
 You need Node 22.18 or newer (`node -v`). pxl has no runtime dependencies and no build step.
 
 ```sh
-git clone https://github.com/augusto-scarvalho/claude-pxl.git
+git clone --depth 1 https://github.com/augusto-scarvalho/claude-pxl.git
 cd claude-pxl
 node bin/pxl.js            # prints every command and its options
 ```

@@ -57,10 +57,13 @@ Every image above is generated from a file in [`examples/`](examples). The long 
 ## Install
 
 ```sh
-git clone https://github.com/augusto-scarvalho/claude-pxl.git
+git clone --depth 1 https://github.com/augusto-scarvalho/claude-pxl.git
 cd claude-pxl
 node bin/pxl.js serve examples/shop.px.js     # live viewer at http://127.0.0.1:4321/
 ```
+
+`--depth 1` takes the files as they are now, not every past version of the gallery's GIFs (the whole
+history is several times the size); `git pull` still updates it.
 
 Or run it without cloning:
 
@@ -117,7 +120,7 @@ through `pxl help`, so it pays only for what the task needs.
 For Claude Code, clone pxl into your skills folder, then ask Claude to draw something:
 
 ```sh
-git clone https://github.com/augusto-scarvalho/claude-pxl.git ~/.claude/skills/pxl-pixel-art
+git clone --depth 1 https://github.com/augusto-scarvalho/claude-pxl.git ~/.claude/skills/pxl-pixel-art
 ```
 
 `git pull` there updates it. If you already have a clone, make `~/.claude/skills/pxl-pixel-art` a

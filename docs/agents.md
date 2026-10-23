@@ -24,12 +24,13 @@ result. To use pxl by hand, start with [Getting started](getting-started.md).
 
 ```sh
 # for all your projects
-git clone https://github.com/augusto-scarvalho/claude-pxl.git ~/.claude/skills/pxl-pixel-art
+git clone --depth 1 https://github.com/augusto-scarvalho/claude-pxl.git ~/.claude/skills/pxl-pixel-art
 # or for one project only
-git clone https://github.com/augusto-scarvalho/claude-pxl.git .claude/skills/pxl-pixel-art
+git clone --depth 1 https://github.com/augusto-scarvalho/claude-pxl.git .claude/skills/pxl-pixel-art
 ```
 
-`git pull` in that folder updates it. If you also work on pxl itself in another clone, make the skills
+`--depth 1` leaves out the history (every past version of the gallery's GIFs, several times the
+size of the files); `git pull` in that folder updates it. If you also work on pxl itself in another clone, make the skills
 folder a link to that clone, so the agent always uses your working copy:
 
 ```sh
@@ -307,6 +308,15 @@ as light or only loosely, how well the cut-out masks match (precision and recall
 light was found. `--vs` prints each line as before → now and the things whose score moved most. Run it
 before and after any change to `src/core/study.ts`, `decompose.ts`, `relight.ts` or `vision.ts`; a
 change that helps one scene often costs another.
+
+### The gallery
+
+`docs/gallery/` holds the README's pictures, made by `node scripts/gallery.ts [name ...]`. Git keeps
+every version of every file for good, and a GIF hardly compresses: each one committed and then
+replaced stays in every full clone (one scene's five versions in a day added 24 MB). Look at a GIF
+that isn't done with `node scripts/gallery.ts <name> --out <scratch dir>`, and commit it once, at
+the end of the round. Keep a GIF under 10 MB (GitHub stops animating bigger ones): a long scene at
+half its HD size (`graveyard_md`), or `every` in the script's list.
 
 ### Keeping pxl fast
 

@@ -1,5 +1,6 @@
 // Renders the README gallery (docs/gallery/) from the examples: clean nearest-neighbour upscales,
-// GIFs for animated assets. Run: node scripts/gallery.ts [asset ...] (all, or only those)
+// GIFs for animated assets. Run: node scripts/gallery.ts [asset ...] [--out DIR] (all, or only those;
+// --out writes them elsewhere: a look at one before it's done, which isn't committed)
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +9,8 @@ import { loadProject } from "../src/node/load.ts";
 import { encodePng } from "../src/node/png.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const out = join(root, "docs", "gallery");
+const args = process.argv.slice(2), at = args.indexOf("--out")
+const out = at >= 0 ? args.splice(at, 2)[1] : join(root, "docs", "gallery");
 mkdirSync(out, { recursive: true });
 
 // [example file, asset, target width in px, every nth frame (each kept frame lasts n times as long, so
@@ -37,7 +39,7 @@ const shots: [string, string, number, number?, string?][] = [
   ["hd2d/graveyard.px.js", "graveyard_md", 640, 1, "hd2d_graveyard"],
 ];
 
-const only = process.argv.slice(2);
+const only = args;
 for (const [file, name, width, every = 1, as = name] of shots.filter(([, n, , , a]) => !only.length || only.includes(n) || only.includes(a ?? ""))) {
   const p = loadProject(join(root, "examples", file));
   const b = p.build(name);
