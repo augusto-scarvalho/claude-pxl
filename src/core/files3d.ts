@@ -6,6 +6,7 @@
 import { type Color, LIN } from "./color.ts";
 import { PxError } from "./errors.ts";
 import type { Mesh3, Voxels } from "./grids.ts";
+import { SPLAT_LIGHT, type Splats, splatLight } from "./splats.ts";
 
 const rgb = (c: Color): [number, number, number] => [c >>> 24, (c >>> 16) & 255, (c >>> 8) & 255];
 /** MagicaVoxel's model limit, cells a side. */
@@ -126,4 +127,52 @@ export function readGlb(b: Uint8Array): { vertices: number; triangles: number; m
 export function readObj(s: string): { vertices: number; faces: number; materials: number } {
   const l = s.split("\n");
   return { vertices: l.filter((x) => x.startsWith("v ")).length, faces: l.filter((x) => x.startsWith("f ")).length, materials: l.filter((x) => x.startsWith("usemtl ")).length };
+}
+
+/** The 3DGS layout's color: the zeroth spherical harmonic, so a viewer's 0.5 + C0 f_dc gives it back. */
+const C0 = 0.28209479177387814;
+const PLY_PROPS = ["x", "y", "z", "nx", "ny", "nz", "f_dc_0", "f_dc_1", "f_dc_2", "opacity", "scale_0", "scale_1", "scale_2", "rot_0", "rot_1", "rot_2", "rot_3"];
+/**
+ * Splats as a .ply in the layout 3D Gaussian Splatting writes (Spark, SuperSplat and the other viewers
+ * read it): position, normal, color as SH DC (degree 0: no f_rest), opacity as its logit, scales as
+ * their logs, rotation as a quaternion (w, x, y, z); Y up, as .glb: the positions and normals turned
+ * (x, z, -y), each rotation turned with them. Each splat's color its material's ramp at its light.
+ */
+export function encodePly(S: Splats, ramps: Color[][]): Uint8Array {
+  const head = new TextEncoder().encode(["ply", "format binary_little_endian 1.0", `comment pxl: ${S.n} splats, Y up`, `element vertex ${S.n}`, ...PLY_PROPS.map((p) => `property float ${p}`), "end_header", ""].join("\n"));
+  const out = new Uint8Array(head.length + S.n * PLY_PROPS.length * 4), dv = new DataView(out.buffer);
+  out.set(head);
+  // the turn from z up to y up, -90 degrees about x: (w, x, y, z)
+  const qw = Math.SQRT1_2, qx = -Math.SQRT1_2;
+  let at = head.length;
+  const f = (v: number) => { dv.setFloat32(at, v, true); at += 4; };
+  for (let i = 0; i < S.n; i++) {
+    const p = S.pos, n = S.normal, r = S.rot, ramp = ramps[S.mat[i]] ?? ramps[0], lt = splatLight(S, i, SPLAT_LIGHT);
+    f(p[i * 3]); f(p[i * 3 + 2]); f(-p[i * 3 + 1]);
+    f(n[i * 3]); f(n[i * 3 + 2]); f(-n[i * 3 + 1]);
+    const col = ramp[Math.max(0, Math.min(ramp.length - 1, Math.round(lt * (ramp.length - 1))))];
+    for (const sh of [24, 16, 8]) f((((col >>> sh) & 255) / 255 - 0.5) / C0);
+    const o = Math.min(0.999, Math.max(0.001, S.opacity[i]));
+    f(Math.log(o / (1 - o)));
+    for (let e = 0; e < 3; e++) f(Math.log(Math.max(1e-6, S.scale[i * 3 + e])));
+    const [w, x, y, z] = [r[i * 4], r[i * 4 + 1], r[i * 4 + 2], r[i * 4 + 3]];
+    f(qw * w - qx * x); f(qw * x + qx * w); f(qw * y - qx * z); f(qw * z + qx * y);
+  }
+  return out;
+}
+/** What a 3DGS .ply says: its splats, its properties, its box (Y up), the mean opacity and scale. */
+export function readPly(b: Uint8Array): { count: number; props: string[]; min: number[]; max: number[]; opacity: number; scale: number } {
+  const text = new TextDecoder().decode(b.subarray(0, Math.min(b.length, 4096))), end = text.indexOf("end_header\n");
+  if (!text.startsWith("ply\n") || end < 0 || !text.includes("format binary_little_endian 1.0")) throw new PxError("not a binary little-endian .ply");
+  const lines = text.slice(0, end).split("\n"), count = +(/element vertex (\d+)/.exec(text)?.[1] ?? NaN), props = lines.filter((l) => l.startsWith("property float ")).map((l) => l.slice(15));
+  const base = new TextEncoder().encode(text.slice(0, end + 11)).length, stride = props.length * 4, dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  if (!(count >= 0) || base + count * stride !== b.length) throw new PxError(`.ply: ${count} vertices of ${props.length} floats don't fill its ${b.length} bytes`);
+  const get = (i: number, p: string) => dv.getFloat32(base + i * stride + props.indexOf(p) * 4, true);
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  let op = 0, sc = 0;
+  for (let i = 0; i < count; i++) {
+    ["x", "y", "z"].forEach((p, e) => { const v = get(i, p); min[e] = Math.min(min[e], v); max[e] = Math.max(max[e], v); });
+    op += 1 / (1 + Math.exp(-get(i, "opacity"))); sc += Math.exp(get(i, "scale_0"));
+  }
+  return { count, props, min, max, opacity: count ? op / count : 0, scale: count ? sc / count : 0 };
 }

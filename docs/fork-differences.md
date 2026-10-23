@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**354 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**355 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -24,10 +24,10 @@ page lists what the fork adds. Every commit is in
 | | Original (Oct 14) | This fork (Oct 23) |
 | --- | --- | --- |
 | Commands | 4: `build`, `serve`, `ascii`, `list` | 12: adds `describe`, `shot`, `check`, `steps`, `help`, `compare`, `blind`, `study` |
-| Engine modules | 16 core, 6 Node | 45 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
+| Engine modules | 16 core, 6 Node | 46 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [environment](../environment.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
-| Example files | 13 | 61 |
-| Tests | 59 | 315 |
+| Example files | 13 | 62 |
+| Tests | 59 | 317 |
 
 ## Looking and checking
 
@@ -105,6 +105,7 @@ follows from it.
 | `sdf`, `surface()` | Things described as distance fields in meters: primitives (sphere, rounded box, capsule tapering, cylinder, cone, torus, plane, ellipsoid), joined plainly or smoothly, moved, twisted, bent, mirrored, repeated, pushed by seeded noise, painted by region; any number read from the clock. Four kinds kept apart: distance, occupancy, density, appearance. `surface()` draws one as pixel art (ramps stepped by the light, its own shadows, clusters, an outline away from the light, normals, depth) from the side, the top, in iso, or through a `mesh()` camera at its depth with its shadow on what is drawn; each field's distance compiled to one function. |
 | `sdf.voxels`, `voxels()`, `sdf.mesh`, `export3d` | The same fields as voxel grids (cells of any size in meters, per axis too: slabs, bricks) drawn as pixel-art cubes, a tone to each face and the outline on the shaded side, in iso and top on the pixel grid (a cube `px` wide) or through a camera at its depth, things of different cells in one world; as meshes by surface nets for `mesh()`; written as MagicaVoxel `.vox`, `.obj` and glTF `.glb` (Y up), each read back. |
 | `sdf.density`, `volume()` | Densities from the same shapes: a soft edge eaten by seeded noise that flows through them on the clock and closes its loop, thinning away up; drawn as pixel art, ray-marched through their own light on a grid, a few tones of their ramp in clusters, dithered where thin (in the palette, or laid over by alpha); through a `mesh()` camera hidden by what is nearer and over what is behind, their shadow on the ground, and what glows lighting what is round it: a cloud, a ground mist, smoke, a magic orb. |
+| `sdf.splats`, `splats()` | Procedural Gaussian splats, experimental: a field's surface as flat discs along its normals, a density's inside as round blobs; a CPU rasterizer to pixel art (each ellipse through the camera, the nearest first, 3DGS's blending, snapped to the ramps in clusters, dithered where thin, outlined); written as a `.ply` in 3D Gaussian Splatting's layout for Spark and other viewers. The reference tree as surface, voxels, mesh and splats in four cameras side by side. |
 
 Five scenes are built on this: a road across the sertão, a park at 2 pm in two-point perspective, the
 end of the Cretaceous in three-point, a street race from the driver's seat, and two HD-2D dioramas (a

@@ -10,7 +10,8 @@ import { tiledMap } from "../core/tiled.ts";
 import { encodeAseprite } from "./aseprite.ts";
 import { encodeGif } from "./gif.ts";
 import { encodePng } from "./png.ts";
-import { encodeGlb, encodeObj, encodeVox, readGlb, readObj, readVox } from "../core/files3d.ts";
+import { encodeGlb, encodeObj, encodePly, encodeVox, readGlb, readObj, readPly, readVox } from "../core/files3d.ts";
+import { Splats } from "../core/splats.ts";
 import { Voxels } from "../core/grids.ts";
 
 export interface OutputOptions {
@@ -174,9 +175,13 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
     if (want && !want.has(m.name)) continue;
     try {
       const kb = (b: { length: number }) => `${(b.length / 1024).toFixed(1)} KB`;
-      const mesh = m.thing instanceof Voxels ? (m.as.some((f) => f !== "vox") ? m.thing.mesh() : undefined) : m.thing;
+      const mesh = m.thing instanceof Splats ? undefined : m.thing instanceof Voxels ? (m.as.some((f) => f !== "vox") ? m.thing.mesh() : undefined) : m.thing;
       for (const f of m.as) {
-        if (f === "vox") {
+        if (f === "ply") {
+          const b = encodePly(m.thing as Splats, m.ramps), r = readPly(b);
+          write(join(out, m.name + ".ply"), Buffer.from(b));
+          lines.push(`ply ${m.name} ${r.count} splats (3DGS: ${r.props.length} properties), Y up ${r.min.map((v) => +v.toFixed(2)).join(",")} to ${r.max.map((v) => +v.toFixed(2)).join(",")}, mean opacity ${r.opacity.toFixed(2)}, radius ${r.scale.toFixed(3)} m, ${kb(b)}`);
+        } else if (f === "vox") {
           const V = m.thing as Voxels, b = encodeVox(V, m.colors), r = readVox(b), [lo, hi] = V.bounds();
           write(join(out, m.name + ".vox"), Buffer.from(b));
           lines.push(`vox ${m.name} ${r.size.join("x")}, ${r.count} voxels of ${V.size.map((v) => +v.toFixed(4)).join(" x ")} m (${hi.map((v, e) => +(v - lo[e]).toFixed(2)).join(" x ")} m, from [${lo.map((v) => +v.toFixed(2)).join(", ")}]), ${r.colors} colors, ${kb(b)}`);

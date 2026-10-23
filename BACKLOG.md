@@ -935,8 +935,26 @@ What the phases left, each waiting for a reason:
 - [x] **Density volumes** (phase 4): `sdf.density` with flowing seeded noise that closes its loop and a
   fade up, `volume()` ray-marched through its own light on a grid, its ramp in clusters, dithered where
   thin, in mesh()'s depth, its shadow (`cast`) and its glow (`emit.glow`) on what is drawn.
-- [ ] **Procedural splats** (phase 5, `.ply`), **a scene IR with named parts and local edits** (phase
-  6), **evaluation and the guides** (phase 7).
+- [x] **Procedural splats** (phase 5, experimental): `sdf.splats` from a field's surface (flat discs
+  along the normals) or a density's inside (round blobs), `splats()` a CPU rasterizer to pixel art (EWA
+  ellipses, the nearest first, 3DGS's blending, snapped to the ramps in clusters), `.ply` in 3DGS's layout.
+- [ ] **A scene IR with named parts and local edits** (phase 6), **evaluation and the guides** (phase 7).
+- [ ] **Splats' own shadows**: a splat set lays none; a field's `surface(..., { hide: true })` lays it.
+  When: splats come from somewhere with no field behind them (a capture read from a .ply).
+- [ ] **Reading a .ply of trained splats** (a capture, from Spark's or SuperSplat's files) into
+  splats() as pixel art: the one use where splats bring what a field can't. Why: a photographed thing
+  drawn in a scene's palette. When: someone has one to draw (SH degree 0 colors first; the rest as an
+  average).
+- [ ] **The .ply opened in Spark**: checked here by reading it back (3DGS's 17 properties, SH degree 0),
+  not yet in a viewer. Why: a reader may want f_rest or another order. When: the first time one is
+  shared (a page with Spark from a CDN, the file beside it).
+- [ ] **mesh() in surface()'s orthographic views**: a mesh from the side, the top or in iso goes through
+  a camera function of one's own today (examples/sdf/splats.px.js, `orthoMesh`). When: a second file
+  needs it (a `view` with `kind` for mesh(), the faces turned into its frame).
+- [ ] **Splats' sizes by material** (a crown's leaf clumps bigger than its bark's flakes) and higher
+  SH degrees in the .ply: one size and the DC color today. When: phase 6's builders ask for leafier
+  crowns, or a viewer shows the flat color wrong.
+
 - [ ] **Volumes among volumes**: a volume writes no depth (it hides nothing), so volumes are drawn
   farthest first by hand; two crossing (mist through smoke) lie one over the other, not mixed. Why: a
   fog bank a column of smoke rises through. When: a scene shows it wrong (march them in one pass, their

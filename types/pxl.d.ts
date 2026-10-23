@@ -240,6 +240,13 @@ declare global {
     view?: PxSurfaceView; ppm?: number; at?: number[]; ramp?: string | PxColor[]; light?: number[]; thickness?: number; ambient?: number; cell?: number;
     emit?: { ramp: string | PxColor[]; strength?: number; glow?: number }; blend?: "dither" | "alpha"; pixel?: number; cast?: number;
   }
+  /** Gaussian splats: how many, their box. */
+  interface PxSplats { readonly kind: "splats"; readonly n: number; bounds(): [PxV3, PxV3] }
+  /** splats()'s options: made here from a field or density (spacing, size, seed), the view, materials' ramps or one ramp, the light, dither/cut/alpha where thin, the outline, a cell of K x K px. */
+  interface PxSplatOpts {
+    spacing?: number; size?: number; seed?: number; view?: PxSurfaceView; ppm?: number; at?: number[];
+    mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; ramp?: string | PxColor[]; light?: number[]; blend?: "dither" | "cut" | "alpha"; outline?: boolean; pixel?: number;
+  }
   /** voxels()'s options: surface()'s but ao; a cell's size (given a field), a cube's width in px (iso and top on the pixel grid). */
   interface PxVoxelOpts extends Omit<PxSurfaceOpts, "ao"> { size?: number | number[]; px?: number }
   /** A voxel grid: cells a side, their size in m, its low corner, how many are filled, its box; its outside as a mesh, and as mesh()'s faces. */
@@ -492,6 +499,8 @@ declare global {
     voxels(grid: PxVoxels | PxSdf, opts?: PxVoxelOpts): void;
     /** A density drawn as pixel art: ray-marched through its own light, its ramp in clusters, dithered where thin; through a camera at its depth, its shadow and glow on what is round it. */
     volume(density: PxDensity, opts?: PxVolumeOpts): void;
+    /** Gaussian splats (or a field or density made splats now) rasterized to pixel art, the nearest first. */
+    splats(set: PxSplats | PxSdf | PxDensity, opts?: PxSplatOpts): void;
     /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade. */
     shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): void;
     /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
@@ -601,8 +610,10 @@ declare global {
   function voxels(grid: PxVoxels | PxSdf, opts?: PxVoxelOpts): PxOp;
   /** A density (a cloud, mist, smoke, a glowing orb) drawn as pixel art, on the clock. */
   function volume(density: PxDensity, opts?: PxVolumeOpts): PxOp;
+  /** Gaussian splats rasterized to pixel art (experimental). */
+  function splats(set: PxSplats | PxSdf | PxDensity, opts?: PxSplatOpts): PxOp;
   /** Written by build: a grid as name.vox (and .obj/.glb of its blocks), a mesh as name.obj (+ .mtl) and name.glb, Y up; each read back. */
-  function export3d(name: string, thing: PxVoxels | PxMesh3, opts?: { mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; as?: ("vox" | "obj" | "glb")[] }): void;
+  function export3d(name: string, thing: PxVoxels | PxMesh3 | PxSplats, opts?: { mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; as?: ("vox" | "obj" | "glb" | "ply")[] }): void;
   /** Fields in 3D, in meters ([x, y ahead, z up]): primitives (round the origin; cylinder and cone standing on it), joins, and the other kinds made from a distance. */
   const sdf: {
     sphere(r: PxNum): PxSdf; box(size: PxVec | PxNum, o?: { round?: PxNum }): PxSdf; capsule(a: PxVec, b: PxVec, r: PxNum, r2?: PxNum): PxSdf;
@@ -619,6 +630,8 @@ declare global {
     voxels(f: PxSdf, o: { size: number | number[]; fill?: number; clock?: PxClock }): PxVoxels;
     /** the field as a mesh by surface nets, cells `size` m */
     mesh(f: PxSdf, o: { size: number | number[]; clock?: PxClock }): PxMesh3;
+    /** splats from a field's surface (flat discs) or a density's inside (round blobs), spacing m apart */
+    splats(f: PxSdf | PxDensity, o?: { spacing?: number; size?: number; seed?: number; light?: number[]; thickness?: number; clock?: PxClock }): PxSplats;
   };
   /** A model for mesh(): face(mat, ...points), strip(mat, a, b) between two lines of points, loft(mat, sections), box(mat, corner, corner); faces holds them. */
   function model(): {
