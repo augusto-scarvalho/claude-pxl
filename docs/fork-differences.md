@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**340 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**341 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -27,7 +27,7 @@ page lists what the fork adds. Every commit is in
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [environment](../environment.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 54 |
-| Tests | 59 | 266 |
+| Tests | 59 | 274 |
 
 ## Looking and checking
 
@@ -63,6 +63,7 @@ moved into the DSL where every scene can use it.
 | Rotation | Free angles, `directions()` for 8 or 16 views, RotSprite checked on real sprites, and a rotation guide. |
 | Import and export | `build --share N` (each asset N times bigger, clean, to post), PNG import (`shrink`, `palettize` to the nearest key in OKLab), Aseprite export (layers, frames, tags, palette, slices), GIFs that keep small figures' colors in lit scenes. |
 | Procedural | `hash`, `vnoise`, `fbm`, `bayer`, `seamless`; `scroll()` for parallax planes, `clouds()`, `plume()` for smoke and steam. |
+| Effects | `effect()`: what a shader does, done on the CPU on a sprite, an anim's frame or a layer, on the clock and a seed, so every frame is the same in the viewer, `shot` and the exports: `dissolve` (noise holes with burning rings), `pixelate`, `dither` to the palette, `tint` (kept in the palette with `ramp`), `distort` (a UV distortion that loops), `emit`. |
 | The ground and what grows on it | An [environment guide](../environment.md): grass, trees, bushes, rocks, walls, paths and small things as 16-bit games draw them, from SLYNYRD's, Saint11's and final boss blues' tutorials and `pxl study` on seven games' sheets, with the numbers to check a drawing against; and a [nature kit](../examples/nature/kit.px.js) to include, with builders for more (`grassTile`, `pine`, `bush`, `rampart`). |
 
 ## Characters, animation and rigs

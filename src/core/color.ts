@@ -35,6 +35,15 @@ export function toHex(c: Color): string {
   return "#" + h(r) + h(g) + h(b) + (a === 255 ? "" : h(a));
 }
 
+/** A channel blended over another (source s, under d, 0..255), as image editors' layer modes: layers' `blend`, `tint`. */
+export const MIXES: Record<string, (s: number, d: number) => number> = {
+  normal: (s) => s,
+  multiply: (s, d) => (s * d) / 255,
+  screen: (s, d) => 255 - ((255 - s) * (255 - d)) / 255,
+  add: (s, d) => Math.min(255, s + d),
+  overlay: (s, d) => (d < 128 ? (2 * s * d) / 255 : 255 - (2 * (255 - s) * (255 - d)) / 255),
+};
+
 /** Darken toward black by k (0..1); result is opaque. */
 export function darken(c: Color, k: number): Color {
   const [r, g, b] = channels(c);

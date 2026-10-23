@@ -1,7 +1,7 @@
 // Turns an asset definition into an image: base -> items (ops, grids, functions, layers)
 // -> post-processing (mirror, swap, flip, rot, outline, crop). Optionally traced.
 import { Canvas, type Placed, type Placement, type Resolver, betweenKey } from "./canvas.ts";
-import { type Color, TRANSPARENT, oklab, pack } from "./color.ts";
+import { type Color, MIXES, TRANSPARENT, oklab, pack } from "./color.ts";
 import { PxError, wrap } from "./errors.ts";
 import { Img } from "./image.ts";
 import { applyGlow } from "./glow.ts";
@@ -652,14 +652,6 @@ export function blend(img: Img, limg: Img, l: LayerOpts, pal: Palette, warn?: (m
     img.data[i] = c;
   }
 }
-
-const MIXES: Record<string, (s: number, d: number) => number> = {
-  normal: (s) => s,
-  multiply: (s, d) => (s * d) / 255,
-  screen: (s, d) => 255 - ((255 - s) * (255 - d)) / 255,
-  add: (s, d) => Math.min(255, s + d),
-  overlay: (s, d) => (d < 128 ? (2 * s * d) / 255 : 255 - (2 * (255 - s) * (255 - d)) / 255),
-};
 
 /**
  * Color-math layers (`blend`, `opacity`), as image editors have them. The results are new colors,

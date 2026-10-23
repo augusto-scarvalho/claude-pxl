@@ -504,6 +504,10 @@ happens after another, never all at once.
   another hue (a yellow crescent, then a magenta one), then a 1-frame sliver; a wedge, a crescent, a
   line along the edge, ghost copies. A dashing body leaves a dark trail back to where it was; a ball
   crossing in one frame is a capsule spanning the gap (`stamp`'s `smear`; a blade's, `arc()`).
+- **Shader effects** (`effect()`, `PXL help effect`): a teleport or a death as a dissolve over 1 s
+  (12 frames), holes in blobs about a quarter of the figure wide and 2 rings, the first white-yellow;
+  a hit's poison or frost as a `tint` of 0.3-0.5 then `dither` back to the palette; a ghost or heat
+  shimmer as `distort` of 1 px, `scale` 4 and more (at 3 the outline breaks into loose pixels).
 - **Shine:** a rest of 0.6–0.8 s, then a sweep in 4 frames: a corner glint, a short slanted band, a
   long band, the far corner (`clip` the item, a slanted `poly`); on a ring a crescent following the
   curve; a gem lights facet by facet until it is all lit 1 frame, then dark at once; ice, flat white

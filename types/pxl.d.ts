@@ -250,6 +250,23 @@ declare global {
     fog?: { color: PxColor; from: number; to: number; max?: number };
     vignette?: number;
   }
+  /** Options every effect takes: the pixels it writes (a region, keys) and its seed. */
+  interface PxEffectBase { where?: PxRegion; on?: string; seed?: number }
+  /** dissolve: noise holes over `progress` (0..1) of the drawing, `scale` px a blob, rings of `edge` keys round them (the first at the hole). */
+  interface PxDissolve extends PxEffectBase { progress?: number; scale?: number; edge?: string | string[]; pixel?: number }
+  /** pixelate: cells of `size` px, each the color most of its pixels have. */
+  interface PxPixelate extends PxEffectBase { size?: number }
+  /** dither: ordered (Bayer 4x4) to `keys` (default the palette); part-clear pixels go clear or opaque. */
+  interface PxDitherFx extends PxEffectBase { keys?: string | string[]; pixel?: number }
+  /** tint: opaque pixels blended toward `color` by `amount`, as a layer's blend mode; `ramp` keeps it in the palette (true) or in those keys. */
+  interface PxTint extends PxEffectBase { color: PxColor; amount?: number; blend?: "normal" | "multiply" | "screen" | "add" | "overlay"; ramp?: boolean | string | string[] }
+  /** distort: each pixel takes the one up to `amount` px away, offsets read off noise `scale` px a cell that goes `speed` cells round a circle over the loop. */
+  interface PxDistort extends PxEffectBase { amount?: number; scale?: number; speed?: number; axis?: "xy" | "x" | "y"; pixel?: number }
+  /** emit: `strength` of `color` (default their own) added in linear light, past white into white; `pulse` breathes it over the loop. */
+  interface PxEmit extends PxEffectBase { color?: PxColor; strength?: number; pulse?: number }
+  type PxEffect =
+    | ["dissolve", PxDissolve?] | ["pixelate", PxPixelate?] | ["dither", PxDitherFx?] | ["tint", PxTint]
+    | ["distort", PxDistort?] | ["emit", PxEmit?];
   interface PxGlow {
     where?: PxRegion; r?: number; strength?: number; color?: PxColor; bands?: number; ramp?: number;
     /** Keys the halo leaves as drawn: what the glowing thing is made of (the logs and stones under flames). */
@@ -296,6 +313,8 @@ declare global {
     rampmap(ramp: string | string[], opts?: { where?: PxRegion; hue?: [number, number] }): void;
     /** Move pixels by whole-pixel offsets: fn(x, y) gives [dx, dy] at a pixel's new place; it takes the color (dx, dy) behind it. */
     warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): void;
+    /** A shader's effect on what the canvas holds so far, in place, on its clock and seed: dissolve, pixelate, dither, tint, distort, emit. */
+    effect(...fx: PxEffect): void;
     /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away ("." or nothing: leave it). */
     plane(view: PxView | PxPerspective, fn: (x: number, z: number, col: number, row: number) => PxColor | null | undefined, where?: PxRegion): void;
     /** A tapered capsule painted round (px), shaded across toward the light along `ramp`, a rim on the lit edge. */
@@ -460,6 +479,8 @@ declare global {
   function rampmap(ramp: string | string[], opts?: { where?: PxRegion; hue?: [number, number] }): PxOp;
   /** Move pixels by whole-pixel offsets (breathing, hair and tails swaying, a body on a slope): fn(x, y) gives [dx, dy] at a pixel's new place. */
   function warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): PxOp;
+  /** A shader's effect on everything drawn before it (a sprite, an anim's frame, a layer), on the clock and a seed: dissolve, pixelate, dither, tint, distort, emit. */
+  function effect(...fx: PxEffect): PxOp;
   function recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): PxOp;
   function stamp(name: string, x?: number, y?: number, opts?: PxPlace): PxOp;
   function tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): PxOp;

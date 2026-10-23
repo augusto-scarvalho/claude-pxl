@@ -338,6 +338,32 @@ At 1920x1080 a frame takes about a second with `mesh()` and `post()` together: m
 own size first (`check` and `shot` are fast there), then the same at four times with `post()`, and
 `check: false` on it.
 
+## Effects
+
+`effect(name, opts)` runs a shader's effect, done on the CPU, on what the canvas holds so far: put it
+after what it changes, in a sprite, an anim (on each frame), a layer, or a function as
+`c.effect(...)`. A finished asset (its outline drawn) is changed by making one from it:
+`sprite("ghost", { base: "hero" }, effect("tint", { color: "i" }))`; an anim with `base` plays its
+base under it: `anim("hero_gone", { base: "hero", frames: 24, fps: 12 }, (c) => c.effect("dissolve", { progress: c.phase, edge: "yo" }))`.
+
+Each one is a function of the pixels, its options, a seed and the clock (`c.frame` of `c.frames`:
+the anim's, or the loop of what the asset places; a still is frame 0 of 1). The same frame is the
+same image in the viewer, `shot`, a sheet and a GIF, and nothing carries from one frame to the next.
+Several run in order (a tint, then a dither back to the palette). Every one takes `where` (a region)
+and `on` (keys), the pixels it writes, and `seed`. Sizes are in the art's pixels: `pixel: K` makes
+them K px each, for a picture drawn K times as big (HD, as `mesh({ pixel })`). Past the image's edge
+is clear (the other side on a `wrap` asset) and the image doesn't grow: leave room for what moves
+out. `pxl steps` lists each one with its options.
+
+| Effect | Notes |
+|---|---|
+| `effect("dissolve", { progress = 0.5, scale = 6, edge, pixel })` | holes eat the drawing: noise in blobs about `scale` px, made even so `progress` is the share gone (0 keeps everything, 1 takes everything). `edge: "yo"` draws a ring of each key round the holes, a pixel wide, the first touching the hole: a burning rim (only round holes, not along the silhouette). Moved by the clock: `(c) => c.effect("dissolve", { progress: c.phase })`. A teleport, a death, a spell fading. On a 26 px figure: `scale: 7` and two rings; at 4 with three rings the rims had eaten it by 0.3 |
+| `effect("pixelate", { size = 2 })` | cells of `size` px from the drawing's origin, each in the color most of its pixels have (the clear counts: a cell mostly empty goes empty), a tie to the pixel nearest its middle: coarser, in the palette. `size: 1` changes nothing |
+| `effect("dither", { keys, pixel })` | ordered dither (Bayer 4×4) to `keys` (default every color the file chose): each color goes to the mix of two keys nearest it (OKLab; keys far apart count against, Yliluoma's way), the second on as many pixels as the color is far toward it. A key stays a key; part-clear pixels go clear or opaque by the same pattern. Back to the palette after a `tint`, an `emit`, a `blend` layer |
+| `effect("tint", { color, amount = 0.5, blend = "normal", ramp })` | every opaque pixel toward `color` by `amount`, as a layer's `blend` (`multiply`, `screen`, `add`, `overlay`): poison, frost, part of a hit's flash; alpha kept. It leaves the palette, keeping each cluster one color; `ramp: true` stays in it (each tinted color goes to the palette's nearest, OKLab), `ramp: "uBbi"` to those keys only (a frost ramp). Two colors can land on one key: give the ramp as many steps as the tones it takes |
+| `effect("distort", { amount = 1, scale = 8, speed = 1, axis = "xy", pixel })` | UV distortion: each pixel takes the one up to `amount` px away (rounded, as `warp`: whole pixels move, no color is made up), the offset read off noise `scale` px a cell. Over the loop the noise goes round a circle `speed` cells long, so the last frame runs into the first. Heat haze, water, a ghost's shimmer; under 0.5 px it moves nothing |
+| `effect("emit", { color, strength = 0.5, pulse = 0 })` | emission: the pixels (`on`, `where`) give light, `strength` of `color` (default their own) added in linear light, what goes past white spilling into the other channels (a hot core whitens); `pulse` takes that share away and back over the loop. Runes, eyes, an edge, embers. After `lighting()`, which would darken it; its light doesn't reach anything else yet (a `lamp` does) |
+
 ## Animation
 
 ```js

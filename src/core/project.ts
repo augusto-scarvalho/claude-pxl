@@ -45,6 +45,7 @@ export const SIGNATURES: Record<string, string> = {
   light: "?where:r steps:n density:n",
   relight: "?where:r opts:o",
   warp: "fn:f ?where:r",
+  effect: "name:s ?opts:o",
   plane: "view:o fn:f ?where:r",
   terrain: "view:o height:f fn:f ?opts:o",
   solids: "view:o shapes:a ?opts:o",
@@ -76,7 +77,7 @@ export const SIGNATURES: Record<string, string> = {
 };
 
 /** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
-const CLOCKED = new Set(["flame", "scroll", "clouds", "plume"]);
+const CLOCKED = new Set(["flame", "scroll", "clouds", "plume", "effect"]);
 /** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
 function drawsWithFunctions(items: Item[]): boolean {
   return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));

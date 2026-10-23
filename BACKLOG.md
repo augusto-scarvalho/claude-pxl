@@ -827,3 +827,21 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   row's) and counts them off the clock, building nothing; `sheet(..., { rows: "tag" })` puts each
   animation on a row of its own. A pivot that moves with a stamp's `flip` is meant (a joint mirrors
   about itself) and documented: no change.
+
+## Shaders, wind and abilities (a plan ported from VFX Essential, VFX.js, Three and Babylon)
+
+- [x] **Effects on assets**: `effect(name, opts)`, an op that runs on what a sprite, an anim's frame
+  or a layer holds so far: `dissolve` (noise holes with burning rings), `pixelate`, `dither` (ordered,
+  to the palette), `tint`, `distort` (UV distortion off noise, looping), `emit`. Each a pure function
+  of the pixels, its options, a seed and the clock; on the CPU, the canonical implementation. Written
+  anew from what each does, no code copied.
+- [ ] **A GPU executor for the effects** (WebGL2, the plan's phase 2): deferred. WebGL exists only in
+  the browser and a GPU in Node needs native dependencies, while pxl renders in Node with none; a
+  simple effect on a sprite costs less on the CPU than a texture's round trip. The contract keeps the
+  door open: RGBA of a fixed size in and out, alpha straight, options as uniforms (numbers, colors,
+  keys), the clock and seed passed in, nothing kept between frames; noise is a function of (x, y,
+  seed), so a shader can compute the same field. Worth it only for a measured slow pass (a bloom at
+  1920x1080, many effects on a long scene), with a CPU/GPU comparison test per effect.
+- [ ] **The emission mask travels**: `emit` brightens its pixels, and nothing marks them as shining after. For
+  `mesh()` (sprites that shine and aren't darkened by the sun), `lighting()` and a bloom fed by it,
+  the mask has to move with the pixels as normals do (stamp, flip, rot, crop, outline).

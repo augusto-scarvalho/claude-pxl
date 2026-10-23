@@ -5,6 +5,7 @@ import { PxError } from "./errors.ts";
 import { glyph, lineWidth } from "./font.ts";
 import type { BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
 import { bump, dirOf, setNormal } from "./normals.ts";
+import { runEffect } from "./effects.ts";
 import { type View, perspective } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
 import { type Face, type Material, type MeshCanvas, type MeshOpts, drawMesh } from "./mesh.ts";
@@ -817,6 +818,21 @@ export class Canvas {
   }
 
   /**
+   * A shader's effect (effects.ts) on what the canvas holds so far, in place: dissolve, pixelate,
+   * dither, tint, distort, emit. `where` (a region) and `on` (keys) pick the pixels it writes.
+   */
+  effect(name: string, opts: Record<string, unknown> = {}): void {
+    if (typeof opts !== "object" || opts === null || Array.isArray(opts)) throw new PxError(`effect("${name}", { ... }): the options are an object, got ${JSON.stringify(opts)}`);
+    const { where, on, ...own } = opts;
+    if (on !== undefined && typeof on !== "string") throw new PxError(`effect "${name}": on is keys ("Yy", "*" any opaque), got ${JSON.stringify(on)}`);
+    const out = runEffect(name, this.img, own, { frame: this.frame, frames: this.frames, seed: this.seed, ox: this.ox, oy: this.oy, pal: this.pal, wrap: this.wrap });
+    if (where === undefined && on === undefined && !this.clipPred) return void this.img.data.set(out.data);
+    const ok = regionPred(where as Region), keys = this.maskAt(on);
+    for (let y = -this.oy; y < this.img.h - this.oy; y++)
+      for (let x = -this.ox; x < this.img.w - this.ox; x++) if (ok(x, y) && keys(x, y)) this.plot(x, y, out.data[this.index(x, y)]);
+  }
+
+  /**
    * Volume for flat art: each pixel steps along its ramp by where it sits in the shape. An edge
    * facing the light (empty space on that side) gets lighter, one facing away darker; the steps
    * come from the light direction, so with the default top-left light a top edge gets +1, a left
@@ -1401,7 +1417,7 @@ export function frameStart(tl: Timeline, n: number): number {
 /** Ops callable from art files; each top-level call can be traced as one painting step. */
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
-  "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp",
+  "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp", "effect",
   "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "capsule", "flame", "scroll", "clouds", "plume",
 ] as const;
 export type OpName = (typeof OPS)[number];
