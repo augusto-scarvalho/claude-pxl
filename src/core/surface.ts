@@ -16,7 +16,7 @@ import { PxError } from "./errors.ts";
 import type { Img } from "./image.ts";
 import { setNormal } from "./normals.ts";
 import type { Palette } from "./palette.ts";
-import { type View, perspective } from "./perspective.ts";
+import { type Perspective, type View, perspective } from "./perspective.ts";
 import { type Clock, type Compiled, Sdf, type V3, article, compile } from "./sdf.ts";
 import { Voxels, sizeOf, voxelize } from "./grids.ts";
 
@@ -68,7 +68,7 @@ export interface SurfaceCanvas {
 const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const unit = (a: readonly number[]): V3 => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 const RAD = Math.PI / 180;
-const corners = (lo: V3, hi: V3): V3[] => [0, 1, 2, 3, 4, 5, 6, 7].map((i) => [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]]);
+export const corners = (lo: V3, hi: V3): V3[] => [0, 1, 2, 3, 4, 5, 6, 7].map((i) => [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]]);
 
 /** An orthographic camera: right, up and forward (into the picture) in the world, turned `yaw` right and tilted `pitch` down. */
 export function orthoBasis(view: SurfaceView | undefined): { R: V3; U: V3; F: V3 } {
@@ -133,7 +133,7 @@ function finite(C: Compiled) {
 }
 
 /** Where a ray o + d t enters and leaves a box, or null. */
-function slab(o: number[], d: number[], lo: V3, hi: V3): [number, number] | null {
+export function slab(o: number[], d: number[], lo: V3, hi: V3): [number, number] | null {
   let t0 = -Infinity, t1 = Infinity;
   for (let e = 0; e < 3; e++) {
     if (Math.abs(d[e]) < 1e-12) { if (o[e] < lo[e] || o[e] > hi[e]) return null; continue; }
@@ -241,7 +241,75 @@ export function drawVoxels(c: SurfaceCanvas, thing: unknown, o: VoxelOpts = {}):
   drawTraced(c, voxelTracer(V), { ...o, ao: 0 }, "voxels");
 }
 
-const clockOf = (c: SurfaceCanvas): Clock => ({ t: c.t, phase: c.frames > 0 ? c.frame / c.frames : 0, frame: c.frame, frames: c.frames });
+export const clockOf = (c: SurfaceCanvas): Clock => ({ t: c.t, phase: c.frames > 0 ? c.frame / c.frames : 0, frame: c.frame, frames: c.frames });
+
+/** The view's camera on a canvas: a ray through a cell's middle, a point's depth along the camera's axis and where it lands, how near a march must come, the camera's axes, the light (the way to it, and on the picture). */
+export interface ViewCam {
+  W: number; H: number; x0: number; y0: number;
+  ray(cx: number, cy: number): { o: V3; d: V3 } | null;
+  axisDepth(p: V3): number;
+  toScreen(p: V3): [number, number] | null;
+  near(t: number): number;
+  R: V3; U: V3; F: V3; at: V3; L: V3; lx: number; ly: number; scale: number;
+  /** through a camera: the perspective and the eye in the thing's own frame */
+  P?: Perspective; eye: V3;
+}
+/** The camera for a thing with box lo..hi (its own frame; `cell` a voxel's size) drawn with options o: see drawTraced. */
+export function viewOf(c: SurfaceCanvas, o: SurfaceOpts & { px?: number }, lo: V3, hi: V3, cell: V3 | undefined, who: string, persp: boolean, K: number, origin: unknown): ViewCam {
+  const W = c.img.w, H = c.img.h, x0 = -c.ox, y0 = -c.oy;
+  let ray: (cx: number, cy: number) => { o: V3; d: V3 } | null;
+  let R: V3, U: V3, F: V3, at: V3 = [0, 0, 0], axisDepth: (p: V3) => number, toScreen: (p: V3) => [number, number] | null, lx = 0, ly = 0, scale = 0;
+  // how near the march must come: a fraction of a cell, which through a camera grows with the distance
+  let near: (t: number) => number;
+  let P: Perspective | undefined, eye: V3 = [0, 0, 0];
+  if (persp) {
+    P = perspective({ ...(o.view as View), w: (o.view as View).w ?? W });
+    const cy = P.horizon - P.focal * Math.tan(P.pitch * RAD), Pp = P;
+    at = (o.at ?? [0, 0, 0]) as V3;
+    eye = [-at[0], -at[1], P.eye - at[2]];
+    const E = eye;
+    F = unit(P.ray(P.vp - 0.5, cy - 0.5));
+    R = unit([Math.cos(P.yaw * RAD), -Math.sin(P.yaw * RAD), 0]);
+    U = [R[1] * F[2] - R[2] * F[1], R[2] * F[0] - R[0] * F[2], R[0] * F[1] - R[1] * F[0]];
+    ray = (cx, cy2) => ({ o: E, d: Pp.ray(cx - 0.5, cy2 - 0.5) as V3 });
+    axisDepth = (p) => dot([p[0] - E[0], p[1] - E[1], p[2] - E[2]], F);
+    toScreen = (p) => (axisDepth(p) > 0.05 ? Pp.ground(p[0] + at[0], p[1] + at[1], p[2] + at[2]) : null);
+    near = (t) => Math.max(0.002, (0.3 * K * t) / Pp.focal);
+  } else {
+    const pr = projection(o.view, o.ppm, o.px, cell, who), ppm = pr.k, { a, b, D } = pr;
+    ({ R, U, F } = pr);
+    scale = ppm;
+    // where its origin lands: given, or where it stands in the view's world (and its depth there)
+    const [ox, oy] = (origin ?? [W / 2 + x0, H + y0]) as number[];
+    const world = o.at?.length === 3 ? (o.at as V3) : undefined, [ax, ay] = world ? [ox + dot(world, a), oy + dot(world, b)] : ((o.at ?? [ox, oy]) as number[]);
+    const lift = world ? dot(world, D) : 0, back = Math.max(...corners(lo, hi).map((p) => Math.abs(dot(p, F)))) + 1;
+    if (!pr.grid) {
+      ray = (cx, cy) => {
+        const u = (cx - ax) / ppm, v = (ay - cy) / ppm;
+        return { o: [R[0] * u + U[0] * v - F[0] * back, R[1] * u + U[1] * v - F[1] * back, R[2] * u + U[2] * v - F[2] * back], d: F };
+      };
+      toScreen = (p) => [ax + dot(p, R) * ppm, ay - dot(p, U) * ppm];
+    } else {
+      // a point on the ray: in the plane of a and b, where it lands on (u, v)
+      const aa = dot(a, a), ab = dot(a, b), bb = dot(b, b), det = aa * bb - ab * ab;
+      ray = (cx, cy) => {
+        const u = cx - ax, v = cy - ay, al = (u * bb - v * ab) / det, be = (v * aa - u * ab) / det;
+        return { o: [a[0] * al + b[0] * be - D[0] * back, a[1] * al + b[1] * be - D[1] * back, a[2] * al + b[2] * be - D[2] * back], d: D };
+      };
+      toScreen = (p) => [ax + dot(p, a), ay + dot(p, b)];
+    }
+    // (the depth from the plane through its origin across the view: things drawn on one canvas at
+    // their own px `at` stand as if side by side; at [x, y, z] m, at their depths in one world)
+    axisDepth = lift ? (p) => dot(p, F) + lift : (p) => dot(p, F);
+    near = () => 0.3 / ppm;
+  }
+  const L = unit(o.light ?? [-0.55 * R[0] + 0.55 * U[0] - 0.6 * F[0], -0.55 * R[1] + 0.55 * U[1] - 0.6 * F[1], -0.55 * R[2] + 0.55 * U[2] - 0.6 * F[2]]);
+  if (o.light !== undefined && !(Array.isArray(o.light) && o.light.length === 3 && o.light.every(Number.isFinite) && Math.hypot(...o.light) > 0)) throw new PxError(`${who}: light is the way toward it, [x, y, z], got ${JSON.stringify(o.light)}`);
+  // which way the light is on the picture: the contour on that side is lit, the other outlined
+  lx = dot(L, R); ly = -dot(L, U);
+  return { W, H, x0, y0, ray, axisDepth, toScreen, near, R, U, F, at, L, lx, ly, scale, P, eye };
+
+}
 
 /** What both draw: the rays through the cells, the light, the clusters, the contour, the normals and depth, the shadow on what is drawn. */
 function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number }, who: string): void {
@@ -272,55 +340,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   const outKey = typeof o.outline === "string" ? c.color(o.outline) : null;
   if (typeof o.outline === "string" && (outKey === null || outKey === TRANSPARENT)) throw new PxError(`${who}: outline '${o.outline}' is not a color`);
 
-  // the camera: a ray for a cell (a pixel, or a block), the depth of a point along its axis
-  const W = c.img.w, H = c.img.h, x0 = -c.ox, y0 = -c.oy;
-  let ray: (cx: number, cy: number) => { o: V3; d: V3 } | null;
-  let R: V3, U: V3, F: V3, at: V3 = [0, 0, 0], axisDepth: (p: V3) => number, toScreen: (p: V3) => [number, number] | null, lx = 0, ly = 0, scale = 0;
-  // how near the march must come: a fraction of a cell, which through a camera grows with the distance
-  let near: (t: number) => number;
-  if (persp) {
-    const P = perspective({ ...(o.view as View), w: (o.view as View).w ?? W }), cy = P.horizon - P.focal * Math.tan(P.pitch * RAD);
-    at = (o.at ?? [0, 0, 0]) as V3;
-    const eye: V3 = [-at[0], -at[1], P.eye - at[2]];
-    F = unit(P.ray(P.vp - 0.5, cy - 0.5));
-    R = unit([Math.cos(P.yaw * RAD), -Math.sin(P.yaw * RAD), 0]);
-    U = [R[1] * F[2] - R[2] * F[1], R[2] * F[0] - R[0] * F[2], R[0] * F[1] - R[1] * F[0]];
-    ray = (cx, cy2) => ({ o: eye, d: P.ray(cx - 0.5, cy2 - 0.5) as V3 });
-    axisDepth = (p) => dot([p[0] - eye[0], p[1] - eye[1], p[2] - eye[2]], F);
-    toScreen = (p) => (axisDepth(p) > 0.05 ? P.ground(p[0] + at[0], p[1] + at[1], p[2] + at[2]) : null);
-    near = (t) => Math.max(0.002, (0.3 * K * t) / P.focal);
-  } else {
-    const pr = projection(o.view, o.ppm, o.px, T.cell, who), ppm = pr.k, { a, b, D } = pr;
-    ({ R, U, F } = pr);
-    scale = ppm;
-    // where its origin lands: given, or where it stands in the view's world (and its depth there)
-    const [ox, oy] = (origin ?? [W / 2 + x0, H + y0]) as number[];
-    const world = o.at?.length === 3 ? (o.at as V3) : undefined, [ax, ay] = world ? [ox + dot(world, a), oy + dot(world, b)] : ((o.at ?? [ox, oy]) as number[]);
-    const lift = world ? dot(world, D) : 0, back = Math.max(...corners(T.lo, T.hi).map((p) => Math.abs(dot(p, F)))) + 1;
-    if (!pr.grid) {
-      ray = (cx, cy) => {
-        const u = (cx - ax) / ppm, v = (ay - cy) / ppm;
-        return { o: [R[0] * u + U[0] * v - F[0] * back, R[1] * u + U[1] * v - F[1] * back, R[2] * u + U[2] * v - F[2] * back], d: F };
-      };
-      toScreen = (p) => [ax + dot(p, R) * ppm, ay - dot(p, U) * ppm];
-    } else {
-      // a point on the ray: in the plane of a and b, where it lands on (u, v)
-      const aa = dot(a, a), ab = dot(a, b), bb = dot(b, b), det = aa * bb - ab * ab;
-      ray = (cx, cy) => {
-        const u = cx - ax, v = cy - ay, al = (u * bb - v * ab) / det, be = (v * aa - u * ab) / det;
-        return { o: [a[0] * al + b[0] * be - D[0] * back, a[1] * al + b[1] * be - D[1] * back, a[2] * al + b[2] * be - D[2] * back], d: D };
-      };
-      toScreen = (p) => [ax + dot(p, a), ay + dot(p, b)];
-    }
-    // (the depth from the plane through its origin across the view: things drawn on one canvas at
-    // their own px `at` stand as if side by side; at [x, y, z] m, at their depths in one world)
-    axisDepth = lift ? (p) => dot(p, F) + lift : (p) => dot(p, F);
-    near = () => 0.3 / ppm;
-  }
-  const L = unit(o.light ?? [-0.55 * R[0] + 0.55 * U[0] - 0.6 * F[0], -0.55 * R[1] + 0.55 * U[1] - 0.6 * F[1], -0.55 * R[2] + 0.55 * U[2] - 0.6 * F[2]]);
-  if (o.light !== undefined && !(Array.isArray(o.light) && o.light.length === 3 && o.light.every(Number.isFinite) && Math.hypot(...o.light) > 0)) throw new PxError(`${who}: light is the way toward it, [x, y, z], got ${JSON.stringify(o.light)}`);
-  // which way the light is on the picture: the contour on that side is lit, the other outlined
-  lx = dot(L, R); ly = -dot(L, U);
+  const cam = viewOf(c, o, T.lo, T.hi, T.cell, who, persp, K, origin), { W, H, x0, y0, ray, axisDepth, toScreen, near, R, U, F, L, lx, ly, scale } = cam;
 
   // the cells the field's box covers on the picture
   const pts = corners(T.lo, T.hi).map(toScreen);
@@ -416,7 +436,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   // world, and the way from it to the light marched through the field
   if (o.hide && !persp) throw new PxError(`${who}: hide (its shadow alone) is through a perspective() camera`);
   if (!persp || castK <= 0 || !vis) return;
-  const P = perspective({ ...(o.view as View), w: (o.view as View).w ?? W }), eye: V3 = [-at[0], -at[1], P.eye - at[2]];
+  const { P, eye } = cam;
   const steps = c.pal.stepMap(-1);
   const down = (col: Color) => {
     const st = steps.get(col);
@@ -434,7 +454,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       if (q < 0 || !Number.isFinite(vis[q])) continue;
       const g = bx - gx0, gyy = by - gy0;
       if (g >= 0 && gyy >= 0 && g < GW && gyy < GH && m[gyy * GW + g] >= 0 && !hidden[gyy * GW + g]) continue;
-      const dir = P.ray(cx - 0.5, cy - 0.5), t = vis[q] / dot(dir, F), p: V3 = [eye[0] + dir[0] * t, eye[1] + dir[1] * t, eye[2] + dir[2] * t];
+      const dir = P!.ray(cx - 0.5, cy - 0.5), t = vis[q] / dot(dir, F), p: V3 = [eye[0] + dir[0] * t, eye[1] + dir[1] * t, eye[2] + dir[2] * t];
       if (!blocks(p, 0.02, 0.01)) continue;
       for (let y = 0; y < K; y++)
         for (let x = 0; x < K; x++) {

@@ -8,6 +8,7 @@ import { model } from "./mesh.ts";
 import { sdf } from "./sdf.ts";
 import { SURFACE_OPTS, VOXEL_OPTS, surfaceSize } from "./surface.ts";
 import { Mesh3, Voxels, surfaceNets, voxelize } from "./grids.ts";
+import { VOLUME_OPTS } from "./volume.ts";
 import type { Color } from "./color.ts";
 import { TRANSPARENT, oklab, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
@@ -61,6 +62,7 @@ export const SIGNATURES: Record<string, string> = {
   mesh: "view:v faces:a mats:o ?opts:o",
   surface: "field:o ?opts:o",
   voxels: "grid:o ?opts:o",
+  volume: "density:o ?opts:o",
   capsule: "x0:n y0:n r0:n x1:n y1:n r1:n ramp:s ?opts:o",
   flame: "x:n y:n size:n keys:s ?opts:o",
   scroll: "name:s y:n per:n ?opts:o",
@@ -92,7 +94,7 @@ export const SIGNATURES: Record<string, string> = {
 };
 
 /** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
-const CLOCKED = new Set(["surface", "voxels", "flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast", "shake"]);
+const CLOCKED = new Set(["surface", "voxels", "volume", "flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast", "shake"]);
 /** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
 function drawsWithFunctions(items: Item[]): boolean {
   return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
@@ -131,6 +133,7 @@ export const OP_OPTS: Record<string, string[]> = {
   mesh: ["light", "sprites", "pixel", "sun", "sky", "lamps", "emit", "shadows"],
   surface: SURFACE_OPTS,
   voxels: VOXEL_OPTS,
+  volume: VOLUME_OPTS,
   capsule: ["light", "rim"],
   flame: ["wind", "period", "seed", "frame"],
   scroll: ["x", "y", "frame", "axis"],
@@ -599,7 +602,7 @@ export class Project implements BuildCtx {
         const loc = this.callerLoc();
         try {
           checkArgs(name, args);
-          const o = name === "mesh" ? args[3] : name === "surface" || name === "voxels" ? args[1] : args[args.length - 1];
+          const o = name === "mesh" ? args[3] : name === "surface" || name === "voxels" || name === "volume" ? args[1] : args[args.length - 1];
           if (OP_OPTS[name] && isPlainObject(o)) checkKeys(name, o, OP_OPTS[name]);
         } catch (e) { throw wrap(e).within(name, loc); }
         if (name === "clip") checkItems("clip", args.slice(1), loc);

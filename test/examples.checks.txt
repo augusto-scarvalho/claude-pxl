@@ -97,6 +97,8 @@ sdf/grids.px.js: 0 warnings (3 scenes (3 frames, 8 distinct placements), 0 rigs,
   ran: nothing; not run: front marker (nothing has one), lit side (no scene declares world.light), feet (nothing placed has a height)
 sdf/kit.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one)
+sdf/volumes.px.js: 0 warnings (5 scenes (5 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: nothing; not run: front marker (nothing has one), lit side (no scene declares world.light), feet (nothing placed has a height)
 shop.px.js: 0 warnings (1 scene (1 frame, 13 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lettering on 1, lines on 22; not run: front marker (nothing has one), lit side (no scene declares world.light), feet (nothing placed has a height)
 sidescroller/duel.px.js: 0 warnings (1 scene (80 frames, 6 distinct placements), 0 rigs, 0 other assets with a front marker)

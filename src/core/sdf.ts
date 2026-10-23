@@ -173,14 +173,69 @@ export class Occupancy {
   inside(p: readonly number[], clock: Clock = STILL): boolean { return this.of.dist(p, clock) <= 0; }
   bounds(clock: Clock = STILL): [V3, V3] { return this.of.bounds(clock); }
 }
-/** How much matter there is, 0..1: fog, smoke. From a distance field: 1 deeper than `edge` m inside, 0 outside, smooth between. */
+/** A density's options: how soft its edge is, the noise that eats into it and how it flows, where it thins away up. */
+export interface DensityOpts {
+  /** m over which it goes from none at the shape's surface to full inside (default 0.1) */
+  edge?: number;
+  /** m the seeded noise pushes its edge in and out (default 0: none) */
+  noise?: Num;
+  /** the noise's billows, m across (default 0.5) */
+  scale?: Num;
+  seed?: number;
+  /** octaves of the noise (default 3: big billows and their curls) */
+  octaves?: number;
+  /** m the noise is carried through the shape over the loop, [x, y, z]: boiling, rising, creeping (it closes) */
+  flow?: Vec;
+  /** [z0, z1] m: full up to z0, thinning to none at z1 (smoke going, mist lying low) */
+  fade?: [number, number];
+}
+/**
+ * How much matter there is, 0..1: fog, smoke, a cloud. Made from a distance field: none outside its
+ * shape, full `edge` m inside, smooth between; the edge pushed in and out by seeded noise (fBm) that
+ * flows through it on the clock (sampled twice and crossfaded, so the loop closes), thinned away
+ * above `fade`.
+ */
 export class Density {
   readonly kind = "density";
   readonly of: Sdf;
   readonly edge: number;
-  constructor(of: Sdf, edge = 0.1) { needSdf(of, "density"); this.of = of; this.edge = pos(edge, "density's edge"); }
-  at(p: readonly number[], clock: Clock = STILL): number { const t = Math.max(0, Math.min(1, -this.of.dist(p, clock) / this.edge)); return t * t * (3 - 2 * t); }
-  bounds(clock: Clock = STILL): [V3, V3] { return this.of.bounds(clock); }
+  readonly o: DensityOpts;
+  constructor(of: Sdf, o: number | DensityOpts = {}) {
+    needSdf(of, "density");
+    const opts = typeof o === "number" ? { edge: o } : o ?? {};
+    const bad = Object.keys(opts).filter((k) => !["edge", "noise", "scale", "seed", "octaves", "flow", "fade"].includes(k));
+    if (bad.length) throw new PxError(`sdf.density(field, { edge, noise, scale, seed, octaves, flow, fade }): no option ${bad.join(", ")}`);
+    if (opts.seed !== undefined && !Number.isInteger(opts.seed)) throw new PxError(`sdf.density: seed is a whole number, got ${opts.seed}`);
+    if (opts.octaves !== undefined && !(Number.isInteger(opts.octaves) && opts.octaves >= 1 && opts.octaves <= 6)) throw new PxError(`sdf.density: octaves 1 to 6, got ${opts.octaves}`);
+    if (opts.fade !== undefined && !(Array.isArray(opts.fade) && opts.fade.length === 2 && opts.fade.every(Number.isFinite) && opts.fade[1] > opts.fade[0])) throw new PxError(`sdf.density: fade is [z0, z1] m, full below z0, none above z1, got ${JSON.stringify(opts.fade)}`);
+    this.of = of; this.o = opts; this.edge = pos(opts.edge ?? 0.1, "density's edge");
+  }
+  at(p: readonly number[], clock: Clock = STILL): number { return compileDensity(this, clock).rho(p[0], p[1], p[2]); }
+  bounds(clock: Clock = STILL): [V3, V3] { const c = compileDensity(this, clock); return [c.lo, c.hi]; }
+}
+/** A density at a moment: rho(x, y, z) 0..1, and its box (the shape's, grown by the noise's reach). */
+export function compileDensity(D: Density, clock: Clock = STILL): { rho: (x: number, y: number, z: number) => number; lo: V3; hi: V3 } {
+  const C = compile(D.of, clock), o = D.o, A = Math.abs(num(o.noise ?? 0, clock, "density's noise")), sc = pos(num(o.scale ?? 0.5, clock, "density's scale"), "density's scale");
+  const seed = o.seed ?? 1, oc = o.octaves ?? 3, f = vec(o.flow ?? [0, 0, 0], clock, "density's flow"), ph = clock.phase, edge = D.edge, fade = o.fade;
+  const moves = f.some((v) => v !== 0), w0 = 1 - ph, w1 = ph, norm = 1 / Math.sqrt(w0 * w0 + w1 * w1);
+  // the noise carried by flow over the loop: at phase 0 and 1 the same, so it closes; the two crossfaded
+  // samples brought back to one's spread
+  const n = (x: number, y: number, z: number) => {
+    if (!moves) return fbm3(x / sc, y / sc, z / sc, seed, oc);
+    const a = fbm3((x - f[0] * ph) / sc, (y - f[1] * ph) / sc, (z - f[2] * ph) / sc, seed, oc), b = fbm3((x - f[0] * (ph - 1)) / sc, (y - f[1] * (ph - 1)) / sc, (z - f[2] * (ph - 1)) / sc, seed, oc);
+    return 0.5 + (w0 * a + w1 * b - 0.5) * norm;
+  };
+  const rho = (x: number, y: number, z: number): number => {
+    const d = C.d(x, y, z);
+    if (d >= A) return 0;
+    let t = (-d + (A > 0 ? A * (2 * n(x, y, z) - 1) : 0)) / edge;
+    if (t <= 0) return 0;
+    if (t > 1) t = 1;
+    t = t * t * (3 - 2 * t);
+    if (fade) { if (z >= fade[1]) return 0; if (z > fade[0]) { const u = (z - fade[0]) / (fade[1] - fade[0]); t *= 1 - u * u * (3 - 2 * u); } }
+    return t;
+  };
+  return { rho, lo: C.lo.map((v) => v - A) as V3, hi: C.hi.map((v) => v + A) as V3 };
 }
 /** Which material a point of a surface is (by its normal there too): a distance field's mat() and paint(), apart from its shape. */
 export class Appearance {
@@ -234,7 +289,7 @@ export const sdf = {
   /** Seeded 3D noise in [0, 1] (what noise() pushes the surface by), for paint()'s regions: moss in patches. */
   fbm: (x: number, y: number, z: number, seed = 0, octaves = 2) => fbm3(x, y, z, seed, octaves),
   occupancy: (f: Sdf) => new Occupancy(f),
-  density: (f: Sdf, o: { edge?: number } = {}) => new Density(f, o?.edge),
+  density: (f: Sdf, o: DensityOpts = {}) => new Density(f, o),
   appearance: (f: Sdf) => new Appearance(f),
 };
 

@@ -231,6 +231,15 @@ declare global {
     /** through a camera: its shadow alone (a mesh made of it in its place) */
     hide?: boolean;
   }
+  /** A density's options: its soft edge (m), the noise eating it (m, billows scale m across, octaves), carried flow m over the loop, thinned away up from fade [z0, z1]. */
+  interface PxDensityOpts { edge?: number; noise?: PxNum; scale?: PxNum; seed?: number; octaves?: number; flow?: PxVec; fade?: [number, number] }
+  /** How much matter there is at a point, 0..1, at a moment; its box. */
+  interface PxDensity { readonly kind: "density"; at(p: number[], clock?: PxClock): number; bounds(clock?: PxClock): [PxV3, PxV3] }
+  /** volume()'s options: the view, its ramp, the light, how much a meter holds back, its shade, the grid's cell, what glows (and lights round it, m), dither or alpha where thin, a ray to K x K px, its shadow on what is drawn. */
+  interface PxVolumeOpts {
+    view?: PxSurfaceView; ppm?: number; at?: number[]; ramp?: string | PxColor[]; light?: number[]; thickness?: number; ambient?: number; cell?: number;
+    emit?: { ramp: string | PxColor[]; strength?: number; glow?: number }; blend?: "dither" | "alpha"; pixel?: number; cast?: number;
+  }
   /** voxels()'s options: surface()'s but ao; a cell's size (given a field), a cube's width in px (iso and top on the pixel grid). */
   interface PxVoxelOpts extends Omit<PxSurfaceOpts, "ao"> { size?: number | number[]; px?: number }
   /** A voxel grid: cells a side, their size in m, its low corner, how many are filled, its box; its outside as a mesh, and as mesh()'s faces. */
@@ -481,6 +490,8 @@ declare global {
     surface(field: PxSdf, opts?: PxSurfaceOpts): void;
     /** A voxel grid, or a field made voxels of `size` m now, drawn as pixel-art cubes: a tone a face, the outline on the shaded side; iso and top on the pixel grid. */
     voxels(grid: PxVoxels | PxSdf, opts?: PxVoxelOpts): void;
+    /** A density drawn as pixel art: ray-marched through its own light, its ramp in clusters, dithered where thin; through a camera at its depth, its shadow and glow on what is round it. */
+    volume(density: PxDensity, opts?: PxVolumeOpts): void;
     /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade. */
     shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): void;
     /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
@@ -588,6 +599,8 @@ declare global {
   function surface(field: PxSdf, opts?: PxSurfaceOpts): PxOp;
   /** A voxel grid, or a field made voxels of `size` m at each moment, drawn as pixel-art cubes. */
   function voxels(grid: PxVoxels | PxSdf, opts?: PxVoxelOpts): PxOp;
+  /** A density (a cloud, mist, smoke, a glowing orb) drawn as pixel art, on the clock. */
+  function volume(density: PxDensity, opts?: PxVolumeOpts): PxOp;
   /** Written by build: a grid as name.vox (and .obj/.glb of its blocks), a mesh as name.obj (+ .mtl) and name.glb, Y up; each read back. */
   function export3d(name: string, thing: PxVoxels | PxMesh3, opts?: { mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; as?: ("vox" | "obj" | "glb")[] }): void;
   /** Fields in 3D, in meters ([x, y ahead, z up]): primitives (round the origin; cylinder and cone standing on it), joins, and the other kinds made from a distance. */
@@ -598,7 +611,7 @@ declare global {
     union(...a: (PxSdf | PxSdf[] | { smooth?: PxNum })[]): PxSdf; intersect(...a: (PxSdf | PxSdf[] | { smooth?: PxNum })[]): PxSdf;
     /** seeded 3D noise in [0, 1] */ fbm(x: number, y: number, z: number, seed?: number, octaves?: number): number;
     occupancy(f: PxSdf): { kind: "occupancy"; inside(p: number[], clock?: PxClock): boolean };
-    density(f: PxSdf, o?: { edge?: number }): { kind: "density"; at(p: number[], clock?: PxClock): number };
+    density(f: PxSdf, o?: PxDensityOpts): PxDensity;
     appearance(f: PxSdf): { kind: "appearance"; at(p: number[], n?: number[], clock?: PxClock): string | null };
     /** a sprite's size for the field (or a grid, or a field as voxels of `size`) in an orthographic view, and its pivot (where its origin lands) */
     size(f: PxSdf | PxVoxels, o?: { view?: PxSurfaceView; ppm?: number; px?: number; size?: number | number[]; pad?: number; frames?: number }): { w: number; h: number; pivot: [number, number] };

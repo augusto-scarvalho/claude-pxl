@@ -932,8 +932,24 @@ What the phases left, each waiting for a reason:
 - [x] **Voxels and meshes from a field** (phase 3): `sdf.voxels` (cells of any size, per axis too),
   `voxels()` drawing cubes on the pixel grid (iso, top) or through a camera, `sdf.mesh` by surface nets,
   greedy voxel faces, `export3d` to `.vox`, `.obj`, `.glb` (Y up), each read back.
-- [ ] **Density volumes** (phase 4), **procedural splats** (phase 5, `.ply`), **a scene IR with named
-  parts and local edits** (phase 6), **evaluation and the guides** (phase 7).
+- [x] **Density volumes** (phase 4): `sdf.density` with flowing seeded noise that closes its loop and a
+  fade up, `volume()` ray-marched through its own light on a grid, its ramp in clusters, dithered where
+  thin, in mesh()'s depth, its shadow (`cast`) and its glow (`emit.glow`) on what is drawn.
+- [ ] **Procedural splats** (phase 5, `.ply`), **a scene IR with named parts and local edits** (phase
+  6), **evaluation and the guides** (phase 7).
+- [ ] **Volumes among volumes**: a volume writes no depth (it hides nothing), so volumes are drawn
+  farthest first by hand; two crossing (mist through smoke) lie one over the other, not mixed. Why: a
+  fog bank a column of smoke rises through. When: a scene shows it wrong (march them in one pass, their
+  grids together).
+- [ ] **A volume's glow on fields and volumes**: `emit.glow` steps up what is drawn round it (the ground,
+  walls, a field's pixels) by distance alone; another volume isn't lit, nor does the light turn with a
+  surface's facing. When: an orb in a fog reads wrong (mesh()'s lamps in a sun-lit diorama could take it).
+- [ ] **A volume's shadow on another volume, and on itself from a field**: the cloud's shadow falls on
+  what has a depth; mist under it isn't darkened. When: a scene needs it.
+- [ ] **How far light gets into a volume, as an option**: its own shadow takes 0.4 of its thickness on
+  the light's way (light in a cloud scatters forward); a fixed share. Why: a dense smoke wants deeper
+  shade, a thin cloud less. When: a volume reads too flat or too dark with thickness alone.
+
 - [ ] **surface() on voxels' pixel grid in iso**: voxels() draws iso on the pixel grid (a cube px wide,
   its top half as tall, its sides as tall), surface() draws a true orthographic iso (30 degrees down):
   the two don't line up on one canvas. Why: a field and its voxels side by side in one iso picture. When:
@@ -945,8 +961,9 @@ What the phases left, each waiting for a reason:
   sun's shadows, and only with `sun` on; a mesh made from a field (sdf.mesh) gets its shadow from its
   field (`surface(..., { hide: true })`). Why: a block or a mesh in a palette-lit diorama grounded by its
   own faces. When: a scene of meshes that no field stands behind.
-- [ ] **surface() and voxels() in mesh()'s sun**: they light by their own ramps and lay their shadow on
-  what is drawn, but walls' shadows don't fall on them and the sun's and sky's colours don't tint them.
+- [ ] **surface(), voxels() and volume() in mesh()'s sun**: they light by their own ramps and lay their
+  shadow on what is drawn, but walls' shadows don't fall on them and the sun's and sky's colours don't
+  tint them.
   Why: a field among sun-lit textured faces reads cooler than they do. When: an HD-2D scene in the sun
   shows a field (a SunMap test per hit, then shine() on the ramp tone, kept in clusters).
 - [ ] **An SDF sprite's depth pixel by pixel in mesh()**: a sprite stands as a card, each row at its
