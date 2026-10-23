@@ -72,7 +72,7 @@ npx github:augusto-scarvalho/claude-pxl build art.px.js
 ```
 
 Below, `pxl` means `node bin/pxl.js` in a clone, or `npx github:augusto-scarvalho/claude-pxl`.
-Reading JPEG, WebP or video (only `pxl study` and `pxl shot` do) needs `ffmpeg` on your PATH.
+Reading JPEG, WebP or video (only `pxl study`, `pxl shot` and `pxl compare` do) needs `ffmpeg` on your PATH.
 
 ## A first file
 
@@ -139,13 +139,14 @@ pxl build <art.px.js>             PNGs, sheets + JSON, GIFs and previews in out/
 pxl serve <art.px.js>             the live viewer: rebuilds on save and replays the painting
 pxl shot <art.px.js> <name>       one asset as a picture to look at: frames side by side, a region enlarged,
                                   values only (--grey), guide layers over it (--ref), the last commit above
-                                  and the pixels that changed (--vs HEAD --diff); a reference GIF, WebP or video too
+                                  and the pixels that changed (--vs HEAD --diff); more names a row each, or
+                                  playing side by side in one GIF (--gif); a reference GIF, WebP or video too
 pxl ascii <art.px.js> <name>      an asset as palette keys with x/y rulers
 pxl describe <art.px.js> <name>   a whole scene as text: what is where, what covers it, how it moves
 pxl check <art.px.js>             warnings on every scene and frame; LOOK lines on hand-drawn lines
 pxl steps <art.px.js> <name>      how it was painted; --at x,y names the line that painted that pixel
 pxl list <art.px.js>              a map of the file: each definition's lines and comment
-pxl compare <art.px.js> <name> <ref.png>   silhouette rows against a reference
+pxl compare <art.px.js> <name> <ref.png | other>   silhouette rows against a reference or another asset
 pxl blind <art.px.js> <name...>   facing labels checked by a reader who doesn't know them
 pxl study <picture or clip>       learn from finished art or a reference, and what to use in pxl for each part
 pxl help [name]                   the reference on an op or option, or a guide's section
@@ -193,7 +194,8 @@ says which to reach for.
 | which model and effort to draw with: one scene, seventeen runs | [docs/model-study.md](docs/model-study.md) |
 | every op and option | [reference.md](reference.md), or `pxl help <name>` |
 | the agent's workflow, and which example teaches what | [SKILL.md](SKILL.md) |
-| scenes, perspective, parallax, shadows | [scenes.md](scenes.md) |
+| scenes, perspective, HD-2D dioramas, parallax, shadows | [scenes.md](scenes.md) |
+| grass, trees, bushes, rocks, walls and paths as games draw them | [environment.md](environment.md) |
 | characters, animation with parts, rigs | [characters.md](characters.md) |
 | lamps, walls that block light, normal maps | [lighting.md](lighting.md) |
 | turning a sprite by any angle, 8 or 16 directions | [rotation.md](rotation.md) |
@@ -205,9 +207,9 @@ says which to reach for.
 Long projects made with pxl by agents, most over rounds of a curator's notes. Each is a folder in
 [`examples/`](examples) to read and copy. Smaller files to start from (the starter
 `basics.px.js`, tilesets, a top-down game character with idle, walk, run and a sword attack in four
-directions in [`examples/topdown_hero/`](examples/topdown_hero), and an HD-2D figure in eight
-directions, a graveyard, a harbor and a diorama in [`examples/hd2d/`](examples/hd2d)) are in the
-[examples table](SKILL.md#examples) of `SKILL.md`.
+directions in [`examples/topdown_hero/`](examples/topdown_hero), an HD-2D figure in eight directions
+and a small diorama in [`examples/hd2d/`](examples/hd2d), a kit of grass, trees and rocks in
+[`examples/nature/`](examples/nature)) are in the [examples table](SKILL.md#examples) of `SKILL.md`.
 
 ### A tropical forest
 
@@ -409,10 +411,11 @@ are shaded as crumpled cloth.
 ## Development
 
 ```sh
-npm install                     # dev only: typescript, @types/node
-node --test test/docs.test.ts   # one test file, while you iterate
-npm run test:quick              # every test but the two slowest (~20 s): before a push of small changes
-npm run check                   # type check + every test (~45 s), once before a commit
+npm install                                          # dev only: typescript, @types/node
+node --test test/docs.test.ts                        # one test file, while you iterate
+PXL_EXAMPLES=hd2d node --test test/examples.test.ts  # the examples' check on one folder
+npm run test:quick                                   # every test but the two slowest (~20 s)
+npm run check                                        # type check + every test (~60 s), once before a commit
 ```
 
 ```
@@ -428,7 +431,7 @@ test/         node:test suites
 | Script | What it does |
 | --- | --- |
 | `scripts/build.js` | writes `dist/` for npm installs |
-| `scripts/gallery.ts` | regenerates `docs/gallery/` from the examples |
+| `scripts/gallery.ts` | regenerates `docs/gallery/` from the examples (`--out DIR` to look first, `--every N` for a quick look) |
 | `scripts/calibrate.ts` | scores `pxl study` against the examples' own source |
 | `scripts/perf.ts` | `pxl check`'s time and peak memory on every example |
 | `scripts/hashes.ts` | a hash of every asset of the files given, to diff before and after an engine change that shouldn't move a pixel |

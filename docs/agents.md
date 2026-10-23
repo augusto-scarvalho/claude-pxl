@@ -11,8 +11,9 @@ result. To use pxl by hand, start with [Getting started](getting-started.md).
 - [Pick the model and effort](#pick-the-model-and-effort)
 - [Writing a brief](#writing-a-brief)
 - [How the agent works](#how-the-agent-works): look, fix in one turn, check
+- [Blocks first, then paint](#blocks-first-then-paint): a new move, a big scene in stages
 - [What it costs](#what-it-costs), and how to keep it cheap
-- [A big scene: one agent or a pipeline](#a-big-scene-one-agent-or-a-pipeline)
+- [A big scene: one agent, a fresh one, or a pipeline](#a-big-scene-one-agent-a-fresh-one-or-a-pipeline)
 - [Reviewing the result](#reviewing-the-result)
 - [When pxl gets in the agent's way](#when-pxl-gets-in-the-agents-way): the `FEEDBACK.md` loop
 - [For contributors](#for-contributors): tests, tutorials, calibrating `pxl study`, speed, measuring
@@ -119,7 +120,8 @@ it:
    guide's sections with their size. `pxl help <op>` prints what the reference says about one op and
    where the examples use it; `pxl help "scenes 1 3 11 14"` prints those sections of a guide. An
    example is mapped with `pxl list <file>` first, and only the lines needed are read. A reference
-   picture or clip is read with `pxl study ref.gif`. Guides and the reference are never dumped whole.
+   picture or clip is read with `pxl study ref.gif`. Guides and the reference are never dumped whole:
+   what an agent reads early is paid again on every later turn.
 2. **Look with one call.** `pxl shot art.px.js <name>` builds only that asset and writes a picture
    to read. Its text says what changed since the last shot and what `pxl check` finds on it. Exact
    pixels come as text from `pxl ascii art.px.js <name>`, cheaper than an image. A scene is also read
@@ -138,6 +140,25 @@ Commands run on one of pxl's examples write an `out/` next to it, so the agent g
 
 To watch it work, ask the agent to start `pxl serve art.px.js` in the background and give you the
 URL: the viewer replays each save op by op.
+
+## Blocks first, then paint
+
+Painting is the slow part, and a pose or a layout that is wrong under the paint costs the painting
+too. So judge the shape of the thing before any of it is painted:
+
+- **A new move** (a kneel, carrying a crate, a swing) is first drawn as flat blocks on the figure's
+  skeleton, in every direction it will be seen from. [`examples/hd2d/traveler.px.js`](../examples/hd2d/traveler.px.js)
+  makes `bk_<move>_<dir>` for each of its moves: the head yellow with a red patch where the face is,
+  the body orange, the right limbs light and the left dark. Ask for them as a GIF
+  (`pxl shot art.px.js bk_kneel_s bk_kneel_w bk_kneel_n --gif`), approve the pose and the timing, then
+  have it painted. The harbor's dockhand carries his crate low because the blocks showed the other
+  ways wrong: held up under the chin he read as a sleepwalker.
+- **A big scene** goes in stages, each shown and approved before the next: the camera and the ground
+  as flat blocks, then the big props, then the people and what they do, then the light and the
+  finish. Changing the camera after the props are painted repaints them all.
+- **A new head or part beside approved ones** is held to them row by row:
+  `pxl compare art.px.js new_head_s approved_head_s` lists each row's extents and where the new one
+  is wider. The harbor's crew kept their heads within a pixel of the traveler's skull this way.
 
 ## What it costs
 
@@ -174,11 +195,19 @@ What keeps a session cheap (the skill already asks the agent for the first three
 - **The right effort.** Thinking is the biggest share, and effort sets it: medium for drafts and
   small fixes, xhigh for a scene you'll show.
 
-## A big scene: one agent or a pipeline
+## A big scene: one agent, a fresh one, or a pipeline
 
 For a scene of 320×180 and up with many props and motion, the skill has the agent ask you which way
 to make it, with the numbers above and how long the conversation already is. One agent is the
 default: the cheapest and the most coherent (85 turns and 31 minutes for the city street).
+
+When the conversation is already long (a few hundred thousand tokens), give the scene to a fresh
+agent instead of going on: every turn re-reads the whole conversation. Write the brief to a file
+(what to make, the stages to show, the files and guide sections to read, where the art goes) and
+start a new session with it, `claude -p --effort xhigh --allowedTools "Bash Read Write Edit Glob Grep" < brief.txt`
+or an interactive one told to read the file. Inside Claude Code, a subagent that isn't a fork starts
+fresh too, with only its prompt. The harbor was made this way: a brief file, a fresh agent, the
+stages approved one by one.
 
 A pipeline has a planner write the palette (keys and ramps only), a plan (for each part: its file,
 its assets named with the part as prefix, its box, pivot, where it is stamped, its light, one timing
@@ -225,6 +254,7 @@ Pass the prompt on stdin: `--add-dir` takes several values and would swallow it.
 - **Compare versions.** When the agent replaces art you approved, ask it to keep the old one as
   `<name>_old` and show both: `pxl shot art.px.js name name_old`. Against the last commit:
   `pxl shot art.px.js name --vs HEAD --diff` (the old version above, the changed pixels in red).
+  Several moving at once: `pxl shot art.px.js walk_s walk_w walk_n --gif`.
 - **Ask what painted a pixel.** `pxl steps art.px.js name --at x,y` names the source line.
 - **Facing.** For a rig, `pxl blind` shows its parts unnamed to a reader who doesn't know which way
   they're meant to face, and checks the answers.
@@ -251,23 +281,32 @@ lists them.
 
 ### Tests
 
-While you iterate, run only the test file for what you changed:
+Iterate on the cheap tests, run the full suite once before a commit. While you work, run only the
+test file for what you changed, or the quick suite:
 
 ```sh
-node --test test/docs.test.ts           # the commands and flags the docs cite, the sections SKILL.md names
+node --test test/docs.test.ts                            # one file: the commands and flags the docs cite
+npm run test:quick                                       # every test but the two slowest, about 20 s
+PXL_EXAMPLES=hd2d node --test test/examples.test.ts      # the examples check, on one folder (or hd2d/harbor, or a,b)
+npm run check                                            # types and every test, about 60 s: once, before the commit
 ```
 
-`npm run test:quick` runs every test but the two slowest (the check of every example and the study
-of the gallery's GIFs), about 20 s. Run `npm run check` (types and every test, about 45 s) once
-before a commit, not after each edit: the full suite is mostly those two, and a change to a check,
-the study or an example is what they catch.
+The two slowest tests are the check of every example (about 50 s, all cores) and the study of the
+gallery's GIFs; a change to a check, to `study` or to an example is what they catch. With
+`PXL_EXAMPLES`, the examples test checks only the examples whose path under `examples/` starts with
+it, says in its name how many it left out, and leaves the other examples' lines alone.
 
 `test/examples.checks.txt` holds what `pxl check` says on every example. After a change you meant
 that adds or removes a warning, rewrite it and read the diff:
 
 ```sh
-PXL_UPDATE=1 node --test test/examples.test.ts
+PXL_UPDATE=1 node --test test/examples.test.ts                       # every example
+PXL_UPDATE=1 PXL_EXAMPLES=hd2d node --test test/examples.test.ts     # only those lines
 ```
+
+An example that has grown slow slows every run of the suite: `node scripts/perf.ts <file>` times its
+check, and `pxl build <file> --profile` names the art file's own slow functions (the harbor's water
+worked out the same cells for every frame; once a pixel took its check from 28 s to 10 s).
 
 ### Teaching pxl from tutorials
 
@@ -314,9 +353,10 @@ change that helps one scene often costs another.
 `docs/gallery/` holds the README's pictures, made by `node scripts/gallery.ts [name ...]`. Git keeps
 every version of every file for good, and a GIF hardly compresses: each one committed and then
 replaced stays in every full clone (one scene's five versions in a day added 24 MB). Look at a GIF
-that isn't done with `node scripts/gallery.ts <name> --out <scratch dir>`, and commit it once, at
-the end of the round. Keep a GIF under 10 MB (GitHub stops animating bigger ones): a long scene at
-half its HD size (`graveyard_md`), or `every` in the script's list.
+that isn't done with `node scripts/gallery.ts <name> --out <scratch dir>` (`--every 4` builds one
+frame in four, a quick look at a long story), and commit it once, at the end of the round. Keep a GIF
+under 10 MB (GitHub stops animating bigger ones): a long scene at half its HD size (`graveyard_md`),
+an excerpt of its story (`harbor_clip`), or `every` in the script's list.
 
 ### Keeping pxl fast
 
@@ -324,7 +364,7 @@ Agents run `pxl shot`, `check` and `study` many times a session, and the test su
 every example: a slow path costs every turn. Before and after a change to the engine:
 
 ```sh
-npm run check                                           # types and tests, about 45 s (test:quick ~20 s)
+npm run check                                           # types and tests, about 60 s (test:quick ~20 s)
 node scripts/perf.ts                                    # pxl check's time and peak memory on every example
 node scripts/hashes.ts examples/hd2d/*.px.js > a.txt    # every asset's hash: diff it after, nothing should move
 node --cpu-prof --cpu-prof-dir=prof bin/pxl.js study clip.gif --no-out

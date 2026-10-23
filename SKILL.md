@@ -57,8 +57,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    keeps one frame in three. A build that has grown slow: `--profile` names the functions where
    the time went, in your file and in pxl.
 5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
-   rig of the file and every frame of an animated scene (a picture made as an `anim()` gets none of
-   those): warnings only, with the frames they happen at. Fix each or say why it's meant. It also
+   rig of the file and every frame of an animated scene (one in 8 with `check: { every: 8 }` on a long
+   story's; a picture made as an `anim()` gets none of those): warnings only, with the frames they happen at. Fix each or say why it's meant. It also
    lists, as LOOK lines that don't fail it, the L-corners and jaggies in the 1 px lines of every
    sprite and part drawn by hand, and tones side by side too close to tell apart (`PXL shot` rings
    those pixels in `<name>_look.png`): look at each, delete a doubled step on a smooth line, keep a
@@ -69,8 +69,9 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    A lit-side warning that looks wrong: `--readings` shows what the rule read on every placement.
    Then look as a critic. Replacing approved art: keep `name_old` beside the new one and show
    both, `PXL shot art.px.js name name_old`, for the user to choose. Matching a reference:
-   `PXL compare art.px.js <name> ref.png [--shrink N]` lists each row's extents side by side
-   (`PXL compare ref.png` alone: the reference's own rows, to draw to). Which
+   `PXL compare art.px.js <name> ref.png [--shrink N]` lists each row's extents side by side (against
+   another asset, `other` or `other.px.js:name`: a new head within a pixel of the approved one; `PXL
+   compare ref.png` alone: the reference's own rows, to draw to). Which
    way a rig's parts face: `PXL blind art.px.js <rig>` shows them unnamed to a reader who doesn't
    know the labels (characters.md §11).
 6. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL.
@@ -83,7 +84,8 @@ the others.
 For a big, busy scene (320×180 and up, many props, animated), ask the user first, with the numbers:
 
 - **One agent** (the default): you plan and draw it all. The cheapest and the most coherent: a
-  320×180 animated city street took 85 turns and 31 minutes.
+  320×180 animated city street took 85 turns and 31 minutes. In a conversation already long, a fresh
+  agent given a brief file (`claude -p ... < brief.txt`, as below) costs less than going on here.
 - **A pipeline**: a planner writes `palette.px.js` (keys and ramps only), a plan (per part: its
   file, its assets with the part's name as prefix, box, pivot, where it is stamped, its light, one
   timing for every loop) and the scene file that includes the parts. Then one fork of the planner
@@ -103,7 +105,9 @@ For a big, busy scene (320×180 and up, many props, animated), ask the user firs
   as cheap.
 
 Both are in `examples/cyberpunk/`; `pipeline/plan.md` is a plan whose parts fit. Included files
-share one scope, so every top-level name in a part starts with the part's name.
+share one scope, so every top-level name in a part starts with the part's name. Either way, show it in
+stages for the user to approve before painting on: the camera and the ground as blocks, the props,
+then the people; a new move as flat blocks first (`bk_<move>_<dir>` in `hd2d/traveler.px.js`).
 
 ## Looking things up
 
@@ -191,8 +195,8 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 - **In meters**: `perspective()` (one, two or three points: `yaw`, `pitch`), `plane()` for flat ground,
   `terrain()` for hills and mountains, `solids()`/`shadows()` for things built of `solid` shapes,
   `mesh()` for faces in meters from `model()` (what you are inside of or that wraps round itself; an
-  HD-2D diorama: textured boxes, sprites standing in them, `sun`, `lamps`), then `post()` in the
-  same body for depth of field, haze, bloom; `capsule` for a limb painted round, `flame` for fire
+  HD-2D diorama: textured boxes, sprites standing in them, `sun`, `lamps`; a material's `block: 4`
+  draws its faces in blocks of a sprite's pixel in an HD picture), then `post()` in the same body for depth of field, haze, bloom; `capsule` for a limb painted round, `flame` for fire
   (`PXL help "scenes 7"`); procedural texture with `hash`, `vnoise`, `fbm`, `bayer`, `seamless`
   (`PXL help vnoise`).
 
@@ -229,9 +233,9 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `rig/knight.px.js` | a 72 px knight built skeleton first: `rig`, `figure`, stand-ins, `plate`-lit parts, `twin` parts for the turned rig; poses from `ik`, slashes with `arc` smears; `facing` and `world` read out by describe |
 | `rig/warden.px.js` | a whirling axe combo on a skeleton in 3D: the body turns about its upright with the swing (front, back, front again), the shoulders coil against the hips, the knees bend, the arm reaches full length; the head drawn by hand in five views picked by the turn, the torso and a coat that flares with the turn sampled as surfaces, the hair a frame late; at rest a fighting stance sways from foot to foot by half pixels, the head a frame behind, the feet still (`stamp`'s `sub`, `c.subpixel`); the axe drawn in 3D and its smear the path its blade took, behind the body where that path ran; a reflection on a polished floor (`flip: "y"`, `opacity`) |
 | `cyberpunk/` | a 320×180 animated city street at dusk made two ways: by one agent (`sodium_hour.px.js`) and by a pipeline (`pipeline/`: the plan, the palette, eight part files, the scene) |
-| `nature/kit.px.js` | grass tiles, pines, bushes, rocks, walls, flagstones, tufts, flowers, a dead tree, drawn to the environment guide; builders for more (`grassTile`, `pine`, `bush`, `rampart`); `include` it |
-| `hd2d/traveler.px.js` | an HD-2D figure in the 8 directions (S, SW, W, NW, N and their mirrors), walking and idle: a skeleton in 3D as the warden's, blocked out first, painted part by part (trousers, boots, a tunic with its belt, a cloak hung from the shoulders that trails and sways), a head drawn per view; a walk of its own per view; a second figure recolored |
-| `hd2d/graveyard.px.js` | an HD-2D graveyard on a hill, drawn after the games' sheets (`pxl study`): grass of blades laid a texel to a pixel, flagstones, a mossy rampart, headstones and rocks as sprites at the scene's scale, festooned pines; a fence whose clear texels are holes (`anchor: "face"`), a low sun behind, mist |
+| `nature/kit.px.js` | grass tiles, pines, bushes, rocks, walls, flagstones, tufts, flowers, a dead tree, drawn to the environment guide; builders for more (`grassTile`, `pine`, `bush`, `rampart`), and trees built as volumes in 3D that sway (`pineVolume`, `deadTreeVolume`); `include` it |
+| `hd2d/traveler.px.js` | an HD-2D figure in the 8 directions (S, SW, W, NW, N and their mirrors), walking and idle: a skeleton in 3D as the warden's, blocked out first, painted part by part (trousers, boots, a tunic with its belt, a cloak hung from the shoulders that trails and sways), a head drawn per view; a walk of its own per view; a kneel; each move also as flat blocks (`bk_<move>_<dir>`), to judge a new one before painting it; a second figure recolored |
+| `hd2d/graveyard.px.js` | an HD-2D graveyard on a hill, drawn after the games' sheets (`pxl study`): grass of blades laid a texel to a pixel, flagstones, a mossy rampart, headstones and rocks as sprites at the scene's scale, festooned pines; a fence whose clear texels are holes (`anchor: "face"`), a low sun behind, mist; a story on one clock: the traveler comes in, kneels to lay a rose and talks with a mourner in parchment dialogue boxes, `check: { every: 8 }` |
 | `hd2d/harbor.px.js` | an HD-2D harbor after Octopath Traveler II, its camera matched by measuring the reference: a galleon lofted in meters, castles, balusters, lanterns, sails sewn of panels toned by the sun through them, bobbing at a pier of two levels with a diagonal ramp; wood laid whole at the sprites' scale; water with glints, bokeh and the hull's reflection; rowboats, a crane, gulls, a crew at work; Alden's passage aboard with a dialogue; a `camera()` that runs an excerpt of the story for the gallery |
 | `hd2d/crew.px.js` | the traveler's skeleton dressed per person: five heads drawn per view within a pixel of his skull (a bandana and a ponytail, bald and bearded, a flat cap, a braid, grey hair tied back), outfits swept round the body (a striped shirt, a vest, a leather apron, a long coat, a bodice and a long skirt), a crate carried low painted into the figure's depth, and its blocks |
 | `hd2d/plaza.px.js` | an HD-2D diorama: a camera high up through a long lens, boxes in meters tiled with pixel-art textures by `mesh()`, the topdown hero, pines and lamps standing among them in one depth (`sprites`, on contact shadows); a late sun, sky and lamps with the sun's shadows (`sun`, `lamps`, `emit`, sprites lit through `bump("hybrid")`); the same at 1920x1080 (`pixel: 4`) with `post()`: depth of field, haze, bloom, vignette; the camera, blocks and textures it shares with the graveyard in `kit.px.js` |

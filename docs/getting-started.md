@@ -32,7 +32,7 @@ node bin/pxl.js            # prints every command and its options
 Below, `pxl` means `node bin/pxl.js` in the clone (or `node <path to the clone>/bin/pxl.js` from
 anywhere). Without cloning, `npx github:augusto-scarvalho/claude-pxl <command>` runs the same CLI.
 
-Reading videos, JPEG or WebP (only `pxl study` and `pxl shot` do) needs `ffmpeg` on your PATH. PNG
+Reading videos, JPEG or WebP (only `pxl study`, `pxl shot` and `pxl compare` do) needs `ffmpeg` on your PATH. PNG
 and GIF need nothing.
 
 ## Your first sprite
@@ -157,6 +157,7 @@ Useful options:
 | get around a long file | `pxl list art.px.js` (each definition's line range and comment) |
 | look up an op or option | `pxl help <name>`; `pxl help` alone for the index |
 | match a reference sprite's silhouette | `pxl compare art.px.js hero ref.png --shrink 2`; `pxl compare ref.png` alone measures its rows |
+| hold a new part to one you approved, row by row | `pxl compare art.px.js head_new head_old` (or `other.px.js:head`) |
 | learn from finished art or a reference | `pxl study ref.gif` |
 | measure one thing moving in a reference | `pxl study ref.gif --at x,y,w,h` (its box every frame, its spacing; the region in the drawing's own pixels, as `shot` shows it) |
 
@@ -201,11 +202,14 @@ each piece as a strip. `--no-out` prints the text only.
   animating with parts (timing an action, squash and stretch, walks), rigs. What the tutorials teach
   about lines, anti-aliasing, clusters and timing is in §4, §7, §10 and §12 (frame counts measured
   on Saint11's cards).
+- [environment.md](../environment.md): grass, trees, bushes, rocks, walls and paths as games draw
+  them, with a kit to start from (`examples/nature/kit.px.js`).
 - [lighting.md](../lighting.md): lamps, light blocked by walls, normal maps, glow.
 - [rotation.md](../rotation.md): turning sprites by any angle, 8 or 16 directions.
 - [`examples/`](../examples): finished files to copy the structure of. Start with `basics.px.js`;
   for a game, `platformer.px.js` and `topdown.px.js` (tilesets laid out as levels) and
-  [`topdown_hero/`](../examples/topdown_hero) (a character in four directions, a tagged sheet).
+  [`topdown_hero/`](../examples/topdown_hero) (a character in four directions, a tagged sheet); for
+  an HD-2D scene (pixel-art sprites in a 3D diorama), [`hd2d/`](../examples/hd2d).
   [SKILL.md](../SKILL.md#examples) has a table of which example teaches what.
 
 Art files can be `.ts`: add `/// <reference path="<pxl>/types/pxl.d.ts" />` at the top for editor
@@ -215,6 +219,9 @@ completion.
 
 - **An error.** It names `file:line:col`, the asset, layer and op, and often suggests a fix. One
   broken asset doesn't stop the others from building.
+- **An error ends "the art file's top level declares 'post'"** (or `text`, `frame`...). A helper of
+  yours has the name of one of pxl's ops and hides it in the whole file, so the call meant for pxl's
+  went to yours. Rename yours (`pole`, not `post`).
 - **`node: bad option` or a syntax error inside pxl.** Your Node is older than 22.18.
 - **A video, JPEG or WebP won't open.** Install `ffmpeg` and make sure `ffmpeg -version` runs.
 - **`study` reads a reference at the wrong size** (its `Kind:` line says 8x where you count 16 screen
