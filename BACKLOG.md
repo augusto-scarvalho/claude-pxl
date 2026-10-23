@@ -879,9 +879,12 @@ WebP read frame by frame, one cycle of a loop in place read as such.
 - [ ] **A spell kit**: `spell(element, tier, { from, to })` on the abilities' pieces, drawn by `cast()`;
   nine elements as recipes (ramp, noise, particles, motion, impact, centerpiece, mark), three tiers
   (size, particles, time, light, glow, shake; a shockwave from 2, a centerpiece, flash and mark at
-  3); a guide to designing an element (scenes 12); the sheet in `examples/spells.px.js`. Left: a
-  spell drawn in `mesh()` by itself (today a diorama places its sprites and lights by `S.at(t)` and
-  `S.lights(t)`, as the clearing does), the shake for a whole scene from a cast in one cell of it.
+  3); a guide to designing an element (scenes 12); the sheet in `examples/spells.px.js`. Variants
+  and forms (solids by the volume method in src/core/volumes.ts: rising, falling, cracking, breaking
+  up; quakes, slides, novas, blizzards, waves, chains, blades, rain, grasping shadows, leaves) and
+  views (side, top, iso, a perspective() camera), `examples/spell_variants.px.js`. Left: a cast
+  inside `mesh()`'s depth (a spell through a camera draws over the diorama, not between its things),
+  the shake for a whole scene from a cast in one cell of it, pieces that collide with each other.
 - [ ] **Dissolve looks**: `look` (neutral by default, burn, acid, magic, frost), the edge's keys over
   the progress, a char band ahead of the edge, glow, seeded debris (ash, drips, frost, sparks) aged by
   the progress; on sprites and on mesh faces (no debris on faces: a face's pieces would need the

@@ -733,6 +733,7 @@ export class Canvas {
    */
   cast(s: Spell): void {
     if (!s || typeof s.draw !== "function") throw new PxError('cast(spell("fire", 2, { from: [x, y], to: [x, y] })): a spell');
+    s.bind(this);
     s.under(this);
     const d = this.img.data, a = d.slice();
     s.draw(this);

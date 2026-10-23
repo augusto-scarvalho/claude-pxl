@@ -549,7 +549,8 @@ happens after another, never all at once.
   over the last 35%, the target's light `{ r: 3, strength: 2.5 }` flickering with its flames.
 - **A spell kit** (`spell()`, `examples/spells.px.js`): one call a whole cast, `cast(spell("ice", 2,
   { from, to, ground }))`, the nine elements at three tiers on a 4 s loop at 20 fps (the third tier
-  lasts 3.3 s). How each is made, and how to make one: "Designing an element", below.
+  lasts 3.3 s). How each is made, and how to make one: "Designing an element", below; its variants
+  and views (`examples/spell_variants.px.js`): "Variants and views", below that.
 - **Shader effects** (`effect()`, `PXL help effect`): a teleport or a death as a dissolve over 1 s
   (12 frames), holes in blobs about a quarter of the figure wide and 2 rings, the first white-yellow;
   a hit's poison or frost as a `tint` of 0.3-0.5 then `dither` back to the palette; a ghost or heat
@@ -645,6 +646,60 @@ foot, read as fire and water. Two bolts 3 px wide side by side read as a hose: o
 over 100 ms; with the impact's light at power 2 the picture stayed white three frames (1.5 now).
 What a spell draws gives light (`lighting()` leaves it bright in a dusk at ambient 0.55) and its
 lamps light the ground round it, so put a `lighting()` item after `cast()`.
+
+### Variants and views
+
+`variant` is another way of the same element and `form` its shape; `view` sees one world from the
+side, from above, in isometric or through a camera (`examples/spell_variants.px.js`: the ice and earth
+variants, a row for each other element, four spells four ways, all at tier 3 on a 5 s loop).
+
+What the games do with their big spells, as I remember them (described, never copied; the numbers
+are the ones tuned here, not measured off their footage):
+
+- **The solid outweighs the target.** Golden Sun drops a glacier or a stone spire bigger than the
+  enemies onto them and its Quake Sphere heaves the ground under them; Final Fantasy's Blizzaga
+  grows a cluster of crystals round the target and shatters it; Chrono Trigger shuts the target in a
+  block of ice that breaks. Here a solid at tier 3 is 1.5 to 2.5 times the target's height (an
+  iceberg 11 px of the spell, a boulder 9, a glacier 10, a spire 8, times the tier's size and `form.size`).
+- **It arrives fast, holds, cracks, breaks.** A boulder or a glacier falls in 520 ms of the spell's
+  time (speeding up, a slow turn of 2.2 radians a second), lands in 220; an iceberg or a spire rises
+  in 380 (times the tier's time); it holds `stay` ms (700 to 900), cracks spreading from where it hit
+  or from its top over the last 60% of that, then breaks into `debris` pieces (20 to 26) flying out
+  at about 70 px a second, falling, lying, gone in 900 ms. Glints fly off ice as it breaks.
+- **One after another, never at once.** Pokémon's Rock Slide drops several rocks in turn; here a
+  slide's rocks start 110 ms apart, tumble 420 ms and roll 3 px; a chain of lightning jumps 110 ms
+  apart; wind's blades leave 90 ms apart and arrive together.
+- **The ground answers.** Quake: the picture shaken 3 px for 700 ms while fissures run out 34 px
+  (times the size) over 600 ms and rocks thrust up where they pass (Stone Edge's sharp stones round
+  the target); a falling boulder or meteor cracks the ground 18 px (times the size) round where it
+  lands; frost and scorch stay a while.
+- **A falling thing's shadow comes first**, wide and faint, closing on where it lands and darkening
+  as it nears; from above (Octopath's high camera, any top-down game) it is off toward the light's
+  far side and closes on the rock as it comes down.
+- **Light and bloom sell it** (Octopath's HD-2D): what a spell draws gives light and blooms; the
+  solids don't: they are matter, lit by the scene and by the spell's lamps.
+
+The spell leaves from the caster's hand: `from: "hero.hand"`, the socket of the figure stamped
+before it with `{ id: "hero" }` (the traveler's `tr_cast_e` sets it in every pose), lifted into the
+view's world (from the side as deep as the target; from above, in iso and through a camera, `hand`
+up, 22 px of the spell by default: a 34 px figure's hand at its thrust, about 1 m). It is read in
+each frame, so time the pose to the spell: the wind-up as it starts charging, held while the energy
+gathers, the thrust as it is cast, held while it flies, back once it hits (`castPose` in the
+examples). What is born in the ground (an iceberg, a spire, a quake, a nova) doesn't run there from
+the caster's feet: the hand lets it go and the ground glows and stirs at the target until it comes up.
+
+How the views see it: side, x across, y toward us squashed to 0.35, z straight up; top, x and y as
+they are, a height foreshortened (half the size at the view's `height`, 240 px up), so a falling rock
+grows as it comes down and a pillar is a disc from above; iso 2:1, heights straight up, rings and
+marks on the ground iso ellipses; a perspective() camera, meters, the spell's px where it lands.
+Rings, marks, shadows and fissures are laid on the ground and seen through the view; columns
+(pillars, spikes, waves) stand up in it, discs from above; solids are drawn by the volume method
+seen from the view's angle (20 degrees down from the side, 30 in iso turned 45, straight down from
+above, the camera's pitch). Found while tuning: a smoke puff drawn over a solid hid it as a glowing
+ball (smoke goes first, the solid stands in it); pieces a third of the solid's size read as a second
+solid falling apart, an eighth as shards; a frost mark as wide as the iceberg drowned it (0.6 of it,
+dithered); a wave of columns in a dither read as a wall (flames: tongues of their own heights, each
+narrowing up; water: a steep face, the crest curling over the front 5 px).
 
 ## 13. Blend modes leave the palette
 

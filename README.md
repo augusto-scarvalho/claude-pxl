@@ -187,7 +187,9 @@ says which to reach for.
   pixelate, dither to the palette, tint, a UV distortion, a plant swaying in the wind, an aura, energy,
   emission that lights `mesh()`; on one placement with `fx`. Abilities on the clock: `ability()`
   phases, `emitter()` particles, `trail()`; a spell kit, `spell("fire", 3, { from, to })`: nine
-  elements at three tiers (fire, fira, firaga), each a recipe to start one's own from;
+  elements at three tiers (fire, fira, firaga), each a recipe to start one's own from, with variants
+  (an iceberg, a falling boulder, a quake, a meteor, a wave...) and views (side, top-down, isometric,
+  a perspective camera);
   `post()`'s finish (Three's bloom, a `.cube` LUT, grain, sharpen, the picture back in the palette).
 - **Out**: sprite sheets with JSON tags (`rows: "tag"`: an animation a row; the sheet's preview GIF
   plays them all), GIFs, Tiled maps (`.tmj`), Aseprite files to keep editing.
@@ -367,6 +369,22 @@ dissolve's `"burn"` look on that copy alone: flames from its burning front, the 
 behind them, ash), its shadow burning with it, a column of `smoke()` rising, sparks from an
 `emitter()`. Through `post()`: the depth in focus, Three's bloom, a dusk grade from a `.cube` LUT and a
 grain that stays still (one that changed each frame made the GIF 13 MB instead of 2.5).
+
+### A spell kit: elements, tiers, variants, views
+
+<p>
+  <img src="docs/gallery/spells_ice_earth.gif" width="100%" alt="Animated sheet in pixel art of ten spells at their strongest tier, each in a small dusk scene where a young traveler in a green cloak gathers energy at his hand and casts at a standing stone: above, ice: spikes bursting from the ground, an iceberg of flat faceted ice rising out of the ground, cracking and shattering into shards, a block of glacier falling with a slow turn onto the stone and breaking, a blizzard of shards driven slantwise, a ring of frost running out along the ground with crystals springing up; below, earth: rock spikes, a tall stone spire thrusting up and crumbling, a mossy boulder falling, cracking the ground and breaking up, a quake whose fissures run out while rocks thrust up along them, a slide of rocks coming down one after another">
+</p>
+
+The ninth, in [`examples/spells.px.js`](examples/spells.px.js) and
+[`examples/spell_variants.px.js`](examples/spell_variants.px.js): a whole cast in one call,
+`spell("ice", 3, { from: "hero.hand", to, variant: "iceberg" })`, drawn by `cast()` on the clock and
+leaving from the caster's hand. Nine elements (fire, ice, lightning, water, earth, wind, light, dark,
+heal), each a recipe to start one's own from; three tiers the Final Fantasy way (fire, fira, firaga:
+size, particles, time, light, bloom and the drama of the hit); variants with a form (an iceberg, a
+falling boulder, a quake, a meteor, a wave, a chain of lightning...), their big solids drawn by the
+volume method, lit, cracking and breaking up; and views: the same spell from the side, from above, in
+isometric or through a perspective camera.
 
 ### True perspective
 

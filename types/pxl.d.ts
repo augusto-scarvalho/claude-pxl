@@ -305,17 +305,28 @@ declare global {
     motion?: { arc?: number; ease?: "linear" | "in" | "out"; wave?: number }; trail?: false | { length?: number; width?: [number, number] };
     particles?: false | (PxEmitter & { keys?: string[] });
     impact?: { shape?: "burst" | "ring" | "shards" | "splash" | "debris" | "swirl" | "rays" | "implode" | "sparkle"; keys?: string[]; smoke?: false | string[] };
-    big?: "pillar" | "bolts" | "spikes" | "tornado" | "sphere" | "beam" | "helix"; mark?: false | string[]; flash?: string; light?: string;
+    big?: "pillar" | "bolts" | "spikes" | "tornado" | "sphere" | "beam" | "helix" | "nova" | "blizzard" | "quake" | "slide" | "rain" | "grasp" | "leaves";
+    mark?: false | string[]; flash?: string; light?: string;
     timing?: { charge?: number; cast?: number; travel?: number; impact?: number; dissipate?: number };
+    /** its variants, the first its own way; what its solids are made of */
+    variants?: string[]; matter?: "ice" | "rock";
   }
+  /** A variant's shape and complexity: size (times the tier's), how many, facets, jaggedness 0..1, pieces it breaks into, ms it stays. */
+  interface PxForm { size?: number; count?: number; facets?: number; jag?: number; debris?: number; stay?: number }
+  /** How a spell is seen: "side" (3/4), "top", "iso" 2:1, { kind, origin, height }, or a perspective() view (the world in meters). */
+  type PxSpellView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; origin?: [number, number]; height?: number } | PxView;
   /** spell()'s options: where from and to, the ground's row, when; the tier's factors; anything of the element over it. */
-  interface PxSpellOpts extends Omit<PxElement, "like"> {
-    from: [number, number]; to: [number, number]; ground?: number; start?: number; seed?: number;
+  interface PxSpellOpts extends Omit<PxElement, "like" | "variants"> {
+    /** [x, y, z] in the view's world; seen from the side with no view, [x, y] on the picture and `ground` the ground's row; `from` also the caster's hand: a socket ("hero.hand") or { at: [x, y] } on the picture */
+    from: number[] | string | { at: [number, number] }; to: number[]; ground?: number; hand?: number; view?: PxSpellView; variant?: string; form?: PxForm; start?: number; seed?: number;
     scale?: number; count?: number; time?: number; reach?: number; power?: number; glow?: number; shake?: number;
   }
   /** A whole cast on the clock, drawn by cast(); its ability, where it is, its lamps, flash and shake at a time. */
   interface PxSpell {
-    ability: PxAbility; total: number; element: PxElement; tier: number; glow: number;
+    ability: PxAbility; total: number; element: PxElement; variant?: string; tier: number; glow: number;
+    /** the view it is seen through: P(point) where a world point lands, s(point) px a world unit there */
+    view: { kind: string; P(p: number[]): [number, number]; s(p: number[]): number; unit: number };
+    /** where it is at a time, in the view's world */
     at(t: number): number[];
     lights(t: number): { x: number; y: number; r: number; power: number; color: string }[];
     flash(t: number): { color: string; amount: number } | undefined;
