@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**338 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**339 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -224,9 +224,11 @@ references until it read right.
 ## Speed, size and reliability
 
 - GIFs store only what changed in each frame: the gallery went from 34.5 MB to 8.5 MB.
-- The tests run in about 45 s (they took nearly two): the examples' check in worker threads, the
+- The tests run in about a minute (they took nearly two): the examples' check in worker threads, the
   longest first, the study's tests in two files that run at once; `npm run test:quick` leaves out the
-  two slowest (every example's check, the gallery's study) for about 20 s while iterating; `study` reads a long clip a third faster (the train's 192 frames, 34 to 23 s) and
+  two slowest (every example's check, the gallery's study) for about 20 s while iterating, and
+  `PXL_EXAMPLES=hd2d` checks one folder of examples; the HD-2D examples' own hot loops were made
+  faster with every pixel the same (the harbor's check 28 s to 10 s, the suite 80 s to 58 s); `study` reads a long clip a third faster (the train's 192 frames, 34 to 23 s) and
   `check` runs two to three times faster on the heaviest scenes, every output the same.
 - Lit scenes keep small figures' colors in GIFs (a weighted median cut refined by k-means).
 - Timed builds are cached within a budget of bytes, so a long loop no longer fills memory.

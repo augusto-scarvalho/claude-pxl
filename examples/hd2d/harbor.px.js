@@ -238,15 +238,17 @@ sprite("_valance", { w: 38, h: 6 }, (c) => {
 const WN = 8, WW = 128, WH = 48, GX = 8, GY = 6
 const CELLS = []
 for (let gy = 0; gy < GY; gy++) for (let gx = 0; gx < GX; gx++) CELLS.push([(gx + hash(gx, gy)) * (WW / GX), (gy + hash(gx + 7, gy)) * (WH / GY), hash(gx, gy + 9) * 6.28])
-// the nearest cell's distance, its point and phase, and the second distance (on the tile, wrapping)
-const near2 = (X, Y) => {
+// the nearest cell's distance, its point and phase, and the second distance (on the tile, wrapping):
+// the same in every frame and every water, so worked out once a pixel
+const NEAR2 = []
+const near2 = (X, Y) => NEAR2[Y * WW + X] ??= (() => {
   let a = [1e9, 0, 0, 0], d2 = 1e9
   for (const [px, py, ph] of CELLS) for (const ox of [-WW, 0, WW]) for (const oy of [-WH, 0, WH]) {
     const d = Math.hypot(X - px - ox, (Y - py - oy) * 2.3)
     if (d < a[0]) { d2 = a[0]; a = [d, px + ox, py + oy, ph] } else if (d < d2) d2 = d
   }
   return [...a, d2]
-}
+})()
 const SWELL = [seamless((x, y) => vnoise(x / 12, y / 4), WW, WH), seamless((x, y) => vnoise(x / 12 + 40, y / 4 + 13), WW, WH)]
 const water = (name, f, glints, big, holes) => sprite(name, { w: WW, h: WH }, (c) => {
   const t = (2 * Math.PI * f) / WN, mix = (1 - Math.cos(t)) / 2

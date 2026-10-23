@@ -429,11 +429,20 @@ const deadTreeVolume = (name, h, seed, { frames = 16, fps = 1000 / 220, sway = 1
       const shift = (p) => [p[0] + g * Math.pow(Math.max(0, p[1]) / top, 2) + (lvl > 1 ? 0.25 * lvl * Math.sin(2 * ph + k) * (p[1] / top) : 0), p[1], p[2]]
       return [shift(A), shift(B), ra, rb, lvl]
     })
+    // each limb's box on the screen (x across, y·CP - z·SP up) widened by its radius: a pixel's ray
+    // outside it passes the limb by
+    const boxes = moved.map(([A, B, ra, rb]) => {
+      const r = Math.max(ra, rb) + 0.01, va = A[1] * CP - A[2] * SP, vb = B[1] * CP - B[2] * SP
+      return [Math.min(A[0], B[0]) - r, Math.max(A[0], B[0]) + r, Math.min(va, vb) - r, Math.max(va, vb) + r]
+    })
     const grid = Array.from({ length: h }, () => Array(W).fill(null))
     for (let sy = 0; sy < h; sy++) for (let sx = 0; sx < W; sx++) {
-      const o = [sx + 0.5 - OX, CP * (OY - sy - 0.5), -SP * (OY - sy - 0.5)]
+      const o = [sx + 0.5 - OX, CP * (OY - sy - 0.5), -SP * (OY - sy - 0.5)], up = OY - sy - 0.5
       let best = null
-      for (const [A, B, ra, rb, lvl] of moved) {
+      for (let i = 0; i < moved.length; i++) {
+        const b = boxes[i]
+        if (o[0] < b[0] || o[0] > b[1] || up < b[2] || up > b[3]) continue
+        const [A, B, ra, rb, lvl] = moved[i]
         // the ray's nearest approach to the limb's axis, and whether it passes within the limb's radius there
         const u = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], w = [o[0] - A[0], o[1] - A[1], o[2] - A[2]]
         const uu = dot(u, u), ud = dot(u, D), uw = dot(u, w), dw = dot(D, w), den = uu - ud * ud

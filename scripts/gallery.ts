@@ -1,6 +1,7 @@
 // Renders the README gallery (docs/gallery/) from the examples: clean nearest-neighbour upscales,
-// GIFs for animated assets. Run: node scripts/gallery.ts [asset ...] [--out DIR] (all, or only those;
-// --out writes them elsewhere: a look at one before it's done, which isn't committed)
+// GIFs for animated assets. Run: node scripts/gallery.ts [asset ...] [--out DIR] [--every N] (all, or only
+// those; --out writes them elsewhere: a look at one before it's done, which isn't committed; --every N
+// builds one frame in N, each lasting N times as long: a quick look at a long story)
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +12,7 @@ import { encodePng } from "../src/node/png.ts";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2), at = args.indexOf("--out")
 const out = at >= 0 ? args.splice(at, 2)[1] : join(root, "docs", "gallery");
+const ev = args.indexOf("--every"), EVERY = ev >= 0 ? Math.max(1, Math.floor(+args.splice(ev, 2)[1])) : 0;
 mkdirSync(out, { recursive: true });
 
 // [example file, asset, target width in px, every nth frame (each kept frame lasts n times as long, so
@@ -41,12 +43,15 @@ const shots: [string, string, number, number?, string?][] = [
 ];
 
 const only = args;
-for (const [file, name, width, every = 1, as = name] of shots.filter(([, n, , , a]) => !only.length || only.includes(n) || only.includes(a ?? ""))) {
+for (const [file, name, width, every0 = 1, as = name] of shots.filter(([, n, , , a]) => !only.length || only.includes(n) || only.includes(a ?? ""))) {
   const p = loadProject(join(root, "examples", file));
   const b = p.build(name);
-  const s = Math.max(1, Math.floor(width / b.img.w));
-  if (b.anim) {
-    const frames = p.frames(name).filter((_, i) => i % every === 0).map((f) => ({ img: f.img.scale(s), ms: f.ms * every }));
+  const s = Math.max(1, Math.floor(width / b.img.w)), every = EVERY || every0, tl = b.anim;
+  if (tl) {
+    // one frame in N: only those built (on a clock; frames of their own lengths are all built)
+    const frames = every > 1 && !tl.durations
+      ? Array.from({ length: Math.ceil(Math.round(tl.loop / tl.step) / every) }, (_, i) => ({ img: p.build(name, 0, i * every * tl.step).img.scale(s), ms: tl.step * every }))
+      : p.frames(name).filter((_, i) => i % every === 0).map((f) => ({ img: f.img.scale(s), ms: f.ms * every }));
     writeFileSync(join(out, as + ".gif"), encodeGif(frames));
   } else writeFileSync(join(out, as + ".png"), encodePng(b.img.scale(s)));
   console.log(`${name} ${b.img.w}x${b.img.h} @${s}x`);

@@ -110,9 +110,10 @@ const W = 26, H = 40, OX = 13, OY = 38
 const scr = ([x, y, z]) => [OX + x, OY - y * CP + z * SP]
 const depth = ([x, y, z]) => z * CP + y * SP
 const rad = (d) => (d * Math.PI) / 180
-const add = (a, b) => a.map((v, i) => v + b[i]), sub = (a, b) => a.map((v, i) => v - b[i])
-const mul = (a, k) => a.map((v) => v * k), dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-const len = (a) => Math.hypot(...a), unit = (a) => mul(a, 1 / (len(a) || 1))
+// 3D vectors, written out: a figure samples its surfaces some 100,000 times a frame
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+const mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+const len = (a) => Math.hypot(a[0], a[1], a[2]), unit = (a) => mul(a, 1 / (len(a) || 1))
 const UP = [0, 1, 0], SUN = unit([0, 0.75, 0.6])   // from above, toward us: a mirrored view keeps it where it is
 const frame3 = (yaw) => { const f = [Math.sin(rad(yaw)), 0, Math.cos(rad(yaw))]; return { f, r: [-f[2], 0, f[0]] } }
 const local = (o, fr, [a, b, c]) => add(o, add(add(mul(fr.f, a), mul(fr.r, b)), mul(UP, c)))
@@ -183,9 +184,10 @@ const bones = (p, yaw) => {
 // lying behind it (painted after the colors, so it stays)
 const surface = (best, q, n, ramp, part, key) => {
   if (q[1] < -0.2) return                                                  // nothing below the ground: a cloak lies on it
-  const [x, y] = scr(q).map(Math.round), d = depth(q), k = y * 4096 + x, b = best.get(k)
-  const t = (dot(n, SUN) + 0.55) / 1.3, c = key ?? ramp[Math.max(0, Math.min(ramp.length - 1, Math.round(t * (ramp.length - 1))))]
-  if (!b || d > b[0]) best.set(k, [d, c, x, y, part])
+  const x = Math.round(OX + q[0]), y = Math.round(OY - q[1] * CP + q[2] * SP), d = depth(q), k = y * 4096 + x, b = best.get(k)   // scr(q), rounded
+  if (b && !(d > b[0])) return                                             // behind what is there: its tone isn't needed
+  const t = (dot(n, SUN) + 0.55) / 1.3
+  best.set(k, [d, key ?? ramp[Math.max(0, Math.min(ramp.length - 1, Math.round(t * (ramp.length - 1))))], x, y, part])
 }
 const tube = (best, a, b, r0, r1, ramp, part, rampOf) => {
   const d = sub(b, a), u = unit(d), e1 = unit(Math.abs(u[1]) < 0.9 ? [u[2], 0, -u[0]] : [1, 0, 0])

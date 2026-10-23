@@ -7,7 +7,10 @@
 // The parts of a pipeline (`pipeline/part_*.px.js`) are left out: their test_* scenes are scaffolding
 // (a whole 240-frame street each, minutes of checking), and their assets are checked where the
 // pipeline's scene places them.
-// After a change you meant, rewrite the file: PXL_UPDATE=1 npm test
+// After a change you meant, rewrite the file: PXL_UPDATE=1 node --test test/examples.test.ts
+// While working on some examples, check only those: PXL_EXAMPLES=hd2d (or hd2d/harbor, or several,
+// comma-separated: the start of each path under examples/) compares and rewrites only their lines; the
+// test's name says how many it left out, and `npm test` checks them all.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -18,13 +21,19 @@ import { Worker } from "node:worker_threads";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SNAP = join(root, "test", "examples.checks.txt");
+const all = (readdirSync(join(root, "examples"), { recursive: true }) as string[])
+  .map((f) => f.split("\\").join("/")).filter((f) => f.endsWith(".px.js") && !f.split("/").some((s) => s.startsWith("_") || s === "out") && !/(^|\/)pipeline\/part_/.test(f)).sort();
+const only = process.env.PXL_EXAMPLES?.split(",").map((s) => s.trim()).filter(Boolean);
+const files = only ? all.filter((f) => only.some((o) => f.startsWith(o))) : all;
 
-test("pxl check on every example: the same warnings as kept", async () => {
-  const files = (readdirSync(join(root, "examples"), { recursive: true }) as string[])
-    .map((f) => f.split("\\").join("/")).filter((f) => f.endsWith(".px.js") && !f.split("/").some((s) => s.startsWith("_") || s === "out") && !/(^|\/)pipeline\/part_/.test(f)).sort();
+test(`pxl check on ${only ? `${files.length} of the ${all.length} examples (PXL_EXAMPLES=${only.join(",")})` : "every example"}: the same warnings as kept`, async () => {
+  assert.ok(files.length, `PXL_EXAMPLES=${only} matches no example (paths under examples/, e.g. hd2d or hd2d/harbor)`);
+  // the kept lines, by file: a file's first line starts at the margin, the rest are indented
+  const kept = existsSync(SNAP) ? readFileSync(SNAP, "utf8") : "", blocks = new Map<string, string[]>();
+  for (const l of kept.split("\n").filter(Boolean)) if (l.startsWith(" ")) blocks.get([...blocks.keys()].pop()!)!.push(l); else blocks.set(l.slice(0, l.indexOf(": ")), [l]);
   // each example checked in one of a few threads (check.worker.ts), handed out as they finish, the most
   // frames (as the kept file counts them) first: the longest doesn't start last
-  const kept = existsSync(SNAP) ? readFileSync(SNAP, "utf8") : "", frames = (f: string) => +(new RegExp(`^${f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}: .*?\\((\\d+) frames`, "m").exec(kept)?.[1] ?? 1e9);
+  const frames = (f: string) => +(/\((\d+) frames/.exec(blocks.get(f)?.[0] ?? "")?.[1] ?? 1e9);
   const said = new Map<string, string[]>(), queue = [...files].sort((a, b) => frames(b) - frames(a));
   const workers = Array.from({ length: Math.max(1, Math.min(files.length, availableParallelism())) }, () => new Worker(new URL("./check.worker.ts", import.meta.url)));
   try {
@@ -37,7 +46,7 @@ test("pxl check on every example: the same warnings as kept", async () => {
   } finally {
     await Promise.all(workers.map((w) => w.terminate()));
   }
-  const text = files.flatMap((f) => said.get(f)!).join("\n") + "\n";
-  if (process.env.PXL_UPDATE || !existsSync(SNAP)) writeFileSync(SNAP, text);
-  assert.equal(text, readFileSync(SNAP, "utf8"));
+  const text = (fs: string[]) => fs.flatMap((f) => said.get(f) ?? blocks.get(f) ?? []).join("\n") + "\n";
+  if (process.env.PXL_UPDATE || !existsSync(SNAP)) writeFileSync(SNAP, text(all));
+  assert.equal(text(files), only ? files.flatMap((f) => blocks.get(f) ?? []).join("\n") + "\n" : kept);
 });
