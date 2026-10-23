@@ -246,9 +246,19 @@ declare global {
   /** post(): a depth of field from mesh()'s depth (the pixel in focus, m kept sharp, m to full blur, the blur's radius in px), a bloom, a haze by depth, darker corners. */
   interface PxPost {
     focus?: [number, number]; sharp?: number; soft?: number; blur?: number;
-    bloom?: number | { above?: number; r?: number; strength?: number };
+    bloom?: number | { above?: number; r?: number; strength?: number; levels?: number; spread?: number };
     fog?: { color: PxColor; from: number; to: number; max?: number };
     vignette?: number;
+    /** px to an art pixel: sharpen, grain and the palette's dither work in blocks of it */
+    pixel?: number;
+    /** each pixel stepped from its four neighbours (a block off) by this much of the difference: 0.2-0.3 a little */
+    sharpen?: number;
+    /** a grade from a .cube file next to the art file, at amount (0..1) */
+    lut?: string | { cube: string; amount?: number };
+    /** film grain in blocks of pixel, new each frame, in the middle tones: up to amount of full scale */
+    grain?: number | { amount?: number; seed?: number };
+    /** the picture taken back to the palette (true) or to those keys, Bayer-dithered between two by dither (0 the nearest) */
+    palette?: true | string | string[] | { keys?: string | string[]; dither?: number };
   }
   /** Options every effect takes: the pixels it writes (a region, keys) and its seed. */
   interface PxEffectBase { where?: PxRegion; on?: string; seed?: number }

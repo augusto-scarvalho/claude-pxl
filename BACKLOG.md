@@ -852,3 +852,8 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   picture, sway with them. Normals move with their pixels, not turned (a lean of 2 px over 68 is
   under 2 degrees). Left: a painted mask of what moves (by height covers the kit's plants), and
   grass bent by a passer-by as an option rather than a recipe (an anim of bends and `frame`).
+- [ ] **post() finishing** (Three's and Babylon's, written anew): `bloom: { levels }` for Three's
+  bloom beside pxl's (they differ in use: a halo round small lights, a glow over bright surfaces),
+  `lut` from a .cube file, `grain` seeded by the frame in blocks of `pixel`, `sharpen`, and `palette`
+  to take the picture back to the palette. Left: a sparse first blur for Three's bloom (0.9 s a frame
+  at 1920x1080), a LUT strip image (Babylon's 256x16 PNG) beside .cube.

@@ -209,7 +209,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     if (ctx.checksOnly) return;
     if (name === "post") {
       const o = (args[0] ?? {}) as PostOpts;
-      applyPost(base, o, o.fog ? pal.resolve(o.fog.color) : null);
+      applyPost(base, o, o.fog ? pal.resolve(o.fog.color) : null, pal, main.frame);
       snap?.("post", loc);
       return;
     }

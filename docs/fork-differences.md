@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**342 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**343 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -27,7 +27,7 @@ page lists what the fork adds. Every commit is in
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [environment](../environment.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 54 |
-| Tests | 59 | 276 |
+| Tests | 59 | 279 |
 
 ## Looking and checking
 
@@ -98,7 +98,7 @@ follows from it.
 | `solids()`, `shadows()` | Things built of solid shapes, each face lit by the side it faces, casting its shadow from one sun. |
 | `ray()`, `toward()` | Where a screen point lands in the world, and where the sun or any direction sits in the picture. |
 | `mesh()`, `model()` | Flat faces in meters drawn with a depth per pixel, like the race's car interior, modelled after a Supra A80; materials tiled with pixel-art textures (laid a texel to a pixel of the picture, anchored to a face, clear texels holes), and sprites standing among the faces in the same depth, on contact shadows (HD-2D's dioramas); light in the world on them: a sun with shadows (sprites throw theirs, turned to it), a sky, lamps, sprites lit through their normal maps. A material can be drawn in blocks of a sprite's pixel (`block`), its outline only on its shaded side: pixel art among an HD picture's faces (the graveyard's fence). |
-| `post()` | What the camera does after: depth of field by `mesh()`'s depth (the tilt-shift look of HD-2D), haze, bloom, vignette, in linear light, at 1920x1080 in about a second a frame. |
+| `post()` | What the camera does after: depth of field by `mesh()`'s depth (the tilt-shift look of HD-2D), haze, bloom, vignette, in linear light, at 1920x1080 in about a second a frame. Then the finish: Three's bloom beside pxl's (`levels`), a grade from a `.cube` LUT, film grain seeded by the frame in blocks of the art's pixel, a sharpen, and `palette` to take the picture back to the palette's colors. |
 
 Five scenes are built on this: a road across the sertão, a park at 2 pm in two-point perspective, the
 end of the Cretaceous in three-point, a street race from the driver's seat, and two HD-2D dioramas (a

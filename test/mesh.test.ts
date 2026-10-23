@@ -4,7 +4,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { failure, keys, PAL } from "./helpers.ts";
-import { loadSource } from "../src/node/load.ts";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { loadProject, loadSource } from "../src/node/load.ts";
 
 const STAGE = `ramps("kgw")
 const V = { w: 40, horizon: 10, eye: 1, focal: 40 }
@@ -140,4 +143,57 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { b: { ramp: "kgw", block
   const t = rows(`const M = model(); M.box("b", [-1, 3, 0], [1, 3.6, 1.2])
 scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { b: { tex: "_white", edge: "k" } }))`).join("");
   assert.ok(t.includes("k") && t.includes("g"), "edge and texture (stepped down by its light) both drawn");
+});
+
+// post's finish on a picture of its own (no mesh needed): a dark ground, a lit stripe, a bright spot
+const PIC = `const pic = [rect(0, 0, 64, 40, "#30303a"), rect(0, 20, 64, 2, "#9a8a70"), rect(30, 8, 3, 3, "#fffaf0"), rect(10, 30, 8, 6, "#5a7aa0")]\n`;
+const finish = (o: string, src = "") => loadSource(PAL + PIC + src + `scene("a", { w: 64, h: 40, frames: 4 }, ...pic, post(${o}))`, "t.px.js");
+const same = (a: { data: Uint32Array }, b: { data: Uint32Array }) => a.data.every((c, i) => c === b.data[i]);
+
+test("post finish: strength 0 changes nothing; Three's bloom spreads farther than pxl's; dark pictures don't bloom", () => {
+  const plain = finish("{}").image("a");
+  for (const o of ["{ bloom: { strength: 0, levels: 5 } }", "{ bloom: 0 }", "{ grain: 0, pixel: 2 }", "{ sharpen: 0 }"]) assert.ok(same(finish(o).image("a"), plain), o);
+  const lift = (o: string, x: number, y: number) => (finish(o).image("a").get(x, y) >>> 24) - (plain.get(x, y) >>> 24);
+  assert.ok(lift("{ bloom: { strength: 1, above: 0.9, levels: 5 } }", 31, 2) > 0 && lift("{ bloom: { strength: 1, above: 0.9, r: 3 } }", 31, 2) === 0, "8 px from the spot: only the levels reach");
+  assert.ok(lift("{ bloom: { strength: 1, above: 0.9, levels: 5 } }", 33, 9) > 0, "round the spot both do");
+  assert.ok(same(finish("{ bloom: { strength: 1, above: 0.99, levels: 5 } }").image("a"), plain), "nothing that bright: nothing added");
+  assert.match(failure(PAL + PIC + `scene("a", { w: 64, h: 40 }, post({ bloom: { levels: 5, r: 4 } }))`, "a").message, /give levels or r, not both/);
+});
+
+test("post finish: grain is the frame's, in blocks of pixel, and the same each time; sharpen steps edges apart, flat stays flat", () => {
+  const f = finish("{ grain: 0.2, pixel: 2 }").frames("a");
+  assert.ok(same(f[1].img, finish("{ grain: 0.2, pixel: 2 }").frames("a")[1].img), "the same frame, the same grain");
+  assert.ok(!same(f[0].img, f[1].img), "another frame, another grain");
+  const g = f[0].img, blocks = [0, 2, 4, 6].every((x) => [0, 2, 4].every((y) => g.get(x, y) === g.get(x + 1, y) && g.get(x, y) === g.get(x, y + 1) && g.get(x, y) === g.get(x + 1, y + 1)));
+  assert.ok(blocks, "2 x 2 blocks");
+  const plain = finish("{}").image("a"), sharp = finish("{ sharpen: 0.5 }").image("a");
+  assert.equal(sharp.get(50, 5), plain.get(50, 5), "the flat ground as it was");
+  assert.ok((sharp.get(50, 20) >>> 24) > (plain.get(50, 20) >>> 24) && (sharp.get(50, 19) >>> 24) < (plain.get(50, 19) >>> 24), "the stripe's edge steeper: lighter inside, darker out");
+});
+
+test("post finish: a .cube LUT grades (identity changes nothing, amount mixes), the palette takes the picture back", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-lut-"));
+  try {
+    const cube = (f: (r: number, g: number, b: number) => number[]) => {
+      const lines = ["LUT_3D_SIZE 2"];
+      for (const b of [0, 1]) for (const g of [0, 1]) for (const r of [0, 1]) lines.push(f(r, g, b).join(" "));
+      return lines.join("\n");
+    };
+    writeFileSync(join(dir, "same.cube"), cube((r, g, b) => [r, g, b]));
+    writeFileSync(join(dir, "neg.cube"), "# negative\nTITLE \"neg\"\n" + cube((r, g, b) => [1 - r, 1 - g, 1 - b]));
+    writeFileSync(join(dir, "flat.cube"), "LUT_1D_SIZE 2\n0 0 0\n1 1 1\n");
+    const at = (o: string) => { writeFileSync(join(dir, "a.px.js"), PAL + PIC + `scene("a", { w: 64, h: 40 }, ...pic, post(${o}))`); return loadProject(join(dir, "a.px.js")).image("a"); };
+    const plain = at("{}");
+    assert.ok(same(at('{ lut: "same.cube" }'), plain), "the identity LUT");
+    assert.ok(same(at('{ lut: { cube: "neg.cube", amount: 0 } }'), plain), "amount 0");
+    assert.equal(at('{ lut: "neg.cube" }').get(5, 5), 0xcfcfc5ff, "#30303a inverted");
+    assert.equal(at('{ lut: { cube: "neg.cube", amount: 0.5 } }').get(5, 5) >>> 24, Math.round(0x30 + (0xcf - 0x30) * 0.5));
+    assert.throws(() => at('{ lut: "flat.cube" }'), /a 1D LUT/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  const keyed = new Set(finish("{}").assets.get("a")!.pal.chosen());
+  assert.ok([...finish("{ bloom: 1, palette: true, pixel: 2 }").image("a").data].every((c) => keyed.has(c)), "every color the palette's");
+  const two = finish('{ palette: { keys: "kw", dither: 0 } }').image("a");
+  assert.ok([...two.data].every((c) => c === 0x000000ff || c === 0xfff1e8ff), "those keys, the nearest: no checker");
 });

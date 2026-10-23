@@ -319,11 +319,13 @@ changed their colors.
 
 ## Post
 
-`post({ blur, focus, sharp, soft, fog, bloom, vignette })` goes directly in a sprite or scene body,
+`post({ blur, focus, sharp, soft, fog, bloom, vignette, sharpen, lut, grain, palette, pixel })` goes directly in a sprite or scene body,
 after a `mesh()` drawn in that body (not in a layer): what a camera does to the picture, the HD-2D
 look. It reads the depth `mesh()` left on each pixel (what it didn't draw, a sky painted first,
-counts as far). In linear light; the blurs at a fraction of the size, brought back up smoothly. It
-leaves the palette; `pxl check` skips it (it reads what was placed, not the finished pixels).
+counts as far; only `blur` and `fog` need it, the rest works on any picture). In linear light; the
+blurs at a fraction of the size, brought back up smoothly; then `sharpen`, `lut`, `grain` and
+`palette`, in that order, on the colors as seen. It leaves the palette (`palette` brings it back);
+`pxl check` skips it (it reads what was placed, not the finished pixels).
 
 | Option | Meaning |
 |---|---|
@@ -331,8 +333,13 @@ leaves the palette; `pxl check` skips it (it reads what was placed, not the fini
 | `focus` | The pixel `[col, row]` whose depth is sharp (default the picture's middle). |
 | `sharp`, `soft` | m of depth either side of the focus kept sharp (default 1), and m past that over which the blur grows to full (default 4), or two, `[nearer, farther]` (Unreal's near and far transition regions); the blur grows slowly at first, faster in the middle, and eases into full. HD-2D keeps the whole diorama the player stands on sharp and lets the blur grow over many meters (Octopath: the plateau sharp, the wood behind going soft over tens of meters). |
 | `fog` | `{ color, from, to, max = 0.6 }`: haze toward `color` from `from` m of depth to `to`, `max` of it there. |
-| `bloom` | A glow round what's bright: `{ above = 0.75, r = width / 40, strength = 0.6 }`, `above` the brightness (0..1) it starts at; a number is the strength. |
+| `bloom` | A glow round what's bright: `{ above = 0.75, r = width / 40, strength = 0.6 }`, `above` the brightness (0..1) it starts at, and only what passes it (a light just over it hardly glows); a number is the strength. A halo round lamps, glints, embers. `levels: 5` instead is Three's bloom (UnrealBloomPass): the whole color of what passes `above`, at half size and at each size half the last, blurred and added back, the small sizes weighing most and `spread` (0..1, default 0.4) of it moved to the big ones; the same `strength` adds as much light, spread from a few px to a fifth of the picture: sunlit sails and skies glowing, the air bright round them. On the harbor's frame at `strength: 1` it lifted 29% of the picture by 8 levels and more where pxl's lifted 1%: a strength of 0.3-0.5. About 0.3 s a frame at 960x540 and 0.9 s at 1920x1080 (pxl's: under 0.1 s). |
 | `vignette` | Darker corners, 0..1. |
+| `sharpen` | Babylon's sharpen, on the colors as seen: each pixel plus this much of how far it stands from its four neighbours, `pixel` px off (so in HD the art's own edges sharpen, not the inside of its blocks): 0.2-0.3 a little; 0.6 drew dark lines round the graveyard's stones. |
+| `lut` | A grade, a 3D LUT from a `.cube` file next to the art file (Resolve's, Photoshop's, any grading tool's): `lut: "dusk.cube"`, or `{ cube: "dusk.cube", amount }` (0..1, default 1), on the colors as seen, after the bloom and before the grain. |
+| `grain` | Film grain (Babylon's, seeded by the frame instead of a random call): an amount (0..1 of full scale, 0.05-0.1), or `{ amount, seed }`; a number a block of `pixel` px, so in HD it reads as pixels of the art, most in the middle tones and none at black and white; the same frame always the same grain. |
+| `palette` | The picture taken back to the palette, a palette LUT: `true` (every color the file chose) or keys (a ramp, `"DdvVJ"`), each color to the two keys mixed nearest it, by a Bayer pattern in blocks of `pixel` (the dither effect's way); `{ keys, dither }`, `dither: 0` the nearest key alone. Last of all, so what comes out is in the palette; where the light and the blur made colors the palette lacks they turn to other hues (the graveyard's green in the shade went brown and checkered): give keys for those tones, a ramp of the shade's greens. |
+| `pixel` | px to a pixel of the art (2 at twice the size, 4 at four times): what `sharpen`, `grain` and `palette` work in blocks of. |
 
 At 1920x1080 a frame takes about a second with `mesh()` and `post()` together: make the scene at its
 own size first (`check` and `shot` are fast there), then the same at four times with `post()`, and

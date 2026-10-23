@@ -181,11 +181,11 @@ export const EFFECTS: Record<string, Effect> = {
   /**
    * Ordered (Bayer 4x4) dither to `keys` (default: the palette): each color goes to the two keys whose
    * mix is nearest it (OKLab, keys far apart counted against), the second on as many pixels as the
-   * color is far along toward it. A color already a key stays; part-clear pixels go clear or opaque
-   * by the same pattern.
+   * color is far along toward it (times `spread`: 0 the nearest key alone). A color already a key
+   * stays; part-clear pixels go clear or opaque by the same pattern.
    */
   dither: {
-    params: { keys: colors, pixel: PIXEL },
+    params: { keys: colors, pixel: PIXEL, spread: num(1, 0, 1) },
     run(src, p, x) {
       const to: Color[] = (p.keys as Color[]).length ? p.keys : x.pal.chosen().filter((c) => (c & 255) === 255);
       if (!to.length) throw new PxError("effect \"dither\": no colors to dither to: give keys");
@@ -215,7 +215,7 @@ export const EFFECTS: Record<string, Effect> = {
         const o = (c | 255) >>> 0;
         let m = memo.get(o);
         if (!m) memo.set(o, (m = pair(o)));
-        out.data[i] = b < m[2] ? m[1] : m[0];
+        out.data[i] = b < m[2] * p.spread ? m[1] : m[0];
       });
       return out;
     },

@@ -16,6 +16,7 @@ import { PALETTE_FILE, Palette, paletteFromFile } from "./palette.ts";
 import { type Motion, readJoints, readMotion } from "./pose.ts";
 import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
+import { type Lut, readCube } from "./post.ts";
 import { bayer, fbm, globRe, latticeHash, rng, vnoise, seamless } from "./util.ts";
 
 /**
@@ -108,7 +109,7 @@ export const OP_OPTS: Record<string, string[]> = {
   bump: ["w", "depth", "on", "where", "shapeRadius", "shapeStrength", "shapeSoftness", "detailStrength", "detailScale"],
   lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "shape", "relief", "skyDir"],
   glow: ["where", "r", "strength", "color", "bands", "ramp", "keep"],
-  post: ["focus", "sharp", "soft", "blur", "bloom", "fog", "vignette"],
+  post: ["focus", "sharp", "soft", "blur", "bloom", "fog", "vignette", "pixel", "sharpen", "lut", "grain", "palette"],
   terrain: ["far", "top", "bound", "margin", "sky"],
   // one options object serves both: solids ignores shade, shadows ramps and light
   solids: ["at", "sun", "scale", "ramps", "light", "shade"],
@@ -550,6 +551,10 @@ export class Project implements BuildCtx {
           if (OP_OPTS[name] && isPlainObject(o)) checkKeys(name, o, OP_OPTS[name]);
         } catch (e) { throw wrap(e).within(name, loc); }
         if (name === "clip") checkItems("clip", args.slice(1), loc);
+        // post's lut names a .cube file next to the art file: read once, here
+        if (name === "post" && isPlainObject(args[0]) && args[0].lut !== undefined) {
+          try { args = [{ ...args[0], lut: this.cube(args[0].lut) }]; } catch (e) { throw wrap(e).within(name, loc); }
+        }
         return { __op: true, name, args, loc };
       };
     }
@@ -600,6 +605,18 @@ export class Project implements BuildCtx {
    * opaque columns (a proportional font); a space not in `chars` is half a cell wide. `mono`: every
    * glyph centered in the widest one's width, so a score or a timer keeps its place as it counts.
    */
+  /** post()'s lut: "dusk.cube" (a file next to the art file), or { cube: "dusk.cube", amount }, read into a LUT once. */
+  cube(spec: unknown): Lut | { cube: Lut; amount?: number } {
+    const file = typeof spec === "string" ? spec : isPlainObject(spec) && typeof spec.cube === "string" ? spec.cube : undefined;
+    if (file === undefined) throw new PxError(`lut is a .cube file ("dusk.cube"), or { cube: "dusk.cube", amount (0..1) }, got ${JSON.stringify(spec)}`);
+    if (isPlainObject(spec)) checkKeys("lut", spec, ["cube", "amount"]);
+    if (!this.readHook) throw new PxError(".cube files need an art file on disk");
+    let lut = this.cubes.get(file);
+    if (!lut) this.cubes.set(file, (lut = readCube(this.readHook(file), file)));
+    return typeof spec === "string" ? lut : { ...(spec as object), cube: lut };
+  }
+  private cubes = new Map<string, Lut>();
+
   glyphs(font: string): (ch: string) => string[] {
     const hit = this.glyphCache.get(font);
     if (hit) return hit;

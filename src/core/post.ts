@@ -3,11 +3,16 @@
 // blurs what is nearer and farther (from a camera high up, the tilt-shift look of a model); a bloom
 // round what is bright; darker corners. Depth is mesh()'s (Img.depth): what it didn't draw (a sky
 // painted under it) is far away. In linear light; the blurs at a fraction of the picture's size
-// (they are smooth) and brought back up bilinearly. It leaves the palette: colors mix.
+// (they are smooth) and brought back up bilinearly. Then the finish (Three's and Babylon's, written
+// anew): a sharpen, a grade from a 3D LUT, a grain that changes with the frame, and the picture taken
+// back to the palette. It leaves the palette (colors mix) unless that last one brings it back.
 import { type Color, LIN, TRANSPARENT, fromLinear } from "./color.ts";
+import { runEffect } from "./effects.ts";
 import { PxError } from "./errors.ts";
 import type { Img } from "./image.ts";
 import { blur } from "./normals.ts";
+import type { Palette } from "./palette.ts";
+import { hash } from "./util.ts";
 
 export interface PostOpts {
   /** the pixel [col, row] whose depth is sharp (default the picture's middle) */
@@ -21,12 +26,51 @@ export interface PostOpts {
   soft?: number | [number, number];
   /** the most blur, about its radius in px (default 0: none) */
   blur?: number;
-  /** a glow round what is brighter than `above` (0..1, default 0.75), `r` px out (default 1/40 of the width), at `strength` (default 0.6); a number is the strength */
-  bloom?: number | { above?: number; r?: number; strength?: number };
+  /**
+   * a glow round what is brighter than `above` (0..1, default 0.75), `r` px out (default 1/40 of the
+   * width), at `strength` (default 0.6); a number is the strength. `levels`: Three's way instead, the
+   * bright part at half size and at `levels` sizes each half the last, blurred and added back, `spread`
+   * (0..1, default 0.4) of the weight moved toward the big ones
+   */
+  bloom?: number | { above?: number; r?: number; strength?: number; levels?: number; spread?: number };
   /** haze toward `color` from `from` m of depth to `to`, up to `max` of it there (default 0.6) */
   fog?: { color: string; from: number; to: number; max?: number };
   /** darker corners: 0 none (default), 1 black */
   vignette?: number;
+  /** px to an art pixel (default 1): sharpen, grain and the palette's dither work in blocks of it */
+  pixel?: number;
+  /** each pixel stepped away from its four neighbours a pixel off (a block off), by this much of the difference (0 none, 0.2-0.3 a little) */
+  sharpen?: number;
+  /** a grade: a 3D LUT (the DSL reads `"dusk.cube"` into one), at `amount` (0..1, default 1) */
+  lut?: Lut | { cube: Lut; amount?: number };
+  /** film grain in blocks of `pixel`, new each frame, most in the middle tones: up to `amount` of full scale (0..1) */
+  grain?: number | { amount?: number; seed?: number };
+  /** the picture taken back to the palette's colors (true), or to those keys, ordered-dithered between two by `dither` (0..1, default 1; 0 the nearest) */
+  palette?: true | string | string[] | { keys?: string | string[]; dither?: number };
+}
+
+/** A 3D LUT: size^3 colors (r, g, b in 0..1), red changing fastest, as a .cube file lists them. */
+export interface Lut { size: number; data: Float32Array }
+
+/** Read a .cube file (Adobe's, Resolve's): LUT_3D_SIZE n, an optional DOMAIN_MIN / DOMAIN_MAX, then n^3 lines of r g b. */
+export function readCube(text: string, name = "LUT"): Lut {
+  let size = 0, lo = [0, 0, 0], hi = [1, 1, 1];
+  const vals: number[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/#.*/, "").trim();
+    if (!line || /^TITLE\b/.test(line)) continue;
+    const [k, ...rest] = line.split(/\s+/);
+    if (k === "LUT_3D_SIZE") size = Number(rest[0]);
+    else if (k === "LUT_1D_SIZE") throw new PxError(`${name}: a 1D LUT; post's lut takes a 3D one (LUT_3D_SIZE)`);
+    else if (k === "DOMAIN_MIN") lo = rest.map(Number);
+    else if (k === "DOMAIN_MAX") hi = rest.map(Number);
+    else if (/^[-+.\d]/.test(k)) vals.push(Number(k), ...rest.map(Number));
+  }
+  if (!(Number.isInteger(size) && size >= 2 && size <= 256)) throw new PxError(`${name}: no LUT_3D_SIZE from 2 to 256`);
+  if (vals.length !== 3 * size ** 3 || !vals.every(Number.isFinite)) throw new PxError(`${name}: LUT_3D_SIZE ${size} wants ${size ** 3} lines of r g b, got ${vals.length / 3}`);
+  // a domain other than 0..1 is brought to it, so the lookup reads every color the same way
+  const data = Float32Array.from(vals, (v, i) => (v - lo[i % 3]) / (hi[i % 3] - lo[i % 3]));
+  return { size, data };
 }
 
 /** The last vignette's factor per pixel: an animation's frames share one. */
@@ -53,7 +97,41 @@ function rowOf(y: number, lh: number, f: number, w: number): [number, number, nu
 
 const num = (v: unknown, lo: number, hi: number) => typeof v === "number" && v >= lo && v <= hi;
 
-export function applyPost(img: Img, o: PostOpts, fogColor: Color | null): void {
+/** A box average down to half size (an odd edge's cells of fewer pixels). */
+function half(p: ArrayLike<number>, w: number, h: number): Float64Array {
+  const hw = Math.ceil(w / 2), hh = Math.ceil(h / 2), out = new Float64Array(hw * hh);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out[(y >> 1) * hw + (x >> 1)] += p[y * w + x];
+  for (let Y = 0; Y < hh; Y++) for (let X = 0; X < hw; X++) out[Y * hw + X] /= Math.min(2, w - 2 * X) * Math.min(2, h - 2 * Y);
+  return out;
+}
+
+/** Add a low-res plane (1/f of the size) to a picture's plane, brought up bilinearly, times k. */
+function addUp(to: Float32Array, p: Float64Array, lw: number, lh: number, f: number, w: number, h: number, k: number): void {
+  const wide = widen(p, lw, lh, f, w);
+  for (let y = 0; y < h; y++) {
+    const [a, b, t] = rowOf(y, lh, f, w);
+    for (let x = 0; x < w; x++) to[y * w + x] += (wide[a + x] + (wide[b + x] - wide[a + x]) * t) * k;
+  }
+}
+
+/** The color at sRGB (r, g, b) 0..255 through a 3D LUT, trilinear between its entries, into out[0..2]. */
+function lookup(L: Lut, r: number, g: number, b: number, out: Float64Array): void {
+  const N = L.size - 1, S = L.size, d = L.data, fr = (r / 255) * N, fg = (g / 255) * N, fb = (b / 255) * N;
+  const r0 = Math.min(N - 1, Math.floor(fr)), g0 = Math.min(N - 1, Math.floor(fg)), b0 = Math.min(N - 1, Math.floor(fb));
+  const tr = fr - r0, tg = fg - g0, tb = fb - b0, i000 = 3 * (r0 + g0 * S + b0 * S * S), dr = 3, dg = 3 * S, db = 3 * S * S;
+  for (let c = 0; c < 3; c++) {
+    const i = i000 + c;
+    const x00 = d[i] + (d[i + dr] - d[i]) * tr, x10 = d[i + dg] + (d[i + dg + dr] - d[i + dg]) * tr;
+    const x01 = d[i + db] + (d[i + db + dr] - d[i + db]) * tr, x11 = d[i + db + dg] + (d[i + db + dg + dr] - d[i + db + dg]) * tr;
+    const y0 = x00 + (x10 - x00) * tg, y1 = x01 + (x11 - x01) * tg;
+    out[c] = 255 * (y0 + (y1 - y0) * tb);
+  }
+}
+
+const byte = (v: number) => (v <= 0 ? 0 : v >= 255 ? 255 : Math.round(v));
+
+/** `pal`: the palette the picture goes back to; `frame`: the clock's frame, for the grain. */
+export function applyPost(img: Img, o: PostOpts, fogColor: Color | null, pal?: Palette, frame = 0): void {
   const { w, h } = img, n = w * h, D = img.depth;
   if (Array.isArray(o.soft) && !(o.soft.length === 2 && o.soft.every((v) => num(v, 1e-6, Infinity))))
     throw new PxError(`post: soft is m over which the blur grows to full, above 0, or two of them [nearer, farther], got ${JSON.stringify(o.soft)}`);
@@ -134,7 +212,47 @@ export function applyPost(img: Img, o: PostOpts, fogColor: Color | null): void {
   if (o.bloom) {
     const bo = typeof o.bloom === "number" ? { strength: o.bloom } : o.bloom;
     const above = bo.above ?? 0.75, r = bo.r ?? w / 40, strength = bo.strength ?? 0.6;
-    if (!num(above, 0, 1) || !num(r, 1e-6, Infinity) || !num(strength, 0, Infinity)) throw new PxError(`post: bloom is a strength, or { above (0..1), r (px), strength }, got ${JSON.stringify(o.bloom)}`);
+    if (!num(above, 0, 1) || !num(r, 1e-6, Infinity) || !num(strength, 0, Infinity) || (bo.levels !== undefined && !(Number.isInteger(bo.levels) && bo.levels >= 1 && bo.levels <= 8)) || (bo.spread !== undefined && !num(bo.spread, 0, 1)))
+      throw new PxError(`post: bloom is a strength, or { above (0..1), r (px), strength }, or Three's { above, strength, levels (1..8), spread (0..1) }, got ${JSON.stringify(o.bloom)}`);
+    if (bo.levels !== undefined && bo.r !== undefined) throw new PxError("post: bloom's levels set their own sizes: give levels or r, not both");
+  }
+  if (o.bloom && typeof o.bloom === "object" && o.bloom.levels) {
+    // Three's UnrealBloomPass: the part brighter than `above` (a knee of 0.01), at half size; then at
+    // each level blurred (3, 5, 7... of its own px), halved for the next; all added back, the first
+    // weighing 1, then 0.8, 0.6, 0.4, 0.2, `spread` of each moved toward 1.2 less it (the big ones)
+    const { above = 0.75, strength = 0.6, levels, spread = 0.4 } = o.bloom, aL = LIN[Math.round(above * 255)], knee = 0.01;
+    const bright = [new Float32Array(n), new Float32Array(n), new Float32Array(n)];
+    let any = false;
+    for (let i = 0; i < n; i++) {
+      const Y = 0.2126 * R[i] + 0.7152 * G[i] + 0.0722 * B[i], t = clamp01((Y - aL) / knee), k = t * t * (3 - 2 * t);
+      if (k) { bright[0][i] = R[i] * k; bright[1][i] = G[i] * k; bright[2][i] = B[i] * k; any = true; }
+    }
+    // ponytail: dense separable blurs from half size, about 0.3 s a frame at 960x540 and 0.9 s at
+    // 1920x1080; a sparse first pass (few pixels are bright) if long HD runs need it faster
+    if (any) {
+      // (the weights brought to sum to 2, as the two sizes of the other bloom do, so a strength adds as much light)
+      const wt = Array.from({ length: levels }, (_, l) => { const fl = Math.max(0.2, 1 - 0.2 * l); return fl + (1.2 - 2 * fl) * spread; }), sum = wt.reduce((a, b) => a + b, 0);
+      // the levels summed at half size, brought up to the picture once
+      const w0 = Math.ceil(w / 2), h0 = Math.ceil(h / 2), acc = [new Float64Array(w0 * h0), new Float64Array(w0 * h0), new Float64Array(w0 * h0)];
+      let lw = w0, lh = h0, f = 1, cur = bright.map((p) => half(p, w, h));
+      for (let l = 0; l < levels; l++) {
+        const k = (2 * strength * wt[l]) / sum, blurred = cur.map((p) => blur(p, lw, lh, 0.55 * (3 + 2 * l)));
+        blurred.forEach((p, c) => {
+          if (f === 1) { for (let j = 0; j < p.length; j++) acc[c][j] += p[j] * k; return; }
+          const wide = widen(p, lw, lh, f, w0);
+          for (let y = 0; y < h0; y++) {
+            const [a, b, t] = rowOf(y, lh, f, w0);
+            for (let x = 0; x < w0; x++) acc[c][y * w0 + x] += (wide[a + x] + (wide[b + x] - wide[a + x]) * t) * k;
+          }
+        });
+        if (l + 1 < levels) cur = blurred.map((p) => half(p, lw, lh));
+        lw = Math.ceil(lw / 2); lh = Math.ceil(lh / 2); f *= 2;
+      }
+      [R, G, B].forEach((plane, c) => addUp(plane, acc[c], w0, h0, 2, w, h, 1));
+    }
+  } else if (o.bloom) {
+    const bo = typeof o.bloom === "number" ? { strength: o.bloom } : o.bloom;
+    const above = bo.above ?? 0.75, r = bo.r ?? w / 40, strength = bo.strength ?? 0.6;
     // what is brighter than `above`, by how much, spread r px and r / 2 px and added back
     const aL = LIN[Math.round(above * 255)], f = Math.max(1, Math.round(r / 4)), s = r / f / 2, { lw, lh, share, col } = cells(w, h, f);
     const eR = new Float64Array(lw * lh), eG = new Float64Array(lw * lh), eB = new Float64Array(lw * lh);
@@ -179,10 +297,74 @@ export function applyPost(img: Img, o: PostOpts, fogColor: Color | null): void {
     for (let i = 0; i < n; i++) { R[i] *= v[i]; G[i] *= v[i]; B[i] *= v[i]; }
   }
 
+  const K = o.pixel ?? 1;
+  if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`post: pixel is how many px an art pixel takes, a whole number from 1, got ${JSON.stringify(o.pixel)}`);
+  if (o.sharpen !== undefined && !num(o.sharpen, 0, 4)) throw new PxError(`post: sharpen is how far each pixel steps from its neighbours, 0 to 4, got ${JSON.stringify(o.sharpen)}`);
+  const lut = o.lut === undefined ? undefined : "cube" in o.lut ? o.lut : { cube: o.lut, amount: 1 }, la = lut?.amount ?? 1;
+  if (lut && !(lut.cube && Number.isInteger(lut.cube.size) && lut.cube.data instanceof Float32Array && num(la, 0, 1)))
+    throw new PxError('post: lut is a .cube file ("dusk.cube"), or { cube: "dusk.cube", amount (0..1) }');
+  const go = o.grain === undefined ? undefined : typeof o.grain === "number" ? { amount: o.grain } : o.grain, ga = go?.amount ?? 0.05;
+  if (go && (!num(ga, 0, 1) || !(go.seed === undefined || Number.isInteger(go.seed)))) throw new PxError(`post: grain is an amount (0..1), or { amount, seed }, got ${JSON.stringify(o.grain)}`);
   const data = img.data;
-  for (let i = 0; i < n; i++) {
-    const c = data[i];
-    if (c === TRANSPARENT) continue;
-    data[i] = fromLinear(R[i], G[i], B[i], c);
+  for (let i = 0; i < n; i++) if (data[i] !== TRANSPARENT) data[i] = fromLinear(R[i], G[i], B[i], data[i]);
+
+  if (o.sharpen) {
+    // Babylon's sharpen, on the colors as they're seen (in linear light the dark side of an edge went
+    // black): each pixel plus `sharpen` times how far it stands from the four around it, a block off in
+    // HD so the art's own edges are what sharpens; off the picture or clear: itself
+    const a = o.sharpen, src = data.slice();
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x, c = src[i];
+        if (c === TRANSPARENT) continue;
+        const cr = c >>> 24, cg = (c >>> 16) & 255, cb = (c >>> 8) & 255;
+        let r = 4 * cr, g = 4 * cg, b = 4 * cb;
+        for (let k = 0; k < 4; k++) {
+          const X = x + (k === 0 ? K : k === 1 ? -K : 0), Y = y + (k === 2 ? K : k === 3 ? -K : 0);
+          let d = X < 0 || Y < 0 || X >= w || Y >= h ? c : src[Y * w + X];
+          if (d === TRANSPARENT) d = c;
+          r -= d >>> 24; g -= (d >>> 16) & 255; b -= (d >>> 8) & 255;
+        }
+        data[i] = ((byte(cr + a * r) << 24) | (byte(cg + a * g) << 16) | (byte(cb + a * b) << 8) | (c & 255)) >>> 0;
+      }
+  }
+
+  if ((lut && la) || (go && ga)) {
+    const memo = new Map<number, number>(), out = new Float64Array(3), bw = Math.ceil(w / K), z = new Float64Array(bw);
+    // grain most in the middle tones: none at black and white
+    const mid = Float64Array.from({ length: 256 }, (_, l) => 0.5 - 0.5 * Math.cos((2 * Math.PI * l) / 255));
+    for (let y = 0; y < h; y++) {
+      // a new grain each frame (Babylon's, seeded by the frame instead of a random call), a number a block
+      if (go && ga && y % K === 0) for (let bx = 0; bx < bw; bx++) z[bx] = ga * 255 * ((hash(bx, y / K, frame * 7919 + (go.seed ?? 0)) / 4294967296) * 2 - 1);
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x, c = data[i];
+        if (c === TRANSPARENT) continue;
+        let v = c;
+        if (lut && la) {
+          const got = memo.get(c >>> 8);
+          if (got !== undefined) v = ((got << 8) | (c & 255)) >>> 0;
+          else {
+            const r = c >>> 24, g = (c >>> 16) & 255, b = (c >>> 8) & 255;
+            lookup(lut.cube, r, g, b, out);
+            v = ((byte(r + (out[0] - r) * la) << 24) | (byte(g + (out[1] - g) * la) << 16) | (byte(b + (out[2] - b) * la) << 8) | (c & 255)) >>> 0;
+            memo.set(c >>> 8, v >>> 8);
+          }
+        }
+        if (go && ga) {
+          const r = v >>> 24, g = (v >>> 16) & 255, b = (v >>> 8) & 255, d = z[(x / K) | 0] * mid[Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b)];
+          v = ((byte(r + d) << 24) | (byte(g + d) << 16) | (byte(b + d) << 8) | (c & 255)) >>> 0;
+        }
+        data[i] = v;
+      }
+    }
+  }
+
+  if (o.palette !== undefined) {
+    // the picture back in the palette: the dither effect, in blocks of the art's pixel
+    const po = typeof o.palette === "object" && !Array.isArray(o.palette) ? o.palette : { keys: o.palette === true ? undefined : o.palette, dither: undefined };
+    if (!pal) throw new PxError("post: palette needs the asset's palette");
+    if (po.dither !== undefined && !num(po.dither, 0, 1)) throw new PxError(`post: palette's dither is 0 (the nearest key) to 1 (mixed by a Bayer pattern), got ${JSON.stringify(po.dither)}`);
+    const out = runEffect("dither", img, { ...(po.keys !== undefined ? { keys: po.keys } : {}), pixel: K, spread: po.dither ?? 1 }, { frame, frames: 1, seed: 0, ox: 0, oy: 0, pal });
+    data.set(out.data);
   }
 }
