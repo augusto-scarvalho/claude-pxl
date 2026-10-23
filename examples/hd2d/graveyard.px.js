@@ -77,6 +77,12 @@ const boulder = (name, w, h, lobes) => sprite(name, { w, h, pivot: "bottom" }, (
 boulder("_boulder", 28, 16, [[11, 8, 9, 7], [19, 10, 7.5, 5.5], [8, 12, 6, 3]])
 boulder("_boulder_b", 21, 12, [[9, 6, 7, 5.5], [14.5, 8, 5.5, 4]])
 
+// The rose he lays at the old grave: lying on the grass, its stem toward us, a red bloom of three tones
+// lit from above, two leaves.
+sprite("_rose", { w: 8, h: 4, pivot: "bottom" }, (c) => {
+  for (const [x, y, k] of [[5, 0, "#ff8c96"], [6, 0, "#e8455a"], [4, 1, "#e8455a"], [5, 1, "#ff8c96"], [6, 1, "#c42a44"], [7, 1, "#c42a44"], [5, 2, "#c42a44"], [6, 2, "#8a1a32"],
+    [0, 3, "#577f3c"], [1, 3, "#577f3c"], [2, 2, "#577f3c"], [3, 2, "#3d6b42"], [4, 2, "#3d6b42"], [2, 3, "#6c9243"], [3, 1, "#6c9243"]]) c.px(x, y, k)
+})
 // A small dead leaf tumbling in the wind: face on, turning, edge on, turned the other way; brown, or
 // yellow.
 anim("_leaf", { w: 3, h: 3, frames: 4, fps: 1000 / 110, pivot: "bottom" },
@@ -249,12 +255,12 @@ for (const [x0, n] of [[-6.1, 3], [-3.2, 2], [2.4, 2], [4.9, 3]]) {
 }
 
 // The traveler's visit, on the scene's clock (80 ms a frame): he comes in from the near left through a
-// gap in the wood, climbs the steps, stops at the old grave with flowers, crosses to the mourner and
-// asks if she's all right; she turns to him and answers; he goes back down and away. Each leg walked
+// gap in the wood, climbs the steps, kneels by the old grave and lays a rose at its foot, crosses to the
+// mourner and asks if she's all right; she turns to him and answers; he goes back down and away. Each leg walked
 // in one of the 8 directions, so every one of them shows, at the walk's own pace (two steps of 6.4 px a
 // cycle of 8 frames, 24 px to the meter: 0.067 m a frame), no faster, or the feet slide; his feet on
-// the ground, each step, the path. A wait before he comes makes the loop a whole number of the pines'
-// sways (44 frames).
+// the ground, each step, the path. He starts just out of the picture, in view within a second; the
+// wait that makes the loop a whole number of the pines' sways (44 frames) comes after he has gone.
 const PACE = (4 * 3.2) / 24 / 8, MS = 80
 const feetAt = (x, z) => {                         // how high the ground is under (x, z): the hill, its steps, the wood
   const dz = Z - 2.5 - z
@@ -263,19 +269,20 @@ const feetAt = (x, z) => {                         // how high the ground is und
   return 0
 }
 const LEGS = [
-  ["ne", [-3.4, -8.6], [-0.2, -5.4]],              // in from the near left
+  ["ne", [-2.6, -7.8], [-0.2, -5.4]],              // in from the near left, from just out of the picture
   ["n", [-0.2, -5.4], [-0.2, 0.4]],                // up the steps and the path
-  ["e", [-0.2, 0.4], [1.45, 0.4]],                 // to the old grave with flowers, beside it
-  ["e", 22, "grave"],                              // stands looking at it (in front, he'd hide it)
-  ["nw", [1.45, 0.4], [-0.2, 2.05]],
-  ["w", [-0.2, 2.05], [-1.95, 2.05]],              // to the mourner's side
+  ["e", [-0.2, 0.4], [1.2, 0.4]],                  // to the old grave with flowers, beside it
+  ["e", 40, "grave"],                              // kneels and lays a flower at its foot (in front, he'd hide it)
+  ["nw", [1.2, 0.4], [-0.2, 1.8]],
+  ["w", [-0.2, 1.8], [-1.95, 1.8]],                // to the mourner's side
   ["w", 76, "talk"],
-  ["se", [-1.95, 2.05], [-0.2, 0.3]],
-  ["s", [-0.2, 0.3], [-0.2, -5.4]],                // back down
-  ["sw", [-0.2, -5.4], [-3.4, -8.6]],              // and away
+  ["se", [-1.95, 1.8], [-0.2, 0.05]],
+  ["s", [-0.2, 0.05], [-0.2, -5.4]],               // back down
+  ["sw", [-0.2, -5.4], [-2.6, -7.8]],              // and away
 ].map(([dir, a, b]) => (Array.isArray(a) ? { dir, a, b, n: Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / PACE) } : { dir, n: a, what: b }))
-const BUSY = LEGS.reduce((n, l) => n + l.n, 0), FRAMES = Math.ceil(BUSY / 44) * 44, WAIT = FRAMES - BUSY
-const TALK = WAIT + LEGS.slice(0, 6).reduce((n, l) => n + l.n, 0)       // the frame he stops by her
+const BUSY = LEGS.reduce((n, l) => n + l.n, 0), FRAMES = Math.ceil(BUSY / 44) * 44
+const TALK = LEGS.slice(0, 6).reduce((n, l) => n + l.n, 0)              // the frame he stops by her
+const GRAVE = LEGS.slice(0, 3).reduce((n, l) => n + l.n, 0)             // the frame he stops by the grave
 // the gap in the wood he comes and goes by: no pine within a meter of his way
 const nearWay = ([x, z]) => LEGS.some(({ a, b }) => {
   if (!a) return false
@@ -286,14 +293,15 @@ const nearWay = ([x, z]) => LEGS.some(({ a, b }) => {
 const wood = things.filter((t) => !(t.name.startsWith("_spruce") && nearWay(t.at)))
 // where he is and what he does at frame f; the mourner's turn to him and back
 const traveler = (f) => {
-  let t = f - WAIT, at = LEGS[0].a
-  if (t < 0) return null
+  let t = f, at = LEGS[0].a
   for (const L of LEGS) {
     if (L.a && t < L.n) {
       const k = t / L.n, x = L.a[0] + (L.b[0] - L.a[0]) * k, z = Z + L.a[1] + (L.b[1] - L.a[1]) * k
       return { name: `tr_walk_${L.dir}`, at: [x, z, feetAt(x, z)], frame: f % 8 }
     }
-    if (!L.a && t < L.n) return { name: `tr_idle_${L.dir}`, at: [at[0], Z + at[1], feetAt(at[0], Z + at[1])], frame: Math.floor((f * MS) / 250) % 4 }
+    // at the grave: down (a frame of the kneel every 2 of the scene's), the flower laid, held, up again
+    const kneel = L.what === "grave" && t < 30 ? (t < 8 ? t >> 1 : t < 22 ? 3 : 4 + Math.min(2, (t - 22) >> 1)) : -1
+    if (!L.a && t < L.n) return { name: kneel >= 0 ? `tr_kneel_${L.dir}` : `tr_idle_${L.dir}`, at: [at[0], Z + at[1], feetAt(at[0], Z + at[1])], frame: kneel >= 0 ? kneel : Math.floor((f * MS) / 250) % 4 }
     if (L.a) at = L.b
     t -= L.n
   }
@@ -305,7 +313,7 @@ const mourner = (f) => {
   return { name: `mo_idle_${TURN[t < 76 || t >= 80 ? k : 3]}`, at: [-2.75, Z + 2.45, TOP], frame: Math.floor((f * MS) / 250) % 4 }
 }
 const SAYS = [
-  [4, 32, "Alden", ["Are you all right?"], () => [-1.95, Z + 2.05, TOP], 1],
+  [4, 32, "Alden", ["Are you all right?"], () => [-1.95, Z + 1.8, TOP], 1],
   [36, 74, "Edith", ["I will be.", "Thank you for asking."], () => [-2.75, Z + 2.45, TOP], -1],
 ]
 // A dialogue box as HD-2D games draw theirs (Triangle Strategy above all): parchment, its corners cut;
@@ -315,7 +323,7 @@ const SAYS = [
 // lower edge down to the speaker's head; a blue-grey mark at its lower right corner that more is
 // coming. Over the speaker and off to one side (side: 1 right, -1 left), in pixels finer than the
 // art's (3 of the picture's to the art's 4), as a game's interface is.
-const bubble = (c, K, v, [x, z, u], name, lines, side) => {
+const bubble = (c, K, v, [x, z, u], name, lines, side, t) => {
   const U = Math.max(1, Math.round(K * 0.75)), pad = 7, lineH = 10, ch = 5
   const tw = Math.max(name.length * 6 + 16, ...lines.map((l) => l.length * 6)), w = tw + 2 * pad + 8, h = pad + 7 + 6 + lines.length * lineH + pad - 2
   const [hx, hy] = v.ground(x, z, u + 1.5), tail = 9
@@ -339,14 +347,18 @@ const bubble = (c, K, v, [x, z, u], name, lines, side) => {
   const rule = Math.round(tw * 0.62)
   R(pad + 3, pad + 9, Math.round(rule * 0.6), 1, "#8c7457"); R(pad + 3 + Math.round(rule * 0.6), pad + 9, Math.round(rule * 0.4), 1, "#b9a483")
   lines.forEach((l, k) => c.text(X0 + (pad + 6) * U, Y0 + (pad + 14 + k * lineH) * U, l, "#3a2f27", { font: "5x7", scale: U }))
-  // more is coming: a small triangle pointing down, outlined, over a short rule
-  const mx = w - pad - 10, my = h - pad - 5
-  R(mx, my, 7, 1, "#4f6382"); R(mx + 1, my + 1, 1, 1, "#4f6382"); R(mx + 5, my + 1, 1, 1, "#4f6382"); R(mx + 2, my + 2, 1, 1, "#4f6382"); R(mx + 4, my + 2, 1, 1, "#4f6382"); R(mx + 3, my + 3, 1, 1, "#4f6382")
-  R(mx + 2, my + 1, 3, 1, "#9db0cc"); R(mx + 3, my + 2, 1, 1, "#9db0cc"); R(mx, my + 5, 7, 1, "#4f6382")
+  // more is coming, waiting for a button: a small triangle pointing down over a short rule, bobbing a
+  // pixel down and back and blinking off, as a game's prompt does (t: frames since the box opened)
+  const mx = w - pad - 10, ph = t % 10, my = h - pad - 5 + (ph >= 4 && ph < 8 ? 1 : 0)
+  if (ph < 8) {
+    R(mx, my, 7, 1, "#4f6382"); R(mx + 1, my + 1, 1, 1, "#4f6382"); R(mx + 5, my + 1, 1, 1, "#4f6382"); R(mx + 2, my + 2, 1, 1, "#4f6382"); R(mx + 4, my + 2, 1, 1, "#4f6382"); R(mx + 3, my + 3, 1, 1, "#4f6382")
+    R(mx + 2, my + 1, 3, 1, "#9db0cc"); R(mx + 3, my + 2, 1, 1, "#9db0cc")
+  }
+  R(mx, h - pad, 7, 1, "#4f6382")
 }
 const talk = (c, K) => {
   const t = c.frame - TALK, v = perspective(view(K))
-  for (const [t0, t1, name, lines, who, side] of SAYS) if (t >= t0 && t < t1) bubble(c, K, v, who(), name, lines, side)
+  for (const [t0, t1, name, lines, who, side] of SAYS) if (t >= t0 && t < t1) bubble(c, K, v, who(), name, lines, side, t - t0)
 }
 // The wind from the left: the pines and the dead tree sway with it (16 frames of 220 ms, a whole number
 // of sways a loop), the gust reaching the ones on the left first; and it brings small dead leaves in
@@ -359,7 +371,8 @@ const leaves = (f) => LEAVES.map((l, i) => {
   const s = f / FRAMES, w = 2 * Math.PI * s
   return { name: l.name, at: [-18 + ((l.x0 + 36 * 6 * s) % 36), l.z + 0.4 * Math.sin(8 * w + l.ph), l.u + 0.45 * Math.sin(12 * w + l.ph)], frame: (f + i) % 4, shadow: 0 }
 })
-const people = (f) => [...wood.map((t) => sway(t, f)), ...leaves(f), mourner(f), ...[traveler(f)].filter(Boolean)]
+const laid = (f) => (f >= GRAVE + 8 ? [{ name: "_rose", at: [1.55, Z + 0.3, TOP], shadow: 0 }] : [])
+const people = (f) => [...wood.map((t) => sway(t, f)), ...leaves(f), ...laid(f), mourner(f), ...[traveler(f)].filter(Boolean)]
 const CLOCK = { frames: FRAMES, fps: 1000 / MS }
 // Morning: the sun behind on the left (the shadows fall toward us and to the right), warm; the sky's
 // light violet in the shade.

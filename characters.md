@@ -175,6 +175,15 @@ What the first tries of the traveler (34 px) got wrong, and the fix:
 - Profile, the face jutting forward: the head over the neck, the face no further out than the chest.
 - A fix to one view changed another the user had approved: keep approved views, edit the rest.
 
+A new move is another pose of the same skeleton, in every direction at once (`tr_kneel_*`: kneeling
+to lay a flower). Judge it as blocks first (`bk_<move>_<dir>`: the same skeleton in flat colors, the
+face a red patch, his right limbs light and his left dark), then paint it. Leaning a short-armed
+chibi far forward buried its reaching arm in the tunic, a hunched lump: kneel on one knee instead,
+the near foot planted ahead with its knee up, the back knee down and its shin lying behind, the
+torso upright, the hand reaching out in front of the body, where it shows. Painted, a cloak hanging
+straight hid what the blocks showed (in profile its side covers the legs): let it settle back and
+lie on the ground behind him.
+
 A pre-render from a 3D package (Blender, a CC0 mannequin made chibi, cel shading by blocks, the head
 drawn per frame) was tried on the traveler and dropped: the structure came out right, but the
 borrowed walk read stiff on a chibi, the turns were stuck at the angles rendered, and each proportion

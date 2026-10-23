@@ -265,12 +265,15 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   pace (a cycle's two steps over its frames; faster, the feet slide), the feet at the height of what
   is under them (ground, each step, a path); holds between them in an idle; the other figure turning
   to whoever speaks, a direction every two frames. Stand a figure beside what it looks at, not in
-  front of it: from above and in front its body hides a headstone it faces. Clear what stands in its
-  way (no tree within a meter of its walk). Dialogue as HD-2D games draw it (Triangle Strategy):
+  front of it: from above and in front its body hides a headstone it faces, and kneeling a step too
+  close its head meets the stone. Clear what stands in its way (no tree within a meter of its walk).
+  Start the loop with the figure just past the picture's edge, the wait that rounds it off after it
+  has gone: a GIF that opens on seconds of nothing loses whoever is watching. A thing laid down
+  (a rose at the grave) appears where the hand reaches the ground, out of the stone's shadow. Dialogue as HD-2D games draw it (Triangle Strategy):
   parchment with cut corners, fibers, darker toward its edges, a light line inside a thin brown
   outline, the name over a rule from a small diamond, the words in a 5x7 font, a short tail to the
-  speaker, a mark that more is coming; drawn after `post()`, so it stays sharp, in pixels finer than
-  the art's. A loop that long checked one frame in eight: `check: { every: 8 }`.
+  speaker, a mark that more is coming, bobbing a pixel and blinking off as a game's prompt waiting
+  for a button does; drawn after `post()`, so it stays sharp, in pixels finer than the art's. A loop that long checked one frame in eight: `check: { every: 8 }`.
 - The ground and what grows and lies on it (grass, trees, bushes, rocks, walls, paths, tufts,
   flowers), as 16-bit games draw them: the environment guide (`pxl help "environment"`, by section)
   and its kit, `examples/nature/kit.px.js`, to include.

@@ -305,7 +305,7 @@ scene, not a default. Its plan is there to read (`pipeline/plan.md`).
 ### An HD-2D graveyard: a visit, in eight directions
 
 <p>
-  <img src="docs/gallery/hd2d_graveyard.gif" width="100%" alt="Animated HD-2D diorama in pixel art: a graveyard on a grassy hill in a pine wood, morning mist, seen from high up through a long lens; a rounded hill held up by a mossy stone wall, stone steps up its front, a flagstone path between headstones, a wooden picket fence following the hill's edge, a dead tree, boulders at the corners, pines and the dead tree swaying in the wind as dead leaves blow across; a young traveler in a green cloak comes in through the wood, climbs the steps, stands by an old grave with flowers, crosses to a grey-haired mourner and asks in a parchment dialogue box if she is all right; she turns to him and answers, and he walks back down and away; the near and far edges soft with depth of field">
+  <img src="docs/gallery/hd2d_graveyard.gif" width="100%" alt="Animated HD-2D diorama in pixel art: a graveyard on a grassy hill in a pine wood, morning mist, seen from high up through a long lens; a rounded hill held up by a mossy stone wall, stone steps up its front, a flagstone path between headstones, a wooden picket fence following the hill's edge, a dead tree, boulders at the corners, pines and the dead tree swaying in the wind as dead leaves blow across; a young traveler in a green cloak comes in through the wood, climbs the steps, kneels by an old grave and lays a red rose at its foot, crosses to a grey-haired mourner and asks in a parchment dialogue box if she is all right; she turns to him and answers, and he walks back down and away; the near and far edges soft with depth of field">
 </p>
 
 The sixth, in [`examples/hd2d/`](examples/hd2d): the look of Octopath Traveler's dioramas. The
@@ -314,8 +314,9 @@ rounded, uneven outline, a fence drawn in blocks of the sprites' pixel) and the 
 trees stand in it as sprites, shadows cast by one sun, then `post()` adds the camera's depth of
 field. The pines and the dead tree are volumes in 3D, rendered to pixel art and swaying in the
 wind. The traveler is a 34 px figure built on a skeleton in 3D inside pxl with a head drawn by hand
-per view; his 46 s visit walks each of his eight directions once, at his walk's own pace, his feet
-on the ground, the steps and the path, and ends in a dialogue box as Triangle Strategy draws them.
+per view; his 42 s visit walks each of his eight directions once, at his walk's own pace, his feet
+on the ground, the steps and the path, kneels to lay a rose (another pose of the same skeleton), and
+talks in dialogue boxes as Triangle Strategy draws them, their prompt blinking for a button.
 [`characters.md`](characters.md) §3 keeps what the user's notes on each try of him taught (a big
 head, stick limbs, a hunch, a cloak fixed in the world).
 

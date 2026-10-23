@@ -147,7 +147,19 @@ const walk = (i, yaw) => {
 }
 const idle = (i) => ({ feet: [[0, -HIPW - 0.3], [0, HIPW + 0.3]], lift: [0, 0], down: [0, 1, 1, 0][i], lean: 1, trail: 0.15, sway: 0,
   hands: [[0, -1, -7], [0, 1, -7]] })
-const MOVES = { walk: { ms: 110, frames: 8, f: walk }, idle: { ms: 250, frames: 4, f: idle } }
+// Kneeling to lay something on the ground before him, on one knee as game figures do: the near foot
+// planted ahead with its knee up, the back knee down to the ground and its shin lying behind, the body
+// upright (leant forward, a short-armed chibi buried its reaching arm in the tunic: a lump), one hand
+// on the raised knee and the other reaching down in front of him; held, then up again. The cloak
+// settles back and lies on the ground behind him (hanging straight, its side hid the raised knee and
+// the shin behind: what the blocks showed).
+const KNEEL = [0.3, 0.65, 0.9, 1, 0.7, 0.4, 0.1]
+const kneel = (i) => {
+  const k = KNEEL[i], mix = (a, b) => a + (b - a) * k
+  return { feet: [[mix(0, 3.2), -HIPW - 0.2], [mix(0, -4.4), HIPW + 0.2]], lift: [0, mix(0, 0.6)], down: mix(0, 5.6), lean: mix(1, 8), trail: mix(0.2, 2.6), sway: 0,
+    hands: [[mix(0, 5.4), mix(-1, -0.2), mix(-7, -7.6)], [mix(0, 2.6), 0.8, mix(-7, -5.4)]] }
+}
+const MOVES = { walk: { ms: 110, frames: 8, f: walk }, idle: { ms: 250, frames: 4, f: idle }, kneel: { ms: 160, frames: 7, f: kneel } }
 
 const bones = (p, yaw) => {
   const fr = frame3(yaw), spine = unit(add(mul(UP, Math.cos(rad(p.lean))), mul(fr.f, Math.sin(rad(p.lean)))))
@@ -168,6 +180,7 @@ const bones = (p, yaw) => {
 // how it faces the light; an outline round each part on what is next to it: nothing, or another part
 // lying behind it (painted after the colors, so it stays)
 const surface = (best, q, n, ramp, part, key) => {
+  if (q[1] < -0.2) return                                                  // nothing below the ground: a cloak lies on it
   const [x, y] = scr(q).map(Math.round), d = depth(q), k = y * 4096 + x, b = best.get(k)
   const t = (dot(n, SUN) + 0.55) / 1.3, c = key ?? ramp[Math.max(0, Math.min(ramp.length - 1, Math.round(t * (ramp.length - 1))))]
   if (!b || d > b[0]) best.set(k, [d, c, x, y, part])
@@ -253,6 +266,34 @@ const figure = (c, set, p, yaw, mirror) => {
     if (r >= 0 && c.get(X, y + r + 1)) c.px(X, y + r + 1, "D")
   }
 }
+// Step 1 again, for a new move: the same skeleton as flat blocks (bk_<move>_<dir>), to judge the pose
+// and the motion before anything is painted: the head yellow with a red patch where the face is, the
+// body orange, his right limbs light and his left dark, outlined. Drawn turned to each direction, no
+// mirror (nothing in it is lit from one side).
+const BLOCK = { head: ["#f2cd3a"], face: ["#d8402e"], body: ["#e7763a"], right: ["#98e2ec"], left: ["#2b6b91"] }
+const blocks = (c, p, yaw) => {
+  const j = bones(p, yaw), best = new Map(), fr = j.fr
+  j.legs.forEach((L, i) => {
+    const k = i ? BLOCK.right : BLOCK.left
+    tube(best, L.hip, L.knee, 1.6, 1.5, k, "leg" + i); tube(best, L.knee, L.ankle, 1.5, 1.4, k, "leg" + i)
+    ball(best, add(L.ankle, mul(fr.f, 1.1)), fr, 1.6, 1.1, 2.3, k, "leg" + i)
+  })
+  tube(best, j.pelvis, j.chest, 3.6, 3.9, BLOCK.body, "body")
+  j.arms.forEach((A, i) => {
+    const k = i ? BLOCK.right : BLOCK.left
+    tube(best, A.sh, A.elbow, 1.1, 1, k, "arm" + i); tube(best, A.elbow, A.hand, 1, 0.9, k, "arm" + i); ball(best, A.hand, fr, 1, 1, 1, k, "arm" + i)
+  })
+  ball(best, j.head, fr, HEADR, HEADR, HEADR, BLOCK.head, "head")
+  ball(best, add(j.head, mul(fr.f, HEADR * 0.75)), fr, 2.4, 2, 1.6, BLOCK.face, "face")
+  const inner = new Set()
+  for (const [d0, , x, y, part] of best.values()) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const k = (y + dy) * 4096 + x + dx, o = best.get(k)
+    if (!o) c.px(x + dx, y + dy, "k")
+    else if (o[4] !== part && o[0] < d0 - 0.5) inner.add(k)
+  }
+  for (const [, key, x, y] of best.values()) c.px(x, y, key)
+  for (const k of inner) c.px(k % 4096, Math.floor(k / 4096), "k")
+}
 // 8 directions: the left ones drawn, the right ones their mirrors
 const DIRS = { s: [0, "s"], sw: [-45, "sw"], w: [-90, "w"], nw: [-135, "nw"], n: [180, "n"], ne: [135, "nw"], e: [90, "w"], se: [45, "sw"] }
 const HEADVIEW = Object.fromEntries(Object.values(DIRS).map(([yaw, v]) => [yaw, v]))
@@ -267,5 +308,7 @@ for (const [who, set] of [["tr", "_tr"], ["mo", "_mo"]]) for (const [move, M] of
   anim(`${who}_${move}_${d}`, { w: W, h: H, pivot: [OX, OY], ...(who === "mo" ? { swap: MOURNER } : {}) },
     (c) => figure(c, set, M.f(c.frame, yaw), yaw, mirror), ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })), bump("hybrid"))
 }
+for (const [move, M] of Object.entries(MOVES)) for (const [d, [yaw]] of Object.entries(DIRS))
+  anim(`bk_${move}_${d}`, { w: W, h: H, pivot: [OX, OY] }, (c) => blocks(c, M.f(c.frame, yaw), yaw), ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })))
 sheet("traveler", ["tr_*", "mo_*"], { rows: "tag", pad: 1 })
 }
