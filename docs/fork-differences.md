@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**359 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**360 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -27,7 +27,7 @@ page lists what the fork adds. Every commit is in
 | Engine modules | 16 core, 6 Node | 46 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [environment](../environment.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 62 |
-| Tests | 59 | 317 |
+| Tests | 59 | 327 |
 
 ## Looking and checking
 
@@ -256,8 +256,8 @@ references until it read right.
 - Timed builds are cached within a budget of bytes, so a long loop no longer fills memory.
 - `build --profile` names where the time went; `build --every N` keeps long previews small; the onion
   sheet no longer costs frames squared.
-- Tests went from 59 to 300. One keeps the editor types in step with what the runtime accepts, and
-  another keeps the guides in step with the CLI: every command, flag and section they cite exists.
+- Tests went from 59 to 327. One keeps the editor types in step with what the runtime accepts, and
+  another keeps the guides in step with the CLI: every command, flag, section and link they cite exists.
 - An art file whose own top-level name hides one of pxl's ops (a helper `post` hiding `post()`) is
   named in the error its load fails with, instead of only "item 2 is undefined".
 
@@ -284,7 +284,7 @@ Every change was made by Claude while drawing real scenes, and reviewed by a per
   the outline push for subpixel motion, the line, palette and cluster readings in study, a pixel-perfect
   `wire()` (study found its doubled steps) and the lessons on lines, anti-aliasing, timing an action,
   very low resolution and one-shot effects in the guides.
-- **Docs checked against the code:** five full reviews of the written skill, every tool and option
+- **Docs checked against the code:** six full reviews of the written skill, every tool and option
   tried, with fixes where the docs and the code disagreed.
 - **Calibration against the source:** for `pxl study`, the gallery scenes' own code is the ground truth
   ([above](#calibration)).

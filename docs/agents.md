@@ -13,6 +13,7 @@ result. To use pxl by hand, start with [Getting started](getting-started.md).
 - [Writing a brief](#writing-a-brief)
 - [How the agent works](#how-the-agent-works): look, fix in one turn, check
 - [Blocks first, then paint](#blocks-first-then-paint): a new move, a big scene in stages
+- [3D as code](#3d-as-code-which-drawer-and-edits-by-name): which drawer for what, edits by name, rules
 - [What it costs](#what-it-costs), and how to keep it cheap
 - [A big scene: one agent, a fresh one, or a pipeline](#a-big-scene-one-agent-a-fresh-one-or-a-pipeline)
 - [Reviewing the result](#reviewing-the-result)
@@ -41,6 +42,9 @@ The order that has worked over this fork's rounds, each step with its section be
    the end, under 10 MB ([The gallery](#the-gallery)).
 8. **Fast tests while working** (the file you touched, `npm run test:quick`, `PXL_EXAMPLES=<folder>`),
    the full suite once before a commit ([Tests](#tests)).
+
+A thing in 3D (a tree, a house, mist) is a scene of named parts edited by name, its rules checked by
+`pxl check` ([3D as code](#3d-as-code-which-drawer-and-edits-by-name)).
 
 ## Install the skill
 
@@ -183,6 +187,31 @@ too. So judge the shape of the thing before any of it is painted:
   `pxl compare art.px.js new_head_s approved_head_s` lists each row's extents and where the new one
   is wider. The harbor's crew kept their heads within a pixel of the traveler's skull this way.
 
+## 3D as code: which drawer, and edits by name
+
+Something that turns, sways or is seen from several cameras is described once in meters and drawn as
+pixel art (`pxl help "scenes 17"`, [`examples/sdf/`](../examples/sdf)). Which drawer:
+
+| For | Use |
+| --- | --- |
+| solid forms (a trunk, a rock, a house, a crystal) | a distance field drawn by `surface()` |
+| a block look, or a model for MagicaVoxel | `voxels()` (cells of any size; `ao` for creases) |
+| faces you build by hand, an HD-2D diorama's ground | `mesh()` with `model()` (or `sdf.mesh` of a field) |
+| air: mist, smoke, a cloud, a glowing orb | `volume()` of an `sdf.density` |
+| leaves, moss, snow on a form | `sdf.scatter` (drawn as small brushes), not splats of the whole form |
+| a face, a door, a rune, a sign on a form | a hand-drawn `decal()`, a drawing per view it needs |
+| a captured or soft look to export | `splats()` and `.ply` (experimental) |
+
+Ask for the scene as data: `world3d` parts made by builders (`make3d.tree`, `pine`, `bush`, `rock`,
+`house`, `crystal`, `mist`, `smoke`) with parameters that mean something, placed by relations. A
+request ("a denser canopy, wind from the left") is then a local edit of the parameters it names, and
+the approved parts stay byte for byte as they were; in the [evaluation](evaluation-3d.md) a rewrite
+kept them too but cost half again as much. Give the scene `expect3d` rules (the canopy above the
+trunk, the rock clear of the house, one thing before another) and let `pxl check` run them; a rule
+that fails over a place or a gap is fixed with no model by `pxl check --fix`. `pxl steps <file>
+<scene> --at x,y` names the part that painted a pixel, to find a defect's cause. To turn a model round,
+`export3d` it and open the viewer's "3D" link.
+
 ## What it costs
 
 Measured on fresh agents given only the skill:
@@ -320,7 +349,9 @@ npm run check                                            # types and every test,
 
 The two slowest tests are the check of every example (about 30 s alone, in threads on half the
 cores, the slowest of the last run first) and the study of the gallery's GIFs; a change to a check, to
-`study` or to an example is what they catch. With
+`study` or to an example is what they catch. `npm test` preloads `test/compile-cache.ts` (Node's
+compile cache, half a second off every test file's start); a file alone runs the same with
+`node --import ./test/compile-cache.ts --test test/<file>.test.ts`. With
 `PXL_EXAMPLES`, the examples test checks only the examples whose path under `examples/` starts with
 it, says in its name how many it left out, and leaves the other examples' lines alone.
 
@@ -404,7 +435,8 @@ node scripts/cpuprofile.ts prof                         # where that time went, 
 ```
 
 `pxl build --profile` names the slow functions of one art file's build. Keep a new test to what it
-checks: a few frames, a small picture, `study --seconds` for part of a long clip.
+checks: a few frames, a small picture (a 3D one: a 30 px sprite, cells of 0.25 m), `study --seconds`
+for part of a long clip.
 
 ### Measuring sessions and models
 

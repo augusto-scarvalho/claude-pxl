@@ -69,6 +69,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    `world.ground`, `height`, a `front` socket), so "no warnings" with "not run: lit side" checked
    nothing about the light (a scene lit by a fire or a lamp: `world: { light: { at: [x, y] } }`).
    A lit-side warning that looks wrong: `--readings` shows what the rule read on every placement.
+   A 3D scene's `expect3d` rules run there too; `--fix` fixes a failing one with one number (where a
+   part stands, a gap) and writes it into the file.
    Then look as a critic. Replacing approved art: keep `name_old` beside the new one and show
    both, `PXL shot art.px.js name name_old`, for the user to choose. Matching a reference:
    `PXL compare art.px.js <name> ref.png [--shrink N]` lists each row's extents side by side (against
@@ -76,7 +78,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    compare ref.png` alone: the reference's own rows, to draw to). Which
    way a rig's parts face: `PXL blind art.px.js <rig>` shows them unnamed to a reader who doesn't
    know the labels (characters.md §11).
-6. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL.
+6. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL
+   (a file that exports 3D models: its `/3d` page turns them round).
 
 Errors name file:line:col and the asset/layer/op, and suggest fixes. One broken asset doesn't stop
 the others.
@@ -130,6 +133,7 @@ task needs before starting:
 | a scene, level, building or environment | `PXL help "scenes 1 3 11 14"` (layout, texture, shadows and light, checking); then what it needs: 2 ground and tiles, 4 trees, 5 water, 6 distance, 7 true perspective and HD-2D dioramas, 8-10 loops and parallax, 12 effects; for a game, 15 its screen and 16 its projections (top-down 3/4, isometric); for its grass, trees, bushes, rocks, walls and paths, `PXL help "environment 1"` and the section of each (2-9), starting from `examples/nature/kit.px.js` |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2.5k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
+| a thing in 3D that turns, sways or is seen from several cameras (a tree, a rock, a house, mist, voxels) | `PXL help "scenes 17"`, then `PXL help sdf`, `PXL help make3d`, `PXL help world3d`; start from `examples/sdf/world.px.js` |
 | an effect a shader would do (a dissolve, an aura, a plant in the wind, a tint, energy), particles, a trail, smoke, a spell | `PXL help effects` (the kinds; `fx` on one copy), `PXL help abilities` (phases, `emitter`, `particles`, `trail`, sockets, `spell`, `cast`), `PXL help smoke`; `PXL help "designing an element"` for an element of your own; `PXL help "scenes 12"` for effects' timing and numbers, `PXL help "scenes 7"` for light, holes and see-through things in a diorama |
 
 An example, or your own file after many edits: `PXL list <file>` maps it (each asset definition and
@@ -208,9 +212,11 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   (`PXL help "scenes 7"`); procedural texture with `hash`, `vnoise`, `fbm`, `bayer`, `seamless`
   (`PXL help vnoise`).
 - **3D fields**: things in meters as distance fields (`sdf`), drawn as pixel art by `surface()`, as
-  cubes by `voxels()`, air by `volume()`, details by `sdf.scatter` + `splats()`, hand-drawn art pinned
-  on them by `decal()`; a scene of named parts by `world3d` (edit by name), checked by `expect3d`
-  (`PXL help "scenes 17"`, `PXL help sdf`).
+  cubes by `voxels()` (`ao` for creases; `grid: true` views line fields up with them), meshes by
+  `mesh()` (a camera or side/top/iso), air by `volume()`, details by `sdf.scatter` + `splats()`,
+  hand-drawn art pinned on them by `decal()`; a scene of named parts by `world3d` and the `make3d`
+  builders (edit by name), checked by `expect3d`; out to other tools by `export3d` (`.vox`, `.obj`,
+  `.glb`, `.ply`; a function of the clock with `frames`: a `.glb` that plays).
 
 ## Examples
 

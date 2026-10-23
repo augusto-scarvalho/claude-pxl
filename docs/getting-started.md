@@ -76,7 +76,8 @@ pxl serve art.px.js
 
 Open http://127.0.0.1:4321/. Every time you save, the viewer rebuilds and replays the asset you
 changed op by op, so you see how it was painted. It writes the same `out/` files as `build`
-(`--no-out` to skip them, `--port` for another port).
+(`--no-out` to skip them, `--port` for another port). A file that exports 3D models (`export3d`) gets a
+"3D" link in the viewer: http://127.0.0.1:4321/3d turns them round with the mouse.
 
 ## An animation and a scene
 
@@ -127,6 +128,8 @@ out/_preview/                     enlarged previews (a GIF too for what moves); 
                                   <name>_onion.png (onion skin), and a sheet that holds animations a GIF
                                   playing them all
 out/share/                        with --share N: each asset N times bigger, clean (no grid), to post
+out/<name>.vox .obj .glb .ply     each export3d(): a voxel model, a mesh, splats (something that moves:
+                                  one .glb that plays, and <name>_0, <name>_1 ... for the others)
 ```
 
 Useful options:
@@ -161,6 +164,8 @@ Useful options:
 | hold a new part to one you approved, row by row | `pxl compare art.px.js head_new head_old` (or `other.px.js:head`) |
 | learn from finished art or a reference | `pxl study ref.gif` |
 | measure one thing moving in a reference | `pxl study ref.gif --at x,y,w,h` (its box every frame, its spacing; the region in the drawing's own pixels, as `shot` shows it) |
+| fix a 3D scene's rule that fails (the rock inside the house, the house off the ground) | `pxl check art.px.js --fix` changes the one number that makes it hold and says which |
+| turn an exported 3D model round | `pxl serve art.px.js`, then the viewer's "3D" link |
 
 `pxl check` makes every check `describe` can warn on (facing, feet on the ground, lit side,
 lettering, and more) on every scene at every frame, and exits 1 when it finds anything. Its LOOK lines don't fail it: they point at the L-corners and jaggies of
@@ -211,6 +216,8 @@ each piece as a strip. `--no-out` prints the text only.
   [`spell_variants.px.js`](../examples/spell_variants.px.js) and
   [`hd2d/clearing.px.js`](../examples/hd2d/clearing.px.js).
 - [rotation.md](../rotation.md): turning sprites by any angle, 8 or 16 directions.
+- 3D as code (a tree, a rock, a house, mist, voxels, described in meters and drawn as pixel art):
+  `pxl help "scenes 17"`, then [`examples/sdf/`](../examples/sdf), starting with `world.px.js`.
 - [`examples/`](../examples): finished files to copy the structure of. Start with `basics.px.js`;
   for a game, `platformer.px.js` and `topdown.px.js` (tilesets laid out as levels) and
   [`topdown_hero/`](../examples/topdown_hero) (a character in four directions, a tagged sheet); for

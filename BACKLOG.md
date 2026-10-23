@@ -512,6 +512,9 @@ one), and the art code itself (4% of the cost).
     far side frames after its near one): each pixel's curve against the run's mean, kept at 0.4 and up.
     The sunset's clouds stayed light (its light precision 5%), and the tournament lost light (found
     91% -> 84%). Taken out.
+  - The 3D round's sweep: no new quick idea; the calibration as it stands (`calibrate.ts --summary`:
+    party 44% of frames found, sunset 25%, sodium_hour 10%, tournament 43%). When: captures cut from
+    the frame difference, or cars told apart where they overlap, are taken on as a piece of work.
 - [x] **More of what the papers measure**: a sprite's light from its rim (Johnson and Farid, 2005);
   banding by Pixel Logic's rule as the Pixel Fixer paper (TU Delft, 2025) states it; pillow shading;
   the translation of a photo by superpixels after Gerstner et al. (NPAR 2012), which keeps edges.
@@ -723,6 +726,10 @@ Saint11's, read from his page, and not kept in the repository):
 - [ ] **The harbor read as tilted ~31° where its camera is 22°** (`pxl study` on the HD-2D fixtures; the
   graveyard reads 39° for 38°). Tried once: the point above the picture with the most lines instead of
   the one nearest the middle column: the same point (the only one with four lines or more), no change.
+  Tried in the 3D round: the point's lines in the lower half of the picture alone (the pier's, nearer
+  the ground) meet higher still (row -416 against -396: 32°), so the lower lines aren't the ground's
+  either; taken out. When: the lines are told by what they lie on (planks along the ground, an
+  awning's slope), not by where they are on the picture.
   What it needs: the lines along the ground (planks, the pier's edges) weighed over the awnings' and
   the ship's slopes, which meet higher.
   Measured since, and not enough alone: (1) edges behind kept through the body while it moves: 1% of
@@ -738,6 +745,8 @@ Saint11's, read from his page, and not kept in the repository):
   Looked at again (time-boxed, no quick idea fits): pxl's own ghost at `opacity: 0.6` over a night sky
   is found as one piece of 12x7, the rows at its top and hem where it changes, so its float can't be
   read off the piece either; following the body whole comes first, and that is the two-layer model.
+  The 3D round: no new quick idea; waits for the two-layer model, when a reference with a see-through
+  body is studied for real.
 - [x] **A runner in place read as a camera moving forward**: require the backdrop to move first.
   Done another way: the opening out has to hold frame after frame (a runner spreads its limbs and
   draws them in by turns); the race still reads as a camera going forward.
@@ -906,7 +915,10 @@ What the phases left, each waiting for a reason:
   1 GHz): post() with Three's bloom at 1920x1080 is 0.26-0.4 s a frame since the sparse blur, and the
   HD-2D scenes' frames are spent in mesh()'s rasterizer, not in effects (harbor's check: mesh() a
   third of it and more, effects none). Worth it only for a measured slow pass (a long
-  HD run's bloom, many effects on a long scene), with a CPU/GPU comparison test per effect.
+  HD run's bloom, many effects on a long scene), with a CPU/GPU comparison test per effect. Still so
+  in the 3D round: the slow passes are now fields and volumes ray-marched on the CPU (a 320x180
+  diorama with a leafy tree, smoke and mist 0.6 to 1.3 s a frame; `pxl check` on `sdf/volumes.px.js`,
+  one frame of each scene, 3.4 s), and those are a GPU engine's case (below), not the effects'.
 - [ ] **A cast's depth part by part**: `cast()` in `mesh()`'s depth takes one depth for all of the
   spell, its head's (nearer by its size). A beam reaching toward the eye, or a mark on the ground half
   behind a wall, would need a depth for each primitive it draws (its points are in the world, so the
@@ -952,101 +964,110 @@ What the phases left, each waiting for a reason:
   splats() as pixel art: the one use where splats bring what a field can't. Why: a photographed thing
   drawn in a scene's palette. When: someone has one to draw (SH degree 0 colors first; the rest as an
   average).
-- [ ] **The .ply opened in Spark**: checked here by reading it back (3DGS's 17 properties, SH degree 0),
-  not yet in a viewer. Why: a reader may want f_rest or another order. When: the first time one is
-  shared (a page with Spark from a CDN, the file beside it).
-- [ ] **mesh() in surface()'s orthographic views**: a mesh from the side, the top or in iso goes through
-  a camera function of one's own today (examples/sdf/splats.px.js, `orthoMesh`). When: a second file
-  needs it (a `view` with `kind` for mesh(), the faces turned into its frame).
+- [ ] **The .ply as splats in a viewer**: `pxl serve`'s `/3d` shows it as points in their colors (three.js
+  reads 3DGS's 17 properties); drawn as splats needs Spark's renderer. When: the first time one is
+  shared, or points read wrong.
+- [x] **mesh() in surface()'s orthographic views**: `mesh("side" | "top" | "iso" | { kind, ... }, faces,
+  mats, { ppm, at })`, the faces in the world's meters at their depth (a field drawn after it through
+  the same view stands in front or behind); `examples/sdf/splats.px.js` uses it for its mesh panels
+  instead of its own camera function (3 px and 1 px moved). Faces only: the sun and sprites keep
+  needing a perspective view.
 - [ ] **Higher SH degrees in the .ply**: the DC color only. When: a viewer shows the flat color wrong.
   (Sizes by material: a scatter set has its own size, a crown's leaves and a rock's moss each theirs.)
 
 - [ ] **Volumes among volumes**: a volume writes no depth (it hides nothing), so volumes are drawn
   farthest first by hand; two crossing (mist through smoke) lie one over the other, not mixed. Why: a
   fog bank a column of smoke rises through. When: a scene shows it wrong (march them in one pass, their
-  grids together).
+  grids together, each ray gathering from all of them by depth).
 - [ ] **A volume's glow on fields and volumes**: `emit.glow` steps up what is drawn round it (the ground,
   walls, a field's pixels) by distance alone; another volume isn't lit, nor does the light turn with a
-  surface's facing. When: an orb in a fog reads wrong (mesh()'s lamps in a sun-lit diorama could take it).
+  surface's facing. When: an orb in a fog reads wrong (the picture's normals are there to read: the
+  facing is a few lines; lighting another volume is the one pass above).
 - [ ] **A volume's shadow on another volume, and on itself from a field**: the cloud's shadow falls on
-  what has a depth; mist under it isn't darkened. When: a scene needs it.
-- [ ] **How far light gets into a volume, as an option**: its own shadow takes 0.4 of its thickness on
-  the light's way (light in a cloud scatters forward); a fixed share. Why: a dense smoke wants deeper
-  shade, a thin cloud less. When: a volume reads too flat or too dark with thickness alone.
+  what has a depth; mist under it isn't darkened. When: a scene needs it (with volumes in one pass).
+- [x] **How far light gets into a volume, as an option**: `volume(..., { shadow })`, the share of its
+  thickness on the light's way that counts (0.4 as before; 1 a dense smoke's deep shade, 0.1 a thin
+  cloud lit through).
 
-- [ ] **surface() on voxels' pixel grid in iso**: voxels() draws iso on the pixel grid (a cube px wide,
-  its top half as tall, its sides as tall), surface() draws a true orthographic iso (30 degrees down):
-  the two don't line up on one canvas. Why: a field and its voxels side by side in one iso picture. When:
-  the first scene that mixes them (a `grid: true` view for surface(), the same projection voxels use).
-- [ ] **A grid past 256 a side as several MagicaVoxel models**: refused today with the cell size that
-  fits. Why: a big asset (a building, a terrain) at a fine cell. When: one needs it; write parts of 256
-  and a scene graph placing them (nTRN, nGRP, nSHP chunks).
+- [x] **surface() on voxels' pixel grid in iso**: `view: { kind: "iso", grid: true }` draws a field on
+  the projection voxels() uses (a meter `ppm` px along each axis), so a field and its voxels line up
+  on one canvas (a 0.5 m box and its 0.5 m voxel cover the same pixels).
+- [x] **A grid past 256 a side as several MagicaVoxel models**: cut in models of 256 at most, each
+  placed by the scene graph (nTRN, nGRP, nSHP; `_t` its middle), read back voxel by voxel to where the
+  grid had them.
 - [ ] **mesh() casting shadows from ramp faces without a sun**: only textured faces and sprites take the
   sun's shadows, and only with `sun` on; a mesh made from a field (sdf.mesh) gets its shadow from its
   field (`surface(..., { hide: true })`). Why: a block or a mesh in a palette-lit diorama grounded by its
-  own faces. When: a scene of meshes that no field stands behind.
+  own faces. When: a scene of meshes that no field stands behind (the SunMap built from all faces, a
+  ramp step down where it shades).
 - [ ] **surface(), voxels() and volume() in mesh()'s sun**: they light by their own ramps and lay their
   shadow on what is drawn, but walls' shadows don't fall on them and the sun's and sky's colours don't
   tint them.
   Why: a field among sun-lit textured faces reads cooler than they do. When: an HD-2D scene in the sun
-  shows a field (a SunMap test per hit, then shine() on the ramp tone, kept in clusters).
+  shows a field (mesh() leaving its SunMap on the picture, a test per hit, then shine() on the ramp
+  tone, kept in clusters).
 - [ ] **An SDF sprite's depth pixel by pixel in mesh()**: a sprite stands as a card, each row at its
   height's depth; a field drawn through the camera has the true depth. Why: a wide crown in front of a
-  fence behind the trunk. When: a card reads wrong (a depth channel travelling with the sprite's pixels,
-  as its normals do).
+  fence behind the trunk. When: a card reads wrong (surface() already leaves a depth on its picture:
+  carry it with the sprite's pixels, as its normals are, offset to the card's).
 - [x] **A leafier canopy**: `make3d.tree({ leaves })`, leaf clusters scattered on the lobes as brushes
   (examples/sdf/details.px.js).
-- [ ] **Voxels' creases darker** (ambient occlusion per cube face, as block games shade corners): off
-  today, a tone a face. Why: a big voxel scene can read flat. When: one does.
-- [ ] **Voxels on the pixel grid from the side**: iso and top are on the grid; any other view of
-  voxels is a true orthographic one, its cubes uneven by a pixel. When: a side-view game wants voxels.
-- [ ] **Exports that move**: `export3d` writes a moment (a swaying tree still). Why: an engine plays
-  the wind itself. When: someone exports an animated field (glTF morph targets or a node's animation).
+- [x] **Voxels' creases darker**: `voxels(..., { ao })`, each face darker toward the cubes beside it, by
+  its corners as block games shade them (off by default: no example moved).
+- [x] **Voxels on the pixel grid from the side**: `view: { kind: "side", grid: true }`, a cube's front
+  `px` wide and tall and a quarter of its top.
+- [x] **Exports that move**: `export3d(name, (c) => sdf.mesh(field, { size, clock: c }), { frames, fps })`:
+  one `.glb` holding a mesh a moment, shown in turn by an animation (scales stepped), which loops in
+  three.js and other viewers; `.vox`, `.obj`, `.ply` a file a moment. Morph targets skipped: surface
+  nets give each moment its own vertices.
 - [ ] **The material lookup as generated code too**: the distance is one generated function; the
   material is still closures, read at each hit, voxel and quad (surface nets at 0.05 m: 0.5 s). When:
   meshing or voxelizing big grids is measured slow.
-- [ ] **A GPU engine**: not yet, by decision. Why not: the CPU renderer is measured first; a backend
-  waits for a pass measured slow (HD dioramas ~1 s a frame). When: a long HD sequence is.
-- [ ] **An interactive WebGL preview** of fields, voxels and meshes (turn it, look round): not yet, by
-  decision. When: agents or the user need to orbit a model (the semantic layer is done and nobody has
-  yet); the .glb export opens in any viewer meanwhile.
-- [ ] **A Blender pipeline**: not yet, by decision; .obj and .glb reach it. When: a render or an edit
-  only Blender does is asked for.
+- [ ] **A GPU engine**: not yet, by decision. Why not: the CPU renderer holds, measured: a 320x180
+  diorama with a tree, smoke and mist 0.6 to 1.3 s a frame, the HD-2D scenes' checks 5 s or so a file
+  alone, every 24th frame. When: a long HD sequence is measured slow (minutes a render), or an
+  interactive tool needs frames at 30 fps.
+- [x] **An interactive 3D view**: `pxl serve` serves `/3d` (and a "3D" link in the viewer): the `.glb`
+  and `.ply` export3d wrote, turned with the mouse, a moving `.glb` playing; three.js 0.169 from a
+  pinned CDN build, nothing installed, and nothing else of pxl needs the network.
+- [ ] **A Blender pipeline**: not yet, by decision; `.obj` and `.glb` reach it (the moving `.glb` too,
+  its moments shown in turn). When: a render or an edit only Blender does is asked for.
 
 Left from phase 6 (details, decals, the scene of parts):
 
-- [ ] **What painted a pixel through stamp()**: `Img.parts` is written by surface(), splats(), volume(),
-  decal() and draw3d() on the canvas they draw on; a panel stamped into a scene leaves its parts behind
-  (`pxl steps <scene> --at` says none there). Why: a sheet of panels asked what is where. When: someone
-  asks it of a composed scene (stamp copying the ids, the names joined).
-- [ ] **Decals on mesh() and voxels()**: a decal lies on a field drawn by surface(); a mesh's faces or a
-  voxel model take none. Why: a sign on a modelled building. When: a mesh scene wants one (the anchor
-  from the face's plane, the depth from mesh()'s buffer).
-- [ ] **Views for wrapped decals**: `views` picks a grid for `pin`; a `wrap` decal is one grid laid on
+- [x] **What painted a pixel through stamp()**: a picture's parts travel with a stamp, a copy and a
+  flip; what a stamp covers no longer says it; `pxl steps --at` names a part only when a 3D op or a
+  stamp painted the pixel last (a rect over it said the part before).
+- [x] **Decals on voxels() and on a mesh of a field**: they lie on the field the grid or the mesh was
+  made of (`on: field`), checked against the depth those leave. A hand-modelled mesh (`model()`) still
+  takes none: when a modelled building wants a sign (the anchor from the face's plane).
+- [ ] **Views for wrapped decals**: `views` picks a grid by the angle; a `wrap` decal is one grid laid on
   the surface (it foreshortens on its own). On a hard edge (a prism's) its texels bend round with it.
-  When: a wrapped emblem needs a drawing per side.
+  Today: a wrap decal for each face, each its own drawing. When: an emblem round a hard edge reads wrong.
 - [ ] **Brushes by distance**: under 2 cells a detail is a fixed brush (dot, clump, leaf, blade,
   cluster), whatever its size; past that an ellipse. Why: a camera close to a crown could show leaves
   as bigger brushes (a 5x5 leaf) before they turn to ellipses. When: a close-up reads wrong.
-- [ ] **More builders and relations**: tree, rock, house, crystal, mist, smoke; at, on, beside, around,
-  attach. Why: a forest edge, a fence, a path between parts, rows. When: a scene asks for them (a pine,
-  a bush, `along` a path, `apart` kept by placing, not only checked).
-- [ ] **expect3d's sampling and its tenses**: points 0.1 m apart over 8 frames, so a part thinner than
-  that (a twig) can slip through, and rules are "at every frame" or "by then" (`reaches`). Why: MoVer's
-  rules also say before, after, while. When: a rule misses what it should catch, or an animation needs
-  an order checked (finer sampling where a part is thin; `before: [rule, rule]`).
+- [x] **More builders**: `make3d.pine({ height, tiers, girth, snow })` (cones of needles up a trunk,
+  ragged with noise, snow on the tiers) and `make3d.bush({ size, leaves })`, both in the world's wind;
+  `make3d.crystal({ moss })` (the evaluation's builders arm couldn't give its rock moss).
+- [ ] **More relations**: `along` a path (a fence, a row), `apart` kept by placing (not only checked).
+  When: a scene asks for rows or paths; `pxl check --fix` moves one thing clear today.
+- [x] **expect3d's sampling and its tenses**: `{ before: [rule, rule] }` (the first holds at an earlier
+  frame than the second first does) and `{ while: [rule, rule] }`; a part thinner than the samples (a
+  twig) is taken by the points within half a step of it instead of reading as nothing.
 - [ ] **Edits finer than a builder's part**: an edit re-makes what it names (the canopy, its leaves)
   whole; one limb or one leaf can't be kept while the others change. Why: "this branch is approved, the
   rest can move". When: an agent's edit loop asks for it (seeds per limb, a part per limb).
 
 Left from phase 7 (evaluation):
 
-- [ ] **The four comparisons run in full**: one run an arm of comparison 2 so far (Sonnet, low effort,
-  one request; both arms kept the house and the rock byte for byte, the rewrite did more than asked).
-  Why: one run is a first measure; the comparison that would show the IR's worth is a scene of raw
-  primitives rewritten (comparison 1's arm A). When: before choosing what to build next on the 3D
-  layer, or when an agent's 3D work goes wrong in a way one of them would measure (three runs an
-  arm, two models, the tasks in docs/evaluation-3d.md).
-- [ ] **A numeric fixer for expect3d**: a failing rule names the numbers it depends on (a gap, a
-  place); a search over one of them until it holds would fix it without the model (comparison 3's arm
-  B). When: agents spend turns on such fixes.
+- [x] **The four comparisons run**: one run an arm of each (Sonnet, low effort, US$1.57 in all), in
+  docs/evaluation-3d.md: a rewrite keeps the approved parts as a local edit does at half again the
+  cost; builders write less but bend a request to their parameters; `pxl check --fix` fixes seeded
+  defects with no model; the trace saved a turn. Next: three runs an arm and a second model before
+  reading a difference as one, and the defects a picture hides (a part placed by the wrong relation).
+- [x] **A numeric fixer for expect3d**: `pxl check --fix`: a failing rule's parts' numbers (where one
+  stands, its gap beside another, then a parameter) searched outward from their values until it
+  holds, the least change (rounded where a rounder number holds), the rules that held still holding,
+  written into the file where the part's spec is written out once; each fix on the world the ones
+  before it left.
