@@ -180,7 +180,14 @@ says which to reach for.
   `shadows()`), faces you are inside of (`mesh()`), and after a `mesh()` a camera's depth of field,
   haze and bloom (`post()`, the HD-2D look); see [`scenes.md`](scenes.md).
 - **Going by in a loop**: parallax planes (`scroll()`, across or, with `axis: "y"`, down the
-  picture; pxl warns when a plane would judder), `clouds()`, smoke and steam (`plume()`).
+  picture; pxl warns when a plane would judder), `clouds()`, smoke and steam (`plume()`, and
+  `smoke()` in shapes: a column on a path, a puff, a bank, a ring).
+- **Effects, as shaders do them, on the CPU**: `effect()` on a sprite, an anim's frame or a layer, on
+  the clock: a dissolve in patterns and looks (burn with flames, acid, frost, magic, neutral),
+  pixelate, dither to the palette, tint, a UV distortion, a plant swaying in the wind, an aura, energy,
+  emission that lights `mesh()`; on one placement with `fx`. Abilities on the clock: `ability()`
+  phases, `emitter()` particles, `trail()`; `post()`'s finish (Three's bloom, a `.cube` LUT, grain,
+  sharpen, the picture back in the palette).
 - **Out**: sprite sheets with JSON tags (`rows: "tag"`: an animation a row; the sheet's preview GIF
   plays them all), GIFs, Tiled maps (`.tmj`), Aseprite files to keep editing.
 - **Errors** point at `file:line:col` and the asset/layer/op path, with "did you mean…" hints.
@@ -341,6 +348,24 @@ ripples. The crew ([`crew.px.js`](examples/hd2d/crew.px.js)) are dressed on the 
 each with a head of their own drawn per view and an outfit swept round the body. In the 38 s loop
 Alden comes along the upper walkway, down the ramp, asks the captain in parchment dialogue boxes and
 goes aboard; the GIF is its middle, at the full frame rate.
+
+### An HD-2D clearing: a fireball, a wall, a scarecrow on fire
+
+<p>
+  <img src="docs/gallery/hd2d_clearing.gif" width="100%" alt="Animated HD-2D diorama in pixel art: a clearing in a pine wood at dusk, seen from high up through a long lens, long shadows across the grass; pines, a dead tree, bushes and tufts of grass swaying in one wind, out of step; a young traveler in a green cloak on a flagstone path draws his hand back as fire gathers at it, an aura of fire flickering round him, and throws a fireball that lights the ground as it flies; it passes behind a ruined stone wall, which hides it, and hits a straw scarecrow, which catches fire at the chest, the flames spreading over it and lighting the grass and the wall, a column of smoke rising, until it burns away to embers and ash; then the scarecrow comes back and the loop closes">
+</p>
+
+The eighth, in [`examples/hd2d/clearing.px.js`](examples/hd2d/clearing.px.js): every shader of the
+fork in one scene, on its 5 s clock, the same in every frame you seek. The wood and the grass sway in
+one wind (`effect("sway")`), a gust rolling across, no two tufts in step. The traveler's cast is a
+new pose of his skeleton, blocks first, his hand a socket that moves with it; the fire gathers there
+(`effect("energy")`), an aura hugs every frame of the pose (`effect("aura")`, blended `add` in
+`mesh()`), and the ball flies on an `ability()`'s clock, lighting the ground as it goes, hidden by the
+wall it passes behind. It hits; the scarecrow catches fire where it was hit and burns away (the
+dissolve's `"burn"` look on that copy alone: flames from its burning front, the char and the embers
+behind them, ash), its shadow burning with it, a column of `smoke()` rising, sparks from an
+`emitter()`. Through `post()`: the depth in focus, Three's bloom, a dusk grade from a `.cube` LUT and a
+grain that stays still (one that changed each frame made the GIF 13 MB instead of 2.5).
 
 ### True perspective
 

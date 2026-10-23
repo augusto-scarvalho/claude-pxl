@@ -165,6 +165,8 @@ test("post finish: grain is the frame's, in blocks of pixel, and the same each t
   const f = finish("{ grain: 0.2, pixel: 2 }").frames("a");
   assert.ok(same(f[1].img, finish("{ grain: 0.2, pixel: 2 }").frames("a")[1].img), "the same frame, the same grain");
   assert.ok(!same(f[0].img, f[1].img), "another frame, another grain");
+  const still = finish("{ grain: { amount: 0.2, animated: false }, pixel: 2 }").frames("a");
+  assert.ok(same(still[0].img, still[1].img) && !same(still[0].img, finish("{}").image("a")), "animated: false: a grain, the same in every frame");
   const g = f[0].img, blocks = [0, 2, 4, 6].every((x) => [0, 2, 4].every((y) => g.get(x, y) === g.get(x + 1, y) && g.get(x, y) === g.get(x, y + 1) && g.get(x, y) === g.get(x + 1, y + 1)));
   assert.ok(blocks, "2 x 2 blocks");
   const plain = finish("{}").image("a"), sharp = finish("{ sharpen: 0.5 }").image("a");

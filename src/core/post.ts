@@ -43,8 +43,8 @@ export interface PostOpts {
   sharpen?: number;
   /** a grade: a 3D LUT (the DSL reads `"dusk.cube"` into one), at `amount` (0..1, default 1) */
   lut?: Lut | { cube: Lut; amount?: number };
-  /** film grain in blocks of `pixel`, new each frame, most in the middle tones: up to `amount` of full scale (0..1) */
-  grain?: number | { amount?: number; seed?: number };
+  /** film grain in blocks of `pixel`, new each frame (`animated: false`: the same in every frame), most in the middle tones: up to `amount` of full scale (0..1) */
+  grain?: number | { amount?: number; seed?: number; animated?: boolean };
   /** the picture taken back to the palette's colors (true), or to those keys, ordered-dithered between two by `dither` (0..1, default 1; 0 the nearest) */
   palette?: true | string | string[] | { keys?: string | string[]; dither?: number };
 }
@@ -306,7 +306,7 @@ export function applyPost(img: Img, o: PostOpts, fogColor: Color | null, pal?: P
   if (lut && !(lut.cube && Number.isInteger(lut.cube.size) && lut.cube.data instanceof Float32Array && num(la, 0, 1)))
     throw new PxError('post: lut is a .cube file ("dusk.cube"), or { cube: "dusk.cube", amount (0..1) }');
   const go = o.grain === undefined ? undefined : typeof o.grain === "number" ? { amount: o.grain } : o.grain, ga = go?.amount ?? 0.05;
-  if (go && (!num(ga, 0, 1) || !(go.seed === undefined || Number.isInteger(go.seed)))) throw new PxError(`post: grain is an amount (0..1), or { amount, seed }, got ${JSON.stringify(o.grain)}`);
+  if (go && (!num(ga, 0, 1) || !(go.seed === undefined || Number.isInteger(go.seed)) || !(go.animated === undefined || typeof go.animated === "boolean"))) throw new PxError(`post: grain is an amount (0..1), or { amount, seed, animated }, got ${JSON.stringify(o.grain)}`);
   const data = img.data;
   for (let i = 0; i < n; i++) if (data[i] !== TRANSPARENT) data[i] = fromLinear(R[i], G[i], B[i], data[i]);
 
@@ -337,7 +337,7 @@ export function applyPost(img: Img, o: PostOpts, fogColor: Color | null, pal?: P
     const mid = Float64Array.from({ length: 256 }, (_, l) => 0.5 - 0.5 * Math.cos((2 * Math.PI * l) / 255));
     for (let y = 0; y < h; y++) {
       // a new grain each frame (Babylon's, seeded by the frame instead of a random call), a number a block
-      if (go && ga && y % K === 0) for (let bx = 0; bx < bw; bx++) z[bx] = ga * 255 * ((hash(bx, y / K, frame * 7919 + (go.seed ?? 0)) / 4294967296) * 2 - 1);
+      if (go && ga && y % K === 0) for (let bx = 0; bx < bw; bx++) z[bx] = ga * 255 * ((hash(bx, y / K, (go.animated === false ? 0 : frame) * 7919 + (go.seed ?? 0)) / 4294967296) * 2 - 1);
       for (let x = 0; x < w; x++) {
         const i = y * w + x, c = data[i];
         if (c === TRANSPARENT) continue;

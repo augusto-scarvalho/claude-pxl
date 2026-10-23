@@ -5,7 +5,7 @@
 // for mesh()'s blend: "alpha"); over what is drawn it lays its tones in an ordered dither, in the palette.
 import { type Color, TRANSPARENT } from "./color.ts";
 import { PxError } from "./errors.ts";
-import { bayer, hash, rng, vnoise } from "./util.ts";
+import { bayer, colorList, hash, rng, vnoise } from "./util.ts";
 
 export interface SmokeOpts {
   /** "column" (default), "puff", "bank" or "ring" */
@@ -70,10 +70,10 @@ function along(pts: number[], s: number): [number, number] {
   return [pts[0], pts[1]];
 }
 
-export function drawSmoke(c: SmokeCanvas, x0: number, y0: number, keys: string, o: SmokeOpts = {}): void {
+export function drawSmoke(c: SmokeCanvas, x0: number, y0: number, keys: string | string[], o: SmokeOpts = {}): void {
   const shape = o.shape ?? "column";
   if (!["column", "puff", "bank", "ring"].includes(shape)) throw new PxError(`smoke: shape is "column", "puff", "bank" or "ring", got ${JSON.stringify(o.shape)}`);
-  const ks = [...keys].map((k) => c.color(k));
+  const ks = colorList(keys).map((k) => c.color(k));
   if (ks.length !== 3 || ks.some((k) => k === null || k === TRANSPARENT)) throw new PxError(`smoke: keys are three: lit, middle, shaded ("wmd"), got ${JSON.stringify(keys)}`);
   const N = o.count ?? { column: 16, puff: 12, bank: 8, ring: 14 }[shape], [s0, s1] = o.size ?? [3, 8], vary = o.vary ?? 0.3, turb = o.turbulence ?? 2, rough = o.rough ?? 0.35;
   const thin = o.thin ?? 0.35, life = o.life ?? 1, alpha = o.alpha ?? [0.4, 0.62, 0.85], [lx, ly] = o.light ?? [-0.6, -0.8], K = o.pixel ?? 1;

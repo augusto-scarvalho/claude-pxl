@@ -3,7 +3,7 @@
 // state carried from frame to frame): any frame, sought on its own, comes out the same.
 import { type Color, TRANSPARENT } from "./color.ts";
 import { PxError } from "./errors.ts";
-import { bayer, hash, rng } from "./util.ts";
+import { bayer, colorList, hash, rng } from "./util.ts";
 
 export type Phases = [string, number][] | Record<string, number>;
 export interface PhaseAt {
@@ -126,14 +126,14 @@ export function emitter(o: EmitterOpts = {}): (t: number) => Particle[] {
 /** What the particles and trails draw on. */
 export interface VfxCanvas { t: number; color(k: unknown): Color | null; get(x: number, y: number): Color; plot(x: number, y: number, c: Color): boolean }
 
-const keysOf = (c: VfxCanvas, keys: string, what: string) => {
-  const ks = [...keys].map((k) => c.color(k));
+const keysOf = (c: VfxCanvas, keys: string | string[], what: string) => {
+  const ks = colorList(keys).map((k) => c.color(k));
   if (!ks.length || ks.some((k) => k === null || k === TRANSPARENT)) throw new PxError(`${what}: keys are its tones, young (hot) to old ("wyor"), got ${JSON.stringify(keys)}`);
   return ks as Color[];
 };
 
 /** Draw an emitter's particles now (the canvas's clock), each in the key of its age, a streak `trail` ms back along its way. */
-export function drawParticles(c: VfxCanvas, emit: (t: number) => Particle[], keys: string, o: { x?: number; y?: number; trail?: number; size?: [number, number] } = {}): void {
+export function drawParticles(c: VfxCanvas, emit: (t: number) => Particle[], keys: string | string[], o: { x?: number; y?: number; trail?: number; size?: [number, number] } = {}): void {
   if (typeof emit !== "function") throw new PxError("particles(emitter({ ... }), keys, opts): the first is an emitter");
   const ks = keysOf(c, keys, "particles"), [s0, s1] = o.size ?? [1, 1], ox = o.x ?? 0, oy = o.y ?? 0, tr = o.trail ?? 0;
   const now = emit(c.t), back = tr > 0 ? new Map(emit(c.t - tr).map((p) => [p.id, p])) : undefined;
@@ -153,7 +153,7 @@ export function drawParticles(c: VfxCanvas, emit: (t: number) => Particle[], key
  * `length` ms, `width` px across at its head and at its tail, in the keys head (hot) to tail, the
  * tail thinning in an ordered dither by `fade` (0..1).
  */
-export function drawTrail(c: VfxCanvas, path: (t: number) => number[], keys: string, o: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number } = {}): void {
+export function drawTrail(c: VfxCanvas, path: (t: number) => number[], keys: string | string[], o: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number } = {}): void {
   if (typeof path !== "function") throw new PxError("trail(t => [x, y], keys, opts): the first is the path, a function of the time");
   const ks = keysOf(c, keys, "trail"), L = o.length ?? 300, [w0, w1] = o.width ?? [4, 1], fade = o.fade ?? 0.6, step = o.step ?? 10, t = c.t;
   if (!(L > 0 && w0 >= 0 && w1 >= 0 && step > 0 && fade >= 0 && fade <= 1)) throw new PxError(`trail: length ms above 0, width [head, tail] px, fade 0..1, step ms above 0, got ${JSON.stringify(o)}`);

@@ -270,6 +270,14 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   (`examples/hd2d/graveyard.px.js`). A box drawn in meters at the HD picture's own pixel (a fence)
   reads as a 3D render among the sprites: give its materials `block: 4`, faces in blocks of a
   sprite's pixel, a tone each, the outline only on the shaded side.
+- Hiding a thing behind a wall in a diorama: from a camera tilted `pitch` down, a wall `h` m tall
+  hides what is `d` m behind it only below `h - d * tan(pitch)`: at 38 degrees a 1.4 m wall didn't
+  hide a ball 0.4 m behind it at 1.2 m; at 1.7 m and 0.2 m behind it does. Its light still shows on the
+  wall's top as it passes. Frame the action on the picture's middle row (the camera's `z`): at
+  480x270 the clearing's actors sat in the top third over empty grass; 320x180, three times as big
+  (`pixel: 3`), put them in the middle at the same scale.
+- A GIF of a scene with `post()`'s grain: a grain that changes each frame changes every pixel, and the
+  clearing's 100 frames went from 2.5 MB to 13; `grain: { animated: false }` keeps the texture.
 - Light, holes and see-through things in a diorama (`mesh()`). What gives light is a sprite with
   `effect("emit")` on it (a lantern's glass, a crystal, embers): its pixels are drawn as they are,
   whatever the sun, a lamp at their middle lights what is round it (`light: { r, strength }` on the
@@ -529,6 +537,16 @@ happens after another, never all at once.
   material ahead of a green edge, drips falling; frost pales it blue behind a white crystal edge;
   magic is gold with sparkles. Without a theme, `neutral`: a thin ring of the thing's own lightest
   tone, half clear. Give the edge's keys over the progress for a color that changes as it goes.
+- **A spell in a scene** (`examples/hd2d/clearing.px.js`): its phases on an `ability()` (charge 600 ms,
+  cast 200, flight 600, impact 200, the target burning 2300, back 600, in 5 s); every loop in it a
+  divisor of the scene's (20 fps: the idle's 1000 ms, the fire's 500, the wind's 2500 into 5000: at
+  12.5 fps with the 250 ms idle the loops met only after 60 s). The ball a 4 px disc of
+  `effect("energy")` in 4 fire tones (scale 1.6: at 4 its noise was one band) with a 1 px `distort`;
+  its trail three of it at 50 ms steps back, fainter; its light `{ r: 2.5, strength: 3 }`. The aura 3
+  px in 3 tones, flicker 0.6 on 3.5 px cells, at 0.2-0.6 opacity (at 0.85 it hid the figure). A
+  target catching fire: the burn spreading from where it was hit over 2.4 s, flames 10 px from a third
+  of the front, a smoke column of 18 billows growing 3 to 10 px fading in over the first 15% and out
+  over the last 35%, the target's light `{ r: 3, strength: 2.5 }` flickering with its flames.
 - **Shader effects** (`effect()`, `PXL help effect`): a teleport or a death as a dissolve over 1 s
   (12 frames), holes in blobs about a quarter of the figure wide and 2 rings, the first white-yellow;
   a hit's poison or frost as a `tint` of 0.3-0.5 then `dither` back to the palette; a ghost or heat

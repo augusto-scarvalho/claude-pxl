@@ -125,7 +125,7 @@ function each(img: Img, x: FxCtx, K: number, fn: (i: number, ax: number, ay: num
  */
 export const LOOKS: Record<string, Record<string, unknown>> = {
   neutral: { edge: "neutral" },
-  burn: { edge: [["#fff2b0", "#ffa040"], ["#ff8a30", "#c8361e"], ["#a02818", "#3a2a2a"], ["#4a4040", "#2a2626"]], char: { width: 3, tones: ["#8a5a30", "#3a2618", "#141010"] }, glow: 1, debris: "ash" },
+  burn: { edge: [["#fff2b0", "#ffa040"], ["#ff8a30", "#c8361e"], ["#a02818", "#3a2a2a"], ["#4a4040", "#2a2626"]], char: { width: 3, tones: ["#8a5a30", "#3a2618", "#141010"] }, glow: 1, debris: "ash", flames: true },
   acid: { edge: [["#e8ff80", "#9adf40"], ["#9adf40", "#5a8a2a"]], char: { width: 4, tones: ["#c8d860", "#7a9a30", "#4a6a28"], desat: 0.7 }, glow: 0.4, debris: "acid" },
   magic: { edge: ["#fff4b0", "#ffae3c"], glow: 1, debris: "sparks" },
   frost: { edge: ["#ffffff", "#bfe8ff"], char: { width: 3, tones: ["#d8f0ff", "#9ccbf0"], desat: 0.6 }, glow: 0.5, debris: "frost", jag: 0.5 },
@@ -156,6 +156,14 @@ const charSpec: Check = (v, what, pal) => {
   if (typeof o !== "object" || !(Number.isInteger(o.width) && o.width! >= 1 && o.width! <= 32) || !(o.amount === undefined || (o.amount >= 0 && o.amount <= 1)) || !(o.desat === undefined || (o.desat >= 0 && o.desat <= 1)))
     throw new PxError(`${what} is a width in px, or { width, tones, amount (0..1), desat (0..1) }: a band ahead of the edge going toward its tones, got ${JSON.stringify(v)}`);
   return { width: o.width!, tones: o.tones === undefined ? colors(["#6a4a30", "#201818"], what, pal) : colors(o.tones, what, pal), amount: o.amount ?? 0.85, desat: o.desat ?? 0 };
+};
+/** Flames rising from a burning front: how tall (art px), from how many of its pixels, in which tones (the base first, the tips last). */
+const flameSpec: Check = (v, what, pal) => {
+  if (v === undefined || v === false) return undefined;
+  const o = (v === true ? {} : v) as { height?: number; density?: number; keys?: unknown };
+  if (typeof o !== "object" || !(o.height === undefined || (o.height > 0 && o.height <= 64)) || !(o.density === undefined || (o.density > 0 && o.density <= 1)))
+    throw new PxError(`${what} is true, or { height (px), density (0..1), keys (base to tips) }, got ${JSON.stringify(v)}`);
+  return { height: o.height ?? 8, density: o.density ?? 0.3, keys: colors(o.keys ?? ["#fff8d0", "#ffd050", "#ff8a20", "#c8301c"], what, pal) };
 };
 const debrisSpec: Check = (v, what, pal) => {
   if (v === undefined || v === false || v === "none") return undefined;
@@ -236,7 +244,7 @@ export const EFFECTS: Record<string, Effect> = {
       at: (v, what) => { if (v !== undefined && !(Array.isArray(v) && v.length === 2 && v.every(Number.isFinite))) throw new PxError(`${what} is [x, y] in the drawing, got ${JSON.stringify(v)}`); return v; },
       mask: (v, what) => { if (v !== undefined && typeof v !== "string") throw new PxError(`${what} is an asset's name, got ${JSON.stringify(v)}`); return v; },
       look: (v, what) => { if (v !== undefined && !(typeof v === "string" && LOOKS[v])) throw new PxError(`${what} is ${Object.keys(LOOKS).map((k) => `"${k}"`).join(", ")}, got ${JSON.stringify(v)}`); return v; },
-      char: charSpec, glow: num(0, 0, 1), debris: debrisSpec, jag: num(1, 0, 1),
+      char: charSpec, glow: num(0, 0, 1), debris: debrisSpec, jag: num(1, 0, 1), flames: flameSpec,
     },
     // a look sets what isn't given; with neither a look nor an edge, the neutral one
     prepare: (o) => ({ ...LOOKS[(o.look as string) ?? (o.edge === undefined ? "neutral" : "")], ...o }),
@@ -251,6 +259,7 @@ export const EFFECTS: Record<string, Effect> = {
       const glow = p.glow > 0 ? (out.emit = new Uint8Array(W * H)) : undefined, nE = keys.length, cw = ch?.width ?? 0;
       const charAt = (i: number, t: number) => { const tone = ch!.tones[Math.min(ch!.tones.length - 1, Math.floor(t * ch!.tones.length))]; out.data[i] = toward(src.data[i], tone, ch!.amount * t, ch!.desat); };
       let thr = p.progress, band = false;
+      const gone = new Uint8Array(W * H);
       if (p.pattern === "scatter" || p.pattern === "scan") {
         // scattered holes have no rim to ring: the pixels next to go glow first, a band of the order a key
         const w = 0.06 * nE, c = 0.04 * cw;
@@ -259,7 +268,7 @@ export const EFFECTS: Record<string, Effect> = {
         each(src, x, K, (i, ax, ay, px, py) => {
           if (src.data[i] === TRANSPARENT) return;
           const v = order(ax, ay, px, py);
-          if (v < thr) out.data[i] = TRANSPARENT;
+          if (v < thr) { out.data[i] = TRANSPARENT; gone[i] = 1; }
           else if (v < thr + w) { const k = Math.min(nE - 1, Math.floor((v - thr) / 0.06)); out.data[i] = keys[k]; if (glow) glow[i] = Math.round(255 * p.glow * (1 - k / nE)); }
           else if (ch && v < thr + w + c) charAt(i, 1 - (v - thr - w) / c);
         });
@@ -267,7 +276,7 @@ export const EFFECTS: Record<string, Effect> = {
         // ring: 0 a hole, k the k-th ring round one, 255 neither (yet); the edge's rings, then the char's
         const ring = new Uint8Array(W * H).fill(255);
         each(src, x, K, (i, ax, ay, px, py) => {
-          if (src.data[i] !== TRANSPARENT && order(ax, ay, px, py) < thr) { ring[i] = 0; out.data[i] = TRANSPARENT; }
+          if (src.data[i] !== TRANSPARENT && order(ax, ay, px, py) < thr) { ring[i] = 0; out.data[i] = TRANSPARENT; gone[i] = 1; }
         });
         for (let k = 1; k <= nE + cw; k++)
           for (let py = 0; py < H; py++)
@@ -284,6 +293,29 @@ export const EFFECTS: Record<string, Effect> = {
                 if (glow) glow[i] = Math.round(255 * p.glow * (1 - (k - 1) / nE));
               } else charAt(i, 1 - (k - nE - 1) / cw);
             }
+      }
+      // flames from the burning front (what is left next to a hole), a tongue from a few of its pixels:
+      // tapering up from the base's tone to the tips', flickering on the clock (a few times a second,
+      // whole times a loop), growing as the fire takes and dying down as the last of it goes; giving light
+      const fl = p.flames as { height: number; density: number; keys: Color[] } | undefined;
+      if (fl) {
+        const life = Math.min(1, p.progress / 0.25) * Math.min(1, (1 - p.progress) / 0.35), cyc = Math.max(1, Math.round(x.frames / 5)), t = turn(x) * cyc;
+        const gn = (qx: number, qy: number) => qx >= 0 && qy >= 0 && qx < W && qy < H && gone[qy * W + qx] === 1, emit = (out.emit ??= new Uint8Array(W * H));
+        each(src, x, K, (i, ax, ay, px, py) => {
+          if (src.data[i] === TRANSPARENT || gone[i] || px % K || py % K || !(gn(px - K, py) || gn(px + K, py) || gn(px, py - K) || gn(px, py + K))) return;
+          const h = hash(ax, ay, x.seed + 91) / 4294967296;
+          if (h >= fl.density) return;
+          const ph = hash(ax, ay, x.seed + 92) / 4294967296, flick = 0.55 + 0.45 * Math.sin(2 * Math.PI * (t + ph));
+          const n = Math.round(fl.height * life * flick * (0.6 + (0.8 * h) / fl.density));
+          for (let j = 0; j < n; j++) {
+            const f = j / n, wob = Math.round(Math.sin(f * 3.5 + 2 * Math.PI * (t + ph)) * 0.9 * f), half = Math.round((1 - f) * 1.2), key = fl.keys[Math.min(fl.keys.length - 1, Math.floor(f * fl.keys.length))];
+            for (let d = -half; d <= half; d++)
+              for (let q = 0; q < K; q++) for (let r = 0; r < K; r++) {
+                const X = px + (wob + d) * K + q, Y = py - j * K + r;
+                if (X >= 0 && Y >= 0 && X < W && Y < H) { out.data[Y * W + X] = key; emit[Y * W + X] = 255; }
+              }
+          }
+        });
       }
       // debris from the pixels gone: each of a few throws one off as it goes, aged by how far the
       // front has gone past it since (so it moves as the progress does, on the clock that drives it)

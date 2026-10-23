@@ -721,13 +721,22 @@ export class Canvas {
   }
 
   /** An emitter's particles now, each in the key of its age (young first), a streak `trail` ms back: see vfx.ts. */
-  particles(emit: (t: number) => Particle[], keys: string, opts: { x?: number; y?: number; trail?: number; size?: [number, number] } = {}): void {
+  particles(emit: (t: number) => Particle[], keys: string | string[], opts: { x?: number; y?: number; trail?: number; size?: [number, number] } = {}): void {
     drawParticles(this, emit, keys, opts);
   }
 
   /** A trail behind what goes along `path` (a function of the time), `length` ms of it now: see vfx.ts. */
-  trail(path: (t: number) => number[], keys: string, opts: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number } = {}): void {
+  trail(path: (t: number) => number[], keys: string | string[], opts: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number } = {}): void {
     drawTrail(this, path, keys, opts);
+  }
+
+  /**
+   * A socket of what is being drawn, here in this frame (a hand that moves with the pose): stamps
+   * (`at`), `c.socket()` and `c.meshSocket()` find it as they find one given in `sockets`.
+   */
+  setSocket(name: string, x: number, y: number): void {
+    if (typeof name !== "string" || !Number.isFinite(x) || !Number.isFinite(y)) throw new PxError(`setSocket(name, x, y): a name and a point in the drawing, got ${JSON.stringify([name, x, y])}`);
+    (this.img.sockets ??= {})[name] = [this.ox + x, this.oy + y];
   }
 
   /** Where a socket of an earlier placement is ("hero.hand"), in canvas coords: a spell starts there. */
@@ -748,7 +757,7 @@ export class Canvas {
   }
 
   /** Smoke of a shape (a column, a puff, a bank, a ring) at this moment of the loop: see smoke.ts. */
-  smoke(x: number, y: number, keys: string, opts: SmokeOpts = {}): void {
+  smoke(x: number, y: number, keys: string | string[], opts: SmokeOpts = {}): void {
     drawSmoke(this as unknown as Parameters<typeof drawSmoke>[0], x, y, keys, opts);
   }
 

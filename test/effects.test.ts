@@ -302,9 +302,23 @@ test("dissolve looks: neutral by default, edge: false, keys over the progress, a
   const ash = sq('effect("dissolve", { progress: 0.5, pattern: "bottom", ragged: 0, edge: false, debris: { kind: "ash", density: 1 } })');
   assert.ok([...Array(4).keys()].some((y) => [...Array(24).keys()].some((x) => ash.get(x, y) !== 0)), "flakes above the drawing");
   assert.ok(same(ash, sq('effect("dissolve", { progress: 0.5, pattern: "bottom", ragged: 0, edge: false, debris: { kind: "ash", density: 1 } })')));
-  const burn = sq('effect("dissolve", { look: "burn", progress: 0.4 })'), noGlow = sq('effect("dissolve", { look: "burn", progress: 0.4, glow: 0 })');
+  const burn = sq('effect("dissolve", { look: "burn", progress: 0.4 })'), noGlow = sq('effect("dissolve", { look: "burn", progress: 0.4, glow: 0, flames: false })');
   assert.ok(burn.emit?.some((v) => v > 0) && !noGlow.emit?.some((v) => v > 0), "a look, and what is given over it");
   assert.ok(!same(sq('effect("dissolve", { look: "acid", progress: 0.4 })'), sq('effect("dissolve", { look: "frost", progress: 0.4 })')));
   assert.match(failure(PALS + 'sprite("s", { w: 4, h: 4 }, rect(0, 0, 4, 4, "g"), effect("dissolve", { look: "lava" }))', "s").message, /look is "neutral", "burn", "acid", "magic", "frost"/);
   void plain;
+});
+
+test("dissolve flames: tongues from the burning front, in their keys base to tips, flickering on the clock, giving light", () => {
+  const p = load(`sprite("s", { w: 24, h: 30 }, rect(4, 12, 16, 16, "g"))
+anim("a", { base: "s", frames: 10 }, effect("dissolve", { progress: 0.4, pattern: "bottom", ragged: 0, edge: false, flames: { height: 6, density: 1, keys: "yor" } }))
+anim("off", { base: "s", frames: 2 }, effect("dissolve", { progress: 0.4, pattern: "bottom", ragged: 0, edge: false }))`);
+  const f = p.frames("a"), Y = 0xffec27ff;
+  const img = f[0].img, rows = (g: Img) => [...g.data.keys()].filter((i) => g.data[i] === 0xff004dff).map((i) => Math.floor(i / 24));
+  assert.ok(img.data.includes(Y), "the base's key");
+  assert.ok(f.some((g) => rows(g.img).some((y) => y < 21)), "the tips' key up over what is still there");
+  assert.ok(img.emit && [...img.data.keys()].every((i) => img.data[i] !== Y || img.emit![i] === 255), "giving light");
+  assert.ok(f.some((g) => !same(g.img, f[0].img)), "flickering");
+  assert.ok(!p.frames("off")[0].img.data.includes(Y), "none unless asked (the burn look has them)");
+  assert.ok(load(`sprite("s", { w: 8, h: 8 }, rect(0, 0, 8, 8, "g"), effect("dissolve", { look: "burn", progress: 0.5 }))`).image("s").emit!.some((v) => v === 255));
 });

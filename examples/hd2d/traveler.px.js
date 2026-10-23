@@ -162,7 +162,24 @@ const kneel = (i) => {
   return { feet: [[mix(0, 3.2), -HIPW - 0.2], [mix(0, -4.4), HIPW + 0.2]], lift: [0, mix(0, 0.6)], down: mix(0, 5.6), lean: mix(1, 8), trail: mix(0.2, 2.6), sway: 0,
     hands: [[mix(0, 5.4), mix(-1, -0.2), mix(-7, -7.6)], [mix(0, 2.6), 0.8, mix(-7, -5.4)]] }
 }
-const MOVES = { walk: { ms: 110, frames: 8, f: walk }, idle: { ms: 250, frames: 4, f: idle }, kneel: { ms: 160, frames: 7, f: kneel } }
+// Casting (the blocks approved first, characters §4): the near hand drawn back and up as the energy
+// gathers at it (held while it grows), thrust forward at shoulder height, then back down; the foot
+// across from it steps forward, the body leaning back, then into the throw. 13 frames of 100 ms:
+// wind-up 2, held 3, the thrust and its hold 2, back 4, rest 2. The near hand is a socket, "hand", that
+// moves with the pose: where the spell starts. In the four views a spell is cast in (profiles, diagonals).
+const CH = [0, 0.5, 0.9, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0], TH = [0, 0, 0, 0, 0, 0, 1, 1, 0.75, 0.45, 0.2, 0.05, 0]
+const cast = (i, yaw) => {
+  const a = CH[i], b = TH[i], near = yaw < 0 ? 0 : 1, s = near ? 1 : -1, mix = (p, q, k) => p.map((v, e) => v + (q[e] - v) * k)
+  const rest = (k) => [0, (k ? 1 : -1), -7]
+  const hands = [0, 1].map((k) => k === near
+    ? mix(mix(rest(k), [-4.2, s * 1.8, -0.3], a), [5.8, -s * 1.2, -0.4], b)
+    : mix(mix(rest(k), [1.4, -s * 1, -5.6], a), [-1.6, -s * 1, -6.4], b))
+  const front = 1 - near, step = 1.6 * a + 3 * b
+  const feet = [0, 1].map((k) => [k === front ? step : -step * 0.8, k ? HIPW + 0.3 : -HIPW - 0.3])
+  return { feet, lift: [0, 0], down: a + 1.5 * b, lean: 1 - 3 * a + 7 * b, trail: 0.2 + 1.2 * b, sway: 0, hands }
+}
+const MOVES = { walk: { ms: 110, frames: 8, f: walk }, idle: { ms: 250, frames: 4, f: idle }, kneel: { ms: 160, frames: 7, f: kneel },
+  cast: { ms: 100, frames: 13, f: cast, dirs: ["e", "w", "se", "sw"], hand: true } }
 
 const bones = (p, yaw) => {
   const fr = frame3(yaw), spine = unit(p.tilt ? add(add(mul(UP, Math.cos(rad(p.lean))), mul(fr.f, Math.sin(rad(p.lean)))), mul(fr.r, Math.sin(rad(p.tilt)))) : add(mul(UP, Math.cos(rad(p.lean))), mul(fr.f, Math.sin(rad(p.lean)))))   // tilt: bent to his right (degrees)
@@ -325,13 +342,18 @@ const MOURNER = {
   C: "#7a6c8c", c: "#56496a", n: "#3a3150", N: "#231d33", W: "#a8a196", w: "#7f786f", v: "#58534e",
 }
 for (const v of Object.keys(HEADS)) sprite(`_mo_head_${v}`, { base: `_tr_head_${v}`, swap: MOURNER })
+// a move with a hand that matters (casting): its near hand a socket, in every frame where the pose puts it
+const handAt = (c, p, yaw) => c.setSocket("hand", ...scr(bones(p, yaw).arms[yaw < 0 ? 0 : 1].hand))
 for (const [who, set] of [["tr", "_tr"], ["mo", "_mo"]]) for (const [move, M] of Object.entries(MOVES)) for (const [d, [yaw]] of Object.entries(DIRS)) {
+  if (M.dirs && !M.dirs.includes(d)) continue
   const mirror = yaw > 0 && yaw < 180
   anim(`${who}_${move}_${d}`, { w: W, h: H, pivot: [OX, OY], ...(who === "mo" ? { swap: MOURNER } : {}) },
-    (c) => figure(c, set, M.f(c.frame, yaw), yaw, mirror), ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })), bump("hybrid"))
+    (c) => { const p = M.f(c.frame, yaw); figure(c, set, p, yaw, mirror); if (M.hand) handAt(c, p, yaw) }, ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })), bump("hybrid"))
 }
-for (const [move, M] of Object.entries(MOVES)) for (const [d, [yaw]] of Object.entries(DIRS))
-  anim(`bk_${move}_${d}`, { w: W, h: H, pivot: [OX, OY] }, (c) => blocks(c, M.f(c.frame, yaw), yaw), ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })))
+for (const [move, M] of Object.entries(MOVES)) for (const [d, [yaw]] of Object.entries(DIRS)) {
+  if (M.dirs && !M.dirs.includes(d)) continue
+  anim(`bk_${move}_${d}`, { w: W, h: H, pivot: [OX, OY] }, (c) => { const p = M.f(c.frame, yaw); blocks(c, p, yaw); if (M.hand) handAt(c, p, yaw) }, ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })))
+}
 sheet("traveler", ["tr_*", "mo_*"], { rows: "tag", pad: 1 })
-Object.assign(travelerRig, { figure, blocks, bones, scr, depth, local, surface, TRAVELER, MOVES, DIRS, W, H, OX, OY })
+Object.assign(travelerRig, { figure, blocks, bones, scr, depth, local, surface, TRAVELER, MOVES, DIRS, W, H, OX, OY, cast, CH, TH })
 }

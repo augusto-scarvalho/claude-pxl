@@ -266,7 +266,7 @@ declare global {
     /** a grade from a .cube file next to the art file, at amount (0..1) */
     lut?: string | { cube: string; amount?: number };
     /** film grain in blocks of pixel, new each frame, in the middle tones: up to amount of full scale */
-    grain?: number | { amount?: number; seed?: number };
+    grain?: number | { amount?: number; seed?: number; animated?: boolean };
     /** the picture taken back to the palette (true) or to those keys, Bayer-dithered between two by dither (0 the nearest) */
     palette?: true | string | string[] | { keys?: string | string[]; dither?: number };
   }
@@ -282,6 +282,8 @@ declare global {
     /** a band ahead of the edge where its own colors go toward tones */
     char?: number | { width: number; tones?: string | string[]; amount?: number; desat?: number };
     glow?: number; jag?: number;
+    /** flames rising from the burning front (the burn look has them): height px, density, keys base to tips */
+    flames?: boolean | { height?: number; density?: number; keys?: string | string[] };
     debris?: "ash" | "acid" | "frost" | "sparks" | { kind: "ash" | "acid" | "frost" | "sparks"; keys?: string | string[]; density?: number; life?: number };
     /** the order holes come in: noise blobs, a sweep from a side, out from a point or in to it, scattered, scanlines, a painted mask's dark first */
     pattern?: "noise" | "top" | "bottom" | "left" | "right" | "out" | "in" | "scatter" | "scan" | "mask";
@@ -385,13 +387,15 @@ declare global {
     /** Smoke, steam or dust from a point, in a loop that closes. */
     plume(x: number, y: number, keys: string, opts?: PxPlume): void;
     /** Smoke of a shape: a column on a path, a puff, a bank drifting, a ring spreading (keys lit, middle, shaded). */
-    smoke(x: number, y: number, keys: string, opts?: PxSmoke): void;
+    smoke(x: number, y: number, keys: string | string[], opts?: PxSmoke): void;
     /** An emitter's particles now, each in the key of its age (young first), streaked `trail` ms back. */
-    particles(emit: (t: number) => PxParticle[], keys: string, opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): void;
+    particles(emit: (t: number) => PxParticle[], keys: string | string[], opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): void;
     /** A trail behind what goes along path(t), `length` ms of it now, `width` [head, tail] px, keys head to tail. */
-    trail(path: (t: number) => number[], keys: string, opts?: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number }): void;
+    trail(path: (t: number) => number[], keys: string | string[], opts?: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number }): void;
     /** Where a socket of an earlier placement is ("hero.hand"), in canvas coords. */
     socket(at: string): [number, number];
+    /** A socket of what is being drawn, here in this frame (a hand that moves with the pose). */
+    setSocket(name: string, x: number, y: number): void;
     /** Where a socket of a sprite standing in mesh() is, in meters [x, z, up] ({ name, at, frame?, flip? }, pixel px to its pixels). */
     meshSocket(view: PxView | PxPerspective, sprite: { name: string; at: number[]; frame?: number; flip?: "x"; delay?: number }, socket: string, pixel?: number): [number, number, number];
     /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly). */
@@ -478,11 +482,11 @@ declare global {
   function clouds(opts: PxClouds): PxOp;
   function plume(x: number, y: number, keys: string, opts?: PxPlume): PxOp;
   /** Smoke of a shape: a column on a path, a puff, a bank drifting, a ring spreading (keys lit, middle, shaded). */
-  function smoke(x: number, y: number, keys: string, opts?: PxSmoke): PxOp;
+  function smoke(x: number, y: number, keys: string | string[], opts?: PxSmoke): PxOp;
   /** An emitter's particles now, each in the key of its age. */
-  function particles(emit: (t: number) => PxParticle[], keys: string, opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): PxOp;
+  function particles(emit: (t: number) => PxParticle[], keys: string | string[], opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): PxOp;
   /** A trail behind what goes along path(t). */
-  function trail(path: (t: number) => number[], keys: string, opts?: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number }): PxOp;
+  function trail(path: (t: number) => number[], keys: string | string[], opts?: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number }): PxOp;
   /** A spell's phases on the clock: ability([["charge", 600], ["cast", 150], ["travel", 500], ...], { start, events }). */
   function ability(phases: [string, number][] | Record<string, number>, opts?: { start?: number; events?: Record<string, [string, number]> }): PxAbility;
   /** Seeded particles: (t) gives the ones alive at time t, each where its own path puts it. */

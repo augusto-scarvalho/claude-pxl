@@ -31,7 +31,7 @@
     "examples/motion/*.{json,md}",
     "examples/fonts/*.px.js",
     "examples/topdown_hero/*.px.js",
-    "examples/hd2d/*.px.js",
+    "examples/hd2d/*.{px.js,cube}",
     "examples/nature/*.px.js",
     "SKILL.md",
     "characters.md",
