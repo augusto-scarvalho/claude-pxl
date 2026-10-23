@@ -1,0 +1,5 @@
+In this folder, outcrop.px.js is a pxl scene (3D fields drawn as pixel art; it includes kit.px.js, which you must not change: it gives the palette, MATS, LIGHT, CLOCK, the HD-2D camera and the ground). The pxl CLI is `node <pxl>/bin/pxl.js` (check, shot, build, steps); its reference is <pxl>/reference.md.
+
+The request: "a crystal outcrop on the ground near the middle of the picture: three or more crystals rising from a mossy rock, the rune sprite glowing on the tallest crystal, and a second, smaller rock beside it."
+
+Build it from distance-field primitives only (sdf.box, sdf.sphere, sdf.cylinder, sdf.plane and the rest, joined and moved, drawn with surface() and decal() through VIEW). Do not use make3d or world3d. The scene must still be named outcrop. Look at it with `pxl shot outcrop.px.js outcrop` and check it with `pxl check outcrop.px.js`. When done, reply with one line saying what you made.

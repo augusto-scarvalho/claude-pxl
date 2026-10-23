@@ -1,0 +1,3 @@
+In this folder, grove.px.js is a pxl scene (3D fields drawn as pixel art; it includes kit.px.js, which you must not change). The pxl CLI is `node <pxl>/bin/pxl.js` (check, shot, build, steps); its reference is <pxl>/reference.md.
+
+`pxl check grove.px.js` says some of the scene's expect3d rules don't hold. Fix them by changing only the numbers the failing rules depend on (a part's place, a gap), one number at a time, running `pxl check grove.px.js` after each change; change nothing else. When done, reply with one line saying what you changed.

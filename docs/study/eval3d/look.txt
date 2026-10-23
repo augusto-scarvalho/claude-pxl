@@ -1,0 +1,3 @@
+In this folder, grove.px.js is a pxl scene (3D fields drawn as pixel art; it includes kit.px.js, which you must not change), and grove.png is its first frame. The pxl CLI is `node <pxl>/bin/pxl.js`; its reference is <pxl>/reference.md.
+
+The house's door is drawn green in grove.png; it should be brown wood. Find the cause (the line of grove.px.js) and fix it, changing nothing else. When done, reply with one line: the cause and the fix.

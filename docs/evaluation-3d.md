@@ -3,8 +3,9 @@
 How to tell whether pxl's 3D layer (fields, builders, `world3d`, local edits, `expect3d`, the part
 trace) makes agents better at 3D pixel art, rather than only making the code run. The four
 comparisons are the dsl3d plan's (§6.6), in the spirit of BlenderGym: a task is done when the
-requested change happened and nothing else did, not when the file builds. One small instance of the
-second comparison was run (below); the rest is a protocol ready to run.
+requested change happened and nothing else did, not when the file builds. Each comparison has been
+run once an arm, Claude Sonnet at low effort, for US$1.57 in all ([the runs](#the-runs-one-an-arm)):
+a first measure, not a verdict.
 
 ## Contents
 
@@ -13,7 +14,8 @@ second comparison was run (below); the rest is a protocol ready to run.
 - [2. Full rewrite vs local edit](#2-full-rewrite-vs-local-edit)
 - [3. Fixes by the model alone vs numeric, local fixes](#3-fixes-by-the-model-alone-vs-numeric-local-fixes)
 - [4. A screenshot vs a screenshot and the execution trace](#4-a-screenshot-vs-a-screenshot-and-the-execution-trace)
-- [A first run: the grove's edit, rewritten and edited](#a-first-run-the-groves-edit-rewritten-and-edited)
+- [The runs, one an arm](#the-runs-one-an-arm)
+- [Doing it again](#doing-it-again)
 
 ## What every comparison shares
 
@@ -74,8 +76,8 @@ second comparison was run (below); the rest is a protocol ready to run.
   (`near`), the canopy shrunk under the trunk's top (`above`).
 - **Arms.** A: the agent gets `pxl check`'s warning and fixes the file as it sees fit. B: the agent
   may change only the numbers the failing rule names (a gap, a position, a parameter), one at a
-  time, re-running the check; or no agent at all, a search over that one number until the rule
-  holds (model calls: zero).
+  time, re-running the check; or no agent at all, `pxl check --fix`: a search over one number of the
+  parts the rule names until it holds, written into the file (model calls: zero).
 - **Measure** rules held after, unintended changes, model calls and tokens, time.
 
 ## 4. A screenshot vs a screenshot and the execution trace
@@ -90,40 +92,52 @@ second comparison was run (below); the rest is a protocol ready to run.
 - **Measure** whether the first answer names the right part and line, turns and tokens until the fix,
   unintended changes of the fix.
 
-## A first run: the grove's edit, rewritten and edited
+## The runs, one an arm
 
-Comparison 2, one task, one run an arm, Claude Sonnet 5.5 at low effort (the cheapest that could do
-it), on pxl as of the commit that adds this file, before the range check it led to. The start scene and the two briefs are in
-[`study/eval3d/`](study/eval3d); the request: "a denser canopy, twistier branches, wind from the left,
-a bluish ground mist". Scored with `scripts/eval3d.ts --touch oak,smoke,mist`, four moments of the
-loop.
+One headless session an arm, Claude Sonnet 5.5 at low effort, on pxl as of the commit before the
+one that adds this section (the 3D layer as phases 1 to 7 left it). The briefs and start files are
+in [`study/eval3d/`](study/eval3d); scored with `scripts/eval3d.ts` (four moments of the loop) and
+`pxl check`.
 
-| | Rewrite (A) | Local edit (B) |
-|---|---:|---:|
-| Cost, turns, time | $0.23, 10, 35 s | $0.15, 8, 49 s |
-| Input-token units (`tokens.ts`) | 131k (reference.md read whole: 71% of what was read again) | 89k |
-| What it changed | wind left; oak `canopy` 1.5, `leaves` 34, `twist` 1.6, `limbs` 5; mist blue | wind left; oak `canopy` 1.5, `twist` 70; mist blue |
-| Unintended changes (house, rock: 17,348 px) | 0 | 0 |
-| Canopy, leaves px (start 8,590, 8,263) | 8,833, 14,526 | 12,611, 12,724 |
-| Mist's mean color | grey to `#a6c0dc` | grey to `#a6c0dc` |
-| Smoke's middle x (wind from the left) | 200 to 213 | 200 to 213 |
-| Expects held | 6 of 6 | 6 of 6 |
+| Comparison, task | Arm | Cost, turns, time | Result |
+|---|---|---:|---|
+| 1. A crystal outcrop with a glowing rune and a second, smaller rock (held out) | A, primitives | $0.24, 14, 65 s | 31 lines; all four asks met, the rock a flat mossy cushion; check clean |
+| | B, builders | $0.22, 15, 60 s | 23 lines, 2 expects held; the crystal's rock not mossy (the builder had no parameter for it) and the "smaller" rock bigger than it |
+| 2. "A denser canopy, twistier branches, wind from the left, a bluish ground mist" | A, rewrite | $0.23, 10, 35 s | 0 of 17,348 px of the house and the rock changed; did more than asked (5 limbs) |
+| | B, local edit | $0.15, 8, 49 s | 0 changed; `twist: 70` out of range (now refused) |
+| 2. "Snow on the house's cap, and the rock moved to the left of the house" | A, rewrite | $0.22, 9, 26 s | the same file as B's: 292 of 29,037 px of the other parts changed (1.0%: mist the moved rock covers) |
+| | B, local edit | $0.12, 7, 23 s | the same |
+| 3. Two defects seeded: the house 0.6 m up, the rock pushed into it | A, as it sees fit | $0.12, 4, 33 s | house down to 0, rock gap -1.2 to 1.2; 6 of 6 expects |
+| | B, the numbers only | $0.09, 5, 34 s | the same two numbers; 6 of 6 |
+| | B', `pxl check --fix` | $0, no model, 3 s | house down to 0, rock gap to -0.75 (the least that holds); 6 of 6 |
+| 4. The door drawn green (a ramp override in the file) | A, the picture | $0.087, 5, 19 s | the right line at the first answer, fixed |
+| | B, the picture and `pxl steps --at` | $0.086, 4, 20 s | the same, a turn fewer |
+
+In comparison 3 every arm changed the same 768 of 27,474 px of the parts it doesn't name (2.8%: the
+oak and the mist the house covers once it is down), so the arms differ only in cost.
 
 What it says, as a first measure:
 
-- **The scene as data kept the approved parts in both arms.** Even writing the file anew, the agent
-  kept the parts' builders, seeds and places, so the house and the rock came out byte for byte. The
-  protection is in `world3d` (named parts, a seed each), not in the agent's restraint; the
-  comparison that would show a difference is a scene of raw primitives rewritten (comparison 1's arm
-  A, then 2 on it).
-- **The rewrite did more than asked** (5 limbs instead of 3, a structural change no one requested)
-  and cost half again as much, reading the whole reference.
-- **The local edit guessed a parameter's range wrong**: `twist: 70`, where twist is radians from 0
-  to 1.5; the limbs wrapped round to an arbitrary kink instead of a twistier one. Fixed in pxl: the
-  reference now gives each tree parameter's range and default, and a value out of range is refused
-  with them (`make3d.tree: twist is 0 to 1.5 (default 0.35), got 70`).
+- **The scene as data keeps the approved parts in both arms of comparison 2.** Writing the file anew
+  the agent kept the parts' builders, seeds and places, so the pixels came out the same as the local
+  edit's; the rewrite cost half again to three quarters more. The protection is in `world3d`, not in
+  the agent's restraint.
+- **Builders: a shorter file, the same cost, a narrower reach.** The builders' arm wrote a quarter
+  fewer lines and checked its relations, but bent the request to what the parameters say: no moss on
+  the crystal's rock. Fixed in pxl (`make3d.crystal({ moss })`); the next builder gaps will show the
+  same way.
+- **A numeric fix needs no model.** `pxl check --fix` held both rules with two numbers in 3 s; it
+  takes the least change that holds (the rock at -0.75, its edge under the cap, where the agents
+  moved it out to 1.2): a rule says what must hold, not where the author wanted it.
+- **The trace is cheap and saved a turn** on a defect a careful reader finds anyway; the defects
+  that need it (a part placed by the wrong relation, a decal under a rim) are the ones to try next.
 
-Doing it again, from the repository:
+## Doing it again
+
+From the repository, a comparison's two arms (comparison 2's first task here; the others take
+`outcrop.px.js` with `primitives.txt` and `builders.txt`, `defects.px.js` as `grove.px.js` with
+`fix.txt` and `numbers.txt`, `door.px.js` as `grove.px.js` and its first frame as `grove.png` with
+`look.txt` and `trace.txt`, `grove.px.js` with `edit2.txt` and `rewrite2.txt`):
 
 ```sh
 mkdir -p runs/rewrite/sonnet-low runs/edit/sonnet-low
@@ -136,3 +150,6 @@ for a in rewrite edit; do
   node scripts/eval3d.ts docs/study/eval3d/grove.px.js runs/$a/sonnet-low/grove.px.js grove --touch oak,smoke,mist
 done
 ```
+
+Run the sessions against a copy of pxl at one commit (`git worktree add`, its path in the briefs) when
+pxl is being changed meanwhile.
