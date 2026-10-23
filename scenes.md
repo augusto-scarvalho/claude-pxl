@@ -4,7 +4,8 @@ Read this before building a scene, a level, a building or any environment.
 
 Contents: Layout and scale · Ground, paths and tiles · Texture without filler · Trees and big organic
 shapes · Water and things that land · Distance (aerial perspective) · True perspective · Slow motion
-in a short loop · Closing a loop · Parallax · Shadows and light · Blend modes · Checking a scene
+in a short loop · Closing a loop · Parallax · Shadows and light · Blend modes · Checking a scene ·
+A game's screen · A game's projections · 3D as code
 
 A reference scene (a screenshot, a photo of the place, a GIF or a video of a game): `PXL study` gives
 its horizon and vanishing points, its planes and their speeds, its palette and its light, the
@@ -773,3 +774,45 @@ Pick one and keep everything in it (a 45° oblique bridge among isometric blocks
   darkest tone, between two walls an optional 1 px strip of the mid tone (`plate()` per face, or
   `relight` with `reach: 1`). Shadows short and pointing nowhere in particular, on a layer of their
   own, a tile long at most.
+
+## 17. 3D as code (fields, voxels, volumes, splats, decals)
+
+A thing that turns, sways or is seen from several cameras can be described once in meters with `sdf`
+and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). What held, from building them:
+
+- **Four kinds, never one.** A distance (`sdf.*`) for solid forms, drawn by `surface()`, `voxels()`
+  or `mesh()`; a density (`sdf.density`) for air (mist, smoke, cloud), drawn by `volume()`; an
+  appearance (`.mat()`, `.paint()`) for what each part is made of; an occupancy for voxels. A cloud as
+  a distance has a hard edge; a rock as a density has none.
+- **Splats for detail, not form.** A whole tree laid as splats read as soft blobs beside the same tree
+  drawn by `surface()`. Keep the form a field and scatter the small things on it (`sdf.scatter`):
+  leaves 20 to 40 to a square meter, each under about 4 px drawn as a brush (a 2x2 clump, a leaf, a
+  blade), never in the ramp's darkest tone and with no outline of its own (outlined, they read as dark
+  speckle). Moss and snow only where the form faces up (`up` 0.66 hugs a painted patch; at 0.55 tufts
+  landed on bare stone and read as noise).
+- **Decals or a sprite per view.** A face of 11 rows or less on a sprite figure: draw it per view by
+  hand (`characters 5 6`). On a 3D form: a decal, drawn once per view it needs (front under 25
+  degrees from the eye, three quarters under 65, profile beyond, mirrored for the other side), so it
+  stays a texel to a pixel in any camera. Put it where the camera sees it: through a camera 40 degrees
+  down, a mushroom cap with a 1.3 m rim hid everything on its 0.6 m stem above about 0.85 m (the
+  sign and the window were moved down to the door). Something glowing needs a hue apart from what it
+  lies on (a white rune on a pale crystal vanished; gold reads).
+- **Voxels: the cell is a choice of look.** On the iso pixel grid at 16 px to the meter a 0.25 m cell
+  is a cube 8 px wide, 0.125 m 4 px, 0.0625 m 2 px; things of different cells can share a world. A
+  limb thinner than a cell is kept as a line of cells by `fill` 0.5, else it vanishes. `.vox` holds
+  256 cells a side at most (pxl refuses more and says the cell that fits).
+- **Volumes: a core, a dithered rim.** A volume thin all through is a field of dots (the grove's
+  first mist, a ring of checkerboard round the house). Give it a core that hides what is behind
+  (`thickness` 3 or more for a ground mist, `edge` about 0.9 m) so its middle reads as two or three
+  tones in clusters and only its rim dithers. A ground mist is a low band (12 m by 2.2 m, 1 m tall)
+  behind or round the things, not a disc under one of them. Volumes write no depth: draw them after
+  the solids, the farthest first.
+- **A scene as data, edited by name.** `world3d` parts made by builders with parameters that mean
+  something, a seed each: "a denser canopy, twistier branches, wind from the left" is an `edit` of
+  `oak.canopy`, `oak.twist`, `wind.from`, and the house and the rock stay byte for byte. Give values
+  in the builder's range (`PXL help make3d`: a tree's `twist` is 0 to 1.5 radians; an agent once gave
+  70). `expect3d` rules (the canopy above the trunk, the rock clear of the house, the orb reaching
+  its mark by a time) run in `pxl check`; `pxl steps <file> <scene> --at x,y` says which part
+  painted a pixel.
+- **Cost.** A 320x180 HD-2D frame with a leafy tree, smoke and mist takes 0.6 to 1.3 s on the CPU:
+  check one frame in 24 (`check: { every: 24 }`) and keep the loop short.

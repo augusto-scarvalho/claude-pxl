@@ -71,6 +71,8 @@ test("world3d: parts placed by relations, a seed each; an edit changes only what
   assert.throws(() => W.edit({ "pine.canopy": 2 }), /no part 'pine'/);
   assert.throws(() => new World({ parts: { a: { make: "tree", on: "b" } } }), /refers to 'b'/);
   assert.notEqual(make3d.tree({ seed: 1 }).field!.dist([0, 0, 3]), make3d.tree({ seed: 2 }).field!.dist([0, 0, 3]));
+  // a guess out of range said, not drawn (an agent once gave twist 70, radians wrapping round)
+  assert.throws(() => make3d.tree({ twist: 70 }), /twist is 0 to 1\.5 \(default 0\.35\), got 70/);
 });
 
 test("draw3d: the parts an edit leaves alone drawn the same, byte for byte; each pixel knows its part; expect3d's rules in pxl check", () => {

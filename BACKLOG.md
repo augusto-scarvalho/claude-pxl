@@ -943,7 +943,9 @@ What the phases left, each waiting for a reason:
   wrapped on a form, a grid per view, lit or glowing), `.part()` and what painted each pixel (`pxl steps
   --at`), the builders (`make3d`), `world3d` (parts, seeds, relations, a shared wind; `edit` and `changed`,
   the rest byte for byte), `draw3d`, `expect3d` run by `pxl check`.
-- [ ] **Evaluation and the guides** (phase 7).
+- [x] **Evaluation and the guides** (phase 7): the protocol for the plan's four comparisons with a first
+  run of one ([docs/evaluation-3d.md](docs/evaluation-3d.md), `scripts/eval3d.ts`), the grove in the
+  gallery, scenes.md section 17, SKILL.md's lines.
 - [ ] **Splats' own shadows**: a splat set lays none; a field's `surface(..., { hide: true })` lays it.
   When: splats come from somewhere with no field behind them (a capture read from a .ply).
 - [ ] **Reading a .ply of trained splats** (a capture, from Spark's or SuperSplat's files) into
@@ -1006,8 +1008,8 @@ What the phases left, each waiting for a reason:
 - [ ] **A GPU engine**: not yet, by decision. Why not: the CPU renderer is measured first; a backend
   waits for a pass measured slow (HD dioramas ~1 s a frame). When: a long HD sequence is.
 - [ ] **An interactive WebGL preview** of fields, voxels and meshes (turn it, look round): not yet, by
-  decision. When: after the semantic layer (phase 6), if agents and the user need to orbit a model;
-  the .glb export opens in any viewer meanwhile.
+  decision. When: agents or the user need to orbit a model (the semantic layer is done and nobody has
+  yet); the .glb export opens in any viewer meanwhile.
 - [ ] **A Blender pipeline**: not yet, by decision; .obj and .glb reach it. When: a render or an edit
   only Blender does is asked for.
 
@@ -1036,3 +1038,15 @@ Left from phase 6 (details, decals, the scene of parts):
 - [ ] **Edits finer than a builder's part**: an edit re-makes what it names (the canopy, its leaves)
   whole; one limb or one leaf can't be kept while the others change. Why: "this branch is approved, the
   rest can move". When: an agent's edit loop asks for it (seeds per limb, a part per limb).
+
+Left from phase 7 (evaluation):
+
+- [ ] **The four comparisons run in full**: one run an arm of comparison 2 so far (Sonnet, low effort,
+  one request; both arms kept the house and the rock byte for byte, the rewrite did more than asked).
+  Why: one run is a first measure; the comparison that would show the IR's worth is a scene of raw
+  primitives rewritten (comparison 1's arm A). When: before choosing what to build next on the 3D
+  layer, or when an agent's 3D work goes wrong in a way one of them would measure (three runs an
+  arm, two models, the tasks in docs/evaluation-3d.md).
+- [ ] **A numeric fixer for expect3d**: a failing rule names the numbers it depends on (a gap, a
+  place); a search over one of them until it holds would fix it without the model (comparison 3's arm
+  B). When: agents spend turns on such fixes.

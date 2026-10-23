@@ -207,6 +207,10 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   draws its faces in blocks of a sprite's pixel in an HD picture), then `post()` in the same body for depth of field, haze, bloom, a `lut` grade, `grain`, the `palette` back (`PXL help post`); `capsule` for a limb painted round, `flame` for fire
   (`PXL help "scenes 7"`); procedural texture with `hash`, `vnoise`, `fbm`, `bayer`, `seamless`
   (`PXL help vnoise`).
+- **3D fields**: things in meters as distance fields (`sdf`), drawn as pixel art by `surface()`, as
+  cubes by `voxels()`, air by `volume()`, details by `sdf.scatter` + `splats()`, hand-drawn art pinned
+  on them by `decal()`; a scene of named parts by `world3d` (edit by name), checked by `expect3d`
+  (`PXL help "scenes 17"`, `PXL help sdf`).
 
 ## Examples
 
@@ -249,6 +253,9 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `spells.px.js`, `spell_variants.px.js` | the spell kit: nine elements at three tiers on one clock (`spell()`, `cast()`); their variants (icebergs, boulders, quakes, meteors as lit volumes) and the same spell seen from the side, above, in iso and through a camera, cast from the traveler's hand |
 | `hd2d/clearing.px.js` | every shader at once, on a 5 s clock: a dusk clearing whose wood and grass sway in one wind (`effect("sway")`, a gust by `delay`); the traveler's cast pose, his hand a socket (`c.setSocket`, `c.meshSocket`); a fireball of `effect("energy")` with an `effect("aura")` round him, on an `ability()`'s phases, lighting the ground as it flies, hidden behind a wall; the scarecrow catching fire and burning away (the dissolve's `"burn"` look with flames, on that copy alone: `fx`), `smoke()` rising, `emitter()` sparks; `post()` with Three's bloom, a `.cube` LUT and a still grain |
 | `hd2d/plaza.px.js` | an HD-2D diorama: a camera high up through a long lens, boxes in meters tiled with pixel-art textures by `mesh()`, the topdown hero, pines and lamps standing among them in one depth (`sprites`, on contact shadows); a late sun, sky and lamps with the sun's shadows (`sun`, `lamps`, `emit`, sprites lit through `bump("hybrid")`); the same at 1920x1080 (`pixel: 4`) with `post()`: depth of field, haze, bloom, vignette; the camera, blocks and textures it shares with the graveyard in `kit.px.js` |
+| `sdf/fields.px.js`, `sdf/kit.px.js` | 3D as code: a tree, a rock, a mushroom house and a crystal as distance fields drawn as pixel art from the side, the top, in iso and through the HD-2D camera, swaying; the kit's camera, ground and materials |
+| `sdf/grids.px.js`, `sdf/volumes.px.js`, `sdf/splats.px.js` | the same fields as voxels (cells of any size) and meshes, exported (`.vox`, `.obj`, `.glb`); clouds, mist, smoke and a glowing orb as densities; Gaussian splats (`.ply`) |
+| `sdf/details.px.js`, `sdf/decals.px.js`, `sdf/world.px.js` | leaves and moss scattered on forms as brushes; hand-drawn doors, faces and runes pinned on forms (views, a blink); a scene of named parts edited by name, its rules checked; the gallery's grove (`grove_showcase`) |
 | `fonts/font5x7.px.js` | a 5×7 font for titles: `include` it, `text(..., { font: "5x7" })` |
 
 Every command run on an example writes an `out/` next to it (build, shot, describe): give it

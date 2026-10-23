@@ -29,9 +29,11 @@ export interface Built {
   windy?: boolean;
 }
 type P = Record<string, unknown>;
-const n = (p: P, k: string, d: number, who: string): number => {
+// a parameter: a number, within [lo, hi] when given (an agent's guess out of range is said, not drawn)
+const n = (p: P, k: string, d: number, who: string, lo = -Infinity, hi = Infinity): number => {
   const v = p[k] ?? d;
   if (typeof v !== "number" || !Number.isFinite(v)) throw new PxError(`${who}: ${k} is a number, got ${JSON.stringify(v)}`);
+  if (v < lo || v > hi) throw new PxError(`${who}: ${k} is ${lo} to ${hi} (default ${d}), got ${v}`);
   return v;
 };
 const known = (p: P, keys: string[], who: string) => {
@@ -50,7 +52,7 @@ export const partSeed = (seed: number, part: string) => hash(seed, [...part].red
 export function tree(p: P = {}): Built {
   const who = "make3d.tree";
   known(p, ["height", "limbs", "twist", "lobe", "canopy", "leaves", "wind", "seed"], who);
-  const height = n(p, "height", 4.4, who), limbs = n(p, "limbs", 3, who), twist = n(p, "twist", 0.35, who), lobe = n(p, "lobe", 0.9, who), canopy = n(p, "canopy", 1, who), leavesN = n(p, "leaves", 0, who), seed = n(p, "seed", 7, who);
+  const height = n(p, "height", 4.4, who), limbs = n(p, "limbs", 3, who, 1, 8), twist = n(p, "twist", 0.35, who, 0, 1.5), lobe = n(p, "lobe", 0.9, who), canopy = n(p, "canopy", 1, who, 0.5, 3), leavesN = n(p, "leaves", 0, who, 0, 200), seed = n(p, "seed", 7, who);
   const wind = p.wind ?? 0.2;
   if (!(typeof wind === "number" || (Array.isArray(wind) && wind.length === 2 && wind.every(Number.isFinite)))) throw new PxError(`${who}: wind is m at its top, or [x, y], got ${JSON.stringify(wind)}`);
   const R = rng(seed), H = height / 4.4, fork: V3 = [0, 0, 1.6 * H], wood: Sdf[] = [], lobes: Sdf[] = [];
@@ -98,7 +100,7 @@ export function tree(p: P = {}): Built {
 export function rock(p: P = {}): Built {
   const who = "make3d.rock";
   known(p, ["size", "seed", "moss"], who);
-  const size = n(p, "size", 0.9, who), seed = n(p, "seed", 3, who), moss = n(p, "moss", 0, who), R = rng(seed), cuts: Sdf[] = [];
+  const size = n(p, "size", 0.9, who), seed = n(p, "seed", 3, who), moss = n(p, "moss", 0, who, 0, 1), R = rng(seed), cuts: Sdf[] = [];
   for (let i = 0; i < 9; i++) {
     const a = (i * TAU) / 9 + R() * 0.5, e = ((R() * 70 - 15) * Math.PI) / 180;
     cuts.push(sdf.plane([Math.cos(a) * Math.cos(e), Math.sin(a) * Math.cos(e), Math.sin(e)], size * (0.62 + R() * 0.12)));
@@ -116,7 +118,7 @@ export function rock(p: P = {}): Built {
 export function house(p: P = {}): Built {
   const who = "make3d.house";
   known(p, ["seed", "snow", "door", "window", "sign"], who);
-  const seed = n(p, "seed", 5, who), snow = n(p, "snow", 0, who);
+  const seed = n(p, "seed", 5, who), snow = n(p, "snow", 0, who, 0, 1);
   const stem = sdf.cone(0.78, 1.5, 0.6).union(sdf.torus(0.66, 0.1).at(0, 0, 0.1), { smooth: 0.15 }).mat("stem");
   const door = sdf.box([0.5, 0.4, 0.9], { round: 0.04 }).union(sdf.cylinder(0.25, 0.4).rotate(90, "x").at(0, 0.2, 0.9)).at(0, -0.75, 0.45);
   const window = sdf.cylinder(0.14, 0.4).rotate(90, "x").at(0.42, -0.6, 1.05);
@@ -126,10 +128,11 @@ export function house(p: P = {}): Built {
   const cap = sdf.ellipsoid([1.3, 1.3, 0.85]).intersect(sdf.plane([0, 0, -1], -0.1)).at(0, 0, 1.4).mat("cap")
     .paint("spot", (q, nn) => spots.some((s) => s[0] * nn[0] + s[1] * nn[1] + s[2] * nn[2] > 0.982));
   const chimney = sdf.cylinder(0.12, 0.6).at(0.45, 0.35, 1.85).union(sdf.cylinder(0.16, 0.08).at(0.45, 0.35, 2.4)).mat("door");
+  // the decals low on the stem, where a camera looking down sees them under the cap's rim
   const decals: Record<string, BuiltDecal> = {};
   if (typeof p.door === "string") decals.door = { asset: p.door, point: [0, -0.62, 0.55] };
-  if (typeof p.window === "string") decals.window = { asset: p.window, point: [-0.45, -0.6, 1.0] };
-  if (typeof p.sign === "string") decals.sign = { asset: p.sign, point: [0, -0.7, 1.12] };
+  if (typeof p.window === "string") decals.window = { asset: p.window, point: [-0.48, -0.42, 0.78] };
+  if (typeof p.sign === "string") decals.sign = { asset: p.sign, point: [0.48, -0.42, 0.62] };
   return {
     field: body.union(cap.part("cap"), chimney.part("chimney")), decals, sockets: { chimney: [0.45, 0.35, 2.48] },
     parts: { stem, cap, chimney },
@@ -153,14 +156,16 @@ export function crystal(p: P = {}): Built {
   return { field: gems.at(0, 0, 0.12).part("gems").union(base), parts: { gems, base }, details: {}, decals, sockets: { tip: [0, 0, 1.4] } };
 }
 
-/** A mist lying low: `color` (its ramp's material is "mist_<color>"), `size` [x, y] m, creeping with the `wind`. */
+/** A ground mist: a low bank `size` [x, y] m (default a band 12 m long, 2.2 m deep), dense enough to read as
+ * a few tones in clusters with a dithered rim (thin all through it reads as a field of dots), `color` (its
+ * ramp's material is "mist_<color>"), creeping with the `wind`. */
 export function mist(p: P = {}): Built {
   const who = "make3d.mist";
   known(p, ["color", "size", "seed", "wind"], who);
-  const color = String(p.color ?? "grey"), size = (p.size ?? [5.6, 3.6]) as number[], seed = n(p, "seed", 6, who), wind = (p.wind ?? [0.2, 0]) as number[];
+  const color = String(p.color ?? "grey"), size = (p.size ?? [12, 2.2]) as number[], seed = n(p, "seed", 6, who), wind = (p.wind ?? [0.2, 0]) as number[];
   const flow = [wind[0] * 12, wind[1] * 12 + 0.6, 0];
-  const density = new Density(sdf.ellipsoid([size[0] / 2, size[1] / 2, 0.6]).at(0, 0, 0.1), { edge: 0.6, noise: 0.6, scale: 0.8, seed, octaves: 3, flow, fade: [0.1, 0.7] } as DensityOpts);
-  return { density, look: { ramp: `mist_${color}`, thickness: 1.4 }, parts: {}, details: {}, decals: {}, sockets: {}, windy: true };
+  const density = new Density(sdf.ellipsoid([size[0] / 2, size[1] / 2, 1]).at(0, 0, 0.1), { edge: 0.9, noise: 0.9, scale: 1.4, seed, octaves: 3, flow, fade: [0.1, 1.1] } as DensityOpts);
+  return { density, look: { ramp: `mist_${color}`, thickness: 3, ambient: 0.2 }, parts: {}, details: {}, decals: {}, sockets: {}, windy: true };
 }
 
 /** Smoke rising from where it is attached (a chimney), leaning with the `wind`. */

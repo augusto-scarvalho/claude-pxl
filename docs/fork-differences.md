@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**356 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**357 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -107,6 +107,7 @@ follows from it.
 | `sdf.density`, `volume()` | Densities from the same shapes: a soft edge eaten by seeded noise that flows through them on the clock and closes its loop, thinning away up; drawn as pixel art, ray-marched through their own light on a grid, a few tones of their ramp in clusters, dithered where thin (in the palette, or laid over by alpha); through a `mesh()` camera hidden by what is nearer and over what is behind, their shadow on the ground, and what glows lighting what is round it: a cloud, a ground mist, smoke, a magic orb. |
 | `sdf.splats`, `splats()` | Procedural Gaussian splats, experimental: a field's surface as flat discs along its normals, a density's inside as round blobs; a CPU rasterizer to pixel art (each ellipse through the camera, the nearest first, 3DGS's blending, snapped to the ramps in clusters, dithered where thin, outlined); written as a `.ply` in 3D Gaussian Splatting's layout for Spark and other viewers. The reference tree as surface, voxels, mesh and splats in four cameras side by side. |
 | `sdf.scatter`, `decal()`, `make3d`, `world3d`, `draw3d`, `expect3d` | A 3D scene an agent edits by name: details scattered on a form (leaves, moss, snow) drawn as pixel-art brushes that sway with it; hand-drawn decals pinned on a form a texel to a pixel, cut by its silhouette and depth, a drawing per view (front, three quarters, profile), blinking, glowing, or wrapped round it; builders with parameters that mean something (a tree's canopy, twist and wind, a rock's moss, a house's door, windows and sign); a world of named parts with a seed each, placed by relations (on, beside, around, attached to a socket), whose local edits leave the rest byte for byte as it was (`changed` says which parts moved); what part painted each pixel in `pxl steps --at`; rules over the loop (above, on, apart, near, reaches, within) run by `pxl check`. |
+| `docs/evaluation-3d.md`, `scripts/eval3d.ts` | Whether the 3D layer helps agents: a protocol for four comparisons (primitives or builders, a rewrite or a local edit, fixes by the model or by numbers, a screenshot with or without the trace), measured part by part (what an edit changed that it shouldn't have, from which part painted each pixel), and a first run with headless agents. |
 
 Five scenes are built on this: a road across the sertão, a park at 2 pm in two-point perspective, the
 end of the Cretaceous in three-point, a street race from the driver's seat, and two HD-2D dioramas (a

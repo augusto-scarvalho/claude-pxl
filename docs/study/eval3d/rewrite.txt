@@ -1,0 +1,5 @@
+In this folder, grove.px.js is a pxl scene (3D fields drawn as pixel art; it includes kit.px.js, which you must not change). The pxl CLI is `node <pxl>/bin/pxl.js` (check, build, steps); its reference is <pxl>/reference.md.
+
+The request: "a denser canopy, twistier branches, wind from the left, a bluish ground mist."
+
+Write grove.px.js anew, as a whole file from scratch (do not patch the old one), so the scene meets the request. The scene must still be named grove, at the same size. Check it with `pxl check grove.px.js`. When done, reply with one line saying what you changed.

@@ -43,9 +43,9 @@ const face = (name, rows) => anim(name, { w: rows[0].length, h: rows.length, piv
 face("face_front", ["dd...dd", "dd...dd", ".......", "...OO..", "d.....d", ".ddddd."])
 face("face_three", ["..dd..dd", "..dd..dd", "........", "......OO", "...d...d", "....ddd."])
 face("face_side", ["....dd..", "....dd..", "........", "......OO", ".....d..", "....dd.."])
-const spirit = sdf.union(sdf.sphere(0.7).at(0, 0, 0.65), sdf.sphere(0.5).at(0, 0, 1.65), sdf.sphere(0.38).at(0, 0, 2.38), { smooth: 0.12 }).mat("stem")
+const snowman = sdf.union(sdf.sphere(0.7).at(0, 0, 0.65), sdf.sphere(0.5).at(0, 0, 1.65), sdf.sphere(0.38).at(0, 0, 2.38), { smooth: 0.12 }).mat("stem")
   .union(sdf.torus(0.36, 0.08).at(0, 0, 2.05).mat("cap"), sdf.capsule([0.45, 0, 1.75], [1.05, 0.1, 2.15], 0.04, 0.02).mat("bark"), sdf.capsule([-0.45, 0, 1.75], [-1.0, -0.05, 2.05], 0.04, 0.02).mat("bark"))
-  .rotate((c) => 360 * c.phase)
+const spirit = snowman.rotate((c) => 360 * c.phase)
 const FACE = { on: spirit, point: [0, -0.38, 2.5], views: { three: "face_three", profile: "face_side" } }
 const spiritView = (name, w, h, view, ppm, at) => anim(name, { w, h, ...CLOCK }, surface(spirit, { view, ppm, at, mats: MATS, light: LIGHT }), decal("face_front", { ...FACE, view, ppm, at, light: LIGHT }))
 for (const v of ["side", "top", "iso"]) spiritView(`spirit_${v}`, 80, 96, v, 24, [40, v === "top" ? 50 : 90])
@@ -81,3 +81,25 @@ sprite("sun", { pivot: "center" }, `
 const barrel = sdf.cylinder(0.45, 1.1).union(sdf.torus(0.46, 0.035).at(0, 0, 0.15), sdf.torus(0.46, 0.035).at(0, 0, 0.95), { smooth: 0.02 }).mat("door").rotate((c) => 360 * c.phase)
 for (const v of ["side", "iso"]) anim(`barrel_${v}`, { w: 72, h: 80, ...CLOCK }, surface(barrel, { view: v, ppm: 40, at: [36, 72], mats: MATS, light: LIGHT }),
   decal("sun", { on: barrel, point: [0, -0.45, 0.55], mode: "wrap", size: 0.6, view: v, ppm: 40, at: [36, 72], light: LIGHT }))
+
+// The showcase (docs/gallery/sdf_grove.gif): the grove's world through the HD-2D camera, the oak in leaf
+// swaying in the wind, the house with its door, window and sign, smoke from its chimney, a mossy rock, a
+// ground mist behind; the snow spirit in front looking from side to side (its face turning from the front
+// to three quarters, mirrored), blinking. Not checked (a frame takes a second or two): its parts are, in
+// the scenes above and in world.px.js.
+{
+  const SHOW = world3d({ seed: 11, wind: { from: "right", strength: 0.18 }, parts: {
+    oak: { make: "tree", at: [-2.6, 0.8], params: { leaves: 26 } },
+    house: { make: "house", at: [1.3, 1.6], params: { door: "door", window: "window", sign: "sign" } },
+    smoke: { make: "smoke", attach: ["house", "chimney"] },
+    rock: { make: "rock", beside: ["house", "front", 0.4], params: { moss: 0.6 } },
+    mist: { make: "mist", at: [0, 3.4] },
+  } })
+  const W = 320, H = 180, { Z, view: VIEW } = hd2d(W, H), GR = ground(Z), AT = [0, Z - 2.4, 0]
+  const looking = snowman.scale(0.62).rotate((c) => 40 * Math.sin(TAU * c.phase)).at(-0.5, -0.9, 0)
+  const LOOKS = { ...MATS, mist_grey: "90+=", smoke_grey: "90+=" }
+  scene("grove_showcase", { w: W, h: H, bg: "k", ...CLOCK, check: false }, (c) => c.mesh(VIEW, GR.faces, GMATS, { light: LIGHT }),
+    (c) => c.draw3d(SHOW, { view: VIEW, at: AT, mats: LOOKS, light: LIGHT }),
+    (c) => c.surface(looking, { view: VIEW, at: AT, mats: MATS, light: LIGHT }),
+    (c) => c.decal("face_front", { on: looking, point: [-0.5, -0.9 - 0.62 * 0.38, 0.62 * 2.5], views: { three: "face_three", profile: "face_side" }, view: VIEW, at: AT, light: LIGHT }))
+}

@@ -204,6 +204,7 @@ says which to reach for.
 | a first sprite, an animation and a scene by hand; which command when | [docs/getting-started.md](docs/getting-started.md) |
 | running an agent: install, model and effort, briefs, how it works, costs, review; tests for contributors | [docs/agents.md](docs/agents.md) |
 | which model and effort to draw with: one scene, seventeen runs | [docs/model-study.md](docs/model-study.md) |
+| whether the 3D layer helps agents: four comparisons, a first run | [docs/evaluation-3d.md](docs/evaluation-3d.md) |
 | every op and option | [reference.md](reference.md), or `pxl help <name>` |
 | the agent's workflow, and which example teaches what | [SKILL.md](SKILL.md) |
 | scenes, perspective, HD-2D dioramas, parallax, shadows | [scenes.md](scenes.md) |
@@ -221,6 +222,26 @@ in [`examples/`](examples) to read and copy. Smaller files to start from (the st
 `basics.px.js`, tilesets, a top-down game character in [`examples/topdown_hero/`](examples/topdown_hero),
 a kit of grass, trees and rocks in [`examples/nature/`](examples/nature)) are in the
 [examples table](SKILL.md#examples) of `SKILL.md`.
+
+### 3D as code: fields, voxels, volumes, splats, decals
+
+<p>
+  <img src="docs/gallery/sdf_grove.gif" width="100%" alt="Animated pixel-art scene seen from high up through a long lens: on a grassy ground, an oak in full leaf sways in the wind, its crown made of leaf clusters lit on top; a red mushroom house with cream spots, a hand-drawn wooden door, a round window and a small sign, smoke rising from its chimney and drifting in the wind; a mossy boulder in front of it; a pale ground mist lying behind; a little snow spirit in a red scarf turns its head from side to side, its hand-drawn face changing from the front to three quarters, and blinks">
+</p>
+
+Everything in this scene is described in meters, in code, and drawn as pixel art by pxl itself, on the
+CPU ([`examples/sdf/`](examples/sdf)). The forms are signed distance fields (`sdf`: spheres, capsules,
+cones and planes joined smoothly, bent by the wind, pushed by noise) drawn by `surface()` in a few
+tones of each material's ramp, with an outline away from the light and their shadows on the ground.
+The mist and the smoke are densities ray-marched by `volume()`; the oak's leaves and the rock's moss
+are details scattered on the forms (`sdf.scatter`), each a few pixels' brush; the door, the window, the
+sign and the spirit's face are drawn by hand and pinned on the forms as decals, the face picked by
+how far it turns from the eye. The scene is data (`world3d`): named parts made by builders with
+parameters that mean something (a tree's canopy, twist and wind), placed by relations, so "a denser
+canopy, twistier branches, wind from the left, a bluish mist" is an edit that leaves the house and the
+rock byte for byte as they were, and rules over the loop (the canopy above the trunk, the rock clear
+of the house) are checked by `pxl check`. The same fields become voxel models and meshes (`.vox`,
+`.obj`, `.glb`) and Gaussian splats (`.ply`).
 
 ### HD-2D dioramas: a graveyard, a harbor, a clearing
 
@@ -409,6 +430,7 @@ test/         node:test suites
 | `scripts/cpuprofile.ts` | a CPU profile of any pxl command, summed by function |
 | `scripts/tokens.ts` | where a Claude Code session's tokens went, read from its transcript |
 | `scripts/model-study.sh` | one run of the [model study](docs/model-study.md): a brief to a new Claude Code, Codex or `agy` session |
+| `scripts/eval3d.ts` | what an edit of a 3D scene changed, part by part, and what it shouldn't have ([evaluation-3d.md](docs/evaluation-3d.md)) |
 | `scripts/mhtml.ts` | saved web pages (`.mhtml`) opened as text and images, to read tutorials |
 
 How to use them, and how to update the examples' snapshot after a change you meant, is in
