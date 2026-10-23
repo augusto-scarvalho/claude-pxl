@@ -842,7 +842,7 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   keys), the clock and seed passed in, nothing kept between frames; noise is a function of (x, y,
   seed), so a shader can compute the same field. Worth it only for a measured slow pass (a bloom at
   1920x1080, many effects on a long scene), with a CPU/GPU comparison test per effect.
-- [ ] **The emission mask travels**: `emit` brightens its pixels, and nothing marks them as shining after. For
+- [x] **The emission mask travels** (done with mesh() materials, below): `emit` brightened its pixels, and nothing marked them as shining after. For
   `mesh()` (sprites that shine and aren't darkened by the sun), `lighting()` and a bloom fed by it,
   the mask has to move with the pixels as normals do (stamp, flip, rot, crop, outline).
 - [x] **Vegetation in the wind, for flat sprites**: `effect("sway")`, rows moved by their height over
@@ -857,3 +857,18 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   `lut` from a .cube file, `grain` seeded by the frame in blocks of `pixel`, `sharpen`, and `palette`
   to take the picture back to the palette. Left: a sparse first blur for Three's bloom (0.9 s a frame
   at 1920x1080), a LUT strip image (Babylon's 256x16 PNG) beside .cube.
+- [ ] **mesh() materials and transparency**: `effect("emit")` marks the pixels that give light and the
+  mark travels with them (as normals do); `mesh()` draws them as they are and lights what is round
+  them (a lamp at their middle per sprite, `light: { r, strength }`), `lighting()` leaves them lit,
+  `post()`'s bloom takes them. `dissolve` on a material eats its faces with holes that show what is
+  behind and let the sun through (a dissolving sprite already did). `blend` on a sprite (alpha, add,
+  screen, `opacity`): laid over what is behind by its alpha, after everything solid, farthest first,
+  hidden by what is in front, no shadow (scenes 7). Left: a faint shadow by alpha (the sun's map
+  holds one depth, no opacity), the emitting pixels' light in plain lighting() (a lamp() does it),
+  several lamps for one sprite's separate glowing parts, the mark through free `angle` rotations.
+- [ ] **Auras, smoke shapes, dissolve patterns**: `effect("aura")` grows the silhouette into a glow
+  of 2-3 tones, flickering, marked as light, hugging every pose of an anim; `smoke()` draws a column
+  on a path, a puff, a bank or a ring of lit billows in three opacities (dithered in the palette over
+  what is drawn); the dissolve's `pattern` (sweeps, radial, scatter, scan, a painted mask) on sprites
+  and on mesh faces. A variant of an anim timed by its frame()s now keeps their pace (it took 8 fps).
+

@@ -270,6 +270,19 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   (`examples/hd2d/graveyard.px.js`). A box drawn in meters at the HD picture's own pixel (a fence)
   reads as a 3D render among the sprites: give its materials `block: 4`, faces in blocks of a
   sprite's pixel, a tone each, the outline only on the shaded side.
+- Light, holes and see-through things in a diorama (`mesh()`). What gives light is a sprite with
+  `effect("emit")` on it (a lantern's glass, a crystal, embers): its pixels are drawn as they are,
+  whatever the sun, a lamp at their middle lights what is round it (`light: { r, strength }` on the
+  sprite: 3 m, 1 by default; a crystal a hand high needed strength 5 to show on dark grass, its light
+  coming in low), and `post()`'s bloom takes it however dark the scene. Something dissolving (a
+  figure teleported, a wall crumbling under a spell) is cut, not faded: a sprite with the dissolve
+  effect, a face with `dissolve` on its material: its holes show what is behind and let the sun
+  through, its shadow has them too. Smoke, an aura, energy: `blend` on the sprite, `"alpha"` laid
+  over what is behind by its alpha (lit like the rest), `"add"` or `"screen"` for light; drawn after
+  everything solid, the farthest first, hidden by what stands in front of it, hiding nothing. The
+  policy: a blended sprite throws no shadow, sun or contact (smoke and light don't; what should is
+  drawn solid), and doesn't light anything unless it has `emit` on it. Draw smoke in 2-3 alpha levels
+  in clusters, as its tones would be (50%, 70%, 85%), not as a smooth fade.
 - Matching a reference's camera (the harbor, after an Octopath Traveler II screenshot): measure it.
   The tilt from foreshortening: a floor's plank width across against along (the sine of the pitch), a
   crate's top against its front (the tangent), a deck's depth against its length; three readings gave
@@ -504,6 +517,13 @@ happens after another, never all at once.
   another hue (a yellow crescent, then a magenta one), then a 1-frame sliver; a wedge, a crescent, a
   line along the edge, ghost copies. A dashing body leaves a dark trail back to where it was; a ball
   crossing in one frame is a capsule spanning the gap (`stamp`'s `smear`; a blade's, `arc()`).
+- **Smoke** (`smoke()`, `PXL help smoke`): billows in clusters lit on top and shaded beneath, three
+  opacities, never a smooth fade; a column of 16-18 billows growing from 4 to 10 px in radius (12
+  smaller ones read as beads on a string, not a column); a puff of 12 bursting 14 px; a bank of 7-8
+  churning, thin at the ends; a ring of 14 spreading flat on the ground. On a dark ground give the
+  shaded key a mid grey: a dark one reads as a gap and the puff splits in two bands.
+- **Auras** (`effect("aura")`): 3-4 px round a 26 px figure in three keys, the lightest next to it,
+  flicker 0.6 on cells of 3.5 px (at 2 px the edge turned to speckle).
 - **Shader effects** (`effect()`, `PXL help effect`): a teleport or a death as a dissolve over 1 s
   (12 frames), holes in blobs about a quarter of the figure wide and 2 rings, the first white-yellow;
   a hit's poison or frost as a `tint` of 0.3-0.5 then `dither` back to the palette; a ghost or heat

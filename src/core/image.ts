@@ -42,6 +42,12 @@ export class Img {
    */
   norm?: Int8Array;
   /**
+   * Per-pixel light it gives, 0 none to 255 (effect("emit")): mesh() draws those pixels as they are
+   * and lights what is near them, lighting() leaves them as they are, post()'s bloom takes them.
+   * Travels with the pixels as the normals do.
+   */
+  emit?: Uint8Array;
+  /**
    * Per-pixel distance from the camera along its axis, in m, where mesh() drew (Infinity elsewhere):
    * what post() blurs and hazes by. Only the image mesh() drew into has it; it doesn't travel.
    */
@@ -90,6 +96,7 @@ export class Img {
     const o = new Img(this.w, this.h, this.data.slice());
     if (this.lamps) o.lamps = this.lamps.map((l) => ({ ...l }));
     if (this.norm) o.norm = this.norm.slice();
+    if (this.emit) o.emit = this.emit.slice();
     if (this.pivot) o.pivot = [...this.pivot];
     if (this.sockets) o.sockets = mapPoints(this.sockets, (x, y) => [x, y]);
     if (this.slice) o.slice = [...this.slice];
@@ -161,8 +168,8 @@ export class Img {
   blit(src: Img, dx: number, dy: number): void {
     dx = Math.floor(dx);
     dy = Math.floor(dy);
-    if (!src.norm && !this.norm) {
-      // (no normals either side: just the overlap, row by row)
+    if (!src.norm && !this.norm && !src.emit && !this.emit) {
+      // (no normals or light either side: just the overlap, row by row)
       const xa = Math.max(0, -dx), xb = Math.min(src.w, this.w - dx), s = src.data, d = this.data;
       for (let y = Math.max(0, -dy); y < Math.min(src.h, this.h - dy); y++) {
         const so = y * src.w, to = (dy + y) * this.w + dx;
@@ -182,6 +189,8 @@ export class Img {
         // Normals come along; flat art drawn over a bumped surface clears it.
         if (src.norm) Img.moveNorm(src.norm, y * src.w + x, this.normals(), i);
         else if (this.norm) this.norm[i * 3 + 2] = 0;
+        // what it draws over gives no light unless it does
+        if (src.emit || this.emit) (this.emit ??= new Uint8Array(this.w * this.h))[i] = src.emit ? src.emit[y * src.w + x] : 0;
       }
     }
   }
@@ -194,6 +203,7 @@ export class Img {
         const j = (fy ? this.h - 1 - y : y) * this.w + (fx ? this.w - 1 - x : x);
         o.data[y * this.w + x] = this.data[j];
         if (this.norm) Img.moveNorm(this.norm, j, o.normals(), y * this.w + x, fx ? -1 : 1, fy ? -1 : 1);
+        if (this.emit) (o.emit ??= new Uint8Array(this.w * this.h))[y * this.w + x] = this.emit[j];
       }
     this.movePivot(o, (x, y) => [fx ? this.w - x : x, fy ? this.h - y : y]);
     if (this.slice) { const [l, t, r, b] = this.slice; o.slice = [fx ? r : l, fy ? b : t, fx ? l : r, fy ? t : b]; }
@@ -213,6 +223,7 @@ export class Img {
         const [tx, ty] = d === 90 ? [this.h - 1 - y, x] : [y, this.w - 1 - x];
         o.set(tx, ty, c);
         if (this.norm) Img.moveNorm(this.norm, y * this.w + x, o.normals(), ty * o.w + tx, 1, 1, d);
+        if (this.emit) (o.emit ??= new Uint8Array(o.w * o.h))[ty * o.w + tx] = this.emit[y * this.w + x];
       }
     this.movePivot(o, (x, y) => (d === 90 ? [this.h - y, x] : [y, this.w - x]));
     if (this.slice) { const [l, t, r, b] = this.slice; o.slice = d === 90 ? [b, l, t, r] : [t, r, b, l]; }
@@ -227,12 +238,14 @@ export class Img {
         for (let x = 0; x < Math.floor(this.w / 2); x++) {
           this.set(this.w - 1 - x, y, this.get(x, y));
           if (n) Img.moveNorm(n, y * this.w + x, n, y * this.w + this.w - 1 - x, -1, 1);
+          if (this.emit) this.emit[y * this.w + this.w - 1 - x] = this.emit[y * this.w + x];
         }
     } else {
       for (let y = 0; y < Math.floor(this.h / 2); y++)
         for (let x = 0; x < this.w; x++) {
           this.set(x, this.h - 1 - y, this.get(x, y));
           if (n) Img.moveNorm(n, y * this.w + x, n, (this.h - 1 - y) * this.w + x, 1, -1);
+          if (this.emit) this.emit[(this.h - 1 - y) * this.w + x] = this.emit[y * this.w + x];
         }
     }
     if (this.lamps) {
@@ -268,6 +281,7 @@ export class Img {
       for (let xx = 0; xx < w; xx++) {
         o.data[yy * w + xx] = this.get(x + xx, y + yy);
         if (this.norm && this.inside(x + xx, y + yy)) Img.moveNorm(this.norm, (y + yy) * this.w + x + xx, o.normals(), yy * w + xx);
+        if (this.emit && this.inside(x + xx, y + yy)) (o.emit ??= new Uint8Array(w * h))[yy * w + xx] = this.emit[(y + yy) * this.w + x + xx];
       }
     this.movePivot(o, (px, py) => [px - x, py - y]);
     return this.moveLamps(o, (lx, ly) => [lx - x, ly - y]);

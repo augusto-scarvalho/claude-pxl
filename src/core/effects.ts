@@ -27,6 +27,8 @@ export interface FxCtx {
   oy: number;
   pal: Palette;
   wrap?: { x: boolean; y: boolean };
+  /** Another asset's picture (a dissolve's mask). */
+  asset?: (name: string) => Img;
 }
 
 type Params = Record<string, any>;
@@ -76,7 +78,7 @@ function even(n: number): number {
   return CDF[k] + (CDF[k + 1] - CDF[k]) * (f - k);
 }
 /** An even noise field in [0, 1) for a seed, one unit a cell. It keeps its last answer: the pixels of a block along a row ask for the same point. */
-function noise(seed: number): (u: number, v: number) => number {
+export function noise(seed: number): (u: number, v: number) => number {
   const su = (hash(seed, 1, 7) % 4096) + 0.5, sv = (hash(seed, 2, 7) % 4096) + 0.5;
   let lu = NaN, lv = NaN, last = 0;
   return (u, v) => (u === lu && v === lv ? last : ((lu = u), (lv = v), (last = even(fbm(u + su, v + sv, OCTAVES)))));
@@ -95,12 +97,14 @@ function at(img: Img, x: number, y: number, wrap?: { x: boolean; y: boolean }): 
  */
 function moved(src: Img, from: (px: number, py: number, i: number) => number): Img {
   const out = new Img(src.w, src.h), n = src.norm, on = n ? (out.norm = new Int8Array(n.length)) : undefined;
+  const e = src.emit, oe = e ? (out.emit = new Uint8Array(e.length)) : undefined;
   for (let py = 0, i = 0; py < src.h; py++)
     for (let px = 0; px < src.w; px++, i++) {
       const j = from(px, py, i);
       if (j < 0) continue;
       out.data[i] = src.data[j];
       if (on) { on[3 * i] = n![3 * j]; on[3 * i + 1] = n![3 * j + 1]; on[3 * i + 2] = n![3 * j + 2]; }
+      if (oe) oe[i] = e![j];
     }
   return out;
 }
@@ -113,26 +117,79 @@ function each(img: Img, x: FxCtx, K: number, fn: (i: number, ax: number, ay: num
   }
 }
 
+/** The orders a dissolve can eat a drawing (or a face) in. */
+export const PATTERNS = ["noise", "top", "bottom", "left", "right", "out", "in", "scatter", "scan", "mask"];
+/** Rows of a scan in the order they go: every fourth from the top, then the ones two below, then the rest. */
+export const SCAN = [0, 2, 1, 3];
+
+/**
+ * When each pixel of the drawing goes (0 first, below 1), in art pixels (ax, ay) or at image pixel
+ * (px, py) for a mask: by the dissolve's pattern, over the box of what is drawn.
+ */
+function holeOrder(src: Img, p: Params, x: FxCtx): (ax: number, ay: number, px: number, py: number) => number {
+  const n = noise(x.seed), K: number = p.pixel, b = src.bounds() ?? { x: 0, y: 0, w: src.w, h: src.h };
+  const x0 = Math.floor((b.x - x.ox) / K), x1 = Math.floor((b.x + b.w - 1 - x.ox) / K) + 1, y0 = Math.floor((b.y - x.oy) / K), y1 = Math.floor((b.y + b.h - 1 - x.oy) / K) + 1;
+  const r: number = p.ragged, rag = (pos: number, ax: number, ay: number) => Math.min(0.9999, Math.max(0, pos * (1 - r) + (r ? r * n(ax / p.scale, ay / p.scale) : 0)));
+  const [cx, cy] = p.at ?? [(x0 + x1) / 2, (y0 + y1) / 2], far = Math.max(...[[x0, y0], [x1, y0], [x0, y1], [x1, y1]].map(([a, c]) => Math.hypot(a - cx, c - cy)), 1e-6);
+  switch (p.pattern as string) {
+    case "top": return (ax, ay) => rag((ay - y0 + 0.5) / (y1 - y0), ax, ay);
+    case "bottom": return (ax, ay) => rag((y1 - ay - 0.5) / (y1 - y0), ax, ay);
+    case "left": return (ax, ay) => rag((ax - x0 + 0.5) / (x1 - x0), ax, ay);
+    case "right": return (ax, ay) => rag((x1 - ax - 0.5) / (x1 - x0), ax, ay);
+    case "out": return (ax, ay) => rag(Math.hypot(ax + 0.5 - cx, ay + 0.5 - cy) / far, ax, ay);
+    case "in": return (ax, ay) => rag(1 - Math.hypot(ax + 0.5 - cx, ay + 0.5 - cy) / far, ax, ay);
+    case "scatter": return (ax, ay) => hash(ax, ay, x.seed) / 4294967296;
+    case "scan": return (ax, ay) => (SCAN[((ay % 4) + 4) % 4] + Math.min(0.9999, Math.max(0, (ay - y0 + 0.5) / (y1 - y0)))) / 4;
+    case "mask": {
+      if (!p.mask || !x.asset) throw new PxError('effect "dissolve": pattern "mask" needs mask: the name of an asset of the same size, its dark pixels going first');
+      const m = x.asset(p.mask);
+      // (its lightness, the clear last)
+      return (_ax, _ay, px, py) => { const c = m.get(px, py); return c === TRANSPARENT ? 0.9999 : Math.min(0.9999, (0.2126 * (c >>> 24) + 0.7152 * ((c >>> 16) & 255) + 0.0722 * ((c >>> 8) & 255)) / 255); };
+    }
+    default: return (ax, ay) => n(ax / p.scale, ay / p.scale);
+  }
+}
+
 /** The clock as a turn, 0 up to just below 1. */
 const turn = (x: FxCtx) => (x.frames > 1 ? x.frame / x.frames : 0);
 
 export const EFFECTS: Record<string, Effect> = {
   /**
-   * Noise over the drawing; pixels under the threshold go clear. `progress` is the share gone (the
-   * noise is made even, so 0.5 takes half): 0 keeps everything, 1 takes everything. `edge` keys draw
-   * rings round the holes, a pixel each, the first touching the hole (the hottest): a burning rim.
+   * Holes eat the drawing in an order, `progress` the share gone: 0 keeps everything, 1 takes
+   * everything. `pattern`: "noise" (blobs `scale` px, made even so 0.5 takes half), a sweep from the
+   * "top", "bottom", "left" or "right", "out" from a point (`at`, default the middle) or "in" toward
+   * it, each with a `ragged` edge (noise mixed in); "scatter" (pixel by pixel, a block by `pixel`);
+   * "scan" (every fourth row going top to bottom, then the rows between: a teleport); "mask" (an
+   * asset of the same size, its dark pixels first). `edge` keys draw rings round the holes, a pixel
+   * each, the first touching the hole (the hottest): a burning rim; scattered and scanned holes have
+   * no rim to ring, so there the pixels next to go glow first.
    */
   dissolve: {
-    params: { progress: num(0.5, 0, 1), scale: num(6, 0.5), edge: colors, pixel: PIXEL },
+    params: {
+      progress: num(0.5, 0, 1), scale: num(6, 0.5), edge: colors, pixel: PIXEL, pattern: oneOf(...PATTERNS), ragged: num(0.25, 0, 1),
+      at: (v, what) => { if (v !== undefined && !(Array.isArray(v) && v.length === 2 && v.every(Number.isFinite))) throw new PxError(`${what} is [x, y] in the drawing, got ${JSON.stringify(v)}`); return v; },
+      mask: (v, what) => { if (v !== undefined && typeof v !== "string") throw new PxError(`${what} is an asset's name, got ${JSON.stringify(v)}`); return v; },
+    },
     run(src, p, x) {
       const out = new Img(src.w, src.h, src.data.slice()), K: number = p.pixel, W = src.w, H = src.h;
       if (p.progress <= 0) return out;
       if (p.progress >= 1) return new Img(W, H);
-      const n = noise(x.seed), keys: Color[] = p.edge;
+      const order = holeOrder(src, p, x), keys: Color[] = p.edge;
+      if (p.pattern === "scatter" || p.pattern === "scan") {
+        // scattered holes have no rim to ring: the pixels next to go glow first, a band of the order a key
+        const w = 0.06 * keys.length, thr = -w + p.progress * (1 + w);
+        each(src, x, K, (i, ax, ay, px, py) => {
+          if (src.data[i] === TRANSPARENT) return;
+          const v = order(ax, ay, px, py);
+          if (v < thr) out.data[i] = TRANSPARENT;
+          else if (v < thr + w) out.data[i] = keys[Math.min(keys.length - 1, Math.floor((v - thr) / 0.06))];
+        });
+        return out;
+      }
       // ring: 0 a hole, k the k-th ring round one, 255 neither (yet)
       const ring = new Uint8Array(W * H).fill(255);
-      each(src, x, K, (i, ax, ay) => {
-        if (src.data[i] !== TRANSPARENT && n(ax / p.scale, ay / p.scale) < p.progress) { ring[i] = 0; out.data[i] = TRANSPARENT; }
+      each(src, x, K, (i, ax, ay, px, py) => {
+        if (src.data[i] !== TRANSPARENT && order(ax, ay, px, py) < p.progress) { ring[i] = 0; out.data[i] = TRANSPARENT; }
       });
       for (let k = 1; k <= keys.length; k++)
         for (let py = 0; py < H; py++)
@@ -294,6 +351,41 @@ export const EFFECTS: Record<string, Effect> = {
     },
   },
   /**
+   * A glow hugging the drawing: its silhouette grown `width` px round it, in bands of the `color`
+   * keys (the first next to it), each band clearer than the one inside it by `fade` (2-3 tones fading
+   * out, not a smooth gradient). `pulse` breathes the width over the loop; `flicker` licks its edge
+   * with noise `scale` px a cell, going round `speed` cells a loop. Only the glow is left (`keep`: the
+   * drawing too), marked as giving light: made from an anim (`base`), it hugs every pose; in mesh()
+   * as a sprite with `blend: "add"` over the figure.
+   */
+  aura: {
+    params: { width: num(3, 1, 32), color: (v, what, pal) => { const c = colors(v, what, pal) as Color[]; if (!c.length) throw new PxError(`${what}: give its keys, the one next to the drawing first ("cC")`); return c; },
+      fade: num(0.6, 0, 1), pulse: num(0, 0, 1), flicker: num(0, 0, 1), scale: num(3, 0.5), speed: num(1, 0), keep: (v, what) => { if (v !== undefined && typeof v !== "boolean") throw new PxError(`${what} is true or false`); return !!v; }, pixel: PIXEL },
+    run(src, p, x) {
+      const K: number = p.pixel, W = src.w, H = src.h, keys: Color[] = p.color, nb = keys.length, out = new Img(W, H), glow = (out.emit = new Uint8Array(W * H));
+      const a = 2 * Math.PI * turn(x), wid = p.width * (1 - p.pulse * (0.5 - 0.5 * Math.cos(a))), reach = Math.ceil(wid * (1 + p.flicker)) * K;
+      const n = noise(x.seed), r = p.speed / (2 * Math.PI), u0 = r * Math.cos(a), v0 = r * Math.sin(a);
+      // how far (art px) each clear pixel is from the drawing, within reach
+      for (let py = 0; py < H; py++)
+        for (let px = 0; px < W; px++) {
+          const i = py * W + px;
+          if (src.data[i] !== TRANSPARENT) { if (p.keep) out.data[i] = src.data[i]; continue; }
+          let best = Infinity;
+          for (let y = Math.max(0, py - reach); y <= Math.min(H - 1, py + reach); y++)
+            for (let xx = Math.max(0, px - reach); xx <= Math.min(W - 1, px + reach); xx++)
+              if (src.data[y * W + xx] !== TRANSPARENT) best = Math.min(best, Math.hypot(Math.floor(xx / K) - Math.floor(px / K), Math.floor(y / K) - Math.floor(py / K)));
+          if (best === Infinity) continue;
+          const ax = Math.floor((px - x.ox) / K), ay = Math.floor((py - x.oy) / K);
+          const d = best + (p.flicker ? p.flicker * wid * (2 * n(ax / p.scale + u0, ay / p.scale + v0) - 1) : 0);
+          if (d > wid || d <= 0) continue;
+          const k = Math.min(nb - 1, Math.floor(((d - 1) / Math.max(1, wid)) * nb)), al = Math.round(255 * (1 - (p.fade * Math.max(0, k)) / nb));
+          out.data[i] = ((keys[Math.max(0, k)] & ~255) | al) >>> 0;
+          glow[i] = al;
+        }
+      return out;
+    },
+  },
+  /**
    * Emission: the pixels (`on` keys, `where`) give light: `strength` of `color` (default their own)
    * added in linear light, what goes past white spilling into the other channels (a hot core turns
    * white). `pulse` takes that much of it away and back over the loop.
@@ -303,10 +395,12 @@ export const EFFECTS: Record<string, Effect> = {
     run(src, p, x) {
       const k = p.strength * (1 - p.pulse * (0.5 - 0.5 * Math.cos(2 * Math.PI * turn(x)))), out = new Img(src.w, src.h, src.data.slice());
       if (!k) return out;
-      const e = p.color as Color | undefined, memo = new Map<Color, Color>();
+      // the pixels marked as giving light, as strong as they shine (mesh() lights what is near them)
+      const e = p.color as Color | undefined, memo = new Map<Color, Color>(), glow = (out.emit = new Uint8Array(out.data.length)), g = Math.min(255, Math.round(k * 255));
       for (let i = 0; i < out.data.length; i++) {
         const c = out.data[i];
         if (c === TRANSPARENT) continue;
+        glow[i] = g;
         let o = memo.get(c);
         if (o === undefined) {
           const r = LIN[c >>> 24], g = LIN[(c >>> 16) & 255], b = LIN[(c >>> 8) & 255], E = e ?? c;

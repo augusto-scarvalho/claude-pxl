@@ -197,3 +197,84 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, F.faces, { f: { tex: "_white" } },
   assert.ok(changed.some((i) => Math.floor(i / 40) > 21), "floor pixels in front of its foot changed: the shadow moved");
   assert.ok(same(load(src(125)).frames("a")[0].img, f[1].img), "delayed a frame: its first frame is the other's second");
 });
+
+test("emit marks the pixels that give light, and the mark travels with them: stamps, flips, outlines, distort; lighting() leaves them lit", () => {
+  const src = `sprite("s", { w: 16, h: 12 }, ${BODY}, effect("emit", { on: "r", strength: 1 }))
+sprite("o", { base: "s", outline: "k" })
+anim("d", { base: "s", frames: 2 }, effect("distort", { amount: 2, scale: 2 }))
+scene("sc", { w: 40, h: 20 }, stamp("s", 2, 3), stamp("s", 20, 3, { flip: "x" }))
+scene("dark", { w: 16, h: 12, bg: "g" }, stamp("s", 0, 0), lighting({ ambient: 0.2 }))`;
+  const p = load(src), s = p.image("s"), e = (img: Img, x: number, y: number) => img.emit?.[y * img.w + x] ?? 0;
+  assert.equal(e(s, 4, 3), 255, "the red pixel gives light");
+  assert.equal(e(s, 2, 1), 0, "the green one doesn't");
+  const sc = p.image("sc");
+  assert.equal(e(sc, 2 + 4, 3 + 3), 255, "stamped");
+  assert.equal(e(sc, 20 + 15 - 4, 3 + 3), 255, "flipped");
+  assert.equal(e(sc, 2 + 2, 3 + 1), 0);
+  assert.equal(e(p.image("o"), 5, 4), 255, "outlined: a px over and down");
+  const d = p.frames("d")[0].img;
+  assert.ok([...d.data.keys()].every((i) => (d.emit![i] === 255) === (d.data[i] === s.get(4, 3))), "distorted: the mark went with the red pixels");
+  const dark = p.image("dark");
+  assert.equal(dark.get(4, 3), s.get(4, 3), "lighting(): what gives light as it is");
+  assert.notEqual(dark.get(2, 1), s.get(2, 1), "the rest in the dark");
+});
+
+test("aura: the silhouette grown width px in bands of its keys, clearer outward, marked as light; flicker moves it on the clock", () => {
+  const src = (o: string) => load(`sprite("b", { w: 9, h: 9 }, rect(3, 3, 3, 3, "r"))
+anim("a", { base: "b", frames: 4 }, effect("aura", { width: 2, color: "ywg", ${o} }))`);
+  const a = src("").frames("a")[0].img, Y = 0xffec27, W = 0xfff1e8;
+  assert.equal(a.get(4, 4), 0, "the drawing itself left out");
+  assert.equal(a.get(2, 4), ((Y << 8) | 255) >>> 0, "next to it, the first key, whole");
+  assert.equal(a.get(1, 4), ((W << 8) | Math.round(255 * (1 - 0.6 / 3))) >>> 0, "a px out, the second, clearer");
+  assert.equal(a.get(0, 4), 0, "past the width, nothing");
+  assert.equal(a.emit![1 * 9 + 4], a.get(4, 1) & 255, "marked as giving light, as strong as it shows");
+  assert.equal(src("keep: true").frames("a")[0].img.get(4, 4) >>> 8, 0xff004d, "keep: the drawing too");
+  assert.ok(src("").frames("a").every((f) => same(f.img, a)), "no flicker: still");
+  const fl = src("flicker: 0.8, scale: 1").frames("a");
+  assert.ok(fl.some((f) => !same(f.img, fl[0].img)), "flicker: it moves");
+  // a variant of an anim timed by its frame()s keeps their pace (it took 8 fps, 125 ms, before)
+  const v = load(`anim("w", { w: 2, h: 2 }, rect(0, 0, 1, 1, "r"), ...[0, 1, 2, 3].map(() => frame({ ms: 110 })))
+anim("wa", { base: "w" }, effect("aura", { width: 1, color: "y" }))`);
+  assert.deepEqual(v.timeline("wa")!.durations, [110, 110, 110, 110]);
+});
+
+test("dissolve patterns: sweeps, radial, scatter, scan and a painted mask eat the drawing in their order", () => {
+  const full = (fx: string, extra = "") => load(`${extra}sprite("s", { w: 16, h: 16 }, rect(0, 0, 16, 16, "g"), ${fx})`).image("s");
+  const gone = (img: Img, x: number, y: number) => img.get(x, y) === 0;
+  for (const pt of ["noise", "top", "bottom", "left", "right", "out", "in", "scatter", "scan"])
+    assert.ok(same(full(`effect("dissolve", { pattern: "${pt}", progress: 0, edge: "y" })`), full("rect(0, 0, 1, 1, \"g\")")), `${pt}: progress 0`);
+  const sweep = (pt: string) => full(`effect("dissolve", { pattern: "${pt}", progress: 0.5, ragged: 0 })`);
+  assert.ok(gone(sweep("top"), 5, 7) && !gone(sweep("top"), 5, 8), "top: the upper half");
+  assert.ok(gone(sweep("bottom"), 5, 8) && !gone(sweep("bottom"), 5, 7), "bottom: the lower half");
+  assert.ok(gone(sweep("left"), 7, 5) && !gone(sweep("left"), 8, 5), "left");
+  assert.ok(gone(sweep("right"), 8, 5) && !gone(sweep("right"), 7, 5), "right");
+  const out = full('effect("dissolve", { pattern: "out", progress: 0.3, ragged: 0 })'), inn = full('effect("dissolve", { pattern: "in", progress: 0.3, ragged: 0 })');
+  assert.ok(gone(out, 8, 8) && !gone(out, 0, 0) && gone(inn, 0, 0) && !gone(inn, 8, 8), "out from the middle, in from the corners");
+  const scan = full('effect("dissolve", { pattern: "scan", progress: 0.25 })');
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7].map((y) => gone(scan, 3, y)), [true, false, false, false, true, false, false, false], "scan: every fourth row first");
+  const sc = full('effect("dissolve", { pattern: "scatter", progress: 0.5, edge: "y" })'), share = sc.data.filter((c) => c === 0).length / 256;
+  assert.ok(share > 0.35 && share < 0.6, `scatter: about half, got ${share}`);
+  const mask = full('effect("dissolve", { pattern: "mask", mask: "m", progress: 0.5 })', 'sprite("m", { w: 16, h: 16 }, rect(0, 0, 8, 16, "k"), rect(8, 0, 8, 16, "w"))\n');
+  assert.ok(gone(mask, 3, 3) && !gone(mask, 12, 3), "mask: its dark first");
+  assert.match(failure(PALS + 'sprite("s", { w: 4, h: 4 }, rect(0, 0, 4, 4, "g"), effect("dissolve", { pattern: "mask" }))', "s").message, /needs mask/);
+});
+
+test("smoke: a column, a puff, a bank and a ring in clustered tones and three opacities, lit on top; dithered in the palette over what is drawn", () => {
+  const sm = (o: string, under = "") => load(`anim("a", { w: 64, h: 64, frames: 8 }, ${under}smoke(32, 56, "wgk", { ${o} }))`).frames("a");
+  const levels = new Set([0, 102, 158, 217]);
+  for (const shape of ["column", "puff", "bank", "ring"]) {
+    const f = sm(`shape: "${shape}", seed: 3`);
+    assert.ok(f.some((g) => g.img.data.some((c) => c !== 0)), `${shape} draws`);
+    assert.ok(f.every((g) => g.img.data.every((c) => levels.has(c & 255))), `${shape}: its opacities only`);
+    assert.ok(same(f[2].img, sm(`shape: "${shape}", seed: 3`)[2].img), `${shape}: the same frame, the same`);
+  }
+  const col = sm('shape: "column", count: 20').map((g) => g.img);
+  assert.ok(!same(col[0], col[3]), "it moves");
+  // lit from the upper left: the lit key above the shaded one
+  const at = (img: Img, k: number) => { const ys: number[] = []; img.data.forEach((c, i) => { if (c !== 0 && c >>> 8 === k) ys.push(Math.floor(i / 64)); }); return ys.reduce((a, b) => a + b, 0) / Math.max(1, ys.length); };
+  const puff = sm('shape: "puff", size: [8, 10], spread: 4')[1].img;
+  assert.ok(at(puff, 0xfff1e8) < at(puff, 0x000000), "lit on top, shaded beneath");
+  const over = sm('shape: "column"', 'rect(0, 0, 64, 64, "r"), ')[4].img;
+  assert.ok(over.data.every((c) => [0xfff1e8ff, 0x00e436ff, 0x000000ff, 0xff004dff].includes(c)), "over a ground: its keys or the ground, no opacity");
+  assert.match(failure(PALS + 'sprite("s", { w: 4, h: 4 }, smoke(2, 2, "wgk", { shape: "cone" }))', "s").message, /shape is "column", "puff", "bank" or "ring"/);
+});

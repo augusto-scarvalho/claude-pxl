@@ -220,7 +220,10 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     }
     const lo = (args[0] ?? {}) as LightingOpts;
     const none = () => new Uint8Array(base.data.length);
-    const lit = applyLighting(base, { solid: solid ?? none(), wall: wall ?? none(), unlit }, base.lamps ?? [], lo, pal);
+    // what gives light (effect("emit")) is drawn as it is, as an unlit layer is
+    let un = unlit;
+    if (base.emit) { un = un ? un.slice() : none(); for (let i = 0; i < un.length; i++) if (base.emit[i]) un[i] = 1; }
+    const lit = applyLighting(base, { solid: solid ?? none(), wall: wall ?? none(), unlit: un }, base.lamps ?? [], lo, pal);
     if (base.norm) trace?.record("normal map", loc, normalImage(base));
     trace?.record("light map", loc, lit.map);
     const before = preLight ? keyed() : base.data.slice();
@@ -348,6 +351,7 @@ function register(base: Img, refs: Img[], spec: string | { key: string; x?: numb
     moved.blit(img, dx, 0);
     img.data.set(moved.data);
     if (moved.norm) img.norm = moved.norm;
+    if (moved.emit) img.emit = moved.emit;
   }
   if (base.lamps) for (const l of base.lamps) l.x += dx;
 }
@@ -624,6 +628,7 @@ export function blend(img: Img, limg: Img, l: LayerOpts, pal: Palette, warn?: (m
       img.data[i] = c;
       if (limg.norm) img.normals().set(limg.norm.subarray(i * 3, i * 3 + 3), i * 3);
       else if (img.norm) img.norm[i * 3 + 2] = 0;
+      if (limg.emit || img.emit) (img.emit ??= new Uint8Array(img.data.length))[i] = limg.emit ? limg.emit[i] : 0;
     }
     return;
   }

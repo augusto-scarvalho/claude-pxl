@@ -184,9 +184,15 @@ declare global {
   /** A flat face of a model, its corners in meters. */
   interface PxFace { mat: string; pts: PxV3[] }
   /** How a material is drawn by mesh(): its tones dark to light, the outline, the lit top edge, no creases on a round surface, a lift to its light, a dither between tones, a texture stepping the tone per pixel; or `tex`, an asset tiling its faces, `texel` m to its pixel (default 1/16), from the world's origin or each face's (`anchor`); `block` px to one of its pixels (its faces in blocks, pixel art among HD faces). */
-  interface PxMaterial { ramp?: string | PxColor[]; edge?: PxColor; top?: PxColor; smooth?: boolean; bias?: number; dither?: number; texture?: (x: number, y: number) => number; tex?: string; texel?: number | [number, number]; anchor?: "world" | "face"; block?: number }
+  interface PxMaterial { ramp?: string | PxColor[]; edge?: PxColor; top?: PxColor; smooth?: boolean; bias?: number; dither?: number; texture?: (x: number, y: number) => number; tex?: string; texel?: number | [number, number]; anchor?: "world" | "face"; block?: number;
+    /** holes eating its faces (and its shadow): progress 0..1, blobs scale m wide, a burning edge key */
+    dissolve?: { progress: number; scale?: number; seed?: number; edge?: PxColor; width?: number; pattern?: PxDissolve["pattern"]; ragged?: number; at?: PxV3; mask?: string } }
   /** A sprite standing among mesh()'s faces: its feet at [x, z] or [x, z, up] m, the contact shadow's radius in m (0: none). */
-  interface PxMeshSprite { name: string; at: [number, number] | PxV3; flip?: "x"; frame?: number; delay?: number; rdelay?: boolean; seed?: number; reseed?: boolean | number; shadow?: number }
+  interface PxMeshSprite { name: string; at: [number, number] | PxV3; flip?: "x"; frame?: number; delay?: number; rdelay?: boolean; seed?: number; reseed?: boolean | number; shadow?: number;
+    /** laid over what is behind by its alpha (smoke: "alpha"; light: "add", "screen"), no shadow */
+    blend?: "alpha" | "add" | "screen"; opacity?: number;
+    /** the light its effect("emit") pixels give round them: r m, strength; false for none */
+    light?: false | { r?: number; strength?: number } }
   /** mesh()'s light: the way toward it in the points' frame, or a face's light (0 dark, 1 lit) from its normal toward the eye, its middle, the face; sprites standing among the faces (a perspective view). */
   interface PxMeshOpts {
     light?: PxV3 | ((normal: PxV3, middle: PxV3, face: PxFace) => number); sprites?: PxMeshSprite[]; /** px to a sprite's pixel (an HD picture: 4) */ pixel?: number;
@@ -263,7 +269,20 @@ declare global {
   /** Options every effect takes: the pixels it writes (a region, keys) and its seed. */
   interface PxEffectBase { where?: PxRegion; on?: string; seed?: number }
   /** dissolve: noise holes over `progress` (0..1) of the drawing, `scale` px a blob, rings of `edge` keys round them (the first at the hole). */
-  interface PxDissolve extends PxEffectBase { progress?: number; scale?: number; edge?: string | string[]; pixel?: number }
+  interface PxDissolve extends PxEffectBase {
+    progress?: number; scale?: number; edge?: string | string[]; pixel?: number;
+    /** the order holes come in: noise blobs, a sweep from a side, out from a point or in to it, scattered, scanlines, a painted mask's dark first */
+    pattern?: "noise" | "top" | "bottom" | "left" | "right" | "out" | "in" | "scatter" | "scan" | "mask";
+    ragged?: number; at?: [number, number]; mask?: string;
+  }
+  /** aura: the silhouette grown width px in bands of the color keys (inner first), clearer outward by fade; pulse, a flickering edge; only the glow unless keep. */
+  interface PxAura extends PxEffectBase { width?: number; color: string | string[]; fade?: number; pulse?: number; flicker?: number; scale?: number; speed?: number; keep?: boolean; pixel?: number }
+  /** smoke(): a column, a puff, a bank or a ring of billows at this moment of the loop, lit on top, in three opacities. */
+  interface PxSmoke {
+    shape?: "column" | "puff" | "bank" | "ring"; count?: number; size?: [number, number]; vary?: number; rise?: number; path?: number[];
+    wind?: number | [number, number]; spread?: number; length?: number; flat?: number; turbulence?: number; rough?: number; thin?: number;
+    life?: number; alpha?: [number, number, number]; light?: [number, number]; pixel?: number; seed?: number; frame?: number;
+  }
   /** pixelate: cells of `size` px, each the color most of its pixels have. */
   interface PxPixelate extends PxEffectBase { size?: number }
   /** dither: ordered (Bayer 4x4) to `keys` (default the palette); part-clear pixels go clear or opaque. */
@@ -278,7 +297,7 @@ declare global {
   interface PxSway extends PxEffectBase { amount?: number; lean?: number; power?: number; still?: number; cycles?: number; flutter?: number; vary?: number; pixel?: number }
   type PxEffect =
     | ["dissolve", PxDissolve?] | ["pixelate", PxPixelate?] | ["dither", PxDitherFx?] | ["tint", PxTint]
-    | ["distort", PxDistort?] | ["sway", PxSway?] | ["emit", PxEmit?];
+    | ["distort", PxDistort?] | ["sway", PxSway?] | ["emit", PxEmit?] | ["aura", PxAura];
   interface PxGlow {
     where?: PxRegion; r?: number; strength?: number; color?: PxColor; bands?: number; ramp?: number;
     /** Keys the halo leaves as drawn: what the glowing thing is made of (the logs and stones under flames). */
@@ -339,6 +358,8 @@ declare global {
     clouds(opts: PxClouds): void;
     /** Smoke, steam or dust from a point, in a loop that closes. */
     plume(x: number, y: number, keys: string, opts?: PxPlume): void;
+    /** Smoke of a shape: a column on a path, a puff, a bank drifting, a ring spreading (keys lit, middle, shaded). */
+    smoke(x: number, y: number, keys: string, opts?: PxSmoke): void;
     /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly). */
     solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): void;
     /** Flat faces in meters (model()) through the camera, the nearest per pixel, toned along their material's ramp, outlined where a surface ends. */
@@ -422,6 +443,8 @@ declare global {
   function scroll(name: string, y: number, per: number, opts?: { x?: number; y?: number; frame?: number; axis?: "x" | "y" }): PxOp;
   function clouds(opts: PxClouds): PxOp;
   function plume(x: number, y: number, keys: string, opts?: PxPlume): PxOp;
+  /** Smoke of a shape: a column on a path, a puff, a bank drifting, a ring spreading (keys lit, middle, shaded). */
+  function smoke(x: number, y: number, keys: string, opts?: PxSmoke): PxOp;
   /** A function of (x, y) made to close over w (and h): for noise on strips and tiles that wrap. */
   function seamless(fn: (x: number, y: number) => number, w: number, h?: number): (x: number, y: number) => number;
   /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly); boxes' faces lit by the sun. */

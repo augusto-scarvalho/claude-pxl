@@ -132,7 +132,7 @@ const byte = (v: number) => (v <= 0 ? 0 : v >= 255 ? 255 : Math.round(v));
 
 /** `pal`: the palette the picture goes back to; `frame`: the clock's frame, for the grain. */
 export function applyPost(img: Img, o: PostOpts, fogColor: Color | null, pal?: Palette, frame = 0): void {
-  const { w, h } = img, n = w * h, D = img.depth;
+  const { w, h } = img, n = w * h, D = img.depth, E = img.emit;
   if (Array.isArray(o.soft) && !(o.soft.length === 2 && o.soft.every((v) => num(v, 1e-6, Infinity))))
     throw new PxError(`post: soft is m over which the blur grows to full, above 0, or two of them [nearer, farther], got ${JSON.stringify(o.soft)}`);
   for (const [k, lo, hi] of [["sharp", 0, Infinity], ...(Array.isArray(o.soft) ? [] : [["soft", 1e-6, Infinity] as const]), ["blur", 0, Infinity], ["vignette", 0, 1]] as const)
@@ -224,7 +224,8 @@ export function applyPost(img: Img, o: PostOpts, fogColor: Color | null, pal?: P
     const bright = [new Float32Array(n), new Float32Array(n), new Float32Array(n)];
     let any = false;
     for (let i = 0; i < n; i++) {
-      const Y = 0.2126 * R[i] + 0.7152 * G[i] + 0.0722 * B[i], t = clamp01((Y - aL) / knee), k = t * t * (3 - 2 * t);
+      // (what gives light blooms by how much it gives, however bright it is)
+      const Y = 0.2126 * R[i] + 0.7152 * G[i] + 0.0722 * B[i], t = clamp01((Y - aL) / knee), k = Math.max(t * t * (3 - 2 * t), (E?.[i] ?? 0) / 255);
       if (k) { bright[0][i] = R[i] * k; bright[1][i] = G[i] * k; bright[2][i] = B[i] * k; any = true; }
     }
     // ponytail: dense separable blurs from half size, about 0.3 s a frame at 960x540 and 0.9 s at
@@ -259,9 +260,10 @@ export function applyPost(img: Img, o: PostOpts, fogColor: Color | null, pal?: P
     for (let y = 0; y < h; y++) {
       const jy = Math.floor(y / f) * lw;
       for (let x = 0; x < w; x++) {
-        const i = y * w + x, Y = 0.2126 * R[i] + 0.7152 * G[i] + 0.0722 * B[i];
-        if (Y <= aL) continue;
-        const e = ((Y - aL) / Y) * share, j = jy + col[x];
+        const i = y * w + x, Y = 0.2126 * R[i] + 0.7152 * G[i] + 0.0722 * B[i], em = E?.[i] ?? 0;
+        if (Y <= aL && !em) continue;
+        // (what gives light blooms by how much it gives, however bright it is)
+        const e = Math.max(Y > aL ? (Y - aL) / Y : 0, em / 255) * share, j = jy + col[x];
         eR[j] += R[i] * e; eG[j] += G[i] * e; eB[j] += B[i] * e;
       }
     }

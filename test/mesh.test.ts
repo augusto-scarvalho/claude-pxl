@@ -197,3 +197,73 @@ test("post finish: a .cube LUT grades (identity changes nothing, amount mixes), 
   const two = finish('{ palette: { keys: "kw", dither: 0 } }').image("a");
   assert.ok([...two.data].every((c) => c === 0x000000ff || c === 0xfff1e8ff), "those keys, the nearest: no checker");
 });
+
+// what gives light, dissolving faces and sprites, blended sprites (phase 4 of the shader plan)
+const GLOW = `const N = model(); N.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0])
+sprite("_gem", { w: 4, h: 4, pivot: "bottom" }, rect(0, 0, 4, 4, "#30a0e0"))
+sprite("_gem_lit", { base: "_gem" }, effect("emit", { strength: 1 }))
+const night = (sprites, o = {}) => (c) => c.mesh(V, N.faces, { f: { tex: "_white" } }, { light: [-1, 0, 0.8], sun: { color: "w", strength: 0.1 }, sky: { color: "w", strength: 0.1 }, shadows: false, sprites, ...o })
+`;
+const glow = (body: string) => loadSource(PAL + STAGE + GLOW + body, "t.px.js").image("a");
+
+test("mesh emission: what gives light is drawn as it is and lights the floor round it, as a lamp; the bloom takes it", () => {
+  const lit = glow(`scene("a", { w: 40, h: 40 }, night([{ name: "_gem_lit", at: [0, 4], shadow: 0 }]))`);
+  const off = glow(`scene("a", { w: 40, h: 40 }, night([{ name: "_gem_lit", at: [0, 4], shadow: 0, light: false }]))`);
+  const plain = glow(`scene("a", { w: 40, h: 40 }, night([{ name: "_gem", at: [0, 4], shadow: 0 }]))`);
+  const gem = loadSource(PAL + STAGE + GLOW, "t.px.js").image("_gem_lit").get(1, 1);
+  assert.equal(lit.get(19, 18), gem, "its pixels as they are, in the night");
+  assert.ok((plain.get(19, 18) >>> 8 & 255) < (gem >>> 8 & 255), "a gem that gives no light is darkened");
+  assert.ok((lit.get(20, 23) >>> 8 & 255) > (off.get(20, 23) >>> 8 & 255) + 20, "the floor just in front of it lit blue");
+  assert.equal(off.get(20, 23), plain.get(20, 23), "light: false: none");
+  assert.equal(lit.get(20, 11), off.get(20, 11), "far away, nothing");
+  for (const b of ["{ above: 1, strength: 2, r: 3 }", "{ above: 1, strength: 2, levels: 4 }"]) {
+    const bloomed = glow(`scene("a", { w: 40, h: 40 }, night([{ name: "_gem_lit", at: [0, 4], shadow: 0, light: false }]), post({ bloom: ${b} }))`);
+    assert.ok((bloomed.get(23, 18) >>> 8 & 255) > (off.get(23, 18) >>> 8 & 255), `${b}: nothing is that bright, but what gives light blooms`);
+  }
+});
+
+test("mesh dissolve: a face's holes show what is behind it and let the sun through; progress 0 changes nothing", () => {
+  const wall = (d: string, sun = "") => rows(`const D = model(); D.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0]); D.box("stone", [-1.5, 3, 0], [1.5, 3.2, 1.5])
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, D.faces, { f: { tex: "_white" }, stone: { ramp: "kg"${d} } }, { sprites: [{ name: "s", at: [0, 4], shadow: 0 }]${sun} }))`);
+  assert.deepEqual(wall(", dissolve: { progress: 0 }"), wall(""), "progress 0");
+  const whole = wall(""), holed = wall(", dissolve: { progress: 0.5, scale: 0.15 }");
+  const seen = (r: string[]) => r.slice(5, 20).filter((row) => row.slice(19, 21).includes("r")).length;
+  assert.equal(seen(whole), 0, "the figure behind the wall is hidden");
+  assert.ok(seen(holed) > 0, "seen through the holes");
+  assert.ok(wall(", dissolve: { progress: 0.3, scale: 0.15, edge: \"w\", width: 0.2 }").slice(5, 23).some((row) => row.slice(8, 32).includes("w")), "the burning edge in its key");
+  // a sweep from the top: its upper half gone, the lower whole
+  const top = wall(', dissolve: { progress: 0.5, pattern: "top", ragged: 0 }');
+  assert.ok(top.slice(5, 12).every((row) => row[20] === "r") && top.slice(15, 20).every((row) => row[20] !== "r"), top.slice(3, 22).map((r) => r.slice(16, 25)).join("|"));
+  // the sun behind the wall: its shadow on the floor in front, with the same holes
+  const sun = (d: string) => loadSource(PAL + STAGE + `const D = model(); D.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0]); D.box("stone", [-1.5, 3, 0], [1.5, 3.2, 1.5])
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, D.faces, { f: { tex: "_white" }, stone: { tex: "_white"${d} } }, { light: [-0.3, 1, 0.8], sun: "w", sky: { color: "w", strength: 0.2 } }))`, "t.px.js").image("a");
+  const light = (img: { get(x: number, y: number): number }) => { let s = 0; for (let y = 25; y < 40; y++) for (let x = 0; x < 40; x++) s += img.get(x, y) >>> 24; return s; };
+  assert.ok(light(sun(", dissolve: { progress: 0.6, scale: 0.15 }")) > light(sun("")) * 1.1, "more of the floor lit through the holes in its shadow");
+});
+
+test("mesh blend: smoke laid over what is behind by its alpha, hidden by what stands in front, no shadow; a dissolving sprite's shadow has its holes", () => {
+  const SM = `sprite("_grey", { w: 1, h: 1 }, px(0, 0, "#606060"))
+sprite("_puff", { w: 6, h: 6, pivot: "bottom" }, rect(0, 0, 6, 6, "#ffffff80"))
+const P = model(); P.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0])
+const smoke = (s, wall = false) => (c) => { if (wall) P.box("f", [-1, 3, 0], [1, 3.2, 1]); c.mesh(V, P.faces, { f: { tex: "_grey" } }, { sprites: s }) }
+`;
+  const at = (s: string, x: number, y: number, wall = false) => loadSource(PAL + STAGE + SM + `scene("a", { w: 40, h: 40 }, smoke(${s}, ${wall}))`, "t.px.js").image("a").get(x, y) >>> 24;
+  const floor = at("[]", 20, 18), over = at('[{ name: "_puff", at: [0, 4], blend: "alpha" }]', 20, 18);
+  assert.ok(over > floor && over < 0xff, `between the floor and white: ${over}`);
+  assert.ok(at('[{ name: "_puff", at: [0, 4], blend: "add" }]', 20, 18) > over, "add: brighter still");
+  assert.equal(at('[{ name: "_puff", at: [0, 4], blend: "alpha", opacity: 0 }]', 20, 18), floor, "opacity 0: nothing");
+  assert.equal(at('[{ name: "_puff", at: [0, 5], blend: "alpha" }]', 20, 18, true), at("[]", 20, 18, true), "behind a wall: hidden");
+  assert.equal(at('[{ name: "_puff", at: [0, 4], blend: "alpha" }]', 20, 21), floor, "no contact shadow under it");
+  // the sun behind the slab: its shadow in front of its foot, with its holes when it dissolves
+  const slab = (fx: string) => loadSource(PAL + STAGE + `sprite("_slab", { w: 20, h: 10, pivot: "bottom" }, rect(0, 0, 20, 10, "r"))
+sprite("_slab_d", { base: "_slab" }${fx})
+const F = model(); F.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0])
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, F.faces, { f: { tex: "_white" } }, { light: [-1, 1, 0.8], sun: "w", sky: { color: "w", strength: 0.2 }, sprites: [{ name: "_slab_d", at: [0, 4], shadow: 0 }] }))`, "t.px.js").image("a");
+  const shaded = (img: { get(x: number, y: number): number }) => { let s = 0; for (let y = 20; y < 26; y++) for (let x = 10; x < 40; x++) if (img.get(x, y) >>> 24 < 200) s++; return s; };
+  const whole = shaded(slab("")), holed = shaded(slab(', effect("dissolve", { progress: 0.5, scale: 2 })'));
+  assert.ok(whole > 60 && holed < whole * 0.8, `its shadow lets the sun through its holes: ${holed} of ${whole} px still shaded`);
+  const holes = slab(', effect("dissolve", { progress: 0.5, scale: 2 })');
+  let floorSeen = 0;
+  for (let y = 11; y < 20; y++) for (let x = 11; x < 29; x++) if (holes.get(x, y) >>> 24 !== 0xff || ((holes.get(x, y) >>> 16) & 255) > 60) floorSeen++;
+  assert.ok(floorSeen > 10, "the floor behind seen through it");
+});

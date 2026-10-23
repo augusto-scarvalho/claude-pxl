@@ -17,6 +17,7 @@ import { type Motion, readJoints, readMotion } from "./pose.ts";
 import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
 import { type Lut, readCube } from "./post.ts";
+import { SMOKE_OPTS } from "./smoke.ts";
 import { bayer, fbm, globRe, latticeHash, rng, vnoise, seamless } from "./util.ts";
 
 /**
@@ -57,6 +58,7 @@ export const SIGNATURES: Record<string, string> = {
   scroll: "name:s y:n per:n ?opts:o",
   clouds: "opts:o",
   plume: "x:n y:n keys:s ?opts:o",
+  smoke: "x:n y:n keys:s ?opts:o",
   rampmap: "ramp:S ?opts:o",
   stamp: "name:s ?x:n y:n opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
@@ -78,7 +80,7 @@ export const SIGNATURES: Record<string, string> = {
 };
 
 /** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
-const CLOCKED = new Set(["flame", "scroll", "clouds", "plume", "effect"]);
+const CLOCKED = new Set(["flame", "scroll", "clouds", "plume", "effect", "smoke"]);
 /** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
 function drawsWithFunctions(items: Item[]): boolean {
   return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
@@ -120,6 +122,7 @@ export const OP_OPTS: Record<string, string[]> = {
   scroll: ["x", "y", "frame", "axis"],
   clouds: ["y", "gap", "w", "h", "n", "seed", "keys", "x", "empty", "sizes", "frame"],
   plume: ["every", "life", "rise", "wind", "inertia", "size", "young", "seed", "frame", "light"],
+  smoke: SMOKE_OPTS,
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
@@ -332,7 +335,11 @@ export class Project implements BuildCtx {
       const from = kind === "anim" && typeof opts.base === "string" ? this.assets.get(opts.base) : undefined;
       if (from?.kind === "anim" && !rest.some((v) => isOp(v) && v.name === "frame")) {
         for (const k of ["fps", "frames", "loop", "dir", "pivot"] as const) if (opts[k] === undefined && from.opts[k] !== undefined) (opts as Record<string, unknown>)[k] = from.opts[k];
-        if (opts.frames === undefined) opts.frames = animTimeline(from).durations!.length;
+        const d = animTimeline(from).durations!;
+        if (opts.frames === undefined) opts.frames = d.length;
+        // (a base timed by its frame()s' ms, all alike: that pace, not 8 fps; a walk at 110 ms and its
+        // variant at 125 made a 22 s loop of 4400 frames)
+        if (opts.fps === undefined && d.every((v) => v === d[0])) opts.fps = 1000 / d[0];
       }
       const light = opts.world?.light, pair = (v: unknown) => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
       if (light !== undefined && !pair(light) && !(isPlainObject(light) && pair((light as { at?: unknown }).at)))

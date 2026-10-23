@@ -6,6 +6,7 @@ import { glyph, lineWidth } from "./font.ts";
 import type { BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
 import { bump, dirOf, setNormal } from "./normals.ts";
 import { runEffect } from "./effects.ts";
+import { type SmokeOpts, drawSmoke } from "./smoke.ts";
 import { type View, perspective } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
 import { type Face, type Material, type MeshCanvas, type MeshOpts, drawMesh } from "./mesh.ts";
@@ -718,6 +719,11 @@ export class Canvas {
     }
   }
 
+  /** Smoke of a shape (a column, a puff, a bank, a ring) at this moment of the loop: see smoke.ts. */
+  smoke(x: number, y: number, keys: string, opts: SmokeOpts = {}): void {
+    drawSmoke(this as unknown as Parameters<typeof drawSmoke>[0], x, y, keys, opts);
+  }
+
   /** Shapes in meters (sticks, blobs, boxes, cones, polygons: see solids.ts) drawn far to near through the camera. */
   solids(view: Partial<View>, shapes: Solid[], opts: SolidOpts = {}): void {
     drawSolids(this as unknown as SolidCanvas, perspective({ ...view, w: view.w ?? this.img.w } as View), shapes, opts);
@@ -736,14 +742,20 @@ export class Canvas {
   /** Flat faces in meters (model()) drawn through the camera, the nearest kept per pixel, toned along their material's ramp: see mesh.ts. */
   mesh(view: Partial<View> | ((p: [number, number, number]) => [number, number, number]), faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}): void {
     const tex: Record<string, Img> = {};
-    for (const [k, M] of Object.entries(mats ?? {})) if (M?.tex !== undefined) tex[k] = this.asset(M.tex);
+    const masks: Record<string, Img> = {};
+    for (const [k, M] of Object.entries(mats ?? {})) {
+      if (M?.tex !== undefined) tex[k] = this.asset(M.tex);
+      if (typeof M?.dissolve?.mask === "string") masks[k] = this.asset(M.dissolve.mask);
+    }
     const sprites = (opts.sprites ?? []).map((s, k) => {
       const at = s?.at;
       if (!s || typeof s.name !== "string" || !Array.isArray(at) || (at.length !== 2 && at.length !== 3) || !at.every(Number.isFinite))
-        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, delay?, rdelay?, seed?, reseed?, shadow? }, got ${JSON.stringify(s)}`);
+        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, delay?, rdelay?, seed?, reseed?, shadow?, blend?, opacity?, light? }, got ${JSON.stringify(s)}`);
       // its own time in its loop and its own random choices, as a stamp's, picked by where it stands (cm)
       const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed };
-      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow };
+      if (s.blend !== undefined && !["alpha", "add", "screen"].includes(s.blend)) throw new PxError(`mesh: sprite ${k} has blend ${JSON.stringify(s.blend)}: "alpha" (over, lit), "add" or "screen" (light)`);
+      if (s.opacity !== undefined && !(s.opacity >= 0 && s.opacity <= 1)) throw new PxError(`mesh: sprite ${k} has opacity ${JSON.stringify(s.opacity)}: 0..1`);
+      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, light: s.light };
     });
     // looked up on first use: a palette without ramps has nothing to step (and needs nothing stepped without textures or sprites)
     let maps: Map<Color, Color>[] | undefined;
@@ -781,7 +793,7 @@ export class Canvas {
     }
     // straight into the pixels when nothing stands between (a clip, a twin's mirror, a wrapped edge)
     const mc = Object.assign(Object.create(this) as MeshCanvas, { raw: this.clipPred || this.mirrored || this.wrap ? undefined : this.img.data });
-    for (const p of drawMesh(mc, view, faces, mats, opts, { tex, sprites, step, lit }))
+    for (const p of drawMesh(mc, view, faces, mats, opts, { tex, masks, sprites, step, lit }))
       this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img });
   }
 
@@ -827,19 +839,22 @@ export class Canvas {
     if (typeof opts !== "object" || opts === null || Array.isArray(opts)) throw new PxError(`effect("${name}", { ... }): the options are an object, got ${JSON.stringify(opts)}`);
     const { where, on, ...own } = opts;
     if (on !== undefined && typeof on !== "string") throw new PxError(`effect "${name}": on is keys ("Yy", "*" any opaque), got ${JSON.stringify(on)}`);
-    const out = runEffect(name, this.img, own, { frame: this.frame, frames: this.frames, seed: this.seed, ox: this.ox, oy: this.oy, pal: this.pal, wrap: this.wrap });
-    // what moved pixels (distort, sway) moved their normals too
-    const n = out.norm && this.img.norm;
+    const out = runEffect(name, this.img, own, { frame: this.frame, frames: this.frames, seed: this.seed, ox: this.ox, oy: this.oy, pal: this.pal, wrap: this.wrap, asset: (n) => this.asset(n) });
+    // what moved pixels (distort, sway) moved their normals and their light too; emit gives light
+    const n = out.norm && this.img.norm, e = out.emit && (this.img.emit ??= new Uint8Array(this.img.w * this.img.h));
     if (where === undefined && on === undefined && !this.clipPred) {
       this.img.data.set(out.data);
       if (n) n.set(out.norm!);
+      if (e) e.set(out.emit!);
       return;
     }
     const ok = regionPred(where as Region), keys = this.maskAt(on);
     for (let y = -this.oy; y < this.img.h - this.oy; y++)
       for (let x = -this.ox; x < this.img.w - this.ox; x++) {
         const i = this.index(x, y);
-        if (ok(x, y) && keys(x, y) && this.plot(x, y, out.data[i]) && n) n.set(out.norm!.subarray(3 * i, 3 * i + 3), 3 * i);
+        if (!ok(x, y) || !keys(x, y) || !this.plot(x, y, out.data[i])) continue;
+        if (n) n.set(out.norm!.subarray(3 * i, 3 * i + 3), 3 * i);
+        if (e) e[i] = out.emit![i];
       }
   }
 
@@ -981,6 +996,7 @@ export class Canvas {
           const n = this.img.normals();
           n.set(src.norm.subarray(j * 3, j * 3 + 3), i * 3);
         } else if (this.img.norm) this.img.norm[i * 3 + 2] = 0;
+        if (src.emit || this.img.emit) (this.img.emit ??= new Uint8Array(this.img.w * this.img.h))[i] = src.emit ? src.emit[j] : 0;
       }
   }
 
@@ -1429,7 +1445,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp", "effect",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "capsule", "flame", "scroll", "clouds", "plume",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "capsule", "flame", "scroll", "clouds", "plume", "smoke",
 ] as const;
 export type OpName = (typeof OPS)[number];
 
