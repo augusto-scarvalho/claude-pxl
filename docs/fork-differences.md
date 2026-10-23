@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**351 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**352 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -24,10 +24,10 @@ page lists what the fork adds. Every commit is in
 | | Original (Oct 14) | This fork (Oct 23) |
 | --- | --- | --- |
 | Commands | 4: `build`, `serve`, `ascii`, `list` | 12: adds `describe`, `shot`, `check`, `steps`, `help`, `compare`, `blind`, `study` |
-| Engine modules | 16 core, 6 Node | 33 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
+| Engine modules | 16 core, 6 Node | 42 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [environment](../environment.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
-| Example files | 13 | 57 |
-| Tests | 59 | 300 |
+| Example files | 13 | 58 |
+| Tests | 59 | 307 |
 
 ## Looking and checking
 
@@ -101,6 +101,8 @@ follows from it.
 | `ray()`, `toward()` | Where a screen point lands in the world, and where the sun or any direction sits in the picture. |
 | `mesh()`, `model()` | Flat faces in meters drawn with a depth per pixel, like the race's car interior, modelled after a Supra A80; materials tiled with pixel-art textures (laid a texel to a pixel of the picture, anchored to a face, clear texels holes), and sprites standing among the faces in the same depth, on contact shadows (HD-2D's dioramas); light in the world on them: a sun with shadows (sprites throw theirs, turned to it), a sky, lamps, sprites lit through their normal maps. A material can be drawn in blocks of a sprite's pixel (`block`), its outline only on its shaded side: pixel art among an HD picture's faces (the graveyard's fence). |
 | `post()` | What the camera does after: depth of field by `mesh()`'s depth (the tilt-shift look of HD-2D), haze, bloom, vignette, in linear light, at 1920x1080 in about a second a frame. Then the finish: Three's bloom beside pxl's (`levels`; its blur sums only near what is bright, a frame at 1920x1080 0.6 s to 0.3 s), a grade from a `.cube` LUT or a LUT strip PNG, film grain seeded by the frame in blocks of the art's pixel, a sharpen, and `palette` to take the picture back to the palette's colors. |
+
+| `sdf`, `surface()` | Things described as distance fields in meters: primitives (sphere, rounded box, capsule tapering, cylinder, cone, torus, plane, ellipsoid), joined plainly or smoothly, moved, twisted, bent, mirrored, repeated, pushed by seeded noise, painted by region; any number read from the clock. Four kinds kept apart: distance, occupancy, density, appearance. `surface()` draws one as pixel art (ramps stepped by the light, its own shadows, clusters, an outline away from the light, normals, depth) from the side, the top, in iso, or through a `mesh()` camera at its depth with its shadow on what is drawn; each field's distance compiled to one function. |
 
 Five scenes are built on this: a road across the sertão, a park at 2 pm in two-point perspective, the
 end of the Cretaceous in three-point, a street race from the driver's seat, and two HD-2D dioramas (a

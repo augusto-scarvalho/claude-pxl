@@ -5,6 +5,8 @@ import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from 
 import { type View, perspective } from "./perspective.ts";
 import { solid } from "./solids.ts";
 import { model } from "./mesh.ts";
+import { sdf } from "./sdf.ts";
+import { SURFACE_OPTS, surfaceSize } from "./surface.ts";
 import { TRANSPARENT, oklab, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
@@ -55,6 +57,7 @@ export const SIGNATURES: Record<string, string> = {
   solids: "view:o shapes:a ?opts:o",
   shadows: "view:o shapes:a opts:o",
   mesh: "view:v faces:a mats:o ?opts:o",
+  surface: "field:o ?opts:o",
   capsule: "x0:n y0:n r0:n x1:n y1:n r1:n ramp:s ?opts:o",
   flame: "x:n y:n size:n keys:s ?opts:o",
   scroll: "name:s y:n per:n ?opts:o",
@@ -86,7 +89,7 @@ export const SIGNATURES: Record<string, string> = {
 };
 
 /** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
-const CLOCKED = new Set(["flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast", "shake"]);
+const CLOCKED = new Set(["surface", "flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast", "shake"]);
 /** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
 function drawsWithFunctions(items: Item[]): boolean {
   return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
@@ -123,6 +126,7 @@ export const OP_OPTS: Record<string, string[]> = {
   solids: ["at", "sun", "scale", "ramps", "light", "shade"],
   shadows: ["at", "sun", "scale", "shade", "ramps", "light"],
   mesh: ["light", "sprites", "pixel", "sun", "sky", "lamps", "emit", "shadows"],
+  surface: SURFACE_OPTS,
   capsule: ["light", "rim"],
   flame: ["wind", "period", "seed", "frame"],
   scroll: ["x", "y", "frame", "axis"],
@@ -509,6 +513,8 @@ export class Project implements BuildCtx {
     env.solid = solid;
     // a model for mesh(): faces, strips, lofts and boxes in meters, each of a material
     env.model = model;
+    // fields in 3D, in meters: sdf.sphere(r), .union(...), .bend(k), ... drawn by surface(); sdf.size(field, { view, ppm }) a sprite's size for it
+    env.sdf = { ...sdf, size: surfaceSize };
     // perspective({ w, horizon, eye, fov | focal, vp, yaw, pitch }): ground(x, z, up), at(col, row), scale(z, x, up), vanish(angle), vertical()
     env.perspective = (view: unknown) => {
       try { return perspective(view as View); } catch (e) { throw wrap(e).within("perspective", this.callerLoc()); }
@@ -562,7 +568,7 @@ export class Project implements BuildCtx {
         const loc = this.callerLoc();
         try {
           checkArgs(name, args);
-          const o = name === "mesh" ? args[3] : args[args.length - 1];
+          const o = name === "mesh" ? args[3] : name === "surface" ? args[1] : args[args.length - 1];
           if (OP_OPTS[name] && isPlainObject(o)) checkKeys(name, o, OP_OPTS[name]);
         } catch (e) { throw wrap(e).within(name, loc); }
         if (name === "clip") checkItems("clip", args.slice(1), loc);

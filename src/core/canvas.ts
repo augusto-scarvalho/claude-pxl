@@ -11,6 +11,7 @@ import { type Particle, drawParticles, drawTrail } from "./vfx.ts";
 import type { Spell } from "./spells.ts";
 import { type View, perspective } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
+import { type SurfaceCanvas, type SurfaceOpts, drawSurface } from "./surface.ts";
 import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshWorld, drawMesh } from "./mesh.ts";
 import type { Lit } from "./sunlight.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
@@ -886,6 +887,15 @@ export class Canvas {
       this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img });
   }
 
+  /**
+   * A distance field (sdf.*) drawn as pixel art: its materials' ramps stepped by the light, an outline
+   * away from it, the normals and the depth; seen from the side, the top, in iso, or through a
+   * perspective() camera after a mesh(), at its depth, its shadow on what is drawn: see surface.ts.
+   */
+  surface(field: unknown, opts: SurfaceOpts = {}): void {
+    drawSurface(this as unknown as SurfaceCanvas, field, opts);
+  }
+
   plane(view: Partial<View>, fn: (x: number, z: number, col: number, row: number) => string | null | undefined, where?: Region): void {
     const P = perspective({ ...view, w: view.w ?? this.img.w } as View), inside = where === undefined ? undefined : regionPred(where);
     for (let row = Math.max(-this.oy, Math.floor(P.horizon)); row < this.img.h - this.oy; row++) {
@@ -1544,7 +1554,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp", "effect",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

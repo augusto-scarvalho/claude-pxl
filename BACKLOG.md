@@ -923,3 +923,20 @@ What the phases left, each waiting for a reason:
 - [ ] **A painted sway mask** (what moves, painted, instead of by height): only when a case needs it;
   by height covers the kit's plants.
 - [ ] **The emitting pixels' light in plain lighting()**: a `lamp()` at the glow does it today.
+
+## A 3D DSL: fields, voxels, volumes, splats (the dsl3d plan, in phases)
+
+- [x] **Distance fields and surface()**: `sdf.*` primitives, joins plain and smooth, moves,
+  deformations, noise, materials by region, parameters on the clock; drawn as pixel art from the side,
+  the top, in iso and through a perspective() camera after a mesh(), at its depth with its shadow.
+- [ ] **Voxels and meshes from a field** (phase 3): grids sampled from it, `.vox`; surface nets or
+  marching cubes to mesh() faces and `.obj`/`.glb`.
+- [ ] **Density volumes** (phase 4), **procedural splats** (phase 5, `.ply`), **a scene IR with named
+  parts and local edits** (phase 6).
+- [ ] **An SDF sprite's depth pixel by pixel in mesh()**: a sprite stands as a card, each row at its
+  height's depth; a field drawn through the camera has the true depth. A depth channel travelling with
+  the sprite's pixels (as its normals do) would give a card the true one: when a card reads wrong.
+- [ ] **mesh()'s sun on a field drawn through the camera**: surface() lights by its own ramps and lays
+  its shadow on what is drawn, but walls' shadows don't fall on it and the sun's colours don't tint it.
+- [ ] **Not yet, by decision**: a GPU engine, a Blender pipeline, an interactive WebGL preview (the
+  CPU renderer first, measured; then a backend where a measured pass is slow).

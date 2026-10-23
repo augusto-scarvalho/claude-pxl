@@ -254,6 +254,27 @@ away at one scale for a whole step and change it only at the next contact, when 
 at its exact size turns into a blob, so draw the small sizes by hand (`walker_14`, `walker_12` ...
 `walker_5`) and pick with `fit` (`examples/perspective/road.px.js`).
 
+### Fields in 3D
+
+A thing in meters described as a distance field (an SDF: how far a point is from its surface, negative
+inside) built with the `sdf` global, `[x, y, z]` with x across, y ahead (away from the viewer, mesh()'s z) and z up, drawn as
+pixel art by `surface()`. Four kinds, never one: a distance (`sdf.*`), and made from it an
+occupancy (inside or not), a density (how much matter, 0..1) and an appearance (which material a
+surface point is). Any number in a field may be a function of the clock, `(c) => ...` with
+`c.t` (ms), `c.phase` (0..1 over the loop), `c.frame`, `c.frames`, read when it is drawn: a tree
+swaying, a crystal turning (`examples/sdf/fields.px.js`).
+
+| Op | Notes |
+|---|---|
+| `sdf.sphere(r)`, `sdf.box([x, y, z], { round? })`, `sdf.capsule(a, b, r, r2?)`, `sdf.cylinder(r, h)`, `sdf.cone(r, h, top?)`, `sdf.torus(R, r)`, `sdf.plane(n?, h?)`, `sdf.ellipsoid([rx, ry, rz])` | not ops: the primitives, round the origin (a box `size` m, its edges rounded `round` m; an ellipsoid its radii) except the upright ones standing on it (a cylinder and a cone `h` m tall, the cone `r` at its foot and `top` at its top, 0 a point); a capsule a rod from point a to b, radius r tapering to `r2` (a limb); a torus lying on the ground plane; a plane everything below it (normal `n`, default up, `h` m along it: endless, intersect it with something) |
+| `field.union(...others, { smooth? })`, `.subtract(...)`, `.intersect(...)`; `sdf.union(list, { smooth? })`, `sdf.intersect(...)` | joined: `smooth` m over which they melt into each other (0, a crease) |
+| `field.at(x, y, z)`, `.rotate(deg, axis = "z")`, `.scale(k or [x, y, z])` | moved, turned about an axis through its origin (`"x"`, `"y"`, `"z"` or `[x, y, z]`), scaled about it |
+| `field.twist(deg)`, `.bend(k or [kx, ky])`, `.mirror("x")`, `.repeat([sx, sy, sz], count)`, `.noise({ amp, scale = 0.5, seed = 1, octaves = 2 })` | deformed: twisted `deg` degrees a meter up; bent as `perspective()`'s way bends, a point z m up moved k·z²/2 m along x (the wind in a tree); the positive side of the axes named mirrored to the other; copies `step` m apart, `count` each way (keep each in its cell); its surface pushed in and out by seeded noise, `amp` m at most in bumps `scale` m across. `sdf.fbm(x, y, z, seed, octaves)` is that noise, 0..1 |
+| `field.mat(name)`, `.paint(name, (p, n) => bool)` | its material, a key of `surface()`'s `mats` (one given inside it wins), or one where `paint`'s test holds, `p` the point and `n` its normal in the field's own frame (moss where `n[2] > 0.6`) |
+| `sdf.occupancy(field)`, `sdf.density(field, { edge = 0.1 })`, `sdf.appearance(field)` | the other kinds: `.inside(p)`; `.at(p)` 0..1, full `edge` m inside; `.at(p, n)` the material's name. `field.dist(p)` and `field.bounds()` read a distance field at a moment (`clock` last) |
+| `sdf.size(field, { view?, ppm?, pad?, frames? })` | the size a sprite needs for the field in an orthographic view: `{ w, h, pivot }`, `pivot` where its origin lands (give it to the sprite and to `surface()`'s `at`), over `frames` moments of its loop |
+| `surface(field, { view?, ppm?, at?, mats?, light?, outline?, rim?, shadows?, ao?, pixel?, cast? })` | the field drawn as pixel art, a ray marched to its surface through each pixel: each material's ramp (`mats: { bark: "bBiI", gem: { ramp, shine } }`, dark to light; what has no material takes the first) stepped by the light (`light`: the way to it in the world, default the upper left toward the viewer; the field's shadows on itself, `shadows: false` for none; a sky from above; the creases darker, `ao` 0..1, 0.5), a tone none of its four neighbours shares taken into theirs (clusters, not speckle), `shine` a glint where the light mirrors toward the eye; an `outline` (true: each ramp's darkest, a key, or false) on the contour away from the light, unless it is a pixel thin, and a `rim` a step lighter toward it; the normals written (`normals()`, `lighting()`, mesh()'s sun read them) and the depth (`post()`); what it doesn't cover left as it was. `view`: `"side"` (3/4, 20 degrees down), `"top"`, `"iso"` (2:1, 30 down, 45 round), or `{ kind, yaw, pitch }` (degrees turned right, tilted down), orthographic at `ppm` px to the meter (16), the origin landing at `at` (`[x, y]` px, default the middle of the bottom edge, as `pivot: "bottom"`); or a `perspective()` view, the field standing at `at: [x, z, up]` m: after a `mesh()` through the same camera, drawn only where it is nearer the eye than what is there (a wall hides its foot), its shadow laid on what is drawn (`cast`: the share of light it takes, 0.4; a step down the ramps, or darker in linear light off them); `pixel: K` a ray to each K x K block (an HD picture's sprite pixel, with the camera's `w` and `horizon` K times too). An anim of it is a sprite like any other: in `mesh()`'s `sprites` it stands as the pines do |
+
 ### Going by in a loop
 
 In an anim (or a sprite or scene animated by what it places), these follow its frame and close over

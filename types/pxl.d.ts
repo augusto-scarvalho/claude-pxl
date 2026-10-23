@@ -206,6 +206,29 @@ declare global {
   }
   /** A camera of one's own for mesh(): a point in the camera's frame (x right, y up, z ahead, from the eye) to [col, row, depth]. */
   type PxProject = (p: PxV3) => [number, number, number];
+  /** What a field's parameters read: ms, 0..1 over the loop, the frame, the loop's frames. */
+  interface PxClock { t: number; phase: number; frame: number; frames: number }
+  /** A number of a field, or one read from the clock when it is drawn. */
+  type PxNum = number | ((c: PxClock) => number);
+  type PxVec = PxNum[] | ((c: PxClock) => number[]);
+  /** A distance field in meters ([x, y ahead, z up]): how far a point is from its surface, negative inside. Each method gives a new one. */
+  interface PxSdf {
+    readonly kind: "distance";
+    union(...a: (PxSdf | { smooth?: PxNum })[]): PxSdf; subtract(...a: (PxSdf | { smooth?: PxNum })[]): PxSdf; intersect(...a: (PxSdf | { smooth?: PxNum })[]): PxSdf;
+    at(x: PxNum | PxVec, y?: PxNum, z?: PxNum): PxSdf; rotate(deg: PxNum, axis?: "x" | "y" | "z" | PxVec): PxSdf; scale(s: PxNum | PxVec): PxSdf;
+    /** degrees a meter up */ twist(deg: PxNum): PxSdf;
+    /** a point z m up moved k z^2 / 2 m along x (or [kx, ky]) */ bend(k: PxNum | PxVec): PxSdf;
+    mirror(axes?: string): PxSdf; repeat(step: PxVec, count?: PxNum | PxVec): PxSdf;
+    noise(o: { amp: PxNum; scale?: PxNum; seed?: number; octaves?: number }): PxSdf;
+    mat(name: string): PxSdf; paint(name: string, where: (p: PxV3, n: PxV3) => unknown): PxSdf;
+    bounds(clock?: PxClock): [PxV3, PxV3]; dist(p: number[], clock?: PxClock): number;
+  }
+  type PxSurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number } | PxView;
+  /** surface()'s options: the view (orthographic at ppm px to the meter, its origin at `at` px; or a perspective() view, standing `at` [x, z, up] m), the materials' ramps, the light, the outline, the rim, its own shadows, the creases, a ray to K x K px, its shadow on what is drawn. */
+  interface PxSurfaceOpts {
+    view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number }>;
+    light?: number[]; outline?: boolean | PxColor; rim?: boolean; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
+  }
   /** terrain()'s options: how far to look (m), the land's highest point, a cheap height it never rises more than `margin` above, the sky's color where a pixel sees no land. */
   interface PxTerrainOpts {
     far?: number; top?: number; bound?: (x: number, z: number) => number; margin?: number;
@@ -446,6 +469,8 @@ declare global {
     solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): void;
     /** Flat faces in meters (model()) through the camera, the nearest per pixel, toned along their material's ramp, outlined where a surface ends. */
     mesh(view: PxView | PxPerspective | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): void;
+    /** A distance field drawn as pixel art: ramps stepped by the light, an outline away from it, its normals and depth; through a camera after a mesh(), at its depth, its shadow on what is drawn. */
+    surface(field: PxSdf, opts?: PxSurfaceOpts): void;
     /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade. */
     shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): void;
     /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
@@ -549,6 +574,21 @@ declare global {
   function shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): PxOp;
   /** Flat faces in meters drawn through the camera with a depth per pixel (a dash round a driver, a wheel in front of its spokes): each toned along its material's ramp by how it lies to the light, outlined where a surface ends in front of another, creased where two faces of one material meet, its top edge a step lighter. Through perspective() points are [x, z, up]; a function camera takes [x right, y up, z ahead] from the eye. */
   function mesh(view: PxView | PxPerspective | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): PxOp;
+  /** A distance field drawn as pixel art from the side, the top, in iso, or through a perspective() camera after a mesh(), at its depth, its shadow on what is drawn. */
+  function surface(field: PxSdf, opts?: PxSurfaceOpts): PxOp;
+  /** Fields in 3D, in meters ([x, y ahead, z up]): primitives (round the origin; cylinder and cone standing on it), joins, and the other kinds made from a distance. */
+  const sdf: {
+    sphere(r: PxNum): PxSdf; box(size: PxVec | PxNum, o?: { round?: PxNum }): PxSdf; capsule(a: PxVec, b: PxVec, r: PxNum, r2?: PxNum): PxSdf;
+    cylinder(r: PxNum, h: PxNum): PxSdf; cone(r: PxNum, h: PxNum, top?: PxNum): PxSdf; torus(R: PxNum, r: PxNum): PxSdf;
+    plane(n?: PxVec, h?: PxNum): PxSdf; ellipsoid(r: PxVec): PxSdf;
+    union(...a: (PxSdf | PxSdf[] | { smooth?: PxNum })[]): PxSdf; intersect(...a: (PxSdf | PxSdf[] | { smooth?: PxNum })[]): PxSdf;
+    /** seeded 3D noise in [0, 1] */ fbm(x: number, y: number, z: number, seed?: number, octaves?: number): number;
+    occupancy(f: PxSdf): { kind: "occupancy"; inside(p: number[], clock?: PxClock): boolean };
+    density(f: PxSdf, o?: { edge?: number }): { kind: "density"; at(p: number[], clock?: PxClock): number };
+    appearance(f: PxSdf): { kind: "appearance"; at(p: number[], n?: number[], clock?: PxClock): string | null };
+    /** a sprite's size for the field in an orthographic view, and its pivot (where its origin lands) */
+    size(f: PxSdf, o?: { view?: PxSurfaceView; ppm?: number; pad?: number; frames?: number }): { w: number; h: number; pivot: [number, number] };
+  };
   /** A model for mesh(): face(mat, ...points), strip(mat, a, b) between two lines of points, loft(mat, sections), box(mat, corner, corner); faces holds them. */
   function model(): {
     faces: PxFace[];
