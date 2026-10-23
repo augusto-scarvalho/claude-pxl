@@ -5,11 +5,12 @@ import { PxError } from "./errors.ts";
 import { glyph, lineWidth } from "./font.ts";
 import type { BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
 import { bump, dirOf, setNormal } from "./normals.ts";
-import { runEffect } from "./effects.ts";
+import { LOOKS, dissolveChar, dissolveEdge, lightestOf, runEffect } from "./effects.ts";
 import { type SmokeOpts, drawSmoke } from "./smoke.ts";
+import { type Particle, drawParticles, drawTrail } from "./vfx.ts";
 import { type View, perspective } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
-import { type Face, type Material, type MeshCanvas, type MeshOpts, drawMesh } from "./mesh.ts";
+import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshWorld, drawMesh } from "./mesh.ts";
 import type { Lit } from "./sunlight.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
 import { bayer, colorList, gridRows, hash, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
@@ -719,6 +720,33 @@ export class Canvas {
     }
   }
 
+  /** An emitter's particles now, each in the key of its age (young first), a streak `trail` ms back: see vfx.ts. */
+  particles(emit: (t: number) => Particle[], keys: string, opts: { x?: number; y?: number; trail?: number; size?: [number, number] } = {}): void {
+    drawParticles(this, emit, keys, opts);
+  }
+
+  /** A trail behind what goes along `path` (a function of the time), `length` ms of it now: see vfx.ts. */
+  trail(path: (t: number) => number[], keys: string, opts: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number } = {}): void {
+    drawTrail(this, path, keys, opts);
+  }
+
+  /** Where a socket of an earlier placement is ("hero.hand"), in canvas coords: a spell starts there. */
+  socket(at: string): [number, number] {
+    return this.socketAt(at, 0, 0);
+  }
+
+  /**
+   * Where a socket of a sprite standing in mesh() is, in meters [x, z, up]: the sprite as mesh()
+   * places it ({ name, at, frame?, flip? }), `pixel` px to its pixels.
+   */
+  meshSocket(view: Partial<View>, sprite: { name: string; at: number[]; frame?: number; flip?: "x"; delay?: number }, socket: string, pixel = 1): [number, number, number] {
+    const P = perspective({ ...view, w: view.w ?? this.img.w } as View), img = this.asset(sprite.name, { frame: sprite.frame, flip: sprite.flip, delay: sprite.delay });
+    const s = img.sockets?.[socket];
+    if (!s) throw new PxError(`meshSocket: '${sprite.name}' has no socket '${socket}'` + (img.sockets ? `; it has: ${Object.keys(img.sockets).join(", ")}` : `; give it { sockets: { ${socket}: [x, y] } }`));
+    const [x, z, u = 0] = sprite.at, [px, py] = img.pivot ?? [img.w / 2, img.h], m = pixel / P.scale(z, x, u), yaw = ((P.yaw ?? 0) * Math.PI) / 180;
+    return [x + Math.cos(yaw) * (s[0] - px) * m, z - Math.sin(yaw) * (s[0] - px) * m, u + (py - s[1]) * m];
+  }
+
   /** Smoke of a shape (a column, a puff, a bank, a ring) at this moment of the loop: see smoke.ts. */
   smoke(x: number, y: number, keys: string, opts: SmokeOpts = {}): void {
     drawSmoke(this as unknown as Parameters<typeof drawSmoke>[0], x, y, keys, opts);
@@ -742,17 +770,26 @@ export class Canvas {
   /** Flat faces in meters (model()) drawn through the camera, the nearest kept per pixel, toned along their material's ramp: see mesh.ts. */
   mesh(view: Partial<View> | ((p: [number, number, number]) => [number, number, number]), faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}): void {
     const tex: Record<string, Img> = {};
-    const masks: Record<string, Img> = {};
+    const masks: Record<string, Img> = {}, looks: NonNullable<MeshWorld["looks"]> = {};
     for (const [k, M] of Object.entries(mats ?? {})) {
       if (M?.tex !== undefined) tex[k] = this.asset(M.tex);
       if (typeof M?.dissolve?.mask === "string") masks[k] = this.asset(M.dissolve.mask);
+      if (M?.dissolve) {
+        // its look, as the dissolve effect's (with neither a look nor an edge, the neutral one), its keys resolved
+        const D = M.dissolve, at = `mesh: material '${k}' dissolve`;
+        if (D.look !== undefined && !LOOKS[D.look]) throw new PxError(`${at}: look is ${Object.keys(LOOKS).map((l) => `"${l}"`).join(", ")}, got ${JSON.stringify(D.look)}`);
+        const o = { ...LOOKS[D.look ?? (D.edge === undefined ? "neutral" : "")], ...D } as Record<string, unknown>;
+        const e = dissolveEdge(o.edge, at, this.pal), ch = dissolveChar(o.char, at, this.pal) as { width: number; tones: Color[]; amount: number; desat: number } | undefined;
+        const light = M.tex !== undefined ? lightestOf(tex[k]) : this.color([...(M.ramp ?? "")].pop() ?? "#fff") ?? 0xffffffff;
+        looks[k] = { ...("over" in e ? { over: e.over } : "neutral" in e ? { neutral: light } : {}), ...(ch ? { char: ch } : {}), glow: typeof o.glow === "number" ? o.glow : 0 };
+      }
     }
     const sprites = (opts.sprites ?? []).map((s, k) => {
       const at = s?.at;
       if (!s || typeof s.name !== "string" || !Array.isArray(at) || (at.length !== 2 && at.length !== 3) || !at.every(Number.isFinite))
-        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, delay?, rdelay?, seed?, reseed?, shadow?, blend?, opacity?, light? }, got ${JSON.stringify(s)}`);
+        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, light? }, got ${JSON.stringify(s)}`);
       // its own time in its loop and its own random choices, as a stamp's, picked by where it stands (cm)
-      const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed };
+      const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed, fx: s.fx };
       if (s.blend !== undefined && !["alpha", "add", "screen"].includes(s.blend)) throw new PxError(`mesh: sprite ${k} has blend ${JSON.stringify(s.blend)}: "alpha" (over, lit), "add" or "screen" (light)`);
       if (s.opacity !== undefined && !(s.opacity >= 0 && s.opacity <= 1)) throw new PxError(`mesh: sprite ${k} has opacity ${JSON.stringify(s.opacity)}: 0..1`);
       return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, light: s.light };
@@ -793,7 +830,7 @@ export class Canvas {
     }
     // straight into the pixels when nothing stands between (a clip, a twin's mirror, a wrapped edge)
     const mc = Object.assign(Object.create(this) as MeshCanvas, { raw: this.clipPred || this.mirrored || this.wrap ? undefined : this.img.data });
-    for (const p of drawMesh(mc, view, faces, mats, opts, { tex, masks, sprites, step, lit }))
+    for (const p of drawMesh(mc, view, faces, mats, opts, { tex, masks, looks, sprites, step, lit }))
       this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img });
   }
 
@@ -966,6 +1003,16 @@ export class Canvas {
       if (opts.castBase !== undefined && opts.castBase !== "pivot" && opts.castBase !== "column")
         throw new PxError(`castBase must be "pivot" (the pivot's row) or "column" (each column's lowest pixel), got ${JSON.stringify(opts.castBase)}`);
       src = src.cast(k[0], k[1], opts.castBase);
+    }
+    if (opts.fx !== undefined) {
+      // effects on this copy alone, on this canvas's clock and the copy's seed: a dissolve driven by the scene
+      const list = Array.isArray(opts.fx) && typeof opts.fx[0] === "string" ? [opts.fx] : opts.fx;
+      if (!Array.isArray(list) || !list.every((e) => Array.isArray(e) && typeof e[0] === "string" && (e[1] === undefined || (typeof e[1] === "object" && e[1] !== null))))
+        throw new PxError(`fx is an effect, ["dissolve", { progress: 0.5 }], or a list of them, got ${JSON.stringify(opts.fx)}`);
+      const c = new Canvas(src.copy(), this.pal, this.res, 0, 0, inner);
+      c.t = this.t; c.frame = this.frame; c.frames = this.frames;
+      for (const [name, o] of list as [string, Record<string, unknown>?][]) c.effect(name, o ?? {});
+      src = c.img;
     }
     return src;
   }
@@ -1445,7 +1492,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp", "effect",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "capsule", "flame", "scroll", "clouds", "plume", "smoke",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

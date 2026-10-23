@@ -34,7 +34,7 @@ export interface FxCtx {
 type Params = Record<string, any>;
 /** Reads one parameter: its default when not given, an error naming it when wrong. */
 type Check = (v: unknown, what: string, pal: Palette) => unknown;
-interface Effect { params: Record<string, Check>; run(src: Img, p: Params, x: FxCtx): Img }
+interface Effect { params: Record<string, Check>; run(src: Img, p: Params, x: FxCtx): Img; prepare?(opts: Record<string, unknown>): Record<string, unknown> }
 
 const num = (def: number, lo: number, hi = Infinity, whole = false): Check => (v, what) => {
   if (v === undefined) return def;
@@ -117,6 +117,72 @@ function each(img: Img, x: FxCtx, K: number, fn: (i: number, ax: number, ay: num
   }
 }
 
+/**
+ * A dissolve's looks: what eats it. Each sets the edge (its keys over the progress), the char (a band
+ * ahead of the edge the material's own colors go toward), the glow and the debris; any can be given
+ * over it. "neutral" (the default with no look and no edge): one ring of the drawing's lightest tone,
+ * half clear, fading at the end.
+ */
+export const LOOKS: Record<string, Record<string, unknown>> = {
+  neutral: { edge: "neutral" },
+  burn: { edge: [["#fff2b0", "#ffa040"], ["#ff8a30", "#c8361e"], ["#a02818", "#3a2a2a"], ["#4a4040", "#2a2626"]], char: { width: 3, tones: ["#8a5a30", "#3a2618", "#141010"] }, glow: 1, debris: "ash" },
+  acid: { edge: [["#e8ff80", "#9adf40"], ["#9adf40", "#5a8a2a"]], char: { width: 4, tones: ["#c8d860", "#7a9a30", "#4a6a28"], desat: 0.7 }, glow: 0.4, debris: "acid" },
+  magic: { edge: ["#fff4b0", "#ffae3c"], glow: 1, debris: "sparks" },
+  frost: { edge: ["#ffffff", "#bfe8ff"], char: { width: 3, tones: ["#d8f0ff", "#9ccbf0"], desat: 0.6 }, glow: 0.5, debris: "frost", jag: 0.5 },
+};
+/** What falls off, by kind: its tones young to old, how many of the gone pixels throw one, how far they go (px) and which way. */
+const DEBRIS: Record<string, { keys: string[]; density: number; life: number; dx: number; dy: number; fall?: boolean }> = {
+  ash: { keys: ["#2a2424", "#5a5252", "#8a8282"], density: 0.1, life: 0.3, dx: 3, dy: -14 },
+  acid: { keys: ["#c8ff60", "#8ac838", "#5a8a2a"], density: 0.07, life: 0.25, dx: 0, dy: 12, fall: true },
+  frost: { keys: ["#ffffff", "#cfeaff", "#9ccbf0"], density: 0.06, life: 0.35, dx: 2, dy: 8 },
+  sparks: { keys: ["#fffbe0", "#ffe080", "#ffae3c"], density: 0.08, life: 0.25, dx: 1, dy: -10 },
+};
+/** A dissolve's edge: none, the neutral ring, or ring keys over the progress (one entry when it doesn't change). */
+type EdgeSpec = { none: true } | { neutral: true } | { over: Color[][] };
+export const dissolveEdge = (v: unknown, what: string, pal: Palette): EdgeSpec => edgeSpec(v, what, pal) as EdgeSpec;
+export const dissolveChar = (v: unknown, what: string, pal: Palette) => charSpec(v, what, pal);
+const edgeSpec: Check = (v, what, pal): EdgeSpec => {
+  if (v === undefined || v === false) return { none: true };
+  if (v === "neutral") return { neutral: true };
+  if (typeof v === "string") return { over: [colors(v, what, pal) as Color[]] };
+  if (!Array.isArray(v)) throw new PxError(`${what} is keys ("yo"), a list of them over the progress ([["y?", "?r", "r0"]]), or false, got ${JSON.stringify(v)}`);
+  // a list over the progress when an entry is itself several keys (a string of two or more, or a list)
+  const over = v.some((e) => Array.isArray(e) || (typeof e === "string" && !e.startsWith("#") && [...e].length > 1));
+  return over ? { over: v.map((e) => colors(e, what, pal) as Color[]) } : { over: [colors(v, what, pal) as Color[]] };
+};
+const charSpec: Check = (v, what, pal) => {
+  if (v === undefined || v === false || v === 0) return undefined;
+  const o = (typeof v === "number" ? { width: v } : v) as { width?: number; tones?: unknown; amount?: number; desat?: number };
+  if (typeof o !== "object" || !(Number.isInteger(o.width) && o.width! >= 1 && o.width! <= 32) || !(o.amount === undefined || (o.amount >= 0 && o.amount <= 1)) || !(o.desat === undefined || (o.desat >= 0 && o.desat <= 1)))
+    throw new PxError(`${what} is a width in px, or { width, tones, amount (0..1), desat (0..1) }: a band ahead of the edge going toward its tones, got ${JSON.stringify(v)}`);
+  return { width: o.width!, tones: o.tones === undefined ? colors(["#6a4a30", "#201818"], what, pal) : colors(o.tones, what, pal), amount: o.amount ?? 0.85, desat: o.desat ?? 0 };
+};
+const debrisSpec: Check = (v, what, pal) => {
+  if (v === undefined || v === false || v === "none") return undefined;
+  const o = (typeof v === "string" ? { kind: v } : v) as { kind?: string; keys?: unknown; density?: number; life?: number };
+  const base = DEBRIS[o?.kind ?? ""];
+  if (!base || !(o.density === undefined || (o.density >= 0 && o.density <= 1)) || !(o.life === undefined || (o.life > 0 && o.life <= 1)))
+    throw new PxError(`${what} is ${Object.keys(DEBRIS).map((k) => `"${k}"`).join(", ")}, or { kind, keys, density (0..1), life (0..1 of the progress) }, got ${JSON.stringify(v)}`);
+  return { ...base, keys: colors(o.keys ?? base.keys, what, pal), density: o.density ?? base.density, life: o.life ?? base.life };
+};
+/** A color pushed toward a tone by t, grey first by `desat` of t (sRGB, its alpha kept). */
+export function toward(c: Color, tone: Color, t: number, desat = 0): Color {
+  const r = c >>> 24, g = (c >>> 16) & 255, b = (c >>> 8) & 255, y = 0.2126 * r + 0.7152 * g + 0.0722 * b, d = desat * t;
+  const m = (v: number, s: number) => Math.round(v + (y - v) * d + (s - (v + (y - v) * d)) * t);
+  return pack(m(r, tone >>> 24), m(g, (tone >>> 16) & 255), m(b, (tone >>> 8) & 255), c & 255);
+}
+/** The lightest color of a drawing (white when it has none). */
+export const lightestOf = (img: Img): Color => lightest(img);
+function lightest(img: Img): Color {
+  let best = 0xffffffff, l = -1;
+  for (const c of new Set(img.data)) {
+    if ((c & 255) === 0) continue;
+    const y = 0.2126 * (c >>> 24) + 0.7152 * ((c >>> 16) & 255) + 0.0722 * ((c >>> 8) & 255);
+    if (y > l) { l = y; best = c; }
+  }
+  return best;
+}
+
 /** The orders a dissolve can eat a drawing (or a face) in. */
 export const PATTERNS = ["noise", "top", "bottom", "left", "right", "out", "in", "scatter", "scan", "mask"];
 /** Rows of a scan in the order they go: every fourth from the top, then the ones two below, then the rest. */
@@ -166,39 +232,75 @@ export const EFFECTS: Record<string, Effect> = {
    */
   dissolve: {
     params: {
-      progress: num(0.5, 0, 1), scale: num(6, 0.5), edge: colors, pixel: PIXEL, pattern: oneOf(...PATTERNS), ragged: num(0.25, 0, 1),
+      progress: num(0.5, 0, 1), scale: num(6, 0.5), edge: edgeSpec, pixel: PIXEL, pattern: oneOf(...PATTERNS), ragged: num(0.25, 0, 1),
       at: (v, what) => { if (v !== undefined && !(Array.isArray(v) && v.length === 2 && v.every(Number.isFinite))) throw new PxError(`${what} is [x, y] in the drawing, got ${JSON.stringify(v)}`); return v; },
       mask: (v, what) => { if (v !== undefined && typeof v !== "string") throw new PxError(`${what} is an asset's name, got ${JSON.stringify(v)}`); return v; },
+      look: (v, what) => { if (v !== undefined && !(typeof v === "string" && LOOKS[v])) throw new PxError(`${what} is ${Object.keys(LOOKS).map((k) => `"${k}"`).join(", ")}, got ${JSON.stringify(v)}`); return v; },
+      char: charSpec, glow: num(0, 0, 1), debris: debrisSpec, jag: num(1, 0, 1),
     },
+    // a look sets what isn't given; with neither a look nor an edge, the neutral one
+    prepare: (o) => ({ ...LOOKS[(o.look as string) ?? (o.edge === undefined ? "neutral" : "")], ...o }),
     run(src, p, x) {
       const out = new Img(src.w, src.h, src.data.slice()), K: number = p.pixel, W = src.w, H = src.h;
       if (p.progress <= 0) return out;
       if (p.progress >= 1) return new Img(W, H);
-      const order = holeOrder(src, p, x), keys: Color[] = p.edge;
+      const order = holeOrder(src, p, x), E = p.edge as EdgeSpec, ch = p.char as { width: number; tones: Color[]; amount: number; desat: number } | undefined;
+      // the ring keys now (the neutral ring: the lightest tone, half clear, gone over the last 15%)
+      const fadeEnd = 1 - Math.min(1, Math.max(0, (p.progress - 0.85) / 0.15));
+      const keys: Color[] = "over" in E ? E.over[Math.min(E.over.length - 1, Math.floor(p.progress * E.over.length))] : "neutral" in E ? [(((lightest(src) & ~255) | Math.round(127 * fadeEnd)) >>> 0)] : [];
+      const glow = p.glow > 0 ? (out.emit = new Uint8Array(W * H)) : undefined, nE = keys.length, cw = ch?.width ?? 0;
+      const charAt = (i: number, t: number) => { const tone = ch!.tones[Math.min(ch!.tones.length - 1, Math.floor(t * ch!.tones.length))]; out.data[i] = toward(src.data[i], tone, ch!.amount * t, ch!.desat); };
+      let thr = p.progress, band = false;
       if (p.pattern === "scatter" || p.pattern === "scan") {
         // scattered holes have no rim to ring: the pixels next to go glow first, a band of the order a key
-        const w = 0.06 * keys.length, thr = -w + p.progress * (1 + w);
+        const w = 0.06 * nE, c = 0.04 * cw;
+        thr = -w + p.progress * (1 + w);
+        band = true;
         each(src, x, K, (i, ax, ay, px, py) => {
           if (src.data[i] === TRANSPARENT) return;
           const v = order(ax, ay, px, py);
           if (v < thr) out.data[i] = TRANSPARENT;
-          else if (v < thr + w) out.data[i] = keys[Math.min(keys.length - 1, Math.floor((v - thr) / 0.06))];
+          else if (v < thr + w) { const k = Math.min(nE - 1, Math.floor((v - thr) / 0.06)); out.data[i] = keys[k]; if (glow) glow[i] = Math.round(255 * p.glow * (1 - k / nE)); }
+          else if (ch && v < thr + w + c) charAt(i, 1 - (v - thr - w) / c);
         });
-        return out;
+      } else {
+        // ring: 0 a hole, k the k-th ring round one, 255 neither (yet); the edge's rings, then the char's
+        const ring = new Uint8Array(W * H).fill(255);
+        each(src, x, K, (i, ax, ay, px, py) => {
+          if (src.data[i] !== TRANSPARENT && order(ax, ay, px, py) < thr) { ring[i] = 0; out.data[i] = TRANSPARENT; }
+        });
+        for (let k = 1; k <= nE + cw; k++)
+          for (let py = 0; py < H; py++)
+            for (let px = 0; px < W; px++) {
+              const i = py * W + px;
+              if (ring[i] !== 255 || src.data[i] === TRANSPARENT) continue;
+              const was = (qx: number, qy: number) => qx >= 0 && qy >= 0 && qx < W && qy < H && ring[qy * W + qx] === k - 1;
+              if (!(was(px - K, py) || was(px + K, py) || was(px, py - K) || was(px, py + K))) continue;
+              ring[i] = k;
+              if (k <= nE) {
+                // (frost: the outer rings only here and there, as crystals)
+                if (k > 1 && p.jag < 1 && hash(Math.floor(px / K), Math.floor(py / K), x.seed + 31) / 4294967296 > p.jag) { if (ch) charAt(i, 1); continue; }
+                out.data[i] = keys[k - 1];
+                if (glow) glow[i] = Math.round(255 * p.glow * (1 - (k - 1) / nE));
+              } else charAt(i, 1 - (k - nE - 1) / cw);
+            }
       }
-      // ring: 0 a hole, k the k-th ring round one, 255 neither (yet)
-      const ring = new Uint8Array(W * H).fill(255);
-      each(src, x, K, (i, ax, ay, px, py) => {
-        if (src.data[i] !== TRANSPARENT && order(ax, ay, px, py) < p.progress) { ring[i] = 0; out.data[i] = TRANSPARENT; }
-      });
-      for (let k = 1; k <= keys.length; k++)
-        for (let py = 0; py < H; py++)
-          for (let px = 0; px < W; px++) {
-            const i = py * W + px;
-            if (ring[i] !== 255 || out.data[i] === TRANSPARENT) continue;
-            const was = (qx: number, qy: number) => qx >= 0 && qy >= 0 && qx < W && qy < H && ring[qy * W + qx] === k - 1;
-            if (was(px - K, py) || was(px + K, py) || was(px, py - K) || was(px, py + K)) { ring[i] = k; out.data[i] = keys[k - 1]; }
-          }
+      // debris from the pixels gone: each of a few throws one off as it goes, aged by how far the
+      // front has gone past it since (so it moves as the progress does, on the clock that drives it)
+      const db = p.debris as { keys: Color[]; density: number; life: number; dx: number; dy: number; fall?: boolean } | undefined;
+      if (db)
+        each(src, x, K, (i, ax, ay, px, py) => {
+          if (src.data[i] === TRANSPARENT || px % K || py % K) return;
+          const h = hash(ax, ay, x.seed + 77) / 4294967296;
+          if (h >= db.density) return;
+          const v = order(ax, ay, px, py), a = (thr - v) / db.life;
+          if (a <= 0 || a >= 1) return;
+          const side = (hash(ax, ay, x.seed + 78) / 4294967296) * 2 - 1, wob = Math.sin(a * 7 + side * 40) * 1.5;
+          const X = px + K * Math.round(db.dx * a * side + wob), Y = py + K * Math.round(db.fall ? db.dy * a * a : db.dy * a);
+          const key = db.keys[Math.min(db.keys.length - 1, Math.floor(a * db.keys.length))];
+          if (a > 0.7 && bayer(ax, ay) > 0.5) return;
+          for (let j = 0; j < K; j++) for (let q = 0; q < K; q++) if (X + q >= 0 && Y + j >= 0 && X + q < W && Y + j < H) out.data[(Y + j) * W + X + q] = key;
+        });
       return out;
     },
   },
@@ -386,6 +488,32 @@ export const EFFECTS: Record<string, Effect> = {
     },
   },
   /**
+   * Energy, a spell's matter: inside the drawing (its shape the mask), noise `scale` px a cell flowing
+   * round `speed` cells a loop, laid on the `keys` dark to bright in clustered bands, `rim` px of its
+   * edge in the brightest; all of it marked as giving light (the bright bands most). Then a distort
+   * and a dissolve after it make it a spell: `effect("energy", ...), effect("distort", ...)`.
+   */
+  energy: {
+    params: { keys: (v, what, pal) => { const c = colors(v, what, pal) as Color[]; if (c.length < 2) throw new PxError(`${what}: give two or more keys, dark to bright ("bBcw")`); return c; },
+      scale: num(4, 0.5), speed: num(1, 0), rim: num(1, 0, 8, true), pixel: PIXEL },
+    run(src, p, x) {
+      const keys: Color[] = p.keys, nk = keys.length, K: number = p.pixel, W = src.w, H = src.h, out = new Img(W, H, src.data.slice()), glow = (out.emit = new Uint8Array(W * H));
+      const n = noise(x.seed), a = 2 * Math.PI * turn(x), r = p.speed / (2 * Math.PI), u0 = r * Math.cos(a), v0 = r * Math.sin(a);
+      // how far in from the edge each pixel is (up to rim + 1), a block at a time
+      const inside = (px: number, py: number) => px >= 0 && py >= 0 && px < W && py < H && src.data[py * W + px] !== TRANSPARENT;
+      each(src, x, K, (i, ax, ay, px, py) => {
+        const c = src.data[i];
+        if (c === TRANSPARENT) return;
+        let edge = false;
+        for (let d = 1; d <= p.rim && !edge; d++) edge = !inside(px - d * K, py) || !inside(px + d * K, py) || !inside(px, py - d * K) || !inside(px, py + d * K);
+        const k = edge ? nk - 1 : Math.min(nk - 1, Math.floor(n(ax / p.scale + u0, ay / p.scale + v0) * nk));
+        out.data[i] = ((keys[k] & ~255) | (c & 255)) >>> 0;
+        glow[i] = Math.round(255 * (0.35 + (0.65 * k) / (nk - 1)));
+      });
+      return out;
+    },
+  },
+  /**
    * Emission: the pixels (`on` keys, `where`) give light: `strength` of `color` (default their own)
    * added in linear light, what goes past white spilling into the other channels (a hot core turns
    * white). `pulse` takes that much of it away and back over the loop.
@@ -424,6 +552,9 @@ export function runEffect(name: string, src: Img, opts: Record<string, unknown>,
   const fx = EFFECTS[name];
   if (!fx) throw new PxError(`effect: no effect '${name}'${didYouMean(String(name), Object.keys(EFFECTS))}; there are ${Object.keys(EFFECTS).join(", ")}`);
   const allowed = [...Object.keys(fx.params), ...COMMON];
+  for (const k of Object.keys(opts))
+    if (!allowed.includes(k)) throw new PxError(`effect "${name}": unknown option '${k}'${didYouMean(k, allowed)} (allowed: ${allowed.join(", ")})`);
+  if (fx.prepare) opts = fx.prepare(opts);
   for (const k of Object.keys(opts))
     if (!allowed.includes(k)) throw new PxError(`effect "${name}": unknown option '${k}'${didYouMean(k, allowed)} (allowed: ${allowed.join(", ")})`);
   const p: Params = {};

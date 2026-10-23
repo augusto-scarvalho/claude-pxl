@@ -524,6 +524,11 @@ happens after another, never all at once.
   shaded key a mid grey: a dark one reads as a gap and the puff splits in two bands.
 - **Auras** (`effect("aura")`): 3-4 px round a 26 px figure in three keys, the lightest next to it,
   flicker 0.6 on cells of 3.5 px (at 2 px the edge turned to speckle).
+- **What eats a thing** (the dissolve's `look`): a burn browns and blackens a band ahead of its
+  orange edge, the edge going red then grey as it goes, ash rising; acid greens and greys the
+  material ahead of a green edge, drips falling; frost pales it blue behind a white crystal edge;
+  magic is gold with sparkles. Without a theme, `neutral`: a thin ring of the thing's own lightest
+  tone, half clear. Give the edge's keys over the progress for a color that changes as it goes.
 - **Shader effects** (`effect()`, `PXL help effect`): a teleport or a death as a dissolve over 1 s
   (12 frames), holes in blobs about a quarter of the figure wide and 2 rings, the first white-yellow;
   a hit's poison or frost as a `tint` of 0.3-0.5 then `dither` back to the palette; a ghost or heat

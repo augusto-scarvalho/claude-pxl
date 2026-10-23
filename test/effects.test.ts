@@ -278,3 +278,33 @@ test("smoke: a column, a puff, a bank and a ring in clustered tones and three op
   assert.ok(over.data.every((c) => [0xfff1e8ff, 0x00e436ff, 0x000000ff, 0xff004dff].includes(c)), "over a ground: its keys or the ground, no opacity");
   assert.match(failure(PALS + 'sprite("s", { w: 4, h: 4 }, smoke(2, 2, "wgk", { shape: "cone" }))', "s").message, /shape is "column", "puff", "bank" or "ring"/);
 });
+
+test("dissolve looks: neutral by default, edge: false, keys over the progress, a char ahead of the edge, glow, debris, presets", () => {
+  const sq = (fx: string) => load(`sprite("s", { w: 24, h: 24 }, rect(4, 4, 16, 16, "g"), rect(4, 4, 16, 2, "w"), ${fx})`).image("s");
+  const plain = sq('rect(0, 0, 1, 1, "_")'), G = 0x00e436ff, Wt = 0xfff1e8;
+  const half = (img: Img) => [...img.data].filter((c) => (c & 255) > 0 && (c & 255) < 255);
+  const neutral = sq('effect("dissolve", { progress: 0.4, scale: 3, pattern: "top", ragged: 0 })');
+  assert.ok(half(neutral).length > 0 && half(neutral).every((c) => c >>> 8 === Wt && (c & 255) === 127), "neutral: one ring, the lightest tone, half clear");
+  assert.equal(half(sq('effect("dissolve", { progress: 0.4, scale: 3, pattern: "top", ragged: 0, edge: false })')).length, 0, "edge: false: only holes");
+  assert.ok(half(sq('effect("dissolve", { progress: 0.95, scale: 3, pattern: "top", ragged: 0 })')).every((c) => (c & 255) < 127), "the neutral ring fades at the end");
+  const over = (p: number) => sq(`effect("dissolve", { progress: ${p}, pattern: "top", ragged: 0, edge: [["y", "o"], ["r", "k"]] })`);
+  assert.ok(over(0.3).data.includes(0xffec27ff) && !over(0.3).data.includes(0xff004dff), "the first keys early");
+  assert.ok(over(0.7).data.includes(0xff004dff) && !over(0.7).data.includes(0xffec27ff), "the last keys late");
+  // char: rows below the edge's ring pushed toward black, the rest as drawn
+  const charred = sq('effect("dissolve", { progress: 0.25, pattern: "top", ragged: 0, edge: "y", char: { width: 3, tones: ["#000000"] } })');
+  const rowOf = (img: Img, y: number) => img.get(12, y);
+  const ringY = [...Array(24).keys()].find((y) => rowOf(charred, y) === 0xffec27ff)!;
+  assert.ok(rowOf(charred, ringY + 1) !== G && (rowOf(charred, ringY + 1) >>> 24) < (rowOf(charred, ringY + 3) >>> 24 || 255), "darkest right ahead of the edge");
+  assert.equal(rowOf(charred, ringY + 4), G, "past its width, as drawn");
+  const glowing = sq('effect("dissolve", { progress: 0.3, edge: "y", glow: 1 })');
+  assert.ok(glowing.emit && [...glowing.data.keys()].every((i) => (glowing.data[i] === 0xffec27ff) === (glowing.emit![i] > 0)), "glow: the edge marked as giving light");
+  // debris: ash rising from where it went, seeded
+  const ash = sq('effect("dissolve", { progress: 0.5, pattern: "bottom", ragged: 0, edge: false, debris: { kind: "ash", density: 1 } })');
+  assert.ok([...Array(4).keys()].some((y) => [...Array(24).keys()].some((x) => ash.get(x, y) !== 0)), "flakes above the drawing");
+  assert.ok(same(ash, sq('effect("dissolve", { progress: 0.5, pattern: "bottom", ragged: 0, edge: false, debris: { kind: "ash", density: 1 } })')));
+  const burn = sq('effect("dissolve", { look: "burn", progress: 0.4 })'), noGlow = sq('effect("dissolve", { look: "burn", progress: 0.4, glow: 0 })');
+  assert.ok(burn.emit?.some((v) => v > 0) && !noGlow.emit?.some((v) => v > 0), "a look, and what is given over it");
+  assert.ok(!same(sq('effect("dissolve", { look: "acid", progress: 0.4 })'), sq('effect("dissolve", { look: "frost", progress: 0.4 })')));
+  assert.match(failure(PALS + 'sprite("s", { w: 4, h: 4 }, rect(0, 0, 4, 4, "g"), effect("dissolve", { look: "lava" }))', "s").message, /look is "neutral", "burn", "acid", "magic", "frost"/);
+  void plain;
+});

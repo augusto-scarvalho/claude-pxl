@@ -244,6 +244,8 @@ export interface PlaceOpts {
    * own lowest pixel (a base that isn't level: a tent seen at an angle, a crate on a slope).
    */
   castBase?: "pivot" | "column";
+  /** Effects on this copy alone: ["dissolve", { progress }] or a list of them, on the canvas's clock. */
+  fx?: unknown;
   /** Attach to a socket of an earlier placement in this asset: "id.socket"; x, y become an offset from it. */
   at?: string;
   /** Name this placement for `at` (default: the asset name). */

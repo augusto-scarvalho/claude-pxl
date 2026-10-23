@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**344 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**345 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -27,7 +27,7 @@ page lists what the fork adds. Every commit is in
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [environment](../environment.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 54 |
-| Tests | 59 | 286 |
+| Tests | 59 | 291 |
 
 ## Looking and checking
 
@@ -64,6 +64,7 @@ moved into the DSL where every scene can use it.
 | Import and export | `build --share N` (each asset N times bigger, clean, to post), PNG import (`shrink`, `palettize` to the nearest key in OKLab), Aseprite export (layers, frames, tags, palette, slices), GIFs that keep small figures' colors in lit scenes. |
 | Procedural | `hash`, `vnoise`, `fbm`, `bayer`, `seamless`; `scroll()` for parallax planes, `clouds()`, `plume()` for smoke and steam. |
 | Effects | `effect()`: what a shader does, done on the CPU on a sprite, an anim's frame or a layer, on the clock and a seed, so every frame is the same in the viewer, `shot` and the exports: `dissolve` (noise holes with burning rings), `pixelate`, `dither` to the palette, `tint` (kept in the palette with `ramp`), `distort` (a UV distortion that loops), `sway` (a plant in the wind: its foot still, its rows bending by their height, each copy out of step with `reseed`, a gust across the scene with `delay`; in `mesh()` its shadow sways too), `emit` (the pixels marked as giving light, the mark travelling with them), `aura` (the silhouette grown into a flickering glow that hugs every pose); the dissolve in patterns (sweeps, radial, scatter, scanlines, a painted mask). `smoke()`: a column on a path, a puff, a bank or a ring of lit billows in three opacities. In `mesh()`: what emits is drawn as it is and lights what is round it, faces dissolve with holes that let the sun through, and sprites blend over what is behind (`alpha`, `add`, `screen`) at their depth. |
+| Abilities | `ability()` for a spell's phases on the clock (charge, cast, travel, impact, dissipate) and a point along its way, `emitter()` for seeded particles in closed form, `particles()` and `trail()` drawn on the clock (any frame sought alone comes out the same), `effect("energy")` for its matter, a placement's `fx` (effects on one copy), `c.socket()` and `c.meshSocket()` for a hand. The dissolve's looks: what eats a thing (a burn, acid, magic, frost, or a neutral ring by default), its edge's colors over the progress, a char band ahead of it, glow, seeded debris. |
 | The ground and what grows on it | An [environment guide](../environment.md): grass, trees, bushes, rocks, walls, paths and small things as 16-bit games draw them, from SLYNYRD's, Saint11's and final boss blues' tutorials and `pxl study` on seven games' sheets, with the numbers to check a drawing against; and a [nature kit](../examples/nature/kit.px.js) to include, with builders for more (`grassTile`, `pine`, `bush`, `rampart`). |
 
 ## Characters, animation and rigs

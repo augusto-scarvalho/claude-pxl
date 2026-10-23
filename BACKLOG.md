@@ -871,4 +871,13 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   on a path, a puff, a bank or a ring of lit billows in three opacities (dithered in the palette over
   what is drawn); the dissolve's `pattern` (sweeps, radial, scatter, scan, a painted mask) on sprites
   and on mesh faces. A variant of an anim timed by its frame()s now keeps their pace (it took 8 fps).
+- [ ] **Abilities**: `ability()` (phases in time, events, a point along the way), `emitter()` (seeded
+  particles in closed form, bursts, loops that close), `particles()` and `trail()` drawn on the clock,
+  `effect("energy")`, a placement's `fx` (effects on one copy, on stamps and mesh() sprites),
+  `c.socket()` and `c.meshSocket()` for a spell's start at a hand. Left: a cast pose for the traveler
+  (blocks first), a trail as a ribbon in mesh() (today a few sprites at past moments).
+- [ ] **Dissolve looks**: `look` (neutral by default, burn, acid, magic, frost), the edge's keys over
+  the progress, a char band ahead of the edge, glow, seeded debris (ash, drips, frost, sparks) aged by
+  the progress; on sprites and on mesh faces (no debris on faces: a face's pieces would need the
+  world's particles).
 

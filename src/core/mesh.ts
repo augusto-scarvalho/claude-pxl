@@ -13,7 +13,7 @@ import { PxError } from "./errors.ts";
 import type { Img } from "./image.ts";
 import { type Perspective, type View, perspective } from "./perspective.ts";
 import { type Lamp, type Lit, SunMap, shine } from "./sunlight.ts";
-import { PATTERNS, SCAN, noise } from "./effects.ts";
+import { PATTERNS, SCAN, noise, toward } from "./effects.ts";
 import { hash } from "./util.ts";
 import { bayer } from "./util.ts";
 
@@ -62,7 +62,7 @@ export interface Material {
    * round the holes (it gives light: drawn as it is). What the holes leave shows what is behind them
    * and lets the sun through: the face's shadow has the same holes
    */
-  dissolve?: { progress: number; scale?: number; seed?: number; edge?: string; width?: number; pattern?: string; ragged?: number; at?: V3; mask?: string };
+  dissolve?: { progress: number; scale?: number; seed?: number; edge?: unknown; width?: number; pattern?: string; ragged?: number; at?: V3; mask?: string; look?: string; char?: unknown; glow?: number };
 }
 export interface MeshSprite {
   /** an asset's name (an animation plays on the scene's clock) */
@@ -76,6 +76,8 @@ export interface MeshSprite {
   rdelay?: boolean;
   seed?: number;
   reseed?: boolean | number;
+  /** effects on this sprite alone, as a stamp's `fx` */
+  fx?: unknown;
   /** the contact shadow's radius in m, 0 for none (default: a third of the sprite's width; none for a blended one) */
   shadow?: number;
   /**
@@ -125,6 +127,8 @@ export interface MeshWorld {
   tex: Record<string, Img>;
   /** a dissolving material's mask (pattern "mask"), by material */
   masks?: Record<string, Img>;
+  /** a dissolving material's look, its keys resolved: the edge's keys over the progress (or the neutral ring's tone), its char, its glow */
+  looks?: Record<string, { over?: Color[][]; neutral?: Color; char?: { width: number; tones: Color[]; amount: number; desat: number }; glow: number }>;
   sprites: { name: string; img: Img; at: V3; shadow?: number; blend?: MeshSprite["blend"]; opacity?: number; light?: MeshSprite["light"] }[];
   step(c: Color, n: number): Color;
   /** the light, its colors resolved (with `sun`) */
@@ -223,7 +227,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     if (!(typeof progress === "number" && progress >= 0 && progress <= 1) || !(scale > 0) || !Number.isInteger(seed) || !(width >= 0 && width <= 1) || !PATTERNS.includes(pattern) || !(ragged >= 0 && ragged <= 1)
       || (D.at !== undefined && !(Array.isArray(D.at) && D.at.length === 3 && D.at.every(Number.isFinite))) || (pattern === "mask" && !world?.masks?.[name]))
       throw new PxError(`mesh: material '${name}' has dissolve ${JSON.stringify(D)}: { progress (0..1), scale (m, above 0), seed (whole), edge (a key), width (0..1), pattern (${PATTERNS.join(", ")}), ragged (0..1), at ([x, z, up]), mask (an asset, for pattern "mask") }`);
-    const f = noise(seed), w = D.edge ? width : 0, thr = -w + progress * (1 + w);
+    const lk = world?.looks?.[name], ch = lk?.char, w = lk?.over || lk?.neutral ? width : 0, cw = ch ? 0.03 * ch.width : 0, f = noise(seed), thr = -w + progress * (1 + w);
     const [tu, tv] = Array.isArray(M.texel) ? M.texel : [M.texel ?? 1 / 16, M.texel ?? 1 / 16], snap = M.tex !== undefined;
     // the extent of its faces, for the sweeps, the radial order and the mask
     const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
@@ -245,10 +249,11 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
         : pattern === "scan" ? (SCAN[((Math.floor(Q[UP] / (snap ? tv : scale / 4)) % 4) + 4) % 4] + Math.min(0.9999, 1 - up)) / 4
         : pattern === "mask" ? (() => { const c = mask!.get(Math.floor(across * mask!.w), Math.floor((1 - up) * mask!.h)); return c === TRANSPARENT ? 0.9999 : Math.min(0.9999, (0.2126 * (c >>> 24) + 0.7152 * ((c >>> 16) & 255) + 0.0722 * ((c >>> 8) & 255)) / 255); })()
         : nz;
-      return o < thr ? 1 : o < thr + w ? 2 : 0;
+      // a hole; the edge (2 and up: 2 + its band's place, 0..1); the char ahead of it (-t, its strength)
+      return o < thr ? 1 : o < thr + w ? 2 + (o - thr) / w : o < thr + w + cw ? -(1 - (o - thr - w) / cw) : 0;
     });
   }
-  const burn = holes.size ? new Uint8Array(W * H) : undefined;
+  const burn = holes.size ? new Float32Array(W * H) : undefined;
   faces.forEach((F, k) => {
     if (!F || !Array.isArray(F.pts) || F.pts.length < 3) throw new PxError(`mesh: face ${k} needs a material and 3 or more corners, { mat, pts: [[x, y, z], ...] } (model().face(mat, ...points))`);
     const M = mats[F.mat];
@@ -367,7 +372,14 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     const i = y * W + x, k = who[i];
     if (k < 0) continue;
     const F = faces[k], M = mats[F.mat], r = ramps[F.mat], N = normals[k], B = M.block ?? 1, bx = Math.floor((x + x0) / B), by = Math.floor((y + y0) / B);
-    if (burn?.[i] === 2) { c.px(x + x0, y + y0, M.dissolve!.edge!); continue; }
+    // a dissolving face's edge in its keys of the moment, drawn as it is (the neutral one and the char after)
+    const lk = burn?.[i] && burn[i] >= 2 ? world?.looks?.[F.mat] : undefined;
+    if (lk?.over) {
+      const keys = lk.over[Math.min(lk.over.length - 1, Math.floor(M.dissolve!.progress * lk.over.length))];
+      c.plot(x + x0, y + y0, keys[Math.min(keys.length - 1, Math.floor((burn![i] - 2) * keys.length))]);
+      if (lk.glow) (c.img.emit ??= new Uint8Array(n))[i] = Math.round(255 * lk.glow);
+      continue;
+    }
     // a floor reads the texture across and away, a wall across and down; light steps each texel along its ramp
     const texCol = () => {
       const tk = texOf[k]!, lit = L ? tk.T.data : litTex(k, tk.T);
@@ -410,6 +422,16 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     const tx = M.texture && !line && !rim ? Math.round(M.texture(B > 1 ? bx : x + x0, B > 1 ? by : y + y0)) : 0;
     c.px(x + x0, y + y0, line ?? (rim ? M.top ?? r[Math.min(r.length - 1, lv + 1)] : r[Math.max(0, Math.min(r.length - 1, lv + tx))]));
   }
+  // the char ahead of a dissolving face's edge, and the neutral ring: over what the face drew
+  if (burn)
+    for (let i = 0; i < n; i++) {
+      const b = burn[i], k = who[i];
+      if (!b || k < 0 || b === 1) continue;
+      const lk = world?.looks?.[faces[k].mat], x = (i % W) + x0, y = Math.floor(i / W) + y0, col = c.get(x, y);
+      if (!lk || col === TRANSPARENT) continue;
+      if (b >= 2 && lk.neutral !== undefined) c.plot(x, y, toward(col, lk.neutral, 0.5 * (1 - Math.max(0, (mats[faces[k].mat].dissolve!.progress - 0.85) / 0.15))));
+      else if (b < 0 && lk.char) c.plot(x, y, toward(col, lk.char.tones[Math.min(lk.char.tones.length - 1, Math.floor(-b * lk.char.tones.length))], lk.char.amount * -b, lk.char.desat));
+    }
   const keep = () => {
     // the depth stays on the image for post(); a second mesh() keeps the nearer of the two
     const d = (c.img.depth ??= new Float32Array(n).fill(Infinity));

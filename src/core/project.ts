@@ -18,6 +18,7 @@ import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
 import { type Lut, readCube } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
+import { ability, emitter } from "./vfx.ts";
 import { bayer, fbm, globRe, latticeHash, rng, vnoise, seamless } from "./util.ts";
 
 /**
@@ -59,6 +60,8 @@ export const SIGNATURES: Record<string, string> = {
   clouds: "opts:o",
   plume: "x:n y:n keys:s ?opts:o",
   smoke: "x:n y:n keys:s ?opts:o",
+  particles: "emit:f keys:s ?opts:o",
+  trail: "path:f keys:s ?opts:o",
   rampmap: "ramp:S ?opts:o",
   stamp: "name:s ?x:n y:n opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
@@ -80,7 +83,7 @@ export const SIGNATURES: Record<string, string> = {
 };
 
 /** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
-const CLOCKED = new Set(["flame", "scroll", "clouds", "plume", "effect", "smoke"]);
+const CLOCKED = new Set(["flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail"]);
 /** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
 function drawsWithFunctions(items: Item[]): boolean {
   return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
@@ -92,7 +95,7 @@ function readsClock(items: Item[]): boolean {
 }
 
 /** Options every placement takes (stamp, tile, pattern, panel, scatter, tilemap, wire hangs). */
-const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay"];
+const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay", "fx"];
 /** Allowed option keys of ops whose last argument is an options object. */
 export const OP_OPTS: Record<string, string[]> = {
   stamp: [...PLACE, "sub", "smear", "at", "id", "z"],
@@ -123,6 +126,8 @@ export const OP_OPTS: Record<string, string[]> = {
   clouds: ["y", "gap", "w", "h", "n", "seed", "keys", "x", "empty", "sizes", "frame"],
   plume: ["every", "life", "rise", "wind", "inertia", "size", "young", "seed", "frame", "light"],
   smoke: SMOKE_OPTS,
+  particles: ["x", "y", "trail", "size"],
+  trail: ["length", "width", "fade", "step", "from"],
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
@@ -578,6 +583,23 @@ export class Project implements BuildCtx {
         }
         return { __op: true, name: "pose", args: [readJoints(data), opts], loc };
       } catch (e) { throw wrap(e).within("pose", loc); }
+    };
+    // ability(phases, opts) and emitter(opts): a spell's phases on the clock, and seeded particles (vfx.ts)
+    env.ability = (phases: unknown, opts: unknown = {}) => {
+      const loc = this.callerLoc();
+      try {
+        if (!isPlainObject(opts)) throw new PxError("ability(phases, { start, events })");
+        checkKeys("ability", opts, ["start", "events"]);
+        return ability(phases as never, opts as never);
+      } catch (e) { throw wrap(e).within("ability", loc); }
+    };
+    env.emitter = (opts: unknown = {}) => {
+      const loc = this.callerLoc();
+      try {
+        if (!isPlainObject(opts)) throw new PxError("emitter({ at, rate | burst, from, to, life, speed, angle, spread, gravity, drag, loop, seed })");
+        checkKeys("emitter", opts, ["at", "rate", "burst", "from", "to", "life", "speed", "angle", "spread", "gravity", "drag", "loop", "seed"]);
+        return emitter(opts as never);
+      } catch (e) { throw wrap(e).within("emitter", loc); }
     };
     // chain(anchors, opts): hair / tail points per frame, following the anchors with lag (chain.ts).
     env.chain = (anchors: unknown, opts: unknown = {}): number[][][] => {

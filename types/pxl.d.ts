@@ -13,6 +13,8 @@ declare global {
   interface PxPlace {
     /** Of a group or glob, the member whose drawing is nearest this height in px (sizes of one thing). */
     fit?: number;
+    /** Effects on this copy alone, on the canvas's clock: ["dissolve", { progress }] or a list of them. */
+    fx?: PxEffect | PxEffect[];
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; swap?: Record<string, PxColor>;
     rflip?: "x" | "y" | "xy"; rswap?: Record<string, PxColor>[]; seed?: number; reseed?: boolean | number;
     /** Animated assets: freeze on frame n / start later (ms) / random start. */
@@ -186,9 +188,11 @@ declare global {
   /** How a material is drawn by mesh(): its tones dark to light, the outline, the lit top edge, no creases on a round surface, a lift to its light, a dither between tones, a texture stepping the tone per pixel; or `tex`, an asset tiling its faces, `texel` m to its pixel (default 1/16), from the world's origin or each face's (`anchor`); `block` px to one of its pixels (its faces in blocks, pixel art among HD faces). */
   interface PxMaterial { ramp?: string | PxColor[]; edge?: PxColor; top?: PxColor; smooth?: boolean; bias?: number; dither?: number; texture?: (x: number, y: number) => number; tex?: string; texel?: number | [number, number]; anchor?: "world" | "face"; block?: number;
     /** holes eating its faces (and its shadow): progress 0..1, blobs scale m wide, a burning edge key */
-    dissolve?: { progress: number; scale?: number; seed?: number; edge?: PxColor; width?: number; pattern?: PxDissolve["pattern"]; ragged?: number; at?: PxV3; mask?: string } }
+    dissolve?: { progress: number; scale?: number; seed?: number; edge?: PxDissolve["edge"]; width?: number; pattern?: PxDissolve["pattern"]; ragged?: number; at?: PxV3; mask?: string; look?: PxDissolve["look"]; char?: PxDissolve["char"]; glow?: number } }
   /** A sprite standing among mesh()'s faces: its feet at [x, z] or [x, z, up] m, the contact shadow's radius in m (0: none). */
   interface PxMeshSprite { name: string; at: [number, number] | PxV3; flip?: "x"; frame?: number; delay?: number; rdelay?: boolean; seed?: number; reseed?: boolean | number; shadow?: number;
+    /** effects on this sprite alone, as a stamp's */
+    fx?: PxEffect | PxEffect[];
     /** laid over what is behind by its alpha (smoke: "alpha"; light: "add", "screen"), no shadow */
     blend?: "alpha" | "add" | "screen"; opacity?: number;
     /** the light its effect("emit") pixels give round them: r m, strength; false for none */
@@ -270,10 +274,32 @@ declare global {
   interface PxEffectBase { where?: PxRegion; on?: string; seed?: number }
   /** dissolve: noise holes over `progress` (0..1) of the drawing, `scale` px a blob, rings of `edge` keys round them (the first at the hole). */
   interface PxDissolve extends PxEffectBase {
-    progress?: number; scale?: number; edge?: string | string[]; pixel?: number;
+    progress?: number; scale?: number; pixel?: number;
+    /** what eats it: a burn, acid, magic, frost, or the neutral ring (the default with no look and no edge) */
+    look?: "neutral" | "burn" | "acid" | "magic" | "frost";
+    /** its keys, a ring each; a list of them over the progress; false for none */
+    edge?: false | string | string[] | (string | string[])[];
+    /** a band ahead of the edge where its own colors go toward tones */
+    char?: number | { width: number; tones?: string | string[]; amount?: number; desat?: number };
+    glow?: number; jag?: number;
+    debris?: "ash" | "acid" | "frost" | "sparks" | { kind: "ash" | "acid" | "frost" | "sparks"; keys?: string | string[]; density?: number; life?: number };
     /** the order holes come in: noise blobs, a sweep from a side, out from a point or in to it, scattered, scanlines, a painted mask's dark first */
     pattern?: "noise" | "top" | "bottom" | "left" | "right" | "out" | "in" | "scatter" | "scan" | "mask";
     ragged?: number; at?: [number, number]; mask?: string;
+  }
+  /** energy: noise flowing inside the drawing in bands of keys dark to bright, its rim the brightest, marked as giving light. */
+  interface PxEnergy extends PxEffectBase { keys: string | string[]; scale?: number; speed?: number; rim?: number; pixel?: number }
+  /** A spell's phases on the clock: (t) the phase then; start(name) when a phase or event begins; along(from, to, t) a point over "travel". */
+  interface PxAbility {
+    (t: number): { name: string; i: number; k: number; ms: number; since: number; before: boolean; done: boolean };
+    start(name: string): number;
+    total: number;
+    along(from: number[], to: number[], t: number, opts?: { phase?: string; arc?: number; ease?: "linear" | "in" | "out" }): number[];
+  }
+  interface PxParticle { x: number; y: number; vx: number; vy: number; age: number; life: number; id: number }
+  interface PxEmitter {
+    at?: [number, number] | ((t: number) => [number, number]); rate?: number; burst?: number; from?: number; to?: number; life?: [number, number];
+    speed?: [number, number]; angle?: number; spread?: number; gravity?: [number, number]; drag?: number; loop?: number; seed?: number;
   }
   /** aura: the silhouette grown width px in bands of the color keys (inner first), clearer outward by fade; pulse, a flickering edge; only the glow unless keep. */
   interface PxAura extends PxEffectBase { width?: number; color: string | string[]; fade?: number; pulse?: number; flicker?: number; scale?: number; speed?: number; keep?: boolean; pixel?: number }
@@ -297,7 +323,7 @@ declare global {
   interface PxSway extends PxEffectBase { amount?: number; lean?: number; power?: number; still?: number; cycles?: number; flutter?: number; vary?: number; pixel?: number }
   type PxEffect =
     | ["dissolve", PxDissolve?] | ["pixelate", PxPixelate?] | ["dither", PxDitherFx?] | ["tint", PxTint]
-    | ["distort", PxDistort?] | ["sway", PxSway?] | ["emit", PxEmit?] | ["aura", PxAura];
+    | ["distort", PxDistort?] | ["sway", PxSway?] | ["emit", PxEmit?] | ["aura", PxAura] | ["energy", PxEnergy];
   interface PxGlow {
     where?: PxRegion; r?: number; strength?: number; color?: PxColor; bands?: number; ramp?: number;
     /** Keys the halo leaves as drawn: what the glowing thing is made of (the logs and stones under flames). */
@@ -360,6 +386,14 @@ declare global {
     plume(x: number, y: number, keys: string, opts?: PxPlume): void;
     /** Smoke of a shape: a column on a path, a puff, a bank drifting, a ring spreading (keys lit, middle, shaded). */
     smoke(x: number, y: number, keys: string, opts?: PxSmoke): void;
+    /** An emitter's particles now, each in the key of its age (young first), streaked `trail` ms back. */
+    particles(emit: (t: number) => PxParticle[], keys: string, opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): void;
+    /** A trail behind what goes along path(t), `length` ms of it now, `width` [head, tail] px, keys head to tail. */
+    trail(path: (t: number) => number[], keys: string, opts?: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number }): void;
+    /** Where a socket of an earlier placement is ("hero.hand"), in canvas coords. */
+    socket(at: string): [number, number];
+    /** Where a socket of a sprite standing in mesh() is, in meters [x, z, up] ({ name, at, frame?, flip? }, pixel px to its pixels). */
+    meshSocket(view: PxView | PxPerspective, sprite: { name: string; at: number[]; frame?: number; flip?: "x"; delay?: number }, socket: string, pixel?: number): [number, number, number];
     /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly). */
     solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): void;
     /** Flat faces in meters (model()) through the camera, the nearest per pixel, toned along their material's ramp, outlined where a surface ends. */
@@ -445,6 +479,14 @@ declare global {
   function plume(x: number, y: number, keys: string, opts?: PxPlume): PxOp;
   /** Smoke of a shape: a column on a path, a puff, a bank drifting, a ring spreading (keys lit, middle, shaded). */
   function smoke(x: number, y: number, keys: string, opts?: PxSmoke): PxOp;
+  /** An emitter's particles now, each in the key of its age. */
+  function particles(emit: (t: number) => PxParticle[], keys: string, opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): PxOp;
+  /** A trail behind what goes along path(t). */
+  function trail(path: (t: number) => number[], keys: string, opts?: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number }): PxOp;
+  /** A spell's phases on the clock: ability([["charge", 600], ["cast", 150], ["travel", 500], ...], { start, events }). */
+  function ability(phases: [string, number][] | Record<string, number>, opts?: { start?: number; events?: Record<string, [string, number]> }): PxAbility;
+  /** Seeded particles: (t) gives the ones alive at time t, each where its own path puts it. */
+  function emitter(opts: PxEmitter): (t: number) => PxParticle[];
   /** A function of (x, y) made to close over w (and h): for noise on strips and tiles that wrap. */
   function seamless(fn: (x: number, y: number) => number, w: number, h?: number): (x: number, y: number) => number;
   /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly); boxes' faces lit by the sun. */

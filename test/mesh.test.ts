@@ -8,6 +8,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadProject, loadSource } from "../src/node/load.ts";
+import type { Img } from "../src/core/image.ts";
 
 const STAGE = `ramps("kgw")
 const V = { w: 40, horizon: 10, eye: 1, focal: 40 }
@@ -231,6 +232,15 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, D.faces, { f: { tex: "_white" }, s
   assert.equal(seen(whole), 0, "the figure behind the wall is hidden");
   assert.ok(seen(holed) > 0, "seen through the holes");
   assert.ok(wall(", dissolve: { progress: 0.3, scale: 0.15, edge: \"w\", width: 0.2 }").slice(5, 23).some((row) => row.slice(8, 32).includes("w")), "the burning edge in its key");
+  // its looks, as a sprite's: neutral by default (a ring lighter than the face), none with edge: false; acid's green char
+  const flat = (d: string) => loadSource(PAL + STAGE + `sprite("_grey", { w: 4, h: 1 }, rect(0, 0, 4, 1, "#707070"), px(3, 0, "#c0c0c0"))
+const D = model(); D.box("stone", [-1.5, 3, 0], [1.5, 3.2, 1.5])
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, D.faces, { stone: { tex: "_grey"${d} } }))`, "t.px.js").image("a");
+  const none = flat(', dissolve: { progress: 0.4, scale: 0.15, edge: false }'), neu = flat(', dissolve: { progress: 0.4, scale: 0.15 }'), acid = flat(', dissolve: { progress: 0.4, scale: 0.15, look: "acid" }');
+  const between = (img: Img) => img.data.filter((c) => c >>> 24 > 0x80 && c >>> 24 < 0xb0).length;
+  assert.equal(between(none), 0, "edge: false: the face as it is, its two tones");
+  assert.ok(between(neu) > 0, "neutral: a ring halfway to its lightest tone");
+  assert.ok(acid.data.some((c) => ((c >>> 16) & 255) > (c >>> 24) + 30), "acid: green at the edge");
   // a sweep from the top: its upper half gone, the lower whole
   const top = wall(', dissolve: { progress: 0.5, pattern: "top", ragged: 0 }');
   assert.ok(top.slice(5, 12).every((row) => row[20] === "r") && top.slice(15, 20).every((row) => row[20] !== "r"), top.slice(3, 22).map((r) => r.slice(16, 25)).join("|"));
