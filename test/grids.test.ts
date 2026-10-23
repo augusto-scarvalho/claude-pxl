@@ -1,6 +1,6 @@
 // A field made voxels and a mesh (grids.ts), drawn as cubes (voxels()), written as .vox, .obj and .glb
 // (files3d.ts) and read back: cells of any size in meters, a cube's px apart from them, things of
-// different cells at their depths, MagicaVoxel's 256 a side refused with a size that fits.
+// different cells at their depths, a grid past MagicaVoxel's 256 a side as several models.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -52,12 +52,15 @@ test("meshes: surface nets on the surface, quads facing out; a grid's outside me
   assert.equal(F.quads.length / 4, 6);
 });
 
-test("files: .vox, .obj and .glb written and read back; a grid past 256 a side refused with a size that fits", () => {
+test("files: .vox, .obj and .glb written and read back; a grid past 256 a side as models of 256 in place", () => {
   const G = voxelize(sdf.sphere(1).mat("a").union(sdf.box([0.5, 0.5, 0.5]).at(0, 0, 1.2).mat("b")), { size: 0.25 });
   const vox = readVox(encodeVox(G, [0xff0000ff, 0x00ff00ff]));
   assert.deepEqual(vox.size, G.n); assert.equal(vox.count, G.count); assert.equal(vox.colors, 2);
-  const big = new Voxels([300, 2, 2], [0.01, 0.01, 0.01], [0, 0, 0], new Uint8Array(1200), [""]);
-  assert.throws(() => encodeVox(big, []), /300 x 2 x 2 cells; MagicaVoxel holds 256 a side.*\[0\.012/);
+  // past 256 a side: models of 256 placed by the scene graph, each cell where it was (the middle across at 0)
+  const cells = new Uint8Array(1200).map((_, q) => (q % 7 ? 1 : 0)), big = new Voxels([300, 2, 2], [0.01, 0.01, 0.01], [0, 0, 0], cells, [""]), r = readVox(encodeVox(big, []));
+  assert.equal(r.models, 2); assert.equal(r.count, big.count); assert.deepEqual(r.size, [300, 2, 2]);
+  const want = [...cells].flatMap((v, q) => (v ? [`${(q % 300) - 150},${Math.floor(q / 300) % 2 - 1},${Math.floor(q / 600)}`] : []));
+  assert.deepEqual(new Set(r.cells.map((c) => c.join())), new Set(want));
   const M = surfaceNets(sdf.box([1, 1, 2]).at(0, 0, 1).mat("a"), { size: 0.25 }), glb = readGlb(encodeGlb(M, "t", [0x808080ff]));
   assert.equal(glb.vertices, M.positions.length / 3); assert.equal(glb.triangles, M.quads.length / 2);
   // z up goes out y up: the box 2 m tall from the ground
@@ -88,6 +91,25 @@ scene("a", { w: 40, h: 40 }, (c) => {
   assert.ok(reds(scene(true)) > reds(scene(false)), "the fine one in front shows more of itself than behind");
 });
 
+test("voxels(): creases darker with ao (off by default); from the side on the pixel grid; a field on the same grid lines up", () => {
+  const p = loadSource(PAL + `ramps("kgw")
+const B = sdf.box(0.5).at(0, 0, 0.25), F = sdf.box([0.75, 0.75, 0.25]).at(0, 0, 0.125).union(sdf.box(0.25).at(0, 0, 0.375))
+const o = { px: 4, mats: { m: "kgw" }, outline: false, rim: false }
+sprite("plain", { w: 16, h: 14 }, voxels(sdf.voxels(F, { size: 0.25 }), { ...o, view: "top", at: [8, 12] }))
+sprite("ao0", { w: 16, h: 14 }, voxels(sdf.voxels(F, { size: 0.25 }), { ...o, view: "top", at: [8, 12], ao: 0 }))
+sprite("ao", { w: 16, h: 14 }, voxels(sdf.voxels(F, { size: 0.25 }), { ...o, view: "top", at: [8, 12], ao: 1 }))
+sprite("vox", { w: 12, h: 12 }, voxels(sdf.voxels(B, { size: 0.5 }), { ...o, px: 8, view: "iso", at: [6, 10] }))
+sprite("field", { w: 12, h: 12 }, surface(B, { mats: o.mats, outline: false, rim: false, ppm: 8, view: { kind: "iso", grid: true }, at: [6, 10] }))
+sprite("side", { w: 12, h: 12 }, voxels(sdf.voxels(B, { size: 0.5 }), { ...o, px: 8, view: { kind: "side", grid: true }, at: [6, 10] }))`, "t.px.js");
+  const lit = (n: string) => (keys(p, n).match(/w/g) ?? []).length;
+  assert.equal(keys(p, "plain"), keys(p, "ao0"));
+  assert.ok(lit("ao") < lit("ao0") - 4, "the floor's faces darker toward the cube on it");
+  const shape = (n: string) => keys(p, n).replace(/[^.\n]/g, "#");
+  assert.equal(shape("field"), shape("vox"), "a field's cube on the grid covers what the voxel's does");
+  const rows = keys(p, "side").split("\n").filter((r) => /[kgw]/.test(r));
+  assert.deepEqual(rows.map((r) => r.replace(/\./g, "").length), Array(10).fill(8), "an 8 px front and a 2 px sliver of top");
+});
+
 test("export3d: build writes the files and says what they hold, read back", () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl3d-"));
   try {
@@ -102,5 +124,18 @@ export3d("ballmesh", sdf.mesh(f, { size: 0.25 }), { mats: { m: "kgw" } })`, "t.p
     assert.equal(readVox(new Uint8Array(readFileSync(join(dir, "ball.vox")))).size.join(), "5,5,4");
     assert.ok(readObj(readFileSync(join(dir, "ballmesh.obj"), "utf8")).faces > 10);
     assert.match(readFileSync(join(dir, "ballmesh.mtl"), "utf8"), /newmtl m\nKd /);
+    // a loop's moments: an animated .glb (a mesh each, shown in turn), a .vox and an .obj each
+    const q = loadSource(PAL + `ramps("kgw")
+const f = sdf.sphere(0.4).at((c) => [c.phase, 0, 0.4]).mat("m")
+export3d("roll", (c) => sdf.mesh(f, { size: 0.25, clock: c }), { mats: { m: "kgw" }, frames: 3, fps: 6 })
+export3d("rollv", (c) => sdf.voxels(f, { size: 0.25, clock: c }), { mats: { m: "kgw" }, frames: 2, as: ["vox", "obj"] })`, "t.px.js");
+    const s = writeOutputs(q, dir, { preview: false });
+    assert.deepEqual(s.errors, []);
+    const g = readGlb(new Uint8Array(readFileSync(join(dir, "roll.glb"))));
+    assert.equal(g.meshes, 3); assert.equal(g.seconds, 0.5);
+    assert.match(s.lines.join("\n"), /glb roll .*the first of 3 moments, a loop of 0\.5 s/);
+    assert.equal(readVox(new Uint8Array(readFileSync(join(dir, "rollv_1.vox")))).count > 0, true);
+    assert.match(readFileSync(join(dir, "rollv_0.obj"), "utf8"), /mtllib rollv_0\.mtl/);
+    assert.throws(() => loadSource(PAL + `export3d("x", (c) => sdf.mesh(sdf.sphere(1), { size: 0.5, clock: c }))`, "t.px.js"), /frames: n moments/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

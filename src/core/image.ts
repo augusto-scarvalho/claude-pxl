@@ -66,7 +66,7 @@ export class Img {
   /**
    * Which named part of a 3D thing each pixel shows (surface(), voxels(), volume(), splats(), decal()
    * with a `part`, or a field's .part() names): an index into `names`, -1 none. For pxl steps --at;
-   * it doesn't travel.
+   * it travels with a copy, a flip and a stamp (a stamp over it covers it), not through other ops.
    */
   parts?: { ids: Int32Array; names: string[] };
   /** Its real height in meters, from the asset's `height` (for a scene's `world` scale). */
@@ -108,6 +108,7 @@ export class Img {
     if (this.slice) o.slice = [...this.slice];
     if (this.orient) o.orient = { ...this.orient, f: this.orient.f && [...this.orient.f], u: [...this.orient.u] };
     if (this.meters) o.meters = this.meters;
+    if (this.parts) o.parts = { ids: this.parts.ids.slice(), names: [...this.parts.names] };
     return o;
   }
 
@@ -210,6 +211,7 @@ export class Img {
         o.data[y * this.w + x] = this.data[j];
         if (this.norm) Img.moveNorm(this.norm, j, o.normals(), y * this.w + x, fx ? -1 : 1, fy ? -1 : 1);
         if (this.emit) (o.emit ??= new Uint8Array(this.w * this.h))[y * this.w + x] = this.emit[j];
+        if (this.parts) (o.parts ??= { ids: new Int32Array(this.w * this.h), names: [...this.parts.names] }).ids[y * this.w + x] = this.parts.ids[j];
       }
     this.movePivot(o, (x, y) => [fx ? this.w - x : x, fy ? this.h - y : y]);
     if (this.slice) { const [l, t, r, b] = this.slice; o.slice = [fx ? r : l, fy ? b : t, fx ? l : r, fy ? t : b]; }

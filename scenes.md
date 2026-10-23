@@ -799,8 +799,11 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). What held, from buildi
   lies on (a white rune on a pale crystal vanished; gold reads).
 - **Voxels: the cell is a choice of look.** On the iso pixel grid at 16 px to the meter a 0.25 m cell
   is a cube 8 px wide, 0.125 m 4 px, 0.0625 m 2 px; things of different cells can share a world. A
-  limb thinner than a cell is kept as a line of cells by `fill` 0.5, else it vanishes. `.vox` holds
-  256 cells a side at most (pxl refuses more and says the cell that fits).
+  limb thinner than a cell is kept as a line of cells by `fill` 0.5, else it vanishes. A big block
+  scene reads flat a tone a face: `ao: 1` darkens each face toward the cubes beside it. A field drawn
+  with `view: { kind: "iso", grid: true }` lines up with voxels on one canvas; a side-view game's
+  voxels go on the grid with `{ kind: "side", grid: true }`. A grid past 256 a side goes out as several
+  MagicaVoxel models in place.
 - **Volumes: a core, a dithered rim.** A volume thin all through is a field of dots (the grove's
   first mist, a ring of checkerboard round the house). Give it a core that hides what is behind
   (`thickness` 3 or more for a ground mist, `edge` about 0.9 m) so its middle reads as two or three
@@ -812,7 +815,15 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). What held, from buildi
   `oak.canopy`, `oak.twist`, `wind.from`, and the house and the rock stay byte for byte. Give values
   in the builder's range (`PXL help make3d`: a tree's `twist` is 0 to 1.5 radians; an agent once gave
   70). `expect3d` rules (the canopy above the trunk, the rock clear of the house, the orb reaching
-  its mark by a time) run in `pxl check`; `pxl steps <file> <scene> --at x,y` says which part
-  painted a pixel.
+  its mark by a time, one thing before another) run in `pxl check`; a rule that fails over a place
+  or a gap: `pxl check --fix` finds the one number and writes it (no model, two seconds); `pxl steps
+  <file> <scene> --at x,y` says which part painted a pixel, through stamps too. In the evaluation
+  (docs/evaluation-3d.md) a rewrite and a local edit kept the approved parts alike, the rewrite at
+  half again the cost; the builders made a shorter file than primitives but bent the request to what
+  their parameters say (a crystal's rock had no moss until `crystal({ moss })`).
+- **Out to other tools.** `export3d` writes `.vox`, `.obj`, `.glb` and `.ply`; something that moves,
+  as a function of the clock with `frames`, goes out as one `.glb` that plays (and a file a moment for
+  the others). `pxl serve` shows the `.glb` and `.ply` to turn round at `/3d`. `mesh()` draws a mesh
+  in `surface()`'s side, top and iso views too.
 - **Cost.** A 320x180 HD-2D frame with a leafy tree, smoke and mist takes 0.6 to 1.3 s on the CPU:
   check one frame in 24 (`check: { every: 24 }`) and keep the loop short.

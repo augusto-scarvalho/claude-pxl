@@ -12,7 +12,7 @@ import { encodeGif } from "./gif.ts";
 import { encodePng } from "./png.ts";
 import { encodeGlb, encodeObj, encodePly, encodeVox, readGlb, readObj, readPly, readVox } from "../core/files3d.ts";
 import { Splats } from "../core/splats.ts";
-import { Voxels } from "../core/grids.ts";
+import { type Mesh3, Voxels } from "../core/grids.ts";
 
 export interface OutputOptions {
   /** Only these assets/sheets (default: everything exported). */
@@ -175,25 +175,37 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
     if (want && !want.has(m.name)) continue;
     try {
       const kb = (b: { length: number }) => `${(b.length / 1024).toFixed(1)} KB`;
-      const mesh = m.thing instanceof Splats ? undefined : m.thing instanceof Voxels ? (m.as.some((f) => f !== "vox") ? m.thing.mesh() : undefined) : m.thing;
+      // the moments of a loop (one, unless made by a function of the clock), each painted by its materials
+      const things = typeof m.frames === "function" ? m.frames() : m.frames ?? [m.thing], n = things.length;
+      const paints = things.map((t, f) => (f && m.paint ? m.paint(t) : { colors: m.colors, ramps: m.ramps }));
+      const meshes = things.map((t) => (t instanceof Splats ? undefined : t instanceof Voxels ? (m.as.some((f) => f !== "vox") ? t.mesh() : undefined) : t));
+      const stem = (f: number) => `${m.name}${n > 1 ? `_${String(f).padStart(String(n - 1).length, "0")}` : ""}`, file = (f: number, ext: string) => join(out, `${stem(f)}.${ext}`);
+      const moments = n > 1 ? ` (${n} moments: ${m.name}_${"0".repeat(String(n - 1).length)} to _${n - 1})` : "";
       for (const f of m.as) {
-        if (f === "ply") {
-          const b = encodePly(m.thing as Splats, m.ramps), r = readPly(b);
-          write(join(out, m.name + ".ply"), Buffer.from(b));
-          lines.push(`ply ${m.name} ${r.count} splats (3DGS: ${r.props.length} properties), Y up ${r.min.map((v) => +v.toFixed(2)).join(",")} to ${r.max.map((v) => +v.toFixed(2)).join(",")}, mean opacity ${r.opacity.toFixed(2)}, radius ${r.scale.toFixed(3)} m, ${kb(b)}`);
-        } else if (f === "vox") {
-          const V = m.thing as Voxels, b = encodeVox(V, m.colors), r = readVox(b), [lo, hi] = V.bounds();
-          write(join(out, m.name + ".vox"), Buffer.from(b));
-          lines.push(`vox ${m.name} ${r.size.join("x")}, ${r.count} voxels of ${V.size.map((v) => +v.toFixed(4)).join(" x ")} m (${hi.map((v, e) => +(v - lo[e]).toFixed(2)).join(" x ")} m, from [${lo.map((v) => +v.toFixed(2)).join(", ")}]), ${r.colors} colors, ${kb(b)}`);
-        } else if (f === "obj") {
-          const { obj, mtl } = encodeObj(mesh!, m.name, m.colors), r = readObj(obj);
-          write(join(out, m.name + ".obj"), obj); write(join(out, m.name + ".mtl"), mtl);
-          lines.push(`obj ${m.name} ${r.vertices} vertices, ${r.faces} quads, ${r.materials} materials, ${kb(obj)}`);
-        } else {
-          const b = encodeGlb(mesh!, m.name, m.colors), r = readGlb(b);
+        if (f === "glb") {
+          const b = encodeGlb(meshes as Mesh3[], m.name, paints.map((p) => p.colors), m.fps), r = readGlb(b);
           write(join(out, m.name + ".glb"), Buffer.from(b));
-          lines.push(`glb ${m.name} ${r.vertices} vertices, ${r.triangles} triangles, ${r.materials} materials, Y up ${r.min.map((v) => +v.toFixed(2)).join(",")} to ${r.max.map((v) => +v.toFixed(2)).join(",")}, ${kb(b)}`);
+          lines.push(`glb ${m.name} ${r.vertices} vertices, ${r.triangles} triangles, ${r.materials} materials, Y up ${r.min.map((v) => +v.toFixed(2)).join(",")} to ${r.max.map((v) => +v.toFixed(2)).join(",")}${r.meshes > 1 ? ` (the first of ${r.meshes} moments, a loop of ${+r.seconds.toFixed(2)} s)` : ""}, ${kb(b)}`);
+          continue;
         }
+        let said = "";
+        for (let k = 0; k < n; k++) {
+          const t = things[k];
+          if (f === "ply") {
+            const b = encodePly(t as Splats, paints[k].ramps), r = readPly(b);
+            write(file(k, "ply"), Buffer.from(b));
+            said ||= `ply ${m.name} ${r.count} splats (3DGS: ${r.props.length} properties), Y up ${r.min.map((v) => +v.toFixed(2)).join(",")} to ${r.max.map((v) => +v.toFixed(2)).join(",")}, mean opacity ${r.opacity.toFixed(2)}, radius ${r.scale.toFixed(3)} m, ${kb(b)}`;
+          } else if (f === "vox") {
+            const V = t as Voxels, b = encodeVox(V, paints[k].colors), r = readVox(b), [lo, hi] = V.bounds();
+            write(file(k, "vox"), Buffer.from(b));
+            said ||= `vox ${m.name} ${r.size.join("x")}${r.models > 1 ? ` in ${r.models} models of 256 at most` : ""}, ${r.count} voxels of ${V.size.map((v) => +v.toFixed(4)).join(" x ")} m (${hi.map((v, e) => +(v - lo[e]).toFixed(2)).join(" x ")} m, from [${lo.map((v) => +v.toFixed(2)).join(", ")}]), ${r.colors} colors, ${kb(b)}`;
+          } else {
+            const { obj, mtl } = encodeObj(meshes[k]!, stem(k), paints[k].colors), r = readObj(obj);
+            write(file(k, "obj"), obj); write(file(k, "mtl"), mtl);
+            said ||= `obj ${m.name} ${r.vertices} vertices, ${r.faces} quads, ${r.materials} materials, ${kb(obj)}`;
+          }
+        }
+        lines.push(said + moments);
       }
     } catch (e) {
       errors.push(wrap(e).within(`export3d '${m.name}'`, m.loc));

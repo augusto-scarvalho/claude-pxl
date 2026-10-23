@@ -1,5 +1,5 @@
 // A small library of 3D builders with semantic parameters (in the spirit of ShapeLib and ProcFunc): a
-// tree, a rock, a mushroom house, a crystal, a mist, smoke. Each says what it is made of in named parts
+// tree, a pine, a bush, a rock, a mushroom house, a crystal, a mist, smoke. Each says what it is made of in named parts
 // (a tree's trunk, branches and canopy; a house's stem, door, cap, chimney), the details scattered on it
 // (leaves, moss, snow), the decals pinned to it (a door, windows, a rune), the points others attach to
 // (sockets: the chimney's top), and takes parameters that mean something (canopy, twist, wind, moss,
@@ -96,6 +96,53 @@ export function tree(p: P = {}): Built {
   };
 }
 
+// the wind as a bend: the top `w` m over at the gust, half that between ([x, y]: a direction)
+const windBend = (wind: unknown, height: number, who: string) => {
+  if (!(typeof wind === "number" || (Array.isArray(wind) && wind.length === 2 && wind.every(Number.isFinite)))) throw new PxError(`${who}: wind is m at its top, or [x, y], got ${JSON.stringify(wind)}`);
+  const k = (w: number) => (c: Clock) => (2 * w * (0.45 + 0.55 * Math.sin(TAU * c.phase))) / (height * height);
+  return typeof wind === "number" ? k(wind) : (c: Clock) => [k((wind as number[])[0])(c), k((wind as number[])[1])(c)] as [number, number];
+};
+
+/**
+ * A conifer: a trunk under `tiers` cones of needles stacked up it, each narrower, their rims ragged
+ * with noise, `height` m (4), `girth` the lowest tier's radius m (1.1); `snow` 0..1 lying on the tiers;
+ * swaying in the `wind` as the tree does.
+ */
+export function pine(p: P = {}): Built {
+  const who = "make3d.pine";
+  known(p, ["height", "tiers", "girth", "snow", "wind", "seed"], who);
+  const height = n(p, "height", 4, who, 0.5, 30), tiers = Math.round(n(p, "tiers", 4, who, 1, 10)), girth = n(p, "girth", 1.1, who, 0.2, 5), snow = n(p, "snow", 0, who, 0, 1), seed = n(p, "seed", 9, who);
+  const trunk = sdf.capsule([0, 0, 0], [0, 0, height * 0.45], 0.06 + girth * 0.08, 0.05).mat("bark");
+  const cones = Array.from({ length: tiers }, (_, k) => {
+    const f = k / tiers, foot = height * (0.18 + 0.66 * f), r = girth * (1 - 0.72 * f), h = Math.min(height - foot, height * (0.82 - 0.4 * f) / Math.max(1, tiers / 2.5));
+    return sdf.cone(r, Math.max(0.2, h + r * 0.4), 0).at(0, 0, foot);
+  });
+  const crown = sdf.union(cones, { smooth: 0.06 }).noise({ amp: 0.06 + girth * 0.03, scale: 0.25, seed, octaves: 2 }).mat("leaf");
+  const field = trunk.part("trunk").union(crown.part("crown")).bend(windBend(p.wind ?? 0.15, height, who));
+  return {
+    field, windy: true, decals: {}, sockets: { top: [0, 0, height] },
+    parts: { trunk, crown },
+    details: snow > 0 ? { snow: { up: 0.5, count: 160 * snow, brush: "clump", size: 0.05, vary: 1, mat: "snow", seed: partSeed(seed, "snow") } } : {},
+  };
+}
+
+/** A bush: a few lumps of leaves melted together, `size` m across (0.9), `leaves` clusters to a square meter on it (0 none), swaying a little in the `wind`. */
+export function bush(p: P = {}): Built {
+  const who = "make3d.bush";
+  known(p, ["size", "leaves", "wind", "seed"], who);
+  const size = n(p, "size", 0.9, who, 0.2, 4), leavesN = n(p, "leaves", 0, who, 0, 200), seed = n(p, "seed", 4, who), R = rng(seed);
+  const lumps = Array.from({ length: 4 }, (_, k) => {
+    const a = (k * TAU) / 4 + R() * 0.8, d = k ? size * (0.22 + R() * 0.1) : 0, r = size * (k ? 0.3 + R() * 0.08 : 0.4);
+    return sdf.ellipsoid([r, r, r * 0.85]).at(Math.cos(a) * d, Math.sin(a) * d, r * 0.75);
+  });
+  const crown = sdf.union(lumps, { smooth: size * 0.15 }).noise({ amp: size * 0.06, scale: size * 0.3, seed, octaves: 1 }).intersect(sdf.plane([0, 0, -1], 0)).mat("leaf");
+  return {
+    field: crown.part("crown").bend(windBend(p.wind ?? 0.05, size, who)), windy: true, decals: {}, sockets: { top: [0, 0, size * 0.75 + size * 0.4] },
+    parts: { crown },
+    details: leavesN > 0 ? { leaves: { on: "leaf", count: leavesN, brush: "cluster", size: 0.08, vary: 0, seed: partSeed(seed, "leaves"), flutter: 0.02 } } : {},
+  };
+}
+
 /** A boulder of planes, moss where it faces up (`moss` 0..1: how much; patches drawn on it, and tufts scattered there), `size` m. */
 export function rock(p: P = {}): Built {
   const who = "make3d.rock";
@@ -140,20 +187,22 @@ export function house(p: P = {}): Built {
   };
 }
 
-/** Crystals on a rock: three hexagonal prisms with pointed tips leaning apart; `rune`: a glowing decal's asset on the tallest. */
+/** Crystals on a rock: three hexagonal prisms with pointed tips leaning apart; `rune`: a glowing decal's asset on the tallest; `moss` 0..1 tufts on the rock. */
 export function crystal(p: P = {}): Built {
   const who = "make3d.crystal";
-  known(p, ["seed", "rune"], who);
-  const seed = n(p, "seed", 2, who);
+  known(p, ["seed", "rune", "moss"], who);
+  const seed = n(p, "seed", 2, who), moss = n(p, "moss", 0, who, 0, 1);
   const prism = (r: number, h: number) => {
     const sides = [0, 1, 2, 3, 4, 5].map((k) => { const a = (k * TAU) / 6; return sdf.plane([Math.cos(a), Math.sin(a), 0], r); });
     const tip = [0, 1, 2, 3, 4, 5].map((k) => { const a = (k * TAU) / 6, e = 0.6; return sdf.plane([Math.cos(a) * Math.cos(e), Math.sin(a) * Math.cos(e), Math.sin(e)], (h - r * 0.9) * Math.sin(e) + r * Math.cos(e)); });
     return sdf.cylinder(r * 1.2, h + 0.1).intersect(...sides, ...tip);
   };
   const gems = sdf.union(prism(0.2, 1.3), prism(0.15, 0.95).rotate(-30, "y").rotate(25).at(0.14, 0.04, 0), prism(0.13, 0.75).rotate(34, "y").rotate(-50).at(-0.12, -0.05, 0), prism(0.1, 0.5).rotate(40, "x").at(0, -0.12, 0)).mat("gem");
-  const base = rock({ size: 0.45, seed }).field!;
+  const B = rock({ size: 0.45, seed, moss }), base = B.field!;
   const decals: Record<string, BuiltDecal> = typeof p.rune === "string" ? { rune: { asset: p.rune, point: [0.0, -0.21, 1.0], lit: false } } : {};
-  return { field: gems.at(0, 0, 0.12).part("gems").union(base), parts: { gems, base }, details: {}, decals, sockets: { tip: [0, 0, 1.4] } };
+  // (the rock's moss on the rock only, not on a crystal's face turned up)
+  const details: Built["details"] = B.details.moss ? { moss: { ...B.details.moss, on: "stone" } } : {};
+  return { field: gems.at(0, 0, 0.12).part("gems").union(base), parts: { gems, base }, details, decals, sockets: { tip: [0, 0, 1.4] } };
 }
 
 /** A ground mist: a low bank `size` [x, y] m (default a band 12 m long, 2.2 m deep), dense enough to read as
@@ -177,7 +226,7 @@ export function smoke(p: P = {}): Built {
   return { density, look: { ramp: `smoke_${color}`, thickness: 4 }, parts: {}, details: {}, decals: {}, sockets: {}, windy: true };
 }
 
-export const BUILDERS: Record<string, (p: P) => Built> = { tree, rock, house, crystal, mist, smoke };
+export const BUILDERS: Record<string, (p: P) => Built> = { tree, pine, bush, rock, house, crystal, mist, smoke };
 /** make3d.tree({ ... }) and the rest, as art files call them. */
 export const make3d = Object.fromEntries(Object.entries(BUILDERS).map(([k, f]) => [k, (p: P = {}) => f(p)])) as Record<string, (p?: P) => Built>;
 export { Sdf };

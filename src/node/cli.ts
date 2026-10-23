@@ -20,6 +20,7 @@ import { encodeGif, reduceColors } from "./gif.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 import { checkProject } from "./check.ts";
+import { setKnobInSource } from "../core/world3d.ts";
 import { cellRow, diffRow, frameCount, frameTime, greyRow, otherVersion, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
 import { listProject, listText } from "./list.ts";
@@ -60,7 +61,7 @@ const USAGE = `pxl — pixel-art DSL
       each placement stands out from its surroundings; --at adds that region's exact pixels; --frame
       reads an animated asset at frame N of its loop (a scene: each step of its clock), not the
       first. Any PNG works too: its colors get keys, and repeats are found as identical 16x16 tiles.
-  pxl check <art.px.js> [name...] [--frame N] [--readings]
+  pxl check <art.px.js> [name...] [--frame N] [--readings] [--fix]
       Every check describe makes that can warn (facing, front marker, lit side, parallel parts, feet
       on the ground, lettering), on every scene and rig the file defines (not those it includes, or
       just the named assets) and the front marker of any other asset that has one, from one load: the
@@ -70,7 +71,10 @@ const USAGE = `pxl — pixel-art DSL
       lines of every sprite drawn by hand (grids, runs()), a doubled step or a corner the shape has
       (a line whose steps are nearly all L's is drawn square on purpose: none), and tones side by side
       too close to tell apart. --readings also lists what the lit-side rule read on every placement,
-      warning or not, with a tally: to see where it agrees and where it can't tell.
+      warning or not, with a tally: to see where it agrees and where it can't tell. --fix: each
+      expect3d rule that fails, fixed by one number of the parts it names (where one stands, its gap
+      beside another, then a parameter), searched without a model and written into the file; it
+      says each change, and the rules that held still hold.
   pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--out DIR]
   pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
@@ -166,6 +170,7 @@ interface Args {
   all?: boolean;
   every?: number;
   readings?: boolean;
+  fix?: boolean;
   colors?: number;
   to?: [number, number];
   from?: number;
@@ -227,6 +232,7 @@ function parse(argv: string[]): Args {
     else if (v === "--all") a.all = true;
     else if (v === "--every") a.every = Number(val());
     else if (v === "--readings") a.readings = true;
+    else if (v === "--fix") a.fix = true;
     else if (v === "--profile") a.profile = true;
     else if (v === "--colors") a.colors = Number(val());
     else if (v === "--to") {
@@ -402,7 +408,7 @@ export async function main(argv: string[]): Promise<number> {
           const [x, y] = a.at;
           if (x >= final.w || y >= final.h) throw new PxError(`(${x}, ${y}) is outside ${name} (${final.w}x${final.h})`);
           console.log(`${name} pixel (${x}, ${y}): the steps that changed it${frame0}`);
-          let prev: Color = TRANSPARENT, lost = false;
+          let prev: Color = TRANSPARENT, lost = false, last = "";
           // a shade or light step: the ramps it went along (where a shadow left its ramp for another's)
           const via = (from: Color, to: Color, label: string) => {
             if (from === TRANSPARENT || !def.pal.ramps.length || !/^(shade|light)\(| in (shade|light) layer '/.test(label)) return "";
@@ -417,12 +423,13 @@ export async function main(argv: string[]): Promise<number> {
               return;
             }
             lost = false;
-            if (img.data[i] !== prev) row(s.n, s.label, s.loc, `-> ${key(img.data[i])}${via(prev, img.data[i], s.label)}`);
+            if (img.data[i] !== prev) { row(s.n, s.label, s.loc, `-> ${key(img.data[i])}${via(prev, img.data[i], s.label)}`); last = s.label; }
             prev = img.data[i];
           });
-          // a 3D thing's named part there (surface(), voxels(), volume(), splats(), decal())
+          // a 3D thing's named part there (surface(), voxels(), volume(), splats(), decal(), or a stamp of
+          // one), when one of those painted it last
           const pk = b.img.parts?.ids[y * final.w + x] ?? -1;
-          if (pk >= 0) console.log(`part: ${b.img.parts!.names[pk]}`);
+          if (pk >= 0 && /^(surface|voxels|volume|splats|decal|draw3d|stamp)\(/.test(last)) console.log(`part: ${b.img.parts!.names[pk]}`);
           return 0;
         }
         console.log(`${name}: ${b.trace.frames.length} steps (${def.kind} ${final.w}x${final.h}${frame0})`);
@@ -442,8 +449,21 @@ export async function main(argv: string[]): Promise<number> {
       }
       case "check": {
         const p = loadProject(file, { checksOnly: true });
-        const r = checkProject(p, { names: a.rest.length ? a.rest : undefined, frame: a.frame, file: basename(file), readings: a.readings });
+        const r = checkProject(p, { names: a.rest.length ? a.rest : undefined, frame: a.frame, file: basename(file), readings: a.readings, fix: a.fix });
         for (const l of [...r.lines, ...r.notes]) console.log(l);
+        // --fix: each failing rule's number written into the file, where the part's spec is written there
+        if (r.fixes) {
+          let src = readFileSync(file, "utf8"), wrote = 0;
+          for (const f of r.fixes) {
+            if (f.held) { console.log(`fix: ${f.text}: holds after the changes above`); continue; }
+            if (!f.knob) { console.log(`fix: ${f.text}: no one number of its parts makes it hold`); continue; }
+            const k = f.knob, what = `${k.part} ${k.key === "at" ? `at[${k.i}]` : k.key === "beside" ? "beside's gap" : k.key} ${+k.value.toFixed(3)} -> ${f.to}`, next = setKnobInSource(src, k, f.to!);
+            if (next === undefined) { console.log(`fix: ${f.text}: ${what} (not written: its spec isn't written out once in ${basename(file)}; change it by hand)`); continue; }
+            src = next; wrote++;
+            console.log(`fix: ${f.text}: ${what}`);
+          }
+          if (wrote) { writeFileSync(file, src); console.log(`fix: wrote ${wrote} change${wrote > 1 ? "s" : ""} to ${basename(file)}; check again`); }
+        }
         console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}${r.notes.length ? `, ${r.notes.length} to look at` : ""} (checked ${r.checked}${a.frame ? `, at frame ${a.frame}` : ""})`);
         console.log(r.coverage);
         if (r.readings) console.log(["", "readings (each placement's lit side against world.light, warning or not):", ...r.readings.map((l) => "  " + l), r.tally].join("\n"));

@@ -65,7 +65,7 @@ export class World {
     const p = this.spec.parts[name];
     if (!p) throw new PxError(`world3d: no part '${name}' (it has: ${this.names.join(", ")})`);
     const params: Record<string, unknown> = { seed: p.seed ?? partSeed(this.spec.seed ?? 1, name), ...p.params };
-    if (["tree", "mist", "smoke"].includes(p.make) && params.wind === undefined) params.wind = this.wind();
+    if (["tree", "pine", "bush", "mist", "smoke"].includes(p.make) && params.wind === undefined) params.wind = this.wind();
     b = BUILDERS[p.make](params);
     this.cache.set(name, b);
     return b;
@@ -153,44 +153,69 @@ export class World {
     }
     const f = sub ? b.parts[sub] : b.field;
     if (!f) throw new PxError(`expect3d: part '${name}' has no part '${sub}' (it has: ${[...Object.keys(b.parts), ...Object.keys(b.details)].join(", ")})`);
-    // a named part rides the whole's moves (a canopy swaying with its tree)
+    // a named part rides the whole's moves (a canopy swaying with its tree); one thinner than the
+    // samples (a twig between them) taken as the points within half a step of it
     const carry = peel(b.field!).carry(clock), C = compile(sub ? f : peel(f).inner, clock), s = 0.1;
-    for (let z = C.lo[2]; z <= C.hi[2]; z += s) for (let y = C.lo[1]; y <= C.hi[1]; y += s) for (let x = C.lo[0]; x <= C.hi[0]; x += s)
-      if (C.d(x, y, z) <= 0) { const q = carry([x, y, z]); out.push([q[0] + at[0], q[1] + at[1], q[2] + at[2]]); }
+    for (const lim of [0, s / 2]) {
+      for (let z = C.lo[2]; z <= C.hi[2]; z += s) for (let y = C.lo[1]; y <= C.hi[1]; y += s) for (let x = C.lo[0]; x <= C.hi[0]; x += s)
+        if (C.d(x, y, z) <= lim) { const q = carry([x, y, z]); out.push([q[0] + at[0], q[1] + at[1], q[2] + at[2]]); }
+      if (out.length) break;
+    }
     return out;
   }
 }
 
-/** A rule of expect3d: above, on, apart, near, reaches, within. */
-export type Rule = { above?: [string, string]; on?: [string, string]; apart?: [string, string]; near?: [string, string, number]; reaches?: [string, number[], number, number?]; within?: [string, number[][]] };
+/** A rule of expect3d: above, on, apart, near, reaches, within; and two rules in time, before and while. */
+export type Rule = { above?: [string, string]; on?: [string, string]; apart?: [string, string]; near?: [string, string, number]; reaches?: [string, number[], number, number?]; within?: [string, number[][]]; before?: [Rule, Rule]; while?: [Rule, Rule] };
 const box = (pts: V3[]) => {
   const lo: V3 = [Infinity, Infinity, Infinity], hi: V3 = [-Infinity, -Infinity, -Infinity], c: V3 = [0, 0, 0];
   for (const p of pts) for (let e = 0; e < 3; e++) { lo[e] = Math.min(lo[e], p[e]); hi[e] = Math.max(hi[e], p[e]); c[e] += p[e] / pts.length; }
   return { lo, hi, c };
 };
 const f2 = (v: number) => v.toFixed(2);
+const RULES = "{ above: [a, b] }, { on: [a, b or \"ground\"] }, { apart: [a, b] }, { near: [a, b, m] }, { reaches: [a, [x, y, z], ms] }, { within: [a, [[x0, y0, z0], [x1, y1, z1]]] }, { before: [rule, rule] } or { while: [rule, rule] }";
+const ruleOf = (r: Rule): [string, unknown[]] => {
+  const [kind, args] = Object.entries(r ?? {})[0] ?? [];
+  if (!kind || !Array.isArray(args)) throw new PxError(`expect3d: a rule is ${RULES}, got ${JSON.stringify(r)}`);
+  if (!["above", "on", "apart", "near", "reaches", "within", "before", "while"].includes(kind)) throw new PxError(`expect3d: no rule '${kind}' (above, on, apart, near, reaches, within, before, while)`);
+  return [kind, args];
+};
+/** A rule as words: "rock apart house", "smoke near house within 3.5 m", "a above b before c on ground". */
+export function ruleText(r: Rule): string {
+  const [kind, args] = ruleOf(r);
+  if (kind === "before" || kind === "while") return `${ruleText(args[0] as Rule)} ${kind} ${ruleText(args[1] as Rule)}`;
+  return `${args[0]} ${kind} ${kind === "reaches" || kind === "within" ? JSON.stringify(args[1]) : args[1]}${kind === "near" ? ` within ${args[2]} m` : kind === "reaches" ? ` by ${args[2]} ms` : ""}`;
+}
 /** Run expect3d's rules over a loop of `frames` moments: each rule's text, whether it held, and where it didn't. */
 export function runExpects(W: World, rules: Rule[], frames = 8, ms = 3600): { text: string; ok: boolean; detail?: string }[] {
   const clocks = Array.from({ length: frames }, (_, f): Clock => ({ t: (f * ms) / frames, phase: f / frames, frame: f, frames }));
   const memo = new Map<string, V3[]>();
   const pts = (ref: string, k: number) => { const key = `${ref}#${k}`; let v = memo.get(key); if (!v) memo.set(key, (v = W.points(ref, clocks[k]))); if (!v.length) throw new PxError(`expect3d: '${ref}' has nothing in it at frame ${k}`); return v; };
+  // where a rule of a place fails at frame k (undefined: it holds)
+  const failAt = (r: Rule, k: number): string | undefined => {
+    const [kind, args] = ruleOf(r), a = box(pts(args[0] as string, k));
+    if (kind === "above") { const b = box(pts(args[1] as string, k)); return a.c[2] > b.hi[2] ? undefined : `its middle is ${f2(a.c[2])} m up, ${args[1]}'s top ${f2(b.hi[2])} m`; }
+    if (kind === "on") { const top = args[1] === "ground" ? 0 : box(pts(args[1] as string, k)).hi[2]; return Math.abs(a.lo[2] - top) <= 0.15 ? undefined : `its foot is ${f2(a.lo[2] - top)} m ${a.lo[2] > top ? "over" : "under"} it`; }
+    if (kind === "apart") {
+      const [bn, bsub] = String(args[1]).split("."), bb = W.built(bn), bf = bsub ? bb.parts[bsub] : bb.field, at = W.place(bn, clocks[k]);
+      if (!bf) throw new PxError(`expect3d: apart needs '${args[1]}' to be a solid`);
+      const C = compile(peel(bf).inner, clocks[k]), back = (q: V3): V3 => [q[0] - at[0], q[1] - at[1], q[2] - at[2]];
+      const into = pts(args[0] as string, k).filter((q) => { const p = back(q); return C.d(p[0], p[1], p[2]) < -0.05; }).length;
+      return into ? `${into} of its points are inside ${args[1]}` : undefined;
+    }
+    if (kind === "near") { const b = box(pts(args[1] as string, k)), dd = Math.hypot(a.c[0] - b.c[0], a.c[1] - b.c[1], a.c[2] - b.c[2]); return dd <= (args[2] as number) ? undefined : `their middles are ${f2(dd)} m apart`; }
+    if (kind === "within") { const [lo, hi] = args[1] as number[][]; return a.lo.some((v, e) => v < lo[e] - 1e-9) || a.hi.some((v, e) => v > hi[e] + 1e-9) ? `it spans [${a.lo.map(f2)}] to [${a.hi.map(f2)}]` : undefined; }
+    throw new PxError(`expect3d: ${kind} goes in time on its own, not inside before or while (they take rules of a place: above, on, apart, near, within)`);
+  };
   return rules.map((r) => {
-    const [kind, args] = Object.entries(r)[0] ?? [];
-    if (!kind || !Array.isArray(args)) throw new PxError(`expect3d: a rule is { above: [a, b] }, { on: [a, b or "ground"] }, { apart: [a, b] }, { near: [a, b, m] }, { reaches: [a, [x, y, z], ms] } or { within: [a, [[x0, y0, z0], [x1, y1, z1]]] }, got ${JSON.stringify(r)}`);
-    const text = `${args[0]} ${kind} ${kind === "reaches" || kind === "within" ? JSON.stringify(args[1]) : args[1]}${kind === "near" ? ` within ${args[2]} m` : kind === "reaches" ? ` by ${args[2]} ms` : ""}`;
-    for (let k = 0; k < frames; k++) {
-      const a = box(pts(args[0] as string, k));
-      if (kind === "above") { const b = box(pts(args[1] as string, k)); if (!(a.c[2] > b.hi[2])) return { text, ok: false, detail: `at frame ${k} its middle is ${f2(a.c[2])} m up, ${args[1]}'s top ${f2(b.hi[2])} m` }; }
-      else if (kind === "on") { const top = args[1] === "ground" ? 0 : box(pts(args[1] as string, k)).hi[2]; if (Math.abs(a.lo[2] - top) > 0.15) return { text, ok: false, detail: `at frame ${k} its foot is ${f2(a.lo[2] - top)} m ${a.lo[2] > top ? "over" : "under"} it` }; }
-      else if (kind === "apart") {
-        const [bn, bsub] = String(args[1]).split("."), bb = W.built(bn), bf = bsub ? bb.parts[bsub] : bb.field, at = W.place(bn, clocks[k]);
-        if (!bf) throw new PxError(`expect3d: apart needs '${args[1]}' to be a solid`);
-        const C = compile(peel(bf).inner, clocks[k]), back = (q: V3): V3 => [q[0] - at[0], q[1] - at[1], q[2] - at[2]];
-        const into = pts(args[0] as string, k).filter((q) => { const p = back(q); return C.d(p[0], p[1], p[2]) < -0.05; }).length;
-        if (into) return { text, ok: false, detail: `at frame ${k} ${into} of its points are inside ${args[1]}` };
-      } else if (kind === "near") { const b = box(pts(args[1] as string, k)), dd = Math.hypot(a.c[0] - b.c[0], a.c[1] - b.c[1], a.c[2] - b.c[2]); if (dd > (args[2] as number)) return { text, ok: false, detail: `at frame ${k} their middles are ${f2(dd)} m apart` }; }
-      else if (kind === "within") { const [lo, hi] = args[1] as number[][]; if (a.lo.some((v, e) => v < lo[e] - 1e-9) || a.hi.some((v, e) => v > hi[e] + 1e-9)) return { text, ok: false, detail: `at frame ${k} it spans [${a.lo.map(f2)}] to [${a.hi.map(f2)}]` }; }
-      else if (kind !== "reaches") throw new PxError(`expect3d: no rule '${kind}' (above, on, apart, near, reaches, within)`);
+    const [kind, args] = ruleOf(r), text = ruleText(r);
+    if (kind === "before" || kind === "while") {
+      const [r1, r2] = args as Rule[], t1 = ruleText(r1), t2 = ruleText(r2);
+      const h1 = clocks.map((_, k) => !failAt(r1, k)), h2 = clocks.map((_, k) => !failAt(r2, k));
+      if (kind === "while") { const k = h2.findIndex((h, q) => h && !h1[q]); return k < 0 ? { text, ok: true } : { text, ok: false, detail: `at frame ${k} ${t2} holds and ${t1} doesn't` }; }
+      const k1 = h1.indexOf(true), k2 = h2.indexOf(true);
+      if (k1 >= 0 && k2 >= 0 && k1 < k2) return { text, ok: true };
+      return { text, ok: false, detail: k1 < 0 ? `${t1} never holds` : k2 < 0 ? `${t2} never holds` : `${t1} first holds at frame ${k1}, ${t2} at frame ${k2}` };
     }
     if (kind === "reaches") {
       const [, p, by, tol = 0.3] = args as [string, number[], number, number?];
@@ -198,8 +223,93 @@ export function runExpects(W: World, rules: Rule[], frames = 8, ms = 3600): { te
       for (let k = 0; k < frames; k++) { if (clocks[k].t > by) break; const a = box(pts(args[0] as string, k)); best = Math.min(best, Math.hypot(a.c[0] - p[0], a.c[1] - p[1], a.c[2] - p[2])); if (best <= tol) return { text, ok: true }; }
       return { text, ok: false, detail: `by ${by} ms its middle came no nearer than ${f2(best)} m` };
     }
+    for (let k = 0; k < frames; k++) { const d = failAt(r, k); if (d) return { text, ok: false, detail: `at frame ${k} ${d}` }; }
     return { text, ok: true };
   });
+}
+
+/** A number of a part's spec a fix may change: its place (`at`'s x, y or z), its gap `beside` another, or a parameter. */
+export interface Knob { part: string; key: string; i?: number; value: number }
+const KNOB_ORDER = ["at", "beside"];
+function knobsOf(W: World, part: string): Knob[] {
+  const p = W.spec.parts[part], out: Knob[] = [];
+  if (Array.isArray(p.at)) p.at.forEach((v, i) => out.push({ part, key: "at", i, value: v }));
+  if (p.beside) out.push({ part, key: "beside", i: 2, value: p.beside[2] ?? 0.5 });
+  for (const [k, v] of Object.entries(p.params ?? {})) if (typeof v === "number") out.push({ part, key: k, value: v });
+  return out;
+}
+/** The world with one number of a part's spec changed. */
+export function turnKnob(W: World, k: Knob, v: number): World {
+  const parts = { ...W.spec.parts }, p = { ...parts[k.part], params: { ...parts[k.part].params } };
+  if (k.key === "at") { const a = [...(p.at as number[])]; a[k.i!] = v; p.at = a; }
+  else if (k.key === "beside") { const b = [...p.beside!] as [string, string, number?]; b[2] = v; p.beside = b; }
+  else p.params[k.key] = v;
+  parts[k.part] = p;
+  return new World({ ...W.spec, parts });
+}
+/**
+ * A failing rule fixed by one number, with no model: each number of the parts it names (where they
+ * stand, the gap beside, then their parameters) searched outward from its value, a step that grows,
+ * then narrowed to where the rule starts to hold and taken a little past it; the smallest change
+ * that holds and leaves every rule that held holding. Undefined when none does.
+ */
+export function fixRule(W: World, rules: Rule[], r: Rule, frames = 8, ms = 3600): { knob: Knob; to: number } | undefined {
+  const [kind, args] = ruleOf(r);
+  if (kind === "before" || kind === "while" || kind === "reaches") return undefined;
+  const held = rules.filter((q) => q !== r && runExpects(W, [q], frames, ms)[0].ok);
+  const holds = (w: World) => { try { return runExpects(w, [r], frames, ms)[0].ok; } catch { return false; } };
+  const names = [args[0], args[1]].filter((n): n is string => typeof n === "string" && n !== "ground").map((n) => n.split(".")[0]).filter((n, i, a) => W.spec.parts[n] && a.indexOf(n) === i);
+  const knobs = names.flatMap((n) => knobsOf(W, n)).sort((a, b) => +!KNOB_ORDER.includes(a.key) - +!KNOB_ORDER.includes(b.key));
+  const STEPS = [0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3];
+  let best: { knob: Knob; to: number; d: number; place: boolean } | undefined;
+  for (const k of knobs) {
+    const place = KNOB_ORDER.includes(k.key);
+    if (best && best.place && !place) break;
+    for (const sign of [1, -1]) {
+      let lo = 0, hi: number | undefined;
+      for (const d of STEPS) { if (best && best.place === place && d >= best.d) break; if (holds(turnKnob(W, k, k.value + sign * d))) { hi = d; break; } lo = d; }
+      if (hi === undefined) continue;
+      // narrowed to where it starts to hold, then a little past it
+      let h: number = hi;
+      for (let n = 0; n < 6; n++) { const mid: number = (lo + h) / 2; if (holds(turnKnob(W, k, k.value + sign * mid))) h = mid; else lo = mid; }
+      let to = Math.round((k.value + sign * (h + 0.05)) * 100) / 100;
+      if (!holds(turnKnob(W, k, to))) to = Math.round((k.value + sign * h) * 1000) / 1000;
+      // the roundest number near it that holds too (a foot set on the ground at 0, not 0.03)
+      round: for (const q of [1, 0.5, 0.25, 0.1, 0.05])
+        for (const c of [Math.floor(to / q) * q, Math.ceil(to / q) * q].map((v) => +v.toFixed(2)))
+          if (Math.abs(c - k.value) <= Math.abs(to - k.value) + 0.1 && holds(turnKnob(W, k, c))) { to = c; break round; }
+      const w = turnKnob(W, k, to);
+      if (!holds(w) || !held.every((q) => runExpects(w, [q], frames, ms)[0].ok)) continue;
+      const d = Math.abs(to - k.value);
+      if (!best || d < best.d || (place && !best.place)) best = { knob: k, to, d, place };
+    }
+  }
+  return best && { knob: best.knob, to: best.to };
+}
+/** A knob's number found in the art file's text (the part's `name: { ... }`, its at, beside or parameter) and set to `to`; undefined when it isn't there once, written as a literal. */
+export function setKnobInSource(src: string, k: Knob, to: number): string | undefined {
+  const heads = [...src.matchAll(new RegExp(`(^|[\\s{,])${k.part}\\s*:\\s*\\{`, "g"))];
+  if (heads.length !== 1) return undefined;
+  // the part's braces
+  const start = heads[0].index! + heads[0][0].length - 1;
+  let depth = 0, end = start;
+  for (; end < src.length; end++) { if (src[end] === "{") depth++; else if (src[end] === "}" && --depth === 0) break; }
+  const body = src.slice(start, end + 1), num = (v: number) => String(+v.toFixed(3));
+  let out: string | undefined;
+  if (k.key === "at" || k.key === "beside") {
+    const m = new RegExp(`\\b${k.key}\\s*:\\s*\\[([^\\]]*)\\]`).exec(body);
+    if (!m) return undefined;
+    const items = m[1].split(","), i = k.i!;
+    if (i < items.length) { if (!/^\s*-?[\d.]+\s*$/.test(items[i])) return undefined; items[i] = items[i].replace(/-?[\d.]+/, num(to)); }
+    else if (i === items.length) items.push(" " + num(to));
+    else return undefined;
+    out = body.slice(0, m.index) + m[0].replace(m[1], items.join(",")) + body.slice(m.index + m[0].length);
+  } else {
+    const m = new RegExp(`\\b${k.key}\\s*:\\s*(-?[\\d.]+)`).exec(body);
+    if (!m) return undefined;
+    out = body.slice(0, m.index) + m[0].replace(m[1], num(to)) + body.slice(m.index + m[0].length);
+  }
+  return src.slice(0, start) + out + src.slice(end + 1);
 }
 export { Density, Sdf };
 

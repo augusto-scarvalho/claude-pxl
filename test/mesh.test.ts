@@ -305,3 +305,18 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, F.faces, { f: { tex: "_white" } },
   for (let y = 11; y < 20; y++) for (let x = 11; x < 29; x++) if (holes.get(x, y) >>> 24 !== 0xff || ((holes.get(x, y) >>> 16) & 255) > 60) floorSeen++;
   assert.ok(floorSeen > 10, "the floor behind seen through it");
 });
+
+test("mesh() in surface()'s orthographic views: the same box covers the same pixels; a field drawn after it at its depth", () => {
+  const p = loadSource(PAL + `ramps("kgw", "krr")
+const B = sdf.box([1, 1, 1]).at(0, 0, 0.5).mat("m"), M = sdf.mesh(B, { size: 0.25 })
+for (const v of ["side", "iso"]) {
+  sprite("s_" + v, { w: 32, h: 32 }, surface(B, { view: v, ppm: 12, at: [16, 28], mats: { m: "kgw" } }))
+  sprite("m_" + v, { w: 32, h: 32 }, mesh(v, M.faces, { m: { ramp: "kgw" } }, { ppm: 12, at: [16, 28] }))
+}
+const wall = model(); wall.face("w", [-1, -1, 0], [1, -1, 0], [1, -1, 0.5], [-1, -1, 0.5])
+sprite("hid", { w: 32, h: 32 }, mesh("side", wall.faces, { w: { ramp: "krr" } }, { ppm: 12, at: [16, 28] }), surface(B, { view: "side", ppm: 12, at: [16, 28], mats: { m: "kgw" } }))`, "t.px.js");
+  const shape = (n: string) => keys(p, n).replace(/[^.\n]/g, "#");
+  for (const v of ["side", "iso"]) assert.equal(shape("m_" + v), shape("s_" + v), v);
+  const rows = keys(p, "hid").split("\n");
+  assert.ok(rows[28].includes("rrrr") && !rows[28].includes("g") && rows[20].includes("g"), "the wall in front hides the box's foot, not its top");
+});

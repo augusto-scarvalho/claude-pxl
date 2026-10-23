@@ -10,6 +10,7 @@ import { PxError } from "../core/errors.ts";
 import { dE, lineFlaws } from "../core/vision.ts";
 import { toHex } from "../core/color.ts";
 import type { Item } from "../core/model.ts";
+import { type Knob, fixRule, runExpects, turnKnob } from "../core/world3d.ts";
 
 /** Drawn by hand somewhere: a grid string, grid() or runs(), here or in a layer (line(), curve() and code draw their own lines clean, or as they mean to). */
 const byHand = (items: Item[]): boolean => items.some((i) => typeof i === "string"
@@ -23,6 +24,8 @@ export interface CheckResult {
   notes: string[];
   /** With `readings`: every placement's lit side against the scene's light, warning or not, and a tally (to tune the rule). */
   readings?: string[]; tally?: string;
+  /** With `fix`: each failing expect3d rule's one number that makes it hold (fixRule), or none found. */
+  fixes?: { text: string; knob?: Knob; to?: number; held?: boolean }[];
 }
 
 const hash = (d: Uint32Array) => { let h = 2166136261; for (let i = 0; i < d.length; i++) h = Math.imul(h ^ d[i], 16777619); return h >>> 0; };
@@ -42,7 +45,7 @@ const ranges = (fs: number[]) => fs.reduce<[number, number][]>((r, f) => {
  * that name (not those it includes), unless `names` are given. `frame` / `frames`: those frames of
  * each animated scene only, instead of all of them.
  */
-export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string; readings?: boolean } = {}): CheckResult {
+export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string; readings?: boolean; fix?: boolean } = {}): CheckResult {
   const reads = new Set<string>(), tally = { agree: 0, against: 0, unclear: 0 };
   const lines: string[] = [], notes: string[] = [];
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
@@ -112,10 +115,13 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     const only = opts.frames ?? (opts.frame !== undefined ? [opts.frame] : undefined), co = def.opts.check;
     // a long story checked one frame in n (check: { every: n }): what moves through it is still seen
     // at every few steps, at the cost of a short loop
-    const every = typeof co === "object" && co ? co.every : 1;
+    const every = typeof co === "object" && co ? co.every : 1, keep = p.named(name);
     if (!(Number.isInteger(every) && every >= 1)) throw new PxError(`scene '${name}': check: { every } is how many frames apart the checked ones are, a whole number from 1, got ${JSON.stringify(every)}`);
     for (const f of only && tl ? only : [...Array(count).keys()].filter((k) => k % every === 0)) {
-      const b = p.build(name, 0, tl ? frameTime(p, name, f) : 0);
+      const ft = tl ? frameTime(p, name, f) : 0, b = p.build(name, 0, ft);
+      // (a frame checked once, unless another asset places the scene: kept, it would push out the
+      // anims its frames share; a long loop's frames ran to gigabytes)
+      if (!keep) p.forget(name, ft);
       const unlit = new Set(b.layers.filter((l) => l.unlit).map((l) => l.name));
       frames++;
       // many copies of one small thing (a brush scattered over the ground) are texture, not objects:
@@ -171,16 +177,32 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     if (ran.feet) run.push(`feet on ${ran.feet}${groundSaid ? ` (against the ground row on ${ran.ground})` : ""}`); else not.push("feet (nothing placed has a height)");
   }
   // expect3d's rules over their loops (a world's parts: above, on, apart, near, reaches, within)
+  let fixes: CheckResult["fixes"];
   if (!opts.names && p.expects.length) {
-    const rs = p.runExpects();
-    for (const r of rs) if (!r.ok) lines.push(`${r.name}${r.loc ? ` (${r.loc})` : ""} › WARNING: expect ${r.text}: it doesn't hold (${r.detail})`);
-    run.push(`expects ${rs.length} (${rs.filter((r) => r.ok).length} held)`);
+    let all = 0, held = 0;
+    for (const e of p.expects) {
+      const rs = runExpects(e.world, e.rules, e.frames, e.ms);
+      all += rs.length; held += rs.filter((r) => r.ok).length;
+      let w = e.world;
+      rs.forEach((r, i) => {
+        if (r.ok) return;
+        lines.push(`${e.name}${e.loc ? ` (${e.loc})` : ""} › WARNING: expect ${r.text}: it doesn't hold (${r.detail})`);
+        // --fix: the one number that makes it hold, searched without a model, each on the world the
+        // fixes before it left (one that holds by then needs none)
+        if (!opts.fix) return;
+        if (runExpects(w, [e.rules[i]], e.frames, e.ms)[0].ok) { (fixes ??= []).push({ text: r.text, held: true }); return; }
+        const f = fixRule(w, e.rules, e.rules[i], e.frames, e.ms);
+        if (f) w = turnKnob(w, f.knob, f.to);
+        (fixes ??= []).push({ text: r.text, ...f });
+      });
+    }
+    run.push(`expects ${all} (${held} held)`);
   }
   if (ran.text) run.push(`lettering on ${ran.text}`);
   if (ran.lines) run.push(`lines on ${ran.lines}`);
   if (rigs) run.push(`rig parts ${ran.parts}`);
   const readings = opts.readings ? { readings: [...reads], tally: `${tally.agree + tally.against + tally.unclear} placements read: ${tally.agree} lit as their light, ${tally.against} against it, ${tally.unclear} with no side to tell` } : {};
-  return { ...readings, lines, notes, warnings: lines.length,
+  return { ...readings, ...(fixes ? { fixes } : {}), lines, notes, warnings: lines.length,
     coverage: `ran: ${run.join(", ") || "nothing"}${not.length ? `; not run: ${not.join(", ")}` : ""}`,
     checked: `${n(scenes, "scene")} (${n(frames, "frame")}, ${n(distinct, "distinct placement")}), ${n(rigs, "rig")}, ${n(others, "other asset")} with a front marker` };
 }

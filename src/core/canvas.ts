@@ -11,7 +11,7 @@ import { type Particle, drawParticles, drawTrail } from "./vfx.ts";
 import type { Spell } from "./spells.ts";
 import { type View, perspective } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
-import { type SurfaceCanvas, type SurfaceOpts, type VoxelOpts, drawSurface, drawVoxels } from "./surface.ts";
+import { type SurfaceCanvas, type SurfaceOpts, type SurfaceView, type VoxelOpts, drawSurface, drawVoxels, partIndex } from "./surface.ts";
 import { type VolumeOpts, drawVolume } from "./volume.ts";
 import { type SplatOpts, drawSplats } from "./splats.ts";
 import { type DecalOpts, drawDecal } from "./decal.ts";
@@ -824,7 +824,7 @@ export class Canvas {
   }
 
   /** Flat faces in meters (model()) drawn through the camera, the nearest kept per pixel, toned along their material's ramp: see mesh.ts. */
-  mesh(view: Partial<View> | ((p: [number, number, number]) => [number, number, number]), faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}): void {
+  mesh(view: Partial<View> | SurfaceView | ((p: [number, number, number]) => [number, number, number]), faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}): void {
     const tex: Record<string, Img> = {};
     const masks: Record<string, Img> = {}, looks: NonNullable<MeshWorld["looks"]> = {};
     for (const [k, M] of Object.entries(mats ?? {})) {
@@ -1128,6 +1128,7 @@ export class Canvas {
     // a twin draws pixel by pixel, each one landing mirrored
     if (!ok && !this.clipPred && !this.wrap && !this.mirrored) {
       this.img.blit(src, this.ox + x, this.oy + y);
+      this.carryParts(src, x, y);
       return;
     }
     for (let yy = 0; yy < src.h; yy++)
@@ -1140,6 +1141,21 @@ export class Canvas {
           n.set(src.norm.subarray(j * 3, j * 3 + 3), i * 3);
         } else if (this.img.norm) this.img.norm[i * 3 + 2] = 0;
         if (src.emit || this.img.emit) (this.img.emit ??= new Uint8Array(this.img.w * this.img.h))[i] = src.emit ? src.emit[j] : 0;
+      }
+    this.carryParts(src, x, y);
+  }
+
+  /** What painted each pixel of a 3D thing (Img.parts) comes along with a stamp; what it covers no longer says it. */
+  private carryParts(src: Img, x: number, y: number): void {
+    if (!src.parts && !this.img.parts) return;
+    const map = src.parts?.names.map((n) => partIndex(this.img, n)), ids = (this.img.parts ??= { ids: new Int32Array(this.img.w * this.img.h).fill(-1), names: [] }).ids;
+    const X = Math.floor(this.ox + x), Y = Math.floor(this.oy + y), W = this.img.w;
+    for (let yy = Math.max(0, -Y); yy < Math.min(src.h, this.img.h - Y); yy++)
+      for (let xx = Math.max(0, -X); xx < Math.min(src.w, W - X); xx++) {
+        const j = yy * src.w + xx, i = (Y + yy) * W + X + xx, c = src.data[j];
+        if (c === TRANSPARENT || this.img.data[i] !== c) continue;
+        const k = src.parts ? src.parts.ids[j] : -1;
+        ids[i] = k >= 0 ? map![k] : -1;
       }
   }
 

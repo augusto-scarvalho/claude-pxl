@@ -26,8 +26,13 @@ const D = sdf.density(sdf.sphere(0.6).at(0, 0, 0.6), { edge: 0.6 })
 `;
 test("volume(): thick inside, dithered where thin, its tones from its ramp; what glows marked; a density only", () => {
   const p = loadSource(BALL + `sprite("a", { w: 24, h: 24 }, volume(D, { view: "side", ppm: 18, ramp: "kgw", thickness: 4 }))
-sprite("b", { w: 24, h: 24 }, volume(D, { view: "side", ppm: 18, ramp: "kg", thickness: 4, emit: { ramp: "w", strength: 2 } }))`, "t.px.js");
+sprite("b", { w: 24, h: 24 }, volume(D, { view: "side", ppm: 18, ramp: "kg", thickness: 4, emit: { ramp: "w", strength: 2 } }))
+sprite("deep", { w: 24, h: 24 }, volume(D, { view: "side", ppm: 18, ramp: "kgw", thickness: 4, shadow: 1 }))
+sprite("lit", { w: 24, h: 24 }, volume(D, { view: "side", ppm: 18, ramp: "kgw", thickness: 4, shadow: 0.1 }))`, "t.px.js");
   const rows = keys(p, "a").split("\n"), mid = rows[13];
+  // its own shadow deeper, or the light reaching through it
+  const light = (n: string) => (keys(p, n).match(/w/g) ?? []).length;
+  assert.ok(light("deep") < light("a") && light("a") <= light("lit"), `${light("deep")} ${light("a")} ${light("lit")}`);
   assert.ok(/^[kgw]+$/.test(mid.replace(/\./g, "")) && mid.replace(/\./g, "").length > 10, "drawn in its ramp, thick across its middle");
   // its rim: a dither, some pixels drawn and some not, between where it is solid and where nothing is
   const ring = rows.slice(6, 10).join(""), drawn = ring.replace(/\./g, "").length;

@@ -2,8 +2,8 @@
 // in the reference. Prose is not parsed, only commands in code spans and names.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { Project } from "../src/core/project.ts";
 import { OPS } from "../src/core/canvas.ts";
@@ -35,6 +35,26 @@ test("docs: every command and flag the guides cite is in pxl's usage", () => {
   for (const f of GUIDES) for (const { cmd, rest, s } of commands(f)) {
     if (!usage.has(cmd)) { bad.push(`${f}: no command '${cmd}' in \`${s}\``); continue; }
     for (const fl of rest.matchAll(/--[\w-]+/g)) if (!usage.get(cmd)!.has(fl[0])) bad.push(`${f}: '${cmd} ${fl[0]}' isn't in its usage`);
+  }
+  assert.deepEqual(bad, []);
+});
+
+test("docs: every relative link and #anchor in the guides and docs/ leads somewhere", () => {
+  // GitHub's anchors: a heading lowercased, its punctuation dropped, spaces as hyphens
+  const slug = (h: string) => h.trim().toLowerCase().replace(/<[^>]+>/g, "").replace(/[^\p{L}\p{N} _-]/gu, "").replace(/ /g, "-");
+  const prose = (f: string) => readFileSync(f, "utf8").replace(/^```[^]*?^```/gm, "");
+  const anchors = (f: string) => new Set([...prose(f).matchAll(/^#{1,6} (.+)$/gm)].map((m) => slug(m[1])));
+  const docs = [...GUIDES, ...readdirSync(join(root, "docs")).filter((f) => f.endsWith(".md")).map((f) => `docs/${f}`), "BACKLOG.md"];
+  const bad: string[] = [];
+  for (const f of new Set(docs)) {
+    const p = join(root, f);
+    for (const m of prose(p).matchAll(/\]\(([^)\s]+)\)|src="([^"]+)"/g)) {
+      const link = m[1] ?? m[2];
+      if (/^(https?|mailto):/.test(link)) continue;
+      const [file, hash] = link.split("#"), target = file ? join(dirname(p), decodeURI(file)) : p;
+      if (!existsSync(target)) bad.push(`${f}: ${link} is missing`);
+      else if (hash && target.endsWith(".md") && !anchors(target).has(hash)) bad.push(`${f}: ${link} has no such heading`);
+    }
   }
   assert.deepEqual(bad, []);
 });

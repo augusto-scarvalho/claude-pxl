@@ -25,6 +25,8 @@ export interface VolumeOpts {
   thickness?: number;
   /** the light everywhere in it, 0..1 (default 0.35): its shade */
   ambient?: number;
+  /** its own shadow: the share of its thickness the light's way takes, 0..1 (default 0.4, light in a cloud scattering on; 1 a dense smoke's deep shade, 0.1 a thin cloud lit through) */
+  shadow?: number;
   /** the grid it is sampled on, m (default its box's longest side / 40) */
   cell?: number;
   /** what glows: its tones dark to light, how strong (default 1), and how far it lights what is round it, m (glow, default 0) */
@@ -38,19 +40,19 @@ export interface VolumeOpts {
   /** the name of the part it is (pxl steps --at) */
   part?: string;
 }
-/** Light in a cloud scatters on forward, reaching deeper than a ray sees through it: the share of its thickness the light's way takes. */
-const SCATTER = 0.4;
-export const VOLUME_OPTS = ["view", "ppm", "at", "ramp", "light", "thickness", "ambient", "cell", "emit", "blend", "pixel", "cast", "part"];
+export const VOLUME_OPTS = ["view", "ppm", "at", "ramp", "light", "thickness", "ambient", "shadow", "cell", "emit", "blend", "pixel", "cast", "part"];
 
 /** Draw a density on the canvas (see the top of this file). */
 export function drawVolume(c: SurfaceCanvas, density: unknown, o: VolumeOpts = {}): void {
   const who = "volume";
   if (!(density instanceof Density)) throw new PxError(`volume(density, opts) draws a density (sdf.density(field, { edge, noise, flow, ... }))${density && typeof density === "object" && "kind" in density ? `, not ${article((density as { kind: string }).kind)}` : ""}`);
   const persp = !!o.view && typeof o.view === "object" && "horizon" in o.view;
-  const K = o.pixel ?? 1, thick = o.thickness ?? 3, amb = o.ambient ?? 0.35, castK = o.cast ?? 0, blend = o.blend ?? "dither";
+  // (light in a cloud scatters on forward, reaching deeper than a ray sees through it: its own shadow
+  // takes a share of the thickness on the light's way)
+  const K = o.pixel ?? 1, thick = o.thickness ?? 3, amb = o.ambient ?? 0.35, castK = o.cast ?? 0, blend = o.blend ?? "dither", own = o.shadow ?? 0.4;
   if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`${who}: pixel is px to a ray, a whole number from 1, got ${JSON.stringify(o.pixel)}`);
-  if (!(thick > 0) || !(amb >= 0 && amb <= 1) || !(castK >= 0 && castK <= 1) || (blend !== "dither" && blend !== "alpha"))
-    throw new PxError(`${who}: thickness above 0, ambient and cast 0..1, blend "dither" or "alpha", got ${JSON.stringify([o.thickness, o.ambient, o.cast, o.blend])}`);
+  if (!(thick > 0) || !(amb >= 0 && amb <= 1) || !(castK >= 0 && castK <= 1) || !(own >= 0 && own <= 1) || (blend !== "dither" && blend !== "alpha"))
+    throw new PxError(`${who}: thickness above 0, ambient, shadow and cast 0..1, blend "dither" or "alpha", got ${JSON.stringify([o.thickness, o.ambient, o.shadow, o.cast, o.blend])}`);
   const origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
   if (o.at !== undefined && !(Array.isArray(o.at) && (o.at.length === 3 || (!persp && o.at.length === 2)) && o.at.every(Number.isFinite)))
     throw new PxError(`${who}: at is ${persp ? "where it stands, [x, z, up] m" : "where its origin lands, [x, y] px, or [x, y, z] m in the view's world"}, got ${JSON.stringify(o.at)}`);
@@ -100,7 +102,7 @@ export function drawVolume(c: SurfaceCanvas, density: unknown, o: VolumeOpts = {
     return s * sl;
   };
   for (let k = 0, q = 0; k < n[2]; k++) for (let j = 0; j < n[1]; j++) for (let i = 0; i < n[0]; i++, q++)
-    if (rho[q] > 0 || (i && rho[q - 1] > 0) || (j && rho[q - NX] > 0) || (k && rho[q - NXY] > 0)) lit[q] = Math.exp(-SCATTER * thick * shut(lo[0] + i * st[0], lo[1] + j * st[1], lo[2] + k * st[2]));
+    if (rho[q] > 0 || (i && rho[q - 1] > 0) || (j && rho[q - NX] > 0) || (k && rho[q - NXY] > 0)) lit[q] = Math.exp(-own * thick * shut(lo[0] + i * st[0], lo[1] + j * st[1], lo[2] + k * st[2]));
 
   // the cells of the picture its box covers
   const pts = corners(lo, hi).map(toScreen);

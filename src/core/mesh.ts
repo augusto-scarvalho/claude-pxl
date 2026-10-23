@@ -12,6 +12,7 @@ import { type Color, LIN, TRANSPARENT, fromLinear } from "./color.ts";
 import { PxError } from "./errors.ts";
 import type { Img } from "./image.ts";
 import { type Perspective, type View, perspective } from "./perspective.ts";
+import { projection } from "./surface.ts";
 import { type Lamp, type Lit, SunMap, shine } from "./sunlight.ts";
 import { PATTERNS, SCAN, noise, toward } from "./effects.ts";
 import { hash } from "./util.ts";
@@ -117,6 +118,10 @@ export interface MeshOpts {
   emit?: string;
   /** the sun's shadows (default true with a sun) */
   shadows?: boolean;
+  /** an orthographic view (surface()'s): px to the meter (default 16) */
+  ppm?: number;
+  /** an orthographic view: where the points' [0, 0, 0] lands, [x, y] px (default the middle of the bottom edge, or the view's origin) */
+  at?: number[];
 }
 export interface MeshCanvas {
   img: { w: number; h: number; depth?: Float32Array; emit?: Uint8Array };
@@ -167,20 +172,32 @@ const mod = (a: number, n: number) => ((a % n) + n) % n;
 /** Nearer than this (m along the camera's axis) is cut off: a face reaching behind the eye is drawn up to it. */
 const NEAR = 0.05;
 
+/** An orthographic view's depth goes on from this far, so the rasterizer's division by depth stays affine; taken off again in the depth it leaves. */
+const ORTHO = 1000;
 /**
  * The camera as a function from a point to [col, row, depth], where its eye is, which way is up and
  * where the light comes from by default (from the upper left, behind the eye). Through perspective(),
- * points are the world's [x, z, up], as solid's; a function of one's own takes points in the camera's
- * frame, [x right, y up, z ahead] from the eye.
+ * points are the world's [x, z, up], as solid's; through an orthographic view as surface()'s ("side",
+ * "top", "iso", { kind, yaw, pitch, origin, grid }), the world's [x, y ahead, z up] at `ppm` px to the
+ * meter, its origin at `at` px; a function of one's own takes points in the camera's frame, [x right,
+ * y up, z ahead] from the eye.
  */
-function camera(view: unknown, w: number): { project: Project; eye: V3; up: V3; light: V3; P?: Perspective } {
-  if (typeof view === "function") return { project: view as Project, eye: [0, 0, 0], up: [0, 1, 0], light: [-0.5, 0.7, -0.5] };
-  const P: Perspective = perspective({ ...(view as View), w: (view as View).w ?? w });
-  return { project: ([x, z, u]) => [...P.ground(x, z, u), P.focal / P.scale(z, x, u)], eye: [0, 0, P.eye], up: [0, 0, 1], light: [-0.5, -0.5, 0.7], P };
+function camera(view: unknown, c: MeshCanvas, o: MeshOpts): { project: Project; eye: V3; up: V3; light: V3; P?: Perspective; right?: V3; near: number; off: number } {
+  if (typeof view === "function") return { project: view as Project, eye: [0, 0, 0], up: [0, 1, 0], light: [-0.5, 0.7, -0.5], near: NEAR, off: 0 };
+  if (typeof view === "string" || (view && typeof view === "object" && !("horizon" in view))) {
+    const pr = projection(view as never, o.ppm, undefined, undefined, "mesh"), { a, b, D, R, U, F } = pr;
+    const origin = typeof view === "object" ? (view as { origin?: number[] }).origin : undefined, [ax, ay] = o.at ?? origin ?? [c.img.w / 2 - c.ox, c.img.h - c.oy];
+    if (!(Number.isFinite(ax) && Number.isFinite(ay))) throw new PxError(`mesh: at is where the points' [0, 0, 0] lands, [x, y] px, got ${JSON.stringify(o.at)}`);
+    const L = [-0.55 * R[0] + 0.55 * U[0] - 0.6 * F[0], -0.55 * R[1] + 0.55 * U[1] - 0.6 * F[1], -0.55 * R[2] + 0.55 * U[2] - 0.6 * F[2]] as V3;
+    return { project: (q) => [ax + dot(q, a), ay + dot(q, b), dot(q, D) + ORTHO], eye: [-D[0] * 1e6, -D[1] * 1e6, -D[2] * 1e6], up: [0, 0, 1], light: L, right: R, near: -Infinity, off: ORTHO };
+  }
+  if (o.ppm !== undefined || o.at !== undefined) throw new PxError("mesh: ppm and at are for an orthographic view (\"side\", \"top\", \"iso\" or { kind, ... }); through a perspective() view the points stand where they are");
+  const P: Perspective = perspective({ ...(view as View), w: (view as View).w ?? c.img.w });
+  return { project: ([x, z, u]) => [...P.ground(x, z, u), P.focal / P.scale(z, x, u)], eye: [0, 0, P.eye], up: [0, 0, 1], light: [-0.5, -0.5, 0.7], P, near: NEAR, off: 0 };
 }
 
 /** The part of a face in front of the near plane (depth is linear in the points, so cut where it crosses). */
-function clipNear(pts: V3[], P: [number, number, number][], project: Project): [V3[], [number, number, number][]] {
+function clipNear(pts: V3[], P: [number, number, number][], project: Project, NEAR: number): [V3[], [number, number, number][]] {
   const out: V3[] = [];
   for (let i = 0; i < pts.length; i++) {
     const j = (i + 1) % pts.length, a = pts[i], b = pts[j], da = P[i][2], db = P[j][2];
@@ -192,7 +209,7 @@ function clipNear(pts: V3[], P: [number, number, number][], project: Project): [
 
 /** Draw the faces, then the sprites among them; gives where each sprite landed (canvas coords), for describe. */
 export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}, world?: MeshWorld): { name: string; x: number; y: number; img: Img }[] {
-  const W = c.img.w, H = c.img.h, x0 = -c.ox, y0 = -c.oy, cam = camera(view, W), eye = cam.eye;
+  const W = c.img.w, H = c.img.h, x0 = -c.ox, y0 = -c.oy, cam = camera(view, c, opts), eye = cam.eye;
   const sunDir = unit(Array.isArray(opts.light) ? (opts.light as V3) : cam.light);
   const lightOf = typeof opts.light === "function" ? opts.light : (n: V3) => 0.3 + 0.6 * Math.max(0, dot(n, sunDir));
   const ramps: Record<string, string[]> = {};
@@ -216,7 +233,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
   // away, a wall across and down), where it starts, and whether it has holes
   const UP = cam.up[2] ? 2 : 1, AHEAD = UP === 2 ? 1 : 2;
   // which way on the picture is away from the light (a block material's outline is on that side)
-  const camRight: V3 = cam.P ? [Math.cos((cam.P.yaw * Math.PI) / 180), -Math.sin((cam.P.yaw * Math.PI) / 180), 0] : [1, 0, 0], away = dot(sunDir, camRight) < 0 ? 1 : -1;
+  const camRight: V3 = cam.P ? [Math.cos((cam.P.yaw * Math.PI) / 180), -Math.sin((cam.P.yaw * Math.PI) / 180), 0] : cam.right ?? [1, 0, 0], away = dot(sunDir, camRight) < 0 ? 1 : -1;
   const texOf: ({ T: Img; su: number; sv: number; ua: number; va: number; u0: number; v0: number; holes: boolean } | undefined)[] = [];
   const holed = new Map<Img, boolean>();
   const texel = (t: NonNullable<(typeof texOf)[number]>, X: number, Y: number, Z: number) => {
@@ -280,7 +297,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     }
     const tk = texOf[k], Bk = M.block ?? 1, hk = holes.get(F.mat);
     let pts = F.pts, P = pts.map(cam.project);
-    if (P.some((p) => p[2] < NEAR)) [pts, P] = clipNear(pts, P, cam.project);
+    if (P.some((p) => p[2] < cam.near)) [pts, P] = clipNear(pts, P, cam.project, cam.near);
     for (let t = 1; t + 1 < P.length; t++) {
       const [a, b, d] = [P[0], P[t], P[t + 1]], [A, B, D] = [pts[0], pts[t], pts[t + 1]];
       const Az = A.map((v) => v / a[2]), Bz = B.map((v) => v / b[2]), Dz = D.map((v) => v / d[2]);
@@ -313,7 +330,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
   const L = world?.lit, K = opts.pixel ?? 1;
   if (L) L.dir = sunDir;
   if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`mesh: pixel is how many px a sprite's pixel takes, a whole number from 1, got ${K}`);
-  if ((L || world?.sprites.length) && !cam.P) throw new PxError(`mesh: ${L ? "a sun" : "sprites"} need a perspective view ({ w, horizon, eye, ... }), not a camera function`);
+  if ((L || world?.sprites.length) && !cam.P) throw new PxError(`mesh: ${L ? "a sun" : "sprites"} need a perspective view ({ w, horizon, eye, ... }), not ${cam.off ? "an orthographic one" : "a camera function"}`);
   const feet = (world?.sprites ?? []).map((s) => cam.project(s.at)), perM = feet.map((f) => cam.P!.focal / f[2]);
   // a sprite's right, the world's up, and its face (toward the camera, level)
   const yaw = cam.P ? (cam.P.yaw * Math.PI) / 180 : 0, right: V3 = [Math.cos(yaw), -Math.sin(yaw), 0], front: V3 = [-Math.sin(yaw), -Math.cos(yaw), 0];
@@ -464,7 +481,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
   const keep = () => {
     // the depth stays on the image for post(); a second mesh() keeps the nearer of the two
     const d = (c.img.depth ??= new Float32Array(n).fill(Infinity));
-    for (let i = 0; i < n; i++) if (who[i] !== -1 && depth[i] < d[i]) d[i] = depth[i];
+    for (let i = 0; i < n; i++) if (who[i] !== -1 && depth[i] - cam.off < d[i]) d[i] = depth[i] - cam.off;
   };
   if (!world?.sprites.length) { keep(); return []; }
   const placed: { name: string; x: number; y: number; img: Img }[] = [];

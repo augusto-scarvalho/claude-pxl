@@ -2,7 +2,7 @@
 
 interface ErrInfo { message: string; loc?: string }
 interface AssetInfo { name: string; kind: string; part: boolean; w?: number; h?: number; hash?: string; steps?: number; changed: boolean; edited: boolean; error?: ErrInfo }
-interface State { version: number; file: string; time: string; ms: number; error?: ErrInfo; assets: AssetInfo[]; sheets: string[]; errors: ErrInfo[] }
+interface State { version: number; file: string; time: string; ms: number; error?: ErrInfo; assets: AssetInfo[]; sheets: string[]; models: string[]; errors: ErrInfo[] }
 interface FrameJ { label: string; loc?: string; w: number; h: number; full?: string; changes?: string }
 interface AssetJ { name: string; kind: string; w: number; h: number; loc?: string; palette: Record<string, string>; layers: string[]; image: string; frames: FrameJ[]; anim?: { ms: number; image: string }[] }
 interface Frame { label: string; loc?: string; w: number; h: number; full?: Uint32Array; changes?: Uint32Array }
@@ -381,6 +381,7 @@ function onBuild(s: State): void {
   st.textContent = bad ? `${bad} error${bad > 1 ? "s" : ""}` : "ok";
   st.className = "pill " + (bad ? "bad" : "ok");
   $("buildinfo").textContent = `v${s.version} · ${s.ms}ms · ${s.time}`;
+  $("three").hidden = !s.models?.length;
   renderList();
 
   const follow = ($<HTMLInputElement>("follow")).checked;

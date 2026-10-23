@@ -203,6 +203,8 @@ declare global {
     /** Light in the world (textured faces and sprites, through their normal maps): the sun's color (`light` the way to it), the sky's, lamps, keys that give light, the sun's shadows (default on). */
     sun?: PxColor | { color: PxColor; strength?: number }; sky?: PxColor | { color: PxColor; strength?: number };
     lamps?: { at: PxV3; color: PxColor; r?: number; strength?: number }[]; emit?: string; shadows?: boolean;
+    /** an orthographic view ("side", "top", "iso", { kind, ... }): px to the meter (16), where the points' [0, 0, 0] lands, [x, y] px */
+    ppm?: number; at?: number[];
   }
   /** A camera of one's own for mesh(): a point in the camera's frame (x right, y up, z ahead, from the eye) to [col, row, depth]. */
   type PxProject = (p: PxV3) => [number, number, number];
@@ -225,7 +227,8 @@ declare global {
     part(name: string): PxSdf;
     bounds(clock?: PxClock): [PxV3, PxV3]; dist(p: number[], clock?: PxClock): number;
   }
-  type PxSurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number; origin?: [number, number] } | PxView;
+  /** grid: on voxels' pixel grid (a voxel grid's iso and top are, unless false; a field's, or voxels from the side, when true) */
+  type PxSurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number; origin?: [number, number]; grid?: boolean } | PxView;
   /** surface()'s options: the view (orthographic at ppm px to the meter, its origin at `at` px; or a perspective() view, standing `at` [x, z, up] m), the materials' ramps, the light, the outline, the rim, its own shadows, the creases, a ray to K x K px, its shadow on what is drawn. */
   interface PxSurfaceOpts {
     view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number }>;
@@ -241,7 +244,7 @@ declare global {
   interface PxDensity { readonly kind: "density"; at(p: number[], clock?: PxClock): number; bounds(clock?: PxClock): [PxV3, PxV3] }
   /** volume()'s options: the view, its ramp, the light, how much a meter holds back, its shade, the grid's cell, what glows (and lights round it, m), dither or alpha where thin, a ray to K x K px, its shadow on what is drawn. */
   interface PxVolumeOpts {
-    view?: PxSurfaceView; ppm?: number; at?: number[]; ramp?: string | PxColor[]; light?: number[]; thickness?: number; ambient?: number; cell?: number;
+    view?: PxSurfaceView; ppm?: number; at?: number[]; ramp?: string | PxColor[]; light?: number[]; thickness?: number; ambient?: number; shadow?: number; cell?: number;
     emit?: { ramp: string | PxColor[]; strength?: number; glow?: number }; blend?: "dither" | "alpha"; pixel?: number; cast?: number; part?: string;
   }
   /** Gaussian splats: how many, their box. */
@@ -266,10 +269,10 @@ declare global {
   /** A scene as data: named parts by builders and relations; an edit of it, what changed, where a part stands. */
   interface PxWorld { readonly kind: "world"; readonly names: string[]; edit(changes: Record<string, unknown>): PxWorld; changed(other: PxWorld): string[]; place(name: string, clock?: PxClock): PxV3; built(name: string): PxBuilt }
   interface PxPartSpec { make: "tree" | "rock" | "house" | "crystal" | "mist" | "smoke"; params?: Record<string, unknown>; seed?: number; at?: number[] | ((c: PxClock) => number[]); on?: string; beside?: [string, string, number?]; around?: string; attach?: [string, string] }
-  /** expect3d's rules. */
-  type PxRule = { above?: [string, string]; on?: [string, string]; apart?: [string, string]; near?: [string, string, number]; reaches?: [string, number[], number, number?]; within?: [string, number[][]] };
-  /** voxels()'s options: surface()'s but ao; a cell's size (given a field), a cube's width in px (iso and top on the pixel grid). */
-  interface PxVoxelOpts extends Omit<PxSurfaceOpts, "ao"> { size?: number | number[]; px?: number }
+  /** expect3d's rules; before and while take two rules of a place. */
+  type PxRule = { above?: [string, string]; on?: [string, string]; apart?: [string, string]; near?: [string, string, number]; reaches?: [string, number[], number, number?]; within?: [string, number[][]]; before?: [PxRule, PxRule]; while?: [PxRule, PxRule] };
+  /** voxels()'s options: surface()'s (ao 0 unless given: a face darker at the creases); a cell's size (given a field), a cube's width in px (iso and top on the pixel grid). */
+  interface PxVoxelOpts extends PxSurfaceOpts { size?: number | number[]; px?: number }
   /** A voxel grid: cells a side, their size in m, its low corner, how many are filled, its box; its outside as a mesh, and as mesh()'s faces. */
   interface PxVoxels { readonly kind: "voxels"; readonly n: PxV3; readonly size: PxV3; readonly origin: PxV3; readonly count: number; bounds(): [PxV3, PxV3]; mesh(): PxMesh3; readonly faces: PxFace[] }
   /** A mesh in meters: positions, normals, quads (4 indices each) and their materials; mesh()'s faces. */
@@ -513,7 +516,7 @@ declare global {
     /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly). */
     solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): void;
     /** Flat faces in meters (model()) through the camera, the nearest per pixel, toned along their material's ramp, outlined where a surface ends. */
-    mesh(view: PxView | PxPerspective | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): void;
+    mesh(view: PxView | PxPerspective | PxSurfaceView | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): void;
     /** A distance field drawn as pixel art: ramps stepped by the light, an outline away from it, its normals and depth; through a camera after a mesh(), at its depth, its shadow on what is drawn. */
     surface(field: PxSdf, opts?: PxSurfaceOpts): void;
     /** A voxel grid, or a field made voxels of `size` m now, drawn as pixel-art cubes: a tone a face, the outline on the shaded side; iso and top on the pixel grid. */
@@ -628,7 +631,7 @@ declare global {
   /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade by `shade`. */
   function shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): PxOp;
   /** Flat faces in meters drawn through the camera with a depth per pixel (a dash round a driver, a wheel in front of its spokes): each toned along its material's ramp by how it lies to the light, outlined where a surface ends in front of another, creased where two faces of one material meet, its top edge a step lighter. Through perspective() points are [x, z, up]; a function camera takes [x right, y up, z ahead] from the eye. */
-  function mesh(view: PxView | PxPerspective | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): PxOp;
+  function mesh(view: PxView | PxPerspective | PxSurfaceView | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): PxOp;
   /** A distance field drawn as pixel art from the side, the top, in iso, or through a perspective() camera after a mesh(), at its depth, its shadow on what is drawn. */
   function surface(field: PxSdf, opts?: PxSurfaceOpts): PxOp;
   /** A voxel grid, or a field made voxels of `size` m at each moment, drawn as pixel-art cubes. */
@@ -645,10 +648,11 @@ declare global {
   function world3d(spec: { seed?: number; wind?: { from?: "left" | "right" | "front" | "behind"; strength?: number }; parts: Record<string, PxPartSpec> }): PxWorld;
   /** Rules over a world's loop, run by pxl check. */
   function expect3d(name: string, world: PxWorld, rules: PxRule[], opts?: { frames?: number; ms?: number }): void;
-  /** Builders with semantic parameters: make3d.tree({ canopy, twist, leaves, wind }), rock({ moss }), house({ snow, door, window, sign }), crystal({ rune }), mist({ color }), smoke(). */
-  const make3d: Record<"tree" | "rock" | "house" | "crystal" | "mist" | "smoke", (params?: Record<string, unknown>) => PxBuilt>;
+  /** Builders with semantic parameters: make3d.tree({ canopy, twist, leaves, wind }), pine({ height, tiers, girth, snow }), bush({ size, leaves }), rock({ moss }), house({ snow, door, window, sign }), crystal({ rune, moss }), mist({ color }), smoke(). */
+  const make3d: Record<"tree" | "pine" | "bush" | "rock" | "house" | "crystal" | "mist" | "smoke", (params?: Record<string, unknown>) => PxBuilt>;
   /** Written by build: a grid as name.vox (and .obj/.glb of its blocks), a mesh as name.obj (+ .mtl) and name.glb, Y up; each read back. */
-  function export3d(name: string, thing: PxVoxels | PxMesh3 | PxSplats, opts?: { mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; as?: ("vox" | "obj" | "glb" | "ply")[] }): void;
+  /** A function of the clock with frames: n moments of its loop: an animated .glb, a file a moment for the others. */
+  function export3d(name: string, thing: PxVoxels | PxMesh3 | PxSplats | ((c: PxClock) => PxVoxels | PxMesh3 | PxSplats), opts?: { mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; as?: ("vox" | "obj" | "glb" | "ply")[]; frames?: number; fps?: number }): void;
   /** Fields in 3D, in meters ([x, y ahead, z up]): primitives (round the origin; cylinder and cone standing on it), joins, and the other kinds made from a distance. */
   const sdf: {
     sphere(r: PxNum): PxSdf; box(size: PxVec | PxNum, o?: { round?: PxNum }): PxSdf; capsule(a: PxVec, b: PxVec, r: PxNum, r2?: PxNum): PxSdf;

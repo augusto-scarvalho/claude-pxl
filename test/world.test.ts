@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { sdf } from "../src/core/sdf.ts";
 import { scatter } from "../src/core/scatter.ts";
-import { World, runExpects } from "../src/core/world3d.ts";
+import { World, fixRule, runExpects, setKnobInSource } from "../src/core/world3d.ts";
 import { make3d } from "../src/core/builders.ts";
 import { loadSource } from "../src/node/load.ts";
 import { checkProject } from "../src/node/check.ts";
@@ -51,6 +51,18 @@ sprite("a", { w: 30, h: 30 }, surface(B, { ppm: 24, view: { kind: "side", pitch:
   const p = draw(0, ", lit: false");
   assert.ok(p.image("a").emit?.some((v) => v), "unlit: glowing");
   assert.equal(p.image("a").parts!.names.includes("decal eye"), true, "what painted it");
+  // stamped (flipped too) into a scene, it still says what painted each pixel; a stamp over it covers that
+  const q = loadSource(FACE + `const B = sdf.sphere(0.5).at(0, 0, 0.5)
+sprite("ball", { w: 30, h: 30 }, surface(B, { ppm: 24, at: [15, 27], mats: { m: "kgw" }, part: "ball" }))
+sprite("dot", "k")
+scene("s", { w: 64, h: 32 }, stamp("ball", 0, 0), stamp("ball", 32, 0, { flip: "x" }), stamp("dot", 15, 15))`, "t.px.js").image("s");
+  const at = (x: number, y: number) => q.parts!.names[q.parts!.ids[y * 64 + x]];
+  assert.deepEqual([at(15, 20), at(47, 20), at(15, 15)], ["ball", "ball", undefined]);
+  // on the voxels or the mesh made of a field: the field is what it lies on
+  const vm = loadSource(FACE + `const B = sdf.sphere(0.5).at(0, 0, 0.5).mat("m"), V = { kind: "side", pitch: 0 }, E = { on: B, point: [0, -0.5, 0.5], ppm: 24, view: V, at: [15, 27] }
+sprite("vox", { w: 30, h: 30 }, voxels(B, { size: 0.125, view: V, ppm: 24, at: [15, 27], mats: { m: "kgw" } }), decal("eye", E))
+sprite("msh", { w: 30, h: 30 }, mesh(V, sdf.mesh(B, { size: 0.1 }).faces, { m: { ramp: "kgw" } }, { ppm: 24, at: [15, 27] }), decal("eye", E))`, "t.px.js");
+  for (const n of ["vox", "msh"]) assert.equal((keys(vm, n).match(/r/g) ?? []).length, 4, n);
   const wrap = keys(loadSource(FACE + `const C = sdf.cylinder(0.5, 1)
 sprite("a", { w: 40, h: 40 }, surface(C, { ppm: 24, view: { kind: "side", pitch: 0 }, at: [20, 36], mats: { m: "kgw" } }), decal("eye", { on: C, point: [0, -0.5, 0.5], mode: "wrap", size: 0.4, ppm: 24, view: { kind: "side", pitch: 0 }, at: [20, 36] }))`, "t.px.js"), "a");
   assert.ok((wrap.match(/r/g) ?? []).length >= 60, "wrapped 0.4 m across, no holes");
@@ -73,6 +85,13 @@ test("world3d: parts placed by relations, a seed each; an edit changes only what
   assert.notEqual(make3d.tree({ seed: 1 }).field!.dist([0, 0, 3]), make3d.tree({ seed: 2 }).field!.dist([0, 0, 3]));
   // a guess out of range said, not drawn (an agent once gave twist 70, radians wrapping round)
   assert.throws(() => make3d.tree({ twist: 70 }), /twist is 0 to 1\.5 \(default 0\.35\), got 70/);
+  // a pine of tiers (snow on them), a bush; both swaying in the world's wind
+  const pine = make3d.pine({ height: 5, snow: 0.5 }), bush = make3d.bush({ leaves: 20 });
+  assert.deepEqual([Object.keys(pine.parts), Object.keys(pine.details), pine.sockets.top], [["trunk", "crown"], ["snow"], [0, 0, 5]]);
+  assert.ok(pine.field!.dist([0, 0, 4.5]) < 0 && pine.field!.dist([0, 0, 5.5]) > 0 && bush.field!.dist([0, 0, 0.4]) < 0);
+  assert.throws(() => make3d.pine({ tiers: 40 }), /tiers is 1 to 10/);
+  const P = new World({ wind: { from: "left" }, parts: { p: { make: "pine" } } }), Q = P.edit({ "wind.from": "right" });
+  assert.ok(P.changed(Q).includes("p"), "the pine sways with the world's wind");
 });
 
 test("draw3d: the parts an edit leaves alone drawn the same, byte for byte; each pixel knows its part; expect3d's rules in pxl check", () => {
@@ -94,4 +113,20 @@ expect3d("w", W, [{ above: ["oak.canopy", "oak.trunk"] }, { on: ["rock", "ground
   // a part that moves, reaching a point in time
   const orb = new World({ parts: { o: { make: "rock", params: { size: 0.3 }, at: (c) => [4 * c.phase, 0, 0] } } });
   assert.deepEqual(runExpects(orb, [{ reaches: ["o", [2, 0, 0.15], 2000, 0.4] }, { reaches: ["o", [3.5, 0, 0.15], 1000, 0.3] }], 8, 3600).map((x) => x.ok), [true, false]);
+});
+
+test("expect3d in time (before, while); a failing rule fixed by one number, no model; written into the file", () => {
+  // a rock rolling right over the loop: at x 0, 1, 2, 3 m
+  const W = new World({ parts: { a: { make: "rock", params: { size: 0.3 }, at: (c) => [4 * c.phase, 0, 0] }, b: { make: "rock", params: { size: 0.3 }, at: [3, 0] } } });
+  const ok = (rules: object[]) => runExpects(W, rules as never, 4, 3600).map((r) => r.ok);
+  const left = { within: ["a", [[-1, -1, -1], [1.5, 1, 1]]] }, right = { within: ["a", [[1.5, -1, -1], [5, 1, 1]]] };
+  assert.deepEqual(ok([{ before: [left, right] }, { before: [right, left] }, { while: [{ near: ["a", "b", 1.2] }, right] }, { while: [{ near: ["a", "b", 0.5] }, right] }]), [true, false, true, false]);
+  // apart fails: the rock's gap fixed (the smallest change, a round number), the other rule kept
+  const V = new World({ parts: { h: { make: "house", at: [0, 0] }, r: { make: "rock", beside: ["h", "front", -1.2] } } });
+  const rules = [{ apart: ["r", "h"] }, { on: ["h", "ground"] }] as never[];
+  const f = fixRule(V, rules, rules[0], 2)!;
+  assert.deepEqual([f.knob.part, f.knob.key, f.knob.value], ["r", "beside", -1.2]);
+  assert.ok(f.to > -1.2 && f.to < 0, String(f.to));
+  assert.equal(setKnobInSource(`const V = world3d({ parts: {\n  h: { make: "house", at: [0, 0] },\n  r: { make: "rock", beside: ["h", "front", -1.2] } } })`, f.knob, f.to)!.split("\n")[2], `  r: { make: "rock", beside: ["h", "front", ${f.to}] } } })`);
+  assert.equal(setKnobInSource(`a: { at: [1, 2] }`, { part: "a", key: "at", i: 2, value: 0 }, 0.5), `a: { at: [1, 2, 0.5] }`);
 });

@@ -20,8 +20,8 @@ import { type Perspective, type View, perspective } from "./perspective.ts";
 import { type Clock, type Compiled, Sdf, type V3, article, compile } from "./sdf.ts";
 import { Voxels, sizeOf, voxelize } from "./grids.ts";
 
-/** A view: a name, or { kind, yaw, pitch, origin } (`origin`: where the world's [0, 0, 0] lands, px; with it `at` is [x, y, z] m), or a perspective() view. */
-export type SurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number; origin?: [number, number] } | View;
+/** A view: a name, or { kind, yaw, pitch, origin, grid } (`origin`: where the world's [0, 0, 0] lands, px; with it `at` is [x, y, z] m; `grid`: on voxels' pixel grid), or a perspective() view. */
+export type SurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number; origin?: [number, number]; grid?: boolean } | View;
 export interface SurfaceMat { ramp: string | string[]; shine?: number }
 export interface SurfaceOpts {
   view?: SurfaceView;
@@ -58,9 +58,9 @@ export function partIndex(img: Img, name: string): number {
   const k = P.names.indexOf(name);
   return k >= 0 ? k : P.names.push(name) - 1;
 }
-/** voxels()'s: surface()'s but ao, and a cell's `size` (when it is given a field) and `px` (a cube's width on the picture) */
-export interface VoxelOpts extends Omit<SurfaceOpts, "ao"> { size?: number | number[]; px?: number }
-export const VOXEL_OPTS = ["size", "px", ...SURFACE_OPTS.filter((k) => k !== "ao")];
+/** voxels()'s: surface()'s (ao off unless given: the creases a cube face's corners make), and a cell's `size` (when it is given a field) and `px` (a cube's width on the picture) */
+export interface VoxelOpts extends SurfaceOpts { size?: number | number[]; px?: number }
+export const VOXEL_OPTS = ["size", "px", ...SURFACE_OPTS];
 export interface SurfaceCanvas {
   img: Img;
   ox: number;
@@ -124,13 +124,17 @@ export function surfaceSize(thing: Sdf | Voxels, o: { view?: SurfaceView; ppm?: 
 export function projection(view: SurfaceView | undefined, ppm: number | undefined, px: number | undefined, cell: V3 | undefined, who: string): { a: V3; b: V3; D: V3; R: V3; U: V3; F: V3; k: number; grid: boolean } {
   if (ppm !== undefined && px !== undefined) throw new PxError(`${who}: give ppm (px to the meter) or px (a cube's width), not both`);
   if ((ppm !== undefined && !(ppm > 0)) || (px !== undefined && !(px > 0))) throw new PxError(`${who}: ppm and px are above 0, got ${JSON.stringify(ppm ?? px)}`);
-  const o = typeof view === "string" || view === undefined ? { kind: view ?? "side" } : (view as { kind?: string; yaw?: number; pitch?: number });
-  const kind = o.kind ?? "side", grid = !!cell && (kind === "iso" || kind === "top") && o.yaw === undefined && o.pitch === undefined;
+  const o = typeof view === "string" || view === undefined ? { kind: view ?? "side" } : (view as { kind?: string; yaw?: number; pitch?: number; grid?: boolean });
+  const kind = o.kind ?? "side", plain = o.yaw === undefined && o.pitch === undefined;
+  if (o.grid !== undefined && (typeof o.grid !== "boolean" || (o.grid && !plain))) throw new PxError(`${who}: grid (on voxels' pixel grid) is true or false, on a view without yaw or pitch, got ${JSON.stringify(view)}`);
+  // a voxel grid's iso and top are on the pixel grid unless told not to; anything's side, iso or top when told to
+  const grid = plain && (o.grid ?? (!!cell && (kind === "iso" || kind === "top")));
   if (grid) {
-    const [sx, sy] = cell!, iso = kind === "iso", k = ppm ?? (px ?? 4) / (iso ? sx + sy : sx);
+    const [sx, sy] = cell ?? [1, 1, 1], iso = kind === "iso", side = kind === "side", k = ppm ?? (cell ? (px ?? 4) / (iso ? sx + sy : sx) : 16);
     // iso: x up to the right, y up to the left (both away), z up, a meter k px across; top: x right, y
-    // (away) and z up alike, a meter k px
-    const a: V3 = iso ? [k, -k, 0] : [k, 0, 0], b: V3 = iso ? [-k / 2, -k / 2, -k] : [0, -k, -k], D = unit(iso ? [1, 1, -1] : [0, 1, -1]);
+    // (away) and z up alike, a meter k px; side: x right, z up, y (away) a quarter as far up (a cube's
+    // front and a sliver of its top)
+    const a: V3 = iso ? [k, -k, 0] : [k, 0, 0], b: V3 = iso ? [-k / 2, -k / 2, -k] : side ? [0, -k / 4, -k] : [0, -k, -k], D = unit(iso ? [1, 1, -1] : side ? [0, 4, -1] : [0, 1, -1]);
     return { a, b, D, R: unit(a), U: unit([-b[0], -b[1], -b[2]]), F: D, k, grid };
   }
   const { R, U, F } = orthoBasis(view), k = ppm ?? (px !== undefined && cell ? px / cell[0] : 16);
@@ -232,6 +236,17 @@ function voxelTracer(V: Voxels): Tracer {
     shade: () => { const nn: V3 = [0, 0, 0]; nn[axis] = sign; return { n: nn, m: cells[last] - 1 }; },
     // (off the face into the empty cell beside it, never past it)
     lift: (e) => Math.min(2 * e, 0.25 * Math.min(s[0], s[1], s[2])),
+    // creases, as block games shade a face's corners: at each corner of the face, the cells over it
+    // beside and across (both sides filled: shut), mixed by where on the face the point is
+    ao: (p, nn) => {
+      const ax = nn[0] ? 0 : nn[1] ? 1 : 2, u = (ax + 1) % 3, v = (ax + 2) % 3, c = [0, 0, 0], f = [0, 0, 0];
+      for (let e = 0; e < 3; e++) { const g = (p[e] - nn[e] * 0.5 * s[e] - o[e]) / s[e]; c[e] = Math.floor(g); f[e] = g - c[e]; }
+      c[ax] += nn[ax];
+      const full = (du: number, dv: number) => { const q = [...c]; q[u] += du; q[v] += dv; return V.at(q[0], q[1], q[2]) ? 1 : 0; };
+      const corner = (du: number, dv: number) => { const a = full(du, 0), b = full(0, dv); return a && b ? 3 : a + b + full(du, dv); };
+      const lo = (1 - f[v]) * corner(-1, -1) + f[v] * corner(-1, 1), hi = (1 - f[v]) * corner(1, -1) + f[v] * corner(1, 1);
+      return ((1 - f[u]) * lo + f[u] * hi) / 3;
+    },
   };
 }
 
@@ -249,7 +264,7 @@ export function drawVoxels(c: SurfaceCanvas, thing: unknown, o: VoxelOpts = {}):
   if (thing instanceof Voxels) { if (o.size !== undefined) throw new PxError("voxels: a grid has its size already (size is for a field)"); V = thing; }
   else if (thing instanceof Sdf) { if (o.size === undefined) throw new PxError("voxels(field, { size }): a cell's size in m, one number or [x, y, z]"); V = voxelize(thing, { size: o.size, clock: clockOf(c) }); }
   else throw new PxError(`voxels(grid or field, opts) draws a voxel grid (sdf.voxels(field, { size })) or a distance field${thing && typeof thing === "object" && "kind" in thing ? `, not ${article((thing as { kind: string }).kind)}` : ""}`);
-  drawTraced(c, voxelTracer(V), { ...o, ao: 0 }, "voxels");
+  drawTraced(c, voxelTracer(V), { ...o, ao: o.ao ?? 0 }, "voxels");
 }
 
 export const clockOf = (c: SurfaceCanvas): Clock => ({ t: c.t, phase: c.frames > 0 ? c.frame / c.frames : 0, frame: c.frame, frames: c.frames });

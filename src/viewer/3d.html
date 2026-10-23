@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pxl 3D</title>
+<!-- The models export3d wrote (.glb, .ply), turned with the mouse: three.js from a pinned CDN build,
+     the only part of pxl that needs the network. Rebuilt files reload on their own. -->
+<style>
+  html, body { margin: 0; height: 100%; background: #15131c; color: #e8e4f0; font: 13px system-ui, sans-serif; overflow: hidden; }
+  #bar { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: #1d1a27; border-bottom: 1px solid #322d40; }
+  #bar b { font: 700 14px ui-monospace, Consolas, monospace; color: #ffb454; }
+  select { background: #15131c; color: #e8e4f0; border: 1px solid #322d40; border-radius: 6px; padding: 3px 6px; }
+  #info { color: #9a93ab; font: 12px ui-monospace, Consolas, monospace; }
+  canvas { display: block; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="bar"><b>pxl 3D</b><select id="pick"></select><span id="info">drag to turn, scroll to zoom, right-drag to move</span></div>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { PLYLoader } from "three/addons/loaders/PLYLoader.js";
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+document.body.append(renderer.domElement);
+const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, 0.01, 1000), controls = new OrbitControls(camera, renderer.domElement), clock = new THREE.Clock();
+scene.background = new THREE.Color(0x15131c);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x404050, 1.4));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(-3, 5, 4);
+scene.add(sun);
+const pick = document.getElementById("pick");
+let current, mixer, framed = "";
+
+async function show(file, keepView) {
+  const url = "/files/" + encodeURIComponent(file) + "?v=" + Date.now();
+  let obj;
+  mixer = undefined;
+  if (file.endsWith(".ply")) {
+    // splats as points, each its color from 3DGS's zeroth harmonic
+    const loader = new PLYLoader();
+    loader.setCustomPropertyNameMapping({ dc: ["f_dc_0", "f_dc_1", "f_dc_2"] });
+    const g = await loader.loadAsync(url), dc = g.getAttribute("dc");
+    if (dc) g.setAttribute("color", new THREE.BufferAttribute(dc.array.map((v) => Math.min(1, Math.max(0, 0.5 + 0.28209479 * v)) ** 2.2), 3));
+    g.computeBoundingSphere();
+    obj = new THREE.Points(g, new THREE.PointsMaterial({ size: g.boundingSphere.radius / 60, vertexColors: true }));
+  } else {
+    const gltf = await new GLTFLoader().loadAsync(url);
+    obj = gltf.scene;
+    if (gltf.animations.length) { mixer = new THREE.AnimationMixer(obj); for (const c of gltf.animations) mixer.clipAction(c).play(); }
+  }
+  if (current) scene.remove(current);
+  current = obj;
+  scene.add(obj);
+  if (keepView && framed === file) return;
+  framed = file;
+  const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() || 1;
+  controls.target.copy(c);
+  camera.position.copy(c).add(new THREE.Vector3(0.55, 0.5, 1.2).multiplyScalar(r));
+  camera.near = r / 200; camera.far = r * 200; camera.updateProjectionMatrix();
+}
+function list(state) {
+  const was = pick.value;
+  pick.replaceChildren(...state.models.map((m) => new Option(m, m)));
+  if (!state.models.length) { document.getElementById("info").textContent = "no .glb or .ply yet: export3d(...) in the art file writes them"; return; }
+  pick.value = state.models.includes(was) ? was : state.models[0];
+  show(pick.value, true);
+}
+pick.onchange = () => show(pick.value);
+new EventSource("/events").addEventListener("build", (ev) => list(JSON.parse(ev.data)));
+const fit = () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); };
+addEventListener("resize", fit);
+fit();
+renderer.setAnimationLoop(() => { mixer?.update(clock.getDelta()); controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>

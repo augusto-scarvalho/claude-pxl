@@ -488,6 +488,8 @@ test("server: state, asset frames, rebuild on change", async () => {
     assert.ok(html.includes("/app.js"));
     const js = await (await fetch(s.url + "app.js")).text();
     assert.ok(js.includes("EventSource") && !js.includes("interface AssetInfo"));
+    assert.match(await (await fetch(s.url + "3d")).text(), /three@0\.169\.0/);
+    assert.equal((await fetch(s.url + "files/a.glb")).status, 404, "only the models it lists");
 
     writeFileSync(file, `use("pico8")\nsprite("a", { w: 1, h: 1 }, px(0, 0, "9"))`);
     const t0 = Date.now();
@@ -503,6 +505,20 @@ test("server: state, asset frames, rebuild on change", async () => {
       }
     }
     assert.ok(v > 1, "rebuild did not happen");
+  } finally {
+    s.close();
+  }
+});
+
+test("server: /3d lists the models export3d wrote and serves them, nothing else of the folder", async () => {
+  const { dir, file } = tmpArt(`use("pico8"); pal({ g: 11 }); ramps("g")\nexport3d("ball", sdf.mesh(sdf.sphere(0.5).mat("m"), { size: 0.25 }), { mats: { m: "g" }, as: ["glb"] })`);
+  const s = await serve(file, { port: 0, out: join(dir, "out"), log: () => {} });
+  try {
+    const state = await (await fetch(s.url + "api/state")).json();
+    assert.deepEqual(state.models, ["ball.glb"]);
+    const glb = new Uint8Array(await (await fetch(s.url + "files/ball.glb")).arrayBuffer());
+    assert.equal(new TextDecoder().decode(glb.subarray(0, 4)), "glTF");
+    assert.equal((await fetch(s.url + "files/..%2Fa.px.js")).status, 404);
   } finally {
     s.close();
   }

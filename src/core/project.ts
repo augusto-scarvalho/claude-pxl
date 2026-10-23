@@ -138,7 +138,7 @@ export const OP_OPTS: Record<string, string[]> = {
   // one options object serves both: solids ignores shade, shadows ramps and light
   solids: ["at", "sun", "scale", "ramps", "light", "shade"],
   shadows: ["at", "sun", "scale", "shade", "ramps", "light"],
-  mesh: ["light", "sprites", "pixel", "sun", "sky", "lamps", "emit", "shadows"],
+  mesh: ["light", "sprites", "pixel", "sun", "sky", "lamps", "emit", "shadows", "ppm", "at"],
   surface: SURFACE_OPTS,
   voxels: VOXEL_OPTS,
   volume: VOLUME_OPTS,
@@ -200,7 +200,7 @@ function checkArgs(name: string, args: unknown[]): void {
       case "o": if (typeof v !== "object" || v === null || Array.isArray(v)) bad("an options object"); break;
       case "b": if (typeof v !== "boolean") bad("true/false"); break;
       case "f": if (typeof v !== "function") bad("a function"); break;
-      case "v": if (typeof v !== "function" && (typeof v !== "object" || v === null || Array.isArray(v))) bad("a camera: perspective(...) or its { w, horizon, eye, ... }, or a function from a point to [col, row, depth]"); break;
+      case "v": if (typeof v !== "function" && !["side", "top", "iso"].includes(v as string) && (typeof v !== "object" || v === null || Array.isArray(v))) bad("a camera: perspective(...) or its { w, horizon, eye, ... }, an orthographic view (\"side\", \"top\", \"iso\" or { kind, yaw, pitch, origin, grid }), or a function from a point to [col, row, depth]"); break;
     }
   });
 }
@@ -248,7 +248,7 @@ export class Project implements BuildCtx {
   readonly expects: { name: string; world: World; rules: Rule[]; frames: number; ms: number; loc?: string }[] = [];
   /** Run expect3d's rules: each its name, text, whether it held and where not. */
   runExpects() { return this.expects.flatMap((e) => runExpects(e.world, e.rules, e.frames, e.ms).map((r) => ({ ...r, name: e.name, loc: e.loc }))); }
-  readonly models: { name: string; thing: Voxels | Mesh3 | Splats; colors: Color[]; ramps: Color[][]; as: ("vox" | "obj" | "glb" | "ply")[]; loc?: string }[] = [];
+  readonly models: { name: string; thing: Voxels | Mesh3 | Splats; colors: Color[]; ramps: Color[][]; as: ("vox" | "obj" | "glb" | "ply")[]; loc?: string; frames?: (Voxels | Mesh3 | Splats)[] | (() => (Voxels | Mesh3 | Splats)[]); fps?: number; paint?: (t: Voxels | Mesh3 | Splats) => { colors: Color[]; ramps: Color[][] } }[] = [];
   readonly fonts = new Map<string, FontDef>();
   /** rig() skeletons by name, for describe's RIG section. */
   readonly rigs = new Map<string, RigDef>();
@@ -557,27 +557,44 @@ export class Project implements BuildCtx {
       checkKeys(`expect3d '${name}'`, opts, ["frames", "ms"], loc);
       this.expects.push({ name, world, rules: rules as Rule[], frames: (opts as { frames?: number }).frames ?? 8, ms: (opts as { ms?: number }).ms ?? 3600, loc });
     };
-    // export3d(name, grid or mesh, { mats, as }): .vox, .obj, .glb written by build
+    // export3d(name, grid or mesh, { mats, as }): .vox, .obj, .glb written by build; a function of the
+    // clock and frames: n, the loop's moments (an animated .glb, a file a moment for the others)
     env.export3d = (name: unknown, thing: unknown, opts: unknown = {}) => {
       const loc = this.callerLoc();
-      if (typeof name !== "string" || !name || !(thing instanceof Voxels || thing instanceof Mesh3 || thing instanceof Splats) || !isPlainObject(opts))
-        throw new PxError('export3d("name", sdf.voxels(field, { size }), sdf.mesh(field, { size }) or sdf.splats(field, { spacing }), { mats: { name: ramp }, as: ["vox"], ["obj", "glb"] or ["ply"] })', loc);
-      checkKeys(`export3d '${name}'`, opts, ["mats", "as"], loc);
-      const { mats = {}, as = thing instanceof Voxels ? ["vox"] : thing instanceof Splats ? ["ply"] : ["obj", "glb"] } = opts as { mats?: Record<string, unknown>; as?: unknown };
-      const splat = thing instanceof Splats;
-      if (!Array.isArray(as) || !as.length || as.some((f) => !["vox", "obj", "glb", "ply"].includes(f)) || (!(thing instanceof Voxels) && as.includes("vox")) || splat !== as.includes("ply") || (splat && as.length > 1))
+      const USAGE = 'export3d("name", sdf.voxels(field, { size }), sdf.mesh(field, { size }) or sdf.splats(field, { spacing }), { mats: { name: ramp }, as: ["vox"], ["obj", "glb"] or ["ply"] }), or a function of the clock, (c) => sdf.mesh(field, { size, clock: c }), with { frames: n, fps }';
+      if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError(USAGE, loc);
+      checkKeys(`export3d '${name}'`, opts, ["mats", "as", "frames", "fps"], loc);
+      const { mats = {}, frames, fps = 8 } = opts as { mats?: Record<string, unknown>; frames?: number; fps?: number };
+      const kind = (t: unknown) => (t instanceof Voxels ? "a grid" : t instanceof Mesh3 ? "a mesh" : t instanceof Splats ? "splats" : undefined);
+      let make: ((f: number) => unknown) | undefined;
+      if (typeof thing === "function") {
+        if (!(Number.isInteger(frames) && frames! >= 2) || !(fps > 0)) throw new PxError(`export3d '${name}': a function of the clock is made at frames: n moments of its loop (2 or more, fps 8 unless given), got ${JSON.stringify({ frames, fps })}`, loc);
+        const f0 = thing as (c: unknown) => unknown;
+        make = (f) => { const t = f0({ t: (f * 1000) / fps, phase: f / frames!, frame: f, frames }); if (kind(t) !== kind(first)) throw new PxError(`export3d '${name}': its function gave ${kind(t) ?? JSON.stringify(t)} at frame ${f}, ${kind(first)} at frame 0`, loc); return t as Voxels | Mesh3 | Splats; };
+        const first = f0({ t: 0, phase: 0, frame: 0, frames });
+        thing = first;
+      } else if (frames !== undefined) throw new PxError(`export3d '${name}': frames is for a function of the clock, (c) => sdf.mesh(field, { size, clock: c })`, loc);
+      if (!kind(thing)) throw new PxError(USAGE, loc);
+      const T = thing as Voxels | Mesh3 | Splats, as = ((opts as { as?: unknown }).as ?? (T instanceof Voxels ? ["vox"] : T instanceof Splats ? ["ply"] : ["obj", "glb"])) as unknown;
+      const splat = T instanceof Splats;
+      if (!Array.isArray(as) || !as.length || as.some((f) => !["vox", "obj", "glb", "ply"].includes(f)) || (!(T instanceof Voxels) && as.includes("vox")) || splat !== as.includes("ply") || (splat && as.length > 1))
         throw new PxError(`export3d '${name}': as is a list of "vox" (a voxel grid), "obj", "glb" (a grid or a mesh), or ["ply"] (splats), got ${JSON.stringify(as)}`, loc);
       // each material's color: a light middle tone of its ramp (what another tool lights itself)
-      const ramps = thing.mats.map((m) => {
-        const spec = mats[m] ?? Object.values(mats)[0] ?? this.pal.ramps[0];
-        const keys = typeof spec === "string" ? [...spec] : Array.isArray(spec) ? spec : isPlainObject(spec) && "ramp" in spec ? [...(spec as { ramp: string })["ramp"]] : undefined;
-        const cs = (keys ?? []).map((k) => this.pal.resolve(k));
-        if (!cs.length || cs.some((c) => c === null || c === undefined)) throw new PxError(`export3d '${name}': material '${m || "(none)"}' needs a ramp in mats (it has: ${Object.keys(mats).join(", ") || "none"})`, loc);
-        return cs as Color[];
-      });
-      const colors = ramps.map((r) => r[Math.ceil((r.length - 1) * 0.6)]);
+      const paint = (t: Voxels | Mesh3 | Splats) => {
+        const ramps = t.mats.map((m) => {
+          const spec = mats[m] ?? Object.values(mats)[0] ?? this.pal.ramps[0];
+          const keys = typeof spec === "string" ? [...spec] : Array.isArray(spec) ? spec : isPlainObject(spec) && "ramp" in spec ? [...(spec as { ramp: string })["ramp"]] : undefined;
+          const cs = (keys ?? []).map((k) => this.pal.resolve(k));
+          if (!cs.length || cs.some((c) => c === null || c === undefined)) throw new PxError(`export3d '${name}': material '${m || "(none)"}' needs a ramp in mats (it has: ${Object.keys(mats).join(", ") || "none"})`, loc);
+          return cs as Color[];
+        });
+        return { ramps, colors: ramps.map((r) => r[Math.ceil((r.length - 1) * 0.6)]) };
+      };
+      const { colors, ramps } = paint(T);
       if (this.models.some((x) => x.name === name)) throw new PxError(`export3d '${name}' is already defined`, loc);
-      this.models.push({ name, thing, colors, ramps, as: as as ("vox" | "obj" | "glb" | "ply")[], loc });
+      // the other moments made when build writes them (check and shot don't)
+      const moments = make ? () => Array.from({ length: frames! }, (_, f) => (f ? make!(f) : T)) as (Voxels | Mesh3 | Splats)[] : undefined;
+      this.models.push({ name, thing: T, colors, ramps, as: as as ("vox" | "obj" | "glb" | "ply")[], loc, ...(moments ? { frames: moments, fps, paint } : {}) });
     };
     // perspective({ w, horizon, eye, fov | focal, vp, yaw, pitch }): ground(x, z, up), at(col, row), scale(z, x, up), vanish(angle), vertical()
     env.perspective = (view: unknown) => {
@@ -812,6 +829,20 @@ export class Project implements BuildCtx {
     if (!tl || t === 0) return first;
     const tt = tl.once ? Math.min(Math.max(0, t), tl.loop) : ((t % tl.loop) + tl.loop) % tl.loop;
     return tt === 0 ? first : this.buildAt(name, seed, tt, def?.kind !== "anim" ? tl : undefined);
+  }
+
+  /** Drop a build at time t from the cache (a scene's frame checked once: kept, it would push out the anims its frames share). */
+  forget(name: string, t: number): void {
+    const tl = this.cache.get(name)?.anim;
+    if (!tl || !t) return;
+    const tt = tl.once ? Math.min(Math.max(0, t), tl.loop) : ((t % tl.loop) + tl.loop) % tl.loop, key = `${name}#${tt}`, v = this.timed.get(key);
+    if (v) { this.timed.delete(key); this.timedBytes -= v.bytes; }
+  }
+  /** Does another asset name this one (stamps it, as a zoom on a scene does)? Read off its ops and its functions' code. */
+  named(name: string): boolean {
+    const quoted = [`"${name}"`, `'${name}'`, `\`${name}\``], says = (f: unknown) => quoted.some((q) => String(f).includes(q));
+    const has = (items: Item[]): boolean => items.some((v) => typeof v === "function" ? says(v) : isLayer(v) ? has(v.items) : isOp(v) ? v.args.some((a) => a === name || (Array.isArray(a) && has(a as Item[])) || (typeof a === "function" && says(a))) : false);
+    return [...this.assets.values()].some((d) => d.name !== name && has(d.items));
   }
 
   /**

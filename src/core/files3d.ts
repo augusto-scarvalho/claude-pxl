@@ -1,6 +1,8 @@
 // 3D files for other tools, written by hand: a voxel grid as MagicaVoxel's .vox (a model at most 256
-// cells a side, its colors from the materials), a mesh as Wavefront .obj (+ .mtl) and glTF 2.0 binary
-// (.glb: one primitive per material, positions, normals, indices, a base color each). pxl's world is
+// cells a side, its colors from the materials; a bigger grid cut in models of 256 placed by a scene
+// graph), a mesh as Wavefront .obj (+ .mtl) and glTF 2.0 binary (.glb: one primitive per material,
+// positions, normals, indices, a base color each; several moments of a loop as a mesh each, shown in
+// turn by an animation). pxl's world is
 // [x, y ahead, z up], MagicaVoxel's z is up too; .obj and .glb are Y-up (glTF's +Z toward the viewer),
 // so a point goes out as (x, z, -y). Each has a reader of what it needs to check a file back.
 import { type Color, LIN } from "./color.ts";
@@ -12,46 +14,79 @@ const rgb = (c: Color): [number, number, number] => [c >>> 24, (c >>> 16) & 255,
 /** MagicaVoxel's model limit, cells a side. */
 export const VOX_MAX = 256;
 
-/** A grid as .vox: SIZE, XYZI (a cell each, its color 1 + its material), RGBA (the materials' colors, then grey). */
+/**
+ * A grid as .vox: SIZE, XYZI (a cell each, its color 1 + its material), RGBA (the materials' colors,
+ * then grey). Past 256 cells a side, cut in models of 256 at most, each placed by MagicaVoxel's scene
+ * graph (a transform over a group, a transform and a shape per model: its `_t` the model's middle,
+ * the whole grid's middle at the origin across, its floor at 0).
+ */
 export function encodeVox(V: Voxels, colors: Color[]): Uint8Array {
-  const [nx, ny, nz] = V.n;
-  if (nx > VOX_MAX || ny > VOX_MAX || nz > VOX_MAX) {
-    const ext = V.n.map((n, e) => n * V.size[e]), fit = ext.map((x) => x / VOX_MAX);
-    throw new PxError(`vox: ${nx} x ${ny} x ${nz} cells; MagicaVoxel holds ${VOX_MAX} a side. Its ${ext.map((x) => x.toFixed(2)).join(" x ")} m fit at a size of [${fit.map((x) => Math.ceil(x * 1000) / 1000).join(", ")}] m or more (or cut it in parts, each its own grid)`);
+  const [nx, ny, nz] = V.n, X = nx, XY = nx * ny;
+  // the models: blocks of 256 a side with a cell in them
+  const models: { o: number[]; s: number[]; xyz: number[] }[] = [];
+  for (let bz = 0; bz < nz; bz += VOX_MAX) for (let by = 0; by < ny; by += VOX_MAX) for (let bx = 0; bx < nx; bx += VOX_MAX) {
+    const s = [Math.min(VOX_MAX, nx - bx), Math.min(VOX_MAX, ny - by), Math.min(VOX_MAX, nz - bz)], xyz: number[] = [];
+    for (let k = 0; k < s[2]; k++) for (let j = 0; j < s[1]; j++) for (let i = 0; i < s[0]; i++) {
+      const v = V.cells[(bz + k) * XY + (by + j) * X + bx + i];
+      if (v) xyz.push(i, j, k, Math.min(255, v));
+    }
+    if (xyz.length || (!bx && !by && !bz)) models.push({ o: [bx, by, bz], s, xyz });
   }
-  const n = V.count, size = 12 + 12 + (12 + 4 + 4 * n) + (12 + 1024), out = new Uint8Array(8 + 12 + size), dv = new DataView(out.buffer);
-  let at = 0;
-  const id = (s: string) => { for (const ch of s) out[at++] = ch.charCodeAt(0); };
-  const i32 = (v: number) => { dv.setInt32(at, v, true); at += 4; };
-  id("VOX "); i32(150);
-  id("MAIN"); i32(0); i32(size);
-  id("SIZE"); i32(12); i32(0); i32(nx); i32(ny); i32(nz);
-  id("XYZI"); i32(4 + 4 * n); i32(0); i32(n);
-  for (let k = 0, q = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++, q++) {
-    const v = V.cells[q];
-    if (!v) continue;
-    out[at++] = i; out[at++] = j; out[at++] = k; out[at++] = Math.min(255, v);
+  const many = models.length > 1, bytes: number[] = [];
+  const i32 = (v: number) => { bytes.push(v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255); };
+  const str = (t: string) => { i32(t.length); for (const ch of t) bytes.push(ch.charCodeAt(0)); };
+  const dict = (d: Record<string, string>) => { i32(Object.keys(d).length); for (const [k, v] of Object.entries(d)) { str(k); str(v); } };
+  // a chunk: its id, its content's size (filled in after), no children
+  const chunk = (id: string, body: () => void) => {
+    for (const ch of id) bytes.push(ch.charCodeAt(0));
+    const at = bytes.length;
+    i32(0); i32(0); body();
+    const n = bytes.length - at - 8;
+    bytes.splice(at, 4, n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255);
+  };
+  for (const m of models) {
+    chunk("SIZE", () => m.s.forEach(i32));
+    chunk("XYZI", () => { i32(m.xyz.length / 4); for (const v of m.xyz) bytes.push(v); });
   }
-  id("RGBA"); i32(1024); i32(0);
-  for (let p = 0; p < 256; p++) {
-    const [r, g, b] = p < colors.length ? rgb(colors[p]) : [128, 128, 128];
-    out[at++] = r; out[at++] = g; out[at++] = b; out[at++] = 255;
+  if (many) {
+    chunk("nTRN", () => { i32(0); dict({}); i32(1); i32(-1); i32(-1); i32(1); dict({}); });
+    chunk("nGRP", () => { i32(1); dict({}); i32(models.length); models.forEach((_, k) => i32(2 + 2 * k)); });
+    models.forEach((m, k) => {
+      const t = [0, 1, 2].map((e) => m.o[e] + (m.s[e] >> 1) - (e < 2 ? V.n[e] >> 1 : 0));
+      chunk("nTRN", () => { i32(2 + 2 * k); dict({}); i32(3 + 2 * k); i32(-1); i32(0); i32(1); dict({ _t: t.join(" ") }); });
+      chunk("nSHP", () => { i32(3 + 2 * k); dict({}); i32(1); i32(k); dict({}); });
+    });
   }
+  chunk("RGBA", () => { for (let p = 0; p < 256; p++) { const [r, g, b] = p < colors.length ? rgb(colors[p]) : [128, 128, 128]; bytes.push(r, g, b, 255); } });
+  const out = new Uint8Array(20 + bytes.length), dv = new DataView(out.buffer);
+  out.set([86, 79, 88, 32]); dv.setInt32(4, 150, true); out.set([77, 65, 73, 78], 8); dv.setInt32(12, 0, true); dv.setInt32(16, bytes.length, true);
+  out.set(bytes, 20);
   return out;
 }
-/** What a .vox says: its size, how many voxels, the colors used. */
-export function readVox(b: Uint8Array): { size: [number, number, number]; count: number; colors: number } {
+/** What a .vox says: its size (the span of its voxels, its models put in place), how many voxels, the colors used, its models; `cells` each voxel's place [x, y, z] as the scene graph puts it. */
+export function readVox(b: Uint8Array): { size: [number, number, number]; count: number; colors: number; models: number; cells: number[][] } {
   const dv = new DataView(b.buffer, b.byteOffset, b.byteLength), tag = (at: number) => String.fromCharCode(...b.subarray(at, at + 4));
   if (tag(0) !== "VOX " || tag(8) !== "MAIN") throw new PxError("not a .vox file");
-  let at = 20, size: [number, number, number] = [0, 0, 0], count = 0;
-  const used = new Set<number>();
+  let at = 20;
+  const sizes: number[][] = [], vox: number[][][] = [], used = new Set<number>(), shapeModel = new Map<number, number>(), trn = new Map<number, { child: number; t: number[] }>();
   while (at + 12 <= b.length) {
     const t = tag(at), len = dv.getInt32(at + 4, true), body = at + 12;
-    if (t === "SIZE") size = [dv.getInt32(body, true), dv.getInt32(body + 4, true), dv.getInt32(body + 8, true)];
-    if (t === "XYZI") { count = dv.getInt32(body, true); for (let i = 0; i < count; i++) used.add(b[body + 4 + i * 4 + 3]); }
+    let p = body;
+    const i32 = () => { p += 4; return dv.getInt32(p - 4, true); }, str = () => { const n = i32(); p += n; return String.fromCharCode(...b.subarray(p - n, p)); };
+    const dict = () => { const d: Record<string, string> = {}; for (let k = i32(); k > 0; k--) { const key = str(); d[key] = str(); } return d; };
+    if (t === "SIZE") sizes.push([i32(), i32(), i32()]);
+    if (t === "XYZI") { const n = i32(), v: number[][] = []; for (let i = 0; i < n; i++, p += 4) { v.push([b[p], b[p + 1], b[p + 2]]); used.add(b[p + 3]); } vox.push(v); }
+    if (t === "nTRN") { const id = i32(); dict(); const child = i32(); i32(); i32(); i32(); trn.set(id, { child, t: (dict()._t ?? "0 0 0").split(" ").map(Number) }); }
+    if (t === "nSHP") { const id = i32(); dict(); i32(); shapeModel.set(id, i32()); }
     at = body + len;
   }
-  return { size, count, colors: used.size };
+  // each voxel where its model's transform puts it (the model's middle at _t), or as it is with no graph
+  const place = vox.map((): number[] => [0, 0, 0]);
+  for (const { child, t } of trn.values()) { const m = shapeModel.get(child); if (m !== undefined) place[m] = t.map((v, e) => v - (sizes[m][e] >> 1)); }
+  const cells = vox.flatMap((v, m) => v.map((q) => q.map((c, e) => c + place[m][e])));
+  const span = (e: number) => { let lo = Infinity, hi = -Infinity; for (const q of cells) { lo = Math.min(lo, q[e]); hi = Math.max(hi, q[e]); } return hi - lo + 1; };
+  const size = (vox.length === 1 || !cells.length ? sizes[0] ?? [0, 0, 0] : [span(0), span(1), span(2)]) as [number, number, number];
+  return { size, count: cells.length, colors: used.size, models: vox.length, cells };
 }
 
 /** A point out to Y-up: (x, z, -y). */
@@ -74,34 +109,54 @@ export function encodeObj(M: Mesh3, name: string, colors: Color[]): { obj: strin
   return { obj: lines.join("\n") + "\n", mtl: mtl.join("\n") };
 }
 
-/** A mesh as glTF 2.0 binary: positions and normals shared, a primitive (two triangles a quad) per material, each a base color in linear light. */
-export function encodeGlb(M: Mesh3, name: string, colors: Color[]): Uint8Array {
-  const V = M.positions.length / 3, mats = used(M), pos = new Float32Array(V * 3), nor = new Float32Array(V * 3);
-  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < V; i++) {
-    const p = yUp(M.positions, i), n = yUp(M.normals, i);
-    pos.set(p, i * 3); nor.set(n, i * 3);
-    for (let e = 0; e < 3; e++) { lo[e] = Math.min(lo[e], pos[i * 3 + e]); hi[e] = Math.max(hi[e], pos[i * 3 + e]); }
-  }
-  const idx = mats.map((k) => {
-    const t: number[] = [];
-    for (let q = 0; q < M.quadMat.length; q++) if (M.quadMat[q] === k) { const [a, b, c, d] = M.quads.subarray(q * 4, q * 4 + 4); t.push(a, b, c, a, c, d); }
-    return new Uint32Array(t);
-  });
-  const parts = [pos, nor, ...idx], views: { buffer: 0; byteOffset: number; byteLength: number; target: number }[] = [];
+/**
+ * A mesh as glTF 2.0 binary: positions and normals shared, a primitive (two triangles a quad) per
+ * material, each a base color in linear light. Several meshes (the moments of a loop, `fps` a second)
+ * go as a node each under one, shown in turn by an animation (their scales stepped between 0 and 1),
+ * which loops in any viewer; a material by its name across them (`colors` per mesh, or one list).
+ */
+export function encodeGlb(M: Mesh3 | Mesh3[], name: string, colors: Color[] | Color[][], fps = 8): Uint8Array {
+  const Ms = Array.isArray(M) ? M : [M], Cs = (Array.isArray(colors[0]) ? colors : Ms.map(() => colors)) as Color[][];
+  const names: string[] = [], matColor: Color[] = [];
+  const views: { buffer: 0; byteOffset: number; byteLength: number; target?: number }[] = [], accessors: Record<string, unknown>[] = [], parts: ArrayBufferView[] = [];
   let off = 0;
-  for (const [i, a] of parts.entries()) { views.push({ buffer: 0, byteOffset: off, byteLength: a.byteLength, target: i < 2 ? 34962 : 34963 }); off += a.byteLength; }
+  const view = (a: ArrayBufferView, target?: number) => { views.push({ buffer: 0, byteOffset: off, byteLength: a.byteLength, ...(target ? { target } : {}) }); parts.push(a); off += a.byteLength; return views.length - 1; };
+  const meshes = Ms.map((m, f) => {
+    const V = m.positions.length / 3, pos = new Float32Array(V * 3), nor = new Float32Array(V * 3);
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < V; i++) {
+      const p = yUp(m.positions, i), n = yUp(m.normals, i);
+      pos.set(p, i * 3); nor.set(n, i * 3);
+      for (let e = 0; e < 3; e++) { lo[e] = Math.min(lo[e], pos[i * 3 + e]); hi[e] = Math.max(hi[e], pos[i * 3 + e]); }
+    }
+    const P = accessors.push({ bufferView: view(pos, 34962), componentType: 5126, count: V, type: "VEC3", min: lo, max: hi }) - 1;
+    const N = accessors.push({ bufferView: view(nor, 34962), componentType: 5126, count: V, type: "VEC3" }) - 1;
+    const primitives = used(m).map((k) => {
+      const t: number[] = [];
+      for (let q = 0; q < m.quadMat.length; q++) if (m.quadMat[q] === k) { const [a, b, c, d] = m.quads.subarray(q * 4, q * 4 + 4); t.push(a, b, c, a, c, d); }
+      const ix = new Uint32Array(t), mn = matName(m, k);
+      if (!names.includes(mn)) { names.push(mn); matColor.push(Cs[f][k] ?? 0x808080ff); }
+      return { attributes: { POSITION: P, NORMAL: N }, indices: accessors.push({ bufferView: view(ix, 34963), componentType: 5125, count: ix.length, type: "SCALAR" }) - 1, material: names.indexOf(mn) };
+    });
+    return { name: Ms.length > 1 ? `${name}_${f}` : name, primitives };
+  });
   const lin = (c: number) => +LIN[c].toFixed(5);
+  const materials = names.map((mn, i) => { const [r, g, b] = rgb(matColor[i]); return { name: mn, pbrMetallicRoughness: { baseColorFactor: [lin(r), lin(g), lin(b), 1], metallicFactor: 0, roughnessFactor: 1 } }; });
+  let nodes: Record<string, unknown>[] = [{ mesh: 0, name }], animations: Record<string, unknown>[] | undefined;
+  if (Ms.length > 1) {
+    // a key at each moment's start and one at the loop's end; each node's scale 1 on its own moment
+    const n = Ms.length, T = new Float32Array(n + 1).map((_, k) => k / fps);
+    const input = accessors.push({ bufferView: view(T), componentType: 5126, count: n + 1, type: "SCALAR", min: [0], max: [n / fps] }) - 1;
+    nodes = [{ name, children: Ms.map((_, f) => f + 1) }, ...Ms.map((_, f) => ({ mesh: f, name: `${name}_${f}`, ...(f ? { scale: [0, 0, 0] } : {}) }))];
+    const samplers = Ms.map((_, f) => {
+      const S = new Float32Array((n + 1) * 3).map((_, q) => (Math.floor(q / 3) % n === f ? 1 : 0));
+      return { input, output: accessors.push({ bufferView: view(S), componentType: 5126, count: n + 1, type: "VEC3" }) - 1, interpolation: "STEP" };
+    });
+    animations = [{ name: "loop", samplers, channels: Ms.map((_, f) => ({ sampler: f, target: { node: f + 1, path: "scale" } })) }];
+  }
   const json = {
-    asset: { version: "2.0", generator: "pxl" }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0, name }],
-    meshes: [{ name, primitives: mats.map((_, i) => ({ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2 + i, material: i })) }],
-    materials: mats.map((k) => { const [r, g, b] = rgb(colors[k] ?? 0x808080ff); return { name: matName(M, k), pbrMetallicRoughness: { baseColorFactor: [lin(r), lin(g), lin(b), 1], metallicFactor: 0, roughnessFactor: 1 } }; }),
-    buffers: [{ byteLength: off }], bufferViews: views,
-    accessors: [
-      { bufferView: 0, componentType: 5126, count: V, type: "VEC3", min: lo, max: hi },
-      { bufferView: 1, componentType: 5126, count: V, type: "VEC3" },
-      ...idx.map((a, i) => ({ bufferView: 2 + i, componentType: 5125, count: a.length, type: "SCALAR" })),
-    ],
+    asset: { version: "2.0", generator: "pxl" }, scene: 0, scenes: [{ nodes: [0] }], nodes, meshes, materials,
+    buffers: [{ byteLength: off }], bufferViews: views, accessors, ...(animations ? { animations } : {}),
   };
   // chunks padded to 4 bytes: the JSON with spaces, the binary with zeros
   const js = new TextEncoder().encode(JSON.stringify(json)), jl = Math.ceil(js.length / 4) * 4, bl = Math.ceil(off / 4) * 4;
@@ -113,15 +168,18 @@ export function encodeGlb(M: Mesh3, name: string, colors: Color[]): Uint8Array {
   for (const a of parts) { out.set(new Uint8Array(a.buffer, a.byteOffset, a.byteLength), at); at += a.byteLength; }
   return out;
 }
-/** What a .glb says: its vertices, triangles and materials (counted from its accessors), its box, checked against its header. */
-export function readGlb(b: Uint8Array): { vertices: number; triangles: number; materials: number; min: number[]; max: number[] } {
+/** What a .glb says: its first mesh's vertices and triangles, its materials (counted from its accessors), its box, its meshes and how long its animation runs (s), checked against its header. */
+export function readGlb(b: Uint8Array): { vertices: number; triangles: number; materials: number; min: number[]; max: number[]; meshes: number; seconds: number } {
   const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
   if (dv.getUint32(0, true) !== 0x46546c67 || dv.getUint32(4, true) !== 2 || dv.getUint32(8, true) !== b.length) throw new PxError("not a glTF 2.0 binary");
   const jl = dv.getUint32(12, true), json = JSON.parse(new TextDecoder().decode(b.subarray(20, 20 + jl)));
   const bl = dv.getUint32(20 + jl, true);
   if (dv.getUint32(24 + jl, true) !== 0x004e4942 || bl < json.buffers[0].byteLength) throw new PxError(".glb: its binary chunk is missing or short");
-  const prims = json.meshes[0].primitives, acc = json.accessors;
-  return { vertices: acc[prims[0].attributes.POSITION].count, triangles: prims.reduce((t: number, p: { indices: number }) => t + acc[p.indices].count / 3, 0), materials: json.materials.length, min: acc[0].min, max: acc[0].max };
+  const prims = json.meshes[0].primitives, acc = json.accessors, anim = json.animations?.[0];
+  return {
+    vertices: acc[prims[0].attributes.POSITION].count, triangles: prims.reduce((t: number, p: { indices: number }) => t + acc[p.indices].count / 3, 0), materials: json.materials.length,
+    min: acc[prims[0].attributes.POSITION].min, max: acc[prims[0].attributes.POSITION].max, meshes: json.meshes.length, seconds: anim ? acc[anim.samplers[0].input].max[0] : 0,
+  };
 }
 /** What an .obj says: its vertices and faces. */
 export function readObj(s: string): { vertices: number; faces: number; materials: number } {

@@ -1,5 +1,5 @@
 // Live viewer server: watch art files, rebuild with traces, push updates over SSE.
-import { readFileSync, unwatchFile, watchFile } from "node:fs";
+import { existsSync, readFileSync, unwatchFile, watchFile } from "node:fs";
 import { createServer, type ServerResponse } from "node:http";
 import { stripTypeScriptTypes } from "node:module";
 import { basename, dirname, join, resolve } from "node:path";
@@ -47,6 +47,8 @@ interface State {
   error?: ErrInfo;
   assets: AssetInfo[];
   sheets: string[];
+  /** the 3D files export3d wrote that /3d shows (.glb, .ply) */
+  models: string[];
   errors: ErrInfo[];
 }
 
@@ -73,7 +75,7 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
   const log = opts.log ?? ((l: string) => console.log(l));
   const clients = new Set<ServerResponse>();
   let project: Project | undefined;
-  let state: State = { version: 0, file: basename(abs), time: "", ms: 0, assets: [], sheets: [], errors: [] };
+  let state: State = { version: 0, file: basename(abs), time: "", ms: 0, assets: [], sheets: [], models: [], errors: [] };
   const hashes = new Map<string, string>();
   const fps = new Map<string, string>();
   let watched = new Set<string>();
@@ -86,7 +88,7 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
 
   const rebuild = () => {
     const t0 = performance.now();
-    const next: State = { version: state.version + 1, file: basename(abs), time: new Date().toLocaleTimeString(), ms: 0, assets: [], sheets: [], errors: [] };
+    const next: State = { version: state.version + 1, file: basename(abs), time: new Date().toLocaleTimeString(), ms: 0, assets: [], sheets: [], models: [], errors: [] };
     try {
       project = loadProject(abs, { trace: true });
     } catch (e) {
@@ -120,6 +122,9 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
         const r = writeOutputs(project, out, { preview: opts.preview });
         // asset failures are already listed per asset; keep the rest (sheets, unknown names)
         next.errors = r.errors.filter((e) => !next.assets.some((a) => a.error?.message === e.message)).map(errInfo);
+        // what /3d can show: a .glb (a loop's moments in one), or a .ply (its first moment)
+        next.models = project.models.flatMap((m) => [...(m.as.includes("glb") ? [`${m.name}.glb`] : []), ...(m.as.includes("ply") ? [m.frames ? `${m.name}_0.ply` : `${m.name}.ply`] : [])])
+          .filter((f) => existsSync(join(out, f)));
       }
       watch(project.files);
     } else watch([abs]);
@@ -172,6 +177,13 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
       if (url.pathname === "/") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(readFileSync(join(viewerDir, "index.html")));
+      } else if (url.pathname === "/3d") {
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(readFileSync(join(viewerDir, "3d.html")));
+      } else if (url.pathname.startsWith("/files/") && out && state.models.includes(decodeURIComponent(url.pathname.slice(7)))) {
+        // only the files listed: nothing else of the folder is served
+        res.writeHead(200, { "content-type": url.pathname.endsWith(".glb") ? "model/gltf-binary" : "application/octet-stream", "cache-control": "no-store" });
+        res.end(readFileSync(join(out, decodeURIComponent(url.pathname.slice(7)))));
       } else if (url.pathname === "/app.js") {
         const src = readFileSync(join(viewerDir, "app.ts"), "utf8");
         res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });

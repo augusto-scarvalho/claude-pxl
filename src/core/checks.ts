@@ -132,10 +132,27 @@ function thinAcross(img: Img): [number, number] | undefined {
  * rocks and props shaded at their rims agree; a flipped variant is caught; a building whose outline is
  * mostly trims (cornice, steps) can still read wrong. Look before trusting a warning.
  */
+// what the rim reads depends only on the pixels (and the ramps): read once per drawing, however many
+// frames and places it is checked at (a walker crossing a long scene)
+const readings = new WeakMap<object, Map<string, { d?: LitReading; n?: [number, number] }>>(), NO_STEPS = {};
+const fnv = (d: Uint32Array) => { let h = 2166136261; for (let i = 0; i < d.length; i++) h = Math.imul(h ^ d[i], 16777619); return h >>> 0; };
+function rimOf(img: Img, steps?: Steps): { d?: LitReading; n?: [number, number] } {
+  let m = readings.get(steps ?? NO_STEPS);
+  if (!m) readings.set(steps ?? NO_STEPS, (m = new Map()));
+  const key = `${img.w}x${img.h}:${fnv(img.data)}`;
+  let r = m.get(key);
+  if (!r) {
+    if (m.size > 50000) m.clear();
+    const d = litDir(img, steps);
+    m.set(key, (r = { d, n: d ? thinAcross(img) : undefined }));
+  }
+  return r;
+}
+
 export function lightWords(img: Img, light?: [number, number], steps?: Steps): string {
-  const d = litDir(img, steps);
+  const { d, n } = rimOf(img, steps);
   if (!d) return "";
-  const m = Math.hypot(...d), n = thinAcross(img);
+  const m = Math.hypot(...d);
   if (n) {
     // a blade: its rim shows two faces, so the reading only says which one is lit; whether that
     // one looks toward the light is what can be checked (lit from the top left, a blade lying
