@@ -845,3 +845,10 @@ WebP read frame by frame, one cycle of a loop in place read as such.
 - [ ] **The emission mask travels**: `emit` brightens its pixels, and nothing marks them as shining after. For
   `mesh()` (sprites that shine and aren't darkened by the sun), `lighting()` and a bloom fed by it,
   the mask has to move with the pixels as normals do (stamp, flip, rot, crop, outline).
+- [x] **Vegetation in the wind, for flat sprites**: `effect("sway")`, rows moved by their height over
+  the base (warp's whole pixels, the normals along), a lean downwind and a to-and-fro on the loop;
+  each copy its own phase and reach by `reseed`, a gust across the scene by `delay`, and the same in
+  `mesh()` (its sprites take `delay`, `rdelay`, `seed`, `reseed`), whose shadows, cut from the swayed
+  picture, sway with them. Normals move with their pixels, not turned (a lean of 2 px over 68 is
+  under 2 degrees). Left: a painted mask of what moves (by height covers the kit's plants), and
+  grass bent by a passer-by as an option rather than a recipe (an anim of bends and `frame`).

@@ -163,3 +163,37 @@ sheet("all", ["fade"], { pad: 1 })`);
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("sway: the foot stays, the top goes amount px downwind, the rows between by their height; normals go with their pixels", () => {
+  const bar = (fx: string) => load(`sprite("t", { w: 9, h: 10, pivot: "bottom" }, rect(4, 0, 1, 10, "g"), bump("dome"))
+anim("a", { base: "t", frames: 4 }, ${fx})`);
+  const xs = (img: Img) => Array.from({ length: 10 }, (_, y) => [...Array(9).keys()].find((x) => img.get(x, y) !== 0));
+  const p = bar('effect("sway", { amount: 3, lean: 1, power: 1, vary: 0 })'), f = p.frames("a");
+  assert.deepEqual(xs(f[2].img), [7, 7, 6, 6, 6, 5, 5, 5, 4, 4], "3 px at the top, nothing at the foot");
+  assert.deepEqual(xs(bar('effect("sway", { amount: -3, lean: 1, power: 1, vary: 0, still: 4 })').frames("a")[0].img), [1, 2, 2, 3, 3, 4, 4, 4, 4, 4], "to the left, the 4 rows over the foot still");
+  const flat = p.image("t"), moved = f[2].img, n = (img: Img, x: number, y: number) => [...img.norm!.subarray(3 * (y * 9 + x), 3 * (y * 9 + x) + 3)];
+  assert.deepEqual(n(moved, 7, 0), n(flat, 4, 0), "the top pixel's normal went with it");
+  assert.ok(same(bar('effect("sway", { amount: 0 })').frames("a")[1].img, flat), "amount 0 changes nothing");
+  // lean 0: to and fro about the upright; copies reseeded sway out of step
+  const fro = bar('effect("sway", { amount: 3, lean: 0, power: 1, vary: 0 })').frames("a").map((g) => xs(g.img)[0]);
+  assert.deepEqual(fro, [4, 7, 4, 1], "upright, right, upright, left over the loop");
+  const two = load(`sprite("t", { w: 9, h: 10, pivot: "bottom" }, rect(4, 0, 1, 10, "g"))
+anim("a", { base: "t", frames: 8 }, effect("sway", { amount: 3, vary: 1 }))
+scene("s", { w: 18, h: 10 }, stamp("a", 4.5, 10, { reseed: true }), stamp("a", 13.5, 10, { reseed: true }))`).frames("s");
+  assert.ok(two.some((g) => !same(g.img.sub(0, 0, 9, 10), g.img.sub(9, 0, 9, 10))), "each copy its own way");
+});
+
+test("sway in mesh(): a sprite's shadow on the floor sways with it; a sprite's delay is its own time in the loop", () => {
+  const src = (delay: number) => `ramps("kgw")
+const V = { w: 40, horizon: 10, eye: 1, focal: 40 }
+sprite("_white", "w")
+sprite("_pole", { w: 12, h: 20, pivot: "bottom" }, rect(5, 0, 2, 20, "r"))
+anim("_pole_sway", { base: "_pole", frames: 4 }, effect("sway", { amount: 4, lean: 0, vary: 0 }))
+const F = model(); F.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0])
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, F.faces, { f: { tex: "_white" } }, { light: [-1, 1, 0.8], sun: "w", sky: { color: "w", strength: 0.2 }, sprites: [{ name: "_pole_sway", at: [0, 4], shadow: 0, delay: ${delay} }] }))`;
+  const f = load(src(0)).frames("a");
+  assert.equal(f.length, 4);
+  const changed = [...f[0].img.data.keys()].filter((i) => f[0].img.data[i] !== f[1].img.data[i]);
+  assert.ok(changed.some((i) => Math.floor(i / 40) > 21), "floor pixels in front of its foot changed: the shadow moved");
+  assert.ok(same(load(src(125)).frames("a")[0].img, f[1].img), "delayed a frame: its first frame is the other's second");
+});

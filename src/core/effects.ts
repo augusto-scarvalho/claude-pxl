@@ -13,7 +13,7 @@ import { type Color, LIN, MIXES, TRANSPARENT, fromLinear, oklab, pack } from "./
 import { PxError, didYouMean } from "./errors.ts";
 import { Img } from "./image.ts";
 import type { Palette } from "./palette.ts";
-import { bayer, colorList, fbm, hash } from "./util.ts";
+import { bayer, colorList, fbm, hash, rng } from "./util.ts";
 
 /** What an effect gets besides the pixels and its parameters. */
 export interface FxCtx {
@@ -82,11 +82,27 @@ function noise(seed: number): (u: number, v: number) => number {
   return (u, v) => (u === lu && v === lv ? last : ((lu = u), (lv = v), (last = even(fbm(u + su, v + sv, OCTAVES)))));
 }
 
-/** The pixel at (x, y), clear past the edges (or across them, on a wrapped canvas). */
-function sample(img: Img, x: number, y: number, wrap?: { x: boolean; y: boolean }): Color {
+/** The index of the pixel at (x, y), -1 past the edges (or across them, on a wrapped canvas). */
+function at(img: Img, x: number, y: number, wrap?: { x: boolean; y: boolean }): number {
   if (wrap?.x) x = ((x % img.w) + img.w) % img.w;
   if (wrap?.y) y = ((y % img.h) + img.h) % img.h;
-  return x < 0 || y < 0 || x >= img.w || y >= img.h ? TRANSPARENT : img.data[y * img.w + x];
+  return x < 0 || y < 0 || x >= img.w || y >= img.h ? -1 : y * img.w + x;
+}
+
+/**
+ * Pixels moved as warp() moves them: each place takes the pixel `from` names (an index, -1 for the
+ * clear), its normal along with it, so a normal map lights what moved as it lit it before.
+ */
+function moved(src: Img, from: (px: number, py: number, i: number) => number): Img {
+  const out = new Img(src.w, src.h), n = src.norm, on = n ? (out.norm = new Int8Array(n.length)) : undefined;
+  for (let py = 0, i = 0; py < src.h; py++)
+    for (let px = 0; px < src.w; px++, i++) {
+      const j = from(px, py, i);
+      if (j < 0) continue;
+      out.data[i] = src.data[j];
+      if (on) { on[3 * i] = n![3 * j]; on[3 * i + 1] = n![3 * j + 1]; on[3 * i + 2] = n![3 * j + 2]; }
+    }
+  return out;
 }
 
 /** Each pixel of the image with its place in the art's pixels (K px to one, from the drawing's origin). */
@@ -244,14 +260,37 @@ export const EFFECTS: Record<string, Effect> = {
   distort: {
     params: { amount: num(1, 0), scale: num(8, 0.5), speed: num(1, 0), axis: oneOf("xy", "x", "y"), pixel: PIXEL },
     run(src, p, x) {
-      const nx = noise(x.seed), ny = noise(x.seed + 7919), K: number = p.pixel, out = new Img(src.w, src.h);
+      const nx = noise(x.seed), ny = noise(x.seed + 7919), K: number = p.pixel;
       const a = 2 * Math.PI * turn(x), r = p.speed / (2 * Math.PI), u0 = r * Math.cos(a), v0 = r * Math.sin(a);
       const off = (n: (u: number, v: number) => number, ax: number, ay: number) => Math.round(p.amount * (2 * n(ax / p.scale + u0, ay / p.scale + v0) - 1));
-      each(src, x, K, (i, ax, ay, px, py) => {
+      return moved(src, (px, py, i) => {
+        const ax = Math.floor((px - x.ox) / K), ay = Math.floor((py - x.oy) / K);
         const dx = p.axis !== "y" ? off(nx, ax, ay) : 0, dy = p.axis !== "x" ? off(ny, ax, ay) : 0;
-        out.data[i] = dx || dy ? sample(src, px - dx * K, py - dy * K, x.wrap) : src.data[i];
+        return dx || dy ? at(src, px - dx * K, py - dy * K, x.wrap) : i;
       });
-      return out;
+    },
+  },
+  /**
+   * Swaying in the wind, a plant's way: each row moves sideways by its height over the base (the pivot's
+   * row, or the bottom): nothing at the foot and `still` rows above it, `amount` px at the top, growing
+   * with the height to the `power` (2: a trunk bending). Over the loop it sways `cycles` times, `lean`
+   * of the bend always downwind (negative `amount`: the wind blows to the left), the rest to and fro;
+   * `flutter` px more at the top, twice as fast, row by row (the leaves). `vary` (0..1) of a turn and of
+   * the reach comes from the seed: placed with `reseed`, each copy sways its own way, out of step.
+   * Whole pixels move, with their normals (warp's way).
+   */
+  sway: {
+    params: { amount: num(1.5, -64, 64), lean: num(0.5, 0, 1), power: num(2, 0.25, 8), still: num(0, 0), cycles: num(1, 1, 64, true), flutter: num(0, 0, 16), vary: num(0.25, 0, 1), pixel: PIXEL },
+    run(src, p, x) {
+      const r = rng(hash(x.seed, 3, 11)), start = p.vary * r(), far = 1 + p.vary * (2 * r() - 1), K: number = p.pixel;
+      const th = 2 * Math.PI * (p.cycles * turn(x) + start), s = p.lean + (1 - p.lean) * Math.sin(th);
+      const base = Math.round(src.pivot?.[1] ?? src.h), top = Math.max(1, Math.floor((base - 1) / K) - p.still);
+      const row = new Int32Array(src.h);
+      for (let py = 0; py < src.h; py++) {
+        const up = Math.floor((base - 1 - py) / K) - p.still, w = up <= 0 ? 0 : Math.min(1, up / top) ** p.power;
+        row[py] = K * Math.round(w * (p.amount * far * s + p.flutter * Math.sin(2 * th + 0.3 * up)));
+      }
+      return moved(src, (px, py, i) => (row[py] ? at(src, px - row[py], py, x.wrap) : i));
     },
   },
   /**

@@ -62,6 +62,11 @@ export interface MeshSprite {
   at: [number, number] | V3;
   flip?: "x";
   frame?: number;
+  /** an animation's own time in its loop and random choices, as a stamp's (a tree swaying out of step) */
+  delay?: number;
+  rdelay?: boolean;
+  seed?: number;
+  reseed?: boolean | number;
   /** the contact shadow's radius in m, 0 for none (default: a third of the sprite's width) */
   shadow?: number;
 }

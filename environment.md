@@ -67,6 +67,11 @@ round it.
 - Far off: near grass has blades, the middle plane 1-2 px clusters, the far plane none; farther is
   lighter, less saturated, its hue nearer the sky's. Under trees: darker and browner, so the open
   ground where the player is draws the eye.
+- Tufts in the wind: grass sways twice in the trees' loop (`cycles: 2`), power 1 (blades bend from
+  the root), 1-2 px at the top, `vary: 0.5`; one wind for the field, a gust rolling across it as a
+  `delay` of 10 ms a px of x (120 ms a m in a `mesh()`), so neighbours move together and the far side
+  later. Someone walking through: the tufts within 9 px of the feet pushed away from them, 3 px at
+  the feet down to none, standing back up as they pass (`PXL help effect`, sway).
 - Tiles laid in a map, details scattered over them, corner tilesets: scenes §2.
 - On a floor seen at an angle (`mesh()`, `plane()`), lay the texture a texel to a pixel where the
   camera looks (`texel: [1 / ppm, 1 / (ppm * sin pitch)]`): at a fixed texel the camera squashes
@@ -110,6 +115,11 @@ round it.
   toward us, going off behind the trunk or bending back read as a tangle at the fork); three levels
   of them, not four (in 3D the fourth's twigs overlap into a bush); bark on the trunk only; the lit
   edge the whole side toward the sun, not the corners of its steps (dots).
+- Flat trees in the wind (`effect("sway")`, `PXL help effect`), each an anim made from the sprite,
+  16 frames of 125 ms: the kit's 68 px pine 2 px at the top with its 6 rows of trunk still, the dead
+  tree 1.5 px, power 2.5, 12 rows still (its limbs only), a bush 1 px, power 1.5. A flutter whose
+  ripple turns fast up the rows (0.9 radian a row) tore the tiers into a comb; at 0.3 a row, 1 px
+  of it keeps them whole. Placed with `reseed: true`, no two in step; the foot never moves.
 - Variety: 2-3 heights and a color swap or two (a far one hazier); symmetric trees may repeat in
   staggered rows, asymmetric ones are focal points, used once. Don't mirror a tree lit from one side.
 - Backlit (the sun behind): the fronts lose detail and contrast, and a 1 px rim of the lightest tone

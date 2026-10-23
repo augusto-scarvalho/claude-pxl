@@ -740,8 +740,10 @@ export class Canvas {
     const sprites = (opts.sprites ?? []).map((s, k) => {
       const at = s?.at;
       if (!s || typeof s.name !== "string" || !Array.isArray(at) || (at.length !== 2 && at.length !== 3) || !at.every(Number.isFinite))
-        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, shadow? }, got ${JSON.stringify(s)}`);
-      return { name: s.name, img: this.asset(s.name, { flip: s.flip, frame: s.frame }), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow };
+        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, delay?, rdelay?, seed?, reseed?, shadow? }, got ${JSON.stringify(s)}`);
+      // its own time in its loop and its own random choices, as a stamp's, picked by where it stands (cm)
+      const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed };
+      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow };
     });
     // looked up on first use: a palette without ramps has nothing to step (and needs nothing stepped without textures or sprites)
     let maps: Map<Color, Color>[] | undefined;
@@ -819,17 +821,26 @@ export class Canvas {
 
   /**
    * A shader's effect (effects.ts) on what the canvas holds so far, in place: dissolve, pixelate,
-   * dither, tint, distort, emit. `where` (a region) and `on` (keys) pick the pixels it writes.
+   * dither, tint, distort, sway, emit. `where` (a region) and `on` (keys) pick the pixels it writes.
    */
   effect(name: string, opts: Record<string, unknown> = {}): void {
     if (typeof opts !== "object" || opts === null || Array.isArray(opts)) throw new PxError(`effect("${name}", { ... }): the options are an object, got ${JSON.stringify(opts)}`);
     const { where, on, ...own } = opts;
     if (on !== undefined && typeof on !== "string") throw new PxError(`effect "${name}": on is keys ("Yy", "*" any opaque), got ${JSON.stringify(on)}`);
     const out = runEffect(name, this.img, own, { frame: this.frame, frames: this.frames, seed: this.seed, ox: this.ox, oy: this.oy, pal: this.pal, wrap: this.wrap });
-    if (where === undefined && on === undefined && !this.clipPred) return void this.img.data.set(out.data);
+    // what moved pixels (distort, sway) moved their normals too
+    const n = out.norm && this.img.norm;
+    if (where === undefined && on === undefined && !this.clipPred) {
+      this.img.data.set(out.data);
+      if (n) n.set(out.norm!);
+      return;
+    }
     const ok = regionPred(where as Region), keys = this.maskAt(on);
     for (let y = -this.oy; y < this.img.h - this.oy; y++)
-      for (let x = -this.ox; x < this.img.w - this.ox; x++) if (ok(x, y) && keys(x, y)) this.plot(x, y, out.data[this.index(x, y)]);
+      for (let x = -this.ox; x < this.img.w - this.ox; x++) {
+        const i = this.index(x, y);
+        if (ok(x, y) && keys(x, y) && this.plot(x, y, out.data[i]) && n) n.set(out.norm!.subarray(3 * i, 3 * i + 3), 3 * i);
+      }
   }
 
   /**

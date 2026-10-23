@@ -186,7 +186,7 @@ declare global {
   /** How a material is drawn by mesh(): its tones dark to light, the outline, the lit top edge, no creases on a round surface, a lift to its light, a dither between tones, a texture stepping the tone per pixel; or `tex`, an asset tiling its faces, `texel` m to its pixel (default 1/16), from the world's origin or each face's (`anchor`); `block` px to one of its pixels (its faces in blocks, pixel art among HD faces). */
   interface PxMaterial { ramp?: string | PxColor[]; edge?: PxColor; top?: PxColor; smooth?: boolean; bias?: number; dither?: number; texture?: (x: number, y: number) => number; tex?: string; texel?: number | [number, number]; anchor?: "world" | "face"; block?: number }
   /** A sprite standing among mesh()'s faces: its feet at [x, z] or [x, z, up] m, the contact shadow's radius in m (0: none). */
-  interface PxMeshSprite { name: string; at: [number, number] | PxV3; flip?: "x"; frame?: number; shadow?: number }
+  interface PxMeshSprite { name: string; at: [number, number] | PxV3; flip?: "x"; frame?: number; delay?: number; rdelay?: boolean; seed?: number; reseed?: boolean | number; shadow?: number }
   /** mesh()'s light: the way toward it in the points' frame, or a face's light (0 dark, 1 lit) from its normal toward the eye, its middle, the face; sprites standing among the faces (a perspective view). */
   interface PxMeshOpts {
     light?: PxV3 | ((normal: PxV3, middle: PxV3, face: PxFace) => number); sprites?: PxMeshSprite[]; /** px to a sprite's pixel (an HD picture: 4) */ pixel?: number;
@@ -264,9 +264,11 @@ declare global {
   interface PxDistort extends PxEffectBase { amount?: number; scale?: number; speed?: number; axis?: "xy" | "x" | "y"; pixel?: number }
   /** emit: `strength` of `color` (default their own) added in linear light, past white into white; `pulse` breathes it over the loop. */
   interface PxEmit extends PxEffectBase { color?: PxColor; strength?: number; pulse?: number }
+  /** sway: rows moved sideways by their height over the base, `amount` px at the top (negative: to the left), `lean` of it always downwind, `cycles` a loop. */
+  interface PxSway extends PxEffectBase { amount?: number; lean?: number; power?: number; still?: number; cycles?: number; flutter?: number; vary?: number; pixel?: number }
   type PxEffect =
     | ["dissolve", PxDissolve?] | ["pixelate", PxPixelate?] | ["dither", PxDitherFx?] | ["tint", PxTint]
-    | ["distort", PxDistort?] | ["emit", PxEmit?];
+    | ["distort", PxDistort?] | ["sway", PxSway?] | ["emit", PxEmit?];
   interface PxGlow {
     where?: PxRegion; r?: number; strength?: number; color?: PxColor; bands?: number; ramp?: number;
     /** Keys the halo leaves as drawn: what the glowing thing is made of (the logs and stones under flames). */
@@ -313,7 +315,7 @@ declare global {
     rampmap(ramp: string | string[], opts?: { where?: PxRegion; hue?: [number, number] }): void;
     /** Move pixels by whole-pixel offsets: fn(x, y) gives [dx, dy] at a pixel's new place; it takes the color (dx, dy) behind it. */
     warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): void;
-    /** A shader's effect on what the canvas holds so far, in place, on its clock and seed: dissolve, pixelate, dither, tint, distort, emit. */
+    /** A shader's effect on what the canvas holds so far, in place, on its clock and seed: dissolve, pixelate, dither, tint, distort, sway, emit. */
     effect(...fx: PxEffect): void;
     /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away ("." or nothing: leave it). */
     plane(view: PxView | PxPerspective, fn: (x: number, z: number, col: number, row: number) => PxColor | null | undefined, where?: PxRegion): void;
@@ -479,7 +481,7 @@ declare global {
   function rampmap(ramp: string | string[], opts?: { where?: PxRegion; hue?: [number, number] }): PxOp;
   /** Move pixels by whole-pixel offsets (breathing, hair and tails swaying, a body on a slope): fn(x, y) gives [dx, dy] at a pixel's new place. */
   function warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): PxOp;
-  /** A shader's effect on everything drawn before it (a sprite, an anim's frame, a layer), on the clock and a seed: dissolve, pixelate, dither, tint, distort, emit. */
+  /** A shader's effect on everything drawn before it (a sprite, an anim's frame, a layer), on the clock and a seed: dissolve, pixelate, dither, tint, distort, sway, emit. */
   function effect(...fx: PxEffect): PxOp;
   function recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): PxOp;
   function stamp(name: string, x?: number, y?: number, opts?: PxPlace): PxOp;
