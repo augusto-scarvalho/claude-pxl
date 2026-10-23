@@ -547,6 +547,9 @@ happens after another, never all at once.
   target catching fire: the burn spreading from where it was hit over 2.4 s, flames 10 px from a third
   of the front, a smoke column of 18 billows growing 3 to 10 px fading in over the first 15% and out
   over the last 35%, the target's light `{ r: 3, strength: 2.5 }` flickering with its flames.
+- **A spell kit** (`spell()`, `examples/spells.px.js`): one call a whole cast, `cast(spell("ice", 2,
+  { from, to, ground }))`, the nine elements at three tiers on a 4 s loop at 20 fps (the third tier
+  lasts 3.3 s). How each is made, and how to make one: "Designing an element", below.
 - **Shader effects** (`effect()`, `PXL help effect`): a teleport or a death as a dissolve over 1 s
   (12 frames), holes in blobs about a quarter of the figure wide and 2 rings, the first white-yellow;
   a hit's poison or frost as a `tint` of 0.3-0.5 then `dither` back to the palette; a ghost or heat
@@ -578,6 +581,70 @@ happens after another, never all at once.
   a laser aims a thin line 4 frames and fires 2; a flame jet burns bright 2 and smokes ~6; a saw spins
   as a blurred disc, its art never rotated. A thruster's 5-frame loop at 60 ms: a round burst
   (lighting the ship's rear), a long thin flame, the mass thrown back, wider and darker, smallest.
+
+### Designing an element
+
+An element of `spell()` is a recipe (`ELEMENTS` in `src/core/spells.ts`); a new one is an object
+given in place of the name, best started from the nearest one with `like`, then its own over it:
+
+```js
+const POISON = { like: "water", keys: ["#f0ffc0", "#b0e040", "#609020", "#2a4010"],
+  particles: { rate: 30, life: [300, 600], speed: [2, 8], angle: -90, spread: 40, gravity: [0, -15], keys: ["#b0e040", "#609020"] },
+  impact: { shape: "splash", smoke: ["#a0c060", "#6a8a40", "#3a5020"] }, big: "sphere", mark: ["#609020", "#2a4010"] }
+anim("poison_3", { w: 112, h: 80, frames: 80, fps: 20 }, stamp("_place", 0, 0),
+  cast(spell(POISON, 3, { from: [23, 51], to: [89, 52], ground: 64 })), lighting({ ambient: 0.55 }))
+```
+
+Decide five things, in this order:
+
+1. **Its ramp** (`keys`): 4 tones, the core first. The core is near white with the element's hue in
+   it (fire `#fff4c0`, ice `#ffffff`, heal `#ffffff`); then the color it is known by; then a deeper
+   one; the last the darkest, its rim, what shows it against the sky. Shift the hue as it darkens
+   (fire yellow, orange, red, brown-red; ice white, cyan, blue, navy), never the same hue darker. A
+   dark element turns it round: a pale violet core in a near-black ball, and its flash is black
+   (`flash: "#000000"`). Its light (`light`) is the second key unless said (earth's is a warm dust,
+   dark's its violet: a black lamp lights nothing).
+2. **Its noise** (`ball: { r, scale, speed }`): the radius at tier 1 (2-3 px), the noise's cell in px
+   and how fast it churns. Small cells churning fast read as flame or air (fire 1.6 and 2, wind 1.2
+   and 4); big slow ones as matter (ice 2.4 and 1, earth 3 and 0.3: a rock barely turns). `ball:
+   false` and `bolt: true` for something that is there at once (lightning: kinks every 7 px, 6 px
+   either way, a fork at three kinks in ten in the second key; a new bolt every 50 ms).
+3. **How its particles behave** (`particles`, an `emitter()`'s options, `keys` young to old): what
+   the element does in the air. Fire rises (`angle: -90`, `gravity: [0, -40]`); ice and water drop
+   (`gravity` 30 and 120: ice crystals hang, water falls); earth crumbles, few of them (15 a second,
+   gravity 80); wind streams back fast (20-40 px/s at 180 degrees, spread 20); lightning crackles
+   (life 80-200 ms, all ways); light and dark drift all round (spread 180), heal floats up slowly.
+   The rate is per second at tier 1, times the tier's `count`.
+4. **How it moves** (`motion: { arc, ease, wave }`, `trail`): heavy things are lobbed high (`arc`
+   16 for earth, 14 for water, `ease: "linear"`); a thrown fireball speeds up (`"in"`, `arc` 4); a
+   beam of light slows into its target (`"out"`); something alive weaves (`wave`: wind 4 px, dark 2).
+   The trail is the ball's width at its head, 160 ms long, or as given (wind's: 260 ms, 3 px to 1).
+5. **What it does to what it hits** (`impact.shape`, `big`, `mark`): the impact's shape is what it
+   does: `burst` (fire), `shards` (ice), `rays` (light, lightning), `splash` (water), `debris`
+   (earth), `swirl` (wind), `implode` (dark: it draws in), `sparkle` (heal: it rises), `ring`; its
+   smoke, if any, three keys lit to shaded (steam is pale, dust warm, dark's a violet grey). The
+   third tier's centerpiece: `pillar` (a column wider at its foot, its edges licking up: fire, a
+   geyser of water), `bolts` (from the top of the picture), `spikes` (ice, rock), `tornado` (wind),
+   `sphere` (dark), `beam` (light: straight, its core white), `helix` (heal: two strands winding up,
+   sparks riding them); its mark on the ground two keys, the rim first (scorched, frosted, wet, a
+   crater; wind leaves none).
+
+What the tiers do (`TIERS`), each factor an option of `spell()` to change:
+
+| Tier | Size | Particles | Time | Light (reach, power) | Glow | Shake | Drama |
+|---|---|---|---|---|---|---|---|
+| 1 (fire) | 1 | 1 | 1 | 28 px, 0.9 | 0.4 | 0 | the impact's shape |
+| 2 (fira) | 1.5 | 2 | 1.25 | 44 px, 1.2 | 0.7 | 1 px | and a shockwave on the ground |
+| 3 (firaga) | 2 | 3 | 1.6 | 72 px, 1.5 | 1 | 2 px | and the centerpiece, a flash, a mark; the impact 1.6 times as long |
+
+The phases at tier 1: charge 400 ms, cast 120, travel 450, impact 250, dissipate 700 (`timing`;
+a bolt's travel 160 and not drawn out by the tier). Found while tuning the sheet: a pillar whose whole
+column wavered on one noise read as a bolt (a zigzag); edges that lick on their own, wider at the
+foot, read as fire and water. Two bolts 3 px wide side by side read as a hose: one 3 px, the others
+1 px, with forks. A helix of dots 3 px apart read as dust: unbroken strands. A flash is a tint of 0.35
+over 100 ms; with the impact's light at power 2 the picture stayed white three frames (1.5 now).
+What a spell draws gives light (`lighting()` leaves it bright in a dusk at ambient 0.55) and its
+lamps light the ground round it, so put a `lighting()` item after `cast()`.
 
 ## 13. Blend modes leave the palette
 

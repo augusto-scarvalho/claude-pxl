@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**346 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**347 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -24,10 +24,10 @@ page lists what the fork adds. Every commit is in
 | | Original (Oct 14) | This fork (Oct 23) |
 | --- | --- | --- |
 | Commands | 4: `build`, `serve`, `ascii`, `list` | 12: adds `describe`, `shot`, `check`, `steps`, `help`, `compare`, `blind`, `study` |
-| Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
+| Engine modules | 16 core, 6 Node | 32 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [environment](../environment.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
-| Example files | 13 | 55 |
-| Tests | 59 | 292 |
+| Example files | 13 | 56 |
+| Tests | 59 | 295 |
 
 ## Looking and checking
 
@@ -64,6 +64,7 @@ moved into the DSL where every scene can use it.
 | Import and export | `build --share N` (each asset N times bigger, clean, to post), PNG import (`shrink`, `palettize` to the nearest key in OKLab), Aseprite export (layers, frames, tags, palette, slices), GIFs that keep small figures' colors in lit scenes. |
 | Procedural | `hash`, `vnoise`, `fbm`, `bayer`, `seamless`; `scroll()` for parallax planes, `clouds()`, `plume()` for smoke and steam. |
 | Effects | `effect()`: what a shader does, done on the CPU on a sprite, an anim's frame or a layer, on the clock and a seed, so every frame is the same in the viewer, `shot` and the exports: `dissolve` (noise holes with burning rings), `pixelate`, `dither` to the palette, `tint` (kept in the palette with `ramp`), `distort` (a UV distortion that loops), `sway` (a plant in the wind: its foot still, its rows bending by their height, each copy out of step with `reseed`, a gust across the scene with `delay`; in `mesh()` its shadow sways too), `emit` (the pixels marked as giving light, the mark travelling with them), `aura` (the silhouette grown into a flickering glow that hugs every pose); the dissolve in patterns (sweeps, radial, scatter, scanlines, a painted mask). `smoke()`: a column on a path, a puff, a bank or a ring of lit billows in three opacities. In `mesh()`: what emits is drawn as it is and lights what is round it, faces dissolve with holes that let the sun through, and sprites blend over what is behind (`alpha`, `add`, `screen`) at their depth. |
+| Spell kit | `spell(element, tier, { from, to })`: a whole cast in one call on `ability()`, `emitter()`, `particles()`, `trail()` and `smoke()`, drawn by `cast()` (what it draws gives light, its lamps light the ground, a flash, a shake). Nine elements (fire, ice, lightning, water, earth, wind, light, dark, heal), each a recipe of a ramp, a noise, how its particles fly, how it moves and what it does to what it hits; three tiers in the Final Fantasy way, scaling its size, particles, time, light, glow and the drama of its impact (a shockwave; a centerpiece filling the picture, a flash, a mark on the ground); a guide to designing one's own. |
 | Abilities | `ability()` for a spell's phases on the clock (charge, cast, travel, impact, dissipate) and a point along its way, `emitter()` for seeded particles in closed form, `particles()` and `trail()` drawn on the clock (any frame sought alone comes out the same), `effect("energy")` for its matter, a placement's `fx` (effects on one copy), `c.socket()` and `c.meshSocket()` for a hand. The dissolve's looks: what eats a thing (a burn, acid, magic, frost, or a neutral ring by default), its edge's colors over the progress, a char band ahead of it, glow, seeded debris. |
 | The ground and what grows on it | An [environment guide](../environment.md): grass, trees, bushes, rocks, walls, paths and small things as 16-bit games draw them, from SLYNYRD's, Saint11's and final boss blues' tutorials and `pxl study` on seven games' sheets, with the numbers to check a drawing against; and a [nature kit](../examples/nature/kit.px.js) to include, with builders for more (`grassTile`, `pine`, `bush`, `rampart`). |
 
@@ -204,7 +205,7 @@ over a still floor no longer read as a plane going by or a loop that closes.
 
 ## Examples
 
-39 new example files are finished scenes an agent copies the structure of; each was curated against
+40 new example files are finished scenes an agent copies the structure of; each was curated against
 references until it read right.
 
 | Example | What it teaches |
@@ -222,6 +223,7 @@ references until it read right.
 | [`hd2d/`](../examples/hd2d) | HD-2D dioramas: a plaza in a pine wood at the end of the afternoon, textured boxes, the hero walking behind a low wall, long shadows, lit lamps; and a graveyard on a hill in the morning mist, its grass, stones, headstones and pines drawn after the games' sheets, a traveler and a mourner drawn as Octopath draws its people; each at 1920x1080 through `post()`. Its pines and dead tree built as volumes in 3D and swaying in the wind, leaves blowing across. The traveler's visit walks his eight directions and ends in a parchment dialogue box. And a harbor after Octopath Traveler II: a galleon bobbing at a pier, sails sewn of panels, water with glints, bokeh and the hull's reflection, a crew dressed on the traveler's skeleton with heads of their own, Alden's passage aboard in a dialogue. And a clearing at dusk with every shader at once: the wood swaying in one wind, the traveler's new cast pose, a fireball of energy with an aura, hidden behind a wall on its way, a scarecrow catching fire and burning away with its shadow, smoke and sparks, through Three's bloom, a LUT and a still grain. |
 | [`parallax/`](../examples/parallax) | A steam train crossing the hills of Minas Gerais, planes going by at their own speeds. |
 | [`fonts/`](../examples/fonts) | A 5×7 font for titles. |
+| [`spells`](../examples/spells.px.js) | The spell kit's sheet: nine elements at three tiers, each cast one call, lighting a dusk and blooming. |
 
 ## Speed, size and reliability
 

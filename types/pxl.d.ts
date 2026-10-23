@@ -299,6 +299,28 @@ declare global {
     along(from: number[], to: number[], t: number, opts?: { phase?: string; arc?: number; ease?: "linear" | "in" | "out" }): number[];
   }
   interface PxParticle { x: number; y: number; vx: number; vy: number; age: number; life: number; id: number }
+  /** An element of the spell kit: a recipe (scenes.md, "Designing an element"); `like` an element to start from. */
+  interface PxElement {
+    like?: string; keys?: string[]; ball?: false | { r?: number; scale?: number; speed?: number }; bolt?: boolean;
+    motion?: { arc?: number; ease?: "linear" | "in" | "out"; wave?: number }; trail?: false | { length?: number; width?: [number, number] };
+    particles?: false | (PxEmitter & { keys?: string[] });
+    impact?: { shape?: "burst" | "ring" | "shards" | "splash" | "debris" | "swirl" | "rays" | "implode" | "sparkle"; keys?: string[]; smoke?: false | string[] };
+    big?: "pillar" | "bolts" | "spikes" | "tornado" | "sphere" | "beam" | "helix"; mark?: false | string[]; flash?: string; light?: string;
+    timing?: { charge?: number; cast?: number; travel?: number; impact?: number; dissipate?: number };
+  }
+  /** spell()'s options: where from and to, the ground's row, when; the tier's factors; anything of the element over it. */
+  interface PxSpellOpts extends Omit<PxElement, "like"> {
+    from: [number, number]; to: [number, number]; ground?: number; start?: number; seed?: number;
+    scale?: number; count?: number; time?: number; reach?: number; power?: number; glow?: number; shake?: number;
+  }
+  /** A whole cast on the clock, drawn by cast(); its ability, where it is, its lamps, flash and shake at a time. */
+  interface PxSpell {
+    ability: PxAbility; total: number; element: PxElement; tier: number; glow: number;
+    at(t: number): number[];
+    lights(t: number): { x: number; y: number; r: number; power: number; color: string }[];
+    flash(t: number): { color: string; amount: number } | undefined;
+    shake(t: number): [number, number];
+  }
   interface PxEmitter {
     at?: [number, number] | ((t: number) => [number, number]); rate?: number; burst?: number; from?: number; to?: number; life?: [number, number];
     speed?: [number, number]; angle?: number; spread?: number; gravity?: [number, number]; drag?: number; loop?: number; seed?: number;
@@ -392,6 +414,8 @@ declare global {
     particles(emit: (t: number) => PxParticle[], keys: string | string[], opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): void;
     /** A trail behind what goes along path(t), `length` ms of it now, `width` [head, tail] px, keys head to tail. */
     trail(path: (t: number) => number[], keys: string | string[], opts?: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number }): void;
+    /** A spell as it is now: its mark, what gives light (emitting, unlit), its smoke, its lamps, its flash and shake. */
+    cast(spell: PxSpell): void;
     /** Where a socket of an earlier placement is ("hero.hand"), in canvas coords. */
     socket(at: string): [number, number];
     /** A socket of what is being drawn, here in this frame (a hand that moves with the pose). */
@@ -491,6 +515,10 @@ declare global {
   function ability(phases: [string, number][] | Record<string, number>, opts?: { start?: number; events?: Record<string, [string, number]> }): PxAbility;
   /** Seeded particles: (t) gives the ones alive at time t, each where its own path puts it. */
   function emitter(opts: PxEmitter): (t: number) => PxParticle[];
+  /** A whole cast of an element at a tier (1 fire, 2 fira, 3 firaga): spell("fire", 3, { from: [x, y], to: [x, y], ground }); draw it with cast(). */
+  function spell(element: string | PxElement, tier: 1 | 2 | 3, opts: PxSpellOpts): PxSpell;
+  /** A spell as it is now (see PxCanvas.cast). */
+  function cast(spell: PxSpell): PxOp;
   /** A function of (x, y) made to close over w (and h): for noise on strips and tiles that wrap. */
   function seamless(fn: (x: number, y: number) => number, w: number, h?: number): (x: number, y: number) => number;
   /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly); boxes' faces lit by the sun. */

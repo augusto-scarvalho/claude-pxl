@@ -128,7 +128,7 @@ task needs before starting:
 | a scene, level, building or environment | `PXL help "scenes 1 3 11 14"` (layout, texture, shadows and light, checking); then what it needs: 2 ground and tiles, 4 trees, 5 water, 6 distance, 7 true perspective and HD-2D dioramas, 8-10 loops and parallax, 12 effects; for a game, 15 its screen and 16 its projections (top-down 3/4, isometric); for its grass, trees, bushes, rocks, walls and paths, `PXL help "environment 1"` and the section of each (2-9), starting from `examples/nature/kit.px.js` |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2.5k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
-| an effect a shader would do (a dissolve, an aura, a plant in the wind, a tint), a spell, smoke | `PXL help effect`, `PXL help ability`, `PXL help smoke`; `PXL help "scenes 12"` for effects' timing and numbers, `PXL help "scenes 7"` for light, holes and see-through things in a diorama |
+| an effect a shader would do (a dissolve, an aura, a plant in the wind, a tint), a spell, smoke | `PXL help spell` (an element at a tier in one call; `PXL help "designing an element"` for one of your own), `PXL help effect`, `PXL help ability`, `PXL help smoke`; `PXL help "scenes 12"` for effects' timing and numbers, `PXL help "scenes 7"` for light, holes and see-through things in a diorama |
 
 An example, or your own file after many edits: `PXL list <file>` maps it (each asset definition and
 function with its line range and the comment above it, what a loop makes on one line; a file meant

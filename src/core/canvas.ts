@@ -8,6 +8,7 @@ import { bump, dirOf, setNormal } from "./normals.ts";
 import { LOOKS, dissolveChar, dissolveEdge, lightestOf, runEffect } from "./effects.ts";
 import { type SmokeOpts, drawSmoke } from "./smoke.ts";
 import { type Particle, drawParticles, drawTrail } from "./vfx.ts";
+import type { Spell } from "./spells.ts";
 import { type View, perspective } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
 import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshWorld, drawMesh } from "./mesh.ts";
@@ -723,6 +724,33 @@ export class Canvas {
   /** An emitter's particles now, each in the key of its age (young first), a streak `trail` ms back: see vfx.ts. */
   particles(emit: (t: number) => Particle[], keys: string | string[], opts: { x?: number; y?: number; trail?: number; size?: [number, number] } = {}): void {
     drawParticles(this, emit, keys, opts);
+  }
+
+  /**
+   * A spell (`spell(element, tier, { from, to })`) as it is now: its mark under it, what gives light
+   * (marked as emitting by its glow: unlit, blooming), its smoke over it, its lamps (a lighting() item
+   * lights the ground with them) and its flash: see spells.ts.
+   */
+  cast(s: Spell): void {
+    if (!s || typeof s.draw !== "function") throw new PxError('cast(spell("fire", 2, { from: [x, y], to: [x, y] })): a spell');
+    s.under(this);
+    const d = this.img.data, a = d.slice();
+    s.draw(this);
+    const b = d.slice();
+    s.over(this);
+    const g = Math.round(255 * Math.max(0, Math.min(1, s.glow)));
+    const e = g ? (this.img.emit ??= new Uint8Array(d.length)) : this.img.emit;
+    if (e) for (let i = 0; i < d.length; i++) if (d[i] !== b[i]) e[i] = 0; else if (b[i] !== a[i]) e[i] = Math.max(e[i], g);
+    for (const l of s.lights(this.t)) if (l.power > 0) this.lamp(l.x, l.y, { r: Math.max(1, l.r), power: l.power, color: l.color });
+    const f = s.flash(this.t);
+    if (f) this.effect("tint", f);
+    // the shake: all drawn so far thrown a few px, the edge it leaves the one before it
+    const [sx, sy] = s.shake(this.t), { w, h } = this.img;
+    if (sx || sy) for (const arr of [d, this.img.emit]) {
+      if (!arr) continue;
+      const src = arr.slice();
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) arr[y * w + x] = src[Math.min(h - 1, Math.max(0, y - sy)) * w + Math.min(w - 1, Math.max(0, x - sx))];
+    }
   }
 
   /** A trail behind what goes along `path` (a function of the time), `length` ms of it now: see vfx.ts. */
@@ -1501,7 +1529,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp", "effect",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

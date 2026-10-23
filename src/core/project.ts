@@ -19,6 +19,7 @@ import { Trace } from "./trace.ts";
 import { type Lut, readCube } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
 import { ability, emitter } from "./vfx.ts";
+import { SPELL_OPTS, spell } from "./spells.ts";
 import { bayer, fbm, globRe, latticeHash, rng, vnoise, seamless } from "./util.ts";
 
 /**
@@ -62,6 +63,7 @@ export const SIGNATURES: Record<string, string> = {
   smoke: "x:n y:n keys:S ?opts:o",
   particles: "emit:f keys:S ?opts:o",
   trail: "path:f keys:S ?opts:o",
+  cast: "spell:o",
   rampmap: "ramp:S ?opts:o",
   stamp: "name:s ?x:n y:n opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
@@ -83,7 +85,7 @@ export const SIGNATURES: Record<string, string> = {
 };
 
 /** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
-const CLOCKED = new Set(["flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail"]);
+const CLOCKED = new Set(["flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast"]);
 /** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
 function drawsWithFunctions(items: Item[]): boolean {
   return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
@@ -600,6 +602,15 @@ export class Project implements BuildCtx {
         checkKeys("emitter", opts, ["at", "rate", "burst", "from", "to", "life", "speed", "angle", "spread", "gravity", "drag", "loop", "seed"]);
         return emitter(opts as never);
       } catch (e) { throw wrap(e).within("emitter", loc); }
+    };
+    // spell(element, tier, { from, to, ... }): a whole cast of an element at a tier (spells.ts), drawn by cast()
+    env.spell = (el: unknown, tier: unknown, opts: unknown = {}) => {
+      const loc = this.callerLoc();
+      try {
+        if (!isPlainObject(opts)) throw new PxError('spell("fire", 1 | 2 | 3, { from: [x, y], to: [x, y], ground, start, seed, ... })');
+        checkKeys("spell", opts, SPELL_OPTS);
+        return spell(el as never, tier as never, opts as never);
+      } catch (e) { throw wrap(e).within("spell", loc); }
     };
     // chain(anchors, opts): hair / tail points per frame, following the anchors with lag (chain.ts).
     env.chain = (anchors: unknown, opts: unknown = {}): number[][][] => {

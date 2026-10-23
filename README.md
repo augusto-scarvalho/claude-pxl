@@ -186,8 +186,9 @@ says which to reach for.
   the clock: a dissolve in patterns and looks (burn with flames, acid, frost, magic, neutral),
   pixelate, dither to the palette, tint, a UV distortion, a plant swaying in the wind, an aura, energy,
   emission that lights `mesh()`; on one placement with `fx`. Abilities on the clock: `ability()`
-  phases, `emitter()` particles, `trail()`; `post()`'s finish (Three's bloom, a `.cube` LUT, grain,
-  sharpen, the picture back in the palette).
+  phases, `emitter()` particles, `trail()`; a spell kit, `spell("fire", 3, { from, to })`: nine
+  elements at three tiers (fire, fira, firaga), each a recipe to start one's own from;
+  `post()`'s finish (Three's bloom, a `.cube` LUT, grain, sharpen, the picture back in the palette).
 - **Out**: sprite sheets with JSON tags (`rows: "tag"`: an animation a row; the sheet's preview GIF
   plays them all), GIFs, Tiled maps (`.tmj`), Aseprite files to keep editing.
 - **Errors** point at `file:line:col` and the asset/layer/op path, with "did you mean…" hints.

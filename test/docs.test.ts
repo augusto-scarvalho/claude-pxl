@@ -42,7 +42,7 @@ test("docs: every command and flag the guides cite is in pxl's usage", () => {
 test("docs: every guide section SKILL.md sends the agent to prints", async () => {
   // in this process, not a node each (ten of those took 16 s of the suite)
   const help = async (q: string) => { const log = console.log, out: string[] = []; console.log = (s: string) => out.push(String(s)); try { await main(["help", q]); } finally { console.log = log; } return out.join("\n"); };
-  for (const [, q] of read("SKILL.md").matchAll(/PXL help "([^"<]+)"/g)) assert.match(await help(q), /^## /m, `pxl help "${q}" prints no section`);
+  for (const [, q] of read("SKILL.md").matchAll(/PXL help "([^"<]+)"/g)) assert.match(await help(q), /^###? /m, `pxl help "${q}" prints no section`);
 });
 
 test("docs: every op and DSL global is in the reference, and every example SKILL.md lists exists", () => {

@@ -876,6 +876,12 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   `effect("energy")`, a placement's `fx` (effects on one copy, on stamps and mesh() sprites),
   `c.socket()` and `c.meshSocket()` for a spell's start at a hand. Left: a cast pose for the traveler
   (blocks first), a trail as a ribbon in mesh() (today a few sprites at past moments).
+- [ ] **A spell kit**: `spell(element, tier, { from, to })` on the abilities' pieces, drawn by `cast()`;
+  nine elements as recipes (ramp, noise, particles, motion, impact, centerpiece, mark), three tiers
+  (size, particles, time, light, glow, shake; a shockwave from 2, a centerpiece, flash and mark at
+  3); a guide to designing an element (scenes 12); the sheet in `examples/spells.px.js`. Left: a
+  spell drawn in `mesh()` by itself (today a diorama places its sprites and lights by `S.at(t)` and
+  `S.lights(t)`, as the clearing does), the shake for a whole scene from a cast in one cell of it.
 - [ ] **Dissolve looks**: `look` (neutral by default, burn, acid, magic, frost), the edge's keys over
   the progress, a char band ahead of the edge, glow, seeded debris (ash, drips, frost, sparks) aged by
   the progress; on sprites and on mesh faces (no debris on faces: a face's pieces would need the
