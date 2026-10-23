@@ -1,8 +1,8 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**337 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
-and none behind. The work spans October 16–22, 2026. Everything the original does still works; this
+**338 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
 
@@ -21,13 +21,13 @@ page lists what the fork adds. Every commit is in
 
 ## At a glance
 
-| | Original (Oct 14) | This fork (Oct 22) |
+| | Original (Oct 14) | This fork (Oct 23) |
 | --- | --- | --- |
 | Commands | 4: `build`, `serve`, `ascii`, `list` | 12: adds `describe`, `shot`, `check`, `steps`, `help`, `compare`, `blind`, `study` |
 | Engine modules | 16 core, 6 Node | 31 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [environment](../environment.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
 | Example files | 13 | 54 |
-| Tests | 59 | 258 |
+| Tests | 59 | 266 |
 
 ## Looking and checking
 
@@ -42,7 +42,7 @@ look, in text where text is cheaper than an image.
 | `pxl steps` | The painting log as text; `--at x,y` names the source line that painted a pixel. |
 | `pxl list` | A file as a map: each definition's line range and comment, so an agent reads only the lines it needs. |
 | `pxl help` | Every op and option by section; `help <name>` prints the reference text and where the examples use it; guide sections on demand. |
-| `pxl compare` | An asset against a reference image, row by row; a picture alone, its own rows' extents to draw to. |
+| `pxl compare` | An asset against a reference image or another asset (a new head against an approved one), row by row; a picture alone, its own rows' extents to draw to. |
 | `pxl blind` | A rig's parts unnamed and shuffled, for a second reader to label; `--check` scores them. |
 
 These were tuned on measured runs of fresh agents: one call per look, all fixes in one turn, short
@@ -131,9 +131,12 @@ of and what to use in pxl to make the same.
     turns from shade to light; numbers to hold a drawing against the games'.
 - **Perspective:** straight edges (LSD) and where they meet: one, two or three vanishing points, with
   the lens, the turn and the tilt they imply; an isometric picture by its two sets of parallel lines
-  (2:1 or 30°).
+  (2:1 or 30°); a camera looking down from high up (an HD-2D diorama) by its horizon above the
+  picture, with the tilt each lens would give, not taken for uprights meeting above; no three-point
+  reading through a lens wider than 120°.
 - **Motion:** timing and holds, the cycle, whether the loop closes, parallax planes and their speeds
-  to a fraction of a pixel, a camera moving forward.
+  to a fraction of a pixel, a camera moving forward (the ground going by under its point: a
+  waterfall's splash spreading up from where it lands is not one).
 - **Pieces:** an animation taken apart, each piece with what to build it with.
   - Kinds: the backdrop, planes, things carried along a path, walks, traffic, anims in place, rigs,
     actions (an attack, with the frames of its smears), effects (fire, water, an explosion played
@@ -229,8 +232,10 @@ references until it read right.
 - Timed builds are cached within a budget of bytes, so a long loop no longer fills memory.
 - `build --profile` names where the time went; `build --every N` keeps long previews small; the onion
   sheet no longer costs frames squared.
-- Tests went from 59 to 241. One keeps the editor types in step with what the runtime accepts, and
+- Tests went from 59 to 266. One keeps the editor types in step with what the runtime accepts, and
   another keeps the guides in step with the CLI: every command, flag and section they cite exists.
+- An art file whose own top-level name hides one of pxl's ops (a helper `post` hiding `post()`) is
+  named in the error its load fails with, instead of only "item 2 is undefined".
 
 ## How it was built
 

@@ -1,13 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Img } from "../src/core/image.ts";
 import { pack } from "../src/core/color.ts";
 import { encodeGif } from "../src/node/gif.ts";
 import { decodeGif } from "../src/node/gifread.ts";
 import { writePng } from "../src/node/output.ts";
+import { decodePng } from "../src/node/png.ts";
 import { findGrid, lineFlaws } from "../src/core/vision.ts";
 import { latticeHash } from "../src/core/util.ts";
 import { hueShifting, regionLines, spacingWords, study } from "../src/core/study.ts";
@@ -97,6 +99,31 @@ test("study: two-point perspective, its lens and its turn, from lines meeting on
   const m = /Two-point perspective: the horizon at row (\d+);.*\(fov ~(\d+)°\)/.exec(text), y = /yaw: (\d+)/.exec(text);
   assert.ok(m && y, text.slice(text.indexOf("PERSPECTIVE")));
   assert.ok(Math.abs(+m![1] - 70) <= 4 && Math.abs(+m![2] - 90) <= 8 && Math.abs(+y![1] - 40) <= 4, `${m![0]} ${y![0]}`);
+});
+
+test("study: an HD-2D diorama looks down through a long lens: its horizon above the picture, not uprights meeting there", () => {
+  // frame 0 of examples/hd2d/harbor.px.js (tilted down 22°, fov 30) and graveyard.px.js (38°, fov 30) at
+  // 1x (`pxl shot <file> <scene> --scale 1`). Seen from high up, the lines along the ground run steep and
+  // meet above the picture: read as uprights, they said "three-point, tilted up". The harbor's are few
+  // (a sloping awning's meet above the horizon), so its tilt reads high.
+  const fixtures = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
+  for (const [name, lo, hi] of [["harbor", 18, 34], ["graveyard", 33, 43]] as const) {
+    const img = decodePng(readFileSync(join(fixtures, `hd2d_${name}_1x.png`)));
+    const text = study({ name, frames: [img], ms: [100], kind: "test" }).text.join("\n"), persp = text.slice(text.indexOf("PERSPECTIVE"));
+    const m = /Looking down: the horizon above the picture at row -\d+.* 30° -> ~(\d+)°/.exec(text);
+    assert.ok(m && +m[1] >= lo && +m[1] <= hi, persp);
+    assert.doesNotMatch(text, /tilted up|Three-point/, name);
+    assert.match(text, /pitch: -\d+, fov: 30/);
+  }
+  // uprights meeting just above the middle and a level point just below it: a lens of ~160° is no camera's
+  const W = 320, H = 180, img = new Img(W, H), ink = pack(230, 220, 160);
+  img.fill(pack(40, 44, 60));
+  const draw = (x0: number, y0: number, vx: number, vy: number, t1: number) => { for (let t = 0; t <= t1; t += 0.002) { const x = Math.round(x0 + (vx - x0) * t), y = Math.round(y0 + (vy - y0) * t); if (img.inside(x, y)) { img.set(x, y, ink); if (img.inside(x + 1, y)) img.set(x + 1, y, ink); } } };
+  for (const x0 of [60, 110, 150, 190, 230, 270]) draw(x0, 179, 160, -30, 0.6);
+  for (const y0 of [0, 30, 150, 179]) draw(319, y0, 20, 100, 0.7);
+  for (const y0 of [10, 170]) draw(0, y0, 20, 100, 0.5);
+  const wide = study({ name: "wide", frames: [img], ms: [100], kind: "test" }).text.join("\n");
+  assert.doesNotMatch(wide, /Three-point/, wide.slice(wide.indexOf("PERSPECTIVE")));
 });
 
 test("study: a sprite's light read off its rim, pillow shading, banding", () => {
@@ -368,14 +395,17 @@ test("study: a camera going forward opens out from a point in view; one off the 
   // a pixel texture zoomed 4% a frame about the picture's middle, and about a point above it (what a
   // scroll or things falling or rising together fit): only the first is a camera going forward
   const W = 160, H = 96, tex = drawing(64, 64, 3);
-  const zoom = ([px, py]: number[]) => {
+  const zoom = ([px, py]: number[], still = H) => {
     const frames = Array.from({ length: 12 }, (_, f) => {
-      const img = new Img(W, H), s = 1.04 ** f, m = (v: number) => ((Math.floor(v) % 64) + 64) % 64;
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) img.set(x, y, tex.get(m(px + (x - px) / s), m(py + (y - py) / s)));
+      const img = new Img(W, H), s = (y: number) => 1.04 ** (y < still ? f : 0), m = (v: number) => ((Math.floor(v) % 64) + 64) % 64;
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) img.set(x, y, tex.get(m(px + (x - px) / s(y)), m(py + (y - py) / s(y))));
       return img;
     });
     return study({ name: "t", frames, ms: frames.map(() => 80), kind: "test" }).text.join("\n");
   };
   assert.match(zoom([W / 2, H / 2]), /Camera: the scene opens out from 80,48/);
   assert.doesNotMatch(zoom([W / 2, -H]), /Camera:/);
+  // opening out only above a point low in the picture, still under it: a waterfall's splash, not the
+  // ground going by under a camera
+  assert.doesNotMatch(zoom([W / 2, H - 12], H - 12), /Camera:/);
 });

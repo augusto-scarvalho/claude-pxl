@@ -352,13 +352,17 @@ function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, 
   // and on the column the camera looks along (a tilted camera's uprights meet straight above or below it)
   const third = (v: Vanish) => !v.far && Math.abs(v.dir[1]) > 0.9 && v.lines.length >= 5 && v.fan >= 3 && Math.abs(v.y - H / 2) < 4 * H && (v.y < -0.1 * H || v.y > 1.1 * H) && Math.abs(v.x - W / 2) < 0.25 * W;
   const finite = vps.filter((v) => !v.far), near = finite.filter((v) => Math.abs(v.x - W / 2) < 1.5 * W && v.y > -H && v.y < 2 * H);
+  const level = finite.filter((v) => Math.abs(v.dir[1]) <= 0.9), cx = W / 2, cy = H / 2;
+  // looking down from high up (an HD-2D diorama, a 3/4 view from above): the lines along the ground meet
+  // above the picture over its middle, so steep near us that they pass for uprights; with no level point
+  // below the middle (a camera tilted up has its horizon there), that point is the horizon
+  const down = level.some((v) => v.y > cy) ? undefined : finite.filter((v) => v.y < -0.1 * H && v.y > -12 * H && Math.abs(v.x - cx) < 0.25 * W && v.lines.length >= 4).sort((a, b) => Math.abs(a.x - cx) - Math.abs(b.x - cx))[0];
   for (const v of vps) {
     const share = pct(v.lines.reduce((s, q) => s + q.len, 0), total);
     const verticalish = Math.abs(v.dir[1]) > 0.9;
     if (v.far) out.push(`  - ${v.lines.length} lines parallel in the picture (${share} of their length), ${verticalish ? "upright: uprights stay upright (no third point)" : Math.abs(v.dir[0]) > 0.9 ? "level: lines across stay level" : `at ${Math.round((Math.atan2(v.dir[1], v.dir[0]) * 180) / Math.PI)}°: an oblique set (isometric or a side view)`}.`);
-    else out.push(`  - ${v.lines.length} lines meet at ${Math.round(v.x * k)},${Math.round(v.y * k)} (${share} of their length)${verticalish ? (third(v) ? `: uprights converge ${v.y < H / 2 ? "above" : "below"} (three-point, the camera tilted ${v.y < H / 2 ? "up" : "down"})` : ": uprights nearly parallel (no third point to speak of)") : ""}.`);
+    else out.push(`  - ${v.lines.length} lines meet at ${Math.round(v.x * k)},${Math.round(v.y * k)} (${share} of their length)${v === down ? ": above the middle, lines along the ground seen from high up (below)" : verticalish ? (third(v) ? `: uprights converge ${v.y < H / 2 ? "above" : "below"} (three-point, the camera tilted ${v.y < H / 2 ? "up" : "down"})` : ": uprights nearly parallel (no third point to speak of)") : ""}.`);
   }
-  const level = finite.filter((v) => Math.abs(v.dir[1]) <= 0.9), cx = W / 2, cy = H / 2;
   // two-point: two level points on one horizon, either side of the middle, square to each other through a believable lens
   let two: [Vanish, Vanish, number] | null = null;
   for (let i = 0; i < level.length && !two; i++) for (let j = i + 1; j < level.length; j++) {
@@ -373,11 +377,12 @@ function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, 
   const byFoe = foe ? inside.filter((v) => Math.hypot(v.x - foe.x, v.y - foe.y) < 0.2 * W).sort((a, b) => Math.hypot(a.x - foe.x, a.y - foe.y) - Math.hypot(b.x - foe.x, b.y - foe.y))[0] : undefined;
   // three points: uprights meeting above or below, with the horizon of the level points: the lens from
   // the two (square to each other through the middle), and the tilt from where the horizon is
-  const up = vps.find(third), cx2 = W / 2, cy2 = H / 2;
+  const up = vps.find((v) => v !== down && third(v)), cx2 = W / 2, cy2 = H / 2;
   const level0 = two ? (two[0].y + two[1].y) / 2 : (byFoe ?? inside[0] ?? level.slice().sort((a, b) => b.weight - a.weight)[0])?.y;
-  const f3 = up && level0 !== undefined ? -(up.y - cy2) * (level0 - cy2) : -1;
-  // uprights that meet (strictly tested above) outweigh a pair of level points that disagree with them
-  if (up && level0 !== undefined && f3 > 0 && Math.sign(up.y - cy2) !== Math.sign(level0 - cy2)) {
+  const f3 = up && level0 !== undefined ? -(up.y - cy2) * (level0 - cy2) : -1, fov3 = f3 > 0 ? (2 * Math.atan(W / 2 / Math.sqrt(f3)) * 180) / Math.PI : 180;
+  // uprights that meet (strictly tested above) outweigh a pair of level points that disagree with them;
+  // a lens wider than 120° is two points that aren't a camera's
+  if (up && level0 !== undefined && f3 > 0 && fov3 <= 120 && Math.sign(up.y - cy2) !== Math.sign(level0 - cy2)) {
     const f = Math.sqrt(f3), pitch = (Math.atan((level0 - cy2) / f) * 180) / Math.PI;
     horizon = level0;
     out.push(`  Three-point perspective: uprights meet at ${Math.round(up.x * k)},${Math.round(up.y * k)}, the horizon at row ${Math.round(level0 * k)}: a lens of ~${Math.round(f * k)} px (fov ~${Math.round((2 * Math.atan(W / 2 / f) * 180) / Math.PI)}°), the camera tilted ${pitch > 0 ? "up" : "down"} ~${Math.round(Math.abs(pitch))}°.`);
@@ -388,6 +393,12 @@ function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, 
     out.push(`  Two-point perspective: the horizon at row ${Math.round(hy * k)}; if the two sets are square to each other, a focal length of ~${Math.round(f * k)} px (fov ~${Math.round((2 * Math.atan(W / 2 / f) * 180) / Math.PI)}°).`);
     const yaw = Math.round((Math.atan((W / 2 - a.x) / f) * 180) / Math.PI);
     pxl = `perspective({ w: ${PW}, horizon: ${Math.round(hy * k)}, eye: <m>, focal: ${Math.round(f * k)}, yaw: ${yaw} }): vanish(0) and vanish(90) then land near ${Math.round(a.x * k)} and ${Math.round(b.x * k)}.`;
+  } else if (down) {
+    // tan(tilt) = (the middle's row - the horizon's) / focal: one equation, two unknowns
+    const tilt = (fov: number) => Math.round((Math.atan(((cy - down.y) * Math.tan((fov / 2) * (Math.PI / 180))) / (W / 2)) * 180) / Math.PI);
+    horizon = down.y;
+    out.push(`  Looking down: the horizon above the picture at row ${Math.round(down.y * k)}, the camera high up (an HD-2D diorama, a 3/4 view from above). Lines alone don't part the tilt from the lens: fov 20° -> tilted down ~${tilt(20)}°, 30° -> ~${tilt(30)}°, 45° -> ~${tilt(45)}°; uprights that stay nearly parallel say a long lens (HD-2D: ~30°). A square on the ground tells which: near the middle it looks sin(tilt) as deep as it is wide (a cube's top tan(tilt) as tall as its front): planks, tiles, a crate.`);
+    pxl = `perspective({ w: ${PW}, horizon: ${Math.round(down.y * k)}, pitch: -${tilt(30)}, fov: 30, eye: <m> }), or hd2dCamera({ pitch: -${tilt(30)}, fov: 30, ... }) of examples/hd2d/kit.px.js; the fov as above.`;
   } else if (byFoe || inside.length) {
     const v = byFoe ?? inside.sort((a, b) => b.weight - a.weight)[0];
     horizon = v.y;
@@ -509,7 +520,10 @@ function motionOf(frames: Img[], ms: number[], smeared = false) {
     const F = foe;
     const ins = moving.filter((f) => { const rx = f.x - F.x, ry = f.y - F.y, c = (rx * f.dx + ry * f.dy) / (Math.hypot(rx, ry) * Math.hypot(f.dx, f.dy) || 1); return F.out ? c > 0.9 : c < -0.9; });
     const left = ins.filter((f) => f.x < F.x).length, xs = ins.map((f) => f.x);
-    forward = Math.min(left, ins.length - left) >= 0.2 * ins.length && Math.max(...xs) - Math.min(...xs) >= 0.5 * W;
+    // and the ground going by under the point (a sky stays put, so a forward camera's blocks are seldom
+    // all above it): a waterfall's splash spreads up and out from where it lands (6% under the point,
+    // a cockpit's road 39%)
+    forward = Math.min(left, ins.length - left) >= 0.2 * ins.length && Math.max(...xs) - Math.min(...xs) >= 0.5 * W && ins.filter((f) => f.y > F.y).length >= 0.15 * ins.length;
     // and the same way frame after frame: a runner in place spreads its limbs out and draws them in by
     // turns, a camera going forward opens out every frame
     const said = each.map((f) => focusOfExpansion(f)).filter((e) => e !== null);

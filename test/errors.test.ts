@@ -23,6 +23,16 @@ test("op argument checks at definition time, with usage", () => {
   has(failure(PAL + 'sprite("a", { w: 1, h: 1 }, px(0, 0))').message, "px: missing argument 3 (c)");
 });
 
+test("a top-level helper named as a global (post, text) is named when the load fails", () => {
+  // the helper is called where pxl's post() was meant: it returns nothing, the scene gets undefined
+  const e = failure(PAL + 'const post = (x, z) => { const h = z + 1 }, W = 4\nscene("s", { w: W, h: 4 },\n  rect(0, 0, 1, 1, "r"),\n  post({ blur: 1 }))');
+  assert.equal(e.loc, "t.px.js:2:1");
+  has(e.message, "item 2 is undefined", "declares 'post', hiding pxl's post()", "rename the file's");
+  // declared after the failing line (not yet initialized) still counts; a file hiding nothing says nothing
+  has(failure(PAL + 'sprite("a", { w: 1, h: 1 }, rect(0, 0, 1, "r"))\nfunction text() {}\nconst frame = 1').message, "'frame', 'text'");
+  assert.ok(!failure(PAL + 'sprite("a", { w: 1, h: 1 }, rect(0, 0, 1, "r"))').message.includes("hiding"));
+});
+
 test("unknown options get suggestions", () => {
   has(failure(PAL + 'sprite("a", { outlin: "k" }, "r")').message, "unknown option 'outlin'", "did you mean 'outline'");
   has(failure(PAL + 'sprite("a", "r", layer("l", { hiden: true }))').message, "unknown option 'hiden'", "did you mean 'hidden'");

@@ -18,8 +18,8 @@ function compile(code: string, file: string): string {
  * the art files (this one and what it includes): another version of them, e.g. at a git revision.
  */
 export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs: string) => readFileSync(abs, "utf8")): Project {
-  const p = new Project(opts);
-  const ctx = vm.createContext({ ...p.env(), console });
+  const p = new Project(opts), env = p.env();
+  const ctx = vm.createContext({ ...env, console });
   const stack: string[] = [];
   const run = (path: string) => {
     const abs = resolve(path);
@@ -65,21 +65,36 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
       throw new PxError(`cannot read '${abs}'`);
     }
   };
-  run(file);
+  try { run(file); } catch (e) { throw hiding(e, ctx, env); }
   return p;
 }
 
 /** Load art source from a string (tests, embedding). `name` appears in error locations. */
 export function loadSource(src: string, name = "art.px.js", opts: ProjectOptions = {}): Project {
-  const p = new Project(opts);
-  const ctx = vm.createContext({ ...p.env(), console });
+  const p = new Project(opts), env = p.env();
+  const ctx = vm.createContext({ ...env, console });
   p.addFile(name);
   try {
     vm.runInContext(compile(src, name), ctx, { filename: name });
   } catch (e) {
-    throw syntaxAware(e, name, p);
+    throw hiding(syntaxAware(e, name, p), ctx, env);
   }
   return p;
+}
+
+/**
+ * A load that failed may have called the file's own helper where it meant pxl's (a top-level `post`
+ * hides post(): "item 2 is undefined"): name the globals the art file's top-level names hide (a name
+ * still uninitialized when it failed is declared too).
+ */
+function hiding(e: unknown, ctx: vm.Context, env: Record<string, unknown>): unknown {
+  if (!(e instanceof PxError)) return e;
+  const hid = Object.keys(env).filter((n) => { try { return vm.runInContext(n, ctx) !== env[n]; } catch { return true; } });
+  if (hid.length) {
+    e.detail += ` (the art file's top level declares ${hid.map((n) => `'${n}'`).join(", ")}, hiding pxl's ${hid.map((n) => `${n}()`).join(", ")} wherever the file calls ${hid.length > 1 ? "them" : "it"}: if it meant pxl's, rename the file's)`;
+    e.message = e.format();
+  }
+  return e;
 }
 
 function syntaxAware(e: unknown, file: string, p: Project): PxError {

@@ -97,11 +97,12 @@ const USAGE = `pxl — pixel-art DSL
       asset (a rig: each of its parts) to <out>/_blind/<n>.png, shuffled and unnamed, and the
       labels to key.json. Show only the images to the reader, ask which way each one faces (right,
       left, front = toward us, back), save the answers as {"1": "right", ...}; --check compares.
-  pxl compare <art.px.js> <name> <ref.png> [--shrink N] [--offset x,y]
+  pxl compare <art.px.js> <name> <other name | other.px.js:name | ref.png> [--shrink N] [--offset x,y]
   pxl compare <picture or clip> [--frame N] [--shrink N]
-      Silhouette check: each row's opaque extents in the asset and in a reference image (shrunk
-      by N first, placed at x,y), and how many px wider the asset is on each side. A picture alone:
-      its own rows' extents and widths (an upscale read at 1x), the rows to draw a figure to.
+      Silhouette check: each row's opaque extents in the asset and in a reference (a PNG shrunk by N
+      first, or another asset: a new head against an approved one), placed at x,y, and how many px
+      wider the asset is on each side. A picture alone: its own rows' extents and widths (an upscale
+      read at 1x), the rows to draw a figure to.
   pxl study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--px N] [--out DIR | --no-out]
       Learn from finished art or a reference: what it is made of and what to use in pxl to make the
       same. Pixel art (an upscale found by its grid, blurred or not; --px N when the size it finds
@@ -569,11 +570,15 @@ export async function main(argv: string[]): Promise<number> {
           return 0;
         }
         const [name, ref] = a.rest;
-        if (!name || !ref) throw new PxError("compare needs an asset and a reference PNG: pxl compare <file> <name> <ref.png> [--shrink N] [--offset x,y]");
+        if (!name || !ref) throw new PxError("compare needs an asset and what to hold it against: pxl compare <file> <name> <other name | other.px.js:name | ref.png> [--shrink N] [--offset x,y]");
         const p = loadProject(file);
         const img = p.image(name);
+        // against a picture, another asset of the file, or one of another file's (a new head against an approved one)
+        const other = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(ref);
         let r: Img;
-        try { r = decodePng(readFileSync(resolve(ref))); } catch (e) { throw new PxError(`${ref}: ${(e as Error).message}`); }
+        if (other) r = loadProject(resolve(other[1])).image(other[2]);
+        else if (!/\.png$/i.test(ref)) r = p.image(ref);
+        else try { r = decodePng(readFileSync(resolve(ref))); } catch (e) { throw new PxError(`${ref}: ${(e as Error).message}`); }
         if (a.shrink !== undefined) r = r.shrink(a.shrink);
         console.log(`${name} (${img.w}x${img.h}) against ${ref} (${r.w}x${r.h}${a.shrink ? `, shrunk ${a.shrink}x` : ""}${a.offset ? ` at ${a.offset.join(",")}` : ""})`);
         console.log(compareSilhouettes(img, r, ...(a.offset ?? [0, 0])));

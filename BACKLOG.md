@@ -505,6 +505,11 @@ one), and the art code itself (4% of the cost).
     cars apart where they overlap.
   - Not done: a light as a few basis images times a curve (NMF, Oya et al. 2020): where scenes light
     themselves the light is already 71-99% right, and the misses are clouds and backlit people.
+  - Tried next (one idea, time-boxed): a run of light whose pixels change in step with the whole run,
+    not only with their neighbors (a lamp lights all of it at once; a soft cloud drifting reaches its
+    far side frames after its near one): each pixel's curve against the run's mean, kept at 0.4 and up.
+    The sunset's clouds stayed light (its light precision 5%), and the tournament lost light (found
+    91% -> 84%). Taken out.
 - [x] **More of what the papers measure**: a sprite's light from its rim (Johnson and Farid, 2005);
   banding by Pixel Logic's rule as the Pixel Fixer paper (TU Delft, 2025) states it; pillow shading;
   the translation of a photo by superpixels after Gerstner et al. (NPAR 2012), which keeps edges.
@@ -723,6 +728,9 @@ Saint11's, read from his page, and not kept in the repository):
   takes the motion: two layers, one still and one following the body's float, added (Szeliski,
   Avidan and Anandan, "Layer extraction from multiple images containing reflections and
   transparency", CVPR 2000), the share where the body's edge crosses what is behind.
+  Looked at again (time-boxed, no quick idea fits): pxl's own ghost at `opacity: 0.6` over a night sky
+  is found as one piece of 12x7, the rows at its top and hem where it changes, so its float can't be
+  read off the piece either; following the body whole comes first, and that is the two-layer model.
 - [x] **A runner in place read as a camera moving forward**: require the backdrop to move first.
   Done another way: the opening out has to hold frame after frame (a runner spreads its limbs and
   draws them in by turns); the race still reads as a camera going forward.
@@ -779,7 +787,7 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   to three parts, not many; a wave's crests followed a few frames at a time, again and again at a
   steady beat, are one piece ("the same going by 33 times, a new one every 6 frames: a texture
   scrolling past"). The calibration as it was on every scene.
-- [ ] **A waterfall read as a camera going forward**: its splash spreads out from where the water
+- [x] **A waterfall read as a camera going forward**: its splash spreads out from where the water
   lands (44% of the moving blocks agree), as a cockpit's view does (42%); what tells them apart
   isn't found yet (blocks coming toward the point: the cockpit has more; speed growing with the
   distance from the point, as going forward should: the cockpit's correlates -0.17).
@@ -789,6 +797,11 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   tutorial clips did find: 6 misread as a camera moving with the point off the picture (his shooter
   scrolling down, cards of tiles and sprites); done, the point must be in view (a starfield and the
   cockpit keep theirs).
+  Done (one idea, time-boxed): a camera going forward has the ground going by under its point (a sky
+  stays put), so at least 15% of the blocks opening out from the point lie under it. The waterfall:
+  6% (its splash spreads up and out from where it lands, low in the picture); the cockpit 39%. The
+  calibration as it was. A forward camera seeing no ground (a tunnel's ceiling only) would need it
+  back.
 - [x] **A flat figure running in place read as a light** (SLYNYRD's run demo): a light changes all
   brighter or all darker from one frame to the next (70% one way and more: the party's lanterns 73-100%),
   a flat figure moving lightens at its front and darkens at its back (56-60%). The calibration as it

@@ -409,8 +409,8 @@ painting replay ends ("animate" toggle).
 ## CLI
 
 ```
-node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--out DIR]
-node <pxl>/bin/pxl.js shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--out DIR]
+node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif] [--out DIR]
+node <pxl>/bin/pxl.js shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
 node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
 node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
@@ -419,7 +419,7 @@ node <pxl>/bin/pxl.js ascii <file> <name> [--frame N]
 node <pxl>/bin/pxl.js list  <file>
 node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--sheet] [--out DIR]
 node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief] [--out DIR | --no-out]     (or describe <image.png>)
-node <pxl>/bin/pxl.js compare <file> <name> <ref.png> [--shrink N] [--offset x,y]
+node <pxl>/bin/pxl.js compare <file> <name> <other name | other.px.js:name | ref.png> [--shrink N] [--offset x,y]   |   compare <picture or clip> [--frame N] [--shrink N]
 node <pxl>/bin/pxl.js blind <file> <name...> [--out DIR]   |   blind <file> --check answers.json
 node <pxl>/bin/pxl.js study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--px N] [--out DIR | --no-out]
 ```
@@ -574,9 +574,11 @@ art, else to 640 px). PNG and GIF are read by pxl; JPEG, WebP, BMP and video nee
 An animated WebP (what a saved web page often makes of a GIF) is read frame by frame, each with its
 own time; a lossless one's pixels are taken as exact, a lossy one's as a JPEG's.
 
-`compare` checks a silhouette against a reference image: for every row, the opaque runs of the
-reference (shrunk by N first, placed at x,y in the asset's coordinates) and of the asset, and how
-many px wider the asset is on each side, then a summary. A figure 1 to 3 px too wide per side reads
+`compare` checks a silhouette against a reference image or another asset (`other`, or
+`other.px.js:name`: a new head against an approved one): for every row, the opaque runs of the
+reference (a PNG shrunk by N first; placed at x,y in the asset's coordinates) and of the asset, and how
+many px wider the asset is on each side, then a summary. A picture alone gives its own rows' runs and
+widths, to draw a figure to. A figure 1 to 3 px too wide per side reads
 as heavy or "fat" without anyone being able to say why in a preview; this shows where.
 
 `describe` gives a whole asset as text to read at once, objects first, with what a reader would

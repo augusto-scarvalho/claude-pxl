@@ -161,6 +161,14 @@ test("cli compare: the asset's rows against a reference PNG, shrunk and offset",
   const text = lines.join("\n");
   assert.match(text, /^ {2}0 {2}1-2 +0-3 +\+1 +\+1$/m);
   assert.match(text, /wider on 1/);
+  // against another asset of the file, or of another file: a head held to an approved one, row by row
+  writeFileSync(join(dir, "b.px.js"), `pal({ R: "#ff0000" })\nsprite("u", "RR\\n.R")`);
+  writeFileSync(file, `pal({ R: "#ff0000" })\nsprite("t", { w: 4, h: 1 }, "RRRR")\nsprite("_v", ".R")`);
+  lines.length = 0;
+  console.log = (s: string) => lines.push(s);
+  try { assert.equal(await main(["compare", file, "t", "_v"]), 0); assert.equal(await main(["compare", file, "t", `${join(dir, "b.px.js")}:u`]), 0); } finally { console.log = log; }
+  assert.match(lines[1], /^ {2}0 {2}1 +0-3 +\+1 +\+2$/m);
+  assert.match(lines[3], /^ {2}0 {2}0-1 +0-3 +0 +\+2$/m);
 });
 
 function tmpArt(src: string): { dir: string; file: string } {
