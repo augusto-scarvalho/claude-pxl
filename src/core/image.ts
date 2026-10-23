@@ -63,6 +63,12 @@ export class Img {
   slice?: [number, number, number, number];
   /** Which way it faces and which way is up, from the asset's `facing`; travels like the pivot. */
   orient?: Orient;
+  /**
+   * Which named part of a 3D thing each pixel shows (surface(), voxels(), volume(), splats(), decal()
+   * with a `part`, or a field's .part() names): an index into `names`, -1 none. For pxl steps --at;
+   * it doesn't travel.
+   */
+  parts?: { ids: Int32Array; names: string[] };
   /** Its real height in meters, from the asset's `height` (for a scene's `world` scale). */
   meters?: number;
 

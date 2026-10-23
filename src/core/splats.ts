@@ -9,7 +9,7 @@ import { type Color, TRANSPARENT } from "./color.ts";
 import { PxError } from "./errors.ts";
 import { sizeOf } from "./grids.ts";
 import { type Clock, Density, STILL, Sdf, type V3, article, compile, compileDensity } from "./sdf.ts";
-import { type SurfaceCanvas, type SurfaceView, clockOf, slab, viewOf } from "./surface.ts";
+import { type SurfaceCanvas, type SurfaceView, clockOf, partIndex, slab, viewOf } from "./surface.ts";
 import { bayer, hash } from "./util.ts";
 
 /** A set of splats: for each, where (m), its three radii (std devs, m) along its own axes, its turn (quaternion w, x, y, z), opacity, normal (0 for a round one), how much sun reaches it, its material. */
@@ -18,6 +18,9 @@ export class Splats {
   readonly n: number;
   readonly pos: Float32Array; readonly scale: Float32Array; readonly rot: Float32Array; readonly opacity: Float32Array;
   readonly normal: Float32Array; readonly sun: Float32Array; readonly mat: Uint16Array; readonly mats: string[];
+  /** details scattered on a form (scatter.ts): each one's brush (0 an ellipse), its step along the ramp, its flutter's phase, and how the form carries them at a moment */
+  brush?: Uint8Array; shift?: Int8Array; phase?: Float32Array;
+  move?: (clock: Clock) => (i: number, p: V3) => V3;
   constructor(n: number, mats: string[]) {
     this.n = n; this.mats = mats;
     this.pos = new Float32Array(n * 3); this.scale = new Float32Array(n * 3); this.rot = new Float32Array(n * 4); this.opacity = new Float32Array(n);
@@ -134,8 +137,12 @@ export interface SplatOpts {
   /** the darkest tone on the solid contour away from the light (default true) */
   outline?: boolean;
   pixel?: number;
+  /** the name of the part they are (pxl steps --at) */
+  part?: string;
 }
-export const SPLAT_OPTS = ["view", "ppm", "at", "spacing", "size", "seed", "mats", "ramp", "light", "blend", "outline", "pixel"];
+export const SPLAT_OPTS = ["view", "ppm", "at", "spacing", "size", "seed", "mats", "ramp", "light", "blend", "outline", "pixel", "part"];
+/** A brush's cells (scatter.ts's BRUSH_CELLS, by its code): [dx, dy, a step along the ramp]. */
+const CELLS: number[][][] = [[], [[0, 0, 0]], [[0, 0, 1], [1, 0, 0], [0, 1, 0], [1, 1, -1]], [[0, -1, 1], [-1, 0, 0], [0, 0, 0], [1, 0, -1], [0, 1, -1]], [[0, 0, -1], [0, -1, 0], [0, -2, 1]], [[0, -1, 1], [1, -1, 0], [-1, 0, 1], [0, 0, 0], [1, 0, 0], [-1, 1, 0], [0, 1, -1], [1, 1, -1]]];
 
 /** Draw splats on the canvas (see the top of this file). */
 export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): void {
@@ -143,7 +150,8 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
   if (set instanceof Sdf || set instanceof Density) set = makeSplats(set, { spacing: o.spacing, size: o.size, seed: o.seed, light: o.light, clock: clockOf(c) });
   else if (o.spacing !== undefined || o.size !== undefined || o.seed !== undefined) throw new PxError(`${who}: spacing, size and seed are for a field or a density made splats here; a set has them`);
   if (!(set instanceof Splats)) throw new PxError(`splats(set, opts) draws splats (sdf.splats(field or density, { spacing })), or a field or a density with { spacing }${set && typeof set === "object" && "kind" in set ? `, not ${article((set as { kind: string }).kind)}` : ""}`);
-  const S = set, persp = !!o.view && typeof o.view === "object" && "horizon" in o.view, K = o.pixel ?? 1, blend = o.blend ?? "dither";
+  // (details scattered on a form: solid where gathered, no outline of their own, as a painter's dabs)
+  const S = set, persp = !!o.view && typeof o.view === "object" && "horizon" in o.view, K = o.pixel ?? 1, blend = o.blend ?? (S.brush ? "cut" : "dither"), outline = o.outline ?? !S.brush;
   if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`${who}: pixel is px to a cell, a whole number from 1, got ${JSON.stringify(o.pixel)}`);
   if (!["dither", "cut", "alpha"].includes(blend)) throw new PxError(`${who}: blend is "dither", "cut" or "alpha", got ${JSON.stringify(o.blend)}`);
   const origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
@@ -158,14 +166,23 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
   if (missing.length) throw new PxError(`${who}: the splats' material ${missing.map((m) => `'${m}'`).join(", ")} is not in mats (it has: ${names.join(", ")})`);
   const matOf = S.mats.map((m) => (o.mats ? Math.max(0, names.indexOf(m)) : 0)), M = ramps.length;
   if (!S.n) return;
-  const [lo, hi] = S.bounds(), cam = viewOf(c, o as never, lo, hi, undefined, who, persp, K, origin), { W, H, x0, y0, axisDepth, toScreen, L, lx, ly } = cam;
+  // where each is now: carried by its form's moves, fluttering (a scatter), or where it was made
+  let P = S.pos;
+  if (S.move) {
+    const mv = S.move(clockOf(c));
+    P = new Float32Array(S.n * 3);
+    for (let i = 0; i < S.n; i++) P.set(mv(i, [S.pos[i * 3], S.pos[i * 3 + 1], S.pos[i * 3 + 2]]), i * 3);
+  }
+  const lo: V3 = [Infinity, Infinity, Infinity], hi: V3 = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < S.n; i++) { const r = 2 * Math.max(S.scale[i * 3], S.scale[i * 3 + 1], S.scale[i * 3 + 2]); for (let e = 0; e < 3; e++) { lo[e] = Math.min(lo[e], P[i * 3 + e] - r); hi[e] = Math.max(hi[e], P[i * 3 + e] + r); } }
+  const cam = viewOf(c, o as never, lo, hi, undefined, who, persp, K, origin), { W, H, x0, y0, axisDepth, toScreen, L, lx, ly } = cam;
 
   // each splat on the picture: its middle, its depth, its ellipse (the covariance through the camera's
   // slope there, a third of a cell added so none falls between cells), in cells
   const n = S.n, cx = new Float32Array(n), cy = new Float32Array(n), dep = new Float32Array(n), conic = new Float32Array(n * 3), rad = new Float32Array(n), tone = new Float32Array(n);
-  const keep: number[] = [];
+  const keep: number[] = [], brushes: number[] = [], lean = new Int8Array(n);
   for (let i = 0; i < n; i++) {
-    const p: V3 = [S.pos[i * 3], S.pos[i * 3 + 1], S.pos[i * 3 + 2]], q = toScreen(p);
+    const p: V3 = [P[i * 3], P[i * 3 + 1], P[i * 3 + 2]], q = toScreen(p);
     if (!q) continue;
     const hh = Math.max(1e-3, S.scale[i * 3]) * 0.5, J: number[][] = [];
     let ok = true;
@@ -185,7 +202,13 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
     rad[i] = Math.ceil(3 * Math.sqrt(l1));
     cx[i] = q[0] / K; cy[i] = q[1] / K; dep[i] = axisDepth(p);
     tone[i] = splatLight(S, i, L);
-    keep.push(i);
+    // a detail smaller than a few cells: a pixel-art brush, not an ellipse
+    if (S.brush?.[i] && Math.sqrt(l1) < 2) {
+      brushes.push(i);
+      // a blade leans the way its axis goes on the picture
+      const zx = 2 * (x * z + w * y), zy = 2 * (y * z - w * x), zz = 1 - 2 * (x * x + y * y), sx = J[0][0] * zx + J[1][0] * zy + J[2][0] * zz, sy = J[0][1] * zx + J[1][1] * zy + J[2][1] * zz;
+      lean[i] = Math.abs(sx) > 0.4 * Math.abs(sy) ? Math.sign(sx) : 0;
+    } else keep.push(i);
   }
   keep.sort((a, b) => dep[a] - dep[b]);
 
@@ -228,18 +251,44 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
       const best = nb.find((v) => nb.filter((u) => u === v).length >= 3) ?? (nb.length === 4 && nb.filter((u) => u === nb[0]).length === 2 ? nb[0] : undefined);
       if (best !== undefined) tn[i] = best;
     }
+  // the brushes: each cell of each, nearer than what is there (and than the other brushes), in its tone
+  // along its ramp (its light, its own step, the brush's shading)
+  const bz = new Float32Array(N).fill(Infinity), bcol = new Uint32Array(N);
+  for (const i of brushes) {
+    const ramp = ramps[matOf[S.mat[i]]], base = Math.round(tone[i] * (ramp.length - 1)) + (S.shift?.[i] ?? 0), ux = Math.floor(cx[i]) - gx0, uy = Math.floor(cy[i]) - gy0;
+    for (const [dx, dy, dt] of CELLS[S.brush![i]] ?? CELLS[1]) {
+      const gx = ux + dx + (S.brush![i] === 4 && dy < -1 ? lean[i] : 0), gy = uy + dy;
+      if (gx < 0 || gy < 0 || gx >= GW || gy >= GH) continue;
+      const j = gy * GW + gx;
+      if (dep[i] >= bz[j] || dep[i] > behind[j]) continue;
+      bz[j] = dep[i];
+      // (never the ramp's darkest, the outline's: a clump in shade is dark, not a hole)
+      bcol[j] = ramp[Math.max(ramp.length > 3 ? 1 : 0, Math.min(ramp.length - 1, base + dt))];
+    }
+  }
   // on the picture: thin, dithered (or cut, or laid over); the solid contour away from the light outlined
   const shown = (j: number, gx: number, gy: number) => mat[j] >= 0 && (blend === "alpha" ? true : blend === "cut" ? al[j] > 0.5 : al[j] > 0.2 + 0.6 * bayer(gx0 + gx, gy0 + gy));
   const on = new Uint8Array(N);
   for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) { const j = gy * GW + gx; if (shown(j, gx, gy)) on[j] = 1; }
-  const zbuf = (c.img.depth ??= new Float32Array(W * H).fill(Infinity));
+  const zbuf = (c.img.depth ??= new Float32Array(W * H).fill(Infinity)), pk = o.part !== undefined ? partIndex(c.img, o.part) : -1;
   for (let gy = 0; gy < GH; gy++)
     for (let gx = 0; gx < GW; gx++) {
       const j = gy * GW + gx;
+      // a brush in front of what the ellipses gathered (or where they left nothing)
+      if (bcol[j] && (!on[j] || bz[j] <= front[j])) {
+        for (let y = 0; y < K; y++)
+          for (let x = 0; x < K; x++) {
+            const px = (gx0 + gx) * K + x, py = (gy0 + gy) * K + y, q = c.index(px, py);
+            if (q < 0 || !c.plot(px, py, bcol[j])) continue;
+            zbuf[q] = Math.min(zbuf[q], bz[j]);
+            if (pk >= 0) c.img.parts!.ids[q] = pk;
+          }
+        continue;
+      }
       if (!on[j]) continue;
       const ramp = ramps[mat[j]];
       let col = ramp[tn[j]];
-      if (o.outline !== false && al[j] > 0.6) {
+      if (outline && al[j] > 0.6) {
         const open = (x: number, y: number) => x < 0 || y < 0 || x >= GW || y >= GH || !on[y * GW + x];
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (open(gx + dx, gy + dy) && dx * lx + dy * ly < 0 && !open(gx - dx, gy - dy)) { col = ramp[0]; break; }
       }
@@ -252,6 +301,7 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
             c.plot(px, py, u === TRANSPARENT ? (((col & ~255) | Math.round(k * 255)) >>> 0) : mixRgb(u, col, k));
           } else c.plot(px, py, col);
           if (front[j] < Infinity && al[j] > 0.5) zbuf[q] = Math.min(zbuf[q], front[j]);
+          if (pk >= 0) c.img.parts!.ids[q] = pk;
         }
     }
 }

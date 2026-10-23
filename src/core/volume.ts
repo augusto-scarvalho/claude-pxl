@@ -10,7 +10,7 @@
 import { type Color, LIN, TRANSPARENT, fromLinear } from "./color.ts";
 import { PxError } from "./errors.ts";
 import { Density, type V3, article, compileDensity } from "./sdf.ts";
-import { type SurfaceCanvas, type SurfaceView, clockOf, corners, slab, viewOf } from "./surface.ts";
+import { type SurfaceCanvas, type SurfaceView, clockOf, corners, partIndex, slab, viewOf } from "./surface.ts";
 import { bayer } from "./util.ts";
 
 export interface VolumeOpts {
@@ -35,10 +35,12 @@ export interface VolumeOpts {
   pixel?: number;
   /** through a camera: its shadow on what is drawn, the share of light it takes where it is thick (default 0: none) */
   cast?: number;
+  /** the name of the part it is (pxl steps --at) */
+  part?: string;
 }
 /** Light in a cloud scatters on forward, reaching deeper than a ray sees through it: the share of its thickness the light's way takes. */
 const SCATTER = 0.4;
-export const VOLUME_OPTS = ["view", "ppm", "at", "ramp", "light", "thickness", "ambient", "cell", "emit", "blend", "pixel", "cast"];
+export const VOLUME_OPTS = ["view", "ppm", "at", "ramp", "light", "thickness", "ambient", "cell", "emit", "blend", "pixel", "cast", "part"];
 
 /** Draw a density on the canvas (see the top of this file). */
 export function drawVolume(c: SurfaceCanvas, density: unknown, o: VolumeOpts = {}): void {
@@ -152,7 +154,7 @@ export function drawVolume(c: SurfaceCanvas, density: unknown, o: VolumeOpts = {
       if (best !== undefined) tone[i] = best;
     }
   // on the picture: thin, a dither between it and what is behind (or its alpha over it); what glows in its own tones, marked as giving light
-  const drawn = new Uint8Array(N);
+  const drawn = new Uint8Array(N), pk = o.part !== undefined ? partIndex(c.img, o.part) : -1;
   for (let gy = 0; gy < GH; gy++)
     for (let gx = 0; gx < GW; gx++) {
       const i = gy * GW + gx, A = alpha[i];
@@ -169,6 +171,7 @@ export function drawVolume(c: SurfaceCanvas, density: unknown, o: VolumeOpts = {
             if (u === TRANSPARENT) { c.plot(px, py, ((col & ~255) | Math.round(k * 255)) >>> 0); continue; }
             c.plot(px, py, fromLinear(LIN[u >>> 24] + (LIN[col >>> 24] - LIN[u >>> 24]) * k, LIN[(u >>> 16) & 255] + (LIN[(col >>> 16) & 255] - LIN[(u >>> 16) & 255]) * k, LIN[(u >>> 8) & 255] + (LIN[(col >>> 8) & 255] - LIN[(u >>> 8) & 255]) * k, u));
           } else c.plot(px, py, col);
+          if (pk >= 0) c.img.parts!.ids[j] = pk;
           if (hot) (c.img.emit ??= new Uint8Array(W * H))[j] = Math.round(255 * Math.min(1, e));
         }
     }

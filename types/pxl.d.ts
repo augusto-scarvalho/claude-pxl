@@ -221,6 +221,8 @@ declare global {
     mirror(axes?: string): PxSdf; repeat(step: PxVec, count?: PxNum | PxVec): PxSdf;
     noise(o: { amp: PxNum; scale?: PxNum; seed?: number; octaves?: number }): PxSdf;
     mat(name: string): PxSdf; paint(name: string, where: (p: PxV3, n: PxV3) => unknown): PxSdf;
+    /** a name for this part of it: what painted a pixel is said by it (pxl steps --at) */
+    part(name: string): PxSdf;
     bounds(clock?: PxClock): [PxV3, PxV3]; dist(p: number[], clock?: PxClock): number;
   }
   type PxSurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number; origin?: [number, number] } | PxView;
@@ -230,6 +232,8 @@ declare global {
     light?: number[]; outline?: boolean | PxColor; rim?: boolean; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
     /** through a camera: its shadow alone (a mesh made of it in its place) */
     hide?: boolean;
+    /** the name of the part it is (pxl steps --at) */
+    part?: string;
   }
   /** A density's options: its soft edge (m), the noise eating it (m, billows scale m across, octaves), carried flow m over the loop, thinned away up from fade [z0, z1]. */
   interface PxDensityOpts { edge?: number; noise?: PxNum; scale?: PxNum; seed?: number; octaves?: number; flow?: PxVec; fade?: [number, number] }
@@ -238,15 +242,32 @@ declare global {
   /** volume()'s options: the view, its ramp, the light, how much a meter holds back, its shade, the grid's cell, what glows (and lights round it, m), dither or alpha where thin, a ray to K x K px, its shadow on what is drawn. */
   interface PxVolumeOpts {
     view?: PxSurfaceView; ppm?: number; at?: number[]; ramp?: string | PxColor[]; light?: number[]; thickness?: number; ambient?: number; cell?: number;
-    emit?: { ramp: string | PxColor[]; strength?: number; glow?: number }; blend?: "dither" | "alpha"; pixel?: number; cast?: number;
+    emit?: { ramp: string | PxColor[]; strength?: number; glow?: number }; blend?: "dither" | "alpha"; pixel?: number; cast?: number; part?: string;
   }
   /** Gaussian splats: how many, their box. */
   interface PxSplats { readonly kind: "splats"; readonly n: number; bounds(): [PxV3, PxV3] }
   /** splats()'s options: made here from a field or density (spacing, size, seed), the view, materials' ramps or one ramp, the light, dither/cut/alpha where thin, the outline, a cell of K x K px. */
   interface PxSplatOpts {
     spacing?: number; size?: number; seed?: number; view?: PxSurfaceView; ppm?: number; at?: number[];
-    mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; ramp?: string | PxColor[]; light?: number[]; blend?: "dither" | "cut" | "alpha"; outline?: boolean; pixel?: number;
+    mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; ramp?: string | PxColor[]; light?: number[]; blend?: "dither" | "cut" | "alpha"; outline?: boolean; pixel?: number; part?: string;
   }
+  /** sdf.scatter's options: on a material or where, how many a square meter, facing up, lit only, turned, sizes, the brush, tone steps, its material, seed, light, flutter. */
+  interface PxScatterOpts {
+    on?: string | string[]; where?: (p: PxV3, n: PxV3) => unknown; count?: number; up?: number; lit?: boolean; orient?: "normal" | "up" | number[];
+    size?: number | [number, number]; brush?: "ellipse" | "dot" | "clump" | "leaf" | "blade" | "cluster"; vary?: number; mat?: string; seed?: number; light?: number[]; flutter?: number;
+  }
+  /** decal()'s options: the field it lies on, where (its rest frame), its up, pin or wrap, its size, other views, lit or glowing, the view as surface()'s, its part. */
+  interface PxDecalOpts {
+    on: PxSdf; point: number[]; up?: number[]; mode?: "pin" | "wrap"; size?: number; views?: { three?: string; profile?: string }; lit?: boolean;
+    view?: PxSurfaceView; ppm?: number; at?: number[]; pixel?: number; light?: number[]; part?: string;
+  }
+  /** What a builder makes: a field (or a density and its look), named parts, details, decals, sockets. */
+  interface PxBuilt { field?: PxSdf; density?: PxDensity; parts: Record<string, PxSdf>; details: Record<string, PxScatterOpts>; decals: Record<string, { asset: string; point: PxV3 }>; sockets: Record<string, PxV3> }
+  /** A scene as data: named parts by builders and relations; an edit of it, what changed, where a part stands. */
+  interface PxWorld { readonly kind: "world"; readonly names: string[]; edit(changes: Record<string, unknown>): PxWorld; changed(other: PxWorld): string[]; place(name: string, clock?: PxClock): PxV3; built(name: string): PxBuilt }
+  interface PxPartSpec { make: "tree" | "rock" | "house" | "crystal" | "mist" | "smoke"; params?: Record<string, unknown>; seed?: number; at?: number[] | ((c: PxClock) => number[]); on?: string; beside?: [string, string, number?]; around?: string; attach?: [string, string] }
+  /** expect3d's rules. */
+  type PxRule = { above?: [string, string]; on?: [string, string]; apart?: [string, string]; near?: [string, string, number]; reaches?: [string, number[], number, number?]; within?: [string, number[][]] };
   /** voxels()'s options: surface()'s but ao; a cell's size (given a field), a cube's width in px (iso and top on the pixel grid). */
   interface PxVoxelOpts extends Omit<PxSurfaceOpts, "ao"> { size?: number | number[]; px?: number }
   /** A voxel grid: cells a side, their size in m, its low corner, how many are filled, its box; its outside as a mesh, and as mesh()'s faces. */
@@ -501,6 +522,10 @@ declare global {
     volume(density: PxDensity, opts?: PxVolumeOpts): void;
     /** Gaussian splats (or a field or density made splats now) rasterized to pixel art, the nearest first. */
     splats(set: PxSplats | PxSdf | PxDensity, opts?: PxSplatOpts): void;
+    /** Hand-drawn pixel art pinned (or wrapped) on a field's surface, crisp in any camera, after the surface(). */
+    decal(name: string, opts?: PxDecalOpts): void;
+    /** A world drawn through a view: its solids, their details and decals, its air. */
+    draw3d(world: PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[]; pixel?: number; only?: string[] }): void;
     /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade. */
     shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): void;
     /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
@@ -612,6 +637,16 @@ declare global {
   function volume(density: PxDensity, opts?: PxVolumeOpts): PxOp;
   /** Gaussian splats rasterized to pixel art (experimental). */
   function splats(set: PxSplats | PxSdf | PxDensity, opts?: PxSplatOpts): PxOp;
+  /** Hand-drawn pixel art pinned (or wrapped) on a field's surface. */
+  function decal(name: string, opts?: PxDecalOpts): PxOp;
+  /** A world3d(...) drawn through a view. */
+  function draw3d(world: PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[]; pixel?: number; only?: string[] }): PxOp;
+  /** A scene as data: named parts made by builders, a seed each, placed by relations, a shared wind. */
+  function world3d(spec: { seed?: number; wind?: { from?: "left" | "right" | "front" | "behind"; strength?: number }; parts: Record<string, PxPartSpec> }): PxWorld;
+  /** Rules over a world's loop, run by pxl check. */
+  function expect3d(name: string, world: PxWorld, rules: PxRule[], opts?: { frames?: number; ms?: number }): void;
+  /** Builders with semantic parameters: make3d.tree({ canopy, twist, leaves, wind }), rock({ moss }), house({ snow, door, window, sign }), crystal({ rune }), mist({ color }), smoke(). */
+  const make3d: Record<"tree" | "rock" | "house" | "crystal" | "mist" | "smoke", (params?: Record<string, unknown>) => PxBuilt>;
   /** Written by build: a grid as name.vox (and .obj/.glb of its blocks), a mesh as name.obj (+ .mtl) and name.glb, Y up; each read back. */
   function export3d(name: string, thing: PxVoxels | PxMesh3 | PxSplats, opts?: { mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; as?: ("vox" | "obj" | "glb" | "ply")[] }): void;
   /** Fields in 3D, in meters ([x, y ahead, z up]): primitives (round the origin; cylinder and cone standing on it), joins, and the other kinds made from a distance. */
@@ -632,6 +667,8 @@ declare global {
     mesh(f: PxSdf, o: { size: number | number[]; clock?: PxClock }): PxMesh3;
     /** splats from a field's surface (flat discs) or a density's inside (round blobs), spacing m apart */
     splats(f: PxSdf | PxDensity, o?: { spacing?: number; size?: number; seed?: number; light?: number[]; thickness?: number; clock?: PxClock }): PxSplats;
+    /** details scattered on a field's surface, drawn as pixel-art brushes by splats() */
+    scatter(f: PxSdf, o?: PxScatterOpts): PxSplats;
   };
   /** A model for mesh(): face(mat, ...points), strip(mat, a, b) between two lines of points, loft(mat, sections), box(mat, corner, corner); faces holds them. */
   function model(): {

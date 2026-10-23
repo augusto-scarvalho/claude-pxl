@@ -1,5 +1,6 @@
 // The fields kit: the palette, an HD-2D camera, the ground, and the builders of examples/sdf (a tree,
-// a rock, a mushroom house, a crystal), each a distance field in meters with semantic parameters.
+// a rock, a mushroom house, a crystal: make3d's, the library of builders with semantic parameters, their
+// fields here), each a distance field in meters.
 // Taken with include("kit.px.js", { palette: true }) by fields.px.js (as pixel art) and grids.px.js
 // (as voxels and meshes).
 pal({ k: "#141222", K: "#1f1a30" })
@@ -25,7 +26,7 @@ pal({ q: "#2c3a28", Q: "#3d5232", s: "#56703e", S: "#7a8c4e", p: "#6a5a48", P: "
 ramps("qQsS", "pP")
 
 const CLOCK = { frames: 24, fps: 1000 / 150 }, TAU = 2 * Math.PI
-const MATS = { bark: "bBiI", leaf: "ZzxcvVJ", stone: "DtTuUE", moss: "mMnN", cap: "rRoO", spot: "Wyy", stem: "awWy", door: "deX", glow: "Ff", gem: { ramp: "gGhHjl", shine: 0.7 } }
+const MATS = { bark: "bBiI", leaf: "ZzxcvVJ", stone: "DtTuUE", moss: "mMnN", cap: "rRoO", spot: "Wyy", stem: "awWy", door: "deX", glow: "Ff", gem: { ramp: "gGhHjl", shine: 0.7 }, snow: "Wyy" }
 
 // An HD-2D camera, as the hd2d examples' (hd2d/kit.px.js): 40 degrees down through a long lens (30
 // across), 24 px to the meter where it looks, the middle of a w x h picture on the ground Z m ahead.
@@ -56,75 +57,21 @@ const ground = (Z) => { const g = model(); g.face("grass", [-12, Z - 8, 0], [12,
 // trunk's share under it), 4 to 7 tones a material in clusters, the outline only on the side away from
 // the light, its foot on the ground and its shadow touching it, the same seed the same tree, and its
 // parameters (height, limbs, twist, lobe, wind, seed) the handles a local edit turns.
-const tree = ({ height = 4.4, limbs = 3, twist = 0.35, lobe = 0.9, wind = 0.2, seed = 7 } = {}) => {
-  const R = rng(seed), H = height / 4.4, fork = [0, 0, 1.6 * H], parts = [], leaves = []
-  const trunk = sdf.capsule([0, 0, 0], fork, 0.2, 0.13).union(
-    sdf.capsule([0, 0, 0.25], [-0.55, -0.25, -0.05], 0.11, 0.04), sdf.capsule([0, 0, 0.25], [0.5, 0.3, -0.05], 0.1, 0.04), { smooth: 0.15 })
-  parts.push(trunk)
-  const tips = []
-  for (let i = 0; i < limbs; i++) {
-    // all round the fork, the first to the left: each its own way and climb
-    const az = (Math.PI + (i * TAU) / limbs + (R() - 0.5) * 0.5), up = (45 + R() * 15) * Math.PI / 180, len = (1.1 + R() * 0.3) * H
-    const dir = (a, e) => [Math.cos(a) * Math.cos(e), Math.sin(a) * Math.cos(e), Math.sin(e)]
-    const d1 = dir(az, up), mid = fork.map((v, k) => v + d1[k] * len * 0.5)
-    const d2 = dir(az + (i % 2 ? 1 : -1) * twist, up + 0.15), tip = mid.map((v, k) => v + d2[k] * len * 0.5)
-    parts.push(sdf.capsule(fork, mid, 0.11, 0.08), sdf.capsule(mid, tip, 0.08, 0.05))
-    tips.push(tip)
-  }
-  const wood = sdf.union(parts, { smooth: 0.08 }).mat("bark")
-  // the crown: a lobe at each tip, one over the fork, one between each two tips
-  const top = [0, 0, fork[2] + 1.9 * H]
-  const lobes = [...tips.map((t) => [t[0] * 1.1, t[1] * 1.1, t[2] + 0.4]), top, ...tips.map((t, i) => { const u = tips[(i + 1) % tips.length]; return [(t[0] + u[0]) * 0.5, (t[1] + u[1]) * 0.5, (t[2] + u[2]) / 2 + 0.75] })]
-  lobes.forEach((p, i) => {
-    const r = lobe * (i < tips.length ? 0.85 : i === tips.length ? 1.05 : 0.75) * (0.9 + R() * 0.2), ph = R()
-    leaves.push(sdf.ellipsoid([r, r, r * 0.8]).at((c) => [p[0] + 0.05 * Math.sin(TAU * (2 * c.phase + ph)), p[1], p[2]]))
-  })
-  const crown = sdf.union(leaves, { smooth: 0.15 }).noise({ amp: 0.14, scale: 0.45, seed, octaves: 1 }).mat("leaf")
-  // the wind: the top `wind` m over at the gust, half that between
-  return wood.union(crown).bend((c) => (2 * wind * (0.45 + 0.55 * Math.sin(TAU * c.phase))) / (height * height))
-}
+const tree = (o = {}) => make3d.tree(o).field
 
 // A boulder: a squat ellipsoid cut flat by planes all round (rocks read as a few big planes, each one
 // tone), their edges softened, a lumpy noise over it, the part under the ground cut away; stone, and
 // moss where it faces up.
-const rock = ({ size = 0.9, seed = 3 } = {}) => {
-  const R = rng(seed), cuts = []
-  for (let i = 0; i < 9; i++) {
-    const a = (i * TAU) / 9 + R() * 0.5, e = (R() * 70 - 15) * Math.PI / 180
-    cuts.push(sdf.plane([Math.cos(a) * Math.cos(e), Math.sin(a) * Math.cos(e), Math.sin(e)], size * (0.62 + R() * 0.12)))
-  }
-  return sdf.ellipsoid([size, size * 0.8, size * 0.62]).intersect(...cuts, { smooth: 0.06 }).noise({ amp: 0.04, scale: 0.3, seed, octaves: 1 })
-    .at(0, 0, size * 0.42).intersect(sdf.plane([0, 0, -1], 0)).mat("stone")
-    .paint("moss", (p, n) => n[2] > 0.72 && sdf.fbm(p[0] * 2.2, p[1] * 2.2, p[2] * 2.2, seed) > 0.42)
-}
+const rock = (o = {}) => make3d.rock(o).field
 // A mushroom house: a stem widening to its foot, a door sunk into it (its frame, a knob) and a round
 // window lit from inside, under a cap a dome flattened and cut below, red with cream spots, a chimney
 // through it.
-const house = ({ seed = 5 } = {}) => {
-  const stem = sdf.cone(0.78, 1.5, 0.6).union(sdf.torus(0.66, 0.1).at(0, 0, 0.1), { smooth: 0.15 }).mat("stem")
-  const door = sdf.box([0.5, 0.4, 0.9], { round: 0.04 }).union(sdf.cylinder(0.25, 0.4).rotate(90, "x").at(0, 0.2, 0.9)).at(0, -0.75, 0.45)
-  const window = sdf.cylinder(0.14, 0.4).rotate(90, "x").at(0.42, -0.6, 1.05)
-  const body = stem.subtract(door, window)
-    .union(sdf.box([0.42, 0.06, 0.8]).at(0, -0.58, 0.4).union(sdf.sphere(0.04).at(0.13, -0.62, 0.45)).mat("door"), sdf.cylinder(0.13, 0.08).rotate(90, "x").at(0.42, -0.52, 1.05).mat("glow"))
-  const R = rng(seed), spots = Array.from({ length: 11 }, (_, i) => { const a = (i * TAU) / 11 + R() * 0.8, e = 0.3 + R() * 1; return [Math.cos(a) * Math.cos(e), Math.sin(a) * Math.cos(e), Math.sin(e)] })
-  const cap = sdf.ellipsoid([1.3, 1.3, 0.85]).intersect(sdf.plane([0, 0, -1], -0.1)).at(0, 0, 1.4).mat("cap")
-    .paint("spot", (p, n) => spots.some((s) => s[0] * n[0] + s[1] * n[1] + s[2] * n[2] > 0.982))
-  const chimney = sdf.cylinder(0.12, 0.6).at(0.45, 0.35, 1.85).union(sdf.cylinder(0.16, 0.08).at(0.45, 0.35, 2.4)).mat("door")
-  return body.union(cap, chimney)
-}
+const house = (o = {}) => make3d.house(o).field
+
 // A crystal cluster: three hexagonal prisms with pointed tips (each the inside of six planes round it,
 // six leaning in over its tip), leaning apart from a rock at their foot; glinting where the light
 // mirrors toward the eye. It turns once round over the loop.
-const crystal = ({ seed = 2 } = {}) => {
-  const prism = (r, h) => {
-    const sides = [0, 1, 2, 3, 4, 5].map((k) => { const a = (k * TAU) / 6; return sdf.plane([Math.cos(a), Math.sin(a), 0], r) })
-    const tip = [0, 1, 2, 3, 4, 5].map((k) => { const a = (k * TAU) / 6, e = 0.6; return sdf.plane([Math.cos(a) * Math.cos(e), Math.sin(a) * Math.cos(e), Math.sin(e)], (h - r * 0.9) * Math.sin(e) + r * Math.cos(e)) })
-    return sdf.cylinder(r * 1.2, h + 0.1).intersect(...sides, ...tip)
-  }
-  const gems = sdf.union(prism(0.2, 1.3), prism(0.15, 0.95).rotate(-30, "y").rotate(25).at(0.14, 0.04, 0), prism(0.13, 0.75).rotate(34, "y").rotate(-50).at(-0.12, -0.05, 0), prism(0.1, 0.5).rotate(40, "x").at(0, -0.12, 0)).mat("gem")
-  const base = rock({ size: 0.45, seed })
-  return gems.at(0, 0, 0.12).union(base).rotate((c) => 360 * c.phase)
-}
+const crystal = (o = {}) => make3d.crystal(o).field.rotate((c) => 360 * c.phase)
 
 // Densities for volume() and splats: a cloud, a mist, smoke and a magic orb, and how each is drawn (LOOK).
 // the cloud: slate blue in its shade to white in the sun

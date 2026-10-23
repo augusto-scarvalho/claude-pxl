@@ -47,8 +47,17 @@ export interface SurfaceOpts {
   cast?: number;
   /** through a camera: nothing drawn but its shadow (a mesh made of it stands in its place) */
   hide?: boolean;
+  /** the name of the part it is (pxl steps --at says what part painted a pixel; a field's own .part() names go after it) */
+  part?: string;
 }
-export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "outline", "rim", "shadows", "ao", "pixel", "cast", "hide"];
+export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "outline", "rim", "shadows", "ao", "pixel", "cast", "hide", "part"];
+/** The index of a part's name in the picture's list of what painted each pixel (see Img.parts). */
+export function partIndex(img: Img, name: string): number {
+  if (typeof name !== "string" || !name) throw new PxError(`part is a name, got ${JSON.stringify(name)}`);
+  const P = (img.parts ??= { ids: new Int32Array(img.w * img.h).fill(-1), names: [] });
+  const k = P.names.indexOf(name);
+  return k >= 0 ? k : P.names.push(name) - 1;
+}
 /** voxels()'s: surface()'s but ao, and a cell's `size` (when it is given a field) and `px` (a cube's width on the picture) */
 export interface VoxelOpts extends Omit<SurfaceOpts, "ao"> { size?: number | number[]; px?: number }
 export const VOXEL_OPTS = ["size", "px", ...SURFACE_OPTS.filter((k) => k !== "ao")];
@@ -148,10 +157,12 @@ interface Tracer {
   lo: V3;
   hi: V3;
   names: string[];
+  /** its own parts' names (a field's .part()) */
+  parts?: string[];
   /** the first hit along o + d t for t in t0..t1, to within e: t, or -1 (it keeps what it hit for shade()) */
   hit(o: V3, d: V3, t0: number, t1: number, e: number): number;
-  /** the last hit's normal and material (-1 none) */
-  shade(p: V3, e: number): { n: V3; m: number };
+  /** the last hit's normal, material and part (-1 none) */
+  shade(p: V3, e: number): { n: V3; m: number; part?: number };
   /** how far off a surface a ray to the light starts */
   lift(e: number): number;
   /** how shut in a point is (creases), 0..1, if it says */
@@ -173,13 +184,13 @@ function fieldTracer(C: Compiled): Tracer {
     return -1;
   };
   return {
-    lo: C.lo, hi: C.hi, names: C.mats,
+    lo: C.lo, hi: C.hi, names: C.mats, parts: C.parts,
     hit: (o, r, t0, t1, e) => march(o[0], o[1], o[2], r[0], r[1], r[2], t0, t1, e),
     shade: (p, e) => {
       // the normal (four taps, Inigo Quilez's tetrahedron), the material there
       const h = Math.max(1e-4, e * 0.6), a = d(p[0] + h, p[1] - h, p[2] - h), b = d(p[0] - h, p[1] - h, p[2] + h), cc = d(p[0] - h, p[1] + h, p[2] - h), dd = d(p[0] + h, p[1] + h, p[2] + h);
       const n = unit([a - b - cc + dd, -a - b + cc + dd, -a + b - cc + dd]);
-      return { n, m: C.m(p[0], p[1], p[2], n[0], n[1], n[2]) };
+      return { n, m: C.m(p[0], p[1], p[2], n[0], n[1], n[2]), part: C.parts.length ? C.part(p[0], p[1], p[2], n[0], n[1], n[2]) : -1 };
     },
     lift: (e) => 2 * e,
     // creases: how much nearer the field comes than the open air along the normal, a few steps out
@@ -351,7 +362,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   }
   const gx0 = Math.floor(bx0 / K), gy0 = Math.floor(by0 / K), GW = Math.ceil(bx1 / K) - gx0, GH = Math.ceil(by1 / K) - gy0;
   if (GW <= 0 || GH <= 0) return;
-  const N = GW * GH, m = new Int16Array(N).fill(-1), tone = new Int8Array(N), depth = new Float32Array(N), nrm = new Float32Array(N * 3), hidden = new Uint8Array(N);
+  const N = GW * GH, m = new Int16Array(N).fill(-1), tone = new Int8Array(N), depth = new Float32Array(N), nrm = new Float32Array(N * 3), hidden = new Uint8Array(N), pt = new Int16Array(N).fill(-1);
 
   // something of it between a point and the light, from t0 on
   const blocks = (p: V3, t0: number, e: number): boolean => {
@@ -373,7 +384,8 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       // drawn already nearer the eye (mesh()'s depth): there, but hidden
       if (vis) { const q = c.index(cx - K / 2, cy - K / 2); if (q >= 0 && vis[q] < depth[i]) hidden[i] = 1; }
       // the normal, the material there, the light
-      const { n, m: mi } = T.shade(p, e), k = mi < 0 ? 0 : matOf[mi];
+      const { n, m: mi, part } = T.shade(p, e), k = mi < 0 ? 0 : matOf[mi];
+      pt[i] = part ?? -1;
       nrm[i * 3] = n[0]; nrm[i * 3 + 1] = n[1]; nrm[i * 3 + 2] = n[2];
       m[i] = k;
       const ramp = ramps[k], up = T.lift(e), q: V3 = [p[0] + n[0] * up, p[1] + n[1] * up, p[2] + n[2] * up];
@@ -406,6 +418,8 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   const gap = persp ? 0.25 : Math.max(0.15, 3 / scale);
   const open = (gx: number, gy: number, i: number) => gx < 0 || gy < 0 || gx >= GW || gy >= GH || m[gy * GW + gx] < 0 || depth[gy * GW + gx] > depth[i] + gap;
   const norm = c.img.normals(), zbuf = (c.img.depth ??= new Float32Array(W * H).fill(Infinity));
+  // what each part is called on the picture: the drawing's part, then the field's own
+  const own = (T.parts ?? []).map((n) => partIndex(c.img, o.part ? `${o.part}.${n}` : n)), whole = o.part !== undefined ? partIndex(c.img, o.part) : -1;
   for (let gy = 0; gy < GH; gy++)
     for (let gx = 0; gx < GW; gx++) {
       const i = gy * GW + gx;
@@ -429,6 +443,8 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
           if (!c.plot(px, py, col)) continue;
           setNormal(norm, j, nx, ny, nz);
           zbuf[j] = depth[i];
+          const pk = pt[i] >= 0 ? own[pt[i]] : whole;
+          if (pk >= 0) c.img.parts!.ids[j] = pk;
         }
     }
 

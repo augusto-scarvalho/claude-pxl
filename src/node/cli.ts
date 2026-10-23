@@ -420,6 +420,9 @@ export async function main(argv: string[]): Promise<number> {
             if (img.data[i] !== prev) row(s.n, s.label, s.loc, `-> ${key(img.data[i])}${via(prev, img.data[i], s.label)}`);
             prev = img.data[i];
           });
+          // a 3D thing's named part there (surface(), voxels(), volume(), splats(), decal())
+          const pk = b.img.parts?.ids[y * final.w + x] ?? -1;
+          if (pk >= 0) console.log(`part: ${b.img.parts!.names[pk]}`);
           return 0;
         }
         console.log(`${name}: ${b.trace.frames.length} steps (${def.kind} ${final.w}x${final.h}${frame0})`);

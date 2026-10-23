@@ -938,7 +938,12 @@ What the phases left, each waiting for a reason:
 - [x] **Procedural splats** (phase 5, experimental): `sdf.splats` from a field's surface (flat discs
   along the normals) or a density's inside (round blobs), `splats()` a CPU rasterizer to pixel art (EWA
   ellipses, the nearest first, 3DGS's blending, snapped to the ramps in clusters), `.ply` in 3DGS's layout.
-- [ ] **A scene IR with named parts and local edits** (phase 6), **evaluation and the guides** (phase 7).
+- [x] **Details, decals and a scene of parts** (phase 6): `sdf.scatter` (leaves, moss, snow on a form,
+  drawn as pixel-art brushes under a few px, carried by its sway), `decal()` (hand-drawn art pinned or
+  wrapped on a form, a grid per view, lit or glowing), `.part()` and what painted each pixel (`pxl steps
+  --at`), the builders (`make3d`), `world3d` (parts, seeds, relations, a shared wind; `edit` and `changed`,
+  the rest byte for byte), `draw3d`, `expect3d` run by `pxl check`.
+- [ ] **Evaluation and the guides** (phase 7).
 - [ ] **Splats' own shadows**: a splat set lays none; a field's `surface(..., { hide: true })` lays it.
   When: splats come from somewhere with no field behind them (a capture read from a .ply).
 - [ ] **Reading a .ply of trained splats** (a capture, from Spark's or SuperSplat's files) into
@@ -951,9 +956,8 @@ What the phases left, each waiting for a reason:
 - [ ] **mesh() in surface()'s orthographic views**: a mesh from the side, the top or in iso goes through
   a camera function of one's own today (examples/sdf/splats.px.js, `orthoMesh`). When: a second file
   needs it (a `view` with `kind` for mesh(), the faces turned into its frame).
-- [ ] **Splats' sizes by material** (a crown's leaf clumps bigger than its bark's flakes) and higher
-  SH degrees in the .ply: one size and the DC color today. When: phase 6's builders ask for leafier
-  crowns, or a viewer shows the flat color wrong.
+- [ ] **Higher SH degrees in the .ply**: the DC color only. When: a viewer shows the flat color wrong.
+  (Sizes by material: a scatter set has its own size, a crown's leaves and a rock's moss each theirs.)
 
 - [ ] **Volumes among volumes**: a volume writes no depth (it hides nothing), so volumes are drawn
   farthest first by hand; two crossing (mist through smoke) lie one over the other, not mixed. Why: a
@@ -988,9 +992,8 @@ What the phases left, each waiting for a reason:
   height's depth; a field drawn through the camera has the true depth. Why: a wide crown in front of a
   fence behind the trunk. When: a card reads wrong (a depth channel travelling with the sprite's pixels,
   as its normals do).
-- [ ] **A leafier canopy**: the reference tree's crown is lobes melted with noise, read as smooth
-  clumps; no leaf clusters drawn in them. Why: pixel-art trees show leaf masses and lit clumps. When:
-  phase 6's builders (a `paint()` pattern of leaf clusters, or finer noise kept in clusters).
+- [x] **A leafier canopy**: `make3d.tree({ leaves })`, leaf clusters scattered on the lobes as brushes
+  (examples/sdf/details.px.js).
 - [ ] **Voxels' creases darker** (ambient occlusion per cube face, as block games shade corners): off
   today, a tone a face. Why: a big voxel scene can read flat. When: one does.
 - [ ] **Voxels on the pixel grid from the side**: iso and top are on the grid; any other view of
@@ -1007,3 +1010,29 @@ What the phases left, each waiting for a reason:
   the .glb export opens in any viewer meanwhile.
 - [ ] **A Blender pipeline**: not yet, by decision; .obj and .glb reach it. When: a render or an edit
   only Blender does is asked for.
+
+Left from phase 6 (details, decals, the scene of parts):
+
+- [ ] **What painted a pixel through stamp()**: `Img.parts` is written by surface(), splats(), volume(),
+  decal() and draw3d() on the canvas they draw on; a panel stamped into a scene leaves its parts behind
+  (`pxl steps <scene> --at` says none there). Why: a sheet of panels asked what is where. When: someone
+  asks it of a composed scene (stamp copying the ids, the names joined).
+- [ ] **Decals on mesh() and voxels()**: a decal lies on a field drawn by surface(); a mesh's faces or a
+  voxel model take none. Why: a sign on a modelled building. When: a mesh scene wants one (the anchor
+  from the face's plane, the depth from mesh()'s buffer).
+- [ ] **Views for wrapped decals**: `views` picks a grid for `pin`; a `wrap` decal is one grid laid on
+  the surface (it foreshortens on its own). On a hard edge (a prism's) its texels bend round with it.
+  When: a wrapped emblem needs a drawing per side.
+- [ ] **Brushes by distance**: under 2 cells a detail is a fixed brush (dot, clump, leaf, blade,
+  cluster), whatever its size; past that an ellipse. Why: a camera close to a crown could show leaves
+  as bigger brushes (a 5x5 leaf) before they turn to ellipses. When: a close-up reads wrong.
+- [ ] **More builders and relations**: tree, rock, house, crystal, mist, smoke; at, on, beside, around,
+  attach. Why: a forest edge, a fence, a path between parts, rows. When: a scene asks for them (a pine,
+  a bush, `along` a path, `apart` kept by placing, not only checked).
+- [ ] **expect3d's sampling and its tenses**: points 0.1 m apart over 8 frames, so a part thinner than
+  that (a twig) can slip through, and rules are "at every frame" or "by then" (`reaches`). Why: MoVer's
+  rules also say before, after, while. When: a rule misses what it should catch, or an animation needs
+  an order checked (finer sampling where a part is thin; `before: [rule, rule]`).
+- [ ] **Edits finer than a builder's part**: an edit re-makes what it names (the canopy, its leaves)
+  whole; one limb or one leaf can't be kept while the others change. Why: "this branch is approved, the
+  rest can move". When: an agent's edit loop asks for it (seeds per limb, a part per limb).

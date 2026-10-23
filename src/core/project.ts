@@ -10,6 +10,10 @@ import { SURFACE_OPTS, VOXEL_OPTS, surfaceSize } from "./surface.ts";
 import { Mesh3, Voxels, surfaceNets, voxelize } from "./grids.ts";
 import { VOLUME_OPTS } from "./volume.ts";
 import { SPLAT_OPTS, Splats, makeSplats } from "./splats.ts";
+import { scatter } from "./scatter.ts";
+import { DECAL_OPTS } from "./decal.ts";
+import { make3d } from "./builders.ts";
+import { DRAW3D_OPTS, type Rule, World, runExpects } from "./world3d.ts";
 import type { Color } from "./color.ts";
 import { TRANSPARENT, oklab, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
@@ -65,6 +69,8 @@ export const SIGNATURES: Record<string, string> = {
   voxels: "grid:o ?opts:o",
   volume: "density:o ?opts:o",
   splats: "set:o ?opts:o",
+  decal: "name:s ?opts:o",
+  draw3d: "world:o ?opts:o",
   capsule: "x0:n y0:n r0:n x1:n y1:n r1:n ramp:s ?opts:o",
   flame: "x:n y:n size:n keys:s ?opts:o",
   scroll: "name:s y:n per:n ?opts:o",
@@ -96,7 +102,7 @@ export const SIGNATURES: Record<string, string> = {
 };
 
 /** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
-const CLOCKED = new Set(["surface", "voxels", "volume", "splats", "flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast", "shake"]);
+const CLOCKED = new Set(["surface", "voxels", "volume", "splats", "decal", "draw3d", "flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast", "shake"]);
 /** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
 function drawsWithFunctions(items: Item[]): boolean {
   return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
@@ -137,6 +143,8 @@ export const OP_OPTS: Record<string, string[]> = {
   voxels: VOXEL_OPTS,
   volume: VOLUME_OPTS,
   splats: SPLAT_OPTS,
+  decal: DECAL_OPTS,
+  draw3d: DRAW3D_OPTS,
   capsule: ["light", "rim"],
   flame: ["wind", "period", "seed", "frame"],
   scroll: ["x", "y", "frame", "axis"],
@@ -236,6 +244,10 @@ export class Project implements BuildCtx {
   readonly groups = new Map<string, GroupDef>();
   readonly sheets: SheetDef[] = [];
   /** 3D files to write (export3d): a voxel grid or a mesh, its materials' colors, the formats */
+  /** expect3d's rules, run by pxl check */
+  readonly expects: { name: string; world: World; rules: Rule[]; frames: number; ms: number; loc?: string }[] = [];
+  /** Run expect3d's rules: each its name, text, whether it held and where not. */
+  runExpects() { return this.expects.flatMap((e) => runExpects(e.world, e.rules, e.frames, e.ms).map((r) => ({ ...r, name: e.name, loc: e.loc }))); }
   readonly models: { name: string; thing: Voxels | Mesh3 | Splats; colors: Color[]; ramps: Color[][]; as: ("vox" | "obj" | "glb" | "ply")[]; loc?: string }[] = [];
   readonly fonts = new Map<string, FontDef>();
   /** rig() skeletons by name, for describe's RIG section. */
@@ -532,6 +544,18 @@ export class Project implements BuildCtx {
       voxels: (f: unknown, o: unknown = {}) => { try { return voxelize(f, o as never); } catch (e) { throw wrap(e).within("sdf.voxels", this.callerLoc()); } },
       mesh: (f: unknown, o: unknown = {}) => { try { return surfaceNets(f, o as never); } catch (e) { throw wrap(e).within("sdf.mesh", this.callerLoc()); } },
       splats: (f: unknown, o: unknown = {}) => { try { return makeSplats(f, o as never); } catch (e) { throw wrap(e).within("sdf.splats", this.callerLoc()); } },
+      scatter: (f: unknown, o: unknown = {}) => { try { return scatter(f, o as never); } catch (e) { throw wrap(e).within("sdf.scatter", this.callerLoc()); } },
+    };
+    // make3d.tree({ canopy, twist, wind, ... }) and the rest: builders with semantic parameters (builders.ts)
+    env.make3d = Object.fromEntries(Object.entries(make3d).map(([k, f]) => [k, (o: unknown = {}) => { try { return f(o as never); } catch (e) { throw wrap(e).within(`make3d.${k}`, this.callerLoc()); } }]));
+    // world3d({ seed, wind, parts }): a scene of named parts (world3d.ts); world.edit({ "part.param": v }), world.changed(other)
+    env.world3d = (spec: unknown) => { try { return new World(spec as never); } catch (e) { throw wrap(e).within("world3d", this.callerLoc()); } };
+    // expect3d(name, world, rules, { frames }): rules over the loop, run by pxl check
+    env.expect3d = (name: unknown, world: unknown, rules: unknown, opts: unknown = {}) => {
+      const loc = this.callerLoc();
+      if (typeof name !== "string" || !(world instanceof World) || !Array.isArray(rules) || !isPlainObject(opts)) throw new PxError('expect3d("name", world, [{ above: ["oak.canopy", "oak.trunk"] }, { on: ["rock", "ground"] }, ...], { frames })', loc);
+      checkKeys(`expect3d '${name}'`, opts, ["frames", "ms"], loc);
+      this.expects.push({ name, world, rules: rules as Rule[], frames: (opts as { frames?: number }).frames ?? 8, ms: (opts as { ms?: number }).ms ?? 3600, loc });
     };
     // export3d(name, grid or mesh, { mats, as }): .vox, .obj, .glb written by build
     env.export3d = (name: unknown, thing: unknown, opts: unknown = {}) => {
@@ -608,7 +632,7 @@ export class Project implements BuildCtx {
         const loc = this.callerLoc();
         try {
           checkArgs(name, args);
-          const o = name === "mesh" ? args[3] : name === "surface" || name === "voxels" || name === "volume" || name === "splats" ? args[1] : args[args.length - 1];
+          const o = name === "mesh" ? args[3] : name === "surface" || name === "voxels" || name === "volume" || name === "splats" || name === "draw3d" ? args[1] : args[args.length - 1];
           if (OP_OPTS[name] && isPlainObject(o)) checkKeys(name, o, OP_OPTS[name]);
         } catch (e) { throw wrap(e).within(name, loc); }
         if (name === "clip") checkItems("clip", args.slice(1), loc);

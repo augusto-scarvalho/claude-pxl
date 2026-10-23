@@ -14,6 +14,8 @@ import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } 
 import { type SurfaceCanvas, type SurfaceOpts, type VoxelOpts, drawSurface, drawVoxels } from "./surface.ts";
 import { type VolumeOpts, drawVolume } from "./volume.ts";
 import { type SplatOpts, drawSplats } from "./splats.ts";
+import { type DecalOpts, drawDecal } from "./decal.ts";
+import { type Draw3dOpts, drawWorld } from "./world3d.ts";
 import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshWorld, drawMesh } from "./mesh.ts";
 import type { Lit } from "./sunlight.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
@@ -913,6 +915,21 @@ export class Canvas {
     drawSplats(this as unknown as SurfaceCanvas, set, opts);
   }
 
+  /** Hand-drawn pixel art pinned to a field's surface (a face, a rune, an emblem), crisp in any camera, after the surface(): see decal.ts. */
+  decal(name: string, opts: DecalOpts = {}): void {
+    drawDecal(this as unknown as Parameters<typeof drawDecal>[0], name, opts);
+  }
+
+  /** A world3d(...) drawn through a view: its solids, their details and decals, its air: see world3d.ts. */
+  draw3d(world: unknown, opts: Draw3dOpts = {}): void {
+    const self = this as unknown as SurfaceCanvas;
+    drawWorld(world, opts, {
+      surface: (f, o) => drawSurface(self, f, o as SurfaceOpts), splats: (s, o) => drawSplats(self, s, o as SplatOpts),
+      volume: (dd, o) => drawVolume(self, dd, o as VolumeOpts), decal: (n, o) => drawDecal(this as unknown as Parameters<typeof drawDecal>[0], n, o as DecalOpts),
+      clock: { t: this.t, phase: this.frames > 0 ? this.frame / this.frames : 0, frame: this.frame, frames: this.frames },
+    });
+  }
+
   plane(view: Partial<View>, fn: (x: number, z: number, col: number, row: number) => string | null | undefined, where?: Region): void {
     const P = perspective({ ...view, w: view.w ?? this.img.w } as View), inside = where === undefined ? undefined : regionPred(where);
     for (let row = Math.max(-this.oy, Math.floor(P.horizon)); row < this.img.h - this.oy; row++) {
@@ -1571,7 +1588,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp", "effect",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "voxels", "volume", "splats", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "voxels", "volume", "splats", "decal", "draw3d", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

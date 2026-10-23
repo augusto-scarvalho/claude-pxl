@@ -37,12 +37,17 @@ type Node =
   | { op: "repeat"; of: Sdf; step: Vec; count: Vec }
   | { op: "noise"; of: Sdf; amp: Num; scale: Num; seed: number; octaves: number }
   | { op: "mat"; of: Sdf; name: string }
-  | { op: "paint"; of: Sdf; name: string; where: (p: V3, n: V3) => unknown };
+  | { op: "paint"; of: Sdf; name: string; where: (p: V3, n: V3) => unknown }
+  | { op: "part"; of: Sdf; name: string };
 
-/** A field compiled at one moment: its distance, its material (an index into `mats`, -1 none) at a point with its normal, its box, its stretch. */
+/** A field compiled at one moment: its distance, its material (an index into `mats`, -1 none) and its named part (into `parts`, -1 none) at a point with its normal, its box, its stretch. */
 export interface Compiled {
   d(x: number, y: number, z: number): number;
   m(x: number, y: number, z: number, nx: number, ny: number, nz: number): number;
+  part(x: number, y: number, z: number, nx: number, ny: number, nz: number): number;
+  parts: string[];
+  /** its distance's code and numbers: the same key, the same field (a fingerprint) */
+  key: string;
   lo: V3;
   hi: V3;
   lip: number;
@@ -57,8 +62,8 @@ const fin = (v: unknown, what: string): number => {
   if (typeof v !== "number" || !Number.isFinite(v)) throw new PxError(`sdf: ${what} must be a number (or a function of the clock giving one), got ${JSON.stringify(v)}`);
   return v;
 };
-const num = (v: Num, c: Clock, what: string): number => fin(typeof v === "function" ? v(c) : v, what);
-const vec = (v: Num | Vec, c: Clock, what: string, n = 3): number[] => {
+export const num = (v: Num, c: Clock, what: string): number => fin(typeof v === "function" ? v(c) : v, what);
+export const vec = (v: Num | Vec, c: Clock, what: string, n = 3): number[] => {
   const a = typeof v === "function" ? (v as (c: Clock) => unknown)(c) : v;
   if (typeof a === "number") return Array(n).fill(fin(a, what));
   if (!Array.isArray(a) || a.length !== n) throw new PxError(`sdf: ${what} must be [${"xyz".slice(0, n).split("").join(", ")}] (or a function of the clock giving it), got ${JSON.stringify(a)}`);
@@ -153,6 +158,11 @@ export class Sdf {
   mat(name: string): Sdf {
     if (typeof name !== "string" || !name) throw new PxError(`sdf: mat(name): a material's name, got ${JSON.stringify(name)}`);
     return new Sdf({ op: "mat", of: this, name });
+  }
+  /** A name for this part of it (the trunk, the canopy): what painted a pixel is said by it (pxl steps --at), its parts' names joined ("oak.canopy"). */
+  part(name: string): Sdf {
+    if (typeof name !== "string" || !/^[\w-]+$/.test(name)) throw new PxError(`sdf: part(name): a name of letters, digits, _ or -, got ${JSON.stringify(name)}`);
+    return new Sdf({ op: "part", of: this, name });
   }
   /** A material where `where(p, n)` holds: p the point and n its normal, in this field's own frame (moss where n[2] > 0.6). */
   paint(name: string, where: (p: V3, n: V3) => unknown): Sdf {
@@ -301,7 +311,8 @@ const boxOut = (lo: V3, hi: V3, x: number, y: number, z: number) => {
   const dx = Math.max(lo[0] - x, 0, x - hi[0]), dy = Math.max(lo[1] - y, 0, y - hi[1]), dz = Math.max(lo[2] - z, 0, z - hi[2]);
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 };
-const NONE: Fm = () => -1;
+// (inside, a lookup gives the material and the part as one number: (material + 1) + 1024 (part + 1), 0 none)
+const NONE: Fm = () => 0;
 const MOVES_ITSELF = new Set(["sphere", "box", "cylinder", "cone", "torus", "ellipsoid"]);
 const corners = (lo: V3, hi: V3): V3[] => [0, 1, 2, 3, 4, 5, 6, 7].map((i) => [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]]);
 const boxOf = (pts: V3[]): [V3, V3] => [[0, 1, 2].map((e) => Math.min(...pts.map((p) => p[e]))) as V3, [0, 1, 2].map((e) => Math.max(...pts.map((p) => p[e]))) as V3];
@@ -323,8 +334,9 @@ class Code {
 }
 type Factory = (K: number[], smin: (a: number, b: number, k: number) => number, fbm: typeof fbm3) => Fd;
 const FACTORIES = new Map<string, Factory>();
-function written(P: Part): Fd {
+function written(P: Part, keyOut?: { key: string }): Fd {
   const c = new Code(), r = P.e(c, "x", "y", "z"), src = `return (x, y, z) => {\n${c.lines.join("\n")}\nreturn ${r};\n}`;
+  if (keyOut) keyOut.key = `${src}#${c.K.join(",")}`;
   let f = FACTORIES.get(src);
   if (!f) {
     f = new Function("K", "smin", "fbm3", src) as Factory;
@@ -337,7 +349,7 @@ function written(P: Part): Fd {
 /** The field at a moment, as functions. Materials are numbered in `mats`. */
 export function compile(f: Sdf, clock: Clock = STILL): Compiled {
   needSdf(f, "compile");
-  const mats: string[] = [];
+  const mats: string[] = [], parts: string[] = [], prefix: string[] = [];
   const idx = (name: string) => { const i = mats.indexOf(name); return i >= 0 ? i : mats.push(name) - 1; };
   // (a primitive moved by at() takes the move itself, (ox, oy, oz): one function a point, not two)
   const go = (s: Sdf, ox = 0, oy = 0, oz = 0): Part => {
@@ -568,7 +580,8 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         };
       }
       case "bend": {
-        const [kx, ky] = typeof n.k === "object" ? vec(n.k, clock, "bend's [kx, ky]", 2) : [num(n.k as Num, clock, "bend's k"), 0], C = go(n.of), Z = Math.max(0, C.hi[2]), off = (z: number) => (z > 0 ? (z * z) / 2 : 0);
+        const kv = typeof n.k === "function" ? (n.k as (c: Clock) => unknown)(clock) : n.k;
+        const [kx, ky] = typeof kv === "object" ? vec(kv as Vec, clock, "bend's [kx, ky]", 2) : [num(kv as Num, clock, "bend's k"), 0], C = go(n.of), Z = Math.max(0, C.hi[2]), off = (z: number) => (z > 0 ? (z * z) / 2 : 0);
         const ex = kx * off(Z), ey = ky * off(Z);
         return {
           d: (x, y, z) => C.d(x - kx * off(z), y - ky * off(z), z),
@@ -621,14 +634,26 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
       }
       case "mat": {
         const C = go(n.of), k = idx(n.name);
-        return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c); return v < 0 ? k : v; } };
+        return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c); return v % 1024 ? v : v + k + 1; } };
       }
       case "paint": {
         const C = go(n.of), k = idx(n.name), where = n.where;
-        return { ...C, m: (x, y, z, a, b, c) => (where([x, y, z], [a, b, c]) ? k : C.m(x, y, z, a, b, c)) };
+        return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c); return where([x, y, z], [a, b, c]) ? v - (v % 1024) + k + 1 : v; } };
+      }
+      case "part": {
+        // its full name: the parts round it first; the innermost names a point
+        const full = [...prefix, n.name].join("."), k = parts.indexOf(full) >= 0 ? parts.indexOf(full) : parts.push(full) - 1;
+        prefix.push(n.name);
+        const C = go(n.of);
+        prefix.pop();
+        return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c); return v >= 1024 ? v : v + 1024 * (k + 1); } };
       }
     }
   };
-  const P = go(f);
-  return { d: written(P), m: P.m, lo: P.lo, hi: P.hi, lip: P.lip, mats };
+  const P = go(f), raw = P.m, out = { key: "" };
+  return {
+    d: written(P, out), key: out.key, lo: P.lo, hi: P.hi, lip: P.lip, mats, parts,
+    m: (x, y, z, a, b, c) => (raw(x, y, z, a, b, c) % 1024) - 1,
+    part: (x, y, z, a, b, c) => Math.floor(raw(x, y, z, a, b, c) / 1024) - 1,
+  };
 }

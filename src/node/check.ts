@@ -170,6 +170,12 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     if (lightSaid) run.push(`lit side on ${ran.light} (a clear reading on ${ran.read})`); else not.push("lit side (no scene declares world.light)");
     if (ran.feet) run.push(`feet on ${ran.feet}${groundSaid ? ` (against the ground row on ${ran.ground})` : ""}`); else not.push("feet (nothing placed has a height)");
   }
+  // expect3d's rules over their loops (a world's parts: above, on, apart, near, reaches, within)
+  if (!opts.names && p.expects.length) {
+    const rs = p.runExpects();
+    for (const r of rs) if (!r.ok) lines.push(`${r.name}${r.loc ? ` (${r.loc})` : ""} › WARNING: expect ${r.text}: it doesn't hold (${r.detail})`);
+    run.push(`expects ${rs.length} (${rs.filter((r) => r.ok).length} held)`);
+  }
   if (ran.text) run.push(`lettering on ${ran.text}`);
   if (ran.lines) run.push(`lines on ${ran.lines}`);
   if (rigs) run.push(`rig parts ${ran.parts}`);
