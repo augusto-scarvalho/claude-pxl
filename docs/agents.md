@@ -7,6 +7,7 @@ result. To use pxl by hand, start with [Getting started](getting-started.md).
 
 ## Contents
 
+- [A round, start to finish](#a-round-start-to-finish): the order that works, a line each
 - [Install the skill](#install-the-skill): Claude Code, the Codex CLI, Antigravity's `agy`, others
 - [Pick the model and effort](#pick-the-model-and-effort)
 - [Writing a brief](#writing-a-brief)
@@ -18,6 +19,28 @@ result. To use pxl by hand, start with [Getting started](getting-started.md).
 - [When pxl gets in the agent's way](#when-pxl-gets-in-the-agents-way): the `FEEDBACK.md` loop
 - [For contributors](#for-contributors): tests, tutorials, calibrating `pxl study`, speed, measuring
   sessions
+
+## A round, start to finish
+
+The order that has worked over this fork's rounds, each step with its section below:
+
+1. **A brief, in a file when the work is big**: what to make, its size and view, the references as
+   files, the stages you want to approve ([Writing a brief](#writing-a-brief)).
+2. **Stages, each approved before the next**: a new move as flat blocks, a scene's camera and ground
+   as blocks, then the props, the people, the light ([Blocks first, then paint](#blocks-first-then-paint)).
+3. **Look, fix everything in one turn, check**: the agent reads only the guide sections it needs
+   (`pxl help`), looks with one `pxl shot` or `pxl describe`, sends all the fixes in one message, and
+   runs `pxl check` before handing over ([How the agent works](#how-the-agent-works)).
+4. **A fresh agent for a big scene** when the conversation is already long: the brief file to a new
+   session, not more turns here ([A big scene](#a-big-scene-one-agent-a-fresh-one-or-a-pipeline)).
+5. **Your notes in one round**, after watching the loops, not the stills
+   ([Reviewing the result](#reviewing-the-result)).
+6. **Friction to `FEEDBACK.md`**: the agent writes a line when pxl cost it a workaround, and whoever
+   curates pxl turns it into a fix ([When pxl gets in the agent's way](#when-pxl-gets-in-the-agents-way)).
+7. **One gallery GIF a round**: previewed in a scratch folder (`--out`, `--every`), committed once at
+   the end, under 10 MB ([The gallery](#the-gallery)).
+8. **Fast tests while working** (the file you touched, `npm run test:quick`, `PXL_EXAMPLES=<folder>`),
+   the full suite once before a commit ([Tests](#tests)).
 
 ## Install the skill
 
@@ -249,6 +272,10 @@ Pass the prompt on stdin: `--add-dir` takes several values and would swallow it.
   LOOK pixels it changed.
 - **Check the values.** `pxl shot art.px.js name --grey` adds the picture in greys: whether the
   planes read by light and dark before color.
+- **Key frames of a long scene.** `pxl shot art.px.js scene --frames 0,40,80,120,160,200` lays them in
+  rows when they are too wide for one: a contact sheet of the story. Moving:
+  `pxl shot art.px.js scene --gif --every 4 --out <scratch dir>` builds one frame in four and prints
+  the GIF's size.
 - **See the guides.** `pxl shot art.px.js name --ref` draws the asset's `ref: true` layers over it
   (guide rows, a skeleton), to see whether the figure keeps to them.
 - **Compare versions.** When the agent replaces art you approved, ask it to keep the old one as
@@ -288,11 +315,12 @@ test file for what you changed, or the quick suite:
 node --test test/docs.test.ts                            # one file: the commands and flags the docs cite
 npm run test:quick                                       # every test but the two slowest, about 20 s
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts      # the examples check, on one folder (or hd2d/harbor, or a,b)
-npm run check                                            # types and every test, about 60 s: once, before the commit
+npm run check                                            # types and every test, under a minute: once, before the commit
 ```
 
-The two slowest tests are the check of every example (about 50 s, all cores) and the study of the
-gallery's GIFs; a change to a check, to `study` or to an example is what they catch. With
+The two slowest tests are the check of every example (about 30 s alone, in threads on half the
+cores, the slowest of the last run first) and the study of the gallery's GIFs; a change to a check, to
+`study` or to an example is what they catch. With
 `PXL_EXAMPLES`, the examples test checks only the examples whose path under `examples/` starts with
 it, says in its name how many it left out, and leaves the other examples' lines alone.
 
@@ -306,7 +334,9 @@ PXL_UPDATE=1 PXL_EXAMPLES=hd2d node --test test/examples.test.ts     # only thos
 
 An example that has grown slow slows every run of the suite: `node scripts/perf.ts <file>` times its
 check, and `pxl build <file> --profile` names the art file's own slow functions (the harbor's water
-worked out the same cells for every frame; once a pixel took its check from 28 s to 10 s).
+worked out the same cells for every frame; once a pixel took its check from 28 s to 10 s). A long
+story whose frames no rule reads (no `world.light`, nothing with a height or a front marker) can be
+checked one frame in N, `check: { every: N }`: the frames checked only prove they build.
 
 ### Teaching pxl from tutorials
 
@@ -354,7 +384,8 @@ change that helps one scene often costs another.
 every version of every file for good, and a GIF hardly compresses: each one committed and then
 replaced stays in every full clone (one scene's five versions in a day added 24 MB). Look at a GIF
 that isn't done with `node scripts/gallery.ts <name> --out <scratch dir>` (`--every 4` builds one
-frame in four, a quick look at a long story), and commit it once, at the end of the round. Keep a GIF
+frame in four, a quick look at a long story; `pxl shot <file> <scene> --gif --every 4 --out <scratch dir>`
+does the same for any scene and prints its size), and commit it once, at the end of the round. Keep a GIF
 under 10 MB (GitHub stops animating bigger ones): a long scene at half its HD size (`graveyard_md`),
 an excerpt of its story (`harbor_clip`), or `every` in the script's list.
 
@@ -364,9 +395,10 @@ Agents run `pxl shot`, `check` and `study` many times a session, and the test su
 every example: a slow path costs every turn. Before and after a change to the engine:
 
 ```sh
-npm run check                                           # types and tests, about 60 s (test:quick ~20 s)
+npm run check                                           # types and tests, under a minute (test:quick ~20 s)
 node scripts/perf.ts                                    # pxl check's time and peak memory on every example
-node scripts/hashes.ts examples/hd2d/*.px.js > a.txt    # every asset's hash: diff it after, nothing should move
+node scripts/hashes.ts > after.txt                      # every example's assets hashed: diff with a run before the change
+git worktree add ../pxl-head HEAD && node ../pxl-head/scripts/hashes.ts > before.txt   # (the run before, on the last commit)
 node --cpu-prof --cpu-prof-dir=prof bin/pxl.js study clip.gif --no-out
 node scripts/cpuprofile.ts prof                         # where that time went, by function
 ```

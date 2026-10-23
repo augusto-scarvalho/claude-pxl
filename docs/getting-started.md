@@ -144,8 +144,9 @@ Useful options:
 | You want to | Run |
 | --- | --- |
 | see one asset now, without building everything | `pxl shot art.px.js slime` writes `out/_shot/slime.png` |
-| see some frames side by side, or a part enlarged | `pxl shot art.px.js slime_hop --frames all --at 0,0,8,8` |
+| see some frames side by side (in rows when too wide), or a part enlarged | `pxl shot art.px.js slime_hop --frames all --at 0,0,8,8` |
 | watch several animations play side by side | `pxl shot art.px.js walk_s walk_w walk_n --gif` writes one GIF |
+| preview a long scene as a GIF, quickly | `pxl shot art.px.js street --gif --every 4` builds one frame in four and prints its size |
 | check the values (lights and darks) without the color | `pxl shot art.px.js meadow --grey` adds the same picture in greys |
 | see the guide layers (`ref: true`: guide rows, a skeleton) over the art | `pxl shot art.px.js meadow --ref` |
 | compare two versions | `pxl shot art.px.js slime slime_old`, or `--vs HEAD --diff` against your last commit |
@@ -205,6 +206,10 @@ each piece as a strip. `--no-out` prints the text only.
 - [environment.md](../environment.md): grass, trees, bushes, rocks, walls and paths as games draw
   them, with a kit to start from (`examples/nature/kit.px.js`).
 - [lighting.md](../lighting.md): lamps, light blocked by walls, normal maps, glow.
+- Effects as shaders do them (a dissolve, an aura, wind, energy), particles, trails and spells:
+  `pxl help effects` and `pxl help abilities`, then [`spells.px.js`](../examples/spells.px.js),
+  [`spell_variants.px.js`](../examples/spell_variants.px.js) and
+  [`hd2d/clearing.px.js`](../examples/hd2d/clearing.px.js).
 - [rotation.md](../rotation.md): turning sprites by any angle, 8 or 16 directions.
 - [`examples/`](../examples): finished files to copy the structure of. Start with `basics.px.js`;
   for a game, `platformer.px.js` and `topdown.px.js` (tilesets laid out as levels) and
@@ -228,6 +233,7 @@ completion.
   pixels to an art pixel; it happens on blurred copies). Give the size: `pxl study ref.png --px 16`.
 - **A plane judders, or a warning says it does.** Give `scroll()` a `per` that moves it a whole
   number of px a frame; the warning names one.
-- **A preview GIF is many MB.** Build with `--every 3`; the GIFs in `out/` keep every frame.
+- **A preview GIF is many MB.** Build with `--every 3` (the GIFs in `out/` keep every frame), or
+  look first with `pxl shot art.px.js scene --gif --every 3`, which builds only those frames.
 - **Running an example filled the repository with `out/` folders.** Commands write next to the art
   file; pass `--out <some scratch folder>`. `out/` is ignored by git.

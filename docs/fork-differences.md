@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**350 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**351 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -272,7 +272,7 @@ Every change was made by Claude while drawing real scenes, and reviewed by a per
   the outline push for subpixel motion, the line, palette and cluster readings in study, a pixel-perfect
   `wire()` (study found its doubled steps) and the lessons on lines, anti-aliasing, timing an action,
   very low resolution and one-shot effects in the guides.
-- **Docs checked against the code:** four full reviews of the written skill, every tool and option
+- **Docs checked against the code:** five full reviews of the written skill, every tool and option
   tried, with fixes where the docs and the code disagreed.
 - **Calibration against the source:** for `pxl study`, the gallery scenes' own code is the ground truth
   ([above](#calibration)).

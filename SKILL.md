@@ -35,10 +35,12 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
 2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
    `out/_shot/<name>.png` (read it). Its text says what changed since your last shot of it (pixels
    and where, so an edit that did nothing shows) and the warnings `check` finds on it.
-   `--frames 0,12,30` (or `0-17`, `all`) puts frames side by side, `--grey` adds the same in values only (the squint test), `--ref` draws its guide layers over it, `--at x,y,w,h` enlarges a part
+   `--frames 0,12,30` (or `0-17`, `all`) puts frames side by side (in rows when too wide: a contact
+   sheet of a big scene's key frames), `--grey` adds the same in values only (the squint test), `--ref` draws its guide layers over it, `--at x,y,w,h` enlarges a part
    (again for another part, a column each); more names (another file's as `other.px.js:name`, any
    PNG at 1×, a reference GIF or video) make a row each, to compare; `--gif` plays them side by
-   side instead (a walk in 8 directions, two versions moving). Exact pixels:
+   side instead (a walk in 8 directions, two versions moving; `--every 3` builds one frame in three:
+   a long scene's preview, its size in MB). Exact pixels:
    `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an image). Scenes:
    `PXL describe art.px.js <scene>` (`--brief` when busy) gives each object's
    position, gaps, cover, contrast and motion as text: answer layout questions from it, not by
@@ -57,7 +59,7 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    keeps one frame in three. A build that has grown slow: `--profile` names the functions where
    the time went, in your file and in pxl.
 5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
-   rig of the file and every frame of an animated scene (one in 8 with `check: { every: 8 }` on a long
+   rig of the file and every frame of an animated scene (one in N with `check: { every: N }` on a long
    story's; a picture made as an `anim()` gets none of those): warnings only, with the frames they happen at. Fix each or say why it's meant. It also
    lists, as LOOK lines that don't fail it, the L-corners and jaggies in the 1 px lines of every
    sprite and part drawn by hand, and tones side by side too close to tell apart (`PXL shot` rings
@@ -128,7 +130,7 @@ task needs before starting:
 | a scene, level, building or environment | `PXL help "scenes 1 3 11 14"` (layout, texture, shadows and light, checking); then what it needs: 2 ground and tiles, 4 trees, 5 water, 6 distance, 7 true perspective and HD-2D dioramas, 8-10 loops and parallax, 12 effects; for a game, 15 its screen and 16 its projections (top-down 3/4, isometric); for its grass, trees, bushes, rocks, walls and paths, `PXL help "environment 1"` and the section of each (2-9), starting from `examples/nature/kit.px.js` |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2.5k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
-| an effect a shader would do (a dissolve, an aura, a plant in the wind, a tint), a spell, smoke | `PXL help spell` (an element at a tier in one call; `PXL help "designing an element"` for one of your own), `PXL help effect`, `PXL help ability`, `PXL help smoke`; `PXL help "scenes 12"` for effects' timing and numbers, `PXL help "scenes 7"` for light, holes and see-through things in a diorama |
+| an effect a shader would do (a dissolve, an aura, a plant in the wind, a tint, energy), particles, a trail, smoke, a spell | `PXL help effects` (the kinds; `fx` on one copy), `PXL help abilities` (phases, `emitter`, `particles`, `trail`, sockets, `spell`, `cast`), `PXL help smoke`; `PXL help "designing an element"` for an element of your own; `PXL help "scenes 12"` for effects' timing and numbers, `PXL help "scenes 7"` for light, holes and see-through things in a diorama |
 
 An example, or your own file after many edits: `PXL list <file>` maps it (each asset definition and
 function with its line range and the comment above it, what a loop makes on one line; a file meant
@@ -191,13 +193,18 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
   person to keep editing in Aseprite, `build --share 4` for clean enlarged PNGs and GIFs to post.
 - **Light**: `shade:`/`light:` layers and `cast` shadows, `relight`/`plate()` for a part lit on its
   own edges, `glow`, `lighting()` (lighting.md).
+- **Effects and spells**: `effect(kind, opts)` on what is drawn so far (`dissolve`, `pixelate`,
+  `dither`, `tint`, `distort`, `emit` (it gives light), `aura`, `sway`, `energy`), on one copy by a
+  placement's `fx`; `smoke()`; `emitter()` drawn by `particles()`, `trail()`, timed by `ability()`,
+  from a hand's socket (`c.setSocket`, `c.socket`, `c.meshSocket`); a whole cast,
+  `cast(spell("fire", 3, { from, to, view?, variant? }))`, in a `mesh()`'s depth after it.
 - **Text**: `text()` in the 3×5 built in, or `include("<skill dir>/examples/fonts/font5x7.px.js")`
   for `{ font: "5x7" }` (lowercase too) or `"5x7 mono"` (a score, a timer); `fonts/font_demo.px.js` uses them.
 - **In meters**: `perspective()` (one, two or three points: `yaw`, `pitch`), `plane()` for flat ground,
   `terrain()` for hills and mountains, `solids()`/`shadows()` for things built of `solid` shapes,
   `mesh()` for faces in meters from `model()` (what you are inside of or that wraps round itself; an
   HD-2D diorama: textured boxes, sprites standing in them, `sun`, `lamps`; a material's `block: 4`
-  draws its faces in blocks of a sprite's pixel in an HD picture), then `post()` in the same body for depth of field, haze, bloom; `capsule` for a limb painted round, `flame` for fire
+  draws its faces in blocks of a sprite's pixel in an HD picture), then `post()` in the same body for depth of field, haze, bloom, a `lut` grade, `grain`, the `palette` back (`PXL help post`); `capsule` for a limb painted round, `flame` for fire
   (`PXL help "scenes 7"`); procedural texture with `hash`, `vnoise`, `fbm`, `bayer`, `seamless`
   (`PXL help vnoise`).
 
@@ -239,6 +246,7 @@ Finished art files in `examples/` (this skill's directory). Copy the structure o
 | `hd2d/graveyard.px.js` | an HD-2D graveyard on a hill, drawn after the games' sheets (`pxl study`): grass of blades laid a texel to a pixel, flagstones, a mossy rampart, headstones and rocks as sprites at the scene's scale, festooned pines; a fence whose clear texels are holes (`anchor: "face"`), a low sun behind, mist; a story on one clock: the traveler comes in, kneels to lay a rose and talks with a mourner in parchment dialogue boxes, `check: { every: 8 }` |
 | `hd2d/harbor.px.js` | an HD-2D harbor after Octopath Traveler II, its camera matched by measuring the reference: a galleon lofted in meters, castles, balusters, lanterns, sails sewn of panels toned by the sun through them, bobbing at a pier of two levels with a diagonal ramp; wood laid whole at the sprites' scale; water with glints, bokeh and the hull's reflection; rowboats, a crane, gulls, a crew at work; Alden's passage aboard with a dialogue; a `camera()` that runs an excerpt of the story for the gallery |
 | `hd2d/crew.px.js` | the traveler's skeleton dressed per person: five heads drawn per view within a pixel of his skull (a bandana and a ponytail, bald and bearded, a flat cap, a braid, grey hair tied back), outfits swept round the body (a striped shirt, a vest, a leather apron, a long coat, a bodice and a long skirt), a crate carried low painted into the figure's depth, and its blocks |
+| `spells.px.js`, `spell_variants.px.js` | the spell kit: nine elements at three tiers on one clock (`spell()`, `cast()`); their variants (icebergs, boulders, quakes, meteors as lit volumes) and the same spell seen from the side, above, in iso and through a camera, cast from the traveler's hand |
 | `hd2d/clearing.px.js` | every shader at once, on a 5 s clock: a dusk clearing whose wood and grass sway in one wind (`effect("sway")`, a gust by `delay`); the traveler's cast pose, his hand a socket (`c.setSocket`, `c.meshSocket`); a fireball of `effect("energy")` with an `effect("aura")` round him, on an `ability()`'s phases, lighting the ground as it flies, hidden behind a wall; the scarecrow catching fire and burning away (the dissolve's `"burn"` look with flames, on that copy alone: `fx`), `smoke()` rising, `emitter()` sparks; `post()` with Three's bloom, a `.cube` LUT and a still grain |
 | `hd2d/plaza.px.js` | an HD-2D diorama: a camera high up through a long lens, boxes in meters tiled with pixel-art textures by `mesh()`, the topdown hero, pines and lamps standing among them in one depth (`sprites`, on contact shadows); a late sun, sky and lamps with the sun's shadows (`sun`, `lamps`, `emit`, sprites lit through `bump("hybrid")`); the same at 1920x1080 (`pixel: 4`) with `post()`: depth of field, haze, bloom, vignette; the camera, blocks and textures it shares with the graveyard in `kit.px.js` |
 | `fonts/font5x7.px.js` | a 5×7 font for titles: `include` it, `text(..., { font: "5x7" })` |
