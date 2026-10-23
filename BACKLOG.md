@@ -505,6 +505,8 @@ one), and the art code itself (4% of the cost).
     cars apart where they overlap.
   - Not done: a light as a few basis images times a curve (NMF, Oya et al. 2020): where scenes light
     themselves the light is already 71-99% right, and the misses are clouds and backlit people.
+  - Left as it is this round (the curator's sweep): no quick idea left for these that the tries above
+    don't cover; each needs captures cut from the frame difference or the cars told apart, not a tweak.
   - Tried next (one idea, time-boxed): a run of light whose pixels change in step with the whole run,
     not only with their neighbors (a lamp lights all of it at once; a soft cloud drifting reaches its
     far side frames after its near one): each pixel's curve against the run's mean, kept at 0.4 and up.
@@ -718,6 +720,11 @@ Saint11's, read from his page, and not kept in the repository):
   What it needs: the body followed by its float, each of its own pixels compared over the frames as
   different things pass behind it (the change in it against the change behind gives the share), and
   added light told from a glow by its silhouette moving, not its brightness.
+- [ ] **The harbor read as tilted ~31° where its camera is 22°** (`pxl study` on the HD-2D fixtures; the
+  graveyard reads 39° for 38°). Tried once: the point above the picture with the most lines instead of
+  the one nearest the middle column: the same point (the only one with four lines or more), no change.
+  What it needs: the lines along the ground (planks, the pier's edges) weighed over the awnings' and
+  the ship's slopes, which meet higher.
   Measured since, and not enough alone: (1) edges behind kept through the body while it moves: 1% of
   the changing side-by-side pairs in both ghosts, as in opaque movers (0-4%): a ghost floating a pixel
   or two changes only at its edges, its middle stays, behind and its own drawing alike; (2) each
@@ -835,58 +842,84 @@ WebP read frame by frame, one cycle of a loop in place read as such.
   to the palette), `tint`, `distort` (UV distortion off noise, looping), `emit`. Each a pure function
   of the pixels, its options, a seed and the clock; on the CPU, the canonical implementation. Written
   anew from what each does, no code copied.
-- [ ] **A GPU executor for the effects** (WebGL2, the plan's phase 2): deferred. WebGL exists only in
-  the browser and a GPU in Node needs native dependencies, while pxl renders in Node with none; a
-  simple effect on a sprite costs less on the CPU than a texture's round trip. The contract keeps the
-  door open: RGBA of a fixed size in and out, alpha straight, options as uniforms (numbers, colors,
-  keys), the clock and seed passed in, nothing kept between frames; noise is a function of (x, y,
-  seed), so a shader can compute the same field. Worth it only for a measured slow pass (a bloom at
-  1920x1080, many effects on a long scene), with a CPU/GPU comparison test per effect.
 - [x] **The emission mask travels** (done with mesh() materials, below): `emit` brightened its pixels, and nothing marked them as shining after. For
   `mesh()` (sprites that shine and aren't darkened by the sun), `lighting()` and a bloom fed by it,
-  the mask has to move with the pixels as normals do (stamp, flip, rot, crop, outline).
+  the mask has to move with the pixels as normals do (stamp, flip, rot, crop, outline); since the
+  sweep below, through free `angle` turns too (shear's pixels carry it, RotSprite's samples take the
+  mark of the nearest source pixel of their color).
 - [x] **Vegetation in the wind, for flat sprites**: `effect("sway")`, rows moved by their height over
   the base (warp's whole pixels, the normals along), a lean downwind and a to-and-fro on the loop;
   each copy its own phase and reach by `reseed`, a gust across the scene by `delay`, and the same in
   `mesh()` (its sprites take `delay`, `rdelay`, `seed`, `reseed`), whose shadows, cut from the swayed
   picture, sway with them. Normals move with their pixels, not turned (a lean of 2 px over 68 is
-  under 2 degrees). Left: a painted mask of what moves (by height covers the kit's plants), and
-  grass bent by a passer-by as an option rather than a recipe (an anim of bends and `frame`).
-- [ ] **post() finishing** (Three's and Babylon's, written anew): `bloom: { levels }` for Three's
+  under 2 degrees). Grass parted by a passer-by is an option now, not a recipe: `push` (the column
+  where something passes through), `reach`, `bend`: the stems near it carried away from it, by their
+  height, their feet where they were.
+- [x] **post() finishing** (Three's and Babylon's, written anew): `bloom: { levels }` for Three's
   bloom beside pxl's (they differ in use: a halo round small lights, a glow over bright surfaces),
-  `lut` from a .cube file, `grain` seeded by the frame in blocks of `pixel`, `sharpen`, and `palette`
-  to take the picture back to the palette. Left: a sparse first blur for Three's bloom (0.9 s a frame
-  at 1920x1080), a LUT strip image (Babylon's 256x16 PNG) beside .cube.
-- [ ] **mesh() materials and transparency**: `effect("emit")` marks the pixels that give light and the
+  `lut` from a .cube file or a LUT strip PNG (Unreal's and Babylon's 256x16), `grain` seeded by the
+  frame in blocks of `pixel`, `sharpen`, and `palette` to take the picture back to the palette. The
+  blur sums only near what isn't 0 (rows and columns of nothing skipped, the same result to the bit):
+  post() with Three's bloom at 1920x1080 went from 0.5-0.7 s a frame to 0.26-0.4 s (960x540:
+  0.13-0.16 to 0.07-0.13; the blur itself from 1.3 s to 0.36 s over eight frames); the rest is the
+  trip to linear light and back.
+- [x] **mesh() materials and transparency**: `effect("emit")` marks the pixels that give light and the
   mark travels with them (as normals do); `mesh()` draws them as they are and lights what is round
-  them (a lamp at their middle per sprite, `light: { r, strength }`), `lighting()` leaves them lit,
-  `post()`'s bloom takes them. `dissolve` on a material eats its faces with holes that show what is
-  behind and let the sun through (a dissolving sprite already did). `blend` on a sprite (alpha, add,
-  screen, `opacity`): laid over what is behind by its alpha, after everything solid, farthest first,
-  hidden by what is in front, no shadow (scenes 7). Left: a faint shadow by alpha (the sun's map
-  holds one depth, no opacity), the emitting pixels' light in plain lighting() (a lamp() does it),
-  several lamps for one sprite's separate glowing parts, the mark through free `angle` rotations.
-- [ ] **Auras, smoke shapes, dissolve patterns**: `effect("aura")` grows the silhouette into a glow
+  them (a lamp at their middle per sprite, `light: { r, strength }`; `each: true` a lamp for each
+  part glowing apart, two lanterns on a beam), `lighting()` leaves them lit, `post()`'s bloom takes
+  them. `dissolve` on a material eats its faces with holes that show what is behind and let the sun
+  through. `blend` on a sprite (alpha, add, screen, `opacity`): laid over what is behind by its
+  alpha, after everything solid, farthest first, hidden by what is in front, no shadow (scenes 7);
+  an "alpha" one a faint one with `veil` (a second map of the sun's: the share its pixels hold back).
+- [x] **Auras, smoke shapes, dissolve patterns**: `effect("aura")` grows the silhouette into a glow
   of 2-3 tones, flickering, marked as light, hugging every pose of an anim; `smoke()` draws a column
   on a path, a puff, a bank or a ring of lit billows in three opacities (dithered in the palette over
   what is drawn); the dissolve's `pattern` (sweeps, radial, scatter, scan, a painted mask) on sprites
   and on mesh faces. A variant of an anim timed by its frame()s now keeps their pace (it took 8 fps).
-- [ ] **Abilities**: `ability()` (phases in time, events, a point along the way), `emitter()` (seeded
+- [x] **Abilities**: `ability()` (phases in time, events, a point along the way), `emitter()` (seeded
   particles in closed form, bursts, loops that close), `particles()` and `trail()` drawn on the clock,
   `effect("energy")`, a placement's `fx` (effects on one copy, on stamps and mesh() sprites),
-  `c.socket()` and `c.meshSocket()` for a spell's start at a hand. Left: a cast pose for the traveler
-  (blocks first), a trail as a ribbon in mesh() (today a few sprites at past moments).
-- [ ] **A spell kit**: `spell(element, tier, { from, to })` on the abilities' pieces, drawn by `cast()`;
+  `c.socket()` and `c.meshSocket()` for a spell's start at a hand; the traveler's cast pose (blocks
+  first, `examples/hd2d/clearing.px.js`).
+- [x] **A spell kit**: `spell(element, tier, { from, to })` on the abilities' pieces, drawn by `cast()`;
   nine elements as recipes (ramp, noise, particles, motion, impact, centerpiece, mark), three tiers
   (size, particles, time, light, glow, shake; a shockwave from 2, a centerpiece, flash and mark at
   3); a guide to designing an element (scenes 12); the sheet in `examples/spells.px.js`. Variants
   and forms (solids by the volume method in src/core/volumes.ts: rising, falling, cracking, breaking
   up; quakes, slides, novas, blizzards, waves, chains, blades, rain, grasping shadows, leaves) and
-  views (side, top, iso, a perspective() camera), `examples/spell_variants.px.js`. Left: a cast
-  inside `mesh()`'s depth (a spell through a camera draws over the diorama, not between its things),
-  the shake for a whole scene from a cast in one cell of it, pieces that collide with each other.
-- [ ] **Dissolve looks**: `look` (neutral by default, burn, acid, magic, frost), the edge's keys over
+  views (side, top, iso, a perspective() camera), `examples/spell_variants.px.js`. Since: a cast
+  after a `mesh()` through the spell's own camera is drawn in its depth (what is nearer the eye stays
+  in front: the ball behind a wall), `S.lamps(t)` light the diorama through `mesh()`'s `lamps`, and
+  `cast(S, { shake: false })` with `shake(S)` shakes a whole scene from a cast in one cell of it.
+- [x] **Dissolve looks**: `look` (neutral by default, burn, acid, magic, frost), the edge's keys over
   the progress, a char band ahead of the edge, glow, seeded debris (ash, drips, frost, sparks) aged by
-  the progress; on sprites and on mesh faces (no debris on faces: a face's pieces would need the
-  world's particles).
+  the progress; on sprites and on mesh faces (no debris on faces: below).
 
+What the phases left, each waiting for a reason:
+
+- [ ] **A GPU executor for the effects** (WebGL2, the plan's phase 2): deferred. WebGL exists only in
+  the browser and a GPU in Node needs native dependencies, while pxl renders in Node with none; a
+  simple effect on a sprite costs less on the CPU than a texture's round trip. The contract keeps the
+  door open: RGBA of a fixed size in and out, alpha straight, options as uniforms (numbers, colors,
+  keys), the clock and seed passed in, nothing kept between frames; noise is a function of (x, y,
+  seed), so a shader can compute the same field. Measured on the curator's laptop (a 4-core i5 at
+  1 GHz): post() with Three's bloom at 1920x1080 is 0.26-0.4 s a frame since the sparse blur, and the
+  HD-2D scenes' frames are spent in mesh()'s rasterizer, not in effects (harbor's check: mesh() a
+  third of it and more, effects none). Worth it only for a measured slow pass (a long
+  HD run's bloom, many effects on a long scene), with a CPU/GPU comparison test per effect.
+- [ ] **A cast's depth part by part**: `cast()` in `mesh()`'s depth takes one depth for all of the
+  spell, its head's (nearer by its size). A beam reaching toward the eye, or a mark on the ground half
+  behind a wall, would need a depth for each primitive it draws (its points are in the world, so the
+  view could hand one out): when a scene shows the one depth wrong.
+- [ ] **Pieces that collide with each other** (a spell's shards, a boulder breaking up): waits. The
+  pieces fly on closed-form paths, so any frame is drawn alone; colliding needs a stepped simulation
+  replayed from the start to each frame (seeded and deterministic, seekable at O(frames) a frame) and
+  each piece's shape as a body. Worth it when a cast reads wrong without it.
+- [ ] **Debris on dissolving mesh faces**: waits. The burning edge is found pixel by pixel in the
+  rasterizer; debris needs its points in meters handed back and an emitter per face, its particles
+  then sprites in the depth. Today a dissolving sprite's own debris, or a cast's sparks, stand in.
+- [ ] **A trail as a ribbon in mesh()**: waits. Faces in mesh() are opaque and a ribbon is see-through
+  (blended faces, or a strip drawn as a cast is now, at one depth). Today a few sprites at past moments.
+- [ ] **A painted sway mask** (what moves, painted, instead of by height): only when a case needs it;
+  by height covers the kit's plants.
+- [ ] **The emitting pixels' light in plain lighting()**: a `lamp()` at the glow does it today.

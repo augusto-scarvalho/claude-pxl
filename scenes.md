@@ -289,7 +289,8 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   over what is behind by its alpha (lit like the rest), `"add"` or `"screen"` for light; drawn after
   everything solid, the farthest first, hidden by what stands in front of it, hiding nothing. The
   policy: a blended sprite throws no shadow, sun or contact (smoke and light don't; what should is
-  drawn solid), and doesn't light anything unless it has `emit` on it. Draw smoke in 2-3 alpha levels
+  drawn solid; thick smoke a faint one, `veil: 0.3`), and doesn't light anything unless it has `emit`
+  on it (two lanterns on one sprite: `light: { each: true }`, a lamp for each). Draw smoke in 2-3 alpha levels
   in clusters, as its tones would be (50%, 70%, 85%), not as a smooth fade.
 - Matching a reference's camera (the harbor, after an Octopath Traveler II screenshot): measure it.
   The tilt from foreshortening: a floor's plank width across against along (the sine of the pitch), a
@@ -327,7 +328,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   parchment with cut corners, fibers, darker toward its edges, a light line inside a thin brown
   outline, the name over a rule from a small diamond, the words in a 5x7 font, a short tail to the
   speaker, a mark that more is coming, bobbing a pixel and blinking off as a game's prompt waiting
-  for a button does; drawn after `post()`, so it stays sharp, in pixels finer than the art's. A loop that long checked one frame in eight: `check: { every: 8 }`.
+  for a button does; drawn after `post()`, so it stays sharp, in pixels finer than the art's. A loop that long checked one frame in 24: `check: { every: 24 }` (no rule runs on it but the frames building: fewer keep the tests fast).
 - The ground and what grows and lies on it (grass, trees, bushes, rocks, walls, paths, tufts,
   flowers), as 16-bit games draw them: the environment guide (`pxl help "environment"`, by section)
   and its kit, `examples/nature/kit.px.js`, to include.

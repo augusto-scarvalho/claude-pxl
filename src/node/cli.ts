@@ -71,10 +71,11 @@ const USAGE = `pxl — pixel-art DSL
       (a line whose steps are nearly all L's is drawn square on purpose: none), and tones side by side
       too close to tell apart. --readings also lists what the lit-side rule read on every placement,
       warning or not, with a tally: to see where it agrees and where it can't tell.
-  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif] [--out DIR]
+  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--out DIR]
   pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
-      to the region, side by side, enlarged, written to <out>/_shot/<name>.png. --vs puts the same
+      to the region, side by side (in rows when too wide for one: a contact sheet), enlarged,
+      written to <out>/_shot/<name>.png. --vs puts the same
       shot of another version above it (at a git revision, the file and what it includes as they
       were there); --diff adds a row with the pixels that changed in red; --grey adds it all again in
       values only (each pixel's lightness), to see the planes read before the color; --ref draws
@@ -87,7 +88,8 @@ const USAGE = `pxl — pixel-art DSL
       a big one.
       Give PNGs at 1x (out/scenes/x.png): rows are enlarged together.
       --gif plays them instead, side by side (8 to a row), each its own loop on one clock, to
-      <out>/_shot/<names>.gif: a walk in 8 directions, two versions of a scene moving.
+      <out>/_shot/<names>.gif: a walk in 8 directions, two versions of a scene moving; --every N
+      builds and plays one frame in N (a long scene's preview before a build, its size printed).
   pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
@@ -471,8 +473,9 @@ export async function main(argv: string[]): Promise<number> {
           if (a.vs) throw new PxError("shot --gif plays things side by side: --vs isn't for it (shoot the two versions as other.px.js:name)");
           const clips = shots.map((s) => {
             if ("png" in s) { const m = readMedia(s.png!); return { imgs: m.frames, ms: m.ms }; }
-            const p = proj(s.file), n = frameCount(p, s.name), tl = p.timeline(s.name), t = Array.from({ length: n }, (_, f) => frameTime(p, s.name, f));
-            return { imgs: t.map((_, f) => shotFrame(p, s.name, f, a.ref)), ms: t.map((v, f) => (f + 1 < n ? t[f + 1] : (tl?.loop ?? 1000)) - v) };
+            // --every N: one frame in N built and shown, lasting until the next (a long loop's preview)
+            const p = proj(s.file), n = frameCount(p, s.name), tl = p.timeline(s.name), k = Math.max(1, Math.floor(a.every ?? 1)), keep = Array.from({ length: Math.ceil(n / k) }, (_, i) => i * k), t = keep.map((f) => frameTime(p, s.name, f));
+            return { imgs: keep.map((f) => shotFrame(p, s.name, f, a.ref)), ms: t.map((v, i) => (i + 1 < keep.length ? t[i + 1] : (tl?.loop ?? 1000)) - v) };
           });
           const loops = clips.map((c) => c.ms.reduce((x, y) => x + y, 0)), T = Math.max(...loops);
           const cuts = [...new Set(clips.flatMap((c, i) => { const out: number[] = []; for (let s = 0; s < T; s += loops[i]) { let t = s; for (const m of c.ms) { if (t < T) out.push(t); t += m; } } return out; }))].sort((x, y) => x - y);
@@ -481,8 +484,9 @@ export async function main(argv: string[]): Promise<number> {
           const k = a.scale ?? Math.max(1, Math.min(8, Math.floor(1024 / Math.max(sheets[0].w, sheets[0].h))));
           const path = join(outDir, "_shot", shots.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".gif");
           mkdirSync(dirname(path), { recursive: true });
-          writeFileSync(path, encodeGif(sheets.map((img, i) => ({ img: img.scale(k), ms: (cuts[i + 1] ?? T) - cuts[i] }))));
-          console.log(`-> ${path} (${cuts.length} frames, a loop of ${T} ms${new Set(loops).size > 1 ? `: ${loops.join(", ")} ms each, the shorter starting over` : ""}; across: ${shots.map((s) => s.name).join(", ")}; ${k}x)`);
+          const gif = encodeGif(sheets.map((img, i) => ({ img: img.scale(k), ms: (cuts[i + 1] ?? T) - cuts[i] })));
+          writeFileSync(path, gif);
+          console.log(`-> ${path} (${(gif.length / 1e6).toFixed(1)} MB, ${cuts.length} frames, a loop of ${T} ms${new Set(loops).size > 1 ? `: ${loops.join(", ")} ms each, the shorter starting over` : ""}; across: ${shots.map((s) => s.name).join(", ")}; ${k}x)`);
           return 0;
         }
         // several things, or several regions: a row each, one under the other, a column per region

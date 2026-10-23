@@ -26,9 +26,19 @@ export function frameTime(p: Project, name: string, n: number): number {
 
 const GAP = 2, GAP_C = 0x1b1b22ff, EMPTY = 0x4a4a55ff;
 
-/** The frames side by side (gaps between), cropped to `at`; transparent shows as a flat gray. */
+/**
+ * Frames to a row: all of them when they fit the 1568 px a model is shown at 1x, else rows as even as
+ * can be within it (a contact sheet of a big scene's key frames).
+ */
+export function perRow(n: number, w: number): number {
+  const fit = Math.max(1, Math.floor((1568 + GAP) / (w + GAP)));
+  return n <= fit ? n : Math.ceil(n / Math.ceil(n / fit));
+}
+
+/** The frames side by side (gaps between), in rows when they are too wide for one, cropped to `at`; transparent shows as a flat gray. */
 export function shotRow(p: Project, name: string, frames: number[], at?: number[], ref = false): Img {
-  return cellRow(frames.map((f) => shotFrame(p, name, f, ref)), [at]);
+  const imgs = frames.map((f) => shotFrame(p, name, f, ref)), cols = perRow(imgs.length, at?.[2] ?? imgs[0].w);
+  return stack(Array.from({ length: Math.ceil(imgs.length / cols) }, (_, r) => cellRow(imgs.slice(r * cols, (r + 1) * cols), [at])));
 }
 
 /** Frame f of an asset as shot shows it: with its `ref: true` layers over it (guide rows, a skeleton) when asked. */
@@ -75,11 +85,13 @@ export function diffRow(was: Img, now: Img): { img: Img; changed: number } {
  */
 export function shotChanges(was: Img, now: Img, frames: number[], at?: number[]): string {
   if (was.w !== now.w || was.h !== now.h) return `size ${was.w}x${was.h} -> ${now.w}x${now.h}`;
-  const w = (now.w + GAP) / frames.length - GAP, [ox, oy] = at ?? [0, 0];
+  // the frames' grid as shotRow laid it out: the most to a row whose cells' width fits
+  const N = frames.length, cols = Array.from({ length: N }, (_, i) => N - i).find((c) => { const w = (now.w + GAP) / c - GAP; return Number.isInteger(w) && perRow(N, w) === c; }) ?? N;
+  const rows = Math.ceil(N / cols), w = (now.w + GAP) / cols - GAP, h = (now.h + GAP) / rows - GAP, [ox, oy] = at ?? [0, 0];
   return frames.map((f, i) => {
     let n = 0, x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
-    for (let y = 0; y < now.h; y++) for (let x = 0; x < w; x++) {
-      const k = y * now.w + i * (w + GAP) + x;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const k = (Math.floor(i / cols) * (h + GAP) + y) * now.w + (i % cols) * (w + GAP) + x;
       if (was.data[k] === now.data[k]) continue;
       n++;
       x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);

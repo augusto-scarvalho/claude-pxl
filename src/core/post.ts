@@ -41,7 +41,7 @@ export interface PostOpts {
   pixel?: number;
   /** each pixel stepped away from its four neighbours a pixel off (a block off), by this much of the difference (0 none, 0.2-0.3 a little) */
   sharpen?: number;
-  /** a grade: a 3D LUT (the DSL reads `"dusk.cube"` into one), at `amount` (0..1, default 1) */
+  /** a grade: a 3D LUT (the DSL reads `"dusk.cube"`, or a 256x16 strip `"dusk.png"`, into one), at `amount` (0..1, default 1) */
   lut?: Lut | { cube: Lut; amount?: number };
   /** film grain in blocks of `pixel`, new each frame (`animated: false`: the same in every frame), most in the middle tones: up to `amount` of full scale (0..1) */
   grain?: number | { amount?: number; seed?: number; animated?: boolean };
@@ -71,6 +71,18 @@ export function readCube(text: string, name = "LUT"): Lut {
   // a domain other than 0..1 is brought to it, so the lookup reads every color the same way
   const data = Float32Array.from(vals, (v, i) => (v - lo[i % 3]) / (hi[i % 3] - lo[i % 3]));
   return { size, data };
+}
+
+/** A LUT strip image (Unreal's and Babylon's 256x16 PNG): n tiles of n x n side by side, red across a tile, green down it, blue tile by tile. */
+export function readStrip(img: Img, name = "LUT"): Lut {
+  const n = img.h;
+  if (n < 2 || img.w !== n * n) throw new PxError(`${name}: a LUT strip is n tiles of n x n side by side (256x16, 1024x32), got ${img.w}x${img.h}`);
+  const data = new Float32Array(3 * n ** 3);
+  for (let b = 0; b < n; b++) for (let g = 0; g < n; g++) for (let r = 0; r < n; r++) {
+    const c = img.data[g * img.w + b * n + r], i = 3 * (r + n * (g + n * b));
+    data[i] = (c >>> 24) / 255; data[i + 1] = ((c >>> 16) & 255) / 255; data[i + 2] = ((c >>> 8) & 255) / 255;
+  }
+  return { size: n, data };
 }
 
 /** The last vignette's factor per pixel: an animation's frames share one. */
@@ -228,8 +240,8 @@ export function applyPost(img: Img, o: PostOpts, fogColor: Color | null, pal?: P
       const Y = 0.2126 * R[i] + 0.7152 * G[i] + 0.0722 * B[i], t = clamp01((Y - aL) / knee), k = Math.max(t * t * (3 - 2 * t), (E?.[i] ?? 0) / 255);
       if (k) { bright[0][i] = R[i] * k; bright[1][i] = G[i] * k; bright[2][i] = B[i] * k; any = true; }
     }
-    // ponytail: dense separable blurs from half size, about 0.3 s a frame at 960x540 and 0.9 s at
-    // 1920x1080; a sparse first pass (few pixels are bright) if long HD runs need it faster
+    // separable blurs from half size, each summing only near what is bright (blur() is sparse): post()
+    // with it about 0.07-0.13 s a frame at 960x540 and 0.26-0.4 s at 1920x1080 (0.13-0.16 and 0.5-0.7 dense)
     if (any) {
       // (the weights brought to sum to 2, as the two sizes of the other bloom do, so a strength adds as much light)
       const wt = Array.from({ length: levels }, (_, l) => { const fl = Math.max(0.2, 1 - 0.2 * l); return fl + (1.2 - 2 * fl) * spread; }), sum = wt.reduce((a, b) => a + b, 0);
@@ -304,7 +316,7 @@ export function applyPost(img: Img, o: PostOpts, fogColor: Color | null, pal?: P
   if (o.sharpen !== undefined && !num(o.sharpen, 0, 4)) throw new PxError(`post: sharpen is how far each pixel steps from its neighbours, 0 to 4, got ${JSON.stringify(o.sharpen)}`);
   const lut = o.lut === undefined ? undefined : "cube" in o.lut ? o.lut : { cube: o.lut, amount: 1 }, la = lut?.amount ?? 1;
   if (lut && !(lut.cube && Number.isInteger(lut.cube.size) && lut.cube.data instanceof Float32Array && num(la, 0, 1)))
-    throw new PxError('post: lut is a .cube file ("dusk.cube"), or { cube: "dusk.cube", amount (0..1) }');
+    throw new PxError('post: lut is a .cube file ("dusk.cube") or a LUT strip ("dusk.png"), or { cube: "dusk.cube", amount (0..1) }');
   const go = o.grain === undefined ? undefined : typeof o.grain === "number" ? { amount: o.grain } : o.grain, ga = go?.amount ?? 0.05;
   if (go && (!num(ga, 0, 1) || !(go.seed === undefined || Number.isInteger(go.seed)) || !(go.animated === undefined || typeof go.animated === "boolean"))) throw new PxError(`post: grain is an amount (0..1), or { amount, seed, animated }, got ${JSON.stringify(o.grain)}`);
   const data = img.data;

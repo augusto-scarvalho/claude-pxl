@@ -181,6 +181,13 @@ anim("a", { base: "t", frames: 4 }, ${fx})`);
 anim("a", { base: "t", frames: 8 }, effect("sway", { amount: 3, vary: 1 }))
 scene("s", { w: 18, h: 10 }, stamp("a", 4.5, 10, { reseed: true }), stamp("a", 13.5, 10, { reseed: true }))`).frames("s");
   assert.ok(two.some((g) => !same(g.img.sub(0, 0, 9, 10), g.img.sub(9, 0, 9, 10))), "each copy its own way");
+  // push: stems either side of what passes bent away from it, the nearest most, by their height
+  const grass = (o: string) => load(`sprite("t", { w: 13, h: 8, pivot: "bottom" }, ...[0, 2, 4, 8, 10, 12].map((x) => rect(x, 0, 1, 8, "g")))
+anim("a", { base: "t", frames: 2 }, effect("sway", { amount: 0, vary: 0, power: 1${o} }))`).frames("a")[0].img;
+  const tops = (img: Img) => [...Array(13).keys()].filter((x) => img.get(x, 0) !== 0);
+  assert.deepEqual(tops(grass("")), [0, 2, 4, 8, 10, 12], "no push: upright");
+  assert.deepEqual(tops(grass(", push: 6.5, reach: 6, bend: 3")), [0, 1, 2, 10, 11, 12], "the stems at 4 and 8 pushed 2 px out, at 2 and 10 1 px, those at 0 and 12 out of reach");
+  assert.deepEqual(tops(grass(", push: 6.5, reach: 6, bend: 3").sub(0, 7, 13, 1)), [0, 2, 4, 8, 10, 12], "their feet where they were");
 });
 
 test("sway in mesh(): a sprite's shadow on the floor sways with it; a sprite's delay is its own time in the loop", () => {
@@ -198,7 +205,7 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, F.faces, { f: { tex: "_white" } },
   assert.ok(same(load(src(125)).frames("a")[0].img, f[1].img), "delayed a frame: its first frame is the other's second");
 });
 
-test("emit marks the pixels that give light, and the mark travels with them: stamps, flips, outlines, distort; lighting() leaves them lit", () => {
+test("emit marks the pixels that give light, and the mark travels with them: stamps, flips, outlines, distort, any angle; lighting() leaves them lit", () => {
   const src = `sprite("s", { w: 16, h: 12 }, ${BODY}, effect("emit", { on: "r", strength: 1 }))
 sprite("o", { base: "s", outline: "k" })
 anim("d", { base: "s", frames: 2 }, effect("distort", { amount: 2, scale: 2 }))
@@ -214,6 +221,11 @@ scene("dark", { w: 16, h: 12, bg: "g" }, stamp("s", 0, 0), lighting({ ambient: 0
   assert.equal(e(p.image("o"), 5, 4), 255, "outlined: a px over and down");
   const d = p.frames("d")[0].img;
   assert.ok([...d.data.keys()].every((i) => (d.emit![i] === 255) === (d.data[i] === s.get(4, 3))), "distorted: the mark went with the red pixels");
+  const turned = load(src + `\nsprite("t", { base: "s", angle: 30 })\nsprite("t2", { base: "s", angle: 10 })`);
+  for (const n of ["t", "t2"]) {
+    const t = turned.image(n), red = s.get(4, 3);
+    assert.ok([...t.data.keys()].every((i) => (t.emit?.[i] === 255) === (t.data[i] === red)), `turned by ${n === "t" ? "rotsprite" : "shear"}: the mark on the red pixels`);
+  }
   const dark = p.image("dark");
   assert.equal(dark.get(4, 3), s.get(4, 3), "lighting(): what gives light as it is");
   assert.notEqual(dark.get(2, 1), s.get(2, 1), "the rest in the dark");

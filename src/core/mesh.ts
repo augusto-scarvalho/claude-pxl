@@ -88,8 +88,14 @@ export interface MeshSprite {
    */
   blend?: "alpha" | "add" | "screen";
   opacity?: number;
-  /** the light its emitting pixels (effect("emit")) give round it, a lamp at their middle: how far (m, default 3), how strong (default 1); false for none */
-  light?: false | { r?: number; strength?: number };
+  /** a blended "alpha" sprite's faint shadow: the share of the sun its pixels hold back, by their alpha (times `opacity`; 0.3 a thin smoke; default 0, none) */
+  veil?: number;
+  /**
+   * the light its emitting pixels (effect("emit")) give round it, a lamp at their middle: how far (m,
+   * default 3), how strong (default 1); `each`: a lamp for each part that glows apart from the others
+   * (two lanterns on a beam), the strength shared by their pixels; false for none
+   */
+  light?: false | { r?: number; strength?: number; each?: boolean };
 }
 export interface MeshOpts {
   /** the way toward the light, in the points' frame, or a function giving a face's light (0 dark, 1 lit) */
@@ -129,7 +135,7 @@ export interface MeshWorld {
   masks?: Record<string, Img>;
   /** a dissolving material's look, its keys resolved: the edge's keys over the progress (or the neutral ring's tone), its char, its glow */
   looks?: Record<string, { over?: Color[][]; neutral?: Color; char?: { width: number; tones: Color[]; amount: number; desat: number }; glow: number }>;
-  sprites: { name: string; img: Img; at: V3; shadow?: number; blend?: MeshSprite["blend"]; opacity?: number; light?: MeshSprite["light"] }[];
+  sprites: { name: string; img: Img; at: V3; shadow?: number; blend?: MeshSprite["blend"]; opacity?: number; veil?: number; light?: MeshSprite["light"] }[];
   step(c: Color, n: number): Color;
   /** the light, its colors resolved (with `sun`) */
   lit?: Lit;
@@ -312,25 +318,45 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
   // a sprite's right, the world's up, and its face (toward the camera, level)
   const yaw = cam.P ? (cam.P.yaw * Math.PI) / 180 : 0, right: V3 = [Math.cos(yaw), -Math.sin(yaw), 0], front: V3 = [-Math.sin(yaw), -Math.cos(yaw), 0];
   // what gives light (effect("emit")) lights what is round it: a lamp at the middle of each sprite's
-  // emitting pixels, in their color, as strong as they shine
+  // emitting pixels (or of each part of them apart from the rest), in their color, as strong as they shine
   if (L && world) {
     const glows: Lamp[] = [];
     world.sprites.forEach((s, k) => {
       const e = s.img.emit, img = s.img;
       if (!e || s.light === false) return;
-      let t = 0, n0 = 0, si = 0, sj = 0, r = 0, g = 0, b = 0;
-      for (let q = 0; q < e.length; q++) {
-        const c = img.data[q];
-        if (!e[q] || (c & 255) === 0) continue;
-        const wq = e[q] / 255;
-        t += wq; n0++; si += wq * (q % img.w); sj += wq * Math.floor(q / img.w);
-        r += wq * LIN[c >>> 24]; g += wq * LIN[(c >>> 16) & 255]; b += wq * LIN[(c >>> 8) & 255];
-      }
-      if (!t) return;
       const o = s.light ?? {}, R = o.r ?? 3, S = o.strength ?? 1;
-      if (!(R > 0) || !(S >= 0)) throw new PxError(`mesh: sprite '${s.name}' has light ${JSON.stringify(s.light)}: false, or { r (m, above 0), strength (0 up) }`);
-      const [px, py] = img.pivot ?? [img.w / 2, img.h], m = K / perM[k], a = (si / t + 0.5 - px) * m, k2 = S / n0;
-      glows.push({ at: [s.at[0] + right[0] * a, s.at[1] + right[1] * a, s.at[2] + (py - sj / t - 0.5) * m], rgb: [r * k2, g * k2, b * k2], r: R });
+      if (!(R > 0) || !(S >= 0)) throw new PxError(`mesh: sprite '${s.name}' has light ${JSON.stringify(s.light)}: false, or { r (m, above 0), strength (0 up), each }`);
+      const on = (q: number) => e[q] > 0 && (img.data[q] & 255) !== 0;
+      // each part: the glowing pixels touching (8 ways), found by a flood; else all of them as one
+      const part = new Int32Array(e.length).fill(-1);
+      let parts = 0;
+      for (let q0 = 0; q0 < e.length; q0++) {
+        if (!on(q0) || part[q0] >= 0) continue;
+        if (!o.each) { part[q0] = 0; parts = 1; continue; }
+        const id = parts++, todo = [q0];
+        part[q0] = id;
+        while (todo.length) {
+          const q = todo.pop()!, x = q % img.w, y = (q - x) / img.w;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const X = x + dx, Y = y + dy, j = Y * img.w + X;
+            if (X >= 0 && Y >= 0 && X < img.w && Y < img.h && part[j] < 0 && on(j)) { part[j] = id; todo.push(j); }
+          }
+        }
+      }
+      if (!parts) return;
+      const acc = Array.from({ length: parts }, () => [0, 0, 0, 0, 0, 0]);
+      let n0 = 0;
+      for (let q = 0; q < e.length; q++) {
+        if (part[q] < 0) continue;
+        const c = img.data[q], wq = e[q] / 255, A = acc[part[q]];
+        n0++; A[0] += wq; A[1] += wq * (q % img.w); A[2] += wq * Math.floor(q / img.w);
+        A[3] += wq * LIN[c >>> 24]; A[4] += wq * LIN[(c >>> 16) & 255]; A[5] += wq * LIN[(c >>> 8) & 255];
+      }
+      const [px, py] = img.pivot ?? [img.w / 2, img.h], m = K / perM[k], k2 = S / n0;
+      for (const [t, si, sj, r, g, b] of acc) {
+        const a = (si / t + 0.5 - px) * m;
+        glows.push({ at: [s.at[0] + right[0] * a, s.at[1] + right[1] * a, s.at[2] + (py - sj / t - 0.5) * m], rgb: [r * k2, g * k2, b * k2], r: R });
+      }
     });
     if (glows.length) L.lamps = [...L.lamps, ...glows];
   }
@@ -357,7 +383,10 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       }
     });
     // (a blended sprite, smoke or light, throws none)
-    world!.sprites.forEach((s, k) => { if (!s.blend) sunMap!.sprite(s.img, s.at, K / perM[k], -2 - k, right); });
+    world!.sprites.forEach((s, k) => {
+      if (!s.blend) sunMap!.sprite(s.img, s.at, K / perM[k], -2 - k, right);
+      else if (s.veil) sunMap!.sprite(s.img, s.at, K / perM[k], -2 - k, right, s.veil * (s.opacity ?? 1));
+    });
   }
   // each face's texture stepped once by its light (the faces of a material in one light share it)
   const lits = new Map<string, Uint32Array>(), litOf: Uint32Array[] = [];
@@ -386,7 +415,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       let col = lit[texel(tk, pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2])];
       if (col !== TRANSPARENT && L) {
         const px = pos[i * 3], py = pos[i * 3 + 1], pz = pos[i * 3 + 2], facing = dot(N, L.dir);
-        col = shine(col, N, px, py, pz, L, facing > 0 && (!sunMap || sunMap.sees(px, py, pz, k, facing)), 0);
+        col = shine(col, N, px, py, pz, L, facing > 0 && (!sunMap || sunMap.sun(px, py, pz, k, facing)), 0);
       }
       return col;
     };
@@ -476,7 +505,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       const col = img.data[q], a = (i + 0.5 - px) * m, X = s.at[0] + right[0] * a, Y = s.at[1] + right[1] * a, U = s.at[2] + (py - j - 0.5) * m;
       const has = nm && nm[q * 3 + 2] > 0, nx = has ? nm![q * 3] / 127 : 0, ny = has ? nm![q * 3 + 1] / 127 : 0, nz = has ? nm![q * 3 + 2] / 127 : 1;
       const N = unit([nx * right[0] + nz * front[0], nx * right[1] + nz * front[1], -ny]), facing = dot(N, L!.dir);
-      return (lit[q] = shine(col, N, X, Y, U, L!, facing > -0.5 && (!sunMap || sunMap.sees(X, Y, U, -2 - k, Math.max(0.2, facing))), 0.5));
+      return (lit[q] = shine(col, N, X, Y, U, L!, facing > -0.5 && (!sunMap || sunMap.sun(X, Y, U, -2 - k, Math.max(0.2, facing))), 0.5));
     };
     for (let j = 0; j < img.h * K; j++) {
       const yi = Y0 + j - y0;

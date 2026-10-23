@@ -84,6 +84,21 @@ function sampled(src: Img, deg: number, big: Img, k: number): Img {
   }
   const o = new Img(W, H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) o.data[y * W + x] = at(x, y, best[0], best[1]);
+  // what gives light (effect("emit")) turns with its pixels: each one's mark from the pixel it was sampled from
+  if (src.emit) {
+    const e = (o.emit = new Uint8Array(W * H));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (o.data[y * W + x] === TRANSPARENT) continue;
+      // (RotSprite's corners take a neighbour's color: the mark of the nearest pixel of that color)
+      const [sx, sy] = back(x + 0.5, y + 0.5), bx = Math.floor((sx * k + best[0]) / k), by = Math.floor((sy * k + best[1]) / k), c = o.data[y * W + x];
+      let j = -1;
+      for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+        const X = bx + dx, Y = by + dy;
+        if (X >= 0 && Y >= 0 && X < src.w && Y < src.h && (j < 0 || src.data[Y * src.w + X] === c)) { j = Y * src.w + X; if (src.data[j] === c) break; }
+      }
+      if (j >= 0) e[y * W + x] = src.emit[j];
+    }
+  }
   src.movePivot(o, fwd);
   return o;
 }
@@ -95,17 +110,18 @@ function shear(src: Img, deg: number): Img {
     x -= Math.round(t * y); y += Math.round(s * x); x -= Math.round(t * y);
     return [x, y];
   };
-  const pts: [number, number, Color][] = [];
+  const pts: [number, number, Color, number][] = [];
   for (let y = 0; y < src.h; y++)
     for (let x = 0; x < src.w; x++) {
       const c = src.data[y * src.w + x];
-      if (c !== TRANSPARENT) pts.push([...move(x + 0.5 - cx, y + 0.5 - cy), c]);
+      if (c !== TRANSPARENT) pts.push([...move(x + 0.5 - cx, y + 0.5 - cy), c, y * src.w + x]);
     }
   if (!pts.length) return src.copy();
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const [x, y] of pts) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
   const o = new Img(x1 - x0 + 1, y1 - y0 + 1);
   for (const [x, y, c] of pts) o.set(x - x0, y - y0, c);
+  if (src.emit) { const e = (o.emit = new Uint8Array(o.w * o.h)); for (const [x, y, , i] of pts) e[(y - y0) * o.w + x - x0] = src.emit[i]; }
   src.movePivot(o, (x, y) => { const [px, py] = move(x - cx, y - cy); return [px - x0, py - y0]; });
   return o;
 }

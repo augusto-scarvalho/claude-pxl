@@ -31,7 +31,7 @@ function entries(): Entry[] {
     if (line.startsWith("| `")) {
       flush();
       const first = line.split(" | ")[0];
-      out.push({ section: h3 ? `${h2} > ${h3}` : h2, text: line, names: [...first.matchAll(/`([A-Za-z_$][\w$]*)/g)].map((m) => m[1]), row: true });
+      out.push({ section: h3 ? `${h2} > ${h3}` : h2, text: line, names: [...first.matchAll(/`(?:c\.)?([A-Za-z_$][\w$]*)/g)].map((m) => m[1]), row: true });
       continue;
     }
     if (!line.trim() || line.startsWith("|") || line.startsWith("#")) { flush(); continue; }

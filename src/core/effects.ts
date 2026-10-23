@@ -468,20 +468,34 @@ export const EFFECTS: Record<string, Effect> = {
    * of the bend always downwind (negative `amount`: the wind blows to the left), the rest to and fro;
    * `flutter` px more at the top, twice as fast, row by row (the leaves). `vary` (0..1) of a turn and of
    * the reach comes from the seed: placed with `reseed`, each copy sways its own way, out of step.
+   * `push`: where something passes through it (its column, px from the sprite's left): the stems within
+   * `reach` px of it bent away from it, `bend` px at the top for the nearest, by the same height (grass
+   * parted by a walker: give each copy the walker's column through its `fx`).
    * Whole pixels move, with their normals (warp's way).
    */
   sway: {
-    params: { amount: num(1.5, -64, 64), lean: num(0.5, 0, 1), power: num(2, 0.25, 8), still: num(0, 0), cycles: num(1, 1, 64, true), flutter: num(0, 0, 16), vary: num(0.25, 0, 1), pixel: PIXEL },
+    params: { amount: num(1.5, -64, 64), lean: num(0.5, 0, 1), power: num(2, 0.25, 8), still: num(0, 0), cycles: num(1, 1, 64, true), flutter: num(0, 0, 16), vary: num(0.25, 0, 1),
+      push: num(NaN, -4096, 4096), reach: num(6, 1, 256), bend: num(3, -64, 64), pixel: PIXEL },
     run(src, p, x) {
       const r = rng(hash(x.seed, 3, 11)), start = p.vary * r(), far = 1 + p.vary * (2 * r() - 1), K: number = p.pixel;
       const th = 2 * Math.PI * (p.cycles * turn(x) + start), s = p.lean + (1 - p.lean) * Math.sin(th);
       const base = Math.round(src.pivot?.[1] ?? src.h), top = Math.max(1, Math.floor((base - 1) / K) - p.still);
-      const row = new Int32Array(src.h);
+      const row = new Int32Array(src.h), wt = new Float64Array(src.h);
       for (let py = 0; py < src.h; py++) {
         const up = Math.floor((base - 1 - py) / K) - p.still, w = up <= 0 ? 0 : Math.min(1, up / top) ** p.power;
         row[py] = K * Math.round(w * (p.amount * far * s + p.flutter * Math.sin(2 * th + 0.3 * up)));
+        wt[py] = w;
       }
-      return moved(src, (px, py, i) => (row[py] ? at(src, px - row[py], py, x.wrap) : i));
+      if (!Number.isFinite(p.push)) return moved(src, (px, py, i) => (row[py] ? at(src, px - row[py], py, x.wrap) : i));
+      // the stems near what passes through, bent away from it: each row's pixels carried out, where
+      // each lands the one taken from (the farthest first, so the nearest, pushed, lands over them)
+      const W = src.w, from = new Int32Array(W * src.h).fill(-1), order = [...Array(W).keys()].sort((a, b) => Math.abs(b + 0.5 - p.push) - Math.abs(a + 0.5 - p.push));
+      for (let py = 0; py < src.h; py++)
+        for (const px of order) {
+          const d = (px + 0.5 - p.push) / K, to = px + (Math.abs(d) < p.reach ? K * Math.round(Math.sign(d) * p.bend * (1 - Math.abs(d) / p.reach) * wt[py]) : 0), j = py * W + to;
+          if (to >= 0 && to < W && (from[j] < 0 || src.data[py * W + px] !== TRANSPARENT)) from[j] = py * W + px;
+        }
+      return moved(src, (px, py, i) => { const j = row[py] ? at(src, px - row[py], py, x.wrap) : i; return j < 0 ? -1 : from[j]; });
     },
   },
   /**

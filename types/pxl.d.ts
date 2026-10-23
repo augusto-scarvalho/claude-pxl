@@ -193,10 +193,10 @@ declare global {
   interface PxMeshSprite { name: string; at: [number, number] | PxV3; flip?: "x"; frame?: number; delay?: number; rdelay?: boolean; seed?: number; reseed?: boolean | number; shadow?: number;
     /** effects on this sprite alone, as a stamp's */
     fx?: PxEffect | PxEffect[];
-    /** laid over what is behind by its alpha (smoke: "alpha"; light: "add", "screen"), no shadow */
-    blend?: "alpha" | "add" | "screen"; opacity?: number;
-    /** the light its effect("emit") pixels give round them: r m, strength; false for none */
-    light?: false | { r?: number; strength?: number } }
+    /** laid over what is behind by its alpha (smoke: "alpha"; light: "add", "screen"), no shadow; `veil` (an "alpha" one): the share of the sun its pixels hold back, a faint shadow */
+    blend?: "alpha" | "add" | "screen"; opacity?: number; veil?: number;
+    /** the light its effect("emit") pixels give round them: r m, strength, a lamp for `each` part glowing apart; false for none */
+    light?: false | { r?: number; strength?: number; each?: boolean } }
   /** mesh()'s light: the way toward it in the points' frame, or a face's light (0 dark, 1 lit) from its normal toward the eye, its middle, the face; sprites standing among the faces (a perspective view). */
   interface PxMeshOpts {
     light?: PxV3 | ((normal: PxV3, middle: PxV3, face: PxFace) => number); sprites?: PxMeshSprite[]; /** px to a sprite's pixel (an HD picture: 4) */ pixel?: number;
@@ -264,6 +264,7 @@ declare global {
     /** each pixel stepped from its four neighbours (a block off) by this much of the difference: 0.2-0.3 a little */
     sharpen?: number;
     /** a grade from a .cube file next to the art file, at amount (0..1) */
+    /** a .cube file or a LUT strip PNG (256x16) next to the art file */
     lut?: string | { cube: string; amount?: number };
     /** film grain in blocks of pixel, new each frame, in the middle tones: up to amount of full scale */
     grain?: number | { amount?: number; seed?: number; animated?: boolean };
@@ -329,6 +330,10 @@ declare global {
     /** where it is at a time, in the view's world */
     at(t: number): number[];
     lights(t: number): { x: number; y: number; r: number; power: number; color: string }[];
+    /** the same lamps in its world (m through a perspective() camera): mesh()'s `lamps: S.lamps(c.t)` */
+    lamps(t: number): { at: PxV3; r: number; strength: number; color: string }[];
+    /** through a perspective() camera: how far from the eye its nearest part is now (cast() after a mesh() draws it at that depth) */
+    depth(t: number): number | undefined;
     flash(t: number): { color: string; amount: number } | undefined;
     shake(t: number): [number, number];
   }
@@ -355,7 +360,9 @@ declare global {
   /** emit: `strength` of `color` (default their own) added in linear light, past white into white; `pulse` breathes it over the loop. */
   interface PxEmit extends PxEffectBase { color?: PxColor; strength?: number; pulse?: number }
   /** sway: rows moved sideways by their height over the base, `amount` px at the top (negative: to the left), `lean` of it always downwind, `cycles` a loop. */
-  interface PxSway extends PxEffectBase { amount?: number; lean?: number; power?: number; still?: number; cycles?: number; flutter?: number; vary?: number; pixel?: number }
+  interface PxSway extends PxEffectBase { amount?: number; lean?: number; power?: number; still?: number; cycles?: number; flutter?: number; vary?: number; pixel?: number;
+    /** something passing through at column `push` (px from the left): the stems within `reach` px bent away from it, `bend` px at the top */
+    push?: number; reach?: number; bend?: number }
   type PxEffect =
     | ["dissolve", PxDissolve?] | ["pixelate", PxPixelate?] | ["dither", PxDitherFx?] | ["tint", PxTint]
     | ["distort", PxDistort?] | ["sway", PxSway?] | ["emit", PxEmit?] | ["aura", PxAura] | ["energy", PxEnergy];
@@ -425,8 +432,10 @@ declare global {
     particles(emit: (t: number) => PxParticle[], keys: string | string[], opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): void;
     /** A trail behind what goes along path(t), `length` ms of it now, `width` [head, tail] px, keys head to tail. */
     trail(path: (t: number) => number[], keys: string | string[], opts?: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number }): void;
-    /** A spell as it is now: its mark, what gives light (emitting, unlit), its smoke, its lamps, its flash and shake. */
-    cast(spell: PxSpell): void;
+    /** A spell as it is now: its mark, what gives light (emitting, unlit), its smoke, its lamps, its flash and shake (`shake: false`: none); after a mesh() through its camera, at its depth. */
+    cast(spell: PxSpell, opts?: { shake?: boolean }): void;
+    /** All drawn so far thrown by a spell's shake now, or [dx, dy] px. */
+    shake(by: PxSpell | number, dy?: number): void;
     /** Where a socket of an earlier placement is ("hero.hand"), in canvas coords. */
     socket(at: string): [number, number];
     /** A socket of what is being drawn, here in this frame (a hand that moves with the pose). */
@@ -529,7 +538,9 @@ declare global {
   /** A whole cast of an element at a tier (1 fire, 2 fira, 3 firaga): spell("fire", 3, { from: [x, y], to: [x, y], ground }); draw it with cast(). */
   function spell(element: string | PxElement, tier: 1 | 2 | 3, opts: PxSpellOpts): PxSpell;
   /** A spell as it is now (see PxCanvas.cast). */
-  function cast(spell: PxSpell): PxOp;
+  function cast(spell: PxSpell, opts?: { shake?: boolean }): PxOp;
+  /** All drawn so far thrown by a spell's shake now: a whole scene shaking from a cast in one cell of it (cast there with shake: false). */
+  function shake(spell: PxSpell): PxOp;
   /** A function of (x, y) made to close over w (and h): for noise on strips and tiles that wrap. */
   function seamless(fn: (x: number, y: number) => number, w: number, h?: number): (x: number, y: number) => number;
   /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly); boxes' faces lit by the sun. */

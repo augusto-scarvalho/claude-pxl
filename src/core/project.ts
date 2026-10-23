@@ -16,7 +16,7 @@ import { PALETTE_FILE, Palette, paletteFromFile } from "./palette.ts";
 import { type Motion, readJoints, readMotion } from "./pose.ts";
 import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
-import { type Lut, readCube } from "./post.ts";
+import { type Lut, readCube, readStrip } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
 import { ability, emitter } from "./vfx.ts";
 import { SPELL_OPTS, spell } from "./spells.ts";
@@ -63,7 +63,8 @@ export const SIGNATURES: Record<string, string> = {
   smoke: "x:n y:n keys:S ?opts:o",
   particles: "emit:f keys:S ?opts:o",
   trail: "path:f keys:S ?opts:o",
-  cast: "spell:o",
+  cast: "spell:o ?opts:o",
+  shake: "spell:o",
   rampmap: "ramp:S ?opts:o",
   stamp: "name:s ?x:n y:n opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
@@ -85,7 +86,7 @@ export const SIGNATURES: Record<string, string> = {
 };
 
 /** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
-const CLOCKED = new Set(["flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast"]);
+const CLOCKED = new Set(["flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast", "shake"]);
 /** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
 function drawsWithFunctions(items: Item[]): boolean {
   return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
@@ -645,14 +646,15 @@ export class Project implements BuildCtx {
    * opaque columns (a proportional font); a space not in `chars` is half a cell wide. `mono`: every
    * glyph centered in the widest one's width, so a score or a timer keeps its place as it counts.
    */
-  /** post()'s lut: "dusk.cube" (a file next to the art file), or { cube: "dusk.cube", amount }, read into a LUT once. */
+  /** post()'s lut: "dusk.cube" or a strip "dusk.png" (a file next to the art file), or { cube: "dusk.cube", amount }, read into a LUT once. */
   cube(spec: unknown): Lut | { cube: Lut; amount?: number } {
     const file = typeof spec === "string" ? spec : isPlainObject(spec) && typeof spec.cube === "string" ? spec.cube : undefined;
-    if (file === undefined) throw new PxError(`lut is a .cube file ("dusk.cube"), or { cube: "dusk.cube", amount (0..1) }, got ${JSON.stringify(spec)}`);
+    if (file === undefined) throw new PxError(`lut is a .cube file ("dusk.cube") or a LUT strip ("dusk.png", 256x16), or { cube: "dusk.cube", amount (0..1) }, got ${JSON.stringify(spec)}`);
     if (isPlainObject(spec)) checkKeys("lut", spec, ["cube", "amount"]);
-    if (!this.readHook) throw new PxError(".cube files need an art file on disk");
+    const strip = /\.png$/i.test(file);
+    if (!(strip ? this.pngHook : this.readHook)) throw new PxError(`${strip ? "LUT strips" : ".cube files"} need an art file on disk`);
     let lut = this.cubes.get(file);
-    if (!lut) this.cubes.set(file, (lut = readCube(this.readHook(file), file)));
+    if (!lut) this.cubes.set(file, (lut = strip ? readStrip(this.pngHook!(file), file) : readCube(this.readHook!(file), file)));
     return typeof spec === "string" ? lut : { ...(spec as object), cube: lut };
   }
   private cubes = new Map<string, Lut>();

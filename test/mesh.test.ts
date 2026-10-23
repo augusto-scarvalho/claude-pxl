@@ -8,7 +8,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadProject, loadSource } from "../src/node/load.ts";
-import type { Img } from "../src/core/image.ts";
+import { Img } from "../src/core/image.ts";
+import { pack } from "../src/core/color.ts";
+import { encodePng } from "../src/node/png.ts";
 
 const STAGE = `ramps("kgw")
 const V = { w: 40, horizon: 10, eye: 1, focal: 40 }
@@ -174,7 +176,7 @@ test("post finish: grain is the frame's, in blocks of pixel, and the same each t
   assert.ok((sharp.get(50, 20) >>> 24) > (plain.get(50, 20) >>> 24) && (sharp.get(50, 19) >>> 24) < (plain.get(50, 19) >>> 24), "the stripe's edge steeper: lighter inside, darker out");
 });
 
-test("post finish: a .cube LUT grades (identity changes nothing, amount mixes), the palette takes the picture back", () => {
+test("post finish: a .cube LUT grades (identity changes nothing, amount mixes), a LUT strip as its .cube does, the palette takes the picture back", () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-lut-"));
   try {
     const cube = (f: (r: number, g: number, b: number) => number[]) => {
@@ -185,6 +187,11 @@ test("post finish: a .cube LUT grades (identity changes nothing, amount mixes), 
     writeFileSync(join(dir, "same.cube"), cube((r, g, b) => [r, g, b]));
     writeFileSync(join(dir, "neg.cube"), "# negative\nTITLE \"neg\"\n" + cube((r, g, b) => [1 - r, 1 - g, 1 - b]));
     writeFileSync(join(dir, "flat.cube"), "LUT_1D_SIZE 2\n0 0 0\n1 1 1\n");
+    // the negative as a strip: two tiles of 2 x 2, red across a tile, green down it, blue tile by tile
+    const strip = new Img(4, 2);
+    for (const b of [0, 1]) for (const g of [0, 1]) for (const r of [0, 1]) strip.set(b * 2 + r, g, pack(255 * (1 - r), 255 * (1 - g), 255 * (1 - b)));
+    writeFileSync(join(dir, "neg.png"), encodePng(strip));
+    writeFileSync(join(dir, "odd.png"), encodePng(new Img(5, 2)));
     const at = (o: string) => { writeFileSync(join(dir, "a.px.js"), PAL + PIC + `scene("a", { w: 64, h: 40 }, ...pic, post(${o}))`); return loadProject(join(dir, "a.px.js")).image("a"); };
     const plain = at("{}");
     assert.ok(same(at('{ lut: "same.cube" }'), plain), "the identity LUT");
@@ -192,6 +199,8 @@ test("post finish: a .cube LUT grades (identity changes nothing, amount mixes), 
     assert.equal(at('{ lut: "neg.cube" }').get(5, 5), 0xcfcfc5ff, "#30303a inverted");
     assert.equal(at('{ lut: { cube: "neg.cube", amount: 0.5 } }').get(5, 5) >>> 24, Math.round(0x30 + (0xcf - 0x30) * 0.5));
     assert.throws(() => at('{ lut: "flat.cube" }'), /a 1D LUT/);
+    assert.ok(same(at('{ lut: "neg.png" }'), at('{ lut: "neg.cube" }')), "the strip grades as the cube");
+    assert.throws(() => at('{ lut: "odd.png" }'), /n tiles of n x n side by side/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -199,6 +208,23 @@ test("post finish: a .cube LUT grades (identity changes nothing, amount mixes), 
   assert.ok([...finish("{ bloom: 1, palette: true, pixel: 2 }").image("a").data].every((c) => keyed.has(c)), "every color the palette's");
   const two = finish('{ palette: { keys: "kw", dither: 0 } }').image("a");
   assert.ok([...two.data].every((c) => c === 0x000000ff || c === 0xfff1e8ff), "those keys, the nearest: no checker");
+});
+
+test("mesh: a blended sprite's veil, a faint shadow by its alpha; a lamp for each glowing part", () => {
+  const F = `const F = model(); F.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0])\n`;
+  // the sun behind a half-clear slab: no shadow, then one as faint as its veil, a solid one the darkest
+  const slab = (fill: string, o: string) => loadSource(PAL + STAGE + F + `sprite("_slab", { w: 20, h: 10, pivot: "bottom" }, rect(0, 0, 20, 10, "${fill}"))
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, F.faces, { f: { tex: "_white" } }, { light: [-1, 1, 0.8], sun: "w", sky: { color: "w", strength: 0.2 }, sprites: [{ name: "_slab", at: [0, 4], shadow: 0${o} }] }))`, "t.px.js").image("a").get(30, 22) >>> 24;
+  const solid = slab("r", ""), none = slab("#ff000080", ', blend: "alpha"'), half = slab("#ff000080", ', blend: "alpha", veil: 0.5'), full = slab("#ff000080", ', blend: "alpha", veil: 1');
+  assert.ok(solid < full && full < half && half < none, `solid ${solid} < veil 1 ${full} < veil 0.5 ${half} < none ${none}`);
+  assert.match(failure(PAL + STAGE + F + `sprite("_slab", { w: 2, h: 2 }, rect(0, 0, 2, 2, "r"))
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, F.faces, { f: { tex: "_white" } }, { sprites: [{ name: "_slab", at: [0, 4], veil: 0.5 }] }))`, "a").message, /blended "alpha"/);
+  // two gems apart on one sprite: one lamp between them, or one on each (each: true)
+  const gems = (o: string) => loadSource(PAL + STAGE + F + `sprite("_two", { w: 16, h: 4, pivot: "bottom" }, rect(0, 0, 3, 3, "#30a0e0"), rect(13, 0, 3, 3, "#30a0e0"), effect("emit", { strength: 1 }))
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, F.faces, { f: { tex: "_white" } }, { light: [-1, 0, 0.8], sun: { color: "w", strength: 0.1 }, sky: { color: "w", strength: 0.1 }, shadows: false, sprites: [{ name: "_two", at: [0, 4], shadow: 0${o} }] }))`, "t.px.js").image("a");
+  const one = gems(""), each = gems(", light: { each: true }"), blue = (i: Img, x: number, y: number) => (i.get(x, y) >>> 8) & 255;
+  assert.ok(blue(each, 13, 20) > blue(one, 13, 20) + 10 && blue(each, 27, 20) > blue(one, 27, 20) + 10, "the floor by each gem lit more");
+  assert.ok(blue(each, 20, 21) < blue(one, 20, 21), "the middle, where the one lamp was, less");
 });
 
 // what gives light, dissolving faces and sprites, blended sprites (phase 4 of the shader plan)

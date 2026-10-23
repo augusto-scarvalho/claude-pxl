@@ -391,11 +391,14 @@ test("cli shot --gif: animations side by side, each its own loop on one clock as
 anim("a", { w: 2, h: 2, frames: 2, fps: 10 }, (c) => c.rect(0, 0, 2, 2, c.phase < 0.5 ? "8" : "7"))
 anim("b", { w: 2, h: 2, frames: 3, fps: 10 }, (c) => c.rect(0, 0, 2, 2, ["8", "7", "9"][Math.round(c.phase * 3)]))`);
   const text = await said("shot", file, "a", "b", "--gif", "--scale", "1");
-  assert.match(text, /a\+b\.gif \(3 frames, a loop of 300 ms: 200, 300 ms each, the shorter starting over; across: a, b; 1x\)/);
+  assert.match(text, /a\+b\.gif \([\d.]+ MB, 3 frames, a loop of 300 ms: 200, 300 ms each, the shorter starting over; across: a, b; 1x\)/);
   const g = decodeGif(readFileSync(join(dir, "out", "_shot", "a+b.gif")));
   assert.deepEqual([g.w, g.h, g.frames.map((f) => f.ms)], [2 + 2 + 2, 2, [100, 100, 100]]);
   // the third: a over again (red), b on its third (orange)
   assert.deepEqual([g.frames[2].img.get(0, 0), g.frames[2].img.get(4, 0)], [g.frames[0].img.get(0, 0), pack(255, 163, 0)]);
+  // --every 2: b's frames 0 and 2 built, the first lasting until the second
+  await said("shot", file, "b", "--gif", "--every", "2", "--scale", "1");
+  assert.deepEqual(decodeGif(readFileSync(join(dir, "out", "_shot", "b.gif"))).frames.map((f) => f.ms), [200, 100]);
 });
 
 test("cli compare with a picture alone: each row's opaque extents and width", async () => {

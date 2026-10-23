@@ -51,19 +51,20 @@ test("cast: every element at every tier draws on the clock, any frame alone; wha
   const cells = Object.keys(ELEMENTS).flatMap((el) => [1, 2, 3].map((t) =>
     `anim("${el}_${t}", { w: 96, h: 64, frames: 40, fps: 20 }, rect(0, 50, 96, 14, "g"), cast(spell("${el}", ${t}, { from: [12, 40], to: [76, 40], ground: 52, start: 100 })))`)).join("\n");
   const p = load(cells);
+  // (only the frames looked at are drawn: frame k at k * 50 ms)
   for (const el of Object.keys(ELEMENTS))
     for (const t of [1, 2, 3]) {
-      const f = p.frames(`${el}_${t}`);
-      assert.ok(f[1].img.data.every((c, i) => c === f[0].img.data[i]), `${el} ${t}: nothing before it starts`);
-      for (const k of [6, 18, 32]) assert.ok(!same(f[k].img, f[0].img), `${el} ${t}: drawn at frame ${k}`);
+      const at = (k: number) => p.image(`${el}_${t}`, 0, k * 50), f0 = at(0);
+      assert.ok(same(at(1), f0), `${el} ${t}: nothing before it starts`);
+      for (const k of [6, 18, 32]) assert.ok(!same(at(k), f0), `${el} ${t}: drawn at frame ${k}`);
     }
   const f = p.frames("fire_3");
   assert.ok(same(load(cells).build("fire_3", 0, 1600).img, f[32].img), "frame 32 sought alone is frame 32");
   const e = f[6].img.emit!;
   assert.ok(e.some((v) => v === 255) && f[6].img.data.every((c, i) => c === f[0].img.data[i] || e[i] > 0), "the spell's pixels give light (tier 3: all of it)");
   assert.equal(e[60 * 96 + 2], 0, "the ground doesn't");
-  const lit = load(`anim("a", { w: 96, h: 64, frames: 40, fps: 20 }, rect(0, 0, 96, 64, "g"), cast(spell("fire", 3, { from: [12, 40], to: [76, 40], ground: 52 })), lighting({ ambient: 0.3 }))`).frames("a");
-  const luma = (k: number) => { const c = lit[k].img.get(40, 30); return (c >>> 24) + ((c >>> 16) & 255) + ((c >>> 8) & 255); };
+  const lit = load(`anim("a", { w: 96, h: 64, frames: 40, fps: 20 }, rect(0, 0, 96, 64, "g"), cast(spell("fire", 3, { from: [12, 40], to: [76, 40], ground: 52 })), lighting({ ambient: 0.3 }))`);
+  const luma = (k: number) => { const c = lit.image("a", 0, k * 50).get(40, 30); return (c >>> 24) + ((c >>> 16) & 255) + ((c >>> 8) & 255); };
   assert.ok(luma(32) > luma(0) + 30, "its lamps light the ground near it as it hits");
 });
 
@@ -113,8 +114,42 @@ test("cast: the variants draw on the clock in every view", () => {
     .concat(["spire", "boulder", "quake", "slide"].map((variant) => ["earth", variant, vn, v])))
     .map(([el, variant, vn, v]) => `anim("${variant}_${vn}", { w: 96, h: 64, frames: 50, fps: 20 }, rect(0, 0, 96, 64, "g"), cast(spell("${el}", 3, { view: ${v}, from: [-30, 0, 10], to: [30, 0, 8], variant: "${variant}", start: 100, seed: 3 })))`).join("\n");
   const p = load(cells);
+  // (any frame alone: only those looked at are drawn)
   for (const n of p.order) {
-    const f = p.frames(n), drawn = (k: number) => !same(f[k].img, f[0].img);
+    const f0 = p.image(n, 0, 0), drawn = (k: number) => !same(p.image(n, 0, k * 50), f0);
     assert.ok([30, 40, 48].some(drawn), `${n}: something there after it lands`);
   }
+});
+
+test("cast in mesh()'s depth: a wall nearer the eye hides it, its lamps light the diorama; shake for a whole scene", () => {
+  // the camera of the views test; a wall 2 m high between the caster and the target behind it
+  const V = "{ w: 96, horizon: -40, eye: 3, fov: 40, pitch: -30 }", S = `spell("fire", 3, { view: ${V}, from: [-1, 6, 1], to: [1.5, 6, 0.4], start: 0, seed: 2 })`;
+  const stage = (wall: boolean, cast: string, lamps = "") => load(`sprite("_w", "w")
+const M = model(); M.face("f", [-9, 1, 0], [9, 1, 0], [9, 30, 0], [-9, 30, 0])${wall ? '; M.box("f", [0.4, 4.4, 0], [3, 4.6, 2])' : ""}
+const SP = ${S}
+anim("a", { w: 96, h: 64, frames: 40, fps: 20 }, (c) => c.mesh(${V}, M.faces, { f: { tex: "_w" } }, { light: [-0.5, -0.5, 0.7], sun: "w"${lamps} }), ${cast})`);
+  const s = spell("fire", 3, { view: { w: 96, horizon: -40, eye: 3, fov: 40, pitch: -30 }, from: [-1, 6, 1], to: [1.5, 6, 0.4], start: 0, seed: 2 }), t = s.ability.start("impact") + 120;
+  const z = s.depth(t)!, img = (wall: boolean, cast: string, lamps?: string) => stage(wall, cast, lamps).image("a", 0, t);
+  assert.ok(z > 0 && spell("fire", 3, { from: [10, 30], to: [90, 30] }).depth(t) === undefined, "a depth through a camera only");
+  const bare = img(true, "rect(0, 0, 1, 1, \"w\")"), cast = img(true, "cast(SP, { shake: false })"), D = cast.depth!;
+  let hidden = 0, shown = 0;
+  for (let i = 0; i < D.length; i++) if (cast.data[i] !== bare.data[i]) { if (D[i] < z) hidden++; else shown++; }
+  assert.equal(hidden, 0, "nothing drawn where the wall stands nearer the eye");
+  assert.ok(shown > 0, "drawn over what is behind it");
+  const open = img(false, "cast(SP, { shake: false })"), openBare = img(false, "rect(0, 0, 1, 1, \"w\")");
+  assert.ok([...D.keys()].some((i) => D[i] < z && open.data[i] !== openBare.data[i]), "without the wall it is drawn there");
+  // its lamps in meters, for mesh()'s lamps: the floor round where it hit lit in its color
+  const L = s.lamps(t);
+  assert.equal(L.length, 1);
+  assert.ok(Math.abs(L[0].at[0] - 1.5) < 0.01 && Math.abs(L[0].at[1] - 6) < 0.01 && L[0].r > 0.3 && L[0].strength === s.lights(t)[0].power, JSON.stringify(L[0]));
+  assert.ok(!same(img(false, "rect(0, 0, 1, 1, \"w\")", ", lamps: SP.lamps(c.t)"), openBare), "the diorama lit by it");
+  // shake: none in the cell with shake: false, the whole scene thrown by shake(spell)
+  const hit = load(`anim("cell", { w: 40, h: 30, frames: 20, fps: 20 }, rect(0, 0, 40, 30, "g"), rect(10, 10, 4, 4, "w"), cast(spell("earth", 3, { from: [5, 20], to: [30, 20], start: 0 }), { shake: false }))
+const SP = spell("earth", 3, { from: [5, 20], to: [30, 20], start: 0 })
+scene("s", { w: 90, h: 30, bg: "k" }, stamp("cell", 0, 0), rect(50, 10, 4, 4, "w"), shake(SP))`);
+  const sp = spell("earth", 3, { from: [5, 20], to: [30, 20], start: 0 }), tt = [0, 50, 100, 150].map((d) => sp.ability.start("impact") + d).find((x) => sp.shake(x).some((v) => v))!, [dx, dy] = sp.shake(tt);
+  const frame = hit.image("s", 0, tt), cell = hit.image("cell", 0, tt);
+  assert.equal(cell.get(11, 11), hit.image("cell", 0, 0).get(11, 11), "the cell itself still");
+  assert.equal(frame.get(51 + dx, 11 + dy), cell.get(11, 11), "the scene thrown: the square beside the cell moved with it");
+  assert.match(failure(PALS + 'anim("a", { w: 9, h: 9, frames: 2 }, cast(spell("fire", 1, { from: [1, 1], to: [5, 5] }), { shook: false }))', "a").message, /no option 'shook'/);
 });

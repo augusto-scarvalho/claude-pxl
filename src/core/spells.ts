@@ -183,6 +183,10 @@ export interface Spell {
   over(c: SpellCanvas): void;
   /** its lamps at a time ({ x, y, r, power, color } on the picture) and its flash ({ color, amount } for effect("tint"), or none) */
   lights(t: number): { x: number; y: number; r: number; power: number; color: string }[];
+  /** the same lamps in its world ({ at, r, strength, color }; in m through a perspective() camera), for mesh()'s `lamps`: the spell lights the diorama */
+  lamps(t: number): { at: V3; r: number; strength: number; color: string }[];
+  /** through a perspective() camera: how far from the eye (m, along its axis) its nearest part is now, for cast() in mesh()'s depth */
+  depth(t: number): number | undefined;
   flash(t: number): { color: string; amount: number } | undefined;
   /** px the picture is thrown [x, y] as it hits (the tier's drama), [0, 0] otherwise */
   shake(t: number): [number, number];
@@ -195,7 +199,7 @@ const RAD = Math.PI / 180;
 
 // ---------------------------------------------------------------- views
 /** A view: where a world point lands on the picture, px a world unit there, world units a px of the spell, the camera's axes. */
-export interface SpellView { kind: string; P(p: number[]): [number, number]; s(p: number[]): number; unit: number; top: boolean; R: V3; U: V3; F: V3; k(p: number[]): number }
+export interface SpellView { kind: string; P(p: number[]): [number, number]; s(p: number[]): number; unit: number; top: boolean; R: V3; U: V3; F: V3; k(p: number[]): number; z?(p: number[]): number }
 const basis = (pitch: number, yaw: number, ahead: number) => {
   const p = pitch * RAD, c = Math.cos(yaw * RAD), s = Math.sin(yaw * RAD), rot = (v: number[]): V3 => [v[0] * c - v[1] * s, v[0] * s + v[1] * c, v[2]];
   return { R: rot([1, 0, 0]), U: rot([0, ahead * Math.sin(p), Math.cos(p)]), F: rot([0, ahead * Math.cos(p), -Math.sin(p)]) };
@@ -210,7 +214,7 @@ const basis = (pitch: number, yaw: number, ahead: number) => {
 export function spellView(v: ViewOpt | undefined, at: number[]): SpellView {
   if (v && typeof v === "object" && "horizon" in v) {
     const Pp = perspective(v), s = (p: number[]) => Pp.scale(p[1], p[0], p[2] ?? 0);
-    return { kind: "perspective", P: (p) => Pp.ground(p[0], p[1], p[2] ?? 0), s, k: s, unit: 1 / s(at), top: false, ...basis(-Pp.pitch, -Pp.yaw, 1) };
+    return { kind: "perspective", P: (p) => Pp.ground(p[0], p[1], p[2] ?? 0), s, k: s, z: (p) => Pp.focal / s(p), unit: 1 / s(at), top: false, ...basis(-Pp.pitch, -Pp.yaw, 1) };
   }
   const o = typeof v === "object" && v ? v : { kind: v as "side" | "top" | "iso" | undefined, origin: undefined, height: undefined }, kind = o.kind ?? "side", [ox, oy] = o.origin ?? [0, 0];
   if (kind === "side") return { kind, P: (p) => [ox + p[0], oy + 0.35 * p[1] - (p[2] ?? 0)], s: () => 1, k: () => 1, unit: 1, top: false, ...basis(20.5, 0, -1) };
@@ -625,12 +629,16 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
       if (big === "quake" && t >= hit) quakeRocks(c, t);
     },
     lights(t) {
-      if (!live(t)) return [];
-      const p = A(t), color = E.light ?? E.keys[1], L = (q: number[], rr: number, pw: number) => { const [x, y] = scr(q); return { x, y, r: rr * sc(q), power: pw, color }; };
-      if (p.name === "charge") return [L(A3, R * 0.4 * (0.4 + 0.6 * p.k), P * 0.6 * p.k)];
-      if (p.name === "cast") return [L(A3, R * 0.5, P * 0.8)];
-      if (p.name === "travel") return del === "sky" || (del === "fall" && !VR.burning && SO) ? [] : [L(path(t), R * 0.5, P * 0.8)];
-      return [L([I3[0], I3[1], Math.max(2 * U, I3[2])], R * (0.6 + 0.4 * ease(into(t))), P * (1 - after(t)) ** 1.5)];
+      const color = E.light ?? E.keys[1];
+      return glows(t).map(([q, rr, pw]) => { const [x, y] = scr(q); return { x, y, r: rr * sc(q), power: pw, color }; });
+    },
+    lamps(t) {
+      const color = E.light ?? E.keys[1];
+      return glows(t).map(([q, rr, pw]) => ({ at: [q[0], q[1], q[2] ?? 0] as V3, r: rr * U, strength: pw, color }));
+    },
+    depth(t) {
+      // where it is now, nearer by its size (6 px of the spell a tier's scale): a wall in front hides it, the target it hits doesn't
+      return V.z && live(t) ? V.z(at(t)) - 6 * S * U : undefined;
     },
     flash(t) {
       return T.big && t >= hit && t < hit + 100 ? { color: E.flash ?? E.keys[0], amount: 0.35 * (1 - (t - hit) / 100) } : undefined;
@@ -645,6 +653,15 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
     },
   };
 
+  // its lamps: [where in its world, how far in px of the spell, how strong]
+  function glows(t: number): [number[], number, number][] {
+    if (!live(t)) return [];
+    const p = A(t);
+    if (p.name === "charge") return [[A3, R * 0.4 * (0.4 + 0.6 * p.k), P * 0.6 * p.k]];
+    if (p.name === "cast") return [[A3, R * 0.5, P * 0.8]];
+    if (p.name === "travel") return del === "sky" || (del === "fall" && !VR.burning && SO) ? [] : [[path(t), R * 0.5, P * 0.8]];
+    return [[[I3[0], I3[1], Math.max(2 * U, I3[2])], R * (0.6 + 0.4 * ease(into(t))), P * (1 - after(t)) ** 1.5]];
+  }
   // where the chain jumps to after the target: points round it on the ground
   function chainAt(i: number): V3 {
     const rr = rng(hash(seed, i, 43)), a = (i * 2.4 + rr()) % (Math.PI * 2), d = (20 + 12 * rr()) * S;

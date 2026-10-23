@@ -729,11 +729,16 @@ export class Canvas {
   /**
    * A spell (`spell(element, tier, { from, to })`) as it is now: its mark under it, what gives light
    * (marked as emitting by its glow: unlit, blooming), its smoke over it, its lamps (a lighting() item
-   * lights the ground with them) and its flash: see spells.ts.
+   * lights the ground with them), its flash and its shake (`shake: false`: none here, for shake() to
+   * throw a whole scene): see spells.ts. Through the perspective() camera of a mesh() drawn before it,
+   * it is drawn at the depth of where it is now: what stands nearer the eye stays in front of it.
    */
-  cast(s: Spell): void {
+  cast(s: Spell, opts: { shake?: boolean } = {}): void {
     if (!s || typeof s.draw !== "function") throw new PxError('cast(spell("fire", 2, { from: [x, y], to: [x, y] })): a spell');
+    const bad = Object.keys(opts ?? {}).find((k) => k !== "shake");
+    if (bad) throw new PxError(`cast(spell, { shake }): no option '${bad}'`);
     s.bind(this);
+    const D = this.img.depth, z = D ? s.depth?.(this.t) : undefined, before = z !== undefined ? { d: this.img.data.slice(), e: this.img.emit?.slice() } : undefined;
     s.under(this);
     const d = this.img.data, a = d.slice();
     s.draw(this);
@@ -742,11 +747,19 @@ export class Canvas {
     const g = Math.round(255 * Math.max(0, Math.min(1, s.glow)));
     const e = g ? (this.img.emit ??= new Uint8Array(d.length)) : this.img.emit;
     if (e) for (let i = 0; i < d.length; i++) if (d[i] !== b[i]) e[i] = 0; else if (b[i] !== a[i]) e[i] = Math.max(e[i], g);
+    // in mesh()'s depth: where something drawn is nearer the eye than the spell, it stays as it was
+    if (before) for (let i = 0; i < d.length; i++) if (D![i] < z! && d[i] !== before.d[i]) { d[i] = before.d[i]; if (e) e[i] = before.e?.[i] ?? 0; }
     for (const l of s.lights(this.t)) if (l.power > 0) this.lamp(l.x, l.y, { r: Math.max(1, l.r), power: l.power, color: l.color });
     const f = s.flash(this.t);
     if (f) this.effect("tint", f);
-    // the shake: all drawn so far thrown a few px, the edge it leaves the one before it
-    const [sx, sy] = s.shake(this.t), { w, h } = this.img;
+    if (opts.shake !== false) this.shake(s);
+  }
+
+  /** All drawn so far thrown [dx, dy] px (a spell's: as it hits, now), the edge it leaves the one before it. */
+  shake(by: Spell | number, dy = 0): void {
+    const [sx, sy] = typeof by === "number" ? [Math.round(by), Math.round(dy)] : by && typeof by.shake === "function" ? by.shake(this.t) : [NaN, NaN];
+    if (!Number.isFinite(sx) || !Number.isFinite(sy)) throw new PxError(`shake(spell) or c.shake(dx, dy): a spell, or px to throw the picture, got ${JSON.stringify([by, dy])}`);
+    const d = this.img.data, { w, h } = this.img;
     if (sx || sy) for (const arr of [d, this.img.emit]) {
       if (!arr) continue;
       const src = arr.slice();
@@ -825,12 +838,13 @@ export class Canvas {
     const sprites = (opts.sprites ?? []).map((s, k) => {
       const at = s?.at;
       if (!s || typeof s.name !== "string" || !Array.isArray(at) || (at.length !== 2 && at.length !== 3) || !at.every(Number.isFinite))
-        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, light? }, got ${JSON.stringify(s)}`);
+        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, veil?, light? }, got ${JSON.stringify(s)}`);
       // its own time in its loop and its own random choices, as a stamp's, picked by where it stands (cm)
       const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed, fx: s.fx };
       if (s.blend !== undefined && !["alpha", "add", "screen"].includes(s.blend)) throw new PxError(`mesh: sprite ${k} has blend ${JSON.stringify(s.blend)}: "alpha" (over, lit), "add" or "screen" (light)`);
       if (s.opacity !== undefined && !(s.opacity >= 0 && s.opacity <= 1)) throw new PxError(`mesh: sprite ${k} has opacity ${JSON.stringify(s.opacity)}: 0..1`);
-      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, light: s.light };
+      if (s.veil !== undefined && !(s.veil >= 0 && s.veil <= 1 && s.blend === "alpha")) throw new PxError(`mesh: sprite ${k} has veil ${JSON.stringify(s.veil)}: the share of the sun a sprite blended "alpha" holds back, 0..1`);
+      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, veil: s.veil, light: s.light };
     });
     // looked up on first use: a palette without ramps has nothing to step (and needs nothing stepped without textures or sprites)
     let maps: Map<Color, Color>[] | undefined;
@@ -1530,7 +1544,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp", "effect",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
 ] as const;
 export type OpName = (typeof OPS)[number];
 
