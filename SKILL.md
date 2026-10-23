@@ -79,7 +79,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    way a rig's parts face: `PXL blind art.px.js <rig>` shows them unnamed to a reader who doesn't
    know the labels (characters.md §11).
 6. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL
-   (a file that exports 3D models: its `/3d` page turns them round).
+   (a file that exports 3D models: its `/3d` page turns them round). Stop it when you're done.
+   Never open a page in a headless browser to look at it: on a laptop that froze the machine.
 
 Errors name file:line:col and the asset/layer/op, and suggest fixes. One broken asset doesn't stop
 the others.

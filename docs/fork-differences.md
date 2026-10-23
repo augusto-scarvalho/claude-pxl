@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**360 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**361 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -239,8 +239,8 @@ references until it read right.
 - Art files run in a vm context that isn't contextified, so their own hot loops read globals (`Math`,
   their helpers) at full speed: the HD-2D figures' builds went 6x faster (the crew's check 9.9 s to
   1.5 s, the extinction's 9.7 s to 0.9 s, every example's hashes 1m46s to 56 s), every pixel the same.
-- The tests run in under a minute (they took nearly two, then 70 s): the examples' check in worker
-  threads on half the cores (the hyperthreads gave nothing), the slowest of the last run first, the
+- The tests run in about a minute (they took nearly two, then 70 s): the examples' check in worker
+  threads, one per four of the machine's (more gave nothing), the slowest of the last run first, the
   study's tests in two files that run at once, tests that draw only the frames they look at (the
   spell variants' 16 s to 0.1 s); `npm run test:quick` leaves out the
   two slowest (every example's check, the gallery's study) for about 20 s while iterating, and
@@ -252,6 +252,11 @@ references until it read right.
   22 s to about 19 s on a 4-core laptop, with `check` reading a drawing's lit side once however many
   frames show it and letting a long loop's checked frames go (the city street's check 1.3 GB to
   0.8 GB, sodium_hour's 1.3 GB to 150 MB).
+- Light on a laptop: `pxl` and the tests run below normal priority, so a long render or test run waits
+  for the user's own programs instead of freezing them. The tests run three files at a time and the
+  examples' check in two threads on a 4-core laptop: seven files and four threads took as long (the
+  quick suite 21 s either way) and burned a fifth more processor. The `/3d` page draws only when the
+  model or the view changes, not 60 times a second.
 - Lit scenes keep small figures' colors in GIFs (a weighted median cut refined by k-means).
 - Timed builds are cached within a budget of bytes, so a long loop no longer fills memory.
 - `build --profile` names where the time went; `build --every N` keeps long previews small; the onion

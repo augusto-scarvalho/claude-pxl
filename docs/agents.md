@@ -42,6 +42,10 @@ The order that has worked over this fork's rounds, each step with its section be
    the end, under 10 MB ([The gallery](#the-gallery)).
 8. **Fast tests while working** (the file you touched, `npm run test:quick`, `PXL_EXAMPLES=<folder>`),
    the full suite once before a commit ([Tests](#tests)).
+9. **Light on the machine**, which may be a 4-core laptop: one heavy job at a time (a render, a test
+   run), long renders in the background; no headless browser (one froze the user's laptop: look at
+   a page in the user's own browser, or say what you couldn't check); stop `pxl serve` and anything
+   else started in the background before reporting.
 
 A thing in 3D (a tree, a house, mist) is a scene of named parts edited by name, its rules checked by
 `pxl check` ([3D as code](#3d-as-code-which-drawer-and-edits-by-name)).
@@ -344,12 +348,14 @@ test file for what you changed, or the quick suite:
 node --test test/docs.test.ts                            # one file: the commands and flags the docs cite
 npm run test:quick                                       # every test but the two slowest, about 20 s
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts      # the examples check, on one folder (or hd2d/harbor, or a,b)
-npm run check                                            # types and every test, under a minute: once, before the commit
+npm run check                                            # types and every test, about a minute: once, before the commit
 ```
 
-The two slowest tests are the check of every example (about 30 s alone, in threads on half the
-cores, the slowest of the last run first) and the study of the gallery's GIFs; a change to a check, to
-`study` or to an example is what they catch. `npm test` preloads `test/compile-cache.ts` (Node's
+The two slowest tests are the check of every example (about 60 s on a 4-core laptop, in one thread
+per four of the machine's, the slowest of the last run first) and the study of the gallery's GIFs; a
+change to a check, to `study` or to an example is what they catch. The suite runs three test files at
+a time, below normal priority, as `pxl` itself does: on a 4-core laptop seven at a time took as long
+(the quick suite 21 s either way), burned a fifth more processor and froze the user's programs. `npm test` preloads `test/compile-cache.ts` (Node's
 compile cache, half a second off every test file's start); a file alone runs the same with
 `node --import ./test/compile-cache.ts --test test/<file>.test.ts`. With
 `PXL_EXAMPLES`, the examples test checks only the examples whose path under `examples/` starts with
@@ -426,7 +432,7 @@ Agents run `pxl shot`, `check` and `study` many times a session, and the test su
 every example: a slow path costs every turn. Before and after a change to the engine:
 
 ```sh
-npm run check                                           # types and tests, under a minute (test:quick ~20 s)
+npm run check                                           # types and tests, about a minute (test:quick ~20 s)
 node scripts/perf.ts                                    # pxl check's time and peak memory on every example
 node scripts/hashes.ts > after.txt                      # every example's assets hashed: diff with a run before the change
 git worktree add ../pxl-head HEAD && node ../pxl-head/scripts/hashes.ts > before.txt   # (the run before, on the last commit)

@@ -360,7 +360,7 @@ npm install                                          # dev only: typescript, @ty
 node --test test/docs.test.ts                        # one test file, while you iterate
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts  # the examples' check on one folder
 npm run test:quick                                   # every test but the two slowest (~20 s)
-npm run check                                        # type check + every test (under a minute), once before a commit
+npm run check                                        # type check + every test (about a minute), once before a commit
 ```
 
 ```

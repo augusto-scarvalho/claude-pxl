@@ -36,6 +36,10 @@ sun.position.set(-3, 5, 4);
 scene.add(sun);
 const pick = document.getElementById("pick");
 let current, mixer, framed = "";
+// drawn when the model or the view changes, in a loop only while a model animates: an open tab
+// doesn't keep the graphics card busy redrawing a still picture
+const draw = () => renderer.render(scene, camera);
+controls.addEventListener("change", draw);
 
 async function show(file, keepView) {
   const url = "/files/" + encodeURIComponent(file) + "?v=" + Date.now();
@@ -57,12 +61,15 @@ async function show(file, keepView) {
   if (current) scene.remove(current);
   current = obj;
   scene.add(obj);
-  if (keepView && framed === file) return;
+  renderer.setAnimationLoop(mixer ? () => { mixer.update(clock.getDelta()); draw(); } : null);
+  if (keepView && framed === file) return draw();
   framed = file;
   const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() || 1;
   controls.target.copy(c);
   camera.position.copy(c).add(new THREE.Vector3(0.55, 0.5, 1.2).multiplyScalar(r));
   camera.near = r / 200; camera.far = r * 200; camera.updateProjectionMatrix();
+  controls.update();
+  draw();
 }
 function list(state) {
   const was = pick.value;
@@ -73,10 +80,9 @@ function list(state) {
 }
 pick.onchange = () => show(pick.value);
 new EventSource("/events").addEventListener("build", (ev) => list(JSON.parse(ev.data)));
-const fit = () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); };
+const fit = () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); draw(); };
 addEventListener("resize", fit);
 fit();
-renderer.setAnimationLoop(() => { mixer?.update(clock.getDelta()); controls.update(); renderer.render(scene, camera); });
 </script>
 </body>
 </html>

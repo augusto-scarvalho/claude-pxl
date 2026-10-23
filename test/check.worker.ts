@@ -1,5 +1,6 @@
 // One example's `pxl check` lines, in a thread of its own: examples.test.ts hands the examples out to
-// as many of these as the machine has cores (the scenes checked frame by frame take seconds each).
+// a few of these, one per four of the machine's threads (the scenes checked frame by frame take seconds
+// each; on a 4-core laptop more threads took as long and only heated it).
 import { parentPort } from "node:worker_threads";
 import { basename, join } from "node:path";
 import { loadProject } from "../src/node/load.ts";

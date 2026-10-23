@@ -39,7 +39,7 @@ test(`pxl check on ${only ? `${files.length} of the ${all.length} examples (PXL_
   try { took = JSON.parse(readFileSync(TIMES, "utf8")); } catch { /* the first run */ }
   const cost = (f: string) => took[f] ?? 1e9 + frames(f);
   const said = new Map<string, string[]>(), queue = [...files].sort((a, b) => cost(b) - cost(a));
-  const workers = Array.from({ length: Math.max(1, Math.min(files.length, Math.ceil(availableParallelism() / 2))) }, () => new Worker(new URL("./check.worker.ts", import.meta.url)));
+  const workers = Array.from({ length: Math.max(1, Math.min(files.length, Math.floor(availableParallelism() / 4))) }, () => new Worker(new URL("./check.worker.ts", import.meta.url)));
   try {
     await Promise.all(workers.map((w) => new Promise<void>((done, fail) => {
       const next = () => { const f = queue.shift(); if (f === undefined) done(); else w.postMessage({ root, f }); };
