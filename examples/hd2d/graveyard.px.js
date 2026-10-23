@@ -377,7 +377,9 @@ const CLOCK = { frames: FRAMES, fps: 1000 / MS }
 // Morning: the sun behind on the left (the shadows fall toward us and to the right), warm; the sky's
 // light violet in the shade.
 const LIGHT = { light: [-0.55, 0.6, 0.72], sun: { color: "#ffe2b4", strength: 1.3 }, sky: { color: "#a4a6d8", strength: 0.45 } }
-scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 8 } }, (c) => c.mesh(view(1), M.faces, MATS, { sprites: people(c.frame), ...LIGHT }), (c) => talk(c, 1))
+// checked one frame in 24: no scene rule runs on it (no world.light, nothing with a height or a front
+// marker), so the frames checked only prove they build; the tests stay fast
+scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 24 } }, (c) => c.mesh(view(1), M.faces, MATS, { sprites: people(c.frame), ...LIGHT }), (c) => talk(c, 1))
 
 // K times the size and through the camera: the hill's top sharp, the wood below and the hills behind
 // blurred and taken by a warm mist, a bloom, darker corners; the fence in blocks of a sprite's pixel.

@@ -239,18 +239,31 @@ export function blur(src: Float64Array, w: number, h: number, sigma: number): Fl
   for (let t = -r; t <= r; t++) sum += k[t + r] = Math.exp(-0.5 * (t / sigma) ** 2);
   for (let t = 0; t < k.length; t++) k[t] /= sum;
   const rows = new Float64Array(w * h), out = new Float64Array(w * h);
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      let a = 0;
-      for (let t = Math.max(-r, -x); t <= Math.min(r, w - 1 - x); t++) a += k[t + r] * src[y * w + x + t];
-      rows[y * w + x] = a;
+  // sparse: a bloom's bright part is a few spots, so only the columns near what isn't 0 in a row are
+  // summed, and only the rows near a row that isn't all 0 (the sums skipped are all 0: the same result)
+  const busy = new Int32Array(h + 1);
+  let x0 = w, x1 = -1;
+  for (let y = 0; y < h; y++) {
+    let a = w, b = -1;
+    for (let x = 0; x < w; x++) if (src[y * w + x] !== 0) { if (a === w) a = x; b = x; }
+    busy[y + 1] = busy[y] + (b >= 0 ? 1 : 0);
+    if (b < 0) continue;
+    a = Math.max(0, a - r); b = Math.min(w - 1, b + r);
+    x0 = Math.min(x0, a); x1 = Math.max(x1, b);
+    for (let x = a; x <= b; x++) {
+      let s = 0;
+      for (let t = Math.max(-r, -x); t <= Math.min(r, w - 1 - x); t++) s += k[t + r] * src[y * w + x + t];
+      rows[y * w + x] = s;
     }
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
+  }
+  for (let y = 0; y < h; y++) {
+    if (busy[Math.min(h, y + r + 1)] === busy[Math.max(0, y - r)]) continue;
+    for (let x = x0; x <= x1; x++) {
       let a = 0;
       for (let t = Math.max(-r, -y); t <= Math.min(r, h - 1 - y); t++) a += k[t + r] * rows[(y + t) * w + x];
       out[y * w + x] = a;
     }
+  }
   return out;
 }
 

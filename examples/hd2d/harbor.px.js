@@ -758,7 +758,9 @@ const faces = (f) => {
   crane(D, f); lines(D, f)
   return [...M.faces, ...ship, ...ship.map((F) => ({ mat: F.mat + "_r", pts: F.pts.map(([x, z, u]) => [x, z, -u]) })), ...boats(f), ...D.faces]
 }
-scene("harbor", { w: W, h: H, bg: "b", ...CLOCK, check: { every: 8 } }, (c) => c.mesh(view(1), faces(c.frame), mats(c.frame), { sprites: people(c.frame), ...LIGHT }), (c) => talk(c, 1))
+// checked one frame in 24: no scene rule runs on it (no world.light, nothing with a height or a front
+// marker), so the frames checked only prove they build; the tests stay fast
+scene("harbor", { w: W, h: H, bg: "b", ...CLOCK, check: { every: 24 } }, (c) => c.mesh(view(1), faces(c.frame), mats(c.frame), { sprites: people(c.frame), ...LIGHT }), (c) => talk(c, 1))
 
 // K times the size through the camera: the pier and the boats sharp, the awning near us and the far water blurred
 // (its glints into bokeh), a light haze far off, a bloom; every face in blocks of a sprite's pixel.

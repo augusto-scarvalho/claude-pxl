@@ -8,6 +8,17 @@ import { PxError, wrap } from "../core/errors.ts";
 import { Project, type ProjectOptions } from "../core/project.ts";
 import { decodePng } from "./png.ts";
 
+/**
+ * A fresh context whose globals are the DSL. Not contextified: its global object is an ordinary one,
+ * so an art file's own hot loops reading globals (Math, its helpers) run at full speed (a figure drawn
+ * of 14k samples took 150 ms through the contextified one's interceptors).
+ */
+function sandbox(env: Record<string, unknown>): vm.Context {
+  const ctx = vm.createContext(vm.constants.DONT_CONTEXTIFY);
+  Object.assign(ctx, env, { console });
+  return ctx;
+}
+
 function compile(code: string, file: string): string {
   // Type stripping keeps every line and column in place, so error locations stay exact.
   return /\.[cm]?ts$/.test(file) ? stripTypeScriptTypes(code, { mode: "strip" }) : code;
@@ -19,7 +30,7 @@ function compile(code: string, file: string): string {
  */
 export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs: string) => readFileSync(abs, "utf8")): Project {
   const p = new Project(opts), env = p.env();
-  const ctx = vm.createContext({ ...env, console });
+  const ctx = sandbox(env);
   const stack: string[] = [];
   const run = (path: string) => {
     const abs = resolve(path);
@@ -72,7 +83,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
 /** Load art source from a string (tests, embedding). `name` appears in error locations. */
 export function loadSource(src: string, name = "art.px.js", opts: ProjectOptions = {}): Project {
   const p = new Project(opts), env = p.env();
-  const ctx = vm.createContext({ ...env, console });
+  const ctx = sandbox(env);
   p.addFile(name);
   try {
     vm.runInContext(compile(src, name), ctx, { filename: name });

@@ -7,6 +7,7 @@ import { checkProject } from "../src/node/check.ts";
 
 parentPort!.on("message", ({ root, f }: { root: string; f: string }) => {
   let out: string[];
+  const t0 = performance.now();
   try {
     const p = loadProject(join(root, "examples", f), { checksOnly: true });
     // every frame of every animated scene (the bout's blows, the blocks, the last clash included)
@@ -15,5 +16,5 @@ parentPort!.on("message", ({ root, f }: { root: string; f: string }) => {
   } catch {
     out = [`${f}: included only (doesn't build on its own: its palette comes from the file including it)`];
   }
-  parentPort!.postMessage({ f, out });
+  parentPort!.postMessage({ f, out, ms: Math.round(performance.now() - t0) });
 });
