@@ -222,7 +222,7 @@ each piece as a strip. `--no-out` prints the text only.
   for a game, `platformer.px.js` and `topdown.px.js` (tilesets laid out as levels) and
   [`topdown_hero/`](../examples/topdown_hero) (a character in four directions, a tagged sheet); for
   an HD-2D scene (pixel-art sprites in a 3D diorama), [`hd2d/`](../examples/hd2d).
-  [SKILL.md](../SKILL.md#examples) has a table of which example teaches what.
+  [examples/README.md](../examples/README.md) says which example teaches what.
 
 Art files can be `.ts`: add `/// <reference path="<pxl>/types/pxl.d.ts" />` at the top for editor
 completion.

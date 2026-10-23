@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**361 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**362 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -257,6 +257,11 @@ references until it read right.
   examples' check in two threads on a 4-core laptop: seven files and four threads took as long (the
   quick suite 21 s either way) and burned a fifth more processor. The `/3d` page draws only when the
   model or the view changes, not 60 times a second.
+- `SKILL.md`, loaded into every session that draws, is a map again: 30 KB to 13.5 KB (about 7.5k
+  tokens to 3.5k), each part pointing to the guide sections, `pxl help` and `pxl --help`; the examples'
+  table is `examples/README.md`, and a test keeps SKILL.md under 14,000 characters. The examples'
+  check is skipped when nothing it reads changed since it last passed (a commit of docs only saves
+  its minute).
 - Lit scenes keep small figures' colors in GIFs (a weighted median cut refined by k-means).
 - Timed builds are cached within a budget of bytes, so a long loop no longer fills memory.
 - `build --profile` names where the time went; `build --every N` keeps long previews small; the onion

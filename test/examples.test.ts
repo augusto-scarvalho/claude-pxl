@@ -12,9 +12,13 @@
 // comma-separated: the start of each path under examples/) compares and rewrites only their lines; the
 // test's name says how many it left out, and `npm test` checks them all. How long each took is kept
 // in node_modules/.cache/pxl/examples-times.json, to hand out the slowest first next time.
+// A whole run that passed keeps a fingerprint of what the check reads (pxl's sources, the examples,
+// this test and the kept lines, Node's version) beside it: the next run with nothing of that changed
+// (a commit of docs only) is skipped, saying so. Delete examples-passed.txt there to run it anyway.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,12 +26,23 @@ import { Worker } from "node:worker_threads";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SNAP = join(root, "test", "examples.checks.txt"), TIMES = join(root, "node_modules", ".cache", "pxl", "examples-times.json");
+const PASSED = join(dirname(TIMES), "examples-passed.txt");
+const fingerprint = () => {
+  const h = createHash("sha1").update(process.version);
+  const under = (d: string) => (readdirSync(join(root, d), { recursive: true }) as string[]).map((f) => join(d, f)).filter((f) => !f.split(/[\\/]/).includes("out"));
+  for (const f of [...under("src"), ...under("examples"), "test/examples.test.ts", "test/check.worker.ts", "test/examples.checks.txt"].sort()) {
+    const p = join(root, f);
+    if (statSync(p).isFile()) h.update(f).update(readFileSync(p));
+  }
+  return h.digest("hex");
+};
 const all = (readdirSync(join(root, "examples"), { recursive: true }) as string[])
   .map((f) => f.split("\\").join("/")).filter((f) => f.endsWith(".px.js") && !f.split("/").some((s) => s.startsWith("_") || s === "out") && !/(^|\/)pipeline\/part_/.test(f)).sort();
 const only = process.env.PXL_EXAMPLES?.split(",").map((s) => s.trim()).filter(Boolean);
 const files = only ? all.filter((f) => only.some((o) => f.startsWith(o))) : all;
 
-test(`pxl check on ${only ? `${files.length} of the ${all.length} examples (PXL_EXAMPLES=${only.join(",")})` : "every example"}: the same warnings as kept`, async () => {
+test(`pxl check on ${only ? `${files.length} of the ${all.length} examples (PXL_EXAMPLES=${only.join(",")})` : "every example"}: the same warnings as kept`, async (t) => {
+  if (!only && !process.env.PXL_UPDATE && existsSync(PASSED) && readFileSync(PASSED, "utf8") === fingerprint()) return t.skip("nothing it reads changed since it last passed");
   assert.ok(files.length, `PXL_EXAMPLES=${only} matches no example (paths under examples/, e.g. hd2d or hd2d/harbor)`);
   // the kept lines, by file: a file's first line starts at the margin, the rest are indented
   const kept = existsSync(SNAP) ? readFileSync(SNAP, "utf8") : "", blocks = new Map<string, string[]>();
@@ -54,4 +69,5 @@ test(`pxl check on ${only ? `${files.length} of the ${all.length} examples (PXL_
   const text = (fs: string[]) => fs.flatMap((f) => said.get(f) ?? blocks.get(f) ?? []).join("\n") + "\n";
   if (process.env.PXL_UPDATE || !existsSync(SNAP)) writeFileSync(SNAP, text(all));
   assert.equal(text(files), only ? files.flatMap((f) => blocks.get(f) ?? []).join("\n") + "\n" : kept);
+  if (!only) try { writeFileSync(PASSED, fingerprint()); } catch { /* only a shortcut */ }
 });

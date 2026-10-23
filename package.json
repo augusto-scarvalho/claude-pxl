@@ -18,6 +18,7 @@
     "scripts",
     "types",
     "examples/*.px.js",
+    "examples/README.md",
     "examples/sidescroller/*.{px.js,hex,png}",
     "examples/tropical/*.{px.js,hex}",
     "examples/tropical/refs/*.{png,txt,md}",

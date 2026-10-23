@@ -462,6 +462,12 @@ and fix dither and shading. Upscaled, round off the big square blocks and redraw
   freely on rocks and tiles; on a small face accept a little. `PXL study` marks the pairs in red.
 - **A line's end** tapers by lightening its last pixels toward what is round it (hair strands,
   whiskers, a crease that fades).
+- **Light and shadow are two families.** The step across the terminator is bigger than any within
+  them, and light bounced into a shadow is a duller, darker step, never as bright as the lit side.
+  Ramps can share their ends (one darkest under all, one lightest over all:
+  `ramps("kGgY", "kRrY")`): the palette mixes like paint.
+- **Something on one side only** (a shine, a shadow side) of a mirrored sprite: mirror a `_part`,
+  stamp it, then draw the one-sided detail over it.
 
 ## 8. The same character, someone else
 

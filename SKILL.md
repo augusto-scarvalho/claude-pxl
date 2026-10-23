@@ -8,138 +8,83 @@ description: Creates pixel art (game sprites, characters, animations, items, ico
 You write a small `.px.js` file; pxl renders PNGs and upscaled previews you can look at. The DSL
 avoids writing pixels twice: mirroring, auto-outline, palette-swap variants, reusable parts,
 primitives, brushes and tilemaps. `PXL` below means `node <this skill's directory>/bin/pxl.js`
-(Node ≥ 22.18, no install).
+(Node ≥ 22.18, no install). This page is a map: each part names where to read more, and
+`PXL --help` lists every command with all its flags.
 
 ## Workflow
 
-1. Read the [example](#examples) closest to what you're making (`PXL list <file>` maps it: read the
-   lines you need) and start from the template below.
-   Given a reference or art to learn from (a PNG or GIF; JPEG, WebP or video with ffmpeg on PATH;
-   pixel art or not), look at it with `PXL shot ref.gif` (a clip's frames on one sheet at 1×) and
-   run `PXL study ref.gif`. Study says what the piece is made of and what to use in pxl for each
-   part, and writes a sheet, the palette and each piece cut out of its background to `out/_study/`:
-   - a picture: palette and ramps (hue shifting, near twins), outlines, a line's L-corners and
-     jaggies, dithering, anti-aliasing, clusters, light, banding, pillow shading, tiles, perspective
-     (vanishing points, lens, tilt); read at the wrong pixel size (a blurred copy), `--px N`; a photo
-     or painting: its masses of light and dark, its colors as ramps, and a small picture in few
-     colors to draw over (`--to WxH`, `--colors N`);
-   - a clip: timing per drawing (on twos), cycle and loop, subpixel motion, parallax planes and their
-     speeds (bands of rows, and planes sharing rows), and its pieces (the backdrop, sprites carried along, walks, anims in place, rigs, actions
-     with their smears, effects, and the lights, told apart first), each with its box in every frame,
-     and the spacing of what travels (easing, anticipation, overshoot, squash and stretch). To measure
-     one thing moving: `PXL study ref.gif --at x,y,w,h` (the region in the drawing's own pixels, as
-     `shot` shows it) follows it frame by frame. `--no-out` prints the text only.
-
-   An editor's transparency checker exported with it is taken for clear; a reflection under it is
-   told (row, opacity) and set aside.
+1. Start from the closest example ([below](#examples); `PXL list <file>` maps it: read the lines you
+   need) and the template. Given a reference (a PNG or GIF; JPEG, WebP or video with ffmpeg on
+   PATH; pixel art or not): `PXL shot ref.gif` shows it (a clip's frames on one sheet) and
+   `PXL study ref.gif` reads it: palette and ramps, outlines, light, perspective, a clip's timing
+   and parallax planes, each moving piece cut out, and what to use in pxl for each part
+   (`--at x,y,w,h` follows one thing; more in `PXL --help` and `PXL help "characters 2 3"`).
 2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
-   `out/_shot/<name>.png` (read it). Its text says what changed since your last shot of it (pixels
-   and where, so an edit that did nothing shows) and the warnings `check` finds on it.
-   `--frames 0,12,30` (or `0-17`, `all`) puts frames side by side (in rows when too wide: a contact
-   sheet of a big scene's key frames), `--grey` adds the same in values only (the squint test), `--ref` draws its guide layers over it, `--at x,y,w,h` enlarges a part
-   (again for another part, a column each); more names (another file's as `other.px.js:name`, any
-   PNG at 1×, a reference GIF or video) make a row each, to compare; `--gif` plays them side by
-   side instead (a walk in 8 directions, two versions moving; `--every 3` builds one frame in three:
-   a long scene's preview, its size in MB). Exact pixels:
-   `PXL ascii art.px.js <name>` (keys + rulers, cheaper than an image). Scenes:
-   `PXL describe art.px.js <scene>` (`--brief` when busy) gives each object's
-   position, gaps, cover, contrast and motion as text: answer layout questions from it, not by
-   eyeballing (`--frame N` for another frame).
-3. Fix everything one look showed, then look again: send all the edits in the same message
-   (parallel tool calls are one turn, and every turn re-reads the whole conversation, so a turn
-   per edit is what makes a long session expensive). After the first write, change the file with
-   Edit, not by writing it whole again: each rewrite stays in the conversation (in measured
-   sessions, rewrites were a quarter of all that was re-read). `PXL describe ... --diff` lists the objects an
-   edit moved, redrew or recolored; `PXL shot ... --vs HEAD --diff` shows the last
-   committed version above and the pixels that changed below. A wrong pixel: `PXL steps art.px.js
-   <name> --at x,y` names the line that painted it.
-4. `PXL build art.px.js` writes the outputs: PNGs, sheets, GIFs, and previews in `out/_preview/`
-   (checkerboard = transparent, pixel grid; anims also `<name>_onion.png`, a motion map + onion
-   skin). `--only a,b` for some of them; a long loop's preview GIF runs to many MB, `--every 3`
-   keeps one frame in three. A build that has grown slow: `--profile` names the functions where
-   the time went, in your file and in pxl.
-5. Before handing over, run `PXL check art.px.js`: every check describe makes, on every scene and
-   rig of the file and every frame of an animated scene (one in N with `check: { every: N }` on a long
-   story's; a picture made as an `anim()` gets none of those): warnings only, with the frames they happen at. Fix each or say why it's meant. It also
-   lists, as LOOK lines that don't fail it, the L-corners and jaggies in the 1 px lines of every
-   sprite and part drawn by hand, and tones side by side too close to tell apart (`PXL shot` rings
-   those pixels in `<name>_look.png`): look at each, delete a doubled step on a smooth line, keep a
-   corner the shape has (a tyre, a roof, a wingtip). Its last
-   line says which rules ran: a rule runs only where the art says what it needs (`world.light`,
-   `world.ground`, `height`, a `front` socket), so "no warnings" with "not run: lit side" checked
-   nothing about the light (a scene lit by a fire or a lamp: `world: { light: { at: [x, y] } }`).
-   A lit-side warning that looks wrong: `--readings` shows what the rule read on every placement.
-   A 3D scene's `expect3d` rules run there too; `--fix` fixes a failing one with one number (where a
-   part stands, a gap) and writes it into the file.
-   Then look as a critic. Replacing approved art: keep `name_old` beside the new one and show
-   both, `PXL shot art.px.js name name_old`, for the user to choose. Matching a reference:
-   `PXL compare art.px.js <name> ref.png [--shrink N]` lists each row's extents side by side (against
-   another asset, `other` or `other.px.js:name`: a new head within a pixel of the approved one; `PXL
-   compare ref.png` alone: the reference's own rows, to draw to). Which
-   way a rig's parts face: `PXL blind art.px.js <rig>` shows them unnamed to a reader who doesn't
-   know the labels (characters.md §11).
-6. If the user wants to watch: start `PXL serve art.px.js` in the background and give them the URL
-   (a file that exports 3D models: its `/3d` page turns them round). Stop it when you're done.
-   Never open a page in a headless browser to look at it: on a laptop that froze the machine.
+   `out/_shot/<name>.png` (read it); its text says what changed since your last shot of it and
+   the warnings `check` finds on it. `--frames 0,12,30` side by side, `--at x,y,w,h` enlarges a
+   part, more names make a row each to compare, `--gif` (`--every 3`) plays them, `--grey` shows the
+   values. Exact pixels: `PXL ascii art.px.js <name>`. Scenes: `PXL describe art.px.js <scene>`
+   (`--brief` when busy) gives each object's position, gaps, cover, contrast and motion as text:
+   answer layout questions from it, not by eyeballing.
+3. Fix everything one look showed, then look again: all the edits in the same message (every turn
+   re-reads the whole conversation, so a turn per edit makes a session expensive). After the first
+   write, change the file with Edit, never write it whole again. `describe --diff` lists what an
+   edit moved or redrew; `shot --vs HEAD --diff` shows the pixels it changed;
+   `PXL steps art.px.js <name> --at x,y` names the line that painted a pixel.
+4. `PXL build art.px.js` writes the PNGs, sheets, GIFs and previews in `out/_preview/` (`--only a,b`;
+   `--every 3` keeps a long loop's GIF small; `--profile` when a build has grown slow).
+5. Before handing over, `PXL check art.px.js`: every scene and rig of the file, every frame of an
+   animated scene (`check: { every: N }` on a long story), warnings only, with their frames. Fix each
+   or say why it's meant. LOOK lines (L-corners, jaggies, tones too close) don't fail it: look at
+   each. Its last line says which rules ran: "not run: lit side" means nothing about the light was
+   checked (give the scene `world.light`); `expect3d` rules run there too (`--fix`). Then look as a
+   critic. Replacing approved art: keep `name_old` beside the new one and show both
+   (`PXL shot art.px.js name name_old`); against a reference or an approved part, `PXL compare`
+   lists each row's extents. More: `PXL help "scenes 14"`, `PXL --help`.
+6. If the user wants to watch: start `PXL serve art.px.js` in the background, give them the URL,
+   and stop it when you're done. Never open a page in a headless browser (on a laptop that froze the
+   machine), and run one heavy job (a long render, a test run) at a time.
 
 Errors name file:line:col and the asset/layer/op, and suggest fixes. One broken asset doesn't stop
 the others.
 
 ## A big scene: ask how to make it
 
-For a big, busy scene (320×180 and up, many props, animated), ask the user first, with the numbers:
+For a big, busy scene (320×180 and up, many props, animated), ask the user first, with the numbers
+and how long this conversation already is:
 
-- **One agent** (the default): you plan and draw it all. The cheapest and the most coherent: a
-  320×180 animated city street took 85 turns and 31 minutes. In a conversation already long, a fresh
-  agent given a brief file (`claude -p ... < brief.txt`, as below) costs less than going on here.
-- **A pipeline**: a planner writes `palette.px.js` (keys and ramps only), a plan (per part: its
-  file, its assets with the part's name as prefix, box, pivot, where it is stamped, its light, one
-  timing for every loop) and the scene file that includes the parts. Then one fork of the planner
-  per part draws it in its own file with a `test_<part>` scene, all at once, and a last fork puts
-  the scene together. The same street came out denser (more people, cars, shops) but less
-  coherent, for ~5× the tokens and ~2× the time.
+- **One agent** (the default): the cheapest and the most coherent; a 320×180 animated city street
+  took 85 turns and 31 minutes. In a conversation already long, a fresh agent given a brief file
+  costs less than going on here.
+- **A pipeline**: a planner and one fork per part, then a fork that puts the scene together:
+  denser but less coherent, ~5× the tokens and ~2× the time. Run it from a new session, never
+  forked from a long one (each fork rereads all of it).
 
-  Run it from a new session, not from this conversation. A fork carries everything in the session
-  that makes it and rereads it on every step: the ~5× was measured with the planner new (~130k of
-  context when it forked); forked from a long conversation (500k and more), each of 8-10 forks
-  carries all of it, many times the cost, enough to run out a usage limit. So say how long this
-  conversation is when you ask. Write the brief to a file; the planner is
-  `claude -p --session-id <new uuid> --allowedTools "Bash Read Write Edit Glob Grep" < plan_prompt.txt`,
-  each part `claude -p --resume <that uuid> --fork-session --allowedTools "..." < part_prompt.txt`
-  (the prompt on stdin: `--add-dir` takes several values and would swallow it). Only when this
-  session is still short is a fork of yourself (Claude Code's Agent tool, `subagent_type: "fork"`)
-  as cheap.
-
-Both are in `examples/cyberpunk/`; `pipeline/plan.md` is a plan whose parts fit. Included files
-share one scope, so every top-level name in a part starts with the part's name. Either way, show it in
-stages for the user to approve before painting on: the camera and the ground as blocks, the props,
-then the people; a new move as flat blocks first (`bk_<move>_<dir>` in `hd2d/traveler.px.js`).
+How to run each, with the commands: [docs/agents.md](docs/agents.md#a-big-scene-one-agent-a-fresh-one-or-a-pipeline);
+both streets are in `examples/cyberpunk/`. Either way, show it in stages for the user to approve
+before painting on: the camera and the ground as blocks, the props, then the people; a new move as
+flat blocks first (`bk_<move>_<dir>` in `hd2d/traveler.px.js`).
 
 ## Looking things up
 
 What you read early is paid again on every later turn: in measured sessions, guides and examples
-dumped whole (`cat`, `sed -n 1,200p`) were a third of all that was re-read. Read the reference and
-the guides by section, through `PXL help`, never whole; this file is already in your context.
-`PXL help` lists every op and option by section, and each guide's sections with their size;
-`PXL help <name>` prints what the reference says about it and where the examples use it;
-`PXL help "<guide> <numbers or words of a heading>"` prints those sections. Read the ones your
-task needs before starting:
+dumped whole were a third of all that was re-read. Read the reference and the guides by section,
+never whole: `PXL help` lists every op and option and each guide's sections with their size;
+`PXL help <name>` prints what the reference says about an op and where the examples use it;
+`PXL help "<guide> <numbers or words of a heading>"` prints those sections. Read the ones your task
+needs before starting:
 
 | Making | Read |
 |---|---|
-| a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate, 12 for an action's or a cycle's frame counts, 13 for a game's look (its figures' heights and colors, how it builds and flips them) |
+| a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate, 12 for frame counts, 13 for a game's look |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a figure that turns to 4 or 8 directions and walks (a field sprite) | `PXL help "characters 3 5 6 10"` (a skeleton in 3D and a head per view, and what went wrong on the traveler; faces and hair; the views; the walk) |
-| a scene, level, building or environment | `PXL help "scenes 1 3 11 14"` (layout, texture, shadows and light, checking); then what it needs: 2 ground and tiles, 4 trees, 5 water, 6 distance, 7 true perspective and HD-2D dioramas, 8-10 loops and parallax, 12 effects; for a game, 15 its screen and 16 its projections (top-down 3/4, isometric); for its grass, trees, bushes, rocks, walls and paths, `PXL help "environment 1"` and the section of each (2-9), starting from `examples/nature/kit.px.js` |
+| a figure that turns to 4 or 8 directions and walks (a field sprite) | `PXL help "characters 3 5 6 10"` |
+| a scene, level, building or environment | `PXL help "scenes 1 3 11 14"`; then by need: 2 ground, 4 trees, 5 water, 6 distance, 7 perspective and HD-2D, 8-10 loops and parallax, 16 a game's projections; grass, trees, rocks, walls: `PXL help "environment 1"` |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~2.5k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
-| a thing in 3D that turns, sways or is seen from several cameras (a tree, a rock, a house, mist, voxels) | `PXL help "scenes 17"`, then `PXL help sdf`, `PXL help make3d`, `PXL help world3d`; start from `examples/sdf/world.px.js` |
-| an effect a shader would do (a dissolve, an aura, a plant in the wind, a tint, energy), particles, a trail, smoke, a spell | `PXL help effects` (the kinds; `fx` on one copy), `PXL help abilities` (phases, `emitter`, `particles`, `trail`, sockets, `spell`, `cast`), `PXL help smoke`; `PXL help "designing an element"` for an element of your own; `PXL help "scenes 12"` for effects' timing and numbers, `PXL help "scenes 7"` for light, holes and see-through things in a diorama |
-
-An example, or your own file after many edits: `PXL list <file>` maps it (each asset definition and
-function with its line range and the comment above it, what a loop makes on one line; a file meant
-to be included is mapped from its text). Read those lines, not the file.
+| a thing in 3D: turns, sways, seen from several cameras | `PXL help "scenes 17"`; start from `examples/sdf/world.px.js` |
+| an effect a shader would do, particles, smoke, a spell | `PXL help effects`, `PXL help abilities`, `PXL help "scenes 12"`; your own element: `PXL help "designing an element"` |
 
 ## Template
 
@@ -172,127 +117,72 @@ sheet("chars", ["slime*", "chest"], { pad: 1 })
 
 ## Essentials
 
+What exists, a line each; `PXL help <name>` prints the rest of any op or option named here.
+
 - **Colors**: one-char keys from `pal`; `"#hex"`; `"."` skip; `"_"` erase. Palettes: `use("pico8" |
-  "sweetie16" | "endesga32" | "palette.hex")` (Lospec files; `1a1626 k ink` gives a color its key);
-  `shades("HGgl", "#5aa040", { sat? })` makes a hue-shifted ramp from one color.
+  "sweetie16" | "endesga32" | "palette.hex")`; `shades("HGgl", "#5aa040")` makes a hue-shifted ramp.
 - **Order**: grid strings, ops, `(c) => { ... }` functions and `layer(...)`s run in order; then
   mirror → swap → flip → rot → angle → aa → inline/outline/outline8 (grows 1px) → crop.
 - **Regions** (`where`, `clip(region, ...items)`): `[cx, cy, r]`, `[x, y, w, h]`, a polygon's points,
-  or `(x, y) => bool`. Shading: `shade`/`light(region, steps, density)` step colors along the ramps;
-  a second pass, `shade(region, 1, 0.5)`, softens the edge of a round form's shadow (a cast shadow
-  and a flat face's edge stay sharp).
+  or `(x, y) => bool`. `shade`/`light(region, steps, density)` step colors along the ramps.
 - **Reuse**: variants are `base` + `swap`; repeated details `_parts` + `stamp`; families a `group` or a
   loop; props get `pivot: "bottom"`; texture is `scatter` of tiny parts; areas are `tilemap`/`pattern`.
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` and functions reading `c.phase`;
-  `dir: "pingpong"`; motion blur, `stamp(name, x, y, { smear: [fromX, fromY] })`; a part half a
-  pixel along: `stamp(name, x, y + 0.5, { sub: true })`
-  (subpixel, `PXL help "characters 10"`); stamping an anim animates the scene, and the scene's own
-  functions then get its loop (`c.frame`, `c.frames`, `c.phase`, `c.t`), or a clock of its own,
-  `scene(..., { frames, fps })`, when they pick what to draw by time. Things going by in a loop
-  that closes (in an anim, or a scene that stamps one): `scroll()` (parallax planes), `clouds()`,
-  `plume()` (smoke, steam). Limbs, walks, hair: `PXL help "characters 9 10"`.
-- **Existing art**: `sprite("x", { png, area, shrink, palettize })`, `anim(..., { png, frames })`;
-  `rampmap` maps imported tones onto a ramp without merging them.
-- **Out**: `sheet()` (+ JSON with tags; `rows: "tag"` a row per animation; its preview GIF plays them
-  all at once), GIFs, Tiled `.tmj` for tilemaps, `build --aseprite` for a
-  person to keep editing in Aseprite, `build --share 4` for clean enlarged PNGs and GIFs to post.
-- **Light**: `shade:`/`light:` layers and `cast` shadows, `relight`/`plate()` for a part lit on its
-  own edges, `glow`, `lighting()` (lighting.md).
-- **Effects and spells**: `effect(kind, opts)` on what is drawn so far (`dissolve`, `pixelate`,
-  `dither`, `tint`, `distort`, `emit` (it gives light), `aura`, `sway`, `energy`), on one copy by a
-  placement's `fx`; `smoke()`; `emitter()` drawn by `particles()`, `trail()`, timed by `ability()`,
-  from a hand's socket (`c.setSocket`, `c.socket`, `c.meshSocket`); a whole cast,
-  `cast(spell("fire", 3, { from, to, view?, variant? }))`, in a `mesh()`'s depth after it.
-- **Text**: `text()` in the 3×5 built in, or `include("<skill dir>/examples/fonts/font5x7.px.js")`
-  for `{ font: "5x7" }` (lowercase too) or `"5x7 mono"` (a score, a timer); `fonts/font_demo.px.js` uses them.
-- **In meters**: `perspective()` (one, two or three points: `yaw`, `pitch`), `plane()` for flat ground,
-  `terrain()` for hills and mountains, `solids()`/`shadows()` for things built of `solid` shapes,
-  `mesh()` for faces in meters from `model()` (what you are inside of or that wraps round itself; an
-  HD-2D diorama: textured boxes, sprites standing in them, `sun`, `lamps`; a material's `block: 4`
-  draws its faces in blocks of a sprite's pixel in an HD picture), then `post()` in the same body for depth of field, haze, bloom, a `lut` grade, `grain`, the `palette` back (`PXL help post`); `capsule` for a limb painted round, `flame` for fire
-  (`PXL help "scenes 7"`); procedural texture with `hash`, `vnoise`, `fbm`, `bayer`, `seamless`
-  (`PXL help vnoise`).
-- **3D fields**: things in meters as distance fields (`sdf`), drawn as pixel art by `surface()`, as
-  cubes by `voxels()` (`ao` for creases; `grid: true` views line fields up with them), meshes by
-  `mesh()` (a camera or side/top/iso), air by `volume()`, details by `sdf.scatter` + `splats()`,
-  hand-drawn art pinned on them by `decal()`; a scene of named parts by `world3d` and the `make3d`
-  builders (edit by name), checked by `expect3d`; out to other tools by `export3d` (`.vox`, `.obj`,
-  `.glb`, `.ply`; a function of the clock with `frames`: a `.glb` that plays).
+  stamping an anim animates the scene; `scroll()`, `clouds()`, `plume()` go by in a loop. Limbs,
+  walks, hair: `PXL help "characters 9 10"`; loops and parallax: `PXL help "scenes 8 9 10"`.
+- **Existing art**: `sprite("x", { png, area, shrink, palettize })`, `anim(..., { png, frames })`, `rampmap`.
+- **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj`, `build --aseprite`, `build --share 4`.
+- **Light**: `shade:`/`light:` layers and `cast` shadows, `relight`/`plate()`, `glow`, `lighting()`
+  ([lighting.md](lighting.md)).
+- **Text**: `text()` in the 3×5 built in, or `include` `examples/fonts/font5x7.px.js` for `{ font: "5x7" }`.
+- **In meters and HD-2D**: `perspective()`, `plane()`, `terrain()`, `solids()`/`shadows()`,
+  `mesh()` of `model()` faces (`block: K` keeps faces in the sprites' pixel), `post()` for depth of
+  field, bloom, a `lut`, `grain`; `capsule`, `flame` (`PXL help "scenes 7"`, `PXL help post`).
+- **Effects and spells**: `effect(kind)` (`dissolve`, `pixelate`, `dither`, `tint`, `distort`,
+  `emit`, `aura`, `sway`, `energy`), one copy's `fx`; `smoke()`, `emitter()` + `particles()`,
+  `trail()`, `ability()` from a hand's socket; `cast(spell("fire", 3, { from, to }))`.
+- **3D fields**: `sdf` drawn by `surface()`, `voxels()`, `mesh()`, `volume()`; details by
+  `sdf.scatter` + `splats()`; hand-drawn art pinned on by `decal()`; a scene of named parts by
+  `world3d` and `make3d`, checked by `expect3d`; out by `export3d` (`PXL help "scenes 17"`).
+- **Procedural texture**: `hash`, `vnoise`, `fbm`, `bayer`, `seamless` (`PXL help vnoise`).
 
 ## Examples
 
-Finished art files in `examples/` (this skill's directory). Copy the structure of the closest one;
-`PXL help <op>` shows where each op is used.
+Finished art files in `examples/`: [examples/README.md](examples/README.md) says what each one is
+for, a line each. Copy the structure of the closest:
 
-| File | Read it for |
-|---|---|
-| `basics.px.js` | the starter: `mx` + `outline`, `base`/`swap`, parts, `sheet` |
-| `platformer.px.js` | a tileset laid out as a level: `tilemap`, `group` variety, tile `sheet`, `include` |
-| `topdown.px.js` | overhead RPG island: corner-tile shore generated in code, `scatter`, cast shadows |
-| `topdown_hero/` | a top-down game character in four directions: a colored dummy animated first and the costume over it, idle, walk and run from one set of drawings, a sword attack with smears, lit from straight above, a tagged `sheet` |
-| `isometric.px.js` | 2:1 blocks, back-to-front order, iso helpers |
-| `perspective/road.px.js` | true perspective: `perspective()` and `plane()`, props in meters whose parts also cast their shadows, a walker shrinking step by step with hand-drawn small sizes picked by `fit` |
-| `perspective/park.px.js` | two-point perspective (`yaw`) at 2 pm: benches, trees and people as `solid` shapes drawn by `solids()` and cast by `shadows()`, boxes lit by the side they face, people and a dog posed in 3D by a gait (any heading, own shadows), moving things interleaved far to near with still ones, a loop closed by hiding behind hedges |
-| `perspective/extinction.px.js` | three-point perspective (`pitch`, `vertical()`), a worm's-eye view: a volcano on a massif by `terrain()`, lava down the steepest way, the sun at `toward()`, a sky by `ray()`, uprights leaning to the third point, dinosaurs drawn from their profile on a 3D run (legs by `capsule`), pterosaurs by hand placed by the camera, everything burning by `flame` |
-| `perspective/race.px.js` | a view from the driver's seat: a road that bends in perspective, rivals drawn by hand from behind at seven sizes picked by the camera, overtaken one by one, their long shadows, the far things swinging by the heading (parallax), a cockpit modelled in 3D with `model()` and drawn by `mesh()` (faces toned by material ramps, outlined, details put where the camera puts them; `cockpit.px.js`), more cameras in the mirrors, a burst of speed whose integral moves everything, the wheel turning with the hands on it, each hand a puppet: a skeleton of joints read off photos, set on the rim every frame, its parts painted between the joints (`capsule`, a plate) |
-| `subpixel.px.js` | subpixel motion: a block moved half a pixel three ways with `stamp(..., { sub: [dx, dy] })`, pushing into its own outline, and the same idle as a single-pixel bob and by half pixels, part by part, the feet still |
-| `parallax/train.px.js` | parallax: planes as strips that wrap going by with `scroll`, a far ridge that drifts by crossfading, `clouds`, a steam engine standing still with its wheels and rods, its smoke a `plume`, people at the windows |
-| `sidescroller/` | a game's art over several files: shared `palette.hex`, `wrap` tiles, `png` import, hit flash |
-| `shop.px.js`, `moon_bakery.px.js` | flat building facades from parts: tiles, signs, `wire` lights |
-| `moon_bakery_3d.px.js`, `tackle.px.js` | 3/4 buildings; weathering with a cause |
-| `neon_noodle_3d.px.js` | night street: neon, reflections, steam |
-| `lighting.px.js`, `outpost.px.js` | `lighting()` scenes: lamps, `solid`/`wall` layers |
-| `normals.px.js` | normal maps: the four `bump` shapes on one rock (`hybrid` as Sprite Fusion makes them), painted `normals` |
-| `cave.px.js`, `grotto.px.js` | animated glow scenes: pulsing lamps, waterfall, particles |
-| `tropical/` | 320×240 animated forest: imported trees, river, trail tileset, animals, a girl on the trail (her walk cycle in `girl.px.js`) |
-| `halloween/` | 320×180 night party: `lighting()` with many lamps, point-light `cast` shadows, dancing monsters (bones drawn between joints, a cape polygon, `warp`) |
-| `no_magic.px.js` | the largest interior: character anims, fire, many props |
-| `sunset/` | 320×180 backlit scene: long shadows toward us, glowing edges, a tent lit through, a sky that loops slower than the rest |
-| `rig/tournament.px.js` | the knights in a scene: ground in perspective with every height checked, a 96-frame bout with trumpeters and marshal on named cues, pavilions, ground shadows from one sun, distance haze |
-| `rig/knight.px.js` | a 72 px knight built skeleton first: `rig`, `figure`, stand-ins, `plate`-lit parts, `twin` parts for the turned rig; poses from `ik`, slashes with `arc` smears; `facing` and `world` read out by describe |
-| `rig/warden.px.js` | a whirling axe combo on a skeleton in 3D: the body turns about its upright with the swing (front, back, front again), the shoulders coil against the hips, the knees bend, the arm reaches full length; the head drawn by hand in five views picked by the turn, the torso and a coat that flares with the turn sampled as surfaces, the hair a frame late; at rest a fighting stance sways from foot to foot by half pixels, the head a frame behind, the feet still (`stamp`'s `sub`, `c.subpixel`); the axe drawn in 3D and its smear the path its blade took, behind the body where that path ran; a reflection on a polished floor (`flip: "y"`, `opacity`) |
-| `cyberpunk/` | a 320×180 animated city street at dusk made two ways: by one agent (`sodium_hour.px.js`) and by a pipeline (`pipeline/`: the plan, the palette, eight part files, the scene) |
-| `nature/kit.px.js` | grass tiles, pines, bushes, rocks, walls, flagstones, tufts, flowers, a dead tree, drawn to the environment guide; builders for more (`grassTile`, `pine`, `bush`, `rampart`), and trees built as volumes in 3D that sway (`pineVolume`, `deadTreeVolume`); `include` it |
-| `hd2d/traveler.px.js` | an HD-2D figure in the 8 directions (S, SW, W, NW, N and their mirrors), walking and idle, casting (in four): a skeleton in 3D as the warden's, blocked out first, painted part by part (trousers, boots, a tunic with its belt, a cloak hung from the shoulders that trails and sways), a head drawn per view; a walk of its own per view; a kneel; each move also as flat blocks (`bk_<move>_<dir>`), to judge a new one before painting it; a second figure recolored |
-| `hd2d/graveyard.px.js` | an HD-2D graveyard on a hill, drawn after the games' sheets (`pxl study`): grass of blades laid a texel to a pixel, flagstones, a mossy rampart, headstones and rocks as sprites at the scene's scale, festooned pines; a fence whose clear texels are holes (`anchor: "face"`), a low sun behind, mist; a story on one clock: the traveler comes in, kneels to lay a rose and talks with a mourner in parchment dialogue boxes, `check: { every: 8 }` |
-| `hd2d/harbor.px.js` | an HD-2D harbor after Octopath Traveler II, its camera matched by measuring the reference: a galleon lofted in meters, castles, balusters, lanterns, sails sewn of panels toned by the sun through them, bobbing at a pier of two levels with a diagonal ramp; wood laid whole at the sprites' scale; water with glints, bokeh and the hull's reflection; rowboats, a crane, gulls, a crew at work; Alden's passage aboard with a dialogue; a `camera()` that runs an excerpt of the story for the gallery |
-| `hd2d/crew.px.js` | the traveler's skeleton dressed per person: five heads drawn per view within a pixel of his skull (a bandana and a ponytail, bald and bearded, a flat cap, a braid, grey hair tied back), outfits swept round the body (a striped shirt, a vest, a leather apron, a long coat, a bodice and a long skirt), a crate carried low painted into the figure's depth, and its blocks |
-| `spells.px.js`, `spell_variants.px.js` | the spell kit: nine elements at three tiers on one clock (`spell()`, `cast()`); their variants (icebergs, boulders, quakes, meteors as lit volumes) and the same spell seen from the side, above, in iso and through a camera, cast from the traveler's hand |
-| `hd2d/clearing.px.js` | every shader at once, on a 5 s clock: a dusk clearing whose wood and grass sway in one wind (`effect("sway")`, a gust by `delay`); the traveler's cast pose, his hand a socket (`c.setSocket`, `c.meshSocket`); a fireball of `effect("energy")` with an `effect("aura")` round him, on an `ability()`'s phases, lighting the ground as it flies, hidden behind a wall; the scarecrow catching fire and burning away (the dissolve's `"burn"` look with flames, on that copy alone: `fx`), `smoke()` rising, `emitter()` sparks; `post()` with Three's bloom, a `.cube` LUT and a still grain |
-| `hd2d/plaza.px.js` | an HD-2D diorama: a camera high up through a long lens, boxes in meters tiled with pixel-art textures by `mesh()`, the topdown hero, pines and lamps standing among them in one depth (`sprites`, on contact shadows); a late sun, sky and lamps with the sun's shadows (`sun`, `lamps`, `emit`, sprites lit through `bump("hybrid")`); the same at 1920x1080 (`pixel: 4`) with `post()`: depth of field, haze, bloom, vignette; the camera, blocks and textures it shares with the graveyard in `kit.px.js` |
-| `sdf/fields.px.js`, `sdf/kit.px.js` | 3D as code: a tree, a rock, a mushroom house and a crystal as distance fields drawn as pixel art from the side, the top, in iso and through the HD-2D camera, swaying; the kit's camera, ground and materials |
-| `sdf/grids.px.js`, `sdf/volumes.px.js`, `sdf/splats.px.js` | the same fields as voxels (cells of any size) and meshes, exported (`.vox`, `.obj`, `.glb`); clouds, mist, smoke and a glowing orb as densities; Gaussian splats (`.ply`) |
-| `sdf/details.px.js`, `sdf/decals.px.js`, `sdf/world.px.js` | leaves and moss scattered on forms as brushes; hand-drawn doors, faces and runes pinned on forms (views, a blink); a scene of named parts edited by name, its rules checked; the gallery's grove (`grove_showcase`) |
-| `fonts/font5x7.px.js` | a 5×7 font for titles: `include` it, `text(..., { font: "5x7" })` |
+- **First files**: `basics.px.js` (mirror, outline, variants, parts, a sheet), `platformer.px.js`
+  (a tileset as a level), `topdown.px.js`, `isometric.px.js`.
+- **Characters**: `topdown_hero/` (four directions, a tagged sheet), `rig/knight.px.js` and
+  `rig/warden.px.js` (skeleton first), `hd2d/traveler.px.js` and `hd2d/crew.px.js` (8 directions,
+  moves as blocks first), `tropical/girl.px.js` (a walk).
+- **Scenes**: `sunset/`, `tropical/`, `halloween/`, `cyberpunk/`, `no_magic.px.js`; lamps in
+  `lighting.px.js` and `outpost.px.js`; parallax in `parallax/train.px.js`.
+- **Perspective and HD-2D**: `perspective/` (one, two and three points, a cockpit),
+  `hd2d/plaza.px.js`, `hd2d/graveyard.px.js` (a story with dialogue), `hd2d/harbor.px.js`.
+- **Effects, spells, 3D**: `hd2d/clearing.px.js` (every shader at once), `spells.px.js`, `sdf/`
+  (start from `world.px.js`); grass, trees and rocks to `include`: `nature/kit.px.js`.
 
-Every command run on an example writes an `out/` next to it (build, shot, describe): give it
-`--out <scratch dir>` to keep the skill clean, e.g. `PXL shot <skill dir>/examples/shop.px.js
-comet_repair --out <scratch dir>`.
+Every command run on an example writes an `out/` next to it: give it `--out <scratch dir>`.
 
 ## Habits that give better art
 
 - Write half of anything symmetric (`mx`) and let `outline` draw outlines (`selout` takes a dark
-  shade of what it touches, `inline` stays inside, `outline8` squares the steps, `caps` darkens each
-  run's end where it steps). Shine is a lighter tone of the color, not white (a glint on metal or a gem, a wet spot, magic may be white; pure black only as an outline, never in a shadow).
-  Something on one side only (a shine, a shadow side): mirror a `_part`, stamp it, then draw it.
+  shade of what it touches, `inline` stays inside, `outline8` squares the steps). Shine is a lighter
+  tone of the color, not white (a glint on metal or a gem may be white; pure black only as an
+  outline, never in a shadow).
 - Small organic shapes (a face, a leaf, an item icon) are grids, pixel by pixel; primitives are for
   structure, large areas and long lines. Never big hand grids.
 - Every mark on a surface needs a cause (seams, weathering, story): no filler `noise` or `dither`.
-- Drawing a kind of thing new to you (a tree, a rock, a wall): `PXL study` a game's sheet of it and
-  your drawing, and hold your numbers (tones, patch sizes, single pixels, deep shadow, the hue's turn)
-  against the game's (environment §1).
-- 2–4 shades per material, mnemonic keys (`g`/`G`); reuse a tone across materials (one's shadow is
-  another's light) before adding a color. Light and shadow are two families: the step across the
-  terminator is bigger than any within them, and light bounced into a shadow is a duller, darker
-  step, never as bright as the lit side. Light from one side: a flat face is one tone,
-  a round form changes only along its curve, never darker all round its rim (pillow shading). A
-  sprite the game will flip (a side or top-down character, its tiles) is lit from straight above, a
-  touch toward the viewer (`light: [0, -1]`), so its mirror keeps the light where it was. Ramps can
-  share their ends (one darkest under all, one lightest over all: `ramps("kGgY", "kRrY")`):
-  the palette mixes like paint.
-- Lines step diagonally, without L-corners, their runs in order (`PXL help "characters 7"`);
-  anti-alias by hand, or `aa: true` on a sprite as a start; at 16 px and under, drop the outline
-  (unless it's 8-bit: few colors and a busy ground keep it, in the shared black).
+- Drawing a kind of thing new to you: `PXL study` a game's sheet of it and your drawing, and hold
+  your numbers against the game's (`PXL help "environment 1"`).
+- 2–4 shades per material, mnemonic keys (`g`/`G`); reuse a tone across materials before adding a
+  color. Light and shadow are two families: the step across the terminator is bigger than any
+  within them. A flat face is one tone; a round form changes only along its curve, never darker all
+  round its rim (pillow shading). A sprite the game will flip is lit from straight above
+  (`light: [0, -1]`).
+- Lines step diagonally, without L-corners, their runs in order; at 16 px and under, drop the
+  outline (unless it's 8-bit). Lines, clusters, banding, shared ramps: `PXL help "characters 7"`.
 - Look with `shot` while iterating; `build` when you need the files.
 
 ## When pxl gets in your way

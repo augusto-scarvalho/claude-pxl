@@ -242,7 +242,7 @@ token five, a token written to the cache two, as Claude Code keeps its cache an 
 What keeps a session cheap (the skill already asks the agent for the first three; see
 [How the agent works](#how-the-agent-works)):
 
-- **Read by section.** `SKILL.md` (about 6k tokens) is loaded when the task matches. `pxl help
+- **Read by section.** `SKILL.md` (about 3.5k tokens, a test keeps it under 14 KB) is loaded when the task matches. `pxl help
   "scenes 1 3 11 14"` is about 3k tokens where `scenes.md` whole is 12k.
 - **Edit, don't rewrite.** A file written whole again stays in the conversation.
 - **Fewer turns.** One look per call, and all the fixes one look showed in one turn.
@@ -359,7 +359,10 @@ a time, below normal priority, as `pxl` itself does: on a 4-core laptop seven at
 compile cache, half a second off every test file's start); a file alone runs the same with
 `node --import ./test/compile-cache.ts --test test/<file>.test.ts`. With
 `PXL_EXAMPLES`, the examples test checks only the examples whose path under `examples/` starts with
-it, says in its name how many it left out, and leaves the other examples' lines alone.
+it, says in its name how many it left out, and leaves the other examples' lines alone. A run of
+every example that passed keeps a fingerprint of what the check reads (pxl's sources, the examples,
+the kept lines): the next run with none of that changed, a commit of docs only, skips it and says so
+(delete `node_modules/.cache/pxl/examples-passed.txt` to run it anyway).
 
 `test/examples.checks.txt` holds what `pxl check` says on every example. After a change you meant
 that adds or removes a warning, rewrite it and read the diff:

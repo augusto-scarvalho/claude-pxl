@@ -12,7 +12,7 @@ import { main } from "../src/node/cli.ts";
 const root = join(import.meta.dirname, "..");
 const read = (f: string) => readFileSync(join(root, f), "utf8");
 const pxl = (...a: string[]) => execFileSync(process.execPath, [join(root, "bin/pxl.js"), ...a], { encoding: "utf8" });
-const GUIDES = ["SKILL.md", "reference.md", "scenes.md", "characters.md", "environment.md", "lighting.md", "rotation.md", "README.md", "docs/getting-started.md", "docs/agents.md"];
+const GUIDES = ["SKILL.md", "reference.md", "scenes.md", "characters.md", "environment.md", "lighting.md", "rotation.md", "README.md", "examples/README.md", "docs/getting-started.md", "docs/agents.md"];
 // each command's flags, from the usage pxl prints
 const usage = new Map<string, Set<string>>();
 let cur = "";
@@ -59,18 +59,24 @@ test("docs: every relative link and #anchor in the guides and docs/ leads somewh
   assert.deepEqual(bad, []);
 });
 
+test("docs: SKILL.md stays a map: under 14 KB, the details in the guides it points to", () => {
+  // it is loaded whole into every session that draws; it grew from ~2k tokens back to ~7.5k over the
+  // rounds before this was kept
+  assert.ok(read("SKILL.md").length < 14000, `SKILL.md is ${read("SKILL.md").length} characters: move a detail to its guide and point to it`);
+});
+
 test("docs: every guide section SKILL.md sends the agent to prints", async () => {
   // in this process, not a node each (ten of those took 16 s of the suite)
   const help = async (q: string) => { const log = console.log, out: string[] = []; console.log = (s: string) => out.push(String(s)); try { await main(["help", q]); } finally { console.log = log; } return out.join("\n"); };
   for (const [, q] of read("SKILL.md").matchAll(/PXL help "([^"<]+)"/g)) assert.match(await help(q), /^###? /m, `pxl help "${q}" prints no section`);
 });
 
-test("docs: every op and DSL global is in the reference, and every example SKILL.md lists exists", () => {
+test("docs: every op and DSL global is in the reference, and every example the examples' list names exists", () => {
   const ref = read("reference.md");
   const names = new Set([...OPS, ...Object.keys(new Project().env())]);
   const missing = [...names].filter((n) => !new RegExp(`(^|[^\\w.$])${n}\\(|\`${n}[\`(]`, "m").test(ref));
   assert.deepEqual(missing, [], "not in reference.md");
-  const rows = [...read("SKILL.md").matchAll(/^\| `([\w/.]+)`(?:, `([\w/.]+)`)? \|/gm)].flatMap((m) => [m[1], m[2]]).filter(Boolean);
+  const rows = [...read("examples/README.md").matchAll(/^\| `([\w/.]+)`(?:, `([\w/.]+)`)? \|/gm)].flatMap((m) => [m[1], m[2]]).filter(Boolean);
   assert.ok(rows.length > 20);
   for (const r of rows) assert.ok(existsSync(join(root, "examples", r)), `examples/${r}`);
 });

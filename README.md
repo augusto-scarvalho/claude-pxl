@@ -215,7 +215,8 @@ says which to reach for.
 | which model and effort to draw with: one scene, seventeen runs | [docs/model-study.md](docs/model-study.md) |
 | whether the 3D layer helps agents: four comparisons, each run once an arm | [docs/evaluation-3d.md](docs/evaluation-3d.md) |
 | every op and option | [reference.md](reference.md), or `pxl help <name>` |
-| the agent's workflow, and which example teaches what | [SKILL.md](SKILL.md) |
+| the agent's workflow, and where to read each thing | [SKILL.md](SKILL.md) |
+| which example teaches what, a line each | [examples/README.md](examples/README.md) |
 | scenes, perspective, HD-2D dioramas, parallax, shadows | [scenes.md](scenes.md) |
 | grass, trees, bushes, rocks, walls and paths as games draw them | [environment.md](environment.md) |
 | characters, animation with parts, rigs | [characters.md](characters.md) |
@@ -230,7 +231,7 @@ Long projects made with pxl by agents, most over rounds of a curator's notes, th
 Each is in [`examples/`](examples) to read and copy. Smaller files to start from (the starter
 `basics.px.js`, tilesets, a top-down game character in [`examples/topdown_hero/`](examples/topdown_hero),
 a kit of grass, trees and rocks in [`examples/nature/`](examples/nature)) are in the
-[examples table](SKILL.md#examples) of `SKILL.md`.
+[list of examples](examples/README.md).
 
 ### HD-2D dioramas: a graveyard, a harbor, a clearing
 
