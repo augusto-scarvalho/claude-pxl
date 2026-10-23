@@ -10,6 +10,8 @@ import { tiledMap } from "../core/tiled.ts";
 import { encodeAseprite } from "./aseprite.ts";
 import { encodeGif } from "./gif.ts";
 import { encodePng } from "./png.ts";
+import { encodeGlb, encodeObj, encodeVox, readGlb, readObj, readVox } from "../core/files3d.ts";
+import { Voxels } from "../core/grids.ts";
 
 export interface OutputOptions {
   /** Only these assets/sheets (default: everything exported). */
@@ -48,7 +50,7 @@ export function writePng(path: string, img: Img): void {
 /** Build and write. Each asset fails independently; errors are collected, not thrown. */
 export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}): OutputResult {
   const lines: string[] = [], errors: PxError[] = [], times: [string, number][] = [];
-  const sheetNames = new Set(p.sheets.map((s) => s.name));
+  const sheetNames = new Set([...p.sheets.map((s) => s.name), ...p.models.map((m) => m.name)]);
   if (opts.only)
     for (const n of opts.only)
       if (!p.assets.has(n) && !sheetNames.has(n))
@@ -165,6 +167,31 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       }
     } catch (e) {
       errors.push(wrap(e).within(`sheet '${s.name}'`, s.loc));
+    }
+  }
+  // 3D files, each read back to say what it holds
+  for (const m of p.models) {
+    if (want && !want.has(m.name)) continue;
+    try {
+      const kb = (b: { length: number }) => `${(b.length / 1024).toFixed(1)} KB`;
+      const mesh = m.thing instanceof Voxels ? (m.as.some((f) => f !== "vox") ? m.thing.mesh() : undefined) : m.thing;
+      for (const f of m.as) {
+        if (f === "vox") {
+          const V = m.thing as Voxels, b = encodeVox(V, m.colors), r = readVox(b), [lo, hi] = V.bounds();
+          write(join(out, m.name + ".vox"), Buffer.from(b));
+          lines.push(`vox ${m.name} ${r.size.join("x")}, ${r.count} voxels of ${V.size.map((v) => +v.toFixed(4)).join(" x ")} m (${hi.map((v, e) => +(v - lo[e]).toFixed(2)).join(" x ")} m, from [${lo.map((v) => +v.toFixed(2)).join(", ")}]), ${r.colors} colors, ${kb(b)}`);
+        } else if (f === "obj") {
+          const { obj, mtl } = encodeObj(mesh!, m.name, m.colors), r = readObj(obj);
+          write(join(out, m.name + ".obj"), obj); write(join(out, m.name + ".mtl"), mtl);
+          lines.push(`obj ${m.name} ${r.vertices} vertices, ${r.faces} quads, ${r.materials} materials, ${kb(obj)}`);
+        } else {
+          const b = encodeGlb(mesh!, m.name, m.colors), r = readGlb(b);
+          write(join(out, m.name + ".glb"), Buffer.from(b));
+          lines.push(`glb ${m.name} ${r.vertices} vertices, ${r.triangles} triangles, ${r.materials} materials, Y up ${r.min.map((v) => +v.toFixed(2)).join(",")} to ${r.max.map((v) => +v.toFixed(2)).join(",")}, ${kb(b)}`);
+        }
+      }
+    } catch (e) {
+      errors.push(wrap(e).within(`export3d '${m.name}'`, m.loc));
     }
   }
   return { lines, errors, times };

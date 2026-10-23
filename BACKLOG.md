@@ -926,17 +926,49 @@ What the phases left, each waiting for a reason:
 
 ## A 3D DSL: fields, voxels, volumes, splats (the dsl3d plan, in phases)
 
-- [x] **Distance fields and surface()**: `sdf.*` primitives, joins plain and smooth, moves,
-  deformations, noise, materials by region, parameters on the clock; drawn as pixel art from the side,
-  the top, in iso and through a perspective() camera after a mesh(), at its depth with its shadow.
-- [ ] **Voxels and meshes from a field** (phase 3): grids sampled from it, `.vox`; surface nets or
-  marching cubes to mesh() faces and `.obj`/`.glb`.
+- [x] **Distance fields and surface()** (phases 1-2): `sdf.*` primitives, joins plain and smooth,
+  moves, deformations, noise, materials by region, parameters on the clock; drawn as pixel art from the
+  side, the top, in iso and through a perspective() camera after a mesh(), at its depth with its shadow.
+- [x] **Voxels and meshes from a field** (phase 3): `sdf.voxels` (cells of any size, per axis too),
+  `voxels()` drawing cubes on the pixel grid (iso, top) or through a camera, `sdf.mesh` by surface nets,
+  greedy voxel faces, `export3d` to `.vox`, `.obj`, `.glb` (Y up), each read back.
 - [ ] **Density volumes** (phase 4), **procedural splats** (phase 5, `.ply`), **a scene IR with named
-  parts and local edits** (phase 6).
+  parts and local edits** (phase 6), **evaluation and the guides** (phase 7).
+- [ ] **surface() on voxels' pixel grid in iso**: voxels() draws iso on the pixel grid (a cube px wide,
+  its top half as tall, its sides as tall), surface() draws a true orthographic iso (30 degrees down):
+  the two don't line up on one canvas. Why: a field and its voxels side by side in one iso picture. When:
+  the first scene that mixes them (a `grid: true` view for surface(), the same projection voxels use).
+- [ ] **A grid past 256 a side as several MagicaVoxel models**: refused today with the cell size that
+  fits. Why: a big asset (a building, a terrain) at a fine cell. When: one needs it; write parts of 256
+  and a scene graph placing them (nTRN, nGRP, nSHP chunks).
+- [ ] **mesh() casting shadows from ramp faces without a sun**: only textured faces and sprites take the
+  sun's shadows, and only with `sun` on; a mesh made from a field (sdf.mesh) gets its shadow from its
+  field (`surface(..., { hide: true })`). Why: a block or a mesh in a palette-lit diorama grounded by its
+  own faces. When: a scene of meshes that no field stands behind.
+- [ ] **surface() and voxels() in mesh()'s sun**: they light by their own ramps and lay their shadow on
+  what is drawn, but walls' shadows don't fall on them and the sun's and sky's colours don't tint them.
+  Why: a field among sun-lit textured faces reads cooler than they do. When: an HD-2D scene in the sun
+  shows a field (a SunMap test per hit, then shine() on the ramp tone, kept in clusters).
 - [ ] **An SDF sprite's depth pixel by pixel in mesh()**: a sprite stands as a card, each row at its
-  height's depth; a field drawn through the camera has the true depth. A depth channel travelling with
-  the sprite's pixels (as its normals do) would give a card the true one: when a card reads wrong.
-- [ ] **mesh()'s sun on a field drawn through the camera**: surface() lights by its own ramps and lays
-  its shadow on what is drawn, but walls' shadows don't fall on it and the sun's colours don't tint it.
-- [ ] **Not yet, by decision**: a GPU engine, a Blender pipeline, an interactive WebGL preview (the
-  CPU renderer first, measured; then a backend where a measured pass is slow).
+  height's depth; a field drawn through the camera has the true depth. Why: a wide crown in front of a
+  fence behind the trunk. When: a card reads wrong (a depth channel travelling with the sprite's pixels,
+  as its normals do).
+- [ ] **A leafier canopy**: the reference tree's crown is lobes melted with noise, read as smooth
+  clumps; no leaf clusters drawn in them. Why: pixel-art trees show leaf masses and lit clumps. When:
+  phase 6's builders (a `paint()` pattern of leaf clusters, or finer noise kept in clusters).
+- [ ] **Voxels' creases darker** (ambient occlusion per cube face, as block games shade corners): off
+  today, a tone a face. Why: a big voxel scene can read flat. When: one does.
+- [ ] **Voxels on the pixel grid from the side**: iso and top are on the grid; any other view of
+  voxels is a true orthographic one, its cubes uneven by a pixel. When: a side-view game wants voxels.
+- [ ] **Exports that move**: `export3d` writes a moment (a swaying tree still). Why: an engine plays
+  the wind itself. When: someone exports an animated field (glTF morph targets or a node's animation).
+- [ ] **The material lookup as generated code too**: the distance is one generated function; the
+  material is still closures, read at each hit, voxel and quad (surface nets at 0.05 m: 0.5 s). When:
+  meshing or voxelizing big grids is measured slow.
+- [ ] **A GPU engine**: not yet, by decision. Why not: the CPU renderer is measured first; a backend
+  waits for a pass measured slow (HD dioramas ~1 s a frame). When: a long HD sequence is.
+- [ ] **An interactive WebGL preview** of fields, voxels and meshes (turn it, look round): not yet, by
+  decision. When: after the semantic layer (phase 6), if agents and the user need to orbit a model;
+  the .glb export opens in any viewer meanwhile.
+- [ ] **A Blender pipeline**: not yet, by decision; .obj and .glb reach it. When: a render or an edit
+  only Blender does is asked for.

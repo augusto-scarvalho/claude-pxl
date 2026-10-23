@@ -223,12 +223,20 @@ declare global {
     mat(name: string): PxSdf; paint(name: string, where: (p: PxV3, n: PxV3) => unknown): PxSdf;
     bounds(clock?: PxClock): [PxV3, PxV3]; dist(p: number[], clock?: PxClock): number;
   }
-  type PxSurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number } | PxView;
+  type PxSurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number; origin?: [number, number] } | PxView;
   /** surface()'s options: the view (orthographic at ppm px to the meter, its origin at `at` px; or a perspective() view, standing `at` [x, z, up] m), the materials' ramps, the light, the outline, the rim, its own shadows, the creases, a ray to K x K px, its shadow on what is drawn. */
   interface PxSurfaceOpts {
     view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number }>;
     light?: number[]; outline?: boolean | PxColor; rim?: boolean; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
+    /** through a camera: its shadow alone (a mesh made of it in its place) */
+    hide?: boolean;
   }
+  /** voxels()'s options: surface()'s but ao; a cell's size (given a field), a cube's width in px (iso and top on the pixel grid). */
+  interface PxVoxelOpts extends Omit<PxSurfaceOpts, "ao"> { size?: number | number[]; px?: number }
+  /** A voxel grid: cells a side, their size in m, its low corner, how many are filled, its box; its outside as a mesh, and as mesh()'s faces. */
+  interface PxVoxels { readonly kind: "voxels"; readonly n: PxV3; readonly size: PxV3; readonly origin: PxV3; readonly count: number; bounds(): [PxV3, PxV3]; mesh(): PxMesh3; readonly faces: PxFace[] }
+  /** A mesh in meters: positions, normals, quads (4 indices each) and their materials; mesh()'s faces. */
+  interface PxMesh3 { readonly kind: "mesh"; readonly positions: Float32Array; readonly normals: Float32Array; readonly quads: Uint32Array; readonly mats: string[]; readonly faces: PxFace[] }
   /** terrain()'s options: how far to look (m), the land's highest point, a cheap height it never rises more than `margin` above, the sky's color where a pixel sees no land. */
   interface PxTerrainOpts {
     far?: number; top?: number; bound?: (x: number, z: number) => number; margin?: number;
@@ -471,6 +479,8 @@ declare global {
     mesh(view: PxView | PxPerspective | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): void;
     /** A distance field drawn as pixel art: ramps stepped by the light, an outline away from it, its normals and depth; through a camera after a mesh(), at its depth, its shadow on what is drawn. */
     surface(field: PxSdf, opts?: PxSurfaceOpts): void;
+    /** A voxel grid, or a field made voxels of `size` m now, drawn as pixel-art cubes: a tone a face, the outline on the shaded side; iso and top on the pixel grid. */
+    voxels(grid: PxVoxels | PxSdf, opts?: PxVoxelOpts): void;
     /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade. */
     shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): void;
     /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
@@ -576,6 +586,10 @@ declare global {
   function mesh(view: PxView | PxPerspective | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): PxOp;
   /** A distance field drawn as pixel art from the side, the top, in iso, or through a perspective() camera after a mesh(), at its depth, its shadow on what is drawn. */
   function surface(field: PxSdf, opts?: PxSurfaceOpts): PxOp;
+  /** A voxel grid, or a field made voxels of `size` m at each moment, drawn as pixel-art cubes. */
+  function voxels(grid: PxVoxels | PxSdf, opts?: PxVoxelOpts): PxOp;
+  /** Written by build: a grid as name.vox (and .obj/.glb of its blocks), a mesh as name.obj (+ .mtl) and name.glb, Y up; each read back. */
+  function export3d(name: string, thing: PxVoxels | PxMesh3, opts?: { mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; as?: ("vox" | "obj" | "glb")[] }): void;
   /** Fields in 3D, in meters ([x, y ahead, z up]): primitives (round the origin; cylinder and cone standing on it), joins, and the other kinds made from a distance. */
   const sdf: {
     sphere(r: PxNum): PxSdf; box(size: PxVec | PxNum, o?: { round?: PxNum }): PxSdf; capsule(a: PxVec, b: PxVec, r: PxNum, r2?: PxNum): PxSdf;
@@ -586,8 +600,12 @@ declare global {
     occupancy(f: PxSdf): { kind: "occupancy"; inside(p: number[], clock?: PxClock): boolean };
     density(f: PxSdf, o?: { edge?: number }): { kind: "density"; at(p: number[], clock?: PxClock): number };
     appearance(f: PxSdf): { kind: "appearance"; at(p: number[], n?: number[], clock?: PxClock): string | null };
-    /** a sprite's size for the field in an orthographic view, and its pivot (where its origin lands) */
-    size(f: PxSdf, o?: { view?: PxSurfaceView; ppm?: number; pad?: number; frames?: number }): { w: number; h: number; pivot: [number, number] };
+    /** a sprite's size for the field (or a grid, or a field as voxels of `size`) in an orthographic view, and its pivot (where its origin lands) */
+    size(f: PxSdf | PxVoxels, o?: { view?: PxSurfaceView; ppm?: number; px?: number; size?: number | number[]; pad?: number; frames?: number }): { w: number; h: number; pivot: [number, number] };
+    /** the field as a voxel grid, cells `size` m (or [x, y, z]), filled within `fill` half-cells of their middle (0.5) */
+    voxels(f: PxSdf, o: { size: number | number[]; fill?: number; clock?: PxClock }): PxVoxels;
+    /** the field as a mesh by surface nets, cells `size` m */
+    mesh(f: PxSdf, o: { size: number | number[]; clock?: PxClock }): PxMesh3;
   };
   /** A model for mesh(): face(mat, ...points), strip(mat, a, b) between two lines of points, loft(mat, sections), box(mat, corner, corner); faces holds them. */
   function model(): {

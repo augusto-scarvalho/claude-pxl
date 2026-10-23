@@ -6,7 +6,9 @@ import { type View, perspective } from "./perspective.ts";
 import { solid } from "./solids.ts";
 import { model } from "./mesh.ts";
 import { sdf } from "./sdf.ts";
-import { SURFACE_OPTS, surfaceSize } from "./surface.ts";
+import { SURFACE_OPTS, VOXEL_OPTS, surfaceSize } from "./surface.ts";
+import { Mesh3, Voxels, surfaceNets, voxelize } from "./grids.ts";
+import type { Color } from "./color.ts";
 import { TRANSPARENT, oklab, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import type { Img } from "./image.ts";
@@ -58,6 +60,7 @@ export const SIGNATURES: Record<string, string> = {
   shadows: "view:o shapes:a opts:o",
   mesh: "view:v faces:a mats:o ?opts:o",
   surface: "field:o ?opts:o",
+  voxels: "grid:o ?opts:o",
   capsule: "x0:n y0:n r0:n x1:n y1:n r1:n ramp:s ?opts:o",
   flame: "x:n y:n size:n keys:s ?opts:o",
   scroll: "name:s y:n per:n ?opts:o",
@@ -89,7 +92,7 @@ export const SIGNATURES: Record<string, string> = {
 };
 
 /** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
-const CLOCKED = new Set(["surface", "flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast", "shake"]);
+const CLOCKED = new Set(["surface", "voxels", "flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast", "shake"]);
 /** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
 function drawsWithFunctions(items: Item[]): boolean {
   return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
@@ -127,6 +130,7 @@ export const OP_OPTS: Record<string, string[]> = {
   shadows: ["at", "sun", "scale", "shade", "ramps", "light"],
   mesh: ["light", "sprites", "pixel", "sun", "sky", "lamps", "emit", "shadows"],
   surface: SURFACE_OPTS,
+  voxels: VOXEL_OPTS,
   capsule: ["light", "rim"],
   flame: ["wind", "period", "seed", "frame"],
   scroll: ["x", "y", "frame", "axis"],
@@ -225,6 +229,8 @@ export class Project implements BuildCtx {
   readonly order: string[] = [];
   readonly groups = new Map<string, GroupDef>();
   readonly sheets: SheetDef[] = [];
+  /** 3D files to write (export3d): a voxel grid or a mesh, its materials' colors, the formats */
+  readonly models: { name: string; thing: Voxels | Mesh3; colors: Color[]; as: ("vox" | "obj" | "glb")[]; loc?: string }[] = [];
   readonly fonts = new Map<string, FontDef>();
   /** rig() skeletons by name, for describe's RIG section. */
   readonly rigs = new Map<string, RigDef>();
@@ -514,7 +520,32 @@ export class Project implements BuildCtx {
     // a model for mesh(): faces, strips, lofts and boxes in meters, each of a material
     env.model = model;
     // fields in 3D, in meters: sdf.sphere(r), .union(...), .bend(k), ... drawn by surface(); sdf.size(field, { view, ppm }) a sprite's size for it
-    env.sdf = { ...sdf, size: surfaceSize };
+    // sdf.voxels(field, { size, clock }) a voxel grid, sdf.mesh(field, { size, clock }) a mesh by surface nets
+    env.sdf = {
+      ...sdf, size: surfaceSize,
+      voxels: (f: unknown, o: unknown = {}) => { try { return voxelize(f, o as never); } catch (e) { throw wrap(e).within("sdf.voxels", this.callerLoc()); } },
+      mesh: (f: unknown, o: unknown = {}) => { try { return surfaceNets(f, o as never); } catch (e) { throw wrap(e).within("sdf.mesh", this.callerLoc()); } },
+    };
+    // export3d(name, grid or mesh, { mats, as }): .vox, .obj, .glb written by build
+    env.export3d = (name: unknown, thing: unknown, opts: unknown = {}) => {
+      const loc = this.callerLoc();
+      if (typeof name !== "string" || !name || !(thing instanceof Voxels || thing instanceof Mesh3) || !isPlainObject(opts))
+        throw new PxError('export3d("name", sdf.voxels(field, { size }) or sdf.mesh(field, { size }), { mats: { name: ramp }, as: ["vox"] or ["obj", "glb"] })', loc);
+      checkKeys(`export3d '${name}'`, opts, ["mats", "as"], loc);
+      const { mats = {}, as = thing instanceof Voxels ? ["vox"] : ["obj", "glb"] } = opts as { mats?: Record<string, unknown>; as?: unknown };
+      if (!Array.isArray(as) || !as.length || as.some((f) => !["vox", "obj", "glb"].includes(f)) || (thing instanceof Mesh3 && as.includes("vox")))
+        throw new PxError(`export3d '${name}': as is a list of "vox" (a voxel grid), "obj", "glb" (either), got ${JSON.stringify(as)}`, loc);
+      // each material's color: a light middle tone of its ramp (what another tool lights itself)
+      const colors = thing.mats.map((m) => {
+        const spec = mats[m] ?? Object.values(mats)[0] ?? this.pal.ramps[0];
+        const keys = typeof spec === "string" ? [...spec] : Array.isArray(spec) ? spec : isPlainObject(spec) && "ramp" in spec ? [...(spec as { ramp: string })["ramp"]] : undefined;
+        const c = keys?.length ? this.pal.resolve(keys[Math.ceil((keys.length - 1) * 0.6)]) : null;
+        if (c === null || c === undefined) throw new PxError(`export3d '${name}': material '${m || "(none)"}' needs a ramp in mats (it has: ${Object.keys(mats).join(", ") || "none"})`, loc);
+        return c as Color;
+      });
+      if (this.models.some((x) => x.name === name)) throw new PxError(`export3d '${name}' is already defined`, loc);
+      this.models.push({ name, thing, colors, as: as as ("vox" | "obj" | "glb")[], loc });
+    };
     // perspective({ w, horizon, eye, fov | focal, vp, yaw, pitch }): ground(x, z, up), at(col, row), scale(z, x, up), vanish(angle), vertical()
     env.perspective = (view: unknown) => {
       try { return perspective(view as View); } catch (e) { throw wrap(e).within("perspective", this.callerLoc()); }
@@ -568,7 +599,7 @@ export class Project implements BuildCtx {
         const loc = this.callerLoc();
         try {
           checkArgs(name, args);
-          const o = name === "mesh" ? args[3] : name === "surface" ? args[1] : args[args.length - 1];
+          const o = name === "mesh" ? args[3] : name === "surface" || name === "voxels" ? args[1] : args[args.length - 1];
           if (OP_OPTS[name] && isPlainObject(o)) checkKeys(name, o, OP_OPTS[name]);
         } catch (e) { throw wrap(e).within(name, loc); }
         if (name === "clip") checkItems("clip", args.slice(1), loc);
