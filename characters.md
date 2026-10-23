@@ -273,6 +273,18 @@ of the nose; the corners of the mouth straight below the pupils.)
   - In profile the mass reaches 2-3 px behind the skull and the fringe overhangs the brow a pixel;
     from behind it keeps the front's top and narrows to a nape of 4-6 px ending in points, the ears
     peeking out a pixel. One haircut, the same locks seen from every side.
+- **A new head on an approved body** (the harbor's crew, `examples/hd2d/crew.px.js`): start from the
+  approved head's grid in each view and change only the hair, hat or beard, keeping the face, eye, ear
+  and jaw pixels. Row by row the new skull stays within ±1 px of the approved one's extents (print each
+  row's first and last pixel against it: it catches what the eye misses); a bald head is the skull
+  alone, 1-2 px narrower than hair, never longer. Drawn freehand, the first napes ran 2-3 px back and
+  up and read as aliens, and back views widest at their bottom row, stopping flat over the tail, read
+  as a mushroom cap: from behind a head is widest at the ears and its last 3-4 rows narrow 1-2 px a row
+  to a nape of 5-7 px. Hair pulled back hugs the skull (1 px over it at most), the forehead 1-2 rows
+  higher, the temple and ear bare, lit in 2-3 broad strokes in the upper third running toward the
+  knot; a cap or bandana sits on the skull and overhangs the brow by a pixel; a ponytail, braid or queue
+  hangs down behind the neck from a small dark knot at ear height (2 px wide, 3-4 long), never out
+  sideways, and nothing else hangs below the skull (strands at its edges read as tentacles).
 - **Pupils:** keep at least 1 px of skin between a pupil and the outline, or it reads as a crease.
 - **How eyes read:**
   - Both irises shifted the same way reads as a glance.
@@ -459,6 +471,24 @@ clothes and what they carry or wear. Use real details of the people you mean, no
 shorthand: for an Indigenous Brazilian girl, long straight black hair with a straight fringe, red
 urucum dots and black jenipapo bands painted on the skin, a bead necklace, a woven top and a
 fiber skirt, bare feet; no feather headdress. Keep the original as its own file.
+
+A crowd on one skeleton (a figure in 3D, §3): dress each person rather than recolor one. The painter
+takes an outfit (`travelerRig.figure(..., outfit)`, `examples/hd2d/traveler.px.js`), what is swept
+round the body and its ramps: trousers down to a cuff (rolled to the shin over bare feet, or into
+boots); drapes hung from a height (a cloak behind, a coat open at the front with buttons down its
+edges, a long skirt from the waist); the shirt's body by height and angle (stripes 2 px, a vest open
+over a shirt, a laced bodice); drapes over it (an apron from the chest to the knees); sleeves rolled
+to skin at the forearm. Recolors (`base` + `swap`) of those outfits make the rest of the crowd: nine
+people from five heads and five outfits read as nine at a glance (`examples/hd2d/crew.px.js`); nine
+recolors of one cloaked traveler read as one man nine times.
+
+Carrying, on a chibi's 6.6 px arms (the crew's dockhand, chosen from blocks): a crate held low in
+front, against the belly at the waist, the arms down along the body with the forearms bent forward, a
+hand at each side of its lower half, leaning back 3 degrees, the stride 0.7 of the walk's (and the
+pace with it, or the feet slide). Held up under the chin with the arms forward at shoulder height it
+read as a sleepwalker; on a shoulder, beside an 11 px head, half of it covered the face; over the head
+it is out of the hands' reach. Paint what is carried into the figure's own depth (the outfit's
+`prop`), so the hands hold its sides and the outline runs round both.
 
 ## 9. Small animals
 

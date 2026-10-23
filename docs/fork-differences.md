@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**336 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**337 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–22, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -214,7 +214,7 @@ references until it read right.
 | [`cyberpunk/`](../examples/cyberpunk) | One city street made two ways: by one agent, and by a planner with eight forked agents. |
 | [`perspective/`](../examples/perspective) | The sertão road, the park at 2 pm, the end of the Cretaceous, a street race from the cockpit. |
 | [`nature/`](../examples/nature) | The nature kit: grass tiles, pines, bushes, rocks, a wall, flagstones, tufts, flowers, a dead tree. |
-| [`hd2d/`](../examples/hd2d) | HD-2D dioramas: a plaza in a pine wood at the end of the afternoon, textured boxes, the hero walking behind a low wall, long shadows, lit lamps; and a graveyard on a hill in the morning mist, its grass, stones, headstones and pines drawn after the games' sheets, a traveler and a mourner drawn as Octopath draws its people; each at 1920x1080 through `post()`. Its pines and dead tree built as volumes in 3D and swaying in the wind, leaves blowing across. The traveler's visit walks his eight directions and ends in a parchment dialogue box. |
+| [`hd2d/`](../examples/hd2d) | HD-2D dioramas: a plaza in a pine wood at the end of the afternoon, textured boxes, the hero walking behind a low wall, long shadows, lit lamps; and a graveyard on a hill in the morning mist, its grass, stones, headstones and pines drawn after the games' sheets, a traveler and a mourner drawn as Octopath draws its people; each at 1920x1080 through `post()`. Its pines and dead tree built as volumes in 3D and swaying in the wind, leaves blowing across. The traveler's visit walks his eight directions and ends in a parchment dialogue box. And a harbor after Octopath Traveler II: a galleon bobbing at a pier, sails sewn of panels, water with glints, bokeh and the hull's reflection, a crew dressed on the traveler's skeleton with heads of their own, Alden's passage aboard in a dialogue. |
 | [`parallax/`](../examples/parallax) | A steam train crossing the hills of Minas Gerais, planes going by at their own speeds. |
 | [`fonts/`](../examples/fonts) | A 5×7 font for titles. |
 

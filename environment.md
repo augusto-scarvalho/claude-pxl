@@ -158,6 +158,8 @@ Two or three shapes, set in groups of 2-3 at uneven gaps.
 
 ## 7. Paths and floors
 
+Wooden decks, piers and planked hulls at the sprites' scale: scenes §7 (the harbor).
+
 Cobbles of 6-9 px (SLYNYRD) or 10-16 x 6-8 (final boss blues), 4 tones; the gap 1 px of a darker
 shade of the ground's hue; one dash of 2-4 px lit on each stone's lit edge, not a lit outline.
 Flagstones of mixed sizes, moss in no more than a third of the joints. Low contrast.

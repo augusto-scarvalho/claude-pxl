@@ -206,7 +206,7 @@ Long projects made with pxl by agents, most over rounds of a curator's notes. Ea
 [`examples/`](examples) to read and copy. Smaller files to start from (the starter
 `basics.px.js`, tilesets, a top-down game character with idle, walk, run and a sword attack in four
 directions in [`examples/topdown_hero/`](examples/topdown_hero), and an HD-2D figure in eight
-directions, a graveyard and a diorama in [`examples/hd2d/`](examples/hd2d)) are in the
+directions, a graveyard, a harbor and a diorama in [`examples/hd2d/`](examples/hd2d)) are in the
 [examples table](SKILL.md#examples) of `SKILL.md`.
 
 ### A tropical forest
@@ -322,6 +322,23 @@ on the ground, the steps and the path, kneels to lay a rose (another pose of the
 talks in dialogue boxes as Triangle Strategy draws them, their prompt blinking for a button.
 [`characters.md`](characters.md) §3 keeps what the user's notes on each try of him taught (a big
 head, stick limbs, a hunch, a cloak fixed in the world).
+
+### An HD-2D harbor: a galleon, its crew, a passage aboard
+
+<p>
+  <img src="docs/gallery/hd2d_harbor.gif" width="100%" alt="Animated HD-2D diorama in pixel art: a harbor on a bright afternoon, seen from high up through a long lens; a galleon moored along a wooden pier, its pale planked hull with a red band of gold ornaments, white balusters, red and white lanterns at the stern, three masts with rope ladders and sails sewn of canvas panels glowing in the sun from behind, bobbing gently; the pier on two levels with a diagonal ramp, a wooden crane with a swinging crate, crates, barrels and sacks, rowboats moored in front, gulls crossing, blue water full of sun glints blurring into bokeh, a striped awning soft in the foreground; dockhands and sailors at work, each with their own hair and clothes; a young traveler in a green cloak walks up beside a grey-haired captain in a long navy coat and asks in a parchment dialogue box if this is the ship to Port Winds; the captain turns to him and answers, and the traveler walks up the gangplank aboard">
+</p>
+
+The seventh, in [`examples/hd2d/`](examples/hd2d): a port after a screenshot of Octopath Traveler
+II, its camera matched by measuring the picture (22 degrees down through a 30-degree lens, the frame
+20 figures wide). The galleon, the pier on its two levels and the boats are built in meters and drawn
+in blocks of the sprites' pixel, their wood laid a texel to a pixel: planks of their own tones,
+grain, knots, tar, worn where feet go. The sails are cloth sewn of panels, each piece toned by the sun
+through it; the water glints, the far glints blur into bokeh, and the hull shows in it between the
+ripples. The crew ([`crew.px.js`](examples/hd2d/crew.px.js)) are dressed on the traveler's skeleton,
+each with a head of their own drawn per view and an outfit swept round the body. In the 38 s loop
+Alden comes along the upper walkway, down the ramp, asks the captain in parchment dialogue boxes and
+goes aboard; the GIF is its middle, at the full frame rate.
 
 ### True perspective
 

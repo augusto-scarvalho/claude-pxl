@@ -19,6 +19,8 @@ pal({
   l: "#83542f", d: "#4b2e1e", D: "#2e1a10", g: "#f0cc62",         // leather: boots, belt; a buckle
 })
 ramps("kzsSL", "kJjhHY", "kNncC", "kvwW", "kRPp", "kDdl")
+// the skeleton, its moves and the painter, for files that dress figures of their own (crew.px.js)
+const travelerRig = {}
 // in a block: its names stay its own when a scene includes the file
 {
 // ---------------------------------------------------------------- the heads, by hand
@@ -162,7 +164,7 @@ const kneel = (i) => {
 const MOVES = { walk: { ms: 110, frames: 8, f: walk }, idle: { ms: 250, frames: 4, f: idle }, kneel: { ms: 160, frames: 7, f: kneel } }
 
 const bones = (p, yaw) => {
-  const fr = frame3(yaw), spine = unit(add(mul(UP, Math.cos(rad(p.lean))), mul(fr.f, Math.sin(rad(p.lean)))))
+  const fr = frame3(yaw), spine = unit(p.tilt ? add(add(mul(UP, Math.cos(rad(p.lean))), mul(fr.f, Math.sin(rad(p.lean)))), mul(fr.r, Math.sin(rad(p.tilt)))) : add(mul(UP, Math.cos(rad(p.lean))), mul(fr.f, Math.sin(rad(p.lean)))))   // tilt: bent to his right (degrees)
   const pelvis = [0, HIP - p.down, 0], chest = add(pelvis, mul(spine, TORSO)), head = add(chest, mul(spine, NECK + HEADR))
   const legs = [0, 1].map((i) => {
     const hip = local(pelvis, fr, [0, i ? HIPW : -HIPW, 0]), ankle = local([0, 1.2 + p.lift[i], 0], fr, [...p.feet[i], 0])
@@ -213,57 +215,75 @@ const sweep = (best, base, fr, y0, y1, radius, paint, part, keep = () => true, s
     surface(best, q, outside ? dir : mul(dir, -1), pt, part, pt.length === 1 ? pt : undefined)
   }
 }
-const figure = (c, set, p, yaw, mirror) => {
+// What a figure wears, part by part (ramps dark to light): the traveler's own here; other files dress
+// theirs (crew.px.js). The legs' trousers down to `cuff` of the shin and what shows under them (boots,
+// or bare skin), the feet; drapes swept round the body from a height down a length (a cloak behind, a
+// coat open at the front, a long skirt), trailing as he walks by `trail`; the shirt's skirt at the
+// hips and its body (a key or ramp by height and angle: stripes, a vest, the belt); drapes over it (an
+// apron); the sleeves to the elbow, the forearms, the hands; the outline, the line under the head, and
+// the head's grids by view.
+const TRAVELER = {
+  legs: (far) => ({ tr: far ? "RRP" : "RPp", shin: far ? "DDd" : "Ddl", foot: far ? "DDd" : "Ddl" }), cuff: 0.45,
+  drapes: [{ top: (j) => j.chest[1] + 0.6, len: CLOAK, out: "NncC", in: "N", trail: 1, keep: (h, a) => Math.abs(a) > 1.35,
+    radius: (h, a) => { const s = Math.abs(Math.sin(a)); return (3.9 + 1.2 * (1 - h)) * (1 - s) + (4.4 + 1.4 * (1 - h)) * s + 0.2 * Math.sin(a * 7) * (1 - h) } }],
+  skirt: (h, a, out) => (out ? "vwW" : "v"), body: (h, a) => (h < 0.1 ? (Math.abs(a) < 0.3 ? "g" : "Ddl") : "vwW"), over: [],
+  sleeve: (far) => (far ? "vvw" : "vwW"), fore: (far) => (far ? "vvw" : "vwW"), hand: (far) => (far ? "zzs" : "zsS"), ink: "k", chin: "D",
+}
+// a drape swept round the body (or the hips, base "pelvis"), hung from its top, trailing behind as he walks
+const drape = (best, j, fr, p, D, part) => {
+  const top = D.top(j), base = D.base === "pelvis" ? [j.pelvis[0], 0, j.pelvis[2]] : [j.chest[0], 0, j.chest[2]]
+  sweep(best, base, fr, top - D.len, top, D.radius, typeof D.out === "function" ? D.out : (h, a, out) => (out ? D.out : D.in), part, D.keep ?? (() => true),
+    (h) => { const down = 1 - h; return add(mul(fr.f, -(0.3 + 1.1 * p.trail) * down * D.trail), mul(fr.r, 0.9 * p.sway * down ** 1.5 * D.trail)) })
+}
+const figure = (c, set, p, yaw, mirror, o = TRAVELER) => {
   const j = bones(p, yaw), best = new Map(), fr = j.fr
   // the limb on the side away from us a step darker
   const farLeg = depth(j.legs[0].hip) < depth(j.legs[1].hip) ? 0 : 1, farArm = depth(j.arms[0].sh) < depth(j.arms[1].sh) ? 0 : 1
-  // the legs: trousers to mid-shin, then the boot, and the foot pointing ahead
+  // the legs: trousers to the cuff, then what is under, and the foot pointing ahead
   j.legs.forEach((L, i) => {
-    const far = i === farLeg, tr = far ? "RRP" : "RPp", bt = far ? "DDd" : "Ddl"
-    tube(best, L.hip, L.knee, 1.6, 1.5, tr, "leg" + i)
-    tube(best, L.knee, L.ankle, 1.5, 1.4, null, "leg" + i, (t) => (t < 0.45 ? tr : bt))
-    ball(best, add(L.ankle, mul(fr.f, 1.1)), fr, 1.6, 1.1, 2.3, bt, "leg" + i)
+    const g = o.legs(i === farLeg)
+    tube(best, L.hip, L.knee, 1.6, 1.5, g.tr, "leg" + i)
+    tube(best, L.knee, L.ankle, 1.5, 1.4, null, "leg" + i, (t) => (t < o.cuff ? g.tr : g.shin))
+    ball(best, add(L.ankle, mul(fr.f, 1.1)), fr, 1.6, 1.1, 2.3, g.foot, "leg" + i)
   })
-  // the cloak, behind him: hung from the shoulders (it rises, falls and leans with him), an ellipse a
-  // little wider than deep, flaring to mid-thigh, open in front; walking, it trails behind, more toward
-  // the hem, and swings aside with each step a little after the legs; its inside in its darkest tone
-  const top = j.chest[1] + 0.6
-  sweep(best, [j.chest[0], 0, j.chest[2]], fr, top - CLOAK, top,
-    (h, a) => { const s = Math.abs(Math.sin(a)); return (3.9 + 1.2 * (1 - h)) * (1 - s) + (4.4 + 1.4 * (1 - h)) * s + 0.2 * Math.sin(a * 7) * (1 - h) },
-    (h, a, out) => (out ? "NncC" : "N"), "cloak", (h, a) => Math.abs(a) > 1.35,
-    (h) => { const down = 1 - h; return add(mul(fr.f, -(0.3 + 1.1 * p.trail) * down), mul(fr.r, 0.9 * p.sway * down ** 1.5)) })
+  // The traveler's cloak, behind him: hung from the shoulders (it rises, falls and leans with him), an
+  // ellipse a little wider than deep, flaring to mid-thigh, open in front; walking, it trails behind,
+  // more toward the hem, and swings aside with each step a little after the legs; its inside in its
+  // darkest tone.
+  o.drapes.forEach((D, k) => drape(best, j, fr, p, D, k ? "drape" + k : "cloak"))
   // the tunic: its short skirt flaring a little below the belt; from the belt up, round, a little deeper
   // at the sides; the belt and its buckle in front
   const waist = j.pelvis[1] + 1.4, base = [j.pelvis[0], 0, j.pelvis[2]]
-  sweep(best, base, fr, waist - 2.4, waist, (h) => 3.6 + 0.6 * (1 - h), (h, a, out) => (out ? "vwW" : "v"), "tunic")
-  sweep(best, base, fr, waist, j.chest[1] + 0.5, (h, a) => (4 - 0.5 * h * h) * (0.84 + 0.16 * Math.abs(Math.sin(a))),
-    (h, a) => (h < 0.1 ? (Math.abs(a) < 0.3 ? "g" : "Ddl") : "vwW"), "tunic")
-  // the arms: linen sleeves, the hands
+  sweep(best, base, fr, waist - 2.4, waist, (h) => 3.6 + 0.6 * (1 - h), o.skirt, "tunic")
+  sweep(best, base, fr, waist, j.chest[1] + 0.5, (h, a) => (4 - 0.5 * h * h) * (0.84 + 0.16 * Math.abs(Math.sin(a))), o.body, "tunic")
+  o.over.forEach((D, k) => drape(best, j, fr, p, D, "over" + k))
+  // the arms: sleeves, forearms, the hands
   j.arms.forEach((A, i) => {
     const far = i === farArm
-    tube(best, A.sh, A.elbow, 1.1, 1, far ? "vvw" : "vwW", "arm" + i)
-    tube(best, A.elbow, A.hand, 1, 0.9, far ? "vvw" : "vwW", "arm" + i)
-    ball(best, A.hand, fr, 1, 1, 1, far ? "zzs" : "zsS", "arm" + i)
+    tube(best, A.sh, A.elbow, 1.1, 1, o.sleeve(far), "arm" + i)
+    tube(best, A.elbow, A.hand, 1, 0.9, o.fore(far), "arm" + i)
+    ball(best, A.hand, fr, 1, 1, 1, o.hand(far), "arm" + i)
   })
+  o.prop?.(best, j, fr, surface)                                           // something he carries, in the same depth
   const inner = new Set()
   for (const [d0, , x, y, part] of best.values()) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-    const k = (y + dy) * 4096 + x + dx, o = best.get(k)
-    if (!o) c.px(x + dx, y + dy, "k")
-    else if (o[4] !== part && o[0] < d0 - 0.5) inner.add(k)
+    const k = (y + dy) * 4096 + x + dx, ob = best.get(k)
+    if (!ob) c.px(x + dx, y + dy, o.ink)
+    else if (ob[4] !== part && ob[0] < d0 - 0.5) inner.add(k)
   }
   for (const [, key, x, y] of best.values()) c.px(x, y, key)
-  for (const k of inner) c.px(k % 4096, Math.floor(k / 4096), "k")
+  for (const k of inner) c.px(k % 4096, Math.floor(k / 4096), o.ink)
   // the head over all, by hand, its middle row on the skeleton's head (the profile's 2 px back, so the
   // face doesn't jut ahead of the body); under it, where it meets the body, a line of dark brown (the
   // chin's and the nape's edge), so the face and the clothes don't run together
-  const [hx, hy] = scr(j.head).map(Math.round), v = HEADVIEW[yaw], g = GRID[v], w = g[0].length
+  const [hx, hy] = scr(j.head).map(Math.round), v = HEADVIEW[yaw], g = (o.grid ?? GRID)[v], w = g[0].length
   const x0 = hx + HEADX[v], x = mirror ? 2 * hx - x0 - (w - 1) : x0, y = hy - 5
   c.stamp(`${set}_head_${v}`, x, y, mirror ? { flip: "x" } : {})
   for (let col = 0; col < w; col++) {
     let r = g.length - 1
     while (r >= 0 && g[r][col] === ".") r--
     const X = x + (mirror ? w - 1 - col : col)
-    if (r >= 0 && c.get(X, y + r + 1)) c.px(X, y + r + 1, "D")
+    if (r >= 0 && c.get(X, y + r + 1)) c.px(X, y + r + 1, o.chin)
   }
 }
 // Step 1 again, for a new move: the same skeleton as flat blocks (bk_<move>_<dir>), to judge the pose
@@ -311,4 +331,5 @@ for (const [who, set] of [["tr", "_tr"], ["mo", "_mo"]]) for (const [move, M] of
 for (const [move, M] of Object.entries(MOVES)) for (const [d, [yaw]] of Object.entries(DIRS))
   anim(`bk_${move}_${d}`, { w: W, h: H, pivot: [OX, OY] }, (c) => blocks(c, M.f(c.frame, yaw), yaw), ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })))
 sheet("traveler", ["tr_*", "mo_*"], { rows: "tag", pad: 1 })
+Object.assign(travelerRig, { figure, blocks, bones, scr, depth, local, surface, TRAVELER, MOVES, DIRS, W, H, OX, OY })
 }

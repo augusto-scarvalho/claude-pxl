@@ -175,6 +175,15 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   flipped) at 500 ms with a 50% mix of them for 300 between (`density` keeps the palette); a hard cut
   suits 8-bit. Wet sand is one flat tone with a 1 px lighter line at its edge; a quay's courses
   darken toward the water, which overlaps the lowest one.
+- **Water in an HD-2D diorama** (`examples/hd2d/harbor.px.js`): a floor texture laid a texel to a
+  pixel, 8 frames at 100 ms. Under, troughs that swell and ebb (two smooth fields crossfading, so it
+  closes); over it, the upper rims of small cells flattened by the view (about 16 x 8 px, scattered: a
+  regular net of them read as a honeycomb) as crescents thickening and thinning in place, broken where
+  the swell is low; on some crests the sun's glints, white `emit` keys, so `post()` blooms them and
+  blurs the far ones into bokeh; the far water (toward the sun) takes most of the glints, the near a
+  fifth. A reflection: the ship's faces mirrored under the water, seen through the calm between the
+  ripples (a strip of water whose trough texels are clear), lit by the sky only; foam a strip of dashes
+  and glints along the waterline.
 
 ## 6. Distance (aerial perspective)
 
@@ -261,6 +270,30 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   (`examples/hd2d/graveyard.px.js`). A box drawn in meters at the HD picture's own pixel (a fence)
   reads as a 3D render among the sprites: give its materials `block: 4`, faces in blocks of a
   sprite's pixel, a tone each, the outline only on the shaded side.
+- Matching a reference's camera (the harbor, after an Octopath Traveler II screenshot): measure it.
+  The tilt from foreshortening: a floor's plank width across against along (the sine of the pitch), a
+  crate's top against its front (the tangent), a deck's depth against its length; three readings gave
+  17-26 degrees, taken as 22 (`pxl study` read the same picture as a camera tilted up). The lens from a
+  receding edge's slant toward the vanishing point (30 degrees fitted). The scale in figure heights:
+  the frame 20 figures wide, the hull 12.5, its rail 2.3 over the water; then the px to the meter that
+  gives the same framing round 34 px figures (17, not the graveyard's 24), every texel at 1/ppm. Past
+  the frame's top the water is out of the picture (here 27 m behind the ship): a far landmark is a
+  miniature placed nearer, hazed.
+- A ship in a diorama: the hull lofted through ~30 sections (pointed bow, square stern, wider at the
+  middle than at the waterline, drawn in at the rail), the castles prisms on its top's plan, the rails
+  faces with clear texels (balusters, a balustrade), lanterns as sprites; it bobs as one (a roll of 0.5
+  degrees and a heave of 5 cm over 4.8 s, its sails, lines and people aboard with it). Sails sewn of
+  panels, each piece one of four tones by the light the sun behind sends through it (the belly facing
+  us warm off-white, its turned edges a cool grey), a seam a step darker every 0.6 m, a bolt rope, reef
+  points, a patch; toned by the light on their front alone, backlit sails came out one flat grey.
+  Furled, a lumpy roll lashed every 0.6 m. Yards braced 45 degrees show a sail's face; square to the
+  camera they hang edge on, slivers.
+- Wood at the sprites' scale: a deck laid whole on its face (`anchor: "face"`, one texture the size of
+  the pier, so it doesn't repeat and wear can follow where feet go), each plank its own tone of four,
+  the grain in broken runs of 5-6 px a step darker (single speckles read as noise), a knot in one plank
+  in nine, nail heads over the joists, joints staggered; the board ends along its front as end grain; a
+  hull's strakes over a line of tar, algae climbing from the waterline in streaks; a rowboat clinker,
+  a shadow line under each strake's lip.
 - A story in a diorama (the graveyard's visit): legs walked in a direction each, at the walk's own
   pace (a cycle's two steps over its frames; faster, the feet slide), the feet at the height of what
   is under them (ground, each step, a path); holds between them in an idle; the other figure turning
