@@ -111,6 +111,10 @@ export interface AssetOpts {
   bg?: string;
   /** Scene: false and check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story). */
   check?: boolean | { every: number };
+  /** Scene: px to an art pixel (w and h are the picture's): mesh(), the 3D ops, meshSocket() and post() draw that many times as big. */
+  pixel?: number;
+  /** Scene: the same scene k times as big under other names ({ name_hd: 4 }), not checked; post() runs only there. */
+  sizes?: Record<string, number>;
   /** anim: default frame rate (frames per second, default 8). */
   fps?: number;
   /** anim: frame count when there are no frame() items (procedural, via c.frame / c.phase). */
@@ -201,6 +205,8 @@ export interface AssetDef {
   png?: Img;
   /** A twin: the items of the asset it was made from, drawn mirrored (before lighting). */
   mirror?: boolean;
+  /** look3d()'s light and mats when it was defined. */
+  look3d?: { light?: number[]; mats?: Record<string, unknown> };
 }
 
 export interface GroupDef {

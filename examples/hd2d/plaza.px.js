@@ -6,7 +6,7 @@
 // head, the crate half hides another, and each stands on a contact shadow. Light in the world: a
 // late sun with its shadows (the wall's, the people's, the pines'), a cool sky, two lamps (LIGHT).
 // `plaza` is the art at its own size, the one checked (check builds it unlit); `plaza_hd` the same
-// four times as big, with what the camera does to it: post().
+// four times as big (a size of it), with what the camera does to it: post().
 include("../topdown_hero/hero.px.js")
 include("kit.px.js", { palette: true })   // the palette, the textures, the pines, bushes and lamps
 
@@ -14,7 +14,7 @@ const MATS = { cobble: { tex: "_cobble" }, wall: { tex: "_wall" }, grass: { tex:
 
 // The camera: 24 px to the meter where it looks (the hero, a chibi 24 px tall, stands 1 m), the
 // middle of the picture on the ground Z m ahead.
-const W = 480, H = 270, CAM = hd2dCamera({ w: W, h: H, pitch: -45, fov: 30, ppm: 24 }), Z = CAM.z, DIST = CAM.dist, view = CAM.view
+const W = 480, H = 270, CAM = perspective({ w: W, h: H, pitch: -45, fov: 30, ppm: 24 }), Z = CAM.z, DIST = CAM.dist
 const M = model(), block = (...a) => hd2dBlock(M, ...a)
 M.face("grass", [-30, Z - 20, 0], [30, Z - 20, 0], [30, Z + 30, 0], [-30, Z + 30, 0])
 const UP = 0.3                                                  // the plaza: a paved step up from the grass
@@ -55,12 +55,10 @@ const LIGHT = {
   light: [-0.75, 0.45, 0.5], sun: { color: "#ffd49a", strength: 1.35 }, sky: { color: "#8aa2d0", strength: 0.42 }, emit: "yY",
   lamps: [-5.6, 5.6].map((x) => ({ at: [x, Z - 3.6, UP + 1.15], color: "#ffbe6a", r: 3.5, strength: 1.6 })),
 }
-scene("plaza", { w: W, h: H, bg: "q", ...CLOCK }, (c) => c.mesh(view(1), M.faces, MATS, { sprites: people(c.frame), ...LIGHT }))
-
-// The same at four times the size (1920x1080), each pixel of art 4x4, and what the camera does to
-// it: the band of depth where the people stand sharp and the rest blurred, from a camera this high
-// up the look of a model (DIST is the depth at the picture's middle, where post() focuses); the far
-// grass hazed; a bloom on what is bright; darker corners. Checked at its own size, above.
-scene("plaza_hd", { w: W * 4, h: H * 4, bg: "q", ...CLOCK, check: false },
-  (c) => c.mesh(view(4), M.faces, MATS, { sprites: people(c.frame), pixel: 4, ...LIGHT }),
-  post({ blur: 32, sharp: 1, soft: 4, fog: { color: "#c8d4dc", from: DIST + 4, to: DIST + 20, max: 0.5 }, bloom: { strength: 0.9, r: 40 }, vignette: 0.35 }))
+// `plaza_hd`: the same at four times the size (1920x1080), each pixel of art 4x4, and what the camera
+// does to it (post(), in the art's pixels, at that size only): the band of depth where the people
+// stand sharp and the rest blurred, from a camera this high up the look of a model (DIST is the depth
+// at the picture's middle, where post() focuses); the far grass hazed; a bloom on what is bright;
+// darker corners.
+scene("plaza", { w: W, h: H, bg: "q", ...CLOCK, sizes: { plaza_hd: 4 } }, (c) => c.mesh(CAM, M.faces, MATS, { sprites: people(c.frame), ...LIGHT }),
+  post({ blur: 8, sharp: 1, soft: 4, fog: { color: "#c8d4dc", from: DIST + 4, to: DIST + 20, max: 0.5 }, bloom: { strength: 0.9, r: 10 }, vignette: 0.35 }))

@@ -16,7 +16,7 @@ import { PxError } from "./errors.ts";
 import type { Img } from "./image.ts";
 import { setNormal } from "./normals.ts";
 import type { Palette } from "./palette.ts";
-import { type Perspective, type View, perspective } from "./perspective.ts";
+import { type Perspective, type View, perspective, scaled } from "./perspective.ts";
 import { type Clock, type Compiled, Sdf, type V3, article, compile } from "./sdf.ts";
 import { Voxels, sizeOf, voxelize } from "./grids.ts";
 
@@ -72,6 +72,8 @@ export interface SurfaceCanvas {
   color(k: unknown): Color | null;
   index(x: number, y: number): number;
   plot(x: number, y: number, c: Color): boolean;
+  /** px to an art pixel (a scene's size): a camera's px k times, a ray to k x k px unless `pixel` says */
+  k?: number;
 }
 
 const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -289,7 +291,8 @@ export function viewOf(c: SurfaceCanvas, o: SurfaceOpts & { px?: number }, lo: V
   let near: (t: number) => number;
   let P: Perspective | undefined, eye: V3 = [0, 0, 0];
   if (persp) {
-    P = perspective({ ...(o.view as View), w: (o.view as View).w ?? W });
+    const V = scaled(o.view as View, c.k ?? 1);
+    P = perspective({ ...V, w: V.w ?? W });
     const cy = P.horizon - P.focal * Math.tan(P.pitch * RAD), Pp = P;
     at = (o.at ?? [0, 0, 0]) as V3;
     eye = [-at[0], -at[1], P.eye - at[2]];
@@ -340,7 +343,7 @@ export function viewOf(c: SurfaceCanvas, o: SurfaceOpts & { px?: number }, lo: V
 /** What both draw: the rays through the cells, the light, the clusters, the contour, the normals and depth, the shadow on what is drawn. */
 function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number }, who: string): void {
   const persp = !!o.view && typeof o.view === "object" && "horizon" in o.view;
-  const K = o.pixel ?? 1, aoK = o.ao ?? 0.5, castK = o.cast ?? 0.4;
+  const K = o.pixel ?? c.k ?? 1, aoK = o.ao ?? 0.5, castK = o.cast ?? 0.4;
   if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`${who}: pixel is px to a ray, a whole number from 1, got ${JSON.stringify(o.pixel)}`);
   if (!(aoK >= 0 && aoK <= 1) || !(castK >= 0 && castK <= 1)) throw new PxError(`${who}: ao and cast are 0..1, got ${JSON.stringify([o.ao, o.cast])}`);
   const origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;

@@ -12,10 +12,10 @@ include("kit.px.js", { palette: true })   // with the palette, the four densitie
 // `lift` m up (the cloud floats), its middle where the camera looks.
 const alone = (name, d, { stage = [128, 112], lift = 0 } = {}) => {
   const [lo, hi] = d.bounds(), w = Math.ceil((hi[0] - lo[0]) * 16) + 8, h = Math.ceil((hi[2] - lo[2] + 0.4 * (hi[1] - lo[1])) * 16) + 8
-  anim(`${name}_side`, { w, h, ...CLOCK }, volume(d, { view: "side", ppm: 16, at: [w / 2 - (lo[0] + hi[0]) * 8, h - 4 + lo[2] * 16], light: LIGHT, ...LOOK[name], cast: 0 }))
-  const C = hd2d(...stage), G = ground(C.Z), mid = lift + (lo[2] + hi[2]) / 2, at = [0, C.Z - mid / Math.tan(-PITCH * RAD), lift]
+  anim(`${name}_side`, { w, h, ...CLOCK }, volume(d, { view: "side", ppm: 16, at: [w / 2 - (lo[0] + hi[0]) * 8, h - 4 + lo[2] * 16], ...LOOK[name], cast: 0 }))
+  const C = hd2d(...stage), G = ground(C.z), at = C.aim(lift + (lo[2] + hi[2]) / 2, lift)
   scene(`${name}_camera`, { w: stage[0], h: stage[1], bg: "k", ...CLOCK, check: { every: 24 } },
-    (c) => c.mesh(C.view, G.faces, GMATS, { light: LIGHT }), (c) => c.volume(d, { view: C.view, at, light: LIGHT, ...LOOK[name] }))
+    (c) => c.mesh(C, G.faces, GMATS), (c) => c.volume(d, { view: C, at, ...LOOK[name] }))
 }
 alone("cloud", cloud(), { stage: [160, 128], lift: 2.4 })
 alone("mist", mist(), { stage: [160, 96] })
@@ -31,7 +31,7 @@ make3d.define("cloud", ({ size = 1 }) => ({ density: cloud(size) }), { params: {
 make3d.define("chimney_smoke", () => ({ density: smokeField() }))
 make3d.define("bank", () => ({ density: mist() }))
 make3d.define("orb", () => ({ density: orb() }))
-const W = 320, H = 180, { Z, view: VIEW } = hd2d(W, H), G = ground(Z)
+const W = 320, H = 180, VIEW = hd2d(W, H), Z = VIEW.z, G = ground(Z)
 for (let i = 0; i < 6; i++) G.box("path", [-0.9 + (i % 2) * 0.15, Z - 3.6 + i * 0.62, 0], [-0.25 + (i % 2) * 0.15, Z - 3.1 + i * 0.62, 0.04])
 const DIORAMA = world3d({ parts: {
   house: { make: "house", at: [0.9, Z + 0.4], seed: 5 },
@@ -43,4 +43,4 @@ const DIORAMA = world3d({ parts: {
   orb: { make: "orb", at: [-0.6, Z - 2.4], look: LOOK.orb },
 } })
 scene("volumes", { w: W, h: H, bg: "k", ...CLOCK, check: { every: 24 } },
-  (c) => c.mesh(VIEW, G.faces, GMATS, { light: LIGHT }), (c) => c.draw3d(DIORAMA, { view: VIEW, mats: MATS, light: LIGHT }))
+  (c) => c.mesh(VIEW, G.faces, GMATS), (c) => c.draw3d(DIORAMA, { view: VIEW }))

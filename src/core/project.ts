@@ -133,7 +133,7 @@ export const OP_OPTS: Record<string, string[]> = {
   bump: ["w", "depth", "on", "where", "shapeRadius", "shapeStrength", "shapeSoftness", "detailStrength", "detailScale"],
   lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "shape", "relief", "skyDir"],
   glow: ["where", "r", "strength", "color", "bands", "ramp", "keep"],
-  post: ["focus", "sharp", "soft", "blur", "bloom", "fog", "vignette", "pixel", "sharpen", "lut", "grain", "palette"],
+  post: ["focus", "sharp", "soft", "blur", "bloom", "fog", "vignette", "pixel", "sharpen", "lut", "grain", "palette", "px"],
   terrain: ["far", "top", "bound", "margin", "sky"],
   // one options object serves both: solids ignores shade, shadows ramps and light
   solids: ["at", "sun", "scale", "ramps", "light", "shade"],
@@ -157,7 +157,7 @@ export const OP_OPTS: Record<string, string[]> = {
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
   sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "facing", "height", "twin", "register"],
-  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check"],
+  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "pixel", "sizes"],
   anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir", "facing", "height", "twin", "register"],
 };
 const FRAME_OPTS = ["ms", "hold"];
@@ -262,6 +262,8 @@ export class Project implements BuildCtx {
   /** Art files loaded so far (absolute paths or virtual names), for locations and watching. */
   readonly files: string[] = [];
   pal: Palette = Palette.builtin("pico8").asDefault();
+  /** look3d()'s light and mats: the 3D ops' when they don't say them, taken by each asset defined after it, as the palette is. */
+  look3d?: { light?: number[]; mats?: Record<string, unknown> };
   /** Set by a loader to support include(). */
   includeHook?: (path: string) => void;
   /** Set by a loader to support palette files in use(): the file's text, path relative to the art file. */
@@ -381,9 +383,22 @@ export class Project implements BuildCtx {
       if (light !== undefined && light !== false && !pair(light) && !(isPlainObject(light) && pair((light as { at?: unknown }).at)))
         throw new PxError(`${kind} '${name}': world.light is where the light comes from, [x, y] (e.g. [0.6, -1]: the top right), or a point light in the scene, { at: [x, y] } (false: none read); got ${JSON.stringify(light)}`, loc);
       const items = checkItems(`${kind} '${name}'`, rest, loc);
-      const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true);
-      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png });
+      const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true), look3d = this.look3d;
+      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, look3d });
       this.order.push(name);
+      // a scene's pixel: px to an art pixel; its sizes: the same scene k times as big under other names, not checked
+      const whole = (k: unknown) => Number.isInteger(k) && (k as number) >= 1;
+      if (opts.pixel !== undefined && !whole(opts.pixel)) throw new PxError(`${kind} '${name}': pixel is px to an art pixel (mesh(), the 3D ops and post() draw that many times as big), a whole number from 1, got ${JSON.stringify(opts.pixel)}`, loc);
+      if (opts.sizes !== undefined) {
+        if (!isPlainObject(opts.sizes) || !Object.values(opts.sizes).every(whole) || opts.pixel !== undefined) throw new PxError(`${kind} '${name}': sizes names the same scene k times as big, { ${name}_hd: 4 } (whole numbers; the scene itself at pixel 1), got ${JSON.stringify(opts.sizes)}`, loc);
+        for (const [n, k] of Object.entries(opts.sizes as Record<string, number>)) {
+          const other = this.assets.get(n) ?? this.groups.get(n);
+          if (other) throw new PxError(`'${n}' (a size of '${name}') is already defined at ${other.loc}`, loc);
+          const { sizes: _, ...so } = opts;
+          this.assets.set(n, { kind, name: n, opts: { ...so, w: opts.w! * k, h: opts.h! * k, pixel: k, check: false }, items, pal: this.pal, loc, top, look3d });
+          this.order.push(n);
+        }
+      }
       // twin: the same items drawn mirrored before they're lit, facing the other way
       const twin = (opts as { twin?: unknown }).twin;
       if (twin === undefined) return;
@@ -578,7 +593,7 @@ export class Project implements BuildCtx {
       const USAGE = 'export3d("name", sdf.voxels(field, { size }), sdf.mesh(field, { size }) or sdf.splats(field, { spacing }), { mats: { name: ramp }, as: ["vox"], ["obj", "glb"] or ["ply"] }), or a function of the clock, (c) => sdf.mesh(field, { size, clock: c }), with { frames: n, fps }';
       if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError(USAGE, loc);
       checkKeys(`export3d '${name}'`, opts, ["mats", "as", "frames", "fps"], loc);
-      const { mats = {}, frames, fps = 8 } = opts as { mats?: Record<string, unknown>; frames?: number; fps?: number };
+      const { mats = this.look3d?.mats ?? {}, frames, fps = 8 } = opts as { mats?: Record<string, unknown>; frames?: number; fps?: number };
       const kind = (t: unknown) => (t instanceof Voxels ? "a grid" : t instanceof Mesh3 ? "a mesh" : t instanceof Splats ? "splats" : undefined);
       let make: ((f: number) => unknown) | undefined;
       if (typeof thing === "function") {
@@ -610,7 +625,16 @@ export class Project implements BuildCtx {
       const moments = make ? () => Array.from({ length: frames! }, (_, f) => (f ? make!(f) : T)) as (Voxels | Mesh3 | Splats)[] : undefined;
       this.models.push({ name, thing: T, colors, ramps, as: as as ("vox" | "obj" | "glb" | "ply")[], loc, ...(moments ? { frames: moments, fps, paint } : {}) });
     };
-    // perspective({ w, horizon, eye, fov | focal, vp, yaw, pitch }): ground(x, z, up), at(col, row), scale(z, x, up), vanish(angle), vertical()
+    // look3d({ light, mats }): what the 3D ops (mesh's light, surface, voxels, volume, splats, decal, draw3d, export3d) take when a call doesn't say it
+    env.look3d = (o: unknown) => {
+      const loc = this.callerLoc(), L = (o ?? {}) as { light?: unknown; mats?: unknown };
+      if (!isPlainObject(o)) throw new PxError("look3d({ light: [x, y, z], mats: { name: ramp } }): the 3D ops' light and materials when a call doesn't give them", loc);
+      checkKeys("look3d", o, ["light", "mats"], loc);
+      if (L.light !== undefined && !(Array.isArray(L.light) && L.light.length === 3 && L.light.every(Number.isFinite))) throw new PxError(`look3d: light is the way toward it, [x, y, z], got ${JSON.stringify(L.light)}`, loc);
+      if (L.mats !== undefined && !isPlainObject(L.mats)) throw new PxError(`look3d: mats is { name: ramp }, got ${JSON.stringify(L.mats)}`, loc);
+      this.look3d = { ...this.look3d, ...(L.light ? { light: L.light as number[] } : {}), ...(L.mats ? { mats: L.mats as Record<string, unknown> } : {}) };
+    };
+    // perspective({ w, horizon, eye, fov | focal, vp, yaw, pitch }) or ({ w, h, pitch, fov, ppm }): ground(x, z, up), at(col, row), scale(z, x, up), vanish(angle), vertical(), aim(mid, up)
     env.perspective = (view: unknown) => {
       try { return perspective(view as View); } catch (e) { throw wrap(e).within("perspective", this.callerLoc()); }
     };

@@ -53,13 +53,15 @@ for (const [n, o] of Object.entries(SWAY)) anim(`${n}_wind`, { base: n, ...WIND 
 // the left facing right; a ruined wall 1.4 m high runs across in front of the way to the scarecrow, so
 // from up here it hides the ball as it passes behind (a wall hides only what is near it: the ball goes
 // 0.5 m behind it, below its top less that much of the tilt).
-const W = 320, H = 180, CAM = hd2dCamera({ w: W, h: H, pitch: -38, fov: 30, ppm: 24 }), Z = CAM.z, DIST = CAM.dist
+const W = 320, H = 180, CAM = perspective({ w: W, h: H, pitch: -38, fov: 30, ppm: 24 }), Z = CAM.z
 const M = model(), block = (...a) => hd2dBlock(M, ...a)
 M.face("grass", [-30, Z - 20, 0], [30, Z - 20, 0], [30, Z + 30, 0], [-30, Z + 30, 0])
 M.face("path", [-3, Z - 9, 0.01], [-1.9, Z - 9, 0.01], [-1.9, Z - 0.1, 0.01], [-3, Z - 0.1, 0.01])
 block("wall", "wall", -1.1, Z - 0.65, 1.3, Z - 0.4, 0, 1.7)
 block("wall", "wall", 1.3, Z - 0.65, 1.8, Z - 0.4, 0, 0.7)
-const MATS = { grass: { tex: "_grass", texel: CAM.floor }, path: { tex: "_flags", texel: CAM.floor }, wall: { tex: "_wall" } }
+// the grass and the flags a texel to a pixel where the camera looks (k times as big, to the picture's
+// pixel: a finer grass), the wall in blocks of the art's pixel
+const mats = (k) => ({ grass: { tex: "_grass", texel: CAM.floor.map((v) => v / k) }, path: { tex: "_flags", texel: CAM.floor.map((v) => v / k) }, wall: { tex: "_wall", block: k } })
 const HERO = [-2.4, Z - 0.25], CROW = [2.5, Z - 0.15]
 // the wood round the clearing, and the grass, placed once
 const R = rng(11), WOOD = []
@@ -77,11 +79,11 @@ for (let k = 0; WOOD.length < 70; k++) {
 const SPELL = ability({ charge: 600, cast: 200, travel: 600, impact: 200, burn: 2300, reform: 600 }, { start: 200 })
 const sparks = emitter({ at: [0, 0], burst: 18, from: SPELL.start("impact"), life: [300, 800], speed: [1.2, 3], angle: -90, spread: 75, gravity: [0, 6], drag: 1.2, seed: 9 })
 const DUSK = { light: [-0.8, 0.45, 0.35], sun: { color: "#ffb478", strength: 1.25 }, sky: { color: "#6a72b8", strength: 0.45 } }
-const people = (c, K) => {
-  const t = c.t, p = SPELL(t), view = CAM.view(K), pose = SPELL.frame(t, [["charge", 0, 12, 100]], { before: -1, after: -1 })
+const people = (c) => {
+  const t = c.t, p = SPELL(t), pose = SPELL.frame(t, [["charge", 0, 12, 100]], { before: -1, after: -1 })
   const hero = pose >= 0 ? { name: "tr_cast_e", at: HERO, frame: pose } : { name: "tr_idle_e", at: HERO }
   const S = [...WOOD, hero]
-  const hand = pose >= 0 ? c.meshSocket(view, hero, "hand", K) : null, from = c.meshSocket(view, { name: "tr_cast_e", at: HERO, frame: 6 }, "hand", K)
+  const hand = pose >= 0 ? c.meshSocket(CAM, hero, "hand") : null, from = c.meshSocket(CAM, { name: "tr_cast_e", at: HERO, frame: 6 }, "hand")
   const to = [CROW[0], CROW[1], 1.05], fly = (tt) => SPELL.along(from, to, tt, { ease: "in" })
   if (pose >= 0 && pose <= 7) S.push({ name: "tr_cast_aura_e", at: [HERO[0], HERO[1] - 0.01], frame: pose, blend: "add", opacity: pose <= 5 ? 0.2 + 0.07 * pose : 0.6, light: false })
   if (p.name === "charge" && !p.before) S.push({ name: p.k < 0.35 ? "_fire_s" : p.k < 0.7 ? "_fire_m" : "_fire", at: hand, blend: "add", light: { r: 2, strength: 2 * p.k } })
@@ -106,11 +108,8 @@ const people = (c, K) => {
   return S
 }
 const CLOCK = { frames: 100, fps: 20 }
-scene("clearing", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 8 } }, (c) => c.mesh(CAM.view(1), M.faces, MATS, { sprites: people(c, 1), ...DUSK }))
-// three times as big, through the camera: the actors' band of depth sharp, the wood behind soft, Three's
-// bloom on the fire, the dusk grade, a light grain in blocks of the art's pixel (the same in every frame:
-// a grain that changes each frame changes every pixel, and the GIF went from 1.1 MB to 13); the wall in blocks
-const K = 3
-scene("clearing_md", { w: W * K, h: H * K, bg: "q", ...CLOCK, check: false },
-  (c) => c.mesh(CAM.view(K), M.faces, { ...MATS, grass: { tex: "_grass", texel: CAM.floor.map((v) => v / K) }, path: { tex: "_flags", texel: CAM.floor.map((v) => v / K) }, wall: { tex: "_wall", block: K } }, { sprites: people(c, K), pixel: K, ...DUSK }),
-  post({ blur: 6 * K, focus: [(W * K) / 2, H * K * 0.55], sharp: 3, soft: [3, 8], bloom: { levels: 5, strength: 0.5, above: 0.9 }, lut: { cube: "dusk.cube", amount: 0.6 }, grain: { amount: 0.035, animated: false }, pixel: K, vignette: 0.3 }))
+// `clearing_md` three times as big, through the camera: the actors' band of depth sharp, the wood behind soft,
+// Three's bloom on the fire, the dusk grade, a light grain in blocks of the art's pixel (the same in every
+// frame: a grain that changes each frame changes every pixel, and the GIF went from 1.1 MB to 13)
+scene("clearing", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 8 }, sizes: { clearing_md: 3 } }, (c) => c.mesh(CAM, M.faces, mats(c.k), { sprites: people(c), ...DUSK }),
+  post({ blur: 6, focus: [W / 2, H * 0.55], sharp: 3, soft: [3, 8], bloom: { levels: 5, strength: 0.5, above: 0.9 }, lut: { cube: "dusk.cube", amount: 0.6 }, grain: { amount: 0.035, animated: false }, vignette: 0.3 }))

@@ -11,6 +11,6 @@ sprite("rune", { pivot: "center" }, `
   .F.F.
   F...F`)
 
-const W = 320, H = 180, { Z, view: VIEW } = hd2d(W, H), GR = ground(Z)
+const W = 320, H = 180, VIEW = hd2d(W, H), Z = VIEW.z, GR = ground(Z)
 scene("outcrop", { w: W, h: H, bg: "k", ...CLOCK, check: { every: 24 } },
-  (c) => c.mesh(VIEW, GR.faces, GMATS, { light: LIGHT }))
+  (c) => c.mesh(VIEW, GR.faces, GMATS))

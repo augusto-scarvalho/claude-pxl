@@ -40,9 +40,10 @@ export interface Material {
   /**
    * a texel's size in m (default 1/16: a 16 px tile to the meter); two, across and down, to lay the
    * texture one texel to a pixel on a floor or wall the camera foreshortens (a floor seen from 38 degrees
-   * up: [1 / ppm, 1 / (ppm * sin 38)]), so it reads drawn on the screen and not squashed
+   * up: [1 / ppm, 1 / (ppm * sin 38)]), so it reads drawn on the screen and not squashed; "screen": those
+   * two of a perspective() camera looking down (its floor or its wall, by the face), in the art's pixel
    */
-  texel?: number | [number, number];
+  texel?: number | [number, number] | "screen";
   /**
    * where the texture starts: "world" (default) tiles it from the world's origin, so neighbouring faces
    * carry on one another's; "face" starts it at each face's own top left (a gravestone's whole drawing
@@ -213,12 +214,15 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
   const sunDir = unit(Array.isArray(opts.light) ? (opts.light as V3) : cam.light);
   const lightOf = typeof opts.light === "function" ? opts.light : (n: V3) => 0.3 + 0.6 * Math.max(0, dot(n, sunDir));
   const ramps: Record<string, string[]> = {};
+  // a texel's size across and down; "screen": a texel to a pixel where the camera looks, on a floor or a wall by the face
+  const look = (view && typeof view === "object" && "floor" in view ? view : cam.P) as { floor?: [number, number]; wall?: [number, number] } | undefined;
+  const texelOf = (M: Material, floor: boolean): [number, number] => M.texel === "screen" ? (floor ? look!.floor! : look!.wall!) : Array.isArray(M.texel) ? M.texel : [M.texel ?? 1 / 16, M.texel ?? 1 / 16];
   for (const [name, M] of Object.entries(mats)) {
     if (M?.block !== undefined && !(Number.isInteger(M.block) && M.block >= 1)) throw new PxError(`mesh: material '${name}' has block ${JSON.stringify(M.block)}: how many px to one of its pixels, a whole number from 1`);
     if (M?.tex !== undefined) {
       const t = M.texel;
-      if (!(t === undefined || (typeof t === "number" && t > 0) || (Array.isArray(t) && t.length === 2 && t[0] > 0 && t[1] > 0)))
-        throw new PxError(`mesh: material '${name}' has texel ${JSON.stringify(t)}: a texel's size in m, above 0 (1/16: a 16 px tile to the meter), or two, across and down`);
+      if (!(t === undefined || (typeof t === "number" && t > 0) || (Array.isArray(t) && t.length === 2 && t[0] > 0 && t[1] > 0) || (t === "screen" && look?.floor)))
+        throw new PxError(`mesh: material '${name}' has texel ${JSON.stringify(t)}: a texel's size in m, above 0 (1/16: a 16 px tile to the meter), or two, across and down, or "screen" (through a perspective() camera looking down)`);
       ramps[name] = M.ramp ? [...M.ramp] : [];
       continue;
     }
@@ -251,7 +255,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       || (D.at !== undefined && !(Array.isArray(D.at) && D.at.length === 3 && D.at.every(Number.isFinite))) || (pattern === "mask" && !world?.masks?.[name]))
       throw new PxError(`mesh: material '${name}' has dissolve ${JSON.stringify(D)}: { progress (0..1), scale (m, above 0), seed (whole), edge (a key), width (0..1), pattern (${PATTERNS.join(", ")}), ragged (0..1), at ([x, z, up]), mask (an asset, for pattern "mask") }`);
     const lk = world?.looks?.[name], ch = lk?.char, w = lk?.over || lk?.neutral ? width : 0, cw = ch ? 0.03 * ch.width : 0, f = noise(seed), thr = -w + progress * (1 + w);
-    const [tu, tv] = Array.isArray(M.texel) ? M.texel : [M.texel ?? 1 / 16, M.texel ?? 1 / 16], snap = M.tex !== undefined;
+    const TF = texelOf(M, true), TW = texelOf(M, false), snap = M.tex !== undefined;
     // the extent of its faces, for the sweeps, the radial order and the mask
     const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
     for (const F of faces) if (F?.mat === name) for (const p of F.pts) for (let e = 0; e < 3; e++) { lo[e] = Math.min(lo[e], p[e]); hi[e] = Math.max(hi[e], p[e]); }
@@ -260,7 +264,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     const mask = world?.masks?.[name];
     holes.set(name, (X, Y, Z, N) => {
       if (progress <= 0) return 0;
-      const P = [X, Y, Z], a = [0, 1, 2].reduce((m, e) => (Math.abs(N[e]) > Math.abs(N[m]) ? e : m), 0), [ua, va] = a === 0 ? [1, 2] : a === 1 ? [0, 2] : [0, 1];
+      const P = [X, Y, Z], a = [0, 1, 2].reduce((m, e) => (Math.abs(N[e]) > Math.abs(N[m]) ? e : m), 0), [ua, va] = a === 0 ? [1, 2] : a === 1 ? [0, 2] : [0, 1], [tu, tv] = a === UP ? TF : TW;
       const u = snap ? (Math.floor(P[ua] / tu) + 0.5) * tu : P[ua], v = snap ? (Math.floor(P[va] / tv) + 0.5) * tv : P[va], nz = f(u / scale, v / scale);
       // (on its texels, as the noise is: snapped where it has a texture)
       const Q = [X, Y, Z];
@@ -292,7 +296,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       const [ua, va] = a === UP ? [0, AHEAD] : [a === 0 ? AHEAD : 0, UP], face = M.anchor === "face";
       if (M.anchor !== undefined && M.anchor !== "face" && M.anchor !== "world") throw new PxError(`mesh: material '${F.mat}' has anchor ${JSON.stringify(M.anchor)}: "world" (tiled from the world's origin) or "face" (from each face's top left)`);
       if (!holed.has(T)) holed.set(T, T.data.some((c) => (c & 255) < 128));
-      const [tu, tv] = Array.isArray(M.texel) ? M.texel : [M.texel ?? 1 / 16, M.texel ?? 1 / 16];
+      const [tu, tv] = texelOf(M, a === UP);
       texOf[k] = { T, su: 1 / tu, sv: 1 / tv, ua, va, u0: face ? Math.min(...F.pts.map((p) => p[ua])) : 0, v0: face ? Math.min(...F.pts.map((p) => -p[va])) : 0, holes: holed.get(T)! };
     }
     const tk = texOf[k], Bk = M.block ?? 1, hk = holes.get(F.mat);

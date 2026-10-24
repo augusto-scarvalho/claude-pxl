@@ -21,10 +21,10 @@ const GROVE = world3d({
 })
 const EDITED = GROVE.edit({ "oak.canopy": 1.6, "oak.leaves": 34, "oak.twist": 0.8, "wind.from": "left", "mist.color": "blue" })
 
-const W = 320, H = 180, { Z, view: VIEW } = hd2d(W, H), GR = ground(Z)
+const W = 320, H = 180, VIEW = hd2d(W, H), Z = VIEW.z, GR = ground(Z)
 // the edited grove's frames aren't checked (its expects are): a frame through this camera takes a second
 const grove = (name, world, check = { every: 24 }) => scene(name, { w: W, h: H, bg: "k", ...CLOCK, check },
-  (c) => c.mesh(VIEW, GR.faces, GMATS, { light: LIGHT }), (c) => c.draw3d(world, { view: VIEW, at: [0, Z - 2.4, 0], mats: LOOKS, light: LIGHT }))
+  (c) => c.mesh(VIEW, GR.faces, GMATS), (c) => c.draw3d(world, { view: VIEW, at: [0, Z - 2.4, 0], mats: LOOKS }))
 grove("grove", GROVE)
 grove("grove_edited", EDITED, false)
 

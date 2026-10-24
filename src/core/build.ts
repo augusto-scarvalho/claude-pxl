@@ -8,7 +8,7 @@ import { applyGlow } from "./glow.ts";
 import { applyLighting } from "./light.ts";
 import { rotate } from "./rotate.ts";
 import { normalImage } from "./normals.ts";
-import { type PostOpts, applyPost } from "./post.ts";
+import { type PostOpts, applyPost, postAt } from "./post.ts";
 import { type AssetDef, type FrameOpts, type GlowOpts, type Item, type Layer, type LayerOpts, type LightingOpts, type Op, type RelightOpts, type TileLayer, type Timeline, isLayer, isOp } from "./model.ts";
 import type { Palette } from "./palette.ts";
 import { Trace } from "./trace.ts";
@@ -193,6 +193,8 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     c.frames = tick?.frames ?? frames;
     c.inAnim = !!tl;
     c.mirrored = !!def.mirror;
+    c.k = opts.pixel ?? 1;
+    c.look3d = def.look3d;
     c.owner = { name: def.name, loc: def.loc };
     return c;
   };
@@ -212,7 +214,9 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     // the checks read what was placed and how, not the lit pixels: 2/3 of a lit city frame's time
     if (ctx.checksOnly) return;
     if (name === "post") {
-      const o = (args[0] ?? {}) as PostOpts;
+      // a scene with sizes: what the camera does is for them, not for the art at its own size
+      if (opts.sizes) return;
+      const o = postAt((args[0] ?? {}) as PostOpts, main.k);
       applyPost(base, o, o.fog ? pal.resolve(o.fog.color) : null, pal, main.frame);
       snap?.("post", loc);
       return;

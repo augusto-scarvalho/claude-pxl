@@ -137,14 +137,15 @@ What exists, a line each; `PXL help <name>` prints the rest of any op or option 
   ([lighting.md](lighting.md)).
 - **Text**: `text()` in the 3×5 built in, or `include` `examples/fonts/font5x7.px.js` for `{ font: "5x7" }`.
 - **In meters and HD-2D**: `perspective()`, `plane()`, `terrain()`, `solids()`/`shadows()`,
-  `mesh()` of `model()` faces (`block: K` keeps faces in the sprites' pixel), `post()` for depth of
-  field, bloom, a `lut`, `grain`; `capsule`, `flame` (`PXL help "scenes 7"`, `PXL help post`).
+  `mesh()` of `model()` faces, a scene's `sizes` (HD, faces in the sprites' pixel), `post()` for depth
+  of field, bloom, a `lut`, `grain`; `capsule`, `flame` (`PXL help "scenes 7"`, `PXL help post`).
 - **Effects and spells**: `effect(kind)` (`dissolve`, `pixelate`, `dither`, `tint`, `distort`,
   `emit`, `aura`, `sway`, `energy`), one copy's `fx`; `smoke()`, `emitter()` + `particles()`,
   `trail()`, `ability()` from a hand's socket; `cast(spell("fire", 3, { from, to }))`.
 - **3D fields**: `sdf` drawn by `surface()`, `voxels()`, `mesh()`, `volume()`; details by
   `sdf.scatter` + `splats()`; hand-drawn art pinned on by `decal()`; a scene of named parts by
-  `world3d` and `make3d`, checked by `expect3d`; out by `export3d` (`PXL help "scenes 17"`).
+  `world3d` and `make3d`, checked by `expect3d`; light and mats once by `look3d`; out by `export3d`
+  (`PXL help "scenes 17"`).
 - **Procedural texture**: `hash`, `vnoise`, `fbm`, `bayer`, `seamless` (`PXL help vnoise`).
 
 ## Examples

@@ -37,14 +37,15 @@ ramps("abcdef", "GgHhVij", "klmFnToO", "pqr", "st", "uvw", "IJyz", "AB", "CDE", 
 // The camera: 17 px to the meter where it looks (the reference's frame, its figures 34 px instead of
 // 24), 22 degrees down, 30 across. Z: the ground (the water) in the picture's middle; every z below is
 // from there, every x from the middle, u up from the water.
-const W = 480, H = 270, PPM = 17, CAM = hd2dCamera({ w: W, h: H, pitch: -22, fov: 30, ppm: PPM }), Z = CAM.z, DIST = CAM.dist, view = CAM.view
+const W = 480, H = 270, PPM = 17, CAM = perspective({ w: W, h: H, pitch: -22, fov: 30, ppm: PPM }), Z = CAM.z, DIST = CAM.dist
 const M = model()
 const LOWER = 0.6, UPPER = 1.6                                      // the pier's two decks above the water
 const MS = 100, LOOP = 96, SAILF = 16                                           // the clock: the water's 8 frames twice, the sails' one sway
 
 // ---------------------------------------------------------------- textures, a texel to a sprite's pixel
-// laid with CAM.floor on floors (a texel 1/17 m across, 0.157 m away) and CAM.wall on walls (0.063 m
-// down); the red band and the rails with 0.06 m, so their 20 rows are the castle's 1.2 m exactly.
+// laid with texel "screen": CAM.floor on floors (a texel 1/17 m across, 0.157 m away) and CAM.wall on walls
+// (0.063 m down); the hull, the boats and the deck across keep one by hand (their faces turning past 45
+// degrees still take it); the red band and the rails 0.06 m, so their 20 rows are the castle's 1.2 m exactly.
 const BANDT = [1 / PPM, 0.06]
 // The hull's planks: strakes 4 px over a line of tar, each strake its own shade, the grain in broken
 // lines along it (runs of 5 px a step darker), butt joints staggered strake to strake with a pair of
@@ -269,20 +270,20 @@ for (let f = 0; f < WN; f++) {
 }
 
 const MATS = {
-  hull: { tex: "_hull", texel: CAM.wall }, pale: { tex: "_planks_pale", texel: CAM.wall }, port: { tex: "_port", anchor: "face", texel: CAM.wall },
+  hull: { tex: "_hull", texel: CAM.wall }, pale: { tex: "_planks_pale", texel: "screen" }, port: { tex: "_port", anchor: "face", texel: "screen" },
   band: { tex: "_band", texel: BANDT }, bal: { tex: "_bal", anchor: "face", texel: BANDT }, rail: { tex: "_rail", anchor: "face", texel: BANDT },
-  deck: { tex: "_deck_lower", anchor: "face", texel: CAM.floor }, deckup: { tex: "_deck_upper", anchor: "face", texel: CAM.floor }, deckx: { tex: "_deck_x", texel: CAM.floor }, ramp: { tex: "_deck_d", texel: CAM.floor }, ends: { tex: "_ends", anchor: "face", texel: CAM.wall },
+  deck: { tex: "_deck_lower", anchor: "face", texel: "screen" }, deckup: { tex: "_deck_upper", anchor: "face", texel: "screen" }, deckx: { tex: "_deck_x", texel: CAM.floor }, ramp: { tex: "_deck_d", texel: "screen" }, ends: { tex: "_ends", anchor: "face", texel: "screen" },
   wood: { ramp: "lmno" }, pile: { ramp: "lmnoO", smooth: true }, wet: { ramp: "kGH", smooth: true }, mast: { ramp: "lmnoO", smooth: true }, rope: { ramp: "kl", bias: -0.2 },
   canvas: { ramp: "IJyz", smooth: true, bias: 0.1 }, canvas0: { ramp: "I", edge: "x", smooth: true }, canvas1: { ramp: "J", edge: "x", smooth: true }, canvas2: { ramp: "y", edge: "x", smooth: true }, canvas3: { ramp: "z", edge: "I", smooth: true, bias: 0 }, boltrope: { ramp: "xI", smooth: true }, red: { ramp: "pqr" }, white: { ramp: "uvw" }, haze: { ramp: "AB" },
-  crate: { tex: "_crate", anchor: "face", texel: CAM.wall, edge: "l" }, cratetop: { tex: "_cratetop", anchor: "face", texel: CAM.floor, edge: "l" },
+  crate: { tex: "_crate", anchor: "face", texel: "screen", edge: "l" }, cratetop: { tex: "_cratetop", anchor: "face", texel: "screen", edge: "l" },
   boat: { tex: "_boatwood", texel: CAM.wall }, boatin: { ramp: "lmn", smooth: true }, boatrim: { ramp: "noO" },
-  beam: { ramp: "lmnoO", texture: (x, y) => (hash(x, y >> 2) < 0.15 ? -1 : 0) }, tower: { tex: "_tower", texel: CAM.wall }, glass: { ramp: "de" }, rock: { ramp: "LNP" },
-  awning: { tex: "_awning", texel: CAM.floor }, valance: { tex: "_valance", texel: [1 / PPM, 0.05] },
+  beam: { ramp: "lmnoO", texture: (x, y) => (hash(x, y >> 2) < 0.15 ? -1 : 0) }, tower: { tex: "_tower", texel: "screen" }, glass: { ramp: "de" }, rock: { ramp: "LNP" },
+  awning: { tex: "_awning", texel: "screen" }, valance: { tex: "_valance", texel: [1 / PPM, 0.05] },
 }
 // the materials for frame f, in blocks of K px for a picture K times as big (pixel art among its faces)
 const mats = (f, K = 1) => {
   const w = Math.floor((f * MS) / 100) % WN
-  const all = { ...MATS, water: { tex: `_water_${w}`, texel: CAM.floor }, waterfar: { tex: `_waterfar_${w}`, texel: CAM.floor }, waterrefl: { tex: `_waterrefl_${w}`, texel: CAM.floor }, foam: { tex: `_foam_${w}`, texel: CAM.floor } }
+  const all = { ...MATS, water: { tex: `_water_${w}`, texel: "screen" }, waterfar: { tex: `_waterfar_${w}`, texel: "screen" }, waterrefl: { tex: `_waterrefl_${w}`, texel: "screen" }, foam: { tex: `_foam_${w}`, texel: "screen" } }
   for (const [k, m] of Object.entries(MATS)) all[k + "_r"] = { ...m, bias: (m.bias ?? 0) - 0.08 }   // the reflection's
   return K === 1 ? all : Object.fromEntries(Object.entries(all).map(([k, m]) => [k, { ...m, block: K }]))
 }
@@ -703,10 +704,10 @@ const SAYS = [
 // lower edge down to the speaker's head; a blue-grey mark at its lower right corner that more is
 // coming. Over the speaker and off to one side (side: 1 right, -1 left), in pixels finer than the
 // art's (3 of the picture's to the art's 4), as a game's interface is.
-const bubble = (c, K, v, [x, z, u], name, lines, side, t) => {
-  const U = Math.max(1, Math.round(K * 0.75)), pad = 7, lineH = 10, ch = 5
+const bubble = (c, [x, z, u], name, lines, side, t) => {
+  const K = c.k, U = Math.max(1, Math.round(K * 0.75)), pad = 7, lineH = 10, ch = 5
   const tw = Math.max(name.length * 6 + 16, ...lines.map((l) => l.length * 6)), w = tw + 2 * pad + 8, h = pad + 7 + 6 + lines.length * lineH + pad - 2
-  const [hx, hy] = v.ground(x, z, u + 2.1), tail = 9
+  const [hx, hy] = CAM.ground(x, z, u + 2.1).map((p) => p * K), tail = 9
   const X0 = Math.round(hx - (side > 0 ? 0.22 : 0.78) * w * U), Y0 = Math.round(hy - (h + tail) * U) - 2 * U
   const sx = Math.max(ch + 5, Math.min(w - ch - 6, Math.round((hx - X0) / U))), tip = Math.round((hx - X0) / U)
   const cells = new Set(), key = (i, j) => i + "," + j, has = (i, j) => cells.has(key(i, j))
@@ -736,9 +737,9 @@ const bubble = (c, K, v, [x, z, u], name, lines, side, t) => {
   }
   R(mx, h - pad, 7, 1, "#4f6382")
 }
-const talk = (c, K, f = c.frame) => {
-  const t = f - TALK, v = perspective(view(K))
-  for (const [t0, t1, name, lines, who, side] of SAYS) if (t >= t0 && t < t1) bubble(c, K, v, who(), name, lines, side, t - t0)
+const talk = (c, f = c.frame) => {
+  const t = f - TALK
+  for (const [t0, t1, name, lines, who, side] of SAYS) if (t >= t0 && t < t1) bubble(c, who(), name, lines, side, t - t0)
 }
 const people = (f) => [
   ...[alden(f)].filter(Boolean), captain(f), ...watchers.map((w) => w(f)), ...talkers(f),
@@ -758,21 +759,19 @@ const faces = (f) => {
   crane(D, f); lines(D, f)
   return [...M.faces, ...ship, ...ship.map((F) => ({ mat: F.mat + "_r", pts: F.pts.map(([x, z, u]) => [x, z, -u]) })), ...boats(f), ...D.faces]
 }
-// checked one frame in 24: no scene rule runs on it (no world.light, nothing with a height or a front
-// marker), so the frames checked only prove they build; the tests stay fast
-scene("harbor", { w: W, h: H, bg: "b", ...CLOCK, check: { every: 24 } }, (c) => c.mesh(view(1), faces(c.frame), mats(c.frame), { sprites: people(c.frame), ...LIGHT }), (c) => talk(c, 1))
-
-// K times the size through the camera: the pier and the boats sharp, the awning near us and the far water blurred
-// (its glints into bokeh), a light haze far off, a bloom; every face in blocks of a sprite's pixel.
-// `harbor_md` twice (960x540); a camera can also start its clock `from` a frame of the story and run
-// `n` frames of it.
-const camera = (name, K, from = 0, n = FRAMES) => scene(name, { w: W * K, h: H * K, bg: "b", frames: n, fps: 1000 / MS, check: false },
-  (c) => c.mesh(view(K), faces(c.frame + from), mats(c.frame + from, K), { sprites: people(c.frame + from), pixel: K, ...LIGHT }),
-  post({ blur: 9 * K, focus: [(W * K) / 2, H * K * 0.64], sharp: 5.5, soft: [4, 10], fog: { color: "#8fb8d6", from: DIST + 20, to: DIST + 60, max: 0.25 }, bloom: { strength: 1.0, r: 12 * K, above: 0.86 }, vignette: 0.3 }),
-  (c) => talk(c, K, c.frame + from))
-camera("harbor_md", 2)
+// The scene, its clock starting `from` a frame of the story; through the camera at its sizes (post(), in
+// the art's pixels): the pier and the boats sharp, the awning near us and the far water blurred (its glints
+// into bokeh), a light haze far off, a bloom; every face in blocks of a sprite's pixel (c.k px).
+const camera = (name, o, from = 0) => scene(name, { w: W, h: H, bg: "b", fps: 1000 / MS, ...o },
+  (c) => c.mesh(CAM, faces(c.frame + from), mats(c.frame + from, c.k), { sprites: people(c.frame + from), ...LIGHT }),
+  post({ blur: 9, focus: [W / 2, H * 0.64], sharp: 5.5, soft: [4, 10], fog: { color: "#8fb8d6", from: DIST + 20, to: DIST + 60, max: 0.25 }, bloom: { strength: 1.0, r: 12, above: 0.86 }, vignette: 0.3 }),
+  (c) => talk(c, c.frame + from))
+// `harbor` checked one frame in 24: no scene rule runs on it (no world.light, nothing with a height or a
+// front marker), so the frames checked only prove they build; the tests stay fast. `harbor_md` twice as
+// big (960x540).
+camera("harbor", { frames: FRAMES, check: { every: 24 }, sizes: { harbor_md: 2 } })
 // The gallery's excerpt (`harbor_clip`, 960x540): the story's middle at the full frame rate, from
 // Alden's last steps to the captain through the talk to the head of the gangway (the whole loop's GIF,
 // 38 s of water moving everywhere, would run to 28 MB).
 const CLIP0 = TALK - 12
-camera("harbor_clip", 2, CLIP0, TALKED + LEGS[5].n + LEGS[6].n - CLIP0)
+camera("harbor_clip", { w: W * 2, h: H * 2, pixel: 2, frames: TALKED + LEGS[5].n + LEGS[6].n - CLIP0, check: false }, CLIP0)

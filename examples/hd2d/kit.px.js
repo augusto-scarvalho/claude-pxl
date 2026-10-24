@@ -1,7 +1,7 @@
 // HD-2D kit: what the hd2d scenes share (plaza.px.js, graveyard.px.js), taken with
 // include("kit.px.js", { palette: true }): the nature kit (grass, pines, bushes, rocks, walls, paths;
-// ../nature/kit.px.js), cobbles, an ashlar wall, planks and a lamp, and two helpers: a camera high up
-// through a long lens, and blocks in meters.
+// ../nature/kit.px.js), cobbles, an ashlar wall, planks and a lamp, and blocks in meters. The camera
+// high up through a long lens is the DSL's: perspective({ w, h, pitch, fov, ppm }).
 include("../nature/kit.px.js", { palette: true })
 pal({ k: "#1a1620" })
 shades("1234", "#8d8070")   // cobbles: the gaps, the stones, their lit edges
@@ -41,15 +41,6 @@ sprite("_planks", { w: 16, h: 16 }, (c) => {
 sprite("_lamp", { w: 7, h: 30, pivot: "bottom" }, rect(3, 8, 1, 22, "k"), rect(1, 28, 5, 2, "k"),
   rect(1, 1, 5, 1, "k"), rect(1, 2, 5, 5, "Y"), rect(2, 3, 3, 3, "y"), rect(0, 7, 7, 1, "k"))
 
-// A camera high up through a long lens: tilted `pitch` degrees, `fov` across, `ppm` px to the meter
-// where it looks (the picture's middle, on the ground `z` m ahead, `dist` m from the eye along its
-// axis: where post() focuses by default); view(k) for a picture k times as big.
-const hd2dCamera = ({ w, h, pitch, fov, ppm }) => {
-  const rad = Math.PI / 180, focal = w / 2 / Math.tan((fov / 2) * rad), dist = focal / ppm
-  // texels to lay textures a texel to a pixel where it looks: on the floor (foreshortened down) and on walls
-  const floor = [1 / ppm, 1 / (ppm * Math.sin(-pitch * rad))], wall = [1 / ppm, 1 / (ppm * Math.cos(-pitch * rad))]
-  return { dist, floor, wall, z: dist * Math.cos(-pitch * rad), view: (k = 1) => ({ w: w * k, fov, pitch, eye: dist * Math.sin(-pitch * rad), horizon: (h / 2 + focal * Math.tan(pitch * rad)) * k }) }
-}
 // A block into model m, from (x0, z0) to (x1, z1), u0 to u1 m up: its top of one material, its sides of another.
 const hd2dBlock = (m, top, side, x0, z0, x1, z1, u0, u1) => {
   m.face(top, [x0, z0, u1], [x1, z0, u1], [x1, z1, u1], [x0, z1, u1])

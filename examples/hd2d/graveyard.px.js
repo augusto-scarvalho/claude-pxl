@@ -6,7 +6,7 @@
 // them, its clear texels holes the stones show through; the fence of boxes), the people (traveler.px.js), trees, stones and plants as sprites standing in it,
 // a low sun behind on the left. Its ground, plants and stones are drawn after the games' sheets (pxl
 // study) and SLYNYRD's, Saint11's and final boss blues' tutorials. `graveyard` is the art at its own
-// size, the one checked; `graveyard_hd` the same four times as big through post().
+// size, the one checked; `graveyard_hd` the same four times as big through post() (a size of it).
 include("traveler.px.js")
 include("kit.px.js", { palette: true })
 include("../fonts/font5x7.px.js")
@@ -129,17 +129,18 @@ headstone("_grave_old", 13, 16, arch(13), () => false, { lean: -2, seed: 4, chip
 
 // The camera: 24 px to the meter, 38 degrees down, 30 across; the hill centred (Z, 1.6 m behind where it
 // looks, is the hill's middle).
-const W = 480, H = 270, CAM = hd2dCamera({ w: W, h: H, pitch: -38, fov: 30, ppm: 24 }), Z = CAM.z - 1.6, DIST = CAM.dist, view = CAM.view
+const W = 480, H = 270, CAM = perspective({ w: W, h: H, pitch: -38, fov: 30, ppm: 24 }), Z = CAM.z - 1.6, DIST = CAM.dist
 const M = model(), block = (...a) => hd2dBlock(M, ...a)
-// The textures a texel to a pixel where the camera looks: the floors foreshortened, the walls a little.
+// The textures a texel to a pixel where the camera looks (texel "screen": the floors foreshortened, the walls
+// a little; the flags the floor's on their 2.5 cm kerb too).
 const MATS = {
-  grass: { tex: "_grass", texel: CAM.floor }, turf: { tex: "_turf", texel: CAM.floor }, flags: { tex: "_flags", texel: CAM.floor },
-  rampart: { tex: "_rampart", texel: [CAM.wall[0], 1.5 / 29] }, riser: { tex: "_riser", anchor: "face", texel: CAM.wall },
+  grass: { tex: "_grass", texel: "screen" }, turf: { tex: "_turf", texel: "screen" }, flags: { tex: "_flags", texel: CAM.floor },
+  rampart: { tex: "_rampart", texel: [CAM.wall[0], 1.5 / 29] }, riser: { tex: "_riser", anchor: "face", texel: "screen" },
   // the fence's weathered wood in the trunks' browns, a tone to each face by its light (in the HD picture
   // in blocks of the sprites' pixel, its outline on the shaded side: pixel art as they are), the grain
   // in dashes a step darker
   wood: { ramp: "basdf", edge: "b", bias: 0.08, texture: (x, y) => (hash(x, y >> 2) < 0.18 ? -1 : 0) }, rail: { ramp: "basdf", edge: "b", bias: 0.08, texture: (x, y) => (hash(x >> 2, y) < 0.2 ? -1 : 0) },
-  edge: { tex: "_edge", anchor: "face", texel: CAM.floor }, edge_r: { tex: "_edge_r", anchor: "face", texel: CAM.floor },
+  edge: { tex: "_edge", anchor: "face", texel: "screen" }, edge_r: { tex: "_edge_r", anchor: "face", texel: "screen" },
 }
 const TOP = 1.5                                                     // the hill's top
 M.face("turf", [-40, Z - 25, 0], [40, Z - 25, 0], [40, Z + 60, 0], [-40, Z + 60, 0])
@@ -323,10 +324,10 @@ const SAYS = [
 // lower edge down to the speaker's head; a blue-grey mark at its lower right corner that more is
 // coming. Over the speaker and off to one side (side: 1 right, -1 left), in pixels finer than the
 // art's (3 of the picture's to the art's 4), as a game's interface is.
-const bubble = (c, K, v, [x, z, u], name, lines, side, t) => {
-  const U = Math.max(1, Math.round(K * 0.75)), pad = 7, lineH = 10, ch = 5
+const bubble = (c, [x, z, u], name, lines, side, t) => {
+  const K = c.k, U = Math.max(1, Math.round(K * 0.75)), pad = 7, lineH = 10, ch = 5
   const tw = Math.max(name.length * 6 + 16, ...lines.map((l) => l.length * 6)), w = tw + 2 * pad + 8, h = pad + 7 + 6 + lines.length * lineH + pad - 2
-  const [hx, hy] = v.ground(x, z, u + 1.5), tail = 9
+  const [hx, hy] = CAM.ground(x, z, u + 1.5).map((p) => p * K), tail = 9
   const X0 = Math.round(hx - (side > 0 ? 0.22 : 0.78) * w * U), Y0 = Math.round(hy - (h + tail) * U) - 2 * U
   const sx = Math.max(ch + 5, Math.min(w - ch - 6, Math.round((hx - X0) / U))), tip = Math.round((hx - X0) / U)
   const cells = new Set(), key = (i, j) => i + "," + j, has = (i, j) => cells.has(key(i, j))
@@ -356,9 +357,9 @@ const bubble = (c, K, v, [x, z, u], name, lines, side, t) => {
   }
   R(mx, h - pad, 7, 1, "#4f6382")
 }
-const talk = (c, K) => {
-  const t = c.frame - TALK, v = perspective(view(K))
-  for (const [t0, t1, name, lines, who, side] of SAYS) if (t >= t0 && t < t1) bubble(c, K, v, who(), name, lines, side, t - t0)
+const talk = (c) => {
+  const t = c.frame - TALK
+  for (const [t0, t1, name, lines, who, side] of SAYS) if (t >= t0 && t < t1) bubble(c, who(), name, lines, side, t - t0)
 }
 // The wind from the left: the pines and the dead tree sway with it (16 frames of 220 ms, a whole number
 // of sways a loop), the gust reaching the ones on the left first; and it brings small dead leaves in
@@ -379,15 +380,11 @@ const CLOCK = { frames: FRAMES, fps: 1000 / MS }
 const LIGHT = { light: [-0.55, 0.6, 0.72], sun: { color: "#ffe2b4", strength: 1.3 }, sky: { color: "#a4a6d8", strength: 0.45 } }
 // checked one frame in 24: no scene rule runs on it (no world.light, nothing with a height or a front
 // marker), so the frames checked only prove they build; the tests stay fast
-scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 24 } }, (c) => c.mesh(view(1), M.faces, MATS, { sprites: people(c), ...LIGHT }), (c) => talk(c, 1))
-
-// K times the size and through the camera: the hill's top sharp, the wood below and the hills behind
-// blurred and taken by a warm mist, a bloom, darker corners; the fence in blocks of a sprite's pixel.
-// `graveyard_hd` four times (1920x1080); `graveyard_md` twice (960x540: the gallery's GIF, its 46 s a
-// quarter of the pixels to draw and to store).
-const camera = (name, K) => scene(name, { w: W * K, h: H * K, bg: "q", ...CLOCK, check: false },
-  (c) => c.mesh(view(K), M.faces, { ...MATS, wood: { ...MATS.wood, block: K }, rail: { ...MATS.rail, block: K } }, { sprites: people(c), pixel: K, ...LIGHT }),
-  post({ blur: 9 * K, focus: [(W * K) / 2, H * K * 0.55], sharp: 2.5, soft: [3, 8], fog: { color: "#dcdccc", from: DIST + 2, to: DIST + 26, max: 0.7 }, bloom: { strength: 0.6, r: 10 * K }, vignette: 0.35 }),
-  (c) => talk(c, K))
-camera("graveyard_hd", 4)
-camera("graveyard_md", 2)
+// Its sizes, through the camera (post(), in the art's pixels): the hill's top sharp, the wood below and
+// the hills behind blurred and taken by a warm mist, a bloom, darker corners; the fence in blocks of a
+// sprite's pixel. `graveyard_hd` four times (1920x1080); `graveyard_md` twice (960x540: the gallery's
+// GIF, its 46 s a quarter of the pixels to draw and to store).
+scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 24 }, sizes: { graveyard_hd: 4, graveyard_md: 2 } },
+  (c) => c.mesh(CAM, M.faces, MATS, { sprites: people(c), ...LIGHT }),
+  post({ blur: 9, focus: [W / 2, H * 0.55], sharp: 2.5, soft: [3, 8], fog: { color: "#dcdccc", from: DIST + 2, to: DIST + 26, max: 0.7 }, bloom: { strength: 0.6, r: 10 }, vignette: 0.35 }),
+  (c) => talk(c))

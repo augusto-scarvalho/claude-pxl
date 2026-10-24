@@ -30,10 +30,10 @@ sprite("sign", { pivot: "center" }, `
   eeeeeeeee`)
 const HOUSE = world3d({ parts: { house: { make: "house", params: { door: "door", window: "window", sign: "sign" } } } })
 const view4 = (name, W, w, h, ppm, cam) => {
-  for (const v of ["side", "top", "iso"]) anim(`${name}_${v}`, { w, h, ...CLOCK }, draw3d(W, { view: { kind: v, origin: [w / 2, v === "top" ? h / 2 : h - 4] }, ppm, mats: MATS, light: LIGHT }))
-  const C = hd2d(w, h, cam), G = ground(C.Z), at = [0, C.Z - 1.1 / Math.tan(-PITCH * RAD), 0]
-  scene(`${name}_camera`, { w, h, bg: "k", ...CLOCK, check: { every: 24 } }, (c) => c.mesh(C.view, G.faces, GMATS, { light: LIGHT }),
-    (c) => c.draw3d(W, { view: C.view, at, mats: MATS, light: LIGHT }))
+  for (const v of ["side", "top", "iso"]) anim(`${name}_${v}`, { w, h, ...CLOCK }, draw3d(W, { view: { kind: v, origin: [w / 2, v === "top" ? h / 2 : h - 4] }, ppm }))
+  const C = hd2d(w, h, cam), G = ground(C.z), at = C.aim(1.1)
+  scene(`${name}_camera`, { w, h, bg: "k", ...CLOCK, check: { every: 24 } }, (c) => c.mesh(C, G.faces, GMATS),
+    (c) => c.draw3d(W, { view: C, at }))
 }
 view4("house", HOUSE, 96, 96, 28, 15)
 
@@ -47,12 +47,12 @@ const snowman = sdf.union(sdf.sphere(0.7).at(0, 0, 0.65), sdf.sphere(0.5).at(0, 
   .union(sdf.torus(0.36, 0.08).at(0, 0, 2.05).mat("cap"), sdf.capsule([0.45, 0, 1.75], [1.05, 0.1, 2.15], 0.04, 0.02).mat("bark"), sdf.capsule([-0.45, 0, 1.75], [-1.0, -0.05, 2.05], 0.04, 0.02).mat("bark"))
 const spirit = snowman.rotate((c) => 360 * c.phase)
 const FACE = { on: spirit, point: [0, -0.38, 2.5], views: { three: "face_three", profile: "face_side" } }
-const spiritView = (name, w, h, view, ppm, at) => anim(name, { w, h, ...CLOCK }, surface(spirit, { view, ppm, at, mats: MATS, light: LIGHT }), decal("face_front", { ...FACE, view, ppm, at, light: LIGHT }))
+const spiritView = (name, w, h, view, ppm, at) => anim(name, { w, h, ...CLOCK }, surface(spirit, { view, ppm, at }), decal("face_front", { ...FACE, view, ppm, at }))
 for (const v of ["side", "top", "iso"]) spiritView(`spirit_${v}`, 80, 96, v, 24, [40, v === "top" ? 50 : 90])
 {
-  const C = hd2d(96, 112, 22), G = ground(C.Z), at = [0, C.Z - 1.3 / Math.tan(-PITCH * RAD), 0]
-  scene("spirit_camera", { w: 96, h: 112, bg: "k", ...CLOCK, check: { every: 24 } }, (c) => c.mesh(C.view, G.faces, GMATS, { light: LIGHT }),
-    (c) => c.surface(spirit, { view: C.view, at, mats: MATS, light: LIGHT }), (c) => c.decal("face_front", { ...FACE, view: C.view, at, light: LIGHT }))
+  const C = hd2d(96, 112, 22), G = ground(C.z), at = C.aim(1.3)
+  scene("spirit_camera", { w: 96, h: 112, bg: "k", ...CLOCK, check: { every: 24 } }, (c) => c.mesh(C, G.faces, GMATS),
+    (c) => c.surface(spirit, { view: C, at }), (c) => c.decal("face_front", { ...FACE, view: C, at }))
 }
 
 // A rune glowing on the crystal (unlit, marked as giving light), turning with it.
@@ -65,7 +65,7 @@ sprite("rune", { pivot: "center" }, `
   .F.F.
   F...F`)
 const CR = make3d.crystal({ rune: "rune" }), CRF = CR.field.rotate((c) => 360 * c.phase), RUNE = { on: CRF, point: CR.decals.rune.point, lit: false }
-for (const v of ["side", "iso"]) anim(`rune_${v}`, { w: 64, h: 72, ...CLOCK }, surface(CRF, { view: v, ppm: 32, at: [32, 66], mats: MATS, light: LIGHT }), decal("rune", { ...RUNE, view: v, ppm: 32, at: [32, 66] }))
+for (const v of ["side", "iso"]) anim(`rune_${v}`, { w: 64, h: 72, ...CLOCK }, surface(CRF, { view: v, ppm: 32, at: [32, 66] }), decal("rune", { ...RUNE, view: v, ppm: 32, at: [32, 66] }))
 
 // An emblem wrapped round a barrel: a gold sun, its texels laid on the staves' curve, 0.6 m across.
 sprite("sun", { pivot: "center" }, `
@@ -79,8 +79,8 @@ sprite("sun", { pivot: "center" }, `
   ..O..O..O..
   .....O.....`)
 const barrel = sdf.cylinder(0.45, 1.1).union(sdf.torus(0.46, 0.035).at(0, 0, 0.15), sdf.torus(0.46, 0.035).at(0, 0, 0.95), { smooth: 0.02 }).mat("door").rotate((c) => 360 * c.phase)
-for (const v of ["side", "iso"]) anim(`barrel_${v}`, { w: 72, h: 80, ...CLOCK }, surface(barrel, { view: v, ppm: 40, at: [36, 72], mats: MATS, light: LIGHT }),
-  decal("sun", { on: barrel, point: [0, -0.45, 0.55], mode: "wrap", size: 0.6, view: v, ppm: 40, at: [36, 72], light: LIGHT }))
+for (const v of ["side", "iso"]) anim(`barrel_${v}`, { w: 72, h: 80, ...CLOCK }, surface(barrel, { view: v, ppm: 40, at: [36, 72] }),
+  decal("sun", { on: barrel, point: [0, -0.45, 0.55], mode: "wrap", size: 0.6, view: v, ppm: 40, at: [36, 72] }))
 
 // The showcase (docs/gallery/sdf_grove.gif): the grove's world through the HD-2D camera, the oak in leaf
 // swaying in the wind, the house with its door, window and sign, smoke from its chimney, a mossy rock, a
@@ -99,7 +99,7 @@ make3d.define("snowman", ({ size = 1, look = 0 }) => ({ field: snowman.scale(siz
     mist: { make: "mist", at: [0, 3.4], look: { ramp: "90+=" } },
     spirit: { make: "snowman", at: [-0.5, -0.9], params: { size: 0.62, look: 40 } },
   } })
-  const W = 320, H = 180, { Z, view: VIEW } = hd2d(W, H), GR = ground(Z), AT = [0, Z - 2.4, 0]
-  scene("grove_showcase", { w: W, h: H, bg: "k", ...CLOCK, check: false }, (c) => c.mesh(VIEW, GR.faces, GMATS, { light: LIGHT }),
-    (c) => c.draw3d(SHOW, { view: VIEW, at: AT, mats: MATS, light: LIGHT }))
+  const W = 320, H = 180, VIEW = hd2d(W, H), Z = VIEW.z, GR = ground(Z), AT = [0, Z - 2.4, 0]
+  scene("grove_showcase", { w: W, h: H, bg: "k", ...CLOCK, check: false }, (c) => c.mesh(VIEW, GR.faces, GMATS),
+    (c) => c.draw3d(SHOW, { view: VIEW, at: AT }))
 }

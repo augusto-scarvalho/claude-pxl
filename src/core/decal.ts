@@ -48,7 +48,7 @@ export function drawDecal(c: DecalCanvas, name: string, o: DecalOpts = {}): void
   const who = `decal '${name}'`;
   if (!(o.on instanceof Sdf)) throw new PxError(`${who}: on is the distance field it lies on (drawn by surface() before it)`);
   if (!(Array.isArray(o.point) && o.point.length === 3 && o.point.every(Number.isFinite))) throw new PxError(`${who}: point is where it lies, [x, y, z] in the field's own frame, got ${JSON.stringify(o.point)}`);
-  const mode = o.mode ?? "pin", K = o.pixel ?? 1, lit = o.lit !== false;
+  const mode = o.mode ?? "pin", K = o.pixel ?? c.k ?? 1, lit = o.lit !== false;
   if (mode !== "pin" && mode !== "wrap") throw new PxError(`${who}: mode is "pin" or "wrap", got ${JSON.stringify(o.mode)}`);
   if (o.size !== undefined && !(o.size > 0)) throw new PxError(`${who}: size is m across, above 0, got ${JSON.stringify(o.size)}`);
   const persp = !!o.view && typeof o.view === "object" && "horizon" in o.view, origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;

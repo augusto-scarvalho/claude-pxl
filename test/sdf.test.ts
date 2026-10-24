@@ -143,3 +143,15 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { g: { ramp: "w" }, s: { 
   assert.ok(o.slice(18, 24).some((r) => r.slice(24, 34).includes("g")), "a shadow to the right on the ground");
   assert.ok(o[20].slice(0, 12).split("").every((k) => k === "w"), "none to the left");
 });
+
+test("look3d: the 3D ops' light and mats where a call doesn't say them; a call's own wins, light \"view\" the view's own", () => {
+  const F = `const f = sdf.sphere(0.4).at(0, 0, 0.4).union(sdf.box([0.3, 0.3, 0.3]).at(0.4, 0, 0.15).mat("m2")), O = { view: "iso", ppm: 16, at: [12, 22] }, L = [0.7, 0.2, 0.6], M = { "": "kgw", m2: "krw" }\n`;
+  const p = loadSource(PAL + F + `sprite("given", { w: 24, h: 24 }, surface(f, { ...O, light: L, mats: M }))
+sprite("plain", { w: 24, h: 24 }, surface(f, { ...O, mats: M }))
+look3d({ light: L, mats: M })
+sprite("taken", { w: 24, h: 24 }, surface(f, O))
+sprite("own", { w: 24, h: 24 }, surface(f, { ...O, light: "view" }))`, "t.px.js");
+  assert.equal(p.image("taken").hash(), p.image("given").hash(), "look3d's light and mats");
+  assert.equal(p.image("own").hash(), p.image("plain").hash(), "light: \"view\", the view's own");
+  assert.notEqual(p.image("given").hash(), p.image("plain").hash());
+});

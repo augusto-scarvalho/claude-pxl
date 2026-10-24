@@ -11,6 +11,8 @@ import { loadProject, loadSource } from "../src/node/load.ts";
 import { Img } from "../src/core/image.ts";
 import { pack } from "../src/core/color.ts";
 import { encodePng } from "../src/node/png.ts";
+import { type View, perspective, scaled } from "../src/core/perspective.ts";
+import { postAt } from "../src/core/post.ts";
 
 const STAGE = `ramps("kgw")
 const V = { w: 40, horizon: 10, eye: 1, focal: 40 }
@@ -319,4 +321,40 @@ sprite("hid", { w: 32, h: 32 }, mesh("side", wall.faces, { w: { ramp: "krr" } },
   for (const v of ["side", "iso"]) assert.equal(shape("m_" + v), shape("s_" + v), v);
   const rows = keys(p, "hid").split("\n");
   assert.ok(rows[28].includes("rrrr") && !rows[28].includes("g") && rows[20].includes("g"), "the wall in front hides the box's foot, not its top");
+});
+
+test("the HD-2D camera: perspective({ w, h, pitch, fov, ppm }) looks at the picture's middle, ppm px to the meter there; aim, texels, k times as big", () => {
+  const C = perspective({ w: 64, h: 36, pitch: -40, fov: 30, ppm: 24 } as View), near = (a: number, b: number, what: string, e = 1e-9) => assert.ok(Math.abs(a - b) < e, `${what}: ${a} != ${b}`);
+  const [x, y] = C.ground(0, C.z!, 0);
+  near(x, 32, "the middle column"); near(y, 18, "the middle row"); near(C.scale(C.z!), 24, "px to the meter there"); near(C.dist!, C.focal / 24, "dist");
+  // a texel of the floor (and of a wall) there a pixel tall
+  near(C.ground(0, C.z! - C.floor![1] / 2)[1] - C.ground(0, C.z! + C.floor![1] / 2)[1], 1, "a floor texel", 1e-3); near(C.floor![0], 1 / 24, "a texel across");
+  const [ax, az, au] = C.aim(1.2, 0.3), [mx, my] = C.ground(ax, az, 1.2);
+  near(mx, 32, "aimed"); near(my, 18, "aimed"); assert.equal(au, 0.3, "lifted");
+  const B = perspective(scaled(C, 2)), [bx, by] = B.ground(0.7, C.z! + 1, 0.4), [sx, sy] = C.ground(0.7, C.z! + 1, 0.4);
+  near(bx, 2 * sx, "k times as big"); near(by, 2 * sy, "k times as big");
+  assert.throws(() => perspective({ w: 64, h: 36, pitch: 10, ppm: 24 } as View), /looking at the picture's middle/);
+  // post() in the art's pixels on a picture k times as big, unless px
+  assert.deepEqual(postAt({ blur: 4, focus: [3, 5], bloom: { r: 2, strength: 1 }, sharp: 2 }, 3), { blur: 12, focus: [9, 15], bloom: { r: 6, strength: 1 }, sharp: 2, pixel: 3 });
+  assert.deepEqual(postAt({ blur: 4, px: true }, 3), { blur: 4 });
+});
+
+test("a scene's sizes: the same scene k times as big (camera, sprites, ramp materials in blocks, meshSocket), post() only there; texel \"screen\"", () => {
+  const src = PAL + `ramps("kgw")
+const C = perspective({ w: 24, h: 16, pitch: -40, fov: 30, ppm: 16 }), Z = C.z
+sprite("s", { w: 2, h: 6, pivot: "bottom", sockets: { tip: [1, 0] } }, rect(0, 0, 2, 6, "r"))
+sprite("_t", { w: 2, h: 2 }, rect(0, 0, 1, 1, "w"), rect(1, 1, 1, 1, "w"), rect(1, 0, 1, 1, "g"), rect(0, 1, 1, 1, "g"))
+const M = (top, side) => { const m = model(); m.face("floor", [-3, Z - 3, 0], [3, Z - 3, 0], [3, Z + 3, 0], [-3, Z + 3, 0]); m.face(top, [0.3, Z - 0.3, 0.4], [0.9, Z - 0.3, 0.4], [0.9, Z + 0.3, 0.4], [0.3, Z + 0.3, 0.4]); m.face(side, [0.3, Z - 0.3, 0], [0.9, Z - 0.3, 0], [0.9, Z - 0.3, 0.4], [0.3, Z - 0.3, 0.4]); m.box("box", [-0.9, Z - 0.2, 0], [-0.5, Z + 0.2, 0.5]); return m.faces }
+// a socket in meters is the same at every size
+const S = [{ name: "s", at: [-0.2, Z] }], tips = {}, tip = (c) => { const t = (tips[c.k] = c.meshSocket(C, S[0], "tip")); if (!tips[1] || t.some((x, i) => Math.abs(x - tips[1][i]) > 1e-9)) throw new Error("meshSocket at size " + c.k) }
+scene("a", { w: 24, h: 16, sizes: { a2: 2 } }, (c) => { tip(c); c.mesh(C, M("crate", "crate"), { floor: { tex: "_t", texel: "screen" }, crate: { tex: "_t", texel: "screen" }, box: { ramp: "kgw" } }, { sprites: S }) }, post({ vignette: 0.6 }))
+const H = (k) => (c) => c.mesh({ w: 24 * k, fov: 30, pitch: -40, eye: C.eye, horizon: C.horizon * k }, M("top", "side"), { floor: { tex: "_t", texel: C.floor }, top: { tex: "_t", texel: C.floor }, side: { tex: "_t", texel: C.wall }, box: { ramp: "kgw", block: k } }, { sprites: S, pixel: k })
+scene("h1", { w: 24, h: 16 }, H(1))
+scene("h2", { w: 48, h: 32 }, H(2), post({ vignette: 0.6 }))`;
+  const p = loadSource(src, "t.px.js");
+  assert.equal(p.image("a").hash(), p.image("h1").hash(), "at its own size: texel \"screen\" as the floor's and the wall's texels, no post()");
+  assert.deepEqual([p.image("a2").w, p.image("a2").h], [48, 32]);
+  assert.equal(p.image("a2").hash(), p.image("h2").hash(), "twice as big: the camera, the sprites, the box in blocks, post()");
+  assert.equal(p.assets.get("a2")!.opts.check, false, "a size isn't checked");
+  assert.match(failure(PAL + `scene("a", { w: 4, h: 4, sizes: { b: 1.5 } })`).message, /sizes names the same scene/);
 });

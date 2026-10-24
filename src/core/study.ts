@@ -398,7 +398,7 @@ function perspectiveLines(segs: Segment[], vps: Vanish[], W: number, H: number, 
     const tilt = (fov: number) => Math.round((Math.atan(((cy - down.y) * Math.tan((fov / 2) * (Math.PI / 180))) / (W / 2)) * 180) / Math.PI);
     horizon = down.y;
     out.push(`  Looking down: the horizon above the picture at row ${Math.round(down.y * k)}, the camera high up (an HD-2D diorama, a 3/4 view from above). Lines alone don't part the tilt from the lens: fov 20° -> tilted down ~${tilt(20)}°, 30° -> ~${tilt(30)}°, 45° -> ~${tilt(45)}°; uprights that stay nearly parallel say a long lens (HD-2D: ~30°). A square on the ground tells which: near the middle it looks sin(tilt) as deep as it is wide (a cube's top tan(tilt) as tall as its front): planks, tiles, a crate.`);
-    pxl = `perspective({ w: ${PW}, horizon: ${Math.round(down.y * k)}, pitch: -${tilt(30)}, fov: 30, eye: <m> }), or hd2dCamera({ pitch: -${tilt(30)}, fov: 30, ... }) of examples/hd2d/kit.px.js; the fov as above.`;
+    pxl = `perspective({ w: ${PW}, horizon: ${Math.round(down.y * k)}, pitch: -${tilt(30)}, fov: 30, eye: <m> }), or HD-2D's perspective({ w: ${PW}, h: <px>, pitch: -${tilt(30)}, fov: 30, ppm: <px a meter> }), looking at the middle; the fov as above.`;
   } else if (byFoe || inside.length) {
     const v = byFoe ?? inside.sort((a, b) => b.weight - a.weight)[0];
     horizon = v.y;

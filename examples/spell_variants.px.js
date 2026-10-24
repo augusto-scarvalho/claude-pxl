@@ -30,11 +30,11 @@ sprite("_iso", { w: CW, h: CH }, (c) => {
   c.poly([56, 22, 112, 50, 56, 78, 0, 50], "g"); c.poly([0, 50, 56, 78, 56, 80, 0, 52], "d"); c.poly([56, 78, 112, 50, 112, 52, 56, 80], "h")
   c.poly([73, 34, 79, 31, 85, 34, 85, 48, 79, 51, 73, 48], "t"); c.poly([73, 34, 79, 37, 79, 51, 73, 48], "s"); c.poly([73, 34, 79, 31, 85, 34, 79, 37], "x")
 })
-// through a perspective() camera tilted down 30 degrees, as an HD-2D diorama is seen: 24 px a meter
-// in the middle, the ground going back darker
-const CAM = { w: CW, fov: 40, pitch: -30, eye: 3.2, horizon: CH / 2 - (CW / 2 / Math.tan((20 * Math.PI) / 180)) * Math.tan((30 * Math.PI) / 180) }
+// through a perspective() camera tilted down 30 degrees, as an HD-2D diorama is seen, looking at the
+// picture's middle from 3.2 m up (24 px a meter there), the ground going back darker
+const CAM = perspective({ w: CW, h: CH, fov: 40, pitch: -30, eye: 3.2 })
 sprite("_persp", { w: CW, h: CH }, (c) => {
-  const P = perspective(CAM), at = (x, z, up) => P.ground(x, z, up).map(Math.round)
+  const at = (x, z, up) => CAM.ground(x, z, up).map(Math.round)
   c.rect(0, 0, CW, CH, "g"); c.dither(0, 0, CW, 20, "d", "g", 0.5); c.dither(0, 50, CW, 30, "g", "h", 0.25)
   const [sx, sy] = at(0.95, 5.55, 0), [tx, ty] = at(0.95, 5.55, 0.8)
   c.rect(sx - 4, ty, 9, sy - ty, "t"); c.rect(sx - 4, ty, 2, sy - ty, "s"); c.rect(sx + 3, ty, 2, sy - ty, "u")
@@ -49,7 +49,7 @@ const VIEWS = {
   side: { view: { kind: "side", origin: [0, GY] }, feet: [14, GY + 1], to: [77, 0, 10] },
   top: { view: { kind: "top", origin: [56, 40] }, feet: [20, 50], to: [22, -2, 6] },
   iso: { view: { kind: "iso", origin: [56, 50] }, feet: [26, 51], to: [11, -12, 11] },
-  persp: { view: CAM, feet: perspective(CAM).ground(-1.4, 5.55, 0).map(Math.round), to: [0.95, 5.55, 0.42] },
+  persp: { view: CAM, feet: CAM.ground(-1.4, 5.55, 0).map(Math.round), to: [0.95, 5.55, 0.42] },
 }
 const cell = (name, el, variant, where = "side", form) => {
   const v = VIEWS[where], S = spell(el, 3, { view: v.view, from: "hero.hand", to: v.to, variant, form, start: 200, seed: 5 })

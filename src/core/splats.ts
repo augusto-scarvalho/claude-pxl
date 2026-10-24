@@ -151,7 +151,7 @@ export function drawSplats(c: SurfaceCanvas, set: unknown, o: SplatOpts = {}): v
   else if (o.spacing !== undefined || o.size !== undefined || o.seed !== undefined) throw new PxError(`${who}: spacing, size and seed are for a field or a density made splats here; a set has them`);
   if (!(set instanceof Splats)) throw new PxError(`splats(set, opts) draws splats (sdf.splats(field or density, { spacing })), or a field or a density with { spacing }${set && typeof set === "object" && "kind" in set ? `, not ${article((set as { kind: string }).kind)}` : ""}`);
   // (details scattered on a form: solid where gathered, no outline of their own, as a painter's dabs)
-  const S = set, persp = !!o.view && typeof o.view === "object" && "horizon" in o.view, K = o.pixel ?? 1, blend = o.blend ?? (S.brush ? "cut" : "dither"), outline = o.outline ?? !S.brush;
+  const S = set, persp = !!o.view && typeof o.view === "object" && "horizon" in o.view, K = o.pixel ?? c.k ?? 1, blend = o.blend ?? (S.brush ? "cut" : "dither"), outline = o.outline ?? !S.brush;
   if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`${who}: pixel is px to a cell, a whole number from 1, got ${JSON.stringify(o.pixel)}`);
   if (!["dither", "cut", "alpha"].includes(blend)) throw new PxError(`${who}: blend is "dither", "cut" or "alpha", got ${JSON.stringify(o.blend)}`);
   const origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;

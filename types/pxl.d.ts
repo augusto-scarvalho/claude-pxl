@@ -96,7 +96,11 @@ declare global {
     ground?: number;
   }
   /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
-  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number } }
+  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number };
+    /** px to an art pixel (w and h the picture's): mesh(), the 3D ops, meshSocket() and post() draw that many times as big */
+    pixel?: number;
+    /** the same scene k times as big under other names, not checked ({ name_hd: 4 }); post() runs only there */
+    sizes?: Record<string, number> }
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong" }
   interface PxFrame { ms?: number; hold?: number }
   interface PxLayerOpts {
@@ -190,7 +194,7 @@ declare global {
   /** A flat face of a model, its corners in meters. */
   interface PxFace { mat: string; pts: PxV3[] }
   /** How a material is drawn by mesh(): its tones dark to light, the outline, the lit top edge, no creases on a round surface, a lift to its light, a dither between tones, a texture stepping the tone per pixel; or `tex`, an asset tiling its faces, `texel` m to its pixel (default 1/16), from the world's origin or each face's (`anchor`); `block` px to one of its pixels (its faces in blocks, pixel art among HD faces). */
-  interface PxMaterial { ramp?: string | PxColor[]; edge?: PxColor; top?: PxColor; smooth?: boolean; bias?: number; dither?: number; texture?: (x: number, y: number) => number; tex?: string; texel?: number | [number, number]; anchor?: "world" | "face"; block?: number;
+  interface PxMaterial { ramp?: string | PxColor[]; edge?: PxColor; top?: PxColor; smooth?: boolean; bias?: number; dither?: number; texture?: (x: number, y: number) => number; tex?: string; texel?: number | [number, number] | "screen"; anchor?: "world" | "face"; block?: number;
     /** holes eating its faces (and its shadow): progress 0..1, blobs scale m wide, a burning edge key */
     dissolve?: { progress: number; scale?: number; seed?: number; edge?: PxDissolve["edge"]; width?: number; pattern?: PxDissolve["pattern"]; ragged?: number; at?: PxV3; mask?: string; look?: PxDissolve["look"]; char?: PxDissolve["char"]; glow?: number } }
   /** A sprite standing among mesh()'s faces: its feet at [x, z] or [x, z, up] m, the contact shadow's radius in m (0: none). */
@@ -236,7 +240,8 @@ declare global {
   /** surface()'s options: the view (orthographic at ppm px to the meter, its origin at `at` px; or a perspective() view, standing `at` [x, z, up] m), the materials' ramps, the light, the outline, the rim, its own shadows, the creases, a ray to K x K px, its shadow on what is drawn. */
   interface PxSurfaceOpts {
     view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number }>;
-    light?: number[]; outline?: boolean | PxColor; rim?: boolean; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
+    /** the way toward the light; "view": its view's own (from the upper left) where look3d() gives another */
+    light?: number[] | "view"; outline?: boolean | PxColor; rim?: boolean; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
     /** through a camera: its shadow alone (a mesh made of it in its place) */
     hide?: boolean;
     /** the name of the part it is (pxl steps --at) */
@@ -248,7 +253,7 @@ declare global {
   interface PxDensity { readonly kind: "density"; at(p: number[], clock?: PxClock): number; bounds(clock?: PxClock): [PxV3, PxV3] }
   /** volume()'s options: the view, its ramp, the light, how much a meter holds back, its shade, the grid's cell, what glows (and lights round it, m), dither or alpha where thin, a ray to K x K px, its shadow on what is drawn. */
   interface PxVolumeOpts {
-    view?: PxSurfaceView; ppm?: number; at?: number[]; ramp?: string | PxColor[]; light?: number[]; thickness?: number; ambient?: number; shadow?: number; cell?: number;
+    view?: PxSurfaceView; ppm?: number; at?: number[]; ramp?: string | PxColor[]; light?: number[] | "view"; thickness?: number; ambient?: number; shadow?: number; cell?: number;
     emit?: { ramp: string | PxColor[]; strength?: number; glow?: number }; blend?: "dither" | "alpha"; pixel?: number; cast?: number; part?: string;
   }
   /** Gaussian splats: how many, their box. */
@@ -256,7 +261,7 @@ declare global {
   /** splats()'s options: made here from a field or density (spacing, size, seed), the view, materials' ramps or one ramp, the light, dither/cut/alpha where thin, the outline, a cell of K x K px. */
   interface PxSplatOpts {
     spacing?: number; size?: number; seed?: number; view?: PxSurfaceView; ppm?: number; at?: number[];
-    mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; ramp?: string | PxColor[]; light?: number[]; blend?: "dither" | "cut" | "alpha"; outline?: boolean; pixel?: number; part?: string;
+    mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; ramp?: string | PxColor[]; light?: number[] | "view"; blend?: "dither" | "cut" | "alpha"; outline?: boolean; pixel?: number; part?: string;
   }
   /** sdf.scatter's options: on a material or where, how many a square meter, facing up, lit only, turned, sizes, the brush, tone steps, its material, seed, light, flutter. */
   interface PxScatterOpts {
@@ -266,7 +271,7 @@ declare global {
   /** decal()'s options: the field it lies on, where (its rest frame), its up, pin or wrap, its size, other views, lit or glowing, the view as surface()'s, its part. */
   interface PxDecalOpts {
     on: PxSdf; point: number[]; up?: number[]; mode?: "pin" | "wrap"; size?: number; views?: { three?: string; profile?: string }; lit?: boolean;
-    view?: PxSurfaceView; ppm?: number; at?: number[]; pixel?: number; light?: number[]; part?: string;
+    view?: PxSurfaceView; ppm?: number; at?: number[]; pixel?: number; light?: number[] | "view"; part?: string;
   }
   /** What a builder makes: a field (or a density and its look), named parts, details, decals, sockets. */
   interface PxBuilt { field?: PxSdf; density?: PxDensity; parts: Record<string, PxSdf>; details: Record<string, PxScatterOpts>; decals: Record<string, { asset: string; point: PxV3 }>; sockets: Record<string, PxV3> }
@@ -290,7 +295,9 @@ declare global {
   }
   /** A pinhole camera over flat ground, in meters: the horizon's row, the eye's height, a field of view. */
   interface PxView {
-    w?: number; horizon: number; eye: number; fov?: number; focal?: number;
+    w?: number; horizon?: number; eye?: number; fov?: number; focal?: number;
+    /** Looking down at the picture's middle instead of horizon: the picture's height, and px to the meter where it looks instead of eye (HD-2D's camera). */
+    h?: number; ppm?: number;
     /** The column the camera looks at (default the middle). */
     vp?: number;
     /** Degrees the camera is turned right of the world's z axis: two-point perspective (default 0). */
@@ -301,7 +308,11 @@ declare global {
     bend?: number;
   }
   interface PxPerspective {
-    readonly w: number; readonly horizon: number; readonly eye: number; readonly focal: number; readonly vp: number; readonly yaw: number; readonly pitch: number; readonly bend: number;
+    readonly w: number; readonly horizon: number; readonly eye: number; readonly focal: number; readonly vp: number; readonly yaw: number; readonly pitch: number; readonly bend: number; readonly fov?: number;
+    /** Looking down: the ground z m ahead where it looks, dist m from the eye along its axis (post() focuses there), the texels a texel to a pixel there on a floor and on a wall. */
+    readonly z?: number; readonly dist?: number; readonly floor?: [number, number]; readonly wall?: [number, number];
+    /** Looking down: where to stand a thing, [x, z, up], so its point mid m up is where the camera looks (lifted up m). */
+    aim(mid: number, up?: number): [number, number, number];
     /** Where a point x m across, z m ahead and up m above the ground lands on screen (not rounded). */
     ground(x: number, z: number, up?: number): [number, number];
     /** The ground point [x, z] seen through a pixel's center; null at the horizon and above. */
@@ -347,6 +358,8 @@ declare global {
     grain?: number | { amount?: number; seed?: number; animated?: boolean };
     /** the picture taken back to the palette (true) or to those keys, Bayer-dithered between two by dither (0 the nearest) */
     palette?: true | string | string[] | { keys?: string | string[]; dither?: number };
+    /** in a scene k times as big (pixel, sizes), blur, focus, bloom's r and pixel are the art's px: true keeps them the picture's */
+    px?: boolean;
   }
   /** Options every effect takes: the pixels it writes (a region, keys) and its seed. */
   interface PxEffectBase { where?: PxRegion; on?: string; seed?: number }
@@ -463,6 +476,8 @@ declare global {
     readonly t: number; readonly frame: number; readonly frames: number; readonly phase: number;
     /** Drawing a twin: every x lands mirrored (for the few choices a mirror doesn't make by itself). */
     readonly mirrored: boolean;
+    /** px to an art pixel: a scene's pixel (its sizes), 1 elsewhere. */
+    readonly k: number;
     is(x: number, y: number, keys: string): boolean;
     key(x: number, y: number): string;
     get(x: number, y: number): number;
@@ -546,7 +561,7 @@ declare global {
     /** Hand-drawn pixel art pinned (or wrapped) on a field's surface, crisp in any camera, after the surface(). */
     decal(name: string, opts?: PxDecalOpts): void;
     /** A world drawn through a view: its solids, their details and decals, its air. */
-    draw3d(world: PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[]; pixel?: number; only?: string[] }): void;
+    draw3d(world: PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view"; pixel?: number; only?: string[] }): void;
     /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade. */
     shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): void;
     /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
@@ -665,7 +680,7 @@ declare global {
   /** Hand-drawn pixel art pinned (or wrapped) on a field's surface. */
   function decal(name: string, opts?: PxDecalOpts): PxOp;
   /** A world3d(...) drawn through a view. */
-  function draw3d(world: PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[]; pixel?: number; only?: string[] }): PxOp;
+  function draw3d(world: PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view"; pixel?: number; only?: string[] }): PxOp;
   /** A scene as data: named parts made by builders, a seed each, placed by relations, a shared wind. */
   function world3d(spec: { seed?: number; wind?: { from?: "left" | "right" | "front" | "behind"; strength?: number }; parts: Record<string, PxPartSpec> }): PxWorld;
   /** Rules over a world's loop, run by pxl check. */
@@ -675,6 +690,8 @@ declare global {
     /** A builder of the file's own: fn(params) returns { field } or { density, look } (and parts, details, decals, sockets); params' ranges refused when exceeded; wind: it sways. */
     define(name: string, fn: (params: Record<string, any>) => Partial<PxBuilt>, opts?: { params?: Record<string, [number, number]>; wind?: boolean }): void;
   };
+  /** The light and materials the 3D ops take when a call doesn't give them (mesh()'s light; surface, voxels, volume, splats, decal, draw3d, export3d), for the assets defined after it, as pal() and ramps() are. */
+  function look3d(o: { light?: PxV3; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number }> }): void;
   /** Written by build: a grid as name.vox (and .obj/.glb of its blocks), a mesh as name.obj (+ .mtl) and name.glb, Y up; each read back. */
   /** A function of the clock with frames: n moments of its loop: an animated .glb, a file a moment for the others. */
   function export3d(name: string, thing: PxVoxels | PxMesh3 | PxSplats | ((c: PxClock) => PxVoxels | PxMesh3 | PxSplats), opts?: { mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; as?: ("vox" | "obj" | "glb" | "ply")[]; frames?: number; fps?: number }): void;

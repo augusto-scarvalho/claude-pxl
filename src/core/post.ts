@@ -47,6 +47,16 @@ export interface PostOpts {
   grain?: number | { amount?: number; seed?: number; animated?: boolean };
   /** the picture taken back to the palette's colors (true), or to those keys, ordered-dithered between two by `dither` (0..1, default 1; 0 the nearest) */
   palette?: true | string | string[] | { keys?: string | string[]; dither?: number };
+  /** in a scene k times as big (its `pixel`, its `sizes`), blur, focus, bloom's r and pixel are in the art's pixels: true keeps them the picture's */
+  px?: boolean;
+}
+
+/** post()'s px on a picture k times as big as its art: blur, focus, bloom's r and pixel k times, unless `px`. */
+export function postAt(o: PostOpts, k: number): PostOpts {
+  const { px, ...p } = o, b = p.bloom;
+  if (k === 1 || px) return p;
+  return { ...p, ...(typeof p.blur === "number" ? { blur: p.blur * k } : {}), ...(Array.isArray(p.focus) ? { focus: p.focus.map((v) => v * k) as [number, number] } : {}),
+    ...(b && typeof b === "object" && typeof b.r === "number" ? { bloom: { ...b, r: b.r * k } } : {}), pixel: typeof p.pixel === "number" ? p.pixel * k : p.pixel ?? k };
 }
 
 /** A 3D LUT: size^3 colors (r, g, b in 0..1), red changing fastest, as a .cube file lists them. */

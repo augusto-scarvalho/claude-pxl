@@ -49,7 +49,7 @@ export function drawVolume(c: SurfaceCanvas, density: unknown, o: VolumeOpts = {
   const persp = !!o.view && typeof o.view === "object" && "horizon" in o.view;
   // (light in a cloud scatters on forward, reaching deeper than a ray sees through it: its own shadow
   // takes a share of the thickness on the light's way)
-  const K = o.pixel ?? 1, thick = o.thickness ?? 3, amb = o.ambient ?? 0.35, castK = o.cast ?? 0, blend = o.blend ?? "dither", own = o.shadow ?? 0.4;
+  const K = o.pixel ?? c.k ?? 1, thick = o.thickness ?? 3, amb = o.ambient ?? 0.35, castK = o.cast ?? 0, blend = o.blend ?? "dither", own = o.shadow ?? 0.4;
   if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`${who}: pixel is px to a ray, a whole number from 1, got ${JSON.stringify(o.pixel)}`);
   if (!(thick > 0) || !(amb >= 0 && amb <= 1) || !(castK >= 0 && castK <= 1) || !(own >= 0 && own <= 1) || (blend !== "dither" && blend !== "alpha"))
     throw new PxError(`${who}: thickness above 0, ambient, shadow and cast 0..1, blend "dither" or "alpha", got ${JSON.stringify([o.thickness, o.ambient, o.shadow, o.cast, o.blend])}`);

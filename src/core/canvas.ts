@@ -9,7 +9,7 @@ import { LOOKS, dissolveChar, dissolveEdge, lightestOf, runEffect } from "./effe
 import { type SmokeOpts, drawSmoke } from "./smoke.ts";
 import { type Particle, drawParticles, drawTrail } from "./vfx.ts";
 import type { Spell } from "./spells.ts";
-import { type View, perspective } from "./perspective.ts";
+import { type View, perspective, scaled } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
 import { type SurfaceCanvas, type SurfaceOpts, type SurfaceView, type VoxelOpts, drawSurface, drawVoxels, partIndex } from "./surface.ts";
 import { type VolumeOpts, drawVolume } from "./volume.ts";
@@ -79,6 +79,10 @@ export class Canvas {
   frames = 1;
   /** Building an anim (frame() items allowed). */
   inAnim = false;
+  /** px to an art pixel (a scene's `pixel`, its `sizes`): mesh(), the 3D ops, meshSocket() and post() draw k times as big. */
+  k = 1;
+  /** look3d()'s light and mats, for the 3D ops that don't say them. */
+  look3d?: { light?: number[]; mats?: Record<string, unknown> };
   /** Composite below the current layer (absolute coords), for `below` masks. */
   below?: Img;
   /** Seamless tiles: drawing (and reading) past these edges continues on the opposite side. */
@@ -813,8 +817,8 @@ export class Canvas {
    * Where a socket of a sprite standing in mesh() is, in meters [x, z, up]: the sprite as mesh()
    * places it ({ name, at, frame?, flip? }), `pixel` px to its pixels.
    */
-  meshSocket(view: Partial<View>, sprite: { name: string; at: number[]; frame?: number; flip?: "x"; delay?: number }, socket: string, pixel = 1): [number, number, number] {
-    const P = perspective({ ...view, w: view.w ?? this.img.w } as View), img = this.asset(sprite.name, { frame: sprite.frame, flip: sprite.flip, delay: sprite.delay });
+  meshSocket(view: Partial<View>, sprite: { name: string; at: number[]; frame?: number; flip?: "x"; delay?: number }, socket: string, pixel = this.k): [number, number, number] {
+    const v = scaled(view, this.k), P = perspective({ ...v, w: v.w ?? this.img.w } as View), img = this.asset(sprite.name, { frame: sprite.frame, flip: sprite.flip, delay: sprite.delay });
     const s = img.sockets?.[socket];
     if (!s) throw new PxError(`meshSocket: '${sprite.name}' has no socket '${socket}'` + (img.sockets ? `; it has: ${Object.keys(img.sockets).join(", ")}` : `; give it { sockets: { ${socket}: [x, y] } }`));
     const [x, z, u = 0] = sprite.at, [px, py] = img.pivot ?? [img.w / 2, img.h], m = pixel / P.scale(z, x, u), yaw = ((P.yaw ?? 0) * Math.PI) / 180;
@@ -843,6 +847,14 @@ export class Canvas {
 
   /** Flat faces in meters (model()) drawn through the camera, the nearest kept per pixel, toned along their material's ramp: see mesh.ts. */
   mesh(view: Partial<View> | SurfaceView | ((p: [number, number, number]) => [number, number, number]), faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}): void {
+    // k times as big: the camera, the sprites' pixel, and the ramp materials in blocks of it (a material's own block wins)
+    const k = this.k;
+    if (k > 1) {
+      view = scaled(view, k);
+      opts = { ...opts, pixel: opts.pixel ?? k };
+      mats = Object.fromEntries(Object.entries(mats ?? {}).map(([n, M]) => [n, M && M.tex === undefined && M.block === undefined ? { ...M, block: k } : M]));
+    }
+    opts = this.in3d(opts, false);
     const tex: Record<string, Img> = {};
     const masks: Record<string, Img> = {}, looks: NonNullable<MeshWorld["looks"]> = {};
     for (const [k, M] of Object.entries(mats ?? {})) {
@@ -915,33 +927,44 @@ export class Canvas {
    * perspective() camera after a mesh(), at its depth, its shadow on what is drawn: see surface.ts.
    */
   surface(field: unknown, opts: SurfaceOpts = {}): void {
-    drawSurface(this as unknown as SurfaceCanvas, field, opts);
+    drawSurface(this as unknown as SurfaceCanvas, field, this.in3d(opts));
+  }
+
+  /**
+   * A 3D op's options, look3d()'s light and mats where they don't say them (mats, unless a ramp is
+   * given); `light: "view"` the op's own, from its view's upper left.
+   */
+  private in3d<T extends object>(o: T, mats = true): T {
+    const L = this.look3d, { light, ...q } = (o ?? {}) as { light?: unknown; mats?: unknown; ramp?: unknown };
+    if (!L && light !== "view") return o;
+    const lt = light === "view" ? undefined : light ?? L?.light;
+    return { ...q, ...(lt !== undefined ? { light: lt } : {}), ...(mats && q.mats === undefined && q.ramp === undefined && L?.mats ? { mats: L.mats } : {}) } as T;
   }
 
   /** A voxel grid (sdf.voxels), or a field made voxels of `size` m at this moment, a cube to a cell, drawn as surface() draws (iso and top on the pixel grid, a cube `px` wide): see surface.ts. */
   voxels(thing: unknown, opts: VoxelOpts = {}): void {
-    drawVoxels(this as unknown as SurfaceCanvas, thing, opts);
+    drawVoxels(this as unknown as SurfaceCanvas, thing, this.in3d(opts));
   }
 
   /** A density (sdf.density): a cloud, mist, smoke, a glowing orb, ray-marched through its light and drawn as pixel art, dithered where thin; through a camera at its depth, its shadow and its glow on what is round it: see volume.ts. */
   volume(density: unknown, opts: VolumeOpts = {}): void {
-    drawVolume(this as unknown as SurfaceCanvas, density, opts);
+    drawVolume(this as unknown as SurfaceCanvas, density, this.in3d(opts, false));
   }
 
   /** Gaussian splats (sdf.splats, or a field or density made splats now with spacing) rasterized to pixel art: see splats.ts. */
   splats(set: unknown, opts: SplatOpts = {}): void {
-    drawSplats(this as unknown as SurfaceCanvas, set, opts);
+    drawSplats(this as unknown as SurfaceCanvas, set, this.in3d(opts));
   }
 
   /** Hand-drawn pixel art pinned to a field's surface (a face, a rune, an emblem), crisp in any camera, after the surface(): see decal.ts. */
   decal(name: string, opts: DecalOpts = {}): void {
-    drawDecal(this as unknown as Parameters<typeof drawDecal>[0], name, opts);
+    drawDecal(this as unknown as Parameters<typeof drawDecal>[0], name, this.in3d(opts, false));
   }
 
   /** A world3d(...) drawn through a view: its solids, their details and decals, its air: see world3d.ts. */
   draw3d(world: unknown, opts: Draw3dOpts = {}): void {
     const self = this as unknown as SurfaceCanvas;
-    drawWorld(world, opts, {
+    drawWorld(world, this.in3d(opts), {
       surface: (f, o) => drawSurface(self, f, o as SurfaceOpts), splats: (s, o) => drawSplats(self, s, o as SplatOpts),
       volume: (dd, o) => drawVolume(self, dd, o as VolumeOpts), decal: (n, o) => drawDecal(this as unknown as Parameters<typeof drawDecal>[0], n, o as DecalOpts),
       clock: { t: this.t, phase: this.frames > 0 ? this.frame / this.frames : 0, frame: this.frame, frames: this.frames },

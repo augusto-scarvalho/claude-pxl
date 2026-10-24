@@ -28,16 +28,14 @@ ramps("qQsS", "pP")
 const CLOCK = { frames: 24, fps: 1000 / 150 }, TAU = 2 * Math.PI
 const MATS = { bark: "bBiI", leaf: "ZzxcvVJ", stone: "DtTuUE", moss: "mMnN", cap: "rRoO", spot: "Wyy", stem: "awWy", door: "deX", glow: "Ff", gem: { ramp: "gGhHjl", shine: 0.7 }, snow: "Wyy" }
 
-// An HD-2D camera, as the hd2d examples' (hd2d/kit.px.js): 40 degrees down through a long lens (30
-// across), 24 px to the meter where it looks, the middle of a w x h picture on the ground Z m ahead.
-// The light from the upper left, a little toward us: shadows fall right and away.
-const PITCH = -40, FOV = 30, PPM = 24, LIGHT = [-0.65, -0.35, 0.68], RAD = Math.PI / 180
-// view(k): the same picture k times as big (HD), a pixel of art k x k px; `ppm` another scale.
-const hd2d = (w, h, ppm = PPM) => {
-  const focal = w / 2 / Math.tan((FOV / 2) * RAD), dist = focal / ppm
-  const view = (k = 1) => ({ w: w * k, fov: FOV, pitch: PITCH, eye: dist * Math.sin(-PITCH * RAD), horizon: (h / 2 + focal * Math.tan(PITCH * RAD)) * k })
-  return { Z: dist * Math.cos(-PITCH * RAD), view: view(), hd: view }
-}
+// An HD-2D camera, as the hd2d examples' (perspective()'s): 40 degrees down through a long lens (30
+// across), 24 px to the meter where it looks (`ppm` another scale), the middle of a w x h picture on the
+// ground z m ahead; its aim(h) stands a thing so its point h m up is there. The light from the upper
+// left, a little toward us: shadows fall right and away. It and the materials are what the 3D ops take
+// where a call doesn't say them (look3d; light: "view" for a view's own, from its upper left).
+const PITCH = -40, PPM = 24, LIGHT = [-0.65, -0.35, 0.68]
+const hd2d = (w, h, ppm = PPM) => perspective({ w, h, pitch: PITCH, fov: 30, ppm })
+look3d({ light: LIGHT, mats: MATS })
 const GMATS = { grass: { ramp: "qQsS" }, path: { ramp: "tTu" }, wall: { ramp: "DtTuU" } }
 const ground = (Z) => { const g = model(); g.face("grass", [-12, Z - 8, 0], [12, Z - 8, 0], [12, Z + 12, 0], [-12, Z + 12, 0]); return g }
 

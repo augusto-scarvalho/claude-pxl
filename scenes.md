@@ -258,20 +258,21 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   materials are textures (`{ tex: "_cobble" }`, 16 px tiles to the meter), and the characters as
   `sprites` of the same `mesh()` call, upright in the one depth: a wall hides the legs of who walks
   close behind it. From that high a wall hides only what is near it. Pick the camera by px to the
-  meter where it looks, so a texel and a sprite's pixel come out the same size. The look is the
-  camera's: the same scene four times as big (the view's `w` and `horizon` x4, `pixel: 4` for the
-  sprites) with `post()` after it, a band of depth in focus and the rest blurred, haze far off, a
-  bloom, darker corners; `check: false` on that one, the small one is what's checked. And light in
+  meter where it looks, so a texel and a sprite's pixel come out the same size:
+  `perspective({ w, h, pitch, fov, ppm })` (its `z`, `dist`, `floor`, `wall`, `aim()`). The look is
+  the camera's: `sizes: { plaza_hd: 4 }` on the scene draws it four times as big with `post()` (only
+  there, in the art's px), a band of depth in focus and the rest blurred, haze far off, a bloom,
+  darker corners; the small one is what's checked. And light in
   the world on `mesh()`: a warm `sun` low and a little behind (its shadows fall toward us), a cool
   `sky`, `lamps` with `emit` on their glass, `bump("hybrid")` on the sprites so they take it
   (`examples/hd2d/plaza.px.js`). Lay the floor's texture a texel to a pixel where the camera looks
-  (`texel: [1 / ppm, 1 / (ppm * sin pitch)]`): at a 16-to-the-meter texel the camera squashes it, and
-  blades drawn upright come out lying down. What stands on the ground and is smaller than a person (a
+  (`texel: "screen"`, the camera's `floor` or `wall` by the face): at a 16-to-the-meter texel the
+  camera squashes it, and blades drawn upright come out lying down. What stands on the ground and is smaller than a person (a
   headstone, a rock) is a sprite drawn at the scene's scale, its top in the sun and its front in the
   shade when the sun is behind; drawn as a textured box it comes out blurred into the stone round it
   (`examples/hd2d/graveyard.px.js`). A box drawn in meters at the HD picture's own pixel (a fence)
-  reads as a 3D render among the sprites: give its materials `block: 4`, faces in blocks of a
-  sprite's pixel, a tone each, the outline only on the shaded side.
+  reads as a 3D render among the sprites: at the sizes its ramp materials go in blocks of a sprite's
+  pixel by themselves, a tone each, the outline only on the shaded side (`block: k` on a textured one).
 - Hiding a thing behind a wall in a diorama: from a camera tilted `pitch` down, a wall `h` m tall
   hides what is `d` m behind it only below `h - d * tan(pitch)`: at 38 degrees a 1.4 m wall didn't
   hide a ball 0.4 m behind it at 1.2 m; at 1.7 m and 0.2 m behind it does. Its light still shows on the
@@ -827,6 +828,10 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). What held, from buildi
   `make3d.define("spirit", (params) => ({ field, decals }), { params: { size: [0.3, 2] } })`, and it is
   a part like the others (relations, edits, rules, `--fix` within its ranges); a part's own `mats`
   and, air, `look: { ramp }` instead of a remap of draw3d's mats.
+- **One stage for every 3D op.** The kit says the light and the materials once, `look3d({ light,
+  mats })`, and the calls stop repeating them; the HD-2D camera is `perspective({ w, h, pitch, fov,
+  ppm })`, and `at: CAM.aim(h)` stands a thing so its point h m up (its middle) is where the camera
+  looks. A scene's `sizes` draws its fields, voxels and volumes k times as big too, a ray to a block.
 - **Out to other tools.** `export3d` writes `.vox`, `.obj`, `.glb` and `.ply`; something that moves,
   as a function of the clock with `frames`, goes out as one `.glb` that plays (and a file a moment for
   the others). `pxl serve` shows the `.glb` and `.ply` to turn round at `/3d`. `mesh()` draws a mesh

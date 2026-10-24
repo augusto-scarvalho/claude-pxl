@@ -14,9 +14,9 @@ const GROVE = world3d({
   },
 })
 
-const W = 320, H = 180, { Z, view: VIEW } = hd2d(W, H), GR = ground(Z)
+const W = 320, H = 180, VIEW = hd2d(W, H), Z = VIEW.z, GR = ground(Z)
 const grove = (name, world, check = { every: 24 }) => scene(name, { w: W, h: H, bg: "k", ...CLOCK, check },
-  (c) => c.mesh(VIEW, GR.faces, GMATS, { light: LIGHT }), (c) => c.draw3d(world, { view: VIEW, at: [0, Z - 2.4, 0], mats: LOOKS, light: LIGHT }))
+  (c) => c.mesh(VIEW, GR.faces, GMATS), (c) => c.draw3d(world, { view: VIEW, at: [0, Z - 2.4, 0], mats: LOOKS }))
 grove("grove", GROVE)
 
 // What should hold over the loop: the canopy over the trunk as it sways, everything standing on the
