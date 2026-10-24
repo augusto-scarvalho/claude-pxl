@@ -367,26 +367,26 @@ const talk = (c, K) => {
 // running on the ground below.
 const sway = (t, f) => (t.name.startsWith("_spruce") || t.name === "_snag" ? { ...t, frame: (((Math.floor((f * MS) / 220) - Math.round(t.at[0] * 0.6)) % 16) + 16) % 16 } : t)
 const LEAVES = Array.from({ length: 14 }, (_, i) => ({ x0: hash(i, 41) * 36, z: Z - 7 + hash(i, 42) * 17, u: TOP + 0.5 + hash(i, 43) * 2.2, ph: hash(i, 44) * 6.28, name: hash(i, 45) < 0.55 ? "_leaf" : "_leaf_y" }))
-const leaves = (f) => LEAVES.map((l, i) => {
-  const s = f / FRAMES, w = 2 * Math.PI * s
-  return { name: l.name, at: [-18 + ((l.x0 + 36 * 6 * s) % 36), l.z + 0.4 * Math.sin(8 * w + l.ph), l.u + 0.45 * Math.sin(12 * w + l.ph)], frame: (f + i) % 4, shadow: 0 }
+const leaves = (c) => LEAVES.map((l, i) => {
+  const f = c.frame, w = 2 * Math.PI * c.phase
+  return { name: l.name, at: [c.cross(l.x0, { span: 36, per: 36 * 6, from: -18, whole: false }), l.z + 0.4 * Math.sin(8 * w + l.ph), l.u + 0.45 * Math.sin(12 * w + l.ph)], frame: (f + i) % 4, shadow: 0 }
 })
 const laid = (f) => (f >= GRAVE + 8 ? [{ name: "_rose", at: [1.55, Z + 0.3, TOP], shadow: 0 }] : [])
-const people = (f) => [...wood.map((t) => sway(t, f)), ...leaves(f), ...laid(f), mourner(f), ...[traveler(f)].filter(Boolean)]
+const people = (c, f = c.frame) => [...wood.map((t) => sway(t, f)), ...leaves(c), ...laid(f), mourner(f), ...[traveler(f)].filter(Boolean)]
 const CLOCK = { frames: FRAMES, fps: 1000 / MS }
 // Morning: the sun behind on the left (the shadows fall toward us and to the right), warm; the sky's
 // light violet in the shade.
 const LIGHT = { light: [-0.55, 0.6, 0.72], sun: { color: "#ffe2b4", strength: 1.3 }, sky: { color: "#a4a6d8", strength: 0.45 } }
 // checked one frame in 24: no scene rule runs on it (no world.light, nothing with a height or a front
 // marker), so the frames checked only prove they build; the tests stay fast
-scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 24 } }, (c) => c.mesh(view(1), M.faces, MATS, { sprites: people(c.frame), ...LIGHT }), (c) => talk(c, 1))
+scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 24 } }, (c) => c.mesh(view(1), M.faces, MATS, { sprites: people(c), ...LIGHT }), (c) => talk(c, 1))
 
 // K times the size and through the camera: the hill's top sharp, the wood below and the hills behind
 // blurred and taken by a warm mist, a bloom, darker corners; the fence in blocks of a sprite's pixel.
 // `graveyard_hd` four times (1920x1080); `graveyard_md` twice (960x540: the gallery's GIF, its 46 s a
 // quarter of the pixels to draw and to store).
 const camera = (name, K) => scene(name, { w: W * K, h: H * K, bg: "q", ...CLOCK, check: false },
-  (c) => c.mesh(view(K), M.faces, { ...MATS, wood: { ...MATS.wood, block: K }, rail: { ...MATS.rail, block: K } }, { sprites: people(c.frame), pixel: K, ...LIGHT }),
+  (c) => c.mesh(view(K), M.faces, { ...MATS, wood: { ...MATS.wood, block: K }, rail: { ...MATS.rail, block: K } }, { sprites: people(c), pixel: K, ...LIGHT }),
   post({ blur: 9 * K, focus: [(W * K) / 2, H * K * 0.55], sharp: 2.5, soft: [3, 8], fog: { color: "#dcdccc", from: DIST + 2, to: DIST + 26, max: 0.7 }, bloom: { strength: 0.6, r: 10 * K }, vignette: 0.35 }),
   (c) => talk(c, K))
 camera("graveyard_hd", 4)

@@ -39,12 +39,12 @@ const NB = 152                    // foot of the street-front buildings
 
 // ordered dither: banded tones with dithered seams. v runs over the ramp's indices.
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
-const bayer = (x, y) => (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16
+const bayer4 = (x, y) => (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16
 const tone = (ramp, v, x, y, sharp = 3) => {
   const i = Math.floor(v), f = Math.min(1, Math.max(0, (v - i - 0.5) * sharp + 0.5))
-  return ramp[Math.min(ramp.length - 1, Math.max(0, i + (f > bayer(x, y) ? 1 : 0)))]
+  return ramp[Math.min(ramp.length - 1, Math.max(0, i + (f > bayer4(x, y) ? 1 : 0)))]
 }
-const hash = (a, b = 0) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296 }
+const ihash = (a, b = 0) => { let h = (a * 374761393 + b * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296 }
 
 // ================================================================ sky
 // Dusty slate overhead, thickening to pale dust toward the horizon, brightest around the sun. The
@@ -93,12 +93,12 @@ const SUNLINE = 66               // the city's shadow: below this row the sun no
 const westFace = (c, x, w, top, base, shadow = "4") => {
   for (let y = top; y < base; y++) for (let i = 0; i < w; i++) {
     const v = 3.2 - Math.max(0, (y - 14) / 22) + (i === 0 ? 0.4 : 0)       // 9 high up, 6 near the line
-    c.px(x + i, y, y < SUNLINE - 2 || (y < SUNLINE + 2 && bayer(x + i, y) < (SUNLINE + 2 - y) / 4) ? tone("6789", Math.max(0, v), x + i, y) : shadow)
+    c.px(x + i, y, y < SUNLINE - 2 || (y < SUNLINE + 2 && bayer4(x + i, y) < (SUNLINE + 2 - y) / 4) ? tone("6789", Math.max(0, v), x + i, y) : shadow)
   }
 }
 const winGrid = (c, x, y, cols, rows, dx, dy, ww, wh, dark, litKeys, p, seed) => {
   for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
-    const hsh = hash(seed + i, j), k = hsh < p ? litKeys[Math.floor(hash(seed + j, i) * litKeys.length)] : dark
+    const hsh = ihash(seed + i, j), k = hsh < p ? litKeys[Math.floor(ihash(seed + j, i) * litKeys.length)] : dark
     c.rect(x + i * dx, y + j * dy, ww, wh, k)
   }
 }
@@ -120,12 +120,12 @@ function corpTower(c) {
   for (let y = top + 1; y < 120; y++) {
     if ((y - top) % 4 === 3) continue
     const s = y < 72 ? "j" : "i"
-    c.px(x + 5, y, s); if (y < 96) c.px(x + 6, y, y < 60 ? "j" : "i"); if (y < 56 && bayer(x + 4, y) < 0.5) c.px(x + 4, y, "i")
+    c.px(x + 5, y, s); if (y < 96) c.px(x + 6, y, y < 60 ? "j" : "i"); if (y < 56 && bayer4(x + 4, y) < 0.5) c.px(x + 4, y, "i")
   }
   // offices: more of them lit lower down, where the evening has come already
   for (let y = top + 1; y < 128; y += 4) for (let xx = x + 9; xx < x + w - 2; xx += 3) {
     const pr = y > SUNLINE ? 0.16 : 0.05
-    if (hash(xx, y) < pr) c.hline(xx, y, 2, hash(y, xx) < 0.7 ? "p" : "R")
+    if (ihash(xx, y) < pr) c.hline(xx, y, 2, ihash(y, xx) < 0.7 ? "p" : "R")
   }
   // the crown emblem, an invented mark: a ring around a diamond, sodium-lit
   c.ring(x + 15, top - 2, 3, "Q"); c.px(x + 15, top - 2, "R")
@@ -151,8 +151,8 @@ function megaBlock(c) {
       const f = (y - st) % 6
       c.hline(sx, y, sw, f === 0 ? "4" : f < 3 ? "3" : f === 3 ? "1" : "2")
       if (f >= 4) for (let xx = sx + 1; xx < sx + sw - 1; xx += 4) {
-        const fl = Math.floor((y - st) / 6), hh = hash(xx, fl * 7)
-        c.hline(xx, y, 3, hh < (y > SUNLINE ? 0.22 : 0.08) ? (hash(fl, xx) < 0.6 ? "Q" : hash(fl, xx) < 0.8 ? "R" : "p") : "g")
+        const fl = Math.floor((y - st) / 6), hh = ihash(xx, fl * 7)
+        c.hline(xx, y, 3, hh < (y > SUNLINE ? 0.22 : 0.08) ? (ihash(fl, xx) < 0.6 ? "Q" : ihash(fl, xx) < 0.8 ? "R" : "p") : "g")
       }
     }
     // grime from the lips, where the condensate runs off
@@ -166,7 +166,7 @@ function megaBlock(c) {
     c.hline(cx, ct, cw, "8")
     // slits up the core, a few lit
     for (let y = ct + 4; y < 128; y += 7) for (let xx = cx + 3; xx < cx + cw - 2; xx += 3)
-      c.vline(xx, y, 4, hash(xx, y) < 0.12 ? "Q" : "1")
+      c.vline(xx, y, 4, ihash(xx, y) < 0.12 ? "Q" : "1")
     // vents near the top: grilles
     for (let i = 0; i < 3; i++) c.hline(cx + 2, ct + 1 + i, cw - 4, i % 2 ? "2" : "1")
     const slabTop = cx === 146 ? 132 : MEGA.slabs.find(([sx]) => sx + 36 === cx)?.[2] ?? 132
@@ -187,7 +187,7 @@ function rightTower(c) {
   const x = 262, w = 36, top = 16
   c.poly([x, top + 6, x + 6, top, x + w - 6, top, x + w, top + 6, x + w, 132, x, 132], "i")
   for (let y = top + 9; y < 132; y += 4) c.hline(x, y, w, "h")
-  for (let y = top + 4; y < 132; y++) for (let xx = x + 4; xx < x + w - 4; xx += 3) if ((y - top) % 4 === 2 && hash(xx, y) < 0.1) c.hline(xx, y, 2, "p")
+  for (let y = top + 4; y < 132; y++) for (let xx = x + 4; xx < x + w - 4; xx += 3) if ((y - top) % 4 === 2 && ihash(xx, y) < 0.1) c.hline(xx, y, 2, "p")
   westFace(c, x, 2, top + 6, 132, "h")
   c.line(x, top + 6, x + 6, top, "8"); c.hline(x + 6, top, w - 12, "8")
   c.vline(x + 4, top + 6, 126 - top, "t"); c.vline(x + w - 5, top + 6, 126 - top, "t")
@@ -224,7 +224,7 @@ sprite("_hwy", { w: W, h: NB }, (c) => {
   for (let x = 30; x < W; x += 64) c.vline(x, HB + 3, 9, "2")                // expansion joints
   for (let x = 0; x < W; x += 8) c.px(x + 3, HB + 2, "3")                    // drain holes along the barrier
   // stains bleeding from the drain holes down the deck face
-  for (let x = 3; x < W; x += 8) if (hash(x, 3) < 0.4) c.vline(x, HB + 4, 2 + Math.floor(hash(x, 4) * 4), "2")
+  for (let x = 3; x < W; x += 8) if (ihash(x, 3) < 0.4) c.vline(x, HB + 4, 2 + Math.floor(ihash(x, 4) * 4), "2")
   for (const lx of HLAMPS) { c.vline(lx, HB - 13, 13, "2"); c.hline(lx, HB - 13, 4, "2"); c.hline(lx + 2, HB - 12, 3, "1"); c.px(lx + 3, HB - 11, "R") }
   // the gantry over the lanes, a sign for the next exit
   c.vline(119, 66, HB - 66, "2"); c.vline(151, 66, HB - 66, "2"); c.hline(117, 66, 37, "1")
@@ -235,7 +235,7 @@ sprite("_hwy", { w: W, h: NB }, (c) => {
 // ================================================================ the street-front: five buildings
 // In the city's shadow: lit only by the sky above and by their own windows and signs. Grime gathers
 // where water runs (under sills and AC units, down from roofs) and splashes back up from the sidewalk.
-const grimeBase = (c, x, w, key) => { for (let xx = x; xx < x + w; xx++) { c.px(xx, NB - 1, key); if (bayer(xx, NB - 2) < 0.5) c.px(xx, NB - 2, key); if (bayer(xx, NB - 3) < 0.15) c.px(xx, NB - 3, key) } }
+const grimeBase = (c, x, w, key) => { for (let xx = x; xx < x + w; xx++) { c.px(xx, NB - 1, key); if (bayer4(xx, NB - 2) < 0.5) c.px(xx, NB - 2, key); if (bayer4(xx, NB - 3) < 0.15) c.px(xx, NB - 3, key) } }
 const drip = (c, x, y, len, key) => { c.vline(x, y, len, key); if (len > 3) c.vline(x + 1, y, len - 2, key) }
 const acUnit = (c, x, y, side = "5") => { c.rect(x, y, 6, 4, side); c.hline(x, y, 6, "V"); c.px(x + 1, y + 1, "4"); c.px(x + 3, y + 1, "4"); c.px(x + 1, y + 2, "4"); c.px(x + 3, y + 2, "4"); c.hline(x, y + 4, 6, "1") }
 
@@ -268,7 +268,7 @@ function liquor(c) {
   c.rect(64, 129, 64, 3, "L"); c.hline(64, 129, 64, "M"); c.hline(64, 131, 64, "U")
   // the storefront: shelves of bottles behind posters
   c.rect(67, 135, 36, 13, "p"); c.box(66, 134, 38, 15, "K")
-  for (let y = 137; y < 147; y += 3) { c.hline(67, y + 1, 36, "5"); for (let x = 68; x < 102; x += 2) c.px(x, y, ["x", "R", "u", "s", "Q", "V"][Math.floor(hash(x, y) * 6)]) }
+  for (let y = 137; y < 147; y += 3) { c.hline(67, y + 1, 36, "5"); for (let x = 68; x < 102; x += 2) c.px(x, y, ["x", "R", "u", "s", "Q", "V"][Math.floor(ihash(x, y) * 6)]) }
   c.rect(70, 139, 7, 9, "Q"); c.rect(71, 140, 5, 3, "n"); c.hline(71, 144, 5, "k"); c.hline(71, 146, 3, "k")    // a poster: fight night
   c.rect(92, 136, 8, 6, "V"); c.hline(93, 137, 6, "x"); c.hline(93, 139, 4, "k")                               // a sale sign
   c.rect(107, 134, 9, 18, "p"); c.box(106, 133, 11, 19, "K"); c.vline(114, 140, 3, "5")
@@ -317,16 +317,16 @@ function lot(c) {
   // a sodium lamp over the lot
   c.vline(131, 108, NB - 108, "2"); c.hline(131, 108, 5, "1"); c.px(134, 109, "R")
   // the fence: posts, a top rail, chain-link diamonds
-  for (let y = 139; y < NB; y++) for (let x = 128; x < 184; x++) if ((x + y) % 4 === 0 || (x - y + 400) % 4 === 0) if (bayer(x, y) < 0.6) c.px(x, y, "5")
+  for (let y = 139; y < NB; y++) for (let x = 128; x < 184; x++) if ((x + y) % 4 === 0 || (x - y + 400) % 4 === 0) if (bayer4(x, y) < 0.6) c.px(x, y, "5")
   c.hline(128, 138, 56, "Y"); for (let x = 130; x < 184; x += 13) c.vline(x, 138, NB - 138, "Y")
 }
 
 // 4. the clinic: board-formed concrete, a ribbon window, a canopy, a billboard on the roof
 function clinic(c) {
   c.rect(184, 104, 62, NB - 104, "3"); c.hline(184, 104, 62, "5")
-  for (let y = 108; y < NB; y += 4) for (let x = 184; x < 246; x++) if (hash(x >> 3, y) < 0.7 && x % 8) c.px(x, y, "2")   // board marks
+  for (let y = 108; y < NB; y += 4) for (let x = 184; x < 246; x++) if (ihash(x >> 3, y) < 0.7 && x % 8) c.px(x, y, "2")   // board marks
   c.hline(186, 111, 58, "1"); c.rect(186, 112, 58, 8, "g")
-  for (let x = 186; x < 244; x += 6) { c.vline(x, 112, 8, "2"); if (hash(x, 1) < 0.5) c.rect(x + 1, 113, 5, 7, hash(x, 2) < 0.5 ? "p" : "j") }
+  for (let x = 186; x < 244; x += 6) { c.vline(x, 112, 8, "2"); if (ihash(x, 1) < 0.5) c.rect(x + 1, 113, 5, 7, ihash(x, 2) < 0.5 ? "p" : "j") }
   c.hline(186, 120, 58, "4")
   c.rect(184, 125, 62, 6, "4"); c.hline(184, 125, 62, "5"); c.hline(184, 131, 62, "1"); c.text(192, 126, "CLINIC", "v")
   c.rect(198, 134, 18, 18, "p"); c.box(197, 133, 20, 19, "2"); c.vline(206, 134, 18, "2"); c.hline(198, 140, 18, "j")
@@ -350,14 +350,14 @@ function hotel(c) {
   c.hline(246, 127, 74, "r"); c.hline(246, 128, 74, "x")
   for (const fy of HOTEL_FLOORS) for (const wx of HOTEL_WIN) {
     c.rect(wx, fy, 9, 12, "g"); c.box(wx - 1, fy - 1, 11, 14, "r"); c.hline(wx - 1, fy + 13, 11, "x")
-    const h = hash(wx, fy)
+    const h = ihash(wx, fy)
     if (h < 0.35) { c.rect(wx, fy, 9, 12, "Q"); c.rect(wx, fy, 9, 3, "R"); c.rect(wx, fy, 3, 12, "s"); c.rect(wx + 7, fy, 2, 12, "s") }  // lit, curtains half drawn
     else if (h < 0.5) c.rect(wx, fy + 4, 9, 8, "h")
-    drip(c, wx + 4, fy + 14, 2 + Math.floor(hash(fy, wx) * 4), "s")
+    drip(c, wx + 4, fy + 14, 2 + Math.floor(ihash(fy, wx) * 4), "s")
   }
   acUnit(c, 255, 78); drip(c, 257, 83, 5, "s"); acUnit(c, 309, 98); drip(c, 312, 103, 4, "s"); acUnit(c, 291, 118)
   // the west face over the clinic's roof: lit above the city's shadow
-  for (let y = 62; y < 104; y++) for (let i = 0; i < 2; i++) c.px(246 + i, y, y < SUNLINE ? (i ? "8" : "9") : y < SUNLINE + 3 && bayer(246 + i, y) < 0.5 ? "y" : "s")
+  for (let y = 62; y < 104; y++) for (let i = 0; i < 2; i++) c.px(246 + i, y, y < SUNLINE ? (i ? "8" : "9") : y < SUNLINE + 3 && bayer4(246 + i, y) < 0.5 ? "y" : "s")
   // the fire escape: landings, rails, stairs between them
   for (const fy of HOTEL_FLOORS) {
     const ly = fy + 15
@@ -370,7 +370,7 @@ function hotel(c) {
   "ROOMS".split("").forEach((ch, i) => c.text(251, 70 + i * 6, ch, "s"))
   // the ground floor: a bar, a glass-block window, a shutter half up
   c.rect(252, 134, 8, 18, "Q"); c.box(251, 133, 10, 19, "r")
-  for (let y = 134; y < 146; y += 3) for (let x = 264; x < 290; x += 3) c.rect(x, y, 2, 2, hash(x, y) < 0.3 ? "j" : "i")
+  for (let y = 134; y < 146; y += 3) for (let x = 264; x < 290; x += 3) c.rect(x, y, 2, 2, ihash(x, y) < 0.3 ? "j" : "i")
   c.box(263, 133, 28, 14, "r")
   c.rect(296, 136, 22, 8, "4"); for (let y = 137; y < 144; y += 2) c.hline(296, y, 22, "3"); c.rect(296, 144, 22, 8, "Q"); c.hline(296, 144, 22, "R"); c.box(295, 135, 24, 17, "r")
   c.text(300, 130, "BAR", "s")
@@ -405,7 +405,7 @@ sprite("_street", { w: W, h: H - NB }, (c) => {
   c.hline(0, 5, W, "Y"); c.hline(0, 6, W, "z"); c.hline(0, 7, W, "e")
   c.rect(0, 8, W, 11, "f")
   c.noise(0, 8, W, 11, "ez", 0.06, 4)
-  for (let x = 0; x < W; x++) { if (bayer(x, 11) < 0.35) c.px(x, 11, "e"); if (bayer(x, 17) < 0.35) c.px(x, 17, "e") }   // worn tracks
+  for (let x = 0; x < W; x++) { if (bayer4(x, 11) < 0.35) c.px(x, 11, "e"); if (bayer4(x, 17) < 0.35) c.px(x, 17, "e") }   // worn tracks
   for (let x = 4; x < W; x += 20) c.hline(x, 13, 9, "6")                                                                // the centre line, faded
   c.ellipse(214, 16, 4, 1, "e"); c.hline(212, 16, 5, "z")                                                               // a manhole
   c.hline(98, 6, 7, "e"); c.hline(250, 6, 7, "e")                                                                       // storm drains
@@ -458,7 +458,7 @@ sprite("_fore", { w: W, h: H }, (c) => {
 // The scene's clock: 360 frames. Everything below is a function of the frame f; whatever loops
 // sooner divides 360.
 anim("_clock", { w: 1, h: 1, frames: L, fps: FPS }, () => {})
-const wrapX = (x0, v, f) => ((x0 + v * f) % P + P) % P - 30          // a strip 360 wide, from x -30 to 330: off screen at the jump
+const drive = (v) => ({ per: v * L, span: P, from: -30 })             // v px a frame round a strip 360 wide, from x -30 to 330: off screen at the jump
 
 // ---------------------------------------------------------------- the sky: smog and an AV
 // Smog lies in long thin streaks, darker than the sky over the city and lit from below near the sun.
@@ -498,11 +498,11 @@ function beacons(c) { for (const [x, y, d] of BEACONS) if ((c.frame + d) % 20 < 
 // windows switching on (and a few off) at their own moments: [x, y, w, key, on, off]
 const SWITCH = []
 for (let i = 0; i < 46; i++) {
-  const slab = MEGA.slabs[i % 2], fl = 2 + Math.floor(hash(i, 1) * 12), col = Math.floor(hash(i, 2) * 8)
-  const on = Math.floor(hash(i, 3) * L), dur = 120 + Math.floor(hash(i, 4) * 200)
-  SWITCH.push([slab[0] + 1 + col * 4, slab[2] + fl * 6 + 4, 3, hash(i, 5) < 0.6 ? "Q" : "R", on, (on + dur) % L])
+  const slab = MEGA.slabs[i % 2], fl = 2 + Math.floor(ihash(i, 1) * 12), col = Math.floor(ihash(i, 2) * 8)
+  const on = Math.floor(ihash(i, 3) * L), dur = 120 + Math.floor(ihash(i, 4) * 200)
+  SWITCH.push([slab[0] + 1 + col * 4, slab[2] + fl * 6 + 4, 3, ihash(i, 5) < 0.6 ? "Q" : "R", on, (on + dur) % L])
 }
-for (let i = 0; i < 16; i++) SWITCH.push([CORP.x + 9 + Math.floor(hash(i, 7) * 6) * 3, CORP.top + 1 + Math.floor(4 + hash(i, 8) * 20) * 4, 2, "p", Math.floor(hash(i, 9) * L), Math.floor(hash(i, 10) * L)])
+for (let i = 0; i < 16; i++) SWITCH.push([CORP.x + 9 + Math.floor(ihash(i, 7) * 6) * 3, CORP.top + 1 + Math.floor(4 + ihash(i, 8) * 20) * 4, 2, "p", Math.floor(ihash(i, 9) * L), Math.floor(ihash(i, 10) * L)])
 const isOn = (on, off, f) => on < off ? f >= on && f < off : f >= on || f < off
 function windowsOn(c) {
   for (const [x, y, w, k, on, off] of SWITCH) {
@@ -562,7 +562,7 @@ function holoBanner(c) {
     const id = ((r + base) % 15) * 2 + g, gy = y + 2 + r * 6 - sc
     for (let i = 0; i < 12; i++) {
       const px = x + 2 + g * 5 + (i % 3), py = gy + Math.floor(i / 3)
-      if (hash(id, i) < 0.55 && py > y && py < y + h - 1) c.px(px, py, g ? "u" : "v")
+      if (ihash(id, i) < 0.55 && py > y && py < y + h - 1) c.px(px, py, g ? "u" : "v")
     }
   }
 }
@@ -588,13 +588,12 @@ sprite("_htruck", `
 const HWY_E = [["_hcar", 0, {}], ["_htruck", 70, { x: "V", y: "9", s: "N" }], ["_hcar", 150, { x: "4", y: "5", s: "3" }], ["_hvan", 230, { x: "M", y: "N", s: "L" }], ["_hcar", 300, { x: "7", y: "8", s: "6" }]]
 const HWY_W = [["_hcar", 40, { x: "2", y: "3", s: "1" }], ["_hvan", 160, { x: "i", y: "j", s: "h" }], ["_hcar", 260, { x: "N", y: "9", s: "M" }]]
 function hwyTraffic(c) {
-  const f = c.frame
   for (const [n, x0, swap] of HWY_W) {        // the far lane, westbound
-    const x = wrapX(x0, -4, f), { w, h } = c.size(n)
+    const x = c.cross(x0, drive(-4)), { w, h } = c.size(n)
     c.stamp(n, x, HB + 1 - h, { swap, flip: "x" }); c.px(x, HB - 1, "W"); c.px(x + w - 1, HB - 1, "n")
   }
   for (const [n, x0, swap] of HWY_E) {        // the near lane, eastbound
-    const x = wrapX(x0, 5, f), { w, h } = c.size(n)
+    const x = c.cross(x0, drive(5)), { w, h } = c.size(n)
     c.stamp(n, x, HB + 2 - h, { swap }); c.px(x + w - 1, HB, "W"); c.px(x, HB, "n")
   }
 }
@@ -648,21 +647,21 @@ const STREET_E = [["_sedan", 0, RED], ["_van", 120, BEIGE], ["_coupe", 250, SAND
 const STREET_W = [["_pickup", 30, TEAL], ["_sedan", 150, BLACK], ["_coupe", 260, GREY]]
 const LANE_W = 164, LANE_E = 170                       // rows the wheels stand on
 const streetCars = (c, lane) => {
-  const f = c.frame, list = lane === "E" ? STREET_E : STREET_W, v = lane === "E" ? 5 : -4, ground = lane === "E" ? LANE_E : LANE_W
+  const list = lane === "E" ? STREET_E : STREET_W, v = lane === "E" ? 5 : -4, ground = lane === "E" ? LANE_E : LANE_W
   for (const [n, x0, swap] of list) {
-    const x = wrapX(x0, v, f), { w, h } = c.size(n)
+    const x = c.cross(x0, drive(v)), { w, h } = c.size(n)
     c.stamp(n, x, ground + 1 - h, { swap, flip: v < 0 ? "x" : undefined })
   }
 }
 // the road under each car darkens, and the headlights lay a short pool ahead
 const carShadows = (c) => {
   for (const [lane, list, v, ground] of [["W", STREET_W, -4, LANE_W], ["E", STREET_E, 5, LANE_E]])
-    for (const [n, x0] of list) { const x = wrapX(x0, v, c.frame), { w } = c.size(n); c.rect(x + 2, ground, w - 4, 1, "k") }
+    for (const [n, x0] of list) { const x = c.cross(x0, drive(v)), { w } = c.size(n); c.rect(x + 2, ground, w - 4, 1, "k") }
 }
 const headBeams = (c) => {
   for (const [list, v, ground] of [[STREET_W, -4, LANE_W], [STREET_E, 5, LANE_E]])
     for (const [n, x0] of list) {
-      const x = wrapX(x0, v, c.frame), { w } = c.size(n), fx = v > 0 ? x + w : x
+      const x = c.cross(x0, drive(v)), { w } = c.size(n), fx = v > 0 ? x + w : x
       const d = v > 0 ? 1 : -1
       c.poly([fx, ground - 2, fx + d * 22, ground - 1, fx + d * 22, ground + 1, fx, ground + 1], "k")
     }
@@ -713,7 +712,7 @@ const WALK_NEAR = [["courier", 20, 1, 177], ["suit", 140, 1, 177], ["tourist", 2
 const WALK_FAR = [["nurse", 60, 1, 154], ["worker", 190, 1, 154], ["local", 110, -1, 156], ["suit", 280, -1, 156]]
 function walkers(c, list) {
   for (const [look, x0, s, y] of [...list].sort((p, q) => p[3] - q[3])) {
-    const x = wrapX(x0, s, c.frame)
+    const x = c.cross(x0, drive(s))
     person(c, x, y, ((c.frame + x0) % 8 + 8) % 8, LOOKS[look], s)
   }
 }

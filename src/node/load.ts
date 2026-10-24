@@ -31,7 +31,7 @@ function compile(code: string, file: string): string {
 export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs: string) => readFileSync(abs, "utf8")): Project {
   const p = new Project(opts), env = p.env();
   const ctx = sandbox(env);
-  const stack: string[] = [];
+  const stack: string[] = [], codes = new Map<string, string>();
   const run = (path: string) => {
     const abs = resolve(path);
     if (stack.includes(abs)) throw new PxError(`include cycle: ${[...stack, abs].join(" -> ")}`);
@@ -40,6 +40,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
       throw new PxError(`cannot read art file '${abs}'`, p.callerLoc());
     }
     p.addFile(abs);
+    codes.set(abs, code);
     stack.push(abs);
     try {
       vm.runInContext(compile(code, abs), ctx, { filename: abs });
@@ -77,6 +78,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
     }
   };
   try { run(file); } catch (e) { throw hiding(e, ctx, env); }
+  warnHiding(p, ctx, env, codes);
   return p;
 }
 
@@ -90,22 +92,42 @@ export function loadSource(src: string, name = "art.px.js", opts: ProjectOptions
   } catch (e) {
     throw hiding(syntaxAware(e, name, p), ctx, env);
   }
+  warnHiding(p, ctx, env, new Map([[name, src]]));
   return p;
 }
 
+/** The DSL globals the art file's top-level names hide (a name still uninitialized when it failed is declared too). */
+function hidden(ctx: vm.Context, env: Record<string, unknown>): string[] {
+  return Object.keys(env).filter((n) => { try { return vm.runInContext(n, ctx) !== env[n]; } catch { return true; } });
+}
 /**
  * A load that failed may have called the file's own helper where it meant pxl's (a top-level `post`
- * hides post(): "item 2 is undefined"): name the globals the art file's top-level names hide (a name
- * still uninitialized when it failed is declared too).
+ * hides post(): "item 2 is undefined"): name the globals the art file's top-level names hide.
  */
 function hiding(e: unknown, ctx: vm.Context, env: Record<string, unknown>): unknown {
   if (!(e instanceof PxError)) return e;
-  const hid = Object.keys(env).filter((n) => { try { return vm.runInContext(n, ctx) !== env[n]; } catch { return true; } });
+  const hid = hidden(ctx, env);
   if (hid.length) {
     e.detail += ` (the art file's top level declares ${hid.map((n) => `'${n}'`).join(", ")}, hiding pxl's ${hid.map((n) => `${n}()`).join(", ")} wherever the file calls ${hid.length > 1 ? "them" : "it"}: if it meant pxl's, rename the file's)`;
     e.message = e.format();
   }
   return e;
+}
+
+/**
+ * Said when the file loads, not only after a failure: a top-level name that hides a DSL global (a
+ * helper `pose` in a file that later wants pose()). Its place: the first top-level line declaring it.
+ */
+function warnHiding(p: Project, ctx: vm.Context, env: Record<string, unknown>, codes: Map<string, string>): void {
+  for (const n of hidden(ctx, env)) {
+    const decl = new RegExp(`^(?:(?:const|let|var)\\s(?:.*[\\s,])?${n}\\s*=(?![=>])|(?:async\\s+)?(?:function\\*?|class)\\s+${n}\\b)`);
+    let loc: string | undefined;
+    for (const [f, code] of codes) {
+      const i = code.split("\n").findIndex((l) => decl.test(l));
+      if (i >= 0) { loc = `${f.replace(/^.*[\\/]/, "")}:${i + 1}`; break; }
+    }
+    p.warn(`globals: the art file's top level declares '${n}', hiding pxl's ${n}() in this file and the files it includes: rename the file's (e.g. '${n}2' or a longer name)`, loc);
+  }
 }
 
 function syntaxAware(e: unknown, file: string, p: Project): PxError {

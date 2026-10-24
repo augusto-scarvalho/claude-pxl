@@ -40,7 +40,7 @@ const HAZE = [null, null, "I", "i"]                                // what props
 const ROAD_HALF = 3.6, PAINT_W = 0.12, FENCE_X = -6, POLE_X = 6.6
 // the sun, low ahead: 10 degrees up, so a thing's shadow is 5.7 times its height, and 6 degrees left of the road
 const SR = 9, SUN_AZ = -6, SUNX = Math.round(P.vp + P.focal * Math.tan((SUN_AZ * Math.PI) / 180)), SUNY = P.horizon - 3, LONG = 1 / Math.tan((10 * Math.PI) / 180)
-const B4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], bayer = (x, y) => (B4[(y & 3) * 4 + (x & 3)] + 0.5) / 16
+const B4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], bayer4 = (x, y) => (B4[(y & 3) * 4 + (x & 3)] + 0.5) / 16
 // smooth noise, for the serras' ridges and the sandy patches (in meters, so it recedes like the rest)
 
 // ================================================================ sky
@@ -391,7 +391,7 @@ const PROPS = []
 // field going dark. Wires and blades cast too little.
 const SHADE = { g: "Z", G: "z", J: "G", E: "J", h: "E", Z: "k", z: "Z", a: "k", A: "a", b: "A", B: "b", l: "L", L: "A" }
 const SX = Math.sin((-SUN_AZ * Math.PI) / 180) * LONG, SZ = Math.cos((SUN_AZ * Math.PI) / 180) * LONG
-function cast(out, ox, oz, parts, height) {
+function castShadow(out, ox, oz, parts, height) {
   for (const q of parts) {
     const [a, b, half] = q.e ? [[q.e[0], q.e[1], q.e[2] - q.ry], [q.e[0], q.e[1], q.e[2] + q.ry], q.rx] : [q.a, q.b, q.half]
     if (half < 0.015) continue
@@ -409,14 +409,14 @@ function cast(out, ox, oz, parts, height) {
       const [sx, sy] = P.ground(gx, gz), rx = half * P.scale(gz), ry = (half * P.focal * P.eye) / (gz * gz)
       if (rx < 0.71 && ry < 0.71) {                                     // thinner than a pixel: one pixel
         const x = Math.floor(sx), y = Math.floor(sy)
-        if (x >= 0 && x < W && y > P.horizon && y < H && !(soft && bayer(x, y) < soft)) out.add(y * W + x)
+        if (x >= 0 && x < W && y > P.horizon && y < H && !(soft && bayer4(x, y) < soft)) out.add(y * W + x)
         continue
       }
       if (sy - ry > H || sx + rx < 0 || sx - rx > W) continue
       for (let y = Math.floor(sy - ry); y <= Math.ceil(sy + ry); y++) {
         if (y <= P.horizon || y >= H) continue
         for (let x = Math.max(0, Math.floor(sx - rx)); x <= Math.min(W - 1, Math.ceil(sx + rx)); x++)
-          if (((x + 0.5 - sx) / rx) ** 2 + ((y + 0.5 - sy) / ry) ** 2 <= 1 && !(soft && bayer(x, y) < soft) && !(q.dapple && hash(x * 7 + y, y * 13 - x) > q.dapple)) out.add(y * W + x)
+          if (((x + 0.5 - sx) / rx) ** 2 + ((y + 0.5 - sy) / ry) ** 2 <= 1 && !(soft && bayer4(x, y) < soft) && !(q.dapple && hash(x * 7 + y, y * 13 - x) > q.dapple)) out.add(y * W + x)
       }
     }
   }
@@ -501,7 +501,7 @@ sprite("_land", { w: W, h: H },
     const out = new Set(), deep = new Set()
     for (const p of PROPS) {
       if (p.z > 160 || P.scale(p.z) * p.thing.height < 1.5) continue
-      if (p.z < 70 && p.thing.height >= 0.8) cast(out, p.x, p.z, p.thing.parts, p.thing.height)
+      if (p.z < 70 && p.thing.height >= 0.8) castShadow(out, p.x, p.z, p.thing.parts, p.thing.height)
       if (p.thing.foot) pool(deep, p.x, p.z, ...p.thing.foot)
     }
     darken(c, out); darken(c, deep)
@@ -638,7 +638,7 @@ function walker(c, frame) {
   const s = P.scale(zh), tall = s * TALL                           // px per meter, held for the step
   const fade = Math.min(1, Math.max(0, (zk - FADE[0]) / (FADE[1] - FADE[0])))
   if (fade >= 1) return
-  c.clip(fade > 0 ? (x, y) => bayer(x, y) >= fade : undefined, () => {
+  c.clip(fade > 0 ? (x, y) => bayer4(x, y) >= fade : undefined, () => {
     shadow(c, frame, pose, side, zk)
     if (tall >= BIG) draw(c, frame, POSES[pose], side, zk, zh, s)
     else c.stamp("walker_*", ...at(LANE, zk), { fit: tall, frame: pose, ...(side > 0 && { flip: "x" }), ...(zk >= FAR_BODY && { swap: { S: "T", P: "T" } }) })
@@ -665,7 +665,7 @@ function walkerParts(pose, side, frame) {
 }
 function shadow(c, frame, pose, side, zk) {
   const out = new Set()
-  cast(out, LANE + side * 0.11, zk, walkerParts(POSES[pose], side, frame), TALL)
+  castShadow(out, LANE + side * 0.11, zk, walkerParts(POSES[pose], side, frame), TALL)
   darken(c, out)
 }
 

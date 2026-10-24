@@ -17,6 +17,8 @@ declare global {
     fx?: PxEffect | PxEffect[];
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; swap?: Record<string, PxColor>;
     rflip?: "x" | "y" | "xy"; rswap?: Record<string, PxColor>[]; seed?: number; reseed?: boolean | number;
+    /** This copy n steps darker along the ramps (negative: lighter): a far limb; swap wins for the keys it names. */
+    shade?: number;
     /** Animated assets: freeze on frame n / start later (ms) / random start. */
     frame?: number; delay?: number; rdelay?: boolean;
     /** stamp only: x, y between pixels (subpixel); [dx, dy] the way it moves (1 right/down, -1 left/up). */
@@ -88,8 +90,8 @@ declare global {
   interface PxWorld {
     /** Ground in perspective: the horizon's row and the eye's height in meters; or a flat side view's px per meter. */
     horizon?: number; eye?: number; scale?: number;
-    /** Where the light comes from, or a point light in the scene ({ at: [x, y] }: a fire, a lamp): each object's lit side is checked against it. */
-    light?: [number, number] | { at: [number, number] };
+    /** Where the light comes from, or a point light in the scene ({ at: [x, y] }: a fire, a lamp): each object's lit side is checked against it. Without it, the lamp lighting() lit each by, or a mesh's light; false: none. */
+    light?: [number, number] | { at: [number, number] } | false;
     /** Flat side view: the ground's row; what has a height is checked for floating or sinking. */
     ground?: number;
   }
@@ -124,6 +126,8 @@ declare global {
     side?: "l" | "r";
     /** Fine order (higher = in front) on top of far -100 / middle 0 / near +100; out: how far outside its limb. */
     z?: number; out?: number;
+    /** Steps darker on the far side for this part (default the rig's far; 0: as drawn). */
+    far?: number;
     /** The part's asset (default "<rig>_<slot>"); on: its joint is a socket of another slot's part ("arm_l.hand"). */
     part?: string; on?: string;
     /** A part with two faces, each its own drawing; the one turned to us shows. */
@@ -268,7 +272,9 @@ declare global {
   interface PxBuilt { field?: PxSdf; density?: PxDensity; parts: Record<string, PxSdf>; details: Record<string, PxScatterOpts>; decals: Record<string, { asset: string; point: PxV3 }>; sockets: Record<string, PxV3> }
   /** A scene as data: named parts by builders and relations; an edit of it, what changed, where a part stands. */
   interface PxWorld { readonly kind: "world"; readonly names: string[]; edit(changes: Record<string, unknown>): PxWorld; changed(other: PxWorld): string[]; place(name: string, clock?: PxClock): PxV3; built(name: string): PxBuilt }
-  interface PxPartSpec { make: "tree" | "rock" | "house" | "crystal" | "mist" | "smoke"; params?: Record<string, unknown>; seed?: number; at?: number[] | ((c: PxClock) => number[]); on?: string; beside?: [string, string, number?]; around?: string; attach?: [string, string] }
+  interface PxPartSpec { make: "tree" | "pine" | "bush" | "rock" | "house" | "crystal" | "mist" | "smoke" | (string & {}); params?: Record<string, unknown>; seed?: number; at?: number[] | ((c: PxClock) => number[]); on?: string; beside?: [string, string, number?]; around?: string; attach?: [string, string];
+    /** its own materials over draw3d's; air: its own look ({ ramp: keys, thickness, ... }) */
+    mats?: Record<string, unknown>; look?: { ramp?: string; thickness?: number; ambient?: number; cast?: number; emit?: { ramp: string; strength?: number; glow?: number } } }
   /** expect3d's rules; before and while take two rules of a place. */
   type PxRule = { above?: [string, string]; on?: [string, string]; apart?: [string, string]; near?: [string, string, number]; reaches?: [string, number[], number, number?]; within?: [string, number[][]]; before?: [PxRule, PxRule]; while?: [PxRule, PxRule] };
   /** voxels()'s options: surface()'s (ao 0 unless given: a face darker at the creases); a cell's size (given a field), a cube's width in px (iso and top on the pixel grid). */
@@ -369,6 +375,14 @@ declare global {
     start(name: string): number;
     total: number;
     along(from: number[], to: number[], t: number, opts?: { phase?: string; arc?: number; ease?: "linear" | "in" | "out" }): number[];
+    /** A pose's frame by phase: steps [phase, from, to?, ms?] in order; before the first, after the last ends. */
+    frame(t: number, steps: [string, number, number?, number?][], opts?: { before?: number; after?: number }): number;
+    /** 0..1 from moment a (a phase or event, or [it, ms after]) to b (default the end of a's phase). */
+    span(t: number, a: string | [string, number], b?: string | [string, number]): number;
+    /** The same span in and out: min(1, k / in) × min(1, (1 - k) / out), 0 outside it. */
+    fade(t: number, a: string | [string, number], b?: string | [string, number], opts?: { in?: number; out?: number }): number;
+    /** Whole ms steps since a moment, up to n - 1. */
+    since(t: number, a: string | [string, number], ms?: number, n?: number): number;
   }
   interface PxParticle { x: number; y: number; vx: number; vy: number; age: number; life: number; id: number }
   /** An element of the spell kit: a recipe (scenes.md, "Designing an element"); `like` an element to start from. */
@@ -493,6 +507,10 @@ declare global {
     flame(x: number, y: number, size: number, keys: string, opts?: { wind?: number; period?: number; seed?: number; frame?: number }): void;
     /** A strip that wraps going by, `per` px a loop (a whole number of its widths): a parallax plane. */
     scroll(name: string, y: number, per: number, opts?: { x?: number; y?: number; frame?: number; axis?: "x" | "y" }): void;
+    /** How far something going `per` px a loop has moved at this frame (whole px). */
+    moved(per: number): number;
+    /** Where something crossing in a loop is now: from x0, per a loop (default span), wrapped into the strip span wide from `from`; whole px unless whole: false. */
+    cross(x0: number, opts: { span: number; per?: number; from?: number; whole?: boolean }): number;
     /** A lane of cumulus drifting one slot a loop while each turns into the next. */
     clouds(opts: PxClouds): void;
     /** Smoke, steam or dust from a point, in a loop that closes. */
@@ -614,6 +632,10 @@ declare global {
   function particles(emit: (t: number) => PxParticle[], keys: string | string[], opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): PxOp;
   /** A trail behind what goes along path(t). */
   function trail(path: (t: number) => number[], keys: string | string[], opts?: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number }): PxOp;
+  /** Values keyed in time: tween([{ t: 0, yaw: 60 }, { t: 4 }, { t: 6, yaw: 90 }], { moments }) gives at(t); each key carries what it doesn't say, numbers eased, the rest held. */
+  function tween(keys: ({ t: number } & Record<string, unknown>)[], opts?: { moments?: string[] }): (t: number) => Record<string, any> & { t: number };
+  /** [frames, value] runs as a value a frame ([frames, a, b] holds [a, b]). */
+  function unroll(runs: [number, ...unknown[]][]): unknown[];
   /** A spell's phases on the clock: ability([["charge", 600], ["cast", 150], ["travel", 500], ...], { start, events }). */
   function ability(phases: [string, number][] | Record<string, number>, opts?: { start?: number; events?: Record<string, [string, number]> }): PxAbility;
   /** Seeded particles: (t) gives the ones alive at time t, each where its own path puts it. */
@@ -649,7 +671,10 @@ declare global {
   /** Rules over a world's loop, run by pxl check. */
   function expect3d(name: string, world: PxWorld, rules: PxRule[], opts?: { frames?: number; ms?: number }): void;
   /** Builders with semantic parameters: make3d.tree({ canopy, twist, leaves, wind }), pine({ height, tiers, girth, snow }), bush({ size, leaves }), rock({ moss }), house({ snow, door, window, sign }), crystal({ rune, moss }), mist({ color }), smoke(). */
-  const make3d: Record<"tree" | "pine" | "bush" | "rock" | "house" | "crystal" | "mist" | "smoke", (params?: Record<string, unknown>) => PxBuilt>;
+  const make3d: Record<"tree" | "pine" | "bush" | "rock" | "house" | "crystal" | "mist" | "smoke" | (string & {}), (params?: Record<string, unknown>) => PxBuilt> & {
+    /** A builder of the file's own: fn(params) returns { field } or { density, look } (and parts, details, decals, sockets); params' ranges refused when exceeded; wind: it sways. */
+    define(name: string, fn: (params: Record<string, any>) => Partial<PxBuilt>, opts?: { params?: Record<string, [number, number]>; wind?: boolean }): void;
+  };
   /** Written by build: a grid as name.vox (and .obj/.glb of its blocks), a mesh as name.obj (+ .mtl) and name.glb, Y up; each read back. */
   /** A function of the clock with frames: n moments of its loop: an animated .glb, a file a moment for the others. */
   function export3d(name: string, thing: PxVoxels | PxMesh3 | PxSplats | ((c: PxClock) => PxVoxels | PxMesh3 | PxSplats), opts?: { mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; as?: ("vox" | "obj" | "glb" | "ply")[]; frames?: number; fps?: number }): void;

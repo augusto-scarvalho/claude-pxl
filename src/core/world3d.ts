@@ -26,6 +26,10 @@ export interface PartSpec {
   around?: string;
   /** at another's socket: [part, socket] (smoke at a chimney) */
   attach?: [string, string];
+  /** its own materials, over draw3d's (a birch's bark beside an oak's) */
+  mats?: Record<string, unknown>;
+  /** air: how it is drawn, over its builder's look (ramp: the keys themselves, thickness, ambient, cast, emit) */
+  look?: Partial<NonNullable<Built["look"]>>;
 }
 export interface WorldSpec {
   seed?: number;
@@ -39,13 +43,17 @@ const SIDES: Record<string, V3> = { left: [-1, 0, 0], right: [1, 0, 0], front: [
 export class World {
   readonly kind = "world";
   readonly spec: WorldSpec;
+  /** its builders: the eight built in and the art file's own (make3d.define) */
+  readonly makers: Record<string, (p: Record<string, unknown>) => Built>;
   private cache = new Map<string, Built>();
   private scat = new Map<string, Splats>();
-  constructor(spec: WorldSpec) {
+  constructor(spec: WorldSpec, makers: Record<string, (p: Record<string, unknown>) => Built> = BUILDERS) {
+    this.makers = makers;
     if (!spec || typeof spec !== "object" || !spec.parts || typeof spec.parts !== "object") throw new PxError("world3d({ seed, wind: { from, strength }, parts: { name: { make, params, at | on | beside | around | attach } } })");
     for (const [name, p] of Object.entries(spec.parts)) {
       if (!/^[\w-]+$/.test(name)) throw new PxError(`world3d: a part's name is letters, digits, _ or -, got '${name}'`);
-      if (!p || !BUILDERS[p.make]) throw new PxError(`world3d: part '${name}' is made by one of ${Object.keys(BUILDERS).join(", ")}, got ${JSON.stringify(p?.make)}`);
+      if (!p || !makers[p.make]) throw new PxError(`world3d: part '${name}' is made by one of ${Object.keys(makers).join(", ")} (or one of the file's own, make3d.define, before the world), got ${JSON.stringify(p?.make)}`);
+      if ((p.mats !== undefined && (typeof p.mats !== "object" || p.mats === null)) || (p.look !== undefined && (typeof p.look !== "object" || p.look === null))) throw new PxError(`world3d: part '${name}': mats is { material: ramp } and look { thickness, ramp, ... }`);
       for (const r of [p.on, p.around, p.beside?.[0], p.attach?.[0]]) if (r !== undefined && !spec.parts[r]) throw new PxError(`world3d: part '${name}' refers to '${r}', which isn't a part (it has: ${Object.keys(spec.parts).join(", ")})`);
       if (p.beside && !SIDES[p.beside[1]]) throw new PxError(`world3d: part '${name}' is beside on "left", "right", "front" or "behind", got ${JSON.stringify(p.beside[1])}`);
     }
@@ -58,15 +66,15 @@ export class World {
     if (!d) throw new PxError(`world3d: wind.from is "left", "right", "front" or "behind", got ${JSON.stringify(w.from)}`);
     return [-d[0] * k, -d[1] * k];
   }
-  /** A part as its builder makes it: its parameters, its seed (its own, or the world's and its name), the wind if it sways. */
+  /** A part as its builder makes it: its parameters, its seed (its own, or the world's and its name), the world's wind if what it builds sways. */
   built(name: string): Built {
     let b = this.cache.get(name);
     if (b) return b;
     const p = this.spec.parts[name];
     if (!p) throw new PxError(`world3d: no part '${name}' (it has: ${this.names.join(", ")})`);
     const params: Record<string, unknown> = { seed: p.seed ?? partSeed(this.spec.seed ?? 1, name), ...p.params };
-    if (["tree", "pine", "bush", "mist", "smoke"].includes(p.make) && params.wind === undefined) params.wind = this.wind();
-    b = BUILDERS[p.make](params);
+    b = this.makers[p.make](params);
+    if (b.windy && params.wind === undefined) b = this.makers[p.make]({ ...params, wind: this.wind() });
     this.cache.set(name, b);
     return b;
   }
@@ -113,7 +121,7 @@ export class World {
       if (!spec.parts[part]) throw new PxError(`edit: no part '${part}' (it has: ${this.names.join(", ")})`);
       spec.parts[part].params![key] = v;
     }
-    return new World(spec);
+    return new World(spec, this.makers);
   }
   /** What a part is, as a string: its fields' code and numbers, its density, details, decals and place over the loop (the same string, the same pixels). */
   prints(name: string): Record<string, string> {
@@ -245,7 +253,7 @@ export function turnKnob(W: World, k: Knob, v: number): World {
   else if (k.key === "beside") { const b = [...p.beside!] as [string, string, number?]; b[2] = v; p.beside = b; }
   else p.params[k.key] = v;
   parts[k.part] = p;
-  return new World({ ...W.spec, parts });
+  return new World({ ...W.spec, parts }, W.makers);
 }
 /**
  * A failing rule fixed by one number, with no model: each number of the parts it names (where they
@@ -339,17 +347,19 @@ export function drawWorld(W: unknown, o: Draw3dOpts, d: Drawers): void {
   const off = o.at ?? [0, 0, 0];
   if (!(Array.isArray(off) && off.length === 3 && off.every(Number.isFinite))) throw new PxError(`draw3d: at is where the world's [0, 0, 0] stands, [x, y, z] m, got ${JSON.stringify(o.at)}`);
   const base = { view: o.view, ppm: o.ppm, pixel: o.pixel, light: o.light }, at = (n: string) => { const p = W.place(n, d.clock); return [p[0] + off[0], p[1] + off[1], p[2] + off[2]]; };
-  for (const n of names) { const b = W.built(n); if (b.field) d.surface(b.field, { ...base, at: at(n), mats, part: n }); }
-  for (const n of names) for (const [k, s] of W.details(n)) d.splats(s, { ...base, at: at(n), mats, part: `${n}.${k}` });
+  const own = (n: string) => (W.spec.parts[n].mats ? { ...mats, ...W.spec.parts[n].mats } : mats);
+  for (const n of names) { const b = W.built(n); if (b.field) d.surface(b.field, { ...base, at: at(n), mats: own(n), part: n }); }
+  for (const n of names) for (const [k, s] of W.details(n)) d.splats(s, { ...base, at: at(n), mats: own(n), part: `${n}.${k}` });
   for (const n of names) {
     const b = W.built(n);
     for (const [k, dc] of Object.entries(b.decals)) d.decal(dc.asset, { ...base, at: at(n), on: b.field, point: dc.point, views: dc.views, lit: dc.lit, mode: dc.mode, size: dc.size, up: dc.up, part: `${n}.${k}` });
   }
   const air = names.filter((n) => W.built(n).density).sort((a, b) => at(b)[1] - at(a)[1]);
   for (const n of air) {
-    const b = W.built(n), L = b.look!, ramp = mats[L.ramp];
-    if (ramp === undefined) throw new PxError(`draw3d: part '${n}' is drawn in '${L.ramp}': give mats a ramp for it`);
-    const emit = L.emit ? { ...L.emit, ramp: mats[L.emit.ramp] } : undefined;
+    // its own look's ramp is the keys themselves; its builder's names a material of mats
+    const b = W.built(n), pl = W.spec.parts[n].look, L = { ...b.look!, ...pl }, M = own(n), ramp = pl?.ramp ?? M[L.ramp];
+    if (ramp === undefined) throw new PxError(`draw3d: part '${n}' is drawn in '${L.ramp}': give mats (draw3d's or the part's) a ramp for it, or the part a look: { ramp: "keys" }`);
+    const emit = L.emit ? { ...L.emit, ramp: pl?.emit?.ramp ?? M[L.emit.ramp] } : undefined;
     d.volume(b.density!, { ...base, at: at(n), ...L, ramp, ...(emit ? { emit } : {}), part: n });
   }
 }

@@ -40,8 +40,6 @@ pal({
 const W = 320, H = 180, FPS = 16, FRAMES = 192
 const RAIL = 158                      // the rails' top row
 const TAU = Math.PI * 2
-// how far a plane that goes `per` px in a loop has moved at frame f (whole pixels)
-const moved = (f, per) => Math.floor((f * per) / FRAMES)
 // smooth waves that close over a strip `w` wide: [cycles, amplitude, phase]...
 const waves = (x, w, parts) => parts.reduce((s, [k, a, ph]) => s + a * Math.sin((x / w) * TAU * k + ph), 0)
 // a soft edge: rows from y0 down, `rows` of them, dithered into solid `key`
@@ -544,9 +542,9 @@ function engineer(c) {
 // ---------------------------------------------------------------- the loop
 // the rails stand still with the train: the head lit on top, the web, the foot; their joints go by
 // with the land, a bolted plate every 96 px (a step that divides the trackside's 1536)
-function rails(c, f) {
+function rails(c) {
   c.rect(0, RAIL, W, 1, "i"); c.rect(0, RAIL + 1, W, 1, "a"); c.rect(0, RAIL + 2, W, 1, "I"); c.rect(0, RAIL + 3, W, 1, "d")
-  for (let x = -(moved(f, SIDE_W) % 96); x < W + 4; x += 96) { c.rect(x - 3, RAIL + 1, 7, 3, "c"); c.px(x - 2, RAIL + 2, "a"); c.px(x + 2, RAIL + 2, "a"); c.vline(x, RAIL, 2, "I") }
+  for (let x = -(c.moved(SIDE_W) % 96); x < W + 4; x += 96) { c.rect(x - 3, RAIL + 1, 7, 3, "c"); c.px(x - 2, RAIL + 2, "a"); c.px(x + 2, RAIL + 2, "a"); c.vline(x, RAIL, 2, "I") }
 }
 anim("train", { w: W, h: H, frames: FRAMES, fps: FPS },
   (c) => c.stamp("_sky", 0, 0),
@@ -557,7 +555,7 @@ anim("train", { w: W, h: H, frames: FRAMES, fps: FPS },
   scroll("_side", SIDE_Y, SIDE_W),
   // under the train the ballast lies in its shade, between the wheels
   recolor({ p: "P", P: "y", "/": "p", s: "]", g: "Q", Q: "q", z: "g" }, [0, 150, 312, RAIL - 150]),
-  (c) => rails(c, c.frame),
+  rails,
   (c) => { coach(c, -COACH, c.frame, [...PEOPLE].reverse()); coach(c, 14, c.frame, PEOPLE); conductor(c, 8); tender(c, c.frame); engine(c, c.frame) },
   // smoke: a puff every frame from the stack, dark while fresh, left behind at the ground's speed
   plume(296, 89, "YV=", { every: 1, life: 38, rise: 30, wind: -SIDE_W / FRAMES, inertia: 5, size: [3, 13], young: "=$", seed: 5 }),

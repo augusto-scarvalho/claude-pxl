@@ -223,6 +223,21 @@ scene("s", { w: 60, h: 14, bg: "d", world: { scale: 10, light: [0.6, -1] } }, st
   assert.equal(checkProject(loadSource(src, "t.px.js")).readings, undefined, "only when asked");
 });
 
+test("lit side without world.light: against the lamp lighting() lit it by, or a mesh's light; light: false reads none", () => {
+  const scene = (lamps: string, world = "") => PAL + `ramps("1d6")\n` + HEAD + `\nscene("s", { w: 60, h: 30, bg: "d"${world} }, stamp("head", 20, 12), ${lamps}, lighting({ cell: 1, ambient: 0.3 }))`;
+  const read = (src: string) => checkProject(loadSource(src, "t.px.js", { checksOnly: true }), { readings: true });
+  assert.deepEqual(read(scene("lamp(40, 2, { r: 40 })")).readings, ["s › head @- › lit from the top right, as its light"]);
+  // the strongest at its middle: a far weak lamp on the other side doesn't count
+  assert.match(read(scene("lamp(2, 2, { r: 40 }), lamp(58, 28, { r: 6 })")).readings![0], /WARNING: lit from the top right, but its light comes from the top left/);
+  const off = read(scene("lamp(2, 2, { r: 40 })", ", world: { light: false }"));
+  assert.deepEqual([off.lines, off.readings], [[], []]);
+  assert.match(off.coverage, /not run: lit side/);
+  // a sprite in mesh(): the mesh's light (by default from the upper left, behind the eye) through its camera
+  const m = read(PAL + `ramps("1d6")\n` + HEAD + `\nconst G = model(); G.face("g", [-5, 1, 0], [5, 1, 0], [5, 9, 0], [-5, 9, 0])
+scene("s", { w: 60, h: 40, bg: "d" }, (c) => c.mesh({ w: 60, horizon: 8, eye: 1.6, focal: 40 }, G.faces, { g: { ramp: "1d6" } }, { sprites: [{ name: "head", at: [0, 4] }] }))`);
+  assert.match(m.readings![0], /s › head @- › WARNING: lit from the top right, but its light comes from the (top )?left/);
+});
+
 test("check: a hand-drawn sprite's 1 px lines, L-corners and jaggies with where, to look at; line() and outline8 aren't asked", () => {
   // a shallow line by hand, one step doubled (x 6), the others clean; the same by line(); a grid
   // drawn square on purpose

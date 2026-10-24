@@ -5,17 +5,8 @@
 // woman with long hair in a braid, an older man with grey hair tied back. The faces keep the
 // traveler's approved rows (characters §5); the hair and what covers it change. Recolors of these
 // (base + swap) make the rest of the crew.
-include("traveler.px.js")
-// the traveler's palette, so the painter's keys mean the same here
+include("traveler.px.js", { palette: true })   // its palette and ramps, so the painter's keys mean the same here
 pal({
-  k: "#1c1418",
-  L: "#fde6c6", S: "#f0c79e", s: "#d2966f", z: "#9c5b45",
-  Y: "#c9934f", H: "#a56c3a", h: "#7d4a2a", j: "#4a2716", J: "#24110b",
-  E: "#1f2f55", e: "#3a6aa2", G: "#f4f0e6",
-  C: "#77a068", c: "#4c7652", n: "#30503d", N: "#1c2e27",
-  W: "#d8c69e", w: "#a68f6c", v: "#6f5c4a",
-  p: "#66637a", P: "#423f53", R: "#2e2b3c",
-  l: "#83542f", d: "#4b2e1e", D: "#2e1a10", g: "#f0cc62",
   // the crew's cloth: red (a bandana, a bodice), tweed (a cap, a shirt), navy (a coat, stripes), white
   // linen, brown canvas (trousers), olive (a vest), plum (a skirt)
   m: "#6e1c22", r: "#a8323a", t: "#d0604c", a: "#3a332e", b: "#5c544b", f: "#857a6c",
@@ -23,7 +14,7 @@ pal({
   i: "#5a4630", o: "#7e6646", u: "#a08660", O: "#384530", U: "#55663e", V: "#76875a",
   I: "#2e2638", K: "#4c3e5e", M: "#6e5c84",
 })
-ramps("kzsSL", "kJjhHY", "kNncC", "kvwW", "kRPp", "kDdl", "kmrt", "kabf", "kQAB", "kxyZ", "kiou", "kOUV", "kIKM")
+ramps("kmrt", "kabf", "kQAB", "kxyZ", "kiou", "kOUV", "kIKM")
 
 // ---------------------------------------------------------------- the heads, by hand
 // Five haircuts, each seen from the five sides, on the traveler's face. The bandana: a flat crown of

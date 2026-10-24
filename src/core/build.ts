@@ -3,7 +3,7 @@
 import { Canvas, type Placed, type Placement, type Resolver, betweenKey } from "./canvas.ts";
 import { type Color, MIXES, TRANSPARENT, oklab, pack } from "./color.ts";
 import { PxError, wrap } from "./errors.ts";
-import { Img } from "./image.ts";
+import { Img, type Lamp } from "./image.ts";
 import { applyGlow } from "./glow.ts";
 import { applyLighting } from "./light.ts";
 import { rotate } from "./rotate.ts";
@@ -52,6 +52,8 @@ export interface BuildOut {
   placements: Placement[];
   /** Built with the loop of what it places as its clock (its functions saw the real frame). */
   clocked?: boolean;
+  /** The lamps its lighting() lit by (drawing coordinates). */
+  lamps?: Lamp[];
 }
 
 /** An anim's frames: count and durations (ms), from its frame() items or { frames, fps }. */
@@ -197,7 +199,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   const main = timed(new Canvas(base, pal, ctx, 0, 0, seed));
   hook(main);
   // After lighting(), pixels it changed still count as their palette color for glow().
-  let preLight: { before: Uint32Array; after: Uint32Array } | undefined;
+  let preLight: { before: Uint32Array; after: Uint32Array } | undefined, lamps: Lamp[] | undefined;
   const keyed = () => {
     if (!preLight) return base.data;
     const k = base.data.slice();
@@ -205,6 +207,8 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     return k;
   };
   const onPass: OnPass = (name, args, loc) => {
+    // the lamps lighting() lights by: the lit-side check reads each thing against the strongest
+    if (name === "lighting" && base.lamps?.length) (lamps ??= []).push(...base.lamps.map((l) => ({ ...l })));
     // the checks read what was placed and how, not the lit pixels: 2/3 of a lit city frame's time
     if (ctx.checksOnly) return;
     if (name === "post") {
@@ -299,7 +303,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   const img = finish(base, def, pal, trace, loose);
   trace?.finish(img);
   const guide = refs.length ? guideOver(img, refs, def) : undefined;
-  return { img, layers, trace, anim: tl, placements: log, ...(tick ? { clocked: true } : {}), ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}) };
+  return { img, layers, trace, anim: tl, placements: log, ...(lamps ? { lamps } : {}), ...(tick ? { clocked: true } : {}), ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}) };
 }
 
 /**

@@ -45,7 +45,7 @@ type Pred = (x: number, y: number) => boolean;
 /** Where stamps landed in an asset (top-left in image coords) with their sockets, by id: for `at`. */
 export type Placed = Map<string, { x: number; y: number; sockets?: Record<string, [number, number]> }>;
 /** What was stamped where, in drawing order (top-left in asset coords): for `pxl describe`. */
-export type Placement = { name: string; x: number; y: number; w: number; h: number; layer?: string; img: Img };
+export type Placement = { name: string; x: number; y: number; w: number; h: number; layer?: string; img: Img; /** the light it was drawn under, on the picture (a sprite in mesh()) */ light?: [number, number] };
 
 /**
  * Drawing surface over an image. Coordinates are relative to (ox, oy); colors are palette
@@ -649,6 +649,24 @@ export class Canvas {
     for (; x < this.img.w - this.ox; x += w) this.stamp(name, x, y);
   }
 
+  /** How far something going `per` px a loop has moved at this frame, in whole px (floored), as scroll() moves a plane. */
+  moved(per: number): number {
+    return Math.floor((this.frame * per) / this.frames);
+  }
+
+  /**
+   * Where something crossing in a loop is at this frame: from `x0`, `per` a loop (default `span`: once
+   * across; negative, leftward), wrapped into the strip `span` wide from `from` (default 0), so it leaves
+   * on one side and comes back on the other; whole px a frame unless `whole: false` (meters, or 1.5 px a frame).
+   */
+  cross(x0: number, opts: { per?: number; span: number; from?: number; whole?: boolean }): number {
+    const { span, per = span, from = 0, whole = true } = opts ?? {};
+    if (!(span > 0) || !Number.isFinite(x0) || per % span !== 0)
+      throw new PxError(`cross(x0, { span, per, from }): span the strip's width (above 0) and per a whole number of spans, so the loop closes (got ${JSON.stringify({ x0, span, per })})`);
+    const r = (x0 + (whole ? this.moved(per) : (this.frame * per) / this.frames)) % span;
+    return from + (r < 0 ? r + span : r);
+  }
+
   /** scroll() down the picture: the strip a whole number of its heights a loop, `x` its column. */
   private scrollY(name: string, x: number, per: number, opts: { y?: number; frame?: number }): void {
     const h = this.size(name).h, f = opts.frame ?? this.frame;
@@ -888,7 +906,7 @@ export class Canvas {
     // straight into the pixels when nothing stands between (a clip, a twin's mirror, a wrapped edge)
     const mc = Object.assign(Object.create(this) as MeshCanvas, { raw: this.clipPred || this.mirrored || this.wrap ? undefined : this.img.data });
     for (const p of drawMesh(mc, view, faces, mats, opts, { tex, masks, looks, sprites, step, lit }))
-      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img });
+      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}) });
   }
 
   /**
@@ -1080,7 +1098,14 @@ export class Canvas {
     }
     let src = this.res.image(pick, inner, t, track);
     const swap = opts.rswap ? opts.rswap[Math.floor(r() * opts.rswap.length)] : opts.swap;
-    if (swap && Object.keys(swap).length) src = src.remap(this.swapMap(swap));
+    if (opts.shade) {
+      // n steps along the ramps, as shade() would on its pixels; what swap names, swap's
+      if (!Number.isInteger(opts.shade)) throw new PxError(`shade is how many steps darker along the ramps this copy is (negative: lighter), got ${JSON.stringify(opts.shade)}`);
+      const step = this.pal.stepMap(opts.shade > 0 ? -1 : 1), m = new Map<Color, Color>();
+      for (const c of step.keys()) { let d = c; for (let i = 0; i < Math.abs(opts.shade); i++) d = step.get(d) ?? d; m.set(c, d); }
+      if (swap) for (const [a, b] of this.swapMap(swap)) m.set(a, b);
+      src = src.remap(m);
+    } else if (swap && Object.keys(swap).length) src = src.remap(this.swapMap(swap));
     if (opts.silhouette !== undefined) {
       const c = this.color(opts.silhouette);
       if (c !== null) src = src.silhouette(c);

@@ -9,7 +9,7 @@
 import type { BuildOut } from "./build.ts";
 import type { Placement } from "./canvas.ts";
 import { type Color, TRANSPARENT, oklab, toHex } from "./color.ts";
-import { Img, type Orient } from "./image.ts";
+import { Img, type Lamp, type Orient } from "./image.ts";
 import type { World } from "./model.ts";
 import { type Steps, dirWords, frontWords, lightWords, rampSteps } from "./checks.ts";
 import type { Palette } from "./palette.ts";
@@ -90,8 +90,8 @@ export function orientWords(o: Orient): string {
  * (sparks, a smear, a glow give light or have none); its feet against where it was stamped (a pivot
  * below the sole floats it) and against the ground. describe and pxl check both use this.
  */
-export function placementChecks(p: Placement, wo: World | undefined, steps: Steps | undefined, unlit = false): string[] {
-  const light = lightFor(wo, p);
+export function placementChecks(p: Placement, wo: World | undefined, steps: Steps | undefined, unlit = false, lamps?: Lamp[]): string[] {
+  const light = lightFor(wo, p, lamps);
   const checks = [frontWords(p.img), light && !unlit ? lightWords(p.img, light, steps) : ""];
   const bb = p.img.bounds(), pv = p.img.pivot;
   if (bb && p.img.meters) {   // what has a real height stands on the ground: a ghost may float
@@ -106,14 +106,25 @@ export function placementChecks(p: Placement, wo: World | undefined, steps: Step
 /**
  * Which way a placement's light comes from: the world's `light` as given, or for a point light
  * (`{ at: [x, y] }`: a fire, a lamp) the way from the middle of what shows of it to that point; none
- * when the point is inside its box (the fire itself).
+ * when the point is inside its box (the fire itself). Without one: the light it was drawn under (a
+ * sprite in mesh()), else the lamp of `lamps` (what lighting() lit by) strongest at its middle, by
+ * its power and reach; `light: false`, none.
  */
-export function lightFor(wo: World | undefined, p: Placement): [number, number] | undefined {
-  const l = wo?.light;
-  if (!l || Array.isArray(l)) return l;
+export function lightFor(wo: World | undefined, p: Placement, lamps?: Lamp[]): [number, number] | undefined {
+  let l = wo?.light;
+  if (l === false) return undefined;
+  if (!l && p.light) return p.light;
+  if (Array.isArray(l)) return l;
   const bb = p.img.bounds();
   if (!bb) return undefined;
-  const dx = l.at[0] - (p.x + bb.x + bb.w / 2), dy = l.at[1] - (p.y + bb.y + bb.h / 2);
+  const cx = p.x + bb.x + bb.w / 2, cy = p.y + bb.y + bb.h / 2;
+  if (!l) {
+    // ponytail: straight-line reach, walls ignored; the light map's flood if lamps behind walls misread
+    let best = 0;
+    for (const m of lamps ?? []) { const v = m.power * (1 - Math.hypot(m.x + 0.5 - cx, m.y + 0.5 - cy) / m.r); if (v > best) { best = v; l = { at: [m.x + 0.5, m.y + 0.5] }; } }
+    if (!l) return undefined;
+  }
+  const dx = l.at[0] - cx, dy = l.at[1] - cy;
   if (Math.abs(dx) <= bb.w / 2 && Math.abs(dy) <= bb.h / 2) return undefined;
   const k = Math.hypot(dx, dy);
   return [dx / k, dy / k];
@@ -382,7 +393,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       const turned = p.img.orient && (p.img.orient.f || p.img.orient.mirrored || tiltOf(p.img.orient)) ? orientWords(p.img.orient) : "";
       let size = "";
       const bb = p.img.bounds();
-      const check = placementChecks(p, wo, steps, unlitLayers.has(p.layer ?? "")).join("; ");
+      const check = placementChecks(p, wo, steps, unlitLayers.has(p.layer ?? ""), b.lamps).join("; ");
       if (wo && p.img.meters && bb) {
         const lying = p.img.orient && Math.abs(Math.abs(tiltOf(p.img.orient)) - 90) <= 45;
         const drawn = lying ? bb.w : bb.h, feet = p.y + bb.y + bb.h, ppm = pxPerMeter(wo, feet);

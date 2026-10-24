@@ -50,6 +50,11 @@ Mark items `[x]` when they ship, with the commit.
 - [x] **Palette keys in the file** (dogfood): `1a1626 k ink` (a one-character word after the color;
   the name in a `.gpl`), so a shared palette needs no `pal({ k: 0, K: 1, ... })` index mapping.
 - [x] **Asset size inside functions**: `c.size("name")` (found building the iso example).
+- [ ] **A warning when `pal()` gives a key in a ramp another color** (found by the lit-side rule in
+  wave 1): `hd2d/clearing.px.js` gave the kit's cobble and wall keys 1-8 its scarecrow's colors, so
+  the ramps "1234" and "5678" no longer ran dark to light (`shade()` on it stepped along cobbles; the
+  rule read its lit side backwards until `rampSteps` skipped such ramps). Say the key, the ramp and
+  where the ramp was made; the keys renamed since.
 
 ## Characters (from dogfooding a 64 px character)
 

@@ -150,9 +150,10 @@ export interface World {
   /**
    * Where the scene's light comes from, [x, y] (e.g. [0.6, -1]: the top right), or a point light in
    * the scene, { at: [x, y] } (a fire, a lamp): each object's lit side is checked against it (against
-   * the way from the object to the point).
+   * the way from the object to the point). Without it, each object is read against the strongest
+   * lamp its lighting() lit it by, or a sprite in mesh() against the mesh's light; false: not read.
    */
-  light?: [number, number] | { at: [number, number] };
+  light?: [number, number] | { at: [number, number] } | false;
   /** Flat side view: the ground's row; what stands (has a height) is checked for floating or sinking. */
   ground?: number;
 }
@@ -235,6 +236,8 @@ export interface PlaceOpts {
   rflip?: "x" | "y" | "xy";
   /** Random recolor per placement; {} = keep. */
   rswap?: Record<string, string>[];
+  /** The copy n steps darker along the palette's ramps (negative: lighter): a far limb; swap wins for the keys it names. */
+  shade?: number;
   /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
   silhouette?: string;
   /** Lay the asset flat on the ground as its shadow: a pixel h above the base lands h * [kx, ky] away. */

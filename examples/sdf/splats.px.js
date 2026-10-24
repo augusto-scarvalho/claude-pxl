@@ -19,7 +19,7 @@ const GRID = sdf.voxels(STILL, { size: 0.1 })
 
 // each panel: the tree as one thing, in one view; the camera's on the grass
 const CAM = hd2d(PW, PH, 13), GR = ground(CAM.Z), AT = [0, CAM.Z - 2.2 / Math.tan(-PITCH * RAD), 0]
-const panel = (rep, view) => sprite(`p_${rep}_${view}`, { w: PW, h: PH }, (c) => {
+const panelOf = (rep, view) => sprite(`p_${rep}_${view}`, { w: PW, h: PH }, (c) => {
   if (view === "camera") {
     const faces = rep === "mesh" ? [...GR.faces, ...MESH.faces.map((f) => ({ mat: f.mat, pts: f.pts.map((p) => [p[0] + AT[0], p[1] + AT[1], p[2]]) }))] : GR.faces
     c.mesh(CAM.view, faces, { ...GMATS, ...MESH_MATS }, { light: LIGHT })
@@ -38,7 +38,7 @@ const panel = (rep, view) => sprite(`p_${rep}_${view}`, { w: PW, h: PH }, (c) =>
   if (rep === "mesh") c.mesh(view, MESH.faces, MESH_MATS, { ppm: PPM16, at, light: LIGHT })
 })
 const REPS = ["surface", "voxels", "mesh", "splats"], VIEWS = ["side", "top", "iso", "camera"]
-for (const r of REPS) for (const v of VIEWS) panel(r, v)
+for (const r of REPS) for (const v of VIEWS) panelOf(r, v)
 // the sheet: a row a representation, a column a view
 scene("tree_four_ways", { w: 34 + VIEWS.length * (PW + 2), h: 10 + REPS.length * (PH + 2), bg: "k" }, (c) => {
   VIEWS.forEach((v, j) => c.text(36 + j * (PW + 2), 2, v, "W"))

@@ -141,9 +141,10 @@ own, or whatever shares them near the fire stays unlit too).
 - Look at the result with `PXL shot`, and at the light alone in describe's LIGHT map (brightness
   per cell after lighting). The live viewer's painting steps also show a **light map** frame right
   before the lit result.
-- Lamps don't tell `pxl check` where the light comes from; `world.light` does. For a scene lit by a
-  fire or a lamp, give the scene `world: { light: { at: [x, y] } }` at that lamp, and each object's
-  lit side is checked against the way from it to there (`check` says "not run: lit side" without it).
+- `pxl check` reads each object's lit side against the lamp `lighting()` lit it by that is strongest
+  at its middle (by `power` and `r`; walls aren't counted). Where that misreads (a lamp behind a wall,
+  two lamps crossing), give the scene `world: { light: { at: [x, y] } }` (or `[x, y]`, a way), which
+  wins, or `light: false` to read none.
 - Doors, windows and holes in floors are just gaps in the `solid` layer. Light flows through them.
 - Too dark? Raise the lamp's `r` before `power`. Light reaching too far into the ground? Raise `block`
   (0.5–0.6). Want more Terraria-style glow through dirt? Lower it (0.25–0.3).

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { failure, PAL } from "./helpers.ts";
+import { loadSource } from "../src/node/load.ts";
 
 const has = (msg: string, ...parts: string[]) => {
   for (const p of parts) assert.ok(msg.includes(p), `expected "${p}" in:\n${msg}`);
@@ -31,6 +32,12 @@ test("a top-level helper named as a global (post, text) is named when the load f
   // declared after the failing line (not yet initialized) still counts; a file hiding nothing says nothing
   has(failure(PAL + 'sprite("a", { w: 1, h: 1 }, rect(0, 0, 1, "r"))\nfunction text() {}\nconst frame = 1').message, "'frame', 'text'");
   assert.ok(!failure(PAL + 'sprite("a", { w: 1, h: 1 }, rect(0, 0, 1, "r"))').message.includes("hiding"));
+});
+
+test("a top-level name hiding a global is a warning when the file loads, at its line", () => {
+  const p = loadSource(PAL + 'sprite("a", "r")\nconst W = 2, pose = (t) => t\nfunction figure() {}\n{ const cast = 1 }', "t.px.js");
+  assert.deepEqual(p.warnings.map((w) => [w.loc, /^globals: .*declares '(\w+)', hiding pxl's \1\(\)/.exec(w.msg)?.[1]]), [["t.px.js:3", "figure"], ["t.px.js:2", "pose"]]);
+  assert.deepEqual(loadSource(PAL + 'sprite("a", "r")', "t.px.js").warnings, []);
 });
 
 test("unknown options get suggestions", () => {

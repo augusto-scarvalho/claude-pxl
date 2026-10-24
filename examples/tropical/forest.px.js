@@ -62,7 +62,7 @@ const dist = (() => {
 const depth = (x, y) => dist[y * W + x]
 
 // Bands by distance, with a checker only where two tones meet (never over a whole area).
-const terrain = (c) => {
+const drawTerrain = (c) => {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const d = depth(x, y), chk = (x + y) % 2 === 0
     if (isWater(x, y)) c.px(x, y, d < 1 ? "V" : d < 4 ? "v" : d < 6 ? (chk ? "v" : "w") : d < 13 ? "w" : d < 15 ? (chk ? "w" : "W") : "W")
@@ -92,7 +92,7 @@ const TRAIL = `
   ................#....
   ................##...
   .................#...`
-const trail = tilemap(TRAIL, { corners: "#", size: T, map: "dirt_" })
+const trailMap = tilemap(TRAIL, { corners: "#", size: T, map: "dirt_" })
 const tc = TRAIL.trim().split("\n").map((r) => [...r.trim()].map((ch) => (ch === "#" ? 1 : 0)))
 const dirt = (i, j) => tc[j]?.[i] ?? 0
 
@@ -213,14 +213,14 @@ anim("ripples", { w: W, h: H, frames: 8, fps: 8 }, (c) => {
 // it; a wake of foam flecks drifts off with the current toward the river; spray jumps up around
 // the foot of the fall. All of it loops over the waterfall's 8 frames.
 const IX = 248, IY = 32
-const noise = (x, y, f) => (((x * 73856093) ^ (y * 19349663) ^ (f * 83492791)) >>> 0) % 97
+const noiseAt = (x, y, f) => (((x * 73856093) ^ (y * 19349663) ^ (f * 83492791)) >>> 0) % 97
 // distance from the impact, 1 at the plume's edge: wide to the sides, long forward, short behind
 const plumeR = (x, y) => Math.hypot((x - IX) / 22, (y - IY) / (y < IY ? 6 : 18))
 anim("splash", { w: W, h: H, frames: 8, fps: 8 }, (c) => {
   const f = c.frame
   for (let y = IY - 8; y < IY + 40; y++) for (let x = IX - 40; x < IX + 40; x++) {
     if (!isWater(x, y)) continue
-    const r = plumeR(x, y), n = noise(x, y, f), band = (((r * 6 - f * 0.75) % 1) + 1) % 1
+    const r = plumeR(x, y), n = noiseAt(x, y, f), band = (((r * 6 - f * 0.75) % 1) + 1) % 1
     if (r < 0.4) c.px(x, y, n % 4 ? "F" : "V")                                    // churning white
     else if (r < 0.75) { if (band < 0.5) c.px(x, y, n % 3 ? "F" : "V"); else if (n % 3 === 0) c.px(x, y, "V") }
     else if (r < 1) { if (band < 0.3 && n % 2) c.px(x, y, "V"); else if (n % 9 === 0) c.px(x, y, "F") }
@@ -272,8 +272,8 @@ const shadowOf = ([n, x, y, o]) => stamp(n, x, y, { ...o, cast: [0.62, 0.22], si
 const contactOf = ([n, x, y, o]) => stamp(n, x, y, { ...o, cast: [0.18, 0.12], silhouette: "k" })
 
 scene("forest", { w: W, h: H, world: { light: [-0.5, -1] } },
-  layer("ground", terrain),
-  layer("trail", trail),
+  layer("ground", drawTerrain),
+  layer("trail", trailMap),
   layer("cover", scatter("litter", 0, 0, W, H, 90, { on: "g", below: true, even: true, rflip: "xy", seed: 2 }),
     scatter("seedlings", 0, 0, W, H, 40, { on: "g", below: true, even: true, seed: 5 }),
     scatter("tufts", 0, 0, W, H, 34, { on: "g", below: true, even: true, rflip: "x", seed: 7 }),
@@ -300,7 +300,7 @@ scene("forest", { w: W, h: H, world: { light: [-0.5, -1] } },
   layer("shafts", { light: 1, density: 0.28 }, ...shafts),
   layer("air", stamp("butterfly", 244, 156), stamp("butterfly", 98, 150, { rdelay: true }), stamp("butterfly", 206, 226, { rdelay: true })))
 
-scene("terrain", { w: W, h: H }, layer("ground", terrain))
+scene("terrain", { w: W, h: H }, layer("ground", drawTerrain))
 
 // A layout check, previews only: every plant's pivot (where it stands) and the trail's dirt
 // corners, over the finished scene.

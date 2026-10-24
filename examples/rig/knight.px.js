@@ -230,7 +230,7 @@ scene("knights", { w: 200, h: 92, bg: "#2a2f3e", world: { scale: 40, light: LIT.
 // mirrored; of the blade's edges the one looking toward the light in the picture is the lit one, so
 // it changes sides as the sword turns. The rest (head, torso, tabard, cape, the shield arm and the
 // shield) is the parts above, carried with the body: `bob` lowers it (feet apart need it, and get it
-// whether asked or not), `lean` takes the upper body forward. pose() builds a pose's parts and its two
+// whether asked or not), `lean` takes the upper body forward. poseOf() builds a pose's parts and its two
 // rigs, knight_<name> and knight_l_<name>, once per distinct pose.
 const LU = 12, LF = 11, LT = 14, LS = 15, STAND = 29          // upper arm, forearm, thigh, shin; ankle under the hip
 const OX = 25, OY = 36, RW = 110, RH = 112                    // room around the body for a swung sword
@@ -309,7 +309,7 @@ const bobOf = (p) => Math.max(p.bob ?? 0, ...(p.feet ?? [[0]]).map(([x]) => {
   return v > 0.1 ? Math.ceil(v) : 0
 }))
 const POSES = new Map()
-const pose = (p) => {
+const poseOf = (p) => {
   const { hand, sword, feet = [[-0.5, 0], [-0.5, 0]], lean = 0 } = p, bob = bobOf(p)
   const key = nm(...hand, sword, ...feet.flat(), lean, bob, ...(p.shield ? [...p.shield.hand, p.shield.bend ?? 1] : []))
   if (POSES.has(key)) return POSES.get(key)
@@ -395,8 +395,7 @@ const RUNS = [[BOUT_SIGNAL + 1, "rest", 0], [1, "guardIn", 0], [3, "guard", 0],
   [1, "thrown", 1], [1, "thrown", -5], [1, "thrown", -10], [1, "thrown", -13], [1, "thrown", -14],
   [1, "stagger", -14], [2, "guard", -14], [1, "saluteIn", -14], [3, "salute", -14], [1, "lower", -14], [1, "rest", -14]]
 const BOUTS = [[], []]                                        // the blue one's frames, the red one's: [pose, dx, move, feet]
-for (const [n, mb, db, mr = mb, dr = db] of RUNS)
-  for (let i = 0; i < n; i++) { BOUTS[0].push([pose(MOVES[mb]), db, mb]); BOUTS[1].push([pose(MOVES[mr]), dr, mr]) }
+for (const [mb, db, mr = mb, dr = db] of unroll(RUNS)) { BOUTS[0].push([poseOf(MOVES[mb]), db, mb]); BOUTS[1].push([poseOf(MOVES[mr]), dr, mr]) }
 // the walk back: three steps (the near foot, the far one, the near one), 4 frames each; the foot on
 // the ground stays put while the body goes over it, the other is lifted and swung through
 const HIPS = [SLOTS.leg_l.at[0] - X, SLOTS.leg_r.at[0] - X]
@@ -409,11 +408,11 @@ for (const [i, len] of [[1, 7], [0, 14], [1, 7]]) {
     body = b0 + (len / 2) * t
     ank[i] = a0 + (len * (1 - Math.cos(Math.PI * t))) / 2
     const feet = HIPS.map((h, j) => [Math.round(ank[j] - dx - h), j === i ? Math.round(3 * Math.sin(Math.PI * t)) : 0])
-    for (const b of BOUTS) b.push([pose({ ...MOVES.rest, feet }), dx, "walk", feet])
+    for (const b of BOUTS) b.push([poseOf({ ...MOVES.rest, feet }), dx, "walk", feet])
   }
 }
 const BOUT_HOME = BOUTS[0].length
-for (const b of BOUTS) while (b.length < BOUT_LOOP) b.push([pose(MOVES.rest), 0, "rest"])
+for (const b of BOUTS) while (b.length < BOUT_LOOP) b.push([poseOf(MOVES.rest), 0, "rest"])
 
 const AW = 130, AX = 102, SOLE = Y(F.sole) + OY
 anim("knight_bout", { w: AW, h: RH, frames: BOUT_LOOP, fps: 8, pivot: [AX, SOLE], facing: "right", height: 1.8 }, (c) => {
@@ -519,7 +518,7 @@ const RED = { q: "x", w: "r", e: "R", x: "q", r: "w", R: "e" }
 const SHOWN = ["rest", "guard", "windHigh", "cut", "windLow", "rise", "swing", "slash", "block", "windBig", "big", "thrown", "salute"]
 scene("knight_moves", { w: 60 * SHOWN.length, h: 116, bg: "#2a2f3e", world: { scale: 40, light: LIT.light, ground: 108 } },
   rect(0, 108, 60 * SHOWN.length, 8, "T"), hline(0, 108, 60 * SHOWN.length, "L"),
-  ...SHOWN.map((m, i) => stamp("knight_" + pose(MOVES[m]), 26 + 60 * i, 108)),
+  ...SHOWN.map((m, i) => stamp("knight_" + poseOf(MOVES[m]), 26 + 60 * i, 108)),
   ...SHOWN.map((m, i) => text(30 + 60 * i, 2, m.toUpperCase(), "4", { align: "c" })))
 scene("bout", { w: 240, h: 120, bg: "#2a2f3e", world: { scale: 40, light: LIT.light, ground: 112 } },
   rect(0, 112, 240, 8, "T"), hline(0, 112, 240, "L"),

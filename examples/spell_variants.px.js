@@ -43,13 +43,7 @@ sprite("_persp", { w: CW, h: CH }, (c) => {
 // the traveler's cast (hd2d/traveler.px.js, 13 poses of 100 ms) timed to the spell: the wind-up as it
 // starts charging, held while the energy gathers, the thrust as it is cast, held while it flies (his
 // hand, where the spell starts, a socket that moves with the pose), back and at rest after it hits
-const castPose = (t, s) => {
-  const a = s.ability, ch = a.start("charge"), ca = a.start("cast"), tr = a.start("travel"), im = a.start("impact")
-  if (t < ch) return 12
-  if (t < ch + 200) return Math.floor((t - ch) / 100)
-  if (t < ca) return 2 + Math.min(2, Math.floor(((t - ch - 200) * 3) / (ca - ch - 200)))
-  return t < tr ? 5 : t < im ? 6 : Math.min(12, 7 + Math.floor((t - im) / 100))
-}
+const CAST = [["charge", 0, 1, 100], ["charge", 2, 4], ["cast", 5], ["travel", 6], ["impact", 7, 12, 100]]
 // each view, where the caster stands (his feet, on the picture) and where the target is in its world
 const VIEWS = {
   side: { view: { kind: "side", origin: [0, GY] }, feet: [14, GY + 1], to: [77, 0, 10] },
@@ -60,7 +54,7 @@ const VIEWS = {
 const cell = (name, el, variant, where = "side", form) => {
   const v = VIEWS[where], S = spell(el, 3, { view: v.view, from: "hero.hand", to: v.to, variant, form, start: 200, seed: 5 })
   anim(name, { w: CW, h: CH, ...CLOCK }, stamp(`_${where}`, 0, 0),
-    (c) => c.stamp("tr_cast_e", v.feet[0], v.feet[1], { frame: castPose(c.t, S), id: "hero" }), cast(S), lighting({ ambient: 0.55 }))
+    (c) => c.stamp("tr_cast_e", v.feet[0], v.feet[1], { frame: S.ability.frame(c.t, CAST, { before: 12 }), id: "hero" }), cast(S), lighting({ ambient: 0.55 }))
 }
 // a sheet of cells in rows, each labelled
 const spellSheet = (name, rows, title = (r, i) => r[i][1]) => {

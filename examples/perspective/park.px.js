@@ -253,7 +253,7 @@ function paving(c) {
 // blobs (crowns, heads, wheels), boxes (benches, hedges), cones (a torso, a skirt; `wrap` adds rings
 // it has to go round, a skirt round the knees) and flat polygons. solids() draws them far to near,
 // shadows() sweeps the same shapes onto the ground away from the sun, so each shadow has its shape.
-const { stick, blob, box, cone } = solid
+const { stick, blob, box: solidBox, cone } = solid
 // the sun for both: which faces of a box it lights, which way and how long the shadows fall
 const SUN = { from: SUN_FROM, up: 55 }
 // a box's faces the eye can see; a face turned to the sun is lit
@@ -524,7 +524,7 @@ const around = (x, z, rad, n) => Array.from({ length: n }, (_, i) => [x + Math.c
 // a park bench: slats on two iron legs, a backrest; `along` the axis it runs on, facing `+1` or `-1`
 function bench(x, z, along, face) {
   const L = 1.8, Dp = 0.45, key = { top: "n", lit: "m", shade: "l" }, iron = "0", sh = []
-  const span = (a0, a1, b0, b1, u0, u1, k = key) => sh.push(box(along === "x" ? [a0, b0, a1, b1, u0, u1] : [b0, a0, b1, a1, u0, u1], k))
+  const span = (a0, a1, b0, b1, u0, u1, k = key) => sh.push(solidBox(along === "x" ? [a0, b0, a1, b1, u0, u1] : [b0, a0, b1, a1, u0, u1], k))
   const [c0, c1] = along === "x" ? [x - L / 2, x + L / 2] : [z - L / 2, z + L / 2], n = along === "x" ? z : x
   span(c0, c1, n - Dp / 2, n + Dp / 2, 0.42, 0.47)                                  // the seat
   const back = n - face * Dp / 2
@@ -538,7 +538,7 @@ function bench(x, z, along, face) {
 // A park lamp post in dark iron: a plinth, a foot tapering into the pole, a ring at the foot and one
 // higher up, a lantern of frosted glass (the frame between its panes on the side toward us) widening
 // under its cap, a finial; lit on a plate, so it rounds.
-function lamp(x, z) {
+function streetLamp(x, z) {
   const p = (u) => [x, z, u], toEye = Math.atan2(CZ - z, CX - x), pane = (a, r, u) => [x + Math.cos(toEye + a) * r, z + Math.sin(toEye + a) * r, u]
   return { d: ahead(x, z), ramps: ["043", "21"], fringe: around(x, z, 0.14, 6), shapes: [
     cone(p(0), 0.14, p(0.14), 0.12, "0"), cone(p(0.14), 0.1, p(0.6), 0.055, "4"), stick(p(0.6), p(3.14), 0.04, "4"),
@@ -575,7 +575,7 @@ function hedge(x0, z0, x1, z1, tall) {
     // along the foot of the face we see
     const foot = [], [fx0, fz0, fx1, fz1] = bx
     for (let a = 0.1; a < (along ? fx1 - fx0 : fz1 - fz0); a += 0.22) foot.push(along ? [fx0 + a, fz0 - 0.06] : [fx0 - 0.06, fz0 + a])
-    out.push({ d: ahead(mx, mz), shapes: [box(b3, keys)], paint, fringe: foot.filter(([px, pz]) => !paved(px, pz)) })
+    out.push({ d: ahead(mx, mz), shapes: [solidBox(b3, keys)], paint, fringe: foot.filter(([px, pz]) => !paved(px, pz)) })
   }
   return out
 }
@@ -583,7 +583,7 @@ function hedge(x0, z0, x1, z1, tall) {
 function slide(x, z) {
   const sh = [], blue = { top: "w", lit: "w", shade: "v" }, X = x + 0.9, Z = z + 0.9
   for (const [px, pz] of [[x, z], [X, z], [X, Z], [x, Z]]) sh.push(stick([px, pz, 0], [px, pz, 2.2], 0.04, "v"))
-  sh.push(box([x, z, X, Z, 1.45, 1.55], { top: "Z", lit: "Z", shade: "z", under: "z" }))
+  sh.push(solidBox([x, z, X, Z, 1.45, 1.55], { top: "Z", lit: "Z", shade: "z", under: "z" }))
   for (const pz of [z, Z]) sh.push(stick([x, pz, 2.0], [X, pz, 2.0], 0.03, "y"))
   sh.push(stick([X, z, 2.2], [X, Z, 2.2], 0.03, "y"), stick([x, z, 2.2], [X, z, 2.2], 0.03, "y"))
   // the ladder up the left side, the chute down to the right
@@ -600,11 +600,11 @@ function swings(x, z) {
   sh.push(stick([x, z, top], [x + L, z, top], 0.05, "x"))
   // the second seat, empty and still
   for (const sd of [-1, 1]) sh.push(stick([x + 2.6 + sd * 0.22, z, top], [x + 2.6 + sd * 0.22, z, 0.5], 0.01, "3"))
-  sh.push(box([x + 2.35, z - 0.12, x + 2.85, z + 0.12, 0.44, 0.5], { top: "Z", lit: "Z", shade: "z" }))
+  sh.push(solidBox([x + 2.35, z - 0.12, x + 2.85, z + 0.12, 0.44, 0.5], { top: "Z", lit: "Z", shade: "z" }))
   return { d: ahead(x + L / 2, z), shapes: sh, ramps: ["xy", "zZ"] }
 }
 function seesaw(x, z) {
-  return { d: ahead(x, z), shapes: [box([x - 0.15, z - 0.15, x + 0.15, z + 0.15, 0, 0.45], { top: "w", lit: "w", shade: "v" }),
+  return { d: ahead(x, z), shapes: [solidBox([x - 0.15, z - 0.15, x + 0.15, z + 0.15, 0, 0.45], { top: "w", lit: "w", shade: "v" }),
     stick([x - 1.4, z, 0.15], [x + 1.4, z, 0.75], 0.08, "Z"), stick([x - 1.15, z, 0.2], [x - 1.15, z, 0.45], 0.025, "y"), stick([x + 1.15, z, 0.68], [x + 1.15, z, 0.95], 0.025, "y")], ramps: ["vw", "zZ", "xy"] }
 }
 function climber(x, z) {
@@ -623,14 +623,14 @@ function curb() {
   const [x0, z0, x1, z1] = SAND, k = { top: "n", lit: "m", shade: "l" }, t = 0.15, out = []
   const edge = (pts) => pts.filter(([px, pz]) => !paved(px, pz))
   for (let x = x0; x < x1; x += 2.6) for (const zz of [z0, z1])
-    out.push({ d: ahead(x + 1.3, zz), shapes: [box([x, zz - t, Math.min(x + 2.6, x1), zz, 0, 0.2], k)], fringe: zz === z0 ? edge(Array.from({ length: 8 }, (_, i) => [x + 0.15 + i * 0.32, zz - t - 0.06])) : [] })
+    out.push({ d: ahead(x + 1.3, zz), shapes: [solidBox([x, zz - t, Math.min(x + 2.6, x1), zz, 0, 0.2], k)], fringe: zz === z0 ? edge(Array.from({ length: 8 }, (_, i) => [x + 0.15 + i * 0.32, zz - t - 0.06])) : [] })
   for (let zz = z0; zz < z1; zz += 2.5) for (const xx of [x0, x1])
-    out.push({ d: ahead(xx, zz + 1.25), shapes: [box([xx, zz, xx + t, Math.min(zz + 2.5, z1), 0, 0.2], k)], fringe: xx === x0 ? edge(Array.from({ length: 8 }, (_, i) => [xx - 0.06, zz + 0.15 + i * 0.3])) : [] })
+    out.push({ d: ahead(xx, zz + 1.25), shapes: [solidBox([xx, zz, xx + t, Math.min(zz + 2.5, z1), 0, 0.2], k)], fringe: xx === x0 ? edge(Array.from({ length: 8 }, (_, i) => [xx - 0.06, zz + 0.15 + i * 0.3])) : [] })
   return out
 }
 // the ice-cream cart: a white box on two wheels with a push bar, a striped umbrella seen from under
 function cart(x, z) {
-  const sh = [box([x, z, x + 1.2, z + 0.7, 0.35, 1.05], { top: "2", lit: "1", shade: "2" }), box([x - 0.01, z - 0.01, x + 1.21, z + 0.71, 0.75, 0.86], { top: "w", lit: "w", shade: "v" }, { top: 1 })]
+  const sh = [solidBox([x, z, x + 1.2, z + 0.7, 0.35, 1.05], { top: "2", lit: "1", shade: "2" }), solidBox([x - 0.01, z - 0.01, x + 1.21, z + 0.71, 0.75, 0.86], { top: "w", lit: "w", shade: "v" }, { top: 1 })]
   for (const px of [x + 0.2, x + 1.0]) sh.push(blob([px, z - 0.04, 0.2], 0.06, 0.2, "0", { top: 2 }), blob([px, z - 0.05, 0.2], 0.025, 0.05, "3", { top: 3 }))
   sh.push(stick([x + 1.2, z + 0.15, 0.9], [x + 1.55, z + 0.15, 1.0], 0.02, "3"), stick([x + 1.2, z + 0.55, 0.9], [x + 1.55, z + 0.55, 1.0], 0.02, "3"), stick([x + 1.55, z + 0.15, 1.0], [x + 1.55, z + 0.55, 1.0], 0.025, "0"))
   sh.push(stick([x + 0.6, z + 0.35, 1.05], [x + 0.6, z + 0.35, 2.25], 0.02, "3"))
@@ -705,7 +705,7 @@ function person(b, { x, z, heading: [hx, hz], phase, gait, look, hat, tail, wave
   // a bag on the left shoulder, hanging at the hip by its strap
   if (bag) {
     const [p, q] = [w3(-0.1, -(b.hipw + 0.17), 0), w3(0.12, -(b.hipw + 0.1), 0)]
-    sh.push(box([Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[0], q[0]), Math.max(p[1], q[1]), hipU - 0.14, hipU + 0.08], bag),
+    sh.push(solidBox([Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[0], q[0]), Math.max(p[1], q[1]), hipU - 0.14, hipU + 0.08], bag),
       stick(w3(g.lean - 0.02, -b.shoulder * 0.8, top - 0.01), w3(0.01, -(b.hipw + 0.13), hipU + 0.08), 0.012, bag.shade, { top: 2 }))
   }
   const head = w3(g.lean * 1.2, 0, top + b.neck), back = (k) => w3(g.lean * 1.2 - k * b.head, 0, top + b.neck + 0.35 * b.head)
@@ -809,7 +809,7 @@ function figures(frame) {
   const ang = 0.55 * Math.sin((frame / 24) * Math.PI * 2), sx = 11 + 0.9, sz = 12.8, Lc = 1.9, top = 2.4
   const seat = [sx, sz - Math.sin(ang) * Lc, top - Math.cos(ang) * Lc], sw = []
   for (const sd of [-1, 1]) sw.push(stick([sx + sd * 0.22, sz, top], [sx + sd * 0.22, seat[1], seat[2] + 0.05], 0.01, "3"))
-  sw.push(box([sx - 0.25, seat[1] - 0.12, sx + 0.25, seat[1] + 0.12, seat[2] - 0.03, seat[2] + 0.03], { top: "Z", lit: "Z", shade: "z" }))
+  sw.push(solidBox([sx - 0.25, seat[1] - 0.12, sx + 0.25, seat[1] + 0.12, seat[2] - 0.03, seat[2] + 0.03], { top: "Z", lit: "Z", shade: "z" }))
   const hip = [sx, seat[1], seat[2] + 0.08], fwd = [Math.sin(ang - 0.15), Math.cos(ang - 0.15)], kick = 0.9 * Math.sin((frame / 24) * Math.PI * 2 + 0.6)
   const knee = [sx, hip[1] - fwd[1] * 0.0 - 0.3 * Math.cos(ang), hip[2] + 0.3 * Math.sin(ang) * 0.6]
   for (const sd of [-0.08, 0.08]) {
@@ -829,7 +829,7 @@ const STATIC = [
   tree(25, 27, { tall: 8.5, crown: 3.4, seed: 7 }), tree(31, 13.5, { tall: 7.5, crown: 3, seed: 9 }), tree(-3.5, 31, { tall: 7, crown: 2.8, ipe: true, seed: 11 }),
   tree(40, 22, { tall: 8, crown: 3.2, seed: 13 }),
   ...hedge(4.4, 19, 5.0, 34, 1.8), ...hedge(30, 5.4, 44, 6.0, 1.5),
-  ...[16, 40, 52, 64].map((z) => lamp(7.9, z)), ...[25, 37, 49, 61].map((x) => lamp(x, 9.1)),
+  ...[16, 40, 52, 64].map((z) => streetLamp(7.9, z)), ...[25, 37, 49, 61].map((x) => streetLamp(x, 9.1)),
   bench(4.75, 11.5, "z", 1), bench(4.75, 15.5, "z", 1), bench(20, 9.45, "x", -1), bench(-2, 9.45, "x", -1),
   bin(4.7, 17.4), bin(21.6, 9.4),
   slide(19.5, 13), swings(11, 12.8), seesaw(16.5, 19.4), climber(11.4, 17.2), ...curb(),

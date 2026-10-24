@@ -208,7 +208,7 @@ function clipNear(pts: V3[], P: [number, number, number][], project: Project, NE
 }
 
 /** Draw the faces, then the sprites among them; gives where each sprite landed (canvas coords), for describe. */
-export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}, world?: MeshWorld): { name: string; x: number; y: number; img: Img }[] {
+export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}, world?: MeshWorld): { name: string; x: number; y: number; img: Img; light?: [number, number] }[] {
   const W = c.img.w, H = c.img.h, x0 = -c.ox, y0 = -c.oy, cam = camera(view, c, opts), eye = cam.eye;
   const sunDir = unit(Array.isArray(opts.light) ? (opts.light as V3) : cam.light);
   const lightOf = typeof opts.light === "function" ? opts.light : (n: V3) => 0.3 + 0.6 * Math.max(0, dot(n, sunDir));
@@ -484,7 +484,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     for (let i = 0; i < n; i++) if (who[i] !== -1 && depth[i] - cam.off < d[i]) d[i] = depth[i] - cam.off;
   };
   if (!world?.sprites.length) { keep(); return []; }
-  const placed: { name: string; x: number; y: number; img: Img }[] = [];
+  const placed: { name: string; x: number; y: number; img: Img; light?: [number, number] }[] = [];
   // contact shadows: what each sprite stands on, two steps darker in the middle and one out to the
   // radius (the darkest where two overlap)
   const shade = new Uint8Array(n);
@@ -550,7 +550,10 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
         if (e || c.img.emit) (c.img.emit ??= new Uint8Array(n))[q] = e ? e[row + si] : 0;
       }
     }
-    placed.push({ name: s.name, x: X0, y: Y0, img: K > 1 ? img.scale(K) : img });
+    // the way to the light on the picture where it stands, its middle a meter toward the light (none for a light of your own, or one straight at the eye)
+    const mid: V3 = [s.at[0], s.at[1], s.at[2] + (py * K) / 2 / perM[k]], a = cam.project(mid), b = cam.project([mid[0] + sunDir[0], mid[1] + sunDir[1], mid[2] + sunDir[2]]);
+    const lx = b[0] - a[0], ly = b[1] - a[1], ll = Math.hypot(lx, ly), seen = typeof opts.light !== "function" && ll > 0.25 * perM[k];
+    placed.push({ name: s.name, x: X0, y: Y0, img: K > 1 ? img.scale(K) : img, ...(seen ? { light: [lx / ll, ly / ll] as [number, number] } : {}) });
   }
   keep();
   return placed;

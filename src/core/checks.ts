@@ -2,19 +2,23 @@
 // against its `facing`, the side its drawing is lit from against the light it should be under, and
 // where its feet are against where it was stamped. `facing` itself is a label; these are what can
 // catch a label that doesn't match the drawing.
-import { type Color, TRANSPARENT } from "./color.ts";
+import { type Color, TRANSPARENT, oklab } from "./color.ts";
 import type { Img } from "./image.ts";
 import type { Palette } from "./palette.ts";
 
-/** Each ramp color's ramp and step (dark to light), for reading light as steps along a ramp. */
+/**
+ * Each ramp color's ramp and step (dark to light), for reading light as steps along a ramp. A ramp
+ * whose colors don't run dark to light isn't one to read light by: its keys given other colors after
+ * it was made (a file reusing an included kit's ramp keys for its own).
+ */
 export type Steps = Map<Color, [number, number]>;
 export function rampSteps(pal: Palette): Steps {
   const m: Steps = new Map();
-  pal.ramps.forEach((r, ri) => [...r].forEach((k, i) => {
-    let c;
-    try { c = pal.resolve(k); } catch { return; }
-    if (c !== null && c !== TRANSPARENT && !m.has(c)) m.set(c, [ri, i]);
-  }));
+  pal.ramps.forEach((r, ri) => {
+    const cs = [...r].map((k) => { try { const c = pal.resolve(k); return c === null || c === TRANSPARENT ? undefined : c; } catch { return undefined; } });
+    if (cs.some((c, i) => i > 0 && c !== undefined && cs[i - 1] !== undefined && oklab(c)[0] < oklab(cs[i - 1]!)[0] - 0.02)) return;
+    cs.forEach((c, i) => { if (c !== undefined && !m.has(c)) m.set(c, [ri, i]); });
+  });
   return m;
 }
 

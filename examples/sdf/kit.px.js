@@ -98,7 +98,7 @@ const cloud = (size = 1) => sdf.density(
 const mist = () => sdf.density(sdf.ellipsoid([2.8, 1.8, 0.6]).at(0, 0, 0.1), { edge: 0.6, noise: 0.6, scale: 0.8, seed: 6, octaves: 3, flow: [2.4, 0.6, 0], fade: [0.1, 0.7] })
 // Smoke from a chimney: a column widening as it rises and leans away from the wind, its billows
 // carried up through it, thinning away from 1.2 m to 2.8 m.
-const smoke = () => sdf.density(sdf.capsule([0, 0, 0.05], [0.55, 0.15, 2.7], 0.14, 0.55), { edge: 0.2, noise: 0.3, scale: 0.25, seed: 8, octaves: 3, flow: [0.2, 0, 2.6], fade: [1.2, 2.8] })
+const smokeField = () => sdf.density(sdf.capsule([0, 0, 0.05], [0.55, 0.15, 2.7], 0.14, 0.55), { edge: 0.2, noise: 0.3, scale: 0.25, seed: 8, octaves: 3, flow: [0.2, 0, 2.6], fade: [1.2, 2.8] })
 // A magic orb: a ball of swirling matter bobbing a meter up, glowing from its middle.
 const orb = () => sdf.density(sdf.sphere(0.42).at((c) => [0, 0, 1 + 0.08 * Math.sin(TAU * c.phase)]), { edge: 0.42, noise: 0.1, scale: 0.18, seed: 2, octaves: 2, flow: [0, 0.2, 0.6] })
 const LOOK = {

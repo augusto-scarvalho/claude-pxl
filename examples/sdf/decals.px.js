@@ -87,19 +87,19 @@ for (const v of ["side", "iso"]) anim(`barrel_${v}`, { w: 72, h: 80, ...CLOCK },
 // ground mist behind; the snow spirit in front looking from side to side (its face turning from the front
 // to three quarters, mirrored), blinking. Not checked (a frame takes a second or two): its parts are, in
 // the scenes above and in world.px.js.
+// the snow spirit as a builder of the file's own: a size, how far it looks from side to side, its face
+make3d.define("snowman", ({ size = 1, look = 0 }) => ({ field: snowman.scale(size).rotate((c) => look * Math.sin(TAU * c.phase)), parts: { body: snowman },
+  decals: { face: { asset: "face_front", point: [0, -0.38 * size, 2.5 * size], views: FACE.views } } }), { params: { size: [0.3, 2], look: [0, 90] } })
 {
   const SHOW = world3d({ seed: 11, wind: { from: "right", strength: 0.18 }, parts: {
     oak: { make: "tree", at: [-2.6, 0.8], params: { leaves: 26 } },
     house: { make: "house", at: [1.3, 1.6], params: { door: "door", window: "window", sign: "sign" } },
-    smoke: { make: "smoke", attach: ["house", "chimney"] },
+    smoke: { make: "smoke", attach: ["house", "chimney"], look: { ramp: "90+=" } },
     rock: { make: "rock", beside: ["house", "front", 0.4], params: { moss: 0.6 } },
-    mist: { make: "mist", at: [0, 3.4] },
+    mist: { make: "mist", at: [0, 3.4], look: { ramp: "90+=" } },
+    spirit: { make: "snowman", at: [-0.5, -0.9], params: { size: 0.62, look: 40 } },
   } })
   const W = 320, H = 180, { Z, view: VIEW } = hd2d(W, H), GR = ground(Z), AT = [0, Z - 2.4, 0]
-  const looking = snowman.scale(0.62).rotate((c) => 40 * Math.sin(TAU * c.phase)).at(-0.5, -0.9, 0)
-  const LOOKS = { ...MATS, mist_grey: "90+=", smoke_grey: "90+=" }
   scene("grove_showcase", { w: W, h: H, bg: "k", ...CLOCK, check: false }, (c) => c.mesh(VIEW, GR.faces, GMATS, { light: LIGHT }),
-    (c) => c.draw3d(SHOW, { view: VIEW, at: AT, mats: LOOKS, light: LIGHT }),
-    (c) => c.surface(looking, { view: VIEW, at: AT, mats: MATS, light: LIGHT }),
-    (c) => c.decal("face_front", { on: looking, point: [-0.5, -0.9 - 0.62 * 0.38, 0.62 * 2.5], views: { three: "face_three", profile: "face_side" }, view: VIEW, at: AT, light: LIGHT }))
+    (c) => c.draw3d(SHOW, { view: VIEW, at: AT, mats: MATS, light: LIGHT }))
 }

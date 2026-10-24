@@ -19,19 +19,28 @@ const alone = (name, d, { stage = [128, 112], lift = 0 } = {}) => {
 }
 alone("cloud", cloud(), { stage: [160, 128], lift: 2.4 })
 alone("mist", mist(), { stage: [160, 96] })
-alone("smoke", smoke(), { stage: [96, 112] })
+alone("smoke", smokeField(), { stage: [96, 112] })
 alone("orb", orb(), { stage: [112, 96] })
 
-// All four in a diorama: the HD-2D camera, the grass, a path; the mushroom house, the tree and a rock
-// drawn through it (surface()); then the volumes, the farthest first (they write no depth): the cloud
-// floating low over the rock, its shadow on the ground, smoke from the house's chimney, the mist creeping round the house's foot, the
+// All four in a diorama, a world: the mushroom house, the tree and a rock; the cloud, the smoke at the
+// house's chimney, the mist and the orb made by builders of this file's own (make3d.define), each drawn
+// in its look; draw3d draws the solids, then the air the farthest first (it writes no depth): the cloud
+// floating low over the rock, its shadow on the ground, the mist creeping round the house's foot, the
 // orb bobbing over the path, lighting it.
+make3d.define("cloud", ({ size = 1 }) => ({ density: cloud(size) }), { params: { size: [0.2, 3] } })
+make3d.define("chimney_smoke", () => ({ density: smokeField() }))
+make3d.define("bank", () => ({ density: mist() }))
+make3d.define("orb", () => ({ density: orb() }))
 const W = 320, H = 180, { Z, view: VIEW } = hd2d(W, H), G = ground(Z)
 for (let i = 0; i < 6; i++) G.box("path", [-0.9 + (i % 2) * 0.15, Z - 3.6 + i * 0.62, 0], [-0.25 + (i % 2) * 0.15, Z - 3.1 + i * 0.62, 0.04])
-const HOUSE = [0.9, Z + 0.4, 0], SOLIDS = [[house(), HOUSE], [tree(), [-3.0, Z + 0.2, 0]], [rock(), [3.0, Z - 1.2, 0]]]
-const AIR = [[cloud(0.55), [3.2, Z - 0.9, 2.3], LOOK.cloud], [smoke(), [HOUSE[0] + 0.45, HOUSE[1] + 0.35, 2.45], LOOK.smoke],
-  [mist(), [0.6, Z - 0.3, 0], LOOK.mist], [orb(), [-0.6, Z - 2.4, 0], LOOK.orb]]
+const DIORAMA = world3d({ parts: {
+  house: { make: "house", at: [0.9, Z + 0.4], seed: 5 },
+  tree: { make: "tree", at: [-3.0, Z + 0.2], seed: 7, params: { wind: 0.2 } },
+  rock: { make: "rock", at: [3.0, Z - 1.2], seed: 3 },
+  cloud: { make: "cloud", at: [3.2, Z - 0.9, 2.3], params: { size: 0.55 }, look: LOOK.cloud },
+  smoke: { make: "chimney_smoke", attach: ["house", "chimney"], at: [0, 0, -0.03], look: LOOK.smoke },
+  mist: { make: "bank", at: [0.6, Z - 0.3], look: LOOK.mist },
+  orb: { make: "orb", at: [-0.6, Z - 2.4], look: LOOK.orb },
+} })
 scene("volumes", { w: W, h: H, bg: "k", ...CLOCK, check: { every: 24 } },
-  (c) => c.mesh(VIEW, G.faces, GMATS, { light: LIGHT }),
-  (c) => { for (const [f, at] of SOLIDS) c.surface(f, { view: VIEW, at, mats: MATS, light: LIGHT }) },
-  (c) => { for (const [d, at, look] of AIR) c.volume(d, { view: VIEW, at, light: LIGHT, ...look }) })
+  (c) => c.mesh(VIEW, G.faces, GMATS, { light: LIGHT }), (c) => c.draw3d(DIORAMA, { view: VIEW, mats: MATS, light: LIGHT }))

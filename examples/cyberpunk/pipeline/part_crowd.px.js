@@ -260,15 +260,15 @@ const CROWD_busker = (c, f) => {
 }
 
 // Everyone on the near sidewalk at frame f: what to draw, and their contact shadows [x, row, half width].
-const CROWD_nearPeople = (f) => {
-  const out = CROWD_NEAR.map((s) => {
-    const ring = (s.x + 1.5 * f) % 360, X = s.dir > 0 ? ring - 20 : 340 - ring, x0 = Math.floor(X)
+const CROWD_nearPeople = (c) => {
+  const f = c.frame, out = CROWD_NEAR.map((s) => {
+    const ring = c.cross(s.x, { span: 360, whole: false }), X = s.dir > 0 ? ring - 20 : 340 - ring, x0 = Math.floor(X)
     const sh = [[x0, s.row, 5]]
     if (s.arms === "dog") sh.push([x0 + s.dir * 11, s.row, 5])
     if (s.arms === "cart") sh.push([x0 + s.dir * 11, s.row, 6])
     return { row: s.row, sh, draw: (c) => CROWD_walker(c, s, X, s.row, ((f + s.ph) % 12) / 12, 4.5, f) }
   })
-  const kx = (CROWD_KID.x + 3 * f) % 720 - 200
+  const kx = c.cross(CROWD_KID.x, { span: 720, from: -200 })
   out.push({ row: CROWD_KID.row, sh: [[Math.floor(kx), CROWD_KID.row, 6]], draw: (c) => CROWD_kid(c, kx, CROWD_KID.row, f) })
   out.push({ row: 24, sh: [[178, 25, 11]], draw: (c) => CROWD_vendor(c, f) })
   out.push({ row: 25, sh: [[262, 25, 6]], draw: (c) => CROWD_busker(c, f) })
@@ -369,11 +369,11 @@ anim("crowd_far", { w: 320, h: 18, frames: 240, fps: 12 }, (c) => {
     if (c.is(x, y, "*") && c.is(x - 1, y, ".") && !c.is(x, y, "K")) rim.push([x, y, CROWD_step(c.key(x, y), 1)])
   for (const [x, y, k] of rim) c.px(x, y, k)
 })
-anim("crowd_near", { w: 320, h: 30, frames: 240, fps: 12 }, (c) => { for (const p of CROWD_nearPeople(c.frame)) p.draw(c) })
+anim("crowd_near", { w: 320, h: 30, frames: 240, fps: 12 }, (c) => { for (const p of CROWD_nearPeople(c)) p.draw(c) })
 // Contact shadows for the scene's shade layer: far sole rows land on box rows 15-17, near ones on 50-54.
 anim("crowd_shadow", { w: 320, h: 56, frames: 240, fps: 12 }, (c) => {
   for (const p of CROWD_farPeople(c.frame)) for (const [x, row, hw] of p.sh) CROWD_shadow(c, x, row, hw)
-  for (const p of CROWD_nearPeople(c.frame)) for (const [x, row, hw] of p.sh) CROWD_shadow(c, x, row + 26, hw)
+  for (const p of CROWD_nearPeople(c)) for (const [x, row, hw] of p.sh) CROWD_shadow(c, x, row + 26, hw)
 })
 
 // ================================================================ test: the part where the city puts it

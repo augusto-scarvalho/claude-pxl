@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**362 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**363 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -279,6 +279,13 @@ Every change was made by Claude while drawing real scenes, and reviewed by a per
 - **Dogfooding:** each scene was drawn with pxl itself; every friction went to `FEEDBACK.md` and became
   a fix or a doc line. Work first done in throwaway scripts (camera math, noise, shadow sweeps) moved
   into the engine in three waves.
+- **Levels of abstraction, wave 1:** what the examples wrote by hand became the DSL's, each proven by
+  rewriting an example with 0 pixels changed: `tween()` and `unroll()` for poses on a clock,
+  `A.frame()`, `span`, `fade` and `since` for timing by an ability's phases, `make3d.define()` for a
+  world's own builders (a part's `mats` and `look`, the wind a property of what was built),
+  `c.cross()` and `c.moved()` for things crossing a loop, `stamp`'s `shade` and a rig slot's `far`;
+  the lit-side check reads the lamps and a `mesh()`'s light without `world.light`, and a top-level name
+  hiding a DSL global is a warning as the file loads.
 - **Measured agent runs:** fresh agents were given only the skill and timed. A 320×180 animated street
   took one agent 85 turns and 31 minutes. A planner with eight forked agents made a denser street for
   about five times the tokens and twice the time. The skill now asks which to use on a big scene.

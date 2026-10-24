@@ -44,6 +44,15 @@ test("stamps resolve lazily and use the host palette for swaps", () => {
   eq(art(PAL + 'sprite("_p", "r"); sprite("b", { w: 2, h: 1 }, stamp("_p", 0, 0, { swap: { r: "g" } }), px(1, 0, "r"))', "b"), "gr");
 });
 
+test("a copy a ramp step darker: stamp's shade (swap wins where it says), a rig slot's own far", () => {
+  const R = PAL + 'pal({ G: 3, b: 12 }); ramps("kGg", "kbw"); sprite("_p", "gwr");';
+  eq(art(R + 'sprite("a", { w: 3, h: 3 }, stamp("_p", 0, 0, { shade: 1 }), stamp("_p", 0, 1, { shade: 2, swap: { w: "r" } }), stamp("_p", 0, 2, { shade: -1 }))', "a"), "Gbr\nkrr\ngwr");
+  const rig = (far: string) => art(R + `sprite("man_leg", "gg"); rig("man", { w: 3, h: 2, facing: "right", guide: false, far: 1, slots: { leg: { at: [1, 0], size: [2, 1], pivot: [0, 0], side: "l"${far} } } })`, "man");
+  eq(rig(""), ".GG\n...");
+  eq(rig(", far: 0"), ".gg\n...");
+  eq(rig(", far: 2"), ".kk\n...");
+});
+
 test("primitives", () => {
   eq(art(PAL + 'sprite("a", { w: 4, h: 3 }, box(0, 0, 4, 3, "r"))', "a"), "rrrr\nr..r\nrrrr");
   eq(art(PAL + 'sprite("a", { w: 4, h: 4 }, line(0, 0, 3, 3, "r"))', "a"), "r...\n.r..\n..r.\n...r");

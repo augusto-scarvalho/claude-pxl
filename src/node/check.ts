@@ -3,7 +3,7 @@
 // every frame of its loop, each distinct placement once: the checks that warn (facing, front marker,
 // lit side, feet, lettering) depend only on the placement (what it looks like, where) and the world.
 import type { Project } from "../core/project.ts";
-import { MANY, orientWords, placementChecks } from "../core/describe.ts";
+import { MANY, lightFor, orientWords, placementChecks } from "../core/describe.ts";
 import { rigLines } from "../core/rig.ts";
 import { frontWords, rampSteps } from "../core/checks.ts";
 import { PxError } from "../core/errors.ts";
@@ -134,12 +134,15 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         let ws = seen.get(key);
         if (!ws) {
           const o = q.img.orient, dark = unlit.has(q.layer ?? "");
-          const all = [...placementChecks(q, wo, steps, dark), ...(o ? orientWords(o).split(", ") : [])];
+          const all = [...placementChecks(q, wo, steps, dark, b.lamps), ...(o ? orientWords(o).split(", ") : [])];
+          // read against a light: the world's, or else the one it was drawn under (a mesh's, a lamp's)
+          const lit = !dark && wo?.light !== false && (!!wo?.light || !!lightFor(wo, q, b.lamps));
+          lightSaid ||= lit;
           ws = all.filter((w) => w.startsWith("WARNING"));
           seen.set(key, ws);
           if (q.img.sockets?.front && o?.f) ran.front++;
-          if (wo?.light && !dark) { ran.light++; if (all.some((w) => /^(WARNING: )?lit (from|on)/.test(w))) ran.read++; }
-          if (opts.readings && wo?.light && !dark) {
+          if (lit) { ran.light++; if (all.some((w) => /^(WARNING: )?lit (from|on)/.test(w))) ran.read++; }
+          if (opts.readings && lit) {
             // what the rule read, kept or not: to see where it agrees, where it warns, where it can't tell
             const r = all.find((w) => /^(WARNING: )?lit (from|on)/.test(w)) ?? "no clear reading";
             tally[r.startsWith("WARNING") ? "against" : /as its light|toward the light/.test(r) ? "agree" : "unclear"]++;
@@ -173,7 +176,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   const run: string[] = [], not: string[] = [];
   if (ran.front + others) run.push(`front marker on ${ran.front + others}`); else not.push("front marker (nothing has one)");
   if (scenes) {
-    if (lightSaid) run.push(`lit side on ${ran.light} (a clear reading on ${ran.read})`); else not.push("lit side (no scene declares world.light)");
+    if (lightSaid) run.push(`lit side on ${ran.light} (a clear reading on ${ran.read})`); else not.push("lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh())");
     if (ran.feet) run.push(`feet on ${ran.feet}${groundSaid ? ` (against the ground row on ${ran.ground})` : ""}`); else not.push("feet (nothing placed has a height)");
   }
   // expect3d's rules over their loops (a world's parts: above, on, apart, near, reaches, within)

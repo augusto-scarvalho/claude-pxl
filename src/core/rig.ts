@@ -46,6 +46,8 @@ export interface Slot {
   parallel?: [string, string, string, string];
   /** A turned rig's slot: the part of the rig it was turned from, flipped, while it has none of its own. */
   mirrorOf?: string;
+  /** Steps darker on the far side for this part (default the rig's `far`; 0: as drawn). */
+  far?: number;
 }
 
 export interface RigDef {
@@ -65,7 +67,7 @@ export interface RigDef {
   loc?: string;
 }
 
-const SLOT_KEYS = ["at", "size", "pivot", "side", "z", "out", "part", "on", "faces", "facesTo", "parallel"];
+const SLOT_KEYS = ["at", "size", "pivot", "side", "z", "out", "part", "on", "faces", "facesTo", "parallel", "far"];
 const pair = (v: unknown) => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
 const BODY = ["left", "right", "front", "back"];
 
@@ -90,6 +92,7 @@ export function readRig(name: string, facing: unknown, slots: unknown, parts: un
     if (s.pivot !== undefined && !pair(s.pivot)) throw bad(`pivot must be [x, y] in the part, got ${JSON.stringify(s.pivot)}`);
     if (s.side !== undefined && s.side !== "l" && s.side !== "r") throw bad(`side must be "l" (its left) or "r" (its right), got ${JSON.stringify(s.side)}`);
     for (const n of ["z", "out"] as const) if (s[n] !== undefined && !Number.isFinite(s[n])) throw bad(`${n} must be a number, got ${JSON.stringify(s[n])}`);
+    if (s.far !== undefined && !(Number.isInteger(s.far) && s.far >= 0)) throw bad(`far is how many steps darker this part is on the far side (0: as drawn), got ${JSON.stringify(s.far)}`);
     const ref = (r: unknown, what: string) => {
       const i = typeof r === "string" ? r.lastIndexOf(".") : -1;
       if (i <= 0 || !names.includes((r as string).slice(0, i)) || (r as string).slice(0, i) === k)
@@ -241,9 +244,10 @@ export function drawParts(rig: RigDef, c: Canvas): void {
     if (src && img) {
       // stamped by its top-left: the pivot (its own, or the slot's) already worked out
       c.stamp(src.part, x + Math.floor(img.pivot?.[0] ?? 0), y + Math.floor(img.pivot?.[1] ?? 0), { ...(src.flip ? { flip: "x" as const } : {}), id: slot });
-      // the far side a step or more darker, on this part's own pixels only
-      if (rig.far && depthOf(rig.facing, s.side) === "far")
-        c.shade((px, py) => img.get(px - x, py - y) !== TRANSPARENT, rig.far);
+      // the far side a step or more darker (the slot's own far, else the rig's), on this part's own pixels only
+      const far = s.far ?? rig.far;
+      if (far && depthOf(rig.facing, s.side) === "far")
+        c.shade((px, py) => img.get(px - x, py - y) !== TRANSPARENT, far);
       continue;
     }
     const [fill, edge] = standIn(rig, s), [w, h] = s.size;

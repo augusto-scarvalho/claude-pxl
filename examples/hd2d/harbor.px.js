@@ -293,7 +293,7 @@ const prism = (top, side, pts, u0, u1, m = M) => {
   m.face(top, ...pts.map(([x, z]) => [x, Z + z, u1]))
   pts.forEach(([x, z], i) => { const [x2, z2] = pts[(i + 1) % pts.length]; m.face(side, [x, Z + z, u0], [x2, Z + z2, u0], [x2, Z + z2, u1], [x, Z + z, u1]) })
 }
-const box = (mat, x0, z0, x1, z1, u0, u1, top = mat, m = M) => prism(top, mat, [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], u0, u1, m)
+const prismBox = (mat, x0, z0, x1, z1, u0, u1, top = mat, m = M) => prism(top, mat, [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], u0, u1, m)
 // a post of n sides (round when its material is smooth)
 const pole = (mat, x, z, r, u0, u1, n = 6) => prism(mat, mat, Array.from({ length: n }, (_, i) => [x + r * Math.cos((2 * Math.PI * i) / n + 0.3), z + r * Math.sin((2 * Math.PI * i) / n + 0.3)]), u0, u1)
 // a slab whose top is four corners [x, z, u] (a ramp, the gangway), t thick
@@ -467,7 +467,7 @@ for (let k = 0; k + 1 < XSEC.length; k++) {
 // and green where the water wets them; bollards along the front.
 const PX0 = -120 / PPM, PX1 = 10.2
 prism("deck", "ends", [[PX0, -9.3], [PX1, -9.3], [PX1, -5.15], [PX0, -5.15]], LOWER - 0.15, LOWER)
-box("wood", PX0, -9.32, PX1, -9.1, LOWER - 0.42, LOWER - 0.15)
+prismBox("wood", PX0, -9.32, PX1, -9.1, LOWER - 0.42, LOWER - 0.15)
 for (let x = PX0 + 0.3; x < PX1; x += 1.5) for (const z of [-9.18, -5.3]) { pole("wet", x, z, 0.14, -0.6, 0.28); pole("pile", x, z, 0.14, 0.28, LOWER - 0.15) }
 for (let x = PX0 + 0.45; x < PX1; x += 3) pole("pile", x, -9.18, 0.15, LOWER, LOWER + 0.62)
 const HAWSERS = [[-6.3, -5.2], [8.8, 8.0]]   // the galleon's lines: from x on the ship to a bollard at x on the pier
@@ -488,27 +488,27 @@ for (const [x, z] of [[-6.75, -7.35], [-6.0, -6.6]]) { pole("wet", x, z, 0.12, -
 // foot, its crank; the rope from the drum to the jib's end, and from there down to a crate that
 // swings a little (crane(f)).
 const CR = [-11.8, -4.6], JIBX = -8.5, JIBU = 6.9
-box("beam", CR[0] - 0.2, CR[1] - 0.2, CR[0] + 0.2, CR[1] + 0.2, UPPER, JIBU + 0.4)
-box("beam", -12.7, CR[1] - 0.14, JIBX, CR[1] + 0.14, JIBU, JIBU + 0.28)
+prismBox("beam", CR[0] - 0.2, CR[1] - 0.2, CR[0] + 0.2, CR[1] + 0.2, UPPER, JIBU + 0.4)
+prismBox("beam", -12.7, CR[1] - 0.14, JIBX, CR[1] + 0.14, JIBU, JIBU + 0.28)
 stick("beam", [CR[0] + 0.15, CR[1], 4.6], [-9.7, CR[1], JIBU], 0.1)
 for (const [dx, dz] of [[-1.1, 0], [1.1, 0], [0, -1.1]]) stick("beam", [CR[0] + dx, CR[1] + dz, UPPER], [CR[0] + dx * 0.14, CR[1] + dz * 0.14, 3.0], 0.09)
-const DRUM = [CR[0] + 0.75, UPPER + 0.62], ring = (z, r) => Array.from({ length: 9 }, (_, i) => [DRUM[0] + r * Math.cos((i * Math.PI) / 4), Z + z, DRUM[1] + r * Math.sin((i * Math.PI) / 4)])
-M.loft("beam", [ring(CR[1] - 0.45, 0.28), ring(CR[1] + 0.45, 0.28)])
-M.face("beam", ...ring(CR[1] - 0.45, 0.28).slice(0, 8))
-for (const z of [CR[1] - 0.55, CR[1] + 0.45]) box("beam", DRUM[0] - 0.12, z, DRUM[0] + 0.12, z + 0.1, UPPER, DRUM[1] + 0.12)
+const DRUM = [CR[0] + 0.75, UPPER + 0.62], drumRing = (z, r) => Array.from({ length: 9 }, (_, i) => [DRUM[0] + r * Math.cos((i * Math.PI) / 4), Z + z, DRUM[1] + r * Math.sin((i * Math.PI) / 4)])
+M.loft("beam", [drumRing(CR[1] - 0.45, 0.28), drumRing(CR[1] + 0.45, 0.28)])
+M.face("beam", ...drumRing(CR[1] - 0.45, 0.28).slice(0, 8))
+for (const z of [CR[1] - 0.55, CR[1] + 0.45]) prismBox("beam", DRUM[0] - 0.12, z, DRUM[0] + 0.12, z + 0.1, UPPER, DRUM[1] + 0.12)
 stick("beam", [DRUM[0], CR[1] - 0.6, DRUM[1]], [DRUM[0] + 0.3, CR[1] - 0.6, DRUM[1] - 0.35], 0.04)
 stick("rope", [DRUM[0], CR[1], DRUM[1] + 0.28], [JIBX + 0.15, CR[1], JIBU], 0.03)
 const crane = (D, f) => {
   const a = 0.09 * Math.sin((2 * Math.PI * f) / 32), tip = [JIBX + 0.15, CR[1], JIBU], hook = [tip[0] + 2.3 * Math.sin(a), CR[1], JIBU - 2.3 * Math.cos(a)]
   stick("rope", tip, hook, 0.03, D)
-  box("crate", hook[0] - 0.38, hook[1] - 0.38, hook[0] + 0.38, hook[1] + 0.38, hook[2] - 1.08, hook[2] - 0.32, "cratetop", D)
+  prismBox("crate", hook[0] - 0.38, hook[1] - 0.38, hook[0] + 0.38, hook[1] + 0.38, hook[2] - 1.08, hook[2] - 0.32, "cratetop", D)
   for (const dx of [-0.34, 0.34]) stick("rope", hook, [hook[0] + dx, hook[1] - 0.36, hook[2] - 0.32], 0.02, D)
 }
 
 // ---------------------------------------------------------------- cargo
 // Crates (boxes of planks, outlined), barrels and sacks (sprites at the scene's scale) on the pier and
 // the upper level, clear of the ways people walk.
-const crate = (x, z, s, u = LOWER) => box("crate", x - s / 2, z - s / 2, x + s / 2, z + s / 2, u, u + s, "cratetop")
+const crate = (x, z, s, u = LOWER) => prismBox("crate", x - s / 2, z - s / 2, x + s / 2, z + s / 2, u, u + s, "cratetop")
 for (const [x, z, s, u] of [[-6.4, -8.5, 0.9], [-5.3, -8.6, 0.8], [-4.6, -5.9, 0.8], [-4.55, -5.9, 0.65, LOWER + 0.8], [6.8, -5.8, 1.0], [6.8, -5.8, 0.85, LOWER + 1.0], [8.8, -6.0, 1.1], [-12.6, -4.0, 0.8, UPPER]]) crate(x, z, s, u)
 const PROPS = [["_barrel", 3.4, -5.6], ["_barrel", 3.95, -5.45], ["_barrel", 9.7, -7.2], ["_sack", 5.0, -5.55], ["_sack_l", 4.4, -5.75], ["_sack_l", -4.4, -8.65],
   ["_barrel", -11.0, -3.6, UPPER], ["_sack", -12.0, -7.2, UPPER], ["_sack_l", -13.0, -8.6, UPPER]].map(([name, x, z, u = LOWER]) => ({ name, at: [x, Z + z, u], shadow: 0.25 }))
@@ -528,10 +528,10 @@ const rowboat = (len, wid, stuff = () => {}) => {
   const B = model(), L = len / 2, deep = 0.15, floor = 0.06
   const half = (s) => (wid / 2) * Math.max(0, 1 - Math.abs(s / L) ** 2.2) ** 0.6, sheer = (s) => 0.42 + 0.22 * (s / L) ** 2
   const S = Array.from({ length: 13 }, (_, i) => -L + (len * i) / 12)
-  const ring = (s, k, bottom) => Array.from({ length: 7 }, (_, j) => { const a = (Math.PI * j) / 6; return [s, -half(s) * k * Math.cos(a), sheer(s) - (sheer(s) - bottom) * Math.sin(a) ** 0.7] })
-  B.loft("boat", S.map((s) => ring(s, 1, -deep)))
-  B.loft("boatin", S.map((s) => ring(s, 0.86, floor)))
-  for (const j of [0, 6]) B.strip("boatrim", S.map((s) => ring(s, 1, -deep)[j]), S.map((s) => ring(s, 0.86, floor)[j]))
+  const hullRing = (s, k, bottom) => Array.from({ length: 7 }, (_, j) => { const a = (Math.PI * j) / 6; return [s, -half(s) * k * Math.cos(a), sheer(s) - (sheer(s) - bottom) * Math.sin(a) ** 0.7] })
+  B.loft("boat", S.map((s) => hullRing(s, 1, -deep)))
+  B.loft("boatin", S.map((s) => hullRing(s, 0.86, floor)))
+  for (const j of [0, 6]) B.strip("boatrim", S.map((s) => hullRing(s, 1, -deep)[j]), S.map((s) => hullRing(s, 0.86, floor)[j]))
   for (const s of [-0.3 * L, 0.32 * L]) lbox(B, "boatrim", "boatrim", s - 0.12, -half(s) * 0.86, s + 0.12, half(s) * 0.86, sheer(s) - 0.2, sheer(s) - 0.14)
   stuff(B, { L, half, sheer, floor })
   return B.faces

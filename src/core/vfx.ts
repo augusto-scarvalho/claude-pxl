@@ -29,11 +29,26 @@ export interface Ability {
   total: number;
   /** a point from `from` to `to` (2 or 3 numbers) over the phase `name` (default "travel"): from before it, to after; `arc` lifts its middle (up is -y for 2, +up for 3) */
   along(from: number[], to: number[], t: number, opts?: { phase?: string; arc?: number; ease?: "linear" | "in" | "out" }): number[];
+  /** a frame by phase: steps [phase, from, to?, ms?] in order (see ability()) */
+  frame(t: number, steps: Step[], opts?: { before?: number; after?: number }): number;
+  /** 0..1 from moment `a` to `b` (default the end of phase `a`), held at both ends */
+  span(t: number, a: Moment, b?: Moment): number;
+  /** in and out over a span, 0 outside it: min(1, k / in) × min(1, (1 - k) / out) */
+  fade(t: number, a: Moment, b?: Moment, opts?: { in?: number; out?: number }): number;
+  /** whole `ms` steps since a moment (negative before it), up to n - 1 */
+  since(t: number, a: Moment, ms?: number, n?: number): number;
 }
+/** a moment of an ability: a phase's start or an event, or [that, ms after it] */
+export type Moment = string | [string, number];
+export type Step = [string, number, number?, number?];
 
 /**
  * A spell's phases in time: `ability([["charge", 600], ["cast", 150], ...], { start, events })` (or
  * { charge: 600, ... }), `start` ms on the clock, `events` named moments: { hit: ["impact", 0] }.
+ * `A.frame(t, steps)` times a pose's frames by phase: each step [phase, from, to?, ms?] begins at its
+ * phase's start, or where the step before it ends when that one is of the same phase; a range plays at
+ * `ms` a frame, or spread over what is left of the phase, and holds its last frame till the next step
+ * (`before` the first step, `after` the last one ends: default held).
  */
 export function ability(phases: Phases, opts: { start?: number; events?: Record<string, [string, number]> } = {}): Ability {
   const list: [string, number][] = Array.isArray(phases) ? phases : Object.entries(phases ?? {});
@@ -66,7 +81,65 @@ export function ability(phases: Phases, opts: { start?: number; events?: Record<
     const lift = (o.arc ?? 0) * 4 * k * (1 - k), up = from.length === 3 ? 2 : 1, sign = from.length === 3 ? 1 : -1;
     return from.map((v, e) => v + (to[e] - v) * k + (e === up ? sign * lift : 0));
   };
+  const phase = (name: unknown) => {
+    const i = list.findIndex((q) => q[0] === name);
+    if (i < 0) throw new PxError(`ability: no phase '${name}'; it has ${list.map((q) => q[0]).join(", ")}`);
+    return i;
+  };
+  const when = (m: Moment) => (Array.isArray(m) ? at.start(m[0]) + m[1] : at.start(m));
+  const until = (a: Moment, b?: Moment) => { if (b !== undefined) return when(b); const i = phase(Array.isArray(a) ? a[0] : a); return starts[i] + list[i][1]; };
+  at.span = (t, a, b) => { const t0 = when(a); return Math.max(0, Math.min(1, (t - t0) / (until(a, b) - t0))); };
+  at.fade = (t, a, b, o = {}) => {
+    const t0 = when(a), k = (t - t0) / (until(a, b) - t0);
+    return k < 0 || k >= 1 ? 0 : (o.in ? Math.min(1, k / o.in) : 1) * (o.out ? Math.min(1, (1 - k) / o.out) : 1);
+  };
+  at.since = (t, a, ms = 1, n = Infinity) => Math.min(n - 1, Math.floor((t - when(a)) / ms));
+  at.frame = (t, steps, o = {}) => {
+    if (!Array.isArray(steps) || !steps.length || steps.some((s) => !Array.isArray(s) || !Number.isInteger(s[1]) || !(s[2] === undefined || (Number.isInteger(s[2]) && s[2] >= s[1])) || !(s[3] === undefined || s[3] > 0)))
+      throw new PxError(`ability: frame's steps are [[phase, from, to?, ms?], ...]: frames from..to (whole, to at least from) at ms a frame, or spread over the rest of the phase, got ${JSON.stringify(steps)}`);
+    let cur: { from: number; to: number; ms?: number; t0: number; t1: number } | undefined, prev: typeof cur & { i: number } | undefined;
+    for (const [name, from, to = from, ms] of steps) {
+      const i = phase(name), t0 = prev?.i === i ? prev.t1 : starts[i];
+      prev = { i, from, to, ms, t0, t1: ms ? t0 + (to - from + 1) * ms : starts[i] + list[i][1] };
+      if (t >= t0) cur = prev;
+    }
+    if (!cur) return o.before ?? steps[0][1];
+    if (cur === prev && t >= cur.t1 && o.after !== undefined) return o.after;
+    const k = t - cur.t0;
+    return cur.from + Math.min(cur.to - cur.from, Math.floor(cur.ms ? k / cur.ms : (k * (cur.to - cur.from + 1)) / (cur.t1 - cur.t0)));
+  };
   return at;
+}
+
+type Keyed = Record<string, unknown> & { t: number };
+/**
+ * Values keyed in time, `tween([{ t: 0, yaw: 60, look: "calm" }, { t: 4 }, { t: 6, yaw: 90 }], { moments })`:
+ * at(t) gives the values at t, with t. Each key takes what it doesn't say from the one before; between
+ * two keys numbers (and arrays of them) go eased in and out (straight over a span of 1 or less, so a run
+ * of one-frame keys doesn't stop at each), anything else held till the next key; `moments` are said
+ * only at their own key's t (a smear, a hit), never carried. Before the first key the first, after the last the last.
+ */
+export function tween(keys: Keyed[], opts: { moments?: string[] } = {}): (t: number) => Keyed {
+  if (!Array.isArray(keys) || !keys.length || keys.some((k, i) => typeof k?.t !== "number" || (i > 0 && !(k.t > keys[i - 1].t))))
+    throw new PxError(`tween: keys are [{ t: 0, ...values }, { t: 4, ... }, ...], each t a number past the one before, got ${JSON.stringify(keys)?.slice(0, 120)}`);
+  const moments = opts.moments ?? [], once = new Set(["t", ...moments]), K: Keyed[] = [];
+  for (const k of keys) { const o = { ...k }, prev = K[K.length - 1]; if (prev) for (const n in prev) if (!(n in o) && !once.has(n)) o[n] = prev[n]; K.push(o); }
+  const mix = (a: unknown, b: unknown, e: number): unknown => (Array.isArray(b) ? b.map((v, j) => mix((a as unknown[])[j], v, e)) : (a as number) + ((b as number) - (a as number)) * e);
+  return (t) => {
+    const i = K.findIndex((k) => k.t > t);
+    if (i <= 0) { const k = i ? K[K.length - 1] : K[0], p: Keyed = { ...k, t }; if (t !== k.t) for (const n of moments) delete p[n]; return p; }
+    const a = K[i - 1], b = K[i], p: Keyed = { t }, s = (t - a.t) / (b.t - a.t), e = b.t - a.t > 1 ? s * s * (3 - 2 * s) : s;
+    for (const n in b) if (!once.has(n)) p[n] = typeof b[n] === "number" || Array.isArray(b[n]) ? mix(a[n], b[n], e) : a[n];
+    if (t === a.t) for (const n of moments) if (n in a) p[n] = a[n];
+    return p;
+  };
+}
+
+/** `[frames, value]` runs as a value a frame: unroll([[3, "rest"], [2, "cut"]]) is rest ×3, cut ×2; `[frames, a, b, ...]` holds [a, b, ...]. */
+export function unroll<T>(runs: [number, ...T[]][]): (T | T[])[] {
+  if (!Array.isArray(runs) || runs.some((r) => !Array.isArray(r) || !(Number.isInteger(r[0]) && r[0] >= 0) || r.length < 2))
+    throw new PxError(`unroll: runs are [[frames, value], ...] (frames a whole number, 0 or more), got ${JSON.stringify(runs)?.slice(0, 120)}`);
+  return runs.flatMap(([n, ...v]) => Array(n).fill(v.length > 1 ? v : v[0]));
 }
 
 export interface Particle { x: number; y: number; vx: number; vy: number; age: number; life: number; id: number }

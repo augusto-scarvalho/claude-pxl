@@ -37,6 +37,7 @@ look at (`--frames 0-11` for some).
   sole: `stamp(x, groundY)` then stands it above the ground). Lit by a fire or a lamp in the
   scene, give its place instead, `light: { at: [x, y] }` (the flames' middle): each object is then
   checked against the way from it to the fire, so what stands on either side of it can be right.
+  Without `light`, the lamps `lighting()` lights by and a `mesh()`'s light are read (`light: false`: none).
 - What stands on the ground goes in a `sort: "y"` layer, so the lower (nearer) thing draws in front.
   Give props `pivot: "bottom"` and stamp them at the ground's y. Top-down, something floating or
   hanging sorts at the point on the ground under it (its pivot there), and an L-shaped or tall thing
@@ -391,7 +392,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 ## 9. Closing a loop
 
 - Something crossing the picture: let it cover more than the picture's width (plus its own length) in
-  one loop (`x = ((x0 - v·t) mod L) - L/2` from the picture's middle, L = v times the loop's length): it leaves on one side and
+  one loop (`c.cross(x0, { span: L, per: -L, from: -L / 2 })` from the picture's middle, L = v times the loop's length; `c.moved(per)` for how far a plane has gone): it leaves on one side and
   comes back on the other while it can't be seen. Or end its way behind something (a hedge, a cart, a
   trunk) and start it behind something else.
 - Particles (embers, ash, rain): each goes round the picture a whole number of times in the loop.
@@ -685,9 +686,10 @@ The spell leaves from the caster's hand: `from: "hero.hand"`, the socket of the 
 before it with `{ id: "hero" }` (the traveler's `tr_cast_e` sets it in every pose), lifted into the
 view's world (from the side as deep as the target; from above, in iso and through a camera, `hand`
 up, 22 px of the spell by default: a 34 px figure's hand at its thrust, about 1 m). It is read in
-each frame, so time the pose to the spell: the wind-up as it starts charging, held while the energy
-gathers, the thrust as it is cast, held while it flies, back once it hits (`castPose` in the
-examples). What is born in the ground (an iceberg, a spire, a quake, a nova) doesn't run there from
+each frame, so time the pose to the spell by its phases, `S.ability.frame(c.t, steps)`
+(`PXL help abilities`): the wind-up as it starts charging, held while the energy gathers, the thrust
+as it is cast, held while it flies, back once it hits. What is born in the ground (an iceberg, a
+spire, a quake, a nova) doesn't run there from
 the caster's feet: the hand lets it go and the ground glows and stirs at the target until it comes up.
 
 How the views see it: side, x across, y toward us squashed to 0.35, z straight up; top, x and y as
@@ -820,7 +822,11 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). What held, from buildi
   <file> <scene> --at x,y` says which part painted a pixel, through stamps too. In the evaluation
   (docs/evaluation-3d.md) a rewrite and a local edit kept the approved parts alike, the rewrite at
   half again the cost; the builders made a shorter file than primitives but bent the request to what
-  their parameters say (a crystal's rock had no moss until `crystal({ moss })`).
+  their parameters say (a crystal's rock had no moss until `crystal({ moss })`): when none says what
+  you need, make your own,
+  `make3d.define("spirit", (params) => ({ field, decals }), { params: { size: [0.3, 2] } })`, and it is
+  a part like the others (relations, edits, rules, `--fix` within its ranges); a part's own `mats`
+  and, air, `look: { ramp }` instead of a remap of draw3d's mats.
 - **Out to other tools.** `export3d` writes `.vox`, `.obj`, `.glb` and `.ply`; something that moves,
   as a function of the clock with `frames`, goes out as one `.glb` that plays (and a file a moment for
   the others). `pxl serve` shows the `.glb` and `.ply` to turn round at `/3d`. `mesh()` draws a mesh

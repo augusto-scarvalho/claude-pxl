@@ -37,8 +37,8 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    animated scene (`check: { every: N }` on a long story), warnings only, with their frames. Fix each
    or say why it's meant. LOOK lines (L-corners, jaggies, tones too close) don't fail it: look at
    each. Its last line says which rules ran: "not run: lit side" means nothing about the light was
-   checked (give the scene `world.light`); `expect3d` rules run there too (`--fix`). Then look as a
-   critic. Replacing approved art: keep `name_old` beside the new one and show both
+   checked (give the scene `world.light`, or lamps and `lighting()`); `expect3d` rules run there too
+   (`--fix`). Then look as a critic. Replacing approved art: keep `name_old` beside the new one and show both
    (`PXL shot art.px.js name name_old`); against a reference or an approved part, `PXL compare`
    lists each row's extents. More: `PXL help "scenes 14"`, `PXL --help`.
 6. If the user wants to watch: start `PXL serve art.px.js` in the background, give them the URL,
@@ -128,8 +128,9 @@ What exists, a line each; `PXL help <name>` prints the rest of any op or option 
 - **Reuse**: variants are `base` + `swap`; repeated details `_parts` + `stamp`; families a `group` or a
   loop; props get `pivot: "bottom"`; texture is `scatter` of tiny parts; areas are `tilemap`/`pattern`.
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` and functions reading `c.phase`;
-  stamping an anim animates the scene; `scroll()`, `clouds()`, `plume()` go by in a loop. Limbs,
-  walks, hair: `PXL help "characters 9 10"`; loops and parallax: `PXL help "scenes 8 9 10"`.
+  stamping an anim animates the scene; `scroll()`, `clouds()`, `plume()`, `c.cross()` go by in a
+  loop; `tween()` keys poses in time. Limbs, walks, hair: `PXL help "characters 9 10"`; loops and
+  parallax: `PXL help "scenes 8 9 10"`.
 - **Existing art**: `sprite("x", { png, area, shrink, palettize })`, `anim(..., { png, frames })`, `rampmap`.
 - **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj`, `build --aseprite`, `build --share 4`.
 - **Light**: `shade:`/`light:` layers and `cast` shadows, `relight`/`plate()`, `glow`, `lighting()`

@@ -168,7 +168,7 @@ const kneel = (i) => {
 // wind-up 2, held 3, the thrust and its hold 2, back 4, rest 2. The near hand is a socket, "hand", that
 // moves with the pose: where the spell starts. In the four views a spell is cast in (profiles, diagonals).
 const CH = [0, 0.5, 0.9, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0], TH = [0, 0, 0, 0, 0, 0, 1, 1, 0.75, 0.45, 0.2, 0.05, 0]
-const cast = (i, yaw) => {
+const casting = (i, yaw) => {
   const a = CH[i], b = TH[i], near = yaw < 0 ? 0 : 1, s = near ? 1 : -1, mix = (p, q, k) => p.map((v, e) => v + (q[e] - v) * k)
   const rest = (k) => [0, (k ? 1 : -1), -7]
   const hands = [0, 1].map((k) => k === near
@@ -179,7 +179,7 @@ const cast = (i, yaw) => {
   return { feet, lift: [0, 0], down: a + 1.5 * b, lean: 1 - 3 * a + 7 * b, trail: 0.2 + 1.2 * b, sway: 0, hands }
 }
 const MOVES = { walk: { ms: 110, frames: 8, f: walk }, idle: { ms: 250, frames: 4, f: idle }, kneel: { ms: 160, frames: 7, f: kneel },
-  cast: { ms: 100, frames: 13, f: cast, dirs: ["e", "w", "se", "sw"], hand: true } }
+  cast: { ms: 100, frames: 13, f: casting, dirs: ["e", "w", "se", "sw"], hand: true } }
 
 const bones = (p, yaw) => {
   const fr = frame3(yaw), spine = unit(p.tilt ? add(add(mul(UP, Math.cos(rad(p.lean))), mul(fr.f, Math.sin(rad(p.lean)))), mul(fr.r, Math.sin(rad(p.tilt)))) : add(mul(UP, Math.cos(rad(p.lean))), mul(fr.f, Math.sin(rad(p.lean)))))   // tilt: bent to his right (degrees)
@@ -199,7 +199,7 @@ const bones = (p, yaw) => {
 // every surface sampled into one z-buffer (the nearest point wins its pixel), toned along its ramp by
 // how it faces the light; an outline round each part on what is next to it: nothing, or another part
 // lying behind it (painted after the colors, so it stays)
-const surface = (best, q, n, ramp, part, key) => {
+const sample = (best, q, n, ramp, part, key) => {
   if (q[1] < -0.2) return                                                  // nothing below the ground: a cloak lies on it
   const x = Math.round(OX + q[0]), y = Math.round(OY - q[1] * CP + q[2] * SP), d = depth(q), k = y * 4096 + x, b = best.get(k)   // scr(q), rounded
   if (b && !(d > b[0])) return                                             // behind what is there: its tone isn't needed
@@ -211,14 +211,14 @@ const tube = (best, a, b, r0, r1, ramp, part, rampOf) => {
   const e2 = [u[1] * e1[2] - u[2] * e1[1], u[2] * e1[0] - u[0] * e1[2], u[0] * e1[1] - u[1] * e1[0]]
   for (let t = -0.15; t <= 1.15; t += 0.04) for (let k = 0; k < 24; k++) {
     const tc = Math.min(1, Math.max(0, t)), a2 = (k / 24) * Math.PI * 2, n = add(mul(e1, Math.cos(a2)), mul(e2, Math.sin(a2)))
-    surface(best, add(add(a, mul(d, tc)), mul(n, r0 + (r1 - r0) * tc)), n, rampOf ? rampOf(tc) : ramp, part)
+    sample(best, add(add(a, mul(d, tc)), mul(n, r0 + (r1 - r0) * tc)), n, rampOf ? rampOf(tc) : ramp, part)
   }
 }
 const ball = (best, c, fr, rx, ry, rz, ramp, part) => {
   for (let i = 0; i <= 16; i++) for (let k = 0; k < 28; k++) {
     const th = (i / 16) * Math.PI, ph = (k / 28) * Math.PI * 2, o = [Math.sin(th) * Math.cos(ph), Math.cos(th), Math.sin(th) * Math.sin(ph)]
     const n = add(add(mul(fr.r, o[0]), mul(UP, o[1])), mul(fr.f, o[2]))
-    surface(best, add(c, add(add(mul(fr.r, o[0] * rx), mul(UP, o[1] * ry)), mul(fr.f, o[2] * rz))), n, ramp, part)
+    sample(best, add(c, add(add(mul(fr.r, o[0] * rx), mul(UP, o[1] * ry)), mul(fr.f, o[2] * rz))), n, ramp, part)
   }
 }
 // a ring-swept surface round an upright axis from y0 up to y1: `radius(h, a)` at height h (0..1) and
@@ -231,7 +231,7 @@ const sweep = (best, base, fr, y0, y1, radius, paint, part, keep = () => true, s
     const dir = add(mul(fr.f, Math.cos(a)), mul(fr.r, Math.sin(a)))
     const q = add(add(add(base, mul(UP, y0 + (y1 - y0) * h)), mul(dir, radius(h, a))), shift(h))
     const outside = dot(dir, [0, SP, CP]) > -0.05, pt = paint(h, a, outside)
-    surface(best, q, outside ? dir : mul(dir, -1), pt, part, pt.length === 1 ? pt : undefined)
+    sample(best, q, outside ? dir : mul(dir, -1), pt, part, pt.length === 1 ? pt : undefined)
   }
 }
 // What a figure wears, part by part (ramps dark to light): the traveler's own here; other files dress
@@ -283,7 +283,7 @@ const figure = (c, set, p, yaw, mirror, o = TRAVELER) => {
     tube(best, A.elbow, A.hand, 1, 0.9, o.fore(far), "arm" + i)
     ball(best, A.hand, fr, 1, 1, 1, o.hand(far), "arm" + i)
   })
-  o.prop?.(best, j, fr, surface)                                           // something he carries, in the same depth
+  o.prop?.(best, j, fr, sample)                                           // something he carries, in the same depth
   const inner = new Set()
   for (const [d0, , x, y, part] of best.values()) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
     const k = (y + dy) * 4096 + x + dx, ob = best.get(k)
@@ -355,5 +355,5 @@ for (const [move, M] of Object.entries(MOVES)) for (const [d, [yaw]] of Object.e
   anim(`bk_${move}_${d}`, { w: W, h: H, pivot: [OX, OY] }, (c) => { const p = M.f(c.frame, yaw); blocks(c, p, yaw); if (M.hand) handAt(c, p, yaw) }, ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })))
 }
 sheet("traveler", ["tr_*", "mo_*"], { rows: "tag", pad: 1 })
-Object.assign(travelerRig, { figure, blocks, bones, scr, depth, local, surface, TRAVELER, MOVES, DIRS, W, H, OX, OY, cast, CH, TH })
+Object.assign(travelerRig, { figure, blocks, bones, scr, depth, local, sample, TRAVELER, MOVES, DIRS, W, H, OX, OY, casting, CH, TH })
 }

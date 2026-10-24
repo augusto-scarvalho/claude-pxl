@@ -8,6 +8,7 @@ import { scatter } from "../src/core/scatter.ts";
 import { World, fixRule, runExpects, setKnobInSource } from "../src/core/world3d.ts";
 import { make3d } from "../src/core/builders.ts";
 import { loadSource } from "../src/node/load.ts";
+import { Project } from "../src/core/project.ts";
 import { checkProject } from "../src/node/check.ts";
 import { keys, PAL } from "./helpers.ts";
 
@@ -92,6 +93,26 @@ test("world3d: parts placed by relations, a seed each; an edit changes only what
   assert.throws(() => make3d.pine({ tiers: 40 }), /tiers is 1 to 10/);
   const P = new World({ wind: { from: "left" }, parts: { p: { make: "pine" } } }), Q = P.edit({ "wind.from": "right" });
   assert.ok(P.changed(Q).includes("p"), "the pine sways with the world's wind");
+});
+
+test("make3d.define: a builder of the file's own in its worlds, its ranges refused (and so bounding --fix), swaying in the wind; a part's own mats and look", () => {
+  const src = PAL + `ramps("kgw", "krr")
+make3d.define("post", ({ tall = 1 }) => ({ field: sdf.box([0.2, 0.2, tall]).at(0, 0, tall / 2).mat("wood"), sockets: { top: [0, 0, tall] } }), { params: { tall: [0.5, 3] } })
+make3d.define("puff", () => ({ density: sdf.density(sdf.sphere(0.4), { edge: 0.2 }) }))
+const W = world3d({ parts: { a: { make: "post", params: { tall: 2 } }, b: { make: "post", at: [1, 0], mats: { wood: "kgw" } }, c: { make: "puff", attach: ["a", "top"], look: { ramp: "kgw", thickness: 2 } } } })
+sprite("s", { w: 40, h: 40 }, draw3d(W, { view: { kind: "side", origin: [14, 38] }, ppm: 8, mats: { wood: "krr" } }))`;
+  const rows = keys(loadSource(src, "t.px.js"), "s").split("\n");
+  assert.equal(rows[32].slice(13, 23), "rk......wk", "a's wood in draw3d's ramp, b's in its own");
+  assert.equal(rows[22].slice(12, 16), "wwww", "the puff at a's top, in its look");
+  const env = new Project().env() as { make3d: Record<string, (...a: unknown[]) => unknown>; world3d: (s: unknown) => World };
+  env.make3d.define("post", ({ tall = 1, wind = [0, 0] }: { tall?: number; wind?: number[] }) => ({ field: sdf.box([0.2, 0.2, tall]).at(wind[0], 0, 0) }), { params: { tall: [0.5, 3] }, wind: true });
+  const w = env.world3d({ wind: { from: "right", strength: 0.3 }, parts: { a: { make: "post", params: { tall: 2 } } } });
+  assert.ok(w.built("a").field!.dist([-0.3, 0, 0]) < 0 && w.built("a").field!.dist([0, 0, 0]) > 0, "the world's wind given to what sways (0.3 m to the left)");
+  assert.throws(() => w.edit({ "a.tall": 9 }).built("a"), /make3d\.post: tall is 0\.5 to 3, got 9/);
+  assert.throws(() => env.make3d.post({ hight: 2 }), /no parameter hight/);
+  assert.throws(() => env.make3d.define("tree", () => ({})), /built in/);
+  env.make3d.define("bad", () => ({ nothing: 1 }));
+  assert.throws(() => env.make3d.bad(), /returns \{ field: an sdf \} or \{ density/);
 });
 
 test("draw3d: the parts an edit leaves alone drawn the same, byte for byte; each pixel knows its part; expect3d's rules in pxl check", () => {

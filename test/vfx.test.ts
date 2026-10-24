@@ -2,7 +2,7 @@
 // effect, effects on one placement, sockets. Everything a function of the time: any frame alone.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ability, emitter } from "../src/core/vfx.ts";
+import { ability, emitter, tween, unroll } from "../src/core/vfx.ts";
 import { loadSource } from "../src/node/load.ts";
 import { failure } from "./helpers.ts";
 import { Img } from "../src/core/image.ts";
@@ -21,6 +21,31 @@ test("ability: phases in time, their starts and events, a point along the way", 
   assert.deepEqual(a.along([0, 0], [100, 0], 200), [0, 0], "before it, where it starts");
   assert.throws(() => a.start("boom"), /no phase or event 'boom'/);
   assert.match(failure(PALS + 'ability({ charge: -1 })').message, /each above 0 ms/);
+});
+
+test("ability: a pose's frames by phase, a span, a fade and a since", () => {
+  const a = ability([["charge", 500], ["cast", 100], ["travel", 200], ["impact", 300]], { start: 100 });
+  const steps: [string, number, number?, number?][] = [["charge", 0, 1, 100], ["charge", 2, 4], ["cast", 5], ["travel", 6], ["impact", 7, 9, 100]];
+  const f = (t: number) => a.frame(t, steps, { before: 12 });
+  // charge 100-600: 0, 1 at 100 ms, then 2-4 over the 300 ms left; cast 5; travel 6; impact 7-9, then 9 held
+  assert.deepEqual([50, 100, 250, 300, 399, 400, 500, 599, 650, 700, 900, 1000, 1100, 5000].map(f), [12, 0, 1, 2, 2, 3, 4, 4, 5, 6, 7, 8, 9, 9]);
+  assert.deepEqual([0, 150, 400].map((t) => a.frame(t, [["charge", 0, 2, 100]], { before: -1, after: -1 })), [-1, 0, -1], "after its last frame");
+  assert.deepEqual([a.span(50, "cast"), a.span(650, "cast"), a.span(800, "travel", ["travel", 400]), a.span(9000, "impact")], [0, 0.5, 0.25, 1]);
+  assert.deepEqual([a.fade(700, "travel"), a.fade(750, "travel", undefined, { in: 0.5 }), a.fade(850, "travel", undefined, { out: 0.5 }), a.fade(1000, "travel")], [1, 0.5, 0.5, 0]);
+  assert.deepEqual([a.since(700, "travel", 50, 3), a.since(750, "travel", 50, 3), a.since(1000, "travel", 50, 3), a.since(750, ["travel", -100])], [0, 1, 2, 150]);
+  assert.throws(() => a.frame(0, [["dash", 0]]), /no phase 'dash'/);
+});
+
+test("tween and unroll: keys carried and eased, strings held, moments on their own t; runs a value a frame", () => {
+  const at = tween([{ t: 0, x: 0, p: [0, [0, 4]], look: "calm" }, { t: 4, x: 8, hit: 1 }, { t: 5, x: 10, look: "grit" }, { t: 6 }], { moments: ["hit"] });
+  assert.deepEqual(at(2), { t: 2, x: 4, p: [0, [0, 4]], look: "calm" }, "halfway, eased; carried arrays");
+  assert.equal(at(1).x, 8 * 0.15625, "smoothstep over a span of 4");
+  assert.equal(at(4.5).x, 9, "straight over a span of 1");
+  assert.deepEqual([at(4).hit, at(4.5).hit, at(5).hit, at(4.5).look, at(5).look], [1, undefined, undefined, "calm", "grit"]);
+  assert.deepEqual([at(-1).x, at(9).x, at(9).t, at(6).look], [0, 10, 9, "grit"], "before the first, after the last");
+  assert.throws(() => tween([{ t: 2 }, { t: 1 }]), /each t a number past the one before/);
+  assert.deepEqual(unroll([[2, "rest"], [0, "x"], [1, "cut", 4]]), ["rest", "rest", ["cut", 4]]);
+  assert.match(failure(PALS + 'unroll([[1.5, "a"]])').message, /frames a whole number/);
 });
 
 test("emitter: seeded particles, the same at the same time, a burst, a loop that closes, gravity", () => {
@@ -60,6 +85,16 @@ scene("f", { w: 20, h: 10 }, stamp("dot", 5, 5, { fx: ["dissolve", { progress: 1
   assert.ok([...Array(10).keys()].every((x) => fx.get(x, 5) === 0 || x >= 10), "progress 1: that copy gone");
   assert.equal(fx.get(14, 5), pal.resolve("r"), "progress 0: as drawn");
   assert.equal(fx.get(14 - 2 + 4, 5 - 2 + 1), pal.resolve("y"), "the socket of the copy named d");
+});
+
+test("c.moved and c.cross: whole px a frame on the clock, wrapped into a strip, the loop closing", () => {
+  const p = load('sprite("t", "r")'), c = new Canvas(new Img(4, 4), p.assets.get("t")!.pal, p);
+  c.frames = 8;
+  const at = (f: number, fn: () => number) => { c.frame = f; return fn(); };
+  assert.deepEqual([0, 1, 3, 7].map((f) => at(f, () => c.moved(12))), [0, 1, 4, 10], "12 px over 8 frames, floored");
+  assert.deepEqual([0, 2, 4, 7].map((f) => at(f, () => c.cross(2, { span: 10, per: -20, from: -3 }))), [-1, 4, -1, 1], "leftward twice round a strip from -3");
+  assert.deepEqual([1, 5].map((f) => at(f, () => c.cross(0, { span: 12, whole: false }))), [1.5, 7.5], "1.5 px a frame, not floored");
+  assert.throws(() => c.cross(0, { span: 10, per: 15 }), /a whole number of spans/);
 });
 
 test("meshSocket: a socket of a sprite standing in mesh(), in meters", () => {

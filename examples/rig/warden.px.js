@@ -101,20 +101,19 @@ const HEADS = [`
   ..RRrrrRR..
   ...RRRRR...
   ....SSS....`]
-// the expressions, as the rows of a face they change (front, 3/4, profile)
+// the expressions, as the rows of a face they change (front, 3/4, profile), runs over the head's grid
 const GRIT = [
-  { 5: "RrzzZzzzzrR", 6: "RrRRzzzRRrR", 7: "RrziRzRisrR", 8: "RrzizzzisrR", 10: ".RszSSSzsR." },
-  { 5: "RrrqrRzzzRz", 6: "RrrSszRzRzz", 7: "RrrSszizziz", 8: "RrrSszizziz", 10: ".RrSszSSSz." },
-  { 5: "RrrqqrrRzzz.", 6: "RrrrSszzRzz.", 7: "RrrrSszzizz.", 8: "RrrrSszzizzz", 10: ".RrrSszzSS.." },
+  { 5: [[0, "RrzzZzzzzrR"]], 6: [[0, "RrRRzzzRRrR"]], 7: [[0, "RrziRzRisrR"]], 8: [[0, "RrzizzzisrR"]], 10: [[0, ".RszSSSzsR."]] },
+  { 5: [[0, "RrrqrRzzzRz"]], 6: [[0, "RrrSszRzRzz"]], 7: [[0, "RrrSszizziz"]], 8: [[0, "RrrSszizziz"]], 10: [[0, ".RrSszSSSz."]] },
+  { 5: [[0, "RrrqqrrRzzz."]], 6: [[0, "RrrrSszzRzz."]], 7: [[0, "RrrrSszzizz."]], 8: [[0, "RrrrSszzizzz"]], 10: [[0, ".RrrSszzSS.."]] },
 ]
 const SHOUT = [
-  { ...GRIT[0], 10: ".RsziiizsR.", 11: "..SsiyisS..", 12: "...SszsS..." },
-  { ...GRIT[1], 10: ".RrSsziiiz.", 11: "..RSssiyiS.", 12: "...RSszsS.." },
-  { ...GRIT[2], 10: ".RrrSszzii..", 11: "..RrSsszyi..", 12: "...RSssS...." },
+  { ...GRIT[0], 10: [[0, ".RsziiizsR."]], 11: [[0, "..SsiyisS.."]], 12: [[0, "...SszsS..."]] },
+  { ...GRIT[1], 10: [[0, ".RrSsziiiz."]], 11: [[0, "..RSssiyiS."]], 12: [[0, "...RSszsS.."]] },
+  { ...GRIT[2], 10: [[0, ".RrrSszzii.."]], 11: [[0, "..RrSsszyi.."]], 12: [[0, "...RSssS_..."]] },
 ]
-const face = (g, rows) => g.split("\n").map((l, n) => (rows[n - 1] ? "  " + rows[n - 1] : l)).join("\n")
 HEADS.forEach((g, i) => sprite(`_whead${i}`, { outline: "k", pivot: "center" }, g))
-for (const [name, set] of [["grit", GRIT], ["shout", SHOUT]]) set.forEach((rows, i) => sprite(`_whead${i}_${name}`, { outline: "k", pivot: "center" }, face(HEADS[i], rows)))
+for (const [name, set] of [["grit", GRIT], ["shout", SHOUT]]) set.forEach((rows, i) => sprite(`_whead${i}_${name}`, { outline: "k", pivot: "center" }, HEADS[i], runs(rows)))
 
 // ---- the camera: px, x to the right, y up, z toward us; a little from above, so a level circle is a
 // flat ellipse (the smear of a level cut)
@@ -195,18 +194,9 @@ const stance = (f) => {
   const a = Math.sin((2 * Math.PI * k) / IDLE.length)
   return [1.5 * a, 0.8 * (1 - Math.abs(a))]
 }
-// each key takes what it doesn't say from the one before; between keys, eased in and out
-KEYS.forEach((k, i) => { if (i) for (const n in KEYS[i - 1]) if (!(n in k) && n !== "smear" && n !== "spark") k[n] = KEYS[i - 1][n] })
-const pose = (t) => {
-  t = Math.max(0, Math.min(FRAMES - 1, t))
-  let i = KEYS.findIndex((k) => k.t > t)
-  if (i < 0) return { ...KEYS[KEYS.length - 1], t }
-  const a = KEYS[i - 1], b = KEYS[i], s = (t - a.t) / (b.t - a.t), e = b.t - a.t > 1 ? s * s * (3 - 2 * s) : s
-  const p = { t }
-  for (const n in b) if (n !== "t" && n !== "smear" && n !== "spark") p[n] = typeof b[n] === "string" ? (t >= b.t ? b[n] : a[n]) : Array.isArray(b[n]) ? b[n].map((v, j) => lerp(a[n][j], v, e)) : lerp(a[n], b[n], e)
-  if (t === b.t) { p.smear = b.smear; p.spark = b.spark } else if (t === a.t) { p.smear = a.smear; p.spark = a.spark }
-  return p
-}
+// each key takes what it doesn't say from the one before; between keys, eased in and out (tween); a
+// smear or a spark only on its own frame
+const KEYED = tween(KEYS, { moments: ["smear", "spark"] }), poseAt = (t) => KEYED(Math.max(0, Math.min(FRAMES - 1, t)))
 // the joints a pose puts where
 const bones = (p) => {
   const hips = frame3(p.yaw), sh = frame3(p.yaw + p.twist), hd = frame3(p.yaw + p.twist + p.head)
@@ -234,9 +224,9 @@ const bones = (p) => {
 const STEP = 0.25, CUT = 12, NEAR = 2.5                                    // px a frame: a cut; frames from one
 const WAY = []
 for (let i = 0; i < FRAMES / STEP; i++) {
-  const t = i * STEP, at = (u) => { const j = bones(pose(u)); return add(j.hand, mul(j.axe, 15)) }
+  const t = i * STEP, at = (u) => { const j = bones(poseAt(u)); return add(j.hand, mul(j.axe, 15)) }
   const v = mul(sub(at(t + STEP / 2), at(t - STEP / 2)), 1 / STEP)
-  WAY.push({ v, fast: len(v) >= CUT && !!pose(Math.ceil(t - 1e-6)).smear })   // a cut leaves a smear; a backswing doesn't
+  WAY.push({ v, fast: len(v) >= CUT && !!poseAt(Math.ceil(t - 1e-6)).smear })   // a cut leaves a smear; a backswing doesn't
 }
 const wayAt = (t) => {
   const n = WAY.length, i = ((Math.round(t / STEP) % n) + n) % n
@@ -266,7 +256,7 @@ const CHEEK = [[17.5, 0], [18.4, 2.6], [13.6, 2.6], [14.5, 0]], POLL = [[17.5, 0
 // frame late: worked out over the loop twice, so the first frame already has the last one's
 const SPIN = [], FLARE = [], TAIL = []
 for (let pass = 0, fl = 0, tl = 0; pass < 2; pass++) for (let i = 0; i < FRAMES; i++) {
-  const w = ((((pose(i).yaw - pose(i ? i - 1 : FRAMES - 1).yaw + 180) % 360) + 360) % 360) - 180
+  const w = ((((poseAt(i).yaw - poseAt(i ? i - 1 : FRAMES - 1).yaw + 180) % 360) + 360) % 360) - 180
   fl = Math.max(Math.min(1, Math.abs(w) / 70), fl * 0.55); tl = tl * 0.5 + w * 0.5
   SPIN[i] = w; FLARE[i] = fl; TAIL[i] = tl
 }
@@ -388,7 +378,7 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
   // what the blade swept since the frame before, where it ran behind the body
   layer("smear_back", { outline: false, unlit: true }, (c) => smear(c, c.frame, -1)),
   layer("body", (c) => {
-    const p = pose(c.frame), j = skeleton(p), parts = [], mid = depth(j.chest)
+    const p = poseAt(c.frame), j = skeleton(p), parts = [], mid = depth(j.chest)
     const at = (d, draw) => parts.push({ d, draw })
     // the stance sways all but the legs: the body (skirt, chest, arms, axe) by the frame's, the head
     // and its tail of hair by the frame before's
@@ -431,7 +421,7 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
   }),
   layer("smear", { outline: false, unlit: true }, (c) => {
     smear(c, c.frame, 1)
-    const p = pose(c.frame)
+    const p = poseAt(c.frame)
     if (p.spark) {
       const j = skeleton(p), [gx] = scr(axeAt(j, 16, 3)).map(Math.round), gy = OY + 1, s = p.spark
       for (const [dx, dy] of [[-4, -3], [3, -5], [6, -2], [-1, -6], [8, -4], [-7, -2]]) c.px(gx + dx * s, gy + dy * s - (s - 1) * 2, s === 1 ? "x" : "j")
@@ -442,12 +432,12 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
 // the blade's path since the frame before: a ribbon from the edge in toward the haft, thin at its tail
 // and full at the blade; `side` -1 the stretches behind the body, 1 those in front
 function smear(c, f, side) {
-  if (!pose(f).smear) return
+  if (!poseAt(f).smear) return
   // from the frame before (a frame and a half into a turn already under way); thick across the blade's
   // face, so a level cut leaves a band, not a line seen edge on
-  const N = 24, span = pose(f - 1).smear ? 1.6 : 1, mid = depth(skeleton(pose(f)).chest)
+  const N = 24, span = poseAt(f - 1).smear ? 1.6 : 1, mid = depth(skeleton(poseAt(f)).chest)
   const wide = (k) => Math.min(1, (2.2 * k) / N) ** 0.8
-  const at = (k) => { const j = skeleton(pose(f - span + (span * k) / N)); let n = unit(cross(j.axe, j.edge)); if (dot(n, [0, -1, -0.3]) < 0) n = mul(n, -1); return { tip: axeAt(j, 17.5, 5), n, back: mul(j.axe, -1) } }
+  const at = (k) => { const j = skeleton(poseAt(f - span + (span * k) / N)); let n = unit(cross(j.axe, j.edge)); if (dot(n, [0, -1, -0.3]) < 0) n = mul(n, -1); return { tip: axeAt(j, 17.5, 5), n, back: mul(j.axe, -1) } }
   // across the path on screen: the blade's face (a level cut) or the haft (a cut seen from its side),
   // whichever stands wider across where the blade is going now
   const last = at(N), go = sub(scr(last.tip), scr(at(N - 2).tip)), gl = Math.hypot(...go) || 1

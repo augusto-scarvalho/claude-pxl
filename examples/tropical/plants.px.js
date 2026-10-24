@@ -11,7 +11,7 @@ ramps("DHGglL", "nNmM", "qQOoa", "BbcC", "WwvVF", "Ssr", "kD")
 // leafy edge, and a dark rim on its lower right where it sits over the lobe behind it. Lobes are
 // drawn back to front, so the front ones overlap with that rim.
 const L3 = (() => { const v = [-0.55, -0.7, 0.45], n = Math.hypot(...v); return v.map((k) => k / n) })()
-const hash = (x, y) => { const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return h - Math.floor(h) }
+const sinHash = (x, y) => { const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return h - Math.floor(h) }
 const lobe = (c, cx, cy, r, ramp = "DHGglL", seed = 0) => {
   for (let y = Math.floor(cy - r - 2); y <= cy + r + 2; y++)
     for (let x = Math.floor(cx - r - 2); x <= cx + r + 2; x++) {
@@ -20,7 +20,7 @@ const lobe = (c, cx, cy, r, ramp = "DHGglL", seed = 0) => {
       const d2 = dx * dx + dy * dy
       if (d2 > edge * edge) continue
       const z = Math.sqrt(Math.max(0, 1 - d2)), lit = dx * L3[0] + dy * L3[1] + z * L3[2]
-      const tex = (hash(Math.floor((x + (Math.floor(y / 2) % 2) * 1.5) / 3), Math.floor(y / 2)) - 0.5) * 0.35
+      const tex = (sinHash(Math.floor((x + (Math.floor(y / 2) % 2) * 1.5) / 3), Math.floor(y / 2)) - 0.5) * 0.35
       let k = Math.round((lit + tex) * 2.6 + 1.6)
       if (d2 > (edge - 0.16) ** 2 && dx + dy > 0.2) k = 0                    // rim over the lobe behind
       c.px(x, y, ramp[Math.max(0, Math.min(ramp.length - 1, k))])

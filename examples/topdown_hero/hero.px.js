@@ -186,7 +186,7 @@ const MOVES = {
 
 // One frame of the figure, its body box at (ox, oy). The upper body (head, torso, arms) moves by
 // f.up, the head f.hy more and the arms f.ay; the legs stay on the ground.
-function figure(c, set, d, f, ox, oy) {
+function drawFigure(c, set, d, f, ox, oy) {
   const dummy = set === "_dummy_", left = dummy ? { 3: "4" } : null, far = dummy ? { 3: "4" } : FAR
   const ux = ox + f.up[0], uy = oy + f.up[1]
   const put = (n, x, y, o = {}) => c.stamp(set + n, x, y, o)
@@ -254,7 +254,7 @@ function layers(set, move, at) {
   return [
     layer("smear_back", { outline: false }, gear(true, ["smear"])),
     layer("sword_back", gear(true, ["blade", "arm"])),
-    layer("body", each((c, d, x, y) => figure(c, set, d, M.f(c.frame, d), x, y))),
+    layer("body", each((c, d, x, y) => drawFigure(c, set, d, M.f(c.frame, d), x, y))),
     layer("smear", { outline: false }, gear(false, ["smear"])),
     layer("sword", gear(false, ["blade", "arm"])),
   ]

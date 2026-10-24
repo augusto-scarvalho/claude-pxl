@@ -75,7 +75,7 @@ function height(x, z) {
 // the sun at four in the afternoon: low in the west-southwest, ahead and to the left
 const SUN_AZ = -30 * RAD, SUN_EL = 21 * RAD
 const SUN = [Math.sin(SUN_AZ) * Math.cos(SUN_EL), Math.cos(SUN_AZ) * Math.cos(SUN_EL), Math.sin(SUN_EL)]
-const dither = (col, row) => bayer(col, row) - 0.5
+const ditherAt = (col, row) => bayer(col, row) - 0.5
 
 // Lava as it runs on real volcanoes (Semeru, Fuego, Fagradalsfjall, and the USGS on aa flows): a
 // channel narrow near the vent, widening downslope; hot (yellow, 1100 C) where it leaves, cooling to
@@ -120,15 +120,15 @@ function shadeLand(col, row, [x, z, u, t]) {
     // rock: the faces turned to the sun take its dim orange light, the rest in soot-shade; ridges catch
     // what light there is, ravines hold the dark; scree in streaks down the slope
     const k = 30, curv = (4 * height(x, z) - height(x + k, z) - height(x - k, z) - height(x, z + k) - height(x, z - k)) / 4
-    const streak = fbm(Math.atan2(z - VZ, x - VX) * 40, r / 120, 3), v = sun * 1.05 + Math.max(-0.35, Math.min(0.35, curv / 14)) + (streak - 0.5) * 0.4 + dither(col, row) * 0.12
+    const streak = fbm(Math.atan2(z - VZ, x - VX) * 40, r / 120, 3), v = sun * 1.05 + Math.max(-0.35, Math.min(0.35, curv / 14)) + (streak - 0.5) * 0.4 + ditherAt(col, row) * 0.12
     if (r < CR * 1.15) return v > 0.4 ? "Q" : "M"
     return v > 0.78 ? "K" : v > 0.58 ? "O" : v > 0.36 ? "N" : v > 0.14 ? "M" : "L"
   }
   // the plain: scorched earth, ash drifts, burnt grass; far off, the last green. The fire front ahead
   // lights it red, the more the nearer the flames, so the ground runs from dark at our feet to glowing
-  const n2 = fbm(x / 9, z / 9, 3), v = sun * 0.8 + (n2 - 0.5) * 0.6 + dither(col, row) * 0.1
+  const n2 = fbm(x / 9, z / 9, 3), v = sun * 0.8 + (n2 - 0.5) * 0.6 + ditherAt(col, row) * 0.1
   if (t > 280) return n2 > 0.55 ? "g" : "f"
-  const fire = Math.max(0, 1 - Math.abs(z - 95) / 70) + (n2 - 0.5) * 0.3 + dither(col, row) * 0.3
+  const fire = Math.max(0, 1 - Math.abs(z - 95) / 70) + (n2 - 0.5) * 0.3 + ditherAt(col, row) * 0.3
   if (fire > 0.9) return n2 > 0.5 ? "T" : "G"
   if (fire > 0.6) return n2 > 0.62 ? "Q" : "G"
   if (fire > 0.35) return n2 > 0.55 ? "Q" : "b"
@@ -152,8 +152,8 @@ function sky(col, row, breath = 0, a = 0) {
   if (toSun < 0.022 && d < 0.62) return "I"
   if (toSun < 0.036 && d < 0.6) return "J"
   const shaft = toSun < 0.9 && d < 0.52 && vnoise(Math.atan2(el - SUN_EL, az - SUN_AZ) * 11, 2) > 0.6 ? (1 - toSun / 0.9) * 0.22 : 0
-  let v = 0.42 - el * 0.9 - (d - 0.5) * 1.8 + thin * 0.8 + (lit < -0.015 ? 0.18 : lit > 0.02 ? -0.1 : 0) + shaft + dither(col, row) * 0.12
-  if (el < 0.3 && belly > 0.012 && d > 0.45) { const g = (0.3 - el) / 0.3 + (belly - 0.012) * 6 + dither(col, row) * 0.3; if (g > 0.6) return g > 1.0 ? "H" : "G" }
+  let v = 0.42 - el * 0.9 - (d - 0.5) * 1.8 + thin * 0.8 + (lit < -0.015 ? 0.18 : lit > 0.02 ? -0.1 : 0) + shaft + ditherAt(col, row) * 0.12
+  if (el < 0.3 && belly > 0.012 && d > 0.45) { const g = (0.3 - el) / 0.3 + (belly - 0.012) * 6 + ditherAt(col, row) * 0.3; if (g > 0.6) return g > 1.0 ? "H" : "G" }
   if (v > 1.0 && thin > 0.2) return "K"
   return v > 0.86 ? "F" : v > 0.68 ? "E" : v > 0.5 ? "D" : v > 0.32 ? "C" : v > 0.14 ? "B" : "A"
 }
@@ -170,7 +170,7 @@ const PLUME = (() => {
   }
   return out.sort((m, n) => n.s - m.s)
 })()
-function plume(c) {
+function drawPlume(c) {
   for (const b of PLUME) {
     const [cx, cy] = P.ground(...b.p), R = b.rad * P.scale(b.p[1], b.p[0], b.p[2])
     if (cy + R < 0 || cy - R > H) continue
@@ -180,8 +180,8 @@ function plume(c) {
       const dd = Math.hypot(ox, oy)
       if (dd > edge) continue
       // lit by the sun on its upper left, its belly red with the fire below, more the lower it is
-      const lit = (-ox * 0.6 - oy * 0.8) / edge, rim = dd / edge, v = lit * 0.7 + rim * 0.25 + (vnoise(x / 5 + b.k, y / 5) - 0.5) * 0.4 + dither(x, y) * 0.15
-      const belly = oy / edge + (1 - b.s / 1800) * 0.9 + dither(x, y) * 0.2
+      const lit = (-ox * 0.6 - oy * 0.8) / edge, rim = dd / edge, v = lit * 0.7 + rim * 0.25 + (vnoise(x / 5 + b.k, y / 5) - 0.5) * 0.4 + ditherAt(x, y) * 0.15
+      const belly = oy / edge + (1 - b.s / 1800) * 0.9 + ditherAt(x, y) * 0.2
       if (belly > 0.75 && lit < 0.3) c.px(x, y, belly > 1.35 ? "H" : belly > 1.0 ? "G" : "Q")
       else c.px(x, y, v > 0.62 ? "E" : v > 0.3 ? "D" : v > 0.0 ? "C" : "B")
     }
@@ -323,7 +323,7 @@ function column(c, a, b, r0, r1, burning) {
       const across = (x + 0.5 - q.s[0]) / Math.max(0.5, q.h)
       if (Math.abs(across) > 1 || x < 0 || x >= W) continue
       // bark in vertical plates, furrows between them
-      const furrow = Math.abs(vnoise(across * 5 + 9, q.u * 0.7) - 0.5) < 0.07, v = -across * 0.85 + dither(x, y) * 0.25
+      const furrow = Math.abs(vnoise(across * 5 + 9, q.u * 0.7) - 0.5) < 0.07, v = -across * 0.85 + ditherAt(x, y) * 0.25
       if (burning) c.px(x, y, furrow ? (across > -0.2 ? "U" : "T") : across > 0.55 ? "l" : v > 0.45 ? "j" : v > -0.2 ? "i" : "h")
       else c.px(x, y, furrow ? "h" : v > 0.55 ? "k" : v > 0.05 ? "j" : v > -0.45 ? "i" : "h")
     }
@@ -346,18 +346,18 @@ function paintTree(c, T) {
   }
 }
 // flames: pxl's flame(), white-hot at the root to red at the tip, leaning right with the wind
-const flame = (c, x, y, size, frame, seed) => c.flame(x, y, size, "XWVUT", { frame, seed })
+const flameAt = (c, x, y, size, frame, seed) => c.flame(x, y, size, "XWVUT", { frame, seed })
 function treeFire(c, T, frame) {
   for (const [i, q] of T.tufts.entries()) {
     if (!q.burning || i % 2) continue
     const [cx, cy] = P.ground(...q.p), s = q.rad * P.scale(q.p[1], q.p[0], q.p[2])
-    flame(c, cx, cy - s * 0.4, Math.max(2, s * 0.95), frame, T.seed * 100 + i)
+    flameAt(c, cx, cy - s * 0.4, Math.max(2, s * 0.95), frame, T.seed * 100 + i)
   }
   // the windward side of a burning trunk: a sheet of flame licking up it
   if (T.burn > 0.9) for (let i = 0; i < 70; i++) {
     const r = rng(T.seed * 31 + i), u = r() ** 1.3 * T.tall, side = 0.35 + r() * 0.55, p = [T.x + T.r0 * side * (1 - (0.6 * u) / T.tall), T.z, T.g + u], [cx, cy] = P.ground(...p), s = P.scale(p[1], p[0], p[2])
     if (cy < -12 || cy > H + 4) continue
-    flame(c, cx, cy, Math.max(2, s * (0.15 + 0.5 * r() ** 2)), frame, T.seed * 1000 + i)
+    flameAt(c, cx, cy, Math.max(2, s * (0.15 + 0.5 * r() ** 2)), frame, T.seed * 1000 + i)
   }
 }
 
@@ -369,8 +369,8 @@ sprite("_bg", { w: W, h: H }, (c) => {
     { far: 9000, top: VH, bound: bulk, margin: 4, sky: (col, row) => { SKY[row * W + col] = 1; return sky(col, row) } })
   impact(c)
   lavaGlow(c)
-  plume(c)
-  smoke(c)
+  drawPlume(c)
+  drawSmoke(c)
   scrub(c)
   litter(c)
   firelight(c)
@@ -501,11 +501,10 @@ const RUNNERS = [
   { B: TREX, ramp: RAMP.trex, z: 21, x0: 10, v: 13, cycle: 6 },
   ...[[36, 10, 0], [41, 24, 2], [34, 40, 1], [45, 52, 3], [38, 66, 2], [43, 80, 0]].map(([z, x0, off]) => ({ B: GALLI, ramp: RAMP.galli, z, x0, v: 17.5, cycle: 4, off })),
 ]
-function runners(frame) {
-  const t = frame / FPS
+function runners(c) {
   return RUNNERS.map((R) => {
-    const L = R.v * (FRAMES / FPS), x = ((((R.x0 - R.v * t) % L) + L) % L) - (L / 2) * 0.95
-    return runner(R.B, { x, z: R.z, phase: ((frame + (R.off ?? 0)) % R.cycle) / R.cycle, ramp: R.ramp })
+    const L = R.v * (FRAMES / FPS), x = c.cross(R.x0, { span: L, per: -L, from: -(L / 2) * 0.95, whole: false })
+    return runner(R.B, { x, z: R.z, phase: ((c.frame + (R.off ?? 0)) % R.cycle) / R.cycle, ramp: R.ramp })
   })
 }
 // Pterosaurs the size of a Quetzalcoatlus (11 m across), seen from below and ahead: drawn by hand,
@@ -607,7 +606,7 @@ function fronds(c, frame) {
         c.line(Math.round(x), Math.round(y), Math.round(lx), Math.round(ly), k > len * 0.75 && lit ? "S" : "h")
       }
     }
-    if (lit) flame(c, x, y, 4 + r() * 3, frame, 2300 + i)
+    if (lit) flameAt(c, x, y, 4 + r() * 3, frame, 2300 + i)
   }
 }
 const NEAR = Array.from({ length: 12 }, (_, i) => { const r = rng(1700 + i); return { x: -14 + r() * 40, z: 6 + r() * 11, s: 0.4 + r() * 0.5, seed: 1800 + i } }).filter((q) => Math.abs(q.x / q.z) < 0.85)
@@ -615,13 +614,13 @@ function nearFire(c, frame) {
   for (const q of NEAR) {
     const [bx, by] = P.ground(q.x, q.z, height(q.x, q.z)), sc = P.scale(q.z, q.x)
     for (let i = -2; i <= 2; i++) c.px(Math.round(bx + i * q.s * sc * 0.4), Math.round(by), "h")
-    flame(c, bx, by, Math.max(2, q.s * sc), frame, q.seed)
+    flameAt(c, bx, by, Math.max(2, q.s * sc), frame, q.seed)
   }
 }
 function frontFire(c, frame) {
   for (const q of FRONT) {
     const g = height(q.x, q.z), [bx, by] = P.ground(q.x, q.z, g), sc = P.scale(q.z, q.x, g)
-    flame(c, bx, by - q.s * sc * 0.5, Math.max(2, q.s * sc * 1.1), frame, 7000 + q.seed)
+    flameAt(c, bx, by - q.s * sc * 0.5, Math.max(2, q.s * sc * 1.1), frame, 7000 + q.seed)
   }
 }
 
@@ -641,7 +640,7 @@ function impact(c) {
     const up = iy - y, axis = ix + up * 0.35, half = 5 + up * 0.22, off = (x + 0.5 - axis) / half, edge = 1 + 0.35 * (vnoise(y / 6, 3) - 0.5) + 0.25 * (vnoise(y / 3, x / 9) - 0.5)
     if (up > 0 && Math.abs(off) < edge) { c.px(x, y, up < 14 ? (Math.abs(off) < 0.5 ? "V" : "H") : off < -0.6 * edge ? "D" : vnoise(x / 4, y / 4) > 0.55 ? "C" : "B"); continue }
     // the glow on the soot round it, strongest low and near, in dithered bands
-    const d = Math.hypot((x - ix) / 150, (y - iy) / 95) + dither(x, y) * 0.12
+    const d = Math.hypot((x - ix) / 150, (y - iy) / 95) + ditherAt(x, y) * 0.12
     if (d < 0.32) c.px(x, y, d < 0.16 ? "W" : "V")
     else if (d < 0.6) c.px(x, y, "H")
     else if (d < 0.95 && k !== "A") c.px(x, y, "G")
@@ -687,7 +686,7 @@ function sparks(c, frame) {
 }
 // smoke off the fire front, rising and streaming away right in long wisps, thinning (dithered) at its
 // edges, its underside red from the fires
-function smoke(c) {
+function drawSmoke(c) {
   for (let y = 60; y < P.horizon + 4; y++) for (let x = 0; x < W; x++) {
     const k = c.key(x, y)
     if (!"ABCDEFGHKLMNOQ".includes(k)) continue
@@ -811,7 +810,7 @@ function log(c, L, frame) {
       // the charcoal's cracks across the log, glowing (flickering) where it still burns
       if (r() < 0.55) { const glow = L.fire && hash(i + piece * 50, Math.floor(frame / 3) + L.seed) < 0.75; c.line(Math.round(px), Math.round(py) - h + 1, Math.round(px + 0.5), Math.round(py), glow ? (r() < 0.4 ? "U" : "T") : "h") }
       if (r() < 0.12) c.line(Math.round(px), Math.round(py) - h, Math.round(px + (r() - 0.3) * sc * 0.4), Math.round(py - h - sc * (0.3 + r() * 0.5)), "h", Math.max(1, Math.round(sc * 0.08)))
-      if (L.fire && i % 2 === 0 && hash(i + piece * 50, L.seed + 31) < 0.6) flame(c, px, py - rad(f) * sc, Math.max(2, sc * (0.25 + 0.3 * hash(L.seed, i + piece * 50))), frame, L.seed * 300 + i + piece * 50)
+      if (L.fire && i % 2 === 0 && hash(i + piece * 50, L.seed + 31) < 0.6) flameAt(c, px, py - rad(f) * sc, Math.max(2, sc * (0.25 + 0.3 * hash(L.seed, i + piece * 50))), frame, L.seed * 300 + i + piece * 50)
     }
     if (piece > 0) splinters(f0, piece, -1)
     splinters(f1, piece, 1)
@@ -830,7 +829,7 @@ function snag(c, S, frame) {
   for (let u = 0.2; u < S.h; u += 0.4) {
     if (hash(Math.round(u * 10), S.seed) > 0.55) continue
     const p = [S.x + S.r * 0.7, S.z, g + u], [px, py] = P.ground(...p), sc = P.scale(p[1], p[0], p[2])
-    flame(c, px, py, Math.max(2, sc * (0.2 + 0.35 * hash(S.seed, Math.round(u * 10)))), frame, S.seed * 500 + Math.round(u * 10))
+    flameAt(c, px, py, Math.max(2, sc * (0.2 + 0.35 * hash(S.seed, Math.round(u * 10)))), frame, S.seed * 500 + Math.round(u * 10))
   }
 }
 // a boulder or a volcanic bomb: an angular lump sitting on the ground, its facets lit on top and dark
@@ -851,7 +850,7 @@ function firelight(c) {
     const [cx, cy] = P.ground(x, z, height(x, z)), sc = P.scale(z, x), rx = R * sc, ry = R * sc * 0.32
     for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let xx = Math.floor(cx - rx); xx <= Math.ceil(cx + rx); xx++) {
       if (!"abcde".includes(c.key(xx, y))) continue
-      const d = Math.hypot((xx - cx) / rx, (y - cy) / ry) + dither(xx, y) * 0.35
+      const d = Math.hypot((xx - cx) / rx, (y - cy) / ry) + ditherAt(xx, y) * 0.35
       if (d < 0.45) c.px(xx, y, "G"); else if (d < 0.8) c.px(xx, y, "Q")
     }
   }
@@ -872,7 +871,7 @@ anim("extinction", { w: W, h: H, frames: FRAMES, fps: FPS }, stamp("_bg", 0, 0),
   meteors(c, c.frame); breathe(c, c.frame); sootClouds(c, c.frame); lava(c, c.frame); steam(c, c.frame); ejecta(c, c.frame); crater(c, c.frame); frontFire(c, c.frame)
   const wreck = [...LOGS.map((L) => ({ d: Math.hypot(L.x, L.z), draw: (c) => log(c, L, c.frame) })), ...SNAGS.map((S) => ({ d: Math.hypot(S.x, S.z), draw: (c) => snag(c, S, c.frame) })),
     ...ROCKS.map((R) => ({ d: Math.hypot(R.x, R.z), draw: (c) => rock(c, R) }))]
-  const all = [...TREES.map((T, i) => ({ d: T.d, tree: i })), ...runners(c.frame), ...flyers(c.frame), ...wreck].sort((m, n) => n.d - m.d)
+  const all = [...TREES.map((T, i) => ({ d: T.d, tree: i })), ...runners(c), ...flyers(c.frame), ...wreck].sort((m, n) => n.d - m.d)
   for (const m of all) {
     if (m.tree !== undefined) { c.stamp("_tree" + m.tree, 0, 0); treeFire(c, TREES[m.tree], c.frame); continue }
     if (m.sprite) { c.stamp(m.sprite, m.x, m.y); continue }

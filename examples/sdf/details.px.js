@@ -10,7 +10,7 @@ include("kit.px.js", { palette: true })
 const PLAIN = make3d.tree(), LEAFY = make3d.tree({ leaves: 28 }), LEAVES = sdf.scatter(LEAFY.field, LEAFY.details.leaves)
 const PW = 96, PH = 104, CAM = hd2d(PW, PH, 13), GR = ground(CAM.Z), AT = [0, CAM.Z - 2.2 / Math.tan(-PITCH * RAD), 0]
 // a panel: the tree in one view, with its leaves or without
-const panel = (name, T, leaves, view) => anim(name, { w: PW, h: PH, ...CLOCK }, (c) => {
+const panelOf = (name, T, leaves, view) => anim(name, { w: PW, h: PH, ...CLOCK }, (c) => {
   if (view === "camera") {
     c.mesh(CAM.view, GR.faces, GMATS, { light: LIGHT })
     c.surface(T.field, { view: CAM.view, at: AT, mats: MATS, light: LIGHT })
@@ -22,7 +22,7 @@ const panel = (name, T, leaves, view) => anim(name, { w: PW, h: PH, ...CLOCK }, 
   if (leaves) c.splats(leaves, { view, ppm: 16, at, mats: MATS, light: LIGHT })
 })
 const VIEWS = ["side", "top", "iso", "camera"]
-for (const v of VIEWS) { panel(`lobes_${v}`, PLAIN, null, v); panel(`leaves_${v}`, LEAFY, LEAVES, v) }
+for (const v of VIEWS) { panelOf(`lobes_${v}`, PLAIN, null, v); panelOf(`leaves_${v}`, LEAFY, LEAVES, v) }
 scene("canopy", { w: 4 * (PW + 2) + 2, h: 2 * (PH + 2) + 10, bg: "k", ...CLOCK, check: { every: 24 } }, (c) => {
   VIEWS.forEach((v, j) => {
     c.text(4 + j * (PW + 2), 2, v, "W")

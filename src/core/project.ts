@@ -12,7 +12,7 @@ import { VOLUME_OPTS } from "./volume.ts";
 import { SPLAT_OPTS, Splats, makeSplats } from "./splats.ts";
 import { scatter } from "./scatter.ts";
 import { DECAL_OPTS } from "./decal.ts";
-import { make3d } from "./builders.ts";
+import { BUILDERS, type Built, defineBuilder } from "./builders.ts";
 import { DRAW3D_OPTS, type Rule, World, runExpects } from "./world3d.ts";
 import type { Color } from "./color.ts";
 import { TRANSPARENT, oklab, shadeRamp, toHex } from "./color.ts";
@@ -28,7 +28,7 @@ import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
 import { type Lut, readCube, readStrip } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
-import { ability, emitter } from "./vfx.ts";
+import { ability, emitter, tween, unroll } from "./vfx.ts";
 import { SPELL_OPTS, spell } from "./spells.ts";
 import { bayer, fbm, globRe, latticeHash, rng, vnoise, seamless } from "./util.ts";
 
@@ -114,7 +114,7 @@ function readsClock(items: Item[]): boolean {
 }
 
 /** Options every placement takes (stamp, tile, pattern, panel, scatter, tilemap, wire hangs). */
-const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay", "fx"];
+const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "shade", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay", "fx"];
 /** Allowed option keys of ops whose last argument is an options object. */
 export const OP_OPTS: Record<string, string[]> = {
   stamp: [...PLACE, "sub", "smear", "at", "id", "z"],
@@ -378,8 +378,8 @@ export class Project implements BuildCtx {
         if (opts.fps === undefined && d.every((v) => v === d[0])) opts.fps = 1000 / d[0];
       }
       const light = opts.world?.light, pair = (v: unknown) => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
-      if (light !== undefined && !pair(light) && !(isPlainObject(light) && pair((light as { at?: unknown }).at)))
-        throw new PxError(`${kind} '${name}': world.light is where the light comes from, [x, y] (e.g. [0.6, -1]: the top right), or a point light in the scene, { at: [x, y] }; got ${JSON.stringify(light)}`, loc);
+      if (light !== undefined && light !== false && !pair(light) && !(isPlainObject(light) && pair((light as { at?: unknown }).at)))
+        throw new PxError(`${kind} '${name}': world.light is where the light comes from, [x, y] (e.g. [0.6, -1]: the top right), or a point light in the scene, { at: [x, y] } (false: none read); got ${JSON.stringify(light)}`, loc);
       const items = checkItems(`${kind} '${name}'`, rest, loc);
       const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true);
       this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png });
@@ -546,10 +546,24 @@ export class Project implements BuildCtx {
       splats: (f: unknown, o: unknown = {}) => { try { return makeSplats(f, o as never); } catch (e) { throw wrap(e).within("sdf.splats", this.callerLoc()); } },
       scatter: (f: unknown, o: unknown = {}) => { try { return scatter(f, o as never); } catch (e) { throw wrap(e).within("sdf.scatter", this.callerLoc()); } },
     };
-    // make3d.tree({ canopy, twist, wind, ... }) and the rest: builders with semantic parameters (builders.ts)
-    env.make3d = Object.fromEntries(Object.entries(make3d).map(([k, f]) => [k, (o: unknown = {}) => { try { return f(o as never); } catch (e) { throw wrap(e).within(`make3d.${k}`, this.callerLoc()); } }]));
+    // make3d.tree({ canopy, twist, wind, ... }) and the rest: builders with semantic parameters (builders.ts);
+    // make3d.define(name, fn, { params, wind }) adds the file's own, for its worlds and as make3d.<name>
+    const makers: Record<string, (p: Record<string, unknown>) => Built> = { ...BUILDERS };
+    const make = (k: string) => (o: unknown = {}) => { try { return makers[k](o as never); } catch (e) { throw wrap(e).within(`make3d.${k}`, this.callerLoc()); } };
+    const m3: Record<string, unknown> = Object.fromEntries(Object.keys(BUILDERS).map((k) => [k, make(k)]));
+    m3.define = (name: unknown, fn: unknown, o: unknown = {}) => {
+      const loc = this.callerLoc();
+      try {
+        if (!isPlainObject(o)) throw new PxError('make3d.define("name", (params) => ({ field }), { params: { size: [0.3, 2] }, wind })');
+        checkKeys("make3d.define", o, ["params", "wind"]);
+        if (typeof name === "string" && makers[name] && !BUILDERS[name]) throw new PxError(`make3d.${name} is already defined`);
+        makers[name as string] = defineBuilder(name, fn, o as never);
+        m3[name as string] = make(name as string);
+      } catch (e) { throw wrap(e).within("make3d.define", loc); }
+    };
+    env.make3d = m3;
     // world3d({ seed, wind, parts }): a scene of named parts (world3d.ts); world.edit({ "part.param": v }), world.changed(other)
-    env.world3d = (spec: unknown) => { try { return new World(spec as never); } catch (e) { throw wrap(e).within("world3d", this.callerLoc()); } };
+    env.world3d = (spec: unknown) => { try { return new World(spec as never, makers); } catch (e) { throw wrap(e).within("world3d", this.callerLoc()); } };
     // expect3d(name, world, rules, { frames }): rules over the loop, run by pxl check
     env.expect3d = (name: unknown, world: unknown, rules: unknown, opts: unknown = {}) => {
       const loc = this.callerLoc();
@@ -683,6 +697,16 @@ export class Project implements BuildCtx {
         return ability(phases as never, opts as never);
       } catch (e) { throw wrap(e).within("ability", loc); }
     };
+    // tween(keys, { moments }): values keyed in time, at(t); unroll(runs): [frames, value] runs as a value a frame (vfx.ts)
+    env.tween = (keys: unknown, opts: unknown = {}) => {
+      const loc = this.callerLoc();
+      try {
+        if (!isPlainObject(opts)) throw new PxError('tween([{ t: 0, ...values }, { t: 4, ... }], { moments: ["smear"] })');
+        checkKeys("tween", opts, ["moments"]);
+        return tween(keys as never, opts as never);
+      } catch (e) { throw wrap(e).within("tween", loc); }
+    };
+    env.unroll = (runs: unknown) => { try { return unroll(runs as never); } catch (e) { throw wrap(e).within("unroll", this.callerLoc()); } };
     env.emitter = (opts: unknown = {}) => {
       const loc = this.callerLoc();
       try {

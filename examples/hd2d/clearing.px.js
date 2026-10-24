@@ -12,24 +12,25 @@
 // grade from dusk.cube, a light grain.
 include("kit.px.js", { palette: true })
 include("traveler.px.js")
-// the scarecrow's straw, burlap, wood and hat; the fire's tones
-pal({ "1": "#f0d880", "2": "#c8a050", "3": "#8a6830", "4": "#b89a72", "5": "#7a6048", "6": "#8a6a4a", "7": "#4a3428", "8": "#5a4a3a", "9": "#33281f", "0": "#2a1a14" })
+// the scarecrow's straw (S W X), burlap (H F), wood (P R) and hat (C 9), keys of its own (the kit's ramps
+// use 1-8); the fire's tones
+pal({ "S": "#f0d880", "W": "#c8a050", "X": "#8a6830", "H": "#b89a72", "F": "#7a6048", "P": "#8a6a4a", "R": "#4a3428", "C": "#5a4a3a", "9": "#33281f", "0": "#2a1a14" })
 
 // ---------------------------------------------------------------- the things in it
 // A scarecrow: a pole and its crossbar, a burlap head with a stitched face under a straw hat, a sack
 // for a body tied with rope, straw out of its sleeves and from under the sack. Room above it for the ash.
 sprite("_scarecrow", { w: 28, h: 60, pivot: [14, 60], outline: "k" }, (c) => {
   const Y = 12
-  c.rect(13, Y + 22, 2, 26, "6"); c.vline(14, Y + 22, 26, "7")
-  c.rect(3, Y + 23, 22, 2, "6"); c.hline(3, Y + 24, 22, "7")
-  for (const x0 of [4, 17]) { c.rect(x0, Y + 21, 7, 5, "4"); c.hline(x0, Y + 25, 7, "5") }
-  for (const [x, y, k] of [[2, 22, "1"], [1, 23, "2"], [2, 24, "1"], [1, 25, "3"], [25, 22, "1"], [26, 23, "2"], [25, 24, "1"], [26, 25, "3"]]) c.px(x, Y + y, k)
-  c.rect(9, Y + 20, 10, 14, "4"); c.rect(16, Y + 20, 3, 14, "5"); c.hline(9, Y + 27, 10, "3")
-  for (let x = 9; x <= 18; x++) c.px(x, Y + 34 + ((x * 7) % 3 === 0 ? 1 : 0), (x * 5) % 3 ? "2" : "1")
-  c.circ(14, Y + 15, 5, "4"); c.rect(16, Y + 12, 3, 7, "5")
+  c.rect(13, Y + 22, 2, 26, "P"); c.vline(14, Y + 22, 26, "R")
+  c.rect(3, Y + 23, 22, 2, "P"); c.hline(3, Y + 24, 22, "R")
+  for (const x0 of [4, 17]) { c.rect(x0, Y + 21, 7, 5, "H"); c.hline(x0, Y + 25, 7, "F") }
+  for (const [x, y, k] of [[2, 22, "S"], [1, 23, "W"], [2, 24, "S"], [1, 25, "X"], [25, 22, "S"], [26, 23, "W"], [25, 24, "S"], [26, 25, "X"]]) c.px(x, Y + y, k)
+  c.rect(9, Y + 20, 10, 14, "H"); c.rect(16, Y + 20, 3, 14, "F"); c.hline(9, Y + 27, 10, "X")
+  for (let x = 9; x <= 18; x++) c.px(x, Y + 34 + ((x * 7) % 3 === 0 ? 1 : 0), (x * 5) % 3 ? "W" : "S")
+  c.circ(14, Y + 15, 5, "H"); c.rect(16, Y + 12, 3, 7, "F")
   for (const [x, y] of [[12, 14], [16, 14], [12, 17], [13, 18], [14, 17], [15, 18], [16, 17]]) c.px(x, Y + y, "0")
-  c.rect(7, Y + 10, 15, 2, "8"); c.rect(10, Y + 5, 9, 5, "8"); c.hline(10, Y + 8, 9, "9"); c.hline(7, Y + 11, 15, "9")
-  for (const [x, y] of [[8, 12], [9, 13], [19, 12], [20, 13]]) c.px(x, Y + y, "2")
+  c.rect(7, Y + 10, 15, 2, "C"); c.rect(10, Y + 5, 9, 5, "C"); c.hline(10, Y + 8, 9, "9"); c.hline(7, Y + 11, 15, "9")
+  for (const [x, y] of [[8, 12], [9, 13], [19, 12], [20, 13]]) c.px(x, Y + y, "W")
 }, bump("hybrid"))
 // the fire: a ball of it in three sizes, its noise churning, its edge rippling
 for (const [n, r] of [["_fire_s", 2], ["_fire_m", 3], ["_fire", 4]])
@@ -77,7 +78,7 @@ const SPELL = ability({ charge: 600, cast: 200, travel: 600, impact: 200, burn: 
 const sparks = emitter({ at: [0, 0], burst: 18, from: SPELL.start("impact"), life: [300, 800], speed: [1.2, 3], angle: -90, spread: 75, gravity: [0, 6], drag: 1.2, seed: 9 })
 const DUSK = { light: [-0.8, 0.45, 0.35], sun: { color: "#ffb478", strength: 1.25 }, sky: { color: "#6a72b8", strength: 0.45 } }
 const people = (c, K) => {
-  const t = c.t, p = SPELL(t), view = CAM.view(K), pose = t >= 200 && t < 1500 ? Math.floor((t - 200) / 100) : -1
+  const t = c.t, p = SPELL(t), view = CAM.view(K), pose = SPELL.frame(t, [["charge", 0, 12, 100]], { before: -1, after: -1 })
   const hero = pose >= 0 ? { name: "tr_cast_e", at: HERO, frame: pose } : { name: "tr_idle_e", at: HERO }
   const S = [...WOOD, hero]
   const hand = pose >= 0 ? c.meshSocket(view, hero, "hand", K) : null, from = c.meshSocket(view, { name: "tr_cast_e", at: HERO, frame: 6 }, "hand", K)
@@ -91,15 +92,15 @@ const people = (c, K) => {
     S.push({ name: "_fire", at: fly(t), blend: "add", light: { r: 2.5, strength: 3 } })
   }
   // the scarecrow: catching fire where it was hit, burning away, then back, the neutral way
-  const burn = t >= SPELL.start("impact") && t < SPELL.start("reform") ? Math.min(1, (t - SPELL.start("impact")) / 2400) : t >= SPELL.start("reform") ? 1 - Math.min(1, (t - SPELL.start("reform")) / 600) : 0
+  const burn = t < SPELL.start("reform") ? SPELL.span(t, "impact", ["impact", 2400]) : 1 - SPELL.span(t, "reform")
   const look = t >= SPELL.start("reform") ? { look: "neutral" } : { look: "burn", pattern: "out", at: [14, 30], ragged: 0.5, scale: 4 }
   S.push({ name: "_scarecrow", at: CROW, ...(burn > 0 ? { fx: ["dissolve", { ...look, progress: burn, seed: 3, ...(t < SPELL.start("reform") ? { flames: { height: 10, density: 0.35 } } : {}) }], light: { r: 3, strength: 2.5 } } : {}) })
   // its smoke, from the fire taking to its last wisps
-  const fire = t >= SPELL.start("impact") + 150 && t < SPELL.start("reform") ? (t - SPELL.start("impact") - 150) / (2300 + 200 - 150) : -1
-  if (fire >= 0) S.push({ name: "_fire_smoke", at: [CROW[0] + 0.05, CROW[1] + 0.06, 0.9], blend: "alpha", opacity: Math.min(1, fire / 0.15) * Math.min(1, (1 - fire) / 0.35) * 0.85, shadow: 0 })
+  const fire = SPELL.fade(t, ["impact", 150], "reform", { in: 0.15, out: 0.35 })
+  if (fire > 0) S.push({ name: "_fire_smoke", at: [CROW[0] + 0.05, CROW[1] + 0.06, 0.9], blend: "alpha", opacity: fire * 0.85, shadow: 0 })
   if (p.name === "impact") S.push({ name: "_fire", at: to, blend: "add", fx: ["dissolve", { pattern: "out", progress: p.k, look: "magic", glow: 1 }], light: { r: 3.5, strength: 4 * (1 - p.k) + 1 } })
   if (t >= SPELL.start("impact") && t < SPELL.start("impact") + 1300) {
-    S.push({ name: "_burst_smoke", at: [CROW[0], CROW[1] + 0.05], frame: Math.min(25, Math.floor((t - SPELL.start("impact")) / 50)), blend: "alpha" })
+    S.push({ name: "_burst_smoke", at: [CROW[0], CROW[1] + 0.05], frame: SPELL.since(t, "impact", 50, 26), blend: "alpha" })
     for (const q of sparks(t)) S.push({ name: "_spark", at: [CROW[0] + q.x, CROW[1] - 0.05, 1.05 - q.y], blend: "add", light: false })
   }
   return S

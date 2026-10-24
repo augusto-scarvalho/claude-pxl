@@ -379,8 +379,8 @@ of the nose; the corners of the mouth straight below the pupils.)
   `examples/hd2d/traveler.px.js` stands on these numbers (its body a skeleton in 3D, §3).
 - **Profile (side view):** everything says which way the figure faces. The far arm and far leg hide
   behind the near ones or show as a darker sliver on the same side (moving, keep them a ramp step
-  darker in every frame, so crossing legs never swap; a far leg all shadow, with near-black under it,
-  or it reads as raised; an RPG's side idle may spread both legs for a solid stance); a far arm drawn out on the back
+  darker in every frame, `stamp(limb, x, y, { shade: 1 })`, so crossing legs never swap; a far leg
+  all shadow, with near-black under it, or it reads as raised; an RPG's side idle may spread both legs for a solid stance); a far arm drawn out on the back
   with a tail beside it made a werewolf's body read as facing away from its head. Fix one part at a
   time against the facing; when fixes start contradicting each other, go back to the last version
   that read right.
@@ -705,9 +705,9 @@ one-sided gear and lettering off it, or accept the swap. `pxl study` reads such 
 straight above, not as pillow shading.
 A `twin` does it for you (`part()` in the example makes each part and its twin);
 thin parts (a 2 px blade) want `reach: 1`, or each pixel sees open space on both sides. `far: 1`
-darkens the far side by depth, not by side: turned, the other leg darkens. In a side view a limb's
-drawing belongs to its depth more than to its side (the near arm drawn whole, the far one mostly
-hidden), so a turned rig may need its new near limbs drawn.
+(a slot's own `far` for one part) darkens the far side by depth, not by side: turned, the other leg
+darkens. In a side view a limb's drawing belongs to its depth more than to its side (the near arm
+drawn whole, the far one mostly hidden), so a turned rig may need its new near limbs drawn.
 
 **What is checked, and what isn't.** `facing` is a label you write; pxl follows it exactly through
 flips and turns. What reads the pixels:
@@ -738,8 +738,9 @@ orders, darkens and checks them. The rest are the drawn parts, moved with the bo
 name their parts (`part: "knight_head"`: every pose shares them), so turn it with a prefix map,
 `turn: { name: "knight_l_pose3", parts: ["knight_", "knight_l_"] }`: the turned rig looks each part
 up as `knight_l_<part>`, else flips the original. Then the timing is a list: `[frames, pose, how far
-forward]`, and anything else on the same clock (sparks where the blades meet, dust at the feet, a
-marshal's signal) is computed from it. The two can differ where the fight isn't a mirror: a cut
+forward]` (`unroll(RUNS)`: a value a frame), or poses keyed in time and eased between, each key
+saying only what changes (`tween(KEYS)`: `examples/rig/warden.px.js`), and anything else on the
+same clock (sparks where the blades meet, dust at the feet, a marshal's signal) is computed from it. The two can differ where the fight isn't a mirror: a cut
 taken on the shield is one knight's cut and the other's block. A shield raised is the shield arm by
 the same two bones and the shield drawn turned with its forearm, so its straps still run along it.
 Look at each pose for what it says, not only whether it works: a fist at the hip and a level blade

@@ -466,7 +466,7 @@ export async function main(argv: string[]): Promise<number> {
         }
         console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}${r.notes.length ? `, ${r.notes.length} to look at` : ""} (checked ${r.checked}${a.frame ? `, at frame ${a.frame}` : ""})`);
         console.log(r.coverage);
-        if (r.readings) console.log(["", "readings (each placement's lit side against world.light, warning or not):", ...r.readings.map((l) => "  " + l), r.tally].join("\n"));
+        if (r.readings) console.log(["", "readings (each placement's lit side against its light, warning or not):", ...r.readings.map((l) => "  " + l), r.tally].join("\n"));
         return r.warnings ? 1 : 0;
       }
       case "shot": {

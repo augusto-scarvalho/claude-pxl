@@ -25,18 +25,12 @@ sprite("_place", { w: CW, h: CH }, (c) => {
 // the traveler's cast (hd2d/traveler.px.js, 13 poses of 100 ms) timed to the spell: the wind-up as it
 // starts charging, held while the energy gathers, the thrust as it is cast, held while it flies (his
 // hand, where the spell starts, a socket that moves with the pose), back and at rest after it hits
-const castPose = (t, s) => {
-  const a = s.ability, ch = a.start("charge"), ca = a.start("cast"), tr = a.start("travel"), im = a.start("impact")
-  if (t < ch) return 12
-  if (t < ch + 200) return Math.floor((t - ch) / 100)
-  if (t < ca) return 2 + Math.min(2, Math.floor(((t - ch - 200) * 3) / (ca - ch - 200)))
-  return t < tr ? 5 : t < im ? 6 : Math.min(12, 7 + Math.floor((t - im) / 100))
-}
+const CAST = [["charge", 0, 1, 100], ["charge", 2, 4], ["cast", 5], ["travel", 6], ["impact", 7, 12, 100]]
 for (const el of ELEMENTS)
   for (const tier of [1, 2, 3]) {
     const S = spell(el, tier, { from: "hero.hand", to: [89, GY - 10], ground: GY + 2, start: 200, seed: tier * 7 })
     anim(`${el}_${tier}`, { w: CW, h: CH, ...CLOCK },
-      stamp("_place", 0, 0), (c) => c.stamp("tr_cast_e", 14, GY + 1, { frame: castPose(c.t, S), id: "hero" }), cast(S), lighting({ ambient: 0.55 }))
+      stamp("_place", 0, 0), (c) => c.stamp("tr_cast_e", 14, GY + 1, { frame: S.ability.frame(c.t, CAST, { before: 12 }), id: "hero" }), cast(S), lighting({ ambient: 0.55 }))
   }
 
 const GAP = 4, TOP = 12, LEFT = 4
