@@ -151,3 +151,27 @@ test("expect3d in time (before, while); a failing rule fixed by one number, no m
   assert.equal(setKnobInSource(`const V = world3d({ parts: {\n  h: { make: "house", at: [0, 0] },\n  r: { make: "rock", beside: ["h", "front", -1.2] } } })`, f.knob, f.to)!.split("\n")[2], `  r: { make: "rock", beside: ["h", "front", ${f.to}] } } })`);
   assert.equal(setKnobInSource(`a: { at: [1, 2] }`, { part: "a", key: "at", i: 2, value: 0 }, 0.5), `a: { at: [1, 2, 0.5] }`);
 });
+
+test("draw3d as: a field or a built thing drawn as its surface, voxels, splats or a mesh (in the depth drawn, its shadow the field's); a part's own, edited alone", () => {
+  const base = PAL + `ramps("kgw", "krr")
+const C = perspective({ w: 48, h: 40, pitch: -40, fov: 30, ppm: 16 }), G = model(), F = sdf.box([0.8, 0.8, 1]).at(0, 0, 0.5).mat("m")
+G.face("g", [-4, C.z - 4, 0], [4, C.z - 4, 0], [4, C.z + 4, 0], [-4, C.z + 4, 0])
+const draw = (o) => (c) => { c.mesh(C, G.faces, { g: { ramp: "w" } }, { light: [-1, -0.5, 1] }); c.draw3d(F, { view: C, at: C.aim(0.5), mats: { m: "kgw" }, light: [-1, -0.5, 1], ...o }) }
+`;
+  const p = loadSource(base + `for (const as of ["surface", "voxels", "splats", "mesh"]) sprite(as, { w: 48, h: 40 }, draw({ as, size: 0.2, spacing: 0.1 }))
+sprite("hand", { w: 48, h: 40 }, (c) => { c.mesh(C, G.faces, { g: { ramp: "w" } }, { light: [-1, -0.5, 1] }); c.surface(F, { view: C, at: C.aim(0.5), mats: { m: "kgw" }, light: [-1, -0.5, 1] }) })`, "t.px.js");
+  assert.equal(p.image("surface").hash(), p.image("hand").hash(), "as surface: surface()'s");
+  const R = Object.fromEntries(["surface", "voxels", "splats", "mesh"].map((a) => [a, keys(p, a).split("\n")]));
+  for (const a of ["voxels", "splats", "mesh"]) {
+    assert.notEqual(R[a].join(), R.surface.join(), a);
+    assert.ok(R[a].some((r) => /[kgr]/.test(r)), `${a} drawn`);
+    // its shadow on the ground (a step down the ground's ramp, to the right of it: the light from the left)
+    assert.ok(R[a].some((r) => r.slice(30).includes("g")) || R[a].some((r) => /[^w.]/.test(r.slice(30))), `${a}'s shadow`);
+  }
+  assert.throws(() => loadSource(base + `sprite("x", { w: 8, h: 8 }, draw({ as: "cubes" }))`, "t.px.js").image("x"), /as is "surface", "voxels", "splats", "mesh"/);
+  // a world's part drawn its own way; edited, the other part and the world's data alone stay as they were
+  const W = new World({ parts: { oak: { make: "tree", at: [-1, 0] }, rock: { make: "rock", at: [1.2, 0] } } }), W2 = W.edit({ "oak.as": "voxels" });
+  assert.deepEqual(W2.changed(W), ["oak.as"]);
+  assert.equal(W2.spec.parts.oak.as, "voxels"); assert.equal(W2.spec.parts.oak.params?.as, undefined, "not a builder's parameter");
+  assert.throws(() => new World({ parts: { a: { make: "rock", as: "cubes" } } }), /drawn as "surface"/);
+});

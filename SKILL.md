@@ -144,8 +144,8 @@ What exists, a line each; `PXL help <name>` prints the rest of any op or option 
   `trail()`, `ability()` from a hand's socket; `cast(spell("fire", 3, { from, to }))`.
 - **3D fields**: `sdf` drawn by `surface()`, `voxels()`, `mesh()`, `volume()`; details by
   `sdf.scatter` + `splats()`; hand-drawn art pinned on by `decal()`; a scene of named parts by
-  `world3d` and `make3d`, checked by `expect3d`; light and mats once by `look3d`; out by `export3d`
-  (`PXL help "scenes 17"`).
+  `world3d` and `make3d`, checked by `expect3d`; light and mats once by `look3d`; a game's sprites
+  from N headings by `turnaround()`; out by `export3d` (`PXL help "scenes 17"`).
 - **Procedural texture**: `hash`, `vnoise`, `fbm`, `bayer`, `seamless` (`PXL help vnoise`).
 
 ## Examples

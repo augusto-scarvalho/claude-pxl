@@ -16,7 +16,7 @@ import { type VolumeOpts, drawVolume } from "./volume.ts";
 import { type SplatOpts, drawSplats } from "./splats.ts";
 import { type DecalOpts, drawDecal } from "./decal.ts";
 import { type Draw3dOpts, drawWorld } from "./world3d.ts";
-import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshWorld, drawMesh } from "./mesh.ts";
+import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshWorld, drawMesh, groundOf } from "./mesh.ts";
 import type { Lit } from "./sunlight.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
 import { bayer, colorList, gridRows, hash, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
@@ -45,7 +45,8 @@ type Pred = (x: number, y: number) => boolean;
 /** Where stamps landed in an asset (top-left in image coords) with their sockets, by id: for `at`. */
 export type Placed = Map<string, { x: number; y: number; sockets?: Record<string, [number, number]> }>;
 /** What was stamped where, in drawing order (top-left in asset coords): for `pxl describe`. */
-export type Placement = { name: string; x: number; y: number; w: number; h: number; layer?: string; img: Img; /** the light it was drawn under, on the picture (a sprite in mesh()) */ light?: [number, number] };
+export type Placement = { name: string; x: number; y: number; w: number; h: number; layer?: string; img: Img; /** the light it was drawn under, on the picture (a sprite in mesh()) */ light?: [number, number];
+  /** a sprite in mesh(): how far its feet are over (under: below 0) the nearest face looking up under them, m, and its material */ stand?: { off: number; on: string } };
 
 /**
  * Drawing surface over an image. Coordinates are relative to (ox, oy); colors are palette
@@ -870,16 +871,31 @@ export class Canvas {
         looks[k] = { ...("over" in e ? { over: e.over } : "neutral" in e ? { neutral: light } : {}), ...(ch ? { char: ch } : {}), glow: typeof o.glow === "number" ? o.glow : 0 };
       }
     }
-    const sprites = (opts.sprites ?? []).map((s, k) => {
-      const at = s?.at;
+    // what stands on the model: where a sprite stands on, and how far check finds its feet from the face under them
+    const S = opts.sprites ?? [], ms = opts.stand;
+    const ground = S.some((s) => s?.stand) || ms || (this.res as { checksOnly?: boolean }).checksOnly ? groundOf(faces ?? []) : undefined;
+    const mats3 = (v: unknown, what: string) => {
+      if (!(v === undefined || typeof v === "boolean" || (Array.isArray(v) && v.every((m) => typeof m === "string")))) throw new PxError(`mesh: ${what} stand is true (on the highest face looking up under it) or materials' names, ["deck", "flags"], got ${JSON.stringify(v)}`);
+      return v;
+    };
+    mats3(ms, "the");
+    const sprites = S.map((s, k) => {
+      let at = s?.at;
+      const st = mats3(s?.stand, `sprite ${k}'s`) ?? (Array.isArray(at) && at.length === 2 && !s.air ? ms : undefined);
+      if (st && Array.isArray(at)) {
+        // on the highest face looking up under it (of those materials), or where it is
+        const hs = ground!(at[0], at[1]).filter((h) => st === true || (st as string[]).includes(h.mat));
+        if (hs.length) at = [at[0], at[1], Math.max(...hs.map((h) => h.u))];
+      }
       if (!s || typeof s.name !== "string" || !Array.isArray(at) || (at.length !== 2 && at.length !== 3) || !at.every(Number.isFinite))
-        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, veil?, light? }, got ${JSON.stringify(s)}`);
+        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, veil?, light?, stand?, air? }, got ${JSON.stringify(s)}`);
       // its own time in its loop and its own random choices, as a stamp's, picked by where it stands (cm)
       const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed, fx: s.fx };
       if (s.blend !== undefined && !["alpha", "add", "screen"].includes(s.blend)) throw new PxError(`mesh: sprite ${k} has blend ${JSON.stringify(s.blend)}: "alpha" (over, lit), "add" or "screen" (light)`);
       if (s.opacity !== undefined && !(s.opacity >= 0 && s.opacity <= 1)) throw new PxError(`mesh: sprite ${k} has opacity ${JSON.stringify(s.opacity)}: 0..1`);
       if (s.veil !== undefined && !(s.veil >= 0 && s.veil <= 1 && s.blend === "alpha")) throw new PxError(`mesh: sprite ${k} has veil ${JSON.stringify(s.veil)}: the share of the sun a sprite blended "alpha" holds back, 0..1`);
-      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, veil: s.veil, light: s.light };
+      if (s.air !== undefined && typeof s.air !== "boolean") throw new PxError(`mesh: sprite ${k} has air ${JSON.stringify(s.air)}: true when it flies (check doesn't ask its feet to be on the model)`);
+      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, veil: s.veil, light: s.light, air: s.air };
     });
     // looked up on first use: a palette without ramps has nothing to step (and needs nothing stepped without textures or sprites)
     let maps: Map<Color, Color>[] | undefined;
@@ -917,8 +933,11 @@ export class Canvas {
     }
     // straight into the pixels when nothing stands between (a clip, a twin's mirror, a wrapped edge)
     const mc = Object.assign(Object.create(this) as MeshCanvas, { raw: this.clipPred || this.mirrored || this.wrap ? undefined : this.img.data });
-    for (const p of drawMesh(mc, view, faces, mats, opts, { tex, masks, looks, sprites, step, lit }))
-      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}) });
+    for (const p of drawMesh(mc, view, faces, mats, opts, { tex, masks, looks, sprites, step, lit })) {
+      // (its feet against the nearest face looking up under them; none under, or flying: not asked)
+      const hs = ground && p.at && !p.air ? ground(p.at[0], p.at[1]) : [], h = hs.reduce<{ u: number; mat: string } | undefined>((b, q) => (!b || Math.abs(q.u - p.at![2]) < Math.abs(b.u - p.at![2]) ? q : b), undefined);
+      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}), ...(h ? { stand: { off: p.at![2] - h.u, on: h.mat } } : {}) });
+    }
   }
 
   /**
@@ -965,7 +984,8 @@ export class Canvas {
   draw3d(world: unknown, opts: Draw3dOpts = {}): void {
     const self = this as unknown as SurfaceCanvas;
     drawWorld(world, this.in3d(opts), {
-      surface: (f, o) => drawSurface(self, f, o as SurfaceOpts), splats: (s, o) => drawSplats(self, s, o as SplatOpts),
+      surface: (f, o) => drawSurface(self, f, o as SurfaceOpts), splats: (s, o) => drawSplats(self, s, o as SplatOpts), voxels: (f, o) => drawVoxels(self, f, o as VoxelOpts),
+      mesh: (v, faces, m, o) => this.mesh(v as Partial<View>, faces, m as Record<string, Material>, { ...o, over: true } as MeshOpts),
       volume: (dd, o) => drawVolume(self, dd, o as VolumeOpts), decal: (n, o) => drawDecal(this as unknown as Parameters<typeof drawDecal>[0], n, o as DecalOpts),
       clock: { t: this.t, phase: this.frames > 0 ? this.frame / this.frames : 0, frame: this.frame, frames: this.frames },
     });

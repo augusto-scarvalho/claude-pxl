@@ -273,6 +273,11 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   (`examples/hd2d/graveyard.px.js`). A box drawn in meters at the HD picture's own pixel (a fence)
   reads as a 3D render among the sprites: at the sizes its ramp materials go in blocks of a sprite's
   pixel by themselves, a tone each, the outline only on the shaded side (`block: k` on a textured one).
+- Feet on the model in a diorama: `mesh(..., { stand: true })` sets every sprite whose `at` has no up
+  on the face looking up under it (the plaza's step, the hill's top, the pier; `stand: ["deck"]` on those
+  materials alone, when a roof or an awning is over the people), instead of heights by hand. `pxl check`
+  then warns where a sprite's feet are more than 0.15 m off the face under them: a tuft past the hill's
+  round corner in the air. What flies or hangs says `air: true` (gulls, leaves, a lantern on a rope).
 - Hiding a thing behind a wall in a diorama: from a camera tilted `pitch` down, a wall `h` m tall
   hides what is `d` m behind it only below `h - d * tan(pitch)`: at 38 degrees a 1.4 m wall didn't
   hide a ball 0.4 m behind it at 1.2 m; at 1.7 m and 0.2 m behind it does. Its light still shows on the
@@ -832,6 +837,17 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). What held, from buildi
   mats })`, and the calls stop repeating them; the HD-2D camera is `perspective({ w, h, pitch, fov,
   ppm })`, and `at: CAM.aim(h)` stands a thing so its point h m up (its middle) is where the camera
   looks. A scene's `sizes` draws its fields, voxels and volumes k times as big too, a ray to a block.
+- **One thing, any representation.** `draw3d(thing, { as: "voxels" })` draws a field, a built thing or a
+  world as its surface, voxels, splats or a mesh, the splats' and the mesh's shadow the field's, the
+  mesh where `at` puts it; a world's part its own way, `world.edit({ "oak.as": "voxels" })`, the rest as
+  it was (`examples/sdf/splats.px.js`).
+- **A turnaround: a 3D thing as a game's sprites.** `turnaround("house", make3d.house(), { view: "iso",
+  n: 4 })` draws it from each heading, the camera and the light going round it (so every sprite is lit
+  from the same side), one size, the pivot at its foot, named by the compass: `house_ne`, `house_se`,
+  ... (4 in iso: its diagonals; 8; 16: `n, nne, ne, ene, ...`). Stamp them in any scene; through the
+  HD-2D camera, among `mesh()`'s faces. Something symmetric lit from above or in front mirrors its west
+  for its east, as a game flips it (`examples/sdf/turnaround.px.js`): a sprite the game flips is lit
+  from straight above.
 - **Out to other tools.** `export3d` writes `.vox`, `.obj`, `.glb` and `.ply`; something that moves,
   as a function of the clock with `frames`, goes out as one `.glb` that plays (and a file a moment for
   the others). `pxl serve` shows the `.glb` and `.ply` to turn round at `/3d`. `mesh()` draws a mesh

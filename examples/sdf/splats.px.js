@@ -12,30 +12,20 @@ const STILL = tree({ wind: 0 }), PPM16 = 16
 const TREE_SPLATS = sdf.splats(STILL, { spacing: 0.05, size: 0.03 })
 const PW = 96, PH = 104
 
-// A mesh in surface()'s orthographic views: mesh("side" | "top" | "iso", faces, mats, { ppm, at }), the
-// faces in the world's meters, their [0, 0, 0] landing at `at` px.
-const MESH = sdf.mesh(STILL, { size: 0.1 }), MESH_MATS = { bark: { ramp: "bBiI", smooth: true }, leaf: { ramp: "ZzxcvVJ", smooth: true } }
-const GRID = sdf.voxels(STILL, { size: 0.1 })
-
-// each panel: the tree as one thing, in one view; the camera's on the grass
+// each panel: the tree as one thing drawn one way (draw3d's as: its surface, voxels of 0.1 m, a mesh of
+// 0.1 m, splats 0.05 m apart), in one view; the camera's on the grass, the mesh's and the splats' shadow
+// their field's
 const CAM = hd2d(PW, PH, 13), GR = ground(CAM.z), AT = CAM.aim(2.2)
+// (the mesh through the camera in the ground's own mesh(), so the grass in front of the trunk's foot is
+// outlined against it as it was: draw3d's mesh comes after the ground, over its depth)
+const MESH = sdf.mesh(STILL, { size: 0.1 }).faces.map((f) => ({ mat: f.mat, pts: f.pts.map((p) => [p[0] + AT[0], p[1] + AT[1], p[2]]) }))
 const panelOf = (rep, view) => sprite(`p_${rep}_${view}`, { w: PW, h: PH }, (c) => {
-  if (view === "camera") {
-    const faces = rep === "mesh" ? [...GR.faces, ...MESH.faces.map((f) => ({ mat: f.mat, pts: f.pts.map((p) => [p[0] + AT[0], p[1] + AT[1], p[2]]) }))] : GR.faces
-    c.mesh(CAM, faces, { ...GMATS, ...MESH_MATS })
-    if (rep === "surface") c.surface(STILL, { view: CAM, at: AT })
-    if (rep === "voxels") c.voxels(GRID, { view: CAM, at: AT })
-    if (rep === "splats") c.splats(TREE_SPLATS, { view: CAM, at: AT })
-    // (a mesh's and splats' shadow: their field's, laid by surface() drawing nothing else)
-    if (rep === "mesh" || rep === "splats") c.surface(STILL, { view: CAM, at: AT, hide: true })
-    return
-  }
-  const at = [PW / 2, view === "top" ? PH / 2 + 4 : PH - 6]
-  if (rep === "surface") c.surface(STILL, { view, ppm: PPM16, at })
+  const o = { as: rep, size: 0.1, spacing: 0.05 }
+  if (view === "camera" && rep === "mesh") { c.mesh(CAM, [...GR.faces, ...MESH], { ...GMATS, bark: { ramp: "bBiI", smooth: true }, leaf: { ramp: "ZzxcvVJ", smooth: true } }); c.surface(STILL, { view: CAM, at: AT, hide: true }); return }
+  if (view === "camera") { c.mesh(CAM, GR.faces, GMATS); c.draw3d(STILL, { ...o, view: CAM, at: AT }); return }
   // (voxels through the same true views as the others here, not on the pixel grid: the same tree compared)
-  if (rep === "voxels") c.voxels(GRID, { view: { kind: view, pitch: view === "top" ? 90 : view === "iso" ? 30 : 20, yaw: view === "iso" ? 45 : 0 }, ppm: PPM16, at })
-  if (rep === "splats") c.splats(TREE_SPLATS, { view, ppm: PPM16, at })
-  if (rep === "mesh") c.mesh(view, MESH.faces, MESH_MATS, { ppm: PPM16, at })
+  const turn = rep === "voxels" ? { pitch: view === "top" ? 90 : view === "iso" ? 30 : 20, yaw: view === "iso" ? 45 : 0 } : {}
+  c.draw3d(STILL, { ...o, view: { kind: view, ...turn, origin: [PW / 2, view === "top" ? PH / 2 + 4 : PH - 6] }, ppm: PPM16 })
 })
 const REPS = ["surface", "voxels", "mesh", "splats"], VIEWS = ["side", "top", "iso", "camera"]
 for (const r of REPS) for (const v of VIEWS) panelOf(r, v)

@@ -222,21 +222,23 @@ for (const [x0, x1, z0, h] of [[-40, -8, 30, 7], [-12, 14, 36, 9], [10, 40, 28, 
 
 // The wood, the tree, and what grows on the hill: placed once, seeded. The detail goes on the hill's
 // top; the wood round it is quieter, and the far trees are hazed.
-const R = rng(13), things = [{ name: "_snag", at: [-4.6, Z + 4.9, TOP] }]
-const tufts = (x, z, u, n) => { for (let k = 0; k < n; k++) things.push({ name: ["_tuft_a", "_tuft_b", "_tuft_c"][Math.floor(R() * 3)], at: [x + (R() - 0.5) * 0.7, z - R() * 0.15, u], shadow: 0 }) }
+const R = rng(13), things = [{ name: "_snag", at: [-4.6, Z + 4.9] }]
+// (each on the model where it stands, stand: true on the mesh(); `u` keeps one at that height)
+const tufts = (x, z, n, u) => { for (let k = 0; k < n; k++) things.push({ name: ["_tuft_a", "_tuft_b", "_tuft_c"][Math.floor(R() * 3)], at: [x + (R() - 0.5) * 0.7, z - R() * 0.15, ...(u === undefined ? [] : [u])], shadow: 0 }) }
 // the headstones either side of the path, tufts at their feet, flowers by some
 for (const [x, dz, name, flowers] of [[-3.4, 3.2, "_grave_arch", "_flowers_w"], [-2, 4.6, "_grave_cross", ""], [-4.4, 0.8, "_grave_old", ""], [2.6, 3.8, "_grave_arch", "_flowers_p"], [3.9, 1.6, "_grave_slab", ""], [2.1, 0.4, "_grave_old", "_flowers_w"]]) {
-  things.push({ name, at: [x, Z + dz, TOP] })
-  tufts(x, Z + dz - 0.04, TOP, 2 + Math.floor(R() * 2))
-  if (flowers) things.push({ name: flowers, at: [x + 0.45, Z + dz - 0.25, TOP], shadow: 0 })
+  things.push({ name, at: [x, Z + dz] })
+  tufts(x, Z + dz - 0.04, 2 + Math.floor(R() * 2))
+  if (flowers) things.push({ name: flowers, at: [x + 0.45, Z + dz - 0.25], shadow: 0 })
 }
 for (let k = 0; k < 170; k++) {
   const x = -16 + R() * 32, z = Z - 9 + R() * 34, h = R()
   if (Math.abs(x) < 7.5 && z > Z - 4.5 && z < Z + 7.5) continue   // not on the hill or at its foot
   things.push({ name: z > Z + 13 ? "_spruce_far" : h < 0.3 ? "_spruce_s" : h < 0.65 ? "_spruce_m" : "_spruce", at: [x, z] })
 }
-for (const [x, z] of [[-1.6, 1], [1.7, 2.6], [-5.6, 3.5], [5.3, 0.2], [-0.9, 5.4]]) things.push({ name: R() < 0.5 ? "_rock" : "_rock_small", at: [x, Z + z, TOP], shadow: 0 })
-for (const x of [-5.8, -3.6, -1.6, 2, 4.4, 5.9]) tufts(x, Z - 2.25, TOP, 2)                 // along the fence
+for (const [x, z] of [[-1.6, 1], [1.7, 2.6], [-5.6, 3.5], [5.3, 0.2], [-0.9, 5.4]]) things.push({ name: R() < 0.5 ? "_rock" : "_rock_small", at: [x, Z + z], shadow: 0 })
+// along the fence, at the top's height by hand (three of them stand past the hill's round corners, in the air)
+for (const x of [-5.8, -3.6, -1.6, 2, 4.4, 5.9]) tufts(x, Z - 2.25, 2, TOP)
 // grass spilling over the wall's top along its front and sides (the hill's edge isn't a line), small
 // clumps at uneven gaps, a little out from it; mossy boulders at its corners, breaking them
 OUTLINE.forEach(([x, z], i) => {
@@ -252,7 +254,7 @@ for (const [cx, cz, dx, dz, r, u, name] of [[-4.9, -0.9, -1, -1, 1.95, 0, "_boul
 // bushes in twos and threes at the wall's foot, tufts between
 for (const [x0, n] of [[-6.1, 3], [-3.2, 2], [2.4, 2], [4.9, 3]]) {
   for (let k = 0; k < n; k++) things.push({ name: ["_bush", "_bush_b", "_bush_c"][Math.floor(R() * 3)], at: [x0 + k * 0.62 + R() * 0.2, Z - 2.7 - R() * 0.15] })
-  tufts(x0 + n * 0.62 + 0.2, Z - 2.75, 0, 2)
+  tufts(x0 + n * 0.62 + 0.2, Z - 2.75, 2)
 }
 
 // The traveler's visit, on the scene's clock (80 ms a frame): he comes in from the near left through a
@@ -311,7 +313,7 @@ const traveler = (f) => {
 const TURN = ["nw", "n", "ne", "e"]
 const mourner = (f) => {
   const t = f - TALK, k = t < 12 ? 0 : t < 76 ? Math.min(3, Math.floor((t - 12) / 2) + 1) : Math.max(0, 3 - Math.floor((t - 80) / 2) - 1)
-  return { name: `mo_idle_${TURN[t < 76 || t >= 80 ? k : 3]}`, at: [-2.75, Z + 2.45, TOP], frame: Math.floor((f * MS) / 250) % 4 }
+  return { name: `mo_idle_${TURN[t < 76 || t >= 80 ? k : 3]}`, at: [-2.75, Z + 2.45], frame: Math.floor((f * MS) / 250) % 4 }
 }
 const SAYS = [
   [4, 32, "Alden", ["Are you all right?"], () => [-1.95, Z + 1.8, TOP], 1],
@@ -370,21 +372,21 @@ const sway = (t, f) => (t.name.startsWith("_spruce") || t.name === "_snag" ? { .
 const LEAVES = Array.from({ length: 14 }, (_, i) => ({ x0: hash(i, 41) * 36, z: Z - 7 + hash(i, 42) * 17, u: TOP + 0.5 + hash(i, 43) * 2.2, ph: hash(i, 44) * 6.28, name: hash(i, 45) < 0.55 ? "_leaf" : "_leaf_y" }))
 const leaves = (c) => LEAVES.map((l, i) => {
   const f = c.frame, w = 2 * Math.PI * c.phase
-  return { name: l.name, at: [c.cross(l.x0, { span: 36, per: 36 * 6, from: -18, whole: false }), l.z + 0.4 * Math.sin(8 * w + l.ph), l.u + 0.45 * Math.sin(12 * w + l.ph)], frame: (f + i) % 4, shadow: 0 }
+  return { name: l.name, at: [c.cross(l.x0, { span: 36, per: 36 * 6, from: -18, whole: false }), l.z + 0.4 * Math.sin(8 * w + l.ph), l.u + 0.45 * Math.sin(12 * w + l.ph)], frame: (f + i) % 4, shadow: 0, air: true }
 })
-const laid = (f) => (f >= GRAVE + 8 ? [{ name: "_rose", at: [1.55, Z + 0.3, TOP], shadow: 0 }] : [])
+const laid = (f) => (f >= GRAVE + 8 ? [{ name: "_rose", at: [1.55, Z + 0.3], shadow: 0 }] : [])
 const people = (c, f = c.frame) => [...wood.map((t) => sway(t, f)), ...leaves(c), ...laid(f), mourner(f), ...[traveler(f)].filter(Boolean)]
 const CLOCK = { frames: FRAMES, fps: 1000 / MS }
 // Morning: the sun behind on the left (the shadows fall toward us and to the right), warm; the sky's
 // light violet in the shade.
 const LIGHT = { light: [-0.55, 0.6, 0.72], sun: { color: "#ffe2b4", strength: 1.3 }, sky: { color: "#a4a6d8", strength: 0.45 } }
-// checked one frame in 24: no scene rule runs on it (no world.light, nothing with a height or a front
-// marker), so the frames checked only prove they build; the tests stay fast
+// checked one frame in 24 (the lit side against the mesh's light, the feet on the model: stand: true
+// sets the props and the mourner on it, the leaves fly), the tests kept fast
 // Its sizes, through the camera (post(), in the art's pixels): the hill's top sharp, the wood below and
 // the hills behind blurred and taken by a warm mist, a bloom, darker corners; the fence in blocks of a
 // sprite's pixel. `graveyard_hd` four times (1920x1080); `graveyard_md` twice (960x540: the gallery's
 // GIF, its 46 s a quarter of the pixels to draw and to store).
 scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 24 }, sizes: { graveyard_hd: 4, graveyard_md: 2 } },
-  (c) => c.mesh(CAM, M.faces, MATS, { sprites: people(c), ...LIGHT }),
+  (c) => c.mesh(CAM, M.faces, MATS, { sprites: people(c), stand: true, ...LIGHT }),
   post({ blur: 9, focus: [W / 2, H * 0.55], sharp: 2.5, soft: [3, 8], fog: { color: "#dcdccc", from: DIST + 2, to: DIST + 26, max: 0.7 }, bloom: { strength: 0.6, r: 10 }, vignette: 0.35 }),
   (c) => talk(c))

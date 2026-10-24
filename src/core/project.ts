@@ -5,7 +5,8 @@ import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from 
 import { type View, perspective } from "./perspective.ts";
 import { solid } from "./solids.ts";
 import { model } from "./mesh.ts";
-import { sdf } from "./sdf.ts";
+import { Sdf, sdf } from "./sdf.ts";
+import { clocksOf, headingsOf, mirrorSymmetric, turnLight, turnViews } from "./turnaround.ts";
 import { SURFACE_OPTS, VOXEL_OPTS, surfaceSize } from "./surface.ts";
 import { Mesh3, Voxels, surfaceNets, voxelize } from "./grids.ts";
 import { VOLUME_OPTS } from "./volume.ts";
@@ -138,7 +139,7 @@ export const OP_OPTS: Record<string, string[]> = {
   // one options object serves both: solids ignores shade, shadows ramps and light
   solids: ["at", "sun", "scale", "ramps", "light", "shade"],
   shadows: ["at", "sun", "scale", "shade", "ramps", "light"],
-  mesh: ["light", "sprites", "pixel", "sun", "sky", "lamps", "emit", "shadows", "ppm", "at"],
+  mesh: ["light", "sprites", "pixel", "sun", "sky", "lamps", "emit", "shadows", "ppm", "at", "stand"],
   surface: SURFACE_OPTS,
   voxels: VOXEL_OPTS,
   volume: VOLUME_OPTS,
@@ -514,6 +515,48 @@ export class Project implements BuildCtx {
         });
         (env.group as (n: string, m: string[]) => void)(name, want.map((_, i) => `${name}_${i}`));
       } catch (e) { throw wrap(e).within("directions", loc); }
+    };
+    // turnaround(name, thing, { view, ppm, n, headings, part, ... }): a thing in 3D seen from N headings,
+    // a sprite (or anim) each, named by the compass, the east mirrored from the west where it can be (turnaround.ts)
+    env.turnaround = (name: unknown, thing: unknown, opts: unknown = {}) => {
+      const loc = this.callerLoc();
+      try {
+        if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError('turnaround("house", make3d.house(), { view: "iso", n: 8, ppm: 16 })');
+        checkKeys("turnaround", opts, ["view", "ppm", "n", "headings", "part", "mats", "light", "as", "size", "spacing", "frames", "fps", "mirror", "pad"]);
+        const o = opts as { view?: unknown; ppm?: number; n?: number; headings?: unknown; part?: string; mats?: unknown; light?: unknown; as?: string; size?: number; spacing?: number; frames?: number; fps?: number; mirror?: unknown; pad?: number };
+        // what is turned: a field or a built thing, or a world's part standing at the origin
+        let b: Partial<Built> | undefined, only: string[] | undefined, at0 = [0, 0, 0];
+        if (thing instanceof World) {
+          if (typeof o.part !== "string" || !thing.spec.parts[o.part]) throw new PxError(`turnaround: a world's part is { part: "name" } (it has: ${thing.names.join(", ")}), got ${JSON.stringify(o.part)}`);
+          const p = thing.place(o.part);
+          b = thing.built(o.part); only = [o.part]; at0 = [-p[0], -p[1], -p[2]];
+        } else b = thing instanceof Sdf ? { field: thing } : (thing as Built);
+        const field = b?.field;
+        if (!(field instanceof Sdf)) throw new PxError("turnaround: a field (sdf.*), a built thing (make3d.house(...)) or a world with { part }: something solid");
+        const { frames, fps = 8, ppm = 16, pad = 2, mirror = "auto", view = "iso" } = o;
+        if (!(frames === undefined || (Number.isInteger(frames) && frames >= 1)) || !(fps > 0) || !(ppm > 0) || !(Number.isInteger(pad) && pad >= 0) || ![true, false, "auto"].includes(mirror as boolean))
+          throw new PxError(`turnaround: frames (an anim's, when the thing moves on the clock), fps above 0, ppm above 0, pad (px, whole), mirror true, false or "auto", got ${JSON.stringify({ frames, fps, ppm, pad, mirror })}`);
+        const persp = !!view && typeof view === "object" && "horizon" in view, kind = typeof view === "string" ? view : (view as { kind?: string })?.kind;
+        const H = headingsOf(o.n ?? 8, o.headings, !persp && kind === "iso"), clocks = clocksOf(frames, fps);
+        const T = turnViews(view, ppm, field, H.map((h) => h.deg), clocks, pad);
+        // mirrored (the east from the west, as the traveler's) where the thing is its own mirror and its light
+        // comes from the picture's middle (above, in front, behind): what a flip keeps
+        const L = o.light ?? this.look3d?.light, y0 = persp ? (view as View).yaw ?? 0 : (view as { yaw?: number })?.yaw ?? (kind === "iso" ? 45 : 0);
+        const level = Array.isArray(L) && Math.abs(L[0] * Math.cos((y0 * Math.PI) / 180) - L[1] * Math.sin((y0 * Math.PI) / 180)) < 0.05 * Math.hypot(...(L as number[]));
+        const sym = mirror === true || (mirror === "auto" && level && !Object.keys(b.details ?? {}).length && Object.values(b.decals ?? {}).every((d) => Math.abs(d.point[0]) < 0.01) && mirrorSymmetric(field, clocks));
+        const kindA = frames ? "anim" : "sprite", names = H.map((h) => `${name}_${h.name}`);
+        const twin = H.map((h) => (sym && h.deg > 0 && h.deg < 180 ? H.findIndex((g) => Math.abs(g.deg - (360 - h.deg)) < 1e-9) : -1));
+        H.forEach((_, i) => {
+          if (twin[i] >= 0) return;
+          const v = T.views[i], light = Array.isArray(L) ? turnLight(L as number[], v.turn) : L;
+          const draw = { view: v.view, at: [v.at[0] + at0[0], v.at[1] + at0[1], v.at[2] + at0[2]], ...(persp ? {} : { ppm }), ...(o.mats !== undefined ? { mats: o.mats } : {}), ...(light !== undefined ? { light } : {}),
+            ...(o.as !== undefined ? { as: o.as } : {}), ...(o.size !== undefined ? { size: o.size } : {}), ...(o.spacing !== undefined ? { spacing: o.spacing } : {}), ...(only ? { only } : {}) };
+          define(kindA, names[i], [{ w: T.w, h: T.h, pivot: T.pivot, ...(frames ? { frames, fps } : {}) }, (c: Canvas) => c.draw3d(thing, draw as never)]);
+        });
+        H.forEach((_, i) => { if (twin[i] >= 0) define(kindA, names[i], [{ base: names[twin[i]], flip: "x", pivot: T.pivot }]); });
+        (env.group as (n: string, m: string[]) => void)(name, names);
+        return { names, headings: H.map((h) => h.name), w: T.w, h: T.h, pivot: T.pivot, mirrored: names.filter((_, i) => twin[i] >= 0) };
+      } catch (e) { throw wrap(e).within("turnaround", loc); }
     };
     env.font = (name: unknown, asset: unknown, opts: Partial<FontDef> = {}) => {
       const loc = this.callerLoc();

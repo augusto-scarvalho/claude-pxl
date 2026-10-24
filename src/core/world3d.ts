@@ -11,6 +11,10 @@ import { PxError } from "./errors.ts";
 import { type Clock, Density, STILL, Sdf, type V3, compile, compileDensity } from "./sdf.ts";
 import { peel, scatter } from "./scatter.ts";
 import type { Splats } from "./splats.ts";
+import { type Voxels, surfaceNets } from "./grids.ts";
+
+/** How a solid is drawn: surface() (rays to its surface), voxels(), splats() or mesh() of its surface. */
+export const AS = ["surface", "voxels", "splats", "mesh"];
 
 export interface PartSpec {
   make: string;
@@ -30,6 +34,8 @@ export interface PartSpec {
   mats?: Record<string, unknown>;
   /** air: how it is drawn, over its builder's look (ramp: the keys themselves, thickness, ambient, cast, emit) */
   look?: Partial<NonNullable<Built["look"]>>;
+  /** a solid drawn as "surface" (default), "voxels", "splats" or "mesh", over draw3d's */
+  as?: string;
 }
 export interface WorldSpec {
   seed?: number;
@@ -56,6 +62,7 @@ export class World {
       if ((p.mats !== undefined && (typeof p.mats !== "object" || p.mats === null)) || (p.look !== undefined && (typeof p.look !== "object" || p.look === null))) throw new PxError(`world3d: part '${name}': mats is { material: ramp } and look { thickness, ramp, ... }`);
       for (const r of [p.on, p.around, p.beside?.[0], p.attach?.[0]]) if (r !== undefined && !spec.parts[r]) throw new PxError(`world3d: part '${name}' refers to '${r}', which isn't a part (it has: ${Object.keys(spec.parts).join(", ")})`);
       if (p.beside && !SIDES[p.beside[1]]) throw new PxError(`world3d: part '${name}' is beside on "left", "right", "front" or "behind", got ${JSON.stringify(p.beside[1])}`);
+      if (p.as !== undefined && !AS.includes(p.as)) throw new PxError(`world3d: part '${name}' is drawn as ${AS.map((a) => `"${a}"`).join(", ")}, got ${JSON.stringify(p.as)}`);
     }
     this.spec = spec;
   }
@@ -119,7 +126,9 @@ export class World {
       if (rest.length || !key) throw new PxError(`edit: "part.parameter" (or "wind.from"), got '${path}'`);
       if (part === "wind") { if (key !== "from" && key !== "strength") throw new PxError(`edit: the wind has from and strength, got '${key}'`); (spec.wind as Record<string, unknown>)[key] = v; continue; }
       if (!spec.parts[part]) throw new PxError(`edit: no part '${part}' (it has: ${this.names.join(", ")})`);
-      spec.parts[part].params![key] = v;
+      // how it is drawn ("oak.as": "voxels") is the part's, not its builder's
+      if (key === "as") spec.parts[part].as = v as string;
+      else spec.parts[part].params![key] = v;
     }
     return new World(spec, this.makers);
   }
@@ -132,6 +141,7 @@ export class World {
     for (const [k, f] of Object.entries(b.parts)) out[`${name}.${k}`] = key(f);
     for (const [k, s] of this.details(name)) out[`${name}.${k}`] = Buffer.from(s.pos.buffer).toString("base64") + Buffer.from(s.mat.buffer).toString("base64");
     out[`${name}@`] = JSON.stringify(times.map((c) => this.place(name, c)));
+    if (this.spec.parts[name].as) out[`${name}.as`] = this.spec.parts[name].as!;
     return out;
   }
   /** Which parts (and their named parts, details, places) differ from another world's. */
@@ -323,6 +333,8 @@ export { Density, Sdf };
 
 export interface Draw3dOpts {
   view?: unknown; ppm?: number; pixel?: number; light?: number[];
+  /** how its solids are drawn ("surface", "voxels", "splats", "mesh"), where a part doesn't say; `size` the cell of voxels and of a mesh (m, default 0.1), `spacing` the splats' (m) */
+  as?: string; size?: number; spacing?: number;
   /** every material's ramp (a mist's "mist_<color>" too) */
   mats?: Record<string, unknown>;
   /** these parts only */
@@ -330,25 +342,53 @@ export interface Draw3dOpts {
   /** where the world's [0, 0, 0] stands in the view's world (m; through a camera, [x, ahead, up]) */
   at?: number[];
 }
-export const DRAW3D_OPTS = ["view", "ppm", "pixel", "light", "mats", "only", "at"];
+export const DRAW3D_OPTS = ["view", "ppm", "pixel", "light", "mats", "only", "at", "as", "size", "spacing"];
 type Drawers = {
-  surface: (f: Sdf, o: Record<string, unknown>) => void; splats: (s: Splats, o: Record<string, unknown>) => void;
+  surface: (f: Sdf, o: Record<string, unknown>) => void; splats: (s: Splats | Sdf, o: Record<string, unknown>) => void;
+  voxels: (f: Sdf | Voxels, o: Record<string, unknown>) => void; mesh: (view: unknown, faces: { mat: string; pts: V3[] }[], mats: Record<string, unknown>, o: Record<string, unknown>) => void;
   volume: (d: Density, o: Record<string, unknown>) => void; decal: (name: string, o: Record<string, unknown>) => void; clock: Clock;
 };
+/** A world, or a field or a built thing (make3d's) as a world of one part, "thing" (made once each). */
+const ONE = new WeakMap<object, World>();
+function worldOf(t: unknown): World {
+  if (t instanceof World) return t;
+  const b = t instanceof Sdf ? { field: t, parts: {}, details: {}, decals: {}, sockets: {} } : t as Built;
+  if (!b || typeof b !== "object" || !(b.field instanceof Sdf || b.density instanceof Density)) throw new PxError("draw3d(thing, { view, as, mats, light, ppm, pixel, only, at }): a world3d(...), a field (sdf.*) or a built thing (make3d.tree(...))");
+  let W = ONE.get(t as object);
+  if (!W) ONE.set(t as object, (W = new World({ parts: { thing: { make: "thing" } } }, { thing: () => b as Built })));
+  return W;
+}
+
 /**
  * Draw a world through a view: its solids (each pixel named by its part, "oak.canopy"), the details on
  * them, their decals, then its air (mists, smoke) the farthest first. Each part where its relations put
  * it at this moment.
  */
-export function drawWorld(W: unknown, o: Draw3dOpts, d: Drawers): void {
-  if (!(W instanceof World)) throw new PxError("draw3d(world, { view, mats, light, ppm, pixel, only }): a world3d(...)");
+export function drawWorld(thing: unknown, o: Draw3dOpts, d: Drawers): void {
+  const W = worldOf(thing);
+  if (o.as !== undefined && !AS.includes(o.as)) throw new PxError(`draw3d: as is ${AS.map((a) => `"${a}"`).join(", ")}, got ${JSON.stringify(o.as)}`);
   const names = W.names.filter((n) => !o.only || o.only.includes(n)), mats = o.mats ?? {};
   for (const n of o.only ?? []) if (!W.spec.parts[n]) throw new PxError(`draw3d: only names '${n}', which isn't a part (it has: ${W.names.join(", ")})`);
   const off = o.at ?? [0, 0, 0];
   if (!(Array.isArray(off) && off.length === 3 && off.every(Number.isFinite))) throw new PxError(`draw3d: at is where the world's [0, 0, 0] stands, [x, y, z] m, got ${JSON.stringify(o.at)}`);
   const base = { view: o.view, ppm: o.ppm, pixel: o.pixel, light: o.light }, at = (n: string) => { const p = W.place(n, d.clock); return [p[0] + off[0], p[1] + off[1], p[2] + off[2]]; };
   const own = (n: string) => (W.spec.parts[n].mats ? { ...mats, ...W.spec.parts[n].mats } : mats);
-  for (const n of names) { const b = W.built(n); if (b.field) d.surface(b.field, { ...base, at: at(n), mats: own(n), part: n }); }
+  for (const n of names) {
+    const b = W.built(n), f = b.field, as = W.spec.parts[n].as ?? o.as ?? "surface", where = { ...base, at: at(n), mats: own(n), part: n };
+    if (!f) continue;
+    if (as === "surface") d.surface(f, where);
+    else if (as === "voxels") d.voxels(f, { ...where, size: o.size ?? 0.1 });
+    else if (as === "splats") d.splats(f, { ...where, spacing: o.spacing });
+    else {
+      // its surface as faces where it stands, drawn in the depth what is drawn already left, a smooth ramp a material
+      const p = at(n), ortho = !(o.view && typeof o.view === "object" && "horizon" in o.view);
+      const faces = surfaceNets(f, { size: o.size ?? 0.1, clock: d.clock }).faces.map((F) => ({ mat: F.mat, pts: F.pts.map((q) => [q[0] + p[0], q[1] + p[1], q[2] + p[2]] as V3) }));
+      const ramps = Object.fromEntries(Object.entries(own(n)).map(([k, m]) => [k, { ramp: m && typeof m === "object" && !Array.isArray(m) ? (m as { ramp: unknown }).ramp : m, smooth: true }]));
+      d.mesh(o.view, faces, ramps, { ...(o.light !== undefined ? { light: o.light } : {}), ...(ortho && o.ppm !== undefined ? { ppm: o.ppm } : {}) });
+    }
+    // (a mesh's and splats' shadow: the field's, laid by surface() drawing nothing else)
+    if ((as === "mesh" || as === "splats") && o.view && typeof o.view === "object" && "horizon" in o.view) d.surface(f, { ...where, hide: true });
+  }
   for (const n of names) for (const [k, s] of W.details(n)) d.splats(s, { ...base, at: at(n), mats: own(n), part: `${n}.${k}` });
   for (const n of names) {
     const b = W.built(n);

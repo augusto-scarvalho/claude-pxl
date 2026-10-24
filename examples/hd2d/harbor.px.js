@@ -450,8 +450,8 @@ const SAILS = Array.from({ length: SAILF }, (_, f) => {
   M.loft("canvas", Array.from({ length: 17 }, (_, i) => ringAt(i / 16, 0)))
   for (let k = 1; k < 8; k++) M.loft("rope", [ringAt(k / 8 - 0.006, 0.015), ringAt(k / 8 + 0.006, 0.015)])
 }
-// lanterns, red and white: at the bow, and four along the stern with a fifth hung lower
-const LANTERNS = [[-6.2, 1.25], [6.2, 0.8], [7.06, 1.7], [7.76, 1.7], [8.46, 1.7], [9.35, 1.3]].map(([x, u]) => ({ name: "_lantern", at: [x, Z + hullZ(x, 1.8) - 0.35, u], shadow: 0 }))
+// lanterns, red and white: at the bow, and four along the stern with a fifth hung lower (air: they hang)
+const LANTERNS = [[-6.2, 1.25], [6.2, 0.8], [7.06, 1.7], [7.76, 1.7], [8.46, 1.7], [9.35, 1.3]].map(([x, u]) => ({ name: "_lantern", at: [x, Z + hullZ(x, 1.8) - 0.35, u], shadow: 0, air: true }))
 // The galleon bobs at the pier, so its faces are taken out and drawn per frame (faces(f)), with its
 // reflection: the same faces mirrored under the water, seen through the calm between the ripples in
 // front of it, lit by the sky only (the water over it takes the sun), a touch darker.
@@ -608,7 +608,7 @@ const PACE = 1.6 / PPM
 const carrier = (f) => {
   const STEP = 0.7 * PACE, LEG = 45, T = 3, x0 = 4.2, x1 = x0 + LEG * STEP, z = Z - 8.25, t = f % LOOP
   const [x, dir, walking] = t < LEG ? [x0 + t * STEP, "e", true] : t < LEG + T ? [x1, "e", false] : t < 2 * LEG + T ? [x1 - (t - LEG - T) * STEP, "w", true] : [x0, "w", false]
-  return [{ name: `car_${walking ? "carry" : "carryidle"}_${dir}`, at: [x, z, LOWER], frame: walking ? f % 8 : idle(f) }]
+  return [{ name: `car_${walking ? "carry" : "carryidle"}_${dir}`, at: [x, z], frame: walking ? f % 8 : idle(f) }]
 }
 const ONSHIP = [...LANTERNS, { name: "sab_idle_s", at: [2.8, Z + hullZ(2.8, DECK) + 0.45, DECK] }, { name: "off_idle_sw", at: [7.7, Z + hullZ(7.7, DECK) + 0.9, POOP] }]
 const onShip = (f) => { const { th, dh } = shipPose(f); return ONSHIP.map((p) => ({ ...p, at: turnPt(p.at, SHIPC, [1, 0, 0], th, dh), frame: idle(f) })) }
@@ -618,7 +618,7 @@ const onShip = (f) => { const { th, dh } = shipPose(f); return ONSHIP.map((p) =>
 const GULLS = [[-6, 12, 3.0, 1, 0], [10, 4, 5.2, 1, 11], [-14, -12.5, 5.6, -1, 17]]
 const gulls = (f) => GULLS.map(([x0, z, u, way, o], i) => {
   const s = (f % LOOP) / LOOP, t = (f + o) % 24
-  return { name: way > 0 ? "_gull" : "_gull_l", at: [-22 + ((((x0 + 22 + way * 44 * s) % 44) + 44) % 44), Z + z, u + 0.35 * Math.sin(4 * Math.PI * s + i)], frame: t < 8 ? t % 4 : 1, shadow: 0 }
+  return { name: way > 0 ? "_gull" : "_gull_l", at: [-22 + ((((x0 + 22 + way * 44 * s) % 44) + 44) % 44), Z + z, u + 0.35 * Math.sin(4 * Math.PI * s + i)], frame: t < 8 ? t % 4 : 1, shadow: 0, air: true }
 })
 // ---------------------------------------------------------------- the story
 // Alden's passage, on the scene's clock (100 ms a frame), as in the graveyard: he comes in from the
@@ -685,12 +685,12 @@ const watchers = [["mo", -3.2, -5.75], ["cmp", -2.3, -5.6]].map(([who, x, z]) =>
     if (f % 2 === 0 && want !== k) k = (k + (((want - k + 8) % 8) <= 4 ? 1 : 7)) % 8
     dirs.push(ORDER[k])
   }
-  return (f) => ({ name: `${who}_idle_${dirs[f % FRAMES]}`, at: [x, Z + z, LOWER], frame: idle(f) })
+  return (f) => ({ name: `${who}_idle_${dirs[f % FRAMES]}`, at: [x, Z + z], frame: idle(f) })
 })
 // the two talking in the middle of the pier: now one, now the other turns his head toward us and back
 const talkers = (f) => [
-  { name: `sai_idle_${f % 64 >= 10 && f % 64 < 26 ? "se" : "e"}`, at: [2.55, Z - 7.9, LOWER], frame: idle(f) },
-  { name: `dkb_idle_${f % 64 >= 40 && f % 64 < 56 ? "sw" : "w"}`, at: [3.4, Z - 7.75, LOWER], frame: (idle(f) + 2) % 4 },
+  { name: `sai_idle_${f % 64 >= 10 && f % 64 < 26 ? "se" : "e"}`, at: [2.55, Z - 7.9], frame: idle(f) },
+  { name: `dkb_idle_${f % 64 >= 40 && f % 64 < 56 ? "sw" : "w"}`, at: [3.4, Z - 7.75], frame: (idle(f) + 2) % 4 },
 ]
 const SAYS = [
   [3, 25, "Alden", ["Is this the ship", "to Port Winds?"], () => LEGS[3].b, -1],
@@ -743,8 +743,8 @@ const talk = (c, f = c.frame) => {
 }
 const people = (f) => [
   ...[alden(f)].filter(Boolean), captain(f), ...watchers.map((w) => w(f)), ...talkers(f),
-  { name: "dkg_idle_ne", at: [5.7, Z - 6.7, LOWER], frame: (idle(f) + 1) % 4 },
-  { name: "crn_idle_e", at: [-11.25, Z - 5.3, UPPER], frame: idle(f) },
+  { name: "dkg_idle_ne", at: [5.7, Z - 6.7], frame: (idle(f) + 1) % 4 },
+  { name: "crn_idle_e", at: [-11.25, Z - 5.3], frame: idle(f) },
   ...carrier(f), ...onShip(f), ...gulls(f), ...PROPS, ...boatCargo(f),
 ]
 // Afternoon (SUNV, the sails' light, is the same way): the sun behind on the right, high and warm (the water glitters toward us, the shadows
@@ -763,11 +763,11 @@ const faces = (f) => {
 // the art's pixels): the pier and the boats sharp, the awning near us and the far water blurred (its glints
 // into bokeh), a light haze far off, a bloom; every face in blocks of a sprite's pixel (c.k px).
 const camera = (name, o, from = 0) => scene(name, { w: W, h: H, bg: "b", fps: 1000 / MS, ...o },
-  (c) => c.mesh(CAM, faces(c.frame + from), mats(c.frame + from, c.k), { sprites: people(c.frame + from), ...LIGHT }),
+  (c) => c.mesh(CAM, faces(c.frame + from), mats(c.frame + from, c.k), { sprites: people(c.frame + from), stand: true, ...LIGHT }),
   post({ blur: 9, focus: [W / 2, H * 0.64], sharp: 5.5, soft: [4, 10], fog: { color: "#8fb8d6", from: DIST + 20, to: DIST + 60, max: 0.25 }, bloom: { strength: 1.0, r: 12, above: 0.86 }, vignette: 0.3 }),
   (c) => talk(c, c.frame + from))
-// `harbor` checked one frame in 24: no scene rule runs on it (no world.light, nothing with a height or a
-// front marker), so the frames checked only prove they build; the tests stay fast. `harbor_md` twice as
+// `harbor` checked one frame in 24 (the lit side, the feet on the model: stand: true sets the people on
+// the pier on it; the gulls fly, the lanterns hang), the tests kept fast. `harbor_md` twice as
 // big (960x540).
 camera("harbor", { frames: FRAMES, check: { every: 24 }, sizes: { harbor_md: 2 } })
 // The gallery's excerpt (`harbor_clip`, 960x540): the story's middle at the full frame rate, from

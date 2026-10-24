@@ -10,7 +10,7 @@ import { PxError } from "./errors.ts";
 import { sizeOf } from "./grids.ts";
 import { type Clock, Density, STILL, Sdf, type V3, article, compile, compileDensity } from "./sdf.ts";
 import { type SurfaceCanvas, type SurfaceView, clockOf, partIndex, slab, viewOf } from "./surface.ts";
-import { bayer, hash } from "./util.ts";
+import { bayer, hash, once } from "./util.ts";
 
 /** A set of splats: for each, where (m), its three radii (std devs, m) along its own axes, its turn (quaternion w, x, y, z), opacity, normal (0 for a round one), how much sun reaches it, its material. */
 export class Splats {
@@ -55,6 +55,11 @@ export const SPLAT_LIGHT: V3 = unit([-0.65, -0.35, 0.68]);
  * way to the sun, whose shadow each one remembers.
  */
 export function makeSplats(thing: unknown, o: { spacing?: number; size?: number; seed?: number; light?: number[]; clock?: Clock; thickness?: number } = {}): Splats {
+  // (the same splats, the same key: its defaults filled in)
+  const c = o.clock ?? STILL, L = Array.isArray(o.light) && o.light.every(Number.isFinite) ? unit(o.light) : o.light ?? SPLAT_LIGHT, sp = o.spacing ?? (thing instanceof Sdf ? 0.05 : 0.1);
+  return once(thing, `s|${sp}|${o.size ?? sp * 0.6}|${o.seed ?? 1}|${L}|${o.thickness}|${c.t}|${c.phase}|${c.frame}|${c.frames}`, () => makeSplatsNow(thing, o));
+}
+function makeSplatsNow(thing: unknown, o: { spacing?: number; size?: number; seed?: number; light?: number[]; clock?: Clock; thickness?: number }): Splats {
   const clock = o.clock ?? STILL, seed = o.seed ?? 1, L = o.light ? unit(o.light) : SPLAT_LIGHT;
   if (o.light !== undefined && !(Array.isArray(o.light) && o.light.length === 3 && o.light.every(Number.isFinite))) throw new PxError(`sdf.splats: light is the way toward it, [x, y, z], got ${JSON.stringify(o.light)}`);
   const surface = thing instanceof Sdf;

@@ -358,3 +358,23 @@ scene("h2", { w: 48, h: 32 }, H(2), post({ vignette: 0.6 }))`;
   assert.equal(p.assets.get("a2")!.opts.check, false, "a size isn't checked");
   assert.match(failure(PAL + `scene("a", { w: 4, h: 4, sizes: { b: 1.5 } })`).message, /sizes names the same scene/);
 });
+
+test("stand: a sprite's feet on the face looking up under it (or those materials'); check says when they're off it by more than 0.15 m, unless it flies", async () => {
+  const { checkProject } = await import("../src/node/check.ts");
+  const src = (sprites: string, o = "") => PAL + STAGE + `const M = model()
+M.face("g", [-5, 1, 0], [5, 1, 0], [5, 20, 0], [-5, 20, 0]); M.box("deck", [-1, 3, 0], [1, 5, 0.4]); M.box("roof", [0.5, 3.5, 1.6], [1, 4.5, 1.7])
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { g: { ramp: "w" }, deck: { ramp: "kgw" }, roof: { ramp: "kgw" } }, { sprites: ${sprites}${o} }))`;
+  const at = (s: string, o = "") => { const p = loadSource(src(s, o), "t.px.js", { checksOnly: true }); return { r: checkProject(p, { file: "t.px.js" }), q: p.build("a").placements[0] }; };
+  // stood on the deck, 0.4 m up; on the roof above it when standing on whatever is highest; on the deck's alone when asked
+  const deck = loadSource(src(`[{ name: "s", at: [0, 4], stand: true, shadow: 0 }]`), "t.px.js").image("a").hash();
+  assert.equal(deck, loadSource(src(`[{ name: "s", at: [0, 4, 0.4], shadow: 0 }]`), "t.px.js").image("a").hash(), "on the deck");
+  assert.equal(loadSource(src(`[{ name: "s", at: [0.7, 4], stand: true, shadow: 0 }]`), "t.px.js").image("a").hash(), loadSource(src(`[{ name: "s", at: [0.7, 4, 1.7], shadow: 0 }]`), "t.px.js").image("a").hash(), "the highest: the roof");
+  assert.equal(loadSource(src(`[{ name: "s", at: [0.7, 4], shadow: 0 }]`, `, stand: ["deck"]`), "t.px.js").image("a").hash(), loadSource(src(`[{ name: "s", at: [0.7, 4, 0.4], shadow: 0 }]`), "t.px.js").image("a").hash(), "the mesh's stand, the deck's");
+  // check: floating, sinking, flying
+  const fl = at(`[{ name: "s", at: [-3, 4, 0.5] }]`);
+  assert.match(fl.r.lines.join(), /its feet are 0\.50 m over the model's 'g' under them: it floats/);
+  assert.match(at(`[{ name: "s", at: [-3, 4, -0.3] }]`).r.lines.join(), /0\.30 m under the model's 'g'.*sinks/);
+  assert.equal(at(`[{ name: "s", at: [0, 4, 0.48] }]`).r.lines.length, 0, "within 0.15 m");
+  assert.equal(at(`[{ name: "s", at: [-3, 4, 2], air: true }]`).r.lines.length, 0, "it flies");
+  assert.match(fl.r.coverage, /standing on 1/);
+});

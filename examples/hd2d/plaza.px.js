@@ -29,13 +29,13 @@ block("wood", "wood", 2.4, Z - 1.6, 3.2, Z - 0.8, UP, UP + 0.6) // a crate
 // stand: in front of the wall, half behind the crate, and on the grass below the step.
 const walker = (f) => {
   const back = f >= 8, x = -2.5 + 0.25 * (back ? 16 - f : f)
-  return { name: "walk_side", at: [x, Z + 2.25, UP], frame: f % 4, ...(back ? { flip: "x" } : {}) }
+  return { name: "walk_side", at: [x, Z + 2.25], frame: f % 4, ...(back ? { flip: "x" } : {}) }
 }
 const people = (f) => [
   ...around,
   walker(f),
-  { name: "idle_down", at: [-1.2, Z, UP], frame: 0 },
-  { name: "idle_down", at: [2.8, Z - 0.4, UP], frame: 0 },
+  { name: "idle_down", at: [-1.2, Z], frame: 0 },
+  { name: "idle_down", at: [2.8, Z - 0.4], frame: 0 },
   { name: "idle_side", at: [3, Z - 5.2], frame: 0, flip: "x" },
 ]
 // The wood round the plaza, the bushes along its edge, a lamp at each front corner: placed once.
@@ -46,7 +46,7 @@ for (let k = 0; k < 90; k++) {
   around.push({ name: "_pine", at: [x, z] })
 }
 for (let x = -5.5; x <= 5.5; x += 1.6) around.push({ name: "_bush", at: [x + R() * 0.4, Z - 4.4] })
-around.push({ name: "_lamp", at: [-5.6, Z - 3.6, UP] }, { name: "_lamp", at: [5.6, Z - 3.6, UP] })
+around.push({ name: "_lamp", at: [-5.6, Z - 3.6] }, { name: "_lamp", at: [5.6, Z - 3.6] })
 const CLOCK = { frames: 16, fps: 1000 / 210 }
 // Late afternoon: a warm sun low on the left and a little behind the plaza, so the shadows of the
 // wall, the pines and the people fall toward us; a cool sky in the shade; the lamps lit, their
@@ -60,5 +60,5 @@ const LIGHT = {
 // stand sharp and the rest blurred, from a camera this high up the look of a model (DIST is the depth
 // at the picture's middle, where post() focuses); the far grass hazed; a bloom on what is bright;
 // darker corners.
-scene("plaza", { w: W, h: H, bg: "q", ...CLOCK, sizes: { plaza_hd: 4 } }, (c) => c.mesh(CAM, M.faces, MATS, { sprites: people(c.frame), ...LIGHT }),
+scene("plaza", { w: W, h: H, bg: "q", ...CLOCK, sizes: { plaza_hd: 4 } }, (c) => c.mesh(CAM, M.faces, MATS, { sprites: people(c.frame), stand: true, ...LIGHT }),
   post({ blur: 8, sharp: 1, soft: 4, fog: { color: "#c8d4dc", from: DIST + 4, to: DIST + 20, max: 0.5 }, bloom: { strength: 0.9, r: 10 }, vignette: 0.35 }))

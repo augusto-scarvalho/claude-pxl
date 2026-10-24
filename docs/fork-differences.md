@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**365 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**366 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -97,6 +97,8 @@ follows from it.
 | `perspective()` | A pinhole camera in meters: one point; two points (`yaw`, the camera turned); three points (`pitch`, tilted up or down); `bend` for a road that curves. HD-2D's camera by px to the meter where it looks (`{ w, h, pitch, fov, ppm }`), with its floor and wall texels and `aim()`. |
 | Scene `sizes`, `pixel` | One scene drawn at several sizes (`sizes: { plaza_hd: 4 }`): the camera, sprites, blocks, sockets and the 3D ops follow the art's pixel, `post()` runs only there in the art's px. |
 | `look3d()` | The light and materials the 3D ops take when a call doesn't say them, once in a kit. |
+| `draw3d(thing, { as })`, `turnaround()` | One thing drawn as its surface, voxels, splats or a mesh (its shadow the field's), per call or per world part; a 3D thing turned into a family of sprites from 4 (iso's diagonals), 8, 16 or N headings, named by the compass, mirrored where symmetric. |
+| `mesh()`'s `stand`, `air` | Sprites standing on the model's faces instead of heights by hand; `pxl check` says when a sprite's feet are off the face under them. |
 | `plane()`, stamp `fit` | Flat ground drawn through the camera; sprites sized by their distance, with hand-drawn small sizes picked automatically. |
 | `terrain()` | Hills and mountains from a height function, lit and fading with distance. |
 | `solids()`, `shadows()` | Things built of solid shapes, each face lit by the side it faces, casting its shadow from one sun. |

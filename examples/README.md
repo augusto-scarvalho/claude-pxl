@@ -42,6 +42,7 @@ read the lines you need, not the whole file; `pxl help <op>` shows where each op
 | `sdf/fields.px.js`, `sdf/kit.px.js` | 3D as code: a tree, a rock, a mushroom house and a crystal as distance fields drawn as pixel art from the side, the top, in iso and through the HD-2D camera, swaying; the kit's camera, ground and materials |
 | `sdf/grids.px.js`, `sdf/volumes.px.js`, `sdf/splats.px.js` | the same fields as voxels (cells of any size) and meshes, exported (`.vox`, `.obj`, `.glb`); clouds, mist, smoke and a glowing orb as densities; Gaussian splats (`.ply`) |
 | `sdf/details.px.js`, `sdf/decals.px.js`, `sdf/world.px.js` | leaves and moss scattered on forms as brushes; hand-drawn doors, faces and runes pinned on forms (views, a blink); a scene of named parts edited by name, its rules checked; the gallery's grove (`grove_showcase`) |
+| `sdf/turnaround.px.js` | a 3D thing as a game's sprites (`turnaround()`): the mushroom house from 4 iso diagonals, 8 headings through the HD-2D camera and 16 from the side, named by the compass; a symmetric shrine whose east is its west flipped; stamped on an iso grid and among a diorama's faces |
 | `fonts/font5x7.px.js` | a 5×7 font for titles: `include` it, `text(..., { font: "5x7" })` |
 
 Every command run on an example writes an `out/` next to it (build, shot, describe): give it

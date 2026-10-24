@@ -90,6 +90,9 @@ export function orientWords(o: Orient): string {
  * (sparks, a smear, a glow give light or have none); its feet against where it was stamped (a pivot
  * below the sole floats it) and against the ground. describe and pxl check both use this.
  */
+/** How far a sprite's feet may be from the face it stands on in mesh(), m: expect3d's `on`. */
+export const STAND = 0.15;
+
 export function placementChecks(p: Placement, wo: World | undefined, steps: Steps | undefined, unlit = false, lamps?: Lamp[]): string[] {
   const light = lightFor(wo, p, lamps);
   const checks = [frontWords(p.img), light && !unlit ? lightWords(p.img, light, steps) : ""];
@@ -100,6 +103,9 @@ export function placementChecks(p: Placement, wo: World | undefined, steps: Step
     if (wo?.ground !== undefined && Math.abs(wo.ground - feet) >= 2)
       checks.push(`WARNING: its feet (y ${feet}) are ${Math.abs(wo.ground - feet)} px ${wo.ground > feet ? "above" : "below"} the ground (y ${wo.ground})`);
   }
+  // a sprite in mesh(): its feet on the face looking up under them, within expect3d's `on` (0.15 m)
+  const st = p.stand;
+  if (st && Math.abs(st.off) > STAND) checks.push(`WARNING: its feet are ${Math.abs(st.off).toFixed(2)} m ${st.off > 0 ? "over" : "under"} the model's '${st.on}' under them: it ${st.off > 0 ? "floats" : "sinks"} (stand: true sets them on it; air: true if it flies)`);
   return checks.filter(Boolean);
 }
 

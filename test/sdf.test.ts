@@ -155,3 +155,34 @@ sprite("own", { w: 24, h: 24 }, surface(f, { ...O, light: "view" }))`, "t.px.js"
   assert.equal(p.image("own").hash(), p.image("plain").hash(), "light: \"view\", the view's own");
   assert.notEqual(p.image("given").hash(), p.image("plain").hash());
 });
+
+test("turnaround: a thing seen from N headings, named by the compass (an iso view's 4 its diagonals), one size, its foot on the pivot; the east mirrored where it can be", async () => {
+  const { headingsOf } = await import("../src/core/turnaround.ts");
+  assert.deepEqual(headingsOf(4, undefined, true).map((h) => h.name), ["ne", "se", "sw", "nw"]);
+  assert.deepEqual(headingsOf(4, undefined, false).map((h) => h.name), ["n", "e", "s", "w"]);
+  assert.deepEqual(headingsOf(16, undefined, false).slice(0, 4).map((h) => h.name), ["n", "nne", "ne", "ene"]);
+  assert.deepEqual(headingsOf(12, undefined, false).slice(0, 2).map((h) => [h.name, h.deg]), [["0", 0], ["1", 30]]);
+  assert.deepEqual(headingsOf(undefined, ["s", 90], false).map((h) => [h.name, h.deg]), [["s", 180], ["e", 90]]);
+  // a box with a nose at its front (-y), off its middle (no mirror), lit from the left; and one on its middle, lit from above
+  const p = loadSource(PAL + `ramps("kgw")
+const F = (x) => sdf.box([0.6, 0.6, 0.6]).at(0, 0, 0.3).union(sdf.sphere(0.15).at(x, -0.35, 0.3))
+const A = turnaround("a", F(0.2), { view: "side", n: 8, mats: { "": "kgw" }, light: [-1, -0.3, 1] })
+const B = turnaround("b", F(0), { view: "side", n: 8, mats: { "": "kgw" }, light: [0, -0.5, 1] })
+const I = turnaround("i", F(0), { view: "iso", n: 4, mats: { "": "kgw" } })`, "t.px.js");
+  const A = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
+  assert.deepEqual(A.map((h) => [p.image(`a_${h}`).w, p.image(`a_${h}`).h]), A.map(() => [p.image("a_n").w, p.image("a_n").h]), "one size");
+  assert.ok(p.groups.get("a")!.members.length === 8 && p.has("i_ne") && p.has("i_sw"));
+  // the nose: toward us at s (in the middle), right at e, left at w; hidden behind at n
+  const cols = (n: string) => { const im = p.image(n), xs: number[] = []; for (let y = 0; y < im.h; y++) for (let x = 0; x < im.w; x++) if ((im.get(x, y) & 255) > 0) xs.push(x); return [Math.min(...xs), Math.max(...xs)]; };
+  const [e0, e1] = cols("a_e"), [w0, w1] = cols("a_w"), [n0, n1] = cols("a_n");
+  assert.ok(e1 > n1 && w0 < n0, `the nose sticks out right at e (${e0}..${e1}), left at w (${w0}..${w1}), not at n (${n0}..${n1})`);
+  // mirrored: b's east is its west flipped; a's (off its middle, lit from the left) drawn
+  assert.equal(p.assets.get("b_e")!.opts.flip, "x"); assert.equal(p.assets.get("b_e")!.opts.base, "b_w");
+  assert.equal(p.assets.get("a_e")!.opts.flip, undefined);
+  assert.equal(p.image("b_e").hash(), p.image("b_w").flip("x").hash());
+  // its pivot at its foot: under the middle of its box, at its lowest rows
+  const pv = p.image("b_s").pivot!, [s0, s1] = cols("b_s"), im = p.image("b_s");
+  let low = 0;
+  for (let y = 0; y < im.h; y++) for (let x = 0; x < im.w; x++) if ((im.get(x, y) & 255) > 0) low = y;
+  assert.ok(Math.abs(pv[0] - (s0 + s1 + 1) / 2) <= 1 && low >= pv[1] - 1 && low <= pv[1] + 3, `pivot ${pv}, columns ${s0}..${s1}, lowest row ${low}`);
+});

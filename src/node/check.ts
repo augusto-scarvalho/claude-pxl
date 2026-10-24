@@ -3,7 +3,7 @@
 // every frame of its loop, each distinct placement once: the checks that warn (facing, front marker,
 // lit side, feet, lettering) depend only on the placement (what it looks like, where) and the world.
 import type { Project } from "../core/project.ts";
-import { MANY, lightFor, orientWords, placementChecks } from "../core/describe.ts";
+import { MANY, STAND, lightFor, orientWords, placementChecks } from "../core/describe.ts";
 import { rigLines } from "../core/rig.ts";
 import { frontWords, rampSteps } from "../core/checks.ts";
 import { PxError } from "../core/errors.ts";
@@ -51,7 +51,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0 };
   let lightSaid = false, groundSaid = false;
   // by default what the file itself defines (what it includes is checked where it's defined)
   const own = (n: string) => !opts.file || (p.assets.get(n)?.loc ?? "").split(":")[0] === opts.file;
@@ -130,7 +130,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       for (const q of b.placements) copies.set(`${q.name}@${q.layer}`, (copies.get(`${q.name}@${q.layer}`) ?? 0) + 1);
       for (const q of b.placements) {
         if (copies.get(`${q.name}@${q.layer}`)! > MANY) continue;
-        const key = `${q.name}|${q.layer}|${q.x},${q.y}|${q.img.w}x${q.img.h}|${hash(q.img.data)}`;
+        const key = `${q.name}|${q.layer}|${q.x},${q.y}|${q.img.w}x${q.img.h}|${hash(q.img.data)}|${q.stand && Math.abs(q.stand.off) > STAND ? q.stand.off.toFixed(2) : ""}`;
         let ws = seen.get(key);
         if (!ws) {
           const o = q.img.orient, dark = unlit.has(q.layer ?? "");
@@ -150,6 +150,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
           }
           if (q.img.meters) { ran.feet++; if (wo?.ground !== undefined) ran.ground++; }
           if (o?.text) ran.text++;
+          if (q.stand) ran.stand++;
         }
         for (const w of ws) {
           const k = `${q.name} @${q.layer ?? "-"} › ${w}`, bb = q.img.bounds();
@@ -201,6 +202,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     }
     run.push(`expects ${all} (${held} held)`);
   }
+  if (ran.stand) run.push(`standing on ${ran.stand}`);
   if (ran.text) run.push(`lettering on ${ran.text}`);
   if (ran.lines) run.push(`lines on ${ran.lines}`);
   if (rigs) run.push(`rig parts ${ran.parts}`);

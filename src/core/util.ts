@@ -157,3 +157,14 @@ export function fmtArgs(args: unknown[]): string {
   };
   return args.map((a) => f(a, 0)).join(", ");
 }
+
+/** What `make` gives for this owner and key, made once (the last 8 kept an owner): a field's voxels, splats or mesh at a moment, asked for by several panels or headings. */
+const ONCE = new WeakMap<object, Map<string, unknown>>();
+export function once<T>(owner: unknown, key: string, make: () => T): T {
+  if (!owner || typeof owner !== "object") return make();
+  let m = ONCE.get(owner);
+  if (!m) ONCE.set(owner, (m = new Map()));
+  let v = m.get(key) as T | undefined;
+  if (v === undefined) { m.set(key, (v = make())); if (m.size > 8) m.delete(m.keys().next().value!); }
+  return v;
+}

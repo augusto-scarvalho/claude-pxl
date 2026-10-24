@@ -92,6 +92,10 @@ export interface MeshSprite {
   opacity?: number;
   /** a blended "alpha" sprite's faint shadow: the share of the sun its pixels hold back, by their alpha (times `opacity`; 0.3 a thin smoke; default 0, none) */
   veil?: number;
+  /** its feet on the model: on the highest face looking up under [x, z] (true), or on those materials' (its up from them) */
+  stand?: boolean | string[];
+  /** it flies (a gull, a leaf, a spell): check doesn't ask its feet to be on the model */
+  air?: boolean;
   /**
    * the light its emitting pixels (effect("emit")) give round it, a lamp at their middle: how far (m,
    * default 3), how strong (default 1); `each`: a lamp for each part that glows apart from the others
@@ -121,8 +125,12 @@ export interface MeshOpts {
   shadows?: boolean;
   /** an orthographic view (surface()'s): px to the meter (default 16) */
   ppm?: number;
+  /** the sprites whose `at` has no up stand on the model: on the highest face looking up under them (true), or on those materials' */
+  stand?: boolean | string[];
   /** an orthographic view: where the points' [0, 0, 0] lands, [x, y] px (default the middle of the bottom edge, or the view's origin) */
   at?: number[];
+  /** drawn into the depth what is drawn already left (a second mesh, draw3d's): hidden behind what is nearer, outlined against it as against another material */
+  over?: boolean;
 }
 export interface MeshCanvas {
   img: { w: number; h: number; depth?: Float32Array; emit?: Uint8Array };
@@ -141,7 +149,7 @@ export interface MeshWorld {
   masks?: Record<string, Img>;
   /** a dissolving material's look, its keys resolved: the edge's keys over the progress (or the neutral ring's tone), its char, its glow */
   looks?: Record<string, { over?: Color[][]; neutral?: Color; char?: { width: number; tones: Color[]; amount: number; desat: number }; glow: number }>;
-  sprites: { name: string; img: Img; at: V3; shadow?: number; blend?: MeshSprite["blend"]; opacity?: number; veil?: number; light?: MeshSprite["light"] }[];
+  sprites: { name: string; img: Img; at: V3; shadow?: number; blend?: MeshSprite["blend"]; opacity?: number; veil?: number; light?: MeshSprite["light"]; air?: boolean }[];
   step(c: Color, n: number): Color;
   /** the light, its colors resolved (with `sun`) */
   lit?: Lit;
@@ -209,7 +217,31 @@ function clipNear(pts: V3[], P: [number, number, number][], project: Project, NE
 }
 
 /** Draw the faces, then the sprites among them; gives where each sprite landed (canvas coords), for describe. */
-export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}, world?: MeshWorld): { name: string; x: number; y: number; img: Img; light?: [number, number] }[] {
+/**
+ * What stands on a model ([x, z, up] points): the faces looking up (less than 60 degrees from level)
+ * under a point [x, z], each its height there and its material.
+ */
+export function groundOf(faces: Face[]): (x: number, z: number) => { u: number; mat: string }[] {
+  const T: number[] = [], M: string[] = [];
+  for (const F of faces) {
+    const p = F?.pts;
+    if (!p || p.length < 3) continue;
+    if (Math.abs(unit(cross(sub(p[1], p[0]), sub(p[2], p[0])))[2]) < 0.5) continue;
+    for (let t = 1; t + 1 < p.length; t++) { T.push(...p[0], ...p[t], ...p[t + 1]); M.push(F.mat); }
+  }
+  return (x, z) => {
+    const out: { u: number; mat: string }[] = [];
+    for (let i = 0, k = 0; i < T.length; i += 9, k++) {
+      const ax = T[i], az = T[i + 1], bx = T[i + 3] - ax, bz = T[i + 4] - az, cx = T[i + 6] - ax, cz = T[i + 7] - az, d = bx * cz - bz * cx;
+      if (Math.abs(d) < 1e-12) continue;
+      const v = ((x - ax) * cz - (z - az) * cx) / d, w = (bx * (z - az) - bz * (x - ax)) / d;
+      if (v >= -1e-9 && w >= -1e-9 && v + w <= 1 + 1e-9) out.push({ u: T[i + 2] + v * (T[i + 5] - T[i + 2]) + w * (T[i + 8] - T[i + 2]), mat: M[k] });
+    }
+    return out;
+  };
+}
+
+export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}, world?: MeshWorld): { name: string; x: number; y: number; img: Img; light?: [number, number]; at?: V3; air?: boolean }[] {
   const W = c.img.w, H = c.img.h, x0 = -c.ox, y0 = -c.oy, cam = camera(view, c, opts), eye = cam.eye;
   const sunDir = unit(Array.isArray(opts.light) ? (opts.light as V3) : cam.light);
   const lightOf = typeof opts.light === "function" ? opts.light : (n: V3) => 0.3 + 0.6 * Math.max(0, dot(n, sunDir));
@@ -231,6 +263,9 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
   }
   // per pixel: the nearest face's depth and index, and the point of it seen there (textures, shadows)
   const n = W * H, depth = new Float32Array(n).fill(1e9), who = new Int32Array(n).fill(-1), pos = new Float32Array(n * 3);
+  // over a depth already drawn: each pixel there as near as what is there, of none of these faces (-2)
+  const had = opts.over ? c.img.depth : undefined;
+  if (had) for (let i = 0; i < n; i++) if (had[i] < Infinity) { depth[i] = had[i] + cam.off; who[i] = -2; }
   const normals: V3[] = [], lights: number[] = [];
   // which coordinate is up, and which runs away from the camera: [x, z, up] through perspective(), [x, y up, z ahead]
   // otherwise; per textured face, the coordinates its texture runs across and down (a floor across and
@@ -454,10 +489,10 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
       const j = yy * W + xx, k2 = who[j];
       if (k2 === k) continue;
-      if (k2 < 0 || depth[j] > depth[i] * 1.06) { line = M.edge ?? r[0]; break; }
-      const F2 = faces[k2];
-      if (F2.mat !== F.mat && depth[j] >= depth[i]) line = line ?? M.edge ?? r[0];
-      else if (F2.mat === F.mat && !M.smooth && dot(N, normals[k2]) < 0.82 && depth[j] >= depth[i]) line = line ?? r[0];
+      if (k2 === -1 || depth[j] > depth[i] * 1.06) { line = M.edge ?? r[0]; break; }
+      const same = k2 >= 0 && faces[k2].mat === F.mat;
+      if (!same && depth[j] >= depth[i]) line = line ?? M.edge ?? r[0];
+      else if (same && !M.smooth && dot(N, normals[k2]) < 0.82 && depth[j] >= depth[i]) line = line ?? r[0];
     }
     if (M.tex !== undefined) {
       // its outline, and inside it the texture
@@ -468,7 +503,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     const lv = Math.max(0, Math.min(r.length - 1, Math.floor(lights[k] * r.length + (bayer(bx, by) - 0.5) * (M.dither ?? 0))));
     // the top edge of a surface, just under its outline, catches the light: a step lighter
     const up1 = y >= B ? who[i - B * W] : -1, up2 = y >= 2 * B ? who[i - 2 * B * W] : -1;
-    const rim = !line && up1 === k && (up2 < 0 || (up2 !== k && depth[i - 2 * B * W] > depth[i] * 1.06)) && dot(N, cam.up) > -0.3;
+    const rim = !line && up1 === k && (up2 === -1 || (up2 !== k && depth[i - 2 * B * W] > depth[i] * 1.06)) && dot(N, cam.up) > -0.3;
     const tx = M.texture && !line && !rim ? Math.round(M.texture(B > 1 ? bx : x + x0, B > 1 ? by : y + y0)) : 0;
     c.px(x + x0, y + y0, line ?? (rim ? M.top ?? r[Math.min(r.length - 1, lv + 1)] : r[Math.max(0, Math.min(r.length - 1, lv + tx))]));
   }
@@ -488,7 +523,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     for (let i = 0; i < n; i++) if (who[i] !== -1 && depth[i] - cam.off < d[i]) d[i] = depth[i] - cam.off;
   };
   if (!world?.sprites.length) { keep(); return []; }
-  const placed: { name: string; x: number; y: number; img: Img; light?: [number, number] }[] = [];
+  const placed: { name: string; x: number; y: number; img: Img; light?: [number, number]; at: V3; air?: boolean }[] = [];
   // contact shadows: what each sprite stands on, two steps darker in the middle and one out to the
   // radius (the darkest where two overlap)
   const shade = new Uint8Array(n);
@@ -557,7 +592,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     // the way to the light on the picture where it stands, its middle a meter toward the light (none for a light of your own, or one straight at the eye)
     const mid: V3 = [s.at[0], s.at[1], s.at[2] + (py * K) / 2 / perM[k]], a = cam.project(mid), b = cam.project([mid[0] + sunDir[0], mid[1] + sunDir[1], mid[2] + sunDir[2]]);
     const lx = b[0] - a[0], ly = b[1] - a[1], ll = Math.hypot(lx, ly), seen = typeof opts.light !== "function" && ll > 0.25 * perM[k];
-    placed.push({ name: s.name, x: X0, y: Y0, img: K > 1 ? img.scale(K) : img, ...(seen ? { light: [lx / ll, ly / ll] as [number, number] } : {}) });
+    placed.push({ name: s.name, x: X0, y: Y0, img: K > 1 ? img.scale(K) : img, ...(seen ? { light: [lx / ll, ly / ll] as [number, number] } : {}), at: s.at, ...(s.air || s.blend ? { air: true } : {}) });
   }
   keep();
   return placed;

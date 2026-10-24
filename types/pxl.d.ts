@@ -204,7 +204,9 @@ declare global {
     /** laid over what is behind by its alpha (smoke: "alpha"; light: "add", "screen"), no shadow; `veil` (an "alpha" one): the share of the sun its pixels hold back, a faint shadow */
     blend?: "alpha" | "add" | "screen"; opacity?: number; veil?: number;
     /** the light its effect("emit") pixels give round them: r m, strength, a lamp for `each` part glowing apart; false for none */
-    light?: false | { r?: number; strength?: number; each?: boolean } }
+    light?: false | { r?: number; strength?: number; each?: boolean };
+    /** its feet on the model: on the highest face looking up under it (true), or on those materials'; `air`: it flies or hangs (check doesn't ask its feet to be on the model) */
+    stand?: boolean | string[]; air?: boolean }
   /** mesh()'s light: the way toward it in the points' frame, or a face's light (0 dark, 1 lit) from its normal toward the eye, its middle, the face; sprites standing among the faces (a perspective view). */
   interface PxMeshOpts {
     light?: PxV3 | ((normal: PxV3, middle: PxV3, face: PxFace) => number); sprites?: PxMeshSprite[]; /** px to a sprite's pixel (an HD picture: 4) */ pixel?: number;
@@ -213,6 +215,8 @@ declare global {
     lamps?: { at: PxV3; color: PxColor; r?: number; strength?: number }[]; emit?: string; shadows?: boolean;
     /** an orthographic view ("side", "top", "iso", { kind, ... }): px to the meter (16), where the points' [0, 0, 0] lands, [x, y] px */
     ppm?: number; at?: number[];
+    /** the sprites whose `at` has no up stand on the model: on the highest face looking up under them (true), or on those materials' */
+    stand?: boolean | string[];
   }
   /** A camera of one's own for mesh(): a point in the camera's frame (x right, y up, z ahead, from the eye) to [col, row, depth]. */
   type PxProject = (p: PxV3) => [number, number, number];
@@ -279,7 +283,15 @@ declare global {
   interface PxWorld { readonly kind: "world"; readonly names: string[]; edit(changes: Record<string, unknown>): PxWorld; changed(other: PxWorld): string[]; place(name: string, clock?: PxClock): PxV3; built(name: string): PxBuilt }
   interface PxPartSpec { make: "tree" | "pine" | "bush" | "rock" | "house" | "crystal" | "mist" | "smoke" | (string & {}); params?: Record<string, unknown>; seed?: number; at?: number[] | ((c: PxClock) => number[]); on?: string; beside?: [string, string, number?]; around?: string; attach?: [string, string];
     /** its own materials over draw3d's; air: its own look ({ ramp: keys, thickness, ... }) */
-    mats?: Record<string, unknown>; look?: { ramp?: string; thickness?: number; ambient?: number; cast?: number; emit?: { ramp: string; strength?: number; glow?: number } } }
+    mats?: Record<string, unknown>; look?: { ramp?: string; thickness?: number; ambient?: number; cast?: number; emit?: { ramp: string; strength?: number; glow?: number } };
+    /** a solid drawn as its surface, voxels, splats or a mesh, over draw3d's (world.edit({ "oak.as": "voxels" })) */
+    as?: PxAs }
+  /** How draw3d() draws a solid: rays to its surface (surface()), voxels(), splats() or a mesh() of its surface; the splats' and the mesh's shadow its field's. */
+  type PxAs = "surface" | "voxels" | "splats" | "mesh";
+  /** draw3d()'s options: the view, where the world stands, its materials and light, a ray a block, these parts only; how its solids are drawn (`as`), the cell of voxels and of a mesh (`size`, m, 0.1), the splats' spacing. */
+  interface PxDraw3dOpts { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view"; pixel?: number; only?: string[]; as?: PxAs; size?: number; spacing?: number }
+  /** What turnaround() made: its sprites' names and their headings, in order, their one size and pivot, those that are another's mirror. */
+  interface PxTurnaround { names: string[]; headings: string[]; w: number; h: number; pivot: [number, number]; mirrored: string[] }
   /** expect3d's rules; before and while take two rules of a place. */
   type PxRule = { above?: [string, string]; on?: [string, string]; apart?: [string, string]; near?: [string, string, number]; reaches?: [string, number[], number, number?]; within?: [string, number[][]]; before?: [PxRule, PxRule]; while?: [PxRule, PxRule] };
   /** voxels()'s options: surface()'s (ao 0 unless given: a face darker at the creases); a cell's size (given a field), a cube's width in px (iso and top on the pixel grid). */
@@ -561,7 +573,7 @@ declare global {
     /** Hand-drawn pixel art pinned (or wrapped) on a field's surface, crisp in any camera, after the surface(). */
     decal(name: string, opts?: PxDecalOpts): void;
     /** A world drawn through a view: its solids, their details and decals, its air. */
-    draw3d(world: PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view"; pixel?: number; only?: string[] }): void;
+    draw3d(thing: PxWorld | PxSdf | PxBuilt, opts?: PxDraw3dOpts): void;
     /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade. */
     shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): void;
     /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
@@ -603,6 +615,13 @@ declare global {
   /** A bitmap font from glyphs drawn in w x h cells on a sprite, in the order of `chars`; use it with text(..., { font }). */
   function font(name: string, sprite: string, opts: { chars: string; w: number; h: number; cols?: number; mono?: boolean }): void;
   /** n directions (sprites name_0.. + group name) from a pose pointing up, via exact quarter turns and diagonal mirrors where possible. See rotation.md. */
+  /**
+   * A thing in 3D (a field, a built thing, a world's part) seen from n headings (8; an iso view's 4 its
+   * diagonals) or those named, a sprite each (an anim with frames), named by the compass (n, nne, ne, ...;
+   * else their index), a group of them; through an orthographic view or a perspective() camera; the east
+   * the west flipped where the thing is its own mirror and its light from the picture's middle (mirror: "auto").
+   */
+  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number }): PxTurnaround;
   function directions(name: string, n: number, opts: { from: string; outline?: PxColor; outline8?: PxColor; symmetric?: boolean; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; draw?: Record<string, string>; pivot?: "bottom" | "center" | [number, number] }): void;
   /** palette: true keeps the included file's use()/pal()/ramps() active afterwards. */
   function include(path: string, opts?: { palette?: boolean }): void;
@@ -680,7 +699,7 @@ declare global {
   /** Hand-drawn pixel art pinned (or wrapped) on a field's surface. */
   function decal(name: string, opts?: PxDecalOpts): PxOp;
   /** A world3d(...) drawn through a view. */
-  function draw3d(world: PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view"; pixel?: number; only?: string[] }): PxOp;
+  function draw3d(thing: PxWorld | PxSdf | PxBuilt, opts?: PxDraw3dOpts): PxOp;
   /** A scene as data: named parts made by builders, a seed each, placed by relations, a shared wind. */
   function world3d(spec: { seed?: number; wind?: { from?: "left" | "right" | "front" | "behind"; strength?: number }; parts: Record<string, PxPartSpec> }): PxWorld;
   /** Rules over a world's loop, run by pxl check. */

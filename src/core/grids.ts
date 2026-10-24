@@ -7,6 +7,7 @@
 // moves its cells by whole cells and nothing shimmers.
 import { PxError } from "./errors.ts";
 import { type Clock, type Compiled, STILL, Sdf, type V3, article, compile } from "./sdf.ts";
+import { once } from "./util.ts";
 
 /** A voxel grid: n cells along each axis, each `size` m, from `origin` (its low corner, in the field's frame); a cell 0 when empty, else 1 + its material's index in `mats` ("" for none). */
 export class Voxels {
@@ -82,7 +83,12 @@ function normalAt(d: Compiled["d"], x: number, y: number, z: number, h: number):
  * (0: the middle inside; default 0.5, so a limb thinner than a cell keeps a line of cells and nothing
  * comes apart; 1 fattens it by half a cell), of the material there.
  */
+/** A clock as a key: a field made again at another moment only when it differs. */
+const moment = (c: Clock = STILL) => `${c.t}|${c.phase}|${c.frame}|${c.frames}`;
 export function voxelize(field: unknown, o: { size?: unknown; clock?: Clock; fill?: number } = {}): Voxels {
+  return once(field, `v|${JSON.stringify(o.size)}|${o.fill}|${moment(o.clock)}`, () => voxelizeNow(field, o));
+}
+function voxelizeNow(field: unknown, o: { size?: unknown; clock?: Clock; fill?: number }): Voxels {
   needField(field, "sdf.voxels");
   const fill = o.fill ?? 0.5;
   if (!(fill >= 0 && fill <= 1)) throw new PxError(`sdf.voxels: fill is 0..1 (how near the surface comes to a cell's middle, in halves of a cell), got ${JSON.stringify(o.fill)}`);
@@ -110,6 +116,9 @@ export function voxelize(field: unknown, o: { size?: unknown; clock?: Clock; fil
  * quad of the four cells round it, turned to face out; its material at its middle.
  */
 export function surfaceNets(field: unknown, o: { size?: unknown; clock?: Clock } = {}): Mesh3 {
+  return once(field, `m|${JSON.stringify(o.size)}|${moment(o.clock)}`, () => surfaceNetsNow(field, o));
+}
+function surfaceNetsNow(field: unknown, o: { size?: unknown; clock?: Clock }): Mesh3 {
   needField(field, "sdf.mesh");
   const s = sizeOf(o.size, "sdf.mesh"), C = compile(field, o.clock ?? STILL), { origin, n } = lattice(C, s, 1, "sdf.mesh");
   // corners: one more than cells each way

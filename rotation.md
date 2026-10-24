@@ -11,17 +11,21 @@ Turning pixel art by an arbitrary angle always costs something: pixels get dropp
 2. **Rotate the body, outline after.** Turn the sprite without its outline and give the outline to
    the turned variant: `sprite("arrow_30", { base: "_arrow", angle: 30, outline: "k" })`. A turned
    outline comes out 1px in places and 2px in others; a fresh one is even.
-3. **A thing spinning on its upright** needs only half a turn drawn: the frames from 180° on are the
+3. **A thing built in 3D** (a field, `make3d`'s, a world's part) turns without resampling:
+   `turnaround()` draws it from each heading, named by the compass (`n`, `ne`, `e`, ... 16 adds
+   `nne`, `ene`, ...; iso's 4 its diagonals), the east its west flipped when it is symmetric and lit
+   from the picture's middle (`PXL help turnaround`).
+4. **A thing spinning on its upright** needs only half a turn drawn: the frames from 180° on are the
    first half flipped (`flip: "x"`); block the turn out with `model()`/`mesh()` in a `ref: true` layer.
-4. **Shapes, not surfaces.** No rotation keeps a checker dither a checker, and texture or
+5. **Shapes, not surfaces.** No rotation keeps a checker dither a checker, and texture or
    highlight pixels move unpredictably. Turn the flat shape, then add dither, texture and
    highlights to the turned variant.
-5. **Mind the angle** (table below). Small angles are the worst for resampling: `auto` shears them
+6. **Mind the angle** (table below). Small angles are the worst for resampling: `auto` shears them
    into a lean instead.
-6. **Draw what matters by hand.** Small sprites (under ~12px), faces and 1px features rarely
+7. **Draw what matters by hand.** Small sprites (under ~12px), faces and 1px features rarely
    survive a resample. For a direction set, draw the in-between poses yourself and pass them as
    `draw: { 22.5: "_ship_22" }`: every direction derived from them inherits the hand quality.
-7. **What isn't turned** (SLYNYRD). A side-view craft moving up and down banks instead of pitching
+8. **What isn't turned** (SLYNYRD). A side-view craft moving up and down banks instead of pitching
    (rotation breaks its clusters, and its guns stay level): 5 drawings, level and 2 rolls each way,
    the shallow roll shown ~200 ms going in and out; side-lit, each side its own drawing, not a
    mirror. A rotor of N blades repeats every 360/N degrees: 4 drawings of a 4-blade rotor, 22.5°
