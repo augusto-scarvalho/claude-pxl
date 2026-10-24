@@ -165,9 +165,9 @@ sprite("_lantern", { w: 13, h: 36, pivot: "bottom", outline: "k" }, (c) => {
   c.rect(6, 0, 1, 2, "t"); c.rect(5, 2, 3, 1, "s")
   for (let r = 0; r < 6; r++) { const half = r + 1; c.rect(6 - half, 3 + r, half, 1, "q"); c.rect(6, 3 + r, half + 1, 1, "r") }
   c.rect(1, 9, 11, 1, "s")
-  c.rect(1, 10, 3, 18, "v"); c.rect(4, 10, 5, 18, "w"); c.rect(9, 10, 3, 18, "u")
+  c.rect(1, 10, 3, 18, "u"); c.rect(4, 10, 8, 18, "w")       // the side toward the sun as light as the front, the other in shade
   for (const x of [3, 9]) c.rect(x, 10, 1, 18, "q")
-  for (const y of [12, 20]) { c.rect(5, y, 3, 6, "l"); c.rect(6, y, 1, 6, "m"); c.rect(5, y + 3, 3, 1, "m"); c.rect(1, y, 2, 6, "m"); c.rect(10, y, 1, 6, "l") }
+  for (const y of [12, 20]) { c.rect(5, y, 3, 6, "l"); c.rect(6, y, 1, 6, "m"); c.rect(5, y + 3, 3, 1, "m"); c.rect(1, y, 2, 6, "l"); c.rect(10, y, 1, 6, "m") }
   c.rect(1, 28, 11, 1, "s")
   for (let r = 0; r < 5; r++) c.rect(1 + r, 29 + r, 11 - 2 * r, 1, r < 2 ? "r" : "q")
   c.rect(6, 34, 1, 2, "l")
