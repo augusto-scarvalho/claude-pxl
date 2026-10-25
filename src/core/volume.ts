@@ -12,6 +12,7 @@ import { PxError } from "./errors.ts";
 import { Density, type V3, article, compileDensity } from "./sdf.ts";
 import { type SurfaceCanvas, type SurfaceView, clockOf, corners, partIndex, slab, viewOf } from "./surface.ts";
 import { bayer } from "./util.ts";
+import { type Lit, shine } from "./sunlight.ts";
 
 export interface VolumeOpts {
   view?: SurfaceView;
@@ -39,6 +40,8 @@ export interface VolumeOpts {
   cast?: number;
   /** the name of the part it is (pxl steps --at) */
   part?: string;
+  /** (light: "mesh": the light of the mesh() drawn before it, on its tones) */
+  world?: Lit;
 }
 export const VOLUME_OPTS = ["view", "ppm", "at", "ramp", "light", "thickness", "ambient", "shadow", "cell", "emit", "blend", "pixel", "cast", "part"];
 
@@ -157,12 +160,15 @@ export function drawVolume(c: SurfaceCanvas, density: unknown, o: VolumeOpts = {
     }
   // on the picture: thin, a dither between it and what is behind (or its alpha over it); what glows in its own tones, marked as giving light
   const drawn = new Uint8Array(N), pk = o.part !== undefined ? partIndex(c.img, o.part) : -1;
+  // in the world's light (light: "mesh"): its tones times the sky's and the sun's, as mesh()'s sprites
+  // (ponytail: one place for the lamps, its box's middle; a lamp in a mist would want each cell's)
+  const Wl = o.world, mid: V3 = [(lo[0] + hi[0]) / 2 + cam.at[0], (lo[1] + hi[1]) / 2 + cam.at[1], (lo[2] + hi[2]) / 2 + cam.at[2]];
   for (let gy = 0; gy < GH; gy++)
     for (let gx = 0; gx < GW; gx++) {
       const i = gy * GW + gx, A = alpha[i];
       if (!A) continue;
       if (blend === "dither" && A <= 0.2 + 0.6 * bayer(gx0 + gx, gy0 + gy)) continue;
-      const e = glow[i], hot = eramp && e > 0.15, col = hot ? eramp[Math.min(eramp.length - 1, Math.round(Math.min(1, e) * (eramp.length - 1)))] : ramp[tone[i]];
+      const e = glow[i], hot = eramp && e > 0.15, col = hot ? eramp[Math.min(eramp.length - 1, Math.round(Math.min(1, e) * (eramp.length - 1)))] : Wl ? shine(ramp[tone[i]], Wl.dir, mid[0], mid[1], mid[2], Wl, 1, 0) : ramp[tone[i]];
       drawn[i] = 1;
       for (let y = 0; y < K; y++)
         for (let x = 0; x < K; x++) {

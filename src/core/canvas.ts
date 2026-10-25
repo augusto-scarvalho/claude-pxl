@@ -938,6 +938,7 @@ export class Canvas {
       const hs = ground && p.at && !p.air ? ground(p.at[0], p.at[1]) : [], h = hs.reduce<{ u: number; mat: string } | undefined>((b, q) => (!b || Math.abs(q.u - p.at![2]) < Math.abs(b.u - p.at![2]) ? q : b), undefined);
       this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}), ...(h ? { stand: { off: p.at![2] - h.u, on: h.mat } } : {}) });
     }
+    if (lit) this.img.world = lit;
   }
 
   /**
@@ -951,13 +952,18 @@ export class Canvas {
 
   /**
    * A 3D op's options, look3d()'s light and mats where they don't say them (mats, unless a ramp is
-   * given); `light: "view"` the op's own, from its view's upper left.
+   * given); `light: "view"` the op's own, from its view's upper left; `light: "mesh"` the light of the
+   * mesh() drawn before it with a sun (its way, and its sun, sky and lamps on what the op draws).
    */
   private in3d<T extends object>(o: T, mats = true): T {
     const L = this.look3d, { light, ...q } = (o ?? {}) as { light?: unknown; mats?: unknown; ramp?: unknown };
-    if (!L && light !== "view") return o;
-    const lt = light === "view" ? undefined : light ?? L?.light;
-    return { ...q, ...(lt !== undefined ? { light: lt } : {}), ...(mats && q.mats === undefined && q.ramp === undefined && L?.mats ? { mats: L.mats } : {}) } as T;
+    if (!L && light !== "view" && light !== "mesh") return o;
+    const w = light === "mesh" ? this.img.world : undefined;
+    // (only checking, mesh() lights nothing: the op's own light then, which the checks don't read)
+    if (light === "mesh" && !w && !(this.res as { checksOnly?: boolean }).checksOnly)
+      throw new PxError('light: "mesh" is the light of a mesh() with a sun drawn before it on this canvas: draw that first (or give the way to the light, [x, y, z])');
+    const lt = light === "view" || light === "mesh" ? w?.dir : light ?? L?.light;
+    return { ...q, ...(lt !== undefined ? { light: lt } : {}), ...(w ? { world: w } : {}), ...(mats && q.mats === undefined && q.ramp === undefined && L?.mats ? { mats: L.mats } : {}) } as T;
   }
 
   /** A voxel grid (sdf.voxels), or a field made voxels of `size` m at this moment, a cube to a cell, drawn as surface() draws (iso and top on the pixel grid, a cube `px` wide): see surface.ts. */

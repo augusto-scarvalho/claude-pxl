@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**367 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**368 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -99,6 +99,7 @@ follows from it.
 | `look3d()` | The light and materials the 3D ops take when a call doesn't say them, once in a kit. |
 | `draw3d(thing, { as })`, `turnaround()` | One thing drawn as its surface, voxels, splats or a mesh (its shadow the field's), per call or per world part; a 3D thing turned into a family of sprites from 4 (iso's diagonals), 8, 16 or N headings, named by the compass, mirrored where symmetric. |
 | `mesh()`'s `stand`, `air` | Sprites standing on the model's faces instead of heights by hand; `pxl check` says when a sprite's feet are off the face under them. |
+| `light: "mesh"` | Things drawn in 3D (`surface()`, `volume()`, `draw3d()`) after a `mesh()` take its sun and sky on their tones and the sun's share in their shadows, so they stand among a diorama's sprites in its light: the graveyard's `graveyard_3d` (a dead tree of rods swaying, a gate swinging on its hinges, a ground mist) beside the scene it was made from. |
 | `plane()`, stamp `fit` | Flat ground drawn through the camera; sprites sized by their distance, with hand-drawn small sizes picked automatically. |
 | `terrain()` | Hills and mountains from a height function, lit and fading with distance. |
 | `solids()`, `shadows()` | Things built of solid shapes, each face lit by the side it faces, casting its shadow from one sun. |

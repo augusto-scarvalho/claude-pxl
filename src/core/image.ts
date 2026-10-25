@@ -1,4 +1,5 @@
 import { type Color, TRANSPARENT } from "./color.ts";
+import type { Lit } from "./sunlight.ts";
 
 export type Axis = "x" | "y" | "xy";
 
@@ -52,6 +53,8 @@ export class Img {
    * what post() blurs and hazes by. Only the image mesh() drew into has it; it doesn't travel.
    */
   depth?: Float32Array;
+  /** The light of the mesh() drawn into it with a sun (its way, sun, sky, lamps): what the 3D ops after it take with `light: "mesh"`. It doesn't travel. */
+  world?: Lit;
   /**
    * The point placements line up with (stamp's x, y), in pixel-corner coords: [w / 2, h] is the
    * middle of the bottom edge. Set from the asset's `pivot`; travels through transforms.

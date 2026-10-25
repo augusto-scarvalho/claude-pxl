@@ -390,3 +390,43 @@ scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 24 }, sizes:
   (c) => c.mesh(CAM, M.faces, MATS, { sprites: people(c), stand: true, ...LIGHT }),
   post({ blur: 9, focus: [W / 2, H * 0.55], sharp: 2.5, soft: [3, 8], fog: { color: "#dcdccc", from: DIST + 2, to: DIST + 26, max: 0.7 }, bloom: { strength: 0.6, r: 10 }, vignette: 0.35 }),
   (c) => talk(c))
+
+// `graveyard_3d`: the same visit with three things drawn by the 3D layer, beside the scene above to
+// compare. They stand in the mesh's light (light: "mesh": its sun and sky on what they draw, their
+// shadows the sun's share), at its depth, in pixels of the sprites' size.
+// The dead tree in 3D: the sprite's own limbs (deadTreeLimbs, px) as tapering rods in meters, seen through
+// the camera at 38 degrees, swaying with the pines (the top 6 cm over at the gust, in step with the
+// sprite's), its limbs' shadows on the hill, the old graves and the mourner.
+const SNAG_3D = (() => {
+  const { segs, top } = deadTreeLimbs(76, 4), m = (p) => [p[0] / 24, -p[2] / 24, p[1] / 24], h = top / 24, near = {}
+  // (in bunches half a meter across: a point far from a bunch's box skips its rods, half again as fast)
+  for (const [A, B, ra, rb] of segs) (near[`${Math.floor((A[0] + B[0]) / 24)},${Math.floor((A[1] + B[1]) / 24)}`] ??= []).push(sdf.capsule(m(A), m(B), ra / 24, rb / 24))
+  return sdf.union(Object.values(near).map((g) => sdf.union(g))).mat("bark")
+    .bend((c) => (2 * 0.06 * (0.4 + 0.6 * Math.sin(2 * Math.PI * (12 * c.phase + 3 / 16)))) / (h * h))
+})()
+// A gate in the fence's gap at the top of the steps: two leaves of its pickets on two rails and a brace,
+// hung on the posts' inner faces; it swings in (never past 50 degrees) as he comes up the steps and
+// shuts behind him as he goes down. Its wood is the fence's, in the fence's tones (the mesh's light
+// doesn't tint a ramp's faces, so the gate's tones aren't tinted either); its shadow the sun's share.
+const leaf = (side) => sdf.union([
+  ...[0, 1, 2, 3, 4].flatMap((k) => [sdf.box([3 / 24, 1 / 24, 0.62]).at(0.11 + 0.245 * k, 0, 0.31), sdf.box([0.088, 1 / 24, 0.088]).rotate(45, "y").at(0.11 + 0.245 * k, 0, 0.62)]),
+  ...[0.26, 0.56].map((u) => sdf.box([1.16, 0.04, 2 / 24]).at(0.6, side * 0.042, u)),
+  sdf.box([1.04, 0.04, 2 / 24]).rotate(-16.7, "y").at(0.6, side * 0.042, 0.41)]).mat("gate")
+const legAt = (i) => LEGS.slice(0, i).reduce((n, l) => n + l.n, 0)
+const gateAt = (i) => legAt(i) + (LEGS[i].n * (-2.2 - LEGS[i].a[1])) / (LEGS[i].b[1] - LEGS[i].a[1])  // the frame he crosses its line
+const GIN = gateAt(1), GOUT = gateAt(8), ease = (k) => { const v = Math.max(0, Math.min(1, k)); return v * v * (3 - 2 * v) }
+const gateOpen = (f) => 50 * ease((f - GIN + 22) / 12) * (1 - ease((f - GOUT - 12) / 12))
+const GATE = [{ x: -1.217, f: leaf(1).rotate((c) => gateOpen(c.frame)) }, { x: 1.217, f: leaf(-1).rotate((c) => 180 - gateOpen(c.frame)) }]
+// The morning mist: a thin layer lying low in the wood round the hill and over its foot (never on its
+// top, never up the steps), under half a meter, its top rolling in billows that leave gaps where the
+// ground shows, creeping with the wind from the left; pale, lit by the sun, laid over by its alpha (a
+// dither this thin read as speckle); thickness 0.5 (at 0.3 it all but went).
+pal({ "(": "#a2a6bc", ")": "#bcbccc", "~": "#d6d2d6" })
+const MIST_3D = sdf.density(sdf.box([22, 16, 0.1]).at(0, 1.5, 0).subtract(sdf.box([2.8, 2, 2]).at(0, -3.3, 0)),
+  { edge: 0.25, noise: 0.7, scale: 2.2, seed: 21, octaves: 2, flow: [3, 0.4, 0], fade: [0.05, 0.5] })
+scene("graveyard_3d", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 88 } },
+  (c) => c.mesh(CAM, M.faces, MATS, { sprites: people(c).filter((s) => s.name !== "_snag"), stand: true, ...LIGHT }),
+  (c) => c.surface(SNAG_3D, { view: CAM, at: [-4.6, Z + 4.9, TOP], mats: { bark: "bBiI" }, light: "mesh", ao: 0, shadows: false }),
+  (c) => { for (const g of GATE) c.surface(g.f, { view: CAM, at: [g.x, Z - 2.2, TOP], mats: { gate: "basdf" }, light: LIGHT.light, cast: 0.65 }) },
+  (c) => c.volume(MIST_3D, { view: CAM, at: [0, Z, 0], ramp: "()~", thickness: 0.5, ambient: 0.45, cell: 0.15, blend: "alpha", light: "mesh" }),
+  (c) => talk(c))

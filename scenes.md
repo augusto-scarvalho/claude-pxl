@@ -852,5 +852,15 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). What held, from buildi
   as a function of the clock with `frames`, goes out as one `.glb` that plays (and a file a moment for
   the others). `pxl serve` shows the `.glb` and `.ply` to turn round at `/3d`. `mesh()` draws a mesh
   in `surface()`'s side, top and iso views too.
+- **Into a diorama.** Things drawn in 3D stand among `mesh()`'s sprites when drawn after it through the
+  same camera with `light: "mesh"`: its sun and sky on their tones (as on the sprites), their shadows
+  the sun's share, at its depth, in its sizes' pixel (`hd2d/graveyard.px.js`'s `graveyard_3d`, beside the
+  scene it was made from). There, at 480x270, a frame went from 0.5 s to 1.65 s: a dead tree of 105
+  tapering rods 1 s (bunched half a meter across, half again as fast; `ao: 0, shadows: false` looked
+  the same), a ground mist 0.35 s, a gate swinging on its hinges 0.1 s; checked one frame in 88.
+  A thin mist under half a meter (`thickness` 0.5, its top rolling with `noise` 0.7 over a 0.1 m layer,
+  so the ground shows in its gaps) reads as a veil laid over by `blend: "alpha"`; dithered that thin it
+  was speckle. Something that belongs to a ramp material of the mesh (a gate in its fence) keeps that
+  material's tones and its own `light`: `mesh()` doesn't tint a ramp's faces with the sun.
 - **Cost.** A 320x180 HD-2D frame with a leafy tree, smoke and mist takes 0.6 to 1.3 s on the CPU:
   check one frame in 24 (`check: { every: 24 }`) and keep the loop short.

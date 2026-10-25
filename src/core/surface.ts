@@ -19,6 +19,7 @@ import type { Palette } from "./palette.ts";
 import { type Perspective, type View, perspective, scaled } from "./perspective.ts";
 import { type Clock, type Compiled, Sdf, type V3, article, compile } from "./sdf.ts";
 import { Voxels, sizeOf, voxelize } from "./grids.ts";
+import { type Lit, shine } from "./sunlight.ts";
 
 /** A view: a name, or { kind, yaw, pitch, origin, grid } (`origin`: where the world's [0, 0, 0] lands, px; with it `at` is [x, y, z] m; `grid`: on voxels' pixel grid), or a perspective() view. */
 export type SurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number; origin?: [number, number]; grid?: boolean } | View;
@@ -49,6 +50,8 @@ export interface SurfaceOpts {
   hide?: boolean;
   /** the name of the part it is (pxl steps --at says what part painted a pixel; a field's own .part() names go after it) */
   part?: string;
+  /** (light: "mesh": the light of the mesh() drawn before it, on what it draws as on mesh()'s sprites) */
+  world?: Lit;
 }
 export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "outline", "rim", "shadows", "ao", "pixel", "cast", "hide", "part"];
 /** The index of a part's name in the picture's list of what painted each pixel (see Img.parts). */
@@ -381,6 +384,8 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   const gx0 = Math.floor(bx0 / K), gy0 = Math.floor(by0 / K), GW = Math.ceil(bx1 / K) - gx0, GH = Math.ceil(by1 / K) - gy0;
   if (GW <= 0 || GH <= 0) return;
   const N = GW * GH, m = new Int16Array(N).fill(-1), tone = new Int8Array(N), depth = new Float32Array(N), nrm = new Float32Array(N * 3), hidden = new Uint8Array(N), pt = new Int16Array(N).fill(-1);
+  // in the world's light (light: "mesh"): where each cell is in the world and whether the sun reaches it
+  const Wl = o.world, wpos = Wl ? new Float32Array(N * 3) : undefined, wsun = Wl ? new Uint8Array(N) : undefined;
 
   // something of it between a point and the light, from t0 on
   const blocks = (p: V3, t0: number, e: number): boolean => {
@@ -408,6 +413,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       m[i] = k;
       const ramp = ramps[k], up = T.lift(e), q: V3 = [p[0] + n[0] * up, p[1] + n[1] * up, p[2] + n[2] * up];
       const diffuse = Math.max(0, dot(n, L)), sun = diffuse > 0 && (o.shadows === false || !blocks(q, 0, e)) ? diffuse : 0;
+      if (wpos) { wpos[i * 3] = p[0] + cam.at[0]; wpos[i * 3 + 1] = p[1] + cam.at[1]; wpos[i * 3 + 2] = p[2] + cam.at[2]; wsun![i] = sun > 0 ? 1 : 0; }
       const occ = aoK > 0 && T.ao ? T.ao(p, n) : 0;
       let lv = 0.1 + 0.65 * sun + 0.2 * (0.5 + 0.5 * n[2]) - aoK * 0.35 * Math.max(0, Math.min(1, occ));
       if (shines[k] > 0) {
@@ -453,7 +459,9 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       if (away && o.outline !== false) col = outKey ?? ramp[0];
       else if (toward && o.rim !== false) col = ramp[Math.min(ramp.length - 1, tone[i] + 1)];
       // the normal as the picture sees it (x right, y down, z toward the eye)
-      const n = [nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]], nx = dot(n, R), ny = -dot(n, U), nz = -dot(n, F);
+      const n: V3 = [nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]], nx = dot(n, R), ny = -dot(n, U), nz = -dot(n, F);
+      // in the world's light, as mesh() lights its sprites: the art's tone times the sky's and the sun's
+      if (Wl) col = shine(col, n, wpos![i * 3], wpos![i * 3 + 1], wpos![i * 3 + 2], Wl, wsun![i], 0.5);
       for (let y = 0; y < K; y++)
         for (let x = 0; x < K; x++) {
           const px = (gx0 + gx) * K + x, py = (gy0 + gy) * K + y, j = c.index(px, py);
@@ -472,7 +480,11 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   if (!persp || castK <= 0 || !vis) return;
   const { P, eye } = cam;
   const steps = c.pal.stepMap(-1);
+  // in the world's light, the sun's share taken away, as mesh()'s shadows on a floor do (the sky's light
+  // left; ponytail: a floor's share on walls and sprites too, the receiving normal unknown here)
+  const upk = Wl && o.cast === undefined ? Math.max(0, Wl.dir[2]) : -1, keep = Wl && upk >= 0 ? Wl.sky.map((s, k) => s / (s + Wl.sun[k] * upk || 1)) : undefined;
   const down = (col: Color) => {
+    if (keep) return fromLinear(LIN[col >>> 24] * keep[0], LIN[(col >>> 16) & 255] * keep[1], LIN[(col >>> 8) & 255] * keep[2], col);
     const st = steps.get(col);
     return st !== undefined && st !== col ? st : fromLinear(LIN[col >>> 24] * (1 - castK), LIN[(col >>> 16) & 255] * (1 - castK), LIN[(col >>> 8) & 255] * (1 - castK), col);
   };

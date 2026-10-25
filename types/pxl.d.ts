@@ -244,8 +244,8 @@ declare global {
   /** surface()'s options: the view (orthographic at ppm px to the meter, its origin at `at` px; or a perspective() view, standing `at` [x, z, up] m), the materials' ramps, the light, the outline, the rim, its own shadows, the creases, a ray to K x K px, its shadow on what is drawn. */
   interface PxSurfaceOpts {
     view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number }>;
-    /** the way toward the light; "view": its view's own (from the upper left) where look3d() gives another */
-    light?: number[] | "view"; outline?: boolean | PxColor; rim?: boolean; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
+    /** the way toward the light; "view": its view's own (from the upper left) where look3d() gives another; "mesh": the light of the mesh() drawn before it with a sun (its way, sun, sky and lamps) */
+    light?: number[] | "view" | "mesh"; outline?: boolean | PxColor; rim?: boolean; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
     /** through a camera: its shadow alone (a mesh made of it in its place) */
     hide?: boolean;
     /** the name of the part it is (pxl steps --at) */
@@ -257,7 +257,7 @@ declare global {
   interface PxDensity { readonly kind: "density"; at(p: number[], clock?: PxClock): number; bounds(clock?: PxClock): [PxV3, PxV3] }
   /** volume()'s options: the view, its ramp, the light, how much a meter holds back, its shade, the grid's cell, what glows (and lights round it, m), dither or alpha where thin, a ray to K x K px, its shadow on what is drawn. */
   interface PxVolumeOpts {
-    view?: PxSurfaceView; ppm?: number; at?: number[]; ramp?: string | PxColor[]; light?: number[] | "view"; thickness?: number; ambient?: number; shadow?: number; cell?: number;
+    view?: PxSurfaceView; ppm?: number; at?: number[]; ramp?: string | PxColor[]; light?: number[] | "view" | "mesh"; thickness?: number; ambient?: number; shadow?: number; cell?: number;
     emit?: { ramp: string | PxColor[]; strength?: number; glow?: number }; blend?: "dither" | "alpha"; pixel?: number; cast?: number; part?: string;
   }
   /** Gaussian splats: how many, their box. */
@@ -289,7 +289,7 @@ declare global {
   /** How draw3d() draws a solid: rays to its surface (surface()), voxels(), splats() or a mesh() of its surface; the splats' and the mesh's shadow its field's. */
   type PxAs = "surface" | "voxels" | "splats" | "mesh";
   /** draw3d()'s options: the view, where the world stands, its materials and light, a ray a block, these parts only; how its solids are drawn (`as`), the cell of voxels and of a mesh (`size`, m, 0.1), the splats' spacing. */
-  interface PxDraw3dOpts { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view"; pixel?: number; only?: string[]; as?: PxAs; size?: number; spacing?: number }
+  interface PxDraw3dOpts { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view" | "mesh"; pixel?: number; only?: string[]; as?: PxAs; size?: number; spacing?: number }
   /** What turnaround() made: its sprites' names and their headings, in order, their one size and pivot, those that are another's mirror. */
   interface PxTurnaround { names: string[]; headings: string[]; w: number; h: number; pivot: [number, number]; mirrored: string[] }
   /** expect3d's rules; before and while take two rules of a place. */

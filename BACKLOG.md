@@ -55,6 +55,11 @@ Mark items `[x]` when they ship, with the commit.
   the ramps "1234" and "5678" no longer ran dark to light (`shade()` on it stepped along cobbles; the
   rule read its lit side backwards until `rampSteps` skipped such ramps). Say the key, the ramp and
   where the ramp was made; the keys renamed since.
+- [ ] **A field that moves on the clock, made once:** the graveyard_3d's dead tree (105 rods, 480x270)
+  takes 1.8 s a frame swaying (a `bend` by the clock) and 1.05 s still. Its code is cached by source and
+  its numbers read by reference, yet each moment costs 0.7 s more: find where (a closure made cold each
+  frame, the bounds, the box culling's order) and make it once per field. Every swaying sdf example
+  (`sdf/world`, `sdf/volumes`, the trees in the wind) would gain.
 - [ ] **What the 3D stage (wave 2) left to fix by hand, each a small change of pixels for the user to
   see before and after:**
   - three grass tufts along the graveyard's fence stand at its top, 1.5 m over the turf, past the

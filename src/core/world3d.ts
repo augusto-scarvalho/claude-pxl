@@ -371,7 +371,7 @@ export function drawWorld(thing: unknown, o: Draw3dOpts, d: Drawers): void {
   for (const n of o.only ?? []) if (!W.spec.parts[n]) throw new PxError(`draw3d: only names '${n}', which isn't a part (it has: ${W.names.join(", ")})`);
   const off = o.at ?? [0, 0, 0];
   if (!(Array.isArray(off) && off.length === 3 && off.every(Number.isFinite))) throw new PxError(`draw3d: at is where the world's [0, 0, 0] stands, [x, y, z] m, got ${JSON.stringify(o.at)}`);
-  const base = { view: o.view, ppm: o.ppm, pixel: o.pixel, light: o.light }, at = (n: string) => { const p = W.place(n, d.clock); return [p[0] + off[0], p[1] + off[1], p[2] + off[2]]; };
+  const base = { view: o.view, ppm: o.ppm, pixel: o.pixel, light: o.light, world: (o as { world?: unknown }).world }, at = (n: string) => { const p = W.place(n, d.clock); return [p[0] + off[0], p[1] + off[1], p[2] + off[2]]; };
   const own = (n: string) => (W.spec.parts[n].mats ? { ...mats, ...W.spec.parts[n].mats } : mats);
   for (const n of names) {
     const b = W.built(n), f = b.field, as = W.spec.parts[n].as ?? o.as ?? "surface", where = { ...base, at: at(n), mats: own(n), part: n };

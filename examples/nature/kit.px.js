@@ -383,15 +383,16 @@ sprite("_deadtree", { w: 60, h: 74, pivot: "bottom" }, (c) => {
 // the trunk and the big limbs, the thin ones one tone, the darkest only as their outline on the
 // shaded side; two roots. Swaying a little in the wind, the trunk with the square of the height, the
 // thin limbs trembling twice as fast, more toward their tips. h: its height in px.
-const deadTreeVolume = (name, h, seed, { frames = 16, fps = 1000 / 220, sway = 1 } = {}) => {
-  const W = 76, OX = 38, OY = h - 1, P = (20 * Math.PI) / 180, CP = Math.cos(P), SP = Math.sin(P)
+// Its limbs, once: segments [A, B, radius at A, at B, how many splits from the trunk] in px (x across,
+// y up, z toward the eye), h px tall, and how high they reach; drawn as a sprite by deadTreeVolume, and
+// as capsules in 3D by the graveyard's graveyard_3d.
+const deadTreeLimbs = (h, seed) => {
+  const CP = Math.cos((20 * Math.PI) / 180), Hw = (h - 1.5) / CP
   const unit = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l) }
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
   const add = (a, b) => a.map((v, i) => v + b[i]), mul = (a, k) => a.map((v) => v * k)
-  const SUN = unit([-0.55, 0.62, -0.55]), D = [0, SP, CP], Hw = (h - 1.5) / CP
   // turn v about the unit axis k by angle a
   const turn = (v, k, a) => add(add(mul(v, Math.cos(a)), mul(cross(k, v), Math.sin(a))), mul(k, dot(k, v) * (1 - Math.cos(a))))
-  // the skeleton, once: segments [A, B, radius, how many splits from the trunk]
   const r = rng(seed), segs = []
   const limb = (p, d, len, rad, lvl) => {
     for (let done = 0; done < len - 0.5; ) {
@@ -417,6 +418,14 @@ const deadTreeVolume = (name, h, seed, { frames = 16, fps = 1000 / 220, sway = 1
   limb([0, 0, 0], unit([0.04, 1, 0.02]), Hw * 0.3, 3.4, 0)
   for (const a of [Math.PI + 0.3, -0.35]) segs.push([[0, 0.6, 0], [Math.cos(a) * 4, -0.4, Math.sin(a) * 1.5 + 0.8], 1.2, 0.6, 0])   // roots
   const top = Math.max(...segs.map((s) => s[1][1]))
+  return { segs, top }
+}
+const deadTreeVolume = (name, h, seed, { frames = 16, fps = 1000 / 220, sway = 1 } = {}) => {
+  const W = 76, OX = 38, OY = h - 1, P = (20 * Math.PI) / 180, CP = Math.cos(P), SP = Math.sin(P)
+  const unit = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l) }
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+  const add = (a, b) => a.map((v, i) => v + b[i]), mul = (a, k) => a.map((v) => v * k)
+  const SUN = unit([-0.55, 0.62, -0.55]), D = [0, SP, CP], { segs, top } = deadTreeLimbs(h, seed)
   const dir = (n) => {
     const sx = n[0], sy = n[1] * CP - n[2] * SP, l = Math.hypot(sx, sy)
     if (l < 0.3) return "5"

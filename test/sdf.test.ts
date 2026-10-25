@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { Sdf, compile, fbm3, sdf } from "../src/core/sdf.ts";
 import { surfaceSize } from "../src/core/surface.ts";
 import { loadSource } from "../src/node/load.ts";
-import { keys, PAL } from "./helpers.ts";
+import { failure, keys, PAL } from "./helpers.ts";
 
 const near = (a: number, b: number, e = 1e-9, what = "") => assert.ok(Math.abs(a - b) <= e, `${what} ${a} != ${b}`);
 const D = (f: Sdf, p: number[], clock?: Parameters<Sdf["dist"]>[1]) => f.dist(p, clock);
@@ -142,6 +142,26 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { g: { ramp: "w" }, s: { 
   // its shadow: on the ground to the right of the ball (the sun on the left), a step down the ramp
   assert.ok(o.slice(18, 24).some((r) => r.slice(24, 34).includes("g")), "a shadow to the right on the ground");
   assert.ok(o[20].slice(0, 12).split("").every((k) => k === "w"), "none to the left");
+});
+
+test('light "mesh": a surface, a volume and draw3d after a mesh() with a sun take its light (its way, its sun and sky on their tones)', () => {
+  const src = (light: string, sun = true) => PAL + `ramps("kgw")
+const V = { w: 40, horizon: 10, eye: 1, focal: 40 }, M = model()
+M.face("g", [-5, 0.5, 0], [5, 0.5, 0], [5, 20, 0], [-5, 20, 0])
+const ground = (c) => c.mesh(V, M.faces, { g: { ramp: "w" } }, { light: [-1, 0, 1], ${sun ? 'sun: "#ffd0a0", sky: "#6070a0"' : ""} })
+scene("a", { w: 40, h: 40 }, ground, (c) => c.surface(sdf.sphere(0.4).at(0, 0, 0.4), { view: V, at: [0, 4, 0], mats: { m: "rgw" }, light: ${light} }))
+scene("d", { w: 40, h: 40 }, ground, (c) => c.draw3d(sdf.sphere(0.4).at(0, 0, 0.4), { view: V, at: [0, 4, 0], mats: { m: "rgw" }, light: ${light} }))
+scene("v", { w: 40, h: 40 }, ground, (c) => c.volume(sdf.density(sdf.sphere(0.4).at(0, 0, 0.4)), { view: V, at: [0, 4, 0], ramp: "rgw", thickness: 9, light: ${light} }))`;
+  const p = loadSource(src('"mesh"'), "t.px.js"), q = loadSource(src("[-1, 0, 1]"), "t.px.js");
+  for (const n of ["a", "v"]) {
+    const lit = keys(p, n).split("\n"), own = keys(q, n).split("\n");
+    // where the plain one drew its tones (r, g), the lit one drew them in the sun and sky: off the palette
+    const at = own.flatMap((r, y) => [...r].map((k, x) => (k === "r" || k === "g" ? [x, y] : null))).filter((v) => v) as number[][];
+    assert.ok(at.length > 20, `${n}: drawn`);
+    assert.ok(at.every(([x, y]) => lit[y][x] === "?"), `${n}: lit by the mesh's sun and sky`);
+  }
+  assert.equal(p.image("d").hash(), p.image("a").hash(), "draw3d passes it on");
+  assert.match(failure(src('"mesh"', false), "a").message, /light: "mesh" is the light of a mesh\(\) with a sun/);
 });
 
 test("look3d: the 3D ops' light and mats where a call doesn't say them; a call's own wins, light \"view\" the view's own", () => {
