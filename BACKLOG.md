@@ -55,6 +55,20 @@ Mark items `[x]` when they ship, with the commit.
   the ramps "1234" and "5678" no longer ran dark to light (`shade()` on it stepped along cobbles; the
   rule read its lit side backwards until `rampSteps` skipped such ramps). Say the key, the ramp and
   where the ramp was made; the keys renamed since.
+- [ ] **What the 3D stage (wave 2) left to fix by hand, each a small change of pixels for the user to
+  see before and after:**
+  - three grass tufts along the graveyard's fence stand at its top, 1.5 m over the turf, past the
+    hill's rounded corners: `stand` drops them onto the turf beside the wall (33 px);
+  - the standing rule skips things placed as "many copies" (tufts, flowers), so small things floating
+    go unseen: run it on them too, once the tufts are down;
+  - the graveyard's traveler on `stand`: 2 px at frame 150 (the path's stones are 2.5 cm in the
+    model, 2 cm in its `feetAt`); the harbor keeps `feetAt` (the deck bobs with the ship);
+  - `sdf/splats.px.js`'s mesh-through-the-camera panel and `sdf/grids.px.js`'s `tree_three_ways` stay
+    by hand: through `draw3d` the grass before the trunk's foot loses its outline (8 px);
+  - four texels kept by hand (the graveyard's 2.5 cm kerb, the harbor's hull, boat and deck past 45°),
+    where `texel: "screen"` is more correct but moves a few pixels;
+  - `sizes` blocks only ramp materials by default; blocking textures too would keep HD scenes nearer
+    pixel art (plaza_hd and graveyard_hd would change: show both).
 
 ## Characters (from dogfooding a 64 px character)
 
