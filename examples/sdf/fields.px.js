@@ -9,7 +9,7 @@ include("kit.px.js", { palette: true })   // the palette, the camera, the ground
 // A field in the four views: from the side, the top and in iso as sprites (anims on the clock, sized to
 // it), and `<name>_camera`, a scene of it standing on the grass through the HD-2D camera, its shadow on
 // the ground. `turn`: on a turntable, once round over the loop.
-const views = (name, field, { ppm = 16, turn = false, stage = [128, 112] } = {}) => {
+const fourViews = (name, field, { ppm = 16, turn = false, stage = [128, 112] } = {}) => {
   const f = turn ? field.rotate((c) => 360 * c.phase) : field
   for (const v of ["side", "top", "iso"]) {
     const S = sdf.size(f, { view: v, ppm, frames: CLOCK.frames })
@@ -20,10 +20,10 @@ const views = (name, field, { ppm = 16, turn = false, stage = [128, 112] } = {})
   scene(`${name}_camera`, { w: stage[0], h: stage[1], bg: "k", ...CLOCK, check: { every: 24 } },
     (c) => c.mesh(C, G.faces, GMATS), (c) => c.surface(f, { view: C, at }))
 }
-views("tree", tree(), { stage: [144, 176] })
-views("rock", rock(), { ppm: 32, turn: true, stage: [96, 72] })
-views("house", house(), { turn: true, stage: [112, 112] })
-views("crystal", crystal(), { ppm: 32, stage: [80, 80] })
+fourViews("tree", tree(), { stage: [144, 176] })
+fourViews("rock", rock(), { ppm: 32, turn: true, stage: [96, 72] })
+fourViews("house", house(), { turn: true, stage: [112, 112] })
+fourViews("crystal", crystal(), { ppm: 32, stage: [80, 80] })
 
 // The four standing in a diorama: mesh() draws the ground, a flagstone path and a low wall seen
 // through an HD-2D camera (40 degrees down, a long lens, 24 px to the meter where it looks); then each

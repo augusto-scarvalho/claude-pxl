@@ -264,6 +264,8 @@ export interface PlaceOpts {
   seed?: number;
   /** Rebuild the placed asset with its own random choices (true = derived from position). */
   reseed?: boolean | number;
+  /** Of a family named by the compass (name_n, name_ne, ...), the member nearest this heading: compass degrees (0 away, 90 right) or [dx, dz] on the ground. */
+  heading?: number | [number, number];
   /** Animated assets: show this frame index, frozen. */
   frame?: number;
   /** Animated assets: start this many ms later (desync copies). */

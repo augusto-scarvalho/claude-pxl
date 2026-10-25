@@ -71,6 +71,8 @@ export interface MeshSprite {
   name: string;
   /** where its pivot (its feet) stands, in m: [x, z] on the ground, or [x, z, up] */
   at: [number, number] | V3;
+  /** of a family named by the compass (a turnaround, rig3d's moves), the one nearest this heading, as a stamp's */
+  heading?: number | [number, number];
   flip?: "x";
   frame?: number;
   /** an animation's own time in its loop and random choices, as a stamp's (a tree swaying out of step) */

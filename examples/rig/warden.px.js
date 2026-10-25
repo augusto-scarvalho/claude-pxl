@@ -112,8 +112,11 @@ const SHOUT = [
   { ...GRIT[1], 10: [[0, ".RrSsziiiz."]], 11: [[0, "..RSssiyiS."]], 12: [[0, "...RSszsS.."]] },
   { ...GRIT[2], 10: [[0, ".RrrSszzii.."]], 11: [[0, "..RrSsszyi.."]], 12: [[0, "...RSssS_..."]] },
 ]
-HEADS.forEach((g, i) => sprite(`_whead${i}`, { outline: "k", pivot: "center" }, g))
-for (const [name, set] of [["grit", GRIT], ["shout", SHOUT]]) set.forEach((rows, i) => sprite(`_whead${i}_${name}`, { outline: "k", pivot: "center" }, HEADS[i], runs(rows)))
+// views(): the five drawn (front, turned to our right, back), the other three their mirrors;
+// an expression's set keeps the calm head for the back views
+const SIDES = ["s", "se", "e", "ne", "n"]
+views("_whead", Object.fromEntries(HEADS.map((g, i) => [SIDES[i], g])), { anchor: "center", outline: "k" })
+for (const [name, set] of [["grit", GRIT], ["shout", SHOUT]]) views(`_whead_${name}`, Object.fromEntries(HEADS.map((g, i) => [SIDES[i], set[i] ? [g, runs(set[i])] : g])), { anchor: "center", outline: "k" })
 
 // ---- the camera: px, x to the right, y up, z toward us; a little from above, so a level circle is a
 // flat ellipse (the smear of a level cut)
@@ -132,13 +135,6 @@ const UP = [0, 1, 0], VIEW = [0, SP, CP]                      // toward the eye
 // a frame turned `yaw` degrees from facing us (90: facing right): forward, right, up
 const frame3 = (yaw) => { const f = [Math.sin(rad(yaw)), 0, Math.cos(rad(yaw))]; return { f, r: [-f[2], 0, f[0]] } }
 const local = (o, fr, [a, b, c]) => add(o, add(add(mul(fr.f, a), mul(fr.r, b)), mul(UP, c)))
-// two bones from a reaching for b, the joint pushed toward `hint`
-const ik3 = (a, b, l1, l2, hint) => {
-  const d = sub(b, a), dl = Math.min(len(d), l1 + l2 - 0.01), u = unit(d)
-  const x = (l1 * l1 - l2 * l2 + dl * dl) / (2 * dl), y = Math.sqrt(Math.max(0, l1 * l1 - x * x))
-  const side = unit(sub(hint, mul(u, dot(hint, u))))
-  return add(add(a, mul(u, x)), mul(side, y))
-}
 
 // ---- the body, in px over the sole
 const HIP = 22, TORSO = 12, NECK = 6, HIPW = 3, SHW = 6
@@ -397,8 +393,8 @@ anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], fac
     }))
     at(mid, chest(() => torso(c, j, p)))
     // the head as it is turned, and the tail of hair swinging behind it
-    const look = (((p.yaw + p.twist + p.head) % 360) + 360) % 360, view = Math.round(look / 45) % 8
-    at(depth(j.head) + 1, () => { const [x, y] = scr(j.head).map(Math.round); const v = view > 4 ? 8 - view : view; c.stamp(`_whead${v}${v <= 2 && p.look !== "calm" ? "_" + p.look : ""}`, x + hx, y + hy, { sub: headWay, ...(view > 4 ? { flip: "x" } : {}) }) })
+    // (yaw 0 faces us, 90 our right: a compass heading of 180 - yaw)
+    at(depth(j.head) + 1, () => { const [x, y] = scr(j.head).map(Math.round); c.stamp(p.look === "calm" ? "_whead" : `_whead_${p.look}`, x + hx, y + hy, { sub: headWay, heading: 180 - (p.yaw + p.twist + p.head) }) })
     const tailYaw = rad(p.yaw + p.twist + p.head + 180 - Math.max(-70, Math.min(70, TAIL[c.frame] * 0.8))), lift = Math.min(1, Math.abs(TAIL[c.frame]) / 60)
     const tdir = unit([Math.sin(tailYaw) * (0.3 + lift), -1 + lift * 0.8, Math.cos(tailYaw) * (0.3 + lift)])
     const t0 = local(j.head, j.hd, [-3.5, 0, 0]), t1 = add(t0, mul(tdir, 5)), t2 = add(t1, mul(unit(add(tdir, [0, -0.6, 0])), 4))

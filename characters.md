@@ -160,6 +160,10 @@ far limbs swap, every fix breaks something else). In pxl itself (§11; `examples
 5. The walk by the view (§6): facing us or away the feet lift in their own columns, in profile a
    long stride, on the diagonals between.
 
+In the DSL: `rig3d()` is steps 1 and 2 (the skeleton on the 3D layer in every direction, its flat
+blocks with `blocks: true`: the traveler's `bk3_*`), `views()` step 4 (the mirror about the anchor, the
+rows checked), `gait()` step 5's numbers (`PXL help rig3d`).
+
 What the first tries of the traveler (34 px) got wrong, and the fix:
 - A big head: 11 rows of 34, a third; 13 read as a big head on a small body.
 - Stick limbs: legs as tubes about 1.5 px in radius, arms about 1 px; thinner read as a stick figure.
@@ -603,6 +607,7 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   recover (lowest); a game's run, 3 (§12). Top-down, a front or back walk
   is half the cycle and the same half flipped (`flip: "x"`), redrawing only what isn't symmetric,
   with less bob walking up. In-betweens halve each frame's time, so the cycle keeps its length.
+  `gait(t, { heading })` gives a walk's numbers by the view, overridable (`PXL help gait`).
 - **Animate a dummy first** (SLYNYRD, final boss blues): the figure in flat parts, each in its own
   color (the head, the torso, the near limbs light, the far ones dark), through every move; then
   paint the costume over it frame by frame. One leg first (4 keys, then 8 frames), the other the same

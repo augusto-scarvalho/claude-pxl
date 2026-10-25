@@ -99,9 +99,10 @@ const HEADS = {
   ...JjjJjJjjJ...
   .....zJjJz.....`,
 }
-for (const [v, g] of Object.entries(HEADS)) sprite(`_tr_head_${v}`, g)
-const GRID = Object.fromEntries(Object.entries(HEADS).map(([v, g]) => [v, g.trim().split("\n").map((r) => r.trim())]))
-const HEADX = { s: -7, n: -7, w: -5, sw: -8, nw: -8 }
+// each view's pixel on the skeleton's head (the profile's 2 px back, so the face doesn't jut ahead of
+// the body); the right-hand views their mirrors (views())
+const ANCHOR = { s: [7, 5], sw: [8, 5], w: [5, 5], nw: [8, 5], n: [7, 5] }
+views("_tr_head", HEADS, { anchor: ANCHOR })
 
 // ---------------------------------------------------------------- the skeleton
 // the camera: px, x right, y up, z toward us; 20 degrees down (a field sprite, nearly level)
@@ -117,36 +118,26 @@ const len = (a) => Math.hypot(a[0], a[1], a[2]), unit = (a) => mul(a, 1 / (len(a
 const UP = [0, 1, 0], SUN = unit([0, 0.75, 0.6])   // from above, toward us: a mirrored view keeps it where it is
 const frame3 = (yaw) => { const f = [Math.sin(rad(yaw)), 0, Math.cos(rad(yaw))]; return { f, r: [-f[2], 0, f[0]] } }
 const local = (o, fr, [a, b, c]) => add(o, add(add(mul(fr.f, a), mul(fr.r, b)), mul(UP, c)))
-const ik3 = (a, b, l1, l2, hint) => {
-  const d = sub(b, a), dl = Math.min(len(d), l1 + l2 - 0.01), u = unit(d)
-  const x = (l1 * l1 - l2 * l2 + dl * dl) / (2 * dl), y = Math.sqrt(Math.max(0, l1 * l1 - x * x))
-  const side = unit(sub(hint, mul(u, dot(hint, u))))
-  return add(add(a, mul(u, x)), mul(side, y))
-}
 // the body in px over the sole: the head 11 rows, the shoulders under it, the torso 10 to the crotch,
 // the legs about a third of the height
 const HIP = 11.5, TORSO = 10, NECK = 1.6, HEADR = 5.5, HIPW = 2, SHW = 4.3
 const THIGH = 5.3, SHIN = 5, UPPER = 3.4, FORE = 3.2, CLOAK = 13   // the cloak from the shoulders to mid-thigh
 
 // ---------------------------------------------------------------- the moves
-// Walking, 8 frames at 110 ms, by the view (characters §10): facing us or away, the feet step in their
-// own columns, the lifted one up 1, 3, 1 px while the other stays planted, the hand across from it
-// coming forward and up, the body down a pixel at each contact; in profile, the stride long (14-16 px
-// toe to heel), the foot lifted as it swings through, the body a 2 px triangle (lowest at the contacts),
-// the hands forward and back past the body; on the diagonals, between the two. Idle: a breath.
-const FRONT = { lift: [[0, 0, 0, 0, 0, 1, 3, 1], [0, 1, 3, 1, 0, 0, 0, 0]], down: [1, 0, 0, 0, 1, 0, 0, 0] }
+// Walking, 8 frames at 110 ms, by the view (characters §10, gait()): facing us or away, the feet step in
+// their own columns, the lifted one up 1, 3, 1 px while the other stays planted, the hand across from
+// it coming forward and up, the body down a pixel at each contact; in profile, the stride long (14-16
+// px toe to heel), the foot lifted as it swings through, the body a 2 px triangle (lowest at the
+// contacts), the hands forward and back past the body; on the diagonals, between the two. Facing us
+// the lift a little more, so it shows its pixels through the camera's tilt; on the diagonals the body
+// dips 0.6 of the profile's. The body leans, the cloak trails and sways by the view. Idle: a breath.
+const GAIT_TR = { front: { lift: [0, 0, 0, 0, 0, 1, 3, 1].map((v) => v * 1.07) }, diagonal: { bob: [0, 1, 2, 1, 0, 1, 2, 1].map((v) => v * 0.6) } }
 const walk = (i, yaw) => {
-  const ph = (2 * Math.PI * i) / 8, sn = Math.sin(ph), cs = Math.cos(ph), a = Math.abs(Math.sin(rad(yaw)))
-  if (a < 0.1) {   // facing us or away
-    const up = (k) => FRONT.lift[k][i] * 1.07, fwd = [up(0) > 0 ? 1 : 0, up(1) > 0 ? 1 : 0]
-    return { feet: [[0.6 * sn, -HIPW], [-0.6 * sn, HIPW]], lift: [up(0), up(1)], down: FRONT.down[i], lean: 2, trail: 0.4, sway: sn,
-      hands: [fwd[1] ? [0.8, -1, -5.6] : [-0.4, -1, -7], fwd[0] ? [0.8, 1, -5.6] : [-0.4, 1, -7]] }
-  }
-  const stride = a > 0.9 ? 4.6 : 3.4, lift = a > 0.9 ? 2.5 : 1.8, hand = (s) => (s > 0 ? [4.4 * s, 0, -7 + 1.4 * s] : [3.6 * s, 0, -7 - 0.3 * s])
-  const hl = hand(-sn), hr = hand(sn)
-  return { feet: [[stride * sn, -HIPW], [-stride * sn, HIPW]], lift: [lift * Math.max(0, cs), lift * Math.max(0, -cs)],
-    down: [0, 1, 2, 1, 0, 1, 2, 1][i] * (a > 0.9 ? 1 : 0.6), lean: 4, trail: 1 + 0.3 * Math.abs(Math.sin(ph - 0.8)), sway: Math.sin(ph - 0.8) * (1 - a),
-    hands: [[hl[0], -0.8 + 0.6 * a, hl[2]], [hr[0], 0.8 - 0.6 * a, hr[2]]] }
+  const g = gait(i / 8, { heading: 180 - yaw, ...GAIT_TR }), ph = (2 * Math.PI * i) / 8, side = g.view === "profile" || g.view === "diagonal"
+  const feet = g.feet.map(([fwd], k) => [fwd, k ? HIPW : -HIPW]), lift = g.feet.map(([, up]) => up)
+  const hands = g.hands.map(([fwd, up], k) => [fwd, side ? (k ? 0.8 - 0.6 * g.a : -0.8 + 0.6 * g.a) : k ? 1 : -1, -7 + up])
+  return side ? { feet, lift, down: g.bob, lean: 4, trail: 1 + 0.3 * Math.abs(Math.sin(ph - 0.8)), sway: Math.sin(ph - 0.8) * (1 - g.a), hands }
+    : { feet, lift, down: g.bob, lean: 2, trail: 0.4, sway: Math.sin(ph), hands }
 }
 const idle = (i) => ({ feet: [[0, -HIPW - 0.3], [0, HIPW + 0.3]], lift: [0, 0], down: [0, 1, 1, 0][i], lean: 1, trail: 0.15, sway: 0,
   hands: [[0, -1, -7], [0, 1, -7]] })
@@ -254,7 +245,7 @@ const drape = (best, j, fr, p, D, part) => {
   sweep(best, base, fr, top - D.len, top, D.radius, typeof D.out === "function" ? D.out : (h, a, out) => (out ? D.out : D.in), part, D.keep ?? (() => true),
     (h) => { const down = 1 - h; return add(mul(fr.f, -(0.3 + 1.1 * p.trail) * down * D.trail), mul(fr.r, 0.9 * p.sway * down ** 1.5 * D.trail)) })
 }
-const figure = (c, set, p, yaw, mirror, o = TRAVELER) => {
+const figure = (c, set, p, yaw, o = TRAVELER) => {
   const j = bones(p, yaw), best = new Map(), fr = j.fr
   // the limb on the side away from us a step darker
   const farLeg = depth(j.legs[0].hip) < depth(j.legs[1].hip) ? 0 : 1, farArm = depth(j.arms[0].sh) < depth(j.arms[1].sh) ? 0 : 1
@@ -292,17 +283,16 @@ const figure = (c, set, p, yaw, mirror, o = TRAVELER) => {
   }
   for (const [, key, x, y] of best.values()) c.px(x, y, key)
   for (const k of inner) c.px(k % 4096, Math.floor(k / 4096), o.ink)
-  // the head over all, by hand, its middle row on the skeleton's head (the profile's 2 px back, so the
-  // face doesn't jut ahead of the body); under it, where it meets the body, a line of dark brown (the
-  // chin's and the nape's edge), so the face and the clothes don't run together
-  const [hx, hy] = scr(j.head).map(Math.round), v = HEADVIEW[yaw], g = (o.grid ?? GRID)[v], w = g[0].length
-  const x0 = hx + HEADX[v], x = mirror ? 2 * hx - x0 - (w - 1) : x0, y = hy - 5
-  c.stamp(`${set}_head_${v}`, x, y, mirror ? { flip: "x" } : {})
-  for (let col = 0; col < w; col++) {
-    let r = g.length - 1
-    while (r >= 0 && g[r][col] === ".") r--
-    const X = x + (mirror ? w - 1 - col : col)
-    if (r >= 0 && c.get(X, y + r + 1)) c.px(X, y + r + 1, o.chin)
+  // the head over all, by hand, the view its heading's, anchored on the skeleton's head; under it, where
+  // it meets the body, a line of dark brown (the chin's and the nape's edge), so the face and the clothes
+  // don't run together
+  const [hx, hy] = scr(j.head).map(Math.round), head = { heading: 180 - yaw }, g = c.asset(`${set}_head`, head)
+  const x = hx - Math.floor(g.pivot[0]), y = hy - Math.floor(g.pivot[1])
+  c.stamp(`${set}_head`, hx, hy, head)
+  for (let col = 0; col < g.w; col++) {
+    let r = g.h - 1
+    while (r >= 0 && !g.data[r * g.w + col]) r--
+    if (r >= 0 && c.get(x + col, y + r + 1)) c.px(x + col, y + r + 1, o.chin)
   }
 }
 // Step 1 again, for a new move: the same skeleton as flat blocks (bk_<move>_<dir>), to judge the pose
@@ -333,27 +323,33 @@ const blocks = (c, p, yaw) => {
   for (const [, key, x, y] of best.values()) c.px(x, y, key)
   for (const k of inner) c.px(k % 4096, Math.floor(k / 4096), "k")
 }
-// 8 directions: the left ones drawn, the right ones their mirrors
-const DIRS = { s: [0, "s"], sw: [-45, "sw"], w: [-90, "w"], nw: [-135, "nw"], n: [180, "n"], ne: [135, "nw"], e: [90, "w"], se: [45, "sw"] }
-const HEADVIEW = Object.fromEntries(Object.values(DIRS).map(([yaw, v]) => [yaw, v]))
+// 8 directions, each turned to (yaw: degrees from facing us, to the right)
+const DIRS = { s: 0, sw: -45, w: -90, nw: -135, n: 180, ne: 135, e: 90, se: 45 }
 // The mourner: grey hair, a shawl of dark violet, grey linen.
 const MOURNER = {
   Y: "#bdb8ae", H: "#a6a199", h: "#8f8a84", j: "#625e5c", J: "#383536",
   C: "#7a6c8c", c: "#56496a", n: "#3a3150", N: "#231d33", W: "#a8a196", w: "#7f786f", v: "#58534e",
 }
-for (const v of Object.keys(HEADS)) sprite(`_mo_head_${v}`, { base: `_tr_head_${v}`, swap: MOURNER })
+views("_mo_head", HEADS, { anchor: ANCHOR, swap: MOURNER })
 // a move with a hand that matters (casting): its near hand a socket, in every frame where the pose puts it
 const handAt = (c, p, yaw) => c.setSocket("hand", ...scr(bones(p, yaw).arms[yaw < 0 ? 0 : 1].hand))
-for (const [who, set] of [["tr", "_tr"], ["mo", "_mo"]]) for (const [move, M] of Object.entries(MOVES)) for (const [d, [yaw]] of Object.entries(DIRS)) {
+for (const [who, set] of [["tr", "_tr"], ["mo", "_mo"]]) for (const [move, M] of Object.entries(MOVES)) for (const [d, yaw] of Object.entries(DIRS)) {
   if (M.dirs && !M.dirs.includes(d)) continue
-  const mirror = yaw > 0 && yaw < 180
   anim(`${who}_${move}_${d}`, { w: W, h: H, pivot: [OX, OY], ...(who === "mo" ? { swap: MOURNER } : {}) },
-    (c) => { const p = M.f(c.frame, yaw); figure(c, set, p, yaw, mirror); if (M.hand) handAt(c, p, yaw) }, ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })), bump("hybrid"))
+    (c) => { const p = M.f(c.frame, yaw); figure(c, set, p, yaw); if (M.hand) handAt(c, p, yaw) }, ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })), bump("hybrid"))
 }
-for (const [move, M] of Object.entries(MOVES)) for (const [d, [yaw]] of Object.entries(DIRS)) {
+for (const [move, M] of Object.entries(MOVES)) for (const [d, yaw] of Object.entries(DIRS)) {
   if (M.dirs && !M.dirs.includes(d)) continue
   anim(`bk_${move}_${d}`, { w: W, h: H, pivot: [OX, OY] }, (c) => { const p = M.f(c.frame, yaw); blocks(c, p, yaw); if (M.hand) handAt(c, p, yaw) }, ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })))
 }
 sheet("traveler", ["tr_*", "mo_*"], { rows: "tag", pad: 1 })
+// The same skeleton and moves on the 3D layer (rig3d: its limbs fields, drawn by surface()), as blocks
+// to hold against bk_*: bk3_<move>_<dir>
+rig3d("tr3", {
+  body: { h: 34, heads: 3, hip: HIP, torso: TORSO, neck: NECK + HEADR, thigh: THIGH, shin: SHIN, upper: UPPER, fore: FORE, ankle: 1.2, hips: HIPW, shoulders: [0.5, SHW, -1] },
+  w: W, h: H, pivot: [OX, OY], blocks: "bk3",
+  moves: Object.fromEntries(Object.entries(MOVES).map(([m, M]) => [m, { frames: M.frames, ms: M.ms, pose: (i, h) => M.f(i, 180 - h), ...(M.dirs ? { dirs: M.dirs } : {}),
+    ...(M.hand ? { draw: (c, j) => c.setSocket("hand", ...j.screen(j.arms[j.heading > 180 ? 0 : 1].hand)) } : {}) }])),
+})
 Object.assign(travelerRig, { figure, blocks, bones, scr, depth, local, sample, TRAVELER, MOVES, DIRS, W, H, OX, OY, casting, CH, TH })
 }

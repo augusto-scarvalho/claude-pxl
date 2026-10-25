@@ -38,6 +38,7 @@ type Node =
   | { op: "noise"; of: Sdf; amp: Num; scale: Num; seed: number; octaves: number }
   | { op: "mat"; of: Sdf; name: string }
   | { op: "paint"; of: Sdf; name: string; where: (p: V3, n: V3) => unknown }
+  | { op: "paintBy"; of: Sdf; by: (p: V3, n: V3) => unknown }
   | { op: "part"; of: Sdf; name: string };
 
 /** A field compiled at one moment: its distance, its material (an index into `mats`, -1 none) and its named part (into `parts`, -1 none) at a point with its normal, its box, its stretch. */
@@ -164,9 +165,10 @@ export class Sdf {
     if (typeof name !== "string" || !/^[\w-]+$/.test(name)) throw new PxError(`sdf: part(name): a name of letters, digits, _ or -, got ${JSON.stringify(name)}`);
     return new Sdf({ op: "part", of: this, name });
   }
-  /** A material where `where(p, n)` holds: p the point and n its normal, in this field's own frame (moss where n[2] > 0.6). */
-  paint(name: string, where: (p: V3, n: V3) => unknown): Sdf {
-    if (typeof name !== "string" || !name || typeof where !== "function") throw new PxError("sdf: paint(name, (p, n) => true where it is that material)");
+  /** A material where `where(p, n)` holds: p the point and n its normal, in this field's own frame (moss where n[2] > 0.6); or paint((p, n) => name), the material it names there (nothing: what it was). */
+  paint(name: string | ((p: V3, n: V3) => unknown), where?: (p: V3, n: V3) => unknown): Sdf {
+    if (typeof name === "function" && where === undefined) return new Sdf({ op: "paintBy", of: this, by: name });
+    if (typeof name !== "string" || !name || typeof where !== "function") throw new PxError("sdf: paint(name, (p, n) => true where it is that material), or paint((p, n) => the material's name there)");
     return new Sdf({ op: "paint", of: this, name, where });
   }
   /** Its box [lo, hi] at a moment (Infinity for a plane's sides). */
@@ -639,6 +641,11 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
       case "paint": {
         const C = go(n.of), k = idx(n.name), where = n.where;
         return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c); return where([x, y, z], [a, b, c]) ? v - (v % 1024) + k + 1 : v; } };
+      }
+      case "paintBy": {
+        // (the names it gives join `mats` as they come: a renderer looks up those it hasn't seen)
+        const C = go(n.of), by = n.by;
+        return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c), w = by([x, y, z], [a, b, c]); return typeof w === "string" && w ? v - (v % 1024) + idx(w) + 1 : v; } };
       }
       case "part": {
         // its full name: the parts round it first; the innermost names a point

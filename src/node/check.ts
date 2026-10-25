@@ -11,6 +11,7 @@ import { dE, lineFlaws } from "../core/vision.ts";
 import { toHex } from "../core/color.ts";
 import type { Item } from "../core/model.ts";
 import { type Knob, fixRule, runExpects, turnKnob } from "../core/world3d.ts";
+import { viewRows, viewWarnings } from "../core/rig3d.ts";
 
 /** Drawn by hand somewhere: a grid string, grid() or runs(), here or in a layer (line(), curve() and code draw their own lines clean, or as they mean to). */
 const byHand = (items: Item[]): boolean => items.some((i) => typeof i === "string"
@@ -51,7 +52,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0 };
   let lightSaid = false, groundSaid = false;
   // by default what the file itself defines (what it includes is checked where it's defined)
   const own = (n: string) => !opts.file || (p.assets.get(n)?.loc ?? "").split(":")[0] === opts.file;
@@ -167,6 +168,15 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       lines.push(`${name} › ${k.slice(0, i)}${ps.size === 1 ? `, feet ${[...ps][0]}` : ""}${k.slice(i)}${count > 1 ? ` (frame${fs.size > 1 ? "s" : ""} ${ranges([...fs].sort((a, b) => a - b))})` : ""}`);
     }
   }
+  // views() sets: their crown and chin on one row in every view, and kept to the set they're like
+  if (!opts.names) for (const [name, V] of p.views) {
+    if (opts.file && (V.loc ?? "").split(":")[0] !== opts.file) continue;
+    ran.views++;
+    const rows = (s: { drawn: string[] }) => new Map(s.drawn.map((n) => [n.slice(n.lastIndexOf("_") + 1), viewRows(p.image(n))]));
+    const like = V.like ? p.views.get(V.like) : undefined;
+    if (V.like && !like) lines.push(`${name} › WARNING: like '${V.like}' is no views() set`);
+    for (const w of viewWarnings({ name, views: [...rows(V)], ...(like ? { like: { name: V.like!, views: rows(like) } } : {}) })) lines.push(`${name} › WARNING: ${w}`);
+  }
   // what building found on the way (a shade step that left its ramp), where it was asked for
   for (const w of p.warnings) {
     const sub = /^'([^']*)': (a stamp half a pixel.*)$/.exec(w.msg);
@@ -205,6 +215,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.stand) run.push(`standing on ${ran.stand}`);
   if (ran.text) run.push(`lettering on ${ran.text}`);
   if (ran.lines) run.push(`lines on ${ran.lines}`);
+  if (ran.views) run.push(`views' rows on ${ran.views}`);
   if (rigs) run.push(`rig parts ${ran.parts}`);
   const readings = opts.readings ? { readings: [...reads], tally: `${tally.agree + tally.against + tally.unclear} placements read: ${tally.agree} lit as their light, ${tally.against} against it, ${tally.unclear} with no side to tell` } : {};
   return { ...readings, ...(fixes ? { fixes } : {}), lines, notes, warnings: lines.length,

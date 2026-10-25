@@ -68,13 +68,9 @@ const HEADSETS = {
     n: ["....jjjjjj.....", "...jhhHYHhhj...", "..jhHHhhhHHhj..", ".jhhhhhhhhhhhj.", ".jhhhhhhhhhhhj.", "JjhhhhhhhhhhhjJ", "JjjhhhhhhhhhjjJ", ".sJjjhhJJhhjJs.", ".zJjjjjJJjjjJz.", "...JjjjhjjjJ...", ".....zJhJz.....", ".......hJ......", ".......J......."],
   },
 }
-const VIEWS = ["s", "sw", "w", "nw", "n"]
-// each view's rows padded to one width, as a grid for the painter (the line under the head) and a sprite
-const GRIDS = Object.fromEntries(Object.entries(HEADSETS).map(([set, views]) => [set, Object.fromEntries(VIEWS.map((v) => {
-  const rows = views[v], w = Math.max(...rows.map((r) => r.length))
-  return [v, rows.map((r) => r.padEnd(w, "."))]
-}))]))
-for (const [set, views] of Object.entries(GRIDS)) for (const v of VIEWS) sprite(`_${set}_head_${v}`, views[v].join("\n"))
+const VIEWS = ["s", "sw", "w", "nw", "n"], ANCHOR = { s: [7, 5], sw: [8, 5], w: [5, 5], nw: [8, 5], n: [7, 5] }   // the traveler's
+// each a views() set on the traveler's anchors, its rows held to his (pxl check)
+for (const [set, heads] of Object.entries(HEADSETS)) views(`_${set}_head`, heads, { anchor: ANCHOR, like: "_tr_head" })
 
 // ---------------------------------------------------------------- the outfits
 // What each wears, over the same skeleton (the traveler's TRAVELER for what isn't said): no cloak for
@@ -128,15 +124,15 @@ const CREW = [
   ["cmp", "br", "dress", AUBURN],
   ["off", "og", "coat", { ...DARK, Q: "#3a0e12", A: "#6e1c22", B: "#9a3038" }],
 ]
-for (const [who, set, outfit, swap] of CREW) for (const move of ["idle", "walk"]) for (const [d, [yaw]] of Object.entries(R.DIRS)) {
-  const mirror = yaw > 0 && yaw < 180, M = R.MOVES[move], o = { ...OUTFITS[outfit], grid: GRIDS[set] }
+for (const [who, set, outfit, swap] of CREW) for (const move of ["idle", "walk"]) for (const [d, yaw] of Object.entries(R.DIRS)) {
+  const M = R.MOVES[move], o = OUTFITS[outfit]
   anim(`${who}_${move}_${d}`, { w: R.W, h: R.H, pivot: [R.OX, R.OY], swap },
-    (c) => R.figure(c, `_${set}`, M.f(c.frame, yaw), yaw, mirror, o), ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })), bump("hybrid"))
+    (c) => R.figure(c, `_${set}`, M.f(c.frame, yaw), yaw, o), ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })), bump("hybrid"))
 }
 
 // To look at: every head in its five views (a row each, Alden's first to hold them against), and the
 // crew standing turned s, sw and w.
-scene("crew_heads", { w: 5 * 20 + 4, h: 6 * 18 + 4, bg: "#3c4250" }, ...["tr", ...Object.keys(GRIDS)].flatMap((set, r) => VIEWS.map((v, k) => stamp(`_${set}_head_${v}`, 3 + k * 20, 3 + r * 18))))
+scene("crew_heads", { w: 5 * 20 + 4, h: 6 * 18 + 4, bg: "#3c4250" }, ...["tr", ...Object.keys(HEADSETS)].flatMap((set, r) => VIEWS.map((v, k) => stamp(`_${set}_head_${v}`, 3 + k * 20 + ANCHOR[v][0], 3 + r * 18 + ANCHOR[v][1]))))
 scene("crew_standing", { w: CREW.length * 26 + 6, h: 3 * 44 + 4, bg: "#56606e" }, ...CREW.flatMap(([who], i) => ["s", "sw", "w"].map((d, r) => stamp(`${who}_idle_${d}`, 16 + i * 26, 41 + r * 44))))
 
 // ---------------------------------------------------------------- carrying a crate
@@ -159,14 +155,14 @@ const crateProp = (best, j, fr, surface) => {
       surface(best, [0, 1, 2].map((k) => c0[k] + n[k] * h + e1[k] * s + e2[k] * u), n, (u + h) % 3 < 0.6 ? "DDd" : "dlu", "crate")
   }
 }
-for (const [move, [M, pose]] of Object.entries(MOVESLOW)) for (const [d, [yaw]] of Object.entries(R.DIRS)) {
-  const mirror = yaw > 0 && yaw < 180, o = { ...OUTFITS.apron, grid: GRIDS.fc, prop: crateProp }
-  anim(`car_${move}_${d}`, { w: R.W, h: R.H, pivot: [R.OX, R.OY] }, (c) => R.figure(c, "_fc", { ...pose(c.frame, yaw), lean: LOW.lean, hands: LOW.hands }, yaw, mirror, o),
+for (const [move, [M, pose]] of Object.entries(MOVESLOW)) for (const [d, yaw] of Object.entries(R.DIRS)) {
+  const o = { ...OUTFITS.apron, prop: crateProp }
+  anim(`car_${move}_${d}`, { w: R.W, h: R.H, pivot: [R.OX, R.OY] }, (c) => R.figure(c, "_fc", { ...pose(c.frame, yaw), lean: LOW.lean, hands: LOW.hands }, yaw, o),
     ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })), bump("hybrid"))
 }
 // The same in blocks (bk_carrylow_<dir>), as it was judged: the crate a brown block in front of the
 // chest or behind it by its depth.
-for (const [d, [yaw]] of Object.entries(R.DIRS)) anim(`bk_carrylow_${d}`, { w: R.W, h: R.H, pivot: [R.OX, R.OY] }, (c) => {
+for (const [d, yaw] of Object.entries(R.DIRS)) anim(`bk_carrylow_${d}`, { w: R.W, h: R.H, pivot: [R.OX, R.OY] }, (c) => {
   const p = { ...shorter(R.MOVES.walk.f(c.frame, yaw), 0.7), lean: LOW.lean, hands: LOW.hands }, j = R.bones(p, yaw), m = R.local(j.chest, j.fr, LOW.at), [x, y] = R.scr(m).map(Math.round)
   const box = () => { c.rect(x - 5, y - 5, 11, 11, "#2a1c12"); c.rect(x - 4, y - 4, 9, 9, "#a0703e"); c.rect(x - 4, y - 4, 9, 2, "#c99a62") }
   const front = R.depth(m) > R.depth(j.chest) - 1

@@ -5,8 +5,9 @@ import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from 
 import { type View, perspective } from "./perspective.ts";
 import { solid } from "./solids.ts";
 import { model } from "./mesh.ts";
-import { Sdf, sdf } from "./sdf.ts";
-import { clocksOf, headingsOf, mirrorSymmetric, turnLight, turnViews } from "./turnaround.ts";
+import { Sdf, compile, sdf } from "./sdf.ts";
+import { COMPASS, clocksOf, headingsOf, mirrorSymmetric, turnLight, turnViews } from "./turnaround.ts";
+import { BLOCK_MATS, type Body, type Joints, type Pose, blocksOf, bodyOf, gait, ik3, jointsOf, partsOf } from "./rig3d.ts";
 import { SURFACE_OPTS, VOXEL_OPTS, surfaceSize } from "./surface.ts";
 import { Mesh3, Voxels, surfaceNets, voxelize } from "./grids.ts";
 import { VOLUME_OPTS } from "./volume.ts";
@@ -118,7 +119,7 @@ function readsClock(items: Item[]): boolean {
 const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "shade", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay", "fx"];
 /** Allowed option keys of ops whose last argument is an options object. */
 export const OP_OPTS: Record<string, string[]> = {
-  stamp: [...PLACE, "sub", "smear", "at", "id", "z"],
+  stamp: [...PLACE, "sub", "smear", "at", "id", "z", "heading"],
   tile: PLACE,
   pattern: PLACE,
   panel: PLACE,
@@ -253,6 +254,8 @@ export class Project implements BuildCtx {
   readonly fonts = new Map<string, FontDef>();
   /** rig() skeletons by name, for describe's RIG section. */
   readonly rigs = new Map<string, RigDef>();
+  /** views() sets: each drawn view's sprite, the set its rows are held against, pxl check reads them */
+  readonly views = new Map<string, { drawn: string[]; like?: string; loc?: string }>();
   /** What building found wrong but not fatal (a shade step that left its ramp): the CLI prints them, pxl check counts them. */
   readonly warnings: { msg: string; loc?: string }[] = [];
 
@@ -557,6 +560,151 @@ export class Project implements BuildCtx {
         (env.group as (n: string, m: string[]) => void)(name, names);
         return { names, headings: H.map((h) => h.name), w: T.w, h: T.h, pivot: T.pivot, mirrored: names.filter((_, i) => twin[i] >= 0) };
       } catch (e) { throw wrap(e).within("turnaround", loc); }
+    };
+    // views(name, { s: grid, sw: grid, ... }, { anchor, like }): hand-drawn views of a thing (a head), a
+    // sprite each pivoted on its anchor, the views not drawn the mirrors of those across; a group to
+    // stamp by heading (rig3d.ts); pxl check holds their rows together
+    env.views = (name: unknown, grids: unknown, opts: unknown = {}) => {
+      const loc = this.callerLoc();
+      try {
+        if (typeof name !== "string" || !name || !isPlainObject(grids) || !isPlainObject(opts)) throw new PxError('views("_head", { s: grid, sw: grid, w: grid, nw: grid, n: grid }, { anchor: [x, y] (or { s: [x, y], ... }), like: "_other_head" })');
+        checkKeys("views", opts, ["anchor", "like", "swap", "outline", "outline8", "inline", "selout"]);
+        const { anchor, like, ...so } = opts as { anchor?: unknown; like?: unknown };
+        const drawn = Object.keys(grids), bad = drawn.filter((d) => !COMPASS.includes(d));
+        if (!drawn.length || bad.length) throw new PxError(`views: the views are named by the compass (${COMPASS.join(", ")}), got ${JSON.stringify(bad.length ? bad : drawn)}`);
+        if (like !== undefined && typeof like !== "string") throw new PxError(`views: like names another views() set whose rows these keep to, got ${JSON.stringify(like)}`);
+        // a pixel [col, row] lands on the anchor (its middle, so a mirror keeps it there); "center", "bottom"
+        const pivotOf = (d: string) => {
+          const a = isPlainObject(anchor) ? anchor[d] : anchor;
+          if (a === undefined || a === "center" || a === "bottom") return a === undefined ? {} : { pivot: a };
+          if (Array.isArray(a) && a.length === 2 && a.every(Number.isInteger)) return { pivot: [a[0] + 0.5, a[1] + 0.5] };
+          throw new PxError(`views: an anchor is the pixel [col, row] of the view that lands where it is stamped, "center" or "bottom" (one for all, or { ${d}: [col, row], ... }), got ${JSON.stringify(a)}`);
+        };
+        for (const d of drawn) {
+          const g = grids[d], rows = Array.isArray(g) && g.every((r) => typeof r === "string" && !r.includes("\n"));
+          // rows padded to one width, a grid string, or items (a grid and runs())
+          const items = typeof g === "string" ? [g] : rows ? [(g as string[]).map((r) => r.padEnd(Math.max(...(g as string[]).map((q) => q.length)), ".")).join("\n")] : Array.isArray(g) ? g : undefined;
+          if (!items) throw new PxError(`views: view '${d}' is a grid (a string, or its rows), or items ([grid, runs(...)]), got ${JSON.stringify(g)?.slice(0, 60)}`);
+          define("sprite", `${name}_${d}`, [{ ...so, ...pivotOf(d) }, ...items]);
+        }
+        const names: string[] = [];
+        for (const [i, d] of COMPASS.entries()) {
+          const twin = COMPASS[(16 - i) % 16];
+          if (!drawn.includes(d) && !drawn.includes(twin)) continue;
+          if (!drawn.includes(d)) define("sprite", `${name}_${d}`, [{ base: `${name}_${twin}`, flip: "x" }]);
+          names.push(`${name}_${d}`);
+        }
+        (env.group as (n: string, m: string[]) => void)(name, names);
+        this.views.set(name, { drawn: drawn.map((d) => `${name}_${d}`), like: like as string | undefined, loc });
+        return names;
+      } catch (e) { throw wrap(e).within("views", loc); }
+    };
+    // rig3d(name, { body, moves, n, parts, head, blocks, ... }): a figure on the 3D layer, its moves in
+    // every direction asked, drawn by surface(); its flat blocks to judge a move (rig3d.ts)
+    env.rig3d = (name: unknown, opts: unknown) => {
+      const loc = this.callerLoc();
+      try {
+        if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError('rig3d("tr", { body: { h: 34, heads: 3 }, moves: { walk: { frames: 8, ms: 110, pose: (i, heading) => ({ feet, lift, hands }) } }, n: 8, blocks: true })');
+        checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "head", "chin", "blocks", "mirror", "draw"]);
+        const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown };
+        const B: Body = bodyOf(o.body ?? {}), H = headingsOf(o.n ?? 8, o.headings, false), pitch = o.pitch ?? 20;
+        if (!(pitch >= 0 && pitch <= 90)) throw new PxError(`rig3d: pitch is degrees down, 0 to 90 (20: a field sprite's), got ${JSON.stringify(pitch)}`);
+        const prefix = o.blocks === true ? "bk" : o.blocks === false || o.blocks === undefined ? undefined : o.blocks;
+        if (prefix !== undefined && (typeof prefix !== "string" || !prefix)) throw new PxError(`rig3d: blocks is true (bk_<move>_<dir>) or a prefix for their names, got ${JSON.stringify(o.blocks)}`);
+        if (o.parts !== undefined && typeof o.parts !== "function") throw new PxError("rig3d: parts is (j, pose) => ({ name: piece or [pieces] }): j.limb(a, b, r0, r1, paint), j.ball(c, r, paint) or fields");
+        if (!o.parts && prefix === undefined) throw new PxError("rig3d: give it parts (the figure painted) or blocks (its flat blocks), or both");
+        for (const k of ["draw"] as const) if (o[k] !== undefined && typeof o[k] !== "function") throw new PxError(`rig3d: ${k} is (c, j, pose) => { ... }`);
+        if (o.head !== undefined && typeof o.head !== "string") throw new PxError(`rig3d: head names a views() set (or a group of compass-named views) stamped on the head, got ${JSON.stringify(o.head)}`);
+        if (!isPlainObject(o.moves) || !Object.keys(o.moves).length) throw new PxError("rig3d: moves is { walk: { frames, ms, pose: (i, heading) => pose, dirs?, draw? }, ... }");
+        const moves = Object.entries(o.moves).map(([m, M]) => {
+          if (!isPlainObject(M)) throw new PxError(`rig3d: move '${m}' is { frames, ms, pose, dirs?, draw? }`);
+          checkKeys(`rig3d move '${m}'`, M, ["frames", "ms", "pose", "dirs", "draw"]);
+          const { frames, ms = 100, pose, dirs, draw } = M as { frames?: number; ms?: number; pose?: unknown; dirs?: unknown; draw?: unknown };
+          if (!(Number.isInteger(frames) && frames! >= 1) || !(ms > 0) || typeof pose !== "function" || (draw !== undefined && typeof draw !== "function"))
+            throw new PxError(`rig3d: move '${m}' is { frames (a whole number), ms (each frame's), pose: (i, heading) => pose, dirs?, draw? }, got ${JSON.stringify(M)}`);
+          if (dirs !== undefined && !(Array.isArray(dirs) && dirs.every((d) => H.some((h) => h.name === d)))) throw new PxError(`rig3d: move '${m}''s dirs are some of its headings (${H.map((h) => h.name).join(", ")}), got ${JSON.stringify(dirs)}`);
+          return { m, frames: frames!, ms, pose: pose as (i: number, h: number) => Pose, heads: H.filter((h) => !dirs || (dirs as string[]).includes(h.name)), draw: draw as ((c: Canvas, j: Joints, p: Pose) => void) | undefined };
+        });
+        const SP = Math.sin((pitch * Math.PI) / 180), CP = Math.cos((pitch * Math.PI) / 180);
+        const fields = (j: Joints, p: Pose) => [...(prefix !== undefined ? [blocksOf(B, j)] : []), ...(o.parts ? [partsOf((o.parts as (j: Joints, p: Pose) => unknown)(j, p), j).field, sdf.sphere(B.r.head).at(j.head)] : [])];
+        // one size for all: given, or every field's box seen at every frame and heading, a pixel round it
+        let { w, h, pivot } = o;
+        if (w === undefined || h === undefined || pivot === undefined) {
+          let x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+          for (const M of moves) for (const hd of M.heads) for (let i = 0; i < M.frames; i++) {
+            const p = M.pose(i, hd.deg), j = jointsOf(B, p, hd.deg);
+            for (const f of fields(j, p)) {
+              const { lo, hi } = compile(f);
+              for (let c = 0; c < 8; c++) {
+                const q = [c & 1 ? hi[0] : lo[0], c & 2 ? hi[1] : lo[1], c & 4 ? hi[2] : lo[2]], sx = q[0], sy = -q[1] * SP - q[2] * CP;
+                x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+              }
+            }
+          }
+          const L = Math.ceil(-x0) + 2, T = Math.ceil(-y0) + 2;
+          pivot ??= [L, T]; w ??= pivot[0] + Math.ceil(x1) + 3; h ??= pivot[1] + Math.ceil(y1) + 3;
+        }
+        if (!(Number.isInteger(w) && Number.isInteger(h) && Array.isArray(pivot) && pivot.length === 2 && pivot.every(Number.isInteger))) throw new PxError(`rig3d: w, h and pivot (the pixel the figure's foot point lands on, [x, y]) are whole numbers, got ${JSON.stringify({ w, h, pivot })}`);
+        const [px, py] = pivot as [number, number];
+        // where a point lands on the sprite and how near us it is: the joints' escape hatch
+        const screen = (q: number[]): [number, number] => [px + q[0], py - q[1] * SP - q[2] * CP], depth = (q: number[]) => q[2] * SP - q[1] * CP;
+        const joints = (p: Pose, heading: number) => Object.assign(jointsOf(B, p, heading), { screen, depth });
+        const view = { kind: "side" as const, pitch }, at = [px + 0.5, py + 0.5], ink = typeof o.outline === "string" ? o.outline : this.pal.keys.has("k") ? "k" : "#000000";
+        const look = this.look3d, light = o.light ?? look?.light ?? [0, -0.6, 0.75];
+        // the east drawn as the west's mirror where the light comes from the picture's middle (as turnaround's)
+        const level = Array.isArray(light) && Math.abs(light[0]) < 0.05 * Math.hypot(...light), sym = o.mirror === true || ((o.mirror ?? "auto") === "auto" && level);
+        if (![true, false, "auto", undefined].includes(o.mirror as boolean)) throw new PxError(`rig3d: mirror is true, false or "auto", got ${JSON.stringify(o.mirror)}`);
+        const paint = (c: Canvas, p: Pose, deg: number, flat: boolean, M: (typeof moves)[number]) => {
+          const j = joints(p, deg);
+          if (flat) {
+            c.surface(blocksOf(B, j), { view, ppm: 1, at, mats: BLOCK_MATS, outline: false, rim: false, shadows: false, ao: 0, inner: ink });
+            // the line round it, outside, in the sprite's size
+            const { w: W, h: Hh, data } = c.img, on = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < Hh && (data[y * W + x] & 255) >= 128;
+            const ring: number[] = [];
+            for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) if (!on(x, y) && (on(x + 1, y) || on(x - 1, y) || on(x, y + 1) || on(x, y - 1))) ring.push(x, y);
+            for (let i = 0; i < ring.length; i += 2) c.px(ring[i] - c.ox, ring[i + 1] - c.oy, ink);
+          } else {
+            const P = partsOf((o.parts as (j: Joints, p: Pose) => unknown)(j, p), j);
+            c.surface(P.field, { view, ppm: 1, at, mats: { ...(look?.mats ?? {}), ...Object.fromEntries(P.ramps.map((r) => [r, r])), ...o.mats } as never, light, outline: (o.outline ?? true) as never, inner: (o.inner ?? true) as never, shadows: false, ao: 0 });
+            const head = o.head as string | undefined;
+            if (head) {
+              // the head by hand over all, the view its heading's; a line of `chin` under it where it meets the body
+              const [hx, hy] = screen(j.head).map(Math.round), img = c.asset(head, { heading: j.hd.heading }), [ax, ay] = img.pivot ?? [0, 0], x0 = hx - Math.floor(ax), y0 = hy - Math.floor(ay);
+              c.stamp(head, hx, hy, { heading: j.hd.heading });
+              if (typeof o.chin === "string") for (let x = 0; x < img.w; x++) {
+                let r = img.h - 1;
+                while (r >= 0 && (img.data[r * img.w + x] & 255) < 128) r--;
+                if (r >= 0 && c.get(x0 + x, y0 + r + 1)) c.px(x0 + x, y0 + r + 1, o.chin);
+              }
+            }
+          }
+          M.draw?.(c, j, p);
+          (o.draw as ((c: Canvas, j: Joints, p: Pose) => void) | undefined)?.(c, j, p);
+        };
+        const names: string[] = [], frameOps = (M: (typeof moves)[number]) => Array.from({ length: M.frames }, () => ({ __op: true, name: "frame", args: [{ ms: M.ms }], loc }));
+        for (const M of moves) {
+          const groups: [string, string[]][] = [];
+          for (const [flat, pre] of [[false, o.parts ? name : undefined], [true, prefix]] as const) {
+            if (pre === undefined) continue;
+            const fam = `${pre}_${M.m}`, list = M.heads.map((hd) => `${fam}_${hd.name}`);
+            const twin = M.heads.map((hd) => (!flat && sym && hd.deg > 0 && hd.deg < 180 ? M.heads.findIndex((g) => Math.abs(g.deg - (360 - hd.deg)) < 1e-9) : -1));
+            M.heads.forEach((hd, i) => { if (twin[i] < 0) define("anim", list[i], [{ w, h, pivot }, (c: Canvas) => paint(c, M.pose(c.frame, hd.deg), hd.deg, flat, M), ...frameOps(M)]); });
+            // (the mirrors after what they mirror, so they play as it does)
+            M.heads.forEach((hd, i) => { if (twin[i] >= 0) define("anim", list[i], [{ base: list[twin[i]], flip: "x", pivot: [px + 1, py] }]); });
+            groups.push([fam, list]);
+            names.push(...list);
+          }
+          for (const [g, l] of groups) (env.group as (n: string, m: string[]) => void)(g, l);
+        }
+        return { names, headings: H.map((hd) => hd.name), joints, screen, depth, w, h, pivot, body: B };
+      } catch (e) { throw wrap(e).within("rig3d", loc); }
+    };
+    // gait(t, { heading | view, stride, lift, bob, hands, front: {...}, ... }): a walk's numbers by the view (rig3d.ts)
+    env.gait = (t: unknown, o: unknown = {}) => {
+      try { if (!isPlainObject(o)) throw new PxError("gait(t, { heading, stride, lift, bob, hands })"); return gait(t as number, o); } catch (e) { throw wrap(e).within("gait", this.callerLoc()); }
+    };
+    env.ik3 = (a: unknown, b: unknown, l1: unknown, l2: unknown, hint: unknown) => {
+      try { return ik3(a as never, b as never, l1 as number, l2 as number, hint as never); } catch (e) { throw wrap(e).within("ik3", this.callerLoc()); }
     };
     env.font = (name: unknown, asset: unknown, opts: Partial<FontDef> = {}) => {
       const loc = this.callerLoc();

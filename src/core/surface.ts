@@ -36,6 +36,8 @@ export interface SurfaceOpts {
   light?: number[];
   /** the contour away from the light: true (each material's darkest), a key, or false */
   outline?: boolean | string;
+  /** a line where one part lies in front of another, on the one behind (each part outlined against the others, as a figure's limbs): a key, or true (the outline's) */
+  inner?: boolean | string;
   /** the contour toward the light a step lighter (default true) */
   rim?: boolean;
   /** shadows the field casts on itself (default true) */
@@ -53,7 +55,7 @@ export interface SurfaceOpts {
   /** (light: "mesh": the light of the mesh() drawn before it, on what it draws as on mesh()'s sprites) */
   world?: Lit;
 }
-export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "outline", "rim", "shadows", "ao", "pixel", "cast", "hide", "part"];
+export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "outline", "inner", "rim", "shadows", "ao", "pixel", "cast", "hide", "part"];
 /** The index of a part's name in the picture's list of what painted each pixel (see Img.parts). */
 export function partIndex(img: Img, name: string): number {
   if (typeof name !== "string" || !name) throw new PxError(`part is a name, got ${JSON.stringify(name)}`);
@@ -366,11 +368,27 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   if (names.length) names.forEach((n) => mat(o.mats![n], n));
   else if (c.pal.ramps.length) mat(c.pal.ramps[0], "the palette's first ramp");
   else throw new PxError(`${who}: give mats: { name: ramp } (or the palette a ramp)`);
-  const missing = T.names.filter((m) => m && !names.includes(m));
+  // a material not in mats whose name is a ramp of keys ("RPp") is that ramp; a paint() function's
+  // names are looked up as they come
+  const asRamp = (m: string) => [...m].every((k) => { try { const col = c.color(k); return col !== null && col !== TRANSPARENT; } catch { return false; } });
+  const missing = T.names.filter((m) => m && !names.includes(m) && !asRamp(m));
   if (names.length && missing.length) throw new PxError(`${who}: the field's material ${missing.map((m) => `'${m}'`).join(", ")} is not in mats (it has: ${names.join(", ")})`);
-  const matOf = T.names.map((m) => Math.max(0, names.indexOf(m)));
+  const matOf: number[] = [];
+  const matIndex = (mi: number): number => {
+    if (matOf[mi] !== undefined) return matOf[mi];
+    const nm = T.names[mi];
+    let k = names.indexOf(nm);
+    if (k < 0 && names.length && nm) {
+      if (!asRamp(nm)) throw new PxError(`${who}: the field's material '${nm}' is not in mats (it has: ${names.join(", ")}), nor a ramp of keys`);
+      mat(nm, nm); names.push(nm); k = names.length - 1;
+    }
+    return (matOf[mi] = Math.max(0, k));
+  };
+  T.names.forEach((_, mi) => matIndex(mi));
   const outKey = typeof o.outline === "string" ? c.color(o.outline) : null;
   if (typeof o.outline === "string" && (outKey === null || outKey === TRANSPARENT)) throw new PxError(`${who}: outline '${o.outline}' is not a color`);
+  const innerOn = !!o.inner, innerKey = typeof o.inner === "string" ? c.color(o.inner) : outKey;
+  if (typeof o.inner === "string" && (innerKey === null || innerKey === TRANSPARENT)) throw new PxError(`${who}: inner '${o.inner}' is not a color`);
 
   const cam = viewOf(c, o, T.lo, T.hi, T.cell, who, persp, K, origin), { W, H, x0, y0, ray, axisDepth, toScreen, near, R, U, F, L, lx, ly, scale } = cam;
 
@@ -407,7 +425,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       // drawn already nearer the eye (mesh()'s depth): there, but hidden
       if (vis) { const q = c.index(cx - K / 2, cy - K / 2); if (q >= 0 && vis[q] < depth[i]) hidden[i] = 1; }
       // the normal, the material there, the light
-      const { n, m: mi, part } = T.shade(p, e), k = mi < 0 ? 0 : matOf[mi];
+      const { n, m: mi, part } = T.shade(p, e), k = mi < 0 ? 0 : matIndex(mi);
       pt[i] = part ?? -1;
       nrm[i * 3] = n[0]; nrm[i * 3 + 1] = n[1]; nrm[i * 3 + 2] = n[2];
       m[i] = k;
@@ -440,7 +458,17 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   // the contour: a cell with nothing beside it, or something far behind; lit toward the light,
   // outlined away from it (not a part a cell thin: it keeps its tone)
   const gap = persp ? 0.25 : Math.max(0.15, 3 / scale);
-  const open = (gx: number, gy: number, i: number) => gx < 0 || gy < 0 || gx >= GW || gy >= GH || m[gy * GW + gx] < 0 || depth[gy * GW + gx] > depth[i] + gap;
+  // (with inner lines, another part beside it is never open: the line between them is the one behind's)
+  const open = (gx: number, gy: number, i: number) => gx < 0 || gy < 0 || gx >= GW || gy >= GH || m[gy * GW + gx] < 0 || (depth[gy * GW + gx] > depth[i] + gap && !(innerOn && pt[gy * GW + gx] !== pt[i]));
+  // a part's pixel next to another part nearer by half a pixel: the line round that one
+  const nearBy = persp ? 0.05 : 0.5 / scale;
+  const behind = (gx: number, gy: number, i: number) => {
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = gx + dx, y = gy + dy, j = y * GW + x;
+      if (x >= 0 && y >= 0 && x < GW && y < GH && m[j] >= 0 && !hidden[j] && pt[j] !== pt[i] && depth[j] < depth[i] - nearBy) return true;
+    }
+    return false;
+  };
   const norm = c.img.normals(), zbuf = (c.img.depth ??= new Float32Array(W * H).fill(Infinity));
   // what each part is called on the picture: the drawing's part, then the field's own
   const own = (T.parts ?? []).map((n) => partIndex(c.img, o.part ? `${o.part}.${n}` : n)), whole = o.part !== undefined ? partIndex(c.img, o.part) : -1;
@@ -456,7 +484,8 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
         if (dx * lx + dy * ly > 0) toward = true;
         else if (!open(gx - dx, gy - dy, i)) away = true;
       }
-      if (away && o.outline !== false) col = outKey ?? ramp[0];
+      if (innerOn && behind(gx, gy, i)) col = innerKey ?? ramp[0];
+      else if (away && o.outline !== false) col = outKey ?? ramp[0];
       else if (toward && o.rim !== false) col = ramp[Math.min(ramp.length - 1, tone[i] + 1)];
       // the normal as the picture sees it (x right, y down, z toward the eye)
       const n: V3 = [nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]], nx = dot(n, R), ny = -dot(n, U), nz = -dot(n, F);

@@ -16,6 +16,7 @@ import { type VolumeOpts, drawVolume } from "./volume.ts";
 import { type SplatOpts, drawSplats } from "./splats.ts";
 import { type DecalOpts, drawDecal } from "./decal.ts";
 import { type Draw3dOpts, drawWorld } from "./world3d.ts";
+import { byHeading } from "./rig3d.ts";
 import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshWorld, drawMesh, groundOf } from "./mesh.ts";
 import type { Lit } from "./sunlight.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
@@ -888,9 +889,9 @@ export class Canvas {
         if (hs.length) at = [at[0], at[1], Math.max(...hs.map((h) => h.u))];
       }
       if (!s || typeof s.name !== "string" || !Array.isArray(at) || (at.length !== 2 && at.length !== 3) || !at.every(Number.isFinite))
-        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, veil?, light?, stand?, air? }, got ${JSON.stringify(s)}`);
+        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), heading?, flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, veil?, light?, stand?, air? }, got ${JSON.stringify(s)}`);
       // its own time in its loop and its own random choices, as a stamp's, picked by where it stands (cm)
-      const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed, fx: s.fx };
+      const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed, fx: s.fx, heading: s.heading };
       if (s.blend !== undefined && !["alpha", "add", "screen"].includes(s.blend)) throw new PxError(`mesh: sprite ${k} has blend ${JSON.stringify(s.blend)}: "alpha" (over, lit), "add" or "screen" (light)`);
       if (s.opacity !== undefined && !(s.opacity >= 0 && s.opacity <= 1)) throw new PxError(`mesh: sprite ${k} has opacity ${JSON.stringify(s.opacity)}: 0..1`);
       if (s.veil !== undefined && !(s.veil >= 0 && s.veil <= 1 && s.blend === "alpha")) throw new PxError(`mesh: sprite ${k} has veil ${JSON.stringify(s.veil)}: the share of the sun a sprite blended "alpha" holds back, 0..1`);
@@ -1123,6 +1124,8 @@ export class Canvas {
     if (opts.reseed === true) inner += (hash(a, b, opts.seed ?? 0) % 99991) + 1;
     else if (typeof opts.reseed === "number") inner += opts.reseed;
     let pick = list[Math.floor(r() * list.length)];
+    // of a family named by the compass, the view nearest a heading (rig3d.ts)
+    if (opts.heading !== undefined) pick = byHeading(list, opts.heading, name);
     if (opts.fit !== undefined) {
       // of a group (sizes of one thing), the member whose drawing is nearest that height, the smaller
       // on a tie: a figure far down a road takes the sprite drawn for its size
