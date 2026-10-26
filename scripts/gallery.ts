@@ -43,6 +43,7 @@ const shots: [string, string, number, number?, string?][] = [
   ["hd2d/clearing.px.js", "clearing_md", 640, 1, "hd2d_clearing"],
   ["sdf/decals.px.js", "grove_showcase", 640, 1, "sdf_grove"],
   ["spell_variants.px.js", "ice_earth", 1168, 1, "spells_ice_earth"],
+  ["shrine/shrine.px.js", "shrine", 640, 1, "shrine_autumn"],
 ];
 
 const only = args;

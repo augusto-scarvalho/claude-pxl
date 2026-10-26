@@ -256,6 +256,20 @@ is dressed on the traveler's skeleton. The clearing ([`clearing.px.js`](examples
 has every shader at once: a wood swaying in one wind, a fireball from the traveler's hand, a scarecrow
 burning away, smoke, sparks, bloom and a `.cube` grade.
 
+### A Japanese shrine in autumn
+
+<p>
+  <img src="docs/gallery/shrine_autumn.gif" width="100%" alt="Animated top-down pixel art of a Japanese shrine courtyard in autumn under a low golden sun, long shadows: a vermilion torii with a black lintel at the entrance, a temple path of long granite slabs laid across it, fanning round its bend, curbs and a strip of pebbles along it, raked white gravel in lines and rings round the stone lanterns; a hall with a green copper roof, a thick shimenawa rope with white paper streamers, an offering box and a bell rope, two kitsune statues with red bibs facing each other; red and orange momiji maples, a golden ginkgo with a rope round its trunk over a carpet of yellow leaves, a cloud-pruned black pine, all swaying in gusts; a shrine maiden in a white kosode and red hakama sweeps fallen leaves along the path with a bamboo broom, walks back and bows to the hall while leaves fall again and the lanterns catch at dusk">
+</p>
+
+[`examples/shrine/`](examples/shrine): a top-down courtyard whose props are drawn once in 3D and
+turned by `turnaround` (the torii, the hall, the lanterns, the foxes), under one sun that lights the
+3D, the light rule and the shadows. The miko is a `rig3d` figure with a head modeled, baked per view
+and retouched by hand. The path is laid along a polyline by `lane()`; the trees come from a kit of
+species ([`nature/trees.px.js`](examples/nature/trees.px.js)) built on one grower, each in its
+seasons; the Japanese ground and buildings are a kit too ([`nature/japan.px.js`](examples/nature/japan.px.js)).
+It began as a fresh agent's dogfood made with only the skill, and was then reworked in stages.
+
 ### 3D as code: fields, voxels, volumes, splats, decals
 
 <p>
