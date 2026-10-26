@@ -60,6 +60,16 @@ Mark items `[x]` when they ship, with the commit.
   its numbers read by reference, yet each moment costs 0.7 s more: find where (a closure made cold each
   frame, the bounds, the box culling's order) and make it once per field. Every swaying sdf example
   (`sdf/world`, `sdf/volumes`, the trees in the wind) would gain.
+- [ ] **The modeled traveler's head (tr3m, chosen as the traveler): points to improve**, kept as it is
+  for now by the user's call:
+  - in some directions the eyes' lids draw over the fringe (their `depth: 3` lets them through);
+  - the profile has less character than the hand-drawn one (a narrow face; the hand head's
+    forelock and nose read better);
+  - the head is a little smaller and its hair has less volume and fewer light strokes than the hand
+    heads; from behind it is smoother and darker;
+  - seams between pieces can make shapes by chance (a "face" on the back was fixed once);
+  - 1 px creases (knee, elbow) hardly read; the cloak's and boots' accents do;
+  - a frame costs ~13 ms against the hand heads' ~4.4 (the hair's noise).
 - [ ] **What the 3D stage (wave 2) left to fix by hand, each a small change of pixels for the user to
   see before and after:**
   - three grass tufts along the graveyard's fence stand at its top, 1.5 m over the turf, past the
