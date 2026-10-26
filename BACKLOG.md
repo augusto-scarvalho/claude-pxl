@@ -55,11 +55,12 @@ Mark items `[x]` when they ship, with the commit.
   the ramps "1234" and "5678" no longer ran dark to light (`shade()` on it stepped along cobbles; the
   rule read its lit side backwards until `rampSteps` skipped such ramps). Say the key, the ramp and
   where the ramp was made; the keys renamed since.
-- [ ] **A field that moves on the clock, made once:** the graveyard_3d's dead tree (105 rods, 480x270)
-  takes 1.8 s a frame swaying (a `bend` by the clock) and 1.05 s still. Its code is cached by source and
-  its numbers read by reference, yet each moment costs 0.7 s more: find where (a closure made cold each
-  frame, the bounds, the box culling's order) and make it once per field. Every swaying sdf example
-  (`sdf/world`, `sdf/volumes`, the trees in the wind) would gain.
+- [x] **A field that moves on the clock, made once** (the distance written in blocks): the cost was never a moment's compile
+  (0.8 ms for the dead tree's 105 rods) but V8 not optimizing one function of thousands of lines (the
+  tree's distance: 73 kB of code, 8 us a point, swaying or still alike once past its limit). A join's
+  children now go in runs of 250 lines a function (1.5 us); the tree costs ~80 ms of a graveyard_3d
+  frame instead of ~400, the frame 0.8 s instead of 1.2, its check 7.5 s instead of 10.5. The numbers
+  are still worked out each moment (rebuilding them alone would save that 0.8 ms).
 - [ ] **The figures in 3D (wave 3): what is still open**
   - the heads are modeled and drawn once per view, their faces painted over: cut by a script from
     the approved hand heads where the render has the head, then the profiles widened and the nose's
@@ -73,8 +74,12 @@ Mark items `[x]` when they ship, with the commit.
   - 1 px creases (knee, elbow) hardly read; the cloak's and boots' accents do;
   - the warden's stance sways by whole pixels now (its first engine's half pixels went with it), and
     its head is no longer a frame behind the body;
-  - the bodies are drawn every frame: the traveler ~6 ms a frame (4.4 on the first engine), the warden
-    ~35 (23); what doesn't move within a move could be drawn once too (the pass after wave 3);
+  - the bodies are drawn every frame: after perf3d the traveler 5.7 ms a frame warm (6.2 before), the
+    mourner 5.1 (6.4), the crew 3.7 (4.9), the warden 18 (22); 5-19 cold. Each pixel's distance ~10
+    times and 4 more for its normal; a third of it the cloth's sweeps (the art's `trail` and `radius`).
+    A box per part to skip rays or start them later moves pixels (13 rays of the mourner's head hit
+    outside every box), so what's left: frames of a move drawn once where its pose repeats (idle's
+    held breath, cast's hold, turn as idle's first), and cheaper cloth functions in the art files;
   - `views()` doesn't hold a baked head's crown and chin to one row (one head turned keeps them; the
     line under a jaw that turns may reach a row lower in 3/4).
 - [ ] **What the 3D stage (wave 2) left to fix by hand, each a small change of pixels for the user to

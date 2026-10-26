@@ -447,6 +447,14 @@ node scripts/cpuprofile.ts prof                         # where that time went, 
 checks: a few frames, a small picture (a 3D one: a 30 px sprite, cells of 0.25 m), `study --seconds`
 for part of a long clip.
 
+3D marches a ray to each pixel through a field's distance, written as code (`sdf.ts`'s `Code`); a
+change to the march (where a ray starts, a box that lets it skip) moves pixels, so speed comes from
+that code: a join's children go in runs of 250 lines a function (V8 doesn't optimize one of thousands:
+graveyard_3d's tree of 105 rods took 8 µs a point, 1.5 in runs), and a material is one more pass noting
+which child each join took. On the i5-1035G1 (2026-10): a figure's frame 4-6 ms warm (the warden 18;
+a third of a body's time is its cloth's sweeps and their art functions), graveyard_3d 0.8 s a frame
+(1.2 before), its check 7.5 s (10.5).
+
 ### Measuring sessions and models
 
 ```sh

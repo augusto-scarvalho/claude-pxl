@@ -64,6 +64,48 @@ test("sdf: noise is seeded, bounded by its amplitude, the same at the same point
   near(D(sway, [1, 0, 0], { t: 0, phase: 0, frame: 0, frames: 4 }), 0, 1e-9);
 });
 
+test("sdf: a union of hundreds written in runs of code, the same steps to the bit; noise's tables the same in any order", () => {
+  const balls = Array.from({ length: 400 }, (_, i) => [Math.sin(i) * 3, Math.cos(i * 1.3) * 3, Math.sin(i * 0.7) * 3, 0.2 + 0.1 * Math.abs(Math.sin(i * 2.1))]);
+  const C = compile(sdf.union(balls.map(([x, y, z, r]) => sdf.sphere(r).at(x, y, z))));
+  assert.match(C.key, /const s0 = /, "in runs");
+  // the union's steps by hand: the first ball, then each one whose box isn't farther than the best so far
+  const byHand = (x: number, y: number, z: number) => balls.reduce((u, [bx, by, bz, r], i) => {
+    const a = x - bx, b = y - by, c = z - bz, v = Math.sqrt(a * a + b * b + c * c) - r;
+    const ex = Math.max(bx - r - x, 0, x - (bx + r)), ey = Math.max(by - r - y, 0, y - (by + r)), ez = Math.max(bz - r - z, 0, z - (bz + r)), lim = u + 0;
+    return i === 0 ? v : lim < 0 || (ex * ex + ey * ey + ez * ez) * 1 * 1 >= lim * lim ? u : Math.min(u, v);
+  }, NaN);
+  let s = 5;
+  const rand = () => { s = (s * 16807) % 2147483647; return (s / 2147483647) * 8 - 4; };
+  for (let n = 0; n < 400; n++) { const p = [rand(), rand(), rand()]; assert.equal(C.d(p[0], p[1], p[2]), byHand(p[0], p[1], p[2]), `at ${p}`); }
+  const v = (seed: number) => fbm3(0.37, 1.2, 2.9, seed, 3), first = [5, 6, 7].map(v);
+  assert.deepEqual([7, 5, 6, 5, 7, 6].map(v), [first[2], first[0], first[1], first[0], first[2], first[1]]);
+});
+
+test("sdf: a point's material and part, from the child its distance takes at each join (one pass of code)", () => {
+  const r = (10 * Math.PI) / 180, B = [3 * Math.cos(r), 3 * Math.sin(r), 0], Cc = [3 * Math.cos(r) - 3 * Math.sin(r), 3 * Math.sin(r) + 3 * Math.cos(r), 0];
+  const f = sdf.union(sdf.sphere(1).mat("a").part("left"), sdf.union(sdf.sphere(1).at(3, 0, 0).mat("b"), sdf.sphere(1).at(3, 3, 0).mat("c")).rotate(10).part("right"), { smooth: 0.2 })
+    .intersect(sdf.plane([0, 0, -1], 0.5)).paint("top", (p, n) => n[2] > 0.9);
+  const C = compile(f), at = (p: number[], n = [1, 0, 0]) => [C.mats[C.m(p[0], p[1], p[2], n[0], n[1], n[2])] ?? null, C.parts[C.part(p[0], p[1], p[2], n[0], n[1], n[2])] ?? null];
+  assert.deepEqual(at([-1, 0, 0]), ["a", "left"]);
+  assert.deepEqual(at([B[0] + 1, B[1], 0]), ["b", "right"]);
+  assert.deepEqual(at([Cc[0], Cc[1] + 1, 0]), ["c", "right"]);
+  assert.deepEqual(at([0, 0, 1], [0, 0, 1]), ["top", "left"], "painted over it all");
+  assert.deepEqual(at([0, 0, -3]), [null, null], "below the plane the intersection takes it: nothing");
+  assert.equal(C.mp(-1, 0, 0, 1, 0, 0), C.m(-1, 0, 0, 1, 0, 0) + 1 + 1024 * (C.part(-1, 0, 0, 1, 0, 0) + 1));
+});
+
+test("sdf: compiled once a moment (drawn, then a decal laid on it): at another moment its own numbers", () => {
+  const f = sdf.sphere(1).at((c) => [c.phase, 0, 0]), A = { t: 0, phase: 0.25, frame: 1, frames: 4 }, B = { t: 0, phase: 0.5, frame: 2, frames: 4 };
+  const a = compile(f, A);
+  assert.equal(compile(f, { ...A }), a);
+  assert.equal(compile(f, B).d(0.5, 0, 0), -1);
+  assert.equal(compile(f, A).d(0.25, 0, 0), -1);
+  // (a paint() function that named a material since: compiled afresh, as before)
+  const g = sdf.sphere(1).paint(() => "late"), c1 = compile(g);
+  c1.m(1, 0, 0, 1, 0, 0);
+  assert.notEqual(compile(g), c1);
+});
+
 test("sdf: whatever is inside lies within the bounds; distances stretch no more than lip", () => {
   const leaf = sdf.ellipsoid([0.6, 0.5, 0.4]).noise({ amp: 0.1, scale: 0.25, seed: 2 });
   const fields: Sdf[] = [

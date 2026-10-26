@@ -204,8 +204,8 @@ function fieldTracer(C: Compiled): Tracer {
     shade: (p, e) => {
       // the normal (four taps, Inigo Quilez's tetrahedron), the material there
       const h = Math.max(1e-4, e * 0.6), a = d(p[0] + h, p[1] - h, p[2] - h), b = d(p[0] - h, p[1] - h, p[2] + h), cc = d(p[0] - h, p[1] + h, p[2] - h), dd = d(p[0] + h, p[1] + h, p[2] + h);
-      const n = unit([a - b - cc + dd, -a - b + cc + dd, -a + b - cc + dd]);
-      return { n, m: C.m(p[0], p[1], p[2], n[0], n[1], n[2]), part: C.parts.length ? C.part(p[0], p[1], p[2], n[0], n[1], n[2]) : -1 };
+      const n = unit([a - b - cc + dd, -a - b + cc + dd, -a + b - cc + dd]), v = C.mp(p[0], p[1], p[2], n[0], n[1], n[2]);
+      return { n, m: (v % 1024) - 1, part: C.parts.length ? Math.floor(v / 1024) - 1 : -1 };
     },
     lift: (e) => 2 * e,
     // creases: how much nearer the field comes than the open air along the normal, a few steps out

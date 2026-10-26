@@ -47,6 +47,8 @@ export interface Compiled {
   d(x: number, y: number, z: number): number;
   m(x: number, y: number, z: number, nx: number, ny: number, nz: number): number;
   part(x: number, y: number, z: number, nx: number, ny: number, nz: number): number;
+  /** both at once: (material + 1) + 1024 (part + 1), 0 neither */
+  mp(x: number, y: number, z: number, nx: number, ny: number, nz: number): number;
   parts: string[];
   /** its distance's code and numbers: the same key, the same field (a fingerprint) */
   key: string;
@@ -57,8 +59,8 @@ export interface Compiled {
 }
 type Fd = (x: number, y: number, z: number) => number;
 type Fm = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => number;
-/** A part of a compiled field: its distance and material as functions, its box, its stretch, and `e`, which writes the same distance as code (see Code). */
-interface Part { d: Fd; m: Fm; lo: V3; hi: V3; lip: number; e: (c: Code, x: string, y: string, z: string) => string }
+/** A part of a compiled field: its material as a function, its box, its stretch, and `e`, which writes its distance as code (see Code). */
+interface Part { m: Fm; lo: V3; hi: V3; lip: number; e: (c: Code, x: string, y: string, z: string) => string }
 
 const fin = (v: unknown, what: string): number => {
   if (typeof v !== "number" || !Number.isFinite(v)) throw new PxError(`sdf: ${what} must be a number (or a function of the clock giving one), got ${JSON.stringify(v)}`);
@@ -84,7 +86,11 @@ function lattice(i: number, j: number, k: number, s: number): number {
 }
 /** A seed's lattice values, 32 cells each way (a noise that repeats every 32 cells: far past any field's size). */
 const TABLES = new Map<number, Float32Array>();
+// (the last two seeds' at hand: an fbm's octaves take turns)
+let s0 = NaN, t0: Float32Array = new Float32Array(0), s1 = NaN, t1 = t0;
 const table = (s: number) => {
+  if (s === s0) return t0;
+  if (s === s1) return t1;
   let t = TABLES.get(s);
   if (!t) {
     t = new Float32Array(32 * 32 * 32);
@@ -92,6 +98,7 @@ const table = (s: number) => {
     if (TABLES.size > 64) TABLES.clear();
     TABLES.set(s, t);
   }
+  s1 = s0; t1 = t0; s0 = s; t0 = t;
   return t;
 };
 /** Smooth value noise in [0, 1], one unit a cell, seeded. */
@@ -239,13 +246,14 @@ export function compileDensity(D: Density, clock: Clock = STILL): { rho: (x: num
     return 0.5 + (w0 * a + w1 * b - 0.5) * norm;
   };
   const rho = (x: number, y: number, z: number): number => {
+    if (fade && z >= fade[1]) return 0;
     const d = C.d(x, y, z);
     if (d >= A) return 0;
     let t = (-d + (A > 0 ? A * (2 * n(x, y, z) - 1) : 0)) / edge;
     if (t <= 0) return 0;
     if (t > 1) t = 1;
     t = t * t * (3 - 2 * t);
-    if (fade) { if (z >= fade[1]) return 0; if (z > fade[0]) { const u = (z - fade[0]) / (fade[1] - fade[0]); t *= 1 - u * u * (3 - 2 * u); } }
+    if (fade) { if (z > fade[0]) { const u = (z - fade[0]) / (fade[1] - fade[0]); t *= 1 - u * u * (3 - 2 * u); } }
     return t;
   };
   return { rho, lo: C.lo.map((v) => v - A) as V3, hi: C.hi.map((v) => v + A) as V3 };
@@ -321,11 +329,6 @@ export const sdf = {
 // ---------------------------------------------------------------- compiling
 const INF = Infinity;
 const smin = (a: number, b: number, k: number) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; };
-/** How far a point is outside a box (0 inside): a child farther than the best so far can't be nearer. */
-const boxOut = (lo: V3, hi: V3, x: number, y: number, z: number) => {
-  const dx = Math.max(lo[0] - x, 0, x - hi[0]), dy = Math.max(lo[1] - y, 0, y - hi[1]), dz = Math.max(lo[2] - z, 0, z - hi[2]);
-  return Math.sqrt(dx * dx + dy * dy + dz * dz);
-};
 // (inside, a lookup gives the material and the part as one number: (material + 1) + 1024 (part + 1), 0 none)
 const NONE: Fm = () => 0;
 const MOVES_ITSELF = new Set(["sphere", "box", "cylinder", "cone", "torus", "ellipsoid"]);
@@ -340,6 +343,9 @@ const boxOf = (pts: V3[]): [V3, V3] => [[0, 1, 2].map((e) => Math.min(...pts.map
 class Code {
   lines: string[] = [];
   K: number[] = [];
+  /** each join also writes which child it took into W, its slot's (for its material) */
+  track: boolean;
+  constructor(track = false) { this.track = track; }
   /** distance functions the code calls (a field given by one) */
   F: ((x: number, y: number, z: number) => number)[] = [];
   private n = 0;
@@ -348,25 +354,65 @@ class Code {
   /** a new name for a value */
   v(expr: string, mutable = false): string { const name = `v${this.n++}`; this.lines.push(`${mutable ? "let" : "const"} ${name} = ${expr};`); return name; }
   line(s: string): void { this.lines.push(s); }
+  /** the lines `f` writes, kept apart */
+  take(f: () => void): string[] { const outer = this.lines; this.lines = []; f(); const own = this.lines; this.lines = outer; return own; }
+  /** functions the code calls: runs of a join's children */
+  subs: string[] = [];
+  /**
+   * A join's children after the first, each a block of lines updating `vs` (the distance so far, and
+   * which child it is): written as they are, or past RUN lines in all, in runs a function each,
+   * (x, y, z, ...vs) => vs. V8 doesn't optimize a function of thousands of lines: the graveyard's tree
+   * of 105 rods took 8 us a point in one, 1.5 in runs. The same steps either way.
+   */
+  runs(blocks: string[][], x: string, y: string, z: string, vs: string[]): void {
+    if (blocks.reduce((n, b) => n + b.length, 0) <= RUN || new Set([x, y, z, ...vs]).size < 3 + vs.length) { for (const b of blocks) this.lines.push(...b); return; }
+    let run: string[] = [];
+    const out = vs.length > 1 ? `[${vs.join(", ")}]` : vs[0];
+    const flush = () => {
+      const name = `s${this.subs.length}`;
+      this.subs.push(`const ${name} = (${x}, ${y}, ${z}, ${vs.join(", ")}) => {\n${run.join("\n")}\nreturn ${out};\n};`);
+      this.line(`${out} = ${name}(${x}, ${y}, ${z}, ${vs.join(", ")});`);
+      run = [];
+    };
+    for (const b of blocks) { if (run.length && run.length + b.length > RUN) flush(); run.push(...b); }
+    flush();
+  }
 }
-type Factory = (K: number[], smin: (a: number, b: number, k: number) => number, fbm: typeof fbm3, F: Fd[]) => Fd;
-const FACTORIES = new Map<string, Factory>();
-function written(P: Part, keyOut?: { key: string }): Fd {
-  const c = new Code(), r = P.e(c, "x", "y", "z"), src = `return (x, y, z) => {\n${c.lines.join("\n")}\nreturn ${r};\n}`;
-  if (keyOut) keyOut.key = `${src}#${c.K.join(",")}`;
+const RUN = 250;
+type Factory = (K: number[], smin: (a: number, b: number, k: number) => number, fbm: typeof fbm3, F: Fd[], W?: Int32Array) => Fd;
+const FACTORIES = new Map<string, Factory>(), TRACKING = new Map<string, string>();
+/** A distance's code (tracking: each join also writing which child it takes), its numbers and the functions it calls. */
+function written(e: Part["e"], track = false): { src: string; K: number[]; F: Fd[] } {
+  const c = new Code(track), r = e(c, "x", "y", "z");
+  return { src: `${c.subs.join("\n")}\nreturn (x, y, z) => {\n${c.lines.join("\n")}\nreturn ${r};\n}`, K: c.K, F: c.F };
+}
+/** Code as a function, its source made once. */
+function made(src: string, K: number[], F: Fd[], W?: Int32Array): Fd {
   let f = FACTORIES.get(src);
   if (!f) {
-    f = new Function("K", "smin", "fbm3", "F", src) as Factory;
+    f = new Function("K", "smin", "fbm3", "F", "W", src) as Factory;
     if (FACTORIES.size > 256) FACTORIES.clear();
     FACTORIES.set(src, f);
   }
-  return f(c.K, smin, fbm3, c.F);
+  return f(K, smin, fbm3, F, W);
 }
 
+/** Each field's last compile: drawn and a decal laid on it at one moment, or its dist() asked again, it is compiled once. */
+const LAST = new WeakMap<Sdf, { clock: Clock; C: Compiled; n: number }>();
 /** The field at a moment, as functions. Materials are numbered in `mats`. */
 export function compile(f: Sdf, clock: Clock = STILL): Compiled {
   needSdf(f, "compile");
+  // (not when a paint() function has named more materials since: a renderer tells them from those it had)
+  const was = LAST.get(f), c = was?.clock;
+  if (was && c && was.C.mats.length === was.n && c.t === clock.t && c.phase === clock.phase && c.frame === clock.frame && c.frames === clock.frames) return was.C;
+  const C = compiled(f, clock);
+  LAST.set(f, { clock: { t: clock.t, phase: clock.phase, frame: clock.frame, frames: clock.frames }, C, n: C.mats.length });
+  return C;
+}
+function compiled(f: Sdf, clock: Clock): Compiled {
   const mats: string[] = [], parts: string[] = [], prefix: string[] = [];
+  // (each join's slot in W: the child it took at the point a material is asked for)
+  let slots = 0, W = new Int32Array(0), tracks = false;
   const idx = (name: string) => { const i = mats.indexOf(name); return i >= 0 ? i : mats.push(name) - 1; };
   // (a primitive moved by at() takes the move itself, (ox, oy, oz): one function a point, not two)
   const go = (s: Sdf, ox = 0, oy = 0, oz = 0): Part => {
@@ -376,7 +422,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
       case "sphere": {
         const r = pos(num(n.r, clock, "sphere's r"), "sphere's r"), [lo, hi] = shift([-r, -r, -r], [r, r, r]);
         return {
-          d: (x, y, z) => { x -= ox; y -= oy; z -= oz; return Math.sqrt(x * x + y * y + z * z) - r; }, m: NONE, lo, hi, lip: 1,
+          m: NONE, lo, hi, lip: 1,
           e: (c, x, y, z) => { const a = c.v(`${x} - ${c.k(ox)}`), b = c.v(`${y} - ${c.k(oy)}`), d = c.v(`${z} - ${c.k(oz)}`); return c.v(`Math.sqrt(${a} * ${a} + ${b} * ${b} + ${d} * ${d}) - ${c.k(r)}`); },
         };
       }
@@ -384,10 +430,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         const s = vec(n.size, clock, "box's size").map((v) => pos(v, "box's size") / 2), rd = Math.max(0, Math.min(num(n.round, clock, "box's round"), ...s));
         const bx = s[0] - rd, by = s[1] - rd, bz = s[2] - rd, [lo, hi] = shift([-s[0], -s[1], -s[2]], [s[0], s[1], s[2]]);
         return {
-          d: (x, y, z) => {
-            const qx = Math.abs(x - ox) - bx, qy = Math.abs(y - oy) - by, qz = Math.abs(z - oz) - bz, ex = Math.max(qx, 0), ey = Math.max(qy, 0), ez = Math.max(qz, 0);
-            return Math.sqrt(ex * ex + ey * ey + ez * ez) + Math.min(Math.max(qx, qy, qz), 0) - rd;
-          }, m: NONE, lo, hi, lip: 1,
+          m: NONE, lo, hi, lip: 1,
           e: (c, x, y, z) => {
             const qx = c.v(`Math.abs(${x} - ${c.k(ox)}) - ${c.k(bx)}`), qy = c.v(`Math.abs(${y} - ${c.k(oy)}) - ${c.k(by)}`), qz = c.v(`Math.abs(${z} - ${c.k(oz)}) - ${c.k(bz)}`);
             const ex = c.v(`Math.max(${qx}, 0)`), ey = c.v(`Math.max(${qy}, 0)`), ez = c.v(`Math.max(${qz}, 0)`);
@@ -399,11 +442,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         const a = vec(n.a, clock, "capsule's a"), b = vec(n.b, clock, "capsule's b"), r1 = pos(num(n.r, clock, "capsule's r"), "capsule's r"), r2 = n.r2 === undefined ? r1 : Math.max(0, num(n.r2, clock, "capsule's r2"));
         const bax = b[0] - a[0], bay = b[1] - a[1], baz = b[2] - a[2], bb = bax * bax + bay * bay + baz * baz || 1e-12, R = Math.max(r1, r2);
         return {
-          d: (x, y, z) => {
-            const px = x - a[0], py = y - a[1], pz = z - a[2], h = Math.max(0, Math.min(1, (px * bax + py * bay + pz * baz) / bb));
-            const dx = px - bax * h, dy = py - bay * h, dz = pz - baz * h;
-            return Math.sqrt(dx * dx + dy * dy + dz * dz) - (r1 + (r2 - r1) * h);
-          }, m: NONE,
+          m: NONE,
           e: (c, x, y, z) => {
             const BX = c.k(bax), BY = c.k(bay), BZ = c.k(baz), px = c.v(`${x} - ${c.k(a[0])}`), py = c.v(`${y} - ${c.k(a[1])}`), pz = c.v(`${z} - ${c.k(a[2])}`);
             const h = c.v(`Math.max(0, Math.min(1, (${px} * ${BX} + ${py} * ${BY} + ${pz} * ${BZ}) / ${c.k(bb)}))`);
@@ -417,7 +456,6 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
       case "cylinder": {
         const r = pos(num(n.r, clock, "cylinder's r"), "cylinder's r"), h = pos(num(n.h, clock, "cylinder's h"), "cylinder's h") / 2, [lo, hi] = shift([-r, -r, 0], [r, r, 2 * h]);
         return {
-          d: (x, y, z) => { x -= ox; y -= oy; z -= oz; const dx = Math.sqrt(x * x + y * y) - r, dz = Math.abs(z - h) - h; return Math.min(Math.max(dx, dz), 0) + Math.hypot(Math.max(dx, 0), Math.max(dz, 0)); },
           m: NONE, lo, hi, lip: 1,
           e: (c, x, y, z) => {
             const X = c.v(`${x} - ${c.k(ox)}`), Y = c.v(`${y} - ${c.k(oy)}`), Z = c.v(`${z} - ${c.k(oz)}`), H = c.k(h);
@@ -431,13 +469,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         const r1 = pos(num(n.r, clock, "cone's r"), "cone's r"), H = pos(num(n.h, clock, "cone's h"), "cone's h"), r2 = Math.max(0, num(n.top, clock, "cone's top")), h = H / 2, R = Math.max(r1, r2);
         const k2x = r2 - r1, k2y = 2 * h, kk = k2x * k2x + k2y * k2y, [lo, hi] = shift([-R, -R, 0], [R, R, H]);
         return {
-          d: (x, y, z) => {
-            x -= ox; y -= oy;
-            const qx = Math.sqrt(x * x + y * y), qy = z - oz - h;
-            const cax = qx - Math.min(qx, qy < 0 ? r1 : r2), cay = Math.abs(qy) - h;
-            const t = Math.max(0, Math.min(1, ((r2 - qx) * k2x + (h - qy) * k2y) / kk)), cbx = qx - r2 + k2x * t, cby = qy - h + k2y * t;
-            return (cbx < 0 && cay < 0 ? -1 : 1) * Math.sqrt(Math.min(cax * cax + cay * cay, cbx * cbx + cby * cby));
-          }, m: NONE, lo, hi, lip: 1,
+          m: NONE, lo, hi, lip: 1,
           e: (c, x, y, z) => {
             const X = c.v(`${x} - ${c.k(ox)}`), Y = c.v(`${y} - ${c.k(oy)}`), Hh = c.k(h), R1 = c.k(r1), R2 = c.k(r2), KX = c.k(k2x), KY = c.k(k2y);
             const qx = c.v(`Math.sqrt(${X} * ${X} + ${Y} * ${Y})`), qy = c.v(`${z} - ${c.k(oz)} - ${Hh}`);
@@ -451,7 +483,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         const R = pos(num(n.R, clock, "torus's R"), "torus's R"), r = pos(num(n.r, clock, "torus's r"), "torus's r");
         const [lo, hi] = shift([-R - r, -R - r, -r], [R + r, R + r, r]);
         return {
-          d: (x, y, z) => { x -= ox; y -= oy; const q = Math.sqrt(x * x + y * y) - R, w = z - oz; return Math.sqrt(q * q + w * w) - r; }, m: NONE, lo, hi, lip: 1,
+          m: NONE, lo, hi, lip: 1,
           e: (c, x, y, z) => {
             const X = c.v(`${x} - ${c.k(ox)}`), Y = c.v(`${y} - ${c.k(oy)}`), q = c.v(`Math.sqrt(${X} * ${X} + ${Y} * ${Y}) - ${c.k(R)}`), w = c.v(`${z} - ${c.k(oz)}`);
             return c.v(`Math.sqrt(${q} * ${q} + ${w} * ${w}) - ${c.k(r)}`);
@@ -465,15 +497,12 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         // what is below it: bounded only where the plane lies along an axis
         const lo: V3 = [-INF, -INF, -INF], hi: V3 = [INF, INF, INF];
         [nx, ny, nz].forEach((c, e) => { if (Math.abs(c) > 0.9999) (c > 0 ? hi : lo)[e] = c > 0 ? h : -h; });
-        return { d: (x, y, z) => x * nx + y * ny + z * nz - h, m: NONE, lo, hi, lip: 1, e: (c, x, y, z) => c.v(`${x} * ${c.k(nx)} + ${y} * ${c.k(ny)} + ${z} * ${c.k(nz)} - ${c.k(h)}`) };
+        return { m: NONE, lo, hi, lip: 1, e: (c, x, y, z) => c.v(`${x} * ${c.k(nx)} + ${y} * ${c.k(ny)} + ${z} * ${c.k(nz)} - ${c.k(h)}`) };
       }
       case "ellipsoid": {
         const r = vec(n.r, clock, "ellipsoid's r").map((v) => pos(v, "ellipsoid's r")), [a, b, c] = r, ia = 1 / a, ib = 1 / b, ic = 1 / c, [lo, hi] = shift([-a, -b, -c], [a, b, c]);
         return {
-          d: (x, y, z) => {
-            const X = (x - ox) * ia, Y = (y - oy) * ib, Z = (z - oz) * ic, k0 = Math.sqrt(X * X + Y * Y + Z * Z), X2 = X * ia, Y2 = Y * ib, Z2 = Z * ic, k1 = Math.sqrt(X2 * X2 + Y2 * Y2 + Z2 * Z2);
-            return k1 > 1e-12 ? (k0 * (k0 - 1)) / k1 : -Math.min(a, b, c);
-          }, m: NONE, lo, hi, lip: 1.1,
+          m: NONE, lo, hi, lip: 1.1,
           e: (cc, x, y, z) => {
             const IA = cc.k(ia), IB = cc.k(ib), IC = cc.k(ic), X = cc.v(`(${x} - ${cc.k(ox)}) * ${IA}`), Y = cc.v(`(${y} - ${cc.k(oy)}) * ${IB}`), Z = cc.v(`(${z} - ${cc.k(oz)}) * ${IC}`);
             const k0 = cc.v(`Math.sqrt(${X} * ${X} + ${Y} * ${Y} + ${Z} * ${Z})`), X2 = cc.v(`${X} * ${IA}`), Y2 = cc.v(`${Y} * ${IB}`), Z2 = cc.v(`${Z} * ${IC}`), k1 = cc.v(`Math.sqrt(${X2} * ${X2} + ${Y2} * ${Y2} + ${Z2} * ${Z2})`);
@@ -487,61 +516,46 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         const [lo, hi] = uni
           ? [[0, 1, 2].map((e) => Math.min(...ps.map((p) => p.lo[e])) - grow) as V3, [0, 1, 2].map((e) => Math.max(...ps.map((p) => p.hi[e])) + grow) as V3]
           : [[0, 1, 2].map((e) => Math.max(...ps.map((p) => p.lo[e]))) as V3, [0, 1, 2].map((e) => Math.min(...ps.map((p) => p.hi[e]))) as V3];
-        const N = ps.length, ds = ps.map((p) => p.d), bx = new Float64Array(N * 7);
+        const N = ps.length, bx = new Float64Array(N * 7);
         ps.forEach((p, i) => bx.set([...p.lo, ...p.hi, p.lip], i * 7));
-        // the nearest child (a union) or the farthest (an intersection), and the distance joined
-        const which = new Int32Array(1);
-        const d: Fd = uni
-          ? (x, y, z) => {
-            let best = INF, w = -1;
-            for (let i = 0, o = 0; i < N; i++, o += 7) {
-              // (its box farther than the best so far: it can't be nearer, nor melt in, so skip it)
-              const ex = Math.max(bx[o] - x, 0, x - bx[o + 3]), ey = Math.max(bx[o + 1] - y, 0, y - bx[o + 4]), ez = Math.max(bx[o + 2] - z, 0, z - bx[o + 5]), lim = best + k;
-              if (lim < 0 || (ex * ex + ey * ey + ez * ez) * bx[o + 6] * bx[o + 6] >= lim * lim) continue;
-              const v = ds[i](x, y, z);
-              if (w < 0) { best = v; w = i; continue; }   // (the first is always looked at: best starts endless)
-              if (v < best) w = i;
-              best = k > 0 ? smin(best, v, k) : Math.min(best, v);
-            }
-            which[0] = w;
-            return best;
+        // the nearest child (a union) or the farthest (an intersection), and the distance joined: child i's
+        // lines, skipped where its box is farther than the best so far (a union: it can't be nearer, nor
+        // melt in); with `w`, which child it is
+        const child = (c: Code, i: number, x: string, y: string, z: string, u: string, K: string, w?: string, raw?: string) => c.take(() => {
+          c.line("{");
+          if (uni) {
+            const o = i * 7, L = c.k(bx[o + 6]);
+            const ex = c.v(`Math.max(${c.k(bx[o])} - ${x}, 0, ${x} - ${c.k(bx[o + 3])})`), ey = c.v(`Math.max(${c.k(bx[o + 1])} - ${y}, 0, ${y} - ${c.k(bx[o + 4])})`), ez = c.v(`Math.max(${c.k(bx[o + 2])} - ${z}, 0, ${z} - ${c.k(bx[o + 5])})`), lim = c.v(`${u} + ${K}`);
+            c.line(`if (!(${lim} < 0 || (${ex} * ${ex} + ${ey} * ${ey} + ${ez} * ${ez}) * ${L} * ${L} >= ${lim} * ${lim})) {`);
+            const v = ps[i].e(c, x, y, z);
+            if (w) c.line(`if (${v} < ${u}) ${w} = ${i};`);
+            c.line(`${u} = ${k > 0 ? `smin(${u}, ${v}, ${K})` : `Math.min(${u}, ${v})`};`);
+            c.line("}");
+          } else {
+            const v = ps[i].e(c, x, y, z);
+            if (w) c.line(`if (${v} > ${raw}) { ${raw} = ${v}; ${w} = ${i}; }`);
+            c.line(`${u} = ${k > 0 ? `-smin(-${u}, -${v}, ${K})` : `Math.max(${u}, ${v})`};`);
           }
-          : (x, y, z) => {
-            let best = -INF, w = 0, raw = -INF;
-            for (let i = 0; i < N; i++) {
-              const v = ps[i].d(x, y, z);
-              if (v > raw) { raw = v; w = i; }
-              best = i === 0 ? v : k > 0 ? -smin(-best, -v, k) : Math.max(best, v);
-            }
-            which[0] = w;
-            return best;
-          };
+          c.line("}");
+        });
+        const slot = slots++;
         const e = (c: Code, x: string, y: string, z: string) => {
           const K = c.k(k), u = c.v(ps[0].e(c, x, y, z), true);
-          for (let i = 1; i < N; i++) {
-            c.line("{");
-            if (uni) {
-              // (its box farther than the best so far: it can't be nearer, nor melt in, so skip it)
-              const o = i * 7, L = c.k(bx[o + 6]);
-              const ex = c.v(`Math.max(${c.k(bx[o])} - ${x}, 0, ${x} - ${c.k(bx[o + 3])})`), ey = c.v(`Math.max(${c.k(bx[o + 1])} - ${y}, 0, ${y} - ${c.k(bx[o + 4])})`), ez = c.v(`Math.max(${c.k(bx[o + 2])} - ${z}, 0, ${z} - ${c.k(bx[o + 5])})`), lim = c.v(`${u} + ${K}`);
-              c.line(`if (!(${lim} < 0 || (${ex} * ${ex} + ${ey} * ${ey} + ${ez} * ${ez}) * ${L} * ${L} >= ${lim} * ${lim})) {`);
-              const v = ps[i].e(c, x, y, z);
-              c.line(`${u} = ${k > 0 ? `smin(${u}, ${v}, ${K})` : `Math.min(${u}, ${v})`};`);
-              c.line("}");
-            } else {
-              const v = ps[i].e(c, x, y, z);
-              c.line(`${u} = ${k > 0 ? `-smin(-${u}, -${v}, ${K})` : `Math.max(${u}, ${v})`};`);
-            }
-            c.line("}");
-          }
+          if (!c.track) { c.runs(ps.slice(1).map((_, j) => child(c, j + 1, x, y, z, u, K)), x, y, z, [u]); return u; }
+          const w = c.v("0", true), raw = uni ? "" : c.v("-Infinity", true);
+          if (!uni) c.line(`if (${u} > ${raw}) ${raw} = ${u};`);
+          c.runs(ps.slice(1).map((_, j) => child(c, j + 1, x, y, z, u, K, w, raw)), x, y, z, uni ? [u, w] : [u, w, raw]);
+          c.line(`W[${slot}] = ${w};`);
           return u;
         };
-        return { d, m: (x, y, z, a, b, c) => { d(x, y, z); return ps[which[0]].m(x, y, z, a, b, c); }, lo, hi, lip, e };
+        // its material: that of the child its distance takes there (the tracking pass wrote which)
+        if (ps.every((p) => p.m === NONE)) return { m: NONE, lo, hi, lip, e };
+        tracks = true;
+        return { m: (x, y, z, a, b, c) => ps[W[slot]].m(x, y, z, a, b, c), lo, hi, lip, e };
       }
       case "subtract": {
         const [A, B] = n.of.map((o) => go(o)), k = Math.max(0, num(n.k, clock, "subtract's smooth"));
         return {
-          d: (x, y, z) => { const a = A.d(x, y, z); if (boxOut(B.lo, B.hi, x, y, z) * B.lip > Math.max(0, -a) + k) return a; const b = -B.d(x, y, z); return k > 0 ? -smin(-a, -b, k) : Math.max(a, b); },
           m: A.m, lo: A.lo, hi: A.hi, lip: Math.max(A.lip, B.lip),
           e: (c, x, y, z) => {
             const a = c.v(A.e(c, x, y, z), true), K = c.k(k);
@@ -559,7 +573,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         if (MOVES_ITSELF.has(n.of.node.op)) return go(n.of, vx, vy, vz);
         const C = go(n.of);
         return {
-          d: (x, y, z) => C.d(x - vx, y - vy, z - vz), m: (x, y, z, a, b, c) => C.m(x - vx, y - vy, z - vz, a, b, c), lo: [C.lo[0] + vx, C.lo[1] + vy, C.lo[2] + vz], hi: [C.hi[0] + vx, C.hi[1] + vy, C.hi[2] + vz], lip: C.lip,
+          m: C.m === NONE ? NONE : (x, y, z, a, b, c) => C.m(x - vx, y - vy, z - vz, a, b, c), lo: [C.lo[0] + vx, C.lo[1] + vy, C.lo[2] + vz], hi: [C.hi[0] + vx, C.hi[1] + vy, C.hi[2] + vz], lip: C.lip,
           e: (c, x, y, z) => C.e(c, c.v(`${x} - ${c.k(vx)}`), c.v(`${y} - ${c.k(vy)}`), c.v(`${z} - ${c.k(vz)}`)),
         };
       }
@@ -573,8 +587,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
           ? boxOf(corners(C.lo, C.hi).map((p) => [M[0] * p[0] + M[1] * p[1] + M[2] * p[2], M[3] * p[0] + M[4] * p[1] + M[5] * p[2], M[6] * p[0] + M[7] * p[1] + M[8] * p[2]] as V3))
           : [[-INF, -INF, -INF] as V3, [INF, INF, INF] as V3];
         return {
-          d: (x, y, z) => C.d(M[0] * x + M[3] * y + M[6] * z, M[1] * x + M[4] * y + M[7] * z, M[2] * x + M[5] * y + M[8] * z),
-          m: (x, y, z, a, b, c) => C.m(M[0] * x + M[3] * y + M[6] * z, M[1] * x + M[4] * y + M[7] * z, M[2] * x + M[5] * y + M[8] * z, M[0] * a + M[3] * b + M[6] * c, M[1] * a + M[4] * b + M[7] * c, M[2] * a + M[5] * b + M[8] * c),
+          m: C.m === NONE ? NONE : (x, y, z, a, b, c) => C.m(M[0] * x + M[3] * y + M[6] * z, M[1] * x + M[4] * y + M[7] * z, M[2] * x + M[5] * y + M[8] * z, M[0] * a + M[3] * b + M[6] * c, M[1] * a + M[4] * b + M[7] * c, M[2] * a + M[5] * b + M[8] * c),
           lo, hi, lip: C.lip,
           e: (c, x, y, z) => { const m = M.map((v) => c.k(v)); return C.e(c, c.v(`${m[0]} * ${x} + ${m[3]} * ${y} + ${m[6]} * ${z}`), c.v(`${m[1]} * ${x} + ${m[4]} * ${y} + ${m[7]} * ${z}`), c.v(`${m[2]} * ${x} + ${m[5]} * ${y} + ${m[8]} * ${z}`)); },
         };
@@ -583,15 +596,14 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         const [sx, sy, sz] = vec(n.s, clock, "scale").map((v) => pos(v, "scale")), C = go(n.of), k = Math.min(sx, sy, sz);
         const lo: V3 = [C.lo[0] * sx, C.lo[1] * sy, C.lo[2] * sz], hi: V3 = [C.hi[0] * sx, C.hi[1] * sy, C.hi[2] * sz];
         return {
-          d: (x, y, z) => C.d(x / sx, y / sy, z / sz) * k, m: (x, y, z, a, b, c) => C.m(x / sx, y / sy, z / sz, a * sx, b * sy, c * sz), lo, hi, lip: C.lip,
+          m: C.m === NONE ? NONE : (x, y, z, a, b, c) => C.m(x / sx, y / sy, z / sz, a * sx, b * sy, c * sz), lo, hi, lip: C.lip,
           e: (c, x, y, z) => c.v(`${C.e(c, c.v(`${x} / ${c.k(sx)}`), c.v(`${y} / ${c.k(sy)}`), c.v(`${z} / ${c.k(sz)}`))} * ${c.k(k)}`),
         };
       }
       case "twist": {
         const k = (num(n.deg, clock, "twist's deg") * Math.PI) / 180, C = go(n.of), R = Math.max(...[C.lo[0], C.lo[1], C.hi[0], C.hi[1]].map(Math.abs)) * Math.SQRT2;
         return {
-          d: (x, y, z) => { const g = -k * z, c = Math.cos(g), si = Math.sin(g); return C.d(c * x - si * y, si * x + c * y, z); },
-          m: (x, y, z, a, b, cc) => { const g = -k * z, c = Math.cos(g), si = Math.sin(g); return C.m(c * x - si * y, si * x + c * y, z, c * a - si * b, si * a + c * b, cc); },
+          m: C.m === NONE ? NONE : (x, y, z, a, b, cc) => { const g = -k * z, c = Math.cos(g), si = Math.sin(g); return C.m(c * x - si * y, si * x + c * y, z, c * a - si * b, si * a + c * b, cc); },
           lo: [-R, -R, C.lo[2]], hi: [R, R, C.hi[2]], lip: C.lip * Math.hypot(1, k * R),
           e: (c, x, y, z) => { const g = c.v(`-${c.k(k)} * ${z}`), co = c.v(`Math.cos(${g})`), si = c.v(`Math.sin(${g})`); return C.e(c, c.v(`${co} * ${x} - ${si} * ${y}`), c.v(`${si} * ${x} + ${co} * ${y}`), z); },
         };
@@ -601,8 +613,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         const [kx, ky] = typeof kv === "object" ? vec(kv as Vec, clock, "bend's [kx, ky]", 2) : [num(kv as Num, clock, "bend's k"), 0], C = go(n.of), Z = Math.max(0, C.hi[2]), off = (z: number) => (z > 0 ? (z * z) / 2 : 0);
         const ex = kx * off(Z), ey = ky * off(Z);
         return {
-          d: (x, y, z) => C.d(x - kx * off(z), y - ky * off(z), z),
-          m: (x, y, z, a, b, c) => C.m(x - kx * off(z), y - ky * off(z), z, a, b, c),
+          m: C.m === NONE ? NONE : (x, y, z, a, b, c) => C.m(x - kx * off(z), y - ky * off(z), z, a, b, c),
           lo: [C.lo[0] + Math.min(0, ex), C.lo[1] + Math.min(0, ey), C.lo[2]], hi: [C.hi[0] + Math.max(0, ex), C.hi[1] + Math.max(0, ey), C.hi[2]],
           lip: C.lip * Math.hypot(1, Math.hypot(kx, ky) * Z),
           e: (c, x, y, z) => { const o = c.v(`${z} > 0 ? (${z} * ${z}) / 2 : 0`); return C.e(c, c.v(`${x} - ${c.k(kx)} * ${o}`), c.v(`${y} - ${c.k(ky)} * ${o}`), z); },
@@ -613,8 +624,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         const lo = [...C.lo] as V3, hi = [...C.hi] as V3;
         [mx, my, mz].forEach((on, e) => { if (on) { const r = Math.max(Math.abs(lo[e]), Math.abs(hi[e])); lo[e] = -r; hi[e] = r; } });
         return {
-          d: (x, y, z) => C.d(mx ? Math.abs(x) : x, my ? Math.abs(y) : y, mz ? Math.abs(z) : z),
-          m: (x, y, z, a, b, c) => C.m(mx ? Math.abs(x) : x, my ? Math.abs(y) : y, mz ? Math.abs(z) : z, mx && x < 0 ? -a : a, my && y < 0 ? -b : b, mz && z < 0 ? -c : c),
+          m: C.m === NONE ? NONE : (x, y, z, a, b, c) => C.m(mx ? Math.abs(x) : x, my ? Math.abs(y) : y, mz ? Math.abs(z) : z, mx && x < 0 ? -a : a, my && y < 0 ? -b : b, mz && z < 0 ? -c : c),
           lo, hi, lip: C.lip,
           e: (c, x, y, z) => C.e(c, mx ? c.v(`Math.abs(${x})`) : x, my ? c.v(`Math.abs(${y})`) : y, mz ? c.v(`Math.abs(${z})`) : z),
         };
@@ -623,7 +633,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         const s = vec(n.step, clock, "repeat's step"), cnt = vec(n.count, clock, "repeat's count").map((v) => Math.max(0, Math.round(v))), C = go(n.of);
         const q = (v: number, e: number) => (s[e] > 0 ? v - s[e] * Math.max(-cnt[e], Math.min(cnt[e], Math.round(v / s[e]))) : v);
         return {
-          d: (x, y, z) => C.d(q(x, 0), q(y, 1), q(z, 2)), m: (x, y, z, a, b, c) => C.m(q(x, 0), q(y, 1), q(z, 2), a, b, c),
+          m: C.m === NONE ? NONE : (x, y, z, a, b, c) => C.m(q(x, 0), q(y, 1), q(z, 2), a, b, c),
           lo: C.lo.map((v, e) => v - (s[e] > 0 ? s[e] * cnt[e] : 0)) as V3, hi: C.hi.map((v, e) => v + (s[e] > 0 ? s[e] * cnt[e] : 0)) as V3, lip: C.lip,
           e: (c, x, y, z) => {
             const qe = (v: string, e: number) => (s[e] > 0 ? c.v(`${v} - ${c.k(s[e])} * Math.max(-${c.k(cnt[e])}, Math.min(${c.k(cnt[e])}, Math.round(${v} / ${c.k(s[e])})))`) : v);
@@ -641,7 +651,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         const L = 1 + (2 * A * 1.5 * S) / sc;
         return {
           // (far from the surface the noise can't reach it: what it could take away is a bound, and cheap)
-          d: (x, y, z) => { const v = C.d(x, y, z); return v > 3 * A ? v - A : v + amp * (2 * fbm3(x / sc, y / sc, z / sc, seed, oc) - 1); }, m: C.m,
+          m: C.m,
           lo: C.lo.map((v) => v - A) as V3, hi: C.hi.map((v) => v + A) as V3, lip: C.lip * L,
           e: (c, x, y, z) => {
             const v = C.e(c, x, y, z), AA = c.k(A), SC = c.k(sc);
@@ -665,7 +675,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
       case "fn": {
         // (its id among the numbers: two such fields are never the same field)
         const fd = n.d, [lo, hi] = shift(n.lo, n.hi);
-        return { d: fd, m: NONE, lo, hi, lip: n.lip, e: (c, x, y, z) => { c.k(n.id); c.F.push(fd); return c.v(`F[${c.F.length - 1}](${x}, ${y}, ${z})`); } };
+        return { m: NONE, lo, hi, lip: n.lip, e: (c, x, y, z) => { c.k(n.id); c.F.push(fd); return c.v(`F[${c.F.length - 1}](${x}, ${y}, ${z})`); } };
       }
       case "part": {
         // its full name: the parts round it first; the innermost names a point
@@ -677,10 +687,21 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
       }
     }
   };
-  const P = go(f), raw = P.m, out = { key: "" };
+  const P = go(f), raw = P.m, D = written(P.e);
+  W = new Int32Array(slots);
+  // a material asked for: the distance there once more, writing which child each join takes, then down
+  // that way through the joins. The tracking code is the distance's with those lines, the same numbers
+  // in the same order: written once for a field of that shape.
+  let track: Fd | undefined;
+  const tracker = () => {
+    let src = TRACKING.get(D.src);
+    if (!src) { if (TRACKING.size > 256) TRACKING.clear(); TRACKING.set(D.src, (src = written(P.e, true).src)); }
+    return made(src, D.K, D.F, W);
+  };
+  const mp: Fm = !tracks ? raw : (x, y, z, a, b, c) => { (track ??= tracker())(x, y, z); return raw(x, y, z, a, b, c); };
   return {
-    d: written(P, out), key: out.key, lo: P.lo, hi: P.hi, lip: P.lip, mats, parts,
-    m: (x, y, z, a, b, c) => (raw(x, y, z, a, b, c) % 1024) - 1,
-    part: (x, y, z, a, b, c) => Math.floor(raw(x, y, z, a, b, c) / 1024) - 1,
+    d: made(D.src, D.K, D.F), get key() { return `${D.src}#${D.K.join(",")}`; }, lo: P.lo, hi: P.hi, lip: P.lip, mats, parts, mp,
+    m: (x, y, z, a, b, c) => (mp(x, y, z, a, b, c) % 1024) - 1,
+    part: (x, y, z, a, b, c) => Math.floor(mp(x, y, z, a, b, c) / 1024) - 1,
   };
 }
