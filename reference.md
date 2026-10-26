@@ -116,7 +116,12 @@ sheet globs.
   `h`), its value at x blended with its value a width back, for noise on strips and tiles that wrap:
   `const n = seamless((x, y) => fbm(x / 30, y / 30), 640)`. `profile([x0, y0, x1, y1, ...])` a ground
   or a ceiling as a polyline (x going up): `(x) => ` its row there, rounded (the first leg carried on
-  before it, the last row after): props stood on a cave's floor (`examples/grotto.px.js`). `vec` the
+  before it, the last row after): props stood on a cave's floor (`examples/grotto.px.js`).
+  `lane([x0, y0, x1, y1, ...], { round })` a path as a polyline, its corners rounded `round` px: `(x, y) =>
+  [s, u]`, how far along it the nearest point lies (px; its first and last legs carried on) and how far
+  to its right (px, negative to its left), `.total` its length along: what is laid along a path, slabs
+  in courses at steps of `s` that fan round a bend, its edges at `|u|`, its ends at `s` 0 and `total`, a
+  road's lines, a river's banks. `vec` the
   vectors of a hand-built 3D piece, as arrays: `vec.add(a, b)`, `sub`, `mul(a, k)`, `dot`, `cross`
   (3D), `len`, `unit` (`const { add, mul, unit } = vec`).
 - **Layer**: drawn on its own image, then blended in at its place in the list.

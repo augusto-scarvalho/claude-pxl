@@ -8,7 +8,7 @@ import { checkProject } from "../src/node/check.ts";
 import { main } from "../src/node/cli.ts";
 import { frontWords, lightWords, litDir, rampSteps } from "../src/core/checks.ts";
 import { PAL, failure } from "./helpers.ts";
-import { profile } from "../src/core/util.ts";
+import { lane, profile } from "../src/core/util.ts";
 
 const run = async (src: string, ...args: string[]) => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
@@ -119,6 +119,22 @@ test("c.as: what a function paints, a placement by name; an anim with a world ch
   assert.deepEqual([q.x, q.y, q.w, q.h, q.img.meters, q.img.data[0] === 0, q.img.data[1] !== 0], [2, 2, 3, 3, 1, true, true]);
   assert.equal(loadSource(src, "t.px.js").build("a").placements.length, 0, "drawing alone: nothing kept");
   assert.match(checkProject(p).checked, /1 scene \(2 frames/);
+});
+
+test("lane: along a polyline, rounded at its corners: how far along and to its right, carried on past its ends", () => {
+  // east 100 px, then south 100 px (a right turn on the picture), the corner rounded 20 px
+  const L = lane([0, 0, 100, 0, 100, 100], { round: 20 }), near = (a: number, b: number, what: string) => assert.ok(Math.abs(a - b) < 1e-6, `${what}: ${a} != ${b}`);
+  const [s0, u0] = L(50, 5);
+  near(s0, 50, "on the first leg"); near(u0, 5, "south of an eastward leg is its right");
+  // the bend: a quarter circle of 20 px round (80, 20), its middle 10 * pi / 4... along it
+  const arc = (Math.PI / 2) * 20, [s1, u1] = L(80 + 20 * Math.SQRT1_2, 20 - 20 * Math.SQRT1_2);
+  near(s1, 80 + arc / 2, "the bend's middle"); near(u1, 0, "on it");
+  const [s2, u2] = L(80 + 30 * Math.SQRT1_2, 20 - 30 * Math.SQRT1_2);
+  near(s2, s1, "outside the bend, the same course (a fan)"); near(u2, -10, "the outside of a right turn is its left");
+  const [s3, u3] = L(95, 150);
+  near(s3, 80 + arc + 130, "the last leg carried on"); near(u3, 5, "west of a southward leg is its right");
+  near(L.total, 80 + arc + 80, "its length along");
+  assert.throws(() => lane([0, 0]), /lane: points are/);
 });
 
 test("profile and world.ground as a polyline: its row under x; a stamp standing on it; feet read against it there", async () => {

@@ -825,6 +825,8 @@ declare global {
   function corners(prefix: string, opts: { size: number; variants?: number; smooth?: boolean }, fn: (x: number, y: number, t: number, v: number) => PxColor | null | undefined): void;
   /** A ground (or a ceiling) as a polyline [x0, y0, x1, y1, ...], x going up: (x) => its row there, rounded. */
   function profile(pts: number[]): (x: number) => number;
+  /** A path as a polyline [x0, y0, x1, y1, ...] px, its corners rounded `round` px: (x, y) => [s, u], how far along it (px) and to its right (px, negative to its left); `.total` its length along. */
+  function lane(pts: number[], opts?: { round?: number }): ((x: number, y: number) => [number, number]) & { total: number };
   /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly); boxes' faces lit by the sun. */
   function solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): PxOp;
   /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade by `shade`. */

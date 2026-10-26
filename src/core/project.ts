@@ -32,7 +32,7 @@ import { type Lut, readCube, readStrip } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
 import { ability, emitter, follow, route, turnToward, tween, unroll } from "./vfx.ts";
 import { SPELL_OPTS, spell } from "./spells.ts";
-import { bayer, fbm, globRe, gridRows, latticeHash, profile, rng, vec, vnoise, seamless } from "./util.ts";
+import { bayer, fbm, globRe, gridRows, lane, latticeHash, profile, rng, vec, vnoise, seamless } from "./util.ts";
 
 /**
  * Op signatures: name:type, "?" marks the first optional argument.
@@ -899,6 +899,8 @@ export class Project implements BuildCtx {
     env.vec = vec;
     // a ground as a polyline: profile([x0, y0, x1, y1, ...])(x) its row there
     env.profile = (pts: unknown) => { try { return profile(pts as number[]); } catch (e) { throw wrap(e).within("profile", this.callerLoc()); } };
+    // a path as a polyline: lane([x0, y0, ...], { round })(x, y) how far along it and to its side, [s, u]
+    env.lane = (pts: unknown, o: unknown = {}) => { try { return lane(pts as number[], o as { round?: number }); } catch (e) { throw wrap(e).within("lane", this.callerLoc()); } };
     // shapes in meters for solids() and shadows(): solid.stick, blob, box, cone, poly
     env.solid = solid;
     // a model for mesh(): faces, strips, lofts and boxes in meters, each of a material

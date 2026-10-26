@@ -185,6 +185,68 @@ export function once<T>(owner: unknown, key: string, make: () => T): T {
  * A ground (or a ceiling) drawn as a polyline, [x0, y0, x1, y1, ...] with x going up: (x) => its row
  * there, rounded; before the first point the first leg carried on, past the last the last row.
  */
+/**
+ * A lane along a polyline, [x0, y0, x1, y1, ...] px, its corners rounded `round` px (as far as its legs
+ * allow): (x, y) => [s, u], how far along it the nearest point of it lies (px from the first point; its
+ * first and last legs carried on past their ends) and how far the point lies to its side (px, + on the
+ * right going along it); `.total` its length along. What is laid along a path: slabs in courses at steps
+ * of s (fanning round a bend), its edges at |u|, its ends at s 0 and total, a road's lines, a river's banks.
+ */
+export function lane(pts: number[], o: { round?: number } = {}): ((x: number, y: number) => [number, number]) & { total: number } {
+  const r = o.round ?? 0;
+  if (!Array.isArray(pts) || pts.length < 4 || pts.length % 2 || !pts.every(Number.isFinite) || !(r >= 0))
+    throw new PxError(`lane: points are [x0, y0, x1, y1, ...] (two or more), round px (0 up), got ${JSON.stringify(pts)?.slice(0, 120)}, ${JSON.stringify(o.round)}`);
+  const P: number[][] = [];
+  for (let i = 0; i < pts.length; i += 2) if (!P.length || pts[i] !== P[P.length - 1][0] || pts[i + 1] !== P[P.length - 1][1]) P.push([pts[i], pts[i + 1]]);
+  if (P.length < 2) throw new PxError("lane: two points apart at least");
+  const dir = (a: number[], b: number[]) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[0] - a[0]) / l, (b[1] - a[1]) / l, l]; };
+  // its pieces in order: legs [a, way, length] and arcs [center, radius, start angle, sweep (+ clockwise on the picture)]
+  type Leg = { a: number[]; d: number[]; len: number; s: number } | { c: number[]; rad: number; a0: number; sw: number; len: number; s: number };
+  const out: Leg[] = [];
+  let from = P[0], s = 0;
+  for (let i = 1; i < P.length; i++) {
+    const [dx, dy, l] = dir(P[i - 1], P[i]);
+    let to = P[i], next: Leg | undefined, after = P[i];
+    if (i < P.length - 1 && r > 0) {
+      const [ex, ey, m] = dir(P[i], P[i + 1]), turn = Math.atan2(dx * ey - dy * ex, dx * ex + dy * ey);
+      if (Math.abs(turn) > 1e-6) {
+        // its tangents no longer than half of either leg; the center on the side it turns to
+        const t = Math.min(r * Math.tan(Math.abs(turn) / 2), l / 2, m / 2), rad = t / Math.tan(Math.abs(turn) / 2), side = Math.sign(turn);
+        to = [P[i][0] - dx * t, P[i][1] - dy * t];
+        after = [P[i][0] + ex * t, P[i][1] + ey * t];
+        const c = [to[0] - dy * side * rad, to[1] + dx * side * rad];
+        next = { c, rad, a0: Math.atan2(to[1] - c[1], to[0] - c[0]), sw: turn, len: rad * Math.abs(turn), s: 0 };
+      }
+    }
+    const len = Math.hypot(to[0] - from[0], to[1] - from[1]);
+    out.push({ a: from, d: [dx, dy], len, s });
+    s += len;
+    if (next) { next.s = s; out.push(next); s += next.len; }
+    from = after;
+  }
+  const at = (x: number, y: number): [number, number] => {
+    let best = Infinity, bs = 0, bu = 0;
+    out.forEach((q, k) => {
+      if ("d" in q) {
+        let t = (x - q.a[0]) * q.d[0] + (y - q.a[1]) * q.d[1];
+        if (k > 0) t = Math.max(t, 0);
+        if (k < out.length - 1) t = Math.min(t, q.len);
+        const px = q.a[0] + q.d[0] * t, py = q.a[1] + q.d[1] * t, dist = Math.hypot(x - px, y - py);
+        if (dist < best) { best = dist; bs = q.s + t; bu = (x - px) * -q.d[1] + (y - py) * q.d[0]; }
+      } else {
+        const vx = x - q.c[0], vy = y - q.c[1], rho = Math.hypot(vx, vy);
+        let phi = (Math.atan2(vy, vx) - q.a0) * Math.sign(q.sw);
+        phi = ((phi % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        if (phi > Math.abs(q.sw)) return;
+        const dist = Math.abs(rho - q.rad);
+        if (dist < best) { best = dist; bs = q.s + q.rad * phi; bu = -Math.sign(q.sw) * (rho - q.rad); }
+      }
+    });
+    return [bs, bu];
+  };
+  return Object.assign(at, { total: s });
+}
+
 export function profile(pts: number[]): (x: number) => number {
   if (!Array.isArray(pts) || pts.length < 4 || pts.length % 2 || !pts.every(Number.isFinite) || pts.some((v, i) => i % 2 === 0 && i > 0 && v <= pts[i - 2]))
     throw new PxError(`profile: points are [x0, y0, x1, y1, ...] (two or more, x going up), got ${JSON.stringify(pts)?.slice(0, 120)}`);

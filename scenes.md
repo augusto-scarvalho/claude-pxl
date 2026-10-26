@@ -58,6 +58,12 @@ look at (`--frames 0-11` for some).
   `poly`, props stood on it; `world: { ground: [...] }` checks the feet of what has a height against it
   (`[floor, ledge, ...]`: a ledge or an island over its own span) and `stamp(name, x, "ground")` stands
   one on the floor (`examples/grotto.px.js`, `examples/cave.px.js`).
+- A paved path that bends (a temple's approach, a road, a river's banks), not tiles: `lane(points, {
+  round })` gives each pixel `[s, u]`, how far along it and to its side, so slabs laid in courses at
+  steps of `s` fan round the bend with no seam, its curbs at `|u|`, gravel raked along it at the same
+  distance; wide landings (before a gate, a hall) as rectangles it runs into. Temple paths, read on
+  photographs: long slabs across the walk in a running bond, moss in the joints, a curb of long cut
+  stones, then a strip of rounded pebbles.
 - Keep small details that dot an area (pebbles, flowers, tufts) out of tiles: baked in, they repeat
   as a pattern. Lay plain tiles, then `scatter(..., { even: true })` the details over them.
 - A tileset (Saint11): draw the master tile, offset it by half (`wrap: true` shows the seams) and fix
