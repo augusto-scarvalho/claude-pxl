@@ -91,25 +91,27 @@ round it.
   of needles 2-3 px deep every 3-4 px; 2 rows in the shadow of the tier above, then a few lit on the
   sun's side; the far side indigo (hue 230-260); fronds as strips 2 px thick running down and out. A
   frond: a 1 px spine 20-30° down with needle strokes every 2 px (SLYNYRD).
-- A conifer built as volumes in 3D (`pineVolume`, §10; the graveyard's wood), each pixel the nearest
-  surface a ray from it meets, lit as the scene is, its tiers shading the ones below: a cylinder for
-  the trunk; per tier a core round it and 6-12 ellipsoid clumps reaching out and drooping, more
+- A conifer built in 3D on fields (`make3d.spruce`, §10; the graveyard's wood), drawn by `surface()`
+  from a billboard's 20 degrees: a cone for the trunk; per tier a core round it and 6-12 ellipsoid
+  clumps reaching out and drooping, each turned to its branch, more
   toward the top; a spire of three narrowing ellipsoids. What it took: tiers spaced so the dark
   under each shows (overlapping them by 1.7 made one round bush); the clumps no wider than the
   circle shares them out (a wide minimum made the top tiers flat caps, a pagoda); darkening in
   toward the trunk scaled by the tier's size (the small top tiers went black); the sun's rim only
-  on the outer contour and needle strokes only on the sun's side (on every clump they read as
-  noise at the HD size); the normals the surfaces have, given to `normals()`, so the scene's sun
-  lights it as it is. Wind: the trunk bending with the square of the height, the gust coming and
-  going over the loop (16 frames at 220 ms, two sways in the graveyard's 7 s), each clump's tip
-  fluttering twice as fast; each tree's frame offset by where it stands, the gust reaching one side
+  where the contour is open both ways toward it (`rim: 0.85`) and needle strokes only on the sun's
+  side (`strokes`; on every clump they read as noise at the HD size), the hems in points (`hem: 2`),
+  no self-shadow and no outline (a sun behind left it dark and ringed); the normals the surfaces
+  have, so the scene's sun lights it as it is (a hand ray tracer drew it first: the same look at
+  1.4 times the cost a frame, built once a loop, in 40 lines instead of 100). Wind: the trunk bending with the square of the height, the gust coming and
+  going over the loop (16 frames at 220 ms, two sways in the graveyard's 7 s) (a clump's tip
+  fluttering twice as fast, under a pixel, flickered in its tones on fields: `flutter` 0); each tree's frame offset by where it stands, the gust reaching one side
   first.
 - A trunk darker than the crown, planted: seen from above, cut at the ground (SLYNYRD); seen from
   the side or at an angle, its foot flared 2-3 px with a root or two. Bark in 1 px stripes, widest
   apart in the middle; a knot. Laying top-down crowns from one clump, importing trees: scenes §4.
 - A dead tree: limbs that kink every 4-6 px and split in one to three, tapering 5, 3, 2, 1 px, the
   last no longer than 5 px; the lightest tone only on the upper left of the trunk and big limbs.
-  Built in 3D (`deadTreeVolume`, §10), each limb a tube a ray meets, its splits kept apart: from the
+  Built in 3D (`deadTreeLimbs`, made a field of tapering rods by `make3d.snag`, §10), its splits kept apart: from the
   trunk one each way across the picture at angles of their own (and now and then one on up); from a
   limb one carrying on its way and one bending further out, never back over the trunk (limbs coming
   toward us, going off behind the trunk or bending back read as a tangle at the fork); three levels
@@ -225,9 +227,8 @@ Flagstones of mixed sizes, moss in no more than a third of the joints. Low contr
 |---|---|
 | `grassTile(name, { lush, seed })` | a 64x48 grass tile (§2): `_grass` lush, `_turf` the wood's quieter floor |
 | `pine(name, h, seed)` | a conifer h px tall (§3): `_pine` 68, `_pine_m` 60, `_pine_s` 52, `_pine_far` hazed |
-| `deadTreeVolume(name, h, seed, { frames, fps, sway })` | the dead tree built as limbs in 3D, swaying a little (§3): `_snag` |
-| `pineVolume(name, h, seed, { frames, fps, sway })` | the same conifer built as volumes in 3D and swaying in the wind (§3): `_spruce` 68, `_spruce_m` 60, `_spruce_s` 52, `_spruce_far` hazed; a scene picks each one's `frame` |
-| `make3d.spruce({ h, seed, sway })`, `make3d.snag({ h, seed, sway })` | the same spruce and dead tree on fields (`make3d.define`), drawn by `surface()` from 20 degrees up (`hem`, `strokes`, `rim: 0.85`), to compare: `_spruce_3d`, `_spruce_m_3d`, `_spruce_s_3d`, `_spruce_far_3d`, `_snag_3d` |
+| `make3d.snag({ h, seed, sway })` | the dead tree built as limbs in 3D on fields, swaying a little (§3), drawn by `surface()` from 20 degrees up: `_snag` |
+| `make3d.spruce({ h, seed, sway })`, `spruce(name, h, seed)` | the same conifer built in 3D on fields and swaying in the wind (§3), drawn by `surface()` from 20 degrees up (`hem`, `strokes`, `rim: 0.85`): `_spruce` 68, `_spruce_m` 60, `_spruce_s` 52, `_spruce_far` hazed; a scene picks each one's `frame` |
 | `bush(name, w, lobes, seed)` | a bush of lobes `[x, y, r, back]` (§4): `_bush`, `_bush_b`, `_bush_c` |
 | `rampart(name, overhang)` | a 48x29 stone wall face (§6): `_rampart` with grass over its head, `_riser` without |
 | `_flags` | 48x48 flagstones (§7) |

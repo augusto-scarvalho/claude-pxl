@@ -1,4 +1,4 @@
-// Faceted solids drawn as pixel art by the volume method (the nature kit's pineVolume): a convex body
+// Faceted solids drawn as pixel art by the volume method (the ray tracer the nature kit's first spruce had): a convex body
 // of planes, each pixel the facet a ray from it meets first, lit flat by a light from the picture's
 // upper left; seen through any camera (its right, up and forward in the world) at any turn. Ice:
 // flat facets, a cold rim, lighter where it is thin (the planes inside showing), a few glints. Rock:
