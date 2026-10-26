@@ -32,7 +32,7 @@ import { type Lut, readCube, readStrip } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
 import { ability, emitter, route, turnToward, tween, unroll } from "./vfx.ts";
 import { SPELL_OPTS, spell } from "./spells.ts";
-import { bayer, fbm, globRe, gridRows, latticeHash, rng, vnoise, seamless } from "./util.ts";
+import { bayer, fbm, globRe, gridRows, latticeHash, profile, rng, vnoise, seamless } from "./util.ts";
 
 /**
  * Op signatures: name:type, "?" marks the first optional argument.
@@ -84,7 +84,7 @@ export const SIGNATURES: Record<string, string> = {
   cast: "spell:o ?opts:o",
   shake: "spell:o",
   rampmap: "ramp:S ?opts:o",
-  stamp: "name:s ?x:n y:n opts:o",
+  stamp: "name:s ?x:n y:Y opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
   pattern: "name:s x:n y:n w:n h:n ?opts:o",
   panel: "name:s x:n y:n w:n h:n ?opts:o",
@@ -120,8 +120,8 @@ function readsClock(items: Item[]): boolean {
 const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "shade", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay", "fx"];
 /** Allowed option keys of ops whose last argument is an options object. */
 export const OP_OPTS: Record<string, string[]> = {
-  stamp: [...PLACE, "sub", "smear", "at", "id", "z", "heading"],
-  tile: PLACE,
+  stamp: [...PLACE, "sub", "smear", "at", "id", "z", "heading", "shadow"],
+  tile: [...PLACE, "shadow"],
   pattern: PLACE,
   panel: PLACE,
   scatter: [...PLACE, "on", "clip", "below", "even", "near", "within"],
@@ -162,7 +162,7 @@ export const OP_OPTS: Record<string, string[]> = {
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
   sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "facing", "height", "twin", "register"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "pixel", "sizes"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir", "facing", "height", "twin", "register"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir", "facing", "height", "twin", "register", "world", "check"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -175,7 +175,7 @@ function buildBytes(b: BuildOut): number {
   const px = (i?: Img) => (i ? i.data.length : 0);
   return 4 * (px(b.img) + px(b.guide) + px(b.under) + b.layers.reduce((s, l) => s + px(l.img), 0) + (b.refs ?? []).reduce((s, r) => s + px(r.img), 0)) + 64 * b.placements.length;
 }
-export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline"];
+export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "of", "cast", "except", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline"];
 const SHEET_OPTS = ["cols", "pad", "extrude", "rows"];
 
 function checkArgs(name: string, args: unknown[]): void {
@@ -196,6 +196,7 @@ function checkArgs(name: string, args: unknown[]): void {
     };
     switch (type) {
       case "n": if (typeof v !== "number" || !Number.isFinite(v)) bad("a number"); break;
+      case "Y": if (v !== "ground" && (typeof v !== "number" || !Number.isFinite(v))) bad('a number, or "ground" (world.ground under x)'); break;
       case "c": if (typeof v !== "string") bad('a color key or "#hex"'); break;
       case "s": if (typeof v !== "string") bad("a string"); break;
       case "t": if (typeof v !== "string" && typeof v !== "number") bad("text"); break;
@@ -321,7 +322,7 @@ export class Project implements BuildCtx {
   private building = new Set<string>();
   private cands = new Map<string, string[]>();
   private failed = new Map<string, PxError>();
-  private tracing: boolean;
+  readonly tracing: boolean;
 
   constructor(opts: ProjectOptions = {}) {
     this.tracing = !!opts.trace;
@@ -823,6 +824,8 @@ export class Project implements BuildCtx {
     env.fbm = fbm;
     env.bayer = bayer;
     env.seamless = seamless;
+    // a ground as a polyline: profile([x0, y0, x1, y1, ...])(x) its row there
+    env.profile = (pts: unknown) => { try { return profile(pts as number[]); } catch (e) { throw wrap(e).within("profile", this.callerLoc()); } };
     // shapes in meters for solids() and shadows(): solid.stick, blob, box, cone, poly
     env.solid = solid;
     // a model for mesh(): faces, strips, lofts and boxes in meters, each of a material

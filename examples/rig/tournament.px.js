@@ -323,8 +323,6 @@ const SUN = [-0.45, -0.25]
 const BEHIND = [["stand_full", 92, 122, {}], ["pavilion_set", 210, 121, {}], ["pavilion_set", 304, 121, { swap: RED }],
   ["trumpeter", 14, 122, {}], ["trumpeter", 252, 122, { flip: "x" }]]
 const knights = KNIGHTS.map(([n, x, o]) => stamp(n, x, FEET, o))
-const shadowStamps = [...KNIGHTS.map(([n, x, o]) => stamp(n, x, FEET, { ...o, cast: SUN, silhouette: "k" })),
-  stamp("marshal", 160, 140, { cast: SUN, silhouette: "k" })]
 // the sand: trampled darker along the palisade's foot, scuffed where the knights have been
 // shifting their feet, a few straws blown in
 const sand = [
@@ -341,11 +339,10 @@ scene("tournament", { w: W, h: H, bg: "A", world: { horizon: HZ, eye: EYE, light
   layer("horizon haze", { opacity: 0.3 }, rect(0, 86, W, 18, "D")),
   layer("valley", { opacity: 0.45 }, ...valleyMist, rect(0, 102, W, 2, "D")),
   layer("field", ...field, ...sand),
-  layer("ground shadows", { shade: 2 }, ...BEHIND.map(([n, x, y, o]) => stamp(n, x, y, { ...o, cast: SUN, silhouette: "k" })),
-    tile("palisade", 0, 117, 23, 1, { cast: SUN, silhouette: "k" })),
+  layer("ground shadows", { shade: 2, of: ["stands", "lists"], cast: SUN }),
   layer("stands", { sort: "y" }, ...BEHIND.map(([n, x, y, o]) => stamp(n, x, y, o))),
   layer("lists", tile("palisade", 0, 117, 23, 1)),
-  layer("shadows", { shade: true }, ...shadowStamps),
+  layer("shadows", { shade: true, of: "knights", cast: SUN }),
   layer("knights", { sort: "y" }, stamp("marshal", 160, 140), ...knights),
   // sparks, smears and dust give light or take none: `unlit`, so describe doesn't read a lit side off them
   layer("sparks", { unlit: true }, stamp("knight_bout_fx", 160, FEET, { swap: { L: "v", T: "d" } })))

@@ -22,6 +22,10 @@ export interface LayerOpts {
   /** Blend layer: instead of drawing, step what's below darker/lighter where this layer is opaque. */
   shade?: boolean | number | Record<string, string>;
   light?: boolean | number | Record<string, string>;
+  /** A shade layer drawing the shadows of these layers' stamps and tiles (`shadow: false` leaves one out, `shadow: k` its own cast), cast by `cast`, but those named in `except`. */
+  of?: string | string[];
+  cast?: [number, number] | { from: number[]; len?: number };
+  except?: string[];
   /** Fraction (0..1) of a blend layer's pixels that apply (ordered dither). */
   density?: number;
   /** Color math with what's below, as image editors do: new colors, outside the palette. */
@@ -158,8 +162,11 @@ export interface World {
    * lamp its lighting() lit it by, or a sprite in mesh() against the mesh's light; false: not read.
    */
   light?: [number, number] | { at: [number, number] } | false;
-  /** Flat side view: the ground's row; what stands (has a height) is checked for floating or sinking. */
-  ground?: number;
+  /**
+   * Flat side view: the ground's row, or a profile [x0, y0, x1, y1, ...] (a cave's floor): what stands
+   * (has a height) is checked for floating or sinking against it; `stamp(name, x, "ground")` stands on it.
+   */
+  ground?: number | number[];
 }
 
 export type AssetKind = "sprite" | "scene" | "anim";
@@ -246,8 +253,10 @@ export interface PlaceOpts {
   shade?: number;
   /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
   silhouette?: string;
-  /** Lay the asset flat on the ground as its shadow: a pixel h above the base lands h * [kx, ky] away. */
-  cast?: [number, number];
+  /** Lay the asset flat on the ground as its shadow: a pixel h above the base lands h * [kx, ky] away; stamp: or away from a light, `{ from: [x, y] or [x, y, h], len? }`. */
+  cast?: [number, number] | { from: number[]; len?: number };
+  /** In a layer a shade layer casts (`of`): false, no shadow; its own cast instead of the layer's. */
+  shadow?: false | [number, number] | { from: number[]; len?: number };
   /**
    * Where `cast` measures heights from: "pivot" (default), the pivot's row; "column", each column's
    * own lowest pixel (a base that isn't level: a tent seen at an angle, a crate on a slope).

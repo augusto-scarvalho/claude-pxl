@@ -70,7 +70,8 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       }
       continue;
     }
-    if (def.kind !== "scene") {
+    // an anim drawn by functions with a world (c.as() naming what they paint) is checked as a scene
+    if (def.kind !== "scene" && !(def.kind === "anim" && def.opts.world)) {
       // a part or a prop: its own front marker (its light and its feet are read where it's placed), and
       // its 1 px lines where it's drawn by hand, parts too (not a variant, not drawn square on purpose)
       const img = p.image(name);

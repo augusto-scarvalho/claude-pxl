@@ -133,8 +133,8 @@ What exists, a line each; `PXL help <name>` prints the rest of any op or option 
   parallax: `PXL help "scenes 8 9 10"`.
 - **Existing art**: `sprite("x", { png, area, shrink, palettize })`, `anim(..., { png, frames })`, `rampmap`.
 - **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj`, `build --aseprite`, `build --share 4`.
-- **Light**: `shade:`/`light:` layers and `cast` shadows, `relight`/`plate()`, `glow`, `lighting()`
-  ([lighting.md](lighting.md)).
+- **Light**: `shade:`/`light:` layers and `cast` shadows (a shade layer `of` what stands),
+  `relight`/`plate()`, `glow`, `lighting()` ([lighting.md](lighting.md)).
 - **Text**: `text()` in the 3×5 built in, or `include` `examples/fonts/font5x7.px.js` for `{ font: "5x7" }`; `bubble()` a dialogue box.
 - **In meters and HD-2D**: `perspective()`, `plane()`, `terrain()`, `solids()`/`shadows()`,
   `mesh()` of `model()` faces, a scene's `sizes` (HD, faces in the sprites' pixel), `post()` for depth

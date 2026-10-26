@@ -15,11 +15,7 @@ const W = 192, H = 108, FRAMES = 24, TAU = Math.PI * 2;
 // Rock outlines as polylines, so props can sit exactly on them.
 const ceil = [0, 12, 12, 16, 30, 10, 48, 18, 70, 12, 90, 22, 110, 14, 128, 20, 150, 12, 170, 18, 192, 14];
 const floor = [0, 84, 18, 80, 40, 86, 64, 82, 84, 88, 110, 84, 132, 90, 150, 82, 172, 78, 192, 82];
-const edgeY = (pts, x) => {
-  for (let i = 0; i < pts.length - 2; i += 2)
-    if (x <= pts[i + 2]) return Math.round(pts[i + 1] + (pts[i + 3] - pts[i + 1]) * (x - pts[i]) / (pts[i + 2] - pts[i]));
-  return pts[pts.length - 1];
-};
+const ceilY = profile(ceil), floorY = profile(floor);
 
 // ------------------------------------------------------------------ rock parts (normal-mapped)
 for (const [i, rx, ry] of [[1, 3, 2], [2, 4, 3], [3, 5, 3], [4, 6, 4]])
@@ -90,33 +86,33 @@ anim("cave", { w: W, h: H, frames: FRAMES, fps: 8 },
     poly([0, H, ...floor, W, H], "R"),
     poly([146, 84, 150, 66, 156, 62, 186, 62, 192, 63, 192, 84], "R"),                // right ledge
     poly([22, 12, 38, 12, 34, 40, 32, 56, 36, 82, 20, 82, 25, 56, 24, 40], "R"),      // column
-    ...stalactites.map(([x, len, w]) => poly([x - w, edgeY(ceil, x) - 2, x + w, edgeY(ceil, x) - 2, x, edgeY(ceil, x) + len], "R")),
-    ...stalagmites.map(([x, len, w]) => poly([x - w, edgeY(floor, x) + 2, x + w, edgeY(floor, x) + 2, x, edgeY(floor, x) - len], "R")),
+    ...stalactites.map(([x, len, w]) => poly([x - w, ceilY(x) - 2, x + w, ceilY(x) - 2, x, ceilY(x) + len], "R")),
+    ...stalagmites.map(([x, len, w]) => poly([x - w, floorY(x) + 2, x + w, floorY(x) + 2, x, floorY(x) - len], "R")),
     // Upward-facing edges get a lighter lip so the floor reads where props stand on it.
     (c) => { for (let y = 1; y < H; y++) for (let x = 0; x < W; x++) if (c.is(x, y, "R") && c.is(x, y - 1, ".")) c.px(x, y, "q"); },
     bump("bevel", { w: 3 }),
     scatter("_lump*", 0, 0, W, H, 70, { on: "R", clip: true, rflip: "xy", seed: 2 })),
 
   layer("life",
-    ...fungi.map(([n, x]) => stamp(n, x, edgeY(floor, x + 7) - 7, { rdelay: true })),
+    ...fungi.map(([n, x]) => stamp(n, x, floorY(x + 7) - 7, { rdelay: true })),
     stamp("fungus_a_c", 162, 55, { rdelay: true }), stamp("fungus_b_m", 174, 55, { rdelay: true, flip: "x" }),
     (c) => {
       // Glowworm threads: silk from the ceiling, a glowing bead at the end; one lamp per colony.
       for (const colony of glowworms) {
         for (const [x, len] of colony) {
-          const top = edgeY(ceil, x);
+          const top = ceilY(x);
           c.vline(x, top, len, "s");
           c.px(x, top + len, (c.frame + x) % 7 === 0 ? "C" : "b");   // beads twinkle in turn
         }
         const mx = Math.round(colony.reduce((a, [x]) => a + x, 0) / colony.length);
-        c.lamp(mx, edgeY(ceil, mx) + 9, { r: 28, color: "#7ab8ff", power: 0.65, z: 10 });
+        c.lamp(mx, ceilY(mx) + 9, { r: 28, color: "#7ab8ff", power: 0.65, z: 10 });
       }
       // Bracket fungus on the column, with a soft cyan lamp.
       c.stamp("_bracket", 33, 44); c.stamp("_bracket", 32, 61);
       c.lamp(36, 52, { r: 24, color: "#5cf0e0", power: 0.6 + 0.15 * Math.sin(c.phase * TAU * 2), z: 5 });
 
       // A drop falls from the long stalactite and splashes.
-      const tip = edgeY(ceil, 76) + 22, ground = edgeY(floor, 76) - 1, f = c.frame;
+      const tip = ceilY(76) + 22, ground = floorY(76) - 1, f = c.frame;
       const y = tip + 1 + Math.round(0.35 * f * f);
       if (y < ground) c.vline(76, y, f > 3 ? 2 : 1, "w");
       else if (y < ground + 14) c.grid(74, ground - 1, f % 2 ? "w...w" : ".w.w.");

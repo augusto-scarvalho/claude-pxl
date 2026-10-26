@@ -11,15 +11,9 @@ const W = 320, H = 180, GROUND = 124
 // who dances where: [anim, x, y (feet), shadow half-width]
 const DANCERS = [["skeleton", 150, 168, 6], ["vampire", 198, 166, 9], ["mummy", 236, 160, 7], ["zombie", 126, 176, 7], ["ghost", 266, 146, 6]]
 // A light near the ground: [x, y] of the ground under it and its height. What stands near it is laid
-// on the ground away from it (cast): a pixel h above the base lands h * (offset / height) away,
-// at most its own height (a light lower than the thing would stretch it without end).
-const DISCO = [214, 150, 50], FIRE = [104, 153, 14]
-const castFrom = ([lx, ly, lh], n, x, y, o = {}) => {
-  let kx = (x - lx) / lh, ky = (y - ly) / lh
-  const len = Math.hypot(kx, ky)
-  if (len > 1) { kx /= len; ky /= len }
-  return stamp(n, x, y, { ...o, cast: [kx, ky], silhouette: "k" })
-}
+// on the ground away from it (`cast: { from }`): a pixel h above the base lands h * (offset / height)
+// away, at most its own height (a light lower than the thing would stretch it without end).
+const DISCO = [214, 150, 50], FIRE = [104, 153, 14], BY_DISCO = { cast: { from: DISCO }, silhouette: "k" }
 const JACKS = [["jack", 12, GROUND + 1], ["jack_small", 76, GROUND - 2], ["jack_small", 126, GROUND - 7], ["jack", 58, 176],
   ["jack", 288, 170], ["jack_small", 176, 176], ["jack", 34, 178]]
 
@@ -65,9 +59,9 @@ scene("party", { w: W, h: H, bg: "n", world: { light: [0.6, -1] } },
   // cast shadows from the strong lights near the ground: the mirror ball over the floor throws the
   // dancers' and the booth's away from it, the cauldron's fire throws the witch's long to the left
   layer("cast", { shade: 2 },
-    ...DANCERS.filter(([n]) => n !== "ghost").map(([n, x, y]) => castFrom(DISCO, n, x, y)),
-    castFrom(DISCO, "dj", 160, 142), castFrom(DISCO, "speaker", 130, 142), castFrom(DISCO, "speaker", 190, 142, { flip: "x" }),
-    castFrom(FIRE, "witch_body", 96, 156),
+    ...DANCERS.filter(([n]) => n !== "ghost").map(([n, x, y]) => stamp(n, x, y, BY_DISCO)),
+    stamp("dj", 160, 142, BY_DISCO), stamp("speaker", 130, 142, BY_DISCO), stamp("speaker", 190, 142, { ...BY_DISCO, flip: "x" }),
+    stamp("witch_body", 96, 156, { cast: { from: FIRE }, silhouette: "k" }),
     // the tree's, from the moon (high, behind, to the right): it comes toward us and a little left,
     // most of the crown's falling below the frame
     stamp("tree_dead", 296, GROUND + 30, { cast: [-0.12, 0.3], silhouette: "k" })),

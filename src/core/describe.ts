@@ -9,6 +9,7 @@
 import type { BuildOut } from "./build.ts";
 import type { Placement } from "./canvas.ts";
 import { type Color, TRANSPARENT, oklab, toHex } from "./color.ts";
+import { profile } from "./util.ts";
 import { Img, type Lamp, type Orient } from "./image.ts";
 import type { World } from "./model.ts";
 import { type Steps, dirWords, frontWords, lightWords, rampSteps } from "./checks.ts";
@@ -100,8 +101,10 @@ export function placementChecks(p: Placement, wo: World | undefined, steps: Step
   if (bb && p.img.meters) {   // what has a real height stands on the ground: a ghost may float
     const feet = p.y + bb.y + bb.h, off = pv ? Math.round(p.y + pv[1] - feet) : 0;
     if (Math.abs(off) >= 2) checks.push(`WARNING: its feet are ${Math.abs(off)} px ${off > 0 ? "above" : "below"} where it stands (its pivot is ${Math.abs(off)} px ${off > 0 ? "below its sole" : "above it"}): it ${off > 0 ? "floats" : "sinks"}`);
-    if (wo?.ground !== undefined && Math.abs(wo.ground - feet) >= 2)
-      checks.push(`WARNING: its feet (y ${feet}) are ${Math.abs(wo.ground - feet)} px ${wo.ground > feet ? "above" : "below"} the ground (y ${wo.ground})`);
+    // the ground's row under its feet (its pivot's column, or its middle's): one row, or a profile
+    const g = Array.isArray(wo?.ground) ? profile(wo.ground)(p.x + (pv ? pv[0] : bb.x + (bb.w >> 1))) : wo?.ground;
+    if (g !== undefined && Math.abs(g - feet) >= 2)
+      checks.push(`WARNING: its feet (y ${feet}) are ${Math.abs(g - feet)} px ${g > feet ? "above" : "below"} the ground (y ${g})`);
   }
   // a sprite in mesh(): its feet on the face looking up under them, within expect3d's `on` (0.15 m)
   const st = p.stand;

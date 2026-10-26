@@ -7,7 +7,8 @@ import { loadSource } from "../src/node/load.ts";
 import { checkProject } from "../src/node/check.ts";
 import { main } from "../src/node/cli.ts";
 import { frontWords, lightWords, litDir, rampSteps } from "../src/core/checks.ts";
-import { PAL } from "./helpers.ts";
+import { PAL, failure } from "./helpers.ts";
+import { profile } from "../src/core/util.ts";
 
 const run = async (src: string, ...args: string[]) => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
@@ -109,6 +110,26 @@ scene("s", { w: 30, h: 30, bg: "g", world: { scale: 5, ground: 26 } }, layer("pr
   // the sprite's last 3 rows are empty: its pivot is 3 px under its sole, so it floats
   assert.match(text, /man #1[^]*?WARNING: its feet are 3 px above where it stands \(its pivot is 3 px below its sole\): it floats/);
   assert.match(text, /man #2[^]*?WARNING: its feet \(y 21\) are 5 px above the ground \(y 26\)/);
+});
+
+test("c.as: what a function paints, a placement by name; an anim with a world checked as a scene", () => {
+  const src = PAL + 'anim("a", { w: 8, h: 8, frames: 2, world: { light: [1, -1] } }, (c) => { c.rect(0, 0, 8, 8, "g"); c.as("box", () => { c.rect(2, 2, 3, 3, "r"); c.px(2, 2, "g") }, { height: 1 }) })';
+  const p = loadSource(src, "t.px.js", { checksOnly: true }), q = p.build("a").placements.find((v) => v.name === "box")!;
+  // what it changed: the pixel painted in the ground's own color isn't part of it
+  assert.deepEqual([q.x, q.y, q.w, q.h, q.img.meters, q.img.data[0] === 0, q.img.data[1] !== 0], [2, 2, 3, 3, 1, true, true]);
+  assert.equal(loadSource(src, "t.px.js").build("a").placements.length, 0, "drawing alone: nothing kept");
+  assert.match(checkProject(p).checked, /1 scene \(2 frames/);
+});
+
+test("profile and world.ground as a polyline: its row under x; a stamp standing on it; feet read against it there", async () => {
+  const floor = profile([0, 10, 10, 20, 20, 20]);
+  assert.deepEqual([floor(-5), floor(0), floor(5), floor(15), floor(30)], [5, 10, 15, 20, 20], "the first leg carried on before it, the last row after");
+  // a cave floor sloping down to the right: the first stands on it ("ground"), the second 4 px above it
+  const { text } = await run(PAL + `sprite("man", { w: 3, h: 9, height: 1.8, pivot: [1, 9] }, rect(0, 0, 3, 9, "r"))
+scene("s", { w: 30, h: 30, bg: "g", world: { scale: 5, ground: [0, 10, 30, 25] } }, layer("props", stamp("man", 6, "ground"), stamp("man", 20, 16)))`, "describe", "s", "--no-out");
+  assert.doesNotMatch(text.split("A man #2")[0], /WARNING/);
+  assert.match(text, /man #2[^]*?WARNING: its feet \(y 16\) are 4 px above the ground \(y 20\)/);
+  assert.match(failure(PAL + 'sprite("d", "r"); scene("s", { w: 4, h: 4 }, stamp("d", 1, "ground"))', "s").message, /stands on the scene's ground: give it world/);
 });
 
 test("rig turn: the mirrored rig takes its own part when drawn, else the original's flipped; the retouch mirrors too", async () => {

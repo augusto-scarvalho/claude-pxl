@@ -768,14 +768,14 @@ function figures(frame) {
   const t = frame / FPS, out = []
   for (const [who, speed, delay] of [["runner", 3.4, 0], ["chaser", 3.55, 1.3]]) {
     const s = speed * (t - delay), p = TAG.at(s), ph = ((frame + (who === "chaser" ? 3 : 0)) % RUN_CYCLE) / RUN_CYCLE
-    out.push({ d: ahead(p.x, p.z), shapes: person(KID, { ...p, phase: ph, gait: "run", look: LOOKS[who] }) })
+    out.push({ d: ahead(p.x, p.z), name: who, height: 1.3, shapes: person(KID, { ...p, phase: ph, gait: "run", look: LOOKS[who] }) })
   }
   // the woman, 1.46 m/s up path B, a stride a second; the dog trotting ahead on its leash
   const zw = 0.2 + 1.46 * t, wp = { x: 5.75, z: zw, heading: [0, 1] }
   const woman = person(WOMAN, { ...wp, phase: (frame % 10) / 10, gait: "walk", look: LOOKS.woman, hat: true, tail: true, bag: { top: "@", lit: "@", shade: "&" } })
   const pup = dog({ x: 6.45, z: zw + 1.5, heading: [0, 1], phase: (frame % 5) / 5 })
   const [hx, hy] = at(...woman.hand), [cx, cy] = at(...pup.collar)
-  out.push({ d: ahead(5.75, zw), shapes: woman, leash: [hx, hy, cx, cy] }, { d: ahead(6.45, zw + 1.5), shapes: pup })
+  out.push({ d: ahead(5.75, zw), name: "woman", height: 1.75, shapes: woman, leash: [hx, hy, cx, cy] }, { d: ahead(6.45, zw + 1.5), name: "dog", shapes: pup })
   // pigeons pecking on the path, each to its own beat, side on to us: drawn by hand (the nearest a size
   // bigger), turned to the way they face; their shadows from a body and a head
   for (const [px, pz, dir, off] of [[2.85, 7.3, -0.55, 0], [4.0, 7.9, 2.3, 5], [3.1, 8.2, 2.8, 9]]) {
@@ -786,7 +786,7 @@ function figures(frame) {
   }
   // the vendor by his cart, ringing his bell now and then
   const ring = frame % 60 < 8 ? Math.abs(Math.sin((frame % 60) * 1.2)) * 1.2 : 0
-  out.push({ d: ahead(14.5, 4.85), shapes: person(MAN, { x: 14.5, z: 4.85, heading: [-0.9, -0.44], phase: 0, gait: "stand", look: LOOKS.vendor, hat: true, wave: ring }) })
+  out.push({ d: ahead(14.5, 4.85), name: "vendor", height: 1.85, shapes: person(MAN, { x: 14.5, z: 4.85, heading: [-0.9, -0.44], phase: 0, gait: "stand", look: LOOKS.vendor, hat: true, wave: ring }) })
   // a girl on the swing: a pendulum, 2.4 s a swing, her legs kicking out on the way forward
   const ang = 0.55 * Math.sin((frame / 24) * Math.PI * 2), sx = 11 + 0.9, sz = 12.8, Lc = 1.9, top = 2.4
   const seat = [sx, sz - Math.sin(ang) * Lc, top - Math.cos(ang) * Lc], sw = []
@@ -801,7 +801,7 @@ function figures(frame) {
   const sho = [sx, hip[1] + Math.sin(ang) * 0.1 + 0.08, hip[2] + 0.36], headc = [sx, sho[1] + 0.05, sho[2] + 0.2]
   sw.push(stick(hip, sho, 0.1, "!"), blob(headc, 0.115, 0.125, "5", { top: 2 }), blob([sx, headc[1] + 0.04, headc[2] + 0.04], 0.11, 0.09, "8", { top: 3 }))
   for (const sd of [-1, 1]) sw.push(stick([sx + sd * 0.12, sho[1], sho[2] - 0.02], [sx + sd * 0.2, (sho[1] + seat[1]) / 2 + 0.02, sho[2] + 0.12], 0.035, "5"))
-  out.push({ d: ahead(sx, seat[1]) - 0.01, shapes: sw })
+  out.push({ d: ahead(sx, seat[1]) - 0.01, name: "swinger", shapes: sw })
   return out
 }
 
@@ -997,20 +997,22 @@ for (const s of STATIC)
     }
   })
 
-anim("park", { w: W, h: H, frames: FRAMES, fps: FPS },
+anim("park", { w: W, h: H, frames: FRAMES, fps: FPS, world: { horizon: 70, eye: 1.6, light: LIGHT }, check: { every: 24 } },
   stamp("_sky", 0, 0),
   skyClouds,
   stamp("_bg", 0, 0),
   (c) => {
     const moving = figures(c.frame)
     shadowsOf(c, moving.flatMap((m) => m.shapes))
-    const all = [...STATIC.map((s) => ({ d: s.d, still: s })), ...STATIC.filter((s) => s.weeds).map((s) => ({ d: s.d - 0.02, weeds: s.weeds })), ...WILD.map((w) => ({ d: ahead(w.x, w.z), weeds: [w] })), ...moving].sort((m, n) => n.d - m.d)
-    for (const m of all) {
-      if (m.still) { c.stamp("_s" + m.still.id, 0, 0); continue }
-      if (m.weeds) { sway(c, m.weeds, c.frame); continue }
-      if (m.sprite) { c.stamp(m.sprite, m.x, m.y, m.flip ? { flip: "x" } : undefined); continue }
-      const big = pxd(m.d) * 1.2 > 14
-      drawShapes(c, m.shapes, big ? BODY_RAMPS : undefined)
-      if (m.leash) { const [hx, hy, cx, cy] = m.leash, mx = Math.round((hx + cx) / 2), my = Math.round((hy + cy) / 2) + 1; c.line(hx, hy, mx, my, "!"); c.line(mx, my, cx, cy, "!") }
-    }
+    // far to near: each at its depth (c.z, the nearer the later), the weeds at a thing's foot just after it
+    c.sort("z", () => {
+      for (const s of STATIC) c.z(-s.d, () => c.stamp("_s" + s.id, 0, 0))
+      for (const s of STATIC) if (s.weeds) c.z(-(s.d - 0.02), () => sway(c, s.weeds, c.frame))
+      for (const w of WILD) c.z(-ahead(w.x, w.z), () => sway(c, [w], c.frame))
+      // each figure named, so describe and check see it (c.as)
+      for (const m of moving) c.z(-m.d, () => m.sprite ? c.stamp(m.sprite, m.x, m.y, m.flip ? { flip: "x" } : undefined) : c.as(m.name, () => {
+        drawShapes(c, m.shapes, pxd(m.d) * 1.2 > 14 ? BODY_RAMPS : undefined)
+        if (m.leash) { const [hx, hy, cx, cy] = m.leash, mx = Math.round((hx + cx) / 2), my = Math.round((hy + cy) / 2) + 1; c.line(hx, hy, mx, my, "!"); c.line(mx, my, cx, cy, "!") }
+      }, { height: m.height }))
+    })
   })

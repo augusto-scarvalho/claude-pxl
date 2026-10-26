@@ -1,6 +1,6 @@
 // Turns an asset definition into an image: base -> items (ops, grids, functions, layers)
 // -> post-processing (mirror, swap, flip, rot, outline, crop). Optionally traced.
-import { Canvas, type Placed, type Placement, type Resolver, betweenKey } from "./canvas.ts";
+import { Canvas, FACING, type Placed, type Placement, type Resolver, betweenKey } from "./canvas.ts";
 import { type Color, MIXES, TRANSPARENT, oklab, pack } from "./color.ts";
 import { PxError, wrap } from "./errors.ts";
 import { Img, type Lamp } from "./image.ts";
@@ -12,7 +12,7 @@ import { type PostOpts, applyPost, postAt } from "./post.ts";
 import { type AssetDef, type FrameOpts, type GlowOpts, type Item, type Layer, type LayerOpts, type LightingOpts, type Op, type RelightOpts, type TileLayer, type Timeline, isLayer, isOp } from "./model.ts";
 import type { Palette } from "./palette.ts";
 import { Trace } from "./trace.ts";
-import { bayer, fmtArgs, gridRows, gridSize, type Region } from "./util.ts";
+import { bayer, fmtArgs, gridRows, gridSize, profile, type Region } from "./util.ts";
 
 export interface BuildCtx extends Resolver {
   /** Art-file location from an error stack, if any frame points into an art file. */
@@ -111,6 +111,27 @@ export function gcd(a: number, b: number): number {
   return a;
 }
 
+/**
+ * A shade layer's shadows of other layers (`of`): each of their stamps and tiles again, silhouetted
+ * and laid on the ground by the layer's `cast` (or its own `shadow`), unless `shadow: false` or its
+ * name is in `except`. One list of what stands: moved once, its shadow follows.
+ */
+function castsOf(def: AssetDef, l: Layer): Item[] {
+  if (l.opts.shade === undefined || l.opts.shade === false) throw new PxError(`layer '${l.name}': of draws shadows, on a shade layer ({ shade: true or n })`, l.loc);
+  return [l.opts.of].flat().flatMap((n) => {
+    const src = def.items.find((v) => isLayer(v) && v.name === n) as Layer | undefined;
+    if (!src) throw new PxError(`layer '${l.name}': of names no layer '${n}' of ${def.kind} '${def.name}'`, l.loc);
+    return src.items.flatMap((v) => {
+      if (!isOp(v) || (v.name !== "stamp" && v.name !== "tile")) return [];
+      const at = v.name === "stamp" ? 3 : 5, args = [...v.args], { shadow, ...o } = (args[at] ?? {}) as { shadow?: unknown };
+      if (shadow === false || l.opts.except?.includes(args[0] as string)) return [];
+      while (args.length < at) args.push(v.name === "stamp" ? 0 : 1);
+      args[at] = { ...o, cast: shadow ?? l.opts.cast, silhouette: "#000000" };
+      return [{ ...v, args }];
+    });
+  });
+}
+
 function isFrameOpts(v: unknown): boolean {
   return typeof v === "object" && v !== null && !Array.isArray(v) && !isOp(v) && !isLayer(v);
 }
@@ -121,7 +142,8 @@ function isFrameOpts(v: unknown): boolean {
  */
 export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: Trace, t = 0, clock?: Timeline): BuildOut {
   const { opts, pal } = def;
-  const tl = def.kind === "anim" ? animTimeline(def) : undefined;
+  const tl = def.kind === "anim" ? animTimeline(def) : undefined, g = opts.world?.ground;
+  const groundAt = Array.isArray(g) ? profile(g) : typeof g === "number" ? () => g : undefined;
   const at = tl ? frameAt(tl, t) : 0;
   const frame = tl?.order ? tl.order[at] : at, frames = tl ? drawnFrames(tl) : 1;
   const tick = !tl && clock ? { frame: Math.round(t / clock.step), frames: Math.max(1, Math.round(clock.loop / clock.step)) } : undefined;
@@ -196,6 +218,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     c.k = opts.pixel ?? 1;
     c.look3d = def.look3d;
     c.owner = { name: def.name, loc: def.loc };
+    c.groundAt = groundAt;
     return c;
   };
   const main = timed(new Canvas(base, pal, ctx, 0, 0, seed));
@@ -255,7 +278,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     hook(lc, steps ? ` in ${steps} layer '${l.name}'` : "");
     cur = { img: limg, opts: l.opts };
     try {
-      runItems(ctx, l.items, lc, l.loc);
+      runItems(ctx, l.opts.of === undefined ? l.items : [...l.items, ...castsOf(def, l)], lc, l.loc);
       lc.flush();
     } catch (e) {
       throw wrap(e, (st) => ctx.locFromStack(st)).within(`layer '${l.name}'`, l.loc);
@@ -438,7 +461,6 @@ function inferSize(items: Item[]): { w: number; h: number } {
 }
 
 /** facing -> the front's direction in picture space (x right, y down, z into the picture). */
-const FACING: Record<string, [number, number, number]> = { right: [1, 0, 0], left: [-1, 0, 0], front: [0, 0, -1], back: [0, 0, 1] };
 
 function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Uint8Array): Img {
   const o = def.opts;

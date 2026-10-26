@@ -29,8 +29,10 @@ declare global {
     smear?: [number, number] | { from: [number, number]; c?: PxColor };
     /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
     silhouette?: PxColor;
-    /** Lay the asset flat on the ground as its cast shadow: a pixel h above the base lands h * [kx, ky] away. */
-    cast?: [number, number];
+    /** Lay the asset flat on the ground as its cast shadow: a pixel h above the base lands h * [kx, ky] away; a stamp's away from a light: { from: [x, y] (on the horizon) or [x, y, h], len? }. */
+    cast?: [number, number] | { from: number[]; len?: number };
+    /** In a layer a shade layer casts (its `of`): false, none; or its own cast. */
+    shadow?: false | [number, number] | { from: number[]; len?: number };
     /** Where cast measures height from: the pivot's row (default), or each column's lowest pixel (a hem or a base that isn't level). */
     castBase?: "pivot" | "column";
     /** Attach to a socket of an earlier stamp in this asset, "id.socket"; x, y become an offset from it. */
@@ -96,8 +98,8 @@ declare global {
     horizon?: number; eye?: number; scale?: number;
     /** Where the light comes from, or a point light in the scene ({ at: [x, y] }: a fire, a lamp): each object's lit side is checked against it. Without it, the lamp lighting() lit each by, or a mesh's light; false: none. */
     light?: [number, number] | { at: [number, number] } | false;
-    /** Flat side view: the ground's row; what has a height is checked for floating or sinking. */
-    ground?: number;
+    /** Flat side view: the ground's row, or a profile [x0, y0, x1, y1, ...]; what has a height is checked for floating or sinking; stamp(name, x, "ground") stands on it. */
+    ground?: number | number[];
   }
   /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
   interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number };
@@ -105,13 +107,15 @@ declare global {
     pixel?: number;
     /** the same scene k times as big under other names, not checked ({ name_hd: 4 }); post() runs only there */
     sizes?: Record<string, number> }
-  interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong" }
+  interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong"; /** checked as a scene (c.as() names what its functions paint) */ world?: PxWorld; check?: boolean | { every: number } }
   interface PxFrame { ms?: number; hold?: number }
   interface PxLayerOpts {
     /** Draw the layer's stamps sorted: "y" by where they stand (top-down props), "z" by their z. */
     sort?: "y" | "z";
     x?: number; y?: number; hidden?: boolean; density?: number; solid?: boolean; wall?: boolean; unlit?: boolean;
     shade?: boolean | number | Record<string, PxColor>; light?: boolean | number | Record<string, PxColor>;
+    /** A shade layer drawing the shadows of these layers' stamps and tiles, laid down by `cast` (or each one's `shadow`), but those named in `except`. */
+    of?: string | string[]; cast?: [number, number] | { from: number[]; len?: number }; except?: string[];
     /** Color math with what's below (new colors, off the palette; palettize snaps them back). */
     blend?: "normal" | "multiply" | "screen" | "add" | "overlay"; opacity?: number; palettize?: boolean;
     /** Reference / guide layer: shown over the art in previews (true, or a 0..1 strength), left out of the exported image. */
@@ -553,6 +557,13 @@ declare global {
     plate(fn: () => void, opts?: PxRelight): void;
     /** Draw `fn` on a sheet of its own and lay it down moved by (dx, dy), between pixels too (subpixel). */
     subpixel(dx: number, dy: number, fn: () => void, dir?: [number, number]): void;
+    /** A drawing in its turn among a sorted layer's (or a c.sort()'s) stamps: at depth z / row y, ties in call order; outside one, now. */
+    z(z: number, fn: (c: PxCanvas) => void): void;
+    y(y: number, fn: (c: PxCanvas) => void): void;
+    /** What fn stamps and hands to c.z() / c.y() drawn in that order when it ends. */
+    sort(by: "y" | "z", fn: () => void): void;
+    /** What fn paints, a placement by that name: describe lists it, check reads it as a stamp (height m, facing). */
+    as(name: string, fn: (c: PxCanvas) => void, opts?: { height?: number; facing?: "right" | "left" | "front" | "back" }): void;
     px(x: number, y: number, c: PxColor): void;
     rect(x: number, y: number, w: number, h: number, c: PxColor): void;
     box(x: number, y: number, w: number, h: number, c: PxColor): void;
@@ -631,7 +642,7 @@ declare global {
     /** Land with relief in perspective, ray-marched: height(x, z) in meters; fn gives the color of the point each pixel sees. */
     terrain(view: PxView | PxPerspective, height: (x: number, z: number) => number, fn: (x: number, z: number, u: number, t: number, col: number, row: number) => PxColor | null | undefined, opts?: PxTerrainOpts): void;
     recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): void;
-    stamp(name: string, x?: number, y?: number, opts?: PxPlace): void;
+    stamp(name: string, x?: number, y?: number | "ground", opts?: PxPlace): void;
     tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): void;
     pattern(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): void;
     panel(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): void;
@@ -764,6 +775,8 @@ declare global {
   function shake(spell: PxSpell): PxOp;
   /** A function of (x, y) made to close over w (and h): for noise on strips and tiles that wrap. */
   function seamless(fn: (x: number, y: number) => number, w: number, h?: number): (x: number, y: number) => number;
+  /** A ground (or a ceiling) as a polyline [x0, y0, x1, y1, ...], x going up: (x) => its row there, rounded. */
+  function profile(pts: number[]): (x: number) => number;
   /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly); boxes' faces lit by the sun. */
   function solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): PxOp;
   /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade by `shade`. */
@@ -883,7 +896,7 @@ declare global {
   /** A shader's effect on everything drawn before it (a sprite, an anim's frame, a layer), on the clock and a seed: dissolve, pixelate, dither, tint, distort, sway, emit. */
   function effect(...fx: PxEffect): PxOp;
   function recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): PxOp;
-  function stamp(name: string, x?: number, y?: number, opts?: PxPlace): PxOp;
+  function stamp(name: string, x?: number, y?: number | "ground", opts?: PxPlace): PxOp;
   function tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): PxOp;
   function pattern(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): PxOp;
   /** 9-slice: an asset with `slice` margins drawn at w x h; corners stay, edges and center repeat. */

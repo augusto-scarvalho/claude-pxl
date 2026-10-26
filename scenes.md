@@ -53,6 +53,10 @@ look at (`--frames 0-11` for some).
   reads as paint on top of the grass.
 - Tiles that repeat get `wrap: true` (or `"x"`/`"y"`): the preview shows them 3×3 (3×1, 1×3), so seams show,
   and drawing past an edge continues on the other side.
+- A side view's ground that isn't one row (a cave's floor, a ledge, a ceiling for what hangs from it):
+  a polyline, `const floor = profile([0, 118, 24, 114, ...])`, `floor(x)` its row under x; drawn as a
+  `poly`, props stood on it; `world: { ground: [...] }` checks the feet of what has a height against it
+  and `stamp(name, x, "ground")` stands one there (`examples/grotto.px.js`).
 - Keep small details that dot an area (pebbles, flowers, tufts) out of tiles: baked in, they repeat
   as a pattern. Lay plain tiles, then `scatter(..., { even: true })` the details over them.
 - A tileset (Saint11): draw the master tile, offset it by half (`wrap: true` shows the seams) and fix
@@ -456,9 +460,10 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 
 ## 11. Shadows and light
 
-- Cast shadows: a `shade: true` layer, with tall things stamped there by `cast: [kx, ky]` (laid flat
-  from their base, `silhouette: "k"`): a pixel h px up lands h × (kx, ky) away. One sun, one
-  `cast` for everything. `ky` says where the sun is in depth: negative, the shadows fall back (the
+- Cast shadows: a `shade: true` layer `of` the layer things stand in, `cast: [kx, ky]` (each laid
+  flat from its base, silhouetted): a pixel h px up lands h × (kx, ky) away. One sun, one `cast` for
+  everything; a stamp's own `shadow` (`false`: none). The shade layer goes where the shadow is drawn:
+  under what stands, or lower in the list (a firelight, a bridge between). `ky` says where the sun is in depth: negative, the shadows fall back (the
   sun in front of us: the fronts we see are lit), positive, toward us (backlit).
   In true perspective, things built of `solid` shapes cast with `shadows()` instead: each shape
   swept away from the sun in meters, so the shadow foreshortens with the ground.
@@ -472,14 +477,17 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   of shade is lost in the dither: `shade: 2`.
 - From a point light near the ground (a lamp, a fire, a mirror ball), each shadow points away from
   the light and is longer the lower and nearer the light: `[kx, ky] = (base − light's ground point) /
-  light height`, capped at length 1. Keep other lamps out of where a shadow falls: they fill it.
+  light height`, capped at length 1: `cast: { from: [x, y, h] }` on the stamp. A sun low on the
+  horizon at (x, y) fans them out from it: `{ from: [x, y], len }`. Keep other lamps out of where a
+  shadow falls: they fill it.
 - The ground ramp needs a tone below its darkest for shadows to show after lighting (`"0EGgl"`, then
   `shade: 2`): a shade can't step below a ramp's darkest key, so ground already there under a
   shadow doesn't change.
 - Shadows in one `shade` layer are a union: a figure standing in a tree's shadow casts none of its
   own there and looks like it floats. Give what stands a contact shadow in a second `shade` layer,
-  its silhouette squashed under its base (`cast: [0.18, 0.12]`, or a flat ellipse at the feet): dark
-  where it touches the ground, inside the bigger shadow too.
+  its silhouette squashed under its base (a second shade layer `of` the same, `cast: [0.18, 0.12]`,
+  `except` the tall ones; or a flat ellipse at the feet): dark where it touches the ground, inside the
+  bigger shadow too.
 - A base that isn't level (a tent seen at an angle, its hem higher at the back; a crate on a slope)
   casts from each column's own lowest pixel: `castBase: "column"`. From the pivot's row, what hangs
   below it would cast toward the sun.
@@ -732,9 +740,9 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   (`--brief` for busy scenes); after an edit, `--diff` lists what moved, was redrawn or recolored.
 - `PXL check <file>` before handing over: every frame of the loop; its last line says which rules
   ran, and `--readings` shows what the lit-side rule read on each thing when a warning looks wrong.
-  Checks and `world` rules cover `scene()`s (and rigs): a picture made as an `anim()` gets none of
-  them (only the LOOK lines on a hand-drawn line), so
-  for checks make it a scene that stamps its moving parts (as `sunset` and `tournament` do).
+  Checks and `world` rules cover `scene()`s (and rigs), and an `anim()` given a `world`: what its
+  functions paint is seen when they name it, `c.as("bench", (c) => { ... }, { height })`
+  (`examples/perspective/park.px.js`); `check: { every: 24 }` on a long one.
 - A scene built from separate maps (terrain, props): `throw` in the placement loop when a prop lands
   on the wrong ground; it catches the drift before anyone sees it.
 - Before handing over, look as a critic: tiles repeating into a visible grid, props floating or on

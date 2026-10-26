@@ -43,6 +43,11 @@ export interface Resolver {
 
 type Pred = (x: number, y: number) => boolean;
 
+/** c.as(): the picture before each (nested) named drawing, to see what it changed. */
+const asBefore: Uint32Array[] = [];
+let asDepth = 0;
+/** Which way a drawing faces (an asset's `facing`), as a direction on the picture: x right, z away from us. */
+export const FACING: Record<string, [number, number, number]> = { right: [1, 0, 0], left: [-1, 0, 0], front: [0, 0, -1], back: [0, 0, 1] };
 /** Where stamps landed in an asset (top-left in image coords) with their sockets, by id: for `at`. */
 export type Placed = Map<string, { x: number; y: number; sockets?: Record<string, [number, number]> }>;
 /** What was stamped where, in drawing order (top-left in asset coords): for `pxl describe`. */
@@ -83,6 +88,8 @@ export class Canvas {
   inAnim = false;
   /** px to an art pixel (a scene's `pixel`, its `sizes`): mesh(), the 3D ops, meshSocket() and post() draw k times as big. */
   k = 1;
+  /** The scene's ground (world.ground) at a column: stamp(name, x, "ground") stands there. */
+  groundAt?: (x: number) => number;
   /** look3d()'s light and mats, for the 3D ops that don't say them. */
   look3d?: { light?: number[]; mats?: Record<string, unknown> };
   /** Composite below the current layer (absolute coords), for `below` masks. */
@@ -252,6 +259,59 @@ export class Canvas {
     try { fn(); } finally { this.img = under; this.sorted = sorted; }
     if (sheet.orient?.text) this.lettered();
     this.subPut(sheet, dx - this.ox, dy - this.oy, dir);
+  }
+
+  /**
+   * `fn` drawn in its turn among a sorted layer's stamps (or a `c.sort()`'s): at depth `z` (sort: "z")
+   * or row `y` (sort: "y"), ties in call order; outside one, now. What it stamps is drawn as it is.
+   */
+  z(z: number, fn: (c: Canvas) => void): void { this.inTurn("z", z, fn); }
+  y(y: number, fn: (c: Canvas) => void): void { this.inTurn("y", y, fn); }
+  /** What `fn` stamps and hands to c.z() / c.y() drawn in that order when it is done: a sorted layer inside a function. */
+  sort(by: "y" | "z", fn: () => void): void {
+    if ((by !== "y" && by !== "z") || typeof fn !== "function") throw new PxError(`c.sort("y" or "z", () => { ... }): stamps and c.${by === "y" ? "y" : "z"}(key, fn) drawings in their order, got ${JSON.stringify(by)}`);
+    const prev = this.sorted;
+    this.sorted = { by, queue: [] };
+    try { fn(); this.flush(); } finally { this.sorted = prev; }
+  }
+  private inTurn(by: "y" | "z", key: number, fn: (c: Canvas) => void): void {
+    if (!Number.isFinite(key) || typeof fn !== "function") throw new PxError(`c.${by}(${by === "z" ? "depth" : "row"}, (c) => { ... }), got ${JSON.stringify(key)}`);
+    if (!this.sorted) return fn(this);
+    if (this.sorted.by !== by) throw new PxError(`c.${by}() in a layer sorted by ${this.sorted.by}: give its ${this.sorted.by} with c.${this.sorted.by}()`);
+    // drawn later, in order, under the clip of the call; what it stamps is drawn at once
+    const clip = this.clipPred, q = this.sorted.queue;
+    q.push({ key, seq: q.length, draw: () => {
+      const s = this.sorted, c = this.clipPred;
+      this.sorted = undefined; this.clipPred = clip;
+      try { fn(this); } finally { this.sorted = s; this.clipPred = c; }
+    } });
+  }
+
+  /**
+   * What `fn` paints, as a placement named `name`: describe lists it and check reads it as a stamp, its
+   * lit side, its feet (`height` m) and its front (`facing`). It paints as it would without a name; the
+   * placement is what it changed (a pixel painted over in its own color doesn't count), kept only when
+   * something reads placements (pxl check, describe).
+   */
+  as(name: string, fn: (c: Canvas) => void, o: { height?: number; facing?: string } = {}): void {
+    if (typeof name !== "string" || typeof fn !== "function" || !(o.height === undefined || o.height > 0) || !(o.facing === undefined || FACING[o.facing]))
+      throw new PxError(`c.as("name", (c) => { ... }, { height?: m, facing?: "right" | "left" | "front" | "back" }), got ${JSON.stringify([name, o])}`);
+    // only read where something reads placements (check, describe): drawing alone, it just draws
+    const res = this.res as { checksOnly?: boolean; tracing?: boolean };
+    if (!res.checksOnly && !res.tracing) return fn(this);
+    const img = this.img, d = img.data, was = (asBefore[asDepth] ??= new Uint32Array(0)).length === d.length ? asBefore[asDepth] : (asBefore[asDepth] = new Uint32Array(d.length));
+    was.set(d);
+    asDepth++;
+    try { fn(this); } finally { asDepth--; }
+    // ponytail: a scan of the whole picture per call (~0.07 ms at 320x180); track what plot() touches if it adds up
+    let x0 = img.w, y0 = img.h, x1 = -1, y1 = -1;
+    for (let i = 0; i < d.length; i++) if (d[i] !== was[i]) { const x = i % img.w, y = (i / img.w) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; }
+    if (x1 < 0) return;
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, out = new Img(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y0 + y) * img.w + x0 + x; if (d[i] !== was[i]) out.data[y * w + x] = d[i]; }
+    if (o.height) out.meters = o.height;
+    if (o.facing) out.orient = { f: [...FACING[o.facing]], u: [0, -1, 0], mirrored: false, text: false };
+    this.log?.push({ name, x: x0, y: y0, w, h, layer: this.layerName, img: out });
   }
 
   /** Run `fn` with drawing restricted to `region` (nests by intersection). */
@@ -1172,7 +1232,7 @@ export class Canvas {
     if (opts.cast !== undefined) {
       const k = opts.cast;
       if (!Array.isArray(k) || k.length !== 2 || !k.every(Number.isFinite))
-        throw new PxError(`cast must be [kx, ky], how far a pixel 1px up lands from its base (e.g. [0.6, 0.2]), got ${JSON.stringify(k)}`);
+        throw new PxError(`cast must be [kx, ky], how far a pixel 1px up lands from its base (e.g. [0.6, 0.2]), or on a stamp { from: [x, y] or [x, y, h], len? } (away from a light), got ${JSON.stringify(k)}`);
       if (opts.castBase !== undefined && opts.castBase !== "pivot" && opts.castBase !== "column")
         throw new PxError(`castBase must be "pivot" (the pivot's row) or "column" (each column's lowest pixel), got ${JSON.stringify(opts.castBase)}`);
       src = src.cast(k[0], k[1], opts.castBase);
@@ -1256,8 +1316,13 @@ export class Canvas {
     if (name) this.log?.push({ name, x: Math.floor(this.ox + x - Math.floor(px)), y: Math.floor(this.oy + y - Math.floor(py)), w: src.w, h: src.h, layer: this.layerName, img: src });
   }
 
-  stamp(name: string, x = 0, y = 0, opts?: PlaceOpts): void {
+  stamp(name: string, x = 0, y: number | "ground" = 0, opts?: PlaceOpts): void {
+    if (y === "ground") {
+      if (!this.groundAt) throw new PxError(`stamp('${name}', x, "ground") stands on the scene's ground: give it world: { ground: row or [x0, y0, x1, y1, ...] }`);
+      y = this.groundAt(this.ox + x) - this.oy;
+    }
     if (opts?.at !== undefined) [x, y] = this.socketAt(opts.at, x, y);
+    if (opts?.cast && typeof opts.cast === "object" && !Array.isArray(opts.cast)) opts = { ...opts, cast: castAt(opts.cast, x, y) };
     const src = this.asset(name, opts, x, y), [px, py] = src.pivot ?? [0, 0];
     this.placed?.set(opts?.id ?? name, { x: this.ox + x - Math.floor(px), y: this.oy + y - Math.floor(py), sockets: src.sockets });
     const sub = opts?.sub;
@@ -1693,6 +1758,23 @@ export class Canvas {
     this.put(sub.img.scale(U), Math.round(x * this.k - (at + (tw >> 1) + 0.5) * U), Math.round(y * this.k) - (h + th) * U);
     this.lettered();
   }
+}
+
+/**
+ * A stamp's cast from a light at `from`, its base at (x, y): `[x, y]` on the horizon (a low sun),
+ * straight away from it, `len` (1) a px of height; `[x, y, h]` h px over that ground point (a lamp, a
+ * fire), the base's way from it over h, at most `len` long (longer, a light lower than the thing).
+ */
+function castAt(c: unknown, x: number, y: number): [number, number] {
+  const o = c as { from?: number[]; len?: number };
+  if (!(Array.isArray(o?.from) && (o.from.length === 2 || o.from.length === 3) && o.from.every(Number.isFinite)) || !(o.len === undefined || o.len > 0))
+    throw new PxError(`cast is [kx, ky], or { from: [x, y] (a sun on the horizon) or [x, y, h] (a light h px over the ground at x, y), len? }, got ${JSON.stringify(c)}`);
+  const len = o.len ?? 1, dx = x - o.from[0], dy = y - o.from[1];
+  if (o.from.length === 2) { const d = Math.hypot(dx, dy); return [(len * dx) / d, (len * dy) / d]; }
+  let kx = dx / o.from[2], ky = dy / o.from[2];
+  const l = Math.hypot(kx, ky);
+  if (l > len) { kx = (kx / l) * len; ky = (ky / l) * len; }
+  return [kx, ky];
 }
 
 /** Start time (ms) of frame `n` of a timeline. */

@@ -96,6 +96,14 @@ Mark items `[x]` when they ship, with the commit.
     where `texel: "screen"` is more correct but moves a few pixels;
   - `sizes` blocks only ramp materials by default; blocking textures too would keep HD scenes nearer
     pixel art (plaza_hd and graveyard_hd would change: show both).
+- [ ] **The walk's feet slide** (wave 4a): `gait()`'s stride is a sine swing per view (±4.6 px in
+  profile, ±3.4 on a diagonal, ±0.6 facing us), so the planted foot moves back at 1.35 to 3.25 px a
+  frame over its stance (2.3 on average in profile) and no one pace keeps it planted; the graveyard
+  and the harbor walk at 1.6 px a frame, 30% under the profile's 2.3, so on their east and west legs
+  the feet slide back (graveyard's PACE comment, "two steps of 6.4 px", is from before rig3d). The
+  fix belongs to the gait work (A.md P4): a stance moving back at a constant speed and a stride in px
+  a cycle per view; then `route()` could take its pace from the walk by heading. It retimes the
+  stories: the user sees both.
 - [ ] **The crew's grey-haired head turned to profile is a row short at the crown** (`_og_head_w` in
   `hd2d/crew.px.js`): `pxl check`'s views rule reads its crown on row -4 from the anchor, -5 in the
   other views, so the head drops a pixel at its top as it turns. Redraw its top to reach the others'

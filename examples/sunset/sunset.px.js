@@ -202,13 +202,7 @@ const coast = [
 // ================================================================ the cliff top
 const EDGE = [0, 131, 12, 129, 26, 130, 44, 128, 62, 129, 84, 127, 106, 128, 128, 127, 150, 128, 170, 130,
   192, 129, 214, 127, 236, 128, 256, 130, 276, 128, 298, 129, 320, 127]
-const edgeY = (x) => {
-  for (let i = 0; i < EDGE.length - 2; i += 2) {
-    const [x0, y0, x1, y1] = EDGE.slice(i, i + 4)
-    if (x >= x0 && x <= x1) return Math.round(y0 + (y1 - y0) * (x - x0) / (x1 - x0))
-  }
-  return EDGE.at(-1)
-}
+const edgeY = profile(EDGE)
 
 // grass: at the edge the blades stand against the sea with the sun on their tips; nearer us,
 // bigger and darker tufts
@@ -604,7 +598,9 @@ anim("tallgrass", { w: 52, h: 26, frames: N, fps: FPS, pivot: [0, 26] }, (c) => 
 })
 
 // Shadows run straight away from the sun's point on the horizon, so they fan out: left of the sun
-// they fall left, right of it right. `len` = how far a pixel's shadow lands per px of its height.
+// they fall left, right of it right (`cast: { from: SUN, len }`, `len` how far a pixel's shadow
+// lands per px of its height). The pennant's starts where its pole's point's shadow lands.
+const SUN = [SX, HZ]
 const awayFromSun = (x, y, len) => { const dx = x - SX, dy = y - HZ, d = Math.hypot(dx, dy); return [len * dx / d, len * dy / d] }
 
 const AT = { hero: [200, 134], fire: [148, 164], pack: [127, 148], bedroll: [99, 162],
@@ -623,15 +619,9 @@ scene("sunset", { w: W, h: H, bg: "N", world: { light: [1, -0.4] } },
   layer("coast", ...coast),
   layer("ground", ...ground),
   layer("tufts", ...tufts),
-  // long shadows, laid away from the sun's point on the horizon (toward us, and out to the sides)
-  layer("shadows", { shade: true },
-    stamp("hero", ...AT.hero, { cast: awayFromSun(...AT.hero, 1), silhouette: "k" }),
-    ...TENT_SHADOW,
-    stamp("pack", ...AT.pack, { cast: awayFromSun(...AT.pack, 1), silhouette: "k" }),
-    stamp("pot", ...AT.pot, { cast: awayFromSun(...AT.pot, 1), silhouette: "k" }),
-    stamp("logs", ...AT.logs, { cast: awayFromSun(...AT.logs, 1.5), silhouette: "k" }),
-    stamp("cairn", ...AT.cairn, { cast: awayFromSun(...AT.cairn, 1.2), silhouette: "k" }),
-    // the pennant stands 8 px up inside the cairn: its shadow starts where that point's shadow lands
+  // long shadows of the camp, laid away from the sun's point on the horizon (toward us, and out to
+  // the sides); the tent's and the pennant's drawn here
+  layer("shadows", { shade: true, of: "camp", cast: { from: SUN, len: 1 } }, ...TENT_SHADOW,
     ((k) => stamp("pennant", Math.round(AT.cairn[0] + 8 * k[0]), Math.round(AT.cairn[1] + 8 * k[1]), { cast: k, silhouette: "k" }))(awayFromSun(...AT.cairn, 1.2))),
   // the fire's light falls off in three rings, the faintest reaching the tent's door; the bag
   // blocks it, so its shadow comes after that ring
@@ -640,10 +630,10 @@ scene("sunset", { w: W, h: H, bg: "N", world: { light: [1, -0.4] } },
   layer("firelight", { light: true, density: 0.5 }, ellipse(148, 163, 26, 7, "k")),
   layer("firelight2", { light: true }, ellipse(148, 163, 14, 4, "k")),
   layer("camp", { sort: "y" },
-    stamp("tent", 64, 156),                       // sorted at y 156, behind the bedroll lying half out of its door
-    stamp("pack", ...AT.pack), stamp("pot", ...AT.pot), stamp("bedroll", ...AT.bedroll),
-    stamp("campfire", ...AT.fire), stamp("logs", ...AT.logs),
-    stamp("pennant", AT.cairn[0], AT.cairn[1] - 8), stamp("cairn", ...AT.cairn),
+    stamp("tent", 64, 156, { shadow: false }),    // sorted at y 156, behind the bedroll lying half out of its door
+    stamp("pack", ...AT.pack), stamp("pot", ...AT.pot), stamp("bedroll", ...AT.bedroll, { shadow: false }),
+    stamp("campfire", ...AT.fire, { shadow: false }), stamp("logs", ...AT.logs, { shadow: { from: SUN, len: 1.5 } }),
+    stamp("pennant", AT.cairn[0], AT.cairn[1] - 8, { shadow: false }), stamp("cairn", ...AT.cairn, { shadow: { from: SUN, len: 1.2 } }),
     stamp("hero", ...AT.hero)),
   layer("smoke", { opacity: 0.45 }, stamp("smoke", 149, 152)),
   layer("fore", stamp("tallgrass", -6, 180), stamp("tallgrass", 22, 180, { reseed: true }), stamp("tallgrass", 272, 180, { reseed: 2 })),

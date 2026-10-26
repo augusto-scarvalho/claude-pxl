@@ -504,7 +504,7 @@ const RUNNERS = [
 function runners(c) {
   return RUNNERS.map((R) => {
     const L = R.v * (FRAMES / FPS), x = c.cross(R.x0, { span: L, per: -L, from: -(L / 2) * 0.95, whole: false })
-    return runner(R.B, { x, z: R.z, phase: ((c.frame + (R.off ?? 0)) % R.cycle) / R.cycle, ramp: R.ramp })
+    return { ...runner(R.B, { x, z: R.z, phase: ((c.frame + (R.off ?? 0)) % R.cycle) / R.cycle, ramp: R.ramp }), name: R.B === TREX ? "tyrannosaur" : "gallimimus" }
   })
 }
 // Pterosaurs the size of a Quetzalcoatlus (11 m across), seen from below and ahead: drawn by hand,
@@ -867,16 +867,16 @@ function litter(c) {
 
 // each tree's still parts on a sprite of their own, cropped to what they draw
 for (const [i, T] of TREES.entries()) sprite("_tree" + i, { w: W, h: H, crop: true, pivot: [0, 0] }, (c) => paintTree(c, T))
-anim("extinction", { w: W, h: H, frames: FRAMES, fps: FPS }, stamp("_bg", 0, 0), (c) => {
+anim("extinction", { w: W, h: H, frames: FRAMES, fps: FPS, world: { light: [0, -1] }, check: { every: 12 } }, stamp("_bg", 0, 0), (c) => {
   meteors(c, c.frame); breathe(c, c.frame); sootClouds(c, c.frame); lava(c, c.frame); steam(c, c.frame); ejecta(c, c.frame); crater(c, c.frame); frontFire(c, c.frame)
-  const wreck = [...LOGS.map((L) => ({ d: Math.hypot(L.x, L.z), draw: (c) => log(c, L, c.frame) })), ...SNAGS.map((S) => ({ d: Math.hypot(S.x, S.z), draw: (c) => snag(c, S, c.frame) })),
-    ...ROCKS.map((R) => ({ d: Math.hypot(R.x, R.z), draw: (c) => rock(c, R) }))]
-  const all = [...TREES.map((T, i) => ({ d: T.d, tree: i })), ...runners(c), ...flyers(c.frame), ...wreck].sort((m, n) => n.d - m.d)
-  for (const m of all) {
-    if (m.tree !== undefined) { c.stamp("_tree" + m.tree, 0, 0); treeFire(c, TREES[m.tree], c.frame); continue }
-    if (m.sprite) { c.stamp(m.sprite, m.x, m.y); continue }
-    m.draw(c)
-  }
+  // far to near, each at its depth (c.z: the nearer the later), what is drawn by hand named (c.as)
+  c.sort("z", () => {
+    TREES.forEach((T, i) => c.z(-T.d, () => { c.stamp("_tree" + i, 0, 0); treeFire(c, T, c.frame) }))
+    for (const m of [...runners(c), ...flyers(c.frame)]) c.z(-m.d, () => (m.sprite ? c.stamp(m.sprite, m.x, m.y) : c.as(m.name, () => m.draw(c))))
+    for (const L of LOGS) c.z(-Math.hypot(L.x, L.z), () => c.as("log", () => log(c, L, c.frame)))
+    for (const S of SNAGS) c.z(-Math.hypot(S.x, S.z), () => c.as("snag", () => snag(c, S, c.frame)))
+    for (const R of ROCKS) c.z(-Math.hypot(R.x, R.z), () => c.as("rock", () => rock(c, R)))
+  })
   nearFire(c, c.frame)
   fronds(c, c.frame)
   sparks(c, c.frame)

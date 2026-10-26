@@ -1,4 +1,5 @@
 // Small shared helpers: grids, randomness, regions, dithering.
+import { PxError } from "./errors.ts";
 
 /** Grid string -> rows: each row trimmed, blank leading/trailing rows dropped. */
 export function gridRows(s: string): string[] {
@@ -167,4 +168,18 @@ export function once<T>(owner: unknown, key: string, make: () => T): T {
   let v = m.get(key) as T | undefined;
   if (v === undefined) { m.set(key, (v = make())); if (m.size > 8) m.delete(m.keys().next().value!); }
   return v;
+}
+
+/**
+ * A ground (or a ceiling) drawn as a polyline, [x0, y0, x1, y1, ...] with x going up: (x) => its row
+ * there, rounded; before the first point the first leg carried on, past the last the last row.
+ */
+export function profile(pts: number[]): (x: number) => number {
+  if (!Array.isArray(pts) || pts.length < 4 || pts.length % 2 || !pts.every(Number.isFinite) || pts.some((v, i) => i % 2 === 0 && i > 0 && v <= pts[i - 2]))
+    throw new PxError(`profile: points are [x0, y0, x1, y1, ...] (two or more, x going up), got ${JSON.stringify(pts)?.slice(0, 120)}`);
+  return (x) => {
+    for (let i = 0; i < pts.length - 2; i += 2)
+      if (x <= pts[i + 2]) return Math.round(pts[i + 1] + (pts[i + 3] - pts[i + 1]) * (x - pts[i]) / (pts[i + 2] - pts[i]));
+    return pts[pts.length - 1];
+  };
 }

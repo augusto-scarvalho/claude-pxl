@@ -233,6 +233,15 @@ test("font: glyphs cut from a sprite, trimmed to their ink (proportional), used 
   eq(art(M + 'sprite("t", { w: 11, h: 2 }, text(0, 0, "AiA", "w", { font: "tiny" }))', "t"), "www..w..www\nw.w..w..w.w");
 });
 
+test("c.sort, c.z, c.y: drawings in their turn among the stamps, by depth or row, ties in call order", () => {
+  const P = PAL + 'sprite("a", "rr\\nrr"); ';
+  // the drawing at depth 0 under the stamp at 1, the one at 2 over it
+  eq(art(P + 'scene("s", { w: 3, h: 1 }, (c) => c.sort("z", () => { c.z(2, (c) => c.px(1, 0, "w")); c.stamp("a", 0, 0, { z: 1 }); c.z(0, (c) => c.rect(0, 0, 3, 1, "g")) }))', "s"), "rwg");
+  // in a layer sorted by row: a tie with the stamp, called after it, drawn after it; outside one, at once
+  eq(art(P + 'scene("s", { w: 3, h: 3 }, layer("l", { sort: "y" }, stamp("a", 0, 1), (c) => c.y(1, (c) => c.rect(0, 0, 3, 2, "g"))), (c) => c.z(5, (c) => c.px(2, 2, "w")))', "s"), "ggg\nggg\nrrw");
+  assert.match(failure(P + 'scene("s", { w: 3, h: 3 }, layer("l", { sort: "y" }, (c) => c.z(1, () => {})))', "s").message, /c.z\(\) in a layer sorted by y/);
+});
+
 test("panel: 9-slice, corners stay, edges and center repeat; flips turn the margins; sheets export them", () => {
   // corners k, top/bottom edge g, left/right edge w, center r, 1px margins
   const box = 'sprite("b", { slice: 1 }, "kgk\\nwrw\\nkgk"); ';
@@ -429,6 +438,15 @@ test("cast: an upright asset laid flat on the ground from its base, carrying its
   // ky stretches it down the screen too, and a row never leaves a gap
   eq(art(P + 'scene("s", { w: 3, h: 6 }, stamp("post", 0, 3, { cast: [0, 1.5], silhouette: "k" }))', "s"), "...\n...\nk..\nk..\nk..\nk..");
   assert.match(failure(P + 'scene("s", { w: 4, h: 3 }, stamp("post", 0, 3, { cast: 0.5 }))', "s").message, /cast must be \[kx, ky\]/);
+  // away from a light 3 px over the ground at (0, 3): (4 - 0) / 3 a px of height, held to 1
+  eq(art(P + 'scene("s", { w: 8, h: 3 }, stamp("post", 4, 3, { cast: { from: [0, 3, 3] }, silhouette: "k" }))', "s").split("\n")[2], "....kkk.");
+});
+
+test("shadows of a layer (of): a shade layer casts what stands in it, one with its own cast, one with none, one by name", () => {
+  const P = PAL + 'ramps("kr"); sprite("post", { pivot: "bottom" }, "w\\nw\\nw"); sprite("dot", { pivot: "bottom" }, "w"); ';
+  const s = art(P + 'scene("s", { w: 8, h: 3, bg: "r" }, layer("sh", { shade: true, of: "stand", cast: [1, 0], except: ["dot"] }), layer("stand", stamp("post", 0, 3), stamp("post", 5, 3, { shadow: [-1, 0] }), stamp("post", 7, 3, { shadow: false }), stamp("dot", 3, 3)))', "s");
+  eq(s, "wrrrrwrw\nwrrrrwrw\nwkkwkwrw");
+  assert.match(failure(P + 'scene("s", { w: 4, h: 3 }, layer("sh", { shade: true, of: "nope" }))', "s").message, /of names no layer 'nope'/);
 });
 
 test("relight: edges facing the light step lighter along their ramp, edges facing away darker", () => {

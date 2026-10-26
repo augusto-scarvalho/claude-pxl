@@ -938,8 +938,7 @@ function view(c, f) {
   for (const it of [...PALMS].sort((a, b) => along(b.p, f) - along(a.p, f))) {
     const pa = palmAt(it, f)
     if (!pa) continue
-    palmTrunk(c, pa.base, pa.top, 0.17 * pa.sc)
-    palmCrown(c, pa.top[0], pa.top[1], 3.4 * pa.sc, pa.seed * 13 + 5)
+    c.as("palm", () => { palmTrunk(c, pa.base, pa.top, 0.17 * pa.sc); palmCrown(c, pa.top[0], pa.top[1], 3.4 * pa.sc, pa.seed * 13 + 5) })
   }
   // tall grass and weeds along both verges, far to near
   for (let p = Math.floor((travelled(f) + 70) / 2.2) * 2.2; p > travelled(f) + 2; p -= 2.2) {
@@ -947,11 +946,11 @@ function view(c, f) {
     tallGrass(c, SHOULDER + 0.6 + hash(pm, 3) * 2.2, d, f, pm)
     if (hash(pm, 4) < 0.6) tallGrass(c, RAIL_U - 0.5 - hash(pm, 5) * 1.0, d + 1.1, f, pm + 999)
   }
-  // the lamp posts, the chevrons and the sign, far to near
-  for (const it of [...POLES].sort((a, b) => along(b.p, f) - along(a.p, f))) lampPost(c, it, f)
-  for (const it of [...CHEVRONS].sort((a, b) => along(b.p, f) - along(a.p, f))) chevronSign(c, it, f)
-  guideSign(c, f)
-  for (const { r, z } of cars.sort((a, b) => b.z - a.z)) rival(c, r, z, f)
+  // the lamp posts, the chevrons and the sign, far to near, each named (c.as) for describe and check
+  for (const it of [...POLES].sort((a, b) => along(b.p, f) - along(a.p, f))) c.as("lamp post", () => lampPost(c, it, f))
+  for (const it of [...CHEVRONS].sort((a, b) => along(b.p, f) - along(a.p, f))) c.as("chevron", () => chevronSign(c, it, f))
+  c.as("sign", () => guideSign(c, f))
+  for (const { r, z } of cars.sort((a, b) => b.z - a.z)) c.as("rival", () => rival(c, r, z, f))
 }
 
 // ---------------------------------------------------------------- the rear-view mirror
@@ -1198,7 +1197,7 @@ function ribbons(c, f) {
   c.hline(150, 19, 20, "0")
 }
 
-anim("race", { w: W, h: H, frames: FRAMES, fps: FPS },
+anim("race", { w: W, h: H, frames: FRAMES, fps: FPS, world: { horizon: HORIZON, eye: EYE, light: [-1, -0.2] }, check: { every: 24 } },
   (c) => view(c, c.frame),
   stamp("_mirror", 129, 6),
   stamp("_sidemirror", 15, 83),

@@ -640,7 +640,7 @@ function walker(c, frame) {
   if (fade >= 1) return
   c.clip(fade > 0 ? (x, y) => bayer4(x, y) >= fade : undefined, () => {
     shadow(c, frame, pose, side, zk)
-    if (tall >= BIG) draw(c, frame, POSES[pose], side, zk, zh, s)
+    if (tall >= BIG) c.as("walker", () => draw(c, frame, POSES[pose], side, zk, zh, s), { height: TALL })
     else c.stamp("walker_*", ...at(LANE, zk), { fit: tall, frame: pose, ...(side > 0 && { flip: "x" }), ...(zk >= FAR_BODY && { swap: { S: "T", P: "T" } }) })
   })
 }
@@ -725,7 +725,7 @@ function draw(c, frame, pose, side, zk, zh, s) {
   for (const [x, y, above] of rim) c.px(x, y, above ? "R" : "r")
 }
 
-anim("road", { w: W, h: H, frames: FRAMES, fps: FPS },
+anim("road", { w: W, h: H, frames: FRAMES, fps: FPS, world: { horizon: P.horizon, eye: P.eye, light: { at: [SUNX, SUNY] } }, check: { every: 24 } },
   stamp("_sky", 0, 0),
   stamp("_aura", SUNX - 120, SUNY - 47),
   stamp("_sun", SUNX - 30, SUNY - SR - 1),

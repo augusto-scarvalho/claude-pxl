@@ -546,7 +546,7 @@ function rails(c) {
   c.rect(0, RAIL, W, 1, "i"); c.rect(0, RAIL + 1, W, 1, "a"); c.rect(0, RAIL + 2, W, 1, "I"); c.rect(0, RAIL + 3, W, 1, "d")
   for (let x = -(c.moved(SIDE_W) % 96); x < W + 4; x += 96) { c.rect(x - 3, RAIL + 1, 7, 3, "c"); c.px(x - 2, RAIL + 2, "a"); c.px(x + 2, RAIL + 2, "a"); c.vline(x, RAIL, 2, "I") }
 }
-anim("train", { w: W, h: H, frames: FRAMES, fps: FPS },
+anim("train", { w: W, h: H, frames: FRAMES, fps: FPS, world: { light: [-1, -0.5] }, check: { every: 24 } },
   (c) => c.stamp("_sky", 0, 0),
   clouds({ y: 30, gap: 48, w: 46, h: 11, n: 9, seed: 4, sizes: [1, 0.5, 1, 1, 0.5, 1, 0.5, 1, 0.5], empty: [2, 7], keys: "Wwv" }),
   (c) => farRidge(c, c.frame),
@@ -556,7 +556,11 @@ anim("train", { w: W, h: H, frames: FRAMES, fps: FPS },
   // under the train the ballast lies in its shade, between the wheels
   recolor({ p: "P", P: "y", "/": "p", s: "]", g: "Q", Q: "q", z: "g" }, [0, 150, 312, RAIL - 150]),
   rails,
-  (c) => { coach(c, -COACH, c.frame, [...PEOPLE].reverse()); coach(c, 14, c.frame, PEOPLE); conductor(c, 8); tender(c, c.frame); engine(c, c.frame) },
+  // the train, each car named (c.as) for describe and check
+  (c) => {
+    c.as("coach", () => coach(c, -COACH, c.frame, [...PEOPLE].reverse())); c.as("coach", () => coach(c, 14, c.frame, PEOPLE))
+    c.as("conductor", () => conductor(c, 8)); c.as("tender", () => tender(c, c.frame)); c.as("engine", () => engine(c, c.frame))
+  },
   // smoke: a puff every frame from the stack, dark while fresh, left behind at the ground's speed
   plume(296, 89, "YV=", { every: 1, life: 38, rise: 30, wind: -SIDE_W / FRAMES, inertia: 5, size: [3, 13], young: "=$", seed: 5 }),
   scroll("_fg", 164, 1920))

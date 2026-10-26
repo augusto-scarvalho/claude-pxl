@@ -30,12 +30,7 @@ const ceil = [0, 20, 20, 28, 44, 18, 70, 30, 96, 22, 120, 36, 146, 24, 170, 32, 
 const floor = [0, 118, 24, 114, 52, 120, 76, 116, 100, 128, 112, 146, 120, 162, 136, 172, 180, 175, 200, 168, 214, 146, 228, 130, 246, 122, 268, 126, 290, 116, 320, 112];
 const ledgeTop = [236, 74, 300, 70, 320, 72], ledgeUnder = [244, 84, 270, 90, 300, 86, 320, 84];
 const POOL = 150;                                                    // water surface row
-const edgeY = (pts, x) => {
-  for (let i = 0; i < pts.length - 2; i += 2)
-    if (x <= pts[i + 2]) return Math.round(pts[i + 1] + (pts[i + 3] - pts[i + 1]) * (x - pts[i]) / (pts[i + 2] - pts[i]));
-  return pts[pts.length - 1];
-};
-const ground = (x) => edgeY(floor, x), ledge = (x) => edgeY(ledgeTop, x);
+const ceilY = profile(ceil), ground = profile(floor), ledge = profile(ledgeTop), underLedge = profile(ledgeUnder);
 const inPool = (x, y) => y >= POOL && y < ground(x) && x > 100 && x < 220;
 
 // ------------------------------------------------------------------ rock parts (normal-mapped)
@@ -178,10 +173,10 @@ anim("grotto", { w: W, h: H, ...loop },
     poly([66, 26, 90, 24, 84, 60, 80, 90, 86, 118, 64, 118, 70, 90, 72, 60], "R"),                 // column
     poly([136, 176, 140, 152, 147, 145, 158, 144, 166, 147, 172, 154, 176, 176], "R"),            // island
     ...[[44, 12, 4], [96, 16, 5], [120, 26, 5], [150, 12, 3], [170, 18, 4], [250, 14, 4], [276, 20, 5]]
-      .map(([x, len, w]) => poly([x - w, edgeY(ceil, x) - 2, x + w, edgeY(ceil, x) - 2, x, edgeY(ceil, x) + len], "R")),
+      .map(([x, len, w]) => poly([x - w, ceilY(x) - 2, x + w, ceilY(x) - 2, x, ceilY(x) + len], "R")),
     ...[[18, 10, 4], [108, 9, 3], [248, 8, 3], [282, 6, 3]]
       .map(([x, len, w]) => poly([x - w, ground(x) + 2, x + w, ground(x) + 2, x, ground(x) - len], "R")),
-    poly([200, edgeY(ceil, 204) - 1, 207, edgeY(ceil, 204) - 1, 205, edgeY(ceil, 204) + 4, 202, edgeY(ceil, 204) + 4], "_"),  // waterfall crack
+    poly([200, ceilY(204) - 1, 207, ceilY(204) - 1, 205, ceilY(204) + 4, 202, ceilY(204) + 4], "_"),  // waterfall crack
     (c) => { for (let y = 1; y < H; y++) for (let x = 0; x < W; x++) if (c.is(x, y, "R") && c.is(x, y - 1, ".")) c.px(x, y, "q"); },
     bump("bevel", { w: 3 }),
     scatter("_lump*", 0, 0, W, H, 140, { on: "R", clip: true, rflip: "xy", seed: 3 })),
@@ -202,9 +197,9 @@ anim("grotto", { w: W, h: H, ...loop },
     stamp("giant", 140, 145 - 55, { rdelay: true }),
     stamp("fern", 160, 145 - 9, { rdelay: true }), stamp("bell", 146, 145 - 8, { rdelay: true }),
     stamp("crystals", 222, ground(228) - 11),
-    stamp("crystals", 144, edgeY(ceil, 150) - 1, { flip: "y" }),
-    ...vines.map(([x, len]) => stamp("vine" + len, x - 4, edgeY(ceil, x) - 1, { rdelay: true })),
-    ...ledgeVines.map(([x, len]) => stamp("vine" + len, x - 4, edgeY(ledgeUnder, x) - 1, { rdelay: true })),
+    stamp("crystals", 144, ceilY(150) - 1, { flip: "y" }),
+    ...vines.map(([x, len]) => stamp("vine" + len, x - 4, ceilY(x) - 1, { rdelay: true })),
+    ...ledgeVines.map(([x, len]) => stamp("vine" + len, x - 4, underLedge(x) - 1, { rdelay: true })),
     stamp("_bracket", 80, 64), stamp("_bracket", 79, 84), stamp("_bracket", 81, 100),
     (c) => {
       c.lamp(84, 84, { r: 26, color: "#5cf0e0", power: 0.6 + 0.15 * wave(c, 2), z: 5 });
@@ -212,16 +207,16 @@ anim("grotto", { w: W, h: H, ...loop },
       // Glowworm colonies: silk threads, beads that twinkle in turn, one lamp per colony.
       for (const colony of glowworms) {
         for (const [x, len] of colony) {
-          const top = edgeY(ceil, x);
+          const top = ceilY(x);
           c.vline(x, top, len, "i");
           c.px(x, top + len, (c.frame + x) % 7 === 0 ? "C" : "b");
         }
         const mx = Math.round(colony.reduce((a, [x]) => a + x, 0) / colony.length);
-        c.lamp(mx, edgeY(ceil, mx) + 9, { r: 30, color: "#7ab8ff", power: 0.6, z: 10 });
+        c.lamp(mx, ceilY(mx) + 9, { r: 30, color: "#7ab8ff", power: 0.6, z: 10 });
       }
 
       // Waterfall from the crack into the pool: falling streaks, foam and spreading ripples.
-      const top = edgeY(ceil, 204) + 4;
+      const top = ceilY(204) + 4;
       for (let y = top; y < POOL; y++)
         for (let x = 202; x <= 206; x++) {
           // Vertical streaks per column, each with its own offset, scrolling down 6 px a frame.
