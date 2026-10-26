@@ -107,17 +107,34 @@ round it.
   fluttering twice as fast, under a pixel, flickered in its tones on fields: `flutter` 0); each tree's frame offset by where it stands, the gust reaching one side
   first.
 - Trees of a species, built in 3D (`examples/nature/trees.px.js`): one way to grow a tree and a
-  spec per species (`make3d.momiji`, `make3d.ginkgo`, `make3d.kuromatsu`): its form (a trunk forking,
-  a maple's; a leader up the middle, a ginkgo's or a pine's), the trunk's fork, lean and kinks, the
-  branches by order (how many, how steep, how long), the foliage at the twigs' ends in airy clusters
-  or flat cloud pads (`layered`: a maple's tiers). `season` (spring, summer, autumn, a pine's winter;
-  bare) picks the leaves, `color` one of an autumn's; `height` is its top; `wind` m (negative: to the west)
-  its sway. A new species: the nearest spec copied, its leaves in `trees.mats`, then
-  `make3d.define("oak", (o) => trees.grow("oak", OAK, o))`. What it took: forked high, a maple's
-  crown read as an acacia's table, its trunk a lollipop's stick; forked under half a meter, its limbs
-  rising 50 degrees then near level, it came down in tiers; small bumps on the clusters (`bump`,
-  `grain`) gave the leaves' texture under the light; a crown wider than the scene allowed hid the
-  path behind it (`height` sets the top, the width follows).
+  spec per species, a `make3d` builder each: the shrine's momiji, ginkgo and black pine (kuromatsu);
+  the oak, birch, weeping willow, sakura, Italian cypress, umbrella acacia, baobab and coconut palm.
+  The spec: its form (a trunk forking, a maple's or an oak's; a leader up the middle, a ginkgo's, a
+  birch's, a cypress's), the trunk's fork, lean and kinks, its curve (`bow`: a palm's) and swelling
+  (`girth(t)`: a baobab's bottle), the branches by order (how many, how steep, how long), the
+  foliage at the twigs' ends in airy clusters or flat pads (`layered`: a maple's tiers), strands
+  hanging from them (`hang`: a willow's curtains, swinging late behind the crown; golden `twigs`
+  bare) or fronds instead (`fronds`; `fruit`: coconuts), a second bark where a function of the point
+  says (`marks`: a birch's dashes, a palm's rings, a cherry's lenticels). `season` picks the leaves:
+  spring, summer, autumn and bare (a sakura's spring is its blossom); the acacia's summer (the
+  rains) and autumn (dry), the baobab's summer and bare; the evergreens the same all year. `color`
+  picks one of an autumn's, `height` is its top, `wind` m its sway (negative: to the west). A new
+  species: the nearest spec copied (a beech the oak's, a sugi the cypress's), its leaves in
+  `trees.mats`, then `make3d.define("beech", (o) => trees.grow("beech", BEECH, o))`; judge it as
+  flat blocks first (a tone a material), from the side, turned, from above and far, then paint it.
+  Cost, a 50-60 px tree at 20 px to the meter: 0.2-0.5 s (baobab, palm, momiji, birch, cypress),
+  1-1.4 s the dense ones (sakura, acacia, ginkgo, oak, willow), a willow swaying 1.1 s a frame. `pxl
+  check` builds every sprite of a file: the 46 trees of the contact sheet as sprites took the file's
+  check from 7 to 32 s; drawn in place in a `check: false` scene (the grove and the row checked,
+  every species in them), 10 s. What it took: forked high, a maple's crown read as an acacia's
+  table, its trunk a lollipop's stick; forked under half a meter, its limbs rising 50 degrees then
+  near level, it came down in tiers; small bumps on the clusters (`bump`, `grain`) gave the leaves'
+  texture under the light; a crown wider than the scene allowed hid the path behind it (`height`
+  sets the top, the width follows). An oak's long limbs split its crown into lobes (shorter, steeper
+  ones: one heavy dome); a willow came out a box until its outer twigs drooped (`rise` -0.4 at the
+  third order), and its curtain closed with strands as thick as the clusters (a third as thick: the
+  trunk shows); a birch's white twigs vanished against a light ground (marked dark out from the
+  trunk); coconuts hid in the fronds until hung lower; a tree lit from one side is never flipped.
 - A trunk darker than the crown, planted: seen from above, cut at the ground (SLYNYRD); seen from
   the side or at an angle, its foot flared 2-3 px with a root or two. Bark in 1 px stripes, widest
   apart in the middle; a knot. Laying top-down crowns from one clump, importing trees: scenes §4.
