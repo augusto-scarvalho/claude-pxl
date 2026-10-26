@@ -246,6 +246,16 @@ test("panel: 9-slice, corners stay, edges and center repeat; flips turn the marg
   assert.match(failure(PAL + 'sprite("b", { slice: 2 }, "kkk\\nkkk\\nkkk")', "b").message, /slice must be n or \[left, top, right, bottom\] leaving a center/);
 });
 
+test("bubble: a 9-slice sized to its words, its tail down to the point, the prompt at frame t, in bigger pixels at a size", () => {
+  const look = 'sprite("_box", { w: 9, h: 9, slice: 4 }, rect(0, 0, 9, 9, "k"), rect(1, 1, 7, 7, "w")); sprite("_tail", { w: 3, h: 6 }, rect(0, 0, 3, 4, "w"), px(1, 4, "w"), px(1, 5, "r")); anim("_more", { w: 2, h: 2, frames: 2 }, (c) => c.rect(0, 0, 2, 2, c.frame ? "r" : "g")); ';
+  // 17 x 29: the title's row and 7 under it, two lines of 5 + 3, the prompt after the longer; the tail's top 4 rows over the border
+  const s = art(PAL + look + 'scene("s", { w: 18, h: 32 }, bubble(5, 32, "AB", ["CD", "E"], { panel: "_box", tail: "_tail", more: "_more", color: "k", t: 1, pad: 2 }))', "s").split("\n");
+  assert.deepEqual([s[1], s[29], s[30][5], s[31][5], s[27].slice(13, 15)], ["k".repeat(17) + ".", "kkkkwwwkkkkkkkkkk.", "w", "r", "rr"]);
+  const k2 = art(PAL + look + 'scene("s", { w: 30, h: 24, pixel: 2 }, bubble(10, 11, "", "A", { panel: "_box", tail: "_tail", pad: 2, side: -1 }))', "s").split("\n");
+  assert.deepEqual([k2[0].slice(9, 25), k2[20].slice(18, 22), k2[21].slice(18, 22)], ["k".repeat(16), ".rr.", ".rr."], "off to the left, 2 px a pixel, the tip at (20, 22)");
+  assert.match(failure(PAL + 'sprite("b", "kk"); scene("s", { w: 9, h: 9 }, bubble(4, 8, "", "hi", { panel: "b" }))', "s").message, /has no slice margins/);
+});
+
 test("sheet extrude: edge pixels repeat outward, frame rects stay put", () => {
   const p = loadSource(PAL + 'sprite("a", "rw"); sprite("b", "wr")');
   const { sheet, frames } = packSheet([{ name: "a", img: p.image("a") }, { name: "b", img: p.image("b") }], 2, 0, 1);

@@ -59,6 +59,8 @@ declare global {
   }
   interface PxWire extends PxPlace { hang?: string; every?: number; start?: number }
   interface PxText { scale?: number; gap?: number; lead?: number; align?: "l" | "c" | "r"; shadow?: PxColor; font?: string }
+  /** bubble(): the box a 9-slice `panel`, its `tail` down to the point (its top rows over the panel's bottom border), a `rule` under the title, the prompt `more` (an anim at frame `t`); `side` 1 right of the point, -1 left; its pixel `unit` of the art's (0.75); `pad` px in to the words (7). */
+  interface PxBubble { panel: string; tail?: string; rule?: string; more?: string; font?: string; color?: PxColor | [PxColor, PxColor]; side?: number; t?: number; unit?: number; pad?: number }
   interface PxAssetOpts {
     w?: number; h?: number; base?: string; mx?: boolean | "c"; my?: boolean | "c"; swap?: Record<string, PxColor>;
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; angle?: number; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; outline?: PxColor; outline8?: PxColor; crop?: boolean; layers?: boolean;
@@ -443,6 +445,22 @@ declare global {
     /** Whole ms steps since a moment, up to n - 1. */
     since(t: number, a: string | [string, number], ms?: number, n?: number): number;
   }
+  /** A step of a route: a leg walked from a to b (as written), or a hold at a; its frames from `start`. */
+  interface PxRouteLeg { name?: string; dir: string; a: number[]; b: number[]; n: number; start: number; walk: boolean }
+  interface PxRoute {
+    /** The figure at frame f, a sprite for mesh(): `${anim}_${dir}` at its feet; null before it starts and once it is done. */
+    (f: number): { name: string; at: number[]; frame: number; dir: string; flip?: "x" } | null;
+    /** The frame a named step begins; span, fade and since as an ability's. */
+    start(name: string): number;
+    span: PxAbility["span"]; fade: PxAbility["fade"]; since: PxAbility["since"];
+    step(name: string): PxRouteLeg;
+    /** A point [x, z] nearer than d m to one of its legs (a tree in its way). */
+    near(p: number[], d: number): boolean;
+    /** s m along its points (corners rounded by `round`), straight on past both ends: where and the unit way it heads. */
+    at(s: number): { x: number; z: number; heading: number[] };
+    /** Its frames, and those rounded up to a whole number of `loop`. */
+    total: number; frames: number;
+  }
   interface PxParticle { x: number; y: number; vx: number; vy: number; age: number; life: number; id: number }
   /** An element of the spell kit: a recipe (scenes.md, "Designing an element"); `like` an element to start from. */
   interface PxElement {
@@ -624,6 +642,7 @@ declare global {
     pose(joints: Record<string, number[]>, opts?: PxPose): void;
     wire(x0: number, y0: number, x1: number, y1: number, sag: number, c: PxColor, opts?: PxWire): void;
     text(x: number, y: number, str: string | number, c: PxColor, opts?: PxText): void;
+    bubble(x: number, y: number, title: string | number, lines: string | string[], opts: PxBubble): void;
     lamp(x: number, y: number, opts?: PxLamp): void;
     bump(shape?: PxBumpShape, opts?: PxBump): void;
     normals(x: number, y: number, str: string): void;
@@ -728,6 +747,11 @@ declare global {
   function tween(keys: ({ t: number } & Record<string, unknown>)[], opts?: { moments?: string[] }): (t: number) => Record<string, any> & { t: number };
   /** [frames, value] runs as a value a frame ([frames, a, b] holds [a, b]). */
   function unroll(runs: [number, ...unknown[]][]): unknown[];
+  /** A figure's legs and holds on the clock: route({ pace, origin, ground, walk, idle, loop }, [[x, z], [x, z], { hold: 40, name: "talk" }, ...]). */
+  function route(opts: { pace?: number; origin?: number[]; ground?: (x: number, z: number) => number; climb?: boolean; walk?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; idle?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; loop?: number; round?: number },
+    steps: (number[] | { to: number[]; name?: string; dir?: string; anim?: string; frame?: (f: number, t: number) => number } | { hold: number; name?: string; dir?: string; anim?: string; frame?: (f: number, t: number) => number })[]): PxRoute;
+  /** A figure turning to a target (a sprite, a point, a direction, null; or a function of the frame giving one) a direction every `every` frames: (f) => its sprite. */
+  function turnToward(anim: string, at: number[], target: unknown, opts?: { every?: number; rest?: string; within?: number; from?: number; frame?: (f: number) => number }): (f: number) => { name: string; at: number[]; frame: number };
   /** A spell's phases on the clock: ability([["charge", 600], ["cast", 150], ["travel", 500], ...], { start, events }). */
   function ability(phases: [string, number][] | Record<string, number>, opts?: { start?: number; events?: Record<string, [string, number]> }): PxAbility;
   /** Seeded particles: (t) gives the ones alive at time t, each where its own path puts it. */
@@ -873,6 +897,8 @@ declare global {
   function pose(src: string | Record<string, number[]>, opts?: PxPose): PxOp;
   function wire(x0: number, y0: number, x1: number, y1: number, sag: number, c: PxColor, opts?: PxWire): PxOp;
   function text(x: number, y: number, str: string | number, c: PxColor, opts?: PxText): PxOp;
+  /** A dialogue box over a speaker: title over lines in a 9-slice sized to them, its tail down to (x, y) (art px), the prompt in its corner. */
+  function bubble(x: number, y: number, title: string | number, lines: string | string[], opts: PxBubble): PxOp;
   function lamp(x: number, y: number, opts?: PxLamp): PxOp;
   function bump(shape?: PxBumpShape, opts?: PxBump): PxOp;
   function normals(x: number, y: number, str: string): PxOp;

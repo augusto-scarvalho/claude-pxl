@@ -271,50 +271,25 @@ const feetAt = (x, z) => {                         // how high the ground is und
   if (dz < 1.4 && Math.abs(x) < 1) return TOP - 0.3 * (Math.floor(dz / 0.35) + 1)
   return 0
 }
-const LEGS = [
-  ["ne", [-2.6, -7.8], [-0.2, -5.4]],              // in from the near left, from just out of the picture
-  ["n", [-0.2, -5.4], [-0.2, 0.4]],                // up the steps and the path
-  ["e", [-0.2, 0.4], [1.2, 0.4]],                  // to the old grave with flowers, beside it
-  ["e", 40, "grave"],                              // kneels and lays a flower at its foot (in front, he'd hide it)
-  ["nw", [1.2, 0.4], [-0.2, 1.8]],
-  ["w", [-0.2, 1.8], [-1.95, 1.8]],                // to the mourner's side
-  ["w", 76, "talk"],
-  ["se", [-1.95, 1.8], [-0.2, 0.05]],
-  ["s", [-0.2, 0.05], [-0.2, -5.4]],               // back down
-  ["sw", [-0.2, -5.4], [-2.6, -7.8]],              // and away
-].map(([dir, a, b]) => (Array.isArray(a) ? { dir, a, b, n: Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / PACE) } : { dir, n: a, what: b }))
-const BUSY = LEGS.reduce((n, l) => n + l.n, 0), FRAMES = Math.ceil(BUSY / 44) * 44
-const TALK = LEGS.slice(0, 6).reduce((n, l) => n + l.n, 0)              // the frame he stops by her
-const GRAVE = LEGS.slice(0, 3).reduce((n, l) => n + l.n, 0)             // the frame he stops by the grave
+const idle = (f) => Math.floor((f * MS) / 250) % 4  // the idle's 250 ms on the scene's clock; the walk a frame a frame
+const visit = route({ pace: PACE, origin: [0, Z], ground: feetAt, walk: "tr_walk", idle: { anim: "tr_idle", frame: idle }, loop: 44 }, [
+  [-2.6, -7.8], [-0.2, -5.4],                      // in from the near left, from just out of the picture
+  { to: [-0.2, 0.4], name: "up" },                 // up the steps and the path
+  [1.2, 0.4],                                      // to the old grave with flowers, beside it
+  // kneels (a frame of it every 2 of the scene's) and lays a flower at its foot (in front, he'd hide it), up again
+  { hold: 30, name: "grave", anim: "tr_kneel", frame: (f, t) => (t < 8 ? t >> 1 : t < 22 ? 3 : 4 + Math.min(2, (t - 22) >> 1)) },
+  { hold: 10 },
+  [-0.2, 1.8], [-1.95, 1.8],                       // to the mourner's side
+  { hold: 76, name: "talk" },
+  [-0.2, 0.05],
+  { to: [-0.2, -5.4], name: "down" },              // back down
+  [-2.6, -7.8],                                    // and away
+])
+const FRAMES = visit.frames, TALK = visit.start("talk"), GRAVE = visit.start("grave")
 // the gap in the wood he comes and goes by: no pine within a meter of his way
-const nearWay = ([x, z]) => LEGS.some(({ a, b }) => {
-  if (!a) return false
-  const [ax, az] = [a[0], Z + a[1]], [bx, bz] = [b[0], Z + b[1]], dx = bx - ax, dz = bz - az
-  const k = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)))
-  return Math.hypot(x - ax - dx * k, z - az - dz * k) < 1
-})
-const wood = things.filter((t) => !(t.name.startsWith("_spruce") && nearWay(t.at)))
-// where he is and what he does at frame f; the mourner's turn to him and back
-const traveler = (f) => {
-  let t = f, at = LEGS[0].a
-  for (const L of LEGS) {
-    if (L.a && t < L.n) {
-      const k = t / L.n, x = L.a[0] + (L.b[0] - L.a[0]) * k, z = Z + L.a[1] + (L.b[1] - L.a[1]) * k
-      return { name: `tr_walk_${L.dir}`, at: [x, z, feetAt(x, z)], frame: f % 8 }
-    }
-    // at the grave: down (a frame of the kneel every 2 of the scene's), the flower laid, held, up again
-    const kneel = L.what === "grave" && t < 30 ? (t < 8 ? t >> 1 : t < 22 ? 3 : 4 + Math.min(2, (t - 22) >> 1)) : -1
-    if (!L.a && t < L.n) return { name: kneel >= 0 ? `tr_kneel_${L.dir}` : `tr_idle_${L.dir}`, at: [at[0], Z + at[1], feetAt(at[0], Z + at[1])], frame: kneel >= 0 ? kneel : Math.floor((f * MS) / 250) % 4 }
-    if (L.a) at = L.b
-    t -= L.n
-  }
-  return null
-}
-const TURN = ["nw", "n", "ne", "e"]
-const mourner = (f) => {
-  const t = f - TALK, k = t < 12 ? 0 : t < 76 ? Math.min(3, Math.floor((t - 12) / 2) + 1) : Math.max(0, 3 - Math.floor((t - 80) / 2) - 1)
-  return { name: `mo_idle_${TURN[t < 76 || t >= 80 ? k : 3]}`, at: [-2.75, Z + 2.45], frame: Math.floor((f * MS) / 250) % 4 }
-}
+const wood = things.filter((t) => !(t.name.startsWith("_spruce") && visit.near(t.at, 1)))
+// the mourner turns to him a direction every two frames once he has asked, and back as he goes
+const mourner = turnToward("mo_idle", [-2.75, Z + 2.45], (f) => (f >= TALK + 12 && f < TALK + 80 ? "e" : null), { rest: "nw", from: TALK, frame: idle })
 const SAYS = [
   [4, 32, "Alden", ["Are you all right?"], () => [-1.95, Z + 1.8, TOP], 1],
   [36, 74, "Edith", ["I will be.", "Thank you for asking."], () => [-2.75, Z + 2.45, TOP], -1],
@@ -326,7 +301,7 @@ const SAYS = [
 // lower edge down to the speaker's head; a blue-grey mark at its lower right corner that more is
 // coming. Over the speaker and off to one side (side: 1 right, -1 left), in pixels finer than the
 // art's (3 of the picture's to the art's 4), as a game's interface is.
-const bubble = (c, [x, z, u], name, lines, side, t) => {
+const say = (c, [x, z, u], name, lines, side, t) => {
   const K = c.k, U = Math.max(1, Math.round(K * 0.75)), pad = 7, lineH = 10, ch = 5
   const tw = Math.max(name.length * 6 + 16, ...lines.map((l) => l.length * 6)), w = tw + 2 * pad + 8, h = pad + 7 + 6 + lines.length * lineH + pad - 2
   const [hx, hy] = CAM.ground(x, z, u + 1.5).map((p) => p * K), tail = 9
@@ -361,7 +336,7 @@ const bubble = (c, [x, z, u], name, lines, side, t) => {
 }
 const talk = (c) => {
   const t = c.frame - TALK
-  for (const [t0, t1, name, lines, who, side] of SAYS) if (t >= t0 && t < t1) bubble(c, who(), name, lines, side, t - t0)
+  for (const [t0, t1, name, lines, who, side] of SAYS) if (t >= t0 && t < t1) say(c, who(), name, lines, side, t - t0)
 }
 // The wind from the left: the pines and the dead tree sway with it (16 frames of 220 ms, a whole number
 // of sways a loop), the gust reaching the ones on the left first; and it brings small dead leaves in
@@ -375,7 +350,7 @@ const leaves = (c) => LEAVES.map((l, i) => {
   return { name: l.name, at: [c.cross(l.x0, { span: 36, per: 36 * 6, from: -18, whole: false }), l.z + 0.4 * Math.sin(8 * w + l.ph), l.u + 0.45 * Math.sin(12 * w + l.ph)], frame: (f + i) % 4, shadow: 0, air: true }
 })
 const laid = (f) => (f >= GRAVE + 8 ? [{ name: "_rose", at: [1.55, Z + 0.3], shadow: 0 }] : [])
-const people = (c, f = c.frame) => [...wood.map((t) => sway(t, f)), ...leaves(c), ...laid(f), mourner(f), ...[traveler(f)].filter(Boolean)]
+const people = (c, f = c.frame) => [...wood.map((t) => sway(t, f)), ...leaves(c), ...laid(f), mourner(f), ...[visit(f)].filter(Boolean)]
 const CLOCK = { frames: FRAMES, fps: 1000 / MS }
 // Morning: the sun behind on the left (the shadows fall toward us and to the right), warm; the sky's
 // light violet in the shade.
@@ -412,9 +387,8 @@ const leaf = (side) => sdf.union([
   ...[0, 1, 2, 3, 4].flatMap((k) => [sdf.box([3 / 24, 1 / 24, 0.62]).at(0.11 + 0.245 * k, 0, 0.31), sdf.box([0.088, 1 / 24, 0.088]).rotate(45, "y").at(0.11 + 0.245 * k, 0, 0.62)]),
   ...[0.26, 0.56].map((u) => sdf.box([1.16, 0.04, 2 / 24]).at(0.6, side * 0.042, u)),
   sdf.box([1.04, 0.04, 2 / 24]).rotate(-16.7, "y").at(0.6, side * 0.042, 0.41)]).mat("gate")
-const legAt = (i) => LEGS.slice(0, i).reduce((n, l) => n + l.n, 0)
-const gateAt = (i) => legAt(i) + (LEGS[i].n * (-2.2 - LEGS[i].a[1])) / (LEGS[i].b[1] - LEGS[i].a[1])  // the frame he crosses its line
-const GIN = gateAt(1), GOUT = gateAt(8), ease = (k) => { const v = Math.max(0, Math.min(1, k)); return v * v * (3 - 2 * v) }
+const gateAt = (leg) => { const L = visit.step(leg); return L.start + (L.n * (-2.2 - L.a[1])) / (L.b[1] - L.a[1]) }  // the frame he crosses its line
+const GIN = gateAt("up"), GOUT = gateAt("down"), ease = (k) => { const v = Math.max(0, Math.min(1, k)); return v * v * (3 - 2 * v) }
 const gateOpen = (f) => 50 * ease((f - GIN + 22) / 12) * (1 - ease((f - GOUT - 12) / 12))
 const GATE = [{ x: -1.217, f: leaf(1).rotate((c) => gateOpen(c.frame)) }, { x: 1.217, f: leaf(-1).rotate((c) => 180 - gateOpen(c.frame)) }]
 // The morning mist: a thin layer lying low in the wood round the hill and over its foot (never on its

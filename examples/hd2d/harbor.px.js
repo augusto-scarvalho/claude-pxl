@@ -635,67 +635,42 @@ const feetAt = (x, z) => {
   if (s >= 0 && s <= 1 && Math.abs(across) < 0.85) return UPPER + (LOWER + 0.02 - UPPER) * s
   return x <= -9.2 || (x <= -7.4 && z >= x + 3.0 - 1e-6) ? UPPER : LOWER
 }
-const onBoard = (x, z) => z > -5.3 && x > -1.0 && x < 4.6
-const legLen = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1], feetAt(...b) - feetAt(...a))
-const LEGS = [
-  ["ne", [-11.6, -8.6], [-8.4, -5.4]],             // in from the left along the walkway, to the ramp's head
-  ["se", [-8.4, -5.4], [-6.42, -7.38]],            // down the ramp
-  ["e", [-6.42, -7.38], [-1.0, -7.38]],            // along the pier
-  ["ne", [-1.0, -7.38], [0.0, -6.38]],             // beside the captain, facing him
-  ["e", 72, "talk"],
-  ["n", [0.0, -6.38], [0.0, -5.3]],                // to the gangway
-  ["n", [0.0, -5.3], [0.0, -2.6]],                 // up it
-  ["n", [0.0, -2.6], [0.0, -1.9]],
-  ["e", [0.0, -1.9], [4.4, -1.9]],                 // across the deck and in at the stern castle's door
-].map(([dir, a, b]) => (Array.isArray(a) ? { dir, a, b, n: Math.round(legLen(a, b) / PACE) } : { dir, n: a, what: b }))
-const BUSY = LEGS.reduce((n, l) => n + l.n, 0), FRAMES = Math.ceil(BUSY / LOOP) * LOOP
-const TALK = LEGS.slice(0, 4).reduce((n, l) => n + l.n, 0), TALKED = TALK + LEGS[4].n
-// where Alden is and what he does at frame f (null: gone), riding the ship's bob when aboard
+const onBoard = (x, z) => z > Z - 5.3 && x > -1.0 && x < 4.6   // z in the world's
+const visit = route({ pace: PACE, origin: [0, Z], ground: (x, z) => feetAt(x, z - Z), climb: true, walk: "tr_walk", idle: { anim: "tr_idle", frame: idle }, loop: LOOP }, [
+  [-11.6, -8.6], [-8.4, -5.4],                     // in from the left along the walkway, to the ramp's head
+  [-6.42, -7.38],                                  // down the ramp
+  [-1.0, -7.38],                                   // along the pier
+  [0.0, -6.38],                                    // beside the captain, facing him
+  { hold: 72, name: "talk", dir: "e" },
+  { to: [0.0, -5.3], name: "gangway" },            // to the gangway
+  [0.0, -2.6],                                     // up it
+  { to: [0.0, -1.9], name: "deck" },
+  [4.4, -1.9],                                     // across the deck and in at the stern castle's door
+])
+const FRAMES = visit.frames, TALK = visit.start("talk"), TALKED = visit.start("gangway")
+// where Alden is at frame f (null: gone), riding the ship's bob when aboard
 const alden = (f) => {
-  let t = f, at = LEGS[0].a
-  for (const L of LEGS) {
-    if (t < L.n) {
-      const [x, z] = L.a ? [L.a[0] + ((L.b[0] - L.a[0]) * t) / L.n, L.a[1] + ((L.b[1] - L.a[1]) * t) / L.n] : at
-      let p = [x, Z + z, feetAt(x, z)]
-      if (onBoard(x, z)) { const { th, dh } = shipPose(f); p = turnPt(p, SHIPC, [1, 0, 0], th, dh) }
-      return L.a ? { name: `tr_walk_${L.dir}`, at: p, frame: f % 8 } : { name: `tr_idle_${L.dir}`, at: p, frame: idle(f) }
-    }
-    if (L.a) at = L.b
-    t -= L.n
-  }
-  return null
+  const a = visit(f)
+  if (a && onBoard(a.at[0], a.at[1])) { const { th, dh } = shipPose(f); a.at = turnPt(a.at, SHIPC, [1, 0, 0], th, dh) }
+  return a
 }
 // the captain at the gangway's foot: watching the pier, turning to Alden when he asks, then after him
 // as he goes up, and back when he has gone; a direction every two frames
-const CAPTAIN = [1.15, -6.3], GONE = BUSY
+const CAPTAIN = [1.15, -6.3], GONE = visit.total
 const CAPTURNS = [[0, "sw"], [TALK + 2, "w"], [TALKED + 6, "nw"], [TALKED + 8, "n"], [GONE + 8, "nw"], [GONE + 10, "w"], [GONE + 12, "sw"]]
 const captain = (f) => ({ name: `cap_idle_${CAPTURNS.filter(([k]) => k <= f).at(-1)[1]}`, at: [CAPTAIN[0], Z + CAPTAIN[1], LOWER], frame: idle(f) })
 // Edith and the companion by the gangway, watching him: each turns toward him a direction every two
 // frames while he is near, and back to the pier when he has gone
-const ORDER = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
-const watchers = [["mo", -3.2, -5.75], ["cmp", -2.3, -5.6]].map(([who, x, z]) => {
-  const dirs = [], target = (f) => {
-    const a = alden(f)
-    if (!a || Math.hypot(a.at[0] - x, a.at[1] - Z - z) > 6.5) return 4
-    return ((Math.round(Math.atan2(a.at[0] - x, a.at[1] - Z - z) / (Math.PI / 4)) % 8) + 8) % 8
-  }
-  let k = 4
-  for (let f = 0; f < FRAMES; f++) {
-    const want = target(f)
-    if (f % 2 === 0 && want !== k) k = (k + (((want - k + 8) % 8) <= 4 ? 1 : 7)) % 8
-    dirs.push(ORDER[k])
-  }
-  return (f) => ({ name: `${who}_idle_${dirs[f % FRAMES]}`, at: [x, Z + z], frame: idle(f) })
-})
+const watchers = [["mo", -3.2, -5.75], ["cmp", -2.3, -5.6]].map(([who, x, z]) => turnToward(`${who}_idle`, [x, Z + z], alden, { within: 6.5, frame: idle }))
 // the two talking in the middle of the pier: now one, now the other turns his head toward us and back
 const talkers = (f) => [
   { name: `sai_idle_${f % 64 >= 10 && f % 64 < 26 ? "se" : "e"}`, at: [2.55, Z - 7.9], frame: idle(f) },
   { name: `dkb_idle_${f % 64 >= 40 && f % 64 < 56 ? "sw" : "w"}`, at: [3.4, Z - 7.75], frame: (idle(f) + 2) % 4 },
 ]
 const SAYS = [
-  [3, 25, "Alden", ["Is this the ship", "to Port Winds?"], () => LEGS[3].b, -1],
+  [3, 25, "Alden", ["Is this the ship", "to Port Winds?"], () => visit.step("talk").a, -1],
   [28, 50, "Captain", ["Aye. We sail", "with the tide."], () => CAPTAIN, 1],
-  [53, 70, "Alden", ["Then I'm aboard."], () => LEGS[3].b, -1],
+  [53, 70, "Alden", ["Then I'm aboard."], () => visit.step("talk").a, -1],
 ].map(([t0, t1, name, lines, who, side]) => [t0, t1, name, lines, () => { const [x, z] = who(); return [x, Z + z, LOWER] }, side])
 // A dialogue box as HD-2D games draw theirs (Triangle Strategy above all): parchment, its corners cut;
 // a warm beige with faint fibers running across it, darker toward its edges as old paper is, a light
@@ -704,7 +679,7 @@ const SAYS = [
 // lower edge down to the speaker's head; a blue-grey mark at its lower right corner that more is
 // coming. Over the speaker and off to one side (side: 1 right, -1 left), in pixels finer than the
 // art's (3 of the picture's to the art's 4), as a game's interface is.
-const bubble = (c, [x, z, u], name, lines, side, t) => {
+const say = (c, [x, z, u], name, lines, side, t) => {
   const K = c.k, U = Math.max(1, Math.round(K * 0.75)), pad = 7, lineH = 10, ch = 5
   const tw = Math.max(name.length * 6 + 16, ...lines.map((l) => l.length * 6)), w = tw + 2 * pad + 8, h = pad + 7 + 6 + lines.length * lineH + pad - 2
   const [hx, hy] = CAM.ground(x, z, u + 2.1).map((p) => p * K), tail = 9
@@ -739,7 +714,7 @@ const bubble = (c, [x, z, u], name, lines, side, t) => {
 }
 const talk = (c, f = c.frame) => {
   const t = f - TALK
-  for (const [t0, t1, name, lines, who, side] of SAYS) if (t >= t0 && t < t1) bubble(c, who(), name, lines, side, t - t0)
+  for (const [t0, t1, name, lines, who, side] of SAYS) if (t >= t0 && t < t1) say(c, who(), name, lines, side, t - t0)
 }
 const people = (f) => [
   ...[alden(f)].filter(Boolean), captain(f), ...watchers.map((w) => w(f)), ...talkers(f),
@@ -774,4 +749,4 @@ camera("harbor", { frames: FRAMES, check: { every: 24 }, sizes: { harbor_md: 2 }
 // Alden's last steps to the captain through the talk to the head of the gangway (the whole loop's GIF,
 // 38 s of water moving everywhere, would run to 28 MB).
 const CLIP0 = TALK - 12
-camera("harbor_clip", { w: W * 2, h: H * 2, pixel: 2, frames: TALKED + LEGS[5].n + LEGS[6].n - CLIP0, check: false }, CLIP0)
+camera("harbor_clip", { w: W * 2, h: H * 2, pixel: 2, frames: visit.start("deck") - CLIP0, check: false }, CLIP0)

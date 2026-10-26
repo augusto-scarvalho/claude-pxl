@@ -324,19 +324,21 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   in nine, nail heads over the joists, joints staggered; the board ends along its front as end grain; a
   hull's strakes over a line of tar, algae climbing from the waterline in streaks; a rowboat clinker,
   a shadow line under each strake's lip.
-- A story in a diorama (the graveyard's visit): legs walked in a direction each, at the walk's own
-  pace (a cycle's two steps over its frames; faster, the feet slide), the feet at the height of what
-  is under them (ground, each step, a path); holds between them in an idle; the other figure turning
-  to whoever speaks, a direction every two frames. Stand a figure beside what it looks at, not in
-  front of it: from above and in front its body hides a headstone it faces, and kneeling a step too
-  close its head meets the stone. Clear what stands in its way (no tree within a meter of its walk).
-  Start the loop with the figure just past the picture's edge, the wait that rounds it off after it
-  has gone: a GIF that opens on seconds of nothing loses whoever is watching. A thing laid down
-  (a rose at the grave) appears where the hand reaches the ground, out of the stone's shadow. Dialogue as HD-2D games draw it (Triangle Strategy):
-  parchment with cut corners, fibers, darker toward its edges, a light line inside a thin brown
-  outline, the name over a rule from a small diamond, the words in a 5x7 font, a short tail to the
-  speaker, a mark that more is coming, bobbing a pixel and blinking off as a game's prompt waiting
-  for a button does; drawn after `post()`, so it stays sharp, in pixels finer than the art's. A loop that long checked one frame in 24: `check: { every: 24 }` (no rule runs on it but the frames building: fewer keep the tests fast).
+- A story in a diorama (the graveyard's visit): `route()` walks its legs and holds by name, each leg
+  facing its way, at the walk's own pace (a cycle's two steps over its frames; faster, the feet
+  slide), the feet on its `ground` (each step, a path); time what hangs on a hold by `start("talk")`,
+  never by summing frames. `turnToward()` turns the other figure to whoever speaks, a direction every
+  two frames. Stand a figure beside what it looks at, not in front of it: from above and in front its
+  body hides a headstone it faces, and kneeling a step too close its head meets the stone. Clear what
+  stands in its way (`near()`: no tree within a meter of its walk). Start the loop with the figure
+  just past the picture's edge, the wait that rounds it off after it has gone: a GIF that opens on
+  seconds of nothing loses whoever is watching. A thing laid down (a rose at the grave) appears where
+  the hand reaches the ground, out of the stone's shadow. Dialogue by `bubble()`, as HD-2D games draw
+  it (Triangle Strategy), its look your sprites: parchment with cut corners, fibers, darker toward its
+  edges, a light line inside a thin brown outline (a 9-slice), the name over a rule from a small
+  diamond, the words in a 5x7 font, a short tail to the speaker, a mark that more is coming, bobbing a
+  pixel and blinking off as a game's prompt waiting for a button does (an anim); drawn after `post()`,
+  so it stays sharp, in pixels finer than the art's (`unit: 0.75`). A loop that long checked one frame in 24: `check: { every: 24 }` (no rule runs on it but the frames building: fewer keep the tests fast).
 - The ground and what grows and lies on it (grass, trees, bushes, rocks, walls, paths, tufts,
   flowers), as 16-bit games draw them: the environment guide (`pxl help "environment"`, by section)
   and its kit, `examples/nature/kit.px.js`, to include.

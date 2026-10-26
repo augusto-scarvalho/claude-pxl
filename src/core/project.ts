@@ -30,7 +30,7 @@ import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
 import { type Lut, readCube, readStrip } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
-import { ability, emitter, tween, unroll } from "./vfx.ts";
+import { ability, emitter, route, turnToward, tween, unroll } from "./vfx.ts";
 import { SPELL_OPTS, spell } from "./spells.ts";
 import { bayer, fbm, globRe, gridRows, latticeHash, rng, vnoise, seamless } from "./util.ts";
 
@@ -94,6 +94,7 @@ export const SIGNATURES: Record<string, string> = {
   runs: "rows:o",
   wire: "x0:n y0:n x1:n y1:n sag:n c:c ?opts:o",
   text: "x:n y:n str:t c:c ?opts:o",
+  bubble: "x:n y:n title:t lines:L opts:o",
   clip: "where:r ...items:I",
   lamp: "x:n y:n ?opts:o",
   bump: "?shape:s opts:o",
@@ -127,6 +128,7 @@ export const OP_OPTS: Record<string, string[]> = {
   tilemap: [...PLACE, "map", "corners", "iso", "size", "w", "h", "x", "y"],
   wire: [...PLACE, "hang", "every", "start"],
   text: ["scale", "gap", "lead", "align", "shadow", "font"],
+  bubble: ["panel", "tail", "rule", "more", "font", "color", "side", "t", "unit", "pad"],
   lamp: ["r", "color", "power", "z"],
   curve: ["width", "closed"],
   arc: ["inner", "taper"],
@@ -993,6 +995,23 @@ export class Project implements BuildCtx {
         checkKeys("ability", opts, ["start", "events"]);
         return ability(phases as never, opts as never);
       } catch (e) { throw wrap(e).within("ability", loc); }
+    };
+    // route(opts, steps): a figure's legs and holds on the clock; turnToward(anim, at, target, opts): one turning to another (vfx.ts)
+    env.route = (opts: unknown, steps: unknown) => {
+      const loc = this.callerLoc();
+      try {
+        if (!isPlainObject(opts)) throw new PxError("route({ pace, origin, ground, climb, walk, idle, loop, round }, [[x, z], ...steps])");
+        checkKeys("route", opts, ["pace", "origin", "ground", "climb", "walk", "idle", "loop", "round"]);
+        return route(opts as never, steps as never);
+      } catch (e) { throw wrap(e).within("route", loc); }
+    };
+    env.turnToward = (anim: unknown, at: unknown, target: unknown, opts: unknown = {}) => {
+      const loc = this.callerLoc();
+      try {
+        if (!isPlainObject(opts)) throw new PxError('turnToward("mo_idle", [x, z], target, { every, rest, within, from, frame })');
+        checkKeys("turnToward", opts, ["every", "rest", "within", "from", "frame"]);
+        return turnToward(anim as never, at as never, target, opts as never);
+      } catch (e) { throw wrap(e).within("turnToward", loc); }
     };
     // tween(keys, { moments }): values keyed in time, at(t); unroll(runs): [frames, value] runs as a value a frame (vfx.ts)
     env.tween = (keys: unknown, opts: unknown = {}) => {

@@ -3,7 +3,7 @@ import { Img } from "./image.ts";
 import type { Palette, Resolved } from "./palette.ts";
 import { PxError } from "./errors.ts";
 import { glyph, lineWidth } from "./font.ts";
-import type { BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
+import type { BubbleOpts, BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
 import { bump, dirOf, setNormal } from "./normals.ts";
 import { LOOKS, dissolveChar, dissolveEdge, lightestOf, runEffect } from "./effects.ts";
 import { type SmokeOpts, drawSmoke } from "./smoke.ts";
@@ -1663,6 +1663,36 @@ export class Canvas {
       ly += (lineH + lead) * sc;
     }
   }
+
+  /**
+   * A dialogue box as a game draws one over whoever speaks: `title` over `lines` in the 9-slice `panel`,
+   * sized to them, off to one `side` of (x, y) (art px; 1 right, -1 left), its `tail` down to it (the
+   * tail's top rows over the panel's bottom border); a `rule` (9-slice) under the title, the prompt
+   * `more` in its lower right corner (an anim at frame `t`, the frames since it opened: its blink its
+   * own frames). In pixels of max(1, round(k × unit)) px: finer than the art's at a size.
+   */
+  bubble(x: number, y: number, title: string | number, lines: string | string[], o: BubbleOpts): void {
+    if (typeof o?.panel !== "string") throw new PxError("bubble(x, y, title, lines, { panel, tail?, rule?, more?, font?, color?, side?, t?, unit?, pad? }): panel is a sprite with slice margins (a 9-slice)");
+    const f = { font: o.font }, g = o.font ? this.res.glyphs(o.font) : glyph, lh = g(" ").length, name = String(title ?? ""), wd = (s: string) => lineWidth(s, {}, g);
+    const ls = (Array.isArray(lines) ? lines : String(lines).split("\n")).map(String), [tc, lc] = Array.isArray(o.color) ? o.color : [o.color ?? "k", o.color ?? "k"];
+    const P = this.asset(o.panel), tail = o.tail ? this.asset(o.tail) : undefined, more = o.more ? this.asset(o.more, { frame: o.t ?? 0 }) : undefined, rule = o.rule && name ? this.asset(o.rule) : undefined;
+    if (!P.slice) throw new PxError(`bubble: panel '${o.panel}' has no slice margins: give it { slice: n }`);
+    // the words after the rule's left end (a diamond), the prompt after the last line
+    const [sl, st, sr, sb] = P.slice, pad = o.pad ?? 7, tx = pad + (rule?.slice ? rule.slice[0] + 1 : 0), top = name ? lh + 7 : 0;
+    const w = Math.max(sl + sr, tx + wd(name) + pad, tx + Math.max(0, ...ls.map(wd)) + (more ? more.w + 4 : 0) + pad), h = Math.max(st + sb, 2 * pad + top + ls.length * (lh + 3) - 3);
+    // the tail a fifth of the way in from the side the box goes out from, on its straight edge
+    const tw = tail?.w ?? 1, th = tail ? tail.h - sb : 0, at = Math.max(sl, Math.min(w - sr - tw, Math.round(((o.side ?? 1) < 0 ? 0.78 : 0.22) * w) - (tw >> 1)));
+    const sub = new Canvas(new Img(w, h + th), this.pal, this.res);
+    sub.panel(o.panel, 0, 0, w, h);
+    if (tail) sub.put(tail, at, h - sb);
+    if (name) sub.text(tx, pad, name, tc, f);
+    if (rule) sub.panel(o.rule!, pad, pad + lh + 2 - (rule.h >> 1), Math.max(tx - pad + wd(name) + 4, Math.round(0.6 * (w - 2 * pad))), rule.h);
+    ls.forEach((l, i) => sub.text(tx, pad + top + i * (lh + 3), l, lc, f));
+    if (more) sub.put(more, w - pad - more.w, h - pad - more.h + 1);
+    const U = Math.max(1, Math.round(this.k * (o.unit ?? 1)));
+    this.put(sub.img.scale(U), Math.round(x * this.k - (at + (tw >> 1) + 0.5) * U), Math.round(y * this.k) - (h + th) * U);
+    this.lettered();
+  }
 }
 
 /** Start time (ms) of frame `n` of a timeline. */
@@ -1681,7 +1711,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp", "effect",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "voxels", "volume", "splats", "decal", "draw3d", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "bubble", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "voxels", "volume", "splats", "decal", "draw3d", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

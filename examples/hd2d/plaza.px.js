@@ -26,11 +26,9 @@ block("wood", "wood", 2.4, Z - 1.6, 3.2, Z - 0.8, UP, UP + 0.6) // a crate
 
 // The scene's clock: 16 frames of 210 ms, the walk's. One hero walks close behind the wall (from
 // this high up a wall hides only what is near it), 2 m right and back, a step a frame; the others
-// stand: in front of the wall, half behind the crate, and on the grass below the step.
-const walker = (f) => {
-  const back = f >= 8, x = -2.5 + 0.25 * (back ? 16 - f : f)
-  return { name: "walk_side", at: [x, Z + 2.25], frame: f % 4, ...(back ? { flip: "x" } : {}) }
-}
+// stand: in front of the wall, half behind the crate, and on the grass below the step. His side view
+// flipped going left.
+const walker = route({ pace: 0.25, origin: [0, Z], walk: { anim: "walk_side", flip: true } }, [[-2.5, 2.25], [-0.5, 2.25], [-2.5, 2.25]])
 const people = (f) => [
   ...around,
   walker(f),

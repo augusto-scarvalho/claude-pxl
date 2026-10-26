@@ -451,6 +451,29 @@ export interface TextOpts {
   font?: string;
 }
 
+/** bubble(): a dialogue box over a speaker, its look the file's sprites. */
+export interface BubbleOpts {
+  /** a sprite with slice margins: the box, a 9-slice */
+  panel: string;
+  /** a sprite under the box down to the point, its top rows over the panel's bottom border */
+  tail?: string;
+  /** a 9-slice under the title (its left margin a diamond the title starts after) */
+  rule?: string;
+  /** the prompt in the lower right corner: an anim at frame `t` */
+  more?: string;
+  font?: string;
+  /** the words' key, or [the title's, the lines'] */
+  color?: string | [string, string];
+  /** the box off to the right of the point (1) or the left (-1) */
+  side?: number;
+  /** frames since it opened: the prompt's frame */
+  t?: number;
+  /** its pixel in the art's (0.75: finer at a size); default 1 */
+  unit?: number;
+  /** px from the panel's edge to the words (7) */
+  pad?: number;
+}
+
 /** A bitmap font: glyphs in cells of w x h on an asset, in the order of `chars`. */
 export interface FontDef {
   name: string;

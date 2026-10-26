@@ -760,32 +760,14 @@ const BODY_RAMPS = ["xy", "zZ", "0U", "WV", "YX", "&@", "876", "765", "65", "21"
 
 // ---------------------------------------------------------------- where they go
 // Tag: the runner comes down path B from behind the far hedge, turns at the crossing and runs off up
-// path A; the chaser follows the same line a little faster, 1.3 s behind. A route is a list of
-// [x, z] points with the corner rounded; s meters along it gives a position and a heading.
-function route(pts, r) {
-  const segs = []
-  // round each corner with an arc of radius r
-  const [p0, p1, p2] = pts, d0 = [Math.sign(p1[0] - p0[0]), Math.sign(p1[1] - p0[1])], d1 = [Math.sign(p2[0] - p1[0]), Math.sign(p2[1] - p1[1])]
-  const a = [p1[0] - d0[0] * r, p1[1] - d0[1] * r], b = [p1[0] + d1[0] * r, p1[1] + d1[1] * r], c = [a[0] + d1[0] * r, a[1] + d1[1] * r]
-  const l0 = Math.hypot(a[0] - p0[0], a[1] - p0[1]), arc = (Math.PI / 2) * r, l2 = Math.hypot(p2[0] - b[0], p2[1] - b[1])
-  return (s) => {
-    if (s < l0) return { x: p0[0] + d0[0] * s, z: p0[1] + d0[1] * s, heading: d0 }
-    if (s < l0 + arc) {
-      const t = (s - l0) / arc, a0 = Math.atan2(a[1] - c[1], a[0] - c[0]), a1 = Math.atan2(b[1] - c[1], b[0] - c[0])
-      let da = a1 - a0; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI
-      const ang = a0 + da * t, hd = [d0[0] + (d1[0] - d0[0]) * t, d0[1] + (d1[1] - d0[1]) * t], n = Math.hypot(...hd)
-      return { x: c[0] + Math.cos(ang) * r, z: c[1] + Math.sin(ang) * r, heading: [hd[0] / n, hd[1] / n] }
-    }
-    const s2 = s - l0 - arc
-    return { x: b[0] + d1[0] * s2, z: b[1] + d1[1] * s2, heading: d1 }
-  }
-}
-const TAG = route([[6.75, 46], [6.75, 7.5], [80, 7.5]], 1.2)
+// path A; the chaser follows the same line a little faster, 1.3 s behind: `TAG.at(s)`, s meters along
+// it (the corner rounded), gives a position and a heading.
+const TAG = route({ round: 1.2 }, [[6.75, 46], [6.75, 7.5], [80, 7.5]])
 const RUN_CYCLE = 6                                                  // frames a stride: 0.6 s, 40 to the loop
 function figures(frame) {
   const t = frame / FPS, out = []
   for (const [who, speed, delay] of [["runner", 3.4, 0], ["chaser", 3.55, 1.3]]) {
-    const s = speed * (t - delay), p = TAG(s), ph = ((frame + (who === "chaser" ? 3 : 0)) % RUN_CYCLE) / RUN_CYCLE
+    const s = speed * (t - delay), p = TAG.at(s), ph = ((frame + (who === "chaser" ? 3 : 0)) % RUN_CYCLE) / RUN_CYCLE
     out.push({ d: ahead(p.x, p.z), shapes: person(KID, { ...p, phase: ph, gait: "run", look: LOOKS[who] }) })
   }
   // the woman, 1.46 m/s up path B, a stride a second; the dog trotting ahead on its leash

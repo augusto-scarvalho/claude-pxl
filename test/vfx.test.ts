@@ -2,7 +2,7 @@
 // effect, effects on one placement, sockets. Everything a function of the time: any frame alone.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ability, emitter, tween, unroll } from "../src/core/vfx.ts";
+import { ability, emitter, route, tween, turnToward, unroll } from "../src/core/vfx.ts";
 import { loadSource } from "../src/node/load.ts";
 import { failure } from "./helpers.ts";
 import { Img } from "../src/core/image.ts";
@@ -46,6 +46,34 @@ test("tween and unroll: keys carried and eased, strings held, moments on their o
   assert.throws(() => tween([{ t: 2 }, { t: 1 }]), /each t a number past the one before/);
   assert.deepEqual(unroll([[2, "rest"], [0, "x"], [1, "cut", 4]]), ["rest", "rest", ["cut", 4]]);
   assert.match(failure(PALS + 'unroll([[1.5, "a"]])').message, /frames a whole number/);
+});
+
+test("route: legs at a pace and holds by name, the feet on the ground, the way clear, by distance round a corner", () => {
+  const v = route({ pace: 0.5, origin: [0, 10], ground: (x, z) => z - 10, walk: "w", idle: { anim: "i", frame: (f, t) => t }, loop: 4 },
+    [[0, 0], [2, 0], { hold: 3, name: "talk" }, { to: [2, 2], name: "up" }]);
+  // 4 frames east, 3 held facing the way it came, 4 north: 11, a whole number of 4 is 12
+  assert.deepEqual([v.total, v.frames, v.start("talk"), v.start("up"), v.step("up").n], [11, 12, 4, 7, 4]);
+  assert.deepEqual([v(2), v(5), v(9), v(11)], [{ name: "w_e", at: [1, 10, 0], frame: 2, dir: "e" }, { name: "i_e", at: [2, 10, 0], frame: 1, dir: "e" }, { name: "w_n", at: [2, 11, 1], frame: 9, dir: "n" }, null]);
+  assert.deepEqual([v.near([1, 10.5], 1), v.near([1, 12], 1)], [true, false]);
+  assert.equal(route({ pace: 0.5, ground: (x, z) => z, climb: true }, [[0, 0], [0, 2]]).total, 6, "the rise counted: 2.83 m");
+  const p = route({ pace: 1, walk: { anim: "side", flip: true } }, [[0, 0], [2, 0], [0, 0]]);
+  assert.deepEqual([p(0)!.name, p(0)!.flip, p(2)!.name, p(2)!.flip], ["side", undefined, "side", "x"], "one side view, flipped going west");
+  // s m along, the corner a quarter circle of 1 m; straight on before the start and past the end
+  const r = route({ round: 1 }, [[0, 10], [0, 0], [10, 0]]), mid = r.at(9 + Math.PI / 4), end = r.at(12 + Math.PI / 2);
+  assert.deepEqual(r.at(-1), { x: 0, z: 11, heading: [0, -1] });
+  assert.ok([mid.x - (1 - Math.SQRT1_2), mid.z - (1 - Math.SQRT1_2), mid.heading[0] - Math.SQRT1_2, end.x - 4, end.z].every((d) => Math.abs(d) < 1e-9), "halfway round, then on");
+  assert.throws(() => v.start("grave"), /no phase or event 'grave'/);
+  assert.match(failure(PALS + 'route({ pace: 1 }, [[0, 0], { hold: 1.5 }])').message, /a hold is a whole number of frames/);
+  assert.match(failure(PALS + 'route({ pace: 1 }, [[0, 0], [0, 0]])').message, /other than the last/);
+});
+
+test("turnToward: a step every two frames the shorter way round, toward a point within reach or a direction", () => {
+  const t = turnToward("m", [0, 0], (f: number) => (f >= 3 ? "n" : null), { rest: "s", frame: () => 0 });
+  assert.deepEqual([0, 3, 4, 6, 8, 10].map((f) => t(f).name), ["m_s", "m_s", "m_sw", "m_w", "m_nw", "m_n"], "on even frames, west round (a tie turns clockwise)");
+  assert.deepEqual(turnToward("m", [0, 0], (f: number) => (f >= 3 ? "n" : null), { rest: "s", from: 3 })(9), { name: "m_n", at: [0, 0], frame: 9 }, "counted from frame 3; any frame alone");
+  assert.deepEqual([0, 2, 4].map((f) => turnToward("m", [0, 0], [3, 3], { within: 5 })(f).name), ["m_se", "m_e", "m_ne"]);
+  assert.equal(turnToward("m", [0, 0], { at: [6, 6] }, { within: 5 })(8).name, "m_s", "out of reach: at rest");
+  assert.match(failure(PALS + 'turnToward("m", [0, 0], null, { rest: "up" })').message, /rest is one of n, ne/);
 });
 
 test("emitter: seeded particles, the same at the same time, a burst, a loop that closes, gravity", () => {

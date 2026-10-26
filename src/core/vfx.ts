@@ -142,6 +142,187 @@ export function unroll<T>(runs: [number, ...T[]][]): (T | T[])[] {
   return runs.flatMap(([n, ...v]) => Array(n).fill(v.length > 1 ? v : v[0]));
 }
 
+// ---------------------------------------------------------------- a figure's way on the clock
+const DIR8 = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
+/** which of the 8 directions a way [dx, dz] on the ground goes (+z away from us: n) */
+const dir8 = (dx: number, dz: number) => ((Math.round(Math.atan2(dx, dz) / (Math.PI / 4)) % 8) + 8) % 8;
+const isPoint = (p: unknown): p is number[] => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite);
+const isObj = (v: unknown): v is Record<string, any> => typeof v === "object" && v !== null && !Array.isArray(v);
+type FrameFn = (f: number, t: number) => number;
+interface Look { anim?: string; frame?: FrameFn; flip?: boolean }
+export interface RouteOpts { pace?: number; origin?: number[]; ground?: (x: number, z: number) => number; climb?: boolean; walk?: string | Look; idle?: string | Look; loop?: number; round?: number }
+export type RouteStep = number[] | { to?: number[]; hold?: number; name?: string; dir?: string; anim?: string; frame?: FrameFn };
+/** a step of a route: a leg walked from a to b, or a hold at a (= b); its frames, from `start` */
+export interface RouteLeg { name?: string; dir: string; a: number[]; b: number[]; n: number; start: number; walk: boolean; anim?: string; frame?: FrameFn }
+type Placed = { name: string; at: number[]; frame: number; dir: string; flip?: "x" };
+type Way = { x: number; z: number; heading: number[] };
+export interface Route {
+  /** the figure at frame f: a sprite for mesh() (`${anim}_${dir}`, its feet, its frame), null before it starts and once it is done */
+  (f: number): Placed | null;
+  /** the frame a named step begins (ability()'s, as span, fade and since) */
+  start(name: string): number;
+  span: Ability["span"]; fade: Ability["fade"]; since: Ability["since"];
+  /** a named step: its ends as written, its frames and start */
+  step(name: string): RouteLeg;
+  /** a point [x, z] nearer than d to a leg (a tree in its way) */
+  near(p: number[], d: number): boolean;
+  /** s m along its points (holds left out, `round` corners), past both ends straight on: where, and the unit way it heads */
+  at(s: number): Way;
+  /** its frames, and those rounded up to a whole number of `loop` */
+  total: number;
+  frames: number;
+}
+
+/**
+ * A figure's way on the clock, `route({ pace, origin, ground, walk, idle }, [[x, z], [x, z], { hold: 40, name: "talk" }, ...])`:
+ * from the first point, each [x, z] (or `{ to, name?, dir?, anim?, frame? }`) a leg walked at `pace` m a
+ * frame (its frames its length over the pace, `climb` counting the ground's rise), facing the one of 8
+ * directions its way is nearest (`dir` says another); each `{ hold: frames }` a wait there, facing the
+ * last leg's way. A step's sprite `${anim}_${dir}` of `walk` or `idle` (or its own `anim`), at `frame(f, t)`
+ * (f the scene's, t into the step; default f), `flip: true` one side view flipped going west. Points
+ * from `origin`; `ground(x, z)` the feet's height (where they stand: the third number of `at`).
+ */
+export function route(o: RouteOpts, steps: RouteStep[]): Route {
+  if (!Array.isArray(steps) || !isPoint(steps[0]))
+    throw new PxError(`route: steps are [[x, z] (where it starts), then [x, z] or { to: [x, z], name?, dir?, anim?, frame? } (a leg walked there), { hold: frames, name?, dir?, anim?, frame? } (a wait)], got ${JSON.stringify(steps)?.slice(0, 120)}`);
+  if (o.pace !== undefined && !(o.pace > 0)) throw new PxError(`route: pace is m a frame, above 0, got ${JSON.stringify(o.pace)}`);
+  if (o.ground !== undefined && typeof o.ground !== "function") throw new PxError("route: ground is (x, z) => the ground's height there");
+  const look = (v: unknown, what: string): Look => {
+    if (typeof v === "string") return { anim: v };
+    if (v !== undefined && !(isObj(v) && typeof v.anim === "string" && (v.frame === undefined || typeof v.frame === "function")))
+      throw new PxError(`route: ${what} is an anim's name ("tr_${what}": tr_${what}_ne, ...) or { anim, frame?: (f, t) => n, flip? }, got ${JSON.stringify(v)}`);
+    return (v ?? {}) as Look;
+  };
+  const walk = look(o.walk, "walk"), idle = look(o.idle, "idle"), [ox, oz] = o.origin ?? [0, 0], world = (p: number[]) => [ox + p[0], oz + p[1]];
+  const legs: RouteLeg[] = [];
+  let at = steps[0] as number[], dir = "s", start = 0;
+  for (const s of steps.slice(1)) {
+    const p = isPoint(s) ? { to: s } : s;
+    if (!isObj(p) || (p.to === undefined) === (p.hold === undefined) || (p.dir !== undefined && !DIR8.includes(p.dir)) || (p.frame !== undefined && typeof p.frame !== "function"))
+      throw new PxError(`route: a step is [x, z], { to: [x, z], ... } or { hold: frames, ... } (dir one of ${DIR8.join(", ")}, frame (f, t) => n), got ${JSON.stringify(s)}`);
+    let n: number;
+    if (p.to !== undefined) {
+      const b = isPoint(p.to) ? p.to : [NaN, NaN], dx = b[0] - at[0], dz = b[1] - at[1];
+      if (!(dx || dz)) throw new PxError(`route: a leg goes to a point [x, z] other than the last, got ${JSON.stringify(p.to)}`);
+      const [A, B] = [world(at), world(b)], len = o.climb && o.ground ? Math.hypot(dx, dz, o.ground(B[0], B[1]) - o.ground(A[0], A[1])) : Math.hypot(dx, dz);
+      n = o.pace ? Math.max(1, Math.round(len / o.pace)) : 0;
+      dir = p.dir ?? DIR8[dir8(dx, dz)];
+      legs.push({ name: p.name, dir, a: at, b, n, start, walk: true, anim: p.anim, frame: p.frame });
+      at = b;
+    } else {
+      n = p.hold as number;
+      if (!(Number.isInteger(n) && n > 0)) throw new PxError(`route: a hold is a whole number of frames, got ${JSON.stringify(p.hold)}`);
+      dir = p.dir ?? dir;
+      legs.push({ name: p.name, dir, a: at, b: at, n, start, walk: false, anim: p.anim, frame: p.frame });
+    }
+    start += n;
+  }
+  const A = o.pace ? ability(legs.map((l) => [l.name ?? "", l.n])) : undefined;
+  const timed = () => { if (!A) throw new PxError("route: walking it by frames takes a pace (m a frame)"); return A; };
+  const visit = ((f: number) => {
+    timed();
+    for (const L of legs) {
+      const t = f - L.start;
+      if (t < 0) return null;
+      if (t >= L.n) continue;
+      // as far along as the frame is through the leg, from the start's place in the world
+      const k = t / L.n, x = ox + L.a[0] + (L.b[0] - L.a[0]) * k, z = oz + L.a[1] + (L.b[1] - L.a[1]) * k;
+      const lk = L.walk ? walk : idle, anim = L.anim ?? lk.anim, frame = L.frame ?? lk.frame, flip = !L.anim && lk.flip;
+      if (!anim) throw new PxError(`route: no anim to ${L.walk ? "walk" : "hold"} in: give ${L.walk ? "walk" : "idle"} or the step's anim`);
+      return { name: flip ? anim : `${anim}_${L.dir}`, at: o.ground ? [x, z, o.ground(x, z)] : [x, z], frame: frame ? frame(f, t) : f, dir: L.dir, ...(flip && L.dir.includes("w") ? { flip: "x" as const } : {}) };
+    }
+    return null;
+  }) as Route;
+  visit.start = (name) => timed().start(name);
+  visit.span = (t, a, b) => timed().span(t, a, b);
+  visit.fade = (t, a, b, f) => timed().fade(t, a, b, f);
+  visit.since = (t, a, ms, n) => timed().since(t, a, ms, n);
+  visit.step = (name) => {
+    const L = legs.find((l) => l.name === name);
+    if (!L) throw new PxError(`route: no step named '${name}'; it has ${legs.filter((l) => l.name).map((l) => l.name).join(", ") || "none"}`);
+    return L;
+  };
+  visit.near = (p, d) => legs.some((L) => {
+    if (!L.walk) return false;
+    const [ax, az] = world(L.a), [bx, bz] = world(L.b), dx = bx - ax, dz = bz - az;
+    const k = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - az) * dz) / (dx * dx + dz * dz)));
+    return Math.hypot(p[0] - ax - dx * k, p[1] - az - dz * k) < d;
+  });
+  let way: ((s: number) => Way) | undefined;
+  visit.at = (s) => (way ??= along([steps[0] as number[], ...legs.filter((l) => l.walk).map((l) => l.b)].map(world), o.round ?? 0))(s);
+  visit.total = start;
+  visit.frames = Math.ceil(start / (o.loop ?? 1)) * (o.loop ?? 1);
+  return visit;
+}
+
+/** s along the points: straight runs, each corner an arc of radius r touching both (none on a U-turn); straight on past both ends */
+function along(P: number[][], r: number): (s: number) => Way {
+  if (P.length < 2) throw new PxError("route: at(s) goes along its legs: give it one");
+  const d = P.slice(1).map((p, i) => { const dx = p[0] - P[i][0], dz = p[1] - P[i][1], l = Math.hypot(dx, dz); return [dx / l, dz / l]; });
+  const pieces: [number, (u: number) => Way][] = [];
+  let from = P[0];
+  d.forEach((di, i) => {
+    const run = from;
+    let to = P[i + 1], arc: [number, (u: number) => Way] | undefined, next = to;
+    const dn = d[i + 1], cos = dn ? di[0] * dn[0] + di[1] * dn[1] : 1, sin = dn ? di[0] * dn[1] - di[1] * dn[0] : 0;
+    if (r > 0 && sin !== 0 && 1 + cos > 1e-9) {
+      // the arc's ends on this run (A) and the next (B), its middle C to the inside of the turn
+      const e = (r * Math.abs(sin)) / (1 + cos), p = P[i + 1], sg = Math.sign(sin), len = r * Math.atan2(Math.abs(sin), cos);
+      const a = [p[0] - di[0] * e, p[1] - di[1] * e], b = [p[0] + dn[0] * e, p[1] + dn[1] * e], c = [a[0] - sg * di[1] * r, a[1] + sg * di[0] * r];
+      const a0 = Math.atan2(a[1] - c[1], a[0] - c[0]), a1 = Math.atan2(b[1] - c[1], b[0] - c[0]);
+      let da = a1 - a0;
+      if (da > Math.PI) da -= 2 * Math.PI;
+      if (da < -Math.PI) da += 2 * Math.PI;
+      arc = [len, (u) => {
+        const t = u / len, ang = a0 + da * t, hd = [di[0] + (dn[0] - di[0]) * t, di[1] + (dn[1] - di[1]) * t], n = Math.hypot(hd[0], hd[1]);
+        return { x: c[0] + Math.cos(ang) * r, z: c[1] + Math.sin(ang) * r, heading: [hd[0] / n, hd[1] / n] };
+      }];
+      to = a; next = b;
+    }
+    pieces.push([Math.hypot(to[0] - run[0], to[1] - run[1]), (u) => ({ x: run[0] + di[0] * u, z: run[1] + di[1] * u, heading: di })]);
+    if (arc) pieces.push(arc);
+    from = next;
+  });
+  return (s) => {
+    let u = s;
+    for (let i = 0; i < pieces.length - 1; i++) { if (u < pieces[i][0]) return pieces[i][1](u); u -= pieces[i][0]; }
+    return pieces[pieces.length - 1][1](u);
+  };
+}
+
+/**
+ * A figure turning to a target a direction every `every` frames (the shorter way round; counted from
+ * frame `from`): `turnToward("mo_idle", [x, z], visit, { rest: "s", within: 6.5 })`. The target, at a
+ * frame: a sprite (its `at`), a point, a direction ("e"), or null (back to `rest`), or a function of the
+ * frame giving one; nearer than `within` m only. Gives (f) => its sprite `${anim}_${dir}` at `frame(f)` (default f).
+ */
+export function turnToward(anim: string, at: number[], target: unknown, o: { every?: number; rest?: string; within?: number; from?: number; frame?: (f: number) => number } = {}): (f: number) => { name: string; at: number[]; frame: number } {
+  const every = o.every ?? 2, rest = DIR8.indexOf(o.rest ?? "s"), within = o.within ?? Infinity, from = o.from ?? 0, ks: number[] = [];
+  if (typeof anim !== "string" || !Array.isArray(at) || at.length < 2 || !at.every(Number.isFinite)) throw new PxError(`turnToward(anim, [x, z], target, opts): an anim's name ("mo_idle": mo_idle_n, ...) and where it stands, got ${JSON.stringify([anim, at])}`);
+  if (rest < 0 || !(Number.isInteger(every) && every > 0)) throw new PxError(`turnToward: rest is one of ${DIR8.join(", ")} and every a whole number of frames, got ${JSON.stringify([o.rest, o.every])}`);
+  const want = (f: number) => {
+    const g = typeof target === "function" ? target(f) : target;
+    if (typeof g === "string") {
+      if (!DIR8.includes(g)) throw new PxError(`turnToward: a direction is one of ${DIR8.join(", ")}, got '${g}'`);
+      return DIR8.indexOf(g);
+    }
+    const p = Array.isArray(g) ? g : isObj(g) ? g.at : undefined;
+    if (!p) return rest;
+    const dx = p[0] - at[0], dz = p[1] - at[1];
+    return Math.hypot(dx, dz) > within ? rest : dir8(dx, dz);
+  };
+  return (f) => {
+    f = Math.max(0, Math.floor(f));
+    // each frame's facing from the one before (worked out once, in order: any frame sought comes out the same)
+    for (let i = ks.length; i <= f; i++) {
+      let k = i ? ks[i - 1] : rest;
+      if ((((i - from) % every) + every) % every === 0) { const w = want(i); if (w !== k) k = (k + ((w - k + 8) % 8 <= 4 ? 1 : 7)) % 8; }
+      ks.push(k);
+    }
+    return { name: `${anim}_${DIR8[ks[f]]}`, at, frame: o.frame ? o.frame(f) : f };
+  };
+}
+
 export interface Particle { x: number; y: number; vx: number; vy: number; age: number; life: number; id: number }
 export interface EmitterOpts {
   /** where it emits from at a time: [x, y], or a function of the time (a moving source) */
