@@ -21,7 +21,7 @@ pal({
 ramps("kzsSL", "kJjhHY", "kNncC", "kvwW", "kRPp", "kDdl")
 // his figure for files that dress people of their own on it (crew.px.js): rig3d's options (the body,
 // the size), his moves and his walk's pace, the painter of an outfit, his skull, how his head is drawn
-// by view and a neck
+// by view, the approved hand faces painted over it (FACE: the mourner's) and a neck
 const travelerFigure = {}
 // in a block: its names stay its own when a scene includes the file
 {
@@ -273,5 +273,5 @@ const BUN = sdf.ellipsoid([2.6, 2.2, 2.4]).at(0, -6.2, 0).noise({ amp: 0.2, scal
 views("_mo_head", sdf.union(SKULL, MO_HAIR, BUN), { ...HEAD3, retouch: FACE3 })
 for (const n of rig3d("_mo", { ...FIG, head: "_mo_head", parts: parts3m, moves: MOVES3 }).names) anim(n.slice(1), { base: n, swap: MOURNER })
 sheet("traveler", ["tr_*", "mo_*"], { rows: "tag", pad: 1 })
-Object.assign(travelerFigure, { FIG, MOVES: MOVES3, pace, dress, TRAVELER, SKULL, HEAD: HEAD3, neck })
+Object.assign(travelerFigure, { FIG, MOVES: MOVES3, pace, dress, TRAVELER, SKULL, HEAD: HEAD3, FACE: FACE3, neck })
 }

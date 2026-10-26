@@ -166,9 +166,9 @@ const isObj = (v: unknown): v is Record<string, any> => typeof v === "object" &&
 type FrameFn = (f: number, t: number) => number;
 interface Look { anim?: string; frame?: FrameFn; flip?: boolean }
 export interface RouteOpts { pace?: number | ((dir: string) => number); origin?: number[]; ground?: (x: number, z: number) => number; climb?: boolean; walk?: string | Look; idle?: string | Look; loop?: number; round?: number; px?: boolean }
-export type RouteStep = number[] | { to?: number[]; hold?: number; name?: string; dir?: string; anim?: string; frame?: FrameFn };
+export type RouteStep = number[] | { to?: number[]; hold?: number; name?: string; dir?: string; anim?: string | Look; frame?: FrameFn };
 /** a step of a route: a leg walked from a to b, or a hold at a (= b); its frames, from `start` */
-export interface RouteLeg { name?: string; dir: string; a: number[]; b: number[]; n: number; start: number; walk: boolean; anim?: string; frame?: FrameFn }
+export interface RouteLeg { name?: string; dir: string; a: number[]; b: number[]; n: number; start: number; walk: boolean; anim?: string; frame?: FrameFn; flip?: boolean }
 type Placed = { name: string; at: number[]; frame: number; dir: string; flip?: "x" };
 type Way = { x: number; z: number; heading: number[] };
 export interface Route {
@@ -219,6 +219,8 @@ export function route(o: RouteOpts, steps: RouteStep[]): Route {
     const p = isPoint(s) ? { to: s } : s;
     if (!isObj(p) || (p.to === undefined) === (p.hold === undefined) || (p.dir !== undefined && !DIR8.includes(p.dir)) || (p.frame !== undefined && typeof p.frame !== "function"))
       throw new PxError(`route: a step is [x, z], { to: [x, z], ... } or { hold: frames, ... } (dir one of ${DIR8.join(", ")}, frame (f, t) => n), got ${JSON.stringify(s)}`);
+    // the step's own anim, as walk's and idle's are given: a name, or { anim, frame?, flip? }
+    const own = look(p.anim, "a step's anim"), mine = { anim: own.anim, frame: p.frame ?? own.frame, flip: own.flip };
     let n: number;
     if (p.to !== undefined) {
       const b = isPoint(p.to) ? p.to : [NaN, NaN], dx = b[0] - at[0], dz = b[1] - at[1];
@@ -227,13 +229,13 @@ export function route(o: RouteOpts, steps: RouteStep[]): Route {
       dir = p.dir ?? DIR8[dir8(dx, o.px ? -dz : dz)];
       const v = paceOf(dir);
       n = v ? Math.max(1, Math.round(len / v)) : 0;
-      legs.push({ name: p.name, dir, a: at, b, n, start, walk: true, anim: p.anim, frame: p.frame });
+      legs.push({ name: p.name, dir, a: at, b, n, start, walk: true, ...mine });
       at = b;
     } else {
       n = p.hold as number;
       if (!(Number.isInteger(n) && n > 0)) throw new PxError(`route: a hold is a whole number of frames, got ${JSON.stringify(p.hold)}`);
       dir = p.dir ?? dir;
-      legs.push({ name: p.name, dir, a: at, b: at, n, start, walk: false, anim: p.anim, frame: p.frame });
+      legs.push({ name: p.name, dir, a: at, b: at, n, start, walk: false, ...mine });
     }
     start += n;
   }
@@ -247,7 +249,7 @@ export function route(o: RouteOpts, steps: RouteStep[]): Route {
       if (t >= L.n) continue;
       // as far along as the frame is through the leg, from the start's place in the world
       const k = t / L.n, x = ox + L.a[0] + (L.b[0] - L.a[0]) * k, z = oz + L.a[1] + (L.b[1] - L.a[1]) * k;
-      const lk = L.walk ? walk : idle, anim = L.anim ?? lk.anim, frame = L.frame ?? lk.frame, flip = !L.anim && lk.flip;
+      const lk = L.walk ? walk : idle, anim = L.anim ?? lk.anim, frame = L.frame ?? lk.frame, flip = L.anim ? L.flip : lk.flip;
       if (!anim) throw new PxError(`route: no anim to ${L.walk ? "walk" : "hold"} in: give ${L.walk ? "walk" : "idle"} or the step's anim`);
       return { name: flip ? anim : `${anim}_${L.dir}`, at: o.px ? [Math.round(x), Math.round(z)] : o.ground ? [x, z, o.ground(x, z)] : [x, z], frame: frame ? frame(f, t) : f, dir: L.dir, ...(flip && L.dir.includes("w") ? { flip: "x" as const } : {}) };
     }

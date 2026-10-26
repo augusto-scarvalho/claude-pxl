@@ -67,6 +67,9 @@ test("route: legs at a pace and holds by name, the feet on the ground, the way c
   assert.equal(route({ pace: (d) => (d === "e" ? 1 : 0.5) }, [[0, 0], [2, 0], [2, 2]]).total, 6, "a pace by the leg's way: 2 frames east, 4 north");
   const p = route({ pace: 1, walk: { anim: "side", flip: true } }, [[0, 0], [2, 0], [0, 0]]);
   assert.deepEqual([p(0)!.name, p(0)!.flip, p(2)!.name, p(2)!.flip], ["side", undefined, "side", "x"], "one side view, flipped going west");
+  // a step's own anim as walk's and idle's: a name, or { anim, frame, flip } (once taken for a name: "[object Object]_e")
+  const q = route({ pace: 1, walk: "w" }, [[0, 0], { hold: 2, dir: "e", anim: { anim: "sweep", frame: (f, t) => 10 + t } }, { to: [-2, 0], anim: { anim: "side", flip: true } }]);
+  assert.deepEqual([q(1)!.name, q(1)!.frame, q(3)!.name, q(3)!.flip], ["sweep_e", 11, "side", "x"]);
   // s m along, the corner a quarter circle of 1 m; straight on before the start and past the end
   const r = route({ round: 1 }, [[0, 10], [0, 0], [10, 0]]), mid = r.at(9 + Math.PI / 4), end = r.at(12 + Math.PI / 2);
   assert.deepEqual(r.at(-1), { x: 0, z: 11, heading: [0, -1] });
