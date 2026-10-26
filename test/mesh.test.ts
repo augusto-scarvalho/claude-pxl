@@ -393,3 +393,19 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { g: { ramp: "w" }, deck:
   assert.equal(at(`[{ name: "s", at: [-3, 4, 2], air: true }]`).r.lines.length, 0, "it flies");
   assert.match(fl.r.coverage, /standing on 1/);
 });
+
+test("mesh sprites going along at(t), their ghosts back in time, fainter; an emitter's particles as sprites", () => {
+  // a white dot 0.5 m up, 4 m ahead, going right 2 m a second: at t = 500 in the middle (col 20, row 14)
+  const at = (sp: string, t = 500) => loadSource(PAL + STAGE + `sprite("_dot", { w: 1, h: 1, pivot: "bottom" }, px(0, 0, "w"))
+const F = model(); F.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0])
+const E = emitter({ at: [0, 0], burst: 6, from: 0, life: [900, 900], speed: [1, 1], angle: -90, spread: 0, seed: 2 })
+scene("a", { w: 40, h: 40, frames: 10, fps: 10 }, (c) => c.mesh(V, F.faces, { f: { ramp: "k" } }, { sprites: ${sp} }))`, "t.px.js").image("a", 0, t);
+  const red = (img: { get(x: number, y: number): number }, x: number, y: number) => img.get(x, y) >>> 24;
+  const go = at('[{ name: "_dot", at: (t) => [-1 + t / 500, 4, 0.5], ghosts: [2, 250, 0.4] }]');
+  assert.equal(red(go, 20, 14), 255, "where at(t) puts it now");
+  assert.ok(red(go, 15, 14) > red(go, 10, 14) && red(go, 10, 14) > red(go, 30, 14) && red(go, 15, 14) < 255, "250 ms back fainter, 500 ms back fainter still");
+  assert.equal(red(at('[{ name: "_dot", at: (t) => (t < 400 ? null : [0, 4, 0.5]) }]', 300), 20, 14), red(go, 30, 14), "none where at(t) gives none");
+  assert.equal(red(at('E.sprites(c.t, { name: "_dot", at: [0, 4, 0.5] })'), 20, 9), 255, "the particles 0.5 m higher after 0.5 s at 1 m/s");
+  assert.match(failure(PAL + STAGE + 'const E = emitter({ burst: 1 })\nscene("a", { w: 9, h: 9 }, (c) => c.mesh(V, [], {}, { sprites: E.sprites(c.t, { at: [0, 4] }) }))', "a").message, /sprites\(t, \{ name/);
+  assert.match(failure(PAL + STAGE + 'scene("a", { w: 9, h: 9 }, (c) => c.mesh(V, [], {}, { sprites: [{ name: "s", at: [0, 4], ghosts: [2] }] }))', "a").message, /ghosts \[2\]: \[n/);
+});

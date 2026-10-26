@@ -156,7 +156,7 @@ export const OP_OPTS: Record<string, string[]> = {
   plume: ["every", "life", "rise", "wind", "inertia", "size", "young", "seed", "frame", "light"],
   smoke: SMOKE_OPTS,
   particles: ["x", "y", "trail", "size"],
-  trail: ["length", "width", "fade", "step", "from"],
+  trail: ["length", "width", "fade", "step", "from", "t", "taper", "side"],
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {

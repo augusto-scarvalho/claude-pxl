@@ -206,7 +206,9 @@ declare global {
     /** holes eating its faces (and its shadow): progress 0..1, blobs scale m wide, a burning edge key */
     dissolve?: { progress: number; scale?: number; seed?: number; edge?: PxDissolve["edge"]; width?: number; pattern?: PxDissolve["pattern"]; ragged?: number; at?: PxV3; mask?: string; look?: PxDissolve["look"]; char?: PxDissolve["char"]; glow?: number } }
   /** A sprite standing among mesh()'s faces: its feet at [x, z] or [x, z, up] m, the contact shadow's radius in m (0: none). */
-  interface PxMeshSprite { name: string; at: [number, number] | PxV3; /** of a family named by the compass, the one nearest this heading, as a stamp's */ heading?: number | [number, number]; flip?: "x"; frame?: number; delay?: number; rdelay?: boolean; seed?: number; reseed?: boolean | number; shadow?: number;
+  interface PxMeshSprite { name: string; /** or a function of the time (ms on the clock), none where it gives none */ at: [number, number] | PxV3 | ((t: number) => [number, number] | PxV3 | null | undefined);
+    /** a name for its sockets: a spell's from: "hero.hand", a stamp's at */ id?: string;
+    /** n copies of it ms apart back in time (`at` a function of the time), each fade fainter, blended, no light, no shadow */ ghosts?: [number, number, number]; /** of a family named by the compass, the one nearest this heading, as a stamp's */ heading?: number | [number, number]; flip?: "x"; frame?: number; delay?: number; rdelay?: boolean; seed?: number; reseed?: boolean | number; shadow?: number;
     /** effects on this sprite alone, as a stamp's */
     fx?: PxEffect | PxEffect[];
     /** laid over what is behind by its alpha (smoke: "alpha"; light: "add", "screen"), no shadow; `veil` (an "alpha" one): the share of the sun its pixels hold back, a faint shadow */
@@ -468,15 +470,21 @@ declare global {
   interface PxParticle { x: number; y: number; vx: number; vy: number; age: number; life: number; id: number }
   /** An element of the spell kit: a recipe (scenes.md, "Designing an element"); `like` an element to start from. */
   interface PxElement {
-    like?: string; keys?: string[]; ball?: false | { r?: number; scale?: number; speed?: number }; bolt?: boolean;
-    motion?: { arc?: number; ease?: "linear" | "in" | "out"; wave?: number }; trail?: false | { length?: number; width?: [number, number] };
+    /** the ball: its noise, or the file's own art: an asset (an anim, played from the charge's start), or a list grown through the charge */
+    like?: string; keys?: string[]; ball?: false | string | string[] | { r?: number; scale?: number; speed?: number }; bolt?: boolean;
+    /** its trail: ms long, px wide; or `ghosts` copies of the ball `every` ms back, each fainter (a list's entry smaller) */
+    motion?: { arc?: number; ease?: "linear" | "in" | "out"; wave?: number }; trail?: false | { length?: number; width?: [number, number]; ghosts?: number; every?: number };
     particles?: false | (PxEmitter & { keys?: string[] });
-    impact?: { shape?: "burst" | "ring" | "shards" | "splash" | "debris" | "swirl" | "rays" | "implode" | "sparkle"; keys?: string[]; smoke?: false | string[] };
-    big?: "pillar" | "bolts" | "spikes" | "tornado" | "sphere" | "beam" | "helix" | "nova" | "blizzard" | "quake" | "slide" | "rain" | "grasp" | "leaves";
+    /** `anim`: the file's own, played once from the hit where it hits, in place of the shape (a list: the tier picks one) */
+    impact?: { shape?: "burst" | "ring" | "shards" | "splash" | "debris" | "swirl" | "rays" | "implode" | "sparkle"; keys?: string[]; smoke?: false | string[]; anim?: string | string[] };
+    /** the centerpiece, or the file's own `anim` played once from the hit on the ground under the target (a list: the tier picks one) */
+    big?: "pillar" | "bolts" | "spikes" | "tornado" | "sphere" | "beam" | "helix" | "nova" | "blizzard" | "quake" | "slide" | "rain" | "grasp" | "leaves" | { anim: string | string[] };
     mark?: false | string[]; flash?: string; light?: string;
     timing?: { charge?: number; cast?: number; travel?: number; impact?: number; dissipate?: number };
     /** its variants, the first its own way; what its solids are made of */
-    variants?: string[]; matter?: "ice" | "rock";
+    variants?: string[];
+    /** "ice", "rock", or the file's keys: tones dark to light (2-6, spread over 6), rim, glint, crack, moss (3), drawn as `like` */
+    matter?: "ice" | "rock" | { like?: "ice" | "rock"; tones: string | string[]; rim?: string; glint?: string; crack?: string; moss?: string | string[] };
   }
   /** A variant's shape and complexity: size (times the tier's), how many, facets, jaggedness 0..1, pieces it breaks into, ms it stays. */
   interface PxForm { size?: number; count?: number; facets?: number; jag?: number; debris?: number; stay?: number }
@@ -502,6 +510,15 @@ declare global {
     depth(t: number): number | undefined;
     flash(t: number): { color: string; amount: number } | undefined;
     shake(t: number): [number, number];
+    /** the target's dissolve now, for its fx: the element's look (or `look`) spreading from the impact over `over` ms, then `back` ms of coming back whole; undefined before and after */
+    hit(t: number, opts?: PxDissolve & { over?: number; back?: number }): ["dissolve", PxDissolve] | undefined;
+  }
+  /** trail(): ms back from `t` (default the clock), px wide, keys' dither; a blade's: `taper` to nothing at its tail, `side(q)` the stretches kept (q the tip's middle, with what the path gives after x and y) */
+  interface PxTrail { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number; t?: number; taper?: boolean; side?: (q: number[]) => boolean }
+  /** An emitter: the particles alive at t; `sprites(t, { name, at, blend })` the same as mesh() sprites, in m from `at` [x, z, up]. */
+  interface PxEmitted {
+    (t: number): PxParticle[];
+    sprites(t: number, o: { name: string | string[]; at: number[]; blend?: "alpha" | "add" | "screen" }): PxMeshSprite[];
   }
   interface PxEmitter {
     at?: [number, number] | ((t: number) => [number, number]); rate?: number; burst?: number; from?: number; to?: number; life?: [number, number];
@@ -609,8 +626,8 @@ declare global {
     smoke(x: number, y: number, keys: string | string[], opts?: PxSmoke): void;
     /** An emitter's particles now, each in the key of its age (young first), streaked `trail` ms back. */
     particles(emit: (t: number) => PxParticle[], keys: string | string[], opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): void;
-    /** A trail behind what goes along path(t), `length` ms of it now, `width` [head, tail] px, keys head to tail. */
-    trail(path: (t: number) => number[], keys: string | string[], opts?: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number }): void;
+    /** A trail behind what goes along path(t), `length` ms of it now, `width` [head, tail] px, keys head to tail; a blade's, path(t, i) giving its edge [[tip], [inner point]]: the band it swept. */
+    trail(path: (t: number, i: number) => number[] | number[][], keys: string | string[], opts?: PxTrail): void;
     /** A spell as it is now: its mark, what gives light (emitting, unlit), its smoke, its lamps, its flash and shake (`shake: false`: none); after a mesh() through its camera, at its depth. */
     cast(spell: PxSpell, opts?: { shake?: boolean }): void;
     /** All drawn so far thrown by a spell's shake now, or [dx, dy] px. */
@@ -752,8 +769,8 @@ declare global {
   function smoke(x: number, y: number, keys: string | string[], opts?: PxSmoke): PxOp;
   /** An emitter's particles now, each in the key of its age. */
   function particles(emit: (t: number) => PxParticle[], keys: string | string[], opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): PxOp;
-  /** A trail behind what goes along path(t). */
-  function trail(path: (t: number) => number[], keys: string | string[], opts?: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number }): PxOp;
+  /** A trail behind what goes along path(t); a blade's smear, the band its edge [[tip], [inner point]] swept. */
+  function trail(path: (t: number, i: number) => number[] | number[][], keys: string | string[], opts?: PxTrail): PxOp;
   /** Values keyed in time: tween([{ t: 0, yaw: 60 }, { t: 4 }, { t: 6, yaw: 90 }], { moments }) gives at(t); each key carries what it doesn't say, numbers eased, the rest held. */
   function tween(keys: ({ t: number } & Record<string, unknown>)[], opts?: { moments?: string[] }): (t: number) => Record<string, any> & { t: number };
   /** [frames, value] runs as a value a frame ([frames, a, b] holds [a, b]). */
@@ -768,7 +785,7 @@ declare global {
   /** A spell's phases on the clock: ability([["charge", 600], ["cast", 150], ["travel", 500], ...], { start, events }). */
   function ability(phases: [string, number][] | Record<string, number>, opts?: { start?: number; events?: Record<string, [string, number]> }): PxAbility;
   /** Seeded particles: (t) gives the ones alive at time t, each where its own path puts it. */
-  function emitter(opts: PxEmitter): (t: number) => PxParticle[];
+  function emitter(opts: PxEmitter): PxEmitted;
   /** A whole cast of an element at a tier (1 fire, 2 fira, 3 firaga): spell("fire", 3, { from: [x, y], to: [x, y], ground }); draw it with cast(). */
   function spell(element: string | PxElement, tier: 1 | 2 | 3, opts: PxSpellOpts): PxSpell;
   /** A spell as it is now (see PxCanvas.cast). */

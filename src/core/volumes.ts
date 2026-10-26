@@ -6,6 +6,7 @@
 // break; what is under the ground cut away, for one rising out of it.
 import type { Color } from "./color.ts";
 import { noise } from "./effects.ts";
+import { PxError } from "./errors.ts";
 import { bayer, hash, rng } from "./util.ts";
 
 export type V3 = [number, number, number];
@@ -32,6 +33,10 @@ export const MATTER = {
   rock: { tones: ["#261c14", "#3c2c1e", "#584430", "#745e40", "#937c58", "#b29c76"], rim: undefined, glint: undefined, crack: "#140e0a", moss: ["#2c4620", "#46662a", "#66883a"] },
 };
 export type Matter = keyof typeof MATTER;
+/** A matter in the file's own keys: its tones dark to light (6, or as many as it has, spread over 6), rim, glint, crack and moss (3); drawn as `like`. */
+export interface MatterLook { like?: Matter; tones: string | string[]; rim?: string; glint?: string; crack?: string; moss?: string | string[] }
+/** n of a ramp's keys, spread evenly over it (the same keys when it has n). */
+export const spread = (ks: string | string[], n: number) => { const a = [...ks]; return Array.from({ length: n }, (_, i) => a[Math.round((i * (a.length - 1)) / (n - 1))]); };
 export type SolidKind = "berg" | "block" | "boulder" | "spire" | "shard" | "chunk";
 
 /**
@@ -65,8 +70,8 @@ export function makeSolid(kind: SolidKind, seed: number, size: number, facets: n
  * `density` 0..1 thins it out in an ordered dither (breaking up, fading).
  */
 export function drawSolid(c: Plotter, cam: SolidCamera, at: number[], unit: number, S: Solid, rot: M3, mat: Matter,
-  o: { seed: number; crack?: number; crackAt?: number[]; ground?: number; density?: number; hot?: Color }): void {
-  const M = MATTER[mat], k = cam.k(at) * unit, [cx, cy] = cam.P(at), rad = S.r * k + 1, density = o.density ?? 1;
+  o: { seed: number; crack?: number; crackAt?: number[]; ground?: number; density?: number; hot?: Color; look?: MatterLook }): void {
+  const k = cam.k(at) * unit, [cx, cy] = cam.P(at), rad = S.r * k + 1, density = o.density ?? 1;
   if (rad < 1 || density <= 0) return;
   const d = back(rot, cam.F), sun = unit3([-0.55 * cam.R[0] + 0.55 * cam.U[0] - 0.6 * cam.F[0], -0.55 * cam.R[1] + 0.55 * cam.U[1] - 0.6 * cam.F[1], -0.55 * cam.R[2] + 0.55 * cam.U[2] - 0.6 * cam.F[2]]);
   const n1 = noise(o.seed + 5), n2 = noise(o.seed + 9), cr = o.crack ?? 0, ca = o.crackAt ?? [0, 0, 0];
@@ -101,7 +106,13 @@ export function drawSolid(c: Plotter, cam: SolidCamera, at: number[], unit: numb
       tone[j] = Math.max(0, Math.min(5, Math.round(L * 5)));
       cell[j] = v >= 0 ? v : tone[j];
     }
-  const keys = [...M.tones, M.rim ?? M.tones[5], M.glint ?? M.tones[5], M.crack, ...(M.moss ?? M.tones.slice(2, 5))].map((h) => c.color(h)!);
+  // its keys: 0-5 the tones, the rim, the glint, the crack, the moss (the file's own, `look`)
+  const M = o.look ?? MATTER[mat], T = spread(M.tones, 6);
+  const keys = [...T, M.rim ?? T[5], M.glint ?? T[5], M.crack ?? T[0], ...(M.moss ? spread(M.moss, 3) : T.slice(2, 5))].map((h) => {
+    const v = c.color(h);
+    if (v === null) throw new PxError(`spell: matter's '${h}' is not a color`);
+    return v;
+  });
   if (o.hot) keys[8] = o.hot;
   const empty = (x: number, y: number) => x < 0 || y < 0 || x >= W || y >= H || cell[y * W + x] < 0;
   for (let y = 0; y < H; y++)

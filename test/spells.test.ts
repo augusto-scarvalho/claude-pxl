@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { ELEMENTS, TIERS, type ViewOpt, spell, spellView } from "../src/core/spells.ts";
 import { loadSource } from "../src/node/load.ts";
 import { failure } from "./helpers.ts";
+import { type View, perspective } from "../src/core/perspective.ts";
 
 const PALS = 'use("pico8"); pal({ k: 0, g: 3, w: 7 }); ';
 const load = (src: string) => loadSource(PALS + src, "t.px.js");
@@ -152,4 +153,57 @@ scene("s", { w: 90, h: 30, bg: "k" }, stamp("cell", 0, 0), rect(50, 10, 4, 4, "w
   assert.equal(cell.get(11, 11), hit.image("cell", 0, 0).get(11, 11), "the cell itself still");
   assert.equal(frame.get(51 + dx, 11 + dy), cell.get(11, 11), "the scene thrown: the square beside the cell moved with it");
   assert.match(failure(PALS + 'anim("a", { w: 9, h: 9, frames: 2 }, cast(spell("fire", 1, { from: [1, 1], to: [5, 5] }), { shook: false }))', "a").message, /no option 'shook'/);
+});
+
+test("spell of the file's own art: a ball grown through the charge, its ghosts, the impact's and the centerpiece's anims once, matter in its keys", () => {
+  const ART = `pal({ a: "#ff0000", b: "#00ff00", d: "#0000ff", e: "#ffff00" })
+sprite("_s", { w: 1, h: 1, pivot: [0, 0] }, px(0, 0, "a"))
+sprite("_l", { w: 3, h: 3, pivot: [1, 1] }, rect(0, 0, 3, 3, "b"))
+anim("_boom", { w: 5, h: 5, pivot: "center", frames: 4, fps: 20 }, (c) => c.rect(0, 0, 5, 5, c.frame < 2 ? "d" : "e"))
+const at = { from: [10, 30], to: [80, 30], start: 0, particles: false }
+`;
+  const p = load(ART + `anim("a", { w: 96, h: 64, frames: 60, fps: 20 }, cast(spell("fire", 1, { ...at, ball: ["_s", "_l"], trail: { ghosts: 2, every: 50 }, impact: { anim: "_boom", smoke: false } })))
+anim("plain", { w: 96, h: 64, frames: 60, fps: 20 }, cast(spell("fire", 1, { ...at, ball: ["_s", "_l"], trail: false })))
+anim("big", { w: 96, h: 64, frames: 60, fps: 20 }, cast(spell("fire", 3, { ...at, big: { anim: ["_s", "_s", "_boom"] }, impact: { smoke: false } })))
+anim("rock", { w: 96, h: 64, frames: 60, fps: 20 }, cast(spell("earth", 3, { ...at, variant: "boulder", matter: { tones: "abd" } })))`);
+  const pal = p.assets.get("a")!.pal, [A, B, D, E] = ["a", "b", "d", "e"].map((k) => pal.resolve(k) as number);
+  const s = spell("fire", 1, { from: [10, 30], to: [80, 30] }), hit = s.ability.start("impact"), mid = (s.ability.start("travel") + hit) / 2;
+  const n = (img: { data: Uint32Array }, c: number) => img.data.filter((v) => v === c).length, img = (name: string, t: number) => p.image(name, 0, t);
+  assert.equal(img("a", 50).get(10, 30), A, "early in the charge, the first of the list at the hand");
+  assert.equal(img("a", 350).get(10, 30), B, "late, the last");
+  assert.ok(n(img("a", mid), A) > n(img("plain", mid), A), "its ghosts behind it as it flies, the list going smaller");
+  assert.ok(n(img("a", hit + 10), D) > 0 && n(img("a", hit + 120), E) > 0 && n(img("a", hit + 220), D) + n(img("a", hit + 220), E) === 0, "the impact's anim played once from the hit");
+  const S3 = spell("fire", 3, { from: [10, 30], to: [80, 30] }), h3 = S3.ability.start("impact");
+  assert.ok(n(img("big", h3 + 120), E) > 0, "the third tier's centerpiece: the list's third");
+  const E3 = spell("earth", 3, { from: [10, 30], to: [80, 30], variant: "boulder" }), rock = img("rock", E3.ability.start("dissipate") + 100);
+  assert.ok(n(rock, B) > 0 && n(rock, D) > 0, "the boulder in the file's keys");
+  assert.match(failure(PALS + 'anim("x", { w: 9, h: 9, frames: 2 }, cast(spell("earth", 1, { from: [1, 1], to: [5, 5], matter: { tones: "k" } })))', "x").message, /matter is "ice", "rock" or \{ like, tones/);
+  assert.match(failure(PALS + 'anim("x", { w: 9, h: 9, frames: 2 }, cast(spell("fire", 3, { from: [1, 1], to: [5, 5], big: { anim: 3 } })))', "x").message, /\{ anim: an asset/);
+});
+
+test("spell's hit: the target's dissolve in the element's look, spreading from the impact, coming back as it ends", () => {
+  const at = { from: [0, 0], to: [50, 0], start: 0 }, s = spell("fire", 1, at), hit = s.ability.start("impact"), end = s.total;
+  assert.equal(s.hit(hit - 1), undefined, "nothing before it hits");
+  const [kind, o] = s.hit((hit + end) / 2, { pattern: "out", seed: 3 })!;
+  assert.deepEqual([kind, o.look, o.pattern, o.progress], ["dissolve", "burn", "out", 0.5], "fire burns, half gone half way");
+  assert.equal(s.hit(hit + 100, { over: 200 })![1].progress, 0.5, "over: ms to all gone");
+  assert.deepEqual(s.hit(end - 50, { back: 200, pattern: "out", seed: 3, flames: true })![1], { look: "neutral", seed: 3, progress: 0.25 }, "back: whole again over its last ms, in noise");
+  assert.equal(s.hit(end), undefined, "and whole after");
+  assert.deepEqual(["ice", "light", "earth"].map((e) => spell(e, 1, at).hit(hit + 1)![1].look), ["frost", "magic", "neutral"]);
+  assert.equal(spell({ like: "ice", keys: ["#fff", "#aaf", "#55f", "#00a"] }, 1, at).hit(hit + 1)![1].look, "frost", "a recipe's from its like");
+});
+
+test("spell from a figure placed in mesh() with an id; drawn in the art's pixel at a scene's size", () => {
+  const V = { w: 96, horizon: -40, eye: 3, fov: 40, pitch: -30 };
+  const p = load(`pal({ e: "#ffff00" }); ramps("kgw")
+sprite("guy", { w: 8, h: 16, pivot: [4, 16], sockets: { hand: [7, 6] } }, rect(0, 0, 8, 16, "w"))
+sprite("_dot", { w: 1, h: 1, pivot: [0, 0] }, px(0, 0, "e"))
+const V = ${JSON.stringify(V)}, M = model(); M.face("f", [-9, 1, 0], [9, 1, 0], [9, 30, 0], [-9, 30, 0])
+const SP = spell("fire", 1, { view: V, from: "hero.hand", to: [1.5, 6, 0.4], start: 0, ball: "_dot", particles: false })
+scene("a", { w: 96, h: 64, frames: 20, fps: 20, sizes: { a2: 2 } }, (c) => c.mesh(V, M.faces, { f: { ramp: "g" } }, { sprites: [{ name: "guy", at: [0, 6], id: "hero" }] }), cast(SP))`);
+  // the hand in the world: 3 px right of the pivot and 10 up, at its distance's px a meter; where it lands
+  const P = perspective(V as View), m = 1 / P.scale(6, 0, 0), [x, y] = P.ground(3 * m, 6, 10 * m).map(Math.round), e = p.assets.get("a")!.pal.resolve("e");
+  assert.equal(p.image("a", 0, 100).get(x, y), e, "the ball at the figure's hand, in its world");
+  const big = p.image("a2", 0, 100);
+  assert.ok([[0, 0], [1, 0], [0, 1], [1, 1]].every(([i, j]) => big.get(2 * x + i, 2 * y + j) === e), "twice as big: the same pixel, 2 x 2");
 });

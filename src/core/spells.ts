@@ -17,7 +17,8 @@ import { type View, perspective } from "./perspective.ts";
 import { type SmokeCanvas, drawSmoke } from "./smoke.ts";
 import { bayer, hash, rng } from "./util.ts";
 import { type Ability, type EmitterOpts, type VfxCanvas, ability, drawParticles, drawTrail, emitter } from "./vfx.ts";
-import { type Matter, type SolidKind, type V3, drawSolid, makeSolid, pieceAt, pieces, turn } from "./volumes.ts";
+import type { Img } from "./image.ts";
+import { type Matter, type MatterLook, type SolidKind, type V3, MATTER, drawSolid, makeSolid, pieceAt, pieces, spread, turn } from "./volumes.ts";
 
 export const SHAPES = ["burst", "ring", "shards", "splash", "debris", "swirl", "rays", "implode", "sparkle"] as const;
 export const BIGS = ["pillar", "bolts", "spikes", "tornado", "sphere", "beam", "helix", "nova", "blizzard", "quake", "slide", "rain", "grasp", "leaves"] as const;
@@ -28,19 +29,23 @@ export interface Element {
   like?: string;
   /** its ramp: the bright core first, the dark edge last (3 or 4 tones, keys or #hex) */
   keys: string[];
-  /** the ball it flies as: its radius at tier 1 (px), its noise's cell (px), how fast it churns; false: none (a bolt) */
-  ball?: false | { r?: number; scale?: number; speed?: number };
+  /**
+   * the ball it flies as: its radius at tier 1 (px), its noise's cell (px), how fast it churns; false: none (a bolt);
+   * or the file's own: an asset (an anim, played from the charge's start, never scaled), or a list grown through the charge
+   */
+  ball?: false | string | string[] | { r?: number; scale?: number; speed?: number };
   /** it flies as a jagged bolt from the hand to where it has got (lightning) */
   bolt?: boolean;
   /** how it moves: an arc (px up at tier 1), its easing, a wave across its way (px) */
   motion?: { arc?: number; ease?: "linear" | "in" | "out"; wave?: number };
-  trail?: false | { length?: number; width?: [number, number] };
+  /** its trail: ms long, px wide [head, tail]; or `ghosts` copies of the ball `every` ms back, each fainter (and a list's entry smaller) */
+  trail?: false | { length?: number; width?: [number, number]; ghosts?: number; every?: number };
   /** the sparks it throws as it flies (an emitter's options, px and px a second) and their keys, young to old */
   particles?: false | (EmitterOpts & { keys?: string[] });
-  /** the impact's shape and its keys (default the ramp); smoke's three keys (lit, middle, shaded), or false */
-  impact?: { shape?: Shape; keys?: string[]; smoke?: false | string[] };
-  /** the third tier's centerpiece */
-  big?: Big;
+  /** the impact's shape and its keys (default the ramp), or the file's `anim` (a list: the tier picks one) played once from the impact at where it hits; smoke's three keys (lit, middle, shaded), or false */
+  impact?: { shape?: Shape; keys?: string[]; smoke?: false | string[]; anim?: string | string[] };
+  /** the third tier's centerpiece, or the file's `anim` played once from the impact on the ground under the target */
+  big?: Big | { anim: string | string[] };
   /** the mark it leaves on the ground at the third tier: two keys, the rim first; false for none */
   mark?: false | string[];
   /** the third tier's flash (default the ramp's first); its light's color (default the ramp's second) */
@@ -50,7 +55,7 @@ export interface Element {
   timing?: { charge?: number; cast?: number; travel?: number; impact?: number; dissipate?: number };
   /** its variants (VARIANTS), the first its own way; what its solids are made of */
   variants?: string[];
-  matter?: Matter;
+  matter?: Matter | MatterLook;
 }
 const ELEMENT_KEYS = ["like", "keys", "ball", "bolt", "motion", "trail", "particles", "impact", "big", "mark", "flash", "light", "timing", "variants", "matter"];
 
@@ -177,6 +182,13 @@ export interface Spell {
   bind(c: SpellCanvas): void;
   /** where it is at a time, in the view's world (the hand while it charges, the ball, where it hit) */
   at(t: number): number[];
+  /**
+   * the target's dissolve now, for its `fx` (undefined before it is hit and once it is whole again): in
+   * the element's look (fire burns, ice frosts, light, dark and heal magic, else neutral) or `look`,
+   * spreading from the impact over `over` ms (default till it ends, or till `back`), then `back` ms of
+   * coming back whole as it ends (the neutral look in noise, its `seed`); the dissolve's other options as they are
+   */
+  hit(t: number, opts?: Record<string, unknown> & { look?: string; over?: number; back?: number }): [string, Record<string, unknown>] | undefined;
   /** what it draws under itself (marks, shadows, fissures), what gives light, what goes over it (solids, smoke) */
   under(c: SpellCanvas): void;
   draw(c: SpellCanvas): void;
@@ -191,7 +203,13 @@ export interface Spell {
   /** px the picture is thrown [x, y] as it hits (the tier's drama), [0, 0] otherwise */
   shake(t: number): [number, number];
 }
-export interface SpellCanvas extends VfxCanvas, SmokeCanvas { socket?(at: string): [number, number] }
+export interface SpellCanvas extends VfxCanvas, SmokeCanvas {
+  socket?(at: string): [number, number];
+  /** a socket of a sprite placed in mesh() with an id, in its world (m), undefined for anything else */
+  socket3?(at: string): V3 | undefined;
+  /** an asset `ms` into its own loop (a spell's piece of the file's art); `once`: none once played through */
+  piece?(name: string, ms: number, once?: boolean): Img | undefined;
+}
 
 const ease = (k: number) => 1 - (1 - k) ** 2;
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -238,7 +256,10 @@ export function element(e: string | Element): Element {
   const base = e.like ? element(e.like) : undefined, out = { ...base, ...e, impact: { ...base?.impact, ...e.impact } } as Element;
   if (!Array.isArray(out.keys) || out.keys.length < 2) throw new PxError(`spell: an element's keys are its ramp, the core first: 3 or 4 tones, got ${JSON.stringify(out.keys)}`);
   if (out.impact?.shape && !SHAPES.includes(out.impact.shape)) throw new PxError(`spell: an impact's shape is ${SHAPES.join(", ")}, got ${JSON.stringify(out.impact.shape)}`);
-  if (out.big && !BIGS.includes(out.big)) throw new PxError(`spell: big is ${BIGS.join(", ")}, got ${JSON.stringify(out.big)}`);
+  if (out.big && !(BIGS.includes(out.big as Big) || art((out.big as { anim?: unknown }).anim))) throw new PxError(`spell: big is ${BIGS.join(", ")} or { anim: an asset (a list: one a tier) }, got ${JSON.stringify(out.big)}`);
+  const m = out.matter;
+  if (m !== undefined && !(typeof m === "string" ? m in MATTER : m && [...(m.tones ?? "")].length >= 2 && (m.like === undefined || m.like in MATTER)))
+    throw new PxError(`spell: matter is "ice", "rock" or { like, tones: 2-6 keys dark to light, rim, glint, crack, moss }, got ${JSON.stringify(m)}`);
   return out;
 }
 
@@ -257,7 +278,7 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
   const T = TIERS[tier - 1], S = scale ?? T.scale, N = count ?? T.count, D = time ?? T.time, R = reach ?? T.reach, P = power ?? T.power;
   // the variant: named, it shows at every tier, as big as the tier; else the element's own, its centerpiece at tier 3
   const VR: Variant = variant ? VARIANTS[variant] : {}, F = { size: 1, count: 6, facets: 12, jag: 0.25, debris: 12, stay: 600, ...VR.form, ...form };
-  const big: Big | false = variant ? VR.big ?? false : T.big ? E.big ?? "pillar" : false, del = VR.delivery ?? (E.bolt ? "bolt" : "throw"), lasting = !!variant;
+  const B0 = variant ? VR.big ?? false : T.big ? E.big ?? "pillar" : false, bigArt = typeof B0 === "object" ? art(B0.anim) : undefined, big = (bigArt ? false : B0) as Big | false, del = VR.delivery ?? (E.bolt ? "bolt" : "throw"), lasting = !!variant;
   const SS = S * F.size;
   // the view, and the points in its world (from the side with no view, [x, y] on the picture as phase 7 took them)
   const onPicture = !Array.isArray(f0), legacy = (v0 === undefined || v0 === "side") && ((Array.isArray(f0) && f0.length < 3) || t0.length < 3);
@@ -287,13 +308,15 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
   let H3: V3 = [A3[0], A3[1], 0];
   // its solid, if it is one: its size (px of the spell), and how high its middle sits once there
   const SO = VR.solid ? makeSolid(VR.solid, seed, (VR.solid === "spire" ? 8 : VR.solid === "block" ? 10 : VR.solid === "berg" ? 11 : 9) * SS, F.facets, F.jag) : undefined;
-  const mat: Matter = E.matter ?? (VR.solid === "berg" || VR.solid === "block" ? "ice" : "rock");
+  // what it is made of: the element's matter, or the file's keys drawn as one (default its element's, else by the solid)
+  const M0 = E.matter, own = element(name).matter, bySolid = VR.solid === "berg" || VR.solid === "block" ? "ice" : "rock";
+  const look = typeof M0 === "object" ? M0 : undefined, mat: Matter = look ? look.like ?? (typeof own === "string" ? own : bySolid) : (M0 as Matter | undefined) ?? bySolid;
   const rest: V3 = SO ? [G3[0], G3[1], (del === "fall" ? SO.up * 0.8 : SO.up * 0.3) * U] : B3;
   const I3: V3 = SO || del === "fall" || del === "ground" ? [G3[0], G3[1], 2 * U] : B3;
   // its phases
   const tm = { charge: 400, cast: 120, travel: 450, impact: 250, dissipate: 700, ...E.timing };
   const travel = del === "sky" ? 80 : del === "fall" ? 520 * D : del === "wave" ? 650 * D : del === "bolt" || del === "chain" ? tm.travel : tm.travel * D;
-  const A = ability([["charge", tm.charge * D], ["cast", tm.cast], ["travel", travel], ["impact", SO ? (del === "fall" ? 220 : 380) * D : tm.impact * D * (big ? 1.6 : 1)],
+  const A = ability([["charge", tm.charge * D], ["cast", tm.cast], ["travel", travel], ["impact", SO ? (del === "fall" ? 220 : 380) * D : tm.impact * D * (big || bigArt ? 1.6 : 1)],
     ["dissipate", lasting ? F.stay + 900 * D : tm.dissipate * D]], { start });
   const t0r = A.start("travel"), hit = A.start("impact"), end = start + A.total, brk = A.start("dissipate") + (lasting ? F.stay : 0);
   const after = (t: number) => clamp01((t - hit) / (end - hit)), into = (t: number) => clamp01((t - hit) / (A.start("dissipate") - hit));
@@ -316,9 +339,13 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
   const k3 = sc(I3), burst = emitter({ at: scr(I3), burst: Math.round(10 * N * S), from: hit, life: [250, 600 * D], speed: [20 * S * k3, 55 * S * k3], angle: -90, spread: top ? 180 : 100, gravity: [0, top ? 0 : shapeName === "sparkle" ? -30 : 90], drag: 1.4, seed: seed + 1 });
   const charge = emitter({ at: () => scr(A3), rate: 20 * N, from: A.start("charge"), to: A.start("cast"), life: [150, 300], speed: [6, 16], spread: 180, seed: seed + 2 });
   const shards = SO && mat === "ice" ? emitter({ at: scr(rest), burst: Math.round(F.debris * 1.5), from: brk, life: [200, 500], speed: [20 * SS, 60 * SS], spread: 180, angle: -90, gravity: [0, top ? 0 : 60], drag: 1, seed: seed + 3 }) : undefined;
-  const r = (E.ball ? E.ball.r ?? 3 : 2) * S;
+  const r = (E.ball ? (E.ball as { r?: number }).r ?? 3 : 2) * S;
   const pcs = SO ? pieces(seed + 11, F.debris, [0, 0, rest[2] / U], SO.r * 0.6, (70 * SS) / 2, Math.max(2, SO.r * 0.13)) : [];
   const hot = (c: VfxCanvas) => (VR.burning ? c.color(E.keys[1]) ?? undefined : undefined);
+  // the file's own art: the ball (a list grown through the charge, g 0..1) played from its start, the impact's and the centerpiece's (one a tier) once from the hit
+  const balls = art(E.ball), hitArt = art(E.impact?.anim), tierArt = (l: string[]) => l[Math.min(l.length, tier) - 1];
+  const ball = (c: SpellCanvas, x: number, y: number, rr: number, ks: Color[], t: number, g = 1, density = 1) =>
+    balls ? piece(c, balls[Math.max(0, Math.min(balls.length - 1, Math.floor(g * balls.length)))], x, y, t - start, false, density) : orb(c, x, y, rr, ks, E, seed, t);
 
   // ------------------------------------------------ what each variant draws
   /** The solid now: rising out of the ground or falling with a slow turn, there, cracking, broken. */
@@ -328,7 +355,7 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
     const ctr: V3 = del === "fall" ? (t < hit ? path(t) : rest) : [rest[0], rest[1], rest[2] - SO.up * (1 - rise) * 1.1 * U];
     const spin = (2.2 * (Math.min(t, hit) - t0r)) / 1000, rot = del === "fall" ? turn([0.3, 1, 0.25], spin + (seed % 7) * 0.4) : turn([0, 0, 1], (seed % 7) * 0.4);
     const crack = VR.burning ? 1 : clamp01((t - (brk - F.stay * 0.6)) / (F.stay * 0.6));
-    drawSolid(c, V, ctr, U, SO, rot, mat, { seed, crack, crackAt: del === "fall" ? [0, 0, -SO.up] : [0, 0, SO.up * 0.6], ground: del === "fall" ? undefined : ctr[2] / U, hot: hot(c) });
+    drawSolid(c, V, ctr, U, SO, rot, mat, { seed, crack, crackAt: del === "fall" ? [0, 0, -SO.up] : [0, 0, SO.up * 0.6], ground: del === "fall" ? undefined : ctr[2] / U, hot: hot(c), look });
   };
   /** Its pieces once it breaks, flying out and falling, lying a while, going. */
   const drawPieces = (c: SpellCanvas, t: number, n0: number[], list: typeof pcs, kind: SolidKind, g = 260) => {
@@ -337,7 +364,7 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
     for (const p of list) {
       const { at: q, ang } = pieceAt(p, s, g * SS / 2, p.size * 0.4);
       const piece = makeSolid(kind, p.seed, p.size, 7, 0.4);
-      drawSolid(c, V, [n0[0] + q[0] * U, n0[1] + q[1] * U, n0[2] + q[2] * U], U, piece, turn(p.axis, ang), mat, { seed: p.seed, density: fade, hot: hot(c) });
+      drawSolid(c, V, [n0[0] + q[0] * U, n0[1] + q[1] * U, n0[2] + q[2] * U], U, piece, turn(p.axis, ang), mat, { seed: p.seed, density: fade, hot: hot(c), look });
     }
   };
   /** Fissures on the ground from g, `n` of them `len` px long at most, grown by k, opened by w px. */
@@ -536,10 +563,18 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
   return {
     ability: A, total: A.total, element: E, variant, tier, glow: glow ?? T.glow, view: V, at,
     bind(c) {
-      if (typeof f0 !== "string") return;
+      // (only till it hits: the hand matters no more after, the figure may have turned away)
+      if (typeof f0 !== "string" || c.t < start || c.t >= hit) return;
       if (!c.socket) throw new PxError(`spell: from "${f0}" is a socket, read where it is drawn (cast())`);
-      A3 = lift(...c.socket(f0));
+      // a figure's in mesh() (placed with an id) where it is in the world, else lifted from the picture
+      A3 = (V.kind === "perspective" ? c.socket3?.(f0) : undefined) ?? lift(...c.socket(f0));
       H3 = [A3[0], A3[1], 0];
+    },
+    hit(t, o = {}) {
+      const { look: lk, over, back = 0, ...rest } = o, home = end - back, base = typeof name === "string" ? name : name.like ?? "";
+      if (t < hit || t >= end) return undefined;
+      if (t >= home) return ["dissolve", { look: "neutral", ...(o.seed !== undefined ? { seed: o.seed } : {}), progress: 1 - clamp01((t - home) / back) }];
+      return ["dissolve", { look: lk ?? HIT_LOOK[base] ?? "neutral", ...rest, progress: clamp01((t - hit) / (over ?? home - hit)) }];
     },
     under(c) {
       const t = c.t;
@@ -564,11 +599,11 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
       const ks = keysOf(c, E.keys), hand = scr(A3), rh = r * sc(A3);
       if (p.name === "charge") {
         drawParticles(c, charge, E.keys.slice(0, 3));
-        if (E.ball !== false) orb(c, hand[0], hand[1], Math.max(1, rh * (0.3 + 0.7 * p.k)), ks, E, seed, t);
+        if (E.ball !== false) ball(c, hand[0], hand[1], Math.max(1, rh * (0.3 + 0.7 * p.k)), ks, t, p.k);
         else spark(c, hand[0], hand[1], 1 + Math.round(2 * p.k), ks, t);
       } else if (p.name === "cast") {
         ring(c, hand[0], hand[1], rh + 1 + p.k * 4 * S, ks.slice(0, 2), 1 - p.k);
-        if (E.ball !== false) orb(c, hand[0], hand[1], rh, ks, E, seed, t);
+        if (E.ball !== false) ball(c, hand[0], hand[1], rh, ks, t);
       } else if (p.name === "travel") {
         const here = path(t), [x, y] = scr(here);
         if (del === "bolt" || del === "chain") bolt(c, hand, [x, y], ks, seed + Math.floor(t / 50), Math.max(1, Math.round(S / 1.5)));
@@ -579,25 +614,34 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
           if (VR.burning || !SO) {
             if (big !== "slide") {
               drawTrail(c, (tt) => scr(path(tt)), E.keys, { length: 200 * D, width: [Math.round((SO ? SO.r * 1.4 : r * 1.6) * sc(here)), 1], from: t0r });
-              orb(c, x, y, (SO ? SO.r * 1.25 : r) * sc(here), ks, E, seed, t);
+              ball(c, x, y, (SO ? SO.r * 1.25 : r) * sc(here), ks, t);
             }
           }
         } else if (del === "ground") {
           // born at the target: the hand lets it go into the ground, which glows and stirs where it will come up
           const k = kTravel(t);
-          if (E.ball !== false) orb(c, hand[0], hand[1], rh * (1 - k), ks, E, seed, t);
+          if (E.ball !== false) ball(c, hand[0], hand[1], rh * (1 - k), ks, t, 1 - k);
           gring(c, V, U, G3, (3 + 10 * k) * S, ks.slice(0, 2), 0.35 + 0.65 * k);
           gring(c, V, U, G3, (1 + 5 * k) * S, ks.slice(1, 3), 0.5 * k);
         } else if (del !== "sky") {
-          const rr = r * sc(here);
-          if (E.trail !== false) drawTrail(c, (tt) => scr(path(tt)), E.keys, { length: (E.trail?.length ?? 160) * D, width: E.trail?.width ? (E.trail.width.map((w) => w * S) as [number, number]) : [Math.round(rr * 1.6), 1], from: t0r });
-          orb(c, x, y, rr, ks, E, seed, t);
+          const rr = r * sc(here), tr = E.trail || {}, gh = tr.ghosts ?? 0;
+          // ghosts: the ball at past moments, each fainter (and a list's entry smaller), the oldest first
+          for (let i = gh; i >= 1; i--) {
+            const tt = t - i * (tr.every ?? 50);
+            if (tt < t0r) continue;
+            const [gx, gy] = scr(path(tt));
+            if (balls) piece(c, balls[Math.max(0, balls.length - 1 - i)], gx, gy, tt - start, false, 1 - i / (gh + 1));
+            else orb(c, gx, gy, rr * (1 - i / (gh + 1)), ks, E, seed, tt);
+          }
+          if (E.trail !== false && !gh) drawTrail(c, (tt) => scr(path(tt)), E.keys, { length: (E.trail?.length ?? 160) * D, width: E.trail?.width ? (E.trail.width.map((w) => w * S) as [number, number]) : [Math.round(rr * 1.6), 1], from: t0r });
+          ball(c, x, y, rr, ks, t);
         }
         if (fly) drawParticles(c, fly, pk);
       } else {
         // the impact: the centerpiece, its shape, (tier 2 on) a shockwave on the ground, sparks
         const k = after(t), ki = into(t);
-        if (big) centerpiece(c, big, ks, t);
+        if (bigArt) piece(c, tierArt(bigArt), ...scr(G3), t - hit, true);
+        else if (big) centerpiece(c, big, ks, t);
         if (del === "sky" && ki < 0.6 && Math.floor(t / 40) % 3 !== 2) bolt(c, scr([G3[0] + 6 * U, G3[1], (top ? 100 : 160) * U]), scr(B3), ks, seed + Math.floor(t / 40), 1);
         if (del === "chain")
           for (let i = 1; i <= F.count; i++) {
@@ -608,10 +652,11 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
             shape(c, V, U, "rays", j1, [j1[0], j1[1], 0], S * 0.6, ks, clamp01((t - t1) / 200), clamp01((t - t1) / 260), seed + i, t);
             spark(c, x, y, 1, ks, t);
           }
-        shape(c, V, U, shapeName, I3, G3, S * (VR.burning ? 1.8 : SO ? 0.8 : 1), E.impact?.keys ? keysOf(c, E.impact.keys) : ks, ki, k, seed, t);
+        if (hitArt) piece(c, tierArt(hitArt), ...scr(I3), t - hit, true);
+        else shape(c, V, U, shapeName, I3, G3, S * (VR.burning ? 1.8 : SO ? 0.8 : 1), E.impact?.keys ? keysOf(c, E.impact.keys) : ks, ki, k, seed, t);
         if (T.ring) gring(c, V, U, G3, Math.round(4 + ease(ki) * 18 * S), ks.slice(1, 3), 1 - ki);
         drawParticles(c, burst, pk, { trail: 30 });
-        if (shards) drawParticles(c, shards, ["#ffffff", "#c8f0ff", "#6ac8f0"]);
+        if (shards) drawParticles(c, shards, look ? ((T6) => [look.glint ?? T6[5], look.rim ?? T6[5], T6[3]])(spread(look.tones, 6)) : ["#ffffff", "#c8f0ff", "#6ac8f0"]);
       }
     },
     over(c) {
@@ -676,7 +721,7 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
       const k = clamp01((t - t1) / fall), s0: V3 = [g[0] - 45 * S * U, g[1], 95 * U + g[2]], kk = k * k;
       const roll = k >= 1 ? Math.min(1, (t - t1 - fall) / 220) : 0, ctr: V3 = [s0[0] + (g[0] - s0[0]) * kk + roll * 3 * S * U, s0[1] + (g[1] - s0[1]) * kk, s0[2] + (g[2] - s0[2]) * kk];
       const gone = clamp01((t - brk) / ((end - brk) * 0.8));
-      drawSolid(c, V, ctr, U, solid, turn([0.2, 1, 0.3], (Math.min(t, t1 + fall) - t1) / 160 + roll), mat, { seed: seed + i, density: 1 - gone, crack: gone * 2 });
+      drawSolid(c, V, ctr, U, solid, turn([0.2, 1, 0.3], (Math.min(t, t1 + fall) - t1) / 160 + roll), mat, { seed: seed + i, density: 1 - gone, crack: gone * 2, look });
     }
   }
   // the quake: rocks thrust up along its fissures as they open, standing, then sinking back
@@ -688,13 +733,26 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
         if (t < t1) continue;
         const solid = makeSolid("spire", seed + i * 7 + j, size, F.facets, F.jag), up = ease(clamp01((t - t1) / 180)) - ease(clamp01((t - brk) / 400));
         const ctr: V3 = [G3[0] + Math.cos(a0) * d * U, G3[1] + Math.sin(a0) * d * U, solid.up * (0.3 - 1.3 * (1 - up)) * U];
-        drawSolid(c, V, ctr, U, solid, turn([Math.cos(a0), Math.sin(a0), 3], 0.25), mat, { seed: seed + i * 7 + j, ground: ctr[2] / U });
+        drawSolid(c, V, ctr, U, solid, turn([Math.cos(a0), Math.sin(a0), 3], 0.25), mat, { seed: seed + i * 7 + j, ground: ctr[2] / U, look });
       }
     }
   }
 }
 
 // ---------------------------------------------------------------- what spells are drawn of
+/** What it does to what it hits (the dissolve's look), by element. */
+const HIT_LOOK: Record<string, string> = { fire: "burn", lightning: "burn", ice: "frost", light: "magic", dark: "magic", heal: "magic" };
+/** An asset or a list of them (the file's own art), as a list. */
+const art = (v: unknown): string[] | undefined => (typeof v === "string" ? [v] : Array.isArray(v) && v.length && v.every((n) => typeof n === "string") ? v : undefined);
+/** A piece of the file's art at (x, y) on the picture (its pivot there, else its middle), `ms` into it, thinned by `density`. */
+function piece(c: SpellCanvas, name: string, x: number, y: number, ms: number, once = false, density = 1): void {
+  if (!c.piece) throw new PxError(`spell: '${name}' is an asset, drawn by cast()`);
+  const img = c.piece(name, ms, once);
+  if (!img) return;
+  const [px, py] = img.pivot ?? [img.w / 2, img.h / 2], X = Math.round(x - px), Y = Math.round(y - py);
+  for (let j = 0; j < img.h; j++)
+    for (let i = 0; i < img.w; i++) { const col = img.data[j * img.w + i]; if ((col & 255) >= 128) put(c, X + i, Y + j, col, density); }
+}
 const keysOf = (c: VfxCanvas, keys: string[]) =>
   keys.map((k) => { const v = c.color(k); if (v === null || v === TRANSPARENT) throw new PxError(`spell: '${k}' is not a visible color`); return v; });
 const put = (c: VfxCanvas, x: number, y: number, col: Color, density = 1) => {
@@ -709,7 +767,7 @@ function line(c: VfxCanvas, ax: number, ay: number, bx: number, by: number, ks: 
 
 /** A ball of the ramp: noise churning in a disc, brighter toward the middle, its rim the darkest. */
 function orb(c: VfxCanvas, x: number, y: number, r: number, ks: Color[], E: Element, seed: number, t: number): void {
-  const n = noise(seed), sc = (E.ball && E.ball.scale) || 2, a = (t / 1000) * ((E.ball && E.ball.speed) || 1), R = Math.ceil(r);
+  const B = E.ball as { scale?: number; speed?: number } | false | undefined, n = noise(seed), sc = (B && B.scale) || 2, a = (t / 1000) * ((B && B.speed) || 1), R = Math.ceil(r);
   for (let dy = -R; dy <= R; dy++)
     for (let dx = -R; dx <= R; dx++) {
       const d = Math.hypot(dx, dy) / Math.max(r, 0.5);

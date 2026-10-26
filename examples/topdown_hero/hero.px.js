@@ -221,15 +221,10 @@ function swing(c, set, d, i, ox, oy, part) {
   const px = (r, t) => at(r, t).map(Math.round)
   if (part === "smear") {
     if (from === undefined) return
-    // an angular crescent: its outer edge on the tip's path in 3 straight runs, its inner edge
-    // closing in from nothing where it starts to `wide` px at the blade
-    const out = [], inn = []
-    for (let k = 0; k <= 3; k++) {
-      const t = from + ((a - from) * k) / 3
-      out.push(...px(tip + 0.5, t))
-      inn.unshift(px(tip + 0.5 - Math.max(0.6, (wide * k) / 3), t))
-    }
-    c.poly([...out, ...inn.flat()], wide > 2 ? "W" : "w")
+    // an angular crescent swept by the blade in 3 straight runs (u from 0 where it starts to 3 at the
+    // blade), its inner edge closing in from nothing to `wide` px at the blade
+    const edge = (u) => { const t = from + ((a - from) * u) / 3; return [px(tip + 0.5, t), px(tip + 0.5 - Math.max(0.6, (wide * u) / 3), t)] }
+    c.trail(edge, wide > 2 ? "W" : "w", { t: 3, length: 3, step: 1 })
   } else if (part === "blade") {
     const [gx, gy] = at(hand + 1), u = [Math.cos(a * R), Math.sin(a * R)]
     c.line(...px(hand + 2), ...px(tip), dummy ? "5" : "w")

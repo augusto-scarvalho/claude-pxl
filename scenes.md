@@ -543,7 +543,8 @@ happens after another, never all at once.
 - **Smears** (motion blur): 2 frames, the first full and light, the second thinner and darker or in
   another hue (a yellow crescent, then a magenta one), then a 1-frame sliver; a wedge, a crescent, a
   line along the edge, ghost copies. A dashing body leaves a dark trail back to where it was; a ball
-  crossing in one frame is a capsule spanning the gap (`stamp`'s `smear`; a blade's, `arc()`).
+  crossing in one frame is a capsule spanning the gap (`stamp`'s `smear`; a blade's, `trail()` of its
+  edge, the band it swept, or `arc()`).
 - **Smoke** (`smoke()`, `PXL help smoke`): billows in clusters lit on top and shaded beneath, three
   opacities, never a smooth fade; a column of 16-18 billows growing from 4 to 10 px in radius (12
   smaller ones read as beads on a string, not a column); a puff of 12 bursting 14 px; a bank of 7-8
@@ -556,12 +557,14 @@ happens after another, never all at once.
   material ahead of a green edge, drips falling; frost pales it blue behind a white crystal edge;
   magic is gold with sparkles. Without a theme, `neutral`: a thin ring of the thing's own lightest
   tone, half clear. Give the edge's keys over the progress for a color that changes as it goes.
-- **A spell in a scene** (`examples/hd2d/clearing.px.js`): its phases on an `ability()` (charge 600 ms,
+- **A spell in a scene** (`examples/hd2d/clearing.px.js`): a `spell()` of the kit in the file's own
+  fire (`ball`, `trail: { ghosts }`, `impact: { anim }`), from the hand of the caster's `mesh()` sprite
+  (`id: "hero"`), its burn on the target `fx: S.hit(c.t, ...)`; its phases (charge 600 ms,
   cast 200, flight 600, impact 200, the target burning 2300, back 600, in 5 s); every loop in it a
   divisor of the scene's (20 fps: the idle's 1000 ms, the fire's 500, the wind's 2500 into 5000: at
   12.5 fps with the 250 ms idle the loops met only after 60 s). The ball a 4 px disc of
   `effect("energy")` in 4 fire tones (scale 1.6: at 4 its noise was one band) with a 1 px `distort`;
-  its trail three of it at 50 ms steps back, fainter; its light `{ r: 2.5, strength: 3 }`. The aura 3
+  its trail three of it at 50 ms steps back, fainter; its light the spell's lamps (`reach: 120, power: 3.75`: 2.5 m, 3). The aura 3
   px in 3 tones, flicker 0.6 on 3.5 px cells, at 0.2-0.6 opacity (at 0.85 it hid the figure). A
   target catching fire: the burn spreading from where it was hit over 2.4 s, flames 10 px from a third
   of the front, a smoke column of 18 billows growing 3 to 10 px fading in over the first 15% and out
@@ -648,6 +651,10 @@ Decide five things, in this order:
    `sphere` (dark), `beam` (light: straight, its core white), `helix` (heal: two strands winding up,
    sparks riding them); its mark on the ground two keys, the rim first (scorched, frosted, wet, a
    crater; wind leaves none).
+
+Any piece can be the file's own art instead, drawn as it is (never scaled; `examples/hd2d/clearing.px.js`):
+`ball: ["_fire_s", "_fire_m", "_fire"]` (anims grown through the charge, `trail: { ghosts: 3 }` copies of
+it behind), `impact: { anim }`, `big: { anim }` (a list: one a tier), `matter: { tones }` in its ramp.
 
 What the tiers do (`TIERS`), each factor an option of `spell()` to change:
 

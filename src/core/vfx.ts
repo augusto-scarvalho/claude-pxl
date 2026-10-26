@@ -361,8 +361,18 @@ export interface EmitterOpts {
   seed?: number;
 }
 
+/** What an emitter gives: the particles alive at a time; `sprites(t, { name, at, blend })` the same as mesh() sprites. */
+export interface Emitter {
+  (t: number): Particle[];
+  /**
+   * The particles alive at t as sprites for mesh(), in meters: `name` (or names, young to old) at `at`
+   * ([x, z, up], the emitter's origin) + [p.x, 0, -p.y], `blend` as a sprite's; flying, no light, no shadow.
+   */
+  sprites(t: number, o: { name: string | string[]; at: number[]; blend?: "alpha" | "add" | "screen" }): { name: string; at: [number, number, number]; blend?: "alpha" | "add" | "screen"; light: false; shadow: 0; air: true }[];
+}
+
 /** A seeded emitter: (t) gives the particles alive at time t, each where its own closed-form path puts it. */
-export function emitter(o: EmitterOpts = {}): (t: number) => Particle[] {
+export function emitter(o: EmitterOpts = {}): Emitter {
   const [l0, l1] = o.life ?? [400, 800], [v0, v1] = o.speed ?? [20, 60], ang = ((o.angle ?? -90) * Math.PI) / 180, spread = ((o.spread ?? 30) * Math.PI) / 180;
   const [gx, gy] = o.gravity ?? [0, 0], drag = o.drag ?? 0, seed = o.seed ?? 1, from = o.from ?? 0, to = o.to ?? Infinity;
   if (!(l0 > 0 && l1 >= l0) || !(v1 >= v0 && v0 >= 0) || !(drag >= 0) || (o.rate === undefined) === (o.burst === undefined) || !((o.rate ?? 1) > 0) || !((o.burst ?? 1) >= 1))
@@ -375,7 +385,7 @@ export function emitter(o: EmitterOpts = {}): (t: number) => Particle[] {
     const sp = v0 + (v1 - v0) * r(), a = ang + spread * (2 * r() - 1), [sx, sy] = src(born), d = dist(age), k = drag > 0 ? Math.exp(-drag * age) : 1;
     return { x: sx + Math.cos(a) * sp * d + 0.5 * gx * age * age, y: sy + Math.sin(a) * sp * d + 0.5 * gy * age * age, vx: Math.cos(a) * sp * k + gx * age, vy: Math.sin(a) * sp * k + gy * age, age: (age * 1000) / life, life, id };
   };
-  return (t: number) => {
+  const run = ((t: number) => {
     const out: Particle[] = [];
     if (o.burst !== undefined) {
       for (let k = 0; k < o.burst; k++) { const p = one(k, from, k, t); if (p) out.push(p); }
@@ -389,11 +399,18 @@ export function emitter(o: EmitterOpts = {}): (t: number) => Particle[] {
       if (p) out.push(p);
     }
     return out;
+  }) as Emitter;
+  run.sprites = (t, s) => {
+    const names = typeof s?.name === "string" ? [s.name] : s?.name, at = s?.at;
+    if (!Array.isArray(names) || !names.length || !Array.isArray(at) || at.length < 2 || !at.every(Number.isFinite))
+      throw new PxError(`emitter: sprites(t, { name (an asset, or names young to old), at: [x, z, up] (m, where it emits from), blend }), got ${JSON.stringify(s)}`);
+    return run(t).map((p) => ({ name: names[Math.min(names.length - 1, Math.floor(p.age * names.length))], at: [at[0] + p.x, at[1], (at[2] ?? 0) - p.y], blend: s.blend, light: false, shadow: 0, air: true }));
   };
+  return run;
 }
 
-/** What the particles and trails draw on. */
-export interface VfxCanvas { t: number; color(k: unknown): Color | null; get(x: number, y: number): Color; plot(x: number, y: number, c: Color): boolean }
+/** What the particles and trails draw on (a blade's trail fills polygons). */
+export interface VfxCanvas { t: number; color(k: unknown): Color | null; get(x: number, y: number): Color; plot(x: number, y: number, c: Color): boolean; poly?(pts: number[], c: string): void }
 
 const keysOf = (c: VfxCanvas, keys: string | string[], what: string) => {
   const ks = colorList(keys).map((k) => c.color(k));
@@ -417,21 +434,42 @@ export function drawParticles(c: VfxCanvas, emit: (t: number) => Particle[], key
   }
 }
 
+export interface TrailOpts { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number; t?: number; taper?: boolean; side?: (q: number[]) => boolean }
 /**
- * A trail behind what moves along `path` (a function of the time giving [x, y]): from now back
- * `length` ms, `width` px across at its head and at its tail, in the keys head (hot) to tail, the
- * tail thinning in an ordered dither by `fade` (0..1).
+ * A trail behind what moves along `path` (a function of the time giving [x, y]): from now (`t`, default
+ * the clock) back `length` ms, `width` px across at its head and at its tail, in the keys head (hot) to
+ * tail, the tail thinning in an ordered dither by `fade` (0..1). A blade's: `path` gives its edge,
+ * [[tip], [inner point]] (each [x, y, ...]: more numbers, a depth, come along), and the band it swept
+ * is filled a stretch every `step` ms, tail to head (`path(t, i)`: i the step from the tail, 0 to n, for widths of
+ * its own), each stretch in the keys' share of where it is,
+ * `taper` closing it to nothing at its tail, `side(q)` keeping the stretches whose tip's middle passes (in
+ * front of a body or behind it); a stretch its tip moved under 0.8 px along is left out.
  */
-export function drawTrail(c: VfxCanvas, path: (t: number) => number[], keys: string | string[], o: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number } = {}): void {
+export function drawTrail(c: VfxCanvas, path: (t: number, i: number) => number[] | number[][], keys: string | string[], o: TrailOpts = {}): void {
   if (typeof path !== "function") throw new PxError("trail(t => [x, y], keys, opts): the first is the path, a function of the time");
-  const ks = keysOf(c, keys, "trail"), L = o.length ?? 300, [w0, w1] = o.width ?? [4, 1], fade = o.fade ?? 0.6, step = o.step ?? 10, t = c.t;
+  const ks = keysOf(c, keys, "trail"), L = o.length ?? 300, [w0, w1] = o.width ?? [4, 1], fade = o.fade ?? 0.6, step = o.step ?? 10, t = o.t ?? c.t;
   if (!(L > 0 && w0 >= 0 && w1 >= 0 && step > 0 && fade >= 0 && fade <= 1)) throw new PxError(`trail: length ms above 0, width [head, tail] px, fade 0..1, step ms above 0, got ${JSON.stringify(o)}`);
+  if (Array.isArray(path(t - L, 0)[0])) {
+    if (!c.poly) throw new PxError("trail: a blade's trail is filled on a canvas");
+    const names = colorList(keys), n = Math.max(1, Math.round(L / step)), edge = (k: number) => {
+      const [tip, inner] = path(t - L + (L * k) / n, k) as number[][];
+      return o.taper ? [tip, inner.map((v, e) => tip[e] + ((v - tip[e]) * k) / n)] : [tip, inner];
+    };
+    let a = edge(0);
+    for (let k = 0; k < n; k++) {
+      const b = edge(k + 1);
+      if ((o.from === undefined || t - L + (L * k) / n >= o.from) && Math.hypot(b[0][0] - a[0][0], b[0][1] - a[0][1]) >= 0.8 && (!o.side || o.side(a[0].map((v, e) => (v + b[0][e]) / 2))))
+        c.poly([a[0], b[0], b[1], a[1]].flatMap((q) => [Math.round(q[0]), Math.round(q[1])]), names[Math.min(names.length - 1, Math.floor((1 - (k + 0.5) / n) * names.length))]);
+      a = b;
+    }
+    return;
+  }
   const n = Math.max(1, Math.ceil(L / step)), drawn = new Set<number>();
   // the head first, so it keeps its tone where the trail folds over it; nothing before `from` (its start)
   for (let s = 0; s <= n; s++) {
     const k = s / n, tt = t - k * L;
     if (o.from !== undefined && tt < o.from) break;
-    const [x, y] = path(tt), r = Math.max(0, (w0 + (w1 - w0) * k) / 2 - 0.5), key = ks[Math.min(ks.length - 1, Math.floor(k * ks.length))];
+    const [x, y] = path(tt, n - s) as number[], r = Math.max(0, (w0 + (w1 - w0) * k) / 2 - 0.5), key = ks[Math.min(ks.length - 1, Math.floor(k * ks.length))];
     for (let dy = -Math.ceil(r); dy <= Math.ceil(r); dy++)
       for (let dx = -Math.ceil(r); dx <= Math.ceil(r); dx++) {
         if (dx * dx + dy * dy > r * r + 0.5) continue;

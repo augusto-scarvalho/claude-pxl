@@ -772,7 +772,7 @@ wants the arm and the blade in one line, the point toward the ground). Likewise 
 the arm and the blade in one line reads as a thrust: a slash lands with the wrist broken over, the arm
 still up and forward and the blade gone past it, down. On the frame it lands, a smear (the crescent
 the blade's outer part swept, thin at its tail, its last 100 degrees at most, the way round it went)
-says where it came from. `examples/rig/knight.px.js`
+says where it came from (`arc()` round the hand; a blade on a path of its own, `trail()` of its edge). `examples/rig/knight.px.js`
 (stages 4 and 5): twenty-two moves; two exchanges blade to blade, a cut from above taken on the shield
 each way, a clash that throws both back, a salute and the walk back to the marks.
 

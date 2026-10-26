@@ -36,7 +36,6 @@ const add = (a, b) => a.map((v, i) => v + b[i]), sub = (a, b) => a.map((v, i) =>
 const mul = (a, k) => a.map((v) => v * k), dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 const len = (a) => Math.hypot(...a), unit = (a) => mul(a, 1 / (len(a) || 1))
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
-const lerp = (a, b, t) => (Array.isArray(a) ? a.map((v, i) => v + (b[i] - v) * t) : a + (b - a) * t)
 const HIP = 22, TORSO = 12, NECK = 6, HIPW = 3, SHW = 6
 const THIGH = 10, SHIN = 10, UPPER = 8, FORE = 8, HAFT = 17
 // ---- the poses: keys at frames, in between eased. yaw: which way the hips face (90 = right; the cut
@@ -436,23 +435,18 @@ const CHEEK = [[17.5, 0], [18.4, 2.6], [13.6, 2.6], [14.5, 0]], POLL = [[17.5, 0
 // and full at the blade; `side` -1 the stretches behind the body, 1 those in front
 function smear(c, f, side) {
   if (!poseAt(f).smear) return
-  // from the frame before (a frame and a half into a turn already under way); thick across the blade's
-  // face, so a level cut leaves a band, not a line seen edge on
-  const N = 24, span = poseAt(f - 1).smear ? 1.6 : 1, mid = R.depth(grip(f).j.chest), scr = R.screen
-  const wide = (k) => Math.min(1, (2.2 * k) / N) ** 0.8
-  const at = (k) => { const s = skeleton(f - span + (span * k) / N); let n = unit(cross(s.axe, s.edge)); if (dot(n, [0, 0.3, -1]) < 0) n = mul(n, -1); return { tip: axeAt(s, 17.5, 5), n, back: mul(s.axe, -1) } }
+  // from the frame before (a frame and a half into a turn already under way), 24 stretches, the tail third
+  // gold; thick across the blade's face, so a level cut leaves a band, not a line seen edge on
+  const span = poseAt(f - 1).smear ? 1.6 : 1, mid = R.depth(grip(f).j.chest), scr = R.screen, u = (k) => f - span + (span * k) / 24
+  const at = (t) => { const s = skeleton(t); let n = unit(cross(s.axe, s.edge)); if (dot(n, [0, 0.3, -1]) < 0) n = mul(n, -1); return { tip: axeAt(s, 17.5, 5), n, back: mul(s.axe, -1) } }
   // across the path on screen: the blade's face (a level cut) or the haft (a cut seen from its side),
   // whichever stands wider across where the blade is going now
-  const last = at(N), go = sub(scr(last.tip), scr(at(N - 2).tip)), gl = Math.hypot(...go) || 1
+  const last = at(u(24)), go = sub(scr(last.tip), scr(at(u(22)).tip)), gl = Math.hypot(...go) || 1
   const across2 = (v) => Math.abs(go[0] * (scr(v)[1] - scr([0, 0, 0])[1]) - go[1] * (scr(v)[0] - scr([0, 0, 0])[0])) / gl
-  const face = across2(mul(last.n, 5)) >= across2(mul(last.back, 7))
-  const path = []
-  for (let k = 0; k <= N; k++) { const q = at(k); path.push([q.tip, add(q.tip, mul(face ? q.n : q.back, (face ? 5 : 7) * wide(k)))]) }
-  for (let k = 0; k < N; k++) {
-    const [o0, i0] = path[k], [o1, i1] = path[k + 1]
-    if (Math.sign(R.depth(lerp(o0, o1, 0.5)) - mid) !== side || Math.hypot(...sub(scr(o1), scr(o0))) < 0.8) continue
-    c.poly([o0, o1, i1, i0].flatMap((q) => scr(q)).map(Math.round), k > N * 0.3 ? "v" : "j")
-  }
+  const face = across2(mul(last.n, 5)) >= across2(mul(last.back, 7)), seen = (q) => [...scr(q), R.depth(q)]
+  // the edge: the tip and a point in from it, widening from the tail; kept on this side of the body
+  const edge = (t, k) => { const q = at(t), w = Math.min(1, (2.2 * k) / 24) ** 0.8; return [seen(q.tip), seen(add(q.tip, mul(face ? q.n : q.back, (face ? 5 : 7) * w)))] }
+  c.trail(edge, "vvj", { t: f, length: span, step: span / 24, side: (q) => Math.sign(q[2] - mid) === side })
 }
 
 // the combo: what the blade swept since the frame before where it ran behind the body, the figure, what

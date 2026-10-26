@@ -7,7 +7,7 @@ import type { BubbleOpts, BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, 
 import { bump, dirOf, setNormal } from "./normals.ts";
 import { LOOKS, dissolveChar, dissolveEdge, lightestOf, runEffect } from "./effects.ts";
 import { type SmokeOpts, drawSmoke } from "./smoke.ts";
-import { type Particle, drawParticles, drawTrail } from "./vfx.ts";
+import { type Particle, type TrailOpts, drawParticles, drawTrail } from "./vfx.ts";
 import type { Spell } from "./spells.ts";
 import { type View, perspective, scaled } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
@@ -17,7 +17,7 @@ import { type SplatOpts, drawSplats } from "./splats.ts";
 import { type DecalOpts, drawDecal } from "./decal.ts";
 import { type Draw3dOpts, drawWorld } from "./world3d.ts";
 import { byHeading } from "./rig3d.ts";
-import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshWorld, drawMesh, groundOf } from "./mesh.ts";
+import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshSprite, type MeshWorld, drawMesh, groundOf } from "./mesh.ts";
 import type { Lit } from "./sunlight.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
 import { bayer, colorList, gridRows, hash, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
@@ -49,7 +49,7 @@ let asDepth = 0;
 /** Which way a drawing faces (an asset's `facing`), as a direction on the picture: x right, z away from us. */
 export const FACING: Record<string, [number, number, number]> = { right: [1, 0, 0], left: [-1, 0, 0], front: [0, 0, -1], back: [0, 0, 1] };
 /** Where stamps landed in an asset (top-left in image coords) with their sockets, by id: for `at`. */
-export type Placed = Map<string, { x: number; y: number; sockets?: Record<string, [number, number]> }>;
+export type Placed = Map<string, { x: number; y: number; sockets?: Record<string, [number, number]>; /** a sprite in mesh(): a socket in its world (m) */ m3?: (socket: string) => [number, number, number] }>;
 /** What was stamped where, in drawing order (top-left in asset coords): for `pxl describe`. */
 export type Placement = { name: string; x: number; y: number; w: number; h: number; layer?: string; img: Img; /** the light it was drawn under, on the picture (a sprite in mesh()) */ light?: [number, number];
   /** a sprite in mesh(): how far its feet are over (under: below 0) the nearest face looking up under them, m, and its material */ stand?: { off: number; on: string } };
@@ -826,22 +826,34 @@ export class Canvas {
     if (!s || typeof s.draw !== "function") throw new PxError('cast(spell("fire", 2, { from: [x, y], to: [x, y] })): a spell');
     const bad = Object.keys(opts ?? {}).find((k) => k !== "shake");
     if (bad) throw new PxError(`cast(spell, { shake }): no option '${bad}'`);
-    s.bind(this);
+    // in the art's pixel: on a picture k times as big (a scene's sizes) each of its pixels k x k, its view the art's
+    const k = this.k, sc: Canvas = k === 1 ? this : Object.assign(Object.create(this) as Canvas, {
+      plot: (x: number, y: number, col: Color) => { let any = false; for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) any = this.plot(x * k + i, y * k + j, col) || any; return any; },
+      get: (x: number, y: number) => this.get(x * k, y * k),
+      socket: (at: string) => this.socket(at).map((v) => v / k) as [number, number],
+    });
+    s.bind(sc);
     const D = this.img.depth, z = D ? s.depth?.(this.t) : undefined, before = z !== undefined ? { d: this.img.data.slice(), e: this.img.emit?.slice() } : undefined;
-    s.under(this);
+    s.under(sc);
     const d = this.img.data, a = d.slice();
-    s.draw(this);
+    s.draw(sc);
     const b = d.slice();
-    s.over(this);
+    s.over(sc);
     const g = Math.round(255 * Math.max(0, Math.min(1, s.glow)));
     const e = g ? (this.img.emit ??= new Uint8Array(d.length)) : this.img.emit;
     if (e) for (let i = 0; i < d.length; i++) if (d[i] !== b[i]) e[i] = 0; else if (b[i] !== a[i]) e[i] = Math.max(e[i], g);
     // in mesh()'s depth: where something drawn is nearer the eye than the spell, it stays as it was
     if (before) for (let i = 0; i < d.length; i++) if (D![i] < z! && d[i] !== before.d[i]) { d[i] = before.d[i]; if (e) e[i] = before.e?.[i] ?? 0; }
-    for (const l of s.lights(this.t)) if (l.power > 0) this.lamp(l.x, l.y, { r: Math.max(1, l.r), power: l.power, color: l.color });
+    for (const l of s.lights(this.t)) if (l.power > 0) this.lamp(l.x * k, l.y * k, { r: Math.max(1, l.r * k), power: l.power, color: l.color });
     const f = s.flash(this.t);
     if (f) this.effect("tint", f);
-    if (opts.shake !== false) this.shake(s);
+    if (opts.shake !== false) { const [dx, dy] = s.shake(this.t); this.shake(dx * k, dy * k); }
+  }
+
+  /** An asset `ms` into its own loop: a spell's piece of the file's art (`once`: none once it has played through). */
+  piece(name: string, ms: number, once = false): Img | undefined {
+    const tl = once ? this.res.timeline(this.res.candidates(name)[0], this.seed) : undefined;
+    return tl && ms >= tl.loop ? undefined : this.asset(name, { t: ms });
   }
 
   /** All drawn so far thrown [dx, dy] px (a spell's: as it hits, now), the edge it leaves the one before it. */
@@ -856,8 +868,8 @@ export class Canvas {
     }
   }
 
-  /** A trail behind what goes along `path` (a function of the time), `length` ms of it now: see vfx.ts. */
-  trail(path: (t: number) => number[], keys: string | string[], opts: { length?: number; width?: [number, number]; fade?: number; step?: number; from?: number } = {}): void {
+  /** A trail behind what goes along `path` (a function of the time), `length` ms of it now; a blade's, the band its edge swept: see vfx.ts. */
+  trail(path: (t: number, i: number) => number[] | number[][], keys: string | string[], opts: TrailOpts = {}): void {
     drawTrail(this, path, keys, opts);
   }
 
@@ -880,10 +892,19 @@ export class Canvas {
    * places it ({ name, at, frame?, flip? }), `pixel` px to its pixels.
    */
   meshSocket(view: Partial<View>, sprite: { name: string; at: number[]; frame?: number; flip?: "x"; delay?: number }, socket: string, pixel = this.k): [number, number, number] {
-    const v = scaled(view, this.k), P = perspective({ ...v, w: v.w ?? this.img.w } as View), img = this.asset(sprite.name, { frame: sprite.frame, flip: sprite.flip, delay: sprite.delay });
-    const s = img.sockets?.[socket];
-    if (!s) throw new PxError(`meshSocket: '${sprite.name}' has no socket '${socket}'` + (img.sockets ? `; it has: ${Object.keys(img.sockets).join(", ")}` : `; give it { sockets: { ${socket}: [x, y] } }`));
-    const [x, z, u = 0] = sprite.at, [px, py] = img.pivot ?? [img.w / 2, img.h], m = pixel / P.scale(z, x, u), yaw = ((P.yaw ?? 0) * Math.PI) / 180;
+    return this.socketIn(view, sprite.name, this.asset(sprite.name, { frame: sprite.frame, flip: sprite.flip, delay: sprite.delay }), sprite.at, socket, pixel);
+  }
+
+  /** Where a socket of a sprite placed in mesh() with an `id` is ("hero.hand"), in meters; undefined for any other placement. */
+  socket3(at: string): [number, number, number] | undefined {
+    const i = at.lastIndexOf(".");
+    return this.placed?.get(at.slice(0, i))?.m3?.(at.slice(i + 1));
+  }
+
+  private socketIn(view: Partial<View>, name: string, img: Img, at: number[], socket: string, pixel: number): [number, number, number] {
+    const v = scaled(view, this.k), P = perspective({ ...v, w: v.w ?? this.img.w } as View), s = img.sockets?.[socket];
+    if (!s) throw new PxError(`meshSocket: '${name}' has no socket '${socket}'` + (img.sockets ? `; it has: ${Object.keys(img.sockets).join(", ")}` : `; give it { sockets: { ${socket}: [x, y] } }`));
+    const [x, z, u = 0] = at, [px, py] = img.pivot ?? [img.w / 2, img.h], m = pixel / P.scale(z, x, u), yaw = ((P.yaw ?? 0) * Math.PI) / 180;
     return [x + Math.cos(yaw) * (s[0] - px) * m, z - Math.sin(yaw) * (s[0] - px) * m, u + (py - s[1]) * m];
   }
 
@@ -910,7 +931,7 @@ export class Canvas {
   /** Flat faces in meters (model()) drawn through the camera, the nearest kept per pixel, toned along their material's ramp: see mesh.ts. */
   mesh(view: Partial<View> | SurfaceView | ((p: [number, number, number]) => [number, number, number]), faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}): void {
     // k times as big: the camera, the sprites' pixel, and the ramp materials in blocks of it (a material's own block wins)
-    const k = this.k;
+    const k = this.k, view0 = view;
     if (k > 1) {
       view = scaled(view, k);
       opts = { ...opts, pixel: opts.pixel ?? k };
@@ -933,7 +954,19 @@ export class Canvas {
       }
     }
     // what stands on the model: where a sprite stands on, and how far check finds its feet from the face under them
-    const S = opts.sprites ?? [], ms = opts.stand;
+    // a sprite going along `at(t)` (ms on the clock; none where it gives none) and its ghosts: n of it ms apart back
+    // in time, blended (as it is, else "alpha"), each `fade` fainter, giving no light and no shadow
+    const S = (opts.sprites ?? []).flatMap((s, k) => {
+      if (typeof s?.at !== "function" && s?.ghosts === undefined) return [s];
+      const g = s.ghosts ?? [0, 1, 0], at = typeof s.at === "function" ? s.at : () => s.at, out: MeshSprite[] = [];
+      if (!(Array.isArray(g) && Number.isInteger(g[0]) && g[0] >= 0 && g[1] > 0 && g[2] >= 0 && g[2] <= 1))
+        throw new PxError(`mesh: sprite ${k} has ghosts ${JSON.stringify(s.ghosts)}: [n (how many), ms (apart, back in time), fade (0..1, each fainter by)]`);
+      for (let i = g[0]; i >= 0; i--) {
+        const q = at(this.t - i * g[1]) as MeshSprite["at"] | null | undefined, o = (s.opacity ?? 1) * (1 - g[2] * i);
+        if (q && o > 0) out.push(i ? { ...s, at: q, id: undefined, ghosts: undefined, blend: s.blend ?? "alpha", opacity: o, light: false, shadow: 0 } : { ...s, at: q, ghosts: undefined });
+      }
+      return out;
+    }), ms = opts.stand;
     const ground = S.some((s) => s?.stand) || ms || (this.res as { checksOnly?: boolean }).checksOnly ? groundOf(faces ?? []) : undefined;
     const mats3 = (v: unknown, what: string) => {
       if (!(v === undefined || typeof v === "boolean" || (Array.isArray(v) && v.every((m) => typeof m === "string")))) throw new PxError(`mesh: ${what} stand is true (on the highest face looking up under it) or materials' names, ["deck", "flags"], got ${JSON.stringify(v)}`);
@@ -949,13 +982,14 @@ export class Canvas {
         if (hs.length) at = [at[0], at[1], Math.max(...hs.map((h) => h.u))];
       }
       if (!s || typeof s.name !== "string" || !Array.isArray(at) || (at.length !== 2 && at.length !== 3) || !at.every(Number.isFinite))
-        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m), heading?, flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, veil?, light?, stand?, air? }, got ${JSON.stringify(s)}`);
+        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m; or a function of the time giving them), id?, heading?, flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, veil?, light?, stand?, air?, ghosts? }, got ${JSON.stringify(s)}`);
       // its own time in its loop and its own random choices, as a stamp's, picked by where it stands (cm)
       const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed, fx: s.fx, heading: s.heading };
       if (s.blend !== undefined && !["alpha", "add", "screen"].includes(s.blend)) throw new PxError(`mesh: sprite ${k} has blend ${JSON.stringify(s.blend)}: "alpha" (over, lit), "add" or "screen" (light)`);
       if (s.opacity !== undefined && !(s.opacity >= 0 && s.opacity <= 1)) throw new PxError(`mesh: sprite ${k} has opacity ${JSON.stringify(s.opacity)}: 0..1`);
       if (s.veil !== undefined && !(s.veil >= 0 && s.veil <= 1 && s.blend === "alpha")) throw new PxError(`mesh: sprite ${k} has veil ${JSON.stringify(s.veil)}: the share of the sun a sprite blended "alpha" holds back, 0..1`);
       if (s.air !== undefined && typeof s.air !== "boolean") throw new PxError(`mesh: sprite ${k} has air ${JSON.stringify(s.air)}: true when it flies (check doesn't ask its feet to be on the model)`);
+      if (s.id !== undefined && typeof s.id !== "string") throw new PxError(`mesh: sprite ${k} has id ${JSON.stringify(s.id)}: a name for its sockets ("hero": "hero.hand")`);
       return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, veil: s.veil, light: s.light, air: s.air };
     });
     // looked up on first use: a palette without ramps has nothing to step (and needs nothing stepped without textures or sprites)
@@ -995,6 +1029,9 @@ export class Canvas {
     // straight into the pixels when nothing stands between (a clip, a twin's mirror, a wrapped edge)
     const mc = Object.assign(Object.create(this) as MeshCanvas, { raw: this.clipPred || this.mirrored || this.wrap ? undefined : this.img.data });
     for (const p of drawMesh(mc, view, faces, mats, opts, { tex, masks, looks, sprites, step, lit })) {
+      // one with an id: its sockets on the picture and in the world, for stamp's `at` and a spell's `from`
+      const sp = sprites[p.k!], id = S[p.k!]?.id, K = opts.pixel ?? 1;
+      if (id) this.placed?.set(id, { x: this.ox + p.x, y: this.oy + p.y, sockets: Object.fromEntries(Object.entries(sp.img.sockets ?? {}).map(([n, [x, y]]) => [n, [x * K, y * K]])), m3: (sk) => this.socketIn(view0 as Partial<View>, sp.name, sp.img, sp.at, sk, K) });
       // (its feet against the nearest face looking up under them; none under, or flying: not asked)
       const hs = ground && p.at && !p.air ? ground(p.at[0], p.at[1]) : [], h = hs.reduce<{ u: number; mat: string } | undefined>((b, q) => (!b || Math.abs(q.u - p.at![2]) < Math.abs(b.u - p.at![2]) ? q : b), undefined);
       this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}), ...(h ? { stand: { off: p.at![2] - h.u, on: h.mat } } : {}) });

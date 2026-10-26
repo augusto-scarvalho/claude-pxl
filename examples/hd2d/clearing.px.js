@@ -2,9 +2,9 @@
 // shader of the fork in one scene, on its clock (5 s, 100 frames of 50 ms): the pines, the dead tree,
 // the bushes and the grass swaying in one wind (effect "sway": their feet still, a gust rolling across,
 // no two tufts in step); the traveler gathering fire at his hand, an aura hugging his pose (effect
-// "aura", a sprite blended "add"); the ball (effect "energy" and "distort") lighting the ground as it
-// flies, hidden behind a ruined wall on its way (its depth in mesh()), a trail of it behind; the
-// impact's flash, sparks (emitter) and smoke (smoke(), blended "alpha"); the scarecrow catching fire
+// "aura", a sprite blended "add"); a spell() of the kit in the file's own fire (effect "energy" and
+// "distort"), lighting the ground as it flies, hidden behind a ruined wall on its way (cast() in mesh()'s
+// depth), a trail of it behind; the impact, its sparks and smoke (smoke(), blended "alpha"); the scarecrow catching fire
 // where it was hit and burning away (the dissolve's look "burn" on that copy alone, fx: flames rising
 // from the burning front, the char and the embers behind them, ash), its shadow with it, the flames'
 // flicker lighting the ground and the wall, a column of smoke over it; then it comes back (the neutral look). `clearing` is the art at its own size, the
@@ -32,11 +32,11 @@ sprite("_scarecrow", { w: 28, h: 60, pivot: [14, 60], outline: "k" }, (c) => {
   c.rect(7, Y + 10, 15, 2, "C"); c.rect(10, Y + 5, 9, 5, "C"); c.hline(10, Y + 8, 9, "9"); c.hline(7, Y + 11, 15, "9")
   for (const [x, y] of [[8, 12], [9, 13], [19, 12], [20, 13]]) c.px(x, Y + y, "W")
 }, bump("hybrid"))
-// the fire: a ball of it in three sizes, its noise churning, its edge rippling
+// the fire: a ball of it in three sizes, its noise churning, its edge rippling; the big one breaking up as it hits
 for (const [n, r] of [["_fire_s", 2], ["_fire_m", 3], ["_fire", 4]])
   anim(n, { w: 2 * r + 5, h: 2 * r + 5, pivot: "center", frames: 10, fps: 20 }, circ(r + 2, r + 2, r, "Y"),
     effect("energy", { keys: ["#7a1c10", "#d8401c", "#ff9a30", "#fff0b0"], scale: 1.6, speed: 2 }), effect("distort", { amount: 1, scale: 2, speed: 2, axis: "x" }))
-sprite("_spark", { w: 1, h: 1 }, px(0, 0, "Y"))
+anim("_fire_hit", { base: "_fire", frames: 4, fps: 20 }, (c) => c.effect("dissolve", { pattern: "out", progress: c.phase, look: "magic", glow: 1 }))
 anim("_burst_smoke", { w: 48, h: 40, pivot: "bottom", frames: 26, fps: 20 }, smoke(24, 34, ["#d0c4b8", "#988c82", "#625852"], { shape: "puff", spread: 14, size: [4, 10], count: 12, seed: 4 }))
 // the smoke of the fire, a column rising and leaning with the wind, lit warm from below
 anim("_fire_smoke", { w: 44, h: 80, pivot: "bottom", frames: 50, fps: 20 }, smoke(20, 76, ["#b8aca2", "#7e746e", "#4e4846"], { shape: "column", path: [0, 0, 2, -24, 8, -50, 14, -70], size: [3, 10], count: 18, seed: 6, light: [-0.4, 0.8] }))
@@ -74,42 +74,30 @@ for (let k = 0; WOOD.length < 70; k++) {
 }
 
 // ---------------------------------------------------------------- the spell, on the scene's clock
-// charge while he winds up (his pose's frames 0-5), the cast at its thrust (6-7), the ball's flight,
-// the impact, the scarecrow burning, then coming back; the rest of the 4 s, quiet
-const SPELL = ability({ charge: 600, cast: 200, travel: 600, impact: 200, burn: 2300, reform: 600 }, { start: 200 })
-const sparks = emitter({ at: [0, 0], burst: 18, from: SPELL.start("impact"), life: [300, 800], speed: [1.2, 3], angle: -90, spread: 75, gravity: [0, 6], drag: 1.2, seed: 9 })
+// A fireball of the kit in the file's own fire: the ball grown through the charge, three of it its
+// trail, its impact the ball breaking up; from his hand (his pose's socket, the cast's thrust held while
+// it flies) to the scarecrow, lighting the diorama. Charge 600 ms, cast 200, flight 600, impact 200, the
+// scarecrow burning (S.hit: fire's look, spreading from where it was hit over 2.4 s, the last 600 ms
+// coming back whole); the rest of the 5 s, quiet.
+const S = spell("fire", 1, { view: CAM, from: "hero.hand", to: [CROW[0], CROW[1], 1.05], start: 200, seed: 9, reach: 120, power: 3.75,
+  ball: ["_fire_s", "_fire_m", "_fire"], trail: { ghosts: 3, every: 50 }, impact: { anim: "_fire_hit", smoke: false },
+  timing: { charge: 600, cast: 200, travel: 600, impact: 200, dissipate: 2900 } })
+const CAST = [["charge", 0, 1, 100], ["charge", 2, 4], ["cast", 5], ["travel", 6], ["impact", 7, 12, 100]]
 const DUSK = { light: [-0.8, 0.45, 0.35], sun: { color: "#ffb478", strength: 1.25 }, sky: { color: "#6a72b8", strength: 0.45 } }
 const people = (c) => {
-  const t = c.t, p = SPELL(t), pose = SPELL.frame(t, [["charge", 0, 12, 100]], { before: -1, after: -1 })
-  const hero = pose >= 0 ? { name: "tr_cast_e", at: HERO, frame: pose } : { name: "tr_idle_e", at: HERO }
-  const S = [...WOOD, hero]
-  const hand = pose >= 0 ? c.meshSocket(CAM, hero, "hand") : null, from = c.meshSocket(CAM, { name: "tr_cast_e", at: HERO, frame: 6 }, "hand")
-  const to = [CROW[0], CROW[1], 1.05], fly = (tt) => SPELL.along(from, to, tt, { ease: "in" })
-  if (pose >= 0 && pose <= 7) S.push({ name: "tr_cast_aura_e", at: [HERO[0], HERO[1] - 0.01], frame: pose, blend: "add", opacity: pose <= 5 ? 0.2 + 0.07 * pose : 0.6, light: false })
-  if (p.name === "charge" && !p.before) S.push({ name: p.k < 0.35 ? "_fire_s" : p.k < 0.7 ? "_fire_m" : "_fire", at: hand, blend: "add", light: { r: 2, strength: 2 * p.k } })
-  if (p.name === "cast") S.push({ name: "_fire", at: hand, blend: "add", light: { r: 2.5, strength: 3 } })
-  if (p.name === "travel") {
-    for (const [dt, n, o] of [[150, "_fire_s", 0.35], [100, "_fire_s", 0.6], [50, "_fire_m", 0.8]])
-      if (t - dt >= SPELL.start("travel")) S.push({ name: n, at: fly(t - dt), blend: "add", opacity: o, light: false })
-    S.push({ name: "_fire", at: fly(t), blend: "add", light: { r: 2.5, strength: 3 } })
-  }
-  // the scarecrow: catching fire where it was hit, burning away, then back, the neutral way
-  const burn = t < SPELL.start("reform") ? SPELL.span(t, "impact", ["impact", 2400]) : 1 - SPELL.span(t, "reform")
-  const look = t >= SPELL.start("reform") ? { look: "neutral" } : { look: "burn", pattern: "out", at: [14, 30], ragged: 0.5, scale: 4 }
-  S.push({ name: "_scarecrow", at: CROW, ...(burn > 0 ? { fx: ["dissolve", { ...look, progress: burn, seed: 3, ...(t < SPELL.start("reform") ? { flames: { height: 10, density: 0.35 } } : {}) }], light: { r: 3, strength: 2.5 } } : {}) })
-  // its smoke, from the fire taking to its last wisps
-  const fire = SPELL.fade(t, ["impact", 150], "reform", { in: 0.15, out: 0.35 })
-  if (fire > 0) S.push({ name: "_fire_smoke", at: [CROW[0] + 0.05, CROW[1] + 0.06, 0.9], blend: "alpha", opacity: fire * 0.85, shadow: 0 })
-  if (p.name === "impact") S.push({ name: "_fire", at: to, blend: "add", fx: ["dissolve", { pattern: "out", progress: p.k, look: "magic", glow: 1 }], light: { r: 3.5, strength: 4 * (1 - p.k) + 1 } })
-  if (t >= SPELL.start("impact") && t < SPELL.start("impact") + 1300) {
-    S.push({ name: "_burst_smoke", at: [CROW[0], CROW[1] + 0.05], frame: SPELL.since(t, "impact", 50, 26), blend: "alpha" })
-    for (const q of sparks(t)) S.push({ name: "_spark", at: [CROW[0] + q.x, CROW[1] - 0.05, 1.05 - q.y], blend: "add", light: false })
-  }
-  return S
+  const t = c.t, p = S.ability(t), pose = S.ability.frame(t, CAST, { before: -1, after: -1 }), puff = S.ability.since(t, "impact", 50), out = [...WOOD]
+  out.push(pose >= 0 ? { name: "tr_cast_e", at: HERO, frame: pose, id: "hero" } : { name: "tr_idle_e", at: HERO })
+  if (p.name === "charge" || p.name === "cast") out.push({ name: "tr_cast_aura_e", at: [HERO[0], HERO[1] - 0.01], frame: pose, blend: "add", opacity: 0.2 + 0.4 * S.ability.span(t, "charge"), light: false })
+  // the scarecrow burning, a puff of smoke as it is hit, its smoke from the fire taking to its last wisps
+  if (puff >= 0 && puff < 26) out.push({ name: "_burst_smoke", at: [CROW[0], CROW[1] + 0.05], frame: puff, blend: "alpha" })
+  out.push({ name: "_scarecrow", at: CROW, fx: S.hit(t, { over: 2400, back: 600, pattern: "out", at: [14, 30], ragged: 0.5, scale: 4, seed: 3, flames: { height: 10, density: 0.35 } }), light: { r: 3, strength: 2.5 } })
+  const fire = S.ability.fade(t, ["impact", 150], ["dissipate", 2300], { in: 0.15, out: 0.35 })
+  if (fire > 0) out.push({ name: "_fire_smoke", at: [CROW[0] + 0.05, CROW[1] + 0.06, 0.9], blend: "alpha", opacity: fire * 0.85, shadow: 0 })
+  return out
 }
 const CLOCK = { frames: 100, fps: 20 }
 // `clearing_md` three times as big, through the camera: the actors' band of depth sharp, the wood behind soft,
 // Three's bloom on the fire, the dusk grade, a light grain in blocks of the art's pixel (the same in every
 // frame: a grain that changes each frame changes every pixel, and the GIF went from 1.1 MB to 13)
-scene("clearing", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 8 }, sizes: { clearing_md: 3 } }, (c) => c.mesh(CAM, M.faces, mats(c.k), { sprites: people(c), ...DUSK }),
+scene("clearing", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 8 }, sizes: { clearing_md: 3 } }, (c) => c.mesh(CAM, M.faces, mats(c.k), { sprites: people(c), lamps: S.lamps(c.t), ...DUSK }), cast(S),
   post({ blur: 6, focus: [W / 2, H * 0.55], sharp: 3, soft: [3, 8], bloom: { levels: 5, strength: 0.5, above: 0.9 }, lut: { cube: "dusk.cube", amount: 0.6 }, grain: { amount: 0.035, animated: false }, vignette: 0.3 }))

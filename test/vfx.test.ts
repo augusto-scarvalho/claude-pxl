@@ -142,3 +142,14 @@ test("meshSocket: a socket of a sprite standing in mesh(), in meters", () => {
   assert.deepEqual(c.meshSocket({ w: 40, horizon: 10, eye: 1, focal: 40 }, { name: "t", at: [0, 4] }, "hand", 2).map((v) => Math.round(v * 1000) / 1000), [0.2, 4, 1.2], "pixel 2: twice as far");
   assert.throws(() => c.meshSocket({ w: 40, horizon: 10, eye: 1, focal: 40 }, { name: "t", at: [0, 4] }, "foot"), /no socket 'foot'/);
 });
+
+test("trail of a blade: the band its edge swept, tail to head in the keys' shares, tapered, on one side", () => {
+  // the tip along row 4, 1 px a ms, the inner point 4 px under it, a third number (its depth) coming along
+  const at = (o: string) => load(`scene("s", { w: 30, h: 12 }, trail((t, i) => [[t, 4, t], [t, 8, i]], "wr", { t: 24, length: 20, step: 5${o} }))`);
+  const img = (o = "") => at(o).image("s"), p = at(""), r = p.assets.get("s")!.pal.resolve("r"), w = p.assets.get("s")!.pal.resolve("w");
+  const plain = img();
+  assert.deepEqual([6, 12, 16, 22].map((x) => plain.get(x, 5)), [r, r, w, w], "the tail half in its last key, the head in its first");
+  assert.ok([2, 25].every((x) => plain.get(x, 5) === 0) && plain.get(10, 8) === 0 && plain.get(10, 7) === r, "from where it was 20 ms ago to now, tip to inner point");
+  assert.ok(img(", taper: true").get(5, 7) === 0 && img(", taper: true").get(22, 7) === w, "taper: nothing across at its tail, all of it at its head");
+  assert.deepEqual([6, 16].map((x) => img(", side: (q) => q[2] > 12").get(x, 5)), [0, w], "side: the stretches whose tip passes");
+});
