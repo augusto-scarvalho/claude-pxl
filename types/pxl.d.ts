@@ -673,6 +673,8 @@ declare global {
    * the views not drawn the mirrors of those across; a group `name` to stamp by heading. pxl check holds
    * their crown and chin to one row, and with `like` each row within a pixel of that set's.
    */
+  /** A head modeled (a field in its own frame), drawn once per view (the west, the east mirrored where the light is in the middle), each view's `retouch` grid painted over it ("." keeps, "_" erases), its `anchor` on the head's middle. */
+  function views(name: string, field: PxSdf, opts?: { n?: 8 | 16; pitch?: number; light?: PxVec; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: [string, string]; anchor?: [number, number] | Record<string, [number, number]>; retouch?: Record<string, string>; like?: string; chin?: number; swap?: Record<string, PxColor> }): string[];
   function views(name: string, grids: Record<string, string | string[] | PxItem[]>, opts?: { anchor?: [number, number] | "center" | "bottom" | Record<string, [number, number] | "center" | "bottom">; like?: string; /** the chin's row in every grid (a set whose lowest rows aren't the chin: a beard) */ chin?: number; swap?: Record<string, PxColor>; outline?: PxColor; outline8?: PxColor; inline?: PxColor; selout?: boolean | number }): string[];
   /** A walk's numbers at t (0..1 over the cycle) by the view a heading gives (or `view`): each foot [forward, up], the body's dip, each hand [forward, up] from hanging; the guide's measured values, each overridable (`stride`, `lift`, `bob`, `hands`; for one view: `profile: { stride }`). */
   function gait(t: number, opts?: { heading?: number; view?: "front" | "back" | "diagonal" | "profile"; stride?: number | number[]; lift?: number | number[]; bob?: number[]; hands?: number[][]; front?: object; diagonal?: object; profile?: object }): { view: string; a: number; feet: [number, number][]; bob: number; hands: [number, number][] };
@@ -775,6 +777,8 @@ declare global {
     sphere(r: PxNum): PxSdf; box(size: PxVec | PxNum, o?: { round?: PxNum }): PxSdf; capsule(a: PxVec, b: PxVec, r: PxNum, r2?: PxNum): PxSdf;
     cylinder(r: PxNum, h: PxNum): PxSdf; cone(r: PxNum, h: PxNum, top?: PxNum): PxSdf; torus(R: PxNum, r: PxNum): PxSdf;
     plane(n?: PxVec, h?: PxNum): PxSdf; ellipsoid(r: PxVec): PxSdf;
+    /** a field of the file's own: its distance at a point (or less), inside the box lo..hi */
+    field(d: (x: number, y: number, z: number) => number, lo: [number, number, number], hi: [number, number, number]): PxSdf;
     union(...a: (PxSdf | PxSdf[] | { smooth?: PxNum })[]): PxSdf; intersect(...a: (PxSdf | PxSdf[] | { smooth?: PxNum })[]): PxSdf;
     /** seeded 3D noise in [0, 1] */ fbm(x: number, y: number, z: number, seed?: number, octaves?: number): number;
     occupancy(f: PxSdf): { kind: "occupancy"; inside(p: number[], clock?: PxClock): boolean };

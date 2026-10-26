@@ -302,6 +302,11 @@ export const sdf = {
   torus: (R: Num, r: Num) => new Sdf({ op: "torus", R, r }),
   /** Everything below a plane: its normal n (default up) and h m along it (sdf.plane() is the ground, z = 0). Endless: intersect it with something. */
   plane: (n: Vec = [0, 0, 1], h: Num = 0) => new Sdf({ op: "plane", n, h }),
+  /** A field of the file's own: `d(x, y, z)` its distance (or less: never more), inside the box `lo`..`hi` (an axe's head cut to its outline). */
+  field: (d: (x: number, y: number, z: number) => number, lo: number[], hi: number[]) => {
+    if (typeof d !== "function" || ![lo, hi].every((v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite))) throw new PxError("sdf.field((x, y, z) => distance, [lo x, y, z], [hi x, y, z])");
+    return fieldOf(d, lo as V3, hi as V3);
+  },
   /** An ellipsoid round the origin, radii [x, y, z]. */
   ellipsoid: (r: Vec) => new Sdf({ op: "ellipsoid", r }),
   union: (...a: (Sdf | Sdf[] | { smooth?: Num })[]) => join("union", a),

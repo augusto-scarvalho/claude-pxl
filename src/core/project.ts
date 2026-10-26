@@ -32,7 +32,7 @@ import { type Lut, readCube, readStrip } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
 import { ability, emitter, tween, unroll } from "./vfx.ts";
 import { SPELL_OPTS, spell } from "./spells.ts";
-import { bayer, fbm, globRe, latticeHash, rng, vnoise, seamless } from "./util.ts";
+import { bayer, fbm, globRe, gridRows, latticeHash, rng, vnoise, seamless } from "./util.ts";
 
 /**
  * Op signatures: name:type, "?" marks the first optional argument.
@@ -569,11 +569,48 @@ export class Project implements BuildCtx {
     env.views = (name: unknown, grids: unknown, opts: unknown = {}) => {
       const loc = this.callerLoc();
       try {
-        if (typeof name !== "string" || !name || !isPlainObject(grids) || !isPlainObject(opts)) throw new PxError('views("_head", { s: grid, sw: grid, w: grid, nw: grid, n: grid }, { anchor: [x, y] (or { s: [x, y], ... }), like: "_other_head" })');
-        checkKeys("views", opts, ["anchor", "like", "chin", "swap", "outline", "outline8", "inline", "selout"]);
-        const { anchor, like, chin, ...so } = opts as { anchor?: unknown; like?: unknown; chin?: unknown };
+        const model = grids instanceof Sdf ? grids : undefined;
+        if (typeof name !== "string" || !name || !(model || isPlainObject(grids)) || !isPlainObject(opts)) throw new PxError('views("_head", { s: grid, sw: grid, w: grid, nw: grid, n: grid } or a field (the head modeled), { anchor: [x, y] (or { s: [x, y], ... }), like: "_other_head" })');
+        const BAKE = ["n", "pitch", "light", "mats", "surface", "ink", "jaw", "retouch"];
+        checkKeys("views", opts, ["anchor", "like", "chin", "swap", "outline", "outline8", "inline", "selout", ...(model ? BAKE : [])]);
+        const { anchor, like, chin, n: nv, pitch, light, mats, surface: sopts, ink, jaw, retouch, ...so } = opts as { anchor?: unknown; like?: unknown; chin?: unknown; n?: number; pitch?: number; light?: number[]; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: string[]; retouch?: Record<string, string> };
+        // a head modeled (a field in its own frame: x its right, y ahead, z up, px, its middle where it is
+        // stamped), drawn once per view as rig3d draws a figure (surface(), the line all round it, `jaw`'s
+        // line under the skin), then each view's `retouch` painted over it by hand ("." keeps the render's
+        // pixel, "_" erases one), its `anchor` pixel on the head's middle
+        let baked: Record<string, (c: Canvas) => void> | undefined, R = 0;
+        if (model) {
+          if (nv !== undefined && nv !== 8 && nv !== 16) throw new PxError(`views: n is 8 or 16, the directions it is drawn for, got ${JSON.stringify(nv)}`);
+          if (sopts !== undefined) { if (!isPlainObject(sopts)) throw new PxError("views: surface is surface()'s options ({ soft, clean, ... })"); checkKeys("views surface", sopts, SURFACE_OPTS.filter((k) => !["view", "ppm", "at", "part"].includes(k))); }
+          if (jaw !== undefined && !(Array.isArray(jaw) && jaw.length === 2 && jaw.every((k) => typeof k === "string" && k))) throw new PxError(`views: jaw is [key, the skin's ramp]: the line of key under the skin, where the line round it is under the face, got ${JSON.stringify(jaw)}`);
+          if (retouch !== undefined && !(isPlainObject(retouch) && Object.entries(retouch).every(([d, g]) => COMPASS.includes(d) && typeof g === "string"))) throw new PxError("views: retouch is { s: grid, ... }: per view, pixels painted over the render (\".\" keeps it, \"_\" erases)");
+          const sp = Math.sin(((pitch ?? 20) * Math.PI) / 180), cp = Math.cos(((pitch ?? 20) * Math.PI) / 180), { lo, hi, mats: names } = compile(model);
+          // one size for every view: the farthest the head reaches from its middle, turned any way, and a pixel of line round it
+          R = Math.ceil(Math.max(...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => Math.hypot(i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1]) * sp + Math.abs(i & 4 ? hi[2] : lo[2]) * cp), ...[lo[0], hi[0], lo[1], hi[1]].map(Math.abs))) + 2;
+          // its materials: the look's, those it names that are ramps of keys ("JjhH"), what is given
+          const look = (this.look3d?.mats ?? {}) as Record<string, unknown>, M = { ...look, ...Object.fromEntries(names.filter((m) => m && !(m in look)).map((m) => [m, m])), ...mats };
+          const L = light ?? this.look3d?.light ?? [0, -0.6, 0.75], line = ink !== undefined ? { outline: false, rim: false, inner: ink } : { outline: true, inner: true };
+          const bake = (d: string) => (c: Canvas) => {
+            c.surface(model.rotate(-COMPASS.indexOf(d) * 22.5, "z"), { view: { kind: "side", pitch: pitch ?? 20 }, ppm: 1, at: [R + 0.5, R + 0.5], mats: M, light: L, ...line, shadows: false, ao: 0, ...sopts } as never);
+            const { w: W, h: Hh, data } = c.img, on = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < Hh && (data[y * W + x] & 255) >= 128;
+            if (ink !== undefined) {
+              const skin = new Set([...(jaw?.[1] ?? "")].map((k) => c.color(k))), out: [number, number, string][] = [];
+              for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) if (!on(x, y) && (on(x + 1, y) || on(x - 1, y) || on(x, y + 1) || on(x, y - 1))) out.push([x, y, jaw && on(x, y - 1) && skin.has(data[(y - 1) * W + x]) ? jaw[0] : ink]);
+              for (const [x, y, k] of out) c.px(x - c.ox, y - c.oy, k);
+            }
+            const g = retouch?.[d];
+            if (!g) return;
+            const a = isPlainObject(anchor) ? anchor[d] : anchor;
+            if (!(Array.isArray(a) && a.length === 2 && a.every(Number.isInteger))) throw new PxError(`views: retouch '${d}' needs its anchor, the pixel [col, row] of its grid on the head's middle`);
+            gridRows(g).forEach((row, y) => [...row].forEach((k, x) => { if (k !== ".") { const px = R + x - a[0], py = R + y - a[1]; if (k === "_") c.plot(px, py, TRANSPARENT); else c.px(px, py, k); } }));
+          };
+          // the west drawn and the east its mirror where the light comes from the middle (as rig3d's), else every one
+          const all = COMPASS.filter((_, i) => nv === 16 || i % 2 === 0), level = Math.abs(L[0]) < 0.05 * Math.hypot(...L);
+          baked = Object.fromEntries(all.filter((d) => !level || d === "n" || COMPASS.indexOf(d) >= 8).map((d) => [d, bake(d)]));
+        }
+        const G = (baked ?? grids) as Record<string, unknown>;
         if (chin !== undefined && !(Number.isInteger(chin) && (chin as number) >= 0)) throw new PxError(`views: chin is the row of the chin in every view's grid (0 its top row), for a set whose lowest rows aren't the chin (a beard, a braid), got ${JSON.stringify(chin)}`);
-        const drawn = Object.keys(grids), bad = drawn.filter((d) => !COMPASS.includes(d));
+        const drawn = Object.keys(G), bad = drawn.filter((d) => !COMPASS.includes(d));
         if (!drawn.length || bad.length) throw new PxError(`views: the views are named by the compass (${COMPASS.join(", ")}), got ${JSON.stringify(bad.length ? bad : drawn)}`);
         if (like !== undefined && typeof like !== "string") throw new PxError(`views: like names another views() set whose rows these keep to, got ${JSON.stringify(like)}`);
         // a pixel [col, row] lands on the anchor (its middle, so a mirror keeps it there); "center", "bottom"
@@ -584,7 +621,8 @@ export class Project implements BuildCtx {
           throw new PxError(`views: an anchor is the pixel [col, row] of the view that lands where it is stamped, "center" or "bottom" (one for all, or { ${d}: [col, row], ... }), got ${JSON.stringify(a)}`);
         };
         for (const d of drawn) {
-          const g = grids[d], rows = Array.isArray(g) && g.every((r) => typeof r === "string" && !r.includes("\n"));
+          if (baked) { define("sprite", `${name}_${d}`, [{ ...so, w: 2 * R + 1, h: 2 * R + 1, pivot: [R + 0.5, R + 0.5] }, baked[d]]); continue; }
+          const g = G[d], rows = Array.isArray(g) && g.every((r) => typeof r === "string" && !r.includes("\n"));
           // rows padded to one width, a grid string, or items (a grid and runs())
           const items = typeof g === "string" ? [g] : rows ? [(g as string[]).map((r) => r.padEnd(Math.max(...(g as string[]).map((q) => q.length)), ".")).join("\n")] : Array.isArray(g) ? g : undefined;
           if (!items) throw new PxError(`views: view '${d}' is a grid (a string, or its rows), or items ([grid, runs(...)]), got ${JSON.stringify(g)?.slice(0, 60)}`);

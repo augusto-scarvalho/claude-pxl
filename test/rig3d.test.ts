@@ -181,3 +181,20 @@ for (const chin of [undefined, ["r", "w"]]) rig3d(\`f\${chin?.[0] ?? ""}\`, { w:
   // under the head, where it meets the body: the ink, or the chin's line
   assert.ok(count("f_idle_s", "r") === 0 && count("fr_idle_s", "r") >= 3, keys(p, "fr_idle_s"));
 });
+
+test("views of a head modeled: drawn once per view with its line round it, a retouch painted over (. keeps, _ erases), the east mirrored; sdf.field", () => {
+  const p = loadSource(`${PAL} ramps("krw")
+views("_m", sdf.sphere(3).mat("krw"), { ink: "k", anchor: [1, 1], retouch: { s: "_.g\\n.gg" } })`, "t.px.js");
+  assert.deepEqual(p.groups.get("_m")!.members, ["_m_n", "_m_ne", "_m_e", "_m_se", "_m_s", "_m_sw", "_m_w", "_m_nw"]);
+  assert.equal(p.assets.get("_m_e")!.opts.base, "_m_w");
+  const s = p.image("_m_s"), [cx, cy] = s.pivot!.map(Math.floor), at = (x: number, y: number) => s.data[y * s.w + x], K = (k: string) => p.pal.keys.get(k);
+  assert.equal(at(cx - 1, cy - 1) & 255, 0, "erased");
+  assert.equal(at(cx, cy), K("g"));
+  assert.equal(at(cx + 1, cy - 1), K("g"));
+  // the line round it: the first pixel left of the head on its middle row
+  let x = 0;
+  while ((at(x, cy) & 255) < 128) x++;
+  assert.equal(at(x, cy), K("k"));
+  const slab = sdf.field((x, y, z) => Math.max(Math.abs(x), Math.abs(y), Math.abs(z)) - 2, [-2, -2, -2], [2, 2, 2]);
+  assert.ok(Math.abs(slab.dist([3, 0, 0]) - 1) < 1e-9 && slab.dist([0, 0, 0]) < 0);
+});
