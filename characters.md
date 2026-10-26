@@ -161,9 +161,9 @@ far limbs swap, every fix breaks something else). In pxl itself (§11; `examples
    long stride, on the diagonals between.
 
 In the DSL: `rig3d()` is steps 1 to 3 (the skeleton on the 3D layer in every direction, its flat
-blocks with `blocks: true`, its parts painted by hooks, the cloak a `j.sweep`: the traveler's `tr3_*`
-and `bk3_*`), `views()` step 4 (the mirror about the anchor, the rows checked), `gait()` step 5's
-numbers (`PXL help rig3d`). A head modeled too (`tr3m_*`): `surface: { clean: true }` cleans what is
+blocks with `blocks: true`, its parts painted by hooks, the cloak a `j.sweep`: the traveler's `tr_*`
+and `bk_*`), `views()` step 4 (the mirror about the anchor, the rows checked), `gait()` step 5's
+numbers (`PXL help rig3d`). A head modeled too (the traveler's): `surface: { clean: true }` cleans what is
 drawn that small before the lines (a pixel sticking out cut away, no line doubled, the outline
 whole, no eye's pixel on the silhouette); the eyes and the nose decals by view, as the hand heads';
 `chin: ["D", skin ramp]` the hand heads' line under the jaw.

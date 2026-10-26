@@ -1,13 +1,13 @@
-// An HD-2D traveler in the 8 directions Octopath's figures turn to, walking and idle; built as
-// rig/warden.px.js is: a skeleton in 3D, in px (characters §11), its parts painted where the skeleton
-// puts them and as they are turned to us, nearest wins, each with its outline; the head drawn by hand
-// in 5 views (front, front 3/4, profile, back 3/4, back), the other three mirrored. Measured on 16
-// games' field sprites (characters §6, §10): 34 px tall, the head 11 rows (a third: Olberic's; more
-// reads as a big head), a body like a little barrel (the waist about as wide as the chest,
-// the arms slim and close along it, the hands at the crotch: shoulders broad over a narrow waist read
-// as a body-builder); the same rows for the head, shoulders, hands, crotch and soles in every view. Lit from above
-// and toward us, so a mirrored view keeps its light. Step 1 was the same skeleton as flat blocks, the
-// motion judged before anything was painted (characters §4). The mourner is the same figure recolored.
+// An HD-2D traveler in the 8 directions Octopath's figures turn to, walking, idle, kneeling and casting,
+// drawn in 3D (rig3d, characters §11): a skeleton in px, its parts fields along the bones painted as
+// his outfit is, the head modeled too (the skull and the hair as fields, the eyes, nose and mouth drawn
+// by hand on it), a line all round. Measured on 16 games' field sprites (characters §6, §10): 34 px
+// tall, the head 11 rows (a third: Olberic's; more reads as a big head), a body like a little barrel
+// (the waist about as wide as the chest, the arms slim and close along it, the hands at the crotch:
+// shoulders broad over a narrow waist read as a body-builder); the same rows for the head, shoulders,
+// hands, crotch and soles in every view. Lit from above and toward us, so a mirrored view keeps its
+// light. Each move was judged first as flat blocks (bk_<move>_<dir>, characters §4). The mourner is
+// the same figure, her hair her own.
 pal({
   k: "#1c1418",                                                   // outline
   L: "#fde6c6", S: "#f0c79e", s: "#d2966f", z: "#9c5b45",         // skin, its lightest only on the nose
@@ -19,11 +19,13 @@ pal({
   l: "#83542f", d: "#4b2e1e", D: "#2e1a10", g: "#f0cc62",         // leather: boots, belt; a buckle
 })
 ramps("kzsSL", "kJjhHY", "kNncC", "kvwW", "kRPp", "kDdl")
-// the skeleton, its moves and the painter, for files that dress figures of their own (crew.px.js)
+// the first engine (a skeleton, its moves, a painter of tubes and balls), for crew.px.js until its
+// people are dressed on rig3d too
 const travelerRig = {}
 // in a block: its names stay its own when a scene includes the file
 {
 // ---------------------------------------------------------------- the heads, by hand
+// (His head is modeled now, below; these stay as the crew's measure: their heads are held to these rows.)
 // 11 rows. One haircut seen from each side (characters §5, hair): short and tousled, parted just left
 // of the middle as we see it, a 2 px tuft on one side of the parting and a 4 px lobe on the other, each
 // lobe lit by a pair of short strokes along its strands (an arc over the crown, not dots), the top edge
@@ -295,7 +297,7 @@ const figure = (c, set, p, yaw, o = TRAVELER) => {
     if (r >= 0 && c.get(x + col, y + r + 1)) c.px(x + col, y + r + 1, o.chin)
   }
 }
-// Step 1 again, for a new move: the same skeleton as flat blocks (bk_<move>_<dir>), to judge the pose
+// Step 1 again, for a new move: the same skeleton as flat blocks (the crew's bk_carrylow), to judge the pose
 // and the motion before anything is painted: the head yellow with a red patch where the face is, the
 // body orange, his right limbs light and his left dark, outlined. Drawn turned to each direction, no
 // mirror (nothing in it is lit from one side).
@@ -325,30 +327,12 @@ const blocks = (c, p, yaw) => {
 }
 // 8 directions, each turned to (yaw: degrees from facing us, to the right)
 const DIRS = { s: 0, sw: -45, w: -90, nw: -135, n: 180, ne: 135, e: 90, se: 45 }
-// The mourner: grey hair, a shawl of dark violet, grey linen.
-const MOURNER = {
-  Y: "#bdb8ae", H: "#a6a199", h: "#8f8a84", j: "#625e5c", J: "#383536",
-  C: "#7a6c8c", c: "#56496a", n: "#3a3150", N: "#231d33", W: "#a8a196", w: "#7f786f", v: "#58534e",
-}
-views("_mo_head", HEADS, { anchor: ANCHOR, swap: MOURNER })
-// a move with a hand that matters (casting): its near hand a socket, in every frame where the pose puts it
-const handAt = (c, p, yaw) => c.setSocket("hand", ...scr(bones(p, yaw).arms[yaw < 0 ? 0 : 1].hand))
-for (const [who, set] of [["tr", "_tr"], ["mo", "_mo"]]) for (const [move, M] of Object.entries(MOVES)) for (const [d, yaw] of Object.entries(DIRS)) {
-  if (M.dirs && !M.dirs.includes(d)) continue
-  anim(`${who}_${move}_${d}`, { w: W, h: H, pivot: [OX, OY], ...(who === "mo" ? { swap: MOURNER } : {}) },
-    (c) => { const p = M.f(c.frame, yaw); figure(c, set, p, yaw); if (M.hand) handAt(c, p, yaw) }, ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })), bump("hybrid"))
-}
-for (const [move, M] of Object.entries(MOVES)) for (const [d, yaw] of Object.entries(DIRS)) {
-  if (M.dirs && !M.dirs.includes(d)) continue
-  anim(`bk_${move}_${d}`, { w: W, h: H, pivot: [OX, OY] }, (c) => { const p = M.f(c.frame, yaw); blocks(c, p, yaw); if (M.hand) handAt(c, p, yaw) }, ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })))
-}
-sheet("traveler", ["tr_*", "mo_*"], { rows: "tag", pad: 1 })
-// ---------------------------------------------------------------- on the 3D layer
-// The same skeleton and moves on the 3D layer (rig3d: its parts fields along the bones, drawn by
-// surface()): tr3_<move>_<dir>, and as blocks bk3_<move>_<dir> to hold against bk_*. Painted as his
-// outfit is: the trousers to the cuff and the boots, the far limbs a step darker; the cloak a cloth hung
-// from the shoulders, open in front, trailing and swaying as he walks; the tunic's skirt and its body
-// with the belt and the buckle; the sleeves, the hands; his heads by hand (views()), the dark line under.
+// ---------------------------------------------------------------- the traveler, on the 3D layer
+// The skeleton and moves above on the 3D layer (rig3d: its parts fields along the bones, drawn by
+// surface()): tr_<move>_<dir>, and as blocks bk_<move>_<dir>. Painted as his outfit is: the trousers to
+// the cuff and the boots, the far limbs a step darker; the cloak a cloth hung from the shoulders, open
+// in front, trailing and swaying as he walks; the tunic's skirt and its body with the belt and the
+// buckle; the sleeves, the hands.
 const BODY3 = { h: 34, heads: 3, hip: HIP, torso: TORSO, neck: NECK + HEADR, thigh: THIGH, shin: SHIN, upper: UPPER, fore: FORE, ankle: 1.2, hips: HIPW, shoulders: [0.5, SHW, -1] }
 const MOVES3 = Object.fromEntries(Object.entries(MOVES).map(([m, M]) => [m, { frames: M.frames, ms: M.ms, pose: (i, h) => M.f(i, 180 - h), ...(M.dirs ? { dirs: M.dirs } : {}),
   ...(M.hand ? { draw: (c, j) => c.setSocket("hand", ...j.screen(j.arms[j.heading > 180 ? 0 : 1].hand)) } : {}) }]))
@@ -368,55 +352,52 @@ const parts3 = (j, p) => {
 }
 // lit as he is, from above and toward us, the light wrapped round him (a side square to it half lit)
 const LIT3 = { soft: 0.55 }
-rig3d("tr3", { body: BODY3, w: W, h: H, pivot: [OX, OY], blocks: "bk3", parts: parts3, ink: "k", surface: LIT3, head: "_tr_head", chin: "D", moves: MOVES3 })
-// The outline the 3D layer draws by itself, on the shadow side inside the figure and a lit rim toward
-// the light, to choose against the one all round (tr3o_idle_<dir>)
-rig3d("tr3o", { body: BODY3, w: W, h: H, pivot: [OX, OY], parts: parts3, surface: LIT3, head: "_tr_head", chin: "D", moves: { idle: MOVES3.idle } })
-// An experiment (tr3m_<move>_<dir>): the head modeled too, as the grove's snow spirit is, in his head's
+// The head modeled too, as the grove's snow spirit is, in his head's
 // frame (x his right, y ahead, z up, px): the skull; the hair a cap over it cut away at the face, with a
 // mass at the nape, a parting, locks of fringe, side locks to the jaw, tufts at the crown, tousled by
 // noise; a neck. The eyes, the nose (the skin's lightest pixel, as on the hand heads: a sphere smaller
 // than a pixel poked out of the face as a wart) and the mouth in the chin row drawn by hand as decals
-// pinned on it. Turned to 16 directions without drawing a view (tr3m_turn_<dir>).
+// pinned on it. Turned to 16 directions without drawing a view (tr_turn_<dir>).
 // The eyes as the hand heads' rows, a grid a view picked by how far the face turns from us: facing us
 // the irises toward the nose; three quarters the near eye's white and iris looking the way it turns,
 // the far eye a pixel inside the face's edge; in profile the white and the iris a pixel behind the
 // edge, the lid where the fringe allows (each drawn looking right and its mirror; the pivot on the
 // pixel between the eyes, in profile on the near eye's point)
-sprite("_tr3m_eyes_s", { pivot: [2.5, 1] }, "kk.kk\nGE.EG")
-sprite("_tr3m_eyes_se", { pivot: [4.5, 0.5] }, "kk.k\nGE.E")
-sprite("_tr3m_eyes_sw", { pivot: [-0.5, 0.5] }, "k.kk\nE.EG")
-sprite("_tr3m_eyes_e", { pivot: [3.5, 0] }, "kk\nGE")
-sprite("_tr3m_eyes_w", { pivot: [-1.5, 0] }, "kk\nEG")
-sprite("_tr3m_mouth", "z")
-sprite("_tr3m_nose", "L")
-const head3 = (j) => {
+sprite("_tr_eyes_s", { pivot: [2.5, 1] }, "kk.kk\nGE.EG")
+sprite("_tr_eyes_se", { pivot: [4.5, 0.5] }, "kk.k\nGE.E")
+sprite("_tr_eyes_sw", { pivot: [-0.5, 0.5] }, "k.kk\nE.EG")
+sprite("_tr_eyes_e", { pivot: [3.5, 0] }, "kk\nGE")
+sprite("_tr_eyes_w", { pivot: [-1.5, 0] }, "kk\nEG")
+sprite("_tr_mouth", "z")
+sprite("_tr_nose", "L")
+// the cap close on the skull, off the face from the brow down, a mass at the nape, a parting groove;
+// three locks of fringe ending on the brow, side locks behind the cheeks to the jaw, tufts at the crown
+const CAP = sdf.ellipsoid([5.3, 5.6, 4.8]).at(0, -0.5, 1.2).union(sdf.ellipsoid([4, 2.6, 3]).at(0, -3.4, -1.6), { smooth: 1 })
+  .subtract(sdf.ellipsoid([4.4, 4.8, 4.4]).at(0, 4, -2.3), sdf.capsule([-0.9, 4.4, 4.6], [-0.7, -1.5, 5.6], 0.45), { smooth: 0.4 })
+const LOCKS = sdf.union(sdf.capsule([-2.4, 3.4, 3.8], [-2.8, 4.9, 1.6], 0.9, 0.5), sdf.capsule([0.6, 3.8, 4], [1, 5.1, 1.9], 0.9, 0.5), sdf.capsule([2.7, 3.2, 3.7], [3.1, 4.5, 1.7], 0.9, 0.5),
+  sdf.capsule([-4.5, 0, 2], [-4.4, 0.3, -3.2], 1, 0.7), sdf.capsule([4.5, 0, 2], [4.4, 0.3, -3.2], 1, 0.7),
+  sdf.capsule([-1.6, 0.4, 5], [-2.4, -0.6, 6.4], 0.9, 0.4), sdf.capsule([1.2, 1, 5.1], [2.2, 0.8, 6.2], 0.8, 0.4), sdf.capsule([0, -2.2, 4.8], [0.4, -3.6, 5.6], 0.8, 0.4), { smooth: 0.6 })
+const HAIR = CAP.union(LOCKS, { smooth: 0.6 }).noise({ amp: 0.5, scale: 1.1, seed: 3 }).mat("JjhH")
+const head3 = (j, hair = HAIR) => {
   const into = (f) => f.rotate(-j.hd.heading, "z").at(j.head), at = (x, y, z) => [0, 1, 2].map((e) => j.head[e] + j.hd.r[e] * x + j.hd.f[e] * y + (e === 2 ? z : 0))
   const skull = sdf.ellipsoid([4.6, 5, 5.3]), turn = ((((180 - j.hd.heading) % 360) + 540) % 360) - 180
   const eyes = Math.abs(turn) < 20 ? "s" : Math.abs(turn) < 60 ? (turn > 0 ? "se" : "sw") : turn > 0 ? "e" : "w"
-  // the cap close on the skull, off the face from the brow down, a mass at the nape, a parting groove;
-  // three locks of fringe ending on the brow, side locks behind the cheeks to the jaw, tufts at the crown
-  const cap = sdf.ellipsoid([5.3, 5.6, 4.8]).at(0, -0.5, 1.2).union(sdf.ellipsoid([4, 2.6, 3]).at(0, -3.4, -1.6), { smooth: 1 })
-    .subtract(sdf.ellipsoid([4.4, 4.8, 4.4]).at(0, 4, -2.3), sdf.capsule([-0.9, 4.4, 4.6], [-0.7, -1.5, 5.6], 0.45), { smooth: 0.4 })
-  const locks = sdf.union(sdf.capsule([-2.4, 3.4, 3.8], [-2.8, 4.9, 1.6], 0.9, 0.5), sdf.capsule([0.6, 3.8, 4], [1, 5.1, 1.9], 0.9, 0.5), sdf.capsule([2.7, 3.2, 3.7], [3.1, 4.5, 1.7], 0.9, 0.5),
-    sdf.capsule([-4.5, 0, 2], [-4.4, 0.3, -3.2], 1, 0.7), sdf.capsule([4.5, 0, 2], [4.4, 0.3, -3.2], 1, 0.7),
-    sdf.capsule([-1.6, 0.4, 5], [-2.4, -0.6, 6.4], 0.9, 0.4), sdf.capsule([1.2, 1, 5.1], [2.2, 0.8, 6.2], 0.8, 0.4), sdf.capsule([0, -2.2, 4.8], [0.4, -3.6, 5.6], 0.8, 0.4), { smooth: 0.6 })
   return {
     neck: j.limb(j.chest, [j.head[0], j.head[1], j.head[2] - 3], 1.6, 1.5, "zs"),
-    head: [into(skull.mat("zsSL")), into(cap.union(locks, { smooth: 0.6 }).noise({ amp: 0.5, scale: 1.1, seed: 3 }).mat("JjhH"))],
+    head: [into(skull.mat("zsSL")), into(hair)],
     // (the face's turn from us, degrees, to our right +; past 105 the eyes are behind it)
-    face: [...(Math.abs(turn) < 105 ? [j.decal(`_tr3m_eyes_${eyes}`, Math.abs(turn) < 60 ? at(0, 5, -0.6) : at(Math.sign(turn) * 1.8, 4.6, -0.6), { depth: 3 })] : []),
-      j.decal("_tr3m_nose", at(0, 5, -1.7)), j.decal("_tr3m_mouth", at(0, 4.4, -3.9))],
+    face: [...(Math.abs(turn) < 105 ? [j.decal(`_tr_eyes_${eyes}`, Math.abs(turn) < 60 ? at(0, 5, -0.6) : at(Math.sign(turn) * 1.8, 4.6, -0.6), { depth: 3 })] : []),
+      j.decal("_tr_nose", at(0, 5, -1.7)), j.decal("_tr_mouth", at(0, 4.4, -3.9))],
   }
 }
-sprite("_tr3m_clasp", "g")
-// The body as tr3's, with a few accents where the cloth bends or pieces meet, in his ramps (each a cause,
+sprite("_tr_clasp", "g")
+// The body as parts3 paints it, with a few accents where the cloth bends or pieces meet, in his ramps (each a cause,
 // none a texture): the trousers' crease at the front of the knee; the boots' cuffs turned down a tone
 // lighter, their soles dark; the tunic's hem in shadow under its flare, two folds where the skirt flares
 // from the belt, a crease inside each elbow; the cloak's hem darker, its edge at the opening catching
 // the light, two folds down its back that swing with it, the lining's edge a step lighter, the clasp at
 // the collar. (Brushes of cloth on the cloak's trailing hem read as a bush at this size: none.)
-const parts3m = (j, p) => {
+const parts3m = (j, p, hair) => {
   const P = parts3(j, p), farLeg = j.depth(j.legs[0].hip) < j.depth(j.legs[1].hip) ? 0 : 1, farArm = j.depth(j.arms[0].sh) < j.depth(j.arms[1].sh) ? 0 : 1
   const dark = (r) => r.slice(0, 2)
   j.legs.forEach((L, i) => {
@@ -435,12 +416,27 @@ const parts3m = (j, p) => {
   }
   const cloak = j.sweep([j.chest[0], j.chest[1], 0], top - CLOAK, top, CLOAK3.radius, { keep: CLOAK3.keep, shift: trail, shell: 0.4, paint: cloakPaint })
   P.cloak = cloak
-  return { ...P, clasp: j.decal("_tr3m_clasp", [0, 1, 2].map((e) => j.chest[e] + j.f[e] * 3.8 + (e === 2 ? 0.2 : 0)), { depth: 2 }), ...head3(j) }
+  return { ...P, clasp: j.decal("_tr_clasp", [0, 1, 2].map((e) => j.chest[e] + j.f[e] * 3.8 + (e === 2 ? 0.2 : 0)), { depth: 2 }), ...head3(j, hair) }
 }
 const ALL8 = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 // cleaned as a pixel artist would at this size (surface's clean: no pixel sticking out, no black run
 // 2 px thick, the outline whole), under the jaw (not the hair) the hand heads' chin line
-rig3d("tr3m", { body: BODY3, w: W, h: H, pivot: [OX, OY], n: 16, parts: parts3m, ink: "k", chin: ["D", "zsSL"], surface: { ...LIT3, clean: true },
+const FIG = { body: BODY3, w: W, h: H, pivot: [OX, OY], ink: "k", chin: ["D", "zsSL"], surface: { ...LIT3, clean: true } }
+rig3d("tr", { ...FIG, n: 16, parts: parts3m, blocks: true,
   moves: { ...Object.fromEntries(Object.entries(MOVES3).map(([m, M]) => [m, { dirs: ALL8, ...M }])), turn: { frames: 1, ms: 250, pose: MOVES3.idle.pose } } })
-Object.assign(travelerRig, { figure, blocks, bones, scr, depth, local, sample, TRAVELER, MOVES, DIRS, W, H, OX, OY, casting, CH, TH })
+// The mourner (mo_<move>_<dir>): the same figure, her hair her own, grey, parted in the middle and
+// drawn back smooth over the ears into a bun at the back of the head, the brow bare; a shawl of dark
+// violet, grey linen (his colors swapped)
+const MOURNER = {
+  Y: "#bdb8ae", H: "#a6a199", h: "#8f8a84", j: "#625e5c", J: "#383536",
+  C: "#7a6c8c", c: "#56496a", n: "#3a3150", N: "#231d33", W: "#a8a196", w: "#7f786f", v: "#58534e",
+}
+const MO_HAIR = sdf.ellipsoid([5, 5.4, 5.4]).at(0, -0.3, 0.6)
+  .subtract(sdf.ellipsoid([4.4, 4.6, 4.6]).at(0, 4.2, -1.6), sdf.capsule([0, 4.4, 4.6], [0, -1.5, 6.5], 0.25), sdf.plane([0, -0.55, 0.83], -1.2), { smooth: 0.4 })
+  .noise({ amp: 0.4, scale: 1.4, seed: 5 }).mat("JjhH")
+const BUN = sdf.ellipsoid([2.6, 2.2, 2.4]).at(0, -6.2, 0).noise({ amp: 0.2, scale: 1, seed: 6 }).mat("JjhH")
+// (the bun a part of its own, so the line runs round it where it lies over the head)
+for (const n of rig3d("_mo", { ...FIG, parts: (j, p) => ({ ...parts3m(j, p, MO_HAIR), bun: BUN.rotate(-j.hd.heading, "z").at(j.head) }), moves: MOVES3 }).names) anim(n.slice(1), { base: n, swap: MOURNER })
+sheet("traveler", ["tr_*", "mo_*"], { rows: "tag", pad: 1 })
+Object.assign(travelerRig, { figure, blocks, bones, scr, depth, local, sample, TRAVELER, MOVES, DIRS, W, H, OX, OY })
 }
