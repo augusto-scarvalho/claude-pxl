@@ -41,6 +41,13 @@ export interface SmokeOpts {
   pixel?: number;
   seed?: number;
   frame?: number;
+  /**
+   * a perspective() camera and where in its world the smoke stands ([x, z, up] in m): its lengths
+   * (size, rise, path, wind, spread, length, turbulence) in meters there, those not given px there; each
+   * billow on the upright plane through `at` across the view, as near as it is (x and y then px added)
+   */
+  view?: unknown;
+  at?: number[];
 }
 
 /** What smoke draws on: canvas coords, its clip and twin respected. */
@@ -52,7 +59,20 @@ export interface SmokeCanvas {
   plot(x: number, y: number, c: Color): boolean;
 }
 
-const KEYS = ["shape", "count", "size", "vary", "rise", "path", "wind", "spread", "length", "flat", "turbulence", "rough", "thin", "life", "alpha", "light", "pixel", "seed", "frame"];
+const KEYS = ["shape", "count", "size", "vary", "rise", "path", "wind", "spread", "length", "flat", "turbulence", "rough", "thin", "life", "alpha", "light", "pixel", "seed", "frame", "view", "at"];
+/** A camera smoke is seen through: where a world point [x, z, up] lands, px a meter there, its yaw (degrees). */
+export interface SmokeCamera { ground(x: number, z: number, u: number): [number, number]; scale(z: number, x: number, u: number): number; yaw?: number }
+/** Lengths in meters at `at` to px there (the given ones only), and a billow's offset back into the world, seen through the camera. */
+export function inMeters(cam: SmokeCamera, at: number[], what: string) {
+  if (!(Array.isArray(at) && at.length === 3 && at.every(Number.isFinite))) throw new PxError(`${what}: with a view, at is where it stands in its world, [x, z, up] in m, got ${JSON.stringify(at)}`);
+  const k = cam.scale(at[1], at[0], at[2]), a = ((cam.yaw ?? 0) * Math.PI) / 180, rx = Math.cos(a), rz = -Math.sin(a);
+  // (dx, dy) px from where it stands, y down: on the upright plane across the view; where it lands, how much bigger than there
+  const place = (dx: number, dy: number): [number, number, number] => {
+    const w = [at[0] + (rx * dx) / k, at[1] + (rz * dx) / k, at[2] - dy / k], [x, y] = cam.ground(w[0], w[1], w[2]);
+    return [x, y, cam.scale(w[1], w[0], w[2]) / k];
+  };
+  return { k, place };
+}
 export const SMOKE_OPTS = KEYS;
 
 interface Billow { x: number; y: number; r: number; level: number; erode: number; id: number }
@@ -70,7 +90,13 @@ function along(pts: number[], s: number): [number, number] {
   return [pts[0], pts[1]];
 }
 
-export function drawSmoke(c: SmokeCanvas, x0: number, y0: number, keys: string | string[], o: SmokeOpts = {}): void {
+export function drawSmoke(c: SmokeCanvas, x0: number, y0: number, keys: string | string[], o: SmokeOpts = {}, cam?: SmokeCamera): void {
+  // through a camera: the lengths given in meters, px where it stands
+  const M = cam ? inMeters(cam, o.at as number[], "smoke") : undefined;
+  if (M) {
+    const m = (v: number) => (v * M.k) / (o.pixel ?? 1), mm = (v: unknown) => (Array.isArray(v) ? v.map(m) : typeof v === "number" ? m(v) : v);
+    o = { ...o, ...Object.fromEntries((["size", "rise", "path", "wind", "spread", "length", "turbulence"] as const).filter((n) => o[n] !== undefined).map((n) => [n, mm(o[n])])) };
+  }
   const shape = o.shape ?? "column";
   if (!["column", "puff", "bank", "ring"].includes(shape)) throw new PxError(`smoke: shape is "column", "puff", "bank" or "ring", got ${JSON.stringify(o.shape)}`);
   const ks = colorList(keys).map((k) => c.color(k));
@@ -111,6 +137,8 @@ export function drawSmoke(c: SmokeCanvas, x0: number, y0: number, keys: string |
     }
   }
   if (!billows.length) return;
+  // seen through the camera: each billow where it is in the world, as big as it is there
+  if (M) for (const b of billows) { const [x, y, s] = M.place(b.x * K, b.y * K); b.x = x / K; b.y = y / K; b.r *= s; }
   // the art's pixels it covers: in each the billow it is deepest inside, lit by which way that one faces there
   const ll = Math.hypot(lx, ly, 0.7) || 1, Lx = lx / ll, Ly = ly / ll, Lz = 0.7 / ll;
   let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;

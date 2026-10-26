@@ -83,6 +83,17 @@ export function seamless(fn: (x: number, y: number) => number, w: number, h?: nu
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 /** Ordered-dither threshold in (0, 1) for pixel (x, y). */
+/** Vectors as arrays (any length; dot and cross in 3D): what the art files wrote each for itself. */
+export const vec = {
+  add: (a: number[], b: number[]) => a.map((v, i) => v + b[i]),
+  sub: (a: number[], b: number[]) => a.map((v, i) => v - b[i]),
+  mul: (a: number[], k: number) => a.map((v) => v * k),
+  dot: (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + (a.length > 2 ? a[2] * b[2] : 0),
+  cross: (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  len: (a: number[]) => Math.hypot(...a),
+  unit: (a: number[]) => { const l = Math.hypot(...a) || 1; return a.map((v) => v / l); },
+};
+
 export function bayer(x: number, y: number): number {
   return (BAYER[(((y % 4) + 4) % 4) * 4 + (((x % 4) + 4) % 4)] + 0.5) / 16;
 }

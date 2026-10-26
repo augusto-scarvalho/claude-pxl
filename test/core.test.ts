@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { art, failure, keys, PAL } from "./helpers.ts";
 import { perspective } from "../src/core/perspective.ts";
-import { bayer, fbm, latticeHash, seamless, vnoise } from "../src/core/util.ts";
+import { bayer, fbm, latticeHash, seamless, vec, vnoise } from "../src/core/util.ts";
 import { loadSource } from "../src/node/load.ts";
 import { compareSilhouettes, packSheet, playAll, sheetJson } from "../src/core/render.ts";
 import { pack } from "../src/core/color.ts";
@@ -855,4 +855,23 @@ test("ramps: one written light to dark gets a warning (shade and light would swa
   const p = loadSource('pal({ k: "#000000", d: "#404040", l: "#c0c0c0" }); ramps("kdl", "ldk"); sprite("a", { w: 1, h: 1 }, px(0, 0, "d"))', "t.px.js");
   p.image("a");
   assert.deepEqual(p.warnings.map((w) => w.msg.match(/ramp "(\w+)" isn't dark to light/)?.[1]), ["ldk"]);
+});
+
+test("vec: vectors as arrays, what the art files wrote each for itself; a global in every file", () => {
+  const a = [1, 2, 2], b = [0, 1, 0];
+  assert.deepEqual([vec.add(a, b), vec.sub(a, b), vec.mul(a, 2), vec.cross([1, 0, 0], b)], [[1, 3, 2], [1, 1, 2], [2, 4, 4], [0, 0, 1]]);
+  assert.deepEqual([vec.dot(a, b), vec.dot([3, 4], [1, 1]), vec.len(a)], [2, 7, 3], "dot in 3D (and 2D), its length");
+  assert.deepEqual([vec.unit(a), vec.unit([0, 0, 0])], [[1 / 3, 2 / 3, 2 / 3], [0, 0, 0]], "unit: length 1, a zero vector as it is");
+  assert.equal(keys(loadSource(PAL + 'sprite("v", { w: 1, h: 1 }, (c) => c.px(0, 0, vec.len(vec.unit([3, 4])) === 1 ? "r" : "g"))', "t.px.js"), "v"), "r");
+});
+
+test("cells: a labelled contact sheet, rows gap px apart from at, a label in a cell's corner, titles over the columns and left of the rows", () => {
+  const rows = keys(loadSource(PAL + `sprite("a", { w: 10, h: 8 }, rect(0, 0, 10, 8, "r"))
+sprite("b", { w: 10, h: 8 }, rect(0, 0, 10, 8, "g"))
+scene("s", { w: 44, h: 30, bg: "k" }, cells([["a", "b"], [["b", "1"], "a"]], { at: [20, 10], gap: 1, head: { names: ["2", "3"] }, side: { names: ["4"] } }))`, "t.px.js"), "s").split("\n");
+  assert.deepEqual([rows[10][20], rows[10][31], rows[19][20], rows[19][31]], ["r", "g", "g", "r"], "each cell the first one's size, 1 px apart");
+  const w = (y0: number, y1: number, x0: number, x1: number) => rows.slice(y0, y1).some((r) => r.slice(x0, x1).includes("w"));
+  assert.ok(w(22, 27, 23, 26) && !w(13, 18, 20, 30), "a label 3 px into its cell, in w; none on a cell without one");
+  assert.ok(w(2, 7, 22, 25) && w(2, 7, 33, 36), "titles 2 px into each column, 8 over the first row");
+  assert.ok(w(16, 21, 2, 5), "a row's title at x 2 by its middle");
 });

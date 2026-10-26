@@ -32,10 +32,7 @@ ramps("kSszZ", "kRrqQ", "kDGgh", "kLl", "kFfeE", "kBbn", "kTt", "kOo", "k1234", 
 const PITCH = (12 * Math.PI) / 180, CP = Math.cos(PITCH), SP = Math.sin(PITCH)
 const W = 112, H = 84, OX = 56, OY = 76
 const rad = (d) => (d * Math.PI) / 180
-const add = (a, b) => a.map((v, i) => v + b[i]), sub = (a, b) => a.map((v, i) => v - b[i])
-const mul = (a, k) => a.map((v) => v * k), dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-const len = (a) => Math.hypot(...a), unit = (a) => mul(a, 1 / (len(a) || 1))
-const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+const { add, sub, mul, dot, len, cross, unit } = vec
 const HIP = 22, TORSO = 12, NECK = 6, HIPW = 3, SHW = 6
 const THIGH = 10, SHIN = 10, UPPER = 8, FORE = 8, HAFT = 17
 // ---- the poses: keys at frames, in between eased. yaw: which way the hips face (90 = right; the cut

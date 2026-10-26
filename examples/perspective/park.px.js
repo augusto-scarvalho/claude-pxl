@@ -317,7 +317,7 @@ function clump(c, x, y, R, base, ramp, r) {
 // against the sun: on top and toward the sun lit, deep inside and underneath dark, the deepest a cool
 // blue-green. Drawn far to near together with the wood, so the leaves behind a limb are hidden by it and
 // the ones in front hide it. The shadow is cast by the clusters and limbs themselves, so it comes out lacy.
-const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((c) => c / l) }
+const norm = vec.unit
 const SUN3 = norm([SUN_FROM[0] * Math.cos((55 * Math.PI) / 180), SUN_FROM[1] * Math.cos((55 * Math.PI) / 180), Math.sin((55 * Math.PI) / 180)])   // x, z, up
 function grow(seed, { tall = 7, spread = 1, limbs = 4, depth = 3, side = [1, 0] }) {
   const r = rng(seed), wood = [], tips = []

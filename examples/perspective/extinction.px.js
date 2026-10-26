@@ -377,8 +377,7 @@ sprite("_bg", { w: W, h: H }, (c) => {
 })
 
 // ================================================================ shapes
-const addv = (a, b) => a.map((v, k) => v + b[k]), mul = (a, s) => a.map((v) => v * s)
-const unit = (v) => { const l = Math.hypot(...v) || 1; return v.map((c) => c / l) }
+const { add: addv, mul, unit } = vec
 // A limb as a cone from a to b (radius ra to rb, in meters): pxl's capsule() where the camera puts it,
 // lit from above (the sun, and behind, the fires: a hot rim along the top). `ramp`: shade, hide, lit, rim.
 function paintCone(c, [a, ra, b, rb], ramp) {

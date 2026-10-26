@@ -112,9 +112,7 @@ sprite("_pine_far", { base: "_pine_m", swap: { Z: "#3b4260", z: "#405468", x: "#
 // the square of the height, the gust coming and going over the loop, each branch's tip fluttering
 // twice as fast. h: its height in px; frames of the sway at fps.
 const pineVolume = (name, h, seed, { frames = 16, fps = 1000 / 220, sway = 1.6 } = {}) => {
-  const W = 42, OX = 21, OY = h - 1, P = (20 * Math.PI) / 180, CP = Math.cos(P), SP = Math.sin(P)
-  const unit = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l) }
-  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+  const W = 42, OX = 21, OY = h - 1, P = (20 * Math.PI) / 180, CP = Math.cos(P), SP = Math.sin(P), { unit, dot, cross } = vec
   const SUN = unit([-0.55, 0.62, -0.55]), D = [0, SP, CP]               // toward the sun; toward us
   const Hw = (h - 1.5) / CP, y0 = 0.17 * Hw, T = Math.max(4, Math.round(h / 12)), Rmax = 19
   const bend = (y, g) => g * Math.pow(Math.max(0, y) / Hw, 2)             // the trunk's lean at height y
@@ -411,10 +409,7 @@ sprite("_deadtree", { w: 60, h: 74, pivot: "bottom" }, (c) => {
 // y up, z toward the eye), h px tall, and how high they reach; drawn as a sprite by deadTreeVolume, and
 // as capsules in 3D by the graveyard's graveyard_3d.
 const deadTreeLimbs = (h, seed) => {
-  const CP = Math.cos((20 * Math.PI) / 180), Hw = (h - 1.5) / CP
-  const unit = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l) }
-  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
-  const add = (a, b) => a.map((v, i) => v + b[i]), mul = (a, k) => a.map((v) => v * k)
+  const CP = Math.cos((20 * Math.PI) / 180), Hw = (h - 1.5) / CP, { unit, dot, cross, add, mul } = vec
   // turn v about the unit axis k by angle a
   const turn = (v, k, a) => add(add(mul(v, Math.cos(a)), mul(cross(k, v), Math.sin(a))), mul(k, dot(k, v) * (1 - Math.cos(a))))
   const r = rng(seed), segs = []
@@ -445,10 +440,7 @@ const deadTreeLimbs = (h, seed) => {
   return { segs, top }
 }
 const deadTreeVolume = (name, h, seed, { frames = 16, fps = 1000 / 220, sway = 1 } = {}) => {
-  const W = 76, OX = 38, OY = h - 1, P = (20 * Math.PI) / 180, CP = Math.cos(P), SP = Math.sin(P)
-  const unit = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l) }
-  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-  const add = (a, b) => a.map((v, i) => v + b[i]), mul = (a, k) => a.map((v) => v * k)
+  const W = 76, OX = 38, OY = h - 1, P = (20 * Math.PI) / 180, CP = Math.cos(P), SP = Math.sin(P), { unit, dot, add, mul } = vec
   const SUN = unit([-0.55, 0.62, -0.55]), D = [0, SP, CP], { segs, top } = deadTreeLimbs(h, seed)
   const dir = (n) => {
     const sx = n[0], sy = n[1] * CP - n[2] * SP, l = Math.hypot(sx, sy)

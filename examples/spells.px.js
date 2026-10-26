@@ -35,12 +35,5 @@ for (const el of ELEMENTS)
 
 const GAP = 4, TOP = 12, LEFT = 4
 scene("spells", { w: LEFT + 3 * (CW + GAP), h: TOP + ELEMENTS.length * (CH + GAP), bg: "k", ...CLOCK, check: { every: 8 } },
-  (c) => {
-    ["tier 1", "tier 2", "tier 3"].forEach((n, i) => c.text(LEFT + i * (CW + GAP) + 2, 3, n, "x"))
-    ELEMENTS.forEach((el, r) => [1, 2, 3].forEach((tier, i) => {
-      const x = LEFT + i * (CW + GAP), y = TOP + r * (CH + GAP)
-      c.stamp(`${el}_${tier}`, x, y)
-      c.text(x + 3, y + 3, el, "w")
-    }))
-  },
+  cells(ELEMENTS.map((el) => [1, 2, 3].map((tier) => [`${el}_${tier}`, el])), { at: [LEFT, TOP], gap: GAP, head: { names: ["tier 1", "tier 2", "tier 3"], y: 3, key: "x" } }),
   post({ bloom: { levels: 4, strength: 0.6, above: 0.85 } }))

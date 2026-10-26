@@ -6,10 +6,10 @@ import { glyph, lineWidth } from "./font.ts";
 import type { BubbleOpts, BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, ScatterOpts, TextOpts, TileLayer, Timeline, TilemapOpts, WireOpts } from "./model.ts";
 import { bump, dirOf, setNormal } from "./normals.ts";
 import { LOOKS, dissolveChar, dissolveEdge, lightestOf, runEffect } from "./effects.ts";
-import { type SmokeOpts, drawSmoke } from "./smoke.ts";
+import { type SmokeOpts, drawSmoke, inMeters } from "./smoke.ts";
 import { type Particle, type TrailOpts, drawParticles, drawTrail } from "./vfx.ts";
 import type { Spell } from "./spells.ts";
-import { type View, perspective, scaled } from "./perspective.ts";
+import { type Perspective, type View, perspective, scaled } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
 import { type SurfaceCanvas, type SurfaceOpts, type SurfaceView, type VoxelOpts, drawSurface, drawVoxels, partIndex } from "./surface.ts";
 import { type VolumeOpts, drawVolume } from "./volume.ts";
@@ -788,17 +788,21 @@ export class Canvas {
    * px in radius ([2, 8]) and thins out in dither. `keys`: lit, middle, shaded; `young`: lit and shaded
    * while it is fresh (dark smoke at a stack). Lit from `light` (default the upper left).
    */
-  plume(x: number, y: number, keys: string, opts: { every?: number; life?: number; rise?: number; wind?: number | [number, number]; inertia?: number; size?: [number, number]; young?: string; seed?: number; frame?: number; light?: [number, number] } = {}): void {
-    const every = Math.max(1, opts.every ?? 2), life = opts.life ?? 36, rise = opts.rise ?? 24, tau = opts.inertia ?? 0, [s0, s1] = opts.size ?? [2, 8];
-    const [wx, wy] = typeof opts.wind === "number" ? [opts.wind, 0] : opts.wind ?? [0, 0], f = opts.frame ?? this.frame, frames = this.frames;
+  plume(x: number, y: number, keys: string, opts: { every?: number; life?: number; rise?: number; wind?: number | [number, number]; inertia?: number; size?: [number, number]; young?: string; seed?: number; frame?: number; light?: [number, number]; view?: unknown; at?: number[] } = {}): void {
+    // through a camera: rise, wind and size in meters where it stands (`at`), each puff on the upright plane there, as near as it is
+    const M = opts.view !== undefined ? inMeters(this.camera(opts.view, "plume")!, opts.at as number[], "plume") : undefined, m = M ? M.k : 1;
+    const every = Math.max(1, opts.every ?? 2), life = opts.life ?? 36, rise = opts.rise !== undefined ? opts.rise * m : 24, tau = opts.inertia ?? 0, [s0, s1] = opts.size ? opts.size.map((v) => v * m) : [2, 8];
+    const [wx, wy] = (typeof opts.wind === "number" ? [opts.wind, 0] : opts.wind ?? [0, 0]).map((v) => v * m), f = opts.frame ?? this.frame, frames = this.frames;
     const [lit, mid, shade] = [...keys], young = opts.young ? [...opts.young] : null, [lx, ly] = opts.light ?? [-0.6, -0.8], ll = Math.hypot(lx, ly) || 1;
     const carried = (age: number) => (tau > 0 ? age - tau * (1 - Math.exp(-age / tau)) : age);
     for (let age = life - 1; age >= 0; age--) {
       const born = f - age;
       if (((born % every) + every) % every) continue;
       const id = ((born % frames) + frames) % frames, r = rng((opts.seed ?? 1) * 7919 + id);
-      const cx = x + wx * carried(age) + (r() - 0.5) * 5, cy = y + wy * carried(age) - rise * (1 - Math.exp(-age / (life * 0.37))) - r() * 4 + 2;
-      const rad = s0 + ((s1 - s0) * age) / life + r() * 2, fade = 1 - age / life;
+      let cx = x + wx * carried(age) + (r() - 0.5) * 5, cy = y + wy * carried(age) - rise * (1 - Math.exp(-age / (life * 0.37))) - r() * 4 + 2;
+      let rad = s0 + ((s1 - s0) * age) / life + r() * 2;
+      const fade = 1 - age / life;
+      if (M) { const [px, py, s] = M.place(cx - x, cy - y); cx = x + px; cy = y + py; rad *= s; }
       for (let yy = Math.floor(cy - rad); yy <= cy + rad; yy++)
         for (let xx = Math.floor(cx - rad); xx <= cx + rad; xx++) {
           const dx = (xx + 0.5 - cx) / rad, dy = (yy + 0.5 - cy) / rad;
@@ -910,7 +914,15 @@ export class Canvas {
 
   /** Smoke of a shape (a column, a puff, a bank, a ring) at this moment of the loop: see smoke.ts. */
   smoke(x: number, y: number, keys: string | string[], opts: SmokeOpts = {}): void {
-    drawSmoke(this as unknown as Parameters<typeof drawSmoke>[0], x, y, keys, opts);
+    drawSmoke(this as unknown as Parameters<typeof drawSmoke>[0], x, y, keys, opts, this.camera(opts?.view, "smoke"));
+  }
+
+  /** A view given to a 2D op (smoke, plume): the perspective() camera at this canvas's size (k times as big at a scene's size). */
+  private camera(view: unknown, what: string): Perspective | undefined {
+    if (view === undefined) return undefined;
+    if (!view || typeof view !== "object" || !("horizon" in view)) throw new PxError(`${what}: view is a perspective() camera (mesh()'s: { w, horizon, eye, ... }), got ${JSON.stringify(view)}`);
+    const v = scaled(view as View, this.k);
+    return perspective({ ...v, w: v.w ?? this.img.w });
   }
 
   /** Shapes in meters (sticks, blobs, boxes, cones, polygons: see solids.ts) drawn far to near through the camera. */
@@ -1778,6 +1790,29 @@ export class Canvas {
    * `more` in its lower right corner (an anim at frame `t`, the frames since it opened: its blink its
    * own frames). In pixels of max(1, round(k × unit)) px: finer than the art's at a size.
    */
+  /**
+   * A labelled contact sheet: rows of assets side by side, each `gap` px from the next, from `at` (the
+   * first one's size a cell); an entry `[name, label]` writes the label in its top left corner, 3 px in,
+   * in `key`; `head` a title over each column (2 px in, on row `y`, default 8 over the first row), `side`
+   * one left of each row (at `x`, default 2, by its middle).
+   */
+  cells(rows: unknown[][], o: { at?: [number, number]; gap?: number; key?: string; head?: { names: string[]; y?: number; key?: string }; side?: { names: string[]; x?: number; key?: string } } = {}): void {
+    const entry = (e: unknown) => (Array.isArray(e) ? e : [e]) as [string, (string | number)?];
+    if (!Array.isArray(rows) || !rows.length || !rows.every((r) => Array.isArray(r) && r.every((e) => typeof entry(e)[0] === "string")) || (o.head && !Array.isArray(o.head.names)) || (o.side && !Array.isArray(o.side.names)))
+      throw new PxError(`cells([[name or [name, label], ...], ...], { at, gap, key, head: { names, y, key }, side: { names, x, key } }): rows of assets, got ${JSON.stringify(rows)?.slice(0, 120)}`);
+    const [x0, y0] = o.at ?? [0, 0], gap = o.gap ?? 2, { w, h } = this.size(entry(rows[0][0])[0]), key = o.key ?? "w";
+    const X = (i: number) => x0 + i * (w + gap), Y = (j: number) => y0 + j * (h + gap);
+    o.head?.names.forEach((n, i) => this.text(X(i) + 2, o.head!.y ?? y0 - 8, n, o.head!.key ?? key));
+    rows.forEach((row, j) => {
+      if (o.side?.names[j] !== undefined) this.text(o.side.x ?? 2, Y(j) + 2 + h / 2, o.side.names[j], o.side.key ?? key);
+      row.forEach((e, i) => {
+        const [name, label] = entry(e);
+        this.stamp(name, X(i), Y(j));
+        if (label !== undefined) this.text(X(i) + 3, Y(j) + 3, String(label), key);
+      });
+    });
+  }
+
   bubble(x: number, y: number, title: string | number, lines: string | string[], o: BubbleOpts): void {
     if (typeof o?.panel !== "string") throw new PxError("bubble(x, y, title, lines, { panel, tail?, rule?, more?, font?, color?, side?, t?, unit?, pad? }): panel is a sprite with slice margins (a 9-slice)");
     const f = { font: o.font }, g = o.font ? this.res.glyphs(o.font) : glyph, lh = g(" ").length, name = String(title ?? ""), wd = (s: string) => lineWidth(s, {}, g);
@@ -1835,7 +1870,7 @@ export function frameStart(tl: Timeline, n: number): number {
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp", "effect",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "bubble", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "voxels", "volume", "splats", "decal", "draw3d", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "bubble", "cells", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "voxels", "volume", "splats", "decal", "draw3d", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

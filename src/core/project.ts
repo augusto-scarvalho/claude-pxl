@@ -32,7 +32,7 @@ import { type Lut, readCube, readStrip } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
 import { ability, emitter, follow, route, turnToward, tween, unroll } from "./vfx.ts";
 import { SPELL_OPTS, spell } from "./spells.ts";
-import { bayer, fbm, globRe, gridRows, latticeHash, profile, rng, vnoise, seamless } from "./util.ts";
+import { bayer, fbm, globRe, gridRows, latticeHash, profile, rng, vec, vnoise, seamless } from "./util.ts";
 
 /**
  * Op signatures: name:type, "?" marks the first optional argument.
@@ -95,6 +95,7 @@ export const SIGNATURES: Record<string, string> = {
   wire: "x0:n y0:n x1:n y1:n sag:n c:c ?opts:o",
   text: "x:n y:n str:t c:K ?opts:o",
   bubble: "x:n y:n title:t lines:L opts:o",
+  cells: "rows:R ?opts:o",
   clip: "where:r ...items:I",
   lamp: "x:n y:n ?opts:o",
   bump: "?shape:s opts:o",
@@ -129,6 +130,7 @@ export const OP_OPTS: Record<string, string[]> = {
   wire: [...PLACE, "hang", "every", "start"],
   text: ["scale", "gap", "lead", "align", "shadow", "font"],
   bubble: ["panel", "tail", "rule", "more", "font", "color", "side", "t", "unit", "pad"],
+  cells: ["at", "gap", "key", "head", "side"],
   lamp: ["r", "color", "power", "z"],
   curve: ["width", "closed"],
   arc: ["inner", "taper"],
@@ -153,7 +155,7 @@ export const OP_OPTS: Record<string, string[]> = {
   flame: ["wind", "period", "seed", "frame"],
   scroll: ["x", "y", "frame", "axis"],
   clouds: ["y", "gap", "w", "h", "n", "seed", "keys", "x", "empty", "sizes", "frame"],
-  plume: ["every", "life", "rise", "wind", "inertia", "size", "young", "seed", "frame", "light"],
+  plume: ["every", "life", "rise", "wind", "inertia", "size", "young", "seed", "frame", "light", "view", "at"],
   smoke: SMOKE_OPTS,
   particles: ["x", "y", "trail", "size"],
   trail: ["length", "width", "fade", "step", "from", "t", "taper", "side"],
@@ -853,6 +855,8 @@ export class Project implements BuildCtx {
     env.fbm = fbm;
     env.bayer = bayer;
     env.seamless = seamless;
+    // vectors as arrays: vec.add, sub, mul, dot, cross, len, unit
+    env.vec = vec;
     // a ground as a polyline: profile([x0, y0, x1, y1, ...])(x) its row there
     env.profile = (pts: unknown) => { try { return profile(pts as number[]); } catch (e) { throw wrap(e).within("profile", this.callerLoc()); } };
     // shapes in meters for solids() and shadows(): solid.stick, blob, box, cone, poly

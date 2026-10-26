@@ -550,7 +550,9 @@ happens after another, never all at once.
   opacities, never a smooth fade; a column of 16-18 billows growing from 4 to 10 px in radius (12
   smaller ones read as beads on a string, not a column); a puff of 12 bursting 14 px; a bank of 7-8
   churning, thin at the ends; a ring of 14 spreading flat on the ground. On a dark ground give the
-  shaded key a mid grey: a dark one reads as a gap and the puff splits in two bands.
+  shaded key a mid grey: a dark one reads as a gap and the puff splits in two bands. In a diorama or
+  a perspective scene, `smoke()` and `plume()` take its camera: `{ view, at: [x, z, up] }`, the sizes
+  in meters, each billow as far as it is.
 - **Auras** (`effect("aura")`): 3-4 px round a 26 px figure in three keys, the lightest next to it,
   flicker 0.6 on cells of 3.5 px (at 2 px the edge turned to speckle).
 - **What eats a thing** (the dissolve's `look`): a burn browns and blackens a band ahead of its
@@ -743,7 +745,8 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
 - `PXL shot <file> <scene>`: the look, with what changed since the last shot and the warnings on
   it; `--at x,y,w,h` again and again for details side by side, `--frames` for moments of the loop,
   another version as a second name (`old.px.js:scene`) for a before and after, or `--vs HEAD --diff`
-  for the last commit above and the changed pixels in red below.
+  for the last commit above and the changed pixels in red below. Several of the file's own side by
+  side, labelled (variants, tiers, views): a scene of `cells(rows, { head, side })`.
 - `PXL describe <file> <scene>`: every object's visible ranges, gaps, cover, contrast and motion
   (`--brief` for busy scenes); after an edit, `--diff` lists what moved, was redrawn or recolored.
 - `PXL check <file>` before handing over: every frame of the loop; its last line says which rules

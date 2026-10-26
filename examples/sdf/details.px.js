@@ -23,13 +23,8 @@ const panelOf = (name, T, leaves, view) => anim(name, { w: PW, h: PH, ...CLOCK }
 })
 const VIEWS = ["side", "top", "iso", "camera"]
 for (const v of VIEWS) { panelOf(`lobes_${v}`, PLAIN, null, v); panelOf(`leaves_${v}`, LEAFY, LEAVES, v) }
-scene("canopy", { w: 4 * (PW + 2) + 2, h: 2 * (PH + 2) + 10, bg: "k", ...CLOCK, check: { every: 24 } }, (c) => {
-  VIEWS.forEach((v, j) => {
-    c.text(4 + j * (PW + 2), 2, v, "W")
-    c.stamp(`lobes_${v}`, 2 + j * (PW + 2), 10)
-    c.stamp(`leaves_${v}`, 2 + j * (PW + 2), 12 + PH)
-  })
-})
+scene("canopy", { w: 4 * (PW + 2) + 2, h: 2 * (PH + 2) + 10, bg: "k", ...CLOCK, check: { every: 24 } },
+  cells([VIEWS.map((v) => `lobes_${v}`), VIEWS.map((v) => `leaves_${v}`)], { at: [2, 10], key: "W", head: { names: VIEWS } }))
 
 // A rock bare and with moss: patches painted where it faces up, and tufts scattered there (clumps a
 // step up or down the moss's ramp).
@@ -41,6 +36,4 @@ const rockPanel = (name, R, moss, view) => sprite(name, { w: 112, h: 80 }, (c) =
   if (moss) c.splats(moss, { view, ppm: 40, at: [56, 70] })
 })
 for (const v of ["side", "iso", "camera"]) { rockPanel(`bare_${v}`, BARE, null, v); rockPanel(`mossy_${v}`, MOSSY, MOSS, v) }
-scene("rocks", { w: 3 * 114 + 2, h: 2 * 82 + 2, bg: "k" }, (c) => {
-  ["side", "iso", "camera"].forEach((v, j) => { c.stamp(`bare_${v}`, 2 + j * 114, 2); c.stamp(`mossy_${v}`, 2 + j * 114, 84) })
-})
+scene("rocks", { w: 3 * 114 + 2, h: 2 * 82 + 2, bg: "k" }, cells(["bare", "mossy"].map((r) => ["side", "iso", "camera"].map((v) => `${r}_${v}`)), { at: [2, 2] }))

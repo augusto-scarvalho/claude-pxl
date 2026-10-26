@@ -334,3 +334,22 @@ anim("off", { base: "s", frames: 2 }, effect("dissolve", { progress: 0.4, patter
   assert.ok(!p.frames("off")[0].img.data.includes(Y), "none unless asked (the burn look has them)");
   assert.ok(load(`sprite("s", { w: 8, h: 8 }, rect(0, 0, 8, 8, "g"), effect("dissolve", { look: "burn", progress: 0.5 }))`).image("s").emit!.some((v) => v === 255));
 });
+
+test("smoke and plume through a camera: meters where they stand, smaller farther, on the picture where that is", () => {
+  // a level camera 1 m up, the horizon on row 10, 40 px of focal length: 10 px a meter 4 m ahead, 5 at 8 m
+  const V = "{ w: 64, horizon: 10, eye: 1, focal: 40 }";
+  const box = (src: string) => {
+    const img = load(`anim("a", { w: 64, h: 40, frames: 8 }, ${src})`).frames("a")[4].img;
+    let x0 = 99, x1 = -1, y0 = 99, y1 = -1;
+    for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) if (img.get(x, y) & 255) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    return { w: x1 - x0 + 1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  };
+  const near = box(`smoke(0, 0, "wgk", { shape: "puff", view: ${V}, at: [0, 4, 1], spread: 0.4, size: [0.3, 0.6] })`);
+  const far = box(`smoke(0, 0, "wgk", { shape: "puff", view: ${V}, at: [0, 8, 1], spread: 0.4, size: [0.3, 0.6] })`);
+  assert.ok(far.w < near.w * 0.7 && near.w > 6, `a puff 8 m away about half as wide as 4 m away: ${far.w} and ${near.w} px`);
+  assert.ok(Math.abs(near.cx - 32) < 3 && Math.abs(near.cy - 10) < 4, `where [0, 4, 1] lands: ${near.cx}, ${near.cy}`);
+  const p4 = box(`plume(0, 0, "wgk", { view: ${V}, at: [0, 4, 0], rise: 1, size: [0.2, 0.5] })`), p8 = box(`plume(0, 0, "wgk", { view: ${V}, at: [0, 8, 0], rise: 1, size: [0.2, 0.5] })`);
+  assert.ok(p8.w < p4.w * 0.75, `a plume farther, narrower: ${p8.w} and ${p4.w} px`);
+  assert.match(failure(PALS + `anim("a", { w: 9, h: 9, frames: 2 }, smoke(0, 0, "wgk", { view: ${V} }))`, "a").message, /at is where it stands/);
+  assert.match(failure(PALS + 'anim("a", { w: 9, h: 9, frames: 2 }, plume(0, 0, "wgk", { view: "side", at: [0, 4, 0] }))', "a").message, /view is a perspective\(\) camera/);
+});

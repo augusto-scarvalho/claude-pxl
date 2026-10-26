@@ -61,6 +61,8 @@ declare global {
   }
   interface PxWire extends PxPlace { hang?: string; every?: number; start?: number }
   interface PxText { scale?: number; gap?: number; lead?: number; align?: "l" | "c" | "r"; shadow?: PxColor; font?: string }
+  /** cells(): from `at`, `gap` px apart, labels in `key` (3 px in); `head` titles 2 px in on row `y` (default 8 over), `side` ones at `x` (2) by each row's middle. */
+  interface PxCells { at?: [number, number]; gap?: number; key?: string; head?: { names: string[]; y?: number; key?: string }; side?: { names: string[]; x?: number; key?: string } }
   /** bubble(): the box a 9-slice `panel`, its `tail` down to the point (its top rows over the panel's bottom border), a `rule` under the title, the prompt `more` (an anim at frame `t`); `side` 1 right of the point, -1 left; its pixel `unit` of the art's (0.75); `pad` px in to the words (7). */
   interface PxBubble { panel: string; tail?: string; rule?: string; more?: string; font?: string; color?: PxColor | [PxColor, PxColor]; side?: number; t?: number; unit?: number; pad?: number }
   interface PxAssetOpts {
@@ -188,6 +190,8 @@ declare global {
   interface PxPlume {
     every?: number; life?: number; rise?: number; wind?: number | [number, number]; inertia?: number;
     size?: [number, number]; young?: string; seed?: number; frame?: number; light?: [number, number];
+    /** through a perspective() camera: where it stands, [x, z, up] m; rise, wind and size then meters there */
+    view?: PxView | PxPerspective; at?: [number, number, number];
   }
   interface PxSolidOpts {
     /** where the eye stands in the world [x, z] (default 0, 0) */
@@ -531,6 +535,8 @@ declare global {
     shape?: "column" | "puff" | "bank" | "ring"; count?: number; size?: [number, number]; vary?: number; rise?: number; path?: number[];
     wind?: number | [number, number]; spread?: number; length?: number; flat?: number; turbulence?: number; rough?: number; thin?: number;
     life?: number; alpha?: [number, number, number]; light?: [number, number]; pixel?: number; seed?: number; frame?: number;
+    /** through a perspective() camera: where it stands, [x, z, up] m; the lengths given then meters there, each billow as far as it is */
+    view?: PxView | PxPerspective; at?: [number, number, number];
   }
   /** pixelate: cells of `size` px, each the color most of its pixels have. */
   interface PxPixelate extends PxEffectBase { size?: number }
@@ -671,6 +677,8 @@ declare global {
     wire(x0: number, y0: number, x1: number, y1: number, sag: number, c: PxColor, opts?: PxWire): void;
     text(x: number, y: number, str: string | number, c: PxColor | ((i: number, ch: string) => PxColor | null | undefined), opts?: PxText): void;
     bubble(x: number, y: number, title: string | number, lines: string | string[], opts: PxBubble): void;
+    /** A labelled contact sheet: rows of assets (or [name, label]) gap px apart from at; head titles over the columns, side ones left of the rows. */
+    cells(rows: (string | [string, string | number])[][], opts?: PxCells): void;
     lamp(x: number, y: number, opts?: PxLamp): void;
     bump(shape?: PxBumpShape, opts?: PxBump): void;
     normals(x: number, y: number, str: string): void;
@@ -739,6 +747,11 @@ declare global {
   function fbm(x: number, y: number, octaves?: number): number;
   /** Ordered-dither threshold in (0, 1) for pixel (x, y) (a 4x4 Bayer matrix). */
   function bayer(x: number, y: number): number;
+  /** Vectors as arrays (any length; dot and cross in 3D): add, sub, mul by a number, dot, cross, len, unit (length 1; [0, 0, 0] as it is). */
+  const vec: {
+    add(a: number[], b: number[]): number[]; sub(a: number[], b: number[]): number[]; mul(a: number[], k: number): number[];
+    dot(a: number[], b: number[]): number; cross(a: number[], b: number[]): number[]; len(a: number[]): number; unit(a: number[]): number[];
+  };
   /**
    * Hair, tails, scarves: a chain fixed at anchors[f] in frame f that follows with lag (inertia,
    * weight, a rest shape), simulated until the loop repeats. Returns per frame [anchor, p1, ...pN].
@@ -943,6 +956,8 @@ declare global {
   function text(x: number, y: number, str: string | number, c: PxColor | ((i: number, ch: string) => PxColor | null | undefined), opts?: PxText): PxOp;
   /** A dialogue box over a speaker: title over lines in a 9-slice sized to them, its tail down to (x, y) (art px), the prompt in its corner. */
   function bubble(x: number, y: number, title: string | number, lines: string | string[], opts: PxBubble): PxOp;
+  /** A labelled contact sheet: rows of assets (or [name, label]) gap px apart from at; head titles over the columns, side ones left of the rows. */
+  function cells(rows: (string | [string, string | number])[][], opts?: PxCells): PxOp;
   function lamp(x: number, y: number, opts?: PxLamp): PxOp;
   function bump(shape?: PxBumpShape, opts?: PxBump): PxOp;
   function normals(x: number, y: number, str: string): PxOp;

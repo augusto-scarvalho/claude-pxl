@@ -30,13 +30,8 @@ const panelOf = (rep, view) => sprite(`p_${rep}_${view}`, { w: PW, h: PH }, (c) 
 const REPS = ["surface", "voxels", "mesh", "splats"], VIEWS = ["side", "top", "iso", "camera"]
 for (const r of REPS) for (const v of VIEWS) panelOf(r, v)
 // the sheet: a row a representation, a column a view
-scene("tree_four_ways", { w: 34 + VIEWS.length * (PW + 2), h: 10 + REPS.length * (PH + 2), bg: "k" }, (c) => {
-  VIEWS.forEach((v, j) => c.text(36 + j * (PW + 2), 2, v, "W"))
-  REPS.forEach((r, i) => {
-    c.text(2, 12 + i * (PH + 2) + PH / 2, r.slice(0, 6), "W")
-    VIEWS.forEach((v, j) => c.stamp(`p_${r}_${v}`, 34 + j * (PW + 2), 10 + i * (PH + 2)))
-  })
-})
+scene("tree_four_ways", { w: 34 + VIEWS.length * (PW + 2), h: 10 + REPS.length * (PH + 2), bg: "k" },
+  cells(REPS.map((r) => VIEWS.map((v) => `p_${r}_${v}`)), { at: [34, 10], key: "W", head: { names: VIEWS }, side: { names: REPS.map((r) => r.slice(0, 6)) } }))
 
 // A cloud's inside as round splats, beside the same cloud ray-marched by volume(): blobs 0.12 m apart,
 // as opaque as it is dense, lit as the light gets in; drifting and boiling on the clock (made again each

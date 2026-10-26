@@ -60,13 +60,8 @@ const cell = (name, el, variant, where = "side", form) => {
 const spellSheet = (name, rows, title = (r, i) => r[i][1]) => {
   const cols = Math.max(...rows.map((r) => r.length)), GAP = 4
   for (const row of rows) for (const [n, el, v, w, f] of row) cell(n, el, v, w, f)
-  scene(name, { w: 4 + cols * (CW + GAP), h: 4 + rows.length * (CH + GAP), bg: "k", ...CLOCK, check: { every: 10 } }, (c) => {
-    rows.forEach((row, r) => row.forEach(([n, el, v, w], i) => {
-      const x = 4 + i * (CW + GAP), y = 4 + r * (CH + GAP)
-      c.stamp(n, x, y)
-      c.text(x + 3, y + 3, `${el} ${v}${w && w !== "side" ? " / " + w : ""}`, "w")
-    }))
-  }, post({ bloom: { levels: 4, strength: 0.6, above: 0.85 } }))
+  scene(name, { w: 4 + cols * (CW + GAP), h: 4 + rows.length * (CH + GAP), bg: "k", ...CLOCK, check: { every: 10 } },
+    cells(rows.map((row) => row.map(([n, el, v, w]) => [n, `${el} ${v}${w && w !== "side" ? " / " + w : ""}`])), { at: [4, 4], gap: GAP }), post({ bloom: { levels: 4, strength: 0.6, above: 0.85 } }))
 }
 
 spellSheet("ice_earth", [
