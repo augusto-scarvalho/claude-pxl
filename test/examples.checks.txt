@@ -46,7 +46,7 @@ hd2d/plaza.px.js: 0 warnings (1 scene (16 frames, 21 distinct placements), 0 rig
   ran: lit side on 21 (a clear reading on 0), standing on 21; not run: front marker (nothing has one), feet (nothing placed has a height)
   plaza_hd › not checked (check: false)
 hd2d/traveler.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: lines on 16, views' rows on 2, figures' feet on 456 poses; not run: front marker (nothing has one)
+  ran: lines on 18, views' rows on 2, figures' feet on 456 poses; not run: front marker (nothing has one)
 isometric.px.js: 0 warnings (1 scene (1 frame, 11 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 2; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh()), feet (nothing placed has a height)
 lighting.px.js: 0 warnings (1 scene (1 frame, 7 distinct placements), 0 rigs, 0 other assets with a front marker)

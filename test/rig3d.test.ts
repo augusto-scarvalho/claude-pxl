@@ -153,7 +153,7 @@ sprite("x", { w: 16, h: 14 }, (c) => c.surface(F, { ppm: 1, at: [8, 12], view: {
   assert.ok(sdf.sphere(1).paint(() => "x").dist([2, 0, 0]) === 1);
 });
 
-test("clean: surface cuts a pixel sticking out and draws an inner line along the contour in its own darkest; a decal none edge on; rig3d's chin under a modeled head's skin", () => {
+test("clean: surface cuts a pixel sticking out and an inner line's sliver along the outline (one line, not two); a decal none edge on; rig3d's chin under a modeled head's skin", () => {
   const p = loadSource(`${PAL}
 ramps("kgw", "krw")
 // a ball with a bump smaller than a pixel; a ball in front of another, across its edge
@@ -167,14 +167,15 @@ for (const clean of [false, true]) {
   sprite(\`dec_\${clean}\`, { w: 12, h: 12 }, (c) => c.surface(sdf.sphere(3.6), { ...o, at: [6, 6], mats: { m: "w" } }),
     (c) => c.decal("_d", { on: sdf.sphere(3.6), point: [2.5, -2, -2], view: { kind: "side", pitch: 0 }, ppm: 1, at: [6, 6], lit: false, clean }))
 }
-for (const chin of [undefined, "r"]) rig3d(\`f\${chin ?? ""}\`, { w: 26, h: 40, pivot: [13, 38], headings: ["s"], ink: "k", chin, moves: { idle: { frames: 1, pose: () => ({}) } },
+for (const chin of [undefined, ["r", "w"]]) rig3d(\`f\${chin?.[0] ?? ""}\`, { w: 26, h: 40, pivot: [13, 38], headings: ["s"], ink: "k", chin, moves: { idle: { frames: 1, pose: () => ({}) } },
   parts: (j) => ({ body: j.limb(j.pelvis, j.chest, 3, 3, "g"), head: j.ball(j.head, 4, "w") }) })`, "t.px.js");
   const rows = (n: string) => keys(p, n).split("\n"), on = (r: string[], x: number, y: number) => (r[y]?.[x] ?? ".") !== ".";
   const spurs = (r: string[]) => r.flatMap((row, y) => [...row].map((_, x) => on(r, x, y) && +on(r, x - 1, y) + +on(r, x + 1, y) + +on(r, x, y - 1) + +on(r, x, y + 1) <= 1)).filter(Boolean).length;
   assert.ok(spurs(rows("bump_false")) >= 1 && spurs(rows("bump_true")) === 0, keys(p, "bump_false") + "\n\n" + keys(p, "bump_true"));
-  // the back ball's line beside the clear: its own darkest (r, which its light never reaches), fewer ink
+  // the back ball's line where it runs between the clear and the ball in front (a sliver): cut, the
+  // outline round it the one line there; never a dark tone in place of a line (r, which its light never reaches)
   const count = (n: string, k: string) => keys(p, n).split(k).length - 1;
-  assert.ok(count("two_false", "r") === 0 && count("two_true", "r") > 0 && count("two_true", "k") < count("two_false", "k"), keys(p, "two_false") + "\n\n" + keys(p, "two_true"));
+  assert.ok(count("two_false", "k") - count("two_true", "k") === 2 && count("two_true", ".") - count("two_false", ".") === 2 && count("two_true", "r") === 0, keys(p, "two_false") + "\n\n" + keys(p, "two_true"));
   // the decal's texel on the silhouette's last pixel (its normal 0.15 toward the eye): gone
   assert.ok(count("dec_false", "g") === 3 && count("dec_true", "g") === 2, keys(p, "dec_false") + "\n\n" + keys(p, "dec_true"));
   // under the head, where it meets the body: the ink, or the chin's line

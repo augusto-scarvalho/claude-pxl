@@ -254,7 +254,7 @@ declare global {
     hide?: boolean;
     /** the name of the part it is (pxl steps --at) */
     part?: string;
-    /** a pixel artist's pass before its lines: a pixel sticking out alone cut away, an inner line where it meets the outline or runs along another line its own darkest tone */
+    /** a pixel artist's pass before its lines: no black run 2 px thick, the outline whole, a pixel sticking out cut away */
     clean?: boolean;
   }
   /** A density's options: its soft edge (m), the noise eating it (m, billows scale m across, octaves), carried flow m over the loop, thinned away up from fade [z0, z1]. */
@@ -666,7 +666,7 @@ declare global {
    */
   function rig3d(name: string, opts: { body?: PxBody; moves: Record<string, { frames: number; ms?: number; pose: (i: number, heading: number) => PxPose; dirs?: string[]; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }>;
     n?: number; headings?: (string | number)[]; pitch?: number; w?: number; h?: number; pivot?: [number, number]; parts?: (j: PxJoints, pose: PxPose) => Record<string, PxPiece | PxSdf | { decal: object } | { scatter: object } | (PxPiece | PxSdf | { decal: object } | { scatter: object })[]>;
-    mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; inner?: boolean | PxColor; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; head?: string; chin?: PxColor; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }): PxRig3d;
+    mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; inner?: boolean | PxColor; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; head?: string; /** the line under the head; a head modeled: [key, the skin's ramp], under the jaw only */ chin?: PxColor | [PxColor, string]; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }): PxRig3d;
   /**
    * Hand-drawn views of a thing (a head), named by the compass ({ s, sw, w, nw, n }: grids, rows, or items):
    * a sprite each, pivoted on its `anchor` pixel ([col, row], per view or one for all; "center", "bottom"),

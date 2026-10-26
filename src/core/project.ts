@@ -617,6 +617,8 @@ export class Project implements BuildCtx {
         checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "ink", "surface", "head", "chin", "blocks", "mirror", "draw"]);
         const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; ink?: unknown; surface?: Record<string, unknown>; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown };
         if (o.surface !== undefined) { if (!isPlainObject(o.surface)) throw new PxError("rig3d: surface is surface()'s options for the painted figure ({ soft, shadows, ao, rim, ... })"); checkKeys("rig3d surface", o.surface, SURFACE_OPTS.filter((k) => !["view", "ppm", "at", "part"].includes(k))); }
+        if (o.chin !== undefined && typeof o.chin !== "string" && !(Array.isArray(o.chin) && o.chin.length === 2 && o.chin.every((k) => typeof k === "string" && k) && !o.head))
+          throw new PxError(`rig3d: chin is a key (the line under the head), or with a head modeled [key, the skin's ramp] (the line under the jaw only), got ${JSON.stringify(o.chin)}`);
         if (o.ink !== undefined && typeof o.ink !== "string") throw new PxError(`rig3d: ink is a key: the line round the figure outside and round each part on the one behind (instead of surface()'s outline on the shadow side), got ${JSON.stringify(o.ink)}`);
         const B: Body = bodyOf(o.body ?? {}), H = headingsOf(o.n ?? 8, o.headings, false), pitch = o.pitch ?? 20;
         if (!(pitch >= 0 && pitch <= 90)) throw new PxError(`rig3d: pitch is degrees down, 0 to 90 (20: a field sprite's), got ${JSON.stringify(pitch)}`);
@@ -684,15 +686,17 @@ export class Project implements BuildCtx {
             const mats = { ...(look?.mats ?? {}), ...Object.fromEntries(P.ramps.map((r) => [r, r])), ...o.mats } as never;
             c.surface(P.field, { view, ppm: 1, at, mats, light, ...(line as object), shadows: false, ao: 0, ...o.surface });
             // a head modeled (a part named head, no views): the line of `chin` under its jaw where it meets the
-            // body (under the head's pixels of chin's ramp, the skin's, but its darkest; not under the hair)
+            // body, under the head's pixels of the skin (chin: [key, the skin's ramp]; a key alone: its own
+            // ramp but its darkest), not under the hair
             const parts = c.img.parts;
-            if (!o.head && typeof o.chin === "string" && parts) {
+            if (!o.head && o.chin !== undefined && parts) {
+              const [key, skin] = Array.isArray(o.chin) ? o.chin : [o.chin, [...(c.pal.ramps.find((r) => r.includes(o.chin as string)) ?? `.${o.chin}`)].slice(1).join("")];
               const { w: W, h: Hh, data } = c.img, part = (x: number, y: number) => parts.names[parts.ids[y * W + x]] ?? "", head = (x: number, y: number) => /^head(\.|$)/.test(part(x, y));
-              const skin = new Set([...(c.pal.ramps.find((r) => r.includes(o.chin as string)) ?? `.${o.chin}`)].slice(1).map((k) => c.color(k)));
+              const under = new Set([...(skin as string)].map((k) => c.color(k)));
               for (let x = 0; x < W; x++) {
                 let y = Hh - 2;
                 while (y >= 0 && !head(x, y)) y--;
-                if (y >= 0 && skin.has(data[y * W + x]) && part(x, y + 1) && !head(x, y + 1)) c.px(x - c.ox, y + 1 - c.oy, o.chin);
+                if (y >= 0 && under.has(data[y * W + x]) && part(x, y + 1) && !head(x, y + 1)) c.px(x - c.ox, y + 1 - c.oy, key);
               }
             }
             // brushes on it (tufts, strands: no line of their own, the line round it all takes them in), decals

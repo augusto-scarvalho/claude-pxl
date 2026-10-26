@@ -377,17 +377,23 @@ rig3d("tr3o", { body: BODY3, w: W, h: H, pivot: [OX, OY], parts: parts3, surface
 // mass at the nape, a parting, locks of fringe, side locks to the jaw, tufts at the crown, tousled by
 // noise; a neck. The eyes, the nose (the skin's lightest pixel, as on the hand heads: a sphere smaller
 // than a pixel poked out of the face as a wart) and the mouth in the chin row drawn by hand as decals
-// pinned on it, their view picked by how far each turns from us. Turned to 16 directions without
-// drawing a view (tr3m_turn_<dir>).
-sprite("_tr3m_eye", "kk\nGE")
-sprite("_tr3m_eye_l", "kk\nEG")
-// (in profile a pixel behind the face's edge, as the hand-drawn profile's eye: its pivot a pixel ahead)
-sprite("_tr3m_eye_side", { pivot: [1.5, 1] }, "k\nE")
+// pinned on it. Turned to 16 directions without drawing a view (tr3m_turn_<dir>).
+// The eyes as the hand heads' rows, a grid a view picked by how far the face turns from us: facing us
+// the irises toward the nose; three quarters the near eye's white and iris looking the way it turns,
+// the far eye a pixel inside the face's edge; in profile the white and the iris a pixel behind the
+// edge, the lid where the fringe allows (each drawn looking right and its mirror; the pivot on the
+// pixel between the eyes, in profile on the near eye's point)
+sprite("_tr3m_eyes_s", { pivot: [2.5, 1] }, "kk.kk\nGE.EG")
+sprite("_tr3m_eyes_se", { pivot: [4.5, 0.5] }, "kk.k\nGE.E")
+sprite("_tr3m_eyes_sw", { pivot: [-0.5, 0.5] }, "k.kk\nE.EG")
+sprite("_tr3m_eyes_e", { pivot: [3.5, 0] }, "kk\nGE")
+sprite("_tr3m_eyes_w", { pivot: [-1.5, 0] }, "kk\nEG")
 sprite("_tr3m_mouth", "z")
 sprite("_tr3m_nose", "L")
 const head3 = (j) => {
   const into = (f) => f.rotate(-j.hd.heading, "z").at(j.head), at = (x, y, z) => [0, 1, 2].map((e) => j.head[e] + j.hd.r[e] * x + j.hd.f[e] * y + (e === 2 ? z : 0))
-  const skull = sdf.ellipsoid([4.6, 5, 5.3])
+  const skull = sdf.ellipsoid([4.6, 5, 5.3]), turn = ((((180 - j.hd.heading) % 360) + 540) % 360) - 180
+  const eyes = Math.abs(turn) < 20 ? "s" : Math.abs(turn) < 60 ? (turn > 0 ? "se" : "sw") : turn > 0 ? "e" : "w"
   // the cap close on the skull, off the face from the brow down, a mass at the nape, a parting groove;
   // three locks of fringe ending on the brow, side locks behind the cheeks to the jaw, tufts at the crown
   const cap = sdf.ellipsoid([5.3, 5.6, 4.8]).at(0, -0.5, 1.2).union(sdf.ellipsoid([4, 2.6, 3]).at(0, -3.4, -1.6), { smooth: 1 })
@@ -398,9 +404,9 @@ const head3 = (j) => {
   return {
     neck: j.limb(j.chest, [j.head[0], j.head[1], j.head[2] - 3], 1.6, 1.5, "zs"),
     head: [into(skull.mat("zsSL")), into(cap.union(locks, { smooth: 0.6 }).noise({ amp: 0.5, scale: 1.1, seed: 3 }).mat("JjhH"))],
-    // (his right eye, on our left facing us, its iris toward the nose)
-    face: [j.decal("_tr3m_eye", at(1.8, 4.6, -0.6), { views: { three: "_tr3m_eye", profile: "_tr3m_eye_side" }, depth: 1.6 }),
-      j.decal("_tr3m_eye_l", at(-1.8, 4.6, -0.6), { views: { three: "_tr3m_eye", profile: "_tr3m_eye_side" }, depth: 1.6 }), j.decal("_tr3m_nose", at(0, 5, -1.7)), j.decal("_tr3m_mouth", at(0, 4.4, -3.9))],
+    // (the face's turn from us, degrees, to our right +; past 105 the eyes are behind it)
+    face: [...(Math.abs(turn) < 105 ? [j.decal(`_tr3m_eyes_${eyes}`, Math.abs(turn) < 60 ? at(0, 5, -0.6) : at(Math.sign(turn) * 1.8, 4.6, -0.6), { depth: 3 })] : []),
+      j.decal("_tr3m_nose", at(0, 5, -1.7)), j.decal("_tr3m_mouth", at(0, 4.4, -3.9))],
   }
 }
 sprite("_tr3m_clasp", "g")
@@ -433,8 +439,8 @@ const parts3m = (j, p) => {
 }
 const ALL8 = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 // cleaned as a pixel artist would at this size (surface's clean: no pixel sticking out, no black run
-// 2 px thick, no eye's pixel on the silhouette), the jaw's line a dark skin tone, not the ink
-rig3d("tr3m", { body: BODY3, w: W, h: H, pivot: [OX, OY], n: 16, parts: parts3m, ink: "k", chin: "z", surface: { ...LIT3, clean: true },
+// 2 px thick, the outline whole), under the jaw (not the hair) the hand heads' chin line
+rig3d("tr3m", { body: BODY3, w: W, h: H, pivot: [OX, OY], n: 16, parts: parts3m, ink: "k", chin: ["D", "zsSL"], surface: { ...LIT3, clean: true },
   moves: { ...Object.fromEntries(Object.entries(MOVES3).map(([m, M]) => [m, { dirs: ALL8, ...M }])), turn: { frames: 1, ms: 250, pose: MOVES3.idle.pose } } })
 Object.assign(travelerRig, { figure, blocks, bones, scr, depth, local, sample, TRAVELER, MOVES, DIRS, W, H, OX, OY, casting, CH, TH })
 }
