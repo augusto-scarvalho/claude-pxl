@@ -5,7 +5,7 @@ import { PxError, didYouMean, wrap } from "../core/errors.ts";
 import type { Img } from "../core/image.ts";
 import type { Project } from "../core/project.ts";
 import { type FrameTag, onionSheet, packSheet, playAll, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
-import { normalImage } from "../core/normals.ts";
+import { emitImage, glows, normalImage } from "../core/normals.ts";
 import { tiledMap } from "../core/tiled.ts";
 import { encodeAseprite } from "./aseprite.ts";
 import { encodeGif } from "./gif.ts";
@@ -81,6 +81,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         writePng(join(out, dir, n + ".png"), sheet);
         write(join(out, dir, n + ".json"), sheetJson(n + ".png", sheet, fr, [{ name: n, from: 0, to: fr.length - 1, direction: p.direction(n) }]));
         if (drawn.some((f) => f.img.norm)) writePng(join(out, dir, n + "_n.png"), packSheet(drawn.map((f) => ({ name: "", img: normalImage(f.img) })), drawn.length).sheet); // laid out as the art
+        if (drawn.some((f) => glows(f.img))) writePng(join(out, dir, n + "_e.png"), packSheet(drawn.map((f) => ({ name: "", img: emitImage(f.img) })), drawn.length).sheet);
         // previews show reference layers (guides) over each frame, like still assets do
         shown = packSheet(frames.map((f) => ({ name: "", img: f.guide ?? f.img })), frames.length, 1).sheet;
       } else {
@@ -90,6 +91,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         shown = wr ? tiled(art, wr === "y" ? 1 : 3, wr === "x" ? 1 : 3) : art;
         writePng(join(out, dir, n + ".png"), b.img);
         if (b.img.norm) writePng(join(out, dir, n + "_n.png"), normalImage(b.img)); // for engine lights
+        if (glows(b.img)) writePng(join(out, dir, n + "_e.png"), emitImage(b.img));
       }
       if (frames.length) {
         write(join(out, dir, n + ".gif"), encodeGif(frames));
@@ -159,6 +161,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       write(join(out, s.name + ".json"), sheetJson(s.name + ".png", sheet, frames, tags));
       // the normal maps in the same rectangles, for engine lights (the art's json serves both)
       if (items.some((it) => it.img.norm)) writePng(join(out, s.name + "_n.png"), packSheet(items.map((it) => ({ ...it, img: normalImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet);
+      if (items.some((it) => glows(it.img))) writePng(join(out, s.name + "_e.png"), packSheet(items.map((it) => ({ ...it, img: emitImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet);
       lines.push(`sheet ${s.name} ${sheet.w}x${sheet.h} (${frames.length} frames)${prev(s.name, sheet)}`);
       // a sheet of animations also plays them all at once in its preview, each in a cell of its own at
       // its own timing (a character's moves side by side, to judge them together)

@@ -4,10 +4,13 @@ interface ErrInfo { message: string; loc?: string }
 interface AssetInfo { name: string; kind: string; part: boolean; w?: number; h?: number; hash?: string; steps?: number; changed: boolean; edited: boolean; error?: ErrInfo }
 interface State { version: number; file: string; time: string; ms: number; error?: ErrInfo; assets: AssetInfo[]; sheets: string[]; models: string[]; errors: ErrInfo[] }
 interface FrameJ { label: string; loc?: string; w: number; h: number; full?: string; changes?: string }
-interface AssetJ { name: string; kind: string; w: number; h: number; loc?: string; palette: Record<string, string>; layers: string[]; image: string; frames: FrameJ[]; anim?: { ms: number; image: string }[] }
+/** image and anim.images are PNGs in base64; a long loop's frames come from /api/frame as the page plays them. */
+interface AssetJ { name: string; kind: string; w: number; h: number; loc?: string; palette: Record<string, string>; layers: string[]; image: string; frames: FrameJ[]; anim?: { ms: number[]; images?: string[] } }
 interface Frame { label: string; loc?: string; w: number; h: number; full?: Uint32Array; changes?: Uint32Array }
 interface Pic { w: number; h: number; data: Uint32Array }
-interface Loaded { j: AssetJ; hash?: string; frames: Frame[]; final: Pic; marks: Map<number, Pic>; rev: Map<number, string>; anim: { ms: number; pic: Pic }[] }
+/** A frame of the loop: its pixels once fetched (dropped again when far from the one shown), `bad` when the server couldn't build it. */
+interface AnimFrame { ms: number; pic?: Pic; bad?: boolean }
+interface Loaded { j: AssetJ; hash?: string; version?: number; frames: Frame[]; final: Pic; marks: Map<number, Pic>; memo?: { n: number; pic: Pic }; rev: Map<number, string>; anim: AnimFrame[] }
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const view = $<HTMLCanvasElement>("view");
@@ -23,6 +26,11 @@ let zoom = 0; // 0 = fit
 let pan = { x: 0, y: 0 };
 let hover: { x: number; y: number } | undefined;
 const thumbs = new Map<string, string>(); // name -> hash rendered
+let checker: CanvasPattern | undefined;
+/** The anim frame last drawn, kept on screen while the next one is fetched. */
+let held: Pic | undefined;
+/** The asset whose frame is being fetched (one at a time: the server builds each when asked). */
+let loading: Loaded | undefined;
 
 // ---------------------------------------------------------------- decoding
 
@@ -43,6 +51,32 @@ function toImageData(p: Pic): ImageData {
   return id;
 }
 
+/** Each picture once on a canvas of its own, to draw (an HD frame is 2 million pixels to convert). */
+const canvases = new WeakMap<Pic, OffscreenCanvas>();
+function canvasOf(p: Pic): OffscreenCanvas {
+  let off = canvases.get(p);
+  if (!off) {
+    off = new OffscreenCanvas(p.w, p.h);
+    off.getContext("2d")!.putImageData(toImageData(p), 0, 0);
+    canvases.set(p, off);
+  }
+  return off;
+}
+
+/** A PNG decoded by the browser into pixels (a part-clear pixel's color may come back a level off: the canvas keeps it premultiplied). */
+async function fromPng(src: Blob): Promise<Pic> {
+  const bmp = await createImageBitmap(src, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+  const off = new OffscreenCanvas(bmp.width, bmp.height), c = off.getContext("2d")!;
+  c.drawImage(bmp, 0, 0);
+  bmp.close();
+  const d = c.getImageData(0, 0, off.width, off.height).data, data = new Uint32Array(off.width * off.height);
+  for (let i = 0; i < data.length; i++) data[i] = ((d[i * 4] << 24) | (d[i * 4 + 1] << 16) | (d[i * 4 + 2] << 8) | d[i * 4 + 3]) >>> 0;
+  const pic = { w: off.width, h: off.height, data };
+  canvases.set(pic, off);
+  return pic;
+}
+const png64 = (s: string) => fromPng(new Blob([Uint8Array.from(atob(s), (ch) => ch.charCodeAt(0))], { type: "image/png" }));
+
 function hex(c: number): string {
   return "#" + (c >>> 8).toString(16).padStart(6, "0") + ((c & 255) === 255 ? "" : (c & 255).toString(16).padStart(2, "0"));
 }
@@ -51,6 +85,7 @@ function hex(c: number): string {
 function picAt(a: Loaded, n: number): Pic {
   if (!a.frames.length) return a.final;
   n = Math.max(0, Math.min(n, a.frames.length - 1));
+  if (a.memo?.n === n) return a.memo.pic; // (every redraw asks again: a hover, a zoom)
   let k = n;
   while (k > 0 && !a.marks.has(k)) k--;
   let pic = a.marks.get(k);
@@ -65,6 +100,7 @@ function picAt(a: Loaded, n: number): Pic {
     else if (f.changes) for (let j = 0; j < f.changes.length; j += 2) pic.data[f.changes[j]] = f.changes[j + 1];
     if (i % 32 === 0 && !a.marks.has(i)) a.marks.set(i, { ...pic, data: pic.data.slice() });
   }
+  a.memo = { n, pic };
   return pic;
 }
 
@@ -95,15 +131,21 @@ async function select(name: string, opts: { play?: boolean; keepStep?: boolean }
     if (!rev.has(c) || /[A-Za-z]/.test(k)) rev.set(c, k);
   }
   const prevStep = step, prevLen = cur?.frames.length ?? 0;
-  const anim = (j.anim ?? []).map((f) => ({ ms: f.ms, pic: { w: j.w, h: j.h, data: u32(f.image) } }));
-  cur = { j, hash: info.hash, frames, final: { w: j.w, h: j.h, data: u32(j.image) }, marks: new Map(), rev, anim };
+  const anim: AnimFrame[] = (j.anim?.ms ?? []).map((ms) => ({ ms }));
+  const images = Promise.all((j.anim?.images ?? []).map(async (s, i) => { anim[i].pic = await png64(s); }));
+  const final = await png64(j.image);
+  await images;
+  if (sel !== name) return;
+  cur = { j, hash: info.hash, version: state?.version, frames, final, marks: new Map(), rev, anim };
   animAt = 0;
+  held = undefined;
   slider.max = String(Math.max(0, frames.length - 1));
   step = opts.play ? 0 : opts.keepStep && prevStep < prevLen - 1 ? Math.min(prevStep, frames.length - 1) : frames.length - 1;
   renderSteps();
   renderPalette();
   setStep(step);
   if (opts.play) play(true);
+  pump();
 }
 
 // ---------------------------------------------------------------- list
@@ -155,18 +197,16 @@ async function paintThumb(cv: HTMLCanvasElement, a: AssetInfo): Promise<void> {
   if (!pic) {
     const j = await fetchAsset(a.name, false);
     if (!j) return;
-    pic = { w: j.w, h: j.h, data: u32(j.image) };
+    pic = await png64(j.image);
     thumbs.set(a.name, a.hash);
     thumbCache.set(a.name, pic);
   }
-  const off = new OffscreenCanvas(pic.w, pic.h);
-  off.getContext("2d")!.putImageData(toImageData(pic), 0, 0);
   const c = cv.getContext("2d")!;
   c.imageSmoothingEnabled = false;
   const s = Math.min(32 / pic.w, 32 / pic.h);
   const w = pic.w * s, h = pic.h * s;
   c.clearRect(0, 0, 32, 32);
-  c.drawImage(off, (32 - w) / 2, (32 - h) / 2, w, h);
+  c.drawImage(canvasOf(pic), (32 - w) / 2, (32 - h) / 2, w, h);
 }
 
 // ---------------------------------------------------------------- steps panel
@@ -233,31 +273,36 @@ function draw(): void {
   showError();
   if (!cur) { $("hud").textContent = ""; return; }
 
-  const pic = onFrames() ? cur.anim[animAt].pic : picAt(cur, step);
+  // (a frame of a long loop not fetched yet: the last one shown stays)
+  const pic = onFrames() ? (held = cur.anim[animAt].pic ?? held ?? cur.final) : picAt(cur, step);
   const fit = Math.max(1, Math.min(48, Math.floor(Math.min((W - 40) / pic.w, (H - 40) / pic.h))));
   const z = zoom || fit;
   const ox = Math.floor((W - pic.w * z) / 2 + pan.x * dpr), oy = Math.floor((H - pic.h * z) / 2 + pan.y * dpr);
 
   // checkerboard, one check per pixel
-  for (let y = 0; y < pic.h; y++)
-    for (let x = 0; x < pic.w; x++) {
-      g.fillStyle = (x + y) % 2 ? "#2a2735" : "#33303f";
-      g.fillRect(ox + x * z, oy + y * z, z, z);
-    }
   g.imageSmoothingEnabled = false;
+  checker ??= (() => {
+    const c = new OffscreenCanvas(2, 2), x = c.getContext("2d")!;
+    x.fillStyle = "#33303f"; x.fillRect(0, 0, 2, 2);
+    x.fillStyle = "#2a2735"; x.fillRect(1, 0, 1, 1); x.fillRect(0, 1, 1, 1);
+    return g.createPattern(c, "repeat")!;
+  })();
+  checker.setTransform(new DOMMatrix([z, 0, 0, z, ox, oy]));
+  g.fillStyle = checker;
+  g.fillRect(ox, oy, pic.w * z, pic.h * z);
   // Onion skin: the previous frame tinted red and the next tinted blue, faint, under this one.
   if (onion() && cur.anim.length > 1) {
     const n = cur.anim.length;
     for (const [d, tint] of [[-1, "#ff5a5a"], [1, "#5aa8ff"]] as const) {
-      const p = cur.anim[(animAt + d + n) % n].pic, ghost = new OffscreenCanvas(p.w, p.h), gc = ghost.getContext("2d")!;
-      gc.putImageData(toImageData(p), 0, 0);
+      const p = cur.anim[(animAt + d + n) % n].pic;
+      if (!p) continue;
+      const ghost = new OffscreenCanvas(p.w, p.h), gc = ghost.getContext("2d")!;
+      gc.drawImage(canvasOf(p), 0, 0);
       gc.globalCompositeOperation = "source-atop"; gc.globalAlpha = 0.6; gc.fillStyle = tint; gc.fillRect(0, 0, p.w, p.h);
       g.globalAlpha = 0.35; g.drawImage(ghost, ox, oy, p.w * z, p.h * z); g.globalAlpha = 1;
     }
   }
-  const off = new OffscreenCanvas(pic.w, pic.h);
-  off.getContext("2d")!.putImageData(toImageData(pic), 0, 0);
-  g.drawImage(off, ox, oy, pic.w * z, pic.h * z);
+  g.drawImage(canvasOf(pic), ox, oy, pic.w * z, pic.h * z);
 
   if (($<HTMLInputElement>("gridtog")).checked && z >= 6) {
     g.beginPath();
@@ -285,7 +330,7 @@ function draw(): void {
   }
 
   $("hud").textContent = `${cur.j.kind} ${cur.j.name} · ${pic.w}×${pic.h} · ${z}×${zoom ? "" : " (fit)"}` +
-    (cur.anim.length ? ` · frame ${onFrames() ? animAt : 0}/${cur.anim.length - 1}${onion() ? " (onion: , . step)" : ""}` : "");
+    (cur.anim.length ? ` · frame ${onFrames() ? animAt : 0}/${cur.anim.length - 1}${onion() ? " (onion: , . step)" : ""}${loading === cur ? " · building a frame…" : ""}` : "");
   inspect(pic, ox, oy, z, dpr);
 }
 
@@ -356,13 +401,47 @@ function animating(): boolean {
 function animTick(): void {
   clearTimeout(animTimer);
   if (animating()) {
-    animAt = (animAt + 1) % cur!.anim.length;
-    draw();
+    // a long loop's next frame not here yet: this one holds until it is
+    const next = (animAt + 1) % cur!.anim.length, f = cur!.anim[next];
+    if (f.pic || f.bad) { animAt = next; draw(); }
+    pump();
   }
   const ms = cur?.anim[animAt]?.ms ?? 100;
   animTimer = window.setTimeout(animTick, Math.max(20, ms));
 }
 animTick();
+
+/** Decoded frames kept, in bytes: a short loop's all (they come with the asset), a long one's next few (8 MB a 1920x1080 frame). */
+const KEEP = 64e6;
+/**
+ * Fetch the frame the page needs most, then the next: the one shown, the few after it, the one
+ * before (the onion skin's). The frames furthest from the one shown go when more than KEEP is kept.
+ */
+async function pump(): Promise<void> {
+  const a = cur;
+  if (!a || !onFrames() || loading === a) return;
+  const n = a.anim.length, px = a.j.w * a.j.h * 4, ahead = Math.max(1, Math.min(n - 2, Math.floor(KEEP / px) - 2));
+  const want = [0, ...Array.from({ length: ahead }, (_, d) => d + 1), -1].map((d) => (animAt + d + n) % n);
+  const k = want.find((i) => !a.anim[i].pic && !a.anim[i].bad);
+  if (k === undefined) return;
+  loading = a;
+  try {
+    const r = await fetch(`/api/frame?name=${encodeURIComponent(a.j.name)}&i=${k}&v=${a.version}`);
+    if (r.ok) a.anim[k].pic = await fromPng(await r.blob());
+    else a.anim[k].bad = true;
+  } catch {
+    a.anim[k].bad = true;
+  } finally {
+    if (loading === a) loading = undefined; // (not the next asset's: one chain of fetches each)
+  }
+  let kept = a.anim.filter((f) => f.pic).length * px;
+  for (let d = Math.floor(n / 2); d > ahead && kept > KEEP; d--)
+    for (const i of [(animAt + d) % n, (animAt - d + n) % n])
+      if (a.anim[i].pic && !want.includes(i)) { a.anim[i].pic = undefined; kept -= px; }
+  if (a !== cur) return;
+  if (k === animAt || onion()) draw();
+  pump();
+}
 
 // ---------------------------------------------------------------- events
 
@@ -414,7 +493,7 @@ $("last").onclick = () => { play(false); setStep(Infinity); };
 $("prev").onclick = () => { play(false); setStep(step - 1); };
 $("next").onclick = () => { play(false); setStep(step + 1); };
 $("filter").oninput = renderList;
-for (const id of ["gridtog", "hl", "animtog", "oniontog"]) $(id).onchange = draw;
+for (const id of ["gridtog", "hl", "animtog", "oniontog"]) $(id).onchange = () => { draw(); pump(); };
 
 const stage = $("stage");
 stage.addEventListener("wheel", (e) => {
@@ -452,6 +531,7 @@ window.addEventListener("keydown", (e) => {
     const n = cur.anim.length;
     animAt = (animAt + (e.key === "," ? -1 : 1) + n) % n;
     draw();
+    pump();
   }
   else if (e.key === "g") { const t = $<HTMLInputElement>("gridtog"); t.checked = !t.checked; draw(); }
   else if (e.key === "ArrowUp" || e.key === "ArrowDown") {

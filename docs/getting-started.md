@@ -153,7 +153,8 @@ So draw in 3D once and stamp the sprites where you can, and give a long story in
 ## What a build writes
 
 ```
-out/sprites/<name>.png            each sprite at 1x (+ <name>_n.png when it has a normal map)
+out/sprites/<name>.png            each sprite at 1x (+ <name>_n.png when it has a normal map, <name>_e.png
+                                  when it gives light: reference.md, "Output for engines")
 out/anims/<name>.png .json .gif   a strip of the frames, Aseprite-style JSON (tags), the playback
 out/scenes/<name>.png             each scene (+ a GIF when it moves, a folder of layers with layers: true,
                                   a Tiled .tmj when it holds tilemaps)

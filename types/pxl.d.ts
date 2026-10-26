@@ -84,6 +84,8 @@ declare global {
     wrap?: boolean | "x" | "y";
     /** Start from a PNG file (relative to the art file); anims with frames split it into a strip. */
     png?: string; area?: [number, number, number, number]; palettize?: boolean;
+    /** With png: its normal map, a PNG laid out as it (green up: pxl's _n.png, Sprite Fusion's), read as data; an anim's frames from the same rectangles. */
+    normals?: string;
     /** Shrink the PNG by a whole factor: each block becomes its most common opaque color. */
     shrink?: number;
     /** Which way it faces as drawn; flips and turns carry it, describe reads it out. A label: the pixels aren't checked. */
@@ -106,7 +108,7 @@ declare global {
     ground?: number | number[] | number[][];
   }
   /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
-  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number };
+  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "normals" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number };
     /** px to an art pixel (w and h the picture's): mesh(), the 3D ops, meshSocket() and post() draw that many times as big */
     pixel?: number;
     /** the same scene k times as big under other names, not checked ({ name_hd: 4 }); post() runs only there */
@@ -151,7 +153,7 @@ declare global {
     /** Two of its sockets and two of another slot's whose lines must run parallel. */
     parallel?: [string, string, string, string];
   }
-  interface PxRigOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "flip" | "rot" | "angle" | "mx" | "my"> {
+  interface PxRigOpts extends Omit<PxAssetOpts, "base" | "png" | "normals" | "area" | "palettize" | "shrink" | "flip" | "rot" | "angle" | "mx" | "my"> {
     w: number; h: number; facing: "right" | "left" | "front" | "back";
     slots: Record<string, PxSlot>;
     /** false: stand-ins only (a blocking pass); guide: false leaves out the skeleton ref layer. */

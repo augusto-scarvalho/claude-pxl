@@ -10,6 +10,17 @@ import type { AssetDef } from "../core/model.ts";
 import type { Project } from "../core/project.ts";
 import { loadProject } from "./load.ts";
 import { writeOutputs } from "./output.ts";
+import { encodePng } from "./png.ts";
+import { frameCount, frameTime } from "./shot.ts";
+
+/**
+ * An animated asset whose loop holds more pixels than this (frames x w x h; a 1920x1080 scene's 484
+ * frames hold 1e9) is long: its frames are built when the page asks for them, one at a time, and a
+ * save doesn't build or write them all. The rest come whole with the asset, as PNGs.
+ */
+const LONG = 1 << 24;
+/** Frames the page plays of a loop at most (frames() keeps 600). */
+const MAX_FRAMES = 600;
 
 export interface ServeOptions {
   port?: number;
@@ -69,6 +80,13 @@ function b64(a: Uint32Array): string {
   return Buffer.from(a.buffer, a.byteOffset, a.byteLength).toString("base64");
 }
 
+/** An animated asset's frame count on the page, and whether its loop is long (see LONG); undefined for a still one. */
+function loopOf(p: Project, name: string, b: BuildOut): { n: number; long: boolean } | undefined {
+  if (!b.anim) return undefined;
+  const n = Math.min(MAX_FRAMES, frameCount(p, name));
+  return { n, long: n * b.img.w * b.img.h > LONG };
+}
+
 export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: string; close: () => void }> {
   const abs = resolve(file);
   const out = opts.out === false ? undefined : opts.out ?? join(dirname(abs), "out");
@@ -95,6 +113,7 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
       project = undefined;
       next.error = errInfo(wrap(e));
     }
+    const long: string[] = [];
     if (project) {
       for (const name of project.order) {
         const def = project.assets.get(name)!;
@@ -106,7 +125,11 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
           info.w = b.img.w;
           info.h = b.img.h;
           // Animated assets: every frame counts, so an edit to frame 3 still refreshes the viewer.
-          info.hash = b.anim ? project.frames(name).map((f) => f.img.hash() + f.ms).join("|") : b.img.hash();
+          // ponytail: a long loop isn't built to find out: taken as changed by every save (its frames
+          // fetched again), not compared frame by frame
+          const loop = loopOf(project, name, b);
+          if (loop?.long) long.push(name);
+          info.hash = !loop ? b.img.hash() : loop.long ? `${b.img.hash()}@${next.version}` : project.frames(name).map((f) => f.img.hash() + f.ms).join("|");
           info.steps = b.trace?.frames.length ?? 0;
           info.changed = hashes.get(name) !== info.hash;
           hashes.set(name, info.hash);
@@ -119,7 +142,9 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
       }
       next.sheets = project.sheets.map((s) => s.name);
       if (out) {
-        const r = writeOutputs(project, out, { preview: opts.preview });
+        // a long loop's frames, GIFs and sheets aren't written on every save (pxl build --only writes them)
+        const only = long.length ? [...project.exported().filter((n) => !long.includes(n)), ...project.sheets.map((s) => s.name), ...project.models.map((m) => m.name)] : undefined;
+        const r = writeOutputs(project, out, { preview: opts.preview, only });
         // asset failures are already listed per asset; keep the rest (sheets, unknown names)
         next.errors = r.errors.filter((e) => !next.assets.some((a) => a.error?.message === e.message)).map(errInfo);
         // what /3d can show: a .glb (a loop's moments in one), or a .ply (its first moment)
@@ -134,6 +159,7 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
     const changed = next.assets.filter((a) => a.changed && !a.error).map((a) => a.name);
     log(`[pxl] v${next.version} ${next.ms}ms: ${next.assets.length} assets, ${bad} error(s)` +
       (changed.length && state.version > 1 ? `, changed: ${changed.slice(0, 8).join(" ")}${changed.length > 8 ? " …" : ""}` : "") +
+      (long.length && next.version === 1 ? `\n  long loops, built a frame at a time as the page shows them${out ? ` and not written on save (pxl build --only ${long.join(",")})` : ""}: ${long.join(" ")}` : "") +
       (next.error ? `\n  ${next.error.message}` : ""));
     broadcast();
   };
@@ -157,12 +183,17 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
     if (!def) return undefined;
     let b: BuildOut;
     try { b = project.build(name); } catch { return undefined; }
+    const tl = b.anim, loop = loopOf(project, name, b);
     return {
       name, kind: def.kind, w: b.img.w, h: b.img.h, loc: def.loc,
       palette: def.pal.table(),
       layers: b.layers.map((l) => l.name),
-      image: b64((b.guide ?? b.img).data), // reference layers show here too, as in previews
-      anim: b.anim ? project.frames(name, 0, 240).map((f) => ({ ms: f.ms, image: b64(f.img.data) })) : undefined,
+      image: encodePng(b.guide ?? b.img).toString("base64"), // reference layers show here too, as in previews
+      // each frame's ms; the frames themselves (PNGs) with a short loop's steps, else from /api/frame one at a time
+      anim: tl && loop ? {
+        ms: Array.from({ length: loop.n }, (_, i) => tl.durations?.[i] ?? tl.step),
+        images: withFrames && !loop.long ? project.frames(name, 0, loop.n).map((f) => encodePng(f.img).toString("base64")) : undefined,
+      } : undefined,
       frames: (withFrames ? b.trace?.frames ?? [] : []).map((f) => ({
         label: f.label, loc: f.loc, w: f.w, h: f.h,
         full: f.full ? b64(f.full) : undefined,
@@ -200,6 +231,14 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
         const p = assetPayload(url.searchParams.get("name") ?? "", url.searchParams.get("frames") !== "0");
         res.writeHead(p ? 200 : 404, { "content-type": "application/json" });
         res.end(JSON.stringify(p ?? { error: "not found" }));
+      } else if (url.pathname === "/api/frame") {
+        // one frame of a loop as a PNG, built now and not kept (the page keeps the few it needs)
+        const name = url.searchParams.get("name") ?? "", i = Number(url.searchParams.get("i"));
+        if (!project?.assets.has(name)) { res.writeHead(404); res.end("not found"); return; }
+        const t = frameTime(project, name, i), png = encodePng(project.build(name, 0, t).img);
+        project.forget(name, t);
+        res.writeHead(200, { "content-type": "image/png", "cache-control": "no-store" });
+        res.end(png);
       } else {
         res.writeHead(404);
         res.end("not found");

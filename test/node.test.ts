@@ -526,6 +526,30 @@ test("server: state, asset frames, rebuild on change", async () => {
   }
 });
 
+test("server: frames as PNGs, a short loop's with the asset, a long loop's one at a time when asked", async () => {
+  // long: 80 frames of 512x512 (21 million pixels); its frames aren't built until the page asks
+  const { file } = tmpArt(`use("pico8")\nanim("blink", { w: 2, h: 1, frames: 3 }, (c) => c.px(c.frame % 2, 0, "8"))\n` +
+    `scene("long", { w: 512, h: 512, bg: "1", frames: 80, fps: 10 }, (c) => c.rect(c.frame, 0, 4, 4, "8"))`);
+  const s = await serve(file, { port: 0, out: false, log: () => {} });
+  try {
+    const p = loadProject(file), png = (b64: string) => decodePng(Buffer.from(b64, "base64"));
+    const blink = await (await fetch(s.url + "api/asset?name=blink&frames=1")).json();
+    assert.equal(blink.anim.ms.length, 3);
+    assert.deepEqual(blink.anim.images.map((b: string) => png(b).hash()), [0, 125, 250].map((t) => p.image("blink", 0, t).hash()));
+    assert.equal(png(blink.image).hash(), p.image("blink").hash());
+    assert.equal((await (await fetch(s.url + "api/asset?name=blink&frames=0")).json()).anim.images, undefined, "a thumbnail gets no frames");
+    const long = await (await fetch(s.url + "api/asset?name=long&frames=1")).json();
+    assert.equal(long.anim.ms.length, 80);
+    assert.equal(long.anim.images, undefined);
+    const r = await fetch(s.url + "api/frame?name=long&i=7");
+    assert.equal(r.headers.get("content-type"), "image/png");
+    assert.equal(decodePng(new Uint8Array(await r.arrayBuffer())).hash(), p.image("long", 0, 700).hash());
+    assert.equal((await fetch(s.url + "api/frame?name=nope&i=0")).status, 404);
+  } finally {
+    s.close();
+  }
+});
+
 test("server: /3d lists the models export3d wrote and serves them, nothing else of the folder", async () => {
   const { dir, file } = tmpArt(`use("pico8"); pal({ g: 11 }); ramps("g")\nexport3d("ball", sdf.mesh(sdf.sphere(0.5).mat("m"), { size: 0.25 }), { mats: { m: "g" }, as: ["glb"] })`);
   const s = await serve(file, { port: 0, out: join(dir, "out"), log: () => {} });

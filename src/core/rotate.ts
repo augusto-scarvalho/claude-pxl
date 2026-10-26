@@ -84,9 +84,10 @@ function sampled(src: Img, deg: number, big: Img, k: number): Img {
   }
   const o = new Img(W, H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) o.data[y * W + x] = at(x, y, best[0], best[1]);
-  // what gives light (effect("emit")) turns with its pixels: each one's mark from the pixel it was sampled from
-  if (src.emit) {
-    const e = (o.emit = new Uint8Array(W * H));
+  // what gives light (effect("emit")) and the normals turn with their pixels: each one's mark and
+  // normal from the pixel it was sampled from, the normal's x and y turned by the angle
+  if (src.emit || src.norm) {
+    const e = src.emit && (o.emit = new Uint8Array(W * H)), nm = src.norm && o.normals(), a = (deg * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       if (o.data[y * W + x] === TRANSPARENT) continue;
       // (RotSprite's corners take a neighbour's color: the mark of the nearest pixel of that color)
@@ -96,7 +97,9 @@ function sampled(src: Img, deg: number, big: Img, k: number): Img {
         const X = bx + dx, Y = by + dy;
         if (X >= 0 && Y >= 0 && X < src.w && Y < src.h && (j < 0 || src.data[Y * src.w + X] === c)) { j = Y * src.w + X; if (src.data[j] === c) break; }
       }
-      if (j >= 0) e[y * W + x] = src.emit[j];
+      if (j < 0) continue;
+      if (e) e[y * W + x] = src.emit![j];
+      if (nm) turnNorm(src.norm!, j, nm, y * W + x, cos, sin);
     }
   }
   src.movePivot(o, fwd);
@@ -122,6 +125,16 @@ function shear(src: Img, deg: number): Img {
   const o = new Img(x1 - x0 + 1, y1 - y0 + 1);
   for (const [x, y, c] of pts) o.set(x - x0, y - y0, c);
   if (src.emit) { const e = (o.emit = new Uint8Array(o.w * o.h)); for (const [x, y, , i] of pts) e[(y - y0) * o.w + x - x0] = src.emit[i]; }
+  if (src.norm) { const nm = o.normals(); for (const [x, y, , i] of pts) turnNorm(src.norm, i, nm, (y - y0) * o.w + x - x0, Math.cos(a), s); }
   src.movePivot(o, (x, y) => { const [px, py] = move(x - cx, y - cy); return [px - x0, py - y0]; });
   return o;
+}
+
+/** Pixel j's normal into pixel i, its x and y turned clockwise by the angle (cos c, sin s), as the pixels turn; none stays none. */
+function turnNorm(src: Int8Array, j: number, dst: Int8Array, i: number, c: number, s: number): void {
+  const nx = src[j * 3], ny = src[j * 3 + 1], nz = src[j * 3 + 2];
+  if (!nz) return;
+  dst[i * 3] = Math.round(nx * c - ny * s);
+  dst[i * 3 + 1] = Math.round(nx * s + ny * c);
+  dst[i * 3 + 2] = nz;
 }

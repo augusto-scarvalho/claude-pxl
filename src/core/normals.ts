@@ -275,6 +275,25 @@ function blurBy(src: Float64Array, weight: Float64Array, w: number, h: number, s
 }
 
 /**
+ * A normal map's PNG (decoded) read onto `img` as data: RGB = normal * 0.5 + 0.5, green pointing up
+ * (OpenGL's: normalImage()'s, Sprite Fusion's), its y flipped once to pxl's (down); each made unit
+ * length unless it already is to within its 8 bits (so a map pxl wrote comes back exactly); none
+ * where the map or the art is clear. The two the same size.
+ */
+export function readNormals(img: Img, map: Img, file: string): void {
+  if (map.w !== img.w || map.h !== img.h) throw new PxError(`normals: '${file}' is ${map.w}x${map.h} and the png ${img.w}x${img.h}: a normal map is laid out as its art`);
+  const n = img.normals(), v = (b: number) => (b / 255) * 2 - 1;
+  for (let i = 0; i < img.data.length; i++) {
+    const c = map.data[i];
+    if (!(c & 255) || !(img.data[i] & 255)) continue;
+    const x = v(c >>> 24), y = -v((c >>> 16) & 255), z = v((c >>> 8) & 255), q = [x, y, z].map((t) => Math.round(t * 127));
+    // (three roundings of half a level at most move its length by √3 / 2)
+    if (q[2] >= 1 && Math.abs(Math.hypot(q[0], q[1], q[2]) - 127) <= 0.87) n.set(q, i * 3);
+    else setNormal(n, i, x, y, z);
+  }
+}
+
+/**
  * The normal map as an image in the common game-engine encoding (Godot, Unity, LDtk...), the one
  * Sprite Fusion writes: RGB = normal * 0.5 + 0.5 with green pointing up, flat (128, 128, 255) where
  * none was set, and the art's own alpha (a transparent pixel is flat and clear).
@@ -286,6 +305,22 @@ export function normalImage(img: Img): Img {
     const a = img.data[i] & 255, has = a > 0 && n && n[i * 3 + 2] > 0;
     const nx = has ? n![i * 3] / 127 : 0, ny = has ? n![i * 3 + 1] / 127 : 0, nz = has ? n![i * 3 + 2] / 127 : 1;
     out.data[i] = pack(b(nx), b(-ny), b(nz), a);
+  }
+  return out;
+}
+
+/** Does any pixel give light (Img.emit, effect("emit"), a spell's glow)? */
+export const glows = (img: Img): boolean => !!img.emit?.some((v) => v > 0);
+
+/**
+ * What gives light as an image for an engine, beside the art and its normal map: R = G = B = how
+ * much each pixel glows (Img.emit, 0 to 255), black where nothing does, the art's own alpha.
+ */
+export function emitImage(img: Img): Img {
+  const out = new Img(img.w, img.h), e = img.emit;
+  for (let i = 0; i < img.data.length; i++) {
+    const v = e ? e[i] : 0;
+    out.data[i] = pack(v, v, v, img.data[i] & 255);
   }
   return out;
 }

@@ -28,6 +28,7 @@ import { PALETTE_FILE, Palette, paletteFromFile } from "./palette.ts";
 import { type Motion, readJoints, readMotion } from "./pose.ts";
 import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
+import { readNormals } from "./normals.ts";
 import { type Lut, readCube, readStrip } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
 import { ability, emitter, follow, route, turnToward, tween, unroll } from "./vfx.ts";
@@ -162,9 +163,9 @@ export const OP_OPTS: Record<string, string[]> = {
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "facing", "height", "twin", "register"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "palettize", "shrink", "facing", "height", "twin", "register"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "pixel", "sizes"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -295,6 +296,12 @@ export class Project implements BuildCtx {
       if (o.base) throw new PxError("png and base both set the starting image: use one");
       if (!this.pngHook) throw new PxError("png needs an art file on disk");
       let img = this.pngHook(o.png);
+      if (o.normals !== undefined) {
+        // its normal map, laid out as the art, goes through area with it (a frame or a sprite of a sheet)
+        if (typeof o.normals !== "string" || !/\.png$/i.test(o.normals)) throw new PxError(`normals must be a .png path (a normal map laid out as the png), got ${JSON.stringify(o.normals)}`);
+        if (o.shrink !== undefined && o.shrink !== 1) throw new PxError("normals and shrink: a normal map's directions aren't colors to shrink by votes; shrink the art, then make its normal map at that size");
+        readNormals(img, this.pngHook(o.normals), o.normals);
+      }
       const a = o.area;
       if (a) {
         if (!Array.isArray(a) || a.length !== 4 || !a.every(Number.isInteger) || a[2] < 1 || a[3] < 1 || a[0] < 0 || a[1] < 0 || a[0] + a[2] > img.w || a[1] + a[3] > img.h)
@@ -407,6 +414,7 @@ export class Project implements BuildCtx {
       if (light !== undefined && light !== false && !pair(light) && !(isPlainObject(light) && pair((light as { at?: unknown }).at)))
         throw new PxError(`${kind} '${name}': world.light is where the light comes from, [x, y] (e.g. [0.6, -1]: the top right), "sun" (look3d()'s), or a point light in the scene, { at: [x, y] } (false: none read); got ${JSON.stringify(light)}`, loc);
       const items = checkItems(`${kind} '${name}'`, rest, loc);
+      if (opts.normals !== undefined && opts.png === undefined) throw new PxError(`${kind} '${name}': normals is the normal map of its png: give png too`, loc);
       const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true), look3d = this.look3d;
       this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, look3d });
       this.order.push(name);
@@ -1039,7 +1047,7 @@ export class Project implements BuildCtx {
       if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError('rig("name", { w, h, facing, slots: { torso: { at, size }, ... } }, ...retouch items)', loc);
       const { slots, guide = true, parts, light, turn, far, ...rest } = opts as Record<string, unknown>;
       const rig = readRig(name, rest.facing, slots, parts, light, far, loc);
-      checkKeys(`rig '${name}'`, rest, ASSET_OPTS.sprite.filter((k) => !["base", "png", "area", "palettize", "shrink", "flip", "rot", "angle", "mx", "my"].includes(k)), loc);
+      checkKeys(`rig '${name}'`, rest, ASSET_OPTS.sprite.filter((k) => !["base", "png", "normals", "area", "palettize", "shrink", "flip", "rot", "angle", "mx", "my"].includes(k)), loc);
       const layer = (n: string, o: LayerOpts, items: Item[]): Layer => ({ __layer: true, name: n, opts: o, items, loc });
       const stampOp = (...args: unknown[]): Op => ({ __op: true, name: "stamp", args, loc });
       // the retouch is a sprite of its own, the rig's size, so a turned rig can stamp it mirrored

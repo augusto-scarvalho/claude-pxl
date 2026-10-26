@@ -47,8 +47,9 @@ directions("ship", 16, { from: "_ship_body", outline: "k", symmetric: true, pivo
 ```
 
 `angle` runs after `flip`/`rot` and before `outline`, so the outline is drawn around the turned
-shape. The canvas grows to hold the turned image; a `pivot` turns with it. Lamps and normal maps
-don't survive an arbitrary angle.
+shape. The canvas grows to hold the turned image; a `pivot` turns with it, and so do the normal maps
+(each pixel's from the one it was sampled from, its direction turned by the angle) and what gives
+light; lamps don't survive an arbitrary angle.
 
 ## Methods
 

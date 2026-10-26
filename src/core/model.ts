@@ -101,6 +101,8 @@ export interface AssetOpts {
   slice?: number | [number, number, number, number];
   /** Start from a PNG file (path relative to the art file); anims with `frames` split it into a strip. */
   png?: string;
+  /** With `png`: its normal map (a PNG laid out as it, green up: pxl's own _n.png, Sprite Fusion's), read as data. */
+  normals?: string;
   /** Only this part of the PNG: [x, y, w, h]. */
   area?: [number, number, number, number];
   /** Snap the PNG's colors to the nearest keyed palette color. */

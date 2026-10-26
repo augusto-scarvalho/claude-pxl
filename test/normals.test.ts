@@ -1,14 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { failure, PAL } from "./helpers.ts";
-import { loadSource } from "../src/node/load.ts";
+import { loadProject, loadSource } from "../src/node/load.ts";
 import { writeOutputs } from "../src/node/output.ts";
 import { decodePng } from "../src/node/png.ts";
 import { bump, edt, normalImage } from "../src/core/normals.ts";
 import { Img } from "../src/core/image.ts";
+import { rotate } from "../src/core/rotate.ts";
 import { pack } from "../src/core/color.ts";
 import type { BumpOpts } from "../src/core/model.ts";
 
@@ -52,6 +53,23 @@ sprite("m", { mx: true }, "r", normals(0, 0, "4"))`);
   assert.deepEqual(dir(p, "r90", 0, 0), [0, 1], "right turns to down");
   assert.deepEqual(dir(p, "m", 1, 0), [1, 0], "mirrored half faces the other way");
   assert.match(failure(PAL + 'sprite("x", "r", normals(0, 0, "Z"))', "x").message, /unknown direction 'Z'.*row 0, col 0/);
+});
+
+test("normals: any angle (resampled or sheared) turns them with the pixels; a scale keeps them, and the light given", () => {
+  // all facing right and toward us (nx 90, nz 90) but the top row, which has none
+  const img = new Img(12, 12).fill(pack(200, 60, 60)), n = img.normals();
+  for (let i = 12; i < 144; i++) { n[i * 3] = 90; n[i * 3 + 2] = 90; }
+  img.emit = new Uint8Array(144).fill(7);
+  const near = (o: Img, x: number, y: number) => [...o.norm!.subarray((y * o.w + x) * 3, (y * o.w + x) * 3 + 3)];
+  for (const deg of [30, 10]) {
+    const o = rotate(img, deg), m = near(o, o.w >> 1, o.h >> 1), a = (deg * Math.PI) / 180;
+    assert.deepEqual(m, [Math.round(90 * Math.cos(a)), Math.round(90 * Math.sin(a)), 90], `${deg} degrees clockwise: right turns toward down`);
+    assert.ok(o.norm!.some((v, i) => i % 3 === 2 && v === 0 && o.data[i / 3 | 0] !== 0), `${deg}: the row without normals still has none`);
+  }
+  const s = img.scale(3);
+  assert.deepEqual(near(s, 20, 20), [90, 0, 90]);
+  assert.deepEqual(near(s, 20, 2), [0, 0, 0]);
+  assert.equal(s.emit![35 * 36 + 35], 7);
 });
 
 test("normals: stamped art carries them; flat art drawn over clears them", () => {
@@ -170,19 +188,49 @@ test("edt: exact distances, as a brute-force search finds them", () => {
     }
 });
 
-test("build: animations and sheets with normals also write them as an atlas laid out like the art", () => {
+test("normals option: a bumped sprite's and an anim's normal maps, read back, give the same normals", () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-n-"));
   try {
     const p = load(`
-anim("blob", { w: 6, h: 5, frames: 2 }, (c) => c.ellipse(3, 2, 2 + c.frame, 2, "g"), bump("hybrid"))
+sprite("rock", { w: 14, h: 10 }, (c) => { c.ellipse(7, 5, 6, 4, "g"); c.ellipse(5, 3, 2, 1, "w"); c.rect(6, 6, 5, 2, "r") }, bump("hybrid"))
+anim("blob", { w: 9, h: 7, frames: 3 }, (c) => c.ellipse(4, 3, 2 + c.frame, 3, "g"), bump("dome", { depth: 2 }))`);
+    assert.deepEqual(writeOutputs(p, dir, { preview: false }).errors, []);
+    const art = join(dir, "back.px.js");
+    writeFileSync(art, PAL + `sprite("rock", { png: "sprites/rock.png", normals: "sprites/rock_n.png" })
+anim("blob", { png: "anims/blob.png", normals: "anims/blob_n.png", frames: 3 })
+sprite("blob1", { png: "anims/blob.png", normals: "anims/blob_n.png", area: [9, 0, 9, 7] })`);
+    const q = loadProject(art), same = (a: Img, b: Img, what: string) => {
+      assert.ok(a.norm!.some((v, i) => i % 3 !== 2 && v !== 0), `${what}: it has relief`);
+      assert.deepEqual([...b.norm!], [...a.norm!], what);
+    };
+    same(p.image("rock"), q.image("rock"), "rock");
+    for (const f of [0, 1, 2]) same(p.image("blob", 0, f * 125), q.image("blob", 0, f * 125), `blob frame ${f}`);
+    same(p.image("blob", 0, 125), q.image("blob1"), "an area of the strip");
+    assert.match(failure(PAL + 'sprite("x", { normals: "x_n.png" })', "x").message, /normal map of its png: give png too/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("build: animations and sheets with normals or light given also write them as atlases laid out like the art", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-n-"));
+  try {
+    // the blob's eye glows (80% strength: 204) in its second frame only
+    const p = load(`
+anim("blob", { w: 6, h: 5, frames: 2 }, (c) => c.ellipse(3, 2, 2 + c.frame, 2, "g"), bump("hybrid"), (c) => { if (c.frame) c.px(3, 2, "r") }, effect("emit", { on: "r", strength: 0.8 }))
 sprite("flat", "rr")
 sheet("all", ["blob", "flat"], { pad: 1 })`);
     assert.deepEqual(writeOutputs(p, dir, { preview: false }).errors, []);
-    for (const [art, nrm] of [["anims/blob.png", "anims/blob_n.png"], ["all.png", "all_n.png"]]) {
-      const a = decodePng(readFileSync(join(dir, art))), n = decodePng(readFileSync(join(dir, nrm)));
-      assert.deepEqual([n.w, n.h], [a.w, a.h]);
+    for (const [art, nrm, glow] of [["anims/blob.png", "anims/blob_n.png", "anims/blob_e.png"], ["all.png", "all_n.png", "all_e.png"]]) {
+      const a = decodePng(readFileSync(join(dir, art))), n = decodePng(readFileSync(join(dir, nrm))), e = decodePng(readFileSync(join(dir, glow)));
+      assert.deepEqual([n.w, n.h, e.w, e.h], [a.w, a.h, a.w, a.h]);
       for (let i = 0; i < a.data.length; i++) assert.equal(n.data[i] & 255, a.data[i] & 255, `${nrm}: alpha at ${i}`);
+      for (let i = 0; i < a.data.length; i++) assert.equal(e.data[i] & 255, a.data[i] & 255, `${glow}: alpha at ${i}`);
+      // where the art glows its map is grey 204, elsewhere black: the one pixel, in the second frame's rectangle
+      const lit = [...e.data.keys()].filter((i) => e.data[i] >>> 8), x0 = art.startsWith("anims") ? 6 : 7;
+      assert.deepEqual(lit.map((i) => [i % e.w, Math.floor(i / e.w), e.data[i] >>> 8]), [[x0 + 3, 2, 0xcccccc]]);
     }
+    assert.ok(!existsSync(join(dir, "sprites", "flat_e.png")), "nothing glows: no map");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

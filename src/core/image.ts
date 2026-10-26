@@ -422,13 +422,20 @@ export class Img {
     return o;
   }
 
-  /** Nearest-neighbour upscale. */
+  /** Nearest-neighbour upscale; the normals and what gives light go with the pixels. */
   scale(s: number): Img {
     if (s === 1) return this.copy();
-    const o = new Img(this.w * s, this.h * s);
+    const o = new Img(this.w * s, this.h * s), n = this.norm, e = this.emit;
+    if (n) o.norm = new Int8Array(o.w * o.h * 3);
+    if (e) o.emit = new Uint8Array(o.w * o.h);
     for (let y = 0; y < o.h; y++) {
       const row = Math.floor(y / s) * this.w;
-      for (let x = 0; x < o.w; x++) o.data[y * o.w + x] = this.data[row + Math.floor(x / s)];
+      for (let x = 0; x < o.w; x++) {
+        const i = y * o.w + x, j = row + Math.floor(x / s);
+        o.data[i] = this.data[j];
+        if (n) o.norm!.set(n.subarray(j * 3, j * 3 + 3), i * 3);
+        if (e) o.emit![i] = e[j];
+      }
     }
     return o;
   }

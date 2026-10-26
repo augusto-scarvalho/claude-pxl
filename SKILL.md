@@ -129,7 +129,7 @@ What exists, a line each; `PXL help <name>` prints the rest of any op or option 
   stamping an anim animates the scene; `scroll()`, `clouds()`, `plume()`, `c.cross()` go by in a
   loop; `tween()` keys poses in time; `route()` walks a figure along a path (`px: true` on a flat map).
   Limbs, walks, hair: `PXL help "characters 9 10"`; loops and parallax: `PXL help "scenes 8 9 10"`.
-- **Existing art**: `sprite("x", { png, area, shrink, palettize })`, `anim(..., { png, frames })`, `rampmap`.
+- **Existing art**: `sprite("x", { png, normals, area, shrink, palettize })`, `anim(..., { png, frames })`, `rampmap`.
 - **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj`, `build --aseprite`, `build --share 4`.
 - **Light**: `shade:`/`light:` layers and `cast` shadows (a shade layer `of` what stands; `"sun"`: `look3d`'s),
   `relight`/`plate()`, `glow`, `lighting()` ([lighting.md](lighting.md)).

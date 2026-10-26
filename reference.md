@@ -150,6 +150,7 @@ with a `world` (and `check`) is checked as a scene (functions naming what they p
 | `crop: true` | Trim to opaque bounds. |
 | `layers: true` | Also export each layer as `out/<sprites\|scenes\|anims>/<name>/<layer>.png` (anims: frame 0's). |
 | `png: "file.png"` | Start from a PNG (path relative to the art file), like `base` starts from another asset: every option and item then works on it. In an `anim` with `frames: n`, frame k is the k-th of n equal slices of the image (a strip). The live viewer rebuilds when the file changes. Any PNG except interlaced ones. |
+| `normals: "file_n.png"` | With `png`: its normal map, a PNG laid out as it (made by Sprite Fusion, another tool or by hand; pxl's own `_n.png`), read as data, never palettized: RGB = normal × 0.5 + 0.5, green pointing up (OpenGL's), its y flipped once to pxl's, each made unit length (one pxl wrote comes back exactly), none where either PNG is clear. `area` cuts both; an anim with `frames` takes each frame's from the same slice. Lit by `lighting()` and `mesh()` as `bump`'s are (lighting.md). Not with `shrink`. |
 | `area: [x, y, w, h]` | With `png`: only this part of the image (one sprite out of a sheet). |
 | `palettize: true` | With `png`: snap every color to the nearest keyed palette color, so `ascii`, `swap` and `recolor` see keys. |
 | `shrink: n` | With `png`: shrink by a whole factor (1 leaves it as it is), after `area`. Each n×n block becomes its most common opaque color (ties: the first, scanning the block column by column), or transparent when fewer than half of its pixels are opaque. Keeps silhouettes and the curves of shapes far better than sampling one pixel per block: the start for a smaller version of finished art (then redraw what it breaks; see characters.md). |
@@ -843,6 +844,24 @@ thumbnail per step (every k-th of a long build). Anims show frame 0.
 Outputs go to `<file dir>/out`: `sprites/<n>.png`, `scenes/<n>.png`, `anims/<n>.png` (a strip; see Animation), `<sheet>.png` + `<sheet>.json`
 (TexturePacker hash format: Phaser, Godot importers, ...), `_preview/<n>.png` (upscaled to
 ~768px, checkerboard behind transparency, pixel grid at scale ≥ 6 with every 8th line darker).
+
+### Output for engines
+
+Beside the art of a sprite, scene, anim or sheet, a build writes two maps laid out in the same
+rectangles (the art's JSON serves all three), each with the art's own alpha:
+
+| File | When | Each pixel's channels |
+|---|---|---|
+| `<n>_n.png` | anything in it has normals (`bump`, `normals()`, a `normals` PNG) | RGB = the way its surface faces × 0.5 + 0.5: R right, G up, B toward the eye (OpenGL's convention, as Godot and Unity read it; flat `#8080ff`) |
+| `<n>_e.png` | anything in it gives light (`effect("emit")`, a spell's glow) | R = G = B = how much it glows, 0 to 255 (pxl draws such a pixel as it is, unlit, and blooms it); black where nothing does |
+
+Godot 4: the art and `_n.png` make a `CanvasTexture` (its `normal_texture`), so `PointLight2D` and
+`DirectionalLight2D` light the sprite by it; `_e.png` goes to a `CanvasItem` shader as a texture
+uniform that mixes the lit color back to the art's own by its red (and pushes it past 1 for a
+`WorldEnvironment` glow to bloom, with HDR 2D on). Unity (URP 2D): `_n.png` is the sprite's `_NormalMap` secondary
+texture (in the Sprite Editor; the default Sprite-Lit shader reads it for lights with normal maps on);
+`_e.png` another secondary texture (`_EmissionTex`, say) that a Shader Graph of your own adds after
+the 2D light, the art's color times its red, which the URP Bloom then picks up.
 An asset that places tilemaps also gets `<n>.tmj`, a Tiled map with one tile layer per tilemap
 (named after its `layer`) and a tileset image per layer (`<n>.1.png`, ...) holding the distinct tiles
 it used, after group picks, flips and swaps. Orthogonal maps redraw exactly; for isometric ones,
@@ -862,7 +881,10 @@ back, and the next `--aseprite` build writes over it, so copy it out of `out/` b
 
 `serve` opens a live viewer that rebuilds on save, follows the asset you edited and replays its
 painting steps (each top-level op, layer and post-processing step, with its file:line). It also
-writes the same outputs as `build`. For anims, "onion" holds the animation on one frame with the
+writes the same outputs as `build`, except a long loop's (frames x width x height past 16 million:
+a 1920x1080 scene of more than 8 frames): the page fetches its frames one at a time as it plays them,
+each built when asked (a second or two an HD frame), so it plays at that pace; `pxl build --only`
+writes it. For anims, "onion" holds the animation on one frame with the
 previous frame tinted red and the next tinted blue underneath; `,` and `.` step frames. A file that
 exports `.glb` or `.ply` (`export3d`) gets a "3D" link: `/3d` shows them to turn round, a moving
 `.glb` playing (three.js from a CDN: the one part of pxl that needs the network).

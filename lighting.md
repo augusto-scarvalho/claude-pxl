@@ -77,7 +77,7 @@ Overlapping lights combine by max per channel, so they don't blow out.
 Pixels can carry a surface direction. `lighting()` then brightens the sides that face each light
 and darkens the sides that face away, so bricks, domes and bevels catch the light as it moves.
 Flat or unmapped pixels light exactly as before. Normals travel with the pixels through stamps,
-flips, quarter turns and mirroring (any other `angle` drops them). A layer drawn on top without normals clears them where it covers.
+flips, quarter turns, mirroring, and any other `angle` (each turned with it). A layer drawn on top without normals clears them where it covers.
 
 ```js
 sprite("bricks", { w: 32, h: 24 }, pattern("_brick", 0, 0, 32, 24),
@@ -101,8 +101,22 @@ opaque pixels:
 | `"luma"` | Brightness: lighter pixels are higher. Good for art that's already shaded. |
 | `"hybrid"` | Both: a volume rising from each 8-connected island's edge (exact distance, leveling off past `shapeRadius`), plus the shading's lightness (Oklab), each blurred a little. The way [Sprite Fusion](https://github.com/Hugo-Dz/spritefusion-sprite-normals) makes them, with its settings and defaults: `shapeRadius` 4, `shapeStrength` 1.15, `shapeSoftness` 1.15, `detailStrength` 6 (0 for the volume alone), `detailScale` 0.6, and `depth` as its normal strength (1.5). Characters and props drawn with shading: a painted highlight still reads as a bump, so lower `detailStrength` on white cloth or shiny metal. |
 
+An animation's `"hybrid"` maps are made a frame at a time, each alone (as Sprite Fusion makes them),
+and the relief holds still all the same. Measured on the traveler's walk (`tr_walk_e`, 8 frames) under
+one fixed lamp, between each frame and the next, over the pixels of the parts that only bobbed (58%
+of the figure): 6% of their normals turn by more than 10° and 3% change light by more than 8 levels,
+about 7 px a frame of the 396 drawn, all within 4 px of what moved (the cloak's hem over the legs,
+the arm's edge, the hair's tufts); the top-down hero's walk: 1%. Frame by frame the head and the
+body keep their relief, and the hem catches the light with the stride (`"dome"` changes twice as
+many). A figure drawn in 3D (`rig3d`, `surface()`) carries its model's normals already;
+a `bump` replaces them.
+
 `on` limits it to some keys, and the other keys act as edges, so `on: "b"` bevels every brick
 separately. The image border counts as an edge too. `depth` sets the steepness.
+
+A normal map made elsewhere (Sprite Fusion, another tool, by hand) comes in with its art:
+`sprite("hero", { png: "hero.png", normals: "hero_n.png" })`, an anim's frames from the same slices
+of a strip (green pointing up, as engines and pxl's own `_n.png` have it).
 
 `normals(x, y, grid)` paints directions with the numpad: `8` faces up, `2` down, `4` left, `6`
 right, `7 9 1 3` the diagonals, `5` straight at the viewer. `q w e / a s d / z x c` are the same
@@ -112,8 +126,11 @@ directions with a gentler tilt. `0` clears a normal and `.` skips.
 animation and sheet a frame of which has them, laid out in the same rectangles as the art (its JSON
 serves both). It uses the usual engine encoding (RGB = normal × 0.5 + 0.5, green pointing up, flat =
 `#8080ff`, the art's own alpha), the one Sprite Fusion writes, so Godot, Unity and similar engines
-can light the sprite with it, and a hybrid map matches Sprite Fusion's to within a level. The viewer shows a **normal map** frame
-before the light map.
+can light the sprite with it, and a hybrid map matches Sprite Fusion's to within a level. What gives
+light (`effect("emit")`, a spell's glow) goes the same way to `<name>_e.png`, in the same rectangles:
+R = G = B how much each pixel glows (0 to 255), black where nothing does, the art's alpha. How an
+engine reads the three: [reference.md, "Output"](reference.md#output-for-engines). The viewer shows
+a **normal map** frame before the light map.
 
 Full demo: `examples/normals.px.js` (`relief` animates a lantern swinging past; `lit` and `flat`
 compare the same lamp with and without relief; `ways` lights one rock flat, `dome`, `luma` and
