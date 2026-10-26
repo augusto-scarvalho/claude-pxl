@@ -50,11 +50,15 @@ Mark items `[x]` when they ship, with the commit.
 - [x] **Palette keys in the file** (dogfood): `1a1626 k ink` (a one-character word after the color;
   the name in a `.gpl`), so a shared palette needs no `pal({ k: 0, K: 1, ... })` index mapping.
 - [x] **Asset size inside functions**: `c.size("name")` (found building the iso example).
-- [ ] **A warning when `pal()` gives a key in a ramp another color** (found by the lit-side rule in
+- [x] **A warning when `pal()` gives a key in a ramp another color** (found by the lit-side rule in
   wave 1): `hd2d/clearing.px.js` gave the kit's cobble and wall keys 1-8 its scarecrow's colors, so
   the ramps "1234" and "5678" no longer ran dark to light (`shade()` on it stepped along cobbles; the
-  rule read its lit side backwards until `rampSteps` skipped such ramps). Say the key, the ramp and
-  where the ramp was made; the keys renamed since.
+  rule read its lit side backwards until `rampSteps` skipped such ramps). Done (round 5, R2): `pal:`
+  names the keys, the ramp, where it was made (`ramps()` or `shades()`) and whether it still runs
+  dark to light; a kit's ramps count with `include(..., { palette: true })`. An includer's ramps
+  don't: a file included without `palette` (the traveler in the clearing, the girl in the forest, the
+  5x7 font) gives those keys its own colors for its own art, and its art builds the same there as
+  alone (161, 15 and 1 assets checked). No example warns.
 - [x] **A field that moves on the clock, made once** (the distance written in blocks): the cost was never a moment's compile
   (0.8 ms for the dead tree's 105 rods) but V8 not optimizing one function of thousands of lines (the
   tree's distance: 73 kB of code, 8 us a point, swaying or still alike once past its limit). A join's
@@ -113,6 +117,13 @@ Mark items `[x]` when they ship, with the commit.
   outlined drawing, so on the five perspective anims' named drawings (park, road, race, extinction,
   train) it ran on every one and read none ("a clear reading on 0"). Read the light from the tones
   instead: which side of the shape holds its ramp's lighter steps.
+  Found in round 5 (R2): the outline isn't what stops it; those files have no ramps (road one), so no
+  rim pair lies on one. Tried and taken out: (1) luminance pairs at the rim where a drawing's colors
+  are on no ramp: 6 readings against the light in park alone, material read as light (the pigeon "lit
+  from the right" by its darker grey head and white beak); (2) within each hue, where its lighter
+  pixels sit against its darker ones: 26 against across park, race and extinction (a car's mirrors,
+  the rival car). What it needs: materials told apart without ramps (a ramp per hue family guessed
+  from the palette, checked by eye on those drawings), or ramps given to those files.
 - [ ] **The crew's grey-haired head turned to profile is a row short at the crown** (`_og_head_w` in
   `hd2d/crew.px.js`): `pxl check`'s views rule reads its crown on row -4 from the anchor, -5 in the
   other views, so the head drops a pixel at its top as it turns. Redraw its top to reach the others'
@@ -994,9 +1005,11 @@ What the phases left, each waiting for a reason:
   spell, its head's (nearer by its size). A beam reaching toward the eye, or a mark on the ground half
   behind a wall, would need a depth for each primitive it draws (its points are in the world, so the
   view could hand one out): when a scene shows the one depth wrong.
-- [ ] **A spell's art pieces blended in cast()**: `cast()` plots the file's anims (`ball`, `impact`,
+- [x] **A spell's art pieces blended in cast()**: `cast()` plots the file's anims (`ball`, `impact`,
   `big`) as they are, so an energy ball's dark rim shows; the clearing's hand version laid them
-  `blend: "add"` in mesh() and they glowed. A `blend` for the pieces (~10 lines): when one looks wrong.
+  `blend: "add"` in mesh() and they glowed. Done (round 5, R2): `spell(..., { blend: "add" | "screen" })`
+  lays the pieces on what is drawn by their alpha in linear light, as mesh()'s blended sprites; over the
+  clear as they are. The clearing keeps its look (no `blend`).
 - [ ] **Pieces that collide with each other** (a spell's shards, a boulder breaking up): waits. The
   pieces fly on closed-form paths, so any frame is drawn alone; colliding needs a stepped simulation
   replayed from the start to each frame (seeded and deterministic, seekable at O(frames) a frame) and
@@ -1006,9 +1019,12 @@ What the phases left, each waiting for a reason:
   then sprites in the depth. Today a dissolving sprite's own debris, or a cast's sparks, stand in.
 - [ ] **A trail as a ribbon in mesh()**: waits. Faces in mesh() are opaque and a ribbon is see-through
   (blended faces, or a strip drawn as a cast is now, at one depth). Today a few sprites at past moments.
-- [ ] **A painted sway mask** (what moves, painted, instead of by height): only when a case needs it;
-  by height covers the kit's plants.
-- [ ] **The emitting pixels' light in plain lighting()**: a `lamp()` at the glow does it today.
+- [x] **A painted sway mask** (what moves, painted, instead of by height): done (round 5, R2):
+  `effect("sway", { mask: "_m" })`, an asset of the same size, each pixel's lightness its share of the
+  sway (white all, black and clear none); `push` still goes by height.
+- [x] **The emitting pixels' light in plain lighting()**: done (round 5, R2): `lighting({ emitLight: r |
+  { r, power } })`, the `emit` keys and what an effect or a spell marked as giving light lighting what is
+  round them in their colors, as a lamp at each of their cells; on a normal map it comes straight on.
 
 ## A 3D DSL: fields, voxels, volumes, splats (the dsl3d plan, in phases)
 
@@ -1069,17 +1085,18 @@ What the phases left, each waiting for a reason:
 - [x] **A grid past 256 a side as several MagicaVoxel models**: cut in models of 256 at most, each
   placed by the scene graph (nTRN, nGRP, nSHP; `_t` its middle), read back voxel by voxel to where the
   grid had them.
-- [ ] **mesh() casting shadows from ramp faces without a sun**: only textured faces and sprites take the
+- [x] **mesh() casting shadows from ramp faces without a sun**: only textured faces and sprites take the
   sun's shadows, and only with `sun` on; a mesh made from a field (sdf.mesh) gets its shadow from its
-  field (`surface(..., { hide: true })`). Why: a block or a mesh in a palette-lit diorama grounded by its
-  own faces. When: a scene of meshes that no field stands behind (the SunMap built from all faces, a
-  ramp step down where it shades).
-- [ ] **surface(), voxels() and volume() in mesh()'s sun**: they light by their own ramps and lay their
+  field (`surface(..., { hide: true })`). Done (round 5, R2): without a sun, `shadows: true` builds the
+  SunMap from `light` (every face, the sprites as cut-outs), a ramp face a step down its ramp where it
+  shades; off by default, so no scene moved. Textured faces without a sun still take none.
+- [x] **surface(), voxels() and volume() in mesh()'s sun**: they light by their own ramps and lay their
   shadow on what is drawn, but walls' shadows don't fall on them and the sun's and sky's colours don't
-  tint them.
-  Why: a field among sun-lit textured faces reads cooler than they do. When: an HD-2D scene in the sun
-  shows a field (mesh() leaving its SunMap on the picture, a test per hit, then shine() on the ramp
-  tone, kept in clusters).
+  tint them. `light: "mesh"` (wave 2) gave them the sun's and sky's colours and its lamps; done (round
+  5, R2): mesh() leaves its SunMap with its light, and with `light: "mesh"` a surface's or voxels' hit
+  in a wall's or a figure's shadow takes the sky alone. graveyard_3d's snag stands in the sun: no pixel
+  moved. A volume still takes the sun all through (its light read at its box's middle): per cell when
+  a mist in a wall's shadow reads wrong.
 - [ ] **An SDF sprite's depth pixel by pixel in mesh()**: a sprite stands as a card, each row at its
   height's depth; a field drawn through the camera has the true depth. Why: a wide crown in front of a
   fence behind the trunk. When: a card reads wrong (surface() already leaves a depth on its picture:
@@ -1094,9 +1111,11 @@ What the phases left, each waiting for a reason:
   one `.glb` holding a mesh a moment, shown in turn by an animation (scales stepped), which loops in
   three.js and other viewers; `.vox`, `.obj`, `.ply` a file a moment. Morph targets skipped: surface
   nets give each moment its own vertices.
-- [ ] **The material lookup as generated code too**: the distance is one generated function; the
-  material is still closures, read at each hit, voxel and quad (surface nets at 0.05 m: 0.5 s). When:
-  meshing or voxelizing big grids is measured slow.
+- [x] **The material lookup as generated code too**: the distance is one generated function; the
+  material is still closures, read at each hit, voxel and quad (surface nets at 0.05 m: 0.5 s). Not
+  needed (round 5, R2, measured): `make3d.tree` meshed at 0.05 m takes 0.9 s, 35% of it the generated
+  distance and 30% surface nets' own loop; the material closures don't reach the profile's top 18
+  (under 0.3% each). Voxels at 0.1 m: 50 ms.
 - [ ] **A GPU engine**: not yet, by decision. Why not: the CPU renderer holds, measured: a 320x180
   diorama with a tree, smoke and mist 0.6 to 1.3 s a frame, the HD-2D scenes' checks 5 s or so a file
   alone, every 24th frame. When: a long HD sequence is measured slow (minutes a render), or an
@@ -1124,8 +1143,11 @@ Left from phase 6 (details, decals, the scene of parts):
 - [x] **More builders**: `make3d.pine({ height, tiers, girth, snow })` (cones of needles up a trunk,
   ragged with noise, snow on the tiers) and `make3d.bush({ size, leaves })`, both in the world's wind;
   `make3d.crystal({ moss })` (the evaluation's builders arm couldn't give its rock moss).
-- [ ] **More relations**: `along` a path (a fence, a row), `apart` kept by placing (not only checked).
-  When: a scene asks for rows or paths; `pxl check --fix` moves one thing clear today.
+- [x] **More relations**: `along` a path (a fence, a row), `apart` kept by placing (not only checked).
+  Done (round 5, R2): `along: [points, s]` (s m along the path, straight on past its ends; a row is a
+  part a step of s) and `apart: [part, gap]` (moved out of the other's box seen from above the shorter
+  way, x or y, when its relations put it inside). Boxes, not the field: a rock is kept clear of a
+  tree's crown too; `expect3d`'s `apart` and `--fix` still read the field.
 - [x] **expect3d's sampling and its tenses**: `{ before: [rule, rule] }` (the first holds at an earlier
   frame than the second first does) and `{ while: [rule, rule] }`; a part thinner than the samples (a
   twig) is taken by the points within half a step of it instead of reading as nothing.

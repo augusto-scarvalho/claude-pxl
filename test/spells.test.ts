@@ -181,6 +181,20 @@ anim("rock", { w: 96, h: 64, frames: 60, fps: 20 }, cast(spell("earth", 3, { ...
   assert.match(failure(PALS + 'anim("x", { w: 9, h: 9, frames: 2 }, cast(spell("fire", 3, { from: [1, 1], to: [5, 5], big: { anim: 3 } })))', "x").message, /\{ anim: an asset/);
 });
 
+test("spell of the file's own art blended: added to what is under it as light, as it is over the clear", () => {
+  const ART = `pal({ a: "#ff0000", b: "#00ff00", e: "#ffff00" })
+sprite("_l", { w: 3, h: 3, pivot: [1, 1] }, rect(0, 0, 3, 3, "b"))
+const at = { from: [10, 30], to: [80, 30], start: 0, particles: false, ball: "_l", trail: false }
+`;
+  const p = load(ART + `anim("add", { w: 96, h: 64, frames: 60, fps: 20 }, rect(0, 0, 96, 30, "a"), cast(spell("fire", 1, { ...at, blend: "add" })))
+anim("as", { w: 96, h: 64, frames: 60, fps: 20 }, rect(0, 0, 96, 30, "a"), cast(spell("fire", 1, at)))`);
+  const [B, E] = ["b", "e"].map((k) => p.assets.get("add")!.pal.resolve(k) as number), add = p.image("add", 0, 350), as = p.image("as", 0, 350);
+  assert.equal(as.get(10, 29), B, "as it is: the ball's green over the red");
+  assert.equal(add.get(10, 29), E, "added: red and green light make yellow");
+  assert.equal(add.get(10, 31), B, "over the clear, as it is");
+  assert.match(failure(PALS + 'anim("x", { w: 9, h: 9, frames: 2 }, cast(spell("fire", 1, { from: [1, 1], to: [5, 5], blend: "multiply" })))', "x").message, /blend is how the file's art pieces lie/);
+});
+
 test("spell's hit: the target's dissolve in the element's look, spreading from the impact, coming back as it ends", () => {
   const at = { from: [0, 0], to: [50, 0], start: 0 }, s = spell("fire", 1, at), hit = s.ability.start("impact"), end = s.total;
   assert.equal(s.hit(hit - 1), undefined, "nothing before it hits");

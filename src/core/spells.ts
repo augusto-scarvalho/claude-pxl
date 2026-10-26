@@ -10,7 +10,7 @@
 // quake, a wave; its `form` the shape's size, count, facets, jaggedness, debris and how long it stays.
 // It happens in a world (x and y on the ground, z up) seen through a view: side (3/4), top-down,
 // isometric, or a perspective() camera; big solids are volumes (volumes.ts) seen through it.
-import { type Color, TRANSPARENT } from "./color.ts";
+import { type Color, LIN, TRANSPARENT, fromLinear } from "./color.ts";
 import { noise } from "./effects.ts";
 import { PxError } from "./errors.ts";
 import { type View, perspective } from "./perspective.ts";
@@ -46,6 +46,8 @@ export interface Element {
   impact?: { shape?: Shape; keys?: string[]; smoke?: false | string[]; anim?: string | string[] };
   /** the third tier's centerpiece, or the file's `anim` played once from the impact on the ground under the target */
   big?: Big | { anim: string | string[] };
+  /** how the file's own art (an asset `ball`, an impact's or big's `anim`) lies on what is drawn: as it is (default), or as light, "add" or "screen" (by its alpha; a glow's dark rim then vanishes) */
+  blend?: "add" | "screen";
   /** the mark it leaves on the ground at the third tier: two keys, the rim first; false for none */
   mark?: false | string[];
   /** the third tier's flash (default the ramp's first); its light's color (default the ramp's second) */
@@ -57,7 +59,7 @@ export interface Element {
   variants?: string[];
   matter?: Matter | MatterLook;
 }
-const ELEMENT_KEYS = ["like", "keys", "ball", "bolt", "motion", "trail", "particles", "impact", "big", "mark", "flash", "light", "timing", "variants", "matter"];
+const ELEMENT_KEYS = ["like", "keys", "ball", "bolt", "motion", "trail", "particles", "impact", "big", "blend", "mark", "flash", "light", "timing", "variants", "matter"];
 
 /** The elements: each a recipe to copy and change (the guide: scenes, "Designing an element"). */
 export const ELEMENTS: Record<string, Element> = {
@@ -256,6 +258,7 @@ export function element(e: string | Element): Element {
   const base = e.like ? element(e.like) : undefined, out = { ...base, ...e, impact: { ...base?.impact, ...e.impact } } as Element;
   if (!Array.isArray(out.keys) || out.keys.length < 2) throw new PxError(`spell: an element's keys are its ramp, the core first: 3 or 4 tones, got ${JSON.stringify(out.keys)}`);
   if (out.impact?.shape && !SHAPES.includes(out.impact.shape)) throw new PxError(`spell: an impact's shape is ${SHAPES.join(", ")}, got ${JSON.stringify(out.impact.shape)}`);
+  if (out.blend !== undefined && out.blend !== "add" && out.blend !== "screen") throw new PxError(`spell: blend is how the file's art pieces lie on what is drawn, "add" or "screen" (as light), got ${JSON.stringify(out.blend)}`);
   if (out.big && !(BIGS.includes(out.big as Big) || art((out.big as { anim?: unknown }).anim))) throw new PxError(`spell: big is ${BIGS.join(", ")} or { anim: an asset (a list: one a tier) }, got ${JSON.stringify(out.big)}`);
   const m = out.matter;
   if (m !== undefined && !(typeof m === "string" ? m in MATTER : m && [...(m.tones ?? "")].length >= 2 && (m.like === undefined || m.like in MATTER)))
@@ -345,7 +348,7 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
   // the file's own art: the ball (a list grown through the charge, g 0..1) played from its start, the impact's and the centerpiece's (one a tier) once from the hit
   const balls = art(E.ball), hitArt = art(E.impact?.anim), tierArt = (l: string[]) => l[Math.min(l.length, tier) - 1];
   const ball = (c: SpellCanvas, x: number, y: number, rr: number, ks: Color[], t: number, g = 1, density = 1) =>
-    balls ? piece(c, balls[Math.max(0, Math.min(balls.length - 1, Math.floor(g * balls.length)))], x, y, t - start, false, density) : orb(c, x, y, rr, ks, E, seed, t);
+    balls ? piece(c, balls[Math.max(0, Math.min(balls.length - 1, Math.floor(g * balls.length)))], x, y, t - start, false, density, E.blend) : orb(c, x, y, rr, ks, E, seed, t);
 
   // ------------------------------------------------ what each variant draws
   /** The solid now: rising out of the ground or falling with a slow turn, there, cracking, broken. */
@@ -630,7 +633,7 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
             const tt = t - i * (tr.every ?? 50);
             if (tt < t0r) continue;
             const [gx, gy] = scr(path(tt));
-            if (balls) piece(c, balls[Math.max(0, balls.length - 1 - i)], gx, gy, tt - start, false, 1 - i / (gh + 1));
+            if (balls) piece(c, balls[Math.max(0, balls.length - 1 - i)], gx, gy, tt - start, false, 1 - i / (gh + 1), E.blend);
             else orb(c, gx, gy, rr * (1 - i / (gh + 1)), ks, E, seed, tt);
           }
           if (E.trail !== false && !gh) drawTrail(c, (tt) => scr(path(tt)), E.keys, { length: (E.trail?.length ?? 160) * D, width: E.trail?.width ? (E.trail.width.map((w) => w * S) as [number, number]) : [Math.round(rr * 1.6), 1], from: t0r });
@@ -640,7 +643,7 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
       } else {
         // the impact: the centerpiece, its shape, (tier 2 on) a shockwave on the ground, sparks
         const k = after(t), ki = into(t);
-        if (bigArt) piece(c, tierArt(bigArt), ...scr(G3), t - hit, true);
+        if (bigArt) piece(c, tierArt(bigArt), ...scr(G3), t - hit, true, 1, E.blend);
         else if (big) centerpiece(c, big, ks, t);
         if (del === "sky" && ki < 0.6 && Math.floor(t / 40) % 3 !== 2) bolt(c, scr([G3[0] + 6 * U, G3[1], (top ? 100 : 160) * U]), scr(B3), ks, seed + Math.floor(t / 40), 1);
         if (del === "chain")
@@ -652,7 +655,7 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
             shape(c, V, U, "rays", j1, [j1[0], j1[1], 0], S * 0.6, ks, clamp01((t - t1) / 200), clamp01((t - t1) / 260), seed + i, t);
             spark(c, x, y, 1, ks, t);
           }
-        if (hitArt) piece(c, tierArt(hitArt), ...scr(I3), t - hit, true);
+        if (hitArt) piece(c, tierArt(hitArt), ...scr(I3), t - hit, true, 1, E.blend);
         else shape(c, V, U, shapeName, I3, G3, S * (VR.burning ? 1.8 : SO ? 0.8 : 1), E.impact?.keys ? keysOf(c, E.impact.keys) : ks, ki, k, seed, t);
         if (T.ring) gring(c, V, U, G3, Math.round(4 + ease(ki) * 18 * S), ks.slice(1, 3), 1 - ki);
         drawParticles(c, burst, pk, { trail: 30 });
@@ -744,14 +747,20 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
 const HIT_LOOK: Record<string, string> = { fire: "burn", lightning: "burn", ice: "frost", light: "magic", dark: "magic", heal: "magic" };
 /** An asset or a list of them (the file's own art), as a list. */
 const art = (v: unknown): string[] | undefined => (typeof v === "string" ? [v] : Array.isArray(v) && v.length && v.every((n) => typeof n === "string") ? v : undefined);
-/** A piece of the file's art at (x, y) on the picture (its pivot there, else its middle), `ms` into it, thinned by `density`. */
-function piece(c: SpellCanvas, name: string, x: number, y: number, ms: number, once = false, density = 1): void {
+/** A piece of the file's art at (x, y) on the picture (its pivot there, else its middle), `ms` into it, thinned by `density`; `blend`: added to what is under it as light, by its alpha (in linear light, as mesh()'s blended sprites). */
+function piece(c: SpellCanvas, name: string, x: number, y: number, ms: number, once = false, density = 1, blend?: "add" | "screen"): void {
   if (!c.piece) throw new PxError(`spell: '${name}' is an asset, drawn by cast()`);
   const img = c.piece(name, ms, once);
   if (!img) return;
   const [px, py] = img.pivot ?? [img.w / 2, img.h / 2], X = Math.round(x - px), Y = Math.round(y - py);
+  const mix = (U: number, S: number, a: number) => (blend === "add" ? U + S * a : 1 - (1 - U) * (1 - S * a));
   for (let j = 0; j < img.h; j++)
-    for (let i = 0; i < img.w; i++) { const col = img.data[j * img.w + i]; if ((col & 255) >= 128) put(c, X + i, Y + j, col, density); }
+    for (let i = 0; i < img.w; i++) {
+      const col = img.data[j * img.w + i], u = blend ? c.get(X + i, Y + j) : TRANSPARENT;
+      if (u === TRANSPARENT) { if ((col & 255) >= 128) put(c, X + i, Y + j, col, density); continue; }
+      const a = (col & 255) / 255;
+      if (a > 0) put(c, X + i, Y + j, fromLinear(mix(LIN[u >>> 24], LIN[col >>> 24], a), mix(LIN[(u >>> 16) & 255], LIN[(col >>> 16) & 255], a), mix(LIN[(u >>> 8) & 255], LIN[(col >>> 8) & 255], a), u), density);
+    }
 }
 const keysOf = (c: VfxCanvas, keys: string[]) =>
   keys.map((k) => { const v = c.color(k); if (v === null || v === TRANSPARENT) throw new PxError(`spell: '${k}' is not a visible color`); return v; });

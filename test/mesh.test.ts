@@ -165,6 +165,15 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { b: { tex: "_white", edg
   assert.ok(t.includes("k") && t.includes("g"), "edge and texture (stepped down by its light) both drawn");
 });
 
+test("mesh shadows without a sun: shadows: true, a ramp face a step down where a box stands between it and the light", () => {
+  const at = (o: string) => rows(`const M = model(); M.face("f", [-5, 0.5, 0], [5, 0.5, 0], [5, 20, 0], [-5, 20, 0]); M.box("b", [-1, 3, 0], [-0.4, 3.6, 1.2])
+scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { f: { ramp: "kgw" }, b: { ramp: "kgw" } }, { light: [-1, 0, 1]${o} }))`);
+  const g = (r: string[]) => r.slice(18).join("").split("g").length - 1, lit = at(""), shaded = at(", shadows: true");
+  assert.equal(g(lit), 0, "the floor all lit");
+  assert.ok(g(shaded) > 10, `a shadow to the right of the box: ${g(shaded)} px`);
+  assert.deepEqual(lit.slice(0, 17), shaded.slice(0, 17), "the box itself as it was");
+});
+
 // post's finish on a picture of its own (no mesh needed): a dark ground, a lit stripe, a bright spot
 const PIC = `const pic = [rect(0, 0, 64, 40, "#30303a"), rect(0, 20, 64, 2, "#9a8a70"), rect(30, 8, 3, 3, "#fffaf0"), rect(10, 30, 8, 6, "#5a7aa0")]\n`;
 const finish = (o: string, src = "") => loadSource(PAL + PIC + src + `scene("a", { w: 64, h: 40, frames: 4 }, ...pic, post(${o}))`, "t.px.js");

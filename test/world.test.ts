@@ -83,6 +83,15 @@ test("world3d: parts placed by relations, a seed each; an edit changes only what
   for (const k of ["oak.trunk", "house", "house.stem", "house.cap", "rock", "rock.stone", "house@", "rock@", "smoke@"]) assert.ok(!ch.includes(k), `${k} stays: ${ch}`);
   assert.throws(() => W.edit({ "pine.canopy": 2 }), /no part 'pine'/);
   assert.throws(() => new World({ parts: { a: { make: "tree", on: "b" } } }), /refers to 'b'/);
+  // a row along a path, straight on past its ends; a rock kept clear of the house by placing, the shorter way
+  const R = new World({ parts: { house: { make: "house", at: [2, 1] },
+    p0: { make: "rock", along: [[[0, 0], [2, 0], [2, 2]], 1] }, p1: { make: "rock", along: [[[0, 0], [2, 0], [2, 2]], 3] }, p2: { make: "rock", along: [[[0, 0], [2, 0], [2, 2]], 5] },
+    r: { make: "rock", at: [2.3, 1.2], apart: ["house", 0.2] }, far: { make: "rock", at: [9, 9], apart: ["house"] } } });
+  assert.deepEqual([R.place("p0"), R.place("p1"), R.place("p2")], [[1, 0, 0], [2, 1, 0], [2, 3, 0]]);
+  const [hlo, hhi] = R.box("house"), [rlo, rhi] = R.box("r"), r = R.place("r");
+  assert.ok(r[0] + rlo[0] >= 2 + hhi[0] + 0.2 - 1e-9 || r[1] + rlo[1] >= 1 + hhi[1] + 0.2 - 1e-9 || r[0] + rhi[0] <= 2 + hlo[0] - 0.2 + 1e-9 || r[1] + rhi[1] <= 1 + hlo[1] - 0.2 + 1e-9, `clear of the house: ${r}`);
+  assert.deepEqual(R.place("far"), [9, 9, 0], "already clear: where it was put");
+  assert.throws(() => new World({ parts: { a: { make: "rock", along: [[[0, 0]], 1] } } }), /two points or more/);
   assert.notEqual(make3d.tree({ seed: 1 }).field!.dist([0, 0, 3]), make3d.tree({ seed: 2 }).field!.dist([0, 0, 3]));
   // a guess out of range said, not drawn (an agent once gave twist 70, radians wrapping round)
   assert.throws(() => make3d.tree({ twist: 70 }), /twist is 0 to 1\.5 \(default 0\.35\), got 70/);

@@ -204,6 +204,11 @@ scene("v", { w: 40, h: 40 }, ground, (c) => c.volume(sdf.density(sdf.sphere(0.4)
   }
   assert.equal(p.image("d").hash(), p.image("a").hash(), "draw3d passes it on");
   assert.match(failure(src('"mesh"', false), "a").message, /light: "mesh" is the light of a mesh\(\) with a sun/);
+  // a wall's shadow (mesh()'s faces) falls on the field: sky only there, darker
+  const walled = loadSource(src('"mesh"').replace("const ground", 'M.face("g", [-1.2, 3, 0], [-1.2, 5, 0], [-1.2, 5, 3], [-1.2, 3, 3])\nconst ground'), "t.px.js");
+  const [W0, W1] = [p.image("a"), walled.image("a")], darker = [];
+  for (let y = 12; y < 21; y++) for (let x = 14; x < 30; x++) if ((W1.get(x, y) >>> 24) < (W0.get(x, y) >>> 24)) darker.push(x);
+  assert.ok(darker.length > 10, `in the wall's shadow: ${darker.length} px darker`);
 });
 
 test("look3d: the 3D ops' light and mats where a call doesn't say them; a call's own wins, light \"view\" the view's own", () => {

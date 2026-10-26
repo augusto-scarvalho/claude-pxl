@@ -30,6 +30,10 @@ export interface PartSpec {
   around?: string;
   /** at another's socket: [part, socket] (smoke at a chimney) */
   attach?: [string, string];
+  /** on a path: [points [x, y] or [x, y, z] m, s m along it from its first point] (straight on past its ends); a row is a part a step of s */
+  along?: [number[][], number];
+  /** kept clear of another's box, seen from above: [part, gap m]; where it would stand in it, moved out the shorter way (x or y) */
+  apart?: [string, number?];
   /** its own materials, over draw3d's (a birch's bark beside an oak's) */
   mats?: Record<string, unknown>;
   /** air: how it is drawn, over its builder's look (ramp: the keys themselves, thickness, ambient, cast, emit) */
@@ -60,8 +64,11 @@ export class World {
       if (!/^[\w-]+$/.test(name)) throw new PxError(`world3d: a part's name is letters, digits, _ or -, got '${name}'`);
       if (!p || !makers[p.make]) throw new PxError(`world3d: part '${name}' is made by one of ${Object.keys(makers).join(", ")} (or one of the file's own, make3d.define, before the world), got ${JSON.stringify(p?.make)}`);
       if ((p.mats !== undefined && (typeof p.mats !== "object" || p.mats === null)) || (p.look !== undefined && (typeof p.look !== "object" || p.look === null))) throw new PxError(`world3d: part '${name}': mats is { material: ramp } and look { thickness, ramp, ... }`);
-      for (const r of [p.on, p.around, p.beside?.[0], p.attach?.[0]]) if (r !== undefined && !spec.parts[r]) throw new PxError(`world3d: part '${name}' refers to '${r}', which isn't a part (it has: ${Object.keys(spec.parts).join(", ")})`);
+      for (const r of [p.on, p.around, p.beside?.[0], p.attach?.[0], p.apart?.[0]]) if (r !== undefined && !spec.parts[r]) throw new PxError(`world3d: part '${name}' refers to '${r}', which isn't a part (it has: ${Object.keys(spec.parts).join(", ")})`);
       if (p.beside && !SIDES[p.beside[1]]) throw new PxError(`world3d: part '${name}' is beside on "left", "right", "front" or "behind", got ${JSON.stringify(p.beside[1])}`);
+      if (p.along !== undefined && !(Array.isArray(p.along) && Array.isArray(p.along[0]) && p.along[0].length >= 2 && p.along[0].every((q) => Array.isArray(q) && q.length >= 2 && q.every(Number.isFinite)) && Number.isFinite(p.along[1])))
+        throw new PxError(`world3d: part '${name}' is along [[[x, y], [x, y], ...], s]: two points or more (m) and how far along them, got ${JSON.stringify(p.along)}`);
+      if (p.apart !== undefined && !(Array.isArray(p.apart) && (p.apart[1] === undefined || p.apart[1] >= 0))) throw new PxError(`world3d: part '${name}' is apart [part, gap m >= 0], got ${JSON.stringify(p.apart)}`);
       if (p.as !== undefined && !AS.includes(p.as)) throw new PxError(`world3d: part '${name}' is drawn as ${AS.map((a) => `"${a}"`).join(", ")}, got ${JSON.stringify(p.as)}`);
     }
     this.spec = spec;
@@ -102,10 +109,24 @@ export class World {
     const D = compileDensity(b.density!, STILL);
     return [D.lo, D.hi];
   }
-  /** Where a part stands at a moment, by its relations. */
+  /** Where a part stands at a moment, by its relations, kept clear of what it is `apart` from. */
   place(name: string, clock: Clock = STILL, seen: string[] = []): V3 {
     if (seen.includes(name)) throw new PxError(`world3d: parts placed by each other in a ring: ${[...seen, name].join(" -> ")}`);
-    const p = this.spec.parts[name], s = [...seen, name];
+    const q = this.placed(name, clock, [...seen, name]), ap = this.spec.parts[name].apart;
+    if (!ap) return q;
+    const [r, gap = 0] = ap, o = this.place(r, clock, [...seen, name]), [lo, hi] = this.box(r), [lo2, hi2] = this.box(name);
+    let move: [number, number] | undefined;
+    for (const e of [0, 1, 2]) {
+      // how far it moves up the axis to clear the other's box, and down it; clear on one axis is clear
+      const up = o[e] + hi[e] + gap - (q[e] + lo2[e]), down = q[e] + hi2[e] - (o[e] + lo[e] - gap);
+      if (up <= 0 || down <= 0) return q;
+      if (e < 2 && (!move || Math.min(up, down) < Math.abs(move[1]))) move = [e, up <= down ? up : -down];
+    }
+    q[move![0]] += move![1];
+    return q;
+  }
+  private placed(name: string, clock: Clock, s: string[]): V3 {
+    const p = this.spec.parts[name];
     const own = typeof p.at === "function" ? p.at(clock) : p.at;
     const base: V3 = own ? [own[0], own[1], own[2] ?? 0] : [0, 0, 0];
     if (p.attach) { const [r, sock] = p.attach, q = this.place(r, clock, s), so = this.built(r).sockets[sock]; if (!so) throw new PxError(`world3d: part '${r}' has no socket '${sock}' (it has: ${Object.keys(this.built(r).sockets).join(", ")})`); return [q[0] + so[0] + base[0], q[1] + so[1] + base[1], q[2] + so[2] + base[2]]; }
@@ -115,6 +136,14 @@ export class World {
       const [r, side, gap = 0.5] = p.beside, q = this.place(r, clock, s), d = SIDES[side], [lo, hi] = this.box(r), [lo2, hi2] = this.box(name);
       const e = d[0] ? 0 : 1, far = d[e] > 0 ? hi[e] - lo2[e] : hi2[e] - lo[e];
       return [q[0] + d[0] * (far + gap) + base[0], q[1] + d[1] * (far + gap) + base[1], base[2]];
+    }
+    if (p.along) {
+      // the segment s falls on (the first or the last past the ends), and the point s along it
+      const [pts, at] = p.along, P = pts.map((v): V3 => [v[0], v[1], v[2] ?? 0]);
+      let i = 0, s0 = 0;
+      for (; i < P.length - 2; i++) { const l = Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1], P[i + 1][2] - P[i][2]); if (s0 + l > at) break; s0 += l; }
+      const a = P[i], b = P[i + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) || 1, k = (at - s0) / l;
+      return [a[0] + (b[0] - a[0]) * k + base[0], a[1] + (b[1] - a[1]) * k + base[1], a[2] + (b[2] - a[2]) * k + base[2]];
     }
     return base;
   }

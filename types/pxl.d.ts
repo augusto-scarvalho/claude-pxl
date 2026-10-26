@@ -226,7 +226,9 @@ declare global {
     light?: PxV3 | ((normal: PxV3, middle: PxV3, face: PxFace) => number); sprites?: PxMeshSprite[]; /** px to a sprite's pixel (an HD picture: 4) */ pixel?: number;
     /** Light in the world (textured faces and sprites, through their normal maps): the sun's color (`light` the way to it), the sky's, lamps, keys that give light, the sun's shadows (default on). */
     sun?: PxColor | { color: PxColor; strength?: number }; sky?: PxColor | { color: PxColor; strength?: number };
-    lamps?: { at: PxV3; color: PxColor; r?: number; strength?: number }[]; emit?: string; shadows?: boolean;
+    lamps?: { at: PxV3; color: PxColor; r?: number; strength?: number }[]; emit?: string;
+    /** the sun's shadows (default true with one); without a sun, true: cast from `light`, a ramp face a step down where they fall */
+    shadows?: boolean;
     /** an orthographic view ("side", "top", "iso", { kind, ... }): px to the meter (16), where the points' [0, 0, 0] lands, [x, y] px */
     ppm?: number; at?: number[];
     /** the sprites whose `at` has no up stand on the model: on the highest face looking up under them (true), or on those materials' */
@@ -305,6 +307,8 @@ declare global {
   /** A scene as data: named parts by builders and relations; an edit of it, what changed, where a part stands. */
   interface PxWorld { readonly kind: "world"; readonly names: string[]; edit(changes: Record<string, unknown>): PxWorld; changed(other: PxWorld): string[]; place(name: string, clock?: PxClock): PxV3; built(name: string): PxBuilt }
   interface PxPartSpec { make: "tree" | "pine" | "bush" | "rock" | "house" | "crystal" | "mist" | "smoke" | (string & {}); params?: Record<string, unknown>; seed?: number; at?: number[] | ((c: PxClock) => number[]); on?: string; beside?: [string, string, number?]; around?: string; attach?: [string, string];
+    /** s m along a path of [x, y] or [x, y, z] (a row: a part a post); kept clear of another's box seen from above, gap m */
+    along?: [number[][], number]; apart?: [string, number?];
     /** its own materials over draw3d's; air: its own look ({ ramp: keys, thickness, ... }) */
     mats?: Record<string, unknown>; look?: { ramp?: string; thickness?: number; ambient?: number; cast?: number; emit?: { ramp: string; strength?: number; glow?: number } };
     /** a solid drawn as its surface, voxels, splats or a mesh, over draw3d's (world.edit({ "oak.as": "voxels" })) */
@@ -399,6 +403,8 @@ declare global {
     cell?: number; ambient?: number; ambientColor?: PxColor; sky?: number; skyColor?: PxColor; skyReach?: number;
     block?: number; smooth?: boolean; emit?: string; shape?: "round" | "diamond";
     relief?: number; skyDir?: [number, number];
+    /** the emitting pixels (emit keys, effect("emit"), a spell) light what is round them: reach px, or { r, power } */
+    emitLight?: number | { r?: number; power?: number };
   }
   /** post(): a depth of field from mesh()'s depth (the pixel in focus, m kept sharp, m to full blur, the blur's radius in px), a bloom, a haze by depth, darker corners. */
   interface PxPost {
@@ -485,6 +491,8 @@ declare global {
     /** the centerpiece, or the file's own `anim` played once from the hit on the ground under the target (a list: the tier picks one) */
     big?: "pillar" | "bolts" | "spikes" | "tornado" | "sphere" | "beam" | "helix" | "nova" | "blizzard" | "quake" | "slide" | "rain" | "grasp" | "leaves" | { anim: string | string[] };
     mark?: false | string[]; flash?: string; light?: string;
+    /** how the file's own art pieces (ball, impact's and big's anim) lie on what is drawn: as they are, or as light ("add", "screen", by their alpha) */
+    blend?: "add" | "screen";
     timing?: { charge?: number; cast?: number; travel?: number; impact?: number; dissipate?: number };
     /** its variants, the first its own way; what its solids are made of */
     variants?: string[];
@@ -552,7 +560,9 @@ declare global {
   /** sway: rows moved sideways by their height over the base, `amount` px at the top (negative: to the left), `lean` of it always downwind, `cycles` a loop. */
   interface PxSway extends PxEffectBase { amount?: number; lean?: number; power?: number; still?: number; cycles?: number; flutter?: number; vary?: number; pixel?: number;
     /** something passing through at column `push` (px from the left): the stems within `reach` px bent away from it, `bend` px at the top */
-    push?: number; reach?: number; bend?: number }
+    push?: number; reach?: number; bend?: number;
+    /** what moves painted instead of by height: an asset of the same size, each pixel's lightness its share (white all, black and clear none) */
+    mask?: string }
   type PxEffect =
     | ["dissolve", PxDissolve?] | ["pixelate", PxPixelate?] | ["dither", PxDitherFx?] | ["tint", PxTint]
     | ["distort", PxDistort?] | ["sway", PxSway?] | ["emit", PxEmit?] | ["aura", PxAura] | ["energy", PxEnergy];
@@ -687,6 +697,7 @@ declare global {
 
   /** A built-in palette, a palette file (.hex .gpl .pal .txt, relative to the art file) or a color list. */
   function use(palette: "pico8" | "sweetie16" | "db16" | "endesga32" | "gray8" | `${string}.${"hex" | "gpl" | "pal" | "txt" | "png"}` | (string | number)[]): void;
+  /** Add or override keys (hex, palette index, another key). Giving a key one of the file's ramps runs through another color is a warning. */
   function pal(keys: Record<string, string | number>): void;
   function ramps(...darkToLight: string[]): void;
   /** Define keys (dark to light) as hue-shifted shades of `base` and add them as a ramp; base sits at `at` (default the middle). */

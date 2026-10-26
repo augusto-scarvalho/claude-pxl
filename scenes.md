@@ -269,7 +269,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   darker corners; the small one is what's checked. And light in
   the world on `mesh()`: a warm `sun` low and a little behind (its shadows fall toward us), a cool
   `sky`, `lamps` with `emit` on their glass, `bump("hybrid")` on the sprites so they take it
-  (`examples/hd2d/plaza.px.js`). Lay the floor's texture a texel to a pixel where the camera looks
+  (`examples/hd2d/plaza.px.js`). Without a sun, `shadows: true` still grounds blocks in a palette-lit
+  diorama: what stands between a ramp face and `light` puts it a step down its ramp. Lay the floor's
+  texture a texel to a pixel where the camera looks
   (`texel: "screen"`, the camera's `floor` or `wall` by the face): at a 16-to-the-meter texel the
   camera squashes it, and blades drawn upright come out lying down. What stands on the ground and is smaller than a person (a
   headstone, a rock) is a sprite drawn at the scene's scale, its top in the sun and its front in the
@@ -658,6 +660,8 @@ Decide five things, in this order:
 Any piece can be the file's own art instead, drawn as it is (never scaled; `examples/hd2d/clearing.px.js`):
 `ball: ["_fire_s", "_fire_m", "_fire"]` (anims grown through the charge, `trail: { ghosts: 3 }` copies of
 it behind), `impact: { anim }`, `big: { anim }` (a list: one a tier), `matter: { tones }` in its ramp.
+`blend: "add"` (or `"screen"`) lays those pieces on what is drawn as light, by their alpha: a glow's
+dark rim vanishes into what is under it.
 
 What the tiers do (`TIERS`), each factor an option of `spell()` to change:
 
@@ -842,9 +846,10 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn
   the solids, the farthest first.
 - **A scene as data, edited by name.** `world3d` parts made by builders with parameters that mean
   something, a seed each: "a denser canopy, twistier branches, wind from the left" is an `edit` of
-  `oak.canopy`, `oak.twist`, `wind.from`, and the house and the rock stay byte for byte. Give values
-  in the builder's range (`PXL help make3d`: a tree's `twist` is 0 to 1.5 radians; an agent once gave
-  70). `expect3d` rules (the canopy above the trunk, the rock clear of the house, the orb reaching
+  `oak.canopy`, `oak.twist`, `wind.from`, and the house and the rock stay byte for byte. A row or a
+  fence is parts `along` a path (one a post, `s` stepping); `apart: ["house", 0.3]` keeps a rock clear
+  of the house by placing it. Give values in the builder's range (`PXL help make3d`: a tree's
+  `twist` is 0 to 1.5 radians; an agent once gave 70). `expect3d` rules (the canopy above the trunk, the rock clear of the house, the orb reaching
   its mark by a time, one thing before another) run in `pxl check`; a rule that fails over a place
   or a gap: `pxl check --fix` finds the one number and writes it (no model, two seconds); `pxl steps
   <file> <scene> --at x,y` says which part painted a pixel, through stamps too. In the evaluation
@@ -875,9 +880,9 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn
   the others). `pxl serve` shows the `.glb` and `.ply` to turn round at `/3d`. `mesh()` draws a mesh
   in `surface()`'s side, top and iso views too.
 - **Into a diorama.** Things drawn in 3D stand among `mesh()`'s sprites when drawn after it through the
-  same camera with `light: "mesh"`: its sun and sky on their tones (as on the sprites), their shadows
-  the sun's share, at its depth, in its sizes' pixel (`hd2d/graveyard.px.js`'s `graveyard_3d`, beside the
-  scene it was made from). There, at 480x270, a frame went from 0.5 s to 1.65 s: a dead tree of 105
+  same camera with `light: "mesh"`: its sun and sky on their tones (as on the sprites), the walls'
+  and figures' shadows falling on them, their own shadows the sun's share, at its depth, in its
+  sizes' pixel (`hd2d/graveyard.px.js`'s `graveyard_3d`, beside the scene it was made from). There, at 480x270, a frame went from 0.5 s to 1.65 s: a dead tree of 105
   tapering rods 1 s (bunched half a meter across, half again as fast; `ao: 0, shadows: false` looked
   the same), a ground mist 0.35 s, a gate swinging on its hinges 0.1 s; checked one frame in 88.
   A thin mist under half a meter (`thickness` 0.5, its top rolling with `noise` 0.7 over a 0.1 m layer,

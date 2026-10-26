@@ -449,7 +449,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       m[i] = k;
       const ramp = ramps[k], up = T.lift(e), q: V3 = [p[0] + n[0] * up, p[1] + n[1] * up, p[2] + n[2] * up];
       const diffuse = Math.max(0, (dot(n, L) + soft) / (1 + soft)), sun = diffuse > 0 && (o.shadows === false || !blocks(q, 0, e)) ? diffuse : 0;
-      if (wpos) { wpos[i * 3] = p[0] + cam.at[0]; wpos[i * 3 + 1] = p[1] + cam.at[1]; wpos[i * 3 + 2] = p[2] + cam.at[2]; wsun![i] = sun > 0 ? 1 : 0; }
+      if (wpos) { wpos[i * 3] = p[0] + cam.at[0]; wpos[i * 3 + 1] = p[1] + cam.at[1]; wpos[i * 3 + 2] = p[2] + cam.at[2]; wsun![i] = sun > 0 && (!Wl!.map || Wl!.map.sees(wpos[i * 3], wpos[i * 3 + 1], wpos[i * 3 + 2], -1, Math.max(0.2, diffuse))) ? 1 : 0; }
       const occ = aoK > 0 && T.ao ? T.ao(p, n) : 0;
       let lv = 0.1 + 0.65 * sun + 0.2 * (0.5 + 0.5 * n[2]) - aoK * 0.35 * Math.max(0, Math.min(1, occ));
       if (shines[k] > 0) {

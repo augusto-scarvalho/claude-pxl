@@ -20,7 +20,7 @@ import type { Img } from "./image.ts";
 export type V3 = [number, number, number];
 export interface Lamp { at: V3; rgb: V3; r: number }
 /** The light, in linear light and already times its strength; `dir` the unit way toward the sun. */
-export interface Lit { sun: V3; sky: V3; dir: V3; lamps: Lamp[]; emit: Set<Color>; shadows: boolean }
+export interface Lit { sun: V3; sky: V3; dir: V3; lamps: Lamp[]; emit: Set<Color>; shadows: boolean; /** what the sun saw: the shadows of mesh()'s faces and sprites, on what is drawn after it (light: "mesh") */ map?: SunMap }
 
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const unit = (a: V3): V3 => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };

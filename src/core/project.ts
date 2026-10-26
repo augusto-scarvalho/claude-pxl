@@ -137,7 +137,7 @@ export const OP_OPTS: Record<string, string[]> = {
   relight: ["light", "reach", "strength", "ramps", "glint"],
   rampmap: ["where", "hue"],
   bump: ["w", "depth", "on", "where", "shapeRadius", "shapeStrength", "shapeSoftness", "detailStrength", "detailScale"],
-  lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "shape", "relief", "skyDir"],
+  lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "emitLight", "shape", "relief", "skyDir"],
   glow: ["where", "r", "strength", "color", "bands", "ramp", "keep"],
   post: ["focus", "sharp", "soft", "blur", "bloom", "fog", "vignette", "pixel", "sharpen", "lut", "grain", "palette", "px"],
   terrain: ["far", "top", "bound", "margin", "sky"],
@@ -274,6 +274,10 @@ export class Project implements BuildCtx {
   /** Art files loaded so far (absolute paths or virtual names), for locations and watching. */
   readonly files: string[] = [];
   pal: Palette = Palette.builtin("pico8").asDefault();
+  /** Where each ramp was first made (ramps(), shades()), for pal()'s warning when it recolors one. */
+  private rampLoc = new Map<string, string | undefined>();
+  /** The includer's ramps while a file it includes (without `palette`) runs: that file's pal() may recolor them, they aren't its own. */
+  private outerRamps = new Set<string>();
   /** look3d()'s light and mats: the 3D ops' when they don't say them, taken by each asset defined after it, as the palette is. */
   look3d?: { light?: number[]; mats?: Record<string, unknown> };
   /** Set by a loader to support include(). */
@@ -436,7 +440,17 @@ export class Project implements BuildCtx {
       else throw new PxError('use("pico8"), use("colors.hex" | ".gpl" | ".pal" | ".txt") or use(["#000", "#fff", ...])', loc);
     };
     env.pal = (aliases: Record<string, string | number>) => {
-      try { this.pal = this.pal.extend(aliases); } catch (e) { throw wrap(e).within("pal", this.callerLoc()); }
+      const loc = this.callerLoc(), was = this.pal;
+      try { this.pal = this.pal.extend(aliases); } catch (e) { throw wrap(e).within("pal", loc); }
+      // a key a ramp runs through given another color: shade() and light() step along the new colors
+      // (a file reusing an included kit's keys 1-8 for its own turned the kit's ramps into its colors)
+      for (const r of new Set(this.pal.ramps)) {
+        if (this.outerRamps.has(r)) continue;
+        const ks = [...new Set(r)].filter((k) => k in aliases && was.keys.get(k) !== this.pal.keys.get(k));
+        if (!ks.length) continue;
+        const L = [...r].map((k) => oklab(this.pal.keys.get(k)!)[0]), dark = L.findIndex((l, i) => i > 0 && l < L[i - 1] - 0.02) > 0;
+        this.warn(`pal: ${ks.map((k) => `'${k}'`).join(", ")} given another color, but the ramp "${r}"${this.rampLoc.get(r) ? ` (made at ${this.rampLoc.get(r)})` : ""} runs through ${ks.length > 1 ? "them" : "it"}: shade() and light() now step along the new colors${dark ? ", and the ramp no longer runs dark to light" : ""}. A new color wants a key no ramp uses`, loc);
+      }
     };
     env.shades = (keys: unknown, base: unknown, opts: { hue?: number; at?: number; sat?: number } = {}) => {
       const loc = this.callerLoc();
@@ -451,10 +465,12 @@ export class Project implements BuildCtx {
         if (!(Number.isInteger(at) && at >= 0 && at < ks.length)) throw new PxError(`at must be a key index 0..${ks.length - 1}, got ${at}`);
         const cols = shadeRamp(c, ks.length, at, opts.hue ?? 20, opts.sat);
         this.pal = this.pal.extend(Object.fromEntries(ks.map((k, i) => [k, toHex(cols[i])]))).withRamps([ks.join("")]);
+        if (!this.rampLoc.has(ks.join(""))) this.rampLoc.set(ks.join(""), loc);
       } catch (e) { throw wrap(e).within("shades", loc); }
     };
     env.ramps = (...ramps: string[]) => {
       try { this.pal = this.pal.withRamps(ramps); } catch (e) { throw wrap(e).within("ramps", this.callerLoc()); }
+      for (const r of ramps) if (!this.rampLoc.has(r)) this.rampLoc.set(r, this.callerLoc());
       // a ramp runs dark to light: written the other way, shade() lightens and light() darkens
       for (const r of ramps) {
         const L = [...r].map((k) => oklab(this.pal.keys.get(k)!)[0]);
@@ -845,8 +861,9 @@ export class Project implements BuildCtx {
       if (!this.includeHook) throw new PxError("include() is not available here", loc);
       // The included file's use()/pal()/ramps() stay with its own assets, unless the includer
       // asks for them ({ palette: true }: a shared palette file).
-      const pal = this.pal;
-      try { this.includeHook(path); } finally { if (!opts.palette) this.pal = pal; }
+      const pal = this.pal, outer = this.outerRamps;
+      if (!opts.palette) this.outerRamps = new Set(pal.ramps);
+      try { this.includeHook(path); } finally { if (!opts.palette) { this.pal = pal; this.outerRamps = outer; } }
     };
     env.rng = (seed?: number) => rng(seed);
     // procedural texture, the same in every file: hash(i, j), vnoise(x, y), fbm(x, y, octaves), bayer(x, y)

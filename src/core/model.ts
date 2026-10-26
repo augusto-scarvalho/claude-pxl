@@ -429,6 +429,8 @@ export interface LightingOpts {
   smooth?: boolean;
   /** Keys that ignore lighting (flames, windows, lava). */
   emit?: string;
+  /** The emitting pixels (the emit keys, what effect("emit") or a spell marked) light what is round them: reach in px, or { r, power = 1 }. */
+  emitLight?: number | { r?: number; power?: number };
   /** Spread shape: "round" (8 neighbours, default) or "diamond" (4, Terraria-like). */
   shape?: "round" | "diamond";
   /** How strongly normal maps (bump / normals) shape the light, 0 = ignore them (default 1). */

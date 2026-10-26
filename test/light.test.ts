@@ -58,6 +58,11 @@ test("lighting: emit keys ignore it; options are validated", () => {
   const p = room('rect(0, 0, 4, 4, "r")', 'lighting({ cell: 1, emit: "r" })');
   assert.equal(p.image("s").get(1, 1), p.assets.get("s")!.pal.resolve("r"));
   assert.equal(p.image("s").get(20, 6) >>> 24, 0);
+  // and with emitLight they light what is round them, in their color
+  const lit = room('rect(0, 0, 4, 4, "r")', 'lighting({ cell: 1, emit: "r", emitLight: 12 })');
+  assert.ok(red(lit, 8, 2) > 100 && (lit.image("s").get(8, 2) >>> 16 & 255) === 0, "the red cells light the room red");
+  assert.equal(red(lit, 20, 2), 0, "past its reach, dark");
+  assert.match(failure(PAL + 'scene("s", { w: 4, h: 4 }, lighting({ emitLight: -1 }))', "s").message, /emitLight is how far/);
   assert.match(failure(PAL + 'lighting({ cel: 2 })').message, /unknown option 'cel'.*did you mean 'cell'/);
   assert.match(failure(PAL + 'lamp(1, 1, { radius: 3 })').message, /unknown option 'radius'/);
   assert.match(failure(PAL + 'sprite("a", { w: 2, h: 2 }, layer("l", lighting()))', "a").message, /lighting\(\) goes directly/);

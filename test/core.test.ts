@@ -857,6 +857,13 @@ test("ramps: one written light to dark gets a warning (shade and light would swa
   assert.deepEqual(p.warnings.map((w) => w.msg.match(/ramp "(\w+)" isn't dark to light/)?.[1]), ["ldk"]);
 });
 
+test("pal: a key a ramp runs through given another color is warned, with where the ramp was made", () => {
+  const p = loadSource('pal({ k: "#000000", d: "#404040", l: "#c0c0c0" })\nramps("kdl")\npal({ d: "#ffffff", x: "#ff0000", l: "#c0c0c0" })', "t.px.js");
+  assert.equal(p.warnings.length, 1);
+  assert.match(p.warnings[0].msg, /^pal: 'd' given another color, but the ramp "kdl" \(made at t\.px\.js:2:1\).*no longer runs dark to light/);
+  assert.equal(p.warnings[0].loc, "t.px.js:3:1");
+});
+
 test("vec: vectors as arrays, what the art files wrote each for itself; a global in every file", () => {
   const a = [1, 2, 2], b = [0, 1, 0];
   assert.deepEqual([vec.add(a, b), vec.sub(a, b), vec.mul(a, 2), vec.cross([1, 0, 0], b)], [[1, 3, 2], [1, 1, 2], [2, 4, 4], [0, 0, 1]]);

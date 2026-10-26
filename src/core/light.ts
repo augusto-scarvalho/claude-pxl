@@ -81,6 +81,28 @@ export function applyLighting(img: Img, masks: LightMasks, lamps: Lamp[], o: Lig
     mix(field, rgbOf(l.color), (x, y) => unit(l.x - x, l.y - y, l.z ?? 8));
   }
 
+  const emit = new Set<Color>();
+  for (const k of colorList(o.emit ?? "")) {
+    const c = pal.resolve(k);
+    if (c !== null) emit.add(c);
+  }
+
+  // what gives light (the emit keys, what an effect or a spell marked so) lights what is round it:
+  // each cell holding it a source in its color, as a lamp there would
+  if (o.emitLight !== undefined) {
+    const el = typeof o.emitLight === "number" ? { r: o.emitLight } : o.emitLight, R = el?.r ?? 16, P = el?.power ?? 1;
+    if (!(R > 0) || !(P > 0)) throw new PxError(`lighting: emitLight is how far the emitting pixels light, px, or { r, power } (above 0), got ${JSON.stringify(o.emitLight)}`);
+    const by = new Map<Color, Set<number>>();
+    for (let i = 0; i < img.data.length; i++) {
+      const c = img.data[i];
+      if (c === TRANSPARENT || !(emit.has(c) || img.emit?.[i])) continue;
+      if (!by.has(c)) by.set(c, new Set());
+      by.get(c)!.add(Math.floor(Math.floor(i / img.w) / cell) * gw + Math.floor((i % img.w) / cell));
+    }
+    // ponytail: on normal maps it comes straight on, not from where it glows; per source if a relief reads wrong
+    for (const [c, cells] of by) mix(spread(gw, gh, solidCell, [...cells], P, cell / R, keep, diag), rgbOf(c), () => [0, 0, 1]);
+  }
+
   const sky = o.sky ?? 0;
   if (sky > 0) {
     // Cells open to the sky: from the top of each column down to the first solid or wall cell.
@@ -129,12 +151,6 @@ export function applyLighting(img: Img, masks: LightMasks, lamps: Lamp[], o: Lig
     }
     return lit;
   };
-
-  const emit = new Set<Color>();
-  for (const k of colorList(o.emit ?? "")) {
-    const c = pal.resolve(k);
-    if (c !== null) emit.add(c);
-  }
 
   const out = new Img(img.w, img.h), map = new Img(img.w, img.h);
   for (let y = 0; y < img.h; y++)

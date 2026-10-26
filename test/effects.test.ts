@@ -174,6 +174,11 @@ anim("a", { base: "t", frames: 4 }, ${fx})`);
   const flat = p.image("t"), moved = f[2].img, n = (img: Img, x: number, y: number) => [...img.norm!.subarray(3 * (y * 9 + x), 3 * (y * 9 + x) + 3)];
   assert.deepEqual(n(moved, 7, 0), n(flat, 4, 0), "the top pixel's normal went with it");
   assert.ok(same(bar('effect("sway", { amount: 0 })').frames("a")[1].img, flat), "amount 0 changes nothing");
+  // a painted mask instead of the height: its white rows go the whole way, the clear stays
+  const masked = load(`sprite("t", { w: 9, h: 10, pivot: "bottom" }, rect(4, 0, 1, 10, "g"))
+sprite("_m", { w: 9, h: 10 }, rect(0, 0, 9, 4, "#ffffff"))
+anim("a", { base: "t", frames: 4 }, effect("sway", { amount: 3, lean: 1, vary: 0, mask: "_m" }))`).frames("a")[2].img;
+  assert.deepEqual(xs(masked), [7, 7, 7, 7, 4, 4, 4, 4, 4, 4]);
   // lean 0: to and fro about the upright; copies reseeded sway out of step
   const fro = bar('effect("sway", { amount: 3, lean: 0, power: 1, vary: 0 })').frames("a").map((g) => xs(g.img)[0]);
   assert.deepEqual(fro, [4, 7, 4, 1], "upright, right, upright, left over the loop");

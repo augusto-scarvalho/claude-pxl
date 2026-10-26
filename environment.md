@@ -121,7 +121,9 @@ round it.
   16 frames of 125 ms: the kit's 68 px pine 2 px at the top with its 6 rows of trunk still, the dead
   tree 1.5 px, power 2.5, 12 rows still (its limbs only), a bush 1 px, power 1.5. A flutter whose
   ripple turns fast up the rows (0.9 radian a row) tore the tiers into a comb; at 0.3 a row, 1 px
-  of it keeps them whole. Placed with `reseed: true`, no two in step; the foot never moves.
+  of it keeps them whole. Placed with `reseed: true`, no two in step; the foot never moves. What
+  doesn't sway by its height (a vine's hanging tips, a flag's free edge) is painted: `mask`, an
+  asset of the same size, its white going the whole way and its black and clear staying.
 - Variety: 2-3 heights and a color swap or two (a far one hazier); symmetric trees may repeat in
   staggered rows, asymmetric ones are focal points, used once. Don't mirror a tree lit from one side.
 - Backlit (the sun behind): the fronts lose detail and contrast, and a 1 px rim of the lightest tone

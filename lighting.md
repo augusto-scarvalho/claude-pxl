@@ -57,6 +57,7 @@ twice.
 | `ambient` | 0 | Minimum light everywhere, 0..1. Keep it low (0.02–0.08) for Terraria-black darkness. |
 | `ambientColor` | white | |
 | `emit` | — | Keys that ignore lighting: flames, glowing windows, lava (`"yYG"`). |
+| `emitLight` | — | The emitting pixels (the `emit` keys, and what `effect("emit")` or a spell marked as giving light) light what is round them, each in its color, as a lamp at each of their cells would: the reach in px, or `{ r, power = 1 }`. A river of lava or a street of windows without a `lamp()` each. |
 | `shape` | `"round"` | `"diamond"` spreads to 4 neighbours only (diamond-shaped pools). |
 | `relief` | 1 | How strongly normal maps shape the light; 0 ignores them. |
 | `skyDir` | `[0, -1]` | Where the sky light comes from, for normal maps, on screen like `light` elsewhere (`[0, -1]` above, `[-1, -1]` the upper left). |
