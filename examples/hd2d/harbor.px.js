@@ -9,6 +9,7 @@
 include("crew.px.js")                   // the traveler, the mourner and the crew (crew.px.js includes traveler.px.js)
 include("kit.px.js")
 include("../fonts/font5x7.px.js")
+include("dialog.px.js")                 // the dialogue boxes
 
 pal({
   k: "#1d1410",                                                   // outline, the deepest gaps
@@ -654,45 +655,11 @@ const SAYS = [
   [28, 50, "Captain", ["Aye. We sail", "with the tide."], () => CAPTAIN, 1],
   [53, 70, "Alden", ["Then I'm aboard."], () => visit.step("talk").a, -1],
 ].map(([t0, t1, name, lines, who, side]) => [t0, t1, name, lines, () => { const [x, z] = who(); return [x, Z + z, LOWER] }, side])
-// A dialogue box as HD-2D games draw theirs (Triangle Strategy above all): parchment, its corners cut;
-// a warm beige with faint fibers running across it, darker toward its edges as old paper is, a light
-// line just inside its thin brown outline; the speaker's name at its top over a rule that starts at a
-// small diamond and fades out; the words below in the 5x7 letters, a dark sepia; a short tail from its
-// lower edge down to the speaker's head; a blue-grey mark at its lower right corner that more is
-// coming. Over the speaker and off to one side (side: 1 right, -1 left), in pixels finer than the
-// art's (3 of the picture's to the art's 4), as a game's interface is.
+// The dialogue boxes, over the speaker's head and off to one side (side: 1 right, -1 left): bubble()
+// in dialog.px.js's parchment
 const say = (c, [x, z, u], name, lines, side, t) => {
-  const K = c.k, U = Math.max(1, Math.round(K * 0.75)), pad = 7, lineH = 10, ch = 5
-  const tw = Math.max(name.length * 6 + 16, ...lines.map((l) => l.length * 6)), w = tw + 2 * pad + 8, h = pad + 7 + 6 + lines.length * lineH + pad - 2
-  const [hx, hy] = CAM.ground(x, z, u + 2.1).map((p) => p * K), tail = 9
-  const X0 = Math.round(hx - (side > 0 ? 0.22 : 0.78) * w * U), Y0 = Math.round(hy - (h + tail) * U) - 2 * U
-  const sx = Math.max(ch + 5, Math.min(w - ch - 6, Math.round((hx - X0) / U))), tip = Math.round((hx - X0) / U)
-  const cells = new Set(), key = (i, j) => i + "," + j, has = (i, j) => cells.has(key(i, j))
-  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++)
-    if (i + j >= ch && w - 1 - i + j >= ch && i + h - 1 - j >= ch && w - 1 - i + h - 1 - j >= ch) cells.add(key(i, j))
-  for (let r = 0; r <= tail; r++) { const k = r / tail, cx = sx + (tip - sx) * k, half = 4 * (1 - k); for (let i = Math.round(cx - half); i <= Math.round(cx + half); i++) cells.add(key(i, h - 1 + r)) }
-  const R = (i, j, ww, hh, col) => c.rect(X0 + i * U, Y0 + j * U, ww * U, hh * U, col)
-  for (const cell of cells) {
-    const [i, j] = cell.split(",").map(Number)
-    let d = 1                                                                      // how far in from its edge
-    while (d < 5 && [[d, 0], [-d, 0], [0, d], [0, -d]].every(([dx, dy]) => has(i + dx, j + dy))) d++
-    const fiber = hash(i >> 3, j) < 0.12 || hash(i >> 1, j * 7) < 0.06
-    R(i, j, 1, 1, d === 1 ? "#6e5a43" : d === 2 ? "#f4ecda" : d <= 4 ? (fiber ? "#d8c6a2" : "#dfcfae") : fiber ? "#e3d5b8" : "#ebdfc4")
-  }
-  c.text(X0 + (pad + 4) * U, Y0 + pad * U, name, "#4a3a2c", { font: "5x7", scale: U })
-  // the rule under the name: a diamond, then a line fading out
-  R(pad, pad + 9, 1, 1, "#8c7457"); R(pad + 1, pad + 8, 1, 3, "#8c7457"); R(pad + 2, pad + 9, 1, 1, "#8c7457")
-  const rule = Math.round(tw * 0.62)
-  R(pad + 3, pad + 9, Math.round(rule * 0.6), 1, "#8c7457"); R(pad + 3 + Math.round(rule * 0.6), pad + 9, Math.round(rule * 0.4), 1, "#b9a483")
-  lines.forEach((l, k) => c.text(X0 + (pad + 6) * U, Y0 + (pad + 14 + k * lineH) * U, l, "#3a2f27", { font: "5x7", scale: U }))
-  // more is coming, waiting for a button: a small triangle pointing down over a short rule, bobbing a
-  // pixel down and back and blinking off, as a game's prompt does (t: frames since the box opened)
-  const mx = w - pad - 10, ph = t % 10, my = h - pad - 5 + (ph >= 4 && ph < 8 ? 1 : 0)
-  if (ph < 8) {
-    R(mx, my, 7, 1, "#4f6382"); R(mx + 1, my + 1, 1, 1, "#4f6382"); R(mx + 5, my + 1, 1, 1, "#4f6382"); R(mx + 2, my + 2, 1, 1, "#4f6382"); R(mx + 4, my + 2, 1, 1, "#4f6382"); R(mx + 3, my + 3, 1, 1, "#4f6382")
-    R(mx + 2, my + 1, 3, 1, "#9db0cc"); R(mx + 3, my + 2, 1, 1, "#9db0cc")
-  }
-  R(mx, h - pad, 7, 1, "#4f6382")
+  const [hx, hy] = CAM.ground(x, z, u + 2.1)
+  c.bubble(hx, hy - 1.5, name, lines, { ...PARCHMENT, side, t })
 }
 const talk = (c, f = c.frame) => {
   const t = f - TALK

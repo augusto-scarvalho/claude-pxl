@@ -341,7 +341,8 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   it (Triangle Strategy), its look your sprites: parchment with cut corners, fibers, darker toward its
   edges, a light line inside a thin brown outline (a 9-slice), the name over a rule from a small
   diamond, the words in a 5x7 font, a short tail to the speaker, a mark that more is coming, bobbing a
-  pixel and blinking off as a game's prompt waiting for a button does (an anim); drawn after `post()`,
+  pixel and blinking off as a game's prompt waiting for a button does (an anim): `examples/hd2d/dialog.px.js`,
+  to include, its `PARCHMENT` the options; drawn after `post()`,
   so it stays sharp, in pixels finer than the art's (`unit: 0.75`). A loop that long checked one frame in 24: `check: { every: 24 }` (no rule runs on it but the frames building: fewer keep the tests fast).
 - The ground and what grows and lies on it (grass, trees, bushes, rocks, walls, paths, tufts,
   flowers), as 16-bit games draw them: the environment guide (`pxl help "environment"`, by section)
