@@ -38,16 +38,24 @@ const MIKO = {
   body: (h, a) => (h < 0.3 ? "dRr" : collar(h, a) ? "Vv" : "vWw"),
   sleeve: two("vWw", "VvW"), fore: two("vWw", "VvW"), hand: two("zsS", "zzs"),
 }
-// the dressed figure, and what dress() hasn't: the wide sleeves hanging from each forearm, the hair's
-// tail down her back from the nape
+// the dressed figure, and what dress() hasn't: the kosode's body leaning with her (dress() sweeps it
+// round an upright through the hips: as she bowed it stood, a column her shoulders and head left, and
+// it swallowed her hair); the wide sleeves hanging from each forearm; the hair's tail down her back
+// from the nape, lying along her back as she leans (hung plumb from a nape the lean carries forward, it
+// ran inside her), pushed out to her back where the lean brings the nape over it
 const parts = (j, p) => {
   const P = T.dress(MIKO)(j, p), farArm = j.depth(j.arms[0].sh) < j.depth(j.arms[1].sh) ? 0 : 1
+  const waist = j.pelvis[2] + 1.4, chest = j.chest[2] + 0.5, lean = sub(j.chest, j.pelvis)
+  const along = (h) => { const t = (waist + h * (chest - waist) - j.pelvis[2]) / lean[2]; return [lean[0] * t, lean[1] * t] }
+  P.tunic[1] = j.sweep([j.pelvis[0], j.pelvis[1], 0], waist, chest, (h, a) => (4 - 0.5 * h * h) * (0.84 + 0.16 * Math.abs(Math.sin(a))),
+    { shift: along, paint: (h, a, out) => MIKO.body(h < 0.14 ? 0 : h, a, out) })
   j.arms.forEach((A, i) => {
     const a = add(A.elbow, [0, 0, -2]), b = add(add(A.elbow, mul(sub(A.hand, A.elbow), 0.85)), [0, 0, -2.6])
     P[`sode${i}`] = j.limb(a, b, 1.9, 2.3, i === farArm ? "VvW" : "vWw")
   })
   const nape = add(add(j.head, mul(j.hd.f, -3.6)), [0, 0, -3.4])
-  P.tail = j.limb(nape, add(add(nape, [0, 0, -9]), mul(j.f, -1.4)), 1.5, 1.0, "JjhH")
+  const back = unit(add(mul(j.sh.f, -1), mul(j.spine, vec.dot(j.sh.f, j.spine)))), top = add(nape, mul(back, Math.max(0, 3.6 - vec.dot(sub(nape, j.chest), back))))
+  P.tail = j.limb(top, add(add(top, mul(j.spine, -9)), mul(back, 1.4)), 1.5, 1.0, "JjhH")
   return { ...P, neck: T.neck(j) }
 }
 

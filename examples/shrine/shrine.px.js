@@ -29,7 +29,11 @@ front("torii", make3d.torii())
 front("toro", make3d.toro())
 front("basin", make3d.chozubachi({ moss: 0.1 }))
 front("ema", make3d.ema())
-turnaround("fox", make3d.kitsune(), { view: "side", ppm: S, headings: ["e", "w"] })
+// the foxes, a pair as at Inari shrines: the jewel under a forepaw on the left, the key in its mouth on
+// the right, facing each other across the landing; their edges toward the sun lit, their faces carved
+const FOX_TAMA = make3d.kitsune({ holds: "tama" }), FOX_KEY = make3d.kitsune({ holds: "key" })
+turnaround("fox_tama", FOX_TAMA, { view: "side", ppm: S, headings: ["e"], surface: { rim: true }, draw: japan.carve(FOX_TAMA) })
+turnaround("fox_key", FOX_KEY, { view: "side", ppm: S, headings: ["w"], surface: { rim: true }, draw: japan.carve(FOX_KEY) })
 
 // ---------------------------------------------------------------- the trees (trees.px.js), in autumn
 // (swaying: 12 frames of a gust coming and going, the wind from the east, so their tops lean west)
@@ -130,7 +134,7 @@ const airLeaves = (c) => {
 
 // ---------------------------------------------------------------- the courtyard
 const PLACES = [
-  ["hall_s", 84, 63], ["ema_s", 152, 62], ["fox_e", 50, 95], ["fox_w", 118, 95], ["toro_s", 138, 95], ["toro_s", 166, 95],
+  ["hall_s", 84, 63], ["ema_s", 152, 62], ["fox_tama_e", 50, 95], ["fox_key_w", 118, 95], ["toro_s", 138, 95], ["toro_s", 166, 95],
   ["basin_s", 120, 150], ["torii_s", 189, 158],
 ]
 // what moves, stamped by the frame: the trees swaying three times a loop, each a little after another,

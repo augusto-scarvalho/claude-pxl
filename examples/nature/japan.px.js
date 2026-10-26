@@ -17,6 +17,7 @@ pal({
   o: "#7c3413", u: "#c8691d", U: "#f2a443",                               // orange
   g: "#84630f", G: "#cfa01f", Y: "#f5d95a",                               // gold (a ginkgo's)
   P: "#bdb6a8", W: "#faf6ea",                                             // paper
+  E: "#1a1418",                                                           // a carved eye
   i: "#f2b450", I: "#ffeab0",                                             // lamplight
 })
 ramps("xyzZ", "xq", "KOsSF", "mMnN", "eRr", "ouU", "gGY", "PW", "iI")
@@ -142,22 +143,49 @@ make3d.define("ema", ({ seed = 5 } = {}) => {
   return { field }
 }, { params: { seed: [0, 999] } })
 
-// A fox (kitsune) sitting up on its plinth, its front -y, the tail up behind it, a red bib at its
-// throat; stone, mossed where it faces up. `size`: the fox bigger than life (1.45).
-make3d.define("kitsune", ({ size = 1.45, moss = 0.12 } = {}) => {
-  const Z0 = 0.62
-  const plinth = sdf.box([0.72, 0.72, 0.1], { round: 0.02 }).at(0, 0, 0.05)
-    .union(sdf.box([0.6, 0.6, 0.44], { round: 0.02 }).at(0, 0, 0.32), sdf.box([0.68, 0.68, 0.08], { round: 0.02 }).at(0, 0, 0.58))
+// A fox (kitsune) on its pedestal, as the pairs at Inari shrines sit: up on its haunches, the chest high,
+// the front legs straight, tall pointed ears, a narrow snout; its tail big and bushy, raised up behind
+// its back and curling forward at the tip (what says fox from any side); a red bib (yodarekake) tied at
+// its throat; one holding the jewel (tama) under a forepaw, the other a key in its mouth (`holds`), as a
+// pair differs. The pedestal in layers (a slab, a step, the die, its cap and a top), moss on what faces
+// up. Its eyes and the line of its mouth are "eye" and "mouth" sockets, carved by hand over each view:
+// japan.carve(fox) as turnaround's draw. `size`: the fox bigger than life (1.45).
+make3d.define("kitsune", ({ size = 1.45, moss = 0.15, holds = "tama" } = {}) => {
+  // (its parameters checked here: make3d.define's params take ranges of numbers only, and holds is a word)
+  if (!(size >= 0.5 && size <= 3) || !(moss >= 0 && moss <= 1)) throw new Error(`make3d.kitsune: size is 0.5 to 3, moss 0 to 1, got ${size}, ${moss}`)
+  if (!["tama", "key"].includes(holds)) throw new Error(`make3d.kitsune: holds is "tama" (a jewel under a forepaw) or "key" (in its mouth), got ${JSON.stringify(holds)}`)
+  const Z0 = 0.63, at = (p) => [p[0] * size, p[1] * size, p[2] * size + Z0]
+  const pedestal = sdf.union(sdf.box([0.8, 0.8, 0.1], { round: 0.015 }).at(0, 0, 0.05), sdf.box([0.72, 0.72, 0.08], { round: 0.015 }).at(0, 0, 0.14),
+    sdf.box([0.58, 0.58, 0.32], { round: 0.02 }).at(0, 0, 0.34), sdf.box([0.68, 0.68, 0.07], { round: 0.015 }).at(0, 0, 0.535), sdf.box([0.62, 0.62, 0.06], { round: 0.015 }).at(0, 0, 0.6))
+  // the tail from under the haunches up behind the back, thickest halfway, rising past the head on one
+  // side (the pair's on the outer sides: the jewel's on its right, the key's on its left), its tip
+  // curling forward
+  const t = holds === "tama" ? 1 : -1
+  const tail = sdf.union(sdf.capsule([0, 0.18, 0.08], [t * 0.04, 0.3, 0.26], 0.05, 0.1), sdf.capsule([t * 0.04, 0.3, 0.26], [t * 0.09, 0.28, 0.54], 0.1, 0.095),
+    sdf.capsule([t * 0.09, 0.28, 0.54], [t * 0.08, 0.17, 0.76], 0.095, 0.04), { smooth: 0.04 })
+  const paw = holds === "tama" ? [0.065, -0.15, 0.13] : [0.06, -0.11, 0.02]
   const fox = sdf.union([
-    sdf.ellipsoid([0.2, 0.22, 0.14]).at(0, 0.05, 0.12), sdf.ellipsoid([0.15, 0.15, 0.26]).at(0, -0.02, 0.3),
-    sdf.capsule([-0.07, -0.13, 0.02], [-0.07, -0.08, 0.3], 0.04), sdf.capsule([0.07, -0.13, 0.02], [0.07, -0.08, 0.3], 0.04),
-    sdf.sphere(0.13).at(0, -0.06, 0.6), sdf.capsule([0, -0.12, 0.58], [0, -0.3, 0.54], 0.07, 0.035),
-    sdf.cone(0.05, 0.15).at(-0.07, -0.03, 0.66), sdf.cone(0.05, 0.15).at(0.07, -0.03, 0.66),
-    sdf.capsule([0, 0.18, 0.08], [0, 0.26, 0.5], 0.07, 0.09),
-  ], { smooth: 0.03 })
-  const field = mossy(plinth.union(fox.scale(size).at(0, 0, Z0)).mat("stone"), moss).union(sdf.ellipsoid([0.14, 0.05, 0.1]).at(0, -0.14, 0.42).scale(size).at(0, 0, Z0).mat("bib"))
-  return { field }
-}, { params: { size: [0.5, 3], moss: [0, 1] } })
+    sdf.ellipsoid([0.17, 0.19, 0.13]).at(0, 0.08, 0.12), ...[-1, 1].map((x) => sdf.ellipsoid([0.07, 0.15, 0.09]).at(x * 0.13, 0.02, 0.08)),
+    sdf.ellipsoid([0.135, 0.125, 0.24]).at(0, -0.02, 0.3),
+    sdf.capsule([-0.06, -0.11, 0.02], [-0.06, -0.07, 0.3], 0.033), sdf.capsule(paw, [0.06, -0.07, 0.3], 0.033),
+    sdf.capsule([0, -0.04, 0.44], [0, -0.06, 0.56], 0.065), sdf.sphere(0.095).at(0, -0.07, 0.6),
+    sdf.capsule([0, -0.14, 0.59], [0, -0.28, 0.555], 0.042, 0.02),
+    ...[-1, 1].map((x) => sdf.cone(0.04, 0.16).rotate(x * 12, "y").at(x * 0.055, -0.05, 0.66)),
+    tail,
+  ], { smooth: 0.025 })
+  const bib = sdf.union(sdf.ellipsoid([0.11, 0.035, 0.09]).rotate(-20, "x").at(0, -0.12, 0.44), sdf.torus(0.07, 0.014).rotate(-15, "x").at(0, -0.05, 0.5))
+  const held = holds === "tama" ? sdf.union(sdf.sphere(0.065).at(0.065, -0.15, 0.065), sdf.cone(0.03, 0.07).at(0.065, -0.15, 0.11))
+    : sdf.union(sdf.capsule([-0.11, -0.2, 0.56], [0.09, -0.2, 0.56], 0.016), sdf.torus(0.035, 0.012).rotate(90, "y").at(0.125, -0.2, 0.56))
+  const field = mossy(pedestal.union(fox.scale(size).at(0, 0, Z0)).mat("stone"), moss)
+    .union(bib.scale(size).at(0, 0, Z0).mat("bib"), held.scale(size).at(0, 0, Z0).mat("gold"))
+  return { field, sockets: { eye0: at([-0.05, -0.145, 0.63]), eye1: at([0.05, -0.145, 0.63]), mouth0: at([-0.03, -0.24, 0.545]), mouth1: at([0.03, -0.24, 0.545]), head: at([0, -0.07, 0.6]) } }
+})
+// turnaround's draw for a thing with "eye" and "mouth" sockets: each a carved pixel, near black (E),
+// where it faces us (nearer us than the head's middle)
+const carve = (thing) => (c, v) => {
+  const S = thing.sockets ?? {}, mid = S.head ? v.depth(S.head) : -Infinity
+  for (const [n, p] of Object.entries(S)) if (/^(eye|mouth)/.test(n) && v.depth(p) > mid) { const [x, y] = v.screen(p); c.px(Math.round(x), Math.round(y), "E") }
+}
 
 // the paper streamers (shide): a strip folded down in a zigzag, hung by its top middle
 sprite("_shide", { pivot: [1, 0] }, `
@@ -278,5 +306,5 @@ const leaves = (density, color, { seed = 3, cell = 3 } = {}) => (x, y) => {
 }
 // the ground: what the first of them paints at a pixel
 const ground = (...fs) => (x, y) => { for (const f of fs) { const k = f(x, y); if (k) return k } return null }
-Object.assign(japan, { mats: JAPAN_MATS, hand, paving, raked, moss, stones, leaves, ground })
+Object.assign(japan, { mats: JAPAN_MATS, hand, carve, paving, raked, moss, stones, leaves, ground })
 }
