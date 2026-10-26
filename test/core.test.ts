@@ -345,6 +345,9 @@ test("wire with hangs, text", () => {
   eq(art(PAL + 'sprite("_b", "w"); sprite("a", { w: 9, h: 4 }, wire(0, 0, 8, 0, 2, "r", { hang: "_b", every: 4, start: 4 }))', "a"),
     "r.......r\n.r.....r.\n..rrrrr..\n....w....");                       // pixel-perfect and symmetric
   eq(art(PAL + 'sprite("a", { w: 3, h: 5 }, text(0, 0, "L", "r"))', "a"), "r..\nr..\nr..\nr..\nrrr");
+  // a key a letter: null leaves one out and keeps its place; the line break isn't a letter
+  eq(art(PAL + 'sprite("a", { w: 11, h: 1 }, text(0, 0, "III", (i) => (i === 1 ? null : i ? "g" : "r")))', "a"), "rrr.....ggg");
+  eq(art(PAL + 'sprite("a", { w: 3, h: 7 }, text(0, 0, "I\\nI", (i) => (i ? "g" : "r")))', "a").split("\n")[6], "ggg");
 });
 
 test("reseed rebuilds a placed asset with fresh random choices", () => {
@@ -455,6 +458,13 @@ test("relight: edges facing the light step lighter along their ramp, edges facin
   // reach: empty space up to 2 px away counts, past other colors too; ramps given inline; colors on no ramp stay
   eq(art(PAL + 'sprite("a", { w: 4, h: 1 }, rect(0, 0, 4, 1, "r"), px(3, 0, "g"), relight(null, { ramps: ["krw"], light: [-1, 0], reach: 2 }))', "a"), "wwkg");
   assert.match(failure(PAL + 'sprite("a", { w: 1, h: 1 }, px(0, 0, "r"), relight())', "a").message, /relight: no ramps/);
+});
+
+test("corners: a corner terrain's 16 pieces from one function, variants grouped, an empty piece left out", () => {
+  const p = loadSource(PAL + 'corners("d", { size: 2, variants: 2 }, (x, y, t, v) => (t > 0.5 ? (v ? "g" : "r") : null))', "t.px.js");
+  // mask 1 (the top-left corner): only the pixel nearest it has more than half (0.75 x 0.75)
+  assert.deepEqual([p.has("d_0_0"), keys(p, "d_15_0"), keys(p, "d_15_1"), keys(p, "d_1_0"), p.candidates("d_1")], [false, "rr\nrr", "gg\ngg", "r.\n..", ["d_1_0", "d_1_1"]]);
+  assert.match(failure(PAL + 'corners("d", { size: 0 }, () => "r")').message, /size is the tile's px/);
 });
 
 test("tilemap corners: one char per tile corner, each tile picked by its corner mask", () => {
@@ -822,7 +832,10 @@ test("stamp sub: half a pixel along, it stays where it comes from and its edges 
   // the key from the part's own ramp, though another ramp's key lies nearer the middle of the two
   const reds = 'pal({ k: "#000000", D: "#7a1414", R: "#c03030", B: "#5c2a24" }); ramps("kDR", "kB"); sprite("r", { w: 2, h: 2 }, rect(0, 0, 2, 2, "R")); ';
   assert.equal(art(reds + 'scene("s", { w: 4, h: 4, bg: "k" }, stamp("r", 1, 0.5, { sub: true }))', "s"), rows("kRRk", "kRRk", "kDDk", "kkkk"));
-  assert.throws(() => clear('stamp("o", 1, 2.5, { sub: "down" })'), /sub is true, or \[dx, dy\]/);
+  assert.throws(() => clear('stamp("o", 1, 2.5, { sub: "down" })'), /sub is true, \[dx, dy\] the way/);
+  // the way from where it was: up from y 3, down from y 2
+  assert.equal(clear('stamp("o", 1, 2.5, { sub: { from: [1, 3] } })'), clear('stamp("o", 1, 2.5, { sub: [0, -1] })'));
+  assert.equal(clear('stamp("o", 1, 2.5, { sub: { from: [1, 2] } })'), clear('stamp("o", 1, 2.5, { sub: true })'));
   // drawn in code: c.subpixel moves what it draws the same way
   assert.equal(on(pal, '(c) => c.subpixel(0, 0.5, () => c.rect(2, 2, 2, 2, "w"))'), rows("rrrrrr", "rrrrrr", "rrwwrr", "rrwwrr", "rrffrr", "rrrrrr"));
   assert.equal(on(pal, '(c) => c.subpixel(1, 1, () => c.rect(1, 1, 2, 2, "w"))'), on(pal, 'rect(2, 2, 2, 2, "w")'));

@@ -20,11 +20,11 @@ declare global {
     /** This copy n steps darker along the ramps (negative: lighter): a far limb; swap wins for the keys it names. */
     shade?: number;
     /** Animated assets: freeze on frame n / start later (ms) / random start. */
-    frame?: number; delay?: number; rdelay?: boolean;
+    frame?: number; /** an anim as it is t ms into its own loop, frozen */ t?: number; delay?: number; rdelay?: boolean;
     /** stamp only: of a family named by the compass (name_n, name_ne, ...: views(), rig3d's moves, a turnaround), the one nearest this heading: compass degrees (0 away from us, 90 right) or a way on the ground [dx, dz]. */
     heading?: number | [number, number];
     /** stamp only: x, y between pixels (subpixel); [dx, dy] the way it moves (1 right/down, -1 left/up). */
-    sub?: boolean | [number, number];
+    sub?: boolean | [number, number] | { from: [number, number] };
     /** stamp only: motion blur, the silhouette swept from where it was ([x, y]) to here, under it, in one key (default its lightest). */
     smear?: [number, number] | { from: [number, number]; c?: PxColor };
     /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
@@ -107,7 +107,7 @@ declare global {
     pixel?: number;
     /** the same scene k times as big under other names, not checked ({ name_hd: 4 }); post() runs only there */
     sizes?: Record<string, number> }
-  interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; loop?: boolean; dir?: "forward" | "reverse" | "pingpong"; /** checked as a scene (c.as() names what its functions paint) */ world?: PxWorld; check?: boolean | { every: number } }
+  interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; /** a frame's ms instead of fps, or each frame's (as many frames) */ ms?: number | number[]; loop?: boolean; dir?: "forward" | "reverse" | "pingpong"; /** checked as a scene (c.as() names what its functions paint) */ world?: PxWorld; check?: boolean | { every: number } }
   interface PxFrame { ms?: number; hold?: number }
   interface PxLayerOpts {
     /** Draw the layer's stamps sorted: "y" by where they stand (top-down props), "z" by their z. */
@@ -652,7 +652,7 @@ declare global {
     runs(rows: Record<number, [number, string][]>): void;
     pose(joints: Record<string, number[]>, opts?: PxPose): void;
     wire(x0: number, y0: number, x1: number, y1: number, sag: number, c: PxColor, opts?: PxWire): void;
-    text(x: number, y: number, str: string | number, c: PxColor, opts?: PxText): void;
+    text(x: number, y: number, str: string | number, c: PxColor | ((i: number, ch: string) => PxColor | null | undefined), opts?: PxText): void;
     bubble(x: number, y: number, title: string | number, lines: string | string[], opts: PxBubble): void;
     lamp(x: number, y: number, opts?: PxLamp): void;
     bump(shape?: PxBumpShape, opts?: PxBump): void;
@@ -758,6 +758,8 @@ declare global {
   function tween(keys: ({ t: number } & Record<string, unknown>)[], opts?: { moments?: string[] }): (t: number) => Record<string, any> & { t: number };
   /** [frames, value] runs as a value a frame ([frames, a, b] holds [a, b]). */
   function unroll(runs: [number, ...unknown[]][]): unknown[];
+  /** A value lagging a loop's, a frame each: eased toward each value by 1 - damp a frame, or (peak) falling back at damp from each peak; its first frame after its last. */
+  function follow(values: number[], opts?: { damp?: number; peak?: boolean }): number[];
   /** A figure's legs and holds on the clock: route({ pace, origin, ground, walk, idle, loop }, [[x, z], [x, z], { hold: 40, name: "talk" }, ...]). */
   function route(opts: { pace?: number; origin?: number[]; ground?: (x: number, z: number) => number; climb?: boolean; walk?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; idle?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; loop?: number; round?: number },
     steps: (number[] | { to: number[]; name?: string; dir?: string; anim?: string; frame?: (f: number, t: number) => number } | { hold: number; name?: string; dir?: string; anim?: string; frame?: (f: number, t: number) => number })[]): PxRoute;
@@ -775,6 +777,8 @@ declare global {
   function shake(spell: PxSpell): PxOp;
   /** A function of (x, y) made to close over w (and h): for noise on strips and tiles that wrap. */
   function seamless(fn: (x: number, y: number) => number, w: number, h?: number): (x: number, y: number) => number;
+  /** A corner terrain's 16 pieces, `prefix_<mask>` (variants: `prefix_<mask>_<v>` and a group), from fn(x, y, t, v): t how much terrain the corners give that pixel; null leaves it clear. */
+  function corners(prefix: string, opts: { size: number; variants?: number; smooth?: boolean }, fn: (x: number, y: number, t: number, v: number) => PxColor | null | undefined): void;
   /** A ground (or a ceiling) as a polyline [x0, y0, x1, y1, ...], x going up: (x) => its row there, rounded. */
   function profile(pts: number[]): (x: number) => number;
   /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly); boxes' faces lit by the sun. */
@@ -839,7 +843,17 @@ declare global {
     strip(mat: string, a: PxV3[], b: PxV3[]): void;
     loft(mat: string, sections: PxV3[][]): void;
     box(mat: string, a: PxV3, b: PxV3): void;
+    /** A polygon [[x, z], ...] raised from u0 to u1: its top of one material, its sides of another (no bottom). */
+    prism(top: string, side: string, pts: number[][], u0: number, u1: number): void;
+    /** A square stick from a to b, r half its width. */
+    stick(mat: string, a: PxV3, b: PxV3, r?: number): void;
   };
+  namespace model {
+    /** Faces turned th radians about the axis through c along the unit way d, then lifted: a hull on its bob. */
+    function turn(faces: PxFace[], c: PxV3, d: PxV3, th: number, lift?: number): PxFace[];
+    /** A point turned so: what rides the hull. */
+    function turnPoint(p: PxV3, c: PxV3, d: PxV3, th: number, lift?: number): PxV3;
+  }
   /** Shapes in meters for solids() and shadows(). Points are [x, z, up]. */
   const solid: {
     /** round, from a to b, `half` m thick either side: trunks, limbs, poles, bars */
@@ -909,7 +923,7 @@ declare global {
   /** A pose skeleton from a detector's JSON file (or a { name: [x, y, score] } map), as a guide. */
   function pose(src: string | Record<string, number[]>, opts?: PxPose): PxOp;
   function wire(x0: number, y0: number, x1: number, y1: number, sag: number, c: PxColor, opts?: PxWire): PxOp;
-  function text(x: number, y: number, str: string | number, c: PxColor, opts?: PxText): PxOp;
+  function text(x: number, y: number, str: string | number, c: PxColor | ((i: number, ch: string) => PxColor | null | undefined), opts?: PxText): PxOp;
   /** A dialogue box over a speaker: title over lines in a 9-slice sized to them, its tail down to (x, y) (art px), the prompt in its corner. */
   function bubble(x: number, y: number, title: string | number, lines: string | string[], opts: PxBubble): PxOp;
   function lamp(x: number, y: number, opts?: PxLamp): PxOp;

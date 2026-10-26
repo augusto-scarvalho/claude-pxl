@@ -49,33 +49,9 @@ sprite("_lip_c", { pivot: "bottom" }, `
   qwqqQqqwqqQq
   .Qq..Qq..q..
   ..Q...Q.....`)
-// Boulders for the hill's corners, drawn as the kit's rocks are (environment §5), only bigger: two or
-// three masses on one flat foot, a tone to each plane: the top in the sun (cream only as a 1 px rim at
-// its back), the side toward the sun mauve, the front toward us in the shade, the far side darker; a
-// ledge (a light band over a dark undercut) and a crack; the darkest tone only as the line under it and
-// down its shaded side; grass blades over its foot, so it sits in the ground.
-const boulder = (name, w, h, lobes) => sprite(name, { w, h, pivot: "bottom" }, (c) => {
-  // a lobe: a dome over its middle row, widening a little from there to the foot
-  const lobeAt = (X, Y) => lobes.findLast(([x, y, rx, ry]) => { const d = Math.max(0, Y + 0.5 - y) / ry, nx = (X + 0.5 - x) / (rx * (1 + 0.2 * d)), ny = Math.min(0, (Y + 0.5 - y) / ry); return nx * nx + ny * ny <= 1 })
-  const [bx, by, brx, bry] = lobes[0]
-  for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) {
-    const l = lobeAt(X, Y)
-    if (!l) continue
-    const [x, y, rx, ry] = l, nx = (X + 0.5 - x) / rx, ny = (Y + 0.5 - y) / ry
-    const rim = !lobeAt(X, Y - 1), right = !lobeAt(X + 1, Y)
-    let k = ny < -0.62 - 0.25 * nx ? (rim && nx < 0.2 ? "E" : "U") : nx < -0.5 ? "u" : nx > 0.5 ? "t" : "T"
-    if (l === lobes[0] && Y === Math.round(by + bry * 0.3) && nx > -0.75 && nx < 0) k = "D"              // the ledge's undercut
-    if (l === lobes[0] && Y === Math.round(by + bry * 0.3) - 1 && nx > -0.75 && nx < 0) k = "U"          // its lit band
-    if (Y === h - 1 || (right && ny > -0.35)) k = "D"                                                     // under it, its shaded edge
-    c.px(X, Y, k)
-  }
-  // a crack down the front of the biggest mass
-  for (let i = 0; i < 3; i++) c.px(Math.round(bx + 2 + i * 0.6), Math.round(by + 1 + i), "t")
-  // grass over its foot, in tufts of two
-  for (let X = 1; X < w - 2; X++) if (hash(X, w * 7 + h) < 0.22 && lobeAt(X, h - 2)) { c.px(X, h - 1, "w"); c.px(X + 1, h - 1, "e"); c.px(X, h - 2, "e") }
-}, bump("hybrid"))
-boulder("_boulder", 28, 16, [[11, 8, 9, 7], [19, 10, 7.5, 5.5], [8, 12, 6, 3]])
-boulder("_boulder_b", 21, 12, [[9, 6, 7, 5.5], [14.5, 8, 5.5, 4]])
+// Boulders for the hill's corners: the kit's rocks, bigger (rock(): two or three masses on one flat foot)
+rock("_boulder", 28, 16, [[11, 8, 9, 7], [19, 10, 7.5, 5.5], [8, 12, 6, 3]])
+rock("_boulder_b", 21, 12, [[9, 6, 7, 5.5], [14.5, 8, 5.5, 4]])
 
 // The rose he lays at the old grave: lying on the grass, its stem toward us, a red bloom of three tones
 // lit from above, two leaves.
@@ -192,10 +168,8 @@ const FENCE = (() => {
 })()
 // a box of `mat` centred on (x, z), `along` the way (dx, dz) and `across` it, from u0 up to u1
 const turnedBox = (mat, [x, z], [dx, dz], along, across, u0, u1) => {
-  const c = (a, b, u) => [x + dx * a - dz * b, z + dz * a + dx * b, u], A = along / 2, B = across / 2
-  const q = [c(-A, -B, u0), c(A, -B, u0), c(A, B, u0), c(-A, B, u0)], t = q.map(([px, pz]) => [px, pz, u1])
-  M.face(mat, ...t)
-  for (let i = 0; i < 4; i++) M.face(mat, q[i], q[(i + 1) % 4], t[(i + 1) % 4], t[i])
+  const c = (a, b) => [x + dx * a - dz * b, z + dz * a + dx * b], A = along / 2, B = across / 2
+  M.prism(mat, mat, [c(-A, -B), c(A, -B), c(A, B), c(-A, B)], u0, u1)
 }
 let picket = 0
 FENCE.forEach((a, k) => {

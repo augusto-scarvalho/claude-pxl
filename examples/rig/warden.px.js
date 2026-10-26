@@ -100,13 +100,9 @@ const pose3 = (t) => {
   return { turn: -p.yaw, twist: -p.twist, head: -p.head, lean: p.lean, down: p.crouch + sy, feet: p.feet.map(([a, b]) => [a - Math.round(sx) * fx, b - Math.round(sx) * rx]), hands: [p.off, p.hand], i: t, look: p.look }
 }
 // how fast the body turns (deg a frame), and the coat's flare and the hair's swing that follow it a
-// frame late: worked out over the loop twice, so the first frame already has the last one's
-const SPIN = [], FLARE = [], TAIL = []
-for (let pass = 0, fl = 0, tl = 0; pass < 2; pass++) for (let i = 0; i < FRAMES; i++) {
-  const w = ((((poseAt(i).yaw - poseAt(i ? i - 1 : FRAMES - 1).yaw + 180) % 360) + 360) % 360) - 180
-  fl = Math.max(Math.min(1, Math.abs(w) / 70), fl * 0.55); tl = tl * 0.5 + w * 0.5
-  SPIN[i] = w; FLARE[i] = fl; TAIL[i] = tl
-}
+// frame late (follow(): over the loop, so the first frame already has the last one's)
+const SPIN = Array.from({ length: FRAMES }, (_, i) => ((((poseAt(i).yaw - poseAt(i ? i - 1 : FRAMES - 1).yaw + 180) % 360) + 360) % 360) - 180)
+const FLARE = follow(SPIN.map((w) => Math.min(1, Math.abs(w) / 70)), { damp: 0.55, peak: true }), TAIL = follow(SPIN, { damp: 0.5 })
 const SKIRTL = 12, WAIST = 4.3
 
 // ---- the parts

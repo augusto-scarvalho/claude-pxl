@@ -4,7 +4,7 @@ import { type Canvas, OPS } from "./canvas.ts";
 import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from "./rig.ts";
 import { type View, perspective } from "./perspective.ts";
 import { solid } from "./solids.ts";
-import { model } from "./mesh.ts";
+import { model, turnFaces, turnPoint } from "./mesh.ts";
 import { Sdf, compile, sdf } from "./sdf.ts";
 import { COMPASS, clocksOf, headingsOf, mirrorSymmetric, turnLight, turnViews } from "./turnaround.ts";
 import { BLOCK_MATS, type Body, type Joints, type Pose, blocksOf, bodyOf, gait, ik3, jointsOf, partsOf } from "./rig3d.ts";
@@ -30,7 +30,7 @@ import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
 import { type Lut, readCube, readStrip } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
-import { ability, emitter, route, turnToward, tween, unroll } from "./vfx.ts";
+import { ability, emitter, follow, route, turnToward, tween, unroll } from "./vfx.ts";
 import { SPELL_OPTS, spell } from "./spells.ts";
 import { bayer, fbm, globRe, gridRows, latticeHash, profile, rng, vnoise, seamless } from "./util.ts";
 
@@ -93,7 +93,7 @@ export const SIGNATURES: Record<string, string> = {
   grid: "x:n y:n str:s",
   runs: "rows:o",
   wire: "x0:n y0:n x1:n y1:n sag:n c:c ?opts:o",
-  text: "x:n y:n str:t c:c ?opts:o",
+  text: "x:n y:n str:t c:K ?opts:o",
   bubble: "x:n y:n title:t lines:L opts:o",
   clip: "where:r ...items:I",
   lamp: "x:n y:n ?opts:o",
@@ -120,7 +120,7 @@ function readsClock(items: Item[]): boolean {
 const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "shade", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay", "fx"];
 /** Allowed option keys of ops whose last argument is an options object. */
 export const OP_OPTS: Record<string, string[]> = {
-  stamp: [...PLACE, "sub", "smear", "at", "id", "z", "heading", "shadow"],
+  stamp: [...PLACE, "sub", "smear", "at", "id", "z", "heading", "shadow", "t"],
   tile: [...PLACE, "shadow"],
   pattern: PLACE,
   panel: PLACE,
@@ -162,7 +162,7 @@ export const OP_OPTS: Record<string, string[]> = {
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
   sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "facing", "height", "twin", "register"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "pixel", "sizes"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "loop", "dir", "facing", "height", "twin", "register", "world", "check"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "area", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -198,6 +198,7 @@ function checkArgs(name: string, args: unknown[]): void {
       case "n": if (typeof v !== "number" || !Number.isFinite(v)) bad("a number"); break;
       case "Y": if (v !== "ground" && (typeof v !== "number" || !Number.isFinite(v))) bad('a number, or "ground" (world.ground under x)'); break;
       case "c": if (typeof v !== "string") bad('a color key or "#hex"'); break;
+      case "K": if (typeof v !== "string" && typeof v !== "function") bad('a color key or "#hex", or (i, ch) => one for each letter'); break;
       case "s": if (typeof v !== "string") bad("a string"); break;
       case "t": if (typeof v !== "string" && typeof v !== "number") bad("text"); break;
       case "S": if (typeof v !== "string" && !Array.isArray(v)) bad('colors like "abc" or ["a","b"]'); break;
@@ -489,6 +490,34 @@ export class Project implements BuildCtx {
       const prev = this.assets.get(name) ?? this.groups.get(name);
       if (prev) throw new PxError(`'${name}' is already defined at ${prev.loc}`, loc);
       this.groups.set(name, { name, members, loc });
+    };
+    // corners(prefix, { size, variants, smooth }, (x, y, t, v) => key): a corner terrain's 16 pieces, `prefix_<mask>`
+    env.corners = (prefix: unknown, opts: unknown, fn: unknown) => {
+      const loc = this.callerLoc();
+      try {
+        if (typeof prefix !== "string" || !isPlainObject(opts) || typeof fn !== "function")
+          throw new PxError('corners("dirt", { size: 16, variants?: 3, smooth?: true }, (x, y, t, v) => key or null): t how much of the terrain the corners give that pixel, 0..1');
+        checkKeys("corners", opts, ["size", "variants", "smooth"]);
+        const { size: S, variants: V = 1, smooth } = opts as { size?: number; variants?: number; smooth?: boolean };
+        if (!(Number.isInteger(S) && S! > 0) || !(Number.isInteger(V) && V >= 1)) throw new PxError(`corners: size is the tile's px and variants how many of each piece, whole numbers, got ${JSON.stringify([S, V])}`);
+        // corner bits 1 top-left, 2 top-right, 4 bottom-left, 8 bottom-right: blended over the tile (smooth: eased in and out)
+        const ease = (s: number) => (smooth ? s * s * (3 - 2 * s) : s), size = S!;
+        for (let m = 0; m < 16; m++) {
+          const pieces = Array.from({ length: V }, (_, v) => {
+            const keys: (string | null)[] = [];
+            for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+              const u = ease((x + 0.5) / size), w = ease((y + 0.5) / size);
+              const t = (m & 1) * (1 - u) * (1 - w) + ((m >> 1) & 1) * u * (1 - w) + ((m >> 2) & 1) * (1 - u) * w + ((m >> 3) & 1) * u * w;
+              keys.push(((fn as (x: number, y: number, t: number, v: number) => unknown)(x, y, t, v) ?? null) as string | null);
+            }
+            return keys;
+          });
+          if (pieces.every((k) => k.every((c) => c === null))) continue;   // a piece with nothing in it (no terrain at any corner) isn't made
+          const names = pieces.map((_, v) => (V > 1 ? `${prefix}_${m}_${v}` : `${prefix}_${m}`));
+          pieces.forEach((keys, v) => define("sprite", names[v], [{ w: size, h: size }, (c: Canvas) => keys.forEach((k, i) => { if (k !== null) c.px(i % size, Math.floor(i / size), k); })]));
+          if (V > 1) (env.group as (n: string, m: string[]) => void)(`${prefix}_${m}`, names);
+        }
+      } catch (e) { throw wrap(e).within("corners", loc); }
     };
     env.directions = (name: unknown, n: unknown, opts: Record<string, unknown> = {}) => {
       const loc = this.callerLoc();
@@ -829,7 +858,8 @@ export class Project implements BuildCtx {
     // shapes in meters for solids() and shadows(): solid.stick, blob, box, cone, poly
     env.solid = solid;
     // a model for mesh(): faces, strips, lofts and boxes in meters, each of a material
-    env.model = model;
+    // model.turn(faces, c, axis, th, lift) and model.turnPoint(p, ...): a hull on its bob and what rides it
+    env.model = Object.assign(() => model(), { turn: turnFaces, turnPoint });
     // fields in 3D, in meters: sdf.sphere(r), .union(...), .bend(k), ... drawn by surface(); sdf.size(field, { view, ppm }) a sprite's size for it
     // sdf.voxels(field, { size, clock }) a voxel grid, sdf.mesh(field, { size, clock }) a mesh by surface nets
     env.sdf = {
@@ -1026,6 +1056,14 @@ export class Project implements BuildCtx {
       } catch (e) { throw wrap(e).within("tween", loc); }
     };
     env.unroll = (runs: unknown) => { try { return unroll(runs as never); } catch (e) { throw wrap(e).within("unroll", this.callerLoc()); } };
+    env.follow = (values: unknown, opts: unknown = {}) => {
+      const loc = this.callerLoc();
+      try {
+        if (!isPlainObject(opts)) throw new PxError("follow(values, { damp, peak })");
+        checkKeys("follow", opts, ["damp", "peak"]);
+        return follow(values as number[], opts as never);
+      } catch (e) { throw wrap(e).within("follow", loc); }
+    };
     env.emitter = (opts: unknown = {}) => {
       const loc = this.callerLoc();
       try {

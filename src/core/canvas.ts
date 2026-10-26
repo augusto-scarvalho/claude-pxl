@@ -1194,11 +1194,12 @@ export class Canvas {
       pick = list.map((m) => [m, tall(m)] as const).reduce((a, b) => (Math.abs(b[1] - opts.fit!) < Math.abs(a[1] - opts.fit!) || (Math.abs(b[1] - opts.fit!) === Math.abs(a[1] - opts.fit!) && b[1] < a[1]) ? b : a))[0];
     }
     let t = this.t, track = true;
-    if (opts.frame !== undefined || opts.delay || opts.rdelay) {
+    if (opts.frame !== undefined || opts.t !== undefined || opts.delay || opts.rdelay) {
       const tl = this.res.timeline(pick, inner);
+      if (opts.t !== undefined && !Number.isFinite(opts.t)) throw new PxError(`t is ms into the anim's own loop, got ${JSON.stringify(opts.t)}`);
       if (tl) {
-        if (opts.frame !== undefined) {
-          t = frameStart(tl, opts.frame);
+        if (opts.frame !== undefined || opts.t !== undefined) {
+          t = opts.t ?? frameStart(tl, opts.frame!);
           track = false;
         } else {
           // Shifts snap to the anim's step so combined timelines stay on a frame grid.
@@ -1325,9 +1326,12 @@ export class Canvas {
     if (opts?.cast && typeof opts.cast === "object" && !Array.isArray(opts.cast)) opts = { ...opts, cast: castAt(opts.cast, x, y) };
     const src = this.asset(name, opts, x, y), [px, py] = src.pivot ?? [0, 0];
     this.placed?.set(opts?.id ?? name, { x: this.ox + x - Math.floor(px), y: this.oy + y - Math.floor(py), sockets: src.sockets });
-    const sub = opts?.sub;
+    let sub = opts?.sub;
+    // { from: [x, y] }: the way it moves, from where it was (the frame before)
+    const from = (sub as { from?: number[] })?.from;
+    if (from !== undefined && Array.isArray(from) && from.length === 2 && from.every(Number.isFinite)) sub = [x < from[0] ? -1 : 1, y < from[1] ? -1 : 1];
     if (sub !== undefined && sub !== true && sub !== false && !(Array.isArray(sub) && sub.length === 2 && sub.every(Number.isFinite)))
-      throw new PxError(`sub is true, or [dx, dy] the way the part moves (1 right / down, -1 left / up), got ${JSON.stringify(sub)}`);
+      throw new PxError(`sub is true, [dx, dy] the way the part moves (1 right / down, -1 left / up), or { from: [x, y] } where it was, got ${JSON.stringify(sub)}`);
     if (opts?.smear !== undefined) {
       if (sub) throw new PxError("smear and sub don't go together: a smear is a move of more than a pixel");
       return this.place(this.smeared(src, opts.smear, x, y), x, y, [0, 0], undefined, opts?.z, name);
@@ -1704,20 +1708,21 @@ export class Canvas {
   }
 
   /** Text in the built-in 3x5 font. */
-  text(x: number, y: number, s: string, c: string, opts: TextOpts = {}): void {
+  /** `c` a key, or each letter's: (i, ch) => key (null: not drawn, its place kept), i counting the letters, not the line breaks. */
+  text(x: number, y: number, s: string, c: string | ((i: number, ch: string) => string | null | undefined), opts: TextOpts = {}): void {
     if (this.mirrored) throw new PxError("text in a twin would read backwards: letter the twin on its own, or keep the sign out of what's mirrored");
     s = String(s);
     this.lettered();
     if (opts.shadow) this.text(x + 1, y + 1, s, opts.shadow, { ...opts, shadow: undefined });
-    const col = this.color(c);
+    const each = typeof c === "function" ? c : undefined, one = each ? null : this.color(c as string);
     const sc = opts.scale ?? 1, gap = opts.gap ?? 1, lead = opts.lead ?? 1;
     const g = opts.font ? this.res.glyphs(opts.font) : glyph, lineH = g(" ").length;
-    let ly = y;
+    let ly = y, i = 0;
     for (const line of s.split("\n")) {
       const lw = lineWidth(line, opts, g);
       let cx = opts.align === "c" ? x - Math.floor(lw / 2) : opts.align === "r" ? x - lw + 1 : x;
       for (const ch of line) {
-        const rows = g(ch);
+        const rows = g(ch), k = each?.(i++, ch), col = each ? (k == null ? null : this.color(k)) : one;
         rows.forEach((row, r) => {
           for (let b = 0; b < row.length; b++)
             if (row[b] === "#")

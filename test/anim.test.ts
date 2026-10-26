@@ -92,6 +92,14 @@ scene("still", { w: 3, h: 1 }, stamp("blink", 0, 0, { frame: 2 }))`);
   assert.equal(keys(p, "still"), "rgr");
 });
 
+test("anim: ms, each frame's duration; stamp's t, the anim as it is that many ms in, frozen", () => {
+  const p = load(`anim("a", { w: 1, h: 1, ms: [100, 300, 200] }, (c) => c.px(0, 0, "rwg"[c.frame]))
+anim("b", { w: 1, h: 1, frames: 2, ms: 150 }, (c) => c.px(0, 0, "rw"[c.frame]))
+scene("s", { w: 4, h: 1 }, stamp("a", 0, 0, { t: 99 }), stamp("a", 1, 0, { t: 100 }), stamp("a", 2, 0, { t: 500 }), stamp("a", 3, 0, { t: 700 }))`);
+  assert.deepEqual([p.timeline("a")!.durations, p.timeline("b")!.loop, p.timeline("s")], [[100, 300, 200], 300, undefined], "frozen: the scene doesn't animate");
+  assert.equal(keys(p, "s"), "rwgw", "700 ms is 100 into its second loop");
+});
+
 test("anim: loop false holds the last frame; anims combine to the lcm of their loops", () => {
   const p = loadSource(PAL + `anim("a", { fps: 10, loop: false, w: 1, h: 1 }, frame(px(0, 0, "r")), frame(px(0, 0, "w")))
 anim("b", { fps: 10, w: 1, h: 1 }, frame(px(0, 0, "g")), frame(px(0, 0, "k")), frame(px(0, 0, "w")))

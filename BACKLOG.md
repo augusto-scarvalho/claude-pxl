@@ -104,6 +104,15 @@ Mark items `[x]` when they ship, with the commit.
   fix belongs to the gait work (A.md P4): a stance moving back at a constant speed and a stride in px
   a cycle per view; then `route()` could take its pace from the walk by heading. It retimes the
   stories: the user sees both.
+- [ ] **The cave and the grotto on their floor** (wave 4b, a visual step): `world: { ground: [...] }`
+  with their floor's profile and a `height` on what stands, so the feet rule runs there; they are
+  anims (an anim with a `world` is checked as a scene). Standing their props with
+  `stamp(name, x, "ground")` moves the stamps' x, y, which seed `rflip` and `rdelay`: the picks change
+  (show both).
+- [ ] **A lit-side rule for art without an outline** (wave 4b): it reads the side from the rim of an
+  outlined drawing, so on the five perspective anims' named drawings (park, road, race, extinction,
+  train) it ran on every one and read none ("a clear reading on 0"). Read the light from the tones
+  instead: which side of the shape holds its ramp's lighter steps.
 - [ ] **The crew's grey-haired head turned to profile is a row short at the crown** (`_og_head_w` in
   `hd2d/crew.px.js`): `pxl check`'s views rule reads its crown on row -4 from the anchor, -5 in the
   other views, so the head drops a pixel at its top as it turns. Redraw its top to reach the others'

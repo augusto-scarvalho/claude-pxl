@@ -583,7 +583,8 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
 - **A swing moves the body, not only the weapon.** Before it the shoulders coil back against the hips;
   through it the hips turn and the shoulders after them (a whirl shows the back), the knees bend, the
   arm reaches its full length at the release and the free arm tucks in; after it the body follows the
-  weight down; a coat and hair come a frame late, and the head leads a turn. A blade's edge faces the
+  weight down; a coat and hair come a frame late (`follow()` of the turn's speed), and the head leads
+  a turn. A blade's edge faces the
   way the cut goes, every frame of it (a backswing keeps it on its target; edge up or the flat
   leading, an axe reads as a club). An axe's edge is the long curve at the end of the bit, from its
   top corner (the toe) down to the heel, running along the haft, never across its top; the poll is on

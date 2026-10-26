@@ -60,14 +60,13 @@ const CHEST = [0, 0, 0.5, 1, 1, 1, 0.5, 0, 0, 0, 0, 0]
 // the single-pixel bob: the whole body down at once
 const BOB = [0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0]
 
-// which way a part goes at a frame: down (1) or up (-1), from its place the frame before
-const way = (list, f) => (list[f] < list[(f + F - 1) % F] ? -1 : 1)
+// each half step goes the way the part moves: sub: { from } its place the frame before
 const keeper = (c, f, x, y, sub) => {
-  const head = sub ? HEAD[f] : BOB[f], chest = sub ? CHEST[f] : BOB[f]
+  const head = sub ? HEAD[f] : BOB[f], chest = sub ? CHEST[f] : BOB[f], was = (f + F - 1) % F
   c.stamp("_boots", x + 2, y + 27)
   c.stamp("_robe", x + 1, y + 21 + (sub ? 0 : chest))
-  c.stamp("_chest", x, y + 12 + chest, { sub: sub && [1, way(CHEST, f)] })
-  c.stamp("_head", x + 1, y + 2 + head, { sub: sub && [1, way(HEAD, f)] })
+  c.stamp("_chest", x, y + 12 + chest, { sub: sub && { from: [x, y + 12 + CHEST[was]] } })
+  c.stamp("_head", x + 1, y + 2 + head, { sub: sub && { from: [x + 1, y + 2 + HEAD[was]] } })
 }
 
 anim("subpixel", { w: 128, h: 80, frames: F, fps: 9 },

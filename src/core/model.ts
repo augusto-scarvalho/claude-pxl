@@ -121,6 +121,8 @@ export interface AssetOpts {
   sizes?: Record<string, number>;
   /** anim: default frame rate (frames per second, default 8). */
   fps?: number;
+  /** anim: a frame's duration in ms instead of fps, or each frame's ([200, 200, 400]: as many frames); a frame()'s own ms wins. */
+  ms?: number | number[];
   /** anim: frame count when there are no frame() items (procedural, via c.frame / c.phase). */
   frames?: number;
   /** anim: false = play once and hold the last frame (default true). */
@@ -277,6 +279,8 @@ export interface PlaceOpts {
   heading?: number | [number, number];
   /** Animated assets: show this frame index, frozen. */
   frame?: number;
+  /** Animated assets: show it as it is this many ms into its own loop (its frames' own durations), frozen. */
+  t?: number;
   /** Animated assets: start this many ms later (desync copies). */
   delay?: number;
   /** Animated assets: random start time per placement (true), seeded like other picks. */
@@ -286,7 +290,7 @@ export interface PlaceOpts {
    * the way the part moves (1 right / down, -1 left / up; true: [1, 1]). Halfway it stays where it
    * comes from and its edges move: it pushes into its own outline, or spills over what's painted.
    */
-  sub?: boolean | [number, number];
+  sub?: boolean | [number, number] | { from: [number, number] };
   /** Motion blur: the silhouette swept from where it was ([x, y], as this stamp's x, y) to here, in one key (default its lightest color), under it. */
   smear?: [number, number] | { from: [number, number]; c?: string };
 }

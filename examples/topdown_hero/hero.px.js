@@ -263,13 +263,12 @@ const BOX = { w: 14, h: 30, pivot: [7, 30] }, BIG = { w: 30, h: 38, pivot: [15, 
 const DIRS = [["down", "d"], ["up", "u"], ["side", "s"]]
 for (const move of Object.keys(MOVES)) {
   const atk = move === "attack", [ox, oy] = atk ? [8, 4] : [0, 0], slot = atk ? 32 : 16
-  const frames = MOVES[move].ms.map((ms) => frame({ ms }))
-  for (const [dir, d] of DIRS) anim(`${move}_${dir}`, { ...(atk ? BIG : BOX), outline: "k" }, ...layers("_", move, [[d, ox, oy]]), ...frames)
+  const ms = MOVES[move].ms                                       // its frames' own durations
+  for (const [dir, d] of DIRS) anim(`${move}_${dir}`, { ...(atk ? BIG : BOX), outline: "k", ms }, ...layers("_", move, [[d, ox, oy]]))
   // the dummy of the move: the three directions side by side on the guide rows
-  anim(`_dummy_${move}`, { w: 3 * slot - 2, h: atk ? 38 : 30, outline: "k" },
+  anim(`_dummy_${move}`, { w: 3 * slot - 2, h: atk ? 38 : 30, outline: "k", ms },
     ...layers("_dummy_", move, DIRS.map(([, d], k) => [d, k * slot + ox, oy])),
-    layer("guides", { ref: 0.5 }, ...Object.values(ROWS).map((y) => hline(0, y + oy, 3 * slot - 2, "#ff3d8b"))),
-    ...frames)
+    layer("guides", { ref: 0.5 }, ...Object.values(ROWS).map((y) => hline(0, y + oy, 3 * slot - 2, "#ff3d8b"))))
 }
 
 // The four views at rest on their guide rows, the dummy under the costume; the fourth view is the
@@ -290,15 +289,15 @@ sheet("hero", ["idle_*", "walk_*", "run_*", "attack_*"], { rows: "tag", pad: 1 }
 // clock, a 2.48 s loop in 10 ms steps (frames: 248, fps: 100: the walk's 210 and the swing's 50 fall
 // on them); stamping his anims as they are would loop the scene over their least common multiple.
 sprite("_tuft", "M.M\noMo")
-const frameAt = (ms, t) => { let i = 0; while (t >= ms[i]) t -= ms[i++]; return i }
-const hero = (t) => t < 840 ? ["walk_side", frameAt(MOVES.walk.ms, t), 36 + Math.floor(t / 70), false]
-  : t < 1240 ? ["attack_side", frameAt(MOVES.attack.ms, t - 840), 48, false]
-  : t < 2080 ? ["walk_side", frameAt(MOVES.walk.ms, t - 1240), 48 - Math.floor((t - 1240) / 70), true]
-  : ["attack_side", frameAt(MOVES.attack.ms, t - 2080), 36, true]
+// [the move, ms into it (stamp's t: its own frames' durations), x, flipped]
+const hero = (t) => t < 840 ? ["walk_side", t, 36 + Math.floor(t / 70), false]
+  : t < 1240 ? ["attack_side", t - 840, 48, false]
+  : t < 2080 ? ["walk_side", t - 1240, 48 - Math.floor((t - 1240) / 70), true]
+  : ["attack_side", t - 2080, 36, true]
 scene("test_hero", { w: 96, h: 64, bg: "m", frames: 248, fps: 100, world: { light: [0, -1] } },
   scatter("_tuft", 0, 0, 96, 64, 22, { even: true }),
   layer("shadow", { shade: 1 }, (c) => c.ellipse(hero(c.t)[2], 46, 5, 1, "k")),
   layer("hero", (c) => {
-    const [name, frame, x, flip] = hero(c.t)
-    c.stamp(name, x, 46, flip ? { frame, flip: "x" } : { frame })
+    const [name, t, x, flip] = hero(c.t)
+    c.stamp(name, x, 46, flip ? { t, flip: "x" } : { t })
   }))

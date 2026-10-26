@@ -142,6 +142,21 @@ export function unroll<T>(runs: [number, ...T[]][]): (T | T[])[] {
   return runs.flatMap(([n, ...v]) => Array(n).fill(v.length > 1 ? v : v[0]));
 }
 
+/**
+ * A value that lags the list's, a frame of a loop each: eased toward each value by (1 - damp) a frame
+ * (a tail swinging after a turn), or with `peak` falling back at damp a frame from each peak it takes
+ * (a coat's flare). Worked out over the loop twice, so its first frame follows its last.
+ */
+export function follow(values: number[], o: { damp?: number; peak?: boolean } = {}): number[] {
+  const d = o.damp ?? 0.5;
+  if (!Array.isArray(values) || !values.every(Number.isFinite) || !(d >= 0 && d < 1))
+    throw new PxError(`follow(values, { damp, peak }): a number a frame, damp 0..1 (how much of the frame before it keeps), got ${JSON.stringify([values?.slice?.(0, 8), o.damp])}`);
+  const out: number[] = [];
+  let x = 0;
+  for (let pass = 0; pass < 2; pass++) for (let i = 0; i < values.length; i++) out[i] = x = o.peak ? Math.max(values[i], x * d) : x * d + values[i] * (1 - d);
+  return out;
+}
+
 // ---------------------------------------------------------------- a figure's way on the clock
 const DIR8 = ["n", "ne", "e", "se", "s", "sw", "w", "nw"];
 /** which of the 8 directions a way [dx, dz] on the ground goes (+z away from us: n) */

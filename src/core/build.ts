@@ -58,9 +58,12 @@ export interface BuildOut {
 
 /** An anim's frames: count and durations (ms), from its frame() items or { frames, fps }. */
 export function animTimeline(def: AssetDef): Timeline {
-  const fps = def.opts.fps ?? 8;
+  const fps = def.opts.fps ?? 8, ms = def.opts.ms;
   if (!(fps > 0)) throw new PxError(`fps must be > 0, got ${fps}`);
-  const unit = 1000 / fps;
+  if (ms !== undefined && !(typeof ms === "number" ? ms > 0 : Array.isArray(ms) && ms.length && ms.every((v) => v > 0)))
+    throw new PxError(`ms is a frame's duration, or each frame's ([200, 200, 400]), above 0, got ${fmtArgs([ms])}`);
+  // a frame's duration: its frame()'s ms, else the anim's ms (one for all, or a list, frame by frame), else 1000 / fps
+  const unit = typeof ms === "number" ? ms : 1000 / fps, each = Array.isArray(ms) ? ms : undefined;
   // frame() items may sit at the top level or inside layers; frame k of every list plays together.
   let lists: Op[][] = [];
   const walk = (items: Item[]) => {
@@ -69,15 +72,15 @@ export function animTimeline(def: AssetDef): Timeline {
   };
   walk(def.items);
   lists = lists.filter((l) => l.length);
-  const n = lists.length ? Math.max(...lists.map((l) => l.length)) : Math.max(1, Math.floor(def.opts.frames ?? 1));
+  const n = lists.length ? Math.max(...lists.map((l) => l.length)) : Math.max(1, Math.floor(def.opts.frames ?? each?.length ?? 1));
   const durations: number[] = [];
   for (let i = 0; i < n; i++) {
     // The first list that has frame i sets its duration.
     const f = lists.find((l) => l[i])?.[i];
     const fo = (f && isFrameOpts(f.args[0]) ? f.args[0] : {}) as FrameOpts;
-    const ms = fo.ms ?? unit * (fo.hold ?? 1);
-    if (!(ms > 0)) throw new PxError(`frame ${i} duration must be > 0`, f?.loc);
-    durations.push(Math.round(ms));
+    const d = fo.ms ?? ((fo.hold === undefined && each?.[i]) || unit * (fo.hold ?? 1));
+    if (!(d > 0)) throw new PxError(`frame ${i} duration must be > 0`, f?.loc);
+    durations.push(Math.round(d));
   }
   // reverse / pingpong play the drawn frames in another order: 0 1 2 3 2 1, 0 1 2 3 2 1, ...
   const dir = def.opts.dir ?? "forward";

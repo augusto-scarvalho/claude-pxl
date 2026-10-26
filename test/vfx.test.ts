@@ -2,7 +2,7 @@
 // effect, effects on one placement, sockets. Everything a function of the time: any frame alone.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ability, emitter, route, tween, turnToward, unroll } from "../src/core/vfx.ts";
+import { ability, emitter, follow, route, tween, turnToward, unroll } from "../src/core/vfx.ts";
 import { loadSource } from "../src/node/load.ts";
 import { failure } from "./helpers.ts";
 import { Img } from "../src/core/image.ts";
@@ -46,6 +46,14 @@ test("tween and unroll: keys carried and eased, strings held, moments on their o
   assert.throws(() => tween([{ t: 2 }, { t: 1 }]), /each t a number past the one before/);
   assert.deepEqual(unroll([[2, "rest"], [0, "x"], [1, "cut", 4]]), ["rest", "rest", ["cut", 4]]);
   assert.match(failure(PALS + 'unroll([[1.5, "a"]])').message, /frames a whole number/);
+});
+
+test("follow: a value lagging a loop's, its first frame after its last; a peak falling back", () => {
+  // eased halfway a frame: a step up at frame 1 of 4, round the loop twice
+  const v = follow([0, 8, 8, 8], { damp: 0.5 });
+  assert.deepEqual(v, [3.5, 5.75, 6.875, 7.4375], "its first frame carries the last one's (7 halved)");
+  assert.deepEqual(follow([1, 0, 0, 0], { damp: 0.5, peak: true }), [1, 0.5, 0.25, 0.125]);
+  assert.match(failure(PALS + "follow([1, 2], { damp: 1 })").message, /damp 0..1/);
 });
 
 test("route: legs at a pace and holds by name, the feet on the ground, the way clear, by distance round a corner", () => {

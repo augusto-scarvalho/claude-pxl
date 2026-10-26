@@ -48,8 +48,8 @@ look at (`--frames 0-11` for some).
 ## 2. Ground, paths and tiles
 
 - **Paths, roads, shores and patches of ground are laid with tiles**, marked at tile corners with
-  `tilemap(..., { corners })` and a terrain tileset (drawn in code, or reduced from a free LPC-style
-  one): `examples/topdown.px.js`, `examples/tropical/trail.px.js`. A `curve` or `poly` stroke of dirt
+  `tilemap(..., { corners })` and a terrain tileset (drawn in code by `corners()`, or reduced from a
+  free LPC-style one): `examples/topdown.px.js`, `examples/tropical/trail.px.js`. A `curve` or `poly` stroke of dirt
   reads as paint on top of the grass.
 - Tiles that repeat get `wrap: true` (or `"x"`/`"y"`): the preview shows them 3×3 (3×1, 1×3), so seams show,
   and drawing past an edge continues on the other side.

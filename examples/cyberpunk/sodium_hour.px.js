@@ -367,7 +367,7 @@ function hotel(c) {
   c.line(270, 104, 286, 89, "k"); c.line(300, 124, 284, 109, "k"); c.vline(268, 125, 8, "1"); c.hline(267, 129, 3, "1")
   // the vertical sign
   c.rect(248, 68, 9, 36, "r"); c.box(248, 68, 9, 36, "k")
-  "ROOMS".split("").forEach((ch, i) => c.text(251, 70 + i * 6, ch, "s"))
+  c.text(251, 70, "R\nO\nO\nM\nS", "s")
   // the ground floor: a bar, a glass-block window, a shutter half up
   c.rect(252, 134, 8, 18, "Q"); c.box(251, 133, 10, 19, "r")
   for (let y = 134; y < 146; y += 3) for (let x = 264; x < 290; x += 3) c.rect(x, y, 2, 2, ihash(x, y) < 0.3 ? "j" : "i")
@@ -377,7 +377,7 @@ function hotel(c) {
   grimeBase(c, 246, 74, "s")
   // the rooftop sign: steel frame, letters of bulbs (drawn unlit here)
   c.hline(254, 58, 44, "1"); for (let x = 256; x < 298; x += 10) c.vline(x, 44, 18, "1"); c.line(256, 58, 266, 46, "1"); c.line(286, 58, 296, 46, "1")
-  "HOTEL".split("").forEach((ch, i) => c.text(257 + i * 8, 46, ch, "s", { scale: 2 }))
+  c.text(257, 46, "HOTEL", "s", { scale: 2 })
   c.vline(314, 42, 20, "1"); c.hline(312, 46, 5, "1")
 }
 
@@ -742,13 +742,9 @@ function signs(c) {
   if (liq) c.text(74, 128, "LIQUOR".replace(/./g, (ch, j) => j === 3 && f % 47 < 2 ? " " : ch), "m")
   // ROOMS: letters lit one by one down the blade, all held, two blinks, and again (6 s)
   const r = f % 60
-  "ROOMS".split("").forEach((ch, j) => { const on = r < 30 ? r >= j * 5 : r < 44 || (r >= 48 && r < 52) || r >= 56; c.text(251, 70 + j * 6, ch, on ? "m" : "s") })
+  c.text(251, 70, "R\nO\nO\nM\nS", (j) => ((r < 30 ? r >= j * 5 : r < 44 || (r >= 48 && r < 52) || r >= 56) ? "m" : "s"))
   // HOTEL: bulbs; the E has a bad socket. At 30 s the sign trips and relights letter by letter.
-  "HOTEL".split("").forEach((ch, j) => {
-    let on = f < 300 || f >= 318 + j * 7
-    if (j === 3 && (f % 23 < 2 || f % 31 === 5)) on = false
-    if (on) c.text(257 + j * 8, 46, ch, "R", { scale: 2 })
-  })
+  c.text(257, 46, "HOTEL", (j) => ((f < 300 || f >= 318 + j * 7) && !(j === 3 && (f % 23 < 2 || f % 31 === 5)) ? "R" : null), { scale: 2 })
   // the lamp over the lot has a failing ballast
   if (f % 37 < 2 || f % 53 === 7 || f % 53 === 9) c.px(134, 109, "1")
   // BAR, the CLINIC canopy and its 24H box are steady

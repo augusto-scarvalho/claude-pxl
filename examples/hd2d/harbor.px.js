@@ -290,10 +290,7 @@ const mats = (f, K = 1) => {
 
 // ---------------------------------------------------------------- building helpers (z from Z)
 // a polygon [[x, z], ...] raised from u0 to u1: its top of one material, its sides of another
-const prism = (top, side, pts, u0, u1, m = M) => {
-  m.face(top, ...pts.map(([x, z]) => [x, Z + z, u1]))
-  pts.forEach(([x, z], i) => { const [x2, z2] = pts[(i + 1) % pts.length]; m.face(side, [x, Z + z, u0], [x2, Z + z2, u0], [x2, Z + z2, u1], [x, Z + z, u1]) })
-}
+const prism = (top, side, pts, u0, u1, m = M) => m.prism(top, side, pts.map(([x, z]) => [x, Z + z]), u0, u1)
 const prismBox = (mat, x0, z0, x1, z1, u0, u1, top = mat, m = M) => prism(top, mat, [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], u0, u1, m)
 // a post of n sides (round when its material is smooth)
 const pole = (mat, x, z, r, u0, u1, n = 6) => prism(mat, mat, Array.from({ length: n }, (_, i) => [x + r * Math.cos((2 * Math.PI * i) / n + 0.3), z + r * Math.sin((2 * Math.PI * i) / n + 0.3)]), u0, u1)
@@ -304,13 +301,7 @@ const slab = (top, side, pts, t = 0.15) => {
   for (let i = 0; i < 4; i++) M.face(side, P[i], P[(i + 1) % 4], B[(i + 1) % 4], B[i])
 }
 // a square stick from a to b ([x, z, u]), r half its width: a spar, a rope
-const stick = (mat, a, b, r = 0.05, m = M) => {
-  const cr = (p, q) => [p[1] * q[2] - p[2] * q[1], p[2] * q[0] - p[0] * q[2], p[0] * q[1] - p[1] * q[0]], unit = (v) => v.map((x) => x / Math.hypot(...v))
-  const D = unit([b[0] - a[0], b[1] - a[1], b[2] - a[2]]), e1 = unit(cr(D, Math.abs(D[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), e2 = cr(D, e1)
-  const at = (p, s, t) => [p[0] + (e1[0] * s + e2[0] * t) * r, Z + p[1] + (e1[1] * s + e2[1] * t) * r, p[2] + (e1[2] * s + e2[2] * t) * r]
-  const sq = [[-1, -1], [1, -1], [1, 1], [-1, 1]]
-  sq.forEach(([s, t], i) => { const [s2, t2] = sq[(i + 1) % 4]; m.face(mat, at(a, s, t), at(a, s2, t2), at(b, s2, t2), at(b, s, t)) })
-}
+const stick = (mat, a, b, r = 0.05, m = M) => m.stick(mat, [a[0], Z + a[1], a[2]], [b[0], Z + b[1], b[2]], r)
 
 // ---------------------------------------------------------------- the water
 // in front of the galleon the water is holed between its ripples (`_waterrefl`), and under it the
@@ -520,11 +511,7 @@ const PROPS = [["_barrel", 3.4, -5.6], ["_barrel", 3.95, -5.45], ["_barrel", 9.7
 // water plane would flood it), a lit gunwale, two thwarts. In their own meters (s along, t across, u
 // up), set where they float and bobbing on the scene's clock (boats(f)): a heave and a roll about
 // their length, each on its own beat.
-const lbox = (B, side, top, s0, t0, s1, t1, u0, u1) => {
-  const q = [[s0, t0], [s1, t0], [s1, t1], [s0, t1]]
-  B.face(top, ...q.map(([a, b]) => [a, b, u1]))
-  q.forEach(([a, b], i) => { const [a2, b2] = q[(i + 1) % 4]; B.face(side, [a, b, u0], [a2, b2, u0], [a2, b2, u1], [a, b, u1]) })
-}
+const lbox = (B, side, top, s0, t0, s1, t1, u0, u1) => B.prism(top, side, [[s0, t0], [s1, t0], [s1, t1], [s0, t1]], u0, u1)
 const rowboat = (len, wid, stuff = () => {}) => {
   const B = model(), L = len / 2, deep = 0.15, floor = 0.06
   const half = (s) => (wid / 2) * Math.max(0, 1 - Math.abs(s / L) ** 2.2) ** 0.6, sheer = (s) => 0.42 + 0.22 * (s / L) ** 2
@@ -545,12 +532,7 @@ const BOATS = [
   { at: [8.0, -10.85], dir: [1, 0], ph: 4.2, faces: rowboat(7.2, 2.4, cargoCrates) },
 ].map((b) => ({ ...b, faces: b.faces.map((F) => ({ mat: F.mat, pts: F.pts.map(([s, t, u]) => [b.at[0] + b.dir[0] * s - b.dir[1] * t, Z + b.at[1] + b.dir[1] * s + b.dir[0] * t, u]) })) }))
 // faces (or a point) turned th about the axis through c along d (a unit vector), then lifted dh
-const turnPt = ([x, z, u], c, d, th, dh) => {
-  const v = [x - c[0], z - c[1], u - c[2]], cs = Math.cos(th), sn = Math.sin(th), k = d[0] * v[0] + d[1] * v[1] + d[2] * v[2]
-  const cr = [d[1] * v[2] - d[2] * v[1], d[2] * v[0] - d[0] * v[2], d[0] * v[1] - d[1] * v[0]]
-  return [0, 1, 2].map((e) => c[e] + v[e] * cs + cr[e] * sn + d[e] * k * (1 - cs) + (e === 2 ? dh : 0))
-}
-const turn = (faces, c, d, th, dh) => faces.map((F) => ({ mat: F.mat, pts: F.pts.map((q) => turnPt(q, c, d, th, dh)) }))
+const turnPt = model.turnPoint, turn = model.turn
 const boatPose = (b, f) => ({ c: [b.at[0], Z + b.at[1], 0], d: [b.dir[0], b.dir[1], 0], th: 0.035 * Math.sin((2 * Math.PI * f) / 32 + b.ph), dh: 0.035 * Math.sin((2 * Math.PI * f) / 32 + b.ph + 1.3) })
 const boats = (f) => BOATS.flatMap((b) => { const P = boatPose(b, f); return turn(b.faces, P.c, P.d, P.th, P.dh) })
 const boatPt = (b, f, [s, t, u]) => { const P = boatPose(b, f); return turnPt([b.at[0] + b.dir[0] * s - b.dir[1] * t, Z + b.at[1] + b.dir[1] * s + b.dir[0] * t, u], P.c, P.d, P.th, P.dh) }

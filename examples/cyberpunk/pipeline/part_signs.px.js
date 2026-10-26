@@ -223,7 +223,7 @@ anim("signs_neons", { w: 320, h: 32, frames: SIGNS_N, fps: SIGNS_FPS }, (c) => {
   const f = c.frame
   // A, the repair and pawn shop (x 6-34, rows 113-118): a wrench, FIX, a chip; the I flickers
   SIGNS_PIX(c, 7, 9, SIGNS_WRENCH, "z", "x")
-  c.text(15, 10, "F", "z"); c.text(19, 10, "I", SIGNS_HASH(f * 5 + 11) < 0.08 ? "Z" : "z"); c.text(23, 10, "X", "z")
+  c.text(15, 10, "FIX", (i) => (i === 1 && SIGNS_HASH(f * 5 + 11) < 0.08 ? "Z" : "z"))
   SIGNS_PIX(c, 28, 10, SIGNS_CHIP, "z", f % 24 < 3 ? "z" : "x")
   // B, the taco counter (x 72-92, rows 106-111): a red chili and warm letters, buzzing now and then
   const buzz = SIGNS_HASH(f + 101) < 0.04

@@ -13,6 +13,7 @@ import { pack } from "../src/core/color.ts";
 import { encodePng } from "../src/node/png.ts";
 import { type View, perspective, scaled } from "../src/core/perspective.ts";
 import { postAt } from "../src/core/post.ts";
+import { model, turnFaces, turnPoint } from "../src/core/mesh.ts";
 
 const STAGE = `ramps("kgw")
 const V = { w: 40, horizon: 10, eye: 1, focal: 40 }
@@ -20,6 +21,20 @@ sprite("s", { w: 2, h: 20, pivot: "bottom" }, rect(0, 0, 2, 20, "r"))
 sprite("_white", "w")
 `;
 const rows = (body: string) => keys(loadSource(PAL + STAGE + body, "t.px.js"), "a").split("\n");
+
+test("model: a prism (its top, then a side for each edge), a stick (four sides), faces turned and a point with them", () => {
+  const m = model();
+  m.prism("top", "side", [[0, 0], [1, 0], [1, 2]], 0, 3);
+  assert.deepEqual(m.faces.map((F) => F.mat), ["top", "side", "side", "side"]);
+  assert.deepEqual([m.faces[0].pts, m.faces[2].pts], [[[0, 0, 3], [1, 0, 3], [1, 2, 3]], [[1, 0, 0], [1, 2, 0], [1, 2, 3], [1, 0, 3]]]);
+  m.stick("rope", [0, 0, 0], [0, 0, 2], 0.1);
+  assert.equal(m.faces.length, 8);
+  assert.ok(m.faces.slice(4).every((F) => F.pts.every((q) => Math.abs(Math.hypot(q[0], q[1]) - 0.1 * Math.SQRT2) < 1e-9)), "its corners r * sqrt 2 from its axis");
+  // a quarter turn about the x axis through (0, 1, 0), lifted 0.5: (0, 2, 0) goes to (0, 1, 1.5)
+  assert.deepEqual(turnPoint([0, 2, 0], [0, 1, 0], [1, 0, 0], Math.PI / 2, 0.5).map((v) => Math.round(v * 1e9) / 1e9), [0, 1, 1.5]);
+  assert.deepEqual(turnFaces([{ mat: "a", pts: [[0, 2, 0]] }], [0, 1, 0], [1, 0, 0], Math.PI / 2)[0].pts[0].map(Math.round), [0, 1, 1]);
+  assert.match(failure(PAL + 'const m = model(); m.prism("a", "b", [[0, 0]], 0, 1)').message, /prism\(top, side, \[\[x, z\], ...\] \(3 or more\)/);
+});
 
 test("mesh sprites: a wall hides what stands behind it below its top, and nothing in front of it", () => {
   // the wall's top, 0.5 m up at z 3.2, on row 16.25; its foot at z 3 on row 23.3

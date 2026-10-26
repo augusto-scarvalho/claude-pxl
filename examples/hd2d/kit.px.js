@@ -42,8 +42,4 @@ sprite("_lamp", { w: 7, h: 30, pivot: "bottom" }, rect(3, 8, 1, 22, "k"), rect(1
   rect(1, 1, 5, 1, "k"), rect(1, 2, 5, 5, "Y"), rect(2, 3, 3, 3, "y"), rect(0, 7, 7, 1, "k"))
 
 // A block into model m, from (x0, z0) to (x1, z1), u0 to u1 m up: its top of one material, its sides of another.
-const hd2dBlock = (m, top, side, x0, z0, x1, z1, u0, u1) => {
-  m.face(top, [x0, z0, u1], [x1, z0, u1], [x1, z1, u1], [x0, z1, u1])
-  for (const [a, b] of [[[x0, z0], [x1, z0]], [[x0, z1], [x1, z1]], [[x0, z0], [x0, z1]], [[x1, z0], [x1, z1]]])
-    m.face(side, [...a, u0], [...b, u0], [...b, u1], [...a, u1])
-}
+const hd2dBlock = (m, top, side, x0, z0, x1, z1, u0, u1) => m.prism(top, side, [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], u0, u1)

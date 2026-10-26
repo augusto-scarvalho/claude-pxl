@@ -339,6 +339,30 @@ sprite("_rock_small", { w: 11, h: 7, pivot: "bottom" }, `
   uTTTTTTTtt.
   DtTeTTTTttD
   .DDweDDDDD.`, bump("hybrid"))
+// A rock of any size by the same rules, drawn from its masses: `lobes` [[x, y, rx, ry], ...], each a
+// dome over its middle row widening a little to the foot, the first the biggest (its ledge and crack)
+// and the last drawn over the others; a tone to each plane, the darkest as the line under it and down
+// its shaded side, grass over its foot (graveyard's boulders: rock("_boulder", 28, 16, [...]))
+const rock = (name, w, h, lobes) => sprite(name, { w, h, pivot: "bottom" }, (c) => {
+  // a lobe: a dome over its middle row, widening a little from there to the foot
+  const lobeAt = (X, Y) => lobes.findLast(([x, y, rx, ry]) => { const d = Math.max(0, Y + 0.5 - y) / ry, nx = (X + 0.5 - x) / (rx * (1 + 0.2 * d)), ny = Math.min(0, (Y + 0.5 - y) / ry); return nx * nx + ny * ny <= 1 })
+  const [bx, by, brx, bry] = lobes[0]
+  for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) {
+    const l = lobeAt(X, Y)
+    if (!l) continue
+    const [x, y, rx, ry] = l, nx = (X + 0.5 - x) / rx, ny = (Y + 0.5 - y) / ry
+    const rim = !lobeAt(X, Y - 1), right = !lobeAt(X + 1, Y)
+    let k = ny < -0.62 - 0.25 * nx ? (rim && nx < 0.2 ? "E" : "U") : nx < -0.5 ? "u" : nx > 0.5 ? "t" : "T"
+    if (l === lobes[0] && Y === Math.round(by + bry * 0.3) && nx > -0.75 && nx < 0) k = "D"              // the ledge's undercut
+    if (l === lobes[0] && Y === Math.round(by + bry * 0.3) - 1 && nx > -0.75 && nx < 0) k = "U"          // its lit band
+    if (Y === h - 1 || (right && ny > -0.35)) k = "D"                                                     // under it, its shaded edge
+    c.px(X, Y, k)
+  }
+  // a crack down the front of the biggest mass
+  for (let i = 0; i < 3; i++) c.px(Math.round(bx + 2 + i * 0.6), Math.round(by + 1 + i), "t")
+  // grass over its foot, in tufts of two
+  for (let X = 1; X < w - 2; X++) if (hash(X, w * 7 + h) < 0.22 && lobeAt(X, h - 2)) { c.px(X, h - 1, "w"); c.px(X + 1, h - 1, "e"); c.px(X, h - 2, "e") }
+}, bump("hybrid"))
 
 // A dead tree, 4 m: limbs that kink every 4-6 px and split in one to three at angles of their own,
 // tapering 5, 3, 2, 1 px, the last no longer than 5 px; lit only on the upper left of the trunk and the

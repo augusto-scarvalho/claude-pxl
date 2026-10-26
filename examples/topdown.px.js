@@ -20,14 +20,7 @@ ramps("hGgl", "Aa", "NBbf", "KSs", "xWw", "Oo")             // the shadow layer 
 // shallow and deep water. The wobble repeats every 8 px, so it matches across every tile seam.
 const T = 16
 const band = (t) => t < 0.34 ? "g" : t < 0.38 ? "G" : t < 0.45 ? "a" : t < 0.49 ? "A" : t < 0.56 ? "f" : t < 0.72 ? "b" : "B"
-for (let m = 0; m < 16; m++) sprite("shore_" + m, { w: T, h: T }, (c) => {
-  for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) {
-    const u = (x + 0.5) / T, v = (y + 0.5) / T
-    const t = (m & 1) * (1 - u) * (1 - v) + (m >> 1 & 1) * u * (1 - v) + (m >> 2 & 1) * (1 - u) * v + (m >> 3 & 1) * u * v
-      + 0.035 * Math.sin((x + 0.5) * Math.PI / 4) + 0.035 * Math.sin((y + 0.5) * Math.PI / 4)
-    c.px(x, y, band(t))
-  }
-})
+corners("shore", { size: T }, (x, y, t) => band(t + 0.035 * Math.sin((x + 0.5) * Math.PI / 4) + 0.035 * Math.sin((y + 0.5) * Math.PI / 4)))
 
 // Full land and full sea get variants, so big areas don't repeat.
 sprite("_tuft", `

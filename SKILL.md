@@ -126,7 +126,8 @@ What exists, a line each; `PXL help <name>` prints the rest of any op or option 
 - **Regions** (`where`, `clip(region, ...items)`): `[cx, cy, r]`, `[x, y, w, h]`, a polygon's points,
   or `(x, y) => bool`. `shade`/`light(region, steps, density)` step colors along the ramps.
 - **Reuse**: variants are `base` + `swap`; repeated details `_parts` + `stamp`; families a `group` or a
-  loop; props get `pivot: "bottom"`; texture is `scatter` of tiny parts; areas are `tilemap`/`pattern`.
+  loop; props get `pivot: "bottom"`; texture is `scatter` of tiny parts; areas are `tilemap`/`pattern`
+  (a terrain's 16 corner pieces from one function: `corners()`).
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` and functions reading `c.phase`;
   stamping an anim animates the scene; `scroll()`, `clouds()`, `plume()`, `c.cross()` go by in a
   loop; `tween()` keys poses in time; `route()` walks a figure's legs and holds by name. Limbs, walks, hair: `PXL help "characters 9 10"`; loops and

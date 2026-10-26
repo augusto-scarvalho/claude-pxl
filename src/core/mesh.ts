@@ -172,8 +172,31 @@ export function model() {
     face(mat, p(0, 0, 0), p(0, 1, 0), p(0, 1, 1), p(0, 0, 1)); face(mat, p(1, 0, 0), p(1, 0, 1), p(1, 1, 1), p(1, 1, 0));
     face(mat, p(0, 0, 0), p(0, 0, 1), p(1, 0, 1), p(1, 0, 0)); face(mat, p(0, 0, 1), p(0, 1, 1), p(1, 1, 1), p(1, 0, 1));
   };
-  return { faces, face, strip, loft, box };
+  // a polygon [[x, z], ...] raised from u0 to u1, its top of one material and its sides of another (a
+  // block on the ground, a deck, a post of n sides): no bottom
+  const prism = (top: string, side: string, pts: number[][], u0: number, u1: number) => {
+    if (!Array.isArray(pts) || pts.length < 3 || !pts.every((p) => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)) || !Number.isFinite(u0) || !Number.isFinite(u1))
+      throw new PxError(`model: prism(top, side, [[x, z], ...] (3 or more), u0, u1), got ${JSON.stringify([pts, u0, u1])?.slice(0, 120)}`);
+    face(top, ...pts.map(([x, z]): V3 => [x, z, u1]));
+    pts.forEach(([x, z], i) => { const [x2, z2] = pts[(i + 1) % pts.length]; face(side, [x, z, u0], [x2, z2, u0], [x2, z2, u1], [x, z, u1]); });
+  };
+  // a square stick from a to b, r half its width (a spar, a rope, a rail)
+  const stick = (mat: string, a: V3, b: V3, r = 0.05) => {
+    const D = unit(sub(b, a)), e1 = unit(cross(D, Math.abs(D[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), e2 = cross(D, e1);
+    const at = (p: V3, s: number, t: number): V3 => [p[0] + (e1[0] * s + e2[0] * t) * r, p[1] + (e1[1] * s + e2[1] * t) * r, p[2] + (e1[2] * s + e2[2] * t) * r];
+    const sq = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+    sq.forEach(([s, t], i) => { const [s2, t2] = sq[(i + 1) % 4]; face(mat, at(a, s, t), at(a, s2, t2), at(b, s2, t2), at(b, s, t)); });
+  };
+  return { faces, face, strip, loft, box, prism, stick };
 }
+/** A point turned th radians about the axis through c along the unit way d, then lifted (up) by lift: a hull rolling, its riders with it. */
+export function turnPoint([x, z, u]: V3, c: V3, d: V3, th: number, lift = 0): V3 {
+  const v = [x - c[0], z - c[1], u - c[2]], cs = Math.cos(th), sn = Math.sin(th), k = d[0] * v[0] + d[1] * v[1] + d[2] * v[2];
+  const cr = [d[1] * v[2] - d[2] * v[1], d[2] * v[0] - d[0] * v[2], d[0] * v[1] - d[1] * v[0]];
+  return [0, 1, 2].map((e) => c[e] + v[e] * cs + cr[e] * sn + d[e] * k * (1 - cs) + (e === 2 ? lift : 0)) as V3;
+}
+/** Faces turned so (turnPoint each corner): a ship on its bob, a boat. */
+export const turnFaces = (faces: Face[], c: V3, d: V3, th: number, lift = 0): Face[] => faces.map((F) => ({ mat: F.mat, pts: F.pts.map((q) => turnPoint(q, c, d, th, lift)) }));
 
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
