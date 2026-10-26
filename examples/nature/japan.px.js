@@ -151,9 +151,6 @@ make3d.define("ema", ({ seed = 5 } = {}) => {
 // up. Its eyes and the line of its mouth are "eye" and "mouth" sockets, carved by hand over each view:
 // japan.carve(fox) as turnaround's draw. `size`: the fox bigger than life (1.45).
 make3d.define("kitsune", ({ size = 1.45, moss = 0.15, holds = "tama" } = {}) => {
-  // (its parameters checked here: make3d.define's params take ranges of numbers only, and holds is a word)
-  if (!(size >= 0.5 && size <= 3) || !(moss >= 0 && moss <= 1)) throw new Error(`make3d.kitsune: size is 0.5 to 3, moss 0 to 1, got ${size}, ${moss}`)
-  if (!["tama", "key"].includes(holds)) throw new Error(`make3d.kitsune: holds is "tama" (a jewel under a forepaw) or "key" (in its mouth), got ${JSON.stringify(holds)}`)
   const Z0 = 0.63, at = (p) => [p[0] * size, p[1] * size, p[2] * size + Z0]
   const pedestal = sdf.union(sdf.box([0.8, 0.8, 0.1], { round: 0.015 }).at(0, 0, 0.05), sdf.box([0.72, 0.72, 0.08], { round: 0.015 }).at(0, 0, 0.14),
     sdf.box([0.58, 0.58, 0.32], { round: 0.02 }).at(0, 0, 0.34), sdf.box([0.68, 0.68, 0.07], { round: 0.015 }).at(0, 0, 0.535), sdf.box([0.62, 0.62, 0.06], { round: 0.015 }).at(0, 0, 0.6))
@@ -179,7 +176,7 @@ make3d.define("kitsune", ({ size = 1.45, moss = 0.15, holds = "tama" } = {}) => 
   const field = mossy(pedestal.union(fox.scale(size).at(0, 0, Z0)).mat("stone"), moss)
     .union(bib.scale(size).at(0, 0, Z0).mat("bib"), held.scale(size).at(0, 0, Z0).mat("gold"))
   return { field, sockets: { eye0: at([-0.05, -0.145, 0.63]), eye1: at([0.05, -0.145, 0.63]), mouth0: at([-0.03, -0.24, 0.545]), mouth1: at([0.03, -0.24, 0.545]), head: at([0, -0.07, 0.6]) } }
-})
+}, { params: { size: [0.5, 3], moss: [0, 1], holds: ["tama", "key"] } })
 // turnaround's draw for a thing with "eye" and "mouth" sockets: each a carved pixel, near black (E),
 // where it faces us (nearer us than the head's middle)
 const carve = (thing) => (c, v) => {

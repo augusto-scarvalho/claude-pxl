@@ -31,24 +31,20 @@ const pleats = (h, a, out) => (!out ? "d" : ((((a * 6) / Math.PI) % 1) + 1) % 1 
 // the kosode's collar crossed at the chest: two bands from the shoulders down to the hakama's top
 const collar = (h, a) => h > 0.45 && Math.abs(Math.abs(a) - (1 - h) * 1.2) < 0.13
 const MIKO = {
-  ...T.TRAVELER, over: [],
+  ...T.TRAVELER, over: [], spine: true,
   legs: (far) => ({ tr: far ? "kdR" : "dRr", shin: far ? "kdR" : "dRr", foot: far ? "VvW" : "vWw" }), cuff: 0.97,
   drapes: [{ base: "pelvis", top: (j) => j.pelvis[2] + 3.6, len: 13.6, out: pleats, in: "d", trail: 0.35, keep: () => true, radius: (h) => 3.7 + 2.1 * (1 - h) }],
   skirt: (h, a, out) => (out ? "dRr" : "d"),
   body: (h, a) => (h < 0.3 ? "dRr" : collar(h, a) ? "Vv" : "vWw"),
   sleeve: two("vWw", "VvW"), fore: two("vWw", "VvW"), hand: two("zsS", "zzs"),
 }
-// the dressed figure, and what dress() hasn't: the kosode's body leaning with her (dress() sweeps it
-// round an upright through the hips: as she bowed it stood, a column her shoulders and head left, and
-// it swallowed her hair); the wide sleeves hanging from each forearm; the hair's tail down her back
-// from the nape, lying along her back as she leans (hung plumb from a nape the lean carries forward, it
-// ran inside her), pushed out to her back where the lean brings the nape over it
+// the dressed figure (the kosode's body along her spine, `spine`: round an upright through the hips, as
+// she bowed it stood, a column her shoulders and head left, and it swallowed her hair), and what dress()
+// hasn't: the wide sleeves hanging from each forearm; the hair's tail down her back from the nape, lying
+// along her back as she leans (hung plumb from a nape the lean carries forward, it ran inside her),
+// pushed out to her back where the lean brings the nape over it
 const parts = (j, p) => {
   const P = T.dress(MIKO)(j, p), farArm = j.depth(j.arms[0].sh) < j.depth(j.arms[1].sh) ? 0 : 1
-  const waist = j.pelvis[2] + 1.4, chest = j.chest[2] + 0.5, lean = sub(j.chest, j.pelvis)
-  const along = (h) => { const t = (waist + h * (chest - waist) - j.pelvis[2]) / lean[2]; return [lean[0] * t, lean[1] * t] }
-  P.tunic[1] = j.sweep([j.pelvis[0], j.pelvis[1], 0], waist, chest, (h, a) => (4 - 0.5 * h * h) * (0.84 + 0.16 * Math.abs(Math.sin(a))),
-    { shift: along, paint: (h, a, out) => MIKO.body(h < 0.14 ? 0 : h, a, out) })
   j.arms.forEach((A, i) => {
     const a = add(A.elbow, [0, 0, -2]), b = add(add(A.elbow, mul(sub(A.hand, A.elbow), 0.85)), [0, 0, -2.6])
     P[`sode${i}`] = j.limb(a, b, 1.9, 2.3, i === farArm ? "VvW" : "vWw")
@@ -88,22 +84,20 @@ views("_mk_head", sdf.union(T.SKULL, MK_HAIR, RIBBON), { ...T.HEAD, retouch: FAC
 const STROKE = [0, 0.45, 0.85, 1, 1, 0.75, 0.4, 0.12], OFF = [0, 0, 0, 0, 1.2, 1.8, 1.4, 0.5], LEAN = 14
 const sweep = (i) => {
   const s = STROKE[i], down = 0.8 + 0.3 * Math.sin(Math.PI * s), cf = B3.torso * Math.sin(LEAN * RAD), cz = B3.hip - down + B3.torso * Math.cos(LEAN * RAD)
-  const sh = [-1, 1].map((k) => [cf + B3.shoulders[0], k * B3.shoulders[1], cz + B3.shoulders[2]])
-  // in the shoulders' frame (px: forward, right, up from under the pelvis): the top hand, the broom's
-  // head on the ground, the lower hand on the line between them
-  const top = [cf + 2.5, -0.8, cz - 4.5], head = [12 + 1.5 * Math.sin(Math.PI * s), 6 - 12 * s, OFF[i]], f = 2.8 / (top[2] - head[2])
-  const low = top.map((v, e) => v + (head[e] - v) * f)
+  // the grip (px: forward, right, up from under the pelvis, as her shoulders face): the top hand under her
+  // chest (cf, cz), the broom's head on the ground, the lower hand on the line between them 2.8 px lower
+  const top = [cf + 2.5, -0.8, cz - 4.5], head = [12 + 1.5 * Math.sin(Math.PI * s), 6 - 12 * s, OFF[i]]
   return { feet: [[1.4, -2.5], [-0.9, 2.5]], lift: [0, 0], down, lean: LEAN, turn: 5 * (1 - 2 * s), twist: 8 * (1 - 2 * s), head: -8 * (1 - 2 * s),
-    hands: [top, low].map((p, k) => p.map((v, e) => v - sh[k][e])), trail: 0.2, sway: 0, broom: 1 / f, stroke: s }
+    grip: { from: top, to: head, at: [0, 2.8 / (top[2] - head[2])] }, trail: 0.2, sway: 0, stroke: s }
 }
 // the broom by hand after her: the handle from above the top hand through the lower one, the head a fan
 // of twigs from a third of the way up to the ground; drawn where it is nearer us than her chest or on
 // nothing, and never over her hands. As blocks, two flat colors; painted, bamboo with its nodes, seven
 // twigs fanning out, their ends lighter.
-const broomOf = (j, p) => { const H0 = j.arms[0].hand, H1 = j.arms[1].hand, G = add(H0, mul(sub(H1, H0), p.broom)), up = sub(H0, G); return { H0, H1, G, up, across: unit([up[1], -up[0], 0]) } }
+const broomOf = (j) => { const [H0, G] = j.grip, up = sub(H0, G); return { H0, H1: j.arms[1].hand, G, up, across: unit([up[1], -up[0], 0]) } }
 const BLOCK = { handle: "#c8d46a", twigs: "#7a5530" }
 const drawBroom = (painted) => (c, j, p) => {
-  const { H0, H1, G, up, across } = broomOf(j, p), chest = j.depth(j.chest), hands = [H0, H1].map((q) => j.screen(q).map(Math.round))
+  const { H0, H1, G, up, across } = broomOf(j), chest = j.depth(j.chest), hands = [H0, H1].map((q) => j.screen(q).map(Math.round))
   const put = (q, key, handle) => {
     const [x, y] = j.screen(q).map(Math.round)
     if (painted && handle && hands.some(([hx, hy]) => Math.abs(hx - x) + Math.abs(hy - y) <= 1)) return

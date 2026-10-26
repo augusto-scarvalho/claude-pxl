@@ -229,21 +229,26 @@ export function smoke(p: P = {}): Built {
 export const BUILDERS: Record<string, (p: P) => Built> = { tree, pine, bush, rock, house, crystal, mist, smoke };
 
 /**
- * A builder of the art file's own, `make3d.define(name, fn, { params: { k: [lo, hi] }, wind })`: fn
- * takes the parameters and returns a Built as the eight above do ({ field } or { density, look }, and
- * parts, details, decals, sockets if it has them). A declared parameter out of its range is refused
- * (and so bounds `check --fix`), an undeclared one too once any is declared; `wind`: what it builds
- * sways, and a world gives it its wind.
+ * A builder of the art file's own, `make3d.define(name, fn, { params: { k: [lo, hi], w: ["a", "b"] }, wind })`:
+ * fn takes the parameters and returns a Built as the eight above do ({ field } or { density, look }, and
+ * parts, details, decals, sockets if it has them). A declared parameter out of its range (or not one of
+ * its words) is refused (and so bounds `check --fix`), an undeclared one too once any is declared;
+ * `wind`: what it builds sways, and a world gives it its wind.
  */
 export function defineBuilder(name: unknown, fn: unknown, o: { params?: Record<string, unknown>; wind?: boolean } = {}): (p: P) => Built {
   const who = `make3d.${name}`;
-  if (typeof name !== "string" || !/^\w+$/.test(name) || typeof fn !== "function") throw new PxError('make3d.define("name", (params) => ({ field, parts, sockets }) or ({ density, look }), { params: { size: [0.3, 2] }, wind })');
+  if (typeof name !== "string" || !/^\w+$/.test(name) || typeof fn !== "function") throw new PxError('make3d.define("name", (params) => ({ field, parts, sockets }) or ({ density, look }), { params: { size: [0.3, 2], season: ["summer", "bare"] }, wind })');
   if (BUILDERS[name]) throw new PxError(`${who} is built in: give yours another name`);
-  const ranges = Object.entries(o.params ?? {});
-  for (const [k, r] of ranges) if (!(Array.isArray(r) && r.length === 2 && r.every(Number.isFinite) && r[0] <= r[1])) throw new PxError(`make3d.define '${name}': params.${k} is its range, [lo, hi], got ${JSON.stringify(r)}`);
+  const ranges = Object.entries(o.params ?? {}), words = (r: unknown): r is string[] => Array.isArray(r) && r.length > 0 && r.every((w) => typeof w === "string");
+  for (const [k, r] of ranges) if (!(words(r) || (Array.isArray(r) && r.length === 2 && r.every(Number.isFinite) && r[0] <= r[1]))) throw new PxError(`make3d.define '${name}': params.${k} is its range, [lo, hi], or the words it takes, ["spring", "autumn"], got ${JSON.stringify(r)}`);
   return (p: P = {}) => {
     if (ranges.length) known(p, [...ranges.map(([k]) => k), "seed", ...(o.wind ? ["wind"] : [])], who);
-    for (const [k, [lo, hi]] of ranges as [string, [number, number]][]) { const v = p[k]; if (v !== undefined && !(typeof v === "number" && v >= lo && v <= hi)) throw new PxError(`${who}: ${k} is ${lo} to ${hi}, got ${JSON.stringify(v)}`); }
+    for (const [k, r] of ranges) {
+      const v = p[k];
+      if (v === undefined) continue;
+      if (words(r)) { if (!r.includes(v as string)) throw new PxError(`${who}: ${k} is ${r.map((w) => JSON.stringify(w)).join(", ")}, got ${JSON.stringify(v)}`); }
+      else if (!(typeof v === "number" && v >= (r as number[])[0] && v <= (r as number[])[1])) throw new PxError(`${who}: ${k} is ${(r as number[])[0]} to ${(r as number[])[1]}, got ${JSON.stringify(v)}`);
+    }
     const b = (fn as (p: P) => Partial<Built>)(p);
     if (!b || typeof b !== "object" || !(b.field instanceof Sdf || b.density instanceof Density)) throw new PxError(`${who}: its function returns { field: an sdf } or { density: sdf.density(...), look: { ramp } }, got ${typeof b === "object" ? `{ ${Object.keys(b ?? {}).join(", ")} }` : JSON.stringify(b)}`);
     return { parts: {}, details: {}, decals: {}, sockets: {}, ...b, ...(o.wind ? { windy: true } : {}) };

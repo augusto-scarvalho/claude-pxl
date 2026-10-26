@@ -319,8 +319,8 @@ declare global {
   type PxAs = "surface" | "voxels" | "splats" | "mesh";
   /** draw3d()'s options: the view, where the world stands, its materials and light, a ray a block, these parts only; how its solids are drawn (`as`), the cell of voxels and of a mesh (`size`, m, 0.1), the splats' spacing; more of surface()'s options (`surface`: soft, outline, rim, ao, shadows). */
   interface PxDraw3dOpts { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view" | "mesh"; pixel?: number; only?: string[]; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown> }
-  /** A figure's pose, the file's own numbers: each foot [forward, right] on the floor from under the pelvis (left, right), lifted; the pelvis down; leaning forward and to the right (deg); the hips turned from the heading, the shoulders against them, the head against those (deg, clockwise from above); each hand [forward, right, up] from its shoulder. Other keys pass to parts(). */
-  interface PxPose { feet?: number[][]; lift?: number[]; down?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; [k: string]: unknown }
+  /** A figure's pose, the file's own numbers: each foot [forward, right] on the floor from under the pelvis (left, right), lifted; the pelvis down; leaning forward and to the right (deg); the hips turned from the heading, the shoulders against them, the head against those (deg, clockwise from above); each hand [forward, right, up] from its shoulder, or both on one line (grip: its ends [forward, right, up] from under the pelvis as the shoulders face, each hand `at` its share of the way, [left, right]). Other keys pass to parts(). */
+  interface PxPose { feet?: number[][]; lift?: number[]; down?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; grip?: { from: PxV3; to: PxV3; at: [number, number] }; [k: string]: unknown }
   /** A piece of a figure's part: a field, and its paint: a material (a ramp of keys or a name in mats) or (h along it 0..1, a round it from the way the body faces, outside) => one. */
   interface PxPiece { field: PxSdf; paint?: string | ((h: number, a: number, outside: boolean) => string | null | undefined) }
   /** The joints a pose puts where at a heading, in the sprite's px (x across, y away from us, z up); limb() and ball() make pieces along them; screen() where a point lands on the sprite, depth() how near us it is. */
@@ -328,6 +328,10 @@ declare global {
     heading: number; f: PxV3; r: PxV3; up: PxV3; spine: PxV3; pelvis: PxV3; chest: PxV3; head: PxV3;
     sh: { f: PxV3; r: PxV3 }; hd: { f: PxV3; r: PxV3; heading: number };
     legs: { hip: PxV3; knee: PxV3; ankle: PxV3; foot: PxV3 }[]; arms: { sh: PxV3; elbow: PxV3; hand: PxV3 }[];
+    /** the pose's grip, [from, to]: the line the hands hold */
+    grip?: [PxV3, PxV3];
+    /** in a draw hook: a line of pixels from a to b in the figure's own depth (a held broom), paint a key or (t) => key along it */
+    rod(a: PxV3, b: PxV3, paint: string | ((t: number) => string | undefined)): void;
     limb(a: PxV3, b: PxV3, r0: number, r1?: number, paint?: PxPiece["paint"]): PxPiece;
     ball(c: PxV3, r: number | PxV3, paint?: PxPiece["paint"]): PxPiece;
     /** a surface swept round an upright through base from z0 up to z1: keep(h, a) the part there is, shift(h) [dx, dy] that height carried off the axis, shell half its thickness (a cloth) */
@@ -851,8 +855,8 @@ declare global {
   function expect3d(name: string, world: PxWorld, rules: PxRule[], opts?: { frames?: number; ms?: number }): void;
   /** Builders with semantic parameters: make3d.tree({ canopy, twist, leaves, wind }), pine({ height, tiers, girth, snow }), bush({ size, leaves }), rock({ moss }), house({ snow, door, window, sign }), crystal({ rune, moss }), mist({ color }), smoke(). */
   const make3d: Record<"tree" | "pine" | "bush" | "rock" | "house" | "crystal" | "mist" | "smoke" | (string & {}), (params?: Record<string, unknown>) => PxBuilt> & {
-    /** A builder of the file's own: fn(params) returns { field } or { density, look } (and parts, details, decals, sockets); params' ranges refused when exceeded; wind: it sways. */
-    define(name: string, fn: (params: Record<string, any>) => Partial<PxBuilt>, opts?: { params?: Record<string, [number, number]>; wind?: boolean }): void;
+    /** A builder of the file's own: fn(params) returns { field } or { density, look } (and parts, details, decals, sockets); params: a number's range [lo, hi] or a word's list, refused outside it; wind: it sways. */
+    define(name: string, fn: (params: Record<string, any>) => Partial<PxBuilt>, opts?: { params?: Record<string, [number, number] | string[]>; wind?: boolean }): void;
   };
   /** The light and materials the 3D ops take when a call doesn't give them (mesh()'s light; surface, voxels, volume, splats, decal, draw3d, export3d), for the assets defined after it, as pal() and ramps() are. */
   function look3d(o: { light?: PxV3; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number }> }): void;

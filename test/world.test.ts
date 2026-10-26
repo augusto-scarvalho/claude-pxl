@@ -124,6 +124,15 @@ sprite("s", { w: 40, h: 40 }, draw3d(W, { view: { kind: "side", origin: [14, 38]
   assert.throws(() => env.make3d.bad(), /returns \{ field: an sdf \} or \{ density/);
 });
 
+test("make3d.define: a parameter that is a word, its words declared beside the ranges; another refused", () => {
+  const env = new Project().env() as { make3d: Record<string, (...a: unknown[]) => { field?: unknown }> };
+  env.make3d.define("lamp", ({ size = 1, season = "summer" }: { size?: number; season?: string }) => ({ field: sdf.sphere(season === "bare" ? size / 2 : size) }), { params: { size: [0.5, 2], season: ["summer", "bare"] } });
+  assert.ok(env.make3d.lamp({ season: "bare", size: 2 }).field);
+  assert.throws(() => env.make3d.lamp({ season: "autumn" }), /make3d\.lamp: season is "summer", "bare", got "autumn"/);
+  assert.throws(() => env.make3d.lamp({ colour: 1 }), /no parameter colour/);
+  assert.throws(() => env.make3d.define("odd", () => ({}), { params: { season: ["summer", 2] } }), /the words it takes/);
+});
+
 test("draw3d: the parts an edit leaves alone drawn the same, byte for byte; each pixel knows its part; expect3d's rules in pxl check", () => {
   const src = (wind: string, canopy: number, only: string) => PAL + `ramps("kgw", "krr")
 const MATS = { bark: "krr", leaf: "kgw", stone: "kgw", moss: "kgw", stem: "kgw", door: "krr", glow: "krr", cap: "krr", spot: "kgw", gem: "kgw", mist_grey: "kgw", smoke_grey: "kgw" }

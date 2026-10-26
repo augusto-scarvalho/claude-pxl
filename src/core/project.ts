@@ -780,8 +780,39 @@ export class Project implements BuildCtx {
           for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) if (!on(x, y) && (on(x + 1, y) || on(x - 1, y) || on(x, y + 1) || on(x, y - 1))) out.push(x, y);
           for (let i = 0; i < out.length; i += 2) c.px(out[i] - c.ox, out[i + 1] - c.oy, ink);
         };
+        // j.rod(a, b, paint) in a draw hook: a line of pixels from a to b drawn where it is nearer us than the
+        // figure there (a held broom, a staff, in the blocks and painted): the depth surface() left, the head
+        // stamped by hand at its middle's, the line round the figure at what it runs round
+        const rodOn = (c: Canvas, head?: { at: (x: number, y: number) => boolean; z: number }) => {
+          const Z = c.img.depth, data = c.img.data, own = new Map<number, number>();
+          const zAt = (x: number, y: number, i: number) => {
+            if (own.has(i)) return own.get(i)!;
+            if (head?.at(x, y)) return head.z;
+            if (Z && Number.isFinite(Z[i])) return Z[i];
+            if ((data[i] & 255) < 128 || !Z) return Infinity;
+            let m = Infinity;
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const k = c.index(x + dx, y + dy); if (k >= 0 && Z[k] < m) m = Z[k]; }
+            return m;
+          };
+          return (a: number[], b: number[], key: unknown) => {
+            if (![a, b].every((q) => Array.isArray(q) && q.length === 3 && q.every(Number.isFinite)) || !(typeof key === "string" || typeof key === "function"))
+              throw new PxError("rig3d: j.rod(a, b, paint) draws a line from a to b ([x, y, z] px, as the joints) in a draw hook, paint a key or (t) => key along it (t 0 at a, 1 at b)");
+            const [x0, y0] = screen(a), [x1, y1] = screen(b), n = Math.max(1, Math.ceil(2 * Math.hypot(x1 - x0, y1 - y0)));
+            let last = -1;
+            for (let s = 0; s <= n; s++) {
+              const t = s / n, q = [0, 1, 2].map((e) => a[e] + (b[e] - a[e]) * t), [x, y] = screen(q).map(Math.round), i = c.index(x, y);
+              if (i < 0 || i === last) continue;
+              last = i;
+              const z = -depth(q), k = typeof key === "function" ? key(t) : key;
+              if (z > zAt(x, y, i) || typeof k !== "string" || k === ".") continue;
+              c.px(x, y, k);
+              own.set(i, z);
+            }
+          };
+        };
         const paint = (c: Canvas, p: Pose, deg: number, flat: boolean, M: (typeof moves)[number]) => {
           const j = joints(p, deg);
+          let hd: { at: (x: number, y: number) => boolean; z: number } | undefined;
           if (flat) {
             c.surface(blocksOf(B, j), { view, ppm: 1, at, mats: BLOCK_MATS, outline: false, rim: false, shadows: false, ao: 0, inner: ink });
             ring(c);
@@ -823,8 +854,10 @@ export class Project implements BuildCtx {
                 while (r >= 0 && (img.data[r * img.w + x] & 255) < 128) r--;
                 if (r >= 0 && c.get(x0 + x, y0 + r + 1)) c.px(x0 + x, y0 + r + 1, o.chin);
               }
+              hd = { at: (x, y) => x >= x0 && y >= y0 && x < x0 + img.w && y < y0 + img.h && (img.data[(y - y0) * img.w + x - x0] & 255) >= 128, z: -depth(j.head) };
             }
           }
+          j.rod = rodOn(c, hd);
           M.draw?.(c, j, p);
           (o.draw as ((c: Canvas, j: Joints, p: Pose) => void) | undefined)?.(c, j, p);
         };
@@ -924,7 +957,7 @@ export class Project implements BuildCtx {
     m3.define = (name: unknown, fn: unknown, o: unknown = {}) => {
       const loc = this.callerLoc();
       try {
-        if (!isPlainObject(o)) throw new PxError('make3d.define("name", (params) => ({ field }), { params: { size: [0.3, 2] }, wind })');
+        if (!isPlainObject(o)) throw new PxError('make3d.define("name", (params) => ({ field }), { params: { size: [0.3, 2], season: ["summer", "bare"] }, wind })');
         checkKeys("make3d.define", o, ["params", "wind"]);
         if (typeof name === "string" && makers[name] && !BUILDERS[name]) throw new PxError(`make3d.${name} is already defined`);
         makers[name as string] = defineBuilder(name, fn, o as never);

@@ -120,8 +120,9 @@ round it.
   rains) and autumn (dry), the baobab's summer and bare; the evergreens the same all year. `color`
   picks one of an autumn's, `height` is its top, `wind` m its sway (negative: to the west). A new
   species: the nearest spec copied (a beech the oak's, a sugi the cypress's), its leaves in
-  `trees.mats`, then `make3d.define("beech", (o) => trees.grow("beech", BEECH, o))`; judge it as
-  flat blocks first (a tone a material), from the side, turned, from above and far, then paint it.
+  `trees.mats`, then `make3d.define("beech", (o) => trees.grow(BEECH, o), trees.params(BEECH))` (its
+  parameters declared: a season it has no leaves for refused); judge it as flat blocks first (a tone
+  a material), from the side, turned, from above and far, then paint it.
   Cost, a 50-60 px tree at 20 px to the meter: 0.2-0.5 s (baobab, palm, momiji, birch, cypress),
   1-1.4 s the dense ones (sakura, acacia, ginkgo, oak, willow), a willow swaying 1.1 s a frame. `pxl
   check` builds every sprite of a file: the 46 trees of the contact sheet as sprites took the file's

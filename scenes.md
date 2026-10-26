@@ -874,9 +874,9 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn
   half again the cost; the builders made a shorter file than primitives but bent the request to what
   their parameters say (a crystal's rock had no moss until `crystal({ moss })`): when none says what
   you need, make your own,
-  `make3d.define("spirit", (params) => ({ field, decals }), { params: { size: [0.3, 2] } })`, and it is
-  a part like the others (relations, edits, rules, `--fix` within its ranges); a part's own `mats`
-  and, air, `look: { ramp }` instead of a remap of draw3d's mats.
+  `make3d.define("spirit", (params) => ({ field, decals }), { params: { size: [0.3, 2], holds: ["lamp", "none"] } })`
+  (a number's range, a word's list), and it is a part like the others (relations, edits, rules,
+  `--fix` within its ranges); a part's own `mats` and, air, `look: { ramp }` instead of a remap of draw3d's mats.
 - **One stage for every 3D op.** The kit says the light and the materials once, `look3d({ light,
   mats })`, and the calls stop repeating them; the HD-2D camera is `perspective({ w, h, pitch, fov,
   ppm })`, and `at: CAM.aim(h)` stands a thing so its point h m up (its middle) is where the camera

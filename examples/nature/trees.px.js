@@ -24,22 +24,21 @@
 //   leaves none, a willow's strands then of `twigs`);
 // - its sway: bent by the wind (`wind` m at its top) with the square of the height.
 // Each species is a spec: a new one is a dozen numbers. Any view, any heading (turnaround(), draw3d(),
-// a world's make). Parameters: height (m), seed, season, color, wind. Drawn in trees.mats (ramps of
+// a world's make). Parameters: height (m), seed, season, color, wind (declared: make3d refuses others,
+// and a season the species hasn't). Drawn in trees.mats (ramps of
 // colors: no keys of a scene's taken) with trees.look, surface()'s options for foliage lit from the
 // side: turnaround("maple", make3d.momiji({ season: "autumn" }), { view: "side", ppm: 20, mats:
 // trees.mats, surface: trees.look }). trees.species holds the specs. A species of your own: its spec
 // (copy the nearest: a beech the oak, a sugi the cypress) and its materials in trees.mats, then
-// make3d.define("beech", (o) => trees.grow("beech", BEECH, o)).
+// make3d.define("beech", (o) => trees.grow(BEECH, o), trees.params(BEECH)).
 // ponytail: one material a crown; a maple turning unevenly (its clusters of two tints) when one should.
 const trees = {}
 // in a block: its names stay its own when a scene includes the file
 {
-const TREE_OPTS = ["height", "seed", "season", "color", "wind"]
-const growTree = (who, S, o = {}) => {
-  const bad = Object.keys(o).filter((k) => !TREE_OPTS.includes(k))
-  if (bad.length) throw new Error(`make3d.${who}: no parameter ${bad.join(", ")} (it has ${TREE_OPTS.join(", ")})`)
+// a species' parameters, for make3d.define: its seasons the ones it has leaves for, and bare
+const treeParams = (S) => ({ params: { height: [0.5, 40], season: [...Object.keys(S.leaves), "bare"], color: [0, 9], wind: [-2, 2] } })
+const growTree = (S, o = {}) => {
   const { height = S.height, seed = 1, season = "summer", color = 0, wind = S.wind } = o
-  if (season !== "bare" && !(season in S.leaves)) throw new Error(`make3d.${who}: season is ${[...Object.keys(S.leaves), "bare"].join(", ")}, got ${JSON.stringify(season)}`)
   const { unit, add, mul } = vec, R = rng(seed), k = height / S.height, TAU = 2 * Math.PI
   const way = (az, el) => [Math.cos(az) * Math.cos(el), Math.sin(az) * Math.cos(el), Math.sin(el)]
   const wood = [], masses = [], tips = []
@@ -237,8 +236,8 @@ const TREE_MATS = {
 // step up, no line round it
 const TREE_LOOK = { soft: 0.6, rim: 0.85, outline: false }
 const SPECIES = { momiji: MOMIJI, ginkgo: GINKGO, kuromatsu: KUROMATSU, oak: OAK, birch: BIRCH, willow: WILLOW, palm: PALM, sakura: SAKURA, cypress: CYPRESS, acacia: ACACIA, baobab: BAOBAB }
-for (const [name, S] of Object.entries(SPECIES)) make3d.define(name, (o) => growTree(name, S, o))
-Object.assign(trees, { mats: TREE_MATS, look: TREE_LOOK, species: SPECIES, grow: growTree })
+for (const [name, S] of Object.entries(SPECIES)) make3d.define(name, (o) => growTree(S, o), treeParams(S))
+Object.assign(trees, { mats: TREE_MATS, look: TREE_LOOK, species: SPECIES, grow: growTree, params: treeParams })
 }
 
 // ---------------------------------------------------------------- the species, to look at

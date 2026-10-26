@@ -91,8 +91,9 @@ const MOVES = { walk: { ms: 110, frames: 8, f: walk }, idle: { ms: 250, frames: 
 // theirs (crew.px.js). The legs' trousers down to `cuff` of the shin and what shows under them (boots,
 // or bare skin), the feet; drapes swept round the body from a height down a length (a cloak behind, a
 // coat open at the front, a long skirt), trailing as he walks by `trail`; the shirt's skirt at the
-// hips and its body (a key or ramp by height and angle: stripes, a vest, the belt); drapes over it (an
-// apron); the sleeves to the elbow, the forearms, the hands.
+// hips and its body (a key or ramp by height and angle: stripes, a vest, the belt), round an upright
+// through the hips, or with `spine: true` along the spine (a figure that bows: the miko's; his kneel and
+// cast keep the upright); drapes over it (an apron); the sleeves to the elbow, the forearms, the hands.
 const TRAVELER = {
   legs: (far) => ({ tr: far ? "RRP" : "RPp", shin: far ? "DDd" : "Ddl", foot: far ? "DDd" : "Ddl" }), cuff: 0.45,
   drapes: [{ top: (j) => j.chest[2] + 0.6, len: CLOAK, out: "NncC", in: "N", trail: 1, keep: (h, a) => Math.abs(a) > 1.35,
@@ -116,7 +117,9 @@ const O = TRAVELER, CLOAK3 = O.drapes[0]
 // toward the hem, and swinging aside a little after the legs
 const dress = (o) => (j, p) => {
   const farLeg = j.depth(j.legs[0].hip) < j.depth(j.legs[1].hip) ? 0 : 1, farArm = j.depth(j.arms[0].sh) < j.depth(j.arms[1].sh) ? 0 : 1
-  const waist = j.pelvis[2] + 1.4, hips = [j.pelvis[0], j.pelvis[1], 0]
+  const waist = j.pelvis[2] + 1.4, hips = [j.pelvis[0], j.pelvis[1], 0], top = j.chest[2] + 0.5, lean = j.chest.map((v, e) => v - j.pelvis[e])
+  // (spine: each height of the shirt's body carried along the spine, pelvis to chest)
+  const along = (h) => { const t = (waist + h * (top - waist) - j.pelvis[2]) / lean[2]; return [lean[0] * t, lean[1] * t] }
   const drape = (D) => {
     const top = D.top(j), trail = (h) => { const down = 1 - h; return [0, 1].map((e) => j.f[e] * -(0.3 + 1.1 * p.trail) * down * D.trail + j.r[e] * 0.9 * p.sway * down ** 1.5 * D.trail) }
     return j.sweep(D.base === "pelvis" ? hips : [j.chest[0], j.chest[1], 0], top - D.len, top, D.radius, { keep: D.keep, shift: trail, shell: 0.4, paint: typeof D.out === "function" ? D.out : (h, a, out) => (out ? D.out : D.in) })
@@ -125,7 +128,7 @@ const dress = (o) => (j, p) => {
     ...Object.fromEntries(j.legs.map((L, i) => { const g = o.legs(i === farLeg); return [`leg${i}`, [j.limb(L.hip, L.knee, 1.6, 1.5, g.tr), j.limb(L.knee, L.ankle, 1.5, 1.4, (h) => (h < o.cuff ? g.tr : g.shin)), j.ball(L.foot, [1.6, 2.3, 1.1], g.foot)]] })),
     ...Object.fromEntries(o.drapes.map((D, k) => [k ? "drape" + k : "cloak", drape(D)])),
     // (the belt a pixel and more, so a pixel's middle falls on it)
-    tunic: [j.sweep(hips, waist - 2.4, waist, (h) => 3.6 + 0.6 * (1 - h), { paint: o.skirt }), j.sweep(hips, waist, j.chest[2] + 0.5, (h, a) => (4 - 0.5 * h * h) * (0.84 + 0.16 * Math.abs(Math.sin(a))), { paint: (h, a, out) => o.body(h < 0.14 ? 0 : h, a, out) })],
+    tunic: [j.sweep(hips, waist - 2.4, waist, (h) => 3.6 + 0.6 * (1 - h), { paint: o.skirt }), j.sweep(hips, waist, top, (h, a) => (4 - 0.5 * h * h) * (0.84 + 0.16 * Math.abs(Math.sin(a))), { ...(o.spine ? { shift: along } : {}), paint: (h, a, out) => o.body(h < 0.14 ? 0 : h, a, out) })],
     ...Object.fromEntries(o.over.map((D, k) => ["over" + k, drape(D)])),
     ...Object.fromEntries(j.arms.map((A, i) => { const far = i === farArm; return [`arm${i}`, [j.limb(A.sh, A.elbow, 1.1, 1, o.sleeve(far)), j.limb(A.elbow, A.hand, 1, 0.9, o.fore(far)), j.ball(A.hand, 1, o.hand(far))]] })),
   }

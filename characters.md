@@ -501,7 +501,8 @@ takes an outfit (`dress(outfit)`, `rig3d()`'s parts, `examples/hd2d/traveler.px.
 round the body and its ramps: trousers down to a cuff (rolled to the shin over bare feet, or into
 boots); drapes hung from a height (a cloak behind, a coat open at the front with buttons down its
 edges, a long skirt from the waist); the shirt's body by height and angle (stripes 2 px, a vest open
-over a shirt, a laced bodice); drapes over it (an apron from the chest to the knees); sleeves rolled
+over a shirt, a laced bodice; `spine: true` swept along the spine, for a figure that bows: the
+miko's); drapes over it (an apron from the chest to the knees); sleeves rolled
 to skin at the forearm. Recolors (`base` + `swap`) of those outfits make the rest of the crowd: nine
 people from five heads and five outfits read as nine at a glance (`examples/hd2d/crew.px.js`); nine
 recolors of one cloaked traveler read as one man nine times.
@@ -512,7 +513,10 @@ hand at each side of its lower half, leaning back 3 degrees, the stride 0.7 of t
 pace with it, or the feet slide). Held up under the chin with the arms forward at shoulder height it
 read as a sleepwalker; on a shoulder, beside an 11 px head, half of it covered the face; over the head
 it is out of the hands' reach. Paint what is carried into the figure's own depth (the outfit's
-`prop`), so the hands hold its sides and the outline runs round both.
+`prop`), so the hands hold its sides and the outline runs round both. A tool in both hands: the
+pose's `grip: { from, to, at }` puts the hands on its line (the miko's broom,
+`examples/shrine/miko.px.js`), and `j.rod(a, b, key)` in a `draw` hook draws a handle in the
+figure's own depth, in the blocks and painted.
 
 ## 9. Small animals
 

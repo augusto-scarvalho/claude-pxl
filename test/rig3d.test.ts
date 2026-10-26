@@ -2,11 +2,14 @@
 // views placed by a heading and their rows checked, and rig3d's figure: its blocks in every heading,
 // feet on the ground line, its parts painted by a hook, the east mirrored, the escape hatches.
 import { test } from "node:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import assert from "node:assert/strict";
 import { gait, ik3 } from "../src/core/rig3d.ts";
 import { sdf } from "../src/core/sdf.ts";
 import { checkProject } from "../src/node/check.ts";
-import { loadSource } from "../src/node/load.ts";
+import { loadProject, loadSource } from "../src/node/load.ts";
 import { PAL, keys } from "./helpers.ts";
 
 const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -104,6 +107,37 @@ test("rig3d: its blocks and its painted figure in every heading, feet on the piv
   }
   assert.ok(p.image("bk_walk_s").sockets?.hand);
   assert.match(keys(p, "s"), /r/);
+});
+
+test("rig3d: a grip puts both hands on one line; j.rod draws a held rod in the figure's own depth, painted and in the blocks", () => {
+  const p = loadSource(`${PAL}
+ramps("kg")
+// in front of the chest (y toward us) and behind the belly (away), across the whole sprite
+const rods = (c, j) => { j.rod([-14, -8, 18], [14, -8, 18], "r"); j.rod([-14, 8, 14], [14, 8, 14], (t) => (t < 0.5 ? "w" : "w")) }
+const R = rig3d("g", { w: 32, h: 44, pivot: [16, 40], headings: ["s"], ink: "k", blocks: true,
+  moves: { hold: { frames: 1, pose: () => ({}), draw: rods } }, parts: (j) => ({ body: j.limb(j.pelvis, j.chest, 4, 4, "kg") }) })
+sprite("x", { w: 1, h: 1 }, (c) => {
+  const j = R.joints({ grip: { from: [4, -3, 16], to: [4, 7, 2], at: [0, 0.6] } }, 180), [a, b] = j.grip, d = (u, v) => Math.hypot(u[0] - v[0], u[1] - v[1], u[2] - v[2])
+  if (d(j.arms[0].hand, a) < 1e-9 && d(j.arms[1].hand, a.map((v, e) => v + (b[e] - v) * 0.6)) < 1e-9 && Math.abs(a[2] - 16) < 1e-9) c.px(0, 0, "r")
+})`, "t.px.js");
+  assert.equal(keys(p, "x"), "r", "the hands at their shares of the grip's line, its ends from under the pelvis");
+  const rows = keys(p, "g_hold_s").split("\n"), front = rows.find((r) => r.includes("r"))!, back = rows.find((r) => r.includes("w"))!;
+  // in front: one run over the body; behind: either side of it only, the line round the body kept
+  assert.match(front, /r{26}/, rows.join("\n"));
+  assert.match(back, /^\.*w+k[kg]+kw+\.*$/, rows.join("\n"));
+  const b = p.image("bk_hold_s"), red = p.pal.resolve("r")!, wh = p.pal.resolve("w")!, row = (c: number) => Array.from({ length: b.h }, (_, y) => y).find((y) => b.data.slice(y * b.w, (y + 1) * b.w).includes(c))!;
+  assert.ok(b.data.slice(row(red) * b.w, (row(red) + 1) * b.w).filter((v) => v === red).length >= 26 && b.data[row(wh) * b.w + 16] !== wh, "the blocks: in front over them, behind under them");
+  assert.throws(() => loadSource(`${PAL}rig3d("e", { blocks: true, moves: { m: { frames: 1, pose: () => ({ grip: { from: [0, 0], to: [1, 1, 1], at: [0, 1] } }) } } })`, "t.px.js").image("bk_m_s"), /a pose's grip is/);
+});
+
+test("dress() (examples/hd2d/traveler.px.js): spine: true sweeps the shirt's body along the spine, not round an upright through the hips", () => {
+  // a point on the spine under the chest of a figure leaning 30 degrees: inside the one, outside the other
+  const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");
+  writeFileSync(f, `include(${JSON.stringify(join(import.meta.dirname, "../examples/hd2d/traveler.px.js"))})
+const T = travelerFigure, R = rig3d("q", { ...T.FIG, parts: T.dress(T.TRAVELER), moves: { m: { frames: 1, pose: () => ({}) } } })
+const j = R.joints({ lean: 30 }, 270), q = j.chest.map((v, e) => v - 2 * j.spine[e]), d = (o) => T.dress(o)(j, {}).tunic[1].field.dist(q)
+sprite("x", { w: 2, h: 1 }, (c) => { if (d({ ...T.TRAVELER, spine: true }) < -1.5) c.px(0, 0, "#ff0000"); if (d(T.TRAVELER) > 0) c.px(1, 0, "#ff0000") })`);
+  assert.ok([...loadProject(f).image("x").data].every((v) => (v & 255) === 255));
 });
 
 test("rig3d: a cloth swept round the body (open in front, its lining), a decal pinned on it, the line all round; pxl check: a pose off the ground, a leg out of reach", () => {

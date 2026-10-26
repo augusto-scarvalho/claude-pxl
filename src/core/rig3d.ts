@@ -72,9 +72,11 @@ export function bodyOf(spec: Record<string, unknown> = {}): Body {
  * (left, right) on the floor from under the pelvis; lift: each foot up; down: the pelvis lowered; lean:
  * degrees forward, tilt: to the right; turn: the hips turned from the heading (degrees, clockwise from
  * above), twist: the shoulders against the hips, head: the head against the shoulders; hands:
- * [[forward, right, up], ...] of each hand from its shoulder.
+ * [[forward, right, up], ...] of each hand from its shoulder; grip: both hands on one line instead (a
+ * broom, a staff), `from` and `to` [forward, right, up] from under the pelvis as the shoulders face, each
+ * hand `at` [left, right] of the way.
  */
-export interface Pose { feet?: number[][]; lift?: number[]; down?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; [k: string]: unknown }
+export interface Pose { feet?: number[][]; lift?: number[]; down?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; grip?: { from: number[]; to: number[]; at: number[] }; [k: string]: unknown }
 
 /** A piece of a part: its field, and where on it a point is: h along it (0..1) and a round it (radians from the way the body faces, toward its right), and its paint. */
 export interface Piece { field: Sdf; at: (p: V3) => [number, number, V3]; paint?: unknown }
@@ -87,6 +89,10 @@ export interface Joints {
   sh: { f: V3; r: V3 }; hd: { f: V3; r: V3; heading: number };
   legs: { hip: V3; knee: V3; ankle: V3; foot: V3 }[];
   arms: { sh: V3; elbow: V3; hand: V3 }[];
+  /** the pose's grip, [from, to]: the line the hands hold */
+  grip?: [V3, V3];
+  /** in a draw hook: a line of pixels from a to b in the figure's own depth (a held broom, a staff) */
+  rod?(a: V3, b: V3, paint: unknown): void;
   /** a limb along a bone, a ball turned with the body: pieces for parts() */
   limb(a: V3, b: V3, r0: number, r1?: number, paint?: unknown): Piece;
   ball(c: V3, r: number | number[], paint?: unknown): Piece;
@@ -118,6 +124,11 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
   const feet = pairs(p.feet, [[0, -B.hips], [0, B.hips]], 2, "feet"), reach = B.upper + B.fore;
   const hands = pairs(p.hands, [[0, -B.r.arm[0], -reach], [0, B.r.arm[0], -reach]], 3, "hands");
   const local = (o: V3, fr: { f: V3; r: V3 }, a: number, b: number, c: number) => add(o, add(add(mul(fr.f, a), mul(fr.r, b)), mul(UP, c)));
+  // a grip: both hands on one line, its ends from under the pelvis as the shoulders face
+  const g = p.grip as { from: V3; to: V3; at: number[] } | undefined;
+  if (g !== undefined && !(g && typeof g === "object" && [g.from, g.to].every((q) => Array.isArray(q) && q.length === 3 && q.every(Number.isFinite)) && Array.isArray(g.at) && g.at.length === 2 && g.at.every(Number.isFinite)))
+    throw new PxError(`rig3d: a pose's grip is { from: [forward, right, up], to: [...] (px from under the pelvis), at: [left, right] (each hand's share of the way) }, got ${JSON.stringify(p.grip)}`);
+  const grip = g && ([local([0, 0, 0], sh, ...g.from), local([0, 0, 0], sh, ...g.to)] as [V3, V3]);
   const spine = unit(add(add(mul(UP, Math.cos(lean)), mul(sh.f, Math.sin(lean))), mul(sh.r, Math.sin(tilt))));
   const pelvis: V3 = [0, 0, B.hip - down], chest = add(pelvis, mul(spine, B.torso)), head = add(chest, mul(spine, B.neck));
   const k = B.r.foot[1] / 2.3;
@@ -126,7 +137,8 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
     return { hip, ankle, knee: ik3(hip, ankle, B.thigh, B.shin, add(f, [0, 0, 0.3])), foot: add(ankle, mul(f, 1.1 * k)) };
   });
   const arms = [0, 1].map((i) => {
-    const s = local(chest, sh, B.shoulders[0], i ? B.shoulders[1] : -B.shoulders[1], B.shoulders[2]), hand = local(s, sh, hands[i][0], hands[i][1], hands[i][2]);
+    const s = local(chest, sh, B.shoulders[0], i ? B.shoulders[1] : -B.shoulders[1], B.shoulders[2]);
+    const hand = grip ? add(grip[0], mul(sub(grip[1], grip[0]), g!.at[i])) : local(s, sh, hands[i][0], hands[i][1], hands[i][2]);
     return { sh: s, hand, elbow: ik3(s, hand, B.upper, B.fore, local([0, 0, 0], sh, -0.4, i ? 0.5 : -0.5, -1)) };
   });
   // where on a piece a point is: along its bone (or up a ball) and round it, from the way the body faces
@@ -136,7 +148,7 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
     return v;
   };
   return {
-    heading, f, r, up: UP, spine, pelvis, chest, head, sh, hd, legs, arms,
+    heading, f, r, up: UP, spine, pelvis, chest, head, sh, hd, legs, arms, ...(grip ? { grip } : {}),
     limb: (a, b, r0, r1 = r0, paint) => {
       v3(a, "limb(a, b, r0, r1, paint): a"); v3(b, "limb: b");
       if (!(r0 > 0) || !(r1 >= 0)) throw new PxError(`limb(a, b, r0, r1, paint): radii in px, above 0, got ${r0}, ${r1}`);
