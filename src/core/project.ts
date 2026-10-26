@@ -255,7 +255,7 @@ export class Project implements BuildCtx {
   /** rig() skeletons by name, for describe's RIG section. */
   readonly rigs = new Map<string, RigDef>();
   /** views() sets: each drawn view's sprite, the set its rows are held against, pxl check reads them */
-  readonly views = new Map<string, { drawn: string[]; like?: string; chin?: Record<string, number>; loc?: string }>();
+  readonly views = new Map<string, { drawn: string[]; like?: string; chin?: Record<string, number>; baked?: boolean; loc?: string }>();
   /** rig3d() figures: the body and each move's poses at its headings, pxl check reads their joints */
   readonly figures = new Map<string, { body: Body; moves: { m: string; frames: number; pose: (i: number, h: number) => Pose; heads: { deg: number; name: string }[] }[]; loc?: string }>();
   /** What building found wrong but not fatal (a shade step that left its ramp): the CLI prints them, pxl check counts them. */
@@ -642,7 +642,7 @@ export class Project implements BuildCtx {
           if (!Array.isArray(a)) throw new PxError("views: chin needs the anchors as pixels [col, row] (the rows are counted from them)");
           return [`${name}_${d}`, (chin as number) - (a[1] as number)];
         }));
-        this.views.set(name, { drawn: drawn.map((d) => `${name}_${d}`), like: like as string | undefined, ...(chins ? { chin: chins } : {}), loc });
+        this.views.set(name, { drawn: drawn.map((d) => `${name}_${d}`), like: like as string | undefined, ...(chins ? { chin: chins } : {}), ...(model ? { baked: true } : {}), loc });
         return names;
       } catch (e) { throw wrap(e).within("views", loc); }
     };

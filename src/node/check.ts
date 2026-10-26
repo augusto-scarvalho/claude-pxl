@@ -175,7 +175,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     const rows = (s: { drawn: string[]; chin?: Record<string, number> }) => new Map(s.drawn.map((n) => [n.slice(n.lastIndexOf("_") + 1), viewRows(p.image(n), s.chin?.[n])]));
     const like = V.like ? p.views.get(V.like) : undefined;
     if (V.like && !like) lines.push(`${name} › WARNING: like '${V.like}' is no views() set`);
-    for (const w of viewWarnings({ name, views: [...rows(V)], ...(like ? { like: { name: V.like!, views: rows(like) } } : {}) })) lines.push(`${name} › WARNING: ${w}`);
+    for (const w of viewWarnings({ name, views: [...rows(V)], baked: V.baked, ...(like ? { like: { name: V.like!, views: rows(like) } } : {}) })) lines.push(`${name} › WARNING: ${w}`);
   }
   // rig3d() figures: every pose of every move at its headings, on the ground and within the legs' reach
   if (!opts.names) for (const [name, F] of p.figures) {

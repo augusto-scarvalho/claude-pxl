@@ -330,9 +330,11 @@ export function viewRows(img: { w: number; h: number; data: Uint32Array; pivot?:
  * (from the anchor: a head that turns doesn't bob), and with `like`, the rows from its crown to above
  * its chin that stick out past the other set's same view by more than a pixel.
  */
-export function viewWarnings(set: { name: string; views: [string, Rows | undefined][]; like?: { name: string; views: Map<string, Rows | undefined> } }): string[] {
+export function viewWarnings(set: { name: string; views: [string, Rows | undefined][]; like?: { name: string; views: Map<string, Rows | undefined> }; baked?: boolean }): string[] {
   const out: string[] = [], seen = set.views.filter((v): v is [string, Rows] => !!v[1]);
-  for (const k of ["crown", "chin"] as const) {
+  // (views drawn from one modeled head keep their rows by being one head: the line under a jaw that
+  // turns may reach a row lower, and that is the jaw, not a bob)
+  if (!set.baked) for (const k of ["crown", "chin"] as const) {
     const at = new Map<number, string[]>();
     for (const [v, R] of seen) at.set(R[k], [...(at.get(R[k]) ?? []), v]);
     if (at.size > 1) out.push(`its ${k} isn't on one row in every view (from the anchor: ${[...at].map(([r, vs]) => `${r} in ${vs.join(", ")}`).join("; ")}): a head that turns bobs`);

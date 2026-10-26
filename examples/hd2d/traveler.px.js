@@ -1,7 +1,7 @@
 // An HD-2D traveler in the 8 directions Octopath's figures turn to, walking, idle, kneeling and casting,
 // drawn in 3D (rig3d, characters §11): a skeleton in px, its parts fields along the bones painted as
-// his outfit is, the head modeled too (the skull and the hair as fields, the eyes, nose and mouth drawn
-// by hand on it), a line all round. Measured on 16 games' field sprites (characters §6, §10): 34 px
+// his outfit is, a line all round; the head modeled too (the skull and the hair as fields), drawn once
+// per view and its face painted over by hand (views()). Measured on 16 games' field sprites (characters §6, §10): 34 px
 // tall, the head 11 rows (a third: Olberic's; more reads as a big head), a body like a little barrel
 // (the waist about as wide as the chest, the arms slim and close along it, the hands at the crotch:
 // shoulders broad over a narrow waist read as a body-builder); the same rows for the head, shoulders,
@@ -20,92 +20,10 @@ pal({
 })
 ramps("kzsSL", "kJjhHY", "kNncC", "kvwW", "kRPp", "kDdl")
 // his figure for files that dress people of their own on it (crew.px.js): rig3d's options (the body,
-// the size), his moves, the painter of an outfit and the modeled head
+// the size), his moves, the painter of an outfit, his skull, how his head is drawn by view and a neck
 const travelerFigure = {}
 // in a block: its names stay its own when a scene includes the file
 {
-// ---------------------------------------------------------------- the heads, by hand
-// (His head is modeled now, below; these stay as the crew's measure: their hand heads are held to these rows.)
-// 11 rows. One haircut seen from each side (characters §5, hair): short and tousled, parted just left
-// of the middle as we see it, a 2 px tuft on one side of the parting and a 4 px lobe on the other, each
-// lobe lit by a pair of short strokes along its strands (an arc over the crown, not dots), the top edge
-// in the hair's dark and not the outline's black, the darkest at the nape; three locks of fringe ending
-// on the brow, side locks 2-3 px wide hanging to the jaw, so the face is narrower than the hair and the
-// jaw closes the shape (no ball); in profile a forelock over the brow and the back flicking out, from
-// behind the mass narrowing to points at the nape. The diagonals keep the faces already approved (16
-// wide); front, profile and back are 15 wide (odd: the middle column on the body's). Lit from above: front, the face's lower 6 rows under a fringe, 2x2 eyes (the dark lid over the white
-// outside and the iris inside), 3 px between the irises, the nose the skin's lightest pixel, a pixel
-// of mouth in the chin row; front 3/4 (down and to the left), the face on the leading side, the far eye
-// a pixel at its edge, the ear past the near eye's white; profile (left), the eye 1 px behind the face's
-// edge (the iris in front, the white behind), a nose of a pixel past it, the ear just behind the head's
-// middle; back 3/4 and back, all hair, lit at the crown, darkest at the nape, an ear's sliver.
-const HEADS = {
-  s: `
-  .....jh.jhhj...
-  ...jhHYjhYHj...
-  ..jhHYHhjHYHj..
-  .jhHHhhhjHHhhj.
-  .JhhhjhHhjhhhJ.
-  JhhjSShhjSSjhhJ
-  JjjSkkSSSkkSjjJ
-  .JjSGESSSEGSjJ.
-  .JjsSSSLSSSsjJ.
-  ..jJsSSzSSsJj..
-  .....JsssJ.....`,
-  sw: `
-  ......jh.jhhj...
-  ....jhHYjhYHj...
-  ...jhHYHhjHYHhj.
-  ..jhHHhjhhHHhhjJ
-  .jhhSjhSShjhhhjJ
-  .jjSSSSSShjhjjhJ
-  ..hSkSSkkjhjjjJ.
-  ..jSESSEGjsjhjJ.
-  ..JSSLLeSjzjjJ..
-  ...JSSzSsjjJjJ..
-  ....JsssjJ......`,
-  w: `
-  .......jh......
-  .....jhHYhj....
-  ...jhHYHHhhj...
-  ..jhHHhhhjhhj..
-  .jhhhhjhhhjhhjJ
-  jhSSShhjhhhjhhJ
-  .SkkSSsjhhjjjJ.
-  .SEGSSzjjhjjjJ.
-  SLSSSsjjjjjjjJ.
-  .zSSsJjjjJjjJ..
-  ..JzsJ.JJ.JJ...`,
-  nw: `
-  .....jhhj.jh....
-  ....jhHYHYHhj...
-  ...jhHYHjHYHhj..
-  ..jhHHYhjhYHHhj.
-  .jhhhHHhhhHHhhjJ
-  .JjhhhhhhhhhhjjJ
-  .Jsjhhjhhhjhhjj.
-  .Jzjjhjjjhjjjj..
-  ..JzjjjjhjjjJ...
-  ..JzJjjJjjJjJ...
-  ...JJ.zJjJz.....`,
-  n: `
-  ...jhhj.hj.....
-  ...jhHYHYHhj...
-  ..jhHYHjHYHhj..
-  .jhHHYhjhYHHhj.
-  .JhhHHhhhHHhhJ.
-  JhjhhhhhhhhhjjJ
-  JjjhhjhhhjhhjjJ
-  .sJjhhjjjhhjJs.
-  .zJjjjjhjjjjJz.
-  ...JjjJjJjjJ...
-  .....zJjJz.....`,
-}
-// each view's pixel on the skeleton's head (the profile's 2 px back, so the face doesn't jut ahead of
-// the body); the right-hand views their mirrors (views())
-const ANCHOR = { s: [7, 5], sw: [8, 5], w: [5, 5], nw: [8, 5], n: [7, 5] }
-views("_tr_head", HEADS, { anchor: ANCHOR })
-
 // ---------------------------------------------------------------- the skeleton
 // the sprite's size and the pixel his feet stand on
 const W = 26, H = 40, OX = 13, OY = 38
@@ -208,24 +126,14 @@ const dress = (o) => (j, p) => {
 }
 // lit as he is, from above and toward us, the light wrapped round him (a side square to it half lit)
 const LIT3 = { soft: 0.55 }
-// The head modeled too, as the grove's snow spirit is, in his head's
-// frame (x his right, y ahead, z up, px): the skull; the hair a cap over it cut away at the face, with a
-// mass at the nape, a parting, locks of fringe, side locks to the jaw, tufts at the crown, tousled by
-// noise; a neck. The eyes, the nose (the skin's lightest pixel, as on the hand heads: a sphere smaller
-// than a pixel poked out of the face as a wart) and the mouth in the chin row drawn by hand as decals
-// pinned on it. Turned to 16 directions without drawing a view (tr_turn_<dir>).
-// The eyes as the hand heads' rows, a grid a view picked by how far the face turns from us: facing us
-// the irises toward the nose; three quarters the near eye's white and iris looking the way it turns,
-// the far eye a pixel inside the face's edge; in profile the white and the iris a pixel behind the
-// edge, the lid where the fringe allows (each drawn looking right and its mirror; the pivot on the
-// pixel between the eyes, in profile on the near eye's point)
-sprite("_tr_eyes_s", { pivot: [2.5, 1] }, "kk.kk\nGE.EG")
-sprite("_tr_eyes_se", { pivot: [4.5, 0.5] }, "kk.k\nGE.E")
-sprite("_tr_eyes_sw", { pivot: [-0.5, 0.5] }, "k.kk\nE.EG")
-sprite("_tr_eyes_e", { pivot: [3.5, 0] }, "kk\nGE")
-sprite("_tr_eyes_w", { pivot: [-1.5, 0] }, "kk\nEG")
-sprite("_tr_mouth", "z")
-sprite("_tr_nose", "L")
+// The head modeled, as the grove's snow spirit is, in his head's frame (x his right, y ahead, z up, px):
+// the skull; the hair a cap over it cut away at the face, with a mass at the nape, a parting, locks of
+// fringe, side locks to the jaw, tufts at the crown, tousled by noise. Drawn once per view (views(): five
+// for his 8 directions, the east mirrored; his 16 take the nearest), the face painted over it by hand:
+// the approved hand heads' eyes (the dark lid over the white outside and the iris inside), the nose the
+// skin's lightest pixel, the mouth in the chin row, the skin under the fringe, cut from them where the
+// render has the head ("." keeps its pixel); in profile the face a pixel wider than the hair leaves it,
+// the nose's tip past the line. The body is drawn every frame, the head stamped on it, a neck under it.
 // the cap close on the skull, off the face from the brow down, a mass at the nape, a parting groove;
 // three locks of fringe ending on the brow, side locks behind the cheeks to the jaw, tufts at the crown
 const CAP = sdf.ellipsoid([5.3, 5.6, 4.8]).at(0, -0.5, 1.2).union(sdf.ellipsoid([4, 2.6, 3]).at(0, -3.4, -1.6), { smooth: 1 })
@@ -234,57 +142,9 @@ const LOCKS = sdf.union(sdf.capsule([-2.4, 3.4, 3.8], [-2.8, 4.9, 1.6], 0.9, 0.5
   sdf.capsule([-4.5, 0, 2], [-4.4, 0.3, -3.2], 1, 0.7), sdf.capsule([4.5, 0, 2], [4.4, 0.3, -3.2], 1, 0.7),
   sdf.capsule([-1.6, 0.4, 5], [-2.4, -0.6, 6.4], 0.9, 0.4), sdf.capsule([1.2, 1, 5.1], [2.2, 0.8, 6.2], 0.8, 0.4), sdf.capsule([0, -2.2, 4.8], [0.4, -3.6, 5.6], 0.8, 0.4), { smooth: 0.6 })
 const HAIR = CAP.union(LOCKS, { smooth: 0.6 }).noise({ amp: 0.5, scale: 1.1, seed: 3 }).mat("JjhH")
-const head3 = (j, hair = HAIR) => {
-  const into = (f) => f.rotate(-j.hd.heading, "z").at(j.head), at = (x, y, z) => [0, 1, 2].map((e) => j.head[e] + j.hd.r[e] * x + j.hd.f[e] * y + (e === 2 ? z : 0))
-  const skull = sdf.ellipsoid([4.6, 5, 5.3]), turn = ((((180 - j.hd.heading) % 360) + 540) % 360) - 180
-  const eyes = Math.abs(turn) < 20 ? "s" : Math.abs(turn) < 60 ? (turn > 0 ? "se" : "sw") : turn > 0 ? "e" : "w"
-  return {
-    neck: j.limb(j.chest, [j.head[0], j.head[1], j.head[2] - 3], 1.6, 1.5, "zs"),
-    head: [into(skull.mat("zsSL")), into(hair)],
-    // (the face's turn from us, degrees, to our right +; past 105 the eyes are behind it)
-    face: [...(Math.abs(turn) < 105 ? [j.decal(`_tr_eyes_${eyes}`, Math.abs(turn) < 60 ? at(0, 5, -0.6) : at(Math.sign(turn) * 1.8, 4.6, -0.6), { depth: 3 })] : []),
-      j.decal("_tr_nose", at(0, 5, -1.7)), j.decal("_tr_mouth", at(0, 4.4, -3.9))],
-  }
-}
-sprite("_tr_clasp", "g")
-// The body as dress() paints his outfit, with a few accents where the cloth bends or pieces meet, in his ramps (each a cause,
-// none a texture): the trousers' crease at the front of the knee; the boots' cuffs turned down a tone
-// lighter, their soles dark; the tunic's hem in shadow under its flare, two folds where the skirt flares
-// from the belt, a crease inside each elbow; the cloak's hem darker, its edge at the opening catching
-// the light, two folds down its back that swing with it, the lining's edge a step lighter, the clasp at
-// the collar. (Brushes of cloth on the cloak's trailing hem read as a bush at this size: none.)
-const parts3m = (j, p, hair) => {
-  const P = dress(O)(j, p), farLeg = j.depth(j.legs[0].hip) < j.depth(j.legs[1].hip) ? 0 : 1, farArm = j.depth(j.arms[0].sh) < j.depth(j.arms[1].sh) ? 0 : 1
-  const dark = (r) => r.slice(0, 2)
-  j.legs.forEach((L, i) => {
-    const g = O.legs(i === farLeg)
-    P[`leg${i}`] = [j.limb(L.hip, L.knee, 1.6, 1.5, (h, a) => (h > 0.78 && Math.abs(a) < 1 ? dark(g.tr) : g.tr)),
-      j.limb(L.knee, L.ankle, 1.5, 1.4, (h) => (h < O.cuff ? g.tr : h < O.cuff + 0.14 ? "dl" : g.shin)), j.ball(L.foot, [1.6, 2.3, 1.1], (h) => (h < 0.3 ? "D" : g.foot))]
-  })
-  j.arms.forEach((A, i) => { const far = i === farArm, s = O.sleeve(far); P[`arm${i}`][0] = j.limb(A.sh, A.elbow, 1.1, 1, (h, a) => (h > 0.8 && Math.abs(a) < 1.2 ? dark(s) : s)) })
-  const waist = j.pelvis[2] + 1.4, hips = [j.pelvis[0], j.pelvis[1], 0], top = j.chest[2] + 0.6
-  P.tunic[0] = j.sweep(hips, waist - 2.4, waist, (h) => 3.6 + 0.6 * (1 - h), { paint: (h, a, out) => (!out ? "v" : h < 0.25 || Math.abs(Math.abs(a) - 0.75) < 0.13 ? "vw" : "vwW") })
-  const trail = (h) => { const down = 1 - h; return [0, 1].map((e) => j.f[e] * -(0.3 + 1.1 * p.trail) * down * CLOAK3.trail + j.r[e] * 0.9 * p.sway * down ** 1.5 * CLOAK3.trail) }
-  const cloakPaint = (h, a, out) => {
-    const edge = Math.abs(a) < 1.6
-    if (!out) return edge ? "n" : "N"
-    return h < 0.08 ? "nc" : edge ? "cC" : Math.abs(Math.abs(a) - 2.45) < 0.1 ? "Nn" : CLOAK3.out
-  }
-  const cloak = j.sweep([j.chest[0], j.chest[1], 0], top - CLOAK, top, CLOAK3.radius, { keep: CLOAK3.keep, shift: trail, shell: 0.4, paint: cloakPaint })
-  P.cloak = cloak
-  return { ...P, clasp: j.decal("_tr_clasp", [0, 1, 2].map((e) => j.chest[e] + j.f[e] * 3.8 + (e === 2 ? 0.2 : 0)), { depth: 2 }), ...head3(j, hair) }
-}
-const ALL8 = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
-// cleaned as a pixel artist would at this size (surface's clean: no pixel sticking out, no black run
-// 2 px thick, the outline whole), under the jaw (not the hair) the hand heads' chin line
-const FIG = { body: BODY3, w: W, h: H, pivot: [OX, OY], ink: "k", chin: ["D", "zsSL"], surface: { ...LIT3, clean: true } }
-rig3d("tr", { ...FIG, n: 16, parts: parts3m, blocks: true,
-  moves: { ...Object.fromEntries(Object.entries(MOVES3).map(([m, M]) => [m, { dirs: ALL8, ...M }])), turn: { frames: 1, ms: 250, pose: MOVES3.idle.pose } } })
-// The hybrid (trh_<move>_<dir>): the modeled head drawn once per view (views()), its face retouched by
-// hand, stamped as the hand heads are; the body drawn every frame
 const SKULL = sdf.ellipsoid([4.6, 5, 5.3]).mat("zsSL")
-// the face as the hand heads have it (their eyes, nose, mouth, the skin under the fringe), cut from them
-// where the render has the head ("." keeps the render), on the same anchors
+// each view's grid's pixel on the head's middle
+const ANCHOR = { s: [7, 5], sw: [8, 5], w: [6, 5] }
 const FACE3 = {
   s: `
     ...............
@@ -309,21 +169,55 @@ const FACE3 = {
     ....SLLeS.z.....
     .....SzSs.......`,
   w: `
-    ...............
-    ...............
-    ...............
-    ...............
-    ...............
-    ..SSS..........
-    .SkkSSs........
-    .SEGSSz........
-    .LSSSs.........
-    ..SSs..........
-    ...zs..........`,
+    .................
+    .................
+    .................
+    .................
+    .................
+    ...SSS...........
+    ..SkkSSs.........
+    ..SEGSSzs........
+    kSLSSSss.........
+    ...SSss..........
+    ....zss..........`,
 }
-views("_tr_head3", sdf.union(SKULL, HAIR), { ink: "k", jaw: ["D", "zsSL"], surface: { ...LIT3, clean: true }, anchor: ANCHOR, retouch: FACE3 })
-const body3 = (j, p) => { const { head, face, ...rest } = parts3m(j, p); return rest }
-rig3d("trh", { ...FIG, chin: undefined, n: 16, head: "_tr_head3", parts: body3,
+// as the figure is drawn: the line all round, under the skin a dark brown (the chin's edge), cleaned
+const HEAD3 = { ink: "k", jaw: ["D", "zsSL"], surface: { ...LIT3, clean: true }, anchor: ANCHOR }
+views("_tr_head", sdf.union(SKULL, HAIR), { ...HEAD3, retouch: FACE3 })
+const neck = (j) => j.limb(j.chest, [j.head[0], j.head[1], j.head[2] - 3], 1.6, 1.5, "zs")
+sprite("_tr_clasp", "g")
+// The body as dress() paints his outfit, with a few accents where the cloth bends or pieces meet, in his ramps (each a cause,
+// none a texture): the trousers' crease at the front of the knee; the boots' cuffs turned down a tone
+// lighter, their soles dark; the tunic's hem in shadow under its flare, two folds where the skirt flares
+// from the belt, a crease inside each elbow; the cloak's hem darker, its edge at the opening catching
+// the light, two folds down its back that swing with it, the lining's edge a step lighter, the clasp at
+// the collar. (Brushes of cloth on the cloak's trailing hem read as a bush at this size: none.)
+const parts3m = (j, p) => {
+  const P = dress(O)(j, p), farLeg = j.depth(j.legs[0].hip) < j.depth(j.legs[1].hip) ? 0 : 1, farArm = j.depth(j.arms[0].sh) < j.depth(j.arms[1].sh) ? 0 : 1
+  const dark = (r) => r.slice(0, 2)
+  j.legs.forEach((L, i) => {
+    const g = O.legs(i === farLeg)
+    P[`leg${i}`] = [j.limb(L.hip, L.knee, 1.6, 1.5, (h, a) => (h > 0.78 && Math.abs(a) < 1 ? dark(g.tr) : g.tr)),
+      j.limb(L.knee, L.ankle, 1.5, 1.4, (h) => (h < O.cuff ? g.tr : h < O.cuff + 0.14 ? "dl" : g.shin)), j.ball(L.foot, [1.6, 2.3, 1.1], (h) => (h < 0.3 ? "D" : g.foot))]
+  })
+  j.arms.forEach((A, i) => { const far = i === farArm, s = O.sleeve(far); P[`arm${i}`][0] = j.limb(A.sh, A.elbow, 1.1, 1, (h, a) => (h > 0.8 && Math.abs(a) < 1.2 ? dark(s) : s)) })
+  const waist = j.pelvis[2] + 1.4, hips = [j.pelvis[0], j.pelvis[1], 0], top = j.chest[2] + 0.6
+  P.tunic[0] = j.sweep(hips, waist - 2.4, waist, (h) => 3.6 + 0.6 * (1 - h), { paint: (h, a, out) => (!out ? "v" : h < 0.25 || Math.abs(Math.abs(a) - 0.75) < 0.13 ? "vw" : "vwW") })
+  const trail = (h) => { const down = 1 - h; return [0, 1].map((e) => j.f[e] * -(0.3 + 1.1 * p.trail) * down * CLOAK3.trail + j.r[e] * 0.9 * p.sway * down ** 1.5 * CLOAK3.trail) }
+  const cloakPaint = (h, a, out) => {
+    const edge = Math.abs(a) < 1.6
+    if (!out) return edge ? "n" : "N"
+    return h < 0.08 ? "nc" : edge ? "cC" : Math.abs(Math.abs(a) - 2.45) < 0.1 ? "Nn" : CLOAK3.out
+  }
+  const cloak = j.sweep([j.chest[0], j.chest[1], 0], top - CLOAK, top, CLOAK3.radius, { keep: CLOAK3.keep, shift: trail, shell: 0.4, paint: cloakPaint })
+  P.cloak = cloak
+  return { ...P, clasp: j.decal("_tr_clasp", [0, 1, 2].map((e) => j.chest[e] + j.f[e] * 3.8 + (e === 2 ? 0.2 : 0)), { depth: 2 }), neck: neck(j) }
+}
+const ALL8 = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
+// cleaned as a pixel artist would at this size (surface's clean: no pixel sticking out, no black run
+// 2 px thick, the outline whole), his head stamped on it by its heading
+const FIG = { body: BODY3, w: W, h: H, pivot: [OX, OY], ink: "k", surface: { ...LIT3, clean: true } }
+rig3d("tr", { ...FIG, n: 16, head: "_tr_head", parts: parts3m, blocks: true,
   moves: { ...Object.fromEntries(Object.entries(MOVES3).map(([m, M]) => [m, { dirs: ALL8, ...M }])), turn: { frames: 1, ms: 250, pose: MOVES3.idle.pose } } })
 // The mourner (mo_<move>_<dir>): the same figure, her hair her own, grey, parted in the middle and
 // drawn back smooth over the ears into a bun at the back of the head, the brow bare; a shawl of dark
@@ -335,9 +229,11 @@ const MOURNER = {
 const MO_HAIR = sdf.ellipsoid([5, 5.4, 5.4]).at(0, -0.3, 0.6)
   .subtract(sdf.ellipsoid([4.4, 4.6, 4.6]).at(0, 4.2, -1.6), sdf.capsule([0, 4.4, 4.6], [0, -1.5, 6.5], 0.25), sdf.plane([0, -0.55, 0.83], -1.2), { smooth: 0.4 })
   .noise({ amp: 0.4, scale: 1.4, seed: 5 }).mat("JjhH")
-const BUN = sdf.ellipsoid([2.6, 2.2, 2.4]).at(0, -6.2, 0).noise({ amp: 0.2, scale: 1, seed: 6 }).mat("JjhH")
 // (the bun a part of its own, so the line runs round it where it lies over the head)
-for (const n of rig3d("_mo", { ...FIG, parts: (j, p) => ({ ...parts3m(j, p, MO_HAIR), bun: BUN.rotate(-j.hd.heading, "z").at(j.head) }), moves: MOVES3 }).names) anim(n.slice(1), { base: n, swap: MOURNER })
+const BUN = sdf.ellipsoid([2.6, 2.2, 2.4]).at(0, -6.2, 0).noise({ amp: 0.2, scale: 1, seed: 6 }).mat("JjhH").part("bun")
+// her head drawn once per view as his, his face painted over it
+views("_mo_head", sdf.union(SKULL, MO_HAIR, BUN), { ...HEAD3, retouch: FACE3 })
+for (const n of rig3d("_mo", { ...FIG, head: "_mo_head", parts: parts3m, moves: MOVES3 }).names) anim(n.slice(1), { base: n, swap: MOURNER })
 sheet("traveler", ["tr_*", "mo_*"], { rows: "tag", pad: 1 })
-Object.assign(travelerFigure, { FIG, MOVES: MOVES3, dress, TRAVELER, head: head3, SKULL })
+Object.assign(travelerFigure, { FIG, MOVES: MOVES3, dress, TRAVELER, SKULL, HEAD: HEAD3, neck })
 }

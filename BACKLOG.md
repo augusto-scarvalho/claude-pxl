@@ -60,18 +60,23 @@ Mark items `[x]` when they ship, with the commit.
   its numbers read by reference, yet each moment costs 0.7 s more: find where (a closure made cold each
   frame, the bounds, the box culling's order) and make it once per field. Every swaying sdf example
   (`sdf/world`, `sdf/volumes`, the trees in the wind) would gain.
-- [ ] **The modeled traveler's head (tr3m, chosen as the traveler): points to improve**, kept as it is
-  for now by the user's call:
-  - in some directions the eyes' lids draw over the fringe (their `depth: 3` lets them through);
-  - the profile has less character than the hand-drawn one (a narrow face; the hand head's
-    forelock and nose read better);
-  - the head is a little smaller and its hair has less volume and fewer light strokes than the hand
-    heads; from behind it is smoother and darker;
-  - seams between pieces can make shapes by chance (a "face" on the back was fixed once);
-  - in sw and se a cream pixel of scalp shows at the crown, where the parting's groove cuts down to
-    the skull (the mourner's groove sits higher: none);
+- [ ] **The figures in 3D (wave 3): what is still open**
+  - the heads are modeled and drawn once per view, their faces painted over: cut by a script from
+    the approved hand heads where the render has the head, then the profiles widened and the nose's
+    tip given back by hand; the rest not retouched past that (the 3/4 cheeks, the ears, the warden's
+    profile);
+  - the traveler's head is a little smaller and its hair has less volume and fewer light strokes than
+    the hand heads had; from behind it is smoother and darker; seams between pieces can make shapes
+    by chance (a "face" on the back was fixed once);
+  - the crew's bandana and long hair had one pass each (a knot and tails, a hem; locks, a parting, a
+    braid of plaits); the flat cap's brim and the bald crown's highlight could take one;
   - 1 px creases (knee, elbow) hardly read; the cloak's and boots' accents do;
-  - a frame costs ~13 ms against the hand heads' ~4.4 (the hair's noise).
+  - the warden's stance sways by whole pixels now (its first engine's half pixels went with it), and
+    its head is no longer a frame behind the body;
+  - the bodies are drawn every frame: the traveler ~6 ms a frame (4.4 on the first engine), the warden
+    ~35 (23); what doesn't move within a move could be drawn once too (the pass after wave 3);
+  - `views()` doesn't hold a baked head's crown and chin to one row (one head turned keeps them; the
+    line under a jaw that turns may reach a row lower in 3/4).
 - [ ] **What the 3D stage (wave 2) left to fix by hand, each a small change of pixels for the user to
   see before and after:**
   - three grass tufts along the graveyard's fence stand at its top, 1.5 m over the turf, past the

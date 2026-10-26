@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**376 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**377 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -228,7 +228,7 @@ references until it read right.
 | [`tropical/`](../examples/tropical) | A 320×240 animated forest: imported trees, river, trail tileset, animals, a girl walking with hair that swings. |
 | [`halloween/`](../examples/halloween) | A night party: many lamps, point-light shadows, eight dancing monsters. |
 | [`sunset/`](../examples/sunset) | A backlit cliff at sunset: long shadows toward us, glowing edges, a tent lit through. |
-| [`rig/`](../examples/rig) | A 72 px knight built skeleton first, two knights fighting a bout at a tournament, and a warden's whirling axe combo on a skeleton in 3D, the body turning with the swing, with smears and a floor reflection. |
+| [`rig/`](../examples/rig) | A 72 px knight built skeleton first, two knights fighting a bout at a tournament, and a warden's whirling axe combo on the 3D layer (`rig3d()`), the body turning with the swing, with smears and a floor reflection. |
 | [`cyberpunk/`](../examples/cyberpunk) | One city street made two ways: by one agent, and by a planner with eight forked agents. |
 | [`perspective/`](../examples/perspective) | The sertão road, the park at 2 pm, the end of the Cretaceous, a street race from the cockpit. |
 | [`nature/`](../examples/nature) | The nature kit: grass tiles, pines, bushes, rocks, a wall, flagstones, tufts, flowers, a dead tree. |
@@ -291,6 +291,14 @@ Every change was made by Claude while drawing real scenes, and reviewed by a per
   `c.cross()` and `c.moved()` for things crossing a loop, `stamp`'s `shade` and a rig slot's `far`;
   the lit-side check reads the lamps and a `mesh()`'s light without `world.light`, and a top-level name
   hiding a DSL global is a warning as the file loads.
+- **Levels of abstraction, wave 3, characters in 3D:** the two private figure engines (the
+  traveler's and the warden's: a camera, IK, a z-buffer of tubes and balls) became the 3D layer's:
+  `rig3d()` (a skeleton posed in 3D, its parts distance fields along the bones drawn by `surface()` in
+  every direction, flat blocks to judge a move, joints, raw fields and a draw hook as escape hatches),
+  `views()` (heads by view mirrored about an anchor and their rows checked, or a modeled head drawn once
+  per view with its face painted over by hand: the 3D's hair and beards, the hand's faces), `gait()` (a
+  walk's numbers by view) and `sdf.field()`. The traveler, the mourner, the harbor's crew and the warden
+  stand on them; `pxl check` reads every pose of every figure.
 - **Measured agent runs:** fresh agents were given only the skill and timed. A 320×180 animated street
   took one agent 85 turns and 31 minutes. A planner with eight forked agents made a denser street for
   about five times the tokens and twice the time. The skill now asks which to use on a big scene.

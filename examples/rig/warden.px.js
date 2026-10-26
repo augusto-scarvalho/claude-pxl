@@ -1,11 +1,13 @@
 // A forest warden's axe combo, 48 px tall: idle, a wind-up, a whirling cut that turns the whole body
 // round (front, back, front again) with the coat flaring out, a thrust, a second wind-up overhead, a
-// turn into a chop to the floor with sparks and dust, and back to idle. The body is a skeleton in 3D,
-// in px: it turns about its upright, the shoulders twist against the hips, the knees bend, and each
-// part is drawn where the skeleton puts it and as it is turned to us, far to near. The axe is drawn in
-// 3D from the fist, its head as an axe is made (the edge a long curve from toe to heel along the haft);
-// the edge faces the way each cut goes (worked out from the motion), and its smear is the path the
-// edge took since the frame before, behind the body where that path is. On the floor, its reflection.
+// turn into a chop to the floor with sparks and dust, and back to idle. The body is a skeleton on the
+// 3D layer (rig3d, characters §11), in px: it turns about its upright, the shoulders twist against the
+// hips, the knees bend, and its parts are fields along the bones, drawn by surface() as they are turned
+// to us, the nearest in front. The axe is its own fields, its head as an axe is made (the edge a long
+// curve from toe to heel along the haft); the edge faces the way each cut goes (worked out from the
+// motion), and its smear is the path the edge took since the frame before, behind the body where that
+// path is. The head modeled, drawn once per view, its faces painted over by hand. On the floor, its
+// reflection.
 pal({
   k: "#17111c",
   S: "#7d4636", s: "#c47c5a", z: "#eab08a", Z: "#f7cfa8",     // skin
@@ -26,120 +28,17 @@ pal({
 })
 ramps("kSszZ", "kRrqQ", "kDGgh", "kLl", "kFfeE", "kBbn", "kTt", "kOo", "k1234", "kWwm", "kuY")
 
-// ---- the head by hand, as it is turned to us: front, front 3/4 right, right, back 3/4 right, back;
-// facing left are these mirrored. The tail of hair is drawn apart (it swings). The face is round and
-// a row taller than it needs at rest, to hold its expressions: calm; brows down and drawn together
-// over a hard mouth when winding up; and a shout, the jaw dropped, in the cut.
-const HEADS = [`
-  ...RRRRRR..
-  ..RrqqRqrR.
-  .RrqQQqqqrR
-  RrqqQqqqqrR
-  RrqrqrrqrrR
-  RrRRzzzRRrR
-  RrzzZzzzsrR
-  RrzizzzisrR
-  RrzizzzisrR
-  RRczzzszcRR
-  .RszzyzzsR.
-  ..SszzzsS..
-  ...SsssS...
-  ....SSS....`, `
-  ..RRRRRR...
-  .RrqqqRqrR.
-  RrqQQqqqqrR
-  RqqqQqqqqrR
-  RrqqrqrqrqR
-  RrrqrRRzRRz
-  RrrSszzZzzz
-  RrrSszizziz
-  RrrSszizziz
-  .RrSczzzscz
-  .RrSszzyzz.
-  ..RSsszzzS.
-  ...RSsssS..
-  ...SSS.....`, `
-  ..RRRRRR....
-  .RrqqqRqrR..
-  RrqQQqqqqrR.
-  RqqqQqqqqqR.
-  RrqqqrqrqrR.
-  RrrqqrrRRzz.
-  RrrrSszzzzz.
-  RrrrSszzizz.
-  RrrrSszzizzz
-  RrrrSsczzzS.
-  .RrrSszzyz..
-  ..RrSsszzS..
-  ...RSsssS...
-  ...SSS......`, `
-  ..RRRRRR...
-  .RrqqqRqrR.
-  RrqQQqqqqrR
-  RqqqQqqqqrR
-  RrqrqqrqrrR
-  RrrqrqqrrrR
-  RrrrqrqrrSR
-  RrrrrbrrRsR
-  RRrrrrrrRsR
-  RRrrrrrrRsR
-  .rRrrrrRSS.
-  ..rRrrRSS..
-  ...rRRSS...
-  ...SSS.....`, `
-  ...RRRRRR..
-  ..RrqqRqrR.
-  .RrqQQqqqrR
-  RrqqQqqqqrR
-  RrqrqqqrqrR
-  RrrqrqrqrrR
-  RrrrqrqrrrR
-  RrrrbbbrrrR
-  RRrrrqrrrRR
-  RRrrrrrrrRR
-  .RRrrrrrRR.
-  ..RRrrrRR..
-  ...RRRRR...
-  ....SSS....`]
-// the expressions, as the rows of a face they change (front, 3/4, profile), runs over the head's grid
-const GRIT = [
-  { 5: [[0, "RrzzZzzzzrR"]], 6: [[0, "RrRRzzzRRrR"]], 7: [[0, "RrziRzRisrR"]], 8: [[0, "RrzizzzisrR"]], 10: [[0, ".RszSSSzsR."]] },
-  { 5: [[0, "RrrqrRzzzRz"]], 6: [[0, "RrrSszRzRzz"]], 7: [[0, "RrrSszizziz"]], 8: [[0, "RrrSszizziz"]], 10: [[0, ".RrSszSSSz."]] },
-  { 5: [[0, "RrrqqrrRzzz."]], 6: [[0, "RrrrSszzRzz."]], 7: [[0, "RrrrSszzizz."]], 8: [[0, "RrrrSszzizzz"]], 10: [[0, ".RrrSszzSS.."]] },
-]
-const SHOUT = [
-  { ...GRIT[0], 10: [[0, ".RsziiizsR."]], 11: [[0, "..SsiyisS.."]], 12: [[0, "...SszsS..."]] },
-  { ...GRIT[1], 10: [[0, ".RrSsziiiz."]], 11: [[0, "..RSssiyiS."]], 12: [[0, "...RSszsS.."]] },
-  { ...GRIT[2], 10: [[0, ".RrrSszzii.."]], 11: [[0, "..RrSsszyi.."]], 12: [[0, "...RSssS_..."]] },
-]
-// views(): the five drawn (front, turned to our right, back), the other three their mirrors;
-// an expression's set keeps the calm head for the back views
-const SIDES = ["s", "se", "e", "ne", "n"]
-views("_whead", Object.fromEntries(HEADS.map((g, i) => [SIDES[i], g])), { anchor: "center", outline: "k" })
-for (const [name, set] of [["grit", GRIT], ["shout", SHOUT]]) views(`_whead_${name}`, Object.fromEntries(HEADS.map((g, i) => [SIDES[i], set[i] ? [g, runs(set[i])] : g])), { anchor: "center", outline: "k" })
-
-// ---- the camera: px, x to the right, y up, z toward us; a little from above, so a level circle is a
-// flat ellipse (the smear of a level cut)
+// ---- the body, in px over the sole (the stage's: 12 degrees down, the sprite's size, where the ground under the body lands)
 const PITCH = (12 * Math.PI) / 180, CP = Math.cos(PITCH), SP = Math.sin(PITCH)
-const W = 112, H = 84, OX = 56, OY = 76                      // the anim's size; where the ground under the body lands
-const scr = ([x, y, z]) => [OX + x, OY - y * CP + z * SP]
-const depth = ([x, y, z]) => z * CP + y * SP                 // toward us
-const LIGHT = [-0.6, -1]                                      // from the upper left, on screen
+const W = 112, H = 84, OX = 56, OY = 76
 const rad = (d) => (d * Math.PI) / 180
 const add = (a, b) => a.map((v, i) => v + b[i]), sub = (a, b) => a.map((v, i) => v - b[i])
 const mul = (a, k) => a.map((v) => v * k), dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 const len = (a) => Math.hypot(...a), unit = (a) => mul(a, 1 / (len(a) || 1))
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 const lerp = (a, b, t) => (Array.isArray(a) ? a.map((v, i) => v + (b[i] - v) * t) : a + (b - a) * t)
-const UP = [0, 1, 0], VIEW = [0, SP, CP]                      // toward the eye
-// a frame turned `yaw` degrees from facing us (90: facing right): forward, right, up
-const frame3 = (yaw) => { const f = [Math.sin(rad(yaw)), 0, Math.cos(rad(yaw))]; return { f, r: [-f[2], 0, f[0]] } }
-const local = (o, fr, [a, b, c]) => add(o, add(add(mul(fr.f, a), mul(fr.r, b)), mul(UP, c)))
-
-// ---- the body, in px over the sole
 const HIP = 22, TORSO = 12, NECK = 6, HIPW = 3, SHW = 6
 const THIGH = 10, SHIN = 10, UPPER = 8, FORE = 8, HAFT = 17
-
 // ---- the poses: keys at frames, in between eased. yaw: which way the hips face (90 = right; the cut
 // turns it on, so it only grows); twist: the shoulders against the hips; head: the head against the
 // shoulders (it leads a turn); lean (deg), crouch (px down); feet [left, right] as [forward, right]
@@ -193,61 +92,13 @@ const stance = (f) => {
 // each key takes what it doesn't say from the one before; between keys, eased in and out (tween); a
 // smear or a spark only on its own frame
 const KEYED = tween(KEYS, { moments: ["smear", "spark"] }), poseAt = (t) => KEYED(Math.max(0, Math.min(FRAMES - 1, t)))
-// the joints a pose puts where
-const bones = (p) => {
-  const hips = frame3(p.yaw), sh = frame3(p.yaw + p.twist), hd = frame3(p.yaw + p.twist + p.head)
-  const spine = unit(add(mul(UP, Math.cos(rad(p.lean))), mul(sh.f, Math.sin(rad(p.lean)))))
-  const pelvis = [0, HIP - p.crouch, 0], chest = add(pelvis, mul(spine, TORSO))
-  const head = add(chest, mul(spine, NECK))
-  const legs = [-1, 1].map((sd, i) => {
-    const hip = local(pelvis, hips, [0, sd * HIPW, 0]), ankle = local([0, 2, 0], hips, [...p.feet[i], 0])
-    const knee = ik3(hip, ankle, THIGH, SHIN, add(hips.f, [0, 0.2, 0]))
-    return { hip, knee, ankle, toe: add(ankle, mul(hips.f, 3)) }
-  })
-  const shoulders = [-1, 1].map((sd) => local(chest, sh, [0, sd * SHW, -1]))
-  const hand = local(shoulders[1], sh, p.hand), off = local(shoulders[0], sh, p.off)
-  const elbow = ik3(shoulders[1], hand, UPPER, FORE, local([0, 0, 0], sh, [-0.3, 0.6, -1]))
-  const offElbow = ik3(shoulders[0], off, UPPER, FORE, local([0, 0, 0], sh, [-0.3, -0.6, -1]))
-  const axe = unit(local([0, 0, 0], sh, p.axe))
-  return { hips, sh, hd, spine, pelvis, chest, head, legs, shoulders, hand, off, elbow, offElbow, axe }
+// The moments as rig3d's poses (headings by the compass: the hips turned -yaw from facing us, the
+// twist and the head the other way round, the free hand the left). The stance's sway moves the body
+// over the feet: the feet carried back under it, the figure stamped a whole pixel over.
+const pose3 = (t) => {
+  const p = poseAt(t), [sx, sy] = stance(t), fx = Math.sin(rad(p.yaw)), rx = -Math.cos(rad(p.yaw))
+  return { turn: -p.yaw, twist: -p.twist, head: -p.head, lean: p.lean, down: p.crouch + sy, feet: p.feet.map(([a, b]) => [a - Math.round(sx) * fx, b - Math.round(sx) * rx]), hands: [p.off, p.hand], i: t, look: p.look }
 }
-// The blade's edge always faces the way the cut goes, so it never strikes with the flat or the back
-// like a club. Where the axe head cuts (moves fast into a frame with a smear), that is the way it
-// moves; held, wound up or let
-// down, it is the way of the nearer cut in time, the one coming or the one just made (the wrist doesn't
-// turn the axe between a backswing and its cut); further from any, at rest, forward. Then turned square
-// to the haft.
-const STEP = 0.25, CUT = 12, NEAR = 2.5                                    // px a frame: a cut; frames from one
-const WAY = []
-for (let i = 0; i < FRAMES / STEP; i++) {
-  const t = i * STEP, at = (u) => { const j = bones(poseAt(u)); return add(j.hand, mul(j.axe, 15)) }
-  const v = mul(sub(at(t + STEP / 2), at(t - STEP / 2)), 1 / STEP)
-  WAY.push({ v, fast: len(v) >= CUT && !!poseAt(Math.ceil(t - 1e-6)).smear })   // a cut leaves a smear; a backswing doesn't
-}
-const wayAt = (t) => {
-  const n = WAY.length, i = ((Math.round(t / STEP) % n) + n) % n
-  if (WAY[i].fast) return { v: WAY[i].v, cut: true }
-  for (let d = 1; d <= NEAR / STEP; d++) for (const k of [i - d, i + d]) { const w = WAY[((k % n) + n) % n]; if (w.fast) return { v: w.v } }
-  return null
-}
-const skeleton = (p) => {
-  // held (wound up, or after a cut), the blade is turned to show its side to us, its edge still on
-  // the way the cut goes as we see it; in a cut it turns as the cut does
-  const w = wayAt(p.t), j = bones(p), seen = (v) => (w?.cut ? v : sub(v, mul(VIEW, dot(v, VIEW))))
-  const way = seen(w?.v ?? j.sh.f), sq = sub(way, mul(j.axe, dot(way, j.axe)))
-  const fall = sub(j.sh.f, mul(j.axe, dot(j.sh.f, j.axe)))                 // the haft along the cut: its forward
-  return { ...j, edge: unit(len(sq) > 0.35 * len(way) ? sq : fall) }
-}
-// a point of the axe: t along the haft from the hand, s along the edge's way
-const axeAt = (j, t, s) => add(j.hand, add(mul(j.axe, t), mul(j.edge, s)))
-// The head as an axe is made, in 3D on the haft (t along it from the hand, s out to the bit, px): the
-// eye round the haft's top; the bit out on the edge's side, its edge a long curve running from the toe
-// (its top corner) down to the heel at the tip of the beard, along the haft, not across it; the poll on
-// the other side. Turned level in a whirl it shows edge on, as a real one would.
-const BIT = [[17.5, 0], [18.6, 3], [19.6, 6.5], [18.4, 8.4], [15.5, 9.1], [12.6, 8.5], [10.3, 6.8], [11.3, 4.9], [13.4, 2.2], [14.5, 0]]
-const EDGE = [[19.6, 6.5], [18.4, 8.4], [15.5, 9.1], [12.6, 8.5], [10.3, 6.8]]
-const CHEEK = [[17.5, 0], [18.4, 2.6], [13.6, 2.6], [14.5, 0]], POLL = [[17.5, 0], [17.5, -2.6], [14.6, -2.6], [14.6, 0]]
-
 // how fast the body turns (deg a frame), and the coat's flare and the hair's swing that follow it a
 // frame late: worked out over the loop twice, so the first frame already has the last one's
 const SPIN = [], FLARE = [], TAIL = []
@@ -256,222 +107,9 @@ for (let pass = 0, fl = 0, tl = 0; pass < 2; pass++) for (let i = 0; i < FRAMES;
   fl = Math.max(Math.min(1, Math.abs(w) / 70), fl * 0.55); tl = tl * 0.5 + w * 0.5
   SPIN[i] = w; FLARE[i] = fl; TAIL[i] = tl
 }
-
-// ---- painting the parts
-const limb = (c, a, b, r0, r1, ramp) => {
-  const [x0, y0] = scr(a), [x1, y1] = scr(b)
-  c.capsule(x0, y0, r0 + 1, x1, y1, r1 + 1, "k")
-  c.capsule(x0, y0, r0, x1, y1, r1, ramp, { light: LIGHT })
-}
-const poly3 = (c, pts, key) => c.poly(pts.flatMap((q) => scr(q)).map(Math.round), key)
-const fist = (c, q, key) => { const [x, y] = scr(q).map(Math.round); c.rect(x - 2, y - 2, 4, 4, "k"); c.rect(x - 1, y - 1, 2, 2, key) }
-// a surface sampled point by point: each pixel takes the nearest sample's key, and a pixel round it
-// the outline, so the part stands off whatever it's drawn over
-const zbuffer = (sample) => {
-  const best = new Map()
-  sample((q, key, tag) => {
-    if (!key) return
-    const [x, y] = scr(q).map(Math.round), d = depth(q), k = y * 4096 + x, b = best.get(k)
-    if (!b || d > b[0]) best.set(k, [d, key, x, y, tag])
-  })
-  return best
-}
-// paint the pixels whose sample `keep` takes, each with the outline where the surface ends
-const zfill = (c, best, keep = () => true) => {
-  const mine = [...best.values()].filter((b) => keep(b[4]))
-  for (const [, , x, y] of mine) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!best.has((y + dy) * 4096 + x + dx)) c.px(x + dx, y + dy, "k")
-  for (const [, key, x, y] of mine) c.px(x, y, key)
-}
-const zpaint = (c, sample) => zfill(c, zbuffer(sample))
-// the light, in the world: from the upper left and in front
-const SUN = unit([-0.6, 0.65, 0.45])
-const tone = (n, ramp, bias = 0) => { const l = dot(n, SUN) + bias; return ramp[l > 0.55 ? 3 : l > 0.12 ? 2 : l > -0.3 ? 1 : 0] ?? ramp[ramp.length - 1] }
-
-// a boot, one surface so it has one outline and one light: the shaft round up the shin, its cuff
-// turned down at the top (a shadow under it, not a line), and at the ankle, as wide as the shaft, the
-// foot on the floor the way `f` points: the heel behind, the instep falling to a round toe cap that
-// catches the light, a dark sole
-const boot = (L, f) => zbuffer((emit) => {
-  const r = unit(cross(f, UP)), base = [L.ankle[0], 0, L.ankle[2]]
-  for (let u = -1.5; u <= 4.3; u += 0.2) {
-    const toe = u > 2.7 ? Math.sqrt(Math.max(0, 1 - ((u - 2.7) / 1.6) ** 2)) : 1, heel = u < -0.5 ? Math.sqrt(Math.max(0, 1 - ((u + 0.5) / 1) ** 2)) : 1
-    const wid = (u < 1 ? 1.8 : 1.8 - (u - 1) * 0.15) * Math.min(toe, heel), hgt = (u < 0.5 ? 3 : 3 - (u - 0.5) * 0.45) * Math.min(1, 0.35 + toe, 0.35 + heel)
-    const end = u > 2.7 ? (u - 2.7) * 0.9 : u < -0.5 ? (u + 0.5) * 0.9 : 0             // the toe and the heel face out
-    for (let a = 0; a <= Math.PI; a += Math.PI / 16) {
-      const cs = Math.cos(a), sn = Math.sin(a), up = hgt * sn
-      const q = add(base, add(mul(f, u), add(mul(r, wid * cs), mul(UP, up))))
-      const n = unit(add(add(mul(r, cs / Math.max(wid, 0.3)), mul(UP, sn / Math.max(hgt, 0.3))), mul(f, end)))
-      emit(q, up < 0.7 ? "O" : tone(n, "OOob", u > 2.3 ? 0.2 : -0.15))
-    }
-  }
-  const top = lerp(L.knee, L.ankle, 0.38), ad = unit(sub(L.ankle, top)), al = len(sub(L.ankle, top)) + 1
-  const e1 = unit(cross(ad, Math.abs(ad[1]) < 0.9 ? UP : [1, 0, 0])), e2 = cross(ad, e1)
-  for (let t = 0; t <= 1; t += 0.04) for (let k = 0; k < 28; k++) {
-    const a = (k / 28) * Math.PI * 2, n = add(mul(e1, Math.cos(a)), mul(e2, Math.sin(a))), cuff = t < 0.22
-    emit(add(add(top, mul(ad, t * al)), mul(n, cuff ? 2.4 : 2 - 0.2 * t)), cuff ? tone(n, "Obbn") : t < 0.3 ? "O" : tone(n, "OOob", -0.1))
-  }
-})
-
-// the tunic from the belt to the shoulders, an ellipse round that turns with the hips at the belt and
-// with the shoulders at the top (the twist between them shows); the belt and its buckle, the coat's
-// front edge with its toggles, and the fur mantle over the shoulders, its lower edge in tufts
-const torso = (c, j, p) => zpaint(c, (emit) => {
-  const waist = add(j.pelvis, [0, 2, 0])
-  for (let hi = 0; hi <= 24; hi++) {
-    const h = hi / 24, center = lerp(waist, j.chest, h), fr = frame3(p.yaw + p.twist * h * h * (3 - 2 * h))
-    const a = 4.2 + 2.2 * h, b = 2.7 + 0.8 * h
-    for (let ti = 0; ti < 64; ti++) {
-      const th = (ti / 64) * Math.PI * 2, cs = Math.cos(th), sn = Math.sin(th), front = Math.abs(Math.atan2(sn, cs))
-      const q = add(center, add(mul(fr.f, b * cs), mul(fr.r, a * sn))), n = unit(add(mul(fr.f, cs / b), mul(fr.r, sn / a)))
-      let key = tone(n, "DGgh")
-      if (h < 0.16) key = front < 0.3 && h > 0.03 && h < 0.13 ? (dot(n, SUN) > 0 ? "Y" : "u") : tone(n, "Bbbn")
-      else if (front < 0.13) key = hi === 8 || hi === 14 ? "Y" : "D"
-      emit(q, key)
-    }
-  }
-  // the mantle: wider than the shoulders, narrowing to the collar round the neck
-  const fr = frame3(p.yaw + p.twist), base = add(j.chest, mul(j.spine, -3.5))
-  for (let hi = 0; hi <= 14; hi++) {
-    const h = hi / 14, center = add(base, mul(j.spine, 5 * h)), a = 7.6 - 4.2 * h * h, b = 4.6 - 1.8 * h * h
-    for (let ti = 0; ti < 72; ti++) {
-      const th = (ti / 72) * Math.PI * 2, cs = Math.cos(th), sn = Math.sin(th)
-      if (h < 0.42 * Math.max(0, cs) + 0.25 * hash(Math.floor(ti / 3), 7)) continue   // shorter in front; tufts at the hem
-      const q = add(center, add(mul(fr.f, b * cs), mul(fr.r, a * sn))), n = unit(add(add(mul(fr.f, cs / b), mul(fr.r, sn / a)), mul(UP, 0.5 + h)))
-      emit(add(q, mul(VIEW, 0.6)), tone(n, h > 0.7 ? "FfeE" : "Ffee", (ti + hi) % 3 === 0 ? -0.4 : -0.05))
-    }
-  }
-})
-
-// the coat's skirt, closed round the legs, its front edge lapped over: from the belt it hangs out at an
-// angle that grows with the turn (a frame late), so it flares into a bell, its hem trailing round
-// behind the hips; pleats; inside, the lining shows where it turns away from us; fur along the hem,
-// like the collar. Its half behind the legs and its half in front are painted apart, the legs between,
-// so only shins and boots show below the hem
 const SKIRTL = 12, WAIST = 4.3
-const skirt = (j, flare, lag) => zbuffer((emit) => {
-  const w = add(j.pelvis, [0, 1.5, 0]), fall = rad(8 + 44 * flare)
-  for (let si = 0; si <= 22; si++) {
-    const s = si / 22, axis = add(w, mul(UP, -s * SKIRTL * Math.cos(fall)))
-    for (let ti = 0; ti < 96; ti++) {
-      const th = (ti / 96) * Math.PI * 2 - Math.PI
-      const at = th - lag * s, dir = add(mul(j.hips.f, Math.cos(at)), mul(j.hips.r, Math.sin(at)))
-      const pleat = Math.sin(th * 7) * 0.45, out = unit(add(dir, mul(cross(UP, dir), pleat)))
-      const q = add(w, add(mul(dir, WAIST + s * SKIRTL * Math.sin(fall)), mul(UP, -s * SKIRTL * Math.cos(fall))))
-      const n = unit(add(mul(out, Math.cos(fall)), mul(UP, Math.sin(fall))))
-      const fold = ((((th * 9) / (2 * Math.PI)) % 1) + 1) % 1 < 0.14 ? -0.4 : 0          // a fold every 40 degrees
-      const outside = dot(n, VIEW) > -0.05
-      const front = depth(q) > depth(axis)
-      emit(q, si >= 20 ? (outside ? tone(n, "Ffe", (ti % 3 === 0 ? -0.4 : 0)) : "F")               // the fur at the hem
-        : Math.abs(th) < 0.07 && outside ? "D"                                                   // the lapped front edge
-        : outside ? tone(n, "DGgh", fold - 0.2) : tone(mul(n, -1), "LLll", -0.2), front)
-    }
-  }
-})
 
-// no outline on the whole: each part carries its own, a px wide, so the edge of the figure is one px
-// and not that px plus the part's
-anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], facing: "right" },
-  // what the blade swept since the frame before, where it ran behind the body
-  layer("smear_back", { outline: false, unlit: true }, (c) => smear(c, c.frame, -1)),
-  layer("body", (c) => {
-    const p = poseAt(c.frame), j = skeleton(p), parts = [], mid = depth(j.chest)
-    const at = (d, draw) => parts.push({ d, draw })
-    // the stance sways all but the legs: the body (skirt, chest, arms, axe) by the frame's, the head
-    // and its tail of hair by the frame before's
-    const [sx, sy] = stance(c.frame), [hx, hy] = stance(c.frame - 1)
-    // which way each goes (a half step stays where it comes from and pushes into its outline ahead)
-    const way = (f) => { const [a, b] = stance(f), [p0, q0] = stance(f - 1); return [a < p0 ? -1 : 1, b < q0 ? -1 : 1] }
-    const bodyWay = way(c.frame), headWay = way(c.frame - 1)
-    const chest = (draw) => () => c.subpixel(sx, sy, draw, bodyWay), head = (draw) => () => c.subpixel(hx, hy, draw, headWay)
-    const sk = skirt(j, FLARE[c.frame], rad(Math.max(-32, Math.min(32, -TAIL[c.frame] * 0.4))))
-    at(mid - 2.5, chest(() => zfill(c, sk, (front) => !front)))
-    at(mid + 0.6, chest(() => zfill(c, sk, (front) => front)))
-    // the legs, the far one first, inside the skirt
-    j.legs.forEach((L, side) => at(mid - 1.5 + 0.01 * depth(L.knee), () => {
-      limb(c, L.hip, L.knee, 2.2, 1.9, "Ttt"); limb(c, L.knee, L.ankle, 1.9, 1.7, "Tt")
-      zfill(c, boot(L, unit(add(j.hips.f, mul(j.hips.r, side ? 0.3 : -0.3)))))           // toes turned out a little
-    }))
-    at(mid, chest(() => torso(c, j, p)))
-    // the head as it is turned, and the tail of hair swinging behind it
-    // (yaw 0 faces us, 90 our right: a compass heading of 180 - yaw)
-    at(depth(j.head) + 1, () => { const [x, y] = scr(j.head).map(Math.round); c.stamp(p.look === "calm" ? "_whead" : `_whead_${p.look}`, x + hx, y + hy, { sub: headWay, heading: 180 - (p.yaw + p.twist + p.head) }) })
-    const tailYaw = rad(p.yaw + p.twist + p.head + 180 - Math.max(-70, Math.min(70, TAIL[c.frame] * 0.8))), lift = Math.min(1, Math.abs(TAIL[c.frame]) / 60)
-    const tdir = unit([Math.sin(tailYaw) * (0.3 + lift), -1 + lift * 0.8, Math.cos(tailYaw) * (0.3 + lift)])
-    const t0 = local(j.head, j.hd, [-3.5, 0, 0]), t1 = add(t0, mul(tdir, 5)), t2 = add(t1, mul(unit(add(tdir, [0, -0.6, 0])), 4))
-    at(depth(t1) - 0.5, head(() => { limb(c, t0, t1, 1.5, 1.2, "Rrq"); limb(c, t1, t2, 1.2, 0.6, "Rr") }))
-    // the arms: the free one, and the axe arm with the axe in its fist
-    at((depth(j.shoulders[0]) + depth(j.off)) / 2, chest(() => {
-      limb(c, j.shoulders[0], j.offElbow, 2, 1.7, "DGg"); limb(c, j.offElbow, j.off, 1.7, 1.4, "Bbn"); fist(c, j.off, "s")
-    }))
-    at((depth(j.shoulders[1]) + depth(j.elbow)) / 2, chest(() => limb(c, j.shoulders[1], j.elbow, 2, 1.7, "DGgh")))
-    at(depth(axeAt(j, 9, 2)), chest(() => {
-      limb(c, axeAt(j, -3, 0), axeAt(j, HAFT, 0), 0.9, 0.9, "Wwm")
-      const pt = ([t, s]) => scr(axeAt(j, t, s)).map(Math.round)
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const q of [BIT, POLL]) c.poly(q.flatMap((v) => add(pt(v), [dx, dy])), "k")
-      const n = cross(j.axe, j.edge), face = dot(n, VIEW), lit = dot(n, SUN) * Math.sign(face || 1)
-      c.poly(BIT.flatMap(pt), lit > 0.1 ? "3" : "2"); c.poly(CHEEK.flatMap(pt), lit > 0.1 ? "2" : "1"); c.poly(POLL.flatMap(pt), "1")
-      EDGE.slice(1).forEach((q, i) => c.line(...pt(EDGE[i]), ...pt(q), "4"))            // the edge, bright, toe to heel
-    }))
-    at(Math.max(depth(j.elbow), depth(j.hand)) + 0.2, chest(() => { limb(c, j.elbow, j.hand, 1.7, 1.4, "Bbn"); fist(c, j.hand, "s") }))
-    parts.sort((a, b) => a.d - b.d).forEach((q) => q.draw())
-  }),
-  layer("smear", { outline: false, unlit: true }, (c) => {
-    smear(c, c.frame, 1)
-    const p = poseAt(c.frame)
-    if (p.spark) {
-      const j = skeleton(p), [gx] = scr(axeAt(j, 16, 3)).map(Math.round), gy = OY + 1, s = p.spark
-      for (const [dx, dy] of [[-4, -3], [3, -5], [6, -2], [-1, -6], [8, -4], [-7, -2]]) c.px(gx + dx * s, gy + dy * s - (s - 1) * 2, s === 1 ? "x" : "j")
-      c.ellipse(gx, gy - 1, 3 + s * 3, 1 + s, s === 1 ? "d" : "p")
-    }
-  }))
-
-// the blade's path since the frame before: a ribbon from the edge in toward the haft, thin at its tail
-// and full at the blade; `side` -1 the stretches behind the body, 1 those in front
-function smear(c, f, side) {
-  if (!poseAt(f).smear) return
-  // from the frame before (a frame and a half into a turn already under way); thick across the blade's
-  // face, so a level cut leaves a band, not a line seen edge on
-  const N = 24, span = poseAt(f - 1).smear ? 1.6 : 1, mid = depth(skeleton(poseAt(f)).chest)
-  const wide = (k) => Math.min(1, (2.2 * k) / N) ** 0.8
-  const at = (k) => { const j = skeleton(poseAt(f - span + (span * k) / N)); let n = unit(cross(j.axe, j.edge)); if (dot(n, [0, -1, -0.3]) < 0) n = mul(n, -1); return { tip: axeAt(j, 17.5, 5), n, back: mul(j.axe, -1) } }
-  // across the path on screen: the blade's face (a level cut) or the haft (a cut seen from its side),
-  // whichever stands wider across where the blade is going now
-  const last = at(N), go = sub(scr(last.tip), scr(at(N - 2).tip)), gl = Math.hypot(...go) || 1
-  const across2 = (v) => Math.abs(go[0] * (scr(v)[1] - scr([0, 0, 0])[1]) - go[1] * (scr(v)[0] - scr([0, 0, 0])[0])) / gl
-  const face = across2(mul(last.n, 5)) >= across2(mul(last.back, 7))
-  const path = []
-  for (let k = 0; k <= N; k++) { const q = at(k); path.push([q.tip, add(q.tip, mul(face ? q.n : q.back, (face ? 5 : 7) * wide(k)))]) }
-  for (let k = 0; k < N; k++) {
-    const [o0, i0] = path[k], [o1, i1] = path[k + 1]
-    if (Math.sign(depth(lerp(o0, o1, 0.5)) - mid) !== side || Math.hypot(...sub(scr(o1), scr(o0))) < 0.8) continue
-    poly3(c, [o0, o1, i1, i0], k > N * 0.3 ? "v" : "j")
-  }
-}
-
-// on a polished stone floor: the combo and, under it, its reflection at a quarter's opacity
-scene("warden_floor", { w: W, h: 150, bg: "a" },
-  rect(0, OY + 1, W, 150 - OY - 1, "A"),
-  layer("reflection", { opacity: 0.25 }, stamp("warden_combo", OX, OY + 1, { flip: "y" })),
-  layer("warden", stamp("warden_combo", OX, OY + 1)))
-
-// ---------------------------------------------------------------- on the 3D layer
-// The same combo on rig3d (warden3_combo): a body of the warden's lengths, each moment's pose in rig3d's
-// terms (headings by the compass: the hips turned -yaw from facing us, the twist and the head the other way
-// round, the free hand the left; a point of the first figure's, y up and z toward us, is [x, -z, y] here),
-// drawn by surface() 12 degrees down, lit from the upper left in front. The stance's sway moves the body
-// over the feet: the feet carried back under it, the figure stamped a whole pixel over. The tunic swept
-// from the belt to the chest and turning with the twist; the coat's skirt a cloth swept round the hips,
-// flaring with the turn (a frame late), its hem trailing round, pleated, its lining inside, fur at the
-// hem; the fur mantle over the shoulders; boots, arms, fists, the tail of hair swinging; the axe its own
-// fields (the haft, its head cut to the outline above by sdf.field), so the body hides it where it passes
-// behind. The smears and the sparks are the first figure's, drawn the same. The head three ways (WHEAD_BY).
-const WHEAD_BY = "hand"
-const B3 = { h: 48, hip: HIP, torso: TORSO, neck: NECK, thigh: THIGH, shin: SHIN, upper: UPPER, fore: FORE, ankle: 2, hips: HIPW, shoulders: [0, SHW, -1] }
-const to3 = ([x, y, z]) => [x, -z, y]
-const pose3 = (i) => {
-  const p = poseAt(i), [sx, sy] = stance(i), fx = Math.sin(rad(p.yaw)), rx = -Math.cos(rad(p.yaw))
-  return { turn: -p.yaw, twist: -p.twist, head: -p.head, lean: p.lean, down: p.crouch + sy, feet: p.feet.map(([a, b]) => [a - Math.round(sx) * fx, b - Math.round(sx) * rx]), hands: [p.off, p.hand], i, look: p.look }
-}
+// ---- the parts
 // the signed distance to a polygon of [t, s] (inside below 0), and to a line through points
 const inPoly = (P, u, v) => {
   let d = Infinity, inside = false
@@ -483,10 +121,10 @@ const inPoly = (P, u, v) => {
   return inside ? -d : d
 }
 const along = (P, u, v) => Math.min(...P.slice(1).map(([b0, b1], i) => { const [a0, a1] = P[i], e0 = b0 - a0, e1 = b1 - a1, h = Math.max(0, Math.min(1, ((u - a0) * e0 + (v - a1) * e1) / (e0 * e0 + e1 * e1))); return Math.hypot(u - a0 - e0 * h, v - a1 - e1 * h) }))
-// the axe at a moment: the haft from the fist, and the head a slab 1.2 px thick: the bit lit, its edge
-// bright from toe to heel, the cheek and the poll darker
+// the axe at a moment: the haft from the fist, and the head a slab 1.2 px thick cut to its outline
+// (sdf.field): the bit lit, its edge bright from toe to heel, the cheek and the poll darker
 const axe3 = (j, p) => {
-  const o = skeleton(poseAt(p.i)), A = to3(o.axe), E = to3(o.edge), N = unit(cross(A, E)), h = j.arms[1].hand
+  const k = skeleton(p.i), A = k.axe, E = k.edge, N = unit(cross(A, E)), h = j.arms[1].hand
   const at = (t, s) => add(h, add(mul(A, t), mul(E, s))), tsw = (q) => { const r = sub(q, h); return [dot(r, A), dot(r, E), dot(r, N)] }
   const pts = [...BIT, ...POLL].map(([t, s]) => at(t, s)), box = (f) => [0, 1, 2].map((e) => f(...pts.map((q) => q[e])))
   const head = sdf.field((x, y, z) => { const [t, s, w] = tsw([x, y, z]); return Math.max(Math.min(inPoly(BIT, t, s), inPoly(POLL, t, s)), Math.abs(w) - 0.6) }, box(Math.min).map((v) => v - 1), box(Math.max).map((v) => v + 1))
@@ -496,7 +134,7 @@ const axe3 = (j, p) => {
 // the tail of hair: from behind the head, swinging out with the turn a frame late
 const tail3 = (j, p) => {
   const o = poseAt(p.i), lift = Math.min(1, Math.abs(TAIL[p.i]) / 60), ty = rad(o.yaw + o.twist + o.head + 180 - Math.max(-70, Math.min(70, TAIL[p.i] * 0.8)))
-  const d = unit(to3([Math.sin(ty) * (0.3 + lift), -1 + lift * 0.8, Math.cos(ty) * (0.3 + lift)])), t0 = sub(j.head, mul(j.hd.f, 3.5)), t1 = add(t0, mul(d, 5)), t2 = add(t1, mul(unit(add(d, [0, 0, -0.6])), 4))
+  const d = unit([Math.sin(ty) * (0.3 + lift), -Math.cos(ty) * (0.3 + lift), -1 + lift * 0.8]), t0 = sub(j.head, mul(j.hd.f, 3.5)), t1 = add(t0, mul(d, 5)), t2 = add(t1, mul(unit(add(d, [0, 0, -0.6])), 4))
   return [j.limb(t0, t1, 1.5, 1.2, "Rrq"), j.limb(t1, t2, 1.2, 0.6, "Rr")]
 }
 const parts3 = (j, p) => {
@@ -524,19 +162,18 @@ const parts3 = (j, p) => {
     arm1: [j.limb(j.arms[1].sh, j.arms[1].elbow, 2, 1.7, "DGgh"), j.limb(j.arms[1].elbow, j.arms[1].hand, 1.7, 1.4, "Bbn"), j.ball(j.arms[1].hand, 1.5, "Ssz")],
     axe: axe3(j, p),
     tail: tail3(j, p),
-    ...(WHEAD_BY === "modeled" ? whead3(j, p) : WHEAD_BY === "hybrid" ? { neck: j.limb(j.chest, sub(j.head, [0, 0, 4]), 1.8, 1.7, "Ssz") } : {}),
+    neck: j.limb(j.chest, sub(j.head, [0, 0, 4]), 1.8, 1.7, "Ssz"),
   }
 }
 // The head modeled: the skull; the auburn hair a cap cut away at the face, locks at the sides to the
-// jaw, tousled; the neck. The face drawn by hand as decals pinned on it, by the look: the eyes (2 px tall,
-// as the hand heads'), the brows down and together over them in a grit, the mouth a pixel, a hard line,
-// or open in a shout.
+// jaw, tousled. Drawn once per view as the figure is lit (every view: the light is from the left), its
+// face painted over by hand for each look: calm; the brows down and drawn together over a hard mouth
+// when winding up; and a shout, the jaw dropped, in the cut (the first hand heads' faces, "." keeps the
+// render's pixel). The tail of hair drawn apart (it swings).
 const WSKULL = sdf.ellipsoid([4.7, 5, 6]).mat("SszZ")
 const WHAIR = sdf.ellipsoid([5.3, 5.6, 5.4]).at(0, -0.6, 1.4)
   .union(sdf.capsule([-4.7, 0.6, 2], [-4.6, 1.2, -4.4], 1.1, 0.8), sdf.capsule([4.7, 0.6, 2], [4.6, 1.2, -4.4], 1.1, 0.8), { smooth: 0.8 })
   .subtract(sdf.ellipsoid([4.3, 4.8, 5]).at(0, 4.3, -2.6), { smooth: 0.4 }).noise({ amp: 0.45, scale: 1.2, seed: 4 }).mat("RrqQ")
-// the head baked (the hybrid): drawn once per view as the figure is lit, its face retouched by hand, cut
-// from the hand heads by the look ("." keeps the render), on their middle
 const WFACE3 = {
   calm: {
     s: `
@@ -551,8 +188,7 @@ const WFACE3 = {
       ...zizzzis...
       ...zizzzis...
       ...czzzszc...
-      ...szzyzzs...
-      ...SszzzsS...`,
+      ...szzyzzs...`,
     se: `
       .............
       .............
@@ -565,8 +201,7 @@ const WFACE3 = {
       ....Sszizziz.
       ....Sszizziz.
       ....Sczzzscz.
-      ....Sszzyzz..
-      ....SsszzzS..`,
+      ....Sszzyzz..`,
     e: `
       ..............
       ..............
@@ -579,8 +214,7 @@ const WFACE3 = {
       .....Sszzizz..
       .....Sszzizzz.
       .....SsczzzS..
-      .....Sszzyz...
-      .....SsszzS...`,
+      .....Sszzyz...`,
     w: `
       ..............
       ..............
@@ -593,8 +227,7 @@ const WFACE3 = {
       ..zzizzsS.....
       ..zzizzsS.....
       ..SzzzcsS.....
-      ...zyzzsS.....
-      ...SzzssS.....`,
+      ...zyzzsS.....`,
     sw: `
       .............
       .............
@@ -607,8 +240,7 @@ const WFACE3 = {
       .zizzizsS....
       .zizzizsS....
       .zcszzzcS....
-      ..zzyzzsS....
-      ..SzzzssS....`,
+      ..zzyzzsS....`,
   },
   grit: {
     s: `
@@ -623,8 +255,7 @@ const WFACE3 = {
       ...ziRzRis...
       ...zizzzis...
       ...czzzszc...
-      ...szSSSzs...
-      ...SszzzsS...`,
+      ...szSSSzs...`,
     se: `
       .............
       .............
@@ -637,8 +268,7 @@ const WFACE3 = {
       ....Sszizziz.
       ....Sszizziz.
       ....Sczzzscz.
-      ....SszSSSz..
-      ....SsszzzS..`,
+      ....SszSSSz..`,
     e: `
       ..............
       ..............
@@ -651,8 +281,7 @@ const WFACE3 = {
       .....Sszzizz..
       .....Sszzizzz.
       .....SsczzzS..
-      .....SszzSS...
-      .....SsszzS...`,
+      .....SszzSS...`,
     w: `
       ..............
       ..............
@@ -665,8 +294,7 @@ const WFACE3 = {
       ..zzizzsS.....
       ..zzizzsS.....
       ..SzzzcsS.....
-      ...SSzzsS.....
-      ...SzzssS.....`,
+      ...SSzzsS.....`,
     sw: `
       .............
       .............
@@ -679,8 +307,7 @@ const WFACE3 = {
       .zizzizsS....
       .zizzizsS....
       .zcszzzcS....
-      ..zSSSzsS....
-      ..SzzzssS....`,
+      ..zSSSzsS....`,
   },
   shout: {
     s: `
@@ -695,8 +322,7 @@ const WFACE3 = {
       ...ziRzRis...
       ...zizzzis...
       ...czzzszc...
-      ...sziiizs...
-      ...SsiyisS...`,
+      ...sziiizs...`,
     se: `
       .............
       .............
@@ -709,8 +335,7 @@ const WFACE3 = {
       ....Sszizziz.
       ....Sszizziz.
       ....Sczzzscz.
-      ....Ssziiiz..
-      ....SssiyiS..`,
+      ....Ssziiiz..`,
     e: `
       ..............
       ..............
@@ -723,8 +348,7 @@ const WFACE3 = {
       .....Sszzizz..
       .....Sszzizzz.
       .....SsczzzS..
-      .....Sszzii...
-      .....Ssszyi...`,
+      .....Sszzii...`,
     w: `
       ..............
       ..............
@@ -737,8 +361,7 @@ const WFACE3 = {
       ..zzizzsS.....
       ..zzizzsS.....
       ..SzzzcsS.....
-      ...iizzsS.....
-      ...iyzssS.....`,
+      ...iizzsS.....`,
     sw: `
       .............
       .............
@@ -751,54 +374,108 @@ const WFACE3 = {
       .zizzizsS....
       .zizzizsS....
       .zcszzzcS....
-      ..ziiizsS....
-      ..SiyissS....`,
+      ..ziiizsS....`,
   },
 }
-if (WHEAD_BY === "hybrid") for (const look of ["calm", "grit", "shout"]) views(look === "calm" ? "_whead3" : `_whead3_${look}`, sdf.union(WSKULL, WHAIR), { pitch: 12, light: [-0.6, -0.45, 0.65], ink: "k", surface: { clean: true }, anchor: { s: [6, 8], se: [6, 8], e: [7, 8], w: [7, 8], sw: [6, 8] }, retouch: WFACE3[look] })
-sprite("_w3_eyes", { pivot: [2.5, 0.5] }, "i...i\ni...i")
-sprite("_w3_eyes3", { pivot: [1.5, 0.5] }, "i..i\ni..i")
-sprite("_w3_eyesp", { pivot: [0.5, 0.5] }, "i\ni")
-sprite("_w3_grit", { pivot: [2.5, 1.5] }, "iR.Ri\ni...i")
-sprite("_w3_grit3", { pivot: [1.5, 1.5] }, "iR.i\ni..i")
-sprite("_w3_gritp", { pivot: [0.5, 1.5] }, "R\ni\ni")
-sprite("_w3_mouth_calm", "y")
-sprite("_w3_mouth_grit", "SSS")
-sprite("_w3_mouth_shout", { pivot: [1.5, 0.5] }, "iii\niyi")
-const whead3 = (j, p) => {
-  const into = (f) => f.rotate(-j.hd.heading, "z").at(j.head), at = (x, y, z) => [0, 1, 2].map((e) => j.head[e] + j.hd.r[e] * x + j.hd.f[e] * y + (e === 2 ? z : 0))
-  const eyes = p.look === "calm" ? "_w3_eyes" : "_w3_grit"
-  return {
-    neck: j.limb(j.chest, sub(j.head, [0, 0, 4]), 1.8, 1.7, "Ssz"),
-    head: [into(WSKULL), into(WHAIR)],
-    face: [j.decal(eyes, at(0, 4.9, -0.6), { views: { three: eyes + "3", profile: eyes + "p" }, depth: 3 }), j.decal(`_w3_mouth_${p.look}`, at(0, 4.4, -3.6), { depth: 2 })],
+const LIGHT3 = [-0.6, -0.45, 0.65]
+for (const look of ["calm", "grit", "shout"]) views(look === "calm" ? "_whead" : `_whead_${look}`, sdf.union(WSKULL, WHAIR), { pitch: 12, light: LIGHT3, ink: "k", surface: { clean: true },
+  anchor: { s: [6, 8], se: [6, 8], e: [7, 8], w: [7, 8], sw: [6, 8] }, retouch: WFACE3[look] })
+// the head stamped by the look on the head joint; the axe and the tail of hair kept over it where they
+// are nearer, a line on the head round them
+const stampHead = (c, j, p) => {
+  const ids = c.img.parts?.ids, names = c.img.parts?.names ?? [], near = (q) => j.depth(q) > j.depth(j.head), data = c.img.data
+  const over = new Set([...(near(j.arms[1].hand) ? ["axe"] : []), ...(near(sub(j.head, mul(j.hd.f, 5))) ? ["tail"] : [])].map((n) => names.indexOf(n)))
+  const keep = ids ? [...ids.keys()].filter((i) => over.has(ids[i])) : [], was = keep.map((i) => data[i]), before = data.slice()
+  const [x, y] = j.screen(j.head).map(Math.round)
+  c.stamp(p.look === "calm" ? "_whead" : `_whead_${p.look}`, x, y, { heading: j.hd.heading })
+  const kept = new Set(keep.filter((i, n) => data[i] !== was[n])), ink = c.color("k")
+  keep.forEach((i, n) => { data[i] = was[n] })
+  for (const i of kept) for (const d of [1, -1, c.img.w, -c.img.w]) if (!kept.has(i + d) && data[i + d] !== before[i + d] && !over.has(ids[i + d])) data[i + d] = ink
+}
+
+// ---- the figure: the moves on rig3d, 12 degrees down, lit from the upper left in front
+const B3 = { h: 48, hip: HIP, torso: TORSO, neck: NECK, thigh: THIGH, shin: SHIN, upper: UPPER, fore: FORE, ankle: 2, hips: HIPW, shoulders: [0, SHW, -1] }
+const R = rig3d("_warden", { body: B3, headings: ["s"], pitch: 12, w: W, h: H, pivot: [OX, OY], light: LIGHT3, ink: "k", surface: { clean: true }, parts: parts3,
+  moves: { combo: { frames: FRAMES, ms: 1000 / 11, pose: (i) => pose3(i), draw: stampHead } } })
+
+// The blade's edge always faces the way the cut goes, so it never strikes with the flat or the back
+// like a club. Where the axe head cuts (moves fast into a frame with a smear), that is the way it
+// moves; held, wound up or let down, it is the way of the nearer cut in time, the one coming or the one
+// just made (the wrist doesn't turn the axe between a backswing and its cut); further from any, at rest,
+// forward. Then turned square to the haft. (rig3d's frame: y away from us, z up; EYE the way to the eye)
+const UP = [0, 0, 1], EYE = [0, -CP, SP]
+const STEP = 0.25, CUT = 12, NEAR = 2.5                                    // px a frame: a cut; frames from one
+// the fist and the haft's way at a moment (the pose's axe: [forward, right, up] in the shoulders' frame)
+const grip = (t) => { const j = R.joints(pose3(t), 180), a = poseAt(t).axe; return { j, hand: j.arms[1].hand, axe: unit(add(add(mul(j.sh.f, a[0]), mul(j.sh.r, a[1])), mul(UP, a[2]))) } }
+const WAY = []
+for (let i = 0; i < FRAMES / STEP; i++) {
+  const t = i * STEP, at = (u) => { const g = grip(u); return add(g.hand, mul(g.axe, 15)) }
+  const v = mul(sub(at(t + STEP / 2), at(t - STEP / 2)), 1 / STEP)
+  WAY.push({ v, fast: len(v) >= CUT && !!poseAt(Math.ceil(t - 1e-6)).smear })   // a cut leaves a smear; a backswing doesn't
+}
+const wayAt = (t) => {
+  const n = WAY.length, i = ((Math.round(t / STEP) % n) + n) % n
+  if (WAY[i].fast) return { v: WAY[i].v, cut: true }
+  for (let d = 1; d <= NEAR / STEP; d++) for (const k of [i - d, i + d]) { const w = WAY[((k % n) + n) % n]; if (w.fast) return { v: w.v } }
+  return null
+}
+const skeleton = (t) => {
+  // held (wound up, or after a cut), the blade is turned to show its side to us, its edge still on
+  // the way the cut goes as we see it; in a cut it turns as the cut does
+  const w = wayAt(t), g = grip(t), sf = g.j.sh.f, seen = (v) => (w?.cut ? v : sub(v, mul(EYE, dot(v, EYE))))
+  const way = seen(w?.v ?? sf), sq = sub(way, mul(g.axe, dot(way, g.axe))), fall = sub(sf, mul(g.axe, dot(sf, g.axe)))   // the haft along the cut: its forward
+  return { ...g, edge: unit(len(sq) > 0.35 * len(way) ? sq : fall) }
+}
+// a point of the axe: t along the haft from the hand, s along the edge's way
+const axeAt = (k, t, s) => add(k.hand, add(mul(k.axe, t), mul(k.edge, s)))
+// The head as an axe is made, in 3D on the haft (t along it from the hand, s out to the bit, px): the
+// eye round the haft's top; the bit out on the edge's side, its edge a long curve running from the toe
+// (its top corner) down to the heel at the tip of the beard, along the haft, not across it; the poll on
+// the other side. Turned level in a whirl it shows edge on, as a real one would.
+const BIT = [[17.5, 0], [18.6, 3], [19.6, 6.5], [18.4, 8.4], [15.5, 9.1], [12.6, 8.5], [10.3, 6.8], [11.3, 4.9], [13.4, 2.2], [14.5, 0]]
+const EDGE = [[19.6, 6.5], [18.4, 8.4], [15.5, 9.1], [12.6, 8.5], [10.3, 6.8]]
+const CHEEK = [[17.5, 0], [18.4, 2.6], [13.6, 2.6], [14.5, 0]], POLL = [[17.5, 0], [17.5, -2.6], [14.6, -2.6], [14.6, 0]]
+
+// the blade's path since the frame before: a ribbon from the edge in toward the haft, thin at its tail
+// and full at the blade; `side` -1 the stretches behind the body, 1 those in front
+function smear(c, f, side) {
+  if (!poseAt(f).smear) return
+  // from the frame before (a frame and a half into a turn already under way); thick across the blade's
+  // face, so a level cut leaves a band, not a line seen edge on
+  const N = 24, span = poseAt(f - 1).smear ? 1.6 : 1, mid = R.depth(grip(f).j.chest), scr = R.screen
+  const wide = (k) => Math.min(1, (2.2 * k) / N) ** 0.8
+  const at = (k) => { const s = skeleton(f - span + (span * k) / N); let n = unit(cross(s.axe, s.edge)); if (dot(n, [0, 0.3, -1]) < 0) n = mul(n, -1); return { tip: axeAt(s, 17.5, 5), n, back: mul(s.axe, -1) } }
+  // across the path on screen: the blade's face (a level cut) or the haft (a cut seen from its side),
+  // whichever stands wider across where the blade is going now
+  const last = at(N), go = sub(scr(last.tip), scr(at(N - 2).tip)), gl = Math.hypot(...go) || 1
+  const across2 = (v) => Math.abs(go[0] * (scr(v)[1] - scr([0, 0, 0])[1]) - go[1] * (scr(v)[0] - scr([0, 0, 0])[0])) / gl
+  const face = across2(mul(last.n, 5)) >= across2(mul(last.back, 7))
+  const path = []
+  for (let k = 0; k <= N; k++) { const q = at(k); path.push([q.tip, add(q.tip, mul(face ? q.n : q.back, (face ? 5 : 7) * wide(k)))]) }
+  for (let k = 0; k < N; k++) {
+    const [o0, i0] = path[k], [o1, i1] = path[k + 1]
+    if (Math.sign(R.depth(lerp(o0, o1, 0.5)) - mid) !== side || Math.hypot(...sub(scr(o1), scr(o0))) < 0.8) continue
+    c.poly([o0, o1, i1, i0].flatMap((q) => scr(q)).map(Math.round), k > N * 0.3 ? "v" : "j")
   }
 }
-// the head by hand (the first figure's views) or baked (_whead3), stamped by the look on the head joint;
-// the axe and the tail of hair kept over it where they are nearer
-const stampHead = (c, j, p, set) => {
-  const ids = c.img.parts?.ids, names = c.img.parts?.names ?? [], near = (q) => j.depth(q) > j.depth(j.head)
-  const over = new Set([...(near(j.arms[1].hand) ? ["axe"] : []), ...(near(sub(j.head, mul(j.hd.f, 5))) ? ["tail"] : [])].map((n) => names.indexOf(n)))
-  const keep = ids ? [...ids.keys()].filter((i) => over.has(ids[i])).map((i) => [i, c.img.data[i]]) : []
-  const [x, y] = j.screen(j.head).map(Math.round)
-  c.stamp(p.look === "calm" ? set : `${set}_${p.look}`, x, y, { heading: j.hd.heading })
-  for (const [i, v] of keep) c.img.data[i] = v
-}
-rig3d("_warden3", { body: B3, headings: ["s"], pitch: 12, w: W, h: H, pivot: [OX, OY], light: [-0.6, -0.45, 0.65], ink: "k", surface: { clean: true }, parts: parts3,
-  moves: { combo: { frames: FRAMES, ms: 1000 / 11, pose: (i) => pose3(i), ...(WHEAD_BY === "modeled" ? {} : { draw: (c, j, p) => stampHead(c, j, p, WHEAD_BY === "hand" ? "_whead" : "_whead3") }) } } })
-anim("warden3_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], facing: "right" },
+
+// the combo: what the blade swept since the frame before where it ran behind the body, the figure, what
+// it swept in front, the chop's sparks and dust
+anim("warden_combo", { w: W, h: H, frames: FRAMES, fps: 11, pivot: [OX, OY], facing: "right" },
   layer("smear_back", { outline: false, unlit: true }, (c) => smear(c, c.frame, -1)),
-  layer("body", (c) => c.stamp("_warden3_combo_s", OX + Math.round(stance(c.frame)[0]), OY, { frame: c.frame })),
+  layer("body", (c) => c.stamp("_warden_combo_s", OX + Math.round(stance(c.frame)[0]), OY, { frame: c.frame })),
   layer("smear", { outline: false, unlit: true }, (c) => {
     smear(c, c.frame, 1)
     const p = poseAt(c.frame)
     if (p.spark) {
-      const j = skeleton(p), [gx] = scr(axeAt(j, 16, 3)).map(Math.round), gy = OY + 1, s = p.spark
+      const [gx] = R.screen(axeAt(skeleton(c.frame), 16, 3)).map(Math.round), gy = OY + 1, s = p.spark
       for (const [dx, dy] of [[-4, -3], [3, -5], [6, -2], [-1, -6], [8, -4], [-7, -2]]) c.px(gx + dx * s, gy + dy * s - (s - 1) * 2, s === 1 ? "x" : "j")
       c.ellipse(gx, gy - 1, 3 + s * 3, 1 + s, s === 1 ? "d" : "p")
     }
   }))
-scene("warden3_floor", { w: W, h: 150, bg: "a" },
+
+// on a polished stone floor: the combo and, under it, its reflection at a quarter's opacity
+scene("warden_floor", { w: W, h: 150, bg: "a" },
   rect(0, OY + 1, W, 150 - OY - 1, "A"),
-  layer("reflection", { opacity: 0.25 }, stamp("warden3_combo", OX, OY + 1, { flip: "y" })),
-  layer("warden", stamp("warden3_combo", OX, OY + 1)))
+  layer("reflection", { opacity: 0.25 }, stamp("warden_combo", OX, OY + 1, { flip: "y" })),
+  layer("warden", stamp("warden_combo", OX, OY + 1)))

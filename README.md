@@ -248,7 +248,8 @@ a kit of grass, trees and rocks in [`examples/nature/`](examples/nature)) are in
 The look of Octopath Traveler's dioramas, in [`examples/hd2d/`](examples/hd2d): the ground built in
 meters with `mesh()` (textured boxes laid a texel to a pixel, a hill with an uneven outline), people,
 stones and trees standing in it as sprites, shadows from one sun, `post()`'s depth of field. The
-traveler is a 34 px figure on a skeleton in 3D with a head drawn per view: he walks his eight
+traveler is a 34 px figure in 3D (`rig3d()`), his head modeled and drawn once per view, its face
+painted over by hand: he walks his eight
 directions, kneels to lay a rose and talks in dialogue boxes. The harbor's camera was matched by
 measuring a screenshot of Octopath Traveler II; its crew ([`crew.px.js`](examples/hd2d/crew.px.js))
 is dressed on the traveler's skeleton. The clearing ([`clearing.px.js`](examples/hd2d/clearing.px.js))

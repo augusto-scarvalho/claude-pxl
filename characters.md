@@ -137,36 +137,45 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
 - **Licence:** whatever you paint over the base is a derivative of it. With a CC-BY-SA base, the
   result has to credit its author and be shared under CC-BY-SA, so tell the user.
 
-### A body that turns and walks: a skeleton in 3D, a head per view
+### A body that turns and walks: a figure in 3D, a head per view
 
-When no base exists in the view you need, build the body on a skeleton in 3D: drawing a turned,
+When no base exists in the view you need, build the body as a figure in 3D: drawing a turned,
 walking body pixel by pixel by eye is where code drawing fails worst (proportions drift, the near and
-far limbs swap, every fix breaks something else). In pxl itself (§11; `examples/rig/warden.px.js`,
-`examples/hd2d/traveler.px.js`, its 8 directions walking and idle):
+far limbs swap, every fix breaks something else). In pxl that is one op, `rig3d()` (`PXL help rig3d`;
+`examples/hd2d/traveler.px.js`, its 8 directions walking, idle, kneeling and casting;
+`examples/rig/warden.px.js`, an axe combo that turns the whole body round):
 
-1. Joints as points in px (x right, y up, z toward us), each limb placed by a two-bone IK from its
-   root to its end; the camera a field sprite's, nearly level (20 degrees down: a billboard is drawn
-   as seen from the front). The body turned by one angle about its upright: one skeleton and one set
-   of moves give every direction.
-2. Blocks first: each part a flat color (a tube between two joints, a ball, a surface swept round
-   the upright for a torso, a tunic, a cloak) into one z-buffer, the nearest wins. Judge the
-   proportions and the motion on a GIF of all the directions before painting anything.
-3. Paint: each surface toned along its ramp by how it faces the light, the light from above and
-   toward us (a mirrored view keeps it, §6); the outlines round each part after the colors, so they
-   stay.
-4. The head by hand, a grid per view: front, front 3/4, profile, back 3/4, back; the other three
-   their mirrors (`x' = 2*hx - x - (w - 1)` round the head's anchor column hx). The crown, chin and
-   anchor on the same rows in every view; one haircut seen from each side (§5).
-5. The walk by the view (§6): facing us or away the feet lift in their own columns, in profile a
-   long stride, on the diagonals between.
+1. **The skeleton:** a body of lengths in px (`figure(h, heads)`'s unless given), a pose per moment
+   (the feet, their lift, the lean, the hands; `gait()` for a walk, `tween()` and `unroll()` for the
+   timing), each limb placed by two-bone IK (`ik3`); the camera a field sprite's, nearly level (20
+   degrees down: a billboard is drawn as seen from the front). The body turned to every heading asked
+   (`n`: 4, 8, 16): one skeleton and one set of moves give every direction.
+2. **Blocks first** (`blocks: true`, `bk_<move>_<dir>`): the head yellow with a red patch where the
+   face is, the body orange, the right limbs light and the left dark. Judge the proportions and the
+   motion on a GIF of all the directions before painting anything.
+3. **Paint** (`parts`): each part fields along the bones (`j.limb`, `j.ball`), a torso, a tunic, a
+   coat or a cloak a surface swept round the upright (`j.sweep`: open in front, its lining, trailing
+   as he walks, flaring as he turns), drawn by `surface()` toned by how it faces the light (from
+   above and toward us: a mirrored view keeps it, §6); `ink` the line all round and on the part
+   behind; `surface: { clean: true }` cleans what is drawn that small (a pixel sticking out cut away,
+   no line doubled, the outline whole). What no primitive gives is a field of the file's own
+   (`sdf.field`: the warden's axe head) or drawn by hand after the figure (`draw`).
+4. **The head**, as a pixel artist paints over a 3D render: modeled (the skull, and on it the hair, a
+   beard, a hat or a bandana as fields in the head's frame) and drawn once per view by
+   `views(name, field, { retouch })` (five views for 8 directions, the east the west's mirror; all of
+   them under a light from one side); then its face painted over each view by hand (`retouch`: `"."`
+   keeps the render's pixel, `"_"` erases one): the eyes, the nose, the mouth, the brow, the cheek's
+   edge, cut from approved hand heads (§5); in profile the face a pixel wider than the hair leaves it
+   and the nose's tip past the line. The 3D gets right the volumes hand drawing struggles with (the
+   hair, a beard); a face of fields and decals reads worse than a painted one, so the face is painted.
+   `rig3d`'s `head` stamps it by the heading, as it would hand-drawn views (`views(name, { s: grid,
+   sw, w, nw, n })`: front, front 3/4, profile, back 3/4, back, their crown, chin and anchor on the
+   same rows); drawn once per view, a head costs nothing per frame.
+5. **The walk by the view** (§6): facing us or away the feet lift in their own columns, in profile a
+   long stride, on the diagonals between (`gait()`'s numbers).
 
-In the DSL: `rig3d()` is steps 1 to 3 (the skeleton on the 3D layer in every direction, its flat
-blocks with `blocks: true`, its parts painted by hooks, the cloak a `j.sweep`: the traveler's `tr_*`
-and `bk_*`), `views()` step 4 (the mirror about the anchor, the rows checked), `gait()` step 5's
-numbers (`PXL help rig3d`). A head modeled too (the traveler's): `surface: { clean: true }` cleans what is
-drawn that small before the lines (a pixel sticking out cut away, no line doubled, the outline
-whole, no eye's pixel on the silhouette); the eyes and the nose decals by view, as the hand heads';
-`chin: ["D", skin ramp]` the hand heads' line under the jaw.
+`pxl check` reads every pose at every heading: both feet off the ground (it floats), a leg pulled
+longer than its bones.
 
 What the first tries of the traveler (34 px) got wrong, and the fix:
 - A big head: 11 rows of 34, a third; 13 read as a big head on a small body.
@@ -384,7 +393,8 @@ of the nose; the corners of the mouth straight below the pupils.)
     2:1 diagonal), the leading heel a pixel up, the body a pixel lower there and tallest passing (a
     triangle wave); the arms the other way round, the far one showing only at its extremes; a cloak's
     tail and the hair a frame late. Feet moved 1 px each way never part and read as shuffling.
-  `examples/hd2d/traveler.px.js` stands on these numbers (its body a skeleton in 3D, §3).
+  `examples/hd2d/traveler.px.js` stands on these numbers (its body a figure in 3D, `rig3d()` and
+  `gait()`, §3).
 - **Profile (side view):** everything says which way the figure faces. The far arm and far leg hide
   behind the near ones or show as a darker sliver on the same side (moving, keep them a ramp step
   darker in every frame, `stamp(limb, x, y, { shade: 1 })`, so crossing legs never swap; a far leg
@@ -578,9 +588,11 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   leading, an axe reads as a club). An axe's edge is the long curve at the end of the bit, from its
   top corner (the toe) down to the heel, running along the haft, never across its top; the poll is on
   the other side. Held, show the blade's side; in a level whirl it turns edge on, as it would. An arm
-  that swings an axe round a body that stays in profile reads as a puppet. Posed as a skeleton in 3D
-  and turned about its upright, the views come by themselves (`examples/rig/warden.px.js`: the head
-  drawn in five views, picked by the turn).
+  that swings an axe round a body that stays in profile reads as a puppet. Posed as a figure in 3D
+  and turned about its upright, the views come by themselves (`examples/rig/warden.px.js` on
+  `rig3d()`: the hips' yaw, the shoulders' twist against them, a coat swept round that flares with
+  the turn, the axe its own field and its smear behind the body where its path ran; the head modeled,
+  drawn once per view and its faces painted, picked by the turn).
 - **Timing an action** (Saint11): anticipation, strike, overshoot, recovery. The anticipation coils
   the other way, its first frame held longest; the strike is 1–2 frames, the first already at full
   reach with its smear; the overshoot passes the end pose; the recovery is the longest phase and
@@ -642,8 +654,7 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
     flickers): look at it at game scale. Keep eyes and faces crisp, moved by whole pixels.
   - **In pxl:** stamp each part with `{ sub: [dx, dy] }` at its place of the frame, `[dx, dy]` the way
     it goes (or draw it in `c.subpixel(dx, dy, () => ..., [dx, dy])`); give each ramp its steps toward
-    the ink (`examples/subpixel.px.js`; `examples/rig/warden.px.js` sways so at rest, a fighting
-    stance from foot to foot). `pxl study` tells it in a clip ("Subpixel: ..."), with the tones it
+    the ink (`examples/subpixel.px.js`). `pxl study` tells it in a clip ("Subpixel: ..."), with the tones it
     takes.
 - **Register the whole figure by one point**, the pelvis: move the entire frame so it lands on the
   same x every frame, with one constant y offset per cycle for the bob. Never centre frames on
@@ -679,7 +690,9 @@ parts meet; a chain's far joints come a frame later each, which reads as weight:
 
 
 A figure or prop past ~48 px is too much to draw in one go: the proportions drift, a limb lands on
-the wrong side, and fixing one thing breaks another. Build it as a rig, in stages:
+the wrong side, and fixing one thing breaks another. One that turns about its upright (a whirl, a
+spin, a walk in 8 directions) is a figure in 3D (`rig3d()`, §3). One seen from a side or two, built
+from drawn parts, is a rig, in stages:
 
 1. **Skeleton.** `figure(h, heads)` gives a standing figure's landmark rows (chin, shoulders,
    chest, waist, crotch, knees, ankles, sole) and its shoulder width. Lay the slots out from them:
@@ -867,7 +880,7 @@ figure and pick its build by the game whose look you're after.
 A 16-bit sprite keeps to a palette of 16, its sixteenth clear: 15 colors at most to a sprite (the
 SNES and GBA rows). HD-2D's figures stand taller (32–38 px) and take more colors (22–54: ramps of
 four to six tones, softer shading), the black outline kept: `examples/hd2d/traveler.px.js` (34 px, its
-body pre-rendered from a 3D figure, §3, its head drawn).
+body a figure in 3D drawn every frame, its head modeled, drawn once per view and its face painted, §3).
 
 How they play, and the same in pxl:
 
