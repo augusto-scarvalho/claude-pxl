@@ -8,7 +8,7 @@ import { model, turnFaces, turnPoint } from "./mesh.ts";
 import { Sdf, compile, sdf } from "./sdf.ts";
 import { COMPASS, clocksOf, headingsOf, mirrorSymmetric, topOf, turnLight, turnViews } from "./turnaround.ts";
 import { BLOCK_MATS, type Body, type Joints, type Pose, blocksOf, bodyOf, gait, ik3, jointsOf, partsOf } from "./rig3d.ts";
-import { SURFACE_OPTS, VOXEL_OPTS, surfaceSize } from "./surface.ts";
+import { SURFACE_OPTS, VOXEL_OPTS, projection, surfaceSize } from "./surface.ts";
 import { Mesh3, Voxels, surfaceNets, voxelize } from "./grids.ts";
 import { VOLUME_OPTS } from "./volume.ts";
 import { SPLAT_OPTS, Splats, makeSplats } from "./splats.ts";
@@ -584,8 +584,10 @@ export class Project implements BuildCtx {
       const loc = this.callerLoc();
       try {
         if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError('turnaround("house", make3d.house(), { view: "iso", n: 8, ppm: 16 })');
-        checkKeys("turnaround", opts, ["view", "ppm", "n", "headings", "part", "mats", "light", "as", "size", "spacing", "frames", "fps", "mirror", "pad"]);
-        const o = opts as { view?: unknown; ppm?: number; n?: number; headings?: unknown; part?: string; mats?: unknown; light?: unknown; as?: string; size?: number; spacing?: number; frames?: number; fps?: number; mirror?: unknown; pad?: number };
+        checkKeys("turnaround", opts, ["view", "ppm", "n", "headings", "part", "mats", "light", "as", "size", "spacing", "surface", "draw", "frames", "fps", "mirror", "pad"]);
+        const o = opts as { view?: unknown; ppm?: number; n?: number; headings?: unknown; part?: string; mats?: unknown; light?: unknown; as?: string; size?: number; spacing?: number; surface?: unknown; draw?: unknown; frames?: number; fps?: number; mirror?: unknown; pad?: number };
+        if (!(o.draw === undefined || typeof o.draw === "function")) throw new PxError(`turnaround: draw is (c, v) => { ... }, drawing by hand over each heading (v.screen(p), v.depth(p) of a point in m), got ${JSON.stringify(o.draw)}`);
+        if (!(o.surface === undefined || isPlainObject(o.surface))) throw new PxError(`turnaround: surface is more of surface()'s options ({ soft, outline, rim, ao, shadows }), got ${JSON.stringify(o.surface)}`);
         // what is turned: a field or a built thing, or a world's part standing at the origin
         let b: Partial<Built> | undefined, only: string[] | undefined, at0 = [0, 0, 0];
         if (thing instanceof World) {
@@ -599,13 +601,14 @@ export class Project implements BuildCtx {
         if (!(frames === undefined || (Number.isInteger(frames) && frames >= 1)) || !(fps > 0) || !(ppm > 0) || !(Number.isInteger(pad) && pad >= 0) || ![true, false, "auto"].includes(mirror as boolean))
           throw new PxError(`turnaround: frames (an anim's, when the thing moves on the clock), fps above 0, ppm above 0, pad (px, whole), mirror true, false or "auto", got ${JSON.stringify({ frames, fps, ppm, pad, mirror })}`);
         const persp = !!view && typeof view === "object" && "horizon" in view, kind = typeof view === "string" ? view : (view as { kind?: string })?.kind;
+        if (persp && o.draw) throw new PxError("turnaround: draw (by hand over each heading) is for an orthographic view (\"side\", \"top\", \"iso\" or { kind, pitch })");
         const H = headingsOf(o.n ?? 8, o.headings, !persp && kind === "iso"), clocks = clocksOf(frames, fps);
         const T = turnViews(view, ppm, field, H.map((h) => h.deg), clocks, pad);
         // mirrored (the east from the west, as the traveler's) where the thing is its own mirror and its light
         // comes from the picture's middle (above, in front, behind): what a flip keeps
         const L = o.light ?? this.look3d?.light, y0 = persp ? (view as View).yaw ?? 0 : (view as { yaw?: number })?.yaw ?? (kind === "iso" ? 45 : 0);
         const level = Array.isArray(L) && Math.abs(L[0] * Math.cos((y0 * Math.PI) / 180) - L[1] * Math.sin((y0 * Math.PI) / 180)) < 0.05 * Math.hypot(...(L as number[]));
-        const sym = mirror === true || (mirror === "auto" && level && !Object.keys(b.details ?? {}).length && Object.values(b.decals ?? {}).every((d) => Math.abs(d.point[0]) < 0.01) && mirrorSymmetric(field, clocks));
+        const sym = mirror === true || (mirror === "auto" && !o.draw && level && !Object.keys(b.details ?? {}).length && Object.values(b.decals ?? {}).every((d) => Math.abs(d.point[0]) < 0.01) && mirrorSymmetric(field, clocks));
         const kindA = frames ? "anim" : "sprite", names = H.map((h) => `${name}_${h.name}`);
         // its height over the ground it stands on (its origin's), for pxl check and describe
         const top = topOf(field) + at0[2], height = Number.isFinite(top) && top > 0 ? { height: Math.round(top * 100) / 100 } : {};
@@ -614,8 +617,12 @@ export class Project implements BuildCtx {
           if (twin[i] >= 0) return;
           const v = T.views[i], light = Array.isArray(L) ? turnLight(L as number[], v.turn) : L;
           const draw = { view: v.view, at: [v.at[0] + at0[0], v.at[1] + at0[1], v.at[2] + at0[2]], ...(persp ? {} : { ppm }), ...(o.mats !== undefined ? { mats: o.mats } : {}), ...(light !== undefined ? { light } : {}),
-            ...(o.as !== undefined ? { as: o.as } : {}), ...(o.size !== undefined ? { size: o.size } : {}), ...(o.spacing !== undefined ? { spacing: o.spacing } : {}), ...(only ? { only } : {}) };
-          define(kindA, names[i], [{ w: T.w, h: T.h, pivot: T.pivot, ...height, ...(frames ? { frames, fps } : {}) }, (c: Canvas) => c.draw3d(thing, draw as never)]);
+            ...(o.as !== undefined ? { as: o.as } : {}), ...(o.size !== undefined ? { size: o.size } : {}), ...(o.spacing !== undefined ? { spacing: o.spacing } : {}), ...(o.surface !== undefined ? { surface: o.surface } : {}), ...(only ? { only } : {}) };
+          // drawn by hand over it, a point p (m, the thing's) landing at v.screen(p), nearer us the more v.depth(p)
+          const pr = o.draw ? projection(v.view as never, ppm, undefined, undefined, "turnaround") : undefined, org = (v.view as { origin: number[] }).origin;
+          const lay = (p: number[], q: number[]) => (p[0] + at0[0]) * q[0] + (p[1] + at0[1]) * q[1] + (p[2] + at0[2]) * q[2];
+          const hand = pr ? { heading: H[i].name, screen: (p: number[]) => [org[0] + lay(p, pr.a), org[1] + lay(p, pr.b)], depth: (p: number[]) => -lay(p, pr.D) } : undefined;
+          define(kindA, names[i], [{ w: T.w, h: T.h, pivot: T.pivot, ...height, ...(frames ? { frames, fps } : {}) }, (c: Canvas) => { c.draw3d(thing, draw as never); if (hand) (o.draw as (c: Canvas, v: unknown) => void)(c, hand); }]);
         });
         H.forEach((_, i) => { if (twin[i] >= 0) define(kindA, names[i], [{ base: names[twin[i]], flip: "x", pivot: T.pivot }]); });
         for (const n of names) this.assets.get(n)!.grounded = true;
@@ -879,7 +886,11 @@ export class Project implements BuildCtx {
     };
     env.rng = (seed?: number) => rng(seed);
     // procedural texture, the same in every file: hash(i, j), vnoise(x, y), fbm(x, y, octaves), bayer(x, y)
-    env.hash = latticeHash;
+    // (a third number, a seed, makes another draw at the same point: hash(i, j, 1), hash(i, j, 2); two as they always were)
+    env.hash = (...a: number[]) => {
+      if (a.length < 2 || a.length > 3) throw new PxError(`hash(i, j) or hash(i, j, seed): a number in [0, 1) for a lattice point, got ${a.length} numbers`);
+      return a.length === 2 ? latticeHash(a[0], a[1]) : latticeHash(Math.floor(latticeHash(a[0], a[1]) * 2147483648), a[2]);
+    };
     env.vnoise = vnoise;
     env.fbm = fbm;
     env.bayer = bayer;

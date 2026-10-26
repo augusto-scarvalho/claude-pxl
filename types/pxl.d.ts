@@ -317,8 +317,8 @@ declare global {
     as?: PxAs }
   /** How draw3d() draws a solid: rays to its surface (surface()), voxels(), splats() or a mesh() of its surface; the splats' and the mesh's shadow its field's. */
   type PxAs = "surface" | "voxels" | "splats" | "mesh";
-  /** draw3d()'s options: the view, where the world stands, its materials and light, a ray a block, these parts only; how its solids are drawn (`as`), the cell of voxels and of a mesh (`size`, m, 0.1), the splats' spacing. */
-  interface PxDraw3dOpts { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view" | "mesh"; pixel?: number; only?: string[]; as?: PxAs; size?: number; spacing?: number }
+  /** draw3d()'s options: the view, where the world stands, its materials and light, a ray a block, these parts only; how its solids are drawn (`as`), the cell of voxels and of a mesh (`size`, m, 0.1), the splats' spacing; more of surface()'s options (`surface`: soft, outline, rim, ao, shadows). */
+  interface PxDraw3dOpts { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view" | "mesh"; pixel?: number; only?: string[]; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown> }
   /** A figure's pose, the file's own numbers: each foot [forward, right] on the floor from under the pelvis (left, right), lifted; the pelvis down; leaning forward and to the right (deg); the hips turned from the heading, the shoulders against them, the head against those (deg, clockwise from above); each hand [forward, right, up] from its shoulder. Other keys pass to parts(). */
   interface PxPose { feet?: number[][]; lift?: number[]; down?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; [k: string]: unknown }
   /** A piece of a figure's part: a field, and its paint: a material (a ramp of keys or a name in mats) or (h along it 0..1, a round it from the way the body faces, outside) => one. */
@@ -724,7 +724,7 @@ declare global {
    * else their index), a group of them; through an orthographic view or a perspective() camera; the east
    * the west flipped where the thing is its own mirror and its light from the picture's middle (mirror: "auto").
    */
-  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number }): PxTurnaround;
+  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown>; draw?: (c: PxCanvas, v: { heading: string; screen(p: number[]): number[]; depth(p: number[]): number }) => void; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number }): PxTurnaround;
   /**
    * A figure on the 3D layer: a skeleton (`body`) posed per frame by the file's own `pose(i, heading)`,
    * its parts fields along the bones (`parts(j, pose)`: j.limb, j.ball or fields, each painted by a
@@ -754,7 +754,7 @@ declare global {
   function include(path: string, opts?: { palette?: boolean }): void;
   function rng(seed?: number): () => number;
   /** A number in [0, 1) for a lattice point (integers): the same (i, j) always gives the same. */
-  function hash(i: number, j: number): number;
+  function hash(i: number, j: number, seed?: number): number;
   /** Smooth value noise in [0, 1], one unit a cell. */
   function vnoise(x: number, y: number): number;
   /** Octaves of vnoise, finer and fainter each, in [0, 1] (default 4): billows, clouds, rock. */

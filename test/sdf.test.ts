@@ -223,6 +223,24 @@ sprite("own", { w: 24, h: 24 }, surface(f, { ...O, light: "view" }))`, "t.px.js"
   assert.notEqual(p.image("given").hash(), p.image("plain").hash());
 });
 
+test("turnaround and draw3d: surface passes more of surface()'s options (an outline left off)", () => {
+  const p = loadSource(PAL + `ramps("kgw")
+const F = sdf.sphere(0.4).at(0, 0, 0.4)
+turnaround("a", F, { view: "side", headings: ["s"], mats: { "": "kgw" } })
+turnaround("b", F, { view: "side", headings: ["s"], mats: { "": "kgw" }, surface: { outline: false } })
+sprite("c", { w: 20, h: 20 }, draw3d(F, { view: "side", ppm: 16, at: [0, 0, 0], mats: { "": "kgw" }, surface: { outline: false } }))
+sprite("d", { w: 20, h: 20 }, draw3d(F, { view: "side", ppm: 16, at: [0, 0, 0], mats: { "": "kgw" } }))`, "t.px.js");
+  assert.notEqual(p.image("a_s").hash(), p.image("b_s").hash());
+  assert.notEqual(p.image("c").hash(), p.image("d").hash());
+  assert.match(failure(PAL + `turnaround("e", sdf.sphere(1), { surface: "soft" })`).message, /surface is more of surface/);
+  // drawn by hand after it: a point on its front face where the camera 20 degrees down puts it over the pivot; never mirrored by itself
+  const q = loadSource(PAL + `ramps("kgw")
+turnaround("f", sdf.box([0.6, 0.6, 0.6]).at(0, 0, 0.3), { view: "side", n: 4, mats: { "": "kgw" }, draw: (c, v) => { const [x, y] = v.screen([0, -0.3, 0.3]); c.px(Math.round(x), Math.round(y), "#ff00ff"); if (!(v.depth([0, -1, 0]) > v.depth([0, 1, 0]))) throw new Error("its front is nearer") } })`, "t.px.js");
+  const im = q.image("f_s"), pv = im.pivot!;
+  assert.equal(im.get(pv[0], pv[1] - Math.round(16 * 0.3 * (Math.cos(Math.PI / 9) - Math.sin(Math.PI / 9)))), q.assets.get("f_s")!.pal.resolve("#ff00ff"));
+  assert.equal(q.assets.get("f_e")!.opts.flip, undefined);
+});
+
 test("turnaround: a thing seen from N headings, named by the compass (an iso view's 4 its diagonals), one size, its foot on the pivot; the east mirrored where it can be", async () => {
   const { headingsOf } = await import("../src/core/turnaround.ts");
   assert.deepEqual(headingsOf(4, undefined, true).map((h) => h.name), ["ne", "se", "sw", "nw"]);

@@ -370,8 +370,10 @@ export interface Draw3dOpts {
   only?: string[];
   /** where the world's [0, 0, 0] stands in the view's world (m; through a camera, [x, ahead, up]) */
   at?: number[];
+  /** more of surface()'s options for the solids it draws so (soft, outline, rim, shadows, ao, inner, clean) */
+  surface?: Record<string, unknown>;
 }
-export const DRAW3D_OPTS = ["view", "ppm", "pixel", "light", "mats", "only", "at", "as", "size", "spacing"];
+export const DRAW3D_OPTS = ["view", "ppm", "pixel", "light", "mats", "only", "at", "as", "size", "spacing", "surface"];
 type Drawers = {
   surface: (f: Sdf, o: Record<string, unknown>) => void; splats: (s: Splats | Sdf, o: Record<string, unknown>) => void;
   voxels: (f: Sdf | Voxels, o: Record<string, unknown>) => void; mesh: (view: unknown, faces: { mat: string; pts: V3[] }[], mats: Record<string, unknown>, o: Record<string, unknown>) => void;
@@ -405,7 +407,7 @@ export function drawWorld(thing: unknown, o: Draw3dOpts, d: Drawers): void {
   for (const n of names) {
     const b = W.built(n), f = b.field, as = W.spec.parts[n].as ?? o.as ?? "surface", where = { ...base, at: at(n), mats: own(n), part: n };
     if (!f) continue;
-    if (as === "surface") d.surface(f, where);
+    if (as === "surface") d.surface(f, { ...o.surface, ...where });
     else if (as === "voxels") d.voxels(f, { ...where, size: o.size ?? 0.1 });
     else if (as === "splats") d.splats(f, { ...where, spacing: o.spacing });
     else {

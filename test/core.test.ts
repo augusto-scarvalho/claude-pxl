@@ -731,6 +731,11 @@ test("procedural texture: hash, vnoise and fbm stay in [0, 1], the same for the 
   // and in an art file, under those names
   const p = loadSource(PAL + `sprite("ok", { w: 1, h: 1 }, (c) => c.px(0, 0, hash(1, 2) < 1 && vnoise(0.5, 0.5) <= 1 && fbm(1, 1) <= 1 && bayer(0, 0) > 0 ? "r" : "g"))`, "t.px.js");
   assert.equal(keys(p, "ok"), "r");
+  // hash(i, j) as it always was; a seed a draw of its own (once a third number was dropped: one draw for all)
+  const q = loadSource(PAL + `const a = [hash(3, 4), hash(3, 4, 1), hash(3, 4, 2)]
+sprite("h", { w: 1, h: 1 }, (c) => c.px(0, 0, a[0] === ${latticeHash(3, 4)} && a[1] !== a[2] && a[1] !== a[0] && a.every((v) => v >= 0 && v < 1) ? "r" : "g"))`, "t.px.js");
+  assert.equal(keys(q, "h"), "r");
+  assert.match(failure(PAL + `const z = hash(1, 2, 3, 4)`).message, /hash\(i, j\) or hash\(i, j, seed\)/);
 });
 
 test("solids and shadows: a box drawn where the camera puts it, the face toward the sun lit, its shadow falling away from the sun; a ghost only casts", () => {

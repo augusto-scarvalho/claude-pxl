@@ -882,7 +882,9 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn
   n: 4 })` draws it from each heading, the camera and the light going round it (so every sprite is lit
   from the same side), one size, the pivot at its foot, named by the compass: `house_ne`, `house_se`,
   ... (4 in iso: its diagonals; 8; 16: `n, nne, ne, ene, ...`). Stamp them in any scene; through the
-  HD-2D camera, among `mesh()`'s faces. Something symmetric lit from above or in front mirrors its west
+  HD-2D camera, among `mesh()`'s faces. `surface: { soft: 0.6, rim: 0.85, outline: false }` gives it
+  surface()'s look (a tree's); `draw: (c, v) => ...` draws by hand over each heading where `v.screen(p)`
+  puts a point: what hangs off it (paper streamers under a rope), which a decal, cut at its surface, can't. Something symmetric lit from above or in front mirrors its west
   for its east, as a game flips it (`examples/sdf/turnaround.px.js`): a sprite the game flips is lit
   from straight above.
 - **Out to other tools.** `export3d` writes `.vox`, `.obj`, `.glb` and `.ply`; something that moves,
