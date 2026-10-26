@@ -34,6 +34,7 @@
     "examples/topdown_hero/*.px.js",
     "examples/hd2d/*.{px.js,cube}",
     "examples/nature/*.px.js",
+    "examples/shrine/*.px.js",
     "examples/sdf/*.px.js",
     "SKILL.md",
     "characters.md",

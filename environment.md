@@ -106,6 +106,18 @@ round it.
   going over the loop (16 frames at 220 ms, two sways in the graveyard's 7 s) (a clump's tip
   fluttering twice as fast, under a pixel, flickered in its tones on fields: `flutter` 0); each tree's frame offset by where it stands, the gust reaching one side
   first.
+- Trees of a species, built in 3D (`examples/nature/trees.px.js`): one way to grow a tree and a
+  spec per species (`make3d.momiji`, `make3d.ginkgo`, `make3d.kuromatsu`): its form (a trunk forking,
+  a maple's; a leader up the middle, a ginkgo's or a pine's), the trunk's fork, lean and kinks, the
+  branches by order (how many, how steep, how long), the foliage at the twigs' ends in airy clusters
+  or flat cloud pads (`layered`: a maple's tiers). `season` (spring, summer, autumn, a pine's winter;
+  bare) picks the leaves, `color` one of an autumn's; `height` is its top; `wind` m (negative: to the west)
+  its sway. A new species: the nearest spec copied, its leaves in `trees.mats`, then
+  `make3d.define("oak", (o) => trees.grow("oak", OAK, o))`. What it took: forked high, a maple's
+  crown read as an acacia's table, its trunk a lollipop's stick; forked under half a meter, its limbs
+  rising 50 degrees then near level, it came down in tiers; small bumps on the clusters (`bump`,
+  `grain`) gave the leaves' texture under the light; a crown wider than the scene allowed hid the
+  path behind it (`height` sets the top, the width follows).
 - A trunk darker than the crown, planted: seen from above, cut at the ground (SLYNYRD); seen from
   the side or at an angle, its foot flared 2-3 px with a root or two. Bark in 1 px stripes, widest
   apart in the middle; a knot. Laying top-down crowns from one clump, importing trees: scenes §4.
@@ -177,6 +189,13 @@ Wooden decks, piers and planked hulls at the sprites' scale: scenes §7 (the har
 Cobbles of 6-9 px (SLYNYRD) or 10-16 x 6-8 (final boss blues), 4 tones; the gap 1 px of a darker
 shade of the ground's hue; one dash of 2-4 px lit on each stone's lit edge, not a lit outline.
 Flagstones of mixed sizes, moss in no more than a third of the joints. Low contrast.
+
+A temple's approach (ishidatami), read on photographs: long slabs laid across the walk in a running
+bond of lengths of their own, a speckled granite in a few tones, moss in some joints; a curb of long
+cut stones, a strip of rounded pebbles, then gravel or moss; a landing of wider slabs before a gate
+or a hall; a bend paved without a seam, the slabs fanning round it. Three straight runs butting into
+each other read as parts joined, not a path: lay it along a `lane()` (`japan.paving()` in
+`examples/nature/japan.px.js`, the shrine's: `examples/shrine/shrine.px.js`).
 
 ## 8. Small things
 

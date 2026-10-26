@@ -63,7 +63,8 @@ look at (`--frames 0-11` for some).
   steps of `s` fan round the bend with no seam, its curbs at `|u|`, gravel raked along it at the same
   distance; wide landings (before a gate, a hall) as rectangles it runs into. Temple paths, read on
   photographs: long slabs across the walk in a running bond, moss in the joints, a curb of long cut
-  stones, then a strip of rounded pebbles.
+  stones, then a strip of rounded pebbles (`japan.paving()` in `examples/nature/japan.px.js`; the
+  shrine's approach, `examples/shrine/shrine.px.js`).
 - Keep small details that dot an area (pebbles, flowers, tufts) out of tiles: baked in, they repeat
   as a pattern. Lay plain tiles, then `scatter(..., { even: true })` the details over them.
 - A tileset (Saint11): draw the master tile, offset it by half (`wrap: true` shows the seams) and fix

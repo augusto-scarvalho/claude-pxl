@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**394 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**395 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -219,7 +219,7 @@ over a still floor no longer read as a plane going by or a loop that closes.
 
 ## Examples
 
-41 new example files are finished scenes an agent copies the structure of; each was curated against
+45 new example files are finished scenes an agent copies the structure of; each was curated against
 references until it read right.
 
 | Example | What it teaches |
@@ -239,6 +239,7 @@ references until it read right.
 | [`fonts/`](../examples/fonts) | A 5×7 font for titles. |
 | [`spells`](../examples/spells.px.js) | The spell kit's sheet: nine elements at three tiers, each cast one call, lighting a dusk and blooming. |
 | [`spell_variants`](../examples/spell_variants.px.js) | The spell kit's variants (an iceberg, a glacier, a blizzard, a nova; a spire, a boulder, a quake, a slide; a meteor, waves, a chain, blades, a rain of light, grasping shadows, leaves) and four spells seen from the side, from above, in isometric and through a perspective camera. |
+| [`shrine/`](../examples/shrine), [`nature/trees`](../examples/nature/trees.px.js), [`nature/japan`](../examples/nature/japan.px.js) | A Japanese shrine courtyard in autumn, top-down: a miko on `rig3d` (a hybrid head) sweeping leaves along a temple path laid by `lane()`, a torii, a hall, lanterns and kitsune drawn in 3D by `turnaround` under one sun; a kit of tree species (momiji, ginkgo, kuromatsu) in every season, built on one shared grower; the Japanese ground (ishidatami, raked gravel, stepping stones). |
 
 ## Speed, size and reliability
 
