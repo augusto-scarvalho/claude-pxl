@@ -101,7 +101,7 @@ export const SIGNATURES: Record<string, string> = {
   bump: "?shape:s opts:o",
   normals: "x:n y:n str:s",
   lighting: "?opts:o",
-  glow: "keys:S ?opts:o",
+  glow: "keys:M ?opts:o",
   post: "?opts:o",
 };
 
@@ -204,6 +204,7 @@ function checkArgs(name: string, args: unknown[]): void {
       case "s": if (typeof v !== "string") bad("a string"); break;
       case "t": if (typeof v !== "string" && typeof v !== "number") bad("text"); break;
       case "S": if (typeof v !== "string" && !Array.isArray(v)) bad('colors like "abc" or ["a","b"]'); break;
+      case "M": if (typeof v !== "string" && !Array.isArray(v) && !(typeof (v as { ramp?: unknown })?.ramp === "string" || Array.isArray((v as { ramp?: unknown })?.ramp))) bad('colors like "abc" or ["a","#f2b450"], or a 3D material ({ ramp })'); break;
       case "a": if (!Array.isArray(v)) bad("an array of numbers"); break;
       case "o": if (typeof v !== "object" || v === null || Array.isArray(v)) bad("an options object"); break;
       case "b": if (typeof v !== "boolean") bad("true/false"); break;

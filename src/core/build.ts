@@ -273,7 +273,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
       return;
     }
     if (name === "glow") {
-      base.data.set(applyGlow(base, args[0] as string | string[], (args[1] ?? {}) as GlowOpts, pal, keyed()).data);
+      base.data.set(applyGlow(base, args[0] as Parameters<typeof applyGlow>[1], (args[1] ?? {}) as GlowOpts, pal, keyed()).data);
       snap?.("glow", loc);
       return;
     }

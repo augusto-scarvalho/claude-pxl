@@ -978,7 +978,8 @@ declare global {
   function bump(shape?: PxBumpShape, opts?: PxBump): PxOp;
   function normals(x: number, y: number, str: string): PxOp;
   function lighting(opts?: PxLighting): PxOp;
-  function glow(keys: string | string[], opts?: PxGlow): PxOp;
+  /** A halo round every pixel of these keys or colors, or of a 3D material (its ramp: glow(trees.mats.sakura_blossom)). */
+  function glow(keys: string | string[] | { ramp: string | string[] }, opts?: PxGlow): PxOp;
   /** The camera's after-effects on the whole picture (HD-2D): depth of field by mesh()'s depth, bloom, haze, vignette. After the mesh(), in the sprite or scene itself. */
   function post(opts?: PxPost): PxOp;
 }

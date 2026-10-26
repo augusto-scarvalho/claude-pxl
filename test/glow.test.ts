@@ -68,3 +68,12 @@ test("glow: after lighting(), lit pixels still glow by their palette key", () =>
   assert.ok(red(p, 12, 0) > 0, "halo around the dimmed red pixel");
   assert.ok(red(p, 10, 0) < 255, "the lit source keeps its lit color");
 });
+
+test("glow: a 3D material glows by its ramp, drawn in colors that are no palette key", () => {
+  const lamp = (glow: string) => loadSource(PAL + `const LAMP = { ramp: ["#f2b450", "#ffeab0"] }
+scene("s", { w: 20, h: 20, bg: "k" }, surface(sdf.sphere(0.15).mat("lamp"), { view: "side", ppm: 20, at: [10, 13], mats: { lamp: LAMP }, outline: false }), ${glow})`, "t.px.js");
+  const dark = lamp("px(0, 0, \"k\")").image("s").get(10, 18), lit = lamp("glow(LAMP, { r: 6, strength: 1 })").image("s");
+  assert.ok((lit.get(10, 18) >>> 24) > (dark >>> 24), "the ground under the lamp in its halo");
+  assert.equal(lamp('glow(["#f2b450", "#ffeab0"], { r: 6, strength: 1 })').image("s").hash(), lit.hash(), "the same as its colors");
+  assert.match(failure(PAL + 'scene("s", { w: 4, h: 4 }, glow({ colors: "r" }))').message, /a 3D material \(\{ ramp \}\)/);
+});

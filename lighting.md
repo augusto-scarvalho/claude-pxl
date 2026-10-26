@@ -137,6 +137,9 @@ The halo lifts everything in reach, what the glowing thing is made of too: the l
 under a fire turn to one tan blob. `keep: "WuK"` leaves those keys as drawn (give them keys of their
 own, or whatever shares them near the fire stays unlit too).
 
+A thing drawn in 3D in a material of colors (a kit's, clear of the scene's keys) glows by that
+material: `glow(kit.mats.lamp, { r: 5 })` takes its ramp.
+
 ## Tips
 
 - Look at the result with `PXL shot`, and at the light alone in describe's LIGHT map (brightness

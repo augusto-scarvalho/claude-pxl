@@ -407,7 +407,9 @@ draws the edges' dark rims across the terrain. `shrink: 2` takes 32px tiles to 1
 `glow(keys, { where, r = 6, strength = 0.5, color, bands, ramp, keep })` goes directly in a sprite or
 scene body (like `lighting`) and works on everything drawn before it: every pixel whose color is
 one of `keys` spills a halo onto the opaque pixels within `r`, falling off with distance. The
-glowing pixels themselves are left as they are, and transparent pixels stay empty.
+glowing pixels themselves are left as they are, and transparent pixels stay empty. `keys` are palette
+keys, colors (`["#f2b450", "#ffeab0"]`) or a 3D material as `surface()` takes it, its ramp of keys or
+colors: `glow(kit.mats.lamp)` lights what was drawn in it, the scene's keys untouched.
 
 | Option | Meaning |
 |---|---|

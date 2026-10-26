@@ -9,12 +9,13 @@ import type { Palette } from "./palette.ts";
 import { bayer, colorList, regionPred } from "./util.ts";
 
 /**
- * Return `img` with a halo around every pixel whose color is one of `keys`. `keyed` gives each
- * pixel's palette color when `img` has left the palette (lit by lighting()); defaults to img.
+ * Return `img` with a halo around every pixel whose color is one of `keys` (keys or colors, or a 3D
+ * material's: its ramp, what surface() drew it in). `keyed` gives each pixel's palette color when `img`
+ * has left the palette (lit by lighting()); defaults to img.
  */
-export function applyGlow(img: Img, keys: string | string[], o: GlowOpts, pal: Palette, keyed: Uint32Array = img.data): Img {
+export function applyGlow(img: Img, keys: string | string[] | { ramp: string | string[] }, o: GlowOpts, pal: Palette, keyed: Uint32Array = img.data): Img {
   const src = new Set<Color>();
-  for (const k of colorList(keys)) {
+  for (const k of colorList(typeof keys === "object" && !Array.isArray(keys) ? keys.ramp : keys)) {
     const c = pal.resolve(k);
     if (c !== null && c !== TRANSPARENT) src.add(c);
   }
