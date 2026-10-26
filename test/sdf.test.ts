@@ -248,3 +248,18 @@ const I = turnaround("i", F(0), { view: "iso", n: 4, mats: { "": "kgw" } })`, "t
   for (let y = 0; y < im.h; y++) for (let x = 0; x < im.w; x++) if ((im.get(x, y) & 255) > 0) low = y;
   assert.ok(Math.abs(pv[0] - (s0 + s1 + 1) / 2) <= 1 && low >= pv[1] - 1 && low <= pv[1] + 3, `pivot ${pv}, columns ${s0}..${s1}, lowest row ${low}`);
 });
+
+test("surface: a material's hems hang under it, its strokes lighter where the sun is, a back rim at least that far up its ramp", () => {
+  const draw = (mat: string, o = "") => keys(loadSource(PAL + `sprite("a", { w: 24, h: 24 }, surface(sdf.box([0.6, 0.4, 0.4]).at(0, 0, 0.5), { view: "side", ppm: 24, at: [12, 20], mats: { m: ${mat} }${o} }))`, "t.px.js"), "a").split("\n");
+  const plain = draw('"kgrw"'), low = (rows: string[]) => Math.max(...rows.flatMap((r, y) => (/[^.]/.test(r) ? [y] : [])));
+  const hem = draw('{ ramp: "kgrw", hem: 2 }'), under = hem.slice(low(plain) + 1).join("");
+  assert.ok(low(hem) > low(plain) && low(hem) <= low(plain) + 2, "hems 1 to 2 px under it");
+  assert.ok(/[^.]\.[^.]/.test(hem[low(plain) + 1]) && under.replace(/\./g, "").length < under.length / 2, "every other column");
+  const st = draw('{ ramp: "kgrw", strokes: 2 / 24 }');
+  assert.ok(st.join("") !== plain.join("") && st.every((r, y) => [...r].every((ch, x) => (ch === ".") === (plain[y][x] === "."))), "strokes: tones, not the shape");
+  // a ball lit from behind on the left: where it is open left and up, the top of its ramp (9)
+  const ball = (o: string) => keys(loadSource(PAL + `sprite("a", { w: 24, h: 24 }, surface(sdf.sphere(0.35).at(0, 0, 0.4), { view: "side", ppm: 24, at: [12, 20], light: [-1, 1, 0.4], mats: { m: "0123456789" }${o} }))`, "t.px.js"), "a");
+  const [b0, b1] = [ball(""), ball(", rim: 1")];
+  assert.ok(!b0.includes("9") && b1.includes("9") && b1.replace(/9/g, "").length > b1.length - 8, "rim 1: the edge's corners toward the light the ramp's top, a few of them");
+  assert.match(failure(PAL + 'sprite("a", { w: 9, h: 9 }, surface(sdf.sphere(0.2), { mats: { m: { ramp: "kw", hem: 1.5 } } }))', "a").message, /hem whole px/);
+});

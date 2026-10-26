@@ -227,6 +227,7 @@ Flagstones of mixed sizes, moss in no more than a third of the joints. Low contr
 | `pine(name, h, seed)` | a conifer h px tall (§3): `_pine` 68, `_pine_m` 60, `_pine_s` 52, `_pine_far` hazed |
 | `deadTreeVolume(name, h, seed, { frames, fps, sway })` | the dead tree built as limbs in 3D, swaying a little (§3): `_snag` |
 | `pineVolume(name, h, seed, { frames, fps, sway })` | the same conifer built as volumes in 3D and swaying in the wind (§3): `_spruce` 68, `_spruce_m` 60, `_spruce_s` 52, `_spruce_far` hazed; a scene picks each one's `frame` |
+| `make3d.spruce({ h, seed, sway })`, `make3d.snag({ h, seed, sway })` | the same spruce and dead tree on fields (`make3d.define`), drawn by `surface()` from 20 degrees up (`hem`, `strokes`, `rim: 0.85`), to compare: `_spruce_3d`, `_spruce_m_3d`, `_spruce_s_3d`, `_spruce_far_3d`, `_snag_3d` |
 | `bush(name, w, lobes, seed)` | a bush of lobes `[x, y, r, back]` (§4): `_bush`, `_bush_b`, `_bush_c` |
 | `rampart(name, overhang)` | a 48x29 stone wall face (§6): `_rampart` with grass over its head, `_riser` without |
 | `_flags` | 48x48 flagstones (§7) |

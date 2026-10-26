@@ -212,6 +212,49 @@ pineVolume("_spruce", 68, 3)
 pineVolume("_spruce_m", 60, 5)
 pineVolume("_spruce_s", 52, 9)
 anim("_spruce_far", { base: "_spruce_m", swap: { Z: "#3b4260", z: "#405468", x: "#4b6866", c: "#567763", v: "#6a8865", V: "#879d6c", J: "#b6bc8c" } })
+// The same spruce on fields (beside the hand one, to compare): make3d.define, a builder of this file's,
+// of the hand one's parts in meters at 24 px a meter ([x, ahead, up]: its px x, toward us and up turned
+// so), the ellipsoids turned each to its branch, the trunk a cone, swaying as the hand one does (the
+// trunk bent with the square of the height, each branch's tip fluttering twice as fast); drawn by
+// surface() from 20 degrees up at 24 px a meter, as the billboard is: the sun behind on the left lighting
+// its edge (rim: 0.85), no self-shadow, no outline, the hems hanging in points, the needles in strokes.
+const fromPx = ([x, y, z]) => [x / 24, -z / 24, y / 24]
+// an ellipsoid of radii rr along the ways e1 and e2 (and their cross), at C: one turn about an axis takes it there
+const ellipsoidAlong = (rr, e1, e2, C) => {
+  const { unit, cross } = vec, a = unit(e1), b = unit(e2), c = cross(a, b), th = Math.acos(Math.max(-1, Math.min(1, (a[0] + b[1] + c[2] - 1) / 2)))
+  let ax = [b[2] - c[1], c[0] - a[2], a[1] - b[0]]
+  if (Math.hypot(...ax) < 1e-6) ax = th < 0.1 ? [0, 0, 1] : [[a[0] + 1, a[1], a[2]], [b[0], b[1] + 1, b[2]], [c[0], c[1], c[2] + 1]].sort((u, v) => Math.hypot(...v) - Math.hypot(...u))[0]
+  return sdf.ellipsoid(rr).rotate((th * 180) / Math.PI, ax).at(C)
+}
+make3d.define("spruce", ({ h = 68, seed = 3, sway = 1.6 }) => {
+  const P = (20 * Math.PI) / 180, CP = Math.cos(P), Hw = (h - 1.5) / CP, y0 = 0.17 * Hw, T = Math.max(4, Math.round(h / 12)), Rmax = 19, { unit } = vec
+  const r = rng(seed), clumps = [], cores = []
+  for (let t = 0; t < T; t++) {
+    const f = t / T, sp = ((Hw * 0.84 - y0) * 0.95) / T, yb = y0 + sp * t, th = sp * 1.3, R = 3.5 + (Rmax - 3.5) * Math.pow(1 - f, 1.1)
+    cores.push(sdf.ellipsoid([R * (0.45 - 0.15 * f), R * (0.45 - 0.15 * f), th * 0.55].map((v) => v / 24)).at(0, 0, (yb + th * 0.5) / 24))
+    const K = Math.round(5 + R / 2.4), a0 = r() * 6.28
+    for (let k = 0; k < K; k++) {
+      const a = a0 + (k * 6.28) / K + (r() - 0.5) * 0.4, out = [Math.sin(a), 0, Math.cos(a)], rho = R * (0.5 + r() * 0.08), flick = r() * 6.28
+      const droop = 0.5 + 0.8 * f * f + r() * 0.15, C = fromPx([out[0] * rho, yb + th * 0.32 - droop * rho * 0.3, out[2] * rho])
+      clumps.push(ellipsoidAlong([R * 0.55, Math.max(1.5, ((3.14 * rho) / K) * 1.15), th * 0.28].map((v) => v / 24), fromPx(unit([out[0], -droop, out[2]])), fromPx([Math.cos(a), 0, -Math.sin(a)]),
+        (c) => [C[0] + (0.35 / 24) * Math.sin(4 * Math.PI * c.phase + flick), C[1], C[2]]))
+    }
+  }
+  // the spire: a narrow cone of three, the leader at its tip
+  for (const [y, rad, hh] of [[Hw * 0.86, 3.4, 4.5], [Hw * 0.93, 2.2, 3.5], [Hw - 1.8, 0.9, 2.2]]) cores.push(sdf.ellipsoid([rad / 24, rad / 24, hh / 24]).at(0, 0, y / 24))
+  const crown = sdf.union([...cores, ...clumps]).mat("needles"), trunk = sdf.cone(1.7 / 24, (Hw * 0.8) / 24, 0.98 / 24).union(sdf.cylinder(2.7 / 24, 1.5 / 24)).mat("bark")
+  const H = Hw / 24, bend = (c) => (2 * (sway / 24) * (0.45 + 0.55 * Math.sin(2 * Math.PI * c.phase))) / (H * H)
+  return { field: trunk.part("trunk").union(crown.part("crown")).bend(bend), parts: { trunk, crown } }
+}, { params: { h: [20, 160], sway: [0, 6] } })
+const spruce3d = (name, h, seed, { frames = 16, fps = 1000 / 220 } = {}) => {
+  const W = 42, ST = make3d.spruce({ h, seed })
+  anim(name, { w: W, h, pivot: "bottom", frames, fps }, surface(ST.field, { view: "side", ppm: 24, at: [W / 2, h - 0.5], light: [-0.55, 0.55, 0.62], soft: 0.6, rim: 0.85, shadows: false, outline: false,
+    mats: { needles: { ramp: "ZzxcvVJ", strokes: 4 / 24, hem: 2 }, bark: "ads" } }))
+}
+spruce3d("_spruce_3d", 68, 3)
+spruce3d("_spruce_m_3d", 60, 5)
+spruce3d("_spruce_s_3d", 52, 9)
+anim("_spruce_far_3d", { base: "_spruce_m_3d", swap: { Z: "#3b4260", z: "#405468", x: "#4b6866", c: "#567763", v: "#6a8865", V: "#879d6c", J: "#b6bc8c" } })
 // Bushes after SLYNYRD (Pixelblog 44, 51) and Saint11: lobes of leaf clusters (2x2, or 3 px in an L),
 // each lobe on a fill of its dark, a dark crescent on its shadow side and a step lighter toward its lit
 // one, the light tone kept to a pixel or two (they stand in the wall's shade), the back lobes a step
@@ -511,5 +554,20 @@ const deadTreeVolume = (name, h, seed, { frames = 16, fps = 1000 / 220, sway = 1
   })
 }
 deadTreeVolume("_snag", 76, 4)
+// The same dead tree on fields (beside the hand one, to compare): its limbs (deadTreeLimbs) as tapering
+// rods in meters, the bark in dashes a step darker on the trunk and the big limbs, swaying as the hand
+// one does; drawn by surface() from 20 degrees up at 24 px a meter, the sun behind on the left.
+make3d.define("snag", ({ h = 76, seed = 4, sway = 1 }) => {
+  const { segs, top } = deadTreeLimbs(h, seed), near = {}
+  // (in bunches half a meter across: a point far from a bunch's box skips its rods)
+  for (const [A, B, ra, rb, lvl] of segs) {
+    const rod = sdf.capsule(fromPx(A), fromPx(B), ra / 24, rb / 24)
+    ;(near[`${Math.floor((A[0] + B[0]) / 24)},${Math.floor((A[1] + B[1]) / 24)}`] ??= []).push(ra + rb < 1.8 ? rod.mat("twig") : lvl === 0 && ra > 1.8 ? rod.paint("dash", (p, n) => hash(Math.floor((p[2] * 24) / 2.5), Math.floor(Math.atan2(-n[1], n[0]) * 2)) < 0.2) : rod)
+  }
+  const H = top / 24, bend = (c) => (2 * (sway / 24) * (0.4 + 0.6 * Math.sin(2 * Math.PI * c.phase))) / (H * H)
+  return { field: sdf.union(Object.values(near).map((g) => sdf.union(g))).mat("bark").bend(bend) }
+}, { params: { h: [20, 160], sway: [0, 6] } })
+anim("_snag_3d", { w: 76, h: 76, pivot: "bottom", frames: 16, fps: 1000 / 220 }, surface(make3d.snag({ h: 76, seed: 4 }).field, { view: "side", ppm: 24, at: [38, 75.5],
+  light: [-0.55, 0.55, 0.62], soft: 1, ao: 0, rim: 0.85, shadows: false, mats: { bark: "bBiiI", dash: "bbBii", twig: "BB" } }))
 // All of it on one sheet, to look at (pxl build writes it).
 sheet("nature", ["_grass", "_turf", "_pine", "_pine_m", "_pine_s", "_pine_far", "_bush", "_bush_b", "_bush_c", "_rock", "_rock_small", "_tuft_a", "_tuft_b", "_tuft_c", "_flowers_w", "_flowers_p", "_deadtree", "_rampart", "_riser", "_flags"], { pad: 2 })

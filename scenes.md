@@ -807,7 +807,8 @@ Pick one and keep everything in it (a 45° oblique bridge among isometric blocks
 ## 17. 3D as code (fields, voxels, volumes, splats, decals)
 
 A thing that turns, sways or is seen from several cameras can be described once in meters with `sdf`
-and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). What held, from building them:
+and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn so (the nature kit's
+`_spruce_3d`, `_snag_3d`): a material's `hem` and `strokes`, a back light's `rim: 0.85`. What held, from building them:
 
 - **Four kinds, never one.** A distance (`sdf.*`) for solid forms, drawn by `surface()`, `voxels()`
   or `mesh()`; a density (`sdf.density`) for air (mist, smoke, cloud), drawn by `volume()`; an

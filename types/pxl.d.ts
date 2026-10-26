@@ -259,9 +259,10 @@ declare global {
   type PxSurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number; origin?: [number, number]; grid?: boolean } | PxView;
   /** surface()'s options: the view (orthographic at ppm px to the meter, its origin at `at` px; or a perspective() view, standing `at` [x, z, up] m), the materials' ramps, the light, the outline, the rim, its own shadows, the creases, a ray to K x K px, its shadow on what is drawn. */
   interface PxSurfaceOpts {
-    view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number }>;
+    /** a material: its ramp, a glint (shine), strokes m apart lighter where the sun is (needles), hem px hanging in points under it */
+    view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number; strokes?: number; hem?: number }>;
     /** the way toward the light; "view": its view's own (from the upper left) where look3d() gives another; "mesh": the light of the mesh() drawn before it with a sun (its way, sun, sky and lamps) */
-    light?: number[] | "view" | "mesh"; /** the light wrapped round the form, 0..1: a side square to it lit soft / (1 + soft) */ soft?: number; outline?: boolean | PxColor; /** a line where one part lies in front of another, on the one behind: a key, or true (the outline's) */ inner?: boolean | PxColor; rim?: boolean; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
+    light?: number[] | "view" | "mesh"; /** the light wrapped round the form, 0..1: a side square to it lit soft / (1 + soft) */ soft?: number; outline?: boolean | PxColor; /** a line where one part lies in front of another, on the one behind: a key, or true (the outline's) */ inner?: boolean | PxColor; /** a step lighter toward the light; a number: where open both ways it comes from, at least that share up the ramp (a sun behind) */ rim?: boolean | number; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
     /** through a camera: its shadow alone (a mesh made of it in its place) */
     hide?: boolean;
     /** the name of the part it is (pxl steps --at) */

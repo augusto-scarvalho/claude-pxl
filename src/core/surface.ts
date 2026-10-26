@@ -23,7 +23,13 @@ import { type Lit, shine } from "./sunlight.ts";
 
 /** A view: a name, or { kind, yaw, pitch, origin, grid } (`origin`: where the world's [0, 0, 0] lands, px; with it `at` is [x, y, z] m; `grid`: on voxels' pixel grid), or a perspective() view. */
 export type SurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number; origin?: [number, number]; grid?: boolean } | View;
-export interface SurfaceMat { ramp: string | string[]; shine?: number }
+/**
+ * A material: its ramp dark to light; `shine` a glint where the light reflects toward the eye (0..1);
+ * `strokes` its sunlit part a step lighter in strokes that far apart (m), a quarter of that wide, across
+ * the way round its upright (needles along a branch); `hem` px of it hanging in points under it where
+ * nothing is below, every other column, a step darker a px (a conifer's tiers)
+ */
+export interface SurfaceMat { ramp: string | string[]; shine?: number; strokes?: number; hem?: number }
 export interface SurfaceOpts {
   view?: SurfaceView;
   /** px to the meter (an orthographic view; default 16) */
@@ -38,8 +44,8 @@ export interface SurfaceOpts {
   outline?: boolean | string;
   /** a line where one part lies in front of another, on the one behind (each part outlined against the others, as a figure's limbs): a key, or true (the outline's); between pieces of one part (`.part()`s inside it: locks of hair) its own darkest tone */
   inner?: boolean | string;
-  /** the contour toward the light a step lighter (default true) */
-  rim?: boolean;
+  /** the contour toward the light a step lighter (default true); a number: where it is open both ways the light comes from (across and up or down), at least that share up its ramp (0..1: a sun behind lighting its edge, 0.85) */
+  rim?: boolean | number;
   /** the light wrapped round the form, 0..1 (default 0): a side square to it lit as much as `soft` / (1 + soft) of the full (a figure's broad light) */
   soft?: number;
   /** shadows the field casts on itself (default true) */
@@ -357,6 +363,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   if (!(aoK >= 0 && aoK <= 1) || !(castK >= 0 && castK <= 1)) throw new PxError(`${who}: ao and cast are 0..1, got ${JSON.stringify([o.ao, o.cast])}`);
   const soft = o.soft ?? 0;
   if (!(soft >= 0 && soft <= 1)) throw new PxError(`${who}: soft is 0..1, how far the light wraps round the form, got ${JSON.stringify(o.soft)}`);
+  if (!(o.rim === undefined || typeof o.rim === "boolean" || (typeof o.rim === "number" && o.rim >= 0 && o.rim <= 1))) throw new PxError(`${who}: rim is true, false or 0..1 (the share up its ramp the lit edge takes at least), got ${JSON.stringify(o.rim)}`);
   if (o.clean !== undefined && typeof o.clean !== "boolean") throw new PxError(`${who}: clean is true or false, got ${JSON.stringify(o.clean)}`);
   const origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
   if (origin !== undefined && !(Array.isArray(origin) && origin.length === 2 && origin.every(Number.isFinite))) throw new PxError(`${who}: view's origin is where the world's [0, 0, 0] lands, [x, y] px, got ${JSON.stringify(origin)}`);
@@ -364,13 +371,16 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
     throw new PxError(`${who}: at is ${persp ? "where it stands, [x, z, up] m" : "where its origin lands, [x, y] px, or where it stands in the view's world, [x, y, z] m"}, got ${JSON.stringify(o.at)}`);
   // the materials: each a ramp of resolved colors, dark to light, and its glint
   const names = Object.keys(o.mats ?? {});
-  const ramps: Color[][] = [], shines: number[] = [];
+  const ramps: Color[][] = [], shines: number[] = [], strokes: number[] = [], hems: number[] = [];
   const mat = (spec: unknown, name: string) => {
     const s = (typeof spec === "string" || Array.isArray(spec) ? { ramp: spec } : spec) as SurfaceMat;
     const keys = typeof s?.ramp === "string" ? [...s.ramp] : s?.ramp;
     if (!Array.isArray(keys) || !keys.length) throw new PxError(`${who}: material '${name}' is a ramp of keys dark to light ("asdf"), or { ramp, shine }, got ${JSON.stringify(spec)}`);
     ramps.push(keys.map((k) => { const col = c.color(k); if (col === null || col === TRANSPARENT) throw new PxError(`${who}: material '${name}': '${k}' is not a color`); return col; }));
     shines.push(s.shine ?? 0);
+    if (!(s.strokes === undefined || s.strokes > 0) || !(s.hem === undefined || (Number.isInteger(s.hem) && s.hem >= 0))) throw new PxError(`${who}: material '${name}': strokes is m apart (above 0), hem whole px (0 up), got ${JSON.stringify([s.strokes, s.hem])}`);
+    strokes.push(s.strokes ?? 0);
+    hems.push(s.hem ?? 0);
   };
   if (names.length) names.forEach((n) => mat(o.mats![n], n));
   else if (c.pal.ramps.length) mat(c.pal.ramps[0], "the palette's first ramp");
@@ -447,6 +457,11 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
         const dn = dot(r.d, n), rf: V3 = [r.d[0] - 2 * dn * n[0], r.d[1] - 2 * dn * n[1], r.d[2] - 2 * dn * n[2]];
         if (sun > 0) lv += shines[k] * Math.max(0, dot(rf, L)) ** 12;
       }
+      // needles in strokes: the sunlit part a step lighter in bands across the way round the upright
+      if (strokes[k] > 0 && sun > 0.15 && lv < 0.85) {
+        const th = Math.hypot(n[0], n[1]) || 1, u = (p[0] * -n[1] + p[1] * n[0]) / th / strokes[k];
+        if (u - Math.floor(u) < 0.25) lv += 0.09;
+      }
       tone[i] = Math.max(0, Math.min(ramp.length - 1, Math.round(lv * (ramp.length - 1))));
     }
   // tones in clusters: a cell whose tone none of its four neighbours of the same material share takes
@@ -462,6 +477,20 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       if (best !== undefined) tone[i] = best;
     }
 
+  // hems: under a material that hangs, where nothing is below, every other column a point of it 1 to
+  // `hem` px long, a step darker each px, as deep as what it hangs from
+  if (hems.some((v) => v > 0))
+    for (let gy = GH - 2; gy >= 0; gy--)
+      for (let gx = 0; gx < GW; gx++) {
+        const i = gy * GW + gx, k = m[i];
+        if (k < 0 || !hems[k] || m[i + GW] >= 0 || (gx + gy) % 2) continue;
+        for (let d = 1, n = 1 + (((gx >> 1) + gy) % hems[k]); d <= n && gy + d < GH && m[i + d * GW] < 0; d++) {
+          const j = i + d * GW;
+          m[j] = k; tone[j] = Math.max(0, tone[i] - d); depth[j] = depth[i]; hidden[j] = hidden[i]; pt[j] = pt[i];
+          nrm[j * 3] = nrm[i * 3]; nrm[j * 3 + 1] = nrm[i * 3 + 1]; nrm[j * 3 + 2] = nrm[i * 3 + 2];
+          if (wpos) { wpos.set(wpos.subarray(i * 3, i * 3 + 3), j * 3); wsun![j] = wsun![i]; }
+        }
+      }
   // the contour: a cell with nothing beside it, or something far behind; lit toward the light,
   // outlined away from it (not a part a cell thin: it keeps its tone)
   const gap = persp ? 0.25 : Math.max(0.15, 3 / scale);
@@ -518,16 +547,16 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       if (m[i] < 0 || hidden[i] || o.hide) continue;
       const ramp = ramps[m[i]];
       let col = ramp[tone[i]];
-      let toward = false, away = false;
+      let toward = false, away = false, both = 0;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         if (!open(gx + dx, gy + dy, i)) continue;
-        if (dx * lx + dy * ly > 0) toward = true;
+        if (dx * lx + dy * ly > 0) { toward = true; both += dx * lx > 0 || dy * ly > 0 ? (dx ? 1 : 2) : 0; }
         else if (!open(gx - dx, gy - dy, i)) away = true;
       }
       const seam = innerOn && !(o.clean && twice(gx, gy, i)) ? behind(gx, gy, i) : 0;
       if (seam) col = seam === 2 ? ramp[0] : innerKey ?? ramp[0];
       else if (away && o.outline !== false) col = outKey ?? ramp[0];
-      else if (toward && o.rim !== false) col = ramp[Math.min(ramp.length - 1, tone[i] + 1)];
+      else if (toward && o.rim !== false) col = ramp[Math.min(ramp.length - 1, Math.max(tone[i] + 1, typeof o.rim === "number" && both === 3 ? Math.round(o.rim * (ramp.length - 1)) : 0))];
       // the normal as the picture sees it (x right, y down, z toward the eye)
       const n: V3 = [nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]], nx = dot(n, R), ny = -dot(n, U), nz = -dot(n, F);
       // in the world's light, as mesh() lights its sprites: the art's tone times the sky's and the sun's
