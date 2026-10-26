@@ -70,7 +70,8 @@ const HEADSETS = {
 }
 const VIEWS = ["s", "sw", "w", "nw", "n"], ANCHOR = { s: [7, 5], sw: [8, 5], w: [5, 5], nw: [8, 5], n: [7, 5] }   // the traveler's
 // each a views() set on the traveler's anchors, its rows held to his (pxl check)
-for (const [set, heads] of Object.entries(HEADSETS)) views(`_${set}_head`, heads, { anchor: ANCHOR, like: "_tr_head" })
+// (the bald one's beard hangs below his chin, row 10 as everyone's)
+for (const [set, heads] of Object.entries(HEADSETS)) views(`_${set}_head`, heads, { anchor: ANCHOR, like: "_tr_head", ...(set === "bd" ? { chin: 10 } : {}) })
 
 // ---------------------------------------------------------------- the outfits
 // What each wears, over the same skeleton (the traveler's TRAVELER for what isn't said): no cloak for

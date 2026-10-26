@@ -39,7 +39,8 @@ type Node =
   | { op: "mat"; of: Sdf; name: string }
   | { op: "paint"; of: Sdf; name: string; where: (p: V3, n: V3) => unknown }
   | { op: "paintBy"; of: Sdf; by: (p: V3, n: V3) => unknown }
-  | { op: "part"; of: Sdf; name: string };
+  | { op: "part"; of: Sdf; name: string }
+  | { op: "fn"; d: (x: number, y: number, z: number) => number; lo: V3; hi: V3; lip: number; id: number };
 
 /** A field compiled at one moment: its distance, its material (an index into `mats`, -1 none) and its named part (into `parts`, -1 none) at a point with its normal, its box, its stretch. */
 export interface Compiled {
@@ -259,6 +260,13 @@ export class Appearance {
     return k < 0 ? null : c.mats[k];
   }
 }
+/**
+ * A field given by its distance function itself, in a box, stretching distances by at most `lip` (a
+ * march steps d / lip): what the primitives can't make (rig3d's sweeps: a cloak round a body).
+ */
+let FNS = 0;
+export const fieldOf = (d: (x: number, y: number, z: number) => number, lo: V3, hi: V3, lip = 1): Sdf => new Sdf({ op: "fn", d, lo, hi, lip, id: ++FNS });
+
 /** "a density", "an occupancy". */
 export const article = (w: string) => `${/^[aeiou]/.test(w) ? "an" : "a"} ${w}`;
 function needSdf(f: unknown, what: string): asserts f is Sdf {
@@ -327,6 +335,8 @@ const boxOf = (pts: V3[]): [V3, V3] => [[0, 1, 2].map((e) => Math.min(...pts.map
 class Code {
   lines: string[] = [];
   K: number[] = [];
+  /** distance functions the code calls (a field given by one) */
+  F: ((x: number, y: number, z: number) => number)[] = [];
   private n = 0;
   /** a number of the field, by reference (its value changes with the clock, the code doesn't) */
   k(v: number): string { this.K.push(v); return `K[${this.K.length - 1}]`; }
@@ -334,18 +344,18 @@ class Code {
   v(expr: string, mutable = false): string { const name = `v${this.n++}`; this.lines.push(`${mutable ? "let" : "const"} ${name} = ${expr};`); return name; }
   line(s: string): void { this.lines.push(s); }
 }
-type Factory = (K: number[], smin: (a: number, b: number, k: number) => number, fbm: typeof fbm3) => Fd;
+type Factory = (K: number[], smin: (a: number, b: number, k: number) => number, fbm: typeof fbm3, F: Fd[]) => Fd;
 const FACTORIES = new Map<string, Factory>();
 function written(P: Part, keyOut?: { key: string }): Fd {
   const c = new Code(), r = P.e(c, "x", "y", "z"), src = `return (x, y, z) => {\n${c.lines.join("\n")}\nreturn ${r};\n}`;
   if (keyOut) keyOut.key = `${src}#${c.K.join(",")}`;
   let f = FACTORIES.get(src);
   if (!f) {
-    f = new Function("K", "smin", "fbm3", src) as Factory;
+    f = new Function("K", "smin", "fbm3", "F", src) as Factory;
     if (FACTORIES.size > 256) FACTORIES.clear();
     FACTORIES.set(src, f);
   }
-  return f(c.K, smin, fbm3);
+  return f(c.K, smin, fbm3, c.F);
 }
 
 /** The field at a moment, as functions. Materials are numbered in `mats`. */
@@ -646,6 +656,11 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
         // (the names it gives join `mats` as they come: a renderer looks up those it hasn't seen)
         const C = go(n.of), by = n.by;
         return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c), w = by([x, y, z], [a, b, c]); return typeof w === "string" && w ? v - (v % 1024) + idx(w) + 1 : v; } };
+      }
+      case "fn": {
+        // (its id among the numbers: two such fields are never the same field)
+        const fd = n.d, [lo, hi] = shift(n.lo, n.hi);
+        return { d: fd, m: NONE, lo, hi, lip: n.lip, e: (c, x, y, z) => { c.k(n.id); c.F.push(fd); return c.v(`F[${c.F.length - 1}](${x}, ${y}, ${z})`); } };
       }
       case "part": {
         // its full name: the parts round it first; the innermost names a point

@@ -343,13 +343,92 @@ for (const [move, M] of Object.entries(MOVES)) for (const [d, yaw] of Object.ent
   anim(`bk_${move}_${d}`, { w: W, h: H, pivot: [OX, OY] }, (c) => { const p = M.f(c.frame, yaw); blocks(c, p, yaw); if (M.hand) handAt(c, p, yaw) }, ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })))
 }
 sheet("traveler", ["tr_*", "mo_*"], { rows: "tag", pad: 1 })
-// The same skeleton and moves on the 3D layer (rig3d: its limbs fields, drawn by surface()), as blocks
-// to hold against bk_*: bk3_<move>_<dir>
-rig3d("tr3", {
-  body: { h: 34, heads: 3, hip: HIP, torso: TORSO, neck: NECK + HEADR, thigh: THIGH, shin: SHIN, upper: UPPER, fore: FORE, ankle: 1.2, hips: HIPW, shoulders: [0.5, SHW, -1] },
-  w: W, h: H, pivot: [OX, OY], blocks: "bk3",
-  moves: Object.fromEntries(Object.entries(MOVES).map(([m, M]) => [m, { frames: M.frames, ms: M.ms, pose: (i, h) => M.f(i, 180 - h), ...(M.dirs ? { dirs: M.dirs } : {}),
-    ...(M.hand ? { draw: (c, j) => c.setSocket("hand", ...j.screen(j.arms[j.heading > 180 ? 0 : 1].hand)) } : {}) }])),
-})
+// ---------------------------------------------------------------- on the 3D layer
+// The same skeleton and moves on the 3D layer (rig3d: its parts fields along the bones, drawn by
+// surface()): tr3_<move>_<dir>, and as blocks bk3_<move>_<dir> to hold against bk_*. Painted as his
+// outfit is: the trousers to the cuff and the boots, the far limbs a step darker; the cloak a cloth hung
+// from the shoulders, open in front, trailing and swaying as he walks; the tunic's skirt and its body
+// with the belt and the buckle; the sleeves, the hands; his heads by hand (views()), the dark line under.
+const BODY3 = { h: 34, heads: 3, hip: HIP, torso: TORSO, neck: NECK + HEADR, thigh: THIGH, shin: SHIN, upper: UPPER, fore: FORE, ankle: 1.2, hips: HIPW, shoulders: [0.5, SHW, -1] }
+const MOVES3 = Object.fromEntries(Object.entries(MOVES).map(([m, M]) => [m, { frames: M.frames, ms: M.ms, pose: (i, h) => M.f(i, 180 - h), ...(M.dirs ? { dirs: M.dirs } : {}),
+  ...(M.hand ? { draw: (c, j) => c.setSocket("hand", ...j.screen(j.arms[j.heading > 180 ? 0 : 1].hand)) } : {}) }]))
+const O = TRAVELER, CLOAK3 = O.drapes[0]
+const parts3 = (j, p) => {
+  const farLeg = j.depth(j.legs[0].hip) < j.depth(j.legs[1].hip) ? 0 : 1, farArm = j.depth(j.arms[0].sh) < j.depth(j.arms[1].sh) ? 0 : 1
+  const waist = j.pelvis[2] + 1.4, hips = [j.pelvis[0], j.pelvis[1], 0], top = j.chest[2] + 0.6
+  // the cloak trails behind as he walks, more toward the hem, and swings aside a little after the legs
+  const trail = (h) => { const down = 1 - h; return [0, 1].map((e) => j.f[e] * -(0.3 + 1.1 * p.trail) * down * CLOAK3.trail + j.r[e] * 0.9 * p.sway * down ** 1.5 * CLOAK3.trail) }
+  return {
+    ...Object.fromEntries(j.legs.map((L, i) => { const g = O.legs(i === farLeg); return [`leg${i}`, [j.limb(L.hip, L.knee, 1.6, 1.5, g.tr), j.limb(L.knee, L.ankle, 1.5, 1.4, (h) => (h < O.cuff ? g.tr : g.shin)), j.ball(L.foot, [1.6, 2.3, 1.1], g.foot)]] })),
+    cloak: j.sweep([j.chest[0], j.chest[1], 0], top - CLOAK, top, CLOAK3.radius, { keep: CLOAK3.keep, shift: trail, shell: 0.4, paint: (h, a, out) => (out ? CLOAK3.out : CLOAK3.in) }),
+    // (the belt a pixel and more, so a pixel's middle falls on it)
+    tunic: [j.sweep(hips, waist - 2.4, waist, (h) => 3.6 + 0.6 * (1 - h), { paint: O.skirt }), j.sweep(hips, waist, j.chest[2] + 0.5, (h, a) => (4 - 0.5 * h * h) * (0.84 + 0.16 * Math.abs(Math.sin(a))), { paint: (h, a) => O.body(h < 0.14 ? 0 : h, a) })],
+    ...Object.fromEntries(j.arms.map((A, i) => { const far = i === farArm; return [`arm${i}`, [j.limb(A.sh, A.elbow, 1.1, 1, O.sleeve(far)), j.limb(A.elbow, A.hand, 1, 0.9, O.fore(far)), j.ball(A.hand, 1, O.hand(far))]] })),
+  }
+}
+// lit as he is, from above and toward us, the light wrapped round him (a side square to it half lit)
+const LIT3 = { soft: 0.55 }
+rig3d("tr3", { body: BODY3, w: W, h: H, pivot: [OX, OY], blocks: "bk3", parts: parts3, ink: "k", surface: LIT3, head: "_tr_head", chin: "D", moves: MOVES3 })
+// The outline the 3D layer draws by itself, on the shadow side inside the figure and a lit rim toward
+// the light, to choose against the one all round (tr3o_idle_<dir>)
+rig3d("tr3o", { body: BODY3, w: W, h: H, pivot: [OX, OY], parts: parts3, surface: LIT3, head: "_tr_head", chin: "D", moves: { idle: MOVES3.idle } })
+// An experiment (tr3m_<move>_<dir>): the head modeled too, as the grove's snow spirit is, in his head's
+// frame (x his right, y ahead, z up, px): the skull; the hair a cap over it cut away at the face, with a
+// mass at the nape, a parting, locks of fringe, side locks to the jaw, tufts at the crown, tousled by
+// noise; a nose; a neck. The eyes and the mouth drawn by hand as decals pinned on it, their view picked
+// by how far each turns from us. Turned to 16 directions without drawing a view (tr3m_turn_<dir>).
+sprite("_tr3m_eye", "kk\nGE")
+sprite("_tr3m_eye_l", "kk\nEG")
+sprite("_tr3m_eye_side", "k\nE")
+sprite("_tr3m_mouth", "z")
+const head3 = (j) => {
+  const into = (f) => f.rotate(-j.hd.heading, "z").at(j.head), at = (x, y, z) => [0, 1, 2].map((e) => j.head[e] + j.hd.r[e] * x + j.hd.f[e] * y + (e === 2 ? z : 0))
+  const skull = sdf.ellipsoid([4.6, 5, 5.3]), nose = sdf.sphere(0.8).at(0, 4.8, -1.2)
+  // the cap close on the skull, off the face from the brow down, a mass at the nape, a parting groove;
+  // three locks of fringe ending on the brow, side locks behind the cheeks to the jaw, tufts at the crown
+  const cap = sdf.ellipsoid([5.3, 5.6, 4.8]).at(0, -0.5, 1.2).union(sdf.ellipsoid([4, 2.6, 3]).at(0, -3.4, -1.6), { smooth: 1 })
+    .subtract(sdf.ellipsoid([4.4, 4.8, 4.4]).at(0, 4, -2.3), sdf.capsule([-0.9, 4.4, 4.6], [-0.7, -1.5, 5.6], 0.45), { smooth: 0.4 })
+  const locks = sdf.union(sdf.capsule([-2.4, 3.4, 3.8], [-2.8, 4.9, 1.6], 0.9, 0.5), sdf.capsule([0.6, 3.8, 4], [1, 5.1, 1.9], 0.9, 0.5), sdf.capsule([2.7, 3.2, 3.7], [3.1, 4.5, 1.7], 0.9, 0.5),
+    sdf.capsule([-4.5, 0, 2], [-4.4, 0.3, -3.2], 1, 0.7), sdf.capsule([4.5, 0, 2], [4.4, 0.3, -3.2], 1, 0.7),
+    sdf.capsule([-1.6, 0.4, 5], [-2.4, -0.6, 6.4], 0.9, 0.4), sdf.capsule([1.2, 1, 5.1], [2.2, 0.8, 6.2], 0.8, 0.4), sdf.capsule([0, -2.2, 4.8], [0.4, -3.6, 5.6], 0.8, 0.4), { smooth: 0.6 })
+  return {
+    neck: j.limb(j.chest, [j.head[0], j.head[1], j.head[2] - 3], 1.6, 1.5, "zs"),
+    head: [into(skull.union(nose).mat("zsSL")), into(cap.union(locks, { smooth: 0.6 }).noise({ amp: 0.5, scale: 1.1, seed: 3 }).mat("JjhH"))],
+    // (his right eye, on our left facing us, its iris toward the nose)
+    face: [j.decal("_tr3m_eye", at(1.8, 4.6, -0.6), { views: { three: "_tr3m_eye", profile: "_tr3m_eye_side" } }),
+      j.decal("_tr3m_eye_l", at(-1.8, 4.6, -0.6), { views: { three: "_tr3m_eye", profile: "_tr3m_eye_side" } }), j.decal("_tr3m_mouth", at(0, 4.6, -3.2))],
+  }
+}
+sprite("_tr3m_clasp", "g")
+// The body as tr3's, with a few accents where the cloth bends or pieces meet, in his ramps (each a cause,
+// none a texture): the trousers' crease at the front of the knee; the boots' cuffs turned down a tone
+// lighter, their soles dark; the tunic's hem in shadow under its flare, two folds where the skirt flares
+// from the belt, a crease inside each elbow; the cloak's hem darker, its edge at the opening catching
+// the light, two folds down its back that swing with it, the lining's edge a step lighter, the clasp at
+// the collar. (Brushes of cloth on the cloak's trailing hem read as a bush at this size: none.)
+const parts3m = (j, p) => {
+  const P = parts3(j, p), farLeg = j.depth(j.legs[0].hip) < j.depth(j.legs[1].hip) ? 0 : 1, farArm = j.depth(j.arms[0].sh) < j.depth(j.arms[1].sh) ? 0 : 1
+  const dark = (r) => r.slice(0, 2)
+  j.legs.forEach((L, i) => {
+    const g = O.legs(i === farLeg)
+    P[`leg${i}`] = [j.limb(L.hip, L.knee, 1.6, 1.5, (h, a) => (h > 0.78 && Math.abs(a) < 1 ? dark(g.tr) : g.tr)),
+      j.limb(L.knee, L.ankle, 1.5, 1.4, (h) => (h < O.cuff ? g.tr : h < O.cuff + 0.14 ? "dl" : g.shin)), j.ball(L.foot, [1.6, 2.3, 1.1], (h) => (h < 0.3 ? "D" : g.foot))]
+  })
+  j.arms.forEach((A, i) => { const far = i === farArm, s = O.sleeve(far); P[`arm${i}`][0] = j.limb(A.sh, A.elbow, 1.1, 1, (h, a) => (h > 0.8 && Math.abs(a) < 1.2 ? dark(s) : s)) })
+  const waist = j.pelvis[2] + 1.4, hips = [j.pelvis[0], j.pelvis[1], 0], top = j.chest[2] + 0.6
+  P.tunic[0] = j.sweep(hips, waist - 2.4, waist, (h) => 3.6 + 0.6 * (1 - h), { paint: (h, a, out) => (!out ? "v" : h < 0.25 || Math.abs(Math.abs(a) - 0.75) < 0.13 ? "vw" : "vwW") })
+  const trail = (h) => { const down = 1 - h; return [0, 1].map((e) => j.f[e] * -(0.3 + 1.1 * p.trail) * down * CLOAK3.trail + j.r[e] * 0.9 * p.sway * down ** 1.5 * CLOAK3.trail) }
+  const cloakPaint = (h, a, out) => {
+    const edge = Math.abs(a) < 1.6
+    if (!out) return edge ? "n" : "N"
+    return h < 0.08 ? "nc" : edge ? "cC" : Math.abs(Math.abs(a) - 2.45) < 0.1 ? "Nn" : CLOAK3.out
+  }
+  const cloak = j.sweep([j.chest[0], j.chest[1], 0], top - CLOAK, top, CLOAK3.radius, { keep: CLOAK3.keep, shift: trail, shell: 0.4, paint: cloakPaint })
+  P.cloak = cloak
+  return { ...P, clasp: j.decal("_tr3m_clasp", [0, 1, 2].map((e) => j.chest[e] + j.f[e] * 3.8 + (e === 2 ? 0.2 : 0)), { depth: 2 }), ...head3(j) }
+}
+const ALL8 = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
+rig3d("tr3m", { body: BODY3, w: W, h: H, pivot: [OX, OY], n: 16, parts: parts3m, ink: "k", surface: LIT3,
+  moves: { ...Object.fromEntries(Object.entries(MOVES3).map(([m, M]) => [m, { dirs: ALL8, ...M }])), turn: { frames: 1, ms: 250, pose: MOVES3.idle.pose } } })
 Object.assign(travelerRig, { figure, blocks, bones, scr, depth, local, sample, TRAVELER, MOVES, DIRS, W, H, OX, OY, casting, CH, TH })
 }

@@ -30,13 +30,15 @@ export interface DecalOpts {
   size?: number;
   /** other views' assets: three quarters and the profile, drawn looking to the picture's right */
   views?: { three?: string; profile?: string };
+  /** pin: how far (m) what is drawn under a texel may lie in front of or behind its point and still take it (default its own width: a lock of hair a little nearer, a surface seen edge on) */
+  depth?: number;
   /** its tones stepped by the light there (default true); false: drawn as it is, glowing */
   lit?: boolean;
   view?: SurfaceView; ppm?: number; at?: number[]; pixel?: number; light?: number[];
   /** the name of the part it is (pxl steps --at; default "decal <name>") */
   part?: string;
 }
-export const DECAL_OPTS = ["on", "point", "up", "mode", "size", "views", "lit", "view", "ppm", "at", "pixel", "light", "part"];
+export const DECAL_OPTS = ["on", "point", "up", "mode", "size", "views", "depth", "lit", "view", "ppm", "at", "pixel", "light", "part"];
 interface DecalCanvas extends SurfaceCanvas { asset(name: string): Img }
 
 const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -51,6 +53,7 @@ export function drawDecal(c: DecalCanvas, name: string, o: DecalOpts = {}): void
   const mode = o.mode ?? "pin", K = o.pixel ?? c.k ?? 1, lit = o.lit !== false;
   if (mode !== "pin" && mode !== "wrap") throw new PxError(`${who}: mode is "pin" or "wrap", got ${JSON.stringify(o.mode)}`);
   if (o.size !== undefined && !(o.size > 0)) throw new PxError(`${who}: size is m across, above 0, got ${JSON.stringify(o.size)}`);
+  if (o.depth !== undefined && !(o.depth > 0)) throw new PxError(`${who}: depth is m in front of or behind its point it may be laid on, above 0, got ${JSON.stringify(o.depth)}`);
   const persp = !!o.view && typeof o.view === "object" && "horizon" in o.view, origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
   const clock = clockOf(c), C = compile(o.on, clock), d = C.d;
   // the anchor: a point of the field as it stands at rest, carried by its moves to this moment, put back
@@ -94,7 +97,7 @@ export function drawDecal(c: DecalCanvas, name: string, o: DecalOpts = {}): void
     if (!s0) return;
     // a texel to a pixel (or block), or grown by a whole number to its size in m there
     const sx = toScreen([p[0] + R[0] * 0.1, p[1] + R[1] * 0.1, p[2] + R[2] * 0.1]), ppm = sx ? Math.hypot(sx[0] - s0[0], sx[1] - s0[1]) / 0.1 : 1;
-    const s = o.size ? Math.max(1, Math.round((o.size * ppm) / img.w)) : K, z = axisDepth(p), tol = Math.max(0.12, (img.w * s) / ppm), lv = light(p, n);
+    const s = o.size ? Math.max(1, Math.round((o.size * ppm) / img.w)) : K, z = axisDepth(p), tol = o.depth ?? Math.max(0.12, (img.w * s) / ppm), lv = light(p, n);
     const X0 = Math.round(s0[0] - pvx * s), Y0 = Math.round(s0[1] - pvy * s);
     for (let j = 0; j < img.h; j++)
       for (let i = 0; i < img.w; i++) {

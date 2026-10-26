@@ -11,7 +11,7 @@ import { dE, lineFlaws } from "../core/vision.ts";
 import { toHex } from "../core/color.ts";
 import type { Item } from "../core/model.ts";
 import { type Knob, fixRule, runExpects, turnKnob } from "../core/world3d.ts";
-import { viewRows, viewWarnings } from "../core/rig3d.ts";
+import { FLAWS, jointsOf, poseFlaws, viewRows, viewWarnings } from "../core/rig3d.ts";
 
 /** Drawn by hand somewhere: a grid string, grid() or runs(), here or in a layer (line(), curve() and code draw their own lines clean, or as they mean to). */
 const byHand = (items: Item[]): boolean => items.some((i) => typeof i === "string"
@@ -52,7 +52,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0 };
   let lightSaid = false, groundSaid = false;
   // by default what the file itself defines (what it includes is checked where it's defined)
   const own = (n: string) => !opts.file || (p.assets.get(n)?.loc ?? "").split(":")[0] === opts.file;
@@ -172,10 +172,23 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (!opts.names) for (const [name, V] of p.views) {
     if (opts.file && (V.loc ?? "").split(":")[0] !== opts.file) continue;
     ran.views++;
-    const rows = (s: { drawn: string[] }) => new Map(s.drawn.map((n) => [n.slice(n.lastIndexOf("_") + 1), viewRows(p.image(n))]));
+    const rows = (s: { drawn: string[]; chin?: Record<string, number> }) => new Map(s.drawn.map((n) => [n.slice(n.lastIndexOf("_") + 1), viewRows(p.image(n), s.chin?.[n])]));
     const like = V.like ? p.views.get(V.like) : undefined;
     if (V.like && !like) lines.push(`${name} › WARNING: like '${V.like}' is no views() set`);
     for (const w of viewWarnings({ name, views: [...rows(V)], ...(like ? { like: { name: V.like!, views: rows(like) } } : {}) })) lines.push(`${name} › WARNING: ${w}`);
+  }
+  // rig3d() figures: every pose of every move at its headings, on the ground and within the legs' reach
+  if (!opts.names) for (const [name, F] of p.figures) {
+    if (opts.file && (F.loc ?? "").split(":")[0] !== opts.file) continue;
+    for (const M of F.moves) for (const hd of M.heads) {
+      const worst = { floats: 0, reach: 0 }, at = { floats: [] as number[], reach: [] as number[] };
+      for (let i = 0; i < M.frames; i++) {
+        ran.poses++;
+        const fl = poseFlaws(F.body, jointsOf(F.body, M.pose(i, hd.deg), hd.deg));
+        for (const k of ["floats", "reach"] as const) if (fl[k] > 0.5) { at[k].push(i); worst[k] = Math.max(worst[k], fl[k]); }
+      }
+      for (const k of ["floats", "reach"] as const) if (at[k].length) lines.push(`${name} › ${M.m} ${hd.name} › WARNING: ${FLAWS[k](worst[k])} (frame${at[k].length > 1 ? "s" : ""} ${ranges(at[k])})`);
+    }
   }
   // what building found on the way (a shade step that left its ramp), where it was asked for
   for (const w of p.warnings) {
@@ -216,6 +229,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.text) run.push(`lettering on ${ran.text}`);
   if (ran.lines) run.push(`lines on ${ran.lines}`);
   if (ran.views) run.push(`views' rows on ${ran.views}`);
+  if (ran.poses) run.push(`figures' feet on ${ran.poses} poses`);
   if (rigs) run.push(`rig parts ${ran.parts}`);
   const readings = opts.readings ? { readings: [...reads], tally: `${tally.agree + tally.against + tally.unclear} placements read: ${tally.agree} lit as their light, ${tally.against} against it, ${tally.unclear} with no side to tell` } : {};
   return { ...readings, ...(fixes ? { fixes } : {}), lines, notes, warnings: lines.length,

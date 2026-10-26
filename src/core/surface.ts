@@ -36,10 +36,12 @@ export interface SurfaceOpts {
   light?: number[];
   /** the contour away from the light: true (each material's darkest), a key, or false */
   outline?: boolean | string;
-  /** a line where one part lies in front of another, on the one behind (each part outlined against the others, as a figure's limbs): a key, or true (the outline's) */
+  /** a line where one part lies in front of another, on the one behind (each part outlined against the others, as a figure's limbs): a key, or true (the outline's); between pieces of one part (`.part()`s inside it: locks of hair) its own darkest tone */
   inner?: boolean | string;
   /** the contour toward the light a step lighter (default true) */
   rim?: boolean;
+  /** the light wrapped round the form, 0..1 (default 0): a side square to it lit as much as `soft` / (1 + soft) of the full (a figure's broad light) */
+  soft?: number;
   /** shadows the field casts on itself (default true) */
   shadows?: boolean;
   /** how much the creases darken, 0..1 (default 0.5) */
@@ -55,7 +57,7 @@ export interface SurfaceOpts {
   /** (light: "mesh": the light of the mesh() drawn before it, on what it draws as on mesh()'s sprites) */
   world?: Lit;
 }
-export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "outline", "inner", "rim", "shadows", "ao", "pixel", "cast", "hide", "part"];
+export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "soft", "outline", "inner", "rim", "shadows", "ao", "pixel", "cast", "hide", "part"];
 /** The index of a part's name in the picture's list of what painted each pixel (see Img.parts). */
 export function partIndex(img: Img, name: string): number {
   if (typeof name !== "string" || !name) throw new PxError(`part is a name, got ${JSON.stringify(name)}`);
@@ -351,6 +353,8 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   const K = o.pixel ?? c.k ?? 1, aoK = o.ao ?? 0.5, castK = o.cast ?? 0.4;
   if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`${who}: pixel is px to a ray, a whole number from 1, got ${JSON.stringify(o.pixel)}`);
   if (!(aoK >= 0 && aoK <= 1) || !(castK >= 0 && castK <= 1)) throw new PxError(`${who}: ao and cast are 0..1, got ${JSON.stringify([o.ao, o.cast])}`);
+  const soft = o.soft ?? 0;
+  if (!(soft >= 0 && soft <= 1)) throw new PxError(`${who}: soft is 0..1, how far the light wraps round the form, got ${JSON.stringify(o.soft)}`);
   const origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
   if (origin !== undefined && !(Array.isArray(origin) && origin.length === 2 && origin.every(Number.isFinite))) throw new PxError(`${who}: view's origin is where the world's [0, 0, 0] lands, [x, y] px, got ${JSON.stringify(origin)}`);
   if (o.at !== undefined && !(Array.isArray(o.at) && (o.at.length === 3 || (!persp && o.at.length === 2)) && o.at.every(Number.isFinite)))
@@ -373,14 +377,15 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   const asRamp = (m: string) => [...m].every((k) => { try { const col = c.color(k); return col !== null && col !== TRANSPARENT; } catch { return false; } });
   const missing = T.names.filter((m) => m && !names.includes(m) && !asRamp(m));
   if (names.length && missing.length) throw new PxError(`${who}: the field's material ${missing.map((m) => `'${m}'`).join(", ")} is not in mats (it has: ${names.join(", ")})`);
-  const matOf: number[] = [];
+  // (with no mats, what the field names before it is drawn takes the first ramp, as it always has)
+  const matOf: number[] = [], rampOf = new Map(names.map((n, i) => [n, i])), known = T.names.length;
   const matIndex = (mi: number): number => {
     if (matOf[mi] !== undefined) return matOf[mi];
     const nm = T.names[mi];
-    let k = names.indexOf(nm);
-    if (k < 0 && names.length && nm) {
-      if (!asRamp(nm)) throw new PxError(`${who}: the field's material '${nm}' is not in mats (it has: ${names.join(", ")}), nor a ramp of keys`);
-      mat(nm, nm); names.push(nm); k = names.length - 1;
+    let k = rampOf.get(nm) ?? -1;
+    if (k < 0 && nm && (names.length || mi >= known)) {
+      if (asRamp(nm)) { mat(nm, nm); k = ramps.length - 1; rampOf.set(nm, k); }
+      else if (names.length) throw new PxError(`${who}: the field's material '${nm}' is not in mats (it has: ${names.join(", ")}), nor a ramp of keys`);
     }
     return (matOf[mi] = Math.max(0, k));
   };
@@ -430,7 +435,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       nrm[i * 3] = n[0]; nrm[i * 3 + 1] = n[1]; nrm[i * 3 + 2] = n[2];
       m[i] = k;
       const ramp = ramps[k], up = T.lift(e), q: V3 = [p[0] + n[0] * up, p[1] + n[1] * up, p[2] + n[2] * up];
-      const diffuse = Math.max(0, dot(n, L)), sun = diffuse > 0 && (o.shadows === false || !blocks(q, 0, e)) ? diffuse : 0;
+      const diffuse = Math.max(0, (dot(n, L) + soft) / (1 + soft)), sun = diffuse > 0 && (o.shadows === false || !blocks(q, 0, e)) ? diffuse : 0;
       if (wpos) { wpos[i * 3] = p[0] + cam.at[0]; wpos[i * 3 + 1] = p[1] + cam.at[1]; wpos[i * 3 + 2] = p[2] + cam.at[2]; wsun![i] = sun > 0 ? 1 : 0; }
       const occ = aoK > 0 && T.ao ? T.ao(p, n) : 0;
       let lv = 0.1 + 0.65 * sun + 0.2 * (0.5 + 0.5 * n[2]) - aoK * 0.35 * Math.max(0, Math.min(1, occ));
@@ -462,12 +467,18 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   const open = (gx: number, gy: number, i: number) => gx < 0 || gy < 0 || gx >= GW || gy >= GH || m[gy * GW + gx] < 0 || (depth[gy * GW + gx] > depth[i] + gap && !(innerOn && pt[gy * GW + gx] !== pt[i]));
   // a part's pixel next to another part nearer by half a pixel: the line round that one
   const nearBy = persp ? 0.05 : 0.5 / scale;
+  // (pieces of one part, `.part()`s inside it, are parted by its own darkest tone, as locks of hair are;
+  // parts from each other by the line: 2 and 1)
+  const top = (T.parts ?? []).map((n) => n.split(".")[0]);
   const behind = (gx: number, gy: number, i: number) => {
+    let seam = 0;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const x = gx + dx, y = gy + dy, j = y * GW + x;
-      if (x >= 0 && y >= 0 && x < GW && y < GH && m[j] >= 0 && !hidden[j] && pt[j] !== pt[i] && depth[j] < depth[i] - nearBy) return true;
+      if (!(x >= 0 && y >= 0 && x < GW && y < GH && m[j] >= 0 && !hidden[j] && pt[j] !== pt[i] && depth[j] < depth[i] - nearBy)) continue;
+      if (pt[j] < 0 || pt[i] < 0 || top[pt[j]] !== top[pt[i]]) return 1;
+      seam = 2;
     }
-    return false;
+    return seam;
   };
   const norm = c.img.normals(), zbuf = (c.img.depth ??= new Float32Array(W * H).fill(Infinity));
   // what each part is called on the picture: the drawing's part, then the field's own
@@ -484,7 +495,8 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
         if (dx * lx + dy * ly > 0) toward = true;
         else if (!open(gx - dx, gy - dy, i)) away = true;
       }
-      if (innerOn && behind(gx, gy, i)) col = innerKey ?? ramp[0];
+      const seam = innerOn ? behind(gx, gy, i) : 0;
+      if (seam) col = seam === 2 ? ramp[0] : innerKey ?? ramp[0];
       else if (away && o.outline !== false) col = outKey ?? ramp[0];
       else if (toward && o.rim !== false) col = ramp[Math.min(ramp.length - 1, tone[i] + 1)];
       // the normal as the picture sees it (x right, y down, z toward the eye)

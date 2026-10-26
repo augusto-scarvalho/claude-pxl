@@ -7,7 +7,7 @@
 // face, the body orange, the right limbs light and the left dark) is how a new move is judged before
 // it is painted. gait() gives a walk's numbers by the view, views() places hand-drawn heads.
 import { PxError } from "./errors.ts";
-import { Sdf, sdf, type V3 } from "./sdf.ts";
+import { Sdf, fieldOf, sdf, type V3 } from "./sdf.ts";
 import { figure } from "./rig.ts";
 
 // 3D vectors, written out: a pose is a few dozen of them
@@ -90,7 +90,17 @@ export interface Joints {
   /** a limb along a bone, a ball turned with the body: pieces for parts() */
   limb(a: V3, b: V3, r0: number, r1?: number, paint?: unknown): Piece;
   ball(c: V3, r: number | number[], paint?: unknown): Piece;
+  /** a surface swept round an upright through `base` from z0 up to z1 (a tunic, a cloak), see SweepOpts */
+  sweep(base: V3, z0: number, z1: number, radius: (h: number, a: number) => number, o?: SweepOpts): Piece;
+  /** a hand-drawn decal pinned on the figure at `point` (a face's eyes), its other views by the angle; `on` the field it lies on (default the whole figure: an eye on the skull, not on the lock nearest) */
+  decal(asset: string, point: V3, o?: { views?: { three?: string; profile?: string }; up?: V3; on?: Sdf; lit?: boolean; depth?: number }): DecalPiece;
+  /** brushes scattered on a field (sdf.scatter's: tufts, strands), drawn on the figure before its line round */
+  scatter(field: Sdf, o?: Record<string, unknown>): ScatterPiece;
 }
+/** A sweep's shape: `keep(h, a)` which of it there is (a cloak open in front), `shift(h)` the way that height of it is carried off the axis (trailing), `shell` half its thickness (a cloth; none: solid), `paint` as a piece's. */
+export interface SweepOpts { keep?: (h: number, a: number) => unknown; shift?: (h: number) => number[]; shell?: number; paint?: unknown }
+export interface DecalPiece { decal: { asset: string; point: V3; views?: { three?: string; profile?: string }; up?: V3; on?: Sdf; lit?: boolean; depth?: number } }
+export interface ScatterPiece { scatter: { field: Sdf; o: Record<string, unknown> } }
 const frameAt = (deg: number) => { const s = Math.sin(deg * RAD), c = Math.cos(deg * RAD); return { f: [s, c, 0] as V3, r: [c, -s, 0] as V3 }; };
 const num = (v: unknown, d: number, what: string) => { const x = v ?? d; if (!Number.isFinite(x)) throw new PxError(`rig3d: a pose's ${what} is a number, got ${JSON.stringify(v)}`); return x as number; };
 const pairs = (v: unknown, d: number[][], n: number, what: string) => {
@@ -139,6 +149,44 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
       if (!(Array.isArray(R) && R.length === 3 && R.every((x) => x > 0))) throw new PxError(`ball(c, r, paint): r is a radius or [across, ahead, up] in px, got ${JSON.stringify(rr)}`);
       return { field: sdf.ellipsoid(R).rotate(-(heading + turn), "z").at(c), paint: paintOf(paint, "a ball"), at: (q) => { const o = sub(q, c); return [Math.max(0, Math.min(1, (o[2] + R[2]) / (2 * R[2]))), round(o), o]; } };
     },
+    sweep: (base, z0, z1, radius, so = {}) => {
+      v3(base, "sweep(base, z0, z1, radius, opts): base");
+      const { keep, shift, shell = 0, paint } = so;
+      if (!(z1 > z0) || typeof radius !== "function" || (keep !== undefined && typeof keep !== "function") || (shift !== undefined && typeof shift !== "function") || !(shell >= 0))
+        throw new PxError("sweep(base, z0, z1, (h, a) => radius, { keep?, shift?, shell?, paint? }): from z0 up to z1 (px), its radius at height h (0..1) and angle a (0 the way the body faces)");
+      const H = z1 - z0, fx = f[0], fy = f[1], rx = r[0], ry = r[1], bx = base[0], by = base[1];
+      // its box: the radius and the shift sampled over it
+      let R = 0, x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+      for (let i = 0; i <= 8; i++) {
+        const s = shift?.(i / 8) ?? [0, 0, 0];
+        x0 = Math.min(x0, s[0]); x1 = Math.max(x1, s[0]); y0 = Math.min(y0, s[1]); y1 = Math.max(y1, s[1]);
+        for (let k = 0; k < 24; k++) R = Math.max(R, radius(i / 8, (k / 24) * 2 * Math.PI - Math.PI));
+      }
+      const pad = R * 1.25 + shell + 0.5;
+      // the distance: across to the swept rim (a cloth: its two faces), and up to its ends; where it is cut
+      // away, at least a step (ponytail: a bound only while the radius changes slowly: lip 1.5)
+      const d = (x: number, y: number, z: number) => {
+        const h = Math.max(0, Math.min(1, (z - z0) / H)), s = shift ? shift(h) : undefined, vx = x - bx - (s ? s[0] : 0), vy = y - by - (s ? s[1] : 0);
+        const a = Math.atan2(vx * rx + vy * ry, vx * fx + vy * fy), rr = Math.sqrt(vx * vx + vy * vy), Rr = radius(h, a);
+        const side = shell ? Math.abs(rr - Rr) - shell : rr - Rr, cap = Math.max(z0 - z, z - z1);
+        const v = Math.min(Math.max(side, cap), 0) + Math.sqrt(Math.max(side, 0) ** 2 + Math.max(cap, 0) ** 2);
+        return keep && !keep(h, a) ? Math.max(v, 0.3) : v;
+      };
+      const field = fieldOf(d, [bx + x0 - pad, by + y0 - pad, z0 - 0.5], [bx + x1 + pad, by + y1 + pad, z1 + 0.5], 1.5);
+      return { field, paint: paintOf(paint, "a sweep"), at: (q) => {
+        const h = Math.max(0, Math.min(1, (q[2] - z0) / H)), s = shift?.(h) ?? [0, 0, 0], o: V3 = [q[0] - bx - s[0], q[1] - by - s[1], 0];
+        return [h, round(o), o];
+      } };
+    },
+    decal: (asset, point, o = {}) => {
+      if (typeof asset !== "string" || !asset) throw new PxError(`decal(asset, point, { views, up, on, lit }): a sprite's name, got ${JSON.stringify(asset)}`);
+      if (o.on !== undefined && !(o.on instanceof Sdf)) throw new PxError("decal(asset, point, { on }): on is the field it lies on");
+      return { decal: { asset, point: v3(point, "decal(asset, point): point"), views: o.views, up: o.up, on: o.on, lit: o.lit, depth: o.depth } };
+    },
+    scatter: (field, o = {}) => {
+      if (!(field instanceof Sdf)) throw new PxError("scatter(field, opts): brushes scattered on a field (sdf.scatter's options)");
+      return { scatter: { field, o } };
+    },
   };
 }
 
@@ -172,11 +220,15 @@ export const BLOCK_MATS = Object.fromEntries(Object.entries(BLOCKS).map(([k, v])
  * paint (a material, or (h, a, outside) => one: h along it, a round it, outside its face away from
  * its middle); the materials it names that are ramps of keys, for surface()'s mats.
  */
-export function partsOf(spec: unknown, j: Joints): { field: Sdf; ramps: string[] } {
+export function partsOf(spec: unknown, j: Joints): { field: Sdf; ramps: string[]; decals: (DecalPiece["decal"] & { part: string })[]; brushes: (ScatterPiece["scatter"] & { part: string })[] } {
   if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new PxError(`rig3d: parts(j, pose) gives { name: piece or [pieces] } (j.limb(a, b, r0, r1, paint), j.ball(c, r, paint), or a field), got ${JSON.stringify(spec)?.slice(0, 80)}`);
-  const ramps = new Set<string>(), all: Sdf[] = [];
+  const ramps = new Set<string>(), all: Sdf[] = [], decals: (DecalPiece["decal"] & { part: string })[] = [], brushes: (ScatterPiece["scatter"] & { part: string })[] = [];
   for (const [name, v] of Object.entries(spec as Record<string, unknown>)) {
-    const list = (Array.isArray(v) ? v : [v]).map((q) => {
+    const list = (Array.isArray(v) ? v : [v]).filter((q) => {
+      if (q && typeof q === "object" && "decal" in q) { decals.push({ ...(q as DecalPiece).decal, part: name }); return false; }
+      if (q && typeof q === "object" && "scatter" in q) { brushes.push({ ...(q as ScatterPiece).scatter, part: name }); return false; }
+      return true;
+    }).map((q) => {
       if (q instanceof Sdf) return q;
       if (!isPiece(q)) throw new PxError(`rig3d: part '${name}' is a piece (j.limb, j.ball), a field (sdf.*) or a list of them, got ${JSON.stringify(q)?.slice(0, 80)}`);
       const P = q.paint;
@@ -187,7 +239,7 @@ export function partsOf(spec: unknown, j: Joints): { field: Sdf; ramps: string[]
     if (list.length) all.push(sdf.union(list).part(name));
   }
   if (!all.length) throw new PxError("rig3d: parts(j, pose) gave no parts");
-  return { field: sdf.union(all).intersect(GROUND), ramps: [...ramps] };
+  return { field: sdf.union(all).intersect(GROUND), ramps: [...ramps], decals, brushes };
 }
 
 // ---------------------------------------------------------------- the walk's numbers
@@ -253,11 +305,11 @@ export function gait(t: number, o: Record<string, unknown> = {}) {
 // ---------------------------------------------------------------- views' rows
 type Rows = { crown: number; chin: number; runs: Map<number, [number, number]>; rows: Map<number, [number, number]> };
 /**
- * A view's rows from its anchor: the crown (its top row), the chin (its lowest row with a third as many
- * pixels as its fullest: a lock hanging below isn't the chin), each row's run through the anchor's
+ * A view's rows from its anchor: the crown (its top row), the chin (the row given, or its lowest row with
+ * a third as many pixels as its fullest: a lock hanging below isn't the chin), each row's run through the anchor's
  * column (or nearest it: what hangs apart, a braid beside the jaw, isn't the head's) and its extent.
  */
-export function viewRows(img: { w: number; h: number; data: Uint32Array; pivot?: number[] }): Rows | undefined {
+export function viewRows(img: { w: number; h: number; data: Uint32Array; pivot?: number[] }, chin?: number): Rows | undefined {
   const [ax, ay] = (img.pivot ?? [0, 0]).map(Math.floor), on = (x: number, y: number) => (img.data[y * img.w + x] & 255) >= 128;
   const runs = new Map<number, [number, number]>(), rows = new Map<number, [number, number]>(), count: [number, number][] = [];
   for (let y = 0; y < img.h; y++) {
@@ -271,7 +323,7 @@ export function viewRows(img: { w: number; h: number; data: Uint32Array; pivot?:
   }
   if (!count.length) return undefined;
   const most = Math.max(...count.map((e) => e[1]));
-  return { crown: count[0][0], chin: Math.max(...count.filter((e) => e[1] >= most / 3).map((e) => e[0])), runs, rows };
+  return { crown: count[0][0], chin: chin ?? Math.max(...count.filter((e) => e[1] >= most / 3).map((e) => e[0])), runs, rows };
 }
 /**
  * What pxl check says about a views() set: the views whose crown or chin isn't on the others' row
@@ -301,6 +353,20 @@ export function viewWarnings(set: { name: string; views: [string, Rows | undefin
   }
   return out;
 }
+
+// ---------------------------------------------------------------- nothing floats
+/**
+ * What pxl check reads in a pose, px: how far its lower foot is off the ground (both up: it floats), and
+ * how much longer than its two bones a leg is pulled (the foot out of its reach: the shin stretches).
+ * More than half a pixel warns: `FLAWS` says each.
+ */
+export function poseFlaws(B: Body, j: Joints): { floats: number; reach: number } {
+  return { floats: Math.min(...j.legs.map((L) => L.ankle[2])) - B.ankle, reach: Math.max(...j.legs.map((L) => len(sub(L.ankle, L.hip)) - B.thigh - B.shin)) };
+}
+export const FLAWS = {
+  floats: (v: number) => `both feet off the ground (up to ${v.toFixed(1)} px): it floats`,
+  reach: (v: number) => `a leg longer than its bones (by up to ${v.toFixed(1)} px): its foot out of reach; lower the pelvis or bring the foot in`,
+};
 
 // ---------------------------------------------------------------- picking a view by heading
 const COMPASS16 = ["n", "nne", "ne", "ene", "e", "ese", "se", "sse", "s", "ssw", "sw", "wsw", "w", "wnw", "nw", "nnw"];

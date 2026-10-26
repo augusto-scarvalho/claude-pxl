@@ -50,11 +50,14 @@ test("views: pxl check holds the crown and chin to one row in every view, and wi
   const bad = checkProject(loadSource(`${PAL}
 views("_a", { s: "kkk\\nkkk\\nkkk", w: "...\\nkkk\\nkkk" }, { anchor: [1, 1] })
 views("_b", { s: "kkkkkkk\\n..kkk..\\n..kkk.." }, { anchor: [3, 1], like: "_a" })
-views("_c", { s: "kkkkk\\n.kkk.\\n.kkk." }, { anchor: [2, 1], like: "_a" })`, "t.px.js"));
-  // (_c's top row a pixel wider each side: kept)
+views("_c", { s: "kkkkk\\n.kkk.\\n.kkk." }, { anchor: [2, 1], like: "_a" })
+views("_d", { s: "kkk\\nkkk\\nkkk\\n.k.", w: "kkk\\nkkk\\nkkk" }, { anchor: [1, 1] })
+views("_e", { s: "kkk\\nkkk\\nkkk\\n.k.", w: "kkk\\nkkk\\nkkk" }, { anchor: [1, 1], chin: 2 })`, "t.px.js"));
+  // (_c's top row a pixel wider each side: kept; _e's beard below the chin it names: kept)
   assert.deepEqual(bad.lines, [
     "_a › WARNING: its crown isn't on one row in every view (from the anchor: -1 in s; 0 in w): a head that turns bobs",
     "_b › WARNING: s: row -1 (2 px left, 2 px right) from the anchor sticks out past _a_s by more than a pixel",
+    "_d › WARNING: its chin isn't on one row in every view (from the anchor: 2 in s; 1 in w): a head that turns bobs",
   ]);
 });
 
@@ -95,6 +98,49 @@ test("rig3d: its blocks and its painted figure in every heading, feet on the piv
   }
   assert.ok(p.image("bk_walk_s").sockets?.hand);
   assert.match(keys(p, "s"), /r/);
+});
+
+test("rig3d: a cloth swept round the body (open in front, its lining), a decal pinned on it, the line all round; pxl check: a pose off the ground, a leg out of reach", () => {
+  const p = loadSource(`${PAL}
+ramps("kgw", "krw")
+sprite("_dot", "w")
+rig3d("c", { w: 26, h: 40, pivot: [13, 38], headings: ["s", "n"], ink: "k", surface: { soft: 0.5 },
+  moves: { idle: { frames: 1, pose: () => ({}) }, hop: { frames: 2, pose: (i) => ({ lift: [2 * i, 2 * i] }) }, reach: { frames: 1, pose: () => ({ feet: [[9, -2], [0, 2]] }) } },
+  parts: (j) => ({ body: j.limb(j.pelvis, j.chest, 3, 3, "g"),
+    cloak: j.sweep([0, 0, 0], 8, j.chest[2], () => 4.5, { shell: 0.4, keep: (h, a) => Math.abs(a) > 1.2, paint: (h, a, out) => (out ? "r" : "w") }),
+    mark: j.decal("_dot", [j.chest[0] + j.f[0] * 3, j.chest[1] + j.f[1] * 3, j.chest[2] - 3]),
+    fuzz: j.scatter(j.limb(j.pelvis, j.chest, 3, 3).field, { brush: "dot", count: 1, size: 1, mat: "g", seed: 1 }) }) })`, "t.px.js");
+  // the brushes drew on it, as a part of their own
+  assert.ok(p.image("c_idle_s").parts!.names.includes("fuzz"));
+  const s = keys(p, "c_idle_s").split("\n"), n = keys(p, "c_idle_n").split("\n");
+  // facing us: the body through the cloak's open front, its lining inside, its edges beside; from behind,
+  // the cloak (the shoulders above it)
+  assert.ok(s.some((r) => /r.*g.*r/.test(r)) && s.some((r) => r.includes("w")), s.join("\n"));
+  assert.ok(n.filter((r) => /^[.]*kr+k[.]*$/.test(r)).length >= 10, n.join("\n"));
+  // the line all round: every row's ends the ink
+  for (const r of s.filter((q) => /[^.]/.test(q))) assert.ok(r.replace(/[.]/g, "").startsWith("k") && r.replace(/[.]/g, "").endsWith("k"), r);
+  const lines = checkProject(p).lines;
+  assert.deepEqual(lines.filter((l) => l.startsWith("c ›")), [
+    "c › hop s › WARNING: both feet off the ground (up to 2.0 px): it floats (frame 1)",
+    "c › hop n › WARNING: both feet off the ground (up to 2.0 px): it floats (frame 1)",
+    "c › reach s › WARNING: a leg longer than its bones (by up to 3.0 px): its foot out of reach; lower the pelvis or bring the foot in (frame 0)",
+    "c › reach n › WARNING: a leg longer than its bones (by up to 3.0 px): its foot out of reach; lower the pelvis or bring the foot in (frame 0)",
+  ]);
+});
+
+test("surface: pieces of one part parted by its own darkest tone, parts by the line; decal: depth, how far a nearer surface may be and still take it", () => {
+  const p = loadSource(`${PAL}
+ramps("kgw", "krw")
+const F = sdf.union(sdf.sphere(4).at(0, 6, 4).part("a"), sdf.sphere(1.5).at(-2.5, 0, 4).part("b")).mat("m").part("hair").union(sdf.sphere(1.5).at(2.5, 0, 4).mat("m").part("body"))
+sprite("x", { w: 16, h: 12 }, (c) => c.surface(F, { ppm: 1, at: [8, 10], view: { kind: "side", pitch: 0 }, mats: { m: "rww" }, light: [0, -1, 0], soft: 1, outline: false, rim: false, shadows: false, ao: 0, inner: "k" }))
+sprite("_d", "g")
+const G = sdf.union(sdf.sphere(3), sdf.sphere(1).at(0, -3.2, 0)), BIG = sdf.sphere(3)
+for (const [n, o] of [["near", {}], ["deep", { depth: 2 }]]) sprite(n, { w: 12, h: 12 }, (c) => c.surface(G, { ppm: 1, at: [6, 6], view: { kind: "side", pitch: 0 }, mats: { m: "w" }, outline: false, rim: false, shadows: false }),
+  (c) => c.decal("_d", { on: BIG, point: [0, -3, 0], view: { kind: "side", pitch: 0 }, ppm: 1, at: [6, 6], ...o }))`, "t.px.js");
+  // the big ball behind: a dark seam of its own beside the lock in front, the line beside the other part
+  assert.match(keys(p, "x").split("\n")[5], /w+rkw+/, keys(p, "x"));
+  // a decal on the big ball, where a small one sits a little nearer: lost, or taken over it with depth
+  assert.ok(!keys(p, "near").includes("g") && keys(p, "deep").includes("g"), keys(p, "near") + "\n\n" + keys(p, "deep"));
 });
 
 test("surface: inner lines on the part behind another; paint((p, n) => name) and a material named by its ramp of keys", () => {

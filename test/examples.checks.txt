@@ -26,9 +26,8 @@ halloween/props.px.js: included only (doesn't build on its own: its palette come
 hd2d/clearing.px.js: 0 warnings (1 scene (13 frames, 102 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 102 (a clear reading on 53), standing on 83; not run: front marker (nothing has one), feet (nothing placed has a height)
   clearing_md › not checked (check: false)
-hd2d/crew.px.js: 2 warnings (2 scenes (5 frames, 84 distinct placements), 0 rigs, 0 other assets with a front marker)
+hd2d/crew.px.js: 1 warning (2 scenes (5 frames, 84 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 25, views' rows on 5; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh()), feet (nothing placed has a height)
-  _bd_head › WARNING: its chin isn't on one row in every view (from the anchor: 7 in s; 6 in sw, w; 5 in nw, n): a head that turns bobs
   _og_head › WARNING: its crown isn't on one row in every view (from the anchor: -5 in s, sw, nw, n; -4 in w): a head that turns bobs
   _sa_head_s › LOOK: 1 L-corner in its 1 px lines (at 12,3): where a smooth line steps, the elbow of three pixels in an L doubles it; delete that one. A corner the shape has (a tyre, a roof, a tip) stays (PXL help "characters 7")
   _br_head_sw › LOOK: 1 L-corner in its 1 px lines (at 8,2): where a smooth line steps, the elbow of three pixels in an L doubles it; delete that one. A corner the shape has (a tyre, a roof, a tip) stays (PXL help "characters 7")
@@ -47,7 +46,7 @@ hd2d/plaza.px.js: 0 warnings (1 scene (16 frames, 21 distinct placements), 0 rig
   ran: lit side on 21 (a clear reading on 0), standing on 21; not run: front marker (nothing has one), feet (nothing placed has a height)
   plaza_hd › not checked (check: false)
 hd2d/traveler.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: lines on 10, views' rows on 2; not run: front marker (nothing has one)
+  ran: lines on 15, views' rows on 2, figures' feet on 456 poses; not run: front marker (nothing has one)
 isometric.px.js: 0 warnings (1 scene (1 frame, 11 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 2; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh()), feet (nothing placed has a height)
 lighting.px.js: 0 warnings (1 scene (1 frame, 7 distinct placements), 0 rigs, 0 other assets with a front marker)

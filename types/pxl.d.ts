@@ -249,7 +249,7 @@ declare global {
   interface PxSurfaceOpts {
     view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number }>;
     /** the way toward the light; "view": its view's own (from the upper left) where look3d() gives another; "mesh": the light of the mesh() drawn before it with a sun (its way, sun, sky and lamps) */
-    light?: number[] | "view" | "mesh"; outline?: boolean | PxColor; /** a line where one part lies in front of another, on the one behind: a key, or true (the outline's) */ inner?: boolean | PxColor; rim?: boolean; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
+    light?: number[] | "view" | "mesh"; /** the light wrapped round the form, 0..1: a side square to it lit soft / (1 + soft) */ soft?: number; outline?: boolean | PxColor; /** a line where one part lies in front of another, on the one behind: a key, or true (the outline's) */ inner?: boolean | PxColor; rim?: boolean; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
     /** through a camera: its shadow alone (a mesh made of it in its place) */
     hide?: boolean;
     /** the name of the part it is (pxl steps --at) */
@@ -279,6 +279,8 @@ declare global {
   /** decal()'s options: the field it lies on, where (its rest frame), its up, pin or wrap, its size, other views, lit or glowing, the view as surface()'s, its part. */
   interface PxDecalOpts {
     on: PxSdf; point: number[]; up?: number[]; mode?: "pin" | "wrap"; size?: number; views?: { three?: string; profile?: string }; lit?: boolean;
+    /** pin: m in front of or behind its point what is drawn under a texel may lie and still take it (default its own width) */
+    depth?: number;
     view?: PxSurfaceView; ppm?: number; at?: number[]; pixel?: number; light?: number[] | "view"; part?: string;
   }
   /** What a builder makes: a field (or a density and its look), named parts, details, decals, sockets. */
@@ -305,6 +307,12 @@ declare global {
     legs: { hip: PxV3; knee: PxV3; ankle: PxV3; foot: PxV3 }[]; arms: { sh: PxV3; elbow: PxV3; hand: PxV3 }[];
     limb(a: PxV3, b: PxV3, r0: number, r1?: number, paint?: PxPiece["paint"]): PxPiece;
     ball(c: PxV3, r: number | PxV3, paint?: PxPiece["paint"]): PxPiece;
+    /** a surface swept round an upright through base from z0 up to z1: keep(h, a) the part there is, shift(h) [dx, dy] that height carried off the axis, shell half its thickness (a cloth) */
+    sweep(base: PxV3, z0: number, z1: number, radius: (h: number, a: number) => number, o?: { keep?: (h: number, a: number) => unknown; shift?: (h: number) => number[]; shell?: number; paint?: PxPiece["paint"] }): PxPiece;
+    /** hand-drawn pixel art pinned on the figure at point, its other views by the angle (as decal()) */
+    decal(asset: string, point: PxV3, o?: { views?: { three?: string; profile?: string }; up?: PxV3; on?: PxSdf; depth?: number; lit?: boolean }): { decal: object };
+    /** sdf.scatter's brushes on a field (strands, tufts), drawn on the figure before the line round it */
+    scatter(field: PxSdf, o?: PxScatterOpts): { scatter: object };
     screen(p: number[]): [number, number]; depth(p: number[]): number;
   }
   /** rig3d()'s body: figure(h, heads)'s lengths in px unless given; half the hips, the shoulders [forward, half the width, down]; the blocks' thickness. */
@@ -653,15 +661,15 @@ declare global {
    * `blocks`: the flat blocks too (bk_<move>_<dir>, or that prefix), to judge a move before painting.
    */
   function rig3d(name: string, opts: { body?: PxBody; moves: Record<string, { frames: number; ms?: number; pose: (i: number, heading: number) => PxPose; dirs?: string[]; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }>;
-    n?: number; headings?: (string | number)[]; pitch?: number; w?: number; h?: number; pivot?: [number, number]; parts?: (j: PxJoints, pose: PxPose) => Record<string, PxPiece | PxSdf | (PxPiece | PxSdf)[]>;
-    mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; inner?: boolean | PxColor; head?: string; chin?: PxColor; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }): PxRig3d;
+    n?: number; headings?: (string | number)[]; pitch?: number; w?: number; h?: number; pivot?: [number, number]; parts?: (j: PxJoints, pose: PxPose) => Record<string, PxPiece | PxSdf | { decal: object } | { scatter: object } | (PxPiece | PxSdf | { decal: object } | { scatter: object })[]>;
+    mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; inner?: boolean | PxColor; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; head?: string; chin?: PxColor; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }): PxRig3d;
   /**
    * Hand-drawn views of a thing (a head), named by the compass ({ s, sw, w, nw, n }: grids, rows, or items):
    * a sprite each, pivoted on its `anchor` pixel ([col, row], per view or one for all; "center", "bottom"),
    * the views not drawn the mirrors of those across; a group `name` to stamp by heading. pxl check holds
    * their crown and chin to one row, and with `like` each row within a pixel of that set's.
    */
-  function views(name: string, grids: Record<string, string | string[] | PxItem[]>, opts?: { anchor?: [number, number] | "center" | "bottom" | Record<string, [number, number] | "center" | "bottom">; like?: string; swap?: Record<string, PxColor>; outline?: PxColor; outline8?: PxColor; inline?: PxColor; selout?: boolean | number }): string[];
+  function views(name: string, grids: Record<string, string | string[] | PxItem[]>, opts?: { anchor?: [number, number] | "center" | "bottom" | Record<string, [number, number] | "center" | "bottom">; like?: string; /** the chin's row in every grid (a set whose lowest rows aren't the chin: a beard) */ chin?: number; swap?: Record<string, PxColor>; outline?: PxColor; outline8?: PxColor; inline?: PxColor; selout?: boolean | number }): string[];
   /** A walk's numbers at t (0..1 over the cycle) by the view a heading gives (or `view`): each foot [forward, up], the body's dip, each hand [forward, up] from hanging; the guide's measured values, each overridable (`stride`, `lift`, `bob`, `hands`; for one view: `profile: { stride }`). */
   function gait(t: number, opts?: { heading?: number; view?: "front" | "back" | "diagonal" | "profile"; stride?: number | number[]; lift?: number | number[]; bob?: number[]; hands?: number[][]; front?: object; diagonal?: object; profile?: object }): { view: string; a: number; feet: [number, number][]; bob: number; hands: [number, number][] };
   /** Two bones of lengths l1 and l2 from a reaching for b in 3D: the joint between, pushed toward `hint` (a way); out of reach, straight. */

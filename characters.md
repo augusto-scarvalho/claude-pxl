@@ -160,9 +160,10 @@ far limbs swap, every fix breaks something else). In pxl itself (§11; `examples
 5. The walk by the view (§6): facing us or away the feet lift in their own columns, in profile a
    long stride, on the diagonals between.
 
-In the DSL: `rig3d()` is steps 1 and 2 (the skeleton on the 3D layer in every direction, its flat
-blocks with `blocks: true`: the traveler's `bk3_*`), `views()` step 4 (the mirror about the anchor, the
-rows checked), `gait()` step 5's numbers (`PXL help rig3d`).
+In the DSL: `rig3d()` is steps 1 to 3 (the skeleton on the 3D layer in every direction, its flat
+blocks with `blocks: true`, its parts painted by hooks, the cloak a `j.sweep`: the traveler's `tr3_*`
+and `bk3_*`), `views()` step 4 (the mirror about the anchor, the rows checked), `gait()` step 5's
+numbers (`PXL help rig3d`).
 
 What the first tries of the traveler (34 px) got wrong, and the fix:
 - A big head: 11 rows of 34, a third; 13 read as a big head on a small body.

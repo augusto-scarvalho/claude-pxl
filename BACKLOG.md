@@ -74,6 +74,10 @@ Mark items `[x]` when they ship, with the commit.
     where `texel: "screen"` is more correct but moves a few pixels;
   - `sizes` blocks only ramp materials by default; blocking textures too would keep HD scenes nearer
     pixel art (plaza_hd and graveyard_hd would change: show both).
+- [ ] **The crew's grey-haired head turned to profile is a row short at the crown** (`_og_head_w` in
+  `hd2d/crew.px.js`): `pxl check`'s views rule reads its crown on row -4 from the anchor, -5 in the
+  other views, so the head drops a pixel at its top as it turns. Redraw its top to reach the others'
+  crown (a change of pixels for the user to see before and after).
 
 ## Characters (from dogfooding a 64 px character)
 

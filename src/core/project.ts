@@ -255,7 +255,9 @@ export class Project implements BuildCtx {
   /** rig() skeletons by name, for describe's RIG section. */
   readonly rigs = new Map<string, RigDef>();
   /** views() sets: each drawn view's sprite, the set its rows are held against, pxl check reads them */
-  readonly views = new Map<string, { drawn: string[]; like?: string; loc?: string }>();
+  readonly views = new Map<string, { drawn: string[]; like?: string; chin?: Record<string, number>; loc?: string }>();
+  /** rig3d() figures: the body and each move's poses at its headings, pxl check reads their joints */
+  readonly figures = new Map<string, { body: Body; moves: { m: string; frames: number; pose: (i: number, h: number) => Pose; heads: { deg: number; name: string }[] }[]; loc?: string }>();
   /** What building found wrong but not fatal (a shade step that left its ramp): the CLI prints them, pxl check counts them. */
   readonly warnings: { msg: string; loc?: string }[] = [];
 
@@ -568,8 +570,9 @@ export class Project implements BuildCtx {
       const loc = this.callerLoc();
       try {
         if (typeof name !== "string" || !name || !isPlainObject(grids) || !isPlainObject(opts)) throw new PxError('views("_head", { s: grid, sw: grid, w: grid, nw: grid, n: grid }, { anchor: [x, y] (or { s: [x, y], ... }), like: "_other_head" })');
-        checkKeys("views", opts, ["anchor", "like", "swap", "outline", "outline8", "inline", "selout"]);
-        const { anchor, like, ...so } = opts as { anchor?: unknown; like?: unknown };
+        checkKeys("views", opts, ["anchor", "like", "chin", "swap", "outline", "outline8", "inline", "selout"]);
+        const { anchor, like, chin, ...so } = opts as { anchor?: unknown; like?: unknown; chin?: unknown };
+        if (chin !== undefined && !(Number.isInteger(chin) && (chin as number) >= 0)) throw new PxError(`views: chin is the row of the chin in every view's grid (0 its top row), for a set whose lowest rows aren't the chin (a beard, a braid), got ${JSON.stringify(chin)}`);
         const drawn = Object.keys(grids), bad = drawn.filter((d) => !COMPASS.includes(d));
         if (!drawn.length || bad.length) throw new PxError(`views: the views are named by the compass (${COMPASS.join(", ")}), got ${JSON.stringify(bad.length ? bad : drawn)}`);
         if (like !== undefined && typeof like !== "string") throw new PxError(`views: like names another views() set whose rows these keep to, got ${JSON.stringify(like)}`);
@@ -595,7 +598,13 @@ export class Project implements BuildCtx {
           names.push(`${name}_${d}`);
         }
         (env.group as (n: string, m: string[]) => void)(name, names);
-        this.views.set(name, { drawn: drawn.map((d) => `${name}_${d}`), like: like as string | undefined, loc });
+        // the chin from each view's anchor (its pixel's row)
+        const chins = chin === undefined ? undefined : Object.fromEntries(drawn.map((d) => {
+          const a = isPlainObject(anchor) ? anchor[d] : anchor;
+          if (!Array.isArray(a)) throw new PxError("views: chin needs the anchors as pixels [col, row] (the rows are counted from them)");
+          return [`${name}_${d}`, (chin as number) - (a[1] as number)];
+        }));
+        this.views.set(name, { drawn: drawn.map((d) => `${name}_${d}`), like: like as string | undefined, ...(chins ? { chin: chins } : {}), loc });
         return names;
       } catch (e) { throw wrap(e).within("views", loc); }
     };
@@ -605,8 +614,10 @@ export class Project implements BuildCtx {
       const loc = this.callerLoc();
       try {
         if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError('rig3d("tr", { body: { h: 34, heads: 3 }, moves: { walk: { frames: 8, ms: 110, pose: (i, heading) => ({ feet, lift, hands }) } }, n: 8, blocks: true })');
-        checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "head", "chin", "blocks", "mirror", "draw"]);
-        const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown };
+        checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "ink", "surface", "head", "chin", "blocks", "mirror", "draw"]);
+        const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; ink?: unknown; surface?: Record<string, unknown>; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown };
+        if (o.surface !== undefined) { if (!isPlainObject(o.surface)) throw new PxError("rig3d: surface is surface()'s options for the painted figure ({ soft, shadows, ao, rim, ... })"); checkKeys("rig3d surface", o.surface, SURFACE_OPTS.filter((k) => !["view", "ppm", "at", "part"].includes(k))); }
+        if (o.ink !== undefined && typeof o.ink !== "string") throw new PxError(`rig3d: ink is a key: the line round the figure outside and round each part on the one behind (instead of surface()'s outline on the shadow side), got ${JSON.stringify(o.ink)}`);
         const B: Body = bodyOf(o.body ?? {}), H = headingsOf(o.n ?? 8, o.headings, false), pitch = o.pitch ?? 20;
         if (!(pitch >= 0 && pitch <= 90)) throw new PxError(`rig3d: pitch is degrees down, 0 to 90 (20: a field sprite's), got ${JSON.stringify(pitch)}`);
         const prefix = o.blocks === true ? "bk" : o.blocks === false || o.blocks === undefined ? undefined : o.blocks;
@@ -649,23 +660,37 @@ export class Project implements BuildCtx {
         // where a point lands on the sprite and how near us it is: the joints' escape hatch
         const screen = (q: number[]): [number, number] => [px + q[0], py - q[1] * SP - q[2] * CP], depth = (q: number[]) => q[2] * SP - q[1] * CP;
         const joints = (p: Pose, heading: number) => Object.assign(jointsOf(B, p, heading), { screen, depth });
-        const view = { kind: "side" as const, pitch }, at = [px + 0.5, py + 0.5], ink = typeof o.outline === "string" ? o.outline : this.pal.keys.has("k") ? "k" : "#000000";
+        const view = { kind: "side" as const, pitch }, at = [px + 0.5, py + 0.5], ink = typeof o.ink === "string" ? o.ink : typeof o.outline === "string" ? o.outline : this.pal.keys.has("k") ? "k" : "#000000";
         const look = this.look3d, light = o.light ?? look?.light ?? [0, -0.6, 0.75];
         // the east drawn as the west's mirror where the light comes from the picture's middle (as turnaround's)
         const level = Array.isArray(light) && Math.abs(light[0]) < 0.05 * Math.hypot(...light), sym = o.mirror === true || ((o.mirror ?? "auto") === "auto" && level);
         if (![true, false, "auto", undefined].includes(o.mirror as boolean)) throw new PxError(`rig3d: mirror is true, false or "auto", got ${JSON.stringify(o.mirror)}`);
+        // the line round what is drawn, outside it, in the sprite's size
+        const ring = (c: Canvas) => {
+          const { w: W, h: Hh, data } = c.img, on = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < Hh && (data[y * W + x] & 255) >= 128;
+          const out: number[] = [];
+          for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) if (!on(x, y) && (on(x + 1, y) || on(x - 1, y) || on(x, y + 1) || on(x, y - 1))) out.push(x, y);
+          for (let i = 0; i < out.length; i += 2) c.px(out[i] - c.ox, out[i + 1] - c.oy, ink);
+        };
         const paint = (c: Canvas, p: Pose, deg: number, flat: boolean, M: (typeof moves)[number]) => {
           const j = joints(p, deg);
           if (flat) {
             c.surface(blocksOf(B, j), { view, ppm: 1, at, mats: BLOCK_MATS, outline: false, rim: false, shadows: false, ao: 0, inner: ink });
-            // the line round it, outside, in the sprite's size
-            const { w: W, h: Hh, data } = c.img, on = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < Hh && (data[y * W + x] & 255) >= 128;
-            const ring: number[] = [];
-            for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) if (!on(x, y) && (on(x + 1, y) || on(x - 1, y) || on(x, y + 1) || on(x, y - 1))) ring.push(x, y);
-            for (let i = 0; i < ring.length; i += 2) c.px(ring[i] - c.ox, ring[i + 1] - c.oy, ink);
+            ring(c);
           } else {
             const P = partsOf((o.parts as (j: Joints, p: Pose) => unknown)(j, p), j);
-            c.surface(P.field, { view, ppm: 1, at, mats: { ...(look?.mats ?? {}), ...Object.fromEntries(P.ramps.map((r) => [r, r])), ...o.mats } as never, light, outline: (o.outline ?? true) as never, inner: (o.inner ?? true) as never, shadows: false, ao: 0 });
+            // ink: a line all round outside and on the part behind (the traveler's); else surface()'s, on the shadow side
+            const line = o.ink !== undefined ? { outline: false, rim: false, inner: o.ink } : { outline: o.outline ?? true, inner: o.inner ?? true };
+            const mats = { ...(look?.mats ?? {}), ...Object.fromEntries(P.ramps.map((r) => [r, r])), ...o.mats } as never;
+            c.surface(P.field, { view, ppm: 1, at, mats, light, ...(line as object), shadows: false, ao: 0, ...o.surface });
+            // brushes on it (tufts, strands: no line of their own, the line round it all takes them in), decals
+            // pinned on it (a face drawn by hand), then the line round it all
+            for (const S of P.brushes) {
+              const set = scatter(S.field, { light, ...S.o } as never), own = Object.fromEntries(set.mats.filter((m) => m && !(m in (mats as object))).map((m) => [m, m]));
+              c.splats(set, { view, ppm: 1, at, mats: { ...(mats as object), ...own } as never, light: (S.o.light as number[] | undefined) ?? light, part: S.part });
+            }
+            for (const D of P.decals) c.decal(D.asset, { on: D.on ?? P.field, point: D.point, ...(D.views ? { views: D.views } : {}), ...(D.up ? { up: D.up } : {}), ...(D.lit !== undefined ? { lit: D.lit } : {}), ...(D.depth !== undefined ? { depth: D.depth } : {}), view, ppm: 1, at, light, part: D.part });
+            if (o.ink !== undefined) ring(c);
             const head = o.head as string | undefined;
             if (head) {
               // the head by hand over all, the view its heading's; a line of `chin` under it where it meets the body
@@ -688,7 +713,9 @@ export class Project implements BuildCtx {
             if (pre === undefined) continue;
             const fam = `${pre}_${M.m}`, list = M.heads.map((hd) => `${fam}_${hd.name}`);
             const twin = M.heads.map((hd) => (!flat && sym && hd.deg > 0 && hd.deg < 180 ? M.heads.findIndex((g) => Math.abs(g.deg - (360 - hd.deg)) < 1e-9) : -1));
-            M.heads.forEach((hd, i) => { if (twin[i] < 0) define("anim", list[i], [{ w, h, pivot }, (c: Canvas) => paint(c, M.pose(c.frame, hd.deg), hd.deg, flat, M), ...frameOps(M)]); });
+            // (a move of one frame never reads the clock: a still pose)
+            const draw = (hd: (typeof H)[number]) => (M.frames > 1 ? (c: Canvas) => paint(c, M.pose(c.frame, hd.deg), hd.deg, flat, M) : (c: Canvas) => paint(c, M.pose(0, hd.deg), hd.deg, flat, M));
+            M.heads.forEach((hd, i) => { if (twin[i] < 0) define("anim", list[i], [{ w, h, pivot }, draw(hd), ...frameOps(M)]); });
             // (the mirrors after what they mirror, so they play as it does)
             M.heads.forEach((hd, i) => { if (twin[i] >= 0) define("anim", list[i], [{ base: list[twin[i]], flip: "x", pivot: [px + 1, py] }]); });
             groups.push([fam, list]);
@@ -696,6 +723,7 @@ export class Project implements BuildCtx {
           }
           for (const [g, l] of groups) (env.group as (n: string, m: string[]) => void)(g, l);
         }
+        this.figures.set(name, { body: B, moves: moves.map(({ m, frames, pose, heads }) => ({ m, frames, pose, heads })), loc });
         return { names, headings: H.map((hd) => hd.name), joints, screen, depth, w, h, pivot, body: B };
       } catch (e) { throw wrap(e).within("rig3d", loc); }
     };
