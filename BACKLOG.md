@@ -68,6 +68,8 @@ Mark items `[x]` when they ship, with the commit.
   - the head is a little smaller and its hair has less volume and fewer light strokes than the hand
     heads; from behind it is smoother and darker;
   - seams between pieces can make shapes by chance (a "face" on the back was fixed once);
+  - in sw and se a cream pixel of scalp shows at the crown, where the parting's groove cuts down to
+    the skull (the mourner's groove sits higher: none);
   - 1 px creases (knee, elbow) hardly read; the cloak's and boots' accents do;
   - a frame costs ~13 ms against the hand heads' ~4.4 (the hair's noise).
 - [ ] **What the 3D stage (wave 2) left to fix by hand, each a small change of pixels for the user to

@@ -1,6 +1,7 @@
-// The harbor's crew (harbor.px.js): the traveler's skeleton and moves (traveler.px.js, its `travelerRig`)
-// dressed in outfits of their own, under heads drawn by hand in the five views the traveler's are
-// (front, front 3/4, profile, back 3/4, back; the right-hand ones mirrored), each a person at a glance:
+// The harbor's crew (harbor.px.js): the traveler's figure on the 3D layer and his moves (traveler.px.js,
+// its `travelerFigure`) dressed in outfits of their own, under heads of their own, each a person at a
+// glance, drawn by hand in the five views the traveler's hand heads are (front, front 3/4, profile, back
+// 3/4, back; the right-hand ones mirrored) or modeled as his head is:
 // a sailor in a bandana with a short ponytail, a bald dockhand with a beard, one in a flat cap, a
 // woman with long hair in a braid, an older man with grey hair tied back. The faces keep the
 // traveler's approved rows (characters §5); the hair and what covers it change. Recolors of these
@@ -80,7 +81,7 @@ for (const [set, heads] of Object.entries(HEADSETS)) views(`_${set}_head`, heads
 // rolled, boots; a docker's leather apron from the chest to the knees over a twill shirt; a captain's
 // long navy coat open in front over a white shirt, gold buttons down its edges, white breeches in high
 // boots; the companion's red bodice laced over a white chemise, puffed sleeves, a long plum skirt.
-const R = travelerRig, BASE = { ...R.TRAVELER, drapes: [], over: [] }
+const T = travelerFigure, BASE = { ...T.TRAVELER, drapes: [], over: [] }
 const two = (near, far) => (isFar) => (isFar ? far : near)
 const legs = (tr, shin) => (isFar) => ({ tr: isFar ? tr[1] : tr[0], shin: isFar ? shin[1] : shin[0], foot: isFar ? shin[1] : shin[0] })
 const CANVAS = ["iou", "iio"], NAVY = ["QAB", "QQA"], LINEN = ["xyZ", "xxy"], BOOTS = ["Ddl", "DDd"], SKIN = ["zsS", "zzs"]
@@ -93,16 +94,16 @@ const OUTFITS = {
     body: (h, a) => (h < 0.1 ? "Ddl" : Math.abs(a) < 0.55 && h > 0.15 ? "xyZ" : "OUV") },
   apron: { ...BASE, legs: legs(NAVY, BOOTS), skirt: hips("QAB"), sleeve: two("abf", "aab"), fore: two(...SKIN),
     body: (h, a) => (h < 0.1 ? "Ddl" : "abf"),
-    over: [{ top: (j) => j.chest[1] - 0.8, len: 11.5, out: "Ddl", in: "D", trail: 0.15, keep: (h, a) => Math.abs(a) < 0.95,
+    over: [{ top: (j) => j.chest[2] - 0.8, len: 11.5, out: "Ddl", in: "D", trail: 0.15, keep: (h, a) => Math.abs(a) < 0.95,
       radius: (h, a) => (h > 0.32 ? 3.7 : 3.7 + (1.4 * (0.32 - h)) / 0.32) * sides(a) + 0.4 }] },
   coat: { ...BASE, legs: legs(LINEN, BOOTS), cuff: 0.15, skirt: hips("xyZ"), sleeve: two(...NAVY), fore: two(...NAVY),
     body: (h, a) => (h < 0.1 ? "Ddl" : "xyZ"),
-    drapes: [{ top: (j) => j.chest[1] + 0.6, len: 14.5, trail: 0.35, keep: (h, a) => Math.abs(a) > 0.32,
+    drapes: [{ top: (j) => j.chest[2] + 0.6, len: 14.5, trail: 0.35, keep: (h, a) => Math.abs(a) > 0.32,
       out: (h, a, out) => (!out ? "Q" : h > 0.4 && Math.abs(Math.abs(a) - 0.4) < 0.1 && Math.floor(h * 14) % 2 ? "g" : "QAB"),
       radius: (h, a) => (h > 0.37 ? 3.6 : 3.6 + (1.3 * (0.37 - h)) / 0.37) * sides(a) + 0.45 }] },
   dress: { ...BASE, legs: legs(["IKM", "IIK"], BOOTS), cuff: 0.3, skirt: hips("IKM"), sleeve: two(...LINEN), fore: two(...SKIN),
     body: (h, a) => (h > 0.6 && Math.abs(a) < 0.4 ? "xyZ" : Math.abs(a) < 0.08 ? "m" : "mrt"),
-    drapes: [{ base: "pelvis", top: (j) => j.pelvis[1] + 1.4, len: 12.4, out: "IKM", in: "I", trail: 0.3, radius: (h) => 3.7 + 1.7 * (1 - h) }] },
+    drapes: [{ base: "pelvis", top: (j) => j.pelvis[2] + 1.4, len: 12.4, out: "IKM", in: "I", trail: 0.3, radius: (h) => 3.7 + 1.7 * (1 - h) }] },
 }
 
 // ---------------------------------------------------------------- the crew
@@ -125,16 +126,41 @@ const CREW = [
   ["cmp", "br", "dress", AUBURN],
   ["off", "og", "coat", { ...DARK, Q: "#3a0e12", A: "#6e1c22", B: "#9a3038" }],
 ]
-for (const [who, set, outfit, swap] of CREW) for (const move of ["idle", "walk"]) for (const [d, yaw] of Object.entries(R.DIRS)) {
-  const M = R.MOVES[move], o = OUTFITS[outfit]
-  anim(`${who}_${move}_${d}`, { w: R.W, h: R.H, pivot: [R.OX, R.OY], swap },
-    (c) => R.figure(c, `_${set}`, M.f(c.frame, yaw), yaw, o), ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })), bump("hybrid"))
-}
-
 // To look at: every head in its five views (a row each, Alden's first to hold them against), and the
 // crew standing turned s, sw and w.
 scene("crew_heads", { w: 5 * 20 + 4, h: 6 * 18 + 4, bg: "#3c4250" }, ...["tr", ...Object.keys(HEADSETS)].flatMap((set, r) => VIEWS.map((v, k) => stamp(`_${set}_head_${v}`, 3 + k * 20 + ANCHOR[v][0], 3 + r * 18 + ANCHOR[v][1]))))
 scene("crew_standing", { w: CREW.length * 26 + 6, h: 3 * 44 + 4, bg: "#56606e" }, ...CREW.flatMap(([who], i) => ["s", "sw", "w"].map((d, r) => stamp(`${who}_idle_${d}`, 16 + i * 26, 41 + r * 44))))
+
+// ---------------------------------------------------------------- the heads modeled
+// The same five as the traveler's head is modeled (traveler.px.js): his skull, the face drawn by hand
+// on it, and as fields in the head's frame (x his right, y ahead, z up, px) what each wears on it. Short
+// hair under a hat. The bandana: a cloth cap from the brow down to the nape, knotted at the back, its
+// two tails hanging, a short ponytail under them. The bald head: a band of short hair round the back
+// below the crown, a full beard from the cheekbones down, hanging past the chin. The flat cap: a puffed
+// crown wider than the head, its brim over the brow. The braid: long hair parted in the middle, falling
+// past the jaw at the sides and behind, a braid of four plaits over the right shoulder. Grey hair tied
+// back: pulled close over the skull from a high forehead (the temples and the ear bare), a small knot
+// low at the back, a short tail hanging behind the neck.
+const FACE = sdf.ellipsoid([4.4, 4.8, 4.4]).at(0, 4, -2.3), below = (n, h) => sdf.plane(n, h)
+const SHORT = sdf.ellipsoid([5, 5.3, 5]).at(0, -0.4, 0.8).subtract(FACE, { smooth: 0.4 }).noise({ amp: 0.35, scale: 1.1, seed: 7 }).mat("JjhH")
+const HAIRS3 = {
+  sa: sdf.union(sdf.ellipsoid([5.4, 5.5, 4.4]).at(0, -0.5, 0.2).subtract(FACE, { smooth: 0.4 }).noise({ amp: 0.35, scale: 1.1, seed: 7 }).mat("JjhH"),
+    sdf.ellipsoid([5, 5.4, 4.4]).at(0, -0.3, 1.6).subtract(below([0, -0.04, 1], 1.7)).mat("mrt"),
+    sdf.union(sdf.ellipsoid([1.5, 1.2, 1.3]).at(0, -5.9, 1.9), sdf.capsule([-0.5, -6, 1.5], [-1.3, -6.6, -1.8], 0.7, 0.4), sdf.capsule([0.6, -6, 1.5], [1.2, -6.4, -1.2], 0.6, 0.35)).mat("mrt"),
+    sdf.capsule([0, -5.2, -0.8], [0, -6, -4.2], 1.1, 0.7).mat("JjhH")),
+  bd: sdf.union(sdf.ellipsoid([4.95, 5.3, 5.2]).at(0, -0.15, 0).intersect(below([0, 0, 1], 0.6), below([0, 1, 0], 1.6)).subtract(below([0, 0, 1], -3.2)).noise({ amp: 0.25, scale: 0.9, seed: 8 }).mat("JjhH"),
+    sdf.ellipsoid([4.5, 4.4, 3.6]).at(0, 1.4, -3.2).intersect(below([0, 0, 1], -1.4), below([0, -1, 0], 0.5)).noise({ amp: 0.3, scale: 0.9, seed: 9 }).mat("JjhH")),
+  fc: sdf.union(SHORT, sdf.ellipsoid([5.5, 6, 1.6]).at(0, 0.4, 4.6).mat("abf"), sdf.ellipsoid([4, 2.6, 0.5]).at(0, 4.8, 3.2).mat("abf")),
+  br: sdf.ellipsoid([5.1, 5.5, 5.1]).at(0, -0.4, 0.9)
+    .union(sdf.ellipsoid([4.6, 3.2, 4.4]).at(0, -2.6, -3), sdf.capsule([-4.4, 1.4, 1.5], [-4.6, 0.6, -5.6], 1.2, 0.9), sdf.capsule([4.4, 1.4, 1.5], [4.6, 0.6, -5.6], 1.2, 0.9), { smooth: 1 })
+    .subtract(sdf.ellipsoid([4, 4.8, 4.6]).at(0, 4.2, -1.4), sdf.capsule([0, 4.6, 4.6], [0, -1.5, 6.6], 0.25), { smooth: 0.4 })
+    .union(...[0, 1, 2, 3].map((k) => sdf.ellipsoid([1.1, 1, 1]).at(3.7, 3.4, -4.6 - 1.6 * k)))
+    .noise({ amp: 0.45, scale: 1.1, seed: 11 }).mat("JjhH"),
+  og: sdf.ellipsoid([4.9, 5.3, 5.4]).at(0, -0.4, 0.4)
+    .subtract(sdf.ellipsoid([4.5, 4.6, 4.8]).at(0, 4.4, -1), below([0, -0.55, 0.83], -1.4), { smooth: 0.4 })
+    .union(sdf.ellipsoid([1.5, 1.3, 1.4]).at(0, -5.5, -1.6), sdf.capsule([0, -5.6, -2.4], [0, -5.9, -5.6], 0.8, 0.5))
+    .noise({ amp: 0.3, scale: 1.2, seed: 10 }).mat("JjhH"),
+}
 
 // ---------------------------------------------------------------- carrying a crate
 // The dockhand carries a crate held low in front (chosen from blocks, characters §4): against the belly
@@ -143,31 +169,31 @@ scene("crew_standing", { w: CREW.length * 26 + 6, h: 3 * 44 + 4, bg: "#56606e" }
 // walk's (the scene moves him at 0.7 of the pace). Held up under the chin with the arms forward at
 // shoulder height, the blocks read as a sleepwalker; on a shoulder, beside an 11 px head, half the
 // crate covered the face.
-const shorter = (w, k) => ({ ...w, feet: w.feet.map(([a, b]) => [a * k, b]), lift: w.lift.map((l) => l * k) })
 const LOW = { at: [3.4, 0, -5], hands: [[2.5, -0.4, -5.5], [2.5, 0.4, -5.5]], lean: -3 }
-const MOVESLOW = { carry: [R.MOVES.walk, (i, yaw) => shorter(R.MOVES.walk.f(i, yaw), 0.7)], carryidle: [R.MOVES.idle, (i) => R.MOVES.idle.f(i)] }
-// The crate, painted into the figure's depth as its parts are (his hands hold its sides, the outline
-// runs round it): a cube 9 px a side, boards 3 px with a dark seam across its sides and along its lid.
-const crateProp = (best, j, fr, surface) => {
-  const c0 = R.local(j.chest, fr, LOW.at), h = 4.5, axes = [fr.f, fr.r, [0, 1, 0]]
-  for (let a = 0; a < 3; a++) for (const sg of [-1, 1]) {
-    const n = axes[a].map((v) => v * sg), [e1, e2] = axes.filter((_, k) => k !== a)
-    for (let s = -h; s <= h; s += 0.25) for (let u = -h; u <= h; u += 0.25)
-      surface(best, [0, 1, 2].map((k) => c0[k] + n[k] * h + e1[k] * s + e2[k] * u), n, (u + h) % 3 < 0.6 ? "DDd" : "dlu", "crate")
-  }
+const shorter = (w, k) => ({ ...w, feet: w.feet.map(([a, b]) => [a * k, b]), lift: w.lift.map((l) => l * k) })
+const carrying = (pose) => (i, h) => ({ ...pose(i, h), lean: LOW.lean, hands: LOW.hands, crate: true })
+const CARRY = { carry: { ...T.MOVES.walk, pose: carrying((i, h) => shorter(T.MOVES.walk.pose(i, h), 0.7)) }, carryidle: { ...T.MOVES.idle, pose: carrying(T.MOVES.idle.pose) } }
+const lowAt = (j) => [0, 1, 2].map((e) => j.chest[e] + j.f[e] * LOW.at[0] + (e === 2 ? LOW.at[2] : 0))
+// The crate, a part of the figure (his hands hold its sides, the line runs round it): a cube 9 px a side,
+// boards 3 px with a dark seam across its sides and along its lid.
+const crateOf = (j) => sdf.box(9).paint((q, n) => (((Math.abs(n[2]) > 0.7 ? q[0] : q[2]) + 4.5) % 3 < 1 ? "DDd" : "dlu")).rotate(-j.heading, "z").at(lowAt(j))
+
+// ---------------------------------------------------------------- the crew on the 3D layer
+// Their heads two ways, for the user to choose: drawn by hand (views(), as approved) or modeled.
+const MODELED = false
+// Each body and outfit a figure (_<head><outfit>_<move>_<dir>), idle and walking in the 8 directions,
+// each person a recolor of one: <who>_<move>_<dir>
+const figures = new Map()
+for (const [who, set, outfit, swap] of CREW) {
+  const key = `_${set}${outfit}`
+  if (!figures.has(key)) figures.set(key, rig3d(key, { ...T.FIG, ...(MODELED ? {} : { head: `_${set}_head`, chin: "D" }),
+    parts: (j, p) => ({ ...T.dress(OUTFITS[outfit])(j, p), ...(MODELED ? T.head(j, HAIRS3[set]) : {}), ...(p.crate ? { crate: crateOf(j) } : {}) }),
+    moves: { idle: T.MOVES.idle, walk: T.MOVES.walk, ...(who === "car" ? CARRY : {}) } }))
+  for (const n of figures.get(key).names) anim(who + n.slice(key.length), { base: n, swap })
 }
-for (const [move, [M, pose]] of Object.entries(MOVESLOW)) for (const [d, yaw] of Object.entries(R.DIRS)) {
-  const o = { ...OUTFITS.apron, prop: crateProp }
-  anim(`car_${move}_${d}`, { w: R.W, h: R.H, pivot: [R.OX, R.OY] }, (c) => R.figure(c, "_fc", { ...pose(c.frame, yaw), lean: LOW.lean, hands: LOW.hands }, yaw, o),
-    ...Array.from({ length: M.frames }, () => frame({ ms: M.ms })), bump("hybrid"))
-}
-// The same in blocks (bk_carrylow_<dir>), as it was judged: the crate a brown block in front of the
+// The carry in blocks (bk_carrylow_<dir>), as it was judged: the crate a brown block in front of the
 // chest or behind it by its depth.
-for (const [d, yaw] of Object.entries(R.DIRS)) anim(`bk_carrylow_${d}`, { w: R.W, h: R.H, pivot: [R.OX, R.OY] }, (c) => {
-  const p = { ...shorter(R.MOVES.walk.f(c.frame, yaw), 0.7), lean: LOW.lean, hands: LOW.hands }, j = R.bones(p, yaw), m = R.local(j.chest, j.fr, LOW.at), [x, y] = R.scr(m).map(Math.round)
-  const box = () => { c.rect(x - 5, y - 5, 11, 11, "#2a1c12"); c.rect(x - 4, y - 4, 9, 9, "#a0703e"); c.rect(x - 4, y - 4, 9, 2, "#c99a62") }
-  const front = R.depth(m) > R.depth(j.chest) - 1
-  if (!front) box()
-  R.blocks(c, p, yaw)
-  if (front) box()
-}, ...Array.from({ length: 8 }, () => frame({ ms: 110 })))
+rig3d("_carry", { body: T.FIG.body, w: T.FIG.w, h: T.FIG.h, pivot: T.FIG.pivot, blocks: true, moves: { carrylow: { ...CARRY.carry, draw: (c, j) => {
+  const m = lowAt(j), [x, y] = j.screen(m).map(Math.round), front = j.depth(m) > j.depth(j.chest) - 1
+  for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) if (front || !c.get(x + dx, y + dy)) c.px(x + dx, y + dy, Math.max(Math.abs(dx), Math.abs(dy)) === 5 ? "#2a1c12" : dy <= -3 ? "#c99a62" : "#a0703e")
+} } } })

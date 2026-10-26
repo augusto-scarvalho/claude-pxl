@@ -487,7 +487,7 @@ urucum dots and black jenipapo bands painted on the skin, a bead necklace, a wov
 fiber skirt, bare feet; no feather headdress. Keep the original as its own file.
 
 A crowd on one skeleton (a figure in 3D, §3): dress each person rather than recolor one. The painter
-takes an outfit (`travelerRig.figure(..., outfit)`, `examples/hd2d/traveler.px.js`), what is swept
+takes an outfit (`dress(outfit)`, `rig3d()`'s parts, `examples/hd2d/traveler.px.js`), what is swept
 round the body and its ramps: trousers down to a cuff (rolled to the shin over bare feet, or into
 boots); drapes hung from a height (a cloak behind, a coat open at the front with buttons down its
 edges, a long skirt from the waist); the shirt's body by height and angle (stripes 2 px, a vest open
