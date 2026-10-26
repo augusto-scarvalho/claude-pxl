@@ -26,29 +26,33 @@ result. To use pxl by hand, start with [Getting started](getting-started.md).
 The order that has worked over this fork's rounds, each step with its section below:
 
 1. **A brief, in a file when the work is big**: what to make, its size and view, the references as
-   files, the stages you want to approve ([Writing a brief](#writing-a-brief)).
+   files, the stages you want to approve ([Writing a brief](#writing-a-brief)). For a round of
+   several jobs, one file: a "how we work" part every stage shares (these rules) and a part per
+   stage. A fresh agent does one stage, stops and reports; your main session goes over it with you
+   and commits.
 2. **Stages, each approved before the next**: a new move as flat blocks, a scene's camera and ground
    as blocks, then the props, the people, the light ([Blocks first, then paint](#blocks-first-then-paint)).
 3. **Look, fix everything in one turn, check**: the agent reads only the guide sections it needs
    (`pxl help`), looks with one `pxl shot` or `pxl describe`, sends all the fixes in one message, and
    runs `pxl check` before handing over ([How the agent works](#how-the-agent-works)).
-4. **A fresh agent for a big scene** when the conversation is already long: the brief file to a new
+4. **Side by side, then your yes**: a change to art you approved is shown before it is kept, the old
+   above the new (`pxl shot art.px.js name name_old`, `--vs HEAD --diff`, `--gif` when it moves), and
+   applied when you say so. A change to pxl that shouldn't move a pixel is proven byte for byte
+   (`node scripts/hashes.ts --vs HEAD` ends in `0 differ`, [Keeping pxl fast](#keeping-pxl-fast)).
+5. **A fresh agent for a big scene** when the conversation is already long: the brief file to a new
    session, not more turns here ([A big scene](#a-big-scene-one-agent-a-fresh-one-or-a-pipeline)).
-5. **Your notes in one round**, after watching the loops, not the stills
+6. **Your notes in one round**, after watching the loops, not the stills
    ([Reviewing the result](#reviewing-the-result)).
-6. **Friction to `FEEDBACK.md`**: the agent writes a line when pxl cost it a workaround, and whoever
+7. **Friction to `FEEDBACK.md`**: the agent writes a line when pxl cost it a workaround, and whoever
    curates pxl turns it into a fix ([When pxl gets in the agent's way](#when-pxl-gets-in-the-agents-way)).
-7. **One gallery GIF a round**: previewed in a scratch folder (`--out`, `--every`), committed once at
+8. **One gallery GIF a round**: previewed in a scratch folder (`--out`, `--every`), committed once at
    the end, under 10 MB ([The gallery](#the-gallery)).
-8. **Fast tests while working** (the file you touched, `npm run test:quick`, `PXL_EXAMPLES=<folder>`),
+9. **Fast tests while working** (the file you touched, `npm run test:quick`, `PXL_EXAMPLES=<folder>`),
    the full suite once before a commit ([Tests](#tests)).
-9. **Light on the machine**, which may be a 4-core laptop: one heavy job at a time (a render, a test
-   run), long renders in the background; no headless browser (one froze the user's laptop: look at
-   a page in the user's own browser, or say what you couldn't check); stop `pxl serve` and anything
-   else started in the background before reporting.
-
-A thing in 3D (a tree, a house, mist) is a scene of named parts edited by name, its rules checked by
-`pxl check` ([3D as code](#3d-as-code-which-drawer-and-edits-by-name)).
+10. **Light on the machine**, which may be a 4-core laptop: one heavy job at a time (a render, a test
+    run), long renders in the background; no headless browser (one froze the user's laptop: look at
+    a page in the user's own browser, or say what you couldn't check); stop `pxl serve` and anything
+    else started in the background before reporting.
 
 ## Install the skill
 
@@ -62,8 +66,8 @@ git clone --depth 1 https://github.com/augusto-scarvalho/claude-pxl.git .claude/
 ```
 
 `--depth 1` leaves out the history (every past version of the gallery's GIFs, several times the
-size of the files); `git pull` in that folder updates it. If you also work on pxl itself in another clone, make the skills
-folder a link to that clone, so the agent always uses your working copy:
+size of the files); `git pull` in that folder updates it. If you also work on pxl itself in another
+clone, make the skills folder a link to that clone, so the agent always uses your working copy:
 
 ```sh
 ln -s <your clone> ~/.claude/skills/pxl-pixel-art                       # macOS, Linux
@@ -190,6 +194,10 @@ too. So judge the shape of the thing before any of it is painted:
 - **A new head or part beside approved ones** is held to them row by row:
   `pxl compare art.px.js new_head_s approved_head_s` lists each row's extents and where the new one
   is wider. The harbor's crew kept their heads within a pixel of the traveler's skull this way.
+- **A head for a figure in 3D** is modeled (the skull, the hair, a hat), baked once per view and its
+  face painted over by hand, cut from approved hand faces (`views(name, field, { retouch })`,
+  `pxl help "a body that turns"`). Ask to see each view's render and its retouch side by side; the
+  traveler's, the crew's and the miko's heads were made so.
 
 ## 3D as code: which drawer, and edits by name
 
@@ -205,6 +213,13 @@ pixel art (`pxl help "scenes 17"`, [`examples/sdf/`](../examples/sdf)). Which dr
 | leaves, moss, snow on a form | `sdf.scatter` (drawn as small brushes), not splats of the whole form |
 | a face, a door, a rune, a sign on a form | a hand-drawn `decal()`, a drawing per view it needs |
 | a captured or soft look to export | `splats()` and `.ply` (experimental) |
+| a figure that turns and walks | `rig3d()`, its head baked per view by `views()` and retouched |
+| a prop as a game's sprites, one per heading | `turnaround()` (the shrine's torii, hall and lanterns) |
+| one thing in any of these ways | `draw3d(thing, { as: "voxels" })` |
+| a thing in 3D standing in a `mesh()` diorama's sun and shadows | `light: "mesh"` (`graveyard_3d`) |
+
+Whether a thing is worth drawing in 3D at all, and what a frame of each costs:
+[By hand or in 3D](getting-started.md#by-hand-or-in-3d).
 
 Ask for the scene as data: `world3d` parts made by builders (`make3d.tree`, `pine`, `bush`, `rock`,
 `house`, `crystal`, `mist`, `smoke`) with parameters that mean something, placed by relations. A
@@ -223,8 +238,11 @@ Measured on fresh agents given only the skill:
 - The model study's 160×120 animated scene cost $0.54 on Opus at low (2 minutes) to $20.01 at max
   (68 minutes) in Claude Code; see [Pick the model and effort](#pick-the-model-and-effort).
 - A 320×180 animated city street took one agent **85 turns and 31 minutes**. The same brief by a
-  pipeline (a planner and eight forked agents) came out denser but less coherent, for about
-  **5× the tokens and 2× the time**.
+  pipeline (a planner, eight forks drawing the parts and a ninth putting them together) came out
+  denser but less coherent, for about **5× the tokens and 2× the time** (5.2× and 55 minutes).
+- A frame takes 5 ms (a figure drawn in 3D) to 0.7 s (a diorama with a tree and a mist in 3D) to
+  render ([the table](getting-started.md#by-hand-or-in-3d)): a story of hundreds of frames is
+  checked one frame in N (`check: { every: N }`) and previewed with `--every 4`.
 
 Where the tokens go, read from the transcripts of three single-agent sessions that drew a 320×180
 night scene (about 70 turns each; cost in input-token units: a cache read a tenth of one, an output
@@ -242,8 +260,9 @@ token five, a token written to the cache two, as Claude Code keeps its cache an 
 What keeps a session cheap (the skill already asks the agent for the first three; see
 [How the agent works](#how-the-agent-works)):
 
-- **Read by section.** `SKILL.md` (about 3.5k tokens, a test keeps it under 14 KB) is loaded when the task matches. `pxl help
-  "scenes 1 3 11 14"` is about 3k tokens where `scenes.md` whole is 12k.
+- **Read by section.** `SKILL.md` (about 3.5k tokens; a test keeps it under 14,000 characters) is
+  loaded when the task matches. `pxl help "scenes 1 3 11 14"` is about 3k tokens where `scenes.md`
+  whole is about 20k.
 - **Edit, don't rewrite.** A file written whole again stays in the conversation.
 - **Fewer turns.** One look per call, and all the fixes one look showed in one turn.
 - **One big asset per conversation.** Start a new conversation for the next asset rather than
@@ -271,12 +290,11 @@ for every loop) and the scene file that includes the parts. One fork of the plan
 in its own file with a `test_<part>` scene, all at once, and a last fork puts the scene together.
 Included files share one scope, so every top-level name in a part starts with the part's name.
 [`examples/cyberpunk/pipeline/`](../examples/cyberpunk/pipeline) has a plan whose parts fit
-(`plan.md`), the parts and the scene. It came out denser than one agent's street but less coherent,
-for about 5× the tokens and 2× the time.
+(`plan.md`), the parts and the scene.
 
 Run it from a new session. A fork carries everything in the session that makes it and rereads it on
 every step: the 5× above was measured with the planner new (about 130k tokens of context when it
-forked). Forked from a conversation of 500k tokens, each of 8 to 10 forks carries all of it, enough
+forked). Forked from a conversation of 500k tokens, each of the nine forks carries all of it, enough
 to run out a usage limit. Only while a session is still short is a fork of it (Claude Code's Agent
 tool, `subagent_type: "fork"`) as cheap. With Claude Code, the planner at xhigh and each part at
 high:
@@ -320,9 +338,9 @@ Pass the prompt on stdin: `--add-dir` takes several values and would swallow it.
   they're meant to face, and checks the answers.
 
 Watch the loops yourself: in the model study, an agent judging stills ranked two Codex scenes first,
-and the curator, watching the loops, put every Codex scene below Claude's. Give notes the way you would to an artist: what
-reads wrong and why ("the knight floats: the feet aren't on the ground line"), one round with all of
-them.
+and the curator, watching the loops, put every Codex scene below Claude's. Give notes the way you
+would to an artist: what reads wrong and why ("the knight floats: the feet aren't on the ground
+line"), one round with all of them.
 
 ## When pxl gets in the agent's way
 
@@ -346,30 +364,32 @@ test file for what you changed, or the quick suite:
 
 ```sh
 node --test test/docs.test.ts                            # one file: the commands and flags the docs cite
-npm run test:quick                                       # every test but the two slowest, about 18 s
+npm run test:quick                                       # every test but the two slowest, about 23 s
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts      # the examples check, on one folder (or hd2d/harbor, or a,b)
-npm run check                                            # types and every test, about 20 s (a minute after an engine change): before the commit
+npm run check                                            # types and every test, about 25 s (100 s after an engine change): before the commit
 ```
 
-The two slowest tests are the check of every example (about 45 s on a 4-core laptop when all of
-them run, in one thread per four of the machine's, the slowest of the last run first) and the study
-of the gallery's GIFs (7 s); a change to a check, to `study` or to an example is what they catch.
-Both leave alone what already passed. Each example that passed is noted in `node_modules/.cache/pxl/`
+The two slowest tests are the check of every example (about 70 s on a 4-core laptop when all 69
+run, in one thread per four of the machine's, the slowest of the last run first) and the study of
+the gallery's GIFs (7 s); a change to a check, to `study` or to an example is what they catch. Both
+leave alone what already passed. Each example that passed is noted in `node_modules/.cache/pxl/`
 with a hash of what its check read (pxl's sources, Node's version, the test, the example and every
 file it read: what it includes, its palettes, PNGs and poses), and the next run checks only the
-examples whose hash changed: an example edited reruns alone (half a second, where every example took
-45), a shared file (`hd2d/kit.px.js`) reruns the examples that include it, a change to pxl's sources
-reruns them all; the test says how many it left alone. The gallery's study is skipped while pxl's
-sources and its two GIFs are the same. Delete `examples-passed.json` or `gallery-passed.txt` there
-to run them anyway. The suite runs three test files at
-a time, below normal priority, as `pxl` itself does: on a 4-core laptop seven at a time took as long
-(the quick suite 21 s either way), burned a fifth more processor and froze the user's programs. `npm test` preloads `test/compile-cache.ts` (Node's
-compile cache, half a second off every test file's start); a file alone runs the same with
+examples whose hash changed: an example edited reruns alone (half a second for a small one, a few
+for the harbor), a shared file (`hd2d/kit.px.js`) reruns the examples that include it, a change to
+pxl's sources reruns them all; the test says how many it left alone. The gallery's study is skipped
+while pxl's sources and its two GIFs are the same. Delete `examples-passed.json` or
+`gallery-passed.txt` there to run them anyway.
+
+The suite runs three test files at a time, below normal priority, as `pxl` itself does: on a 4-core
+laptop seven at a time took as long, burned a fifth more processor and froze the user's programs.
+`npm test` preloads `test/compile-cache.ts` (Node's compile cache, half a second off every test
+file's start); a file alone runs the same with
 `node --import ./test/compile-cache.ts --test test/<file>.test.ts`. The preload also puts the
 temporary folders the tests make in one of each process's, removed when it exits (before, the tests
-that didn't remove theirs had left 24,000 in the system's temp folder). With
-`PXL_EXAMPLES`, the examples test checks only the examples whose path under `examples/` starts with
-it, says in its name how many it left out, and leaves the other examples' lines alone.
+that didn't remove theirs had left 24,000 in the system's temp folder). With `PXL_EXAMPLES`, the
+examples test checks only the examples whose path under `examples/` starts with it, says in its name
+how many it left out, and leaves the other examples' lines alone.
 
 `test/examples.checks.txt` holds what `pxl check` says on every example. After a change you meant
 that adds or removes a warning, rewrite it and read the diff:
@@ -432,8 +452,8 @@ every version of every file for good, and a GIF hardly compresses: each one comm
 replaced stays in every full clone (one scene's five versions in a day added 24 MB). Look at a GIF
 that isn't done with `node scripts/gallery.ts <name> --out <scratch dir>` (`--every 4` builds one
 frame in four, a quick look at a long story; `pxl shot <file> <scene> --gif --every 4 --out <scratch dir>`
-does the same for any scene and prints its size), and commit it once, at the end of the round. Keep a GIF
-under 10 MB (GitHub stops animating bigger ones): a long scene at half its HD size (`graveyard_md`),
+does the same for any scene and prints its size), and commit it once, at the end of the round. Keep
+a GIF under 10 MB (GitHub stops animating bigger ones): a long scene at half its HD size (`graveyard_md`),
 an excerpt of its story (`harbor_clip`), or `every` in the script's list.
 
 ### Keeping pxl fast
@@ -442,7 +462,7 @@ Agents run `pxl shot`, `check` and `study` many times a session, and the test su
 every example: a slow path costs every turn. Before and after a change to the engine:
 
 ```sh
-npm run check                                           # types and tests: an engine change rechecks every example, about a minute
+npm run check                                           # types and tests: an engine change rechecks every example, about 100 s
 node scripts/hashes.ts --vs HEAD                        # every example's assets built by the last commit's pxl and by yours: what differs
 node scripts/hashes.ts --vs HEAD --frames 12 examples/hd2d/graveyard.px.js   # the animated ones' frames too, 12 over each loop (--frames: all)
 node scripts/perf.ts                                    # pxl check's time, processor time and peak memory on every example
@@ -453,14 +473,14 @@ node scripts/cpuprofile.ts prof                         # where that time went, 
 ```
 
 `--vs <rev>` unpacks the revision's `src/` and `examples/` once into the system's temp folder
-(`pxl-rev-<commit>`) and loads both pxls in one process: no worktree, no stash. `hashes.ts --vs`
-prints only the lines that differ and a count, and exits 1 when one does: a change meant to move no
-pixel ends with `0 differ`, frame by frame for the animated files (`--only <regex>` narrows a file
-to some assets; a long scene's frames take a second each). `perf.ts --vs` builds each frame with one
+(`pxl-rev-<commit>`, by `scripts/vs.ts`) and loads both pxls in one process: no worktree, no
+stash. `hashes.ts --vs` prints only the lines that differ and a count, and exits 1 when one does: a
+change meant to move no pixel ends with `0 differ`, frame by frame for the animated files
+(`--only <regex>` narrows a file to some assets; a long scene's frames take a second each). `perf.ts --vs` builds each frame with one
 pxl and then the other, alternating, because a laptop's speed drifts within seconds: two runs a
 minute apart differ by more than most changes, and the same pxl against itself reads within 6% on a
 figure. `meter.ts`, preloaded, prints each test file's time, processor time and peak memory: which
-files hold the suite back (the three `study` files, 7 to 10 s each of the quick suite's 18).
+files hold the suite back (the three `study` files, 7 to 10 s each of the quick suite's 23).
 
 `pxl build --profile` names the slow functions of one art file's build. Keep a new test to what it
 checks: a few frames, a small picture (a 3D one: a 30 px sprite, cells of 0.25 m), `study --seconds`
@@ -469,10 +489,11 @@ for part of a long clip.
 3D marches a ray to each pixel through a field's distance, written as code (`sdf.ts`'s `Code`); a
 change to the march (where a ray starts, a box that lets it skip) moves pixels, so speed comes from
 that code: a join's children go in runs of 250 lines a function (V8 doesn't optimize one of thousands:
-graveyard_3d's tree of 105 rods took 8 µs a point, 1.5 in runs), and a material is one more pass noting
-which child each join took. On the i5-1035G1 (2026-10): a figure's frame 4-6 ms warm (the warden 18;
-a third of a body's time is its cloth's sweeps and their art functions), graveyard_3d 0.8 s a frame
-(1.2 before), its check 7.5 s (10.5).
+graveyard_3d's tree of 105 rods took 8 µs a point, 1.5 in runs), a long union tests each group of 8
+children's box before the children (a big tree 1.5× as fast), and a material is one more pass noting
+which child each join took. On the i5-1035G1 (2026-10): a figure's frame 5-6 ms warm (the warden 22;
+a third of a body's time is its cloth's sweeps and their art functions), graveyard_3d 0.7 s a frame
+(1.2 before the runs).
 
 ### Measuring sessions and models
 
@@ -485,5 +506,4 @@ scripts/model-study.sh <brief.txt> <runs folder> <model> <effort> [claude|codex|
 
 `tokens.ts` splits the cost by what it paid for (thinking, tool results, the fixed context), then
 lists each kind of tool result by how much of the context it took and how often later turns re-read
-it. `model-study.sh` keeps each run's result, the pxl commit it read, and its start
-and end times. [Doing it again](model-study.md#doing-it-again) has the whole study's commands.
+it. `model-study.sh` keeps each run's result, the pxl commit it read, and its start and end times. [Doing it again](model-study.md#doing-it-again) has the whole study's commands.

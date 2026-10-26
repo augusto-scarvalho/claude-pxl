@@ -47,6 +47,7 @@ if (args[0] === "--one") {
       });
       if (pass >= 0) n += jobs.length;
     }
+    if (!n) { console.log(`${relative(repo, resolve(f)).split("\\").join("/")}: no asset to time (--only matched none)`); continue; }
     console.log(`${relative(repo, resolve(f)).split("\\").join("/")}: ${(ms[vs] / n).toFixed(2)} ms a frame at ${vs}, ${(ms.here / n).toFixed(2)} here (${(ms[vs] / ms.here).toFixed(2)}x as fast) over ${n / 3} frames`);
   }
 } else {

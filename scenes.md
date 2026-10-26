@@ -903,7 +903,8 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn
   and figures' shadows falling on them, their own shadows the sun's share, at its depth, in its
   sizes' pixel (`hd2d/graveyard.px.js`'s `graveyard_3d`, beside the scene it was made from). There, at 480x270, a frame went from 0.5 s to 1.65 s: a dead tree of 105
   tapering rods 1 s (bunched half a meter across, half again as fast; `ao: 0, shadows: false` looked
-  the same), a ground mist 0.35 s, a gate swinging on its hinges 0.1 s; checked one frame in 88.
+  the same), a ground mist 0.35 s, a gate swinging on its hinges 0.1 s; checked one frame in 88
+  (with the tree's distance compiled in runs V8 optimizes, the frame now takes 0.7 s).
   A thin mist under half a meter (`thickness` 0.5, its top rolling with `noise` 0.7 over a 0.1 m layer,
   so the ground shows in its gaps) reads as a veil laid over by `blend: "alpha"`; dithered that thin it
   was speckle. Something that belongs to a ramp material of the mesh (a gate in its fence) keeps that

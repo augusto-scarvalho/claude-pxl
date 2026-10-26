@@ -1,8 +1,8 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**402 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
-and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
+**403 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+and none behind. The work spans October 16–26, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
 
@@ -21,13 +21,13 @@ page lists what the fork adds. Every commit is in
 
 ## At a glance
 
-| | Original (Oct 14) | This fork (Oct 23) |
+| | Original (Oct 14) | This fork (Oct 26) |
 | --- | --- | --- |
 | Commands | 4: `build`, `serve`, `ascii`, `list` | 12: adds `describe`, `shot`, `check`, `steps`, `help`, `compare`, `blind`, `study` |
-| Engine modules | 16 core, 6 Node | 46 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `cpuprofile`, `tokens`, `mhtml`, `model-study`) |
+| Engine modules | 16 core, 6 Node | 52 core, 14 Node, plus maintainers' scripts (`calibrate`, `perf`, `hashes`, `meter`, `cpuprofile`, `tokens`, `mhtml`, `model-study`, `eval3d`, `gallery`) |
 | Guides | README, SKILL, reference, lighting | adds [characters](../characters.md), [scenes](../scenes.md), [environment](../environment.md), [rotation](../rotation.md), [getting started](getting-started.md), [working with an agent](agents.md), [BACKLOG](../BACKLOG.md) |
-| Example files | 13 | 62 |
-| Tests | 59 | 327 |
+| Example files | 13 | 77 |
+| Tests | 59 | 386 |
 
 ## Looking and checking
 

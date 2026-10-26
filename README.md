@@ -130,8 +130,9 @@ link to it instead. To be sure the skill is used, name it: "use the pxl skill to
 The Codex CLI, Antigravity's `agy` and other agents install it differently: see
 [Install the skill](docs/agents.md#install-the-skill). [Working with an agent](docs/agents.md) also
 covers which model and effort to pick (in the [model study](docs/model-study.md), Opus at xhigh was
-the sweet spot), writing a brief, how the agent works and what a session costs, one agent or a
-pipeline for a big scene, and reviewing the result.
+the sweet spot), writing a brief, a round in stages you approve one by one, what a session and a
+frame cost, when to draw in 3D and when by hand, one agent or a pipeline for a big scene, and
+reviewing the result.
 
 ## Commands
 
@@ -169,15 +170,18 @@ says which to reach for.
   anti-aliasing as by hand (`aa`).
 - **Primitives and brushes**: rects, lines and curves drawn pixel-perfect, circles, polygons,
   gradients (dithered, or by whole rows: `grad(..., "lines")`), dithering, noise, pixel fonts (a 3×5
-  built in, a 5×7 to include, `mono` for a score), `scatter` brushes, tilemaps, random groups with
-  reproducible seeds.
+  built in, a 5×7 to include, `mono` for a score), `scatter` brushes, tilemaps, paths along a
+  polyline that fan round their bends (`lane()`), random groups with reproducible seeds.
 - **Scenes**: layers, cast-shadow and light layers, per-layer PNG export.
 - **Animation**: frames as patches over a base sprite → strips + JSON tags + GIF; motion blur
   (`stamp(..., { smear })`); parts half a pixel along (`stamp(..., { sub: true })`) for an idle
   without the single-pixel bob. A scene runs on the clock of what it stamps, or on its own:
   `scene(..., { frames, fps })`.
 - **Characters**: `rig()` skeleton first (slots, stand-ins, parts ordered by facing, turned with
-  `twin` parts), `ik` for poses, `register` by the pelvis (see [`characters.md`](characters.md)).
+  `twin` parts), `ik` for poses, `register` by the pelvis; `rig3d()` a figure posed in 3D and drawn
+  in 4, 8 or 16 directions (flat blocks first, `gait()` for the walk, the head modeled, baked once
+  per view and its face retouched by hand); `route()` walks it through a story and `bubble()` gives
+  it dialogue boxes (see [`characters.md`](characters.md)).
 - **Lighting** (optional): lamps, glow, normal-based relief (see [`lighting.md`](lighting.md)).
 - **In meters**: a camera with one, two or three vanishing points (`perspective()`), ground
   (`plane()`), hills (`terrain()`), things built of solid shapes and their shadows (`solids()`,
@@ -187,8 +191,10 @@ says which to reach for.
   (`voxels()`), meshes (`mesh()`), air (`volume()`: mist, smoke, a glowing orb) or Gaussian splats;
   leaves and moss scattered on them, hand-drawn decals pinned on them; a scene of named parts
   (`world3d`, builders such as `make3d.tree` and `make3d.pine`) edited by name, with rules
-  (`expect3d`) that `pxl check` runs and `--fix` repairs; out to other tools as `.vox`, `.obj`, `.glb`
-  (one that plays, for something that moves) and `.ply`. See [`scenes.md`](scenes.md) §17.
+  (`expect3d`) that `pxl check` runs and `--fix` repairs; one thing drawn as any of them
+  (`draw3d(thing, { as })`); turned into a game's sprites, one per heading (`turnaround()`); standing
+  in a `mesh()` diorama's sun and shadows (`light: "mesh"`); out to other tools as `.vox`, `.obj`,
+  `.glb` (one that plays, for something that moves) and `.ply`. See [`scenes.md`](scenes.md) §17.
 - **Going by in a loop**: parallax planes (`scroll()`, across or, with `axis: "y"`, down the
   picture; pxl warns when a plane would judder), `clouds()`, smoke and steam (`plume()`, and
   `smoke()` in shapes: a column on a path, a puff, a bank, a ring).
@@ -211,7 +217,7 @@ says which to reach for.
 | For | Read |
 | --- | --- |
 | a first sprite, an animation and a scene by hand; which command when | [docs/getting-started.md](docs/getting-started.md) |
-| running an agent: install, model and effort, briefs, how it works, costs, review; tests for contributors | [docs/agents.md](docs/agents.md) |
+| running an agent: install, model and effort, briefs, a round in stages, costs, 3D or by hand, review; tests and tools for contributors | [docs/agents.md](docs/agents.md) |
 | which model and effort to draw with: one scene, seventeen runs | [docs/model-study.md](docs/model-study.md) |
 | whether the 3D layer helps agents: four comparisons, each run once an arm | [docs/evaluation-3d.md](docs/evaluation-3d.md) |
 | every op and option | [reference.md](reference.md), or `pxl help <name>` |
@@ -230,8 +236,8 @@ says which to reach for.
 Long projects made with pxl by agents, most over rounds of a curator's notes, the strongest first.
 Each is in [`examples/`](examples) to read and copy. Smaller files to start from (the starter
 `basics.px.js`, tilesets, a top-down game character in [`examples/topdown_hero/`](examples/topdown_hero),
-a kit of grass, trees and rocks in [`examples/nature/`](examples/nature)) are in the
-[list of examples](examples/README.md).
+kits of grass, trees and rocks and of tree species in their seasons in
+[`examples/nature/`](examples/nature)) are in the [list of examples](examples/README.md).
 
 ### HD-2D dioramas: a graveyard, a harbor, a clearing
 
@@ -248,13 +254,16 @@ a kit of grass, trees and rocks in [`examples/nature/`](examples/nature)) are in
 The look of Octopath Traveler's dioramas, in [`examples/hd2d/`](examples/hd2d): the ground built in
 meters with `mesh()` (textured boxes laid a texel to a pixel, a hill with an uneven outline), people,
 stones and trees standing in it as sprites, shadows from one sun, `post()`'s depth of field. The
-traveler is a 34 px figure in 3D (`rig3d()`), his head modeled and drawn once per view, its face
-painted over by hand: he walks his eight
-directions, kneels to lay a rose and talks in dialogue boxes. The harbor's camera was matched by
+traveler ([`traveler.px.js`](examples/hd2d/traveler.px.js)) is a 34 px figure in 3D (`rig3d()`),
+his head modeled, baked once per view and its face painted over by hand: he walks his eight
+directions along a `route()`, kneels to lay a rose and talks in `bubble()` boxes. In
+`graveyard_3d`, beside the graveyard, its dead tree, a ground mist and the swinging gate are drawn in
+3D inside the diorama's light (`light: "mesh"`), 0.7 s a frame. The harbor's camera was matched by
 measuring a screenshot of Octopath Traveler II; its crew ([`crew.px.js`](examples/hd2d/crew.px.js))
 is dressed on the traveler's skeleton. The clearing ([`clearing.px.js`](examples/hd2d/clearing.px.js))
-has every shader at once: a wood swaying in one wind, a fireball from the traveler's hand, a scarecrow
-burning away, smoke, sparks, bloom and a `.cube` grade.
+has every shader at once: a wood swaying in one wind, a fireball cast from the traveler's hand by the
+spell kit, hidden by the wall on its way, a scarecrow burning away, smoke, sparks, bloom and a
+`.cube` grade.
 
 ### A Japanese shrine in autumn
 
@@ -282,7 +291,8 @@ the smoke densities ray-marched by `volume()`, the leaves and moss details scatt
 door, the sign and the spirit's face hand-drawn decals pinned on them. The scene is data
 (`world3d`): "a denser canopy, twistier branches, wind from the left" is an edit that leaves the house
 and the rock byte for byte as they were, and its rules are checked by `pxl check`. The same fields
-go out as voxel models, meshes and splats (`.vox`, `.obj`, `.glb`, `.ply`).
+go out as voxel models, meshes and splats (`.vox`, `.obj`, `.glb`, `.ply`), or as a game's sprites
+turned to each heading by `turnaround` ([`turnaround.px.js`](examples/sdf/turnaround.px.js)).
 
 ### A spell kit: elements, tiers, variants, views
 
@@ -375,8 +385,8 @@ Jungle" by bluecarrot16, Lanea Zimmerman (Sharm), Sevarihk, Hyptosis and others,
 npm install                                          # dev only: typescript, @types/node
 node --test test/docs.test.ts                        # one test file, while you iterate
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts  # the examples' check on one folder
-npm run test:quick                                   # every test but the two slowest (~18 s)
-npm run check                                        # type check + every test (~20 s; a minute after an engine change), before a commit
+npm run test:quick                                   # every test but the two slowest (~23 s)
+npm run check                                        # type check + every test (~25 s; ~100 s after an engine change), before a commit
 ```
 
 ```
@@ -396,6 +406,7 @@ test/         node:test suites
 | `scripts/calibrate.ts` | scores `pxl study` against the examples' own source |
 | `scripts/perf.ts` | `pxl check`'s time, processor time and peak memory on every example; `--vs <rev>`: ms a frame, that revision's pxl against yours |
 | `scripts/hashes.ts` | a hash of every asset of the files given (none: every example); `--vs <rev>`: what differs from that revision's pxl, `--frames` frame by frame, for an engine change that shouldn't move a pixel |
+| `scripts/vs.ts` | what `hashes.ts` and `perf.ts` share: a revision's `src/` and `examples/` unpacked once into the temp folder |
 | `scripts/meter.ts` | preloaded into the tests, each test file's time, processor time and peak memory |
 | `scripts/cpuprofile.ts` | a CPU profile of any pxl command, summed by function |
 | `scripts/tokens.ts` | where a Claude Code session's tokens went, read from its transcript |

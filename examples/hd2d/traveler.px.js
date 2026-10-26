@@ -6,7 +6,7 @@
 // (the waist about as wide as the chest, the arms slim and close along it, the hands at the crotch:
 // shoulders broad over a narrow waist read as a body-builder); the same rows for the head, shoulders,
 // hands, crotch and soles in every view. Lit from above and toward us, so a mirrored view keeps its
-// light. Each move was judged first as flat blocks (bk_<move>_<dir>, characters §4). The mourner is
+// light. Each move was judged first as flat blocks (bk_<move>_<dir>, characters §3). The mourner is
 // the same figure, her hair her own.
 pal({
   k: "#1c1418",                                                   // outline

@@ -13,6 +13,7 @@ animation and a scene, then shows where each command fits. For the full API see
 - [Watch it while you edit](#watch-it-while-you-edit)
 - [An animation and a scene](#an-animation-and-a-scene)
 - [Loops, clocks and sheets](#loops-clocks-and-sheets)
+- [By hand or in 3D](#by-hand-or-in-3d), and what a frame costs
 - [What a build writes](#what-a-build-writes)
 - [Which command, when](#which-command-when)
 - [Starting from a reference](#starting-from-a-reference)
@@ -116,6 +117,39 @@ examples use them.
 - **Sheets for a game.** `sheet("hero", ["idle_*", "walk_*"], { rows: "tag" })` puts each animation
   on a row of its own, and the sheet's preview GIF plays every animation in it at once.
 
+## By hand or in 3D
+
+Most of pxl is drawing by hand in code: grids, primitives, parts. Some things are better described
+once in meters and drawn as pixel art by pxl (`pxl help "scenes 17"`). What the examples taught:
+
+- **By hand:** a face of 11 rows or less, an eye, a leaf, an icon (a grid, pixel by pixel); anything
+  a few px tall (the road's walker far off, the race's rivals at seven sizes); a tree that only
+  sways (a sprite and `effect("sway")`, 2 px at its top).
+- **In 3D:** a body that turns and walks (`rig3d()`): drawn by eye, its proportions drift and its
+  near and far limbs swap, where one skeleton and one set of moves give every direction. A prop seen
+  from several sides (`turnaround()` draws it once per heading: the shrine's torii, hall, lanterns
+  and foxes). Trees, rocks and mist that one sun has to light alike (`examples/nature/`, `volume()`).
+- **A head, both ways.** Model it (the skull, the hair, a hat), bake it once per view with
+  `views(name, field, { retouch })` (five views for eight directions, the east the west's mirror),
+  then paint its face over each view by hand (`"."` keeps the render's pixel, `"_"` erases one). The
+  3D gets the hair's volume right; a face of fields and decals read worse than a painted one. Baked
+  once, it costs nothing a frame (`pxl help "a body that turns"`; the traveler, the miko).
+- **What didn't work:** a whole tree as splats (soft blobs beside the same tree drawn by
+  `surface()`); a figure pre-rendered in Blender (a stiff borrowed walk, turns stuck at the angles
+  rendered, every fix of a proportion a round trip through another program).
+
+What a frame costs, warm, on a 4-core laptop (i5-1035G1):
+
+| | a frame |
+| --- | --- |
+| a `rig3d` figure: the traveler, 34 px | 5-6 ms (the warden, 48 px with an axe: 22) |
+| a tree in 3D, 50-60 px | 0.2-0.5 s, the dense species 1-1.4 s |
+| the shrine, 240×160: its props and trees turned once when it loads (10 s to its first `shot`) | 0.06 s |
+| `graveyard_3d`, 480×270: a dead tree, a mist and a gate drawn in 3D every frame | 0.7 s |
+
+So draw in 3D once and stamp the sprites where you can, and give a long story in 3D
+`check: { every: N }` (the graveyard: one frame in 24).
+
 ## What a build writes
 
 ```
@@ -205,11 +239,12 @@ each piece as a strip. `--no-out` prints the text only.
 - [scenes.md](../scenes.md): layout, ground, texture, distance, true perspective, parallax, shadows,
   one-shot effects, a game's screen and projections.
 - [characters.md](../characters.md): proportions, faces, views, clean lines and anti-aliasing,
-  animating with parts (timing an action, squash and stretch, walks), rigs. What the tutorials teach
-  about lines, anti-aliasing, clusters and timing is in §4, §7, §10 and §12 (frame counts measured
-  on Saint11's cards).
+  animating with parts (timing an action, squash and stretch, walks), rigs, a body in 3D with its
+  head baked and retouched (§3). What the tutorials teach about lines, anti-aliasing, clusters and
+  timing is in §4, §7, §10 and §12 (frame counts measured on Saint11's cards).
 - [environment.md](../environment.md): grass, trees, bushes, rocks, walls and paths as games draw
-  them, with a kit to start from (`examples/nature/kit.px.js`).
+  them, with kits to start from (`examples/nature/kit.px.js`; tree species in their seasons,
+  `examples/nature/trees.px.js`).
 - [lighting.md](../lighting.md): lamps, light blocked by walls, normal maps, glow.
 - Effects as shaders do them (a dissolve, an aura, wind, energy), particles, trails and spells:
   `pxl help effects` and `pxl help abilities`, then [`spells.px.js`](../examples/spells.px.js),
@@ -221,7 +256,8 @@ each piece as a strip. `--no-out` prints the text only.
 - [`examples/`](../examples): finished files to copy the structure of. Start with `basics.px.js`;
   for a game, `platformer.px.js` and `topdown.px.js` (tilesets laid out as levels) and
   [`topdown_hero/`](../examples/topdown_hero) (a character in four directions, a tagged sheet); for
-  an HD-2D scene (pixel-art sprites in a 3D diorama), [`hd2d/`](../examples/hd2d).
+  an HD-2D scene (pixel-art sprites in a 3D diorama), [`hd2d/`](../examples/hd2d); for a top-down
+  scene whose props are drawn in 3D and turned, [`shrine/`](../examples/shrine).
   [examples/README.md](../examples/README.md) says which example teaches what.
 
 Art files can be `.ts`: add `/// <reference path="<pxl>/types/pxl.d.ts" />` at the top for editor
@@ -242,5 +278,9 @@ completion.
   number of px a frame; the warning names one.
 - **A preview GIF is many MB.** Build with `--every 3` (the GIFs in `out/` keep every frame), or
   look first with `pxl shot art.px.js scene --gif --every 3`, which builds only those frames.
+- **The computer slows to a crawl.** A long scene's build or check keeps a core busy for minutes
+  (pxl runs below normal priority) and pxl's own test run several: run one at a time, look with
+  `pxl shot` (one asset, the frames you name) rather than a whole `build`, and stop `pxl serve`
+  when you're done with it.
 - **Running an example filled the repository with `out/` folders.** Commands write next to the art
   file; pass `--out <some scratch folder>`. `out/` is ignored by git.
