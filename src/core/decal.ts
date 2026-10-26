@@ -37,8 +37,12 @@ export interface DecalOpts {
   view?: SurfaceView; ppm?: number; at?: number[]; pixel?: number; light?: number[];
   /** the name of the part it is (pxl steps --at; default "decal <name>") */
   part?: string;
+  /** none of it where the surface under it turns edge on to the eye (an eye's pixel on the silhouette of a face turned away), and lit, never darkened into a ramp's darkest (the outline's ink) */
+  clean?: boolean;
 }
-export const DECAL_OPTS = ["on", "point", "up", "mode", "size", "views", "depth", "lit", "view", "ppm", "at", "pixel", "light", "part"];
+export const DECAL_OPTS = ["on", "point", "up", "mode", "size", "views", "depth", "lit", "view", "ppm", "at", "pixel", "light", "part", "clean"];
+/** clean: how far toward the eye the surface under a texel must face (the normal's share along the view) */
+const EDGE = 0.3;
 interface DecalCanvas extends SurfaceCanvas { asset(name: string): Img }
 
 const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -80,13 +84,17 @@ export function drawDecal(c: DecalCanvas, name: string, o: DecalOpts = {}): void
   const tone = (col: Color, lv: number) => {
     if (!lit) return col;
     let k = Math.max(-2, Math.min(2, Math.round((lv - 0.62) * 4)));
-    while (k) { const s = steps[k < 0 ? 0 : 1].get(col); if (s === undefined || s === col) break; col = s; k -= Math.sign(k); }
+    // (clean: never down into a ramp's darkest, the outline's ink: a mouth in shadow stays a mouth)
+    while (k) { const s = steps[k < 0 ? 0 : 1].get(col); if (s === undefined || s === col || (o.clean && k < 0 && !steps[0].has(s))) break; col = s; k -= Math.sign(k); }
     return col;
   };
-  const pk = partIndex(c.img, o.part ?? `decal ${name}`), emit = !lit;
+  if (o.clean !== undefined && typeof o.clean !== "boolean") throw new PxError(`${who}: clean is true or false, got ${JSON.stringify(o.clean)}`);
+  const pk = partIndex(c.img, o.part ?? `decal ${name}`), emit = !lit, nrm = o.clean ? c.img.normals() : undefined;
   const put = (x: number, y: number, col: Color, z: number, tol: number) => {
     const q = c.index(x, y);
     if (q < 0 || !vis || !(Math.abs(vis[q] - z) < tol)) return;
+    // (the normal surface() wrote there, its z toward the eye)
+    if (nrm && nrm[q * 3 + 2] < EDGE * 127) return;
     if (!c.plot(x, y, col)) return;
     c.img.parts!.ids[q] = pk;
     if (emit) (c.img.emit ??= new Uint8Array(W * H))[q] = 255;

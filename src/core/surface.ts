@@ -54,10 +54,12 @@ export interface SurfaceOpts {
   hide?: boolean;
   /** the name of the part it is (pxl steps --at says what part painted a pixel; a field's own .part() names go after it) */
   part?: string;
+  /** a pixel artist's pass over a small thing before its lines: a pixel sticking out alone cut away, an inner line where it meets the outline or under another line its own darkest tone (one line, not a doubled black run) */
+  clean?: boolean;
   /** (light: "mesh": the light of the mesh() drawn before it, on what it draws as on mesh()'s sprites) */
   world?: Lit;
 }
-export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "soft", "outline", "inner", "rim", "shadows", "ao", "pixel", "cast", "hide", "part"];
+export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "soft", "outline", "inner", "rim", "shadows", "ao", "pixel", "cast", "hide", "part", "clean"];
 /** The index of a part's name in the picture's list of what painted each pixel (see Img.parts). */
 export function partIndex(img: Img, name: string): number {
   if (typeof name !== "string" || !name) throw new PxError(`part is a name, got ${JSON.stringify(name)}`);
@@ -355,6 +357,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   if (!(aoK >= 0 && aoK <= 1) || !(castK >= 0 && castK <= 1)) throw new PxError(`${who}: ao and cast are 0..1, got ${JSON.stringify([o.ao, o.cast])}`);
   const soft = o.soft ?? 0;
   if (!(soft >= 0 && soft <= 1)) throw new PxError(`${who}: soft is 0..1, how far the light wraps round the form, got ${JSON.stringify(o.soft)}`);
+  if (o.clean !== undefined && typeof o.clean !== "boolean") throw new PxError(`${who}: clean is true or false, got ${JSON.stringify(o.clean)}`);
   const origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
   if (origin !== undefined && !(Array.isArray(origin) && origin.length === 2 && origin.every(Number.isFinite))) throw new PxError(`${who}: view's origin is where the world's [0, 0, 0] lands, [x, y] px, got ${JSON.stringify(origin)}`);
   if (o.at !== undefined && !(Array.isArray(o.at) && (o.at.length === 3 || (!persp && o.at.length === 2)) && o.at.every(Number.isFinite)))
@@ -446,6 +449,20 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       }
       tone[i] = Math.max(0, Math.min(ramp.length - 1, Math.round(lv * (ramp.length - 1))));
     }
+  // clean: a cell alone, or sticking out a pixel from the figure (its one neighbour of it inside, with
+  // three or four of its own: a nose smaller than a pixel, a tuft's tip), cut away before the lines
+  if (o.clean) {
+    const on = (x: number, y: number) => x >= 0 && y >= 0 && x < GW && y < GH && m[y * GW + x] >= 0;
+    const nbs = (x: number, y: number) => +on(x - 1, y) + +on(x + 1, y) + +on(x, y - 1) + +on(x, y + 1);
+    const cut: number[] = [];
+    for (let gy = 0; gy < GH; gy++)
+      for (let gx = 0; gx < GW; gx++) {
+        if (!on(gx, gy)) continue;
+        const n = nbs(gx, gy);
+        if (!n || (n === 1 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => on(gx + dx, gy + dy) && nbs(gx + dx, gy + dy) >= 3))) cut.push(gy * GW + gx);
+      }
+    for (const i of cut) m[i] = -1;
+  }
 
   // tones in clusters: a cell whose tone none of its four neighbours of the same material share takes
   // the one most of them have (three or four)
@@ -480,9 +497,26 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
     }
     return seam;
   };
+  // (clean: an inner line where it meets the contour, the outline beside it, or where it runs along a
+  // nearer part's own line, would make a black run 2 px thick: there it takes its own darkest tone, as a
+  // selective outline does; two parts' lines end to end stay one line)
+  const inkBy = (i: number, x: number, y: number) => {
+    const j = y * GW + x;
+    return x >= 0 && y >= 0 && x < GW && y < GH && m[j] >= 0 && !hidden[j] && pt[j] !== pt[i] && depth[j] < depth[i] - nearBy && (pt[j] < 0 || pt[i] < 0 || top[pt[j]] !== top[pt[i]]);
+  };
+  const doubled = (gx: number, gy: number, i: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) =>
+    open(gx + dx, gy + dy, i) || (inkBy(i, gx + dx, gy + dy) && inkBy((gy + dy) * GW + gx + dx, gx + 2 * dx, gy + 2 * dy)));
   const norm = c.img.normals(), zbuf = (c.img.depth ??= new Float32Array(W * H).fill(Infinity));
   // what each part is called on the picture: the drawing's part, then the field's own
   const own = (T.parts ?? []).map((n) => partIndex(c.img, o.part ? `${o.part}.${n}` : n)), whole = o.part !== undefined ? partIndex(c.img, o.part) : -1;
+  // (clean: the inner line's cells that take their own darkest; a cell of it left between two of them
+  // on its line too, so a short line doesn't read dashed)
+  const sel = o.clean && innerOn ? new Uint8Array(N) : undefined;
+  if (sel) {
+    const ink = new Uint8Array(N), same = (i: number, j: number) => sel[j] === 1 && pt[j] === pt[i];
+    for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) { const i = gy * GW + gx; if (m[i] >= 0 && !hidden[i] && behind(gx, gy, i) === 1) { ink[i] = 1; sel[i] = doubled(gx, gy, i) ? 1 : 0; } }
+    for (let gy = 1; gy < GH - 1; gy++) for (let gx = 1; gx < GW - 1; gx++) { const i = gy * GW + gx; if (ink[i] && !sel[i] && ((same(i, i - 1) && same(i, i + 1)) || (same(i, i - GW) && same(i, i + GW)))) sel[i] = 2; }
+  }
   for (let gy = 0; gy < GH; gy++)
     for (let gx = 0; gx < GW; gx++) {
       const i = gy * GW + gx;
@@ -496,7 +530,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
         else if (!open(gx - dx, gy - dy, i)) away = true;
       }
       const seam = innerOn ? behind(gx, gy, i) : 0;
-      if (seam) col = seam === 2 ? ramp[0] : innerKey ?? ramp[0];
+      if (seam) col = seam === 2 || sel?.[i] ? ramp[0] : innerKey ?? ramp[0];
       else if (away && o.outline !== false) col = outKey ?? ramp[0];
       else if (toward && o.rim !== false) col = ramp[Math.min(ramp.length - 1, tone[i] + 1)];
       // the normal as the picture sees it (x right, y down, z toward the eye)

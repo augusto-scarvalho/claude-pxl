@@ -254,6 +254,8 @@ declare global {
     hide?: boolean;
     /** the name of the part it is (pxl steps --at) */
     part?: string;
+    /** a pixel artist's pass before its lines: a pixel sticking out alone cut away, an inner line where it meets the outline or runs along another line its own darkest tone */
+    clean?: boolean;
   }
   /** A density's options: its soft edge (m), the noise eating it (m, billows scale m across, octaves), carried flow m over the loop, thinned away up from fade [z0, z1]. */
   interface PxDensityOpts { edge?: number; noise?: PxNum; scale?: PxNum; seed?: number; octaves?: number; flow?: PxVec; fade?: [number, number] }
@@ -282,6 +284,8 @@ declare global {
     /** pin: m in front of or behind its point what is drawn under a texel may lie and still take it (default its own width) */
     depth?: number;
     view?: PxSurfaceView; ppm?: number; at?: number[]; pixel?: number; light?: number[] | "view"; part?: string;
+    /** none of it where the surface turns edge on to the eye; lit, never darkened into a ramp's darkest */
+    clean?: boolean;
   }
   /** What a builder makes: a field (or a density and its look), named parts, details, decals, sockets. */
   interface PxBuilt { field?: PxSdf; density?: PxDensity; parts: Record<string, PxSdf>; details: Record<string, PxScatterOpts>; decals: Record<string, { asset: string; point: PxV3 }>; sockets: Record<string, PxV3> }

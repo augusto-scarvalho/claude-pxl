@@ -683,13 +683,25 @@ export class Project implements BuildCtx {
             const line = o.ink !== undefined ? { outline: false, rim: false, inner: o.ink } : { outline: o.outline ?? true, inner: o.inner ?? true };
             const mats = { ...(look?.mats ?? {}), ...Object.fromEntries(P.ramps.map((r) => [r, r])), ...o.mats } as never;
             c.surface(P.field, { view, ppm: 1, at, mats, light, ...(line as object), shadows: false, ao: 0, ...o.surface });
+            // a head modeled (a part named head, no views): the line of `chin` under its jaw where it meets the
+            // body (under the head's pixels of chin's ramp, the skin's, but its darkest; not under the hair)
+            const parts = c.img.parts;
+            if (!o.head && typeof o.chin === "string" && parts) {
+              const { w: W, h: Hh, data } = c.img, part = (x: number, y: number) => parts.names[parts.ids[y * W + x]] ?? "", head = (x: number, y: number) => /^head(\.|$)/.test(part(x, y));
+              const skin = new Set([...(c.pal.ramps.find((r) => r.includes(o.chin as string)) ?? `.${o.chin}`)].slice(1).map((k) => c.color(k)));
+              for (let x = 0; x < W; x++) {
+                let y = Hh - 2;
+                while (y >= 0 && !head(x, y)) y--;
+                if (y >= 0 && skin.has(data[y * W + x]) && part(x, y + 1) && !head(x, y + 1)) c.px(x - c.ox, y + 1 - c.oy, o.chin);
+              }
+            }
             // brushes on it (tufts, strands: no line of their own, the line round it all takes them in), decals
             // pinned on it (a face drawn by hand), then the line round it all
             for (const S of P.brushes) {
               const set = scatter(S.field, { light, ...S.o } as never), own = Object.fromEntries(set.mats.filter((m) => m && !(m in (mats as object))).map((m) => [m, m]));
               c.splats(set, { view, ppm: 1, at, mats: { ...(mats as object), ...own } as never, light: (S.o.light as number[] | undefined) ?? light, part: S.part });
             }
-            for (const D of P.decals) c.decal(D.asset, { on: D.on ?? P.field, point: D.point, ...(D.views ? { views: D.views } : {}), ...(D.up ? { up: D.up } : {}), ...(D.lit !== undefined ? { lit: D.lit } : {}), ...(D.depth !== undefined ? { depth: D.depth } : {}), view, ppm: 1, at, light, part: D.part });
+            for (const D of P.decals) c.decal(D.asset, { on: D.on ?? P.field, point: D.point, ...(D.views ? { views: D.views } : {}), ...(D.up ? { up: D.up } : {}), ...(D.lit !== undefined ? { lit: D.lit } : {}), ...(D.depth !== undefined ? { depth: D.depth } : {}), ...(o.surface?.clean ? { clean: true } : {}), view, ppm: 1, at, light, part: D.part });
             if (o.ink !== undefined) ring(c);
             const head = o.head as string | undefined;
             if (head) {
