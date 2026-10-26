@@ -45,8 +45,11 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
     try {
       vm.runInContext(compile(code, abs), ctx, { filename: abs });
     } catch (e) {
-      // Included files run in one shared scope: say so instead of JavaScript's bare redeclaration.
-      if ((e as Error)?.name === "SyntaxError" && /has already been declared/.test((e as Error).message) && stack.length > 1)
+      // Included files run in one shared scope: say so instead of JavaScript's bare redeclaration, when the
+      // file compiles on its own (the clash is with another file's name); a name declared twice within
+      // this file is its own error, with its line
+      const alone = () => { try { new vm.Script(compile(code, abs)); return true; } catch { return false; } };
+      if ((e as Error)?.name === "SyntaxError" && /has already been declared/.test((e as Error).message) && stack.length > 1 && alone())
         throw new PxError(`${abs.replace(/^.*[\\/]/, "")}: ${(e as Error).message}. Included files share one scope for top-level names, so each const/let/function name can be declared in only one of them; rename it in one file`);
       throw syntaxAware(e, abs, p);
     } finally {
@@ -132,8 +135,9 @@ function warnHiding(p: Project, ctx: vm.Context, env: Record<string, unknown>, c
 
 function syntaxAware(e: unknown, file: string, p: Project): PxError {
   const err = wrap(e, (s) => p.locFromStack(s));
-  // SyntaxErrors put the location in the first stack line ("file:line").
-  if (!err.loc && typeof e === "object" && e && "stack" in e) {
+  // SyntaxErrors put the location in the first stack line ("file:line"): the file's own, also when an
+  // include called it (the call stack's place would be the include's line)
+  if ((!err.loc || (e as Error)?.name === "SyntaxError") && typeof e === "object" && e && "stack" in e) {
     const m = new RegExp(escape(file) + ":(\\d+)").exec(String((e as Error).stack));
     if (m) err.loc = `${file.replace(/^.*[\\/]/, "")}:${m[1]}`;
     err.message = err.format();

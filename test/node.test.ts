@@ -259,6 +259,12 @@ test("include: a top-level name declared in two files says that included files s
   const { dir, file } = tmpArt(`const SIZE = 1\ninclude("lib.px.js")`);
   writeFileSync(join(dir, "lib.px.js"), `const SIZE = 2`);
   assert.throws(() => loadProject(file), /lib\.px\.js: Identifier 'SIZE' has already been declared\. Included files share one scope/);
+  // the includer's name, declared after the include (still uninitialized when the included file runs)
+  writeFileSync(file, `include("lib.px.js")\nconst SIZE = 1`);
+  assert.throws(() => loadProject(file), /Included files share one scope/);
+  // a name declared twice inside one function of the included file is that file's own error, with its line
+  writeFileSync(join(dir, "lib.px.js"), `const f = () => {\n  const top = 1\n  const top = 2\n}`);
+  assert.throws(() => loadProject(file), (e) => /lib\.px\.js:3/.test(String(e)) && !/share one scope/.test(String(e)));
 });
 
 test("include { palette: true } shares the included palette", () => {
