@@ -3,7 +3,8 @@
 interface ErrInfo { message: string; loc?: string }
 interface AssetInfo { name: string; kind: string; part: boolean; w?: number; h?: number; hash?: string; steps?: number; changed: boolean; edited: boolean; error?: ErrInfo }
 interface State { version: number; file: string; time: string; ms: number; error?: ErrInfo; assets: AssetInfo[]; sheets: string[]; models: string[]; errors: ErrInfo[] }
-interface FrameJ { label: string; loc?: string; w: number; h: number; full?: string; changes?: string }
+/** A painting step: the pixels it changed, all of them (the first), or, a big one, the picture after it as a PNG. */
+interface FrameJ { label: string; loc?: string; w: number; h: number; full?: string; changes?: string; png?: string }
 /** image and anim.images are PNGs in base64; a long loop's frames come from /api/frame as the page plays them. */
 interface AssetJ { name: string; kind: string; w: number; h: number; loc?: string; palette: Record<string, string>; layers: string[]; image: string; frames: FrameJ[]; anim?: { ms: number[]; images?: string[] } }
 interface Frame { label: string; loc?: string; w: number; h: number; full?: Uint32Array; changes?: Uint32Array }
@@ -125,6 +126,7 @@ async function select(name: string, opts: { play?: boolean; keepStep?: boolean }
   const j = await fetchAsset(name, true);
   if (!j || sel !== name) return;
   const frames: Frame[] = j.frames.map((f) => ({ label: f.label, loc: f.loc, w: f.w, h: f.h, full: f.full ? u32(f.full) : undefined, changes: f.changes ? u32(f.changes) : undefined }));
+  if (j.frames.some((f) => f.png)) await unpack(j.frames, frames);
   const rev = new Map<number, string>();
   for (const [k, v] of Object.entries(j.palette)) {
     const c = parseInt(v.slice(1).padEnd(8, "f"), 16) >>> 0;
@@ -146,6 +148,30 @@ async function select(name: string, opts: { play?: boolean; keepStep?: boolean }
   setStep(step);
   if (opts.play) play(true);
   pump();
+}
+
+/**
+ * Steps sent as the picture after them (PNG): their pixels, and what they changed from the picture
+ * before (for the highlight), as the replay reads the others.
+ */
+async function unpack(js: FrameJ[], frames: Frame[]): Promise<void> {
+  const pics = await Promise.all(js.map((f) => (f.png ? png64(f.png) : undefined)));
+  let prev: Uint32Array | undefined; // the picture after the step before, our own copy
+  frames.forEach((f, i) => {
+    const pic = pics[i];
+    if (pic) {
+      if (prev?.length === pic.data.length) {
+        let n = 0;
+        for (let k = 0; k < prev.length; k++) if (prev[k] !== pic.data[k]) n++;
+        const ch = new Uint32Array(2 * n);
+        for (let k = 0, o = 0; k < prev.length; k++) if (prev[k] !== pic.data[k]) { ch[o++] = k; ch[o++] = pic.data[k]; }
+        f.changes = ch;
+      }
+      f.full = pic.data;
+      prev = pic.data.slice();
+    } else if (f.full) prev = f.full.slice();
+    else if (f.changes && prev) for (let k = 0; k < f.changes.length; k += 2) prev[f.changes[k]] = f.changes[k + 1];
+  });
 }
 
 // ---------------------------------------------------------------- list

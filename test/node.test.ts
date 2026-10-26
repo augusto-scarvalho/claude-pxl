@@ -541,6 +541,10 @@ test("server: frames as PNGs, a short loop's with the asset, a long loop's one a
     const long = await (await fetch(s.url + "api/asset?name=long&frames=1")).json();
     assert.equal(long.anim.ms.length, 80);
     assert.equal(long.anim.images, undefined);
+    // its painting steps: the background (1 MB of pixels) as a PNG of the picture after it, the square as its changes
+    assert.deepEqual(long.frames.map((f: Record<string, string>) => [!!f.png, !!f.full, !!f.changes]), [[true, false, false], [false, false, true]]);
+    assert.ok(png(long.frames[0].png).data.every((c) => c === p.pal.resolve("1")));
+    assert.ok(blink.frames.every((f: Record<string, string>) => !f.png), "a small asset's steps as they were");
     const r = await fetch(s.url + "api/frame?name=long&i=7");
     assert.equal(r.headers.get("content-type"), "image/png");
     assert.equal(decodePng(new Uint8Array(await r.arrayBuffer())).hash(), p.image("long", 0, 700).hash());

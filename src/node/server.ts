@@ -6,6 +6,8 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type PxError, wrap } from "../core/errors.ts";
 import type { BuildOut } from "../core/build.ts";
+import { Img } from "../core/image.ts";
+import type { Frame } from "../core/trace.ts";
 import type { AssetDef } from "../core/model.ts";
 import type { Project } from "../core/project.ts";
 import { loadProject } from "./load.ts";
@@ -21,6 +23,11 @@ import { frameCount, frameTime } from "./shot.ts";
 const LONG = 1 << 24;
 /** Frames the page plays of a loop at most (frames() keeps 600). */
 const MAX_FRAMES = 600;
+/**
+ * A painting step of more bytes than this goes as the picture after it, a PNG, and the page finds
+ * what it changed (a 1920x1080 scene's mesh(): 16.6 MB of changes, a PNG of 154 kB).
+ */
+const BIG_STEP = 1 << 18;
 
 export interface ServeOptions {
   port?: number;
@@ -78,6 +85,24 @@ function fingerprint(def: AssetDef): string {
 
 function b64(a: Uint32Array): string {
   return Buffer.from(a.buffer, a.byteOffset, a.byteLength).toString("base64");
+}
+
+/** The painting steps for the page: the pixels each changed, or, a big one, the picture after it (see BIG_STEP). */
+function stepsOut(steps: Frame[]) {
+  const size = (f: Frame) => (f.full ?? f.changes)?.byteLength ?? 0, big = steps.some((f) => size(f) > BIG_STEP);
+  let pic: Uint32Array | undefined; // the picture after each step, kept when one is big
+  return steps.map((f) => {
+    if (big) {
+      if (f.full) pic = f.full.slice();
+      else if (f.changes && pic) for (let j = 0; j < f.changes.length; j += 2) pic[f.changes[j]] = f.changes[j + 1];
+    }
+    const png = big && pic && size(f) > BIG_STEP ? encodePng(new Img(f.w, f.h, pic)).toString("base64") : undefined;
+    return {
+      label: f.label, loc: f.loc, w: f.w, h: f.h, png,
+      full: f.full && !png ? b64(f.full) : undefined,
+      changes: f.changes && !png ? b64(f.changes) : undefined,
+    };
+  });
 }
 
 /** An animated asset's frame count on the page, and whether its loop is long (see LONG); undefined for a still one. */
@@ -194,11 +219,7 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
         ms: Array.from({ length: loop.n }, (_, i) => tl.durations?.[i] ?? tl.step),
         images: withFrames && !loop.long ? project.frames(name, 0, loop.n).map((f) => encodePng(f.img).toString("base64")) : undefined,
       } : undefined,
-      frames: (withFrames ? b.trace?.frames ?? [] : []).map((f) => ({
-        label: f.label, loc: f.loc, w: f.w, h: f.h,
-        full: f.full ? b64(f.full) : undefined,
-        changes: f.changes ? b64(f.changes) : undefined,
-      })),
+      frames: stepsOut(withFrames ? b.trace?.frames ?? [] : []),
     };
   };
 
