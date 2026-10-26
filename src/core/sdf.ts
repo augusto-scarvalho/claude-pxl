@@ -521,12 +521,15 @@ function compiled(f: Sdf, clock: Clock): Compiled {
         // the nearest child (a union) or the farthest (an intersection), and the distance joined: child i's
         // lines, skipped where its box is farther than the best so far (a union: it can't be nearer, nor
         // melt in); with `w`, which child it is
+        const near = (c: Code, lo: ArrayLike<number>, hi: ArrayLike<number>, lip: number, x: string, y: string, z: string, u: string, K: string) => {
+          const L = c.k(lip);
+          const ex = c.v(`Math.max(${c.k(lo[0])} - ${x}, 0, ${x} - ${c.k(hi[0])})`), ey = c.v(`Math.max(${c.k(lo[1])} - ${y}, 0, ${y} - ${c.k(hi[1])})`), ez = c.v(`Math.max(${c.k(lo[2])} - ${z}, 0, ${z} - ${c.k(hi[2])})`), lim = c.v(`${u} + ${K}`);
+          c.line(`if (!(${lim} < 0 || (${ex} * ${ex} + ${ey} * ${ey} + ${ez} * ${ez}) * ${L} * ${L} >= ${lim} * ${lim})) {`);
+        };
         const child = (c: Code, i: number, x: string, y: string, z: string, u: string, K: string, w?: string, raw?: string) => c.take(() => {
           c.line("{");
           if (uni) {
-            const o = i * 7, L = c.k(bx[o + 6]);
-            const ex = c.v(`Math.max(${c.k(bx[o])} - ${x}, 0, ${x} - ${c.k(bx[o + 3])})`), ey = c.v(`Math.max(${c.k(bx[o + 1])} - ${y}, 0, ${y} - ${c.k(bx[o + 4])})`), ez = c.v(`Math.max(${c.k(bx[o + 2])} - ${z}, 0, ${z} - ${c.k(bx[o + 5])})`), lim = c.v(`${u} + ${K}`);
-            c.line(`if (!(${lim} < 0 || (${ex} * ${ex} + ${ey} * ${ey} + ${ez} * ${ez}) * ${L} * ${L} >= ${lim} * ${lim})) {`);
+            near(c, bx.subarray(i * 7, i * 7 + 3), bx.subarray(i * 7 + 3, i * 7 + 6), bx[i * 7 + 6], x, y, z, u, K);
             const v = ps[i].e(c, x, y, z);
             if (w) c.line(`if (${v} < ${u}) ${w} = ${i};`);
             c.line(`${u} = ${k > 0 ? `smin(${u}, ${v}, ${K})` : `Math.min(${u}, ${v})`};`);
@@ -538,13 +541,41 @@ function compiled(f: Sdf, clock: Clock): Compiled {
           }
           c.line("}");
         });
+        // a long union's children in groups of up to 8 (as a run's function allows), each group passed over
+        // by one test of the box round it: farther than the best so far, so is each child's box (inside it,
+        // their lips no smaller) and each would be passed over: the same distance, a tree's hundreds of
+        // clusters tested a group at a time. Where the groups end is set by the distance's lines, and kept for
+        // the tracking pass's (more lines, the same numbers in the same order)
+        let cuts: number[] | undefined;
+        const grouped = (c: Code, blocks: string[][], x: string, y: string, z: string, u: string, K: string) => {
+          if (!uni || blocks.length <= 8) return blocks;
+          if (!cuts) {
+            cuts = [];
+            for (let s = 0, e = 0, n = 0; s < blocks.length; s = e, cuts.push(e))
+              for (e = s + 1, n = blocks[s].length; e < blocks.length && e - s < 8 && n + blocks[e].length <= RUN; e++) n += blocks[e].length;
+          }
+          const out: string[][] = [];
+          for (let i = 0, s = 0, e = 0; i < cuts.length; i++, s = e) {
+            e = cuts[i];
+            if (e - s < 2) { out.push(blocks[s]); continue; }
+            const g = ps.slice(s + 1, e + 1);
+            out.push(c.take(() => {
+              c.line("{");
+              near(c, [0, 1, 2].map((a) => Math.min(...g.map((p) => p.lo[a]))), [0, 1, 2].map((a) => Math.max(...g.map((p) => p.hi[a]))), Math.min(...g.map((p) => p.lip)), x, y, z, u, K);
+              for (const b of blocks.slice(s, e)) c.lines.push(...b);
+              c.line("}");
+              c.line("}");
+            }));
+          }
+          return out;
+        };
         const slot = slots++;
         const e = (c: Code, x: string, y: string, z: string) => {
           const K = c.k(k), u = c.v(ps[0].e(c, x, y, z), true);
-          if (!c.track) { c.runs(ps.slice(1).map((_, j) => child(c, j + 1, x, y, z, u, K)), x, y, z, [u]); return u; }
+          if (!c.track) { c.runs(grouped(c, ps.slice(1).map((_, j) => child(c, j + 1, x, y, z, u, K)), x, y, z, u, K), x, y, z, [u]); return u; }
           const w = c.v("0", true), raw = uni ? "" : c.v("-Infinity", true);
           if (!uni) c.line(`if (${u} > ${raw}) ${raw} = ${u};`);
-          c.runs(ps.slice(1).map((_, j) => child(c, j + 1, x, y, z, u, K, w, raw)), x, y, z, uni ? [u, w] : [u, w, raw]);
+          c.runs(grouped(c, ps.slice(1).map((_, j) => child(c, j + 1, x, y, z, u, K, w, raw)), x, y, z, u, K), x, y, z, uni ? [u, w] : [u, w, raw]);
           c.line(`W[${slot}] = ${w};`);
           return u;
         };

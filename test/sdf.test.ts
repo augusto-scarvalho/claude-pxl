@@ -64,7 +64,7 @@ test("sdf: noise is seeded, bounded by its amplitude, the same at the same point
   near(D(sway, [1, 0, 0], { t: 0, phase: 0, frame: 0, frames: 4 }), 0, 1e-9);
 });
 
-test("sdf: a union of hundreds written in runs of code, the same steps to the bit; noise's tables the same in any order", () => {
+test("sdf: a union of hundreds written in runs of code, passed over a group at a time, the same steps to the bit, a point's material from the nearest child; noise's tables the same in any order", () => {
   const balls = Array.from({ length: 400 }, (_, i) => [Math.sin(i) * 3, Math.cos(i * 1.3) * 3, Math.sin(i * 0.7) * 3, 0.2 + 0.1 * Math.abs(Math.sin(i * 2.1))]);
   const C = compile(sdf.union(balls.map(([x, y, z, r]) => sdf.sphere(r).at(x, y, z))));
   assert.match(C.key, /const s0 = /, "in runs");
@@ -77,6 +77,15 @@ test("sdf: a union of hundreds written in runs of code, the same steps to the bi
   let s = 5;
   const rand = () => { s = (s * 16807) % 2147483647; return (s / 2147483647) * 8 - 4; };
   for (let n = 0; n < 400; n++) { const p = [rand(), rand(), rand()]; assert.equal(C.d(p[0], p[1], p[2]), byHand(p[0], p[1], p[2]), `at ${p}`); }
+  // a point's material from the nearest child, the groups the same in the pass that tracks it (more lines)
+  const kids = Array.from({ length: 60 }, (_, i) => sdf.union(sdf.sphere(0.3).at(Math.sin(i) * 3, Math.cos(i * 1.3) * 3, 0), sdf.sphere(0.2).at(Math.sin(i) * 3, Math.cos(i * 1.3) * 3, 0.3), sdf.sphere(0.1).at(Math.sin(i) * 3, Math.cos(i * 1.3) * 3, 0.5)).mat(["a", "b", "c"][i % 3]));
+  const M = compile(sdf.union(kids)), each = kids.map((f) => compile(f));
+  for (let n = 0, hit = 0; hit < 100 && n < 1e5; n++) {
+    const p = [rand(), rand(), rand() / 8], ds = each.map((C) => C.d(p[0], p[1], p[2])), i = ds.indexOf(Math.min(...ds));
+    if (!(ds[i] > 0 && ds[i] < 0.05)) continue;
+    hit++;
+    assert.equal(M.mats[M.m(p[0], p[1], p[2], 0, 0, 1)], ["a", "b", "c"][i % 3], `at ${p}`);
+  }
   const v = (seed: number) => fbm3(0.37, 1.2, 2.9, seed, 3), first = [5, 6, 7].map(v);
   assert.deepEqual([7, 5, 6, 5, 7, 6].map(v), [first[2], first[0], first[1], first[0], first[2], first[1]]);
 });
