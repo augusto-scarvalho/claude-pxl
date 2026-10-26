@@ -491,14 +491,15 @@ test("cli build reports per-asset errors and still writes the rest", async () =>
 });
 
 test("server: state, asset frames, rebuild on change", async () => {
-  const { file } = tmpArt(`use("pico8")\nsprite("a", { w: 2, h: 1 }, px(0, 0, "8"), px(1, 0, "7"))`);
+  const { file } = tmpArt(`use("pico8")\nsprite("a", { w: 2, h: 1 }, px(0, 0, "8"), px(1, 0, "7"), px(1, 0, "7"))`);
   const logs: string[] = [];
   const s = await serve(file, { port: 0, out: false, log: (l) => logs.push(l) });
   try {
     const state = await (await fetch(s.url + "api/state")).json();
     assert.equal(state.assets[0].name, "a");
     const a = await (await fetch(s.url + "api/asset?name=a")).json();
-    assert.deepEqual(a.frames.map((f: { label: string }) => f.label), ['px(0, 0, "8")', 'px(1, 0, "7")']);
+    assert.deepEqual(a.frames.map((f: { label: string }) => f.label), ['px(0, 0, "8")', 'px(1, 0, "7")', 'px(1, 0, "7")']);
+    assert.equal(a.frames[2].changes, "", "a step that changed nothing: no pixels, which the page reads as such and dims");
     assert.equal(a.frames[1].loc, "a.px.js:2:44");
     const html = await (await fetch(s.url)).text();
     assert.ok(html.includes("/app.js"));

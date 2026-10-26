@@ -125,7 +125,7 @@ async function select(name: string, opts: { play?: boolean; keepStep?: boolean }
   }
   const j = await fetchAsset(name, true);
   if (!j || sel !== name) return;
-  const frames: Frame[] = j.frames.map((f) => ({ label: f.label, loc: f.loc, w: f.w, h: f.h, full: f.full ? u32(f.full) : undefined, changes: f.changes ? u32(f.changes) : undefined }));
+  const frames: Frame[] = j.frames.map((f) => ({ label: f.label, loc: f.loc, w: f.w, h: f.h, full: f.full ? u32(f.full) : undefined, changes: f.changes !== undefined ? u32(f.changes) : undefined }));
   if (j.frames.some((f) => f.png)) await unpack(j.frames, frames);
   const rev = new Map<number, string>();
   for (const [k, v] of Object.entries(j.palette)) {
