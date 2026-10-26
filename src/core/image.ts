@@ -74,6 +74,8 @@ export class Img {
   parts?: { ids: Int32Array; names: string[] };
   /** Its real height in meters, from the asset's `height` (for a scene's `world` scale). */
   meters?: number;
+  /** Drawn in 3D standing on its origin (turnaround(), rig3d()): its pivot is where it meets the ground, its feet for pxl check. */
+  grounded?: boolean;
 
   constructor(w: number, h: number, data?: Uint32Array) {
     w = Math.floor(w);
@@ -111,6 +113,7 @@ export class Img {
     if (this.slice) o.slice = [...this.slice];
     if (this.orient) o.orient = { ...this.orient, f: this.orient.f && [...this.orient.f], u: [...this.orient.u] };
     if (this.meters) o.meters = this.meters;
+    if (this.grounded) o.grounded = true;
     if (this.parts) o.parts = { ids: this.parts.ids.slice(), names: [...this.parts.names] };
     return o;
   }
@@ -123,6 +126,7 @@ export class Img {
     if (this.pivot) o.pivot = f(...this.pivot);
     if (this.sockets) o.sockets = mapPoints(this.sockets, f);
     if (this.meters) o.meters = this.meters;
+    if (this.grounded) o.grounded = true;
     if (this.orient) {
       const [ox, oy] = f(0, 0), [ax, ay] = f(1, 0), [bx, by] = f(0, 1);
       const m = [ax - ox, ay - oy, bx - ox, by - oy];

@@ -5,7 +5,11 @@
 // boss blues, So You Want To Be A Pixel Artist, and pxl study on Chrono Trigger, CrossCode, Terranigma,
 // Final Fantasy Tactics Advance and others. Builders make more of a kind (grassTile, pine, bush, rampart,
 // make3d.spruce and make3d.snag on fields); the sprites made here are the defaults. The light comes from the upper left (the sun behind
-// on the left in the hd2d graveyard); the textures tile and are drawn a texel to a pixel.
+// on the left in the hd2d graveyard); the textures tile and are drawn a texel to a pixel. Under a sun of
+// your own: spruce(name, h, seed, { light, mats, ... }) takes surface()'s options over its own (your
+// look3d light, needles and bark in your palette's ramps: spruce("_cedar", 70, 5, { light: SUN, mats:
+// { needles: { ramp: "123456", strokes: 4 / 24, hem: 2 }, bark: "kBbx" } })); the drawn ones (pine, bush,
+// rocks) are lit from the left: flip: "x" for a sun on the right.
 // grass: a yellow-green base, its darks turning blue, its light yellow (SLYNYRD's lush grass)
 pal({ Q: "#23484a", q: "#3d6b42", w: "#577f3c", e: "#6c9243", r: "#a4b45a" })
 ramps("Qqwer")
@@ -140,10 +144,11 @@ make3d.define("spruce", ({ h = 68, seed = 3, sway = 1.6, flutter = 0 }) => {
   const H = Hw / 24, bend = (c) => (2 * (sway / 24) * (0.45 + 0.55 * Math.sin(2 * Math.PI * c.phase))) / (H * H)
   return { field: trunk.part("trunk").union(crown.part("crown")).bend(bend), parts: { trunk, crown } }
 }, { params: { h: [20, 160], sway: [0, 6], flutter: [0, 2] } })
-const spruce = (name, h, seed, { frames = 16, fps = 1000 / 220 } = {}) => {
+// (`look`: surface()'s options over these, a light and mats of your own)
+const spruce = (name, h, seed, { frames = 16, fps = 1000 / 220, ...look } = {}) => {
   const W = 42, ST = make3d.spruce({ h, seed })
   anim(name, { w: W, h, pivot: "bottom", frames, fps }, surface(ST.field, { view: "side", ppm: 24, at: [W / 2, h - 0.5], light: [-0.55, 0.55, 0.62], soft: 0.6, rim: 0.85, shadows: false, outline: false,
-    mats: { needles: { ramp: "ZzxcvVJ", strokes: 4 / 24, hem: 2 }, bark: "ads" } }))
+    mats: { needles: { ramp: "ZzxcvVJ", strokes: 4 / 24, hem: 2 }, bark: "ads" }, ...look }))
 }
 spruce("_spruce", 68, 3)
 spruce("_spruce_m", 60, 5)

@@ -6,7 +6,7 @@ import { type View, perspective } from "./perspective.ts";
 import { solid } from "./solids.ts";
 import { model, turnFaces, turnPoint } from "./mesh.ts";
 import { Sdf, compile, sdf } from "./sdf.ts";
-import { COMPASS, clocksOf, headingsOf, mirrorSymmetric, turnLight, turnViews } from "./turnaround.ts";
+import { COMPASS, clocksOf, headingsOf, mirrorSymmetric, topOf, turnLight, turnViews } from "./turnaround.ts";
 import { BLOCK_MATS, type Body, type Joints, type Pose, blocksOf, bodyOf, gait, ik3, jointsOf, partsOf } from "./rig3d.ts";
 import { SURFACE_OPTS, VOXEL_OPTS, surfaceSize } from "./surface.ts";
 import { Mesh3, Voxels, surfaceNets, voxelize } from "./grids.ts";
@@ -395,9 +395,16 @@ export class Project implements BuildCtx {
         // variant at 125 made a 22 s loop of 4400 frames)
         if (opts.fps === undefined && d.every((v) => v === d[0])) opts.fps = 1000 / d[0];
       }
+      // the sun of look3d() on things standing up: one sun for the 3D ops, the lit side and the shadows (cast: "sun")
+      if ((opts.world?.light as unknown) === "sun") {
+        const L = this.look3d?.light;
+        if (!L) throw new PxError(`${kind} '${name}': world.light "sun" is look3d()'s light: call look3d({ light: [x, y, z] }) before it`, loc);
+        opts.world = { ...opts.world, light: [L[0], -L[2]] };
+      }
+      if (opts.world?.view !== undefined && !["top", "side"].includes(opts.world.view)) throw new PxError(`${kind} '${name}': world.view is "top" (a flat world seen from above: a map, its up away from us) or "side", got ${JSON.stringify(opts.world.view)}`, loc);
       const light = opts.world?.light, pair = (v: unknown) => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
       if (light !== undefined && light !== false && !pair(light) && !(isPlainObject(light) && pair((light as { at?: unknown }).at)))
-        throw new PxError(`${kind} '${name}': world.light is where the light comes from, [x, y] (e.g. [0.6, -1]: the top right), or a point light in the scene, { at: [x, y] } (false: none read); got ${JSON.stringify(light)}`, loc);
+        throw new PxError(`${kind} '${name}': world.light is where the light comes from, [x, y] (e.g. [0.6, -1]: the top right), "sun" (look3d()'s), or a point light in the scene, { at: [x, y] } (false: none read); got ${JSON.stringify(light)}`, loc);
       const items = checkItems(`${kind} '${name}'`, rest, loc);
       const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true), look3d = this.look3d;
       this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, look3d });
@@ -600,15 +607,18 @@ export class Project implements BuildCtx {
         const level = Array.isArray(L) && Math.abs(L[0] * Math.cos((y0 * Math.PI) / 180) - L[1] * Math.sin((y0 * Math.PI) / 180)) < 0.05 * Math.hypot(...(L as number[]));
         const sym = mirror === true || (mirror === "auto" && level && !Object.keys(b.details ?? {}).length && Object.values(b.decals ?? {}).every((d) => Math.abs(d.point[0]) < 0.01) && mirrorSymmetric(field, clocks));
         const kindA = frames ? "anim" : "sprite", names = H.map((h) => `${name}_${h.name}`);
+        // its height over the ground it stands on (its origin's), for pxl check and describe
+        const top = topOf(field) + at0[2], height = Number.isFinite(top) && top > 0 ? { height: Math.round(top * 100) / 100 } : {};
         const twin = H.map((h) => (sym && h.deg > 0 && h.deg < 180 ? H.findIndex((g) => Math.abs(g.deg - (360 - h.deg)) < 1e-9) : -1));
         H.forEach((_, i) => {
           if (twin[i] >= 0) return;
           const v = T.views[i], light = Array.isArray(L) ? turnLight(L as number[], v.turn) : L;
           const draw = { view: v.view, at: [v.at[0] + at0[0], v.at[1] + at0[1], v.at[2] + at0[2]], ...(persp ? {} : { ppm }), ...(o.mats !== undefined ? { mats: o.mats } : {}), ...(light !== undefined ? { light } : {}),
             ...(o.as !== undefined ? { as: o.as } : {}), ...(o.size !== undefined ? { size: o.size } : {}), ...(o.spacing !== undefined ? { spacing: o.spacing } : {}), ...(only ? { only } : {}) };
-          define(kindA, names[i], [{ w: T.w, h: T.h, pivot: T.pivot, ...(frames ? { frames, fps } : {}) }, (c: Canvas) => c.draw3d(thing, draw as never)]);
+          define(kindA, names[i], [{ w: T.w, h: T.h, pivot: T.pivot, ...height, ...(frames ? { frames, fps } : {}) }, (c: Canvas) => c.draw3d(thing, draw as never)]);
         });
         H.forEach((_, i) => { if (twin[i] >= 0) define(kindA, names[i], [{ base: names[twin[i]], flip: "x", pivot: T.pivot }]); });
+        for (const n of names) this.assets.get(n)!.grounded = true;
         (env.group as (n: string, m: string[]) => void)(name, names);
         return { names, headings: H.map((h) => h.name), w: T.w, h: T.h, pivot: T.pivot, mirrored: names.filter((_, i) => twin[i] >= 0) };
       } catch (e) { throw wrap(e).within("turnaround", loc); }
@@ -822,6 +832,8 @@ export class Project implements BuildCtx {
             M.heads.forEach((hd, i) => { if (twin[i] < 0) define("anim", list[i], [{ w, h, pivot }, draw(hd), ...frameOps(M)]); });
             // (the mirrors after what they mirror, so they play as it does)
             M.heads.forEach((hd, i) => { if (twin[i] >= 0) define("anim", list[i], [{ base: list[twin[i]], flip: "x", pivot: [px + 1, py] }]); });
+            // standing on its foot point: pxl check reads its feet there (in px, it has no height in meters)
+            for (const n of list) this.assets.get(n)!.grounded = true;
             groups.push([fam, list]);
             names.push(...list);
           }
@@ -1054,8 +1066,8 @@ export class Project implements BuildCtx {
     env.route = (opts: unknown, steps: unknown) => {
       const loc = this.callerLoc();
       try {
-        if (!isPlainObject(opts)) throw new PxError("route({ pace, origin, ground, climb, walk, idle, loop, round }, [[x, z], ...steps])");
-        checkKeys("route", opts, ["pace", "origin", "ground", "climb", "walk", "idle", "loop", "round"]);
+        if (!isPlainObject(opts)) throw new PxError("route({ pace, origin, ground, climb, walk, idle, loop, round, px }, [[x, z], ...steps])");
+        checkKeys("route", opts, ["pace", "origin", "ground", "climb", "walk", "idle", "loop", "round", "px"]);
         return route(opts as never, steps as never);
       } catch (e) { throw wrap(e).within("route", loc); }
     };

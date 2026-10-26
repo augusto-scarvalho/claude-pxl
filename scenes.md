@@ -335,7 +335,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   facing its way, at the walk's own pace by its way (`pace: (dir) => ...`, from `gait()`'s `pace` over
   the walk's frames at the scene's px to the meter; slower or faster, the feet slide), the feet on its
   `ground` (each step, a path) or the mesh's `stand`; time what hangs on a hold by `start("talk")`,
-  never by summing frames. `turnToward()` turns the other figure to whoever speaks, a direction every
+  never by summing frames. In a flat scene (a top-down map), `route({ px: true, pace: travelerFigure.pace })`:
+  points on the picture, up it is `n`, `R(f).at` the px to `c.stamp` it at from a function in the
+  layer a shade layer is `of`, so its shadow comes with it. `turnToward()` turns the other figure to whoever speaks, a direction every
   two frames. Stand a figure beside what it looks at, not in front of it: from above and in front its
   body hides a headstone it faces, and kneeling a step too close its head meets the stone. Clear what
   stands in its way (`near()`: no tree within a meter of its walk). Start the loop with the figure
@@ -467,7 +469,11 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 
 - Cast shadows: a `shade: true` layer `of` the layer things stand in, `cast: [kx, ky]` (each laid
   flat from its base, silhouetted): a pixel h px up lands h × (kx, ky) away. One sun, one `cast` for
-  everything; a stamp's own `shadow` (`false`: none). The shade layer goes where the shadow is drawn:
+  everything; a stamp's own `shadow` (`false`: none). What a function in that layer stamps casts too
+  (a `route()`'s walker, an anim stamped by the frame). Props drawn in 3D under `look3d()`'s light
+  on a map seen from above: write the sun once there, and take it everywhere, `world: { scale,
+  view: "top", light: "sun" }` (the lit side read off it) and `cast: "sun"` (h px up lands
+  h × [−x / z, y / z] away); the nature kit's `spruce()` takes it as `light`. The shade layer goes where the shadow is drawn:
   under what stands, or lower in the list (a firelight, a bridge between). `ky` says where the sun is in depth: negative, the shadows fall back (the
   sun in front of us: the fronts we see are lit), positive, toward us (backlit).
   In true perspective, things built of `solid` shapes cast with `shadows()` instead: each shape
@@ -794,7 +800,9 @@ Pick one and keep everything in it (a 45° oblique bridge among isometric blocks
   the front, the side walls cut to about half their height, the roof's slopes at their front view's
   45°, its planes seen from above. The footprint stays on the grid and only the top overhangs (more
   breaks the draw order). A room shows the back wall's face, two tiles tall; the side and front walls
-  only as a top edge, black beyond.
+  only as a top edge, black beyond. Props and figures drawn in 3D (`turnaround()`'s `"side"` view,
+  `rig3d()`) stand in it as they are: `world: { scale, view: "top", light: "sun" }`, one `look3d()`
+  sun, `cast: "sun"` shadows, a walker by `route({ px: true })` (§11, the story bullet in §7).
 - **Side 3/4** (a corner toward us): the gable end about half its width, the 45° roof kept, the
   overhang even. **Oblique** (cabinet): x and y flat, every depth edge at one slope (1:1 or 2:1), the
   same in every tile.

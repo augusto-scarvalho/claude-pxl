@@ -252,6 +252,16 @@ const I = turnaround("i", F(0), { view: "iso", n: 4, mats: { "": "kgw" } })`, "t
   let low = 0;
   for (let y = 0; y < im.h; y++) for (let x = 0; x < im.w; x++) if ((im.get(x, y) & 255) > 0) low = y;
   assert.ok(Math.abs(pv[0] - (s0 + s1 + 1) / 2) <= 1 && low >= pv[1] - 1 && low <= pv[1] + 3, `pivot ${pv}, columns ${s0}..${s1}, lowest row ${low}`);
+  // its height its top over its origin, standing there: pxl check reads its feet at its pivot, the
+  // front of its box and its line lower down
+  assert.deepEqual([im.meters, im.grounded, p.image("b_e").grounded], [0.6, true, true]);
+  const { checkProject } = await import("../src/node/check.ts");
+  const q = loadSource(PAL + `ramps("kgw")
+turnaround("b", sdf.box([0.6, 0.6, 0.6]).at(0, 0, 0.3), { view: "side", n: 4, mats: { "": "kgw" } })
+scene("s", { w: 40, h: 40, world: { scale: 16, ground: 30 } }, stamp("b_s", 12, 30), stamp("b_n", 28, 33))`, "t.px.js");
+  const r = checkProject(q);
+  assert.deepEqual([r.lines.length, r.coverage.match(/feet on \d+/)?.[0]], [1, "feet on 2"], r.lines.join("\n"));
+  assert.match(r.lines[0], /b_n @-, feet [\d,]+ › WARNING: its feet \(y 33\) are 3 px below the ground \(y 30\)/);
 });
 
 test("surface: a material's hems hang under it, its strokes lighter where the sun is, a back rim at least that far up its ramp", () => {

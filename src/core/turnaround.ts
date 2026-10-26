@@ -56,6 +56,25 @@ export function mirrorSymmetric(f: Sdf, clocks: Clock[]): boolean {
   return true;
 }
 
+/**
+ * How high the thing reaches over its origin, m: an n x n grid of columns over its box, each traced
+ * down from the box's top to the surface (the box is loose round an intersection: a roof's wedge).
+ */
+export function topOf(f: Sdf, n = 16): number {
+  const C = compile(f), { lo, hi } = C;
+  if (![...lo, ...hi].every(Number.isFinite)) return NaN;
+  let top = -Infinity;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const x = lo[0] + ((hi[0] - lo[0]) * (i + 0.5)) / n, y = lo[1] + ((hi[1] - lo[1]) * (j + 0.5)) / n;
+    for (let z = hi[2]; z > Math.max(lo[2], top); ) {
+      const d = C.d(x, y, z);
+      if (d <= 1e-3) { top = z; break; }
+      z -= Math.max(d, 1e-3);
+    }
+  }
+  return top;
+}
+
 /** The moments a turnaround's sprites are drawn at: its anims' frames, or the still one. */
 export const clocksOf = (frames: number | undefined, fps: number): Clock[] => (frames ? Array.from({ length: frames }, (_, f) => ({ t: (f * 1000) / fps, phase: f / frames, frame: f, frames })) : [STILL]);
 

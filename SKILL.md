@@ -130,11 +130,11 @@ What exists, a line each; `PXL help <name>` prints the rest of any op or option 
   (a terrain's 16 corner pieces from one function: `corners()`).
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` and functions reading `c.phase`;
   stamping an anim animates the scene; `scroll()`, `clouds()`, `plume()`, `c.cross()` go by in a
-  loop; `tween()` keys poses in time; `route()` walks a figure's legs and holds by name. Limbs, walks, hair: `PXL help "characters 9 10"`; loops and
+  loop; `tween()` keys poses in time; `route()` walks a figure's legs and holds by name (`px: true` on a flat map). Limbs, walks, hair: `PXL help "characters 9 10"`; loops and
   parallax: `PXL help "scenes 8 9 10"`.
 - **Existing art**: `sprite("x", { png, area, shrink, palettize })`, `anim(..., { png, frames })`, `rampmap`.
 - **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj`, `build --aseprite`, `build --share 4`.
-- **Light**: `shade:`/`light:` layers and `cast` shadows (a shade layer `of` what stands),
+- **Light**: `shade:`/`light:` layers and `cast` shadows (a shade layer `of` what stands; `"sun"`: `look3d`'s),
   `relight`/`plate()`, `glow`, `lighting()` ([lighting.md](lighting.md)).
 - **Text**: `text()` in the 3×5 built in, or `include` `examples/fonts/font5x7.px.js` for `{ font: "5x7" }`; `bubble()` a dialogue box.
 - **In meters and HD-2D**: `perspective()`, `plane()`, `terrain()`, `solids()`/`shadows()`,

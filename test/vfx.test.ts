@@ -74,6 +74,9 @@ test("route: legs at a pace and holds by name, the feet on the ground, the way c
   assert.throws(() => v.start("grave"), /no phase or event 'grave'/);
   assert.match(failure(PALS + 'route({ pace: 1 }, [[0, 0], { hold: 1.5 }])').message, /a hold is a whole number of frames/);
   assert.match(failure(PALS + 'route({ pace: 1 }, [[0, 0], [0, 0]])').message, /other than the last/);
+  // px: a flat scene's, points on the picture (up it is n), pace px a frame, at whole px to stamp
+  const f = route({ px: true, pace: 2, walk: "w" }, [[10, 20], [10, 15], [16, 15]]);
+  assert.deepEqual([f.total, f(1), f(4)], [6, { name: "w_n", at: [10, 18], frame: 1, dir: "n" }, { name: "w_e", at: [12, 15], frame: 4, dir: "e" }]);
 });
 
 test("turnToward: a step every two frames the shorter way round, toward a point within reach or a direction", () => {

@@ -98,8 +98,9 @@ export function placementChecks(p: Placement, wo: World | undefined, steps: Step
   const light = lightFor(wo, p, lamps);
   const checks = [frontWords(p.img), light && !unlit ? lightWords(p.img, light, steps) : ""];
   const bb = p.img.bounds(), pv = p.img.pivot;
-  if (bb && p.img.meters) {   // what has a real height stands on the ground: a ghost may float
-    const feet = p.y + bb.y + bb.h, off = pv ? Math.round(p.y + pv[1] - feet) : 0;
+  if (bb && (p.img.meters || p.img.grounded)) {   // what has a real height stands on the ground: a ghost may float
+    // (drawn in 3D on its origin: its feet are its pivot, the front of its footprint and its line lower down)
+    const feet = p.img.grounded && pv ? Math.round(p.y + pv[1]) : p.y + bb.y + bb.h, off = pv ? Math.round(p.y + pv[1] - feet) : 0;
     if (Math.abs(off) >= 2) checks.push(`WARNING: its feet are ${Math.abs(off)} px ${off > 0 ? "above" : "below"} where it stands (its pivot is ${Math.abs(off)} px ${off > 0 ? "below its sole" : "above it"}): it ${off > 0 ? "floats" : "sinks"}`);
     // the ground's row under its feet (its pivot's column, or its middle's): one row, or a profile
     const x = p.x + (pv ? pv[0] : bb.x + (bb.w >> 1)), G = wo?.ground;
@@ -209,7 +210,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
   if (wo?.light) out.push(Array.isArray(wo.light)
     ? `LIGHT: from ${dirWords(wo.light[0], wo.light[1])}; each object's lit side (from its edges) is checked against it.`
     : `LIGHT: a point at ${wo.light.at.join(",")}; each object's lit side (from its edges) is checked against the way from its middle to there.`);
-  if (wo?.scale !== undefined) out.push(`WORLD: flat side view, ${wo.scale} px per meter (a 1.8 m figure is ${Math.round(1.8 * wo.scale)} px tall).`);
+  if (wo?.scale !== undefined) out.push(`WORLD: ${wo.view === "top" ? "flat, seen from above (a map: up is away from us)" : "flat side view"}, ${wo.scale} px per meter (a 1.8 m figure is ${Math.round(1.8 * wo.scale)} px tall).`);
   else if (wo?.horizon !== undefined && wo.eye)
     out.push(`WORLD: ground in perspective, horizon at y ${wo.horizon}, eye ${wo.eye} m up: a thing standing on row y is (y - ${wo.horizon}) / ${wo.eye} px per meter, ` +
       `so a 1.8 m figure is ${[Math.round(wo.horizon + (H - wo.horizon) / 3), H].map((y) => `${Math.round((1.8 * (y - wo.horizon!)) / wo.eye!)} px at y ${y}`).join(", ")}; anything at eye height sits on the horizon.`);
@@ -410,7 +411,9 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       const check = placementChecks(p, wo, steps, unlitLayers.has(p.layer ?? ""), b.lamps).join("; ");
       if (wo && p.img.meters && bb) {
         const lying = p.img.orient && Math.abs(Math.abs(tiltOf(p.img.orient)) - 90) <= 45;
-        const drawn = lying ? bb.w : bb.h, feet = p.y + bb.y + bb.h, ppm = pxPerMeter(wo, feet);
+        // (drawn in 3D on its origin: from its pivot up, the front of its footprint below that not counted)
+        const pv = p.img.grounded ? p.img.pivot : undefined, feet = pv ? Math.round(p.y + pv[1]) : p.y + bb.y + bb.h;
+        const drawn = lying ? bb.w : pv ? feet - p.y - bb.y : bb.h, ppm = pxPerMeter(wo, feet);
         if (ppm === undefined) size = "";
         else if (ppm <= 0) size = `size: its foot (y ${feet}) is at or above the horizon (y ${wo.horizon}): it floats, or the horizon is wrong`;
         else {
@@ -418,8 +421,9 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
           size = `size: ${p.img.meters} m ${lying ? "long" : "tall"} is ${Math.round(want)} px where it stands (y ${feet}); drawn ${drawn} px` +
             (Math.abs(off) <= 8 ? ", right" : `, ${Math.abs(off)}% too ${off > 0 ? (lying ? "long" : "tall") : lying ? "short" : "small"}`) +
             // a wide thing (a tent, a cart, a log) is often seen at an angle: its far end rises on
-            // screen and its box counts that; silhouettes can't tell that from a wrong scale
-            (off > 8 && !lying && bb.w > bb.h ? " (its box, top to bottom: seen at an angle, its far end rises on screen and counts too, so compare its near end)" : "");
+            // screen and its box counts that; silhouettes can't tell that from a wrong scale (a thing drawn
+            // in 3D from a little above, a turnaround's, always is)
+            (off > 8 && !lying && (bb.w > bb.h || pv) ?" (its box, top to bottom: seen at an angle, its far end rises on screen and counts too, so compare its near end)" : "");
         }
       }
       if (opts.brief) {

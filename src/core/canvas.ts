@@ -1824,7 +1824,15 @@ export class Canvas {
     const [sl, st, sr, sb] = P.slice, pad = o.pad ?? 7, tx = pad + (rule?.slice ? rule.slice[0] + 1 : 0), top = name ? lh + 7 : 0;
     const w = Math.max(sl + sr, tx + wd(name) + pad, tx + Math.max(0, ...ls.map(wd)) + (more ? more.w + 4 : 0) + pad), h = Math.max(st + sb, 2 * pad + top + ls.length * (lh + 3) - 3);
     // the tail a fifth of the way in from the side the box goes out from, on its straight edge
-    const tw = tail?.w ?? 1, th = tail ? tail.h - sb : 0, at = Math.max(sl, Math.min(w - sr - tw, Math.round(((o.side ?? 1) < 0 ? 0.78 : 0.22) * w) - (tw >> 1)));
+    const tw = tail?.w ?? 1, th = tail ? tail.h - sb : 0, U = Math.max(1, Math.round(this.k * (o.unit ?? 1)));
+    let at = Math.max(sl, Math.min(w - sr - tw, Math.round(((o.side ?? 1) < 0 ? 0.78 : 0.22) * w) - (tw >> 1)));
+    // kept inside the picture: the box slides along its tail (the tail stays on the speaker) as far as the tail goes
+    const left = (a: number) => this.ox + Math.round(x * this.k - (a + (tw >> 1) + 0.5) * U), W = this.img.w;
+    while (at > sl && left(at) < 0) at--;
+    while (at < w - sr - tw && left(at) + w * U > W) at++;
+    const off = ([["left", -left(at)], ["right", left(at) + w * U - W], ["top", -(this.oy + Math.round(y * this.k) - (h + th) * U)]] as const).filter(([, d]) => d > 0);
+    // (by side only: a box following a speaker would say it once a frame)
+    if (off.length) this.res.warn?.(`bubble: '${name || ls[0]}' runs off the picture's ${off.map(([s]) => s).join(" and ")}, its tail as far along it as it goes: turn its side, shorten its lines, or move it`, this.loc ?? this.owner?.loc);
     const sub = new Canvas(new Img(w, h + th), this.pal, this.res);
     sub.panel(o.panel, 0, 0, w, h);
     if (tail) sub.put(tail, at, h - sb);
@@ -1832,7 +1840,6 @@ export class Canvas {
     if (rule) sub.panel(o.rule!, pad, pad + lh + 2 - (rule.h >> 1), Math.max(tx - pad + wd(name) + 4, Math.round(0.6 * (w - 2 * pad))), rule.h);
     ls.forEach((l, i) => sub.text(tx, pad + top + i * (lh + 3), l, lc, f));
     if (more) sub.put(more, w - pad - more.w, h - pad - more.h + 1);
-    const U = Math.max(1, Math.round(this.k * (o.unit ?? 1)));
     this.put(sub.img.scale(U), Math.round(x * this.k - (at + (tw >> 1) + 0.5) * U), Math.round(y * this.k) - (h + th) * U);
     this.lettered();
   }

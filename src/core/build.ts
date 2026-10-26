@@ -9,7 +9,7 @@ import { applyLighting } from "./light.ts";
 import { rotate } from "./rotate.ts";
 import { normalImage } from "./normals.ts";
 import { type PostOpts, applyPost, postAt } from "./post.ts";
-import { type AssetDef, type FrameOpts, type GlowOpts, type Item, type Layer, type LayerOpts, type LightingOpts, type Op, type RelightOpts, type TileLayer, type Timeline, isLayer, isOp } from "./model.ts";
+import { type AssetDef, type FrameOpts, type GlowOpts, type Item, type Layer, type LayerOpts, type LightingOpts, type Op, type PlaceOpts, type RelightOpts, type TileLayer, type Timeline, isLayer, isOp } from "./model.ts";
 import type { Palette } from "./palette.ts";
 import { Trace } from "./trace.ts";
 import { bayer, fmtArgs, gridRows, gridSize, profile, type Region } from "./util.ts";
@@ -117,22 +117,46 @@ export function gcd(a: number, b: number): number {
 /**
  * A shade layer's shadows of other layers (`of`): each of their stamps and tiles again, silhouetted
  * and laid on the ground by the layer's `cast` (or its own `shadow`), unless `shadow: false` or its
- * name is in `except`. One list of what stands: moved once, its shadow follows.
+ * name is in `except`; a function's too (run again, only what it stamps or tiles lands: a route's
+ * walker, an anim stamped by the frame). One list of what stands: moved once, its shadow follows.
  */
 function castsOf(def: AssetDef, l: Layer): Item[] {
   if (l.opts.shade === undefined || l.opts.shade === false) throw new PxError(`layer '${l.name}': of draws shadows, on a shade layer ({ shade: true or n })`, l.loc);
+  // a copy's options as its shadow's, or none
+  const shadowOf = (name: unknown, opts: unknown): PlaceOpts | undefined => {
+    const { shadow, ...o } = (opts ?? {}) as { shadow?: unknown };
+    if (shadow === false || l.opts.except?.includes(name as string)) return undefined;
+    const k = shadow ?? l.opts.cast;
+    return { ...o, cast: k === "sun" ? sunCast(def, l) : k, silhouette: "#000000" } as PlaceOpts;
+  };
   return [l.opts.of].flat().flatMap((n) => {
     const src = def.items.find((v) => isLayer(v) && v.name === n) as Layer | undefined;
     if (!src) throw new PxError(`layer '${l.name}': of names no layer '${n}' of ${def.kind} '${def.name}'`, l.loc);
-    return src.items.flatMap((v) => {
+    return src.items.flatMap((v): Item[] => {
+      if (typeof v === "function") return [(c: Canvas) => {
+        // on a canvas of its own, so what else it draws lands nowhere; its stamps and tiles come here as shadows
+        const s = Object.assign(Object.create(c) as Canvas, { img: new Img(c.img.w, c.img.h), log: undefined, maps: undefined, sorted: undefined, onOp: undefined });
+        s.stamp = (name, x, y, o) => { const k = shadowOf(name, o); if (k) c.stamp(name, x, y, k); };
+        s.tile = (name, x, y, cols, rows, o) => { const k = shadowOf(name, o); if (k) c.tile(name, x, y, cols, rows, k); };
+        v(s);
+      }];
       if (!isOp(v) || (v.name !== "stamp" && v.name !== "tile")) return [];
-      const at = v.name === "stamp" ? 3 : 5, args = [...v.args], { shadow, ...o } = (args[at] ?? {}) as { shadow?: unknown };
-      if (shadow === false || l.opts.except?.includes(args[0] as string)) return [];
+      const at = v.name === "stamp" ? 3 : 5, args = [...v.args], k = shadowOf(args[0], args[at]);
+      if (!k) return [];
       while (args.length < at) args.push(v.name === "stamp" ? 0 : 1);
-      args[at] = { ...o, cast: shadow ?? l.opts.cast, silhouette: "#000000" };
+      args[at] = k;
       return [{ ...v, args }];
     });
   });
+}
+
+/** cast: "sun": look3d()'s light laid on a ground seen from above, what is h px up landing h * [kx, ky] away (long under a low sun). */
+function sunCast(def: AssetDef, l: Layer): [number, number] {
+  const L = def.look3d?.light;
+  if (!L) throw new PxError(`layer '${l.name}': cast "sun" is look3d()'s light: call look3d({ light: [x, y, z] }) before the ${def.kind}`, l.loc);
+  if (def.opts.world?.view !== "top") throw new PxError(`layer '${l.name}': cast "sun" lays the shadows on a ground seen from above: give the ${def.kind} world: { view: "top" } (seen from the side, cast is [kx, ky])`, l.loc);
+  if (!(L[2] > 0)) throw new PxError(`layer '${l.name}': cast "sun": look3d()'s light ${JSON.stringify(L)} is at or under the horizon (its z, up, is 0 or less)`, l.loc);
+  return [-L[0] / L[2], L[1] / L[2]];
 }
 
 function isFrameOpts(v: unknown): boolean {
@@ -503,6 +527,7 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
     if (!(typeof o.height === "number" && o.height > 0)) throw new PxError(`height is its real height in meters (e.g. 1.8), got ${fmtArgs([o.height])}`);
     img.meters = o.height;
   }
+  if (def.grounded) img.grounded = true;
   if (o.mx) step("mirror x", () => img.mirror("x"), (k) => { k.mirror("x"); return k; });
   if (o.my) step("mirror y", () => img.mirror("y"), (k) => { k.mirror("y"); return k; });
   if (o.swap) {

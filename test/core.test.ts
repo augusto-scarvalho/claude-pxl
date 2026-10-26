@@ -263,6 +263,12 @@ test("bubble: a 9-slice sized to its words, its tail down to the point, the prom
   const k2 = art(PAL + look + 'scene("s", { w: 30, h: 24, pixel: 2 }, bubble(10, 11, "", "A", { panel: "_box", tail: "_tail", pad: 2, side: -1 }))', "s").split("\n");
   assert.deepEqual([k2[0].slice(9, 25), k2[20].slice(18, 22), k2[21].slice(18, 22)], ["k".repeat(16), ".rr.", ".rr."], "off to the left, 2 px a pixel, the tip at (20, 22)");
   assert.match(failure(PAL + 'sprite("b", "kk"); scene("s", { w: 9, h: 9 }, bubble(4, 8, "", "hi", { panel: "b" }))', "s").message, /has no slice margins/);
+  // near the edge the box slides along its tail, the tip still on the speaker; past what the tail allows, a warning
+  const edge = art(PAL + look + 'scene("s", { w: 20, h: 32 }, bubble(6, 32, "AB", ["CD", "E"], { panel: "_box", tail: "_tail", more: "_more", color: "k", pad: 2, side: -1 }))', "s").split("\n");
+  assert.deepEqual([edge[1].slice(0, 17), edge[31][6]], ["k".repeat(17), "r"], "inside the picture (it would start at x -5), the tip at x 6");
+  const p = loadSource(PAL + look + 'scene("s", { w: 30, h: 32 }, bubble(1, 32, "AB", ["CD", "E"], { panel: "_box", tail: "_tail", pad: 2 }))');
+  p.image("s");
+  assert.match(p.warnings.map((w) => w.msg).join("\n"), /bubble: 'AB' runs off the picture's left, its tail as far along it as it goes/);
 });
 
 test("sheet extrude: edge pixels repeat outward, frame rects stay put", () => {
@@ -450,6 +456,15 @@ test("shadows of a layer (of): a shade layer casts what stands in it, one with i
   const s = art(P + 'scene("s", { w: 8, h: 3, bg: "r" }, layer("sh", { shade: true, of: "stand", cast: [1, 0], except: ["dot"] }), layer("stand", stamp("post", 0, 3), stamp("post", 5, 3, { shadow: [-1, 0] }), stamp("post", 7, 3, { shadow: false }), stamp("dot", 3, 3)))', "s");
   eq(s, "wrrrrwrw\nwrrrrwrw\nwkkwkwrw");
   assert.match(failure(P + 'scene("s", { w: 4, h: 3 }, layer("sh", { shade: true, of: "nope" }))', "s").message, /of names no layer 'nope'/);
+  // a function's stamps too (a walker placed by the frame), what else it draws left out
+  eq(art(P + 'scene("s", { w: 4, h: 3, bg: "r" }, layer("sh", { shade: true, of: "stand", cast: [1, 0] }), layer("stand", (c) => { c.stamp("post", 0, 3); c.px(3, 0, "w") }))', "s"), "wrrw\nwrrr\nwkkr");
+  // cast "sun": look3d()'s light on a ground seen from above, h px up landing h * [-x / z, y / z] away
+  const sun = 'look3d({ light: [-1, 0, 1] }); scene("s", { w: 4, h: 3, bg: "r", world: { scale: 20, view: "top" } }, layer("sh", { shade: true, of: "stand", cast: "sun" }), layer("stand", stamp("post", 0, 3)))';
+  eq(art(P + sun, "s"), "wrrr\nwrrr\nwkkr");
+  assert.match(failure(P + sun.replace(', view: "top"', ""), "s").message, /cast "sun" lays the shadows on a ground seen from above: give the scene world: \{ view: "top" \}/);
+  // and the lit side read off the same sun: world.light "sun", the way to it on things standing up
+  assert.deepEqual(loadSource(P + sun.replace('view: "top"', 'view: "top", light: "sun"')).assets.get("s")!.opts.world!.light, [-1, -1]);
+  assert.match(failure(P + sun.replace('view: "top"', 'view: "map"'), "s").message, /world.view is "top" \(a flat world seen from above/);
 });
 
 test("relight: edges facing the light step lighter along their ramp, edges facing away darker", () => {

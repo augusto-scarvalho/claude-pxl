@@ -91,6 +91,8 @@ test("rig3d: its blocks and its painted figure in every heading, feet on the piv
   assert.ok(s.includes("r") && s.includes("g") && s.includes("w"), s);
   assert.deepEqual([...p.image("t_walk_e").data], [...p.image("t_walk_w").flip("x").data]);
   assert.equal(p.image("t_walk_e").pivot![0], 12);
+  // standing on that pivot, the mirror too: pxl check reads its feet there
+  assert.deepEqual([p.image("t_walk_w").grounded, p.image("t_walk_e").grounded, b.grounded], [true, true, true]);
   // the escape hatches: the joints and where they land; the draw hook set a socket in each frame
   assert.equal(keys(p, "hatch"), "r");
   // sized by itself: all of it inside, clear round it, the soles on the pivot's row (the near foot a row

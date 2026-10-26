@@ -152,7 +152,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
             tally[r.startsWith("WARNING") ? "against" : /as its light|toward the light/.test(r) ? "agree" : "unclear"]++;
             reads.add(`${name} › ${q.name} @${q.layer ?? "-"} › ${r}`);
           }
-          if (q.img.meters) { ran.feet++; if (wo?.ground !== undefined) ran.ground++; }
+          if (q.img.meters || q.img.grounded) { ran.feet++; if (wo?.ground !== undefined) ran.ground++; }
           if (o?.text) ran.text++;
           if (q.stand) ran.stand++;
         }

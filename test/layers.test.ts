@@ -142,3 +142,11 @@ sprite("lost", { w: 4, h: 1, register: "c" }, px(1, 0, "r"))`;
   assert.equal(art(src, "inked"), "..r...");
   assert.throws(() => p.image("lost"), /register: frame 0 has no 'c' marker/);
 });
+
+test("the nature kit's spruce() under a light of its own: surface()'s options over the kit's, nothing given the kit's own", async () => {
+  const { loadProject } = await import("../src/node/load.ts");
+  const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");
+  writeFileSync(f, `include(${JSON.stringify(join(process.cwd(), "examples/nature/kit.px.js"))}, { palette: true }); spruce("same", 52, 9); spruce("lit", 52, 9, { light: [0.55, 0.55, 0.62] })`);
+  const p = loadProject(f);
+  assert.deepEqual([p.image("same").hash() === p.image("_spruce_s").hash(), p.image("lit").hash() === p.image("_spruce_s").hash()], [true, false]);
+});

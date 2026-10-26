@@ -739,6 +739,8 @@ test("pxl help is short: other mentions a line each, a guide section by its head
   assert.doesNotMatch(anim, /Small animals/);
   assert.match(await said("help", "glow"), /^\[reference\.md: Glow\][^]*`keep`/m);
   assert.match(await said("help", "castBase"), /^\| `castBase: "pivot" \\| "column"` \|/m);
+  // an op written up in prose (no row of its own), found by its name first
+  assert.match(await said("help", "corners"), /^\[reference\.md: Ops > Terrain tilesets\]\nDraw the 16 pieces from one function: `corners\(/);
 });
 
 test("cli shot of a GIF: drawn larger, read at 1x; all its frames in rows of 12; a range picks some", async () => {

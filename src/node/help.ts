@@ -123,9 +123,9 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
   const refWhole = refs.length <= 2 ? refs : [];
   for (const s of refWhole) out.push(`[reference.md: ${s.head}]`, s.text);
   if (refs.length > refWhole.length) out.push(`[reference.md: ${refs.length} sections]`, ...refs.slice(0, 8).map((s) => `  pxl help "${s.head}" (${k(s.text.length)})`));
-  // a name with no row or section of its own, defined in a bullet as a call (`vnoise(x, y)` in
-  // "Procedural texture"): that bullet whole
-  if (!own.length && !refs.length) print((own = all.filter((e) => !e.row && e.text.startsWith("- ") && e.text.includes("`" + t + "("))));
+  // a name with no row or section of its own, defined in prose as a call (`vnoise(x, y)` in a bullet of
+  // "Procedural texture", `corners("dirt", ...)` under "Terrain tilesets"): that paragraph whole, first
+  if (!own.length && !refs.length) print((own = all.filter((e) => !e.row && e.text.includes("`" + t + "("))));
   const whole = !own.length && !refWhole.length && (secs.length <= 2 || nums) ? secs : [];
   for (const s of whole) out.push(`[${s.file}]`, s.text);
   if (secs.length > whole.length) {
