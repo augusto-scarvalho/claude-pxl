@@ -346,23 +346,30 @@ test file for what you changed, or the quick suite:
 
 ```sh
 node --test test/docs.test.ts                            # one file: the commands and flags the docs cite
-npm run test:quick                                       # every test but the two slowest, about 20 s
+npm run test:quick                                       # every test but the two slowest, about 18 s
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts      # the examples check, on one folder (or hd2d/harbor, or a,b)
-npm run check                                            # types and every test, about a minute: once, before the commit
+npm run check                                            # types and every test, about 20 s (a minute after an engine change): before the commit
 ```
 
-The two slowest tests are the check of every example (about 60 s on a 4-core laptop, in one thread
-per four of the machine's, the slowest of the last run first) and the study of the gallery's GIFs; a
-change to a check, to `study` or to an example is what they catch. The suite runs three test files at
+The two slowest tests are the check of every example (about 45 s on a 4-core laptop when all of
+them run, in one thread per four of the machine's, the slowest of the last run first) and the study
+of the gallery's GIFs (7 s); a change to a check, to `study` or to an example is what they catch.
+Both leave alone what already passed. Each example that passed is noted in `node_modules/.cache/pxl/`
+with a hash of what its check read (pxl's sources, Node's version, the test, the example and every
+file it read: what it includes, its palettes, PNGs and poses), and the next run checks only the
+examples whose hash changed: an example edited reruns alone (half a second, where every example took
+45), a shared file (`hd2d/kit.px.js`) reruns the examples that include it, a change to pxl's sources
+reruns them all; the test says how many it left alone. The gallery's study is skipped while pxl's
+sources and its two GIFs are the same. Delete `examples-passed.json` or `gallery-passed.txt` there
+to run them anyway. The suite runs three test files at
 a time, below normal priority, as `pxl` itself does: on a 4-core laptop seven at a time took as long
 (the quick suite 21 s either way), burned a fifth more processor and froze the user's programs. `npm test` preloads `test/compile-cache.ts` (Node's
 compile cache, half a second off every test file's start); a file alone runs the same with
-`node --import ./test/compile-cache.ts --test test/<file>.test.ts`. With
+`node --import ./test/compile-cache.ts --test test/<file>.test.ts`. The preload also puts the
+temporary folders the tests make in one of each process's, removed when it exits (before, the tests
+that didn't remove theirs had left 24,000 in the system's temp folder). With
 `PXL_EXAMPLES`, the examples test checks only the examples whose path under `examples/` starts with
-it, says in its name how many it left out, and leaves the other examples' lines alone. A run of
-every example that passed keeps a fingerprint of what the check reads (pxl's sources, the examples,
-the kept lines): the next run with none of that changed, a commit of docs only, skips it and says so
-(delete `node_modules/.cache/pxl/examples-passed.txt` to run it anyway).
+it, says in its name how many it left out, and leaves the other examples' lines alone.
 
 `test/examples.checks.txt` holds what `pxl check` says on every example. After a change you meant
 that adds or removes a warning, rewrite it and read the diff:
@@ -435,13 +442,25 @@ Agents run `pxl shot`, `check` and `study` many times a session, and the test su
 every example: a slow path costs every turn. Before and after a change to the engine:
 
 ```sh
-npm run check                                           # types and tests, about a minute (test:quick ~20 s)
-node scripts/perf.ts                                    # pxl check's time and peak memory on every example
-node scripts/hashes.ts > after.txt                      # every example's assets hashed: diff with a run before the change
-git worktree add ../pxl-head HEAD && node ../pxl-head/scripts/hashes.ts > before.txt   # (the run before, on the last commit)
+npm run check                                           # types and tests: an engine change rechecks every example, about a minute
+node scripts/hashes.ts --vs HEAD                        # every example's assets built by the last commit's pxl and by yours: what differs
+node scripts/hashes.ts --vs HEAD --frames 12 examples/hd2d/graveyard.px.js   # the animated ones' frames too, 12 over each loop (--frames: all)
+node scripts/perf.ts                                    # pxl check's time, processor time and peak memory on every example
+node scripts/perf.ts --vs HEAD examples/hd2d/traveler.px.js --only "^tr_walk_"   # ms a frame, the last commit's pxl against yours
+node --import ./scripts/meter.ts --import ./test/compile-cache.ts --test --test-concurrency=3 "test/**/*.test.ts" 2>&1 | grep METER | sort -k2 -rn
 node --cpu-prof --cpu-prof-dir=prof bin/pxl.js study clip.gif --no-out
 node scripts/cpuprofile.ts prof                         # where that time went, by function
 ```
+
+`--vs <rev>` unpacks the revision's `src/` and `examples/` once into the system's temp folder
+(`pxl-rev-<commit>`) and loads both pxls in one process: no worktree, no stash. `hashes.ts --vs`
+prints only the lines that differ and a count, and exits 1 when one does: a change meant to move no
+pixel ends with `0 differ`, frame by frame for the animated files (`--only <regex>` narrows a file
+to some assets; a long scene's frames take a second each). `perf.ts --vs` builds each frame with one
+pxl and then the other, alternating, because a laptop's speed drifts within seconds: two runs a
+minute apart differ by more than most changes, and the same pxl against itself reads within 6% on a
+figure. `meter.ts`, preloaded, prints each test file's time, processor time and peak memory: which
+files hold the suite back (the three `study` files, 7 to 10 s each of the quick suite's 18).
 
 `pxl build --profile` names the slow functions of one art file's build. Keep a new test to what it
 checks: a few frames, a small picture (a 3D one: a 30 px sprite, cells of 0.25 m), `study --seconds`

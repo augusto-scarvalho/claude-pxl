@@ -373,6 +373,16 @@ sprite("a", { w: 2, h: 2 }, rect(0, 0, 2, 2, KEY))`);
   assert.match(await said("shot", file, "a", "--vs", "HEAD", "--diff"), /^4 px changed$/m);
 });
 
+test("scripts/hashes.ts: an asset's frames a line each; --vs builds them with the last commit's pxl too and counts what differs", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
+  writeFileSync(file, `use("pico8"); pal({ k: 0, r: 8 })
+sprite("dot", { w: 4, h: 4 }, (c) => c.rect(1, 1, 2, 2, "r"))
+anim("blink", { w: 4, h: 4, frames: 3, fps: 4 }, (c) => c.rect(c.frame, 0, 1, 1, "k"))`);
+  const run = (...a: string[]) => execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "scripts/hashes.ts", ...a, file], { cwd: join(import.meta.dirname, ".."), encoding: "utf8" });
+  assert.deepEqual(run("--frames").split("\n").map((l) => l.split(" ")[1]), ["dot", "blink", "blink@1", "blink@2", undefined]);
+  assert.equal(run("--vs", "HEAD", "--frames", "2"), "3 the same, 0 differ (HEAD against the working tree)\n");
+});
+
 test("cli shot of PNGs from anywhere, several regions: a row per image, a column per region", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), a = join(dir, "a.png"), b = join(dir, "b.png");
   const img = (c: number) => { const i = new Img(8, 6); i.fill(c); return i; };
