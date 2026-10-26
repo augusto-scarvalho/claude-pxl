@@ -3,7 +3,7 @@
 // every frame of its loop, each distinct placement once: the checks that warn (facing, front marker,
 // lit side, feet, lettering) depend only on the placement (what it looks like, where) and the world.
 import type { Project } from "../core/project.ts";
-import { MANY, STAND, lightFor, orientWords, placementChecks } from "../core/describe.ts";
+import { MANY, STAND, lightFor, orientWords, placementChecks, standWords } from "../core/describe.ts";
 import { rigLines } from "../core/rig.ts";
 import { frontWords, rampSteps } from "../core/checks.ts";
 import { PxError } from "../core/errors.ts";
@@ -127,18 +127,20 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       const unlit = new Set(b.layers.filter((l) => l.unlit).map((l) => l.name));
       frames++;
       // many copies of one small thing (a brush scattered over the ground) are texture, not objects:
-      // describe lists them on one line and checks none of them, and so does this
+      // describe lists them on one line and checks none of them, and so does this, but for where one
+      // stands in a mesh() (a tuft floating past a hill's edge)
       const copies = new Map<string, number>();
       for (const q of b.placements) copies.set(`${q.name}@${q.layer}`, (copies.get(`${q.name}@${q.layer}`) ?? 0) + 1);
       for (const q of b.placements) {
-        if (copies.get(`${q.name}@${q.layer}`)! > MANY) continue;
+        const many = copies.get(`${q.name}@${q.layer}`)! > MANY;
+        if (many && !standWords(q.stand)) continue;
         const key = `${q.name}|${q.layer}|${q.x},${q.y}|${q.img.w}x${q.img.h}|${hash(q.img.data)}|${q.stand && Math.abs(q.stand.off) > STAND ? q.stand.off.toFixed(2) : ""}`;
         let ws = seen.get(key);
         if (!ws) {
           const o = q.img.orient, dark = unlit.has(q.layer ?? "");
-          const all = [...placementChecks(q, wo, steps, dark, b.lamps), ...(o ? orientWords(o).split(", ") : [])];
+          const all = many ? [standWords(q.stand)] : [...placementChecks(q, wo, steps, dark, b.lamps), ...(o ? orientWords(o).split(", ") : [])];
           // read against a light: the world's, or else the one it was drawn under (a mesh's, a lamp's)
-          const lit = !dark && wo?.light !== false && (!!wo?.light || !!lightFor(wo, q, b.lamps));
+          const lit = !many && !dark && wo?.light !== false && (!!wo?.light || !!lightFor(wo, q, b.lamps));
           lightSaid ||= lit;
           ws = all.filter((w) => w.startsWith("WARNING"));
           seen.set(key, ws);

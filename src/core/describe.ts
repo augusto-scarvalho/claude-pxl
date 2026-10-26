@@ -102,14 +102,19 @@ export function placementChecks(p: Placement, wo: World | undefined, steps: Step
     const feet = p.y + bb.y + bb.h, off = pv ? Math.round(p.y + pv[1] - feet) : 0;
     if (Math.abs(off) >= 2) checks.push(`WARNING: its feet are ${Math.abs(off)} px ${off > 0 ? "above" : "below"} where it stands (its pivot is ${Math.abs(off)} px ${off > 0 ? "below its sole" : "above it"}): it ${off > 0 ? "floats" : "sinks"}`);
     // the ground's row under its feet (its pivot's column, or its middle's): one row, or a profile
-    const g = Array.isArray(wo?.ground) ? profile(wo.ground)(p.x + (pv ? pv[0] : bb.x + (bb.w >> 1))) : wo?.ground;
+    const x = p.x + (pv ? pv[0] : bb.x + (bb.w >> 1)), G = wo?.ground;
+    // (several profiles: a floor everywhere and ledges over it, each over its own span; the row nearest the feet)
+    const rows = G === undefined ? [] : typeof G === "number" ? [G] : Array.isArray(G[0]) ? (G as number[][]).filter((P, i) => !i || (x >= P[0] && x <= P[P.length - 2])).map((P) => profile(P)(x)) : [profile(G as number[])(x)];
+    const g = rows.length ? rows.reduce((a, b) => (Math.abs(b - feet) < Math.abs(a - feet) ? b : a)) : undefined;
     if (g !== undefined && Math.abs(g - feet) >= 2)
       checks.push(`WARNING: its feet (y ${feet}) are ${Math.abs(g - feet)} px ${g > feet ? "above" : "below"} the ground (y ${g})`);
   }
-  // a sprite in mesh(): its feet on the face looking up under them, within expect3d's `on` (0.15 m)
-  const st = p.stand;
-  if (st && Math.abs(st.off) > STAND) checks.push(`WARNING: its feet are ${Math.abs(st.off).toFixed(2)} m ${st.off > 0 ? "over" : "under"} the model's '${st.on}' under them: it ${st.off > 0 ? "floats" : "sinks"} (stand: true sets them on it; air: true if it flies)`);
+  checks.push(standWords(p.stand));
   return checks.filter(Boolean);
+}
+/** A sprite in mesh(): its feet on the face looking up under them, within expect3d's `on` (0.15 m); "" when they are. */
+export function standWords(st: Placement["stand"]): string {
+  return st && Math.abs(st.off) > STAND ? `WARNING: its feet are ${Math.abs(st.off).toFixed(2)} m ${st.off > 0 ? "over" : "under"} the model's '${st.on}' under them: it ${st.off > 0 ? "floats" : "sinks"} (stand: true sets them on it; air: true if it flies)` : "";
 }
 
 /**

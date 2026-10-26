@@ -63,7 +63,7 @@ const shapes = {
 };
 for (const [id, [p1, p2, p3, lx, ly]] of Object.entries(shapes))
   for (const [tint, [swap, light]] of Object.entries(tints))
-    anim(`fungus_${id}_${tint}`, { w: 14, h: 8, ...loop },
+    anim(`fungus_${id}_${tint}`, { w: 14, h: 8, ...loop, pivot: [7, 7], height: 0.1 },
       ...[p1, p2, p3].map(([n, x, y]) => stamp(n, x, y, { swap })),
       (c) => {
         const k = wave(c);
@@ -73,7 +73,7 @@ for (const [id, [p1, p2, p3, lx, ly]] of Object.entries(shapes))
 
 // Tall lantern mushrooms: the stem bends a little, the cap breathes.
 for (const h of [12, 16, 22])
-  anim("lantern" + h, { w: 9, h, ...loop }, (c) => {
+  anim("lantern" + h, { w: 9, h, ...loop, pivot: [4, h - 1], height: h / 40 }, (c) => {
     const s = Math.round(wave(c) * 1.2), k = wave(c, 1, 0.3);
     c.line(4, h - 1, 4 + s, 4, "f");
     c.vline(4, h - 3, 3, "F");
@@ -83,7 +83,7 @@ for (const h of [12, 16, 22])
   });
 
 // Ferns sway; the further up the frond, the more it moves.
-anim("fern", { w: 11, h: 10, ...loop }, (c) => {
+anim("fern", { w: 11, h: 10, ...loop, pivot: [5, 9], height: 0.3 }, (c) => {
   const sway = wave(c) * 1.6;
   for (let i = 0; i <= 8; i++) {
     const y = 9 - i, x = 5 + Math.round(sway * (i / 8) ** 2);
@@ -97,7 +97,7 @@ anim("fern", { w: 11, h: 10, ...loop }, (c) => {
 });
 
 // Bellflowers: a curled stem with a glowing bell that slowly pulses.
-anim("bell", { w: 6, h: 9, ...loop }, (c) => {
+anim("bell", { w: 6, h: 9, ...loop, pivot: [2, 8], height: 0.2 }, (c) => {
   c.vline(1, 2, 7, "l"); c.px(2, 1, "l"); c.px(3, 1, "l"); c.px(0, 6, "L"); c.px(2, 5, "L");
   c.grid(3, 2, wave(c, 2) > 0 ? "ZZz\nz.z" : "zZz\nz.z");
 });
@@ -118,7 +118,7 @@ for (const len of [14, 20, 26, 34])
 
 // The centrepiece: a giant lantern mushroom. Thick curved stem, a wide spotted cap that sways
 // slowly, glowing gills and a big soft lamp.
-anim("giant", { w: 35, h: 56, ...loop }, (c) => {
+anim("giant", { w: 35, h: 56, ...loop, pivot: [17, 55], height: 1.4 }, (c) => {
   const s = wave(c) * 1.5, k = wave(c, 1, 0.25);
   for (let y = 10; y < 56; y++) {
     const t = (56 - y) / 46, x = Math.round(17 + s * t * t + 3 * Math.sin(t * 2.2));
@@ -139,7 +139,7 @@ anim("giant", { w: 35, h: 56, ...loop }, (c) => {
 });
 
 // Snail with a glowing shell.
-sprite("_snail", "..aa...\n.aAAa.h\n.aAaa.h\nhhhhhhh");
+sprite("_snail", { pivot: [3, 3], height: 0.03 }, "..aa...\n.aAAa.h\n.aAaa.h\nhhhhhhh");
 
 // ------------------------------------------------------------------ placement lists
 const fungi = [["fungus_a_c", 30], ["fungus_b_m", 50], ["fungus_a_t", 92], ["fungus_b_c", 222], ["fungus_a_m", 262], ["fungus_b_t", 304]];
@@ -160,7 +160,10 @@ const fishAt = (i, t) => [Math.round(156 + 40 * Math.sin((t + i * 0.5) * TAU)), 
 const sporeSources = [[37, 112], [57, 114], [99, 121], [229, 125], [269, 120], [311, 107]];
 
 // ------------------------------------------------------------------ the grotto
-anim("grotto", { w: W, h: H, ...loop },
+// what stands on the floor (world.ground: stamp(name, x, "ground") stands one there), the ledge's top
+// and the island's (pxl check reads the feet of what has a height against the nearest)
+const island = [140, 152, 147, 145, 158, 144, 166, 147, 172, 154];
+anim("grotto", { w: W, h: H, ...loop, world: { ground: [floor, ledgeTop, island] } },
   layer("backwall", { wall: true }, rect(0, 0, W, H, "K"),
     scatter("_stone*", -8, -8, W + 16, H + 16, 620, { rflip: "xy", rswap: [{}, {}, { r: "R" }], seed: 7 })),
 
@@ -187,15 +190,15 @@ anim("grotto", { w: W, h: H, ...loop },
     scatter("_tuft*", 0, 0, W, POOL, 90, { on: "q", below: true, rflip: "x", seed: 6 })),
 
   layer("life",
-    ...ferns.map((x) => stamp("fern", x - 5, ground(x) - 9, { rdelay: true, rflip: "x" })),
-    ...ledgeFerns.map((x) => stamp("fern", x - 5, ledge(x) - 9, { rdelay: true, rflip: "x" })),
-    ...bells.map((x) => stamp("bell", x - 2, ground(x) - 8, { rdelay: true, rflip: "x" })),
-    ...lanterns.map(([x, h]) => stamp("lantern" + h, x - 4, ground(x) - h + 1, { rdelay: true })),
-    stamp("lantern12", 262, ledge(266) - 11, { rdelay: true }),
-    ...fungi.map(([n, x]) => stamp(n, x - 7, ground(x) - 7, { rdelay: true })),
-    stamp("fungus_b_c", 280, ledge(287) - 7, { rdelay: true }),
-    stamp("giant", 140, 145 - 55, { rdelay: true }),
-    stamp("fern", 160, 145 - 9, { rdelay: true }), stamp("bell", 146, 145 - 8, { rdelay: true }),
+    ...ferns.map((x) => stamp("fern", x, "ground", { rdelay: true, rflip: "x" })),
+    ...ledgeFerns.map((x) => stamp("fern", x, ledge(x), { rdelay: true, rflip: "x" })),
+    ...bells.map((x) => stamp("bell", x, "ground", { rdelay: true, rflip: "x" })),
+    ...lanterns.map(([x, h]) => stamp("lantern" + h, x, "ground", { rdelay: true })),
+    stamp("lantern12", 266, ledge(266), { rdelay: true }),
+    ...fungi.map(([n, x]) => stamp(n, x, "ground", { rdelay: true })),
+    stamp("fungus_b_c", 287, ledge(287), { rdelay: true }),
+    stamp("giant", 157, 144, { rdelay: true }),
+    stamp("fern", 165, 145, { rdelay: true }), stamp("bell", 148, 145, { rdelay: true }),
     stamp("crystals", 222, ground(228) - 11),
     stamp("crystals", 144, ceilY(150) - 1, { flip: "y" }),
     ...vines.map(([x, len]) => stamp("vine" + len, x - 4, ceilY(x) - 1, { rdelay: true })),
@@ -237,7 +240,7 @@ anim("grotto", { w: W, h: H, ...loop },
 
       // The snail crawls back and forth along the left terrace.
       const sx = Math.round(4 + 14 * (0.5 - 0.5 * Math.cos(c.phase * TAU))), left = Math.sin(c.phase * TAU) < 0;
-      c.stamp("_snail", sx, ground(sx + 3) - 4, left ? {} : { flip: "x" });
+      c.stamp("_snail", sx + 3, "ground", left ? {} : { flip: "x" });
       c.lamp(sx + 3, ground(sx + 3) - 3, { r: 16, color: "#ffb060", power: 0.45, z: 4 });
 
       // Fish light the pool from below the surface (drawn after the reflection).

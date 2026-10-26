@@ -146,7 +146,8 @@ function isFrameOpts(v: unknown): boolean {
 export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: Trace, t = 0, clock?: Timeline): BuildOut {
   const { opts, pal } = def;
   const tl = def.kind === "anim" ? animTimeline(def) : undefined, g = opts.world?.ground;
-  const groundAt = Array.isArray(g) ? profile(g) : typeof g === "number" ? () => g : undefined;
+  // (several: the first is what "ground" stands on; each made once here so a bad one says so)
+  const groundAt = Array.isArray(g) ? (Array.isArray(g[0]) ? (g as number[][]).map(profile)[0] : profile(g as number[])) : typeof g === "number" ? () => g : undefined;
   const at = tl ? frameAt(tl, t) : 0;
   const frame = tl?.order ? tl.order[at] : at, frames = tl ? drawnFrames(tl) : 1;
   const tick = !tl && clock ? { frame: Math.round(t / clock.step), frames: Math.max(1, Math.round(clock.loop / clock.step)) } : undefined;

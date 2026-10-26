@@ -269,9 +269,11 @@ const GAIT_KEYS = ["heading", "view", "stride", "lift", "bob", "hands", "front",
 /**
  * A walk's numbers at t (0..1 over the cycle; at 0 both feet down facing us, the left foot passing in
  * profile): `heading` (compass degrees) or `view`; each of GAIT's numbers overridable, for every view (`stride: 4`) or one
- * (`profile: { stride: 4 }`); a number of stride or lift a swing (sin, cos over the cycle), a list
- * one value a frame. Returns { view, a, feet: [[forward, up], ...], bob, hands: [[forward, up], ...] }:
- * numbers, placing nothing (the right foot half a cycle after the left).
+ * (`profile: { stride: 4 }`); a number of stride the foot planted half the cycle going back at an even
+ * speed and swung through the other half, of lift a swing (cos over the cycle), a list one value a
+ * frame. Returns { view, a, feet: [[forward, up], ...], bob, hands: [[forward, up], ...], pace }:
+ * numbers, placing nothing (the right foot half a cycle after the left; pace the px a cycle the body
+ * goes over a planted foot).
  */
 export function gait(t: number, o: Record<string, unknown> = {}) {
   if (!Number.isFinite(t)) throw new PxError(`gait(t, opts): t is 0..1 over the cycle, got ${JSON.stringify(t)}`);
@@ -286,7 +288,13 @@ export function gait(t: number, o: Record<string, unknown> = {}) {
   const ph = 2 * Math.PI * t, sn = Math.sin(ph), cs = Math.cos(ph);
   // a table's value at t (and half a cycle later), or a number's swing
   const at = (v: number[], half = 0) => v[(((Math.round(t * v.length) + (half ? v.length / 2 : 0)) % v.length) + v.length) % v.length];
-  const stride = (k: number) => (typeof G.stride === "number" ? (k ? -G.stride * sn : G.stride * sn) : at(G.stride, k));
+  // a number of stride: the foot planted from its reach ahead back to its reach behind at an even speed
+  // (half the cycle, as the body goes over it), then swung through (eased, lifted)
+  const stride = (k: number) => {
+    if (typeof G.stride !== "number") return at(G.stride, k);
+    const u = (((t + (k ? 0.5 : 0) - 0.25) % 1) + 1) % 1;
+    return u < 0.5 ? G.stride * (1 - 4 * u) : -G.stride * Math.cos(2 * Math.PI * (u - 0.5));
+  };
   const lift = (k: number) => (typeof G.lift === "number" ? G.lift * Math.max(0, k ? -cs : cs) : at(G.lift, k));
   const feet = [0, 1].map((k) => [stride(k), lift(k)]);
   let hands: number[][];
@@ -299,7 +307,9 @@ export function gait(t: number, o: Record<string, unknown> = {}) {
     const hand = (s: number) => (s > 0 ? [G.hands[0][0] * s, G.hands[0][1] * s] : [G.hands[1][0] * s, G.hands[1][1] * s]);
     hands = [hand(-sn), hand(sn)];
   }
-  return { view: vw.view, a: vw.a, feet, bob: at(G.bob), hands };
+  // how far the body goes over a planted foot in a cycle (px): a figure moved this fast keeps its feet planted
+  const S = G.stride, pace = typeof S === "number" ? 4 * S : 2 * S.reduce((s, v, i) => s + Math.max(0, v - S[(i + 1) % S.length]), 0);
+  return { view: vw.view, a: vw.a, feet, bob: at(G.bob), hands, pace };
 }
 
 // ---------------------------------------------------------------- views' rows

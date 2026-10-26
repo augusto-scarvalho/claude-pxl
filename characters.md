@@ -624,7 +624,8 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   recover (lowest); a game's run, 3 (§12). Top-down, a front or back walk
   is half the cycle and the same half flipped (`flip: "x"`), redrawing only what isn't symmetric,
   with less bob walking up. In-betweens halve each frame's time, so the cycle keeps its length.
-  `gait(t, { heading })` gives a walk's numbers by the view, overridable (`PXL help gait`).
+  `gait(t, { heading })` gives a walk's numbers by the view, overridable, and its `pace`: a figure
+  moved that fast (`route()`'s pace by direction) keeps the planted foot still (`PXL help gait`).
 - **Animate a dummy first** (SLYNYRD, final boss blues): the figure in flat parts, each in its own
   color (the head, the torso, the near limbs light, the far ones dark), through every move; then
   paint the costume over it frame by frame. One leg first (4 keys, then 8 frames), the other the same

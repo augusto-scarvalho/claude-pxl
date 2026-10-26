@@ -129,6 +129,11 @@ test("profile and world.ground as a polyline: its row under x; a stamp standing 
 scene("s", { w: 30, h: 30, bg: "g", world: { scale: 5, ground: [0, 10, 30, 25] } }, layer("props", stamp("man", 6, "ground"), stamp("man", 20, 16)))`, "describe", "s", "--no-out");
   assert.doesNotMatch(text.split("A man #2")[0], /WARNING/);
   assert.match(text, /man #2[^]*?WARNING: its feet \(y 16\) are 4 px above the ground \(y 20\)/);
+  // a ledge over the floor from x 15 to 25: the second stands on it; "ground" is the floor's
+  const two = (await run(PAL + `sprite("man", { w: 3, h: 9, height: 1.8, pivot: [1, 9] }, rect(0, 0, 3, 9, "r"))
+scene("s", { w: 30, h: 30, bg: "g", world: { scale: 5, ground: [[0, 10, 30, 25], [15, 16, 25, 16]] } }, layer("props", stamp("man", 6, "ground"), stamp("man", 20, 16), stamp("man", 5, 8)))`, "describe", "s", "--no-out")).text;
+  assert.doesNotMatch(two.split("A man #3")[0], /WARNING/);
+  assert.match(two, /man #3[^]*?WARNING: its feet \(y 8\) are 5 px above the ground \(y 13\)/, "the ledge only over its span");
   assert.match(failure(PAL + 'sprite("d", "r"); scene("s", { w: 4, h: 4 }, stamp("d", 1, "ground"))', "s").message, /stands on the scene's ground: give it world/);
 });
 

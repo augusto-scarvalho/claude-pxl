@@ -56,7 +56,8 @@ look at (`--frames 0-11` for some).
 - A side view's ground that isn't one row (a cave's floor, a ledge, a ceiling for what hangs from it):
   a polyline, `const floor = profile([0, 118, 24, 114, ...])`, `floor(x)` its row under x; drawn as a
   `poly`, props stood on it; `world: { ground: [...] }` checks the feet of what has a height against it
-  and `stamp(name, x, "ground")` stands one there (`examples/grotto.px.js`).
+  (`[floor, ledge, ...]`: a ledge or an island over its own span) and `stamp(name, x, "ground")` stands
+  one on the floor (`examples/grotto.px.js`, `examples/cave.px.js`).
 - Keep small details that dot an area (pebbles, flowers, tufts) out of tiles: baked in, they repeat
   as a pattern. Lay plain tiles, then `scatter(..., { even: true })` the details over them.
 - A tileset (Saint11): draw the master tile, offset it by half (`wrap: true` shows the seams) and fix
@@ -331,8 +332,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   hull's strakes over a line of tar, algae climbing from the waterline in streaks; a rowboat clinker,
   a shadow line under each strake's lip.
 - A story in a diorama (the graveyard's visit): `route()` walks its legs and holds by name, each leg
-  facing its way, at the walk's own pace (a cycle's two steps over its frames; faster, the feet
-  slide), the feet on its `ground` (each step, a path); time what hangs on a hold by `start("talk")`,
+  facing its way, at the walk's own pace by its way (`pace: (dir) => ...`, from `gait()`'s `pace` over
+  the walk's frames at the scene's px to the meter; slower or faster, the feet slide), the feet on its
+  `ground` (each step, a path) or the mesh's `stand`; time what hangs on a hold by `start("talk")`,
   never by summing frames. `turnToward()` turns the other figure to whoever speaks, a direction every
   two frames. Stand a figure beside what it looks at, not in front of it: from above and in front its
   body hides a headstone it faces, and kneeling a step too close its head meets the stone. Clear what

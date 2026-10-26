@@ -16,12 +16,8 @@ const PW = 96, PH = 104
 // 0.1 m, splats 0.05 m apart), in one view; the camera's on the grass, the mesh's and the splats' shadow
 // their field's
 const CAM = hd2d(PW, PH, 13), GR = ground(CAM.z), AT = CAM.aim(2.2)
-// (the mesh through the camera in the ground's own mesh(), so the grass in front of the trunk's foot is
-// outlined against it as it was: draw3d's mesh comes after the ground, over its depth)
-const MESH = sdf.mesh(STILL, { size: 0.1 }).faces.map((f) => ({ mat: f.mat, pts: f.pts.map((p) => [p[0] + AT[0], p[1] + AT[1], p[2]]) }))
 const panelOf = (rep, view) => sprite(`p_${rep}_${view}`, { w: PW, h: PH }, (c) => {
   const o = { as: rep, size: 0.1, spacing: 0.05 }
-  if (view === "camera" && rep === "mesh") { c.mesh(CAM, [...GR.faces, ...MESH], { ...GMATS, bark: { ramp: "bBiI", smooth: true }, leaf: { ramp: "ZzxcvVJ", smooth: true } }); c.surface(STILL, { view: CAM, at: AT, hide: true }); return }
   if (view === "camera") { c.mesh(CAM, GR.faces, GMATS); c.draw3d(STILL, { ...o, view: CAM, at: AT }); return }
   // (voxels through the same true views as the others here, not on the pixel grid: the same tree compared)
   const turn = rep === "voxels" ? { pitch: view === "top" ? 90 : view === "iso" ? 30 : 20, yaw: view === "iso" ? 45 : 0 } : {}

@@ -68,16 +68,23 @@ Mark items `[x]` when they ship, with the commit.
 - [ ] **The figures in 3D (wave 3): what is still open**
   - the heads are modeled and drawn once per view, their faces painted over: cut by a script from
     the approved hand heads where the render has the head, then the profiles widened and the nose's
-    tip given back by hand; the rest not retouched past that (the 3/4 cheeks, the ears, the warden's
-    profile);
+    tip given back by hand; in round 5 (R3) the traveler's 3/4 cheek and profile jaw (the side lock
+    dark down past the ear to a chin 3 px wide, where the render left a jowl of the skull's shade) and
+    the warden's profiles (the nose's tip a pixel past the line, the chin in skin where the side locks
+    hung as a beard);
+  - the same cheek and jaw retouch for the mourner and the crew (their sw and w grids: the render's
+    block of skin under the ear reads as a jowl; the mourner's hair is drawn back, so hers closes in
+    skin, not a lock);
   - the traveler's head is a little smaller and its hair has less volume and fewer light strokes than
     the hand heads had; from behind it is smoother and darker; seams between pieces can make shapes
     by chance (a "face" on the back was fixed once);
   - the crew's bandana and long hair had one pass each (a knot and tails, a hem; locks, a parting, a
     braid of plaits); the flat cap's brim and the bald crown's highlight could take one;
   - 1 px creases (knee, elbow) hardly read; the cloak's and boots' accents do;
-  - the warden's stance sways by whole pixels now (its first engine's half pixels went with it), and
-    its head is no longer a frame behind the body;
+  - the warden's stance sways by half pixels again (round 5, R3: the figure stamped with `sub`, its
+    feet carried back to the place it stays crisp at; the boots' outline ahead takes the tone between
+    on those frames); its head is no longer a frame behind the body (on rig3d the figure is one
+    image);
   - the bodies are drawn every frame: after perf3d the traveler 5.7 ms a frame warm (6.2 before), the
     mourner 5.1 (6.4), the crew 3.7 (4.9), the warden 18 (22); 5-19 cold. Each pixel's distance ~10
     times and 4 more for its normal; a third of it the cloth's sweeps (the art's `trail` and `radius`).
@@ -85,8 +92,10 @@ Mark items `[x]` when they ship, with the commit.
     outside every box), so what's left: frames of a move drawn once where its pose repeats (idle's
     held breath, cast's hold, turn as idle's first), and cheaper cloth functions in the art files;
   - `views()` doesn't hold a baked head's crown and chin to one row (one head turned keeps them; the
-    line under a jaw that turns may reach a row lower in 3/4).
-- [ ] **What the 3D stage (wave 2) left to fix by hand, each a small change of pixels for the user to
+    line under a jaw that turns may reach a row lower in 3/4). The crew's grey head (once its own item)
+    is this: its crown on row -7 from the anchor in s and sw, -6 in w, nw and n, a tuft of 2 px at its
+    top; a retouch grid can't reach above its anchor's rows, so it takes the model (round 5, R3).
+- [x] **What the 3D stage (wave 2) left to fix by hand, each a small change of pixels for the user to
   see before and after:**
   - three grass tufts along the graveyard's fence stand at its top, 1.5 m over the turf, past the
     hill's rounded corners: `stand` drops them onto the turf beside the wall (33 px);
@@ -100,7 +109,15 @@ Mark items `[x]` when they ship, with the commit.
     where `texel: "screen"` is more correct but moves a few pixels;
   - `sizes` blocks only ramp materials by default; blocking textures too would keep HD scenes nearer
     pixel art (plaza_hd and graveyard_hd would change: show both).
-- [ ] **The walk's feet slide** (wave 4a): `gait()`'s stride is a sine swing per view (±4.6 px in
+
+  Done (round 5, R3), each shown and approved: the fence's tufts on `stand` (28 px; the grass lips
+  hanging over the wall's edge say `air`); check's standing rule on many copies too (nothing else of
+  them checked); the graveyard's traveler on `stand`, `feetAt` gone (23 px over 239 frames); both
+  panels through `draw3d` (8 and 7 px at the trunk's foot); `texel: "screen"` on the graveyard's flags
+  (0 px at its size), the harbor's hull (7) and boats (20), the deck across kept by hand (the wall's
+  texel on its steep faces made a dark band, 428 px); `sizes` lays textures in blocks too, a texel a
+  block (`block: 1` keeps one finer: the clearing's grass and path, unchanged).
+- [x] **The walk's feet slide** (wave 4a): `gait()`'s stride is a sine swing per view (±4.6 px in
   profile, ±3.4 on a diagonal, ±0.6 facing us), so the planted foot moves back at 1.35 to 3.25 px a
   frame over its stance (2.3 on average in profile) and no one pace keeps it planted; the graveyard
   and the harbor walk at 1.6 px a frame, 30% under the profile's 2.3, so on their east and west legs
@@ -108,11 +125,25 @@ Mark items `[x]` when they ship, with the commit.
   fix belongs to the gait work (A.md P4): a stance moving back at a constant speed and a stride in px
   a cycle per view; then `route()` could take its pace from the walk by heading. It retimes the
   stories: the user sees both.
-- [ ] **The cave and the grotto on their floor** (wave 4b, a visual step): `world: { ground: [...] }`
+  Done (round 5, R3): a number of `stride` is the foot planted half the cycle, going back at an even
+  speed (2.3 px a frame in profile), and swung through the other half (frames 1, 3, 5 and 7 change);
+  `gait()` gives its `pace` (4 strides a cycle); `route({ pace: (dir) => ... })` walks each leg at its
+  way's, the traveler's `travelerFigure.pace` (1.6 px toward us or away, where the stride hardly
+  shows). The graveyard went from 528 frames to 484, the harbor from 384 to 288 (its docker walks
+  3 m and rests 1.6 s at each end). Left: 0.35 px a frame on the harbor's pier, nearer the camera
+  than its 17 px to the meter (19.6 there); 0.1 or less elsewhere.
+- [x] **The cave and the grotto on their floor** (wave 4b, a visual step): `world: { ground: [...] }`
   with their floor's profile and a `height` on what stands, so the feet rule runs there; they are
   anims (an anim with a `world` is checked as a scene). Standing their props with
   `stamp(name, x, "ground")` moves the stamps' x, y, which seed `rflip` and `rdelay`: the picks change
   (show both).
+  Done (round 5, R3): `world.ground` takes several profiles (the floor everywhere, a ledge or an
+  island over its own span; the feet read against the nearest, `"ground"` the floor); the props a
+  `height` and a pivot at the foot of their stem, stood by `stamp(name, x, "ground")`; the feet rule
+  runs on 12 placements in the cave and 108 in the grotto, and found the giant mushroom 2 px into its
+  island (up a pixel). The picks changed: the fungi and lanterns pulse out of step as before, at other
+  moments. Without the pivots (stamps where they were, no pixel moved) 3 props read 2 px off: the rule
+  reads under the drawing's middle, not its stem.
 - [ ] **A lit-side rule for art without an outline** (wave 4b): it reads the side from the rim of an
   outlined drawing, so on the five perspective anims' named drawings (park, road, race, extinction,
   train) it ran on every one and read none ("a clear reading on 0"). Read the light from the tones
@@ -124,10 +155,12 @@ Mark items `[x]` when they ship, with the commit.
   pixels sit against its darker ones: 26 against across park, race and extinction (a car's mirrors,
   the rival car). What it needs: materials told apart without ramps (a ramp per hue family guessed
   from the palette, checked by eye on those drawings), or ramps given to those files.
-- [ ] **The crew's grey-haired head turned to profile is a row short at the crown** (`_og_head_w` in
+- [x] **The crew's grey-haired head turned to profile is a row short at the crown** (`_og_head_w` in
   `hd2d/crew.px.js`): `pxl check`'s views rule reads its crown on row -4 from the anchor, -5 in the
   other views, so the head drops a pixel at its top as it turns. Redraw its top to reach the others'
   crown (a change of pixels for the user to see before and after).
+  Closed (round 5, R3): the hand head is gone; the baked one is in the figures' item above (its
+  `views()` line).
 
 ## Characters (from dogfooding a 64 px character)
 

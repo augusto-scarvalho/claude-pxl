@@ -100,8 +100,8 @@ declare global {
     horizon?: number; eye?: number; scale?: number;
     /** Where the light comes from, or a point light in the scene ({ at: [x, y] }: a fire, a lamp): each object's lit side is checked against it. Without it, the lamp lighting() lit each by, or a mesh's light; false: none. */
     light?: [number, number] | { at: [number, number] } | false;
-    /** Flat side view: the ground's row, or a profile [x0, y0, x1, y1, ...]; what has a height is checked for floating or sinking; stamp(name, x, "ground") stands on it. */
-    ground?: number | number[];
+    /** Flat side view: the ground's row, a profile [x0, y0, x1, y1, ...], or several (a floor, then ledges over it, each over its own span); what has a height is checked for floating or sinking against the nearest; stamp(name, x, "ground") stands on the first. */
+    ground?: number | number[] | number[][];
   }
   /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
   interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number };
@@ -744,7 +744,7 @@ declare global {
   function views(name: string, field: PxSdf, opts?: { n?: 8 | 16; pitch?: number; light?: PxVec; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: [string, string]; anchor?: [number, number] | Record<string, [number, number]>; retouch?: Record<string, string>; like?: string; chin?: number; swap?: Record<string, PxColor> }): string[];
   function views(name: string, grids: Record<string, string | string[] | PxItem[]>, opts?: { anchor?: [number, number] | "center" | "bottom" | Record<string, [number, number] | "center" | "bottom">; like?: string; /** the chin's row in every grid (a set whose lowest rows aren't the chin: a beard) */ chin?: number; swap?: Record<string, PxColor>; outline?: PxColor; outline8?: PxColor; inline?: PxColor; selout?: boolean | number }): string[];
   /** A walk's numbers at t (0..1 over the cycle) by the view a heading gives (or `view`): each foot [forward, up], the body's dip, each hand [forward, up] from hanging; the guide's measured values, each overridable (`stride`, `lift`, `bob`, `hands`; for one view: `profile: { stride }`). */
-  function gait(t: number, opts?: { heading?: number; view?: "front" | "back" | "diagonal" | "profile"; stride?: number | number[]; lift?: number | number[]; bob?: number[]; hands?: number[][]; front?: object; diagonal?: object; profile?: object }): { view: string; a: number; feet: [number, number][]; bob: number; hands: [number, number][] };
+  function gait(t: number, opts?: { heading?: number; view?: "front" | "back" | "diagonal" | "profile"; stride?: number | number[]; lift?: number | number[]; bob?: number[]; hands?: number[][]; front?: object; diagonal?: object; profile?: object }): { view: string; a: number; feet: [number, number][]; bob: number; hands: [number, number][]; pace: number };
   /** Two bones of lengths l1 and l2 from a reaching for b in 3D: the joint between, pushed toward `hint` (a way); out of reach, straight. */
   function ik3(a: PxV3, b: PxV3, l1: number, l2: number, hint: PxV3): PxV3;
   function directions(name: string, n: number, opts: { from: string; outline?: PxColor; outline8?: PxColor; symmetric?: boolean; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; draw?: Record<string, string>; pivot?: "bottom" | "center" | [number, number] }): void;
@@ -803,7 +803,7 @@ declare global {
   /** A value lagging a loop's, a frame each: eased toward each value by 1 - damp a frame, or (peak) falling back at damp from each peak; its first frame after its last. */
   function follow(values: number[], opts?: { damp?: number; peak?: boolean }): number[];
   /** A figure's legs and holds on the clock: route({ pace, origin, ground, walk, idle, loop }, [[x, z], [x, z], { hold: 40, name: "talk" }, ...]). */
-  function route(opts: { pace?: number; origin?: number[]; ground?: (x: number, z: number) => number; climb?: boolean; walk?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; idle?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; loop?: number; round?: number },
+  function route(opts: { pace?: number | ((dir: string) => number); origin?: number[]; ground?: (x: number, z: number) => number; climb?: boolean; walk?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; idle?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; loop?: number; round?: number },
     steps: (number[] | { to: number[]; name?: string; dir?: string; anim?: string; frame?: (f: number, t: number) => number } | { hold: number; name?: string; dir?: string; anim?: string; frame?: (f: number, t: number) => number })[]): PxRoute;
   /** A figure turning to a target (a sprite, a point, a direction, null; or a function of the frame giving one) a direction every `every` frames: (f) => its sprite. */
   function turnToward(anim: string, at: number[], target: unknown, opts?: { every?: number; rest?: string; within?: number; from?: number; frame?: (f: number) => number }): (f: number) => { name: string; at: number[]; frame: number };

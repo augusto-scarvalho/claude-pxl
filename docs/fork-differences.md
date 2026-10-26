@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**388 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**389 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–23, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -80,6 +80,8 @@ skeleton first.
   the viewer and an onion review sheet.
 - **Secondary motion:** `warp` for small whole-pixel offsets, `chain()` for hair that follows with lag
   (Celeste-style).
+- **Feet that stay planted:** `gait()`'s planted foot goes back at an even speed and gives the walk's
+  `pace`; `route({ pace: (dir) => ... })` walks each leg at its way's, so a story's figure doesn't slide.
 - **Rigs:** `rig()` and `figure()` build big figures skeleton first and say which way each part
   faces, how tall it is and where it stands.
   - `ik()` poses limbs from their joints.

@@ -165,7 +165,7 @@ const isPoint = (p: unknown): p is number[] => Array.isArray(p) && p.length === 
 const isObj = (v: unknown): v is Record<string, any> => typeof v === "object" && v !== null && !Array.isArray(v);
 type FrameFn = (f: number, t: number) => number;
 interface Look { anim?: string; frame?: FrameFn; flip?: boolean }
-export interface RouteOpts { pace?: number; origin?: number[]; ground?: (x: number, z: number) => number; climb?: boolean; walk?: string | Look; idle?: string | Look; loop?: number; round?: number }
+export interface RouteOpts { pace?: number | ((dir: string) => number); origin?: number[]; ground?: (x: number, z: number) => number; climb?: boolean; walk?: string | Look; idle?: string | Look; loop?: number; round?: number }
 export type RouteStep = number[] | { to?: number[]; hold?: number; name?: string; dir?: string; anim?: string; frame?: FrameFn };
 /** a step of a route: a leg walked from a to b, or a hold at a (= b); its frames, from `start` */
 export interface RouteLeg { name?: string; dir: string; a: number[]; b: number[]; n: number; start: number; walk: boolean; anim?: string; frame?: FrameFn }
@@ -191,7 +191,7 @@ export interface Route {
 /**
  * A figure's way on the clock, `route({ pace, origin, ground, walk, idle }, [[x, z], [x, z], { hold: 40, name: "talk" }, ...])`:
  * from the first point, each [x, z] (or `{ to, name?, dir?, anim?, frame? }`) a leg walked at `pace` m a
- * frame (its frames its length over the pace, `climb` counting the ground's rise), facing the one of 8
+ * frame (or `pace(dir)` by its way: a walk's own pace, its feet planted; its frames its length over the pace, `climb` counting the ground's rise), facing the one of 8
  * directions its way is nearest (`dir` says another); each `{ hold: frames }` a wait there, facing the
  * last leg's way. A step's sprite `${anim}_${dir}` of `walk` or `idle` (or its own `anim`), at `frame(f, t)`
  * (f the scene's, t into the step; default f), `flip: true` one side view flipped going west. Points
@@ -200,7 +200,8 @@ export interface Route {
 export function route(o: RouteOpts, steps: RouteStep[]): Route {
   if (!Array.isArray(steps) || !isPoint(steps[0]))
     throw new PxError(`route: steps are [[x, z] (where it starts), then [x, z] or { to: [x, z], name?, dir?, anim?, frame? } (a leg walked there), { hold: frames, name?, dir?, anim?, frame? } (a wait)], got ${JSON.stringify(steps)?.slice(0, 120)}`);
-  if (o.pace !== undefined && !(o.pace > 0)) throw new PxError(`route: pace is m a frame, above 0, got ${JSON.stringify(o.pace)}`);
+  if (o.pace !== undefined && typeof o.pace !== "function" && !(o.pace > 0)) throw new PxError(`route: pace is m a frame, above 0, or (dir) => one (a leg's way: "e", "nw", ...), got ${JSON.stringify(o.pace)}`);
+  const paceOf = (d: string) => { const v = typeof o.pace === "function" ? o.pace(d) : o.pace; if (v !== undefined && !(v > 0)) throw new PxError(`route: pace("${d}") is m a frame, above 0, got ${JSON.stringify(v)}`); return v; };
   if (o.ground !== undefined && typeof o.ground !== "function") throw new PxError("route: ground is (x, z) => the ground's height there");
   const look = (v: unknown, what: string): Look => {
     if (typeof v === "string") return { anim: v };
@@ -220,8 +221,9 @@ export function route(o: RouteOpts, steps: RouteStep[]): Route {
       const b = isPoint(p.to) ? p.to : [NaN, NaN], dx = b[0] - at[0], dz = b[1] - at[1];
       if (!(dx || dz)) throw new PxError(`route: a leg goes to a point [x, z] other than the last, got ${JSON.stringify(p.to)}`);
       const [A, B] = [world(at), world(b)], len = o.climb && o.ground ? Math.hypot(dx, dz, o.ground(B[0], B[1]) - o.ground(A[0], A[1])) : Math.hypot(dx, dz);
-      n = o.pace ? Math.max(1, Math.round(len / o.pace)) : 0;
       dir = p.dir ?? DIR8[dir8(dx, dz)];
+      const v = paceOf(dir);
+      n = v ? Math.max(1, Math.round(len / v)) : 0;
       legs.push({ name: p.name, dir, a: at, b, n, start, walk: true, anim: p.anim, frame: p.frame });
       at = b;
     } else {

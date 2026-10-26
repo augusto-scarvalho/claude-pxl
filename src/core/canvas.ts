@@ -942,12 +942,13 @@ export class Canvas {
 
   /** Flat faces in meters (model()) drawn through the camera, the nearest kept per pixel, toned along their material's ramp: see mesh.ts. */
   mesh(view: Partial<View> | SurfaceView | ((p: [number, number, number]) => [number, number, number]), faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}): void {
-    // k times as big: the camera, the sprites' pixel, and the ramp materials in blocks of it (a material's own block wins)
+    // k times as big: the camera, the sprites' pixel, and the materials in blocks of it, ramps and textures
+    // (a texel a block, as pixel art; a material's own block wins)
     const k = this.k, view0 = view;
     if (k > 1) {
       view = scaled(view, k);
       opts = { ...opts, pixel: opts.pixel ?? k };
-      mats = Object.fromEntries(Object.entries(mats ?? {}).map(([n, M]) => [n, M && M.tex === undefined && M.block === undefined ? { ...M, block: k } : M]));
+      mats = Object.fromEntries(Object.entries(mats ?? {}).map(([n, M]) => [n, M && M.block === undefined ? { ...M, block: k } : M]));
     }
     opts = this.in3d(opts, false);
     const tex: Record<string, Img> = {};

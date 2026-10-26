@@ -163,6 +163,11 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { b: { ramp: "kgw", block
   const t = rows(`const M = model(); M.box("b", [-1, 3, 0], [1, 3.6, 1.2])
 scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { b: { tex: "_white", edge: "k" } }))`).join("");
   assert.ok(t.includes("k") && t.includes("g"), "edge and texture (stepped down by its light) both drawn");
+  // at a scene's size a texture is laid in blocks too, a texel a block (block: 1 keeps it finer)
+  const tex = (o: string) => rows(`${FLOOR}scene("a", { w: 40, h: 40, pixel: 2 },(c) => c.mesh(V, M.faces, { f: { tex: "_check", texel: 0.05${o} } }))`);
+  const whole = (r: string[]) => r.every((l, y) => y % 2 || [...l].every((k, x) => x % 2 || (k === l[x + 1] && k === r[y + 1][x] && k === r[y + 1][x + 1])));
+  assert.ok(whole(tex("")), "2 x 2 blocks");
+  assert.ok(!whole(tex(", block: 1")), "a texel a pixel");
 });
 
 test("mesh shadows without a sun: shadows: true, a ramp face a step down where a box stands between it and the light", () => {
@@ -363,7 +368,7 @@ test("the HD-2D camera: perspective({ w, h, pitch, fov, ppm }) looks at the pict
   assert.deepEqual(postAt({ blur: 4, px: true }, 3), { blur: 4 });
 });
 
-test("a scene's sizes: the same scene k times as big (camera, sprites, ramp materials in blocks, meshSocket), post() only there; texel \"screen\"", () => {
+test("a scene's sizes: the same scene k times as big (camera, sprites, materials in blocks, meshSocket), post() only there; texel \"screen\"", () => {
   const src = PAL + `ramps("kgw")
 const C = perspective({ w: 24, h: 16, pitch: -40, fov: 30, ppm: 16 }), Z = C.z
 sprite("s", { w: 2, h: 6, pivot: "bottom", sockets: { tip: [1, 0] } }, rect(0, 0, 2, 6, "r"))
@@ -372,13 +377,13 @@ const M = (top, side) => { const m = model(); m.face("floor", [-3, Z - 3, 0], [3
 // a socket in meters is the same at every size
 const S = [{ name: "s", at: [-0.2, Z] }], tips = {}, tip = (c) => { const t = (tips[c.k] = c.meshSocket(C, S[0], "tip")); if (!tips[1] || t.some((x, i) => Math.abs(x - tips[1][i]) > 1e-9)) throw new Error("meshSocket at size " + c.k) }
 scene("a", { w: 24, h: 16, sizes: { a2: 2 } }, (c) => { tip(c); c.mesh(C, M("crate", "crate"), { floor: { tex: "_t", texel: "screen" }, crate: { tex: "_t", texel: "screen" }, box: { ramp: "kgw" } }, { sprites: S }) }, post({ vignette: 0.6 }))
-const H = (k) => (c) => c.mesh({ w: 24 * k, fov: 30, pitch: -40, eye: C.eye, horizon: C.horizon * k }, M("top", "side"), { floor: { tex: "_t", texel: C.floor }, top: { tex: "_t", texel: C.floor }, side: { tex: "_t", texel: C.wall }, box: { ramp: "kgw", block: k } }, { sprites: S, pixel: k })
+const H = (k) => (c) => c.mesh({ w: 24 * k, fov: 30, pitch: -40, eye: C.eye, horizon: C.horizon * k }, M("top", "side"), { floor: { tex: "_t", texel: C.floor, block: k }, top: { tex: "_t", texel: C.floor, block: k }, side: { tex: "_t", texel: C.wall, block: k }, box: { ramp: "kgw", block: k } }, { sprites: S, pixel: k })
 scene("h1", { w: 24, h: 16 }, H(1))
 scene("h2", { w: 48, h: 32 }, H(2), post({ vignette: 0.6 }))`;
   const p = loadSource(src, "t.px.js");
   assert.equal(p.image("a").hash(), p.image("h1").hash(), "at its own size: texel \"screen\" as the floor's and the wall's texels, no post()");
   assert.deepEqual([p.image("a2").w, p.image("a2").h], [48, 32]);
-  assert.equal(p.image("a2").hash(), p.image("h2").hash(), "twice as big: the camera, the sprites, the box in blocks, post()");
+  assert.equal(p.image("a2").hash(), p.image("h2").hash(), "twice as big: the camera, the sprites, the box and the textures in blocks, post()");
   assert.equal(p.assets.get("a2")!.opts.check, false, "a size isn't checked");
   assert.match(failure(PAL + `scene("a", { w: 4, h: 4, sizes: { b: 1.5 } })`).message, /sizes names the same scene/);
 });
@@ -401,6 +406,10 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { g: { ramp: "w" }, deck:
   assert.equal(at(`[{ name: "s", at: [0, 4, 0.48] }]`).r.lines.length, 0, "within 0.15 m");
   assert.equal(at(`[{ name: "s", at: [-3, 4, 2], air: true }]`).r.lines.length, 0, "it flies");
   assert.match(fl.r.coverage, /standing on 1/);
+  // many copies of a small thing are texture, unchecked but for where they stand: one floating is said
+  const tufts = (u: number) => `[${[0, 1, 2, 3, 4, 5, 6, 7].map((k) => `{ name: "s", at: [${-4 + k}, 6${k === 7 ? `, ${u}` : ""}] }`).join()}]`;
+  assert.match(at(tufts(0.5), ", stand: true").r.lines.join(), /its feet are 0\.50 m over the model's 'g'/);
+  assert.equal(at(tufts(0), ", stand: true").r.lines.length, 0);
 });
 
 test("mesh sprites going along at(t), their ghosts back in time, fainter; an emitter's particles as sprites", () => {

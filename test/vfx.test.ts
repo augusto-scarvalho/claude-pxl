@@ -64,6 +64,7 @@ test("route: legs at a pace and holds by name, the feet on the ground, the way c
   assert.deepEqual([v(2), v(5), v(9), v(11)], [{ name: "w_e", at: [1, 10, 0], frame: 2, dir: "e" }, { name: "i_e", at: [2, 10, 0], frame: 1, dir: "e" }, { name: "w_n", at: [2, 11, 1], frame: 9, dir: "n" }, null]);
   assert.deepEqual([v.near([1, 10.5], 1), v.near([1, 12], 1)], [true, false]);
   assert.equal(route({ pace: 0.5, ground: (x, z) => z, climb: true }, [[0, 0], [0, 2]]).total, 6, "the rise counted: 2.83 m");
+  assert.equal(route({ pace: (d) => (d === "e" ? 1 : 0.5) }, [[0, 0], [2, 0], [2, 2]]).total, 6, "a pace by the leg's way: 2 frames east, 4 north");
   const p = route({ pace: 1, walk: { anim: "side", flip: true } }, [[0, 0], [2, 0], [0, 0]]);
   assert.deepEqual([p(0)!.name, p(0)!.flip, p(2)!.name, p(2)!.flip], ["side", undefined, "side", "x"], "one side view, flipped going west");
   // s m along, the corner a quarter circle of 1 m; straight on before the start and past the end

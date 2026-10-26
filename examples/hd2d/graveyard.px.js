@@ -109,9 +109,9 @@ headstone("_grave_old", 13, 16, arch(13), () => false, { lean: -2, seed: 4, chip
 const W = 480, H = 270, CAM = perspective({ w: W, h: H, pitch: -38, fov: 30, ppm: 24 }), Z = CAM.z - 1.6, DIST = CAM.dist
 const M = model(), block = (...a) => hd2dBlock(M, ...a)
 // The textures a texel to a pixel where the camera looks (texel "screen": the floors foreshortened, the walls
-// a little; the flags the floor's on their 2.5 cm kerb too).
+// a little, the flags' 2.5 cm kerb a wall's).
 const MATS = {
-  grass: { tex: "_grass", texel: "screen" }, turf: { tex: "_turf", texel: "screen" }, flags: { tex: "_flags", texel: CAM.floor },
+  grass: { tex: "_grass", texel: "screen" }, turf: { tex: "_turf", texel: "screen" }, flags: { tex: "_flags", texel: "screen" },
   rampart: { tex: "_rampart", texel: [CAM.wall[0], 1.5 / 29] }, riser: { tex: "_riser", anchor: "face", texel: "screen" },
   // the fence's weathered wood in the trunks' browns, a tone to each face by its light (in the HD picture
   // in blocks of the sprites' pixel, its outline on the shaded side: pixel art as they are), the grain
@@ -212,14 +212,14 @@ for (let k = 0; k < 170; k++) {
   things.push({ name: z > Z + 13 ? "_spruce_far" : h < 0.3 ? "_spruce_s" : h < 0.65 ? "_spruce_m" : "_spruce", at: [x, z] })
 }
 for (const [x, z] of [[-1.6, 1], [1.7, 2.6], [-5.6, 3.5], [5.3, 0.2], [-0.9, 5.4]]) things.push({ name: R() < 0.5 ? "_rock" : "_rock_small", at: [x, Z + z], shadow: 0 })
-// along the fence, at the top's height by hand (three of them stand past the hill's round corners, in the air)
-for (const x of [-5.8, -3.6, -1.6, 2, 4.4, 5.9]) tufts(x, Z - 2.25, 2, TOP)
+// along the fence (those past the hill's round corners on the turf at the wall's foot)
+for (const x of [-5.8, -3.6, -1.6, 2, 4.4, 5.9]) tufts(x, Z - 2.25, 2)
 // grass spilling over the wall's top along its front and sides (the hill's edge isn't a line), small
-// clumps at uneven gaps, a little out from it; mossy boulders at its corners, breaking them
+// clumps at uneven gaps, a little out from it (hanging over the turf: air); mossy boulders at its corners, breaking them
 OUTLINE.forEach(([x, z], i) => {
   if (z > Z + 5.5 || (z < Z - 2.4 && Math.abs(x) < 1.4) || hash(i, 31) < 0.4) return
   const out = [x, z - (Z + 1.75)], l = Math.hypot(...out)
-  things.push({ name: ["_lip_a", "_lip_b", "_lip_c"][Math.floor(hash(i, 32) * 3)], at: [x + (out[0] / l) * 0.05, z + (out[1] / l) * 0.05, TOP - 0.07], shadow: 0 })
+  things.push({ name: ["_lip_a", "_lip_b", "_lip_c"][Math.floor(hash(i, 32) * 3)], at: [x + (out[0] / l) * 0.05, z + (out[1] / l) * 0.05, TOP - 0.07], shadow: 0, air: true })
 })
 // the boulders: in front of the wall where it turns at the front corners, at its foot; on top inside
 // the fence's back corners (the hill's corners are round: past them is the air)
@@ -235,19 +235,14 @@ for (const [x0, n] of [[-6.1, 3], [-3.2, 2], [2.4, 2], [4.9, 3]]) {
 // The traveler's visit, on the scene's clock (80 ms a frame): he comes in from the near left through a
 // gap in the wood, climbs the steps, kneels by the old grave and lays a rose at its foot, crosses to the
 // mourner and asks if she's all right; she turns to him and answers; he goes back down and away. Each leg walked
-// in one of the 8 directions, so every one of them shows, at the walk's own pace (two steps of 6.4 px a
-// cycle of 8 frames, 24 px to the meter: 0.067 m a frame), no faster, or the feet slide; his feet on
-// the ground, each step, the path. He starts just out of the picture, in view within a second; the
-// wait that makes the loop a whole number of the pines' sways (44 frames) comes after he has gone.
-const PACE = (4 * 3.2) / 24 / 8, MS = 80
-const feetAt = (x, z) => {                         // how high the ground is under (x, z): the hill, its steps, the wood
-  const dz = Z - 2.5 - z
-  if (dz <= 0) return TOP + (Math.abs(x) < 0.9 ? 0.02 : 0)
-  if (dz < 1.4 && Math.abs(x) < 1) return TOP - 0.3 * (Math.floor(dz / 0.35) + 1)
-  return 0
-}
+// in one of the 8 directions, so every one of them shows, at the walk's own pace by its way (his
+// travelerFigure.pace: 2.3 px a frame across, 1.7 on the diagonals, 1.6 toward us or away, 24 px to the
+// meter), no slower, or the feet slide; his feet on the model (the mesh's stand), each step, the path.
+// He starts just out of the picture, in view within a second; the wait that makes the loop a whole
+// number of the pines' sways (44 frames) comes after he has gone.
+const PACE = (dir) => travelerFigure.pace(dir) / 24, MS = 80
 const idle = (f) => Math.floor((f * MS) / 250) % 4  // the idle's 250 ms on the scene's clock; the walk a frame a frame
-const visit = route({ pace: PACE, origin: [0, Z], ground: feetAt, walk: "tr_walk", idle: { anim: "tr_idle", frame: idle }, loop: 44 }, [
+const visit = route({ pace: PACE, origin: [0, Z], walk: "tr_walk", idle: { anim: "tr_idle", frame: idle }, loop: 44 }, [
   [-2.6, -7.8], [-0.2, -5.4],                      // in from the near left, from just out of the picture
   { to: [-0.2, 0.4], name: "up" },                 // up the steps and the path
   [1.2, 0.4],                                      // to the old grave with flowers, beside it

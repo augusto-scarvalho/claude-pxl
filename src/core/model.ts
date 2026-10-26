@@ -165,10 +165,11 @@ export interface World {
    */
   light?: [number, number] | { at: [number, number] } | false;
   /**
-   * Flat side view: the ground's row, or a profile [x0, y0, x1, y1, ...] (a cave's floor): what stands
-   * (has a height) is checked for floating or sinking against it; `stamp(name, x, "ground")` stands on it.
+   * Flat side view: the ground's row, or a profile [x0, y0, x1, y1, ...] (a cave's floor), or several (the
+   * floor, then ledges over it, each over its own span): what stands (has a height) is checked for
+   * floating or sinking against the one nearest its feet; `stamp(name, x, "ground")` stands on the first.
    */
-  ground?: number | number[];
+  ground?: number | number[] | number[][];
 }
 
 export type AssetKind = "sprite" | "scene" | "anim";

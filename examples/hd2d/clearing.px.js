@@ -60,8 +60,8 @@ M.face("path", [-3, Z - 9, 0.01], [-1.9, Z - 9, 0.01], [-1.9, Z - 0.1, 0.01], [-
 block("wall", "wall", -1.1, Z - 0.65, 1.3, Z - 0.4, 0, 1.7)
 block("wall", "wall", 1.3, Z - 0.65, 1.8, Z - 0.4, 0, 0.7)
 // the grass and the flags a texel to a pixel where the camera looks (k times as big, to the picture's
-// pixel: a finer grass), the wall in blocks of the art's pixel
-const mats = (k) => ({ grass: { tex: "_grass", texel: CAM.floor.map((v) => v / k) }, path: { tex: "_flags", texel: CAM.floor.map((v) => v / k) }, wall: { tex: "_wall", block: k } })
+// pixel: a finer grass, not in blocks), the wall in blocks of the art's pixel (a size's default)
+const mats = (k) => ({ grass: { tex: "_grass", texel: CAM.floor.map((v) => v / k), block: 1 }, path: { tex: "_flags", texel: CAM.floor.map((v) => v / k), block: 1 }, wall: { tex: "_wall" } })
 const HERO = [-2.4, Z - 0.25], CROW = [2.5, Z - 0.15]
 // the wood round the clearing, and the grass, placed once
 const R = rng(11), WOOD = []

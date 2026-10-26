@@ -31,6 +31,10 @@ test("gait: the guide's walk by the view (lift 1, 3, 1 facing us, the other foot
   assert.equal(gait(0.25, { view: "profile", stride: 4 }).feet[0][0], 4);
   assert.equal(gait(0.25, { heading: 225, diagonal: { bob: [0, 0, 9, 0, 0, 0, 9, 0] } }).bob, 9);
   assert.throws(() => gait(0, { pace: 1 }), /no option pace/);
+  // the planted foot goes back at an even speed (2.3 px a frame in profile), the body over it 4 strides a cycle
+  const back = [2, 3, 4, 5, 6].map((i) => gait(i / 8, { heading: 90 }).feet[0][0]);
+  assert.ok(back.every((v, i) => Math.abs(v - (4.6 - 2.3 * i)) < 1e-9), back.join());
+  assert.equal(gait(0, { heading: 90 }).pace, 18.4);
 });
 
 const VIEWS = `${PAL}

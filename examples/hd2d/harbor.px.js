@@ -45,8 +45,9 @@ const MS = 100, LOOP = 96, SAILF = 16                                           
 
 // ---------------------------------------------------------------- textures, a texel to a sprite's pixel
 // laid with texel "screen": CAM.floor on floors (a texel 1/17 m across, 0.157 m away) and CAM.wall on walls
-// (0.063 m down); the hull, the boats and the deck across keep one by hand (their faces turning past 45
-// degrees still take it); the red band and the rails 0.06 m, so their 20 rows are the castle's 1.2 m exactly.
+// (0.063 m down), the hull's and the boats' too (their faces turning past 45 degrees take the other); the
+// deck across keeps the floor's by hand (on its steep faces the wall's made a dark band); the red band and
+// the rails 0.06 m, so their 20 rows are the castle's 1.2 m exactly.
 const BANDT = [1 / PPM, 0.06]
 // The hull's planks: strakes 4 px over a line of tar, each strake its own shade, the grain in broken
 // lines along it (runs of 5 px a step darker), butt joints staggered strake to strake with a pair of
@@ -271,13 +272,13 @@ for (let f = 0; f < WN; f++) {
 }
 
 const MATS = {
-  hull: { tex: "_hull", texel: CAM.wall }, pale: { tex: "_planks_pale", texel: "screen" }, port: { tex: "_port", anchor: "face", texel: "screen" },
+  hull: { tex: "_hull", texel: "screen" }, pale: { tex: "_planks_pale", texel: "screen" }, port: { tex: "_port", anchor: "face", texel: "screen" },
   band: { tex: "_band", texel: BANDT }, bal: { tex: "_bal", anchor: "face", texel: BANDT }, rail: { tex: "_rail", anchor: "face", texel: BANDT },
   deck: { tex: "_deck_lower", anchor: "face", texel: "screen" }, deckup: { tex: "_deck_upper", anchor: "face", texel: "screen" }, deckx: { tex: "_deck_x", texel: CAM.floor }, ramp: { tex: "_deck_d", texel: "screen" }, ends: { tex: "_ends", anchor: "face", texel: "screen" },
   wood: { ramp: "lmno" }, pile: { ramp: "lmnoO", smooth: true }, wet: { ramp: "kGH", smooth: true }, mast: { ramp: "lmnoO", smooth: true }, rope: { ramp: "kl", bias: -0.2 },
   canvas: { ramp: "IJyz", smooth: true, bias: 0.1 }, canvas0: { ramp: "I", edge: "x", smooth: true }, canvas1: { ramp: "J", edge: "x", smooth: true }, canvas2: { ramp: "y", edge: "x", smooth: true }, canvas3: { ramp: "z", edge: "I", smooth: true, bias: 0 }, boltrope: { ramp: "xI", smooth: true }, red: { ramp: "pqr" }, white: { ramp: "uvw" }, haze: { ramp: "AB" },
   crate: { tex: "_crate", anchor: "face", texel: "screen", edge: "l" }, cratetop: { tex: "_cratetop", anchor: "face", texel: "screen", edge: "l" },
-  boat: { tex: "_boatwood", texel: CAM.wall }, boatin: { ramp: "lmn", smooth: true }, boatrim: { ramp: "noO" },
+  boat: { tex: "_boatwood", texel: "screen" }, boatin: { ramp: "lmn", smooth: true }, boatrim: { ramp: "noO" },
   beam: { ramp: "lmnoO", texture: (x, y) => (hash(x, y >> 2) < 0.15 ? -1 : 0) }, tower: { tex: "_tower", texel: "screen" }, glass: { ramp: "de" }, rock: { ramp: "LNP" },
   awning: { tex: "_awning", texel: "screen" }, valance: { tex: "_valance", texel: [1 / PPM, 0.05] },
 }
@@ -582,14 +583,14 @@ const shipPose = (f) => ({ th: 0.008 * Math.sin((2 * Math.PI * f) / 48), dh: 0.0
 // (his passage below), the grey-haired captain in his long coat at its foot; a sailor in a
 // bandana and a bearded dockhand talking in the middle of the pier, turned to each other; the docker
 // in the flat cap and apron carrying a crate held low in front between the stack and the big boat,
-// there and back at his shortened stride's own pace (0.7 of the walk's 1.6 px a frame: no sliding),
-// turning at each end; a ginger
+// there and back, 3 m, at his shortened stride's own pace (0.7 of the walk's across: no sliding),
+// a breath and a turn at each end; a ginger
 // dockhand at the stack, one in a grey cap at the crane's winch; on the ship, a sailor at the waist's
 // rail and an officer on the poop, riding its bob; the lanterns.
 const idle = (f) => Math.floor(f / 3) % 4
-const PACE = 1.6 / PPM
+const PACE = (dir) => travelerFigure.pace(dir) / PPM
 const carrier = (f) => {
-  const STEP = 0.7 * PACE, LEG = 45, T = 3, x0 = 4.2, x1 = x0 + LEG * STEP, z = Z - 8.25, t = f % LOOP
+  const STEP = 0.7 * PACE("e"), LEG = Math.round(3 / STEP), T = LOOP / 2 - LEG, x0 = 4.2, x1 = x0 + LEG * STEP, z = Z - 8.25, t = f % LOOP
   const [x, dir, walking] = t < LEG ? [x0 + t * STEP, "e", true] : t < LEG + T ? [x1, "e", false] : t < 2 * LEG + T ? [x1 - (t - LEG - T) * STEP, "w", true] : [x0, "w", false]
   return [{ name: `car_${walking ? "carry" : "carryidle"}_${dir}`, at: [x, z], frame: walking ? f % 8 : idle(f) }]
 }
@@ -609,7 +610,7 @@ const gulls = (f) => GULLS.map(([x0, z, u, way, o], i) => {
 // captain at the gangway, stands beside him and asks; the captain turns to him (a direction every two
 // frames) and answers; he goes up the gangway, onto the deck and through the stern castle's door, out
 // of sight; the wait that rounds the loop comes after he has gone. Each leg walked in one of the 8
-// directions at the walk's own pace (1.6 px a frame: no sliding), his feet at the height of what is
+// directions at the walk's own pace by its way (no sliding), his feet at the height of what is
 // under them: the walkway, the ramp, the pier, the gangway and the deck riding the ship's bob.
 const feetAt = (x, z) => {
   const s = ((x + 8.4) * 0.7071 - (z + 5.4) * 0.7071) / 2.8, across = (x + 8.4) * 0.7071 + (z + 5.4) * 0.7071

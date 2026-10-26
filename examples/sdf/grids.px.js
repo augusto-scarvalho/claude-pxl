@@ -42,15 +42,13 @@ scene("voxel_world", { w: 300, h: 210, bg: "k" }, (c) => {
 
 // The diorama: the HD-2D camera on the grass; on the left the tree as its surface, in the middle as
 // voxels of 0.15 m made again each frame as it sways (seen through the camera, a ray stepping cell to
-// cell), on the right as a mesh of 0.15 m (surface nets) whose faces mesh() draws with the ground,
-// smooth (no creases between them), its shadow laid by its field. Each casts its shadow on what is drawn.
+// cell), on the right as a mesh of 0.15 m (surface nets, draw3d's as "mesh"), smooth (no creases between
+// its faces), its shadow laid by its field. Each casts its shadow on what is drawn.
 const W = 320, H = 180, VIEW = hd2d(W, H), Z = VIEW.z, GR = ground(Z), SWAY = tree()
-const MESH_MATS = { ...GMATS, bark: { ramp: "bBiI", smooth: true }, leaf: { ramp: "ZzxcvVJ", smooth: true } }
 const AT = [[-3.4, Z, 0], [0, Z, 0], [3.4, Z, 0]]
-const moved = (faces, [x, y, z]) => faces.map((f) => ({ mat: f.mat, pts: f.pts.map((p) => [p[0] + x, p[1] + y, p[2] + z]) }))
 scene("tree_three_ways", { w: W, h: H, bg: "k", ...CLOCK, check: { every: 24 } }, (c) => {
-  c.mesh(VIEW, [...GR.faces, ...moved(sdf.mesh(SWAY, { size: 0.15, clock: c }).faces, AT[2])], MESH_MATS)
-  c.surface(SWAY, { view: VIEW, at: AT[2], hide: true })
+  c.mesh(VIEW, GR.faces, GMATS)
+  c.draw3d(SWAY, { as: "mesh", size: 0.15, view: VIEW, at: AT[2] })
   c.surface(SWAY, { view: VIEW, at: AT[0] })
   c.voxels(SWAY, { size: 0.15, view: VIEW, at: AT[1] })
 })

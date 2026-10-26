@@ -16,6 +16,9 @@ const W = 192, H = 108, FRAMES = 24, TAU = Math.PI * 2;
 const ceil = [0, 12, 12, 16, 30, 10, 48, 18, 70, 12, 90, 22, 110, 14, 128, 20, 150, 12, 170, 18, 192, 14];
 const floor = [0, 84, 18, 80, 40, 86, 64, 82, 84, 88, 110, 84, 132, 90, 150, 82, 172, 78, 192, 82];
 const ceilY = profile(ceil), floorY = profile(floor);
+// what the fungi stand on: the floor, and the right ledge's top (the scene's world.ground: stamp(name, x,
+// "ground") stands one there, and pxl check reads the feet of what has a height against it)
+const stands = [...floor.slice(0, 14), 146, 84, 150, 66, 156, 62, 186, 62, 192, 63];
 
 // ------------------------------------------------------------------ rock parts (normal-mapped)
 for (const [i, rx, ry] of [[1, 3, 2], [2, 4, 3], [3, 5, 3], [4, 6, 4]])
@@ -49,7 +52,7 @@ const clusters = {
 };
 for (const [id, [p1, p2, p3, lx, ly]] of Object.entries(clusters))
   for (const [tint, swap, light] of [["c", {}, "#5cf0e0"], ["m", { c: "m", C: "M", e: "E" }, "#ff7ae8"]])
-    anim(`fungus_${id}_${tint}`, { w: 14, h: 8, frames: FRAMES, fps: 8 },
+    anim(`fungus_${id}_${tint}`, { w: 14, h: 8, frames: FRAMES, fps: 8, pivot: [7, 7], height: 0.1 },
       ...[p1, p2, p3].map(([n, x, y]) => stamp(n, x, y, { swap })),
       (c) => {
         const k = Math.sin(c.phase * TAU);
@@ -76,7 +79,7 @@ const bugs = [
 const bugAt = ([cx, cy, ax, ay, fx, fy, p], t) =>
   [Math.round(cx + ax * Math.sin((fx * t + p) * TAU)), Math.round(cy + ay * Math.sin((fy * t + p * 2) * TAU) + 1.5 * Math.sin((3 * t + p) * TAU))];
 
-anim("cave", { w: W, h: H, frames: FRAMES, fps: 8 },
+anim("cave", { w: W, h: H, frames: FRAMES, fps: 8, world: { ground: stands } },
   // Back wall: domed cobbles, invisible in the dark, picked out by passing lights.
   layer("backwall", { wall: true }, rect(0, 0, W, H, "K"),
     scatter("_stone*", -6, -6, W + 12, H + 12, 260, { rflip: "xy", rswap: [{}, {}, { r: "R" }], seed: 4 })),
@@ -94,8 +97,8 @@ anim("cave", { w: W, h: H, frames: FRAMES, fps: 8 },
     scatter("_lump*", 0, 0, W, H, 70, { on: "R", clip: true, rflip: "xy", seed: 2 })),
 
   layer("life",
-    ...fungi.map(([n, x]) => stamp(n, x, floorY(x + 7) - 7, { rdelay: true })),
-    stamp("fungus_a_c", 162, 55, { rdelay: true }), stamp("fungus_b_m", 174, 55, { rdelay: true, flip: "x" }),
+    ...fungi.map(([n, x]) => stamp(n, x + 7, "ground", { rdelay: true })),
+    stamp("fungus_a_c", 169, "ground", { rdelay: true }), stamp("fungus_b_m", 181, "ground", { rdelay: true, flip: "x" }),
     (c) => {
       // Glowworm threads: silk from the ceiling, a glowing bead at the end; one lamp per colony.
       for (const colony of glowworms) {
