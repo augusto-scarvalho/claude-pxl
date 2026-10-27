@@ -583,14 +583,14 @@ const shipPose = (f) => ({ th: 0.008 * Math.sin((2 * Math.PI * f) / 48), dh: 0.0
 // (his passage below), the grey-haired captain in his long coat at its foot; a sailor in a
 // bandana and a bearded dockhand talking in the middle of the pier, turned to each other; the docker
 // in the flat cap and apron carrying a crate held low in front between the stack and the big boat,
-// there and back, 3 m, at his shortened stride's own pace (0.7 of the walk's across: no sliding),
-// a breath and a turn at each end; a ginger
+// there and back, 2.6 m, at his shortened stride's own pace (0.7 of the walk's across, at the pier's px
+// to the meter, nearer us than where the camera looks: no sliding), a breath and a turn at each end; a ginger
 // dockhand at the stack, one in a grey cap at the crane's winch; on the ship, a sailor at the waist's
 // rail and an officer on the poop, riding its bob; the lanterns.
 const idle = (f) => Math.floor(f / 3) % 4
 const PACE = (dir) => travelerFigure.pace(dir) / PPM
 const carrier = (f) => {
-  const STEP = 0.7 * PACE("e"), LEG = Math.round(3 / STEP), T = LOOP / 2 - LEG, x0 = 4.2, x1 = x0 + LEG * STEP, z = Z - 8.25, t = f % LOOP
+  const z = Z - 8.25, STEP = (0.7 * travelerFigure.pace("e")) / CAM.scale(z), LEG = Math.round(2.6 / STEP), T = LOOP / 2 - LEG, x0 = 4.2, x1 = x0 + LEG * STEP, t = f % LOOP
   const [x, dir, walking] = t < LEG ? [x0 + t * STEP, "e", true] : t < LEG + T ? [x1, "e", false] : t < 2 * LEG + T ? [x1 - (t - LEG - T) * STEP, "w", true] : [x0, "w", false]
   return [{ name: `car_${walking ? "carry" : "carryidle"}_${dir}`, at: [x, z], frame: walking ? f % 8 : idle(f) }]
 }

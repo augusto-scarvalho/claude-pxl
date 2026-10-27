@@ -73,8 +73,11 @@ Mark items `[x]` when they ship, with the commit.
     the warden's profiles (the nose's tip a pixel past the line, the chin in skin where the side locks
     hung as a beard);
   - the same cheek and jaw retouch for the mourner and the crew (their sw and w grids: the render's
-    block of skin under the ear reads as a jowl; the mourner's hair is drawn back, so hers closes in
-    skin, not a lock);
+    block of skin under the ear reads as a jowl). Done (round 6, R3), approved: a chin 3 px wide; the
+    bandana's and the flat cap's by a side lock dark down to the jaw (the traveler's grids), the
+    mourner's (`FACE3_MO`, `FACE3` kept for the miko) and the grey head's, their hair drawn back, in
+    skin: the jaw's line in `D` up toward the ear, a pixel of the neck in shade, the hair behind; the
+    beard and the braid already close it;
   - the traveler's head is a little smaller and its hair has less volume and fewer light strokes than
     the hand heads had; from behind it is smoother and darker; seams between pieces can make shapes
     by chance (a "face" on the back was fixed once);
@@ -94,7 +97,9 @@ Mark items `[x]` when they ship, with the commit.
   - `views()` doesn't hold a baked head's crown and chin to one row (one head turned keeps them; the
     line under a jaw that turns may reach a row lower in 3/4). The crew's grey head (once its own item)
     is this: its crown on row -7 from the anchor in s and sw, -6 in w, nw and n, a tuft of 2 px at its
-    top; a retouch grid can't reach above its anchor's rows, so it takes the model (round 5, R3).
+    top. Done (round 6, R3), approved: its s and sw grids two rows taller and their anchor two rows
+    down (a set's own `anchor` only places a baked head's retouch), the tuft erased and the crown's
+    line closed on row -6.
 - [x] **What the 3D stage (wave 2) left to fix by hand, each a small change of pixels for the user to
   see before and after:**
   - three grass tufts along the graveyard's fence stand at its top, 1.5 m over the turf, past the
@@ -131,7 +136,9 @@ Mark items `[x]` when they ship, with the commit.
   way's, the traveler's `travelerFigure.pace` (1.6 px toward us or away, where the stride hardly
   shows). The graveyard went from 528 frames to 484, the harbor from 384 to 288 (its docker walks
   3 m and rests 1.6 s at each end). Left: 0.35 px a frame on the harbor's pier, nearer the camera
-  than its 17 px to the meter (19.6 there); 0.1 or less elsewhere.
+  than its 17 px to the meter (19.6 there); 0.1 or less elsewhere. Done (round 6, R3), approved: the
+  docker's step at the pier's px to the meter (`CAM.scale(z)`, 19.9), its body 1.61 px a frame as its
+  planted foot (1.88 before); 2.6 m there and back, so his 32 frames walking and 1.6 s at rest stay.
 - [x] **The cave and the grotto on their floor** (wave 4b, a visual step): `world: { ground: [...] }`
   with their floor's profile and a `height` on what stands, so the feet rule runs there; they are
   anims (an anim with a `world` is checked as a scene). Standing their props with
@@ -1221,9 +1228,11 @@ Left from phase 7 (evaluation):
   same lines printed: a stamp moved on the shrine 23-28 s to 10-16 s (written and checked), 16-18 s to
   9 s dry; the lantern by its table (all rebuilt) 22 s to 17; the sunset's logs and the grove's rock
   5.3 s to 4.4.
-- [ ] **The ink line round a 3D figure has no normal** (round 6, R2): `scripts/pulse.ts` found 22% of
+- [x] **The ink line round a 3D figure has no normal** (round 6, R2): `scripts/pulse.ts` found 22% of
   the traveler's pixels that only move with none, lit flat: `rig3d`'s and `views()`' `ink` line, drawn
   outside the model, where it has no surface (and the jaw line and a retouch pixel on it). Giving each
   line pixel the mean normal of the model pixels beside it (the silhouette's, facing out) leaves none
   without, but moves the HD-2D scenes that light the figures by their normals (the clearing, the
-  graveyard, the harbor): shown to the user, waiting for a yes.
+  graveyard, the harbor). Decided against (round 6, R3, the user's choice): lit by those normals the
+  line on the sun's side turns pale and the figure loses its edge against the ground; flat, the ink
+  keeps its contrast.
