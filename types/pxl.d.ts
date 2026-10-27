@@ -21,6 +21,10 @@ declare global {
     rflip?: "x" | "y" | "xy"; rswap?: Record<string, PxColor>[]; seed?: number; reseed?: boolean | number;
     /** This copy n steps darker along the ramps (negative: lighter): a far limb; swap wins for the keys it names. */
     shade?: number;
+    /** With shade: keys a step never lands on ("k": ramps that all start at the ink stop a key above it, no black). */
+    floor?: string;
+    /** stamp only: turned clockwise by any angle round the point it is placed by (its pivot: a part's joint; else its top-left), as a sprite's angle turns (RotSprite), its line turned with it. */
+    angle?: number;
     /** Animated assets: freeze on frame n / start later (ms) / random start. */
     frame?: number; /** an anim as it is t ms into its own loop, frozen */ t?: number; delay?: number; rdelay?: boolean;
     /** stamp only: of a family named by the compass (name_n, name_ne, ...: views(), rig3d's moves, a turnaround), the one nearest this heading: compass degrees (0 away from us, 90 right) or a way on the ground [dx, dz]. */
@@ -84,6 +88,8 @@ declare global {
      * the color it touches, n steps darker (true = 2).
      */
     inline?: PxColor | { color: PxColor; keep?: string }; selout?: boolean | number; /** each straight run of the edge's line a step darker at its ends where it steps (true: 1) */ caps?: boolean | number; aa?: boolean;
+    /** With selout or caps: keys a step never lands on ("k": ramps that all start at the ink stop a key above it, no black round everything). */
+    floor?: string;
     /** Point that stamp / scatter / wire hangs place: "bottom" / "center" of the final image, or [x, y] in drawing coords. */
     pivot?: "bottom" | "center" | [number, number];
     /** Named points in drawing coords (they travel with flips, turns and the outline) that other stamps attach to with { at: "id.socket" }. */
@@ -94,6 +100,8 @@ declare global {
     wrap?: boolean | "x" | "y";
     /** Start from a PNG file (relative to the art file); anims with frames split it into a strip. */
     png?: string; area?: [number, number, number, number]; palettize?: boolean;
+    /** With png: this "#rrggbb" read as clear, before area, shrink and palettize (a ripped sheet's cell fill). */
+    key?: string;
     /** With png: its normal map, a PNG laid out as it (green up: pxl's _n.png, Sprite Fusion's), read as data; an anim's frames from the same rectangles. */
     normals?: string;
     /** Shrink the PNG by a whole factor: each block becomes its most common opaque color. */
@@ -118,7 +126,7 @@ declare global {
     ground?: number | number[] | number[][];
   }
   /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
-  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "normals" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number }; /** rules on its placements, run by pxl check and fixed by --fix */ expect?: PxRule2d[];
+  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "normals" | "area" | "key" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number }; /** rules on its placements, run by pxl check and fixed by --fix */ expect?: PxRule2d[];
     /** px to an art pixel (w and h the picture's): mesh(), the 3D ops, meshSocket() and post() draw that many times as big */
     pixel?: number;
     /** the same scene k times as big under other names, not checked ({ name_hd: 4 }); post() runs only there */

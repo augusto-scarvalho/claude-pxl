@@ -88,6 +88,9 @@ sheet globs.
 
 - **Grid string**: one char per pixel, drawn at 0,0. Rows are trimmed, blank edge rows dropped,
   short rows padded. `.`/space keep, `_` erases. Use template literals for multi-line grids.
+  In a `layer()`, `_` (here and in every op) clears that layer's own pixels only, and what lies under
+  it still shows (an erase that clears nothing of its layer is a warning): erase what is below at the
+  asset's top level, after the layers.
   `grid(x, y, str)` draws one at x, y: a patch over what's there (a frame's changed pixels, a fix).
   For figures wider than ~20 px, `runs()` (below) avoids counting dots.
 - **Op**: `rect(...)`, `stamp(...)`, ... (below).
@@ -149,11 +152,13 @@ with a `world` (and `check`) is checked as a scene (functions naming what they p
 | `aa: true` | Anti-alias the edges between two colors inside the sprite, as by hand: on each step of 2 px and more, a strip half its length from the corner, on the lighter side, in the key between the two (a ramp through both, or a chosen color near their middle; none, no strip). Nothing against the clear, on 1:1 diagonals or straight edges. Before the outline. Hand AA reads better: use it on lines and big round shapes, then fix by hand. |
 | `selout: true \| n` | With `outline`/`outline8`/`inline`: each line pixel takes the sprite color it touches, `n` steps darker along the ramps (`true` = 2), so the line softens next to light colors; colors without a ramp keep the line color. Needs `ramps`. (On Pixel Joint "sel-out" is something else: an outline lightened toward the fill, which they call bad anti-aliasing except over a known dark ground; keep the silhouette's outer line dark on light or busy grounds.) |
 | `caps: true \| n` | Where a straight run of the edge's line ends and the line steps on diagonally, its end pixel goes `n` steps darker along its ramp (`true` = 1): light runs with dark caps, so a selective outline holds on any ground (So You Want To Be A Pixel Artist's fighters). After `outline`/`selout`; with no outline, the sprite's own edge pixels (Capcom vs SNK's look, no new colors). 1:1 diagonals stay. Needs `ramps` |
+| `floor: "k"` | With `selout` or `caps`: keys a step never lands on, so each ramp stops a key above them. When every ramp starts at the ink (`ramps("kSsz", "kNn")`), `selout: 2, floor: "k"` gives skin its darkest tone two steps down and cloth its own one step down, and an edge already on a ramp's darkest keeps it: no black round everything. |
 | `crop: true` | Trim to opaque bounds. |
 | `layers: true` | Also export each layer as `out/<sprites\|scenes\|anims>/<name>/<layer>.png` (anims: frame 0's). |
 | `png: "file.png"` | Start from a PNG (path relative to the art file), like `base` starts from another asset: every option and item then works on it. In an `anim` with `frames: n`, frame k is the k-th of n equal slices of the image (a strip). The live viewer rebuilds when the file changes. Any PNG except interlaced ones. |
 | `normals: "file_n.png"` | With `png`: its normal map, a PNG laid out as it (made by Sprite Fusion, another tool or by hand; pxl's own `_n.png`), read as data, never palettized: RGB = normal × 0.5 + 0.5, green pointing up (OpenGL's), its y flipped once to pxl's, each made unit length (one pxl wrote comes back exactly), none where either PNG is clear. `area` cuts both; an anim with `frames` takes each frame's from the same slice. Lit by `lighting()` and `mesh()` as `bump`'s are (lighting.md). Not with `shrink`. |
 | `area: [x, y, w, h]` | With `png`: only this part of the image (one sprite out of a sheet). |
+| `key: "#ff00ff"` | With `png`: that color read as clear before `area`, `shrink` and `palettize` (a ripped sheet's cell fill; `pxl study` names it). |
 | `palettize: true` | With `png`: snap every color to the nearest keyed palette color, so `ascii`, `swap` and `recolor` see keys. |
 | `shrink: n` | With `png`: shrink by a whole factor (1 leaves it as it is), after `area`. Each n×n block becomes its most common opaque color (ties: the first, scanning the block column by column), or transparent when fewer than half of its pixels are opaque. Keeps silhouettes and the curves of shapes far better than sampling one pixel per block: the start for a smaller version of finished art (then redraw what it breaks; see characters.md). |
 | `slice: n \| [left, top, right, bottom]` | 9-slice margins of the final image (outline included) for `panel()`; flips and rotations turn them; sheets export them as Aseprite `meta.slices` (bounds + center). |
@@ -253,11 +258,12 @@ Animation); an option a placement doesn't take is an error, not ignored:
 | Option | Effect |
 |---|---|
 | `flip: "x"\|"y"\|"xy"`, `rot: 90\|180\|270` | mirror or turn this copy |
+| `angle: deg` | (stamp only) this copy turned clockwise round the point it is placed by: its pivot (a part's joint: `pivot: [x, y]` on the elbow, stamped where the elbow is now), else its top-left. As the sprite's `angle` turns it (quarter turns exact, under 12° a shear, the rest RotSprite: no new colors, a 1 px line stays 1 px), but its line is turned with it, not drawn again: for a fresh line, stamp the part unlined, turned, inside a sprite that draws the line. Shading bands inside it turn too and their edges can jag: turn the part flat and paint its bands after, or keep a turned part to one or two tones |
 | `swap: { g: "r" }` | recolor this copy |
 | `fit: px` | of a group or glob, the member whose drawing is nearest that height (the smaller on a tie): one thing drawn at several sizes, picked by how big it is where it stands. `stamp("walker_*", x, y, { fit: P.scale(z) * 1.75, frame: n })`: a figure far down a road takes the sprite drawn for its size instead of a scaled one |
 | `rflip: "x"\|"y"\|"xy"` | random flips, per copy |
 | `rswap: [{ g: "r" }, {}]` | a random recolor per copy (`{}` = none) |
-| `shade: n` | this copy n steps darker along the ramps (negative: lighter), as `shade()` steps its pixels: a far limb (`swap` wins for the keys it names) |
+| `shade: n`, `floor: "k"` | this copy n steps darker along the ramps (negative: lighter), as `shade()` steps its pixels: a far limb (`swap` wins for the keys it names). `floor`: keys a step never lands on (ramps that all start at the ink stop a key above it: the far limb a step darker, no black) |
 | `seed`, `reseed: true \| n` | `reseed` rebuilds the placed asset with its own random choices; `true` derives them from the position (a stamp with an `id`: from its id), so `tile("house", 0, 0, 4, 1, { reseed: true })` gives four different houses from one definition |
 | `fx: ["dissolve", { progress: 0.5 }]` | effects on this copy alone (one, or a list of `[name, opts]`), on the canvas's clock and the copy's seed: a dissolve, a tint, an aura driven per placement by the scene (Abilities) |
 | `silhouette: "w"` | every opaque pixel in that color: hit flashes, and cast shadows when placed in a `shade: true` layer |
@@ -711,7 +717,10 @@ under half a figure's height, to build frames from, FFT's way), a tileset's piec
 whether a sprite's mirror image is on the sheet too (drawn both ways) or none is (one side drawn, the other
 flipped when played); a ripper's labels (small marks of a color or two side by side), boxes drawn round
 frames and one-hue silhouettes (masks) are left out, its panels taken for ground (a color an eighth of
-the sheet, much of it in one field), and no perspective is read off it. How its biggest things are
+the sheet, much of it in one field), and no perspective is read off it. A ripper's cells filled in one
+color round each sprite (#ff00ff, clear or a line between the cells: the color meeting the corners' in
+straight lines) are taken for clear, the lines between with them, and said (`Clear:`), with the
+`key` that clears that color on import (`sprite(name, { png, area, key: "#ff00ff" })`). How its biggest things are
 built (OBJECTS, up to six; OBJECT for the one thing a sprite on clear is; none for a map, a screen of it
 and up), to draw a tree or a rock
 against: its tones, the patches of one color it is painted in (their size, its single pixels), where its

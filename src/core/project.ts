@@ -18,7 +18,7 @@ import { BUILDERS, type Built, defineBuilder } from "./builders.ts";
 import { DRAW3D_OPTS, type Rule, World, runExpects } from "./world3d.ts";
 import { checkExpect } from "./expect.ts";
 import type { Color } from "./color.ts";
-import { TRANSPARENT, oklab, shadeRamp, toHex } from "./color.ts";
+import { TRANSPARENT, oklab, parseHex, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
 import { Img } from "./image.ts";
 import {
@@ -120,10 +120,10 @@ function readsClock(items: Item[]): boolean {
 }
 
 /** Options every placement takes (stamp, tile, pattern, panel, scatter, tilemap, wire hangs). */
-const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "shade", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay", "fx"];
+const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "shade", "floor", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay", "fx"];
 /** Allowed option keys of ops whose last argument is an options object. */
 export const OP_OPTS: Record<string, string[]> = {
-  stamp: [...PLACE, "sub", "smear", "at", "id", "z", "heading", "shadow", "t", "beside", "on", "along", "apart"],
+  stamp: [...PLACE, "angle", "sub", "smear", "at", "id", "z", "heading", "shadow", "t", "beside", "on", "along", "apart"],
   tile: [...PLACE, "shadow"],
   pattern: PLACE,
   panel: PLACE,
@@ -164,9 +164,9 @@ export const OP_OPTS: Record<string, string[]> = {
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "palettize", "shrink", "facing", "height", "twin", "register"],
-  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "expect", "pixel", "sizes"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "facing", "height", "twin", "register"],
+  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "floor", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "expect", "pixel", "sizes"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -333,6 +333,12 @@ export class Project implements BuildCtx {
         if (typeof o.normals !== "string" || !/\.png$/i.test(o.normals)) throw new PxError(`normals must be a .png path (a normal map laid out as the png), got ${JSON.stringify(o.normals)}`);
         if (o.shrink !== undefined && o.shrink !== 1) throw new PxError("normals and shrink: a normal map's directions aren't colors to shrink by votes; shrink the art, then make its normal map at that size");
         readNormals(img, this.pngHook(o.normals), o.normals);
+      }
+      if (o.key !== undefined) {
+        // a color key: a ripped sheet's cell fill read as clear
+        const c = typeof o.key === "string" ? parseHex(o.key) : undefined;
+        if (c === undefined || !o.key.startsWith("#")) throw new PxError(`key is the "#rrggbb" read as clear (a ripped sheet's cell fill, "#ff00ff"), got ${JSON.stringify(o.key)}`);
+        img = img.remap(new Map([[c, TRANSPARENT]]));
       }
       const a = o.area;
       if (a) {
@@ -1091,7 +1097,7 @@ export class Project implements BuildCtx {
       if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError('rig("name", { w, h, facing, slots: { torso: { at, size }, ... } }, ...retouch items)', loc);
       const { slots, guide = true, parts, light, turn, far, ...rest } = opts as Record<string, unknown>;
       const rig = readRig(name, rest.facing, slots, parts, light, far, loc);
-      checkKeys(`rig '${name}'`, rest, ASSET_OPTS.sprite.filter((k) => !["base", "png", "normals", "area", "palettize", "shrink", "flip", "rot", "angle", "mx", "my"].includes(k)), loc);
+      checkKeys(`rig '${name}'`, rest, ASSET_OPTS.sprite.filter((k) => !["base", "png", "normals", "area", "key", "palettize", "shrink", "flip", "rot", "angle", "mx", "my"].includes(k)), loc);
       const layer = (n: string, o: LayerOpts, items: Item[]): Layer => ({ __layer: true, name: n, opts: o, items, loc });
       const stampOp = (...args: unknown[]): Op => ({ __op: true, name: "stamp", args, loc });
       // the retouch is a sprite of its own, the rig's size, so a turned rig can stamp it mirrored

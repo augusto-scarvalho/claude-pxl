@@ -94,12 +94,13 @@ test("png decode: round-trips the encoder (indexed + RGBA), all filters, gray / 
   assert.throws(() => decodePng(Buffer.from("nope, not a png")), /not a PNG/);
 });
 
-test("png assets: { png, area }, strip anims, palettize, use(\"x.png\"), errors", () => {
+test("png assets: { png, area }, strip anims, palettize, a color key, use(\"x.png\"), errors", () => {
   const { dir, file } = tmpArt(`pal({ R: "#ff0000", B: "#0000ff" })
 sprite("whole", { png: "sheet.png", outline: "0" })
 sprite("part", { png: "sheet.png", area: [2, 0, 2, 1] })
 anim("strip", { png: "sheet.png", frames: 2, fps: 10 })
-sprite("snap", { png: "near.png", palettize: true })`);
+sprite("snap", { png: "near.png", palettize: true })
+sprite("keyed", { png: "sheet.png", key: "#00ff00", palettize: true })`);
   const sheet = new Img(4, 1);
   sheet.data.set([pack(255, 0, 0), pack(0, 255, 0), pack(0, 0, 255), 0]);
   writeFileSync(join(dir, "sheet.png"), encodePng(sheet));
@@ -111,6 +112,7 @@ sprite("snap", { png: "near.png", palettize: true })`);
   assert.deepEqual([...p.image("part").data], [pack(0, 0, 255), 0]);
   assert.deepEqual(p.frames("strip").map((f) => [...f.img.data]), [[pack(255, 0, 0), pack(0, 255, 0)], [pack(0, 0, 255), 0]]);
   assert.deepEqual([...p.image("snap").data], [pack(255, 0, 0), pack(0, 0, 255)]);
+  assert.deepEqual([...p.image("keyed").data], [pack(255, 0, 0), 0, pack(0, 0, 255), 0], "the key clear, before palettize");
   assert.ok(p.files.some((f) => f.endsWith("sheet.png")), "watched for live rebuilds");
 
   // use("x.png"): the image's colors, keyed in order of first appearance
@@ -121,6 +123,7 @@ sprite("snap", { png: "near.png", palettize: true })`);
   const bad = (src: string, re: RegExp) => { const t = tmpArt(src); writeFileSync(join(t.dir, "s.png"), encodePng(sheet)); assert.throws(() => loadProject(t.file), re); };
   bad(`sprite("a", { png: "s.png", area: [3, 0, 2, 1] })`, /area must be \[x, y, w, h\] inside the 4x1 image/);
   bad(`sprite("a", { png: "missing.png" })`, /cannot read .*missing\.png/);
+  bad(`sprite("a", { png: "s.png", key: "m" })`, /key is the "#rrggbb" read as clear/);
   bad(`sprite("b", "r"); sprite("a", { png: "s.png", base: "b" })`, /png and base both set the starting image/);
 });
 

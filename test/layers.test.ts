@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { art, PAL } from "./helpers.ts";
+import { art, keys, PAL } from "./helpers.ts";
 import { main } from "../src/node/cli.ts";
 import { loadSource } from "../src/node/load.ts";
 import { whenChanged } from "./passed.ts";
@@ -19,6 +19,20 @@ sprite("one", { w: 8, h: 1 }, rect(0, 0, 8, 1, "d"), relight(undefined, ${LIT}))
   assert.equal(art(src, "plates"), "1dd61dd6");
   assert.equal(art(src, "in_layer"), "1dd61dd6");
   assert.equal(art(src, "one"), "1dddddd6");
+});
+
+test('"_" in a layer clears that layer only: one that cleared nothing of its own, over what is below, is a warning', () => {
+  const p = loadSource(PAL + 'sprite("a", { w: 4, h: 1 }, rect(0, 0, 4, 1, "r"), layer("fix", rect(0, 0, 2, 1, "_")))', "t.px.js");
+  assert.equal(keys(p, "a"), "rrrr");
+  assert.match(p.warnings[0]?.msg ?? "", /^layer 'fix': its "_" cleared nothing, it fell on what the layers below drew/);
+  // its own pixels erased: no warning
+  const own = loadSource(PAL + 'sprite("a", { w: 4, h: 1 }, rect(0, 0, 4, 1, "r"), layer("l", rect(0, 0, 4, 1, "w"), px(1, 0, "_")))', "t.px.js");
+  assert.equal(keys(own, "a"), "wrww");
+  assert.equal(own.warnings.length, 0);
+  // a shade over the layer's clear leaves it clear: not an erase
+  const shaded = loadSource(PAL + 'ramps("kr"); sprite("a", { w: 4, h: 1 }, rect(0, 0, 4, 1, "r"), layer("s", px(0, 0, "r"), shade([0, 0, 4, 1], 1)))', "t.px.js");
+  assert.equal(keys(shaded, "a"), "krrr");
+  assert.equal(shaded.warnings.length, 0);
 });
 
 test("outline: false keeps a layer's pixels out of the asset's outline, through a flip", () => {

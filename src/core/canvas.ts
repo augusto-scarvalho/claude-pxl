@@ -17,6 +17,7 @@ import { type SplatOpts, drawSplats } from "./splats.ts";
 import { type DecalOpts, drawDecal } from "./decal.ts";
 import { type Draw3dOpts, drawWorld } from "./world3d.ts";
 import { byHeading } from "./rig3d.ts";
+import { rotate } from "./rotate.ts";
 import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshSprite, type MeshWorld, drawMesh, groundOf } from "./mesh.ts";
 import type { Lit } from "./sunlight.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
@@ -104,6 +105,8 @@ export class Canvas {
   look3d?: { light?: number[]; mats?: Record<string, unknown> };
   /** Composite below the current layer (absolute coords), for `below` masks. */
   below?: Img;
+  /** In a layer: the pixels "_" cleared of its own, and those it fell on that only the layers below had. */
+  erased?: { own: number; under: number };
   /** Seamless tiles: drawing (and reading) past these edges continues on the opposite side. */
   wrap?: { x: boolean; y: boolean };
   /** Where tilemap() records what it placed (the build collects them for a Tiled export). */
@@ -161,6 +164,12 @@ export class Canvas {
     if (this.clipPred && !this.clipPred(x, y)) return false;
     const i = this.index(x, y);
     if (i < 0) return false;
+    // "_" in a layer: what it cleared of its own, and what it fell on of the layers below (which it can't clear)
+    if (c === TRANSPARENT && this.below) {
+      const e = (this.erased ??= { own: 0, under: 0 });
+      if (this.img.data[i] !== TRANSPARENT) e.own++;
+      else if (this.below.data[i] !== TRANSPARENT) e.under++;
+    }
     this.img.data[i] = c;
     return true;
   }
@@ -546,9 +555,11 @@ export class Canvas {
     for (let y = -this.oy; y < this.img.h - this.oy; y++)
       for (let x = -this.ox; x < this.img.w - this.ox; x++) {
         if (!ok(x, y) || (density < 1 && bayer(x, y) >= density)) continue;
-        let c = this.get(x, y);
+        const was = this.get(x, y);
+        let c = was;
         for (let i = 0; i < steps; i++) c = map.get(c) ?? c;
-        this.plot(x, y, c);
+        // (what it leaves as it was isn't drawn: a layer's clear isn't an erase)
+        if (c !== was) this.plot(x, y, c);
       }
   }
 
@@ -1289,10 +1300,11 @@ export class Canvas {
     }
     let src = this.res.image(pick, inner, t, track);
     const swap = opts.rswap ? opts.rswap[Math.floor(r() * opts.rswap.length)] : opts.swap;
+    if (opts.floor !== undefined && !opts.shade) throw new PxError("floor stops shade's steps above those keys: add shade: n");
     if (opts.shade) {
       // n steps along the ramps, as shade() would on its pixels; what swap names, swap's
       if (!Number.isInteger(opts.shade)) throw new PxError(`shade is how many steps darker along the ramps this copy is (negative: lighter), got ${JSON.stringify(opts.shade)}`);
-      const step = this.pal.stepMap(opts.shade > 0 ? -1 : 1), m = new Map<Color, Color>();
+      const step = this.pal.stepMap(opts.shade > 0 ? -1 : 1, opts.floor === undefined ? undefined : this.pal.floorOf(opts.floor)), m = new Map<Color, Color>();
       for (const c of step.keys()) { let d = c; for (let i = 0; i < Math.abs(opts.shade); i++) d = step.get(d) ?? d; m.set(c, d); }
       if (swap) for (const [a, b] of this.swapMap(swap)) m.set(a, b);
       src = src.remap(m);
@@ -1308,6 +1320,13 @@ export class Canvas {
       if (f) src = src.flip(f as "x" | "y" | "xy");
     }
     if (opts.rot) src = src.rot(opts.rot);
+    if (opts.angle) {
+      // any angle, round the point it is placed by (its pivot, else its top-left): a part turning on its
+      // joint. Cut to its pixels first, so a part drawn on a whole frame's canvas turns as fast as a small one
+      const b = src.bounds() ?? { x: 0, y: 0, w: src.w, h: src.h }, cut = src.sub(b.x, b.y, b.w, b.h);
+      cut.pivot ??= [-b.x, -b.y];
+      src = rotate(cut, opts.angle, "auto", true);
+    }
     if (opts.cast !== undefined) {
       const k = opts.cast;
       if (!Array.isArray(k) || k.length !== 2 || !k.every(Number.isFinite))
@@ -1417,6 +1436,7 @@ export class Canvas {
     // copy as the thing it's of: what walks by carries its followers, flames that flicker shake none)
     let body: Img | undefined;
     this.placed?.set(opts?.id ?? name, { x: this.ox + x - Math.floor(px), y: this.oy + y - Math.floor(py), sockets: src.sockets, at: [this.ox + x, this.oy + y], body: () => (body ??= this.asset(name, still(o), X, Y)) });
+    this.offCanvas(name, src, x, y);
     let sub = opts?.sub;
     // { from: [x, y] }: the way it moves, from where it was (the frame before)
     const from = (sub as { from?: number[] })?.from;
@@ -1428,6 +1448,22 @@ export class Canvas {
       return this.place(this.smeared(src, opts.smear, x, y), x, y, [0, 0], undefined, opts?.z, name, undefined, { id: opts?.id, loc: this.loc, rel, ...this.code() });
     }
     this.place(src, x, y, [0, 0], undefined, opts?.z, name, sub ? (Array.isArray(sub) ? (sub as [number, number]) : [1, 1]) : undefined, { id: opts?.id, loc: this.loc, rel, ...this.code() });
+  }
+
+  /**
+   * Warns of a stamp placed on the canvas whose drawing lands wholly off it: the point it is placed by
+   * (its pivot, else its top-left) is far from its pixels (a part cut from a frame keeps the frame's pivot).
+   * A thing walking off the picture is placed off it too, and says nothing.
+   */
+  private offCanvas(name: string, src: Img, x: number, y: number): void {
+    const W = this.img.w, H = this.img.h, X = this.ox + Math.floor(x), Y = this.oy + Math.floor(y);
+    if (this.wrap || X < 0 || Y < 0 || X >= W || Y >= H) return;
+    const [px, py] = src.pivot ?? [0, 0], x0 = X - Math.floor(px), y0 = Y - Math.floor(py);
+    if (x0 >= 0 && y0 >= 0 && x0 + src.w <= W && y0 + src.h <= H) return;
+    const b = src.bounds();
+    if (!b || (x0 + b.x < W && y0 + b.y < H && x0 + b.x + b.w > 0 && y0 + b.y + b.h > 0)) return;
+    const by = src.pivot ? `its pivot [${src.pivot.join(", ")}]` : "its top-left";
+    this.res.warn?.(`'${this.owner?.name ?? "?"}': stamp('${name}', ${x}, ${y}) drew nothing: placed by ${by}, its pixels land at ${x0 + b.x},${y0 + b.y} (${b.w}x${b.h}), wholly off the ${W}x${H} canvas. A part cut from a sprite (base) keeps that sprite's pivot: give it its own (pivot: [x, y]), or stamp it where its pivot goes`, this.loc ?? this.owner?.loc);
   }
 
   /**

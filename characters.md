@@ -399,7 +399,9 @@ of the nose; the corners of the mouth straight below the pupils.)
   `gait()`, §3).
 - **Profile (side view):** everything says which way the figure faces. The far arm and far leg hide
   behind the near ones or show as a darker sliver on the same side (moving, keep them a ramp step
-  darker in every frame, `stamp(limb, x, y, { shade: 1 })`, so crossing legs never swap; a far leg
+  darker in every frame, `stamp(limb, x, y, { shade: 1 })`, so crossing legs never swap; when every
+  ramp starts at the ink, add `floor: "k"` (each ramp stops at its darkest above the black, as
+  `selout`'s line does with it), or the far leg gets a black line and black bands; a far leg
   all shadow, with near-black under it, or it reads as raised; an RPG's side idle may spread both legs for a solid stance); a far arm drawn out on the back
   with a tail beside it made a werewolf's body read as facing away from its head. Fix one part at a
   time against the facing; when fixes start contradicting each other, go back to the last version
@@ -588,6 +590,13 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   }))
 ```
 
+- **A drawn part turned on its joint** (a big figure's in-betweens: a 110 px fighter's forearm
+  between its guard and its reach): `stamp(part, x, y, { angle })` turns it round its pivot, so give
+  the part its joint as its pivot (drawn in the frame's coords: `sprite("fore_p", { base: "fore",
+  pivot: ELBOW0 })`) and stamp it where the joint is now. RotSprite adds no color and keeps a 1 px
+  line thin, but breaks a small limb's clusters (the rejection above): turn parts of 40 px and up.
+  Its line turns with it; for one drawn fresh, stamp the part unlined, turned, in a sprite that draws
+  it (`inline`, `selout`, `floor`).
 - **A swing moves the body, not only the weapon.** Before it the shoulders coil back against the hips;
   through it the hips turn and the shoulders after them (a whirl shows the back), the knees bend, the
   arm reaches its full length at the release and the free arm tucks in; after it the body follows the

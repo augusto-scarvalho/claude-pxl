@@ -106,9 +106,11 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
     text.push(`Kind: not pixel art (a photo, painting or render: ${nColors} colors after folding near ones, ${pct(smooth * 100, 100)} of the steps between neighbors gentle). Read for its masses, colors and light, and translated into a ${tw}x${th} picture in ${q.palette.length} colors to draw over (--to WxH, --colors N).`);
   }
   // a sprite on a flat backdrop (a tutorial's panel): the color all round the border is taken for clear
-  // by the techniques (its edge, rim, pillow, halo) and left out of the temperature
-  const backdrop = pixelArt ? flatBackdrop(picture) : null;
-  const ramps = findRamps(picture), tech = techniques(backdrop === null ? picture : picture.remap(new Map([[backdrop, TRANSPARENT]])), ramps);
+  // by the techniques (its edge, rim, pillow, halo) and left out of the temperature; so is a ripped
+  // sheet's cell fill (one color round each sprite), and what is between its cells with it
+  const cells = pixelArt ? cellFill(picture) : null, backdrop = cells?.fill ?? (pixelArt ? flatBackdrop(picture) : null);
+  if (cells) text.push(`Clear: ${hex(cells.fill)} fills the cells round the sprites (a ripper's, ${cells.between ? hex(cells.between) : "clear"} between them): taken for clear by the techniques, the sheet and the objects. In pxl: sprite(name, { png, area: [x, y, w, h], key: "${hex(cells.fill)}" }) clears it on import.`);
+  const ramps = findRamps(picture), tech = techniques(cells ? clearCells(picture, cells) : backdrop === null ? picture : picture.remap(new Map([[backdrop, TRANSPARENT]])), ramps);
 
   // ---------------------------------------------------------------- palette and ramps
   text.push("", "PALETTE AND RAMPS (dark to light; % of the picture)");
@@ -168,11 +170,12 @@ export function study(input: StudyInput, opts: StudyOpts = {}): StudyOut {
   text.push(...lightLines(tech, ramps, pixelArt));
 
   // ---------------------------------------------------------------- a sheet: its sprites apart
-  const sheetRead = pixelArt && input.frames.length === 1 ? sliceSheet(whole && !up ? whole : picture, backdrop) : null, sheetOut = sheetRead ? sheetLines(sheetRead, nColors) : null;
+  const sheetSrc = whole && !up ? whole : picture, sheetImg = cells ? clearCells(sheetSrc, cells) : sheetSrc;
+  const sheetRead = pixelArt && input.frames.length === 1 ? sliceSheet(sheetImg, cells ? null : backdrop) : null, sheetOut = sheetRead ? sheetLines(sheetRead, nColors) : null;
   if (sheetOut) text.push("", "SHEET (its sprites apart, each measured)", ...sheetOut.lines);
   // how the things in it are built: its biggest (a tree, a house), or the one thing a sprite on clear is
   if (pixelArt) {
-    const src = sheetRead && whole && !up ? whole : picture, grounds = sheetRead?.grounds ?? new Set<number>(), seen = (c: number) => (c & 255) >= 128 && !grounds.has(c) && c !== backdrop;
+    const src = sheetRead ? sheetImg : picture, grounds = sheetRead?.grounds ?? new Set<number>(), seen = (c: number) => (c & 255) >= 128 && !grounds.has(c) && c !== backdrop;
     const boxes = sheetRead
       ? [...sheetRead.sprites].filter((b) => b.x1 - b.x0 >= 19 && b.y1 - b.y0 >= 19 && b.x1 - b.x0 < Math.max(160, 0.3 * src.w) && b.y1 - b.y0 < Math.max(160, 0.3 * src.h)).sort((a, b) => b.n - a.n).slice(0, 6)
       : picture.data.some((c) => (c & 255) < 128) || backdrop !== null ? [(() => { const b = picture.bounds(); return b ? { x0: b.x, y0: b.y, x1: b.x + b.w - 1, y1: b.y + b.h - 1 } : null; })()].filter((b) => b !== null && (b.x1 - b.x0 + 1) * (b.y1 - b.y0 + 1) < 50000) : [];   // a screen of it and up (50k px): a map, not a thing
@@ -314,6 +317,69 @@ function flatBackdrop(img: Img): Color | null {
   for (let y = 1; y < img.h - 1; y++) for (const x of [0, img.w - 1]) { n.set(img.data[y * img.w + x], (n.get(img.data[y * img.w + x]) ?? 0) + 1); all++; }
   const top = [...n].sort((a, b) => b[1] - a[1])[0];
   return top && top[1] >= 0.8 * all ? top[0] : null;
+}
+
+/**
+ * A ripped sheet's cell fill (#ff00ff round each sprite, clear or a separator between the cells): the
+ * commonest color but the top corners', an eighth of the picture and more, meeting the corners' color
+ * in straight lines (the cells' sides, 5 px at least: 81-95% of its edge there on SFA3, KOF and 3S
+ * sheets, under 20% on art) and holding art (a quarter of its edge and more on other colors).
+ */
+function cellFill(img: Img): { fill: Color; between: Color } | null {
+  const { w, h, data } = img, v = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? -1 : (data[y * w + x] & 255) < 128 ? 0 : data[y * w + x]);
+  const s = v(0, 0), n = new Map<number, number>();
+  if (v(w - 1, 0) !== s) return null;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const q = v(x, y); if (q && q !== s) n.set(q, (n.get(q) ?? 0) + 1); }
+  const top = [...n].sort((a, b) => b[1] - a[1])[0];
+  if (!top || top[1] < 0.12 * w * h) return null;
+  const c = top[0];
+  let onS = 0, straight = 0, art = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (v(x, y) !== c) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const q = v(x + dx, y + dy);
+      if (q === c || q === -1) continue;
+      if (q !== s) { art++; continue; }
+      onS++;
+      if ([-2, -1, 1, 2].every((t) => v(x + t * dy, y + t * dx) === c && v(x + t * dy + dx, y + t * dx + dy) === s)) straight++;
+    }
+  }
+  return onS >= 64 && straight >= 0.8 * onS && art >= 0.25 * (art + onS) ? { fill: c, between: s } : null;
+}
+
+/**
+ * A sheet with its cells' fill cleared, and what is between them, from the picture's edge: where it
+ * touches no art, or runs 16 px straight (a line between two cells whose sprites touch it, 3S's); a
+ * sprite's own line of that color stays.
+ */
+function clearCells(img: Img, { fill, between }: { fill: Color; between: Color }): Img {
+  const o = img.remap(new Map([[fill, TRANSPARENT]])), { w, h, data } = o, n = data.length;
+  if (!between) return o;
+  const art = (i: number) => (data[i] & 255) >= 128 && data[i] !== between, long = new Uint8Array(n);
+  const runs = (count: number, len: number, at: (k: number, j: number) => number) => {
+    for (let k = 0; k < count; k++) for (let j = 0; j < len;) {
+      let e = j;
+      while (e < len && data[at(k, e)] === between) e++;
+      if (e - j >= 16) for (let t = j; t < e; t++) long[at(k, t)] = 1;
+      j = Math.max(e, j + 1);
+    }
+  };
+  runs(h, w, (y, x) => y * w + x);
+  runs(w, h, (x, y) => y * w + x);
+  const free = (i: number) => data[i] === between && (long[i] || (!(i % w > 0 && art(i - 1)) && !(i % w < w - 1 && art(i + 1)) && !(i >= w && art(i - w)) && !(i + w < n && art(i + w))));
+  // from the picture's edge, through what is between the cells
+  const st: number[] = [];
+  for (let i = 0; i < n; i++) if (i < w || i >= n - w || i % w === 0 || i % w === w - 1) st.push(i);
+  while (st.length) {
+    const i = st.pop()!;
+    if (!free(i)) continue;
+    data[i] = TRANSPARENT;
+    if (i % w > 0) st.push(i - 1);
+    if (i % w < w - 1) st.push(i + 1);
+    if (i >= w) st.push(i - w);
+    if (i + w < n) st.push(i + w);
+  }
+  return o;
 }
 
 function valueLines(img: Img, backdrop: Color | null = null): string[] {

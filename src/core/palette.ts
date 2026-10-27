@@ -224,8 +224,18 @@ export class Palette {
     return m;
   }
 
-  /** Map color -> darker (dir -1) or lighter (dir +1) neighbour along the ramps. */
-  stepMap(dir: -1 | 1): Map<Color, Color> {
+  /**
+   * The colors of `floor` keys ("k"): a step never lands on them (`floor` with selout, caps or a stamp's
+   * shade: ramps that all start at the ink stop a key above it).
+   */
+  floorOf(floor: unknown): Set<Color> {
+    if (typeof floor !== "string" || !floor || floor.includes("_") || floor.includes("."))
+      throw new PxError(`floor is the keys a step never lands on, e.g. "k" (the ink every ramp starts at), got ${JSON.stringify(floor)}`);
+    return new Set([...floor].map((k) => this.resolve(k) as Color));
+  }
+
+  /** Map color -> darker (dir -1) or lighter (dir +1) neighbour along the ramps; none where it would land on a `floor` color. */
+  stepMap(dir: -1 | 1, floor?: Set<Color>): Map<Color, Color> {
     if (!this.ramps.length) throw new PxError('no ramps defined: add ramps("kDdu", ...) (dark -> light) after pal()');
     const m = new Map<Color, Color>();
     for (const r of this.ramps) {
@@ -237,6 +247,7 @@ export class Palette {
         if (!m.has(a)) m.set(a, b);
       }
     }
+    if (floor) for (const [a, b] of m) if (floor.has(b)) m.delete(a);
     return m;
   }
 

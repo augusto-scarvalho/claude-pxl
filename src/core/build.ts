@@ -318,6 +318,8 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     } finally {
       cur = undefined;
     }
+    if (lc.erased && !lc.erased.own && lc.erased.under && !l.opts.ref && !l.opts.hidden)
+      ctx.warn?.(`layer '${l.name}': its "_" cleared nothing, it fell on what the layers below drew: in a layer, "_" clears that layer's own pixels only; to erase what is below, erase at the asset's top level after the layers, or draw it in this layer`, l.loc);
     if (l.opts.ref) {
       const k = l.opts.ref === true ? 1 : l.opts.ref;
       if (!(typeof k === "number" && k > 0 && k <= 1)) throw new PxError(`layer '${l.name}': ref must be true or a strength from 0 to 1, got ${fmtArgs([l.opts.ref])}`, l.loc);
@@ -555,7 +557,10 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
   if (o.aa) step("aa", () => antialias(img, pal));
   // selout: the line takes the color it touches, `selout` steps darker along the ramps (colors
   // without a ramp keep the line color).
-  const sel = o.selout ? seloutPick(pal, o.selout === true ? 2 : o.selout) : undefined;
+  // floor: keys the steps never land on (ramps that all start at the ink stop a key above it)
+  if (o.floor !== undefined && !o.selout && !o.caps) throw new PxError("floor stops selout's and caps' steps above those keys: add selout or caps");
+  const floor = o.floor === undefined ? undefined : pal.floorOf(o.floor);
+  const sel = o.selout ? seloutPick(pal, o.selout === true ? 2 : o.selout, floor) : undefined;
   if (o.selout && !o.outline && !o.outline8 && !o.inline) throw new PxError("selout recolors a line: add outline, outline8 or inline");
   const as = (c: Color) => (sel ? (t: Color) => sel(t, c) : undefined);
   if (o.inline) {
@@ -580,7 +585,7 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
     const n = o.caps === true ? 1 : o.caps;
     if (!(Number.isInteger(n) && n >= 1)) throw new PxError(`caps is true or a number of steps >= 1, got ${fmtArgs([o.caps])}`);
     if (!pal.ramps.length) throw new PxError('caps darkens along the ramps: add ramps("kDdu", ...) first');
-    step(`caps ${n}`, () => capEnds(img, pal.stepMap(-1), n));
+    step(`caps ${n}`, () => capEnds(img, pal.stepMap(-1, floor), n));
   }
   if (o.crop) step("crop", () => img.crop());
   if (pv === "bottom" || pv === "center") img.pivot = [img.w / 2, pv === "bottom" ? img.h : img.h / 2];
@@ -594,14 +599,15 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
   return img;
 }
 
-function seloutPick(pal: Palette, steps: number): (touching: Color, line: Color) => Color {
+function seloutPick(pal: Palette, steps: number, floor?: Set<Color>): (touching: Color, line: Color) => Color {
   if (!(Number.isInteger(steps) && steps >= 1)) throw new PxError(`selout must be true or a number of steps >= 1, got ${steps}`);
   if (!pal.ramps.length) throw new PxError('selout darkens along the ramps: add ramps("kDdu", ...) first');
-  const dark = pal.stepMap(-1);
+  const dark = pal.stepMap(-1, floor), all = floor ? pal.stepMap(-1) : dark;
   return (t, line) => {
     let c = t;
     for (let i = 0; i < steps; i++) c = dark.get(c) ?? c;
-    return c === t ? line : c;
+    // (a color already on the floor keeps its own: the line is the ramp's darkest above the ink)
+    return c === t && !(floor && all.has(t)) ? line : c;
   };
 }
 

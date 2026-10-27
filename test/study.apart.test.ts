@@ -319,6 +319,22 @@ test("study takes normal maps laid beside the art out, leaves one-hue masks and 
   assert.match(text, /8 sprites apart on clear, in 1 row; (8|9) one-color silhouettes \(masks of where each sprite is\) left out/, text.slice(text.indexOf("SHEET")));
 });
 
+test("study reads a ripped sheet's cell fill as clear: magenta cells, black lines between, sprites touching them (3S's)", () => {
+  // 4 x 3 cells of 25 x 41 magenta; in each a figure: a body 11 px wide, its feet across the whole cell on its bottom rows
+  const img = new Img(105, 127), black = pack(0, 0, 0), magenta = pack(255, 0, 255), line = pack(16, 32, 96), fill = pack(48, 112, 208);
+  img.fill(black);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
+    const x0 = 1 + c * 26, y0 = 1 + r * 42, body = (x: number, y: number) => y >= 37 || (y >= 12 && x >= 7 && x < 18);
+    for (let y = 0; y < 41; y++) for (let x = 0; x < 25; x++) {
+      const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => !body(x + dx, y + dy) || x + dx < 0 || x + dx > 24 || y + dy > 40);
+      img.set(x0 + x, y0 + y, !body(x, y) ? magenta : edge ? line : fill);
+    }
+  }
+  const text = study({ name: "cells", frames: [img], ms: [100], kind: "test" }).text.join("\n");
+  assert.match(text, /Clear: #ff00ff fills the cells round the sprites \(a ripper's, #000000 between them\).*key: "#ff00ff"/, text.slice(0, 800));
+  assert.match(text, /12 sprites apart on clear, in 3 rows/, text.slice(text.indexOf("SHEET")));
+});
+
 test("study tells how a thing is built: its tones, where its lights and darks sit, its hue's turn", async () => {
   // a ball 30 px across on clear, lit from the upper left in four tones from a blue shade to a yellow light
   const img = new Img(34, 34), T = [pack(40, 50, 90), pack(60, 110, 80), pack(120, 170, 70), pack(220, 220, 120)];

@@ -55,6 +55,27 @@ test("a copy a ramp step darker: stamp's shade (swap wins where it says), a rig 
   eq(rig(", far: 2"), ".kk\n...");
 });
 
+test("floor: selout, and a stamp's shade, stop a key above it when every ramp starts at the ink", () => {
+  const R = 'use("pico8"); pal({ k: 0, D: 2, d: 8, w: 7 }); ramps("kDd"); ';
+  eq(art(R + 'sprite("t", { w: 3, h: 3, inline: "k", selout: 2 }, rect(0, 0, 3, 3, "d"))', "t"), "kkk\nkdk\nkkk");
+  eq(art(R + 'sprite("t", { w: 3, h: 3, inline: "k", selout: 2, floor: "k" }, rect(0, 0, 3, 3, "d"))', "t"), "DDD\nDdD\nDDD");
+  // an edge already the darkest above the ink keeps it, not the line's black
+  eq(art(R + 'sprite("t", { w: 3, h: 3, inline: "k", selout: 1, floor: "k" }, rect(0, 0, 3, 3, "D"))', "t"), "DDD\nDDD\nDDD");
+  // a far limb two steps darker: each ramp's darkest above the ink, no black
+  const S = PAL + 'pal({ G: 3, b: 12 }); ramps("kGg", "kbw"); sprite("_p", "gwr");';
+  eq(art(S + 'sprite("a", { w: 3, h: 1 }, stamp("_p", 0, 0, { shade: 2, floor: "k" }))', "a"), "Gbr");
+  assert.match(failure(R + 'sprite("t", { floor: "k" }, "d")', "t").message, /floor stops selout's and caps' steps/);
+  assert.match(failure(S + 'sprite("a", { w: 3, h: 1 }, stamp("_p", 0, 0, { floor: "k" }))', "a").message, /floor stops shade's steps/);
+});
+
+test("a stamp on the canvas whose pixels land wholly off it is a warning naming its pivot; one walking off the picture isn't", () => {
+  // the top half of a frame cut by base keeps the frame's pivot: stamped at 0, 0 it is drawn above the picture
+  const p = loadSource(PAL + `sprite("f0", { w: 10, h: 10, pivot: [5, 9] }, rect(2, 0, 6, 10, "r")); sprite("_top", { base: "f0" }, rect(0, 5, 10, 5, "_"))
+sprite("a", { w: 10, h: 10 }, stamp("_top", 0, 0), stamp("f0", 5, 9), stamp("f0", -6, 9))`, "t.px.js");
+  p.image("a");
+  assert.deepEqual(p.warnings.map((w) => w.msg.replace(/ \(.*/, "")), ["'a': stamp('_top', 0, 0) drew nothing: placed by its pivot [5, 9], its pixels land at -3,-9"]);
+});
+
 test("primitives", () => {
   eq(art(PAL + 'sprite("a", { w: 4, h: 3 }, box(0, 0, 4, 3, "r"))', "a"), "rrrr\nr..r\nrrrr");
   eq(art(PAL + 'sprite("a", { w: 4, h: 4 }, line(0, 0, 3, 3, "r"))', "a"), "r...\n.r..\n..r.\n...r");
@@ -198,6 +219,18 @@ directions("e", 8, { from: "_b", outline: "k", draw: { 45: "_hand" } }); sprite(
   assert.equal(p.candidates("d").length, 16, "a group of all directions");
   assert.deepEqual([...p.image("e_1").data], [...p.image("_hand").data], "a hand-drawn pose wins");
   assert.deepEqual([...p.image("e_3").data], [...p.image("_hand").rot(90).data], "and its quarter turns follow it");
+});
+
+test("stamp angle: a part turned round its pivot (a forearm on its elbow), else round its top-left", () => {
+  const B = PAL + 'sprite("_bar", { pivot: [0, 4] }, "r\\nr\\nr\\nw"); sprite("_free", "r\\nr\\nr\\nw"); sprite("_big", { w: 30, h: 30, pivot: [12, 20] }, grid(12, 16, "r\\nr\\nr\\nw"));';
+  const on = (s: string) => art(B + `sprite("a", { w: 9, h: 9 }, ${s})`, "a");
+  eq(on('stamp("_bar", 4, 5, { angle: 90 })'), on('stamp("_bar", 4, 5, { rot: 90 })'));
+  // the end on the pivot stays there, the rest swings round it: resampled (RotSprite) and sheared
+  eq(on('stamp("_bar", 4, 5, { angle: -45 })'), [".........", ".........", "..r......", "...r.....", "....w....", ".........", ".........", ".........", "........."].join("\n"));
+  eq(on('stamp("_bar", 4, 5, { angle: 8 })').split("\n")[4], "....w....");
+  eq(on('stamp("_free", 4, 5, { angle: 90 })').split("\n")[5], "wrrr.....");
+  // a part drawn on a whole frame's canvas turns as if drawn small
+  for (const a of [8, 30, -60]) eq(on(`stamp("_big", 4, 5, { angle: ${a} })`), on(`stamp("_bar", 4, 5, { angle: ${a} })`));
 });
 
 test("layer blend / opacity: color math with what's below; palettize snaps it back", () => {

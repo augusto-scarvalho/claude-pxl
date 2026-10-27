@@ -157,7 +157,8 @@ const USAGE = `pxl — pixel-art DSL
       render) is read for its masses of light and dark, its colors as ramps, the light's color
       against the shadows', the haze with distance, and translated by superpixels into a small
       picture in few colors to draw over (--to, --colors). An editor's transparency checker exported
-      with it is taken for clear; a reflection under it is told (its row and opacity) and set aside.
+      with it is taken for clear, and so is a ripped sheet's cell fill (#ff00ff round each sprite) with
+      the lines between the cells; a reflection under it is told (its row and opacity) and set aside.
       Both: straight edges and where they meet (one, two or three points, the horizon). Animated
       (a GIF, a video): timing, a cycle, whether it loops, planes going by and their speeds
       (parallax), a scene opening out from the point it moves toward; and its pieces, each with what to

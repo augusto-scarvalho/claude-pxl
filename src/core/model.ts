@@ -87,6 +87,8 @@ export interface AssetOpts {
   selout?: boolean | number;
   /** each straight run of the edge's line ends a step darker where it steps on diagonally (true: 1 step) */
   caps?: boolean | number;
+  /** With selout or caps: keys a step never lands on ("k", the ink every ramp starts at): each ramp stops a key above it. */
+  floor?: string;
   /** Anti-alias the inner edges: on each step of 2 px and more, a strip half its length in the key between. */
   aa?: boolean;
   crop?: boolean;
@@ -106,6 +108,8 @@ export interface AssetOpts {
   normals?: string;
   /** Only this part of the PNG: [x, y, w, h]. */
   area?: [number, number, number, number];
+  /** With `png`: this "#rrggbb" read as clear (a ripped sheet's cell fill, #ff00ff), before `area`, `shrink` and `palettize`. */
+  key?: string;
   /** Snap the PNG's colors to the nearest keyed palette color. */
   palettize?: boolean;
   /**
@@ -256,6 +260,8 @@ export interface PlaceOpts {
   fit?: number;
   flip?: "x" | "y" | "xy";
   rot?: 90 | 180 | 270;
+  /** stamp only: any angle, clockwise, round the point it is placed by (its pivot, else its top-left), as a sprite's `angle` turns (its line turned with it). */
+  angle?: number;
   swap?: Record<string, string>;
   /** Random flips per placement. */
   rflip?: "x" | "y" | "xy";
@@ -263,6 +269,8 @@ export interface PlaceOpts {
   rswap?: Record<string, string>[];
   /** The copy n steps darker along the palette's ramps (negative: lighter): a far limb; swap wins for the keys it names. */
   shade?: number;
+  /** With shade: keys a step never lands on ("k", the ink every ramp starts at): each ramp stops a key above it. */
+  floor?: string;
   /** Paint every opaque pixel this color: hit flashes, cast shadows, silhouettes. */
   silhouette?: string;
   /** Lay the asset flat on the ground as its shadow: a pixel h above the base lands h * [kx, ky] away; stamp: or away from a light, `{ from: [x, y] or [x, y, h], len? }`. */

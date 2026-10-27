@@ -11,17 +11,20 @@ export type RotateMethod = "auto" | "rotsprite" | "shear" | "nearest";
 /** Below this many degrees off a quarter turn, "auto" shears instead of resampling. */
 export const SHEAR_BELOW = 12;
 
-/** Rotate clockwise by `deg`. The canvas grows to hold the result; the pivot turns with it. */
-export function rotate(img: Img, deg: number, method: RotateMethod = "auto"): Img {
+/**
+ * Rotate clockwise by `deg`. The canvas grows to hold the result; the pivot turns with it. `aroundPivot`:
+ * turned round the pivot, which lands on a pixel corner of the result (a stamp's joint stays put).
+ */
+export function rotate(img: Img, deg: number, method: RotateMethod = "auto", aroundPivot = false): Img {
   if (!Number.isFinite(deg)) throw new PxError(`angle must be a number of degrees, got ${deg}`);
   const q = Math.round(deg / 90), r = deg - q * 90, quarter = ((q % 4) + 4) % 4;
   // Exact quarter turns go first, so what's left to resample is at most 45 degrees.
   const base = quarter ? img.rot(quarter * 90) : img.copy();
   if (Math.abs(r) < 1e-9) return base;
-  const m = method === "auto" ? (Math.abs(r) < SHEAR_BELOW ? "shear" : "rotsprite") : method;
-  if (m === "shear") return shear(base, r);
-  if (m === "nearest") return sampled(base, r, base, 1);
-  if (m === "rotsprite") return sampled(base, r, scale2x(scale2x(scale2x(base))), 8);
+  const m = method === "auto" ? (Math.abs(r) < SHEAR_BELOW ? "shear" : "rotsprite") : method, at = aroundPivot ? base.pivot : undefined;
+  if (m === "shear") return shear(base, r, at);
+  if (m === "nearest") return sampled(base, r, base, 1, at);
+  if (m === "rotsprite") return sampled(base, r, scale2x(scale2x(scale2x(base))), 8, at);
   throw new PxError(`rotate must be "auto", "rotsprite", "shear" or "nearest", got ${JSON.stringify(method)}`);
 }
 
@@ -44,9 +47,17 @@ export function scale2x(img: Img): Img {
   return o;
 }
 
-/** Size of the rotated canvas, and a map from its pixel centers back to source coordinates. */
-function frame(w: number, h: number, deg: number) {
+/** Size of the rotated canvas, and a map from its pixel centers back to source coordinates; round `at` (on a corner of the result), else the middles. */
+function frame(w: number, h: number, deg: number, at?: [number, number]) {
   const a = (deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
+  if (at) {
+    const turned = [[0, 0], [w, 0], [0, h], [w, h]].map(([x, y]) => [(x - at[0]) * c - (y - at[1]) * s, (x - at[0]) * s + (y - at[1]) * c]);
+    const X0 = Math.floor(Math.min(...turned.map((p) => p[0])) + 1e-6), Y0 = Math.floor(Math.min(...turned.map((p) => p[1])) + 1e-6);
+    const W = Math.max(1, Math.ceil(Math.max(...turned.map((p) => p[0])) - 1e-6) - X0), H = Math.max(1, Math.ceil(Math.max(...turned.map((p) => p[1])) - 1e-6) - Y0);
+    const back = (x: number, y: number): [number, number] => [(x + X0) * c + (y + Y0) * s + at[0], -(x + X0) * s + (y + Y0) * c + at[1]];
+    const fwd = (x: number, y: number): [number, number] => [(x - at[0]) * c - (y - at[1]) * s - X0, (x - at[0]) * s + (y - at[1]) * c - Y0];
+    return { W, H, back, fwd };
+  }
   const W = Math.max(1, Math.ceil(Math.abs(w * c) + Math.abs(h * s) - 1e-6)), H = Math.max(1, Math.ceil(Math.abs(w * s) + Math.abs(h * c) - 1e-6));
   const back = (x: number, y: number): [number, number] => {
     const dx = x - W / 2, dy = y - H / 2;
@@ -63,8 +74,8 @@ function frame(w: number, h: number, deg: number) {
  * Nearest-neighbour rotation of `src` (k = 1), or of its k-times magnification `big` (RotSprite).
  * For RotSprite the sub-pixel offset is chosen so samples fall inside flat areas, not on edges.
  */
-function sampled(src: Img, deg: number, big: Img, k: number): Img {
-  const { W, H, back, fwd } = frame(src.w, src.h, deg);
+function sampled(src: Img, deg: number, big: Img, k: number, turnAt?: [number, number]): Img {
+  const { W, H, back, fwd } = frame(src.w, src.h, deg, turnAt);
   const at = (x: number, y: number, u: number, v: number): Color => {
     const [sx, sy] = back(x + 0.5, y + 0.5);
     return big.get(Math.floor(sx * k + u), Math.floor(sy * k + v));
@@ -106,9 +117,9 @@ function sampled(src: Img, deg: number, big: Img, k: number): Img {
   return o;
 }
 
-/** Three shears (x, y, x), each shifting whole rows or columns: a lean that keeps every pixel. */
-function shear(src: Img, deg: number): Img {
-  const a = (deg * Math.PI) / 180, t = Math.tan(a / 2), s = Math.sin(a), cx = src.w / 2, cy = src.h / 2;
+/** Three shears (x, y, x), each shifting whole rows or columns: a lean that keeps every pixel; round `at` (on a corner of the result), else the middle. */
+function shear(src: Img, deg: number, at?: [number, number]): Img {
+  const a = (deg * Math.PI) / 180, t = Math.tan(a / 2), s = Math.sin(a), cx = at ? at[0] : src.w / 2, cy = at ? at[1] : src.h / 2;
   const move = (x: number, y: number): [number, number] => {
     x -= Math.round(t * y); y += Math.round(s * x); x -= Math.round(t * y);
     return [x, y];
@@ -126,7 +137,9 @@ function shear(src: Img, deg: number): Img {
   for (const [x, y, c] of pts) o.set(x - x0, y - y0, c);
   if (src.emit) { const e = (o.emit = new Uint8Array(o.w * o.h)); for (const [x, y, , i] of pts) e[(y - y0) * o.w + x - x0] = src.emit[i]; }
   if (src.norm) { const nm = o.normals(); for (const [x, y, , i] of pts) turnNorm(src.norm, i, nm, (y - y0) * o.w + x - x0, Math.cos(a), s); }
-  src.movePivot(o, (x, y) => { const [px, py] = move(x - cx, y - cy); return [px - x0, py - y0]; });
+  // (a pixel is set at its middle less the lowest middle: a point at a corner is half a pixel on)
+  const half = at ? 0.5 : 0;
+  src.movePivot(o, (x, y) => { const [px, py] = move(x - cx, y - cy); return [px - x0 + half, py - y0 + half]; });
   return o;
 }
 
