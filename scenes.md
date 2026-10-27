@@ -5,7 +5,7 @@ Read this before building a scene, a level, a building or any environment.
 Contents: Layout and scale · Ground, paths and tiles · Texture without filler · Trees and big organic
 shapes · Water and things that land · Distance (aerial perspective) · True perspective · Slow motion
 in a short loop · Closing a loop · Parallax · Shadows and light · Blend modes · Checking a scene ·
-A game's screen · A game's projections · 3D as code
+A game's screen · A game's projections · 3D as code · Profiles
 
 A reference scene (a screenshot, a photo of the place, a GIF or a video of a game): `PXL study` gives
 its horizon and vanishing points, its planes and their speeds, its palette and its light, the
@@ -953,3 +953,34 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn
   material's tones and its own `light`: `mesh()` doesn't tint a ramp's faces with the sun.
 - **Cost.** A 320x180 HD-2D frame with a leafy tree, smoke and mist takes 0.6 to 1.3 s on the CPU:
   check one frame in 24 (`check: { every: 24 }`) and keep the loop short.
+
+## 18. Profiles (a genre as data)
+
+A profile says how a thing is seen and what it is for, as a genre is named: its camera and pitch, its
+tile grid, a box per category (a chibi world's trees and houses small, its figures big), the
+directions, the states and their timing, the contract an engine reads, and the checks. Pick the
+profile first, then draw to it. `genre()` holds it as data the file reads; `pxl check` runs its
+checks on what names it (reference, under Assets):
+
+```js
+const FIGHT = genre("fighting", { camera: { kind: "side", pitch: 10 }, grid: null, scale: { character: [110, 80] },
+  heads: 6.5, dirs: ["e"], states: { idle: { frames: 8, ms: 100 }, strike: { ms: [60, 40, 60, 80, 80, 80, 100] } },
+  contract: { boxes: ["hurt", "hit"] }, checks: ["ground"] })
+anim("rv_idle", { w: 130, h: 118, pivot: [52, 114], genre: FIGHT.name }, ...)
+const TOPDOWN = genre("action-topdown", { camera: { kind: "topdown", pitch: 45 }, pitch: 30, grid: 16,
+  scale: { character: [1.5, 1], tree: [2.5, 2.5] }, heads: 2.5, dirs: ["s", "e", "n", "w"], checks: ["height"] })
+rig3d("hero", { body: { h: TOPDOWN.scale.character[0] * TOPDOWN.grid, heads: TOPDOWN.heads }, pitch: TOPDOWN.pitch, n: 4, genre: TOPDOWN.name, ... })
+```
+
+- **Fighting:** the feet on one ground line through each move (`"ground"`): a front foot drawn a row
+  up on the active frames is the float a player sees. Hit and hurt boxes by `c.setBox`, the phase by
+  `c.setData`; palette slots by `sheet(..., { slots })`.
+- **Action top-down:** the same height in every direction (`"height"`, the head over the ground
+  point: feet that land a row apart seen from behind don't count). The figure's own pitch can be
+  gentler than the ground's (30 on a 45 degree ground showed a chibi's face and chest).
+- **Racing** (behind, top-down): a car's footprint is where its wheels meet the road, and seen turned
+  or from above it moves on the picture: the nearer tyre lands a row lower, a nose hangs below the
+  wheels. So the check is the footprint (`"footprint"`: the drawing reaches down to it at every
+  heading, `turnaround()` gives it), never one ground line for all.
+- **Colors by role:** the model and the hand-drawn sprites name roles (`primary`, `accent`, `skin`);
+  a livery or a slot gives the roles other colors: `mats` in 3D, `roleSwap()` in 2D.

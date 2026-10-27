@@ -75,6 +75,23 @@ export function topOf(f: Sdf, n = 16): number {
   return top;
 }
 
+/**
+ * Where the thing meets the ground (z = z0, m), a point every px (1 / ppm m) over its box: the field's
+ * inside half a px up. None when it doesn't reach the ground (a lamp hanging).
+ */
+export function contactOf(f: Sdf, clock: Clock, ppm: number, z0 = 0): number[][] {
+  const C = compile(f, clock), { lo, hi } = C, s = 1 / ppm, z = z0 + s / 2, out: number[][] = [];
+  if (![lo[0], lo[1], hi[0], hi[1]].every(Number.isFinite) || lo[2] > z || hi[2] < z0) return out;
+  // (along each row, a point d away from the surface skips the points nearer than d: a tree's crown over
+  // a trunk is a few calls a row)
+  for (let y = lo[1] + s / 2; y < hi[1]; y += s) for (let x = lo[0] + s / 2; x < hi[0]; ) {
+    const d = C.d(x, y, z);
+    if (d <= 0) out.push([x, y, z0]);
+    x += s * Math.max(1, Math.floor(d / s));
+  }
+  return out;
+}
+
 /** The moments a turnaround's sprites are drawn at: its anims' frames, or the still one. */
 export const clocksOf = (frames: number | undefined, fps: number): Clock[] => (frames ? Array.from({ length: frames }, (_, f) => ({ t: (f * 1000) / fps, phase: f / frames, frame: f, frames })) : [STILL]);
 

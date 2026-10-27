@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { PxError, didYouMean, wrap } from "../core/errors.ts";
 import type { Img } from "../core/image.ts";
+import { TRANSPARENT, toHex } from "../core/color.ts";
 import type { Project } from "../core/project.ts";
 import { type FrameTag, onionSheet, packSheet, playAll, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
 import { emitImage, glows, normalImage } from "../core/normals.ts";
@@ -167,7 +168,12 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       const rows = s.opts.rows === "tag" ? new Set(tags.flatMap((g) => [g.from, g.to + 1])) : undefined;
       const { sheet, frames } = packSheet(items, s.opts.cols, s.opts.pad, s.opts.extrude, rows);
       writePng(join(out, s.name + ".png"), sheet);
-      write(join(out, s.name + ".json"), sheetJson(s.name + ".png", sheet, frames, tags));
+      // palette slots: the sheet's colors as they first appear, and each slot's in the same order (a
+      // palette swap's lookup), in the JSON and as .hex files beside it (rrggbb: alpha stays the art's)
+      const cs = s.slots && [...new Set(sheet.data)].filter((c) => c !== TRANSPARENT);
+      const pals = cs && { palette: cs.map(toHex), slots: Object.fromEntries(s.slots!.map(([n, m]) => [n, cs.map((c) => toHex(m.get(c) ?? c))])) };
+      write(join(out, s.name + ".json"), sheetJson(s.name + ".png", sheet, frames, tags, pals ?? {}));
+      if (pals) for (const [n, l] of [["", pals.palette], ...Object.entries(pals.slots)] as [string, string[]][]) write(join(out, `${s.name}${n && "." + n}.hex`), l.map((h) => h.slice(1, 7) + "\n").join(""));
       // the normal maps in the same rectangles, for engine lights (the art's json serves both)
       if (items.some((it) => it.img.norm)) writeMap("sheet", s.name, "", "_n", () => packSheet(items.map((it) => ({ ...it, img: normalImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet, s.loc);
       if (items.some((it) => glows(it.img))) writeMap("sheet", s.name, "", "_e", () => packSheet(items.map((it) => ({ ...it, img: emitImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet, s.loc);

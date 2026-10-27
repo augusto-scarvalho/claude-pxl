@@ -192,10 +192,10 @@ export function packSheet(items: { name: string; img: Img; ms?: number }[], cols
 
 /**
  * TexturePacker "hash" JSON (read by Phaser, Godot importers, etc.). Animation frames add a
- * `duration` (ms) and `meta.frameTags`, as Aseprite exports them; a frame with boxes or data
- * (`c.setBox`, `c.setData`) its `boxes` and `data`.
+ * `duration` (ms) and `meta.frameTags`, as Aseprite exports them; a frame with boxes, data or sockets
+ * (`c.setBox`, `c.setData`, `sockets`) its `boxes`, `data` and `sockets`; `more` goes into `meta`.
  */
-export function sheetJson(image: string, sheet: Img, frames: SheetFrame[], tags: FrameTag[] = []): string {
+export function sheetJson(image: string, sheet: Img, frames: SheetFrame[], tags: FrameTag[] = [], more: Record<string, unknown> = {}): string {
   const out: Record<string, unknown> = {};
   for (const f of frames) {
     const { w, h } = f.img;
@@ -208,9 +208,11 @@ export function sheetJson(image: string, sheet: Img, frames: SheetFrame[], tags:
       // a fighter's hit and hurt boxes (c.setBox), in the frame's own px, and its data (c.setData)
       ...(f.img.boxes ? { boxes: Object.fromEntries(Object.entries(f.img.boxes).map(([k, bs]) => [k, bs.map(([x, y, w, h]) => ({ x, y, w, h }))])) } : {}),
       ...(f.img.info ? { data: f.img.info } : {}),
+      // named points (a hand, a muzzle) in the frame's own px, as the boxes
+      ...(f.img.sockets ? { sockets: Object.fromEntries(Object.entries(f.img.sockets).map(([k, [x, y]]) => [k, { x: +x.toFixed(2), y: +y.toFixed(2) }])) } : {}),
     };
   }
-  const meta: Record<string, unknown> = { app: "pxl", image, format: "RGBA8888", size: { w: sheet.w, h: sheet.h }, scale: "1" };
+  const meta: Record<string, unknown> = { app: "pxl", image, format: "RGBA8888", size: { w: sheet.w, h: sheet.h }, scale: "1", ...more };
   if (tags.length) meta.frameTags = tags.map((t) => ({ ...t, direction: t.direction ?? "forward" }));
   // 9-slice margins, as Aseprite exports slices: bounds and center in the frame's own coordinates.
   const slices = frames.flatMap((f, i) => {

@@ -114,6 +114,8 @@ declare global {
     twin?: string;
     /** Register every frame by a marker pixel of this key (the pelvis): moved sideways so it lands on x (default the middle). */
     register?: string | { key: string; x?: number };
+    /** the genre() it is made for: pxl check runs that genre's checks on it */
+    genre?: string;
   }
   interface PxWorld {
     /** Ground in perspective: the horizon's row and the eye's height in meters; or a flat side view's px per meter. */
@@ -126,13 +128,28 @@ declare global {
     ground?: number | number[] | number[][];
   }
   /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
-  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "normals" | "area" | "key" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number }; /** rules on its placements, run by pxl check and fixed by --fix */ expect?: PxRule2d[];
+  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "normals" | "area" | "key" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register" | "genre"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number }; /** rules on its placements, run by pxl check and fixed by --fix */ expect?: PxRule2d[];
     /** px to an art pixel (w and h the picture's): mesh(), the 3D ops, meshSocket() and post() draw that many times as big */
     pixel?: number;
     /** the same scene k times as big under other names, not checked ({ name_hd: 4 }); post() runs only there */
     sizes?: Record<string, number> }
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; /** a frame's ms instead of fps, or each frame's (as many frames) */ ms?: number | number[]; loop?: boolean; dir?: "forward" | "reverse" | "pingpong"; /** checked as a scene (c.as() names what its functions paint) */ world?: PxWorld; check?: boolean | { every: number } }
   interface PxFrame { ms?: number; hold?: number }
+  interface PxGenre {
+    camera?: { kind?: string; pitch?: number | Record<string, number> };
+    /** a tile's px; null: none */
+    grid?: number | null;
+    /** a box per category, [tall, wide] in tiles (px with no grid) */
+    scale?: Record<string, [number, number]>;
+    heads?: number; dirs?: string[] | number; states?: Record<string, { frames?: number; ms?: number | number[] }>;
+    contract?: { boxes?: string[]; [k: string]: unknown };
+    /** the figure's own pitch, apart from the camera's */
+    pitch?: number;
+    /** ground: the feet on one row through a move; height: a family as tall in every direction; footprint: the drawing down to where it meets the ground */
+    checks?: ("ground" | "height" | "footprint")[];
+    /** any other field, kept for the file to read (tones, steer) */
+    [field: string]: any;
+  }
   interface PxLayerOpts {
     /** Draw the layer's stamps sorted: "y" by where they stand (top-down props), "z" by their z. */
     sort?: "y" | "z";
@@ -737,6 +754,16 @@ declare global {
   function ramps(...darkToLight: string[]): void;
   /** Define keys (dark to light) as hue-shifted shades of `base` and add them as a ramp; base sits at `at` (default the middle). */
   function shades(keys: string, base: PxColor, opts?: { hue?: number; at?: number; sat?: number }): void;
+  /**
+   * A swap by role: each role's keys in `from` ({ primary: "aAbB" }, dark to light) to that role's in `to`
+   * (keys "cCdD" or colors ["#123", ...], as many); roles `to` leaves out keep theirs. A livery, a palette slot.
+   */
+  function roleSwap(from: Record<string, string>, to: Record<string, string | PxColor[]>): Record<string, PxColor>;
+  /**
+   * A profile as data (fighting, action top-down, racing): the fields the file reads, given back with
+   * `name`; pxl check runs its `checks` on the assets naming it (`genre: "fighting"`). Other fields are kept.
+   */
+  function genre(name: string, spec: PxGenre): PxGenre & { name: string };
   function sprite(name: string, opts: PxAssetOpts, ...items: PxItem[]): void;
   function sprite(name: string, ...items: PxItem[]): void;
   function scene(name: string, opts: PxSceneOpts, ...items: PxItem[]): void;
@@ -747,7 +774,8 @@ declare global {
   function layer(name: string, opts: PxLayerOpts, ...items: PxItem[]): PxLayer;
   function layer(name: string, ...items: PxItem[]): PxLayer;
   function group(name: string, members: string[]): void;
-  function sheet(name: string, entries: string[], opts?: { cols?: number; pad?: number; extrude?: number; /** each animation on a row of its own */ rows?: "tag" }): void;
+  function sheet(name: string, entries: string[], opts?: { cols?: number; pad?: number; extrude?: number; /** each animation on a row of its own */ rows?: "tag";
+    /** palette slots: { jade: swap }, keys to colors; the JSON gets meta.palette and meta.slots, a .hex each */ slots?: Record<string, Record<string, string>> }): void;
   /** A bitmap font from glyphs drawn in w x h cells on a sprite, in the order of `chars`; use it with text(..., { font }). */
   function font(name: string, sprite: string, opts: { chars: string; w: number; h: number; cols?: number; mono?: boolean }): void;
   /** n directions (sprites name_0.. + group name) from a pose pointing up, via exact quarter turns and diagonal mirrors where possible. See rotation.md. */
@@ -757,7 +785,7 @@ declare global {
    * else their index), a group of them; through an orthographic view or a perspective() camera; the east
    * the west flipped where the thing is its own mirror and its light from the picture's middle (mirror: "auto").
    */
-  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown>; draw?: (c: PxCanvas, v: { heading: string; screen(p: number[]): number[]; depth(p: number[]): number }) => void; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number }): PxTurnaround;
+  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown>; draw?: (c: PxCanvas, v: { heading: string; screen(p: number[]): number[]; depth(p: number[]): number }) => void; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number; /** the genre() its sprites are made for */ genre?: string }): PxTurnaround;
   /**
    * A figure on the 3D layer: a skeleton (`body`) posed per frame by the file's own `pose(i, heading)`,
    * its parts fields along the bones (`parts(j, pose)`: j.limb, j.ball or fields, each painted by a
@@ -768,7 +796,7 @@ declare global {
    */
   function rig3d(name: string, opts: { body?: PxBody; moves: Record<string, { frames: number; /** each frame's (100), or a list, a number a frame */ ms?: number | number[]; pose: (i: number, heading: number) => PxPose; dirs?: string[]; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }>;
     n?: number; headings?: (string | number)[]; pitch?: number; w?: number; h?: number; pivot?: [number, number]; parts?: (j: PxJoints, pose: PxPose) => Record<string, PxPiece | PxSdf | { decal: object } | { scatter: object } | (PxPiece | PxSdf | { decal: object } | { scatter: object })[]>;
-    mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; inner?: boolean | PxColor; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; head?: string; /** the line under the head; a head modeled: [key, the skin's ramp], under the jaw only */ chin?: PxColor | [PxColor, string]; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }): PxRig3d;
+    mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; inner?: boolean | PxColor; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; head?: string; /** the line under the head; a head modeled: [key, the skin's ramp], under the jaw only */ chin?: PxColor | [PxColor, string]; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void; /** the genre() its painted moves are made for */ genre?: string }): PxRig3d;
   /**
    * Hand-drawn views of a thing (a head), named by the compass ({ s, sw, w, nw, n }: grids, rows, or items):
    * a sprite each, pivoted on its `anchor` pixel ([col, row], per view or one for all; "center", "bottom"),

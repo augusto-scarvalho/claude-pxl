@@ -6,7 +6,7 @@ import type { Project } from "../core/project.ts";
 import { MANY, STAND, lightFor, orientWords, placementChecks, standWords } from "../core/describe.ts";
 import { rigLines } from "../core/rig.ts";
 import { frontWords, rampSteps } from "../core/checks.ts";
-import { PxError } from "../core/errors.ts";
+import { PxError, didYouMean } from "../core/errors.ts";
 import { dE, lineFlaws } from "../core/vision.ts";
 import { toHex } from "../core/color.ts";
 import type { Item, World } from "../core/model.ts";
@@ -35,6 +35,40 @@ export interface CheckResult {
   fixes?: { text: string; knob?: Knob; to?: number; held?: boolean; move?: { part: string; key: Knob2d["key"]; i?: number; label: string; by: number; loc: string }; why?: string }[];
   /** A scene's rules that don't hold, "scene › rule" (what --fix's changes are checked against, rebuilt). */
   failed?: string[];
+}
+
+/** An asset's frames (a still one's image). */
+const frameImgs = (p: Project, n: string) => (p.assets.get(n)!.kind === "anim" ? p.drawn(n).map((f) => f.img) : [p.image(n)]);
+
+/**
+ * The checks of the genre an asset names, on its frames: "ground", the feet (its drawing's lowest row) on
+ * one row in every frame; "footprint", that lowest row down to where it meets the ground (its footprint
+ * box, a turnaround()'s), within a px, in every frame (what is nearer us may hang lower: a bumper seen
+ * from above).
+ */
+function genreLines(p: Project, name: string, ran: { genre: number }): string[] {
+  const gn = p.assets.get(name)!.opts.genre!, g = p.genres.get(gn), out: string[] = [];
+  if (!g) return [`${name} › WARNING: genre '${gn}' is no genre() here${didYouMean(gn, p.genres.keys())}${p.genres.size ? ` (there are: ${[...p.genres.keys()].join(", ")})` : ""}: its checks didn't run`];
+  const fr = frameImgs(p, name), low = fr.map((im) => { const b = im.bounds(); return b ? b.y + b.h - 1 : -1; });
+  // what each frame says, the frames that say the same together: "113 (frames 2-4), 114 (frames 0-1, 5-6)"
+  const said = (say: (i: number) => string | undefined) => {
+    const m = new Map<string, number[]>();
+    fr.forEach((_, i) => { const s = say(i); if (s !== undefined) m.set(s, [...(m.get(s) ?? []), i]); });
+    return [...m].map(([s, fs]) => `${s}${fr.length > 1 ? ` (frame${fs.length > 1 ? "s" : ""} ${ranges(fs)})` : ""}`);
+  };
+  if (g.checks.includes("ground") && fr.length > 1) {
+    ran.genre += fr.length;
+    const rows = said((i) => `${low[i]}`);
+    if (rows.length > 1) out.push(`${name} › WARNING: genre '${gn}': its feet aren't on one ground line: its lowest row is ${rows.join(", ")}; a move keeps them on one row`);
+  }
+  if (g.checks.includes("footprint")) {
+    ran.genre += fr.length;
+    const none = fr.filter((im) => !im.boxes?.footprint).length;
+    if (none) out.push(`${name} › WARNING: genre '${gn}': ${none === fr.length ? "it has" : `${none} of its frames have`} no footprint (a box "footprint" where it meets the ground: a turnaround()'s in an orthographic view, or c.setBox)`);
+    const off = said((i) => { const f = fr[i].boxes?.footprint?.[0]; return f && low[i] + 1 < f[1] + f[3] - 1 ? `${low[i]}, its footprint's ${f[1] + f[3] - 1}` : undefined; });
+    if (off.length) out.push(`${name} › WARNING: genre '${gn}': its drawing doesn't reach where it meets the ground: its lowest row is ${off.join("; ")}: drawn lifted, or its wheels or feet hidden or cut, it floats there`);
+  }
+  return out;
 }
 
 /** A placement as a warning names it: its id (and its asset), else its asset. */
@@ -127,7 +161,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0 };
   let lightSaid = false, groundSaid = false, fixes: CheckResult["fixes"], rulesAll = 0, rulesHeld = 0;
   const failed: string[] = [];
   // by default what the file itself defines (what it includes is checked where it's defined)
@@ -184,6 +218,8 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         ran.boxes += fr.length;
         for (const [s, fs] of out) lines.push(`${name} › WARNING: box ${s}${fr.length > 1 ? ` (frame${fs.length > 1 ? "s" : ""} ${ranges(fs)})` : ""}: an engine reads it as it is; keep it inside, or give the asset room (w, h)`);
       }
+      // the genre() it is made for: its checks on its frames (the height across directions is a family's, below)
+      if (def.opts.genre !== undefined) lines.push(...genreLines(p, name, ran));
       if (!img.sockets?.front) continue;
       others++;
       const w = frontWords(img);
@@ -277,6 +313,19 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     if (V.like && !like) lines.push(`${name} › WARNING: like '${V.like}' is no views() set`);
     for (const w of viewWarnings({ name, views: [...rows(V)], baked: V.baked, ...(like ? { like: { name: V.like!, views: rows(like) } } : {}) })) lines.push(`${name} › WARNING: ${w}`);
   }
+  // a genre's families (a group whose members all name it: rig3d()'s moves, a turnaround()): one height
+  // across the directions, how far its top stands over its pivot (its ground point) at its tallest frame
+  // (no pivot: its ink's height), so the feet that land a row apart seen from behind don't count
+  if (!opts.names) for (const [gname, G] of p.groups) {
+    if (opts.file && (G.loc ?? "").split(":")[0] !== opts.file) continue;
+    let ms: string[];
+    try { ms = p.candidates(gname); } catch { continue; }
+    const gn = p.assets.get(ms[0])?.opts.genre, genre = gn === undefined ? undefined : p.genres.get(gn);
+    if (!genre?.checks.includes("height") || ms.length < 2 || !ms.every((m) => p.assets.get(m)?.opts.genre === gn)) continue;
+    const fs = ms.map((m) => frameImgs(p, m)), hs = fs.map((f) => Math.max(...f.map((im) => { const b = im.bounds(); return !b ? 0 : im.pivot ? Math.round(im.pivot[1] - b.y) : b.h; })));
+    ran.genre += fs.flat().length;
+    if (new Set(hs).size > 1) lines.push(`${gname} › WARNING: genre '${gn}': its directions aren't one height: ${ms.map((m, i) => `${m.slice(m.lastIndexOf("_") + 1)} ${hs[i]}`).join(", ")} px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces`);
+  }
   // rig3d() figures: every pose of every move at its headings, on the ground and within the legs' reach
   if (!opts.names) for (const [name, F] of p.figures) {
     if (opts.file && (F.loc ?? "").split(":")[0] !== opts.file) continue;
@@ -327,6 +376,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.text) run.push(`lettering on ${ran.text}`);
   if (ran.lines) run.push(`lines on ${ran.lines}`);
   if (ran.boxes) run.push(`boxes on ${ran.boxes} frame${ran.boxes > 1 ? "s" : ""}`);
+  if (ran.genre) run.push(`genres' checks on ${ran.genre} frame${ran.genre > 1 ? "s" : ""}`);
   if (ran.views) run.push(`views' rows on ${ran.views}`);
   if (ran.poses) run.push(`figures' feet on ${ran.poses} poses`);
   if (rigs) run.push(`rig parts ${ran.parts}`);

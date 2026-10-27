@@ -6,7 +6,7 @@ import { type View, perspective } from "./perspective.ts";
 import { solid } from "./solids.ts";
 import { model, turnFaces, turnPoint } from "./mesh.ts";
 import { Sdf, compile, sdf } from "./sdf.ts";
-import { COMPASS, clocksOf, headingsOf, mirrorSymmetric, topOf, turnLight, turnViews } from "./turnaround.ts";
+import { COMPASS, clocksOf, contactOf, headingsOf, mirrorSymmetric, topOf, turnLight, turnViews } from "./turnaround.ts";
 import { BLOCK_MATS, type Body, type Joints, type Pose, blocksOf, bodyOf, gait, ik3, jointsOf, partsOf } from "./rig3d.ts";
 import { SURFACE_OPTS, VOXEL_OPTS, projection, surfaceSize } from "./surface.ts";
 import { Mesh3, Voxels, surfaceNets, voxelize } from "./grids.ts";
@@ -25,7 +25,7 @@ import {
   type AssetDef, type AssetKind, type AssetOpts, type GroupDef, type Item, type Layer, type LayerOpts, type Op,
   type FontDef, type SheetDef, type SheetOpts, type Timeline, isLayer, isOp,
 } from "./model.ts";
-import { PALETTE_FILE, Palette, paletteFromFile } from "./palette.ts";
+import { PALETTE_FILE, Palette, paletteFromFile, roleSwap } from "./palette.ts";
 import { type Motion, readJoints, readMotion } from "./pose.ts";
 import { type ChainOpts, chain } from "./chain.ts";
 import { Trace } from "./trace.ts";
@@ -164,9 +164,9 @@ export const OP_OPTS: Record<string, string[]> = {
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "facing", "height", "twin", "register"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "facing", "height", "twin", "register", "genre"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "floor", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "expect", "pixel", "sizes"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check", "genre"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -180,7 +180,9 @@ function buildBytes(b: BuildOut): number {
   return 4 * (px(b.img) + px(b.guide) + px(b.under) + b.layers.reduce((s, l) => s + px(l.img), 0) + (b.refs ?? []).reduce((s, r) => s + px(r.img), 0)) + 64 * b.placements.length;
 }
 export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "of", "cast", "except", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline"];
-const SHEET_OPTS = ["cols", "pad", "extrude", "rows"];
+const SHEET_OPTS = ["cols", "pad", "extrude", "rows", "slots"];
+/** The checks a genre() can ask pxl check for (check.ts runs them on the assets naming it). */
+export const GENRE_CHECKS = ["ground", "height", "footprint"];
 
 function checkArgs(name: string, args: unknown[]): void {
   const sig = SIGNATURES[name];
@@ -273,6 +275,8 @@ export class Project implements BuildCtx {
   readonly figures = new Map<string, { body: Body; moves: { m: string; frames: number; pose: (i: number, h: number) => Pose; heads: { deg: number; name: string }[] }[]; loc?: string }>();
   /** turnaround() families: each member's heading (`${family}_${name}`) and the call, for pxl edit (a flip turns a member) */
   readonly turnarounds = new Map<string, { heads: { deg: number; name: string }[]; loc?: string }>();
+  /** genre() profiles by name: their data as the file gave it, the checks pxl check runs on the assets naming them */
+  readonly genres = new Map<string, Record<string, unknown> & { name: string; checks: string[]; loc?: string }>();
   /** What building found wrong but not fatal (a shade step that left its ramp): the CLI prints them, pxl check counts them; `by` the assets being built when it was found. */
   readonly warnings: { msg: string; loc?: string; by?: Set<string> }[] = [];
 
@@ -509,6 +513,7 @@ export class Project implements BuildCtx {
       if (light !== undefined && light !== false && !pair(light) && !(isPlainObject(light) && pair((light as { at?: unknown }).at)))
         throw new PxError(`${kind} '${name}': world.light is where the light comes from, [x, y] (e.g. [0.6, -1]: the top right), "sun" (look3d()'s), or a point light in the scene, { at: [x, y] } (false: none read); got ${JSON.stringify(light)}`, loc);
       const items = checkItems(`${kind} '${name}'`, rest, loc);
+      if (opts.genre !== undefined && (typeof opts.genre !== "string" || !opts.genre)) throw new PxError(`${kind} '${name}': genre names a genre() it is made for ("fighting"): pxl check runs that genre's checks on it, got ${JSON.stringify(opts.genre)}`, loc);
       if (opts.expect !== undefined) try { checkExpect(opts.expect, opts.world); } catch (e) { throw wrap(e).within(`${kind} '${name}'`, loc); }
       if (opts.normals !== undefined && opts.png === undefined) throw new PxError(`${kind} '${name}': normals is the normal map of its png: give png too`, loc);
       const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true), look3d = this.look3d, ns = this.ns ? { ns: this.ns } : {};
@@ -692,8 +697,8 @@ export class Project implements BuildCtx {
       try {
         if (typeof given !== "string" || !given || !isPlainObject(opts)) throw new PxError('turnaround("house", make3d.house(), { view: "iso", n: 8, ppm: 16 })');
         const name = this.qualify(given);
-        checkKeys("turnaround", opts, ["view", "ppm", "n", "headings", "part", "mats", "light", "as", "size", "spacing", "surface", "draw", "frames", "fps", "mirror", "pad"]);
-        const o = opts as { view?: unknown; ppm?: number; n?: number; headings?: unknown; part?: string; mats?: unknown; light?: unknown; as?: string; size?: number; spacing?: number; surface?: unknown; draw?: unknown; frames?: number; fps?: number; mirror?: unknown; pad?: number };
+        checkKeys("turnaround", opts, ["view", "ppm", "n", "headings", "part", "mats", "light", "as", "size", "spacing", "surface", "draw", "frames", "fps", "mirror", "pad", "genre"]);
+        const o = opts as { view?: unknown; ppm?: number; n?: number; headings?: unknown; part?: string; mats?: unknown; light?: unknown; as?: string; size?: number; spacing?: number; surface?: unknown; draw?: unknown; frames?: number; fps?: number; mirror?: unknown; pad?: number; genre?: string };
         if (!(o.draw === undefined || typeof o.draw === "function")) throw new PxError(`turnaround: draw is (c, v) => { ... }, drawing by hand over each heading (v.screen(p), v.depth(p) of a point in m), got ${JSON.stringify(o.draw)}`);
         if (!(o.surface === undefined || isPlainObject(o.surface))) throw new PxError(`turnaround: surface is more of surface()'s options ({ soft, outline, rim, ao, shadows }), got ${JSON.stringify(o.surface)}`);
         // what is turned: a field or a built thing, or a world's part standing at the origin
@@ -721,18 +726,39 @@ export class Project implements BuildCtx {
         // its height over the ground it stands on (its origin's), for pxl check and describe
         const top = topOf(field) + at0[2], height = Number.isFinite(top) && top > 0 ? { height: Math.round(top * 100) / 100 } : {};
         const twin = H.map((h) => (sym && h.deg > 0 && h.deg < 180 ? H.findIndex((g) => Math.abs(g.deg - (360 - h.deg)) < 1e-9) : -1));
+        const genre = o.genre !== undefined ? { genre: o.genre } : {}, contact: number[][][] = [];
+        // its footprint, a box of each frame an engine reads: where it meets the ground (its origin's), as
+        // this heading sees it (orthographic views; through a perspective() camera, none)
+        const footprint = (c: Canvas, k: number, screen: (p: number[]) => number[]) => {
+          const pts = (contact[k] ??= contactOf(field, clocks[k] ?? clocks[0], ppm, -at0[2]));
+          let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+          // (each point the middle of a cell a px across: its corners)
+          const e = 0.5 / ppm;
+          for (const q of pts) for (const d of [[-e, -e], [e, -e], [-e, e], [e, e]]) {
+            const [x, y] = screen([q[0] + d[0], q[1] + d[1], q[2]]);
+            x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+          }
+          // (the pixels whose middles it covers: its edges rounded; seen level, a line 0 px tall)
+          const [l, t, r, b] = [x0, y0, x1, y1].map(Math.round);
+          if (pts.length) c.setBox("footprint", l, t, r - l, b - t);
+        };
         H.forEach((_, i) => {
           if (twin[i] >= 0) return;
           const v = T.views[i], light = Array.isArray(L) ? turnLight(L as number[], v.turn) : L;
           const draw = { view: v.view, at: [v.at[0] + at0[0], v.at[1] + at0[1], v.at[2] + at0[2]], ...(persp ? {} : { ppm }), ...(o.mats !== undefined ? { mats: o.mats } : {}), ...(light !== undefined ? { light } : {}),
             ...(o.as !== undefined ? { as: o.as } : {}), ...(o.size !== undefined ? { size: o.size } : {}), ...(o.spacing !== undefined ? { spacing: o.spacing } : {}), ...(o.surface !== undefined ? { surface: o.surface } : {}), ...(only ? { only } : {}) };
           // drawn by hand over it, a point p (m, the thing's) landing at v.screen(p), nearer us the more v.depth(p)
-          const pr = o.draw ? projection(v.view as never, ppm, undefined, undefined, "turnaround") : undefined, org = (v.view as { origin: number[] }).origin;
+          const pr = persp ? undefined : projection(v.view as never, ppm, undefined, undefined, "turnaround"), org = (v.view as { origin: number[] }).origin;
           const lay = (p: number[], q: number[]) => (p[0] + at0[0]) * q[0] + (p[1] + at0[1]) * q[1] + (p[2] + at0[2]) * q[2];
-          const hand = pr ? { heading: H[i].name, screen: (p: number[]) => [org[0] + lay(p, pr.a), org[1] + lay(p, pr.b)], depth: (p: number[]) => -lay(p, pr.D) } : undefined;
-          define(kindA, names[i], [{ w: T.w, h: T.h, pivot: T.pivot, ...height, ...(frames ? { frames, fps } : {}) }, (c: Canvas) => { c.draw3d(thing, draw as never); if (hand) (o.draw as (c: Canvas, v: unknown) => void)(c, hand); }]);
+          const screen = pr && ((p: number[]) => [org[0] + lay(p, pr.a), org[1] + lay(p, pr.b)]);
+          const hand = pr && o.draw ? { heading: H[i].name, screen, depth: (p: number[]) => -lay(p, pr.D) } : undefined;
+          define(kindA, names[i], [{ w: T.w, h: T.h, pivot: T.pivot, ...height, ...genre, ...(frames ? { frames, fps } : {}) }, (c: Canvas) => {
+            c.draw3d(thing, draw as never);
+            if (hand) (o.draw as (c: Canvas, v: unknown) => void)(c, hand);
+            if (screen) footprint(c, c.frame, screen);
+          }]);
         });
-        H.forEach((_, i) => { if (twin[i] >= 0) define(kindA, names[i], [{ base: names[twin[i]], flip: "x", pivot: T.pivot }]); });
+        H.forEach((_, i) => { if (twin[i] >= 0) define(kindA, names[i], [{ base: names[twin[i]], flip: "x", pivot: T.pivot, ...genre }]); });
         for (const n of names) this.assets.get(n)!.grounded = true;
         (env.group as (n: string, m: string[]) => void)(name, names);
         this.turnarounds.set(name, { heads: H, loc });
@@ -830,8 +856,8 @@ export class Project implements BuildCtx {
       try {
         if (typeof given !== "string" || !given || !isPlainObject(opts)) throw new PxError('rig3d("tr", { body: { h: 34, heads: 3 }, moves: { walk: { frames: 8, ms: 110, pose: (i, heading) => ({ feet, lift, hands }) } }, n: 8, blocks: true })');
         const name = this.qualify(given);
-        checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "ink", "surface", "head", "chin", "blocks", "mirror", "draw"]);
-        const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; ink?: unknown; surface?: Record<string, unknown>; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown };
+        checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "ink", "surface", "head", "chin", "blocks", "mirror", "draw", "genre"]);
+        const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; ink?: unknown; surface?: Record<string, unknown>; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown; genre?: string };
         if (o.surface !== undefined) { if (!isPlainObject(o.surface)) throw new PxError("rig3d: surface is surface()'s options for the painted figure ({ soft, shadows, ao, rim, ... })"); checkKeys("rig3d surface", o.surface, SURFACE_OPTS.filter((k) => !["view", "ppm", "at", "part"].includes(k))); }
         if (o.chin !== undefined && typeof o.chin !== "string" && !(Array.isArray(o.chin) && o.chin.length === 2 && o.chin.every((k) => typeof k === "string" && k) && !o.head))
           throw new PxError(`rig3d: chin is a key (the line under the head), or with a head modeled [key, the skin's ramp] (the line under the jaw only), got ${JSON.stringify(o.chin)}`);
@@ -983,9 +1009,10 @@ export class Project implements BuildCtx {
             const twin = M.heads.map((hd) => (!flat && sym && hd.deg > 0 && hd.deg < 180 ? M.heads.findIndex((g) => Math.abs(g.deg - (360 - hd.deg)) < 1e-9) : -1));
             // (a move of one frame never reads the clock: a still pose)
             const draw = (hd: (typeof H)[number]) => (M.frames > 1 ? (c: Canvas) => paint(c, M.pose(c.frame, hd.deg), hd.deg, flat, M) : (c: Canvas) => paint(c, M.pose(0, hd.deg), hd.deg, flat, M));
-            M.heads.forEach((hd, i) => { if (twin[i] < 0) define("anim", list[i], [{ w, h, pivot }, draw(hd), ...frameOps(M)]); });
+            const genre = !flat && o.genre !== undefined ? { genre: o.genre } : {};
+            M.heads.forEach((hd, i) => { if (twin[i] < 0) define("anim", list[i], [{ w, h, pivot, ...genre }, draw(hd), ...frameOps(M)]); });
             // (the mirrors after what they mirror, so they play as it does)
-            M.heads.forEach((hd, i) => { if (twin[i] >= 0) define("anim", list[i], [{ base: list[twin[i]], flip: "x", pivot: [px + 1, py] }]); });
+            M.heads.forEach((hd, i) => { if (twin[i] >= 0) define("anim", list[i], [{ base: list[twin[i]], flip: "x", pivot: [px + 1, py], ...genre }]); });
             // standing on its foot point: pxl check reads its feet there (in px, it has no height in meters)
             for (const n of list) this.assets.get(n)!.grounded = true;
             groups.push([fam, list]);
@@ -1019,7 +1046,14 @@ export class Project implements BuildCtx {
       const loc = this.callerLoc();
       if (typeof name !== "string" || !Array.isArray(entries)) throw new PxError('sheet("name", ["a", "b*"], { cols, pad })', loc);
       checkKeys(`sheet '${name}'`, opts, SHEET_OPTS, loc);
-      this.sheets.push({ name: this.qualify(name), entries, opts, loc, ...(this.ns ? { ns: this.ns } : {}) });
+      // palette slots: each a swap ({ R: "#30544b" }, roleSwap(...)) in the palette here, exported as a palette a slot
+      const sl = opts.slots;
+      if (sl !== undefined && !(isPlainObject(sl) && Object.keys(sl).length && Object.values(sl).every(isPlainObject)))
+        throw new PxError(`sheet '${name}': slots is { name: swap }, each a swap of keys to colors ({ jade: { R: "#30544b" } } or roleSwap(...)), got ${JSON.stringify(sl)}`, loc);
+      let slots: [string, Map<Color, Color>][] | undefined;
+      const col = (c: unknown) => { const v = this.pal.resolve(c); if (v === null) throw new PxError("'.' is no color"); return v; };
+      try { slots = sl && Object.entries(sl).map(([n, sw]) => [n, new Map(Object.entries(sw as Record<string, unknown>).map(([k, c]) => [col(k), col(c)]))]); } catch (e) { throw this.keyHint(wrap(e).within(`sheet '${name}' slots`, loc)); }
+      this.sheets.push({ name: this.qualify(name), entries, opts, loc, ...(slots ? { slots } : {}), ...(this.ns ? { ns: this.ns } : {}) });
     };
     env.include = (path: unknown, opts: { palette?: boolean; as?: string } = {}) => {
       const loc = this.callerLoc();
@@ -1039,6 +1073,23 @@ export class Project implements BuildCtx {
       }
     };
     env.rng = (seed?: number) => rng(seed);
+    env.roleSwap = (from: unknown, to: unknown) => { try { return roleSwap(from, to); } catch (e) { throw wrap(e).within("roleSwap", this.callerLoc()); } };
+    // genre(name, { camera, grid, scale, heads, dirs, states, contract, pitch, checks }): a profile as data;
+    // the file reads its fields, pxl check runs its checks on the assets that name it (genre: "fighting")
+    env.genre = (name: unknown, spec: unknown) => {
+      const loc = this.callerLoc();
+      if (typeof name !== "string" || !name || !isPlainObject(spec)) throw new PxError('genre("fighting", { camera, grid, scale: { character: [tall, wide] }, heads, dirs, states, contract: { boxes }, pitch, checks: ["ground"] })', loc);
+      const had = this.genres.get(name);
+      if (had) throw new PxError(`genre '${name}' is already defined at ${had.loc}`, loc);
+      const { checks = [], scale, grid } = spec as { checks?: unknown; scale?: unknown; grid?: unknown };
+      if (!(Array.isArray(checks) && checks.every((c) => GENRE_CHECKS.includes(c)))) throw new PxError(`genre '${name}': checks are some of ${GENRE_CHECKS.join(", ")}, got ${JSON.stringify(checks)}`, loc);
+      if (!(grid === undefined || grid === null || (typeof grid === "number" && grid > 0))) throw new PxError(`genre '${name}': grid is a tile's px (16), or null for none, got ${JSON.stringify(grid)}`, loc);
+      if (!(scale === undefined || (isPlainObject(scale) && Object.values(scale).every((b) => Array.isArray(b) && b.length === 2 && b.every((v) => typeof v === "number" && v > 0)))))
+        throw new PxError(`genre '${name}': scale is a box per category, [tall, wide] in tiles (px with no grid): { character: [1.5, 1], tree: [2.5, 2] }, got ${JSON.stringify(scale)}`, loc);
+      const g = { ...(spec as Record<string, unknown>), name, checks: checks as string[] };
+      this.genres.set(name, { ...g, loc });
+      return g;
+    };
     // procedural texture, the same in every file: hash(i, j), vnoise(x, y), fbm(x, y, octaves), bayer(x, y)
     // (a third number, a seed, makes another draw at the same point: hash(i, j, 1), hash(i, j, 2); two as they always were)
     env.hash = (...a: number[]) => {

@@ -1,6 +1,7 @@
 // The data an art file produces. Definitions are plain data + closures; nothing is drawn
 // until build time, so references between assets are order-independent.
 import type { Palette } from "./palette.ts";
+import type { Color } from "./color.ts";
 import type { Img } from "./image.ts";
 import type { Canvas } from "./canvas.ts";
 import type { Region } from "./util.ts";
@@ -154,6 +155,8 @@ export interface AssetOpts {
    * best in a `ref: true` layer (else erased from the art once found).
    */
   register?: string | { key: string; x?: number };
+  /** The genre() it is made for: pxl check runs that genre's checks on it. */
+  genre?: string;
   /** Scene: the world's scale, { horizon, eye } (ground seen in perspective) or { scale } (px per meter, flat side view). */
   world?: World;
 }
@@ -250,12 +253,16 @@ export interface SheetOpts {
   extrude?: number;
   /** "tag": each animation starts a row of its own (`cols` still wraps a long one). */
   rows?: "tag";
+  /** Palette slots: { name: swap } (keys to colors), exported as a palette a slot beside the sheet's own. */
+  slots?: Record<string, Record<string, string>>;
 }
 
 export interface SheetDef {
   name: string;
   entries: string[];
   opts: SheetOpts;
+  /** Its slots' swaps, resolved in the palette where the sheet was defined. */
+  slots?: [string, Map<Color, Color>][];
   loc?: string;
   ns?: string;
 }

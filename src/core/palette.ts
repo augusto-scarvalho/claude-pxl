@@ -269,3 +269,25 @@ export class Palette {
     return t;
   }
 }
+
+/**
+ * A swap by role (a car's livery, a fighter's palette slot): each role's keys in `from` ({ primary:
+ * "aAbB", ... }, dark to light) to that role's in `to`, one by one: keys ("cCdD") or colors
+ * (["#173c34", ...]). Roles `to` leaves out keep their colors. The same role map is a `mats` in 3D.
+ */
+export function roleSwap(from: unknown, to: unknown): Record<string, string> {
+  const obj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+  if (!obj(from) || !obj(to)) throw new PxError('roleSwap({ primary: "aAbB", ... }, { primary: "cCdD" or ["#123", ...] }): two maps of roles, a swap back');
+  const out: Record<string, string> = {}, by: Record<string, string> = {};
+  for (const [role, v] of Object.entries(to)) {
+    const keys = from[role], cs = typeof v === "string" ? [...v] : v;
+    if (typeof keys !== "string") throw new PxError(`roleSwap: role '${role}' isn't in the first map${didYouMean(role, Object.keys(from))} (it has: ${Object.keys(from).join(", ")})`);
+    if (!Array.isArray(cs) || cs.length !== keys.length || !cs.every((c) => typeof c === "string" && c))
+      throw new PxError(`roleSwap: role '${role}' is ${keys.length} keys ("${keys}"), so ${keys.length} new ones, dark to light: keys or colors (["#173c34", ...]), got ${JSON.stringify(v)}`);
+    [...keys].forEach((k, i) => {
+      if (k in out && out[k] !== cs[i]) throw new PxError(`roleSwap: key '${k}' is in ${by[k]} and ${role}, which swap it to ${out[k]} and ${cs[i]}: a key takes one color`);
+      out[k] = cs[i]; by[k] = role;
+    });
+  }
+  return Object.fromEntries(Object.entries(out).filter(([k, c]) => k !== c));
+}
