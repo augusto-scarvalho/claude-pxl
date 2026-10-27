@@ -15,7 +15,8 @@ import { MANY, describe, labelOf } from "../core/describe.ts";
 import { type Rule2d, callAt, listAt, moveInSource, nameAll, namesOf, runRules2d } from "../core/expect.ts";
 import { ruleText } from "../core/world3d.ts";
 import { headingsOf } from "../core/turnaround.ts";
-import { type Edit, REL2D, addHeading, checkEdit, editAsset, editPart, editStamp, entries, readLit } from "../core/edit.ts";
+import type { Img } from "../core/image.ts";
+import { type Edit, REL2D, addHeading, addStamp, addTo, checkEdit, editAsset, editPart, editStamp, entries, readLit } from "../core/edit.ts";
 import { loadProject } from "./load.ts";
 import { checkProject } from "./check.ts";
 import { frameCount, frameTime } from "./shot.ts";
@@ -121,8 +122,10 @@ function details(p: Project, scene: string, b: BuildOut, t: Target, all: Target[
           vals[k.label] = typeof w === "string" ? `(${w.replace(/^its (x|y|\w+'s \w+) /, "")})` : `${w.from} (${w.line === own ? "written" : "a table's"}, ${file}:${w.line})`;
           if (typeof w !== "string") movable = true;
         }
+        // (placed by its relation alone: a move writes x, y into its call)
+        if (q.rel && items[1]?.t.trim().startsWith("{")) movable = true;
         // (placed by its relation alone: said once)
-        if (vals.x === vals.y.replace(/\by\b/, "x") && vals.x.startsWith("(")) { vals["x, y"] = vals.x; delete vals.x; delete vals.y; }
+        if ((vals.x === vals.y || vals.x === vals.y.replace(/\by\b/, "x")) && vals.x.startsWith("(")) { vals["x, y"] = vals.x; delete vals.x; delete vals.y; }
         const o = items.find((x, i) => i > 0 && x.t.trim().startsWith("{"));
         if (o) for (const [k, e] of entries(s, o.s + o.t.indexOf("{"))) vals[k] = `${e.text} (${readLit(e.text) === undefined ? "code" : "written"}, ${line(e.vs)})`;
         out.values = vals;
@@ -144,12 +147,15 @@ function details(p: Project, scene: string, b: BuildOut, t: Target, all: Target[
       // its asset's own options, when a sprite() or anim() of its name writes them (scope "asset": every copy)
       const def = p.assets.get(q.name), ds = def?.loc ? src(def.loc) : undefined, mine = ds !== undefined && typeof editAsset(ds, def!.loc!, q.name, { op: "set", target: t.id, key: "?", value: 0 }) !== "string";
       const sc = () => (mine ? ["instance", "asset"] : ["instance"]);
+      const sibs = siblings(p, q.name);
       if (movable) ops.push({ op: "move", scopes: ["instance"], takes: "by: [dx, dy] px" });
       ops.push({ op: "set", scopes: sc(), takes: "key, value: an option (z, shade, seed, reseed, fx, cast, shadow, heading, ...)" },
-        { op: "recolor", scopes: sc(), takes: `swap: { key: key } (its colors: ${out.colors})` }, { op: "flip", scopes: sc(), takes: `axis: x (default${turnText(p, q.name)}) | y` });
+        { op: "recolor", scopes: sc(), takes: `swap: { key: key } (its colors: ${out.colors})` },
+        { op: "flip", scopes: sc(), takes: `axis: x (default${turnText(p, q.name) || (ownMirror(q.img, "x") ? `: it is its own mirror, a flip changes nothing${sibs.length ? " (swap turns it)" : ""}` : "")}) | y` });
       if (frameCount(p, q.name) > 1) ops.push({ op: "frame", scopes: ["instance"], takes: `frame: 0-${frameCount(p, q.name) - 1} | t: ms` });
       ops.push({ op: "relation", scopes: ["instance"], takes: `on | beside: [id, "left" | "right" | "above" | "below", gap] | along: [points, s, u] | apart: [id, gap] | at: "id.socket"; ids: ${ids}` },
-        { op: "swap", scopes: ["instance"], takes: "asset: another asset's name" });
+        { op: "swap", scopes: ["instance"], takes: `asset: another asset's name${sibs.length ? ` (its siblings: ${sibs.join(", ")})` : ""}` },
+        { op: "add", scopes: ["instance"], takes: `target: a new id, asset: a name | like: an id (its asset and options), beside: ["${t.id}", side, gap] | on: "${t.id}" | at: "${t.id}.socket": a new stamp by this one, its line after this one's` });
       if (!mine) out.asset = def?.loc ? `made by code at ${def.loc}: scope "asset" can't write it` : undefined;
     }
   }
@@ -171,6 +177,14 @@ function turned(p: Project, asset: string): { family: string; deg: number; to: s
     return m === h ? undefined : { family, deg, to: `${family}_${m.name}`, add: !f.heads.includes(m), loc: f.loc };
   }
   return undefined;
+}
+/** Does a flip across `axis` ("x", "y", "xy") draw it the same: a front or back view drawn symmetric? */
+const ownMirror = (im: Img, axis: string) => im.data.every((c, j) => { const x = j % im.w, y = (j - x) / im.w; return c === im.data[(axis.includes("y") ? im.h - 1 - y : y) * im.w + (axis.includes("x") ? im.w - 1 - x : x)]; });
+/** The assets a swap may turn it to: its `<name>_<x>` siblings (vendor_n's vendor_s, a turnaround's other headings), each with its facing, but those facing as it does. */
+function siblings(p: Project, asset: string): string[] {
+  const stem = asset.replace(/_[^_]*$/, ""), facing = (n: string) => p.assets.get(n)?.opts.facing, mine = facing(asset);
+  const out = [...p.assets.values()].filter((d) => d.name !== asset && d.kind !== "scene" && (d.name === stem || (d.name.startsWith(stem + "_") && !d.name.slice(stem.length + 1).includes("_"))) && !(mine && facing(d.name) === mine));
+  return out.slice(0, 8).map((d) => (facing(d.name) ? `${d.name} (facing ${facing(d.name)})` : d.name)).concat(out.length > 8 ? [`+${out.length - 8} more`] : []);
 }
 const turnText = (p: Project, asset: string) => { const t = turned(p, asset); return t ? `: turned to face ${t.to.slice(t.family.length + 1)}, its turnaround's ${t.to}${t.add ? " (added to its headings)" : ""}, lit as it is` : ""; };
 
@@ -399,13 +413,27 @@ export function edit(file: string, scene: string, given: unknown, o: { frame?: n
   const f = o.frame ?? 0, b = p.build(scene, 0, frameTime(p, scene, f)), all = targetsOf(p, b);
   const texts = new Map<string, string>(), read = (abs: string) => texts.get(abs) ?? readFileSync(abs, "utf8");
   // each edit's place in its file: the last first, so what one writes doesn't move the next's (a part's spec is found by its name)
-  const anchor = (e: Edit) => { const t = all.find((x) => x.id === e.target); const loc = t?.kind === "part" ? undefined : e.scope === "asset" ? p.assets.get(t?.asset ?? "")?.loc : t?.p?.loc; return loc ? loc.split(":").slice(1).map(Number) : [-1, -1]; };
+  const anchor = (e: Edit) => { const t = all.find((x) => x.id === (e.op === "add" ? addTo(e) : e.target)); const loc = t?.kind === "part" ? undefined : e.scope === "asset" ? p.assets.get(t?.asset ?? "")?.loc : t?.p?.loc; return loc ? loc.split(":").slice(1).map(Number) : [-1, -1]; };
   const order = edits.map((e, i) => ({ e, i, a: anchor(e) })).sort((u, v) => v.a[0] - u.a[0] || v.a[1] - u.a[1] || u.i - v.i);
   const said: string[] = [], refused: string[] = [];
   for (const { e } of order) {
     const t = all.find((x) => x.id === e.target);
     const r = ((): { src: string; said: string; abs: string } | string => {
-      if (!t) return `no '${e.target}' in ${scene} at frame ${f} (it has: ${all.map((x) => x.id).join(", ")})`;
+      const has = () => `it has: ${all.map((x) => x.id).join(", ")}`;
+      if (e.op === "add") {
+        // a new stamp, its line after the one its relation names (that one's layer)
+        const to = all.find((x) => x.id === addTo(e)), lk = e.like === undefined ? undefined : all.find((x) => x.id === e.like);
+        if (t || b.placements.some((q) => q.id === e.target)) return `'${e.target}' names one already: an add's target is the new one's id`;
+        if (!to) return `no '${addTo(e)}' in ${scene} at frame ${f} to place it by (${has()})`;
+        if (to.kind !== "stamp" || to.why) return `${to.id} isn't a stamp call of its own in the file (${to.why ?? `a ${to.kind}`}): add it by hand`;
+        if (e.asset !== undefined && !p.has(e.asset)) return `no asset '${e.asset}'`;
+        if (e.like !== undefined && (!lk || lk.kind !== "stamp" || lk.why)) return lk ? `like copies a stamp's call: ${lk.id}'s ${lk.why ?? `is a ${lk.kind}'s`}` : `no '${e.like}' to copy (${has()})`;
+        const abs = fileOf(p, to.p!.loc!), la = lk && fileOf(p, lk.p!.loc!);
+        if (!abs || (lk && !la)) return "its stamp isn't in an art file";
+        const w = addStamp(read(abs), to.p!.loc!, e, lk && { src: read(la!), loc: lk.p!.loc! });
+        return typeof w === "string" ? w : { ...w, abs };
+      }
+      if (!t) return `no '${e.target}' in ${scene} at frame ${f} (${has()})`;
       if (t.kind === "part") {
         const abs = t.world!.loc && fileOf(p, t.world!.loc);
         if (!abs) return "its world3d() isn't in an art file";
@@ -455,6 +483,7 @@ export function edit(file: string, scene: string, given: unknown, o: { frame?: n
   const line = (q: Placement) => q.loc?.split(":").slice(0, 2).join(":"), from = (x: BuildOut, q: Placement) => x.placements.filter((r) => r.layer === q.layer && r.loc && line(r) === line(q));
   for (const e of edits) {
     const t = all.find((x) => x.id === e.target)!;
+    if (e.op === "add") { seedsA.push(e.target); continue; }
     if (t.kind !== "part" && e.scope === "asset") { for (const [x, s] of [[lb, seedsB], [lb2, seedsA]] as const) for (const [q, l] of x) if (q.name === t.asset) s.push(l); continue; }
     const now = t.p && !t.p.id ? from(b2, t.p)[from(b, t.p).indexOf(t.p)] : undefined;
     seedsB.push(t.id); seedsA.push(now ? lb2.get(now)! : t.id);
@@ -466,6 +495,16 @@ export function edit(file: string, scene: string, given: unknown, o: { frame?: n
   const { by, other } = changedBy(b, b2, mayB, mayA, lit);
   const top = (m: [string, number][]) => m.slice(0, 8).map(([l, n]) => `${l} ${n}`).join(", ") + (m.length > 8 ? `, +${m.length - 8} more` : "");
   lines.push(`  pixels changed by id: ${by.length ? top(by) : "none"}`);
+  if (!by.length) {
+    // nothing changed in the drawing: what never will isn't written (a flip of its own mirror, z in a layer
+    // sorted by y); else said, and written (its light or another frame may change)
+    const e = edits.length === 1 ? edits[0] : undefined, t = e && all.find((x) => x.id === e.target), axis = e?.axis ?? "x", sibs = t ? siblings(p, t.asset) : [];
+    const why = !t?.p ? undefined
+      : e!.op === "flip" && ownMirror(t.p.img, axis) ? `${t.asset} is its own mirror across ${axis} (a front or back view drawn symmetric), so a flip can't turn it${sibs.length ? `; swap it for another view: ${sibs.join(", ")}` : ""}`
+      : e!.op === "set" && e!.key === "z" && t.p.sort !== undefined ? `z orders a layer sorted by z, and its layer, ${t.layer}, sorts by y: what stands lower covers (move it, or stamp it in a layer drawn after)` : undefined;
+    if (why) return { lines: [...lines, `edit: refused: it changes nothing: ${why}`, "nothing written"], ok: false };
+    lines.push(`edit: it changes nothing in the drawing at frame ${f}: what it writes isn't read there, or changes only its light or another frame (pxl shot shows those)`);
+  }
   if (other.length) return { lines: [...lines, `edit: refused: besides ${[...new Set([...mayB, ...mayA])].join(", ")} (its targets and what is placed by them), it changes ${top(other)} px (--allow "${other.map(([l]) => l).join(",")}" lets it)`, "nothing written"], ok: false };
   if (o.dry) return { lines: [...lines, "dry: nothing written"], ok: true };
   for (const [abs, t] of texts) writeFileSync(abs, t);

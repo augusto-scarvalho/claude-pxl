@@ -779,21 +779,30 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
 - A small change to what is placed, without reading the file: `PXL inspect <file> <scene>` lists what
   an edit can name (by id) with its box and the operations it takes (`--find stone lantern`: only
   those whose id, asset or the comment above their call or their asset's definition has the words,
-  the most first); `--id x`
-  gives one in full (its values and where the file writes each: its call, a table it reads, or code;
-  its relation, rules, parts, colors), `--json` for a program. `PXL edit <file> <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'`
-  writes it where the number lives (the table's `[87, 21]`, the stamp's own options), all the edits
-  given or none, then prints `describe --diff` by id, the pixels it changed by id, and `check`. It is
-  guarded: an edit changes its targets and what is placed by relation to them; anything else changing
-  (a ring in the ground drawn from the same table, a thing that reads the same number) refuses it,
-  saying what, and `--allow a,b` lets those. `--dry` prints the source lines it would change (- now,
-  + after) and what would change, and writes nothing. Ops: `move`, `set` (an option, a
-  part's parameter), `recolor` (`swap`), `flip` (a `turnaround()` sprite is turned to its mirror
-  heading instead, added to its `headings` if new, so its lit side stays the sun's), `frame` (or `t`), `relation` (on, beside, along,
-  apart, at; a world3d part's around, attach), `swap` (another asset; a part's builder), `as` (a part
-  drawn as voxels...); `scope: "asset"` writes the asset's own options, for every copy. What code
-  computes (a stamp a function makes, a number worked out, one call placing several things) is
-  refused, saying where it is: change that by hand.
+  the most first); `--id x` gives one in full (its values and where the file writes each: its call, a
+  table it reads, or code; its relation, rules, parts, colors; the siblings a `swap` can turn it to,
+  `vendor_n`'s `vendor_s` with its `facing`), `--json` for a program.
+  `PXL edit <file> <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'` writes it where the
+  number lives (the table's `[87, 21]`, the stamp's own options; a stamp its relation alone places
+  gets x, y in its call, an offset from there), all the edits given or none, then prints
+  `describe --diff` by id, the pixels it changed by id, and `check`. It is guarded: an edit changes
+  its targets and what is placed by relation to them; anything else changing (a ring in the ground
+  drawn from the same table, a thing that reads the same number) refuses it, saying what, and
+  `--allow a,b` lets those. An edit that changes nothing in the drawing says so; one that never will
+  (a flip of a front or back view drawn symmetric, `z` in a layer sorted by y) is refused, saying
+  why. `--dry` prints the source lines it would change (- now, + after) and what would change, and
+  writes nothing. Ops: `move`, `set` (an option, a part's parameter), `recolor` (`swap`), `flip` (a
+  `turnaround()` sprite is turned to its mirror heading instead, added to its `headings` if new, so
+  its lit side stays the sun's), `frame` (or `t`), `relation` (on, beside, along, apart, at; a world3d
+  part's around, attach), `swap` (another asset; a part's builder), `as` (a part drawn as
+  voxels...), `add`; `scope: "asset"` writes the asset's own options, for every copy.
+  `{ "op": "add", "target": "lantern_3", "like": "lantern_1", "beside": ["tea_stall", "left", 2] }`
+  stamps a new thing (`target` its new id; `asset`, or `like` an id: its asset and options, and its
+  x, y when it is placed the same way) by `beside`, `on` or `at` another stamp, written as a line
+  after that one's call, so in its layer; it may change only the new one (its light aside). It
+  refuses an id in use, a relation to the ground, a path or a world3d part, and a thing code places.
+  What code computes (a stamp a function makes, a number worked out, one call placing several
+  things) is refused, saying where it is: change that by hand.
 - `PXL check <file>` before handing over: every frame of the loop; its last line says which rules
   ran, and `--readings` shows what the lit-side rule read on each thing when a warning looks wrong.
   Checks and `world` rules cover `scene()`s (and rigs), and an `anim()` given a `world`: what its

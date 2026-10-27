@@ -169,17 +169,22 @@ it:
    one message, then one look again. Every turn re-reads the whole conversation, so a turn per edit
    is what makes a long session expensive. After the first write the art file is changed with edits,
    not written whole again.
-4. **A small change by name.** Moving, flipping, recoloring, putting one thing by another, a world3d
-   part's parameter: `pxl inspect art.px.js <scene> --find lantern` finds it by the words of its id,
-   its asset or the comment above its call or its asset's definition (an id is the file's name: the east
+4. **A small change by name.** Moving, flipping, recoloring, putting one thing by another, adding one
+   more by another, a world3d part's parameter: `pxl inspect art.px.js <scene> --find lantern`
+   finds it by the words of its id, its asset or the comment above its call or its asset's
+   definition (an id is the file's name: the east
    lantern is `toro_e`; "the fox with the jewel" finds `fox_tama_e` by its definition's comment);
    `pxl inspect art.px.js <scene> --id <id>` says in a few hundred tokens what the thing is, where,
    where the file writes each of its values and which operations it takes; then
    `pxl edit art.px.js <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'` writes the
    change where the value lives (the stamp's call, the table it reads, the part's spec) and prints
    what changed (`describe --diff` and the pixels changed, by id) and what `pxl check` says. No
-   reading of the file, no code written. What code computes is refused with where it is; that edit
-   is made by hand. `--dry` shows the source lines it would change and what would change, writing
+   reading of the file, no code written. "Add a lantern beside the tea stall" is
+   `{ "op": "add", "target": "lantern_3", "like": "lantern_1", "beside": ["tea_stall", "left", 2] }`:
+   a new stamp line after the tea stall's, guarded like the rest. "Turn the vendor to face us": its
+   `--id` lists the `swap` siblings (`vendor_s`, facing front); a flip of a front or back view drawn
+   symmetric is refused, as it changes nothing. What code computes is refused with where it is; that
+   edit is made by hand. `--dry` shows the source lines it would change and what would change, writing
    nothing. An edit that changes more than its target and what is placed by it (the ground drawn
    from the same table, another thing reading the same number) is refused, saying what; `--allow
    <ids>` lets those when meant.

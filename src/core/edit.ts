@@ -11,11 +11,17 @@ import { COMPASS, headingsOf } from "./turnaround.ts";
 export const OPS: Record<string, string[]> = {
   move: ["by"], set: ["key", "value"], recolor: ["swap"], flip: ["axis"], frame: ["frame", "t"],
   relation: ["on", "beside", "along", "apart", "at", "around", "attach"], swap: ["asset"], as: ["as"],
+  add: ["asset", "like", "beside", "on", "at"],
 };
-export type Edit = { op: string; target: string; scope?: "instance" | "asset"; by?: number[]; key?: string; value?: unknown; swap?: Record<string, string>; axis?: string; frame?: number; t?: number; asset?: string; as?: string; [k: string]: unknown };
+export type Edit = { op: string; target: string; scope?: "instance" | "asset"; by?: number[]; key?: string; value?: unknown; swap?: Record<string, string>; axis?: string; frame?: number; t?: number; asset?: string; like?: string; as?: string; [k: string]: unknown };
 type Done = { src: string; said: string } | string;
 
-const FORM = `{ op: "move", target, by: [dx, dy] px (a part's: [dx, dy] or [dx, dy, dz] m) } | { op: "set", target, key, value } | { op: "recolor", target, swap: { key: key } } | { op: "flip", target, axis?: "x" | "y" } | { op: "frame", target, frame | t } | { op: "relation", target, on | beside | along | apart | at (a stamp's) | around | attach (a part's): value } | { op: "swap", target, asset } | { op: "as", target, as: "surface" | "voxels" | "splats" | "mesh" }; each with scope?: "instance" (default) or "asset"`;
+const FORM = `{ op: "move", target, by: [dx, dy] px (a part's: [dx, dy] or [dx, dy, dz] m) } | { op: "set", target, key, value } | { op: "recolor", target, swap: { key: key } } | { op: "flip", target, axis?: "x" | "y" } | { op: "frame", target, frame | t } | { op: "relation", target, on | beside | along | apart | at (a stamp's) | around | attach (a part's): value } | { op: "swap", target, asset } | { op: "as", target, as: "surface" | "voxels" | "splats" | "mesh" } | { op: "add", target: its new id, asset | like: an id, beside: [id, side, gap] | on: id | at: "id.socket" }; each with scope?: "instance" (default) or "asset"`;
+/** What an add places its new stamp by: the id its relation names (undefined: a ground, a row, a path). */
+export const addTo = (e: Edit): string | undefined => {
+  const v = e.beside ?? e.on ?? e.at, id = Array.isArray(v) ? v[0] : typeof v === "string" && e.at !== undefined ? v.split(".")[0] : v;
+  return typeof id === "string" && id !== "ground" ? id : undefined;
+};
 
 /** An edit as given (a file's JSON, the command line's), checked: its op, its target, the fields its op takes. */
 export function checkEdit(e: unknown): Edit {
@@ -23,7 +29,7 @@ export function checkEdit(e: unknown): Edit {
   if (!e || typeof e !== "object" || Array.isArray(e)) throw bad("an edit is an object");
   const o = e as Edit, takes = OPS[o.op];
   if (!takes) throw bad(`no op '${o.op}' (${Object.keys(OPS).join(", ")})`);
-  if (typeof o.target !== "string" || !o.target) throw bad("target is the id of what it changes (pxl inspect lists them)");
+  if (typeof o.target !== "string" || !o.target) throw bad("target is the id of what it changes (pxl inspect lists them; an add's: the new one's)");
   if (o.scope !== undefined && o.scope !== "instance" && o.scope !== "asset") throw bad('scope is "instance" or "asset"');
   const extra = Object.keys(o).filter((k) => !["op", "target", "scope", ...takes].includes(k)), given = takes.filter((k) => o[k] !== undefined);
   if (extra.length) throw bad(`${o.op} takes ${takes.join(", ")}, not ${extra.join(", ")}`);
@@ -35,6 +41,9 @@ export function checkEdit(e: unknown): Edit {
   if (o.op === "relation" && given.length !== 1) throw bad("relation takes one of on, beside, along, apart, at (a stamp's), around, attach (a part's)");
   if (o.op === "swap" && typeof o.asset !== "string") throw bad("swap's asset is another asset's name (a part's: a builder's)");
   if (o.op === "as" && !AS.includes(o.as as string)) throw bad(`as is ${AS.map((a) => `"${a}"`).join(", ")}`);
+  if (o.op === "add" && (given.filter((k) => k === "asset" || k === "like").length !== 1 || ![o.asset, o.like].some((v) => typeof v === "string") || given.length !== 2 || !addTo(o)))
+    throw bad('add takes its new id as target, asset (a name) or like (an id: its asset and options), and one relation to another: beside: [id, side, gap], on: id or at: "id.socket"');
+  if (o.op === "add" && o.scope === "asset") throw bad("add places one new stamp: no scope");
   return o;
 }
 
@@ -131,7 +140,14 @@ export function editStamp(src: string, loc: string, e: Edit, info: StampInfo): D
       const da = Math.round((dx * b[1] - dy * b[0]) / det), db = Math.round((a[0] * dy - a[1] * dx) / det), ma = knobs[i].move(da), mb = knobs[j].move(db);
       if (near([ma[0] + mb[0], ma[1] + mb[1]])) plan = ([[knobs[i], da], [knobs[j], db]] as [(typeof knobs)[number], number][]).filter(([, d]) => d);
     }
-    if (!plan) { const why = moveInSource(src, loc, "x", 0); return `no number written for it moves it by ${dx},${dy}${typeof why === "string" ? `: ${why}` : ""}`; }
+    if (!plan) {
+      // placed by its relation alone: x, y written into its call, an offset from where the relation puts it
+      const a = args(src), end = a[0].s + a[0].t.trimEnd().length;
+      if (a[1]?.t.trim().startsWith("{") && REL2D.some((k) => get(k) !== undefined))
+        return { src: src.slice(0, end) + `, ${dx}, ${dy}` + src.slice(end), said: `moved ${dx},${dy}: x, y ${dx}, ${dy} written into its call, an offset from where its relation puts it (${where})` };
+      const why = moveInSource(src, loc, "x", 0);
+      return `no number written for it moves it by ${dx},${dy}${typeof why === "string" ? `: ${why}` : ""}`;
+    }
     let s = src;
     const said: string[] = [];
     for (const [k, d] of plan) {
@@ -174,6 +190,37 @@ export function editStamp(src: string, loc: string, e: Edit, info: StampInfo): D
     return { src: src.slice(0, a0.s) + m[1] + JSON.stringify(e.asset) + m[3] + src.slice(a0.s + a0.t.length), said: `asset ${JSON.stringify(e.asset)}, was ${a0.t.trim()} (${where})` };
   }
   return `${e.op} is a world3d part's: a stamp's look is its asset's (swap it, or recolor)`;
+}
+
+/**
+ * add: a new stamp named by its id (the edit's target) and placed by its relation, written as a line after
+ * the stamp call at `loc` (what it relates to: so in its layer, drawn after it). Its asset's name, or
+ * `like`'s call's asset and options (`like`: that call's source and place; not its id or relation, and its
+ * x, y only when it is placed the same way: the same relation, beside's same side).
+ */
+export function addStamp(src: string, loc: string, e: Edit, like?: { src: string; loc: string }): Done {
+  const at = callAt(src, loc, /^stamp\s*\(/), where = fileLine(loc);
+  if (at === undefined) return `the stamp it relates to isn't at ${loc}`;
+  const end = listAt(src, src.indexOf("(", at)).end + 1, next = /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*(.)/.exec(src.slice(end))?.[1];
+  if (next !== "," && next !== ")") return `the stamp at ${where} isn't an item of a list (a layer's, a scene's): add it by hand`;
+  const rel = REL2D.find((k) => e[k] !== undefined)!, opts = [`${rel}: ${lit(e[rel])}`, `id: ${lit(e.target)}`];
+  let name = lit(e.asset), xy = "";
+  if (like) {
+    const a = callAt(like.src, like.loc, /^stamp\s*\(/), items = a === undefined ? [] : listAt(like.src, like.src.indexOf("(", a)).items;
+    if (!items.length) return `like's stamp isn't at ${like.loc}`;
+    name = items[0].t.trim();
+    const o = items.find((x, i) => i > 0 && x.t.trim().startsWith("{")), E = o ? entries(like.src, o.s + o.t.indexOf("{")) : new Map<string, { text: string }>();
+    const was = E.get(rel) && readLit(E.get(rel)!.text), num = (i: number) => /^\s*-?\d+(\.\d+)?\s*$/.test(items[i]?.t ?? "");
+    if (was !== undefined && (rel !== "beside" || (Array.isArray(was) && was[1] === (e.beside as unknown[])[1])) && num(1) && num(2)) xy = `, ${items[1].t.trim()}, ${items[2].t.trim()}`;
+    for (const [k, v] of E) {
+      if (k === "id" || REL2D.includes(k)) continue;
+      if (readLit(v.text) === undefined) return `like's ${k} is code (\`${v.text}\` at ${fileLine(like.loc)}): give asset and set it, or add it by hand`;
+      opts.push(`${k}: ${v.text}`);
+    }
+    if (readLit(name) === undefined) return `like's asset is code (\`${name}\` at ${fileLine(like.loc)})`;
+  }
+  const indent = /^[ \t]*/.exec(src.slice(src.lastIndexOf("\n", at) + 1))![0], nl = src.includes("\r\n") ? "\r\n" : "\n", call = `stamp(${name}${xy}, { ${opts.join(", ")} })`;
+  return { src: src.slice(0, end) + `,${nl}${indent}${call}` + src.slice(end), said: `added ${call} (${loc.split(":")[0]}:${src.slice(0, end).split("\n").length + 1}, after ${addTo(e)}'s stamp, in its layer)` };
 }
 
 /** An edit of an asset's own options (scope "asset": every placement of it), at its sprite() or anim() call `loc`. */

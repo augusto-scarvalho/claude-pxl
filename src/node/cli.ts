@@ -68,26 +68,32 @@ const USAGE = `pxl — pixel-art DSL
   pxl inspect <art.px.js> <scene> [--id x | --find words] [--frame N] [--json]
       What an edit can name in a scene, a line each: its stamps (by id, else name #n), what c.as()
       names, its mesh() sprites, the world3d parts it draws; where each is and the operations it
-      takes. --find "stone lantern": only those whose id, asset or the comment above their call or
-      their asset's definition has the words (the most first, with the comment). --id x: that one in full, in a few hundred tokens: what it is, its box and feet, its
-      values and where the file writes each (in its call, a table it reads, or code), its relation,
-      what is placed by it, the scene's rules on it, its parts, its colors, and each operation it
-      takes with what that takes; the scene drawn with only what that thing's place and rules read
-      (a second or two where the whole takes ten). --json for a program choosing among the edits.
+      takes. --find stone lantern: only those whose id, asset or the comment above their call or
+      their asset's definition has the words (the most first, with the comment). --id x: that one
+      in full, in a few hundred tokens: what it is, its box and feet, its values and where the file
+      writes each (in its call, a table it reads, or code), its relation, what is placed by it, the
+      scene's rules on it, its parts, its colors, and each operation it takes with what that takes
+      (swap: its <name>_<x> siblings, each with its facing); the scene drawn with only what that
+      thing's place and rules read (a second or two where the whole takes ten). --json for a
+      program choosing among the edits.
   pxl edit <art.px.js> <scene> <edits.json | '{ "op": ..., "target": "id", ... }' | [...]> [--frame N] [--dry] [--allow ids]
       Small edits written into the art file where each value lives: move (by [dx, dy] px; a part's
-      m), set (an option, a part's parameter), recolor (a swap), flip (a turnaround's sprite turned to
-      its mirror heading, lit as it was), frame (or t), relation (on,
-      beside, along, apart, at; a part's around, attach), swap (another asset; a part's builder),
-      as (a part drawn as voxels...); scope "asset" writes the asset's own options. A stamp's number in
-      its call or the table it reads, an option added to its call, a part's spec; what code computes,
-      or a call that places several things, is refused with where it is. All are written or none:
-      the scene is rebuilt first (what the edit can't reach kept from the first build). It prints what changed in the drawing at that frame (its light
-      passes left out: describe --diff, by id; the pixels changed by id), then writes and runs pxl
-      check. Guarded: an edit changes its targets and what is placed by relation to them; anything
-      else changing (pixels outside them, another thing moved) refuses it, saying what (--allow a,b
-      lets those). --dry: the source lines it would change (- now, + after) and what would change
-      in the picture, nothing written.
+      m; a stamp its relation alone places gets x, y in its call, an offset from there), set (an
+      option, a part's parameter), recolor (a swap), flip (a turnaround's sprite turned to its mirror
+      heading, lit as it was), frame (or t), relation (on, beside, along, apart, at; a part's around,
+      attach), swap (another asset; a part's builder), as (a part drawn as voxels...), add (a new
+      stamp: target its new id, asset or like: an id, by beside, on or at another stamp, written as a
+      line after that one's, in its layer); scope "asset" writes the asset's own options. A stamp's
+      number in its call or the table it reads, an option added to its call, a part's spec; what
+      code computes, or a call that places several things, is refused with where it is. All are
+      written or none: the scene is rebuilt first (what the edit can't reach kept from the first
+      build). It prints what changed in the drawing at that frame (its light passes left out:
+      describe --diff, by id; the pixels changed by id), then writes and runs pxl check. Guarded: an
+      edit changes its targets and what is placed by relation to them; anything else changing
+      (pixels outside them, another thing moved) refuses it, saying what (--allow a,b lets those).
+      One that changes nothing says so; one that never will (a flip of its own mirror, z in a layer
+      sorted by y) is refused, saying why. --dry: the source lines it would change (- now, + after)
+      and what would change in the picture, nothing written.
   pxl check <art.px.js> [name...] [--frame N] [--readings] [--fix]
       Every check describe makes that can warn (facing, front marker, lit side, parallel parts, feet
       on the ground, lettering), on every scene and rig the file defines (not those it includes, or
@@ -434,8 +440,11 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case "inspect": {
-        if (!a.rest[0]) throw new PxError("inspect needs a scene: pxl inspect <file> <scene> [--id x | --find words] [--frame N] [--json]");
-        console.log(inspect(file, a.rest[0], { id: a.id, json: a.json, frame: a.frame, find: a.find }));
+        const [scene, ...words] = a.rest;
+        if (!scene) throw new PxError("inspect needs a scene: pxl inspect <file> <scene> [--id x | --find words] [--frame N] [--json]");
+        // --find cat crates, unquoted: the words after the scene are --find's too
+        if (words.length && a.find === undefined) throw new PxError(`inspect takes one scene, got ${a.rest.join(" ")} (words to look for: --find "${words.join(" ")}")`);
+        console.log(inspect(file, scene, { id: a.id, json: a.json, frame: a.frame, find: a.find === undefined ? undefined : [a.find, ...words].join(" ") }));
         return 0;
       }
       case "edit": {

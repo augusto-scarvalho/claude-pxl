@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkEdit, editAsset, editPart, editStamp } from "../src/core/edit.ts";
+import { addStamp, checkEdit, editAsset, editPart, editStamp } from "../src/core/edit.ts";
+import { main } from "../src/node/cli.ts";
 import { edit, inspect, unchanged } from "../src/node/edit.ts";
 import { loadProject } from "../src/node/load.ts";
 import { whenChanged } from "./passed.ts";
@@ -51,7 +52,7 @@ scene("s", { w: 20, h: 8, bg: "g" }, layer("props", stamp("rock", 2, 2, { id: "a
 `);
   const things = JSON.parse(inspect(file, "s", { json: true })).things as { id: string; ops: string[]; why?: string }[];
   assert.deepEqual(things.map((t) => t.id), ["a", "rock #2", "c"]);
-  assert.deepEqual(things[0].ops, ["move", "set", "recolor", "flip", "relation", "swap"]);
+  assert.deepEqual(things[0].ops, ["move", "set", "recolor", "flip", "relation", "swap", "add"]);
   assert.match(things[2].why!, /placed by code \(c\.stamp\(\) in a function, a\.px\.js:3:\d+\)/);
   assert.match(inspect(file, "s", { id: "a" }), /values: asset "rock" \(written\); x 2 \(written, a\.px\.js:3\); y 2[^\n]*\n[^]*recolor \{ swap: \{ key: key \} \(its colors: kg\) \}, scope instance \| asset/);
   const before = readFileSync(file, "utf8");
@@ -152,4 +153,47 @@ scene("s", { w: 20, h: 8, bg: "g" }, layer("props", stamp("pile", 2, 2), stamp("
   assert.equal(q.image("pile"), p.image("pile"), "its build taken, not drawn again");
   assert.deepEqual(["rock", "bush", "pile", "s"].map(keep(`sprite("rock", "kk`, `sprite("rock", { flip: "x" }, "kk`).k), [false, true, false, false]);
   assert.deepEqual(["rock", "bush", "pile", "s"].map(keep("bush: [9, 2]", "bush: [10, 2]").k), [false, false, false, false]);
+});
+
+test("pxl edit after a relation: a move writes x, y into a call its relation alone places; add writes a new stamp after the one it relates to", () => {
+  const src = `scene("s", {}, layer("props",\n  stamp("crates", 5, 9, { id: "crates" }),\n  stamp("cat", { id: "cat", on: "crates" })))\n`, cat = `a.px.js:3:3`, crates = `a.px.js:2:3`, info = { knobs: [], anim: false, has: () => true };
+  assert.match(ok(editStamp(src, cat, E({ op: "move", by: [0, 2] }), info)), /stamp\("cat", 0, 2, \{ id: "cat", on: "crates" \}\)/);
+  assert.match(ok(addStamp(src, crates, E({ op: "add", target: "cat_2", asset: "cat", beside: ["crates", "left", 2] }))), /\{ id: "crates" \}\),\n {2}stamp\("cat", \{ beside: \["crates", "left", 2\], id: "cat_2" \}\),\n {2}stamp\("cat", \{ id/);
+  // like: its asset and options, its x, y when placed the same way; the file's line ends kept
+  const lk = { src: `stamp("lamp", -3, 0, { beside: ["post", "above", -14], id: "l1", swap: { y: "r" } })`, loc: "b.px.js:1:1" };
+  const crlf = src.replace(/\n/g, "\r\n"), add = (o: Record<string, unknown>) => ok(addStamp(crlf, crates, E({ op: "add", target: "l2", like: "l1", ...o }), lk));
+  assert.match(add({ beside: ["crates", "above", -9] }), /\r\n {2}stamp\("lamp", -3, 0, \{ beside: \["crates", "above", -9\], id: "l2", swap: \{ y: "r" \} \}\),\r\n/);
+  assert.match(add({ on: "crates" }), /stamp\("lamp", \{ on: "crates", id: "l2", swap/);
+  assert.match(addStamp(`const c = stamp("crates", 5, 9, { id: "crates" })\n`, "a.px.js:1:11", E({ op: "add", asset: "cat", on: "crates" })) as string, /isn't an item of a list/);
+  assert.throws(() => E({ op: "add", asset: "cat", on: "ground" }), /add takes its new id/);
+  assert.throws(() => E({ op: "add", asset: "cat", like: "c", on: "crates" }), /add takes its new id/);
+});
+
+test("pxl edit add, guarded: only the new one changes; inspect names swap's siblings; an edit that changes nothing says so (a flip of its own mirror isn't written); --find's words unquoted", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
+  writeFileSync(file, `pal({ k: "#1b1630", g: "#8ccf63", r: "#e2585e" })
+sprite("rock", "kk\\nkg")
+sprite("man_n", { facing: "back" }, "rkr\\nkkk")
+sprite("man_s", { facing: "front" }, "rgr\\nkkk")
+scene("s", { w: 24, h: 10, bg: "g" }, layer("props", { sort: "y" },
+  stamp("rock", 2, 6, { id: "a", swap: { g: "r" } }),
+  stamp("man_n", { beside: ["a", "right", 2], id: "man" })))
+`);
+  const before = readFileSync(file, "utf8");
+  assert.match(inspect(file, "s", { id: "man" }), /flip \{ axis: x \(default: it is its own mirror, a flip changes nothing \(swap turns it\)\)[^]*swap \{ asset: another asset's name \(its siblings: man_s \(facing front\)\) \}[^]*add \{ target: a new id/);
+  const flip = edit(file, "s", { op: "flip", target: "man" });
+  assert.equal(flip.ok, false);
+  assert.match(flip.lines.join("\n"), /it changes nothing: man_n is its own mirror across x[^]*swap it for another view: man_s \(facing front\)[^]*nothing written/);
+  assert.match(edit(file, "s", { op: "set", target: "a", key: "seed", value: 3 }, { dry: true }).lines.join("\n"), /changes nothing in the drawing at frame 0/);
+  assert.match(edit(file, "s", { op: "set", target: "a", key: "z", value: 1 }).lines.join("\n"), /refused: it changes nothing: z orders a layer sorted by z, and its layer, props, sorts by y/);
+  assert.equal(edit(file, "s", { op: "add", target: "man", asset: "rock", on: "a" }).lines[0], "edit: man: add refused: 'man' names one already: an add's target is the new one's id");
+  const r = edit(file, "s", [{ op: "add", target: "b", like: "a", beside: ["a", "right", 9] }, { op: "move", target: "man", by: [0, -1] }]);
+  assert.ok(r.ok, r.lines.join("\n"));
+  assert.match(r.lines.join("\n"), /added b: x 13-14[^]*pixels changed by id: [^\n]*b 4/);
+  assert.equal(readFileSync(file, "utf8"), before.replace(`swap: { g: "r" } }),`, `swap: { g: "r" } }),\n  stamp("rock", { beside: ["a", "right", 9], id: "b", swap: { g: "r" } }),`).replace(`stamp("man_n", {`, `stamp("man_n", 0, -1, {`));
+  // --find cat crates, unquoted
+  const log = console.log, out: string[] = [];
+  console.log = (s: string) => out.push(s);
+  try { await main(["inspect", file, "s", "--find", "rock", "man"]); } finally { console.log = log; }
+  assert.match(out.join("\n"), /3 of its 3 things match "rock man"/);
 });

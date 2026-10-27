@@ -286,7 +286,7 @@ export function moveInSource(src: string, loc: string, key: Knob2d["key"], by: n
     if (!out) return `its ${key}'s ${n === 2 ? (key === "beside" ? "gap" : "u") : "s"} isn't a number written in its options at ${loc}`;
     return { src: src.slice(0, o!.s) + out + src.slice(o!.s + o!.t.length), from: was, to: was + by, line: lineAt(o!.s + m!.index) };
   }
-  if (args[1]?.t.trim().startsWith("{")) return `its ${key} isn't written: its relation alone places it (give it x, y to move it by hand)`;
+  if (args[1]?.t.trim().startsWith("{")) return `its ${key} isn't written: its relation alone places it (pxl edit's move writes x, y into its call: an offset from there)`;
   const i = key === "x" ? 1 : 2, spread = spreadOf(args[1]?.t);
   const arg = spread ? args[1] : args[i], text = arg?.t.trim() ?? "";
   const table = spread ? [spread, i - 1] : /^[\w$]+\.([\w$]+)\s*\[\s*([01])\s*\]$/.exec(text)?.slice(1).map((v, j) => (j ? +v : v));

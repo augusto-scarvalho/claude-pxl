@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**415 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**416 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–27, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -40,7 +40,7 @@ look, in text where text is cheaper than an image.
 | `pxl shot` | One asset built and written as a PNG to look at, with what changed since the last shot and the check's lines (LOOK pixels ringed in `<name>_look.png`). Frames side by side (`0-17`, `all`; in rows when too wide: a contact sheet of a long scene), zoomed regions, several assets or other files in rows, `--vs HEAD --diff` against the committed version. A reference GIF or video too: all its frames on one sheet, at 1×. `--gif` plays several side by side, each its own loop (a walk in 8 directions); `--every N` builds one frame in N, a long scene's preview, its size printed. |
 | `pxl check` | Every check `describe` makes, over every scene, rig and frame, and, to look at without failing it, the 1 px lines of every sprite drawn by hand (L-corners, jaggies), and which rules actually ran, so "no warnings" can't hide a check that never applied. `--readings` shows each light reading. |
 | `pxl steps` | The painting log as text; `--at x,y` names the source line that painted a pixel. |
-| `pxl inspect`, `pxl edit` | A small change without reading the file: a scene's things by id, where the file writes each value and the operations each takes; the edit (move, set, recolor, flip, relation, swap, as) written where the value lives, guarded so nothing else changes, with `describe --diff` by id. Measured against editing the script ([evaluation-edit.md](evaluation-edit.md): six edits, Sonnet at low effort, one run an arm, US$1.39): both right on all six with nothing else changed; its context 4 to 8.5k tokens whatever the file, 29 to 41% cheaper on a 660-line file, even on small ones, and 2.5 times slower (each edit rebuilds the scene). |
+| `pxl inspect`, `pxl edit` | A small change without reading the file: a scene's things by id, where the file writes each value and the operations each takes; the edit (move, set, recolor, flip, relation, swap, as, add) written where the value lives, guarded so nothing else changes, with `describe --diff` by id. Measured against editing the script ([evaluation-edit.md](evaluation-edit.md): six edits, Sonnet at low effort, one run an arm, US$1.39): both right on all six with nothing else changed; its context 4 to 8.5k tokens whatever the file, 29 to 41% cheaper on a 660-line file, even on small ones, and 2.5 times slower (each edit rebuilds the scene). |
 | `pxl list` | A file as a map: each definition's line range and comment, so an agent reads only the lines it needs. |
 | `pxl help` | Every op and option by section; `help <name>` prints the reference text and where the examples use it; guide sections on demand. |
 | `pxl compare` | An asset against a reference image or another asset (a new head against an approved one), row by row; a picture alone, its own rows' extents to draw to. |
