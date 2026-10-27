@@ -613,7 +613,15 @@ const AT = { hero: [200, 134], fire: [148, 164], pack: [127, 148], bedroll: [99,
 const BEDROLL_SHADOW = ((x, y) => poly([x - 4, y - 3, x - 3, y, x + 1, y + 1, x + 7, y + 2, x + 15, y + 3, x + 25, y + 3, x + 27, y + 1,
   x + 22, y + 4, x + 20, y + 6, x + 10, y + 6, x + 2, y + 5, x - 4, y + 4, x - 8, y + 3, x - 8, y - 1], "k"))(...AT.bedroll)
 
-scene("sunset", { w: W, h: H, bg: "N", world: { light: [1, -0.4] } },
+// What the camp's layout holds to (pxl check runs them; pxl check --fix puts a stray one back): the fire
+// between the pot and the logs, the bag lying out of the tent's door in front of it, the pot in front of
+// the pack, the cairn's stones over its pennant's foot, the hero standing back from the fire.
+const CAMP = [
+  { beside: ["pot", "campfire", { gap: [2, 6], side: "left" }] }, { beside: ["logs", "campfire", { gap: [2, 6], side: "right" }] },
+  { before: ["bedroll", "tent"] }, { before: ["pot", "pack"] }, { before: ["cairn", "pennant"] }, { apart: ["hero", "campfire", 16] },
+]
+
+scene("sunset", { w: W, h: H, bg: "N", world: { light: [1, -0.4] }, expect: CAMP },
   layer("sky", ...sky, stamp("_birds", 0, 0)),
   layer("sea", ...sea),
   layer("coast", ...coast),

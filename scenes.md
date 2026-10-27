@@ -773,6 +773,12 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   Checks and `world` rules cover `scene()`s (and rigs), and an `anim()` given a `world`: what its
   functions paint is seen when they name it, `c.as("bench", (c) => { ... }, { height })`
   (`examples/perspective/park.px.js`); `check: { every: 24 }` on a long one.
+- What the layout must keep, said once on the scene so `PXL check` holds it at every frame it checks:
+  `expect: [{ beside: ["pot", "campfire", { gap: [2, 6], side: "left" }] }, { before: ["bedroll", "tent"] }]`
+  (also `apart`, `inside`, `onGround`; over a loop, `while` and a rule's `frames`), a placement named
+  by its stamp's `id` or its asset placed once. A rule broken by an edit: `PXL check --fix` moves the
+  placement back by the fewest px, written where its number is (`PXL help expect`; the sunset's camp,
+  the island in `topdown.px.js`, the shrine's lanterns and miko).
 - A scene built from separate maps (terrain, props): `throw` in the placement loop when a prop lands
   on the wrong ground; it catches the drift before anyone sees it.
 - Before handing over, look as a critic: tiles repeating into a visible grid, props floating or on

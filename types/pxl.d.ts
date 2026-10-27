@@ -108,7 +108,7 @@ declare global {
     ground?: number | number[] | number[][];
   }
   /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
-  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "normals" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number };
+  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "normals" | "area" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number }; /** rules on its placements, run by pxl check and fixed by --fix */ expect?: PxRule2d[];
     /** px to an art pixel (w and h the picture's): mesh(), the 3D ops, meshSocket() and post() draw that many times as big */
     pixel?: number;
     /** the same scene k times as big under other names, not checked ({ name_hd: 4 }); post() runs only there */
@@ -351,6 +351,8 @@ declare global {
   interface PxRig3d { names: string[]; headings: string[]; joints(pose: PxPose, heading: number): PxJoints; screen(p: number[]): [number, number]; depth(p: number[]): number; w: number; h: number; pivot: [number, number] }
   /** What turnaround() made: its sprites' names and their headings, in order, their one size and pivot, those that are another's mirror. */
   interface PxTurnaround { names: string[]; headings: string[]; w: number; h: number; pivot: [number, number]; mirrored: string[] }
+  /** A scene's rules (its expect): a and b a stamp's id or an asset placed once, b also a box [x, y, w, h]; gap the empty px between their pixels; while takes two rules; frames: the span of the loop it holds over. */
+  type PxRule2d = { beside?: [string, string | number[], { gap?: number | [number, number]; side?: "left" | "right" | "above" | "below" }]; before?: [string, string]; apart?: [string, string | number[], number?]; inside?: [string, PxRegion]; onGround?: [string, (number | ((x: number) => number))?]; while?: [PxRule2d, PxRule2d]; frames?: [number, number] };
   /** expect3d's rules; before and while take two rules of a place. */
   type PxRule = { above?: [string, string]; on?: [string, string]; apart?: [string, string]; near?: [string, string, number]; reaches?: [string, number[], number, number?]; within?: [string, number[][]]; before?: [PxRule, PxRule]; while?: [PxRule, PxRule] };
   /** voxels()'s options: surface()'s (ao 0 unless given: a face darker at the creases); a cell's size (given a field), a cube's width in px (iso and top on the pixel grid). */

@@ -76,7 +76,17 @@ for (let m = 1; m < 15; m++) tileMap[m] = "shore_" + m
 
 const trees = [[56, 42], [78, 34], [150, 40], [44, 74], [170, 70]]
 
-scene("island", { w: 256, h: 160, world: { light: [-0.5, -1] } },
+// What the island's layout holds to (pxl check runs them; pxl check --fix puts a stray one back): the
+// trees' crowns clear of each other, the bushes and rocks on the land (a corner of CORNERS nearest each
+// of their pixels a "g"), the east rock at the foot of the east tree.
+const ROWS = CORNERS.trim().split("\n").map((r) => r.trim()), onLand = (x, y) => ROWS[Math.round(y / T)]?.[Math.round(x / T)] === "g"
+const LAYOUT = [
+  { apart: ["tree1", "tree2"] }, { apart: ["tree1", "tree4"] }, { apart: ["tree3", "tree5"] },
+  { beside: ["rock_e", "tree5", { gap: [4, 8], side: "right" }] },
+  ...["bush_s", "bush_n", "rock_e", "rock_w"].map((n) => ({ inside: [n, onLand] })),
+]
+
+scene("island", { w: 256, h: 160, world: { light: [-0.5, -1] }, expect: LAYOUT },
   layer("ground", tilemap(CORNERS, { corners: "w", size: T, map: tileMap })),
   // below: the layer starts empty, so "on grass" has to look at the layers under it.
   layer("flowers", scatter("flowers", 64, 56, 120, 48, 14, { on: "g", below: true, seed: 3 })),
@@ -85,9 +95,9 @@ scene("island", { w: 256, h: 160, world: { light: [-0.5, -1] } },
     ellipse(110, 101, 7, 2, "k"), ellipse(126, 61, 7, 2, "k")),
   layer("props",
     stamp("pier", 152, 116),
-    stamp("bush", 102, 92), stamp("bush", 118, 52, { flip: "x" }),
-    stamp("rock", 196, 92), stamp("rock", 90, 70, { flip: "x" }),
-    ...trees.map(([x, y]) => stamp("tree", x, y))))
+    stamp("bush", 102, 92, { id: "bush_s" }), stamp("bush", 118, 52, { flip: "x", id: "bush_n" }),
+    stamp("rock", 196, 92, { id: "rock_e" }), stamp("rock", 90, 70, { flip: "x", id: "rock_w" }),
+    ...trees.map(([x, y], i) => stamp("tree", x, y, { id: `tree${i + 1}` }))))
 
 // For the engine: the 16 shore tiles in mask order, then the variants.
 sheet("tiles", ["shore_*", "grass_tuft", "grass_flower", "sea_glint"], { cols: 8 })

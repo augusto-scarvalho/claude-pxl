@@ -4,6 +4,7 @@ import type { Palette } from "./palette.ts";
 import type { Img } from "./image.ts";
 import type { Canvas } from "./canvas.ts";
 import type { Region } from "./util.ts";
+import type { Rule2d } from "./expect.ts";
 
 /** A drawing op recorded with where it was written. */
 export interface Op {
@@ -117,6 +118,8 @@ export interface AssetOpts {
   bg?: string;
   /** Scene: false and check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story). */
   check?: boolean | { every: number };
+  /** Scene: rules on its placements, run by pxl check at the frames it checks and fixed by --fix (expect.ts). */
+  expect?: Rule2d[];
   /** Scene: px to an art pixel (w and h are the picture's): mesh(), the 3D ops, meshSocket() and post() draw that many times as big. */
   pixel?: number;
   /** Scene: the same scene k times as big under other names ({ name_hd: 4 }), not checked; post() runs only there. */

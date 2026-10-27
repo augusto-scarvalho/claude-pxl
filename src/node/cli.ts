@@ -19,7 +19,7 @@ import { decodePng } from "./png.ts";
 import { encodeGif, reduceColors } from "./gif.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
-import { checkProject } from "./check.ts";
+import { checkProject, writeMoves } from "./check.ts";
 import { setKnobInSource } from "../core/world3d.ts";
 import { cellRow, diffRow, frameCount, frameTime, greyRow, otherVersion, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
@@ -71,10 +71,13 @@ const USAGE = `pxl — pixel-art DSL
       lines of every sprite drawn by hand (grids, runs()), a doubled step or a corner the shape has
       (a line whose steps are nearly all L's is drawn square on purpose: none), and tones side by side
       too close to tell apart. --readings also lists what the lit-side rule read on every placement,
-      warning or not, with a tally: to see where it agrees and where it can't tell. --fix: each
-      expect3d rule that fails, fixed by one number of the parts it names (where one stands, its gap
-      beside another, then a parameter), searched without a model and written into the file; it
-      says each change, and the rules that held still hold.
+      warning or not, with a tally: to see where it agrees and where it can't tell. A scene's
+      expect rules (beside, before, apart, inside, onGround, while) run at the frames it checks.
+      --fix: each expect3d rule that fails, fixed by one number of the parts it names (where one
+      stands, its gap beside another, then a parameter), and each scene rule by where a placement
+      it names stands (x or y, the fewest px), searched without a model and written into the file
+      where the number is (a computed one is said and left); it says each change, and the rules
+      that held still hold (a scene's checked rebuilt before anything is written).
   pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--out DIR]
   pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
@@ -456,6 +459,8 @@ export async function main(argv: string[]): Promise<number> {
           let src = readFileSync(file, "utf8"), wrote = 0;
           for (const f of r.fixes) {
             if (f.held) { console.log(`fix: ${f.text}: holds after the changes above`); continue; }
+            // a scene's rule: a placement moved (written below, once checked rebuilt), or why not
+            if (f.why || f.move) { console.log(`fix: ${f.text}: ${f.why ?? `${f.move!.part} ${f.move!.key} ${f.move!.by > 0 ? "+" : ""}${f.move!.by} px`}`); continue; }
             if (!f.knob) { console.log(`fix: ${f.text}: no one number of its parts makes it hold`); continue; }
             const k = f.knob, what = `${k.part} ${k.key === "at" ? `at[${k.i}]` : k.key === "beside" ? "beside's gap" : k.key} ${+k.value.toFixed(3)} -> ${f.to}`, next = setKnobInSource(src, k, f.to!);
             if (next === undefined) { console.log(`fix: ${f.text}: ${what} (not written: its spec isn't written out once in ${basename(file)}; change it by hand)`); continue; }
@@ -463,6 +468,7 @@ export async function main(argv: string[]): Promise<number> {
             console.log(`fix: ${f.text}: ${what}`);
           }
           if (wrote) { writeFileSync(file, src); console.log(`fix: wrote ${wrote} change${wrote > 1 ? "s" : ""} to ${basename(file)}; check again`); }
+          for (const l of writeMoves(file, p, r, a.frame)) console.log(l);
         }
         console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}${r.notes.length ? `, ${r.notes.length} to look at` : ""} (checked ${r.checked}${a.frame ? `, at frame ${a.frame}` : ""})`);
         console.log(r.coverage);

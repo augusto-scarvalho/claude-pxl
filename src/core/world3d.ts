@@ -307,50 +307,74 @@ export function fixRule(W: World, rules: Rule[], r: Rule, frames = 8, ms = 3600)
   const holds = (w: World) => { try { return runExpects(w, [r], frames, ms)[0].ok; } catch { return false; } };
   const names = [args[0], args[1]].filter((n): n is string => typeof n === "string" && n !== "ground").map((n) => n.split(".")[0]).filter((n, i, a) => W.spec.parts[n] && a.indexOf(n) === i);
   const knobs = names.flatMap((n) => knobsOf(W, n)).sort((a, b) => +!KNOB_ORDER.includes(a.key) - +!KNOB_ORDER.includes(b.key));
-  const STEPS = [0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3];
-  let best: { knob: Knob; to: number; d: number; place: boolean } | undefined;
+  const at = (k: Knob, v: number) => holds(turnKnob(W, k, v));
+  return searchKnobs(knobs, {
+    place: (k) => KNOB_ORDER.includes(k.key), holds: at, steps: [0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3],
+    keeps: (k, v) => { const w = turnKnob(W, k, v); return held.every((q) => runExpects(w, [q], frames, ms)[0].ok); },
+    settle: (k, sign, lo, h) => {
+      // narrowed to where it starts to hold, then a little past it
+      for (let n = 0; n < 6; n++) { const mid: number = (lo + h) / 2; if (at(k, k.value + sign * mid)) h = mid; else lo = mid; }
+      let to = Math.round((k.value + sign * (h + 0.05)) * 100) / 100;
+      if (!at(k, to)) to = Math.round((k.value + sign * h) * 1000) / 1000;
+      // the roundest number near it that holds too (a foot set on the ground at 0, not 0.03)
+      for (const q of [1, 0.5, 0.25, 0.1, 0.05])
+        for (const c of [Math.floor(to / q) * q, Math.ceil(to / q) * q].map((v) => +v.toFixed(2)))
+          if (Math.abs(c - k.value) <= Math.abs(to - k.value) + 0.1 && at(k, c)) return c;
+      return to;
+    },
+  });
+}
+/**
+ * The fix's search, for any numbers (a world's, a 2D scene's placements'): each knob tried outward from
+ * its value by `steps` that grow, then `settle`d between the last step that failed and the first that
+ * held; the smallest change that holds and `keeps` the rest, a knob of a place (`place`) before any
+ * other. Undefined when none does.
+ */
+export function searchKnobs<K extends { value: number }>(knobs: K[], o: { place: (k: K) => boolean; holds: (k: K, v: number) => boolean; keeps: (k: K, v: number) => boolean; steps: number[]; settle: (k: K, sign: number, lo: number, hi: number) => number }): { knob: K; to: number } | undefined {
+  let best: { knob: K; to: number; d: number; place: boolean } | undefined;
   for (const k of knobs) {
-    const place = KNOB_ORDER.includes(k.key);
+    const place = o.place(k);
     if (best && best.place && !place) break;
     for (const sign of [1, -1]) {
       let lo = 0, hi: number | undefined;
-      for (const d of STEPS) { if (best && best.place === place && d >= best.d) break; if (holds(turnKnob(W, k, k.value + sign * d))) { hi = d; break; } lo = d; }
+      for (const d of o.steps) { if (best && best.place === place && d >= best.d) break; if (o.holds(k, k.value + sign * d)) { hi = d; break; } lo = d; }
       if (hi === undefined) continue;
-      // narrowed to where it starts to hold, then a little past it
-      let h: number = hi;
-      for (let n = 0; n < 6; n++) { const mid: number = (lo + h) / 2; if (holds(turnKnob(W, k, k.value + sign * mid))) h = mid; else lo = mid; }
-      let to = Math.round((k.value + sign * (h + 0.05)) * 100) / 100;
-      if (!holds(turnKnob(W, k, to))) to = Math.round((k.value + sign * h) * 1000) / 1000;
-      // the roundest number near it that holds too (a foot set on the ground at 0, not 0.03)
-      round: for (const q of [1, 0.5, 0.25, 0.1, 0.05])
-        for (const c of [Math.floor(to / q) * q, Math.ceil(to / q) * q].map((v) => +v.toFixed(2)))
-          if (Math.abs(c - k.value) <= Math.abs(to - k.value) + 0.1 && holds(turnKnob(W, k, c))) { to = c; break round; }
-      const w = turnKnob(W, k, to);
-      if (!holds(w) || !held.every((q) => runExpects(w, [q], frames, ms)[0].ok)) continue;
+      const to = o.settle(k, sign, lo, hi);
+      if (!o.holds(k, to) || !o.keeps(k, to)) continue;
       const d = Math.abs(to - k.value);
       if (!best || d < best.d || (place && !best.place)) best = { knob: k, to, d, place };
     }
   }
   return best && { knob: best.knob, to: best.to };
 }
-/** A knob's number found in the art file's text (the part's `name: { ... }`, its at, beside or parameter) and set to `to`; undefined when it isn't there once, written as a literal. */
+/**
+ * A knob's number found in the art file's text (the part's `name: { ... }`, its at, beside or parameter;
+ * or a place written as a bare array in a table, `const AT = { pack: [127, 148] }`, a 2D scene's) and
+ * set to `to`; undefined when it isn't there once, written as a literal.
+ */
 export function setKnobInSource(src: string, k: Knob, to: number): string | undefined {
-  const heads = [...src.matchAll(new RegExp(`(^|[\\s{,])${k.part}\\s*:\\s*\\{`, "g"))];
-  if (heads.length !== 1) return undefined;
-  // the part's braces
-  const start = heads[0].index! + heads[0][0].length - 1;
-  let depth = 0, end = start;
-  for (; end < src.length; end++) { if (src[end] === "{") depth++; else if (src[end] === "}" && --depth === 0) break; }
-  const body = src.slice(start, end + 1), num = (v: number) => String(+v.toFixed(3));
-  let out: string | undefined;
-  if (k.key === "at" || k.key === "beside") {
-    const m = new RegExp(`\\b${k.key}\\s*:\\s*\\[([^\\]]*)\\]`).exec(body);
+  const head = (open: string) => [...src.matchAll(new RegExp(`(^|[\\s{,])${k.part}\\s*:\\s*\\${open}`, "g"))];
+  const heads = head("{"), num = (v: number) => String(+v.toFixed(3));
+  // the i-th number of the list `m` found, set (one past its end: added)
+  const item = (text: string, m: RegExpExecArray | null): string | undefined => {
     if (!m) return undefined;
     const items = m[1].split(","), i = k.i!;
     if (i < items.length) { if (!/^\s*-?[\d.]+\s*$/.test(items[i])) return undefined; items[i] = items[i].replace(/-?[\d.]+/, num(to)); }
     else if (i === items.length) items.push(" " + num(to));
     else return undefined;
-    out = body.slice(0, m.index) + m[0].replace(m[1], items.join(",")) + body.slice(m.index + m[0].length);
+    return text.slice(0, m.index) + m[0].replace(m[1], items.join(",")) + text.slice(m.index + m[0].length);
+  };
+  if (!heads.length && k.key === "at" && head("[").length === 1) return item(src, new RegExp(`(?:^|[\\s{,])${k.part}\\s*:\\s*\\[([^\\]]*)\\]`).exec(src));
+  if (heads.length !== 1) return undefined;
+  // the part's braces
+  const start = heads[0].index! + heads[0][0].length - 1;
+  let depth = 0, end = start;
+  for (; end < src.length; end++) { if (src[end] === "{") depth++; else if (src[end] === "}" && --depth === 0) break; }
+  const body = src.slice(start, end + 1);
+  let out: string | undefined;
+  if (k.key === "at" || k.key === "beside") {
+    out = item(body, new RegExp(`\\b${k.key}\\s*:\\s*\\[([^\\]]*)\\]`).exec(body));
+    if (out === undefined) return undefined;
   } else {
     const m = new RegExp(`\\b${k.key}\\s*:\\s*(-?[\\d.]+)`).exec(body);
     if (!m) return undefined;

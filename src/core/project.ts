@@ -16,6 +16,7 @@ import { scatter } from "./scatter.ts";
 import { DECAL_OPTS } from "./decal.ts";
 import { BUILDERS, type Built, defineBuilder } from "./builders.ts";
 import { DRAW3D_OPTS, type Rule, World, runExpects } from "./world3d.ts";
+import { checkExpect } from "./expect.ts";
 import type { Color } from "./color.ts";
 import { TRANSPARENT, oklab, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
@@ -164,7 +165,7 @@ export const OP_OPTS: Record<string, string[]> = {
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
   sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "palettize", "shrink", "facing", "height", "twin", "register"],
-  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "pixel", "sizes"],
+  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "expect", "pixel", "sizes"],
   anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check"],
 };
 const FRAME_OPTS = ["ms", "hold"];
@@ -414,6 +415,7 @@ export class Project implements BuildCtx {
       if (light !== undefined && light !== false && !pair(light) && !(isPlainObject(light) && pair((light as { at?: unknown }).at)))
         throw new PxError(`${kind} '${name}': world.light is where the light comes from, [x, y] (e.g. [0.6, -1]: the top right), "sun" (look3d()'s), or a point light in the scene, { at: [x, y] } (false: none read); got ${JSON.stringify(light)}`, loc);
       const items = checkItems(`${kind} '${name}'`, rest, loc);
+      if (opts.expect !== undefined) try { checkExpect(opts.expect, opts.world); } catch (e) { throw wrap(e).within(`${kind} '${name}'`, loc); }
       if (opts.normals !== undefined && opts.png === undefined) throw new PxError(`${kind} '${name}': normals is the normal map of its png: give png too`, loc);
       const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true), look3d = this.look3d;
       this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, look3d });

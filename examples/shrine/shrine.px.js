@@ -134,7 +134,7 @@ const airLeaves = (c) => {
 
 // ---------------------------------------------------------------- the courtyard
 const PLACES = [
-  ["hall_s", 84, 63], ["ema_s", 152, 62], ["fox_tama_e", 50, 95], ["fox_key_w", 118, 95], ["toro_s", 138, 95], ["toro_s", 166, 95],
+  ["hall_s", 84, 63], ["ema_s", 152, 62], ["fox_tama_e", 50, 95], ["fox_key_w", 118, 95], ["toro_s", 138, 95, "toro_w"], ["toro_s", 166, 95, "toro_e"],
   ["basin_s", 120, 150], ["torii_s", 189, 158],
 ]
 // what moves, stamped by the frame: the trees swaying three times a loop, each a little after another,
@@ -143,12 +143,21 @@ const TREES = [["momiji_red_s", 14, 52, 3], ["momiji_orange_s", 238, 150, 0], ["
 const movers = (c) => {
   for (const [n, x, y, lag] of TREES) c.stamp(n, x, y, { frame: Math.floor((36 * c.frame) / L + lag) % 12 })
   const r = round(c.frame)
-  if (r) c.stamp(r.name, ...r.at, { frame: r.frame })
+  if (r) c.stamp(r.name, ...r.at, { frame: r.frame, id: "miko" })
 }
-scene("shrine", { w: 240, h: 160, frames: L, fps: 1000 / MS, world: { scale: S, view: "top", light: "sun" }, check: { every: 35 } },
+// What the courtyard holds to (pxl check runs them at the frames it checks): the two lanterns just off
+// the north curb of the approach's run to the hall, apart; the miko never behind the key fox, in front
+// of the west lantern whenever she is below it, and on the stretch she sweeps until she walks back.
+const APPROACH = [92, 102, 98, 28], SWEPT = [88, 80, 68, 45]   // PAVE's run west at y 116, 28 wide; her strokes
+const COURTYARD = [
+  { beside: ["toro_w", APPROACH, { gap: [2, 8], side: "above" }] }, { beside: ["toro_e", APPROACH, { gap: [2, 8], side: "above" }] },
+  { apart: ["toro_w", "toro_e", 12] }, { before: ["miko", "fox_key_w"] },
+  { while: [{ before: ["miko", "toro_w"] }, { beside: ["miko", "toro_w", { side: "below" }] }] }, { inside: ["miko", SWEPT], frames: [0, BACK - 1] },
+]
+scene("shrine", { w: 240, h: 160, frames: L, fps: 1000 / MS, world: { scale: S, view: "top", light: "sun" }, check: { every: 35 }, expect: COURTYARD },
   layer("ground", stamp("_ground", 0, 0), groundLeaves),
   layer("shadows", { shade: 1, of: "props", cast: "sun" }),
-  layer("props", { sort: "y" }, ...PLACES.map(([n, x, y]) => stamp(n, x, y)), movers),
+  layer("props", { sort: "y" }, ...PLACES.map(([n, x, y, id]) => stamp(n, x, y, { id })), movers),
   layer("air", airLeaves),
   // the lanterns' lamps, just lit as the sun goes: a faint warm halo round each window
   glow("iI", { r: 5, strength: 0.3, bands: 2 }))

@@ -52,7 +52,8 @@ export const FACING: Record<string, [number, number, number]> = { right: [1, 0, 
 export type Placed = Map<string, { x: number; y: number; sockets?: Record<string, [number, number]>; /** a sprite in mesh(): a socket in its world (m) */ m3?: (socket: string) => [number, number, number] }>;
 /** What was stamped where, in drawing order (top-left in asset coords): for `pxl describe`. */
 export type Placement = { name: string; x: number; y: number; w: number; h: number; layer?: string; img: Img; /** the light it was drawn under, on the picture (a sprite in mesh()) */ light?: [number, number];
-  /** a sprite in mesh(): how far its feet are over (under: below 0) the nearest face looking up under them, m, and its material */ stand?: { off: number; on: string } };
+  /** a sprite in mesh(): how far its feet are over (under: below 0) the nearest face looking up under them, m, and its material */ stand?: { off: number; on: string };
+  /** a stamp's: its id, where the call is in the art file (a stamp() item's, not a function's), its y in a layer sorted by y (for a scene's expect rules and --fix) */ id?: string; loc?: string; sort?: number };
 
 /**
  * Drawing surface over an image. Coordinates are relative to (ox, oy); colors are palette
@@ -1359,12 +1360,12 @@ export class Canvas {
   }
 
   /** Draw `src` with its pivot (default: `def`, as a fraction of its size) on (x, y). */
-  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string, sub?: [number, number]): void {
+  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc" | "sort">): void {
     const [px, py] = src.pivot ?? [src.w * def[0], src.h * def[1]];
     if (sub) this.subPut(src, x - Math.floor(px), y - Math.floor(py), sub);
     else this.put(src, x - Math.floor(px), y - Math.floor(py), ok);
     // logged where it was drawn: blit floors a fractional position (stamp("p", 282 + 8 * 0.88, y))
-    if (name) this.log?.push({ name, x: Math.floor(this.ox + x - Math.floor(px)), y: Math.floor(this.oy + y - Math.floor(py)), w: src.w, h: src.h, layer: this.layerName, img: src });
+    if (name) this.log?.push({ name, x: Math.floor(this.ox + x - Math.floor(px)), y: Math.floor(this.oy + y - Math.floor(py)), w: src.w, h: src.h, layer: this.layerName, img: src, ...meta });
   }
 
   stamp(name: string, x = 0, y: number | "ground" = 0, opts?: PlaceOpts): void {
@@ -1384,9 +1385,9 @@ export class Canvas {
       throw new PxError(`sub is true, [dx, dy] the way the part moves (1 right / down, -1 left / up), or { from: [x, y] } where it was, got ${JSON.stringify(sub)}`);
     if (opts?.smear !== undefined) {
       if (sub) throw new PxError("smear and sub don't go together: a smear is a move of more than a pixel");
-      return this.place(this.smeared(src, opts.smear, x, y), x, y, [0, 0], undefined, opts?.z, name);
+      return this.place(this.smeared(src, opts.smear, x, y), x, y, [0, 0], undefined, opts?.z, name, undefined, { id: opts?.id, loc: this.loc });
     }
-    this.place(src, x, y, [0, 0], undefined, opts?.z, name, sub ? (Array.isArray(sub) ? (sub as [number, number]) : [1, 1]) : undefined);
+    this.place(src, x, y, [0, 0], undefined, opts?.z, name, sub ? (Array.isArray(sub) ? (sub as [number, number]) : [1, 1]) : undefined, { id: opts?.id, loc: this.loc });
   }
 
   /**
@@ -1478,15 +1479,15 @@ export class Canvas {
    * Put a placed asset's pivot on (x, y): drawn now, or in a sorted layer queued and drawn on
    * flush() by y (where it stands) or z.
    */
-  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string, sub?: [number, number]): void {
-    if (!this.sorted) return this.putAt(src, x, y, def, ok, name, sub);
+  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc">): void {
+    if (!this.sorted) return this.putAt(src, x, y, def, ok, name, sub, meta);
     if (!Number.isFinite(z)) throw new PxError(`z must be a number, got ${JSON.stringify(z)}`);
     // Drawn later, in order: keep the clip that was active at the call.
-    const clip = this.clipPred, q = this.sorted.queue;
-    q.push({ key: this.sorted.by === "y" ? y : z, seq: q.length, draw: () => {
+    const clip = this.clipPred, q = this.sorted.queue, byY = this.sorted.by === "y";
+    q.push({ key: byY ? y : z, seq: q.length, draw: () => {
       const prev = this.clipPred;
       this.clipPred = clip;
-      try { this.putAt(src, x, y, def, ok, name, sub); } finally { this.clipPred = prev; }
+      try { this.putAt(src, x, y, def, ok, name, sub, meta && byY ? { ...meta, sort: y } : meta); } finally { this.clipPred = prev; }
     } });
   }
 

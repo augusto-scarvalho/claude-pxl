@@ -99,19 +99,29 @@ export function placementChecks(p: Placement, wo: World | undefined, steps: Step
   const checks = [frontWords(p.img), light && !unlit ? lightWords(p.img, light, steps) : ""];
   const bb = p.img.bounds(), pv = p.img.pivot;
   if (bb && (p.img.meters || p.img.grounded)) {   // what has a real height stands on the ground: a ghost may float
-    // (drawn in 3D on its origin: its feet are its pivot, the front of its footprint and its line lower down)
-    const feet = p.img.grounded && pv ? Math.round(p.y + pv[1]) : p.y + bb.y + bb.h, off = pv ? Math.round(p.y + pv[1] - feet) : 0;
+    const [x, feet] = feetOf(p)!, off = pv ? Math.round(p.y + pv[1] - feet) : 0;
     if (Math.abs(off) >= 2) checks.push(`WARNING: its feet are ${Math.abs(off)} px ${off > 0 ? "above" : "below"} where it stands (its pivot is ${Math.abs(off)} px ${off > 0 ? "below its sole" : "above it"}): it ${off > 0 ? "floats" : "sinks"}`);
-    // the ground's row under its feet (its pivot's column, or its middle's): one row, or a profile
-    const x = p.x + (pv ? pv[0] : bb.x + (bb.w >> 1)), G = wo?.ground;
-    // (several profiles: a floor everywhere and ledges over it, each over its own span; the row nearest the feet)
-    const rows = G === undefined ? [] : typeof G === "number" ? [G] : Array.isArray(G[0]) ? (G as number[][]).filter((P, i) => !i || (x >= P[0] && x <= P[P.length - 2])).map((P) => profile(P)(x)) : [profile(G as number[])(x)];
-    const g = rows.length ? rows.reduce((a, b) => (Math.abs(b - feet) < Math.abs(a - feet) ? b : a)) : undefined;
+    const g = groundUnder(wo?.ground, x, feet);
     if (g !== undefined && Math.abs(g - feet) >= 2)
       checks.push(`WARNING: its feet (y ${feet}) are ${Math.abs(g - feet)} px ${g > feet ? "above" : "below"} the ground (y ${g})`);
   }
   checks.push(standWords(p.stand));
   return checks.filter(Boolean);
+}
+/**
+ * Where a placement's feet are: the column (its pivot's, or its middle's) and the row under its lowest
+ * pixel; drawn in 3D on its origin, its pivot (the front of its footprint and its line lower down).
+ */
+export function feetOf(p: Pick<Placement, "x" | "y" | "img">): [number, number] | undefined {
+  const bb = p.img.bounds(), pv = p.img.pivot;
+  if (!bb) return undefined;
+  return [p.x + (pv ? pv[0] : bb.x + (bb.w >> 1)), p.img.grounded && pv ? Math.round(p.y + pv[1]) : p.y + bb.y + bb.h];
+}
+/** The ground's row under column x (world.ground: one row, a profile, or several: the row nearest the feet). */
+export function groundUnder(G: World["ground"], x: number, feet: number): number | undefined {
+  // (several profiles: a floor everywhere and ledges over it, each over its own span)
+  const rows = G === undefined ? [] : typeof G === "number" ? [G] : Array.isArray(G[0]) ? (G as number[][]).filter((P, i) => !i || (x >= P[0] && x <= P[P.length - 2])).map((P) => profile(P)(x)) : [profile(G as number[])(x)];
+  return rows.length ? rows.reduce((a, b) => (Math.abs(b - feet) < Math.abs(a - feet) ? b : a)) : undefined;
 }
 /** A sprite in mesh(): its feet on the face looking up under them, within expect3d's `on` (0.15 m); "" when they are. */
 export function standWords(st: Placement["stand"]): string {

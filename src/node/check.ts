@@ -9,8 +9,12 @@ import { frontWords, rampSteps } from "../core/checks.ts";
 import { PxError } from "../core/errors.ts";
 import { dE, lineFlaws } from "../core/vision.ts";
 import { toHex } from "../core/color.ts";
-import type { Item } from "../core/model.ts";
+import type { Item, World } from "../core/model.ts";
 import { type Knob, fixRule, runExpects, turnKnob } from "../core/world3d.ts";
+import { type Knob2d, type Named, type Rule2d, type Shift, fixRule2d, moveInSource, nameAll, namesOf, runRules2d } from "../core/expect.ts";
+import { readFileSync, writeFileSync } from "node:fs";
+import { basename } from "node:path";
+import { loadProject } from "./load.ts";
 import { FLAWS, jointsOf, poseFlaws, viewRows, viewWarnings } from "../core/rig3d.ts";
 
 /** Drawn by hand somewhere: a grid string, grid() or runs(), here or in a layer (line(), curve() and code draw their own lines clean, or as they mean to). */
@@ -25,8 +29,13 @@ export interface CheckResult {
   notes: string[];
   /** With `readings`: every placement's lit side against the scene's light, warning or not, and a tally (to tune the rule). */
   readings?: string[]; tally?: string;
-  /** With `fix`: each failing expect3d rule's one number that makes it hold (fixRule), or none found. */
-  fixes?: { text: string; knob?: Knob; to?: number; held?: boolean }[];
+  /**
+   * With `fix`: each failing expect3d rule's one number that makes it hold (fixRule), or none found; a
+   * scene's rule's (expect), a placement moved `by` px along x or y, its stamp at `loc`, or `why` not.
+   */
+  fixes?: { text: string; knob?: Knob; to?: number; held?: boolean; move?: { part: string; key: "x" | "y"; by: number; loc: string }; why?: string }[];
+  /** A scene's rules that don't hold, "scene › rule" (what --fix's changes are checked against, rebuilt). */
+  failed?: string[];
 }
 
 const hash = (d: Uint32Array) => { let h = 2166136261; for (let i = 0; i < d.length; i++) h = Math.imul(h ^ d[i], 16777619); return h >>> 0; };
@@ -41,6 +50,66 @@ const ranges = (fs: number[]) => fs.reduce<[number, number][]>((r, f) => {
 }, []).map(([a, b]) => (a === b ? `${a}` : `${a}-${b}`)).join(", ");
 
 /**
+ * --fix on a scene's rules: each failing one, on the scene the fixes before it left, fixed by moving one
+ * placement it names (fixRule2d) whose number the art file writes (moveInSource); else what would fix it
+ * and why it can't be written, or that nothing does.
+ */
+function fixScene(p: Project, rules: Rule2d[], rs: ReturnType<typeof runRules2d>, named: { f: number; at: Map<string, Named> }[], wo: World | undefined, out: NonNullable<CheckResult["fixes"]>): void {
+  const sh: Shift = new Map(), srcs = new Map<string, string | undefined>();
+  const source = (f: string) => {
+    if (!srcs.has(f)) { const abs = p.files.find((a) => basename(a) === f); try { srcs.set(f, abs && readFileSync(abs, "utf8")); } catch { srcs.set(f, undefined); } }
+    return srcs.get(f);
+  };
+  // where a name's stamp is (the first frame that places it)
+  const locOf = (n: string) => { for (const fr of named) { const q = fr.at.get(n); if (q && typeof q !== "string") return q.p.loc; } return undefined; };
+  const why = (k: Knob2d) => {
+    const loc = locOf(k.part), src = loc && source(loc.split(":")[0]);
+    if (!loc) return `${k.part} is placed by a function (c.stamp), its ${k.key} the code's`;
+    if (src === undefined) return `${loc}: its file can't be read`;
+    const m = moveInSource(src as string, loc, k.key, 0);
+    return typeof m === "string" ? m : undefined;
+  };
+  rs.forEach((r, i) => {
+    if (r.ok) return;
+    if (runRules2d([rules[i]], named, wo, sh)[0].ok) return void out.push({ text: r.text, held: true });
+    const knobs = namesOf([rules[i]]).flatMap((part) => (["x", "y"] as const).map((key): Knob2d => ({ part, key, value: 0 })));
+    const f = fixRule2d(rules, rules[i], named, wo, sh, knobs.filter((k) => !why(k)));
+    if (f) {
+      const { part, key } = f.knob, s = sh.get(part) ?? [0, 0];
+      sh.set(part, key === "x" ? [s[0] + f.to, s[1]] : [s[0], s[1] + f.to]);
+      return void out.push({ text: r.text, move: { part, key, by: f.to, loc: locOf(part)! } });
+    }
+    const g = fixRule2d(rules, rules[i], named, wo, sh, knobs.filter((k) => why(k)));
+    out.push({ text: r.text, why: g ? `${g.knob.part}'s ${g.knob.key} ${g.to > 0 ? "+" : ""}${g.to} px would make it hold, but ${why(g.knob)}: change it by hand` : "no one move of a placement it names makes it hold (within 64 px, keeping the rules that hold)" });
+  });
+}
+
+/**
+ * --fix's moves of a scene's placements written into the art files (each stamp's number once, by the sum
+ * of its moves), checked rebuilt first: written only if each fixed rule holds and none that held fails
+ * (a number another placement shares, or a stamp drawn by where it stands, would). The lines to print.
+ */
+export function writeMoves(file: string, p: Project, r: CheckResult, frame?: number): string[] {
+  const sum = new Map<string, { part: string; key: "x" | "y"; by: number; loc: string }>();
+  for (const f of r.fixes ?? []) if (f.move) { const m = f.move, k = `${m.loc} ${m.key}`; sum.set(k, { ...m, by: (sum.get(k)?.by ?? 0) + m.by }); }
+  // the last in a file first: a number written longer doesn't move the stamps before it
+  const at = (loc: string) => loc.split(":").slice(1).map(Number), texts = new Map<string, string>(), said: string[] = [];
+  for (const m of [...sum.values()].sort((u, v) => at(v.loc)[0] - at(u.loc)[0] || at(v.loc)[1] - at(u.loc)[1])) {
+    const abs = p.files.find((f) => basename(f) === m.loc.split(":")[0])!, w = moveInSource(texts.get(abs) ?? readFileSync(abs, "utf8"), m.loc, m.key, m.by);
+    if (typeof w === "string") return [`fix: not written: ${m.part}: ${w}`];
+    texts.set(abs, w.src);
+    said.push(`${m.part}'s ${m.key} ${w.from} -> ${w.to} (${basename(abs)}:${w.line})`);
+  }
+  if (!said.length) return [];
+  const fixed = new Set((r.fixes ?? []).filter((f) => f.move || f.held).map((f) => f.text)), scenes = [...new Set(r.failed!.map((t) => t.split(" › ")[0]))];
+  const after = checkProject(loadProject(file, { checksOnly: true }, (abs) => texts.get(abs) ?? readFileSync(abs, "utf8")), { names: scenes, frame });
+  const wrong = after.failed!.filter((t) => fixed.has(t.slice(t.indexOf(" › ") + 3)) || !r.failed!.includes(t));
+  if (wrong.length) return [`fix: not written: rebuilt with ${said.join(", ")}, ${wrong.join("; ")} doesn't hold (a number another placement shares, or a stamp drawn by where it stands?): change it by hand`];
+  for (const [abs, t] of texts) writeFileSync(abs, t);
+  return [`fix: wrote ${said.join(", ")}; check again`];
+}
+
+/**
  * The warnings, one line each: `asset › where › what`, `where` being the placement or the rig slot,
  * and, for an animated scene, the frames it happens at. `file`: only the assets defined in the file of
  * that name (not those it includes), unless `names` are given. `frame` / `frames`: those frames of
@@ -53,7 +122,8 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
   const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0 };
-  let lightSaid = false, groundSaid = false;
+  let lightSaid = false, groundSaid = false, fixes: CheckResult["fixes"], rulesAll = 0, rulesHeld = 0;
+  const failed: string[] = [];
   // by default what the file itself defines (what it includes is checked where it's defined)
   const own = (n: string) => !opts.file || (p.assets.get(n)?.loc ?? "").split(":")[0] === opts.file;
   for (const name of opts.names ?? p.order.filter(own)) {
@@ -115,6 +185,8 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     if (tl?.capped) lines.push(`${name} › WARNING: its loop doesn't close within 60 s: its anims' frame times don't line up (a ${tl.step} ms step, ${all} frames); checked its first ${count} frames only. Give every anim the same fps (4, 5 or 10, or ms in 100s)`);
     const seen = new Map<string, string[]>(), found = new Map<string, Set<number>>(), at = new Map<string, Set<string>>();
     const only = opts.frames ?? (opts.frame !== undefined ? [opts.frame] : undefined), co = def.opts.check;
+    // its rules (expect): at each frame checked, the placements they name
+    const rules = def.opts.expect as Rule2d[] | undefined, names = rules ? namesOf(rules) : [], named: { f: number; at: Map<string, Named> }[] = [];
     // a long story checked one frame in n (check: { every: n }): what moves through it is still seen
     // at every few steps, at the cost of a short loop
     const every = typeof co === "object" && co ? co.every : 1, keep = p.named(name);
@@ -126,6 +198,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       if (!keep) p.forget(name, ft);
       const unlit = new Set(b.layers.filter((l) => l.unlit).map((l) => l.name));
       frames++;
+      if (rules) named.push({ f, at: nameAll(b.placements, new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name)), names) });
       // many copies of one small thing (a brush scattered over the ground) are texture, not objects:
       // describe lists them on one line and checks none of them, and so does this, but for where one
       // stands in a mesh() (a tuft floating past a hill's edge)
@@ -165,6 +238,12 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       }
     }
     distinct += seen.size;
+    if (rules) {
+      const rs = runRules2d(rules, named, wo);
+      rulesAll += rs.length; rulesHeld += rs.filter((r) => r.ok).length;
+      for (const r of rs) if (!r.ok) { failed.push(`${name} › ${r.text}`); lines.push(`${name} › WARNING: expect ${r.text}: it doesn't hold (${r.detail})${count > 1 ? ` (frame${r.fails.length > 1 ? "s" : ""} ${ranges(r.fails)})` : ""}`); }
+      if (opts.fix) fixScene(p, rules, rs, named, wo, (fixes ??= []));
+    }
     // where it stands, when that is one place (two copies of a thing, which one), and at which frames
     for (const [k, fs] of found) {
       const ps = at.get(k)!, i = k.indexOf(" › ");
@@ -207,12 +286,10 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     if (ran.feet) run.push(`feet on ${ran.feet}${groundSaid ? ` (against the ground row on ${ran.ground})` : ""}`); else not.push("feet (nothing placed has a height)");
   }
   // expect3d's rules over their loops (a world's parts: above, on, apart, near, reaches, within)
-  let fixes: CheckResult["fixes"];
   if (!opts.names && p.expects.length) {
-    let all = 0, held = 0;
     for (const e of p.expects) {
       const rs = runExpects(e.world, e.rules, e.frames, e.ms);
-      all += rs.length; held += rs.filter((r) => r.ok).length;
+      rulesAll += rs.length; rulesHeld += rs.filter((r) => r.ok).length;
       let w = e.world;
       rs.forEach((r, i) => {
         if (r.ok) return;
@@ -226,8 +303,8 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         (fixes ??= []).push({ text: r.text, ...f });
       });
     }
-    run.push(`expects ${all} (${held} held)`);
   }
+  if (rulesAll) run.push(`expects ${rulesAll} (${rulesHeld} held)`);
   if (ran.stand) run.push(`standing on ${ran.stand}`);
   if (ran.text) run.push(`lettering on ${ran.text}`);
   if (ran.lines) run.push(`lines on ${ran.lines}`);
@@ -235,7 +312,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.poses) run.push(`figures' feet on ${ran.poses} poses`);
   if (rigs) run.push(`rig parts ${ran.parts}`);
   const readings = opts.readings ? { readings: [...reads], tally: `${tally.agree + tally.against + tally.unclear} placements read: ${tally.agree} lit as their light, ${tally.against} against it, ${tally.unclear} with no side to tell` } : {};
-  return { ...readings, ...(fixes ? { fixes } : {}), lines, notes, warnings: lines.length,
+  return { ...readings, ...(fixes ? { fixes } : {}), failed, lines, notes, warnings: lines.length,
     coverage: `ran: ${run.join(", ") || "nothing"}${not.length ? `; not run: ${not.join(", ")}` : ""}`,
     checked: `${n(scenes, "scene")} (${n(frames, "frame")}, ${n(distinct, "distinct placement")}), ${n(rigs, "rig")}, ${n(others, "other asset")} with a front marker` };
 }

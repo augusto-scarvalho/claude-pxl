@@ -35,10 +35,10 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    animated scene (`check: { every: N }` on a long story), warnings only, with their frames. Fix each
    or say why it's meant. LOOK lines (L-corners, jaggies, tones too close) don't fail it: look at
    each. Its last line says which rules ran: "not run: lit side" means nothing about the light was
-   checked (give the scene `world.light`, or lamps and `lighting()`); `expect3d` rules run there too
-   (`--fix`). Then look as a critic. Replacing approved art: keep `name_old` beside the new one and
-   show both (`PXL shot art.px.js name name_old`); against a reference or an approved part,
-   `PXL compare` lists each row's extents. More: `PXL help "scenes 14"`.
+   checked (give the scene `world.light`, or lamps and `lighting()`); a scene's `expect` and
+   `expect3d` rules run there too (`--fix`). Then look as a critic. Replacing approved art: keep
+   `name_old` beside the new one and show both (`PXL shot art.px.js name name_old`); against a
+   reference or an approved part, `PXL compare` lists each row's extents. More: `PXL help "scenes 14"`.
 6. If the user wants to watch: start `PXL serve art.px.js` in the background, give them the URL,
    and stop it when you're done. Never open a page in a headless browser (one froze a laptop), and
    run one heavy job (a long render, a test run) at a time.

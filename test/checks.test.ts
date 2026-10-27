@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadSource } from "../src/node/load.ts";
@@ -310,3 +310,39 @@ scene("s", { w: 8, h: 8, frames: 8, fps: 10, check: { every: 4 } }, (c) => c.sta
   assert.match(checkProject(loadSource(PAL + src, "t.px.js"), {}).checked, /1 scene \(2 frames/);
   assert.throws(() => checkProject(loadSource(PAL + src.replace("every: 4", "every: 0"), "t.px.js"), {}), /check: \{ every \}/);
 });
+
+// a yard: a box (x 7-12 at 10), a post (x 21-22 at 22) and a second box named crate, in a layer sorted by y
+const yard = (rules: string, props = `stamp("box", 10, 40), stamp("post", 22, 40), stamp("box", ...AT.crate, { id: "crate" })`, crate = "[30, 40]", opts = "world: { ground: 40 }") => PAL + `
+sprite("box", { w: 6, h: 6, pivot: "bottom" }, rect(0, 0, 6, 6, "r"))
+sprite("post", { w: 2, h: 8, pivot: "bottom" }, rect(0, 0, 2, 8, "k"))
+const AT = { crate: ${crate} }
+scene("yard", { w: 64, h: 48, ${opts}, expect: [${rules}] },
+  layer("props", { sort: "y" }, ${props}))`;
+const RULES = `{ beside: ["box", "post", { gap: [2, 4], side: "left" }] }, { before: ["crate", "box"] }, { apart: ["crate", "post", 3] },
+  { inside: ["box", [0, 0, 32, 48]] }, { onGround: ["post"] }`;
+
+test("expect: a 2D scene's rules on its placements (by id, or an asset placed once) run by check with the numbers; --fix moves one, written where its number is", async () => {
+  // the box 8 px left of the post, wanted 2-4; the rest hold (the crate is the other box, by its id)
+  const r = checkProject(loadSource(yard(RULES), "t.px.js"));
+  assert.deepEqual(r.lines, ["yard › WARNING: expect box left of post, 2-4 px apart: it doesn't hold (the gap is 8 px, wanted 2-4)"]);
+  assert.match(r.coverage, /expects 5 \(4 held\)/);
+  // over a loop (a box moving right 10 px a frame): a span of it, and one rule wherever another holds
+  const loop = checkProject(loadSource(yard(`{ beside: ["mover", "post", { side: "left" }], frames: [0, 1] }, { while: [{ apart: ["mover", "post", 20] }, { beside: ["mover", "post", { side: "left" }] }] }`,
+    `(c) => c.stamp("box", 4 + 10 * c.frame, 40, { id: "mover" }), stamp("post", 22, 40)`, "[30, 40]", "frames: 4"), "t.px.js"));
+  assert.deepEqual(loop.lines, ["yard › WARNING: expect mover apart from post, 20 px or more while mover left of post: it doesn't hold (at frame 0 mover left of post holds and mover apart from post, 20 px or more doesn't: the gap is 14 px, wanted 20 or more) (frames 0-1)"]);
+  // a name for two placements, a rule's shape and an onGround with no ground are said
+  assert.match(checkProject(loadSource(yard(RULES, `stamp("box", 10, 40), stamp("post", 22, 40), stamp("box", 30, 40)`), "t.px.js")).lines.join("\n"), /'box' is placed 2 times: give the one the rule means an id/);
+  assert.throws(() => loadSource(yard(`{ beside: ["box", "post", { side: "west" }] }`), "t.px.js"), /expect: beside side is "left", "right", "above", "below"/);
+  assert.throws(() => loadSource(yard(RULES, undefined, undefined, "world: {}"), "t.px.js"), /onGround stands on the scene's world.ground/);
+  // --fix: the box's own x (+4, the fewest px), the crate's y in AT's table (past the box's 40: in front), the post's y computed in
+  // code, said and left; written once the scene rebuilt with them holds what it should
+  const f = await run(yard(RULES, `stamp("box", 10, 40), stamp("post", 22, 40 - 3), stamp("box", ...AT.crate, { id: "crate" })`, "[30, 38]"), "check", "--fix");
+  assert.match(f.text, /fix: box left of post, 2-4 px apart: box x \+4 px\nfix: crate in front of box: crate y \+3 px\nfix: post on the ground: post's y \+2 px would make it hold, but its y is computed in code \(`40 - 3` at a\.px\.js:7:\d+\): change it by hand\nfix: wrote crate's y 38 -> 41 \(a\.px\.js:4\), box's x 10 -> 14 \(a\.px\.js:7\); check again/);
+  assert.match(readFileSync(f.file, "utf8"), /const AT = \{ crate: \[30, 41\] \}[^]*stamp\("box", 14, 40\)/);
+  // a number two placements share (the flag's y is the crate's): rebuilt, the crate's rule that the fix held fails, so nothing is written
+  const g = await run(yard(`{ beside: ["crate", "post", { gap: [1, 2], side: "right" }] }, { apart: ["flag", "box", 14] }, { beside: ["post", "box", { gap: [6, 9] }] }`,
+    `stamp("box", 10, 40), stamp("post", 18 + 4, 40), stamp("box", ...AT.crate, { id: "crate" }), stamp("post", AT.crate[0] - 6, AT.crate[1], { id: "flag" })`), "check", "--fix");
+  assert.match(g.text, /fix: not written: rebuilt with flag's y 40 -> 20 .*, yard › crate right of post, 1-2 px apart doesn't hold/);
+  assert.match(readFileSync(g.file, "utf8"), /crate: \[30, 40\]/);
+});
+
