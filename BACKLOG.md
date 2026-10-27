@@ -82,8 +82,20 @@ Mark items `[x]` when they ship, with the commit.
     the hand heads had; from behind it is smoother and darker; seams between pieces can make shapes
     by chance (a "face" on the back was fixed once);
   - the crew's bandana and long hair had one pass each (a knot and tails, a hem; locks, a parting, a
-    braid of plaits); the flat cap's brim and the bald crown's highlight could take one;
-  - 1 px creases (knee, elbow) hardly read; the cloak's and boots' accents do;
+    braid of plaits); the flat cap's brim and the bald crown's highlight could take one. Done (round
+    6), approved: the brim in profile (w and its mirror, the view the harbor shows) was flush with the
+    puffed crown over a lit brow; its tip now a pixel past the crown, lit on top under the crown's dark
+    edge, a pixel of its shadow on the brow (6 px a head, the w grid three columns wider). The bald
+    crown was a blob of the skin's lightest 5 px wide, the same in every view: now a dash of 3 a pixel
+    under the dome's top, the rest in skin, the dome's lower sides a step darker, in all five views
+    (nw and n retouched too: their anchors in the traveler's `ANCHOR`);
+  - 1 px creases (knee, elbow) hardly read; the cloak's and boots' accents do. Done (round 6),
+    approved: only the traveler and the mourner had them (`parts3m`); a tone darker on every frame,
+    they blinked with the idle's breath (its 1 px down bends the knees 51 degrees). Now a pair, only
+    where the joint bends: past 60 degrees at the knee (a step, the kneel) the hollow behind it in the
+    trousers' darkest and the kneecap in their lightest, past 45 at the elbow its inside in the
+    sleeve's darkest and the forearm's top in its lightest; straight limbs none. The crew (`dress()`)
+    and the warden have none: giving them some is a step of its own, not done;
   - the warden's stance sways by half pixels again (round 5, R3: the figure stamped with `sub`, its
     feet carried back to the place it stays crisp at; the boots' outline ahead takes the tone between
     on those frames); its head is no longer a frame behind the body (on rig3d the figure is one

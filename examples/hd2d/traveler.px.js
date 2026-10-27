@@ -152,8 +152,9 @@ const LOCKS = sdf.union(sdf.capsule([-2.4, 3.4, 3.8], [-2.8, 4.9, 1.6], 0.9, 0.5
   sdf.capsule([-1.6, 0.4, 5], [-2.4, -0.6, 6.4], 0.9, 0.4), sdf.capsule([1.2, 1, 5.1], [2.2, 0.8, 6.2], 0.8, 0.4), sdf.capsule([0, -2.2, 4.8], [0.4, -3.6, 5.6], 0.8, 0.4), { smooth: 0.6 })
 const HAIR = CAP.union(LOCKS, { smooth: 0.6 }).noise({ amp: 0.5, scale: 1.1, seed: 3 }).mat("JjhH")
 const SKULL = sdf.ellipsoid([4.6, 5, 5.3]).mat("zsSL")
-// each view's grid's pixel on the head's middle
-const ANCHOR = { s: [7, 5], sw: [8, 5], w: [6, 5] }
+// each view's grid's pixel on the head's middle (nw and n for the heads retouched from behind too: the
+// crew's bald crown)
+const ANCHOR = { s: [7, 5], sw: [8, 5], w: [6, 5], nw: [7, 5], n: [7, 5] }
 const FACE3 = {
   s: `
     ...............
@@ -228,20 +229,29 @@ views("_tr_head", sdf.union(SKULL, HAIR), { ...HEAD3, retouch: FACE3_TR })
 const neck = (j) => j.limb(j.chest, [j.head[0], j.head[1], j.head[2] - 3], 1.6, 1.5, "zs")
 sprite("_tr_clasp", "g")
 // The body as dress() paints his outfit, with a few accents where the cloth bends or pieces meet, in his ramps (each a cause,
-// none a texture): the trousers' crease at the front of the knee; the boots' cuffs turned down a tone
-// lighter, their soles dark; the tunic's hem in shadow under its flare, two folds where the skirt flares
-// from the belt, a crease inside each elbow; the cloak's hem darker, its edge at the opening catching
-// the light, two folds down its back that swing with it, the lining's edge a step lighter, the clasp at
-// the collar. (Brushes of cloth on the cloak's trailing hem read as a bush at this size: none.)
+// none a texture): the trousers' fold at a knee bent past 60 degrees (a step, a kneel; the idle's breath
+// bends them 51: none), the hollow behind it in their darkest and the kneecap in their lightest; the
+// boots' cuffs turned down a tone lighter, their soles dark; the tunic's hem in shadow under its flare,
+// two folds where the skirt flares from the belt, a crease inside each elbow bent past 45 degrees in the
+// sleeve's darkest, the forearm's top past it in its lightest; the cloak's hem darker, its edge at the
+// opening catching the light, two folds down its back that swing with it, the lining's edge a step
+// lighter, the clasp at the collar. (Brushes of cloth on the cloak's trailing hem read as a bush at this
+// size: none. A crease a tone darker on every frame hardly read, and blinked with the breath.)
 const parts3m = (j, p) => {
   const P = dress(O)(j, p), farLeg = j.depth(j.legs[0].hip) < j.depth(j.legs[1].hip) ? 0 : 1, farArm = j.depth(j.arms[0].sh) < j.depth(j.arms[1].sh) ? 0 : 1
-  const dark = (r) => r.slice(0, 2)
+  // how far a joint bends, in degrees (0 straight)
+  const bend = (a, b, c) => { const u = b.map((v, e) => v - a[e]), w = c.map((v, e) => v - b[e]), d = (x, y) => x[0] * y[0] + x[1] * y[1] + x[2] * y[2]; return (Math.acos(Math.min(1, d(u, w) / Math.sqrt(d(u, u) * d(w, w)))) * 180) / Math.PI }
   j.legs.forEach((L, i) => {
-    const g = O.legs(i === farLeg)
-    P[`leg${i}`] = [j.limb(L.hip, L.knee, 1.6, 1.5, (h, a) => (h > 0.78 && Math.abs(a) < 1 ? dark(g.tr) : g.tr)),
-      j.limb(L.knee, L.ankle, 1.5, 1.4, (h) => (h < O.cuff ? g.tr : h < O.cuff + 0.14 ? "dl" : g.shin)), j.ball(L.foot, [1.6, 2.3, 1.1], (h) => (h < 0.3 ? "D" : g.foot))]
+    const g = O.legs(i === farLeg), bent = bend(L.hip, L.knee, L.ankle) > 60, deep = g.tr[0], lit = g.tr.at(-1)
+    P[`leg${i}`] = [j.limb(L.hip, L.knee, 1.6, 1.5, (h, a) => (!bent || h < 0.75 ? g.tr : Math.abs(a) > 2.2 ? deep : Math.abs(a) < 0.8 && h > 0.85 ? lit : g.tr)),
+      j.limb(L.knee, L.ankle, 1.5, 1.4, (h, a) => (bent && h < 0.15 && Math.abs(a) > 2.2 ? deep : bent && h < 0.14 && Math.abs(a) < 0.8 ? lit : h < O.cuff ? g.tr : h < O.cuff + 0.14 ? "dl" : g.shin)),
+      j.ball(L.foot, [1.6, 2.3, 1.1], (h) => (h < 0.3 ? "D" : g.foot))]
   })
-  j.arms.forEach((A, i) => { const far = i === farArm, s = O.sleeve(far); P[`arm${i}`][0] = j.limb(A.sh, A.elbow, 1.1, 1, (h, a) => (h > 0.8 && Math.abs(a) < 1.2 ? dark(s) : s)) })
+  j.arms.forEach((A, i) => {
+    const far = i === farArm, s = O.sleeve(far), f = O.fore(far), bent = bend(A.sh, A.elbow, A.hand) > 45
+    P[`arm${i}`][0] = j.limb(A.sh, A.elbow, 1.1, 1, (h, a) => (bent && h > 0.8 && Math.abs(a) < 1.2 ? s[0] : s))
+    P[`arm${i}`][1] = j.limb(A.elbow, A.hand, 1, 0.9, (h, a) => (bent && h < 0.15 && Math.abs(a) < 0.9 ? f.at(-1) : f))
+  })
   const waist = j.pelvis[2] + 1.4, hips = [j.pelvis[0], j.pelvis[1], 0], top = j.chest[2] + 0.6
   P.tunic[0] = j.sweep(hips, waist - 2.4, waist, (h) => 3.6 + 0.6 * (1 - h), { paint: (h, a, out) => (!out ? "v" : h < 0.25 || Math.abs(Math.abs(a) - 0.75) < 0.13 ? "vw" : "vwW") })
   const trail = (h) => { const down = 1 - h; return [0, 1].map((e) => j.f[e] * -(0.3 + 1.1 * p.trail) * down * CLOAK3.trail + j.r[e] * 0.9 * p.sway * down ** 1.5 * CLOAK3.trail) }
