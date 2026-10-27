@@ -916,7 +916,9 @@ How they play, and the same in pxl:
   head, both hands and the body's middle of every frame with a pixel each in its own color (black,
   green, red, blue), and on another where the shadow goes and how big (three nested sizes); an attack
   names the frames it rushes, hits and returns on. In pxl: `sockets` on each frame, an ellipse under
-  the pivot for the shadow, and a hit effect cued on the hit frame.
+  the pivot for the shadow, and a hit effect cued on the hit frame. A fighter's hit and hurt boxes:
+  `c.setBox("hurt", x, y, w, h)` per frame (from the pose's joints in a rig3d `draw` hook), the move's
+  phase `c.setData({ phase: "active" })`; both reach the sheet's JSON with each frame.
 - **Lit sprites (Triangle Strategy).** Every frame has a normal map and a mask (a silhouette) laid out
   like the art, and the game lights each sprite pixel by pixel in its 3D scene. In pxl: `bump("hybrid")`
   or `normals()` on each frame, `mesh()`'s `sun` and `lamps` to light it, and the `_n.png` atlas a

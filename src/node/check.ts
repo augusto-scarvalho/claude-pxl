@@ -127,7 +127,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0 };
   let lightSaid = false, groundSaid = false, fixes: CheckResult["fixes"], rulesAll = 0, rulesHeld = 0;
   const failed: string[] = [];
   // by default what the file itself defines (what it includes is checked where it's defined)
@@ -172,6 +172,17 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         const twins = [...near].filter(([, d]) => d < 0.03).map(([k, d]) => { const [a, b] = k.split(",").map(Number); return `${key(a) ? `'${key(a)}' ` : ""}${toHex(a)} and ${key(b) ? `'${key(b)}' ` : ""}${toHex(b)} (${d.toFixed(3)})`; });
         if (twins.length) notes.push(`${name} › LOOK: ${twins.length} pair${twins.length > 1 ? "s" : ""} of tones side by side too close to tell apart (under 0.03 in OKLab): ${twins.slice(0, 3).join(", ")}${twins.length > 3 ? " ..." : ""}; merge each, or spread it if both are meant`);
         if (jaggies.length) notes.push(`${name} › LOOK: ${jaggies.length} jagg${jaggies.length > 1 ? "ies" : "y"} in its 1 px lines (${list(jaggies)}): a run out of order along a curve (3 2 4 where 2 3 4 reads smooth); unless the shape bumps there, let the runs grow or shrink steadily (PXL help "characters 7")`);
+      }
+      // its boxes (c.setBox) inside each frame: every frame of an anim whose first frame has one (a
+      // fighter's hurtbox is on every frame)
+      if (img.boxes) {
+        const fr = def.kind === "anim" ? p.drawn(name).map((f) => f.img) : [img], out = new Map<string, number[]>();
+        fr.forEach((im, i) => {
+          for (const [k, bs] of Object.entries(im.boxes ?? {})) for (const [x, y, w, h] of bs)
+            if (x < 0 || y < 0 || x + w > im.w || y + h > im.h) { const s = `'${k}' [${x}, ${y}, ${w}, ${h}] leaves its ${im.w}x${im.h} frame`; out.set(s, [...(out.get(s) ?? []), i]); }
+        });
+        ran.boxes += fr.length;
+        for (const [s, fs] of out) lines.push(`${name} › WARNING: box ${s}${fr.length > 1 ? ` (frame${fs.length > 1 ? "s" : ""} ${ranges(fs)})` : ""}: an engine reads it as it is; keep it inside, or give the asset room (w, h)`);
       }
       if (!img.sockets?.front) continue;
       others++;
@@ -314,6 +325,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.stand) run.push(`standing on ${ran.stand}`);
   if (ran.text) run.push(`lettering on ${ran.text}`);
   if (ran.lines) run.push(`lines on ${ran.lines}`);
+  if (ran.boxes) run.push(`boxes on ${ran.boxes} frame${ran.boxes > 1 ? "s" : ""}`);
   if (ran.views) run.push(`views' rows on ${ran.views}`);
   if (ran.poses) run.push(`figures' feet on ${ran.poses} poses`);
   if (rigs) run.push(`rig parts ${ran.parts}`);

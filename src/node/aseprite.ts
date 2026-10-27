@@ -1,6 +1,7 @@
 // Assets as Aseprite files (.aseprite), so a person can keep editing what was drawn: its layers, its
 // frames with their durations, a tag with the playback direction, the palette with its keys as
-// color names, 9-slice margins and pivot as a slice. Format: Aseprite's docs/ase-file-specs.md.
+// color names, 9-slice margins and pivot as a slice, boxes (c.setBox) as slices keyed by frame.
+// Format: Aseprite's docs/ase-file-specs.md.
 // One way only: pxl never reads these back.
 import { deflateSync } from "node:zlib";
 import { type Color, TRANSPARENT } from "../core/color.ts";
@@ -88,6 +89,12 @@ export function encodeAseprite(p: Project, name: string): { data: Buffer; flat?:
       ...(img.slice ? [i32(l), i32(t), u32(w - l - r), u32(h - t - bm)] : []),
       ...(img.pivot ? [i32(Math.floor(img.pivot[0])), i32(Math.floor(img.pivot[1]))] : [])));
   }
+  // boxes (c.setBox) as slices: "hit", "hurt", "hurt 2" (its second), a key every frame, empty where the frame has none
+  const boxed = frames.map((f) => p.build(name, 0, f.t).img.boxes ?? {}), slices = new Map<string, number>();
+  for (const bx of boxed) for (const [k, bs] of Object.entries(bx)) slices.set(k, Math.max(slices.get(k) ?? 0, bs.length));
+  for (const [k, n] of slices) for (let j = 0; j < n; j++)
+    first.push(chunk(0x2022, u32(frames.length), u32(0), u32(0), str(j ? `${k} ${j + 1}` : k),
+      ...boxed.flatMap((bx, i) => { const [x, y, bw, bh] = bx[k]?.[j] ?? [0, 0, 0, 0]; return [u32(i), i32(x), i32(y), u32(bw), u32(bh)]; })));
 
   // Cels cropped to what they hold; a cel the same as an earlier frame's links to it.
   const seen = layers.map(() => new Map<string, number>());

@@ -76,6 +76,10 @@ export class Img {
   meters?: number;
   /** Drawn in 3D standing on its origin (turnaround(), rig3d()): its pivot is where it meets the ground, its feet for pxl check. */
   grounded?: boolean;
+  /** Boxes an engine reads off this frame (a fighter's hit and hurt boxes), by kind: [x, y, w, h] in pixel-corner coords, from `c.setBox`; they travel like the pivot. */
+  boxes?: Record<string, [number, number, number, number][]>;
+  /** This frame's data for an engine (`c.setData`: a move's phase, its damage), exported with the frame. */
+  info?: Record<string, unknown>;
 
   constructor(w: number, h: number, data?: Uint32Array) {
     w = Math.floor(w);
@@ -115,6 +119,8 @@ export class Img {
     if (this.meters) o.meters = this.meters;
     if (this.grounded) o.grounded = true;
     if (this.parts) o.parts = { ids: this.parts.ids.slice(), names: [...this.parts.names] };
+    if (this.boxes) o.boxes = moveBoxes(this.boxes, (x, y) => [x, y]);
+    if (this.info) o.info = { ...this.info };
     return o;
   }
 
@@ -125,6 +131,8 @@ export class Img {
   movePivot(o: Img, f: (x: number, y: number) => [number, number]): Img {
     if (this.pivot) o.pivot = f(...this.pivot);
     if (this.sockets) o.sockets = mapPoints(this.sockets, f);
+    if (this.boxes) o.boxes = moveBoxes(this.boxes, f);
+    if (this.info) o.info = { ...this.info };
     if (this.meters) o.meters = this.meters;
     if (this.grounded) o.grounded = true;
     if (this.orient) {
@@ -456,6 +464,15 @@ export function mapPoints(pts: Record<string, [number, number]>, f: (x: number, 
   const o: Record<string, [number, number]> = {};
   for (const k of Object.keys(pts)) o[k] = f(...pts[k]);
   return o;
+}
+
+/** A copy of boxes, each moved by f: the box round its four corners moved (a flip, a quarter turn, a shift keep it exact). */
+function moveBoxes(boxes: NonNullable<Img["boxes"]>, f: (x: number, y: number) => [number, number]): NonNullable<Img["boxes"]> {
+  return Object.fromEntries(Object.entries(boxes).map(([k, bs]) => [k, bs.map(([x, y, w, h]) => {
+    const c = [f(x, y), f(x + w, y), f(x, y + h), f(x + w, y + h)], xs = c.map((p) => p[0]), ys = c.map((p) => p[1]);
+    const x0 = Math.min(...xs), y0 = Math.min(...ys);
+    return [x0, y0, Math.max(...xs) - x0, Math.max(...ys) - y0] as [number, number, number, number];
+  })]));
 }
 
 /** The first 4-neighbour (then diagonal) of (x, y) that `want` accepts, or undefined. */

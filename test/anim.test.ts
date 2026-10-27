@@ -345,3 +345,30 @@ anim("d", { base: "c", swap: { r: "g" } })`, "t.px.js");
   assert.deepEqual(p.timeline("d")!.durations, [250, 250]);
   assert.equal(p.image("d", 0, 250).get(0, 0), pack(0, 228, 54));   // its second frame, recolored
 });
+
+test("anim: c.setBox and c.setData reach the sheet's JSON and the .aseprite, a flip mirrors them, check warns where one leaves its frame", async () => {
+  const p = loadSource(PAL + `anim("jab", { frames: 2, fps: 10, w: 8, h: 6 }, (c) => {
+    c.rect(0, 0, 8, 6, "r"); c.setBox("hurt", 1, 1, 4, 5)
+    if (c.frame === 1) { c.setBox("hit", 5, 2, 3, 1); c.setData({ phase: "active" }) }
+  })
+  anim("jab_l", { base: "jab", flip: "x" })
+  anim("wild", { frames: 2, fps: 10, w: 4, h: 4 }, (c) => { c.rect(0, 0, 4, 4, "r"); c.setBox("hurt", 0, 0, 4, 4); if (c.frame) c.setBox("hit", 2, 1, 5, 1) })
+  sheet("moves", ["jab", "jab_l"])`, "t.px.js");
+  const dir = mkdtempSync(join(tmpdir(), "pxl-boxes-"));
+  try {
+    writeOutputs(p, dir, { only: ["moves"], preview: false });
+    const f = JSON.parse(readFileSync(join(dir, "moves.json"), "utf8")).frames;
+    assert.deepEqual(f.jab_0.boxes, { hurt: [{ x: 1, y: 1, w: 4, h: 5 }] });
+    assert.equal(f.jab_0.data, undefined);
+    assert.deepEqual(f.jab_1.boxes, { hurt: [{ x: 1, y: 1, w: 4, h: 5 }], hit: [{ x: 5, y: 2, w: 3, h: 1 }] });
+    assert.deepEqual(f.jab_1.data, { phase: "active" });
+    assert.deepEqual(f.jab_l_1.boxes, { hurt: [{ x: 3, y: 1, w: 4, h: 5 }], hit: [{ x: 0, y: 2, w: 3, h: 1 }] }, "mirrored with the art");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  const { encodeAseprite } = await import("../src/node/aseprite.ts");
+  assert.ok(encodeAseprite(p, "jab").data.includes("hit"), "a slice per box");
+  const { checkProject } = await import("../src/node/check.ts");
+  const r = checkProject(p);
+  assert.deepEqual(r.lines, ["wild › WARNING: box 'hit' [2, 1, 5, 1] leaves its 4x4 frame (frame 1): an engine reads it as it is; keep it inside, or give the asset room (w, h)"]);
+  assert.match(r.coverage, /boxes on 6 frames/);
+  assert.throws(() => loadSource(PAL + `sprite("s", { w: 2, h: 2 }, (c) => c.setBox("hit", 0, 0, -1, 1))`, "t.px.js").image("s"), /setBox\(kind, x, y, w, h\)/);
+});

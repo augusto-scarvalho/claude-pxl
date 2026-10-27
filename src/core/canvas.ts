@@ -897,6 +897,21 @@ export class Canvas {
     (this.img.sockets ??= {})[name] = [this.ox + x, this.oy + y];
   }
 
+  /**
+   * A box of this frame an engine reads (a fighter's `hit`, `hurt`, `push`), by kind, in whole px:
+   * each call adds one; the sheet's JSON lists them with the frame, pxl check says where one leaves it.
+   */
+  setBox(kind: string, x: number, y: number, w: number, h: number): void {
+    if (typeof kind !== "string" || ![x, y, w, h].every(Number.isFinite) || w < 0 || h < 0) throw new PxError(`setBox(kind, x, y, w, h): a kind ("hit", "hurt") and a box in the drawing, got ${JSON.stringify([kind, x, y, w, h])}`);
+    ((this.img.boxes ??= {})[kind] ??= []).push([Math.round(this.ox + x), Math.round(this.oy + y), Math.round(w), Math.round(h)]);
+  }
+
+  /** This frame's data for an engine (`{ phase: "active", damage: 8 }`), merged into what it has; the sheet's JSON gives it with the frame. */
+  setData(data: Record<string, unknown>): void {
+    if (typeof data !== "object" || data === null || Array.isArray(data)) throw new PxError(`setData({ key: value }): the frame's data for an engine, got ${JSON.stringify(data)}`);
+    this.img.info = { ...this.img.info, ...data };
+  }
+
   /** Where a socket of an earlier placement is ("hero.hand"), in canvas coords: a spell starts there. */
   socket(at: string): [number, number] {
     return this.socketAt(at, 0, 0);

@@ -673,6 +673,10 @@ declare global {
     socket(at: string): [number, number];
     /** A socket of what is being drawn, here in this frame (a hand that moves with the pose). */
     setSocket(name: string, x: number, y: number): void;
+    /** A box of this frame an engine reads (a fighter's "hit", "hurt"), by kind, in whole px; each call adds one: the sheet's JSON gives them with the frame. */
+    setBox(kind: string, x: number, y: number, w: number, h: number): void;
+    /** This frame's data for an engine ({ phase: "active", damage: 8 }), merged; the sheet's JSON gives it with the frame. */
+    setData(data: Record<string, unknown>): void;
     /** Where a socket of a sprite standing in mesh() is, in meters [x, z, up] ({ name, at, frame?, flip? }, pixel px to its pixels). */
     meshSocket(view: PxView | PxPerspective, sprite: { name: string; at: number[]; frame?: number; flip?: "x"; delay?: number }, socket: string, pixel?: number): [number, number, number];
     /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly). */
