@@ -1,7 +1,9 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { failure, keys, PAL } from "./helpers.ts";
 import { loadSource } from "../src/node/load.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/glow.test.ts");
 
 // Black 20x5 strip with one red "flame" pixel at (10, 2).
 const strip = (glow: string) =>

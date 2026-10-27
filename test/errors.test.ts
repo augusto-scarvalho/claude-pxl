@@ -1,7 +1,9 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { failure, PAL } from "./helpers.ts";
 import { loadSource } from "../src/node/load.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/errors.test.ts");
 
 const has = (msg: string, ...parts: string[]) => {
   for (const p of parts) assert.ok(msg.includes(p), `expected "${p}" in:\n${msg}`);

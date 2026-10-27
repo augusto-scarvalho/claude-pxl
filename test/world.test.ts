@@ -1,7 +1,6 @@
 // Phase 6 of the 3D DSL: details scattered on a form (sdf.scatter, brushes), decals pinned and wrapped
 // on it (decal), the builders (make3d), a scene as data with named parts and relations (world3d), local
 // edits that leave the rest byte for byte as it was, what painted a pixel (Img.parts), expect3d's rules.
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { sdf } from "../src/core/sdf.ts";
 import { scatter } from "../src/core/scatter.ts";
@@ -11,6 +10,9 @@ import { loadSource } from "../src/node/load.ts";
 import { Project } from "../src/core/project.ts";
 import { checkProject } from "../src/node/check.ts";
 import { keys, PAL } from "./helpers.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/world.test.ts");
 
 test("scatter: on a material, facing up, where asked, seeded; carried by the form's bend, fluttering", () => {
   const f = sdf.sphere(1).at(0, 0, 1).mat("stone").paint("cap", (p) => p[2] > 1.4);

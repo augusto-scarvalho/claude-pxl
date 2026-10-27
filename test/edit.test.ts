@@ -1,10 +1,12 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkEdit, editAsset, editPart, editStamp } from "../src/core/edit.ts";
 import { edit, inspect } from "../src/node/edit.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/edit.test.ts");
 
 const ok = (r: { src: string } | string) => { assert.equal(typeof r, "object", String(r)); return (r as { src: string }).src; };
 const E = (e: Record<string, unknown>) => checkEdit({ target: "t", ...e });

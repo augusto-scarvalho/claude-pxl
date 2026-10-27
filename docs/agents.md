@@ -381,9 +381,9 @@ test file for what you changed, or the quick suite:
 
 ```sh
 node --test test/docs.test.ts                            # one file: the commands and flags the docs cite
-npm run test:quick                                       # every test but the two slowest, about 23 s
+npm run test:quick                                       # every test but the two slowest, about 12 s (23 after a change to pxl's sources)
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts      # the examples check, on one folder (or hd2d/harbor, or a,b)
-npm run check                                            # types and every test, about 25 s (100 s after an engine change): before the commit
+npm run check                                            # types and every test, about 14 s (100 s after an engine change): before the commit
 ```
 
 The two slowest tests are the check of every example (about 70 s on a 4-core laptop when all 69
@@ -395,8 +395,16 @@ file it read: what it includes, its palettes, PNGs and poses), and the next run 
 examples whose hash changed: an example edited reruns alone (half a second for a small one, a few
 for the harbor), a shared file (`hd2d/kit.px.js`) reruns the examples that include it, a change to
 pxl's sources reruns them all; the test says how many it left alone. The gallery's study is skipped
-while pxl's sources and its two GIFs are the same. Delete `examples-passed.json` or
-`gallery-passed.txt` there to run them anyway.
+while pxl's sources and its two GIFs are the same. Every other test file but two is skipped the
+same way, each while pxl's sources, the file, `test/helpers.ts` and what else it names (a fixture,
+an example it includes, `types/pxl.d.ts`) are as they were when all its tests last passed: painting
+or writing docs changes none of them, so the suite then runs only `docs.test.ts` and `node.test.ts`,
+which read more than they could list (the guides and every file they link to; `pxl help` over the
+examples, git, the scripts). A new test file starts with
+`const test = whenChanged("test/<file>.test.ts", [what else it reads])` (`test/passed.ts`), naming
+any example, doc or fixture it reads; one that can't say what it reads keeps node:test's `test`.
+Delete `examples-passed.json`, `gallery-passed.txt` or a `<file>-passed.txt` there to run them
+anyway.
 
 The suite runs three test files at a time, below normal priority, as `pxl` itself does: on a 4-core
 laptop seven at a time took as long, burned a fifth more processor and froze the user's programs.
@@ -487,6 +495,8 @@ node scripts/perf.ts --vs HEAD examples/hd2d/traveler.px.js --only "^tr_walk_"  
 node --import ./scripts/meter.ts --import ./test/compile-cache.ts --test --test-concurrency=3 "test/**/*.test.ts" 2>&1 | grep METER | sort -k2 -rn
 node --cpu-prof --cpu-prof-dir=prof bin/pxl.js study clip.gif --no-out
 node scripts/cpuprofile.ts prof                         # where that time went, by function
+node scripts/served.ts examples/hd2d/graveyard.px.js graveyard_hd   # what the live viewer sends and holds for one asset (--vs HEAD too)
+node scripts/pulse.ts walk.px.js walk walk_hybrid       # how many of a walk's normals turn on the parts that only moved
 ```
 
 `--vs <rev>` unpacks the revision's `src/` and `examples/` once into the system's temp folder
@@ -497,7 +507,15 @@ change meant to move no pixel ends with `0 differ`, frame by frame for the anima
 pxl and then the other, alternating, because a laptop's speed drifts within seconds: two runs a
 minute apart differ by more than most changes, and the same pxl against itself reads within 6% on a
 figure. `meter.ts`, preloaded, prints each test file's time, processor time and peak memory: which
-files hold the suite back (the three `study` files, 7 to 10 s each of the quick suite's 23).
+files hold the suite back (the three `study` files, 6 to 9 s each when they run; `node.test.ts`,
+which runs every time, 6 s, part of it waiting on the processes it starts).
+
+`served.ts` starts the live viewer's server on a file and fetches what the page would when an asset
+is picked: run it after a change to the viewer or to what a build traces (a scene's frames all sent
+with it held 2.65 GB on the HD graveyard's page and froze the browser; as PNGs on demand, 1.6 MB and
+then half a megabyte a frame). `pulse.ts` follows an animation's normals from frame to frame over the
+pixels that only moved: a `bump` made a frame at a time turns 6% of the traveler's walk, his 3D
+model's own normals 1% ([lighting.md](../lighting.md)).
 
 `pxl build --profile` names the slow functions of one art file's build. Keep a new test to what it
 checks: a few frames, a small picture (a 3D one: a 30 px sprite, cells of 0.25 m), `study --seconds`

@@ -1,4 +1,3 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,6 +15,9 @@ import { hueShifting, regionLines, spacingWords, study } from "../src/core/study
 import { loadSource } from "../src/node/load.ts";
 import { smearsOf } from "../src/core/decompose.ts";
 import { drawing, said } from "./helpers.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/study.test.ts", ["test/fixtures/hd2d_harbor_1x.png", "test/fixtures/hd2d_graveyard_1x.png"]);
 
 test("gif decode: every frame as a viewer composites it, with its delay", () => {
   const a = drawing(13, 7), b = a.copy(), c = b.copy();

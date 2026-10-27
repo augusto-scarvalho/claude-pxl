@@ -389,6 +389,18 @@ anim("blink", { w: 4, h: 4, frames: 3, fps: 4 }, (c) => c.rect(c.frame, 0, 1, 1,
   assert.equal(run("--vs", "HEAD", "--frames", "2"), "3 the same, 0 differ (HEAD against the working tree)\n");
 });
 
+test("scripts/pulse.ts and served.ts: a blob carried along keeps its normals, one that grows turns them; what the viewer sends", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
+  writeFileSync(file, `use("pico8"); pal({ k: 0, r: 8 })
+anim("moved", { w: 20, h: 12, frames: 2, fps: 4 }, (c) => c.ellipse(8 + c.frame, 6, 5, 4, "r"), bump("dome"))
+anim("grown", { w: 20, h: 12, frames: 2, fps: 4 }, (c) => c.ellipse(9, 6, 5 + 3 * c.frame, 4, "r"), bump("dome"))`);
+  const run = (script: string, ...a: string[]) => execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", `scripts/${script}`, file, ...a], { cwd: join(import.meta.dirname, ".."), encoding: "utf8" });
+  const pulse = run("pulse.ts", "moved", "grown");
+  assert.match(pulse, /^moved: .*\(shifts 1,0 -1,0\)\n  their normals turned by more than 10°: 0%/m);
+  assert.match(pulse, /^grown: .*\n  their normals turned by more than 10°: [1-9]\d*%/m);
+  assert.match(run("served.ts", "grown"), /grown 20x12, 2 painting steps, 2 frames inline as PNGs\n  select: [\d.]+ kB in \d+ ms;.*\n  the page holds [\d.]+ kB/);
+});
+
 test("cli shot of PNGs from anywhere, several regions: a row per image, a column per region", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), a = join(dir, "a.png"), b = join(dir, "b.png");
   const img = (c: number) => { const i = new Img(8, 6); i.fill(c); return i; };

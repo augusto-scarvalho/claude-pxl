@@ -1,12 +1,14 @@
 // Abilities on the scene's clock (vfx.ts): a spell's phases, seeded particles, trails, the energy
 // effect, effects on one placement, sockets. Everything a function of the time: any frame alone.
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ability, emitter, follow, route, tween, turnToward, unroll } from "../src/core/vfx.ts";
 import { loadSource } from "../src/node/load.ts";
 import { failure } from "./helpers.ts";
 import { Img } from "../src/core/image.ts";
 import { Canvas } from "../src/core/canvas.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/vfx.test.ts");
 
 const PALS = 'use("pico8"); pal({ k: 0, r: 8, w: 7, g: 11, y: 10, o: 9, b: 12, d: 1 }); ';
 const load = (src: string) => loadSource(PALS + src, "t.px.js");

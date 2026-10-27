@@ -1,4 +1,3 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,6 +8,9 @@ import { writeOutputs } from "../src/node/output.ts";
 import { encodeGif } from "../src/node/gif.ts";
 import { Img } from "../src/core/image.ts";
 import { pack, TRANSPARENT } from "../src/core/color.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/anim.test.ts");
 
 const BLINK = `anim("blink", { fps: 4, w: 3, h: 1 }, rect(0, 0, 3, 1, "r"),
   frame(), frame(px(1, 0, "w")), frame({ hold: 2 }, px(1, 0, "g")))`;

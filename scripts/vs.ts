@@ -1,6 +1,6 @@
-// What hashes.ts and perf.ts share to compare the pxl at a git revision with the working tree: the
-// revision's src/ and examples/ unpacked once into the system's temp folder (pxl-rev-<commit>, kept
-// for the next run), each tree's own loader, the examples as the tests list them, frames over a loop.
+// What hashes.ts, perf.ts and served.ts share to compare the pxl at a git revision with the working
+// tree: the revision's src/ and examples/ unpacked once into the system's temp folder (pxl-rev-<commit>,
+// kept for the next run), each tree's own loader, the examples as the tests list them, frames over a loop.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

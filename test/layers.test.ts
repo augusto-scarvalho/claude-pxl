@@ -1,4 +1,3 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,6 +5,9 @@ import { join } from "node:path";
 import { art, PAL } from "./helpers.ts";
 import { main } from "../src/node/cli.ts";
 import { loadSource } from "../src/node/load.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/layers.test.ts", ["examples/nature/kit.px.js"]);
 
 const LIT = '{ light: [1, 0], reach: 1, ramps: ["1d6"] }';
 

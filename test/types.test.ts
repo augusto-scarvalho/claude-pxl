@@ -1,8 +1,10 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { ASSET_OPTS, LAYER_OPTS, OP_OPTS, Project } from "../src/core/project.ts";
 import { OPS } from "../src/core/canvas.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/types.test.ts", ["types/pxl.d.ts"]);
 
 const dts = readFileSync(new URL("../types/pxl.d.ts", import.meta.url), "utf8");
 /** The body of `interface name { ... }` (and of what it extends in this file). */

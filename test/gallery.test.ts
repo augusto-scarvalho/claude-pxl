@@ -3,7 +3,11 @@
 // pxl's sources, the two GIFs and this test unchanged (an example edited) skips it (passed.ts).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { fingerprint, pass, passed, root } from "./passed.ts";
 
@@ -24,4 +28,22 @@ test("study reads pxl's own gallery back as it was made", async (t) => {
   assert.ok(m && y, park);
   assert.ok(Math.abs(+m![1] - 70) <= 6 && Math.abs(+m![2] - 90) <= 8 && Math.abs(+y![1] - 40) <= 4, `${m![0]} ${y![0]}`);
   pass("gallery-passed.txt", key);
+});
+
+test("whenChanged: a test file is noted as passed only when all its tests passed", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), name = `t${process.pid}`, file = join(dir, `${name}.test.ts`);
+  const kept = join(root, "node_modules", ".cache", "pxl", `${name}-passed.txt`), { NODE_TEST_CONTEXT, ...env } = process.env;
+  const run = (fails: boolean) => {
+    writeFileSync(file, `import { whenChanged } from ${JSON.stringify(pathToFileURL(join(root, "test", "passed.ts")).href)};
+const test = whenChanged(${JSON.stringify(file)});
+test("a", () => {});
+test("b", async () => { if (${fails}) throw new Error("no"); });`);
+    return spawnSync(process.execPath, [file], { env, encoding: "utf8" }).status;
+  };
+  try {
+    assert.equal(run(true), 1);
+    assert.ok(!existsSync(kept));
+    assert.equal(run(false), 0);
+    assert.ok(existsSync(kept));
+  } finally { rmSync(kept, { force: true }); }
 });

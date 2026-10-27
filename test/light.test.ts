@@ -1,7 +1,9 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { failure, PAL } from "./helpers.ts";
 import { loadSource } from "../src/node/load.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/light.test.ts");
 
 // White room 40x8 at cell 1 so values are easy to reason about.
 const room = (body: string, lighting = "lighting({ cell: 1 })") =>

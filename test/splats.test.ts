@@ -1,7 +1,6 @@
 // Procedural Gaussian splats (splats.ts): a surface's flat discs along its normals, a density's round
 // blobs; rasterized to pixel art (thick inside, in its ramp, hidden by a wall through a camera); a 3DGS
 // .ply written and read back, Y up.
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,6 +11,9 @@ import { encodePly, readPly } from "../src/core/files3d.ts";
 import { loadSource } from "../src/node/load.ts";
 import { writeOutputs } from "../src/node/output.ts";
 import { keys, PAL } from "./helpers.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/splats.test.ts");
 
 test("splats: a surface as flat discs on it along its normals, the sun each sees; a density's inside as round blobs, as dense as it is", () => {
   const S = makeSplats(sdf.sphere(1).mat("m"), { spacing: 0.1 });

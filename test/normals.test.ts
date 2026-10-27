@@ -1,4 +1,3 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,6 +11,9 @@ import { Img } from "../src/core/image.ts";
 import { rotate } from "../src/core/rotate.ts";
 import { pack } from "../src/core/color.ts";
 import type { BumpOpts } from "../src/core/model.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/normals.test.ts");
 
 const load = (body: string) => loadSource(PAL + body, "t.px.js");
 /** Normal x/y of a pixel as signs (-1, 0, 1); null when it has none. */

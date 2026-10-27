@@ -1,7 +1,6 @@
 // A figure on the 3D layer (rig3d.ts): two-bone IK in 3D, the walk's numbers by the view, hand-drawn
 // views placed by a heading and their rows checked, and rig3d's figure: its blocks in every heading,
 // feet on the ground line, its parts painted by a hook, the east mirrored, the escape hatches.
-import { test } from "node:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,6 +10,9 @@ import { sdf } from "../src/core/sdf.ts";
 import { checkProject } from "../src/node/check.ts";
 import { loadProject, loadSource } from "../src/node/load.ts";
 import { PAL, keys } from "./helpers.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/rig3d.test.ts", ["examples/hd2d/traveler.px.js"]);
 
 const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 

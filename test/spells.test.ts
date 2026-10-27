@@ -1,11 +1,13 @@
 // The spell kit (spells.ts): spell(element, tier, { from, to }) a whole cast on the clock, an element a
 // recipe, a tier scaling it; cast() drawing it, what it draws giving light, its lamps, flash and shake.
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ELEMENTS, TIERS, type ViewOpt, spell, spellView } from "../src/core/spells.ts";
 import { loadSource } from "../src/node/load.ts";
 import { failure } from "./helpers.ts";
 import { type View, perspective } from "../src/core/perspective.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/spells.test.ts");
 
 const PALS = 'use("pico8"); pal({ k: 0, g: 3, w: 7 }); ';
 const load = (src: string) => loadSource(PALS + src, "t.px.js");

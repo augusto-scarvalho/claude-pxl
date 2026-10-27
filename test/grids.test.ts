@@ -1,7 +1,6 @@
 // A field made voxels and a mesh (grids.ts), drawn as cubes (voxels()), written as .vox, .obj and .glb
 // (files3d.ts) and read back: cells of any size in meters, a cube's px apart from them, things of
 // different cells at their depths, a grid past MagicaVoxel's 256 a side as several models.
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,6 +11,9 @@ import { encodeGlb, encodeObj, encodeVox, readGlb, readObj, readVox } from "../s
 import { loadSource } from "../src/node/load.ts";
 import { writeOutputs } from "../src/node/output.ts";
 import { keys, PAL } from "./helpers.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/grids.test.ts");
 
 test("voxels: cells of a size (one or per axis), columns down the origin's upright, thin parts kept, the material there", () => {
   const rod = sdf.cylinder(0.04, 1).mat("wood");

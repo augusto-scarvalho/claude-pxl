@@ -1,6 +1,5 @@
 // pxl study taking a picture or a clip apart (pieces, lights, sheets, normal maps, how a thing is
 // built): in a file of its own beside study.test.ts, so the two run at once
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,6 +15,9 @@ import { craft } from "../src/core/craft.ts";
 import { loadSource } from "../src/node/load.ts";
 import { loopInPlace } from "../src/core/decompose.ts";
 import { PALETTE, drawing, said } from "./helpers.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/study.apart.test.ts", ["examples/subpixel.px.js"]);
 
 test("pixelate keeps an edge where a box average blurs it", () => {
   // black and white, the edge off the 4 px grid: superpixels follow it, boxes average across it

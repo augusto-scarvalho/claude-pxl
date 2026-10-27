@@ -1,4 +1,3 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,6 +8,9 @@ import { main } from "../src/node/cli.ts";
 import { frontWords, lightWords, litDir, rampSteps } from "../src/core/checks.ts";
 import { PAL, failure } from "./helpers.ts";
 import { lane, profile } from "../src/core/util.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/checks.test.ts");
 
 const run = async (src: string, ...args: string[]) => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");

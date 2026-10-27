@@ -385,8 +385,8 @@ Jungle" by bluecarrot16, Lanea Zimmerman (Sharm), Sevarihk, Hyptosis and others,
 npm install                                          # dev only: typescript, @types/node
 node --test test/docs.test.ts                        # one test file, while you iterate
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts  # the examples' check on one folder
-npm run test:quick                                   # every test but the two slowest (~23 s)
-npm run check                                        # type check + every test (~25 s; ~100 s after an engine change), before a commit
+npm run test:quick                                   # every test but the two slowest (~12 s; ~23 s after a change to pxl's sources)
+npm run check                                        # type check + every test (~14 s; ~100 s after an engine change), before a commit
 ```
 
 ```
@@ -406,7 +406,9 @@ test/         node:test suites
 | `scripts/calibrate.ts` | scores `pxl study` against the examples' own source |
 | `scripts/perf.ts` | `pxl check`'s time, processor time and peak memory on every example; `--vs <rev>`: ms a frame, that revision's pxl against yours |
 | `scripts/hashes.ts` | a hash of every asset of the files given (none: every example); `--vs <rev>`: what differs from that revision's pxl, `--frames` frame by frame, for an engine change that shouldn't move a pixel |
-| `scripts/vs.ts` | what `hashes.ts` and `perf.ts` share: a revision's `src/` and `examples/` unpacked once into the temp folder |
+| `scripts/vs.ts` | what `hashes.ts`, `perf.ts` and `served.ts` share: a revision's `src/` and `examples/` unpacked once into the temp folder |
+| `scripts/served.ts` | what the live viewer sends and holds for one asset (`--vs <rev>`: that revision's server first) |
+| `scripts/pulse.ts` | how many of an animation's normals turn from frame to frame on the parts that only moved |
 | `scripts/meter.ts` | preloaded into the tests, each test file's time, processor time and peak memory |
 | `scripts/cpuprofile.ts` | a CPU profile of any pxl command, summed by function |
 | `scripts/tokens.ts` | where a Claude Code session's tokens went, read from its transcript |

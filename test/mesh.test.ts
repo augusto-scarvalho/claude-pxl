@@ -1,7 +1,6 @@
 // mesh() as a stage: textured faces, sprites standing among them in one depth, contact shadows, and
 // faces that reach behind the eye. A level camera 1 m up, the horizon on row 10, 40 px of focal
 // length: a point z m ahead and u m up lands on row 10 + 40 (1 - u) / z.
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { failure, keys, PAL } from "./helpers.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -14,6 +13,9 @@ import { encodePng } from "../src/node/png.ts";
 import { type View, perspective, scaled } from "../src/core/perspective.ts";
 import { postAt } from "../src/core/post.ts";
 import { model, turnFaces, turnPoint } from "../src/core/mesh.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/mesh.test.ts");
 
 const STAGE = `ramps("kgw")
 const V = { w: 40, horizon: 10, eye: 1, focal: 40 }

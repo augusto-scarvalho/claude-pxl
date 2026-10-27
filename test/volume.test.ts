@@ -2,11 +2,13 @@
 // drawn as pixel art (thick inside, dithered where thin, in the palette; what glows marked), and through
 // a camera after a mesh(): hidden by what is nearer, over what is behind, its shadow and its glow on the
 // ground.
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { sdf } from "../src/core/sdf.ts";
 import { loadSource } from "../src/node/load.ts";
 import { keys, PAL } from "./helpers.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/volume.test.ts");
 
 const at = (phase: number) => ({ t: 0, phase, frame: 0, frames: 1 });
 test("density: from a shape, its edge eaten by seeded noise that flows and closes its loop, thinning away up", () => {

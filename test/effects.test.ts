@@ -2,7 +2,6 @@
 // strength changes nothing (RGBA), the same seed and frame give the same image (and seeking needs no
 // history), alpha stays straight over a light and a dark ground, edges, a sheet, and the exported
 // frames equal to what shot and the viewer show.
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,6 +13,9 @@ import { decodePng } from "../src/node/png.ts";
 import { decodeGif } from "../src/node/gifread.ts";
 import { shotFrame } from "../src/node/shot.ts";
 import type { Img } from "../src/core/image.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/effects.test.ts");
 
 const PALS = 'use("pico8"); pal({ k: 0, r: 8, w: 7, g: 11, y: 10, o: 9, h: "#ff004d80" }); ';
 // a sprite with a clear border, three colors, a lone pixel

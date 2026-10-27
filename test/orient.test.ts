@@ -1,4 +1,3 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,6 +7,9 @@ import { main } from "../src/node/cli.ts";
 import { orientWords } from "../src/core/describe.ts";
 import { figure } from "../src/core/rig.ts";
 import { PAL } from "./helpers.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/orient.test.ts");
 
 const describeOf = async (src: string, name: string, ...flags: string[]) => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");

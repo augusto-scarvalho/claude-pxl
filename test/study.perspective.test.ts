@@ -1,11 +1,13 @@
 // study's perspective: lines meeting on one horizon either side, a camera going forward. Apart from
 // study.test.ts so the two run side by side (the camera's clips take seconds).
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Img } from "../src/core/image.ts";
 import { pack } from "../src/core/color.ts";
 import { study } from "../src/core/study.ts";
 import { drawing } from "./helpers.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/study.perspective.test.ts");
 
 test("study: two-point perspective, its lens and its turn, from lines meeting on one horizon either side", () => {
   // a camera turned 40° with a 90° lens: the world's z lines meet at 26,70 and its x lines at 351,70

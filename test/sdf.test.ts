@@ -2,12 +2,14 @@
 // point inside within the bounds a renderer clips to, the four kinds kept apart; and surface(), the
 // field drawn as pixel art: what is inside opaque, outlined away from the light, the normals, the
 // views, and through a camera at mesh()'s depth with its shadow on the ground.
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Sdf, compile, fbm3, sdf } from "../src/core/sdf.ts";
 import { surfaceSize } from "../src/core/surface.ts";
 import { loadSource } from "../src/node/load.ts";
 import { failure, keys, PAL } from "./helpers.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/sdf.test.ts");
 
 const near = (a: number, b: number, e = 1e-9, what = "") => assert.ok(Math.abs(a - b) <= e, `${what} ${a} != ${b}`);
 const D = (f: Sdf, p: number[], clock?: Parameters<Sdf["dist"]>[1]) => f.dist(p, clock);

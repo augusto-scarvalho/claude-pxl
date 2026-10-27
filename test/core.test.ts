@@ -1,4 +1,3 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { art, failure, keys, PAL } from "./helpers.ts";
 import { perspective } from "../src/core/perspective.ts";
@@ -11,6 +10,9 @@ import { chain } from "../src/core/chain.ts";
 import { rotate } from "../src/core/rotate.ts";
 import { ik } from "../src/core/rig.ts";
 import { Img } from "../src/core/image.ts";
+import { whenChanged } from "./passed.ts";
+
+const test = whenChanged("test/core.test.ts");
 
 const eq = (a: string, b: string) => assert.equal(a, b);
 
