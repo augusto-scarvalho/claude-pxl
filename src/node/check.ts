@@ -161,7 +161,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, frozen: 0 };
   let lightSaid = false, groundSaid = false, fixes: CheckResult["fixes"], rulesAll = 0, rulesHeld = 0;
   const failed: string[] = [];
   // by default what the file itself defines (what it includes is checked where it's defined)
@@ -220,6 +220,15 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       }
       // the genre() it is made for: its checks on its frames (the height across directions is a family's, below)
       if (def.opts.genre !== undefined) lines.push(...genreLines(p, name, ran));
+      // a frozen cell against its live render: the engine or the recipe changed what it draws
+      if (def.live && !def.freeze) {
+        ran.frozen++;
+        const now = p.image(def.live);
+        if (now.hash() !== img.hash()) {
+          const n = now.w === img.w && now.h === img.h ? now.data.reduce((k, c, i) => k + +(c !== img.data[i]), 0) : -1;
+          lines.push(`${name} › WARNING: frozen: its live render '${def.live}' drifted from ${def.opts.png}: ${n < 0 ? `${now.w}x${now.h}, the frozen one ${img.w}x${img.h}` : `${n} px differ`}; look at both (pxl shot <file> ${name} ${def.live}); approved, delete the PNG and build to freeze it again`);
+        }
+      }
       if (!img.sockets?.front) continue;
       others++;
       const w = frontWords(img);
@@ -377,6 +386,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.lines) run.push(`lines on ${ran.lines}`);
   if (ran.boxes) run.push(`boxes on ${ran.boxes} frame${ran.boxes > 1 ? "s" : ""}`);
   if (ran.genre) run.push(`genres' checks on ${ran.genre} frame${ran.genre > 1 ? "s" : ""}`);
+  if (ran.frozen) run.push(`frozen cells against their live render on ${ran.frozen}`);
   if (ran.views) run.push(`views' rows on ${ran.views}`);
   if (ran.poses) run.push(`figures' feet on ${ran.poses} poses`);
   if (rigs) run.push(`rig parts ${ran.parts}`);

@@ -1,6 +1,6 @@
 // Loads art files (.js or .ts) into a Project by running them in a vm sandbox whose globals
 // are the DSL. Each load gets a fresh context, so reloading after an edit is clean.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import * as vm from "node:vm";
 import { stripTypeScriptTypes } from "node:module";
@@ -73,6 +73,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
     p.addFile(abs); // the live viewer rebuilds when it changes
     try { return decodePng(bytes); } catch (e) { throw new PxError(`${abs}: ${(e as Error).message}`); }
   };
+  p.whereHook = (path) => { const abs = near(path); return { abs, there: existsSync(abs) }; };
   p.readHook = (path) => {
     const abs = near(path);
     try {

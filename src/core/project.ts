@@ -14,7 +14,7 @@ import { VOLUME_OPTS } from "./volume.ts";
 import { SPLAT_OPTS, Splats, makeSplats } from "./splats.ts";
 import { scatter } from "./scatter.ts";
 import { DECAL_OPTS } from "./decal.ts";
-import { BUILDERS, type Built, defineBuilder } from "./builders.ts";
+import { BUILDERS, type Built, PX, defineBuilder } from "./builders.ts";
 import { DRAW3D_OPTS, type Rule, World, runExpects } from "./world3d.ts";
 import { checkExpect } from "./expect.ts";
 import type { Color } from "./color.ts";
@@ -86,6 +86,7 @@ export const SIGNATURES: Record<string, string> = {
   cast: "spell:o ?opts:o",
   shake: "spell:o",
   rampmap: "ramp:S ?opts:o",
+  foliage: "ramp:S ?opts:o",
   stamp: "name:s ?x:n y:Y opts:o",
   tile: "name:s x:n y:n ?cols:n rows:n opts:o",
   pattern: "name:s x:n y:n w:n h:n ?opts:o",
@@ -138,6 +139,7 @@ export const OP_OPTS: Record<string, string[]> = {
   arc: ["inner", "taper"],
   relight: ["light", "reach", "strength", "ramps", "glint"],
   rampmap: ["where", "hue"],
+  foliage: ["tufts", "step", "vary", "seed", "where"],
   bump: ["w", "depth", "on", "where", "shapeRadius", "shapeStrength", "shapeSoftness", "detailStrength", "detailScale"],
   lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "emitLight", "shape", "relief", "skyDir"],
   glow: ["where", "r", "strength", "color", "bands", "ramp", "keep"],
@@ -164,7 +166,7 @@ export const OP_OPTS: Record<string, string[]> = {
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "facing", "height", "twin", "register", "genre"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "frozen", "normals", "area", "key", "palettize", "shrink", "facing", "height", "twin", "register", "genre"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "floor", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "expect", "pixel", "sizes"],
   anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check", "genre"],
 };
@@ -332,6 +334,8 @@ export class Project implements BuildCtx {
   readHook?: (path: string) => string;
   /** Set by a loader to support { png } and use("x.png"): the decoded image, path relative to the art file. */
   pngHook?: (path: string) => Img;
+  /** Set by a loader for { frozen }: a path relative to the art file, absolute, and whether a file is there. */
+  whereHook?: (path: string) => { abs: string; there: boolean };
 
   /** The image an asset's { png, area } starts from. */
   private readPng(what: string, o: AssetOpts, loc?: string): Img {
@@ -516,8 +520,21 @@ export class Project implements BuildCtx {
       if (opts.genre !== undefined && (typeof opts.genre !== "string" || !opts.genre)) throw new PxError(`${kind} '${name}': genre names a genre() it is made for ("fighting"): pxl check runs that genre's checks on it, got ${JSON.stringify(opts.genre)}`, loc);
       if (opts.expect !== undefined) try { checkExpect(opts.expect, opts.world); } catch (e) { throw wrap(e).within(`${kind} '${name}'`, loc); }
       if (opts.normals !== undefined && opts.png === undefined) throw new PxError(`${kind} '${name}': normals is the normal map of its png: give png too`, loc);
+      // frozen: a render of another asset kept as its PNG (the build reads it; check renders the live one); none yet, that one's image, written by the build
+      let frozen = {};
+      if (opts.frozen !== undefined) {
+        const bad = Object.keys(opts).filter((k) => !["png", "frozen", "pivot", "sockets", "height", "genre", "facing"].includes(k));
+        if (kind !== "sprite" || typeof opts.frozen !== "string" || typeof opts.png !== "string" || items.length || bad.length)
+          throw new PxError(`${kind} '${name}': frozen names the asset its png is a render of: sprite("${name}", { png: "${name}.png", frozen: "_${name}_live" }) (a sprite, no items; with pivot, sockets, height, genre or facing at most${bad.length ? `, not ${bad.join(", ")}` : ""})`, loc);
+        const live = this.qualify(opts.frozen), of = this.assets.get(live), where = this.whereHook?.(opts.png);
+        if (!of) throw new PxError(`${kind} '${name}': frozen '${live}' is no asset defined before it (the live one its png is a render of)`, loc);
+        if (!where) throw new PxError(`${kind} '${name}': frozen needs an art file on disk`, loc);
+        opts.pivot ??= of.opts.pivot;
+        frozen = { live, ...(where.there ? {} : { freeze: where.abs }) };
+        if (!where.there) { delete opts.png; opts.base = live; }
+      }
       const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true), look3d = this.look3d, ns = this.ns ? { ns: this.ns } : {};
-      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, look3d, ...ns });
+      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, look3d, ...ns, ...frozen });
       this.order.push(name);
       // a scene's pixel: px to an art pixel; its sizes: the same scene k times as big under other names, not checked
       const whole = (k: unknown) => Number.isInteger(k) && (k as number) >= 1;
@@ -1135,6 +1152,8 @@ export class Project implements BuildCtx {
         m3[name as string] = make(name as string);
       } catch (e) { throw wrap(e).within("make3d.define", loc); }
     };
+    // make3d.px: texture in screen px (a cluster's px across, grain, marks apart, an edge, a leaf), what builders given a ppm hold to
+    m3.px = Object.freeze({ ...PX });
     env.make3d = m3;
     // world3d({ seed, wind, parts }): a scene of named parts (world3d.ts); world.edit({ "part.param": v }), world.changed(other)
     env.world3d = (spec: unknown) => {

@@ -25,7 +25,9 @@
 // - its sway: bent by the wind (`wind` m at its top) with the square of the height.
 // Each species is a spec: a new one is a dozen numbers. Any view, any heading (turnaround(), draw3d(),
 // a world's make). Parameters: height (m), seed, season, color, wind (declared: make3d refuses others,
-// and a season the species hasn't). Drawn in trees.mats (ramps of
+// and a season the species hasn't), ppm: the px to the meter it is drawn at, its texture then in screen
+// px (make3d.px's floors: a cluster at least 10 px across, fewer of them as they grow, the bumps'
+// grain 2 px; its form in meters as before; without it, as always). Drawn in trees.mats (ramps of
 // colors: no keys of a scene's taken) with trees.look, surface()'s options for foliage lit from the
 // side: turnaround("maple", make3d.momiji({ season: "autumn" }), { view: "side", ppm: 20, mats:
 // trees.mats, surface: trees.look }). trees.species holds the specs. A species of your own: its spec
@@ -36,10 +38,14 @@ const trees = {}
 // in a block: its names stay its own when a scene includes the file
 {
 // a species' parameters, for make3d.define: its seasons the ones it has leaves for, and bare
-const treeParams = (S) => ({ params: { height: [0.5, 40], season: [...Object.keys(S.leaves), "bare"], color: [0, 9], wind: [-2, 2] } })
-const growTree = (S, o = {}) => {
-  const { height = S.height, seed = 1, season = "summer", color = 0, wind = S.wind } = o
-  const { unit, add, mul } = vec, R = rng(seed), k = height / S.height, TAU = 2 * Math.PI
+const treeParams = (S) => ({ params: { height: [0.5, 40], season: [...Object.keys(S.leaves), "bare"], color: [0, 9], wind: [-2, 2], ppm: [1, 1000] } })
+const growTree = (S0, o = {}) => {
+  const { height = S0.height, seed = 1, season = "summer", color = 0, wind = S0.wind, ppm } = o
+  const { unit, add, mul } = vec, R = rng(seed), k = height / S0.height, TAU = 2 * Math.PI
+  // drawn at ppm: the clusters no smaller than make3d.px.cluster px across (fewer as they grow, the mass as
+  // full), the bumps' grain no finer than make3d.px.grain px
+  const M0 = S0.mass, cr = ppm && M0.cr ? Math.max(M0.cr, make3d.px.cluster / 2 / ppm / k) : M0.cr
+  const S = ppm ? { ...S0, mass: { ...M0, cr, clusters: M0.clusters && Math.max(1, Math.round(M0.clusters * (M0.cr / cr) ** 2)), grain: Math.max(M0.grain, make3d.px.grain / ppm / k) } } : S0
   const way = (az, el) => [Math.cos(az) * Math.cos(el), Math.sin(az) * Math.cos(el), Math.sin(el)]
   const wood = [], masses = [], tips = []
   // a limb from p along d, len m, thinning from r0 to r1, kinking as it goes: where it ends, its way

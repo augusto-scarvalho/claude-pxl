@@ -365,7 +365,7 @@ function grow(seed, { tall = 7, spread = 1, limbs = 4, depth = 3, side = [1, 0] 
   branch([lean[0], lean[1], trunk], norm([(r() - 0.5) * 0.3, (r() - 0.5) * 0.3, 1]), tall * 0.32, tr * 0.55, depth, true)
   return { wood, tips, trunk: { line, r: tr } }
 }
-function foliage(seed, tree, { size = 1, per = 6, reach = 0.85 }) {
+function crownLeaves(seed, tree, { size = 1, per = 6, reach = 0.85 }) {
   const r = rng(seed + 1), out = []
   for (const t of tree.tips) for (let i = 0; i < per; i++) {
     const o = norm([r() - 0.5, r() - 0.5, r() - 0.3]), d = Math.cbrt(r()) * reach
@@ -479,7 +479,7 @@ function paintTree(c, tx, tz, t, ramp, bark) {
 // a tree in the park: grown, painted where it stands; its limbs and leaf clusters cast its shadow
 function tree(x, z, { tall = 7, crown = 2.6, ipe = false, seed = 1, limbs = 4 } = {}) {
   const opts = { tall, spread: crown / 2.2, limbs, side: [COS, -SIN], ...(ipe ? { size: 0.65, per: 12, reach: 0.75 } : {}) }
-  const t = grow(seed, opts), f = foliage(seed, t, opts), body = { ...t, ...f }
+  const t = grow(seed, opts), f = crownLeaves(seed, t, opts), body = { ...t, ...f }
   const shapes = [...t.wood.map((w) => stick([x + w.a[0], z + w.a[1], w.a[2]], [x + w.b[0], z + w.b[1], w.b[2]], (w.r0 + w.r1) / 2, "m")),
     ...t.trunk.line.slice(1).map((b, i) => stick([x + t.trunk.line[i][0], z + t.trunk.line[i][1], t.trunk.line[i][2]], [x + b[0], z + b[1], b[2]], t.trunk.r, "m")),
     ...f.leaves.map((q) => blob([x + q.p[0], z + q.p[1], q.p[2]], q.size / 2, q.size / 2, "p", { ghost: true }))]
@@ -868,7 +868,7 @@ function treeline(c) {
   for (const [x, z, tall] of crowns) {
     const s = pxm(x, z), [cx, cy] = at(x, z, tall * 0.65)
     const seed = Math.round(x * 13 + z) & 0xffff, opts = { tall, spread: 1.3, depth: 2, size: 1.4, per: 4 }, t = grow(seed, opts)
-    paintTree(c, x, z, { ...t, ...foliage(seed, t, opts) }, "<<ST>", "<<<SST")
+    paintTree(c, x, z, { ...t, ...crownLeaves(seed, t, opts) }, "<<ST>", "<<<SST")
   }
 }
 // Clouds, drifting: two lanes of cumulus, the far one lower, smaller, flatter and slower. pxl's

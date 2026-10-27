@@ -35,6 +35,15 @@ export class Splats {
     }
     return this.n ? [lo, hi] : [[0, 0, 0], [0, 0, 0]];
   }
+  /** Each one where it stands on the field at rest (carried by the field's moves: a scatter's points are kept inside them), its normal, whether the sun reaches it, its material: a decal's `point` for each. */
+  points(): { p: V3; n: V3; sun: boolean; mat: string }[] {
+    const mv = this.move?.(STILL) ?? ((_: number, p: V3) => p);
+    return Array.from({ length: this.n }, (_, i) => {
+      const q: V3 = [this.pos[i * 3], this.pos[i * 3 + 1], this.pos[i * 3 + 2]], nn: V3 = [this.normal[i * 3], this.normal[i * 3 + 1], this.normal[i * 3 + 2]];
+      const p = mv(i, q), t = mv(i, [q[0] + nn[0] * 0.01, q[1] + nn[1] * 0.01, q[2] + nn[2] * 0.01]);
+      return { p, n: unit([t[0] - p[0], t[1] - p[1], t[2] - p[2]]), sun: this.sun[i] > 0, mat: this.mats[this.mat[i]] };
+    });
+  }
 }
 
 const unit = (v: number[]): V3 => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };

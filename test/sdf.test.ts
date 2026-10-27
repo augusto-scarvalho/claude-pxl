@@ -257,7 +257,9 @@ test("turnaround: a thing seen from N headings, named by the compass (an iso vie
   assert.deepEqual(headingsOf(4, undefined, true).map((h) => h.name), ["ne", "se", "sw", "nw"]);
   assert.deepEqual(headingsOf(4, undefined, false).map((h) => h.name), ["n", "e", "s", "w"]);
   assert.deepEqual(headingsOf(16, undefined, false).slice(0, 4).map((h) => h.name), ["n", "nne", "ne", "ene"]);
-  assert.deepEqual(headingsOf(12, undefined, false).slice(0, 2).map((h) => [h.name, h.deg]), [["0", 0], ["1", 30]]);
+  assert.deepEqual(headingsOf(12, undefined, false).slice(0, 2).map((h) => [h.name, h.deg]), [["n", 0], ["30", 30]]);
+  // off the compass, by its degrees: a heading keeps its name whatever is turned with it (steering -1..1)
+  assert.deepEqual(headingsOf(undefined, [168.75, "s", 191.25], false).map((h) => h.name), ["169", "s", "191"]);
   assert.deepEqual(headingsOf(undefined, ["s", 90], false).map((h) => [h.name, h.deg]), [["s", 180], ["e", 90]]);
   // a box with a nose at its front (-y), off its middle (no mirror), lit from the left; and one on its middle, lit from above
   const p = loadSource(PAL + `ramps("kgw")

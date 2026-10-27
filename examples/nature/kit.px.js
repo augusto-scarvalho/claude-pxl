@@ -115,7 +115,9 @@ sprite("_pine_far", { base: "_pine_m", swap: { Z: "#3b4260", z: "#405468", x: "#
 // a fifth with 0.35). Drawn by surface() from 20 degrees up at 24 px a meter, as a billboard is: the
 // sun behind on the left lighting its upper left edge (rim: 0.85), no self-shadow, no outline, the
 // needles in strokes along each branch, the hems hanging in points; the normals the surfaces really
-// have, so mesh()'s sun lights it as it is. h: its height in px.
+// have, so mesh()'s sun lights it as it is. h: its height in px. ppm: drawn at that many px to the meter
+// instead (turnaround(..., { ppm })): its clumps as many px across on the picture as at 24, more of them
+// round each tier (texture in screen px; its tiers and reach stay relative to it).
 const fromPx = ([x, y, z]) => [x / 24, -z / 24, y / 24]
 // an ellipsoid of radii rr along the ways e1 and e2 (and their cross), at C: one turn about an axis takes it there
 const ellipsoidAlong = (rr, e1, e2, C) => {
@@ -124,13 +126,13 @@ const ellipsoidAlong = (rr, e1, e2, C) => {
   if (Math.hypot(...ax) < 1e-6) ax = th < 0.1 ? [0, 0, 1] : [[a[0] + 1, a[1], a[2]], [b[0], b[1] + 1, b[2]], [c[0], c[1], c[2] + 1]].sort((u, v) => Math.hypot(...v) - Math.hypot(...u))[0]
   return sdf.ellipsoid(rr).rotate((th * 180) / Math.PI, ax).at(C)
 }
-make3d.define("spruce", ({ h = 68, seed = 3, sway = 1.6, flutter = 0 }) => {
+make3d.define("spruce", ({ h = 68, seed = 3, sway = 1.6, flutter = 0, ppm = 24 }) => {
   const P = (20 * Math.PI) / 180, CP = Math.cos(P), Hw = (h - 1.5) / CP, y0 = 0.17 * Hw, T = Math.max(4, Math.round(h / 12)), Rmax = 19, { unit } = vec
   const r = rng(seed), clumps = [], cores = []
   for (let t = 0; t < T; t++) {
     const f = t / T, sp = ((Hw * 0.84 - y0) * 0.95) / T, yb = y0 + sp * t, th = sp * 1.3, R = 3.5 + (Rmax - 3.5) * Math.pow(1 - f, 1.1)
     cores.push(sdf.ellipsoid([R * (0.45 - 0.15 * f), R * (0.45 - 0.15 * f), th * 0.55].map((v) => v / 24)).at(0, 0, (yb + th * 0.5) / 24))
-    const K = Math.round(5 + R / 2.4), a0 = r() * 6.28
+    const K = Math.max(3, Math.round((5 + R / 2.4) * (ppm / 24))), a0 = r() * 6.28
     for (let k = 0; k < K; k++) {
       const a = a0 + (k * 6.28) / K + (r() - 0.5) * 0.4, out = [Math.sin(a), 0, Math.cos(a)], rho = R * (0.5 + r() * 0.08), flick = r() * 6.28
       const droop = 0.5 + 0.8 * f * f + r() * 0.15, C = fromPx([out[0] * rho, yb + th * 0.32 - droop * rho * 0.3, out[2] * rho])
@@ -143,7 +145,7 @@ make3d.define("spruce", ({ h = 68, seed = 3, sway = 1.6, flutter = 0 }) => {
   const crown = sdf.union([...cores, ...clumps]).mat("needles"), trunk = sdf.cone(1.7 / 24, (Hw * 0.8) / 24, 0.98 / 24).union(sdf.cylinder(2.7 / 24, 1.5 / 24)).mat("bark")
   const H = Hw / 24, bend = (c) => (2 * (sway / 24) * (0.45 + 0.55 * Math.sin(2 * Math.PI * c.phase))) / (H * H)
   return { field: trunk.part("trunk").union(crown.part("crown")).bend(bend), parts: { trunk, crown } }
-}, { params: { h: [20, 160], sway: [0, 6], flutter: [0, 2] } })
+}, { params: { h: [20, 160], sway: [0, 6], flutter: [0, 2], ppm: [4, 400] } })
 // (`look`: surface()'s options over these, a light and mats of your own)
 const spruce = (name, h, seed, { frames = 16, fps = 1000 / 220, ...look } = {}) => {
   const W = 42, ST = make3d.spruce({ h, seed })

@@ -616,6 +616,46 @@ export class Canvas {
   }
 
   /**
+   * A foliage brush in screen px (the library lab's 128 px leaves): hand-drawn tufts of steps along
+   * `ramp` (+ a tone lighter, = as it is, - darker, . nothing), each pixel stepped from the tone already
+   * there, so the tufts keep the light and shadow drawn under them (a surface()'s). Laid in rows from the
+   * top, about `step` [across, down] px apart, the lower over the upper like shingles; none where the
+   * tone is the ramp's darkest (the crown's holes stay calm) or off the ramp; past its edge a tuft's top
+   * half steps from the tone at its middle, so the silhouette breaks into scallops. The tufts (five sizes
+   * by default) are picked at random; `vary` 0..1: how far each gap and place strays from the even rows,
+   * and the tufts flipped (0: the lab's rows, regular as bubble wrap).
+   */
+  foliage(ramp: string | string[], opts: { tufts?: string[]; step?: number[]; vary?: number; seed?: number; where?: Region } = {}): void {
+    const keys = [...(Array.isArray(ramp) ? ramp.join("") : ramp)], cols = keys.map((k) => this.color(k));
+    if (keys.length < 2 || cols.some((c) => c === null || c === TRANSPARENT)) throw new PxError(`foliage: ramp is two or more keys dark to light ("12345"), got ${JSON.stringify(ramp)}`);
+    const { step = [7, 4], vary = 0.5, seed = 1 } = opts;
+    if (!(Array.isArray(step) && step.length === 2 && step.every((v) => v >= 1)) || !(vary >= 0 && vary <= 1)) throw new PxError(`foliage: step is [across, down] px apart (1 up), vary 0..1, got ${JSON.stringify({ step, vary })}`);
+    // each tuft: its cells [dx, dy, step] round its anchor (the middle of its width, its upper middle)
+    if (!(opts.tufts === undefined || (Array.isArray(opts.tufts) && opts.tufts.length && opts.tufts.every((g) => typeof g === "string")))) throw new PxError("foliage: tufts is a list of grids of + = - .");
+    const tufts = (opts.tufts ?? TUFTS).map((g) => {
+      const rows = gridRows(g), cells: number[][] = [];
+      rows.forEach((row, y) => [...row].forEach((ch, x) => { const v = { "+": 1, "=": 0, "-": -1 }[ch]; if (v !== undefined) cells.push([x - (row.length >> 1), y - ((rows.length - 1) >> 1), v]); else if (ch !== ".") throw new PxError(`foliage: a tuft is drawn in + (a tone up), = (as it is), - (down) and . (nothing), got '${ch}'`); }));
+      return cells;
+    });
+    const at = new Map(cols.map((c, i) => [c as Color, i])), ok = regionPred(opts.where), W = this.img.w, H = this.img.h, x0 = -this.ox, y0 = -this.oy;
+    // the tones under it, read once: every tuft steps from what was drawn, not from the tufts before it
+    const under = new Int8Array(W * H).fill(-1);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (ok(x + x0, y + y0)) under[y * W + x] = at.get(this.get(x + x0, y + y0)) ?? -1;
+    const tone = (x: number, y: number) => (x < x0 || y < y0 || x >= x0 + W || y >= y0 + H ? -1 : under[(y - y0) * W + x - x0]);
+    const r = this.rng(seed), off = () => (r() * 2 - 1) * vary, n = tufts.length;
+    for (let y = y0, row = 0; y < y0 + H; y += Math.max(1, Math.round(step[1] * (1 + 0.5 * off()))), row++)
+      for (let x = x0 + (row % 2 ? step[0] >> 1 : 0); x < x0 + W; x += Math.max(2, Math.round(step[0] * (1 + off())))) {
+        const tx = x + Math.round(off() * step[0] * 0.5), ty = y + Math.round(off() * step[1] * 0.5), mid = tone(tx, ty);
+        const cells = tufts[Math.floor(r() * n)], flip = vary > 0 && r() < 0.5;
+        if (mid < 1) continue;
+        for (const [dx, dy, s] of cells) {
+          const px = tx + (flip ? -dx : dx), py = ty + dy, u = tone(px, py), base = u >= 0 ? u : dy <= 0 && s >= 0 ? mid : -1;
+          if (base >= 0) this.plot(px, py, cols[Math.max(0, Math.min(keys.length - 1, base + s))]!);
+        }
+      }
+  }
+
+  /**
    * Flat ground seen in perspective: fn(x, z) gives the color of the ground point seen through each
    * pixel under the horizon ("." or nothing leaves it). `view` is a perspective() or its { horizon,
    * eye, fov | focal, vp, yaw, pitch }; the width defaults to this canvas's. Stripes in x recede into the
@@ -2021,10 +2061,40 @@ export function frameStart(tl: Timeline, n: number): number {
   return t;
 }
 
+/** foliage()'s tufts by default, small to big: the library lab's three and two more (+ up, = as it is, - down). */
+const TUFTS = [`
+  .++.
+  +==-
+  .--.`, `
+  ..++...
+  .+==+..
+  +====-.
+  .-===-.
+  ..---..`, `
+  ...+++...
+  .++===+..
+  +=======-
+  +======--
+  .-====--.
+  ..----...`, `
+  ..+++.....
+  .+===++...
+  +=======+.
+  +========-
+  .-======-.
+  ..------..`, `
+  ....+++.....
+  ..++===++...
+  .+=======+..
+  +=========+-
+  +==========-
+  .-========-.
+  ..--------..`];
+
 /** Ops callable from art files; each top-level call can be traced as one painting step. */
 export const OPS = [
   "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
-  "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "warp", "effect",
+  "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "foliage", "warp", "effect",
   "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "bubble", "cells", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "voxels", "volume", "splats", "decal", "draw3d", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
 ] as const;
 export type OpName = (typeof OPS)[number];

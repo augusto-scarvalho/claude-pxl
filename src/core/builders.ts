@@ -48,11 +48,14 @@ export const partSeed = (seed: number, part: string) => hash(seed, [...part].red
  * kinking (`twist`), a canopy of lobes at their tips melted with noise (`canopy`: how full, 1 as it
  * is drawn in the kit, more lobes and bigger past it), `leaves` leaf clusters to a square meter on it (0
  * none), swaying in the `wind` (m at its top; [x, y] a direction: [-0.2, 0] blows to the left).
+ * `ppm`: the px to the meter it is drawn at, so its texture is set in screen px there (PX's floors: the
+ * crown's grain no finer than 2 px, a leaf a 3 px brush at every density, none nearer than 10 px to the
+ * next); its form stays in meters. Without it, the meters it always had.
  */
 export function tree(p: P = {}): Built {
   const who = "make3d.tree";
-  known(p, ["height", "limbs", "twist", "lobe", "canopy", "leaves", "wind", "seed"], who);
-  const height = n(p, "height", 4.4, who), limbs = n(p, "limbs", 3, who, 1, 8), twist = n(p, "twist", 0.35, who, 0, 1.5), lobe = n(p, "lobe", 0.9, who), canopy = n(p, "canopy", 1, who, 0.5, 3), leavesN = n(p, "leaves", 0, who, 0, 200), seed = n(p, "seed", 7, who);
+  known(p, ["height", "limbs", "twist", "lobe", "canopy", "leaves", "wind", "seed", "ppm"], who);
+  const height = n(p, "height", 4.4, who), limbs = n(p, "limbs", 3, who, 1, 8), twist = n(p, "twist", 0.35, who, 0, 1.5), lobe = n(p, "lobe", 0.9, who), canopy = n(p, "canopy", 1, who, 0.5, 3), leavesN = n(p, "leaves", 0, who, 0, 200), seed = n(p, "seed", 7, who), ppm = p.ppm === undefined ? undefined : n(p, "ppm", 16, who, 1, 1000);
   const wind = p.wind ?? 0.2;
   if (!(typeof wind === "number" || (Array.isArray(wind) && wind.length === 2 && wind.every(Number.isFinite)))) throw new PxError(`${who}: wind is m at its top, or [x, y], got ${JSON.stringify(wind)}`);
   const R = rng(seed), H = height / 4.4, fork: V3 = [0, 0, 1.6 * H], wood: Sdf[] = [], lobes: Sdf[] = [];
@@ -84,7 +87,7 @@ export function tree(p: P = {}): Built {
       lobes.push(sdf.ellipsoid([r, r, r * 0.8]).at((c: Clock) => [Math.cos(a) * rr + 0.05 * Math.sin(TAU * (2 * c.phase + ph)), Math.sin(a) * rr, z]));
     }
   }
-  const crown = sdf.union(lobes, { smooth: 0.15 }).noise({ amp: 0.14, scale: 0.45, seed, octaves: 1 });
+  const crown = sdf.union(lobes, { smooth: 0.15 }).noise({ amp: 0.14, scale: ppm ? Math.max(0.45, PX.grain / ppm) : 0.45, seed, octaves: 1 });
   // the wind: the top `wind` m over at the gust, half that between
   const k = (w: number) => (c: Clock) => (2 * w * (0.45 + 0.55 * Math.sin(TAU * c.phase))) / (height * height);
   const field = sdf.union(wood, { smooth: 0.08 }).mat("bark").union(crown.mat("leaf").part("canopy"))
@@ -92,9 +95,19 @@ export function tree(p: P = {}): Built {
   return {
     field, windy: true, decals: {}, sockets: { top },
     parts: { trunk: trunk.mat("bark"), branches: sdf.union(branches).mat("bark"), canopy: crown.mat("leaf") },
-    details: leavesN > 0 ? { leaves: { on: "leaf", count: leavesN, brush: "cluster", size: 0.1, vary: 0, seed: partSeed(seed, "leaves"), flutter: 0.03 } } : {},
+    details: leavesN > 0 ? { leaves: { on: "leaf", ...leafPx(leavesN, 0.1, ppm), brush: "cluster", vary: 0, seed: partSeed(seed, "leaves"), flutter: 0.03 } } : {},
   };
 }
+
+/**
+ * Texture in screen px, F0's floors measured on the library lab's trees (form stays relative to the
+ * thing): a cluster or lobe at least ~10 px across, grain 2 px, marks (strokes, leaves) 4 px apart, an
+ * edge 2 px, a leaf a `leaf` px brush.
+ */
+export const PX = { cluster: 10, grain: 2, every: 4, edge: 2, leaf: 3 };
+// leaves `count` to a square meter, `size` m: drawn at `ppm`, each a PX.leaf px brush, none nearer than PX.cluster px (4 px apart
+// carpeted the crown: 7% specks at 32 px a tile, 5% at 10)
+const leafPx = (count: number, size: number, ppm: number | undefined) => (ppm ? { count: Math.min(count, (ppm / PX.cluster) ** 2), size: PX.leaf / ppm } : { count, size });
 
 // the wind as a bend: the top `w` m over at the gust, half that between ([x, y]: a direction)
 const windBend = (wind: unknown, height: number, who: string) => {
@@ -126,11 +139,11 @@ export function pine(p: P = {}): Built {
   };
 }
 
-/** A bush: a few lumps of leaves melted together, `size` m across (0.9), `leaves` clusters to a square meter on it (0 none), swaying a little in the `wind`. */
+/** A bush: a few lumps of leaves melted together, `size` m across (0.9), `leaves` clusters to a square meter on it (0 none), swaying a little in the `wind`; `ppm` as the tree's. */
 export function bush(p: P = {}): Built {
   const who = "make3d.bush";
-  known(p, ["size", "leaves", "wind", "seed"], who);
-  const size = n(p, "size", 0.9, who, 0.2, 4), leavesN = n(p, "leaves", 0, who, 0, 200), seed = n(p, "seed", 4, who), R = rng(seed);
+  known(p, ["size", "leaves", "wind", "seed", "ppm"], who);
+  const size = n(p, "size", 0.9, who, 0.2, 4), leavesN = n(p, "leaves", 0, who, 0, 200), seed = n(p, "seed", 4, who), R = rng(seed), ppm = p.ppm === undefined ? undefined : n(p, "ppm", 16, who, 1, 1000);
   const lumps = Array.from({ length: 4 }, (_, k) => {
     const a = (k * TAU) / 4 + R() * 0.8, d = k ? size * (0.22 + R() * 0.1) : 0, r = size * (k ? 0.3 + R() * 0.08 : 0.4);
     return sdf.ellipsoid([r, r, r * 0.85]).at(Math.cos(a) * d, Math.sin(a) * d, r * 0.75);
@@ -139,7 +152,7 @@ export function bush(p: P = {}): Built {
   return {
     field: crown.part("crown").bend(windBend(p.wind ?? 0.05, size, who)), windy: true, decals: {}, sockets: { top: [0, 0, size * 0.75 + size * 0.4] },
     parts: { crown },
-    details: leavesN > 0 ? { leaves: { on: "leaf", count: leavesN, brush: "cluster", size: 0.08, vary: 0, seed: partSeed(seed, "leaves"), flutter: 0.02 } } : {},
+    details: leavesN > 0 ? { leaves: { on: "leaf", ...leafPx(leavesN, 0.08, ppm), brush: "cluster", vary: 0, seed: partSeed(seed, "leaves"), flutter: 0.02 } } : {},
   };
 }
 

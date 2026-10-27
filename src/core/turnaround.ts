@@ -15,8 +15,8 @@ export const COMPASS = ["n", "nne", "ne", "ene", "e", "ese", "se", "sse", "s", "
 
 /**
  * The headings: n of them from "n" (an iso view's 4 its diagonals, ne se sw nw: one to a quarter of its
- * grid), or those named (compass names or degrees). Named by the compass when every one is on it, else
- * by their index, as directions() names its sprites.
+ * grid), or those named (compass names or degrees). Each named by the compass when it is on it, else by
+ * its degrees, rounded ("338"), so a heading keeps its name whatever else is turned with it.
  */
 export function headingsOf(n: unknown, headings: unknown, iso: boolean): { deg: number; name: string }[] {
   let degs: number[];
@@ -33,8 +33,9 @@ export function headingsOf(n: unknown, headings: unknown, iso: boolean): { deg: 
     degs = Array.from({ length: k }, (_, i) => ((i * 360) / k + off) % 360);
   }
   if (new Set(degs).size !== degs.length) throw new PxError(`turnaround: a heading given twice, got ${JSON.stringify(headings)}`);
-  const compass = degs.every((d) => Math.abs(d / 22.5 - Math.round(d / 22.5)) < 1e-9);
-  return degs.map((deg, i) => ({ deg, name: compass ? COMPASS[Math.round(deg / 22.5) % 16] : String(i) }));
+  const H = degs.map((deg) => ({ deg, name: Math.abs(deg / 22.5 - Math.round(deg / 22.5)) < 1e-9 ? COMPASS[Math.round(deg / 22.5) % 16] : String(Math.round(deg) % 360) }));
+  if (new Set(H.map((h) => h.name)).size !== H.length) throw new PxError(`turnaround: two headings would be named alike (${H.map((h) => h.name).join(", ")}): a degree or more apart`);
+  return H;
 }
 
 /** Is the field its own mirror across its front-to-back plane (x = 0), distances and materials, at each of these moments? */

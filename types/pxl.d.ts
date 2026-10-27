@@ -100,6 +100,8 @@ declare global {
     wrap?: boolean | "x" | "y";
     /** Start from a PNG file (relative to the art file); anims with frames split it into a strip. */
     png?: string; area?: [number, number, number, number]; palettize?: boolean;
+    /** With png: a frozen cell, the png a render of this (live) asset: the build reads the PNG, pxl check warns when the live render drifted; no PNG yet, the build writes it. */
+    frozen?: string;
     /** With png: this "#rrggbb" read as clear, before area, shrink and palettize (a ripped sheet's cell fill). */
     key?: string;
     /** With png: its normal map, a PNG laid out as it (green up: pxl's _n.png, Sprite Fusion's), read as data; an anim's frames from the same rectangles. */
@@ -310,6 +312,10 @@ declare global {
     part?: string;
     /** a pixel artist's pass before its lines: no black run 2 px thick, the outline whole, a pixel sticking out cut away */
     clean?: boolean;
+    /** a line of this key all round outside it, a px wide (the sprite needs the room) */
+    ink?: PxColor;
+    /** each material's ramp cut to this many tones, its darkest and lightest kept (a genre's tones at a density) */
+    tones?: number;
   }
   /** A density's options: its soft edge (m), the noise eating it (m, billows scale m across, octaves), carried flow m over the loop, thinned away up from fade [z0, z1]. */
   interface PxDensityOpts { edge?: number; noise?: PxNum; scale?: PxNum; seed?: number; octaves?: number; flow?: PxVec; fade?: [number, number] }
@@ -321,7 +327,9 @@ declare global {
     emit?: { ramp: string | PxColor[]; strength?: number; glow?: number }; blend?: "dither" | "alpha"; pixel?: number; cast?: number; part?: string;
   }
   /** Gaussian splats: how many, their box. */
-  interface PxSplats { readonly kind: "splats"; readonly n: number; bounds(): [PxV3, PxV3] }
+  interface PxSplats { readonly kind: "splats"; readonly n: number; bounds(): [PxV3, PxV3];
+    /** each where it stands on the field at rest (its moves applied), its normal, sun, material: a decal's point for each */
+    points(): { p: PxV3; n: PxV3; sun: boolean; mat: string }[] }
   /** splats()'s options: made here from a field or density (spacing, size, seed), the view, materials' ramps or one ramp, the light, dither/cut/alpha where thin, the outline, a cell of K x K px. */
   interface PxSplatOpts {
     spacing?: number; size?: number; seed?: number; view?: PxSurfaceView; ppm?: number; at?: number[];
@@ -334,7 +342,8 @@ declare global {
   }
   /** decal()'s options: the field it lies on, where (its rest frame), its up, pin or wrap, its size, other views, lit or glowing, the view as surface()'s, its part. */
   interface PxDecalOpts {
-    on: PxSdf; point: number[]; up?: number[]; mode?: "pin" | "wrap"; size?: number; views?: { three?: string; profile?: string }; lit?: boolean;
+    /** size: m across, or "px" (a texel to a px where it lies); lit: stepped by the light (true), as drawn and glowing (false), or "surface" (steps from the tone surface() left under it); glow: marked as giving light (default with lit false) */
+    on: PxSdf; point: number[]; up?: number[]; mode?: "pin" | "wrap"; size?: number | "px"; views?: { three?: string; profile?: string }; lit?: boolean | "surface"; glow?: boolean;
     /** pin: m in front of or behind its point what is drawn under a texel may lie and still take it (default its own width) */
     depth?: number;
     view?: PxSurfaceView; ppm?: number; at?: number[]; pixel?: number; light?: number[] | "view"; part?: string;
@@ -666,6 +675,8 @@ declare global {
     relight(where?: PxRegion, opts?: PxRelight): void;
     /** Gradient map: the region's colors, dark to light, take the ramp's keys in order (hue: only colors of that hue). */
     rampmap(ramp: string | string[], opts?: { where?: PxRegion; hue?: [number, number] }): void;
+    /** Leaves in screen px over what is drawn: tufts of + = - steps along the ramp, from the tone already there, in rows `step` px apart, `vary` 0..1 their gaps and sizes. */
+    foliage(ramp: string | string[], opts?: PxFoliageOpts): void;
     /** Move pixels by whole-pixel offsets: fn(x, y) gives [dx, dy] at a pixel's new place; it takes the color (dx, dy) behind it. */
     warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): void;
     /** A shader's effect on what the canvas holds so far, in place, on its clock and seed: dissolve, pixelate, dither, tint, distort, sway, emit. */
@@ -914,10 +925,12 @@ declare global {
   function world3d(spec: { seed?: number; wind?: { from?: "left" | "right" | "front" | "behind"; strength?: number }; parts: Record<string, PxPartSpec> }): PxWorld;
   /** Rules over a world's loop, run by pxl check. */
   function expect3d(name: string, world: PxWorld, rules: PxRule[], opts?: { frames?: number; ms?: number }): void;
-  /** Builders with semantic parameters: make3d.tree({ canopy, twist, leaves, wind }), pine({ height, tiers, girth, snow }), bush({ size, leaves }), rock({ moss }), house({ snow, door, window, sign }), crystal({ rune, moss }), mist({ color }), smoke(). */
+  /** Builders with semantic parameters: make3d.tree({ canopy, twist, leaves, wind, ppm }), pine({ height, tiers, girth, snow }), bush({ size, leaves, ppm }), rock({ moss }), house({ snow, door, window, sign }), crystal({ rune, moss }), mist({ color }), smoke(); ppm: the px to the meter it is drawn at, its texture then in screen px (make3d.px's floors). */
   const make3d: Record<"tree" | "pine" | "bush" | "rock" | "house" | "crystal" | "mist" | "smoke" | (string & {}), (params?: Record<string, unknown>) => PxBuilt> & {
     /** A builder of the file's own: fn(params) returns { field } or { density, look } (and parts, details, decals, sockets); params: a number's range [lo, hi] or a word's list, refused outside it; wind: it sways. */
     define(name: string, fn: (params: Record<string, any>) => Partial<PxBuilt>, opts?: { params?: Record<string, [number, number] | string[]>; wind?: boolean }): void;
+    /** texture in screen px, what a builder given its ppm holds to: a cluster's px across, grain, marks apart, an edge, a leaf's brush */
+    readonly px: { readonly cluster: number; readonly grain: number; readonly every: number; readonly edge: number; readonly leaf: number };
   };
   /** The light and materials the 3D ops take when a call doesn't give them (mesh()'s light; surface, voxels, volume, splats, decal, draw3d, export3d), for the assets defined after it, as pal() and ramps() are. */
   function look3d(o: { light?: PxV3; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number }> }): void;
@@ -1016,6 +1029,10 @@ declare global {
   function relight(where?: PxRegion, opts?: PxRelight): PxOp;
   /** Gradient map onto a ramp: colors sorted dark to light take its keys in order, so imported tones never merge (hue: [from, to] picks colors). */
   function rampmap(ramp: string | string[], opts?: { where?: PxRegion; hue?: [number, number] }): PxOp;
+  /** foliage()'s options: hand-drawn tufts (grids of + up, = as is, - down, . nothing), [across, down] px apart, how far gaps and sizes vary (0..1), a seed, a region. */
+  interface PxFoliageOpts { tufts?: string[]; step?: [number, number]; vary?: number; seed?: number; where?: PxRegion }
+  /** Leaves in screen px over what is drawn (a 3D crown, a frozen cell), each tuft stepping the tones already there. */
+  function foliage(ramp: string | string[], opts?: PxFoliageOpts): PxOp;
   /** Move pixels by whole-pixel offsets (breathing, hair and tails swaying, a body on a slope): fn(x, y) gives [dx, dy] at a pixel's new place. */
   function warp(fn: (x: number, y: number) => [number, number] | null | undefined | false | 0, where?: PxRegion): PxOp;
   /** A shader's effect on everything drawn before it (a sprite, an anim's frame, a layer), on the clock and a seed: dissolve, pixelate, dither, tint, distort, sway, emit. */

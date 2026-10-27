@@ -99,6 +99,8 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         const wr = def.opts.wrap, art = b.guide ?? b.img;
         shown = wr ? tiled(art, wr === "y" ? 1 : 3, wr === "x" ? 1 : 3) : art;
         writePng(join(out, dir, n + ".png"), b.img);
+        // a frozen cell with no PNG yet: its live render, written where it is read from next time
+        if (def.freeze) { writePng(def.freeze, b.img); info += ` (frozen: wrote ${def.freeze})`; }
         if (b.img.norm) writeMap(def.kind, n, dir, "_n", () => normalImage(b.img), def.loc); // for engine lights
         if (glows(b.img)) writeMap(def.kind, n, dir, "_e", () => emitImage(b.img), def.loc);
       }

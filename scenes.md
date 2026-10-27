@@ -889,7 +889,10 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn
   stays a texel to a pixel in any camera. Put it where the camera sees it: through a camera 40 degrees
   down, a mushroom cap with a 1.3 m rim hid everything on its 0.6 m stem above about 0.85 m (the
   sign and the window were moved down to the door). Something glowing needs a hue apart from what it
-  lies on (a white rune on a pale crystal vanished; gold reads).
+  lies on (a white rune on a pale crystal vanished; gold reads). Marks that must agree with the form
+  (moss, an emblem on a hull in sun and shade): `lit: "surface"`, each texel stepped from the tone the
+  surface left under it; many of them at `sdf.scatter(...).points()`. Leaves are a brush, not decals
+  (`foliage()`: a decal clump in steps still reads as a dot, environment §3).
 - **Voxels: the cell is a choice of look.** On the iso pixel grid at 16 px to the meter a 0.25 m cell
   is a cube 8 px wide, 0.125 m 4 px, 0.0625 m 2 px; things of different cells can share a world. A
   limb thinner than a cell is kept as a line of cells by `fill` 0.5, else it vanishes. A big block
@@ -984,3 +987,7 @@ rig3d("hero", { body: { h: TOPDOWN.scale.character[0] * TOPDOWN.grid, heads: TOP
   heading, `turnaround()` gives it), never one ground line for all.
 - **Colors by role:** the model and the hand-drawn sprites name roles (`primary`, `accent`, `skin`);
   a livery or a slot gives the roles other colors: `mats` in 3D, `roleSwap()` in 2D.
+- **The style by density** stays notes the file reads: the tones (`surface: { tones: 3 }` at 16-32 px),
+  the outline all round (`surface: { ink: "k" }`, a turnaround's every heading in one pass), a builder's
+  texture in screen px (`make3d.oak({ ppm })`, environment §3). An approved cell is frozen (`frozen`):
+  pxl check says when the live render drifts from it.

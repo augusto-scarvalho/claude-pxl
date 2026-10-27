@@ -59,7 +59,8 @@ export function bodyOf(spec: Record<string, unknown> = {}): Body {
   const r = { leg: [1.6 * k, 1.5 * k, 1.4 * k] as V3, arm: [1.1 * k, 1 * k, 0.9 * k] as V3, body: [3.6 * k, 3.9 * k] as [number, number], head: headR, hand: k, foot: [1.6 * k, 2.3 * k, 1.1 * k] as V3, ...(spec.r as object) };
   const B: Body = {
     hip, torso: chest - hip, neck: h - headR - chest, thigh: hip - knee, shin: knee - ankle, upper: (chest - 1 - wrist) / 2, fore: (chest - 1 - wrist) / 2, ankle,
-    hips: Math.max(r.leg[0], F.hipW / 2 - r.leg[0]), shoulders: [0, Math.max(r.arm[0] + 1, F.shoulderW / 2 - r.arm[0]), -1], r,
+    // (the arms against the body, never out past it: at few heads figure()'s shoulders are wider than its torso)
+    hips: Math.max(r.leg[0], F.hipW / 2 - r.leg[0]), shoulders: [0, Math.max(r.arm[0] + 1, Math.min(F.shoulderW / 2 - r.arm[0], r.body[1] + r.arm[0])), -1], r,
   };
   for (const key of BODY_KEYS.slice(2, -1)) if (spec[key] !== undefined) (B as unknown as Record<string, unknown>)[key] = spec[key];
   for (const key of ["hip", "torso", "neck", "thigh", "shin", "upper", "fore", "ankle", "hips"] as const) if (!(Number.isFinite(B[key]) && B[key] >= 0)) throw new PxError(`rig3d: body's ${key} is a length in px, got ${JSON.stringify(B[key])}`);

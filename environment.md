@@ -136,6 +136,16 @@ round it.
   third order), and its curtain closed with strands as thick as the clusters (a third as thick: the
   trunk shows); a birch's white twigs vanished against a light ground (marked dark out from the
   trunk); coconuts hid in the fronds until hung lower; a tree lit from one side is never flipped.
+- One tree at every density (the library lab, a tree 2.5 tiles tall on a 16 to 128 px grid): its form
+  relative to it (tiers, clusters, width over height), its texture in screen px. Give the builder the
+  `ppm` it is drawn at (`make3d.oak({ ppm })` and the species, `make3d.tree({ ppm })`, the kit's
+  `make3d.spruce({ ppm })`): it holds `make3d.px`'s floors, a cluster 10 px across or more, grain 2 px,
+  marks 4 px apart, an edge 2 px. The tones are the genre's: `surface: { tones: 3 }` at 16-32 px.
+  Specks (the share of pixels in runs of one tone 1-2 px big) at a 16 px grid: the oak 3.8% as built,
+  1.7% with its ppm, 1.3% with 3 tones as well; the spruce 21%, 6%. At 128 px nothing set in meters
+  reads as leaves: `foliage()` over the crown, hand-drawn tufts in steps from the tones under them,
+  their gaps and sizes varied (`vary`); freeze the 3D render first (`frozen`) and the brush iterates
+  in a second instead of a minute and a half.
 - A trunk darker than the crown, planted: seen from above, cut at the ground (SLYNYRD); seen from
   the side or at an angle, its foot flared 2-3 px with a root or two. Bark in 1 px stripes, widest
   apart in the middle; a knot. Laying top-down crowns from one clump, importing trees: scenes §4.

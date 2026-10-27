@@ -42,6 +42,10 @@ export interface SurfaceOpts {
   light?: number[];
   /** the contour away from the light: true (each material's darkest), a key, or false */
   outline?: boolean | string;
+  /** a line of this key all round outside what it draws, a px wide (the sprite needs the room: turnaround's pad) */
+  ink?: string;
+  /** each material's ramp cut to this many tones, spread from its darkest to its lightest (a genre's tones at a density: 3 at 16-32 px) */
+  tones?: number;
   /** a line where one part lies in front of another, on the one behind (each part outlined against the others, as a figure's limbs): a key, or true (the outline's); between pieces of one part (`.part()`s inside it: locks of hair) its own darkest tone */
   inner?: boolean | string;
   /** the contour toward the light a step lighter (default true); a number: where it is open both ways the light comes from (across and up or down), at least that share up its ramp (0..1: a sun behind lighting its edge, 0.85) */
@@ -65,7 +69,7 @@ export interface SurfaceOpts {
   /** (light: "mesh": the light of the mesh() drawn before it, on what it draws as on mesh()'s sprites) */
   world?: Lit;
 }
-export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "soft", "outline", "inner", "rim", "shadows", "ao", "pixel", "cast", "hide", "part", "clean"];
+export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "soft", "outline", "inner", "rim", "shadows", "ao", "pixel", "cast", "hide", "part", "clean", "ink", "tones"];
 /** The index of a part's name in the picture's list of what painted each pixel (see Img.parts). */
 export function partIndex(img: Img, name: string): number {
   if (typeof name !== "string" || !name) throw new PxError(`part is a name, got ${JSON.stringify(name)}`);
@@ -365,6 +369,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   if (!(soft >= 0 && soft <= 1)) throw new PxError(`${who}: soft is 0..1, how far the light wraps round the form, got ${JSON.stringify(o.soft)}`);
   if (!(o.rim === undefined || typeof o.rim === "boolean" || (typeof o.rim === "number" && o.rim >= 0 && o.rim <= 1))) throw new PxError(`${who}: rim is true, false or 0..1 (the share up its ramp the lit edge takes at least), got ${JSON.stringify(o.rim)}`);
   if (o.clean !== undefined && typeof o.clean !== "boolean") throw new PxError(`${who}: clean is true or false, got ${JSON.stringify(o.clean)}`);
+  if (o.tones !== undefined && !(Number.isInteger(o.tones) && o.tones >= 2)) throw new PxError(`${who}: tones is how many of each ramp's tones it draws in, a whole number from 2, got ${JSON.stringify(o.tones)}`);
   const origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
   if (origin !== undefined && !(Array.isArray(origin) && origin.length === 2 && origin.every(Number.isFinite))) throw new PxError(`${who}: view's origin is where the world's [0, 0, 0] lands, [x, y] px, got ${JSON.stringify(origin)}`);
   if (o.at !== undefined && !(Array.isArray(o.at) && (o.at.length === 3 || (!persp && o.at.length === 2)) && o.at.every(Number.isFinite)))
@@ -374,8 +379,11 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   const ramps: Color[][] = [], shines: number[] = [], strokes: number[] = [], hems: number[] = [];
   const mat = (spec: unknown, name: string) => {
     const s = (typeof spec === "string" || Array.isArray(spec) ? { ramp: spec } : spec) as SurfaceMat;
-    const keys = typeof s?.ramp === "string" ? [...s.ramp] : s?.ramp;
+    let keys = typeof s?.ramp === "string" ? [...s.ramp] : s?.ramp;
     if (!Array.isArray(keys) || !keys.length) throw new PxError(`${who}: material '${name}' is a ramp of keys dark to light ("asdf"), or { ramp, shine }, got ${JSON.stringify(spec)}`);
+    // (tones: n of its keys, its darkest and lightest kept, the rest spread evenly between)
+    const nt = o.tones, all = keys;
+    if (nt && all.length > nt) keys = Array.from({ length: nt }, (_, i) => all[Math.round((i * (all.length - 1)) / (nt - 1))]);
     ramps.push(keys.map((k) => { const col = c.color(k); if (col === null || col === TRANSPARENT) throw new PxError(`${who}: material '${name}': '${k}' is not a color`); return col; }));
     shines.push(s.shine ?? 0);
     if (!(s.strokes === undefined || s.strokes > 0) || !(s.hem === undefined || (Number.isInteger(s.hem) && s.hem >= 0))) throw new PxError(`${who}: material '${name}': strokes is m apart (above 0), hem whole px (0 up), got ${JSON.stringify([s.strokes, s.hem])}`);
@@ -405,6 +413,8 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   T.names.forEach((_, mi) => matIndex(mi));
   const outKey = typeof o.outline === "string" ? c.color(o.outline) : null;
   if (typeof o.outline === "string" && (outKey === null || outKey === TRANSPARENT)) throw new PxError(`${who}: outline '${o.outline}' is not a color`);
+  const inkKey = o.ink === undefined ? null : c.color(o.ink);
+  if (o.ink !== undefined && (typeof o.ink !== "string" || inkKey === null || inkKey === TRANSPARENT)) throw new PxError(`${who}: ink is a key, the line all round outside it, got ${JSON.stringify(o.ink)}`);
   const innerOn = !!o.inner, innerKey = typeof o.inner === "string" ? c.color(o.inner) : outKey;
   if (typeof o.inner === "string" && (innerKey === null || innerKey === TRANSPARENT)) throw new PxError(`${who}: inner '${o.inner}' is not a color`);
 
@@ -572,6 +582,20 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
           if (pk >= 0) c.img.parts!.ids[j] = pk;
         }
     }
+  // ink: a line all round outside it, on each cell beside one it drew (not behind what is nearer there)
+  if (inkKey !== null && !o.hide)
+    for (let gy = 0; gy < GH; gy++)
+      for (let gx = 0; gx < GW; gx++) {
+        if (m[gy * GW + gx] >= 0) continue;
+        let z = Infinity;
+        for (const [dx, dy] of D4) { const x = gx + dx, y = gy + dy, j = y * GW + x; if (x >= 0 && y >= 0 && x < GW && y < GH && m[j] >= 0 && !hidden[j]) z = Math.min(z, depth[j]); }
+        if (z === Infinity) continue;
+        for (let y = 0; y < K; y++)
+          for (let x = 0; x < K; x++) {
+            const px = (gx0 + gx) * K + x, py = (gy0 + gy) * K + y, j = c.index(px, py);
+            if (j >= 0 && !(vis && vis[j] < z)) c.plot(px, py, inkKey);
+          }
+      }
 
   // through a camera, its shadow on what is drawn: each block of what has a depth, put back in the
   // world, and the way from it to the light marched through the field

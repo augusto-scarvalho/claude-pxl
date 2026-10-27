@@ -105,6 +105,8 @@ export interface AssetOpts {
   slice?: number | [number, number, number, number];
   /** Start from a PNG file (path relative to the art file); anims with `frames` split it into a strip. */
   png?: string;
+  /** A frozen cell: its `png` is a render of this asset (the live one), kept: the build reads the PNG, pxl check renders the live one and says if it drifted; no PNG yet, the build writes it. */
+  frozen?: string;
   /** With `png`: its normal map (a PNG laid out as it, green up: pxl's own _n.png, Sprite Fusion's), read as data. */
   normals?: string;
   /** Only this part of the PNG: [x, y, w, h]. */
@@ -237,6 +239,8 @@ export interface AssetDef {
   grounded?: boolean;
   /** Defined in a file included `as` a namespace ("nature."): the names its drawing asks for are looked up there first. */
   ns?: string;
+  /** A frozen cell: the live asset its PNG is a render of (pxl check compares them); `freeze`: the PNG to write, not there yet. */
+  live?: string; freeze?: string;
 }
 
 export interface GroupDef {

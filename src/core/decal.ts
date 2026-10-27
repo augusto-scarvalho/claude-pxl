@@ -26,21 +26,23 @@ export interface DecalOpts {
   up?: number[];
   /** "pin" (default: square to the picture, a texel to a pixel) or "wrap" (laid on the surface) */
   mode?: "pin" | "wrap";
-  /** m across: wrap's width (default a texel to 1/16 m); pin's, texels grown by a whole number to it */
-  size?: number;
+  /** m across: wrap's width (default a texel to 1/16 m); pin's, texels grown by a whole number to it; "px": a texel to a px where it lies (pin's default) */
+  size?: number | "px";
   /** other views' assets: three quarters and the profile, drawn looking to the picture's right */
   views?: { three?: string; profile?: string };
   /** pin: how far (m) what is drawn under a texel may lie in front of or behind its point and still take it (default its own width: a lock of hair a little nearer, a surface seen edge on) */
   depth?: number;
-  /** its tones stepped by the light there (default true); false: drawn as it is, glowing */
-  lit?: boolean;
+  /** its tones stepped by the light there (default true); false: drawn as it is, glowing; "surface": each texel the tone surface() left under it, stepped as far as the texel stands from the art's own commonest tone (a clump drawn + = - takes the form's light and shadow) */
+  lit?: boolean | "surface";
+  /** marked as giving light (the emission map): default with lit: false only */
+  glow?: boolean;
   view?: SurfaceView; ppm?: number; at?: number[]; pixel?: number; light?: number[];
   /** the name of the part it is (pxl steps --at; default "decal <name>") */
   part?: string;
   /** none of it where the surface under it turns edge on to the eye (an eye's pixel on the silhouette of a face turned away), and lit, never darkened into a ramp's darkest (the outline's ink) */
   clean?: boolean;
 }
-export const DECAL_OPTS = ["on", "point", "up", "mode", "size", "views", "depth", "lit", "view", "ppm", "at", "pixel", "light", "part", "clean"];
+export const DECAL_OPTS = ["on", "point", "up", "mode", "size", "views", "depth", "lit", "glow", "view", "ppm", "at", "pixel", "light", "part", "clean"];
 /** clean: how far toward the eye the surface under a texel must face (the normal's share along the view) */
 const EDGE = 0.3;
 interface DecalCanvas extends SurfaceCanvas { asset(name: string): Img }
@@ -54,9 +56,10 @@ export function drawDecal(c: DecalCanvas, name: string, o: DecalOpts = {}): void
   const who = `decal '${name}'`;
   if (!(o.on instanceof Sdf)) throw new PxError(`${who}: on is the distance field it lies on (drawn by surface() before it)`);
   if (!(Array.isArray(o.point) && o.point.length === 3 && o.point.every(Number.isFinite))) throw new PxError(`${who}: point is where it lies, [x, y, z] in the field's own frame, got ${JSON.stringify(o.point)}`);
-  const mode = o.mode ?? "pin", K = o.pixel ?? c.k ?? 1, lit = o.lit !== false;
+  const mode = o.mode ?? "pin", K = o.pixel ?? c.k ?? 1, lit = o.lit !== false, under = o.lit === "surface", px = o.size === "px";
   if (mode !== "pin" && mode !== "wrap") throw new PxError(`${who}: mode is "pin" or "wrap", got ${JSON.stringify(o.mode)}`);
-  if (o.size !== undefined && !(o.size > 0)) throw new PxError(`${who}: size is m across, above 0, got ${JSON.stringify(o.size)}`);
+  if (o.size !== undefined && !px && !((o.size as number) > 0)) throw new PxError(`${who}: size is m across, above 0, or "px" (a texel to a px), got ${JSON.stringify(o.size)}`);
+  if (![undefined, true, false, "surface"].includes(o.lit as never) || ![undefined, true, false].includes(o.glow)) throw new PxError(`${who}: lit is true, false or "surface", glow true or false, got ${JSON.stringify({ lit: o.lit, glow: o.glow })}`);
   if (o.depth !== undefined && !(o.depth > 0)) throw new PxError(`${who}: depth is m in front of or behind its point it may be laid on, above 0, got ${JSON.stringify(o.depth)}`);
   const persp = !!o.view && typeof o.view === "object" && "horizon" in o.view, origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
   const clock = clockOf(c), C = compile(o.on, clock), d = C.d;
@@ -81,20 +84,28 @@ export function drawDecal(c: DecalCanvas, name: string, o: DecalOpts = {}): void
   if (vname !== name && !right) img = img.flip("x");
   const vis = c.img.depth, steps = [c.pal.stepMap(-1), c.pal.stepMap(1)];
   const light = (q: V3, nn: V3) => 0.1 + 0.65 * Math.max(0, dot(nn, L)) + 0.2 * (0.5 + 0.5 * nn[2]);
-  const tone = (col: Color, lv: number) => {
-    if (!lit) return col;
-    let k = Math.max(-2, Math.min(2, Math.round((lv - 0.62) * 4)));
-    // (clean: never down into a ramp's darkest, the outline's ink: a mouth in shadow stays a mouth)
+  // k steps along its ramp (clean: never down into a ramp's darkest, the outline's ink: a mouth in shadow stays a mouth)
+  const walk = (col: Color, k: number) => {
     while (k) { const s = steps[k < 0 ? 0 : 1].get(col); if (s === undefined || s === col || (o.clean && k < 0 && !steps[0].has(s))) break; col = s; k -= Math.sign(k); }
     return col;
   };
+  const tone = (col: Color, lv: number) => (!lit || under ? col : walk(col, Math.max(-2, Math.min(2, Math.round((lv - 0.62) * 4)))));
+  // lit "surface": each texel's steps from the art's commonest tone (a color's place on its ramp: its steps down to the darkest)
+  const rank = (col: Color) => { let n = 0; for (let s = steps[0].get(col); s !== undefined && s !== col && n < 64; s = steps[0].get((col = s))) n++; return n; };
   if (o.clean !== undefined && typeof o.clean !== "boolean") throw new PxError(`${who}: clean is true or false, got ${JSON.stringify(o.clean)}`);
-  const pk = partIndex(c.img, o.part ?? `decal ${name}`), emit = !lit, nrm = o.clean ? c.img.normals() : undefined;
+  const pk = partIndex(c.img, o.part ?? `decal ${name}`), emit = o.glow ?? !lit, nrm = o.clean ? c.img.normals() : undefined;
+  let mid = 0;
+  if (under) {
+    const n = new Map<Color, number>();
+    for (const col of img.data) if ((col & 255) >= 128) n.set(col, (n.get(col) ?? 0) + 1);
+    mid = rank([...n].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0);
+  }
   const put = (x: number, y: number, col: Color, z: number, tol: number) => {
     const q = c.index(x, y);
     if (q < 0 || !vis || !(Math.abs(vis[q] - z) < tol)) return;
     // (the normal surface() wrote there, its z toward the eye)
     if (nrm && nrm[q * 3 + 2] < EDGE * 127) return;
+    if (under) col = walk(c.img.data[q], rank(col) - mid);
     if (!c.plot(x, y, col)) return;
     c.img.parts!.ids[q] = pk;
     if (emit) (c.img.emit ??= new Uint8Array(W * H))[q] = 255;
@@ -105,7 +116,7 @@ export function drawDecal(c: DecalCanvas, name: string, o: DecalOpts = {}): void
     if (!s0) return;
     // a texel to a pixel (or block), or grown by a whole number to its size in m there
     const sx = toScreen([p[0] + R[0] * 0.1, p[1] + R[1] * 0.1, p[2] + R[2] * 0.1]), ppm = sx ? Math.hypot(sx[0] - s0[0], sx[1] - s0[1]) / 0.1 : 1;
-    const s = o.size ? Math.max(1, Math.round((o.size * ppm) / img.w)) : K, z = axisDepth(p), tol = o.depth ?? Math.max(0.12, (img.w * s) / ppm), lv = light(p, n);
+    const s = o.size && !px ? Math.max(1, Math.round(((o.size as number) * ppm) / img.w)) : K, z = axisDepth(p), tol = o.depth ?? Math.max(0.12, (img.w * s) / ppm), lv = light(p, n);
     const X0 = Math.round(s0[0] - pvx * s), Y0 = Math.round(s0[1] - pvy * s);
     for (let j = 0; j < img.h; j++)
       for (let i = 0; i < img.w; i++) {
@@ -118,7 +129,9 @@ export function drawDecal(c: DecalCanvas, name: string, o: DecalOpts = {}): void
   }
   // wrap: the texels on the surface along its tangents (B up it, T across), each corner put back on it
   const up = unit(o.up ?? [0, 0, 1]), B0 = unit([up[0] - n[0] * dot(up, n), up[1] - n[1] * dot(up, n), up[2] - n[2] * dot(up, n)]), T = cross(B0, n);
-  const ts = (o.size ?? img.w / 16) / img.w, cw = img.w + 1, corner: (V3 | null)[] = [], scr: ([number, number] | null)[] = [], cn: V3[] = [];
+  // ("px": a texel to a px, or to a K x K block, how far a step along the picture's right goes there)
+  const s1 = px ? toScreen(p) : null, s2 = px ? toScreen([p[0] + R[0] * 0.1, p[1] + R[1] * 0.1, p[2] + R[2] * 0.1]) : null;
+  const ts = px ? (s1 && s2 ? (0.1 * K) / Math.hypot(s2[0] - s1[0], s2[1] - s1[1]) : 1 / 16) : ((o.size as number | undefined) ?? img.w / 16) / img.w, cw = img.w + 1, corner: (V3 | null)[] = [], scr: ([number, number] | null)[] = [], cn: V3[] = [];
   for (let j = 0; j <= img.h; j++)
     for (let i = 0; i <= img.w; i++) {
       const u = (i - pvx) * ts, v = (pvy - j) * ts, q = onto([p[0] + T[0] * u + B0[0] * v, p[1] + T[1] * u + B0[1] * v, p[2] + T[2] * u + B0[2] * v]);
