@@ -278,7 +278,7 @@ export interface PlaceOpts {
   fx?: unknown;
   /** Attach to a socket of an earlier placement in this asset: "id.socket"; x, y become an offset from it. */
   at?: string;
-  /** Name this placement for `at` (default: the asset name). */
+  /** Which one this placement is, for `at`, relations, rules and describe (default: the asset name); its random picks come from it, not where it stands. */
   id?: string;
   /** stamp only, placed by a relation (it follows what it's placed by; x, y an offset): [id, "left" | "right" | "above" | "below", gap px between their boxes]. */
   beside?: [string, string, number?];
@@ -291,7 +291,7 @@ export interface PlaceOpts {
   /** Draw order in a layer with sort: "z" (default 0; ties keep call order). */
   z?: number;
   seed?: number;
-  /** Rebuild the placed asset with its own random choices (true = derived from position). */
+  /** Rebuild the placed asset with its own random choices (true = derived from position, or its id). */
   reseed?: boolean | number;
   /** Of a family named by the compass (name_n, name_ne, ...), the member nearest this heading: compass degrees (0 away, 90 right) or [dx, dz] on the ground. */
   heading?: number | [number, number];

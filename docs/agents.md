@@ -162,7 +162,9 @@ it:
    pixels come as text from `pxl ascii art.px.js <name>`, cheaper than an image. A scene is also read
    as text: `pxl describe art.px.js <scene>` (`--brief` when busy) gives each object's position, gaps,
    cover, contrast and motion, which answers layout questions better than eyeballing; after an edit,
-   `--diff` lists what it moved, redrew or recolored.
+   `--diff` lists what it moved, redrew or recolored. What is edited later gets an `id` (a stamp's,
+   `c.as`'s, a `mesh()` sprite's): describe and `--diff` name it by that, where "lantern #2" would
+   change with another lantern stamped before it, and moving it keeps its look.
 3. **Fix everything one look showed, in one turn.** All the edits go out as parallel tool calls in
    one message, then one look again. Every turn re-reads the whole conversation, so a turn per edit
    is what makes a long session expensive. After the first write the art file is changed with edits,

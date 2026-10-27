@@ -5,7 +5,7 @@ import { type Color, TRANSPARENT, pack, toHex } from "../core/color.ts";
 import { lineFlaws } from "../core/vision.ts";
 import { Palette } from "../core/palette.ts";
 import { Img } from "../core/image.ts";
-import { type Snapshot, describe } from "../core/describe.ts";
+import { type Snapshot, describe, labelOf } from "../core/describe.ts";
 import type { BuildOut } from "../core/build.ts";
 import type { World } from "../core/model.ts";
 import type { Project } from "../core/project.ts";
@@ -60,7 +60,10 @@ const USAGE = `pxl — pixel-art DSL
       was placed where, cell maps (object on top, color before lighting, brightness after it), how
       each placement stands out from its surroundings; --at adds that region's exact pixels; --frame
       reads an animated asset at frame N of its loop (a scene: each step of its clock), not the
-      first. Any PNG works too: its colors get keys, and repeats are found as identical 16x16 tiles.
+      first. A placement is named by its id (a stamp's, c.as's, a mesh() sprite's), else by its
+      asset's name, "#n" among its copies; --diff says what moved, was redrawn, added or removed
+      since the last describe, by those names. Any PNG works too: its colors get keys, and repeats
+      are found as identical 16x16 tiles.
   pxl check <art.px.js> [name...] [--frame N] [--readings] [--fix]
       Every check describe makes that can warn (facing, front marker, lit side, parallel parts, feet
       on the ground, lettering), on every scene and rig the file defines (not those it includes, or
@@ -101,7 +104,8 @@ const USAGE = `pxl — pixel-art DSL
   pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
-      after each; --sheet also writes a thumbnail per step to _preview/<name>_steps.png.
+      after each, then the placement on top there as describe names it (its id, else name #n);
+      --sheet also writes a thumbnail per step to _preview/<name>_steps.png.
   pxl blind <art.px.js> <name...> [--out DIR]   |   pxl blind <art.px.js> --check answers.json
       Check facing labels against the drawings with a reader who doesn't know them: writes each
       asset (a rig: each of its parts) to <out>/_blind/<n>.png, shuffled and unnamed, and the
@@ -434,6 +438,10 @@ export async function main(argv: string[]): Promise<number> {
           // one), when one of those painted it last
           const pk = b.img.parts?.ids[y * final.w + x] ?? -1;
           if (pk >= 0 && /^(surface|voxels|volume|splats|decal|draw3d|stamp)\(/.test(last)) console.log(`part: ${b.img.parts!.names[pk]}`);
+          // the placement on top there, as describe names it (a shadow or a light only changes what is under it)
+          const blended = new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name));
+          const on = b.placements.filter((q) => !blended.has(q.layer ?? "") && x >= q.x && y >= q.y && x < q.x + q.img.w && y < q.y + q.img.h && q.img.data[(y - q.y) * q.img.w + x - q.x] !== TRANSPARENT).at(-1);
+          if (on) console.log(`placement: ${labelOf(on, b.placements.filter((q) => q.name === on.name && q.layer === on.layer))}${on.id ? ` (${on.name})` : ""} @${on.layer ?? "-"}`);
           return 0;
         }
         console.log(`${name}: ${b.trace.frames.length} steps (${def.kind} ${final.w}x${final.h}${frame0})`);

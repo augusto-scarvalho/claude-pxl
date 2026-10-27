@@ -56,6 +56,8 @@ const mean3 = (cs: Color[]): [number, number, number] => {
 };
 /** Many copies of one small thing (a brush, a string of lights): one line, not one per copy. */
 export const MANY = 6;
+/** How describe names a placement: its id, else its asset's name, numbered among `same` (its asset's copies on its layer) when there are several. */
+export const labelOf = (p: Placement, same: Placement[]): string => p.id ?? (same.length > 1 ? `${p.name} #${same.indexOf(p) + 1}` : p.name);
 
 /** Degrees its top leans from straight up, clockwise (0 upright, 90 top to the right, 180 upside down). */
 const tiltOf = (o: Orient) => Math.round((Math.atan2(o.u[0], -o.u[1]) * 180) / Math.PI);
@@ -225,8 +227,8 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     out.push(`WORLD: ground in perspective, horizon at y ${wo.horizon}, eye ${wo.eye} m up: a thing standing on row y is (y - ${wo.horizon}) / ${wo.eye} px per meter, ` +
       `so a 1.8 m figure is ${[Math.round(wo.horizon + (H - wo.horizon) / 3), H].map((y) => `${Math.round((1.8 * (y - wo.horizon!)) / wo.eye!)} px at y ${y}`).join(", ")}; anything at eye height sits on the horizon.`);
   out.push("");
-  // objects: every placement but the many-copies ones, each with its relations worked out
-  const many = new Set(keys.filter((k) => byKey.get(k)!.length > MANY));
+  // objects: every placement but the many-copies ones (one with an id is always one), each with its relations worked out
+  const many = new Set(keys.filter((k) => byKey.get(k)!.filter((p) => !p.id).length > MANY));
   const shown = b.placements.map((p, i) => {
     let x0 = W, y0 = H, x1 = -1, y1 = -1, n = 0, all = 0;
     const cover = new Map<number, number>();
@@ -242,12 +244,9 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     return { x0, y0, x1, y1, n, all, cover };
   });
   type Shown = (typeof shown)[number];
-  const isMain = (i: number) => !many.has(kOf(i)) && !blended.has(b.placements[i].layer ?? "");
+  const isMain = (i: number) => (!!b.placements[i].id || !many.has(kOf(i))) && !blended.has(b.placements[i].layer ?? "");
   const main = b.placements.map((_, i) => i).filter(isMain);
-  const label = (i: number) => {
-    const same = byKey.get(kOf(i))!, n = b.placements[i].name;
-    return same.length > 1 ? `${n} #${same.indexOf(b.placements[i]) + 1}` : n;
-  };
+  const label = (i: number) => labelOf(b.placements[i], byKey.get(kOf(i))!);
   // empty px between two objects' visible pixels (8-neighbour steps), up to FAR
   const FAR = 96, dist = new Map<number, Int16Array>();
   const field = (i: number) => {
@@ -400,11 +399,12 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     for (const i of main) {
       const p = b.placements[i], sh = shown[i];
       // an anim can draw nothing at the moment described (sparks between clashes): that is not hidden
-      if (!sh.n) { out.push(`  ${sym.get(kOf(i))} ${label(i)} @${p.layer ?? "-"}: ${sh.all ? `hidden (all ${sh.all} px covered)` : "nothing drawn in this frame"}`); continue; }
+      const head = `  ${sym.get(kOf(i))} ${label(i)}${p.id ? ` (${p.name})` : ""} @${p.layer ?? "-"}: `;
+      if (!sh.n) { out.push(head + (sh.all ? `hidden (all ${sh.all} px covered)` : "nothing drawn in this frame")); continue; }
       const parts = [`x ${sh.x0}-${sh.x1}, y ${sh.y0}-${sh.y1} (${sh.x1 - sh.x0 + 1}x${sh.y1 - sh.y0 + 1}), feet ${Math.round((sh.x0 + sh.x1) / 2)},${sh.y1}`];
       if (sh.n < sh.all) parts.push(`${Math.round((100 * sh.n) / sh.all)}% shows`);
       parts.push(`colors ${keysOf(i)}`);
-      out.push(`  ${sym.get(kOf(i))} ${label(i)} @${p.layer ?? "-"}: ${parts.join("; ")}`);
+      out.push(head + parts.join("; "));
       const rel: string[] = [];
       const covers = main.filter((j) => j !== i && shown[j].cover.get(i)).map((j) => `${label(j)} (${shown[j].cover.get(i)}px of it)`);
       const coveredBy = [...sh.cover].filter(([o]) => isMain(o)).map(([o, n]) => `${label(o)} (${n}px)`);
@@ -412,8 +412,9 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       if (coveredBy.length) rel.push(`behind ${coveredBy.join(", ")}`);
       const near = main.filter((j) => j !== i && shown[j].n).map((j) => ({ j, g: gapOf(i, j) })).filter(({ g }) => g < Infinity).sort((u, v) => u.g - v.g).slice(0, 3);
       rel.push(near.length ? "nearest: " + near.map(({ j, g }) => `${label(j)} ${g ? g + "px" : "touching"} ${side(sh, shown[j])}`).join(", ") : `nothing within ${FAR}px`);
-      const shadow = b.placements.map((q, j) => [q, j] as const).filter(([q, j]) => q.name === p.name && blended.has(q.layer ?? "") && shown[j].n);
-      if (shadow.length && byKey.get(kOf(i))!.length === 1) rel.push(shadow.map(([q, j]) => `its ${q.layer} shows at x ${shown[j].x0}-${shown[j].x1}, y ${shown[j].y0}-${shown[j].y1}`).join(", "));
+      // its shadow: a copy in a blended layer, its id's (a shadow layer's copies keep it), or the only one's
+      const shadow = b.placements.map((q, j) => [q, j] as const).filter(([q, j]) => q.name === p.name && blended.has(q.layer ?? "") && shown[j].n && (!p.id || q.id === p.id));
+      if (shadow.length && (p.id || byKey.get(kOf(i))!.length === 1)) rel.push(shadow.map(([q, j]) => `its ${q.layer} shows at x ${shown[j].x0}-${shown[j].x1}, y ${shown[j].y0}-${shown[j].y1}`).join(", "));
       const st = stands(i), mo = motion(i);
       const turned = p.img.orient && (p.img.orient.f || p.img.orient.mirrored || tiltOf(p.img.orient)) ? orientWords(p.img.orient) : "";
       let size = "";
@@ -457,7 +458,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
   if (many.size) {
     out.push("MANY (small things placed many times, one line each):");
     for (const k of many) {
-      const ps = byKey.get(k)!, idx = ps.map((q) => b.placements.indexOf(q)).filter((i) => shown[i].n);
+      const ps = byKey.get(k)!.filter((q) => !q.id), idx = ps.map((q) => b.placements.indexOf(q)).filter((i) => shown[i].n);
       const x0 = Math.min(...idx.map((i) => shown[i].x0)), x1 = Math.max(...idx.map((i) => shown[i].x1));
       const y0 = Math.min(...idx.map((i) => shown[i].y0)), y1 = Math.max(...idx.map((i) => shown[i].y1));
       const [n, layer] = k.split("@");

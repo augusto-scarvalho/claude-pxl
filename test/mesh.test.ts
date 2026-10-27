@@ -406,6 +406,7 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { g: { ramp: "w" }, deck:
   assert.equal(at(`[{ name: "s", at: [0, 4, 0.48] }]`).r.lines.length, 0, "within 0.15 m");
   assert.equal(at(`[{ name: "s", at: [-3, 4, 2], air: true }]`).r.lines.length, 0, "it flies");
   assert.match(fl.r.coverage, /standing on 1/);
+  assert.equal(at(`[{ name: "s", at: [0, 4], id: "guy" }]`).q.id, "guy", "its id is its placement's, as a stamp's");
   // many copies of a small thing are texture, unchecked but for where they stand: one floating is said
   const tufts = (u: number) => `[${[0, 1, 2, 3, 4, 5, 6, 7].map((k) => `{ name: "s", at: [${-4 + k}, 6${k === 7 ? `, ${u}` : ""}] }`).join()}]`;
   assert.match(at(tufts(0.5), ", stand: true").r.lines.join(), /its feet are 0\.50 m over the model's 'g'/);

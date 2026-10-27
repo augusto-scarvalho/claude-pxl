@@ -296,14 +296,15 @@ export class Canvas {
   }
 
   /**
-   * What `fn` paints, as a placement named `name`: describe lists it and check reads it as a stamp, its
-   * lit side, its feet (`height` m) and its front (`facing`). It paints as it would without a name; the
+   * What `fn` paints, as a placement named `name` (`id`: which one, as a stamp's): describe lists it
+   * and check reads it as a stamp, its lit side, its feet (`height` m) and its front (`facing`). It
+   * paints as it would without a name; the
    * placement is what it changed (a pixel painted over in its own color doesn't count), kept only when
    * something reads placements (pxl check, describe).
    */
-  as(name: string, fn: (c: Canvas) => void, o: { height?: number; facing?: string } = {}): void {
-    if (typeof name !== "string" || typeof fn !== "function" || !(o.height === undefined || o.height > 0) || !(o.facing === undefined || FACING[o.facing]))
-      throw new PxError(`c.as("name", (c) => { ... }, { height?: m, facing?: "right" | "left" | "front" | "back" }), got ${JSON.stringify([name, o])}`);
+  as(name: string, fn: (c: Canvas) => void, o: { id?: string; height?: number; facing?: string } = {}): void {
+    if (typeof name !== "string" || typeof fn !== "function" || !(o.id === undefined || typeof o.id === "string") || !(o.height === undefined || o.height > 0) || !(o.facing === undefined || FACING[o.facing]))
+      throw new PxError(`c.as("name", (c) => { ... }, { id?: "which one", height?: m, facing?: "right" | "left" | "front" | "back" }), got ${JSON.stringify([name, o])}`);
     // only read where something reads placements (check, describe): drawing alone, it just draws
     const res = this.res as { checksOnly?: boolean; tracing?: boolean };
     if (!res.checksOnly && !res.tracing) return fn(this);
@@ -319,7 +320,7 @@ export class Canvas {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y0 + y) * img.w + x0 + x; if (d[i] !== was[i]) out.data[y * w + x] = d[i]; }
     if (o.height) out.meters = o.height;
     if (o.facing) out.orient = { f: [...FACING[o.facing]], u: [0, -1, 0], mirrored: false, text: false };
-    this.log?.push({ name, x: x0, y: y0, w, h, layer: this.layerName, img: out });
+    this.log?.push({ name, x: x0, y: y0, w, h, layer: this.layerName, img: out, ...(o.id ? { id: o.id } : {}) });
   }
 
   /** Run `fn` with drawing restricted to `region` (nests by intersection). */
@@ -1004,8 +1005,8 @@ export class Canvas {
       }
       if (!s || typeof s.name !== "string" || !Array.isArray(at) || (at.length !== 2 && at.length !== 3) || !at.every(Number.isFinite))
         throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m; or a function of the time giving them), id?, heading?, flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, veil?, light?, stand?, air?, ghosts? }, got ${JSON.stringify(s)}`);
-      // its own time in its loop and its own random choices, as a stamp's, picked by where it stands (cm)
-      const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed, fx: s.fx, heading: s.heading };
+      // its own time in its loop and its own random choices, as a stamp's, picked by its id or else where it stands (cm)
+      const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed, fx: s.fx, heading: s.heading, id: s.id };
       if (s.blend !== undefined && !["alpha", "add", "screen"].includes(s.blend)) throw new PxError(`mesh: sprite ${k} has blend ${JSON.stringify(s.blend)}: "alpha" (over, lit), "add" or "screen" (light)`);
       if (s.opacity !== undefined && !(s.opacity >= 0 && s.opacity <= 1)) throw new PxError(`mesh: sprite ${k} has opacity ${JSON.stringify(s.opacity)}: 0..1`);
       if (s.veil !== undefined && !(s.veil >= 0 && s.veil <= 1 && s.blend === "alpha")) throw new PxError(`mesh: sprite ${k} has veil ${JSON.stringify(s.veil)}: the share of the sun a sprite blended "alpha" holds back, 0..1`);
@@ -1055,7 +1056,7 @@ export class Canvas {
       if (id) this.placed?.set(id, { x: this.ox + p.x, y: this.oy + p.y, sockets: Object.fromEntries(Object.entries(sp.img.sockets ?? {}).map(([n, [x, y]]) => [n, [x * K, y * K]])), m3: (sk) => this.socketIn(view0 as Partial<View>, sp.name, sp.img, sp.at, sk, K) });
       // (its feet against the nearest face looking up under them; none under, or flying: not asked)
       const hs = ground && p.at && !p.air ? ground(p.at[0], p.at[1]) : [], h = hs.reduce<{ u: number; mat: string } | undefined>((b, q) => (!b || Math.abs(q.u - p.at![2]) < Math.abs(b.u - p.at![2]) ? q : b), undefined);
-      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}), ...(h ? { stand: { off: p.at![2] - h.u, on: h.mat } } : {}) });
+      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}), ...(h ? { stand: { off: p.at![2] - h.u, on: h.mat } } : {}), ...(id ? { id } : {}) });
     }
     if (lit) this.img.world = lit;
   }
@@ -1234,8 +1235,9 @@ export class Canvas {
 
   // ---------------------------------------------------------------- assets
 
-  /** Pick one candidate of `name` and transform it; random choices seeded by (a, b). */
+  /** Pick one candidate of `name` and transform it; random choices seeded by (a, b), or by its id: moved, it keeps its look. */
   asset(name: string, opts: PlaceOpts = {}, a = 0, b = 0): Img {
+    if (typeof opts.id === "string") { a = [...opts.id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7); b = 0; }
     const list = this.res.candidates(name);
     const r = rng(hash(a, b, (opts.seed ?? 0) + this.seed));
     let inner = this.seed;

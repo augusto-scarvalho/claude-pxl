@@ -773,6 +773,9 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   side, labelled (variants, tiers, views): a scene of `cells(rows, { head, side })`.
 - `PXL describe <file> <scene>`: every object's visible ranges, gaps, cover, contrast and motion
   (`--brief` for busy scenes); after an edit, `--diff` lists what moved, was redrawn or recolored.
+  Give what you will edit an `id` (a stamp's, `c.as`'s, a `mesh()` sprite's): describe, `--diff` and
+  `steps --at` name it by that (else "lantern #2", which another lantern stamped before it renumbers),
+  and its random picks follow the id, so moving it keeps its look.
 - `PXL check <file>` before handing over: every frame of the loop; its last line says which rules
   ran, and `--readings` shows what the lit-side rule read on each thing when a warning looks wrong.
   Checks and `world` rules cover `scene()`s (and rigs), and an `anim()` given a `world`: what its

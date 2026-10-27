@@ -674,6 +674,30 @@ scene("s", { w: 32, h: 20, bg: "g" }, layer("props", stamp("rock", 2, 2), stamp(
   assert.doesNotMatch(diff, /rock #1:/);   // the other rock did not change
 });
 
+test("ids: describe, --diff and steps --at name a placement by its id (a stamp's, c.as's); its random picks follow the id, not the place", async () => {
+  const art = (more: string, x: number) => `pal({ k: "#1b1630", g: "#8ccf63", w: "#fff6e0", r: "#e2585e" })
+sprite("rock", "kk\\nkk"); sprite("gem_w", "ww"); sprite("gem_r", "rr"); group("gem", ["gem_w", "gem_r"])
+for (let x = 0; x < 8; x++) { scene("id" + x, { w: 10, h: 1 }, stamp("gem", x, 0, { id: "g" })); scene("at" + x, { w: 10, h: 1 }, stamp("gem", x, 0)) }
+scene("s", { w: 40, h: 12, bg: "g" }, layer("props", ${more}stamp("rock", ${x}, 2, { id: "keeper" }), stamp("rock", 30, 2), (c) => c.as("mark", () => c.rect(20, 8, 2, 2, "w"), { id: "x_mark" })))`;
+  const { file } = tmpArt(art("", 10)), p = loadProject(file), picks = (n: string) => new Set([...Array(8).keys()].map((x) => p.image(n + x).data[x]));
+  assert.equal(picks("id").size, 1, "moved, it keeps its member");
+  assert.equal(picks("at").size, 2, "without an id, where it stands picks");
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try {
+    assert.equal(await main(["describe", file, "s"]), 0);
+    writeFileSync(file, art(`stamp("rock", 2, 6), `, 13));   // another rock stamped before it, and it moved
+    assert.equal(await main(["describe", file, "s", "--diff"]), 0);
+    assert.equal(await main(["steps", file, "s", "--at", "14,3"]), 0);
+  } finally { console.log = log; }
+  assert.match(lines[0], /A keeper \(rock\) @props: x 10-11/);
+  assert.match(lines[0], /B x_mark \(mark\) @props: x 20-21, y 8-9/);
+  assert.match(lines[0], /A rock #2 @props: x 30-31/);   // no id: numbered among its copies
+  assert.match(lines[1], /keeper: moved \+3,\+0/);
+  assert.doesNotMatch(lines[1], /(added|removed) keeper/);
+  assert.match(lines.at(-1)!, /^placement: keeper \(rock\) @props$/);
+});
+
 test("describe: a stamp at a fractional position is placed where it was drawn", async () => {
   const { file } = tmpArt(`pal({ k: "#1b1630", g: "#8ccf63" }); ramps("kg")
 sprite("rock", "kk\\nkk")

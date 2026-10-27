@@ -47,7 +47,7 @@ declare global {
     castBase?: "pivot" | "column";
     /** Attach to a socket of an earlier stamp in this asset, "id.socket"; x, y become an offset from it. */
     at?: string;
-    /** Name this stamp for `at` (default: the asset name). */
+    /** Which one this stamp is: `at`, relations, expect rules and describe name it by this (default: the asset name); its random picks (a group's member, reseed, rswap, rflip, rdelay) come from it, not from where it stands, so moving it keeps its look. */
     id?: string;
     /** Draw order in a layer with sort: "z" (default 0; ties keep call order). */
     z?: number;
@@ -225,7 +225,7 @@ declare global {
     dissolve?: { progress: number; scale?: number; seed?: number; edge?: PxDissolve["edge"]; width?: number; pattern?: PxDissolve["pattern"]; ragged?: number; at?: PxV3; mask?: string; look?: PxDissolve["look"]; char?: PxDissolve["char"]; glow?: number } }
   /** A sprite standing among mesh()'s faces: its feet at [x, z] or [x, z, up] m, the contact shadow's radius in m (0: none). */
   interface PxMeshSprite { name: string; /** or a function of the time (ms on the clock), none where it gives none */ at: [number, number] | PxV3 | ((t: number) => [number, number] | PxV3 | null | undefined);
-    /** a name for its sockets: a spell's from: "hero.hand", a stamp's at */ id?: string;
+    /** which one it is, as a stamp's: its sockets (a spell's from: "hero.hand", a stamp's at), describe's name for it, its random picks */ id?: string;
     /** n copies of it ms apart back in time (`at` a function of the time), each fade fainter, blended, no light, no shadow */ ghosts?: [number, number, number]; /** of a family named by the compass, the one nearest this heading, as a stamp's */ heading?: number | [number, number]; flip?: "x"; frame?: number; delay?: number; rdelay?: boolean; seed?: number; reseed?: boolean | number; shadow?: number;
     /** effects on this sprite alone, as a stamp's */
     fx?: PxEffect | PxEffect[];
@@ -616,8 +616,8 @@ declare global {
     y(y: number, fn: (c: PxCanvas) => void): void;
     /** What fn stamps and hands to c.z() / c.y() drawn in that order when it ends. */
     sort(by: "y" | "z", fn: () => void): void;
-    /** What fn paints, a placement by that name: describe lists it, check reads it as a stamp (height m, facing). */
-    as(name: string, fn: (c: PxCanvas) => void, opts?: { height?: number; facing?: "right" | "left" | "front" | "back" }): void;
+    /** What fn paints, a placement by that name (id: which one, as a stamp's): describe lists it, check reads it as a stamp (height m, facing). */
+    as(name: string, fn: (c: PxCanvas) => void, opts?: { id?: string; height?: number; facing?: "right" | "left" | "front" | "back" }): void;
     px(x: number, y: number, c: PxColor): void;
     rect(x: number, y: number, w: number, h: number, c: PxColor): void;
     box(x: number, y: number, w: number, h: number, c: PxColor): void;
