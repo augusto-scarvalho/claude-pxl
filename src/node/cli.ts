@@ -54,7 +54,8 @@ const USAGE = `pxl — pixel-art DSL
   pxl list  <art.px.js>
       A map of the file (and what it includes): each top-level statement that defines assets, each
       function and each const of 5 lines or more, its line range, the comment above it and what it
-      defines (a loop's many assets on one line); then groups and sheets. A file that doesn't run on
+      defines (a loop's many assets on one line); then groups and sheets. An included file is named by
+      its path from the file's folder (../nature/kit.px.js), as in errors. A file that doesn't run on
       its own (one meant to be included) is mapped from its text. Read those lines, not the file.
   pxl describe <art.px.js> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief] [--out DIR | --no-out]   (or: pxl describe <image.png> [...])
       A whole scene as text to read at once: what was painted (steps grouped by source line), what

@@ -233,6 +233,17 @@ sheet("all", ["blob", "flat"], { pad: 1 })`);
       assert.deepEqual(lit.map((i) => [i % e.w, Math.floor(i / e.w), e.data[i] >>> 8]), [[x0 + 3, 2, 0xcccccc]]);
     }
     assert.ok(!existsSync(join(dir, "sprites", "flat_e.png")), "nothing glows: no map");
+    // a map whose file is another asset's own (car's normal map, car_n.png, and the asset car_n): an error
+    // naming both, the asset's file kept; a heading's own maps (car_e_n.png) and an anim of that name are no clash
+    const q = load(`
+sprite("car", { w: 4, h: 3 }, (c) => c.rect(0, 0, 4, 3, "r"), bump("hybrid"))
+sprite("car_n", "gg")
+sprite("car_e", { w: 3, h: 1 }, (c) => c.rect(0, 0, 3, 1, "w"), bump("hybrid"))
+anim("car_e_n", { w: 1, h: 1, frames: 2 }, (c) => c.px(0, 0, "g"))`);
+    const errs = writeOutputs(q, dir, { preview: false }).errors.map((e) => e.message);
+    assert.equal(errs.length, 1, errs.join("\n"));
+    assert.match(errs[0], /sprite 'car': its normal map would be sprites\/car_n\.png, the file of sprite 'car_n' too .*rename one of them/);
+    assert.deepEqual(["car_n", "car_e_n"].map((n) => decodePng(readFileSync(join(dir, "sprites", `${n}.png`))).w), [2, 3]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

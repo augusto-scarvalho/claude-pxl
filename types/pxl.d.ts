@@ -400,6 +400,8 @@ declare global {
   }
   interface PxPerspective {
     readonly w: number; readonly horizon: number; readonly eye: number; readonly focal: number; readonly vp: number; readonly yaw: number; readonly pitch: number; readonly bend: number; readonly fov?: number;
+    /** The picture's height, when given one ({ w, h, pitch, ppm }). */
+    readonly h?: number;
     /** Looking down: the ground z m ahead where it looks, dist m from the eye along its axis (post() focuses there), the texels a texel to a pixel there on a floor and on a wall. */
     readonly z?: number; readonly dist?: number; readonly floor?: [number, number]; readonly wall?: [number, number];
     /** Looking down: where to stand a thing, [x, z, up], so its point mid m up is where the camera looks (lifted up m). */
@@ -764,7 +766,7 @@ declare global {
    * light is in the picture's middle; `head` a views() set stamped on the head (`chin` a line under it).
    * `blocks`: the flat blocks too (bk_<move>_<dir>, or that prefix), to judge a move before painting.
    */
-  function rig3d(name: string, opts: { body?: PxBody; moves: Record<string, { frames: number; ms?: number; pose: (i: number, heading: number) => PxPose; dirs?: string[]; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }>;
+  function rig3d(name: string, opts: { body?: PxBody; moves: Record<string, { frames: number; /** each frame's (100), or a list, a number a frame */ ms?: number | number[]; pose: (i: number, heading: number) => PxPose; dirs?: string[]; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }>;
     n?: number; headings?: (string | number)[]; pitch?: number; w?: number; h?: number; pivot?: [number, number]; parts?: (j: PxJoints, pose: PxPose) => Record<string, PxPiece | PxSdf | { decal: object } | { scatter: object } | (PxPiece | PxSdf | { decal: object } | { scatter: object })[]>;
     mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; inner?: boolean | PxColor; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; head?: string; /** the line under the head; a head modeled: [key, the skin's ramp], under the jaw only */ chin?: PxColor | [PxColor, string]; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }): PxRig3d;
   /**
@@ -781,8 +783,12 @@ declare global {
   /** Two bones of lengths l1 and l2 from a reaching for b in 3D: the joint between, pushed toward `hint` (a way); out of reach, straight. */
   function ik3(a: PxV3, b: PxV3, l1: number, l2: number, hint: PxV3): PxV3;
   function directions(name: string, n: number, opts: { from: string; outline?: PxColor; outline8?: PxColor; symmetric?: boolean; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; draw?: Record<string, string>; pivot?: "bottom" | "center" | [number, number] }): void;
-  /** palette: true keeps the included file's use()/pal()/ramps() active afterwards. */
-  function include(path: string, opts?: { palette?: boolean }): void;
+  /**
+   * palette: true keeps the included file's use()/pal()/ramps() active afterwards (else its palette
+   * stays with its own assets). as: the names it defines go under `as.` ("nature": its "lamp" is
+   * "nature.lamp" here), its own drawing finding its own first; JavaScript names still share one scope.
+   */
+  function include(path: string, opts?: { palette?: boolean; as?: string }): void;
   function rng(seed?: number): () => number;
   /** A number in [0, 1) for a lattice point (integers): the same (i, j) always gives the same. */
   function hash(i: number, j: number, seed?: number): number;

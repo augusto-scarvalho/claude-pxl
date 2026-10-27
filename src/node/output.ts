@@ -66,6 +66,14 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
   };
 
   const names = want ? p.order.filter((n) => want.has(n)) : p.exported();
+  // a map's file (<x>_n.png, <x>_e.png) that is another's own (an asset x with normals beside an asset
+  // x_n, a sheet beside a sheet x_n): an error naming both, and the map not written over it
+  const folder = (k: string) => (k === "scene" ? "scenes" : k === "anim" ? "anims" : "sprites"), files = new Set(p.exported());
+  const writeMap = (what: string, n: string, dir: string, suffix: "_n" | "_e", img: () => Img, loc?: string) => {
+    const o = n + suffix, d = p.assets.get(o), other = dir ? d && files.has(o) && folder(d.kind) === dir && `${d.kind} '${o}'` : p.sheets.some((s) => s.name === o) && `sheet '${o}'`;
+    if (other) errors.push(new PxError(`${what} '${n}': its ${suffix === "_n" ? "normal" : "emission"} map would be ${dir ? dir + "/" : ""}${o}.png, the file of ${other} too (a heading's sprite?): rename one of them; the map isn't written`, loc));
+    else writePng(join(out, dir, o + ".png"), img());
+  };
   for (const n of names) {
     const def = p.assets.get(n)!, t0 = performance.now();
     try {
@@ -80,8 +88,8 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         const { sheet, frames: fr } = packSheet(drawn.map((f, i) => ({ name: `${n}_${i}`, img: f.img, ms: f.ms })), drawn.length);
         writePng(join(out, dir, n + ".png"), sheet);
         write(join(out, dir, n + ".json"), sheetJson(n + ".png", sheet, fr, [{ name: n, from: 0, to: fr.length - 1, direction: p.direction(n) }]));
-        if (drawn.some((f) => f.img.norm)) writePng(join(out, dir, n + "_n.png"), packSheet(drawn.map((f) => ({ name: "", img: normalImage(f.img) })), drawn.length).sheet); // laid out as the art
-        if (drawn.some((f) => glows(f.img))) writePng(join(out, dir, n + "_e.png"), packSheet(drawn.map((f) => ({ name: "", img: emitImage(f.img) })), drawn.length).sheet);
+        if (drawn.some((f) => f.img.norm)) writeMap(def.kind, n, dir, "_n", () => packSheet(drawn.map((f) => ({ name: "", img: normalImage(f.img) })), drawn.length).sheet, def.loc); // laid out as the art
+        if (drawn.some((f) => glows(f.img))) writeMap(def.kind, n, dir, "_e", () => packSheet(drawn.map((f) => ({ name: "", img: emitImage(f.img) })), drawn.length).sheet, def.loc);
         // previews show reference layers (guides) over each frame, like still assets do
         shown = packSheet(frames.map((f) => ({ name: "", img: f.guide ?? f.img })), frames.length, 1).sheet;
       } else {
@@ -90,8 +98,8 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         const wr = def.opts.wrap, art = b.guide ?? b.img;
         shown = wr ? tiled(art, wr === "y" ? 1 : 3, wr === "x" ? 1 : 3) : art;
         writePng(join(out, dir, n + ".png"), b.img);
-        if (b.img.norm) writePng(join(out, dir, n + "_n.png"), normalImage(b.img)); // for engine lights
-        if (glows(b.img)) writePng(join(out, dir, n + "_e.png"), emitImage(b.img));
+        if (b.img.norm) writeMap(def.kind, n, dir, "_n", () => normalImage(b.img), def.loc); // for engine lights
+        if (glows(b.img)) writeMap(def.kind, n, dir, "_e", () => emitImage(b.img), def.loc);
       }
       if (frames.length) {
         write(join(out, dir, n + ".gif"), encodeGif(frames));
@@ -134,6 +142,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         }
         pv = ` @${s}x`;
       }
+      if (b.anim?.long) info += ` -- ${b.anim.long}`;
       if (b.anim?.capped) info += " -- loops don't line up, cut at 60s: give the anims durations on one grid (fps 4, 5, 10 or ms in 100s; fps 6 makes 167ms frames)";
       lines.push(`${def.kind} ${n} ${b.img.w}x${b.img.h}${info}${pv}`);
     } catch (e) {
@@ -160,8 +169,8 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       writePng(join(out, s.name + ".png"), sheet);
       write(join(out, s.name + ".json"), sheetJson(s.name + ".png", sheet, frames, tags));
       // the normal maps in the same rectangles, for engine lights (the art's json serves both)
-      if (items.some((it) => it.img.norm)) writePng(join(out, s.name + "_n.png"), packSheet(items.map((it) => ({ ...it, img: normalImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet);
-      if (items.some((it) => glows(it.img))) writePng(join(out, s.name + "_e.png"), packSheet(items.map((it) => ({ ...it, img: emitImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet);
+      if (items.some((it) => it.img.norm)) writeMap("sheet", s.name, "", "_n", () => packSheet(items.map((it) => ({ ...it, img: normalImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet, s.loc);
+      if (items.some((it) => glows(it.img))) writeMap("sheet", s.name, "", "_e", () => packSheet(items.map((it) => ({ ...it, img: emitImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet, s.loc);
       lines.push(`sheet ${s.name} ${sheet.w}x${sheet.h} (${frames.length} frames)${prev(s.name, sheet)}`);
       // a sheet of animations also plays them all at once in its preview, each in a cell of its own at
       // its own timing (a character's moves side by side, to judge them together)

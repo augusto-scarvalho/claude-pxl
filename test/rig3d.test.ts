@@ -132,6 +132,16 @@ sprite("x", { w: 1, h: 1 }, (c) => {
   assert.throws(() => loadSource(`${PAL}rig3d("e", { blocks: true, moves: { m: { frames: 1, pose: () => ({ grip: { from: [0, 0], to: [1, 1, 1], at: [0, 1] } }) } } })`, "t.px.js").image("bk_m_s"), /a pose's grip is/);
 });
 
+test("rig3d: a move's ms a list, a number a frame (a strike's 60/40/80); sized by itself, its parts get j.depth and j.screen", () => {
+  const p = loadSource(`${PAL}
+// parts that read the joints' depth and where they land (as the traveler's dress() does), and no w, h, pivot
+const parts = (j) => ({ body: j.limb(j.pelvis, j.chest, j.depth(j.chest) > -100 && j.screen(j.chest)[1] < 100 ? 3 : 1, 3, "w") })
+rig3d("f", { body: { h: 30, heads: 3 }, headings: ["s"], parts, moves: { strike: { frames: 3, ms: [60, 40, 80], pose: () => ({}) } } })`, "t.px.js");
+  assert.deepEqual(p.timeline("f_strike_s")!.durations, [60, 40, 80]);
+  assert.ok(p.image("f_strike_s").pivot, "sized, its foot point found");
+  assert.throws(() => loadSource(`${PAL}rig3d("e", { blocks: true, moves: { m: { frames: 2, ms: [60], pose: () => ({}) } } })`, "t.px.js"), /a list, a number a frame/);
+});
+
 test("dress() (examples/hd2d/traveler.px.js): spine: true sweeps the shirt's body along the spine, not round an upright through the hips", () => {
   // a point on the spine under the chest of a figure leaning 30 degrees: inside the one, outside the other
   const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");

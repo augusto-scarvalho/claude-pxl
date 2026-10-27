@@ -43,6 +43,8 @@ export interface View {
 export interface Perspective extends Required<Omit<View, "fov" | "h" | "ppm">> {
   /** its field of view, when given one (a picture k times as big keeps it) */
   fov?: number;
+  /** the picture's height, when given one ({ w, h, pitch, ppm }): a scene's size is { w: cam.w, h: cam.h } */
+  h?: number;
   /**
    * Looking down: the ground z m ahead where it looks, `dist` m from the eye along its axis (where
    * post() focuses), and the texels that lay a texture a texel to a pixel there, on a floor and on a wall.
@@ -101,7 +103,7 @@ export function perspective(v: View): Perspective {
   const down = -pitch * rad, d = dist ?? eye / Math.sin(down), k = ppm ?? focal / d, z = d * Math.cos(down);
   const look = pitch < 0 ? { z, dist: d, floor: [1 / k, 1 / (k * Math.sin(down))] as [number, number], wall: [1 / k, 1 / (k * Math.cos(down))] as [number, number] } : {};
   return {
-    w, horizon, eye, focal, vp, yaw, pitch, bend, ...(v.fov !== undefined && v.focal === undefined ? { fov: v.fov } : {}), ...look,
+    w, horizon, eye, focal, vp, yaw, pitch, bend, ...(v.fov !== undefined && v.focal === undefined ? { fov: v.fov } : {}), ...(v.h !== undefined ? { h: v.h } : {}), ...look,
     aim: (mid, up = 0) => {
       if (!(pitch < 0) || !Number.isFinite(mid) || !Number.isFinite(up)) throw new PxError(`perspective: aim(mid, up) is for a camera looking down (pitch below 0), mid and up in m, got ${JSON.stringify([mid, up])} with pitch ${pitch}`);
       const a = z - mid / Math.tan(down);
@@ -133,5 +135,5 @@ export function perspective(v: View): Perspective {
 export function scaled<T>(view: T, k: number): T {
   const v = view as unknown as Partial<Perspective>;
   if (k === 1 || !v || typeof v !== "object" || !("horizon" in v)) return view;
-  return { ...v, horizon: v.horizon! * k, ...(v.w !== undefined ? { w: v.w * k } : {}), ...(v.vp !== undefined ? { vp: v.vp * k } : {}), ...(v.focal !== undefined ? { focal: v.fov !== undefined ? undefined : v.focal * k } : {}) } as T;
+  return { ...v, horizon: v.horizon! * k, ...(v.w !== undefined ? { w: v.w * k } : {}), ...(v.h !== undefined ? { h: v.h * k } : {}), ...(v.vp !== undefined ? { vp: v.vp * k } : {}), ...(v.focal !== undefined ? { focal: v.fov !== undefined ? undefined : v.focal * k } : {}) } as T;
 }

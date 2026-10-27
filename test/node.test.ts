@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { crc32, deflateSync, inflateSync } from "node:zlib";
 import { Img } from "../src/core/image.ts";
 import { pack } from "../src/core/color.ts";
+import { Palette } from "../src/core/palette.ts";
 import { decodePng, encodePng } from "../src/node/png.ts";
 import { encodeGif, medianCut } from "../src/node/gif.ts";
 import { decodeGif } from "../src/node/gifread.ts";
@@ -220,7 +221,30 @@ test("include keeps each file's palette to itself", () => {
   const p = loadProject(file);
   assert.equal(p.image("a").data[0], pack(255, 0, 0));
   assert.equal(p.image("b").data[0], pack(0, 255, 0));
-  assert.throws(() => p.image("c"), /unknown color key 'z'/);
+  // the error names the file whose palette has the key, and the option that shares it
+  assert.throws(() => p.image("c"), /unknown color key 'z' .*'z' is in the palette of lib\.px\.js, included at a\.px\.js:2:1 without \{ palette: true \}.*include\("lib\.px\.js", \{ palette: true \}\)/);
+  writeFileSync(file, `include("lib.px.js")\nramps("zq")`);
+  assert.throws(() => loadProject(file), /ramp "zq" uses unknown key 'z'.*in the palette of lib\.px\.js/);
+});
+
+test("include { as }: an included file's names go under it, its own drawing finds its own first; two files of the same names side by side", () => {
+  const { dir, file } = tmpArt(`use("pico8")
+include("a/kit.px.js", { as: "a" })
+include("b/kit.px.js", { as: "b" })
+sprite("lamp", "7")
+scene("all", { w: 9, h: 1 }, stamp("a.lamp", 0, 0), stamp("b.lamp", 3, 0), stamp("lamp", 6, 0), stamp("a.rocks", 7, 0))
+sheet("kits", ["a.*", "b.lamp"])`);
+  const kit = (key: string) => `use("pico8")\nsprite("_dot", "${key}")\nsprite("lamp", { w: 2, h: 1 }, stamp("_dot", 0, 0), (c) => c.stamp("_dot", 1, 0))\nsprite("rock1", "${key}")\ngroup("rocks", ["rock*"])\nsheet("own", ["lamp"])\nfont("tiny", "_dot", { chars: "A", w: 1, h: 1 })\nsprite("word", { w: 1, h: 1 }, text(0, 0, "A", "${key}", { font: "tiny" }))`;
+  for (const [d, key] of [["a", "8"], ["b", "b"]]) { mkdirSync(join(dir, d)); writeFileSync(join(dir, d, "kit.px.js"), kit(key)); }
+  const p = loadProject(file), c = (k: string) => Palette.builtin("pico8").resolve(k);
+  assert.deepEqual([...p.image("all").data], [c("8"), c("8"), 0, c("b"), c("b"), 0, c("7"), c("8"), 0]);
+  assert.deepEqual([p.image("b.word").data[0], [...p.groups.get("a.rocks")!.members], p.sheets.map((s) => s.name)], [c("b"), ["rock*"], ["a.own", "b.own", "kits"]]);
+  assert.deepEqual(p.sheetNames(p.sheets[0]), ["a.lamp"]);
+  assert.deepEqual(p.sheetNames(p.sheets[2]), ["a.lamp", "a.rock1", "a.word", "b.lamp"], "a part (a._dot) isn't exported");
+  // pxl list: each kit.px.js its own, by its path from the main file's folder; locations say it too
+  assert.equal(p.assets.get("b.lamp")!.loc, "b/kit.px.js:3:1");
+  assert.equal(p.fileOf("b/kit.px.js:3:1"), join(dir, "b", "kit.px.js"));
+  assert.throws(() => loadProject(tmpArt(`include("x.px.js", { as: "a.b" })`).file), /as is the name its assets go under/);
 });
 
 test("use() reads palette files next to the art file: .hex, .gpl, .pal, .txt", () => {

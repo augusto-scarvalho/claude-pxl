@@ -13,7 +13,6 @@ import type { Item, World } from "../core/model.ts";
 import { type Knob, fixRule, runExpects, turnKnob } from "../core/world3d.ts";
 import { type Frame2d, type Knob2d, type Rule2d, type Shift, fixRule2d, moveInSource, nameAll, namesOf, runRules2d } from "../core/expect.ts";
 import { readFileSync, writeFileSync } from "node:fs";
-import { basename } from "node:path";
 import { loadProject } from "./load.ts";
 import { FLAWS, jointsOf, poseFlaws, viewRows, viewWarnings } from "../core/rig3d.ts";
 
@@ -58,8 +57,9 @@ const ranges = (fs: number[]) => fs.reduce<[number, number][]>((r, f) => {
  */
 function fixScene(p: Project, rules: Rule2d[], rs: ReturnType<typeof runRules2d>, named: Frame2d[], wo: World | undefined, out: NonNullable<CheckResult["fixes"]>): void {
   const sh: Shift = new Map(), srcs = new Map<string, string | undefined>();
-  const source = (f: string) => {
-    if (!srcs.has(f)) { const abs = p.files.find((a) => basename(a) === f); try { srcs.set(f, abs && readFileSync(abs, "utf8")); } catch { srcs.set(f, undefined); } }
+  const source = (loc: string) => {
+    const f = loc.replace(/:\d+(:\d+)?$/, "");
+    if (!srcs.has(f)) { const abs = p.fileOf(f); try { srcs.set(f, abs && readFileSync(abs, "utf8")); } catch { srcs.set(f, undefined); } }
     return srcs.get(f);
   };
   // a name's stamp (the first frame that places it): where it is in the file, and its numbers a fix may change
@@ -69,7 +69,7 @@ function fixScene(p: Project, rules: Rule2d[], rs: ReturnType<typeof runRules2d>
     ...(first(part)?.rel?.knobs ?? []).map((k) => ({ ...k, part, value: 0 })),
     { part, key: "x", label: "x", value: 0, move: (d) => [d, 0] }, { part, key: "y", label: "y", value: 0, move: (d) => [0, d] }];
   const why = (k: Knob2d) => {
-    const loc = locOf(k.part), src = loc && source(loc.split(":")[0]);
+    const loc = locOf(k.part), src = loc && source(loc);
     if (!loc) return `${k.part} is placed by a function (c.stamp), its ${k.label} the code's`;
     if (src === undefined) return `${loc}: its file can't be read`;
     const m = moveInSource(src as string, loc, k.key, 0, k.i);
@@ -101,10 +101,10 @@ export function writeMoves(file: string, p: Project, r: CheckResult, frame?: num
   // the last in a file first: a number written longer doesn't move the stamps before it
   const at = (loc: string) => loc.split(":").slice(1).map(Number), texts = new Map<string, string>(), said: string[] = [];
   for (const m of [...sum.values()].sort((u, v) => at(v.loc)[0] - at(u.loc)[0] || at(v.loc)[1] - at(u.loc)[1])) {
-    const abs = p.files.find((f) => basename(f) === m.loc.split(":")[0])!, w = moveInSource(texts.get(abs) ?? readFileSync(abs, "utf8"), m.loc, m.key, m.by, m.i);
+    const abs = p.fileOf(m.loc)!, w = moveInSource(texts.get(abs) ?? readFileSync(abs, "utf8"), m.loc, m.key, m.by, m.i);
     if (typeof w === "string") return [`fix: not written: ${m.part}: ${w}`];
     texts.set(abs, w.src);
-    said.push(`${m.part}'s ${m.label} ${w.from} -> ${w.to} (${basename(abs)}:${w.line})`);
+    said.push(`${m.part}'s ${m.label} ${w.from} -> ${w.to} (${p.short(abs)}:${w.line})`);
   }
   if (!said.length) return [];
   const fixed = new Set((r.fixes ?? []).filter((f) => f.move || f.held).map((f) => f.text)), scenes = [...new Set(r.failed!.map((t) => t.split(" › ")[0]))];
@@ -199,6 +199,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     // a loop cut at 60 s (its anims' frame times don't line up) can run to tens of thousands of frames:
     // say so, and check its first frames only, not for hours
     const count = tl?.capped ? Math.min(all, CAPPED_FRAMES) : all;
+    if (tl?.long) notes.push(`${name} › LOOK: ${tl.long}; check reads each of its frames (check: { every: n } reads one in n)`);
     if (tl?.capped) lines.push(`${name} › WARNING: its loop doesn't close within 60 s: its anims' frame times don't line up (a ${tl.step} ms step, ${all} frames); checked its first ${count} frames only. Give every anim the same fps (4, 5 or 10, or ms in 100s)`);
     const seen = new Map<string, string[]>(), found = new Map<string, Set<number>>(), at = new Map<string, Set<string>>();
     const only = opts.frames ?? (opts.frame !== undefined ? [opts.frame] : undefined), co = def.opts.check;

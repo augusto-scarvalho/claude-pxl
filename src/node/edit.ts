@@ -32,7 +32,7 @@ export interface Target {
 }
 
 const blendedOf = (b: BuildOut) => new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name));
-const fileOf = (p: Project, loc: string) => p.files.find((f) => basename(f) === loc.split(":")[0]);
+const fileOf = (p: Project, loc: string) => p.fileOf(loc);
 
 /** Every thing of a built scene an edit can name: its placements (not a shadow's or a light's, not the many copies of a small thing without an id), and the world3d parts drawn in it. */
 export function targetsOf(p: Project, b: BuildOut): Target[] {
@@ -232,7 +232,7 @@ function commentsOf(p: Project, t: Target): { line: string; at: string }[] {
     if (part) { const k = L.findIndex((l, j) => j >= i && new RegExp(`(^|[\\s{,])${part}\\s*:`).test(l)); if (k >= 0) i = k; }
     const lines = L[i]?.includes("//") ? [L[i].slice(L[i].indexOf("//"))] : [];
     for (let j = i - 1; j >= 0 && /^\s*\/\//.test(L[j]); j--) lines.unshift(L[j]);
-    return lines.map((l) => ({ line: l.replace(/^\s*\/\/\s*/, ""), at: `${basename(abs)}:${i + 1}` }));
+    return lines.map((l) => ({ line: l.replace(/^\s*\/\/\s*/, ""), at: `${p.short(abs)}:${i + 1}` }));
   };
   if (t.kind === "part") return near(t.world!.loc, t.id);
   const def = p.assets.get(t.asset);
@@ -375,10 +375,10 @@ function alone(src: string, o: number, end: number): boolean {
 export function unchanged(p: Project, p2: Project, texts: Map<string, string>): (name: string) => boolean {
   const none = () => false, bad = new Set<string>();
   for (const [abs, now] of texts) {
-    const was = readFileSync(abs, "utf8"), A = was.split("\n"), B = now.split("\n"), file = basename(abs);
+    const was = readFileSync(abs, "utf8"), A = was.split("\n"), B = now.split("\n"), file = p.short(abs);
     if (A.length !== B.length) return none;
     const calls = [...p.assets.values()].flatMap((d) => {
-      const o = d.loc?.split(":")[0] === file ? callAt(was, d.loc, /^[\w$]+\s*\(/) : undefined;
+      const o = d.loc?.replace(/:\d+(:\d+)?$/, "") === file ? callAt(was, d.loc, /^[\w$]+\s*\(/) : undefined;
       if (o === undefined) return [];
       const open = was.indexOf("(", o), end = listAt(was, open).end;
       return [{ name: d.name, open, end, alone: alone(was, o, end) }];
@@ -437,7 +437,7 @@ export function edit(file: string, scene: string, given: unknown, o: { frame?: n
       if (t.kind === "part") {
         const abs = t.world!.loc && fileOf(p, t.world!.loc);
         if (!abs) return "its world3d() isn't in an art file";
-        const w = editPart(read(abs), basename(abs), t.id, e, Object.keys(t.world!.world.makers), e.op === "set" ? paramsOf(t.world!.world, t.asset) : undefined);
+        const w = editPart(read(abs), p.short(abs), t.id, e, Object.keys(t.world!.world.makers), e.op === "set" ? paramsOf(t.world!.world, t.asset) : undefined);
         return typeof w === "string" ? w : { ...w, abs };
       }
       if (t.why) return t.why;
@@ -470,7 +470,7 @@ export function edit(file: string, scene: string, given: unknown, o: { frame?: n
   try { p2 = loadProject(file, { checksOnly: true, where: true }, read); p2.adopt(p, unchanged(p, p2, texts)); b2 = p2.build(scene, 0, frameTime(p2, scene, f)); }
   catch (err) { return { lines: [...said, `edit: not written: rebuilt, ${(err as Error).message.split("\n")[0]}`], ok: false }; }
   const lines = [...said];
-  if (o.dry) lines.push("source (- now, + after):", ...[...texts].flatMap(([abs, t]) => lineDiff(basename(abs), readFileSync(abs, "utf8"), t)));
+  if (o.dry) lines.push("source (- now, + after):", ...[...texts].flatMap(([abs, t]) => lineDiff(p.short(abs), readFileSync(abs, "utf8"), t)));
   // what changed: describe --diff of the scene at that frame, by id; a world's parts by world.changed()
   const pal = p.assets.get(scene)!.pal, prev = describe(scene, b, pal).snap, text = describe(scene, b2, p2.assets.get(scene)!.pal, { prev }).text.split("\n");
   const i = text.findIndex((l) => l.startsWith("CHANGES")), j = text.indexOf("", i);
@@ -508,7 +508,7 @@ export function edit(file: string, scene: string, given: unknown, o: { frame?: n
   if (other.length) return { lines: [...lines, `edit: refused: besides ${[...new Set([...mayB, ...mayA])].join(", ")} (its targets and what is placed by them), it changes ${top(other)} px (--allow "${other.map(([l]) => l).join(",")}" lets it)`, "nothing written"], ok: false };
   if (o.dry) return { lines: [...lines, "dry: nothing written"], ok: true };
   for (const [abs, t] of texts) writeFileSync(abs, t);
-  lines.push(`wrote ${[...texts.keys()].map((a) => basename(a)).join(", ")}`);
+  lines.push(`wrote ${[...texts.keys()].map((a) => p.short(a)).join(", ")}`);
   // (the file as written is the one rebuilt: its builds serve the check)
   const c = checkProject(p2, { file: basename(file) });
   lines.push(`check: ${c.lines.length ? `${c.lines.length} warning${c.lines.length > 1 ? "s" : ""}` : "no warnings"} (${c.checked}; ${c.coverage})`, ...c.lines.map((l) => "  " + l));

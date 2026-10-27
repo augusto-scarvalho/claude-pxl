@@ -134,7 +134,7 @@ export function listProject(p: Project): string[] {
     (byFile.get(m[1]) ?? byFile.set(m[1], []).get(m[1])!).push({ kind: d.kind, name: n, line: +m[2], col: +m[3] });
   }
   for (const f of p.files) {
-    const short = f.replace(/^.*[\\/]/, "");
+    const short = p.short(f);
     if (!/\.px\.[jt]s$|\.[cm]?[jt]s$/.test(short)) continue;
     let src = "";
     try { src = readFileSync(f, "utf8"); } catch { /* listed without ranges */ }

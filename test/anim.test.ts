@@ -344,6 +344,33 @@ anim("d", { base: "c", swap: { r: "g" } })`, "t.px.js");
   assert.equal(keys(p, "b"), "w");
   assert.deepEqual(p.timeline("d")!.durations, [250, 250]);
   assert.equal(p.image("d", 0, 250).get(0, 0), pack(0, 228, 54));   // its second frame, recolored
+  // frames of their own durations keep them (100/50/150 evened out to 125 x3 showed other frames), and the
+  // frames a pingpong draws once each, played in its order
+  const q = loadSource(PAL + `anim("e", { w: 3, h: 1 }, (c) => c.px(c.frame, 0, "r"), frame({ ms: 100 }), frame({ ms: 50 }), frame({ ms: 150 }))
+anim("f", { base: "e", swap: { r: "g" } })
+anim("pp", { w: 3, h: 1, dir: "pingpong" }, (c) => c.px(c.frame, 0, "r"), frame({ ms: 100 }), frame({ ms: 50 }), frame({ ms: 150 }))
+anim("pq", { base: "pp", swap: { r: "g" } })`, "t.px.js");
+  assert.deepEqual(q.timeline("f")!.durations, [100, 50, 150]);
+  assert.deepEqual(q.drawn("f").map((f) => keys({ ...q, image: () => f.img } as never, "f")), ["g..", ".g.", "..g"]);
+  assert.deepEqual(q.timeline("pq")!.durations, q.timeline("pp")!.durations);
+  assert.equal(q.drawn("pq").length, 3);
+});
+
+test("anim: a loop of many frames longer than all it plays says which loops don't divide (build and check)", async () => {
+  const p = loadSource(PAL + `anim("idle", { w: 1, h: 1, frames: 4, ms: 250 }, (c) => c.px(0, 0, "w"))
+anim("walk", { w: 1, h: 1, frames: 8, ms: 110 }, (c) => c.px(0, 0, "r"))
+anim("run", { w: 1, h: 1, frames: 8, ms: 125 }, (c) => c.px(0, 0, "g"))
+scene("look", { w: 2, h: 1 }, stamp("idle", 0, 0), stamp("walk", 1, 0))
+scene("ok", { w: 2, h: 1 }, stamp("idle", 0, 0), stamp("run", 1, 0))`, "t.px.js");
+  assert.match(p.timeline("look")!.long!, /^its loop is 22 s, 2200 frames of 10 ms: walk \(880 ms\) doesn't divide idle \(1000 ms\)/);
+  assert.equal(p.timeline("ok")!.long, undefined, "8 x 125 beside 4 x 250: 1 s");
+  const { checkProject } = await import("../src/node/check.ts");
+  assert.ok(checkProject(p, { names: ["look"], frame: 0 }).notes.some((n) => /^look › LOOK: its loop is 22 s.*check reads each of its frames/.test(n)));
+  const dir = mkdtempSync(join(tmpdir(), "pxl-"));
+  try {
+    p.frames = () => [];   // (the line only: not its 2200 frames)
+    assert.match(writeOutputs(p, dir, { only: ["look"], preview: false }).lines[0], /-- its loop is 22 s/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("anim: c.setBox and c.setData reach the sheet's JSON and the .aseprite, a flip mirrors them, check warns where one leaves its frame", async () => {

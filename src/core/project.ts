@@ -316,6 +316,14 @@ export class Project implements BuildCtx {
   look3d?: { light?: number[]; mats?: Record<string, unknown> };
   /** Set by a loader to support include(). */
   includeHook?: (path: string) => void;
+  /** A loaded file as locations name it: the loader's (its path from the main file's folder), else its own name. */
+  short: (file: string) => string = shortName;
+  /** include's `as`: what the names the running file defines go under ("nature." while nature's runs). */
+  private ns = "";
+  /** An include had an `as`: names are looked up in their namespace first (until then, no lookup at all). */
+  private spaced = false;
+  /** The palettes of the files included without `palette` (each stayed with its own assets), for an unknown key's error. */
+  private kept: { path: string; loc?: string; pal: Palette }[] = [];
   /** Set by a loader to support palette files in use(): the file's text, path relative to the art file. */
   readHook?: (path: string) => string;
   /** Set by a loader to support { png } and use("x.png"): the decoded image, path relative to the art file. */
@@ -371,7 +379,7 @@ export class Project implements BuildCtx {
   /** Builds for checking only (see BuildCtx.checksOnly). */
   readonly checksOnly: boolean;
   /** Timelines gathered from animated assets placed by the builds in progress (innermost last). */
-  private collect: Partial<Timeline>[] = [];
+  private collect: Acc[] = [];
   private building = new Set<string>();
   private cands = new Map<string, string[]>();
   private failed = new Map<string, PxError>();
@@ -409,7 +417,7 @@ export class Project implements BuildCtx {
         if (i < 0 || (file && f !== file)) continue;
         const m = /^:(\d+):(\d+)/.exec(line.slice(i + f.length));
         if (!m) continue;
-        found = `${shortName(f)}:${m[1]}:${m[2]}`;
+        found = `${this.short(f)}:${m[1]}:${m[2]}`;
         if (!outer) return found;
         file = f;
       }
@@ -425,28 +433,70 @@ export class Project implements BuildCtx {
     return this.locFromStack(stack, outer);
   }
 
+  /** The loaded file a location ("kit.px.js:13:3", "../nature/kit.px.js:13") points into. */
+  fileOf(loc: string): string | undefined {
+    const f = loc.replace(/:\d+(:\d+)?$/, "");
+    return this.files.find((a) => this.short(a) === f);
+  }
+
+  /** A name the running file defines, under its include's `as` ("lamp" in nature's is "nature.lamp"; one already under it stays). */
+  private qualify(name: string): string {
+    return !this.ns || name.startsWith(this.ns) ? name : this.ns + name;
+  }
+
+  /**
+   * A name as the code at hand means it: in a namespace (include's `as`), its own names first, then
+   * the outer ones' ("lamp" asked for by nature's assets is "nature.lamp" when there is one). The code at
+   * hand: the asset being built innermost, else the file running.
+   */
+  private resolve(name: string, ns?: string, has?: (n: string) => boolean): string {
+    if (!this.spaced || typeof name !== "string") return name;
+    has ??= (n) => this.assets.has(n) || this.groups.has(n);
+    if (ns === undefined) { const by = this.inner(); ns = by === undefined ? this.ns : this.assets.get(by)?.ns ?? ""; }
+    // ponytail: a glob in a namespace scans every name each time; a cache when a kit's globs get hot
+    for (let p = ns; p; p = p.replace(/[^.]*\.$/, "")) {
+      const q = p + name, re = q.includes("*") ? globRe(q) : undefined;
+      if (re ? this.order.some((n) => re.test(n)) : has(q)) return q;
+    }
+    return name;
+  }
+
+  /** An unknown key's error: the file included without `palette` whose palette has the key (its palette stayed with its own assets). */
+  private keyHint(e: PxError): PxError {
+    const k = /unknown (?:color )?key '(.+?)'/.exec(e.detail)?.[1], f = k === undefined ? undefined : this.kept.find((f) => f.pal.keys.has(k));
+    if (f && !e.detail.includes("{ palette: true }")) {
+      e.detail += `; '${k}' is in the palette of ${f.path}, included${f.loc ? ` at ${f.loc}` : ""} without { palette: true }: an included file's palette stays with its own assets. include("${f.path}", { palette: true }) draws with it from there on`;
+      e.message = e.format();
+    }
+    return e;
+  }
+
   // ---------------------------------------------------------------- DSL
 
   /** Functions visible to art files. */
   env(): Record<string, unknown> {
     const env: Record<string, unknown> = {};
-    const define = (kind: AssetKind, name: unknown, rest: unknown[]) => {
+    const define = (kind: AssetKind, given: unknown, rest: unknown[]) => {
       const loc = this.callerLoc();
-      if (typeof name !== "string" || !name) throw new PxError(`${kind} needs a name string first`, loc);
+      if (typeof given !== "string" || !given) throw new PxError(`${kind} needs a name string first`, loc);
+      const name = this.qualify(given);
       const prev = this.assets.get(name) ?? this.groups.get(name);
       if (prev) throw new PxError(`'${name}' is already defined at ${prev.loc}`, loc);
       const opts = (isPlainObject(rest[0]) ? rest.shift() : {}) as AssetOpts;
       checkKeys(`${kind} '${name}'`, opts, ASSET_OPTS[kind], loc);
       // a variant of an anim (base + swap) plays as it does: its clock and pivot, unless it says
       // otherwise (it drew one frame at 8 fps, still, where its base moved)
-      const from = kind === "anim" && typeof opts.base === "string" ? this.assets.get(opts.base) : undefined;
+      const from = kind === "anim" && typeof opts.base === "string" ? this.assets.get(this.resolve(opts.base)) : undefined;
       if (from?.kind === "anim" && !rest.some((v) => isOp(v) && v.name === "frame")) {
+        const said = opts.fps !== undefined || opts.ms !== undefined;
         for (const k of ["fps", "frames", "loop", "dir", "pivot"] as const) if (opts[k] === undefined && from.opts[k] !== undefined) (opts as Record<string, unknown>)[k] = from.opts[k];
-        const d = animTimeline(from).durations!;
+        // the frames it draws, each as long as its base's (reverse and pingpong play some again, in their order)
+        const tl = animTimeline(from), d = tl.order ? Array.from({ length: drawnFrames(tl) }, (_, k) => tl.durations![tl.order!.indexOf(k)]) : tl.durations!;
         if (opts.frames === undefined) opts.frames = d.length;
         // (a base timed by its frame()s' ms, all alike: that pace, not 8 fps; a walk at 110 ms and its
-        // variant at 125 made a 22 s loop of 4400 frames)
-        if (opts.fps === undefined && d.every((v) => v === d[0])) opts.fps = 1000 / d[0];
+        // variant at 125 made a 22 s loop of 4400 frames. Unlike, each its own: 100/50/150 evened out to
+        // 125 x3 showed other frames than the base at the same time)
+        if (!said) { if (d.every((v) => v === d[0])) opts.fps ??= 1000 / d[0]; else opts.ms = d; }
       }
       // the sun of look3d() on things standing up: one sun for the 3D ops, the lit side and the shadows (cast: "sun")
       if ((opts.world?.light as unknown) === "sun") {
@@ -461,30 +511,31 @@ export class Project implements BuildCtx {
       const items = checkItems(`${kind} '${name}'`, rest, loc);
       if (opts.expect !== undefined) try { checkExpect(opts.expect, opts.world); } catch (e) { throw wrap(e).within(`${kind} '${name}'`, loc); }
       if (opts.normals !== undefined && opts.png === undefined) throw new PxError(`${kind} '${name}': normals is the normal map of its png: give png too`, loc);
-      const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true), look3d = this.look3d;
-      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, look3d });
+      const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true), look3d = this.look3d, ns = this.ns ? { ns: this.ns } : {};
+      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, look3d, ...ns });
       this.order.push(name);
       // a scene's pixel: px to an art pixel; its sizes: the same scene k times as big under other names, not checked
       const whole = (k: unknown) => Number.isInteger(k) && (k as number) >= 1;
       if (opts.pixel !== undefined && !whole(opts.pixel)) throw new PxError(`${kind} '${name}': pixel is px to an art pixel (mesh(), the 3D ops and post() draw that many times as big), a whole number from 1, got ${JSON.stringify(opts.pixel)}`, loc);
       if (opts.sizes !== undefined) {
         if (!isPlainObject(opts.sizes) || !Object.values(opts.sizes).every(whole) || opts.pixel !== undefined) throw new PxError(`${kind} '${name}': sizes names the same scene k times as big, { ${name}_hd: 4 } (whole numbers; the scene itself at pixel 1), got ${JSON.stringify(opts.sizes)}`, loc);
-        for (const [n, k] of Object.entries(opts.sizes as Record<string, number>)) {
-          const other = this.assets.get(n) ?? this.groups.get(n);
+        for (const [s, k] of Object.entries(opts.sizes as Record<string, number>)) {
+          const n = this.qualify(s), other = this.assets.get(n) ?? this.groups.get(n);
           if (other) throw new PxError(`'${n}' (a size of '${name}') is already defined at ${other.loc}`, loc);
           const { sizes: _, ...so } = opts;
-          this.assets.set(n, { kind, name: n, opts: { ...so, w: opts.w! * k, h: opts.h! * k, pixel: k, check: false }, items, pal: this.pal, loc, top, look3d });
+          this.assets.set(n, { kind, name: n, opts: { ...so, w: opts.w! * k, h: opts.h! * k, pixel: k, check: false }, items, pal: this.pal, loc, top, look3d, ...ns });
           this.order.push(n);
         }
       }
       // twin: the same items drawn mirrored before they're lit, facing the other way
-      const twin = (opts as { twin?: unknown }).twin;
-      if (twin === undefined) return;
-      if (typeof twin !== "string" || !twin || twin === name) throw new PxError(`${kind} '${name}': twin names the asset facing the other way (e.g. twin: "${name}_l")`, loc);
+      const tw = (opts as { twin?: unknown }).twin;
+      if (tw === undefined) return;
+      const twin = typeof tw === "string" && tw ? this.qualify(tw) : "";
+      if (!twin || twin === name) throw new PxError(`${kind} '${name}': twin names the asset facing the other way (e.g. twin: "${name}_l")`, loc);
       const other = this.assets.get(twin) ?? this.groups.get(twin);
       if (other) throw new PxError(`'${twin}' (the twin of '${name}') is already defined at ${other.loc}`, loc);
       const { twin: _, ...topts } = opts as AssetOpts & { twin?: string };
-      this.assets.set(twin, { kind, name: twin, opts: topts, items, pal: this.pal, loc, top, png, mirror: true });
+      this.assets.set(twin, { kind, name: twin, opts: topts, items, pal: this.pal, loc, top, png, mirror: true, ...ns });
       this.order.push(twin);
     };
 
@@ -503,7 +554,7 @@ export class Project implements BuildCtx {
     };
     env.pal = (aliases: Record<string, string | number>) => {
       const loc = this.callerLoc(), was = this.pal;
-      try { this.pal = this.pal.extend(aliases); } catch (e) { throw wrap(e).within("pal", loc); }
+      try { this.pal = this.pal.extend(aliases); } catch (e) { throw this.keyHint(wrap(e).within("pal", loc)); }
       // a key a ramp runs through given another color: shade() and light() step along the new colors
       // (a file reusing an included kit's keys 1-8 for its own turned the kit's ramps into its colors)
       for (const r of new Set(this.pal.ramps)) {
@@ -528,10 +579,10 @@ export class Project implements BuildCtx {
         const cols = shadeRamp(c, ks.length, at, opts.hue ?? 20, opts.sat);
         this.pal = this.pal.extend(Object.fromEntries(ks.map((k, i) => [k, toHex(cols[i])]))).withRamps([ks.join("")]);
         if (!this.rampLoc.has(ks.join(""))) this.rampLoc.set(ks.join(""), loc);
-      } catch (e) { throw wrap(e).within("shades", loc); }
+      } catch (e) { throw this.keyHint(wrap(e).within("shades", loc)); }
     };
     env.ramps = (...ramps: string[]) => {
-      try { this.pal = this.pal.withRamps(ramps); } catch (e) { throw wrap(e).within("ramps", this.callerLoc()); }
+      try { this.pal = this.pal.withRamps(ramps); } catch (e) { throw this.keyHint(wrap(e).within("ramps", this.callerLoc())); }
       for (const r of ramps) if (!this.rampLoc.has(r)) this.rampLoc.set(r, this.callerLoc());
       // a ramp runs dark to light: written the other way, shade() lightens and light() darkens
       for (const r of ramps) {
@@ -563,13 +614,14 @@ export class Project implements BuildCtx {
       checkKeys(`layer '${name}'`, opts, LAYER_OPTS, loc);
       return { __layer: true, name, opts, items: checkItems(`layer '${name}'`, rest, loc), loc };
     };
-    env.group = (name: unknown, members: unknown) => {
+    env.group = (given: unknown, members: unknown) => {
       const loc = this.callerLoc();
-      if (typeof name !== "string" || !Array.isArray(members) || !members.every((m) => typeof m === "string"))
+      if (typeof given !== "string" || !Array.isArray(members) || !members.every((m) => typeof m === "string"))
         throw new PxError('group("name", ["a", "b*", ...])', loc);
+      const name = this.qualify(given);
       const prev = this.assets.get(name) ?? this.groups.get(name);
       if (prev) throw new PxError(`'${name}' is already defined at ${prev.loc}`, loc);
-      this.groups.set(name, { name, members, loc });
+      this.groups.set(name, { name, members, loc, ...(this.ns ? { ns: this.ns } : {}) });
     };
     // corners(prefix, { size, variants, smooth }, (x, y, t, v) => key): a corner terrain's 16 pieces, `prefix_<mask>`
     env.corners = (prefix: unknown, opts: unknown, fn: unknown) => {
@@ -635,10 +687,11 @@ export class Project implements BuildCtx {
     };
     // turnaround(name, thing, { view, ppm, n, headings, part, ... }): a thing in 3D seen from N headings,
     // a sprite (or anim) each, named by the compass, the east mirrored from the west where it can be (turnaround.ts)
-    env.turnaround = (name: unknown, thing: unknown, opts: unknown = {}) => {
+    env.turnaround = (given: unknown, thing: unknown, opts: unknown = {}) => {
       const loc = this.callerLoc();
       try {
-        if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError('turnaround("house", make3d.house(), { view: "iso", n: 8, ppm: 16 })');
+        if (typeof given !== "string" || !given || !isPlainObject(opts)) throw new PxError('turnaround("house", make3d.house(), { view: "iso", n: 8, ppm: 16 })');
+        const name = this.qualify(given);
         checkKeys("turnaround", opts, ["view", "ppm", "n", "headings", "part", "mats", "light", "as", "size", "spacing", "surface", "draw", "frames", "fps", "mirror", "pad"]);
         const o = opts as { view?: unknown; ppm?: number; n?: number; headings?: unknown; part?: string; mats?: unknown; light?: unknown; as?: string; size?: number; spacing?: number; surface?: unknown; draw?: unknown; frames?: number; fps?: number; mirror?: unknown; pad?: number };
         if (!(o.draw === undefined || typeof o.draw === "function")) throw new PxError(`turnaround: draw is (c, v) => { ... }, drawing by hand over each heading (v.screen(p), v.depth(p) of a point in m), got ${JSON.stringify(o.draw)}`);
@@ -689,11 +742,12 @@ export class Project implements BuildCtx {
     // views(name, { s: grid, sw: grid, ... }, { anchor, like }): hand-drawn views of a thing (a head), a
     // sprite each pivoted on its anchor, the views not drawn the mirrors of those across; a group to
     // stamp by heading (rig3d.ts); pxl check holds their rows together
-    env.views = (name: unknown, grids: unknown, opts: unknown = {}) => {
+    env.views = (given: unknown, grids: unknown, opts: unknown = {}) => {
       const loc = this.callerLoc();
       try {
         const model = grids instanceof Sdf ? grids : undefined;
-        if (typeof name !== "string" || !name || !(model || isPlainObject(grids)) || !isPlainObject(opts)) throw new PxError('views("_head", { s: grid, sw: grid, w: grid, nw: grid, n: grid } or a field (the head modeled), { anchor: [x, y] (or { s: [x, y], ... }), like: "_other_head" })');
+        if (typeof given !== "string" || !given || !(model || isPlainObject(grids)) || !isPlainObject(opts)) throw new PxError('views("_head", { s: grid, sw: grid, w: grid, nw: grid, n: grid } or a field (the head modeled), { anchor: [x, y] (or { s: [x, y], ... }), like: "_other_head" })');
+        const name = this.qualify(given);
         const BAKE = ["n", "pitch", "light", "mats", "surface", "ink", "jaw", "retouch"];
         checkKeys("views", opts, ["anchor", "like", "chin", "swap", "outline", "outline8", "inline", "selout", ...(model ? BAKE : [])]);
         const { anchor, like, chin, n: nv, pitch, light, mats, surface: sopts, ink, jaw, retouch, ...so } = opts as { anchor?: unknown; like?: unknown; chin?: unknown; n?: number; pitch?: number; light?: number[]; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: string[]; retouch?: Record<string, string> };
@@ -765,16 +819,17 @@ export class Project implements BuildCtx {
           if (!Array.isArray(a)) throw new PxError("views: chin needs the anchors as pixels [col, row] (the rows are counted from them)");
           return [`${name}_${d}`, (chin as number) - (a[1] as number)];
         }));
-        this.views.set(name, { drawn: drawn.map((d) => `${name}_${d}`), like: like as string | undefined, ...(chins ? { chin: chins } : {}), ...(model ? { baked: true } : {}), loc });
+        this.views.set(name, { drawn: drawn.map((d) => `${name}_${d}`), like: typeof like === "string" ? this.qualify(like) : undefined, ...(chins ? { chin: chins } : {}), ...(model ? { baked: true } : {}), loc });
         return names;
       } catch (e) { throw wrap(e).within("views", loc); }
     };
     // rig3d(name, { body, moves, n, parts, head, blocks, ... }): a figure on the 3D layer, its moves in
     // every direction asked, drawn by surface(); its flat blocks to judge a move (rig3d.ts)
-    env.rig3d = (name: unknown, opts: unknown) => {
+    env.rig3d = (given: unknown, opts: unknown) => {
       const loc = this.callerLoc();
       try {
-        if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError('rig3d("tr", { body: { h: 34, heads: 3 }, moves: { walk: { frames: 8, ms: 110, pose: (i, heading) => ({ feet, lift, hands }) } }, n: 8, blocks: true })');
+        if (typeof given !== "string" || !given || !isPlainObject(opts)) throw new PxError('rig3d("tr", { body: { h: 34, heads: 3 }, moves: { walk: { frames: 8, ms: 110, pose: (i, heading) => ({ feet, lift, hands }) } }, n: 8, blocks: true })');
+        const name = this.qualify(given);
         checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "ink", "surface", "head", "chin", "blocks", "mirror", "draw"]);
         const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; ink?: unknown; surface?: Record<string, unknown>; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown };
         if (o.surface !== undefined) { if (!isPlainObject(o.surface)) throw new PxError("rig3d: surface is surface()'s options for the painted figure ({ soft, shadows, ao, rim, ... })"); checkKeys("rig3d surface", o.surface, SURFACE_OPTS.filter((k) => !["view", "ppm", "at", "part"].includes(k))); }
@@ -783,8 +838,9 @@ export class Project implements BuildCtx {
         if (o.ink !== undefined && typeof o.ink !== "string") throw new PxError(`rig3d: ink is a key: the line round the figure outside and round each part on the one behind (instead of surface()'s outline on the shadow side), got ${JSON.stringify(o.ink)}`);
         const B: Body = bodyOf(o.body ?? {}), H = headingsOf(o.n ?? 8, o.headings, false), pitch = o.pitch ?? 20;
         if (!(pitch >= 0 && pitch <= 90)) throw new PxError(`rig3d: pitch is degrees down, 0 to 90 (20: a field sprite's), got ${JSON.stringify(pitch)}`);
-        const prefix = o.blocks === true ? "bk" : o.blocks === false || o.blocks === undefined ? undefined : o.blocks;
+        let prefix = o.blocks === true ? "bk" : o.blocks === false || o.blocks === undefined ? undefined : o.blocks;
         if (prefix !== undefined && (typeof prefix !== "string" || !prefix)) throw new PxError(`rig3d: blocks is true (bk_<move>_<dir>) or a prefix for their names, got ${JSON.stringify(o.blocks)}`);
+        if (prefix !== undefined) prefix = this.qualify(prefix);
         if (o.parts !== undefined && typeof o.parts !== "function") throw new PxError("rig3d: parts is (j, pose) => ({ name: piece or [pieces] }): j.limb(a, b, r0, r1, paint), j.ball(c, r, paint) or fields");
         if (!o.parts && prefix === undefined) throw new PxError("rig3d: give it parts (the figure painted) or blocks (its flat blocks), or both");
         for (const k of ["draw"] as const) if (o[k] !== undefined && typeof o[k] !== "function") throw new PxError(`rig3d: ${k} is (c, j, pose) => { ... }`);
@@ -793,20 +849,23 @@ export class Project implements BuildCtx {
         const moves = Object.entries(o.moves).map(([m, M]) => {
           if (!isPlainObject(M)) throw new PxError(`rig3d: move '${m}' is { frames, ms, pose, dirs?, draw? }`);
           checkKeys(`rig3d move '${m}'`, M, ["frames", "ms", "pose", "dirs", "draw"]);
-          const { frames, ms = 100, pose, dirs, draw } = M as { frames?: number; ms?: number; pose?: unknown; dirs?: unknown; draw?: unknown };
-          if (!(Number.isInteger(frames) && frames! >= 1) || !(ms > 0) || typeof pose !== "function" || (draw !== undefined && typeof draw !== "function"))
-            throw new PxError(`rig3d: move '${m}' is { frames (a whole number), ms (each frame's), pose: (i, heading) => pose, dirs?, draw? }, got ${JSON.stringify(M)}`);
+          const { frames, ms = 100, pose, dirs, draw } = M as { frames?: number; ms?: number | number[]; pose?: unknown; dirs?: unknown; draw?: unknown };
+          if (!(Number.isInteger(frames) && frames! >= 1) || !(Array.isArray(ms) ? ms.length === frames && ms.every((v) => v > 0) : ms > 0) || typeof pose !== "function" || (draw !== undefined && typeof draw !== "function"))
+            throw new PxError(`rig3d: move '${m}' is { frames (a whole number), ms (each frame's, or a list, a number a frame: [60, 40, 60, 80]), pose: (i, heading) => pose, dirs?, draw? }, got ${JSON.stringify(M)}`);
           if (dirs !== undefined && !(Array.isArray(dirs) && dirs.every((d) => H.some((h) => h.name === d)))) throw new PxError(`rig3d: move '${m}''s dirs are some of its headings (${H.map((h) => h.name).join(", ")}), got ${JSON.stringify(dirs)}`);
           return { m, frames: frames!, ms, pose: pose as (i: number, h: number) => Pose, heads: H.filter((h) => !dirs || (dirs as string[]).includes(h.name)), draw: draw as ((c: Canvas, j: Joints, p: Pose) => void) | undefined };
         });
         const SP = Math.sin((pitch * Math.PI) / 180), CP = Math.cos((pitch * Math.PI) / 180);
+        // where a point lands on the sprite (its foot point at the pivot) and how near us it is: the joints' escape hatch
+        const project = (px: number, py: number) => (q: number[]): [number, number] => [px + q[0], py - q[1] * SP - q[2] * CP], depth = (q: number[]) => q[2] * SP - q[1] * CP;
         const fields = (j: Joints, p: Pose) => [...(prefix !== undefined ? [blocksOf(B, j)] : []), ...(o.parts ? [partsOf((o.parts as (j: Joints, p: Pose) => unknown)(j, p), j).field, sdf.sphere(B.r.head).at(j.head)] : [])];
         // one size for all: given, or every field's box seen at every frame and heading, a pixel round it
         let { w, h, pivot } = o;
         if (w === undefined || h === undefined || pivot === undefined) {
           let x0 = 0, x1 = 0, y0 = 0, y1 = 0;
           for (const M of moves) for (const hd of M.heads) for (let i = 0; i < M.frames; i++) {
-            const p = M.pose(i, hd.deg), j = jointsOf(B, p, hd.deg);
+            // (the parts given the joints they're drawn with: those that read j.depth or j.screen too, the foot point at 0, 0)
+            const p = M.pose(i, hd.deg), j = Object.assign(jointsOf(B, p, hd.deg), { screen: project(0, 0), depth });
             for (const f of fields(j, p)) {
               const { lo, hi } = compile(f);
               for (let c = 0; c < 8; c++) {
@@ -820,8 +879,7 @@ export class Project implements BuildCtx {
         }
         if (!(Number.isInteger(w) && Number.isInteger(h) && Array.isArray(pivot) && pivot.length === 2 && pivot.every(Number.isInteger))) throw new PxError(`rig3d: w, h and pivot (the pixel the figure's foot point lands on, [x, y]) are whole numbers, got ${JSON.stringify({ w, h, pivot })}`);
         const [px, py] = pivot as [number, number];
-        // where a point lands on the sprite and how near us it is: the joints' escape hatch
-        const screen = (q: number[]): [number, number] => [px + q[0], py - q[1] * SP - q[2] * CP], depth = (q: number[]) => q[2] * SP - q[1] * CP;
+        const screen = project(px, py);
         const joints = (p: Pose, heading: number) => Object.assign(jointsOf(B, p, heading), { screen, depth });
         const view = { kind: "side" as const, pitch }, at = [px + 0.5, py + 0.5], ink = typeof o.ink === "string" ? o.ink : typeof o.outline === "string" ? o.outline : this.pal.keys.has("k") ? "k" : "#000000";
         const look = this.look3d, light = o.light ?? look?.light ?? [0, -0.6, 0.75];
@@ -916,7 +974,7 @@ export class Project implements BuildCtx {
           M.draw?.(c, j, p);
           (o.draw as ((c: Canvas, j: Joints, p: Pose) => void) | undefined)?.(c, j, p);
         };
-        const names: string[] = [], frameOps = (M: (typeof moves)[number]) => Array.from({ length: M.frames }, () => ({ __op: true, name: "frame", args: [{ ms: M.ms }], loc }));
+        const names: string[] = [], frameOps = (M: (typeof moves)[number]) => Array.from({ length: M.frames }, (_, i) => ({ __op: true, name: "frame", args: [{ ms: Array.isArray(M.ms) ? M.ms[i] : M.ms }], loc }));
         for (const M of moves) {
           const groups: [string, string[]][] = [];
           for (const [flat, pre] of [[false, o.parts ? name : undefined], [true, prefix]] as const) {
@@ -946,32 +1004,39 @@ export class Project implements BuildCtx {
     env.ik3 = (a: unknown, b: unknown, l1: unknown, l2: unknown, hint: unknown) => {
       try { return ik3(a as never, b as never, l1 as number, l2 as number, hint as never); } catch (e) { throw wrap(e).within("ik3", this.callerLoc()); }
     };
-    env.font = (name: unknown, asset: unknown, opts: Partial<FontDef> = {}) => {
+    env.font = (given: unknown, asset: unknown, opts: Partial<FontDef> = {}) => {
       const loc = this.callerLoc();
-      if (typeof name !== "string" || typeof asset !== "string") throw new PxError('font("name", "glyph_sprite", { chars, w, h, cols?, mono? })', loc);
-      checkKeys(`font '${name}'`, opts, ["chars", "w", "h", "cols", "mono"], loc);
+      if (typeof given !== "string" || typeof asset !== "string") throw new PxError('font("name", "glyph_sprite", { chars, w, h, cols?, mono? })', loc);
+      checkKeys(`font '${given}'`, opts, ["chars", "w", "h", "cols", "mono"], loc);
       const { chars, w, h, cols, mono } = opts;
       if (typeof chars !== "string" || !chars || !(Number.isInteger(w) && w! > 0 && Number.isInteger(h) && h! > 0))
-        throw new PxError(`font '${name}' needs { chars: "ABC...", w, h }: the glyph cell size and the characters in cell order`, loc);
+        throw new PxError(`font '${given}' needs { chars: "ABC...", w, h }: the glyph cell size and the characters in cell order`, loc);
+      const name = this.qualify(given);
       if (this.fonts.has(name)) throw new PxError(`font '${name}' is already defined at ${this.fonts.get(name)!.loc}`, loc);
-      this.fonts.set(name, { name, asset, chars, w: w!, h: h!, cols, mono: !!mono, loc });
+      this.fonts.set(name, { name, asset, chars, w: w!, h: h!, cols, mono: !!mono, loc, ...(this.ns ? { ns: this.ns } : {}) });
     };
     env.sheet = (name: unknown, entries: unknown, opts: SheetOpts = {}) => {
       const loc = this.callerLoc();
       if (typeof name !== "string" || !Array.isArray(entries)) throw new PxError('sheet("name", ["a", "b*"], { cols, pad })', loc);
       checkKeys(`sheet '${name}'`, opts, SHEET_OPTS, loc);
-      this.sheets.push({ name, entries, opts, loc });
+      this.sheets.push({ name: this.qualify(name), entries, opts, loc, ...(this.ns ? { ns: this.ns } : {}) });
     };
-    env.include = (path: unknown, opts: { palette?: boolean } = {}) => {
+    env.include = (path: unknown, opts: { palette?: boolean; as?: string } = {}) => {
       const loc = this.callerLoc();
-      if (typeof path !== "string") throw new PxError('include("other.px.js", { palette? })', loc);
-      checkKeys("include", opts, ["palette"], loc);
+      if (typeof path !== "string") throw new PxError('include("other.px.js", { palette?, as? })', loc);
+      checkKeys("include", opts, ["palette", "as"], loc);
+      if (opts.as !== undefined && !(typeof opts.as === "string" && /^[A-Za-z_$][\w$]*$/.test(opts.as)))
+        throw new PxError(`include: as is the name its assets go under (as: "nature": its "lamp" is "nature.lamp" here), letters, digits and _, got ${JSON.stringify(opts.as)}`, loc);
       if (!this.includeHook) throw new PxError("include() is not available here", loc);
       // The included file's use()/pal()/ramps() stay with its own assets, unless the includer
-      // asks for them ({ palette: true }: a shared palette file).
-      const pal = this.pal, outer = this.outerRamps;
+      // asks for them ({ palette: true }: a shared palette file). Its names go under `as`, if given.
+      const pal = this.pal, outer = this.outerRamps, ns = this.ns;
       if (!opts.palette) this.outerRamps = new Set(pal.ramps);
-      try { this.includeHook(path); } finally { if (!opts.palette) { this.pal = pal; this.outerRamps = outer; } }
+      if (opts.as !== undefined) { this.ns = `${ns}${opts.as}.`; this.spaced = true; }
+      try { this.includeHook(path); } finally {
+        this.ns = ns;
+        if (!opts.palette) { if (this.pal !== pal) this.kept.push({ path, loc, pal: this.pal }); this.pal = pal; this.outerRamps = outer; }
+      }
     };
     env.rng = (seed?: number) => rng(seed);
     // procedural texture, the same in every file: hash(i, j), vnoise(x, y), fbm(x, y, octaves), bayer(x, y)
@@ -1088,7 +1153,7 @@ export class Project implements BuildCtx {
       try { return ik(a as number, b as number, target as [number, number], bend as number); } catch (e) { throw wrap(e).within("ik", this.callerLoc()); }
     };
     // has("name"): is there an asset or a group of that name yet (a generated part made once)
-    env.has = (name: unknown) => typeof name === "string" && (this.assets.has(name) || this.groups.has(name));
+    env.has = (name: unknown) => typeof name === "string" && (this.assets.has(this.resolve(name)) || this.groups.has(this.resolve(name)));
     env.figure = (h: unknown, heads?: unknown) => {
       try { return figure(h as number, heads as number | undefined); } catch (e) { throw wrap(e).within("figure", this.callerLoc()); }
     };
@@ -1108,7 +1173,7 @@ export class Project implements BuildCtx {
         if (guide) items.push(layer("skeleton", { ref: true }, [(c: Canvas) => drawGuide(r, c)]));
         if (retouch.length) items.push(layer("retouch", {}, [stampOp(touch, 0, 0, flip ? { flip: "x" } : {})]));
         define("sprite", r.name, [o, ...items]);
-        this.rigs.set(r.name, r);
+        this.rigs.set(this.qualify(r.name), r);
       };
       make(rig, rest, false);
       if (turn === undefined) return;
@@ -1268,11 +1333,12 @@ export class Project implements BuildCtx {
   private cubes = new Map<string, Lut>();
 
   glyphs(font: string): (ch: string) => string[] {
+    font = this.resolve(font, undefined, (n) => this.fonts.has(n));
     const hit = this.glyphCache.get(font);
     if (hit) return hit;
     const f = this.fonts.get(font);
     if (!f) throw new PxError(`unknown font '${font}'${didYouMean(font, [...this.fonts.keys()])}`);
-    const img = this.image(f.asset, 0, 0, false), cols = f.cols ?? Math.max(1, Math.floor(img.w / f.w));
+    const img = this.image(this.resolve(f.asset, f.ns ?? ""), 0, 0, false), cols = f.cols ?? Math.max(1, Math.floor(img.w / f.w));
     const map = new Map<string, string[]>();
     [...f.chars].forEach((ch, i) => {
       const x0 = (i % cols) * f.w, y0 = Math.floor(i / cols) * f.h;
@@ -1297,19 +1363,20 @@ export class Project implements BuildCtx {
   }
 
   has(name: string): boolean {
+    name = this.resolve(name);
     this.read(name);
     return this.assets.has(name) || this.groups.has(name);
   }
 
   candidates(name: string, depth = 0): string[] {
-    if (!depth) this.read(name);
+    if (!depth) this.read((name = this.resolve(name)));
     const hit = this.cands.get(name);
     if (hit) return hit;
     if (typeof name !== "string") throw new PxError(`asset name must be a string, got ${typeof name}`);
     if (depth > 8) throw new PxError(`group nesting too deep at '${name}'`);
     let list: string[] = [];
     const g = this.groups.get(name);
-    if (g) for (const m of g.members) list.push(...this.candidates(m, depth + 1));
+    if (g) for (const m of g.members) list.push(...this.candidates(this.resolve(m, g.ns ?? ""), depth + 1));
     else if (name.includes("*")) {
       const re = globRe(name);
       list = this.order.filter((n) => re.test(n));
@@ -1332,6 +1399,7 @@ export class Project implements BuildCtx {
    * result makes the asset being built around this call animated too.
    */
   build(name: string, seed = 0, t = 0, track = true): BuildOut {
+    name = this.resolve(name);
     let first = this.buildAt(name, seed, 0);
     const tl = first.anim, def = this.assets.get(name);
     // animated by what it places: its functions run on that loop. The loop is known once built, so a
@@ -1348,6 +1416,7 @@ export class Project implements BuildCtx {
       if (tl.capped || (acc.loop && lcm(acc.loop, tl.loop) > MAX_LOOP)) acc.capped = true;
       acc.loop = acc.loop ? Math.min(MAX_LOOP, lcm(acc.loop, tl.loop)) : tl.loop;
       acc.step = acc.step ? gcd(acc.step, tl.step) : tl.step;
+      (acc.by ??= new Map()).set(name, tl.loop);
     }
     if (!tl || t === 0) return first;
     const tt = tl.once ? Math.min(Math.max(0, t), tl.loop) : ((t % tl.loop) + tl.loop) % tl.loop;
@@ -1431,19 +1500,19 @@ export class Project implements BuildCtx {
     // ponytail: a sprite animated by the anims it stamps, stubbed, leaves the scene's clock (not one anim)
     if (this.stub && this.building.size === 1 && this.stub(name)) return { img: new Img(1, 1), layers: [], placements: [], ...(def.kind === "anim" ? { anim: animTimeline(def) } : {}) };
     this.building.add(name);
-    const acc: Partial<Timeline> = {};
+    const acc: Acc = {};
     // a scene may keep a clock of its own, as an anim does ({ frames, fps }): its functions read it
     // (c.t, c.frame), and the anims it stamps join it (one stamped at a frame it picks doesn't)
     if (def.kind === "scene" && def.opts.frames !== undefined) {
       const fps = def.opts.fps ?? 8, n = Math.floor(def.opts.frames);
       if (!(fps > 0) || !(n >= 1)) throw new PxError(`scene '${name}': frames must be 1 or more and fps above 0, got frames ${def.opts.frames}, fps ${fps}`);
-      acc.step = Math.round(1000 / fps); acc.loop = n * acc.step;
+      acc.step = Math.round(1000 / fps); acc.loop = n * acc.step; acc.by = new Map([["its own frames", acc.loop]]);
     }
     this.collect.push(acc);
     try {
       const out = buildAsset(this, def, seed, this.tracing && seed === 0 && t === 0 ? new Trace() : undefined, t, clock);
       // Anims keep their own frame timing; other assets are as animated as what they place.
-      if (!out.anim && acc.loop) out.anim = { loop: acc.loop, step: acc.step!, ...(acc.capped ? { capped: true } : {}) };
+      if (!out.anim && acc.loop) out.anim = { loop: acc.loop, step: acc.step!, ...(acc.capped ? { capped: true } : {}), ...longLoop(acc) };
       if (!t) this.cache.set(key, out);
       else {
         const old = this.timed.get(key), bytes = buildBytes(out);
@@ -1458,7 +1527,7 @@ export class Project implements BuildCtx {
       }
       return out;
     } catch (e) {
-      const err = wrap(e, (s) => this.locFromStack(s)).within(`${def.kind} '${name}'`, def.loc);
+      const err = this.keyHint(wrap(e, (s) => this.locFromStack(s)).within(`${def.kind} '${name}'`, def.loc));
       this.failed.set(key, err);
       throw err;
     } finally {
@@ -1469,14 +1538,16 @@ export class Project implements BuildCtx {
 
   /** Exported asset names (no "_" prefix), in definition order. */
   exported(): string[] {
-    return this.order.filter((n) => !n.startsWith("_"));
+    // (a part of a namespace too: nature._grass)
+    return this.order.filter((n) => !n.startsWith("_") && !n.includes("._"));
   }
 
   /** Expand a sheet's entries: globs match exported names, groups expand to members. */
   sheetNames(s: SheetDef): string[] {
     const out: string[] = [];
     const add = (n: string) => { if (!out.includes(n)) out.push(n); };
-    for (const e of s.entries) {
+    for (const e0 of s.entries) {
+      const e = this.resolve(e0, s.ns ?? "");
       if (e.includes("*")) {
         const re = globRe(e);
         this.exported().filter((n) => re.test(n)).forEach(add);
@@ -1485,6 +1556,21 @@ export class Project implements BuildCtx {
     }
     return out;
   }
+}
+
+/** A combined timeline being gathered, and the loop of each thing joining it. */
+type Acc = Partial<Timeline> & { by?: Map<string, number> };
+/** Past this many frames, a loop longer than all it plays (their loops don't divide) is said. */
+const LONG_FRAMES = 600;
+/**
+ * A loop longer than any it plays, of many frames: what doesn't divide what (an idle of 1000 ms beside a
+ * walk of 880: 22 s and 2200 frames of 10 ms, built and checked frame by frame, said nowhere below 60 s).
+ */
+function longLoop(acc: Acc): { long?: string } {
+  const n = Math.round(acc.loop! / acc.step!), by = [...(acc.by ?? [])], top = by.reduce((a, b) => (b[1] > a[1] ? b : a), ["", 0]);
+  if (acc.capped || n <= LONG_FRAMES || acc.loop! <= top[1]) return {};
+  const off = by.filter(([, l]) => top[1] % l !== 0).map(([k, l]) => `${k} (${l} ms)`);
+  return { long: `its loop is ${+(acc.loop! / 1000).toFixed(2)} s, ${n} frames of ${acc.step} ms: ${off.join(", ")} ${off.length > 1 ? "don't" : "doesn't"} divide ${top[0]} (${top[1]} ms). Loops that divide one another keep it short (8 x 125 ms beside 4 x 250 ms: 1 s)` };
 }
 
 function lcm(a: number, b: number): number {

@@ -211,6 +211,8 @@ export interface Timeline {
   once?: boolean;
   /** The placed anims' loops don't line up: their combined loop was cut at the 60s maximum. */
   capped?: boolean;
+  /** Its loop runs to many frames because what it plays doesn't divide (1000 ms and 880 ms: 22 s): which, in words. */
+  long?: string;
 }
 
 export interface AssetDef {
@@ -230,12 +232,15 @@ export interface AssetDef {
   look3d?: { light?: number[]; mats?: Record<string, unknown> };
   /** Drawn in 3D standing on its origin (turnaround(), rig3d()): its pivot is where it meets the ground. */
   grounded?: boolean;
+  /** Defined in a file included `as` a namespace ("nature."): the names its drawing asks for are looked up there first. */
+  ns?: string;
 }
 
 export interface GroupDef {
   name: string;
   members: string[];
   loc?: string;
+  ns?: string;
 }
 
 export interface SheetOpts {
@@ -252,6 +257,7 @@ export interface SheetDef {
   entries: string[];
   opts: SheetOpts;
   loc?: string;
+  ns?: string;
 }
 
 /** Options for stamp / tile / pattern / tilemap / scatter / wire hangs. */
@@ -527,6 +533,7 @@ export interface FontDef {
   /** Every glyph as wide as the widest (centered), not trimmed to its own ink. */
   mono?: boolean;
   loc?: string;
+  ns?: string;
 }
 
 export type { Region };

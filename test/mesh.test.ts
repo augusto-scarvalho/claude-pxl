@@ -364,6 +364,8 @@ test("the HD-2D camera: perspective({ w, h, pitch, fov, ppm }) looks at the pict
   near(mx, 32, "aimed"); near(my, 18, "aimed"); assert.equal(au, 0.3, "lifted");
   const B = perspective(scaled(C, 2)), [bx, by] = B.ground(0.7, C.z! + 1, 0.4), [sx, sy] = C.ground(0.7, C.z! + 1, 0.4);
   near(bx, 2 * sx, "k times as big"); near(by, 2 * sy, "k times as big");
+  // the picture's size back, for a scene sized { w: cam.w, h: cam.h }
+  assert.deepEqual([C.w, C.h, scaled(C, 2).h], [64, 36, 72]);
   assert.throws(() => perspective({ w: 64, h: 36, pitch: 10, ppm: 24 } as View), /looking at the picture's middle/);
   // post() in the art's pixels on a picture k times as big, unless px
   assert.deepEqual(postAt({ blur: 4, focus: [3, 5], bloom: { r: 2, strength: 1 }, sharp: 2 }, 3), { blur: 12, focus: [9, 15], bloom: { r: 6, strength: 1 }, sharp: 2, pixel: 3 });

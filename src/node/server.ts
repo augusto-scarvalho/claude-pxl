@@ -143,7 +143,7 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
       for (const name of project.order) {
         const def = project.assets.get(name)!;
         const fp = fingerprint(def);
-        const info: AssetInfo = { name, kind: def.kind, part: name.startsWith("_"), changed: false, edited: fps.size > 0 && fps.get(name) !== fp };
+        const info: AssetInfo = { name, kind: def.kind, part: /(^|\.)_/.test(name), changed: false, edited: fps.size > 0 && fps.get(name) !== fp };
         fps.set(name, fp);
         try {
           const b = project.build(name);

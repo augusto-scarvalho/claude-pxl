@@ -39,7 +39,7 @@ hd2d/harbor.px.js: 0 warnings (1 scene (12 frames, 79 distinct placements), 0 ri
   harbor_md › not checked (check: false)
   harbor_clip › not checked (check: false)
 hd2d/kit.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: lines on 7; not run: front marker (nothing has one)
+  ran: nothing; not run: front marker (nothing has one)
 hd2d/plaza.px.js: 0 warnings (1 scene (16 frames, 21 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 21 (a clear reading on 0), standing on 21; not run: front marker (nothing has one), feet (nothing placed has a height)
   plaza_hd › not checked (check: false)

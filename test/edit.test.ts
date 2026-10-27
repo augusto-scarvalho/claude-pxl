@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addStamp, checkEdit, editAsset, editPart, editStamp } from "../src/core/edit.ts";
 import { main } from "../src/node/cli.ts";
 import { edit, inspect, unchanged } from "../src/node/edit.ts";
 import { loadProject } from "../src/node/load.ts";
+import { listProject } from "../src/node/list.ts";
 import { whenChanged } from "./passed.ts";
 
 const test = whenChanged("test/edit.test.ts");
@@ -200,4 +201,18 @@ scene("s", { w: 24, h: 10, bg: "g" }, layer("props", { sort: "y" },
   console.log = (s: string) => out.push(s);
   try { await main(["inspect", file, "s", "--find", "rock", "man"]); } finally { console.log = log; }
   assert.match(out.join("\n"), /3 of its 3 things match "rock man"/);
+});
+
+test("pxl edit, inspect and list in files of one name in two folders (two kit.px.js): each by its path from the main file's folder", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-"));
+  for (const d of ["other", "sub"]) mkdirSync(join(dir, d));
+  writeFileSync(join(dir, "other", "kit.px.js"), `use("pico8")\nsprite("tree", "33")\n`);
+  writeFileSync(join(dir, "sub", "kit.px.js"), `use("pico8")\nsprite("rock", "88")\nscene("yard", { w: 8, h: 3 },\n  stamp("rock", 2, 1, { id: "stone" }))\n`);
+  const file = join(dir, "a.px.js");
+  writeFileSync(file, `include("other/kit.px.js")\ninclude("sub/kit.px.js")\n`);
+  assert.match(inspect(file, "yard", { id: "stone" }), /call: stamp\("rock", 2, 1, \{ id: "stone" \}\) \(sub\/kit\.px\.js:4\)/);
+  const r = edit(file, "yard", { op: "move", target: "stone", by: [1, 0] });
+  assert.ok(r.ok, r.lines.join("\n"));
+  assert.match(readFileSync(join(dir, "sub", "kit.px.js"), "utf8"), /stamp\("rock", 3, 1, \{ id: "stone" \}\)/);
+  assert.deepEqual(listProject(loadProject(file)).filter((l) => !l.startsWith(" ")), ["a.px.js (3 lines)", "other/kit.px.js (3 lines)", "sub/kit.px.js (5 lines)"]);
 });

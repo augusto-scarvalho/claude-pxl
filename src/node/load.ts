@@ -1,7 +1,7 @@
 // Loads art files (.js or .ts) into a Project by running them in a vm sandbox whose globals
 // are the DSL. Each load gets a fresh context, so reloading after an edit is clean.
 import { readFileSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import * as vm from "node:vm";
 import { stripTypeScriptTypes } from "node:module";
 import { PxError, wrap } from "../core/errors.ts";
@@ -32,6 +32,9 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
   const p = new Project(opts), env = p.env();
   const ctx = sandbox(env);
   const stack: string[] = [], codes = new Map<string, string>();
+  // a file in locations: its path from the main file's folder ("kit.px.js", "../nature/kit.px.js": two kits apart)
+  const home = dirname(resolve(file));
+  p.short = (abs) => { const r = relative(home, abs); return isAbsolute(r) ? abs.replace(/^.*[\\/]/, "") : r.split(sep).join("/"); };
   const run = (path: string) => {
     const abs = resolve(path);
     if (stack.includes(abs)) throw new PxError(`include cycle: ${[...stack, abs].join(" -> ")}`);
@@ -50,7 +53,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
       // this file is its own error, with its line
       const alone = () => { try { new vm.Script(compile(code, abs)); return true; } catch { return false; } };
       if ((e as Error)?.name === "SyntaxError" && /has already been declared/.test((e as Error).message) && stack.length > 1 && alone())
-        throw new PxError(`${abs.replace(/^.*[\\/]/, "")}: ${(e as Error).message}. Included files share one scope for top-level names, so each const/let/function name can be declared in only one of them; rename it in one file`);
+        throw new PxError(`${p.short(abs)}: ${(e as Error).message}. Included files share one scope for top-level names, so each const/let/function name can be declared in only one of them; rename it in one file`);
       throw syntaxAware(e, abs, p);
     } finally {
       stack.pop();
@@ -127,7 +130,7 @@ function warnHiding(p: Project, ctx: vm.Context, env: Record<string, unknown>, c
     let loc: string | undefined;
     for (const [f, code] of codes) {
       const i = code.split("\n").findIndex((l) => decl.test(l));
-      if (i >= 0) { loc = `${f.replace(/^.*[\\/]/, "")}:${i + 1}`; break; }
+      if (i >= 0) { loc = `${p.short(f)}:${i + 1}`; break; }
     }
     p.warn(`globals: the art file's top level declares '${n}', hiding pxl's ${n}() in this file and the files it includes: rename the file's (e.g. '${n}2' or a longer name)`, loc);
   }
@@ -139,7 +142,7 @@ function syntaxAware(e: unknown, file: string, p: Project): PxError {
   // include called it (the call stack's place would be the include's line)
   if ((!err.loc || (e as Error)?.name === "SyntaxError") && typeof e === "object" && e && "stack" in e) {
     const m = new RegExp(escape(file) + ":(\\d+)").exec(String((e as Error).stack));
-    if (m) err.loc = `${file.replace(/^.*[\\/]/, "")}:${m[1]}`;
+    if (m) err.loc = `${p.short(file)}:${m[1]}`;
     err.message = err.format();
   }
   return err;
