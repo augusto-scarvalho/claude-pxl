@@ -127,19 +127,30 @@ git clone --depth 1 https://github.com/augusto-scarvalho/claude-pxl.git ~/.claud
 `git pull` there updates it. If you already have a clone, make `~/.claude/skills/pxl-pixel-art` a
 link to it instead. To be sure the skill is used, name it: "use the pxl skill to draw ...".
 
+A change to a scene is asked for in plain words ("move the fish stall a bit left", "add a lantern
+beside the tea stall"). The agent finds the thing with `pxl inspect` (what the scene holds, by id,
+and where the file writes each value) and makes the change with `pxl edit`, which writes it there,
+refuses it if anything else would move, and says what changed by id. In a
+[first measure](docs/evaluation-edit.md) (six small edits on three examples, Sonnet at low effort,
+one run each way) this and editing the file by hand were both right six times out of six (the hand
+edit lit a turned fox better; `edit`'s flip now turns it the same way). `edit` cost 16% less in
+all (29-41% less on the 660-line file, about even on the other two: it reads 4 to 8.5k tokens where
+the other way reads the file) and took 2.5 times as long (260 s against 104 s; an edit on the
+shrine has since come down to 10-16 s).
+
 The Codex CLI, Antigravity's `agy` and other agents install it differently: see
 [Install the skill](docs/agents.md#install-the-skill). [Working with an agent](docs/agents.md) also
 covers which model and effort to pick (in the [model study](docs/model-study.md), Opus at xhigh was
-the sweet spot), writing a brief, a round in stages you approve one by one, what a session and a
-frame cost, when to draw in 3D and when by hand, one agent or a pipeline for a big scene, and
-reviewing the result.
+the sweet spot), writing a brief, a round in stages you approve one by one, asking for an edit,
+what a session and a frame cost, when to draw in 3D and when by hand, one agent or a pipeline for a
+big scene, and reviewing the result.
 
 ## Commands
 
 ```
 pxl build <art.px.js>             PNGs, sheets + JSON, GIFs and previews in out/ (--only a,b, --share N, --aseprite)
-pxl serve <art.px.js>             the live viewer: rebuilds on save and replays the painting; /3d turns
-                                  the exported 3D models round
+pxl serve <art.px.js>             the live viewer: rebuilds on save and replays the painting (an HD scene's
+                                  frames built as it plays them); /3d turns the exported 3D models round
 pxl shot <art.px.js> <name>       one asset as a picture to look at: frames side by side (in rows when too
                                   wide), a region enlarged, values only (--grey), guide layers over it (--ref),
                                   the last commit above and the pixels that changed (--vs HEAD --diff); more
@@ -147,8 +158,14 @@ pxl shot <art.px.js> <name>       one asset as a picture to look at: frames side
                                   long scene's preview); a reference GIF, WebP or video too
 pxl ascii <art.px.js> <name>      an asset as palette keys with x/y rulers
 pxl describe <art.px.js> <name>   a whole scene as text: what is where, what covers it, how it moves
-pxl check <art.px.js>             warnings on every scene and frame; LOOK lines on hand-drawn lines; a 3D
-                                  scene's rules (--fix: a failing one fixed by one number)
+pxl check <art.px.js>             warnings on every scene and frame; LOOK lines on hand-drawn lines; a
+                                  scene's rules, expect and expect3d (--fix: a failing one fixed by one number)
+pxl inspect <art.px.js> <scene>   what an edit can name in a scene, by id (--find words); --id x: its values,
+                                  where the file writes each, the operations it takes
+pxl edit <art.px.js> <scene> <edit>
+                                  a move, recolor, flip, swap, relation or new stamp written where the value
+                                  lives, refused if anything else moves, then what changed by id and the
+                                  check; --dry shows it first
 pxl steps <art.px.js> <name>      how it was painted; --at x,y names the line that painted that pixel
 pxl list <art.px.js>              a map of the file: each definition's lines and comment
 pxl compare <art.px.js> <name> <ref.png | other>   silhouette rows against a reference or another asset
@@ -172,7 +189,10 @@ says which to reach for.
   gradients (dithered, or by whole rows: `grad(..., "lines")`), dithering, noise, pixel fonts (a 3×5
   built in, a 5×7 to include, `mono` for a score), `scatter` brushes, tilemaps, paths along a
   polyline that fan round their bends (`lane()`), random groups with reproducible seeds.
-- **Scenes**: layers, cast-shadow and light layers, per-layer PNG export.
+- **Scenes**: layers, cast-shadow and light layers, per-layer PNG export. Props placed by a relation
+  (`beside`, `on`, `along`, `apart`) follow what they go with; the scene's rules (`expect`: a gap, an
+  order, inside a region, on the ground) are held by `pxl check` at every frame and mended by
+  `--fix`; an `id` names a placement to `describe`, `inspect` and `edit`.
 - **Animation**: frames as patches over a base sprite → strips + JSON tags + GIF; motion blur
   (`stamp(..., { smear })`); parts half a pixel along (`stamp(..., { sub: true })`) for an idle
   without the single-pixel bob. A scene runs on the clock of what it stamps, or on its own:
@@ -217,9 +237,10 @@ says which to reach for.
 | For | Read |
 | --- | --- |
 | a first sprite, an animation and a scene by hand; which command when | [docs/getting-started.md](docs/getting-started.md) |
-| running an agent: install, model and effort, briefs, a round in stages, costs, 3D or by hand, review; tests and tools for contributors | [docs/agents.md](docs/agents.md) |
+| running an agent: install, model and effort, briefs, a round in stages, edits by name, costs, 3D or by hand, review; tests and tools for contributors | [docs/agents.md](docs/agents.md) |
 | which model and effort to draw with: one scene, seventeen runs | [docs/model-study.md](docs/model-study.md) |
 | whether the 3D layer helps agents: four comparisons, each run once an arm | [docs/evaluation-3d.md](docs/evaluation-3d.md) |
+| whether `inspect` and `edit` make a small edit cheaper than editing the file: six edits, two arms | [docs/evaluation-edit.md](docs/evaluation-edit.md) |
 | every op and option | [reference.md](reference.md), or `pxl help <name>` |
 | the agent's workflow, and where to read each thing | [SKILL.md](SKILL.md) |
 | which example teaches what, a line each | [examples/README.md](examples/README.md) |
@@ -385,8 +406,8 @@ Jungle" by bluecarrot16, Lanea Zimmerman (Sharm), Sevarihk, Hyptosis and others,
 npm install                                          # dev only: typescript, @types/node
 node --test test/docs.test.ts                        # one test file, while you iterate
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts  # the examples' check on one folder
-npm run test:quick                                   # every test but the two slowest (~12 s; ~23 s after a change to pxl's sources)
-npm run check                                        # type check + every test (~14 s; ~100 s after an engine change), before a commit
+npm run test:quick                                   # every test but the two slowest (9-16 s; ~45 s after a change to pxl's sources)
+npm run check                                        # type check + every test (13-20 s; ~2 min after an engine change), before a commit
 ```
 
 ```
@@ -414,6 +435,7 @@ test/         node:test suites
 | `scripts/tokens.ts` | where a Claude Code session's tokens went, read from its transcript |
 | `scripts/model-study.sh` | one run of the [model study](docs/model-study.md): a brief to a new Claude Code, Codex or `agy` session |
 | `scripts/eval3d.ts` | what an edit of a 3D scene changed, part by part, and what it shouldn't have ([evaluation-3d.md](docs/evaluation-3d.md)) |
+| `scripts/evaledit.ts` | what an edit of a scene changed, by id, and the pixels outside what the request names ([evaluation-edit.md](docs/evaluation-edit.md)) |
 | `scripts/mhtml.ts` | saved web pages (`.mhtml`) opened as text and images, to read tutorials |
 
 How to use them, and how to update the examples' snapshot after a change you meant, is in

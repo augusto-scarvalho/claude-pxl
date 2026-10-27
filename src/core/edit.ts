@@ -220,7 +220,10 @@ export function addStamp(src: string, loc: string, e: Edit, like?: { src: string
     if (readLit(name) === undefined) return `like's asset is code (\`${name}\` at ${fileLine(like.loc)})`;
   }
   const indent = /^[ \t]*/.exec(src.slice(src.lastIndexOf("\n", at) + 1))![0], nl = src.includes("\r\n") ? "\r\n" : "\n", call = `stamp(${name}${xy}, { ${opts.join(", ")} })`;
-  return { src: src.slice(0, end) + `,${nl}${indent}${call}` + src.slice(end), said: `added ${call} (${loc.split(":")[0]}:${src.slice(0, end).split("\n").length + 1}, after ${addTo(e)}'s stamp, in its layer)` };
+  // A comment ending its line stays there: the new stamp goes on the next line, before the closers that were on it.
+  const eol = (src + "\n").indexOf("\n", end), m = /^([\s),;]*?)(\s*\/\/[^\r\n]*)$/.exec(src.slice(end, eol).replace(/\r$/, ""));
+  const out = !m ? `,${nl}${indent}${call}` : m[1].trim().startsWith(",") ? `${m[1]}${m[2]}${nl}${indent}${call},` : `,${m[2]}${nl}${indent}${call}${m[1].trimEnd()}`;
+  return { src: src.slice(0, end) + out + src.slice(end + (m ? m[0].length : 0)), said: `added ${call} (${loc.split(":")[0]}:${src.slice(0, end).split("\n").length + 1}, after ${addTo(e)}'s stamp, in its layer)` };
 }
 
 /** An edit of an asset's own options (scope "asset": every placement of it), at its sprite() or anim() call `loc`. */

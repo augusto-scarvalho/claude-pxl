@@ -164,6 +164,10 @@ test("pxl edit after a relation: a move writes x, y into a call its relation alo
   const crlf = src.replace(/\n/g, "\r\n"), add = (o: Record<string, unknown>) => ok(addStamp(crlf, crates, E({ op: "add", target: "l2", like: "l1", ...o }), lk));
   assert.match(add({ beside: ["crates", "above", -9] }), /\r\n {2}stamp\("lamp", -3, 0, \{ beside: \["crates", "above", -9\], id: "l2", swap: \{ y: "r" \} \}\),\r\n/);
   assert.match(add({ on: "crates" }), /stamp\("lamp", \{ on: "crates", id: "l2", swap/);
+  // a comment ending the line it relates to stays on that line
+  const said = (s: string) => ok(addStamp(s, crates, E({ op: "add", target: "c2", asset: "cat", on: "crates" })));
+  assert.match(said(src.replace(`"crates" }),`, `"crates" }),  // the pile`)), /\{ id: "crates" \}\), {2}\/\/ the pile\n {2}stamp\("cat", \{ on: "crates", id: "c2" \}\),\n {2}stamp\("cat", \{ id/);
+  assert.match(said(`scene("s", {}, layer("props",\n  stamp("crates", 5, 9, { id: "crates" }))),  // the pile\n`), /\{ id: "crates" \}\), {2}\/\/ the pile\n {2}stamp\("cat", \{ on: "crates", id: "c2" \}\)\)\),\n$/);
   assert.match(addStamp(`const c = stamp("crates", 5, 9, { id: "crates" })\n`, "a.px.js:1:11", E({ op: "add", asset: "cat", on: "crates" })) as string, /isn't an item of a list/);
   assert.throws(() => E({ op: "add", asset: "cat", on: "ground" }), /add takes its new id/);
   assert.throws(() => E({ op: "add", asset: "cat", like: "c", on: "crates" }), /add takes its new id/);

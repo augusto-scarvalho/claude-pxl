@@ -141,6 +141,10 @@ The agent can measure, check and compare, but it can't guess what you meant. Say
   looks at them with `pxl shot ref.gif` (a clip's frames on one sheet) and reads them with
   `pxl study ref.gif` (palette, ramps, outlines, light, perspective, timing, parallax planes, and each
   moving piece cut out; see [Starting from a reference](getting-started.md#starting-from-a-reference)).
+- **What must stay true.** "The pot beside the fire, 2 to 6 px", "the lantern in front of the
+  hall". The agent places props by a relation (`beside`, `on`, `along`, `apart`), so they follow
+  what they go with, and writes the rules as the scene's `expect`: `pxl check` holds them at every
+  frame and `--fix` mends one an edit broke.
 - **Where it goes.** The file's folder, asset names an engine expects, a sprite sheet's layout.
 
 Say what you'll do with it (a game's tiles, a banner, a GIF to post): that decides sheets, sizes and
@@ -169,25 +173,24 @@ it:
    one message, then one look again. Every turn re-reads the whole conversation, so a turn per edit
    is what makes a long session expensive. After the first write the art file is changed with edits,
    not written whole again.
-4. **A small change by name.** Moving, flipping, recoloring, putting one thing by another, adding one
-   more by another, a world3d part's parameter: `pxl inspect art.px.js <scene> --find lantern`
-   finds it by the words of its id, its asset or the comment above its call or its asset's
-   definition (an id is the file's name: the east
-   lantern is `toro_e`; "the fox with the jewel" finds `fox_tama_e` by its definition's comment);
-   `pxl inspect art.px.js <scene> --id <id>` says in a few hundred tokens what the thing is, where,
-   where the file writes each of its values and which operations it takes; then
-   `pxl edit art.px.js <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'` writes the
-   change where the value lives (the stamp's call, the table it reads, the part's spec) and prints
-   what changed (`describe --diff` and the pixels changed, by id) and what `pxl check` says. No
-   reading of the file, no code written. "Add a lantern beside the tea stall" is
-   `{ "op": "add", "target": "lantern_3", "like": "lantern_1", "beside": ["tea_stall", "left", 2] }`:
-   a new stamp line after the tea stall's, guarded like the rest. "Turn the vendor to face us": its
-   `--id` lists the `swap` siblings (`vendor_s`, facing front); a flip of a front or back view drawn
-   symmetric is refused, as it changes nothing. What code computes is refused with where it is; that
-   edit is made by hand. `--dry` shows the source lines it would change and what would change, writing
-   nothing. An edit that changes more than its target and what is placed by it (the ground drawn
-   from the same table, another thing reading the same number) is refused, saying what; `--allow
-   <ids>` lets those when meant.
+4. **A small change by name.** Ask in plain words: "move the fish stall a bit left", "make the
+   awning red", "put the cat on the crates", "turn the vendor to face the street", "add a lantern
+   beside the tea stall", "a denser canopy" on a `world3d` part. The agent finds the thing with
+   `pxl inspect art.px.js <scene> --find stall` (the words of its id, its asset, or the comment
+   above its call or its asset's definition: the east lantern is `toro_e`, "the fox with the jewel"
+   finds `fox_tama_e`), reads it in full with `--id <id>` (where the file writes each value, the
+   operations it takes, the siblings that face another way), and previews the change:
+   `pxl edit art.px.js <scene> '{ "op": "move", "target": "fish_stall", "by": [-3, 0] }' --dry`
+   prints the source lines it would change and what would change in the picture. Without `--dry`
+   it writes the number where it lives (the stamp's call, a table it reads, a part's spec), says
+   what changed by id (`describe --diff`) and runs `pxl check`. "Add a lantern beside the tea stall"
+   is `{ "op": "add", "target": "lantern_3", "like": "lantern_1", "beside": ["tea_stall", "left", 2] }`,
+   a new stamp line after the tea stall's. An edit is refused, saying why, when it would change
+   anything but its target and what is placed by it (the ground drawn from the same table:
+   `--allow <ids>` lets that when meant), when it would change nothing (a flip of a front view drawn
+   symmetric), and when code computes the value (that one is made by hand). In a
+   [first measure](evaluation-edit.md) this read 4 to 8.5k tokens where reading the file cost its
+   size, was as right, and took longer.
 5. **Check, then build.** `pxl check art.px.js` before handing over: the agent fixes each warning or
    says why it's meant. `pxl build art.px.js` writes the files.
 
@@ -195,7 +198,8 @@ Commands run on one of pxl's examples write an `out/` next to it, so the agent g
 `--out <scratch dir>` to keep the skill's folder clean.
 
 To watch it work, ask the agent to start `pxl serve art.px.js` in the background and give you the
-URL: the viewer replays each save op by op.
+URL: the viewer replays each save op by op. An HD scene's long loop plays as each frame is built
+when the page asks for it, a second or two a frame.
 
 ## Blocks first, then paint
 
@@ -387,20 +391,20 @@ test file for what you changed, or the quick suite:
 
 ```sh
 node --test test/docs.test.ts                            # one file: the commands and flags the docs cite
-npm run test:quick                                       # every test but the two slowest, about 12 s (23 after a change to pxl's sources)
+npm run test:quick                                       # every test but the two slowest, 9 to 16 s (45 after a change to pxl's sources)
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts      # the examples check, on one folder (or hd2d/harbor, or a,b)
-npm run check                                            # types and every test, about 14 s (100 s after an engine change): before the commit
+npm run check                                            # types and every test, 13 to 20 s (2 min after an engine change): before the commit
 ```
 
-The two slowest tests are the check of every example (about 70 s on a 4-core laptop when all 69
+The two slowest tests are the check of every example (70 to 120 s on a 4-core laptop when all 69
 run, in one thread per four of the machine's, the slowest of the last run first) and the study of
-the gallery's GIFs (7 s); a change to a check, to `study` or to an example is what they catch. Both
-leave alone what already passed. Each example that passed is noted in `node_modules/.cache/pxl/`
-with a hash of what its check read (pxl's sources, Node's version, the test, the example and every
-file it read: what it includes, its palettes, PNGs and poses), and the next run checks only the
-examples whose hash changed: an example edited reruns alone (half a second for a small one, a few
-for the harbor), a shared file (`hd2d/kit.px.js`) reruns the examples that include it, a change to
-pxl's sources reruns them all; the test says how many it left alone. The gallery's study is skipped
+the gallery's GIFs (7 to 27 s); a change to a check, to `study` or to an example is what they
+catch. Both leave alone what already passed. Each example that passed is noted in
+`node_modules/.cache/pxl/` with a hash of what its check read (pxl's sources, Node's version, the
+test, the example and every file it read: what it includes, its palettes, PNGs and poses), and the
+next run checks only the examples whose hash changed: an example edited reruns alone (half a
+second for a small one, a few for the harbor), a shared file (`hd2d/kit.px.js`) reruns the
+examples that include it, a change to pxl's sources reruns them all; the test says how many it left alone. The gallery's study is skipped
 while pxl's sources and its two GIFs are the same. Every other test file but two is skipped the
 same way, each while pxl's sources, the file, `test/helpers.ts` and what else it names (a fixture,
 an example it includes, `types/pxl.d.ts`) are as they were when all its tests last passed: painting
@@ -493,7 +497,7 @@ Agents run `pxl shot`, `check` and `study` many times a session, and the test su
 every example: a slow path costs every turn. Before and after a change to the engine:
 
 ```sh
-npm run check                                           # types and tests: an engine change rechecks every example, about 100 s
+npm run check                                           # types and tests: an engine change rechecks every example, about 2 min
 node scripts/hashes.ts --vs HEAD                        # every example's assets built by the last commit's pxl and by yours: what differs
 node scripts/hashes.ts --vs HEAD --frames 12 examples/hd2d/graveyard.px.js   # the animated ones' frames too, 12 over each loop (--frames: all)
 node scripts/perf.ts                                    # pxl check's time, processor time and peak memory on every example
@@ -543,8 +547,12 @@ a third of a body's time is its cloth's sweeps and their art functions), graveya
 node scripts/tokens.ts ~/.claude/projects/<folder>/<session id>.jsonl
 # one run of a model study: the brief to a new headless session in a folder of its own
 scripts/model-study.sh <brief.txt> <runs folder> <model> <effort> [claude|codex|agy]
+# what a run's edit of a scene changed, by id, and the pixels outside what the request names
+node scripts/evaledit.ts <before.px.js> <after.px.js> <scene> --touch <ids>
 ```
 
 `tokens.ts` splits the cost by what it paid for (thinking, tool results, the fixed context), then
 lists each kind of tool result by how much of the context it took and how often later turns re-read
-it. `model-study.sh` keeps each run's result, the pxl commit it read, and its start and end times. [Doing it again](model-study.md#doing-it-again) has the whole study's commands.
+it. `model-study.sh` keeps each run's result, the pxl commit it read, and its start and end times.
+[Doing it again](model-study.md#doing-it-again) has the whole study's commands. `evaledit.ts` scores
+a run of the [edit experiment](evaluation-edit.md#doing-it-again), which has its commands too.

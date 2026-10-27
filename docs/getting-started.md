@@ -12,6 +12,7 @@ animation and a scene, then shows where each command fits. For the full API see
 - [Your first sprite](#your-first-sprite)
 - [Watch it while you edit](#watch-it-while-you-edit)
 - [An animation and a scene](#an-animation-and-a-scene)
+- [Relations, rules and edits by name](#relations-rules-and-edits-by-name)
 - [Loops, clocks and sheets](#loops-clocks-and-sheets)
 - [By hand or in 3D](#by-hand-or-in-3d), and what a frame costs
 - [What a build writes](#what-a-build-writes)
@@ -77,8 +78,10 @@ pxl serve art.px.js
 
 Open http://127.0.0.1:4321/. Every time you save, the viewer rebuilds and replays the asset you
 changed op by op, so you see how it was painted. It writes the same `out/` files as `build`
-(`--no-out` to skip them, `--port` for another port). A file that exports 3D models (`export3d`) gets a
-"3D" link in the viewer: http://127.0.0.1:4321/3d turns them round with the mouse.
+(`--no-out` to skip them, `--port` for another port). An HD scene with a long loop plays too: the
+viewer builds each frame when the page asks for it (a second or two each) and leaves that scene's
+`out/` files to `pxl build --only <scene>`. A file that exports 3D models (`export3d`) gets a "3D"
+link in the viewer: http://127.0.0.1:4321/3d turns them round with the mouse.
 
 ## An animation and a scene
 
@@ -102,6 +105,41 @@ scene("meadow", { w: 160, h: 96, bg: "w" },
 
 `pxl help anim` and `pxl help scene` print what the reference says about each, and where the
 examples use them.
+
+## Relations, rules and edits by name
+
+Give what you will move an `id`, and place what goes with it by a relation: it follows when the
+other moves.
+
+```js
+layer("props", { sort: "y" },
+  stamp("slime_hop", 40, 64, { id: "hop" }),
+  stamp("slime_red", { id: "red", beside: ["hop", "right", 14], flip: "x" }))
+```
+
+`beside` puts it a gap off one side of the other, `on` on its top (or on the ground), `along` some
+px along a path, `apart` clear of it (`pxl help beside`). What the layout must keep goes on the
+scene as rules, which `pxl check` holds at every frame:
+
+```js
+scene("meadow", { w: 160, h: 96, bg: "w", expect: [{ beside: ["red", "hop", { gap: [8, 16] }] }] }, ...)
+```
+
+When a rule breaks, `pxl check art.px.js --fix` changes the one number that makes it hold, where the
+file writes it (`pxl help expect`). A small change then needs no reading of the file:
+
+```sh
+pxl inspect art.px.js meadow --find red     # what the scene holds, by id; --id hop: one in full
+pxl edit art.px.js meadow '{ "op": "move", "target": "hop", "by": [-3, 0] }' --dry   # what it would change
+pxl edit art.px.js meadow '{ "op": "move", "target": "hop", "by": [-3, 0] }'         # hop and red move
+```
+
+`edit` writes the number where it lives (hop's `40` becomes `37`), says what changed by id and runs
+`pxl check`. It refuses an edit that would move anything else, and one on what code computes (make
+that by hand). It also recolors, flips, swaps an asset, changes a relation and adds a stamp beside
+another (`pxl help "scenes 14"`). With an agent, ask in plain words ("move the green slime a bit
+left", "add another red one beside it"): it runs these same commands
+([Working with an agent](agents.md#how-the-agent-works)).
 
 ## Loops, clocks and sheets
 
@@ -199,7 +237,8 @@ Useful options:
 | hold a new part to one you approved, row by row | `pxl compare art.px.js head_new head_old` (or `other.px.js:head`) |
 | learn from finished art or a reference | `pxl study ref.gif` |
 | measure one thing moving in a reference | `pxl study ref.gif --at x,y,w,h` (its box every frame, its spacing; the region in the drawing's own pixels, as `shot` shows it) |
-| fix a 3D scene's rule that fails (the rock inside the house, the house off the ground) | `pxl check art.px.js --fix` changes the one number that makes it hold and says which |
+| move, recolor, flip or add a thing in a scene without reading the file | `pxl inspect art.px.js meadow --find red`, then `pxl edit` ([above](#relations-rules-and-edits-by-name)) |
+| fix a scene's rule that fails (a gap too wide, the rock inside the house) | `pxl check art.px.js --fix` changes the one number that makes it hold and says which |
 | turn an exported 3D model round | `pxl serve art.px.js`, then the viewer's "3D" link |
 
 `pxl check` makes every check `describe` can warn on (facing, feet on the ground, lit side,
