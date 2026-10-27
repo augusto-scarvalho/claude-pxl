@@ -20,7 +20,7 @@ import { checkExpect } from "./expect.ts";
 import type { Color } from "./color.ts";
 import { TRANSPARENT, oklab, shadeRamp, toHex } from "./color.ts";
 import { PxError, didYouMean, wrap } from "./errors.ts";
-import type { Img } from "./image.ts";
+import { Img } from "./image.ts";
 import {
   type AssetDef, type AssetKind, type AssetOpts, type GroupDef, type Item, type Layer, type LayerOpts, type Op,
   type FontDef, type SheetDef, type SheetOpts, type Timeline, isLayer, isOp,
@@ -243,6 +243,8 @@ function checkItems(where: string, items: unknown[], loc?: string): Item[] {
 export interface ProjectOptions {
   /** Record painting traces for seed-0 builds (live viewer). */
   trace?: boolean;
+  /** What code places (a function's stamp, c.as, a mesh() sprite) keeps where that code is (Placement.code): pxl inspect and edit say it. */
+  where?: boolean;
   /** Bytes of builds at times other than 0 to keep (default 1 GB; see Project.timed). */
   timedBytes?: number;
   /** For pxl check: skip the whole-image passes (lighting, glow), which no check reads. */
@@ -341,9 +343,16 @@ export class Project implements BuildCtx {
   private cands = new Map<string, string[]>();
   private failed = new Map<string, PxError>();
   readonly tracing: boolean;
+  readonly where: boolean;
+  /**
+   * pxl inspect --id: what the asset being built stamps itself is drawn as nothing (its clock kept, an
+   * anim's) when this says so, so a scene built for one thing draws only what its place and rules read.
+   */
+  stub?: (name: string) => boolean;
 
   constructor(opts: ProjectOptions = {}) {
     this.tracing = !!opts.trace;
+    this.where = !!opts.where;
     this.timedBudget = opts.timedBytes ?? TIMED_BYTES;
     this.checksOnly = !!opts.checksOnly;
   }
@@ -1316,6 +1325,10 @@ export class Project implements BuildCtx {
     const tt = tl.once ? Math.min(Math.max(0, t), tl.loop) : ((t % tl.loop) + tl.loop) % tl.loop, key = `${name}#${tt}`, v = this.timed.get(key);
     if (v) { this.timed.delete(key); this.timedBytes -= v.bytes; }
   }
+  /** Forget every build (pxl inspect --id: a scene drawn with stubs, drawn again with what they hid). */
+  forgetAll(): void {
+    this.cache.clear(); this.timed.clear(); this.timedBytes = 0; this.failed.clear();
+  }
   /** Does another asset name this one (stamps it, as a zoom on a scene does)? Read off its ops and its functions' code. */
   named(name: string): boolean {
     const quoted = [`"${name}"`, `'${name}'`, `\`${name}\``], says = (f: unknown) => quoted.some((q) => String(f).includes(q));
@@ -1378,6 +1391,8 @@ export class Project implements BuildCtx {
     const failed = this.failed.get(key);
     if (failed) throw new PxError(`depends on '${name}', which failed`);
     if (this.building.has(name)) throw new PxError(`reference cycle through '${name}'`);
+    // ponytail: a sprite animated by the anims it stamps, stubbed, leaves the scene's clock (not one anim)
+    if (this.stub && this.building.size === 1 && this.stub(name)) return { img: new Img(1, 1), layers: [], placements: [], ...(def.kind === "anim" ? { anim: animTimeline(def) } : {}) };
     this.building.add(name);
     const acc: Partial<Timeline> = {};
     // a scene may keep a clock of its own, as an anim does ({ frames, fps }): its functions read it

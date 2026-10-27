@@ -60,3 +60,32 @@ scene("s", { w: 20, h: 8, bg: "g" }, layer("props", stamp("rock", 2, 2, { id: "a
   assert.match(readFileSync(file, "utf8"), /stamp\("rock", 2, 2, \{ id: "a", flip: "x" \}\), stamp\("rock", 11, 2\)/);
   assert.match(r.lines.join("\n"), /a: redrawn[^]*rock #2: moved \+1,\+0[^]*check: no warnings/);
 });
+
+test("pxl inspect --id draws only what the thing reads; pxl edit --dry writes nothing; an edit that changes more than its targets is refused", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js"), boom = join(dir, "boom.px.js");
+  const art = `pal({ k: "#1b1630", g: "#8ccf63", r: "#e2585e" })
+sprite("rock", "kkk\\nkgk")
+sprite("bush", "rr\\nrr")
+const AT = { rock: [3, 4] }
+`;
+  writeFileSync(file, art + `scene("s", { w: 24, h: 10, bg: "g" }, layer("props", stamp("rock", ...AT.rock, { id: "a" }), stamp("bush", 0, 0, { beside: ["a", "right", 1], id: "b" }), stamp("bush", AT.rock[0] + 12, 2, { id: "c" })))\n`);
+  writeFileSync(boom, art + `sprite("boom", { w: 2, h: 2 }, () => { throw new Error("built") })
+scene("t", { w: 24, h: 10, bg: "g" }, layer("props", stamp("rock", 3, 4, { id: "a" }), stamp("bush", 0, 0, { beside: ["a", "right", 1], id: "b" }), stamp("boom", 0, 0)))\n`);
+  // t's boom fails when built: b's place reads a (its relation), never boom
+  const box = (f: string, s: string) => JSON.parse(inspect(f, s, { id: "b", json: true })).box;
+  assert.throws(() => inspect(boom, "t"), /built/);
+  assert.deepEqual(box(boom, "t"), box(file, "s"));
+  const before = readFileSync(file, "utf8");
+  const dry = edit(file, "s", { op: "move", target: "b", by: [1, 0] }, { dry: true }), said = dry.lines.join("\n");
+  assert.ok(dry.ok, said);
+  assert.match(said, /- scene\("s"[^\n]*beside: \["a", "right", 1\][^\n]*\n {2}\+ scene\("s"[^\n]*beside: \["a", "right", 2\][^]*pixels changed by id: b 4[^]*dry: nothing written/);
+  assert.equal(readFileSync(file, "utf8"), before);
+  // a's x is the table c reads too: c would move, refused; allowed, written (b follows a)
+  const no = edit(file, "s", { op: "move", target: "a", by: [1, 0] });
+  assert.equal(no.ok, false);
+  assert.match(no.lines.join("\n"), /refused: besides a, b \(its targets and what is placed by them\), it changes c 4 px \(--allow "c"/);
+  assert.equal(readFileSync(file, "utf8"), before);
+  const yes = edit(file, "s", { op: "move", target: "a", by: [1, 0] }, { allow: ["c"] });
+  assert.ok(yes.ok, yes.lines.join("\n"));
+  assert.match(readFileSync(file, "utf8"), /rock: \[4, 4\]/);
+});

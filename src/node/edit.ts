@@ -1,7 +1,8 @@
 // pxl inspect and pxl edit. A scene's named things (a stamp, what c.as() names, a mesh() sprite, a world3d
 // part): what each is, where it is, its values and where the art file writes them, its relations and
 // rules, the operations it takes; then edits (core/edit.ts) written where the values live, checked
-// rebuilt before anything is written, and what they changed (describe --diff, by id) and pxl check.
+// rebuilt before anything is written, and what they changed (describe --diff, by id) and pxl check;
+// refused when more changes than what they name (--dry: shown, not written).
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import type { Project } from "../core/project.ts";
@@ -9,6 +10,7 @@ import type { BuildOut } from "../core/build.ts";
 import type { Placement } from "../core/canvas.ts";
 import type { World } from "../core/world3d.ts";
 import { PxError } from "../core/errors.ts";
+import { TRANSPARENT } from "../core/color.ts";
 import { MANY, describe, labelOf } from "../core/describe.ts";
 import { type Rule2d, callAt, listAt, moveInSource, nameAll, namesOf, runRules2d } from "../core/expect.ts";
 import { ruleText } from "../core/world3d.ts";
@@ -41,10 +43,8 @@ export function targetsOf(p: Project, b: BuildOut): Target[] {
     if (!q.id && same.length > MANY) continue;
     // its drawing's box, on the picture
     const bb = q.img.bounds(), W = b.img.w - 1, H = b.img.h - 1, box = bb && [Math.max(0, q.x + bb.x), Math.max(0, q.y + bb.y), Math.min(W, q.x + bb.x + bb.w - 1), Math.min(H, q.y + bb.y + bb.h - 1)];
-    // what code places: the step that placed it, from the painting log
-    const step = !q.loc || q.via ? b.trace?.frames.find((f) => f.label.startsWith(q.via === "mesh" ? "mesh(" : "stamp(") && (q.via === "mesh" || (f.label.includes(JSON.stringify(q.name)) && (!q.id || f.label.includes(JSON.stringify(q.id)))))) : undefined;
     const shared = q.loc && !q.via ? calls.get(q.loc)! : [];
-    const why = !q.loc || q.via ? `placed by code (${q.via === "as" ? "c.as() in a function" : q.via === "mesh" ? "a mesh() sprite" : "c.stamp() in a function"}${step?.loc ? `, ${step.loc}` : ""}): its numbers are the code's`
+    const why = !q.loc || q.via ? `placed by code (${q.via === "as" ? "c.as() in a function" : q.via === "mesh" ? "a mesh() sprite" : "c.stamp() in a function"}${q.code ? `, ${q.code}` : ""}): its numbers are the code's`
       : shared.length > 1 ? `its stamp call at ${q.loc} places ${shared.length} things (${shared.map((s) => labelOf(s, groups.get(`${s.name}@${s.layer ?? ""}`)!)).join(", ")}): a value written there changes them all` : undefined;
     out.push({ id: labelOf(q, same), kind: q.via === "as" ? "drawing" : q.via === "mesh" ? "mesh sprite" : "stamp", asset: q.name, layer: q.layer, ...(box ? { box, feet: [Math.round((box[0] + box[2]) / 2), box[3]] } : {}), p: q, ...(why ? { why } : {}) });
   }
@@ -76,7 +76,7 @@ type Op = { op: string; scopes: string[]; takes: string };
 /** What inspect says of one thing: its values and where they're written, relations, rules, parts, operations. */
 function details(p: Project, scene: string, b: BuildOut, t: Target, all: Target[]): Record<string, unknown> {
   const out: Record<string, unknown> = {}, src = (loc: string) => { const f = fileOf(p, loc); return f ? readFileSync(f, "utf8") : undefined; };
-  const others = all.filter((o) => o !== t).map((o) => o.id), ids = others.slice(0, 24).join(", ") + (others.length > 24 ? `, +${others.length - 24} more` : ""), ops: Op[] = [];
+  const others = all.filter((o) => o !== t).map((o) => o.id).sort(), ids = others.slice(0, 24).join(", ") + (others.length > 24 ? `, +${others.length - 24} more` : ""), ops: Op[] = [];
   if (t.kind === "part") {
     const w = t.world!.world, spec = w.spec.parts[t.id], file = t.world!.loc?.split(":")[0] ?? "", text = t.world!.loc ? src(t.world!.loc) : undefined;
     out.world = `world3d at ${t.world!.loc}`;
@@ -128,7 +128,7 @@ function details(p: Project, scene: string, b: BuildOut, t: Target, all: Target[
       }
     }
     if (q.rel) { const k = REL2D.find((r) => (out.values as Record<string, string> | undefined)?.[r]) ?? "placed by"; out.relation = `${k} ${q.rel.to ?? (k === "along" ? "a path" : "the ground or a row")}`; }
-    out.placedByIt = b.placements.filter((o) => o.rel?.to === t.id && !blendedOf(b).has(o.layer ?? "")).map((o) => o.id ?? o.name);
+    out.placedByIt = b.placements.filter((o) => o.rel?.to === t.id && !blendedOf(b).has(o.layer ?? "")).map((o) => o.id ?? o.name).sort();
     const rules = p.assets.get(scene)?.opts.expect as Rule2d[] | undefined;
     if (rules) {
       const mine = rules.filter((r) => namesOf([r]).includes(t.id));
@@ -157,11 +157,42 @@ function details(p: Project, scene: string, b: BuildOut, t: Target, all: Target[
 }
 const REL = ["on", "beside", "around", "attach", "along", "apart"];
 
+/**
+ * The scene built for one thing (`id`), drawing only what it reads: first with nothing it stamps drawn
+ * (Project.stub), to see the thing's asset, what places it and its copies (their places number them,
+ * "rock #2") and what places that, and what its rules name; then with those. What the others are
+ * drawn as moves them, so what lists them is sorted. A drawing, a mesh sprite or a part (what covers
+ * it shapes it), or a scene whose stubs fail, is built whole.
+ */
+// ponytail: scene code that places the thing by another's c.size() reads a stub's; keep what it names if one does
+function narrow(p: Project, scene: string, id: string, at: () => { b: BuildOut; all: Target[] }): { b: BuildOut; all: Target[] } {
+  const whole = () => { p.stub = undefined; p.forgetAll(); return at(); };
+  if (p.worlds.some((w) => w.world.spec.parts[id])) return at();
+  try {
+    p.stub = () => true;
+    const first = at(), t = first.all.find((x) => x.id === id);
+    if (!t || t.kind !== "stamp") return t ? whole() : first;
+    const rules = (p.assets.get(scene)?.opts.expect as Rule2d[] | undefined)?.filter((r) => namesOf([r]).includes(id)) ?? [];
+    const ids = new Set([id, ...namesOf(rules)]), keep = new Set<string>();
+    for (let n = -1; n !== keep.size + ids.size;) {
+      n = keep.size + ids.size;
+      for (const q of first.b.placements) if (q.name === t.p!.name || ids.has(q.id ?? q.name) || ids.has(q.name)) { keep.add(q.name); if (q.rel?.to) ids.add(q.rel.to); }
+    }
+    const names = new Set([...keep].flatMap((k) => p.candidates(k)));
+    p.stub = (n) => !names.has(n);
+    p.forgetAll();
+    const out = at();
+    return out.all.some((x) => x.id === id && x.asset === t.asset) ? out : whole();
+  } catch { return whole(); }
+}
+
 /** pxl inspect: every thing of the scene an edit can name, a line each; or one (`id`) in full. Text, or JSON. */
 export function inspect(file: string, scene: string, o: { id?: string; json?: boolean; frame?: number } = {}): string {
-  const p = loadProject(file, { trace: true });
+  // built for checking (no light passes), keeping where code placed a thing
+  const p = loadProject(file, { checksOnly: true, where: true });
   if (!p.assets.has(scene)) throw new PxError(`unknown asset '${scene}'`);
-  const f = o.frame ?? 0, b = p.build(scene, 0, frameTime(p, scene, f)), all = targetsOf(p, b);
+  const f = o.frame ?? 0, at = () => { const b = p.build(scene, 0, frameTime(p, scene, f)); return { b, all: targetsOf(p, b) }; };
+  const { b, all } = o.id === undefined ? at() : narrow(p, scene, o.id, at);
   const head = (t: Target) => ({ id: t.id, kind: t.kind, asset: t.asset, ...(t.layer ? { layer: t.layer } : {}), ...(t.box ? { box: t.box, feet: t.feet } : {}) });
   const where = (t: Target) => (t.box ? `x ${t.box[0]}-${t.box[2]}, y ${t.box[1]}-${t.box[3]}, feet ${t.feet!.join(",")}` : "nothing drawn");
   if (o.id === undefined) {
@@ -187,10 +218,87 @@ export function inspect(file: string, scene: string, o: { id?: string; json?: bo
   return lines.join("\n");
 }
 
-/** pxl edit: the edits written into the art files (all of them, or none: each checked, and the scene rebuilt), then what changed and pxl check. The lines to print, and whether it wrote. */
-export function edit(file: string, scene: string, given: unknown, o: { frame?: number } = {}): { lines: string[]; ok: boolean } {
+/** Each placement's label: its id, else its asset's name, "#n" among its copies in its layer (describe's). */
+function labelsOf(b: BuildOut): Map<Placement, string> {
+  const groups = new Map<string, Placement[]>();
+  for (const q of b.placements) { const k = `${q.name}@${q.layer ?? ""}`; (groups.get(k) ?? groups.set(k, []).get(k)!).push(q); }
+  return new Map(b.placements.map((q) => [q, labelOf(q, groups.get(`${q.name}@${q.layer ?? ""}`)!)]));
+}
+
+/** The source lines an edit changes in one file, old (-) under new (+), each pair at its file:line. */
+function lineDiff(name: string, a: string, b: string): string[] {
+  const A = a.split("\n"), B = b.split("\n"), out: string[] = [];
+  let i = 0, j = 0;
+  while (i < A.length && i < B.length && A[i] === B[i]) i++;
+  while (j < A.length - i && j < B.length - i && A[A.length - 1 - j] === B[B.length - 1 - j]) j++;
+  if (A.length === B.length) { for (let k = i; k < A.length - j; k++) if (A[k] !== B[k]) out.push(`  ${name}:${k + 1}`, `  - ${A[k]}`, `  + ${B[k]}`); }
+  else out.push(`  ${name}:${i + 1}`, ...A.slice(i, A.length - j).map((l) => `  - ${l}`), ...B.slice(i, B.length - j).map((l) => `  + ${l}`));
+  return out;
+}
+
+/**
+ * What changed between two builds of a picture, pixel by pixel, by who: at each changed pixel, the
+ * labels whose own pixels there differ (a placement's, its shadow's copy with it; else a 3D part's;
+ * else "background": code drew it). `mayB`, `mayA`: the labels (before, after) the edit may change: a
+ * pixel under one of them is theirs to change; any other changed pixel counts against what else changed.
+ * `lit`: a world3d part's light and shadow fall round it, so a pixel no placement changed is its.
+ */
+function changedBy(b: BuildOut, b2: BuildOut, mayB: Set<string>, mayA: Set<string>, lit = false): { by: [string, number][]; other: [string, number][] } {
+  const n = b.img.w * b.img.h, ch = new Uint8Array(n), by = new Map<string, number>(), other = new Map<string, number>();
+  for (let j = 0; j < n; j++) if (b.img.data[j] !== b2.img.data[j]) ch[j] = 1;
+  // what covers each changed pixel: its label, and its layer and color there
+  const covers = (x: BuildOut) => {
+    const out = new Map<number, { l: string; k: string }[]>(), W = x.img.w, H = x.img.h;
+    for (const [q, l] of labelsOf(x))
+      for (let y = 0; y < q.img.h; y++) for (let xx = 0; xx < q.img.w; xx++) {
+        const X = q.x + xx, Y = q.y + y, c = q.img.data[y * q.img.w + xx];
+        if (c === TRANSPARENT || X < 0 || Y < 0 || X >= W || Y >= H || !ch[Y * W + X]) continue;
+        (out.get(Y * W + X) ?? out.set(Y * W + X, []).get(Y * W + X)!).push({ l, k: `${q.layer ?? ""}:${c}` });
+      }
+    return out;
+  };
+  const cb = covers(b), ca = covers(b2), add = (m: Map<string, number>, l: string) => m.set(l, (m.get(l) ?? 0) + 1);
+  const part = (x: BuildOut, j: number) => { const P = x.img.parts, k = P ? P.ids[j] : -1; return k >= 0 ? P!.names[k].split(".")[0] : undefined; };
+  for (let j = 0; j < n; j++) {
+    if (!ch[j]) continue;
+    const B = cb.get(j) ?? [], A = ca.get(j) ?? [], pb = part(b, j), pa = part(b2, j), its = (E: typeof B, l: string) => E.filter((e) => e.l === l).map((e) => e.k).join();
+    let who = [...new Set([...B, ...A].map((e) => e.l))].filter((l) => its(B, l) !== its(A, l));
+    const placed = who.length > 0;
+    if (!who.length) who = [...new Set([pb, pa].filter((v): v is string => !!v))];
+    if (!who.length) who = ["background"];
+    for (const l of who) add(by, l);
+    const ok = B.some((e) => mayB.has(e.l)) || A.some((e) => mayA.has(e.l)) || (pb && mayB.has(pb)) || (pa && mayA.has(pa)) || who.every((l) => mayB.has(l) || mayA.has(l)) || (lit && !placed);
+    if (!ok) for (const l of who) add(other, l);
+  }
+  const sorted = (m: Map<string, number>) => [...m].sort((u, v) => v[1] - u[1]);
+  return { by: sorted(by), other: sorted(other) };
+}
+
+/** What an edit may change in a build: the labels its targets (and `allow`) name there, and what is placed by relation to them, and to that (a world3d part's by its spec). */
+function mayOf(x: BuildOut, worlds: { world: World }[], seeds: Iterable<string>): Set<string> {
+  const may = new Set(seeds), labels = labelsOf(x);
+  for (let n = -1; n !== may.size;) {
+    n = may.size;
+    const keys = new Set(x.placements.filter((q) => may.has(labels.get(q)!)).map((q) => q.id ?? q.name));
+    for (const q of x.placements) if (q.rel?.to && keys.has(q.rel.to)) may.add(labels.get(q)!);
+    for (const { world: w } of worlds) for (const k of w.names) {
+      const s = w.spec.parts[k] as unknown as Record<string, unknown>;
+      if (REL.some((r) => { const v = s[r]; return (typeof v === "string" && may.has(v)) || (Array.isArray(v) && may.has(v[0])); })) may.add(k);
+    }
+  }
+  return may;
+}
+
+/**
+ * pxl edit: the edits written into the art files (all of them, or none: each checked, and the scene
+ * rebuilt), saying what changed (describe --diff by id, the pixels changed by id) and pxl check. Refused,
+ * nothing written, when it changes more than its targets, what is placed by them and `allow`. `dry`:
+ * the source lines it would change and what, nothing written. The lines to print, and whether it held.
+ */
+export function edit(file: string, scene: string, given: unknown, o: { frame?: number; dry?: boolean; allow?: string[] } = {}): { lines: string[]; ok: boolean } {
   const edits = (Array.isArray(given) ? given : [given]).map(checkEdit);
-  const p = loadProject(file, { trace: true });
+  // built for checking (no light passes: what changes is the drawing's), keeping where code placed a thing
+  const p = loadProject(file, { checksOnly: true, where: true });
   if (!p.assets.has(scene)) throw new PxError(`unknown asset '${scene}'`);
   const f = o.frame ?? 0, b = p.build(scene, 0, frameTime(p, scene, f)), all = targetsOf(p, b);
   const texts = new Map<string, string>(), read = (abs: string) => texts.get(abs) ?? readFileSync(abs, "utf8");
@@ -222,15 +330,36 @@ export function edit(file: string, scene: string, given: unknown, o: { frame?: n
   if (refused.length) return { lines: [...refused, "nothing written"], ok: false };
   // rebuilt from the new text before anything is written
   let p2: Project, b2: BuildOut;
-  try { p2 = loadProject(file, { trace: true }, read); b2 = p2.build(scene, 0, frameTime(p2, scene, f)); }
+  try { p2 = loadProject(file, { checksOnly: true, where: true }, read); b2 = p2.build(scene, 0, frameTime(p2, scene, f)); }
   catch (err) { return { lines: [...said, `edit: not written: rebuilt, ${(err as Error).message.split("\n")[0]}`], ok: false }; }
-  for (const [abs, t] of texts) writeFileSync(abs, t);
-  const lines = [...said, `wrote ${[...texts.keys()].map((a) => basename(a)).join(", ")}`];
+  const lines = [...said];
+  if (o.dry) lines.push("source (- now, + after):", ...[...texts].flatMap(([abs, t]) => lineDiff(basename(abs), readFileSync(abs, "utf8"), t)));
   // what changed: describe --diff of the scene at that frame, by id; a world's parts by world.changed()
   const pal = p.assets.get(scene)!.pal, prev = describe(scene, b, pal).snap, text = describe(scene, b2, p2.assets.get(scene)!.pal, { prev }).text.split("\n");
   const i = text.findIndex((l) => l.startsWith("CHANGES")), j = text.indexOf("", i);
   lines.push(...text.slice(i, j < 0 ? undefined : j).map((l) => l.replace("since the last describe of this asset", `describe --diff, frame ${f}`)));
   p.worlds.forEach((w, k) => { if (edits.some((e) => all.find((t) => t.id === e.target)?.world === w) && p2.worlds[k]) lines.push(`  world3d at ${w.loc}: changed ${w.world.changed(p2.worlds[k].world).join(", ") || "nothing"}`); });
+  // the guard: what it may change, its targets (an asset's every copy, scope "asset"), by their labels before
+  // and after (a stamp without an id: the one its call places now), what is placed by them, and `allow`
+  const lb = labelsOf(b), lb2 = labelsOf(b2), seedsB = [...(o.allow ?? [])], seedsA = [...seedsB];
+  const line = (q: Placement) => q.loc?.split(":").slice(0, 2).join(":"), from = (x: BuildOut, q: Placement) => x.placements.filter((r) => r.layer === q.layer && r.loc && line(r) === line(q));
+  for (const e of edits) {
+    const t = all.find((x) => x.id === e.target)!;
+    if (t.kind !== "part" && e.scope === "asset") { for (const [x, s] of [[lb, seedsB], [lb2, seedsA]] as const) for (const [q, l] of x) if (q.name === t.asset) s.push(l); continue; }
+    const now = t.p && !t.p.id ? from(b2, t.p)[from(b, t.p).indexOf(t.p)] : undefined;
+    seedsB.push(t.id); seedsA.push(now ? lb2.get(now)! : t.id);
+  }
+  const mayB = mayOf(b, p.worlds, seedsB), mayA = mayOf(b2, p2.worlds, seedsA), may = (k: string) => mayB.has(k.split(/[@.]/)[0]) || mayA.has(k.split(/[@.]/)[0]);
+  // (an edit of a part, its world's other parts as they were: what no placement changed is its light and shadow)
+  // ponytail: code that draws from the same numbers as the part, in such a scene, passes too
+  const lit = edits.some((e) => all.find((t) => t.id === e.target)?.kind === "part") && p.worlds.every((w, k) => !p2.worlds[k] || w.world.changed(p2.worlds[k].world).every(may));
+  const { by, other } = changedBy(b, b2, mayB, mayA, lit);
+  const top = (m: [string, number][]) => m.slice(0, 8).map(([l, n]) => `${l} ${n}`).join(", ") + (m.length > 8 ? `, +${m.length - 8} more` : "");
+  lines.push(`  pixels changed by id: ${by.length ? top(by) : "none"}`);
+  if (other.length) return { lines: [...lines, `edit: refused: besides ${[...new Set([...mayB, ...mayA])].join(", ")} (its targets and what is placed by them), it changes ${top(other)} px (--allow "${other.map(([l]) => l).join(",")}" lets it)`, "nothing written"], ok: false };
+  if (o.dry) return { lines: [...lines, "dry: nothing written"], ok: true };
+  for (const [abs, t] of texts) writeFileSync(abs, t);
+  lines.push(`wrote ${[...texts.keys()].map((a) => basename(a)).join(", ")}`);
   const c = checkProject(loadProject(file, { checksOnly: true }), { file: basename(file) });
   lines.push(`check: ${c.lines.length ? `${c.lines.length} warning${c.lines.length > 1 ? "s" : ""}` : "no warnings"} (${c.checked}; ${c.coverage})`, ...c.lines.map((l) => "  " + l));
   return { lines, ok: true };

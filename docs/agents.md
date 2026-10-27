@@ -174,8 +174,12 @@ it:
    thing is, where, where the file writes each of its values and which operations it takes; then
    `pxl edit art.px.js <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'` writes the
    change where the value lives (the stamp's call, the table it reads, the part's spec) and prints
-   what changed (`describe --diff`, by id) and what `pxl check` says. No reading of the file, no code
-   written. What code computes is refused with where it is; that edit is made by hand.
+   what changed (`describe --diff` and the pixels changed, by id) and what `pxl check` says. No
+   reading of the file, no code written. What code computes is refused with where it is; that edit
+   is made by hand. `--dry` shows the source lines it would change and what would change, writing
+   nothing. An edit that changes more than its target and what is placed by it (the ground drawn
+   from the same table, another thing reading the same number) is refused, saying what; `--allow
+   <ids>` lets those when meant.
 5. **Check, then build.** `pxl check art.px.js` before handing over: the agent fixes each warning or
    says why it's meant. `pxl build art.px.js` writes the files.
 

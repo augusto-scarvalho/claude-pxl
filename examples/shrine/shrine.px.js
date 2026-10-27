@@ -138,7 +138,7 @@ const airLeaves = (c) => {
 }
 
 // ---------------------------------------------------------------- the courtyard
-const PLACES = [["hall_s", 84, 63], ["ema_s", 152, 62], ["fox_tama_e", 50, 95], ["fox_key_w", 118, 95]]
+const PLACES = [["hall_s", 84, 63], ["ema_s", 152, 62]]
 // what moves, stamped by the frame: the trees swaying three times a loop, each a little after another,
 // and the miko; the shade layer casts them as it casts the rest
 const TREES = [["momiji_red_s", 14, 52, 3], ["momiji_orange_s", 238, 150, 0], ["ginkgo_s", 212, 82, 1], ["kuromatsu_s", 22, 158, 4]]
@@ -160,6 +160,8 @@ scene("shrine", { w: 240, h: 160, frames: L, fps: 1000 / MS, world: { scale: S, 
   layer("ground", stamp("_ground", 0, 0), groundLeaves),
   layer("shadows", { shade: 1, of: "props", cast: "sun" }),
   layer("props", { sort: "y" }, ...PLACES.map(([n, x, y]) => stamp(n, x, y)),
+    // the foxes, a call each: an edit flips or moves one
+    stamp("fox_tama_e", 50, 95), stamp("fox_key_w", 118, 95),
     // what stands by the approach, placed along it: the lanterns off its north curb, the basin off its
     // south one, the torii over it as it comes in
     stamp("toro_s", { along: [ALONG, ...BY_WAY.toro_w], id: "toro_w" }), stamp("toro_s", { along: [ALONG, ...BY_WAY.toro_e], id: "toro_e" }),

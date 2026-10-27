@@ -61,7 +61,8 @@ export type Rel = { to?: string; knobs: { key: "beside" | "along"; i: number; la
 export type Placement = { name: string; x: number; y: number; w: number; h: number; layer?: string; img: Img; /** the light it was drawn under, on the picture (a sprite in mesh()) */ light?: [number, number];
   /** a sprite in mesh(): how far its feet are over (under: below 0) the nearest face looking up under them, m, and its material */ stand?: { off: number; on: string };
   /** a stamp's: its id, where the call is in the art file (a stamp() item's, not a function's), its y in a layer sorted by y, its relation (for a scene's expect rules and --fix) */ id?: string; loc?: string; sort?: number; rel?: Rel;
-  /** not a stamp: what c.as() named, or a sprite in mesh() */ via?: "as" | "mesh" };
+  /** not a stamp: what c.as() named, or a sprite in mesh() */ via?: "as" | "mesh";
+  /** where the call that placed it is (a function's own line, for one placed by code), when the project keeps it (pxl inspect, edit) */ code?: string };
 
 /**
  * Drawing surface over an image. Coordinates are relative to (ox, oy); colors are palette
@@ -321,7 +322,7 @@ export class Canvas {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y0 + y) * img.w + x0 + x; if (d[i] !== was[i]) out.data[y * w + x] = d[i]; }
     if (o.height) out.meters = o.height;
     if (o.facing) out.orient = { f: [...FACING[o.facing]], u: [0, -1, 0], mirrored: false, text: false };
-    this.log?.push({ name, x: x0, y: y0, w, h, layer: this.layerName, img: out, via: "as", ...(o.id ? { id: o.id } : {}) });
+    this.log?.push({ name, x: x0, y: y0, w, h, layer: this.layerName, img: out, via: "as", ...(o.id ? { id: o.id } : {}), ...this.code() });
   }
 
   /** Run `fn` with drawing restricted to `region` (nests by intersection). */
@@ -1051,13 +1052,14 @@ export class Canvas {
     }
     // straight into the pixels when nothing stands between (a clip, a twin's mirror, a wrapped edge)
     const mc = Object.assign(Object.create(this) as MeshCanvas, { raw: this.clipPred || this.mirrored || this.wrap ? undefined : this.img.data });
+    const code = this.code();
     for (const p of drawMesh(mc, view, faces, mats, opts, { tex, masks, looks, sprites, step, lit })) {
       // one with an id: its sockets on the picture and in the world, for stamp's `at` and a spell's `from`
       const sp = sprites[p.k!], id = S[p.k!]?.id, K = opts.pixel ?? 1;
       if (id) this.placed?.set(id, { x: this.ox + p.x, y: this.oy + p.y, sockets: Object.fromEntries(Object.entries(sp.img.sockets ?? {}).map(([n, [x, y]]) => [n, [x * K, y * K]])), m3: (sk) => this.socketIn(view0 as Partial<View>, sp.name, sp.img, sp.at, sk, K) });
       // (its feet against the nearest face looking up under them; none under, or flying: not asked)
       const hs = ground && p.at && !p.air ? ground(p.at[0], p.at[1]) : [], h = hs.reduce<{ u: number; mat: string } | undefined>((b, q) => (!b || Math.abs(q.u - p.at![2]) < Math.abs(b.u - p.at![2]) ? q : b), undefined);
-      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}), ...(h ? { stand: { off: p.at![2] - h.u, on: h.mat } } : {}), via: "mesh", ...(id ? { id } : {}) });
+      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}), ...(h ? { stand: { off: p.at![2] - h.u, on: h.mat } } : {}), via: "mesh", ...(id ? { id } : {}), ...code });
     }
     if (lit) this.img.world = lit;
   }
@@ -1369,8 +1371,14 @@ export class Canvas {
     return { w: img.w, h: img.h };
   }
 
+  /** Where the code drawing now is (a function's: its line), when the project keeps it for pxl inspect. */
+  private code(): { code?: string } {
+    const r = this.res as { where?: boolean; callerLoc?: () => string | undefined }, at = r.where ? this.loc ?? r.callerLoc?.() : undefined;
+    return at ? { code: at } : {};
+  }
+
   /** Draw `src` with its pivot (default: `def`, as a fraction of its size) on (x, y). */
-  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc" | "sort" | "rel">): void {
+  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc" | "sort" | "rel" | "code">): void {
     const [px, py] = src.pivot ?? [src.w * def[0], src.h * def[1]];
     if (sub) this.subPut(src, x - Math.floor(px), y - Math.floor(py), sub);
     else this.put(src, x - Math.floor(px), y - Math.floor(py), ok);
@@ -1402,9 +1410,9 @@ export class Canvas {
       throw new PxError(`sub is true, [dx, dy] the way the part moves (1 right / down, -1 left / up), or { from: [x, y] } where it was, got ${JSON.stringify(sub)}`);
     if (opts?.smear !== undefined) {
       if (sub) throw new PxError("smear and sub don't go together: a smear is a move of more than a pixel");
-      return this.place(this.smeared(src, opts.smear, x, y), x, y, [0, 0], undefined, opts?.z, name, undefined, { id: opts?.id, loc: this.loc, rel });
+      return this.place(this.smeared(src, opts.smear, x, y), x, y, [0, 0], undefined, opts?.z, name, undefined, { id: opts?.id, loc: this.loc, rel, ...this.code() });
     }
-    this.place(src, x, y, [0, 0], undefined, opts?.z, name, sub ? (Array.isArray(sub) ? (sub as [number, number]) : [1, 1]) : undefined, { id: opts?.id, loc: this.loc, rel });
+    this.place(src, x, y, [0, 0], undefined, opts?.z, name, sub ? (Array.isArray(sub) ? (sub as [number, number]) : [1, 1]) : undefined, { id: opts?.id, loc: this.loc, rel, ...this.code() });
   }
 
   /**
@@ -1566,7 +1574,7 @@ export class Canvas {
    * Put a placed asset's pivot on (x, y): drawn now, or in a sorted layer queued and drawn on
    * flush() by y (where it stands) or z.
    */
-  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc" | "rel">): void {
+  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc" | "rel" | "code">): void {
     if (!this.sorted) return this.putAt(src, x, y, def, ok, name, sub, meta);
     if (!Number.isFinite(z)) throw new PxError(`z must be a number, got ${JSON.stringify(z)}`);
     // Drawn later, in order: keep the clip that was active at the call.

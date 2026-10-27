@@ -781,7 +781,11 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   values and where the file writes each: its call, a table it reads, or code; its relation, rules,
   parts, colors), `--json` for a program. `PXL edit <file> <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'`
   writes it where the number lives (the table's `[87, 21]`, the stamp's own options), all the edits
-  given or none, then prints `describe --diff` by id and `check`. Ops: `move`, `set` (an option, a
+  given or none, then prints `describe --diff` by id, the pixels it changed by id, and `check`. It is
+  guarded: an edit changes its targets and what is placed by relation to them; anything else changing
+  (a ring in the ground drawn from the same table, a thing that reads the same number) refuses it,
+  saying what, and `--allow a,b` lets those. `--dry` prints the source lines it would change (- now,
+  + after) and what would change, and writes nothing. Ops: `move`, `set` (an option, a
   part's parameter), `recolor` (`swap`), `flip`, `frame` (or `t`), `relation` (on, beside, along,
   apart, at; a world3d part's around, attach), `swap` (another asset; a part's builder), `as` (a part
   drawn as voxels...); `scope: "asset"` writes the asset's own options, for every copy. What code
