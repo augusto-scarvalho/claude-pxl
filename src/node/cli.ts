@@ -74,8 +74,9 @@ const USAGE = `pxl — pixel-art DSL
       warning or not, with a tally: to see where it agrees and where it can't tell. A scene's
       expect rules (beside, before, apart, inside, onGround, while) run at the frames it checks.
       --fix: each expect3d rule that fails, fixed by one number of the parts it names (where one
-      stands, its gap beside another, then a parameter), and each scene rule by where a placement
-      it names stands (x or y, the fewest px), searched without a model and written into the file
+      stands, its gap beside another, then a parameter), and each scene rule by one number of a
+      placement it names (its relation's: beside's gap, along's s or u; else x or y; the fewest px;
+      what is placed by a relation to it moves too), searched without a model and written into the file
       where the number is (a computed one is said and left); it says each change, and the rules
       that held still hold (a scene's checked rebuilt before anything is written).
   pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--out DIR]
@@ -460,7 +461,7 @@ export async function main(argv: string[]): Promise<number> {
           for (const f of r.fixes) {
             if (f.held) { console.log(`fix: ${f.text}: holds after the changes above`); continue; }
             // a scene's rule: a placement moved (written below, once checked rebuilt), or why not
-            if (f.why || f.move) { console.log(`fix: ${f.text}: ${f.why ?? `${f.move!.part} ${f.move!.key} ${f.move!.by > 0 ? "+" : ""}${f.move!.by} px`}`); continue; }
+            if (f.why || f.move) { console.log(`fix: ${f.text}: ${f.why ?? `${f.move!.part}'s ${f.move!.label} ${f.move!.by > 0 ? "+" : ""}${f.move!.by} px`}`); continue; }
             if (!f.knob) { console.log(`fix: ${f.text}: no one number of its parts makes it hold`); continue; }
             const k = f.knob, what = `${k.part} ${k.key === "at" ? `at[${k.i}]` : k.key === "beside" ? "beside's gap" : k.key} ${+k.value.toFixed(3)} -> ${f.to}`, next = setKnobInSource(src, k, f.to!);
             if (next === undefined) { console.log(`fix: ${f.text}: ${what} (not written: its spec isn't written out once in ${basename(file)}; change it by hand)`); continue; }

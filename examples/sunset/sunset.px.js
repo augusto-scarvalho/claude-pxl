@@ -604,7 +604,7 @@ const SUN = [SX, HZ]
 const awayFromSun = (x, y, len) => { const dx = x - SX, dy = y - HZ, d = Math.hypot(dx, dy); return [len * dx / d, len * dy / d] }
 
 const AT = { hero: [200, 134], fire: [148, 164], pack: [127, 148], bedroll: [99, 162],
-  logs: [171, 165], pot: [137, 151], cairn: [282, 132] }
+  pot: [137, 151], cairn: [282, 132] }
 // The sleeping bag lies on a slant (its underside runs from the pillow's row down to the foot's, 3 px
 // lower), and cast lays a shadow from one base row, so its shadow is drawn: the bag's underside moved
 // away from the sun (left and toward us) by about its own thickness, the way the pack's falls. It
@@ -640,8 +640,10 @@ scene("sunset", { w: W, h: H, bg: "N", world: { light: [1, -0.4] }, expect: CAMP
   layer("camp", { sort: "y" },
     stamp("tent", 64, 156, { shadow: false }),    // sorted at y 156, behind the bedroll lying half out of its door
     stamp("pack", ...AT.pack), stamp("pot", ...AT.pot), stamp("bedroll", ...AT.bedroll, { shadow: false }),
-    stamp("campfire", ...AT.fire, { shadow: false }), stamp("logs", ...AT.logs, { shadow: { from: SUN, len: 1.5 } }),
-    stamp("pennant", AT.cairn[0], AT.cairn[1] - 8, { shadow: false }), stamp("cairn", ...AT.cairn, { shadow: { from: SUN, len: 1.2 } }),
+    // the logs stacked 3 px right of the fire (a row lower), the pennant planted on the cairn (its pole
+    // 6 px right of its middle, 3 px down among the stones): placed by them, they go where they go
+    stamp("campfire", ...AT.fire, { shadow: false }), stamp("logs", 0, 1, { beside: ["campfire", "right", 3], shadow: { from: SUN, len: 1.5 } }),
+    stamp("cairn", ...AT.cairn, { shadow: { from: SUN, len: 1.2 } }), stamp("pennant", 6, 3, { on: "cairn", shadow: false }),
     stamp("hero", ...AT.hero)),
   layer("smoke", { opacity: 0.45 }, stamp("smoke", 149, 152)),
   layer("fore", stamp("tallgrass", -6, 180), stamp("tallgrass", 22, 180, { reseed: true }), stamp("tallgrass", 272, 180, { reseed: 2 })),

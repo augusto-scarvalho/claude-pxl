@@ -44,6 +44,11 @@ look at (`--frames 0-11` for some).
   is cut into pieces, each sorted on its own base.
 - Figures need a few px of air to read. `PXL describe <file> <scene>` gives the gap between objects
   (`nearest: witch 3px left`); two figures at 1 px read as one shape.
+- **Place what belongs to something by its relation to it**, so it follows when that moves: `stamp("pot",
+  { beside: ["campfire", "left", 4] })` (its box 4 px off), `{ on: "cairn" }` (on its top), `{ along:
+  [WAY, 87, 21] }` (87 px along a path or `lane()`, 21 px to its right), `{ apart: ["tree", 2] }`
+  (kept out of its box); x, y stay for the rest, or as an offset. The lanterns, the basin and the torii
+  along the approach in `shrine/shrine.px.js`, the pennant on the sunset's cairn; `PXL help beside`.
 
 ## 2. Ground, paths and tiles
 
@@ -777,7 +782,8 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   `expect: [{ beside: ["pot", "campfire", { gap: [2, 6], side: "left" }] }, { before: ["bedroll", "tent"] }]`
   (also `apart`, `inside`, `onGround`; over a loop, `while` and a rule's `frames`), a placement named
   by its stamp's `id` or its asset placed once. A rule broken by an edit: `PXL check --fix` moves the
-  placement back by the fewest px, written where its number is (`PXL help expect`; the sunset's camp,
+  placement back by the fewest px (its relation's gap, or s along a path, before its x, y), written
+  where its number is (`PXL help expect`; the sunset's camp,
   the island in `topdown.px.js`, the shrine's lanterns and miko).
 - A scene built from separate maps (terrain, props): `throw` in the placement loop when a prop lands
   on the wrong ground; it catches the drift before anyone sees it.

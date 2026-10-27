@@ -11,7 +11,7 @@ import { Img } from "./image.ts";
 import type { World } from "./model.ts";
 import { type Region, regionPred } from "./util.ts";
 import { feetOf, groundUnder } from "./describe.ts";
-import { type Knob, searchKnobs, setKnobInSource } from "./world3d.ts";
+import { type Knob, searchKnobs, setKnobInSource, setListItem } from "./world3d.ts";
 
 /** A placement's name, or a box [x, y, w, h] (a path painted in the ground, a region). */
 type Thing = string | number[];
@@ -83,14 +83,17 @@ export function namesOf(rules: Rule2d[]): string[] {
   rules.forEach(walk);
   return [...out];
 }
+/** A frame checked: the placements the rules name, and what each stamp placed by a relation is placed by. */
+export type Frame2d = { f: number; at: Map<string, Named>; refs?: Map<string, string> };
 /** Each name's placement in a frame (not in a layer that only blends: a shadow, a light): its stamp's id, else its asset's name, as `at: "id.socket"` names them. */
-export function nameAll(placements: Placement[], blended: Set<string>, names: string[]): Map<string, Named> {
-  const out = new Map<string, Named>(), all = placements.map((p, i) => ({ p, i })).filter(({ p }) => !blended.has(p.layer ?? ""));
+export function nameAll(placements: Placement[], blended: Set<string>, names: string[]): Omit<Frame2d, "f"> {
+  const at = new Map<string, Named>(), all = placements.map((p, i) => ({ p, i })).filter(({ p }) => !blended.has(p.layer ?? ""));
   for (const n of names) {
     const own = all.filter(({ p }) => (p.id ?? p.name) === n), ids = all.filter(({ p }) => p.id && p.name === n).map(({ p }) => p.id);
-    out.set(n, own.length === 1 ? own[0] : own.length ? `'${n}' is placed ${own.length} times: give the one the rule means an id (stamp(..., { id: "${n}_1" }))` : `nothing is placed as '${n}'${ids.length ? ` (its placements are named by their ids: ${[...new Set(ids)].join(", ")})` : ""}`);
+    at.set(n, own.length === 1 ? own[0] : own.length ? `'${n}' is placed ${own.length} times: give the one the rule means an id (stamp(..., { id: "${n}_1" }))` : `nothing is placed as '${n}'${ids.length ? ` (its placements are named by their ids: ${[...new Set(ids)].join(", ")})` : ""}`);
   }
-  return out;
+  const refs = new Map(all.filter(({ p }) => p.rel?.to).map(({ p }) => [p.id ?? p.name, p.rel!.to!]));
+  return { at, ...(refs.size ? { refs } : {}) };
 }
 
 /** Where each name stands moved to, px: the fix's trials. */
@@ -136,24 +139,32 @@ function toward(A: At, B: At, side: string): boolean {
 }
 
 /** Run a scene's rules over the frames checked: each rule's text, the frames it fails at and the first's numbers. */
-export function runRules2d(rules: Rule2d[], frames: { f: number; at: Map<string, Named> }[], world?: World, sh: Shift = new Map()): { text: string; ok: boolean; fails: number[]; detail?: string }[] {
-  const atOf = (t: Thing, fr: { at: Map<string, Named> }): At | string => {
+export function runRules2d(rules: Rule2d[], frames: Frame2d[], world?: World, sh: Shift = new Map()): { text: string; ok: boolean; fails: number[]; detail?: string }[] {
+  // how far a name is moved: its own move, and what it's placed by's (it follows that)
+  const moved = (t: string, fr: Frame2d, n = 0): [number, number] => {
+    const own = sh.get(t) ?? [0, 0], by = fr.refs?.get(t);
+    if (!by || n > 32) return own;
+    const o = moved(by, fr, n + 1);
+    return [own[0] + o[0], own[1] + o[1]];
+  };
+  const atOf = (t: Thing, fr: Frame2d): At | string => {
     if (typeof t !== "string") return { img: boxImg(t), x: t[0], y: t[1], key: `box ${t}` };
     const q = fr.at.get(t)!;
     if (typeof q === "string") return q;
     if (!mask(q.p.img).bb) return `'${t}' draws nothing at this frame`;
-    const [dx, dy] = sh.get(t) ?? [0, 0], x = q.p.x + dx, y = q.p.y + dy;
+    // (a move along a lane's bend can fall between pixels: drawn floored, as a stamp is)
+    const [dx, dy] = moved(t, fr), x = Math.floor(q.p.x + dx), y = Math.floor(q.p.y + dy);
     return { img: q.p.img, x, y, key: `${mask(q.p.img).id},${x},${y}` };
   };
   // undefined: it holds at that frame; else what it found
-  const failAt = (r: Rule2d, fr: { at: Map<string, Named> }): string | undefined => {
+  const failAt = (r: Rule2d, fr: Frame2d): string | undefined => {
     const [kind, a] = ruleOf(r), A = atOf(a[0] as Thing, fr);
     if (typeof A === "string") return A;
     if (kind === "before") {
       const qa = fr.at.get(a[0] as string) as { p: Placement; i: number }, qb = fr.at.get(a[1] as string)!;
       if (typeof qb === "string") return qb;
       const pa = qa.p, pb = qb.p, sorted = pa.layer === pb.layer && pa.sort !== undefined && pb.sort !== undefined;
-      const ka = sorted ? pa.sort! + (sh.get(a[0] as string)?.[1] ?? 0) : 0, kb = sorted ? pb.sort! + (sh.get(a[1] as string)?.[1] ?? 0) : 0;
+      const ka = sorted ? pa.sort! + moved(a[0] as string, fr)[1] : 0, kb = sorted ? pb.sort! + moved(a[1] as string, fr)[1] : 0;
       if (ka > kb || (ka === kb && qa.i > qb.i)) return undefined;
       return `it is drawn behind it: ${sorted ? `both in '${pa.layer}', sorted by y, it stands at y ${ka} and ${a[1]} at y ${kb}` : pa.layer === pb.layer ? `both in '${pa.layer ?? "the scene"}', it placed first` : `its layer '${pa.layer ?? "the scene"}' is under '${pb.layer ?? "the scene"}'`}`;
     }
@@ -201,18 +212,22 @@ export function runRules2d(rules: Rule2d[], frames: { f: number; at: Map<string,
   });
 }
 
-/** A number a fix may change: where a placement the rule names stands, x or y, by whole px. */
-export interface Knob2d { part: string; key: "x" | "y"; value: number }
 /**
- * A failing rule fixed by moving one placement it names, along x or y, by the fewest px that make it
- * hold and leave every rule that held holding (expect3d's search, a px at a time up to 64). `knobs`:
- * which may move (those whose number the file writes). Undefined when none does.
+ * A number a fix may change, of a placement the rule names: its x or y, or its relation's (beside's gap,
+ * along's s or u: the i-th of its list), by whole px; `move` how far a change moves it (and so what is
+ * placed by a relation to it).
  */
-export function fixRule2d(rules: Rule2d[], r: Rule2d, frames: { f: number; at: Map<string, Named> }[], world: World | undefined, sh: Shift, knobs: Knob2d[]): { knob: Knob2d; to: number } | undefined {
+export interface Knob2d { part: string; key: "x" | "y" | "beside" | "along"; i?: number; label: string; value: number; move: (d: number) => [number, number] }
+/**
+ * A failing rule fixed by changing one number of a placement it names (its relation's first, then where
+ * it stands), by the fewest px that make it hold and leave every rule that held holding (expect3d's
+ * search, a px at a time up to 64). `knobs`: which may change (those the file writes). Undefined when none does.
+ */
+export function fixRule2d(rules: Rule2d[], r: Rule2d, frames: Frame2d[], world: World | undefined, sh: Shift, knobs: Knob2d[]): { knob: Knob2d; to: number } | undefined {
   if (ruleOf(r)[0] === "while") return undefined;
   const run = (q: Rule2d, s: Shift) => runRules2d([q], frames, world, s)[0].ok;
   const held = rules.filter((q) => q !== r && run(q, sh));
-  const moved = (k: Knob2d, v: number): Shift => { const s = new Map(sh), d = s.get(k.part) ?? [0, 0]; s.set(k.part, k.key === "x" ? [d[0] + v, d[1]] : [d[0], d[1] + v]); return s; };
+  const moved = (k: Knob2d, v: number): Shift => { const s = new Map(sh), d = s.get(k.part) ?? [0, 0], m = k.move(v); s.set(k.part, [d[0] + m[0], d[1] + m[1]]); return s; };
   return searchKnobs(knobs, {
     place: () => true, steps: Array.from({ length: 64 }, (_, i) => i + 1), settle: (k, sign, _lo, hi) => k.value + sign * hi,
     holds: (k, v) => run(r, moved(k, v)), keeps: (k, v) => { const s = moved(k, v); return held.every((q) => run(q, s)); },
@@ -222,9 +237,11 @@ export function fixRule2d(rules: Rule2d[], r: Rule2d, frames: { f: number; at: M
 /**
  * The stamp's number a 2D knob moves, in the art file's text (its call at `loc`, "file:line:col"): its
  * own literal, or a table's (`stamp("pack", ...AT.pack)` or `AT.pack[0]`: the `pack: [127, 148]`
- * written once). Moved `by` px: the new text, the number's old and new value and its line; or why it can't be.
+ * written once); its relation's, the i-th of the list in its options (`beside: ["tent", "left", 4]`; one
+ * left out, a gap or a u, written after the others). Moved `by` px: the new text, the number's old and
+ * new value and its line; or why it can't be.
  */
-export function moveInSource(src: string, loc: string, key: "x" | "y", by: number): { src: string; from: number; to: number; line: number } | string {
+export function moveInSource(src: string, loc: string, key: Knob2d["key"], by: number, n = 0): { src: string; from: number; to: number; line: number } | string {
   const [, line, col] = loc.split(":").map(Number), lines = src.split("\n");
   if (!(line >= 1 && line <= lines.length)) return `its stamp isn't at ${loc}`;
   let o = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0) + col - 1;
@@ -241,15 +258,28 @@ export function moveInSource(src: string, loc: string, key: "x" | "y", by: numbe
     else if (")]}".includes(c) && depth-- === 0) { args.push({ s, t: src.slice(s, i) }); break; }
     else if (c === "," && depth === 0) { args.push({ s, t: src.slice(s, i) }); s = i + 1; }
   }
-  const i = key === "x" ? 1 : 2, spread = /^\s*\.\.\.\s*[\w$]+\.([\w$]+)\s*$/.exec(args[1]?.t ?? "");
-  const arg = spread ? args[1] : args[i], text = arg?.t.trim() ?? "";
-  // a table's: the number in its list, set where it's written once
-  const table = spread ? [spread[1], i - 1] : /^[\w$]+\.([\w$]+)\s*\[\s*([01])\s*\]$/.exec(text)?.slice(1).map((v, j) => (j ? +v : v));
-  if (table) {
-    const [part, n] = table as [string, number], m = new RegExp(`(?:^|[\\s{,])${part}\\s*:\\s*\\[([^\\]]*)\\]`).exec(src), from = Number(m?.[1].split(",")[n]);
-    const out = Number.isFinite(from) ? setKnobInSource(src, { part, key: "at", i: n, value: from } as Knob, from + by) : undefined;
-    return out === undefined ? `its ${key} is \`${text}\`, and '${part}: [...]' isn't written once with numbers` : { src: out, from, to: from + by, line: src.slice(0, m!.index).split("\n").length };
+  const lineAt = (k: number) => src.slice(0, k).split("\n").length, spreadOf = (t?: string) => /^\s*\.\.\.\s*[\w$]+\.([\w$]+)\s*$/.exec(t ?? "")?.[1];
+  // a table's: the j-th number of `part: [...]`, set where it's written once
+  const inTable = (part: string, j: number, text: string) => {
+    const m = new RegExp(`(?:^|[\\s{,])${part}\\s*:\\s*\\[([^\\]]*)\\]`).exec(src), from = Number(m?.[1].split(",")[j]);
+    const out = Number.isFinite(from) ? setKnobInSource(src, { part, key: "at", i: j, value: from } as Knob, from + by) : undefined;
+    return out === undefined ? `its ${key} is \`${text}\`, and '${part}: [...]' isn't written once with numbers` : { src: out, from, to: from + by, line: lineAt(m!.index) };
+  };
+  if (key === "beside" || key === "along") {
+    // its options written out as an object: the relation's list there (along's s and u may be a table's, `[WAY, ...AT.lamp]`)
+    const o = args.slice(1).find((a) => a.t.trim().startsWith("{")), m = o && new RegExp(`\\b${key}\\s*:\\s*\\[([^\\]]*)\\]`).exec(o.t);
+    const items = m?.[1].split(","), sp = n >= 1 ? spreadOf(items?.[1]) : undefined;
+    if (sp) return inTable(sp, n - 1, items![1].trim());
+    const was = items?.[n] === undefined ? (n === 2 ? 0 : NaN) : Number(items[n].trim() || NaN);
+    const out = o && m && Number.isFinite(was) ? setListItem(o.t, m, n, was + by) : undefined;
+    if (!out) return `its ${key}'s ${n === 2 ? (key === "beside" ? "gap" : "u") : "s"} isn't a number written in its options at ${loc}`;
+    return { src: src.slice(0, o!.s) + out + src.slice(o!.s + o!.t.length), from: was, to: was + by, line: lineAt(o!.s + m!.index) };
   }
+  if (args[1]?.t.trim().startsWith("{")) return `its ${key} isn't written: its relation alone places it (give it x, y to move it by hand)`;
+  const i = key === "x" ? 1 : 2, spread = spreadOf(args[1]?.t);
+  const arg = spread ? args[1] : args[i], text = arg?.t.trim() ?? "";
+  const table = spread ? [spread, i - 1] : /^[\w$]+\.([\w$]+)\s*\[\s*([01])\s*\]$/.exec(text)?.slice(1).map((v, j) => (j ? +v : v));
+  if (table) return inTable(table[0] as string, table[1] as number, text);
   if (!/^-?\d+(\.\d+)?$/.test(text)) return `its ${key} is computed in code (\`${text || "missing"}\` at ${loc})`;
   const at = arg.s + arg.t.indexOf(text), from = Number(text);
   return { src: src.slice(0, at) + String(from + by) + src.slice(at + text.length), from, to: from + by, line: src.slice(0, at).split("\n").length };

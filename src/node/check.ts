@@ -11,7 +11,7 @@ import { dE, lineFlaws } from "../core/vision.ts";
 import { toHex } from "../core/color.ts";
 import type { Item, World } from "../core/model.ts";
 import { type Knob, fixRule, runExpects, turnKnob } from "../core/world3d.ts";
-import { type Knob2d, type Named, type Rule2d, type Shift, fixRule2d, moveInSource, nameAll, namesOf, runRules2d } from "../core/expect.ts";
+import { type Frame2d, type Knob2d, type Rule2d, type Shift, fixRule2d, moveInSource, nameAll, namesOf, runRules2d } from "../core/expect.ts";
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { loadProject } from "./load.ts";
@@ -33,7 +33,7 @@ export interface CheckResult {
    * With `fix`: each failing expect3d rule's one number that makes it hold (fixRule), or none found; a
    * scene's rule's (expect), a placement moved `by` px along x or y, its stamp at `loc`, or `why` not.
    */
-  fixes?: { text: string; knob?: Knob; to?: number; held?: boolean; move?: { part: string; key: "x" | "y"; by: number; loc: string }; why?: string }[];
+  fixes?: { text: string; knob?: Knob; to?: number; held?: boolean; move?: { part: string; key: Knob2d["key"]; i?: number; label: string; by: number; loc: string }; why?: string }[];
   /** A scene's rules that don't hold, "scene › rule" (what --fix's changes are checked against, rebuilt). */
   failed?: string[];
 }
@@ -50,37 +50,41 @@ const ranges = (fs: number[]) => fs.reduce<[number, number][]>((r, f) => {
 }, []).map(([a, b]) => (a === b ? `${a}` : `${a}-${b}`)).join(", ");
 
 /**
- * --fix on a scene's rules: each failing one, on the scene the fixes before it left, fixed by moving one
- * placement it names (fixRule2d) whose number the art file writes (moveInSource); else what would fix it
- * and why it can't be written, or that nothing does.
+ * --fix on a scene's rules: each failing one, on the scene the fixes before it left, fixed by one number
+ * of a placement it names (fixRule2d: its relation's, then where it stands) that the art file writes
+ * (moveInSource); else what would fix it and why it can't be written, or that nothing does.
  */
-function fixScene(p: Project, rules: Rule2d[], rs: ReturnType<typeof runRules2d>, named: { f: number; at: Map<string, Named> }[], wo: World | undefined, out: NonNullable<CheckResult["fixes"]>): void {
+function fixScene(p: Project, rules: Rule2d[], rs: ReturnType<typeof runRules2d>, named: Frame2d[], wo: World | undefined, out: NonNullable<CheckResult["fixes"]>): void {
   const sh: Shift = new Map(), srcs = new Map<string, string | undefined>();
   const source = (f: string) => {
     if (!srcs.has(f)) { const abs = p.files.find((a) => basename(a) === f); try { srcs.set(f, abs && readFileSync(abs, "utf8")); } catch { srcs.set(f, undefined); } }
     return srcs.get(f);
   };
-  // where a name's stamp is (the first frame that places it)
-  const locOf = (n: string) => { for (const fr of named) { const q = fr.at.get(n); if (q && typeof q !== "string") return q.p.loc; } return undefined; };
+  // a name's stamp (the first frame that places it): where it is in the file, and its numbers a fix may change
+  const first = (n: string) => { for (const fr of named) { const q = fr.at.get(n); if (q && typeof q !== "string") return q.p; } return undefined; };
+  const locOf = (n: string) => first(n)?.loc;
+  const knobsOf = (part: string): Knob2d[] => [
+    ...(first(part)?.rel?.knobs ?? []).map((k) => ({ ...k, part, value: 0 })),
+    { part, key: "x", label: "x", value: 0, move: (d) => [d, 0] }, { part, key: "y", label: "y", value: 0, move: (d) => [0, d] }];
   const why = (k: Knob2d) => {
     const loc = locOf(k.part), src = loc && source(loc.split(":")[0]);
-    if (!loc) return `${k.part} is placed by a function (c.stamp), its ${k.key} the code's`;
+    if (!loc) return `${k.part} is placed by a function (c.stamp), its ${k.label} the code's`;
     if (src === undefined) return `${loc}: its file can't be read`;
-    const m = moveInSource(src as string, loc, k.key, 0);
+    const m = moveInSource(src as string, loc, k.key, 0, k.i);
     return typeof m === "string" ? m : undefined;
   };
   rs.forEach((r, i) => {
     if (r.ok) return;
     if (runRules2d([rules[i]], named, wo, sh)[0].ok) return void out.push({ text: r.text, held: true });
-    const knobs = namesOf([rules[i]]).flatMap((part) => (["x", "y"] as const).map((key): Knob2d => ({ part, key, value: 0 })));
+    const knobs = namesOf([rules[i]]).flatMap(knobsOf);
     const f = fixRule2d(rules, rules[i], named, wo, sh, knobs.filter((k) => !why(k)));
     if (f) {
-      const { part, key } = f.knob, s = sh.get(part) ?? [0, 0];
-      sh.set(part, key === "x" ? [s[0] + f.to, s[1]] : [s[0], s[1] + f.to]);
-      return void out.push({ text: r.text, move: { part, key, by: f.to, loc: locOf(part)! } });
+      const { part, key, i: n, label } = f.knob, s = sh.get(part) ?? [0, 0], m = f.knob.move(f.to);
+      sh.set(part, [s[0] + m[0], s[1] + m[1]]);
+      return void out.push({ text: r.text, move: { part, key, i: n, label, by: f.to, loc: locOf(part)! } });
     }
     const g = fixRule2d(rules, rules[i], named, wo, sh, knobs.filter((k) => why(k)));
-    out.push({ text: r.text, why: g ? `${g.knob.part}'s ${g.knob.key} ${g.to > 0 ? "+" : ""}${g.to} px would make it hold, but ${why(g.knob)}: change it by hand` : "no one move of a placement it names makes it hold (within 64 px, keeping the rules that hold)" });
+    out.push({ text: r.text, why: g ? `${g.knob.part}'s ${g.knob.label} ${g.to > 0 ? "+" : ""}${g.to} px would make it hold, but ${why(g.knob)}: change it by hand` : "no one number of a placement it names makes it hold (within 64 px, keeping the rules that hold)" });
   });
 }
 
@@ -90,15 +94,15 @@ function fixScene(p: Project, rules: Rule2d[], rs: ReturnType<typeof runRules2d>
  * (a number another placement shares, or a stamp drawn by where it stands, would). The lines to print.
  */
 export function writeMoves(file: string, p: Project, r: CheckResult, frame?: number): string[] {
-  const sum = new Map<string, { part: string; key: "x" | "y"; by: number; loc: string }>();
-  for (const f of r.fixes ?? []) if (f.move) { const m = f.move, k = `${m.loc} ${m.key}`; sum.set(k, { ...m, by: (sum.get(k)?.by ?? 0) + m.by }); }
+  const sum = new Map<string, NonNullable<NonNullable<CheckResult["fixes"]>[number]["move"]>>();
+  for (const f of r.fixes ?? []) if (f.move) { const m = f.move, k = `${m.loc} ${m.key} ${m.i}`; sum.set(k, { ...m, by: (sum.get(k)?.by ?? 0) + m.by }); }
   // the last in a file first: a number written longer doesn't move the stamps before it
   const at = (loc: string) => loc.split(":").slice(1).map(Number), texts = new Map<string, string>(), said: string[] = [];
   for (const m of [...sum.values()].sort((u, v) => at(v.loc)[0] - at(u.loc)[0] || at(v.loc)[1] - at(u.loc)[1])) {
-    const abs = p.files.find((f) => basename(f) === m.loc.split(":")[0])!, w = moveInSource(texts.get(abs) ?? readFileSync(abs, "utf8"), m.loc, m.key, m.by);
+    const abs = p.files.find((f) => basename(f) === m.loc.split(":")[0])!, w = moveInSource(texts.get(abs) ?? readFileSync(abs, "utf8"), m.loc, m.key, m.by, m.i);
     if (typeof w === "string") return [`fix: not written: ${m.part}: ${w}`];
     texts.set(abs, w.src);
-    said.push(`${m.part}'s ${m.key} ${w.from} -> ${w.to} (${basename(abs)}:${w.line})`);
+    said.push(`${m.part}'s ${m.label} ${w.from} -> ${w.to} (${basename(abs)}:${w.line})`);
   }
   if (!said.length) return [];
   const fixed = new Set((r.fixes ?? []).filter((f) => f.move || f.held).map((f) => f.text)), scenes = [...new Set(r.failed!.map((t) => t.split(" › ")[0]))];
@@ -186,7 +190,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     const seen = new Map<string, string[]>(), found = new Map<string, Set<number>>(), at = new Map<string, Set<string>>();
     const only = opts.frames ?? (opts.frame !== undefined ? [opts.frame] : undefined), co = def.opts.check;
     // its rules (expect): at each frame checked, the placements they name
-    const rules = def.opts.expect as Rule2d[] | undefined, names = rules ? namesOf(rules) : [], named: { f: number; at: Map<string, Named> }[] = [];
+    const rules = def.opts.expect as Rule2d[] | undefined, names = rules ? namesOf(rules) : [], named: Frame2d[] = [];
     // a long story checked one frame in n (check: { every: n }): what moves through it is still seen
     // at every few steps, at the cost of a short loop
     const every = typeof co === "object" && co ? co.every : 1, keep = p.named(name);
@@ -198,7 +202,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       if (!keep) p.forget(name, ft);
       const unlit = new Set(b.layers.filter((l) => l.unlit).map((l) => l.name));
       frames++;
-      if (rules) named.push({ f, at: nameAll(b.placements, new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name)), names) });
+      if (rules) named.push({ f, ...nameAll(b.placements, new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name)), names) });
       // many copies of one small thing (a brush scattered over the ground) are texture, not objects:
       // describe lists them on one line and checks none of them, and so does this, but for where one
       // stands in a mesh() (a tuft floating past a hill's edge)

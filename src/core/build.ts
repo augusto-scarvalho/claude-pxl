@@ -136,18 +136,23 @@ function castsOf(def: AssetDef, l: Layer): Item[] {
       if (typeof v === "function") return [(c: Canvas) => {
         // on a canvas of its own, so what else it draws lands nowhere; its stamps and tiles come here as shadows
         const s = Object.assign(Object.create(c) as Canvas, { img: new Img(c.img.w, c.img.h), log: undefined, maps: undefined, sorted: undefined, onOp: undefined });
-        s.stamp = (name, x, y, o) => { const k = shadowOf(name, o); if (k) c.stamp(name, x, y, k); };
+        s.stamp = (name, x, y, o) => { if (typeof x === "object") [x, y, o] = [0, 0, x]; const k = shadowOf(name, o); if (k) c.stamp(name, x, y, k); else unseen(c, name, x, y, o); };
         s.tile = (name, x, y, cols, rows, o) => { const k = shadowOf(name, o); if (k) c.tile(name, x, y, cols, rows, k); };
         v(s);
       }];
       if (!isOp(v) || (v.name !== "stamp" && v.name !== "tile")) return [];
       const at = v.name === "stamp" ? 3 : 5, args = [...v.args], k = shadowOf(args[0], args[at]);
-      if (!k) return [];
+      if (!k) return v.name === "stamp" ? [(c: Canvas) => unseen(c, ...(args as Parameters<Canvas["stamp"]>))] : [];
       while (args.length < at) args.push(v.name === "stamp" ? 0 : 1);
       args[at] = k;
       return [{ ...v, args }];
     });
   });
+}
+
+/** A stamp with no shadow, stamped where nothing shows: what is placed by a relation to it finds it (its shadow beside it). */
+function unseen(c: Canvas, ...a: Parameters<Canvas["stamp"]>): void {
+  Canvas.prototype.stamp.apply(Object.assign(Object.create(c) as Canvas, { img: new Img(1, 1), log: undefined, maps: undefined, sorted: undefined, onOp: undefined }), a);
 }
 
 /** cast: "sun": look3d()'s light laid on a ground seen from above, what is h px up landing h * [kx, ky] away (long under a low sun). */

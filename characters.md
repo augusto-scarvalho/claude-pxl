@@ -482,6 +482,8 @@ and fix dither and shading. Upscaled, round off the big square blocks and redraw
   whiskers, a crease that fades).
 - **Light and shadow are two families.** The step across the terminator is bigger than any within
   them, and light bounced into a shadow is a duller, darker step, never as bright as the lit side.
+  A flat face is one tone; a round form changes only along its curve, never darker all round its rim
+  (pillow shading). A sprite the game will flip is lit from straight above (`light: [0, -1]`).
   Ramps can share their ends (one darkest under all, one lightest over all:
   `ramps("kGgY", "kRrY")`): the palette mixes like paint.
 - **Something on one side only** (a shine, a shadow side) of a mirrored sprite: mirror a `_part`,

@@ -347,6 +347,15 @@ export function searchKnobs<K extends { value: number }>(knobs: K[], o: { place:
   }
   return best && { knob: best.knob, to: best.to };
 }
+/** `m` a list found in `text` (`at: [...]`, its items its first group): its i-th number set to `to` (one past its end: added); undefined when that isn't a number written out. */
+export function setListItem(text: string, m: RegExpExecArray | null, i: number, to: number): string | undefined {
+  if (!m || m[1].includes("[")) return undefined;
+  const items = m[1].split(","), num = String(+to.toFixed(3));
+  if (i < items.length) { if (!/^\s*-?[\d.]+\s*$/.test(items[i])) return undefined; items[i] = items[i].replace(/-?[\d.]+/, num); }
+  else if (i === items.length) items.push(" " + num);
+  else return undefined;
+  return text.slice(0, m.index) + m[0].replace(m[1], items.join(",")) + text.slice(m.index + m[0].length);
+}
 /**
  * A knob's number found in the art file's text (the part's `name: { ... }`, its at, beside or parameter;
  * or a place written as a bare array in a table, `const AT = { pack: [127, 148] }`, a 2D scene's) and
@@ -354,16 +363,7 @@ export function searchKnobs<K extends { value: number }>(knobs: K[], o: { place:
  */
 export function setKnobInSource(src: string, k: Knob, to: number): string | undefined {
   const head = (open: string) => [...src.matchAll(new RegExp(`(^|[\\s{,])${k.part}\\s*:\\s*\\${open}`, "g"))];
-  const heads = head("{"), num = (v: number) => String(+v.toFixed(3));
-  // the i-th number of the list `m` found, set (one past its end: added)
-  const item = (text: string, m: RegExpExecArray | null): string | undefined => {
-    if (!m) return undefined;
-    const items = m[1].split(","), i = k.i!;
-    if (i < items.length) { if (!/^\s*-?[\d.]+\s*$/.test(items[i])) return undefined; items[i] = items[i].replace(/-?[\d.]+/, num(to)); }
-    else if (i === items.length) items.push(" " + num(to));
-    else return undefined;
-    return text.slice(0, m.index) + m[0].replace(m[1], items.join(",")) + text.slice(m.index + m[0].length);
-  };
+  const heads = head("{"), item = (text: string, m: RegExpExecArray | null) => setListItem(text, m, k.i!, to);
   if (!heads.length && k.key === "at" && head("[").length === 1) return item(src, new RegExp(`(?:^|[\\s{,])${k.part}\\s*:\\s*\\[([^\\]]*)\\]`).exec(src));
   if (heads.length !== 1) return undefined;
   // the part's braces
@@ -378,7 +378,7 @@ export function setKnobInSource(src: string, k: Knob, to: number): string | unde
   } else {
     const m = new RegExp(`\\b${k.key}\\s*:\\s*(-?[\\d.]+)`).exec(body);
     if (!m) return undefined;
-    out = body.slice(0, m.index) + m[0].replace(m[1], num(to)) + body.slice(m.index + m[0].length);
+    out = body.slice(0, m.index) + m[0].replace(m[1], String(+to.toFixed(3))) + body.slice(m.index + m[0].length);
   }
   return src.slice(0, start) + out + src.slice(end + 1);
 }

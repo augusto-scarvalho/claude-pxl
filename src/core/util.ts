@@ -189,10 +189,11 @@ export function once<T>(owner: unknown, key: string, make: () => T): T {
  * A lane along a polyline, [x0, y0, x1, y1, ...] px, its corners rounded `round` px (as far as its legs
  * allow): (x, y) => [s, u], how far along it the nearest point of it lies (px from the first point; its
  * first and last legs carried on past their ends) and how far the point lies to its side (px, + on the
- * right going along it); `.total` its length along. What is laid along a path: slabs in courses at steps
+ * right going along it); `.total` its length along; `.point(s, u)` the other way, where that is (what is
+placed `along` it). What is laid along a path: slabs in courses at steps
  * of s (fanning round a bend), its edges at |u|, its ends at s 0 and total, a road's lines, a river's banks.
  */
-export function lane(pts: number[], o: { round?: number } = {}): ((x: number, y: number) => [number, number]) & { total: number } {
+export function lane(pts: number[], o: { round?: number } = {}): ((x: number, y: number) => [number, number]) & { total: number; point: (s: number, u?: number) => [number, number] } {
   const r = o.round ?? 0;
   if (!Array.isArray(pts) || pts.length < 4 || pts.length % 2 || !pts.every(Number.isFinite) || !(r >= 0))
     throw new PxError(`lane: points are [x0, y0, x1, y1, ...] (two or more), round px (0 up), got ${JSON.stringify(pts)?.slice(0, 120)}, ${JSON.stringify(o.round)}`);
@@ -244,7 +245,14 @@ export function lane(pts: number[], o: { round?: number } = {}): ((x: number, y:
     });
     return [bs, bu];
   };
-  return Object.assign(at, { total: s });
+  // the other way: the point s px along it and u to its right as it runs (past its ends, straight on)
+  const point = (sa: number, u = 0): [number, number] => {
+    const q = out.find((p, k) => sa < p.s + p.len || k === out.length - 1)!, t = sa - q.s;
+    if ("d" in q) return [q.a[0] + q.d[0] * t - q.d[1] * u, q.a[1] + q.d[1] * t + q.d[0] * u];
+    const sg = Math.sign(q.sw), ang = q.a0 + (sg * t) / q.rad, rho = q.rad - sg * u;
+    return [q.c[0] + rho * Math.cos(ang), q.c[1] + rho * Math.sin(ang)];
+  };
+  return Object.assign(at, { total: s, point });
 }
 
 export function profile(pts: number[]): (x: number) => number {

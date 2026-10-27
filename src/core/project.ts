@@ -123,7 +123,7 @@ function readsClock(items: Item[]): boolean {
 const PLACE = ["fit", "flip", "rot", "swap", "rflip", "rswap", "shade", "silhouette", "cast", "castBase", "seed", "reseed", "frame", "delay", "rdelay", "fx"];
 /** Allowed option keys of ops whose last argument is an options object. */
 export const OP_OPTS: Record<string, string[]> = {
-  stamp: [...PLACE, "sub", "smear", "at", "id", "z", "heading", "shadow", "t"],
+  stamp: [...PLACE, "sub", "smear", "at", "id", "z", "heading", "shadow", "t", "beside", "on", "along", "apart"],
   tile: [...PLACE, "shadow"],
   pattern: PLACE,
   panel: PLACE,
@@ -1083,6 +1083,8 @@ export class Project implements BuildCtx {
     for (const name of [...OPS, "clip", "lighting", "glow", "post"]) {
       env[name] = (...args: unknown[]): Op => {
         const loc = this.callerLoc();
+        // stamp(name, { beside: [...] }): placed by its relation alone, at no offset
+        if (name === "stamp" && isPlainObject(args[1])) args = [args[0], 0, 0, args[1], ...args.slice(2)];
         try {
           checkArgs(name, args);
           const o = name === "mesh" ? args[3] : name === "surface" || name === "voxels" || name === "volume" || name === "splats" || name === "draw3d" ? args[1] : args[args.length - 1];

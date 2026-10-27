@@ -123,8 +123,8 @@ What exists, a line each; `PXL help <name>` prints the rest of any op or option 
 - **Regions** (`where`, `clip(region, ...items)`): `[cx, cy, r]`, `[x, y, w, h]`, a polygon's points,
   or `(x, y) => bool`. `shade`/`light(region, steps, density)` step colors along the ramps.
 - **Reuse**: variants are `base` + `swap`; repeated details `_parts` + `stamp`; families a `group` or a
-  loop; props get `pivot: "bottom"`; texture is `scatter` of tiny parts; areas are `tilemap`/`pattern`
-  (a terrain's 16 corner pieces from one function: `corners()`).
+  loop; props get `pivot: "bottom"` and a relation to what they go with (`beside`, `on`, `along`);
+  texture is `scatter` of tiny parts; areas are `tilemap`/`pattern` (a terrain's 16 corners: `corners()`).
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` and functions reading `c.phase`;
   stamping an anim animates the scene; `scroll()`, `clouds()`, `plume()`, `c.cross()` go by in a
   loop; `tween()` keys poses in time; `route()` walks a figure along a path (`px: true` on a flat map).
@@ -181,10 +181,8 @@ Every command run on an example writes an `out/` next to it: give it `--out <scr
 - Drawing a kind of thing new to you: `PXL study` a game's sheet of it and your drawing, and hold
   your numbers against the game's (`PXL help "environment 1"`).
 - 2–4 shades per material, mnemonic keys (`g`/`G`); reuse a tone across materials before adding a
-  color. Light and shadow are two families: the step across the terminator is bigger than any
-  within them. A flat face is one tone; a round form changes only along its curve, never darker all
-  round its rim (pillow shading). A sprite the game will flip is lit from straight above
-  (`light: [0, -1]`).
+  color. Light and shadow are two families (the biggest step across the terminator), no pillow
+  shading, a sprite the game flips lit from straight above: `PXL help "characters 7"`.
 - Lines step diagonally, without L-corners, their runs in order; at 16 px and under, drop the
   outline (unless it's 8-bit). Lines, clusters, banding, shared ramps: `PXL help "characters 7"`.
 

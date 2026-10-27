@@ -10,6 +10,8 @@ declare global {
   interface PxLayer { readonly __layer: true }
   type PxItem = string | PxOp | PxLayer | ((c: PxCanvas) => void);
 
+  /** A lane(): (x, y) => [s along it, u to its right]; total its length; point(s, u) where that is. */
+  type PxLane = ((x: number, y: number) => [number, number]) & { total: number; point(s: number, u?: number): [number, number] };
   interface PxPlace {
     /** Of a group or glob, the member whose drawing is nearest this height in px (sizes of one thing). */
     fit?: number;
@@ -23,6 +25,14 @@ declare global {
     frame?: number; /** an anim as it is t ms into its own loop, frozen */ t?: number; delay?: number; rdelay?: boolean;
     /** stamp only: of a family named by the compass (name_n, name_ne, ...: views(), rig3d's moves, a turnaround), the one nearest this heading: compass degrees (0 away from us, 90 right) or a way on the ground [dx, dz]. */
     heading?: number | [number, number];
+    /** stamp only, placed by a relation to an earlier stamp (it follows it; x, y an offset): its box gap px off that side of the other's. */
+    beside?: [string, "left" | "right" | "above" | "below", number?];
+    /** stamp only: its lowest pixel on another stamp's highest under it (its id), or on "ground", a row, a profile() at x. */
+    on?: string | number | ((x: number) => number);
+    /** stamp only: its pivot s px along a path (points [x0, y0, ...] or a lane()) and u px to its right. */
+    along?: [number[] | PxLane, number, number?];
+    /** stamp only: at x, y but out of another stamp's box (and gap px more), the shorter way. */
+    apart?: string | [string, number?];
     /** stamp only: x, y between pixels (subpixel); [dx, dy] the way it moves (1 right/down, -1 left/up). */
     sub?: boolean | [number, number] | { from: [number, number] };
     /** stamp only: motion blur, the silhouette swept from where it was ([x, y]) to here, under it, in one key (default its lightest). */
@@ -687,6 +697,7 @@ declare global {
     terrain(view: PxView | PxPerspective, height: (x: number, z: number) => number, fn: (x: number, z: number, u: number, t: number, col: number, row: number) => PxColor | null | undefined, opts?: PxTerrainOpts): void;
     recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): void;
     stamp(name: string, x?: number, y?: number | "ground", opts?: PxPlace): void;
+    stamp(name: string, opts: PxPlace): void;
     tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): void;
     pattern(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): void;
     panel(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): void;
@@ -834,7 +845,7 @@ declare global {
   /** A ground (or a ceiling) as a polyline [x0, y0, x1, y1, ...], x going up: (x) => its row there, rounded. */
   function profile(pts: number[]): (x: number) => number;
   /** A path as a polyline [x0, y0, x1, y1, ...] px, its corners rounded `round` px: (x, y) => [s, u], how far along it (px) and to its right (px, negative to its left); `.total` its length along. */
-  function lane(pts: number[], opts?: { round?: number }): ((x: number, y: number) => [number, number]) & { total: number };
+  function lane(pts: number[], opts?: { round?: number }): PxLane;
   /** Shapes in meters drawn far to near through the camera (solid.stick, blob, box, cone, poly); boxes' faces lit by the sun. */
   function solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): PxOp;
   /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade by `shade`. */
@@ -965,6 +976,7 @@ declare global {
   function effect(...fx: PxEffect): PxOp;
   function recolor(map: Record<string, PxColor>, where?: PxRegion, density?: number): PxOp;
   function stamp(name: string, x?: number, y?: number | "ground", opts?: PxPlace): PxOp;
+  function stamp(name: string, opts: PxPlace): PxOp;
   function tile(name: string, x: number, y: number, cols?: number, rows?: number, opts?: PxPlace): PxOp;
   function pattern(name: string, x: number, y: number, w: number, h: number, opts?: PxPlace): PxOp;
   /** 9-slice: an asset with `slice` margins drawn at w x h; corners stay, edges and center repeat. */

@@ -337,12 +337,56 @@ test("expect: a 2D scene's rules on its placements (by id, or an asset placed on
   // --fix: the box's own x (+4, the fewest px), the crate's y in AT's table (past the box's 40: in front), the post's y computed in
   // code, said and left; written once the scene rebuilt with them holds what it should
   const f = await run(yard(RULES, `stamp("box", 10, 40), stamp("post", 22, 40 - 3), stamp("box", ...AT.crate, { id: "crate" })`, "[30, 38]"), "check", "--fix");
-  assert.match(f.text, /fix: box left of post, 2-4 px apart: box x \+4 px\nfix: crate in front of box: crate y \+3 px\nfix: post on the ground: post's y \+2 px would make it hold, but its y is computed in code \(`40 - 3` at a\.px\.js:7:\d+\): change it by hand\nfix: wrote crate's y 38 -> 41 \(a\.px\.js:4\), box's x 10 -> 14 \(a\.px\.js:7\); check again/);
+  assert.match(f.text, /fix: box left of post, 2-4 px apart: box's x \+4 px\nfix: crate in front of box: crate's y \+3 px\nfix: post on the ground: post's y \+2 px would make it hold, but its y is computed in code \(`40 - 3` at a\.px\.js:7:\d+\): change it by hand\nfix: wrote crate's y 38 -> 41 \(a\.px\.js:4\), box's x 10 -> 14 \(a\.px\.js:7\); check again/);
   assert.match(readFileSync(f.file, "utf8"), /const AT = \{ crate: \[30, 41\] \}[^]*stamp\("box", 14, 40\)/);
   // a number two placements share (the flag's y is the crate's): rebuilt, the crate's rule that the fix held fails, so nothing is written
   const g = await run(yard(`{ beside: ["crate", "post", { gap: [1, 2], side: "right" }] }, { apart: ["flag", "box", 14] }, { beside: ["post", "box", { gap: [6, 9] }] }`,
     `stamp("box", 10, 40), stamp("post", 18 + 4, 40), stamp("box", ...AT.crate, { id: "crate" }), stamp("post", AT.crate[0] - 6, AT.crate[1], { id: "flag" })`), "check", "--fix");
   assert.match(g.text, /fix: not written: rebuilt with flag's y 40 -> 20 .*, yard › crate right of post, 1-2 px apart doesn't hold/);
   assert.match(readFileSync(g.file, "utf8"), /crate: \[30, 40\]/);
+});
+
+// a crate (a roof's triangle, x 14-24 at 20), things placed by relations to it, a path along y 30
+const placedBy = (crateX: number, rules = "", more = "") => PAL + `
+sprite("box", { w: 6, h: 6, pivot: "bottom" }, rect(0, 0, 6, 6, "r"))
+sprite("post", { w: 2, h: 8, pivot: "bottom" }, rect(0, 0, 2, 8, "k"))
+sprite("roof", { w: 12, h: 6, pivot: "bottom" }, poly([0, 6, 6, 0, 12, 6], "g"))
+const PATH = [4, 30, 60, 30]
+scene("yard", { w: 64, h: 48, world: { ground: 44 }, expect: [${rules}] },
+  layer("props", { sort: "y" }, stamp("roof", ${crateX}, 44, { id: "crate" }),
+    stamp("box", { beside: ["crate", "left", 3], id: "pot" }), stamp("box", { beside: ["crate", "above", 1], id: "lid" }),
+    stamp("post", 2, 0, { on: "crate", id: "flag" }), stamp("post", { on: "pot", id: "pole" }), stamp("box", { along: [PATH, 16], id: "stone" }),
+    stamp("box", 22, 44, { apart: ["crate", 1], id: "pushed" }), stamp("post", 50, 0, { on: "ground", id: "stake" })${more}))`;
+
+test("stamp by a relation (beside, on, along, apart): it follows what it's placed by; x, y an offset; --fix changes the relation's number", async () => {
+  const boxes = (src: string): Record<string, string> => {
+    const b = loadSource(src, "t.px.js").build("yard");
+    return Object.fromEntries(b.placements.map((p) => { const r = p.img.bounds()!; return [p.id, [p.x + r.x, p.y + r.y, p.x + r.x + r.w - 1, p.y + r.y + r.h - 1].join(",")]; }));
+  };
+  // a box 3 px left of the crate, their bottoms on one row; one above it 1 px up, middles in line; a post on
+  // its slope 2 px right of its peak (one row lower) and one on the box; one 16 px along the path; one
+  // pushed out of the crate's box the shorter way (1 px clear); one on the ground at x 50
+  const at = boxes(placedBy(20));
+  assert.deepEqual({ ...at }, { crate: "14,38,24,43", pot: "5,38,10,43", lid: "17,31,22,36", flag: "21,32,22,39", pole: "7,30,8,37", stone: "17,24,22,29", pushed: "26,38,31,43", stake: "49,36,50,43" });
+  // the crate moved 10 px right: what is beside it or on it follows; the path's and the ground's stay
+  const moved = boxes(placedBy(30)), dx = (k: string) => +moved[k].split(",")[0] - +at[k].split(",")[0];
+  assert.deepEqual(["pot", "lid", "flag", "pole", "stone", "stake"].map(dx), [10, 10, 10, 10, 0, 0]);
+  // over a loop: beside a flame that grows (its box at its own frame 0), a box stands still; beside one
+  // moving 10 px a frame, it moves with it
+  const loop = (f: number) => { const b = loadSource(PAL + `anim("flame", { w: 4, h: 8, frames: 4, pivot: "bottom" }, (c) => c.rect(0, 8 - 2 * (c.frame + 1), 4 + (c.frame % 2), 2 * (c.frame + 1), "r"))
+sprite("box", { w: 6, h: 6, pivot: "bottom" }, rect(0, 0, 6, 6, "r"))
+scene("s", { w: 96, h: 48, frames: 4 }, stamp("flame", 10, 40, { id: "fire" }), stamp("box", { beside: ["fire", "right", 2], id: "pot" }),
+  (c) => c.stamp("box", 30 + 10 * c.frame, 40, { id: "cart" }), stamp("box", { beside: ["cart", "right", 1], id: "trailer" }))`, "t.px.js").build("s", 0, f * 125);
+    return Object.fromEntries(b.placements.map((p) => [p.id, p.x]));
+  };
+  assert.deepEqual([0, 1, 2, 3].map((f) => [loop(f).pot, loop(f).trailer - loop(f).cart]), [[14, 7], [14, 7], [14, 7], [14, 7]]);
+  assert.deepEqual([0, 1, 2, 3].map((f) => loop(f).trailer), [34, 44, 54, 64]);
+  assert.throws(() => boxes(placedBy(20, "", `, stamp("box", { beside: ["shed", "left"] })`)), /beside: nothing stamped as 'shed' yet/);
+  assert.throws(() => boxes(placedBy(20, "", `, stamp("box", { beside: ["crate", "west"] })`)), /beside is \[id, "left" \| "right" \| "above" \| "below", gap px\]/);
+  // --fix: the box's beside gap (its relation's, before where it stands), the stone's s along the path
+  // (the pole on the box moved with it, and the stone's fix counted that), checked rebuilt and written
+  const f = await run(placedBy(20, `{ beside: ["pot", "crate", { gap: [5, 7], side: "left" }] }, { beside: ["stone", "pole", { gap: [2, 4], side: "right" }] }`), "check", "--fix");
+  assert.match(f.text, /fix: pot left of crate, 5-7 px apart: pot's beside gap \+2 px\nfix: stone right of pole, 2-4 px apart: stone's along s -6 px\nfix: wrote stone's along s 16 -> 10 \(a\.px\.js:\d+\), pot's beside gap 3 -> 5 \(a\.px\.js:\d+\); check again/);
+  assert.match(readFileSync(f.file, "utf8"), /beside: \["crate", "left", 5\][^]*along: \[PATH, 10\]/);
 });
 

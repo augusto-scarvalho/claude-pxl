@@ -280,6 +280,14 @@ export interface PlaceOpts {
   at?: string;
   /** Name this placement for `at` (default: the asset name). */
   id?: string;
+  /** stamp only, placed by a relation (it follows what it's placed by; x, y an offset): [id, "left" | "right" | "above" | "below", gap px between their boxes]. */
+  beside?: [string, string, number?];
+  /** stamp only: on another stamp's top (its id), or on "ground", a row, a profile() at x. */
+  on?: string | number | ((x: number) => number);
+  /** stamp only: [points [x0, y0, ...] or a lane(), s px along it, u px to its right]. */
+  along?: [number[] | ((x: number, y: number) => [number, number]), number, number?];
+  /** stamp only: at x, y but out of another stamp's box, [id, gap px], the shorter way. */
+  apart?: [string, number?] | string;
   /** Draw order in a layer with sort: "z" (default 0; ties keep call order). */
   z?: number;
   seed?: number;

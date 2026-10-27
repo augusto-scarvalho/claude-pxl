@@ -20,7 +20,7 @@ import { byHeading } from "./rig3d.ts";
 import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshSprite, type MeshWorld, drawMesh, groundOf } from "./mesh.ts";
 import type { Lit } from "./sunlight.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
-import { bayer, colorList, gridRows, hash, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
+import { bayer, colorList, gridRows, hash, lane, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
 
 /** How a canvas reaches other assets. */
 export interface Resolver {
@@ -49,11 +49,18 @@ let asDepth = 0;
 /** Which way a drawing faces (an asset's `facing`), as a direction on the picture: x right, z away from us. */
 export const FACING: Record<string, [number, number, number]> = { right: [1, 0, 0], left: [-1, 0, 0], front: [0, 0, -1], back: [0, 0, 1] };
 /** Where stamps landed in an asset (top-left in image coords) with their sockets, by id: for `at`. */
-export type Placed = Map<string, { x: number; y: number; sockets?: Record<string, [number, number]>; /** a sprite in mesh(): a socket in its world (m) */ m3?: (socket: string) => [number, number, number] }>;
+export type Placed = Map<string, { x: number; y: number; sockets?: Record<string, [number, number]>; /** a sprite in mesh(): a socket in its world (m) */ m3?: (socket: string) => [number, number, number];
+  /** a stamp: where it was stamped, and its drawing (a shadow's copy: the thing's), for what is placed by a relation to it */ at?: [number, number]; body?: () => Img }>;
+/** A stamp's drawing as a relation measures it: not cast, at its own frame 0 (or the frame it's frozen on). */
+const still = (o?: PlaceOpts): PlaceOpts => ({ ...o, cast: undefined, ...(o?.frame === undefined && o?.t === undefined ? { frame: 0 } : {}) });
+/** The relations a stamp can be placed by (Canvas.related). */
+export const RELATIONS = ["beside", "on", "along", "apart"] as const;
+/** A stamp placed by a relation: what it was placed by (it follows that), and its relation's numbers a fix may change, each the way it moves the thing (px). */
+export type Rel = { to?: string; knobs: { key: "beside" | "along"; i: number; label: string; move: (d: number) => [number, number] }[] };
 /** What was stamped where, in drawing order (top-left in asset coords): for `pxl describe`. */
 export type Placement = { name: string; x: number; y: number; w: number; h: number; layer?: string; img: Img; /** the light it was drawn under, on the picture (a sprite in mesh()) */ light?: [number, number];
   /** a sprite in mesh(): how far its feet are over (under: below 0) the nearest face looking up under them, m, and its material */ stand?: { off: number; on: string };
-  /** a stamp's: its id, where the call is in the art file (a stamp() item's, not a function's), its y in a layer sorted by y (for a scene's expect rules and --fix) */ id?: string; loc?: string; sort?: number };
+  /** a stamp's: its id, where the call is in the art file (a stamp() item's, not a function's), its y in a layer sorted by y, its relation (for a scene's expect rules and --fix) */ id?: string; loc?: string; sort?: number; rel?: Rel };
 
 /**
  * Drawing surface over an image. Coordinates are relative to (ox, oy); colors are palette
@@ -1360,7 +1367,7 @@ export class Canvas {
   }
 
   /** Draw `src` with its pivot (default: `def`, as a fraction of its size) on (x, y). */
-  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc" | "sort">): void {
+  private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc" | "sort" | "rel">): void {
     const [px, py] = src.pivot ?? [src.w * def[0], src.h * def[1]];
     if (sub) this.subPut(src, x - Math.floor(px), y - Math.floor(py), sub);
     else this.put(src, x - Math.floor(px), y - Math.floor(py), ok);
@@ -1368,15 +1375,22 @@ export class Canvas {
     if (name) this.log?.push({ name, x: Math.floor(this.ox + x - Math.floor(px)), y: Math.floor(this.oy + y - Math.floor(py)), w: src.w, h: src.h, layer: this.layerName, img: src, ...meta });
   }
 
-  stamp(name: string, x = 0, y: number | "ground" = 0, opts?: PlaceOpts): void {
+  stamp(name: string, x: number | PlaceOpts = 0, y: number | "ground" = 0, opts?: PlaceOpts): void {
+    // stamp(name, { beside: [...] }): placed by its relation alone
+    if (typeof x === "object") { opts = x; x = 0; y = 0; }
     if (y === "ground") {
       if (!this.groundAt) throw new PxError(`stamp('${name}', x, "ground") stands on the scene's ground: give it world: { ground: row or [x0, y0, x1, y1, ...] }`);
       y = this.groundAt(this.ox + x) - this.oy;
     }
     if (opts?.at !== undefined) [x, y] = this.socketAt(opts.at, x, y);
+    let rel: Rel | undefined;
+    if (opts && RELATIONS.some((k) => opts![k] !== undefined)) ({ x, y, rel } = this.related(name, opts, x, y));
     if (opts?.cast && typeof opts.cast === "object" && !Array.isArray(opts.cast)) opts = { ...opts, cast: castAt(opts.cast, x, y) };
-    const src = this.asset(name, opts, x, y), [px, py] = src.pivot ?? [0, 0];
-    this.placed?.set(opts?.id ?? name, { x: this.ox + x - Math.floor(px), y: this.oy + y - Math.floor(py), sockets: src.sockets });
+    const src = this.asset(name, opts, x, y), [px, py] = src.pivot ?? [0, 0], X = x, Y = y, o = opts;
+    // (what a relation reads of it: where it stands now, and its drawing at its own frame 0, a shadow's
+    // copy as the thing it's of: what walks by carries its followers, flames that flicker shake none)
+    let body: Img | undefined;
+    this.placed?.set(opts?.id ?? name, { x: this.ox + x - Math.floor(px), y: this.oy + y - Math.floor(py), sockets: src.sockets, at: [this.ox + x, this.oy + y], body: () => (body ??= this.asset(name, still(o), X, Y)) });
     let sub = opts?.sub;
     // { from: [x, y] }: the way it moves, from where it was (the frame before)
     const from = (sub as { from?: number[] })?.from;
@@ -1385,9 +1399,79 @@ export class Canvas {
       throw new PxError(`sub is true, [dx, dy] the way the part moves (1 right / down, -1 left / up), or { from: [x, y] } where it was, got ${JSON.stringify(sub)}`);
     if (opts?.smear !== undefined) {
       if (sub) throw new PxError("smear and sub don't go together: a smear is a move of more than a pixel");
-      return this.place(this.smeared(src, opts.smear, x, y), x, y, [0, 0], undefined, opts?.z, name, undefined, { id: opts?.id, loc: this.loc });
+      return this.place(this.smeared(src, opts.smear, x, y), x, y, [0, 0], undefined, opts?.z, name, undefined, { id: opts?.id, loc: this.loc, rel });
     }
-    this.place(src, x, y, [0, 0], undefined, opts?.z, name, sub ? (Array.isArray(sub) ? (sub as [number, number]) : [1, 1]) : undefined, { id: opts?.id, loc: this.loc });
+    this.place(src, x, y, [0, 0], undefined, opts?.z, name, sub ? (Array.isArray(sub) ? (sub as [number, number]) : [1, 1]) : undefined, { id: opts?.id, loc: this.loc, rel });
+  }
+
+  /**
+   * Where a stamp placed by a relation stands (its pivot, as stamp's x, y), so it follows what it is
+   * placed by: `beside: [id, side, gap]` its box `gap` px off that side of the other's (left or right:
+   * their bottoms on one row; above or below: their middles in line), `on: id` its lowest pixel on the
+   * other's highest under it (their middles in line), `on: "ground" | row | profile()` on that at x,
+   * `along: [path or lane(), s, u]` s px along it and u to its right as it runs, `apart: [id, gap]` at
+   * x, y but out of the other's box (and gap px more) the shorter way. x, y: an offset from where the
+   * relation puts it (where it stands, on a surface and apart). Boxes are the drawings' opaque ones at
+   * their own frame 0, where each stands now.
+   */
+  private related(name: string, opts: PlaceOpts, dx: number, dy: number): { x: number; y: number; rel: Rel } {
+    const kinds = RELATIONS.filter((k) => opts[k] !== undefined), kind = kinds[0], v = opts[kind] as unknown;
+    if (kinds.length > 1) throw new PxError(`a stamp is placed by one relation, got ${kinds.join(" and ")}`);
+    const im = this.asset(name, still(opts), dx, dy), tb = im.bounds() ?? { x: 0, y: 0, w: im.w, h: im.h }, [ipx, ipy] = im.pivot ?? [0, 0];
+    // its box from where it's stamped, and the middle of a box
+    const b = { x0: tb.x - Math.floor(ipx), y0: tb.y - Math.floor(ipy), x1: tb.x - Math.floor(ipx) + tb.w - 1, y1: tb.y - Math.floor(ipy) + tb.h - 1 };
+    const mid = (a: number, c: number) => Math.floor((a + c) / 2);
+    // the other's box on this canvas, and its drawing's top-left
+    const other = (id: unknown) => {
+      const p = typeof id === "string" ? this.placed?.get(id) : undefined;
+      if (!p?.body || !p.at) throw new PxError(`${kind}: nothing stamped as '${id}' yet in this asset; stamp it first (an earlier layer counts), or name a placement with { id }`);
+      const img = p.body(), bb = img.bounds() ?? { x: 0, y: 0, w: img.w, h: img.h }, x = p.at[0] - this.ox - Math.floor(img.pivot?.[0] ?? 0), y = p.at[1] - this.oy - Math.floor(img.pivot?.[1] ?? 0);
+      return { img, x, y, x0: x + bb.x, y0: y + bb.y, x1: x + bb.x + bb.w - 1, y1: y + bb.y + bb.h - 1 };
+    };
+    const num = (n: unknown, what: string) => { if (typeof n !== "number" || !Number.isFinite(n)) throw new PxError(`${kind}: ${what} is a number, got ${JSON.stringify(n)}`); return n; };
+    if (kind === "beside") {
+      const [id, side, gap = 0] = Array.isArray(v) ? v : [];
+      if (!["left", "right", "above", "below"].includes(side)) throw new PxError(`beside is [id, "left" | "right" | "above" | "below", gap px], got ${JSON.stringify(v)}`);
+      const r = other(id), g = num(gap, "its gap");
+      const x = side === "left" ? r.x0 - g - 1 - b.x1 : side === "right" ? r.x1 + g + 1 - b.x0 : mid(r.x0, r.x1) - mid(b.x0, b.x1);
+      const y = side === "above" ? r.y0 - g - 1 - b.y1 : side === "below" ? r.y1 + g + 1 - b.y0 : r.y1 - b.y1;
+      const way: [number, number] = side === "left" ? [-1, 0] : side === "right" ? [1, 0] : side === "above" ? [0, -1] : [0, 1];
+      return { x: x + dx, y: y + dy, rel: { to: id, knobs: [{ key: "beside", i: 2, label: "beside gap", move: (d) => [way[0] * d, way[1] * d] }] } };
+    }
+    if (kind === "on") {
+      if (typeof v === "string" && v !== "ground") {
+        const r = other(v), x = mid(r.x0, r.x1) - mid(b.x0, b.x1) + dx;
+        // its highest pixel under it, column by column (a roof's slope, a cairn's top)
+        let top = Infinity;
+        for (let c = Math.max(x + b.x0, r.x0); c <= Math.min(x + b.x1, r.x1); c++)
+          for (let row = r.y0; row <= r.y1 && row < top; row++) if (r.img.data[(row - r.y) * r.img.w + c - r.x] !== TRANSPARENT) { top = row; break; }
+        return { x, y: (top === Infinity ? r.y0 : top) - 1 - b.y1 + dy, rel: { to: v, knobs: [] } };
+      }
+      const c = this.ox + dx + mid(b.x0, b.x1);
+      const g = v === "ground" ? this.groundAt?.(c) : typeof v === "number" ? v : typeof v === "function" ? (v as (x: number) => number)(c) : undefined;
+      if (typeof g !== "number" || !Number.isFinite(g)) throw new PxError(`on is a stamp's id, "ground" (the scene's world.ground), a row, or a profile([x0, y0, x1, y1, ...]), got ${JSON.stringify(v)}`);
+      return { x: dx, y: g - this.oy - 1 - b.y1 + dy, rel: { knobs: [] } };
+    }
+    if (kind === "along") {
+      const [path, s, u = 0] = Array.isArray(v) ? v : [];
+      const L = typeof path === "function" && typeof (path as { point?: unknown }).point === "function" ? path as ReturnType<typeof lane> : Array.isArray(path) ? lane(path) : undefined;
+      if (!L) throw new PxError(`along is [points [x0, y0, x1, y1, ...] or a lane(), s px along it, u px to its right], got ${JSON.stringify(v)}`);
+      const at = (s2: number, u2: number) => L.point(s2, u2), p = at(num(s, "s"), num(u, "u"));
+      const step = (q: [number, number]): [number, number] => [q[0] - p[0], q[1] - p[1]];
+      return { x: p[0] - this.ox + dx, y: p[1] - this.oy + dy, rel: { knobs: [
+        { key: "along", i: 1, label: "along s", move: (d) => step(at(s + d, u)) },
+        { key: "along", i: 2, label: "along u", move: (d) => step(at(s, u + d)) }] } };
+    }
+    // apart: where it stands, moved out of the other's box (and gap px more) the shorter way
+    const [id, gap = 0] = Array.isArray(v) ? v : [v];
+    const r = other(id), g = num(gap, "its gap");
+    let x = dx, y = dy;
+    const out = [b.x1 + x - (r.x0 - g - 1), r.x1 + g + 1 - (b.x0 + x), b.y1 + y - (r.y0 - g - 1), r.y1 + g + 1 - (b.y0 + y)];
+    if (out.every((m) => m > 0)) {
+      const m = Math.min(...out), k = out.indexOf(m);
+      if (k < 2) x += k ? m : -m; else y += k === 3 ? m : -m;
+    }
+    return { x, y, rel: { knobs: [] } };
   }
 
   /**
@@ -1479,7 +1563,7 @@ export class Canvas {
    * Put a placed asset's pivot on (x, y): drawn now, or in a sorted layer queued and drawn on
    * flush() by y (where it stands) or z.
    */
-  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc">): void {
+  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc" | "rel">): void {
     if (!this.sorted) return this.putAt(src, x, y, def, ok, name, sub, meta);
     if (!Number.isFinite(z)) throw new PxError(`z must be a number, got ${JSON.stringify(z)}`);
     // Drawn later, in order: keep the clip that was active at the call.

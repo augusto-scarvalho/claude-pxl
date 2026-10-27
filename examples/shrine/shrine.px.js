@@ -52,8 +52,13 @@ front("ginkgo", SACRED, { ...SWAY, draw: japan.hand(SACRED) })
 // bend rounded so its slabs fan round it, along to the left into the landing before the hall's steps,
 // between the foxes. Rings raked round the lanterns' and the basin's feet; stepping stones from the path
 // to the basin's front; moss under the maples and the pine and along the hall's base.
-const PAVE = japan.paving({ points: [189, 180, 189, 116, 92, 116], width: 28, round: 26, landings: [[60, 76, 48, 56, "y"], [154, 142, 70, 18, "y"]] })
-const RINGS = [[138, 94, 9], [166, 94, 9], [120, 149, 15]]
+const WAY = [189, 180, 189, 116, 92, 116], ALONG = lane(WAY)   // the approach's line
+const PAVE = japan.paving({ points: WAY, width: 28, round: 26, landings: [[60, 76, 48, 56, "y"], [154, 142, 70, 18, "y"]] })
+// where the lanterns and the basin stand along it, [s px along it, u px to its right]: they are stamped
+// there (and follow it where it's laid), the gravel raked in rings round them a px up from their feet
+const BY_WAY = { toro_w: [115, 21], toro_e: [87, 21], basin: [133, -34] }
+const ringAt = ([s, u], r) => [...ALONG.point(s, u + 1), r]
+const RINGS = [ringAt(BY_WAY.toro_w, 9), ringAt(BY_WAY.toro_e, 9), ringAt(BY_WAY.basin, 15)]
 const STONES = [[104, 139, 4, 2.5], [99, 145, 4, 2.5], [104, 151, 4.5, 2.5], [113, 157, 4.5, 2.5]]
 const MOSS = [[14, 54, 30, 12], [26, 154, 32, 12], [84, 72, 52, 3], [238, 152, 18, 8], [50, 97, 9, 3], [118, 97, 9, 3]]
 // the leaves: under each crown in its color (the ginkgo's a carpet), and where the wind from the east
@@ -133,10 +138,7 @@ const airLeaves = (c) => {
 }
 
 // ---------------------------------------------------------------- the courtyard
-const PLACES = [
-  ["hall_s", 84, 63], ["ema_s", 152, 62], ["fox_tama_e", 50, 95], ["fox_key_w", 118, 95], ["toro_s", 138, 95, "toro_w"], ["toro_s", 166, 95, "toro_e"],
-  ["basin_s", 120, 150], ["torii_s", 189, 158],
-]
+const PLACES = [["hall_s", 84, 63], ["ema_s", 152, 62], ["fox_tama_e", 50, 95], ["fox_key_w", 118, 95]]
 // what moves, stamped by the frame: the trees swaying three times a loop, each a little after another,
 // and the miko; the shade layer casts them as it casts the rest
 const TREES = [["momiji_red_s", 14, 52, 3], ["momiji_orange_s", 238, 150, 0], ["ginkgo_s", 212, 82, 1], ["kuromatsu_s", 22, 158, 4]]
@@ -148,7 +150,7 @@ const movers = (c) => {
 // What the courtyard holds to (pxl check runs them at the frames it checks): the two lanterns just off
 // the north curb of the approach's run to the hall, apart; the miko never behind the key fox, in front
 // of the west lantern whenever she is below it, and on the stretch she sweeps until she walks back.
-const APPROACH = [92, 102, 98, 28], SWEPT = [88, 80, 68, 45]   // PAVE's run west at y 116, 28 wide; her strokes
+const APPROACH = [WAY[4], WAY[5] - 14, WAY[0] - WAY[4] + 1, 28], SWEPT = [88, 80, 68, 45]   // the way's run west, 28 wide; her strokes
 const COURTYARD = [
   { beside: ["toro_w", APPROACH, { gap: [2, 8], side: "above" }] }, { beside: ["toro_e", APPROACH, { gap: [2, 8], side: "above" }] },
   { apart: ["toro_w", "toro_e", 12] }, { before: ["miko", "fox_key_w"] },
@@ -157,7 +159,11 @@ const COURTYARD = [
 scene("shrine", { w: 240, h: 160, frames: L, fps: 1000 / MS, world: { scale: S, view: "top", light: "sun" }, check: { every: 35 }, expect: COURTYARD },
   layer("ground", stamp("_ground", 0, 0), groundLeaves),
   layer("shadows", { shade: 1, of: "props", cast: "sun" }),
-  layer("props", { sort: "y" }, ...PLACES.map(([n, x, y, id]) => stamp(n, x, y, { id })), movers),
+  layer("props", { sort: "y" }, ...PLACES.map(([n, x, y]) => stamp(n, x, y)),
+    // what stands by the approach, placed along it: the lanterns off its north curb, the basin off its
+    // south one, the torii over it as it comes in
+    stamp("toro_s", { along: [ALONG, ...BY_WAY.toro_w], id: "toro_w" }), stamp("toro_s", { along: [ALONG, ...BY_WAY.toro_e], id: "toro_e" }),
+    stamp("basin_s", { along: [ALONG, ...BY_WAY.basin] }), stamp("torii_s", { along: [ALONG, 22] }), movers),
   layer("air", airLeaves),
   // the lanterns' lamps, just lit as the sun goes: a faint warm halo round each window
   glow("iI", { r: 5, strength: 0.3, bands: 2 }))
