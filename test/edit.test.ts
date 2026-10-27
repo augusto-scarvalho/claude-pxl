@@ -1,0 +1,62 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { checkEdit, editAsset, editPart, editStamp } from "../src/core/edit.ts";
+import { edit, inspect } from "../src/node/edit.ts";
+
+const ok = (r: { src: string } | string) => { assert.equal(typeof r, "object", String(r)); return (r as { src: string }).src; };
+const E = (e: Record<string, unknown>) => checkEdit({ target: "t", ...e });
+
+test("edit's writes: a stamp's number where it is, an option added or toggled, a relation, its asset; an asset's own options; a part's spec", () => {
+  const src = `const AT = { rock: [10, 4] }\nscene("s", {}, stamp("rock", ...AT.rock), stamp("rock", 3, 4, { flip: "x" }))\n`, line = src.split("\n")[1];
+  const A = `a.px.js:2:${line.indexOf("stamp") + 1}`, B = `a.px.js:2:${line.lastIndexOf("stamp") + 1}`, info = { knobs: [], anim: false, has: (n: string) => n === "bush" };
+  const at = (loc: string, e: Record<string, unknown>) => ok(editStamp(src, loc, E(e), info)).split("\n")[1];
+  assert.match(ok(editStamp(src, A, E({ op: "move", by: [-2, 1] }), info)), /rock: \[8, 5\]/);                          // the table it reads
+  assert.match(at(B, { op: "move", by: [2, 0] }), /stamp\("rock", 5, 4, \{ flip: "x" \}\)/);                          // its own number
+  assert.match(at(A, { op: "flip" }), /stamp\("rock", \.\.\.AT\.rock, \{ flip: "x" \}\)/);                               // an option added
+  assert.match(at(B, { op: "flip" }), /stamp\("rock", 3, 4, \{\}\)/);                                                    // toggled off
+  assert.match(at(B, { op: "recolor", swap: { g: "r" } }), /\{ flip: "x", swap: \{ g: "r" \} \}/);
+  assert.match(at(A, { op: "relation", beside: ["b", "left", 2] }), /stamp\("rock", 0, 0, \{ beside: \["b", "left", 2\] \}\)/);   // its x, y now an offset
+  assert.match(at(B, { op: "swap", asset: "bush" }), /stamp\("bush", 3, 4/);
+  assert.match(editStamp(src, B, E({ op: "swap", asset: "tree" }), info) as string, /no asset 'tree'/);
+  assert.match(editStamp(src, B, E({ op: "frame", frame: 2 }), info) as string, /isn't animated/);
+  assert.match(editStamp(src, B, E({ op: "set", key: "id", value: "x" }), info) as string, /rename it by hand/);
+  // an asset's own options, at its sprite() call
+  assert.equal(ok(editAsset(`sprite("rock", "kk")`, "a.px.js:1:1", "rock", E({ op: "recolor", scope: "asset", swap: { k: "r" } }))), `sprite("rock", { swap: { k: "r" } }, "kk")`);
+  assert.match(editAsset(`front("rock", T)`, "a.px.js:1:1", "rock", E({ op: "flip", scope: "asset" })) as string, /isn't made by a sprite\(\) or anim\(\)/);
+  // a world3d part's spec
+  const w = `world3d({ parts: {\n  oak: { make: "tree", at: [1, 2] },\n  rock: { make: "rock", beside: ["oak", "front"] } } })`, part = (n: string, e: Record<string, unknown>, params?: string[]) => editPart(w, "a.px.js", n, E(e), ["tree", "rock", "bush"], params);
+  assert.match(ok(part("oak", { op: "move", by: [0.5, 0, 1] })), /oak: \{ make: "tree", at: \[1\.5, 2, 1\] \}/);
+  assert.match(ok(part("oak", { op: "set", key: "canopy", value: 2 }, ["canopy"])), /at: \[1, 2\], params: \{ canopy: 2 \} \}/);
+  assert.match(part("oak", { op: "set", key: "size", value: 2 }, ["canopy"]) as string, /no parameter 'size' \(it has: canopy\)/);
+  assert.match(ok(part("rock", { op: "relation", on: "oak" })), /rock: \{ make: "rock", on: "oak" \}/);
+  assert.match(ok(part("oak", { op: "relation", on: "rock" })), /oak: \{ make: "tree", on: "rock" \}/);                // its at was where it stood
+  assert.match(ok(part("oak", { op: "as", as: "voxels" })), /as: "voxels" \}/);
+  assert.match(ok(part("rock", { op: "swap", asset: "bush" })), /rock: \{ make: "bush"/);
+  assert.match(part("oak", { op: "flip" }) as string, /a stamp's/);
+  assert.throws(() => checkEdit({ op: "move", target: "t" }), /move's by is \[dx, dy\]/);
+  assert.throws(() => checkEdit({ op: "grow", target: "t" }), /no op 'grow'/);
+});
+
+test("pxl inspect and pxl edit: things by id with their ops; edits written where the values live, all or none, then what changed", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
+  writeFileSync(file, `pal({ k: "#1b1630", g: "#8ccf63", r: "#e2585e" })
+sprite("rock", "kk\\nkg")
+scene("s", { w: 20, h: 8, bg: "g" }, layer("props", stamp("rock", 2, 2, { id: "a" }), stamp("rock", 10, 2), (c) => c.stamp("rock", 15, 4, { id: "c" })))
+`);
+  const things = JSON.parse(inspect(file, "s", { json: true })).things as { id: string; ops: string[]; why?: string }[];
+  assert.deepEqual(things.map((t) => t.id), ["a", "rock #2", "c"]);
+  assert.deepEqual(things[0].ops, ["move", "set", "recolor", "flip", "relation", "swap"]);
+  assert.match(things[2].why!, /placed by code \(c\.stamp\(\) in a function, a\.px\.js:3:\d+\)/);
+  assert.match(inspect(file, "s", { id: "a" }), /values: asset "rock" \(written\); x 2 \(written, a\.px\.js:3\); y 2[^\n]*\n[^]*recolor \{ swap: \{ key: key \} \(its colors: kg\) \}, scope instance \| asset/);
+  const before = readFileSync(file, "utf8");
+  const no = edit(file, "s", [{ op: "flip", target: "a" }, { op: "move", target: "c", by: [1, 0] }]);
+  assert.equal(no.ok, false);
+  assert.equal(readFileSync(file, "utf8"), before, "one refused: nothing written");
+  const r = edit(file, "s", [{ op: "flip", target: "a" }, { op: "move", target: "rock #2", by: [1, 0] }]);
+  assert.ok(r.ok, r.lines.join("\n"));
+  assert.match(readFileSync(file, "utf8"), /stamp\("rock", 2, 2, \{ id: "a", flip: "x" \}\), stamp\("rock", 11, 2\)/);
+  assert.match(r.lines.join("\n"), /a: redrawn[^]*rock #2: moved \+1,\+0[^]*check: no warnings/);
+});

@@ -28,7 +28,7 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    re-reads the whole conversation). After the first write, change the file with Edit, never write
    it whole again. `describe --diff` lists what an edit moved or redrew; `shot --vs HEAD --diff`
    shows the pixels it changed; `PXL steps art.px.js <name> --at x,y` names the line that painted
-   a pixel.
+   a pixel. To move, flip or recolor a placed thing: `PXL inspect`, then `PXL edit`.
 4. `PXL build art.px.js` writes the PNGs, sheets and GIFs to `out/`, previews to `out/_preview/`
    (`--only a,b`; `--every 3` keeps a long loop's GIF small; `--profile` when a build has grown slow).
 5. Before handing over, `PXL check art.px.js`: every scene and rig of the file, every frame of an
@@ -64,11 +64,11 @@ as blocks, the props, then the people; a new move as flat blocks first (`bk_<mov
 
 ## Looking things up
 
-What you read early is paid again on every later turn (guides and examples dumped whole were a third
-of what sessions re-read). Read the reference and the guides by section, never whole: `PXL help`
-is the index (every op, option and guide section, with its size); `PXL help <name>` prints an op's
-reference and its uses in the examples; `PXL help "<guide> <numbers or words of a heading>"` prints
-those sections. Read the ones your task needs first:
+What you read early is paid again on every later turn. Read the reference and the guides by
+section, never whole: `PXL help` is the index (every op, option and guide section, with its size);
+`PXL help <name>` prints an op's reference and its uses in the examples;
+`PXL help "<guide> <numbers or words of a heading>"` prints those sections. Read the ones your task
+needs first:
 
 | Making | Read |
 |---|---|

@@ -257,6 +257,8 @@ export class Project implements BuildCtx {
   /** 3D files to write (export3d): a voxel grid or a mesh, its materials' colors, the formats */
   /** expect3d's rules, run by pxl check */
   readonly expects: { name: string; world: World; rules: Rule[]; frames: number; ms: number; loc?: string }[] = [];
+  /** world3d()'s worlds as the file writes them (not world.edit()'s), for pxl inspect and edit */
+  readonly worlds: { world: World; loc?: string }[] = [];
   /** Run expect3d's rules: each its name, text, whether it held and where not. */
   runExpects() { return this.expects.flatMap((e) => runExpects(e.world, e.rules, e.frames, e.ms).map((r) => ({ ...r, name: e.name, loc: e.loc }))); }
   readonly models: { name: string; thing: Voxels | Mesh3 | Splats; colors: Color[]; ramps: Color[][]; as: ("vox" | "obj" | "glb" | "ply")[]; loc?: string; frames?: (Voxels | Mesh3 | Splats)[] | (() => (Voxels | Mesh3 | Splats)[]); fps?: number; paint?: (t: Voxels | Mesh3 | Splats) => { colors: Color[]; ramps: Color[][] } }[] = [];
@@ -976,7 +978,10 @@ export class Project implements BuildCtx {
     };
     env.make3d = m3;
     // world3d({ seed, wind, parts }): a scene of named parts (world3d.ts); world.edit({ "part.param": v }), world.changed(other)
-    env.world3d = (spec: unknown) => { try { return new World(spec as never, makers); } catch (e) { throw wrap(e).within("world3d", this.callerLoc()); } };
+    env.world3d = (spec: unknown) => {
+      const loc = this.callerLoc();
+      try { const world = new World(spec as never, makers); this.worlds.push({ world, loc }); return world; } catch (e) { throw wrap(e).within("world3d", loc); }
+    };
     // expect3d(name, world, rules, { frames }): rules over the loop, run by pxl check
     env.expect3d = (name: unknown, world: unknown, rules: unknown, opts: unknown = {}) => {
       const loc = this.callerLoc();

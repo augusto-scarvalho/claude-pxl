@@ -60,7 +60,8 @@ export type Rel = { to?: string; knobs: { key: "beside" | "along"; i: number; la
 /** What was stamped where, in drawing order (top-left in asset coords): for `pxl describe`. */
 export type Placement = { name: string; x: number; y: number; w: number; h: number; layer?: string; img: Img; /** the light it was drawn under, on the picture (a sprite in mesh()) */ light?: [number, number];
   /** a sprite in mesh(): how far its feet are over (under: below 0) the nearest face looking up under them, m, and its material */ stand?: { off: number; on: string };
-  /** a stamp's: its id, where the call is in the art file (a stamp() item's, not a function's), its y in a layer sorted by y, its relation (for a scene's expect rules and --fix) */ id?: string; loc?: string; sort?: number; rel?: Rel };
+  /** a stamp's: its id, where the call is in the art file (a stamp() item's, not a function's), its y in a layer sorted by y, its relation (for a scene's expect rules and --fix) */ id?: string; loc?: string; sort?: number; rel?: Rel;
+  /** not a stamp: what c.as() named, or a sprite in mesh() */ via?: "as" | "mesh" };
 
 /**
  * Drawing surface over an image. Coordinates are relative to (ox, oy); colors are palette
@@ -320,7 +321,7 @@ export class Canvas {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y0 + y) * img.w + x0 + x; if (d[i] !== was[i]) out.data[y * w + x] = d[i]; }
     if (o.height) out.meters = o.height;
     if (o.facing) out.orient = { f: [...FACING[o.facing]], u: [0, -1, 0], mirrored: false, text: false };
-    this.log?.push({ name, x: x0, y: y0, w, h, layer: this.layerName, img: out, ...(o.id ? { id: o.id } : {}) });
+    this.log?.push({ name, x: x0, y: y0, w, h, layer: this.layerName, img: out, via: "as", ...(o.id ? { id: o.id } : {}) });
   }
 
   /** Run `fn` with drawing restricted to `region` (nests by intersection). */
@@ -1056,7 +1057,7 @@ export class Canvas {
       if (id) this.placed?.set(id, { x: this.ox + p.x, y: this.oy + p.y, sockets: Object.fromEntries(Object.entries(sp.img.sockets ?? {}).map(([n, [x, y]]) => [n, [x * K, y * K]])), m3: (sk) => this.socketIn(view0 as Partial<View>, sp.name, sp.img, sp.at, sk, K) });
       // (its feet against the nearest face looking up under them; none under, or flying: not asked)
       const hs = ground && p.at && !p.air ? ground(p.at[0], p.at[1]) : [], h = hs.reduce<{ u: number; mat: string } | undefined>((b, q) => (!b || Math.abs(q.u - p.at![2]) < Math.abs(b.u - p.at![2]) ? q : b), undefined);
-      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}), ...(h ? { stand: { off: p.at![2] - h.u, on: h.mat } } : {}), ...(id ? { id } : {}) });
+      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}), ...(h ? { stand: { off: p.at![2] - h.u, on: h.mat } } : {}), via: "mesh", ...(id ? { id } : {}) });
     }
     if (lit) this.img.world = lit;
   }

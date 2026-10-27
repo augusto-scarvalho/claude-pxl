@@ -375,7 +375,8 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
         while (stack.length) {
           const k = stack.pop()!, x = k % W, y = (k - x) / W;
           r.n++; r.x0 = Math.min(r.x0, x); r.x1 = Math.max(r.x1, x); r.y0 = Math.min(r.y0, y); r.y1 = Math.max(r.y1, y);
-          const o = owner[k], wname = o >= 0 && isMain(o) ? label(o) : o >= 0 ? b.placements[o].name : "background";
+          // (not a placement's: a world3d part's, drawn in place, else the background)
+          const o = owner[k], pk = img.parts?.ids[k] ?? -1, wname = o >= 0 && isMain(o) ? label(o) : o >= 0 ? b.placements[o].name : pk >= 0 ? img.parts!.names[pk] : "background";
           r.who.set(wname, (r.who.get(wname) ?? 0) + 1);
           for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
             const X = x + dx, Y = y + dy, n = Y * W + X;

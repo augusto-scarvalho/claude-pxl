@@ -11,7 +11,7 @@ result. To use pxl by hand, start with [Getting started](getting-started.md).
 - [Install the skill](#install-the-skill): Claude Code, the Codex CLI, Antigravity's `agy`, others
 - [Pick the model and effort](#pick-the-model-and-effort)
 - [Writing a brief](#writing-a-brief)
-- [How the agent works](#how-the-agent-works): look, fix in one turn, check
+- [How the agent works](#how-the-agent-works): look, fix in one turn, a small change by name, check
 - [Blocks first, then paint](#blocks-first-then-paint): a new move, a big scene in stages
 - [3D as code](#3d-as-code-which-drawer-and-edits-by-name): which drawer for what, edits by name, rules
 - [What it costs](#what-it-costs), and how to keep it cheap
@@ -169,7 +169,14 @@ it:
    one message, then one look again. Every turn re-reads the whole conversation, so a turn per edit
    is what makes a long session expensive. After the first write the art file is changed with edits,
    not written whole again.
-4. **Check, then build.** `pxl check art.px.js` before handing over: the agent fixes each warning or
+4. **A small change by name.** Moving, flipping, recoloring, putting one thing by another, a world3d
+   part's parameter: `pxl inspect art.px.js <scene> --id <id>` says in a few hundred tokens what the
+   thing is, where, where the file writes each of its values and which operations it takes; then
+   `pxl edit art.px.js <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'` writes the
+   change where the value lives (the stamp's call, the table it reads, the part's spec) and prints
+   what changed (`describe --diff`, by id) and what `pxl check` says. No reading of the file, no code
+   written. What code computes is refused with where it is; that edit is made by hand.
+5. **Check, then build.** `pxl check art.px.js` before handing over: the agent fixes each warning or
    says why it's meant. `pxl build art.px.js` writes the files.
 
 Commands run on one of pxl's examples write an `out/` next to it, so the agent gives them
@@ -230,7 +237,9 @@ the approved parts stay byte for byte as they were; in the [evaluation](evaluati
 kept them too but cost half again as much. Give the scene `expect3d` rules (the canopy above the
 trunk, the rock clear of the house, one thing before another) and let `pxl check` run them; a rule
 that fails over a place or a gap is fixed with no model by `pxl check --fix`. `pxl steps <file>
-<scene> --at x,y` names the part that painted a pixel, to find a defect's cause. To turn a model round,
+<scene> --at x,y` names the part that painted a pixel, to find a defect's cause. A part's place,
+parameter, relation or drawer changes by `pxl edit` (`"target": "oak", "op": "set", "key":
+"canopy", "value": 1.6`; `"op": "as", "as": "voxels"`), written into its spec. To turn a model round,
 `export3d` it and open the viewer's "3D" link.
 
 ## What it costs

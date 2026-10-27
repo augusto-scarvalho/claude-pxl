@@ -776,6 +776,17 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   Give what you will edit an `id` (a stamp's, `c.as`'s, a `mesh()` sprite's): describe, `--diff` and
   `steps --at` name it by that (else "lantern #2", which another lantern stamped before it renumbers),
   and its random picks follow the id, so moving it keeps its look.
+- A small change to what is placed, without reading the file: `PXL inspect <file> <scene>` lists what
+  an edit can name (by id) with its box and the operations it takes; `--id x` gives one in full (its
+  values and where the file writes each: its call, a table it reads, or code; its relation, rules,
+  parts, colors), `--json` for a program. `PXL edit <file> <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'`
+  writes it where the number lives (the table's `[87, 21]`, the stamp's own options), all the edits
+  given or none, then prints `describe --diff` by id and `check`. Ops: `move`, `set` (an option, a
+  part's parameter), `recolor` (`swap`), `flip`, `frame` (or `t`), `relation` (on, beside, along,
+  apart, at; a world3d part's around, attach), `swap` (another asset; a part's builder), `as` (a part
+  drawn as voxels...); `scope: "asset"` writes the asset's own options, for every copy. What code
+  computes (a stamp a function makes, a number worked out, one call placing several things) is
+  refused, saying where it is: change that by hand.
 - `PXL check <file>` before handing over: every frame of the loop; its last line says which rules
   ran, and `--readings` shows what the lit-side rule read on each thing when a warning looks wrong.
   Checks and `world` rules cover `scene()`s (and rigs), and an `anim()` given a `world`: what its

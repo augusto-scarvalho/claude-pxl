@@ -234,6 +234,30 @@ export function fixRule2d(rules: Rule2d[], r: Rule2d, frames: Frame2d[], world: 
   });
 }
 
+/** Where in `src` the call at `loc` ("file:line:col") starts, when it is a call `fn` matches there. */
+export function callAt(src: string, loc: string, fn: RegExp): number | undefined {
+  const [, line, col] = loc.split(":").map(Number), lines = src.split("\n");
+  if (!(line >= 1 && line <= lines.length)) return undefined;
+  const o = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0) + col - 1;
+  return fn.test(src.slice(o, o + 40)) ? o : undefined;
+}
+/** The items of the list opening at src[o] ("(", "[" or "{"), split at the commas outside brackets, strings and comments: each one's start and text; and where it closes. */
+export function listAt(src: string, o: number): { items: { s: number; t: string }[]; end: number } {
+  const items: { s: number; t: string }[] = [];
+  let depth = 0, s = o + 1, q = "";
+  for (let i = o + 1; i < src.length; i++) {
+    const c = src[i];
+    if (q) { if (c === "\\") i++; else if (c === q) q = ""; continue; }
+    if (c === "/" && src[i + 1] === "/") i = src.indexOf("\n", i) < 0 ? src.length : src.indexOf("\n", i);
+    else if (c === "/" && src[i + 1] === "*") i = src.indexOf("*/", i + 2) + 1 || src.length;
+    else if (c === '"' || c === "'" || c === "`") q = c;
+    else if ("([{".includes(c)) depth++;
+    else if (")]}".includes(c) && depth-- === 0) { items.push({ s, t: src.slice(s, i) }); return { items, end: i }; }
+    else if (c === "," && depth === 0) { items.push({ s, t: src.slice(s, i) }); s = i + 1; }
+  }
+  return { items, end: src.length };
+}
+
 /**
  * The stamp's number a 2D knob moves, in the art file's text (its call at `loc`, "file:line:col"): its
  * own literal, or a table's (`stamp("pack", ...AT.pack)` or `AT.pack[0]`: the `pack: [127, 148]`
@@ -242,22 +266,9 @@ export function fixRule2d(rules: Rule2d[], r: Rule2d, frames: Frame2d[], world: 
  * new value and its line; or why it can't be.
  */
 export function moveInSource(src: string, loc: string, key: Knob2d["key"], by: number, n = 0): { src: string; from: number; to: number; line: number } | string {
-  const [, line, col] = loc.split(":").map(Number), lines = src.split("\n");
-  if (!(line >= 1 && line <= lines.length)) return `its stamp isn't at ${loc}`;
-  let o = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0) + col - 1;
-  if (!/^stamp\s*\(/.test(src.slice(o, o + 40))) return `its stamp isn't at ${loc}`;
-  // its arguments: split at the commas outside brackets and strings
-  o = src.indexOf("(", o) + 1;
-  const args: { s: number; t: string }[] = [];
-  let depth = 0, s = o, q = "";
-  for (let i = o; i < src.length; i++) {
-    const c = src[i];
-    if (q) { if (c === "\\") i++; else if (c === q) q = ""; continue; }
-    if (c === '"' || c === "'" || c === "`") q = c;
-    else if ("([{".includes(c)) depth++;
-    else if (")]}".includes(c) && depth-- === 0) { args.push({ s, t: src.slice(s, i) }); break; }
-    else if (c === "," && depth === 0) { args.push({ s, t: src.slice(s, i) }); s = i + 1; }
-  }
+  const o = callAt(src, loc, /^stamp\s*\(/);
+  if (o === undefined) return `its stamp isn't at ${loc}`;
+  const args = listAt(src, src.indexOf("(", o)).items;
   const lineAt = (k: number) => src.slice(0, k).split("\n").length, spreadOf = (t?: string) => /^\s*\.\.\.\s*[\w$]+\.([\w$]+)\s*$/.exec(t ?? "")?.[1];
   // a table's: the j-th number of `part: [...]`, set where it's written once
   const inTable = (part: string, j: number, text: string) => {

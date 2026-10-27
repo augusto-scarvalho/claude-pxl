@@ -20,6 +20,7 @@ import { encodeGif, reduceColors } from "./gif.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 import { checkProject, writeMoves } from "./check.ts";
+import { edit, inspect } from "./edit.ts";
 import { setKnobInSource } from "../core/world3d.ts";
 import { cellRow, diffRow, frameCount, frameTime, greyRow, otherVersion, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
@@ -64,6 +65,21 @@ const USAGE = `pxl — pixel-art DSL
       asset's name, "#n" among its copies; --diff says what moved, was redrawn, added or removed
       since the last describe, by those names. Any PNG works too: its colors get keys, and repeats
       are found as identical 16x16 tiles.
+  pxl inspect <art.px.js> <scene> [--id x] [--frame N] [--json]
+      What an edit can name in a scene, a line each: its stamps (by id, else name #n), what c.as()
+      names, its mesh() sprites, the world3d parts it draws; where each is and the operations it
+      takes. --id x: that one in full, in a few hundred tokens: what it is, its box and feet, its
+      values and where the file writes each (in its call, a table it reads, or code), its relation,
+      what is placed by it, the scene's rules on it, its parts, its colors, and each operation it
+      takes with what that takes. --json for a program choosing among the edits.
+  pxl edit <art.px.js> <scene> <edits.json | '{ "op": ..., "target": "id", ... }' | [...]> [--frame N]
+      Small edits written into the art file where each value lives: move (by [dx, dy] px; a part's
+      m), set (an option, a part's parameter), recolor (a swap), flip, frame (or t), relation (on,
+      beside, along, apart, at; a part's around, attach), swap (another asset; a part's builder),
+      as (a part drawn as voxels...); scope "asset" writes the asset's own options. A stamp's number in
+      its call or the table it reads, an option added to its call, a part's spec; what code computes,
+      or a call that places several things, is refused with where it is. All are written or none:
+      the scene is rebuilt first. Then it prints what changed (describe --diff, by id) and pxl check.
   pxl check <art.px.js> [name...] [--frame N] [--readings] [--fix]
       Every check describe makes that can warn (facing, front marker, lit side, parallel parts, feet
       on the ground, lettering), on every scene and rig the file defines (not those it includes, or
@@ -179,6 +195,8 @@ interface Args {
   every?: number;
   readings?: boolean;
   fix?: boolean;
+  id?: string;
+  json?: boolean;
   colors?: number;
   to?: [number, number];
   from?: number;
@@ -241,6 +259,8 @@ function parse(argv: string[]): Args {
     else if (v === "--every") a.every = Number(val());
     else if (v === "--readings") a.readings = true;
     else if (v === "--fix") a.fix = true;
+    else if (v === "--id") a.id = val();
+    else if (v === "--json") a.json = true;
     else if (v === "--profile") a.profile = true;
     else if (v === "--colors") a.colors = Number(val());
     else if (v === "--to") {
@@ -285,7 +305,7 @@ export async function main(argv: string[]): Promise<number> {
   try { a = parse(argv); } catch (e) { console.error(wrap(e).message); return 2; }
   if (a.cmd === "help") {
     // the reference looked up, not read: an index, or what it says about one name
-    console.log(help(a.file, { all: a.all }) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | check | shot | compare | blind | study | help (pxl --help for their options)"));
+    console.log(help(a.file, { all: a.all }) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | inspect | edit | check | shot | compare | blind | study | help (pxl --help for their options)"));
     return 0;
   }
   if (!a.cmd || a.cmd === "usage" || !a.file) {
@@ -398,6 +418,21 @@ export async function main(argv: string[]): Promise<number> {
           writeFileSync(keep + ".json", JSON.stringify({ name, time: new Date().toISOString(), objects: r.snap.objects }, null, 1) + "\n");
         }
         return 0;
+      }
+      case "inspect": {
+        if (!a.rest[0]) throw new PxError("inspect needs a scene: pxl inspect <file> <scene> [--id x] [--frame N] [--json]");
+        console.log(inspect(file, a.rest[0], { id: a.id, json: a.json, frame: a.frame }));
+        return 0;
+      }
+      case "edit": {
+        const [name, spec] = a.rest;
+        if (!name || !spec) throw new PxError(`edit needs a scene and the edits: pxl edit <file> <scene> <edits.json | '{ "op": "move", "target": "lantern_2", "by": [-3, 0] }'>`);
+        let given: unknown;
+        try { given = JSON.parse(/^\s*[[{]/.test(spec) ? spec : readFileSync(resolve(spec), "utf8")); }
+        catch (e) { throw new PxError(`edit: the edits are JSON, inline or a file: ${(e as Error).message}`); }
+        const r = edit(file, name, given, { frame: a.frame });
+        for (const l of r.lines) console.log(l);
+        return r.ok ? 0 : 1;
       }
       case "steps": {
         const name = a.rest[0];

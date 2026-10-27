@@ -38,6 +38,8 @@ export interface CheckResult {
   failed?: string[];
 }
 
+/** A placement as a warning names it: its id (and its asset), else its asset. */
+const who = (q: { name: string; id?: string }) => (q.id ? `${q.id} (${q.name})` : q.name);
 const hash = (d: Uint32Array) => { let h = 2166136261; for (let i = 0; i < d.length; i++) h = Math.imul(h ^ d[i], 16777619); return h >>> 0; };
 /** 3, 4, 5, 9 -> "3-5, 9" */
 /** The most frames of a scene whose loop was cut at 60 s that check reads. */
@@ -227,14 +229,14 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
             // what the rule read, kept or not: to see where it agrees, where it warns, where it can't tell
             const r = all.find((w) => /^(WARNING: )?lit (from|on)/.test(w)) ?? "no clear reading";
             tally[r.startsWith("WARNING") ? "against" : /as its light|toward the light/.test(r) ? "agree" : "unclear"]++;
-            reads.add(`${name} › ${q.name} @${q.layer ?? "-"} › ${r}`);
+            reads.add(`${name} › ${who(q)} @${q.layer ?? "-"} › ${r}`);
           }
           if (q.img.meters || q.img.grounded) { ran.feet++; if (wo?.ground !== undefined) ran.ground++; }
           if (o?.text) ran.text++;
           if (q.stand) ran.stand++;
         }
         for (const w of ws) {
-          const k = `${q.name} @${q.layer ?? "-"} › ${w}`, bb = q.img.bounds();
+          const k = `${who(q)} @${q.layer ?? "-"} › ${w}`, bb = q.img.bounds();
           if (!found.has(k)) { found.set(k, new Set()); at.set(k, new Set()); }
           found.get(k)!.add(f);
           if (bb) at.get(k)!.add(`${Math.round(q.x + bb.x + bb.w / 2)},${q.y + bb.y + bb.h - 1}`);

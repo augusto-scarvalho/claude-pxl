@@ -329,7 +329,9 @@ a rock, a house with parameters that mean something; `world3d` places named part
 `edit` changes some parameters and `changed` says which parts moved (the rest byte for byte as it
 was), `draw3d` draws it (each pixel knows its part: `pxl steps <file> <name> --at x,y` ends with
 `part: oak.canopy`), `expect3d` says what should hold over the loop and `pxl check` runs it
-(`examples/sdf/details.px.js`, `decals.px.js`, `world.px.js`).
+(`examples/sdf/details.px.js`, `decals.px.js`, `world.px.js`). `pxl inspect <file> <scene> --id oak`
+lists a part's values and where its spec writes them; `pxl edit` changes its place, a parameter, a
+relation, its builder or `as`, written into the spec (`scenes 14`).
 
 **Decals or a sprite per view.** A small face (11 rows and under) on a figure that is itself a
 sprite: draw it per view by hand, as the traveler's heads are (`characters 5 6`). A face, a rune, an
