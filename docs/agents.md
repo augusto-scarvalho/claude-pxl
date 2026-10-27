@@ -171,7 +171,8 @@ it:
    not written whole again.
 4. **A small change by name.** Moving, flipping, recoloring, putting one thing by another, a world3d
    part's parameter: `pxl inspect art.px.js <scene> --find lantern` finds it by the words of its id,
-   its asset or the comment above its call (an id is the file's name: the east lantern is `toro_e`);
+   its asset or the comment above its call or its asset's definition (an id is the file's name: the east
+   lantern is `toro_e`; "the fox with the jewel" finds `fox_tama_e` by its definition's comment);
    `pxl inspect art.px.js <scene> --id <id>` says in a few hundred tokens what the thing is, where,
    where the file writes each of its values and which operations it takes; then
    `pxl edit art.px.js <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'` writes the

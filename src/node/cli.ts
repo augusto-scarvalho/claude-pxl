@@ -68,20 +68,21 @@ const USAGE = `pxl — pixel-art DSL
   pxl inspect <art.px.js> <scene> [--id x | --find words] [--frame N] [--json]
       What an edit can name in a scene, a line each: its stamps (by id, else name #n), what c.as()
       names, its mesh() sprites, the world3d parts it draws; where each is and the operations it
-      takes. --find "stone lantern": only those whose id, asset or the comment above their call has
-      the words (the most first, with the comment). --id x: that one in full, in a few hundred tokens: what it is, its box and feet, its
+      takes. --find "stone lantern": only those whose id, asset or the comment above their call or
+      their asset's definition has the words (the most first, with the comment). --id x: that one in full, in a few hundred tokens: what it is, its box and feet, its
       values and where the file writes each (in its call, a table it reads, or code), its relation,
       what is placed by it, the scene's rules on it, its parts, its colors, and each operation it
       takes with what that takes; the scene drawn with only what that thing's place and rules read
       (a second or two where the whole takes ten). --json for a program choosing among the edits.
   pxl edit <art.px.js> <scene> <edits.json | '{ "op": ..., "target": "id", ... }' | [...]> [--frame N] [--dry] [--allow ids]
       Small edits written into the art file where each value lives: move (by [dx, dy] px; a part's
-      m), set (an option, a part's parameter), recolor (a swap), flip, frame (or t), relation (on,
+      m), set (an option, a part's parameter), recolor (a swap), flip (a turnaround's sprite turned to
+      its mirror heading, lit as it was), frame (or t), relation (on,
       beside, along, apart, at; a part's around, attach), swap (another asset; a part's builder),
       as (a part drawn as voxels...); scope "asset" writes the asset's own options. A stamp's number in
       its call or the table it reads, an option added to its call, a part's spec; what code computes,
       or a call that places several things, is refused with where it is. All are written or none:
-      the scene is rebuilt first. It prints what changed in the drawing at that frame (its light
+      the scene is rebuilt first (what the edit can't reach kept from the first build). It prints what changed in the drawing at that frame (its light
       passes left out: describe --diff, by id; the pixels changed by id), then writes and runs pxl
       check. Guarded: an edit changes its targets and what is placed by relation to them; anything
       else changing (pixels outside them, another thing moved) refuses it, saying what (--allow a,b

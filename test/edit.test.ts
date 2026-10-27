@@ -3,7 +3,8 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkEdit, editAsset, editPart, editStamp } from "../src/core/edit.ts";
-import { edit, inspect } from "../src/node/edit.ts";
+import { edit, inspect, unchanged } from "../src/node/edit.ts";
+import { loadProject } from "../src/node/load.ts";
 import { whenChanged } from "./passed.ts";
 
 const test = whenChanged("test/edit.test.ts");
@@ -64,10 +65,11 @@ scene("s", { w: 20, h: 8, bg: "g" }, layer("props", stamp("rock", 2, 2, { id: "a
   assert.doesNotMatch(r.lines.join("\n"), /region /, "what changed is said by id, not by region");
 });
 
-test("pxl inspect --find: things by the words of their id, their asset or the comment above their call", () => {
+test("pxl inspect --find: things by the words of their id, their asset or the comment above their call or their asset's definition", () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
   writeFileSync(file, `pal({ k: "#1b1630", g: "#8ccf63" })
 sprite("toro", "kk\\nkg")
+// a mossy one
 sprite("rock", "kk")
 scene("s", { w: 20, h: 8, bg: "g" }, layer("props",
   // the stone lanterns
@@ -78,7 +80,9 @@ scene("s", { w: 20, h: 8, bg: "g" }, layer("props",
   const ids = (w: string) => inspect(file, "s", { find: w }).split("\n").slice(1).map((l) => l.trim().split(":")[0]);
   assert.deepEqual(ids("lanterns"), ["toro_e", "toro #2"]);
   assert.deepEqual(ids("the boulder rock"), ["rock"]);
-  assert.match(inspect(file, "s", { find: "boulder" }), /rock: [^\n]*; "a boulder" \(a\.px\.js:8\)/);
+  assert.match(inspect(file, "s", { find: "boulder" }), /rock: [^\n]*; "a boulder" \(a\.px\.js:9\)/);
+  assert.match(inspect(file, "s", { find: "mossy boulder" }), /rock: [^\n]*; "a boulder" \(a\.px\.js:9\)/);       // its definition's comment too
+  assert.match(inspect(file, "s", { find: "the mossy rock" }), /rock: [^\n]*; "a mossy one" \(a\.px\.js:4\)/);
   assert.match(inspect(file, "s", { find: "dragon" }), /nothing matches "dragon"[^]*it has: toro_e, toro #2, rock/);
 });
 
@@ -109,4 +113,43 @@ scene("t", { w: 24, h: 10, bg: "g" }, layer("props", stamp("rock", 3, 4, { id: "
   const yes = edit(file, "s", { op: "move", target: "a", by: [1, 0] }, { allow: ["c"] });
   assert.ok(yes.ok, yes.lines.join("\n"));
   assert.match(readFileSync(file, "utf8"), /rock: \[4, 4\]/);
+});
+
+test("pxl edit's flip turns a turnaround's sprite to its mirror heading (added to its headings when new); facing us, it mirrors", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
+  writeFileSync(file, `pal({ k: "#1b1630", g: "#8ccf63", w: "#f4f4f4" })
+ramps("kgw")
+const F = sdf.box([0.4, 0.4, 0.4]).at(0, 0, 0.2).union(sdf.sphere(0.1).at(0.1, -0.25, 0.2)), O = { view: "side", ppm: 8, mats: { "": "kgw" }, light: [-1, -0.3, 1] }
+turnaround("t", F, { ...O, headings: ["e"] })
+turnaround("u", F, { ...O, headings: ["e", "w", "s"] })
+scene("s", { w: 40, h: 16, bg: "g" }, layer("props", stamp("t_e", 6, 12), stamp("u_e", 18, 12), stamp("u_s", 30, 12)))
+`);
+  assert.match(inspect(file, "s", { id: "t_e" }), /flip \{ axis: x \(default: turned to face w, its turnaround's t_w \(added to its headings\), lit as it is\) \| y \}/);
+  const r = edit(file, "s", [{ op: "flip", target: "t_e" }, { op: "flip", target: "u_e" }, { op: "flip", target: "u_s" }]), said = r.lines.join("\n");
+  assert.ok(r.ok, said);
+  assert.match(said, /u_s: flip "x"[^]*u_e: turned to face w: asset "u_w"[^]*t_e: turned to face w: headings \["e", "w"\] \(a\.px\.js:4\), asset "t_w"/);
+  const text = readFileSync(file, "utf8");
+  assert.match(text, /turnaround\("t", F, \{ \.\.\.O, headings: \["e", "w"\] \}\)\nturnaround\("u", F, \{ \.\.\.O, headings: \["e", "w", "s"\] \}\)/);
+  assert.match(text, /stamp\("t_w", 6, 12\), stamp\("u_w", 18, 12\), stamp\("u_s", 30, 12, \{ flip: "x" \}\)/);
+});
+
+test("pxl edit's rebuild keeps the builds its edit can't reach: a stamp's call redraws its scene, an asset's options it and what reads it, a table everything", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
+  const art = `pal({ k: "#1b1630", g: "#8ccf63" })
+sprite("rock", "kk\\nkg")
+sprite("bush", "gg")
+sprite("pile", { w: 4, h: 2 }, stamp("rock", 0, 0), stamp("rock", 2, 0))
+const AT = { bush: [9, 2] }
+scene("s", { w: 20, h: 8, bg: "g" }, layer("props", stamp("pile", 2, 2), stamp("bush", ...AT.bush)))
+`;
+  writeFileSync(file, art);
+  const p = loadProject(file, { checksOnly: true });
+  p.build("s");
+  const keep = (from: string, to: string) => { const src = art.replace(from, to), q = loadProject(file, { checksOnly: true }, () => src); return { k: unchanged(p, q, new Map([[file, src]])), q }; };
+  const { k, q } = keep(`stamp("pile", 2, 2)`, `stamp("pile", 3, 2, { flip: "x" })`);
+  assert.deepEqual(["rock", "bush", "pile", "s"].map(k), [true, true, true, false]);
+  q.adopt(p, k);
+  assert.equal(q.image("pile"), p.image("pile"), "its build taken, not drawn again");
+  assert.deepEqual(["rock", "bush", "pile", "s"].map(keep(`sprite("rock", "kk`, `sprite("rock", { flip: "x" }, "kk`).k), [false, true, false, false]);
+  assert.deepEqual(["rock", "bush", "pile", "s"].map(keep("bush: [9, 2]", "bush: [10, 2]").k), [false, false, false, false]);
 });

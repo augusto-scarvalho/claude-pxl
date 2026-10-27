@@ -108,8 +108,9 @@ of the figure): 6% of their normals turn by more than 10° and 3% change light b
 about 7 px a frame of the 396 drawn, all within 4 px of what moved (the cloak's hem over the legs,
 the arm's edge, the hair's tufts); the top-down hero's walk: 1%. Frame by frame the head and the
 body keep their relief, and the hem catches the light with the stride (`"dome"` changes twice as
-many). A figure drawn in 3D (`rig3d`, `surface()`) carries its model's normals already;
-a `bump` replaces them.
+many). A figure drawn in 3D (`rig3d`, `surface()`) carries its model's normals already, all
+but its `ink` line, drawn outside the model (lit flat: a fifth of the traveler's pixels); a `bump`
+replaces them.
 
 `on` limits it to some keys, and the other keys act as edges, so `on: "b"` bevels every brick
 separately. The image border counts as an edge too. `depth` sets the steepness.

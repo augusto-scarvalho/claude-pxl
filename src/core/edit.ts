@@ -5,6 +5,7 @@
 import { PxError } from "./errors.ts";
 import { type Knob2d, callAt, listAt, moveInSource } from "./expect.ts";
 import { AS } from "./world3d.ts";
+import { COMPASS, headingsOf } from "./turnaround.ts";
 
 /** Each operation and the fields it takes besides op, target and scope. */
 export const OPS: Record<string, string[]> = {
@@ -184,6 +185,17 @@ export function editAsset(src: string, loc: string, name: string, e: Edit): Done
   if (o === undefined) { const end = args[0].s + args[0].t.length; s = src.slice(0, end) + ", {}" + src.slice(end); o = end + 2; }
   const open = o;
   return optionEdit(e, (k) => entries(s, open).get(k)?.text, (k, v) => setKey(s, open, k, v), (k) => dropKey(s, open, k), `${name}'s own options, ${fileLine(loc)}`);
+}
+
+/** A turnaround family drawn at one more heading (`deg`, a flip turning one of its sprites), its call at `loc` written out (`turnaround("fox", thing, { headings: ["e"] })`): the new source and the heading's sprite, or why not. */
+export function addHeading(src: string, loc: string, family: string, deg: number): { src: string; asset: string; said: string } | string {
+  const at = callAt(src, loc, /^turnaround\s*\(/), where = fileLine(loc), args = at === undefined ? [] : listAt(src, src.indexOf("(", at)).items;
+  if (at === undefined || readLit(args[0]?.t ?? "") !== family) return `its turnaround() at ${where} isn't written for '${family}' alone (a helper's?): add the heading there by hand`;
+  const o = args[2]?.t.trim().startsWith("{") ? args[2].s + args[2].t.indexOf("{") : undefined, h = o === undefined ? undefined : entries(src, o).get("headings"), list = h && readLit(h.text);
+  if (!Array.isArray(list)) return `its headings aren't written out at ${where}`;
+  const H = headingsOf(undefined, [...list, deg], false), name = H.at(-1)!.name;
+  const to = lit([...list, typeof list[0] === "string" && COMPASS.includes(name) ? name : deg]);
+  return { src: src.slice(0, h!.vs) + to + src.slice(h!.ve), asset: `${family}_${name}`, said: `headings ${to} (${where})` };
 }
 
 /** A part's relations: what places it by another (apart only keeps it clear of one). */

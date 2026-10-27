@@ -271,11 +271,38 @@ export class Project implements BuildCtx {
   readonly views = new Map<string, { drawn: string[]; like?: string; chin?: Record<string, number>; baked?: boolean; loc?: string }>();
   /** rig3d() figures: the body and each move's poses at its headings, pxl check reads their joints */
   readonly figures = new Map<string, { body: Body; moves: { m: string; frames: number; pose: (i: number, h: number) => Pose; heads: { deg: number; name: string }[] }[]; loc?: string }>();
-  /** What building found wrong but not fatal (a shade step that left its ramp): the CLI prints them, pxl check counts them. */
-  readonly warnings: { msg: string; loc?: string }[] = [];
+  /** turnaround() families: each member's heading (`${family}_${name}`) and the call, for pxl edit (a flip turns a member) */
+  readonly turnarounds = new Map<string, { heads: { deg: number; name: string }[]; loc?: string }>();
+  /** What building found wrong but not fatal (a shade step that left its ramp): the CLI prints them, pxl check counts them; `by` the assets being built when it was found. */
+  readonly warnings: { msg: string; loc?: string; by?: Set<string> }[] = [];
 
   warn(msg: string, loc?: string): void {
-    if (!this.warnings.some((w) => w.msg === msg && w.loc === loc)) this.warnings.push({ msg, loc });
+    let w = this.warnings.find((v) => v.msg === msg && v.loc === loc);
+    if (!w) this.warnings.push((w = { msg, loc }));
+    const by = this.inner();
+    if (by !== undefined) (w.by ??= new Set()).add(by);
+  }
+  /**
+   * What each asset's builds read: the assets they built or found built, the groups, globs and names
+   * they asked for (pxl edit keeps the builds of what its edit can't reach).
+   */
+  readonly reads = new Map<string, Set<string>>();
+  /** The asset being built innermost, if any. */
+  private inner(): string | undefined { let last: string | undefined; for (const b of this.building) last = b; return last; }
+  private read(name: string): void {
+    const by = this.inner();
+    if (by !== undefined && by !== name) (this.reads.get(by) ?? this.reads.set(by, new Set()).get(by)!).add(name);
+  }
+  /** Take another load's builds of the assets `keep` names (pxl edit: what its edit can't change), with the warnings they found. */
+  adopt(from: Project, keep: (name: string) => boolean): void {
+    const of = (key: string) => key.replace(/(@[^#@]*)?(#[^#@]*)?$/, "");
+    for (const [k, v] of from.cache) if (keep(of(k))) this.cache.set(k, v);
+    for (const [k, v] of from.timed) if (keep(of(k)) && !this.timed.has(k)) { this.timed.set(k, v); this.timedBytes += v.bytes; }
+    for (const w of from.warnings) if (w.by && [...w.by].some(keep)) for (const b of w.by) if (keep(b)) {
+      let v = this.warnings.find((u) => u.msg === w.msg && u.loc === w.loc);
+      if (!v) this.warnings.push((v = { msg: w.msg, loc: w.loc }));
+      (v.by ??= new Set()).add(b);
+    }
   }
   private glyphCache = new Map<string, (ch: string) => string[]>();
   /** Art files loaded so far (absolute paths or virtual names), for locations and watching. */
@@ -649,6 +676,7 @@ export class Project implements BuildCtx {
         H.forEach((_, i) => { if (twin[i] >= 0) define(kindA, names[i], [{ base: names[twin[i]], flip: "x", pivot: T.pivot }]); });
         for (const n of names) this.assets.get(n)!.grounded = true;
         (env.group as (n: string, m: string[]) => void)(name, names);
+        this.turnarounds.set(name, { heads: H, loc });
         return { names, headings: H.map((h) => h.name), w: T.w, h: T.h, pivot: T.pivot, mirrored: names.filter((_, i) => twin[i] >= 0) };
       } catch (e) { throw wrap(e).within("turnaround", loc); }
     };
@@ -1263,10 +1291,12 @@ export class Project implements BuildCtx {
   }
 
   has(name: string): boolean {
+    this.read(name);
     return this.assets.has(name) || this.groups.has(name);
   }
 
   candidates(name: string, depth = 0): string[] {
+    if (!depth) this.read(name);
     const hit = this.cands.get(name);
     if (hit) return hit;
     if (typeof name !== "string") throw new PxError(`asset name must be a string, got ${typeof name}`);
@@ -1376,6 +1406,7 @@ export class Project implements BuildCtx {
 
   private buildAt(name: string, seed: number, t: number, clock?: Timeline, again = false): BuildOut {
     const key = (seed === 0 ? name : `${name}@${seed}`) + (t ? `#${t}` : "");
+    this.read(name);
     const kept = this.cache.get(key), timed = kept ? undefined : this.timed.get(key);
     if ((kept || timed) && !again) {
       // most recently used last, so the oldest goes first when the timed cache is full

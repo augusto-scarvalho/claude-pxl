@@ -14,7 +14,8 @@ import { TRANSPARENT } from "../core/color.ts";
 import { MANY, describe, labelOf } from "../core/describe.ts";
 import { type Rule2d, callAt, listAt, moveInSource, nameAll, namesOf, runRules2d } from "../core/expect.ts";
 import { ruleText } from "../core/world3d.ts";
-import { type Edit, REL2D, checkEdit, editAsset, editPart, editStamp, entries, readLit } from "../core/edit.ts";
+import { headingsOf } from "../core/turnaround.ts";
+import { type Edit, REL2D, addHeading, checkEdit, editAsset, editPart, editStamp, entries, readLit } from "../core/edit.ts";
 import { loadProject } from "./load.ts";
 import { checkProject } from "./check.ts";
 import { frameCount, frameTime } from "./shot.ts";
@@ -145,7 +146,7 @@ function details(p: Project, scene: string, b: BuildOut, t: Target, all: Target[
       const sc = () => (mine ? ["instance", "asset"] : ["instance"]);
       if (movable) ops.push({ op: "move", scopes: ["instance"], takes: "by: [dx, dy] px" });
       ops.push({ op: "set", scopes: sc(), takes: "key, value: an option (z, shade, seed, reseed, fx, cast, shadow, heading, ...)" },
-        { op: "recolor", scopes: sc(), takes: `swap: { key: key } (its colors: ${out.colors})` }, { op: "flip", scopes: sc(), takes: "axis: x (default) | y" });
+        { op: "recolor", scopes: sc(), takes: `swap: { key: key } (its colors: ${out.colors})` }, { op: "flip", scopes: sc(), takes: `axis: x (default${turnText(p, q.name)}) | y` });
       if (frameCount(p, q.name) > 1) ops.push({ op: "frame", scopes: ["instance"], takes: `frame: 0-${frameCount(p, q.name) - 1} | t: ms` });
       ops.push({ op: "relation", scopes: ["instance"], takes: `on | beside: [id, "left" | "right" | "above" | "below", gap] | along: [points, s, u] | apart: [id, gap] | at: "id.socket"; ids: ${ids}` },
         { op: "swap", scopes: ["instance"], takes: "asset: another asset's name" });
@@ -156,6 +157,22 @@ function details(p: Project, scene: string, b: BuildOut, t: Target, all: Target[
   return out;
 }
 const REL = ["on", "beside", "around", "attach", "along", "apart"];
+
+/**
+ * Of a turnaround's sprite: its family, the heading a flip across turns it to and the sprite drawn there
+ * (`to`; `add`: its family doesn't draw that heading yet); undefined when it faces n or s (its own mirror:
+ * a flip mirrors it).
+ */
+function turned(p: Project, asset: string): { family: string; deg: number; to: string; add: boolean; loc?: string } | undefined {
+  for (const [family, f] of p.turnarounds) {
+    const h = f.heads.find((x) => `${family}_${x.name}` === asset);
+    if (!h) continue;
+    const deg = (360 - h.deg) % 360, m = f.heads.find((x) => Math.abs(x.deg - deg) < 1e-9) ?? headingsOf(undefined, [...f.heads.map((x) => x.deg), deg], false).at(-1)!;
+    return m === h ? undefined : { family, deg, to: `${family}_${m.name}`, add: !f.heads.includes(m), loc: f.loc };
+  }
+  return undefined;
+}
+const turnText = (p: Project, asset: string) => { const t = turned(p, asset); return t ? `: turned to face ${t.to.slice(t.family.length + 1)}, its turnaround's ${t.to}${t.add ? " (added to its headings)" : ""}, lit as it is` : ""; };
 
 /**
  * The scene built for one thing (`id`), drawing only what it reads: first with nothing it stamps drawn
@@ -186,21 +203,30 @@ function narrow(p: Project, scene: string, id: string, at: () => { b: BuildOut; 
   } catch { return whole(); }
 }
 
-/** The comment lines a thing's call has in the art file: the block just above it and the call line's own (what --find reads). */
-function commentsOf(p: Project, t: Target): { lines: string[]; at?: string } {
-  const loc = t.kind === "part" ? t.world!.loc : t.p!.loc ?? t.p!.code, abs = loc && fileOf(p, loc);
-  if (!abs) return { lines: [] };
-  const L = readFileSync(abs, "utf8").split("\n");
-  let i = Number(loc.split(":")[1]) - 1;
-  // a part: its spec's line in the world3d() call
-  if (t.kind === "part") { const k = L.findIndex((l, j) => j >= i && new RegExp(`(^|[\\s{,])${t.id}\\s*:`).test(l)); if (k >= 0) i = k; }
-  const lines = L[i]?.includes("//") ? [L[i].slice(L[i].indexOf("//"))] : [];
-  for (let j = i - 1; j >= 0 && /^\s*\/\//.test(L[j]); j--) lines.unshift(L[j]);
-  return { lines: lines.map((l) => l.replace(/^\s*\/\/\s*/, "")), at: `${basename(abs)}:${i + 1}` };
+/**
+ * The comment lines a thing has in the art file (what --find reads), each with its line: the block just
+ * above its call and the call line's own, then the same at its asset's definition (the statement that
+ * makes it: a helper's caller, a loop).
+ */
+function commentsOf(p: Project, t: Target): { line: string; at: string }[] {
+  const near = (loc: string | undefined, part?: string) => {
+    const abs = loc && fileOf(p, loc);
+    if (!abs) return [];
+    const L = readFileSync(abs, "utf8").split("\n");
+    let i = Number(loc.split(":")[1]) - 1;
+    // a part: its spec's line in the world3d() call
+    if (part) { const k = L.findIndex((l, j) => j >= i && new RegExp(`(^|[\\s{,])${part}\\s*:`).test(l)); if (k >= 0) i = k; }
+    const lines = L[i]?.includes("//") ? [L[i].slice(L[i].indexOf("//"))] : [];
+    for (let j = i - 1; j >= 0 && /^\s*\/\//.test(L[j]); j--) lines.unshift(L[j]);
+    return lines.map((l) => ({ line: l.replace(/^\s*\/\/\s*/, ""), at: `${basename(abs)}:${i + 1}` }));
+  };
+  if (t.kind === "part") return near(t.world!.loc, t.id);
+  const def = p.assets.get(t.asset);
+  return [...near(t.p!.loc ?? t.p!.code), ...near(def?.top ?? def?.loc)];
 }
 const STOP = new Set(["a", "an", "the", "of", "on", "in", "to", "at", "by", "and", "with", "its", "for", "from", "that", "this"]);
 
-/** pxl inspect: every thing of the scene an edit can name, a line each (`find`: those whose id, asset or call's comment has the words, the most first); or one (`id`) in full. Text, or JSON. */
+/** pxl inspect: every thing of the scene an edit can name, a line each (`find`: those whose id, asset, or the comment of its call or its asset's definition has the words, the most first); or one (`id`) in full. Text, or JSON. */
 export function inspect(file: string, scene: string, o: { id?: string; json?: boolean; frame?: number; find?: string } = {}): string {
   // built for checking (no light passes), keeping where code placed a thing
   const p = loadProject(file, { checksOnly: true, where: true });
@@ -210,19 +236,19 @@ export function inspect(file: string, scene: string, o: { id?: string; json?: bo
   const head = (t: Target) => ({ id: t.id, kind: t.kind, asset: t.asset, ...(t.layer ? { layer: t.layer } : {}), ...(t.box ? { box: t.box, feet: t.feet } : {}) });
   const where = (t: Target) => (t.box ? `x ${t.box[0]}-${t.box[2]}, y ${t.box[1]}-${t.box[3]}, feet ${t.feet!.join(",")}` : "nothing drawn");
   if (o.id === undefined) {
-    // --find: each word (a plural's s dropped) looked for in its id, its asset's name and the comments of its call
+    // --find: each word (a plural's s dropped) looked for in its id, its asset's name and the comments of its call and its asset's definition
     const words = (o.find ?? "").toLowerCase().split(/[^\p{L}\p{N}_]+/u).filter((w) => w && !STOP.has(w)).map((w) => (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w));
     const found = all.map((t) => {
-      const c = o.find === undefined ? { lines: [] } : commentsOf(p, t), hay = `${t.id} ${t.asset}`.toLowerCase(), has = (s: string) => words.filter((w) => s.toLowerCase().includes(w));
-      const said = c.lines.find((l) => has(l).length);
-      return { t, n: new Set([...has(hay), ...c.lines.flatMap(has)]).size, said: said && `"${said.length > 90 ? said.slice(0, 89) + "…" : said}" (${c.at})` };
+      const c = o.find === undefined ? [] : commentsOf(p, t), hay = `${t.id} ${t.asset}`.toLowerCase(), has = (s: string) => words.filter((w) => s.toLowerCase().includes(w));
+      const said = c.filter((l) => has(l.line).length).sort((u, v) => has(v.line).length - has(u.line).length)[0];
+      return { t, n: new Set([...has(hay), ...c.flatMap((l) => has(l.line))]).size, said: said && `"${said.line.length > 90 ? said.line.slice(0, 89) + "…" : said.line}" (${said.at})` };
     });
     const list = o.find === undefined ? found : found.filter((x) => x.n > 0).sort((u, v) => v.n - u.n);
     const rows = list.map(({ t, said }) => { const ops = (details(p, scene, b, t, all).ops as Op[]).map((x) => x.op); return { ...head(t), ops, ...(t.why ? { why: t.why } : {}), ...(said ? { said } : {}) }; });
     if (o.json) return JSON.stringify({ scene, frame: f, things: rows });
     const top = o.find === undefined ? `${all.length} things an edit can name`
       : list.length ? `${list.length} of its ${all.length} things match "${o.find}", the most words first`
-      : `nothing matches "${o.find}" in an id, an asset or the comment above a call (it has: ${all.map((t) => t.id).join(", ")})`;
+      : `nothing matches "${o.find}" in an id, an asset or the comment above a call or an asset's definition (it has: ${all.map((t) => t.id).join(", ")})`;
     return [`${scene}, frame ${f}: ${top} (pxl inspect <file> ${scene} --id <id> for one; pxl edit <file> ${scene} <edits> changes them)`,
       ...rows.map((r) => `  ${r.id}: ${r.kind === "part" ? `a world3d part made by ${r.asset}` : `a ${r.kind} of ${r.asset} @${r.layer ?? "-"}`}, ${where(all.find((t) => t.id === r.id)!)}; ${r.ops.length ? `ops ${r.ops.join(" ")}` : r.why}${r.said ? `; ${r.said}` : ""}`)].join("\n");
   }
@@ -314,6 +340,51 @@ function mayOf(x: BuildOut, worlds: { world: World }[], seeds: Iterable<string>)
   return may;
 }
 
+/** Code without its comments (a string holding // or /* loses its end: what reads it then says no). */
+const code = (s: string) => s.replace(/\/\*[^]*?\*\//g, " ").replace(/\/\/[^\n]*/g, "");
+/** Is the call at src[o], closing at src[end], a statement of its own: nothing before it in its statement, its value read by nothing? */
+function alone(src: string, o: number, end: number): boolean {
+  const before = code(src.slice(0, o)), prev = before.trimEnd().at(-1), after = code(src.slice(end + 1)), next = after.trimStart()[0];
+  const broke = (gap: string) => gap.includes("\n");
+  const head = prev === undefined || ";{})".includes(prev) || (broke(before.slice(before.trimEnd().length)) && /[\w$"'\]]/.test(prev));
+  const tail = next === undefined || ";}".includes(next) || (broke(after.slice(0, after.length - after.trimStart().length)) && /[\w$"'{]/.test(next) && !/^(in|instanceof)\b/.test(after.trimStart()));
+  return head && tail;
+}
+
+/**
+ * What an edit's new text can't draw otherwise, so the rebuild keeps its builds (p2 takes p's): every
+ * asset but those whose defining call, a statement of its own, holds a changed character, and what
+ * reads them (built, or a group or a name asked for whose answer changed). None kept when a change lies
+ * outside such a call (a table, a const, a helper's arrow: anything may read it).
+ */
+// ponytail: line by line; an edit that adds or takes out a line rebuilds everything
+export function unchanged(p: Project, p2: Project, texts: Map<string, string>): (name: string) => boolean {
+  const none = () => false, bad = new Set<string>();
+  for (const [abs, now] of texts) {
+    const was = readFileSync(abs, "utf8"), A = was.split("\n"), B = now.split("\n"), file = basename(abs);
+    if (A.length !== B.length) return none;
+    const calls = [...p.assets.values()].flatMap((d) => {
+      const o = d.loc?.split(":")[0] === file ? callAt(was, d.loc, /^[\w$]+\s*\(/) : undefined;
+      if (o === undefined) return [];
+      const open = was.indexOf("(", o), end = listAt(was, open).end;
+      return [{ name: d.name, open, end, alone: alone(was, o, end) }];
+    });
+    for (let i = 0, at = 0; i < A.length; at += A[i].length + 1, i++) {
+      if (A[i] === B[i]) continue;
+      let a = 0, z = 0;
+      while (a < A[i].length && A[i][a] === B[i][a]) a++;
+      while (z < A[i].length - a && z < B[i].length - a && A[i].at(-1 - z) === B[i].at(-1 - z)) z++;
+      const s = at + a, e = at + A[i].length - z, own = calls.filter((c) => c.open < s && e <= c.end);
+      if (!own.length || !own.every((c) => c.alone)) return none;
+      for (const c of own) bad.add(c.name);
+    }
+  }
+  const answer = (q: Project, n: string) => { try { return JSON.stringify([q.has(n), q.candidates(n), q.assets.get(n)?.kind, q.assets.get(n)?.loc]); } catch (e) { return String(e); } };
+  for (const [, rs] of p.reads) for (const n of rs) if (answer(p, n) !== answer(p2, n)) bad.add(n);
+  for (let k = -1; k !== bad.size;) { k = bad.size; for (const [by, rs] of p.reads) if (!bad.has(by) && [...rs].some((n) => bad.has(n))) bad.add(by); }
+  return (n) => !bad.has(n) && answer(p, n) === answer(p2, n);
+}
+
 /**
  * pxl edit: the edits written into the art files (all of them, or none: each checked, and the scene
  * rebuilt), saying what changed (describe --diff by id, the pixels changed by id) and pxl check. Refused,
@@ -344,8 +415,21 @@ export function edit(file: string, scene: string, given: unknown, o: { frame?: n
       if (t.why) return t.why;
       const loc = e.scope === "asset" ? p.assets.get(t.asset)?.loc : t.p!.loc!, abs = loc && fileOf(p, loc);
       if (!loc || !abs) return `'${t.asset}' isn't made in an art file`;
-      const w = e.scope === "asset" ? editAsset(read(abs), loc, t.asset, e)
-        : editStamp(read(abs), loc, e, { knobs: t.p!.rel?.knobs ?? [], anim: frameCount(p, t.asset) > 1, has: (n) => p.has(n) });
+      const info = { knobs: t.p!.rel?.knobs ?? [], anim: frameCount(p, t.asset) > 1, has: (n: string) => p.has(n) };
+      const tw = e.op === "flip" && (e.axis ?? "x") === "x" && e.scope !== "asset" ? turned(p, t.asset) : undefined;
+      if (tw) {
+        // a turnaround's sprite flipped across is turned instead: its family's mirror heading, lit as it is (a
+        // mirror would light it from the other side), the heading added to its call when it draws none there
+        const absT = tw.add ? tw.loc && fileOf(p, tw.loc) : abs;
+        if (!absT) return "its turnaround() isn't in an art file";
+        const h = tw.add ? addHeading(read(absT), tw.loc!, tw.family, tw.deg) : undefined;
+        if (typeof h === "string") return `turned, it faces a heading its family doesn't draw: ${h}`;
+        const w = editStamp(h && absT === abs ? h.src : read(abs), loc, { op: "swap", target: e.target, asset: h?.asset ?? tw.to }, { ...info, has: () => true });
+        if (typeof w === "string") return w;
+        if (h && absT !== abs) texts.set(absT, h.src);
+        return { src: w.src, said: `turned to face ${(h?.asset ?? tw.to).slice(tw.family.length + 1)}: ${h ? `${h.said}, ` : ""}${w.said}`, abs };
+      }
+      const w = e.scope === "asset" ? editAsset(read(abs), loc, t.asset, e) : editStamp(read(abs), loc, e, info);
       return typeof w === "string" ? w : { ...w, abs };
     })();
     if (typeof r === "string") { refused.push(`edit: ${e.target}: ${e.op} refused: ${r}`); continue; }
@@ -353,9 +437,9 @@ export function edit(file: string, scene: string, given: unknown, o: { frame?: n
     said.push(`edit: ${e.target}: ${r.said}`);
   }
   if (refused.length) return { lines: [...refused, "nothing written"], ok: false };
-  // rebuilt from the new text before anything is written
+  // rebuilt from the new text before anything is written, keeping the builds of what the edit can't reach
   let p2: Project, b2: BuildOut;
-  try { p2 = loadProject(file, { checksOnly: true, where: true }, read); b2 = p2.build(scene, 0, frameTime(p2, scene, f)); }
+  try { p2 = loadProject(file, { checksOnly: true, where: true }, read); p2.adopt(p, unchanged(p, p2, texts)); b2 = p2.build(scene, 0, frameTime(p2, scene, f)); }
   catch (err) { return { lines: [...said, `edit: not written: rebuilt, ${(err as Error).message.split("\n")[0]}`], ok: false }; }
   const lines = [...said];
   if (o.dry) lines.push("source (- now, + after):", ...[...texts].flatMap(([abs, t]) => lineDiff(basename(abs), readFileSync(abs, "utf8"), t)));
@@ -386,7 +470,8 @@ export function edit(file: string, scene: string, given: unknown, o: { frame?: n
   if (o.dry) return { lines: [...lines, "dry: nothing written"], ok: true };
   for (const [abs, t] of texts) writeFileSync(abs, t);
   lines.push(`wrote ${[...texts.keys()].map((a) => basename(a)).join(", ")}`);
-  const c = checkProject(loadProject(file, { checksOnly: true }), { file: basename(file) });
+  // (the file as written is the one rebuilt: its builds serve the check)
+  const c = checkProject(p2, { file: basename(file) });
   lines.push(`check: ${c.lines.length ? `${c.lines.length} warning${c.lines.length > 1 ? "s" : ""}` : "no warnings"} (${c.checked}; ${c.coverage})`, ...c.lines.map((l) => "  " + l));
   return { lines, ok: true };
 }

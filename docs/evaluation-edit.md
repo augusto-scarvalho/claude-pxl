@@ -88,6 +88,8 @@ Four of the six tasks ended in the same file in both arms; the pennant in the sa
 - **It is slower.** 260 s against 104 s in all: `pxl edit` rebuilds the scene before writing, guards
   it and runs `pxl check` (about 20 s an edit on the shrine; the lantern's refusal and dry run made
   it three edits, 100 s). The model's own time was about the same (B 83 s, A 63 s of API time).
+  Since (round 6) the rebuild keeps what the edit can't reach and the check reads it: a stamp's edit
+  on the shrine 10 to 16 s written and checked, 9 s dry.
 - **It knows what it did.** Each B run read back what changed, by id ("toro_e: moved -3,+0"); no A run
   looked at the picture (none ran `describe --diff` or `shot`), and the lantern's said it hadn't
   measured the shift.
@@ -95,7 +97,8 @@ Four of the six tasks ended in the same file in both arms; the pennant in the sa
   A gave the turnaround a west heading, so the fox was drawn again facing the other way under the
   scene's sun. A's picture is the right one (the lit side stays toward the sun); the EditIR has no
   "turn" for a sprite `turnaround()` makes, and `pxl check`'s lit-side rule had no clear reading on
-  it to object.
+  it to object. Since (round 6) `flip` turns a turnaround's sprite as A did (`fox_tama_w`, its
+  headings `["e", "w"]`), and `--find "the fox with the jewel"` reads the comment above its definition.
 - **Friction in the output.** `pxl edit` prints the changed regions with what shows there after
   ("region x 38-61, y 60-96: 482 px (fox_tama_e 347px, hall_s 102px, _ground 33px)": the hall and
   the ground where the fox no longer stands); the fox's agent read them as collateral changes, where

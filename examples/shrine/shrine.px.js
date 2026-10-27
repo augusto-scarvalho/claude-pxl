@@ -29,10 +29,12 @@ front("torii", make3d.torii())
 front("toro", make3d.toro())
 front("basin", make3d.chozubachi({ moss: 0.1 }))
 front("ema", make3d.ema())
-// the foxes, a pair as at Inari shrines: the jewel under a forepaw on the left, the key in its mouth on
-// the right, facing each other across the landing; their edges toward the sun lit, their faces carved
+// the foxes, a pair as at Inari shrines, facing each other across the landing; their edges toward the
+// sun lit, their faces carved
 const FOX_TAMA = make3d.kitsune({ holds: "tama" }), FOX_KEY = make3d.kitsune({ holds: "key" })
+// the fox with the jewel (tama) under a forepaw, on the left
 turnaround("fox_tama", FOX_TAMA, { view: "side", ppm: S, headings: ["e"], surface: { rim: true }, draw: japan.carve(FOX_TAMA) })
+// the fox with the key in its mouth, on the right
 turnaround("fox_key", FOX_KEY, { view: "side", ppm: S, headings: ["w"], surface: { rim: true }, draw: japan.carve(FOX_KEY) })
 
 // ---------------------------------------------------------------- the trees (trees.px.js), in autumn

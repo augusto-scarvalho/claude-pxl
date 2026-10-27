@@ -778,7 +778,8 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   and its random picks follow the id, so moving it keeps its look.
 - A small change to what is placed, without reading the file: `PXL inspect <file> <scene>` lists what
   an edit can name (by id) with its box and the operations it takes (`--find stone lantern`: only
-  those whose id, asset or the comment above their call has the words, the most first); `--id x`
+  those whose id, asset or the comment above their call or their asset's definition has the words,
+  the most first); `--id x`
   gives one in full (its values and where the file writes each: its call, a table it reads, or code;
   its relation, rules, parts, colors), `--json` for a program. `PXL edit <file> <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'`
   writes it where the number lives (the table's `[87, 21]`, the stamp's own options), all the edits
@@ -787,7 +788,8 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   (a ring in the ground drawn from the same table, a thing that reads the same number) refuses it,
   saying what, and `--allow a,b` lets those. `--dry` prints the source lines it would change (- now,
   + after) and what would change, and writes nothing. Ops: `move`, `set` (an option, a
-  part's parameter), `recolor` (`swap`), `flip`, `frame` (or `t`), `relation` (on, beside, along,
+  part's parameter), `recolor` (`swap`), `flip` (a `turnaround()` sprite is turned to its mirror
+  heading instead, added to its `headings` if new, so its lit side stays the sun's), `frame` (or `t`), `relation` (on, beside, along,
   apart, at; a world3d part's around, attach), `swap` (another asset; a part's builder), `as` (a part
   drawn as voxels...); `scope: "asset"` writes the asset's own options, for every copy. What code
   computes (a stamp a function makes, a number worked out, one call placing several things) is

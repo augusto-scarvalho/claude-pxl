@@ -1200,3 +1200,30 @@ Left from phase 7 (evaluation):
   holds, the least change (rounded where a rounder number holds), the rules that held still holding,
   written into the file where the part's spec is written out once; each fix on the world the ones
   before it left.
+
+## Editing by name (pxl inspect, pxl edit)
+
+- [x] **flip turns a turnaround's sprite** (round 6, R2): in the edit experiment `flip` mirrored the
+  shrine's fox, so it was lit from the side away from the sun. A `turnaround()` sprite flipped across
+  is turned instead: its stamp takes the family's mirror heading (`fox_tama_e` to `fox_tama_w`), drawn
+  under the same light, the heading added to the call's `headings` when the family has none there
+  (`["e"]` to `["e", "w"]`; refused, saying where, when the call is a helper's or its headings code).
+  Facing n or s (its own mirror) or with `axis: "y"` it mirrors as before.
+- [x] **inspect --find reads the comment above an asset's definition** (round 6, R2): after its call's,
+  the block above the statement that makes it (a helper's caller, a loop) and that line's own; the
+  line shown is the one with the most words. The shrine's foxes have a comment each, so "the fox with
+  the jewel" finds `fox_tama_e` first.
+- [x] **pxl edit faster** (round 6, R2): the rebuild takes the first build's images of what the edit
+  can't reach. An asset is drawn again when its defining call, a statement of its own, holds a changed
+  character, or when it reads one that is (built, or a group or a name asked for whose answer
+  changed); a change outside such a call (a table, a const) rebuilds everything, as before. The check
+  after writing runs on that rebuild. Measured on the laptop, HEAD's CLI and this one alternating, the
+  same lines printed: a stamp moved on the shrine 23-28 s to 10-16 s (written and checked), 16-18 s to
+  9 s dry; the lantern by its table (all rebuilt) 22 s to 17; the sunset's logs and the grove's rock
+  5.3 s to 4.4.
+- [ ] **The ink line round a 3D figure has no normal** (round 6, R2): `scripts/pulse.ts` found 22% of
+  the traveler's pixels that only move with none, lit flat: `rig3d`'s and `views()`' `ink` line, drawn
+  outside the model, where it has no surface (and the jaw line and a retouch pixel on it). Giving each
+  line pixel the mean normal of the model pixels beside it (the silhouette's, facing out) leaves none
+  without, but moves the HD-2D scenes that light the figures by their normals (the clearing, the
+  graveyard, the harbor): shown to the user, waiting for a yes.
