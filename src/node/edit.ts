@@ -186,8 +186,22 @@ function narrow(p: Project, scene: string, id: string, at: () => { b: BuildOut; 
   } catch { return whole(); }
 }
 
-/** pxl inspect: every thing of the scene an edit can name, a line each; or one (`id`) in full. Text, or JSON. */
-export function inspect(file: string, scene: string, o: { id?: string; json?: boolean; frame?: number } = {}): string {
+/** The comment lines a thing's call has in the art file: the block just above it and the call line's own (what --find reads). */
+function commentsOf(p: Project, t: Target): { lines: string[]; at?: string } {
+  const loc = t.kind === "part" ? t.world!.loc : t.p!.loc ?? t.p!.code, abs = loc && fileOf(p, loc);
+  if (!abs) return { lines: [] };
+  const L = readFileSync(abs, "utf8").split("\n");
+  let i = Number(loc.split(":")[1]) - 1;
+  // a part: its spec's line in the world3d() call
+  if (t.kind === "part") { const k = L.findIndex((l, j) => j >= i && new RegExp(`(^|[\\s{,])${t.id}\\s*:`).test(l)); if (k >= 0) i = k; }
+  const lines = L[i]?.includes("//") ? [L[i].slice(L[i].indexOf("//"))] : [];
+  for (let j = i - 1; j >= 0 && /^\s*\/\//.test(L[j]); j--) lines.unshift(L[j]);
+  return { lines: lines.map((l) => l.replace(/^\s*\/\/\s*/, "")), at: `${basename(abs)}:${i + 1}` };
+}
+const STOP = new Set(["a", "an", "the", "of", "on", "in", "to", "at", "by", "and", "with", "its", "for", "from", "that", "this"]);
+
+/** pxl inspect: every thing of the scene an edit can name, a line each (`find`: those whose id, asset or call's comment has the words, the most first); or one (`id`) in full. Text, or JSON. */
+export function inspect(file: string, scene: string, o: { id?: string; json?: boolean; frame?: number; find?: string } = {}): string {
   // built for checking (no light passes), keeping where code placed a thing
   const p = loadProject(file, { checksOnly: true, where: true });
   if (!p.assets.has(scene)) throw new PxError(`unknown asset '${scene}'`);
@@ -196,10 +210,21 @@ export function inspect(file: string, scene: string, o: { id?: string; json?: bo
   const head = (t: Target) => ({ id: t.id, kind: t.kind, asset: t.asset, ...(t.layer ? { layer: t.layer } : {}), ...(t.box ? { box: t.box, feet: t.feet } : {}) });
   const where = (t: Target) => (t.box ? `x ${t.box[0]}-${t.box[2]}, y ${t.box[1]}-${t.box[3]}, feet ${t.feet!.join(",")}` : "nothing drawn");
   if (o.id === undefined) {
-    const rows = all.map((t) => { const ops = (details(p, scene, b, t, all).ops as Op[]).map((x) => x.op); return { ...head(t), ops, ...(t.why ? { why: t.why } : {}) }; });
+    // --find: each word (a plural's s dropped) looked for in its id, its asset's name and the comments of its call
+    const words = (o.find ?? "").toLowerCase().split(/[^\p{L}\p{N}_]+/u).filter((w) => w && !STOP.has(w)).map((w) => (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w));
+    const found = all.map((t) => {
+      const c = o.find === undefined ? { lines: [] } : commentsOf(p, t), hay = `${t.id} ${t.asset}`.toLowerCase(), has = (s: string) => words.filter((w) => s.toLowerCase().includes(w));
+      const said = c.lines.find((l) => has(l).length);
+      return { t, n: new Set([...has(hay), ...c.lines.flatMap(has)]).size, said: said && `"${said.length > 90 ? said.slice(0, 89) + "…" : said}" (${c.at})` };
+    });
+    const list = o.find === undefined ? found : found.filter((x) => x.n > 0).sort((u, v) => v.n - u.n);
+    const rows = list.map(({ t, said }) => { const ops = (details(p, scene, b, t, all).ops as Op[]).map((x) => x.op); return { ...head(t), ops, ...(t.why ? { why: t.why } : {}), ...(said ? { said } : {}) }; });
     if (o.json) return JSON.stringify({ scene, frame: f, things: rows });
-    return [`${scene}, frame ${f}: ${all.length} things an edit can name (pxl inspect <file> ${scene} --id <id> for one; pxl edit <file> ${scene} <edits> changes them)`,
-      ...rows.map((r) => `  ${r.id}: ${r.kind === "part" ? `a world3d part made by ${r.asset}` : `a ${r.kind} of ${r.asset} @${r.layer ?? "-"}`}, ${where(all.find((t) => t.id === r.id)!)}; ${r.ops.length ? `ops ${r.ops.join(" ")}` : r.why}`)].join("\n");
+    const top = o.find === undefined ? `${all.length} things an edit can name`
+      : list.length ? `${list.length} of its ${all.length} things match "${o.find}", the most words first`
+      : `nothing matches "${o.find}" in an id, an asset or the comment above a call (it has: ${all.map((t) => t.id).join(", ")})`;
+    return [`${scene}, frame ${f}: ${top} (pxl inspect <file> ${scene} --id <id> for one; pxl edit <file> ${scene} <edits> changes them)`,
+      ...rows.map((r) => `  ${r.id}: ${r.kind === "part" ? `a world3d part made by ${r.asset}` : `a ${r.kind} of ${r.asset} @${r.layer ?? "-"}`}, ${where(all.find((t) => t.id === r.id)!)}; ${r.ops.length ? `ops ${r.ops.join(" ")}` : r.why}${r.said ? `; ${r.said}` : ""}`)].join("\n");
   }
   const t = all.find((x) => x.id === o.id);
   if (!t) throw new PxError(`no '${o.id}' in ${scene} at frame ${f} (it has: ${all.map((x) => x.id).join(", ")})`);
@@ -337,7 +362,8 @@ export function edit(file: string, scene: string, given: unknown, o: { frame?: n
   // what changed: describe --diff of the scene at that frame, by id; a world's parts by world.changed()
   const pal = p.assets.get(scene)!.pal, prev = describe(scene, b, pal).snap, text = describe(scene, b2, p2.assets.get(scene)!.pal, { prev }).text.split("\n");
   const i = text.findIndex((l) => l.startsWith("CHANGES")), j = text.indexOf("", i);
-  lines.push(...text.slice(i, j < 0 ? undefined : j).map((l) => l.replace("since the last describe of this asset", `describe --diff, frame ${f}`)));
+  // (not its regions: they name what shows there after, which read as changed too; the by-id line says what changed)
+  lines.push(...text.slice(i, j < 0 ? undefined : j).filter((l) => !/^\s+(region |…\+\d+ smaller region)/.test(l)).map((l) => l.replace("since the last describe of this asset", `describe --diff, frame ${f}`)));
   p.worlds.forEach((w, k) => { if (edits.some((e) => all.find((t) => t.id === e.target)?.world === w) && p2.worlds[k]) lines.push(`  world3d at ${w.loc}: changed ${w.world.changed(p2.worlds[k].world).join(", ") || "nothing"}`); });
   // the guard: what it may change, its targets (an asset's every copy, scope "asset"), by their labels before
   // and after (a stamp without an id: the one its call places now), what is placed by them, and `allow`

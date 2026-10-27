@@ -28,7 +28,7 @@ primitives, brushes and tilemaps. `PXL` below means `node <this skill's director
    re-reads the whole conversation). After the first write, change the file with Edit, never write
    it whole again. `describe --diff` lists what an edit moved or redrew; `shot --vs HEAD --diff`
    shows the pixels it changed; `PXL steps art.px.js <name> --at x,y` names the line that painted
-   a pixel. To move, flip or recolor a placed thing: `PXL inspect`, then `PXL edit`.
+   a pixel. To move, flip or recolor a placed thing: `PXL inspect` (`--find lantern`), then `PXL edit`.
 4. `PXL build art.px.js` writes the PNGs, sheets and GIFs to `out/`, previews to `out/_preview/`
    (`--only a,b`; `--every 3` keeps a long loop's GIF small; `--profile` when a build has grown slow).
 5. Before handing over, `PXL check art.px.js`: every scene and rig of the file, every frame of an

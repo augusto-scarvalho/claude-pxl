@@ -777,9 +777,10 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
   `steps --at` name it by that (else "lantern #2", which another lantern stamped before it renumbers),
   and its random picks follow the id, so moving it keeps its look.
 - A small change to what is placed, without reading the file: `PXL inspect <file> <scene>` lists what
-  an edit can name (by id) with its box and the operations it takes; `--id x` gives one in full (its
-  values and where the file writes each: its call, a table it reads, or code; its relation, rules,
-  parts, colors), `--json` for a program. `PXL edit <file> <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'`
+  an edit can name (by id) with its box and the operations it takes (`--find stone lantern`: only
+  those whose id, asset or the comment above their call has the words, the most first); `--id x`
+  gives one in full (its values and where the file writes each: its call, a table it reads, or code;
+  its relation, rules, parts, colors), `--json` for a program. `PXL edit <file> <scene> '{ "op": "move", "target": "toro_e", "by": [-3, 0] }'`
   writes it where the number lives (the table's `[87, 21]`, the stamp's own options), all the edits
   given or none, then prints `describe --diff` by id, the pixels it changed by id, and `check`. It is
   guarded: an edit changes its targets and what is placed by relation to them; anything else changing

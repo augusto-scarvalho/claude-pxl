@@ -633,6 +633,8 @@ node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-pr
 node <pxl>/bin/pxl.js ascii <file> <name> [--frame N]
 node <pxl>/bin/pxl.js list  <file>
 node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--sheet] [--out DIR]
+node <pxl>/bin/pxl.js inspect <file> <scene> [--id x | --find words] [--frame N] [--json]
+node <pxl>/bin/pxl.js edit <file> <scene> <edits.json | '{ "op": ..., "target": "id", ... }'> [--frame N] [--dry] [--allow ids]
 node <pxl>/bin/pxl.js describe <file> <name> [--cell N] [--at x,y,w,h] [--frame N] [--diff] [--brief] [--out DIR | --no-out]     (or describe <image.png>)
 node <pxl>/bin/pxl.js compare <file> <name> <other name | other.px.js:name | ref.png> [--shrink N] [--offset x,y]   |   compare <picture or clip> [--frame N] [--shrink N]
 node <pxl>/bin/pxl.js blind <file> <name...> [--out DIR]   |   blind <file> --check answers.json

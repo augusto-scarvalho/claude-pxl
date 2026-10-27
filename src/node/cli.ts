@@ -65,10 +65,11 @@ const USAGE = `pxl — pixel-art DSL
       asset's name, "#n" among its copies; --diff says what moved, was redrawn, added or removed
       since the last describe, by those names. Any PNG works too: its colors get keys, and repeats
       are found as identical 16x16 tiles.
-  pxl inspect <art.px.js> <scene> [--id x] [--frame N] [--json]
+  pxl inspect <art.px.js> <scene> [--id x | --find words] [--frame N] [--json]
       What an edit can name in a scene, a line each: its stamps (by id, else name #n), what c.as()
       names, its mesh() sprites, the world3d parts it draws; where each is and the operations it
-      takes. --id x: that one in full, in a few hundred tokens: what it is, its box and feet, its
+      takes. --find "stone lantern": only those whose id, asset or the comment above their call has
+      the words (the most first, with the comment). --id x: that one in full, in a few hundred tokens: what it is, its box and feet, its
       values and where the file writes each (in its call, a table it reads, or code), its relation,
       what is placed by it, the scene's rules on it, its parts, its colors, and each operation it
       takes with what that takes; the scene drawn with only what that thing's place and rules read
@@ -202,6 +203,7 @@ interface Args {
   readings?: boolean;
   fix?: boolean;
   id?: string;
+  find?: string;
   json?: boolean;
   dry?: boolean;
   allow?: string[];
@@ -268,6 +270,7 @@ function parse(argv: string[]): Args {
     else if (v === "--readings") a.readings = true;
     else if (v === "--fix") a.fix = true;
     else if (v === "--id") a.id = val();
+    else if (v === "--find") a.find = val();
     else if (v === "--json") a.json = true;
     else if (v === "--dry") a.dry = true;
     else if (v === "--allow") a.allow = val().split(",").map((s) => s.trim()).filter(Boolean);
@@ -430,8 +433,8 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case "inspect": {
-        if (!a.rest[0]) throw new PxError("inspect needs a scene: pxl inspect <file> <scene> [--id x] [--frame N] [--json]");
-        console.log(inspect(file, a.rest[0], { id: a.id, json: a.json, frame: a.frame }));
+        if (!a.rest[0]) throw new PxError("inspect needs a scene: pxl inspect <file> <scene> [--id x | --find words] [--frame N] [--json]");
+        console.log(inspect(file, a.rest[0], { id: a.id, json: a.json, frame: a.frame, find: a.find }));
         return 0;
       }
       case "edit": {

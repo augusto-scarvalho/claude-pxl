@@ -59,6 +59,25 @@ scene("s", { w: 20, h: 8, bg: "g" }, layer("props", stamp("rock", 2, 2, { id: "a
   assert.ok(r.ok, r.lines.join("\n"));
   assert.match(readFileSync(file, "utf8"), /stamp\("rock", 2, 2, \{ id: "a", flip: "x" \}\), stamp\("rock", 11, 2\)/);
   assert.match(r.lines.join("\n"), /a: redrawn[^]*rock #2: moved \+1,\+0[^]*check: no warnings/);
+  assert.doesNotMatch(r.lines.join("\n"), /region /, "what changed is said by id, not by region");
+});
+
+test("pxl inspect --find: things by the words of their id, their asset or the comment above their call", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
+  writeFileSync(file, `pal({ k: "#1b1630", g: "#8ccf63" })
+sprite("toro", "kk\\nkg")
+sprite("rock", "kk")
+scene("s", { w: 20, h: 8, bg: "g" }, layer("props",
+  // the stone lanterns
+  // by the gate
+  stamp("toro", 2, 2, { id: "toro_e" }), stamp("toro", 8, 2),
+  stamp("rock", 14, 2)))   // a boulder
+`);
+  const ids = (w: string) => inspect(file, "s", { find: w }).split("\n").slice(1).map((l) => l.trim().split(":")[0]);
+  assert.deepEqual(ids("lanterns"), ["toro_e", "toro #2"]);
+  assert.deepEqual(ids("the boulder rock"), ["rock"]);
+  assert.match(inspect(file, "s", { find: "boulder" }), /rock: [^\n]*; "a boulder" \(a\.px\.js:8\)/);
+  assert.match(inspect(file, "s", { find: "dragon" }), /nothing matches "dragon"[^]*it has: toro_e, toro #2, rock/);
 });
 
 test("pxl inspect --id draws only what the thing reads; pxl edit --dry writes nothing; an edit that changes more than its targets is refused", () => {
