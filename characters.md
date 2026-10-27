@@ -7,7 +7,7 @@ for it, a neck under the chin, arms like columns. (`PXL` below is `node <pxl dir
 Contents: 1 Pick a style · 2 Measure a reference · 3 Start from existing art · 4 Build order ·
 5 Faces · 6 3/4 and profile views · 7 Placing the pixels · 8 The same character, someone else ·
 9 Small animals (warp, hair) · 10 Animating with parts (sockets, motion guides) · 11 Big pieces: rig first ·
-12 Timing in numbers · 13 How games build and play their sprites
+12 Timing in numbers · 13 How games build and play their sprites · 14 Fighting-game sprites
 
 ## 1. Pick a style and stay in it
 
@@ -30,7 +30,7 @@ the top of the head to the soles.
   head, 3 of torso, 3 of legs; eyes 1×2, 2 apart). Realistic figures are 6–8 heads tall, so the head
   is 12–18% (SLYNYRD's 8 heads: the crotch at half the height, the elbows at the navel, the wrists at
   the groin; a faceless action figure of 16 px works too, its head 3 of 16). A fighting game's are
-  about 100 px (76×87 to 116×111), with no fixed box.
+  about 100 px (76×87 to 116×111), with no fixed box (§14).
 - **Avoid the middle**, a head at 25–33% of the height. It reads as a big head on an adult body, and
   people call it "strange" before they can say why.
 - **At 16–32 px** only chibi leaves room for a face. **At 64 px**, LPC proportions (40%) are the
@@ -941,3 +941,101 @@ The sheets were read and measured, not copied; FFT's files as FFTPatcher's sprit
 (ShishiSpriteEditor: its Frame, Tile and Sequence readers) and the FFHacktics wiki read them, Pokémon
 Mystery Dungeon's as PMDCollab's SpriteCollab lays them out (AnimData.xml and its sheets, the rows
 checked on Pikachu's walk).
+
+## 14. Fighting-game sprites
+
+Measured at 1× on sheets ripped from the games (SF2's Ken; SF Alpha 3's Chun-Li and Sagat; SF III 3rd
+Strike's Ryu; KOF 2002's Goro; KOF XIII's Iori): the idle and a light punch. H is the head's height,
+crown or hair to chin. A sheet has no timing: the counts are drawings, not game frames (the timing:
+§12, "Fighting-game normal" and "Fighting stance").
+
+| School | Height | Heads | Colors a frame | Outline | Idle | Light punch |
+|---|---|---|---|---|---|---|
+| SF2 | 89–93 px | 6.4 | 15 (3–6 a material) | black only on the darkest bits (belt, bands); elsewhere the material's darkest on the shadow side, none on the lit side | 4 drawings, the body rising 4 px | 2: chamber (also the way back), full reach |
+| SFA3 | 86–122 px | 6.1–6.4 | 15, materials sharing tones | each material's darkest, never black, nearly closed; on a lit top a rim one step darker instead; a 1 px line in every crease | 3–6, rising 2–5 px | 3–4: chamber, reach, 1–2 back |
+| 3S | 103–111 px | 6.3 | 37–40 (9–12 a material) | none continuous: the edge is the shadow tone, gone on the lit side; black only on hair and belt | 10, an 8 px breath | 6: half, reach 2, back 3 |
+| KOF 2002 | 127 px | 7.9 (a big man, a small head) | 13 | the material's darkest, black on hair, belt and straps; broken on the skin's lit tops | 7, the body still: the head drifts 2 px, the hands flex | 3: chamber, a straight with the body 15 px lower, back |
+| KOF XIII | 217–223 px | 5.4 | 47–49 | a near-black of the material's own, anti-aliased like every edge | 12, rising 6 px, the hair swaying ~10 | 2 found: chamber, straight |
+
+The light: SF2 big flat lights cut by hard edges; SFA3 a lit strip along the contour and each muscle
+an ordered lump (a light crescent on top); 3S broad lit planes, each ringed by a 1 px step, on a
+painted, noisy surface; KOF 2002 clean 2–3 px bands and the cloth's folds as long 1–2 px white
+streaks; XIII glossy hard wedges. No dither in any. None of the light punches has a smear: the active
+frame is the drawing at full reach, 2.2–2.7 H past the idle's front (XIII's 1.4). At 100–110 px pick
+3S (tone areas, many tones and drawings) or KOF 2002 (bands, a line by material, few tones and
+drawings: the cheaper to draw by hand, and the nearer to flat blocks).
+
+**The pose**, measured facing right, against the stance's height:
+
+| | Idle | Light punch |
+|---|---|---|
+| Height | 5.4–6.3 heads (Goro 7.9) | 5.8–6.9 |
+| Feet, rear heel to front toe | 0.57–0.98, mostly 0.6–0.7 | 0.59–1.32 (Ryu 0.75, Goro 0.78, Sagat 0.88) |
+| Gap between the feet | 0.26–0.73 | 0.30–1.05 |
+| Crotch above the soles | 0.38–0.45 | 0.39–0.43 |
+| Weight, 0 over the rear foot, 1 the front | 0.33–0.59 | 0.47–0.67 |
+| Line of action, rear heel to head, off the upright | 16–30° (~21) | 17–40° (Ryu 24, Sagat 33) |
+
+The hips go most of the way to profile while the shoulders twist back toward us. The angles below
+weren't measured on the sprites; they are the `rig3d` settings whose blocks matched the references'
+stances. Facing right: `turn` -70 and `twist` 34, the chest ~54° open to us, `lean` 10. On the punch the
+twist reverses to about -35 (the shoulders turned away, the chest closing), `lean` 20, the rear heel
+up. A first try narrower and more upright (feet 0.43, gap 0.11, line 13°, twist 18) read stiff.
+
+**Pushed parts**, against H: the fist 0.6–0.75 (9×8 to 13×10 px), the foot 0.9–1.2, the waist
+1.5–2.1, across the shoulders with the guard 2.9–3.9 (3S's 3.1 is mostly deltoid); each deltoid about
+0.6 H across (the width that read right on the study's fighter, not a measure of the references).
+
+**Values**, OKLab lightness (0 black, 1 white), read on the references:
+
+| | Line | Shadow band | Plane | Light |
+|---|---|---|---|---|
+| Skin | 0.35–0.38 | 0.45–0.57 | 0.71–0.84 | 0.84–0.95 |
+| Dark cloth (Chun-Li's blue) | 0.17 | 0.25 | 0.32–0.47 | 0.60–0.75, streaks |
+| Light cloth (Goro's gi) | | 0.43 | | 0.88 |
+| Red (Ryu's gloves), gold (Chun-Li's) | | 0.51, ~0.78 | 0.60, ~0.96 | |
+
+Set each key's lightness to these and keep its hue: a first palette read flat beside the games, the
+skin's line and band too light, the dark cloth's light too dark. Look with
+`PXL shot <file> <name> --grey`.
+
+**How to make one.** Every frame in these games is drawn and cleaned by hand; a render alone isn't
+enough at this size (a `rig3d` paint of a 100 px fighter read soft and stiff: the far forearm a club,
+the guard arm folded over the chest, a bob read as a helmet). The 3D is for pose and timing:
+
+1. **Blocks first**: the moves posed and timed as `rig3d` blocks (`blocks: true`) against the numbers
+   above, approved before any painting.
+2. **Parts by hand** over one block frame: the head, torso, upper arm, forearm, fist, thigh, shin and
+   foot, each a sprite of its own, a limb drawn along +x from its joint with its `pivot` on it.
+3. **A 2D rig turns them.** Each frame stamps every part at its joint (`rig3d`'s `joints(pose,
+   heading)` and `screen(p)`), turned to its bone by `stamp(name, x, y, { angle })` (a leg by how far
+   its bone turned since frame 0). The in-betweens come free; draw new parts only where a shape
+   changes (the arm at full reach, the torso turned on the active frames, the rear leg driving). A
+   seam may still want a patch on a frame. Cleaning each frame over the render instead cost runs of
+   pixels at every cut, and a fist couldn't lag the body without being cut out: the rig again.
+4. **Turned parts in one or two tones** (a plane and its light): RotSprite turns the edges of bands
+   inside a fill into a sawtooth. The fist doesn't turn: it stands upright at the hand.
+5. **Far limbs** a step darker: `stamp(..., { shade: 1, floor: "k" })`, stopping a key above the ink.
+6. **The line by material**: every ramp starts at the ink (`ramps("kSszZ", "kNnm")`) and each part
+   has `inline: "k", selout: 2, floor: "k"`, so each material is lined in its own darkest; black kept
+   for the hair and the shoes, as KOF keeps it for hair and belt.
+7. **The boxes from the same joints** (`c.setBox`, `c.setData({ phase })`, §13): the hurt boxes on
+   the head, body and legs and the punching arm while it is out, the hit box round the fist on the
+   active frames. They can't drift off the art.
+
+**How the forms are built**, learned copying Chun-Li (SFA3) and Ryu (3S) at 1× until ~99% of the
+pixels matched:
+- **Masses first.** One polygon a material in its mid tone already gives 93% of the silhouette and
+  reads the pose; then the shading clusters, the line, and the silhouette cleaned against `PXL compare`.
+- **One shaped shadow band a material.** A shoulder is one flat pale plane and a 1–2 px band on its
+  shadow side: the band's shape, not a gradient, is the muscle. Four blues carry a whole leg. In 3S
+  the cloth's mass tone is its shadow and the lit planes are painted on, each ringed by a 1 px warmer
+  step; a fold is a band 3–5 px wide between two light lines.
+- **Where the line breaks or changes color.** A lit top contour has no line, only a 1–2 px rim one
+  step darker than the plane; the dark line goes on the underside and down the crotch. A costume
+  stripe can be the edge, the dark line outside it. The hair's dark is the face's line.
+- **The fist**, 11×9 to 12×11: knuckle bumps with a dent between each (or a row of light pixels), the
+  finger divisions 2 px dark diagonals, the thumb a darker wedge. Under the chin it reads as a ball:
+  keep it in front of the chest.
+- **Diagonals a pixel early.** A polygon through the corners overshoots every diagonal edge by a
+  pixel; the games cut each stair a step earlier, so a drawn silhouette is a little leaner.

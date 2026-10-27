@@ -73,7 +73,7 @@ section, never whole: `PXL help` is the index (every op, option and guide sectio
 
 | Making | Read |
 |---|---|
-| a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 for variants, 10 when limbs animate, 12 for frame counts, 13 for a game's look |
+| a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 variants, 10 animated limbs, 12 frame counts, 13 a game's look, 14 a fighting-game sprite |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
 | a figure that turns to 4 or 8 directions and walks (a field sprite) | `PXL help "a body that turns"` (`rig3d`, blocks first; the head baked per view, its face retouched by hand), then `"characters 5 6 10"` |
