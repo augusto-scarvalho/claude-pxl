@@ -176,10 +176,20 @@ const MAX_LOOP = 60000;
 /** How many bytes of builds at a time other than 0 the project keeps (see Project.timed). */
 const TIMED_BYTES = 1 << 30;
 
-/** Roughly what a build holds in memory: its image, its layers' and the ones beside them. */
+/**
+ * Roughly what a build holds in memory: each image it keeps once (its own, its layers', the ones beside
+ * them, and what it placed: a figure or a mesh sprite drawn for this frame lives only there), with
+ * their normals, emission and depth. Counting the art alone kept ~5 times the budget (a 960x540
+ * graveyard: 1 GB counted, past 5 GB held).
+ */
 function buildBytes(b: BuildOut): number {
-  const px = (i?: Img) => (i ? i.data.length : 0);
-  return 4 * (px(b.img) + px(b.guide) + px(b.under) + b.layers.reduce((s, l) => s + px(l.img), 0) + (b.refs ?? []).reduce((s, r) => s + px(r.img), 0)) + 64 * b.placements.length;
+  const seen = new Set<Img>();
+  const px = (i?: Img) => {
+    if (!i || seen.has(i)) return 0;
+    seen.add(i);
+    return i.data.byteLength + (i.norm?.byteLength ?? 0) + (i.emit?.byteLength ?? 0) + (i.depth?.byteLength ?? 0);
+  };
+  return px(b.img) + px(b.guide) + px(b.under) + b.layers.reduce((s, l) => s + px(l.img), 0) + (b.refs ?? []).reduce((s, r) => s + px(r.img), 0) + b.placements.reduce((s, p) => s + 64 + px(p.img), 0);
 }
 export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "of", "cast", "except", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline"];
 const SHEET_OPTS = ["cols", "pad", "extrude", "rows", "slots"];
