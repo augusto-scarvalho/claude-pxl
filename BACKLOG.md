@@ -131,8 +131,10 @@ Mark items `[x]` when they ship, with the commit.
   hanging over the wall's edge say `air`); check's standing rule on many copies too (nothing else of
   them checked); the graveyard's traveler on `stand`, `feetAt` gone (23 px over 239 frames); both
   panels through `draw3d` (8 and 7 px at the trunk's foot); `texel: "screen"` on the graveyard's flags
-  (0 px at its size), the harbor's hull (7) and boats (20), the deck across kept by hand (the wall's
-  texel on its steep faces made a dark band, 428 px); `sizes` lays textures in blocks too, a texel a
+  (0 px at its size), the harbor's hull (7) and boats (20), the deck across kept by hand at first (a
+  dark band on the castles' tops, 428 px: their faces began with three points in a line, so the
+  normal came out zero; plan() now starts at a corner and the deck takes "screen" too, F3 wave 1);
+  `sizes` lays textures in blocks too, a texel a
   block (`block: 1` keeps one finer: the clearing's grass and path, unchanged).
 - [x] **The walk's feet slide** (wave 4a): `gait()`'s stride is a sine swing per view (±4.6 px in
   profile, ±3.4 on a diagonal, ±0.6 facing us), so the planted foot moves back at 1.35 to 3.25 px a
