@@ -160,8 +160,8 @@ closest:
   `rig/warden.px.js` (skeleton first), `hd2d/traveler.px.js`, `hd2d/crew.px.js` and
   `shrine/miko.px.js` (`rig3d`, 8 directions, moves as blocks first), `tropical/girl.px.js` (a walk).
 - **Scenes**: `sunset/`, `tropical/`, `halloween/`, `cyberpunk/`, `no_magic.px.js`; `shrine/`
-  (top-down, props drawn in 3D and turned); lamps in `lighting.px.js` and `outpost.px.js`; parallax
-  in `parallax/train.px.js`.
+  (top-down, props drawn in 3D and turned); lamps in `lighting.px.js`; parallax in
+  `parallax/train.px.js`.
 - **Perspective and HD-2D**: `perspective/` (one, two and three points, a cockpit),
   `hd2d/plaza.px.js`, `hd2d/graveyard.px.js` (a story with dialogue), `hd2d/harbor.px.js`.
 - **Effects, spells, 3D**: `hd2d/clearing.px.js` (every shader at once), `spells.px.js`, `sdf/`

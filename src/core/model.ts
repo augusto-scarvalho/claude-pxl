@@ -239,6 +239,8 @@ export interface AssetDef {
   grounded?: boolean;
   /** Defined in a file included `as` a namespace ("nature."): the names its drawing asks for are looked up there first. */
   ns?: string;
+  /** A `swap` on a `base` from another file: its keys are read in this palette, the base's. */
+  swapPal?: Palette;
   /** A frozen cell: the live asset its PNG is a render of (pxl check compares them); `freeze`: the PNG to write, not there yet. */
   live?: string; freeze?: string;
 }

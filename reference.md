@@ -49,6 +49,7 @@ views("_head", { s: grid, sw, w, nw, n }, { anchor, like? })  // hand-drawn view
 font(name, "glyph_sprite", { chars: "ABC...", w, h, cols?, mono? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional), or all as wide as the widest with mono: true (a score, a timer)
 include("palette.px.js", { palette: true })  // also take its use()/pal()/ramps() from here on
 include("../nature/kit.px.js", { as: "nature" })  // its names under nature.: its "lamp" is "nature.lamp" here
+own("_parchment")                       // in a kit: the full name of a name it defines, under the `as` it was included with ("dialog._parchment"; without one, "_parchment")
 rig(name, { w, h, facing, slots: { torso: { at, size }, arm: { at, size, side: "r" } }, parts?, guide? }, ...retouch)  // skeleton first: characters.md §11
 figure(h, heads = 7.5)                  // a standing figure's landmark rows: head, eyes, chin, shoulders, chest, elbows, waist, crotch, wrists, knees, ankles, sole; widths headW, shoulderW, hipW
 rng(seed?)                              // a seeded random() for code at the top of a file: the same numbers every build
@@ -95,7 +96,12 @@ JavaScript: included files still share one scope, so a top-level `const` or `fun
 name in two files clashes (wrap a kit's own helpers in a block `{ ... }`). Names are looked up by
 the asset being drawn, not by where the code was written: a kit's helper that your own asset calls
 finds names as yours does (give it `nature.lamp`); the names it hands back (`R.names`,
-`turnaround()`'s) are full ones. Output files take the full name (`sprites/nature.lamp.png`).
+`turnaround()`'s) are full ones. So a kit's constant that holds its own names takes them by `own()`
+(`const PARCHMENT = { panel: own("_parchment") }`: `dialog._parchment` under `as: "dialog"`), at the
+kit's top level, while it runs. A `swap` on a `base` from another file names that file's colors: its
+keys are read in the base's palette, the colors it swaps to in yours
+(`sprite("lamp", { base: "props.lamp", swap: { g: "#ffd27a" } })`, `g` the kit's glass). Output
+files take the full name (`sprites/nature.lamp.png`).
 Locations name an included file by its path from your file's folder (`../nature/kit.px.js:13:3`),
 so two `kit.px.js` stay apart in errors, `pxl list` and `pxl edit`.
 
@@ -176,7 +182,7 @@ with a `world` (and `check`) is checked as a scene (functions naming what they p
 | `base: "name"` | Start from a copy of another asset (variant). Overlay coordinates are the base's final coordinates (outline included). An anim made from an anim, with no `frame()` of its own, plays as its base: its frames, each as long as the base's (100/50/150 ms stay so), its loop, `dir` and pivot, unless it gives `fps` or `ms`: `anim("hero_red", { base: "hero_walk", swap: { b: "r" } })`. |
 | `bg` | Scene background color. |
 | `mx: true` | Mirror the left half onto the right after all items. Inferred width doubles (write half a row). `mx: "c"`: odd width, shared center column. `my` likewise vertically. |
-| `swap: { g: "r" }` | Recolor after drawing. |
+| `swap: { g: "r" }` | Recolor after drawing. With a `base` from another file, its keys are that file's (the base's palette), the new colors yours. |
 | `flip: "x" \| "y" \| "xy"`, `rot: 90 \| 180 \| 270` | Transform. |
 | `angle: deg`, `rotate: "auto" \| "rotsprite" \| "shear" \| "nearest"` | Any angle, clockwise, after `flip`/`rot` and before `outline` (the outline is drawn around the turned shape). `auto`: quarter turns exact, within 12° of one a shear (a lean that keeps every pixel), else RotSprite. No new colors. See [rotation.md](rotation.md) for which angles hold up. |
 | `outline: "k"` | 1px outline around opaque pixels; **grows the canvas 1px on every side**. `outline8` also fills diagonals. |

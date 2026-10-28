@@ -17,10 +17,10 @@ read the lines you need, not the whole file; `pxl help <op>` shows where each op
 | `subpixel.px.js` | subpixel motion: a block moved half a pixel three ways with `stamp(..., { sub: [dx, dy] })`, pushing into its own outline, and the same idle as a single-pixel bob and by half pixels, part by part, the feet still |
 | `parallax/train.px.js` | parallax: planes as strips that wrap going by with `scroll`, a far ridge that drifts by crossfading, `clouds`, a steam engine standing still with its wheels and rods, its smoke a `plume`, people at the windows |
 | `sidescroller/` | a game's art over several files: shared `palette.hex`, `wrap` tiles, `png` import, hit flash |
-| `shop.px.js`, `moon_bakery.px.js` | flat building facades from parts: tiles, signs, `wire` lights |
+| `shop.px.js` | flat building facades from parts: tiles, signs, `wire` lights |
 | `moon_bakery_3d.px.js`, `tackle.px.js` | 3/4 buildings; weathering with a cause |
 | `neon_noodle_3d.px.js` | night street: neon, reflections, steam |
-| `lighting.px.js`, `outpost.px.js` | `lighting()` scenes: lamps, `solid`/`wall` layers |
+| `lighting.px.js` | `lighting()` scenes: lamps, `solid`/`wall` layers |
 | `normals.px.js` | normal maps: the four `bump` shapes on one rock (`hybrid` as Sprite Fusion makes them), painted `normals` |
 | `cave.px.js`, `grotto.px.js` | animated glow scenes: pulsing lamps, waterfall, particles |
 | `tropical/` | 320×240 animated forest: imported trees, river, trail tileset, animals, a girl on the trail (her walk cycle in `girl.px.js`) |

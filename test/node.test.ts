@@ -247,6 +247,25 @@ sheet("kits", ["a.*", "b.lamp"])`);
   assert.throws(() => loadProject(tmpArt(`include("x.px.js", { as: "a.b" })`).file), /as is the name its assets go under/);
 });
 
+test("include { as }: own() gives a kit's names in full for its constants; a swap on another file's base reads its keys in the base's palette", () => {
+  // R is green here and blue in the kit; G only the kit has
+  const main = (as: string) => `pal({ R: "#00ff00" })
+include("kit.px.js"${as})
+sprite("red", { base: "${as ? "ui." : ""}lamp", swap: { R: "#ff0000", G: "R" } })
+scene("box", { w: 1, h: 1 }, (c) => c.stamp(BOX.panel, 0, 0))`;
+  const { dir, file } = tmpArt(main(`, { as: "ui" }`));
+  writeFileSync(join(dir, "kit.px.js"), `pal({ R: "#0000ff", G: "#888888" })\nsprite("_panel", "G")\nsprite("lamp", "RG")\nconst BOX = { panel: own("_panel") }`);
+  for (const src of [main(`, { as: "ui" }`), main("")]) {
+    writeFileSync(file, src);
+    const p = loadProject(file);
+    assert.deepEqual([...p.image("red").data], [pack(255, 0, 0), pack(0, 255, 0)], "the kit's blue red, its grey the includer's green");
+    assert.equal(p.image("box").data[0], pack(136, 136, 136), "BOX.panel is ui._panel under as, _panel without");
+  }
+  // a key the base's file doesn't have (q is the includer's, after the include) says where it was read
+  writeFileSync(file, `include("kit.px.js", { as: "ui" })\npal({ q: "#00ff00" })\nsprite("x", { base: "ui.lamp", swap: { q: "#ff0000" } })`);
+  assert.throws(() => loadProject(file).image("x"), /swap on 'ui\.lamp' \(its keys read in the palette of the file that defines it\): unknown color key 'q'/);
+});
+
 test("use() reads palette files next to the art file: .hex, .gpl, .pal, .txt", () => {
   const files: Record<string, string> = {
     "a.hex": "ff0000\n00ff00\n",

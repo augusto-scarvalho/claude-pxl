@@ -550,7 +550,11 @@ export class Project implements BuildCtx {
         if (!where.there) { delete opts.png; opts.base = live; }
       }
       const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true), look3d = this.look3d, ns = this.ns ? { ns: this.ns } : {};
-      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, look3d, ...ns, ...frozen });
+      // a swap on a base from another file recolors that file's drawing: its keys are read in the base's
+      // palette (a kit's lamp by the kit's own keys, which yours needn't have, or has as other colors)
+      const b = opts.swap && typeof opts.base === "string" ? this.assets.get(this.resolve(opts.base)) : undefined, file = (l?: string) => l?.replace(/:\d+(:\d+)?$/, "");
+      const sp = b && file(b.loc) !== file(loc) ? { swapPal: b.pal } : {};
+      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, look3d, ...ns, ...sp, ...frozen });
       this.order.push(name);
       // a scene's pixel: px to an art pixel; its sizes: the same scene k times as big under other names, not checked
       const whole = (k: unknown) => Number.isInteger(k) && (k as number) >= 1;
@@ -573,7 +577,7 @@ export class Project implements BuildCtx {
       const other = this.assets.get(twin) ?? this.groups.get(twin);
       if (other) throw new PxError(`'${twin}' (the twin of '${name}') is already defined at ${other.loc}`, loc);
       const { twin: _, ...topts } = opts as AssetOpts & { twin?: string };
-      this.assets.set(twin, { kind, name: twin, opts: topts, items, pal: this.pal, loc, top, png, mirror: true, ...ns });
+      this.assets.set(twin, { kind, name: twin, opts: topts, items, pal: this.pal, loc, top, png, mirror: true, ...ns, ...sp });
       this.order.push(twin);
     };
 
@@ -1109,6 +1113,12 @@ export class Project implements BuildCtx {
         this.ns = ns;
         if (!opts.palette) { if (this.pal !== pal) this.kept.push({ path, loc, pal: this.pal }); this.pal = pal; this.outerRamps = outer; }
       }
+    };
+    // own("_parchment"): the full name of an asset this file defines, under the `as` it was included
+    // with ("dialog._parchment"; without one, the name itself), for the names a kit hands out in constants
+    env.own = (given: unknown) => {
+      if (typeof given !== "string" || !given) throw new PxError('own("_parchment"): the name of an asset, group or font this file defines', this.callerLoc());
+      return this.qualify(given);
     };
     env.rng = (seed?: number) => rng(seed);
     env.roleSwap = (from: unknown, to: unknown) => { try { return roleSwap(from, to); } catch (e) { throw wrap(e).within("roleSwap", this.callerLoc()); } };

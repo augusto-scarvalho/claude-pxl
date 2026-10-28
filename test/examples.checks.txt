@@ -49,8 +49,6 @@ isometric.px.js: 0 warnings (1 scene (1 frame, 11 distinct placements), 0 rigs, 
   ran: lines on 2; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh()), feet (nothing placed has a height)
 lighting.px.js: 0 warnings (1 scene (1 frame, 7 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 2 (a clear reading on 0), lines on 4; not run: front marker (nothing has one), feet (nothing placed has a height)
-moon_bakery.px.js: 0 warnings (1 scene (1 frame, 16 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: lettering on 2, lines on 21; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh()), feet (nothing placed has a height)
 moon_bakery_3d.px.js: 0 warnings (1 scene (1 frame, 18 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lettering on 1, lines on 21; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh()), feet (nothing placed has a height)
 nature/japan.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
@@ -69,8 +67,6 @@ no_magic.px.js: 3 warnings (2 scenes (48 frames, 148 distinct placements), 0 rig
   ramps (no_magic.px.js:974:3) › WARNING: light stepped 'R' to 'r' along the ramp "kRrq", but the ramps branch there (in "RHh" it goes on to 'H'): a pixel of the other branch takes this one's color. If both are lit, give each branch its own key
 normals.px.js: 0 warnings (3 scenes (3 frames, 18 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 14 (a clear reading on 0), lines on 3; not run: front marker (nothing has one), feet (nothing placed has a height)
-outpost.px.js: 0 warnings (1 scene (1 frame, 12 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: lit side on 6 (a clear reading on 0), lines on 12; not run: front marker (nothing has one), feet (nothing placed has a height)
 parallax/train.px.js: 0 warnings (1 scene (8 frames, 61 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 61 (a clear reading on 0), lines on 2; not run: front marker (nothing has one), feet (nothing placed has a height)
 perspective/cockpit.px.js: included only (doesn't build on its own: its palette comes from the file including it)

@@ -80,7 +80,9 @@ declare global {
   /** bubble(): the box a 9-slice `panel`, its `tail` down to the point (its top rows over the panel's bottom border), a `rule` under the title, the prompt `more` (an anim at frame `t`); `side` 1 right of the point, -1 left; its pixel `unit` of the art's (0.75); `pad` px in to the words (7). */
   interface PxBubble { panel: string; tail?: string; rule?: string; more?: string; font?: string; color?: PxColor | [PxColor, PxColor]; side?: number; t?: number; unit?: number; pad?: number }
   interface PxAssetOpts {
-    w?: number; h?: number; base?: string; mx?: boolean | "c"; my?: boolean | "c"; swap?: Record<string, PxColor>;
+    w?: number; h?: number; base?: string; mx?: boolean | "c"; my?: boolean | "c";
+    /** Recolor after drawing; with a `base` from another file its keys are read in the base's palette, the new colors in yours. */
+    swap?: Record<string, PxColor>;
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; angle?: number; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; outline?: PxColor; outline8?: PxColor; crop?: boolean; layers?: boolean;
     /**
      * inline: a 1px line over the sprite's own edge; { color, keep: "keys" } leaves edge pixels in
@@ -830,6 +832,8 @@ declare global {
    * "nature.lamp" here), its own drawing finding its own first; JavaScript names still share one scope.
    */
   function include(path: string, opts?: { palette?: boolean; as?: string }): void;
+  /** In a kit, at its top level: the full name of an asset, group or font it defines, under the `as` it was included with (`own("_parchment")` is "dialog._parchment" under as: "dialog", "_parchment" without one): for names a kit hands out in constants. */
+  function own(name: string): string;
   function rng(seed?: number): () => number;
   /** A number in [0, 1) for a lattice point (integers): the same (i, j) always gives the same. */
   function hash(i: number, j: number, seed?: number): number;

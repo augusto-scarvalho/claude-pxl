@@ -542,7 +542,9 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
     step(`swap ${fmtArgs([sw])}`, () => {
       const m = new Map<Color, Color>();
       for (const k of Object.keys(sw)) {
-        const a = pal.resolve(k), b = pal.resolve(sw[k]);
+        let a;
+        try { a = (def.swapPal ?? pal).resolve(k); } catch (e) { throw def.swapPal ? wrap(e).within(`swap on '${def.opts.base}' (its keys read in the palette of the file that defines it)`) : e; }
+        const b = pal.resolve(sw[k]);
         if (a !== null && b !== null) m.set(a, b);
       }
       return img.remap(m);
