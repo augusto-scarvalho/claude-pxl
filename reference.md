@@ -133,7 +133,7 @@ turnaround) standing as tall over its pivot in every direction, its tallest fram
 it meets the ground (`turnaround()` gives one; what is nearer us may hang lower, a bumper seen from
 above) (racing). See scenes.md, "Profiles".
 
-`card(name, { is, cells, vary?, tiles?, draw? })`, just after what it describes, is a library entry's
+`card(name, { is, cells, vary?, tiles?, category?, draw? })`, just after what it describes, is a library entry's
 card: what its code can't show. `name` is an asset, group, `rig3d()` figure, `turnaround()` family
 or font defined above it (under an `as`, its full name: `lamps._lamp`), or `"make3d.<builder>"`;
 `is` what it is, in a line (its silhouette, its parts, its look); `cells` the (camera × density)
@@ -144,14 +144,16 @@ to look at or `"✎"` by hand over a 3D draft, or `[status, asset]` where anothe
 (default the entry; a builder's ◐ cell may name none: `pxl lib draft` draws it); `vary` what varies that
 its code doesn't show, a line or one a channel (`{ color, part, shape, seed }`: its roles, params
 and seed are read from the code); a builder's `tiles` (its box in tiles, `[tall, wide]`, its
-category's on the scale curve, scenes §19; or how many tall alone: a draft's size) and `draw` (its
-drawing call's options). A name or an asset it can't find fails the load at its line.
+category's on the scale curve, scenes §19; or how many tall alone: a draft's size), its `category`
+(a key of a genre's `scale`: `tree`, `pine`, `bush`, `boulder`, `lamp`, `house`, `character`; the
+genre's box for it then sizes its drafts, before its `tiles`) and `draw` (its drawing call's options). A name or an asset it can't find fails the load at its line.
 `card(name)` gives its data back (`card("make3d.oak").draw`). `pxl lib` lists the library's cards
 by subject (`pxl lib --genre hd2d`, `pxl lib --cell side/32`); `pxl lib lamps._lamp` prints one with
 what a build of it reads (its source, size, pivot, footprint, sockets, boxes, frames, roles) and the
 `include` that takes it; `pxl lib draft make3d.oak --genre topdown16` draws a builder in a genre (its
-camera, what stands at its `pitch`, the card's box fitted on its grid or the meters at its `ppm`, its
-`tones` and `ink`; `--cell topdown/16` a cell alone). `pxl check` on the file warns where a cell's
+camera, what stands at its `pitch`, hd2d's a billboard from 20 degrees; fitted to the genre's box for
+the card's `category`, in tiles on its grid or m at its `ppm`, else to the card's `tiles` on the grid,
+else its own height at the `ppm`; its `tones` and `ink`; `--cell topdown/16` a cell alone). `pxl check` on the file warns where a cell's
 status disagrees with how its asset is drawn: a ✎ cell that is the 3D render alone, a ◐ cell drawn by
 hand, a ✓ live 3D sprite not `frozen`. And it warns at densities mixed by accident (scenes §19),
 unless a genre says the mix (`mix: true`; for a scene, a genre at one of the cells it mixes): a scene
@@ -307,7 +309,7 @@ crop; a `pivot: "bottom"` or `"center"` and `slice` are measured on the result.
 | `noise(x, y, w, h, "ab", density = 0.1, seed = 1, on?)` | deterministic speckle; `on` (the 8th argument, a string: `noise(0, 0, 32, 32, "ab", 0.1, 1, "g")`) only touches those keys (`"*"` any opaque) |
 | `shade(where?, steps = 1, density = 1)` · `light(...)` | step colors along ramps inside a region |
 | `rampmap(ramp, { where?, hue? })` | gradient map onto a ramp, kept in the palette: the distinct colors in the region, sorted dark to light by brightness, take the ramp's keys in that order, spread from its darkest to its lightest. Tones never merge while there are no more colors than keys (`palettize` snaps each color to its nearest key, and two can land on one). `hue: [from, to]` (degrees, wrapping past 360) takes only colors of that hue: the greens and the browns of an import go to their own ramps, `rampmap("Ggl", { hue: [70, 170] }), rampmap("bco", { hue: [10, 50] })` |
-| `foliage(ramp, { tufts?, step = [7, 4], vary = 0.5, seed?, where? })` | leaves in screen px over what is drawn (a 3D render's crown, a frozen cell): hand-drawn tufts of steps along `ramp` (`+` a tone lighter, `=` as it is, `-` darker, `.` nothing; five by default, 4 to 12 px wide), each pixel stepped from the tone already there, so they keep its light and shadow; laid in rows from the top about `step` [across, down] px apart, the lower over the upper like shingles, none on the ramp's darkest (the crown's holes stay calm) or off it; past the edge a tuft's top half scallops the silhouette. The tufts are picked at random, `vary` 0..1: how far each gap and place strays from the even rows, the tufts flipped (0: even rows, regular as bubble wrap). The library lab's 128 px winner |
+| `foliage(ramp, { tufts?, step = [7, 4], vary = 0.5, seed?, where? })` | leaves in screen px over what is drawn (a 3D render's crown, a frozen cell): hand-drawn tufts of steps along `ramp` (`+` a tone lighter, `=` as it is, `-` darker, `.` nothing; five by default, leaf clumps of two or three lobes 6 to 13 px wide), each pixel stepped from the tone already there, so they keep its light and shadow; laid in rows from the top about `step` [across, down] px apart, the lower over the upper like shingles, none on the ramp's darkest (the crown's holes stay calm) or off it; past the edge a tuft's top half breaks the silhouette into leaf tips. The tufts are picked at random, `vary` 0..1: how far each gap and place strays from the even rows, the tufts flipped (0: even rows). The library lab's 128 px winner |
 | `relight(where?, { light?, reach?, strength?, ramps?, glint? })` | volume for flat art (a reduced import whose tones merged, a shape filled in one color): each pixel steps along its ramp by where it sits in the shape. An edge facing the light (empty space on that side, up to `reach` px away, default 1) gets lighter, one facing away darker. `glint: 1.5`: pixels at least that exposed (open above and toward the light) take their ramp's lightest key, so glints follow the light instead of being placed by hand. `light` is the direction it comes from, default `[-0.5, -1]` (top-left, mostly from above): a top edge +1, left +0.5, bottom -1, right -0.5, rounded, times `strength`. `ramps` defaults to the palette's. Then `shade` the occluded core (the heart of a crown) and low hanging parts by region |
 | `recolor({ a: "b" }, where?, density = 1)` | swap colors inside a region; `"*"` takes every other opaque color (`frame(recolor({ "*": "w" }))`: a hit-flash frame); a ramp rotated by `c.frame` is color cycling (a waterfall, lava, a conveyor: the palette moves, not the pixels) |
 

@@ -207,6 +207,8 @@ export interface Card {
   vary?: string | Record<string, string>; draw?: Record<string, unknown>; loc?: string; ns: string; data: Record<string, unknown>;
   /** a builder's box in tiles, [tall, wide], or its height alone */
   tiles?: number | [number, number];
+  /** what it is on a genre's scale curve (tree, bush, lamp: a key of genre()'s scale): its drafts sized by that box */
+  category?: string;
 }
 
 function checkArgs(name: string, args: unknown[]): void {
@@ -1182,10 +1184,10 @@ export class Project implements BuildCtx {
       this.genres.set(name, { ...g, loc });
       return g;
     };
-    // card(name, { is, cells: { "hd2d/24": "✓" | [status, asset] }, vary?, tiles?, draw? }): a library entry's card, just
+    // card(name, { is, cells: { "hd2d/24": "✓" | [status, asset] }, vary?, tiles?, category?, draw? }): a library entry's card, just
     // after what it describes (pxl lib reads the rest off a build); card(name): its data, as genre() gives it
     env.card = (given: unknown, spec?: unknown) => {
-      const loc = this.callerLoc(), use = 'card("_lamp", { is: "what it is, a line", cells: { "hd2d/24": "✓" }, vary?, tiles?, draw? }), or card(name): its data';
+      const loc = this.callerLoc(), use = 'card("_lamp", { is: "what it is, a line", cells: { "hd2d/24": "✓" }, vary?, tiles?, category?, draw? }), or card(name): its data';
       if (typeof given !== "string" || !given) throw new PxError(use, loc);
       const builder = given.startsWith("make3d."), has = (n: string) => this.assets.has(n) || this.groups.has(n) || this.figures.has(n) || this.turnarounds.has(n) || this.fonts.has(n);
       if (spec === undefined) {
@@ -1195,13 +1197,13 @@ export class Project implements BuildCtx {
       }
       const name = builder ? given : this.qualify(given), what = `card '${name}'`;
       if (!isPlainObject(spec)) throw new PxError(use, loc);
-      checkKeys(what, spec, ["is", "cells", "vary", "tiles", "draw"], loc);
+      checkKeys(what, spec, ["is", "cells", "vary", "tiles", "category", "draw"], loc);
       const had = this.cards.get(name);
       if (had) throw new PxError(`${what} is already defined at ${had.loc}`, loc);
       const kind = builder ? (makers[given.slice(7)] ? "builder" : undefined) : this.figures.has(name) ? "rig3d" : this.turnarounds.has(name) ? "turnaround"
         : this.assets.get(name)?.kind ?? (this.groups.has(name) ? "group" : this.fonts.has(name) ? "font" : undefined);
       if (!kind) throw new PxError(`${what}: ${builder ? `${given} is no builder (make3d.define)` : `'${name}' is no asset, group, rig3d figure, turnaround or font defined before it`}${didYouMean(builder ? given.slice(7) : name, builder ? Object.keys(makers) : [...this.assets.keys(), ...this.groups.keys(), ...this.figures.keys()])}`, loc);
-      const { is, cells, vary, tiles, draw } = spec as { is?: unknown; cells?: unknown; vary?: unknown; tiles?: unknown; draw?: unknown };
+      const { is, cells, vary, tiles, category, draw } = spec as { is?: unknown; cells?: unknown; vary?: unknown; tiles?: unknown; category?: unknown; draw?: unknown };
       if (typeof is !== "string" || !is) throw new PxError(`${what}: is says what it is in a line (its silhouette, its parts, its look), got ${JSON.stringify(is)}`, loc);
       if (!isPlainObject(cells) || !Object.keys(cells).length) throw new PxError(`${what}: cells are where it exists, { "<camera>/<grid>": status or [status, asset] }: { "hd2d/24": "✓" }, got ${JSON.stringify(cells)}`, loc);
       const out: Card["cells"] = {};
@@ -1221,8 +1223,9 @@ export class Project implements BuildCtx {
       const pos = (t: unknown) => typeof t === "number" && t > 0;
       if (!(tiles === undefined || pos(tiles) || (Array.isArray(tiles) && tiles.length === 2 && tiles.every(pos)))) throw new PxError(`${what}: tiles is its box in tiles, [tall, wide] ([2.5, 2.5]), or how many tall alone (2.5), got ${JSON.stringify(tiles)}`, loc);
       if (!(draw === undefined || isPlainObject(draw))) throw new PxError(`${what}: draw is its drawing call's options ({ mats, surface, light }), got ${JSON.stringify(draw)}`, loc);
+      if (!(category === undefined || (typeof category === "string" && /^\w+$/.test(category)))) throw new PxError(`${what}: category is a key of a genre's scale (tree, bush, rock, lamp, house, character), got ${JSON.stringify(category)}`, loc);
       const data = { ...(spec as Record<string, unknown>), name };
-      this.cards.set(name, { name, kind, is, cells: out, ...(vary !== undefined ? { vary: vary as Card["vary"] } : {}), ...(tiles !== undefined ? { tiles: tiles as Card["tiles"] } : {}), ...(draw !== undefined ? { draw: draw as Record<string, unknown> } : {}), loc, ns: this.ns, data });
+      this.cards.set(name, { name, kind, is, cells: out, ...(vary !== undefined ? { vary: vary as Card["vary"] } : {}), ...(tiles !== undefined ? { tiles: tiles as Card["tiles"] } : {}), ...(category !== undefined ? { category: category as string } : {}), ...(draw !== undefined ? { draw: draw as Record<string, unknown> } : {}), loc, ns: this.ns, data });
       return data;
     };
     // procedural texture, the same in every file: hash(i, j), vnoise(x, y), fbm(x, y, octaves), bayer(x, y)

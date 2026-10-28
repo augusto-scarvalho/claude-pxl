@@ -146,6 +146,8 @@ declare global {
     vary?: string | { color?: string; part?: string; shape?: string; seed?: string };
     /** a builder's box in tiles, [tall, wide] (its category's on the scale curve), or how many tall alone */
     tiles?: number | [number, number];
+    /** what it is on a genre's scale (a key of genre()'s scale: tree, pine, bush, boulder, lamp, house, character): pxl lib draft --genre sizes it by that box */
+    category?: string;
     draw?: Record<string, unknown>;
   }
   interface PxGenre {
@@ -803,7 +805,7 @@ declare global {
    * A library entry's card, just after what it describes (an asset, group, rig3d figure, turnaround,
    * font, or "make3d.<builder>"): what it is, its cells ("<camera>/<grid>": "✓" approved, "◐" a 3D
    * render to look at, "✎" by hand over a 3D draft, or [status, asset]), what varies that the code
-   * doesn't show; a builder's tiles tall and drawing options. card(name) gives its data back.
+   * doesn't show; a builder's tiles tall and drawing options; its category on a genre's scale. card(name) gives its data back.
    */
   function card(name: string, spec: PxCard): PxCard & { name: string };
   function card(name: string): PxCard & { name: string };

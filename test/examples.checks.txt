@@ -183,7 +183,7 @@ lib/profiles/topdown32.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placeme
 lib/props/crates.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 1, cards' cells against their drawing on 8; not run: front marker (nothing has one)
 lib/props/lamps.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: lines on 4, cards' cells against their drawing on 12; not run: front marker (nothing has one)
+  ran: lines on 4, cards' cells against their drawing on 13; not run: front marker (nothing has one)
 lib/styles/fields.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one)
 lib/styles/nature.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)

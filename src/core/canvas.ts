@@ -621,9 +621,9 @@ export class Canvas {
    * there, so the tufts keep the light and shadow drawn under them (a surface()'s). Laid in rows from the
    * top, about `step` [across, down] px apart, the lower over the upper like shingles; none where the
    * tone is the ramp's darkest (the crown's holes stay calm) or off the ramp; past its edge a tuft's top
-   * half steps from the tone at its middle, so the silhouette breaks into scallops. The tufts (five sizes
-   * by default) are picked at random; `vary` 0..1: how far each gap and place strays from the even rows,
-   * and the tufts flipped (0: the lab's rows, regular as bubble wrap).
+   * half steps from the tone at its middle, so the silhouette breaks into leaf tips. The tufts (five leaf
+   * clumps by default, 6 to 13 px wide) are picked at random; `vary` 0..1: how far each gap and place
+   * strays from the even rows, and the tufts flipped (0: even rows).
    */
   foliage(ramp: string | string[], opts: { tufts?: string[]; step?: number[]; vary?: number; seed?: number; where?: Region } = {}): void {
     const keys = [...(Array.isArray(ramp) ? ramp.join("") : ramp)], cols = keys.map((k) => this.color(k));
@@ -2092,35 +2092,46 @@ export function frameStart(tl: Timeline, n: number): number {
   return t;
 }
 
-/** foliage()'s tufts by default, small to big: the library lab's three and two more (+ up, = as it is, - down). */
+/**
+ * foliage()'s tufts by default, small to big (6 to 13 px wide; + up, = as it is, - down): each a cluster of two or
+ * three lobes, the light a patch on the upper left one, the shade a hook under them and a notch between, each
+ * patch 3 px or more (no speck), about as much shade as light (the crown's tone kept): leaf clumps, not the
+ * rings of the library lab's domes (bubble wrap). F5's, approved on the 128 px oak.
+ */
 const TUFTS = [`
-  .++.
-  +==-
-  .--.`, `
-  ..++...
-  .+==+..
-  +====-.
-  .-===-.
-  ..---..`, `
-  ...+++...
-  .++===+..
-  +=======-
-  +======--
-  .-====--.
-  ..----...`, `
-  ..+++.....
-  .+===++...
-  +=======+.
-  +========-
-  .-======-.
+  .++...
+  ++==..
+  =====-
+  .===--
+  ..---.`, `
+  ..++....
+  .++==++.
+  =====+=-
+  .=====--
+  ..=---=.
+  ...---..`, `
+  ...++.....
+  ..++==.++.
+  .+====+==.
+  =========-
+  .======---
+  ..-====--.
   ..------..`, `
-  ....+++.....
-  ..++===++...
-  .+=======+..
-  +=========+-
-  +==========-
-  .-========-.
-  ..--------..`];
+  ...++...++..
+  ..++==.++==.
+  .+=====+====
+  =======+====
+  .======-===-
+  ..====---=--
+  ..-===--=--.
+  ...-----....`, `
+  ....+++......
+  ..++===+.++..
+  .+======++==.
+  =====-======-
+  .====---===--
+  ..-==--==---.
+  ...---..---..`];
 
 /** Ops callable from art files; each top-level call can be traced as one painting step. */
 export const OPS = [

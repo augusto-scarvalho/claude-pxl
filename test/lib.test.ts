@@ -33,6 +33,9 @@ test("card(): kept by its full name, its data given back; a name or an asset it 
   assert.equal(JSON.stringify([box.cards.get("make3d.post")!.tiles, Object.keys(box.cards.get("make3d.post")!.cells)]), '[[1,2],["hd2d/24ppm"]]');
   assert.match(failure(`make3d.define("post", () => ({ field: sdf.sphere(1) }))\ncard("make3d.post", { is: "a ball", cells: { "side/32": "◐" }, tiles: [1] })`).message, /tiles is its box in tiles, \[tall, wide\]/);
   assert.match(failure(`sprite("_post", "1")\ncard("_post", { is: "a post", cells: { "hd2d/24m": "✓" } })`).message, /px a meter \(24ppm\)/);
+  // its category on a genre's scale, a word
+  assert.equal(loadSource(`sprite("_post", "1"); card("_post", { is: "a post", cells: { "side/16": "✓" }, category: "lamp" })`).cards.get("_post")!.category, "lamp");
+  assert.match(failure(`sprite("_post", "1")\ncard("_post", { is: "a post", cells: { "side/16": "✓" }, category: ["lamp"] })`).message, /category is a key of a genre's scale/);
 });
 
 test("genre(): its density a tile's px or px a meter, its mix said; its cell as pxl lib reads it", () => {
@@ -67,7 +70,8 @@ test("pxl lib <entry>: a card with what a build of it reads; --genre hd2d lists 
   assert.match(tr, /moves +walk 8 x 110 ms, idle 4 x 250 ms, kneel 7 x 160 ms \(n ne e se s sw w nw\); cast 13 x 100 ms \(e se sw w\); turn 1 x 250 ms \(16 headings\)/);
   const hd2d = libList({ genre: "hd2d" }).join("\n");
   assert.match(hd2d, /lamps\._lamp +sprite +hd2d\/24ppm/);
-  assert.doesNotMatch(hd2d, /_lamp_tiny|make3d\.oak/);
+  assert.match(hd2d, /make3d\.oak +builder +.*hd2d\/24ppm ◐/);
+  assert.doesNotMatch(hd2d, /_lamp_tiny|make3d\.birch/);
 });
 
 test("pxl lib draft: a builder at a cell it lacks, written and built; a 2D entry refused", () => {
@@ -84,6 +88,12 @@ test("pxl lib draft: a builder at a cell it lacks, written and built; a 2D entry
   assert.ok(+m[1] <= 32 && +m[2] <= 32 && Math.max(+m[1], +m[2]) >= 31, rock);
   assert.match(readFileSync(join(dir, "rock_topdown16.px.js"), "utf8"), /genre\("topdown16", \{ camera: \{ kind: "topdown", pitch: 45 \}, pitch: 30, grid: 16, tones: 3, ink: "#1a1620" \}\)\nturnaround\("rock_topdown16".*surface: \{ \.\.\.card\("make3d\.rock"\)\.draw\?\.surface, ink: "#1a1620" \}, view: \{ kind: "side", pitch: 30 \}/);
   assert.throws(() => libDraft("make3d.rock", { genre: "racing_behind" }, dir), /its camera is behind; lib draft draws side, topdown, iso, hd2d/);
+  // hd2d: a billboard from its figure's 20 degrees, fitted to the genre's box for the card's category (a bush 0.5 m
+  // tall, 0.8 across: 12 x 19 px at 24 px a meter), not at the builder's own height
+  const bush = libDraft("make3d.bush", { genre: "hd2d" }, dir).join("\n"), o = /drawn (\d+) tall, (\d+) wide/.exec(bush)!;
+  assert.match(bush, /a box 0\.5 m tall, 0\.8 wide \(hd2d's bush\) at 24 px a meter: 12 px tall, 19 wide; .* \(drawn 0\.\d m at 24\), seen from 20 degrees as a billboard/);
+  assert.ok(+o[1] <= 12 && +o[2] <= 19 && (+o[1] >= 12 || +o[2] >= 18), bush);
+  assert.match(readFileSync(join(dir, "bush_hd2d.px.js"), "utf8"), /view: \{ kind: "side", pitch: 20 \}/);
 });
 
 test("pxl check: densities mixed by accident (library entries of two in a scene, a png blown up or shrunk alone), unless a genre says the mix", () => {
