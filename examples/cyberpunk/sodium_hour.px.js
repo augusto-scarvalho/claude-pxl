@@ -752,14 +752,11 @@ function signs(c) {
 }
 
 // ---------------------------------------------------------------- steam
-// from the taco stand's flue, the clinic's duct and the manhole: puffs rising, leaning east on the wind
+// from the taco stand's flue, the clinic's duct and the manhole: two small puffs a second, rising and
+// leaning east on the wind, shrinking away whole; each vent d frames out of step with the others
 const VENTS = [[31, 114, 0], [189, 96, 13], [214, 166, 27]]
 function steam(c) {
-  for (const [vx, vy, d] of VENTS) for (let p = 0; p < 4; p++) {
-    const t = ((c.frame + d + p * 10) % 40) / 40
-    const x = Math.round(vx + t * 6 + Math.sin((t + p) * 5) * 1), y = Math.round(vy - t * 14), r = t < 0.3 ? 1 : 2
-    if (t < 0.85) c.circ(x, y, r, t < 0.5 ? "V" : "5")
-  }
+  VENTS.forEach(([vx, vy, d], i) => c.plume(vx, vy, "VV5", { every: 5, life: 34, rise: 14, wind: 0.15, size: [2, 3], thin: "shrink", seed: i + 1, frame: c.frame + d }))
 }
 
 // ================================================================ the scene
