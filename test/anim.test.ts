@@ -320,6 +320,13 @@ test("plume: puffs born before the loop starts are there on its first frame, and
   assert.notEqual(fr[0], fr[1]);
 });
 
+test('plume: a puff smaller than the default strays less, in proportion, and thin: "shrink" takes it away whole', () => {
+  // a 1-2 px steam from a vent at x = 10: every pixel of every frame within 4 px of it
+  const p = load(`anim("steam", { w: 21, h: 24, frames: 8, fps: 8 }, rect(0, 0, 21, 24, "g"), plume(10, 20, "wrk", { every: 2, life: 8, rise: 12, size: [1, 2], thin: "shrink" }))`);
+  for (const fr of frameKeys(p, "steam")) for (const row of fr.split("\n")) [...row].forEach((ch, x) => ch !== "g" && assert.ok(Math.abs(x - 10) <= 4, `a puff at x ${x}`));
+  assert.match(failure(PAL + `anim("s", { w: 8, h: 8, frames: 2, fps: 2 }, plume(4, 6, "wrk", { thin: "fog" }))`, "s").message, /thin: "dither" or "shrink"/);
+});
+
 test("clocked ops in a scene animated by what it places draw its first frame on its loop, as functions do", () => {
   const smoke = `plume(10, 20, "wrk", { every: 2, life: 8, rise: 10, size: [2, 4] })`, tick = `anim("tick", { w: 1, h: 1, frames: 12, fps: 12 }, (c) => c.px(0, 0, c.frame % 2 ? "r" : "w"))\n`;
   const p = load(tick + `scene("s", { w: 30, h: 24, bg: "g" }, stamp("tick", 0, 0), ${smoke})

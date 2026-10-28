@@ -197,10 +197,12 @@ lines).
   action game: down, up and side (flipped for the fourth), idle, walk, run and the sword attack in
   each, with the chibi's proportions (the head about 40% of 24 px) and a sword that reads on grass.
   The examples that include the hero (`topdown_hero`, `hd2d/plaza`) are shown before and after.
-- [ ] **`plume()` at a small scale**: its jitter (±2.5 px across, 0-4 up) and its dithered thinning
+- [x] **`plume()` at a small scale**: its jitter (±2.5 px across, 0-4 up) and its dithered thinning
   are fixed, tuned for 2-8 px puffs, so steam from a 1 px flue rising 14 px comes out in
   checkerboard puffs off its vent (sodium_hour). A jitter that scales with `size` and a thinning
-  that fades whole puffs (`thin: "dither" | "fade"`). Before extinction's refresh (C13).
+  that fades whole puffs (`thin: "dither" | "fade"`). Before extinction's refresh (C13). Done: puffs
+  smaller than the default stray less, in proportion (bigger ones keep its stray: the train's
+  unchanged), and `thin: "shrink"` takes a puff away whole instead of dithering it.
 - [ ] **A light's own color on an emitting sprite**: `effect("emit")` whitens the glass, and the
   light a mesh() sprite gives is the mean of those pixels times the emit's strength, so the plaza's
   lamps by emit lit a pale pool at half strength (strength 3.2 brings the strength back, nothing
