@@ -969,7 +969,7 @@ scene("no_magic_night", { w: 256, h: 224, bg: "k" },
   // things that shine get a halo on top of the light
   glow("zgG", { r: 7, strength: 0.32 }),
   glow("Q", { r: 9, strength: 0.55 }),
-  glow("lLah", { where: [155, 66, 26, 22], r: 14, strength: 0.55 }),        // the fire
+  glow("lLah", { where: [155, 66, 26, 22], r: 14, strength: 0.55, keep: "WuK" }),  // the fire; its logs keep their shapes
   glow("L", { r: 5, strength: 0.7 }),                                       // candle and lamp flames
   glow("Y", { r: 3, strength: 0.8 }))                                       // the cat's eyes
 
