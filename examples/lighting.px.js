@@ -6,6 +6,7 @@ pal({
   w: "#7a4e32", W: "#5c3a26", b: "#3d2617", l: "#c9a46b", r: "#8c2f2f",
   g: "#5d7fa8", y: "#ffd36b", Y: "#ff8a2a", G: "#e0f4ff",
 })
+include("../lib/props/lamps.px.js")   // the torch and the lamppost, taken in these colors
 
 sprite("_plank", `
   wwwwwwwW
@@ -13,12 +14,7 @@ sprite("_plank", `
   wwwwwwwW
   WWWWWWWW`)
 
-sprite("torch", `
-  .y.
-  yYy
-  .Y.
-  .b.
-  .b.`, lamp(1, 1, { r: 44, color: "#ffb35c" }))
+sprite("torch", { base: "_torch", swap: roleSwap(lamps.ROLES._torch, { light: "Yy", handle: "b" }) })
 
 // Written as the left half; mirroring also mirrors the candle's lamp.
 sprite("chandelier", { mx: "c" }, `
@@ -28,9 +24,7 @@ sprite("chandelier", { mx: "c" }, `
   b...b
   bbbbb`, lamp(0, 2, { r: 40, color: "#ffc070" }))
 
-sprite("lamppost", { w: 3, h: 18 },
-  rect(1, 3, 1, 15, "b"), box(0, 0, 3, 3, "b"), px(1, 1, "G"),
-  lamp(1, 1, { r: 30, color: "#bfe0ff" }))
+sprite("lamppost", { base: "_lamp_tiny", swap: roleSwap(lamps.ROLES._lamp_tiny, { frame: "b", light: "G" }) })
 
 sprite("table", `
   llllllll

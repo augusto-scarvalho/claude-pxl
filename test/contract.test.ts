@@ -23,7 +23,8 @@ const json = (dir: string, n: string) => JSON.parse(readFileSync(join(dir, n + "
 test("roleSwap: each role's keys to a livery's or a slot's, keys or colors; the roles left out keep theirs", () => {
   // the car's (F1 lab): two liveries by role, the 2D swap from one to the other
   const ROLES = { primary: "aAbB", accent: "wWx", glass: "gG", tyre: "ktT", rim: "TsS" };
-  assert.deepEqual(roleSwap(ROLES, { ...ROLES, primary: "cCdD", accent: "uUv" }), { a: "c", A: "C", b: "d", B: "D", w: "u", W: "U", x: "v" });
+  // (the roles given back as they were stay in it: a no-op here, a kit's colors to yours over its base)
+  assert.deepEqual(roleSwap(ROLES, { ...ROLES, primary: "cCdD", accent: "uUv" }), { a: "c", A: "C", b: "d", B: "D", w: "u", W: "U", x: "v", g: "g", G: "G", k: "k", t: "t", T: "T", s: "s", S: "S" });
   // Reva's: a palette slot, colors for some roles
   assert.deepEqual(roleSwap({ hair: "HhJ", shoes: "Oo" }, { hair: ["#3a1a12", "#6e3420", "#a8562e"] }), { H: "#3a1a12", h: "#6e3420", J: "#a8562e" });
   assert.throws(() => roleSwap(ROLES, { primry: "cCdD" }), /role 'primry' isn't in the first map.*primary/);

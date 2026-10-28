@@ -7,7 +7,8 @@
 // passage aboard, with a talk in parchment dialogue boxes. `harbor` is the art at its own size, the one
 // checked; `harbor_md` the same twice as big through post(); `harbor_clip` its middle, for the gallery.
 include("crew.px.js")                   // the traveler, the mourner and the crew (crew.px.js includes traveler.px.js)
-include("../../lib/profiles/hd2d.px.js")
+include("../../lib/profiles/hd2d.px.js")   // its lamps (lib/props/lamps.px.js): the ship's lanterns
+include("../../lib/props/crates.px.js")    // the crates' faces and the barrels
 include("../../lib/ui/font5x7.px.js")
 include("../../lib/ui/dialog.px.js")     // the dialogue boxes
 
@@ -164,17 +165,7 @@ sprite("_deck_d", { w: 48, h: 24 }, (c) => {
 })
 // Lanterns as on the reference's stern and bow: a gold finial, a red roof, white panels with dark
 // windows between red corner posts, a red foot; lit from behind on the right.
-sprite("_lantern", { w: 13, h: 36, pivot: "bottom", outline: "k" }, (c) => {
-  c.rect(6, 0, 1, 2, "t"); c.rect(5, 2, 3, 1, "s")
-  for (let r = 0; r < 6; r++) { const half = r + 1; c.rect(6 - half, 3 + r, half, 1, "q"); c.rect(6, 3 + r, half + 1, 1, "r") }
-  c.rect(1, 9, 11, 1, "s")
-  c.rect(1, 10, 3, 18, "u"); c.rect(4, 10, 8, 18, "w")       // the side toward the sun as light as the front, the other in shade
-  for (const x of [3, 9]) c.rect(x, 10, 1, 18, "q")
-  for (const y of [12, 20]) { c.rect(5, y, 3, 6, "l"); c.rect(6, y, 1, 6, "m"); c.rect(5, y + 3, 3, 1, "m"); c.rect(1, y, 2, 6, "l"); c.rect(10, y, 1, 6, "m") }
-  c.rect(1, 28, 11, 1, "s")
-  for (let r = 0; r < 5; r++) c.rect(1 + r, 29 + r, 11 - 2 * r, 1, r < 2 ? "r" : "q")
-  c.rect(6, 34, 1, 2, "l")
-}, bump("hybrid"))
+sprite("_lantern", { base: "_lantern_ship", swap: roleSwap(lamps.ROLES._lantern_ship, { line: "k", trim: "st", frame: "qr", panel: "uw", glass: "lm" }) })
 
 // The rowboats' planks, clinker-built: each strake 4 px, its top lit, its lower lip lapping over the
 // next one down and a dark line of shadow under that lip, each strake its own tone, grain in broken
@@ -189,25 +180,12 @@ sprite("_boatwood", { w: 32, h: 40 }, (c) => {
 })
 // Crates: boards 3 px across over dark seams, each its own tone, grain in runs, nail heads at their
 // ends, a lighter brace on the diagonal; their edges outlined (the material's edge); the lid's boards.
-sprite("_crate", { w: 14, h: 13 }, (c) => {
-  for (let Y = 0; Y < 13; Y++) for (let X = 0; X < 14; X++) {
-    const b = Math.floor(Y / 4), r = Y % 4, base = hash(b, 51) < 0.5 ? "n" : "T"
-    c.px(X, Y, Math.abs(X - ((12 - Y) * 14) / 12) < 1.2 ? (r === 3 ? "T" : "O") : r === 3 ? "m" : (X === 1 || X === 12) && r === 1 ? "l" : hash(Math.floor(X / 4), Y) < 0.25 ? DARKER[base] : base)
-  }
-})
-sprite("_cratetop", { w: 14, h: 6 }, (c) => { for (let Y = 0; Y < 6; Y++) for (let X = 0; X < 14; X++) c.px(X, Y, X % 5 === 4 ? "m" : Y === 0 ? "O" : hash(X % 5, Y) < 0.3 ? "T" : "o") })
+const WOOD = { wood: "lmFnToO" }
+sprite("_crate", { base: "_crate_face", swap: roleSwap(crates.ROLES._crate_face, WOOD) })
+sprite("_cratetop", { base: "_crate_lid", swap: roleSwap(crates.ROLES._crate_lid, WOOD) })
 // A barrel at the scene's scale (0.65 x 0.9 m): staves 3 px, bulging at its middle, two pairs of dark
 // hoops, its lid seen from above; lit on the right, where the sun is.
-sprite("_barrel", { w: 11, h: 15, pivot: "bottom", outline: "k" }, (c) => {
-  for (let Y = 0; Y < 15; Y++) {
-    const half = Y === 0 ? 3 : Y < 3 ? 4 : 4 + Math.round(Math.sin(((Y - 2) / 12) * Math.PI))
-    for (let X = 5 - half; X <= 5 + half; X++) {
-      const dx = X - 5
-      c.px(X, Y, Y < 3 ? (Y === 0 || Math.abs(dx) === half ? "m" : Y === 1 ? "o" : "n")
-        : Y === 4 || Y === 12 ? (dx >= 2 ? "n" : "l") : Y === 5 || Y === 11 ? "m" : X % 3 === 0 ? "m" : dx >= 2 ? "O" : dx <= -2 ? "n" : "o")
-    }
-  }
-}, bump("hybrid"))
+sprite("_barrel", { base: "_barrel_small", swap: roleSwap(crates.ROLES._barrel_small, { line: "k", ...WOOD }) })
 // Sacks of grain in golden burlap: one standing, tied at the neck, one lying; lit on the right.
 sprite("_sack", { pivot: "bottom", outline: "k" }, "....ll....\n...lDl....\n....CD....\n..CDDDE...\n.CDDDDEE..\nCCDDDDDEE.\nCDDDDDDEE.\nCCDDDDDDE.\n.CCDDDDE..\n..CCCCC...", bump("hybrid"))
 sprite("_sack_l", { pivot: "bottom", outline: "k" }, "...CDDDDE....\n.CDDDDDDDEE..\nCDDDDDDDDDEEl\nCCDDDDDDDDEll\n.CCCDDDDDEE..\n...CCCCCC....", bump("hybrid"))

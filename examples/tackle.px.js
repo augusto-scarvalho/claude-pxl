@@ -13,6 +13,8 @@ pal({
   g: "#8fcf6a", G: "#4a8a52",                               // kelp / plants
 })
 ramps("kNTtq", "kQRro", "keCcw", "kDd", "kYyh", "knMm", "AaW", "kGg", "XUVv")
+include("../lib/props/lamps.px.js")    // the street lamp with its signs, taken in these colors
+include("../lib/props/crates.px.js")   // the crate of fish
 
 // ---------------------------------------------------------------- oblique helpers
 // Main block: front face at x F0..F0+W, y T0..T0+H; side face goes D px right and D/2 up.
@@ -215,24 +217,10 @@ sprite("_jar", `
 
 // ---------------------------------------------------------------- scene
 // ---------------------------------------------------------------- street props
-sprite("lamp", { w: 13, h: 80, outline: "k" },
-  vline(6, 12, 64, "n"), vline(5, 12, 64, "M"), rect(3, 75, 7, 5, "n"), hline(3, 75, 7, "M"),
-  rect(2, 3, 9, 9, "t"), rect(3, 4, 7, 7, "h"), rect(4, 5, 3, 4, "w"), vline(6, 4, 7, "T"),
-  hline(1, 2, 11, "T"), hline(3, 1, 7, "T"), px(6, 0, "T"), hline(1, 12, 11, "T"),
-  rect(0, 30, 13, 7, "c"), hline(0, 36, 13, "C"), text(1, 31, "EEL", "R"),
-  rect(0, 39, 13, 7, "c"), hline(0, 45, 13, "C"), text(1, 40, "COD", "T"))
+sprite("lamp", { base: "_lamp_signs", swap: roleSwap(lamps.ROLES._lamp_signs, { line: "k", frame: "nM", cap: "Tt", light: "hw", sign: "Cc", letters: "R" }) })
 sprite("pole", { w: 4, h: 64, outline: "k" }, rect(1, 0, 2, 64, "d"), vline(1, 0, 64, "o"), rect(0, 60, 4, 4, "D"))
 
-sprite("crate", { w: 20, h: 19, outline: "k" },
-  ...box3(0, 6, 14, 12, 6, "D", "D", "d"),
-  hline(0, 11, 14, "D"), line(1, 17, 13, 7, "D"), rect(1, 7, 12, 1, "C"),
-  stamp("_tail", 2, 1), stamp("_tail", 8, 0, { flip: "x" }), stamp("_tail", 12, 2))
-sprite("_tail", `
-  m.m
-  mmm
-  .M.
-  .M.
-  .m.`)
+sprite("crate", { base: "_crate_fish", swap: roleSwap(crates.ROLES._crate_fish, { line: "k", wood: "Dd", rim: "C", fish: "Mm" }) })
 sprite("icebox", { w: 30, h: 22, outline: "k" },
   ...box3(0, 5, 22, 16, 8, "m", "C", "w"), rect(0, 5, 22, 3, "m"), hline(0, 8, 22, "M"),
   line(22, 5, 29, 1, "M"), text(11, 11, "ICE", "A", { align: "c", shadow: "a" }),

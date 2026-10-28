@@ -252,6 +252,7 @@ test("include { as }: own() gives a kit's names in full for its constants; a swa
   const main = (as: string) => `pal({ R: "#00ff00" })
 include("kit.px.js"${as})
 sprite("red", { base: "${as ? "ui." : ""}lamp", swap: { R: "#ff0000", G: "R" } })
+sprite("green", { base: "${as ? "ui." : ""}lamp", swap: roleSwap({ body: "RG" }, { body: "RR" }) })
 scene("box", { w: 1, h: 1 }, (c) => c.stamp(BOX.panel, 0, 0))`;
   const { dir, file } = tmpArt(main(`, { as: "ui" }`));
   writeFileSync(join(dir, "kit.px.js"), `pal({ R: "#0000ff", G: "#888888" })\nsprite("_panel", "G")\nsprite("lamp", "RG")\nconst BOX = { panel: own("_panel") }`);
@@ -259,6 +260,7 @@ scene("box", { w: 1, h: 1 }, (c) => c.stamp(BOX.panel, 0, 0))`;
     writeFileSync(file, src);
     const p = loadProject(file);
     assert.deepEqual([...p.image("red").data], [pack(255, 0, 0), pack(0, 255, 0)], "the kit's blue red, its grey the includer's green");
+    assert.deepEqual([...p.image("green").data], [pack(0, 255, 0), pack(0, 255, 0)], "a roleSwap's R to R: the kit's blue to the includer's green");
     assert.equal(p.image("box").data[0], pack(136, 136, 136), "BOX.panel is ui._panel under as, _panel without");
   }
   // a key the base's file doesn't have (q is the includer's, after the include) says where it was read

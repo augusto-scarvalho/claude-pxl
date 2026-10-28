@@ -15,6 +15,8 @@ pal({
 })
 // dark -> light; earlier ramps win when a key appears twice (lighting D gives wood d)
 ramps("kZz", "kDd", "kDeCc", "kTtq", "kOou", "aLl", "kPp", "knMm", "kRr", "kGg")
+include("../lib/props/lamps.px.js")    // the street lamp and the lantern, taken in these colors
+include("../lib/props/crates.px.js")   // the crate
 
 // ---------------------------------------------------------------- small parts
 sprite("_dentil", `
@@ -100,13 +102,7 @@ sprite("_porthole", { w: 19, h: 19 },
 sprite("_ac", { w: 13, h: 10 }, rect(0, 0, 13, 10, "m"), box(0, 0, 13, 10, "M"),
   circ(4, 4, 3, "M"), circ(4, 4, 1, "n"), vline(9, 2, 6, "M"), vline(11, 2, 6, "M"), hline(1, 9, 11, "n"))
 
-sprite("_lantern", `
-  ..n..
-  .nnn.
-  nllLn
-  nlwLn
-  nlLan
-  .nnn.`)
+sprite("_lantern", { base: "_lantern_hanging", swap: roleSwap(lamps.ROLES._lantern_hanging, { frame: "n", light: "aLlw" }) })
 
 sprite("_drip_a", "p\np\nP")
 sprite("_drip_b", "P\np\np\np\nP")
@@ -221,14 +217,9 @@ sprite("shed", { w: 30, h: 34, outline: "k" },
   rect(8, 19, 12, 9, "D"), grad(9, 20, 10, 7, "lLa"), vline(13, 20, 7, "D"), hline(9, 23, 10, "D"),
   rect(0, 33, 30, 1, "D"))
 
-sprite("crate", { w: 12, h: 10, outline: "k" },
-  rect(0, 0, 12, 10, "d"), box(0, 0, 12, 10, "D"), line(1, 8, 10, 1, "D"),
-  px(5, 4, "u"), px(6, 4, "u"), px(5, 5, "u"), px(6, 5, "l"))
+sprite("crate", { base: "_crate_latch", swap: roleSwap(crates.ROLES._crate_latch, { line: "k", wood: "Dd", metal: "ul" }) })
 
-sprite("lamp", { w: 11, h: 58, outline: "k" },
-  vline(5, 12, 44, "n"), vline(4, 12, 44, "M"), rect(2, 54, 7, 4, "n"), hline(2, 54, 7, "M"),
-  rect(1, 2, 9, 9, "n"), rect(2, 3, 7, 7, "L"), rect(3, 4, 4, 4, "l"), px(3, 4, "w"),
-  hline(0, 1, 11, "n"), hline(3, 0, 5, "n"), hline(1, 11, 9, "n"))
+sprite("lamp", { base: "_lamp_square", swap: roleSwap(lamps.ROLES._lamp_square, { line: "k", frame: "nM", light: "Llw" }) })
 
 // ---------------------------------------------------------------- scene
 scene("comet_repair", { w: 192, h: 192, bg: "Z", layers: true },

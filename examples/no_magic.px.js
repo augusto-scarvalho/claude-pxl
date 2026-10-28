@@ -20,6 +20,8 @@ pal({
   Q: "#f6f1d5", Y: "#f8e45c",                                  // moon, eyeshine (both glow in the dark)
 })
 ramps("kKPpmM", "kjTty", "keWwu", "kSsiI", "SBCcx", "eAalL", "kRrq", "RHh", "kZGgz", "kFfv", "kNnbo")
+include("../lib/props/lamps.px.js")    // the oil lamp, taken in these colors
+include("../lib/props/crates.px.js")   // the barrel and the crate of potions
 
 const FLOOR = 80   // the back wall meets the floor here
 
@@ -690,12 +692,7 @@ sprite("pumpkin_s", { outline: "k" }, `
   hhHhhHh
   .HHHHH.`)
 
-sprite("barrel", { w: 22, h: 30, outline: "k" },
-  rect(0, 4, 22, 24, "w"), ellipse(11, 4, 10, 3, "u"), ellipse(11, 4, 10, 3, "W", true),
-  ellipse(11, 4, 7, 2, "w", true),
-  (c) => { for (let x = 4; x < 22; x += 5) c.vline(x, 7, 21, "W") },
-  vline(1, 7, 21, "u"), rect(0, 9, 22, 2, "S"), rect(0, 21, 22, 2, "S"), hline(0, 9, 22, "i"), hline(0, 21, 22, "i"),
-  ellipse(11, 28, 10, 2, "W"))
+sprite("barrel", { base: "_barrel_big", swap: roleSwap(crates.ROLES._barrel_big, { line: "k", wood: "Wwu", metal: "Si" }) })
 
 // pointed leaf from a base point, along an angle (degrees, 0 = right, -90 = up)
 const leaf = (bx, by, deg, len, wid, body, rib, hi) => (c) => {
@@ -749,15 +746,7 @@ sprite("side_table", { w: 18, h: 22, outline: "k" },
   ellipse(9, 4, 8, 3, "w"), ellipse(9, 3, 8, 3, "u"), hline(4, 1, 8, "c"),
   rect(8, 7, 3, 12, "W"), vline(8, 7, 12, "w"), ellipse(9, 19, 6, 2, "W"), hline(5, 19, 3, "w"))
 
-sprite("oil_lamp", { outline: "k" }, `
-  ..x..
-  .xLx.
-  .xlx.
-  .cax.
-  ..A..
-  .aaa.
-  alllA
-  .AAA.`)
+sprite("oil_lamp", { base: "_oil_lamp", swap: roleSwap(lamps.ROLES._oil_lamp, { line: "k", frame: "Aa", glass: "cx", light: "lL" }) })
 
 sprite("cookies", { outline: "k" }, `
   ..ccccc..
@@ -766,19 +755,8 @@ sprite("cookies", { outline: "k" }, `
   .cxxxxuc.
   ..ccccc..`)
 
-sprite("crate", { w: 28, h: 24, outline: "k" },
-  rect(0, 0, 28, 8, "e"), box(0, 0, 28, 8, "u"),
-  // potion bottles packed upright, seen from above: corks and shoulders
-  (c) => {
-    const cols = ["G", "b", "r", "G", "a", "b", "r", "G"]
-    for (let i = 0; i < 8; i++) {
-      const x = 3 + (i % 4) * 6, y = 1 + Math.floor(i / 4) * 3, k = cols[i]
-      c.rect(x, y + 1, 4, 3, k); c.px(x + 1, y + 1, "x"); c.rect(x + 1, y, 2, 2, "u"); c.px(x + 1, y, "c")
-    }
-  },
-  rect(0, 8, 28, 16, "w"), hline(0, 8, 28, "u"),
-  hline(0, 13, 28, "W"), hline(0, 18, 28, "W"), vline(0, 8, 16, "W"), vline(27, 8, 16, "W"),
-  rect(1, 10, 2, 13, "W"), rect(25, 10, 2, 13, "W"), text(14, 12, "XXX", "W", { align: "c" }))
+// potion bottles packed upright, seen from above: corks and shoulders
+sprite("crate", { base: "_crate_bottles", swap: roleSwap(crates.ROLES._crate_bottles, { line: "k", wood: "eWwu", bottles: "Gbra", cork: "c", glint: "x" }) })
 
 // the cat's bed, empty: it has better things to do tonight
 sprite("catbed", { w: 32, h: 17, outline: "k" },

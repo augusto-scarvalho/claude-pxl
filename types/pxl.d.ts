@@ -772,6 +772,7 @@ declare global {
   /**
    * A swap by role: each role's keys in `from` ({ primary: "aAbB" }, dark to light) to that role's in `to`
    * (keys "cCdD" or colors ["#123", ...], as many); roles `to` leaves out keep theirs. A livery, a palette slot.
+   * Over a base from another file a key given back as itself is that file's color to yours ({ line: "k" }).
    */
   function roleSwap(from: Record<string, string>, to: Record<string, string | PxColor[]>): Record<string, PxColor>;
   /**

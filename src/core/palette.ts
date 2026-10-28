@@ -273,7 +273,9 @@ export class Palette {
 /**
  * A swap by role (a car's livery, a fighter's palette slot): each role's keys in `from` ({ primary:
  * "aAbB", ... }, dark to light) to that role's in `to`, one by one: keys ("cCdD") or colors
- * (["#173c34", ...]). Roles `to` leaves out keep their colors. The same role map is a `mats` in 3D.
+ * (["#173c34", ...]). Roles `to` leaves out keep their colors. A key given back as itself stays in the
+ * swap: a no-op in one palette, but over a base from another file its color there to yours (a kit's
+ * line "k" to your "k"). The same role map is a `mats` in 3D.
  */
 export function roleSwap(from: unknown, to: unknown): Record<string, string> {
   const obj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -289,5 +291,5 @@ export function roleSwap(from: unknown, to: unknown): Record<string, string> {
       out[k] = cs[i]; by[k] = role;
     });
   }
-  return Object.fromEntries(Object.entries(out).filter(([k, c]) => k !== c));
+  return out;
 }
