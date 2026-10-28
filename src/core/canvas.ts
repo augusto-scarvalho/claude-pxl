@@ -1801,7 +1801,30 @@ export class Canvas {
       };
     }
     let placed = 0, tries = 0;
-    if (opts.even) {
+    if (opts.even && (opts.on !== undefined || opts.near !== undefined)) {
+      // Over a mask: the grid sized so about `count` of its cells hold some of it, a pick at a spot of
+      // it in each (a grid over the whole area leaves most cells off a thin mask, and `count` lies).
+      const xs: number[] = [], ys: number[] = [];
+      for (let cy = y; cy < y + h; cy++) for (let cx = x; cx < x + w; cx++) if (ok(cx, cy)) { xs.push(cx); ys.push(cy); }
+      const grid = (s: number) => {
+        const cols = Math.max(1, Math.round(w / s)), rows = Math.max(1, Math.round(h / s)), cells = new Map<number, number[]>();
+        xs.forEach((cx, k) => {
+          const c = Math.floor(((ys[k] - y) * rows) / h) * cols + Math.floor(((cx - x) * cols) / w), l = cells.get(c);
+          if (l) l.push(k); else cells.set(c, [k]);
+        });
+        return cells;
+      };
+      let lo = 0.5, hi = Math.max(w, h);
+      for (let k = 0; k < 30; k++) { const s = (lo + hi) / 2; if (grid(s).size >= count) lo = s; else hi = s; }
+      // the grid jumps a few cells at a time: take count of them, spread along the rows
+      const cells = [...grid(lo).values()], n = Math.min(count, cells.length);
+      for (let i = 0; i < n; i++) {
+        const l = cells[Math.floor((i * cells.length) / n)], k = l[Math.floor(r() * l.length)];
+        this.place(this.asset(name, opts, xs[k], ys[k]), xs[k], ys[k], [0.5, 0.5], opts.clip ? on : undefined, 0, name);
+        placed++;
+      }
+      tries = count * 30;
+    } else if (opts.even) {
       // One pick per cell of a grid sized to `count`, at a random spot inside it: spread evenly over
       // the whole area, never in rows (pure random clumps and leaves holes).
       const s = Math.sqrt((w * h) / count), cols = Math.max(1, Math.round(w / s)), rows = Math.max(1, Math.round(h / s));

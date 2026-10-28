@@ -77,7 +77,7 @@ anim("cave", { w: W, h: H, frames: FRAMES, fps: 8, world: { ground: stands } },
     // Upward-facing edges get a lighter lip so the floor reads where props stand on it.
     (c) => { for (let y = 1; y < H; y++) for (let x = 0; x < W; x++) if (c.is(x, y, "R") && c.is(x, y - 1, ".")) c.px(x, y, "q"); },
     bump("bevel", { w: 3 }),
-    scatter("_lump*", 0, 0, W, H, 100, { on: "R", clip: true, rflip: "xy", even: true, seed: 2 })),
+    scatter("_lump*", 0, 0, W, H, 70, { on: "R", clip: true, rflip: "xy", even: true, seed: 2 })),
 
   layer("life",
     ...fungi.map(([n, x]) => stamp(n, x + 7, "ground", { rdelay: true })),

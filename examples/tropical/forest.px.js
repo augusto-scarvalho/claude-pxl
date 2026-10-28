@@ -273,13 +273,13 @@ const GIRL = ["girl", 92, 137]
 scene("forest", { w: W, h: H, world: { light: [-0.5, -1] } },
   layer("ground", drawTerrain),
   layer("trail", trailMap),
-  layer("cover", scatter("litter", 0, 0, W, H, 90, { on: "g", below: true, even: true, rflip: "xy", seed: 2 }),
-    scatter("seedlings", 0, 0, W, H, 40, { on: "g", below: true, even: true, seed: 5 }),
-    scatter("tufts", 0, 0, W, H, 34, { on: "g", below: true, even: true, rflip: "x", seed: 7 }),
+  layer("cover", scatter("litter", 0, 0, W, H, 75, { on: "g", below: true, even: true, rflip: "xy", seed: 2 }),
+    scatter("seedlings", 0, 0, W, H, 31, { on: "g", below: true, even: true, seed: 5 }),
+    scatter("tufts", 0, 0, W, H, 32, { on: "g", below: true, even: true, rflip: "x", seed: 7 }),
     // grass and weed clumps over all the open ground, not only near things, plus sprouts between
-    scatter("clump", 0, 0, W, H, 80, { on: "g", below: true, even: true, rflip: "x", seed: 13 }),
-    scatter("sprout", 0, 0, W, H, 60, { on: "g", below: true, even: true, rflip: "x", seed: 17 }),
-    scatter("blooms", 0, 0, W, H, 26, { on: "g", below: true, even: true, seed: 9 })),
+    scatter("clump", 0, 0, W, H, 68, { on: "g", below: true, even: true, rflip: "x", seed: 13 }),
+    scatter("sprout", 0, 0, W, H, 55, { on: "g", below: true, even: true, rflip: "x", seed: 17 }),
+    scatter("blooms", 0, 0, W, H, 22, { on: "g", below: true, even: true, seed: 9 })),
   layer("shadows", { shade: 2, of: "props", cast: [0.62, 0.22] }),
   layer("contact", { shade: 2, of: "props", cast: [0.18, 0.12], except: TALL }),
   layer("water", stamp("ripples", 0, 0), stamp("splash", 0, 0), ...POOL_LIFE.map(place), stamp("frog", 217, 44)),
@@ -289,7 +289,7 @@ scene("forest", { w: W, h: H, world: { light: [-0.5, -1] } },
   layer("props", { sort: "y" }, ...PLANTS.map(place), ...GRASS.map(([n, x, y]) => stamp(n, x, y, { shadow: false })), place(GIRL),
     // grass along both edges of the trail (on grass within 3 px of its dirt), and now and then a
     // sprout on the trail itself, where feet go less; sorted with the rest by where they stand
-    scatter("clump", 0, 0, W, H, 110, { on: "g", near: "aAo", within: 3, below: true, even: true, rflip: "x", seed: 23 }),
+    scatter("clump", 0, 0, W, H, 32, { on: "g", near: "aAo", within: 3, below: true, even: true, rflip: "x", seed: 23 }),
     scatter("sprout", 0, 0, W, H, 8, { on: "a", below: true, seed: 29 })),
   layer("perch", stamp("macaw", 116, 142)),
   // in the trees: the jaguar on the big tree's low branch, the monkey under a leaf pad of the other

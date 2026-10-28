@@ -258,8 +258,8 @@ const ground = [
   (c) => { for (let x = 0; x < W; x++) { const y = edgeY(x); c.px(x, y, "L"); c.px(x, y + 1, "l"); if (x % 3) c.px(x, y + 2, "l") } },
 ]
 const tufts = [
-  scatter("_edge*", 0, 128, W, 6, 34, { on: "lL", below: true, even: true, rflip: "x", seed: 2 }),
-  scatter("_tuft*", 0, 138, W, 16, 26, { on: "gl", below: true, even: true, rflip: "x", seed: 5 }),
+  scatter("_edge*", 0, 128, W, 6, 43, { on: "lL", below: true, even: true, rflip: "x", seed: 2 }),
+  scatter("_tuft*", 0, 138, W, 16, 23, { on: "gl", below: true, even: true, rflip: "x", seed: 5 }),
   scatter("_dark*", 0, 150, W, 12, 30, { on: "g", near: "G", within: 2, below: true, rflip: "x", seed: 6 }),
   scatter("_black*", 0, 164, W, 12, 30, { on: "G", near: "E", within: 2, below: true, rflip: "x", seed: 7 }),
   scatter("_thrift", 200, 130, 120, 10, 7, { on: "glL", below: true, seed: 4 }),

@@ -347,7 +347,7 @@ export interface ScatterOpts extends PlaceOpts {
   clip?: boolean;
   /** Masks read the composite below the current layer instead of the layer itself. */
   below?: boolean;
-  /** Even spacing: one pick per cell of a grid sized to `count`, at a random spot in the cell. */
+  /** Even spacing: one pick per cell of a grid sized to `count` (under on/near, to what they let through), at a random spot in the cell. */
   even?: boolean;
   /** Center must also be within `within` px (default 2) of these keys: along a path, at a rock's foot. */
   near?: string;
