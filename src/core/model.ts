@@ -231,6 +231,8 @@ export interface AssetDef {
   top?: string;
   /** The decoded `png` option (its `area` applied), read when the art file ran. */
   png?: Img;
+  /** With `shrink`: the share of the png's blocks that held more than one color (a finer drawing scaled down; 0, an image blown up and shrunk back). */
+  shrunk?: number;
   /** A twin: the items of the asset it was made from, drawn mirrored (before lighting). */
   mirror?: boolean;
   /** look3d()'s light and mats when it was defined. */

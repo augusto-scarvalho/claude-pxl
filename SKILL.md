@@ -151,8 +151,8 @@ closest:
 - **First files**: `basics.px.js` (mirror, outline, variants, parts, a sheet), `platformer.px.js`
   (a tileset as a level), `topdown.px.js`, `isometric.px.js`.
 - **The library** (`lib/`), to `include` rather than redraw: `PXL lib` lists its entries by subject
-  (`--genre hd2d`, `--cell side/32`), `PXL lib <entry>` gives one's card and the `include` that takes it;
-  a 3D entry at a new cell: `PXL lib draft <entry> --cell topdown/16`.
+  (`--genre topdown16`, `--cell side/32`), `PXL lib <entry>` gives one's card and the `include` that takes it;
+  a 3D entry in a genre: `PXL lib draft <entry> --genre topdown16` (the genres: `lib/profiles/`).
 - **Characters**: in `lib/characters/`, `hero` (four directions, a tagged sheet), `knight` (skeleton
   first), `traveler`, `crew`, `miko` (`rig3d`, 8 directions, blocks first); `rig/warden.px.js`,
   `tropical/girl.px.js` (a walk).

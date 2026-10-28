@@ -68,7 +68,7 @@ if (args.includes("--lib")) {
     if (v.asset) { const p = proj(e.file), ms = members(p, v.asset); img = p.build(ms.find((n) => /_s$/.test(n)) ?? ms[0]).img; }
     else {
       const [cam, g] = cell.split("/"), at = `${cam}/${g === "?" ? 24 : g}`;
-      libDraft(e.name, at, tmp);
+      libDraft(e.name, { cell: at }, tmp);
       img = decodePng(readFileSync(join(tmp, "sprites", `${e.card.name.slice(7)}_${at.replace("/", "")}_s.png`)));
     }
     (sheets.get(e.subject) ?? sheets.set(e.subject, []).get(e.subject)!).push({ img, name: e.card.name.replace(/^make3d\./, ""), cell, status: v.status });

@@ -141,16 +141,20 @@ declare global {
   interface PxFrame { ms?: number; hold?: number }
   interface PxCard {
     is: string;
+    /** "<camera>/<density>": a tile's px ("topdown/16"), px a meter ("hd2d/24ppm"), or ? (drawn for one scene) */
     cells: Record<string, "✓" | "◐" | "✎" | ["✓" | "◐" | "✎", string]>;
     vary?: string | { color?: string; part?: string; shape?: string; seed?: string };
-    tiles?: number;
+    /** a builder's box in tiles, [tall, wide] (its category's on the scale curve), or how many tall alone */
+    tiles?: number | [number, number];
     draw?: Record<string, unknown>;
   }
   interface PxGenre {
     camera?: { kind?: string; pitch?: number | Record<string, number> };
     /** a tile's px; null: none */
     grid?: number | null;
-    /** a box per category, [tall, wide] in tiles (px with no grid) */
+    /** px a meter, where there is no tile grid (a world built in meters: HD-2D's 24); its cell then "hd2d/24ppm" */
+    ppm?: number;
+    /** a box per category, [tall, wide] in tiles (m with a ppm, px with neither) */
     scale?: Record<string, [number, number]>;
     heads?: number; dirs?: string[] | number; states?: Record<string, { frames?: number; ms?: number | number[] }>;
     contract?: { boxes?: string[]; [k: string]: unknown };
@@ -158,8 +162,12 @@ declare global {
     pitch?: number;
     /** ground: the feet on one row through a move; height: a family as tall in every direction; footprint: the drawing down to where it meets the ground */
     checks?: ("ground" | "height" | "footprint")[];
-    /** the tones a turnaround() or rig3d() naming it draws its surface in (where its surface gives none) */
-    tones?: number;
+    /** the tones a turnaround() or rig3d() naming it draws its surface in (where its surface gives none); a range or by size: notes */
+    tones?: number | [number, number] | Record<string, number>;
+    /** its line: a color all round (surface's ink; pxl lib draft draws it), or by category ({ character: "#1a1620", tree: "selective" }), or words */
+    ink?: string | Record<string, unknown>;
+    /** densities mixed on purpose (HD-2D's sprites in a finer world): pxl check doesn't warn at the mix */
+    mix?: boolean;
     /** any other field, kept for the file to read (steer) */
     [field: string]: any;
   }

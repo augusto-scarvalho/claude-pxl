@@ -44,8 +44,8 @@ include("other.px.js")                  // path relative to the current file; in
 directions("ship", 16, { from, outline?, outline8?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
 turnaround("house", thing, { view?, ppm?, n?, headings?, part?, ... })  // a thing in 3D seen from n headings: house_n, house_ne, ... + group "house"; see turnaround() below
 rig3d("tr", { body, moves: { walk: { frames, ms, pose } }, n?, parts?, head?, blocks? })  // a figure on the 3D layer in n headings: tr_walk_s, ... + group "tr_walk"; see rig3d() below
-genre("fighting", { camera, grid, scale, heads, dirs, states, contract, pitch, checks })  // a profile as data, its checks run by pxl check on what names it: see genre() below
-card("_lamp", { is, cells: { "hd2d/24": "✓" }, vary?, tiles?, draw? })  // a library entry's card, just after it: see card() below
+genre("fighting", { camera, grid or ppm, scale, heads, dirs, states, contract, pitch, tones, ink, mix, checks })  // a profile as data, its checks run by pxl check on what names it: see genre() below
+card("_lamp", { is, cells: { "hd2d/24ppm": "✓" }, vary?, tiles?, draw? })  // a library entry's card, just after it: see card() below
 views("_head", { s: grid, sw, w, nw, n }, { anchor, like? })  // hand-drawn views pivoted on an anchor, the others mirrored: _head_s, ... + group "_head"; see views() below
 font(name, "glyph_sprite", { chars: "ABC...", w, h, cols?, mono? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional), or all as wide as the widest with mono: true (a score, a timer)
 include("palette.px.js", { palette: true })  // also take its use()/pal()/ramps() from here on
@@ -113,11 +113,17 @@ Locations name an included file by its path from your file's folder (`../nature/
 so two `kit.px.js` stay apart in errors, `pxl list` and `pxl edit`.
 
 `genre(name, spec)` is a profile as data (a genre as players name it: fighting, action top-down,
-racing): what the art file reads, in the fields the library's profiles use: `camera` (`{ kind,
-pitch }`), `grid` (a tile's px, or `null`), `scale` (a box per category, `[tall, wide]` in tiles, px
-with no grid: `{ character: [1.5, 1], tree: [2.5, 2.5] }`), `heads`, `dirs`, `states` (`{ idle: {
-frames, ms } }`), `contract` (`{ boxes: ["hurt", "hit"] }`), `pitch` (the figure's own, apart from
-the camera's), `tones` (what a `turnaround()` or `rig3d()` naming it draws its surface in, where its `surface` gives none: 3 at 16-32 px) and `checks`; any other field is kept as given, for the file (`steer`). It
+racing): what the art file reads, in the fields the library's profiles use (`lib/profiles/`, one a
+genre, each number's source beside it): `camera` (`{ kind, pitch }`), its density, `grid` (a tile's
+px, or `null`) or else `ppm` (px a meter, a world built in meters with no tile grid: HD-2D's 24),
+`scale` (a box per category, `[tall, wide]` in tiles, m with a `ppm`, px with neither: `{ character:
+[1.5, 1], tree: [2.5, 2.5] }`), `heads`, `dirs`, `states` (`{ idle: { frames, ms } }`), `contract`
+(`{ boxes: ["hurt", "hit"] }`), `pitch` (the figure's own, apart from the camera's: what stands is
+seen at it), `tones` (what a `turnaround()` or `rig3d()` naming it draws its surface in, where its
+`surface` gives none: 3 at 16-32 px), `ink` (its line: a color, all round, `surface: { ink }`'s; or
+by category, `{ character: "#1a1620", tree: "selective" }`, or words), `mix` (`true`: densities mixed
+on purpose, HD-2D's sprites in a finer world) and `checks`; any other field is kept as given, for the
+file (`steer`). Its cell is its camera's kind and its density: `topdown/16`, `hd2d/24ppm`. It
 returns them with `name`. An asset made for it says `genre: "fighting"` (a sprite, an anim,
 `rig3d()` and `turnaround()` pass it to what they make), and `pxl check` runs the genre's checks on
 it: `"ground"`, the feet (its lowest row) on one row through every frame of a move (fighting);
@@ -130,20 +136,28 @@ above) (racing). See scenes.md, "Profiles".
 `card(name, { is, cells, vary?, tiles?, draw? })`, just after what it describes, is a library entry's
 card: what its code can't show. `name` is an asset, group, `rig3d()` figure, `turnaround()` family
 or font defined above it (under an `as`, its full name: `lamps._lamp`), or `"make3d.<builder>"`;
-`is` what it is, in a line (its silhouette, its parts, its look); `cells` the (camera × grid) points
-it exists at, `{ "hd2d/24": "✓" }`: the camera `side`, `topdown`, `iso`, `hd2d` or `behind`, the
-grid a tile's px (`?`: drawn for one scene, no grid), the status `"✓"` approved, `"◐"` a 3D render
+`is` what it is, in a line (its silhouette, its parts, its look); `cells` the (camera × density)
+points it exists at, `{ "hd2d/24ppm": "✓" }`: the camera `side`, `topdown`, `iso`, `hd2d` or
+`behind`, the density a tile's px (`topdown/16`), px a meter (`hd2d/24ppm`: a world in meters, no
+tiles), or `?` (drawn for one scene, neither), the status `"✓"` approved, `"◐"` a 3D render
 to look at or `"✎"` by hand over a 3D draft, or `[status, asset]` where another asset holds the cell
 (default the entry; a builder's ◐ cell may name none: `pxl lib draft` draws it); `vary` what varies that
 its code doesn't show, a line or one a channel (`{ color, part, shape, seed }`: its roles, params
-and seed are read from the code); a builder's `tiles` (how many tiles tall, a draft's size) and
-`draw` (its drawing call's options). A name or an asset it can't find fails the load at its line.
+and seed are read from the code); a builder's `tiles` (its box in tiles, `[tall, wide]`, its
+category's on the scale curve, scenes §19; or how many tall alone: a draft's size) and `draw` (its
+drawing call's options). A name or an asset it can't find fails the load at its line.
 `card(name)` gives its data back (`card("make3d.oak").draw`). `pxl lib` lists the library's cards
 by subject (`pxl lib --genre hd2d`, `pxl lib --cell side/32`); `pxl lib lamps._lamp` prints one with
 what a build of it reads (its source, size, pivot, footprint, sockets, boxes, frames, roles) and the
-`include` that takes it. `pxl check` on the file warns where a cell's status disagrees with how its
-asset is drawn: a ✎ cell that is the 3D render alone, a ◐ cell drawn by hand, a ✓ live 3D sprite not
-`frozen`.
+`include` that takes it; `pxl lib draft make3d.oak --genre topdown16` draws a builder in a genre (its
+camera, what stands at its `pitch`, the card's box fitted on its grid or the meters at its `ppm`, its
+`tones` and `ink`; `--cell topdown/16` a cell alone). `pxl check` on the file warns where a cell's
+status disagrees with how its asset is drawn: a ✎ cell that is the 3D render alone, a ◐ cell drawn by
+hand, a ✓ live 3D sprite not `frozen`. And it warns at densities mixed by accident (scenes §19),
+unless a genre says the mix (`mix: true`; for a scene, a genre at one of the cells it mixes): a scene
+placing library entries of two densities (their cards' cells, a recolor by `base` its entry's), a
+`png` blown up (every k x k block one color: `shrink: k`), a `png` shrunk from a finer drawing alone
+(`shrink: k` over blocks of more than one color).
 
 Names starting with `_` are **parts**: usable everywhere but not exported, and not matched by
 sheet globs.
@@ -238,7 +252,7 @@ with a `world` (and `check`) is checked as a scene (functions naming what they p
 | `pixel: k` | Scene: px to a pixel of the art (`w` and `h` the picture's): `c.k` in its functions; `mesh()` draws its camera k times as big (`perspective()`'s or a view's), its sprites' pixel k x k and its materials in blocks of k, ramps and textures (a texel a block, as pixel art; a material's own `block` wins: `block: 1` for a texture laid finer); `surface()`, `voxels()`, `volume()`, `splats()`, `decal()` through the camera a ray a block; `c.meshSocket()` the same; `post()`'s `blur`, `focus`, `bloom.r` and `pixel` in the art's px (`px: true` keeps the picture's). `text()` doesn't follow (draw it at `c.k`'s scale yourself); `bubble()` does (`unit`). For one size with a clock of its own (an excerpt: `harbor_clip`). |
 | `check: false` | Scene: `pxl check` (and the examples' test) skip it, saying so. For an HD render of a scene that is checked at its own size (`sizes` gives it). `check: { every: n }` checks one frame in n: a long story (the graveyard's 484 frames) at the cost of a short loop. |
 | `expect: [rule, ...]` | Scene: rules on its placements, as `describe` measures them, run by `pxl check` at the frames it checks (a warning says the rule, the frames and the numbers: "the gap is 2 px, wanted 4-8"). `a` and `b` name a placement by its stamp's `id`, else its asset's name (placed once; not in a shade or light layer); `b` may be a box `[x, y, w, h]` (a path painted in the ground). `{ beside: [a, b, { gap, side }] }`: `gap` the empty px between their pixels (0 touching, as describe counts; `n` or `[min, max]`), `side` `"left"`, `"right"`, `"above"` or `"below"` (a's box's two edges past b's that way: a lantern above a long path wherever along it), either or both (a side alone at any distance, overlapping too); `{ before: [a, b] }` a drawn in front (a later layer, or in a layer sorted by y, its y lower); `{ apart: [a, b, min = 0] }` (0: no overlap); `{ inside: [a, region] }` every pixel (a region as `clip()`'s: a box, a circle, a polygon, `(x, y) => bool`); `{ onGround: [a, row or profile()?] }` its feet within a px of the ground under them (check's feet rule; default `world.ground`). Over a loop, `{ while: [rule, rule] }` (the first holds wherever the second does) and any rule's `frames: [first, last]` (that span only). `pxl check --fix` changes one number of a placement a failing rule names, its relation's (beside's gap, along's s or u) or else where it stands (x or y), by the fewest px that make it hold and keep holding the rules that held (`expect3d`'s search, a px at a time up to 64; what is placed by a relation to it moves with it), and writes the number where it is: the stamp's own, or a table's (`const AT = { pack: [127, 148] }` behind `stamp("pack", ...AT.pack)` or `AT.pack[0]`); one computed in code is said and left; nothing is written that doesn't hold rebuilt (a number another placement shares). `examples/sunset/sunset.px.js` (the camp), `topdown.px.js` (the island), `shrine/shrine.px.js` (the lanterns, the miko over her loop). |
-| `genre: "fighting"` | The `genre()` it is made for: `pxl check` runs that genre's checks on it (above, under Assets). |
+| `genre: "fighting"` | The `genre()` it is made for: `pxl check` runs that genre's checks on it (above, under Assets); its `mix: true` lets its `png` be at another density. |
 | `sockets: { name: [x, y], ... }` | Named points in drawing coordinates (pixel corners) that other stamps attach to: `stamp("arm_3", 0, 0, { at: "body.shoulder" })` puts the arm's pivot on the body's `shoulder` socket, wherever and however the body was placed. They move with flip, rot, angle, outline and crop, like the pivot. For characters built from parts (characters.md §10). |
 
 Post-processing order: register → mirror → swap → flip → rot → angle → aa → inline → outline → outline8 →

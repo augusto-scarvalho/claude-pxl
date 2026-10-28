@@ -2,7 +2,7 @@
 // other asset that has one), the warnings only, from one load of the project. A scene is checked at
 // every frame of its loop, each distinct placement once: the checks that warn (facing, front marker,
 // lit side, feet, lettering) depend only on the placement (what it looks like, where) and the world.
-import type { Project } from "../core/project.ts";
+import { type Project, cellOf } from "../core/project.ts";
 import { MANY, STAND, lightFor, orientWords, placementChecks, standWords } from "../core/describe.ts";
 import { rigLines } from "../core/rig.ts";
 import { frontWords, rampSteps } from "../core/checks.ts";
@@ -70,6 +70,55 @@ function genreLines(p: Project, name: string, ran: { genre: number }): string[] 
     if (off.length) out.push(`${name} › WARNING: genre '${gn}': its drawing doesn't reach where it meets the ground: its lowest row is ${off.join("; ")}: drawn lifted, or its wheels or feet hidden or cut, it floats there`);
   }
   return out;
+}
+
+/**
+ * A png at a density not its own (scenes §19), unless its genre says the mix (mix: true): imported blown up
+ * (every k x k block one color: its pixels k px beside the others' 1), or shrunk alone from a finer drawing
+ * (`shrink: k` over blocks of more than one color: its detail a finer grid's). Undefined: none to check.
+ */
+function pngDensity(p: Project, name: string): string[] | undefined {
+  const d = p.assets.get(name)!, o = d.opts, k = typeof o.shrink === "number" ? o.shrink : 1;
+  if (!d.png || o.frozen || (o.genre !== undefined && p.genres.get(o.genre)?.mix === true)) return undefined;
+  const or = "or say the mix on purpose in its genre (mix: true)";
+  if (k > 1) {
+    // (an export blown up k times and shrunk back is its own pixels again)
+    const m = d.shrunk ?? 0;
+    return m > 0.02 ? [`${name} › WARNING: shrink: ${k} scales a finer drawing down alone: ${Math.round(m * 100)}% of its ${k}x${k} blocks held more than one color, so its detail is a grid ${k} times finer than its pixels: one drawing scaled alone mixes densities (scenes §19); redraw it simpler at this one, ${or}`] : [];
+  }
+  const im = d.png, colors = new Set(im.data.filter((v) => (v & 255) >= 128)).size;
+  for (const b of [8, 6, 5, 4, 3, 2]) if (colors > 1 && im.w % b === 0 && im.h % b === 0 && im.w >= 2 * b && im.h >= 2 * b && im.mixedBlocks(b) === 0)
+    return [`${name} › WARNING: its png is drawn ${b} times as big: every ${b}x${b} block is one color, so its pixels are ${b} px beside the others' 1 (scenes §19): shrink: ${b} brings it to its own, ${or}`];
+  return [];
+}
+
+/** Each drawing of a card's cell that has a density (not "?"), a family's members too: the cells it is at. */
+function drawingCells(p: Project): Map<string, string[]> {
+  const by = new Map<string, string[]>();
+  for (const c of p.cards.values()) for (const [k, v] of Object.entries(c.cells))
+    if (v.asset && !k.endsWith("/?")) for (const n of members(p, v.asset)) by.set(n, [...(by.get(n) ?? []), k]);
+  return by;
+}
+
+/**
+ * Library entries of different densities placed in one scene (their cards' cells: a 16 px tile and a 32 px
+ * one, 24 px a meter and 17), its base followed to the entry it recolors; unless a genre at one of those
+ * cells says the mix (mix: true: HD-2D's sprites in a finer world). Undefined: it places no entry with one.
+ */
+function sceneMix(p: Project, used: Set<string>, by: Map<string, string[]>): string | undefined {
+  const at = new Map<string, string[]>();
+  for (const u of used) {
+    let n = u, d = p.assets.get(n), cs = by.get(n);
+    for (let i = 0; d && !cs && i < 8 && typeof d.opts.base === "string"; i++) { n = p.assets.has(d.opts.base) ? d.opts.base : (d.ns ?? "") + d.opts.base; d = p.assets.get(n); cs = by.get(n); }
+    if (cs) at.set(u, cs);
+  }
+  if (!at.size) return undefined;
+  const dens = (c: string) => c.slice(c.indexOf("/") + 1), all = [...at.values()], cells = new Set(all.flat());
+  if ([...cells].some((c) => all.every((cs) => cs.some((x) => dens(x) === dens(c))))) return "";
+  if ([...p.genres.values()].some((g) => g.mix === true && cells.has(cellOf(g)))) return "";
+  const of = new Map<string, string[]>();
+  for (const [n, cs] of at) of.set(cs[0], [...(of.get(cs[0]) ?? []), n]);
+  return `WARNING: it places library entries of ${of.size} densities (${[...of].map(([c, ns]) => `${ns.slice(0, 3).join(", ")}${ns.length > 3 ? ", ..." : ""} at ${c}`).join("; ")}): pixels of different sizes side by side; draw them at one (scenes §19), or say the mix on purpose in a genre at one of those cells (mix: true)`;
 }
 
 /**
@@ -185,7 +234,8 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, frozen: 0, cards: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, frozen: 0, cards: 0, density: 0 };
+  let cellsBy: Map<string, string[]> | undefined;
   let lightSaid = false, groundSaid = false, fixes: CheckResult["fixes"], rulesAll = 0, rulesHeld = 0;
   const failed: string[] = [];
   // by default what the file itself defines (what it includes is checked where it's defined)
@@ -244,6 +294,9 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       }
       // the genre() it is made for: its checks on its frames (the height across directions is a family's, below)
       if (def.opts.genre !== undefined) lines.push(...genreLines(p, name, ran));
+      // a png at a density not its own: blown up, or shrunk from a finer drawing
+      const pd = pngDensity(p, name);
+      if (pd) { ran.density++; lines.push(...pd); }
       // a frozen cell against its live render: the engine or the recipe changed what it draws
       if (def.live && !def.freeze) {
         ran.frozen++;
@@ -270,7 +323,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     const count = tl?.capped ? Math.min(all, CAPPED_FRAMES) : all;
     if (tl?.long) notes.push(`${name} › LOOK: ${tl.long}; check reads each of its frames (check: { every: n } reads one in n)`);
     if (tl?.capped) lines.push(`${name} › WARNING: its loop doesn't close within 60 s: its anims' frame times don't line up (a ${tl.step} ms step, ${all} frames); checked its first ${count} frames only. Give every anim the same fps (4, 5 or 10, or ms in 100s)`);
-    const seen = new Map<string, string[]>(), found = new Map<string, Set<number>>(), at = new Map<string, Set<string>>();
+    const seen = new Map<string, string[]>(), found = new Map<string, Set<number>>(), at = new Map<string, Set<string>>(), used = new Set<string>();
     const only = opts.frames ?? (opts.frame !== undefined ? [opts.frame] : undefined), co = def.opts.check;
     // its rules (expect): at each frame checked, the placements they name
     const rules = def.opts.expect as Rule2d[] | undefined, names = rules ? namesOf(rules) : [], named: Frame2d[] = [];
@@ -290,7 +343,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       // describe lists them on one line and checks none of them, and so does this, but for where one
       // stands in a mesh() (a tuft floating past a hill's edge)
       const copies = new Map<string, number>();
-      for (const q of b.placements) copies.set(`${q.name}@${q.layer}`, (copies.get(`${q.name}@${q.layer}`) ?? 0) + 1);
+      for (const q of b.placements) { copies.set(`${q.name}@${q.layer}`, (copies.get(`${q.name}@${q.layer}`) ?? 0) + 1); used.add(q.name); }
       for (const q of b.placements) {
         const many = copies.get(`${q.name}@${q.layer}`)! > MANY;
         if (many && !standWords(q.stand)) continue;
@@ -325,6 +378,10 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       }
     }
     distinct += seen.size;
+    // the library entries it places, of one density
+    const mix = sceneMix(p, used, (cellsBy ??= drawingCells(p)));
+    if (mix !== undefined) ran.density++;
+    if (mix) lines.push(`${name} › ${mix}`);
     if (rules) {
       const rs = runRules2d(rules, named, wo);
       rulesAll += rs.length; rulesHeld += rs.filter((r) => r.ok).length;
@@ -417,6 +474,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.genre) run.push(`genres' checks on ${ran.genre} frame${ran.genre > 1 ? "s" : ""}`);
   if (ran.frozen) run.push(`frozen cells against their live render on ${ran.frozen}`);
   if (ran.cards) run.push(`cards' cells against their drawing on ${ran.cards}`);
+  if (ran.density) run.push(`densities on ${ran.density}`);
   if (ran.views) run.push(`views' rows on ${ran.views}`);
   if (ran.poses) run.push(`figures' feet on ${ran.poses} poses`);
   if (rigs) run.push(`rig parts ${ran.parts}`);

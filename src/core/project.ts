@@ -197,10 +197,16 @@ const SHEET_OPTS = ["cols", "pad", "extrude", "rows", "slots"];
 export const GENRE_CHECKS = ["ground", "height", "footprint"];
 /** A card's cells: the cameras, and the statuses (approved; a 3D render to look at; by hand over a 3D draft). */
 export const CAMERAS = ["side", "topdown", "iso", "hd2d", "behind"], STATUSES = ["✓", "◐", "✎"];
+/** A cell, "<camera>/<density>": the density a tile's px (16), px a meter (24ppm), or ? (drawn for one scene). */
+export const CELL = /^(\w+)\/(\d+(?:ppm)?|\?)$/;
+/** A genre's cell: its camera's kind, and its grid, else its px a meter. */
+export const cellOf = (g: Record<string, unknown>) => `${(g.camera as { kind?: string } | undefined)?.kind ?? "?"}/${g.grid ?? (g.ppm ? `${g.ppm}ppm` : "?")}`;
 /** A library entry's card (card()): what it is, the cells it exists at, how it varies; the rest pxl lib reads off a build. */
 export interface Card {
   name: string; kind: string; is: string; cells: Record<string, { status: string; asset?: string }>;
-  vary?: string | Record<string, string>; tiles?: number; draw?: Record<string, unknown>; loc?: string; ns: string; data: Record<string, unknown>;
+  vary?: string | Record<string, string>; draw?: Record<string, unknown>; loc?: string; ns: string; data: Record<string, unknown>;
+  /** a builder's box in tiles, [tall, wide], or its height alone */
+  tiles?: number | [number, number];
 }
 
 function checkArgs(name: string, args: unknown[]): void {
@@ -385,7 +391,7 @@ export class Project implements BuildCtx {
   }
 
   /** The image an asset's { png, area } starts from. */
-  private readPng(what: string, o: AssetOpts, loc?: string): Img {
+  private readPng(what: string, o: AssetOpts, loc?: string): { img: Img; shrunk?: number } {
     try {
       if (typeof o.png !== "string" || !/\.png$/i.test(o.png)) throw new PxError(`png must be a .png path, got ${JSON.stringify(o.png)}`);
       if (o.base) throw new PxError("png and base both set the starting image: use one");
@@ -412,9 +418,9 @@ export class Project implements BuildCtx {
       if (o.shrink !== undefined) {
         if (!(Number.isInteger(o.shrink) && o.shrink >= 1 && o.shrink <= Math.min(img.w, img.h)))
           throw new PxError(`shrink must be a whole factor from 1 (as it is) to ${Math.min(img.w, img.h)}, got ${JSON.stringify(o.shrink)}`);
-        if (o.shrink > 1) img = img.shrink(o.shrink);
+        if (o.shrink > 1) return { img: img.shrink(o.shrink), shrunk: img.mixedBlocks(o.shrink) };
       }
-      return img;
+      return { img };
     } catch (e) {
       throw wrap(e).within(what, loc);
     }
@@ -580,12 +586,12 @@ export class Project implements BuildCtx {
         frozen = { live, ...(where.there ? {} : { freeze: where.abs }) };
         if (!where.there) { delete opts.png; opts.base = live; }
       }
-      const png = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), top = this.callerLoc(true), look3d = this.look3d, ns = this.ns ? { ns: this.ns } : {};
+      const read = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), png = read?.img, top = this.callerLoc(true), look3d = this.look3d, ns = this.ns ? { ns: this.ns } : {};
       // a swap on a base from another file recolors that file's drawing: its keys are read in the base's
       // palette (a kit's lamp by the kit's own keys, which yours needn't have, or has as other colors)
       const b = opts.swap && typeof opts.base === "string" ? this.assets.get(this.resolve(opts.base)) : undefined, file = (l?: string) => l?.replace(/:\d+(:\d+)?$/, "");
       const sp = b && file(b.loc) !== file(loc) ? { swapPal: b.pal } : {};
-      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, look3d, ...ns, ...sp, ...frozen });
+      this.assets.set(name, { kind, name, opts, items, pal: this.pal, loc, top, png, ...(read?.shrunk !== undefined ? { shrunk: read.shrunk } : {}), look3d, ...ns, ...sp, ...frozen });
       this.order.push(name);
       // a scene's pixel: px to an art pixel; its sizes: the same scene k times as big under other names, not checked
       const whole = (k: unknown) => Number.isInteger(k) && (k as number) >= 1;
@@ -1158,16 +1164,18 @@ export class Project implements BuildCtx {
     };
     env.rng = (seed?: number) => rng(seed);
     env.roleSwap = (from: unknown, to: unknown) => { try { return roleSwap(from, to); } catch (e) { throw wrap(e).within("roleSwap", this.callerLoc()); } };
-    // genre(name, { camera, grid, scale, heads, dirs, states, contract, pitch, checks }): a profile as data;
-    // the file reads its fields, pxl check runs its checks on the assets that name it (genre: "fighting")
+    // genre(name, { camera, grid or ppm, scale, heads, dirs, states, contract, pitch, tones, ink, mix, checks }): a
+    // profile as data; the file reads its fields, pxl check runs its checks on the assets that name it (genre: "fighting")
     env.genre = (name: unknown, spec: unknown) => {
       const loc = this.callerLoc();
       if (typeof name !== "string" || !name || !isPlainObject(spec)) throw new PxError('genre("fighting", { camera, grid, scale: { character: [tall, wide] }, heads, dirs, states, contract: { boxes }, pitch, checks: ["ground"] })', loc);
       const had = this.genres.get(name);
       if (had) throw new PxError(`genre '${name}' is already defined at ${had.loc}`, loc);
-      const { checks = [], scale, grid } = spec as { checks?: unknown; scale?: unknown; grid?: unknown };
+      const { checks = [], scale, grid, ppm, mix } = spec as { checks?: unknown; scale?: unknown; grid?: unknown; ppm?: unknown; mix?: unknown };
       if (!(Array.isArray(checks) && checks.every((c) => GENRE_CHECKS.includes(c)))) throw new PxError(`genre '${name}': checks are some of ${GENRE_CHECKS.join(", ")}, got ${JSON.stringify(checks)}`, loc);
       if (!(grid === undefined || grid === null || (typeof grid === "number" && grid > 0))) throw new PxError(`genre '${name}': grid is a tile's px (16), or null for none, got ${JSON.stringify(grid)}`, loc);
+      if (!(ppm === undefined || (typeof ppm === "number" && ppm > 0))) throw new PxError(`genre '${name}': ppm is its px a meter where it has no tile grid (HD-2D's 24), got ${JSON.stringify(ppm)}`, loc);
+      if (!(mix === undefined || typeof mix === "boolean")) throw new PxError(`genre '${name}': mix: true declares densities mixed on purpose (HD-2D's sprites in a finer world), got ${JSON.stringify(mix)}`, loc);
       if (!(scale === undefined || (isPlainObject(scale) && Object.values(scale).every((b) => Array.isArray(b) && b.length === 2 && b.every((v) => typeof v === "number" && v > 0)))))
         throw new PxError(`genre '${name}': scale is a box per category, [tall, wide] in tiles (px with no grid): { character: [1.5, 1], tree: [2.5, 2] }, got ${JSON.stringify(scale)}`, loc);
       const g = { ...(spec as Record<string, unknown>), name, checks: checks as string[] };
@@ -1198,8 +1206,8 @@ export class Project implements BuildCtx {
       if (!isPlainObject(cells) || !Object.keys(cells).length) throw new PxError(`${what}: cells are where it exists, { "<camera>/<grid>": status or [status, asset] }: { "hd2d/24": "✓" }, got ${JSON.stringify(cells)}`, loc);
       const out: Card["cells"] = {};
       for (const [k, v] of Object.entries(cells)) {
-        const m = /^(\w+)\/(\d+|\?)$/.exec(k), [status, asset] = Array.isArray(v) ? v : [v];
-        if (!m || !CAMERAS.includes(m[1])) throw new PxError(`${what}: a cell is "<camera>/<grid>", the camera one of ${CAMERAS.join(", ")}, the grid a tile's px or ? (drawn for one scene, no grid), got "${k}"`, loc);
+        const m = CELL.exec(k), [status, asset] = Array.isArray(v) ? v : [v];
+        if (!m || !CAMERAS.includes(m[1])) throw new PxError(`${what}: a cell is "<camera>/<density>", the camera one of ${CAMERAS.join(", ")}, the density a tile's px (16), px a meter (24ppm) or ? (drawn for one scene, neither), got "${k}"`, loc);
         if (!STATUSES.includes(status) || (Array.isArray(v) && (v.length !== 2 || typeof asset !== "string")))
           throw new PxError(`${what}: cell ${k} is a status, "✓" (approved), "◐" (a 3D render to look at) or "✎" (by hand over a 3D draft), or [status, asset], got ${JSON.stringify(v)}`, loc);
         const a = asset === undefined ? (builder ? undefined : name) : this.qualify(asset);
@@ -1209,11 +1217,12 @@ export class Project implements BuildCtx {
       }
       if (!(vary === undefined || typeof vary === "string" || (isPlainObject(vary) && Object.entries(vary).every(([k, t]) => ["color", "part", "shape", "seed"].includes(k) && typeof t === "string"))))
         throw new PxError(`${what}: vary is what varies that its code doesn't show, a line, or one a channel: { color, part, shape, seed }, got ${JSON.stringify(vary)}`, loc);
-      if ((tiles !== undefined || draw !== undefined) && !builder) throw new PxError(`${what}: tiles and draw are a builder's (make3d.<name>): its height in tiles, its drawing call's options`, loc);
-      if (!(tiles === undefined || (typeof tiles === "number" && tiles > 0))) throw new PxError(`${what}: tiles is how many tiles tall it is drawn (2.5), got ${JSON.stringify(tiles)}`, loc);
+      if ((tiles !== undefined || draw !== undefined) && !builder) throw new PxError(`${what}: tiles and draw are a builder's (make3d.<name>): its box in tiles, its drawing call's options`, loc);
+      const pos = (t: unknown) => typeof t === "number" && t > 0;
+      if (!(tiles === undefined || pos(tiles) || (Array.isArray(tiles) && tiles.length === 2 && tiles.every(pos)))) throw new PxError(`${what}: tiles is its box in tiles, [tall, wide] ([2.5, 2.5]), or how many tall alone (2.5), got ${JSON.stringify(tiles)}`, loc);
       if (!(draw === undefined || isPlainObject(draw))) throw new PxError(`${what}: draw is its drawing call's options ({ mats, surface, light }), got ${JSON.stringify(draw)}`, loc);
       const data = { ...(spec as Record<string, unknown>), name };
-      this.cards.set(name, { name, kind, is, cells: out, ...(vary !== undefined ? { vary: vary as Card["vary"] } : {}), ...(tiles !== undefined ? { tiles: tiles as number } : {}), ...(draw !== undefined ? { draw: draw as Record<string, unknown> } : {}), loc, ns: this.ns, data });
+      this.cards.set(name, { name, kind, is, cells: out, ...(vary !== undefined ? { vary: vary as Card["vary"] } : {}), ...(tiles !== undefined ? { tiles: tiles as Card["tiles"] } : {}), ...(draw !== undefined ? { draw: draw as Record<string, unknown> } : {}), loc, ns: this.ns, data });
       return data;
     };
     // procedural texture, the same in every file: hash(i, j), vnoise(x, y), fbm(x, y, octaves), bayer(x, y)

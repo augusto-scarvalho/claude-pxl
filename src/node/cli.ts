@@ -36,17 +36,20 @@ const USAGE = `pxl — pixel-art DSL
       What the reference says about an op or option: the rows that define it, a line for each other
       mention, and a few uses in the examples (--all: everything in full). Words of a guide's
       heading print that section ("characters 9", "small animals"). No name: an index.
-  pxl lib [entry] [--genre <name>] [--cell <camera>/<grid>]
-      pxl's library (lib/): its entries by subject, a line each (its cells: camera/grid ✓ approved,
-      ◐ a 3D render to look at, ✎ by hand over a 3D draft), only those at the genre's cell or naming
-      it (a genre() of lib/profiles), or at that cell (--cell side: any grid). An entry: its card
+  pxl lib [entry] [--genre <name>] [--cell <camera>/<density>]
+      pxl's library (lib/): its entries by subject, a line each (its cells: camera/density, a tile's
+      px or px a meter (hd2d/24ppm), ✓ approved, ◐ a 3D render to look at, ✎ by hand over a 3D draft),
+      only those at the genre's cell or naming it (a genre() of lib/profiles), or at that cell (--cell
+      side: any density). An entry: its card
       (what it is, its source, its cells, size, pivot, footprint, sockets, boxes, frames, roles, what
       varies) and the include that takes it.
-  pxl lib draft <entry> --cell <camera>/<grid> [--out DIR]
+  pxl lib draft <entry> --genre <name> | --cell <camera>/<density> [--out DIR]
       A 3D entry (a make3d builder) at a cell it lacks: an art file that includes it and turns it to
-      that camera (side, topdown at 45 degrees, iso, hd2d), its card's tiles tall on that grid, in the
-      grid's tones (3 at 16-32 px), built to out/_draft/ (or DIR): the ✎ draft to clean by hand, or ◐
-      to look at. A 2D entry is redrawn simpler at a new density, never drafted.
+      the genre's camera (what stands at its figure's pitch: 30 degrees on topdown16's 45 ground), its
+      card's box of tiles [tall, wide] on the genre's grid (fitted: neither side over), or at its px a
+      meter (hd2d), in the genre's tones and ink; a cell alone (side, topdown at 45 degrees, iso, hd2d):
+      3 tones at 16-32 px. Built to out/_draft/ (or DIR): the ✎ draft to clean by hand, or ◐ to look
+      at. A 2D entry is redrawn simpler at a new density, never drafted.
   pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
       previews (out/_preview; animated assets also get a .gif). --share N also writes out/share/:
@@ -349,7 +352,7 @@ export async function main(argv: string[]): Promise<number> {
   if (a.cmd === "lib") {
     // no art file: the library's own
     try {
-      const out = a.file === "draft" ? libDraft(a.rest[0], a.cell, typeof a.out === "string" ? a.out : undefined) : a.file ? libCard(a.file) : libList({ genre: a.genre, cell: a.cell });
+      const out = a.file === "draft" ? libDraft(a.rest[0], { cell: a.cell, genre: a.genre }, typeof a.out === "string" ? a.out : undefined) : a.file ? libCard(a.file) : libList({ genre: a.genre, cell: a.cell });
       for (const l of out) console.log(l);
       return 0;
     } catch (e) { console.error("error: " + wrap(e).message); return 1; }

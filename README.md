@@ -164,7 +164,7 @@ pxl edit <art.px.js> <scene> <edit>
 pxl steps <art.px.js> <name>      how it was painted; --at x,y names the line that painted that pixel
 pxl list <art.px.js>              a map of the file: each definition's lines and comment
 pxl lib [entry]                   the library: its entries by subject (--genre, --cell), an entry's card;
-                                  draft draws a 3D entry at a cell it lacks
+                                  draft draws a 3D entry in a genre (--genre) or at a cell it lacks
 pxl compare <art.px.js> <name> <ref.png | other>   silhouette rows against a reference or another asset
 pxl blind <art.px.js> <name...>   facing labels checked by a reader who doesn't know them
 pxl study <picture or clip>       learn from finished art or a reference, and what to use in pxl for each part

@@ -3,7 +3,8 @@
 // The two warnings today are known: the knights scene shows a flipped knight beside the turned one, lit
 // from the wrong side (its lesson); the cemetery's crypt is misread (its outline is mostly trims: the
 // cornice, the steps; its columns are lit from the right, as the scene is); no_magic's ramps branch at
-// its dark stone (stone and paper) and its dark rose (cloth and fire), and its lights step through them.
+// its dark stone (stone and paper) and its dark rose (cloth and fire), and its lights step through them;
+// tropical/trees' seven are its plants shrunk from finer drawings (shrink: 2), a density mix it doesn't declare.
 // The parts of a pipeline (`pipeline/part_*.px.js`) are left out: their test_* scenes are scaffolding
 // (a whole 240-frame street each, minutes of checking), and their assets are checked where the
 // pipeline's scene places them. The library's files (lib/) are checked too, by their path from the repo

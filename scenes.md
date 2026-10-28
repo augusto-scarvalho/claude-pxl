@@ -982,40 +982,72 @@ rig3d("hero", { body: { h: TOPDOWN.scale.character[0] * TOPDOWN.grid, heads: TOP
   `c.setData`; palette slots by `sheet(..., { slots })`.
 - **Action top-down:** the same height in every direction (`"height"`, the head over the ground
   point: feet that land a row apart seen from behind don't count). The figure's own pitch can be
-  gentler than the ground's (30 on a 45 degree ground showed a chibi's face and chest).
+  gentler than the ground's (30 on a 45 degree ground showed a chibi's face and chest), and what
+  stands is seen at it too (§16: it faces us): a tree drawn at 45 hides its trunk under its crown, at
+  30 it shows, as the games' trees do.
 - **Racing** (behind, top-down): a car's footprint is where its wheels meet the road, and seen turned
   or from above it moves on the picture: the nearer tyre lands a row lower, a nose hangs below the
   wheels. So the check is the footprint (`"footprint"`: the drawing reaches down to it at every
   heading, `turnaround()` gives it), never one ground line for all.
 - **Colors by role:** the model and the hand-drawn sprites name roles (`primary`, `accent`, `skin`);
   a livery or a slot gives the roles other colors: `mats` in 3D, `roleSwap()` in 2D.
-- **The style by density** stays notes the file reads, but the tones: a `turnaround()` or `rig3d()` that
-  names a genre draws in its `tones` (3 at 16-32 px; or `surface: { tones: 3 }`);
-  the outline all round (`surface: { ink: "k" }`, a turnaround's every heading in one pass), a builder's
-  texture in screen px (the drawing call's ppm, environment §3). An approved cell is frozen (`frozen`):
-  pxl check says when the live render drifts from it.
+- **The style by density** is the genre's `tones` and `ink`: a `turnaround()` or `rig3d()` that
+  names a genre draws in its `tones` (3 at 16-32 px; or `surface: { tones: 3 }`); `ink` a color is
+  the outline all round (`surface: { ink: "#1a1620" }`, a turnaround's every heading in one pass), by
+  category or in words the file reads it; a builder's texture in screen px (the drawing call's ppm,
+  environment §3). An approved cell is frozen (`frozen`): pxl check says when the live render
+  drifted from it.
 
 Start a work from one:
 
-1. Take the genre: `include("<pxl>/lib/profiles/hd2d.px.js", { palette: true })` holds its `genre()`
-   and its starter kit; or write `genre()` from a reference's measured numbers (characters §2): measure the numbers,
-   never copy the pixels.
+1. Take the genre: `lib/profiles/` holds one a file, its numbers measured and their sources beside
+   them: `topdown16`, `topdown32` (action top-down), `platformer16`, `hd2d` (with its starter kit:
+   `include("<pxl>/lib/profiles/hd2d.px.js", { palette: true })`), `fighting`, `racing_behind`,
+   `racing_topdown`; or write `genre()` from a reference's measured numbers (characters §2): measure
+   the numbers, never copy the pixels.
 2. See what the library (`lib/`) already has at its cell, to include rather than redraw:
-   `pxl lib --genre hd2d`, and `pxl lib <entry>` for one's card and the `include` that takes it. A 3D
-   entry it lacks: `pxl lib draft <entry> --cell hd2d/24` draws one to look at or clean by hand.
-3. Size each thing from the genre's `scale` × `grid`: a character `[1.5, 1]` on a 16 px grid is 24 px
-   tall. Never size by eye.
+   `pxl lib --genre topdown16`, and `pxl lib <entry>` for one's card and the `include` that takes it.
+   A 3D entry it lacks: `pxl lib draft <entry> --genre topdown16` draws one in the genre (its camera,
+   what stands at its pitch, the card's box fitted on its grid, its tones and line) to look at or
+   clean by hand.
+3. Size each thing from the genre's `scale` × `grid` (the curve, §19): a character `[1.5, 1]` on a
+   16 px grid is 24 px tall. Never size by eye.
 4. Name the genre on what you make (`genre: "hd2d"`), and `pxl check` runs its checks.
 5. Freeze an approved 3D cell (`frozen`), and give the entry a `card()` (reference, under Assets).
 
 ## 19. Scale and density
 
-- **Density is the grid:** a tile's px, 16, 32, 64 or 128 (the HD-2D kit's 24). A thing's size in
-  tiles is the profile's `scale` for its category: a character 1.5 × 1 in action top-down; a tree 2.5
-  tall, a bush about 1, an oak 2.5-3, a pine 3-4.
+- **Density is the grid:** a tile's px, 16, 32, 64 or 128; or, in a world built in meters with no
+  tiles, px a meter (HD-2D's 24: the cell `hd2d/24ppm`, `genre({ ppm: 24 })`). A thing's size is the
+  profile's `scale` for its category, a box `[tall, wide]`: the curve below.
+- **The scale curve:** sizes in tiles by category, the character the anchor (1.5 × 1: 24 px at 16,
+  48 at 32), the rest as boxes; a chibi world makes its trees and houses small and its figures big. A
+  builder's card gives its box (`tiles: [2.5, 2.5]`), and `pxl lib draft` fits it there. Measured on
+  references for numbers only (the library's profiles name them; never their pixels):
+
+  | Category | Tiles, tall × wide | × the figure | Source |
+  |---|---|---|---|
+  | character | 1.5 × 1 | 1 | A Link to the Past's hero 22 px (characters §13); LPC's 46-48 px at 32 |
+  | bush | 1 × 1 | 0.7 | Ninja Adventure's bushes, 12-15 px at 16 |
+  | rock, crate | 1 × 1 | 0.7 | a tile (§16: a crate 8 px of top over 7 of front) |
+  | boulder | 2 × 2 | 1.3 | Ninja Adventure's boulders, 30-31 px |
+  | lamp | 2 × 0.5 | 1.3 | a post over the figure and a head |
+  | door | 2 × 1 | 1.3 | a little over the tallest figure (§1) |
+  | tree | 2.5 × 2.5 | 1.7 | the library lab's (an oak 2.5-3 tall); Ninja Adventure's 2-3 tiles; LPC's 3.7, a chibi world keeps them smaller |
+  | pine | 3.5 × 2 | 2.3 | the library lab's (a pine 3-4) |
+  | house | 4.5 × 5 | 3 | by the door rule (no house measured yet) |
+  | coin (a platformer's) | 0.5 × 0.5 | 0.3 | |
+
+  The same in tiles at 16 and 32 (`topdown16`, `topdown32`, `platformer16`, `racing_topdown`, its car
+  1.75 along). HD-2D's in meters at 24 px a meter: a figure 1.4 × 0.6 (34 px, Octopath's 33-34), a
+  tree 3 × 2, a bush 0.5 × 0.8, a rock 0.5 × 0.75, a lamp post 1.8 × 0.3. A fighter's in px on its
+  screen (110 × 80 on 320 × 224), a racer's in px across (64, 32 and 16; the rivals by `fit`).
 - **A new density means simplifying, not shrinking.** The form stays relative (tiers, clusters, width
   over height); the parts get fewer (the oak's clusters: 1 a tip at 16 px, 2 at 32), the tones too (3
-  at 16-32, 5 at 128). No outline at 16 px and under, unless the style is 8-bit's.
+  at 16-32, 5 at 128). The outline is the genre's (`ink`): a lone icon of 16 px and under may drop
+  it for width (characters §1), but game sets on a 16 px grid outline everything near-black, even
+  13-14 px figures (89-97% of Puny Characters' edge, 70-86% of Ninja Adventure's trees'), and at 32
+  the figures (LPC's, 71-100%) while trees and props keep a selective line (LPC's trees 14-45%).
 - **Detail is measured in screen px.** The floors: a cluster ~10 px across or more, grain 2 px, marks
   4 px apart, an edge 2 px. A builder drawn at its ppm holds them (`make3d.px`, environment §3). The
   specks measure the noise: the oak at 16 px goes from 3.8% to 1.3% with its ppm and 3 tones.
@@ -1026,5 +1058,7 @@ Start a work from one:
   scaled up and down by nearest neighbour, is the counter-example). Scaling the whole screen is fine:
   `--share`, a scene's `pixel`.
 - **Mixing densities on purpose is a declared style.** HD-2D puts sprites in a finer 3D world (the
-  harbor's `sizes`, a camera's `pixel: 2`): say it in the genre and in the file's header. An accidental
-  mix isn't checked yet.
+  harbor's `sizes`, a camera's `pixel: 2`): say it in the genre (`mix: true`, as `hd2d`'s) and in the
+  file's header. An accidental mix is warned by `pxl check`: a scene placing library entries of two
+  densities (their cards' cells), a `png` blown up (every k x k block one color), a `png` shrunk alone
+  from a finer drawing.

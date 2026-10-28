@@ -25,13 +25,15 @@ sprite("lamp", { base: "lamps._lamp_square", swap: roleSwap(lamps.ROLES._lamp_sq
 
 ## What exists, and at which cells
 
-`pxl lib` lists the entries by subject, a line each, with their cells: the camera and the grid each
-exists at, ✓ approved, ◐ a 3D render to look at, ✎ by hand over a 3D draft (`side/?`: drawn for one
-scene, no grid). `pxl lib --genre hd2d` keeps those at a profile's cell, `pxl lib --cell side/32`
-those at a cell. `pxl lib traveler.tr` prints one's card: what it is, its source, its size, pivot,
-sockets and frames, its roles, what varies, and the `include` that takes it. A 3D entry at a cell it
-lacks: `pxl lib draft make3d.oak --cell topdown/16` writes and builds an art file to start from. A 2D
-entry at a new density is redrawn simpler, never scaled (`pxl help "scenes 18 19"`).
+`pxl lib` lists the entries by subject, a line each, with their cells: the camera and the density each
+exists at (a tile's px, `topdown/16`; px a meter in a world with no tiles, `hd2d/24ppm`), ✓ approved,
+◐ a 3D render to look at, ✎ by hand over a 3D draft (`side/?`: drawn for one scene, neither).
+`pxl lib --genre topdown16` keeps those at a profile's cell, `pxl lib --cell side/32` those at a cell.
+`pxl lib traveler.tr` prints one's card: what it is, its source, its size, pivot, sockets and frames,
+its roles, what varies, and the `include` that takes it. A 3D entry a genre lacks: `pxl lib draft
+make3d.oak --genre topdown16` writes and builds an art file to start from, in the genre's camera (what
+stands at its figure's pitch), the card's box of tiles, its tones and line (`--cell topdown/16`: a cell
+alone). A 2D entry at a new density is redrawn simpler, never scaled (`pxl help "scenes 18 19"`).
 
 Each entry's card is a `card()` call just after it in its file: a renamed entry or asset fails the
 load at the card's line, and `pxl check` on the file warns where a cell's status disagrees with how
@@ -64,5 +66,12 @@ top-down hero, the knight.
 
 ![ui](../docs/gallery/lib/ui.png)
 
-`styles/` holds palettes, `profiles/` the genres (`hd2d`) and their starter kits, `vfx/` the
-volumes' densities: no drawings of their own.
+**Styles** (`styles/`): the engine's own builders (`make3d.rock`, `house`, `bush`, `pine`) in the
+fields style, drafted at their first cells.
+
+![styles](../docs/gallery/lib/styles.png)
+
+`styles/` holds palettes (and, in `fields`, the cards of the engine's own builders, `make3d.rock`,
+`house`, `bush`, `pine`, drawn in its colors), `profiles/` the genres (`topdown16`, `topdown32`,
+`platformer16`, `hd2d`, `fighting`, `racing_behind`, `racing_topdown`: each number's source beside
+it) and their starter kits, `vfx/` the volumes' densities.

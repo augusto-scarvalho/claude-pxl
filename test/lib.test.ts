@@ -1,11 +1,14 @@
 // The library (lib/): its cards (card()), the catalog and an entry's card (pxl lib), a draft (pxl lib draft).
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pack } from "../src/core/color.ts";
+import { Img } from "../src/core/image.ts";
 import { loadProject, loadSource } from "../src/node/load.ts";
-import { cardLines } from "../src/node/check.ts";
-import { findEntry, libCard, libDraft, libList } from "../src/node/lib.ts";
+import { cardLines, checkProject } from "../src/node/check.ts";
+import { catalog, findEntry, libCard, libDraft, libList } from "../src/node/lib.ts";
+import { encodePng } from "../src/node/png.ts";
 import { failure } from "./helpers.ts";
 import { whenChanged } from "./passed.ts";
 
@@ -25,13 +28,27 @@ test("card(): kept by its full name, its data given back; a name or an asset it 
   const b = loadSource(`make3d.define("post", () => ({ field: sdf.sphere(1) }))\ncard("make3d.post", { is: "a ball", cells: { "side/32": "◐" }, tiles: 1, draw: { light: [0, 0, 1] } })`);
   assert.deepEqual([b.cards.get("make3d.post")!.kind, b.cards.get("make3d.post")!.cells["side/32"]], ["builder", { status: "◐" }]);
   assert.match(failure(`make3d.define("post", () => ({ field: sdf.sphere(1) }))\ncard("make3d.post", { is: "a ball", cells: { "side/32": "✓" } })`).message, /names no asset/);
+  // a builder's tiles: a box [tall, wide], or its height alone; a cell's density px a meter (24ppm)
+  const box = loadSource(`make3d.define("post", () => ({ field: sdf.sphere(1) }))\ncard("make3d.post", { is: "a ball", cells: { "hd2d/24ppm": "◐" }, tiles: [1, 2] })`);
+  assert.equal(JSON.stringify([box.cards.get("make3d.post")!.tiles, Object.keys(box.cards.get("make3d.post")!.cells)]), '[[1,2],["hd2d/24ppm"]]');
+  assert.match(failure(`make3d.define("post", () => ({ field: sdf.sphere(1) }))\ncard("make3d.post", { is: "a ball", cells: { "side/32": "◐" }, tiles: [1] })`).message, /tiles is its box in tiles, \[tall, wide\]/);
+  assert.match(failure(`sprite("_post", "1")\ncard("_post", { is: "a post", cells: { "hd2d/24m": "✓" } })`).message, /px a meter \(24ppm\)/);
+});
+
+test("genre(): its density a tile's px or px a meter, its mix said; its cell as pxl lib reads it", () => {
+  assert.match(failure(`genre("g", { ppm: -1 })`).message, /ppm is its px a meter/);
+  assert.match(failure(`genre("g", { mix: "yes" })`).message, /mix: true declares densities mixed on purpose/);
+  const { genres } = catalog();
+  assert.deepEqual(["hd2d", "topdown16", "racing_behind"].map((g) => genres.get(g)!.cell), ["hd2d/24ppm", "topdown/16", "behind/?"]);
+  assert.deepEqual([genres.get("topdown16")!.g.pitch, genres.get("hd2d")!.g.mix], [30, true]);
+  assert.match(libList({ cell: "hd2d/17ppm" }).join("\n"), /crates\._crate_face +sprite +hd2d\/17ppm ✓/);
 });
 
 test("pxl lib: the catalog by subject, filters by cell and genre", () => {
   const all = libList();
   assert.match(all[0], /^pxl's library \(lib\/\), by subject/);
   assert.ok(all.some((l) => /^props +lib\/props: crates lamps$/.test(l)));
-  assert.throws(() => libList({ cell: "side/x" }), /--cell is <camera>\/<grid>/);
+  assert.throws(() => libList({ cell: "side/x" }), /--cell is <camera>\/<density>/);
   assert.throws(() => libList({ genre: "racing-behind" }), /no genre 'racing-behind' in lib\/profiles/);
   assert.throws(() => findEntry("nothing.here"), /no entry 'nothing\.here' in the library/);
 });
@@ -43,24 +60,51 @@ test("pxl lib <entry>: a card with what a build of it reads; --genre hd2d lists 
   assert.match(lamp, /roles +frame F, light Ll: base "lamps\._lamp", swap: roleSwap\(lamps\.ROLES\._lamp/);
   assert.match(oak, /params +height 0\.5\.\.40, season spring summer autumn bare, color 0\.\.9/);
   assert.match(oak, /parts +trunk, crown; sockets top\n/);
-  assert.match(oak, /size +2\.5 tiles tall: 40 px at 16, 80 px at 32, 320 px at 128/);
+  assert.match(oak, /size +2\.5 x 2\.5 tiles \(tall x wide\): 40x40 px at 16, 80x80 px at 32, 320x320 px at 128/);
   assert.match(tr, /source +hybrid: 3D \(surface, decal\)/);
   assert.match(tr, /size +26x40, pivot 13,38; 8 x 110 ms/);
   assert.match(tr, /sockets hand \(cast\).*sheet traveler/);
   assert.match(tr, /moves +walk 8 x 110 ms, idle 4 x 250 ms, kneel 7 x 160 ms \(n ne e se s sw w nw\); cast 13 x 100 ms \(e se sw w\); turn 1 x 250 ms \(16 headings\)/);
   const hd2d = libList({ genre: "hd2d" }).join("\n");
-  assert.match(hd2d, /lamps\._lamp +sprite +hd2d\/24/);
+  assert.match(hd2d, /lamps\._lamp +sprite +hd2d\/24ppm/);
   assert.doesNotMatch(hd2d, /_lamp_tiny|make3d\.oak/);
 });
 
 test("pxl lib draft: a builder at a cell it lacks, written and built; a 2D entry refused", () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-draft-"));
-  const said = libDraft("make3d.chozubachi", "side/16", dir).join("\n");
-  assert.match(said, /make3d\.chozubachi at side\/16: 0\.75 tiles \(12 px\) tall/);
+  const said = libDraft("make3d.chozubachi", { cell: "side/16" }, dir).join("\n");
+  assert.match(said, /make3d\.chozubachi at side\/16: 0\.75 tiles tall \(its card's\) on a 16 px grid: 12 px tall; drawn 1[12] tall/);
   const art = readFileSync(join(dir, "chozubachi_side16.px.js"), "utf8");
   assert.match(art, /turnaround\("chozubachi_side16", make3d\.chozubachi\(\), \{ \.\.\.card\("make3d\.chozubachi"\)\.draw, view: \{ kind: "side", pitch: 0 \}/);
   assert.ok(existsSync(join(dir, "sprites", "chozubachi_side16_s.png")));
-  assert.throws(() => libDraft("lamps._lamp", "side/16", dir), /drawn in 2D: at a new density it is redrawn simpler/);
+  assert.throws(() => libDraft("lamps._lamp", { cell: "side/16" }, dir), /drawn in 2D: at a new density it is redrawn simpler/);
+  // by a genre: its camera at the figure's pitch, fitted to the card's box (neither side over), its tones and line
+  const rock = libDraft("make3d.rock", { genre: "topdown16" }, dir).join("\n"), m = /drawn (\d+) tall, (\d+) wide/.exec(rock)!;
+  assert.match(rock, /seen from 30 degrees \(the figure's; the ground's 45\), in 3 tones, a line of #1a1620 all round/);
+  assert.ok(+m[1] <= 32 && +m[2] <= 32 && Math.max(+m[1], +m[2]) >= 31, rock);
+  assert.match(readFileSync(join(dir, "rock_topdown16.px.js"), "utf8"), /genre\("topdown16", \{ camera: \{ kind: "topdown", pitch: 45 \}, pitch: 30, grid: 16, tones: 3, ink: "#1a1620" \}\)\nturnaround\("rock_topdown16".*surface: \{ \.\.\.card\("make3d\.rock"\)\.draw\?\.surface, ink: "#1a1620" \}, view: \{ kind: "side", pitch: 30 \}/);
+  assert.throws(() => libDraft("make3d.rock", { genre: "racing_behind" }, dir), /its camera is behind; lib draft draws side, topdown, iso, hd2d/);
+});
+
+test("pxl check: densities mixed by accident (library entries of two in a scene, a png blown up or shrunk alone), unless a genre says the mix", () => {
+  const mix = (g: string) => loadSource(`sprite("_a", "1"); sprite("_b", "11")
+card("_a", { is: "a", cells: { "topdown/16": "✓" } }); card("_b", { is: "b", cells: { "topdown/32": "✓" } })${g}
+sprite("_c", { base: "_b" })
+scene("yard", { w: 8, h: 8 }, stamp("_a", 1, 1), stamp("_c", 4, 4))`);
+  const r = checkProject(mix(""));
+  assert.match(r.lines.join("\n"), /yard › WARNING: it places library entries of 2 densities \(_a at topdown\/16; _c at topdown\/32\): pixels of different sizes side by side/);
+  assert.match(r.coverage, /densities on 1/);
+  assert.deepEqual(checkProject(mix(`\ngenre("td32", { camera: { kind: "topdown" }, grid: 32, mix: true })`)).lines, []);
+  // a png blown up 2 times; one shrunk back from it (its own pixels again); a finer drawing shrunk
+  const dir = mkdtempSync(join(tmpdir(), "pxl-mix-")), im = new Img(4, 4);
+  for (let i = 0; i < 16; i++) im.data[i] = pack(40 + 50 * (i % 3), 60, 90 + (i >> 2) * 30, 255);
+  writeFileSync(join(dir, "big.png"), encodePng(im.scale(2)));
+  writeFileSync(join(dir, "fine.png"), encodePng(im));
+  writeFileSync(join(dir, "art.px.js"), `sprite("big", { png: "big.png" })\nsprite("back", { png: "big.png", shrink: 2 })\nsprite("small", { png: "fine.png", shrink: 2 })\n`);
+  const lines = checkProject(loadProject(join(dir, "art.px.js"))).lines.join("\n");
+  assert.match(lines, /big › WARNING: its png is drawn 2 times as big: every 2x2 block is one color.*shrink: 2 brings it to its own/);
+  assert.match(lines, /small › WARNING: shrink: 2 scales a finer drawing down alone: 100% of its 2x2 blocks/);
+  assert.doesNotMatch(lines, /back ›/);
 });
 
 test("pxl check on cards: a cell's status against how its asset is drawn; clean on lib/", () => {

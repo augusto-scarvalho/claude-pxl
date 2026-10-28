@@ -352,6 +352,18 @@ export class Img {
     return o;
   }
 
+  /** The share of its n x n blocks (from its corner, those with ink) that aren't one color: 0, a drawing blown up n times. */
+  mixedBlocks(n: number): number {
+    let ink = 0, mixed = 0;
+    for (let y = 0; y + n <= this.h; y += n) for (let x = 0; x + n <= this.w; x += n) {
+      const c = this.data[y * this.w + x];
+      let one = true, any = false;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const v = this.data[(y + j) * this.w + x + i]; one &&= v === c; any ||= (v & 255) >= 128; }
+      if (any) { ink++; if (!one) mixed++; }
+    }
+    return ink ? mixed / ink : 0;
+  }
+
   /**
    * Shrink by a whole factor: each n x n block becomes its most common opaque color (ties: the
    * first, scanning the block column by column), or transparent when fewer than half of its

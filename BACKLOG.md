@@ -241,9 +241,11 @@ still hold, and the rest wait on these:
 
 ## From the library's catalog (library F4)
 
-- [ ] **A warning for an accidental density mix** (scenes §19): a sprite scaled alone (a `png`'s
+- [x] **A warning for an accidental density mix** (scenes §19): a sprite scaled alone (a `png`'s
   `shrink`, an image blown up) or two entries of different grids in one scene mix pixel sizes;
   `pxl check` could say so where the genre doesn't declare the mix (HD-2D's `sizes`, `pixel`).
+  (F5: it does, unless a genre says `mix: true`; a scene's entries by their cards' cells, so the
+  drawings no card names, the hero's other anims, aren't seen.)
 - [ ] **A card for a kit's function**: `card()` names an asset, a group, a rig3d figure, a
   turnaround, a font or a builder, so `lib/vfx/volumes`' four (`volumes.cloud()`, `.mist()`, …,
   functions) have none and `pxl lib` doesn't list them. A card for a kit function, or the volumes
@@ -252,11 +254,13 @@ still hold, and the rest wait on these:
   that no figure or group gathers, so her card sits on `_mo` with `mo_walk_s` as its asset and
   `pxl lib` calls her `traveler._mo`. A name for a recolored figure (a rig3d option) that takes a
   card as a figure.
-- [ ] **A builder's `tiles` as a box**: `tiles` sets only the height, so the oak drafted at
+- [x] **A builder's `tiles` as a box**: `tiles` sets only the height, so the oak drafted at
   `hd2d/128` came out about 830 px wide for 320 tall. `tiles: [tall, wide]`, as `genre()`'s `scale`.
-- [ ] **A cell's density in px a meter**: a cell's grid is a tile's px, but the harbor has no
+  (F5: and `pxl lib draft` fits the drawing in it, measured; `pxl lib draft --genre` too.)
+- [x] **A cell's density in px a meter**: a cell's grid is a tile's px, but the harbor has no
   tiles, only 17 px a meter (its crates went in as `hd2d/17`), and a scene with neither says
   `side/?`. The density in px a meter where there's no tile grid, told apart from a tile's px.
+  (F5: `hd2d/24ppm`, `genre({ ppm })`.)
 
 ## Characters (from dogfooding a 64 px character)
 
