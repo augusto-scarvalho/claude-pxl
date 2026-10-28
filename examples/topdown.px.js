@@ -89,7 +89,7 @@ const LAYOUT = [
 scene("island", { w: 256, h: 160, world: { light: [-0.5, -1] }, expect: LAYOUT },
   layer("ground", tilemap(CORNERS, { corners: "w", size: T, map: tileMap })),
   // below: the layer starts empty, so "on grass" has to look at the layers under it.
-  layer("flowers", scatter("flowers", 64, 56, 120, 48, 14, { on: "g", below: true, seed: 3 })),
+  layer("flowers", scatter("flowers", 64, 56, 120, 48, 14, { on: "g", below: true, even: true, seed: 3 })),
   layer("shadows", { shade: true },
     ...trees.map(([x, y]) => ellipse(x + 13, y + 25, 9, 3, "k")),
     ellipse(110, 101, 7, 2, "k"), ellipse(126, 61, 7, 2, "k")),

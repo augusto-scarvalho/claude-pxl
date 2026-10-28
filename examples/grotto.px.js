@@ -164,7 +164,7 @@ const sporeSources = [[37, 112], [57, 114], [99, 121], [229, 125], [269, 120], [
 const island = [140, 152, 147, 145, 158, 144, 166, 147, 172, 154];
 anim("grotto", { w: W, h: H, ...loop, world: { ground: [floor, ledgeTop, island] } },
   layer("backwall", { wall: true }, rect(0, 0, W, H, "K"),
-    scatter("_stone*", -8, -8, W + 16, H + 16, 620, { rflip: "xy", rswap: [{}, {}, { r: "R" }], seed: 7 })),
+    scatter("_stone*", -8, -8, W + 16, H + 16, 620, { rflip: "xy", rswap: [{}, {}, { r: "R" }], even: true, seed: 7 })),
 
   layer("water", rect(100, POOL, 120, 30, "w")),
 
@@ -181,12 +181,12 @@ anim("grotto", { w: W, h: H, ...loop, world: { ground: [floor, ledgeTop, island]
     poly([200, ceilY(204) - 1, 207, ceilY(204) - 1, 205, ceilY(204) + 4, 202, ceilY(204) + 4], "_"),  // waterfall crack
     (c) => { for (let y = 1; y < H; y++) for (let x = 0; x < W; x++) if (c.is(x, y, "R") && c.is(x, y - 1, ".")) c.px(x, y, "q"); },
     bump("bevel", { w: 3 }),
-    scatter("_lump*", 0, 0, W, H, 140, { on: "R", clip: true, rflip: "xy", seed: 3 })),
+    scatter("_lump*", 0, 0, W, H, 220, { on: "R", clip: true, rflip: "xy", even: true, seed: 3 })),
 
   // Moss and grass carpet every upward-facing rock lip.
   layer("flora",
-    scatter("_moss*", 0, 0, W, POOL, 170, { on: "q", below: true, rflip: "x", seed: 5 }),
-    scatter("_tuft*", 0, 0, W, POOL, 90, { on: "q", below: true, rflip: "x", seed: 6 })),
+    scatter("_moss*", 0, 0, W, POOL, 300, { on: "q", below: true, rflip: "x", even: true, seed: 5 }),
+    scatter("_tuft*", 0, 0, W, POOL, 160, { on: "q", below: true, rflip: "x", even: true, seed: 6 })),
 
   layer("life",
     ...ferns.map((x) => stamp("fern", x, "ground", { rdelay: true, rflip: "x" })),

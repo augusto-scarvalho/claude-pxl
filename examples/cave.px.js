@@ -65,7 +65,7 @@ const bugAt = ([cx, cy, ax, ay, fx, fy, p], t) =>
 anim("cave", { w: W, h: H, frames: FRAMES, fps: 8, world: { ground: stands } },
   // Back wall: domed cobbles, invisible in the dark, picked out by passing lights.
   layer("backwall", { wall: true }, rect(0, 0, W, H, "K"),
-    scatter("_stone*", -6, -6, W + 12, H + 12, 260, { rflip: "xy", rswap: [{}, {}, { r: "R" }], seed: 4 })),
+    scatter("_stone*", -6, -6, W + 12, H + 12, 260, { rflip: "xy", rswap: [{}, {}, { r: "R" }], even: true, seed: 4 })),
 
   layer("rock", { solid: true },
     poly([0, 0, ...ceil, W, 0], "R"),
@@ -77,7 +77,7 @@ anim("cave", { w: W, h: H, frames: FRAMES, fps: 8, world: { ground: stands } },
     // Upward-facing edges get a lighter lip so the floor reads where props stand on it.
     (c) => { for (let y = 1; y < H; y++) for (let x = 0; x < W; x++) if (c.is(x, y, "R") && c.is(x, y - 1, ".")) c.px(x, y, "q"); },
     bump("bevel", { w: 3 }),
-    scatter("_lump*", 0, 0, W, H, 70, { on: "R", clip: true, rflip: "xy", seed: 2 })),
+    scatter("_lump*", 0, 0, W, H, 100, { on: "R", clip: true, rflip: "xy", even: true, seed: 2 })),
 
   layer("life",
     ...fungi.map(([n, x]) => stamp(n, x + 7, "ground", { rdelay: true })),
