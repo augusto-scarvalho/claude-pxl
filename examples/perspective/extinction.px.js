@@ -234,7 +234,9 @@ function lava(c, frame) {
 }
 // Steam and smoke off the lava (Semeru's flow smokes all the way down): puffs rising from the main
 // flow, its lobe and where the old flow meets the plain, red underneath from the lava, gray above,
-// growing and thinning as they rise and drift right with the wind; each lives a loop.
+// growing and thinning as they rise and drift right with the wind; each lives a loop (plume(), a puff a
+// loop from each, rising at a steady rate, lit from straight above: its top catches the light, its
+// underside keeps the lava's red while it is young; whole while young, thinning only with age).
 const STEAM = (() => {
   const out = [], main = FLOWS[0].strands[0], old = FLOWS[2].strands[0]
   for (let i = 0; i < 8; i++) { const q = main[Math.floor(main.length * (0.3 + i * 0.09))]; if (q) out.push({ p: q.p, ph: (i * 0.37) % 1, big: 1 }) }
@@ -244,13 +246,8 @@ const STEAM = (() => {
 })()
 function steam(c, frame) {
   for (const [i, S] of STEAM.entries()) {
-    const life = (frame / FRAMES + S.ph) % 1, [bx, by] = P.ground(...S.p), sc = P.scale(S.p[1], S.p[0], S.p[2])
-    const x = bx + life * 110 * sc, y = by - life * 200 * sc - 1, R = (1.5 + life * 5) * S.big
-    for (let yy = Math.floor(y - R); yy <= Math.ceil(y + R); yy++) for (let xx = Math.floor(x - R); xx <= Math.ceil(x + R); xx++) {
-      const oy = (yy + 0.5 - y) / R, d = Math.hypot((xx + 0.5 - x) / R, oy) + (vnoise(xx / 2 + i * 7, yy / 2) - 0.5) * 0.4
-      if (d > 1 || (life > 0.55 && (xx + yy) & 1) || (life > 0.85 && hash(xx, yy) < 0.5)) continue
-      c.px(xx, yy, oy > 0.25 && life < 0.5 ? "G" : d < 0.55 ? "D" : "C")
-    }
+    const [bx, by] = P.ground(...S.p), sc = P.scale(S.p[1], S.p[0], S.p[2])
+    c.plume(bx, by - 1, "CDC", { every: FRAMES, life: FRAMES, rise: 200 * sc, wind: (110 * sc) / FRAMES, size: [1.5 * S.big, 6.5 * S.big], young: "CG", light: [0, -1], steady: true, thin: "age", seed: i + 1, frame: frame + Math.round(S.ph * FRAMES) })
   }
 }
 // What the eruption throws out: bombs falling on the upper cone glow where they land and cool, white
