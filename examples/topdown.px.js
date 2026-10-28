@@ -41,7 +41,7 @@ sprite("tree", { w: 22, h: 26, outline: "h" },
   circ(8, 6, 3, "l"), px(4, 10, "l"), px(5, 9, "l"))
 sprite("bush", { w: 12, h: 9, outline: "h" },
   circ(4, 5, 3, "G"), circ(8, 5, 3, "G"), circ(6, 3, 3, "G"), circ(5, 3, 2, "g"), px(4, 2, "l"))
-sprite("rock", { w: 12, h: 8, outline: "k" },
+sprite("rock", { w: 12, h: 8, outline: "K" },
   ellipse(6, 4, 5, 3, "S"), ellipse(5, 3, 4, 2, "s"), hline(3, 7, 7, "K"))
 
 // Boards run across the pier; posts stick out at both sides every 12 px.
@@ -92,7 +92,7 @@ scene("island", { w: 256, h: 160, world: { light: [-0.5, -1] }, expect: LAYOUT }
   layer("flowers", scatter("flowers", 64, 56, 120, 48, 14, { on: "g", below: true, even: true, seed: 3 })),
   layer("shadows", { shade: true },
     ...trees.map(([x, y]) => ellipse(x + 13, y + 25, 9, 3, "k")),
-    ellipse(110, 101, 7, 2, "k"), ellipse(126, 61, 7, 2, "k")),
+    ellipse(110, 101, 7, 2, "k"), ellipse(126, 61, 7, 2, "k"), ellipse(99, 79, 7, 2, "k"), ellipse(205, 101, 7, 2, "k")),
   layer("props",
     stamp("pier", 152, 116),
     stamp("bush", 102, 92, { id: "bush_s" }), stamp("bush", 118, 52, { flip: "x", id: "bush_n" }),
