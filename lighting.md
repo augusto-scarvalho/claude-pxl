@@ -24,7 +24,7 @@ scene("cabin", { w: 200, h: 130, bg: "n" },
   layer("backwall", { wall: true }, ...),                      // light passes; sky light doesn't start here (it can spread in)
   layer("frame", { solid: true }, ...),                        // floors, roof, outer walls
   layer("props", stamp("torch", 70, 82), ...),
-  lighting({ cell: 4, sky: 0.9, skyColor: "#d8ccf0", ambient: 0.03, emit: "yY" }),
+  lighting({ cell: 2, smooth: true, sky: 0.9, skyColor: "#d8ccf0", ambient: 0.03, emit: "yY" }),
   layer("ui", ...))                                            // after lighting() = not lit
 ```
 

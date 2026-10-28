@@ -68,4 +68,4 @@ scene("cabin", { w: 200, h: 130, bg: "n", layers: true },
     rect(124, 64, 12, 5, "r"), rect(124, 63, 3, 2, "s"),     // bed
     stamp("lamppost", 36, 84)),
 
-  lighting({ cell: 4, sky: 0.9, skyColor: "#d8ccf0", skyReach: 20, ambient: 0.03, emit: "yYG" }))
+  lighting({ cell: 2, smooth: true, sky: 0.9, skyColor: "#d8ccf0", skyReach: 20, ambient: 0.03, emit: "yYG" }))
