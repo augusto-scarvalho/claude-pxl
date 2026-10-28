@@ -6,7 +6,7 @@
 // darkens it) and its lamps light the ground round it (lighting()); the sheet blooms by how much each
 // pixel gives (post()). How to design an element of your own: scenes.md, "Designing an element".
 // The caster is the traveler casting; the spell leaves from his hand.
-include("../lib/characters/traveler.px.js")
+include("../lib/characters/traveler.px.js", { as: "traveler" })
 pal({ k: "#0e0c16", n: "#1c1a2c", m: "#2a2840", g: "#3a4a3a", h: "#2c382e", d: "#232c24", s: "#6a6a72", t: "#4a4a54", u: "#34343c",
   c: "#3a4a8a", C: "#28346a", f: "#d8b090", w: "#e8e4d8", x: "#8a8aa0" })
 
@@ -30,7 +30,7 @@ for (const el of ELEMENTS)
   for (const tier of [1, 2, 3]) {
     const S = spell(el, tier, { from: "hero.hand", to: [89, GY - 10], ground: GY + 2, start: 200, seed: tier * 7 })
     anim(`${el}_${tier}`, { w: CW, h: CH, ...CLOCK },
-      stamp("_place", 0, 0), (c) => c.stamp("tr_cast_e", 14, GY + 1, { frame: S.ability.frame(c.t, CAST, { before: 12 }), id: "hero" }), cast(S), lighting({ ambient: 0.55 }))
+      stamp("_place", 0, 0), (c) => c.stamp("traveler.tr_cast_e", 14, GY + 1, { frame: S.ability.frame(c.t, CAST, { before: 12 }), id: "hero" }), cast(S), lighting({ ambient: 0.55 }))
   }
 
 const GAP = 4, TOP = 12, LEFT = 4

@@ -11,7 +11,7 @@ pal({
   r: "#ff5d6c",
 })
 ramps("kWVvq", "kPp", "kROou", "kaLlw", "knMm", "keCc")
-include("../lib/props/lamps.px.js")   // the street lamp, taken in these colors
+include("../lib/props/lamps.px.js", { as: "lamps" })   // the street lamp, taken in these colors
 
 // ---------------------------------------------------------------- small parts
 sprite("_dentil", `
@@ -144,7 +144,7 @@ sprite("_bird", `
   kkk
   ..k`)
 
-sprite("lamp", { base: "_lamp_globe", swap: roleSwap(lamps.ROLES._lamp_globe, { line: "k", frame: "WV", glass: "a", light: "lw", beads: "pm" }) })
+sprite("lamp", { base: "lamps._lamp_globe", swap: roleSwap(lamps.ROLES._lamp_globe, { line: "k", frame: "WV", glass: "a", light: "lw", beads: "pm" }) })
 
 sprite("cart", { w: 30, h: 22, outline: "k" },
   rect(0, 0, 30, 4, "p"), pattern("_awning", 0, 0, 30, 6),

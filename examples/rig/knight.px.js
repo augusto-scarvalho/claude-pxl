@@ -1,5 +1,5 @@
 // The knight of lib/characters/knight.px.js (a 72 px knight built skeleton first, its poses and a bout),
-// to look at. The tournament (tournament.px.js) includes this file.
+// to look at. The tournament (tournament.px.js) includes the lib file.
 include("../../lib/characters/knight.px.js", { palette: true })
 const { BOUT_LOOP, BOUT_SIGNAL, BOUT_HOME, RED } = knight   // their old names, for the files that include this one
 

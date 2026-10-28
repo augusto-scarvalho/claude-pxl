@@ -20,8 +20,8 @@ pal({
   Q: "#f6f1d5", Y: "#f8e45c",                                  // moon, eyeshine (both glow in the dark)
 })
 ramps("kKPpmM", "kjTty", "keWwu", "kSsiI", "SBCcx", "eAalL", "kRrq", "RHh", "kZGgz", "kFfv", "kNnbo")
-include("../lib/props/lamps.px.js")    // the oil lamp, taken in these colors
-include("../lib/props/crates.px.js")   // the barrel and the crate of potions
+include("../lib/props/lamps.px.js", { as: "lamps" })    // the oil lamp, taken in these colors
+include("../lib/props/crates.px.js", { as: "crates" })   // the barrel and the crate of potions
 
 const FLOOR = 80   // the back wall meets the floor here
 
@@ -692,7 +692,7 @@ sprite("pumpkin_s", { outline: "k" }, `
   hhHhhHh
   .HHHHH.`)
 
-sprite("barrel", { base: "_barrel_big", swap: roleSwap(crates.ROLES._barrel_big, { line: "k", wood: "Wwu", metal: "Si" }) })
+sprite("barrel", { base: "crates._barrel_big", swap: roleSwap(crates.ROLES._barrel_big, { line: "k", wood: "Wwu", metal: "Si" }) })
 
 // pointed leaf from a base point, along an angle (degrees, 0 = right, -90 = up)
 const leaf = (bx, by, deg, len, wid, body, rib, hi) => (c) => {
@@ -746,7 +746,7 @@ sprite("side_table", { w: 18, h: 22, outline: "k" },
   ellipse(9, 4, 8, 3, "w"), ellipse(9, 3, 8, 3, "u"), hline(4, 1, 8, "c"),
   rect(8, 7, 3, 12, "W"), vline(8, 7, 12, "w"), ellipse(9, 19, 6, 2, "W"), hline(5, 19, 3, "w"))
 
-sprite("oil_lamp", { base: "_oil_lamp", swap: roleSwap(lamps.ROLES._oil_lamp, { line: "k", frame: "Aa", glass: "cx", light: "lL" }) })
+sprite("oil_lamp", { base: "lamps._oil_lamp", swap: roleSwap(lamps.ROLES._oil_lamp, { line: "k", frame: "Aa", glass: "cx", light: "lL" }) })
 
 sprite("cookies", { outline: "k" }, `
   ..ccccc..
@@ -756,7 +756,7 @@ sprite("cookies", { outline: "k" }, `
   ..ccccc..`)
 
 // potion bottles packed upright, seen from above: corks and shoulders
-sprite("crate", { base: "_crate_bottles", swap: roleSwap(crates.ROLES._crate_bottles, { line: "k", wood: "eWwu", bottles: "Gbra", cork: "c", glint: "x" }) })
+sprite("crate", { base: "crates._crate_bottles", swap: roleSwap(crates.ROLES._crate_bottles, { line: "k", wood: "eWwu", bottles: "Gbra", cork: "c", glint: "x" }) })
 
 // the cat's bed, empty: it has better things to do tonight
 sprite("catbed", { w: 32, h: 17, outline: "k" },

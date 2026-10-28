@@ -4,7 +4,7 @@
 // unchanged (the pixel and its 8 neighbours the same colors: a part that only moved), and how many of
 // those turned their normal by more than 10°. lighting.md has what it found on the walks.
 //
-//   node scripts/pulse.ts examples/hd2d/traveler.px.js tr_walk_e
+//   node scripts/pulse.ts lib/characters/traveler.px.js tr_walk_e
 //   node scripts/pulse.ts walk.px.js walk walk_hybrid walk_dome      one walk, each with its own normals
 import { resolve } from "node:path";
 import { loadProject } from "../src/node/load.ts";

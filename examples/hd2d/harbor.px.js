@@ -3,14 +3,15 @@
 // degrees down through a 30-degree lens, the ship's near side square to it, 17 px to the meter so the
 // frame holds what the reference's does round 34 px figures; everything laid a texel to a sprite's
 // pixel. The galleon bobbing at the pier, the pier on two levels, the water, rowboats, the crane,
-// cargo, mooring lines, gulls, a lighthouse, the awning, the crew at work (crew.px.js), and Alden's
-// passage aboard, with a talk in parchment dialogue boxes. `harbor` is the art at its own size, the one
-// checked; `harbor_md` the same twice as big through post(); `harbor_clip` its middle, for the gallery.
-include("crew.px.js")                   // the traveler, the mourner and the crew (crew.px.js includes traveler.px.js)
+// cargo, mooring lines, gulls, a lighthouse, the awning, the crew at work (lib/characters/crew.px.js),
+// and Alden's passage aboard, with a talk in parchment dialogue boxes. `harbor` is the art at its own
+// size, the one checked; `harbor_md` the same twice as big through post(); `harbor_clip` its middle, for
+// the gallery.
+include("../../lib/characters/crew.px.js", { as: "crew" })   // the traveler, the mourner and the crew (it includes the traveler)
 include("../../lib/profiles/hd2d.px.js")   // its lamps (lib/props/lamps.px.js): the ship's lanterns
-include("../../lib/props/crates.px.js")    // the crates' faces and the barrels
+include("../../lib/props/crates.px.js", { as: "crates" })    // the crates' faces and the barrels
 include("../../lib/ui/font5x7.px.js")
-include("../../lib/ui/dialog.px.js")     // the dialogue boxes
+include("../../lib/ui/dialog.px.js", { as: "dialog" })     // the dialogue boxes
 
 pal({
   k: "#1d1410",                                                   // outline, the deepest gaps
@@ -181,11 +182,11 @@ sprite("_boatwood", { w: 32, h: 40 }, (c) => {
 // Crates: boards 3 px across over dark seams, each its own tone, grain in runs, nail heads at their
 // ends, a lighter brace on the diagonal; their edges outlined (the material's edge); the lid's boards.
 const WOOD = { wood: "lmFnToO" }
-sprite("_crate", { base: "_crate_face", swap: roleSwap(crates.ROLES._crate_face, WOOD) })
-sprite("_cratetop", { base: "_crate_lid", swap: roleSwap(crates.ROLES._crate_lid, WOOD) })
+sprite("_crate", { base: "crates._crate_face", swap: roleSwap(crates.ROLES._crate_face, WOOD) })
+sprite("_cratetop", { base: "crates._crate_lid", swap: roleSwap(crates.ROLES._crate_lid, WOOD) })
 // A barrel at the scene's scale (0.65 x 0.9 m): staves 3 px, bulging at its middle, two pairs of dark
 // hoops, its lid seen from above; lit on the right, where the sun is.
-sprite("_barrel", { base: "_barrel_small", swap: roleSwap(crates.ROLES._barrel_small, { line: "k", ...WOOD }) })
+sprite("_barrel", { base: "crates._barrel_small", swap: roleSwap(crates.ROLES._barrel_small, { line: "k", ...WOOD }) })
 // Sacks of grain in golden burlap: one standing, tied at the neck, one lying; lit on the right.
 sprite("_sack", { pivot: "bottom", outline: "k" }, "....ll....\n...lDl....\n....CD....\n..CDDDE...\n.CDDDDEE..\nCCDDDDDEE.\nCDDDDDDEE.\nCCDDDDDDE.\n.CCDDDDE..\n..CCCCC...", bump("hybrid"))
 sprite("_sack_l", { pivot: "bottom", outline: "k" }, "...CDDDDE....\n.CDDDDDDDEE..\nCDDDDDDDDDEEl\nCCDDDDDDDDEll\n.CCCDDDDDEE..\n...CCCCCC....", bump("hybrid"))
@@ -557,7 +558,7 @@ prism("haze", "haze", [[-26, 16], [-12, 16], [-13, 22], [-26, 22]], -0.3, 1.2)
 // the pier.
 const SHIPC = [0, Z + ZC, 0]
 const shipPose = (f) => ({ th: 0.008 * Math.sin((2 * Math.PI * f) / 48), dh: 0.05 * Math.sin((2 * Math.PI * f) / 48 + 1.3) })
-// The crew at work (crew.px.js): Alden with Edith and the braided companion left of the gangway
+// The crew at work (lib/characters/crew.px.js): Alden with Edith and the braided companion left of the gangway
 // (his passage below), the grey-haired captain in his long coat at its foot; a sailor in a
 // bandana and a bearded dockhand talking in the middle of the pier, turned to each other; the docker
 // in the flat cap and apron carrying a crate held low in front between the stack and the big boat,
@@ -570,9 +571,9 @@ const PACE = (dir) => traveler.pace(dir) / PPM
 const carrier = (f) => {
   const z = Z - 8.25, STEP = (0.7 * traveler.pace("e")) / CAM.scale(z), LEG = Math.round(2.6 / STEP), T = LOOP / 2 - LEG, x0 = 4.2, x1 = x0 + LEG * STEP, t = f % LOOP
   const [x, dir, walking] = t < LEG ? [x0 + t * STEP, "e", true] : t < LEG + T ? [x1, "e", false] : t < 2 * LEG + T ? [x1 - (t - LEG - T) * STEP, "w", true] : [x0, "w", false]
-  return [{ name: `car_${walking ? "carry" : "carryidle"}_${dir}`, at: [x, z], frame: walking ? f % 8 : idle(f) }]
+  return [{ name: `crew.car_${walking ? "carry" : "carryidle"}_${dir}`, at: [x, z], frame: walking ? f % 8 : idle(f) }]
 }
-const ONSHIP = [...LANTERNS, { name: "sab_idle_s", at: [2.8, Z + hullZ(2.8, DECK) + 0.45, DECK] }, { name: "off_idle_sw", at: [7.7, Z + hullZ(7.7, DECK) + 0.9, POOP] }]
+const ONSHIP = [...LANTERNS, { name: "crew.sab_idle_s", at: [2.8, Z + hullZ(2.8, DECK) + 0.45, DECK] }, { name: "crew.off_idle_sw", at: [7.7, Z + hullZ(7.7, DECK) + 0.9, POOP] }]
 const onShip = (f) => { const { th, dh } = shipPose(f); return ONSHIP.map((p) => ({ ...p, at: turnPt(p.at, SHIPC, [1, 0, 0], th, dh), frame: idle(f) })) }
 // Seagulls crossing on the wind, each once a loop at its own height and depth, gliding and now and
 // then flapping (8 frames of flaps in 24), rising and falling a little; one low over the boats the
@@ -598,7 +599,7 @@ const feetAt = (x, z) => {
   return x <= -9.2 || (x <= -7.4 && z >= x + 3.0 - 1e-6) ? UPPER : LOWER
 }
 const onBoard = (x, z) => z > Z - 5.3 && x > -1.0 && x < 4.6   // z in the world's
-const visit = route({ pace: PACE, origin: [0, Z], ground: (x, z) => feetAt(x, z - Z), climb: true, walk: "tr_walk", idle: { anim: "tr_idle", frame: idle }, loop: LOOP }, [
+const visit = route({ pace: PACE, origin: [0, Z], ground: (x, z) => feetAt(x, z - Z), climb: true, walk: "crew.tr_walk", idle: { anim: "crew.tr_idle", frame: idle }, loop: LOOP }, [
   [-11.6, -8.6], [-8.4, -5.4],                     // in from the left along the walkway, to the ramp's head
   [-6.42, -7.38],                                  // down the ramp
   [-1.0, -7.38],                                   // along the pier
@@ -620,14 +621,14 @@ const alden = (f) => {
 // as he goes up, and back when he has gone; a direction every two frames
 const CAPTAIN = [1.15, -6.3], GONE = visit.total
 const CAPTURNS = [[0, "sw"], [TALK + 2, "w"], [TALKED + 6, "nw"], [TALKED + 8, "n"], [GONE + 8, "nw"], [GONE + 10, "w"], [GONE + 12, "sw"]]
-const captain = (f) => ({ name: `cap_idle_${CAPTURNS.filter(([k]) => k <= f).at(-1)[1]}`, at: [CAPTAIN[0], Z + CAPTAIN[1], LOWER], frame: idle(f) })
+const captain = (f) => ({ name: `crew.cap_idle_${CAPTURNS.filter(([k]) => k <= f).at(-1)[1]}`, at: [CAPTAIN[0], Z + CAPTAIN[1], LOWER], frame: idle(f) })
 // Edith and the companion by the gangway, watching him: each turns toward him a direction every two
 // frames while he is near, and back to the pier when he has gone
-const watchers = [["mo", -3.2, -5.75], ["cmp", -2.3, -5.6]].map(([who, x, z]) => turnToward(`${who}_idle`, [x, Z + z], alden, { within: 6.5, frame: idle }))
+const watchers = [["mo", -3.2, -5.75], ["cmp", -2.3, -5.6]].map(([who, x, z]) => turnToward(`crew.${who}_idle`, [x, Z + z], alden, { within: 6.5, frame: idle }))
 // the two talking in the middle of the pier: now one, now the other turns his head toward us and back
 const talkers = (f) => [
-  { name: `sai_idle_${f % 64 >= 10 && f % 64 < 26 ? "se" : "e"}`, at: [2.55, Z - 7.9], frame: idle(f) },
-  { name: `dkb_idle_${f % 64 >= 40 && f % 64 < 56 ? "sw" : "w"}`, at: [3.4, Z - 7.75], frame: (idle(f) + 2) % 4 },
+  { name: `crew.sai_idle_${f % 64 >= 10 && f % 64 < 26 ? "se" : "e"}`, at: [2.55, Z - 7.9], frame: idle(f) },
+  { name: `crew.dkb_idle_${f % 64 >= 40 && f % 64 < 56 ? "sw" : "w"}`, at: [3.4, Z - 7.75], frame: (idle(f) + 2) % 4 },
 ]
 const SAYS = [
   [3, 25, "Alden", ["Is this the ship", "to Port Winds?"], () => visit.step("talk").a, -1],
@@ -646,8 +647,8 @@ const talk = (c, f = c.frame) => {
 }
 const people = (f) => [
   ...[alden(f)].filter(Boolean), captain(f), ...watchers.map((w) => w(f)), ...talkers(f),
-  { name: "dkg_idle_ne", at: [5.7, Z - 6.7], frame: (idle(f) + 1) % 4 },
-  { name: "crn_idle_e", at: [-11.25, Z - 5.3], frame: idle(f) },
+  { name: "crew.dkg_idle_ne", at: [5.7, Z - 6.7], frame: (idle(f) + 1) % 4 },
+  { name: "crew.crn_idle_e", at: [-11.25, Z - 5.3], frame: idle(f) },
   ...carrier(f), ...onShip(f), ...gulls(f), ...PROPS, ...boatCargo(f),
 ]
 // Afternoon (SUNV, the sails' light, is the same way): the sun behind on the right, high and warm (the water glitters toward us, the shadows

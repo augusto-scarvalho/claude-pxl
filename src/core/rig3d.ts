@@ -1,8 +1,8 @@
 // A figure on the 3D layer: a skeleton posed in 3D (in the sprite's px: x across, y away from us, z up,
 // as the fields are), its limbs distance fields along the bones (capsules, balls, what the file adds),
 // drawn by surface() from the side as a field sprite is (20 degrees down), turned to each heading of
-// the compass. What hd2d/traveler.px.js and rig/warden.px.js each carried as a private engine (a
-// camera, two-bone IK, a z-buffer of tubes and balls) becomes a field and a camera like any other.
+// the compass. What lib/characters/traveler.px.js and rig/warden.px.js each carried as a private engine
+// (a camera, two-bone IK, a z-buffer of tubes and balls) becomes a field and a camera like any other.
 // rig3d() makes the moves in every direction asked; its flat-blocks mode (the head yellow with a red
 // face, the body orange, the right limbs light and the left dark) is how a new move is judged before
 // it is painted. gait() gives a walk's numbers by the view, views() places hand-drawn heads.

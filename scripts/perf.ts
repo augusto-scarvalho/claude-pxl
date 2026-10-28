@@ -5,7 +5,7 @@
 //
 //   node scripts/perf.ts                     every example, slowest first
 //   node scripts/perf.ts examples/sunset/sunset.px.js
-//   node scripts/perf.ts --vs HEAD examples/hd2d/traveler.px.js --only "^tr_walk_"
+//   node scripts/perf.ts --vs HEAD lib/characters/traveler.px.js --only "^tr_walk_"
 //
 // Each file runs in a process of its own, so one file's memory doesn't count toward the next.
 // --vs <rev> times the files' frames built by the pxl at a git revision and by the working tree, in

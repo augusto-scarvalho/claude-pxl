@@ -783,7 +783,7 @@ const WHAT: Record<Piece["kind"], string> = {
   stream: "things going across one after another (traffic, a crowd): each a sprite stamped along its lane, back at the start when it leaves (a whole lane at one speed: scroll())",
   anim: "animated in place: an anim of its drawings",
   rig: "parts moving against a body that stays: a rig (rig(), its parts at sockets), or an anim with a frame per pose",
-  action: "a run of poses played once (an attack, a jump, a fall): an anim with a frame per pose (for many, a rig posed by ik: rig/knight.px.js), its timing in how many frames each part takes",
+  action: "a run of poses played once (an attack, a jump, a fall): an anim with a frame per pose (for many, a rig posed by ik: lib/characters/knight.px.js), its timing in how many frames each part takes",
   effect: "changing all over without repeating, or paint that comes and goes (fire, water, smoke, sparkle, a flash, a smear): an effect in code (flame(), plume(), warp(), noise drawn per frame), or an anim of its drawings played once (a smear: stamp's smear, arc())",
   light: "lighter and darker all at once: a light: glow(), a lamp, or colors swapped per frame",
 };

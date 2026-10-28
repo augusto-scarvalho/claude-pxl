@@ -11,7 +11,7 @@
 // one checked; `clearing_md` three times as big (960x540) through post(): the depth in focus, Three's bloom, a dusk
 // grade from dusk.cube, a light grain.
 include("../../lib/profiles/hd2d.px.js", { palette: true })
-include("../../lib/characters/traveler.px.js")
+include("../../lib/characters/traveler.px.js", { as: "traveler" })
 // the scarecrow's straw (S W X), burlap (H F), wood (P R) and hat (C 9), keys of its own (the kit's ramps
 // use 1-8); the fire's tones
 pal({ "S": "#f0d880", "W": "#c8a050", "X": "#8a6830", "H": "#b89a72", "F": "#7a6048", "P": "#8a6a4a", "R": "#4a3428", "C": "#5a4a3a", "9": "#33281f", "0": "#2a1a14" })
@@ -41,7 +41,7 @@ anim("_burst_smoke", { w: 48, h: 40, pivot: "bottom", frames: 26, fps: 20 }, smo
 // the smoke of the fire, a column rising and leaning with the wind, lit warm from below
 anim("_fire_smoke", { w: 44, h: 80, pivot: "bottom", frames: 50, fps: 20 }, smoke(20, 76, ["#b8aca2", "#7e746e", "#4e4846"], { shape: "column", path: [0, 0, 2, -24, 8, -50, 14, -70], size: [3, 10], count: 18, seed: 6, light: [-0.4, 0.8] }))
 // the aura round him while he casts, from each frame of the pose (it hugs it)
-anim("tr_cast_aura_e", { base: "tr_cast_e" }, effect("aura", { width: 3, color: ["#fff0b0", "#ff9a30", "#d8401c"], fade: 0.5, flicker: 0.6, scale: 3.5, speed: 2 }))
+anim("tr_cast_aura_e", { base: "traveler.tr_cast_e" }, effect("aura", { width: 3, color: ["#fff0b0", "#ff9a30", "#d8401c"], fade: 0.5, flicker: 0.6, scale: 3.5, speed: 2 }))
 // the wood and the grass in one wind, out of step (environment §2, §3)
 const WIND = { frames: 50, fps: 20 }                       // 2.5 s a sway: twice in the scene's 5 s
 const SWAY = { _pine: { amount: 2, still: 6 }, _deadtree: { amount: 1.5, still: 12, power: 2.5 }, _bush: { amount: 1, power: 1.5 },
@@ -86,7 +86,7 @@ const CAST = [["charge", 0, 1, 100], ["charge", 2, 4], ["cast", 5], ["travel", 6
 const DUSK = { light: [-0.8, 0.45, 0.35], sun: { color: "#ffb478", strength: 1.25 }, sky: { color: "#6a72b8", strength: 0.45 } }
 const people = (c) => {
   const t = c.t, p = S.ability(t), pose = S.ability.frame(t, CAST, { before: -1, after: -1 }), puff = S.ability.since(t, "impact", 50), out = [...WOOD]
-  out.push(pose >= 0 ? { name: "tr_cast_e", at: HERO, frame: pose, id: "hero" } : { name: "tr_idle_e", at: HERO })
+  out.push(pose >= 0 ? { name: "traveler.tr_cast_e", at: HERO, frame: pose, id: "hero" } : { name: "traveler.tr_idle_e", at: HERO })
   if (p.name === "charge" || p.name === "cast") out.push({ name: "tr_cast_aura_e", at: [HERO[0], HERO[1] - 0.01], frame: pose, blend: "add", opacity: 0.2 + 0.4 * S.ability.span(t, "charge"), light: false })
   // the scarecrow burning, a puff of smoke as it is hit, its smoke from the fire taking to its last wisps
   if (puff >= 0 && puff < 26) out.push({ name: "_burst_smoke", at: [CROW[0], CROW[1] + 0.05], frame: puff, blend: "alpha" })

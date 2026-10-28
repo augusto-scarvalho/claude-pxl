@@ -13,8 +13,8 @@ pal({
   g: "#8fcf6a", G: "#4a8a52",                               // kelp / plants
 })
 ramps("kNTtq", "kQRro", "keCcw", "kDd", "kYyh", "knMm", "AaW", "kGg", "XUVv")
-include("../lib/props/lamps.px.js")    // the street lamp with its signs, taken in these colors
-include("../lib/props/crates.px.js")   // the crate of fish
+include("../lib/props/lamps.px.js", { as: "lamps" })    // the street lamp with its signs, taken in these colors
+include("../lib/props/crates.px.js", { as: "crates" })   // the crate of fish
 
 // ---------------------------------------------------------------- oblique helpers
 // Main block: front face at x F0..F0+W, y T0..T0+H; side face goes D px right and D/2 up.
@@ -217,10 +217,10 @@ sprite("_jar", `
 
 // ---------------------------------------------------------------- scene
 // ---------------------------------------------------------------- street props
-sprite("lamp", { base: "_lamp_signs", swap: roleSwap(lamps.ROLES._lamp_signs, { line: "k", frame: "nM", cap: "Tt", light: "hw", sign: "Cc", letters: "R" }) })
+sprite("lamp", { base: "lamps._lamp_signs", swap: roleSwap(lamps.ROLES._lamp_signs, { line: "k", frame: "nM", cap: "Tt", light: "hw", sign: "Cc", letters: "R" }) })
 sprite("pole", { w: 4, h: 64, outline: "k" }, rect(1, 0, 2, 64, "d"), vline(1, 0, 64, "o"), rect(0, 60, 4, 4, "D"))
 
-sprite("crate", { base: "_crate_fish", swap: roleSwap(crates.ROLES._crate_fish, { line: "k", wood: "Dd", rim: "C", fish: "Mm" }) })
+sprite("crate", { base: "crates._crate_fish", swap: roleSwap(crates.ROLES._crate_fish, { line: "k", wood: "Dd", rim: "C", fish: "Mm" }) })
 sprite("icebox", { w: 30, h: 22, outline: "k" },
   ...box3(0, 5, 22, 16, 8, "m", "C", "w"), rect(0, 5, 22, 3, "m"), hline(0, 8, 22, "M"),
   line(22, 5, 29, 1, "M"), text(11, 11, "ICE", "A", { align: "c", shadow: "a" }),

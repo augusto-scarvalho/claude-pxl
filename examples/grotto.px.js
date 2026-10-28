@@ -34,11 +34,13 @@ const ceilY = profile(ceil), ground = profile(floor), ledge = profile(ledgeTop),
 const inPool = (x, y) => y >= POOL && y < ground(x) && x > 100 && x < 220;
 
 // ------------------------------------------------------------------ rock parts (normal-mapped)
-// the cave kit: stones and lumps by its builders, mushroom caps (_cap_big, _cap_mid, _cap_tiny) and a
-// shelf fungus (_bracket), all in this file's keys
-include("../lib/nature/cave.px.js");
+// the cave kit: stones and lumps by its builders, in this file's keys; mushroom caps and a shelf fungus
+// (cave._bracket) in the glow cave's colors, the caps taken with our stems' (a swap on another file's
+// base: its f and F to ours)
+include("../lib/nature/cave.px.js", { as: "cave" });
 [[3, 2], [4, 3], [5, 3], [6, 4], [7, 4], [4, 2]].forEach(([rx, ry], i) => cave.stone("_stone" + i, rx, ry));
 [[4, 2], [6, 3], [3, 2], [8, 3]].forEach(([rx, ry], i) => cave.lump("_lump" + i, rx, ry));
+for (const n of ["_cap_big", "_cap_mid", "_cap_tiny"]) sprite(n, { base: "cave." + n, swap: { f: "f", F: "F" } });
 
 // Crystal shards: hand-painted facets (left face 4, front 5, right face 6, tip 8).
 const shard = (h) => [".X.", ...Array(h - 1).fill("xXx")].join("\n");
@@ -200,7 +202,7 @@ anim("grotto", { w: W, h: H, ...loop, world: { ground: [floor, ledgeTop, island]
     stamp("crystals", 144, ceilY(150) - 1, { flip: "y" }),
     ...vines.map(([x, len]) => stamp("vine" + len, x - 4, ceilY(x) - 1, { rdelay: true })),
     ...ledgeVines.map(([x, len]) => stamp("vine" + len, x - 4, underLedge(x) - 1, { rdelay: true })),
-    stamp("_bracket", 80, 64), stamp("_bracket", 79, 84), stamp("_bracket", 81, 100),
+    stamp("cave._bracket", 80, 64), stamp("cave._bracket", 79, 84), stamp("cave._bracket", 81, 100),
     (c) => {
       c.lamp(84, 84, { r: 26, color: "#5cf0e0", power: 0.6 + 0.15 * wave(c, 2), z: 5 });
 

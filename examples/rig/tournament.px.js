@@ -3,12 +3,13 @@
 // sword in its right hand. Behind them the lists' palisade, the grandstand under a striped canopy
 // with the crowd on its tiers, the pavilions with their pennants, a castle on the hill, clouds
 // drifting over. Everything runs on one 12 s loop (96 frames at 8 fps): the trumpeters sound a
-// fanfare, the marshal drops his baton, and the knights fight their bout (knight.px.js, stage 5), a
-// draw; they walk back to their marks and it starts again. Daylight
+// fanfare, the marshal drops his baton, and the knights fight their bout (lib/characters/knight.px.js,
+// stage 5), a draw; they walk back to their marks and it starts again. Daylight
 // from the top right, as the knights are lit. The ground is seen in perspective: the horizon at
 // y 104 and the eye 1.6 m up make 40 px to the meter where the knights stand (y 168), so their
 // 1.8 m is 72 px, and everything with a height is checked against it by pxl describe.
-include("knight.px.js", { palette: true })
+include("../../lib/characters/knight.px.js", { palette: true, as: "knight" })
+const { BOUT_LOOP, BOUT_SIGNAL, BOUT_HOME, RED } = knight
 pal({
   A: "#3a6ea8", B: "#5b92c8", C: "#8cbbe2", D: "#c6e2f2",                 // sky, top down
   E: "#f4f8fb", F: "#d6e2ee", K: "#a8bcd2",                               // clouds: lit, body, underside
@@ -38,7 +39,7 @@ const FEET = 168                                        // where the knights sta
 // scrolling a whole width. A wisp is a long thin streak of haze; as it gains body the light takes it
 // from the top down (a cap of white thickening row by row, then its gray underside). The sunset's
 // thin streaks took their light column by column; on a heaped cloud that shows as stripes.
-const LOOP = BOUT_LOOP                                  // the bout's 12 s at 8 fps (knight.px.js): one clock for the scene
+const LOOP = BOUT_LOOP                                  // the bout's 12 s at 8 fps (the knight's): one clock for the scene
 const CLOUDS = [[44, 16, 28, 4], [196, 12, 32, 5], [124, 34, 22, 3], [262, 26, 18, 3], [78, 46, 16, 2]]   // x, y (base), half-length, height
 anim("clouds", { w: W, h: HZ, frames: LOOP, fps: 8 }, (c) => {
   const r = c.rng(5)
@@ -310,10 +311,10 @@ anim("marshal", { w: 27, h: 40, pivot: [16, 40], fps: 8, outline: "k", selout: t
     lit(ellipse(8, 2, 3, 2, "r")), lit(ellipse(8, 4, 5, 1, "R")), px(10, 4, "Z")))           // chaperon, brooch
 
 // ---------------------------------------------------------------- the two knights
-// fighting their bout, both anims on the middle of the lists; the red one (knight.px.js's RED: its
-// surcoat and shield field red, its cape blue) first, so the blue one's sword, on its near side,
+// fighting their bout, both anims on the middle of the lists; the red one (lib/characters/knight.px.js's
+// RED: its surcoat and shield field red, its cape blue) first, so the blue one's sword, on its near side,
 // crosses over the red one's, on its far side
-const KNIGHTS = [["knight_l_bout", 160, { swap: RED }], ["knight_bout", 160, {}]]
+const KNIGHTS = [["knight.knight_l_bout", 160, { swap: RED }], ["knight.knight_bout", 160, {}]]
 // The sun is high, in front of us and to the right (the knights' fronts are lit): shadows fall to the
 // left and a little back, onto the ground behind what casts them. Those of what stands behind the
 // lists (the stand, the pavilions, the trumpeters, the palisade itself) go on the grass before those
@@ -345,4 +346,4 @@ scene("tournament", { w: W, h: H, bg: "A", world: { horizon: HZ, eye: EYE, light
   layer("shadows", { shade: true, of: "knights", cast: SUN }),
   layer("knights", { sort: "y" }, stamp("marshal", 160, 140), ...knights),
   // sparks, smears and dust give light or take none: `unlit`, so describe doesn't read a lit side off them
-  layer("sparks", { unlit: true }, stamp("knight_bout_fx", 160, FEET, { swap: { L: "v", T: "d" } })))
+  layer("sparks", { unlit: true }, stamp("knight.knight_bout_fx", 160, FEET, { swap: { L: "v", T: "d" } })))

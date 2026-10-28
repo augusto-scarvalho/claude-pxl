@@ -1,18 +1,18 @@
 // A fox shrine's courtyard in autumn at dusk, top-down (an RPG's 3/4), 240x160 at 20 px to the meter, an
 // 11.5 s loop. The things are the Japanese kit's (lib/architecture/japan.px.js: a torii, the hall with its
 // shimenawa and bell, stone lanterns, the foxes, the basin, the ema rack) and the trees the species kit's
-// (nature/trees.px.js: two momiji, the sacred ginkgo with a shimenawa round its trunk, a black pine),
+// (lib/nature/trees.px.js: two momiji, the sacred ginkgo with a shimenawa round its trunk, a black pine),
 // each drawn in 3D by turnaround() through the scene's camera under its one sun, low in the west, golden;
 // the lanterns' lamps just lit, glowing. The ground is painted by the pixel: the approach in ishidatami
 // laid along a lane() (its slabs fanning round the bend, a landing before the hall and one under the
 // torii, a curb, a strip of pebbles), white gravel raked along it and in rings round the lanterns and the
 // basin, stepping stones, moss under the trees, fallen leaves where the wind leaves them. The miko
-// (miko.px.js, on the traveler's figure) sweeps the path toward the torii, walks back, bows to the hall
-// between the foxes and comes down to sweep again; the trees sway in the wind from the east, which
-// carries their leaves down across the courtyard.
-include("miko.px.js")
-include("../nature/trees.px.js")
-include("../../lib/architecture/japan.px.js", { palette: true })
+// (lib/characters/miko.px.js, on the traveler's figure) sweeps the path toward the torii, walks back,
+// bows to the hall between the foxes and comes down to sweep again; the trees sway in the wind from the
+// east, which carries their leaves down across the courtyard.
+include("../../lib/characters/miko.px.js", { as: "miko" })
+include("../../lib/nature/trees.px.js", { as: "trees" })
+include("../../lib/architecture/japan.px.js", { palette: true, as: "japan" })
 
 pal({ k: "#1a1622" })   // ink
 
@@ -87,12 +87,12 @@ sprite("_ground", { w: 240, h: 160 }, (c) => { for (let y = 0; y < 160; y++) for
 const MS = 110
 const steps = [[100, 118]]
 for (let k = 0; k < 4; k++) {
-  steps.push({ hold: 8, dir: "e", anim: "mk_sweep", frame: (f, t) => t % 8, ...(k ? {} : { name: "sweep" }) })
+  steps.push({ hold: 8, dir: "e", anim: "miko.mk_sweep", frame: (f, t) => t % 8, ...(k ? {} : { name: "sweep" }) })
   if (k < 3) steps.push({ to: [100 + 12 * (k + 1), 118], dir: "e" })
 }
 steps.push({ to: [100, 118], name: "back" }, [84, 104],
-  { hold: 16, name: "bow", dir: "n", anim: "mk_bow", frame: (f, t) => Math.min(11, Math.max(0, Math.floor((t * MS) / 120) - 1)) }, [100, 118])
-const round = route({ px: true, pace: mikoFigure.pace, walk: "mk_walk", idle: { anim: "mk_idle", frame: (f) => Math.floor((f * MS) / 250) % 4 } }, steps)
+  { hold: 16, name: "bow", dir: "n", anim: "miko.mk_bow", frame: (f, t) => Math.min(11, Math.max(0, Math.floor((t * MS) / 120) - 1)) }, [100, 118])
+const round = route({ px: true, pace: miko.pace, walk: "miko.mk_walk", idle: { anim: "miko.mk_idle", frame: (f) => Math.floor((f * MS) / 250) % 4 } }, steps)
 const L = round.frames, BACK = round.start("back")
 
 // ---------------------------------------------------------------- the leaves that move

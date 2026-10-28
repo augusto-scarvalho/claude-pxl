@@ -6,7 +6,7 @@
 // cracking and breaking up. Three sheets on a 5 s loop at 20 fps, every cast at tier 3 from 200 ms:
 // `ice_earth` the ice and earth variants, `variants` a row for each other element, `views` four spells
 // seen four ways. The caster is the traveler casting, the spell leaving from his hand in every view.
-include("../lib/characters/traveler.px.js")
+include("../lib/characters/traveler.px.js", { as: "traveler" })
 pal({ k: "#0e0c16", n: "#1c1a2c", m: "#2a2840", g: "#3a4a3a", h: "#2c382e", d: "#232c24", s: "#6a6a72", t: "#4a4a54", u: "#34343c",
   c: "#3a4a8a", C: "#28346a", f: "#d8b090", w: "#e8e4d8", x: "#8a8aa0" })
 
@@ -54,7 +54,7 @@ const VIEWS = {
 const cell = (name, el, variant, where = "side", form) => {
   const v = VIEWS[where], S = spell(el, 3, { view: v.view, from: "hero.hand", to: v.to, variant, form, start: 200, seed: 5 })
   anim(name, { w: CW, h: CH, ...CLOCK }, stamp(`_${where}`, 0, 0),
-    (c) => c.stamp("tr_cast_e", v.feet[0], v.feet[1], { frame: S.ability.frame(c.t, CAST, { before: 12 }), id: "hero" }), cast(S), lighting({ ambient: 0.55 }))
+    (c) => c.stamp("traveler.tr_cast_e", v.feet[0], v.feet[1], { frame: S.ability.frame(c.t, CAST, { before: 12 }), id: "hero" }), cast(S), lighting({ ambient: 0.55 }))
 }
 // a sheet of cells in rows, each labelled
 const spellSheet = (name, rows, title = (r, i) => r[i][1]) => {

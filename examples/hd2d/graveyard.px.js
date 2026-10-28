@@ -7,10 +7,10 @@
 // a low sun behind on the left. Its ground, plants and stones are drawn after the games' sheets (pxl
 // study) and SLYNYRD's, Saint11's and final boss blues' tutorials. `graveyard` is the art at its own
 // size, the one checked; `graveyard_hd` the same four times as big through post() (a size of it).
-include("../../lib/characters/traveler.px.js")
+include("../../lib/characters/traveler.px.js", { as: "traveler" })
 include("../../lib/profiles/hd2d.px.js", { palette: true })
 include("../../lib/ui/font5x7.px.js")
-include("../../lib/ui/dialog.px.js")     // the dialogue boxes
+include("../../lib/ui/dialog.px.js", { as: "dialog" })     // the dialogue boxes
 
 
 // Where the grass meets the path: blades reaching over the stones' edge 1-5 px, in clumps, their tips
@@ -242,12 +242,12 @@ for (const [x0, n] of [[-6.1, 3], [-3.2, 2], [2.4, 2], [4.9, 3]]) {
 // number of the pines' sways (44 frames) comes after he has gone.
 const PACE = (dir) => traveler.pace(dir) / 24, MS = 80
 const idle = (f) => Math.floor((f * MS) / 250) % 4  // the idle's 250 ms on the scene's clock; the walk a frame a frame
-const visit = route({ pace: PACE, origin: [0, Z], walk: "tr_walk", idle: { anim: "tr_idle", frame: idle }, loop: 44 }, [
+const visit = route({ pace: PACE, origin: [0, Z], walk: "traveler.tr_walk", idle: { anim: "traveler.tr_idle", frame: idle }, loop: 44 }, [
   [-2.6, -7.8], [-0.2, -5.4],                      // in from the near left, from just out of the picture
   { to: [-0.2, 0.4], name: "up" },                 // up the steps and the path
   [1.2, 0.4],                                      // to the old grave with flowers, beside it
   // kneels (a frame of it every 2 of the scene's) and lays a flower at its foot (in front, he'd hide it), up again
-  { hold: 30, name: "grave", anim: "tr_kneel", frame: (f, t) => (t < 8 ? t >> 1 : t < 22 ? 3 : 4 + Math.min(2, (t - 22) >> 1)) },
+  { hold: 30, name: "grave", anim: "traveler.tr_kneel", frame: (f, t) => (t < 8 ? t >> 1 : t < 22 ? 3 : 4 + Math.min(2, (t - 22) >> 1)) },
   { hold: 10 },
   [-0.2, 1.8], [-1.95, 1.8],                       // to the mourner's side
   { hold: 76, name: "talk" },
@@ -259,7 +259,7 @@ const FRAMES = visit.frames, TALK = visit.start("talk"), GRAVE = visit.start("gr
 // the gap in the wood he comes and goes by: no pine within a meter of his way
 const wood = things.filter((t) => !(t.name.startsWith("_spruce") && visit.near(t.at, 1)))
 // the mourner turns to him a direction every two frames once he has asked, and back as he goes
-const mourner = turnToward("mo_idle", [-2.75, Z + 2.45], (f) => (f >= TALK + 12 && f < TALK + 80 ? "e" : null), { rest: "nw", from: TALK, frame: idle })
+const mourner = turnToward("traveler.mo_idle", [-2.75, Z + 2.45], (f) => (f >= TALK + 12 && f < TALK + 80 ? "e" : null), { rest: "nw", from: TALK, frame: idle })
 const SAYS = [
   [4, 32, "Alden", ["Are you all right?"], () => [-1.95, Z + 1.8, TOP], 1],
   [36, 74, "Edith", ["I will be.", "Thank you for asking."], () => [-2.75, Z + 2.45, TOP], -1],

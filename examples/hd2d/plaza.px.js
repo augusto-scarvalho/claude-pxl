@@ -1,13 +1,13 @@
 // HD-2D: a little plaza in a pine wood, seen as Octopath Traveler and Triangle Strategy see theirs,
 // from high up through a long lens (45 degrees down, 30 across), modelled in meters as boxes whose
-// faces are tiled with pixel-art textures, 16 texels to the meter; the hero from topdown_hero, the
-// pines, bushes and lamps stand in it as flat sprites turned to the camera. One mesh() draws them all
+// faces are tiled with pixel-art textures, 16 texels to the meter; the hero (lib/characters/hero.px.js),
+// the pines, bushes and lamps stand in it as flat sprites turned to the camera. One mesh() draws them all
 // with a depth per pixel, so the low wall hides the legs of the hero walking behind it and not his
 // head, the crate half hides another, and each stands on a contact shadow. Light in the world: a
 // late sun with its shadows (the wall's, the people's, the pines'), a cool sky, two lamps (LIGHT).
 // `plaza` is the art at its own size, the one checked (check builds it unlit); `plaza_hd` the same
 // four times as big (a size of it), with what the camera does to it: post().
-include("../topdown_hero/hero.px.js")
+include("../../lib/characters/hero.px.js", { as: "hero" })
 include("../../lib/profiles/hd2d.px.js", { palette: true })   // the palette, the textures, the pines, bushes and lamps
 
 const MATS = { cobble: { tex: "_cobble" }, wall: { tex: "_wall" }, grass: { tex: "_grass" }, wood: { tex: "_planks" } }
@@ -28,13 +28,13 @@ block("wood", "wood", 2.4, Z - 1.6, 3.2, Z - 0.8, UP, UP + 0.6) // a crate
 // this high up a wall hides only what is near it), 2 m right and back, a step a frame; the others
 // stand: in front of the wall, half behind the crate, and on the grass below the step. His side view
 // flipped going left.
-const walker = route({ pace: 0.25, origin: [0, Z], walk: { anim: "walk_side", flip: true } }, [[-2.5, 2.25], [-0.5, 2.25], [-2.5, 2.25]])
+const walker = route({ pace: 0.25, origin: [0, Z], walk: { anim: "hero.walk_side", flip: true } }, [[-2.5, 2.25], [-0.5, 2.25], [-2.5, 2.25]])
 const people = (f) => [
   ...around,
   walker(f),
-  { name: "idle_down", at: [-1.2, Z], frame: 0 },
-  { name: "idle_down", at: [2.8, Z - 0.4], frame: 0 },
-  { name: "idle_side", at: [3, Z - 5.2], frame: 0, flip: "x" },
+  { name: "hero.idle_down", at: [-1.2, Z], frame: 0 },
+  { name: "hero.idle_down", at: [2.8, Z - 0.4], frame: 0 },
+  { name: "hero.idle_side", at: [3, Z - 5.2], frame: 0, flip: "x" },
 ]
 // The wood round the plaza, the bushes along its edge, a lamp at each front corner: placed once.
 const R = rng(5), around = []

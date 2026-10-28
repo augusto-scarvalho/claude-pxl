@@ -13,7 +13,7 @@ pal({
   z: "#14173a", s: "#3a4272",                                // road / sidewalk
 })
 ramps("kXxyY", "keCc", "kMmi", "kTtj", "kAal", "kRr", "kGg")
-include("../lib/props/lamps.px.js")   // the street lamp and the lanterns, taken in these colors
+include("../lib/props/lamps.px.js", { as: "lamps" })   // the street lamp and the lanterns, taken in these colors
 
 // ---------------------------------------------------------------- parts
 sprite("_panel", `
@@ -69,7 +69,7 @@ sprite("_stool", `
   ..kk..
   .k..k.
   k....k`)
-sprite("_lantern", { base: "_lantern_paper", swap: roleSwap(lamps.ROLES._lantern_paper, { frame: "k", light: "al", tassel: "A" }) })
+sprite("_lantern", { base: "lamps._lantern_paper", swap: roleSwap(lamps.ROLES._lantern_paper, { frame: "k", light: "al", tassel: "A" }) })
 sprite("_shrub", `
   g.g.g
   gGggG
@@ -109,7 +109,7 @@ sprite("_bulb_m", "m\nM")
 sprite("_bulb_a", "a\nA")
 group("bulbs", ["_bulb_t", "_bulb_m", "_bulb_a", "_bulb_m"])
 
-sprite("lamp", { base: "_lamp_wide", swap: roleSwap(lamps.ROLES._lamp_wide, { line: "k", frame: "eC", light: "tj" }) })
+sprite("lamp", { base: "lamps._lamp_wide", swap: roleSwap(lamps.ROLES._lamp_wide, { line: "k", frame: "eC", light: "tj" }) })
 
 sprite("blade", { w: 12, h: 36, outline: "k" },
   rect(0, 0, 12, 36, "k"), box(0, 0, 12, 36, "m"),

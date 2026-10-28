@@ -21,17 +21,17 @@ const ceilY = profile(ceil), floorY = profile(floor);
 const stands = [...floor.slice(0, 14), 146, 84, 150, 66, 156, 62, 186, 62, 192, 63];
 
 // ------------------------------------------------------------------ rock parts (normal-mapped)
-// the cave kit: stones and lumps by its builders, mushroom caps (_cap_big, _cap_mid, _cap_tiny) and a
-// shelf fungus (_bracket), all in this file's keys
-include("../lib/nature/cave.px.js");
+// the cave kit: stones and lumps by its builders, in this file's keys; mushroom caps (cave._cap_big,
+// cave._cap_mid, cave._cap_tiny) and a shelf fungus (cave._bracket), in this cave's colors
+include("../lib/nature/cave.px.js", { as: "cave" });
 for (const [i, rx, ry] of [[1, 3, 2], [2, 4, 3], [3, 5, 3], [4, 6, 4]]) cave.stone("_stone" + i, rx, ry);
 for (const [i, rx, ry] of [[1, 4, 2], [2, 6, 3], [3, 3, 2]]) cave.lump("_lump" + i, rx, ry);
 
 // ------------------------------------------------------------------ fungus
 // Clusters pulse: the lamp breathes and the bright spots fade at the dim end of the cycle.
 const clusters = {
-  a: [["_cap_big", 4, 1], ["_cap_mid", 0, 3], ["_cap_tiny", 11, 5], 7, 2],
-  b: [["_cap_mid", 0, 3], ["_cap_tiny", 5, 5], ["_cap_mid", 8, 2], 10, 3],
+  a: [["cave._cap_big", 4, 1], ["cave._cap_mid", 0, 3], ["cave._cap_tiny", 11, 5], 7, 2],
+  b: [["cave._cap_mid", 0, 3], ["cave._cap_tiny", 5, 5], ["cave._cap_mid", 8, 2], 10, 3],
 };
 for (const [id, [p1, p2, p3, lx, ly]] of Object.entries(clusters))
   for (const [tint, swap, light] of [["c", {}, "#5cf0e0"], ["m", { c: "m", C: "M", e: "E" }, "#ff7ae8"]])
@@ -94,7 +94,7 @@ anim("cave", { w: W, h: H, frames: FRAMES, fps: 8, world: { ground: stands } },
         c.lamp(mx, ceilY(mx) + 9, { r: 28, color: "#7ab8ff", power: 0.65, z: 10 });
       }
       // Bracket fungus on the column, with a soft cyan lamp.
-      c.stamp("_bracket", 33, 44); c.stamp("_bracket", 32, 61);
+      c.stamp("cave._bracket", 33, 44); c.stamp("cave._bracket", 32, 61);
       c.lamp(36, 52, { r: 24, color: "#5cf0e0", power: 0.6 + 0.15 * Math.sin(c.phase * TAU * 2), z: 5 });
 
       // A drop falls from the long stalactite and splashes.

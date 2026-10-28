@@ -4,8 +4,8 @@
 // stones are scattered evenly; the hero breathes in pingpong and has a hit-flash anim.
 // Part 2, duel.px.js, imports PNGs.
 include("palette.px.js", { palette: true })
-include("../../lib/props/lamps.px.js")    // the lamp, taken in the game's colors
-include("../../lib/props/crates.px.js")   // the crate
+include("../../lib/props/lamps.px.js", { as: "lamps" })    // the lamp, taken in the game's colors
+include("../../lib/props/crates.px.js", { as: "crates" })   // the crate
 
 const GROUND = 90   // walkable row: the grass top of the ground tiles
 
@@ -40,8 +40,8 @@ sprite("tree", { w: 26, h: 34, outline: "k", pivot: "bottom" },
   circ(13, 11, 10, "H"), circ(7, 15, 6, "H"), circ(19, 15, 6, "H"),
   circ(11, 9, 7, "G"), circ(6, 14, 4, "G"), circ(17, 13, 4, "G"),
   circ(9, 7, 3, "g"), px(5, 12, "g"), px(15, 10, "g"))
-sprite("lamp", { base: "_lamp_box", swap: roleSwap(lamps.ROLES._lamp_box, { line: "k", frame: "K", light: "ox" }) })
-sprite("crate", { base: "_crate_plain", swap: roleSwap(crates.ROLES._crate_plain, { line: "k", wood: "Wwo" }) })
+sprite("lamp", { base: "lamps._lamp_box", swap: roleSwap(lamps.ROLES._lamp_box, { line: "k", frame: "K", light: "ox" }) })
+sprite("crate", { base: "crates._crate_plain", swap: roleSwap(crates.ROLES._crate_plain, { line: "k", wood: "Wwo" }) })
 
 // ---------------------------------------------------------------- hero
 // Upper body rides down 1px on the out-breath; pingpong plays 0 1 2 1, so it's drawn one way.

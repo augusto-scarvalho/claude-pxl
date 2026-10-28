@@ -4,7 +4,7 @@
 // the densities (lib/vfx/volumes.px.js).
 // Taken with include("kit.px.js", { palette: true }) by fields.px.js (as pixel art) and grids.px.js
 // (as voxels and meshes).
-include("../../lib/styles/fields.px.js", { palette: true })   // the palette, MATS and the light (look3d)
+include("../../lib/styles/fields.px.js", { palette: true, as: "fields" })   // the palette, MATS and the light (look3d)
 const { MATS, LIGHT } = fields
 
 const CLOCK = { frames: 24, fps: 1000 / 150 }, TAU = 2 * Math.PI
@@ -51,5 +51,5 @@ const crystal = (o = {}) => make3d.crystal(o).field.rotate((c) => 360 * c.phase)
 
 // Densities for volume() and splats: a cloud, a mist, smoke and a magic orb, and how each is drawn (LOOK):
 // lib/vfx/volumes.px.js.
-include("../../lib/vfx/volumes.px.js", { palette: true })
+include("../../lib/vfx/volumes.px.js", { palette: true, as: "volumes" })
 const { cloud, mist, orb, LOOK } = volumes, smokeField = volumes.smoke
