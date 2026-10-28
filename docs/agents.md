@@ -512,7 +512,8 @@ node scripts/pulse.ts walk.px.js walk walk_hybrid       # how many of a walk's n
 
 `--vs <rev>` unpacks the revision's `src/` and `examples/` once into the system's temp folder
 (`pxl-rev-<commit>`, by `scripts/vs.ts`) and loads both pxls in one process: no worktree, no
-stash. `hashes.ts --vs` prints only the lines that differ and a count, and exits 1 when one does: a
+stash. `hashes.ts --vs` prints only the lines that differ and a count, and exits 1 when one does (an
+asset the revision hasn't, a new library entry, is listed and counted as new, apart): a
 change meant to move no pixel ends with `0 differ`, frame by frame for the animated files
 (`--only <regex>` narrows a file to some assets; a long scene's frames take a second each). `perf.ts --vs` builds each frame with one
 pxl and then the other, alternating, because a laptop's speed drifts within seconds: two runs a

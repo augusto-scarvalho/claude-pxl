@@ -10,12 +10,13 @@
 //
 // --vs <rev> builds each file with the pxl and the examples at a git revision too (unpacked once into
 // the system's temp folder, see vs.ts), in this process, and prints only the lines that differ and a
-// count; it exits 1 when one does. --frames hashes every frame of the animated assets, `asset@frame`
-// a line (--frames N: N frames spread over the loop, a cheap look at a long scene). --only <regex>: the
-// assets whose name matches. --strip <namespaces>: a name under them ("crew.tr_walk_e") is keyed
-// without them ("tr_walk_e"), unless the file has that name of its own: the same pixels after an
-// include takes an `as`. A file that doesn't build on its own (included only) prints SKIP; an asset
-// that fails prints ERR and the error's first words.
+// count; it exits 1 when one does. An asset the revision hasn't (a new library entry, in every file that
+// includes it) is listed as new and counted apart: no pixel of what was there moved. --frames hashes
+// every frame of the animated assets, `asset@frame` a line (--frames N: N frames spread over the loop, a
+// cheap look at a long scene). --only <regex>: the assets whose name matches. --strip <namespaces>: a
+// name under them ("crew.tr_walk_e") is keyed without them ("tr_walk_e"), unless the file has that name
+// of its own: the same pixels after an include takes an `as`. A file that doesn't build on its own
+// (included only) prints SKIP; an asset that fails prints ERR and the error's first words.
 import { join, relative, resolve } from "node:path";
 import { frameCount, frameTime } from "../src/node/shot.ts";
 import { examples, inTree, loader, pick, repo, revTree } from "./vs.ts";
@@ -47,18 +48,19 @@ function lines(load: (f: string) => any, file: string, name: string): Map<string
 }
 
 const here = await loader(repo), tree = vs ? revTree(vs) : "", there = vs ? await loader(tree) : undefined;
-let same = 0, differ = 0;
+let same = 0, differ = 0, added = 0;
 for (const f of files) {
   const rel = relative(join(repo, "examples"), f).split("\\").join("/"), name = rel.startsWith("..") ? f : rel, b = lines(here, f, name);
   if (!there) { for (const [k, h] of b) console.log(`${k} ${h}`); continue; }
   const a = lines(there, inTree(tree, f), name);
   for (const k of new Set([...a.keys(), ...b.keys()])) {
     if (a.get(k) === b.get(k)) { same++; continue; }
+    if (!a.has(k)) { added++; console.log(`${k}: new here, ${b.get(k)}`); continue; }
     differ++;
     console.log(`${k}: ${a.get(k) ?? "(none)"} at ${vs}, ${b.get(k) ?? "(none)"} here`);
   }
 }
 if (vs) {
-  console.log(`${same} the same, ${differ} differ (${vs} against the working tree)`);
+  console.log(`${same} the same, ${differ} differ${added ? `, ${added} new` : ""} (${vs} against the working tree)`);
   if (differ) process.exitCode = 1;
 }
