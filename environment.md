@@ -149,7 +149,8 @@ round it.
   1.7% with its ppm, 1.3% with 3 tones as well; the spruce 21%, 6%. At 128 px nothing set in meters
   reads as leaves: `foliage()` over the crown, hand-drawn tufts in steps from the tones under them,
   their gaps and sizes varied (`vary`); freeze the 3D render first (`frozen`) and the brush iterates
-  in a second instead of a minute and a half.
+  in a second instead of a minute and a half. The rules for every subject at every density (simplify,
+  never shrink; by hand under ~15 px): scenes §19.
 - A trunk darker than the crown, planted: seen from above, cut at the ground (SLYNYRD); seen from
   the side or at an angle, its foot flared 2-3 px with a root or two. Bark in 1 px stripes, widest
   apart in the middle; a knot. Laying top-down crowns from one clump, importing trees: scenes §4.

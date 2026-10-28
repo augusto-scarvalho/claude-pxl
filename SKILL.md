@@ -11,16 +11,14 @@ lists every command and flag.
 
 ## Workflow
 
-1. Start from the closest example ([below](#examples); `PXL list <file>` maps it: read the lines you
-   need) and the template. Given a reference (PNG, GIF; JPEG, WebP or video need ffmpeg; pixel art
-   or not): `PXL shot ref.gif` shows it (a clip's frames on one sheet), `PXL study ref.gif` reads it
-   (palette, ramps, light, perspective, a clip's timing and moving pieces) and what in pxl makes each
-   part (`--at x,y,w,h` follows one thing; `PXL help "characters 2 3"`).
+1. Start from the closest example or library entry ([below](#examples); `PXL list <file>` maps it: read the lines you
+   need) and the template. Given a reference (PNG, GIF; JPEG, WebP or video need ffmpeg):
+   `PXL shot ref.gif` shows it, `PXL study ref.gif` reads it (palette, ramps, light, perspective, timing,
+   moving pieces) and what in pxl makes each part (`PXL help "characters 2 3"`).
 2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
    `out/_shot/<name>.png` (read it); its text says what changed since your last shot of it and
-   the warnings `check` finds on it. `--frames 0,12,30` side by side, `--at x,y,w,h` enlarges a
-   part, more names make a row each to compare, `--gif` (`--every 3`) plays them, `--grey` shows the
-   values. Exact pixels: `PXL ascii art.px.js <name>`. Scenes: `PXL describe art.px.js <scene>`
+   the warnings `check` finds on it. `--frames 0,12,30`, `--at x,y,w,h` (enlarged), more names (a row
+   each), `--gif`, `--grey` (values only). Exact pixels: `PXL ascii art.px.js <name>`. Scenes: `PXL describe art.px.js <scene>`
    (`--brief` when busy) gives each object's position, gaps, cover, contrast and motion as text:
    answer layout questions from it, not by eyeballing.
 3. Fix everything one look showed, then look again: all the edits in the same message (every turn
@@ -29,12 +27,11 @@ lists every command and flag.
    shows the pixels it changed; `PXL steps art.px.js <name> --at x,y` names the line that painted
    a pixel.
 4. A user's change to a scene ("move the stall left", "add a lantern beside it", recolor, flip,
-   turn): `PXL inspect art.px.js <scene> --find stall` (`--id <id>`: its values, where each is
-   written, its ops), then `PXL edit art.px.js <scene> '{ "op": "move", "target": "<id>", "by": [-3, 0] }' --dry`,
-   then without `--dry`: it writes where the value lives, says what changed by id (`describe --diff`)
-   and runs `check`. What code computes is refused: edit that by hand (`PXL help "scenes 14"`).
+   turn): `PXL inspect art.px.js <scene> --find stall` (`--id <id>` for one), then
+   `PXL edit art.px.js <scene> '{ "op": "move", "target": "<id>", "by": [-3, 0] }' --dry`, then without
+   `--dry` (it writes where the value lives and runs `check`). What code computes is refused: edit that by hand (`PXL help "scenes 14"`).
 5. `PXL build art.px.js` writes the PNGs, sheets and GIFs to `out/`, previews to `out/_preview/`
-   (`--only a,b`; `--every 3` keeps a long loop's GIF small; `--profile` when a build has grown slow).
+   (`--only a,b`; `--profile` when it has grown slow).
 6. Before handing over, `PXL check art.px.js`: every scene, rig and frame of the file
    (`check: { every: N }` on a long story), warnings only, with their frames. Fix each or say why
    it's meant. LOOK lines (L-corners, jaggies, tones too close) don't fail it: look at each. Its
@@ -52,9 +49,8 @@ lists every command and flag.
 For a big, busy scene (320×180 and up, many props, animated), ask the user first, with the numbers
 and how long this conversation already is:
 
-- **One agent** (the default): the cheapest and the most coherent; a 320×180 animated city street
-  took 85 turns and 31 minutes. In a conversation already long, a fresh agent given a brief file
-  costs less than going on here.
+- **One agent** (the default): the cheapest and the most coherent (a 320×180 animated street: 85
+  turns, 31 min). In a long conversation, a fresh agent given a brief costs less than going on.
 - **A pipeline**: a planner and one fork per part, then a fork that puts the scene together:
   denser but less coherent, ~5× the tokens and ~2× the time. Run it from a new session, never
   forked from a long one (each fork rereads all of it).
@@ -62,17 +58,17 @@ and how long this conversation already is:
 How to run each: [docs/agents.md](docs/agents.md#a-big-scene-one-agent-a-fresh-one-or-a-pipeline).
 Either way, show it in stages for the user to approve before painting on: the camera and the ground
 as blocks, the props, then the people; a new move as flat blocks first (`bk_<move>_<dir>` in
-`hd2d/traveler.px.js`).
+`lib/characters/traveler.px.js`).
 
 ## Looking things up
 
-What you read early is paid again on every later turn. Read the reference and the guides by
-section, never whole: `PXL help` is the index (every op, option and guide section, with its size);
-`PXL help <name>` prints an op's reference and its uses in the examples;
-`PXL help "<guide> <numbers or words of a heading>"` prints those sections:
+What you read early is paid again every later turn: read by section, never whole. `PXL help` is
+the index (every op, option and guide section, with its size); `PXL help <name>` an op's reference
+and uses; `PXL help "<guide> <numbers or words of a heading>"` those sections:
 
 | Making | Read |
 |---|---|
+| sprites for a game (platformer, top-down, fighting, racing, HD-2D) | pick the profile first: `PXL help "scenes 18 19"` (`genre()`; a new density is drawn simpler, never scaled) |
 | a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 variants, 10 animated limbs, 12 frame counts, 13 a game's look, 14 a fighting-game sprite |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
@@ -130,14 +126,13 @@ What exists, a line each; `PXL help <name>` prints the rest of any op or option 
 - **Animation**: `anim(...)` with `frame()` patches, or `frames: n` and functions reading `c.phase`;
   stamping an anim animates the scene; `scroll()`, `clouds()`, `plume()`, `c.cross()` go by in a
   loop; `tween()` keys poses in time; `route()` walks a figure along a path (`px: true` on a flat map).
-  Limbs, walks, hair: `PXL help "characters 9 10"`; loops and parallax: `PXL help "scenes 8 9 10"`.
 - **Existing art**: `sprite("x", { png, normals, area, shrink, palettize })`, `anim(..., { png, frames })`, `rampmap`.
 - **Out**: `sheet()` (+ JSON with tags), GIFs, Tiled `.tmj`, `build --aseprite`, `build --share 4`.
 - **Light**: `shade:`/`light:` layers and `cast` shadows (a shade layer `of` what stands; `"sun"`: `look3d`'s),
   `relight`/`plate()`, `glow`, `lighting()` ([lighting.md](lighting.md)).
-- **Text**: `text()` in the 3×5 built in, or `include` `examples/fonts/font5x7.px.js` for `{ font: "5x7" }`; `bubble()` a dialogue box.
+- **Text**: `text()` in the 3×5 built in, or `include` `lib/ui/font5x7.px.js` for `{ font: "5x7" }`; `bubble()` a dialogue box.
 - **In meters and HD-2D**: `perspective()`, `plane()`, `terrain()`, `solids()`/`shadows()`,
-  `mesh()` of `model()` faces, a scene's `sizes` (HD, faces in the sprites' pixel), `post()` for depth
+  `mesh()` of `model()` faces, a scene's `sizes`, `post()` for depth
   of field, bloom, a `lut`, `grain`; `capsule`, `flame` (`PXL help "scenes 7"`, `PXL help post`).
 - **Effects and spells**: `effect(kind)` (dissolve, pixelate, dither, tint, distort, emit,
   aura, sway, energy), one copy's `fx`; `smoke()`, `emitter()` + `particles()`,
@@ -145,8 +140,7 @@ What exists, a line each; `PXL help <name>` prints the rest of any op or option 
 - **3D fields**: `sdf` drawn by `surface()`, `voxels()`, `mesh()`, `volume()`, or any of them by
   `draw3d(thing, { as })`; details by `sdf.scatter` + `splats()`; hand-drawn art pinned on by
   `decal()`; a scene of named parts by `world3d` and `make3d`, checked by `expect3d`; light and mats
-  once by `look3d`; a game's sprites from N headings by `turnaround()`; after a `mesh()` with a sun,
-  in its light; out by `export3d` (`PXL help "scenes 17"`).
+  once by `look3d`; a game's sprites from N headings by `turnaround()`; out by `export3d` (`PXL help "scenes 17"`).
 - **Procedural texture**: `hash`, `vnoise`, `fbm`, `bayer`, `seamless` (`PXL help vnoise`).
 
 ## Examples
@@ -156,17 +150,19 @@ closest:
 
 - **First files**: `basics.px.js` (mirror, outline, variants, parts, a sheet), `platformer.px.js`
   (a tileset as a level), `topdown.px.js`, `isometric.px.js`.
-- **Characters**: `topdown_hero/` (four directions, a tagged sheet), `rig/knight.px.js` and
-  `rig/warden.px.js` (skeleton first), `hd2d/traveler.px.js`, `hd2d/crew.px.js` and
-  `shrine/miko.px.js` (`rig3d`, 8 directions, moves as blocks first), `tropical/girl.px.js` (a walk).
+- **The library** (`lib/`), to `include` rather than redraw: `PXL lib` lists its entries by subject
+  (`--genre hd2d`, `--cell side/32`), `PXL lib <entry>` gives one's card and the `include` that takes it;
+  a 3D entry at a new cell: `PXL lib draft <entry> --cell topdown/16`.
+- **Characters**: in `lib/characters/`, `hero` (four directions, a tagged sheet), `knight` (skeleton
+  first), `traveler`, `crew`, `miko` (`rig3d`, 8 directions, blocks first); `rig/warden.px.js`,
+  `tropical/girl.px.js` (a walk).
 - **Scenes**: `sunset/`, `tropical/`, `halloween/`, `cyberpunk/`, `no_magic.px.js`; `shrine/`
   (top-down, props drawn in 3D and turned); lamps in `lighting.px.js`; parallax in
   `parallax/train.px.js`.
 - **Perspective and HD-2D**: `perspective/` (one, two and three points, a cockpit),
   `hd2d/plaza.px.js`, `hd2d/graveyard.px.js` (a story with dialogue), `hd2d/harbor.px.js`.
 - **Effects, spells, 3D**: `hd2d/clearing.px.js` (every shader at once), `spells.px.js`, `sdf/`
-  (start from `world.px.js`); grass, trees and rocks to `include`: `nature/kit.px.js`; tree species
-  by season: `nature/trees.px.js`.
+  (start from `world.px.js`).
 
 Every command run on an example writes an `out/` next to it: give it `--out <scratch dir>`.
 

@@ -170,7 +170,9 @@ material: `glow(kit.mats.lamp, { r: 5 })` takes its ramp.
 - Doors, windows and holes in floors are just gaps in the `solid` layer. Light flows through them.
 - Too dark? Raise the lamp's `r` before `power`. Light reaching too far into the ground? Raise `block`
   (0.5–0.6). Want more Terraria-style glow through dirt? Lower it (0.25–0.3).
-- Smaller `cell` for small sprites and close-ups, 4–8 for scenes.
+- `cell: 2, smooth: true` for a scene: light that fades instead of stepping in blocks (the snowy
+  cabin, `examples/lighting.px.js`); `cell: 1` for a small sprite or a close-up; 4–8 only for a blocky
+  light on purpose (Terraria's).
 - Three lights on a sprite (Saint11): a warm key that makes the bright side, a hard terminator and the
   specular; a weak fill on the other side lifting the shadow one step; a rim, only a 1 px line in a
   cool color on the far edge (a `relight` of its own, or a lamp of another color behind). Light from

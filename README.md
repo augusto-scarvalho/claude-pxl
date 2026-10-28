@@ -130,13 +130,8 @@ link to it instead. To be sure the skill is used, name it: "use the pxl skill to
 A change to a scene is asked for in plain words ("move the fish stall a bit left", "add a lantern
 beside the tea stall"). The agent finds the thing with `pxl inspect` (what the scene holds, by id,
 and where the file writes each value) and makes the change with `pxl edit`, which writes it there,
-refuses it if anything else would move, and says what changed by id. In a
-[first measure](docs/evaluation-edit.md) (six small edits on three examples, Sonnet at low effort,
-one run each way) this and editing the file by hand were both right six times out of six (the hand
-edit lit a turned fox better; `edit`'s flip now turns it the same way). `edit` cost 16% less in
-all (29-41% less on the 660-line file, about even on the other two: it reads 4 to 8.5k tokens where
-the other way reads the file) and took 2.5 times as long (260 s against 104 s; an edit on the
-shrine has since come down to 10-16 s).
+refuses it if anything else would move, and says what changed by id: as right as an edit by hand,
+16% cheaper and slower in [a first measure](docs/evaluation-edit.md).
 
 The Codex CLI, Antigravity's `agy` and other agents install it differently: see
 [Install the skill](docs/agents.md#install-the-skill). [Working with an agent](docs/agents.md) also
@@ -168,6 +163,8 @@ pxl edit <art.px.js> <scene> <edit>
                                   check; --dry shows it first
 pxl steps <art.px.js> <name>      how it was painted; --at x,y names the line that painted that pixel
 pxl list <art.px.js>              a map of the file: each definition's lines and comment
+pxl lib [entry]                   the library: its entries by subject (--genre, --cell), an entry's card;
+                                  draft draws a 3D entry at a cell it lacks
 pxl compare <art.px.js> <name> <ref.png | other>   silhouette rows against a reference or another asset
 pxl blind <art.px.js> <name...>   facing labels checked by a reader who doesn't know them
 pxl study <picture or clip>       learn from finished art or a reference, and what to use in pxl for each part
@@ -244,6 +241,7 @@ says which to reach for.
 | every op and option | [reference.md](reference.md), or `pxl help <name>` |
 | the agent's workflow, and where to read each thing | [SKILL.md](SKILL.md) |
 | which example teaches what, a line each | [examples/README.md](examples/README.md) |
+| the library: props, nature, characters, buildings to `include`, a card each, a sheet per subject | [lib/README.md](lib/README.md), or `pxl lib` |
 | scenes, perspective, HD-2D dioramas, parallax, shadows | [scenes.md](scenes.md) |
 | grass, trees, bushes, rocks, walls and paths as games draw them | [environment.md](environment.md) |
 | characters, animation with parts, rigs | [characters.md](characters.md) |
@@ -256,9 +254,8 @@ says which to reach for.
 
 Long projects made with pxl by agents, most over rounds of a curator's notes, the strongest first.
 Each is in [`examples/`](examples) to read and copy. Smaller files to start from (the starter
-`basics.px.js`, tilesets, a top-down game character in [`examples/topdown_hero/`](examples/topdown_hero),
-kits of grass, trees and rocks and of tree species in their seasons in
-[`examples/nature/`](examples/nature)) are in the [list of examples](examples/README.md).
+`basics.px.js`, tilesets) are in the [list of examples](examples/README.md); characters, props,
+grass, trees and rocks to include are in [the library](lib/README.md).
 
 ### HD-2D dioramas: a graveyard, a harbor, a clearing
 
@@ -423,7 +420,7 @@ test/         node:test suites
 | Script | What it does |
 | --- | --- |
 | `scripts/build.js` | writes `dist/` for npm installs |
-| `scripts/gallery.ts` | regenerates `docs/gallery/` from the examples (`--out DIR` to look first, `--every N` for a quick look) |
+| `scripts/gallery.ts` | regenerates `docs/gallery/` from the examples (`--out DIR` to look first, `--every N` for a quick look; `--lib`: the library's sheets) |
 | `scripts/calibrate.ts` | scores `pxl study` against the examples' own source |
 | `scripts/perf.ts` | `pxl check`'s time, processor time and peak memory on every example; `--vs <rev>`: ms a frame, that revision's pxl against yours |
 | `scripts/hashes.ts` | a hash of every asset of the files given (none: every example); `--vs <rev>`: what differs from that revision's pxl, `--frames` frame by frame, for an engine change that shouldn't move a pixel |

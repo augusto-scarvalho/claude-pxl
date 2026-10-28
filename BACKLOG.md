@@ -239,6 +239,12 @@ still hold, and the rest wait on these:
   `rampmap` leave every color no `rampmap` takes (the LPC trees' #101820 line) off the palette.
   `"rest"`, applied after the items, to what's left.
 
+## From the library's catalog (library F4)
+
+- [ ] **A warning for an accidental density mix** (scenes §19): a sprite scaled alone (a `png`'s
+  `shrink`, an image blown up) or two entries of different grids in one scene mix pixel sizes;
+  `pxl check` could say so where the genre doesn't declare the mix (HD-2D's `sizes`, `pixel`).
+
 ## Characters (from dogfooding a 64 px character)
 
 Each of these was first worked around by hand in an art file or by a Python script on the side.

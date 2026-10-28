@@ -5,7 +5,7 @@ Read this before building a scene, a level, a building or any environment.
 Contents: Layout and scale · Ground, paths and tiles · Texture without filler · Trees and big organic
 shapes · Water and things that land · Distance (aerial perspective) · True perspective · Slow motion
 in a short loop · Closing a loop · Parallax · Shadows and light · Blend modes · Checking a scene ·
-A game's screen · A game's projections · 3D as code · Profiles
+A game's screen · A game's projections · 3D as code · Profiles · Scale and density
 
 A reference scene (a screenshot, a photo of the place, a GIF or a video of a game): `PXL study` gives
 its horizon and vanishing points, its planes and their speeds, its palette and its light, the
@@ -994,3 +994,37 @@ rig3d("hero", { body: { h: TOPDOWN.scale.character[0] * TOPDOWN.grid, heads: TOP
   the outline all round (`surface: { ink: "k" }`, a turnaround's every heading in one pass), a builder's
   texture in screen px (the drawing call's ppm, environment §3). An approved cell is frozen (`frozen`):
   pxl check says when the live render drifts from it.
+
+Start a work from one:
+
+1. Take the genre: `include("<pxl>/lib/profiles/hd2d.px.js", { palette: true })` holds its `genre()`
+   and its starter kit; or write `genre()` from a reference's measured numbers (characters §2): measure the numbers,
+   never copy the pixels.
+2. See what the library (`lib/`) already has at its cell, to include rather than redraw:
+   `pxl lib --genre hd2d`, and `pxl lib <entry>` for one's card and the `include` that takes it. A 3D
+   entry it lacks: `pxl lib draft <entry> --cell hd2d/24` draws one to look at or clean by hand.
+3. Size each thing from the genre's `scale` × `grid`: a character `[1.5, 1]` on a 16 px grid is 24 px
+   tall. Never size by eye.
+4. Name the genre on what you make (`genre: "hd2d"`), and `pxl check` runs its checks.
+5. Freeze an approved 3D cell (`frozen`), and give the entry a `card()` (reference, under Assets).
+
+## 19. Scale and density
+
+- **Density is the grid:** a tile's px, 16, 32, 64 or 128 (the HD-2D kit's 24). A thing's size in
+  tiles is the profile's `scale` for its category: a character 1.5 × 1 in action top-down; a tree 2.5
+  tall, a bush about 1, an oak 2.5-3, a pine 3-4.
+- **A new density means simplifying, not shrinking.** The form stays relative (tiers, clusters, width
+  over height); the parts get fewer (the oak's clusters: 1 a tip at 16 px, 2 at 32), the tones too (3
+  at 16-32, 5 at 128). No outline at 16 px and under, unless the style is 8-bit's.
+- **Detail is measured in screen px.** The floors: a cluster ~10 px across or more, grain 2 px, marks
+  4 px apart, an edge 2 px. A builder drawn at its ppm holds them (`make3d.px`, environment §3). The
+  specks measure the noise: the oak at 16 px goes from 3.8% to 1.3% with its ppm and 3 tones.
+- **Under ~15 px, draw by hand.** A render or a shrink loses the read. Draw each size and let `fit`
+  pick one by its height where it stands: `examples/perspective/road.px.js`'s walkers, 5 to 12 px;
+  the library's crates, 14 to 30 px.
+- **2D art lives at its native grid.** Scaling one sprite mixes pixel sizes (the nature kit's pine,
+  scaled up and down by nearest neighbour, is the counter-example). Scaling the whole screen is fine:
+  `--share`, a scene's `pixel`.
+- **Mixing densities on purpose is a declared style.** HD-2D puts sprites in a finer 3D world (the
+  harbor's `sizes`, a camera's `pixel: 2`): say it in the genre and in the file's header. An accidental
+  mix isn't checked yet.
