@@ -241,6 +241,42 @@ export function smoke(p: P = {}): Built {
 
 export const BUILDERS: Record<string, (p: P) => Built> = { tree, pine, bush, rock, house, crystal, mist, smoke };
 
+/** The builders that set their texture in screen px at a `ppm` they take, and its range: a drawing call gives them its own. */
+const PPM = new WeakMap<object, [number, number]>([[tree, [1, 1000]], [bush, [1, 1000]]]);
+/** The ppm a builder is made at when drawn at `ppm` px to the meter (in its range, to 0.01), or undefined if it takes none. */
+export function ppmFor(maker: object, ppm: number | undefined): number | undefined {
+  const r = PPM.get(maker);
+  return r && ppm && ppm > 0 ? Math.min(r[1], Math.max(r[0], Math.round(ppm * 100) / 100)) : undefined;
+}
+// a thing a builder made without a ppm (and its field): the same made again at a drawing call's, once each
+const AGAIN = new WeakMap<object, (ppm: number) => Built | undefined>();
+/** What make3d.<name>(p) returns: drawn later, a builder that takes a ppm and wasn't given one gets the drawing call's (atPpm). */
+export function remakeable(b: Built, maker: (p: P) => Built, p: P): Built {
+  if (!PPM.has(maker) || !p || typeof p !== "object" || p.ppm !== undefined) return b;
+  const memo = new Map<number, Built>(), again = (ppm: number) => {
+    const k = ppmFor(maker, ppm);
+    if (k === undefined) return undefined;
+    let m = memo.get(k);
+    if (!m) memo.set(k, (m = maker({ ...p, ppm: k })));
+    return m;
+  };
+  AGAIN.set(b, again);
+  if (b.field) AGAIN.set(b.field, again);
+  return b;
+}
+/** A builder's thing (or its field) made again at the ppm it is drawn at, its texture in screen px there; undefined if it was given its own ppm, or takes none. */
+export const atPpm = (thing: unknown, ppm: number | undefined): Built | undefined => (ppm && thing && typeof thing === "object" ? AGAIN.get(thing)?.(ppm) : undefined);
+/** A maker that takes a ppm, in any range (a world's one thing: atPpm keeps it to its builder's). */
+export const takesPpm = (maker: object) => { PPM.set(maker, [1e-3, 1e6]); };
+/** Whether atPpm makes it again. */
+export const remakes = (thing: unknown) => !!thing && typeof thing === "object" && AGAIN.has(thing);
+/** The px to the meter a thing is drawn at: an orthographic view's `ppm` (16) over its `pixel` K; through a perspective() camera, its scale where the thing stands (`at`: [x, ahead, up]). */
+export function drawnPpm(view: unknown, ppm: number | undefined, at: unknown, K = 1): number | undefined {
+  const v = view as { scale?: (z: number, x?: number, up?: number) => number } | undefined;
+  if (v && typeof v === "object" && "horizon" in v) return typeof v.scale === "function" && Array.isArray(at) && at.length === 3 ? v.scale(at[1], at[0], at[2]) : undefined;
+  return (ppm ?? 16) / K;
+}
+
 /**
  * A builder of the art file's own, `make3d.define(name, fn, { params: { k: [lo, hi], w: ["a", "b"] }, wind })`:
  * fn takes the parameters and returns a Built as the eight above do ({ field } or { density, look }, and
@@ -254,7 +290,7 @@ export function defineBuilder(name: unknown, fn: unknown, o: { params?: Record<s
   if (BUILDERS[name]) throw new PxError(`${who} is built in: give yours another name`);
   const ranges = Object.entries(o.params ?? {}), words = (r: unknown): r is string[] => Array.isArray(r) && r.length > 0 && r.every((w) => typeof w === "string");
   for (const [k, r] of ranges) if (!(words(r) || (Array.isArray(r) && r.length === 2 && r.every(Number.isFinite) && r[0] <= r[1]))) throw new PxError(`make3d.define '${name}': params.${k} is its range, [lo, hi], or the words it takes, ["spring", "autumn"], got ${JSON.stringify(r)}`);
-  return (p: P = {}) => {
+  const made = (p: P = {}): Built => {
     if (ranges.length) known(p, [...ranges.map(([k]) => k), "seed", ...(o.wind ? ["wind"] : [])], who);
     for (const [k, r] of ranges) {
       const v = p[k];
@@ -266,6 +302,10 @@ export function defineBuilder(name: unknown, fn: unknown, o: { params?: Record<s
     if (!b || typeof b !== "object" || !(b.field instanceof Sdf || b.density instanceof Density)) throw new PxError(`${who}: its function returns { field: an sdf } or { density: sdf.density(...), look: { ramp } }, got ${typeof b === "object" ? `{ ${Object.keys(b ?? {}).join(", ")} }` : JSON.stringify(b)}`);
     return { parts: {}, details: {}, decals: {}, sockets: {}, ...b, ...(o.wind ? { windy: true } : {}) };
   };
+  // (a declared ppm: its texture in screen px, the drawing call's when not given)
+  const pr = o.params?.ppm;
+  if (Array.isArray(pr) && pr.length === 2 && pr.every(Number.isFinite)) PPM.set(made, pr as [number, number]);
+  return made;
 }
 /** make3d.tree({ ... }) and the rest, as art files call them. */
 export const make3d = Object.fromEntries(Object.entries(BUILDERS).map(([k, f]) => [k, (p: P = {}) => f(p)])) as Record<string, (p?: P) => Built>;

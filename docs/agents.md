@@ -241,7 +241,7 @@ pixel art (`pxl help "scenes 17"`, [`examples/sdf/`](../examples/sdf)). Which dr
 | a figure that turns and walks | `rig3d()`, its head baked per view by `views()` and retouched |
 | a prop as a game's sprites, one per heading | `turnaround()` (the shrine's torii, hall and lanterns) |
 | one thing in any of these ways | `draw3d(thing, { as: "voxels" })` |
-| a thing in 3D standing in a `mesh()` diorama's sun and shadows | `light: "mesh"` (`graveyard_3d`) |
+| a thing in 3D standing in a `mesh()` diorama's sun and shadows | drawn after it (`light: "mesh"`, the default there; `graveyard_3d`) |
 
 Whether a thing is worth drawing in 3D at all, and what a frame of each costs:
 [By hand or in 3D](getting-started.md#by-hand-or-in-3d).

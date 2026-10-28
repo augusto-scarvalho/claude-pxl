@@ -197,7 +197,7 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { g: { ramp: "w" }, s: { 
   assert.ok(o[20].slice(0, 12).split("").every((k) => k === "w"), "none to the left");
 });
 
-test('light "mesh": a surface, a volume and draw3d after a mesh() with a sun take its light (its way, its sun and sky on their tones)', () => {
+test('light "mesh": a surface, a volume and draw3d after a mesh() with a sun take its light (its way, its sun and sky on their tones), by default too', () => {
   const src = (light: string, sun = true) => PAL + `ramps("kgw")
 const V = { w: 40, horizon: 10, eye: 1, focal: 40 }, M = model()
 M.face("g", [-5, 0.5, 0], [5, 0.5, 0], [5, 20, 0], [-5, 20, 0])
@@ -214,6 +214,9 @@ scene("v", { w: 40, h: 40 }, ground, (c) => c.volume(sdf.density(sdf.sphere(0.4)
     assert.ok(at.every(([x, y]) => lit[y][x] === "?"), `${n}: lit by the mesh's sun and sky`);
   }
   assert.equal(p.image("d").hash(), p.image("a").hash(), "draw3d passes it on");
+  const given = loadSource(src("undefined"), "t.px.js");
+  for (const n of ["a", "d", "v"]) assert.equal(given.image(n).hash(), p.image(n).hash(), `${n}: the mesh's light where the call gives none`);
+  assert.ok(loadSource(src("undefined", false), "t.px.js").image("a").hash(), "no sun: its own light, as ever");
   assert.match(failure(src('"mesh"', false), "a").message, /light: "mesh" is the light of a mesh\(\) with a sun/);
   // a wall's shadow (mesh()'s faces) falls on the field: sky only there, darker
   const walled = loadSource(src('"mesh"').replace("const ground", 'M.face("g", [-1.2, 3, 0], [-1.2, 5, 0], [-1.2, 5, 3], [-1.2, 3, 3])\nconst ground'), "t.px.js");

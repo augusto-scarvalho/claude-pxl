@@ -157,8 +157,8 @@ far limbs swap, every fix breaks something else). In pxl that is one op, `rig3d(
    coat or a cloak a surface swept round the upright (`j.sweep`: open in front, its lining, trailing
    as he walks, flaring as he turns), drawn by `surface()` toned by how it faces the light (from
    above and toward us: a mirrored view keeps it, §6); `ink` the line all round and on the part
-   behind; `surface: { clean: true }` cleans what is drawn that small (a pixel sticking out cut away,
-   no line doubled, the outline whole). What no primitive gives is a field of the file's own
+   behind; `surface()` cleans what is drawn that small (`clean`, on unless `false`: a pixel sticking
+   out cut away, no line doubled, the outline whole). What no primitive gives is a field of the file's own
    (`sdf.field`: the warden's axe head) or drawn by hand after the figure (`draw`).
 4. **The head**, as a pixel artist paints over a 3D render: modeled (the skull, and on it the hair, a
    beard, a hat or a bandana as fields in the head's frame) and drawn once per view by
@@ -507,8 +507,8 @@ takes an outfit (`dress(outfit)`, `rig3d()`'s parts, `examples/hd2d/traveler.px.
 round the body and its ramps: trousers down to a cuff (rolled to the shin over bare feet, or into
 boots); drapes hung from a height (a cloak behind, a coat open at the front with buttons down its
 edges, a long skirt from the waist); the shirt's body by height and angle (stripes 2 px, a vest open
-over a shirt, a laced bodice; `spine: true` swept along the spine, for a figure that bows: the
-miko's); drapes over it (an apron from the chest to the knees); sleeves rolled
+over a shirt, a laced bodice; swept along the spine, so it bows with the figure; `spine: false`
+round an upright); drapes over it (an apron from the chest to the knees); sleeves rolled
 to skin at the forearm. Recolors (`base` + `swap`) of those outfits make the rest of the crowd: nine
 people from five heads and five outfits read as nine at a glance (`examples/hd2d/crew.px.js`); nine
 recolors of one cloaked traveler read as one man nine times.

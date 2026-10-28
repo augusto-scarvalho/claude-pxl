@@ -303,8 +303,8 @@ scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 24 }, sizes:
   (c) => talk(c))
 
 // `graveyard_3d`: the same visit with three things drawn by the 3D layer, beside the scene above to
-// compare. They stand in the mesh's light (light: "mesh": its sun and sky on what they draw, their
-// shadows the sun's share), at its depth, in pixels of the sprites' size.
+// compare. They stand in the mesh's light (what a 3D op drawn after a mesh() with a sun takes: its sun
+// and sky on what they draw, their shadows the sun's share), at its depth, in pixels of the sprites' size.
 // The dead tree in 3D: the sprite's own limbs (deadTreeLimbs, px) as tapering rods in meters, seen through
 // the camera at 38 degrees, swaying with the pines (the top 6 cm over at the gust, in step with the
 // sprite's), its limbs' shadows on the hill, the old graves and the mourner.
@@ -336,7 +336,7 @@ const MIST_3D = sdf.density(sdf.box([22, 16, 0.1]).at(0, 1.5, 0).subtract(sdf.bo
   { edge: 0.25, noise: 0.7, scale: 2.2, seed: 21, octaves: 2, flow: [3, 0.4, 0], fade: [0.05, 0.5] })
 scene("graveyard_3d", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 88 } },
   (c) => c.mesh(CAM, M.faces, MATS, { sprites: people(c).filter((s) => s.name !== "_snag"), stand: true, ...LIGHT }),
-  (c) => c.surface(SNAG_3D, { view: CAM, at: [-4.6, Z + 4.9, TOP], mats: { bark: "bBiI" }, light: "mesh", ao: 0, shadows: false }),
+  (c) => c.surface(SNAG_3D, { view: CAM, at: [-4.6, Z + 4.9, TOP], mats: { bark: "bBiI" }, ao: 0, shadows: false }),
   (c) => { for (const g of GATE) c.surface(g.f, { view: CAM, at: [g.x, Z - 2.2, TOP], mats: { gate: "basdf" }, light: LIGHT.light, cast: 0.65 }) },
-  (c) => c.volume(MIST_3D, { view: CAM, at: [0, Z, 0], ramp: "()~", thickness: 0.5, ambient: 0.45, cell: 0.15, blend: "alpha", light: "mesh" }),
+  (c) => c.volume(MIST_3D, { view: CAM, at: [0, Z, 0], ramp: "()~", thickness: 0.5, ambient: 0.45, cell: 0.15, blend: "alpha" }),
   (c) => talk(c))

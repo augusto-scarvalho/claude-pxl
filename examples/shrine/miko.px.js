@@ -31,17 +31,17 @@ const pleats = (h, a, out) => (!out ? "d" : ((((a * 6) / Math.PI) % 1) + 1) % 1 
 // the kosode's collar crossed at the chest: two bands from the shoulders down to the hakama's top
 const collar = (h, a) => h > 0.45 && Math.abs(Math.abs(a) - (1 - h) * 1.2) < 0.13
 const MIKO = {
-  ...T.TRAVELER, over: [], spine: true,
+  ...T.TRAVELER, over: [],
   legs: (far) => ({ tr: far ? "kdR" : "dRr", shin: far ? "kdR" : "dRr", foot: far ? "VvW" : "vWw" }), cuff: 0.97,
   drapes: [{ base: "pelvis", top: (j) => j.pelvis[2] + 3.6, len: 13.6, out: pleats, in: "d", trail: 0.35, keep: () => true, radius: (h) => 3.7 + 2.1 * (1 - h) }],
   skirt: (h, a, out) => (out ? "dRr" : "d"),
   body: (h, a) => (h < 0.3 ? "dRr" : collar(h, a) ? "Vv" : "vWw"),
   sleeve: two("vWw", "VvW"), fore: two("vWw", "VvW"), hand: two("zsS", "zzs"),
 }
-// the dressed figure (the kosode's body along her spine, `spine`: round an upright through the hips, as
-// she bowed it stood, a column her shoulders and head left, and it swallowed her hair), and what dress()
-// hasn't: the wide sleeves hanging from each forearm; the hair's tail down her back from the nape, lying
-// along her back as she leans (hung plumb from a nape the lean carries forward, it ran inside her),
+// the dressed figure (the kosode's body along her spine, as dress() sweeps it: round an upright through
+// the hips it stood as she bowed, a column her shoulders and head left, and swallowed her hair), and what
+// dress() hasn't: the wide sleeves hanging from each forearm; the hair's tail down her back from the
+// nape, lying along her back as she leans (hung plumb from a nape the lean carries forward, it ran inside her),
 // pushed out to her back where the lean brings the nape over it
 const parts = (j, p) => {
   const P = T.dress(MIKO)(j, p), farArm = j.depth(j.arms[0].sh) < j.depth(j.arms[1].sh) ? 0 : 1

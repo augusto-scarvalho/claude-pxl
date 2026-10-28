@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { keys, PAL } from "./helpers.ts";
 import { loadProject, loadSource } from "../src/node/load.ts";
 import { writeOutputs } from "../src/node/output.ts";
@@ -23,6 +23,43 @@ test("make3d.tree given its ppm: leaves a 3 px brush, none nearer than make3d.px
   assert.deepEqual([at(9).count, at(9).size], [(9 / PX.cluster) ** 2, PX.leaf / 9], "sparse where the grid is coarse");
   assert.deepEqual([at(72).count, at(72).size], [28, PX.leaf / 72], "as many as asked where it's fine, still 3 px");
   assert.equal(keys(loadSource(PAL + `sprite("a", { w: make3d.px.grain, h: 1 }, rect(0, 0, 2, 1, "r"))`, "t.px.js"), "a"), "rr", "make3d.px in an art file");
+});
+
+test("a builder made without a ppm is made at the drawing call's (draw3d, turnaround, a world's part, surface); a genre's tones", () => {
+  const p = loadSource(PAL + `ramps("krgw")
+const O = { view: { kind: "side", origin: [60, 108] }, ppm: 20, mats: { leaf: "krgw", bark: "krgw" } }, T = { ...O, view: "side", headings: ["s"] }, A = make3d.tree({ leaves: 28, seed: 3 })
+const at = (ppm) => make3d.tree({ leaves: 28, seed: 3, ppm })
+sprite("a", { w: 120, h: 110 }, draw3d(A, O))
+sprite("b", { w: 120, h: 110 }, draw3d(at(20), O))
+sprite("c", { w: 120, h: 110 }, draw3d(at(60), O))
+const W = (params) => world3d({ parts: { oak: { make: "tree", params } } })
+sprite("wa", { w: 120, h: 110 }, draw3d(W({ leaves: 28, seed: 3 }), O))
+sprite("wb", { w: 120, h: 110 }, draw3d(W({ leaves: 28, seed: 3, ppm: 20 }), O))
+turnaround("ta", A, T)
+turnaround("tb", at(20), T)
+const S = { view: "side", ppm: 3, mats: { leaf: "krgw", bark: "krgw" }, at: [8, 15] }
+sprite("s", { w: 16, h: 16 }, surface(make3d.tree({ seed: 3 }).field, S))
+sprite("s3", { w: 16, h: 16 }, surface(make3d.tree({ seed: 3, ppm: 3 }).field, S))
+sprite("s100", { w: 16, h: 16 }, surface(make3d.tree({ seed: 3, ppm: 100 }).field, S))
+genre("two", { tones: 2 })
+turnaround("g", make3d.tree({ seed: 3 }), { ...T, genre: "two" })`, "t.px.js");
+  assert.ok(keys(p, "a") === keys(p, "b") && keys(p, "a") !== keys(p, "c"), "draw3d: its leaves at 20 px to the meter");
+  assert.ok(keys(p, "wa") === keys(p, "wb") && keys(p, "ta_s") === keys(p, "tb_s"), "a world's part, a turnaround");
+  assert.ok(keys(p, "s") === keys(p, "s3") && keys(p, "s") !== keys(p, "s100"), "surface: the crown's grain at 3");
+  assert.deepEqual([...new Set(keys(p, "g_s").replace(/[.\n]/g, ""))].sort(), ["k", "w"], "the genre's 2 tones");
+});
+
+test("trees.px.js at a coarse ppm: the clusters grown to make3d.px.cluster keep the crown's outline (a birch, a cypress)", () => {
+  const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js"), O = `{ view: { kind: "side", pitch: 10 }, ppm: 12, mats: trees.mats, headings: ["s"] }`;
+  writeFileSync(f, `include(${JSON.stringify(join(import.meta.dirname, "../examples/nature/trees.px.js"))})
+for (const sp of ["birch", "cypress"]) { turnaround(sp, make3d[sp]({ height: 3, seed: 2 }), ${O}); turnaround(sp + "_m", make3d[sp]({ height: 3, seed: 2, ppm: 1000 }), ${O}) }`);
+  const p = loadProject(f);
+  try {
+    for (const sp of ["birch", "cypress"]) {
+      const [a, m] = [p.image(`${sp}_s`), p.image(`${sp}_m_s`)];
+      assert.ok(Math.abs(a.w - m.w) <= 3 && Math.abs(a.h - m.h) <= 3, `${sp}: ${a.w}x${a.h} at 12 px to the meter, ${m.w}x${m.h} with its meters`);
+    }
+  } finally { rmSync(dirname(f), { recursive: true, force: true }); }
 });
 
 const BALL = PAL + `ramps("krgw")

@@ -19,6 +19,7 @@ import type { Palette } from "./palette.ts";
 import { type Perspective, type View, perspective, scaled } from "./perspective.ts";
 import { type Clock, type Compiled, Sdf, type V3, article, compile } from "./sdf.ts";
 import { Voxels, sizeOf, voxelize } from "./grids.ts";
+import { atPpm, drawnPpm } from "./builders.ts";
 import { type Lit, shine } from "./sunlight.ts";
 
 /** A view: a name, or { kind, yaw, pitch, origin, grid } (`origin`: where the world's [0, 0, 0] lands, px; with it `at` is [x, y, z] m; `grid`: on voxels' pixel grid), or a perspective() view. */
@@ -64,7 +65,7 @@ export interface SurfaceOpts {
   hide?: boolean;
   /** the name of the part it is (pxl steps --at says what part painted a pixel; a field's own .part() names go after it) */
   part?: string;
-  /** a pixel artist's pass over a small thing before its lines: a pixel sticking out cut away, no black run 2 px thick (an inner line along the outline or under another line left to that one line), the outline whole */
+  /** a pixel artist's pass before its lines (default true; voxels() false): a pixel sticking out cut away, no black run 2 px thick (an inner line along the outline or under another line left to that one line), the outline whole */
   clean?: boolean;
   /** (light: "mesh": the light of the mesh() drawn before it, on what it draws as on mesh()'s sprites) */
   world?: Lit;
@@ -77,7 +78,7 @@ export function partIndex(img: Img, name: string): number {
   const k = P.names.indexOf(name);
   return k >= 0 ? k : P.names.push(name) - 1;
 }
-/** voxels()'s: surface()'s (ao off unless given: the creases a cube face's corners make), and a cell's `size` (when it is given a field) and `px` (a cube's width on the picture) */
+/** voxels()'s: surface()'s (ao 0.25 unless given: the creases a cube face's corners make, the steps read without banding a fine grid), and a cell's `size` (when it is given a field) and `px` (a cube's width on the picture) */
 export interface VoxelOpts extends SurfaceOpts { size?: number | number[]; px?: number }
 export const VOXEL_OPTS = ["size", "px", ...SURFACE_OPTS];
 export interface SurfaceCanvas {
@@ -274,9 +275,11 @@ function voxelTracer(V: Voxels): Tracer {
 /** Draw a distance field's surface on the canvas (see the top of this file). */
 export function drawSurface(c: SurfaceCanvas, field: unknown, o: SurfaceOpts = {}): void {
   if (!(field instanceof Sdf)) throw new PxError(`surface(field, opts) draws a distance field (sdf.sphere(...) and the rest)${field && typeof field === "object" && "kind" in field ? `, not ${article((field as { kind: string }).kind)}` : ""}`);
-  const C = compile(field, clockOf(c));
+  // a builder's field made without a ppm: made again at the one it is drawn at, its texture in screen px
+  const f = atPpm(field, drawnPpm(o.view, o.ppm, o.at, o.pixel ?? c.k ?? 1))?.field ?? field;
+  const C = compile(f, clockOf(c));
   finite(C);
-  drawTraced(c, fieldTracer(C), o, "surface");
+  drawTraced(c, fieldTracer(C), { ...o, clean: o.clean ?? true }, "surface");
 }
 
 /** Draw a voxel grid, or a field made voxels of `size` m at this moment, a cube to a cell (see the top of this file). */
@@ -285,7 +288,7 @@ export function drawVoxels(c: SurfaceCanvas, thing: unknown, o: VoxelOpts = {}):
   if (thing instanceof Voxels) { if (o.size !== undefined) throw new PxError("voxels: a grid has its size already (size is for a field)"); V = thing; }
   else if (thing instanceof Sdf) { if (o.size === undefined) throw new PxError("voxels(field, { size }): a cell's size in m, one number or [x, y, z]"); V = voxelize(thing, { size: o.size, clock: clockOf(c) }); }
   else throw new PxError(`voxels(grid or field, opts) draws a voxel grid (sdf.voxels(field, { size })) or a distance field${thing && typeof thing === "object" && "kind" in thing ? `, not ${article((thing as { kind: string }).kind)}` : ""}`);
-  drawTraced(c, voxelTracer(V), { ...o, ao: o.ao ?? 0 }, "voxels");
+  drawTraced(c, voxelTracer(V), { ...o, ao: o.ao ?? 0.25 }, "voxels");
 }
 
 export const clockOf = (c: SurfaceCanvas): Clock => ({ t: c.t, phase: c.frames > 0 ? c.frame / c.frames : 0, frame: c.frame, frames: c.frames });
@@ -487,20 +490,6 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       if (best !== undefined) tone[i] = best;
     }
 
-  // hems: under a material that hangs, where nothing is below, every other column a point of it 1 to
-  // `hem` px long, a step darker each px, as deep as what it hangs from
-  if (hems.some((v) => v > 0))
-    for (let gy = GH - 2; gy >= 0; gy--)
-      for (let gx = 0; gx < GW; gx++) {
-        const i = gy * GW + gx, k = m[i];
-        if (k < 0 || !hems[k] || m[i + GW] >= 0 || (gx + gy) % 2) continue;
-        for (let d = 1, n = 1 + (((gx >> 1) + gy) % hems[k]); d <= n && gy + d < GH && m[i + d * GW] < 0; d++) {
-          const j = i + d * GW;
-          m[j] = k; tone[j] = Math.max(0, tone[i] - d); depth[j] = depth[i]; hidden[j] = hidden[i]; pt[j] = pt[i];
-          nrm[j * 3] = nrm[i * 3]; nrm[j * 3 + 1] = nrm[i * 3 + 1]; nrm[j * 3 + 2] = nrm[i * 3 + 2];
-          if (wpos) { wpos.set(wpos.subarray(i * 3, i * 3 + 3), j * 3); wsun![j] = wsun![i]; }
-        }
-      }
   // the contour: a cell with nothing beside it, or something far behind; lit toward the light,
   // outlined away from it (not a part a cell thin: it keeps its tone)
   const gap = persp ? 0.25 : Math.max(0.15, 3 / scale);
@@ -543,6 +532,21 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
     const nbs = (x: number, y: number) => +on(x - 1, y) + +on(x + 1, y) + +on(x, y - 1) + +on(x, y + 1);
     cutAll((gx, gy) => { const n = nbs(gx, gy); return !n || (n === 1 && D4.some(([dx, dy]) => on(gx + dx, gy + dy) && nbs(gx + dx, gy + dy) >= 3)); });
   }
+  // hems: under a material that hangs, where nothing is below, every other column a point of it 1 to
+  // `hem` px long, a step darker each px, as deep as what it hangs from (after clean: points, not
+  // pixels sticking out)
+  if (hems.some((v) => v > 0))
+    for (let gy = GH - 2; gy >= 0; gy--)
+      for (let gx = 0; gx < GW; gx++) {
+        const i = gy * GW + gx, k = m[i];
+        if (k < 0 || !hems[k] || m[i + GW] >= 0 || (gx + gy) % 2) continue;
+        for (let d = 1, n = 1 + (((gx >> 1) + gy) % hems[k]); d <= n && gy + d < GH && m[i + d * GW] < 0; d++) {
+          const j = i + d * GW;
+          m[j] = k; tone[j] = Math.max(0, tone[i] - d); depth[j] = depth[i]; hidden[j] = hidden[i]; pt[j] = pt[i];
+          nrm[j * 3] = nrm[i * 3]; nrm[j * 3 + 1] = nrm[i * 3 + 1]; nrm[j * 3 + 2] = nrm[i * 3 + 2];
+          if (wpos) { wpos.set(wpos.subarray(i * 3, i * 3 + 3), j * 3); wsun![j] = wsun![i]; }
+        }
+      }
   // (every part in front of it there has a line of its own the same way: 2 px of line)
   const twice = (gx: number, gy: number, i: number) => {
     const by = D4.filter(([dx, dy]) => inkBy(i, gx + dx, gy + dy));

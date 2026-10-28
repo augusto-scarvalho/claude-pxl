@@ -213,7 +213,7 @@ says which to reach for.
   (`world3d`, builders such as `make3d.tree` and `make3d.pine`) edited by name, with rules
   (`expect3d`) that `pxl check` runs and `--fix` repairs; one thing drawn as any of them
   (`draw3d(thing, { as })`); turned into a game's sprites, one per heading (`turnaround()`); standing
-  in a `mesh()` diorama's sun and shadows (`light: "mesh"`); out to other tools as `.vox`, `.obj`,
+  in a `mesh()` diorama's sun and shadows (drawn after it); out to other tools as `.vox`, `.obj`,
   `.glb` (one that plays, for something that moves) and `.ply`. See [`scenes.md`](scenes.md) §17.
 - **Going by in a loop**: parallax planes (`scroll()`, across or, with `axis: "y"`, down the
   picture; pxl warns when a plane would judder), `clouds()`, smoke and steam (`plume()`, and
@@ -279,7 +279,7 @@ traveler ([`traveler.px.js`](examples/hd2d/traveler.px.js)) is a 34 px figure in
 his head modeled, baked once per view and its face painted over by hand: he walks his eight
 directions along a `route()`, kneels to lay a rose and talks in `bubble()` boxes. In
 `graveyard_3d`, beside the graveyard, its dead tree, a ground mist and the swinging gate are drawn in
-3D inside the diorama's light (`light: "mesh"`), 0.7 s a frame. The harbor's camera was matched by
+3D inside the diorama's light (what they take after its `mesh()`), 0.7 s a frame. The harbor's camera was matched by
 measuring a screenshot of Octopath Traveler II; its crew ([`crew.px.js`](examples/hd2d/crew.px.js))
 is dressed on the traveler's skeleton. The clearing ([`clearing.px.js`](examples/hd2d/clearing.px.js))
 has every shader at once: a wood swaying in one wind, a fireball cast from the traveler's hand by the

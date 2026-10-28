@@ -100,4 +100,4 @@ const CLOCK = { frames: 100, fps: 20 }
 // Three's bloom on the fire, the dusk grade, a light grain in blocks of the art's pixel (the same in every
 // frame: a grain that changes each frame changes every pixel, and the GIF went from 1.1 MB to 13)
 scene("clearing", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 8 }, sizes: { clearing_md: 3 } }, (c) => c.mesh(CAM, M.faces, mats(c.k), { sprites: people(c), lamps: S.lamps(c.t), ...DUSK }), cast(S),
-  post({ blur: 6, focus: [W / 2, H * 0.55], sharp: 3, soft: [3, 8], bloom: { levels: 5, strength: 0.5, above: 0.9 }, lut: { cube: "dusk.cube", amount: 0.6 }, grain: { amount: 0.035, animated: false }, vignette: 0.3 }))
+  post({ blur: 6, focus: [W / 2, H * 0.55], sharp: 3, soft: [3, 8], bloom: { levels: 5, strength: 0.5, above: 0.9 }, lut: { cube: "dusk.cube", amount: 0.6 }, grain: 0.035, vignette: 0.3 }))

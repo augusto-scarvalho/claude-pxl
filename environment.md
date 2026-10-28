@@ -137,10 +137,12 @@ round it.
   trunk shows); a birch's white twigs vanished against a light ground (marked dark out from the
   trunk); coconuts hid in the fronds until hung lower; a tree lit from one side is never flipped.
 - One tree at every density (the library lab, a tree 2.5 tiles tall on a 16 to 128 px grid): its form
-  relative to it (tiers, clusters, width over height), its texture in screen px. Give the builder the
-  `ppm` it is drawn at (`make3d.oak({ ppm })` and the species, `make3d.tree({ ppm })`, the kit's
-  `make3d.spruce({ ppm })`): it holds `make3d.px`'s floors, a cluster 10 px across or more, grain 2 px,
-  marks 4 px apart, an edge 2 px. The tones are the genre's: `surface: { tones: 3 }` at 16-32 px.
+  relative to it (tiers, clusters, width over height), its texture in screen px. A builder takes the
+  `ppm` it is drawn at from the drawing call (`turnaround()`, `draw3d()`, `surface()`; or give it,
+  `make3d.oak({ ppm })`, the species, `make3d.tree`, the kit's `make3d.spruce`): it holds `make3d.px`'s
+  floors, a cluster 10 px across or more (never past the mass it makes up: a small birch or a cypress
+  keeps its outline), grain 2 px, marks 4 px apart, an edge 2 px. The tones are the genre's:
+  `genre(name, { tones: 3 })` at 16-32 px, or `surface: { tones: 3 }`.
   Specks (the share of pixels in runs of one tone 1-2 px big) at a 16 px grid: the oak 3.8% as built,
   1.7% with its ppm, 1.3% with 3 tones as well; the spruce 21%, 6%. At 128 px nothing set in meters
   reads as leaves: `foliage()` over the crown, hand-drawn tufts in steps from the tones under them,

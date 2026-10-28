@@ -142,13 +142,13 @@ rig3d("f", { body: { h: 30, heads: 3 }, headings: ["s"], parts, moves: { strike:
   assert.throws(() => loadSource(`${PAL}rig3d("e", { blocks: true, moves: { m: { frames: 2, ms: [60], pose: () => ({}) } } })`, "t.px.js"), /a list, a number a frame/);
 });
 
-test("dress() (examples/hd2d/traveler.px.js): spine: true sweeps the shirt's body along the spine, not round an upright through the hips", () => {
+test("dress() (examples/hd2d/traveler.px.js): the shirt's body swept along the spine; spine: false, round an upright through the hips", () => {
   // a point on the spine under the chest of a figure leaning 30 degrees: inside the one, outside the other
   const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");
   writeFileSync(f, `include(${JSON.stringify(join(import.meta.dirname, "../examples/hd2d/traveler.px.js"))})
 const T = travelerFigure, R = rig3d("q", { ...T.FIG, parts: T.dress(T.TRAVELER), moves: { m: { frames: 1, pose: () => ({}) } } })
 const j = R.joints({ lean: 30 }, 270), q = j.chest.map((v, e) => v - 2 * j.spine[e]), d = (o) => T.dress(o)(j, {}).tunic[1].field.dist(q)
-sprite("x", { w: 2, h: 1 }, (c) => { if (d({ ...T.TRAVELER, spine: true }) < -1.5) c.px(0, 0, "#ff0000"); if (d(T.TRAVELER) > 0) c.px(1, 0, "#ff0000") })`);
+sprite("x", { w: 2, h: 1 }, (c) => { if (d(T.TRAVELER) < -1.5) c.px(0, 0, "#ff0000"); if (d({ ...T.TRAVELER, spine: false }) > 0) c.px(1, 0, "#ff0000") })`);
   assert.ok([...loadProject(f).image("x").data].every((v) => (v & 255) === 255));
 });
 
@@ -212,7 +212,7 @@ ramps("kgw", "krw")
 const BUMP = sdf.union(sdf.sphere(4), sdf.sphere(0.7).at(4.4, 0, 0.5)).mat("g")
 const TWO = sdf.union(sdf.sphere(4).at(0, 6, 4).mat("b").part("back"), sdf.sphere(2).at(3, 0, 4).mat("f").part("front"))
 sprite("_d", "ggg")
-for (const clean of [false, true]) {
+for (const clean of [false, true, undefined]) {
   const o = { ppm: 1, view: { kind: "side", pitch: 0 }, outline: false, rim: false, shadows: false, ao: 0, light: [0, -1, 0], soft: 1, clean }
   sprite(\`bump_\${clean}\`, { w: 14, h: 12 }, (c) => c.surface(BUMP, { ...o, at: [6, 10], mats: { g: "gw" } }))
   sprite(\`two_\${clean}\`, { w: 16, h: 14 }, (c) => c.surface(TWO, { ...o, at: [8, 12], mats: { b: "rw", f: "g" }, inner: "k" }))
@@ -224,6 +224,7 @@ for (const chin of [undefined, ["r", "w"]]) rig3d(\`f\${chin?.[0] ?? ""}\`, { w:
   const rows = (n: string) => keys(p, n).split("\n"), on = (r: string[], x: number, y: number) => (r[y]?.[x] ?? ".") !== ".";
   const spurs = (r: string[]) => r.flatMap((row, y) => [...row].map((_, x) => on(r, x, y) && +on(r, x - 1, y) + +on(r, x + 1, y) + +on(r, x, y - 1) + +on(r, x, y + 1) <= 1)).filter(Boolean).length;
   assert.ok(spurs(rows("bump_false")) >= 1 && spurs(rows("bump_true")) === 0, keys(p, "bump_false") + "\n\n" + keys(p, "bump_true"));
+  assert.ok(keys(p, "bump_undefined") === keys(p, "bump_true") && keys(p, "two_undefined") === keys(p, "two_true"), "clean is on by default");
   // the back ball's line where it runs between the clear and the ball in front (a sliver): cut, the
   // outline round it the one line there; never a dark tone in place of a line (r, which its light never reaches)
   const count = (n: string, k: string) => keys(p, n).split(k).length - 1;

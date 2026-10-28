@@ -115,9 +115,9 @@ sprite("_pine_far", { base: "_pine_m", swap: { Z: "#3b4260", z: "#405468", x: "#
 // a fifth with 0.35). Drawn by surface() from 20 degrees up at 24 px a meter, as a billboard is: the
 // sun behind on the left lighting its upper left edge (rim: 0.85), no self-shadow, no outline, the
 // needles in strokes along each branch, the hems hanging in points; the normals the surfaces really
-// have, so mesh()'s sun lights it as it is. h: its height in px. ppm: drawn at that many px to the meter
-// instead (turnaround(..., { ppm })): its clumps as many px across on the picture as at 24, more of them
-// round each tier (texture in screen px; its tiers and reach stay relative to it).
+// have, so mesh()'s sun lights it as it is. h: its height in px. ppm: the px to the meter it is drawn
+// at (the drawing call's, 24 without one): its clumps as many px across on the picture as at 24, more
+// of them round each tier (texture in screen px; its tiers and reach stay relative to it).
 const fromPx = ([x, y, z]) => [x / 24, -z / 24, y / 24]
 // an ellipsoid of radii rr along the ways e1 and e2 (and their cross), at C: one turn about an axis takes it there
 const ellipsoidAlong = (rr, e1, e2, C) => {

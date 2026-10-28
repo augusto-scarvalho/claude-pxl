@@ -93,18 +93,19 @@ scene("a", { w: 40, h: 40 }, (c) => {
   assert.ok(reds(scene(true)) > reds(scene(false)), "the fine one in front shows more of itself than behind");
 });
 
-test("voxels(): creases darker with ao (off by default); from the side on the pixel grid; a field on the same grid lines up", () => {
+test("voxels(): creases darker with ao (0.25 by default); from the side on the pixel grid; a field on the same grid lines up", () => {
   const p = loadSource(PAL + `ramps("kgw")
 const B = sdf.box(0.5).at(0, 0, 0.25), F = sdf.box([0.75, 0.75, 0.25]).at(0, 0, 0.125).union(sdf.box(0.25).at(0, 0, 0.375))
 const o = { px: 4, mats: { m: "kgw" }, outline: false, rim: false }
 sprite("plain", { w: 16, h: 14 }, voxels(sdf.voxels(F, { size: 0.25 }), { ...o, view: "top", at: [8, 12] }))
 sprite("ao0", { w: 16, h: 14 }, voxels(sdf.voxels(F, { size: 0.25 }), { ...o, view: "top", at: [8, 12], ao: 0 }))
 sprite("ao", { w: 16, h: 14 }, voxels(sdf.voxels(F, { size: 0.25 }), { ...o, view: "top", at: [8, 12], ao: 1 }))
+sprite("ao25", { w: 16, h: 14 }, voxels(sdf.voxels(F, { size: 0.25 }), { ...o, view: "top", at: [8, 12], ao: 0.25 }))
 sprite("vox", { w: 12, h: 12 }, voxels(sdf.voxels(B, { size: 0.5 }), { ...o, px: 8, view: "iso", at: [6, 10] }))
 sprite("field", { w: 12, h: 12 }, surface(B, { mats: o.mats, outline: false, rim: false, ppm: 8, view: { kind: "iso", grid: true }, at: [6, 10] }))
 sprite("side", { w: 12, h: 12 }, voxels(sdf.voxels(B, { size: 0.5 }), { ...o, px: 8, view: { kind: "side", grid: true }, at: [6, 10] }))`, "t.px.js");
   const lit = (n: string) => (keys(p, n).match(/w/g) ?? []).length;
-  assert.equal(keys(p, "plain"), keys(p, "ao0"));
+  assert.equal(keys(p, "plain"), keys(p, "ao25"), "0.25 by default");
   assert.ok(lit("ao") < lit("ao0") - 4, "the floor's faces darker toward the cube on it");
   const shape = (n: string) => keys(p, n).replace(/[^.\n]/g, "#");
   assert.equal(shape("field"), shape("vox"), "a field's cube on the grid covers what the voxel's does");

@@ -1136,16 +1136,18 @@ export class Canvas {
    * perspective() camera after a mesh(), at its depth, its shadow on what is drawn: see surface.ts.
    */
   surface(field: unknown, opts: SurfaceOpts = {}): void {
-    drawSurface(this as unknown as SurfaceCanvas, field, this.in3d(opts));
+    drawSurface(this as unknown as SurfaceCanvas, field, this.in3d(opts, true, true));
   }
 
   /**
    * A 3D op's options, look3d()'s light and mats where they don't say them (mats, unless a ramp is
    * given); `light: "view"` the op's own, from its view's upper left; `light: "mesh"` the light of the
-   * mesh() drawn before it with a sun (its way, and its sun, sky and lamps on what the op draws).
+   * mesh() drawn before it with a sun (its way, and its sun, sky and lamps on what the op draws): `scene`,
+   * the ops that take it (surface, voxels, volume, draw3d), take it where the call gives no light.
    */
-  private in3d<T extends object>(o: T, mats = true): T {
-    const L = this.look3d, { light, ...q } = (o ?? {}) as { light?: unknown; mats?: unknown; ramp?: unknown };
+  private in3d<T extends object>(o: T, mats = true, scene = false): T {
+    const L = this.look3d, { light: own, ...q } = (o ?? {}) as { light?: unknown; mats?: unknown; ramp?: unknown };
+    const light = own === undefined && scene && this.img.world ? "mesh" : own;
     if (!L && light !== "view" && light !== "mesh") return o;
     const w = light === "mesh" ? this.img.world : undefined;
     // (only checking, mesh() lights nothing: the op's own light then, which the checks don't read)
@@ -1157,12 +1159,12 @@ export class Canvas {
 
   /** A voxel grid (sdf.voxels), or a field made voxels of `size` m at this moment, a cube to a cell, drawn as surface() draws (iso and top on the pixel grid, a cube `px` wide): see surface.ts. */
   voxels(thing: unknown, opts: VoxelOpts = {}): void {
-    drawVoxels(this as unknown as SurfaceCanvas, thing, this.in3d(opts));
+    drawVoxels(this as unknown as SurfaceCanvas, thing, this.in3d(opts, true, true));
   }
 
   /** A density (sdf.density): a cloud, mist, smoke, a glowing orb, ray-marched through its light and drawn as pixel art, dithered where thin; through a camera at its depth, its shadow and its glow on what is round it: see volume.ts. */
   volume(density: unknown, opts: VolumeOpts = {}): void {
-    drawVolume(this as unknown as SurfaceCanvas, density, this.in3d(opts, false));
+    drawVolume(this as unknown as SurfaceCanvas, density, this.in3d(opts, false, true));
   }
 
   /** Gaussian splats (sdf.splats, or a field or density made splats now with spacing) rasterized to pixel art: see splats.ts. */
@@ -1178,11 +1180,11 @@ export class Canvas {
   /** A world3d(...) drawn through a view: its solids, their details and decals, its air: see world3d.ts. */
   draw3d(world: unknown, opts: Draw3dOpts = {}): void {
     const self = this as unknown as SurfaceCanvas;
-    drawWorld(world, this.in3d(opts), {
+    drawWorld(world, this.in3d(opts, true, true), {
       surface: (f, o) => drawSurface(self, f, o as SurfaceOpts), splats: (s, o) => drawSplats(self, s, o as SplatOpts), voxels: (f, o) => drawVoxels(self, f, o as VoxelOpts),
       mesh: (v, faces, m, o) => this.mesh(v as Partial<View>, faces, m as Record<string, Material>, { ...o, over: true } as MeshOpts),
       volume: (dd, o) => drawVolume(self, dd, o as VolumeOpts), decal: (n, o) => drawDecal(this as unknown as Parameters<typeof drawDecal>[0], n, o as DecalOpts),
-      clock: { t: this.t, phase: this.frames > 0 ? this.frame / this.frames : 0, frame: this.frame, frames: this.frames },
+      clock: { t: this.t, phase: this.frames > 0 ? this.frame / this.frames : 0, frame: this.frame, frames: this.frames }, k: this.k,
     });
   }
 

@@ -172,11 +172,12 @@ scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { b: { tex: "_white", edg
   assert.ok(!whole(tex(", block: 1")), "a texel a pixel");
 });
 
-test("mesh shadows without a sun: shadows: true, a ramp face a step down where a box stands between it and the light", () => {
+test("mesh shadows without a sun (shadows: false none): a ramp face a step down where a box stands between it and the light", () => {
   const at = (o: string) => rows(`const M = model(); M.face("f", [-5, 0.5, 0], [5, 0.5, 0], [5, 20, 0], [-5, 20, 0]); M.box("b", [-1, 3, 0], [-0.4, 3.6, 1.2])
 scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, M.faces, { f: { ramp: "kgw" }, b: { ramp: "kgw" } }, { light: [-1, 0, 1]${o} }))`);
-  const g = (r: string[]) => r.slice(18).join("").split("g").length - 1, lit = at(""), shaded = at(", shadows: true");
+  const g = (r: string[]) => r.slice(18).join("").split("g").length - 1, lit = at(", shadows: false"), shaded = at("");
   assert.equal(g(lit), 0, "the floor all lit");
+  assert.equal(g(at(", light: () => 0.9")), 0, "a light function: none unless shadows: true");
   assert.ok(g(shaded) > 10, `a shadow to the right of the box: ${g(shaded)} px`);
   assert.deepEqual(lit.slice(0, 17), shaded.slice(0, 17), "the box itself as it was");
 });
@@ -196,12 +197,12 @@ test("post finish: strength 0 changes nothing; Three's bloom spreads farther tha
   assert.match(failure(PAL + PIC + `scene("a", { w: 64, h: 40 }, post({ bloom: { levels: 5, r: 4 } }))`, "a").message, /give levels or r, not both/);
 });
 
-test("post finish: grain is the frame's, in blocks of pixel, and the same each time; sharpen steps edges apart, flat stays flat", () => {
-  const f = finish("{ grain: 0.2, pixel: 2 }").frames("a");
-  assert.ok(same(f[1].img, finish("{ grain: 0.2, pixel: 2 }").frames("a")[1].img), "the same frame, the same grain");
-  assert.ok(!same(f[0].img, f[1].img), "another frame, another grain");
-  const still = finish("{ grain: { amount: 0.2, animated: false }, pixel: 2 }").frames("a");
-  assert.ok(same(still[0].img, still[1].img) && !same(still[0].img, finish("{}").image("a")), "animated: false: a grain, the same in every frame");
+test("post finish: grain in blocks of pixel, the same in every frame (animated: the frame's, the same each time); sharpen steps edges apart, flat stays flat", () => {
+  const f = finish("{ grain: { amount: 0.2, animated: true }, pixel: 2 }").frames("a");
+  assert.ok(same(f[1].img, finish("{ grain: { amount: 0.2, animated: true }, pixel: 2 }").frames("a")[1].img), "the same frame, the same grain");
+  assert.ok(!same(f[0].img, f[1].img), "animated: another frame, another grain");
+  const still = finish("{ grain: 0.2, pixel: 2 }").frames("a");
+  assert.ok(same(still[0].img, still[1].img) && !same(still[0].img, finish("{}").image("a")), "by default a grain, the same in every frame");
   const g = f[0].img, blocks = [0, 2, 4, 6].every((x) => [0, 2, 4].every((y) => g.get(x, y) === g.get(x + 1, y) && g.get(x, y) === g.get(x, y + 1) && g.get(x, y) === g.get(x + 1, y + 1)));
   assert.ok(blocks, "2 x 2 blocks");
   const plain = finish("{}").image("a"), sharp = finish("{ sharpen: 0.5 }").image("a");

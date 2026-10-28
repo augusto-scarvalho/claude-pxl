@@ -149,7 +149,9 @@ declare global {
     pitch?: number;
     /** ground: the feet on one row through a move; height: a family as tall in every direction; footprint: the drawing down to where it meets the ground */
     checks?: ("ground" | "height" | "footprint")[];
-    /** any other field, kept for the file to read (tones, steer) */
+    /** the tones a turnaround() or rig3d() naming it draws its surface in (where its surface gives none) */
+    tones?: number;
+    /** any other field, kept for the file to read (steer) */
     [field: string]: any;
   }
   interface PxLayerOpts {
@@ -268,7 +270,7 @@ declare global {
     /** Light in the world (textured faces and sprites, through their normal maps): the sun's color (`light` the way to it), the sky's, lamps, keys that give light, the sun's shadows (default on). */
     sun?: PxColor | { color: PxColor; strength?: number }; sky?: PxColor | { color: PxColor; strength?: number };
     lamps?: { at: PxV3; color: PxColor; r?: number; strength?: number }[]; emit?: string;
-    /** the sun's shadows (default true with one); without a sun, true: cast from `light`, a ramp face a step down where they fall */
+    /** the sun's shadows (default true); without a sun, cast from `light` (a light function: only when true), a ramp face a step down where they fall (never to its darkest) */
     shadows?: boolean;
     /** an orthographic view ("side", "top", "iso", { kind, ... }): px to the meter (16), where the points' [0, 0, 0] lands, [x, y] px */
     ppm?: number; at?: number[];
@@ -310,7 +312,7 @@ declare global {
     hide?: boolean;
     /** the name of the part it is (pxl steps --at) */
     part?: string;
-    /** a pixel artist's pass before its lines: no black run 2 px thick, the outline whole, a pixel sticking out cut away */
+    /** a pixel artist's pass before its lines (default true): no black run 2 px thick, the outline whole, a pixel sticking out cut away */
     clean?: boolean;
     /** a line of this key all round outside it, a px wide (the sprite needs the room) */
     ink?: PxColor;
@@ -399,7 +401,7 @@ declare global {
   type PxRule2d = { beside?: [string, string | number[], { gap?: number | [number, number]; side?: "left" | "right" | "above" | "below" }]; before?: [string, string]; apart?: [string, string | number[], number?]; inside?: [string, PxRegion]; onGround?: [string, (number | ((x: number) => number))?]; while?: [PxRule2d, PxRule2d]; frames?: [number, number] };
   /** expect3d's rules; before and while take two rules of a place. */
   type PxRule = { above?: [string, string]; on?: [string, string]; apart?: [string, string]; near?: [string, string, number]; reaches?: [string, number[], number, number?]; within?: [string, number[][]]; before?: [PxRule, PxRule]; while?: [PxRule, PxRule] };
-  /** voxels()'s options: surface()'s (ao 0 unless given: a face darker at the creases); a cell's size (given a field), a cube's width in px (iso and top on the pixel grid). */
+  /** voxels()'s options: surface()'s (ao 0.25 unless given: a face darker at the creases); a cell's size (given a field), a cube's width in px (iso and top on the pixel grid). */
   interface PxVoxelOpts extends PxSurfaceOpts { size?: number | number[]; px?: number }
   /** A voxel grid: cells a side, their size in m, its low corner, how many are filled, its box; its outside as a mesh, and as mesh()'s faces. */
   interface PxVoxels { readonly kind: "voxels"; readonly n: PxV3; readonly size: PxV3; readonly origin: PxV3; readonly count: number; bounds(): [PxV3, PxV3]; mesh(): PxMesh3; readonly faces: PxFace[] }
@@ -475,7 +477,7 @@ declare global {
     /** a grade from a .cube file next to the art file, at amount (0..1) */
     /** a .cube file or a LUT strip PNG (256x16) next to the art file */
     lut?: string | { cube: string; amount?: number };
-    /** film grain in blocks of pixel, new each frame, in the middle tones: up to amount of full scale */
+    /** film grain in blocks of pixel, in the middle tones: up to amount of full scale; the same each frame unless animated */
     grain?: number | { amount?: number; seed?: number; animated?: boolean };
     /** the picture taken back to the palette (true) or to those keys, Bayer-dithered between two by dither (0 the nearest) */
     palette?: true | string | string[] | { keys?: string | string[]; dither?: number };
@@ -925,7 +927,7 @@ declare global {
   function world3d(spec: { seed?: number; wind?: { from?: "left" | "right" | "front" | "behind"; strength?: number }; parts: Record<string, PxPartSpec> }): PxWorld;
   /** Rules over a world's loop, run by pxl check. */
   function expect3d(name: string, world: PxWorld, rules: PxRule[], opts?: { frames?: number; ms?: number }): void;
-  /** Builders with semantic parameters: make3d.tree({ canopy, twist, leaves, wind, ppm }), pine({ height, tiers, girth, snow }), bush({ size, leaves, ppm }), rock({ moss }), house({ snow, door, window, sign }), crystal({ rune, moss }), mist({ color }), smoke(); ppm: the px to the meter it is drawn at, its texture then in screen px (make3d.px's floors). */
+  /** Builders with semantic parameters: make3d.tree({ canopy, twist, leaves, wind, ppm }), pine({ height, tiers, girth, snow }), bush({ size, leaves, ppm }), rock({ moss }), house({ snow, door, window, sign }), crystal({ rune, moss }), mist({ color }), smoke(); ppm: the px to the meter it is drawn at, its texture then in screen px (make3d.px's floors); not given, the drawing call's. */
   const make3d: Record<"tree" | "pine" | "bush" | "rock" | "house" | "crystal" | "mist" | "smoke" | (string & {}), (params?: Record<string, unknown>) => PxBuilt> & {
     /** A builder of the file's own: fn(params) returns { field } or { density, look } (and parts, details, decals, sockets); params: a number's range [lo, hi] or a word's list, refused outside it; wind: it sways. */
     define(name: string, fn: (params: Record<string, any>) => Partial<PxBuilt>, opts?: { params?: Record<string, [number, number] | string[]>; wind?: boolean }): void;

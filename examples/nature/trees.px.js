@@ -26,8 +26,9 @@
 // Each species is a spec: a new one is a dozen numbers. Any view, any heading (turnaround(), draw3d(),
 // a world's make). Parameters: height (m), seed, season, color, wind (declared: make3d refuses others,
 // and a season the species hasn't), ppm: the px to the meter it is drawn at, its texture then in screen
-// px (make3d.px's floors: a cluster at least 10 px across, fewer of them as they grow, the bumps'
-// grain 2 px; its form in meters as before; without it, as always). Drawn in trees.mats (ramps of
+// px (make3d.px's floors: a cluster at least 10 px across, fewer of them as they grow, pulled in by
+// what they grew and never past their mass, so the outline holds; the bumps' grain 2 px; its form in
+// meters; not given, the drawing call's). Drawn in trees.mats (ramps of
 // colors: no keys of a scene's taken) with trees.look, surface()'s options for foliage lit from the
 // side: turnaround("maple", make3d.momiji({ season: "autumn" }), { view: "side", ppm: 20, mats:
 // trees.mats, surface: trees.look }). trees.species holds the specs. A species of your own: its spec
@@ -43,8 +44,9 @@ const growTree = (S0, o = {}) => {
   const { height = S0.height, seed = 1, season = "summer", color = 0, wind = S0.wind, ppm } = o
   const { unit, add, mul } = vec, R = rng(seed), k = height / S0.height, TAU = 2 * Math.PI
   // drawn at ppm: the clusters no smaller than make3d.px.cluster px across (fewer as they grow, the mass as
-  // full), the bumps' grain no finer than make3d.px.grain px
-  const M0 = S0.mass, cr = ppm && M0.cr ? Math.max(M0.cr, make3d.px.cluster / 2 / ppm / k) : M0.cr
+  // full) but never past the mass they make up (one cluster then fills it: a small tree's crown keeps its
+  // size), the bumps' grain no finer than make3d.px.grain px
+  const M0 = S0.mass, cr = ppm && M0.cr ? Math.min(M0.r, Math.max(M0.cr, make3d.px.cluster / 2 / ppm / k)) : M0.cr
   const S = ppm ? { ...S0, mass: { ...M0, cr, clusters: M0.clusters && Math.max(1, Math.round(M0.clusters * (M0.cr / cr) ** 2)), grain: Math.max(M0.grain, make3d.px.grain / ppm / k) } } : S0
   const way = (az, el) => [Math.cos(az) * Math.cos(el), Math.sin(az) * Math.cos(el), Math.sin(el)]
   const wood = [], masses = [], tips = []
@@ -89,11 +91,13 @@ const growTree = (S0, o = {}) => {
     for (let i = 0; i < M.clusters; i++) {
       let v
       do v = [R() * 2 - 1, R() * 2 - 1, R() * 2 - 1]; while (v[0] ** 2 + v[1] ** 2 + v[2] ** 2 > 1)
-      const cr = M.cr * k * (0.8 + R() * 0.4), q = [c[0] + v[0] * (rr - cr * 0.6), c[1] + v[1] * (rr - cr * 0.6), c[2] + v[2] * rr * M.flat]
+      // (a cluster grown to the ppm's floor pulled in by what it gained, so the crown keeps its outline)
+      const f = 0.8 + R() * 0.4, cr = M.cr * k * f, gain = (M.cr - S0.mass.cr) * k * f, out = rr - cr * 0.6 - gain, up = rr * M.flat - gain * Math.max(M.flat, 0.55)
+      const q = [c[0] + v[0] * (gain ? Math.max(0, out) : out), c[1] + v[1] * (gain ? Math.max(0, out) : out), c[2] + v[2] * Math.max(0, up)]
       if (season !== "bare") masses.push(sdf.ellipsoid([cr, cr, cr * Math.max(M.flat, 0.55)]).at(...q))
       if (!M.hang) continue
       const z = Math.max(0.15 * height, q[2] - M.hang * height * (0.5 + R() * 0.5)), late = gust(0.1 + R() * 0.2), shear = (q[2] ** 2 - z ** 2) / height ** 2
-      const th = season === "bare" ? 0.6 : 1, strand = sdf.capsule(q, (ck) => [q[0] + wind * (gust(0)(ck) * shear + (2 * late(ck) * (q[2] - z)) / height), q[1], z], cr * 0.32 * th, cr * 0.2 * th)
+      const th = season === "bare" ? 0.6 : 1, strand = sdf.capsule(q, (ck) => [q[0] + wind * (gust(0)(ck) * shear + (2 * late(ck) * (q[2] - z)) / height), q[1], z], (cr - gain) * 0.32 * th, (cr - gain) * 0.2 * th)
       if (season === "bare") wood.push(strand.mat(S.twigs))
       else masses.push(strand)
     }

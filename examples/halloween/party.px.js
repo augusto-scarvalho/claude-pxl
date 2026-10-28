@@ -83,7 +83,8 @@ scene("party", { w: W, h: H, bg: "n", world: { light: [0.6, -1] } },
     stamp("witch", 96, 156),
     ...DANCERS.map(([n, x, y]) => stamp(n, x, y)),
     ...JACKS.map(([n, x, y], i) => stamp(n, x, y, { rdelay: true, seed: i }))),
-  lighting({ cell: 2, smooth: true, ambient: 0.54, ambientColor: "#9a9ad8", emit: "aAmMQyopue8eiI6" }),
+  // (what glows lights what is round it, 16 px: the jack-o'-lanterns the grass, the ghost, the bunting the roof)
+  lighting({ cell: 2, smooth: true, ambient: 0.54, ambientColor: "#9a9ad8", emit: "aAmMQyopue8eiI6", emitLight: 16 }),
   glow("aA", { r: 5, strength: 0.4 }), glow("ou", { r: 3, strength: 0.3, where: [0, 60, 320, 40] }),
   glow("i", { r: 4, strength: 0.25 }), glow("pe", { r: 5, strength: 0.35, where: [70, 110, 60, 50] }),
   // the mirror ball's spots sweep over the floor and whoever is dancing there

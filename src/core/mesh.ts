@@ -127,7 +127,7 @@ export interface MeshOpts {
   lamps?: { at: V3; color: string; r?: number; strength?: number }[];
   /** keys that give light instead of taking it (a lamp's glass, a window at night): drawn as they are */
   emit?: string;
-  /** the sun's shadows (default true with a sun); without one, true: the light's, a ramp face a step down where something stands between it and the light */
+  /** the sun's shadows (default true); without a sun, the light's (not a light function's, unless true): a ramp face a step down where something stands between it and the light */
   shadows?: boolean;
   /** an orthographic view (surface()'s): px to the meter (default 16) */
   ppm?: number;
@@ -446,7 +446,8 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     if (glows.length) L.lamps = [...L.lamps, ...glows];
   }
   let sunMap: SunMap | undefined;
-  if (L ? L.shadows : opts.shadows === true) {
+  // (without a sun, cast from `light`: not from a light function, which has no way it comes from)
+  if (L ? L.shadows : opts.shadows ?? typeof opts.light !== "function") {
     const seen = (visit: (x: number, y: number, z: number) => void) => {
       for (let i = 0; i < n; i += 4) if (who[i] >= 0) visit(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
       for (const s of world?.sprites ?? []) visit(...s.at);
@@ -531,8 +532,9 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       continue;
     }
     let lv = Math.max(0, Math.min(r.length - 1, Math.floor(lights[k] * r.length + (bayer(bx, by) - 0.5) * (M.dither ?? 0))));
-    // without a sun, shadows: true: a step down the ramp where something stands between it and the light
-    if (sunMap && !L) { const f = dot(N, sunDir); if (f > 0 && !sunMap.sees(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], k, f)) lv = Math.max(0, lv - 1); }
+    // without a sun: a step down the ramp where something stands between it and the light
+    // (never into its darkest, the line's tone: no dark specks inside a form)
+    if (sunMap && !L) { const f = dot(N, sunDir); if (f > 0 && lv > 1 && !sunMap.sees(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], k, f)) lv--; }
     // the top edge of a surface, just under its outline, catches the light: a step lighter
     const up1 = y >= B ? who[i - B * W] : -1, up2 = y >= 2 * B ? who[i - 2 * B * W] : -1;
     const rim = !line && up1 === k && (up2 === -1 || (up2 !== k && depth[i - 2 * B * W] > depth[i] * 1.06)) && dot(N, cam.up) > -0.3;

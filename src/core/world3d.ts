@@ -6,7 +6,7 @@
 // and says which; the rest stays byte for byte as it was. Drawn by draw3d() through any view (each
 // pixel knowing its part, for pxl steps --at); checked by expect3d()'s rules (MoVer's spirit: what
 // should hold over the loop, run by pxl check).
-import { BUILDERS, type Built, partSeed } from "./builders.ts";
+import { BUILDERS, type Built, atPpm, drawnPpm, partSeed, ppmFor, remakes, takesPpm } from "./builders.ts";
 import { PxError } from "./errors.ts";
 import { type Clock, Density, STILL, Sdf, type V3, compile, compileDensity } from "./sdf.ts";
 import { peel, scatter } from "./scatter.ts";
@@ -56,7 +56,7 @@ export class World {
   /** its builders: the eight built in and the art file's own (make3d.define) */
   readonly makers: Record<string, (p: Record<string, unknown>) => Built>;
   private cache = new Map<string, Built>();
-  private scat = new Map<string, Splats>();
+  private scat = new WeakMap<Built, Map<string, Splats>>();
   constructor(spec: WorldSpec, makers: Record<string, (p: Record<string, unknown>) => Built> = BUILDERS) {
     this.makers = makers;
     if (!spec || typeof spec !== "object" || !spec.parts || typeof spec.parts !== "object") throw new PxError("world3d({ seed, wind: { from, strength }, parts: { name: { make, params, at | on | beside | around | attach } } })");
@@ -80,25 +80,32 @@ export class World {
     if (!d) throw new PxError(`world3d: wind.from is "left", "right", "front" or "behind", got ${JSON.stringify(w.from)}`);
     return [-d[0] * k, -d[1] * k];
   }
-  /** A part as its builder makes it: its parameters, its seed (its own, or the world's and its name), the world's wind if what it builds sways. */
-  built(name: string): Built {
-    let b = this.cache.get(name);
-    if (b) return b;
+  /**
+   * A part as its builder makes it: its parameters, its seed (its own, or the world's and its name), the
+   * world's wind if what it builds sways; drawn at `ppm` px to the meter, a builder that takes a ppm and
+   * isn't given one is made at that one (its texture in screen px; where it stands, its relations, read
+   * it as made without).
+   */
+  built(name: string, ppm?: number): Built {
     const p = this.spec.parts[name];
     if (!p) throw new PxError(`world3d: no part '${name}' (it has: ${this.names.join(", ")})`);
-    const params: Record<string, unknown> = { seed: p.seed ?? partSeed(this.spec.seed ?? 1, name), ...p.params };
+    const at = p.params?.ppm === undefined ? ppmFor(this.makers[p.make], ppm) : undefined, key = at === undefined ? name : `${name}@${at}`;
+    let b = this.cache.get(key);
+    if (b) return b;
+    const params: Record<string, unknown> = { seed: p.seed ?? partSeed(this.spec.seed ?? 1, name), ...p.params, ...(at !== undefined ? { ppm: at } : {}) };
     b = this.makers[p.make](params);
     if (b.windy && params.wind === undefined) b = this.makers[p.make]({ ...params, wind: this.wind() });
-    this.cache.set(name, b);
+    this.cache.set(key, b);
     return b;
   }
-  /** A part's details scattered on it, made once. */
-  details(name: string): [string, Splats][] {
-    const b = this.built(name);
+  /** A part's details scattered on it (made at a ppm, as built()), made once. */
+  details(name: string, ppm?: number): [string, Splats][] {
+    const b = this.built(name, ppm);
+    let made = this.scat.get(b);
+    if (!made) this.scat.set(b, (made = new Map()));
     return Object.entries(b.details).map(([d, o]) => {
-      const key = `${name}.${d}`;
-      let s = this.scat.get(key);
-      if (!s) this.scat.set(key, (s = scatter(b.field!, o)));
+      let s = made.get(d);
+      if (!s) made.set(d, (s = scatter(b.field!, o)));
       return [d, s];
     });
   }
@@ -402,6 +409,8 @@ type Drawers = {
   surface: (f: Sdf, o: Record<string, unknown>) => void; splats: (s: Splats | Sdf, o: Record<string, unknown>) => void;
   voxels: (f: Sdf | Voxels, o: Record<string, unknown>) => void; mesh: (view: unknown, faces: { mat: string; pts: V3[] }[], mats: Record<string, unknown>, o: Record<string, unknown>) => void;
   volume: (d: Density, o: Record<string, unknown>) => void; decal: (name: string, o: Record<string, unknown>) => void; clock: Clock;
+  /** the canvas's px to a pixel of the art (a scene's `pixel`) */
+  k?: number;
 };
 /** A world, or a field or a built thing (make3d's) as a world of one part, "thing" (made once each). */
 const ONE = new WeakMap<object, World>();
@@ -410,7 +419,12 @@ function worldOf(t: unknown): World {
   const b = t instanceof Sdf ? { field: t, parts: {}, details: {}, decals: {}, sockets: {} } : t as Built;
   if (!b || typeof b !== "object" || !(b.field instanceof Sdf || b.density instanceof Density)) throw new PxError("draw3d(thing, { view, as, mats, light, ppm, pixel, only, at }): a world3d(...), a field (sdf.*) or a built thing (make3d.tree(...))");
   let W = ONE.get(t as object);
-  if (!W) ONE.set(t as object, (W = new World({ parts: { thing: { make: "thing" } } }, { thing: () => b as Built })));
+  if (!W) {
+    // (a builder's made without a ppm: made again at the one it is drawn at)
+    const thing = (p: Record<string, unknown>) => atPpm(t, p.ppm as number | undefined) ?? (b as Built);
+    if (remakes(t)) takesPpm(thing);
+    ONE.set(t as object, (W = new World({ parts: { thing: { make: "thing" } } }, { thing })));
+  }
   return W;
 }
 
@@ -428,8 +442,11 @@ export function drawWorld(thing: unknown, o: Draw3dOpts, d: Drawers): void {
   if (!(Array.isArray(off) && off.length === 3 && off.every(Number.isFinite))) throw new PxError(`draw3d: at is where the world's [0, 0, 0] stands, [x, y, z] m, got ${JSON.stringify(o.at)}`);
   const base = { view: o.view, ppm: o.ppm, pixel: o.pixel, light: o.light, world: (o as { world?: unknown }).world }, at = (n: string) => { const p = W.place(n, d.clock); return [p[0] + off[0], p[1] + off[1], p[2] + off[2]]; };
   const own = (n: string) => (W.spec.parts[n].mats ? { ...mats, ...W.spec.parts[n].mats } : mats);
+  // the px to the meter each part is drawn at (through a camera, where it stands at rest): what its builder takes
+  const K = o.pixel ?? d.k ?? 1, ppms = new Map<string, number | undefined>();
+  const ppmOf = (n: string) => { if (!ppms.has(n)) { const p = W.place(n); ppms.set(n, drawnPpm(o.view, o.ppm, [p[0] + off[0], p[1] + off[1], p[2] + off[2]], K)); } return ppms.get(n); };
   for (const n of names) {
-    const b = W.built(n), f = b.field, as = W.spec.parts[n].as ?? o.as ?? "surface", where = { ...base, at: at(n), mats: own(n), part: n };
+    const b = W.built(n, ppmOf(n)), f = b.field, as = W.spec.parts[n].as ?? o.as ?? "surface", where = { ...base, at: at(n), mats: own(n), part: n };
     if (!f) continue;
     if (as === "surface") d.surface(f, { ...o.surface, ...where });
     else if (as === "voxels") d.voxels(f, { ...where, size: o.size ?? 0.1 });
@@ -444,9 +461,9 @@ export function drawWorld(thing: unknown, o: Draw3dOpts, d: Drawers): void {
     // (a mesh's and splats' shadow: the field's, laid by surface() drawing nothing else)
     if ((as === "mesh" || as === "splats") && o.view && typeof o.view === "object" && "horizon" in o.view) d.surface(f, { ...where, hide: true });
   }
-  for (const n of names) for (const [k, s] of W.details(n)) d.splats(s, { ...base, at: at(n), mats: own(n), part: `${n}.${k}` });
+  for (const n of names) for (const [k, s] of W.details(n, ppmOf(n))) d.splats(s, { ...base, at: at(n), mats: own(n), part: `${n}.${k}` });
   for (const n of names) {
-    const b = W.built(n);
+    const b = W.built(n, ppmOf(n));
     for (const [k, dc] of Object.entries(b.decals)) d.decal(dc.asset, { ...base, at: at(n), on: b.field, point: dc.point, views: dc.views, lit: dc.lit, mode: dc.mode, size: dc.size, up: dc.up, part: `${n}.${k}` });
   }
   const air = names.filter((n) => W.built(n).density).sort((a, b) => at(b)[1] - at(a)[1]);

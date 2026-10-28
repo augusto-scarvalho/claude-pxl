@@ -282,8 +282,8 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   darker corners; the small one is what's checked. And light in
   the world on `mesh()`: a warm `sun` low and a little behind (its shadows fall toward us), a cool
   `sky`, `lamps` with `emit` on their glass, `bump("hybrid")` on the sprites so they take it
-  (`examples/hd2d/plaza.px.js`). Without a sun, `shadows: true` still grounds blocks in a palette-lit
-  diorama: what stands between a ramp face and `light` puts it a step down its ramp. Lay the floor's
+  (`examples/hd2d/plaza.px.js`). Without a sun, its shadows still ground blocks in a palette-lit
+  diorama (`shadows: false`: none): what stands between a ramp face and `light` puts it a step down its ramp. Lay the floor's
   texture a texel to a pixel where the camera looks
   (`texel: "screen"`, the camera's `floor` or `wall` by the face): at a 16-to-the-meter texel the
   camera squashes it, and blades drawn upright come out lying down. What stands on the ground and is smaller than a person (a
@@ -304,7 +304,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   480x270 the clearing's actors sat in the top third over empty grass; 320x180, three times as big
   (`pixel: 3`), put them in the middle at the same scale.
 - A GIF of a scene with `post()`'s grain: a grain that changes each frame changes every pixel, and the
-  clearing's 100 frames went from 2.5 MB to 13; `grain: { animated: false }` keeps the texture.
+  clearing's 100 frames went from 2.5 MB to 13; the grain stays still unless `grain: { animated: true }`.
 - Light, holes and see-through things in a diorama (`mesh()`). What gives light is a sprite with
   `effect("emit")` on it (a lantern's glass, a crystal, embers): its pixels are drawn as they are,
   whatever the sun, a lamp at their middle lights what is round it (`light: { r, strength }` on the
@@ -944,7 +944,7 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn
   the others). `pxl serve` shows the `.glb` and `.ply` to turn round at `/3d`. `mesh()` draws a mesh
   in `surface()`'s side, top and iso views too.
 - **Into a diorama.** Things drawn in 3D stand among `mesh()`'s sprites when drawn after it through the
-  same camera with `light: "mesh"`: its sun and sky on their tones (as on the sprites), the walls'
+  same camera, in its light (`light: "mesh"`, what they take where they give none): its sun and sky on their tones (as on the sprites), the walls'
   and figures' shadows falling on them, their own shadows the sun's share, at its depth, in its
   sizes' pixel (`hd2d/graveyard.px.js`'s `graveyard_3d`, beside the scene it was made from). There, at 480x270, a frame went from 0.5 s to 1.65 s: a dead tree of 105
   tapering rods 1 s (bunched half a meter across, half again as fast; `ao: 0, shadows: false` looked
@@ -987,7 +987,8 @@ rig3d("hero", { body: { h: TOPDOWN.scale.character[0] * TOPDOWN.grid, heads: TOP
   heading, `turnaround()` gives it), never one ground line for all.
 - **Colors by role:** the model and the hand-drawn sprites name roles (`primary`, `accent`, `skin`);
   a livery or a slot gives the roles other colors: `mats` in 3D, `roleSwap()` in 2D.
-- **The style by density** stays notes the file reads: the tones (`surface: { tones: 3 }` at 16-32 px),
+- **The style by density** stays notes the file reads, but the tones: a `turnaround()` or `rig3d()` that
+  names a genre draws in its `tones` (3 at 16-32 px; or `surface: { tones: 3 }`);
   the outline all round (`surface: { ink: "k" }`, a turnaround's every heading in one pass), a builder's
-  texture in screen px (`make3d.oak({ ppm })`, environment §3). An approved cell is frozen (`frozen`):
+  texture in screen px (the drawing call's ppm, environment §3). An approved cell is frozen (`frozen`):
   pxl check says when the live render drifts from it.

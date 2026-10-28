@@ -142,12 +142,11 @@ What exists, a line each; `PXL help <name>` prints the rest of any op or option 
 - **Effects and spells**: `effect(kind)` (dissolve, pixelate, dither, tint, distort, emit,
   aura, sway, energy), one copy's `fx`; `smoke()`, `emitter()` + `particles()`,
   `trail()`, `ability()` from a hand's socket; `cast(spell("fire", 3, { from, to }))`.
-- **3D fields**: `sdf` drawn by `surface()` (`clean: true` for a small thing: a figure, a head),
-  `voxels()`, `mesh()`, `volume()`, or any of them by `draw3d(thing, { as })`; details by
-  `sdf.scatter` + `splats()`; hand-drawn art pinned on by `decal()`; a scene of named parts by
-  `world3d` and `make3d`, checked by `expect3d`; light and mats once by `look3d`; a game's sprites
-  from N headings by `turnaround()`; in a `mesh()` diorama's sun and shadows by `light: "mesh"`; out
-  by `export3d` (`PXL help "scenes 17"`).
+- **3D fields**: `sdf` drawn by `surface()`, `voxels()`, `mesh()`, `volume()`, or any of them by
+  `draw3d(thing, { as })`; details by `sdf.scatter` + `splats()`; hand-drawn art pinned on by
+  `decal()`; a scene of named parts by `world3d` and `make3d`, checked by `expect3d`; light and mats
+  once by `look3d`; a game's sprites from N headings by `turnaround()`; after a `mesh()` with a sun,
+  in its light; out by `export3d` (`PXL help "scenes 17"`).
 - **Procedural texture**: `hash`, `vnoise`, `fbm`, `bayer`, `seamless` (`PXL help vnoise`).
 
 ## Examples

@@ -91,9 +91,9 @@ const MOVES = { walk: { ms: 110, frames: 8, f: walk }, idle: { ms: 250, frames: 
 // theirs (crew.px.js). The legs' trousers down to `cuff` of the shin and what shows under them (boots,
 // or bare skin), the feet; drapes swept round the body from a height down a length (a cloak behind, a
 // coat open at the front, a long skirt), trailing as he walks by `trail`; the shirt's skirt at the
-// hips and its body (a key or ramp by height and angle: stripes, a vest, the belt), round an upright
-// through the hips, or with `spine: true` along the spine (a figure that bows: the miko's; his kneel and
-// cast keep the upright); drapes over it (an apron); the sleeves to the elbow, the forearms, the hands.
+// hips and its body (a key or ramp by height and angle: stripes, a vest, the belt), carried along the
+// spine as he leans, kneels or bows (`spine: false`: round an upright through the hips); drapes over it
+// (an apron); the sleeves to the elbow, the forearms, the hands.
 const TRAVELER = {
   legs: (far) => ({ tr: far ? "RRP" : "RPp", shin: far ? "DDd" : "Ddl", foot: far ? "DDd" : "Ddl" }), cuff: 0.45,
   drapes: [{ top: (j) => j.chest[2] + 0.6, len: CLOAK, out: "NncC", in: "N", trail: 1, keep: (h, a) => Math.abs(a) > 1.35,
@@ -128,7 +128,7 @@ const dress = (o) => (j, p) => {
     ...Object.fromEntries(j.legs.map((L, i) => { const g = o.legs(i === farLeg); return [`leg${i}`, [j.limb(L.hip, L.knee, 1.6, 1.5, g.tr), j.limb(L.knee, L.ankle, 1.5, 1.4, (h) => (h < o.cuff ? g.tr : g.shin)), j.ball(L.foot, [1.6, 2.3, 1.1], g.foot)]] })),
     ...Object.fromEntries(o.drapes.map((D, k) => [k ? "drape" + k : "cloak", drape(D)])),
     // (the belt a pixel and more, so a pixel's middle falls on it)
-    tunic: [j.sweep(hips, waist - 2.4, waist, (h) => 3.6 + 0.6 * (1 - h), { paint: o.skirt }), j.sweep(hips, waist, top, (h, a) => (4 - 0.5 * h * h) * (0.84 + 0.16 * Math.abs(Math.sin(a))), { ...(o.spine ? { shift: along } : {}), paint: (h, a, out) => o.body(h < 0.14 ? 0 : h, a, out) })],
+    tunic: [j.sweep(hips, waist - 2.4, waist, (h) => 3.6 + 0.6 * (1 - h), { paint: o.skirt }), j.sweep(hips, waist, top, (h, a) => (4 - 0.5 * h * h) * (0.84 + 0.16 * Math.abs(Math.sin(a))), { ...(o.spine !== false ? { shift: along } : {}), paint: (h, a, out) => o.body(h < 0.14 ? 0 : h, a, out) })],
     ...Object.fromEntries(o.over.map((D, k) => ["over" + k, drape(D)])),
     ...Object.fromEntries(j.arms.map((A, i) => { const far = i === farArm; return [`arm${i}`, [j.limb(A.sh, A.elbow, 1.1, 1, o.sleeve(far)), j.limb(A.elbow, A.hand, 1, 0.9, o.fore(far)), j.ball(A.hand, 1, o.hand(far))]] })),
   }
@@ -192,7 +192,7 @@ const FACE3 = {
     ....zss..........`,
 }
 // as the figure is drawn: the line all round, under the skin a dark brown (the chin's edge), cleaned
-const HEAD3 = { ink: "k", jaw: ["D", "zsSL"], surface: { ...LIT3, clean: true }, anchor: ANCHOR }
+const HEAD3 = { ink: "k", jaw: ["D", "zsSL"], surface: LIT3, anchor: ANCHOR }
 // his own turned away: the side lock dark down past the ear to the jaw, so the cheek closes on a chin
 // 3 px wide (the render left a block of the skull's shade there, a jowl); in profile the line of the
 // jaw between the chin and the lock, the ear framed by the hair (the hand heads' rows)
@@ -267,7 +267,7 @@ const parts3m = (j, p) => {
 const ALL8 = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
 // cleaned as a pixel artist would at this size (surface's clean: no pixel sticking out, no black run
 // 2 px thick, the outline whole), his head stamped on it by its heading
-const FIG = { body: BODY3, w: W, h: H, pivot: [OX, OY], ink: "k", surface: { ...LIT3, clean: true } }
+const FIG = { body: BODY3, w: W, h: H, pivot: [OX, OY], ink: "k", surface: LIT3 }
 rig3d("tr", { ...FIG, n: 16, head: "_tr_head", parts: parts3m, blocks: true,
   moves: { ...Object.fromEntries(Object.entries(MOVES3).map(([m, M]) => [m, { dirs: ALL8, ...M }])), turn: { frames: 1, ms: 250, pose: MOVES3.idle.pose } } })
 // The mourner (mo_<move>_<dir>): the same figure, her hair her own, grey, parted in the middle and

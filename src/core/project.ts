@@ -14,7 +14,7 @@ import { VOLUME_OPTS } from "./volume.ts";
 import { SPLAT_OPTS, Splats, makeSplats } from "./splats.ts";
 import { scatter } from "./scatter.ts";
 import { DECAL_OPTS } from "./decal.ts";
-import { BUILDERS, type Built, PX, defineBuilder } from "./builders.ts";
+import { BUILDERS, type Built, PX, atPpm, defineBuilder, remakeable } from "./builders.ts";
 import { DRAW3D_OPTS, type Rule, World, runExpects } from "./world3d.ts";
 import { checkExpect } from "./expect.ts";
 import type { Color } from "./color.ts";
@@ -336,6 +336,12 @@ export class Project implements BuildCtx {
   pngHook?: (path: string) => Img;
   /** Set by a loader for { frozen }: a path relative to the art file, absolute, and whether a file is there. */
   whereHook?: (path: string) => { abs: string; there: boolean };
+
+  /** The tones of the genre an asset names (`genre: "fighting"`), what its surface() draws in where the call gives none. */
+  genreTones(name: string | undefined): { tones?: number } {
+    const t = name === undefined ? undefined : this.genres.get(name)?.tones;
+    return Number.isInteger(t) && (t as number) >= 2 ? { tones: t as number } : {};
+  }
 
   /** The image an asset's { png, area } starts from. */
   private readPng(what: string, o: AssetOpts, loc?: string): Img {
@@ -718,19 +724,23 @@ export class Project implements BuildCtx {
         const o = opts as { view?: unknown; ppm?: number; n?: number; headings?: unknown; part?: string; mats?: unknown; light?: unknown; as?: string; size?: number; spacing?: number; surface?: unknown; draw?: unknown; frames?: number; fps?: number; mirror?: unknown; pad?: number; genre?: string };
         if (!(o.draw === undefined || typeof o.draw === "function")) throw new PxError(`turnaround: draw is (c, v) => { ... }, drawing by hand over each heading (v.screen(p), v.depth(p) of a point in m), got ${JSON.stringify(o.draw)}`);
         if (!(o.surface === undefined || isPlainObject(o.surface))) throw new PxError(`turnaround: surface is more of surface()'s options ({ soft, outline, rim, ao, shadows }), got ${JSON.stringify(o.surface)}`);
-        // what is turned: a field or a built thing, or a world's part standing at the origin
-        let b: Partial<Built> | undefined, only: string[] | undefined, at0 = [0, 0, 0];
-        if (thing instanceof World) {
-          if (typeof o.part !== "string" || !thing.spec.parts[o.part]) throw new PxError(`turnaround: a world's part is { part: "name" } (it has: ${thing.names.join(", ")}), got ${JSON.stringify(o.part)}`);
-          const p = thing.place(o.part);
-          b = thing.built(o.part); only = [o.part]; at0 = [-p[0], -p[1], -p[2]];
-        } else b = thing instanceof Sdf ? { field: thing } : (thing as Built);
-        const field = b?.field;
-        if (!(field instanceof Sdf)) throw new PxError("turnaround: a field (sdf.*), a built thing (make3d.house(...)) or a world with { part }: something solid");
         const { frames, fps = 8, ppm = 16, pad = 2, mirror = "auto", view = "iso" } = o;
         if (!(frames === undefined || (Number.isInteger(frames) && frames >= 1)) || !(fps > 0) || !(ppm > 0) || !(Number.isInteger(pad) && pad >= 0) || ![true, false, "auto"].includes(mirror as boolean))
           throw new PxError(`turnaround: frames (an anim's, when the thing moves on the clock), fps above 0, ppm above 0, pad (px, whole), mirror true, false or "auto", got ${JSON.stringify({ frames, fps, ppm, pad, mirror })}`);
         const persp = !!view && typeof view === "object" && "horizon" in view, kind = typeof view === "string" ? view : (view as { kind?: string })?.kind;
+        // what is turned: a field or a built thing, or a world's part standing at the origin; a builder's
+        // made without a ppm, made at this one (its texture in screen px; through a camera, draw3d's)
+        let b: Partial<Built> | undefined, only: string[] | undefined, at0 = [0, 0, 0];
+        if (thing instanceof World) {
+          if (typeof o.part !== "string" || !thing.spec.parts[o.part]) throw new PxError(`turnaround: a world's part is { part: "name" } (it has: ${thing.names.join(", ")}), got ${JSON.stringify(o.part)}`);
+          const p = thing.place(o.part);
+          b = thing.built(o.part, persp ? undefined : ppm); only = [o.part]; at0 = [-p[0], -p[1], -p[2]];
+        } else {
+          if (!persp) thing = atPpm(thing, ppm) ?? thing;
+          b = thing instanceof Sdf ? { field: thing } : (thing as Built);
+        }
+        const field = b?.field;
+        if (!(field instanceof Sdf)) throw new PxError("turnaround: a field (sdf.*), a built thing (make3d.house(...)) or a world with { part }: something solid");
         if (persp && o.draw) throw new PxError("turnaround: draw (by hand over each heading) is for an orthographic view (\"side\", \"top\", \"iso\" or { kind, pitch })");
         const H = headingsOf(o.n ?? 8, o.headings, !persp && kind === "iso"), clocks = clocksOf(frames, fps);
         const T = turnViews(view, ppm, field, H.map((h) => h.deg), clocks, pad);
@@ -770,7 +780,8 @@ export class Project implements BuildCtx {
           const screen = pr && ((p: number[]) => [org[0] + lay(p, pr.a), org[1] + lay(p, pr.b)]);
           const hand = pr && o.draw ? { heading: H[i].name, screen, depth: (p: number[]) => -lay(p, pr.D) } : undefined;
           define(kindA, names[i], [{ w: T.w, h: T.h, pivot: T.pivot, ...height, ...genre, ...(frames ? { frames, fps } : {}) }, (c: Canvas) => {
-            c.draw3d(thing, draw as never);
+            const gt = this.genreTones(o.genre);
+            c.draw3d(thing, ("tones" in gt ? { ...draw, surface: { ...gt, ...(o.surface as object) } } : draw) as never);
             if (hand) (o.draw as (c: Canvas, v: unknown) => void)(c, hand);
             if (screen) footprint(c, c.frame, screen);
           }]);
@@ -977,7 +988,7 @@ export class Project implements BuildCtx {
             // ink: a line all round outside and on the part behind (the traveler's); else surface()'s, on the shadow side
             const line = o.ink !== undefined ? { outline: false, rim: false, inner: o.ink } : { outline: o.outline ?? true, inner: o.inner ?? true };
             const mats = { ...(look?.mats ?? {}), ...Object.fromEntries(P.ramps.map((r) => [r, r])), ...o.mats } as never;
-            c.surface(P.field, { view, ppm: 1, at, mats, light, ...(line as object), shadows: false, ao: 0, ...o.surface });
+            c.surface(P.field, { view, ppm: 1, at, mats, light, ...(line as object), shadows: false, ao: 0, ...this.genreTones(o.genre), ...o.surface });
             // a head modeled (a part named head, no views): the line of `chin` under its jaw where it meets the
             // body, under the head's pixels of the skin (chin: [key, the skin's ramp]; a key alone: its own
             // ramp but its darkest), not under the hair
@@ -998,7 +1009,7 @@ export class Project implements BuildCtx {
               const set = scatter(S.field, { light, ...S.o } as never), own = Object.fromEntries(set.mats.filter((m) => m && !(m in (mats as object))).map((m) => [m, m]));
               c.splats(set, { view, ppm: 1, at, mats: { ...(mats as object), ...own } as never, light: (S.o.light as number[] | undefined) ?? light, part: S.part });
             }
-            for (const D of P.decals) c.decal(D.asset, { on: D.on ?? P.field, point: D.point, ...(D.views ? { views: D.views } : {}), ...(D.up ? { up: D.up } : {}), ...(D.lit !== undefined ? { lit: D.lit } : {}), ...(D.depth !== undefined ? { depth: D.depth } : {}), ...(o.surface?.clean ? { clean: true } : {}), view, ppm: 1, at, light, part: D.part });
+            for (const D of P.decals) c.decal(D.asset, { on: D.on ?? P.field, point: D.point, ...(D.views ? { views: D.views } : {}), ...(D.up ? { up: D.up } : {}), ...(D.lit !== undefined ? { lit: D.lit } : {}), ...(D.depth !== undefined ? { depth: D.depth } : {}), ...(o.surface?.clean !== false ? { clean: true } : {}), view, ppm: 1, at, light, part: D.part });
             if (o.ink !== undefined) ring(c);
             const head = o.head as string | undefined;
             if (head) {
@@ -1131,7 +1142,7 @@ export class Project implements BuildCtx {
     // fields in 3D, in meters: sdf.sphere(r), .union(...), .bend(k), ... drawn by surface(); sdf.size(field, { view, ppm }) a sprite's size for it
     // sdf.voxels(field, { size, clock }) a voxel grid, sdf.mesh(field, { size, clock }) a mesh by surface nets
     env.sdf = {
-      ...sdf, size: surfaceSize,
+      ...sdf, size: (f: unknown, o: { ppm?: number } = {}) => surfaceSize((atPpm(f, o?.ppm ?? 16)?.field ?? f) as never, o as never),
       voxels: (f: unknown, o: unknown = {}) => { try { return voxelize(f, o as never); } catch (e) { throw wrap(e).within("sdf.voxels", this.callerLoc()); } },
       mesh: (f: unknown, o: unknown = {}) => { try { return surfaceNets(f, o as never); } catch (e) { throw wrap(e).within("sdf.mesh", this.callerLoc()); } },
       splats: (f: unknown, o: unknown = {}) => { try { return makeSplats(f, o as never); } catch (e) { throw wrap(e).within("sdf.splats", this.callerLoc()); } },
@@ -1140,7 +1151,8 @@ export class Project implements BuildCtx {
     // make3d.tree({ canopy, twist, wind, ... }) and the rest: builders with semantic parameters (builders.ts);
     // make3d.define(name, fn, { params, wind }) adds the file's own, for its worlds and as make3d.<name>
     const makers: Record<string, (p: Record<string, unknown>) => Built> = { ...BUILDERS };
-    const make = (k: string) => (o: unknown = {}) => { try { return makers[k](o as never); } catch (e) { throw wrap(e).within(`make3d.${k}`, this.callerLoc()); } };
+    // (one that takes a ppm and isn't given one: drawn, it is made again at the drawing call's)
+    const make = (k: string) => (o: unknown = {}) => { try { return remakeable(makers[k](o as never), makers[k], o as never); } catch (e) { throw wrap(e).within(`make3d.${k}`, this.callerLoc()); } };
     const m3: Record<string, unknown> = Object.fromEntries(Object.keys(BUILDERS).map((k) => [k, make(k)]));
     m3.define = (name: unknown, fn: unknown, o: unknown = {}) => {
       const loc = this.callerLoc();
