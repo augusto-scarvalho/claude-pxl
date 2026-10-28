@@ -462,9 +462,9 @@ anim("tent", { w: 132, h: 72, frames: N, fps: FPS, pivot: [64, 156 - TO] }, (c) 
   c.vline(DN[0] - 1, DN[1] + 1 - TO, 3, "d")
   c.curve(tp(...TIP, 19, 160, 13, 162), "e"); c.hline(9, 163 - TO, 4, "d"); c.px(12, 163 - TO, "U")
 })
-// its shadow, laid away from the sun: the footprint plus where the ridge's shadow lands, and the
-// guy ropes' shadows from where the pole tips' shadows fall to their pegs
-const TENT_SHADOW = [poly([40, 147, ...DF, ...DN, 71, 180, 0, 161, ...FN], "k"), line(62, 180, 128, 165, "k"), line(0, 160, 6, 146, "k")]
+// its shadow is cast (castBase "column": its hem is higher at the back); the guy ropes' are drawn,
+// from where the pole tips' shadows fall to their pegs (a rope doesn't stand on its column's lowest pixel)
+const ROPE_SHADOWS = [line(62, 180, 128, 165, "k"), line(0, 160, 6, 146, "k")]
 
 // ================================================================ the camp
 // the fire just caught: three small tongues licking up through the kindling, leaning with the wind,
@@ -606,12 +606,9 @@ const awayFromSun = (x, y, len) => { const dx = x - SX, dy = y - HZ, d = Math.hy
 const AT = { hero: [200, 134], fire: [148, 164], pack: [127, 148], bedroll: [99, 162],
   pot: [137, 151], cairn: [282, 132] }
 // The sleeping bag lies on a slant (its underside runs from the pillow's row down to the foot's, 3 px
-// lower), and cast lays a shadow from one base row, so its shadow is drawn: the bag's underside moved
-// away from the sun (left and toward us) by about its own thickness, the way the pack's falls. It
-// lies inside the tent's shadow, where one more shadow in the same layer adds nothing, so it goes in
-// a layer of its own and darkens there too (a contact shadow, where the bag meets the ground).
-const BEDROLL_SHADOW = ((x, y) => poly([x - 4, y - 3, x - 3, y, x + 1, y + 1, x + 7, y + 2, x + 15, y + 3, x + 25, y + 3, x + 27, y + 1,
-  x + 22, y + 4, x + 20, y + 6, x + 10, y + 6, x + 2, y + 5, x - 4, y + 4, x - 8, y + 3, x - 8, y - 1], "k"))(...AT.bedroll)
+// lower), so it casts from each column's lowest pixel (castBase "column"). It lies inside the tent's
+// shadow, where one more shadow in the same layer adds nothing, so it goes in a layer of its own and
+// darkens there too (a contact shadow, where the bag meets the ground).
 
 // What the camp's layout holds to (pxl check runs them; pxl check --fix puts a stray one back): the fire
 // between the pot and the logs, the bag lying out of the tent's door in front of it, the pot in front of
@@ -628,17 +625,17 @@ scene("sunset", { w: W, h: H, bg: "N", world: { light: [1, -0.4] }, expect: CAMP
   layer("ground", ...ground),
   layer("tufts", ...tufts),
   // long shadows of the camp, laid away from the sun's point on the horizon (toward us, and out to
-  // the sides); the tent's and the pennant's drawn here
-  layer("shadows", { shade: true, of: "camp", cast: { from: SUN, len: 1 } }, ...TENT_SHADOW,
+  // the sides); the guy ropes' and the pennant's drawn here
+  layer("shadows", { shade: true, of: "camp", cast: { from: SUN, len: 1 } }, ...ROPE_SHADOWS,
     ((k) => stamp("pennant", Math.round(AT.cairn[0] + 8 * k[0]), Math.round(AT.cairn[1] + 8 * k[1]), { cast: k, silhouette: "k" }))(awayFromSun(...AT.cairn, 1.2))),
   // the fire's light falls off in three rings, the faintest reaching the tent's door; the bag
   // blocks it, so its shadow comes after that ring
   layer("firelight0", { light: true, density: 0.25 }, ellipse(146, 164, 42, 10, "k")),
-  layer("contact", { shade: true }, BEDROLL_SHADOW),
+  layer("contact", { shade: true }, stamp("bedroll", ...AT.bedroll, { cast: { from: SUN, len: 1 }, castBase: "column", silhouette: "k" })),
   layer("firelight", { light: true, density: 0.5 }, ellipse(148, 163, 26, 7, "k")),
   layer("firelight2", { light: true }, ellipse(148, 163, 14, 4, "k")),
   layer("camp", { sort: "y" },
-    stamp("tent", 64, 156, { shadow: false }),    // sorted at y 156, behind the bedroll lying half out of its door
+    stamp("tent", 64, 156, { castBase: "column" }),    // sorted at y 156, behind the bedroll lying half out of its door
     stamp("pack", ...AT.pack), stamp("pot", ...AT.pot), stamp("bedroll", ...AT.bedroll, { shadow: false }),
     // the logs stacked 3 px right of the fire (a row lower), the pennant planted on the cairn (its pole
     // 6 px right of its middle, 3 px down among the stones): placed by them, they go where they go
