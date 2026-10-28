@@ -95,7 +95,9 @@ Mark items `[x]` when they ship, with the commit.
     where the joint bends: past 60 degrees at the knee (a step, the kneel) the hollow behind it in the
     trousers' darkest and the kneecap in their lightest, past 45 at the elbow its inside in the
     sleeve's darkest and the forearm's top in its lightest; straight limbs none. The crew (`dress()`)
-    and the warden have none: giving them some is a step of its own, not done;
+    and the warden have none: giving them some is a step of its own. F5 stage 1: `dress({ creases })`
+    has the rule, and the crew take it (approved: 405 px over 158 of their 672 frames); the
+    warden's stays here;
   - the warden's stance sways by half pixels again (round 5, R3: the figure stamped with `sub`, its
     feet carried back to the place it stays crisp at; the boots' outline ahead takes the tone between
     on those frames); its head is no longer a frame behind the body (on rig3d the figure is one

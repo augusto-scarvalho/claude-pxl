@@ -152,6 +152,27 @@ sprite("x", { w: 2, h: 1 }, (c) => { if (d(T.TRAVELER) < -1.5) c.px(0, 0, "#ff00
   assert.ok([...loadProject(f).image("x").data].every((v) => (v & 255) === 255));
 });
 
+test("dress({ creases }) (lib/characters/traveler.px.js): a pair only where a joint bends (knee past 60, elbow past 45), in the ramps' ends or the keys given; off, the paint as it was", () => {
+  // kneeling (both knees past 100 degrees, one elbow 47), and the idle's breath (the knees 51: none)
+  const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");
+  writeFileSync(f, `include(${JSON.stringify(join(import.meta.dirname, "../lib/characters/traveler.px.js"))})
+const T = traveler, R = rig3d("q", { ...T.FIG, parts: T.dress(T.TRAVELER), moves: { m: { frames: 1, pose: () => ({}) } } })
+const knelt = R.joints(T.MOVES.kneel.pose(3, 180), 180), breath = R.joints(T.MOVES.idle.pose(1, 180), 180)
+const on = T.dress({ ...T.TRAVELER, creases: true }), P = on(knelt, {}), B = on(breath, {}), Q = T.dress(T.TRAVELER)(knelt, {}), G = T.dress({ ...T.TRAVELER, creases: { deep: "r", lit: "g" } })(knelt, {})
+// off (or bent less): the thighs and the sleeves their ramps, the shins by height alone, as before
+const plain = (S) => [0, 1].every((i) => typeof S["leg" + i][0].paint === "string" && S["leg" + i][1].paint.length === 1 && typeof S["arm" + i][0].paint === "string" && typeof S["arm" + i][1].paint === "string")
+const bent = ["arm0", "arm1"].filter((k) => typeof P[k][0].paint === "function")
+const checks = [
+  plain(Q) && plain(B),
+  P.leg0[0].paint(0.9, 3) === "R" && /^[pP]$/.test(P.leg0[0].paint(0.9, 0)) && P.leg0[0].paint(0.5, 3) === Q.leg0[0].paint,
+  P.leg1[1].paint(0.1, 3) === "R" && P.leg1[1].paint(0.6, 0) === Q.leg1[1].paint(0.6),
+  G.leg0[0].paint(0.9, 3) === "r" && G.leg0[0].paint(0.9, 0) === "g" && G.leg1[1].paint(0.1, 3) === "r",
+  bent.length === 1 && P[bent[0]][0].paint(0.9, 0) === "v" && /^[wW]$/.test(P[bent[0]][1].paint(0.1, 0)) && P[bent[0]][1].paint(0.5, 0).length === 3,
+]
+sprite("x", { w: checks.length, h: 1 }, (c) => checks.forEach((ok, i) => ok && c.px(i, 0, "#ff0000")))`);
+  assert.deepEqual([...loadProject(f).image("x").data].map((v) => (v & 255) === 255), [true, true, true, true, true]);
+});
+
 test("rig3d: a cloth swept round the body (open in front, its lining), a decal pinned on it, the line all round; pxl check: a pose off the ground, a leg out of reach", () => {
   const p = loadSource(`${PAL}
 ramps("kgw", "krw")

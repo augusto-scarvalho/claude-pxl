@@ -520,7 +520,10 @@ boots); drapes hung from a height (a cloak behind, a coat open at the front with
 edges, a long skirt from the waist); the shirt's body by height and angle (stripes 2 px, a vest open
 over a shirt, a laced bodice; swept along the spine, so it bows with the figure; `spine: false`
 round an upright); drapes over it (an apron from the chest to the knees); sleeves rolled
-to skin at the forearm. Recolors (`base` + `swap`) of those outfits make the rest of the crowd: nine
+to skin at the forearm; `creases: true`, a pair only where a joint bends (the traveler's: past 60
+degrees at the knee the hollow behind it darkest and the kneecap lightest, past 45 at the elbow; a
+straight limb or the idle's breath none), `{ deep, lit }` two keys of your own to see where they land.
+Recolors (`base` + `swap`) of those outfits make the rest of the crowd: nine
 people from five heads and five outfits read as nine at a glance (`lib/characters/crew.px.js`); nine
 recolors of one cloaked traveler read as one man nine times.
 
