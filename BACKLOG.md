@@ -1063,7 +1063,7 @@ What the phases left, each waiting for a reason:
   `big`) as they are, so an energy ball's dark rim shows; the clearing's hand version laid them
   `blend: "add"` in mesh() and they glowed. Done (round 5, R2): `spell(..., { blend: "add" | "screen" })`
   lays the pieces on what is drawn by their alpha in linear light, as mesh()'s blended sprites; over the
-  clear as they are. The clearing keeps its look (no `blend`).
+  clear as they are. The clearing's fireball takes `blend: "add"` (F3 wave 1).
 - [ ] **Pieces that collide with each other** (a spell's shards, a boulder breaking up): waits. The
   pieces fly on closed-form paths, so any frame is drawn alone; colliding needs a stepped simulation
   replayed from the start to each frame (seeded and deterministic, seekable at O(frames) a frame) and

@@ -80,7 +80,7 @@ for (let k = 0; WOOD.length < 70; k++) {
 // scarecrow burning (S.hit: fire's look, spreading from where it was hit over 2.4 s, the last 600 ms
 // coming back whole); the rest of the 5 s, quiet.
 const S = spell("fire", 1, { view: CAM, from: "hero.hand", to: [CROW[0], CROW[1], 1.05], start: 200, seed: 9, reach: 120, power: 3.75,
-  ball: ["_fire_s", "_fire_m", "_fire"], trail: { ghosts: 3, every: 50 }, impact: { anim: "_fire_hit", smoke: false },
+  ball: ["_fire_s", "_fire_m", "_fire"], blend: "add", trail: { ghosts: 3, every: 50 }, impact: { anim: "_fire_hit", smoke: false },
   timing: { charge: 600, cast: 200, travel: 600, impact: 200, dissipate: 2900 } })
 const CAST = [["charge", 0, 1, 100], ["charge", 2, 4], ["cast", 5], ["travel", 6], ["impact", 7, 12, 100]]
 const DUSK = { light: [-0.8, 0.45, 0.35], sun: { color: "#ffb478", strength: 1.25 }, sky: { color: "#6a72b8", strength: 0.45 } }
