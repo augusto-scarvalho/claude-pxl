@@ -183,7 +183,7 @@ Mark items `[x]` when they ship, with the commit.
   Closed (round 5, R3): the hand head is gone; the baked one is in the figures' item above (its
   `views()` line).
 
-## From the example refreshes (library F3, wave 2)
+## From the example refreshes (library F3, waves 2 and 3)
 
 Wave 2 tried today's techniques on four approved examples (plaza, sodium_hour, topdown_hero,
 knight) and kept none of them: each fell short in a way that's listed here. `knight`'s smear
@@ -215,6 +215,29 @@ lines).
   the meter a texel is 1.5 px, so the stones come out 7 and 9 px wide by turns; with `texel:
   "screen"` they shrink to 2/3 and the paving gets busy behind the figures. Stones drawn about
   1.5 times as big, then `texel: "screen"` (a change for the user to see before and after).
+
+Wave 3 (sodium_hour, crew, warden, extinction, tropical) kept sodium_hour's steam by `plume`
+and extinction's lava steam by `plume` (with the two options below); the crew's hand mends all
+still hold, and the rest wait on these:
+
+- [x] **`plume()` rising at a steady rate, thinning with age only**: it rose quickly at first, so
+  steam off lava climbed past the height where its underside keeps the lava's red, and its rim
+  dithered from birth, eating that red. Done: `steady: true`, and `thin: "age"` (a young puff
+  whole, its rim crisp).
+- [ ] **`rig3d`'s head by the pose, at its depth**: `head` takes one `views()` set, stamped over
+  everything, so the warden's calm, grit and shout faces can't change with the pose, and an axe
+  held before the face goes behind the head; `stampHead` (10 lines) still does both. `head` as a
+  function of the pose, and the head drawn at its depth, the nearer parts over it.
+- [ ] **Big puffs with a tone inside and a light from below** (extinction's ash column):
+  `plume`/`smoke` shade each puff in three flat bands, so at 10-90 px the column comes out a flat
+  diagonal sheet without its modeled billows, and nothing lights it from below (the crater's fire).
+  A texture of tone inside big puffs and a second light by height.
+- [ ] **`views()` closing the cheek into a chin**: the same jowl under the ear in the 3/4 and
+  profile views is mended by hand in five of the crew's heads, and a bald crown comes out a shiny
+  egg. A `views()` option that closes the cheek into a chin n px deep in those views.
+- [ ] **`palettize: "rest"`**: `palettize` runs at load, before the items, so trees mapped by
+  `rampmap` leave every color no `rampmap` takes (the LPC trees' #101820 line) off the palette.
+  `"rest"`, applied after the items, to what's left.
 
 ## Characters (from dogfooding a 64 px character)
 
