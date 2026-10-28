@@ -6,7 +6,7 @@
 // darkens it) and its lamps light the ground round it (lighting()); the sheet blooms by how much each
 // pixel gives (post()). How to design an element of your own: scenes.md, "Designing an element".
 // The caster is the traveler casting; the spell leaves from his hand.
-include("hd2d/traveler.px.js")
+include("../lib/characters/traveler.px.js")
 pal({ k: "#0e0c16", n: "#1c1a2c", m: "#2a2840", g: "#3a4a3a", h: "#2c382e", d: "#232c24", s: "#6a6a72", t: "#4a4a54", u: "#34343c",
   c: "#3a4a8a", C: "#28346a", f: "#d8b090", w: "#e8e4d8", x: "#8a8aa0" })
 
@@ -22,7 +22,7 @@ sprite("_place", { w: CW, h: CH }, (c) => {
   c.rect(84, GY - 18, 10, 18, "t"); c.rect(84, GY - 18, 3, 18, "s"); c.rect(91, GY - 18, 3, 18, "u"); c.hline(84, GY - 18, 10, "s")
 })
 
-// the traveler's cast (hd2d/traveler.px.js, 13 poses of 100 ms) timed to the spell: the wind-up as it
+// the traveler's cast (lib/characters/traveler.px.js, 13 poses of 100 ms) timed to the spell: the wind-up as it
 // starts charging, held while the energy gathers, the thrust as it is cast, held while it flies (his
 // hand, where the spell starts, a socket that moves with the pose), back and at rest after it hits
 const CAST = [["charge", 0, 1, 100], ["charge", 2, 4], ["cast", 5], ["travel", 6], ["impact", 7, 12, 100]]

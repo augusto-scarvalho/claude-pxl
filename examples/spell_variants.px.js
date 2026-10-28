@@ -6,7 +6,7 @@
 // cracking and breaking up. Three sheets on a 5 s loop at 20 fps, every cast at tier 3 from 200 ms:
 // `ice_earth` the ice and earth variants, `variants` a row for each other element, `views` four spells
 // seen four ways. The caster is the traveler casting, the spell leaving from his hand in every view.
-include("hd2d/traveler.px.js")
+include("../lib/characters/traveler.px.js")
 pal({ k: "#0e0c16", n: "#1c1a2c", m: "#2a2840", g: "#3a4a3a", h: "#2c382e", d: "#232c24", s: "#6a6a72", t: "#4a4a54", u: "#34343c",
   c: "#3a4a8a", C: "#28346a", f: "#d8b090", w: "#e8e4d8", x: "#8a8aa0" })
 
@@ -40,7 +40,7 @@ sprite("_persp", { w: CW, h: CH }, (c) => {
   c.rect(sx - 4, ty, 9, sy - ty, "t"); c.rect(sx - 4, ty, 2, sy - ty, "s"); c.rect(sx + 3, ty, 2, sy - ty, "u")
 })
 
-// the traveler's cast (hd2d/traveler.px.js, 13 poses of 100 ms) timed to the spell: the wind-up as it
+// the traveler's cast (lib/characters/traveler.px.js, 13 poses of 100 ms) timed to the spell: the wind-up as it
 // starts charging, held while the energy gathers, the thrust as it is cast, held while it flies (his
 // hand, where the spell starts, a socket that moves with the pose), back and at rest after it hits
 const CAST = [["charge", 0, 1, 100], ["charge", 2, 4], ["cast", 5], ["travel", 6], ["impact", 7, 12, 100]]

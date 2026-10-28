@@ -68,8 +68,8 @@ look at (`--frames 0-11` for some).
   steps of `s` fan round the bend with no seam, its curbs at `|u|`, gravel raked along it at the same
   distance; wide landings (before a gate, a hall) as rectangles it runs into. Temple paths, read on
   photographs: long slabs across the walk in a running bond, moss in the joints, a curb of long cut
-  stones, then a strip of rounded pebbles (`japan.paving()` in `examples/nature/japan.px.js`; the
-  shrine's approach, `examples/shrine/shrine.px.js`).
+  stones, then a strip of rounded pebbles (`japan.paving()` in `lib/architecture/japan.px.js`, its old
+  path `examples/nature/japan.px.js` still working; the shrine's approach, `examples/shrine/shrine.px.js`).
 - Keep small details that dot an area (pebbles, flowers, tufts) out of tiles: baked in, they repeat
   as a pattern. Lay plain tiles, then `scatter(..., { even: true })` the details over them.
 - A tileset (Saint11): draw the master tile, offset it by half (`wrap: true` shows the seams) and fix
@@ -90,7 +90,8 @@ look at (`--frames 0-11` for some).
   Along an edge (grass on a path's border, moss at a rock's foot): `scatter(..., { on: "g", near:
   "<path keys>", within: 3 })`.
 - How to draw the grass, the cobbles and flagstones, a wall's stones, with the games' numbers:
-  environment §2, §6, §7 (`pxl help "environment 2"`), and `examples/nature/kit.px.js` to include.
+  environment §2, §6, §7 (`pxl help "environment 2"`), and `lib/nature/kit.px.js` to include (the
+  old path, `examples/nature/kit.px.js`, still works).
 
 ## 3. Texture without filler
 
@@ -347,7 +348,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   facing its way, at the walk's own pace by its way (`pace: (dir) => ...`, from `gait()`'s `pace` over
   the walk's frames at the scene's px to the meter; slower or faster, the feet slide), the feet on its
   `ground` (each step, a path) or the mesh's `stand`; time what hangs on a hold by `start("talk")`,
-  never by summing frames. In a flat scene (a top-down map), `route({ px: true, pace: travelerFigure.pace })`:
+  never by summing frames. In a flat scene (a top-down map), `route({ px: true, pace: traveler.pace })`:
   points on the picture, up it is `n`, `R(f).at` the px to `c.stamp` it at from a function in the
   layer a shade layer is `of`, so its shadow comes with it. `turnToward()` turns the other figure to whoever speaks, a direction every
   two frames. Stand a figure beside what it looks at, not in front of it: from above and in front its
@@ -359,12 +360,13 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   it (Triangle Strategy), its look your sprites: parchment with cut corners, fibers, darker toward its
   edges, a light line inside a thin brown outline (a 9-slice), the name over a rule from a small
   diamond, the words in a 5x7 font, a short tail to the speaker, a mark that more is coming, bobbing a
-  pixel and blinking off as a game's prompt waiting for a button does (an anim): `examples/hd2d/dialog.px.js`,
-  to include, its `PARCHMENT` the options; drawn after `post()`,
+  pixel and blinking off as a game's prompt waiting for a button does (an anim): `lib/ui/dialog.px.js`
+  to include (its old path, `examples/hd2d/dialog.px.js`, still works), `dialog.PARCHMENT` the options;
+  drawn after `post()`,
   so it stays sharp, in pixels finer than the art's (`unit: 0.75`). A loop that long checked one frame in 24: `check: { every: 24 }` (no rule runs on it but the frames building: fewer keep the tests fast).
 - The ground and what grows and lies on it (grass, trees, bushes, rocks, walls, paths, tufts,
   flowers), as 16-bit games draw them: the environment guide (`pxl help "environment"`, by section)
-  and its kit, `examples/nature/kit.px.js`, to include.
+  and its kit, `lib/nature/kit.px.js`, to include.
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
   `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:
   each is lit or in shade by which way it faces the sun. People walking in such a scene: pose a body
@@ -485,7 +487,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   (a `route()`'s walker, an anim stamped by the frame). Props drawn in 3D under `look3d()`'s light
   on a map seen from above: write the sun once there, and take it everywhere, `world: { scale,
   view: "top", light: "sun" }` (the lit side read off it) and `cast: "sun"` (h px up lands
-  h × [−x / z, y / z] away); the nature kit's `spruce()` takes it as `light`. The shade layer goes where the shadow is drawn:
+  h × [−x / z, y / z] away); the nature kit's `nature.spruce()` takes it as `light`. The shade layer goes where the shadow is drawn:
   under what stands, or lower in the list (a firelight, a bridge between). `ky` says where the sun is in depth: negative, the shadows fall back (the
   sun in front of us: the fronts we see are lit), positive, toward us (backlit).
   In true perspective, things built of `solid` shapes cast with `shadows()` instead: each shape

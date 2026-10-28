@@ -142,7 +142,8 @@ sprite("hero", { w: 32, h: 64, inline: "k" },
 When no base exists in the view you need, build the body as a figure in 3D: drawing a turned,
 walking body pixel by pixel by eye is where code drawing fails worst (proportions drift, the near and
 far limbs swap, every fix breaks something else). In pxl that is one op, `rig3d()` (`PXL help rig3d`;
-`examples/hd2d/traveler.px.js`, its 8 directions walking, idle, kneeling and casting;
+`lib/characters/traveler.px.js` (its old path, `examples/hd2d/traveler.px.js`, still works), its 8
+directions walking, idle, kneeling and casting;
 `examples/rig/warden.px.js`, an axe combo that turns the whole body round):
 
 1. **The skeleton:** a body of lengths in px (`figure(h, heads)`'s unless given), a pose per moment
@@ -254,7 +255,7 @@ of the nose; the corners of the mouth straight below the pupils.)
   - Whites and brows look more natural here than chibi eyes that are all dark. Offer both if
     unsure.
 - **A face turned three quarters, at a head of 13-16 px** (Octopath, Triangle Strategy, FFT, Tactics
-  Ogre, measured; `examples/hd2d/traveler.px.js`):
+  Ogre, measured; `lib/characters/traveler.px.js`):
   - The face 5-7 px wide and 5-7 rows from the lids to the chin, low in the head (the eyes about
     two thirds down); the fringe over all but 3-5 px of forehead, one row of skin over the lids.
   - No brows: the lids' dark row is one. The near eye on the head's middle: a dark lid 2 px wide over
@@ -395,7 +396,7 @@ of the nose; the corners of the mouth straight below the pupils.)
     2:1 diagonal), the leading heel a pixel up, the body a pixel lower there and tallest passing (a
     triangle wave); the arms the other way round, the far one showing only at its extremes; a cloak's
     tail and the hair a frame late. Feet moved 1 px each way never part and read as shuffling.
-  `examples/hd2d/traveler.px.js` stands on these numbers (its body a figure in 3D, `rig3d()` and
+  `lib/characters/traveler.px.js` stands on these numbers (its body a figure in 3D, `rig3d()` and
   `gait()`, §3).
 - **Profile (side view):** everything says which way the figure faces. The far arm and far leg hide
   behind the near ones or show as a darker sliver on the same side (moving, keep them a ramp step
@@ -503,7 +504,7 @@ urucum dots and black jenipapo bands painted on the skin, a bead necklace, a wov
 fiber skirt, bare feet; no feather headdress. Keep the original as its own file.
 
 A crowd on one skeleton (a figure in 3D, §3): dress each person rather than recolor one. The painter
-takes an outfit (`dress(outfit)`, `rig3d()`'s parts, `examples/hd2d/traveler.px.js`), what is swept
+takes an outfit (`dress(outfit)`, `rig3d()`'s parts, `lib/characters/traveler.px.js`), what is swept
 round the body and its ramps: trousers down to a cuff (rolled to the shin over bare feet, or into
 boots); drapes hung from a height (a cloak behind, a coat open at the front with buttons down its
 edges, a long skirt from the waist); the shirt's body by height and angle (stripes 2 px, a vest open
@@ -840,7 +841,7 @@ a guide color: it keeps its size every frame, bending, never popping.
 | Punch and kick (SLYNYRD, side view) | jab: smear 50, hit 100, then 50, 50, 50 back; cross or round kick: load 50, pull 50, smear 50, hit 100, follow-through 100, recover 50, overshoot 50 (idle frame 1 a pixel back). The smear frame is already the strike pose: the limb stretched plus 2–3 thin streaks in its own darker tone; the hit is that pose without them, leaning 1 px more. Sparks 2 frames on a jab, 3 on a cross |
 | Fighting-game normal (Capcom) | stance 200–300 ms; 1–3 startup drawings at 40–60, the last the shortest (30–40) so the path reads straight; contact 40 for a jab, 80–260 for a heavy; one follow-through frame where only cloth, hair and hands move; back through the startup drawings in reverse only when the limb returns along its path (a kick; a straight punch reversed reads as an elbow drawn back). The body and legs shift even on a jab |
 | Slash (an enemy's, top-down) | wind-up 2–3 (the first held longest, ~240 ms); slash 3: the biggest smear, a smaller one, none (held 1.5×); recovery on another arc, about 3× the wind-up |
-| Casting a spell (the traveler, `cast` in `hd2d/traveler.px.js`) | 13 frames of 100 ms: wind-up 2 (the near hand back 4 px and up to the shoulder), held 3 while the energy gathers there, the thrust 1 (the hand 6 px ahead at shoulder height, the foot across from it a step of 3 px forward, the body leaning 7° in) held 1, back 4, rest 2; the near hand a socket that moves with the pose (`c.setSocket`), where the spell starts. Seen on a diagonal the thrust comes toward us and reads short: cast in profile |
+| Casting a spell (the traveler, `cast` in `lib/characters/traveler.px.js`) | 13 frames of 100 ms: wind-up 2 (the near hand back 4 px and up to the shoulder), held 3 while the energy gathers there, the thrust 1 (the hand 6 px ahead at shoulder height, the foot across from it a step of 3 px forward, the body leaning 7° in) held 1, back 4, rest 2; the near hand a socket that moves with the pose (`c.setSocket`), where the spell starts. Seen on a diagonal the thrust comes toward us and reads short: cast in profile |
 | Hit taken | the head jumps the whole way in 1 frame, over half comes back the next, the rest eases over 3; the face takes ~10 more; the target stretches on the hit frame and squashes the next |
 | Freeze before an impact | 1–2 frames, drawn: a white silhouette over a dark band; then the contact flash, a burst bigger than the thing, sparks 2–3 |
 | Death | impact 1 → thrown back, a spark breaking over 3 → 1–2 trying to recover → the knees give → down, head and arms lagging → 1 frame a pixel below rest → an arm bounces → rest |
@@ -898,7 +899,7 @@ figure and pick its build by the game whose look you're after.
 
 A 16-bit sprite keeps to a palette of 16, its sixteenth clear: 15 colors at most to a sprite (the
 SNES and GBA rows). HD-2D's figures stand taller (32–38 px) and take more colors (22–54: ramps of
-four to six tones, softer shading), the black outline kept: `examples/hd2d/traveler.px.js` (34 px, its
+four to six tones, softer shading), the black outline kept: `lib/characters/traveler.px.js` (34 px, its
 body a figure in 3D drawn every frame, its head modeled, drawn once per view and its face painted, §3).
 
 How they play, and the same in pxl:

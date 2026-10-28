@@ -13,7 +13,7 @@ parentPort!.on("message", ({ root, f }: { root: string; f: string }) => {
   let out: string[], read: string[] = [];
   const t0 = performance.now();
   try {
-    const p = loadProject(join(root, "examples", f), { checksOnly: true }, (abs) => { read.push(abs); return readFileSync(abs, "utf8"); });
+    const p = loadProject(join(root, f.startsWith("lib/") ? "" : "examples", f),{ checksOnly: true }, (abs) => { read.push(abs); return readFileSync(abs, "utf8"); });
     // every frame of every animated scene (the bout's blows, the blocks, the last clash included)
     const r = checkProject(p, { file: basename(f) });
     out = [`${f}: ${r.warnings} warning${r.warnings === 1 ? "" : "s"} (${r.checked})`, `  ${r.coverage}`, ...[...r.lines, ...r.notes].map((l) => "  " + l)];

@@ -30,7 +30,7 @@ pal({
 })
 ramps("ABCDEFGHIJ", "abcd", "k12345", "6789", "ghij", "KLMN", "rsxy", "OPQRW", "tuv", "nm", "efz", "qw", "ZY", "ol", "UTS")
 
-include("../fonts/font5x7.px.js")   // a 5x7 font for the billboard
+include("../../lib/ui/font5x7.px.js")   // a 5x7 font for the billboard
 
 const W = 320, H = 180, FPS = 10, L = 360, P = 360
 const SX = 40, SY = 76            // the sun

@@ -1,11 +1,11 @@
-// The harbor's crew (harbor.px.js): the traveler's figure on the 3D layer and his moves (traveler.px.js,
-// its `travelerFigure`) dressed in outfits of their own, under heads of their own, each a person at a
-// glance: a sailor in a bandana with a short ponytail, a bald dockhand with a beard, one in a flat cap, a
-// woman with long hair in a braid, an older man with grey hair tied back. Each head modeled on his skull
-// and drawn once per view as his is, its face painted over by hand: the approved hand heads' faces
-// (characters §5); the hair, the beard and what covers it the 3D's. Recolors of these (base + swap) make
-// the rest of the crew.
-include("traveler.px.js", { palette: true })   // its palette and ramps, so the painter's keys mean the same here
+// The harbor's crew (harbor.px.js): the traveler's figure on the 3D layer and his moves
+// (lib/characters/traveler.px.js, its `traveler`) dressed in outfits of their own, under heads of their
+// own, each a person at a glance: a sailor in a bandana with a short ponytail, a bald dockhand with a
+// beard, one in a flat cap, a woman with long hair in a braid, an older man with grey hair tied back.
+// Each head modeled on his skull and drawn once per view as his is, its face painted over by hand: the
+// approved hand heads' faces (characters §5); the hair, the beard and what covers it the 3D's. Recolors
+// of these (base + swap) make the rest of the crew.
+include("../../lib/characters/traveler.px.js", { palette: true })   // its palette and ramps, so the painter's keys mean the same here
 pal({
   // the crew's cloth: red (a bandana, a bodice), tweed (a cap, a shirt), navy (a coat, stripes), white
   // linen, brown canvas (trousers), olive (a vest), plum (a skirt)
@@ -23,7 +23,7 @@ ramps("kmrt", "kabf", "kQAB", "kxyZ", "kiou", "kOUV", "kIKM")
 // rolled, boots; a docker's leather apron from the chest to the knees over a twill shirt; a captain's
 // long navy coat open in front over a white shirt, gold buttons down its edges, white breeches in high
 // boots; the companion's red bodice laced over a white chemise, puffed sleeves, a long plum skirt.
-const T = travelerFigure, BASE = { ...T.TRAVELER, drapes: [], over: [] }
+const T = traveler, BASE = { ...T.TRAVELER, drapes: [], over: [] }
 const two = (near, far) => (isFar) => (isFar ? far : near)
 const legs = (tr, shin) => (isFar) => ({ tr: isFar ? tr[1] : tr[0], shin: isFar ? shin[1] : shin[0], foot: isFar ? shin[1] : shin[0] })
 const CANVAS = ["iou", "iio"], NAVY = ["QAB", "QQA"], LINEN = ["xyZ", "xxy"], BOOTS = ["Ddl", "DDd"], SKIN = ["zsS", "zzs"]

@@ -7,7 +7,7 @@ import { main } from "../src/node/cli.ts";
 import { loadSource } from "../src/node/load.ts";
 import { whenChanged } from "./passed.ts";
 
-const test = whenChanged("test/layers.test.ts", ["examples/nature/kit.px.js"]);
+const test = whenChanged("test/layers.test.ts", ["lib/nature/kit.px.js", "lib/styles/nature.px.js"]);
 
 const LIT = '{ light: [1, 0], reach: 1, ramps: ["1d6"] }';
 
@@ -162,7 +162,7 @@ sprite("lost", { w: 4, h: 1, register: "c" }, px(1, 0, "r"))`;
 test("the nature kit's spruce() under a light of its own: surface()'s options over the kit's, nothing given the kit's own", async () => {
   const { loadProject } = await import("../src/node/load.ts");
   const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");
-  writeFileSync(f, `include(${JSON.stringify(join(process.cwd(), "examples/nature/kit.px.js"))}, { palette: true }); spruce("same", 52, 9); spruce("lit", 52, 9, { light: [0.55, 0.55, 0.62] })`);
+  writeFileSync(f, `include(${JSON.stringify(join(process.cwd(), "lib/nature/kit.px.js"))}, { palette: true }); nature.spruce("same", 52, 9); nature.spruce("lit", 52, 9, { light: [0.55, 0.55, 0.62] })`);
   const p = loadProject(f);
   assert.deepEqual([p.image("same").hash() === p.image("_spruce_s").hash(), p.image("lit").hash() === p.image("_spruce_s").hash()], [true, false]);
 });

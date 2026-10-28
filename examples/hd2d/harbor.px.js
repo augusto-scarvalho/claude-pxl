@@ -7,9 +7,9 @@
 // passage aboard, with a talk in parchment dialogue boxes. `harbor` is the art at its own size, the one
 // checked; `harbor_md` the same twice as big through post(); `harbor_clip` its middle, for the gallery.
 include("crew.px.js")                   // the traveler, the mourner and the crew (crew.px.js includes traveler.px.js)
-include("kit.px.js")
-include("../fonts/font5x7.px.js")
-include("dialog.px.js")                 // the dialogue boxes
+include("../../lib/profiles/hd2d.px.js")
+include("../../lib/ui/font5x7.px.js")
+include("../../lib/ui/dialog.px.js")     // the dialogue boxes
 
 pal({
   k: "#1d1410",                                                   // outline, the deepest gaps
@@ -588,9 +588,9 @@ const shipPose = (f) => ({ th: 0.008 * Math.sin((2 * Math.PI * f) / 48), dh: 0.0
 // dockhand at the stack, one in a grey cap at the crane's winch; on the ship, a sailor at the waist's
 // rail and an officer on the poop, riding its bob; the lanterns.
 const idle = (f) => Math.floor(f / 3) % 4
-const PACE = (dir) => travelerFigure.pace(dir) / PPM
+const PACE = (dir) => traveler.pace(dir) / PPM
 const carrier = (f) => {
-  const z = Z - 8.25, STEP = (0.7 * travelerFigure.pace("e")) / CAM.scale(z), LEG = Math.round(2.6 / STEP), T = LOOP / 2 - LEG, x0 = 4.2, x1 = x0 + LEG * STEP, t = f % LOOP
+  const z = Z - 8.25, STEP = (0.7 * traveler.pace("e")) / CAM.scale(z), LEG = Math.round(2.6 / STEP), T = LOOP / 2 - LEG, x0 = 4.2, x1 = x0 + LEG * STEP, t = f % LOOP
   const [x, dir, walking] = t < LEG ? [x0 + t * STEP, "e", true] : t < LEG + T ? [x1, "e", false] : t < 2 * LEG + T ? [x1 - (t - LEG - T) * STEP, "w", true] : [x0, "w", false]
   return [{ name: `car_${walking ? "carry" : "carryidle"}_${dir}`, at: [x, z], frame: walking ? f % 8 : idle(f) }]
 }
@@ -660,7 +660,7 @@ const SAYS = [
 // in dialog.px.js's parchment
 const say = (c, [x, z, u], name, lines, side, t) => {
   const [hx, hy] = CAM.ground(x, z, u + 2.1)
-  c.bubble(hx, hy - 1.5, name, lines, { ...PARCHMENT, side, t })
+  c.bubble(hx, hy - 1.5, name, lines, { ...dialog.PARCHMENT, side, t })
 }
 const talk = (c, f = c.frame) => {
   const t = f - TALK

@@ -207,7 +207,7 @@ Painting is the slow part, and a pose or a layout that is wrong under the paint 
 too. So judge the shape of the thing before any of it is painted:
 
 - **A new move** (a kneel, carrying a crate, a swing) is first drawn as flat blocks on the figure's
-  skeleton, in every direction it will be seen from. [`examples/hd2d/traveler.px.js`](../examples/hd2d/traveler.px.js)
+  skeleton, in every direction it will be seen from. [`lib/characters/traveler.px.js`](../lib/characters/traveler.px.js)
   makes `bk_<move>_<dir>` for each of its moves: the head yellow with a red patch where the face is,
   the body orange, the right limbs light and the left dark. Ask for them as a GIF
   (`pxl shot art.px.js bk_kneel_s bk_kneel_w bk_kneel_n --gif`), approve the pose and the timing, then
@@ -403,7 +403,7 @@ catch. Both leave alone what already passed. Each example that passed is noted i
 `node_modules/.cache/pxl/` with a hash of what its check read (pxl's sources, Node's version, the
 test, the example and every file it read: what it includes, its palettes, PNGs and poses), and the
 next run checks only the examples whose hash changed: an example edited reruns alone (half a
-second for a small one, a few for the harbor), a shared file (`hd2d/kit.px.js`) reruns the
+second for a small one, a few for the harbor), a shared file (`lib/profiles/hd2d.px.js`) reruns the
 examples that include it, a change to pxl's sources reruns them all; the test says how many it left alone. The gallery's study is skipped
 while pxl's sources and its two GIFs are the same. Every other test file but two is skipped the
 same way, each while pxl's sources, the file, `test/helpers.ts` and what else it names (a fixture,

@@ -283,8 +283,8 @@ each piece as a strip. `--no-out` prints the text only.
   head baked and retouched (§3). What the tutorials teach about lines, anti-aliasing, clusters and
   timing is in §4, §7, §10 and §12 (frame counts measured on Saint11's cards).
 - [environment.md](../environment.md): grass, trees, bushes, rocks, walls and paths as games draw
-  them, with kits to start from (`examples/nature/kit.px.js`; tree species in their seasons,
-  `examples/nature/trees.px.js`).
+  them, with kits to start from (`lib/nature/kit.px.js`, its old path `examples/nature/kit.px.js`
+  still working; tree species in their seasons, `examples/nature/trees.px.js`).
 - [lighting.md](../lighting.md): lamps, light blocked by walls, normal maps, glow.
 - Effects as shaders do them (a dissolve, an aura, wind, energy), particles, trails and spells:
   `pxl help effects` and `pxl help abilities`, then [`spells.px.js`](../examples/spells.px.js),

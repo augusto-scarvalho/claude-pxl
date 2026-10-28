@@ -8,9 +8,10 @@ ruins, city), final boss blues (Tiling Tiles, Form and Light), So You Want To Be
 Pixelation knowledge repository, and from `pxl study` on the sheets of Chrono Trigger, CrossCode,
 Terranigma, Final Fantasy Tactics Advance, Tactics Ogre, A Link to the Past and Sword of Mana.
 
-Each piece here is in the nature kit, `examples/nature/kit.px.js`: include it
-(`include("<path>/nature/kit.px.js", { palette: true })`) and use its sprites, or call its builders
-for more of a kind (§10). `examples/hd2d/graveyard.px.js` puts it all in a scene.
+Each piece here is in the nature kit, `lib/nature/kit.px.js` (its palette `lib/styles/nature.px.js`;
+the old path, `examples/nature/kit.px.js`, still works): include it
+(`include("<path>/lib/nature/kit.px.js", { palette: true })`) and use its sprites, or call its builders
+(`nature.pine(...)`) for more of a kind (§10). `examples/hd2d/graveyard.px.js` puts it all in a scene.
 
 ## 1. Learning from a game's sheet
 
@@ -153,7 +154,7 @@ round it.
   apart in the middle; a knot. Laying top-down crowns from one clump, importing trees: scenes §4.
 - A dead tree: limbs that kink every 4-6 px and split in one to three, tapering 5, 3, 2, 1 px, the
   last no longer than 5 px; the lightest tone only on the upper left of the trunk and big limbs.
-  Built in 3D (`deadTreeLimbs`, made a field of tapering rods by `make3d.snag`, §10), its splits kept apart: from the
+  Built in 3D (`nature.deadTreeLimbs`, made a field of tapering rods by `make3d.snag`, §10), its splits kept apart: from the
   trunk one each way across the picture at angles of their own (and now and then one on up); from a
   limb one carrying on its way and one bending further out, never back over the trunk (limbs coming
   toward us, going off behind the trunk or bending back read as a tangle at the fork); three levels
@@ -225,7 +226,8 @@ bond of lengths of their own, a speckled granite in a few tones, moss in some jo
 cut stones, a strip of rounded pebbles, then gravel or moss; a landing of wider slabs before a gate
 or a hall; a bend paved without a seam, the slabs fanning round it. Three straight runs butting into
 each other read as parts joined, not a path: lay it along a `lane()` (`japan.paving()` in
-`examples/nature/japan.px.js`, the shrine's: `examples/shrine/shrine.px.js`).
+`lib/architecture/japan.px.js`, whose old path `examples/nature/japan.px.js` still works; the shrine's:
+`examples/shrine/shrine.px.js`).
 
 ## 8. Small things
 
@@ -272,19 +274,20 @@ each other read as parts joined, not a path: lay it along a `lane()` (`japan.pav
 
 ## 10. The kit
 
-`examples/nature/kit.px.js`, its light from the upper left, its textures tiling, a texel to a pixel:
+`lib/nature/kit.px.js` (the old path, `examples/nature/kit.px.js`, still works, its builders there
+without `nature.`), its light from the upper left, its textures tiling, a texel to a pixel:
 
 | Builder / sprite | Makes |
 |---|---|
-| `grassTile(name, { lush, seed })` | a 64x48 grass tile (§2): `_grass` lush, `_turf` the wood's quieter floor |
-| `pine(name, h, seed)` | a conifer h px tall (§3): `_pine` 68, `_pine_m` 60, `_pine_s` 52, `_pine_far` hazed |
+| `nature.grassTile(name, { lush, seed })` | a 64x48 grass tile (§2): `_grass` lush, `_turf` the wood's quieter floor |
+| `nature.pine(name, h, seed)` | a conifer h px tall (§3): `_pine` 68, `_pine_m` 60, `_pine_s` 52, `_pine_far` hazed |
 | `make3d.snag({ h, seed, sway })` | the dead tree built as limbs in 3D on fields, swaying a little (§3), drawn by `surface()` from 20 degrees up: `_snag` |
-| `make3d.spruce({ h, seed, sway })`, `spruce(name, h, seed)` | the same conifer built in 3D on fields and swaying in the wind (§3), drawn by `surface()` from 20 degrees up (`hem`, `strokes`, `rim: 0.85`): `_spruce` 68, `_spruce_m` 60, `_spruce_s` 52, `_spruce_far` hazed; a scene picks each one's `frame` |
-| `bush(name, w, lobes, seed)` | a bush of lobes `[x, y, r, back]` (§4): `_bush`, `_bush_b`, `_bush_c` |
-| `rampart(name, overhang)` | a 48x29 stone wall face (§6): `_rampart` with grass over its head, `_riser` without |
+| `make3d.spruce({ h, seed, sway })`, `nature.spruce(name, h, seed)` | the same conifer built in 3D on fields and swaying in the wind (§3), drawn by `surface()` from 20 degrees up (`hem`, `strokes`, `rim: 0.85`): `_spruce` 68, `_spruce_m` 60, `_spruce_s` 52, `_spruce_far` hazed; a scene picks each one's `frame` |
+| `nature.bush(name, w, lobes, seed)` | a bush of lobes `[x, y, r, back]` (§4): `_bush`, `_bush_b`, `_bush_c` |
+| `nature.rampart(name, overhang)` | a 48x29 stone wall face (§6): `_rampart` with grass over its head, `_riser` without |
 | `_flags` | 48x48 flagstones (§7) |
 | `_rock`, `_rock_small` | rocks in planes (§5) |
 | `_tuft_a/b/c`, `_flowers_w/p` | tufts and flowers (§8) |
 | `_deadtree` | a dead tree, 4 m (§3) |
 
-`pxl build examples/nature/kit.px.js` writes them all on one sheet, `nature.png`.
+`pxl build lib/nature/kit.px.js` writes them all on one sheet, `nature.png`.

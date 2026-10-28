@@ -36,6 +36,7 @@
     "examples/nature/*.px.js",
     "examples/shrine/*.px.js",
     "examples/sdf/*.px.js",
+    "lib/**/*.px.js",
     "SKILL.md",
     "characters.md",
     "environment.md",

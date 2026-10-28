@@ -8,14 +8,14 @@
 // `plaza` is the art at its own size, the one checked (check builds it unlit); `plaza_hd` the same
 // four times as big (a size of it), with what the camera does to it: post().
 include("../topdown_hero/hero.px.js")
-include("kit.px.js", { palette: true })   // the palette, the textures, the pines, bushes and lamps
+include("../../lib/profiles/hd2d.px.js", { palette: true })   // the palette, the textures, the pines, bushes and lamps
 
 const MATS = { cobble: { tex: "_cobble" }, wall: { tex: "_wall" }, grass: { tex: "_grass" }, wood: { tex: "_planks" } }
 
 // The camera: 24 px to the meter where it looks (the hero, a chibi 24 px tall, stands 1 m), the
 // middle of the picture on the ground Z m ahead.
 const W = 480, H = 270, CAM = perspective({ w: W, h: H, pitch: -45, fov: 30, ppm: 24 }), Z = CAM.z, DIST = CAM.dist
-const M = model(), block = (...a) => hd2dBlock(M, ...a)
+const M = model(), block = (...a) => surfaces.block(M, ...a)
 M.face("grass", [-30, Z - 20, 0], [30, Z - 20, 0], [30, Z + 30, 0], [-30, Z + 30, 0])
 const UP = 0.3                                                  // the plaza: a paved step up from the grass
 block("cobble", "wall", -6, Z - 4, 6, Z + 5, 0, UP)

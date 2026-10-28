@@ -151,10 +151,10 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
     const few = opts.all ? hits : hits.slice(0, FEW.guide);
     if (few.length) out.push(`[${g}]`, ...few.map(([l, i]) => `  ${i + 1}: ${opts.all ? l.trim() : snippet(l, inCode, 140)}`), ...(hits.length > few.length ? [`  (…${hits.length - few.length} more)`] : []));
   }
-  // examples: where it is used, one per file first
+  // examples (and the library, lib/): where it is used, one per file first
   const use = new RegExp(`\\b${esc}\\s*[(:]`);
   const used: { file: string; line: string }[] = [];
-  for (const f of examples()) {
+  for (const f of [...examples(), ...examples(join(ROOT, "lib"))]) {
     const file = relative(ROOT, f).replace(/\\/g, "/");
     readFileSync(f, "utf8").split(/\r?\n/).forEach((l, i) => { if (use.test(l)) used.push({ file, line: `  ${file}:${i + 1}: ${l.trim().slice(0, 150)}` }); });
   }

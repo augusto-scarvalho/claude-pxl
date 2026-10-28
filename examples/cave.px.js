@@ -21,30 +21,13 @@ const ceilY = profile(ceil), floorY = profile(floor);
 const stands = [...floor.slice(0, 14), 146, 84, 150, 66, 156, 62, 186, 62, 192, 63];
 
 // ------------------------------------------------------------------ rock parts (normal-mapped)
-for (const [i, rx, ry] of [[1, 3, 2], [2, 4, 3], [3, 5, 3], [4, 6, 4]])
-  sprite("_stone" + i, { w: 2 * rx + 1, h: 2 * ry + 1, outline: "K" }, ellipse(rx, ry, rx, ry, "r"), bump("dome"))
-for (const [i, rx, ry] of [[1, 4, 2], [2, 6, 3], [3, 3, 2]])
-  sprite("_lump" + i, { w: 2 * rx + 1, h: 2 * ry + 1, outline: "r" }, ellipse(rx, ry, rx, ry, "R"), bump("dome", { depth: 0.8 }))
+// the cave kit: stones and lumps by its builders, mushroom caps (_cap_big, _cap_mid, _cap_tiny) and a
+// shelf fungus (_bracket), all in this file's keys
+include("../lib/nature/cave.px.js");
+for (const [i, rx, ry] of [[1, 3, 2], [2, 4, 3], [3, 5, 3], [4, 6, 4]]) cave.stone("_stone" + i, rx, ry);
+for (const [i, rx, ry] of [[1, 4, 2], [2, 6, 3], [3, 3, 2]]) cave.lump("_lump" + i, rx, ry);
 
 // ------------------------------------------------------------------ fungus
-sprite("_cap_big", { mx: "c" }, `
-  ..cC
-  .cCC
-  cCcC
-  eeee
-  ...f
-  ...F
-  ...f`)
-sprite("_cap_mid", { mx: "c" }, `
-  .cC
-  cCC
-  eee
-  ..f
-  ..F`)
-sprite("_cap_tiny", ".C.\nccc\n.f.")
-// Shelf fungus growing out of a rock face (pointing right).
-sprite("_bracket", "cCc.\ncccC\n.eee")
-
 // Clusters pulse: the lamp breathes and the bright spots fade at the dim end of the cycle.
 const clusters = {
   a: [["_cap_big", 4, 1], ["_cap_mid", 0, 3], ["_cap_tiny", 11, 5], 7, 2],

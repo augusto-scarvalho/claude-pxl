@@ -1,5 +1,5 @@
 // A fox shrine's courtyard in autumn at dusk, top-down (an RPG's 3/4), 240x160 at 20 px to the meter, an
-// 11.5 s loop. The things are the Japanese kit's (nature/japan.px.js: a torii, the hall with its
+// 11.5 s loop. The things are the Japanese kit's (lib/architecture/japan.px.js: a torii, the hall with its
 // shimenawa and bell, stone lanterns, the foxes, the basin, the ema rack) and the trees the species kit's
 // (nature/trees.px.js: two momiji, the sacred ginkgo with a shimenawa round its trunk, a black pine),
 // each drawn in 3D by turnaround() through the scene's camera under its one sun, low in the west, golden;
@@ -12,7 +12,7 @@
 // carries their leaves down across the courtyard.
 include("miko.px.js")
 include("../nature/trees.px.js")
-include("../nature/japan.px.js", { palette: true })
+include("../../lib/architecture/japan.px.js", { palette: true })
 
 pal({ k: "#1a1622" })   // ink
 

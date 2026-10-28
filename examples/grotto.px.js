@@ -34,10 +34,11 @@ const ceilY = profile(ceil), ground = profile(floor), ledge = profile(ledgeTop),
 const inPool = (x, y) => y >= POOL && y < ground(x) && x > 100 && x < 220;
 
 // ------------------------------------------------------------------ rock parts (normal-mapped)
-[[3, 2], [4, 3], [5, 3], [6, 4], [7, 4], [4, 2]].forEach(([rx, ry], i) =>
-  sprite("_stone" + i, { w: 2 * rx + 1, h: 2 * ry + 1, outline: "K" }, ellipse(rx, ry, rx, ry, "r"), bump("dome")));
-[[4, 2], [6, 3], [3, 2], [8, 3]].forEach(([rx, ry], i) =>
-  sprite("_lump" + i, { w: 2 * rx + 1, h: 2 * ry + 1, outline: "r" }, ellipse(rx, ry, rx, ry, "R"), bump("dome", { depth: 0.8 })));
+// the cave kit: stones and lumps by its builders, mushroom caps (_cap_big, _cap_mid, _cap_tiny) and a
+// shelf fungus (_bracket), all in this file's keys
+include("../lib/nature/cave.px.js");
+[[3, 2], [4, 3], [5, 3], [6, 4], [7, 4], [4, 2]].forEach(([rx, ry], i) => cave.stone("_stone" + i, rx, ry));
+[[4, 2], [6, 3], [3, 2], [8, 3]].forEach(([rx, ry], i) => cave.lump("_lump" + i, rx, ry));
 
 // Crystal shards: hand-painted facets (left face 4, front 5, right face 6, tip 8).
 const shard = (h) => [".X.", ...Array(h - 1).fill("xXx")].join("\n");
@@ -50,12 +51,8 @@ sprite("crystals", { w: 12, h: 12 },
 // ------------------------------------------------------------------ vegetation parts
 sprite("_moss0", ".t.\ntTt"); sprite("_moss1", "t.tt\nTttT"); sprite("_moss2", "..t..\nttTtt");
 sprite("_tuft0", "g..g\n.gG."); sprite("_tuft1", ".G.\ngGg"); sprite("_tuft2", "g.G.g\n.ggg.");
-sprite("_bracket", "cCc.\ncccC\n.eee");
 
-// Mushroom caps from the first cave, reused for clusters in three colours.
-sprite("_cap_big", { mx: "c" }, "..cC\n.cCC\ncCcC\neeee\n...f\n...F\n...f");
-sprite("_cap_mid", { mx: "c" }, ".cC\ncCC\neee\n..f\n..F");
-sprite("_cap_tiny", ".C.\nccc\n.f.");
+// The cave kit's mushroom caps, in clusters of three colours.
 const tints = { c: [{}, "#5cf0e0"], m: [{ c: "m", C: "M", e: "E" }, "#ff7ae8"], t: [{ c: "t", C: "T", e: "n" }, "#60ffb0"] };
 const shapes = {
   a: [["_cap_big", 4, 1], ["_cap_mid", 0, 3], ["_cap_tiny", 11, 5], 7, 2],

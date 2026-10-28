@@ -7,10 +7,10 @@
 // a low sun behind on the left. Its ground, plants and stones are drawn after the games' sheets (pxl
 // study) and SLYNYRD's, Saint11's and final boss blues' tutorials. `graveyard` is the art at its own
 // size, the one checked; `graveyard_hd` the same four times as big through post() (a size of it).
-include("traveler.px.js")
-include("kit.px.js", { palette: true })
-include("../fonts/font5x7.px.js")
-include("dialog.px.js")                 // the dialogue boxes
+include("../../lib/characters/traveler.px.js")
+include("../../lib/profiles/hd2d.px.js", { palette: true })
+include("../../lib/ui/font5x7.px.js")
+include("../../lib/ui/dialog.px.js")     // the dialogue boxes
 
 
 // Where the grass meets the path: blades reaching over the stones' edge 1-5 px, in clumps, their tips
@@ -50,9 +50,9 @@ sprite("_lip_c", { pivot: "bottom" }, `
   qwqqQqqwqqQq
   .Qq..Qq..q..
   ..Q...Q.....`)
-// Boulders for the hill's corners: the kit's rocks, bigger (rock(): two or three masses on one flat foot)
-rock("_boulder", 28, 16, [[11, 8, 9, 7], [19, 10, 7.5, 5.5], [8, 12, 6, 3]])
-rock("_boulder_b", 21, 12, [[9, 6, 7, 5.5], [14.5, 8, 5.5, 4]])
+// Boulders for the hill's corners: the kit's rocks, bigger (nature.rock(): two or three masses on one flat foot)
+nature.rock("_boulder", 28, 16, [[11, 8, 9, 7], [19, 10, 7.5, 5.5], [8, 12, 6, 3]])
+nature.rock("_boulder_b", 21, 12, [[9, 6, 7, 5.5], [14.5, 8, 5.5, 4]])
 
 // The rose he lays at the old grave: lying on the grass, its stem toward us, a red bloom of three tones
 // lit from above, two leaves.
@@ -107,7 +107,7 @@ headstone("_grave_old", 13, 16, arch(13), () => false, { lean: -2, seed: 4, chip
 // The camera: 24 px to the meter, 38 degrees down, 30 across; the hill centred (Z, 1.6 m behind where it
 // looks, is the hill's middle).
 const W = 480, H = 270, CAM = perspective({ w: W, h: H, pitch: -38, fov: 30, ppm: 24 }), Z = CAM.z - 1.6, DIST = CAM.dist
-const M = model(), block = (...a) => hd2dBlock(M, ...a)
+const M = model(), block = (...a) => surfaces.block(M, ...a)
 // The textures a texel to a pixel where the camera looks (texel "screen": the floors foreshortened, the walls
 // a little, the flags' 2.5 cm kerb a wall's).
 const MATS = {
@@ -236,11 +236,11 @@ for (const [x0, n] of [[-6.1, 3], [-3.2, 2], [2.4, 2], [4.9, 3]]) {
 // gap in the wood, climbs the steps, kneels by the old grave and lays a rose at its foot, crosses to the
 // mourner and asks if she's all right; she turns to him and answers; he goes back down and away. Each leg walked
 // in one of the 8 directions, so every one of them shows, at the walk's own pace by its way (his
-// travelerFigure.pace: 2.3 px a frame across, 1.7 on the diagonals, 1.6 toward us or away, 24 px to the
+// traveler.pace: 2.3 px a frame across, 1.7 on the diagonals, 1.6 toward us or away, 24 px to the
 // meter), no slower, or the feet slide; his feet on the model (the mesh's stand), each step, the path.
 // He starts just out of the picture, in view within a second; the wait that makes the loop a whole
 // number of the pines' sways (44 frames) comes after he has gone.
-const PACE = (dir) => travelerFigure.pace(dir) / 24, MS = 80
+const PACE = (dir) => traveler.pace(dir) / 24, MS = 80
 const idle = (f) => Math.floor((f * MS) / 250) % 4  // the idle's 250 ms on the scene's clock; the walk a frame a frame
 const visit = route({ pace: PACE, origin: [0, Z], walk: "tr_walk", idle: { anim: "tr_idle", frame: idle }, loop: 44 }, [
   [-2.6, -7.8], [-0.2, -5.4],                      // in from the near left, from just out of the picture
@@ -268,7 +268,7 @@ const SAYS = [
 // in dialog.px.js's parchment
 const say = (c, [x, z, u], name, lines, side, t) => {
   const [hx, hy] = CAM.ground(x, z, u + 1.5)
-  c.bubble(hx, hy - 1.5, name, lines, { ...PARCHMENT, side, t })
+  c.bubble(hx, hy - 1.5, name, lines, { ...dialog.PARCHMENT, side, t })
 }
 const talk = (c) => {
   const t = c.frame - TALK
@@ -305,11 +305,11 @@ scene("graveyard", { w: W, h: H, bg: "q", ...CLOCK, check: { every: 24 }, sizes:
 // `graveyard_3d`: the same visit with three things drawn by the 3D layer, beside the scene above to
 // compare. They stand in the mesh's light (what a 3D op drawn after a mesh() with a sun takes: its sun
 // and sky on what they draw, their shadows the sun's share), at its depth, in pixels of the sprites' size.
-// The dead tree in 3D: the sprite's own limbs (deadTreeLimbs, px) as tapering rods in meters, seen through
+// The dead tree in 3D: the sprite's own limbs (nature.deadTreeLimbs, px) as tapering rods in meters, seen through
 // the camera at 38 degrees, swaying with the pines (the top 6 cm over at the gust, in step with the
 // sprite's), its limbs' shadows on the hill, the old graves and the mourner.
 const SNAG_3D = (() => {
-  const { segs, top } = deadTreeLimbs(76, 4), m = (p) => [p[0] / 24, -p[2] / 24, p[1] / 24], h = top / 24, near = {}
+  const { segs, top } = nature.deadTreeLimbs(76, 4), m = (p) => [p[0] / 24, -p[2] / 24, p[1] / 24], h = top / 24, near = {}
   // (in bunches half a meter across: a point far from a bunch's box skips its rods, half again as fast)
   for (const [A, B, ra, rb] of segs) (near[`${Math.floor((A[0] + B[0]) / 24)},${Math.floor((A[1] + B[1]) / 24)}`] ??= []).push(sdf.capsule(m(A), m(B), ra / 24, rb / 24))
   return sdf.union(Object.values(near).map((g) => sdf.union(g))).mat("bark")

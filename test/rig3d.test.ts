@@ -12,7 +12,7 @@ import { loadProject, loadSource } from "../src/node/load.ts";
 import { PAL, keys } from "./helpers.ts";
 import { whenChanged } from "./passed.ts";
 
-const test = whenChanged("test/rig3d.test.ts", ["examples/hd2d/traveler.px.js"]);
+const test = whenChanged("test/rig3d.test.ts", ["lib/characters/traveler.px.js"]);
 
 const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
@@ -142,11 +142,11 @@ rig3d("f", { body: { h: 30, heads: 3 }, headings: ["s"], parts, moves: { strike:
   assert.throws(() => loadSource(`${PAL}rig3d("e", { blocks: true, moves: { m: { frames: 2, ms: [60], pose: () => ({}) } } })`, "t.px.js"), /a list, a number a frame/);
 });
 
-test("dress() (examples/hd2d/traveler.px.js): the shirt's body swept along the spine; spine: false, round an upright through the hips", () => {
+test("dress() (lib/characters/traveler.px.js): the shirt's body swept along the spine; spine: false, round an upright through the hips", () => {
   // a point on the spine under the chest of a figure leaning 30 degrees: inside the one, outside the other
   const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");
-  writeFileSync(f, `include(${JSON.stringify(join(import.meta.dirname, "../examples/hd2d/traveler.px.js"))})
-const T = travelerFigure, R = rig3d("q", { ...T.FIG, parts: T.dress(T.TRAVELER), moves: { m: { frames: 1, pose: () => ({}) } } })
+  writeFileSync(f, `include(${JSON.stringify(join(import.meta.dirname, "../lib/characters/traveler.px.js"))})
+const T = traveler, R = rig3d("q", { ...T.FIG, parts: T.dress(T.TRAVELER), moves: { m: { frames: 1, pose: () => ({}) } } })
 const j = R.joints({ lean: 30 }, 270), q = j.chest.map((v, e) => v - 2 * j.spine[e]), d = (o) => T.dress(o)(j, {}).tunic[1].field.dist(q)
 sprite("x", { w: 2, h: 1 }, (c) => { if (d(T.TRAVELER) < -1.5) c.px(0, 0, "#ff0000"); if (d({ ...T.TRAVELER, spine: false }) > 0) c.px(1, 0, "#ff0000") })`);
   assert.ok([...loadProject(f).image("x").data].every((v) => (v & 255) === 255));

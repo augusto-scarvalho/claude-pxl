@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { globSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -879,10 +879,13 @@ test("cli shot of a GIF: drawn larger, read at 1x; all its frames in rows of 12;
   assert.deepEqual([some.w, some.h], [3 * 16 + 2 * 2, 12]);
 });
 
-test("package.json ships every example folder (the skill points to them all)", () => {
+test("package.json ships every example folder and every file of the library (the skill points to them all)", () => {
   const root = join(import.meta.dirname, ".."), files: string[] = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).files;
   const dirs = execFileSync("git", ["ls-files", "examples"], { cwd: root, encoding: "utf8" }).split("\n").filter((f) => f.split("/").length > 2).map((f) => f.split("/")[1]);
   for (const d of new Set(dirs)) assert.ok(files.some((f) => f.startsWith(`examples/${d}/`)), `examples/${d}/ is not in package.json files`);
+  const shipped = new Set(files.flatMap((f) => globSync(f, { cwd: root })).map((f) => f.split("\\").join("/")));
+  for (const f of (readdirSync(join(root, "lib"), { recursive: true }) as string[]).map((f) => `lib/${f.split("\\").join("/")}`))
+    if (f.endsWith(".px.js")) assert.ok(shipped.has(f), `${f} is not in package.json files`);
 });
 
 test("--scale is a whole number: at 2.5x a picture's pixels would come out 2 and 3 px wide by turns", async () => {

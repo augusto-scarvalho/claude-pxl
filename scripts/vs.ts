@@ -1,6 +1,7 @@
 // What hashes.ts, perf.ts and served.ts share to compare the pxl at a git revision with the working
-// tree: the revision's src/ and examples/ unpacked once into the system's temp folder (pxl-rev-<commit>,
-// kept for the next run), each tree's own loader, the examples as the tests list them, frames over a loop.
+// tree: the revision's src/, examples/ and lib/ unpacked once into the system's temp folder
+// (pxl-rev-<commit>, kept for the next run), each tree's own loader, the examples as the tests list them,
+// frames over a loop.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,14 +14,15 @@ export const repo = resolve(import.meta.dirname, "..");
 export const examples = () => (readdirSync(join(repo, "examples"), { recursive: true }) as string[]).map((f) => f.split("\\").join("/"))
   .filter((f) => f.endsWith(".px.js") && !f.split("/").some((s) => s.startsWith("_") || s === "out") && !/(^|\/)pipeline\/part_/.test(f)).sort();
 
-/** The folder holding the revision's src/ and examples/: unpacked on the first call. */
+/** The folder holding the revision's src/, examples/ and lib/ (one from before lib/ hasn't it): unpacked on the first call. */
 export function revTree(rev: string): string {
   const sha = execFileSync("git", ["rev-parse", "--verify", `${rev}^{commit}`], { cwd: repo, encoding: "utf8" }).trim();
   const dir = join(tmpdir(), `pxl-rev-${sha.slice(0, 12)}`), part = `${dir}.part`;
   if (!existsSync(dir)) {
     rmSync(part, { recursive: true, force: true });
     mkdirSync(part);
-    execFileSync("git", ["archive", "-o", join(part, "rev.tar"), sha, "src", "examples"], { cwd: repo });
+    const top = execFileSync("git", ["ls-tree", "--name-only", sha], { cwd: repo, encoding: "utf8" }).split("\n");
+    execFileSync("git", ["archive", "-o", join(part, "rev.tar"), sha, ...["src", "examples", "lib"].filter((d) => top.includes(d))], { cwd: repo });
     execFileSync("tar", ["-xf", "rev.tar"], { cwd: part });
     rmSync(join(part, "rev.tar"));
     renameSync(part, dir);

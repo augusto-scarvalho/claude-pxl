@@ -10,8 +10,8 @@
 // flicker lighting the ground and the wall, a column of smoke over it; then it comes back (the neutral look). `clearing` is the art at its own size, the
 // one checked; `clearing_md` three times as big (960x540) through post(): the depth in focus, Three's bloom, a dusk
 // grade from dusk.cube, a light grain.
-include("kit.px.js", { palette: true })
-include("traveler.px.js")
+include("../../lib/profiles/hd2d.px.js", { palette: true })
+include("../../lib/characters/traveler.px.js")
 // the scarecrow's straw (S W X), burlap (H F), wood (P R) and hat (C 9), keys of its own (the kit's ramps
 // use 1-8); the fire's tones
 pal({ "S": "#f0d880", "W": "#c8a050", "X": "#8a6830", "H": "#b89a72", "F": "#7a6048", "P": "#8a6a4a", "R": "#4a3428", "C": "#5a4a3a", "9": "#33281f", "0": "#2a1a14" })
@@ -54,7 +54,7 @@ for (const [n, o] of Object.entries(SWAY)) anim(`${n}_wind`, { base: n, ...WIND 
 // from up here it hides the ball as it passes behind (a wall hides only what is near it: the ball goes
 // 0.5 m behind it, below its top less that much of the tilt).
 const W = 320, H = 180, CAM = perspective({ w: W, h: H, pitch: -38, fov: 30, ppm: 24 }), Z = CAM.z
-const M = model(), block = (...a) => hd2dBlock(M, ...a)
+const M = model(), block = (...a) => surfaces.block(M, ...a)
 M.face("grass", [-30, Z - 20, 0], [30, Z - 20, 0], [30, Z + 30, 0], [-30, Z + 30, 0])
 M.face("path", [-3, Z - 9, 0.01], [-1.9, Z - 9, 0.01], [-1.9, Z - 0.1, 0.01], [-3, Z - 0.1, 0.01])
 block("wall", "wall", -1.1, Z - 0.65, 1.3, Z - 0.4, 0, 1.7)

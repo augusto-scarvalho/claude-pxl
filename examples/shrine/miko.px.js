@@ -1,4 +1,4 @@
-// A miko (a shrine maiden) on the traveler's figure (examples/hd2d/traveler.px.js: rig3d's body, his walk
+// A miko (a shrine maiden) on the traveler's figure (lib/characters/traveler.px.js: rig3d's body, his walk
 // and its pace, dress()), in her own outfit: the white kosode, its collar crossed, its wide sleeves hanging
 // from the forearms; the red hakama from high on the waist to the ankles, pleated, flaring; white tabi.
 // Her head the hybrid way, as his: modeled (his skull; black hair with straight bangs to the brows, side
@@ -6,7 +6,7 @@
 // her back), baked once per view, its face painted over it from the approved hand faces. Her moves: his
 // walk and idle; the sweep with a bamboo broom (judged first as blocks, bk_sweep_<dir>); a bow.
 // mk_<move>_<dir>; mikoFigure holds what a scene needs (the rig, the moves' timing, the pace).
-include("../hd2d/traveler.px.js")
+include("../../lib/characters/traveler.px.js")
 pal({
   k: "#1c1418",                                                     // outline
   L: "#fde6c6", S: "#f0c79e", s: "#d2966f", z: "#9c5b45", D: "#2e1a10", // skin (his), under the jaw
@@ -21,7 +21,7 @@ ramps("kzsSL", "kJjhHY", "kVvWw", "kdRr", "ty", "nNo")
 const mikoFigure = {}
 // in a block: its names stay its own when a scene includes the file
 {
-const T = travelerFigure, B3 = T.FIG.body, RAD = Math.PI / 180
+const T = traveler, B3 = T.FIG.body, RAD = Math.PI / 180
 const { add, mul, sub, unit } = vec
 
 // ---------------------------------------------------------------- the outfit (dress()'s, his way)
