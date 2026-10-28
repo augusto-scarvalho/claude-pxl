@@ -482,7 +482,8 @@ change that helps one scene often costs another.
 
 ### The gallery
 
-`docs/gallery/` holds the README's pictures, made by `node scripts/gallery.ts [name ...]`. Git keeps
+`docs/gallery/` holds the README's pictures, made by `node scripts/gallery.ts [name ...]`, and in
+`docs/gallery/lib/` the library's sheets (`--lib`, a PNG per subject, after a card changes). Git keeps
 every version of every file for good, and a GIF hardly compresses: each one committed and then
 replaced stays in every full clone (one scene's five versions in a day added 24 MB). Look at a GIF
 that isn't done with `node scripts/gallery.ts <name> --out <scratch dir>` (`--every 4` builds one

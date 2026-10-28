@@ -12,7 +12,7 @@ import { main } from "../src/node/cli.ts";
 const root = join(import.meta.dirname, "..");
 const read = (f: string) => readFileSync(join(root, f), "utf8");
 const pxl = (...a: string[]) => execFileSync(process.execPath, [join(root, "bin/pxl.js"), ...a], { encoding: "utf8" });
-const GUIDES = ["SKILL.md", "reference.md", "scenes.md", "characters.md", "environment.md", "lighting.md", "rotation.md", "README.md", "examples/README.md", "docs/getting-started.md", "docs/agents.md"];
+const GUIDES = ["SKILL.md", "reference.md", "scenes.md", "characters.md", "environment.md", "lighting.md", "rotation.md", "README.md", "examples/README.md", "lib/README.md", "docs/getting-started.md", "docs/agents.md"];
 // each command's flags, from the usage pxl prints
 const usage = new Map<string, Set<string>>();
 let cur = "";
