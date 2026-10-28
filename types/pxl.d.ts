@@ -237,6 +237,10 @@ declare global {
     size?: [number, number]; young?: string; seed?: number; frame?: number; light?: [number, number];
     /** through a perspective() camera: where it stands, [x, z, up] m; rise, wind and size then meters there */
     view?: PxView | PxPerspective; at?: [number, number, number];
+    /** "dither" (at its rim and with age), "age" (with age only, a young puff whole), "shrink" (away whole) */
+    thin?: "dither" | "age" | "shrink";
+    /** rise at a steady rate, not quickly at first */
+    steady?: boolean;
   }
   interface PxSolidOpts {
     /** where the eye stands in the world [x, z] (default 0, 0) */

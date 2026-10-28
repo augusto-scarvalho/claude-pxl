@@ -159,7 +159,7 @@ export const OP_OPTS: Record<string, string[]> = {
   flame: ["wind", "period", "seed", "frame"],
   scroll: ["x", "y", "frame", "axis"],
   clouds: ["y", "gap", "w", "h", "n", "seed", "keys", "x", "empty", "sizes", "frame"],
-  plume: ["every", "life", "rise", "wind", "inertia", "size", "young", "seed", "frame", "light", "view", "at", "thin"],
+  plume: ["every", "life", "rise", "wind", "inertia", "size", "young", "seed", "frame", "light", "view", "at", "thin", "steady"],
   smoke: SMOKE_OPTS,
   particles: ["x", "y", "trail", "size"],
   trail: ["length", "width", "fade", "step", "from", "t", "taper", "side"],

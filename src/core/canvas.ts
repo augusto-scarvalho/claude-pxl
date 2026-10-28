@@ -844,15 +844,15 @@ export class Canvas {
 
   /**
    * Smoke, steam or dust rising from (x, y) in a loop that closes: a puff every `every` frames (2),
-   * each living `life` frames (36), rising `rise` px (24), quickly at first, and carried `wind` px a
+   * each living `life` frames (36), rising `rise` px (24), quickly at first (`steady`: at a steady rate), and carried `wind` px a
    * frame ([x, y], or a number for x), which it takes on over its first `inertia` frames (0: at once;
    * smoke from a moving engine keeps the stack's speed a while). It swells from `size[0]` to `size[1]`
-   * px in radius ([2, 8]) and thins out in dither (`thin: "shrink"`: shrinks away whole, for small puffs a
-   * dither breaks up); puffs smaller than the default stray less from the stream, in proportion. `keys`: lit, middle,
+   * px in radius ([2, 8]) and thins out in dither, at its rim and with age (`thin: "age"`: with age only, the
+   * rim crisp while it is young; `"shrink"`: shrinks away whole, for small puffs a dither breaks up); puffs smaller than the default stray less from the stream, in proportion. `keys`: lit, middle,
    * shaded; `young`: lit and shaded while it is fresh (dark smoke at a stack). Lit from `light` (default
    * the upper left).
    */
-  plume(x: number, y: number, keys: string, opts: { every?: number; life?: number; rise?: number; wind?: number | [number, number]; inertia?: number; size?: [number, number]; young?: string; seed?: number; frame?: number; light?: [number, number]; view?: unknown; at?: number[]; thin?: "dither" | "shrink" } = {}): void {
+  plume(x: number, y: number, keys: string, opts: { every?: number; life?: number; rise?: number; wind?: number | [number, number]; inertia?: number; size?: [number, number]; young?: string; seed?: number; frame?: number; light?: [number, number]; view?: unknown; at?: number[]; thin?: "dither" | "age" | "shrink"; steady?: boolean } = {}): void {
     // through a camera: rise, wind and size in meters where it stands (`at`), each puff on the upright plane there, as near as it is
     const M = opts.view !== undefined ? inMeters(this.camera(opts.view, "plume")!, opts.at as number[], "plume") : undefined, m = M ? M.k : 1;
     const every = Math.max(1, opts.every ?? 2), life = opts.life ?? 36, rise = opts.rise !== undefined ? opts.rise * m : 24, tau = opts.inertia ?? 0, [s0, s1] = opts.size ? opts.size.map((v) => v * m) : [2, 8];
@@ -860,13 +860,13 @@ export class Canvas {
     const [lit, mid, shade] = [...keys], young = opts.young ? [...opts.young] : null, [lx, ly] = opts.light ?? [-0.6, -0.8], ll = Math.hypot(lx, ly) || 1;
     const carried = (age: number) => (tau > 0 ? age - tau * (1 - Math.exp(-age / tau)) : age);
     // how far a puff strays: the default's, less for puffs smaller than its [2, 8] (a vent's steam); a whole puff shrinking, not dithered
-    const j = Math.min(1, (s0 + s1) / 10), shrink = opts.thin === "shrink";
-    if (opts.thin !== undefined && opts.thin !== "dither" && !shrink) throw new PxError(`plume thin: "dither" or "shrink", got '${opts.thin}'`);
+    const j = Math.min(1, (s0 + s1) / 10), shrink = opts.thin === "shrink", aged = opts.thin === "age";
+    if (opts.thin !== undefined && opts.thin !== "dither" && !shrink && !aged) throw new PxError(`plume thin: "dither", "age" or "shrink", got '${opts.thin}'`);
     for (let age = life - 1; age >= 0; age--) {
       const born = f - age;
       if (((born % every) + every) % every) continue;
       const id = ((born % frames) + frames) % frames, r = rng((opts.seed ?? 1) * 7919 + id);
-      let cx = x + wx * carried(age) + (r() - 0.5) * 5 * j, cy = y + wy * carried(age) - rise * (1 - Math.exp(-age / (life * 0.37))) - r() * 4 * j + 2 * j;
+      let cx = x + wx * carried(age) + (r() - 0.5) * 5 * j, cy = y + wy * carried(age) - rise * (opts.steady ? age / life : 1 - Math.exp(-age / (life * 0.37))) - r() * 4 * j + 2 * j;
       let rad = s0 + ((s1 - s0) * age) / life + r() * 2 * j;
       const fade = 1 - age / life;
       if (shrink) rad *= Math.min(1, 2 * fade ** 1.4);
@@ -875,7 +875,7 @@ export class Canvas {
         for (let xx = Math.floor(cx - rad); xx <= cx + rad; xx++) {
           const dx = (xx + 0.5 - cx) / rad, dy = (yy + 0.5 - cy) / rad;
           const edge = 1 - dx * dx - dy * dy + (vnoise(xx * 0.3 + id * 1.7, yy * 0.3) - 0.5) * 0.6;
-          if (edge <= 0 || (!shrink && Math.min(1, 2 * fade ** 1.4) * Math.min(1, edge * 2.5) < bayer(xx, yy))) continue;
+          if (edge <= 0 || (!shrink && Math.min(1, 2 * fade ** 1.4) * (aged ? 1 : Math.min(1, edge * 2.5)) < bayer(xx, yy))) continue;
           const l = (dx * lx + dy * ly) / ll, fresh = young && age < life * 0.18;
           this.px(xx, yy, fresh ? (l > 0.3 ? young[0] : young[1]) : l > 0.3 ? lit : l > -0.3 ? mid : young && age < life * 0.47 ? young[1] : shade);
         }

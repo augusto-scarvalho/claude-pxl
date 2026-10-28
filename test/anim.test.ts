@@ -324,7 +324,14 @@ test('plume: a puff smaller than the default strays less, in proportion, and thi
   // a 1-2 px steam from a vent at x = 10: every pixel of every frame within 4 px of it
   const p = load(`anim("steam", { w: 21, h: 24, frames: 8, fps: 8 }, rect(0, 0, 21, 24, "g"), plume(10, 20, "wrk", { every: 2, life: 8, rise: 12, size: [1, 2], thin: "shrink" }))`);
   for (const fr of frameKeys(p, "steam")) for (const row of fr.split("\n")) [...row].forEach((ch, x) => ch !== "g" && assert.ok(Math.abs(x - 10) <= 4, `a puff at x ${x}`));
-  assert.match(failure(PAL + `anim("s", { w: 8, h: 8, frames: 2, fps: 2 }, plume(4, 6, "wrk", { thin: "fog" }))`, "s").message, /thin: "dither" or "shrink"/);
+  assert.match(failure(PAL + `anim("s", { w: 8, h: 8, frames: 2, fps: 2 }, plume(4, 6, "wrk", { thin: "fog" }))`, "s").message, /thin: "dither", "age" or "shrink"/);
+});
+
+test("plume steady: a puff halfway through its life is halfway up", () => {
+  // one puff a loop of 8, rising 16 from y 20: at frame 4 its middle near row 12 (quickly at first: row 8)
+  const rows = frameKeys(load(`anim("s", { w: 9, h: 24, frames: 8, fps: 8 }, rect(0, 0, 9, 24, "g"), plume(4, 20, "wrk", { every: 8, life: 8, rise: 16, size: [0.5, 1], steady: true, thin: "age" }))`), "s")[4].split("\n");
+  const hit = rows.flatMap((r, y) => (/[wrk]/.test(r) ? [y] : []));
+  assert.ok(hit.length && hit.every((y) => y >= 10 && y <= 14), `rows ${hit}`);
 });
 
 test("clocked ops in a scene animated by what it places draw its first frame on its loop, as functions do", () => {
