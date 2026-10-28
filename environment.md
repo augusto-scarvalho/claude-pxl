@@ -107,9 +107,10 @@ round it.
   going over the loop (16 frames at 220 ms, two sways in the graveyard's 7 s) (a clump's tip
   fluttering twice as fast, under a pixel, flickered in its tones on fields: `flutter` 0); each tree's frame offset by where it stands, the gust reaching one side
   first.
-- Trees of a species, built in 3D (`examples/nature/trees.px.js`): one way to grow a tree and a
-  spec per species, a `make3d` builder each: the shrine's momiji, ginkgo and black pine (kuromatsu);
-  the oak, birch, weeping willow, sakura, Italian cypress, umbrella acacia, baobab and coconut palm.
+- Trees of a species, built in 3D (`lib/nature/trees.px.js`; to look at, `examples/nature/trees.px.js`):
+  one way to grow a tree and a spec per species, a `make3d` builder each: the shrine's momiji, ginkgo
+  and black pine (kuromatsu); the oak, birch, weeping willow, sakura, Italian cypress, umbrella
+  acacia, baobab and coconut palm.
   The spec: its form (a trunk forking, a maple's or an oak's; a leader up the middle, a ginkgo's, a
   birch's, a cypress's), the trunk's fork, lean and kinks, its curve (`bow`: a palm's) and swelling
   (`girth(t)`: a baobab's bottle), the branches by order (how many, how steep, how long), the

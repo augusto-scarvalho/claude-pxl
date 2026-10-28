@@ -1,41 +1,19 @@
-// The fields kit: the palette, an HD-2D camera, the ground, and the builders of examples/sdf (a tree,
-// a rock, a mushroom house, a crystal: make3d's, the library of builders with semantic parameters, their
-// fields here), each a distance field in meters.
+// The fields kit: the palette, the materials and the light (lib/styles/fields.px.js), an HD-2D camera,
+// the ground, the builders of examples/sdf (a tree, a rock, a mushroom house, a crystal: make3d's, the
+// library of builders with semantic parameters, their fields here), each a distance field in meters, and
+// the densities (lib/vfx/volumes.px.js).
 // Taken with include("kit.px.js", { palette: true }) by fields.px.js (as pixel art) and grids.px.js
 // (as voxels and meshes).
-pal({ k: "#141222", K: "#1f1a30" })
-// bark: violet in the shade to a warm grey-brown
-pal({ b: "#2a2236", B: "#4a3c4a", i: "#6f5c5a", I: "#9c8774" })
-ramps("bBiI")
-// leaves: indigo in the deepest shade to a yellow-green in the sun, the hue doing much of the shading
-pal({ Z: "#1d1d38", z: "#233a4c", x: "#24573f", c: "#2f6b3e", v: "#4a8240", V: "#73983f", J: "#b4b85a" })
-ramps("ZzxcvVJ")
-// stone: indigo in the shade, a mauve grey, cream in the sun; moss
-pal({ D: "#2a2840", t: "#4b4660", T: "#6c6476", u: "#928694", U: "#c0b39f", E: "#e6dcbd" })
-ramps("DtTuUE")
-pal({ m: "#2c4620", M: "#46662a", n: "#66883a", N: "#8fa64a" })
-ramps("mMnN")
-// the mushroom's cap, its spots and stem, a door, a window lit from inside
-pal({ r: "#4a1830", R: "#7a2438", o: "#b23a3a", O: "#e0603e", a: "#5a4a5a", w: "#9a8a8a", W: "#cdbfae", y: "#f0e6d0", d: "#3a2a24", e: "#5c4030", X: "#8a6a4a", f: "#ffd27a", F: "#ffb04a" })
-ramps("rRoO", "awWy", "deX", "Ff")
-// a crystal: violet to ice blue
-pal({ g: "#22205a", G: "#3a3a9a", h: "#4e6ad0", H: "#7aa8f0", j: "#b8e4ff", l: "#f4fcff" })
-ramps("gGhHjl")
-// the diorama's ground
-pal({ q: "#2c3a28", Q: "#3d5232", s: "#56703e", S: "#7a8c4e", p: "#6a5a48", P: "#8a7860" })
-ramps("qQsS", "pP")
+include("../../lib/styles/fields.px.js", { palette: true })   // the palette, MATS and the light (look3d)
+const { MATS, LIGHT } = fields
 
 const CLOCK = { frames: 24, fps: 1000 / 150 }, TAU = 2 * Math.PI
-const MATS = { bark: "bBiI", leaf: "ZzxcvVJ", stone: "DtTuUE", moss: "mMnN", cap: "rRoO", spot: "Wyy", stem: "awWy", door: "deX", glow: "Ff", gem: { ramp: "gGhHjl", shine: 0.7 }, snow: "Wyy" }
 
 // An HD-2D camera, as the hd2d examples' (perspective()'s): 40 degrees down through a long lens (30
 // across), 24 px to the meter where it looks (`ppm` another scale), the middle of a w x h picture on the
-// ground z m ahead; its aim(h) stands a thing so its point h m up is there. The light from the upper
-// left, a little toward us: shadows fall right and away. It and the materials are what the 3D ops take
-// where a call doesn't say them (look3d; light: "view" for a view's own, from its upper left).
-const PITCH = -40, PPM = 24, LIGHT = [-0.65, -0.35, 0.68]
+// ground z m ahead; its aim(h) stands a thing so its point h m up is there.
+const PITCH = -40, PPM = 24
 const hd2d = (w, h, ppm = PPM) => perspective({ w, h, pitch: PITCH, fov: 30, ppm })
-look3d({ light: LIGHT, mats: MATS })
 const GMATS = { grass: { ramp: "qQsS" }, path: { ramp: "tTu" }, wall: { ramp: "DtTuU" } }
 const ground = (Z) => { const g = model(); g.face("grass", [-12, Z - 8, 0], [12, Z - 8, 0], [12, Z + 12, 0], [-12, Z + 12, 0]); return g }
 
@@ -71,37 +49,7 @@ const house = (o = {}) => make3d.house(o).field
 // mirrors toward the eye. It turns once round over the loop.
 const crystal = (o = {}) => make3d.crystal(o).field.rotate((c) => 360 * c.phase)
 
-// Densities for volume() and splats: a cloud, a mist, smoke and a magic orb, and how each is drawn (LOOK).
-// the cloud: slate blue in its shade to white in the sun
-pal({ 1: "#3c4868", 2: "#5d6d92", 3: "#8b9cbc", 4: "#c3cfe0", 5: "#f2f5f8" })
-ramps("12345")
-// the mist: a cool blue
-pal({ 6: "#4a6488", 7: "#7090b4", 8: "#a6c0dc" })
-ramps("678")
-// smoke: warm greys
-pal({ 9: "#3a3638", 0: "#5c5658", "+": "#86807c", "=": "#b0aaa2" })
-ramps("90+=")
-// the orb: violet in its shade; what glows cyan to white
-pal({ "<": "#3a2470", ">": "#6a3cc0", "[": "#5ab8f0", "]": "#b8f0ff", "^": "#ffffff" })
-ramps("<>", "[]^")
-
-// A cumulus: four puffs melted on a flat base, the noise boiling through them over the loop, the
-// whole drifting a little and back; `size` scales it all.
-const cloud = (size = 1) => sdf.density(
-  sdf.union(sdf.ellipsoid([1.4, 1.0, 0.75]), sdf.sphere(0.85).at(1.0, 0.2, 0.3), sdf.sphere(0.8).at(-1.0, -0.1, 0.2), sdf.sphere(0.75).at(0.25, 0.2, 0.65), { smooth: 0.4 })
-    .intersect(sdf.plane([0, 0, -1], 0.45)).at((c) => [0.25 * Math.sin(TAU * c.phase), 0, 0]).scale(size),
-  { edge: 0.3 * size, noise: 0.45 * size, scale: 0.55 * size, seed: 4, octaves: 3, flow: [1.2 * size, 0.2 * size, 0.3 * size] })
-// A mist lying low: a flat bank on the ground, thinning away up from 0.1 m to 0.7 m, its billows
-// creeping along over the loop.
-const mist = () => sdf.density(sdf.ellipsoid([2.8, 1.8, 0.6]).at(0, 0, 0.1), { edge: 0.6, noise: 0.6, scale: 0.8, seed: 6, octaves: 3, flow: [2.4, 0.6, 0], fade: [0.1, 0.7] })
-// Smoke from a chimney: a column widening as it rises and leans away from the wind, its billows
-// carried up through it, thinning away from 1.2 m to 2.8 m.
-const smokeField = () => sdf.density(sdf.capsule([0, 0, 0.05], [0.55, 0.15, 2.7], 0.14, 0.55), { edge: 0.2, noise: 0.3, scale: 0.25, seed: 8, octaves: 3, flow: [0.2, 0, 2.6], fade: [1.2, 2.8] })
-// A magic orb: a ball of swirling matter bobbing a meter up, glowing from its middle.
-const orb = () => sdf.density(sdf.sphere(0.42).at((c) => [0, 0, 1 + 0.08 * Math.sin(TAU * c.phase)]), { edge: 0.42, noise: 0.1, scale: 0.18, seed: 2, octaves: 2, flow: [0, 0.2, 0.6] })
-const LOOK = {
-  cloud: { ramp: "12345", thickness: 3, cast: 0.5 },
-  mist: { ramp: "678", thickness: 1.4 },
-  smoke: { ramp: "90+=", thickness: 4 },
-  orb: { ramp: "<>", thickness: 8, emit: { ramp: "[]^", strength: 1.1, glow: 2.2 } },
-}
+// Densities for volume() and splats: a cloud, a mist, smoke and a magic orb, and how each is drawn (LOOK):
+// lib/vfx/volumes.px.js.
+include("../../lib/vfx/volumes.px.js", { palette: true })
+const { cloud, mist, orb, LOOK } = volumes, smokeField = volumes.smoke

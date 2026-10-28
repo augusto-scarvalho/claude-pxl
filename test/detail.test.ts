@@ -15,7 +15,7 @@ import { sdf } from "../src/core/sdf.ts";
 import { bodyOf } from "../src/core/rig3d.ts";
 import { whenChanged } from "./passed.ts";
 
-const test = whenChanged("test/detail.test.ts");
+const test = whenChanged("test/detail.test.ts", ["lib/nature/trees.px.js"]);
 
 test("make3d.tree given its ppm: leaves a 3 px brush, none nearer than make3d.px.cluster; without it the meters it had", () => {
   assert.deepEqual([tree({ leaves: 28 }).details.leaves.count, tree({ leaves: 28 }).details.leaves.size], [28, 0.1]);
@@ -51,7 +51,7 @@ turnaround("g", make3d.tree({ seed: 3 }), { ...T, genre: "two" })`, "t.px.js");
 
 test("trees.px.js at a coarse ppm: the clusters grown to make3d.px.cluster keep the crown's outline (a birch, a cypress)", () => {
   const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js"), O = `{ view: { kind: "side", pitch: 10 }, ppm: 12, mats: trees.mats, headings: ["s"] }`;
-  writeFileSync(f, `include(${JSON.stringify(join(import.meta.dirname, "../examples/nature/trees.px.js"))})
+  writeFileSync(f, `include(${JSON.stringify(join(import.meta.dirname, "../lib/nature/trees.px.js"))})
 for (const sp of ["birch", "cypress"]) { turnaround(sp, make3d[sp]({ height: 3, seed: 2 }), ${O}); turnaround(sp + "_m", make3d[sp]({ height: 3, seed: 2, ppm: 1000 }), ${O}) }`);
   const p = loadProject(f);
   try {

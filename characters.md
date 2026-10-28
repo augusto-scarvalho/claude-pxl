@@ -293,7 +293,7 @@ of the nose; the corners of the mouth straight below the pupils.)
   - In profile the mass reaches 2-3 px behind the skull and the fringe overhangs the brow a pixel;
     from behind it keeps the front's top and narrows to a nape of 4-6 px ending in points, the ears
     peeking out a pixel. One haircut, the same locks seen from every side.
-- **A new head on an approved body** (the harbor's crew, `examples/hd2d/crew.px.js`): start from the
+- **A new head on an approved body** (the harbor's crew, `lib/characters/crew.px.js`): start from the
   approved head's grid in each view and change only the hair, hat or beard, keeping the face, eye, ear
   and jaw pixels. Row by row the new skull stays within ±1 px of the approved one's extents (print each
   row's first and last pixel against it: it catches what the eye misses); a bald head is the skull
@@ -511,7 +511,7 @@ edges, a long skirt from the waist); the shirt's body by height and angle (strip
 over a shirt, a laced bodice; swept along the spine, so it bows with the figure; `spine: false`
 round an upright); drapes over it (an apron from the chest to the knees); sleeves rolled
 to skin at the forearm. Recolors (`base` + `swap`) of those outfits make the rest of the crowd: nine
-people from five heads and five outfits read as nine at a glance (`examples/hd2d/crew.px.js`); nine
+people from five heads and five outfits read as nine at a glance (`lib/characters/crew.px.js`); nine
 recolors of one cloaked traveler read as one man nine times.
 
 Carrying, on a chibi's 6.6 px arms (the crew's dockhand, chosen from blocks): a crate held low in
@@ -522,7 +522,7 @@ read as a sleepwalker; on a shoulder, beside an 11 px head, half of it covered t
 it is out of the hands' reach. Paint what is carried into the figure's own depth (the outfit's
 `prop`), so the hands hold its sides and the outline runs round both. A tool in both hands: the
 pose's `grip: { from, to, at }` puts the hands on its line (the miko's broom,
-`examples/shrine/miko.px.js`), and `j.rod(a, b, key)` in a `draw` hook draws a handle in the
+`lib/characters/miko.px.js`), and `j.rod(a, b, key)` in a `draw` hook draws a handle in the
 figure's own depth, in the blocks and painted.
 
 ## 9. Small animals
@@ -791,7 +791,7 @@ wants the arm and the blade in one line, the point toward the ground). Likewise 
 the arm and the blade in one line reads as a thrust: a slash lands with the wrist broken over, the arm
 still up and forward and the blade gone past it, down. On the frame it lands, a smear (the crescent
 the blade's outer part swept, thin at its tail, its last 100 degrees at most, the way round it went)
-says where it came from (`arc()` round the hand; a blade on a path of its own, `trail()` of its edge). `examples/rig/knight.px.js`
+says where it came from (`arc()` round the hand; a blade on a path of its own, `trail()` of its edge). `lib/characters/knight.px.js`
 (stages 4 and 5): twenty-two moves; two exchanges blade to blade, a cut from above taken on the shield
 each way, a clash that throws both back, a salute and the walk back to the marks.
 
@@ -821,9 +821,9 @@ hand (`on: "arm_l.hand"`), sits outside the arm (`out`: over the arm near, under
 straps run along the forearm (`parallel`): forearm level (on guard), the shield stands up; forearm
 hanging, it lies down; in between, it leans with it.
 
-`examples/rig/knight.px.js`: a 72 px knight in five stages (`knight_blocking`, `knight_parts`,
-`knight`, the poses, a bout), the same knight turned left, and both next to a flipped copy in a scene with a world
-scale, which `PXL describe` reads out.
+`lib/characters/knight.px.js`: a 72 px knight in five stages (`knight_blocking`, `knight_parts`,
+`knight`, the poses, a bout), the same knight turned left; `examples/rig/knight.px.js` shows both next to a
+flipped copy in a scene with a world scale, which `PXL describe` reads out.
 
 ## 12. Timing in numbers
 

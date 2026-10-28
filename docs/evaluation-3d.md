@@ -141,6 +141,7 @@ From the repository, a comparison's two arms (comparison 2's first task here; th
 
 ```sh
 mkdir -p runs/rewrite/sonnet-low runs/edit/sonnet-low
+cp -r lib runs/   # kit.px.js includes ../../lib/
 for a in rewrite edit; do
   cp docs/study/eval3d/grove.px.js examples/sdf/kit.px.js runs/$a/sonnet-low/
   sed "s|<pxl>|$PWD|g" docs/study/eval3d/$a.txt > runs/$a.txt
