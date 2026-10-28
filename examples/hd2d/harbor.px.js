@@ -48,7 +48,7 @@ const MS = 100, LOOP = 96, SAILF = 16                                           
 // ---------------------------------------------------------------- textures, a texel to a sprite's pixel
 // laid with texel "screen": CAM.floor on floors (a texel 1/17 m across, 0.157 m away) and CAM.wall on walls
 // (0.063 m down), the hull's and the boats' too (their faces turning past 45 degrees take the other), and
-// the deck across (the castles' tops: see plan(), which starts at a corner); the red band and
+// the deck across (the castles' tops); the red band and
 // the rails 0.06 m, so their 20 rows are the castle's 1.2 m exactly.
 const BANDT = [1 / PPM, 0.06]
 // The hull's planks: strakes 4 px over a line of tar, each strake its own shade, the grain in broken
@@ -313,9 +313,8 @@ M.face("hull", ...section(XS))                                                  
 M.face("deckx", ...XSEC.map((x) => [x, Z + hullZ(x, DECK), DECK]), ...[...XSEC].reverse().map((x) => [x, Z + hullZ(x, DECK, 1), DECK]))
 // gun ports on the near side, a little proud of it
 for (const x of [-4.6, -2.6, 3.0, 5.0, 7.2]) { const z = hullZ(x, 1.05) - 0.03; M.face("port", [x - 0.27, Z + z, 1.27], [x + 0.27, Z + z, 1.27], [x + 0.27, Z + z, 0.83], [x - 0.27, Z + z, 0.83]) }
-// the plan of the hull's top from x0 to x1, inset a little (castles stand on it); it starts at a corner,
-// as a face's first three points give its normal (three along the hull's straight middle give none)
-const plan = (x0, x1, n = 8) => { const xs = Array.from({ length: n + 1 }, (_, i) => x0 + ((x1 - x0) * i) / n), P = [...xs.map((x) => [x, hullZ(x, DECK) + 0.02]), ...xs.reverse().map((x) => [x, hullZ(x, DECK, 1) - 0.02])]; return [P.at(-1), ...P.slice(0, -1)] }
+// the plan of the hull's top from x0 to x1, inset a little (castles stand on it)
+const plan = (x0, x1, n = 8) => { const xs = Array.from({ length: n + 1 }, (_, i) => x0 + ((x1 - x0) * i) / n); return [...xs.map((x) => [x, hullZ(x, DECK) + 0.02]), ...xs.reverse().map((x) => [x, hullZ(x, DECK, 1) - 0.02])] }
 // a rail of material mat along the near (s -1) or far (1) edge of the top, from x0 to x1, u0 to u1
 const railAlong = (mat, x0, x1, u0, u1, s = -1, n = 6) => {
   for (let i = 0; i < n; i++) {

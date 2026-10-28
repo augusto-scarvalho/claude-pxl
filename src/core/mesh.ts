@@ -206,6 +206,14 @@ const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const unit = (a: V3): V3 => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+/** A face's normal from its first corners that turn: three in a line (a plan starting midway along a straight edge) give none. */
+export const faceNormal = (p: V3[]): V3 => {
+  for (let i = 1; i + 1 < p.length; i++) {
+    const a = sub(p[i], p[0]), b = sub(p[i + 1], p[0]), n = cross(a, b);
+    if (dot(n, n) > 1e-12 * dot(a, a) * dot(b, b)) return unit(n);
+  }
+  return unit(cross(sub(p[1], p[0]), sub(p[2], p[0])));
+};
 const mod = (a: number, n: number) => ((a % n) + n) % n;
 /** Nearer than this (m along the camera's axis) is cut off: a face reaching behind the eye is drawn up to it. */
 const NEAR = 0.05;
@@ -255,7 +263,7 @@ export function groundOf(faces: Face[]): (x: number, z: number) => { u: number; 
   for (const F of faces) {
     const p = F?.pts;
     if (!p || p.length < 3) continue;
-    if (Math.abs(unit(cross(sub(p[1], p[0]), sub(p[2], p[0])))[2]) < 0.5) continue;
+    if (Math.abs(faceNormal(p)[2]) < 0.5) continue;
     for (let t = 1; t + 1 < p.length; t++) { T.push(...p[0], ...p[t], ...p[t + 1]); M.push(F.mat); }
   }
   return (x, z) => {
@@ -349,7 +357,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     if (!F || !Array.isArray(F.pts) || F.pts.length < 3) throw new PxError(`mesh: face ${k} needs a material and 3 or more corners, { mat, pts: [[x, y, z], ...] } (model().face(mat, ...points))`);
     const M = mats[F.mat];
     if (!M) throw new PxError(`mesh: face ${k} is of material '${F.mat}', which mats doesn't have (it has: ${Object.keys(mats).join(", ")})`);
-    const N = unit(cross(sub(F.pts[1], F.pts[0]), sub(F.pts[2], F.pts[0])));
+    const N = faceNormal(F.pts);
     const L = F.pts.length, mid = F.pts.reduce<V3>((s, p) => [s[0] + p[0] / L, s[1] + p[1] / L, s[2] + p[2] / L], [0, 0, 0]);
     // the side we see: the one toward the eye
     const toward = dot(sub(mid, eye), N) > 0 ? -1 : 1;

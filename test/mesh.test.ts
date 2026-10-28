@@ -12,7 +12,7 @@ import { pack } from "../src/core/color.ts";
 import { encodePng } from "../src/node/png.ts";
 import { type View, perspective, scaled } from "../src/core/perspective.ts";
 import { postAt } from "../src/core/post.ts";
-import { model, turnFaces, turnPoint } from "../src/core/mesh.ts";
+import { faceNormal, model, turnFaces, turnPoint } from "../src/core/mesh.ts";
 import { whenChanged } from "./passed.ts";
 
 const test = whenChanged("test/mesh.test.ts");
@@ -432,4 +432,11 @@ scene("a", { w: 40, h: 40, frames: 10, fps: 10 }, (c) => c.mesh(V, F.faces, { f:
   assert.equal(red(at('E.sprites(c.t, { name: "_dot", at: [0, 4, 0.5] })'), 20, 9), 255, "the particles 0.5 m higher after 0.5 s at 1 m/s");
   assert.match(failure(PAL + STAGE + 'const E = emitter({ burst: 1 })\nscene("a", { w: 9, h: 9 }, (c) => c.mesh(V, [], {}, { sprites: E.sprites(c.t, { at: [0, 4] }) }))', "a").message, /sprites\(t, \{ name/);
   assert.match(failure(PAL + STAGE + 'scene("a", { w: 9, h: 9 }, (c) => c.mesh(V, [], {}, { sprites: [{ name: "s", at: [0, 4], ghosts: [2] }] }))', "a").message, /ghosts \[2\]: \[n/);
+});
+
+test("a face's normal from its first corners that turn: a plan starting midway along a straight edge", () => {
+  // a level quad from the middle of its near edge: the first three corners lie in a line
+  const mid = faceNormal([[0.5, 0, 0], [1, 0, 0], [2, 0, 0], [2, 1, 0], [0, 1, 0], [0, 0, 0]]);
+  assert.deepEqual(mid.map((v) => Math.abs(v)), [0, 0, 1]);
+  assert.deepEqual(faceNormal([[0, 0, 0], [2, 0, 0], [2, 1, 0]]), [0, 0, 1]);
 });
