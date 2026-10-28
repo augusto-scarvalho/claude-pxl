@@ -183,6 +183,37 @@ Mark items `[x]` when they ship, with the commit.
   Closed (round 5, R3): the hand head is gone; the baked one is in the figures' item above (its
   `views()` line).
 
+## From the example refreshes (library F3, wave 2)
+
+Wave 2 tried today's techniques on four approved examples (plaza, sodium_hour, topdown_hero,
+knight) and kept none of them: each fell short in a way that's listed here. `knight`'s smear
+stays two `arc`s (a crescent round a fist that stands still; `trail` drew the same pixels in six
+lines).
+
+- [ ] **Redo the top-down hero from the traveler** (`lib/characters/hero.px.js`, after
+  `lib/characters/traveler.px.js`): the hero is the older flat-parts chibi (24 px, all-black line);
+  the traveler is built the way we build figures now (rig3d, the parts fields painted as the
+  outfit, the head modeled and its face by hand, measured on 16 games). Adapt it to a top-down
+  action game: down, up and side (flipped for the fourth), idle, walk, run and the sword attack in
+  each, with the chibi's proportions (the head about 40% of 24 px) and a sword that reads on grass.
+  The examples that include the hero (`topdown_hero`, `hd2d/plaza`) are shown before and after.
+- [ ] **`plume()` at a small scale**: its jitter (±2.5 px across, 0-4 up) and its dithered thinning
+  are fixed, tuned for 2-8 px puffs, so steam from a 1 px flue rising 14 px comes out in
+  checkerboard puffs off its vent (sodium_hour). A jitter that scales with `size` and a thinning
+  that fades whole puffs (`thin: "dither" | "fade"`). Before extinction's refresh (C13).
+- [ ] **A light's own color on an emitting sprite**: `effect("emit")` whitens the glass, and the
+  light a mesh() sprite gives is the mean of those pixels times the emit's strength, so the plaza's
+  lamps by emit lit a pale pool at half strength (strength 3.2 brings the strength back, nothing
+  the warmth). `light: { color }` on the sprite, apart from its pixels.
+- [ ] **`selout` / `floor` per layer**: they're the whole sprite's, so `floor: "k"` takes the black
+  off the sword too (the blade's line goes pale steel and stops reading on grass), and on the
+  knight's plates the seams go dark steel and the plates part less. Layers already take
+  `outline: false`; the same for these.
+- [ ] **The plaza's cobbles drawn larger** (`lib/architecture/surfaces.px.js`'s `_cobble`): at 16 texels to
+  the meter a texel is 1.5 px, so the stones come out 7 and 9 px wide by turns; with `texel:
+  "screen"` they shrink to 2/3 and the paving gets busy behind the figures. Stones drawn about
+  1.5 times as big, then `texel: "screen"` (a change for the user to see before and after).
+
 ## Characters (from dogfooding a 64 px character)
 
 Each of these was first worked around by hand in an art file or by a Python script on the side.
