@@ -195,6 +195,13 @@ export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "of", "
 const SHEET_OPTS = ["cols", "pad", "extrude", "rows", "slots"];
 /** The checks a genre() can ask pxl check for (check.ts runs them on the assets naming it). */
 export const GENRE_CHECKS = ["ground", "height", "footprint"];
+/** A card's cells: the cameras, and the statuses (approved; a 3D render to look at; by hand over a 3D draft). */
+export const CAMERAS = ["side", "topdown", "iso", "hd2d", "behind"], STATUSES = ["✓", "◐", "✎"];
+/** A library entry's card (card()): what it is, the cells it exists at, how it varies; the rest pxl lib reads off a build. */
+export interface Card {
+  name: string; kind: string; is: string; cells: Record<string, { status: string; asset?: string }>;
+  vary?: string | Record<string, string>; tiles?: number; draw?: Record<string, unknown>; loc?: string; ns: string; data: Record<string, unknown>;
+}
 
 function checkArgs(name: string, args: unknown[]): void {
   const sig = SIGNATURES[name];
@@ -289,6 +296,12 @@ export class Project implements BuildCtx {
   readonly turnarounds = new Map<string, { heads: { deg: number; name: string }[]; loc?: string }>();
   /** genre() profiles by name: their data as the file gave it, the checks pxl check runs on the assets naming them */
   readonly genres = new Map<string, Record<string, unknown> & { name: string; checks: string[]; loc?: string }>();
+  /** card()s by full name: a library entry, what it is (`kind`: an asset's kind, group, rig3d, turnaround, font, builder), its cells, how it varies */
+  readonly cards = new Map<string, Card>();
+  /** make3d.define()'s builders by name: their declared params, where (pxl lib reads them) */
+  readonly builders = new Map<string, { params?: Record<string, unknown>; loc?: string }>();
+  /** Set by a loader: runs code in the art file's scope, for a kit's constants (`lamps.ROLES`). */
+  scope?: (code: string) => unknown;
   /** What building found wrong but not fatal (a shade step that left its ramp): the CLI prints them, pxl check counts them; `by` the assets being built when it was found. */
   readonly warnings: { msg: string; loc?: string; by?: Set<string> }[] = [];
 
@@ -340,6 +353,24 @@ export class Project implements BuildCtx {
   private spaced = false;
   /** The palettes of the files included without `palette` (each stayed with its own assets), for an unknown key's error. */
   private kept: { path: string; loc?: string; pal: Palette }[] = [];
+  /** How deep in includes the running file is (the main file 0), and the includes with palette: "mine" whose includer (at `depth`) is still running. */
+  private depth = 0;
+  private mineAt: { names: string[]; path: string; loc?: string; depth: number; pal: Palette }[] = [];
+  /** The includes with palette: "mine": the keys the file sets that its includer doesn't, which keep its colors (pxl check's LOOK line). */
+  readonly mines: { path: string; loc?: string; keys: string[] }[] = [];
+  /** The includer at `depth` has run: what it included with "mine" draws in its palette, laid over the file's. */
+  private overlay(depth: number): void {
+    const top = this.pal, set = top.own(), now = this.mineAt.filter((m) => m.depth === depth);
+    for (const m of now) {
+      const done = new Map<Palette, Palette>();
+      for (const n of m.names) { const a = this.assets.get(n); if (a) a.pal = done.get(a.pal) ?? done.set(a.pal, a.pal.under(top)).get(a.pal)!; }
+      this.mines.push({ path: m.path, loc: m.loc, keys: [...m.pal.own()].filter((k) => !set.has(k) && m.pal.keys.get(k) !== top.keys.get(k)) });
+    }
+    // ponytail: a base + swap of a "mine" asset keeps reading its keys in the file's own colors (swapPal); overlay it too if that's ever used
+    if (now.length) { this.mineAt = this.mineAt.filter((m) => m.depth !== depth); this.forgetAll(); }
+  }
+  /** Called by the loader when the main file has run. */
+  loaded(): void { this.overlay(0); }
   /** Set by a loader to support palette files in use(): the file's text, path relative to the art file. */
   readHook?: (path: string) => string;
   /** Set by a loader to support { png } and use("x.png"): the decoded image, path relative to the art file. */
@@ -1097,21 +1128,26 @@ export class Project implements BuildCtx {
       try { slots = sl && Object.entries(sl).map(([n, sw]) => [n, new Map(Object.entries(sw as Record<string, unknown>).map(([k, c]) => [col(k), col(c)]))]); } catch (e) { throw this.keyHint(wrap(e).within(`sheet '${name}' slots`, loc)); }
       this.sheets.push({ name: this.qualify(name), entries, opts, loc, ...(slots ? { slots } : {}), ...(this.ns ? { ns: this.ns } : {}) });
     };
-    env.include = (path: unknown, opts: { palette?: boolean; as?: string } = {}) => {
+    env.include = (path: unknown, opts: { palette?: boolean | "mine"; as?: string } = {}) => {
       const loc = this.callerLoc();
       if (typeof path !== "string") throw new PxError('include("other.px.js", { palette?, as? })', loc);
       checkKeys("include", opts, ["palette", "as"], loc);
       if (opts.as !== undefined && !(typeof opts.as === "string" && /^[A-Za-z_$][\w$]*$/.test(opts.as)))
         throw new PxError(`include: as is the name its assets go under (as: "nature": its "lamp" is "nature.lamp" here), letters, digits and _, got ${JSON.stringify(opts.as)}`, loc);
+      if (![undefined, true, false, "mine"].includes(opts.palette)) throw new PxError(`include: palette is true (its use()/pal() go on in yours), "mine" (its assets in your colors where you set the key) or false, got ${JSON.stringify(opts.palette)}`, loc);
       if (!this.includeHook) throw new PxError("include() is not available here", loc);
       // The included file's use()/pal()/ramps() stay with its own assets, unless the includer
       // asks for them ({ palette: true }: a shared palette file). Its names go under `as`, if given.
-      const pal = this.pal, outer = this.outerRamps, ns = this.ns;
-      if (!opts.palette) this.outerRamps = new Set(pal.ramps);
+      const pal = this.pal, outer = this.outerRamps, ns = this.ns, shared = opts.palette === true, from = this.order.length;
+      if (!shared) this.outerRamps = new Set(pal.ramps);
       if (opts.as !== undefined) { this.ns = `${ns}${opts.as}.`; this.spaced = true; }
+      this.depth++;
       try { this.includeHook(path); } finally {
         this.ns = ns;
-        if (!opts.palette) { if (this.pal !== pal) this.kept.push({ path, loc, pal: this.pal }); this.pal = pal; this.outerRamps = outer; }
+        // what the file included with "mine" takes its palette now it has run; this one's, once its includer has
+        this.overlay(this.depth--);
+        if (opts.palette === "mine") this.mineAt.push({ names: this.order.slice(from), path, loc, depth: this.depth, pal: this.pal });
+        if (!shared) { if (this.pal !== pal) this.kept.push({ path, loc, pal: this.pal }); this.pal = pal; this.outerRamps = outer; }
       }
     };
     // own("_parchment"): the full name of an asset this file defines, under the `as` it was included
@@ -1137,6 +1173,48 @@ export class Project implements BuildCtx {
       const g = { ...(spec as Record<string, unknown>), name, checks: checks as string[] };
       this.genres.set(name, { ...g, loc });
       return g;
+    };
+    // card(name, { is, cells: { "hd2d/24": "✓" | [status, asset] }, vary?, tiles?, draw? }): a library entry's card, just
+    // after what it describes (pxl lib reads the rest off a build); card(name): its data, as genre() gives it
+    env.card = (given: unknown, spec?: unknown) => {
+      const loc = this.callerLoc(), use = 'card("_lamp", { is: "what it is, a line", cells: { "hd2d/24": "✓" }, vary?, tiles?, draw? }), or card(name): its data';
+      if (typeof given !== "string" || !given) throw new PxError(use, loc);
+      const builder = given.startsWith("make3d."), has = (n: string) => this.assets.has(n) || this.groups.has(n) || this.figures.has(n) || this.turnarounds.has(n) || this.fonts.has(n);
+      if (spec === undefined) {
+        const c = this.cards.get(builder ? given : this.resolve(given, undefined, (n) => this.cards.has(n)));
+        if (!c) throw new PxError(`card '${given}' is no card() defined before it${didYouMean(given, this.cards.keys())}`, loc);
+        return c.data;
+      }
+      const name = builder ? given : this.qualify(given), what = `card '${name}'`;
+      if (!isPlainObject(spec)) throw new PxError(use, loc);
+      checkKeys(what, spec, ["is", "cells", "vary", "tiles", "draw"], loc);
+      const had = this.cards.get(name);
+      if (had) throw new PxError(`${what} is already defined at ${had.loc}`, loc);
+      const kind = builder ? (makers[given.slice(7)] ? "builder" : undefined) : this.figures.has(name) ? "rig3d" : this.turnarounds.has(name) ? "turnaround"
+        : this.assets.get(name)?.kind ?? (this.groups.has(name) ? "group" : this.fonts.has(name) ? "font" : undefined);
+      if (!kind) throw new PxError(`${what}: ${builder ? `${given} is no builder (make3d.define)` : `'${name}' is no asset, group, rig3d figure, turnaround or font defined before it`}${didYouMean(builder ? given.slice(7) : name, builder ? Object.keys(makers) : [...this.assets.keys(), ...this.groups.keys(), ...this.figures.keys()])}`, loc);
+      const { is, cells, vary, tiles, draw } = spec as { is?: unknown; cells?: unknown; vary?: unknown; tiles?: unknown; draw?: unknown };
+      if (typeof is !== "string" || !is) throw new PxError(`${what}: is says what it is in a line (its silhouette, its parts, its look), got ${JSON.stringify(is)}`, loc);
+      if (!isPlainObject(cells) || !Object.keys(cells).length) throw new PxError(`${what}: cells are where it exists, { "<camera>/<grid>": status or [status, asset] }: { "hd2d/24": "✓" }, got ${JSON.stringify(cells)}`, loc);
+      const out: Card["cells"] = {};
+      for (const [k, v] of Object.entries(cells)) {
+        const m = /^(\w+)\/(\d+|\?)$/.exec(k), [status, asset] = Array.isArray(v) ? v : [v];
+        if (!m || !CAMERAS.includes(m[1])) throw new PxError(`${what}: a cell is "<camera>/<grid>", the camera one of ${CAMERAS.join(", ")}, the grid a tile's px or ? (drawn for one scene, no grid), got "${k}"`, loc);
+        if (!STATUSES.includes(status) || (Array.isArray(v) && (v.length !== 2 || typeof asset !== "string")))
+          throw new PxError(`${what}: cell ${k} is a status, "✓" (approved), "◐" (a 3D render to look at) or "✎" (by hand over a 3D draft), or [status, asset], got ${JSON.stringify(v)}`, loc);
+        const a = asset === undefined ? (builder ? undefined : name) : this.qualify(asset);
+        if (a === undefined && status !== "◐") throw new PxError(`${what}: cell ${k} names no asset: only a builder's ◐ cell may (pxl lib draft draws it)`, loc);
+        if (a !== undefined && !has(a)) throw new PxError(`${what}: cell ${k}'s asset '${a}' is no asset, group, figure or font defined before it${didYouMean(a, this.assets.keys())}`, loc);
+        out[k] = { status, ...(a !== undefined ? { asset: a } : {}) };
+      }
+      if (!(vary === undefined || typeof vary === "string" || (isPlainObject(vary) && Object.entries(vary).every(([k, t]) => ["color", "part", "shape", "seed"].includes(k) && typeof t === "string"))))
+        throw new PxError(`${what}: vary is what varies that its code doesn't show, a line, or one a channel: { color, part, shape, seed }, got ${JSON.stringify(vary)}`, loc);
+      if ((tiles !== undefined || draw !== undefined) && !builder) throw new PxError(`${what}: tiles and draw are a builder's (make3d.<name>): its height in tiles, its drawing call's options`, loc);
+      if (!(tiles === undefined || (typeof tiles === "number" && tiles > 0))) throw new PxError(`${what}: tiles is how many tiles tall it is drawn (2.5), got ${JSON.stringify(tiles)}`, loc);
+      if (!(draw === undefined || isPlainObject(draw))) throw new PxError(`${what}: draw is its drawing call's options ({ mats, surface, light }), got ${JSON.stringify(draw)}`, loc);
+      const data = { ...(spec as Record<string, unknown>), name };
+      this.cards.set(name, { name, kind, is, cells: out, ...(vary !== undefined ? { vary: vary as Card["vary"] } : {}), ...(tiles !== undefined ? { tiles: tiles as number } : {}), ...(draw !== undefined ? { draw: draw as Record<string, unknown> } : {}), loc, ns: this.ns, data });
+      return data;
     };
     // procedural texture, the same in every file: hash(i, j), vnoise(x, y), fbm(x, y, octaves), bayer(x, y)
     // (a third number, a seed, makes another draw at the same point: hash(i, j, 1), hash(i, j, 2); two as they always were)
@@ -1182,6 +1260,7 @@ export class Project implements BuildCtx {
         if (typeof name === "string" && makers[name] && !BUILDERS[name]) throw new PxError(`make3d.${name} is already defined`);
         makers[name as string] = defineBuilder(name, fn, o as never);
         m3[name as string] = make(name as string);
+        this.builders.set(name as string, { params: (o as { params?: Record<string, unknown> }).params, loc });
       } catch (e) { throw wrap(e).within("make3d.define", loc); }
     };
     // make3d.px: texture in screen px (a cluster's px across, grain, marks apart, an edge, a leaf), what builders given a ppm hold to

@@ -14,6 +14,7 @@ import { type Knob, fixRule, runExpects, turnKnob } from "../core/world3d.ts";
 import { type Frame2d, type Knob2d, type Rule2d, type Shift, fixRule2d, moveInSource, nameAll, namesOf, runRules2d } from "../core/expect.ts";
 import { readFileSync, writeFileSync } from "node:fs";
 import { loadProject } from "./load.ts";
+import { drawnWith, members } from "./lib.ts";
 import { FLAWS, jointsOf, poseFlaws, viewRows, viewWarnings } from "../core/rig3d.ts";
 
 /** Drawn by hand somewhere: a grid string, grid() or runs(), here or in a layer (line(), curve() and code draw their own lines clean, or as they mean to). */
@@ -69,6 +70,29 @@ function genreLines(p: Project, name: string, ran: { genre: number }): string[] 
     if (off.length) out.push(`${name} › WARNING: genre '${gn}': its drawing doesn't reach where it meets the ground: its lowest row is ${off.join("; ")}: drawn lifted, or its wheels or feet hidden or cut, it floats there`);
   }
   return out;
+}
+
+/**
+ * card()s against how their cells' assets are drawn (`file`: the cards that file defines): a ✎ cell that is
+ * the 3D render alone, a ◐ cell drawn by hand, a ✓ live 3D sprite not frozen. Anims and families: the
+ * examples' hashes guard them (frozen is for sprites).
+ */
+export function cardLines(p: Project, file?: string): { lines: string[]; cells: number } {
+  const lines: string[] = [];
+  let cells = 0;
+  for (const c of p.cards.values()) {
+    if (file && (c.loc ?? "").split(":")[0] !== file) continue;
+    for (const [k, v] of Object.entries(c.cells)) {
+      const n = v.asset === undefined ? undefined : members(p, v.asset)[0];
+      if (n === undefined) continue;
+      cells++;
+      const d = drawnWith(p, n), live3d = d.three.length > 0 && !d.frozen, at = `${c.name}${c.loc ? ` (${c.loc})` : ""} › WARNING: its card's cell ${k} is ${v.status}`;
+      if (v.status === "✎" && (d.frozen || (d.three.length && !d.hand.length))) lines.push(`${at} (by hand over a 3D draft), but '${n}' is the 3D render alone: retouch it, or mark it ◐`);
+      if (v.status === "◐" && !d.three.length && !d.frozen) lines.push(`${at} (a 3D render to look at), but '${n}' is drawn by hand: mark it ✓ or ✎`);
+      if (v.status === "✓" && live3d && p.assets.get(n)?.kind === "sprite") lines.push(`${at}, but '${n}' is a live 3D sprite: freeze it (frozen), so an engine change can't move it`);
+    }
+  }
+  return { lines, cells };
 }
 
 /** A placement as a warning names it: its id (and its asset), else its asset. */
@@ -161,7 +185,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, frozen: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, frozen: 0, cards: 0 };
   let lightSaid = false, groundSaid = false, fixes: CheckResult["fixes"], rulesAll = 0, rulesHeld = 0;
   const failed: string[] = [];
   // by default what the file itself defines (what it includes is checked where it's defined)
@@ -348,6 +372,11 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       for (const k of ["floats", "reach"] as const) if (at[k].length) lines.push(`${name} › ${M.m} ${hd.name} › WARNING: ${FLAWS[k](worst[k])} (frame${at[k].length > 1 ? "s" : ""} ${ranges(at[k])})`);
     }
   }
+  // include(f, { palette: "mine" }): the keys it sets that this file doesn't keep its colors, an old-and-new mix to see
+  if (!opts.names) for (const m of p.mines)
+    if (m.keys.length && (!opts.file || (m.loc ?? "").split(":")[0] === opts.file)) notes.push(`include '${m.path}' (palette: "mine") › LOOK: its keys ${m.keys.join(", ")} keep its colors (yours don't define them)`);
+  // the cards: each cell's status against how its asset is drawn
+  if (!opts.names) { const cs = cardLines(p, opts.file); lines.push(...cs.lines); ran.cards += cs.cells; }
   // what building found on the way (a shade step that left its ramp), where it was asked for
   for (const w of p.warnings) {
     const sub = /^'([^']*)': (a stamp half a pixel.*)$/.exec(w.msg);
@@ -387,6 +416,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.boxes) run.push(`boxes on ${ran.boxes} frame${ran.boxes > 1 ? "s" : ""}`);
   if (ran.genre) run.push(`genres' checks on ${ran.genre} frame${ran.genre > 1 ? "s" : ""}`);
   if (ran.frozen) run.push(`frozen cells against their live render on ${ran.frozen}`);
+  if (ran.cards) run.push(`cards' cells against their drawing on ${ran.cards}`);
   if (ran.views) run.push(`views' rows on ${ran.views}`);
   if (ran.poses) run.push(`figures' feet on ${ran.poses} poses`);
   if (rigs) run.push(`rig parts ${ran.parts}`);

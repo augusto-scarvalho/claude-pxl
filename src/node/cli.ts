@@ -24,6 +24,7 @@ import { edit, inspect } from "./edit.ts";
 import { setKnobInSource } from "../core/world3d.ts";
 import { cellRow, diffRow, frameCount, frameTime, greyRow, otherVersion, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
+import { libCard, libDraft, libList } from "./lib.ts";
 import { listProject, listText } from "./list.ts";
 import { readMedia } from "./media.ts";
 import { study } from "../core/study.ts";
@@ -35,6 +36,17 @@ const USAGE = `pxl — pixel-art DSL
       What the reference says about an op or option: the rows that define it, a line for each other
       mention, and a few uses in the examples (--all: everything in full). Words of a guide's
       heading print that section ("characters 9", "small animals"). No name: an index.
+  pxl lib [entry] [--genre <name>] [--cell <camera>/<grid>]
+      pxl's library (lib/): its entries by subject, a line each (its cells: camera/grid ✓ approved,
+      ◐ a 3D render to look at, ✎ by hand over a 3D draft), only those at the genre's cell or naming
+      it (a genre() of lib/profiles), or at that cell (--cell side: any grid). An entry: its card
+      (what it is, its source, its cells, size, pivot, footprint, sockets, boxes, frames, roles, what
+      varies) and the include that takes it.
+  pxl lib draft <entry> --cell <camera>/<grid> [--out DIR]
+      A 3D entry (a make3d builder) at a cell it lacks: an art file that includes it and turns it to
+      that camera (side, topdown at 45 degrees, iso, hd2d), its card's tiles tall on that grid, in the
+      grid's tones (3 at 16-32 px), built to out/_draft/ (or DIR): the ✎ draft to clean by hand, or ◐
+      to look at. A 2D entry is redrawn simpler at a new density, never drafted.
   pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
       previews (out/_preview; animated assets also get a .gif). --share N also writes out/share/:
@@ -104,7 +116,8 @@ const USAGE = `pxl — pixel-art DSL
       when there is any. LOOK lines, which don't fail it: the L-corners and jaggies in the 1 px
       lines of every sprite drawn by hand (grids, runs()), a doubled step or a corner the shape has
       (a line whose steps are nearly all L's is drawn square on purpose: none), and tones side by side
-      too close to tell apart. --readings also lists what the lit-side rule read on every placement,
+      too close to tell apart. A card()'s cells are checked against how their assets are drawn (a ✎
+      that is the 3D render alone, a ◐ drawn by hand, a ✓ live 3D sprite not frozen). --readings also lists what the lit-side rule read on every placement,
       warning or not, with a tally: to see where it agrees and where it can't tell. A scene's
       expect rules (beside, before, apart, inside, onGround, while) run at the frames it checks.
       --fix: each expect3d rule that fails, fixed by one number of the parts it names (where one
@@ -192,7 +205,9 @@ interface Args {
   at?: number[];
   /** Every --at given (shot: a column each). */
   ats: number[][];
-  cell?: number;
+  /** describe's cell size; lib's camera/grid */
+  cell?: string;
+  genre?: string;
   diff?: boolean;
   grey?: boolean;
   gif?: boolean;
@@ -263,7 +278,8 @@ function parse(argv: string[]): Args {
       a.at = m.slice(1).filter((s) => s !== undefined).map(Number);
       a.ats.push(a.at);
     }
-    else if (v === "--cell") a.cell = Number(val());
+    else if (v === "--cell") a.cell = val();
+    else if (v === "--genre") a.genre = val();
     else if (v === "--diff") a.diff = true;
     else if (v === "--grey" || v === "--gray") a.grey = true;
     else if (v === "--gif") a.gif = true;
@@ -327,8 +343,16 @@ export async function main(argv: string[]): Promise<number> {
   try { a = parse(argv); } catch (e) { console.error(wrap(e).message); return 2; }
   if (a.cmd === "help") {
     // the reference looked up, not read: an index, or what it says about one name
-    console.log(help(a.file, { all: a.all }) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | inspect | edit | check | shot | compare | blind | study | help (pxl --help for their options)"));
+    console.log(help(a.file, { all: a.all }) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | inspect | edit | check | shot | compare | blind | study | lib | help (pxl --help for their options)"));
     return 0;
+  }
+  if (a.cmd === "lib") {
+    // no art file: the library's own
+    try {
+      const out = a.file === "draft" ? libDraft(a.rest[0], a.cell, typeof a.out === "string" ? a.out : undefined) : a.file ? libCard(a.file) : libList({ genre: a.genre, cell: a.cell });
+      for (const l of out) console.log(l);
+      return 0;
+    } catch (e) { console.error("error: " + wrap(e).message); return 1; }
   }
   if (!a.cmd || a.cmd === "usage" || !a.file) {
     console.log(USAGE);
@@ -432,7 +456,7 @@ export async function main(argv: string[]): Promise<number> {
           if (!existsSync(keep + ".json")) console.log(`(no earlier describe of ${name} in ${join(outDir, "_describe")}: this one is kept for the next --diff)\n`);
           else prev = { objects: JSON.parse(readFileSync(keep + ".json", "utf8")).objects, img: decodePng(readFileSync(keep + ".png")), unlit: decodePng(readFileSync(keep + ".unlit.png")) };
         }
-        const r = describe(name, b, pal, { cell: a.cell, at, frames, prev, note, brief: a.brief, world, extra, frame: a.frame });
+        const r = describe(name, b, pal, { cell: a.cell === undefined ? undefined : Number(a.cell), at, frames, prev, note, brief: a.brief, world, extra, frame: a.frame });
         console.log(r.text);
         if (a.out !== false) {
           writePng(keep + ".png", r.snap.img);

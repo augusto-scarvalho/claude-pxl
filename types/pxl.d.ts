@@ -139,6 +139,13 @@ declare global {
     sizes?: Record<string, number> }
   interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; /** a frame's ms instead of fps, or each frame's (as many frames) */ ms?: number | number[]; loop?: boolean; dir?: "forward" | "reverse" | "pingpong"; /** checked as a scene (c.as() names what its functions paint) */ world?: PxWorld; check?: boolean | { every: number } }
   interface PxFrame { ms?: number; hold?: number }
+  interface PxCard {
+    is: string;
+    cells: Record<string, "✓" | "◐" | "✎" | ["✓" | "◐" | "✎", string]>;
+    vary?: string | { color?: string; part?: string; shape?: string; seed?: string };
+    tiles?: number;
+    draw?: Record<string, unknown>;
+  }
   interface PxGenre {
     camera?: { kind?: string; pitch?: number | Record<string, number> };
     /** a tile's px; null: none */
@@ -784,6 +791,14 @@ declare global {
    * `name`; pxl check runs its `checks` on the assets naming it (`genre: "fighting"`). Other fields are kept.
    */
   function genre(name: string, spec: PxGenre): PxGenre & { name: string };
+  /**
+   * A library entry's card, just after what it describes (an asset, group, rig3d figure, turnaround,
+   * font, or "make3d.<builder>"): what it is, its cells ("<camera>/<grid>": "✓" approved, "◐" a 3D
+   * render to look at, "✎" by hand over a 3D draft, or [status, asset]), what varies that the code
+   * doesn't show; a builder's tiles tall and drawing options. card(name) gives its data back.
+   */
+  function card(name: string, spec: PxCard): PxCard & { name: string };
+  function card(name: string): PxCard & { name: string };
   function sprite(name: string, opts: PxAssetOpts, ...items: PxItem[]): void;
   function sprite(name: string, ...items: PxItem[]): void;
   function scene(name: string, opts: PxSceneOpts, ...items: PxItem[]): void;
@@ -833,10 +848,10 @@ declare global {
   function directions(name: string, n: number, opts: { from: string; outline?: PxColor; outline8?: PxColor; symmetric?: boolean; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; draw?: Record<string, string>; pivot?: "bottom" | "center" | [number, number] }): void;
   /**
    * palette: true keeps the included file's use()/pal()/ramps() active afterwards (else its palette
-   * stays with its own assets). as: the names it defines go under `as.` ("nature": its "lamp" is
+   * stays with its own assets); "mine" draws its assets in your colors wherever you set the key. as: the names it defines go under `as.` ("nature": its "lamp" is
    * "nature.lamp" here), its own drawing finding its own first; JavaScript names still share one scope.
    */
-  function include(path: string, opts?: { palette?: boolean; as?: string }): void;
+  function include(path: string, opts?: { palette?: boolean | "mine"; as?: string }): void;
   /** In a kit, at its top level: the full name of an asset, group or font it defines, under the `as` it was included with (`own("_parchment")` is "dialog._parchment" under as: "dialog", "_parchment" without one): for names a kit hands out in constants. */
   function own(name: string): string;
   function rng(seed?: number): () => number;

@@ -210,6 +210,14 @@ borrowed walk read stiff on a chibi, the turns were stuck at the angles rendered
 fix was a round trip through another program. Averaging a plain render down gives mud; reduce by
 blocks, a region per block and hard tone steps, if you go that way.
 
+### Your own earlier version: its parts in your new colors
+
+A new version that reuses an earlier one's parts with new values (v4 including v3):
+`include("v3.px.js", { palette: "mine" })` draws the included file's assets in your colors wherever
+you set the key, before or after the include; a key only it sets keeps its color, and `pxl check`
+lists those on a LOOK line. Without it, its parts keep its colors and a frame comes out half old,
+half new.
+
 ## 4. Build order
 
 1. **Silhouette.** Draw the figure in flat colours, then check it as one shape with a

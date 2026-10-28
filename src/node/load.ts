@@ -66,6 +66,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
     return resolve(dirname(stack[stack.length - 1]), path);
   };
   p.includeHook = (path) => run(near(path));
+  p.scope = (code) => vm.runInContext(code, ctx);
   p.pngHook = (path) => {
     const abs = near(path);
     let bytes: Buffer;
@@ -84,7 +85,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
       throw new PxError(`cannot read '${abs}'`);
     }
   };
-  try { run(file); } catch (e) { throw hiding(e, ctx, env); }
+  try { run(file); p.loaded(); } catch (e) { throw hiding(e, ctx, env); }
   warnHiding(p, ctx, env, codes);
   return p;
 }

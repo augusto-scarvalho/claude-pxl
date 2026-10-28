@@ -45,9 +45,11 @@ directions("ship", 16, { from, outline?, outline8?, symmetric?, draw?, rotate?, 
 turnaround("house", thing, { view?, ppm?, n?, headings?, part?, ... })  // a thing in 3D seen from n headings: house_n, house_ne, ... + group "house"; see turnaround() below
 rig3d("tr", { body, moves: { walk: { frames, ms, pose } }, n?, parts?, head?, blocks? })  // a figure on the 3D layer in n headings: tr_walk_s, ... + group "tr_walk"; see rig3d() below
 genre("fighting", { camera, grid, scale, heads, dirs, states, contract, pitch, checks })  // a profile as data, its checks run by pxl check on what names it: see genre() below
+card("_lamp", { is, cells: { "hd2d/24": "✓" }, vary?, tiles?, draw? })  // a library entry's card, just after it: see card() below
 views("_head", { s: grid, sw, w, nw, n }, { anchor, like? })  // hand-drawn views pivoted on an anchor, the others mirrored: _head_s, ... + group "_head"; see views() below
 font(name, "glyph_sprite", { chars: "ABC...", w, h, cols?, mono? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional), or all as wide as the widest with mono: true (a score, a timer)
 include("palette.px.js", { palette: true })  // also take its use()/pal()/ramps() from here on
+include("v3.px.js", { palette: "mine" })     // its assets in your colors wherever you set the key (before or after it)
 include("../nature/kit.px.js", { as: "nature" })  // its names under nature.: its "lamp" is "nature.lamp" here
 own("_parchment")                       // in a kit: the full name of a name it defines, under the `as` it was included with ("dialog._parchment"; without one, "_parchment")
 rig(name, { w, h, facing, slots: { torso: { at, size }, arm: { at, size, side: "r" } }, parts?, guide? }, ...retouch)  // skeleton first: characters.md §11
@@ -86,6 +88,11 @@ wherever they're stamped. Your palette is the same after the `include` as before
 of yours after it adds to yours (pico8 unless you said), not to the included file's: a key only it
 has is unknown in your grids, and the error names the file whose palette has it. Pass
 `{ palette: true }` to share one palette file across art files (your `pal()` then adds to it).
+`{ palette: "mine" }` keeps its palette with its assets but lays yours over it once your file has
+loaded: every key you both set draws in your color (your `pal()` before or after the include), your
+ramps through those keys first; a key only it sets keeps its color (`pxl check` lists them on a LOOK
+line), and your grids don't gain its keys. It recolors every asset of the file in place, the parts its
+functions stamp too, with no new names (`base` + `swap` makes a named variant); it takes `as` too.
 
 `include(file, { as: "nature" })` puts the names the file defines (its assets, groups, sheets and
 fonts, and those of what it includes) under `nature.`: its `lamp` is `nature.lamp` to you, so two
@@ -119,6 +126,24 @@ turnaround) standing as tall over its pivot in every direction, its tallest fram
 (action top-down); `"footprint"`, every frame's drawing reaching down to its `footprint` box, where
 it meets the ground (`turnaround()` gives one; what is nearer us may hang lower, a bumper seen from
 above) (racing). See scenes.md, "Profiles".
+
+`card(name, { is, cells, vary?, tiles?, draw? })`, just after what it describes, is a library entry's
+card: what its code can't show. `name` is an asset, group, `rig3d()` figure, `turnaround()` family
+or font defined above it (under an `as`, its full name: `lamps._lamp`), or `"make3d.<builder>"`;
+`is` what it is, in a line (its silhouette, its parts, its look); `cells` the (camera × grid) points
+it exists at, `{ "hd2d/24": "✓" }`: the camera `side`, `topdown`, `iso`, `hd2d` or `behind`, the
+grid a tile's px (`?`: drawn for one scene, no grid), the status `"✓"` approved, `"◐"` a 3D render
+to look at or `"✎"` by hand over a 3D draft, or `[status, asset]` where another asset holds the cell
+(default the entry; a builder's ◐ cell may name none: `pxl lib draft` draws it); `vary` what varies that
+its code doesn't show, a line or one a channel (`{ color, part, shape, seed }`: its roles, params
+and seed are read from the code); a builder's `tiles` (how many tiles tall, a draft's size) and
+`draw` (its drawing call's options). A name or an asset it can't find fails the load at its line.
+`card(name)` gives its data back (`card("make3d.oak").draw`). `pxl lib` lists the library's cards
+by subject (`pxl lib --genre hd2d`, `pxl lib --cell side/32`); `pxl lib lamps._lamp` prints one with
+what a build of it reads (its source, size, pivot, footprint, sockets, boxes, frames, roles) and the
+`include` that takes it. `pxl check` on the file warns where a cell's status disagrees with how its
+asset is drawn: a ✎ cell that is the 3D render alone, a ◐ cell drawn by hand, a ✓ live 3D sprite not
+`frozen`.
 
 Names starting with `_` are **parts**: usable everywhere but not exported, and not matched by
 sheet globs.

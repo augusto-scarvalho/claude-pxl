@@ -16,6 +16,7 @@ import { loadProject } from "../src/node/load.ts";
 import { latticeHash } from "../src/core/util.ts";
 import { writeOutputs, writePng } from "../src/node/output.ts";
 import { serve } from "../src/node/server.ts";
+import { checkProject } from "../src/node/check.ts";
 
 function chunks(buf: Buffer): { type: string; data: Buffer; crcOk: boolean }[] {
   const out = [];
@@ -319,6 +320,16 @@ test("include { palette: true } shares the included palette", () => {
   const { dir, file } = tmpArt(`include("pal.px.js", { palette: true })\nsprite("b", "z")`);
   writeFileSync(join(dir, "pal.px.js"), `pal({ z: "#ff0000" })`);
   assert.equal(loadProject(file).image("b").data[0], pack(255, 0, 0));
+});
+
+test('include { palette: "mine" }: its assets in your colors where you set the key (before or after it), its own elsewhere', () => {
+  const src = `pal({ p: "#00ff00" })\ninclude("v3.px.js", { palette: "mine", as: "v3" })\npal({ q: "#0000ff" })\n`, { dir, file } = tmpArt(src);
+  writeFileSync(join(dir, "v3.px.js"), `pal({ p: "#ff0000", q: "#ff0000", z: "#ff0000" })\nsprite("part", "pqz")`);
+  const p = loadProject(file);
+  assert.deepEqual([...p.image("v3.part").data], [pack(0, 255, 0), pack(0, 0, 255), pack(255, 0, 0)]);
+  assert.match(checkProject(p).notes.join("\n"), /include 'v3\.px\.js' \(palette: "mine"\) › LOOK: its keys z keep its colors/);
+  writeFileSync(file, src + `sprite("x", "z")`);
+  assert.throws(() => loadProject(file).image("x"), /unknown color key 'z'/, "your grids don't gain its keys");
 });
 
 test("cli steps: the painting log, --at follows one pixel, --sheet writes thumbnails", async () => {

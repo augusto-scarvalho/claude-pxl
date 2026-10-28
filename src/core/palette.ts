@@ -180,6 +180,19 @@ export class Palette {
     return c === b && parts.length ? parts.join(", ") : undefined;
   }
 
+  /** The keys its file set: every one it named with use(); on the default it never named, those set with pal(). */
+  own(): Set<string> {
+    return this.implicit ? new Set(this.aliases) : new Set(this.keys.keys());
+  }
+
+  /** This palette with `top`'s colors on the keys top sets that it has, and top's ramps through them first (include's palette: "mine"). */
+  under(top: Palette): Palette {
+    const keys = new Map(this.keys), set = top.own();
+    for (const k of set) if (keys.has(k)) keys.set(k, top.keys.get(k)!);
+    const ramps = top.ramps.filter((r) => [...r].every((k) => set.has(k) && keys.has(k)));
+    return new Palette(keys, [...this.list], [...this.order], new Set(this.aliases), [...new Set([...ramps, ...this.ramps])], this.implicit);
+  }
+
   withRamps(ramps: string[]): Palette {
     for (const r of ramps)
       for (const k of r) if (!this.keys.has(k)) throw new PxError(`ramp "${r}" uses unknown key '${k}'${didYouMean(k, this.order)}`);
