@@ -41,7 +41,9 @@ the top of the head to the soles.
   hips, and the legs are about 1/4 to 1/3 of the height.
 - **Very low resolution, 16 px and under** (Saint11): the outline is the genre's choice. Dropped,
   it gives back 2 px of width and contrasting solid shapes carry the silhouette; game sets on a
-  16 px grid mostly keep a near-black line all round, even on 13–14 px figures (`lib/profiles/topdown16.px.js`).
+  16 px grid mostly keep a near-black line all round the figures, even 13–14 px ones, and only them:
+  trees, props and the ground take their own darkest tone or none (`lib/profiles/topdown16.px.js`'s
+  `ink`, scenes §19).
   Keep 2–4 features that say who it is (a
   beard, a scarf, a 1 px lean for the posture), one light and few contrasting colors, 90° corners
   and a pixel's corner for a point, nothing loose near the face. A subject that won't fit is

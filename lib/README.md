@@ -44,25 +44,31 @@ its asset is drawn. A new entry gets one.
 Each card's cells, frame 0, its name and cell under it (the swatch: green ✓, amber ◐, blue ✎); a
 builder drawn at its first cell. Made by `node scripts/gallery.ts --lib`.
 
-**Props** (`props/`): lamps and crates from the examples' scenes.
+**Props** (`props/`): lamps and crates from the examples' scenes; a top-down village's pot (and its break),
+chest, sign, crate, barrel, lamp post and fence (`village.px.js`).
 
 ![props](../docs/gallery/lib/props.png)
 
 **Nature** (`nature/`): the kit's ground, pines, bushes, rocks and dead trees; the tree species as
-builders; the cave's caps.
+builders, the oak, the maple and the spruce also by hand at `topdown/16` (their 3D drafts frozen in
+`frozen/`); the cave's caps; the top-down island's ground (`island.px.js`: the shore, a path and a darker
+grass by corners, the field's tiles, tall grass, a bank's earth front and a hedge in rows of tiles, flowers
+and a bed of them, a bush, a rock, a stump).
 
 ![nature](../docs/gallery/lib/nature.png)
 
 **Characters** (`characters/`): the traveler and the people on his figure (the crew, the miko), what
-they wear (`dress.px.js`), the top-down hero and the people made from him (`hero.character()`), the knight.
+they wear (`dress.px.js`), the top-down hero and the people made from him (`hero.character()`: two villagers,
+Reva's chibi), a slime, the knight.
 
 ![characters](../docs/gallery/lib/characters.png)
 
-**Architecture** (`architecture/`): the shrine's builders, the HD-2D surfaces.
+**Architecture** (`architecture/`): the shrine's builders, the HD-2D surfaces, the cottage (by hand at
+`topdown/16`, mostly roof; its 3D draft frozen), the island's pier.
 
 ![architecture](../docs/gallery/lib/architecture.png)
 
-**UI** (`ui/`): the dialogue box, the 5x7 font.
+**UI** (`ui/`): the dialogue box, the 5x7 font, life hearts.
 
 ![ui](../docs/gallery/lib/ui.png)
 
@@ -74,4 +80,4 @@ fields style, drafted at their first cells.
 `styles/` holds palettes (and, in `fields`, the cards of the engine's own builders, `make3d.rock`,
 `house`, `bush`, `pine`, drawn in its colors), `profiles/` the genres (`topdown16`, `topdown32`,
 `platformer16`, `hd2d`, `fighting`, `racing_behind`, `racing_topdown`: each number's source beside
-it) and their starter kits, `vfx/` the volumes' densities.
+it) and their starter kits, `vfx/` the volumes' densities and a puff of dust.

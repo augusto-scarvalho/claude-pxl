@@ -37,6 +37,7 @@
     "examples/shrine/*.px.js",
     "examples/sdf/*.px.js",
     "lib/**/*.px.js",
+    "lib/**/*.png",
     "SKILL.md",
     "characters.md",
     "environment.md",

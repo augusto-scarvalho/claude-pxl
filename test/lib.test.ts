@@ -57,7 +57,7 @@ test("genre(): its density a tile's px or px a meter, its mix said; its cell as 
 test("pxl lib: the catalog by subject, filters by cell and genre", () => {
   const all = libList();
   assert.match(all[0], /^pxl's library \(lib\/\), by subject/);
-  assert.ok(all.some((l) => /^props +lib\/props: crates lamps$/.test(l)));
+  assert.ok(all.some((l) => /^props +lib\/props: crates lamps village$/.test(l)));
   assert.throws(() => libList({ cell: "side/x" }), /--cell is <camera>\/<density>/);
   assert.throws(() => libList({ genre: "racing-behind" }), /no genre 'racing-behind' in lib\/profiles/);
   assert.throws(() => findEntry("nothing.here"), /no entry 'nothing\.here' in the library/);
@@ -90,11 +90,11 @@ test("pxl lib draft: a builder at a cell it lacks, written and built; a 2D entry
   assert.ok(existsSync(join(dir, "sprites", "chozubachi_side16_s.png")));
   assert.throws(() => libDraft("lamps._lamp", { cell: "side/16" }, dir), /drawn in 2D: at a new density it is redrawn simpler/);
   // by a genre: its camera, what stands at its stand pitch (topdown16's figures from 45, the rest from 30), fitted to the
-  // card's box (neither side over), its tones and line
+  // card's box (neither side over), its tones; no line (topdown16's ink is the figures' alone, a color by category)
   const rock = libDraft("make3d.rock", { genre: "topdown16" }, dir).join("\n"), m = /drawn (\d+) tall, (\d+) wide/.exec(rock)!;
-  assert.match(rock, /seen from 30 degrees \(what stands; the ground's 45\), in 3 tones, a line of #1a1620 all round/);
+  assert.match(rock, /seen from 30 degrees \(what stands; the ground's 45\), in 3 tones\n/);
   assert.ok(+m[1] <= 32 && +m[2] <= 32 && Math.max(+m[1], +m[2]) >= 31, rock);
-  assert.match(readFileSync(join(dir, "rock_topdown16.px.js"), "utf8"), /genre\("topdown16", \{ camera: \{ kind: "topdown", pitch: 45 \}, pitch: 45, stand: 30, grid: 16, tones: 3, ink: "#1a1620" \}\)\nturnaround\("rock_topdown16".*surface: \{ \.\.\.card\("make3d\.rock"\)\.draw\?\.surface, ink: "#1a1620" \}, view: \{ kind: "side", pitch: 30 \}/);
+  assert.match(readFileSync(join(dir, "rock_topdown16.px.js"), "utf8"), /genre\("topdown16", \{ camera: \{ kind: "topdown", pitch: 45 \}, pitch: 45, stand: 30, grid: 16, tones: 3, ink: \{ character: "#1a1620", rest: "selout".*\}\)\nturnaround\("rock_topdown16", make3d\.rock\(\), \{ \.\.\.card\("make3d\.rock"\)\.draw, view: \{ kind: "side", pitch: 30 \}/);
   assert.throws(() => libDraft("make3d.rock", { genre: "racing_behind" }, dir), /its camera is behind; lib draft draws side, topdown, iso, hd2d/);
   // hd2d: a billboard from its figure's 20 degrees, fitted to the genre's box for the card's category (a bush 0.5 m
   // tall, 0.8 across: 12 x 19 px at 24 px a meter), not at the builder's own height

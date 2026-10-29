@@ -847,9 +847,15 @@ Pick one and keep everything in it (a 45° oblique bridge among isometric blocks
 
 - **Top-down 3/4** (RPGs): what is level is seen from straight above at its true shape (a barrel's lid
   a circle, floor tiles square), what stands faces us flat, at full height or a little less (a crate
-  is 8 px of top over 7 of front in a 16 px tile); nothing shrinks. A house: its facade as seen from
+  is 8 px of top over 7 of front in a 16 px tile); nothing shrinks. What lies flat is ground (a rug,
+  a path, a pier's deck: its boards from above), but where it stands off the ground its edge toward
+  us shows a front (a pier's deck 2-3 px thick, its posts down into the water) and it casts the
+  shadow all that stands casts: one shape for all (`topdown16`'s `shadow`). A house: its facade as seen from
   the front, the side walls cut to about half their height, the roof's slopes at their front view's
-  45°, its planes seen from above. The footprint stays on the grid and only the top overhangs (more
+  45°, its planes seen from above. The action top-down school draws it mostly roof (The Minish Cap: the
+  roof 72-77% of its height over a one-tile wall, the door cut up into the eaves; `topdown16`'s cottage
+  by hand), its trees as round crowns hiding their trunks, its ground in regions with vertical faces
+  (a bank's earth front, a hedge's) that show the camera (`lib/nature/island.px.js`). The footprint stays on the grid and only the top overhangs (more
   breaks the draw order). In 3D, `make3d.cottage` (`lib/architecture/houses.px.js`: walls, a pitched
   roof with eaves, a door two tiles tall at 16 px a meter, windows, `storeys`, `pitch`, its colors by
   role), drafted by `pxl lib draft make3d.cottage --genre topdown16`. A room shows the back wall's
@@ -1048,10 +1054,13 @@ Start a work from one:
   screen (110 × 80 on 320 × 224), a racer's in px across (64, 32 and 16; the rivals by `fit`).
 - **A new density means simplifying, not shrinking.** The form stays relative (tiers, clusters, width
   over height); the parts get fewer (the oak's clusters: 1 a tip at 16 px, 2 at 32), the tones too (3
-  at 16-32, 5 at 128). The outline is the genre's (`ink`): a lone icon of 16 px and under may drop
-  it for width (characters §1), but game sets on a 16 px grid outline everything near-black, even
-  13-14 px figures (89-97% of Puny Characters' edge, 70-86% of Ninja Adventure's trees'), and at 32
-  the figures (LPC's, 71-100%) while trees and props keep a selective line (LPC's trees 14-45%).
+  at 16-32, 5 at 128). The outline is the genre's (`ink`), by kind: the characters (a hero, the
+  people, creatures) a near-black line all round, even 13-14 px figures (89-97% of Puny Characters'
+  edge; at 32 LPC's, 71-100%); everything else none in black, at 16 as at 32: what stands (trees,
+  houses, rocks, props) its edge in its own material's darkest tone (`selout`, or a line of that
+  tone) or none where its tones carry the shape (LPC's trees 14-45% a line), the ground and effects
+  none. A black line round every prop and tree (some sets do, 70-86% of Ninja Adventure's trees')
+  makes the world as loud as its figures: only they keep it (`topdown16`'s `ink`).
 - **Detail is measured in screen px.** The floors: a cluster ~10 px across or more, grain 2 px, marks
   4 px apart, an edge 2 px. A builder drawn at its ppm holds them (`make3d.px`, environment §3). The
   specks measure the noise: the oak at 16 px goes from 3.8% to 1.3% with its ppm and 3 tones.

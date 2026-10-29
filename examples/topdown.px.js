@@ -1,36 +1,13 @@
 // Top-down tileset: an island in an RPG-style overhead view. The shore is a corner-based ("wang")
 // set: the map marks land or water at every tile corner, one function draws all 16 corner
-// combinations, and tilemap() picks the right one per cell. Trees, rocks, a pier and flowers sit
-// on top, with cast shadows from a shade layer.
-pal({
-  k: "#1e1a2e",                                            // ink
-  l: "#b4e46a", g: "#7ec850", G: "#4f9a3c", h: "#2f6a34",  // grass, leaves
-  a: "#f0d89a", A: "#c8b078",                              // sand, wet sand
-  f: "#f4fbff", b: "#5cc8e0", B: "#2f7cc0", N: "#24609c",  // foam, shallow, deep water
-  o: "#8a5a3a", O: "#5a3a2a",                              // trunk
-  s: "#b8b8c8", S: "#7c7c94", K: "#4c4c64",                // rock
-  w: "#d8a868", W: "#a07040", x: "#6a4628",                // pier wood
-  r: "#ff6a7a", y: "#ffe066", p: "#fff4f8",                // flowers
-})
-ramps("hGgl", "Aa", "NBbf", "KSs", "xWw", "Oo")             // the shadow layer steps colors left
-
-// ---------------------------------------------------------------- shore (wang corners)
-// Corner bits: 1 top-left, 2 top-right, 4 bottom-left, 8 bottom-right; a set bit is water.
-// Inside a tile the corners blend bilinearly; the bands of that value become grass, sand, foam,
-// shallow and deep water. The wobble repeats every 8 px, so it matches across every tile seam.
+// combinations, and tilemap() picks the right one per cell. Trees, rocks, a pier, tufts and flowers
+// (in groups, on the land's tiles) sit on top, each with its shadow from a shade layer: a band right under it. The palette, the shore and its variants, the tufts,
+// flowers, bush, rock and pier are the library's (lib/styles/island.px.js, lib/nature/island.px.js,
+// lib/architecture/pier.px.js); the tree is this island's own.
+include("../lib/styles/island.px.js", { palette: true })   // the island's palette and ramps (the shadow layer steps colors left)
+include("../lib/nature/island.px.js")                       // shore_0..15 (wang corners), the groups land and sea, _tuft, flowers, bush, rock
+include("../lib/architecture/pier.px.js")                   // the pier
 const T = 16
-const band = (t) => t < 0.34 ? "g" : t < 0.38 ? "G" : t < 0.45 ? "a" : t < 0.49 ? "A" : t < 0.56 ? "f" : t < 0.72 ? "b" : "B"
-corners("shore", { size: T }, (x, y, t) => band(t + 0.035 * Math.sin((x + 0.5) * Math.PI / 4) + 0.035 * Math.sin((y + 0.5) * Math.PI / 4)))
-
-// Full land and full sea get variants, so big areas don't repeat.
-sprite("_tuft", `
-  G.G
-  .G.`)
-sprite("grass_tuft", { base: "shore_0" }, stamp("_tuft", 3, 4), stamp("_tuft", 10, 10))
-sprite("grass_flower", { base: "shore_0" }, px(5, 6, "y"), px(11, 11, "p"))
-group("land", ["shore_0", "shore_0", "shore_0", "grass_tuft", "grass_flower"])
-sprite("sea_glint", { base: "shore_15" }, hline(4, 5, 3, "b"), hline(10, 11, 2, "b"))
-group("sea", ["shore_15", "shore_15", "shore_15", "sea_glint"])
 
 // ---------------------------------------------------------------- props
 // A canopy of three overlapping crowns, lit from the top-left; the trunk peeks out below.
@@ -39,21 +16,6 @@ sprite("tree", { w: 22, h: 26, outline: "h" },
   circ(11, 10, 9, "G"), circ(6, 12, 5, "G"), circ(16, 12, 5, "G"),
   circ(9, 8, 6, "g"), circ(5, 11, 3, "g"), px(13, 5, "g"),
   circ(8, 6, 3, "l"), px(4, 10, "l"), px(5, 9, "l"))
-sprite("bush", { w: 12, h: 9, outline: "h" },
-  circ(4, 5, 3, "G"), circ(8, 5, 3, "G"), circ(6, 3, 3, "G"), circ(5, 3, 2, "g"), px(4, 2, "l"))
-sprite("rock", { w: 12, h: 8, outline: "K" },
-  ellipse(6, 4, 5, 3, "S"), ellipse(5, 3, 4, 2, "s"), hline(3, 7, 7, "K"))
-
-// Boards run across the pier; posts stick out at both sides every 12 px.
-sprite("pier", { w: 16, h: 40 }, (c) => {
-  for (let y = 0; y < 40; y += 4) { c.hline(2, y, 12, "w"); c.hline(2, y + 1, 12, "w"); c.hline(2, y + 2, 12, "W"); c.hline(2, y + 3, 12, "x") }
-  for (let y = 6; y < 40; y += 12) { c.rect(0, y, 2, 3, "O"); c.rect(14, y, 2, 3, "O") }
-})
-
-sprite("_flower_r", ".r.\nryr\n.r.")
-sprite("_flower_y", ".y.\nyry\n.y.")
-sprite("_flower_w", ".p.\npyp\n.p.")
-group("flowers", ["_flower_r", "_flower_y", "_flower_w"])
 
 // ---------------------------------------------------------------- the island
 // One char per tile CORNER ("w" water, "g" land): 17x11 corners for 16x10 tiles.
@@ -89,14 +51,15 @@ const LAYOUT = [
 scene("island", { w: 256, h: 160, world: { light: [-0.5, -1] }, expect: LAYOUT },
   layer("ground", tilemap(CORNERS, { corners: "w", size: T, map: tileMap })),
   // below: the layer starts empty, so "on grass" has to look at the layers under it.
-  layer("flowers", scatter("flowers", 64, 56, 120, 48, 14, { on: "g", below: true, even: true, seed: 3 })),
+  layer("tufts", scatter("_tuft", 64, 56, 120, 48, 14, { on: "g", below: true, even: true, seed: 3 })),
   layer("shadows", { shade: true },
-    ...trees.map(([x, y]) => ellipse(x + 13, y + 25, 9, 3, "k")),
-    ellipse(110, 101, 7, 2, "k"), ellipse(126, 61, 7, 2, "k"), ellipse(99, 79, 7, 2, "k"), ellipse(205, 101, 7, 2, "k")),
+    ...trees.map(([x, y]) => ellipse(x + 11, y + 25, 8, 2, "k")),
+    ellipse(109, 103, 6, 1, "k"), ellipse(125, 63, 6, 1, "k"), ellipse(97, 80, 6, 1, "k"), ellipse(203, 102, 6, 1, "k"),
+    rect(156, 114, 12, 44, "k")),   // the pier's deck, 2 px over the water, its shadow to the right
   layer("props",
-    stamp("pier", 152, 116),
-    stamp("bush", 102, 92, { id: "bush_s" }), stamp("bush", 118, 52, { flip: "x", id: "bush_n" }),
-    stamp("rock", 196, 92, { id: "rock_e" }), stamp("rock", 90, 70, { flip: "x", id: "rock_w" }),
+    stamp("pier", 152, 112),
+    stamp("bush", 109, 104, { id: "bush_s" }), stamp("bush", 125, 64, { flip: "x", id: "bush_n" }),
+    stamp("rock", 203, 102, { id: "rock_e" }), stamp("rock", 97, 80, { flip: "x", id: "rock_w" }),
     ...trees.map(([x, y], i) => stamp("tree", x, y, { id: `tree${i + 1}` }))))
 
 // For the engine: the 16 shore tiles in mask order, then the variants.

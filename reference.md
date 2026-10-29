@@ -157,8 +157,8 @@ what a build of it reads (its source, size, pivot, footprint, sockets, boxes, fr
 camera, what stands at its `stand`, else its `pitch`, hd2d's a billboard from 20 degrees; fitted to the genre's box for
 the card's `category`, in tiles on its grid or m at its `ppm`, else to the card's `tiles` on the grid,
 else its own height at the `ppm`; its `tones` and `ink`; `--cell topdown/16` a cell alone). `pxl check` on the file warns where a cell's
-status disagrees with how its asset is drawn: a ✎ cell that is the 3D render alone, a ◐ cell drawn by
-hand, a ✓ live 3D sprite not `frozen`. And it warns at densities mixed by accident (scenes §19),
+status disagrees with how its asset is drawn: a ✎ cell that is the 3D render alone (a retouch by `base`
+over a frozen one is by hand), a ◐ cell drawn by hand, a ✓ live 3D sprite not `frozen`. And it warns at densities mixed by accident (scenes §19),
 unless a genre says the mix (`mix: true`; for a scene, a genre at one of the cells it mixes): a scene
 placing library entries of two densities (their cards' cells, a recolor by `base` its entry's), a
 `png` blown up (every k x k block one color: `shrink: k`), a `png` shrunk from a finer drawing alone

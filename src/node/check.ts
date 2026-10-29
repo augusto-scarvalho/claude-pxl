@@ -123,7 +123,7 @@ function sceneMix(p: Project, used: Set<string>, by: Map<string, string[]>): str
 
 /**
  * card()s against how their cells' assets are drawn (`file`: the cards that file defines): a ✎ cell that is
- * the 3D render alone, a ◐ cell drawn by hand, a ✓ live 3D sprite not frozen. Anims and families: the
+ * the 3D render alone (live, or frozen with no retouch over it by `base`), a ◐ cell drawn by hand, a ✓ live 3D sprite not frozen. Anims and families: the
  * examples' hashes guard them (frozen is for sprites).
  */
 export function cardLines(p: Project, file?: string): { lines: string[]; cells: number } {
@@ -136,7 +136,7 @@ export function cardLines(p: Project, file?: string): { lines: string[]; cells: 
       if (n === undefined) continue;
       cells++;
       const d = drawnWith(p, n), live3d = d.three.length > 0 && !d.frozen, at = `${c.name}${c.loc ? ` (${c.loc})` : ""} › WARNING: its card's cell ${k} is ${v.status}`;
-      if (v.status === "✎" && (d.frozen || (d.three.length && !d.hand.length))) lines.push(`${at} (by hand over a 3D draft), but '${n}' is the 3D render alone: retouch it, or mark it ◐`);
+      if (v.status === "✎" && !d.hand.length && (d.frozen || d.three.length)) lines.push(`${at} (by hand over a 3D draft), but '${n}' is the 3D render alone: retouch it, or mark it ◐`);
       if (v.status === "◐" && !d.three.length && !d.frozen) lines.push(`${at} (a 3D render to look at), but '${n}' is drawn by hand: mark it ✓ or ✎`);
       if (v.status === "✓" && live3d && p.assets.get(n)?.kind === "sprite") lines.push(`${at}, but '${n}' is a live 3D sprite: freeze it (frozen), so an engine change can't move it`);
     }

@@ -109,12 +109,13 @@ export function findEntry(name: string, entries = catalog().entries): Entry {
 
 /**
  * What an asset is drawn with: the ops a build of its frame 0 painted with, its base followed to its
- * source, the 3D ones apart; or frozen (a render kept as a PNG), or imported (a png).
+ * source, the 3D ones apart; or frozen (a render kept as a PNG; `hand` its retouch over it by `base`), or
+ * imported (a png).
  */
 export function drawnWith(p: Project, name: string): { three: string[]; hand: string[]; frozen?: boolean; png?: boolean } {
-  let d = p.assets.get(name)!;
-  for (let i = 0; i < 8 && typeof d.opts.base === "string" && !d.opts.frozen; i++) d = p.assets.get(d.opts.base) ?? p.assets.get((d.ns ?? "") + d.opts.base) ?? d;
-  if (d.opts.frozen) return { three: [], hand: [], frozen: true };
+  let d = p.assets.get(name)!, over = false;
+  for (let i = 0; i < 8 && typeof d.opts.base === "string" && !d.opts.frozen; i++) { over ||= d.items.length > 0; d = p.assets.get(d.opts.base) ?? p.assets.get((d.ns ?? "") + d.opts.base) ?? d; }
+  if (d.opts.frozen) return { three: [], hand: over ? ["retouch"] : [], frozen: true };
   if (d.png) return { three: [], hand: [], png: true };
   const tr = new Trace(), ops = new Set<string>();
   buildAsset(p, d, 0, tr);
@@ -125,7 +126,7 @@ export function drawnWith(p: Project, name: string): { three: string[]; hand: st
 /** How its drawing is made, in words. */
 function sourceOf(p: Project, name: string): string {
   const { three, hand, frozen, png } = drawnWith(p, name);
-  if (frozen) return "3D, frozen (a render kept as a PNG)";
+  if (frozen) return `3D, frozen (a render kept as a PNG)${hand.length ? ", retouched by hand" : ""}`;
   if (png) return "imported (png)";
   return three.length ? (hand.length ? `hybrid: 3D (${three.join(", ")}) and by hand (${hand.join(", ")})` : `3D (${three.join(", ")})`) : `2D by hand (${hand.join(", ") || "code"})`;
 }
