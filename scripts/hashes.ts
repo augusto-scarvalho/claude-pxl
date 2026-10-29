@@ -17,6 +17,7 @@
 // name under them ("crew.tr_walk_e") is keyed without them ("tr_walk_e"), unless the file has that name
 // of its own: the same pixels after an include takes an `as`. A file that doesn't build on its own
 // (included only) prints SKIP; an asset that fails prints ERR and the error's first words.
+import { existsSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { frameCount, frameTime } from "../src/node/shot.ts";
 import { examples, inTree, loader, pick, repo, revTree } from "./vs.ts";
@@ -52,7 +53,8 @@ let same = 0, differ = 0, added = 0;
 for (const f of files) {
   const rel = relative(join(repo, "examples"), f).split("\\").join("/"), name = rel.startsWith("..") ? f : rel, b = lines(here, f, name);
   if (!there) { for (const [k, h] of b) console.log(`${k} ${h}`); continue; }
-  const a = lines(there, inTree(tree, f), name);
+  // a file the revision hasn't (a new example): all its lines new, not a SKIP that differs
+  const a = existsSync(inTree(tree, f)) ? lines(there, inTree(tree, f), name) : new Map<string, string>();
   for (const k of new Set([...a.keys(), ...b.keys()])) {
     if (a.get(k) === b.get(k)) { same++; continue; }
     if (!a.has(k)) { added++; console.log(`${k}: new here, ${b.get(k)}`); continue; }
