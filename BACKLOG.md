@@ -331,6 +331,23 @@ still hold, and the rest wait on these:
 - [ ] **`views()` saying its square's size**: the retouch grid's width and anchor show only after a
   first bake and an ascii (19 px for the side hero's head, 31 for the top-down's). Say it in the
   build line.
+- [ ] **A jump in `route()`**: the camera's example made a jump as a named leg plus a height table
+  sampled by hand (`(f - step.start) / step.n`). A leg `{ to, name, rise: TABLE }` (or the genre's
+  rise and fall numbers) for a side-scroller's walker. The platformer demo needs it.
+- [ ] **`route()` without a walk anim**: it asks for `walk` even for a figure the scene stamps
+  itself (a box); only fail when the name is read.
+- [ ] **A stepped ground as floors**: `world.ground` wants a polyline, so floors at heights become
+  `[x0, y, x1 - 1, y]` each; `[[x0, x1, y], ...]` would read better.
+- [ ] **A fade to black**: the camera example closes its loop with `dither(0, 0, W, H, ".", "k", k)`
+  on a screen layer, which works only if you know `"."` skips in `dither`. A `fade` op or recipe.
+- [ ] **Culling for the other fills**: `rect()` now walks only what falls on the canvas; `dither`,
+  `grad`, `noise`, `line` and `arc` still walk every pixel, which a long level pays every frame.
+- [ ] **A scene's first build without a clock**: `c.frame` 0 and `c.frames` 1 on the first build,
+  so a camera path worked out frame by frame had to be kept by clock (following by id stuck at frame
+  0 before). Following by id also builds each frame once more; say so, or cache it.
+- [ ] **`--world` and `describe` with parallax**: in `--world`, planes under parallax 1 show as if
+  the camera stood at 0,0; in `describe`, the MANY lines and the ON TOP/COLOR maps stay in screen
+  coordinates while OBJECTS and OFF SCREEN say the world.
 
 ## Characters (from dogfooding a 64 px character)
 
