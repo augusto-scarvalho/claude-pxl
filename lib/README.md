@@ -59,7 +59,9 @@ and a bed of them, a bush, a rock, a stump).
 
 **Characters** (`characters/`): the traveler and the people on his figure (the crew, the miko), what
 they wear (`dress.px.js`), the top-down hero and the people made from him (`hero.character()`: two villagers,
-Reva's chibi), a slime, the knight.
+Reva's chibi), the same hero side on for a platformer (`hero_side.px.js`, `platformer16`: idle, walk, run, a dash
+with its afterimage and dust, a jump in four to loop the rise and the fall (jump, apex, fall, land), hurt), a slime,
+the knight.
 
 ![characters](../docs/gallery/lib/characters.png)
 

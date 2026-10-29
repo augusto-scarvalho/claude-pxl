@@ -163,6 +163,8 @@ lib/characters/dress.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placement
   ran: nothing; not run: front marker (nothing has one)
 lib/characters/hero.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: boxes on 216 frames, genres' checks on 72 frames, cards' cells against their drawing on 1, views' rows on 1, figures' feet on 144 poses; not run: front marker (nothing has one)
+lib/characters/hero_side.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: boxes on 82 frames, genres' checks on 41 frames, cards' cells against their drawing on 1, views' rows on 1, figures' feet on 82 poses; not run: front marker (nothing has one)
 lib/characters/knight.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 69 rigs, 150 other assets with a front marker)
   ran: front marker on 150, cards' cells against their drawing on 1, rig parts 690
 lib/characters/miko.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)

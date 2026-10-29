@@ -827,19 +827,25 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
 Where a player must find their character and what can hurt it, the picture serves that first
 (SLYNYRD, final boss blues, So You Want To Be A Pixel Artist?):
 
-- The ground figures walk on stays quiet: its tones close in value (a floor that works: 0.05 apart in
-  lightness; one that hid the hero: 0.15), its own palette in the characters' hues, so the figures
-  carry the most contrast, and the near-black outline, the backdrop none. `PXL describe` gives each
-  figure's contrast against what is round it; `PXL shot ... --grey` shows the values alone.
-- The planes behind the playfield are paler, less saturated and less contrasted than it (about −20
-  saturation, −15 contrast, +15 lightness); every top a figure can stand on has the brightest 1 px
-  line on screen, and the solid layer is more saturated than the backdrop. An RPG's backdrop can stay
-  rich.
+- **Seen from above** (top-down, an RPG), the ground is what lies behind a figure, so it stays quiet:
+  its tones close in value (a floor that works: 0.05 apart in lightness; one that hid the hero:
+  0.15), its own palette in the characters' hues, so the figures carry the most contrast, and the
+  near-black outline, the ground none. `PXL describe` gives each figure's contrast against what is
+  round it; `PXL shot ... --grey` shows the values alone.
+- **Seen from the side** (a platformer), a figure stands on the ground, never in front of it, so the
+  ground is busy (Mega Man X2's and X3's, Symphony of the Night's floors: 5 tones inside a tile, V
+  22-88), its top edge its lightest pixels (a grass lip's tips, a snow lip's top 2 px, a marble
+  slab's top rows; a lip 14-20 rows over a dark band of 3-6). What a figure stands in front of is
+  the backdrop: set apart by value, at least 20 V from the walkable tops (lighter outdoors, Mega
+  Man X3's +19; darker indoors, Symphony of the Night's rooms 45 under the floor), lower in
+  contrast, its saturation free (Mega Man X3's sky S 76 over a ground of S 18-44). `platformer16`'s
+  `ground` and `backdrop`.
 - Hit boxes: the player's a small circle at its middle, never past its pixels; a pickup's bigger.
 - Sizes in tiles: a screen of 320×180, 480×270 or 640×360 (1080p a whole multiple), tiles of 8 or
-  16 px, figures 1×1, 1×2 or 2×2 tiles (22–27 px tall in a 16×32 frame), moves sized to the grid (a
-  jump 2 tiles, stairs 8 px a step). Items idle by kind (`PXL help "characters 12"`); an engine flips
-  sprites, so they are lit from straight above (characters §11).
+  16 px, figures 1×1, 1×2 or 2×2 tiles (a top-down figure 22–27 px tall in a 16×32 frame; a
+  platformer's 2 tiles, 32 px, §19), moves sized to the grid (a jump 2 tiles, stairs 8 px a step).
+  Items idle by kind (`PXL help "characters 12"`); an engine flips sprites, so they are lit from
+  straight above (characters §11).
 
 ## 16. A game's projections (top-down 3/4, side 3/4, isometric)
 
@@ -1046,12 +1052,15 @@ Start a work from one:
   | tree | 2.5 × 2.5 | 1.7 | the library lab's (an oak 2.5-3 tall); Ninja Adventure's 2-3 tiles; LPC's 3.7, a chibi world keeps them smaller |
   | pine | 3.5 × 2 | 2.3 | the library lab's (a pine 3-4) |
   | house | 4.5 × 5 | 3 | by the door rule (no house measured yet) |
-  | coin (a platformer's) | 0.5 × 0.5 | 0.3 | |
+  | character (a platformer's) | 2 × 1 | 1 | Mega Man X's hero 28 × 32 (2.5 heads), the Zero and ZX heroes 39-44 px, Castlevania's 43-47, Celeste's 2 of its 8 px tiles (the library's platformer study): none 1.5 tiles |
+  | coin (a platformer's) | 0.5 × 0.5 | 0.25 | |
 
-  The same in tiles at 16 and 32 (`topdown16`, `topdown32`, `platformer16`, `racing_topdown`, its car
-  1.75 along). HD-2D's in meters at 24 px a meter: a figure 1.4 × 0.6 (34 px, Octopath's 33-34), a
-  tree 3 × 2, a bush 0.5 × 0.8, a rock 0.5 × 0.75, a lamp post 1.8 × 0.3. A fighter's in px on its
-  screen (110 × 80 on 320 × 224), a racer's in px across (64, 32 and 16; the rivals by `fit`).
+  The same in tiles at 16 and 32 (`topdown16`, `topdown32`, `racing_topdown`, its car 1.75 along).
+  `platformer16`'s figure is 2 × 1 (32 px), its lamp 2.5 × 0.5, its tree 4 × 3 (2× the figure; Mega
+  Man X2's set-piece tree 11 tiles). HD-2D's in meters at 24 px a meter: a figure 1.4 × 0.6 (34 px,
+  Octopath's 33-34), a tree 3 × 2, a bush 0.5 × 0.8, a rock 0.5 × 0.75, a lamp post 1.8 × 0.3. A
+  fighter's in px on its screen (110 × 80 on 320 × 224), a racer's in px across (64, 32 and 16; the
+  rivals by `fit`).
 - **A new density means simplifying, not shrinking.** The form stays relative (tiers, clusters, width
   over height); the parts get fewer (the oak's clusters: 1 a tip at 16 px, 2 at 32), the tones too (3
   at 16-32, 5 at 128). The outline is the genre's (`ink`), by kind: the characters (a hero, the
