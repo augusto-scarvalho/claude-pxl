@@ -75,9 +75,11 @@ export function bodyOf(spec: Record<string, unknown> = {}): Body {
  * above), twist: the shoulders against the hips, head: the head against the shoulders; hands:
  * [[forward, right, up], ...] of each hand from its shoulder; grip: both hands on one line instead (a
  * broom, a staff), `from` and `to` [forward, right, up] from under the pelvis as the shoulders face, each
- * hand `at` [left, right] of the way.
+ * hand `at` [left, right] of the way; elbow: the way the elbows bend, [forward, out, up] in the shoulders'
+ * frame (out mirrored for the left arm; default [-0.4, 0.5, -1], mostly down); air: in the air (a jump's
+ * frames: pxl check doesn't ask its feet to be on the ground, the frame's data says air).
  */
-export interface Pose { feet?: number[][]; lift?: number[]; down?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; grip?: { from: number[]; to: number[]; at: number[] }; [k: string]: unknown }
+export interface Pose { feet?: number[][]; lift?: number[]; down?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; elbow?: number[]; grip?: { from: number[]; to: number[]; at: number[] }; air?: boolean; [k: string]: unknown }
 
 /** A piece of a part: its field, and where on it a point is: h along it (0..1) and a round it (radians from the way the body faces, toward its right), and its paint. */
 export interface Piece { field: Sdf; at: (p: V3) => [number, number, V3]; paint?: unknown }
@@ -124,6 +126,8 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
   if (!Array.isArray(lift) || lift.length !== 2 || !lift.every(Number.isFinite)) throw new PxError(`rig3d: a pose's lift is [left, right], got ${JSON.stringify(p.lift)}`);
   const feet = pairs(p.feet, [[0, -B.hips], [0, B.hips]], 2, "feet"), reach = B.upper + B.fore;
   const hands = pairs(p.hands, [[0, -B.r.arm[0], -reach], [0, B.r.arm[0], -reach]], 3, "hands");
+  // the way the elbows bend: a hint [forward, out, up] in the shoulders' frame, mostly down by default
+  const eh = p.elbow === undefined ? [-0.4, 0.5, -1] : v3(p.elbow, "rig3d: a pose's elbow (the way the elbows bend, [forward, out, up])");
   const local = (o: V3, fr: { f: V3; r: V3 }, a: number, b: number, c: number) => add(o, add(add(mul(fr.f, a), mul(fr.r, b)), mul(UP, c)));
   // a grip: both hands on one line, its ends from under the pelvis as the shoulders face
   const g = p.grip as { from: V3; to: V3; at: number[] } | undefined;
@@ -140,7 +144,7 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
   const arms = [0, 1].map((i) => {
     const s = local(chest, sh, B.shoulders[0], i ? B.shoulders[1] : -B.shoulders[1], B.shoulders[2]);
     const hand = grip ? add(grip[0], mul(sub(grip[1], grip[0]), g!.at[i])) : local(s, sh, hands[i][0], hands[i][1], hands[i][2]);
-    return { sh: s, hand, elbow: ik3(s, hand, B.upper, B.fore, local([0, 0, 0], sh, -0.4, i ? 0.5 : -0.5, -1)) };
+    return { sh: s, hand, elbow: ik3(s, hand, B.upper, B.fore, local([0, 0, 0], sh, eh[0], i ? eh[1] : -eh[1], eh[2])) };
   });
   // where on a piece a point is: along its bone (or up a ball) and round it, from the way the body faces
   const round = (q: V3) => Math.atan2(dot(q, r), dot(q, f));
@@ -381,16 +385,22 @@ export function viewWarnings(set: { name: string; views: [string, Rows | undefin
 
 // ---------------------------------------------------------------- nothing floats
 /**
- * What pxl check reads in a pose, px: how far its lower foot is off the ground (both up: it floats), and
- * how much longer than its two bones a leg is pulled (the foot out of its reach: the shin stretches).
- * More than half a pixel warns: `FLAWS` says each.
+ * What pxl check reads in a pose, px: how far its lower foot is off the ground (both up: it floats), how
+ * much longer than its two bones a leg is pulled (the foot out of its reach: the shin stretches), and how
+ * far an elbow lies on the wrong side of its shoulder-hand line: ahead of it as he faces, while the hand is
+ * below the shoulder (seen from the side, the elbow's side turns with the arm: under the line of a hand
+ * raised ahead, ahead of a hand overhead; an arm out sideways isn't read). More than half a pixel warns:
+ * `FLAWS` says each.
  */
-export function poseFlaws(B: Body, j: Joints): { floats: number; reach: number } {
-  return { floats: Math.min(...j.legs.map((L) => L.ankle[2])) - B.ankle, reach: Math.max(...j.legs.map((L) => len(sub(L.ankle, L.hip)) - B.thigh - B.shin)) };
+export function poseFlaws(B: Body, j: Joints): { floats: number; reach: number; elbow: number } {
+  const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const elbow = Math.max(...j.arms.map((A) => { const back = cross(unit(sub(A.hand, A.sh)), j.sh.r), n = len(back); return n < 0.3 ? 0 : -dot(sub(A.elbow, A.sh), back) / n; }));
+  return { floats: Math.min(...j.legs.map((L) => L.ankle[2])) - B.ankle, reach: Math.max(...j.legs.map((L) => len(sub(L.ankle, L.hip)) - B.thigh - B.shin)), elbow };
 }
 export const FLAWS = {
   floats: (v: number) => `both feet off the ground (up to ${v.toFixed(1)} px): it floats`,
   reach: (v: number) => `a leg longer than its bones (by up to ${v.toFixed(1)} px): its foot out of reach; lower the pelvis or bring the foot in`,
+  elbow: (v: number) => `an elbow bent the wrong way (up to ${v.toFixed(1)} px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder)`,
 };
 
 // ---------------------------------------------------------------- picking a view by heading

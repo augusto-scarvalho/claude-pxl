@@ -181,8 +181,12 @@ directions walking, idle, kneeling and casting;
 5. **The walk by the view** (§6): facing us or away the feet lift in their own columns, in profile a
    long stride, on the diagonals between (`gait()`'s numbers).
 
-`pxl check` reads every pose at every heading: both feet off the ground (it floats), a leg pulled
-longer than its bones.
+`pxl check` reads every pose at every heading: both feet off the ground (it floats; `air: true` on a
+jump's frames), a leg pulled longer than its bones, an elbow bent forward (ahead of the shoulder-hand
+line). The elbows bend by a hint, mostly down by default: an arm swung back bends forward with it, so a
+run or a side walk gives its poses `elbow: [-1, 0.5, 0]` (behind him), `[-1, 0.5, -1]` with a hand at or
+over the shoulder; an arm out level behind and one ahead want opposite hints, so keep a hand under the
+shoulder when the other swings (`lib/characters/hero.px.js`'s run).
 
 What the first tries of the traveler (34 px) got wrong, and the fix:
 - A big head: 11 rows of 34, a third; 13 read as a big head on a small body.

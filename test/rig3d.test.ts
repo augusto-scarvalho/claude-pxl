@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
-import { gait, ik3 } from "../src/core/rig3d.ts";
+import { bodyOf, gait, ik3, jointsOf, poseFlaws } from "../src/core/rig3d.ts";
 import { sdf } from "../src/core/sdf.ts";
 import { checkProject } from "../src/node/check.ts";
 import { loadProject, loadSource } from "../src/node/load.ts";
@@ -199,6 +199,22 @@ rig3d("c", { w: 26, h: 40, pivot: [13, 38], headings: ["s", "n"], ink: "k", surf
     "c › reach s › WARNING: a leg longer than its bones (by up to 3.0 px): its foot out of reach; lower the pelvis or bring the foot in (frame 0)",
     "c › reach n › WARNING: a leg longer than its bones (by up to 3.0 px): its foot out of reach; lower the pelvis or bring the foot in (frame 0)",
   ]);
+});
+
+test("rig3d: a pose's elbow hint bends the elbows its way (the default as it was); pxl check: an elbow bent forward; a pose in the air", () => {
+  // an arm swung back and bent: the default hint (mostly down) puts its elbow ahead of the shoulder-hand line
+  const B = bodyOf({ h: 34, heads: 3 }), back = { hands: [[-4, -1, -4], [-4, 1, -4]] }, was = jointsOf(B, back, 90), now = jointsOf(B, { ...back, elbow: [-1, 0.5, 0] }, 90);
+  assert.deepEqual(jointsOf(B, { ...back, elbow: [-0.4, 0.5, -1] }, 90).arms, was.arms);
+  assert.ok(poseFlaws(B, was).elbow > 0.5 && poseFlaws(B, now).elbow < 0 && poseFlaws(B, jointsOf(B, {}, 90)).elbow <= 0, `${poseFlaws(B, was).elbow}, ${poseFlaws(B, now).elbow}`);
+  assert.throws(() => jointsOf(B, { elbow: [1, 2] }, 90), /a pose's elbow/);
+  // the check says the frame bent the wrong way, not the one with the hint; a hop's frame in the air isn't floating, its data says so
+  const p = loadSource(`${PAL}rig3d("f", { headings: ["e"], blocks: true, moves: {
+    swing: { frames: 2, pose: (i) => ({ hands: [[-4, -1, -4], [-4, 1, -4]], ...(i ? { elbow: [-1, 0.5, 0] } : {}) }) },
+    hop: { frames: 2, pose: (i) => ({ lift: [2 * i, 2 * i], air: i === 1 }) } } })`, "t.px.js");
+  assert.deepEqual(checkProject(p).lines.filter((l) => l.startsWith("f ›")), [
+    `f › swing e › WARNING: an elbow bent the wrong way (up to ${poseFlaws(B, was).elbow.toFixed(1)} px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frame 0)`,
+  ]);
+  assert.deepEqual(p.drawn("bk_hop_e").map((f) => f.img.info), [undefined, { air: true }]);
 });
 
 test("surface: pieces of one part parted by its own darkest tone, parts by the line; decal: depth, how far a nearer surface may be and still take it", () => {

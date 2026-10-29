@@ -5,6 +5,8 @@
 // cornice, the steps; its columns are lit from the right, as the scene is); no_magic's ramps branch at
 // its dark stone (stone and paper) and its dark rose (cloth and fire), and its lights step through them;
 // tropical/trees' seven are its plants shrunk from finer drawings (shrink: 2), a density mix it doesn't declare.
+// The traveler's and mo's cast (its wind-up, the hand drawn back to the shoulder) and the warden's combo bend an
+// elbow forward (rig3d's elbow), left as they were drawn.
 // The parts of a pipeline (`pipeline/part_*.px.js`) are left out: their test_* scenes are scaffolding
 // (a whole 240-frame street each, minutes of checking), and their assets are checked where the
 // pipeline's scene places them. The library's files (lib/) are checked too, by their path from the repo

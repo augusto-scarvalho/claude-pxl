@@ -1078,6 +1078,7 @@ export class Project implements BuildCtx {
             }
           }
           j.rod = rodOn(c, hd);
+          if (p.air === true) c.setData({ air: true });
           M.draw?.(c, j, p);
           (o.draw as ((c: Canvas, j: Joints, p: Pose) => void) | undefined)?.(c, j, p);
         };

@@ -416,17 +416,20 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     ran.genre += fs.flat().length;
     if (new Set(hs).size > 1) lines.push(`${gname} › WARNING: genre '${gn}': its directions aren't one height: ${ms.map((m, i) => `${m.slice(m.lastIndexOf("_") + 1)} ${hs[i]}`).join(", ")} px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces`);
   }
-  // rig3d() figures: every pose of every move at its headings, on the ground and within the legs' reach
+  // rig3d() figures: every pose of every move at its headings, on the ground (unless in the air), within the
+  // legs' reach, the elbows bent the way elbows bend
   if (!opts.names) for (const [name, F] of p.figures) {
     if (opts.file && (F.loc ?? "").split(":")[0] !== opts.file) continue;
+    const K = ["floats", "reach", "elbow"] as const;
     for (const M of F.moves) for (const hd of M.heads) {
-      const worst = { floats: 0, reach: 0 }, at = { floats: [] as number[], reach: [] as number[] };
+      const worst = { floats: 0, reach: 0, elbow: 0 }, at = { floats: [] as number[], reach: [] as number[], elbow: [] as number[] };
       for (let i = 0; i < M.frames; i++) {
         ran.poses++;
-        const fl = poseFlaws(F.body, jointsOf(F.body, M.pose(i, hd.deg), hd.deg));
-        for (const k of ["floats", "reach"] as const) if (fl[k] > 0.5) { at[k].push(i); worst[k] = Math.max(worst[k], fl[k]); }
+        const pose = M.pose(i, hd.deg), fl = poseFlaws(F.body, jointsOf(F.body, pose, hd.deg));
+        if (pose.air === true) fl.floats = 0;
+        for (const k of K) if (fl[k] > 0.5) { at[k].push(i); worst[k] = Math.max(worst[k], fl[k]); }
       }
-      for (const k of ["floats", "reach"] as const) if (at[k].length) lines.push(`${name} › ${M.m} ${hd.name} › WARNING: ${FLAWS[k](worst[k])} (frame${at[k].length > 1 ? "s" : ""} ${ranges(at[k])})`);
+      for (const k of K) if (at[k].length) lines.push(`${name} › ${M.m} ${hd.name} › WARNING: ${FLAWS[k](worst[k])} (frame${at[k].length > 1 ? "s" : ""} ${ranges(at[k])})`);
     }
   }
   // include(f, { palette: "mine" }): the keys it sets that this file doesn't keep its colors, an old-and-new mix to see
