@@ -77,6 +77,10 @@ fields style, drafted at their first cells.
 
 ![styles](../docs/gallery/lib/styles.png)
 
+**VFX** (`vfx/`): a puff of dust (the volumes' densities have no picture).
+
+![vfx](../docs/gallery/lib/vfx.png)
+
 `styles/` holds palettes (and, in `fields`, the cards of the engine's own builders, `make3d.rock`,
 `house`, `bush`, `pine`, drawn in its colors), `profiles/` the genres (`topdown16`, `topdown32`,
 `platformer16`, `hd2d`, `fighting`, `racing_behind`, `racing_topdown`: each number's source beside
