@@ -315,6 +315,22 @@ still hold, and the rest wait on these:
   Richter, Zero, Vent) and writes "flat" on others, without saying why.
 - [ ] **`rig3d({ ink })` checked against the palette**: an ink key not in `pal` fails only at the
   stamp ("unknown color key 'k'"); rig3d could say so where it is set.
+- [ ] **Calibrate the platformer hero's walk and run by speed** (the user's call): the speeds in px a
+  frame are set in the platformer demo, where he moves through a level, and the walk's and run's
+  timings follow if they slide.
+- [ ] **`dress()`'s belt and buckle as an outfit's fields**: the belt is a fixed share of the
+  shirt (about 1 px), and a straight hem's line ate it; the buckle's angle hid it under the profile's
+  line. The side hero widened both in his own outfit. Their height, edge and the buckle's angle as
+  fields.
+- [ ] **A fist in `dress()`**: a hand is a ball, and the side hero's finger line is a `draw` hook.
+- [ ] **A frame size per move in rig3d**: one size for every move, so the side hero's 40-wide dash
+  is a second `rig3d()` (as the top-down hero's attack). w, h and the pivot by move.
+- [ ] **`clean` erasing a planted foot**: in the side walk the boot behind, mostly hidden by the
+  near one, was cleaned away and the foot vanished. The genre's ground check caught it, rig3d's feet
+  check didn't.
+- [ ] **`views()` saying its square's size**: the retouch grid's width and anchor show only after a
+  first bake and an ascii (19 px for the side hero's head, 31 for the top-down's). Say it in the
+  build line.
 
 ## Characters (from dogfooding a 64 px character)
 
