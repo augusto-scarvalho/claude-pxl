@@ -192,13 +192,15 @@ knight) and kept none of them: each fell short in a way that's listed here. `kni
 stays two `arc`s (a crescent round a fist that stands still; `trail` drew the same pixels in six
 lines).
 
-- [ ] **Redo the top-down hero from the traveler** (`lib/characters/hero.px.js`, after
+- [x] **Redo the top-down hero from the traveler** (`lib/characters/hero.px.js`, after
   `lib/characters/traveler.px.js`): the hero is the older flat-parts chibi (24 px, all-black line);
   the traveler is built the way we build figures now (rig3d, the parts fields painted as the
   outfit, the head modeled and its face by hand, measured on 16 games). Adapt it to a top-down
   action game: down, up and side (flipped for the fourth), idle, walk, run and the sword attack in
   each, with the chibi's proportions (the head about 40% of 24 px) and a sword that reads on grass.
   The examples that include the hero (`topdown_hero`, `hd2d/plaza`) are shown before and after.
+  Done (F5 stage 2, b30e556), after a top-down study: at 45° with a chibi body, a base others are made
+  from (`hero.character`), dress() in its own file.
 - [x] **`plume()` at a small scale**: its jitter (±2.5 px across, 0-4 up) and its dithered thinning
   are fixed, tuned for 2-8 px puffs, so steam from a 1 px flue rising 14 px comes out in
   checkerboard puffs off its vent (sodium_hour). A jitter that scales with `size` and a thinning
