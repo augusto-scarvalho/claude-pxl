@@ -117,6 +117,21 @@ test("make3d.cottage (lib/architecture/houses): params in their ranges, parts an
   assert.ok(+m[1] <= 72 && +m[2] <= 80 && Math.abs(2.3 * Math.cos(Math.PI / 6) * +m[3] - 32) <= 2, said);
 });
 
+test("lib/characters/hero: the old names at setting iii, its rig's joints; a character made from it, dress.px.js included again", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-hero-")), lib = join(process.cwd(), "lib", "characters").replaceAll("\\", "/");
+  writeFileSync(join(dir, "v.px.js"), `include("${lib}/hero.px.js", { as: "hero", palette: true })
+include("${lib}/dress.px.js")
+hero.character("v", { moves: ["idle"], swap: { n: "#7a2f3a" } })
+`);
+  const p = loadProject(join(dir, "v.px.js"));
+  assert.ok(["idle", "walk", "run", "attack"].every((m) => ["down", "up", "side"].every((d) => p.assets.has(`hero.${m}_${d}`))));
+  const v = p.image("v_idle_down"), hit = p.image("hero.attack_side");
+  assert.deepEqual([v.w, v.h, v.pivot, hit.w, hit.h, hit.pivot], [18, 32, [8, 31], 32, 40, [16, 35]]);
+  // his right hand on the walk's second frame facing s, in the 18 x 32 frame: where a 2D part goes
+  const [x, y] = p.scope!(`hero.rig.screen(hero.rig.joints(hero.rig.pose("walk", 1, 180), 180).arms[1].hand)`) as number[];
+  assert.ok(x > 0 && x < 18 && y > 14 && y < 28, `${x}, ${y}`);
+});
+
 test("pxl check: densities mixed by accident (library entries of two in a scene, a png blown up or shrunk alone), unless a genre says the mix", () => {
   const mix = (g: string) => loadSource(`sprite("_a", "1"); sprite("_b", "11")
 card("_a", { is: "a", cells: { "topdown/16": "✓" } }); card("_b", { is: "b", cells: { "topdown/32": "✓" } })${g}

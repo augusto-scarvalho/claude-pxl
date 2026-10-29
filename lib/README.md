@@ -53,8 +53,8 @@ builders; the cave's caps.
 
 ![nature](../docs/gallery/lib/nature.png)
 
-**Characters** (`characters/`): the traveler and the people on his figure (the crew, the miko), the
-top-down hero, the knight.
+**Characters** (`characters/`): the traveler and the people on his figure (the crew, the miko), what
+they wear (`dress.px.js`), the top-down hero and the people made from him (`hero.character()`), the knight.
 
 ![characters](../docs/gallery/lib/characters.png)
 

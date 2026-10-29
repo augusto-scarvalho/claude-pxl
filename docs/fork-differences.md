@@ -1,7 +1,7 @@
 # Fork differences
 
 This fork, [augusto-scarvalho/claude-pxl](https://github.com/augusto-scarvalho/claude-pxl), is
-**463 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
+**464 commits ahead** of the original, [crsolver/claude-pxl](https://github.com/crsolver/claude-pxl),
 and none behind. The work spans October 16–27, 2026. Everything the original does still works; this
 page lists what the fork adds. Every commit is in
 [the comparison on GitHub](https://github.com/crsolver/claude-pxl/compare/main...augusto-scarvalho:claude-pxl:main).
@@ -226,7 +226,7 @@ references until it read right.
 | Example | What it teaches |
 | --- | --- |
 | [`platformer`](../examples/platformer.px.js), [`topdown`](../examples/topdown.px.js), [`isometric`](../examples/isometric.px.js) | Tilesets laid out as levels: tilemaps, corner tiles generated in code, isometric blocks. |
-| [`topdown_hero/`](../examples/topdown_hero) | A top-down game character in four directions: a colored dummy animated first, the costume painted over it, idle, walk, run and a sword attack at a game's timings, a tagged sheet. |
+| [`topdown_hero/`](../examples/topdown_hero) | A top-down game character in four directions, topdown16's hero and base body: a `rig3d()` chibi seen from 45 degrees, in flat blocks first, then dressed with a modeled head and a hand-painted face; idle, walk, run and a sword attack at the genre's timings, foot, hurt and hit boxes, a tagged sheet; other people made from him. |
 | [`sidescroller/`](../examples/sidescroller) | A game's art over several files: a shared palette, seamless tiles, PNG import, a hit flash. |
 | [`tropical/`](../examples/tropical) | A 320×240 animated forest: imported trees, river, trail tileset, animals, a girl walking with hair that swings. |
 | [`halloween/`](../examples/halloween) | A night party: many lamps, point-light shadows, eight dancing monsters. |

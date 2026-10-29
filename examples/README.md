@@ -8,7 +8,7 @@ read the lines you need, not the whole file; `pxl help <op>` shows where each op
 | `basics.px.js` | the starter: `mx` + `outline`, `base`/`swap`, parts, `sheet` |
 | `platformer.px.js` | a tileset laid out as a level: `tilemap`, `group` variety, tile `sheet`, `include` |
 | `topdown.px.js` | overhead RPG island: corner-tile shore generated in code, `scatter`, cast shadows |
-| `topdown_hero/` | a top-down game character in four directions: a colored dummy animated first and the costume over it, idle, walk and run from one set of drawings, a sword attack with smears, lit from straight above, a tagged `sheet` |
+| `topdown_hero/` | a top-down game character in four directions (topdown16's hero and base body): a `rig3d()` chibi seen from 45 degrees, judged first as flat blocks, dressed by `dress()`, the head modeled and its face painted (`views()`); idle, walk, run and a sword attack with crisp smears, foot, hurt and hit boxes, a tagged `sheet`; others made from him by `hero.character()` |
 | `isometric.px.js` | 2:1 blocks, back-to-front order, iso helpers |
 | `perspective/road.px.js` | true perspective: `perspective()` and `plane()`, props in meters whose parts also cast their shadows, a walker shrinking step by step with hand-drawn small sizes picked by `fit` |
 | `perspective/park.px.js` | two-point perspective (`yaw`) at 2 pm: benches, trees and people as `solid` shapes drawn by `solids()` and cast by `shadows()`, boxes lit by the side they face, people and a dog posed in 3D by a gait (any heading, own shadows), moving things interleaved far to near with still ones, a loop closed by hiding behind hedges |
