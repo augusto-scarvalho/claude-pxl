@@ -266,6 +266,36 @@ still hold, and the rest wait on these:
   `side/?`. The density in px a meter where there's no tile grid, told apart from a tile's px.
   (F5: `hd2d/24ppm`, `genre({ ppm })`.)
 
+## From the library's profiles (library F5)
+
+- [ ] **Review the topdown16 props** (the user's call after the village demo): the barrel and the
+  stump first, then the pot, the crate, the chest, the sign and the lamp post, against the redrawn
+  trees and cottage. The barrel went back to its older shape because the user liked it better
+  than the new one, and the stump was never redrawn. Each one is drawn by hand after The Minish
+  Cap's numbers and shown before and after (`examples/village.px.js` takes them).
+- [ ] **Extend the library** (the user's call): more topdown16 entries first, then what the other
+  profiles' demos ask for. For a village and its outskirts: another house, a well, stairs cut in
+  the bank, a bridge, bushes and grass to cut, stones to lift, a market stall, more villagers.
+  Each entry gets a card, a hand drawing and a place in a scene.
+- [ ] **`hero.pace`**: the traveler and the miko export their walk's pace, the topdown16 hero
+  doesn't, so the village measured `hero.rig`'s feet (2 px a frame to the side, 1.41 up and down).
+  Export it, for the people made by `hero.character()` too.
+- [ ] **`route()` and `turnToward()` by a game's views**: both name the sprite by the compass
+  (`walk_s`), while the topdown16 people are named by the game's views (`walk_down`,
+  `walk_up`, `walk_side`, flipped going west), so the village maps them by hand. Add a `views`
+  option on both, or read the genre's.
+- [ ] **`turnToward({ px: true })`**: in a flat scene a target below reads as north, and a tie
+  from w to e turns round by the back. Add `px` as `route()` has, and break a tie toward the front.
+- [ ] **A scene's 600-frame cap, said**: a scene's output stops at 600 frames and nothing says
+  so; the build line read "600 frames, 32000ms" and the GIF ran 6 s. Say it in the build line,
+  or cap after identical frames merge (the village's GIF had 202 distinct frames of 576).
+- [ ] **"Loops don't line up" naming the anim**: `c.asset(n)` read only for bounds joins that
+  anim's loop to the scene's, and the error names no anim. Name the anims that don't divide, and
+  don't join an anim that is read but not stamped.
+- [ ] **A blob shadow for a walker**: a shade layer `of` the walker's layer casts its silhouette,
+  while topdown16's shadow is an ellipse under the foot, so the village draws the hero's ellipse
+  at `route`'s `at` by hand. Add a `blob` option for `of`.
+
 ## Characters (from dogfooding a 64 px character)
 
 Each of these was first worked around by hand in an art file or by a Python script on the side.
