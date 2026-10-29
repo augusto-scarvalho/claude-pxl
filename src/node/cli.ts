@@ -45,8 +45,8 @@ const USAGE = `pxl — pixel-art DSL
       varies) and the include that takes it.
   pxl lib draft <entry> --genre <name> | --cell <camera>/<density> [--out DIR]
       A 3D entry (a make3d builder) at a cell it lacks: an art file that includes it and turns it to
-      the genre's camera (what stands at its figure's pitch: 30 degrees on topdown16's 45 ground, hd2d's
-      billboards from 20), fitted (neither side over) to the genre's box [tall, wide] for its card's
+      the genre's camera (what stands at its stand pitch, else its figure's: 30 degrees on topdown16's 45
+      ground, hd2d's billboards from 20), fitted (neither side over) to the genre's box [tall, wide] for its card's
       category (tiles on its grid, m at its px a meter), else to the card's tiles on the grid, else at
       its own height at the px a meter; in the genre's tones and ink; a cell alone (side, topdown at 45 degrees, iso, hd2d):
       3 tones at 16-32 px. Built to out/_draft/ (or DIR): the ✎ draft to clean by hand, or ◐ to look

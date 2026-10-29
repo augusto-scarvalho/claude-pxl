@@ -1172,6 +1172,8 @@ export class Project implements BuildCtx {
       const loc = this.callerLoc();
       if (typeof name !== "string" || !name || !isPlainObject(spec)) throw new PxError('genre("fighting", { camera, grid, scale: { character: [tall, wide] }, heads, dirs, states, contract: { boxes }, pitch, checks: ["ground"] })', loc);
       const had = this.genres.get(name);
+      // (the same line again: the profile included twice, by a scene and by an entry it includes)
+      if (had && had.loc === loc) { const { loc: _, ...g } = had; return g; }
       if (had) throw new PxError(`genre '${name}' is already defined at ${had.loc}`, loc);
       const { checks = [], scale, grid, ppm, mix } = spec as { checks?: unknown; scale?: unknown; grid?: unknown; ppm?: unknown; mix?: unknown };
       if (!(Array.isArray(checks) && checks.every((c) => GENRE_CHECKS.includes(c)))) throw new PxError(`genre '${name}': checks are some of ${GENRE_CHECKS.join(", ")}, got ${JSON.stringify(checks)}`, loc);

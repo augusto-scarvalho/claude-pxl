@@ -160,8 +160,10 @@ declare global {
     scale?: Record<string, [number, number]>;
     heads?: number; dirs?: string[] | number; states?: Record<string, { frames?: number; ms?: number | number[] }>;
     contract?: { boxes?: string[]; [k: string]: unknown };
-    /** the figure's own pitch, apart from the camera's */
+    /** the figures' own pitch, apart from the camera's */
     pitch?: number;
+    /** what else stands (trees, houses), where it is seen from another pitch than the figures: pxl lib draft draws at it */
+    stand?: number;
     /** ground: the feet on one row through a move; height: a family as tall in every direction; footprint: the drawing down to where it meets the ground */
     checks?: ("ground" | "height" | "footprint")[];
     /** the tones a turnaround() or rig3d() naming it draws its surface in (where its surface gives none); a range or by size: notes */

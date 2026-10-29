@@ -44,7 +44,7 @@ include("other.px.js")                  // path relative to the current file; in
 directions("ship", 16, { from, outline?, outline8?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
 turnaround("house", thing, { view?, ppm?, n?, headings?, part?, ... })  // a thing in 3D seen from n headings: house_n, house_ne, ... + group "house"; see turnaround() below
 rig3d("tr", { body, moves: { walk: { frames, ms, pose } }, n?, parts?, head?, blocks? })  // a figure on the 3D layer in n headings: tr_walk_s, ... + group "tr_walk"; see rig3d() below
-genre("fighting", { camera, grid or ppm, scale, heads, dirs, states, contract, pitch, tones, ink, mix, checks })  // a profile as data, its checks run by pxl check on what names it: see genre() below
+genre("fighting", { camera, grid or ppm, scale, heads, dirs, states, contract, pitch, stand, tones, ink, mix, checks })  // a profile as data, its checks run by pxl check on what names it: see genre() below
 card("_lamp", { is, cells: { "hd2d/24ppm": "✓" }, vary?, tiles?, draw? })  // a library entry's card, just after it: see card() below
 views("_head", { s: grid, sw, w, nw, n }, { anchor, like? })  // hand-drawn views pivoted on an anchor, the others mirrored: _head_s, ... + group "_head"; see views() below
 font(name, "glyph_sprite", { chars: "ABC...", w, h, cols?, mono? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional), or all as wide as the widest with mono: true (a score, a timer)
@@ -118,13 +118,16 @@ genre, each number's source beside it): `camera` (`{ kind, pitch }`), its densit
 px, or `null`) or else `ppm` (px a meter, a world built in meters with no tile grid: HD-2D's 24),
 `scale` (a box per category, `[tall, wide]` in tiles, m with a `ppm`, px with neither: `{ character:
 [1.5, 1], tree: [2.5, 2.5] }`), `heads`, `dirs`, `states` (`{ idle: { frames, ms } }`), `contract`
-(`{ boxes: ["hurt", "hit"] }`), `pitch` (the figure's own, apart from the camera's: what stands is
-seen at it), `tones` (what a `turnaround()` or `rig3d()` naming it draws its surface in, where its
+(`{ boxes: ["hurt", "hit"] }`), `pitch` (the figures' own, apart from the camera's: what stands is
+seen at it), `stand` (what else stands, trees and houses, where it is seen from another pitch than the
+figures: topdown16's figures from 45, its trees from 30), `tones` (what a `turnaround()` or `rig3d()`
+naming it draws its surface in, where its
 `surface` gives none: 3 at 16-32 px), `ink` (its line: a color, all round, `surface: { ink }`'s; or
 by category, `{ character: "#1a1620", tree: "selective" }`, or words), `mix` (`true`: densities mixed
 on purpose, HD-2D's sprites in a finer world) and `checks`; any other field is kept as given, for the
 file (`steer`). Its cell is its camera's kind and its density: `topdown/16`, `hd2d/24ppm`. It
-returns them with `name`. An asset made for it says `genre: "fighting"` (a sprite, an anim,
+returns them with `name`. A profile's file included twice (by a scene and by an entry that names its
+genre and includes it) defines it once. An asset made for it says `genre: "fighting"` (a sprite, an anim,
 `rig3d()` and `turnaround()` pass it to what they make), and `pxl check` runs the genre's checks on
 it: `"ground"`, the feet (its lowest row) on one row through every frame of a move (fighting);
 `"height"`, a family (a group whose members all name the genre: a `rig3d()` move's directions, a
@@ -151,7 +154,7 @@ genre's box for it then sizes its drafts, before its `tiles`) and `draw` (its dr
 by subject (`pxl lib --genre hd2d`, `pxl lib --cell side/32`); `pxl lib lamps._lamp` prints one with
 what a build of it reads (its source, size, pivot, footprint, sockets, boxes, frames, roles) and the
 `include` that takes it; `pxl lib draft make3d.oak --genre topdown16` draws a builder in a genre (its
-camera, what stands at its `pitch`, hd2d's a billboard from 20 degrees; fitted to the genre's box for
+camera, what stands at its `stand`, else its `pitch`, hd2d's a billboard from 20 degrees; fitted to the genre's box for
 the card's `category`, in tiles on its grid or m at its `ppm`, else to the card's `tiles` on the grid,
 else its own height at the `ppm`; its `tones` and `ink`; `--cell topdown/16` a cell alone). `pxl check` on the file warns where a cell's
 status disagrees with how its asset is drawn: a ✎ cell that is the 3D render alone, a ◐ cell drawn by

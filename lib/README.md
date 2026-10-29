@@ -32,7 +32,7 @@ exists at (a tile's px, `topdown/16`; px a meter in a world with no tiles, `hd2d
 `pxl lib traveler.tr` prints one's card: what it is, its source, its size, pivot, sockets and frames,
 its roles, what varies, and the `include` that takes it. A 3D entry a genre lacks: `pxl lib draft
 make3d.oak --genre topdown16` writes and builds an art file to start from, in the genre's camera (what
-stands at its figure's pitch), the genre's box for the card's category (else the card's tiles), its
+stands at its `stand` pitch, else its figure's), the genre's box for the card's category (else the card's tiles), its
 tones and line (`--cell topdown/16`: a cell alone). A 2D entry at a new density is redrawn simpler, never scaled (`pxl help "scenes 18 19"`).
 
 Each entry's card is a `card()` call just after it in its file: a renamed entry or asset fails the

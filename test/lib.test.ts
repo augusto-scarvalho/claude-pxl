@@ -41,9 +41,16 @@ test("card(): kept by its full name, its data given back; a name or an asset it 
 test("genre(): its density a tile's px or px a meter, its mix said; its cell as pxl lib reads it", () => {
   assert.match(failure(`genre("g", { ppm: -1 })`).message, /ppm is its px a meter/);
   assert.match(failure(`genre("g", { mix: "yes" })`).message, /mix: true declares densities mixed on purpose/);
+  // a profile included twice (by a scene and by an entry that includes it) is defined once; twice by two lines, an error
+  const dir = mkdtempSync(join(tmpdir(), "pxl-genre-"));
+  writeFileSync(join(dir, "g.px.js"), `genre("g", { grid: 16 })\n`);
+  writeFileSync(join(dir, "e.px.js"), `include("g.px.js")\nsprite("_e", { genre: "g" }, "1")\n`);
+  writeFileSync(join(dir, "s.px.js"), `include("g.px.js")\ninclude("e.px.js", { as: "e" })\n`);
+  assert.deepEqual([...loadProject(join(dir, "s.px.js")).genres.keys()], ["g"]);
+  assert.match(failure(`genre("g", {})\ngenre("g", {})`).message, /t\.px\.js:2.*genre 'g' is already defined at/);
   const { genres } = catalog();
   assert.deepEqual(["hd2d", "topdown16", "racing_behind"].map((g) => genres.get(g)!.cell), ["hd2d/24ppm", "topdown/16", "behind/?"]);
-  assert.deepEqual([genres.get("topdown16")!.g.pitch, genres.get("hd2d")!.g.mix], [30, true]);
+  assert.deepEqual([genres.get("topdown16")!.g.pitch, genres.get("topdown16")!.g.stand, genres.get("hd2d")!.g.mix], [45, 30, true]);
   assert.match(libList({ cell: "hd2d/17ppm" }).join("\n"), /crates\._crate_face +sprite +hd2d\/17ppm ✓/);
 });
 
@@ -82,11 +89,12 @@ test("pxl lib draft: a builder at a cell it lacks, written and built; a 2D entry
   assert.match(art, /turnaround\("chozubachi_side16", make3d\.chozubachi\(\), \{ \.\.\.card\("make3d\.chozubachi"\)\.draw, view: \{ kind: "side", pitch: 0 \}/);
   assert.ok(existsSync(join(dir, "sprites", "chozubachi_side16_s.png")));
   assert.throws(() => libDraft("lamps._lamp", { cell: "side/16" }, dir), /drawn in 2D: at a new density it is redrawn simpler/);
-  // by a genre: its camera at the figure's pitch, fitted to the card's box (neither side over), its tones and line
+  // by a genre: its camera, what stands at its stand pitch (topdown16's figures from 45, the rest from 30), fitted to the
+  // card's box (neither side over), its tones and line
   const rock = libDraft("make3d.rock", { genre: "topdown16" }, dir).join("\n"), m = /drawn (\d+) tall, (\d+) wide/.exec(rock)!;
-  assert.match(rock, /seen from 30 degrees \(the figure's; the ground's 45\), in 3 tones, a line of #1a1620 all round/);
+  assert.match(rock, /seen from 30 degrees \(what stands; the ground's 45\), in 3 tones, a line of #1a1620 all round/);
   assert.ok(+m[1] <= 32 && +m[2] <= 32 && Math.max(+m[1], +m[2]) >= 31, rock);
-  assert.match(readFileSync(join(dir, "rock_topdown16.px.js"), "utf8"), /genre\("topdown16", \{ camera: \{ kind: "topdown", pitch: 45 \}, pitch: 30, grid: 16, tones: 3, ink: "#1a1620" \}\)\nturnaround\("rock_topdown16".*surface: \{ \.\.\.card\("make3d\.rock"\)\.draw\?\.surface, ink: "#1a1620" \}, view: \{ kind: "side", pitch: 30 \}/);
+  assert.match(readFileSync(join(dir, "rock_topdown16.px.js"), "utf8"), /genre\("topdown16", \{ camera: \{ kind: "topdown", pitch: 45 \}, pitch: 45, stand: 30, grid: 16, tones: 3, ink: "#1a1620" \}\)\nturnaround\("rock_topdown16".*surface: \{ \.\.\.card\("make3d\.rock"\)\.draw\?\.surface, ink: "#1a1620" \}, view: \{ kind: "side", pitch: 30 \}/);
   assert.throws(() => libDraft("make3d.rock", { genre: "racing_behind" }, dir), /its camera is behind; lib draft draws side, topdown, iso, hd2d/);
   // hd2d: a billboard from its figure's 20 degrees, fitted to the genre's box for the card's category (a bush 0.5 m
   // tall, 0.8 across: 12 x 19 px at 24 px a meter), not at the builder's own height
@@ -94,6 +102,19 @@ test("pxl lib draft: a builder at a cell it lacks, written and built; a 2D entry
   assert.match(bush, /a box 0\.5 m tall, 0\.8 wide \(hd2d's bush\) at 24 px a meter: 12 px tall, 19 wide; .* \(drawn 0\.\d m at 24\), seen from 20 degrees as a billboard/);
   assert.ok(+o[1] <= 12 && +o[2] <= 19 && (+o[1] >= 12 || +o[2] >= 18), bush);
   assert.match(readFileSync(join(dir, "bush_hd2d.px.js"), "utf8"), /view: \{ kind: "side", pitch: 20 \}/);
+});
+
+test("make3d.cottage (lib/architecture/houses): params in their ranges, parts and sockets; drafted in topdown16's house box, its door two tiles tall", () => {
+  const p = loadProject("lib/architecture/houses.px.js"), make = (s: string) => p.scope!(`make3d.cottage(${s})`) as { parts: object; sockets: Record<string, number[]> };
+  const two = make(`{ width: 6, storeys: 2, chimney: "left" }`);
+  assert.deepEqual([Object.keys(two.parts), Object.keys(two.sockets)], [["walls", "timber", "door", "windows", "roof", "stone"], ["door", "top", "chimney"]]);
+  assert.ok(two.sockets.chimney[0] < 0 && two.sockets.top[2] > 2 * 2.7, JSON.stringify(two.sockets));
+  assert.deepEqual(Object.keys(make(`{ windows: 0, chimney: "none" }`).sockets), ["door", "top"]);
+  assert.throws(() => make(`{ pitch: 80 }`), /pitch is 20 to 60, got 80/);
+  assert.throws(() => make(`{ chimney: "back" }`), /chimney is "right", "left", "none"/);
+  // the door 2.3 m tall seen from 30 degrees: two 16 px tiles at the px a meter the house box gives it
+  const said = libDraft("make3d.cottage", { genre: "topdown16" }, mkdtempSync(join(tmpdir(), "pxl-cottage-"))).join("\n"), m = /drawn (\d+) tall, (\d+) wide, its [\d.]+ m at ([\d.]+) px\/m/.exec(said)!;
+  assert.ok(+m[1] <= 72 && +m[2] <= 80 && Math.abs(2.3 * Math.cos(Math.PI / 6) * +m[3] - 32) <= 2, said);
 });
 
 test("pxl check: densities mixed by accident (library entries of two in a scene, a png blown up or shrunk alone), unless a genre says the mix", () => {

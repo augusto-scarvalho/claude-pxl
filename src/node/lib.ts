@@ -204,8 +204,8 @@ const js = (v: unknown): string => (Array.isArray(v) ? `[${v.map(js).join(", ")}
 
 /**
  * pxl lib draft <entry> --genre <name> | --cell <camera>/<density>: a 3D entry (a make3d builder) at a cell it
- * lacks, as an art file that includes it and turns it to the genre's camera (what stands seen at its figure's
- * `pitch`: HD-2D's a billboard from 20 degrees), sized to the genre's box for its card's `category` (tiles on
+ * lacks, as an art file that includes it and turns it to the genre's camera (what stands seen at its `stand`, else
+ * its figure's `pitch`: HD-2D's a billboard from 20 degrees), sized to the genre's box for its card's `category` (tiles on
  * its grid, m at its px a meter), else its card's box of tiles on the grid (fitted: neither taller nor wider),
  * else its own height at the px a meter, in the genre's `tones` and `ink` (a cell alone: 3 tones at 16-32 px),
  * built: the ✎ draft to clean by hand, or ◐ to look at. Never into lib/.
@@ -230,13 +230,14 @@ export function libDraft(name: string | undefined, at: { cell?: string; genre?: 
   const scale = (G.scale ?? {}) as Record<string, number[]>, gbox = c.category ? scale[c.category] : undefined;
   const box = gbox ?? (!grid ? undefined : Array.isArray(c.tiles) ? c.tiles : c.tiles ? [c.tiles] : undefined), unit = grid ? "tiles" : "m";
   if (grid && !box) throw new PxError(`${e.name}'s card gives no tiles nor a category on ${G.name}'s scale: its box in tiles, [tall, wide], on a ${grid} px grid`);
-  // the box in px, tall then wide; what stands seen at the figure's pitch where the genre has one (it faces us: scenes §16;
-  // HD-2D's billboards, as rig3d draws its figures)
-  const want = box?.map((t) => Math.round(t * (grid ?? ppmG!))), pitch = typeof G.pitch === "number" ? G.pitch : (cam.pitch ?? CAMS[kind].pitch ?? 0), board = kind === "hd2d" && typeof G.pitch === "number";
+  // the box in px, tall then wide; what stands seen at the genre's `stand`, else at the figure's pitch, where it has one (it
+  // faces us: scenes §16; HD-2D's billboards, as rig3d draws its figures)
+  const stand = [G.stand, G.pitch].find((v) => typeof v === "number") as number | undefined;
+  const want = box?.map((t) => Math.round(t * (grid ?? ppmG!))), pitch = stand ?? cam.pitch ?? CAMS[kind].pitch ?? 0, board = kind === "hd2d" && stand !== undefined;
   const tones = Number.isInteger(G.tones) ? (G.tones as number) : undefined, ink = typeof G.ink === "string" && /^(#|.$)/.test(G.ink) ? G.ink : undefined;
   const view = (ppm: number) => (kind === "iso" ? `"iso"` : kind === "hd2d" && !board ? `perspective({ w: 320, h: 180, pitch: ${cam.pitch ?? -38}, fov: ${cam.fov ?? 30}, ppm: ${ppm} })` : `{ kind: "side", pitch: ${pitch} }`);
   const seen = kind === "iso" ? "in iso" : board ? `from ${pitch} degrees as a billboard (the figure's; the camera's ${-(cam.pitch ?? -38)} down)` : kind === "hd2d" ? `through the HD-2D camera (${-(cam.pitch ?? -38)} degrees down, a ${cam.fov ?? 30} degree lens)`
-    : !pitch ? "from the side" : `from ${pitch} degrees${cam.pitch !== undefined && pitch !== cam.pitch ? ` (the figure's; the ground's ${cam.pitch})` : ""}`;
+    : !pitch ? "from the side" : `from ${pitch} degrees${cam.pitch !== undefined && pitch !== cam.pitch ? ` (${typeof G.stand === "number" ? "what stands" : "the figure's"}; the ground's ${cam.pitch})` : ""}`;
   const b = c.name.slice(7), p = loadProject(e.file), tall = (p.scope!(`make3d[${JSON.stringify(b)}]()`) as { field: { bounds(): number[][] } }).field.bounds()[1][2];
   const dir = resolve(out ?? join("out", "_draft")), base = `${b}_${at.genre ?? G.name.replace("/", "")}`, file = join(dir, `${base}.px.js`), up = relative(dir, e.file).split(sep).join("/");
   // its file as pxl's repo names it, for where an approved draft goes
@@ -245,7 +246,7 @@ export function libDraft(name: string | undefined, at: { cell?: string; genre?: 
   const how = `${tones ? `, in ${tones} tones` : ""}${ink ? `, a line of ${ink} all round` : ""}`;
   const say = `pxl lib draft ${e.name} ${at.genre !== undefined ? `--genre ${at.genre}` : `--cell ${at.cell}`}: ${size}, seen ${seen}${how}: the ✎ draft to clean by hand, or ◐ to look at. Change its knobs here; approved, move the turnaround into ${home} and the cell into its card.`;
   const lines = say.split(" ").reduce<string[]>((ls, w) => { if (ls.length && (ls[ls.length - 1] + " " + w).length <= 104) ls[ls.length - 1] += " " + w; else ls.push(`// ${w}`); return ls; }, []);
-  const spec = Object.fromEntries(["camera", "pitch", "grid", "ppm", "tones", "ink"].filter((k) => G[k] !== undefined && G[k] !== null).map((k) => [k, G[k]]));
+  const spec = Object.fromEntries(["camera", "pitch", "stand", "grid", "ppm", "tones", "ink"].filter((k) => G[k] !== undefined && G[k] !== null).map((k) => [k, G[k]]));
   const src = (ppm: number) => [
     ...lines,
     `include("${up}"${e.opts ?? ""})`,

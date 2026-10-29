@@ -850,8 +850,10 @@ Pick one and keep everything in it (a 45° oblique bridge among isometric blocks
   is 8 px of top over 7 of front in a 16 px tile); nothing shrinks. A house: its facade as seen from
   the front, the side walls cut to about half their height, the roof's slopes at their front view's
   45°, its planes seen from above. The footprint stays on the grid and only the top overhangs (more
-  breaks the draw order). A room shows the back wall's face, two tiles tall; the side and front walls
-  only as a top edge, black beyond. Props and figures drawn in 3D (`turnaround()`'s `"side"` view,
+  breaks the draw order). In 3D, `make3d.cottage` (`lib/architecture/houses.px.js`: walls, a pitched
+  roof with eaves, a door two tiles tall at 16 px a meter, windows, `storeys`, `pitch`, its colors by
+  role), drafted by `pxl lib draft make3d.cottage --genre topdown16`. A room shows the back wall's
+  face, two tiles tall; the side and front walls only as a top edge, black beyond. Props and figures drawn in 3D (`turnaround()`'s `"side"` view,
   `rig3d()`) stand in it as they are: `world: { scale, view: "top", light: "sun" }`, one `look3d()`
   sun, `cast: "sun"` shadows, a walker by `route({ px: true })` (§11, the story bullet in §7).
 - **Side 3/4** (a corner toward us): the gable end about half its width, the 45° roof kept, the
@@ -972,8 +974,8 @@ const FIGHT = genre("fighting", { camera: { kind: "side", pitch: 10 }, grid: nul
   heads: 6.5, dirs: ["e"], states: { idle: { frames: 8, ms: 100 }, strike: { ms: [60, 40, 60, 80, 80, 80, 100] } },
   contract: { boxes: ["hurt", "hit"] }, checks: ["ground"] })
 anim("rv_idle", { w: 130, h: 118, pivot: [52, 114], genre: FIGHT.name }, ...)
-const TOPDOWN = genre("action-topdown", { camera: { kind: "topdown", pitch: 45 }, pitch: 30, grid: 16,
-  scale: { character: [1.5, 1], tree: [2.5, 2.5] }, heads: 2.5, dirs: ["s", "e", "n", "w"], checks: ["height"] })
+const TOPDOWN = genre("action-topdown", { camera: { kind: "topdown", pitch: 45 }, pitch: 45, stand: 30, grid: 16,
+  scale: { character: [1.5, 1], tree: [2.5, 2.5] }, heads: 2.1, dirs: ["s", "e", "n", "w"], checks: ["height"] })
 rig3d("hero", { body: { h: TOPDOWN.scale.character[0] * TOPDOWN.grid, heads: TOPDOWN.heads }, pitch: TOPDOWN.pitch, n: 4, genre: TOPDOWN.name, ... })
 ```
 
@@ -981,10 +983,11 @@ rig3d("hero", { body: { h: TOPDOWN.scale.character[0] * TOPDOWN.grid, heads: TOP
   up on the active frames is the float a player sees. Hit and hurt boxes by `c.setBox`, the phase by
   `c.setData`; palette slots by `sheet(..., { slots })`.
 - **Action top-down:** the same height in every direction (`"height"`, the head over the ground
-  point: feet that land a row apart seen from behind don't count). The figure's own pitch can be
-  gentler than the ground's (30 on a 45 degree ground showed a chibi's face and chest), and what
-  stands is seen at it too (§16: it faces us): a tree drawn at 45 hides its trunk under its crown, at
-  30 it shows, as the games' trees do.
+  point: feet that land a row apart seen from behind don't count). The figures are seen from the
+  ground's 45 (`pitch`) with a chibi's body, 2.1 heads in 3D, the torso twice the legs: the head 54% of
+  the sprite, as The Minish Cap's and A Link to the Past's heroes (57-64%, 1.6-1.75 heads). What else
+  stands (§16: it faces us) can be seen from a gentler pitch of its own (`stand`): a tree drawn at 45
+  hides its trunk under its crown, at 30 it shows, as the games' trees do.
 - **Racing** (behind, top-down): a car's footprint is where its wheels meet the road, and seen turned
   or from above it moves on the picture: the nearer tyre lands a row lower, a nose hangs below the
   wheels. So the check is the footprint (`"footprint"`: the drawing reaches down to it at every
@@ -1028,7 +1031,7 @@ Start a work from one:
 
   | Category | Tiles, tall × wide | × the figure | Source |
   |---|---|---|---|
-  | character | 1.5 × 1 | 1 | A Link to the Past's hero 22 px (characters §13); LPC's 46-48 px at 32 |
+  | character | 1.5 × 1 | 1 | A Link to the Past's hero 21-22 px, The Minish Cap's 25 (the library's top-down study; characters §13); LPC's 46-48 px at 32 |
   | bush | 1 × 1 | 0.7 | Ninja Adventure's bushes, 12-15 px at 16 |
   | rock, crate | 1 × 1 | 0.7 | a tile (§16: a crate 8 px of top over 7 of front) |
   | boulder | 2 × 2 | 1.3 | Ninja Adventure's boulders, 30-31 px |
