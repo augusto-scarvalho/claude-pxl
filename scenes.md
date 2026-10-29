@@ -491,9 +491,11 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   when it lands on another height (a jump doesn't shake the picture), stops at the world's edges, and
   eases under a speed limit, in whole px. Each layer's `parallax`: 1 the world, 0.5 and 0.2 the
   backdrops (strips that wrap, `scroll(name, y, 0)`: still in their layer, they keep covering the
-  picture), 0 the sky and the HUD. A sky behind planes going by takes its tones in by whole rows
-  (`grad(..., "v", 0.5, "lines")`), not a checker: a checker stays still, but where a plane slides
-  over it the eye reads it crawling. `PXL shot <file> <scene> --world --frames 0,60,120` shows the whole
+  picture), 0 the HUD. The sky is the air, not the glass: a gradient as tall as the world, darker the
+  higher, in a layer of its own that moves with the world's height and slowly across (`parallax: [0.1,
+  1]`, a strip that wraps), so a climb or a flight goes up into its darker part and its dither goes by
+  with the land; a sky stuck to the screen (parallax 0) reads as painted on the glass while the land
+  slides under it. `PXL shot <file> <scene> --world --frames 0,60,120` shows the whole
   world with the camera's box, to judge the framing; `describe` says where each thing is in the world
   and what is off the picture (`examples/camera.px.js`).
 
