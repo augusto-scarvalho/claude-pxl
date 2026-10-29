@@ -43,9 +43,9 @@ const frameImgs = (p: Project, n: string) => (p.assets.get(n)!.kind === "anim" ?
 
 /**
  * The checks of the genre an asset names, on its frames: "ground", the feet (its drawing's lowest row) on
- * one row in every frame; "footprint", that lowest row down to where it meets the ground (its footprint
- * box, a turnaround()'s), within a px, in every frame (what is nearer us may hang lower: a bumper seen
- * from above).
+ * one row in every frame but those whose data says air (a jump's); "footprint", that lowest row down to
+ * where it meets the ground (its footprint box, a turnaround()'s), within a px, in every frame (what is
+ * nearer us may hang lower: a bumper seen from above).
  */
 function genreLines(p: Project, name: string, ran: { genre: number }): string[] {
   const gn = p.assets.get(name)!.opts.genre!, g = p.genres.get(gn), out: string[] = [];
@@ -59,7 +59,7 @@ function genreLines(p: Project, name: string, ran: { genre: number }): string[] 
   };
   if (g.checks.includes("ground") && fr.length > 1) {
     ran.genre += fr.length;
-    const rows = said((i) => `${low[i]}`);
+    const rows = said((i) => (fr[i].info?.air === true ? undefined : `${low[i]}`));
     if (rows.length > 1) out.push(`${name} › WARNING: genre '${gn}': its feet aren't on one ground line: its lowest row is ${rows.join(", ")}; a move keeps them on one row`);
   }
   if (g.checks.includes("footprint")) {

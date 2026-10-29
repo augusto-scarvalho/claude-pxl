@@ -129,7 +129,8 @@ file (`steer`). Its cell is its camera's kind and its density: `topdown/16`, `hd
 returns them with `name`. A profile's file included twice (by a scene and by an entry that names its
 genre and includes it) defines it once. An asset made for it says `genre: "fighting"` (a sprite, an anim,
 `rig3d()` and `turnaround()` pass it to what they make), and `pxl check` runs the genre's checks on
-it: `"ground"`, the feet (its lowest row) on one row through every frame of a move (fighting);
+it: `"ground"`, the feet (its lowest row) on one row through every frame of a move (fighting), a frame whose
+data says `air` left out (a jump's: `rig3d()`'s `air: true`, or `c.setData({ air: true })`);
 `"height"`, a family (a group whose members all name the genre: a `rig3d()` move's directions, a
 turnaround) standing as tall over its pivot in every direction, its tallest frame each
 (action top-down); `"footprint"`, every frame's drawing reaching down to its `footprint` box, where

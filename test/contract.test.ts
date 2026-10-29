@@ -81,17 +81,18 @@ sprite("x", { w: 1, h: 1 }, px(0, 0, G.steer[1] === 2 && G.name === "racing" && 
   assert.deepEqual(["f_idle_s", "f_idle_e", "bk_idle_s"].map((n) => q.assets.get(n)!.opts.genre), ["td", "td", undefined]);
 });
 
-test("genre checks: the feet on one ground line through a move (fighting); a genre no genre() defines", () => {
+test("genre checks: the feet on one ground line through a move (fighting), a frame in the air left out; a genre no genre() defines", () => {
   const p = loadSource(PAL + `genre("fighting", { checks: ["ground"] })
 anim("step", { frames: 4, fps: 10, w: 4, h: 6, pivot: [2, 6], genre: "fighting" }, (c) => c.rect(1, 0, 2, c.frame === 2 ? 5 : 6, "r"))
 anim("bob", { frames: 2, fps: 10, w: 4, h: 6, genre: "fighting" }, (c) => c.rect(1, c.frame, 2, 6 - c.frame, "r"))
+anim("hop", { frames: 3, fps: 10, w: 4, h: 6, genre: "fighting" }, (c) => { c.rect(1, 0, 2, c.frame === 1 ? 4 : 6, "r"); if (c.frame === 1) c.setData({ air: true }) })
 anim("odd", { frames: 2, fps: 10, w: 1, h: 1, genre: "fightin" }, (c) => c.px(0, 0, "r"))`, "t.px.js");
   const r = checkProject(p);
   assert.deepEqual(r.lines, [
     "step › WARNING: genre 'fighting': its feet aren't on one ground line: its lowest row is 5 (frames 0-1, 3), 4 (frame 2); a move keeps them on one row",
     "odd › WARNING: genre 'fightin' is no genre() here (did you mean 'fighting'?) (there are: fighting): its checks didn't run",
   ]);
-  assert.match(r.coverage, /genres' checks on 6 frames/);
+  assert.match(r.coverage, /genres' checks on 9 frames/);
 });
 
 test("genre checks: a family stands as tall over its ground point in every direction (action top-down)", () => {
