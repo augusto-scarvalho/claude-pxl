@@ -297,6 +297,19 @@ species ([`nature/trees.px.js`](examples/nature/trees.px.js)) built on one growe
 seasons; the Japanese ground and buildings are a kit too ([`nature/japan.px.js`](examples/nature/japan.px.js)).
 It began as a fresh agent's dogfood made with only the skill, and was then reworked in stages.
 
+### A top-down village from the library
+
+<p>
+  <img src="docs/gallery/topdown16_village.gif" width="100%" alt="Animated top-down pixel art of a village's edge in the style of a 16-bit action RPG, bright and saturated: a cottage with a big red tile roof, a porch hood over its door and a stone chimney pot, a teal spruce, a round green oak and a red autumn maple, a bank of brown earth along the top, a dirt path with a lit middle, a fence, a hedge, a bed of flowers, a stump, boulders, a pier into blue water; a pot, a chest, a sign, a crate, a barrel and a lamp post; a brown-haired hero in a blue tunic walks in from the bottom, along the path past an old man who turns to watch him, up past a villager woman and the lamp post, cuts a pot with his sword so that it bursts in dust and shards, and walks out to the left; a slime hops, a dark-haired fighter idles, three hearts at the top left; the pot comes back in a puff of dust before the loop closes">
+</p>
+
+[`examples/village.px.js`](examples/village.px.js): the library's demo for the action top-down
+genre at a 16 px grid (`lib/profiles/topdown16.px.js`), every piece taken from `lib/`. The kit was
+drawn by hand after measuring The Minish Cap's and A Link to the Past's maps for numbers only: the
+ground in regions on corner tiles, round crowns, a house that is mostly roof, a dark line round the
+characters only, one light and one shadow. The hero is the genre's base body, and the villagers and
+Reva are made from him by `hero.character()`; he walks a `route({ px: true })` and cuts the pot.
+
 ### 3D as code: fields, voxels, volumes, splats, decals
 
 <p>

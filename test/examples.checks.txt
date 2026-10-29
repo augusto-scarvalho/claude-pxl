@@ -146,6 +146,8 @@ tropical/trees.px.js: 7 warnings (1 scene (1 frame, 3 distinct placements), 0 ri
   banana2 › WARNING: shrink: 2 scales a finer drawing down alone: 84% of its 2x2 blocks held more than one color, so its detail is a grid 2 times finer than its pixels: one drawing scaled alone mixes densities (scenes §19); redraw it simpler at this one, or say the mix on purpose in its genre (mix: true)
   monstera › WARNING: shrink: 2 scales a finer drawing down alone: 75% of its 2x2 blocks held more than one color, so its detail is a grid 2 times finer than its pixels: one drawing scaled alone mixes densities (scenes §19); redraw it simpler at this one, or say the mix on purpose in its genre (mix: true)
   fanpalm › WARNING: shrink: 2 scales a finer drawing down alone: 83% of its 2x2 blocks held more than one color, so its detail is a grid 2 times finer than its pixels: one drawing scaled alone mixes densities (scenes §19); redraw it simpler at this one, or say the mix on purpose in its genre (mix: true)
+village.px.js: 0 warnings (1 scene (22 frames, 142 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: lit side on 142 (a clear reading on 25), feet on 30, densities on 1; not run: front marker (nothing has one)
 lib/architecture/houses.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: boxes on 1 frame, frozen cells against their live render on 1, cards' cells against their drawing on 1; not run: front marker (nothing has one)
 lib/architecture/japan.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)

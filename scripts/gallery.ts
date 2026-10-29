@@ -51,6 +51,7 @@ const shots: [string, string, number, number?, string?][] = [
   ["sdf/decals.px.js", "grove_showcase", 640, 1, "sdf_grove"],
   ["spell_variants.px.js", "ice_earth", 1168, 1, "spells_ice_earth"],
   ["shrine/shrine.px.js", "shrine", 640, 1, "shrine_autumn"],
+  ["village.px.js", "village", 512, 1, "topdown16_village"],
 ];
 
 // --lib: a contact sheet per subject, each card's cells at frame 0 (a family's s heading), bottoms aligned,
