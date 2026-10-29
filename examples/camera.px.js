@@ -49,7 +49,7 @@ sprite("_far", { w: 320, h: 120, wrap: "x" }, (c) => {
 sprite("_near", { w: 256, h: 120, wrap: "x" }, (c) => {
   for (let x = 0; x < 256; x++) { const top = Math.round(30 + 10 * Math.sin((x / 256) * 2 * Math.PI * 2) + 6 * Math.sin((x / 256) * 2 * Math.PI * 5)); c.vline(x, top, 120 - top, "h"); c.px(x, top, "H") }
 })
-sprite("_sky", { w: W, h: H }, grad(0, 0, W, H, "sSn"))
+sprite("_sky", { w: W, h: H }, grad(0, 0, W, H, "sSn", "v", 0.5, "lines"))   // its tones in by whole rows: a checker behind planes going by seems to crawl
 sprite("heart", `
   .rr.rr.
   rrrrrrr
