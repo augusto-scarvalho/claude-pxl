@@ -784,7 +784,9 @@ what is below: one deep-blue `rect` at `{ blend: "multiply", opacity: 0.7 }` tur
 But every pixel it touches becomes a color nobody picked, and palette swaps in an engine stop
 finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `density`, `glow`,
 `lighting()`); use blend modes for whole-scene grading or true translucency, and tell the user.
-`palettize: true` snaps results back only when the palette already has those tones.
+`palettize: true` snaps results back only when the palette already has those tones. A time of day is
+a palette, as the SNES and GBA games swapped it on the same tiles: a layer's `swap` (a kit's map,
+`{ swap: side.DUSK }`), or the scene's, not a filter (`lib/nature/side.px.js`'s dusk and night).
 
 ## 14. Checking a scene
 

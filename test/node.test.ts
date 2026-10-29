@@ -269,6 +269,21 @@ scene("box", { w: 1, h: 1 }, (c) => c.stamp(BOX.panel, 0, 0))`;
   assert.throws(() => loadProject(file).image("x"), /swap on 'ui\.lamp' \(its keys read in the palette of the file that defines it\): unknown color key 'q'/);
 });
 
+test("a layer's swap recolors all it draws (a stamp, a tilemap, a scroll strip, a function); a stamp's swap on an included entry reads its keys in the entry's palette", () => {
+  // R is green here and blue in the kit; G only the kit has
+  const { dir, file } = tmpArt(`pal({ R: "#00ff00", k: "#000000" })
+include("kit.px.js", { as: "ui" })
+const NIGHT = { "#0000ff": "#000080", "#888888": "#444444", R: "#ffffff" }
+scene("stamped", { w: 2, h: 1 }, stamp("ui.lamp", 0, 0, { swap: { R: "#ff0000", G: "R" } }))
+scene("night", { w: 2, h: 4, bg: "k" }, layer("n", { swap: NIGHT }, stamp("ui.lamp", 0, 0), tilemap("ab", { map: { a: "ui.dot", b: "ui.lamp" }, size: 1, y: 1 }), scroll("ui.strip", 2, 0), px(0, 3, "R"), (c) => c.px(1, 3, "#0000ff")))`);
+  writeFileSync(join(dir, "kit.px.js"), `pal({ R: "#0000ff", G: "#888888" })\nsprite("lamp", "RG")\nsprite("dot", "G")\nsprite("strip", { w: 2, h: 1, wrap: "x" }, "GR")`);
+  const p = loadProject(file), navy = pack(0, 0, 128), grey = pack(68, 68, 68);
+  assert.deepEqual([...p.image("stamped").data], [pack(255, 0, 0), pack(0, 255, 0)], "the kit's R (blue) to red, its G to the includer's R (green)");
+  assert.deepEqual([...p.image("night").data], [navy, grey, grey, navy, grey, navy, pack(255, 255, 255), navy],
+    "the stamp, the tilemap, the strip and the function: the kit's colors by hex, the scene's R by its key");
+  assert.throws(() => loadProject(tmpArt(`pal({ k: "#000000" })\nscene("s", { w: 1, h: 1 }, layer("a", { swap: "dusk" }, px(0, 0, "k")))`).file).image("s"), /layer 'a': swap is a palette map/);
+});
+
 test("use() reads palette files next to the art file: .hex, .gpl, .pal, .txt", () => {
   const files: Record<string, string> = {
     "a.hex": "ff0000\n00ff00\n",

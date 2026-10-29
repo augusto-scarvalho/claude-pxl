@@ -199,6 +199,8 @@ declare global {
     x?: number; y?: number; hidden?: boolean; density?: number; solid?: boolean; wall?: boolean; unlit?: boolean;
     /** With the scene's camera: how much it moves with it, 1 the world (default), 0.2 a far backdrop, 0 the screen (a HUD); or [x, y]. */
     parallax?: number | [number, number];
+    /** A palette map on everything the layer draws (stamps, tiles, strips, functions), keys read in the scene's palette: another time of day (a kit's side.DUSK). */
+    swap?: Record<string, PxColor>;
     shade?: boolean | number | Record<string, PxColor>; light?: boolean | number | Record<string, PxColor>;
     /** A shade layer drawing the shadows of these layers' stamps and tiles (their functions' too: a route's walker), laid down by `cast` ("sun": look3d()'s light on a world: { view: "top" }) or each one's `shadow`, but those named in `except`. */
     of?: string | string[]; cast?: [number, number] | { from: number[]; len?: number } | "sun"; except?: string[];

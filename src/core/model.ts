@@ -53,6 +53,8 @@ export interface LayerOpts {
   ref?: boolean | number;
   /** With the scene's camera: how much the layer moves with it (1 the world, 0.2 a far backdrop, 0 the screen), or [x, y]. */
   parallax?: number | [number, number];
+  /** A palette map (keys or "#hex" to keys or "#hex", read in the scene's palette) on everything the layer draws: a time of day. */
+  swap?: Record<string, string>;
 }
 
 export interface Layer {

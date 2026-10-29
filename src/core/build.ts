@@ -370,6 +370,11 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     try {
       runItems(ctx, l.opts.of === undefined ? l.items : [...l.items, ...castsOf(def, l)], lc, l.loc);
       lc.flush();
+      // a palette map on all it drew (stamps, tiles, strips, functions): the same art at another time of day
+      if (l.opts.swap !== undefined) {
+        if (!l.opts.swap || typeof l.opts.swap !== "object" || Array.isArray(l.opts.swap)) throw new PxError(`layer '${l.name}': swap is a palette map, { key or "#hex": key or "#hex" } (a kit's time of day, side.DUSK), got ${fmtArgs([l.opts.swap])}`, l.loc);
+        limg.data.set(limg.remap(lc.swapMap(l.opts.swap)).data);
+      }
     } catch (e) {
       throw wrap(e, (st) => ctx.locFromStack(st)).within(`layer '${l.name}'`, l.loc);
     } finally {

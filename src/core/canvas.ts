@@ -40,6 +40,8 @@ export interface Resolver {
   warn?(msg: string, loc?: string): void;
   /** Glyph lookup of a font() (rows of "#" / "."), for text(). */
   glyphs(font: string): (ch: string) => string[];
+  /** The palette of the file that defines an asset, and where: a stamp's swap on an included entry reads its keys there. */
+  palOf?(name: string): { pal: Palette; loc?: string } | undefined;
 }
 
 type Pred = (x: number, y: number) => boolean;
@@ -1306,10 +1308,16 @@ export class Canvas {
       }
   }
 
-  swapMap(swap: Record<string, string>): Map<Color, Color> {
+  /**
+   * A swap's colors. With `own` (a stamp of an entry another file defines: an included kit's), its keys
+   * are read in that file's palette and the new ones in this one, as a `base` swap's are; a key one
+   * palette lacks is read in the other ("#hex" anywhere).
+   */
+  swapMap(swap: Record<string, string>, own?: Palette): Map<Color, Color> {
+    const read = (k: string, a: Palette, b?: Palette) => (b && !a.keys.has(k) && b.keys.has(k) ? b : a).resolve(k);
     const m = new Map<Color, Color>();
     for (const from of Object.keys(swap)) {
-      const a = this.color(from), b = this.color(swap[from]);
+      const a = own ? read(from, own, this.pal) : this.color(from), b = own ? read(swap[from], this.pal, own) : this.color(swap[from]);
       if (a !== null && b !== null) m.set(a, b);
     }
     return m;
@@ -1353,15 +1361,18 @@ export class Canvas {
     }
     let src = this.res.image(pick, inner, t, track);
     const swap = opts.rswap ? opts.rswap[Math.floor(r() * opts.rswap.length)] : opts.swap;
+    // an entry of another file (an included kit's): the swap's keys are its own
+    const home = swap && this.res.palOf?.(pick), file = (l?: string) => l?.replace(/:\d+(:\d+)?$/, "");
+    const own = home && file(home.loc) !== file(this.owner?.loc) ? home.pal : undefined;
     if (opts.floor !== undefined && !opts.shade) throw new PxError("floor stops shade's steps above those keys: add shade: n");
     if (opts.shade) {
       // n steps along the ramps, as shade() would on its pixels; what swap names, swap's
       if (!Number.isInteger(opts.shade)) throw new PxError(`shade is how many steps darker along the ramps this copy is (negative: lighter), got ${JSON.stringify(opts.shade)}`);
       const step = this.pal.stepMap(opts.shade > 0 ? -1 : 1, opts.floor === undefined ? undefined : this.pal.floorOf(opts.floor)), m = new Map<Color, Color>();
       for (const c of step.keys()) { let d = c; for (let i = 0; i < Math.abs(opts.shade); i++) d = step.get(d) ?? d; m.set(c, d); }
-      if (swap) for (const [a, b] of this.swapMap(swap)) m.set(a, b);
+      if (swap) for (const [a, b] of this.swapMap(swap, own)) m.set(a, b);
       src = src.remap(m);
-    } else if (swap && Object.keys(swap).length) src = src.remap(this.swapMap(swap));
+    } else if (swap && Object.keys(swap).length) src = src.remap(this.swapMap(swap, own));
     if (opts.silhouette !== undefined) {
       const c = this.color(opts.silhouette);
       if (c !== null) src = src.silhouette(c);

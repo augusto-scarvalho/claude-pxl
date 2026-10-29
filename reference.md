@@ -273,6 +273,7 @@ crop; a `pivot: "bottom"` or `"center"` and `slice` are measured on the result.
 |---|---|
 | `x, y` | Offset of every op in the layer. |
 | `parallax: k \| [kx, ky]` | With the scene's `camera`: how much the layer moves with it, 1 the world (default), 0.2 a far backdrop, 0 the screen (a sky, a HUD); a `scroll()` strip in it keeps covering the picture. |
+| `swap: { a: "b", "#hex": "#hex" }` | A palette map on everything the layer draws (its stamps, tiles, `scroll()` strips, functions), its keys read in the scene's palette: the same art at another time of day, as the SNES and GBA games did it, by palette (a kit's map, `layer("ground", { swap: side.DUSK }, side.ground(MAP))`, keyed by hex so it reads anywhere). A filter or a blend would mix colors off the palette. The whole scene: its own `swap`. |
 | `sort: "y" \| "z"` | Draw the layer's `stamp`s and `scatter` picks sorted instead of in call order: `"y"` by the point they stand on (top-down scenes: what stands lower, nearer the viewer, covers what stands higher), `"z"` by each `stamp`'s `z` option (default 0; scatter picks are always 0). Ties keep call order. Other ops in the layer draw at once, before the sorted stamps. |
 | `hidden: true` | Skip when compositing (still exported with `layers: true`). |
 | `outline: false` | The asset's `outline` / `outline8` / `inline` isn't drawn around this layer's pixels (1 px ropes, pegs, smears stay 1 px), through mirror, flip, rot and angle. Its pixels stay where they are in the drawing order. |
@@ -350,7 +351,7 @@ Animation); an option a placement doesn't take is an error, not ignored:
 |---|---|
 | `flip: "x"\|"y"\|"xy"`, `rot: 90\|180\|270` | mirror or turn this copy |
 | `angle: deg` | (stamp only) this copy turned clockwise round the point it is placed by: its pivot (a part's joint: `pivot: [x, y]` on the elbow, stamped where the elbow is now), else its top-left. As the sprite's `angle` turns it (quarter turns exact, under 12° a shear, the rest RotSprite: no new colors, a 1 px line stays 1 px), but its line is turned with it, not drawn again: for a fresh line, stamp the part unlined, turned, inside a sprite that draws the line. Shading bands inside it turn too and their edges can jag: turn the part flat and paint its bands after, or keep a turned part to one or two tones |
-| `swap: { g: "r" }` | recolor this copy |
+| `swap: { g: "r" }` | recolor this copy; on an entry another file defines (an included kit's), its keys are read in that file's palette and the new ones in yours, as a `base` swap's (a key one lacks, in the other; `"#hex"` anywhere) |
 | `fit: px` | of a group or glob, the member whose drawing is nearest that height (the smaller on a tie): one thing drawn at several sizes, picked by how big it is where it stands. `stamp("walker_*", x, y, { fit: P.scale(z) * 1.75, frame: n })`: a figure far down a road takes the sprite drawn for its size instead of a scaled one |
 | `rflip: "x"\|"y"\|"xy"` | random flips, per copy |
 | `rswap: [{ g: "r" }, {}]` | a random recolor per copy (`{}` = none) |
