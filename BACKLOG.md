@@ -295,6 +295,26 @@ still hold, and the rest wait on these:
 - [ ] **A blob shadow for a walker**: a shade layer `of` the walker's layer casts its silhouette,
   while topdown16's shadow is an ellipse under the foot, so the village draws the hero's ellipse
   at `route`'s `at` by hand. Add a `blob` option for `of`.
+- [ ] **The elbows pxl check flags in approved art**: the traveler's cast wind-up (and the mourner's,
+  on his rig) in e, se, sw and w, frames 1-5, up to 2.5 px; the warden's combo in s, frames 5-6, 15-16
+  and 20, up to 5 px. With the hand drawn back at the shoulder's height a real arm opens sideways, so
+  the profile alone doesn't settle the cast: look at each before giving it an `elbow` hint, and show
+  it before and after.
+- [ ] **An elbow hint per arm**: a pose's `elbow` serves both arms, so with one arm level ahead and
+  the other behind (a jump's apex, a fall) one of them bends wrong; the platformer blocks kept the
+  back hand under the shoulder. One hint per arm, or "anatomical" as an option.
+- [ ] **A hand out of the arm's reach, said**: rig3d shortens it in silence (the platformer study's
+  raised fist landed inside the head). pxl check warns at a leg out of reach; the arm the same.
+- [ ] **The blocks' face patch at pitch 0**: seen from the side and upright, the red face patch
+  sticks 1.5 px out of the head and drowns in its own line; the blocks leant 1 to show it. A bigger
+  patch, or one drawn over the line, in profile.
+- [ ] **`pxl study` and its findings** (the platformer study): it writes `out/_study` beside the
+  file it reads, inside the user's references (`--out` worked round it: default to the working
+  folder, or say where it wrote); it read a 1x GIF of Madeline as "drawn at 2x2.23" and `--px 1` is
+  refused (let 1 say "this is 1x"); on still crops it leaves out the "Light:" line on some (X,
+  Richter, Zero, Vent) and writes "flat" on others, without saying why.
+- [ ] **`rig3d({ ink })` checked against the palette**: an ink key not in `pal` fails only at the
+  stamp ("unknown color key 'k'"); rig3d could say so where it is set.
 
 ## Characters (from dogfooding a 64 px character)
 
