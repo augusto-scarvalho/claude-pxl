@@ -348,6 +348,22 @@ still hold, and the rest wait on these:
 - [ ] **`--world` and `describe` with parallax**: in `--world`, planes under parallax 1 show as if
   the camera stood at 0,0; in `describe`, the MANY lines and the ON TOP/COLOR maps stay in screen
   coordinates while OBJECTS and OFF SCREEN say the world.
+- [ ] **`corners()` for a side view's tiles**: it hands its function a blend of the four corners,
+  not the mask of a tile's open sides, so the platformer kit wrote its own loop over 16 masks and a
+  map reader (`side.ground`). A `sides()` beside `corners()` handing the mask and each open side's
+  distance.
+- [ ] **`own()` giving a kit's prefix**: a kit's function that stamps tiles by names it builds
+  worked round with `own("ground_0_0").slice(0, -10)`. `own()` with no name, or `own.prefix`.
+- [ ] **A kit's color named under its `as`**: an including file can't say `rect(..., "side.x")`, so
+  the platformer test scene copied the hex. Let a kit's key be named under its `as`.
+- [ ] **`pxl lib draft` filling its box**: the platformer16 tree box (4 x 3) fits the oak by its
+  width, so the draft came out 46 x 33 where the hand oak took 48 x 60. Note when a draft fills
+  less than two thirds of the box's height.
+- [ ] **`grid()` with a flip**: the dust's left puff is the right one's rows reversed by a helper;
+  `flip: "x"` (and "y") on `grid()`, as `stamp()` has.
+- [ ] **One crown painter for both kits**: `lib/nature/trees.px.js`'s crown is a const in its block,
+  so `lib/nature/side.px.js` rewrote its lesson as `leafy()`. Hand it out (`trees.crown`), or a 2D
+  "leafy mass" op both call.
 
 ## Characters (from dogfooding a 64 px character)
 
