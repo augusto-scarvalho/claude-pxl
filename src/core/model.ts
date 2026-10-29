@@ -6,6 +6,7 @@ import type { Img } from "./image.ts";
 import type { Canvas } from "./canvas.ts";
 import type { Region } from "./util.ts";
 import type { Rule2d } from "./expect.ts";
+import type { CameraOpts } from "./camera.ts";
 
 /** A drawing op recorded with where it was written. */
 export interface Op {
@@ -50,6 +51,8 @@ export interface LayerOpts {
    * For drawing over a skeleton, a mannequin or a reduced original.
    */
   ref?: boolean | number;
+  /** With the scene's camera: how much the layer moves with it (1 the world, 0.2 a far backdrop, 0 the screen), or [x, y]. */
+  parallax?: number | [number, number];
 }
 
 export interface Layer {
@@ -161,6 +164,8 @@ export interface AssetOpts {
   genre?: string;
   /** Scene: the world's scale, { horizon, eye } (ground seen in perspective) or { scale } (px per meter, flat side view). */
   world?: World;
+  /** Scene: the picture a window onto a bigger world, following a target (camera.ts); null inside a build that finds an id at 0, 0. */
+  camera?: CameraOpts | null;
 }
 
 /**

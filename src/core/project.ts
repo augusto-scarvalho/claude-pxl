@@ -167,8 +167,8 @@ export const OP_OPTS: Record<string, string[]> = {
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
   sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "frozen", "normals", "area", "key", "palettize", "shrink", "facing", "height", "twin", "register", "genre"],
-  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "floor", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "expect", "pixel", "sizes"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check", "genre"],
+  scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "floor", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "expect", "pixel", "sizes", "camera"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check", "genre", "camera"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -191,7 +191,7 @@ function buildBytes(b: BuildOut): number {
   };
   return px(b.img) + px(b.guide) + px(b.under) + b.layers.reduce((s, l) => s + px(l.img), 0) + (b.refs ?? []).reduce((s, r) => s + px(r.img), 0) + b.placements.reduce((s, p) => s + 64 + px(p.img), 0);
 }
-export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "of", "cast", "except", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline"];
+export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "of", "cast", "except", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline", "parallax"];
 const SHEET_OPTS = ["cols", "pad", "extrude", "rows", "slots"];
 /** The checks a genre() can ask pxl check for (check.ts runs them on the assets naming it). */
 export const GENRE_CHECKS = ["ground", "height", "footprint"];
@@ -278,6 +278,8 @@ export interface ProjectOptions {
   timedBytes?: number;
   /** For pxl check: skip the whole-image passes (lighting, glow), which no check reads. */
   checksOnly?: boolean;
+  /** A scene with a camera built as its whole world, the camera's box on it (shot and build --world). */
+  wholeWorld?: boolean;
 }
 
 export class Project implements BuildCtx {
@@ -441,6 +443,7 @@ export class Project implements BuildCtx {
   private readonly timedBudget: number;
   /** Builds for checking only (see BuildCtx.checksOnly). */
   readonly checksOnly: boolean;
+  readonly wholeWorld: boolean;
   /** Timelines gathered from animated assets placed by the builds in progress (innermost last). */
   private collect: Acc[] = [];
   private building = new Set<string>();
@@ -459,6 +462,7 @@ export class Project implements BuildCtx {
     this.where = !!opts.where;
     this.timedBudget = opts.timedBytes ?? TIMED_BYTES;
     this.checksOnly = !!opts.checksOnly;
+    this.wholeWorld = !!opts.wholeWorld;
   }
 
   // ---------------------------------------------------------------- locations

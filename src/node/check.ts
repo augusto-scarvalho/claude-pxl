@@ -21,6 +21,7 @@ import { FLAWS, jointsOf, poseFlaws, viewRows, viewWarnings } from "../core/rig3
 const byHand = (items: Item[]): boolean => items.some((i) => typeof i === "string"
   || (typeof i === "object" && i !== null && ("__layer" in i ? byHand((i as { items: Item[] }).items) : "__op" in i && ["grid", "runs"].includes((i as { name: string }).name))));
 import { frameTime } from "./shot.ts";
+import { inWorld } from "../core/build.ts";
 
 /** `coverage`: which rules ran and on how many, and those that couldn't (nothing to check them on) */
 export interface CheckResult {
@@ -338,13 +339,17 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       if (!keep) p.forget(name, ft);
       const unlit = new Set(b.layers.filter((l) => l.unlit).map((l) => l.name));
       frames++;
-      if (rules) named.push({ f, ...nameAll(b.placements, new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name)), names) });
+      // through a camera: the rules read the world (its ground, its boxes), the checks only what is on the picture
+      const place = b.camera && b.placements.map((q) => inWorld(b, q));
+      const world = place ? b.placements.map((q, i) => ({ ...q, x: place[i].x, y: place[i].y })) : b.placements, shown = place ? world.filter((_, i) => place[i].seen) : world;
+      if (rules) named.push({ f, ...nameAll(world, new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name)), names) });
       // many copies of one small thing (a brush scattered over the ground) are texture, not objects:
       // describe lists them on one line and checks none of them, and so does this, but for where one
       // stands in a mesh() (a tuft floating past a hill's edge)
       const copies = new Map<string, number>();
-      for (const q of b.placements) { copies.set(`${q.name}@${q.layer}`, (copies.get(`${q.name}@${q.layer}`) ?? 0) + 1); used.add(q.name); }
-      for (const q of b.placements) {
+      for (const q of world) used.add(q.name);
+      for (const q of shown) copies.set(`${q.name}@${q.layer}`, (copies.get(`${q.name}@${q.layer}`) ?? 0) + 1);
+      for (const q of shown) {
         const many = copies.get(`${q.name}@${q.layer}`)! > MANY;
         if (many && !standWords(q.stand)) continue;
         const key = `${q.name}|${q.layer}|${q.x},${q.y}|${q.img.w}x${q.img.h}|${hash(q.img.data)}|${q.stand && Math.abs(q.stand.off) > STAND ? q.stand.off.toFixed(2) : ""}`;

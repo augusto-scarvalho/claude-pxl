@@ -136,8 +136,26 @@ declare global {
     /** px to an art pixel (w and h the picture's): mesh(), the 3D ops, meshSocket() and post() draw that many times as big */
     pixel?: number;
     /** the same scene k times as big under other names, not checked ({ name_hd: 4 }); post() runs only there */
-    sizes?: Record<string, number> }
-  interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; /** a frame's ms instead of fps, or each frame's (as many frames) */ ms?: number | number[]; loop?: boolean; dir?: "forward" | "reverse" | "pingpong"; /** checked as a scene (c.as() names what its functions paint) */ world?: PxWorld; check?: boolean | { every: number } }
+    sizes?: Record<string, number>;
+    camera?: PxCamera }
+  /** The picture a window onto a bigger world, following a target as a side-scroller's camera does (scenes §10). */
+  interface PxCamera {
+    /** the world's size, px */
+    world: [number, number];
+    /** the target's feet at a frame, [x, y] (a route's at) or [x, y, onGround]; or a stamp's id */
+    follow?: ((f: number) => readonly unknown[] | null | undefined) | string;
+    /** where the target rests on the picture, shares of its size (default [0.5, 0.66]) */
+    rest?: [number, number];
+    /** the box round the rest point the target moves in freely, px (default [16, 64]) */
+    window?: [number, number];
+    /** px it looks ahead the way the target last went (default 64), turning once it has gone `turn` px back (default 16) */
+    ahead?: number; turn?: number;
+    /** share of the way it goes a frame (default 0.1 a frame at 60 fps), at most `speed` px a frame (default 360 px a second) */
+    ease?: number; speed?: number;
+    /** y moves when the target lands on another height, not while it jumps (default true); with no third value, standing is y still `settle` frames (default 3) */
+    snap?: boolean; settle?: number;
+  }
+  interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; /** a frame's ms instead of fps, or each frame's (as many frames) */ ms?: number | number[]; loop?: boolean; dir?: "forward" | "reverse" | "pingpong"; /** checked as a scene (c.as() names what its functions paint) */ world?: PxWorld; check?: boolean | { every: number }; camera?: PxCamera }
   interface PxFrame { ms?: number; hold?: number }
   interface PxCard {
     is: string;
@@ -179,6 +197,8 @@ declare global {
     /** Draw the layer's stamps sorted: "y" by where they stand (top-down props), "z" by their z. */
     sort?: "y" | "z";
     x?: number; y?: number; hidden?: boolean; density?: number; solid?: boolean; wall?: boolean; unlit?: boolean;
+    /** With the scene's camera: how much it moves with it, 1 the world (default), 0.2 a far backdrop, 0 the screen (a HUD); or [x, y]. */
+    parallax?: number | [number, number];
     shade?: boolean | number | Record<string, PxColor>; light?: boolean | number | Record<string, PxColor>;
     /** A shade layer drawing the shadows of these layers' stamps and tiles (their functions' too: a route's walker), laid down by `cast` ("sun": look3d()'s light on a world: { view: "top" }) or each one's `shadow`, but those named in `except`. */
     of?: string | string[]; cast?: [number, number] | { from: number[]; len?: number } | "sun"; except?: string[];
@@ -657,6 +677,8 @@ declare global {
 
   interface PxCanvas {
     readonly w: number; readonly h: number; readonly seed: number;
+    /** What of the canvas shows on the picture, [x, y, w, h] in its own coordinates (a scene's camera moves it): to skip work off it. */
+    readonly view: [number, number, number, number];
     /** Time in ms; inside an anim (or a scene animated by what it places) also the frame index, frame count and frame / frames. */
     readonly t: number; readonly frame: number; readonly frames: number; readonly phase: number;
     /** Drawing a twin: every x lands mirrored (for the few choices a mirror doesn't make by itself). */

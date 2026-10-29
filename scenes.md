@@ -444,6 +444,11 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   from a point: `plume()`; soot or mist that comes and goes:
   thin it by `0.5 - 0.5·cos(2π·t)`, fading to nothing at the edge of the part that moves.
 - Gaits: a stride a whole number of frames, and the loop a multiple of every stride in it.
+- A level run to its end (a scene's `camera`, §10): the picture fades to black over the last frames and
+  in from black over the first, so the jump back to the start is never seen: a last layer with
+  `parallax: 0` and `(c) => c.dither(0, 0, W, H, ".", "k", k)`, k going from 0 to 1
+  (`examples/camera.px.js`). Or a title held while the camera eases back: `follow` gives the start
+  again, and the camera's speed limit makes the way back a pan.
 
 ## 10. Parallax (planes going by at their own speeds)
 
@@ -478,6 +483,17 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   of speed by the motion itself, and by the gauges.
 - Mist or haze at the foot of each far plane keeps them apart; the plane nearest the eye goes by too
   fast for detail: streaks along the motion (`examples/parallax/train.px.js`).
+- **A level bigger than the picture** (a side-scroller, a platformer): the scene's
+  `camera: { world: [w, h], follow }`, the level drawn where it is in the world, and the picture a
+  window that follows the target each frame (a `route()`'s `at`; `[x, y, onGround]` when it jumps).
+  As games do (Itay Keren's "Scroll Back"; the numbers Sonic's, `PXL help camera`): the target moves
+  freely in a small box round its rest point, the camera looks ahead the way it runs, moves in y only
+  when it lands on another height (a jump doesn't shake the picture), stops at the world's edges, and
+  eases under a speed limit, in whole px. Each layer's `parallax`: 1 the world, 0.5 and 0.2 the
+  backdrops (strips that wrap, `scroll(name, y, 0)`: still in their layer, they keep covering the
+  picture), 0 the sky and the HUD. `PXL shot <file> <scene> --world --frames 0,60,120` shows the whole
+  world with the camera's box, to judge the framing; `describe` says where each thing is in the world
+  and what is off the picture (`examples/camera.px.js`).
 
 ## 11. Shadows and light
 

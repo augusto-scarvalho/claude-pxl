@@ -6,7 +6,7 @@
 // maps for the layout (object on top, color, light), the painting steps grouped by source line,
 // and a region's exact pixels on request (`at`). Object lists beat raw grids for models reading
 // layout (ARC: LLMs and the Abstraction and Reasoning Corpus, arXiv 2305.18354).
-import type { BuildOut } from "./build.ts";
+import { type BuildOut, inWorld } from "./build.ts";
 import type { Placement } from "./canvas.ts";
 import { type Color, TRANSPARENT, oklab, toHex } from "./color.ts";
 import { profile } from "./util.ts";
@@ -226,6 +226,8 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
   else if (wo?.horizon !== undefined && wo.eye)
     out.push(`WORLD: ground in perspective, horizon at y ${wo.horizon}, eye ${wo.eye} m up: a thing standing on row y is (y - ${wo.horizon}) / ${wo.eye} px per meter, ` +
       `so a 1.8 m figure is ${[Math.round(wo.horizon + (H - wo.horizon) / 3), H].map((y) => `${Math.round((1.8 * (y - wo.horizon!)) / wo.eye!)} px at y ${y}`).join(", ")}; anything at eye height sits on the horizon.`);
+  const cam = b.camera, world = (i: number) => (cam ? inWorld(b, b.placements[i]) : undefined);
+  if (cam) out.push(`CAMERA: the picture shows x ${cam.at[0]}-${cam.at[0] + W - 1}, y ${cam.at[1]}-${cam.at[1] + H - 1} of a world ${cam.world.join("x")}; the ranges below are on the picture, "world" where a thing is in the world (a layer with parallax moves less: 0 stays on the screen).`);
   out.push("");
   // objects: every placement but the many-copies ones (one with an id is always one), each with its relations worked out
   const many = new Set(keys.filter((k) => byKey.get(k)!.filter((p) => !p.id).length > MANY));
@@ -395,15 +397,23 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     out.push("");
   }
 
+  // through a camera: what is placed but off the picture, said once where it is in the world
+  const off: string[] = [], box = (i: number) => {
+    const p = b.placements[i], w = world(i)!, bb = p.img.bounds() ?? { x: 0, y: 0, w: p.w, h: p.h };
+    return `world x ${w.x + bb.x}-${w.x + bb.x + bb.w - 1}, y ${w.y + bb.y}-${w.y + bb.y + bb.h - 1}`;
+  };
   if (main.length) {
     out.push("OBJECTS (in drawing order: later ones are in front; ranges are inclusive px; feet = bottom middle):");
     for (const i of main) {
       const p = b.placements[i], sh = shown[i];
+      if (cam && !world(i)!.seen) { off.push(`${label(i)} (${box(i)})`); continue; }
       // an anim can draw nothing at the moment described (sparks between clashes): that is not hidden
       const head = `  ${sym.get(kOf(i))} ${label(i)}${p.id ? ` (${p.name})` : ""} @${p.layer ?? "-"}: `;
       if (!sh.n) { out.push(head + (sh.all ? `hidden (all ${sh.all} px covered)` : "nothing drawn in this frame")); continue; }
       const parts = [`x ${sh.x0}-${sh.x1}, y ${sh.y0}-${sh.y1} (${sh.x1 - sh.x0 + 1}x${sh.y1 - sh.y0 + 1}), feet ${Math.round((sh.x0 + sh.x1) / 2)},${sh.y1}`];
       if (sh.n < sh.all) parts.push(`${Math.round((100 * sh.n) / sh.all)}% shows`);
+      const w = world(i);
+      if (w && (w.x !== p.x || w.y !== p.y)) parts.push(box(i));
       parts.push(`colors ${keysOf(i)}`);
       out.push(head + parts.join("; "));
       const rel: string[] = [];
@@ -420,7 +430,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
       const turned = p.img.orient && (p.img.orient.f || p.img.orient.mirrored || tiltOf(p.img.orient)) ? orientWords(p.img.orient) : "";
       let size = "";
       const bb = p.img.bounds();
-      const check = placementChecks(p, wo, steps, unlitLayers.has(p.layer ?? ""), b.lamps).join("; ");
+      const check = placementChecks(cam ? { ...p, x: world(i)!.x, y: world(i)!.y } : p, wo, steps, unlitLayers.has(p.layer ?? ""), b.lamps).join("; ");
       if (wo && p.img.meters && bb) {
         const lying = p.img.orient && Math.abs(Math.abs(tiltOf(p.img.orient)) - 90) <= 45;
         // (drawn in 3D on its origin: from its pivot up, the front of its footprint below that not counted)
@@ -456,6 +466,7 @@ export function describe(name: string, b: BuildOut, pal: Palette, opts: Describe
     }
     out.push("");
   }
+  if (off.length) out.push(`OFF SCREEN (placed, not on the picture now): ${off.join("; ")}`, "");
   if (many.size) {
     out.push("MANY (small things placed many times, one line each):");
     for (const k of many) {

@@ -181,6 +181,8 @@ sheet globs.
 - **Function**: `(c) => { ... }` gets the canvas; call ops as methods (`c.rect(...)`), plus
   `c.w`, `c.h`, `c.is(x, y, "ab")` (pixel is one of these keys; `"*"` opaque, `"."` transparent),
   `c.key(x, y)`, `c.get(x, y)` (packed color), `c.rng(seed)` (deterministic, follows reseed),
+  `c.view` (`[x, y, w, h]`: what of the canvas shows on the picture, in its own coordinates; a scene's
+  `camera` moves it: to skip work off it),
   `c.size(name)` (`{ w, h }` of an asset as it would be placed, for layouts),
   `c.subpixel(dx, dy, () => { ... })` (what the function draws, laid down moved by dx, dy, between
   pixels too, as `stamp`'s `sub` lays an asset: subpixel motion for parts drawn in code);
@@ -217,7 +219,7 @@ sheet globs.
 
 ### Sprite / scene options
 
-Scenes take `w`, `h`, `bg`, `world`, the transforms, the outlines, `crop`, `layers`, `pivot` and `wrap`;
+Scenes take `w`, `h`, `bg`, `world`, `camera`, the transforms, the outlines, `crop`, `layers`, `pivot` and `wrap`;
 the rest are for sprites and anims (a scene refuses them by name), and `bg` for scenes only; an anim
 with a `world` (and `check`) is checked as a scene (functions naming what they paint with `c.as()`).
 
@@ -254,6 +256,7 @@ with a `world` (and `check`) is checked as a scene (functions naming what they p
 | `facing: "right" \| "left" \| "front" \| "back"` | Which way it faces as drawn ("front": toward us). Flips and turns carry it, and `PXL describe` says for each placement where it faces, which way its top points (upright, lying, upside down, leaning), which of its sides is toward us, and when it is a mirror image (a flip moves a sword to the other hand). Lettering is tracked even without `facing`: a mirrored sign gets a warning that it reads backwards. In a rig, a part whose `facing` differs from the rig's is called out. It is a label: pxl does not read the pixels to check it. |
 | `height: meters` | Its real height. In a scene with `world`, describe says how tall it should be where it stands, and how far off the drawing is. It measures the drawing's box, top to bottom: a thing seen at an angle (a tent, a cart, a log) has its far end higher on screen, which the box counts too, so judge its near end yourself (describe says so when a wide thing comes out too tall). |
 | `world: { horizon, eye }` or `{ scale }` | Scene (an anim too: then checked as a scene): the world's scale. Ground in perspective: the horizon's row and the eye's height in meters (a thing standing on row y is (y − horizon) / eye px per meter, as in `perspective()`); flat side view: `scale` px per meter, `view: "top"` a flat world seen from above (a map, its up away from us: a top-down RPG's). Used by describe with `height`. `light: [x, y]` (where the light comes from; `"sun"`: `look3d()`'s light as things standing up show it, the one sun for the 3D ops, the lit side and a shade layer's `cast: "sun"`): describe reads each object's lit side off its rim and warns when it disagrees (a flipped copy is lit from the other side). `light: { at: [x, y] }`: a point light in the scene (a fire, a lamp): each object is checked against the way from its middle to that point, and the one it sits in isn't checked. Without `light`, each object is read against the light it was drawn under: the lamp its scene's `lighting()` lit by that is strongest at its middle (by its `power` and `r`, walls not counted), or a sprite in `mesh()` against the mesh's `light` through its camera; `light: false`: not read. `ground: y` (flat views), or a profile `[x0, y0, x1, y1, ...]` (a cave's floor: the row under each thing's feet, as `profile()`; `stamp(name, x, "ground")` stands on it), or several (`[floor, ledge]`: the floor everywhere, each ledge over its own span; the feet read against the one nearest them, `"ground"` the first): what has a `height` is checked for floating or sinking; with or without it, a thing whose feet aren't where it was stamped (its pivot below its sole) is called out. |
+| `camera: { world: [w, h], follow, rest?, window?, ahead?, turn?, ease?, speed?, snap?, settle? }` | Scene (an anim too): the picture is a window `w` x `h` onto a world of `world`'s size, moved each frame to follow a target as a side-scroller's camera does (scenes §10). Everything is drawn and stamped where it is in the world; a layer's `parallax` says how much it moves with the camera (0: the screen, a HUD). `follow`: a function of the frame giving the target's feet `[x, y]` (a `route()`'s `at`), or `[x, y, onGround]`, or a stamp's `id` (each frame built once more to find it). The camera keeps the target in a box `window` px (default `[16, 64]`, Sonic's) round its rest point `rest` (shares of the picture, default `[0.5, 0.66]`); looks `ahead` px the way it last went (default 64, Sonic CD's), turning round once it has gone `turn` px back (default 16); with `snap` (default true) moves in y only when the target lands on another height, not while it jumps (on the ground: no third value, its y still for `settle` frames, default 3); stays inside the world; and goes `ease` of the way a frame (default 0.1 a frame at 60 fps), never more than `speed` px a frame (default 360 px a second, Sonic's 6 a frame at 60 fps), in whole px. Defaults given a second hold at any fps. What is off the window costs little: stamps, `rect` (so `hline`, `vline`), `ellipse` and `poly` touch only what lands in it. `describe` says where each thing is in the world and what is off the picture; `check` reads the world's ground and `expect` rules in world coordinates, and judges only what is on the picture; `shot --world` and `build --world` show the whole world with the camera's box each frame. `examples/camera.px.js` |
 | `sizes: { name: k }` | Scene: the same scene k times as big under each name (`sizes: { plaza_hd: 4 }`, `examples/hd2d/plaza.px.js`), each with `pixel: k` and `check: false`: one scene drawn at several sizes, the small one checked. `post()` runs only at the sizes (what the camera does to the HD picture), its px the art's. |
 | `pixel: k` | Scene: px to a pixel of the art (`w` and `h` the picture's): `c.k` in its functions; `mesh()` draws its camera k times as big (`perspective()`'s or a view's), its sprites' pixel k x k and its materials in blocks of k, ramps and textures (a texel a block, as pixel art; a material's own `block` wins: `block: 1` for a texture laid finer); `surface()`, `voxels()`, `volume()`, `splats()`, `decal()` through the camera a ray a block; `c.meshSocket()` the same; `post()`'s `blur`, `focus`, `bloom.r` and `pixel` in the art's px (`px: true` keeps the picture's). `text()` doesn't follow (draw it at `c.k`'s scale yourself); `bubble()` does (`unit`). For one size with a clock of its own (an excerpt: `harbor_clip`). |
 | `check: false` | Scene: `pxl check` (and the examples' test) skip it, saying so. For an HD render of a scene that is checked at its own size (`sizes` gives it). `check: { every: n }` checks one frame in n: a long story (the graveyard's 484 frames) at the cost of a short loop. |
@@ -269,6 +272,7 @@ crop; a `pivot: "bottom"` or `"center"` and `slice` are measured on the result.
 | Option | Meaning |
 |---|---|
 | `x, y` | Offset of every op in the layer. |
+| `parallax: k \| [kx, ky]` | With the scene's `camera`: how much the layer moves with it, 1 the world (default), 0.2 a far backdrop, 0 the screen (a sky, a HUD); a `scroll()` strip in it keeps covering the picture. |
 | `sort: "y" \| "z"` | Draw the layer's `stamp`s and `scatter` picks sorted instead of in call order: `"y"` by the point they stand on (top-down scenes: what stands lower, nearer the viewer, covers what stands higher), `"z"` by each `stamp`'s `z` option (default 0; scatter picks are always 0). Ties keep call order. Other ops in the layer draw at once, before the sorted stamps. |
 | `hidden: true` | Skip when compositing (still exported with `layers: true`). |
 | `outline: false` | The asset's `outline` / `outline8` / `inline` isn't drawn around this layer's pixels (1 px ropes, pegs, smears stay 1 px), through mirror, flip, rot and angle. Its pixels stay where they are in the drawing order. |
@@ -721,11 +725,11 @@ painting replay ends ("animate" toggle).
 ## CLI
 
 ```
-node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif] [--out DIR]
+node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif] [--world] [--out DIR]
 node <pxl>/bin/pxl.js shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
 node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings] [--fix]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
-node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
+node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
 node <pxl>/bin/pxl.js ascii <file> <name> [--frame N]
 node <pxl>/bin/pxl.js list  <file>
@@ -738,7 +742,9 @@ node <pxl>/bin/pxl.js blind <file> <name...> [--out DIR]   |   blind <file> --ch
 node <pxl>/bin/pxl.js study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--px N] [--out DIR | --no-out]
 ```
 
-`build --share N` also writes `out/share/`: each asset N times bigger, nearest neighbour, clear kept,
+`shot --world` and `build --world`: a scene with a `camera` as its whole world, the camera's box on it
+(a magenta line) at each frame, its layers at the camera's 0, 0 and those of the screen (`parallax: 0`) left out, to judge the framing (`--frames` a strip of moments; `build --world`
+to another `--out`, its files named as the scene's). `build --share N` also writes `out/share/`: each asset N times bigger, nearest neighbour, clear kept,
 no checker or grid, a GIF when it moves: to post. `shot` writes `<name>_look.png` when its check has
 LOOK lines (the pixels they name ringed: L-corners orange, jaggies blue), and a clip's note gives each
 shown frame's ms.

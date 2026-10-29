@@ -13,6 +13,7 @@ import { type AssetDef, type FrameOpts, type GlowOpts, type Item, type Layer, ty
 import type { Palette } from "./palette.ts";
 import { Trace } from "./trace.ts";
 import { bayer, fmtArgs, gridRows, gridSize, profile, type Region } from "./util.ts";
+import { CAMERA_OPTS, type CameraOpts, cameraPath } from "./camera.ts";
 
 export interface BuildCtx extends Resolver {
   /** Art-file location from an error stack, if any frame points into an art file. */
@@ -21,6 +22,8 @@ export interface BuildCtx extends Resolver {
   callerLoc(): string | undefined;
   /** Builds for checking only: the whole-image passes (lighting, glow) are skipped; no check reads them. */
   readonly checksOnly?: boolean;
+  /** A scene with a camera is built as its whole world, the camera's box drawn on it (shot --world). */
+  readonly wholeWorld?: boolean;
 }
 
 export interface LayerOut {
@@ -54,6 +57,41 @@ export interface BuildOut {
   clocked?: boolean;
   /** The lamps its lighting() lit by (drawing coordinates). */
   lamps?: Lamp[];
+  /** A scene's camera at this frame: its top-left in the world, the world's size, and how far each layer was moved ("" the top level's): a placement's world place is its own plus its layer's. */
+  camera?: { at: [number, number]; world: [number, number]; shift: Record<string, [number, number]> };
+}
+
+/** A placement's place in the world, seen through a camera (its layer's shift added back), and whether any of its box is on the picture. */
+export function inWorld(b: BuildOut, p: Placement): { x: number; y: number; seen: boolean } {
+  const [sx, sy] = b.camera?.shift[p.layer ?? ""] ?? [0, 0];
+  return { x: p.x + sx, y: p.y + sy, seen: p.x < b.img.w && p.y < b.img.h && p.x + p.w > 0 && p.y + p.h > 0 };
+}
+
+/** Each scene's camera path on each clock it is built on (it is worked out frame by frame from 0): a scene's first build has none yet. */
+const paths = new WeakMap<AssetDef, Map<string, (f: number) => [number, number]>>();
+/**
+ * The scene's camera (`camera: { world, follow, ... }`) at frame f: its top-left in the world. A stamp's id
+ * to follow is found by building the frame with the camera at 0, 0, where the scene's coordinates are the world's.
+ */
+function cameraAt(ctx: BuildCtx, def: AssetDef, seed: number, f: number, tOf: (f: number) => number, ms: number, clock?: Timeline): [number, number] {
+  const kept = paths.get(def) ?? paths.set(def, new Map()).get(def)!, key = `${ms}/${clock?.loop}`;
+  let path = kept.get(key);
+  if (!path) {
+    const o = def.opts.camera as CameraOpts;
+    if (typeof o !== "object" || o === null || Array.isArray(o)) throw new PxError(`camera is { world: [w, h], follow, ... }, got ${fmtArgs([o])}`);
+    for (const k of Object.keys(o)) if (!CAMERA_OPTS.includes(k)) throw new PxError(`camera: unknown option '${k}' (allowed: ${CAMERA_OPTS.join(", ")})`);
+    // (camera null: built with the camera at 0, 0)
+    const id = o.follow, still = { ...def, opts: { ...def.opts, camera: null } } as unknown as AssetDef;
+    // ponytail: following an id builds each frame once more; a function of the frame (a route's at) is free
+    const target = typeof id === "function" ? id : typeof id === "string" ? (g: number) => {
+      const p = buildAsset(ctx, still, seed, undefined, tOf(g), clock).placements.findLast((q) => q.id === id);
+      // (where it was stamped: its pivot, else its top-left)
+      return p && [p.x + Math.floor(p.img.pivot?.[0] ?? 0), p.y + Math.floor(p.img.pivot?.[1] ?? 0)];
+    } : id === undefined ? () => null : undefined;
+    if (!target) throw new PxError(`camera: follow is a function of the frame giving [x, y] (a route's at) or [x, y, onGround], or a stamp's id, got ${fmtArgs([id])}`);
+    kept.set(key, (path = cameraPath(o, [def.opts.w!, def.opts.h!], ms, target)));
+  }
+  return path(f);
 }
 
 /** An anim's frames: count and durations (ms), from its frame() items or { frames, fps }. */
@@ -180,10 +218,21 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   const at = tl ? frameAt(tl, t) : 0;
   const frame = tl?.order ? tl.order[at] : at, frames = tl ? drawnFrames(tl) : 1;
   const tick = !tl && clock ? { frame: Math.round(t / clock.step), frames: Math.max(1, Math.round(clock.loop / clock.step)) } : undefined;
+  // a camera: the picture a window onto a bigger world, its top-left there this frame (--world: the whole world, the camera's box on it)
+  const cam = opts.camera == null ? undefined : cameraAt(ctx, def, seed, tick?.frame ?? at,
+    (f) => (tl ? tl.durations!.slice(0, f).reduce((a, d) => a + d, 0) : f * (clock?.step ?? 0)), clock?.step ?? (tl ? tl.loop / tl.durations!.length : 1000 / (opts.fps ?? 8)), clock);
+  const whole = cam && ctx.wholeWorld ? (opts.camera as CameraOpts).world : undefined, look = whole || opts.camera === null ? [0, 0] : cam;
+  // how far a layer moves with it: by its parallax (1 the world, 0 the screen)
+  const shift: Record<string, [number, number]> = {}, moved = (name: string, k: unknown = 1): [number, number] => {
+    if (!look) { if (k !== 1) throw new PxError(`layer '${name}': parallax moves a layer with the scene's camera: give the ${def.kind} camera: { world, follow }`); return [0, 0]; }
+    const [kx, ky] = typeof k === "number" ? [k, k] : Array.isArray(k) ? k : [NaN, NaN];
+    if (!(Number.isFinite(kx) && Number.isFinite(ky))) throw new PxError(`layer '${name}': parallax is how much it moves with the camera, a number (1 the world, 0.2 far off, 0 the screen) or [x, y], got ${fmtArgs([k])}`);
+    return (shift[name] = [Math.round(look[0] * kx), Math.round(look[1] * ky)]);
+  };
   let base: Img;
   if (def.kind === "scene") {
     if (!opts.w || !opts.h) throw new PxError("scene needs { w, h }");
-    base = new Img(opts.w, opts.h);
+    base = whole ? new Img(whole[0], whole[1]) : new Img(opts.w, opts.h);
     if (opts.bg) {
       const bg = pal.resolve(opts.bg);
       if (bg !== null) base.fill(bg);
@@ -207,7 +256,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
       h ??= s.h;
     }
     if (!(w >= 1 && h >= 1)) throw new PxError("no size: give { w, h } or a grid string");
-    base = new Img(w, h);
+    base = whole ? new Img(whole[0], whole[1]) : new Img(w, h);
   }
 
   // Current layer being painted, so traced frames show the composite in progress.
@@ -254,7 +303,13 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     c.groundAt = groundAt;
     return c;
   };
-  const main = timed(new Canvas(base, pal, ctx, 0, 0, seed));
+  // moved by the camera: drawn at the world's coordinates less its shift, the ground still the world's
+  const onCamera = (c: Canvas, [sx, sy]: [number, number]) => {
+    c.ox -= sx; c.oy -= sy;
+    if (groundAt && (sx || sy)) c.groundAt = (x) => groundAt(x + sx) - sy;
+    return c;
+  };
+  const main = onCamera(timed(new Canvas(base, pal, ctx, 0, 0, seed)), moved(""));
   hook(main);
   // After lighting(), pixels it changed still count as their palette color for glow().
   let preLight: { before: Uint32Array; after: Uint32Array } | undefined, lamps: Lamp[] | undefined;
@@ -297,9 +352,11 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     snap?.("lighting", loc);
   };
   runItems(ctx, def.items, main, def.loc, onPass, (l) => {
+    // the whole world: what stays on the screen (parallax 0: a sky, a HUD, a fade) isn't in it
+    if (whole && [l.opts.parallax].flat().every((k) => k === 0)) return;
     under ??= base.copy();
     const limg = new Img(base.w, base.h);
-    const lc = timed(new Canvas(limg, pal, ctx, l.opts.x ?? 0, l.opts.y ?? 0, seed));
+    const lc = onCamera(timed(new Canvas(limg, pal, ctx, l.opts.x ?? 0, l.opts.y ?? 0, seed)), moved(l.name, l.opts.parallax));
     lc.layerName = l.name;
     lc.below = base;
     if (l.opts.sort !== undefined) {
@@ -363,9 +420,12 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     snap?.(`register on '${typeof opts.register === "string" ? opts.register : opts.register.key}'`, def.loc);
   }
   const img = finish(base, def, pal, trace, loose);
+  // the whole world: the camera's box on it, a magenta line round what it shows this frame
+  if (whole && cam) for (let i = 0; i < opts.w!; i++) for (let j = 0; j < opts.h!; j++) if (!i || !j || i === opts.w! - 1 || j === opts.h! - 1) img.set(cam[0] + i, cam[1] + j, pack(255, 0, 255));
   trace?.finish(img);
   const guide = refs.length ? guideOver(img, refs, def) : undefined;
-  return { img, layers, trace, anim: tl, placements: log, ...(lamps ? { lamps } : {}), ...(tick ? { clocked: true } : {}), ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}) };
+  return { img, layers, trace, anim: tl, placements: log, ...(lamps ? { lamps } : {}), ...(tick ? { clocked: true } : {}), ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}),
+    ...(cam ? { camera: { at: cam, world: (opts.camera as CameraOpts).world, shift } } : {}) };
 }
 
 /**

@@ -151,6 +151,8 @@ export class Canvas {
 
   get w(): number { return this.img.w; }
   get h(): number { return this.img.h; }
+  /** What of this canvas shows on the picture, [x, y, w, h] in its own coordinates (a scene's camera moves it): to skip what is off it. */
+  get view(): [number, number, number, number] { return [-this.ox, -this.oy, this.img.w, this.img.h]; }
 
   color(c: unknown): Resolved {
     return this.pal.resolve(c);
@@ -349,7 +351,10 @@ export class Canvas {
 
   rect(x: number, y: number, w: number, h: number, c: string): void {
     const col = this.color(c);
-    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) this.plot(xx, yy, col);
+    // only the rows and columns that can land on the image (a level's floor far from a scene's camera costs
+    // nothing), stepping from x and y as ever, so a rect at a fraction lands on the same pixels
+    const [ya, yb] = this.span(y, y + h, "y"), [xa, xb] = this.span(x, x + w, "x"), x0 = x + Math.max(0, Math.ceil(xa - x));
+    for (let yy = y + Math.max(0, Math.ceil(ya - y)); yy < yb; yy++) for (let xx = x0; xx < xb; xx++) this.plot(xx, yy, col);
   }
 
   box(x: number, y: number, w: number, h: number, c: string): void {

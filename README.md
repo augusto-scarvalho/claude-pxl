@@ -391,7 +391,9 @@ everything burning by `flame()`.
 The [train](examples/parallax/train.px.js): the land runs past in planes that wrap (`scroll`), each a
 whole number of px a frame, so none judders and the loop closes. The
 [race](examples/perspective/race.px.js): the road bending through the camera, rivals drawn by hand at
-seven sizes, the cockpit modelled in meters and drawn by `mesh()`, each mirror another camera.
+seven sizes, the cockpit modelled in meters and drawn by `mesh()`, each mirror another camera. A level
+longer than the picture: a scene's `camera` follows the hero as a platformer's does, each layer moving
+by its `parallax` ([camera](examples/camera.px.js)).
 
 ### Journey's end, a Halloween party, a tropical forest
 

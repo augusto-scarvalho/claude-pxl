@@ -51,7 +51,7 @@ const USAGE = `pxl — pixel-art DSL
       its own height at the px a meter; in the genre's tones and ink; a cell alone (side, topdown at 45 degrees, iso, hd2d):
       3 tones at 16-32 px. Built to out/_draft/ (or DIR): the ✎ draft to clean by hand, or ◐ to look
       at. A 2D entry is redrawn simpler at a new density, never drafted.
-  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile]
+  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
       previews (out/_preview; animated assets also get a .gif). --share N also writes out/share/:
       each asset N times bigger, nearest neighbour, clear kept, no checker or grid (and a GIF when
@@ -62,7 +62,8 @@ const USAGE = `pxl — pixel-art DSL
       editing in Aseprite; pxl never reads it back and the next --aseprite build overwrites it, so
       copy it out of out/. --profile: where the time went, read off the CPU profiler: the slowest
       assets, then the functions that spent the most time themselves, in the art file (what to make
-      faster: work done again every frame, a noise called millions of times) and in pxl.
+      faster: work done again every frame, a noise called millions of times) and in pxl. --world: a
+      scene with a camera as its whole world, the camera's box on it (a magenta line) each frame.
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
       Live viewer: rebuilds on save and replays each asset's painting steps.
   pxl ascii <art.px.js> <name> [--frame N]
@@ -130,7 +131,7 @@ const USAGE = `pxl — pixel-art DSL
       what is placed by a relation to it moves too), searched without a model and written into the file
       where the number is (a computed one is said and left); it says each change, and the rules
       that held still hold (a scene's checked rebuilt before anything is written).
-  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--out DIR]
+  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--world] [--out DIR]
   pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
       to the region, side by side (in rows when too wide for one: a contact sheet), enlarged,
@@ -149,6 +150,8 @@ const USAGE = `pxl — pixel-art DSL
       --gif plays them instead, side by side (8 to a row), each its own loop on one clock, to
       <out>/_shot/<names>.gif: a walk in 8 directions, two versions of a scene moving; --every N
       builds and plays one frame in N (a long scene's preview before a build, its size printed).
+      --world: a scene with a camera as its whole world, the camera's box on it (a magenta line), the
+      screen's layers (parallax 0) left out, to judge the framing (--frames for a strip of moments).
   pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
@@ -241,6 +244,7 @@ interface Args {
   seconds?: number;
   fps?: number;
   px?: number;
+  world?: boolean;
 }
 
 function parse(argv: string[]): Args {
@@ -304,6 +308,7 @@ function parse(argv: string[]): Args {
     else if (v === "--dry") a.dry = true;
     else if (v === "--allow") a.allow = val().split(",").map((s) => s.trim()).filter(Boolean);
     else if (v === "--profile") a.profile = true;
+    else if (v === "--world") a.world = true;
     else if (v === "--colors") a.colors = Number(val());
     else if (v === "--to") {
       const m = /^(\d+)x(\d+)$/.exec(val().trim());
@@ -367,7 +372,7 @@ export async function main(argv: string[]): Promise<number> {
   try {
     switch (a.cmd) {
       case "build": {
-        const build = () => { const p = loadProject(file); return { p, r: writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every, share: a.share }) }; };
+        const build = () => { const p = loadProject(file, { wholeWorld: a.world }); return { p, r: writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every, share: a.share }) }; };
         let report = "";
         const { p, r } = a.profile ? await profiled(build).then(({ result, profile }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times); return result; }) : build();
         for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);
@@ -587,7 +592,7 @@ export async function main(argv: string[]): Promise<number> {
           const have = asked.filter((f) => f < n);
           return have.length ? have : [0];
         };
-        const projects = new Map<string, Project>(), proj = (f: string) => projects.get(f) ?? projects.set(f, loadProject(f)).get(f)!;
+        const projects = new Map<string, Project>(), proj = (f: string) => projects.get(f) ?? projects.set(f, loadProject(f, { wholeWorld: a.world })).get(f)!;
         const shots = entries.map((e) => {
           if (MEDIA.test(e)) return { png: resolve(e), name: basename(e).replace(MEDIA, "") };
           const m = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(e);
