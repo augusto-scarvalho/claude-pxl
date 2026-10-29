@@ -45,7 +45,8 @@ Each card's cells, frame 0, its name and cell under it (the swatch: green ✓, a
 builder drawn at its first cell. Made by `node scripts/gallery.ts --lib`.
 
 **Props** (`props/`): lamps and crates from the examples' scenes; a top-down village's pot (and its break),
-chest, sign, crate, barrel, lamp post and fence (`village.px.js`).
+chest, sign, crate, barrel, lamp post and fence (`village.px.js`); a platformer's crate, lamp post and spinning
+coin, side on (`side.px.js`, `platformer16`).
 
 ![props](../docs/gallery/lib/props.png)
 
@@ -53,7 +54,9 @@ chest, sign, crate, barrel, lamp post and fence (`village.px.js`).
 builders, the oak, the maple and the spruce also by hand at `topdown/16` (their 3D drafts frozen in
 `frozen/`); the cave's caps; the top-down island's ground (`island.px.js`: the shore, a path and a darker
 grass by corners, the field's tiles, tall grass, a bank's earth front and a hedge in rows of tiles, flowers
-and a bed of them, a bush, a rock, a stump).
+and a bed of them, a bush, a rock, a stump); a platformer's world side on (`side.px.js`, `platformer16`: the
+ground as tiles by their open sides under a grass lip, their faces and undersides ragged, slopes, water, an oak, a
+pine, two bushes, the backdrop's far and near clouds and hills; `side.ground(map)` draws a level).
 
 ![nature](../docs/gallery/lib/nature.png)
 
@@ -61,16 +64,17 @@ and a bed of them, a bush, a rock, a stump).
 they wear (`dress.px.js`), the top-down hero and the people made from him (`hero.character()`: two villagers,
 Reva's chibi), the same hero side on for a platformer (`hero_side.px.js`, `platformer16`: idle, walk, run, a dash
 with its afterimage and dust, a jump in four to loop the rise and the fall (jump, apex, fall, land), hurt), a slime,
-the knight.
+the knight, a beetle that walks (a platformer's enemy).
 
 ![characters](../docs/gallery/lib/characters.png)
 
 **Architecture** (`architecture/`): the shrine's builders, the HD-2D surfaces, the cottage (by hand at
-`topdown/16`, mostly roof; its 3D draft frozen), the island's pier.
+`topdown/16`, mostly roof; its 3D draft frozen), the island's pier; a platformer's one-way platforms, ladder,
+spikes and door (`side.px.js`).
 
 ![architecture](../docs/gallery/lib/architecture.png)
 
-**UI** (`ui/`): the dialogue box, the 5x7 font, life hearts.
+**UI** (`ui/`): the dialogue box, the 5x7 font, life hearts (top-down and side on).
 
 ![ui](../docs/gallery/lib/ui.png)
 
@@ -79,11 +83,11 @@ fields style, drafted at their first cells.
 
 ![styles](../docs/gallery/lib/styles.png)
 
-**VFX** (`vfx/`): a puff of dust (the volumes' densities have no picture).
+**VFX** (`vfx/`): a puff of dust, and side on a landing's and a running heel's (the volumes' densities have no picture).
 
 ![vfx](../docs/gallery/lib/vfx.png)
 
 `styles/` holds palettes (and, in `fields`, the cards of the engine's own builders, `make3d.rock`,
 `house`, `bush`, `pine`, drawn in its colors), `profiles/` the genres (`topdown16`, `topdown32`,
 `platformer16`, `hd2d`, `fighting`, `racing_behind`, `racing_topdown`: each number's source beside
-it) and their starter kits, `vfx/` the volumes' densities and a puff of dust.
+it) and their starter kits, `vfx/` the volumes' densities and dust.

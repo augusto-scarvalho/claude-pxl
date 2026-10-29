@@ -57,7 +57,7 @@ test("genre(): its density a tile's px or px a meter, its mix said; its cell as 
 test("pxl lib: the catalog by subject, filters by cell and genre", () => {
   const all = libList();
   assert.match(all[0], /^pxl's library \(lib\/\), by subject/);
-  assert.ok(all.some((l) => /^props +lib\/props: crates lamps village$/.test(l)));
+  assert.ok(all.some((l) => /^props +lib\/props: crates lamps side village$/.test(l)));
   assert.throws(() => libList({ cell: "side/x" }), /--cell is <camera>\/<density>/);
   assert.throws(() => libList({ genre: "racing-behind" }), /no genre 'racing-behind' in lib\/profiles/);
   assert.throws(() => findEntry("nothing.here"), /no entry 'nothing\.here' in the library/);
