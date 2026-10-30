@@ -460,6 +460,30 @@ From the platformer demo (F5 3j-3k, `examples/nightfall/`):
   close in 60 s for a scene whose own `frames` are its loop (closed through black).
 - [ ] **`shot --gif --vs`**: before and after for a phone, one above the other, took a PIL script.
 
+From top-down 32's bodies at 48 px (F5 4a-4d, `lib/characters/hero.px.js`'s G32 and SLIM32):
+- [ ] **A smear that follows the blade in 3D**: `arc()` is a ring in the picture; it can't follow the
+  tip's path seen from 45 degrees nor hide behind the body where the blade swings round his back. The
+  crescent took 240 `j.rod` lines in a draw hook. `j.smear(path, width(t), paint)` in rig3d.
+- [ ] **A foot that rolls**: rig3d's foot is a level ball, with no heel strike and no toe-off; `lift`
+  raises the whole foot. A pose's `roll` per foot.
+- [ ] **Hair and cloth after the body**: the head is baked and the plain outfit has no drapes, so
+  nothing lags a frame or two as in every reference (`dress()` has trail and sway).
+- [ ] **A stride seen from above**: a long leg's true stride runs down the screen (the slim's feet
+  11-13 rows apart walking facing us, the refs 3-5). Worked round by a cell's `deep`; it belongs in
+  rig3d, as `soles` now does.
+- [ ] **The lean by the heading**: rig3d leans the spine the way the shoulders face, so a lean in an
+  attack that turns them 80 degrees tilted the head 4 rows. Worked round in `posed()`.
+- [ ] **A bob apart from the stride**: the stride grows with the leg (`legs`) while the bob stays in
+  screen px, so the slim's run reached past its bones by a pixel. A cell's `bob`.
+- [ ] **rig3d cuts at its frame silently**: the fists and the leaning head were cut at the genre's
+  32 x 64 frame with no word. A warning when a pose leaves `w`/`h`.
+- [ ] **`genre` on a rig's blocks**: it goes to the painted moves only, so the lab wrapped each block
+  anim in an anim naming the genre (6 lines).
+- [ ] **`pxl study` on frames**: a move given as a folder of frames with pivots, an atlas, joint tracks
+  or a packed sheet with no rects took a dozen throwaway scripts; and screenshots upscaled by a
+  fraction (2.83) read as "not pixel art". A study of a frame folder, and the pixel size found by
+  the grid's period.
+
 ## Characters (from dogfooding a 64 px character)
 
 Each of these was first worked around by hand in an art file or by a Python script on the side.
