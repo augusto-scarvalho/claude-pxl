@@ -364,6 +364,45 @@ still hold, and the rest wait on these:
 - [ ] **One crown painter for both kits**: `lib/nature/trees.px.js`'s crown is a const in its block,
   so `lib/nature/side.px.js` rewrote its lesson as `leafy()`. Hand it out (`trees.crown`), or a 2D
   "leafy mass" op both call.
+- [ ] **The village's props in 3D** (F5 3e): the well, the hay cart and the barrels are drawn by hand
+  (`lib/props/side_village.px.js`); the houses won in 3D finished by hand (`make3d.old_house`, the
+  painted details set into what the model cuts), and these might gain the same way (a well's ring and
+  roof, a cart's wheels at any heading, barrels in a stack). Not now, by the brief.
+
+From the village and the castle (F5 3d-3f):
+- [ ] **A kit included twice**: included files share one scope, so a lab file and its scene both
+  including `side_village.px.js` failed ("Identifier 'village' has already been declared"). Include
+  a file once per build, or scope each include.
+- [ ] **`make3d.define` params taking a word**: `gate: "none"` was refused ("gate is -1 to 1"), so
+  the castle grew a second param (`gatehouse: "yes" | "no"`). Let a number param also take named
+  values.
+- [ ] **Painted courses on whole px under a pitched view**: side on 10 degrees down, heights scale by
+  cos 10, so 0.5 m courses fell 7.88 px apart and some joints drew 2 px (the draft passes
+  `0.5 / cos 10`). And a `paint` whose period projects under 2 px (tile joints on a gable seen end
+  on) turns to noise: warn, or offer a period in screen px.
+- [ ] **`surface()` and closed planes**: a hipped roof as four planes and a floor was refused ("the
+  field goes on without end") though the five close it; worked round by intersecting a box.
+- [ ] **A socket from a 3D model**: a gargoyle stands on the wall-walk behind the parapet, 7 px under
+  the crenels' sill (`G - 65`, `G - 76`), a number only the cards say in prose. Let `turnaround()`
+  carry a model's named points to the side view as sockets a scene stamps at.
+- [ ] **Density by parallax**: the keep behind the curtain is drawn at 12 px/m for a plane at 0.75
+  the playfield's speed; `pxl check`'s density rule can't be told a layer's density follows its
+  parallax.
+- [ ] **A card status for "by hand, waiting for the gate"**: ✓ approved, ◐ a render, ✎ by hand over
+  a draft; new hand art awaiting the user has no mark of its own.
+- [ ] **`c.clip(region, fn)` inside a function** calls `fn` with no canvas ("Cannot read properties
+  of undefined (reading 'stamp')"). Pass it the canvas.
+- [ ] **`hashes.ts --vs HEAD` covering `lib/`**: with no files it hashes `examples/` only, so a
+  brief's guard skipped the lib entries. Hash `lib/` too by default.
+- [ ] **Before and after from a file**: to show an entry before and after, a lib file was copied
+  aside and a scene built twice and stacked by script. A `shot --vs <file>` beside `--vs HEAD`.
+- [ ] **`pxl shot a b` names its file**: it writes `_shot/a+b.png` and says no path, and a stale
+  `_shot/b.png` was looked at first. Print the path.
+- [ ] **A `log()` in a .px.js**: picking a seed for which lancets are lit, the only way to print a
+  value was to throw. A `log()` that `build` and `shot` print.
+- [ ] **`_n` scenes and normal maps**: scenes `show` and `show_n` built in `shot`, then `build`
+  refused the file (the `_n` suffix names normal maps). `shot` should say so too, or the normal maps
+  take another suffix.
 
 ## Characters (from dogfooding a 64 px character)
 
