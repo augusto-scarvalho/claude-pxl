@@ -179,7 +179,8 @@ directions walking, idle, kneeling and casting;
    sw, w, nw, n })`: front, front 3/4, profile, back 3/4, back, their crown, chin and anchor on the
    same rows); drawn once per view, a head costs nothing per frame.
 5. **The walk by the view** (§6): facing us or away the feet lift in their own columns, in profile a
-   long stride, on the diagonals between (`gait()`'s numbers).
+   long stride, on the diagonals between (`gait()`'s numbers). Seen from steeply above (a top-down game's
+   45 degrees) a foot nearer us stands lower: `soles: true` puts every view's soles on one row.
 
 `pxl check` reads every pose at every heading: both feet off the ground (it floats; `air: true` on a
 jump's frames), a leg pulled longer than its bones, an elbow bent forward (ahead of the shoulder-hand

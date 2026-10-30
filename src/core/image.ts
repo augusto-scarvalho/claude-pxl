@@ -80,6 +80,8 @@ export class Img {
   boxes?: Record<string, [number, number, number, number][]>;
   /** This frame's data for an engine (`c.setData`: a move's phase, its damage), exported with the frame. */
   info?: Record<string, unknown>;
+  /** A rig3d() figure's box before its draw hooks (without the sword it holds): the genre's height check reads it. It travels like the boxes, never exported. */
+  figure?: [number, number, number, number];
 
   constructor(w: number, h: number, data?: Uint32Array) {
     w = Math.floor(w);
@@ -121,6 +123,7 @@ export class Img {
     if (this.parts) o.parts = { ids: this.parts.ids.slice(), names: [...this.parts.names] };
     if (this.boxes) o.boxes = moveBoxes(this.boxes, (x, y) => [x, y]);
     if (this.info) o.info = { ...this.info };
+    if (this.figure) o.figure = [...this.figure];
     return o;
   }
 
@@ -133,6 +136,7 @@ export class Img {
     if (this.sockets) o.sockets = mapPoints(this.sockets, f);
     if (this.boxes) o.boxes = moveBoxes(this.boxes, f);
     if (this.info) o.info = { ...this.info };
+    if (this.figure) o.figure = moveBoxes({ f: [this.figure] }, f).f[0];
     if (this.meters) o.meters = this.meters;
     if (this.grounded) o.grounded = true;
     if (this.orient) {

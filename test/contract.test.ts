@@ -104,6 +104,16 @@ group("pair", ["walk_s", "walk_e"])`, "t.px.js");
   assert.deepEqual(checkProject(p).lines, ["walk › WARNING: genre 'td': its directions aren't one height: s 7, e 7, n 6, w 7 px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces"]);
 });
 
+test("genre checks: a rig3d() figure's height is its own, not the sword its hook raises over its head", () => {
+  // the n view's sword stands 12 px over the head: the figure as tall in every direction
+  const p = loadSource(PAL + `genre("td", { checks: ["height"] })
+rig3d("f", { body: { h: 30, heads: 3 }, headings: ["s", "e", "n"], w: 20, h: 48, pivot: [10, 44], genre: "td", parts: (j) => ({ body: j.limb(j.pelvis, j.head, 3, 3, "w") }),
+  moves: { cut: { frames: 1, pose: () => ({}), draw: (c, j) => { if (j.heading === 0) j.rod(j.head, [j.head[0], j.head[1], j.head[2] + 12], "r") } } } })`, "t.px.js");
+  assert.ok(keys(p, "f_cut_n").includes("r"));
+  assert.deepEqual(checkProject(p).lines, []);
+  assert.deepEqual(p.image("f_cut_n").figure, p.image("f_cut_s").figure);
+});
+
 test("turnaround: a footprint box where the thing meets the ground at each heading; genre checks: the drawing reaches it (racing)", () => {
   const p = loadSource(PAL + `ramps("krw")
 genre("racing", { checks: ["footprint"] })

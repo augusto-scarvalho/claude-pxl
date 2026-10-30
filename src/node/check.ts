@@ -410,14 +410,15 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   }
   // a genre's families (a group whose members all name it: rig3d()'s moves, a turnaround()): one height
   // across the directions, how far its top stands over its pivot (its ground point) at its tallest frame
-  // (no pivot: its ink's height), so the feet that land a row apart seen from behind don't count
+  // (no pivot: its ink's height), so the feet that land a row apart seen from behind don't count; a rig3d()
+  // figure's top without what its hooks drew (the sword raised over its head)
   if (!opts.names) for (const [gname, G] of p.groups) {
     if (opts.file && (G.loc ?? "").split(":")[0] !== opts.file) continue;
     let ms: string[];
     try { ms = p.candidates(gname); } catch { continue; }
     const gn = p.assets.get(ms[0])?.opts.genre, genre = gn === undefined ? undefined : p.genres.get(gn);
     if (!genre?.checks.includes("height") || ms.length < 2 || !ms.every((m) => p.assets.get(m)?.opts.genre === gn)) continue;
-    const fs = ms.map((m) => frameImgs(p, m)), hs = fs.map((f) => Math.max(...f.map((im) => { const b = im.bounds(); return !b ? 0 : im.pivot ? Math.round(im.pivot[1] - b.y) : b.h; })));
+    const fs = ms.map((m) => frameImgs(p, m)), hs = fs.map((f) => Math.max(...f.map((im) => { const b = im.figure ? { y: im.figure[1], h: im.figure[3] } : im.bounds(); return !b ? 0 : im.pivot ? Math.round(im.pivot[1] - b.y) : b.h; })));
     ran.genre += fs.flat().length;
     if (new Set(hs).size > 1) lines.push(`${gname} › WARNING: genre '${gn}': its directions aren't one height: ${ms.map((m, i) => `${m.slice(m.lastIndexOf("_") + 1)} ${hs[i]}`).join(", ")} px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces`);
   }

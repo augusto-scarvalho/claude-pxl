@@ -217,6 +217,27 @@ test("rig3d: a pose's elbow hint bends the elbows its way (the default as it was
   assert.deepEqual(p.drawn("bk_hop_e").map((f) => f.img.info), [undefined, { air: true }]);
 });
 
+test("rig3d: a pose's rise lifts the chest and the head along the spine over a still pelvis, the legs as they were", () => {
+  const B = bodyOf({ h: 34, heads: 3 }), a = jointsOf(B, { lean: 10 }, 90), b = jointsOf(B, { lean: 10, rise: 2 }, 90);
+  assert.deepEqual([b.pelvis, b.legs], [a.pelvis, a.legs]);
+  assert.ok(Math.abs(dist(b.chest, a.chest) - 2) < 1e-9 && Math.abs(dist(b.head, a.head) - 2) < 1e-9 && b.head[2] > a.head[2], `${b.head} ${a.head}`);
+  assert.throws(() => jointsOf(B, { rise: "1" as unknown as number }, 90), /a pose's rise/);
+});
+
+test("rig3d: soles puts each heading's soles on the row they end on facing us (a profile's near foot, a heel toward us), the feet moved by a pose's away", () => {
+  const B = bodyOf({ h: 53.4, heads: 2.81, hip: 14, thigh: 7, shin: 5.6, ankle: 1.4, torso: 20.6, neck: 9.25, hips: 4.8, r: { foot: [3, 4, 1.8] } }), a = jointsOf(B, {}, 180), b = jointsOf(B, { away: 2 }, 180);
+  assert.deepEqual([b.pelvis, b.legs.map((L) => L.hip)], [a.pelvis, a.legs.map((L) => L.hip)]);
+  assert.ok(b.legs.every((L, i) => Math.abs(L.ankle[1] - 2 - a.legs[i].ankle[1]) < 1e-9 && L.ankle[0] === a.legs[i].ankle[0]));
+  const low = (soles: boolean) => {
+    const p = loadSource(`${PAL}rig3d("g", { body: ${JSON.stringify({ h: 53.4, heads: 2.81, hip: 14, thigh: 7, shin: 5.6, ankle: 1.4, torso: 20.6, neck: 9.25, hips: 4.8, r: { foot: [3, 4, 1.8] } })}, headings: ["s", "e", "n"], pitch: 45, w: 36, h: 64, pivot: [17, 54], ink: "k", blocks: true, soles: ${soles}, moves: { idle: { frames: 1, pose: () => ({}) } } })`, "t.px.js");
+    return ["s", "e", "n"].map((d) => { const im = p.image(`bk_idle_${d}`); let y = im.h - 1; while (!im.data.slice(y * im.w, (y + 1) * im.w).some((v) => (v & 255) >= 128)) y--; return y; });
+  };
+  const [was, now] = [low(false), low(true)];
+  assert.ok(was[1] > was[0] && was[0] > was[2], `as seen from above: the profile's near foot lowest, the heels highest ${was}`);
+  assert.deepEqual(now, [was[0], was[0], was[0]]);
+  assert.throws(() => loadSource(`${PAL}rig3d("g", { blocks: true, soles: 1, moves: { m: { frames: 1, pose: () => ({}) } } })`, "t.px.js"), /soles is true/);
+});
+
 test("surface: pieces of one part parted by its own darkest tone, parts by the line; decal: depth, how far a nearer surface may be and still take it", () => {
   const p = loadSource(`${PAL}
 ramps("kgw", "krw")

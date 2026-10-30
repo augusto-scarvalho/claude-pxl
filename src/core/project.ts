@@ -7,7 +7,7 @@ import { solid } from "./solids.ts";
 import { model, turnFaces, turnPoint } from "./mesh.ts";
 import { Sdf, compile, sdf } from "./sdf.ts";
 import { COMPASS, clocksOf, contactOf, headingsOf, mirrorSymmetric, topOf, turnLight, turnViews } from "./turnaround.ts";
-import { BLOCK_MATS, type Body, type Joints, type Pose, blocksOf, bodyOf, gait, ik3, jointsOf, partsOf } from "./rig3d.ts";
+import { BLOCK_MATS, type Body, type Joints, type Pose, blocksOf, bodyOf, gait, ik3, jointsOf, partsOf, solesOf } from "./rig3d.ts";
 import { SURFACE_OPTS, VOXEL_OPTS, projection, surfaceSize } from "./surface.ts";
 import { Mesh3, Voxels, surfaceNets, voxelize } from "./grids.ts";
 import { VOLUME_OPTS } from "./volume.ts";
@@ -941,14 +941,17 @@ export class Project implements BuildCtx {
       try {
         if (typeof given !== "string" || !given || !isPlainObject(opts)) throw new PxError('rig3d("tr", { body: { h: 34, heads: 3 }, moves: { walk: { frames: 8, ms: 110, pose: (i, heading) => ({ feet, lift, hands }) } }, n: 8, blocks: true })');
         const name = this.qualify(given);
-        checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "ink", "surface", "head", "chin", "blocks", "mirror", "draw", "genre"]);
-        const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; ink?: unknown; surface?: Record<string, unknown>; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown; genre?: string };
+        checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "ink", "surface", "head", "chin", "blocks", "mirror", "draw", "genre", "soles"]);
+        const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; ink?: unknown; surface?: Record<string, unknown>; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown; genre?: string; soles?: unknown };
         if (o.surface !== undefined) { if (!isPlainObject(o.surface)) throw new PxError("rig3d: surface is surface()'s options for the painted figure ({ soft, shadows, ao, rim, ... })"); checkKeys("rig3d surface", o.surface, SURFACE_OPTS.filter((k) => !["view", "ppm", "at", "part"].includes(k))); }
         if (o.chin !== undefined && typeof o.chin !== "string" && !(Array.isArray(o.chin) && o.chin.length === 2 && o.chin.every((k) => typeof k === "string" && k) && !o.head))
           throw new PxError(`rig3d: chin is a key (the line under the head), or with a head modeled [key, the skin's ramp] (the line under the jaw only), got ${JSON.stringify(o.chin)}`);
         if (o.ink !== undefined && typeof o.ink !== "string") throw new PxError(`rig3d: ink is a key: the line round the figure outside and round each part on the one behind (instead of surface()'s outline on the shadow side), got ${JSON.stringify(o.ink)}`);
         const B: Body = bodyOf(o.body ?? {}), H = headingsOf(o.n ?? 8, o.headings, false), pitch = o.pitch ?? 20;
         if (!(pitch >= 0 && pitch <= 90)) throw new PxError(`rig3d: pitch is degrees down, 0 to 90 (20: a field sprite's), got ${JSON.stringify(pitch)}`);
+        if (![true, false, undefined].includes(o.soles as boolean)) throw new PxError(`rig3d: soles is true (each heading's feet moved along the view's depth so the soles end on the row they do facing us) or false, got ${JSON.stringify(o.soles)}`);
+        // soles: every pose's feet moved by its heading's share (rig3d.ts solesOf), pxl check's reach reading them there
+        const away = o.soles ? solesOf(B, H.map((hd) => hd.deg), pitch) : undefined;
         let prefix = o.blocks === true ? "bk" : o.blocks === false || o.blocks === undefined ? undefined : o.blocks;
         if (prefix !== undefined && (typeof prefix !== "string" || !prefix)) throw new PxError(`rig3d: blocks is true (bk_<move>_<dir>) or a prefix for their names, got ${JSON.stringify(o.blocks)}`);
         if (prefix !== undefined) prefix = this.qualify(prefix);
@@ -964,7 +967,8 @@ export class Project implements BuildCtx {
           if (!(Number.isInteger(frames) && frames! >= 1) || !(Array.isArray(ms) ? ms.length === frames && ms.every((v) => v > 0) : ms > 0) || typeof pose !== "function" || (draw !== undefined && typeof draw !== "function"))
             throw new PxError(`rig3d: move '${m}' is { frames (a whole number), ms (each frame's, or a list, a number a frame: [60, 40, 60, 80]), pose: (i, heading) => pose, dirs?, draw? }, got ${JSON.stringify(M)}`);
           if (dirs !== undefined && !(Array.isArray(dirs) && dirs.every((d) => H.some((h) => h.name === d)))) throw new PxError(`rig3d: move '${m}''s dirs are some of its headings (${H.map((h) => h.name).join(", ")}), got ${JSON.stringify(dirs)}`);
-          return { m, frames: frames!, ms, pose: pose as (i: number, h: number) => Pose, heads: H.filter((h) => !dirs || (dirs as string[]).includes(h.name)), draw: draw as ((c: Canvas, j: Joints, p: Pose) => void) | undefined };
+          const posed = pose as (i: number, h: number) => Pose;
+          return { m, frames: frames!, ms, pose: away ? (i: number, hd: number) => { const q = posed(i, hd); return { ...q, away: (q.away ?? 0) + (away.get(hd) ?? 0) }; } : posed, heads: H.filter((h) => !dirs || (dirs as string[]).includes(h.name)), draw: draw as ((c: Canvas, j: Joints, p: Pose) => void) | undefined };
         });
         const SP = Math.sin((pitch * Math.PI) / 180), CP = Math.cos((pitch * Math.PI) / 180);
         // where a point lands on the sprite (its foot point at the pivot) and how near us it is: the joints' escape hatch
@@ -1082,6 +1086,8 @@ export class Project implements BuildCtx {
             }
           }
           j.rod = rodOn(c, hd);
+          // what the figure is before its hooks draw what it holds (a sword): the genre's height check reads it
+          if (M.draw || o.draw) { const b = c.img.bounds(); if (b) c.img.figure = [b.x, b.y, b.w, b.h]; }
           if (p.air === true) c.setData({ air: true });
           M.draw?.(c, j, p);
           (o.draw as ((c: Canvas, j: Joints, p: Pose) => void) | undefined)?.(c, j, p);

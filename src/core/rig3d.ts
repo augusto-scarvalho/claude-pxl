@@ -70,16 +70,18 @@ export function bodyOf(spec: Record<string, unknown> = {}): Body {
 
 /**
  * A pose: the file's own numbers, each with a default. feet: [[forward, right], ...] of each foot
- * (left, right) on the floor from under the pelvis; lift: each foot up; down: the pelvis lowered; lean:
+ * (left, right) on the floor from under the pelvis; lift: each foot up; down: the pelvis lowered; rise: the
+ * chest and the head raised along the spine over a still pelvis (a breath; a head that lags the bob); lean:
  * degrees forward, tilt: to the right; turn: the hips turned from the heading (degrees, clockwise from
  * above), twist: the shoulders against the hips, head: the head against the shoulders; hands:
  * [[forward, right, up], ...] of each hand from its shoulder; grip: both hands on one line instead (a
  * broom, a staff), `from` and `to` [forward, right, up] from under the pelvis as the shoulders face, each
  * hand `at` [left, right] of the way; elbow: the way the elbows bend, [forward, out, up] in the shoulders'
  * frame (out mirrored for the left arm; default [-0.4, 0.5, -1], mostly down); air: in the air (a jump's
- * frames: pxl check doesn't ask its feet to be on the ground, the frame's data says air).
+ * frames: pxl check doesn't ask its feet to be on the ground, the frame's data says air); away: both feet moved
+ * that far from us along the view's depth (px; rig3d's soles sets it by heading).
  */
-export interface Pose { feet?: number[][]; lift?: number[]; down?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; elbow?: number[]; grip?: { from: number[]; to: number[]; at: number[] }; air?: boolean; [k: string]: unknown }
+export interface Pose { feet?: number[][]; lift?: number[]; down?: number; rise?: number; away?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; elbow?: number[]; grip?: { from: number[]; to: number[]; at: number[] }; air?: boolean; [k: string]: unknown }
 
 /** A piece of a part: its field, and where on it a point is: h along it (0..1) and a round it (radians from the way the body faces, toward its right), and its paint. */
 export interface Piece { field: Sdf; at: (p: V3) => [number, number, V3]; paint?: unknown }
@@ -121,7 +123,7 @@ const pairs = (v: unknown, d: number[][], n: number, what: string) => {
 export function jointsOf(B: Body, p: Pose, heading: number): Joints {
   const turn = num(p.turn, 0, "turn"), twist = num(p.twist, 0, "twist"), hdeg = num(p.head, 0, "head");
   const { f, r } = frameAt(heading + turn), sh = frameAt(heading + turn + twist), hd = { ...frameAt(heading + turn + twist + hdeg), heading: heading + turn + twist + hdeg };
-  const lean = num(p.lean, 0, "lean") * RAD, tilt = num(p.tilt, 0, "tilt") * RAD, down = num(p.down, 0, "down");
+  const lean = num(p.lean, 0, "lean") * RAD, tilt = num(p.tilt, 0, "tilt") * RAD, down = num(p.down, 0, "down"), rise = num(p.rise, 0, "rise"), away = num(p.away, 0, "away");
   const lift = (p.lift ?? [0, 0]) as number[];
   if (!Array.isArray(lift) || lift.length !== 2 || !lift.every(Number.isFinite)) throw new PxError(`rig3d: a pose's lift is [left, right], got ${JSON.stringify(p.lift)}`);
   const feet = pairs(p.feet, [[0, -B.hips], [0, B.hips]], 2, "feet"), reach = B.upper + B.fore;
@@ -135,10 +137,10 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
     throw new PxError(`rig3d: a pose's grip is { from: [forward, right, up], to: [...] (px from under the pelvis), at: [left, right] (each hand's share of the way) }, got ${JSON.stringify(p.grip)}`);
   const grip = g && ([local([0, 0, 0], sh, ...g.from), local([0, 0, 0], sh, ...g.to)] as [V3, V3]);
   const spine = unit(add(add(mul(UP, Math.cos(lean)), mul(sh.f, Math.sin(lean))), mul(sh.r, Math.sin(tilt))));
-  const pelvis: V3 = [0, 0, B.hip - down], chest = add(pelvis, mul(spine, B.torso)), head = add(chest, mul(spine, B.neck));
+  const pelvis: V3 = [0, 0, B.hip - down], chest = add(pelvis, mul(spine, B.torso + rise)), head = add(chest, mul(spine, B.neck));
   const k = B.r.foot[1] / 2.3;
   const legs = [0, 1].map((i) => {
-    const hip = local(pelvis, { f, r }, 0, i ? B.hips : -B.hips, 0), ankle = local([0, 0, B.ankle + lift[i]], { f, r }, feet[i][0], feet[i][1], 0);
+    const hip = local(pelvis, { f, r }, 0, i ? B.hips : -B.hips, 0), ankle = local([0, away, B.ankle + lift[i]], { f, r }, feet[i][0], feet[i][1], 0);
     return { hip, ankle, knee: ik3(hip, ankle, B.thigh, B.shin, add(f, [0, 0, 0.3])), foot: add(ankle, mul(f, 1.1 * k)) };
   });
   const arms = [0, 1].map((i) => {
@@ -231,6 +233,30 @@ export function blocksOf(B: Body, j: Joints): Sdf {
   return sdf.union(parts).intersect(GROUND);
 }
 export const BLOCK_MATS = Object.fromEntries(Object.entries(BLOCKS).map(([k, v]) => [k, [v]]));
+
+/**
+ * rig3d's soles: how far (px, away from us) each heading's feet stand along the view's depth so that the rest
+ * pose's lowest foot point (the blocks' foot: its ball and the shin's end round the ankle, down to the ground) lands
+ * on the row it does facing us:
+ * seen from above, a foot nearer us stands lower, so a profile's near foot (the hips' width nearer) and a heel
+ * toward us (facing away, the toes ahead) end on rows of their own.
+ */
+export function solesOf(B: Body, headings: number[], pitch: number): Map<number, number> {
+  const SP = Math.sin(pitch * RAD), CP = Math.cos(pitch * RAD), [a, b, c] = B.r.foot, e = B.r.leg[2];
+  // the lowest point on the screen (more is lower) of the feet's ellipsoids and the shins' ends above the ground, sampled
+  const low = (deg: number) => {
+    const j = jointsOf(B, {}, deg);
+    let m = -Infinity;
+    for (const L of j.legs) for (let u = 0; u < 48; u++) for (let v = 0; v <= 24; v++) {
+      const cu = Math.cos((u * Math.PI) / 24), su = Math.sin((u * Math.PI) / 24), sv = Math.sin((v * Math.PI) / 24), cv = Math.cos((v * Math.PI) / 24);
+      for (const q of [add(add(add(L.foot, mul(j.r, a * cu * sv)), mul(j.f, b * su * sv)), [0, 0, c * cv]), add(L.ankle, [e * cu * sv, e * su * sv, e * cv])])
+        if (q[2] >= -0.2) m = Math.max(m, -q[1] * SP - q[2] * CP);
+    }
+    return m;
+  };
+  const ref = low(180);
+  return new Map(headings.map((d) => [d, (low(d) - ref) / (SP || 1)]));
+}
 
 /**
  * What parts(j, pose) gives, as one field: { name: piece, field or a list of them }, each piece its
