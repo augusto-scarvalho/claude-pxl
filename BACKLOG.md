@@ -465,7 +465,8 @@ From top-down 32's bodies at 48 px (F5 4a-4d, `lib/characters/hero.px.js`'s G32 
   tip's path seen from 45 degrees nor hide behind the body where the blade swings round his back. The
   crescent took 240 `j.rod` lines in a draw hook. `j.smear(path, width(t), paint)` in rig3d.
 - [ ] **A foot that rolls**: rig3d's foot is a level ball, with no heel strike and no toe-off; `lift`
-  raises the whole foot. A pose's `roll` per foot.
+  raises the whole foot, and a passing or kicked-back foot can't point its toe down to show its sole
+  (F5 4f: the slim's passing leg could only change its knee and its place). A pose's `roll` per foot.
 - [ ] **Hair and cloth after the body**: the head is baked and the plain outfit has no drapes, so
   nothing lags a frame or two as in every reference (`dress()` has trail and sway).
 - [ ] **A stride seen from above**: a long leg's true stride runs down the screen (the slim's feet
@@ -483,6 +484,28 @@ From top-down 32's bodies at 48 px (F5 4a-4d, `lib/characters/hero.px.js`'s G32 
   or a packed sheet with no rects took a dozen throwaway scripts; and screenshots upscaled by a
   fraction (2.83) read as "not pixel art". A study of a frame folder, and the pixel size found by
   the grid's period.
+
+From painting the slim (F5 4e-4f, `lib/characters/hero32.px.js`; the user: a hunch from 45 degrees, the slim re-pitched to 15):
+- [ ] **Re-pitch a body keeping its rows**: moving the slim from 45 to 15 degrees scaled every upright
+  length by hand (cos 45 / cos 15: bones, `reach`, the shoulders' drop), the foot box by sin 45 / sin 15,
+  and the blade's rise by a new cell number (`upright`). figure()'s lengths for a height on the screen at
+  a pitch.
+- [ ] **`soles` at a low pitch**: it moves the feet in px of depth (2.9 facing n at 15 as at 45) though the
+  rows it evens out shrink by sin p, so the walk's back leg went out of reach; worked round by `deep: 0.8`.
+  Move them only as far as a row needs.
+- [ ] **views()'s retouch grid on its bake**: the bake's square follows the pitch (27 px at 15, 31 at 45)
+  while the grid stays 31, so `pxl ascii` prints columns 2 off and the render shows through rows the grid
+  doesn't give (worked round by rows that erase). `rest: "erase"`, ascii in the grid's columns, and a row
+  as [column, keys] (placing a 13 px face by counting 31 columns went wrong twice).
+- [ ] **Arms longer than their bones**: a hand goes to its target past the arm's reach (the forearm
+  stretched) and check flags only legs: 4e's arms were 2.2 px too long. The same check on the arms.
+- [ ] **A genre's `colors` checked**: nothing reads topdown32's 24 against a figure's colors (a lab sprite
+  counted 18). As check reads `height`.
+- [ ] **dress() paint by px across**: a V neckline by angle came out a column of skin where the tunic
+  narrows (worked round by reading bodyRadius in the paint); and the skirt is 2.4 px whatever the body.
+  The paint given the point's px across; the skirt's length a field.
+- [ ] **A normal map's name clash**: a scene soles_walk_n beside soles_walk stopped the build
+  (soles_walk_n.png is both). soles_walk.normal.png.
 
 ## Characters (from dogfooding a 64 px character)
 

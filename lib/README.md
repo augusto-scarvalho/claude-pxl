@@ -66,8 +66,9 @@ the full moon).
 
 **Characters** (`characters/`): the traveler and the people on his figure (the crew, the miko), what
 they wear (`dress.px.js`), the top-down hero and the people made from him (`hero.character()`: two villagers,
-Reva's chibi), the same hero side on for a platformer (`hero_side.px.js`, `platformer16`: idle, walk, run and sprint
-(a run that speeds up), a dash with its afterimage and dust, a jump in four to loop the rise and the fall (jump, apex,
+Reva's chibi), the same hero at 48 px for top-down 32 on the genre's slim body (`hero32.px.js`, `topdown32`: idle,
+walk, run and the sword attack with its crescent), the same hero side on for a platformer (`hero_side.px.js`,
+`platformer16`: idle, walk, run and sprint (a run that speeds up), a dash with its afterimage and dust, a jump in four to loop the rise and the fall (jump, apex,
 fall, land), hurt, a ladder's climb and his back at a door), a slime,
 the knight, a beetle that walks and a bat that flies (a platformer's enemies).
 
