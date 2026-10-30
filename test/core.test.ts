@@ -654,6 +654,14 @@ if (!before && has("dot") && has("dots") && !has("nothing")) sprite("ok", "r")`,
   assert.ok(p.assets.has("ok"));
 });
 
+test("sockets: an asset's sockets from its pivot, as the file loads", () => {
+  const p = loadSource(PAL + `sprite("crate", { w: 6, h: 4, pivot: "bottom", sockets: { top: [3, 0], lid: [1, 1] } }, rect(0, 0, 6, 4, "r"))
+const S = sockets("crate")
+if (S.top.join() === "0,-4" && S.lid.join() === "-2,-3") sprite("ok", "r")`, "t.px.js");
+  assert.ok(p.assets.has("ok"));
+  assert.match(failure(PAL + `sockets("nothing")`).message, /sockets: the name of an asset/);
+});
+
 test("perspective: ground points land on rays to the vanishing point; plane draws the ground row by row; fit picks a size", () => {
   // a 90-degree view 100 px wide: focal 50 px; the eye 2 m up, the horizon on row 20
   const p = loadSource(PAL + `const P = perspective({ w: 100, horizon: 20, eye: 2, fov: 90 })

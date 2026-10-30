@@ -1074,6 +1074,8 @@ declare global {
   function ik(a: number, b: number, target: [number, number], bend?: number): [[number, number], [number, number]];
   /** Is there an asset or group of that name yet (a generated part made once). */
   function has(name: string): boolean;
+  /** An asset's sockets from where a stamp puts it (its pivot), read as the file loads: { top: [dx, dy] }, a route's point on a prop's top. */
+  function sockets(name: string): Record<string, [number, number]>;
 
   function px(x: number, y: number, c: PxColor): PxOp;
   function rect(x: number, y: number, w: number, h: number, c: PxColor): PxOp;

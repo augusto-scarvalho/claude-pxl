@@ -58,6 +58,7 @@ rng(seed?)                              // a seeded random() for code at the top
 ik(a, b, [x, y], bend?)                 // two bones from (0, 0) reaching for the point: [joint, end]; bend 1 (default) bends toward increasing angle (y down: an arm's elbow below, a leg's knee behind), -1 the other way
 ik3(a, b, l1, l2, hint)                 // the same in 3D: bones l1 and l2 from point a reaching for b, the joint between them pushed toward the way `hint` (a knee forward); out of reach, straight
 has(name)                               // is there an asset or a group of that name yet (a generated part made once)
+sockets(name)                           // an asset's sockets from where a stamp puts it (its pivot), read as the file loads: { top: [dx, dy] }, a route's point on a prop's top (examples/nightfall/)
 ```
 
 A rig is a sprite: each slot is a joint `at`, a box `size` (the part's size, outline included), the

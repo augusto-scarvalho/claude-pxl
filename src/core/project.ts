@@ -1354,6 +1354,12 @@ export class Project implements BuildCtx {
     };
     // has("name"): is there an asset or a group of that name yet (a generated part made once)
     env.has = (name: unknown) => typeof name === "string" && (this.assets.has(this.resolve(name)) || this.groups.has(this.resolve(name)));
+    // sockets("name"): an asset's sockets from where a stamp puts it (its pivot), read as the file loads (a route's point on a prop's top)
+    env.sockets = (name: unknown) => {
+      if (typeof name !== "string" || !this.assets.has(this.resolve(name))) throw new PxError(`sockets: the name of an asset defined so far, got ${JSON.stringify(name)}`, this.callerLoc());
+      const img = this.image(name, 0, 0, false), [px, py] = img.pivot ?? [0, 0];
+      return Object.fromEntries(Object.entries(img.sockets ?? {}).map(([k, [x, y]]) => [k, [x - Math.floor(px), y - Math.floor(py)]]));
+    };
     env.figure = (h: unknown, heads?: unknown) => {
       try { return figure(h as number, heads as number | undefined); } catch (e) { throw wrap(e).within("figure", this.callerLoc()); }
     };

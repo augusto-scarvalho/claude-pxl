@@ -310,6 +310,20 @@ ground in regions on corner tiles, round crowns, a house that is mostly roof, a 
 characters only, one light and one shadow. The hero is the genre's base body, and the villagers and
 Reva are made from him by `hero.character()`; he walks a `route({ px: true })` and cuts the pot.
 
+### A platformer from the library
+
+<p>
+  <img src="docs/gallery/platformer16_nightfall.gif" width="100%" alt="Animated side-scrolling pixel art of a 16-bit platformer level, the camera following the hero from day to night: a brown-haired hero in a blue tunic runs up a grassy slope, climbs a ladder with his back to us, crosses wooden planks, drops onto a crate, jumps a spike pit through an arc of coins, dashes and jumps over a pool past a beetle, and speeds up into a sprint to a cliff; the sky turns to dusk as he drops into a village of timbered houses, hops onto a barrel, a stack of barrels and a hay cart, passes a well and an inn's sign, the town's roofs and a church spire scrolling by behind; night falls with the moon and stars as he reaches a castle, bats flitting round the towers and gargoyles on the walls, sprints through the gate into the courtyard, climbs its steps to the keep, where the door opens, he turns his back and goes into the dark, the door closes and the camera rises to the moon">
+</p>
+
+[`examples/nightfall/`](examples/nightfall/nightfall.px.js): the library's demo for the platformer
+genre at a 16 px grid (`lib/profiles/platformer16.px.js`), every piece taken from `lib/`. A level 4.3
+screens long seen through a camera that follows the hero: obstacles by day, a village at dusk, a
+castle at night, ending at the keep's door. His way is a `route({ px: "side" })` of runs, a run that
+speeds up into a sprint with its soles planted, dashes, jumps by the genre's gravity onto the props'
+tops (their `sockets()`) and a ladder climb. The light changes along the level by a palette swap per
+layer mixed by the camera's x, and the backdrop's planes are places that scroll in, never copies.
+
 ### 3D as code: fields, voxels, volumes, splats, decals
 
 <p>

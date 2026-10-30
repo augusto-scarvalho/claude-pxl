@@ -46,7 +46,8 @@ builder drawn at its first cell. Made by `node scripts/gallery.ts --lib`.
 
 **Props** (`props/`): lamps and crates from the examples' scenes; a top-down village's pot (and its break),
 chest, sign, crate, barrel, lamp post and fence (`village.px.js`); a platformer's crate, lamp post and spinning
-coin, side on (`side.px.js`, `platformer16`); a platformer village's well, hay cart, barrel, hanging sign and
+coin, side on (`side.px.js`, `platformer16`; at dusk and at night by `props.DUSK` and `props.NIGHT`, the lamp unlit by
+day by `props.UNLIT`); a platformer village's well, hay cart, barrel, hanging sign and
 lantern post (`side_village.px.js`).
 
 ![props](../docs/gallery/lib/props.png)
@@ -74,10 +75,10 @@ the knight, a beetle that walks and a bat that flies (a platformer's enemies).
 
 **Architecture** (`architecture/`): the shrine's builders, the HD-2D surfaces, the cottage (by hand at
 `topdown/16`, mostly roof; its 3D draft frozen), the island's pier; a platformer's one-way platforms, ladder,
-spikes and door (`side.px.js`); a platformer village's old houses as a 3D builder, `make3d.old_house` (a stone
+spikes and door (`side.px.js`, at dusk and at night by `built.DUSK` and `built.NIGHT`); a platformer village's old houses as a 3D builder, `make3d.old_house` (a stone
 floor, a half-timbered storey, a tile roof and its chimney), finished by hand with the painted doors, windows lit at
 dusk and shutters set into its openings, the same three drawn by hand of modules as alternatives (`house_a_2d`...),
-its wall and the dusk town behind (`side_village.px.js`); a haunted castle
+its wall and the dusk town behind, by day and at night by `village.TOWN_DAY` and `village.TOWN_NIGHT` (`side_village.px.js`); a haunted castle
 as 3D builders, `make3d.castle` (towers, a curtain wall with real crenellations, a gatehouse and its portcullis: any
 heading or camera) and `make3d.keep` (the tower-house the walls guard: bartizans, a steep roof, lancets), its curtain,
 tower, gate and keep drawn by hand over their side views, lancets, two gargoyles, a banner, the courtyard from inside

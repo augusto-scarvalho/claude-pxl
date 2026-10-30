@@ -431,6 +431,35 @@ From the platformer demo's art (F5 3h-3i):
   by hand (parallax x cx), a scene a place; `camera.follow` with a constant goes through `rest`,
   `window` and `ahead`. `camera: { at: [x, y] }`, or `shot --camera x,y`.
 
+From the platformer demo (F5 3j-3k, `examples/nightfall/`):
+- [ ] **A landing played whole**: a jump onto a barrel straight into the next jump showed its soles
+  on the barrel for one frame (none in a GIF of every other frame), so he seemed to float; the demo
+  holds the land's last two drawings by hand (`settle()`). A jump leg playing its `land` part whole
+  before the next leg, and a check for feet that touch for a frame only.
+- [ ] **A leg's stride**: a leg's `frame(f, t)` knows the frames into it, not the way gone, and its
+  pace is constant, so the demo carries the run's phase from leg to leg and writes a speed-up as a
+  leg a frame. A leg's `stride` (px a drawing: the drawing by the way gone) and a pace from one
+  speed to another along it.
+- [ ] **A climb by its anim's stride**: the climb leg rises its pace every frame while the climb
+  rises 4 px a drawing with the soles on the rungs, so the demo snaps the route's y afterwards.
+- [ ] **`genre(name)`**: a profile's data is handed back only where it is declared, so the demo
+  writes the jump's 48 and 600 again; a lookup as `card(name)` has.
+- [ ] **An anim frame's data in a scene**: the dash's frames say where a puff goes and when to
+  ghost, but a scene can't read them, so the demo names the frames by index. `c.data(name, frame)`.
+- [ ] **A stretch of a strip**: a backdrop strip laid at a layer's x (a town that scrolls in, not
+  one that grows in place) is a helper by hand: a clip round `pattern`, its x0 worked out, and when
+  it comes on the picture worked out as (x - 320) / parallax. `pattern`/`scroll` taking a stretch
+  (`from`, `to`, `at`), and `describe` saying at which camera x each thing comes in and goes out.
+- [ ] **A strip's seams**: where a stretch may begin and end (a house's side, not through one) was
+  read off `pxl ascii` by a script. A strip's card carrying its `cuts`, checked against where a
+  scene cuts it.
+- [ ] **A strip along a profile**: hills falling 38 px under the town took runs of columns, each
+  clipped. `pattern(..., { along: (x) => dy })`, or `scroll()`'s y as a function of x.
+- [ ] **`check` under a camera**: "stamp drew nothing, wholly off the canvas" on frames where a
+  strip's last copy or a spike tile's empty row lands on the picture's edge, and a loop that doesn't
+  close in 60 s for a scene whose own `frames` are its loop (closed through black).
+- [ ] **`shot --gif --vs`**: before and after for a phone, one above the other, took a PIL script.
+
 ## Characters (from dogfooding a 64 px character)
 
 Each of these was first worked around by hand in an art file or by a Python script on the side.

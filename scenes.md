@@ -504,7 +504,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - **The hero's way through it**: `route({ px: "side", pace, ground, gravity, rise, walk, idle, air })`,
   each leg its own pace and anim (a run, a dash, a walk to a door), `{ to: x }` along the ground,
   `{ jump: [x, y] }` by gravity in the anim's four parts (`air: { jump, apex, fall, land }`, picked by
-  its speed up), `{ drop }` off an edge, `{ climb }` up a ladder; a frame off the ground says `air`, so
+  its speed up), `{ drop }` off an edge, `{ climb }` up a ladder, a jump onto a prop to where it is
+  stamped plus its socket (`sockets("vprops.barrel").top`: its top, read as the file loads,
+  `examples/nightfall/`); a frame off the ground says `air`, so
   `follow: R` holds the picture still through a jump (`PXL help route`). The genre's jump is
   `platformer16`'s `jump` (a 48 px rise at 600 px/s²: 1.5 px a frame² at 20 fps). What is keyed to
   where the camera is (the light along the level, a plane coming in) reads `c.camera`, the same on
