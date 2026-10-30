@@ -407,6 +407,30 @@ From the village and the castle (F5 3d-3f):
   refused the file (the `_n` suffix names normal maps). `shot` should say so too, or the normal maps
   take another suffix.
 
+From the platformer demo's art (F5 3h-3i):
+- [ ] **A heading per move in `rig3d()`**: a rig draws one set of headings, so the side hero's climb
+  and enter, from behind, took a rig of their own (`_rsc_`), as the dash's size took `_rsd_`.
+- [ ] **A grip state beside `air`**: a ladder has no ground under it and the feet rule spares only
+  `air`, so every climb frame says `air`; a `grip` flag would let the camera's snap and the checks
+  tell a climb from a jump.
+- [ ] **A model's front as a pivot**: a `turnaround()` building's pivot is its footprint's middle,
+  the keep's front 8 px under it (found by `describe`; the door's socket read off an ascii). A
+  "front foot" pivot, and the model's sockets reaching the sprite (see "A socket from a 3D model").
+- [ ] **`make3d.castle`'s arch**: `archPrism` leaves a course of stone at the springing where the box
+  and the point meet, seen from behind (sealed by hand); and the gate cut the gatehouse only, not the
+  curtain, so there was no way through from inside until `passage: "yes"`.
+- [ ] **Stairs along a wall in 3D**: at 1x they read as the wall's own courses (the same stone and
+  facing, no shadow on the wall); the treads and the silhouette went in by hand. The stair's shadow
+  on the wall it climbs, or a line in scenes.md.
+- [ ] **A walkable top as a segment**: a socket is a point, a top a stretch, so each prop got three
+  (`top`, `top_l`, `top_r`). A `top: [x0, x1, y]` field, as a footprint is.
+- [ ] **`light()` with a density by place**: a mist thickening downward over what was drawn took a
+  hand loop (`c.key` and `bayer`, 5 lines); `light(region, steps, density)` takes one density. A
+  density as `(x, y) => k`.
+- [ ] **A camera standing still**: shots of a wrapping strip at several camera x shifted each layer
+  by hand (parallax x cx), a scene a place; `camera.follow` with a constant goes through `rest`,
+  `window` and `ahead`. `camera: { at: [x, y] }`, or `shot --camera x,y`.
+
 ## Characters (from dogfooding a 64 px character)
 
 Each of these was first worked around by hand in an art file or by a Python script on the side.

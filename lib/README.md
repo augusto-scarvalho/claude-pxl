@@ -65,8 +65,9 @@ the full moon).
 
 **Characters** (`characters/`): the traveler and the people on his figure (the crew, the miko), what
 they wear (`dress.px.js`), the top-down hero and the people made from him (`hero.character()`: two villagers,
-Reva's chibi), the same hero side on for a platformer (`hero_side.px.js`, `platformer16`: idle, walk, run, a dash
-with its afterimage and dust, a jump in four to loop the rise and the fall (jump, apex, fall, land), hurt), a slime,
+Reva's chibi), the same hero side on for a platformer (`hero_side.px.js`, `platformer16`: idle, walk, run and sprint
+(a run that speeds up), a dash with its afterimage and dust, a jump in four to loop the rise and the fall (jump, apex,
+fall, land), hurt, a ladder's climb and his back at a door), a slime,
 the knight, a beetle that walks and a bat that flies (a platformer's enemies).
 
 ![characters](../docs/gallery/lib/characters.png)
@@ -79,8 +80,9 @@ dusk and shutters set into its openings, the same three drawn by hand of modules
 its wall and the dusk town behind (`side_village.px.js`); a haunted castle
 as 3D builders, `make3d.castle` (towers, a curtain wall with real crenellations, a gatehouse and its portcullis: any
 heading or camera) and `make3d.keep` (the tower-house the walls guard: bartizans, a steep roof, lancets), its curtain,
-tower, gate and keep drawn by hand over their side views, lancets, two gargoyles, a banner, and the castle on its hill
-for the night's backdrop (`side_castle.px.js`).
+tower, gate and keep drawn by hand over their side views, lancets, two gargoyles, a banner, the courtyard from inside
+(the curtain, the stairs up to the walk, the gate's back, a terrace and the keep's door opening) and the castle on its
+crag for the night's backdrop (`side_castle.px.js`).
 
 ![architecture](../docs/gallery/lib/architecture.png)
 
