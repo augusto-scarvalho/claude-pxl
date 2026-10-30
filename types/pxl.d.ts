@@ -199,8 +199,10 @@ declare global {
     x?: number; y?: number; hidden?: boolean; density?: number; solid?: boolean; wall?: boolean; unlit?: boolean;
     /** With the scene's camera: how much it moves with it, 1 the world (default), 0.2 a far backdrop, 0 the screen (a HUD); or [x, y]. */
     parallax?: number | [number, number];
-    /** A palette map on everything the layer draws (stamps, tiles, strips, functions), keys read in the scene's palette: another time of day (a kit's side.DUSK). */
-    swap?: Record<string, PxColor>;
+    /** A palette map on everything the layer draws (stamps, tiles, strips, functions), keys read in the scene's palette: another time of day (a kit's side.DUSK); or a list of them, mixed by `mix`. */
+    swap?: Record<string, PxColor> | Record<string, PxColor>[];
+    /** With a list of swaps: where it is along them (0 the first, 1.5 halfway from the second to the third), the later one ordered-dithered in; or (c) => that (c.frame, c.camera). */
+    mix?: number | ((c: PxCanvas) => number);
     shade?: boolean | number | Record<string, PxColor>; light?: boolean | number | Record<string, PxColor>;
     /** A shade layer drawing the shadows of these layers' stamps and tiles (their functions' too: a route's walker), laid down by `cast` ("sun": look3d()'s light on a world: { view: "top" }) or each one's `shadow`, but those named in `except`. */
     of?: string | string[]; cast?: [number, number] | { from: number[]; len?: number } | "sun"; except?: string[];
@@ -568,10 +570,10 @@ declare global {
     since(t: number, a: string | [string, number], ms?: number, n?: number): number;
   }
   /** A step of a route: a leg walked from a to b (as written), or a hold at a; its frames from `start`. */
-  interface PxRouteLeg { name?: string; dir: string; a: number[]; b: number[]; n: number; start: number; walk: boolean }
+  interface PxRouteLeg { name?: string; dir: string; a: number[]; b: number[]; n: number; start: number; walk: boolean; /** a side view's: "to", "jump", "drop", "climb" */ move?: string }
   interface PxRoute {
     /** The figure at frame f, a sprite for mesh(): `${anim}_${dir}` at its feet (with `px`, the whole px to stamp it at); null before it starts and once it is done. */
-    (f: number): { name: string; at: number[]; frame: number; dir: string; flip?: "x" } | null;
+    (f: number): { name: string; at: number[]; frame: number; dir: string; flip?: "x"; /** a side view's: off the ground (a jump, a drop, a climb) */ air?: true } | null;
     /** The frame a named step begins; span, fade and since as an ability's. */
     start(name: string): number;
     span: PxAbility["span"]; fade: PxAbility["fade"]; since: PxAbility["since"];
@@ -681,6 +683,8 @@ declare global {
     readonly w: number; readonly h: number; readonly seed: number;
     /** What of the canvas shows on the picture, [x, y, w, h] in its own coordinates (a scene's camera moves it): to skip work off it. */
     readonly view: [number, number, number, number];
+    /** A scene's camera this frame, [x, y, w, h] in the world: the same on every layer whatever its parallax (with --world the frame's real one); undefined without a camera. */
+    readonly camera?: [number, number, number, number];
     /** Time in ms; inside an anim (or a scene animated by what it places) also the frame index, frame count and frame / frames. */
     readonly t: number; readonly frame: number; readonly frames: number; readonly phase: number;
     /** Drawing a twin: every x lands mirrored (for the few choices a mirror doesn't make by itself). */
@@ -942,9 +946,13 @@ declare global {
   function unroll(runs: [number, ...unknown[]][]): unknown[];
   /** A value lagging a loop's, a frame each: eased toward each value by 1 - damp a frame, or (peak) falling back at damp from each peak; its first frame after its last. */
   function follow(values: number[], opts?: { damp?: number; peak?: boolean }): number[];
-  /** A figure's legs and holds on the clock: route({ pace, origin, ground, walk, idle, loop }, [[x, z], [x, z], { hold: 40, name: "talk" }, ...]); `px: true` a flat scene's, points [x, y] on the picture (up is n), pace px a frame. */
-  function route(opts: { pace?: number | ((dir: string) => number); origin?: number[]; ground?: (x: number, z: number) => number; climb?: boolean; walk?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; idle?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; loop?: number; round?: number; px?: boolean },
-    steps: (number[] | { to: number[]; name?: string; dir?: string; anim?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; frame?: (f: number, t: number) => number } | { hold: number; name?: string; dir?: string; anim?: string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean }; frame?: (f: number, t: number) => number })[]): PxRoute;
+  type PxLook = string | { anim: string; frame?: (f: number, t: number) => number; flip?: boolean };
+  type PxRouteStepOpts = { name?: string; dir?: string; anim?: PxLook; frame?: (f: number, t: number) => number; /** px (m) a frame on this leg */ pace?: number };
+  /** A figure's legs and holds on the clock: route({ pace, origin, ground, walk, idle, loop }, [[x, z], [x, z], { hold: 40, name: "talk" }, ...]); `px: true` a flat scene's, points [x, y] on the picture (up is n), pace px a frame; `px: "side"` a platformer's: { to: x } along ground(x), { jump: [x, y], rise? } by gravity in air's parts, { drop }, { climb }. */
+  function route(opts: { pace?: number | ((dir: string) => number); origin?: number[]; ground?: ((x: number, z: number) => number) | ((x: number) => number); climb?: boolean; walk?: PxLook; idle?: PxLook; loop?: number; round?: number; px?: boolean | "side";
+      /** a side view's: px a frame² its jumps and drops fall by, px a jump rises over its take-off, a jump's anims by part, frames either side of the top in apex (2), frames of the landing (3) */
+      gravity?: number; rise?: number; air?: { jump?: PxLook; apex?: PxLook; fall?: PxLook; land?: PxLook }; hang?: number; landing?: number },
+    steps: (number[] | ({ to: number[] | number } & PxRouteStepOpts) | ({ hold: number } & PxRouteStepOpts) | ({ jump: number[] | number; rise?: number; name?: string } | { drop: number[] | number; name?: string }) | ({ climb: number[] } & PxRouteStepOpts))[]): PxRoute;
   /** A figure turning to a target (a sprite, a point, a direction, null; or a function of the frame giving one) a direction every `every` frames: (f) => its sprite. */
   function turnToward(anim: string, at: number[], target: unknown, opts?: { every?: number; rest?: string; within?: number; from?: number; frame?: (f: number) => number }): (f: number) => { name: string; at: number[]; frame: number };
   /** A spell's phases on the clock: ability([["charge", 600], ["cast", 150], ["travel", 500], ...], { start, events }). */

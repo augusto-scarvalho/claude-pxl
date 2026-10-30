@@ -191,7 +191,7 @@ function buildBytes(b: BuildOut): number {
   };
   return px(b.img) + px(b.guide) + px(b.under) + b.layers.reduce((s, l) => s + px(l.img), 0) + (b.refs ?? []).reduce((s, r) => s + px(r.img), 0) + b.placements.reduce((s, p) => s + 64 + px(p.img), 0);
 }
-export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "of", "cast", "except", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline", "parallax", "swap"];
+export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "of", "cast", "except", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline", "parallax", "swap", "mix"];
 const SHEET_OPTS = ["cols", "pad", "extrude", "rows", "slots"];
 /** The checks a genre() can ask pxl check for (check.ts runs them on the assets naming it). */
 export const GENRE_CHECKS = ["ground", "height", "footprint"];
@@ -1438,8 +1438,8 @@ export class Project implements BuildCtx {
     env.route = (opts: unknown, steps: unknown) => {
       const loc = this.callerLoc();
       try {
-        if (!isPlainObject(opts)) throw new PxError("route({ pace, origin, ground, climb, walk, idle, loop, round, px }, [[x, z], ...steps])");
-        checkKeys("route", opts, ["pace", "origin", "ground", "climb", "walk", "idle", "loop", "round", "px"]);
+        if (!isPlainObject(opts)) throw new PxError("route({ pace, origin, ground, climb, walk, idle, loop, round, px, gravity, rise, air, hang, landing }, [[x, z], ...steps])");
+        checkKeys("route", opts, ["pace", "origin", "ground", "climb", "walk", "idle", "loop", "round", "px", "gravity", "rise", "air", "hang", "landing"]);
         return route(opts as never, steps as never);
       } catch (e) { throw wrap(e).within("route", loc); }
     };

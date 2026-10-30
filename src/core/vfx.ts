@@ -165,11 +165,12 @@ const isPoint = (p: unknown): p is number[] => Array.isArray(p) && p.length === 
 const isObj = (v: unknown): v is Record<string, any> => typeof v === "object" && v !== null && !Array.isArray(v);
 type FrameFn = (f: number, t: number) => number;
 interface Look { anim?: string; frame?: FrameFn; flip?: boolean }
-export interface RouteOpts { pace?: number | ((dir: string) => number); origin?: number[]; ground?: (x: number, z: number) => number; climb?: boolean; walk?: string | Look; idle?: string | Look; loop?: number; round?: number; px?: boolean }
-export type RouteStep = number[] | { to?: number[]; hold?: number; name?: string; dir?: string; anim?: string | Look; frame?: FrameFn };
-/** a step of a route: a leg walked from a to b, or a hold at a (= b); its frames, from `start` */
-export interface RouteLeg { name?: string; dir: string; a: number[]; b: number[]; n: number; start: number; walk: boolean; anim?: string; frame?: FrameFn; flip?: boolean }
-type Placed = { name: string; at: number[]; frame: number; dir: string; flip?: "x" };
+const PARTS = ["jump", "apex", "fall", "land"];
+export interface RouteOpts { pace?: number | ((dir: string) => number); origin?: number[]; ground?: (x: number, z: number) => number; climb?: boolean; walk?: string | Look; idle?: string | Look; loop?: number; round?: number; px?: boolean | "side"; gravity?: number; rise?: number; air?: Record<string, string | Look>; hang?: number; landing?: number }
+export type RouteStep = number[] | { to?: number[] | number; hold?: number; jump?: number[] | number; drop?: number[] | number; climb?: number[]; pace?: number; rise?: number; name?: string; dir?: string; anim?: string | Look; frame?: FrameFn };
+/** a step of a route: a leg walked from a to b, or a hold at a (= b); its frames, from `start`; a side view's `move` (jump, drop, climb), `along` the ground */
+export interface RouteLeg { name?: string; dir: string; a: number[]; b: number[]; n: number; start: number; walk: boolean; anim?: string; frame?: FrameFn; flip?: boolean; move?: string; along?: boolean; v0?: number; up?: number }
+type Placed = { name: string; at: number[]; frame: number; dir: string; flip?: "x"; air?: true };
 type Way = { x: number; z: number; heading: number[] };
 export interface Route {
   /** the figure at frame f: a sprite for mesh() (`${anim}_${dir}`, its feet, its frame), or with `px` the place to stamp it, null before it starts and once it is done */
@@ -197,7 +198,12 @@ export interface Route {
  * (f the scene's, t into the step; default f), `flip: true` one side view flipped going west. Points
  * from `origin`; `ground(x, z)` the feet's height (where they stand: the third number of `at`). `px`: a
  * flat scene's, points [x, y] on the picture (up the picture is away: n), pace px a frame, `at` the
- * whole px to stamp the figure at.
+ * whole px to stamp the figure at. `px: "side"`: a side view's (a platformer), points [x, y] in the world,
+ * legs facing e or w, each frame a step on (a leg's last where it arrives), a leg's frames its way across
+ * over its pace rounded up (`{ to: x }` along `ground(x)`, the feet's row); `{ jump: [x, y], rise? }` by
+ * `gravity` (px a frame²) rising `rise` px over its take-off, `{ drop }` falling from rest, `{ climb }` at
+ * its pace; a jump's frames `air`'s parts by its speed up (jump, apex within `hang` frames of the top, fall,
+ * land on touching down and `landing` frames in all), `air: true` on what is off the ground.
  */
 export function route(o: RouteOpts, steps: RouteStep[]): Route {
   if (!Array.isArray(steps) || !isPoint(steps[0]))
@@ -205,7 +211,10 @@ export function route(o: RouteOpts, steps: RouteStep[]): Route {
   if (o.pace !== undefined && typeof o.pace !== "function" && !(o.pace > 0)) throw new PxError(`route: pace is m a frame, above 0, or (dir) => one (a leg's way: "e", "nw", ...), got ${JSON.stringify(o.pace)}`);
   const paceOf = (d: string) => { const v = typeof o.pace === "function" ? o.pace(d) : o.pace; if (v !== undefined && !(v > 0)) throw new PxError(`route: pace("${d}") is m a frame, above 0, got ${JSON.stringify(v)}`); return v; };
   if (o.ground !== undefined && typeof o.ground !== "function") throw new PxError("route: ground is (x, z) => the ground's height there");
-  if (o.px !== undefined && (typeof o.px !== "boolean" || (o.px && o.ground))) throw new PxError(`route: px is true (a flat scene's: points [x, y] on the picture, pace px a frame; no ground), got ${JSON.stringify(o.px)}${o.ground ? " with a ground" : ""}`);
+  if (o.px !== undefined && ((typeof o.px !== "boolean" && o.px !== "side") || (o.px === true && o.ground))) throw new PxError(`route: px is true (a flat scene's: points [x, y] on the picture, pace px a frame; no ground) or "side" (a platformer's), got ${JSON.stringify(o.px)}${o.ground ? " with a ground" : ""}`);
+  const side = o.px === "side", g = o.gravity as number, hang = o.hang ?? 2, landing = o.landing ?? 3;
+  for (const [k, v] of [["gravity", g], ["rise", o.rise], ["hang", o.hang], ["landing", o.landing]] as const)
+    if (v !== undefined && !(side && v >= 0 && (k === "hang" || v > 0))) throw new PxError(`route: ${k} is a side view's (px: "side"), ${k === "gravity" ? "px a frame² (600 px/s² at 20 fps: 1.5)" : k === "rise" ? "px a jump rises over its take-off" : "frames"}, ${k === "hang" ? "0 or more" : "above 0"}, got ${JSON.stringify(v)}`);
   const look = (v: unknown, what: string): Look => {
     if (typeof v === "string") return { anim: v };
     if (v !== undefined && !(isObj(v) && typeof v.anim === "string" && (v.frame === undefined || typeof v.frame === "function")))
@@ -213,23 +222,39 @@ export function route(o: RouteOpts, steps: RouteStep[]): Route {
     return (v ?? {}) as Look;
   };
   const walk = look(o.walk, "walk"), idle = look(o.idle, "idle"), [ox, oz] = o.origin ?? [0, 0], world = (p: number[]) => [ox + p[0], oz + p[1]];
+  if (o.air !== undefined && !(isObj(o.air) && Object.keys(o.air).every((k) => PARTS.includes(k)))) throw new PxError(`route: air is a jump's anims by part, { ${PARTS.join(", ")} }, got ${JSON.stringify(o.air)}`);
+  const airs = Object.fromEntries(PARTS.map((k) => [k, look(o.air?.[k], `air's ${k}`)]));
   const legs: RouteLeg[] = [];
   let at = steps[0] as number[], dir = "s", start = 0;
   for (const s of steps.slice(1)) {
-    const p = isPoint(s) ? { to: s } : s;
-    if (!isObj(p) || (p.to === undefined) === (p.hold === undefined) || (p.dir !== undefined && !DIR8.includes(p.dir)) || (p.frame !== undefined && typeof p.frame !== "function"))
-      throw new PxError(`route: a step is [x, z], { to: [x, z], ... } or { hold: frames, ... } (dir one of ${DIR8.join(", ")}, frame (f, t) => n), got ${JSON.stringify(s)}`);
+    const p = (isPoint(s) ? { to: s } : s) as Record<string, any>, kind = isObj(p) ? ["to", "hold", "jump", "drop", "climb"].filter((k) => p[k] !== undefined) : [];
+    if (!isObj(p) || kind.length !== 1 || (p.dir !== undefined && !DIR8.includes(p.dir)) || (p.frame !== undefined && typeof p.frame !== "function") || (p.pace !== undefined && !(p.pace > 0)))
+      throw new PxError(`route: a step is [x, z], { to: [x, z], ... } or { hold: frames, ... }${side ? ", { jump | drop: [x, y] or x }, { climb: [x, y] }" : ""} (dir one of ${DIR8.join(", ")}, frame (f, t) => n, pace above 0), got ${JSON.stringify(s)}`);
+    const move = kind[0], to = p[move];
+    if (!side && move !== "to" && move !== "hold") throw new PxError(`route: a ${move} leg is a side view's: route({ px: "side", gravity, ... }), got ${JSON.stringify(s)}`);
+    if ((move === "jump" || move === "drop") && p.anim !== undefined) throw new PxError(`route: a ${move}'s anims are the route's air: { ${PARTS.join(", ")} }, not its own`);
     // the step's own anim, as walk's and idle's are given: a name, or { anim, frame?, flip? }
     const own = look(p.anim, "a step's anim"), mine = { anim: own.anim, frame: p.frame ?? own.frame, flip: own.flip };
     let n: number;
-    if (p.to !== undefined) {
-      const b = isPoint(p.to) ? p.to : [NaN, NaN], dx = b[0] - at[0], dz = b[1] - at[1];
-      if (!(dx || dz)) throw new PxError(`route: a leg goes to a point [x, z] other than the last, got ${JSON.stringify(p.to)}`);
-      const [A, B] = [world(at), world(b)], len = o.climb && o.ground ? Math.hypot(dx, dz, o.ground(B[0], B[1]) - o.ground(A[0], A[1])) : Math.hypot(dx, dz);
-      dir = p.dir ?? DIR8[dir8(dx, o.px ? -dz : dz)];
-      const v = paceOf(dir);
-      n = v ? Math.max(1, Math.round(len / v)) : 0;
-      legs.push({ name: p.name, dir, a: at, b, n, start, walk: true, ...mine });
+    if (move !== "hold") {
+      // a side view's x alone: along the ground to there
+      const along = side && typeof to === "number" && move !== "climb";
+      if (along && !o.ground) throw new PxError(`route: ${JSON.stringify(s)} goes along the ground to x ${to}: give the route ground: (x) => the feet's row`);
+      const b = along ? [to, (o.ground as (x: number) => number)(ox + to) - oz] : isPoint(to) ? to : [NaN, NaN], dx = b[0] - at[0], dz = b[1] - at[1];
+      if (!(dx || dz)) throw new PxError(`route: a leg goes to a point [x, z] other than the last, got ${JSON.stringify(to)}`);
+      const [A, B] = [world(at), world(b)], len = o.climb && o.ground && !side ? Math.hypot(dx, dz, o.ground(B[0], B[1]) - o.ground(A[0], A[1])) : Math.hypot(dx, dz);
+      dir = p.dir ?? (side ? (dx > 0 ? "e" : dx < 0 ? "w" : dir) : DIR8[dir8(dx, o.px ? -dz : dz)]);
+      const v = p.pace ?? paceOf(dir), leg: RouteLeg = { name: p.name, dir, a: at, b, n: 0, start, walk: true, ...mine, ...(side ? { move, along } : {}) };
+      if (move === "jump" || move === "drop") {
+        // by gravity: up to `rise` over the take-off (a drop from rest), then down to where it lands
+        const h = move === "jump" ? p.rise ?? o.rise : 0;
+        if (!(g > 0) || !(h !== undefined && h >= 0)) throw new PxError(`route: a ${move} falls by the route's gravity (px a frame²)${move === "jump" ? " and rises by rise (px over its take-off: the route's or the step's)" : ""}`);
+        if (dz < -h) throw new PxError(`route: a ${move}${move === "jump" ? ` rising ${h} px` : ""} can't land ${-dz} px up, at ${JSON.stringify(b)}`);
+        leg.v0 = Math.sqrt(2 * g * h);
+        leg.up = leg.v0 / g;
+        n = Math.max(2, Math.round(leg.up + Math.sqrt((2 * (dz + h)) / g)));
+      } else n = v ? Math.max(1, side ? Math.ceil((move === "climb" ? len : Math.abs(dx) || Math.abs(dz)) / v) : Math.round(len / v)) : 0;
+      legs.push({ ...leg, n });
       at = b;
     } else {
       n = p.hold as number;
@@ -239,19 +264,35 @@ export function route(o: RouteOpts, steps: RouteStep[]): Route {
     }
     start += n;
   }
-  const A = o.pace ? ability(legs.map((l) => [l.name ?? "", l.n])) : undefined;
+  const A = legs.length && legs.every((l) => l.n > 0) ? ability(legs.map((l) => [l.name ?? "", l.n])) : undefined;
   const timed = () => { if (!A) throw new PxError("route: walking it by frames takes a pace (m a frame)"); return A; };
   const visit = ((f: number) => {
     timed();
+    // (a side view's: the frame the last jump or drop touched down, for the landing after it)
+    let touch = -Infinity;
     for (const L of legs) {
       const t = f - L.start;
       if (t < 0) return null;
-      if (t >= L.n) continue;
-      // as far along as the frame is through the leg, from the start's place in the world
-      const k = t / L.n, x = ox + L.a[0] + (L.b[0] - L.a[0]) * k, z = oz + L.a[1] + (L.b[1] - L.a[1]) * k;
-      const lk = L.walk ? walk : idle, anim = L.anim ?? lk.anim, frame = L.frame ?? lk.frame, flip = L.anim ? L.flip : lk.flip;
-      if (!anim) throw new PxError(`route: no anim to ${L.walk ? "walk" : "hold"} in: give ${L.walk ? "walk" : "idle"} or the step's anim`);
-      return { name: flip ? anim : `${anim}_${L.dir}`, at: o.px ? [Math.round(x), Math.round(z)] : o.ground ? [x, z, o.ground(x, z)] : [x, z], frame: frame ? frame(f, t) : f, dir: L.dir, ...(flip && L.dir.includes("w") ? { flip: "x" as const } : {}) };
+      if (t >= L.n) { if (L.move === "jump" || L.move === "drop" || L.move === "climb") touch = L.move === "climb" ? -Infinity : L.start + L.n - 1; continue; }
+      let x: number, z: number, part: string | undefined, pt = 0, air = false;
+      if (!side) {
+        // as far along as the frame is through the leg, from the start's place in the world
+        const k = t / L.n;
+        x = ox + L.a[0] + (L.b[0] - L.a[0]) * k; z = oz + L.a[1] + (L.b[1] - L.a[1]) * k;
+      } else {
+        // a step on each frame, the leg's last where it arrives: on the ground, up the ladder, or through the air by gravity
+        const k = L.walk ? t + 1 : t, top = L.move === "jump" || L.move === "drop";
+        x = ox + L.a[0] + ((L.b[0] - L.a[0]) * k) / L.n;
+        z = top ? (k === L.n ? oz + L.b[1] : Math.min(oz + L.b[1], oz + L.a[1] - L.v0! * k + (g * k * k) / 2)) : L.along ? (o.ground as (x: number) => number)(x) : oz + L.a[1] + ((L.b[1] - L.a[1]) * k) / L.n;
+        air = (top && k < L.n) || L.move === "climb";
+        // a jump's part by its speed up: rising, hanging round the top, falling, landing (and the frames after on the ground)
+        const up = L.up!, apex = Math.max(1, Math.ceil(up - hang)), fall = L.move === "drop" ? 1 : Math.floor(up + hang) + 1;
+        if (top) [part, pt] = k === L.n ? ["land", 0] : k >= fall ? ["fall", k - fall] : k >= apex ? ["apex", k - apex] : ["jump", k - 1];
+        else if (L.move !== "climb" && f - touch < landing) [part, pt] = ["land", f - touch];
+      }
+      const lk = part ? airs[part] : L.walk ? walk : idle, anim = part ? lk.anim : L.anim ?? lk.anim, frame = part ? lk.frame : L.frame ?? lk.frame, flip = part ? lk.flip : L.anim ? L.flip : lk.flip;
+      if (!anim) throw new PxError(part ? `route: no anim for a jump's ${part}: give the route air: { ${PARTS.join(", ")} }` : `route: no anim to ${L.walk ? "walk" : "hold"} in: give ${L.walk ? "walk" : "idle"} or the step's anim`);
+      return { name: flip ? anim : `${anim}_${L.dir}`, at: o.px ? [Math.round(x), Math.round(z)] : o.ground ? [x, z, o.ground(x, z)] : [x, z], frame: frame ? frame(f, part ? pt : t) : part ? pt : f, dir: L.dir, ...(flip && L.dir.includes("w") ? { flip: "x" as const } : {}), ...(air ? { air: true as const } : {}) };
     }
     return null;
   }) as Route;

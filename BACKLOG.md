@@ -331,9 +331,12 @@ still hold, and the rest wait on these:
 - [ ] **`views()` saying its square's size**: the retouch grid's width and anchor show only after a
   first bake and an ascii (19 px for the side hero's head, 31 for the top-down's). Say it in the
   build line.
-- [ ] **A jump in `route()`**: the camera's example made a jump as a named leg plus a height table
-  sampled by hand (`(f - step.start) / step.n`). A leg `{ to, name, rise: TABLE }` (or the genre's
-  rise and fall numbers) for a side-scroller's walker. The platformer demo needs it.
+- [x] **A jump in `route()`**: done (F5 3i): `route({ px: "side", gravity, rise, air: { jump, apex,
+  fall, land } }, [..., { jump: [x, y] }, { drop }, { climb }, { to: x, pace, anim }])`, a pace and anim
+  per leg, `air: true` off the ground so the camera follows the route itself; and a layer's `swap: [A,
+  B, C]` with `mix`, `c.camera` on every layer, `shot --world --every N`. Left: a route that holds its
+  last frame (`R(f)` is null after the end); a plane that comes in from nothing by `density: (c) => k`;
+  `route()` reading an anim's own `air`/`loop` data (the jump's anticipation frame).
 - [ ] **`route()` without a walk anim**: it asks for `walk` even for a figure the scene stamps
   itself (a box); only fail when the name is read.
 - [ ] **A stepped ground as floors**: `world.ground` wants a polyline, so floors at heights become

@@ -8,11 +8,11 @@
 import { PxError } from "./errors.ts";
 
 /** The target at a frame: its feet [x, y] in the world, and with a third value whether it stands on something. */
-export type Target = (f: number) => readonly unknown[] | null | undefined;
+export type Target = (f: number) => readonly unknown[] | { at: number[]; air?: boolean } | null | undefined;
 export interface CameraOpts {
   /** the world's size, px (the picture, the scene's w x h, is the window onto it) */
   world: [number, number];
-  /** what it follows: a function of the frame giving [x, y] (a route's `at`) or [x, y, onGround], or a stamp's id */
+  /** what it follows: a function of the frame giving [x, y] (a route's `at`) or [x, y, onGround], or a route itself (its figure's feet, standing unless `air`), or a stamp's id */
   follow?: Target | string;
   /** where the target rests on the picture, a share of its width and height (default [0.5, 0.66]) */
   rest?: [number, number];
@@ -61,7 +61,9 @@ export function cameraPath(o: CameraOpts, view: [number, number], ms: number, ta
   let cam: number[] | undefined, goal = [0, 0], dir = 1, far = 0, lastY = NaN, still = 0;
   const out: [number, number][] = [];
   const step = (f: number) => {
-    const t = target(f);
+    // a route's figure ({ at, air }): its feet, standing unless in the air
+    const got = target(f), fig = got && !Array.isArray(got) ? (got as { at: number[]; air?: boolean }) : undefined;
+    const t = fig ? [fig.at[0], fig.at[1], !fig.air] : (got as readonly unknown[] | null | undefined);
     if (t && !(t.length >= 2 && Number.isFinite(t[0]) && Number.isFinite(t[1]))) throw bad(`follow gives [x, y] or [x, y, onGround] (frame ${f})`, t);
     if (t) {
       const tx = t[0] as number, ty = t[1] as number;

@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { cameraPath } from "../src/core/camera.ts";
+import { route } from "../src/core/vfx.ts";
+import { decodePng } from "../src/node/png.ts";
 import { describe } from "../src/core/describe.ts";
 import { loadSource } from "../src/node/load.ts";
 import { checkProject } from "../src/node/check.ts";
-import { art, failure, PAL } from "./helpers.ts";
+import { art, failure, PAL, said } from "./helpers.ts";
 import { whenChanged } from "./passed.ts";
 
 const test = whenChanged("test/camera.test.ts");
@@ -107,4 +112,28 @@ test("describe and check read the world: where each thing is in it, what is off 
   const rules = (r: string) => checkProject(loadSource(LEVEL.replace("FOLLOW", "at").replace("frames: 25,", `frames: 25, world: { ground: 7 }, expect: [${r}],`), "t.px.js")).lines;
   assert.deepEqual(rules('{ onGround: ["hero"] }, { inside: ["mark", [44, 1, 3, 3]] }'), []);
   assert.match(rules('{ inside: ["mark", [0, 0, 20, 8]] }').join("\n"), /expect mark inside .*doesn't hold/);
+});
+
+test("c.camera: the camera's box in the world, the same on every layer whatever its parallax, the frame's own in --world; --world --every N its boxes on one world", async () => {
+  // a layer at half speed and one on the screen each mark the camera's x (2 + x mod 15) on the picture
+  const src = LEVEL.replace("FOLLOW", "at").replace(/\)\)\)$/, `)), layer("p5", { parallax: 0.5 }, (c) => c.px(c.view[0] + 2 + c.camera[0] % 15, 2, "g")), layer("p0", { parallax: 0 }, (c) => c.px(c.view[0] + 2 + c.camera[0] % 15, 3, "g")))`);
+  const p = loadSource(src, "t.px.js"), w = loadSource(src, "t.px.js", { wholeWorld: true }), green = 0x00e436ff;
+  for (const f of [0, 9, 20]) {
+    const b = p.build("lv", 0, f * 100), [cx, cy] = b.camera!.at, row = (y: number) => b.img.data.slice(y * 20, y * 20 + 20).indexOf(green);
+    assert.deepEqual([row(2), row(3)], [2 + cx % 15, 2 + cx % 15], `frame ${f}: one camera on both`);
+    assert.equal(w.build("lv", 0, f * 100).img.data[2 * 60 + 2 + cx % 15], green, `--world, frame ${f}: the frame's own camera, ${cx},${cy}`);
+  }
+  const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "lv.px.js");
+  writeFileSync(file, LEVEL.replace("FOLLOW", "at"));
+  const text = await said("shot", file, "lv", "--world", "--every", "10", "--scale", "1", "--out", dir);
+  assert.match(text, /lv_world\.png .*\nboxes \[frame, x, y\]: 0,0,0 10,\d+,0 20,32,0$/);
+  const img = decodePng(readFileSync(join(dir, "_shot", "lv_world.png")));
+  assert.deepEqual([img.w, img.h, img.get(32, 0), img.get(51, 7)], [60, 8, 0xff00ffff, 0xff00ffff], "the boxes on one world");
+});
+
+test("a route followed as it is: its feet, standing unless in the air (the platform snap holds through its jump)", () => {
+  const r = route({ px: "side", pace: 2, gravity: 1, rise: 32, walk: "w", air: { jump: "j", apex: "a", fall: "f", land: "l" } }, [[300, 150], [340, 150], { jump: [380, 130] }, [420, 130]]);
+  const own = path({ snap: true, window: [20, 80], rest: [0.5, 0.5] }, r as never, 60);
+  assert.deepEqual(own, path({ snap: true, window: [20, 80], rest: [0.5, 0.5] }, (f) => { const s = r(f); return s && [s.at[0], s.at[1], !s.air]; }, 60));
+  assert.deepEqual([new Set(own.slice(20, 32).map(([, y]) => y)).size, own[19][1] - own[40][1]], [1, 20], "y held in the air, then up the 20 px it landed on");
 });

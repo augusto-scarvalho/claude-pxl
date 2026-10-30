@@ -131,7 +131,7 @@ const USAGE = `pxl — pixel-art DSL
       what is placed by a relation to it moves too), searched without a model and written into the file
       where the number is (a computed one is said and left); it says each change, and the rules
       that held still hold (a scene's checked rebuilt before anything is written).
-  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--world] [--out DIR]
+  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--world [--every N]] [--out DIR]
   pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
       to the region, side by side (in rows when too wide for one: a contact sheet), enlarged,
@@ -151,7 +151,8 @@ const USAGE = `pxl — pixel-art DSL
       <out>/_shot/<names>.gif: a walk in 8 directions, two versions of a scene moving; --every N
       builds and plays one frame in N (a long scene's preview before a build, its size printed).
       --world: a scene with a camera as its whole world, the camera's box on it (a magenta line), the
-      screen's layers (parallax 0) left out, to judge the framing (--frames for a strip of moments).
+      screen's layers (parallax 0) left out, to judge the framing (--frames for a strip of moments;
+      --every N: one world, the camera's box every N frames on it, each showing its own frame there).
   pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
       How an asset was painted: every step (op, file:line, pixels changed, where), in order.
       --at x,y lists only the steps that changed that pixel of the final image, and its color
@@ -618,6 +619,24 @@ export async function main(argv: string[]): Promise<number> {
           const gif = encodeGif(sheets.map((img, i) => ({ img: img.scale(k), ms: (cuts[i + 1] ?? T) - cuts[i] })));
           writeFileSync(path, gif);
           console.log(`-> ${path} (${(gif.length / 1e6).toFixed(1)} MB, ${cuts.length} frames, a loop of ${T} ms${new Set(loops).size > 1 ? `: ${loops.join(", ")} ms each, the shorter starting over` : ""}; across: ${shots.map((s) => s.name).join(", ")}; ${k}x)`);
+          return 0;
+        }
+        // --world --every N: the scene's world once, the camera's box every N frames on it, each box what that frame shows there
+        if (a.world && a.every !== undefined) {
+          const s = shots[0], p = "file" in s && shots.length === 1 ? proj(s.file!) : undefined, o = p?.assets.get(s.name)?.opts;
+          if (!p || !o?.camera) throw new PxError("shot --world --every N lays a scene's camera boxes on its world: give it one scene with a camera");
+          const k = Math.max(1, Math.floor(a.every)), boxes: number[][] = [];
+          let img: Img | undefined;
+          for (let f = 0; f < frameCount(p, s.name); f += k) {
+            const b = p.build(s.name, 0, frameTime(p, s.name, f)), [cx, cy] = b.camera!.at;
+            img ??= b.img.copy();
+            for (let y = cy; y < cy + o.h!; y++) for (let x = cx; x < cx + o.w!; x++) img.set(x, y, b.img.data[y * img.w + x]);
+            boxes.push([f, cx, cy]);
+          }
+          for (const [, cx, cy] of boxes) for (let i = 0; i < o.w!; i++) for (let j = 0; j < o.h!; j++) if (!i || !j || i === o.w! - 1 || j === o.h! - 1) img!.set(cx + i, cy + j, pack(255, 0, 255));
+          const sc = a.scale ?? Math.max(1, Math.floor(1568 / Math.max(img!.w, img!.h))), path = join(outDir, "_shot", `${s.name.replace(/[^\w.-]/g, "_")}_world.png`);
+          writePng(path, img!.scale(sc));
+          console.log(`-> ${path} (the world with the camera's box every ${k} frames, each showing its own frame; ${sc}x)\nboxes [frame, x, y]: ${boxes.map((b) => b.join(",")).join(" ")}`);
           return 0;
         }
         // several things, or several regions: a row each, one under the other, a column per region

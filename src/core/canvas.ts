@@ -155,6 +155,8 @@ export class Canvas {
   get h(): number { return this.img.h; }
   /** What of this canvas shows on the picture, [x, y, w, h] in its own coordinates (a scene's camera moves it): to skip what is off it. */
   get view(): [number, number, number, number] { return [-this.ox, -this.oy, this.img.w, this.img.h]; }
+  /** A scene's camera this frame, [x, y, w, h] in the world, the same in every layer whatever its parallax (--world: the frame's real one); none without a camera. */
+  camera?: [number, number, number, number];
 
   color(c: unknown): Resolved {
     return this.pal.resolve(c);
@@ -861,7 +863,7 @@ export class Canvas {
    */
   plume(x: number, y: number, keys: string, opts: { every?: number; life?: number; rise?: number; wind?: number | [number, number]; inertia?: number; size?: [number, number]; young?: string; seed?: number; frame?: number; light?: [number, number]; view?: unknown; at?: number[]; thin?: "dither" | "age" | "shrink"; steady?: boolean } = {}): void {
     // through a camera: rise, wind and size in meters where it stands (`at`), each puff on the upright plane there, as near as it is
-    const M = opts.view !== undefined ? inMeters(this.camera(opts.view, "plume")!, opts.at as number[], "plume") : undefined, m = M ? M.k : 1;
+    const M = opts.view !== undefined ? inMeters(this.viewCam(opts.view, "plume")!, opts.at as number[], "plume") : undefined, m = M ? M.k : 1;
     const every = Math.max(1, opts.every ?? 2), life = opts.life ?? 36, rise = opts.rise !== undefined ? opts.rise * m : 24, tau = opts.inertia ?? 0, [s0, s1] = opts.size ? opts.size.map((v) => v * m) : [2, 8];
     const [wx, wy] = (typeof opts.wind === "number" ? [opts.wind, 0] : opts.wind ?? [0, 0]).map((v) => v * m), f = opts.frame ?? this.frame, frames = this.frames;
     const [lit, mid, shade] = [...keys], young = opts.young ? [...opts.young] : null, [lx, ly] = opts.light ?? [-0.6, -0.8], ll = Math.hypot(lx, ly) || 1;
@@ -1004,11 +1006,11 @@ export class Canvas {
 
   /** Smoke of a shape (a column, a puff, a bank, a ring) at this moment of the loop: see smoke.ts. */
   smoke(x: number, y: number, keys: string | string[], opts: SmokeOpts = {}): void {
-    drawSmoke(this as unknown as Parameters<typeof drawSmoke>[0], x, y, keys, opts, this.camera(opts?.view, "smoke"));
+    drawSmoke(this as unknown as Parameters<typeof drawSmoke>[0], x, y, keys, opts, this.viewCam(opts?.view, "smoke"));
   }
 
   /** A view given to a 2D op (smoke, plume): the perspective() camera at this canvas's size (k times as big at a scene's size). */
-  private camera(view: unknown, what: string): Perspective | undefined {
+  private viewCam(view: unknown, what: string): Perspective | undefined {
     if (view === undefined) return undefined;
     if (!view || typeof view !== "object" || !("horizon" in view)) throw new PxError(`${what}: view is a perspective() camera (mesh()'s: { w, horizon, eye, ... }), got ${JSON.stringify(view)}`);
     const v = scaled(view as View, this.k);

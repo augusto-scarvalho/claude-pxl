@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { art, keys, PAL } from "./helpers.ts";
+import { art, failure, keys, PAL } from "./helpers.ts";
 import { main } from "../src/node/cli.ts";
 import { loadSource } from "../src/node/load.ts";
 import { whenChanged } from "./passed.ts";
@@ -165,4 +165,15 @@ test("the nature kit's spruce() under a light of its own: surface()'s options ov
   writeFileSync(f, `include(${JSON.stringify(join(process.cwd(), "lib/nature/kit.px.js"))}, { palette: true }); nature.spruce("same", 52, 9); nature.spruce("lit", 52, 9, { light: [0.55, 0.55, 0.62] })`);
   const p = loadProject(f);
   assert.deepEqual([p.image("same").hash() === p.image("_spruce_s").hash(), p.image("lit").hash() === p.image("_spruce_s").hash()], [true, false]);
+});
+
+test("a layer's swap as a list mixed by mix: the next map ordered-dithered in by where it is along them, in the layer's own coordinates; mix (c) => one", () => {
+  const at = (mix: string, x = 0) => art(PAL + `sprite("s", { w: 4, h: 4 }, layer("l", { x: ${x}, swap: [{}, { r: "w" }, { r: "g" }], mix: ${mix} }, rect(${-x}, 0, 4, 4, "r")))`, "s");
+  assert.equal(at("0.5"), "wrwr\nrwrw\nwrwr\nrwrw", "half the second over the first, by the 4x4 Bayer");
+  assert.equal(at("1.25"), "gwgw\nwwww\ngwgw\nwwww", "a quarter of the third over the second");
+  assert.deepEqual([at("2"), at("9"), at("-1"), at("(c) => c.w / 4")].map((s) => s.slice(0, 4)), ["gggg", "gggg", "rrrr", "wwww"], "held at both ends; a function of the canvas");
+  assert.equal(at("0.5", 1).slice(0, 4), "rwrw", "the dither goes with the layer: moved 1 px, the pattern with it");
+  assert.match(failure(PAL + 'sprite("s", { w: 1, h: 1 }, layer("l", { swap: [{}, 5] }, px(0, 0, "r")))', "s").message, /swap is a palette map, .* or a list of them mixed by mix/);
+  assert.match(failure(PAL + 'sprite("s", { w: 1, h: 1 }, layer("l", { swap: [{}, {}], mix: "dusk" }, px(0, 0, "r")))', "s").message, /mix is where it is along swap's maps/);
+  assert.match(failure(PAL + 'sprite("s", { w: 1, h: 1 }, layer("l", { mix: 1 }, px(0, 0, "r")))', "s").message, /mix goes with swap/);
 });

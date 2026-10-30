@@ -301,6 +301,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     c.look3d = def.look3d;
     c.owner = { name: def.name, loc: def.loc };
     c.groundAt = groundAt;
+    if (cam) c.camera = [cam[0], cam[1], opts.w!, opts.h!];
     return c;
   };
   // moved by the camera: drawn at the world's coordinates less its shift, the ground still the world's
@@ -372,9 +373,18 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
       lc.flush();
       // a palette map on all it drew (stamps, tiles, strips, functions): the same art at another time of day
       if (l.opts.swap !== undefined) {
-        if (!l.opts.swap || typeof l.opts.swap !== "object" || Array.isArray(l.opts.swap)) throw new PxError(`layer '${l.name}': swap is a palette map, { key or "#hex": key or "#hex" } (a kit's time of day, side.DUSK), got ${fmtArgs([l.opts.swap])}`, l.loc);
-        limg.data.set(limg.remap(lc.swapMap(l.opts.swap)).data);
-      }
+        const list = [l.opts.swap].flat(), plain = (m: unknown) => !!m && typeof m === "object" && !Array.isArray(m);
+        if (!list.length || !list.every(plain)) throw new PxError(`layer '${l.name}': swap is a palette map, { key or "#hex": key or "#hex" } (a kit's time of day, side.DUSK), or a list of them mixed by mix, got ${fmtArgs([l.opts.swap])}`, l.loc);
+        // a list: two neighbours by mix (1.25: a quarter of the third over the second), the later one ordered-dithered in, the dither held to the layer's own coordinates
+        const mix = typeof l.opts.mix === "function" ? l.opts.mix(lc) : l.opts.mix ?? 0;
+        if (!Number.isFinite(mix)) throw new PxError(`layer '${l.name}': mix is where it is along swap's maps, 0 the first, 1 the second (1.5 halfway to the third), or (c) => that (c.frame, c.camera), got ${fmtArgs([mix])}`, l.loc);
+        const t = Math.min(list.length - 1, Math.max(0, mix)), i = Math.min(list.length - 2, Math.floor(t)), s = t - i, maps = list.map((m) => lc.swapMap(m as Record<string, string>));
+        if (list.length < 2 || s <= 0 || s >= 1) limg.data.set(limg.remap(maps[list.length < 2 ? 0 : s >= 1 ? i + 1 : i]).data);
+        else for (let j = 0; j < limg.data.length; j++) {
+          const x = j % limg.w, y = (j - x) / limg.w, to = maps[bayer(x - lc.ox, y - lc.oy) < s ? i + 1 : i].get(limg.data[j]);
+          if (to !== undefined) limg.data[j] = to;
+        }
+      } else if (l.opts.mix !== undefined) throw new PxError(`layer '${l.name}': mix goes with swap: [map, map, ...]`, l.loc);
     } catch (e) {
       throw wrap(e, (st) => ctx.locFromStack(st)).within(`layer '${l.name}'`, l.loc);
     } finally {

@@ -448,7 +448,8 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   in from black over the first, so the jump back to the start is never seen: a last layer with
   `parallax: 0` and `(c) => c.dither(0, 0, W, H, ".", "k", k)`, k going from 0 to 1
   (`examples/camera.px.js`). Or a title held while the camera eases back: `follow` gives the start
-  again, and the camera's speed limit makes the way back a pan.
+  again, and the camera's speed limit makes the way back a pan. A light that turns along the level
+  (§13's times of day by `c.camera`) jumps back with it, so it too comes back through the black.
 
 ## 10. Parallax (planes going by at their own speeds)
 
@@ -485,7 +486,8 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   fast for detail: streaks along the motion (`examples/parallax/train.px.js`).
 - **A level bigger than the picture** (a side-scroller, a platformer): the scene's
   `camera: { world: [w, h], follow }`, the level drawn where it is in the world, and the picture a
-  window that follows the target each frame (a `route()`'s `at`; `[x, y, onGround]` when it jumps).
+  window that follows the target each frame (a `route()`'s `at`; `[x, y, onGround]` when it jumps;
+  a side route itself, `follow: R`).
   As games do (Itay Keren's "Scroll Back"; the numbers Sonic's, `PXL help camera`): the target moves
   freely in a small box round its rest point, the camera looks ahead the way it runs, moves in y only
   when it lands on another height (a jump doesn't shake the picture), stops at the world's edges, and
@@ -496,8 +498,17 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   1]`, a strip that wraps), so a climb or a flight goes up into its darker part and its dither goes by
   with the land; a sky stuck to the screen (parallax 0) reads as painted on the glass while the land
   slides under it. `PXL shot <file> <scene> --world --frames 0,60,120` shows the whole
-  world with the camera's box, to judge the framing; `describe` says where each thing is in the world
+  world with the camera's box, to judge the framing (`--world --every 20`: the box every 20 frames on
+  one world, each showing its own frame); `describe` says where each thing is in the world
   and what is off the picture (`examples/camera.px.js`).
+- **The hero's way through it**: `route({ px: "side", pace, ground, gravity, rise, walk, idle, air })`,
+  each leg its own pace and anim (a run, a dash, a walk to a door), `{ to: x }` along the ground,
+  `{ jump: [x, y] }` by gravity in the anim's four parts (`air: { jump, apex, fall, land }`, picked by
+  its speed up), `{ drop }` off an edge, `{ climb }` up a ladder; a frame off the ground says `air`, so
+  `follow: R` holds the picture still through a jump (`PXL help route`). The genre's jump is
+  `platformer16`'s `jump` (a 48 px rise at 600 px/s²: 1.5 px a frame² at 20 fps). What is keyed to
+  where the camera is (the light along the level, a plane coming in) reads `c.camera`, the same on
+  every layer whatever its parallax (`c.view` is each layer's own).
 
 ## 11. Shadows and light
 
@@ -786,7 +797,11 @@ finding them. Try the palette-safe tools first (`shade:`/`light:` layers, `densi
 `lighting()`); use blend modes for whole-scene grading or true translucency, and tell the user.
 `palettize: true` snaps results back only when the palette already has those tones. A time of day is
 a palette, as the SNES and GBA games swapped it on the same tiles: a layer's `swap` (a kit's map,
-`{ swap: side.DUSK }`), or the scene's, not a filter (`lib/nature/side.px.js`'s dusk and night).
+`{ swap: side.DUSK }`), or the scene's, not a filter (`lib/nature/side.px.js`'s dusk and night). From
+one time to the next: a list of maps and where it is along them, the next one ordered-dithered in,
+each pixel still one of the palette's: `layer("world", { swap: [{}, side.DUSK, side.NIGHT], mix: (c) =>
+light(c.camera[0]) }, ...)`, 0 day, 1 dusk, 1.5 halfway to night, by the frame or by where the camera
+is along a level (§10); the same `mix` on every layer, the sky's with its own maps.
 
 ## 14. Checking a scene
 
@@ -865,7 +880,8 @@ Where a player must find their character and what can hurt it, the picture serve
 - Hit boxes: the player's a small circle at its middle, never past its pixels; a pickup's bigger.
 - Sizes in tiles: a screen of 320×180, 480×270 or 640×360 (1080p a whole multiple), tiles of 8 or
   16 px, figures 1×1, 1×2 or 2×2 tiles (a top-down figure 22–27 px tall in a 16×32 frame; a
-  platformer's 2 tiles, 32 px, §19), moves sized to the grid (a jump 2 tiles, stairs 8 px a step).
+  platformer's 2 tiles, 32 px, §19), moves sized to the grid (a jump 3 tiles, 48 px over a 2-tile
+  figure: `platformer16`'s `jump`; stairs 8 px a step).
   Items idle by kind (`PXL help "characters 12"`); an engine flips sprites, so they are lit from
   straight above (characters §11).
 

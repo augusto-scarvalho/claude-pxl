@@ -84,6 +84,26 @@ test("route: legs at a pace and holds by name, the feet on the ground, the way c
   assert.deepEqual([f.total, f(1), f(4)], [6, { name: "w_n", at: [10, 18], frame: 1, dir: "n" }, { name: "w_e", at: [12, 15], frame: 4, dir: "e" }]);
 });
 
+test("route, a side view: a pace and an anim a leg, along the ground or straight, a jump by gravity in its parts, a drop, a climb, the landing after", () => {
+  // the ground flat at 20, then rising 1 px in 2 from x 10; gravity 1 px a frame², a jump rising 8 (4 frames up)
+  const r = route({ px: "side", pace: 2, ground: (x) => (x < 10 ? 20 : 20 - (x - 10) / 2), gravity: 1, rise: 8, walk: "run", idle: "idle", air: { jump: "j", apex: "a", fall: "f", land: { anim: "l", flip: true } } }, [
+    [0, 20], { to: 14 }, { to: 20, pace: 3, anim: "dash" }, { jump: [30, 17], name: "hop" }, { hold: 4 }, { drop: [34, 25] }, { climb: [34, 15], pace: 5, anim: "up" }, [30, 15]]);
+  // 7 frames to x 14 (a step on each, the last where it arrives), 2 dashing, the jump's 8 (4 up, 4.47 down to 2 px under its take-off), ...
+  assert.deepEqual([r.total, r.step("hop").n, r(29)], [29, 8, null]);
+  assert.deepEqual([r(0), r(6)!.at, r(7)!.at, r(8)], [{ name: "run_e", at: [2, 20], frame: 0, dir: "e" }, [14, 18], [17, 17], { name: "dash_e", at: [20, 15], frame: 8, dir: "e" }]);
+  // the jump's parts by its speed up: rising, within 2 frames of the top, falling, touching down; frames counted in each part
+  assert.deepEqual([r(9), r(12), r(15), r(16)], [{ name: "j_e", at: [21, 12], frame: 0, dir: "e", air: true }, { name: "a_e", at: [25, 7], frame: 2, dir: "e", air: true },
+    { name: "f_e", at: [29, 12], frame: 0, dir: "e", air: true }, { name: "l", at: [30, 17], frame: 0, dir: "e" }]);
+  // the landing on 3 frames in all, over the hold; the drop all fall; the climb off the ground; back west
+  assert.deepEqual([r(18)!.name, r(18)!.frame, r(19)!.name, r(21), r(25), r(27)], ["l", 2, "idle_e", { name: "f_e", at: [31, 18], frame: 0, dir: "e", air: true },
+    { name: "up_e", at: [34, 20], frame: 25, dir: "e", air: true }, { name: "run_w", at: [32, 15], frame: 27, dir: "w" }]);
+  const side = (steps: string) => failure(PALS + `route({ px: "side", pace: 1, gravity: 1, rise: 2 }, [[0, 0], ${steps}])`).message;
+  assert.match(side("{ jump: [5, -5] }"), /a jump rising 2 px can't land 5 px up/);
+  assert.match(side("{ to: 5 }"), /goes along the ground to x 5: give the route ground/);
+  assert.match(failure(PALS + 'route({ pace: 1 }, [[0, 0], { jump: [5, 0] }])').message, /a jump leg is a side view's/);
+  assert.match(failure(PALS + 'route({ px: "side", pace: 1 }, [[0, 0], { drop: [5, 9] }])').message, /a drop falls by the route's gravity/);
+});
+
 test("turnToward: a step every two frames the shorter way round, toward a point within reach or a direction", () => {
   const t = turnToward("m", [0, 0], (f: number) => (f >= 3 ? "n" : null), { rest: "s", frame: () => 0 });
   assert.deepEqual([0, 3, 4, 6, 8, 10].map((f) => t(f).name), ["m_s", "m_s", "m_sw", "m_w", "m_nw", "m_n"], "on even frames, west round (a tie turns clockwise)");
