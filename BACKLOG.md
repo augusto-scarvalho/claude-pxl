@@ -550,6 +550,10 @@ trousers in two colors; done here: surface()'s and rig3d's `inner: "dark"`, dres
   ramp, no light tone at all. A tie within a px taken as neither.
 - [ ] **Where a figure's lines fall**: `pxl study` counts the inside's dark lines, not where they fall (a
   joint, a hem, a limb in front); and no command lists a frame's parts by row (img.parts knows them).
+- [ ] **`clean` cuts the silhouette's last pixel**: a seam pixel with the clear beyond it is cut (no 2 px black
+  run), so a belt a hair wider than the shirt (0.05 px, or the walk's lean) opened a 1 px notch in the slim's
+  profile, ahead and behind; worked round by the belt a hair inside. With `inner: "dark"` there is no black run
+  to avoid: spare the silhouette's last pixel.
 - [ ] **`shot --vs` an uncommitted before**: the before had to be built to a folder and composed by hand
   (~120 lines of Python). `--vs <a folder of built strips>`.
 
