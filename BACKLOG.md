@@ -488,8 +488,9 @@ From top-down 32's bodies at 48 px (F5 4a-4d, `lib/characters/hero.px.js`'s G32 
 From painting the slim (F5 4e-4f, `lib/characters/hero32.px.js`; the user: a hunch from 45 degrees, the slim re-pitched to 15):
 - [ ] **Re-pitch a body keeping its rows**: moving the slim from 45 to 15 degrees scaled every upright
   length by hand (cos 45 / cos 15: bones, `reach`, the shoulders' drop), the foot box by sin 45 / sin 15,
-  and the blade's rise by a new cell number (`upright`). figure()'s lengths for a height on the screen at
-  a pitch.
+  and the blade's rise by a new cell number (`upright`); growing the chibi two rows (F5 4g) was 1/cos p by hand
+  again, and its arms changed silently with the new `h` (rig3d's `h`/`heads` fill only what the body doesn't
+  give). figure()'s lengths for a height on the screen at a pitch.
 - [ ] **`soles` at a low pitch**: it moves the feet in px of depth (2.9 facing n at 15 as at 45) though the
   rows it evens out shrink by sin p, so the walk's back leg went out of reach; worked round by `deep: 0.8`.
   Move them only as far as a row needs.
@@ -499,8 +500,12 @@ From painting the slim (F5 4e-4f, `lib/characters/hero32.px.js`; the user: a hun
   as [column, keys] (placing a 13 px face by counting 31 columns went wrong twice).
 - [ ] **Arms longer than their bones**: a hand goes to its target past the arm's reach (the forearm
   stretched) and check flags only legs: 4e's arms were 2.2 px too long. The same check on the arms.
-- [ ] **A genre's `colors` checked**: nothing reads topdown32's 24 against a figure's colors (a lab sprite
-  counted 18). As check reads `height`.
+- [ ] **A genre's `colors` and body shares checked**: nothing reads topdown32's 24 against a figure's colors
+  (a lab sprite counted 18), nor its `body` shares (head, legs) against the blocks: the chibi's legs 0.29 was
+  the hip in 3D over 48, the sprite reads 0.23 (F5 4g). As check reads `height`.
+- [ ] **A reference cell read as text**: `pxl describe <png> --at` reads one image's region but doesn't lay
+  layers over each other (LPC's body, trousers and head): a third throwaway script (F5 4g). `--over
+  layer.png` and `--cell WxH c,r`.
 - [ ] **dress() paint by px across**: a V neckline by angle came out a column of skin where the tunic
   narrows (worked round by reading bodyRadius in the paint); and the skirt is 2.4 px whatever the body.
   The paint given the point's px across; the skirt's length a field.
