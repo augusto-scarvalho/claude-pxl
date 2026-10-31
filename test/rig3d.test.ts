@@ -263,6 +263,24 @@ sprite("x", { w: 16, h: 14 }, (c) => c.surface(F, { ppm: 1, at: [8, 12], view: {
   assert.ok(sdf.sphere(1).paint(() => "x").dist([2, 0, 0]) === 1);
 });
 
+test('inner: "dark": where one part meets another, the darkest tone of the part behind; rig3d\'s ink then only all round', () => {
+  // a ball in front of a bigger one, and a figure's body with a ball before its middle: their ramps' darkest (r) lit nowhere
+  const p = loadSource(`${PAL}
+const F = sdf.union(sdf.sphere(4).at(0, 6, 4).mat("rww").part("back"), sdf.sphere(2).at(0, 0, 4).mat("g").part("front"))
+sprite("x", { w: 16, h: 14 }, (c) => c.surface(F, { ppm: 1, at: [8, 12], view: { kind: "side", pitch: 0 }, mats: { rww: "rww", g: "g" }, outline: false, rim: false, shadows: false, ao: 0, light: [0, -1, 0], soft: 1, inner: "dark" }))
+for (const inner of [undefined, "dark"]) rig3d(\`f\${inner ? "d" : ""}\`, { w: 26, h: 40, pivot: [13, 38], headings: ["s"], ink: "k", inner, light: [0, -1, 0], surface: { soft: 1 }, moves: { idle: { frames: 1, pose: () => ({}) } },
+  parts: (j) => ({ body: j.limb(j.pelvis, j.chest, 4, 4, "rww"), arm: j.ball(j.pelvis.map((v, e) => (v + j.chest[e]) / 2 - (e === 1 ? 5 : 0)), 2, "g") }) })`, "t.px.js");
+  const grid = (n: string) => keys(p, n).split("\n"), at = (r: string[], x: number, y: number) => r[y]?.[x] ?? ".";
+  const where = (r: string[], k: string) => r.flatMap((row, y) => [...row].flatMap((c, x) => (c === k ? [[x, y]] : [])));
+  const by = (r: string[], [x, y]: number[], k: string) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => at(r, x + dx, y + dy) === k);
+  const x = grid("x"), f = grid("f_idle_s"), d = grid("fd_idle_s");
+  assert.ok(where(x, "r").length >= 4 && where(x, "r").every((q) => by(x, q, "g")) && !where(x, "k").length, keys(p, "x"));
+  // the figure: its line inside (k beside the ball) the body's darkest, the line round it (k beside the clear) as it was
+  assert.ok(where(f, "k").some((q) => !by(f, q, ".")) && where(d, "k").every((q) => by(d, q, ".")), keys(p, "fd_idle_s"));
+  assert.deepEqual(where(d, "k"), where(f, "k").filter((q) => by(f, q, ".")));
+  assert.ok(where(d, "r").length >= 4 && where(d, "r").every((q) => by(d, q, "g")), keys(p, "fd_idle_s"));
+});
+
 test("clean: surface cuts a pixel sticking out and an inner line's sliver along the outline (one line, not two); a decal none edge on; rig3d's chin under a modeled head's skin", () => {
   const p = loadSource(`${PAL}
 ramps("kgw", "krw")

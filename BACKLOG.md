@@ -512,6 +512,47 @@ From painting the slim (F5 4e-4f, `lib/characters/hero32.px.js`; the user: a hun
 - [ ] **A normal map's name clash**: a scene soles_walk_n beside soles_walk stopped the build
   (soles_walk_n.png is both). soles_walk.normal.png.
 
+From painting the chibi and reading 3D models for it (F5 4h-4i, `lib/characters/hero32.px.js`'s `chibi_*`; the user:
+puffed sleeves, domes on the shoulders, big hips):
+- [ ] **dress()'s defaults on a wide body**: the sleeve starts at the shoulder joint, so its round top rose
+  2-3 rows over the tunic's tapering shoulder, outlined (worked round by a lower joint, `cap`); the skirt is
+  round while the body is 0.84 as deep, so it stood 2 px out behind and ahead (17 px against 13). A
+  `sleeveFrom`, and the skirt flattened as the body is.
+- [ ] **dress()'s far arm on a tie**: facing us the shoulders' depths tie and floating noise darkens one
+  forearm. `farBy: px`, or a tie taken as neither.
+- [ ] **An elbow bowed out**: an arm a px longer than its reach bends out by the default hint (the chibi's
+  hanging elbows 1.6-2.5 px out, the sleeve widest there) and nothing says so. A LOOK in check, or a hint
+  whose out is 0 for a hanging arm.
+- [ ] **Hands from the body's middle**: narrowing the shoulders moved every approved pose's hands (they
+  are given from the shoulders); worked round by `hang` on the idle and the walk. Hands optionally from
+  the body's middle, as the feet are from under the pelvis.
+- [ ] **A views() head and the blocks' sphere round alike**: the run facing n stood a row taller painted
+  than in blocks (the head stamped at its rounded middle); worked round by holding the rise facing n.
+- [ ] **Re-material a finished field**: `.mat()` doesn't change a field whose material is set inside, so the
+  24 px hero's hair couldn't be re-toned and was modeled again. `.mat(name, { over: true })`.
+- [ ] **An include's `as` and its object**: `h32.CHIBI` threw "not defined" (the object is the file's var);
+  the error could say so, and a kit's maker resolve its own names.
+- [ ] **`pxl study` of a 3D model**: measuring ten .dae bind poses (heads, the shoulder joint against the
+  chin, slices across and deep, the silhouette's rows at 45 degrees and 48 rows) took ~300 lines of Python.
+  A study of a .dae/.glb, numbers only.
+
+From the chibi's lines inside and its trousers (F5 4j; the user: the legs' blocks show where they join the hips, the
+trousers in two colors; done here: surface()'s and rig3d's `inner: "dark"`, dress()'s `trousers`):
+- [ ] **A joint from a part in front**: at 48 px the depth gap at a seam can't tell them apart (the chibi's
+  shoulder joint 0.6-1.2 px, the arm along the torso 1.1-2.0, the hem over the thighs 1.0-6.6), so "no line at
+  a joint" needs the rig to name its joints; and a row down an upright surface seen from 45 degrees is a pixel
+  deeper, so two parts meeting on one continuous surface (a belt over trousers) get a line. A seam rule that
+  knows a continuing surface.
+- [ ] **Melt pieces into one part**: rig3d's parts can't be smooth-unioned nor named as parts inside a part,
+  so dress() builds the trousers' field by hand (the seat halved by planes, a smooth union per leg).
+  `j.union(pieces, { smooth, part })`.
+- [ ] **dress()'s far limb on a tie** (the forearms in 4h, the legs here): facing us one leg took the far
+  ramp, no light tone at all. A tie within a px taken as neither.
+- [ ] **Where a figure's lines fall**: `pxl study` counts the inside's dark lines, not where they fall (a
+  joint, a hem, a limb in front); and no command lists a frame's parts by row (img.parts knows them).
+- [ ] **`shot --vs` an uncommitted before**: the before had to be built to a folder and composed by hand
+  (~120 lines of Python). `--vs <a folder of built strips>`.
+
 ## Characters (from dogfooding a 64 px character)
 
 Each of these was first worked around by hand in an art file or by a Python script on the side.
