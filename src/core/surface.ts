@@ -47,7 +47,7 @@ export interface SurfaceOpts {
   ink?: string;
   /** each material's ramp cut to this many tones, spread from its darkest to its lightest (a genre's tones at a density: 3 at 16-32 px) */
   tones?: number;
-  /** a line where one part lies in front of another, on the one behind (each part outlined against the others, as a figure's limbs): a key, or true (the outline's); between pieces of one part (`.part()`s inside it: locks of hair) its own darkest tone */
+  /** a line where one part lies in front of another, on the one behind (each part outlined against the others, as a figure's limbs): a key, true (the outline's), or "dark" (the darkest tone of the part behind, as pixel art parts a figure's limbs, joints and hems inside its line); between pieces of one part (`.part()`s inside it: locks of hair) its own darkest tone */
   inner?: boolean | string;
   /** the contour toward the light a step lighter (default true); a number: where it is open both ways the light comes from (across and up or down), at least that share up its ramp (0..1: a sun behind lighting its edge, 0.85) */
   rim?: boolean | number;
@@ -418,8 +418,9 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   if (typeof o.outline === "string" && (outKey === null || outKey === TRANSPARENT)) throw new PxError(`${who}: outline '${o.outline}' is not a color`);
   const inkKey = o.ink === undefined ? null : c.color(o.ink);
   if (o.ink !== undefined && (typeof o.ink !== "string" || inkKey === null || inkKey === TRANSPARENT)) throw new PxError(`${who}: ink is a key, the line all round outside it, got ${JSON.stringify(o.ink)}`);
-  const innerOn = !!o.inner, innerKey = typeof o.inner === "string" ? c.color(o.inner) : outKey;
-  if (typeof o.inner === "string" && (innerKey === null || innerKey === TRANSPARENT)) throw new PxError(`${who}: inner '${o.inner}' is not a color`);
+  // (inner "dark": the line between parts in the darkest tone of the part behind, as between pieces of one part)
+  const innerOn = !!o.inner, dark = o.inner === "dark", innerKey = dark ? null : typeof o.inner === "string" ? c.color(o.inner) : outKey;
+  if (typeof o.inner === "string" && !dark && (innerKey === null || innerKey === TRANSPARENT)) throw new PxError(`${who}: inner is a key, true or "dark", got '${o.inner}'`);
 
   const cam = viewOf(c, o, T.lo, T.hi, T.cell, who, persp, K, origin), { W, H, x0, y0, ray, axisDepth, toScreen, near, R, U, F, L, lx, ly, scale } = cam;
 

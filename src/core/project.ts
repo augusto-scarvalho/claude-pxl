@@ -1046,8 +1046,9 @@ export class Project implements BuildCtx {
             ring(c);
           } else {
             const P = partsOf((o.parts as (j: Joints, p: Pose) => unknown)(j, p), j);
-            // ink: a line all round outside and on the part behind (the traveler's); else surface()'s, on the shadow side
-            const line = o.ink !== undefined ? { outline: false, rim: false, inner: o.ink } : { outline: o.outline ?? true, inner: o.inner ?? true };
+            // ink: a line all round outside and on the part behind (the traveler's; `inner: "dark"` there the darkest tone of
+            // the part behind instead); else surface()'s, on the shadow side
+            const line = o.ink !== undefined ? { outline: false, rim: false, inner: o.inner ?? o.ink } : { outline: o.outline ?? true, inner: o.inner ?? true };
             const mats = { ...(look?.mats ?? {}), ...Object.fromEntries(P.ramps.map((r) => [r, r])), ...o.mats } as never;
             c.surface(P.field, { view, ppm: 1, at, mats, light, ...(line as object), shadows: false, ao: 0, ...this.genreTones(o.genre), ...o.surface });
             // a head modeled (a part named head, no views): the line of `chin` under its jaw where it meets the

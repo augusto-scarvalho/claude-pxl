@@ -162,9 +162,11 @@ directions walking, idle, kneeling and casting;
    coat or a cloak a surface swept round the upright (`j.sweep`: open in front, its lining, trailing
    as he walks, flaring as he turns), drawn by `surface()` toned by how it faces the light (from
    above and toward us: a mirrored view keeps it, §6); `ink` the line all round and on the part
-   behind; `surface()` cleans what is drawn that small (`clean`, on unless `false`: a pixel sticking
-   out cut away, no line doubled, the outline whole). What no primitive gives is a field of the file's own
-   (`sdf.field`: the warden's axe head) or drawn by hand after the figure (`draw`).
+   behind (`inner: "dark"`: there the darkest tone of the part behind, so no near-black where a leg
+   meets the hips or a hem, the games' way, §7); `surface()` cleans what is drawn that small
+   (`clean`, on unless `false`: a pixel sticking out cut away, no line doubled, the outline whole).
+   What no primitive gives is a field of the file's own (`sdf.field`: the warden's axe head) or drawn
+   by hand after the figure (`draw`).
 4. **The head**, as a pixel artist paints over a 3D render: modeled (the skull, and on it the hair, a
    beard, a hat or a bandana as fields in the head's frame) and drawn once per view by
    `views(name, field, { retouch })` (five views for 8 directions, the east the west's mirror; all of
@@ -474,6 +476,12 @@ and fix dither and shading. Upscaled, round off the big square blocks and redraw
   light is a 1 px line just inside the outline, never over it. Near-black pulls the eye: keep most of
   it on the face and the silhouette, and a line that competes with the face takes the material's
   darkest tone; outline what sticks out of the silhouette, divide what lies flat on it by color.
+  Measured on top-down figures (LPC, Eldiran, Puny, Chrono Trigger, Secret of Mana, the Minish Cap,
+  Chained Echoes): a joint (a thigh into the hips, an arm into the shoulder, a wrist) has no line, at
+  most a 2-3 px crease in the material's darkest; a hem over the legs is the hem's darkest or the legs'
+  (only LPC's armour edges its plates in its own near-black); a limb in front of the body or of the
+  other leg a 1 px line, near-black in most, the darkest of the part behind in Chrono Trigger and the
+  Minish Cap. A figure drawn in 3D: `rig3d()`'s `ink` with `inner: "dark"`.
   At 16–24 px leave the outline open where the side lines already close the shape (under the soles,
   a helmet's top, a hair parting: that row in a layer with `outline: false`). 1 px of pure white on
   a dark field reads 2 px and glows: thin trim takes a light tone below white. A selective outline
