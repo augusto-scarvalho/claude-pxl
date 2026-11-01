@@ -57,7 +57,7 @@ test("genre(): its density a tile's px or px a meter, its mix said; its cell as 
 test("pxl lib: the catalog by subject, filters by cell and genre", () => {
   const all = libList();
   assert.match(all[0], /^pxl's library \(lib\/\), by subject/);
-  assert.ok(all.some((l) => /^props +lib\/props: crates lamps side side_village village$/.test(l)));
+  assert.ok(all.some((l) => /^props +lib\/props: crates lamps side side_village village village32$/.test(l)));
   assert.throws(() => libList({ cell: "side/x" }), /--cell is <camera>\/<density>/);
   assert.throws(() => libList({ genre: "racing-behind" }), /no genre 'racing-behind' in lib\/profiles/);
   assert.throws(() => findEntry("nothing.here"), /no entry 'nothing\.here' in the library/);
@@ -130,6 +130,21 @@ hero.character("v", { moves: ["idle"], swap: { n: "#7a2f3a" } })
   // his right hand on the walk's second frame facing s, in the 18 x 32 frame: where a 2D part goes
   const [x, y] = p.scope!(`hero.rig.screen(hero.rig.joints(hero.rig.pose("walk", 1, 180), 180).arms[1].hand)`) as number[];
   assert.ok(x > 0 && x < 18 && y > 14 && y < 28, `${x}, ${y}`);
+});
+
+test("lib/styles/hand32.px.js: a draft drawn 3 times over brought down (shrink), the selective line on its lower right, a lone step evened", () => {
+  const lib = join(process.cwd(), "lib", "styles").replaceAll("\\", "/");
+  const dir = mkdtempSync(join(tmpdir(), "pxl-hand32-"));
+  writeFileSync(join(dir, "h.px.js"), `include("${lib}/hand32.px.js")
+pal({ a: "#808080", b: "#ffffff", k: "#000000" })
+ramps("kab")
+sprite("_big", { w: 18, h: 18 }, (c) => { c.rect(3, 3, 12, 12, "b"); c.rect(4, 0, 1, 2, "b") })
+sprite("small", { base: "_big", shrink: { by: 3, cover: 1 / 3 } }, (c) => { c.px(5, 2, "b"); even32(c); line32(c, ["kab"]) })`);
+  const p = loadProject(join(dir, "h.px.js"));
+  const im = p.image("small"), at = (x: number, y: number) => im.data[y * 6 + x];
+  // the 4 x 4 square kept (its 1 x 2 sliver under a third of a block: gone), the lone pixel out of its right side cut, its
+  // right column and its bottom row in the ramp's darkest, its top left as drawn
+  assert.deepEqual([at(1, 0), at(5, 2), at(1, 1), at(4, 1), at(2, 4), at(4, 4)], [0, 0, pack(255, 255, 255), pack(0, 0, 0), pack(0, 0, 0), pack(0, 0, 0)]);
 });
 
 test("pxl check: densities mixed by accident (library entries of two in a scene, a png blown up or shrunk alone), unless a genre says the mix", () => {

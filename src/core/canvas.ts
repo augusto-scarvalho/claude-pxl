@@ -21,6 +21,7 @@ import { rotate } from "./rotate.ts";
 import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshSprite, type MeshWorld, drawMesh, groundOf } from "./mesh.ts";
 import type { Lit } from "./sunlight.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
+import { closeGaps, lineColors } from "./vision.ts";
 import { bayer, colorList, gridRows, hash, lane, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
 
 /** How a canvas reaches other assets. */
@@ -351,6 +352,13 @@ export class Canvas {
 
   px(x: number, y: number, c: string): void {
     this.plot(x, y, this.color(c));
+  }
+
+  /** The line's gaps along the edge closed: a pixel or two of the edge between two of the line's (`keys`, "qw" or ["q", "#5e2c1a"]; default the colors it lines its edge with: lineColors) takes theirs. */
+  closeLine(keys?: string | string[]): void {
+    if (keys !== undefined && typeof keys !== "string" && !(Array.isArray(keys) && keys.every((k) => typeof k === "string"))) throw new PxError(`closeLine takes the line's keys ("qw", or ["q", "#5e2c1a"]), got ${JSON.stringify(keys)}`);
+    const ink = keys === undefined ? lineColors(this.img) : new Set([...keys].map((k) => this.color(k)).filter((c): c is Color => typeof c === "number" && c !== TRANSPARENT));
+    if (ink.size) for (const [x, y, c] of closeGaps(this.img, ink)) this.plot(x, y, c);
   }
 
   rect(x: number, y: number, w: number, h: number, c: string): void {
@@ -2153,7 +2161,7 @@ const TUFTS = [`
 
 /** Ops callable from art files; each top-level call can be traced as one painting step. */
 export const OPS = [
-  "px", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
+  "px", "closeLine", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "foliage", "warp", "effect",
   "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "bubble", "cells", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "voxels", "volume", "splats", "decal", "draw3d", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
 ] as const;

@@ -607,6 +607,269 @@ export function lineFlaws(img: Img): { line: number; corners: [number, number][]
   return { line, corners, jaggies };
 }
 
+type XY = [number, number];
+/**
+ * What a reduction leaves at a silhouette's edge, read on its mask (1 drawn, W x H): `steps`, where its border's runs go
+ * out of order (lineFlaws's jaggies, read on the silhouette's own border: 1 3 1 2 where a curve wants 1 1 2 3), and a
+ * straight edge's wobble (a run of 1-2 px a pixel out between two runs of 3 or more level with each other); `tips`, a
+ * pixel sticking out alone (one drawn 4-neighbour or none); `bridges`, a pixel two bodies hang by (one wide between
+ * them, or two pixels touching by a corner only); `notches`, a clear pixel with three or four drawn 4-neighbours (a
+ * dent, a pinhole); `corners`, two straight edges of 4 px or more meeting with their corner pixel missing (rounded off
+ * or bitten: meant on a round thing).
+ */
+export function outlineFlaws(on: Uint8Array, W: number, H: number): { steps: XY[]; tips: XY[]; bridges: XY[]; notches: XY[]; corners: XY[] } {
+  const at = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && on[y * W + x] === 1;
+  const n4 = (x: number, y: number) => +at(x - 1, y) + +at(x + 1, y) + +at(x, y - 1) + +at(x, y + 1);
+  const tips: XY[] = [], bridges: XY[] = [], notches: XY[] = [], corners: XY[] = [], border = new Img(W, H);
+  // (an edge of 4 px from (x, y) on, along (dx, dy), the clear on its side (ox, oy))
+  const straight = (x: number, y: number, dx: number, dy: number, ox: number, oy: number) => [0, 1, 2, 3].every((i) => at(x + dx * i, y + dy * i) && !at(x + dx * i + ox, y + dy * i + oy));
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const n = n4(x, y);
+    if (at(x, y)) {
+      if (n <= 1) tips.push([x, y]);
+      if (n < 4) border.data[y * W + x] = 255;
+      if (n === 2 && ((at(x - 1, y) && at(x + 1, y) && n4(x - 1, y) >= 3 && n4(x + 1, y) >= 3) || (at(x, y - 1) && at(x, y + 1) && n4(x, y - 1) >= 3 && n4(x, y + 1) >= 3))) bridges.push([x, y]);
+      else if ([-1, 1].some((s) => at(x + s, y + 1) && !at(x + s, y) && !at(x, y + 1))) bridges.push([x, y]);
+    } else {
+      if (n >= 3) notches.push([x, y]);
+      else if ([[1, 1], [1, -1], [-1, 1], [-1, -1]].some(([sx, sy]) => at(x + sx, y + sy) && !at(x - sx, y) && !at(x, y - sy) && straight(x + sx, y, sx, 0, 0, -sy) && straight(x, y + sy, 0, sy, -sx, 0))) corners.push([x, y]);
+    }
+  }
+  const steps = lineFlaws(border).jaggies;
+  // each side's outermost pixels (per row its left and right, per column its top and bottom), read as a staircase: in
+  // each stretch where it moves one way, its segments (n lines at one place, then a jump of j) go steadily from shallow
+  // to steep or back (n - j rising or falling); a segment out of order between two others is a step, unless the runs
+  // go on steadily two segments either side of it (a waist's S); a segment 2 lines long jumping 2 or more mid-stretch
+  // is a step too (a stair, not a curve); a run of 1-2 px a pixel out between two of 3 or more level is a wobble
+  for (const [n, m, across] of [[W, H, false], [H, W, true]] as [number, number, boolean][]) for (const last of [false, true]) {
+    const e: number[] = [];
+    for (let i = 0; i < n; i++) {
+      e.push(-1);
+      for (let j = 0; j < m; j++) { const k = last ? m - 1 - j : j; if (across ? at(k, i) : at(i, k)) { e[i] = k; break; } }
+    }
+    const xy = (i: number): XY => (across ? [e[i], i] : [i, e[i]]);
+    const runs: { v: number; from: number; to: number }[] = [];
+    for (let i = 0; i < n; i++) {
+      const r = runs[runs.length - 1];
+      if (e[i] >= 0 && r && r.v === e[i] && r.to === i - 1) r.to = i; else if (e[i] >= 0) runs.push({ v: e[i], from: i, to: i });
+    }
+    const len = (q: (typeof runs)[number]) => q.to - q.from + 1;
+    runs.forEach((r, k) => {
+      const a = runs[k - 1], b = runs[k + 1];
+      if (a && b && a.to === r.from - 1 && b.from === r.to + 1 && a.v === b.v && Math.abs(r.v - a.v) === 1 && len(r) <= 2 && len(a) >= 3 && len(b) >= 3)
+        for (let i = r.from; i <= r.to; i++) steps.push(xy(i));
+    });
+    // stretches: runs joined line to line, moving one way
+    for (let k = 0; k < runs.length; ) {
+      const st = [runs[k]];
+      let dir = 0;
+      while (k + st.length < runs.length) {
+        const p = st[st.length - 1], q = runs[k + st.length], d = Math.sign(q.v - p.v);
+        if (q.from !== p.to + 1 || (dir && d !== dir)) break;
+        dir = d; st.push(q);
+      }
+      k += st.length;
+      // each segment's steepness n - j (its first and last left out: they may go on past the stretch)
+      const seg = st.slice(0, -1).map((r, i) => ({ s: len(r) - Math.abs(st[i + 1].v - r.v), r, j: Math.abs(st[i + 1].v - r.v) }));
+      seg.slice(1, -1).forEach((g) => { if (len(g.r) >= 2 && g.j >= 2) steps.push(xy(g.r.to)); });
+      const v = seg.slice(1).filter((g, i, a) => !i || g.s !== a[i - 1].s);
+      const d = (i: number) => Math.sign(v[i + 1].s - v[i].s);
+      for (let i = 1; i + 1 < v.length; i++) {
+        const a = v[i - 1].s, x = v[i].s, b = v[i + 1].s;
+        if (!((x < a && x < b) || (x > a && x > b)) || (a === b && Math.abs(x - a) === 1)) continue;
+        if (i >= 2 && i + 2 < v.length && d(i - 2) === d(i - 1) && d(i) === d(i + 1)) continue;
+        steps.push(xy(v[i].r.to));
+      }
+    }
+  }
+  const seen = new Set<string>();
+  return { steps: steps.filter(([x, y]) => !seen.has(`${x},${y}`) && !!seen.add(`${x},${y}`)), tips, bridges, notches, corners };
+}
+
+/** A sprite's own line colors: those darker than what lies inside them on most of the edge where they are. */
+export function lineColors(img: Img): Set<Color> {
+  const W = img.w, H = img.h, at = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && !clear(img.data[y * W + x]);
+  const edge = (x: number, y: number) => at(x, y) && (!at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1));
+  const L = (i: number) => lab(img.data[i])[0], tally = new Map<Color, [number, number]>();
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!edge(x, y)) continue;
+    const i = y * W + x, inner = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([u, v]) => at(x + u, y + v) && !edge(x + u, y + v)), t = tally.get(img.data[i]) ?? [0, 0];
+    if (inner.length) { t[0] += +inner.every(([u, v]) => L(i) < L((y + v) * W + x + u) - 0.02); t[1]++; }
+    tally.set(img.data[i], t);
+  }
+  return new Set([...tally].filter(([, [d, n]]) => n && d * 2 >= n).map(([c]) => c));
+}
+
+/**
+ * outlineFlaws on a sprite (pxl check --edges), and two of its line: `doubled`, a 1 px line's L-corner at the edge
+ * (lineFlaws's, within a pixel of the clear); `gaps`, the line along the edge broken: a pixel or two of the edge not
+ * lined between two that are (`ink` the line's colors; without, lineColors's).
+ */
+export function edgeFlaws(img: Img, ink?: Set<Color>): ReturnType<typeof outlineFlaws> & { doubled: XY[]; gaps: XY[] } {
+  const W = img.w, H = img.h, on = new Uint8Array(W * H);
+  for (let i = 0; i < on.length; i++) on[i] = clear(img.data[i]) ? 0 : 1;
+  const at = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && on[y * W + x] === 1;
+  const edge = (x: number, y: number) => at(x, y) && (!at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1));
+  const near = (x: number, y: number) => [-1, 0, 1].some((v) => [-1, 0, 1].some((u) => !at(x + u, y + v)));
+  const doubled = lineFlaws(img).corners.filter(([x, y]) => near(x, y));
+  const line = ink ?? lineColors(img), lined = (x: number, y: number) => line.has(img.data[y * W + x]);
+  // each run of the edge not lined, 8-connected: 2 px at most, with lined edge pixels beside it 2 apart (it lies between them)
+  const gaps: XY[] = [], seen = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (seen[y * W + x] || !edge(x, y) || lined(x, y)) continue;
+    const run: XY[] = [[x, y]], ends: XY[] = [];
+    seen[y * W + x] = 1;
+    for (let i = 0; i < run.length && run.length <= 2; i++) for (let v = -1; v <= 1; v++) for (let u = -1; u <= 1; u++) {
+      const p = run[i][0] + u, q = run[i][1] + v;
+      if (!edge(p, q) || seen[q * W + p]) continue;
+      if (lined(p, q)) ends.push([p, q]); else { seen[q * W + p] = 1; run.push([p, q]); }
+    }
+    if (run.length <= 2 && ends.some((a) => ends.some((b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])) >= 2))) gaps.push(...run);
+  }
+  return { ...outlineFlaws(on, W, H), doubled, gaps };
+}
+
+/**
+ * A finer drawing brought down k times (shrink: { by }): coverage first, then the colors. Each k x k block is in where
+ * `cover` of it is drawn (0.5), a straight edge's blocks together (3 or more along a column or row, partly drawn about
+ * alike: in or out by their mean, so a board's side doesn't jog where its render lost a pixel, unless that makes it
+ * worse); then its silhouette evened: a block partly drawn (or a notch, or a tip) flipped in or out where that takes away
+ * steps out of order, tips, notches, bridges or a box's clipped corner (outlineFlaws: a corner block where both edges
+ * are partly drawn has less than either), its holes (but pinholes of 1-2 px) and bodies kept as they were; then each block's
+ * color, the commonest in it, but on the silhouette's edge the commonest of its pixels on the contour at k times where
+ * they are 0.15 of it (the line or the lit rim a pixel thin there isn't outvoted by the fill: the edge a render at one
+ * ray a pixel draws); inside, a tone alone merged into its neighbours'; the line doubled at a corner (an L's elbow)
+ * cut where the silhouette is no worse for it; last the line's gaps along the edge closed (a pixel or two of the edge between
+ * two of the `ink` colors, in theirs; by default its own line colors, lineColors's: what pxl check --edges reads).
+ */
+export function reduceEdges(img: Img, k: number, o: { cover?: number; ink?: Set<Color> } = {}): Img {
+  const W = Math.floor(img.w / k), H = Math.floor(img.h / k), cover = o.cover ?? 0.5;
+  const cov = new Float32Array(W * H), on = new Uint8Array(W * H);
+  for (let b = 0; b < W * H; b++) {
+    const bx = (b % W) * k, by = Math.floor(b / W) * k;
+    let n = 0;
+    for (let v = 0; v < k; v++) for (let u = 0; u < k; u++) n += +!clear(img.data[(by + v) * img.w + bx + u]);
+    cov[b] = n / (k * k);
+    on[b] = cov[b] >= cover ? 1 : 0;
+  }
+  // holes of 3 px or more (clear, 4-connected, not reaching the border) and bodies (8-connected): what evening keeps (a
+  // pinhole of 1-2 px it may close: noise at this size)
+  const count = (want: number, eight: boolean) => {
+    const seen = new Uint8Array(W * H);
+    let n = 0;
+    for (let s = 0; s < W * H; s++) {
+      if (seen[s] || on[s] !== want) continue;
+      let open = false, size = 0;
+      const st = [s];
+      seen[s] = 1;
+      while (st.length) {
+        const i = st.pop()!, x = i % W, y = (i - x) / W;
+        size++;
+        for (let v = -1; v <= 1; v++) for (let u = -1; u <= 1; u++) {
+          if ((!u && !v) || (!eight && u && v)) continue;
+          const p = x + u, q = y + v;
+          if (p < 0 || q < 0 || p >= W || q >= H) { open = true; continue; }
+          if (!seen[q * W + p] && on[q * W + p] === want) { seen[q * W + p] = 1; st.push(q * W + p); }
+        }
+      }
+      if (want === 1 || (!open && size >= 3)) n++;
+    }
+    return n;
+  };
+  const shape = () => `${count(0, false)},${count(1, true)}`, kept = shape();
+  const score = () => { const f = outlineFlaws(on, W, H); return f.steps.length + f.corners.length + 2 * (f.tips.length + f.notches.length + f.bridges.length); };
+  // a straight edge kept straight: along a column (or a row), 3 or more blocks partly drawn whose coverage varies by two
+  // pixels of a block at most (one edge, in one place all along: a board's side) are in or out together, by their mean,
+  // where that leaves the silhouette no worse
+  for (const across of [false, true]) {
+    const n = across ? H : W, m = across ? W : H, at = (i: number, j: number) => (across ? i * W + j : j * W + i);
+    for (let i = 0; i < n; i++) for (let j = 0; j < m; ) {
+      let e = j;
+      while (e < m && cov[at(i, e)] > 0 && cov[at(i, e)] < 1) e++;
+      const v = Array.from({ length: e - j }, (_, t) => cov[at(i, j + t)]);
+      if (v.length >= 3 && Math.max(...v) - Math.min(...v) <= 2 / (k * k) + 1e-6) {
+        const inside = v.reduce((a, b) => a + b, 0) / v.length >= cover ? 1 : 0, was = Array.from({ length: e - j }, (_, t) => on[at(i, j + t)]), before = score();
+        for (let t = j; t < e; t++) on[at(i, t)] = inside;
+        if (score() > before || shape() !== kept) for (let t = j; t < e; t++) on[at(i, t)] = was[t - j];
+      }
+      j = Math.max(e, j + 1);
+    }
+  }
+  // (the blocks partly drawn, nearest the cut first; and each clear one with three or four drawn beside it, a notch, or
+  // a drawn one with one or none, a tip)
+  const part = [...cov.keys()].filter((b) => cov[b] > 0 && cov[b] < 1).sort((a, b) => Math.abs(cov[a] - cover) - Math.abs(cov[b] - cover));
+  const nb = (b: number) => { const x = b % W, y = (b - x) / W; return +(x > 0 && on[b - 1] === 1) + +(x < W - 1 && on[b + 1] === 1) + +(y > 0 && on[b - W] === 1) + +(y < H - 1 && on[b + W] === 1); };
+  let best = score();
+  for (let pass = 0, better = true; better && best > 0 && pass < 8; pass++) {
+    better = false;
+    // (only blocks within 4 px of a defect: one farther off seldom changes it)
+    const f = outlineFlaws(on, W, H), near = new Uint8Array(W * H);
+    for (const [x, y] of [...f.steps, ...f.tips, ...f.notches, ...f.bridges, ...f.corners]) for (let v = -4; v <= 4; v++) for (let u = -4; u <= 4; u++) if (x + u >= 0 && y + v >= 0 && x + u < W && y + v < H) near[(y + v) * W + x + u] = 1;
+    for (const b of [...part, ...[...cov.keys()].filter((q) => (!on[q] && cov[q] === 0 && nb(q) >= 3) || (on[q] && cov[q] === 1 && nb(q) <= 1))]) {
+      if (!near[b]) continue;
+      on[b] ^= 1;
+      const s = score();
+      if (s < best && shape() === kept) { best = s; better = true; } else on[b] ^= 1;
+    }
+  }
+  const out = new Img(W, H), at = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && on[y * W + x] === 1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!on[y * W + x]) continue;
+    const n = new Map<Color, number>(), e = new Map<Color, number>(), rim = !at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1);
+    let ne = 0;
+    // (its own pixels; on the edge, and those of a block beside it left out: its line or rim comes in with it)
+    for (const [bx, by] of [[0, 0], ...(rim ? [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => !at(x + a, y + b)) : [])])
+      for (let v = 0; v < k; v++) for (let u = 0; u < k; u++) {
+        const X = (x + bx) * k + u, Y = (y + by) * k + v, c = img.get(X, Y);
+        if (clear(c)) continue;
+        if (!bx && !by) n.set(c, (n.get(c) ?? 0) + 1);
+        // (on its own contour at k times: what a ray a pixel would have drawn there, the line or the lit rim)
+        if (rim && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => clear(img.get(X + a, Y + b)))) { e.set(c, (e.get(c) ?? 0) + 1); ne++; }
+      }
+    out.data[y * W + x] = [...(ne >= 0.15 * k * k ? e : n)].reduce((a, b) => (b[1] > a[1] ? b : a), [TRANSPARENT, 0] as [Color, number])[0];
+  }
+  // (a notch filled, nothing drawn in it: its neighbours' commonest)
+  for (let b = 0; b < W * H; b++) if (on[b] && out.data[b] === TRANSPARENT) {
+    const x = b % W, y = (b - x) / W, n = new Map<Color, number>();
+    for (const [u, v] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const c = out.get(x + u, y + v); if (!clear(c)) n.set(c, (n.get(c) ?? 0) + 1); }
+    if (n.size) out.data[b] = [...n].reduce((a, q) => (q[1] > a[1] ? q : a))[0];
+  }
+  // inside, a tone alone (none of its 8 neighbours share it) takes its neighbours' commonest where that is near it
+  // (Blubs PixelForge's despeckle, gated by color: a lit pixel left in the line's dark isn't blackened), the line's own
+  // colors left alone (a lock's edge a pixel thin)
+  const was = out.copy(), ink = o.ink ?? lineColors(out);
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const c = was.data[y * W + x];
+    if (clear(c) || ink.has(c)) continue;
+    const n = new Map<Color, number>();
+    for (let v = -1; v <= 1; v++) for (let u = -1; u <= 1; u++) if (u || v) { const d = was.data[(y + v) * W + x + u]; n.set(d, (n.get(d) ?? 0) + 1); }
+    if (n.has(c) || n.has(TRANSPARENT)) continue;
+    const [d] = [...n].reduce((a, b) => (b[1] > a[1] ? b : a));
+    if (dE(c, d) < 0.15) out.data[y * W + x] = d;
+  }
+  // the line doubled at a corner of the silhouette (an L's elbow where it steps): cut, so the line steps diagonally (as
+  // a pixel artist cuts it), where that leaves the silhouette no worse
+  for (const [x, y] of edgeFlaws(out).doubled) {
+    const b = y * W + x;
+    if (![[1, 1], [1, -1], [-1, 1], [-1, -1]].some(([u, v]) => !at(x + u, y) && !at(x, y + v))) continue;
+    const was = score();
+    on[b] = 0;
+    if (shape() === kept && score() <= was) out.data[b] = TRANSPARENT; else on[b] = 1;
+  }
+  if (ink.size) for (const [x, y, c] of closeGaps(out, ink)) out.set(x, y, c);
+  return out;
+}
+
+/** The line's gaps along the edge (edgeFlaws's), each with the commonest of the `ink` colors round it: what closes it
+ * (a gap's pixel with none round it, its run's ends beside its other pixel only, left: that one closes it). */
+export function closeGaps(img: Img, ink: Set<Color>): [number, number, Color][] {
+  return edgeFlaws(img, ink).gaps.flatMap(([x, y]) => {
+    const by = new Map<Color, number>();
+    for (let v = -1; v <= 1; v++) for (let u = -1; u <= 1; u++) { const c = img.get(x + u, y + v); if (ink.has(c)) by.set(c, (by.get(c) ?? 0) + 1); }
+    return by.size ? [[x, y, [...by].reduce((a, b) => (b[1] > a[1] ? b : a))[0]] as [number, number, Color]] : [];
+  });
+}
+
 /** A 3x3 linear system by Cramer's rule; null when singular. */
 function solve3(A: number[][], b: number[]): number[] | null {
   const det = (m: number[][]) => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);

@@ -45,7 +45,8 @@ Each card's cells, frame 0, its name and cell under it (the swatch: green ✓, a
 builder drawn at its first cell. Made by `node scripts/gallery.ts --lib`.
 
 **Props** (`props/`): lamps and crates from the examples' scenes; a top-down village's pot (and its break),
-chest, sign, crate, barrel, lamp post and fence (`village.px.js`); a platformer's crate, lamp post and spinning
+chest, sign, crate, barrel, lamp post and fence (`village.px.js`); its pot, chest and sign at a 32 px grid, with a crate, a barrel, a lamp
+and a big chest, each drafted in 3D and finished by hand (`village32.px.js`, `topdown32`); a platformer's crate, lamp post and spinning
 coin, side on (`side.px.js`, `platformer16`; at dusk and at night by `props.DUSK` and `props.NIGHT`, the lamp unlit by
 day by `props.UNLIT`); a platformer village's well, hay cart, barrel, hanging sign and
 lantern post (`side_village.px.js`).
@@ -56,7 +57,9 @@ lantern post (`side_village.px.js`).
 builders, the oak, the maple and the spruce also by hand at `topdown/16` (their 3D drafts frozen in
 `frozen/`); the cave's caps; the top-down island's ground (`island.px.js`: the shore, a path and a darker
 grass by corners, the field's tiles, tall grass, a bank's earth front and a hedge in rows of tiles, flowers
-and a bed of them, a bush, a rock, a stump); a platformer's world side on (`side.px.js`, `platformer16`: the
+and a bed of them, a bush, a rock, a stump; the same ground at a 32 px grid by its band functions (four drawings a piece, richer), three flowers
+redrawn there, tufts, tall grass (and cut), a bush and a rock drafted in 3D and finished by hand: `island32.px.js`, `topdown32`; the oak, the maple, the spruce and the boulder also by
+hand at `topdown/32` over their drafts); a platformer's world side on (`side.px.js`, `platformer16`: the
 ground as tiles by their open sides under a grass lip, their faces and undersides ragged, slopes, water, an oak, a
 pine, two bushes, the backdrop's far and near clouds and hills; `side.ground(map)` draws a level; the same at dusk
 and at night by a palette swap, `side.DUSK` and `side.NIGHT`, with the sky as the air at each time, `side.sky`, and
@@ -66,16 +69,16 @@ the full moon).
 
 **Characters** (`characters/`): the traveler and the people on his figure (the crew, the miko), what
 they wear (`dress.px.js`), the top-down hero and the people made from him (`hero.character()`: two villagers,
-Reva's chibi), the same hero at 48 px for top-down 32 on the genre's slim body (`hero32.px.js`, `topdown32`: idle,
+Reva's chibi), the villager and the elder at 48 px on the slim body (`villagers32.px.js`, by `hero32.character()`), the same hero at 48 px for top-down 32 on the genre's slim body (`hero32.px.js`, `topdown32`: idle,
 walk, run and the sword attack with its crescent) and on its chibi body (`chibi_*`, to approve), the same hero side on for a platformer (`hero_side.px.js`,
 `platformer16`: idle, walk, run and sprint (a run that speeds up), a dash with its afterimage and dust, a jump in four to loop the rise and the fall (jump, apex,
-fall, land), hurt, a ladder's climb and his back at a door), a slime,
+fall, land), hurt, a ladder's climb and his back at a door), a slime (also at 32),
 the knight, a beetle that walks and a bat that flies (a platformer's enemies).
 
 ![characters](../docs/gallery/lib/characters.png)
 
 **Architecture** (`architecture/`): the shrine's builders, the HD-2D surfaces, the cottage (by hand at
-`topdown/16`, mostly roof; its 3D draft frozen), the island's pier; a platformer's one-way platforms, ladder,
+`topdown/16`, mostly roof, and at `topdown/32` over its draft; its 3D drafts frozen), the island's pier; a platformer's one-way platforms, ladder,
 spikes and door (`side.px.js`, at dusk and at night by `built.DUSK` and `built.NIGHT`); a platformer village's old houses as a 3D builder, `make3d.old_house` (a stone
 floor, a half-timbered storey, a tile roof and its chimney), finished by hand with the painted doors, windows lit at
 dusk and shutters set into its openings, the same three drawn by hand of modules as alternatives (`house_a_2d`...),
@@ -88,16 +91,18 @@ crag for the night's backdrop (`side_castle.px.js`).
 
 ![architecture](../docs/gallery/lib/architecture.png)
 
-**UI** (`ui/`): the dialogue box, the 5x7 font, life hearts (top-down and side on).
+**UI** (`ui/`): the dialogue box, the 5x7 font, life hearts (top-down at 16 and 32, side on).
 
 ![ui](../docs/gallery/lib/ui.png)
 
 **Styles** (`styles/`): the engine's own builders (`make3d.rock`, `house`, `bush`, `pine`) in the
-fields style, drafted at their first cells.
+fields style, drafted at their first cells; `hand32.px.js` the hand pass's steps for a 32 px 3D draft (the draft
+itself drawn three times over and brought down by `shrink: { by: 3 }`; `line32` topdown32's selective line, its
+dashes closed; `even32` a lone step evened, for a pass that cuts pieces).
 
 ![styles](../docs/gallery/lib/styles.png)
 
-**VFX** (`vfx/`): a puff of dust, and side on a landing's and a running heel's (the volumes' densities have no picture).
+**VFX** (`vfx/`): a puff of dust (top-down at 16 and 32), and side on a landing's and a running heel's (the volumes' densities have no picture).
 
 ![vfx](../docs/gallery/lib/vfx.png)
 

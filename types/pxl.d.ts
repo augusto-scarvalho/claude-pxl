@@ -108,8 +108,8 @@ declare global {
     key?: string;
     /** With png: its normal map, a PNG laid out as it (green up: pxl's _n.png, Sprite Fusion's), read as data; an anim's frames from the same rectangles. */
     normals?: string;
-    /** Shrink the PNG by a whole factor: each block becomes its most common opaque color. */
-    shrink?: number;
+    /** Shrink the PNG (or the base: a 3D draft drawn k times over) by a whole factor: each block becomes its most common opaque color. { by, cover, ink }: its edges treated: the silhouette from coverage (cover 0.5) and evened, inner tones by vote, the line by its own vote on the edge, its gaps closed (ink: its keys, default the colors it lines its edge with; false none). */
+    shrink?: number | { by: number; cover?: number; ink?: string | false };
     /** Which way it faces as drawn; flips and turns carry it, describe reads it out. A label: the pixels aren't checked. */
     facing?: "right" | "left" | "front" | "back";
     /** Its real height in meters, checked against a scene's `world` scale where it stands. */
@@ -710,6 +710,8 @@ declare global {
     /** What fn paints, a placement by that name (id: which one, as a stamp's): describe lists it, check reads it as a stamp (height m, facing). */
     as(name: string, fn: (c: PxCanvas) => void, opts?: { id?: string; height?: number; facing?: "right" | "left" | "front" | "back" }): void;
     px(x: number, y: number, c: PxColor): void;
+    /** The line's gaps along the edge closed: a pixel or two of the edge between two of the line's (keys, default the colors it lines its edge with) takes theirs. */
+    closeLine(keys?: string | string[]): void;
     rect(x: number, y: number, w: number, h: number, c: PxColor): void;
     box(x: number, y: number, w: number, h: number, c: PxColor): void;
     line(x0: number, y0: number, x1: number, y1: number, c: PxColor, width?: number): void;
@@ -1078,6 +1080,7 @@ declare global {
   function sockets(name: string): Record<string, [number, number]>;
 
   function px(x: number, y: number, c: PxColor): PxOp;
+  function closeLine(keys?: string | string[]): PxOp;
   function rect(x: number, y: number, w: number, h: number, c: PxColor): PxOp;
   function box(x: number, y: number, w: number, h: number, c: PxColor): PxOp;
   function line(x0: number, y0: number, x1: number, y1: number, c: PxColor, width?: number): PxOp;

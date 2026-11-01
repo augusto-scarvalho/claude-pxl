@@ -557,6 +557,42 @@ trousers in two colors; done here: surface()'s and rig3d's `inner: "dark"`, dres
 - [ ] **`shot --vs` an uncommitted before**: the before had to be built to a folder and composed by hand
   (~120 lines of Python). `--vs <a folder of built strips>`.
 
+From the top-down 32 kit (F5 4k-4n: 3D drafts reduced and finished by hand; the user: jagged edges, thin shapes, gaps in
+the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` with its edges treated, `pxl check --edges`,
+`c.closeLine()`):
+- [ ] **A kit's maker and its checks**: a file whose figures come from an included maker (villagers32 through
+  `hero32.character`) checks "0 rigs": feet, head rows and the genre's height never run there.
+- [ ] **`pxl compare` on views() heads**: bakes differ in size with the field (27-33 px) and compare aligns top
+  left corners, so rows read 1-3 px off without a hand-worked `--offset`. Align on the anchor.
+- [ ] **`pxl lib draft` options**: it takes no builder options (a momiji's season), and doesn't say the colors it
+  drew in (the hand pass needed each tone's hex). `--params` and a palette line.
+- [ ] **`look3d({ mats })` leaks**: a file calling it at its top (fields.px.js) changes the 3D of files included
+  after it ("unknown color key"). Scope it to the file.
+- [ ] **Frozen drafts**: the PNG is written only when the frozen sprite itself is built (parts and passes on top
+  never write it), and `frozen` refuses `shrink`. Build missing frozen PNGs with whatever uses them; `shrink` beside `frozen`.
+- [ ] **A genre read back**: a file that includes topdown32 can't read its `shadow` (`genre(name)` with no spec
+  throws); scenes copy the numbers by hand.
+- [ ] **`sdf.lathe(points)`**: pots and barrels took a hand-written solid of revolution.
+- [ ] **Paint thinner than a pixel**: seams painted on a 3D face (0.02 m at 32 px a meter) vanish with no word.
+- [ ] **Folds under a flat light**: a robe's rippled radius takes one tone at a figure's light; folds were painted
+  by angle. An `ao` for rig3d, or a fold paint helper.
+- [ ] **`shot --vs` a folder**: comparing two uncommitted states took two labs and Python, every round. `--vs <a
+  folder of built strips>`.
+- [ ] **Functions-only includes**: their names land in every including file's scope (a `ring` hid pxl's ring()).
+- [ ] **`check --edges` on things made of pieces**: blades, leaves and a flat-footed outlined figure read as tips,
+  notches, gaps and clipped corners. A card or sprite flag (`pieces: true`, `foot: "flat"`), and a repair helper
+  (exact patches) beside the check: a 20 px pot's lip-over-shoulder S took a lab search.
+- [ ] **A line key a step darker**: topdown32's line is each ramp's darkest, which shading also lands on, so the
+  check reads doubled lines.
+- [ ] **Terrain-aware placement**: "its foot not in the water" took a region per placement (`expect inside` takes
+  every pixel), and nothing reads the terrain a tilemap's corners make; a lone corner of one terrain between tiles
+  of others is cut square. A foot-on-terrain rule, and a check for lone corners.
+- [ ] **Trees by the call**: make3d.oak takes no fork, limbs or crown clusters (a taller, fuller oak needed
+  `make3d.define`).
+- [ ] **Standing ground cover**: `corners()` makes flat tiles; tall grass needed its 14 edge masks as sprites, and
+  a 3D draft of it covers half its square (the ground 32 px a meter both ways, what stands seen from 30 degrees).
+- [ ] **`pxl study` of a mesh**: reading ten character models and thirty props took Python readers twice.
+
 ## Characters (from dogfooding a 64 px character)
 
 Each of these was first worked around by hand in an art file or by a Python script on the side.

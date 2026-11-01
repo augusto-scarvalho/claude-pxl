@@ -7,8 +7,9 @@ import { MANY, STAND, lightFor, orientWords, placementChecks, standWords } from 
 import { rigLines } from "../core/rig.ts";
 import { frontWords, rampSteps } from "../core/checks.ts";
 import { PxError, didYouMean } from "../core/errors.ts";
-import { dE, lineFlaws } from "../core/vision.ts";
-import { toHex } from "../core/color.ts";
+import { dE, edgeFlaws, lineFlaws } from "../core/vision.ts";
+import { type Color, toHex } from "../core/color.ts";
+import type { Img } from "../core/image.ts";
 import type { Item, World } from "../core/model.ts";
 import { type Knob, fixRule, runExpects, turnKnob } from "../core/world3d.ts";
 import { type Frame2d, type Knob2d, type Rule2d, type Shift, fixRule2d, moveInSource, nameAll, namesOf, runRules2d } from "../core/expect.ts";
@@ -17,6 +18,16 @@ import { loadProject } from "./load.ts";
 import { drawnWith, members } from "./lib.ts";
 import { FLAWS, jointsOf, poseFlaws, viewRows, viewWarnings } from "../core/rig3d.ts";
 
+/** --edges's words for an asset's frames: each kind of edge flaw found, how many, where (frame by frame, once). */
+export function edgeLook(frames: Img[], ink?: Set<Color>): string {
+  const fl = frames.map((im) => edgeFlaws(im, ink)), say: string[] = [];
+  const WHAT: [keyof ReturnType<typeof edgeFlaws>, string][] = [["steps", "steps out of order"], ["doubled", "doubled in its line"], ["tips", "tips"], ["bridges", "bridges"], ["notches", "notches"], ["gaps", "gaps in its line"], ["corners", "corners clipped"]];
+  for (const [k, w] of WHAT) {
+    const at = [...new Set(fl.flatMap((f) => f[k].map(([x, y]) => `${x},${y}`)))];
+    if (at.length) say.push(`${at.length} ${w} (at ${at.slice(0, 4).join("; ")}${at.length > 4 ? "; ..." : ""})`);
+  }
+  return say.length ? `${say.join(", ")} (PXL help "edges")` : "";
+}
 /** Drawn by hand somewhere: a grid string, grid() or runs(), here or in a layer (line(), curve() and code draw their own lines clean, or as they mean to). */
 const byHand = (items: Item[]): boolean => items.some((i) => typeof i === "string"
   || (typeof i === "object" && i !== null && ("__layer" in i ? byHand((i as { items: Item[] }).items) : "__op" in i && ["grid", "runs"].includes((i as { name: string }).name))));
@@ -229,13 +240,13 @@ export function writeMoves(file: string, p: Project, r: CheckResult, frame?: num
  * that name (not those it includes), unless `names` are given. `frame` / `frames`: those frames of
  * each animated scene only, instead of all of them.
  */
-export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string; readings?: boolean; fix?: boolean } = {}): CheckResult {
+export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string; readings?: boolean; fix?: boolean; edges?: boolean } = {}): CheckResult {
   const reads = new Set<string>(), tally = { agree: 0, against: 0, unclear: 0 };
   const lines: string[] = [], notes: string[] = [];
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, frozen: 0, cards: 0, density: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, frozen: 0, cards: 0, density: 0, edges: 0 };
   let cellsBy: Map<string, string[]> | undefined;
   let lightSaid = false, groundSaid = false, fixes: CheckResult["fixes"], rulesAll = 0, rulesHeld = 0;
   const failed: string[] = [];
@@ -281,6 +292,12 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         const twins = [...near].filter(([, d]) => d < 0.03).map(([k, d]) => { const [a, b] = k.split(",").map(Number); return `${key(a) ? `'${key(a)}' ` : ""}${toHex(a)} and ${key(b) ? `'${key(b)}' ` : ""}${toHex(b)} (${d.toFixed(3)})`; });
         if (twins.length) notes.push(`${name} › LOOK: ${twins.length} pair${twins.length > 1 ? "s" : ""} of tones side by side too close to tell apart (under 0.03 in OKLab): ${twins.slice(0, 3).join(", ")}${twins.length > 3 ? " ..." : ""}; merge each, or spread it if both are meant`);
         if (jaggies.length) notes.push(`${name} › LOOK: ${jaggies.length} jagg${jaggies.length > 1 ? "ies" : "y"} in its 1 px lines (${list(jaggies)}): a run out of order along a curve (3 2 4 where 2 3 4 reads smooth); unless the shape bumps there, let the runs grow or shrink steadily (PXL help "characters 7")`);
+      }
+      // --edges: what a reduction leaves at its edges, on any sprite (a 3D draft and the pass over it too)
+      if (opts.edges) {
+        ran.edges++;
+        const words = edgeLook(def.kind === "anim" ? p.frames(name).map((f) => f.img) : [img]);
+        if (words) notes.push(`${name} › LOOK: edges: ${words}`);
       }
       // its boxes (c.setBox) inside each frame: every frame of an anim whose first frame has one (a
       // fighter's hurtbox is on every frame)
@@ -484,6 +501,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.frozen) run.push(`frozen cells against their live render on ${ran.frozen}`);
   if (ran.cards) run.push(`cards' cells against their drawing on ${ran.cards}`);
   if (ran.density) run.push(`densities on ${ran.density}`);
+  if (ran.edges) run.push(`edges on ${ran.edges}`);
   if (ran.views) run.push(`views' rows on ${ran.views}`);
   if (ran.poses) run.push(`figures' feet on ${ran.poses} poses`);
   if (rigs) run.push(`rig parts ${ran.parts}`);

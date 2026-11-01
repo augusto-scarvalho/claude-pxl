@@ -250,7 +250,8 @@ with a `world` (and `check`) is checked as a scene (functions naming what they p
 | `area: [x, y, w, h]` | With `png`: only this part of the image (one sprite out of a sheet). |
 | `key: "#ff00ff"` | With `png`: that color read as clear before `area`, `shrink` and `palettize` (a ripped sheet's cell fill; `pxl study` names it). |
 | `palettize: true` | With `png`: snap every color to the nearest keyed palette color, so `ascii`, `swap` and `recolor` see keys. |
-| `shrink: n` | With `png`: shrink by a whole factor (1 leaves it as it is), after `area`. Each n×n block becomes its most common opaque color (ties: the first, scanning the block column by column), or transparent when fewer than half of its pixels are opaque. Keeps silhouettes and the curves of shapes far better than sampling one pixel per block: the start for a smaller version of finished art (then redraw what it breaks; see characters.md). |
+| `shrink: n` | With `png`: shrink by a whole factor (1 leaves it as it is), after `area`. Each n×n block becomes its most common opaque color (ties: the first, scanning the block column by column), or transparent when fewer than half of its pixels are opaque. Keeps silhouettes and the curves of shapes far better than sampling one pixel per block: the start for a smaller version of finished art (then redraw what it breaks; see characters.md). With `base` too: a 3D draft drawn n times over (`turnaround(..., { ppm: 32 * 3 })`) brought to its grid, its blocks lined up on its pivot (where the origin lands: at 1x, on a pixel's corner) and its pivot with it. |
+| `shrink: { by, cover?, ink? }` | `shrink` with its edges treated, coverage first, then the colors: a block is in where `cover` of it is drawn (0.5; a third keeps the bulk a one-ray-a-pixel render has); the silhouette then evened, a block partly drawn (or a notch) flipped where that takes away steps out of order, tips, notches, bridges or a box's clipped corner, its holes (but pinholes of 1-2 px) and bodies kept (`pxl check --edges` names them); each block's color the commonest in it, but on the edge the commonest of its pixels on the fine contour (the line or the lit rim a pixel thin there, outvoted by the fill in a plain vote); inside, a tone alone merged into its neighbours' when near it (Blubs PixelForge's despeckle); the line doubled at a corner cut; its gaps along the edge closed with the `ink` keys (default the colors it lines its edge with, those darker than what lies inside them, as `check --edges` reads them; `false` none). For a render with its line (`surface: { outline: true }`): `sprite("pot_draft", { base: "_pot_draft3", shrink: { by: 3 } })`. |
 | `slice: n \| [left, top, right, bottom]` | 9-slice margins of the final image (outline included) for `panel()`; flips and rotations turn them; sheets export them as Aseprite `meta.slices` (bounds + center). |
 | `wrap: true \| "x" \| "y"` | Seamless tile (Aseprite's tiled mode): drawing, stamps, fills and reads past those edges continue on the opposite side, and the preview lays the tile out 3×3 (3×1, 1×3) so seams show. For tiles that repeat themselves; random variants placed side by side don't line up across edges. |
 | `pivot: "bottom" \| "center" \| [x, y]` | The point `stamp`, `scatter` and wire hangs put on the given position. `"bottom"` is the middle of the final image's bottom edge, so `stamp("tree", x, groundY)` stands it on row `groundY` whatever its size. `[x, y]` is in drawing coordinates (pixel corners) and moves with flip, rot, outline and crop, here and in placements. A `base` variant starts with its base's pivot. Sheets export it as a normalized `pivot` (0.5, 1 = bottom center). |
@@ -313,6 +314,7 @@ crop; a `pivot: "bottom"` or `"center"` and `slice` are measured on the result.
 | `wire(x0, y0, x1, y1, sag, c, { hang?, every = 6, start?, ...placement })` | sagging cable, drawn pixel-perfect (no doubled steps), symmetric when level; `hang` stamps an asset/group under it every `every` px (string lights) |
 | `text(x, y, "str", c, { scale = 1, gap = 1, lead = 1, align: "l"\|"c"\|"r", shadow?, font? })` | built-in 3×5 font: A-Z 0-9 and common punctuation, `\n` for lines; `font` uses a `font()` instead (`lib/ui/font5x7.px.js` is a ready 5×7 one to `include`; its old path, `examples/fonts/font5x7.px.js`, still works). `c` a key, or each letter's: `(i, ch) => key` (`null` leaves the letter out and keeps its place; `i` counts the letters, not the line breaks): a sign's letters lit one by one, one flickering. The 3×5 is for numbers and short labels: O and 0, S and 5 are the same glyph, and 21 pairs differ by one pixel (C/E, H/K, K/X, I/1, G/6...). A reader sorts them out from the word, but not on a busy, lit sign: words that must read take the 5×7. `scale: 2` puts 2× pixels beside 1× art: keep it for a UI made as its own asset |
 | `bubble(x, y, title, lines, { panel, tail?, rule?, more?, font?, color?, side?, t?, unit?, pad? })` | a dialogue box over whoever speaks, its look the file's own sprites (a game's parchment, Triangle Strategy's): `title` ("" for none) over `lines` (an array, or a string's lines) in `panel`, a 9-slice (`slice`) sized to them; off to one `side` of (x, y) (art px; 1 right, -1 left), its `tail` down to that point a fifth of the way in (the tail's top rows, the panel's bottom `slice` margin of them, lie over its bottom border: draw the join there, the rest clear); `rule` a 9-slice under the title (its left margin a diamond the title starts after), `more` the prompt in the lower right corner, an anim at frame `t` (the frames since the box opened: its bob and blink are its own frames); `color` the words' key or `[title, lines]`; `pad` px in from the edge (7). Kept inside the picture: near an edge the box slides along its tail, the tail still on the speaker; what still runs off (the tail can go no further) is a warning in check and shot. In pixels of max(1, round(`c.k` × `unit`)) px: `unit: 0.75` is finer than the art at a size, as a game's interface is. Draw it after `post()`. A parchment to include: `lib/ui/dialog.px.js` (`{ ...dialog.PARCHMENT, side, t }`; its old path, `examples/hd2d/dialog.px.js`, still works, with `PARCHMENT`) |
+| `closeLine(keys?)` | the line's gaps along the edge closed: a pixel or two of the edge between two of the line's (`keys`, `"qw"` or `["q", "#5e2c1a"]`; default the colors it lines its edge with) takes theirs. After a hand pass that lines its own edge (a selective line dashed where the edge steps toward the light) |
 
 ### Texture and tone
 | Op | Notes |
@@ -732,7 +734,7 @@ painting replay ends ("animate" toggle).
 ```
 node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif] [--world [--every N]] [--out DIR]
 node <pxl>/bin/pxl.js shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
-node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings] [--fix]
+node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings] [--fix] [--edges]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
 node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
@@ -753,8 +755,22 @@ to another `--out`, its files named as the scene's); `shot --world --every N`: o
 every N frames on it, each box showing what its own frame has there (its light, who is where), the
 boxes' `[frame, x, y]` printed. `build --share N` also writes `out/share/`: each asset N times bigger, nearest neighbour, clear kept,
 no checker or grid, a GIF when it moves: to post. `shot` writes `<name>_look.png` when its check has
-LOOK lines (the pixels they name ringed: L-corners orange, jaggies blue), and a clip's note gives each
-shown frame's ms.
+LOOK lines (the pixels they name ringed: L-corners orange, jaggies blue; its edges' as `--edges`
+names them: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners
+green), and a clip's note gives each shown frame's ms.
+
+`check --edges` (and every `shot`): a LOOK line on each sprite and anim, made by hand or over a `base`
+(a 3D draft and the pass on it), naming what a reduction leaves at its edges, each kind with where:
+steps out of order (along each side of the silhouette, its staircase's segments going from shallow to
+steep or back steadily: 1 3 1 2 where a curve wants 1 1 2 3; a stair of 2 by 2 mid-curve; a run of 1-2
+px a pixel out of a straight edge; a waist's S, two segments going on steadily either side, is
+meant), doubled (a 1 px line's L-corner at the edge), tips (a pixel sticking out alone), bridges (a
+body hanging by a pixel, or by a corner), notches (a dent or pinhole a pixel wide), gaps in its line
+(a pixel or two of the edge between two of its line colors: those darker than what lies inside them
+on most of the edge) and corners clipped (two straight edges of 4 px meeting without their corner: a
+box's bitten, a round thing's meant). A corner the shape has (a lip over a neck) reads as a step: look
+before fixing. `shrink: { by }` evens what it can when it reduces; `closeLine()` closes a hand pass's
+gaps.
 
 `edit`'s ops (the EditIR, `scenes 14`): `move`, `set`, `recolor`, `flip`, `frame`, `relation`, `swap`,
 `as` on a thing `inspect` names, and `add`: `{ "op": "add", "target": <new id>, "asset" | "like": <id>,

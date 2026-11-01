@@ -152,6 +152,21 @@ sprite("x", { w: 2, h: 1 }, (c) => { if (d(T.TRAVELER) < -1.5) c.px(0, 0, "#ff00
   assert.ok([...loadProject(f).image("x").data].every((v) => (v & 255) === 255));
 });
 
+test("dress() drapes' push (lib/characters/dress.px.js): the legs push the cloth, kept push px over a knee swung ahead; its paint told how far", () => {
+  // a long skirt 2.5 px round the hips, striding: where the front knee's cloth would be (its radius and push ahead of
+  // it, at its height) the skirt passes with push and misses it without; the paint's fourth argument above 0 there
+  const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");
+  writeFileSync(f, `include(${JSON.stringify(join(import.meta.dirname, "../lib/characters/traveler.px.js"))})
+const T = traveler, R = rig3d("q", { ...T.FIG, parts: T.dress(T.TRAVELER), moves: { m: { frames: 1, pose: () => ({}) } } })
+const j = R.joints({ feet: [[5, -2], [-5, 2]] }, 180), L = j.legs.reduce((a, b) => (b.knee[0] * j.f[0] + b.knee[1] * j.f[1] > a.knee[0] * j.f[0] + a.knee[1] * j.f[1] ? b : a))
+let felt = 0
+const skirt = (push) => T.dress({ ...T.TRAVELER, drapes: [{ base: "pelvis", top: (j) => j.pelvis[2] + 1.4, len: 14, out: (h, a, o, p) => ((felt = Math.max(felt, p ?? 0)), "x"), trail: 0, keep: () => true, radius: () => 2.5, push }] })(j, { trail: 0, sway: 0 }).cloak
+const q = L.knee.map((v, e) => v + (e < 2 ? j.f[e] * (dress.r.leg[1] + 0.8) : 0)), on = skirt(0.8), off = skirt(undefined)
+const checks = [on.field.dist(q) < 0, off.field.dist(q) > 0.3, (on.paint(0.5, 0, true), true) && on.paint(...on.at(q).slice(0, 2), true) === "x" && felt > 0.5]
+sprite("x", { w: checks.length, h: 1 }, (c) => checks.forEach((ok, i) => ok && c.px(i, 0, "#ff0000")))`);
+  assert.deepEqual([...loadProject(f).image("x").data].map((v) => (v & 255) === 255), [true, true, true]);
+});
+
 test("dress({ creases }) (lib/characters/traveler.px.js): a pair only where a joint bends (knee past 60, elbow past 45), in the ramps' ends or the keys given; off, the paint as it was", () => {
   // kneeling (both knees past 100 degrees, one elbow 47), and the idle's breath (the knees 51: none)
   const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");

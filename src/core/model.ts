@@ -125,9 +125,10 @@ export interface AssetOpts {
   /**
    * Shrink the PNG by this whole factor: each n x n block becomes its most common opaque color
    * (ties: the first, scanning the block column by column), or transparent when fewer than half
-   * of its pixels are opaque. Applied after `area`.
+   * of its pixels are opaque. Applied after `area`. With `base` too (a 3D draft drawn k times over). { by, cover, ink }:
+   * its edges treated (coverage first, the silhouette evened, the line by its own vote, its gaps closed).
    */
-  shrink?: number;
+  shrink?: number | { by: number; cover?: number; ink?: string | false };
   /** Scene background color. */
   bg?: string;
   /** Scene: false and check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story). */

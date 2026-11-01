@@ -4,6 +4,7 @@ import { Canvas, FACING, type Placed, type Placement, type Resolver, betweenKey 
 import { type Color, MIXES, TRANSPARENT, oklab, pack } from "./color.ts";
 import { PxError, wrap } from "./errors.ts";
 import { Img, type Lamp } from "./image.ts";
+import { reduceEdges } from "./vision.ts";
 import { applyGlow } from "./glow.ts";
 import { applyLighting } from "./light.ts";
 import { rotate } from "./rotate.ts";
@@ -239,6 +240,14 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     }
   } else if (opts.base) {
     base = def.mirror ? ctx.image(opts.base, seed, t).flip("x") : ctx.image(opts.base, seed, t).copy();
+    // a finer drawing (a 3D draft drawn k times over) brought down to its own pixels, its blocks lined up on its pivot
+    // (where a render's origin lands: drawn at 1x, on a pixel's corner) and its pivot with it
+    if (opts.shrink !== undefined) {
+      const pv = base.pivot, k = typeof opts.shrink === "number" ? opts.shrink : opts.shrink.by, o = pv ? pv.map((v) => ((Math.round(v) % k) + k) % k) : [0, 0];
+      if (o[0] || o[1]) base = base.sub(o[0], o[1], base.w - o[0], base.h - o[1]);
+      base = shrinkBy(base, opts.shrink, pal);
+      if (pv) base.pivot = [Math.floor((pv[0] - o[0]) / k), Math.floor((pv[1] - o[1]) / k)];
+    }
   } else if (def.png) {
     // A strip anim ({ frames: n }) shows the n-th equal slice; anything else the whole image.
     const n = def.kind === "anim" && opts.frames ? frames : 1, fw = Math.floor(def.png.w / n);
@@ -692,6 +701,23 @@ function seloutPick(pal: Palette, steps: number, floor?: Set<Color>): (touching:
  * The end pixel of each straight run of the edge (pixels touching the clear) where the line steps on
  * diagonally, `n` steps darker along `dark` (a ramp's one step down). A 1:1 diagonal (no run) stays.
  */
+/**
+ * An image brought down by `shrink`: a number, each n x n block its commonest color, drawn where half of it is (Img.shrink);
+ * { by, cover, ink }, its edges treated (reduceEdges): the silhouette from the coverage, evened, the inner tones by vote,
+ * the line by its own vote on the edge, its gaps closed (`ink` its keys, by default the colors it lines its edge with; false none).
+ */
+export function shrinkBy(img: Img, spec: unknown, pal: Palette): Img {
+  const o = (typeof spec === "number" ? { by: spec } : spec) as { by: number; cover?: number; ink?: string | false };
+  const bad = typeof o === "object" && o ? Object.keys(o).filter((k) => !["by", "cover", "ink"].includes(k)) : [];
+  if (!o || typeof o !== "object" || bad.length || !(Number.isInteger(o.by) && o.by >= 1 && o.by <= Math.min(img.w, img.h)))
+    throw new PxError(`shrink must be a whole factor from 1 (as it is) to ${Math.min(img.w, img.h)}, or { by, cover, ink } (its edges treated)${bad.length ? `, not ${bad.join(", ")}` : ""}, got ${JSON.stringify(spec)}`);
+  if (typeof spec === "number") return spec > 1 ? img.shrink(spec) : img;
+  if (o.cover !== undefined && !(o.cover > 0 && o.cover <= 1)) throw new PxError(`shrink's cover is the share of a block drawn for it to be in, above 0 to 1, got ${JSON.stringify(o.cover)}`);
+  if (o.ink !== undefined && o.ink !== false && typeof o.ink !== "string") throw new PxError(`shrink's ink is the line's keys ("qw"), or false (none), got ${JSON.stringify(o.ink)}`);
+  const ink = o.ink === undefined ? undefined : new Set((o.ink === false ? [] : [...o.ink]).map((k) => pal.resolve(k)).filter((c): c is Color => typeof c === "number" && c !== TRANSPARENT));
+  return reduceEdges(img, o.by, { cover: o.cover, ink });
+}
+
 export function capEnds(img: Img, dark: Map<Color, Color>, n: number): Img {
   const W = img.w, H = img.h, at = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? TRANSPARENT : img.get(x, y));
   const edge = (x: number, y: number) => at(x, y) !== TRANSPARENT && [at(x - 1, y), at(x + 1, y), at(x, y - 1), at(x, y + 1)].some((c) => c === TRANSPARENT);

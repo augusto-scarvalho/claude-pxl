@@ -1,5 +1,5 @@
 // Project: the registry an art file fills in, plus the lazy, cached, cycle-checked resolver.
-import { type BuildCtx, type BuildOut, animTimeline, buildAsset, drawnFrames, gcd } from "./build.ts";
+import { type BuildCtx, type BuildOut, animTimeline, buildAsset, drawnFrames, gcd, shrinkBy } from "./build.ts";
 import { type Canvas, OPS } from "./canvas.ts";
 import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from "./rig.ts";
 import { type View, perspective } from "./perspective.ts";
@@ -420,9 +420,8 @@ export class Project implements BuildCtx {
         img = img.sub(a[0], a[1], a[2], a[3]);
       }
       if (o.shrink !== undefined) {
-        if (!(Number.isInteger(o.shrink) && o.shrink >= 1 && o.shrink <= Math.min(img.w, img.h)))
-          throw new PxError(`shrink must be a whole factor from 1 (as it is) to ${Math.min(img.w, img.h)}, got ${JSON.stringify(o.shrink)}`);
-        if (o.shrink > 1) return { img: img.shrink(o.shrink), shrunk: img.mixedBlocks(o.shrink) };
+        const k = typeof o.shrink === "number" ? o.shrink : (o.shrink as { by: number }).by, out = shrinkBy(img, o.shrink, this.pal);
+        if (out !== img) return { img: out, shrunk: img.mixedBlocks(k) };
       }
       return { img };
     } catch (e) {

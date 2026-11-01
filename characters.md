@@ -118,6 +118,19 @@ the curves of the clothes exactly.
    each row's extents against the halved original. Rows that come out wider are usually where a
    redraw added bulk.
 
+### A 3D draft brought to the grid: its edges
+
+A render at one ray a pixel steps unevenly at its edges (1 3 1 2 on a curve, a lone corner, the line
+broken where a pixel's middle missed it). Draw it k times over and bring it down with its edges
+treated: `turnaround("_pot_live", field, { ppm: 32 * 3, surface: { outline: true } })`, frozen, then
+`sprite("_pot_draft", { base: "_pot_draft3", shrink: { by: 3 } })`. Coverage decides the silhouette
+(`cover` 0.5; a third keeps the bulk), evened where a partly drawn block flipped takes a defect away;
+the edge takes its fine contour's colors (the line, the lit rim) and its line's gaps close. Then
+`pxl check <file> <name> --edges` (or any `pxl shot`, which rings them): steps out of order, doubled
+line, tips, bridges, notches, gaps in the line, clipped corners. A corner the shape has (a lip over a
+neck) reads as a step: say so and keep it. A hand pass that lines its own edge closes its dashes with
+`c.closeLine()`.
+
 ### A base body in the view you need: dress it
 
 When there is no bigger version but there is a base body in the right view, dress it instead of
@@ -532,7 +545,9 @@ A crowd on one skeleton (a figure in 3D, §3): dress each person rather than rec
 takes an outfit (`dress(outfit)`, `rig3d()`'s parts, `lib/characters/traveler.px.js`), what is swept
 round the body and its ramps: trousers down to a cuff (rolled to the shin over bare feet, or into
 boots); drapes hung from a height (a cloak behind, a coat open at the front with buttons down its
-edges, a long skirt from the waist); the shirt's body by height and angle (stripes 2 px, a vest open
+edges, a long skirt from the waist; `push: px` the legs push it, the cloth kept that far over the thighs and shins, so a
+knee swung ahead carries the hem with it and the feet come out from under it, never through it: `lib/characters/hero32.px.js`'s
+ROBE32); the shirt's body by height and angle (stripes 2 px, a vest open
 over a shirt, a laced bodice; swept along the spine, so it bows with the figure; `spine: false`
 round an upright); drapes over it (an apron from the chest to the knees); sleeves rolled
 to skin at the forearm; `creases: true`, a pair only where a joint bends (the traveler's: past 60

@@ -34,7 +34,8 @@ lists every command and flag.
    (`--only a,b`; `--profile` when it has grown slow).
 6. Before handing over, `PXL check art.px.js`: every scene, rig and frame of the file
    (`check: { every: N }` on a long story), warnings only, with their frames. Fix each or say why
-   it's meant. LOOK lines (L-corners, jaggies, tones too close) don't fail it: look at each. Its
+   it's meant. LOOK lines (L-corners, jaggies, tones too close; `--edges`: any sprite's edges, a 3D
+   draft's after `shrink: { by: 3 }`) don't fail it: look at each. Its
    last line says which rules ran: "not run: lit side" means nothing about the light was checked
    (give the scene `world.light`, or lamps and `lighting()`); a scene's `expect` and `expect3d`
    rules run there too (`--fix`). Then look as a critic. Replacing approved art: keep `name_old`

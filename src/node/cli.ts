@@ -2,7 +2,7 @@
 import { basename, dirname, join, resolve } from "node:path";
 import { PxError, wrap } from "../core/errors.ts";
 import { type Color, TRANSPARENT, pack, toHex } from "../core/color.ts";
-import { lineFlaws } from "../core/vision.ts";
+import { edgeFlaws, lineFlaws } from "../core/vision.ts";
 import { Palette } from "../core/palette.ts";
 import { Img } from "../core/image.ts";
 import { type Snapshot, describe, labelOf } from "../core/describe.ts";
@@ -20,6 +20,9 @@ import { encodeGif, reduceColors } from "./gif.ts";
 import { writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 import { checkProject, writeMoves } from "./check.ts";
+
+/** The edge flaws ringed in shot's look image, by kind. */
+const EDGE_RINGS: ["steps" | "doubled" | "tips" | "bridges" | "notches" | "gaps" | "corners", number][] = [["steps", 0xe8202aff], ["doubled", 0xff8c14ff], ["tips", 0xd020d0ff], ["bridges", 0xd020d0ff], ["notches", 0x10c8e0ff], ["gaps", 0xffe020ff], ["corners", 0x20c040ff]];
 import { edit, inspect } from "./edit.ts";
 import { setKnobInSource } from "../core/world3d.ts";
 import { cellRow, diffRow, frameCount, frameTime, greyRow, otherVersion, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
@@ -112,7 +115,7 @@ const USAGE = `pxl — pixel-art DSL
       One that changes nothing says so; one that never will (a flip of its own mirror, z in a layer
       sorted by y) is refused, saying why. --dry: the source lines it would change (- now, + after)
       and what would change in the picture, nothing written.
-  pxl check <art.px.js> [name...] [--frame N] [--readings] [--fix]
+  pxl check <art.px.js> [name...] [--frame N] [--readings] [--fix] [--edges]
       Every check describe makes that can warn (facing, front marker, lit side, parallel parts, feet
       on the ground, lettering), on every scene and rig the file defines (not those it includes, or
       just the named assets) and the front marker of any other asset that has one, from one load: the
@@ -122,7 +125,10 @@ const USAGE = `pxl — pixel-art DSL
       lines of every sprite drawn by hand (grids, runs()), a doubled step or a corner the shape has
       (a line whose steps are nearly all L's is drawn square on purpose: none), and tones side by side
       too close to tell apart. A card()'s cells are checked against how their assets are drawn (a ✎
-      that is the 3D render alone, a ◐ drawn by hand, a ✓ live 3D sprite not frozen). --readings also lists what the lit-side rule read on every placement,
+      that is the 3D render alone, a ◐ drawn by hand, a ✓ live 3D sprite not frozen). --edges: a LOOK
+      line on every sprite and anim, by hand or over a base (a 3D draft and its pass), naming what a
+      reduction leaves at its edges: steps out of order, doubled line, tips, bridges, notches, gaps in
+      the line, clipped corners (pxl help edges; shot rings them). --readings also lists what the lit-side rule read on every placement,
       warning or not, with a tally: to see where it agrees and where it can't tell. A scene's
       expect rules (beside, before, apart, inside, onGround, while) run at the frames it checks.
       --fix: each expect3d rule that fails, fixed by one number of the parts it names (where one
@@ -233,6 +239,7 @@ interface Args {
   all?: boolean;
   every?: number;
   readings?: boolean;
+  edges?: boolean;
   fix?: boolean;
   id?: string;
   find?: string;
@@ -302,6 +309,7 @@ function parse(argv: string[]): Args {
     else if (v === "--all") a.all = true;
     else if (v === "--every") a.every = Number(val());
     else if (v === "--readings") a.readings = true;
+    else if (v === "--edges") a.edges = true;
     else if (v === "--fix") a.fix = true;
     else if (v === "--id") a.id = val();
     else if (v === "--find") a.find = val();
@@ -555,7 +563,7 @@ export async function main(argv: string[]): Promise<number> {
       }
       case "check": {
         const p = loadProject(file, { checksOnly: true });
-        const r = checkProject(p, { names: a.rest.length ? a.rest : undefined, frame: a.frame, file: basename(file), readings: a.readings, fix: a.fix });
+        const r = checkProject(p, { names: a.rest.length ? a.rest : undefined, frame: a.frame, file: basename(file), readings: a.readings, fix: a.fix, edges: a.edges });
         for (const l of [...r.lines, ...r.notes]) console.log(l);
         // --fix: each failing rule's number written into the file, where the part's spec is written there
         if (r.fixes) {
@@ -696,17 +704,18 @@ export async function main(argv: string[]): Promise<number> {
         writePng(last + ".last.png", now);
         writeFileSync(last + ".last.json", key);
         // what pxl check finds on it at these frames, so a look needs no other call
-        const r = checkProject(p, { names: [name], frames });
+        const r = checkProject(p, { names: [name], frames, edges: true });
         for (const l of [...r.lines, ...r.notes]) console.log(l);
-        // the line faults the LOOK lines name, ringed on the asset (corners orange, jaggies blue)
-        if (r.notes.some((l) => / LOOK: \d+ (L-corner|jagg)/.test(l))) {
-          const img = p.image(name), f = lineFlaws(img), s = Math.max(4, k), out = img.scale(s);
-          const ring = (x: number, y: number, c: Color) => { for (let i = 0; i < s; i++) for (const [u, v] of [[i, 0], [i, s - 1], [0, i], [s - 1, i]]) out.set(x * s + u, y * s + v, c); };
-          for (const [x, y] of f.corners) ring(x, y, pack(255, 140, 20));
-          for (const [x, y] of f.jaggies) ring(x, y, pack(40, 120, 255));
+        // the faults the LOOK lines name, ringed on the asset: its lines' (corners orange, jaggies blue) and its edges'
+        const lines = r.notes.some((l) => / LOOK: \d+ (L-corner|jagg)/.test(l)), edges = r.notes.some((l) => / LOOK: edges: /.test(l));
+        if (lines || edges) {
+          const img = p.assets.get(name)!.kind === "anim" ? (p.frames(name)[frames[0]] ?? p.frames(name)[0]).img : p.image(name), s = Math.max(4, k), out = img.scale(s);
+          const ring = (x: number, y: number, c: Color) => { for (let i = 0; i < s; i++) for (let t = 0; t < (s >= 8 ? 2 : 1); t++) for (const [u, v] of [[i, t], [i, s - 1 - t], [t, i], [s - 1 - t, i]]) out.set(x * s + u, y * s + v, c); };
+          if (lines) { const f = lineFlaws(img); for (const [x, y] of f.corners) ring(x, y, pack(255, 140, 20)); for (const [x, y] of f.jaggies) ring(x, y, pack(40, 120, 255)); }
+          if (edges) { const f = edgeFlaws(img); for (const [kind, c] of EDGE_RINGS) for (const [x, y] of f[kind]) ring(x, y, c); }
           const lookPath = base + "_look.png";
           writePng(lookPath, out);
-          console.log(`-> ${lookPath} (the LOOK lines' pixels ringed: L-corners orange, jaggies blue)`);
+          console.log(`-> ${lookPath} (the LOOK lines' pixels ringed, frame ${frames[0]}: ${lines ? "L-corners orange, jaggies blue" : ""}${lines && edges ? "; " : ""}${edges ? "edges: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners green" : ""})`);
         }
         if (r.warnings || p.assets.get(name)?.kind === "scene" || p.rigs.has(name))
           console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
