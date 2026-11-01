@@ -310,6 +310,18 @@ ground in regions on corner tiles, round crowns, a house that is mostly roof, a 
 characters only, one light and one shadow. The hero is the genre's base body, and the villagers and
 Reva are made from him by `hero.character()`; he walks a `route({ px: true })` and cuts the pot.
 
+### The same village at 32 px
+
+<p>
+  <img src="docs/gallery/topdown32_village.gif" width="100%" alt="Animated top-down pixel art of a village by the water at a 32 px grid, bright and detailed: a cottage with a tall red tile roof, a gabled porch over an arched plank door and a stone chimney with a square flue, a teal spruce, a full green oak and a red autumn maple swaying in gusts, a patch of tall grass waving, grass in lighter and darker regions with tufts, a dirt road by corner tiles down to a shore with foam and water darkening with depth; a barrel, a crate, a lamp post, a sign, a chest, boulders, bushes and flowers; a slim brown-haired hero in a blue shirt tucked into dark trousers walks up the road from the bottom, past a blonde villager in a red dress and a bald old man in a brown robe who turns to watch him, cuts a pot with his sword so that it cracks and bursts in dust and shards, and walks out to the left behind the lamp; a green slime hops; three hearts at the top left; the pot comes back in two puffs of dust before the loop closes">
+</p>
+
+[`examples/village32.px.js`](examples/village32.px.js): the same genre at a 32 px grid
+(`lib/profiles/topdown32.px.js`), every piece from `lib/`. The hero is the genre's slim body at 48 px, painted
+over a body posed in 3D; the props are drafted in 3D, brought to the grid with their edges treated
+(`shrink: { by, cover, ink }`, `pxl check --edges`) and finished by hand, their forms measured on game models for
+numbers only. The trees and the tall grass sway in gusts that cross the scene by `effect("sway")`.
+
 ### A platformer from the library
 
 <p>

@@ -592,6 +592,21 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
 - [ ] **Standing ground cover**: `corners()` makes flat tiles; tall grass needed its 14 edge masks as sprites, and
   a 3D draft of it covers half its square (the ground 32 px a meter both ways, what stands seen from 30 degrees).
 - [ ] **`pxl study` of a mesh**: reading ten character models and thirty props took Python readers twice.
+- [ ] **The demo's scene (F5 4o)**: a stamp placed by `beside`/`on`/`apart` can't get the genre's shadow (nothing
+  gives a placement's final box at draw time), so `village32` places by numbers and writes the relations as `expect`
+  rules; those rules judge a placement's whole drawing (a person south of a road "overlaps" it) and refuse a
+  negative gap. A foot option on the rules, and a placement's box readable by its shadow.
+- [ ] **`delay` runs ahead**: reference.md says "start later", but the stamp adds it to the clock (a copy with delay
+  100 shows its frame 1 at t 0), so sway's "delay growing with x" sends a gust from the right. Fix the doc or the sign.
+- [ ] **`effect("sway")` on lib sprites**: they're cropped close (no room to lean: copied onto wider canvases by
+  hand); its `mask` replaces the height weighting; it swings by a sine only. Room by an option, a `tone` mask, a
+  `profile(phase)` for a gust that overshoots and settles, and a `lag` for a crown's clumps.
+- [ ] **An anim's LOOK counts all frames together** (the oak's sway: 46 steps where each frame has 8-12); and the
+  built GIF merges still frames, so frames can't be stepped. Per-frame LOOK lines; `shot --frames ... --at` in rows
+  at its zoom.
+- [ ] **`hero32.pace`**: route() wants a pace by direction and hero32.px.js exports none (the traveler has one).
+- [ ] **Sort ties**: two props' feet on one row sort by call order, so no row puts a figure between them (the hero's
+  blade between the pot and the lamp). A stamp's own sort row.
 
 ## Characters (from dogfooding a 64 px character)
 
