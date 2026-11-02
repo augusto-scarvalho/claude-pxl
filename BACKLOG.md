@@ -638,6 +638,14 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   on the bends, the line on the straights). The mask as the callback's fifth argument; `map(mask, col, row)`.
 - [ ] **trail() drops short stretches without a word**: a path stepped in its own units that moves under 0.8 px a
   step draws nothing. A warning, or `step` in px.
+- [ ] **A route as a racing line** (F5 5g, examples/race_topdown.px.js): `at(s).heading` on an arc blends the legs'
+  ways linearly (4 degrees off the tangent; park.px.js's runners read it, so a fix is shown first); a route doesn't
+  close (its start mid-straight so the last corner rounds); a speed by place (slower into the bends) needs its time
+  per px summed and inverted by hand. The tangent, `loop: true`, `route({ speed: (s) => v, frames })`.
+- [ ] **expect on what lies under, and against many** (F5 5g): "on the asphalt" recomputed corners()'s blend in a
+  region function; "on no prop" took 104 `apart` rules. `inside: [a, { layer, keys }]`, `apart: [a, layer or list]`.
+- [ ] **skid()'s span** (F5 5g): marks laid over a bend and left there need `t` held at its end and the length cut by
+  hand (skid passes trail no `from`; trail has no `until`). `from`, `until` and a wear time.
 - [ ] **Small lib papercuts**: the 5x7 font has no `_ < >`; a card's `draw` mats are keys of its entry's palette
   (each file included with `palette: true`, palettes clashing); one heading of turnaround() is always `<name>_s` (a
   `base` alias per prop); a file included twice by the same path runs twice ("Identifier 'trees' has already been

@@ -75,6 +75,8 @@ perspective/road.px.js: 0 warnings (1 scene (11 frames, 31 distinct placements),
   ran: lit side on 31 (a clear reading on 0), feet on 3; not run: front marker (nothing has one)
 platformer.px.js: 0 warnings (1 scene (1 frame, 8 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 8; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh()), feet (nothing placed has a height)
+race_topdown.px.js: 0 warnings (1 scene (100 frames, 514 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: feet on 225, expects 107 (107 held), densities on 1; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh())
 rig/knight.px.js: 1 warning (3 scenes (98 frames, 123 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 94 (a clear reading on 93), feet on 94 (against the ground row on 94); not run: front marker (nothing has one)
   knights › knight @knights, feet 100,84 › WARNING: lit from the top left, but its light comes from the top right (a flipped drawing carries its light to the other side)

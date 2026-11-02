@@ -322,6 +322,19 @@ over a body posed in 3D; the props are drafted in 3D, brought to the grid with t
 (`shrink: { by, cover, ink }`, `pxl check --edges`) and finished by hand, their forms measured on game models for
 numbers only. The trees and the tall grass sway in gusts that cross the scene by `effect("sway")`.
 
+### Racing seen from above
+
+<p>
+  <img src="docs/gallery/racing_topdown.gif" width="100%" alt="Animated top-down pixel art of a short racing circuit seen from above at a steep angle: a grey asphalt loop with red and white kerbs on the four bends and a white line along the straights, a chequered start line under a gantry on the left straight with two grid slots, tyre stacks and tyre walls at the corners, cones and striped barriers, a lamp post, oaks, spruces, bushes and a rock on the grass in and around the loop, each casting its shadow; a red car and a teal car lap the circuit clockwise, turning through each bend rotation by rotation with their shadows under them: the red car leads out of the start, the teal one dives inside it into the first bend and passes on the top straight, and the red one dives inside the third bend and passes back on the bottom straight; thin dark skid marks are laid in the bends and wear away">
+</p>
+
+[`examples/race_topdown.px.js`](examples/race_topdown.px.js): the library's demo for racing seen
+from above (`lib/profiles/racing_topdown.px.js`), every piece from `lib/`. The cars are drafted in 3D and
+drawn in 32 rotations at the genre's 58 degrees, each frame taking the rotation of the way it moves
+(`car.facing`); the track is laid by corner sets, its props and trees drawn by their 3D builders, each lined
+in its own dark tones. Two cars lap it in 4 s, slower into the bends, passing and passed back, with skid
+marks in the bends; the scene's `expect` holds them on the track, off the props and off each other.
+
 ### A platformer from the library
 
 <p>

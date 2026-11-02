@@ -53,6 +53,7 @@ const shots: [string, string, number, number?, string?][] = [
   ["shrine/shrine.px.js", "shrine", 640, 1, "shrine_autumn"],
   ["village.px.js", "village", 512, 1, "topdown16_village"],
   ["village32.px.js", "village32", 1024, 1, "topdown32_village"],
+  ["race_topdown.px.js", "race_topdown", 640, 1, "racing_topdown"],
   ["nightfall/nightfall.px.js", "nightfall", 640, 2, "platformer16_nightfall"],
 ];
 
