@@ -151,15 +151,39 @@ test("make3d.kart (lib/vehicles/kart): parts, sockets; the hero seated, 48 headi
     assert.equal(names.length, 48);
     assert.deepEqual([names[0], names[1], names[3], names[12], names[24]], [`kart_${liv}_n`, `kart_${liv}_8`, `kart_${liv}_nne`, `kart_${liv}_e`, `kart_${liv}_s`]);
   }
-  // seen from behind at racing_behind's 24 px a meter: Super Circuit's 32 across with its line, its tyres 4 rows under its pivot
+  // seen from behind at racing_behind's 24 px a meter: Super Circuit's 32 across with its line, its tyres 3 rows under its
+  // pivot (drawn 3 times over and shrunk, its line on its edge's own pixels: drawn at 1x it hung a row lower, outside)
   const back = p.image("kart_fuego_n"), b = back.bounds()!;
-  assert.deepEqual([b.w, b.y + b.h - 1 - back.pivot![1]], [32, 4]);
+  assert.deepEqual([b.w, b.y + b.h - 1 - back.pivot![1]], [32, 3]);
+  // painted: the head the hero's views (16, the east the west's mirror), steering 3 steps each way from behind, each with
+  // the footprint the shrink doesn't carry
+  assert.equal(p.groups.get("_hd_kart")!.members.length, 16);
+  for (const n of ["kart_fuego_n", "kart_fuego_left3", "kart_laguna_right2"]) assert.ok(p.image(n).boxes?.footprint?.length, `${n}: its footprint`);
   // the east drawn as the west's mirror (Super Circuit's 23 flipped): their drawings, cut to their bounds, row for row reversed
   const cut = (n: string) => { const im = p.image(n), b = im.bounds()!; return [...Array(b.h).keys()].map((y) => [...Array(b.w).keys()].map((x) => im.data[(b.y + y) * im.w + b.x + x])); };
   const e = cut("kart_fuego_e"), w = cut("kart_fuego_w");
   assert.deepEqual(e, w.map((r) => [...r].reverse()), "e is w flipped");
   // a heading against the camera (0: driving away, clockwise) to the nearest of 48
   assert.deepEqual(["0", "7", "90", "-90", "181"].map((d) => p.scope!(`kart.facing("laguna", ${d})`)), ["kart_laguna_n", "kart_laguna_8", "kart_laguna_e", "kart_laguna_w", "kart_laguna_s"]);
+});
+
+test("lib/architecture/track_behind and lib/nature/trackside_behind: racing_behind's floor at 8 px tiles, what stands by rungs for its distances, the backdrop wraps", () => {
+  const p = loadProject("lib/nature/trackside_behind.px.js"), at = (n: string, x: number, y: number) => { const im = p.image(n); return im.data[y * im.w + x]; };
+  // the floor's tiles 8 px; a road's edge (mask 3: the top half road) a line of 2 px across the tile's middle
+  const road = p.image("circuit.road_3_0");
+  assert.deepEqual([road.w, road.h, at("circuit.road_3_0", 2, 3) === at("circuit.road_3_0", 5, 3), at("circuit.road_3_0", 2, 3) !== at("circuit.road_3_0", 2, 4)], [8, 8, true, true]);
+  // a rung for each doubling of the distance, half the size: a cone 12 px tall at 11 m, 6 at 22; rung() the nearest
+  const tall = (n: string) => p.image(n).bounds()!.h;
+  assert.ok(Math.abs(tall("circuit.cone_0") - 2 * tall("circuit.cone_1")) <= 2, "cone_0 twice cone_1");
+  assert.deepEqual([11, 30, 50, 100, 400].map((z) => p.scope!(`circuit.rung("lamp", ${z})`)), ["circuit.lamp_0", "circuit.lamp_1", "circuit.lamp_2", "circuit.lamp_3", "circuit.lamp_3"]);
+  assert.equal(p.scope!(`circuit.rung("cone", 50)`), "circuit.cone_1", "past its last rung (none under 4 px), its last");
+  assert.deepEqual([11, 30].map((z) => p.scope!(`circuit.rung("gantry", ${z})`)), ["circuit.gantry_1", "circuit.gantry_1"]);
+  // the backdrop's layers 256 across, each wrapping: its first column and its last continue (a ridge's top within a row)
+  for (const n of ["hills", "treeline"]) {
+    const im = p.image(n), topOf = (x: number) => [...Array(im.h).keys()].find((y) => im.data[y * im.w + x] >>> 24) ?? im.h;
+    assert.equal(im.w, 256);
+    assert.ok(Math.abs(topOf(0) - topOf(255)) <= 2, `${n} wraps`);
+  }
 });
 
 test("lib/architecture/track: the kerb's blocks meet at every tile side (red leaving by the left or top, white by the right or bottom); a start line on any tile's asphalt; its 3D things at the car's scale, lined all round in their materials' line tones, none near-black", () => {
