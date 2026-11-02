@@ -1,7 +1,7 @@
 // Turns an asset definition into an image: base -> items (ops, grids, functions, layers)
 // -> post-processing (mirror, swap, flip, rot, outline, crop). Optionally traced.
 import { Canvas, FACING, type Placed, type Placement, type Resolver, betweenKey } from "./canvas.ts";
-import { type Color, MIXES, TRANSPARENT, oklab, pack } from "./color.ts";
+import { type Color, MIXES, TRANSPARENT, oklab, pack, toHex } from "./color.ts";
 import { PxError, wrap } from "./errors.ts";
 import { Img, type Lamp } from "./image.ts";
 import { reduceEdges } from "./vision.ts";
@@ -664,6 +664,7 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
   }
   if (o.outline) step(`outline ${o.outline}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline!); return img.outline(c, false, as(c), skip()); }, (k) => k.pad(1));
   if (o.outline8) step(`outline8 ${o.outline8}${sel ? " (selout)" : ""}`, () => { const c = solid(pal, o.outline8!); return img.outline(c, true, as(c), skip()); }, (k) => k.pad(1));
+  if (o.ink !== undefined) step("ink", () => inkLine(img, pal, o.ink), (k) => k.pad(1));
   // caps (So You Want To Be A Pixel Artist's fighters): where a run of the line along the edge ends and
   // steps on diagonally, its end pixel goes `caps` steps darker along its ramp, so a light selective
   // outline holds on any ground; with no outline, the sprite's own edge (Capcom vs SNK's look)
@@ -683,6 +684,51 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
     img.slice = [s[0], s[1], s[2], s[3]];
   }
   return img;
+}
+
+/**
+ * ink: [ramps]: a line all round outside (the canvas a px bigger each side, as outline), each pixel the line of the
+ * ramp holding the color it touches (its first key; its second where it faces the light, the upper left: what it
+ * lines lies below it or to its right): the same geometry all round, so a symmetric shape stays symmetric.
+ */
+function inkLine(img: Img, pal: Palette, spec: unknown): Img {
+  const say = `ink is [ramps], each dark to light, keys or "#hex" ("qwoOP" or ["#6e2420", ...]): its first two its line (away from the light, facing it), the rest its fill`;
+  if (!Array.isArray(spec) || !spec.length || !spec.every((r) => typeof r === "string" || (Array.isArray(r) && r.every((k) => typeof k === "string")))) throw new PxError(`${say}, got ${fmtArgs([spec])}`);
+  const of = new Map<Color, Color[]>();
+  for (const r of spec as (string | string[])[]) {
+    const ks = (typeof r === "string" ? [...r] : r).map((k) => solid(pal, k));
+    if (ks.length < 3) throw new PxError(`${say}: ${fmtArgs([r])} has no fill`);
+    for (const c of ks.slice(2)) if (!of.has(c)) of.set(c, ks);
+  }
+  const src = img.pad(1), out = src.copy(), none = new Set<string>();
+  for (let y = 0; y < src.h; y++) for (let x = 0; x < src.w; x++) {
+    if (src.get(x, y) !== TRANSPARENT) continue;
+    let ramp: Color[] | undefined, lit = 0;
+    for (const [dx, dy] of [[0, 1], [0, -1], [-1, 0], [1, 0]]) {
+      const c = src.get(x + dx, y + dy);
+      if (c === TRANSPARENT) continue;
+      if (!of.has(c)) none.add(toHex(c));
+      ramp ??= of.get(c);
+      lit += dx + dy;
+    }
+    if (ramp) out.set(x, y, ramp[lit > 0 ? 1 : 0]);
+  }
+  // an L's elbow (the line round a step two px each way: the shape on two sides of it, the line on the other two, not
+  // both going on straight, which a real corner does) takes the fill beside it: the line steps diagonally, pixel-perfect
+  // (again where taking one made another, down a slit)
+  const fill = src.copy(), line = (x: number, y: number) => fill.get(x, y) === TRANSPARENT && out.get(x, y) !== TRANSPARENT;
+  for (let more = true; more; ) {
+    const elbows: [number, number, Color][] = [];
+    for (let y = 0; y < src.h; y++) for (let x = 0; x < src.w; x++) {
+      if (!line(x, y)) continue;
+      const L = [[1, 1], [1, -1], [-1, 1], [-1, -1]].find(([h, v]) => fill.get(x - h, y) !== TRANSPARENT && fill.get(x, y - v) !== TRANSPARENT && line(x + h, y) && line(x, y + v) && !(line(x + 2 * h, y) && line(x, y + 2 * v)));
+      if (L) elbows.push([x, y, fill.get(x - L[0], y)]);
+    }
+    for (const [x, y, c] of elbows) { out.set(x, y, c); fill.set(x, y, c); }
+    more = elbows.length > 0;
+  }
+  if (none.size) throw new PxError(`ink: ${[...none].join(", ")} at its edge ${none.size > 1 ? "are" : "is"} in none of its ramps: give each color at its edge a ramp (${say})`);
+  return out;
 }
 
 function seloutPick(pal: Palette, steps: number, floor?: Set<Color>): (touching: Color, line: Color) => Color {

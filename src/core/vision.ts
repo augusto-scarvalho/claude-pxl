@@ -273,6 +273,32 @@ export function findRamps(img: Img): Ramp[] {
 }
 
 // ---------------------------------------------------------------- pixel-art techniques
+/**
+ * A sprite's edge against the clear as study reads it (and pxl check a genre's ink): each pixel touching the clear
+ * (4 ways; beyond the picture too, for a sprite), what it is: "black", an ink line (dark and nearly grey: pxl's own
+ * ink is a deep purple, chroma 0.05); "selective", over 0.08 of lightness darker than what is inside it, a px or two
+ * in across from a clear side, or diagonally in at a corner (past the line itself: at an outline's corner, or where its
+ * two tones meet, it goes on inward; not along the edge); "none", the fill itself. `inner`, the first color in past its own; `out`, the way out
+ * of it (its clear sides summed).
+ */
+export interface EdgePixel { x: number; y: number; c: Color; inner?: Color; kind: "black" | "selective" | "none"; out: [number, number] }
+export function edgeOf(img: Img, beyond = true): EdgePixel[] {
+  const W = img.w, H = img.h, at = (x: number, y: number) => (x < 0 || y < 0 || x >= W || y >= H ? TRANSPARENT : img.data[y * W + x]), list: EdgePixel[] = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = at(x, y);
+    if (clear(c)) continue;
+    // beyond the picture is clear for a sprite (something with clear pixels), not for an opaque scene
+    const open = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].filter(([u, v]) => (beyond || (u >= 0 && v >= 0 && u < W && v < H)) && clear(at(u, v)));
+    if (!open.length) continue;
+    const out: [number, number] = [open.reduce((s, [u]) => s + u - x, 0), open.reduce((s, [, v]) => s + v - y, 0)];
+    // (and at a corner of the line, the pixel diagonally in)
+    const ins = open.flatMap(([u, v]) => [at(x + (x - u), y + (y - v)), at(x + 2 * (x - u), y + 2 * (y - v))]).concat(out[0] && out[1] ? [at(x - out[0], y - out[1])] : []).filter((n) => !clear(n) && n !== c);
+    const inner = open.map(([u, v]) => { const n = at(x + (x - u), y + (y - v)); return n === c ? at(x + 2 * (x - u), y + 2 * (y - v)) : n; }).find((n) => !clear(n) && n !== c);
+    const k = lch(c), kind: EdgePixel["kind"] = k.C < 0.08 && k.L < 0.3 ? "black" : ins.some((n) => lch(n).L - k.L > 0.08) ? "selective" : "none";
+    list.push({ x, y, c, inner, kind, out });
+  }
+  return list;
+}
 export interface Techniques {
   pixels: number;
   /** pixels in 2x2 checkers of two colors, and the most common pairs */
@@ -356,21 +382,10 @@ export function techniques(img: Img, ramps: Ramp[]): Techniques {
   // a sprite's edge
   let eb = 0, es = 0, en = 0, halo = 0;
   const sprite = img.data.some((c) => clear(c));
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const c = at(x, y);
-    if (clear(c)) continue;
-    // beyond the picture is clear for a sprite (something with clear pixels), not for an opaque scene
-    const out = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].filter(([u, v]) => sprite || (u >= 0 && v >= 0 && u < W && v < H));
-    if (!out.some(([u, v]) => clear(at(u, v)))) continue;
-    // what is inside it: past the line itself (at an outline's corner the line goes on inward)
-    const inner = out.map(([u, v]) => { const n = at(x + (x - u), y + (y - v)); return n === c ? at(x + 2 * (x - u), y + 2 * (y - v)) : n; }).find((n) => !clear(n) && n !== c);
-    const k = lch(c);
-    // an ink line: dark and nearly grey (pxl's own ink is a deep purple, chroma 0.05)
-    if (k.C < 0.08 && k.L < 0.3) eb++;
-    else if (inner !== undefined && lch(inner).L - k.L > 0.08) es++;
-    else en++;
+  for (const e of edgeOf(img, sprite)) {
+    if (e.kind === "black") eb++; else if (e.kind === "selective") es++; else en++;
     // lighter than a dark line just inside it: anti-aliasing toward a background that isn't there
-    if (inner !== undefined && lch(inner).L < 0.35 && k.L - lch(inner).L > 0.12) halo++;
+    if (e.inner !== undefined && lch(e.inner).L < 0.35 && lch(e.c).L - lch(e.inner).L > 0.12) halo++;
   }
   if (sprite && eb + es + en >= 8) edge = { black: eb, selective: es, none: en, halo };
   // the light along a sprite's rim, after Johnson and Farid ("Exposing digital forgeries by detecting

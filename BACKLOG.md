@@ -612,9 +612,12 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
 From racing top-down (F5 5a-5d, `lib/vehicles/car.px.js`, `lib/architecture/track.px.js`, `lib/nature/trackside.px.js`;
 the user: one camera at 58 degrees for the cars and what stands, a line all round each prop in its own darker tones;
 done here: `genre(name)`, surface's `ink: true | 2`):
-- [ ] **The genre's ink checked**: `ink: { character, tree, prop }` is a note; nothing checks an edge against it, so
+- [x] **The genre's ink checked**: `ink: { character, tree, prop }` is a note; nothing checks an edge against it, so
   topdown32's kit passed with a line on its shadow side only. `pxl check` reading it on what names the genre: a
   character's edge near-black all round, a tree's or prop's a line all round in its parts' tones, none near-black.
+  Done (F5 5e): an asset's `category` beside its `genre` (sprite, anim, `turnaround()`, `rig3d()`), read by the
+  genre's `ink` (`character`; `"own"`: pxl study's measure, its share and side in the warning); a sprite's
+  `ink: [ramps]` lines a hand pass all round; topdown32's kit lined with it, its `ink` now `"own"`.
 - [ ] **A decal at some headings**: a builder's decal is drawn at every heading turnaround() draws (the roof's number
   only square on took two turnarounds a livery). A decal's `headings`.
 - [ ] **Shrink keeps the boxes**: a shrunk turnaround sprite loses its `footprint` box, so the genre's footprint check

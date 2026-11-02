@@ -83,7 +83,7 @@ declare global {
     w?: number; h?: number; base?: string; mx?: boolean | "c"; my?: boolean | "c";
     /** Recolor after drawing; with a `base` from another file its keys are read in the base's palette, the new colors in yours. */
     swap?: Record<string, PxColor>;
-    flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; angle?: number; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; outline?: PxColor; outline8?: PxColor; crop?: boolean; layers?: boolean;
+    flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; angle?: number; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; outline?: PxColor; outline8?: PxColor; /** a line all round outside, each part in its own, one geometry every side: [ramps] dark to light, the first key the line away from the light, the second facing it, the rest the fill; an L's elbow takes the fill */ ink?: (string | string[])[]; crop?: boolean; layers?: boolean;
     /**
      * inline: a 1px line over the sprite's own edge; { color, keep: "keys" } leaves edge pixels in
      * those keys alone (closes only the gaps of an outline already there). selout: the line takes
@@ -120,6 +120,8 @@ declare global {
     register?: string | { key: string; x?: number };
     /** the genre() it is made for: pxl check runs that genre's checks on it */
     genre?: string;
+    /** with genre: what it is by the genre's ink, a key of it (character, tree, prop): pxl check reads its edge by that key */
+    category?: string;
   }
   interface PxWorld {
     /** Ground in perspective: the horizon's row and the eye's height in meters; or a flat side view's px per meter. */
@@ -864,7 +866,7 @@ declare global {
    * else their index), a group of them; through an orthographic view or a perspective() camera; the east
    * the west flipped where the thing is its own mirror and its light from the picture's middle (mirror: "auto").
    */
-  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown>; draw?: (c: PxCanvas, v: { heading: string; screen(p: number[]): number[]; depth(p: number[]): number }) => void; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number; /** the genre() its sprites are made for */ genre?: string }): PxTurnaround;
+  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown>; draw?: (c: PxCanvas, v: { heading: string; screen(p: number[]): number[]; depth(p: number[]): number }) => void; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number; /** the genre() its sprites are made for */ genre?: string; /** what they are by its ink (character, tree, prop) */ category?: string }): PxTurnaround;
   /**
    * A figure on the 3D layer: a skeleton (`body`) posed per frame by the file's own `pose(i, heading)`,
    * its parts fields along the bones (`parts(j, pose)`: j.limb, j.ball or fields, each painted by a
@@ -875,7 +877,7 @@ declare global {
    */
   function rig3d(name: string, opts: { body?: PxBody; moves: Record<string, { frames: number; /** each frame's (100), or a list, a number a frame */ ms?: number | number[]; pose: (i: number, heading: number) => PxPose; dirs?: string[]; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }>;
     n?: number; headings?: (string | number)[]; pitch?: number; w?: number; h?: number; pivot?: [number, number]; parts?: (j: PxJoints, pose: PxPose) => Record<string, PxPiece | PxSdf | { decal: object } | { scatter: object } | (PxPiece | PxSdf | { decal: object } | { scatter: object })[]>;
-    mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; /** with ink: "dark", the line on the part behind its darkest tone, the ink only all round */ inner?: boolean | PxColor | "dark"; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; head?: string; /** the line under the head; a head modeled: [key, the skin's ramp], under the jaw only */ chin?: PxColor | [PxColor, string]; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void; /** the genre() its painted moves are made for */ genre?: string; /** each heading's feet moved along the view's depth so the soles end on the row they do facing us */ soles?: boolean }): PxRig3d;
+    mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; /** with ink: "dark", the line on the part behind its darkest tone, the ink only all round */ inner?: boolean | PxColor | "dark"; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; head?: string; /** the line under the head; a head modeled: [key, the skin's ramp], under the jaw only */ chin?: PxColor | [PxColor, string]; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void; /** the genre() its painted moves are made for */ genre?: string; /** what they are by its ink (character) */ category?: string; /** each heading's feet moved along the view's depth so the soles end on the row they do facing us */ soles?: boolean }): PxRig3d;
   /**
    * Hand-drawn views of a thing (a head), named by the compass ({ s, sw, w, nw, n }: grids, rows, or items):
    * a sprite each, pivoted on its `anchor` pixel ([col, row], per view or one for all; "center", "bottom"),

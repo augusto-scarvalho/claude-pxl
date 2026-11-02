@@ -98,6 +98,33 @@ anim("odd", { frames: 2, fps: 10, w: 1, h: 1, genre: "fightin" }, (c) => c.px(0,
   assert.match(r.coverage, /genres' checks on 9 frames/);
 });
 
+test("genre checks: its ink by category (a character near-black all round, \"own\" a line all round darker than its fill, its lit side named); a sprite's ink lines a drawing all round, one geometry every side, an L's elbow the fill's", () => {
+  // a box lit from the upper left, its darkest along its lower right (a hand pass's line there: fill to the ink)
+  const p = loadSource(PAL + `genre("td", { ink: { character: "#1a1620", prop: "own" } })
+genre("said", { ink: "material" })
+sprite("_box", { w: 8, h: 8 }, (c) => { c.rect(1, 1, 6, 6, "#e8763e"); c.rect(6, 1, 1, 6, "#6e2420"); c.rect(1, 6, 6, 1, "#6e2420") })
+sprite("box", { base: "_box", ink: [["#4a0e02", "#832e24", "#6e2420", "#e8763e"]], genre: "td", category: "prop" })
+sprite("bare", { base: "_box", genre: "td", category: "prop" })
+sprite("guy", { base: "_box", genre: "td", category: "character" })
+sprite("tile", { base: "_box", genre: "td", category: "ground" })
+sprite("words", { base: "_box", genre: "said", category: "prop" })
+sprite("step", { w: 8, h: 8, ink: [["#4a0e02", "#832e24", "#e8763e"]] }, (c) => { c.rect(1, 1, 4, 2, "#e8763e"); c.rect(1, 3, 6, 4, "#e8763e") })`, "t.px.js");
+  // a px outside every side: the lighter line over it and left of it, the darker right of it and under it, its old line
+  // on its lower right kept as fill (the line outside it: columns 1 and 8 round a box of 2..7)
+  const im = p.image("box"), hex = (x: number, y: number) => "#" + (im.get(x, y) >>> 8).toString(16).padStart(6, "0");
+  assert.deepEqual([im.w, im.h, hex(4, 1), hex(1, 4), hex(8, 4), hex(4, 8), hex(7, 4), im.get(9, 4), im.get(1, 1)], [10, 10, "#832e24", "#832e24", "#4a0e02", "#4a0e02", "#6e2420", 0, 0]);
+  // round a step two px each way (its upper right cut), the line's elbow there the fill's: the line steps diagonally
+  const st = p.image("step"), sh = (x: number, y: number) => "#" + (st.get(x, y) >>> 8).toString(16).padStart(6, "0");
+  assert.deepEqual([sh(6, 3), sh(6, 2), sh(7, 3)], ["#e8763e", "#4a0e02", "#832e24"]);
+  const r = checkProject(p);
+  assert.equal(r.lines.length, 2, r.lines.join("\n"));
+  assert.match(r.lines[0], /^bare › WARNING: genre 'td': a prop's edge is a line all round outside its fill.*but 45% of its edge isn't, 45% on its lit side \(up and left\) and 0% away from the light: 9 px no darker than inside it/);
+  assert.match(r.lines[1], /^guy › WARNING: genre 'td': a character's edge is near-black all round.*but 100% of its edge isn't/);
+  assert.match(r.coverage, /genres' ink by category on 3 frames/);
+  assert.throws(() => loadSource(PAL + `sprite("x", { w: 4, h: 4, ink: [["#6e2420", "#832e24", "#e8763e"]] }, (c) => c.rect(1, 1, 2, 2, "#ffffff"))`, "t.px.js").image("x"), /ink: #ffffff at its edge is in none of its ramps/);
+  assert.throws(() => loadSource(PAL + `sprite("x", { w: 1, h: 1, category: "prop" })`, "t.px.js"), /category is what it is by its genre's ink.*and no genre/);
+});
+
 test("genre checks: a family stands as tall over its ground point in every direction (action top-down)", () => {
   // n drawn a px short; every direction hops a px on frame 1 (its tallest)
   const p = loadSource(PAL + `genre("td", { checks: ["height"] })

@@ -166,9 +166,9 @@ export const OP_OPTS: Record<string, string[]> = {
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "frozen", "normals", "area", "key", "palettize", "shrink", "facing", "height", "twin", "register", "genre"],
+  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "ink", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "frozen", "normals", "area", "key", "palettize", "shrink", "facing", "height", "twin", "register", "genre", "category"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "floor", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "expect", "pixel", "sizes", "camera"],
-  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check", "genre", "camera"],
+  anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "ink", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check", "genre", "category", "camera"],
 };
 const FRAME_OPTS = ["ms", "hold"];
 /** Longest loop a combined timeline may have (ms); longer ones are cut. */
@@ -576,12 +576,13 @@ export class Project implements BuildCtx {
         throw new PxError(`${kind} '${name}': world.light is where the light comes from, [x, y] (e.g. [0.6, -1]: the top right), "sun" (look3d()'s), or a point light in the scene, { at: [x, y] } (false: none read); got ${JSON.stringify(light)}`, loc);
       const items = checkItems(`${kind} '${name}'`, rest, loc);
       if (opts.genre !== undefined && (typeof opts.genre !== "string" || !opts.genre)) throw new PxError(`${kind} '${name}': genre names a genre() it is made for ("fighting"): pxl check runs that genre's checks on it, got ${JSON.stringify(opts.genre)}`, loc);
+      if (opts.category !== undefined && (typeof opts.category !== "string" || !/^\w+$/.test(opts.category) || opts.genre === undefined)) throw new PxError(`${kind} '${name}': category is what it is by its genre's ink, a key of it (character, tree, prop), beside genre: pxl check reads its edge by that key, got ${JSON.stringify(opts.category)}${opts.genre === undefined ? " and no genre" : ""}`, loc);
       if (opts.expect !== undefined) try { checkExpect(opts.expect, opts.world); } catch (e) { throw wrap(e).within(`${kind} '${name}'`, loc); }
       if (opts.normals !== undefined && opts.png === undefined) throw new PxError(`${kind} '${name}': normals is the normal map of its png: give png too`, loc);
       // frozen: a render of another asset kept as its PNG (the build reads it; check renders the live one); none yet, that one's image, written by the build
       let frozen = {};
       if (opts.frozen !== undefined) {
-        const bad = Object.keys(opts).filter((k) => !["png", "frozen", "pivot", "sockets", "height", "genre", "facing"].includes(k));
+        const bad = Object.keys(opts).filter((k) => !["png", "frozen", "pivot", "sockets", "height", "genre", "category", "facing"].includes(k));
         if (kind !== "sprite" || typeof opts.frozen !== "string" || typeof opts.png !== "string" || items.length || bad.length)
           throw new PxError(`${kind} '${name}': frozen names the asset its png is a render of: sprite("${name}", { png: "${name}.png", frozen: "_${name}_live" }) (a sprite, no items; with pivot, sockets, height, genre or facing at most${bad.length ? `, not ${bad.join(", ")}` : ""})`, loc);
         const live = this.qualify(opts.frozen), of = this.assets.get(live), where = this.whereHook?.(opts.png);
@@ -776,8 +777,8 @@ export class Project implements BuildCtx {
       try {
         if (typeof given !== "string" || !given || !isPlainObject(opts)) throw new PxError('turnaround("house", make3d.house(), { view: "iso", n: 8, ppm: 16 })');
         const name = this.qualify(given);
-        checkKeys("turnaround", opts, ["view", "ppm", "n", "headings", "part", "mats", "light", "as", "size", "spacing", "surface", "draw", "frames", "fps", "mirror", "pad", "genre"]);
-        const o = opts as { view?: unknown; ppm?: number; n?: number; headings?: unknown; part?: string; mats?: unknown; light?: unknown; as?: string; size?: number; spacing?: number; surface?: unknown; draw?: unknown; frames?: number; fps?: number; mirror?: unknown; pad?: number; genre?: string };
+        checkKeys("turnaround", opts, ["view", "ppm", "n", "headings", "part", "mats", "light", "as", "size", "spacing", "surface", "draw", "frames", "fps", "mirror", "pad", "genre", "category"]);
+        const o = opts as { view?: unknown; ppm?: number; n?: number; headings?: unknown; part?: string; mats?: unknown; light?: unknown; as?: string; size?: number; spacing?: number; surface?: unknown; draw?: unknown; frames?: number; fps?: number; mirror?: unknown; pad?: number; genre?: string; category?: string };
         if (!(o.draw === undefined || typeof o.draw === "function")) throw new PxError(`turnaround: draw is (c, v) => { ... }, drawing by hand over each heading (v.screen(p), v.depth(p) of a point in m), got ${JSON.stringify(o.draw)}`);
         if (!(o.surface === undefined || isPlainObject(o.surface))) throw new PxError(`turnaround: surface is more of surface()'s options ({ soft, outline, rim, ao, shadows }), got ${JSON.stringify(o.surface)}`);
         const { frames, fps = 8, ppm = 16, pad = 2, mirror = "auto", view = "iso" } = o;
@@ -809,7 +810,7 @@ export class Project implements BuildCtx {
         // its height over the ground it stands on (its origin's), for pxl check and describe
         const top = topOf(field) + at0[2], height = Number.isFinite(top) && top > 0 ? { height: Math.round(top * 100) / 100 } : {};
         const twin = H.map((h) => (sym && h.deg > 0 && h.deg < 180 ? H.findIndex((g) => Math.abs(g.deg - (360 - h.deg)) < 1e-9) : -1));
-        const genre = o.genre !== undefined ? { genre: o.genre } : {}, contact: number[][][] = [];
+        const genre = o.genre !== undefined ? { genre: o.genre, ...(o.category !== undefined ? { category: o.category } : {}) } : {}, contact: number[][][] = [];
         // its footprint, a box of each frame an engine reads: where it meets the ground (its origin's), as
         // this heading sees it (orthographic views; through a perspective() camera, none)
         const footprint = (c: Canvas, k: number, screen: (p: number[]) => number[]) => {
@@ -940,8 +941,8 @@ export class Project implements BuildCtx {
       try {
         if (typeof given !== "string" || !given || !isPlainObject(opts)) throw new PxError('rig3d("tr", { body: { h: 34, heads: 3 }, moves: { walk: { frames: 8, ms: 110, pose: (i, heading) => ({ feet, lift, hands }) } }, n: 8, blocks: true })');
         const name = this.qualify(given);
-        checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "ink", "surface", "head", "chin", "blocks", "mirror", "draw", "genre", "soles"]);
-        const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; ink?: unknown; surface?: Record<string, unknown>; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown; genre?: string; soles?: unknown };
+        checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "ink", "surface", "head", "chin", "blocks", "mirror", "draw", "genre", "category", "soles"]);
+        const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; ink?: unknown; surface?: Record<string, unknown>; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown; genre?: string; category?: string; soles?: unknown };
         if (o.surface !== undefined) { if (!isPlainObject(o.surface)) throw new PxError("rig3d: surface is surface()'s options for the painted figure ({ soft, shadows, ao, rim, ... })"); checkKeys("rig3d surface", o.surface, SURFACE_OPTS.filter((k) => !["view", "ppm", "at", "part"].includes(k))); }
         if (o.chin !== undefined && typeof o.chin !== "string" && !(Array.isArray(o.chin) && o.chin.length === 2 && o.chin.every((k) => typeof k === "string" && k) && !o.head))
           throw new PxError(`rig3d: chin is a key (the line under the head), or with a head modeled [key, the skin's ramp] (the line under the jaw only), got ${JSON.stringify(o.chin)}`);
@@ -1101,7 +1102,7 @@ export class Project implements BuildCtx {
             const twin = M.heads.map((hd) => (!flat && sym && hd.deg > 0 && hd.deg < 180 ? M.heads.findIndex((g) => Math.abs(g.deg - (360 - hd.deg)) < 1e-9) : -1));
             // (a move of one frame never reads the clock: a still pose)
             const draw = (hd: (typeof H)[number]) => (M.frames > 1 ? (c: Canvas) => paint(c, M.pose(c.frame, hd.deg), hd.deg, flat, M) : (c: Canvas) => paint(c, M.pose(0, hd.deg), hd.deg, flat, M));
-            const genre = !flat && o.genre !== undefined ? { genre: o.genre } : {};
+            const genre = !flat && o.genre !== undefined ? { genre: o.genre, ...(o.category !== undefined ? { category: o.category } : {}) } : {};
             M.heads.forEach((hd, i) => { if (twin[i] < 0) define("anim", list[i], [{ w, h, pivot, ...genre }, draw(hd), ...frameOps(M)]); });
             // (the mirrors after what they mirror, so they play as it does)
             M.heads.forEach((hd, i) => { if (twin[i] >= 0) define("anim", list[i], [{ base: list[twin[i]], flip: "x", pivot: [px + 1, py], ...genre }]); });

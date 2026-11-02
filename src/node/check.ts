@@ -7,7 +7,7 @@ import { MANY, STAND, lightFor, orientWords, placementChecks, standWords } from 
 import { rigLines } from "../core/rig.ts";
 import { frontWords, rampSteps } from "../core/checks.ts";
 import { PxError, didYouMean } from "../core/errors.ts";
-import { dE, edgeFlaws, lineFlaws } from "../core/vision.ts";
+import { dE, edgeFlaws, edgeOf, lch, lineFlaws } from "../core/vision.ts";
 import { type Color, toHex } from "../core/color.ts";
 import type { Img } from "../core/image.ts";
 import type { Item, World } from "../core/model.ts";
@@ -59,7 +59,7 @@ const frameImgs = (p: Project, n: string) => (p.assets.get(n)!.kind === "anim" ?
  * where it meets the ground (its footprint box, a turnaround()'s), within a px, in every frame (what is
  * nearer us may hang lower: a bumper seen from above).
  */
-function genreLines(p: Project, name: string, ran: { genre: number }): string[] {
+function genreLines(p: Project, name: string, ran: { genre: number; ink: number }): string[] {
   const gn = p.assets.get(name)!.opts.genre!, g = p.genres.get(gn), out: string[] = [];
   if (!g) return [`${name} › WARNING: genre '${gn}' is no genre() here${didYouMean(gn, p.genres.keys())}${p.genres.size ? ` (there are: ${[...p.genres.keys()].join(", ")})` : ""}: its checks didn't run`];
   const fr = frameImgs(p, name), low = fr.map((im) => { const b = im.bounds(); return b ? b.y + b.h - 1 : -1; });
@@ -80,6 +80,29 @@ function genreLines(p: Project, name: string, ran: { genre: number }): string[] 
     if (none) out.push(`${name} › WARNING: genre '${gn}': ${none === fr.length ? "it has" : `${none} of its frames have`} no footprint (a box "footprint" where it meets the ground: a turnaround()'s in an orthographic view, or c.setBox)`);
     const off = said((i) => { const f = fr[i].boxes?.footprint?.[0]; return f && low[i] + 1 < f[1] + f[3] - 1 ? `${low[i]}, its footprint's ${f[1] + f[3] - 1}` : undefined; });
     if (off.length) out.push(`${name} › WARNING: genre '${gn}': its drawing doesn't reach where it meets the ground: its lowest row is ${off.join("; ")}: drawn lifted, or its wheels or feet hidden or cut, it floats there`);
+  }
+  // its ink by its category (a key of the genre's ink, an object; a string ink, or a key it doesn't name, unread): a
+  // character's edge near-black all round; "own", a line all round outside its fill, each pixel darker than the fill
+  // inside it and none near-black (pxl study's measure, edgeOf); its lit side the edge facing the upper left; past 2% of
+  // its edge (all its frames together)
+  const cat = p.assets.get(name)!.opts.category, ink = g.ink as Record<string, unknown> | undefined;
+  const rule = cat !== undefined && typeof ink === "object" && ink !== null && !Array.isArray(ink) && cat in ink ? (cat === "character" ? "character" : ink[cat] === "own" ? "own" : undefined) : undefined;
+  if (rule) {
+    ran.ink += fr.length;
+    let n = 0;
+    const bad = { lit: 0, away: 0, black: 0, fill: 0 }, at: number[] = [];
+    fr.forEach((im, i) => {
+      // (a line beside a near-black inside, a hole or a black pattern, can't be darker than it and not near-black)
+      const e = edgeOf(im), wrong = e.filter((q) => (rule === "character" ? q.kind !== "black" : q.kind === "black" || (q.kind === "none" && !(q.inner !== undefined && lch(q.inner).L < 0.3 && lch(q.inner).C < 0.08))));
+      n += e.length;
+      if (wrong.length) at.push(i);
+      for (const q of wrong) { bad[q.out[0] + q.out[1] < 0 ? "lit" : "away"]++; bad[q.kind === "black" ? "black" : "fill"]++; }
+    });
+    const pc = (k: number) => (k && k < n / 100 ? "under 1%" : `${Math.round((100 * k) / n)}%`), all = bad.lit + bad.away;
+    const want = rule === "character" ? `near-black all round (its ink's "character")` : `a line all round outside its fill, each pixel darker than the fill inside it, none near-black (its ink's "own")`;
+    const why = rule === "own" ? `: ${[bad.black ? `${bad.black} px near-black` : "", bad.fill ? `${bad.fill} px no darker than inside it (the fill, unlined)` : ""].filter(Boolean).join(", ")}` : "";
+    // (two pixels in a hundred pass: where two lines meet, or a line folds on itself, three deep)
+    if (all > n / 50) out.push(`${name} › WARNING: genre '${gn}': a ${cat}'s edge is ${want}, but ${pc(all)} of its edge isn't, ${pc(bad.lit)} on its lit side (up and left) and ${pc(bad.away)} away from the light${why}${fr.length > 1 && at.length < fr.length ? ` (frame${at.length > 1 ? "s" : ""} ${ranges(at)})` : ""}`);
   }
   return out;
 }
@@ -246,7 +269,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, frozen: 0, cards: 0, density: 0, edges: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, ink: 0, frozen: 0, cards: 0, density: 0, edges: 0 };
   let cellsBy: Map<string, string[]> | undefined;
   let lightSaid = false, groundSaid = false, fixes: CheckResult["fixes"], rulesAll = 0, rulesHeld = 0;
   const failed: string[] = [];
@@ -498,6 +521,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.lines) run.push(`lines on ${ran.lines}`);
   if (ran.boxes) run.push(`boxes on ${ran.boxes} frame${ran.boxes > 1 ? "s" : ""}`);
   if (ran.genre) run.push(`genres' checks on ${ran.genre} frame${ran.genre > 1 ? "s" : ""}`);
+  if (ran.ink) run.push(`genres' ink by category on ${ran.ink} frame${ran.ink > 1 ? "s" : ""}`);
   if (ran.frozen) run.push(`frozen cells against their live render on ${ran.frozen}`);
   if (ran.cards) run.push(`cards' cells against their drawing on ${ran.cards}`);
   if (ran.density) run.push(`densities on ${ran.density}`);

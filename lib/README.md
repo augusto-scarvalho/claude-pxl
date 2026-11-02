@@ -112,8 +112,8 @@ to come.
 
 **Styles** (`styles/`): the engine's own builders (`make3d.rock`, `house`, `bush`, `pine`) in the
 fields style, drafted at their first cells; `hand32.px.js` the hand pass's steps for a 32 px 3D draft (the draft
-itself drawn three times over and brought down by `shrink: { by: 3 }`; `line32` topdown32's selective line, its
-dashes closed; `even32` a lone step evened, for a pass that cuts pieces).
+itself drawn three times over and brought down by `shrink: { by: 3 }`; `unline32` a draft's line taken off the edge, so
+a sprite's `ink` lines it all round; `even32` a lone step evened, for a pass that cuts pieces).
 
 ![styles](../docs/gallery/lib/styles.png)
 

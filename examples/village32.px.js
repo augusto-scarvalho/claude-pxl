@@ -150,7 +150,7 @@ const DELAY = { villager: 600 }
 const GUST = 56, LAG = 5
 const gust = (t) => (t < 0.2 ? Math.sin((Math.PI * t) / 0.4) ** 2 : Math.exp(-4 * (t - 0.2)) * Math.cos(2 * Math.PI * 2.2 * (t - 0.2)))
 // [canvas w, h, pivot x, y, room left, right]: what a sway would push past its canvas's edges, copied onto a wider one
-const CANVAS = { "trees._oak_td32": [101, 140, 54, 111, 3, 6], "trees._momiji_td32": [87, 110, 42, 85, 3, 6], "isl.bush": [33, 38, 16, 29, 0, 4], "isl.tallgrass": [35, 52, 16, 33, 0, 4] }
+const CANVAS = { "trees._oak_td32": [103, 142, 55, 112, 3, 6], "trees._momiji_td32": [89, 112, 43, 86, 3, 6], "isl.bush": [35, 40, 17, 30, 0, 4], "isl.tallgrass": [35, 52, 16, 33, 0, 4] }
 const lum = (k) => (0.2126 * (k >>> 24) + 0.7152 * ((k >>> 16) & 255) + 0.0722 * ((k >>> 8) & 255)) / 255
 const NEAR = [[-1, 0], [1, 0], [0, -1], [0, 1], [-2, 0], [2, 0], [0, -2], [0, 2]]
 // a tree bent by the gust, frame by frame: each row's pixels carried `amount` px at the top by the square (`power`) of

@@ -86,6 +86,13 @@ export interface AssetOpts {
   outline?: string;
   outline8?: string;
   /**
+   * A line all round outside (the canvas a px bigger each side, as outline), each part in its own: `[ramps]`, each
+   * dark to light (keys or "#hex"), its first two keys its line (away from the light, facing it: the upper left), the
+   * rest its fill. Each line pixel the line of the ramp holding the color it touches, the same all round (an old line on
+   * the edge is fill to it: take it off first).
+   */
+  ink?: (string | string[])[];
+  /**
    * 1px line on the sprite's own edge pixels; the canvas keeps its size. `{ color, keep }` leaves
    * edge pixels in the `keep` keys as they are, closing only the gaps of an outline that is
    * already there (a reduced image's surviving outline, selective colors included).
@@ -167,6 +174,8 @@ export interface AssetOpts {
   register?: string | { key: string; x?: number };
   /** The genre() it is made for: pxl check runs that genre's checks on it. */
   genre?: string;
+  /** What it is by its genre's ink, a key of it (character, tree, prop): pxl check reads its edge by that key. */
+  category?: string;
   /** Scene: the world's scale, { horizon, eye } (ground seen in perspective) or { scale } (px per meter, flat side view). */
   world?: World;
   /** Scene: the picture a window onto a bigger world, following a target (camera.ts); null inside a build that finds an id at 0, 0. */

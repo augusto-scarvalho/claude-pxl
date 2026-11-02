@@ -197,19 +197,20 @@ hero.character("v", { moves: ["idle"], swap: { n: "#7a2f3a" } })
   assert.ok(x > 0 && x < 18 && y > 14 && y < 28, `${x}, ${y}`);
 });
 
-test("lib/styles/hand32.px.js: a draft drawn 3 times over brought down (shrink), the selective line on its lower right, a lone step evened", () => {
+test("lib/styles/hand32.px.js: a draft drawn 3 times over brought down (shrink), a lone step evened, an old line taken off its edge", () => {
   const lib = join(process.cwd(), "lib", "styles").replaceAll("\\", "/");
   const dir = mkdtempSync(join(tmpdir(), "pxl-hand32-"));
   writeFileSync(join(dir, "h.px.js"), `include("${lib}/hand32.px.js")
 pal({ a: "#808080", b: "#ffffff", k: "#000000" })
 ramps("kab")
 sprite("_big", { w: 18, h: 18 }, (c) => { c.rect(3, 3, 12, 12, "b"); c.rect(4, 0, 1, 2, "b") })
-sprite("small", { base: "_big", shrink: { by: 3, cover: 1 / 3 } }, (c) => { c.px(5, 2, "b"); even32(c); line32(c, ["kab"]) })`);
+sprite("small", { base: "_big", shrink: { by: 3, cover: 1 / 3 } }, (c) => { c.px(5, 2, "b"); even32(c); c.rect(3, 1, 1, 3, "a"); c.rect(4, 1, 1, 4, "k"); c.rect(1, 4, 4, 1, "k"); unline32(c, "k") })`);
   const p = loadProject(join(dir, "h.px.js"));
   const im = p.image("small"), at = (x: number, y: number) => im.data[y * 6 + x];
-  // the 4 x 4 square kept (its 1 x 2 sliver under a third of a block: gone), the lone pixel out of its right side cut, its
-  // right column and its bottom row in the ramp's darkest, its top left as drawn
-  assert.deepEqual([at(1, 0), at(5, 2), at(1, 1), at(4, 1), at(2, 4), at(4, 4)], [0, 0, pack(255, 255, 255), pack(0, 0, 0), pack(0, 0, 0), pack(0, 0, 0)]);
+  // the 4 x 4 square kept (its 1 x 2 sliver under a third of a block: gone), the lone pixel out of its right side cut; its
+  // old line (k, its right column and its bottom row) each the colour just inside it, at the corner the one diagonally in
+  const [a, b] = [pack(128, 128, 128), pack(255, 255, 255)];
+  assert.deepEqual([at(1, 0), at(5, 2), at(4, 1), at(2, 4), at(4, 4), at(1, 4)], [0, 0, a, b, a, b]);
 });
 
 test("pxl check: densities mixed by accident (library entries of two in a scene, a png blown up or shrunk alone), unless a genre says the mix", () => {

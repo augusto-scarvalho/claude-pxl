@@ -1049,8 +1049,11 @@ rig3d("hero", { body: { h: TOPDOWN.scale.character[0] * TOPDOWN.grid, heads: TOP
 - **The style by density** is the genre's `tones` and `ink`: a `turnaround()` or `rig3d()` that
   names a genre draws in its `tones` (3 at 16-32 px; or `surface: { tones: 3 }`); `ink` a color is
   the outline all round (`surface: { ink: "#1a1620" }`, a turnaround's every heading in one pass), by
-  category or in words the file reads it; a builder's texture in screen px (the drawing call's ppm,
-  environment §3). An approved cell is frozen (`frozen`): pxl check says when the live render
+  category or in words the file reads it. By category, `pxl check` reads it on what names the genre
+  and its `category` (`{ genre: "topdown32", category: "prop" }`): `character` near-black all round,
+  `"own"` a line all round in the part's own darks, none near-black (a 2D sprite's `ink: [ramps]`, a
+  3D one's `surface: { ink: 2 }`); a string `ink`, or a category it doesn't name, unread. A
+  builder's texture in screen px (the drawing call's ppm, environment §3). An approved cell is frozen (`frozen`): pxl check says when the live render
   drifted from it.
 
 Start a work from one:
@@ -1108,7 +1111,8 @@ Start a work from one:
   people, creatures) a near-black line all round, even 13-14 px figures (89-97% of Puny Characters'
   edge; at 32 LPC's, 71-100%); everything else none in black, at 16 as at 32: what stands (trees,
   houses, rocks, props) its edge in its own material's darkest tone (`selout`, or a line of that
-  tone; drawn in 3D, `surface`'s `ink: 2`: all round, each part in its own two line tones) or none
+  tone; drawn in 3D, `surface`'s `ink: 2`: all round, each part in its own two line tones; a hand pass
+  lined after, a sprite's `ink: [ramps]`; the profile's `"own"`, pxl check reading it) or none
   where its tones carry the shape (LPC's trees 14-45% a line), the ground and effects
   none. A black line round every prop and tree (some sets do, 70-86% of Ninja Adventure's trees')
   makes the world as loud as its figures: only they keep it (`topdown16`'s `ink`).
