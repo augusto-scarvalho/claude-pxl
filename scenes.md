@@ -1059,7 +1059,8 @@ Start a work from one:
    them: `topdown16`, `topdown32` (action top-down), `platformer16`, `hd2d` (with its starter kit:
    `include("<pxl>/lib/profiles/hd2d.px.js", { palette: true })`), `fighting`, `racing_behind`,
    `racing_topdown`; or write `genre()` from a reference's measured numbers (characters §2): measure
-   the numbers, never copy the pixels.
+   the numbers, never copy the pixels. A file that includes it reads them back by `genre(name)`
+   (`genre("racing_topdown").stand`), never writing them again.
 2. See what the library (`lib/`) already has at its cell, to include rather than redraw:
    `pxl lib --genre topdown16`, and `pxl lib <entry>` for one's card and the `include` that takes it.
    A 3D entry it lacks: `pxl lib draft <entry> --genre topdown16` draws one in the genre (its camera,
@@ -1107,7 +1108,8 @@ Start a work from one:
   people, creatures) a near-black line all round, even 13-14 px figures (89-97% of Puny Characters'
   edge; at 32 LPC's, 71-100%); everything else none in black, at 16 as at 32: what stands (trees,
   houses, rocks, props) its edge in its own material's darkest tone (`selout`, or a line of that
-  tone) or none where its tones carry the shape (LPC's trees 14-45% a line), the ground and effects
+  tone; drawn in 3D, `surface`'s `ink: 2`: all round, each part in its own two line tones) or none
+  where its tones carry the shape (LPC's trees 14-45% a line), the ground and effects
   none. A black line round every prop and tree (some sets do, 70-86% of Ninja Adventure's trees')
   makes the world as loud as its figures: only they keep it (`topdown16`'s `ink`).
 - **Detail is measured in screen px.** The floors: a cluster ~10 px across or more, grain 2 px, marks

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pack } from "../src/core/color.ts";
 import { Img } from "../src/core/image.ts";
+import { lch } from "../src/core/vision.ts";
 import { loadProject, loadSource } from "../src/node/load.ts";
 import { cardLines, checkProject } from "../src/node/check.ts";
 import { catalog, findEntry, libCard, libDraft, libList } from "../src/node/lib.ts";
@@ -115,6 +116,70 @@ test("make3d.cottage (lib/architecture/houses): params in their ranges, parts an
   // the door 2.3 m tall seen from 30 degrees: two 16 px tiles at the px a meter the house box gives it
   const said = libDraft("make3d.cottage", { genre: "topdown16" }, mkdtempSync(join(tmpdir(), "pxl-cottage-"))).join("\n"), m = /drawn (\d+) tall, (\d+) wide, its [\d.]+ m at ([\d.]+) px\/m/.exec(said)!;
   assert.ok(+m[1] <= 72 && +m[2] <= 80 && Math.abs(2.3 * Math.cos(Math.PI / 6) * +m[3] - 32) <= 2, said);
+});
+
+// an image's edge against the clear: its pixels' colors (a sprite's outline, or what stands in for one)
+const edge = (im: Img) => im.data.filter((c, i) => c >>> 24 && [[-1, 0], [1, 0], [0, -1], [0, 1]].some(([u, v]) => { const x = (i % im.w) + u, y = Math.floor(i / im.w) + v; return x < 0 || y < 0 || x >= im.w || y >= im.h || !(im.data[y * im.w + x] >>> 24); }));
+// near-black as pxl study reads an edge: dark and nearly grey
+const black = (c: number) => { const k = lch(c); return k.L < 0.3 && k.C < 0.08; };
+
+test("make3d.car (lib/vehicles/car): parts, sockets, its decal; 32 rotations a livery from 58, each on its footprint's middle, its line near-black all round; car.facing", () => {
+  const p = loadProject("lib/vehicles/car.px.js"), make = (s: string) => p.scope!(`make3d.car(${s})`) as { parts: object; sockets: object; decals: object };
+  assert.deepEqual([Object.keys(make("{}").parts), Object.keys(make("{}").sockets)], [["body", "wheels", "lights", "wing"], ["exhaust", "tow"]]);
+  assert.deepEqual([Object.keys(make(`{ spoiler: 0, number: "none" }`).parts), Object.keys(make(`{ number: "none" }`).decals)], [["body", "wheels", "lights"], []]);
+  assert.throws(() => make(`{ number: "num9" }`), /number is "num7", "num7_laguna", "roundel", "roundel_laguna", "none"/);
+  for (const liv of ["fuego", "laguna"]) {
+    const names = p.groups.get(`car_${liv}`)!.members;
+    assert.equal(names.length, 32);
+    assert.deepEqual([names[0], names[1], names[2], names[8]], [`car_${liv}_n`, `car_${liv}_11`, `car_${liv}_nne`, `car_${liv}_e`]);
+    for (const n of names) {
+      const im = p.image(n), [x, y, w, h] = im.boxes!.footprint[0];
+      assert.ok(Math.abs(x + w / 2 - im.pivot![0]) <= 0.5 && Math.abs(y + h / 2 - im.pivot![1]) <= 0.5, `${n}: ${[x, y, w, h]} pivot ${im.pivot}`);
+      assert.ok(edge(im).every(black), `${n}: the genre's ink all round, a character's`);
+    }
+  }
+  // a route's heading on the picture (up it is n) to the rotation facing it, the nearest of 32
+  assert.deepEqual(["[0, -1]", "[1, 0]", "[-1, 0.9]", "[0.1, 1]", "[1, -0.2]"].map((h) => p.scope!(`car.facing("laguna", ${h})`)), ["car_laguna_n", "car_laguna_e", "car_laguna_sw", "car_laguna_169", "car_laguna_79"]);
+});
+
+test("lib/architecture/track: the kerb's blocks meet at every tile side (red leaving by the left or top, white by the right or bottom); a start line on any tile's asphalt; its 3D things at the car's scale, lined all round in their materials' line tones, none near-black", () => {
+  const p = loadProject("lib/architecture/track.px.js"), RED = pack(0xe8, 0x41, 0x4b), WHITE = pack(0xee, 0xeb, 0xe0);
+  for (const m of [1, 2, 3, 4, 5, 7, 8, 10, 11, 12, 13, 14]) {
+    const im = p.image(`kerb_${m}_0`), at = (x: number, y: number) => im.data[y * 16 + x];
+    for (let i = 0; i < 16; i++) for (const [x, y, want] of [[0, i, RED], [i, 0, RED], [15, i, WHITE], [i, 15, WHITE]] as const) {
+      const c = at(x, y);
+      if (c === RED || c === WHITE) assert.equal(c, want, `kerb_${m}_0 at ${x},${y}`);
+    }
+  }
+  const line = p.image("start_12").data, blank = p.image("track_12_0").data;
+  assert.ok(line.some((c, i) => c !== blank[i]) && line.slice(0, 16 * 8).every((c, i) => c === blank[i]), "start_12: the checker on the lower half's asphalt only");
+  // its things in 3D, in meters at the car's scale: four tyres along are 2.48 m; drawn at racing_topdown at twice the
+  // car's scale (its boxes for the small things), the wall and the barrier are two 16 px tiles (their line a px
+  // outside); a near-black line the cars' alone (racing_topdown's ink by kind): theirs all round, each part in its
+  // material's line tones (its ramp's first two), the banner's black squares inside it
+  const mats = p.scope!(`card("make3d.gantry").draw.mats`) as Record<string, string[]>, LINE = new Set(Object.values(mats).flatMap((r) => r.slice(0, 2)).map((h) => pack(...(h.match(/\w\w/g)!.map((x) => parseInt(x, 16)) as [number, number, number]))));
+  assert.deepEqual(p.scope!("make3d.tyres({ along: 4 }).field.bounds()"), [[-1.24, -0.31, 0], [1.24, 0.31, 0.6]]);
+  for (const n of ["tyre_wall", "barrier"]) {
+    const im = p.image(n), xs = [...im.data.keys()].filter((i) => im.data[i] >>> 24).map((i) => i % im.w);
+    assert.equal(Math.max(...xs) - Math.min(...xs) + 1, 32 + 2, `${n} drawn 32 px wide, its line a px outside each end`);
+  }
+  for (const n of ["tyres", "tyre_wall", "cone", "barrier", "lamp", "gantry"]) assert.ok(edge(p.image(n)).every((c) => LINE.has(c) && !black(c)), `${n}: lined all round, no near-black`);
+});
+
+test("lib/nature/trackside: the trees, bush and rock drawn by their 3D builders at racing_topdown, its pivot on its footprint, the bush in the kit's greens, each lined all round in its parts' own line tones, none near-black; the oak's trunk under its crown", () => {
+  const p = loadProject("lib/nature/trackside.px.js"), leaves = new Set(["#123a2a", "#1b4d34", "#287a44", "#3f9a3c", "#97e04a"].map((h) => pack(...(h.match(/\w\w/g)!.map((x) => parseInt(x, 16)) as [number, number, number]))));
+  // the leaves', the bark's, the needles' and the stone's two line tones
+  const LINE = new Set(["#123a2a", "#1b4d34", "#4a2a22", "#57322a", "#103a36", "#16493f", "#36344a", "#3f3d55"].map((h) => pack(...(h.match(/\w\w/g)!.map((x) => parseInt(x, 16)) as [number, number, number]))));
+  for (const n of ["oak", "spruce", "bush", "rock"]) {
+    const im = p.image(n), [x, y, w, h] = im.boxes!.footprint[0];
+    assert.ok(im.pivot![0] >= x && im.pivot![0] <= x + w && im.pivot![1] >= y && im.pivot![1] <= y + h, `${n}: ${[x, y, w, h]} pivot ${im.pivot}`);
+    assert.ok(edge(im).every((c) => LINE.has(c) && !black(c)), `${n}: lined all round, no near-black`);
+  }
+  // from 58 the oak's trunk shows: bark in the rows under its lowest leaf, above its foot (the pivot)
+  const oak = p.image("oak"), BARK = new Set(["#4a2a22", "#57322a", "#7a4630", "#a06a40", "#c98a55"].map((h) => pack(...(h.match(/\w\w/g)!.map((x) => parseInt(x, 16)) as [number, number, number]))));
+  const rows = (keep: (c: number) => boolean) => [...oak.data.keys()].filter((i) => keep(oak.data[i])).map((i) => Math.floor(i / oak.w));
+  assert.ok(Math.max(...rows((c) => BARK.has(c))) - Math.max(...rows((c) => !!(c >>> 24) && !BARK.has(c))) >= 3, "the oak's trunk 3 rows under its crown");
+  assert.ok(p.image("bush").data.every((c) => !(c >>> 24) || leaves.has(c)), "the bush in the kit's greens");
 });
 
 test("lib/characters/hero: the old names at setting iii, its rig's joints; a character made from it, dress.px.js included again", () => {

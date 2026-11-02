@@ -442,8 +442,8 @@ From the platformer demo (F5 3j-3k, `examples/nightfall/`):
   speed to another along it.
 - [ ] **A climb by its anim's stride**: the climb leg rises its pace every frame while the climb
   rises 4 px a drawing with the soles on the rungs, so the demo snaps the route's y afterwards.
-- [ ] **`genre(name)`**: a profile's data is handed back only where it is declared, so the demo
-  writes the jump's 48 and 600 again; a lookup as `card(name)` has.
+- [x] **`genre(name)`**: a profile's data is handed back only where it is declared, so the demo
+  writes the jump's 48 and 600 again; a lookup as `card(name)` has. Done (F5 5c): `genre(name)` gives it back.
 - [ ] **An anim frame's data in a scene**: the dash's frames say where a puff goes and when to
   ghost, but a scene can't read them, so the demo names the frames by index. `c.data(name, frame)`.
 - [ ] **A stretch of a strip**: a backdrop strip laid at a layer's x (a town that scrolls in, not
@@ -570,8 +570,8 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
   after it ("unknown color key"). Scope it to the file.
 - [ ] **Frozen drafts**: the PNG is written only when the frozen sprite itself is built (parts and passes on top
   never write it), and `frozen` refuses `shrink`. Build missing frozen PNGs with whatever uses them; `shrink` beside `frozen`.
-- [ ] **A genre read back**: a file that includes topdown32 can't read its `shadow` (`genre(name)` with no spec
-  throws); scenes copy the numbers by hand.
+- [x] **A genre read back**: a file that includes topdown32 can't read its `shadow` (`genre(name)` with no spec
+  throws); scenes copy the numbers by hand. Done (F5 5c): `genre("topdown32").shadow`.
 - [ ] **`sdf.lathe(points)`**: pots and barrels took a hand-written solid of revolution.
 - [ ] **Paint thinner than a pixel**: seams painted on a 3D face (0.02 m at 32 px a meter) vanish with no word.
 - [ ] **Folds under a flat light**: a robe's rippled radius takes one tone at a figure's light; folds were painted
@@ -582,8 +582,9 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
 - [ ] **`check --edges` on things made of pieces**: blades, leaves and a flat-footed outlined figure read as tips,
   notches, gaps and clipped corners. A card or sprite flag (`pieces: true`, `foot: "flat"`), and a repair helper
   (exact patches) beside the check: a 20 px pot's lip-over-shoulder S took a lab search.
-- [ ] **A line key a step darker**: topdown32's line is each ramp's darkest, which shading also lands on, so the
-  check reads doubled lines.
+- [x] **A line key a step darker**: topdown32's line is each ramp's darkest, which shading also lands on, so the
+  check reads doubled lines. Done (F5 5d): surface's `ink: true` or `2`, the line its ramp's first key (or two),
+  the fill never landing on it, as racing_topdown's kit draws it; topdown32's approved kit keeps its line.
 - [ ] **Terrain-aware placement**: "its foot not in the water" took a region per placement (`expect inside` takes
   every pixel), and nothing reads the terrain a tilemap's corners make; a lone corner of one terrain between tiles
   of others is cut square. A foot-on-terrain rule, and a check for lone corners.
@@ -607,6 +608,36 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
 - [ ] **`hero32.pace`**: route() wants a pace by direction and hero32.px.js exports none (the traveler has one).
 - [ ] **Sort ties**: two props' feet on one row sort by call order, so no row puts a figure between them (the hero's
   blade between the pot and the lamp). A stamp's own sort row.
+
+From racing top-down (F5 5a-5d, `lib/vehicles/car.px.js`, `lib/architecture/track.px.js`, `lib/nature/trackside.px.js`;
+the user: one camera at 58 degrees for the cars and what stands, a line all round each prop in its own darker tones;
+done here: `genre(name)`, surface's `ink: true | 2`):
+- [ ] **The genre's ink checked**: `ink: { character, tree, prop }` is a note; nothing checks an edge against it, so
+  topdown32's kit passed with a line on its shadow side only. `pxl check` reading it on what names the genre: a
+  character's edge near-black all round, a tree's or prop's a line all round in its parts' tones, none near-black.
+- [ ] **A decal at some headings**: a builder's decal is drawn at every heading turnaround() draws (the roof's number
+  only square on took two turnarounds a livery). A decal's `headings`.
+- [ ] **Shrink keeps the boxes**: a shrunk turnaround sprite loses its `footprint` box, so the genre's footprint check
+  fails every rotation; and a wrap decal's `size: "px"` is read at the 3x render, not the final scale.
+- [ ] **A heading to a rotation**: route()'s frames name 8 directions; a family of 16 or 32 rotations needs its own
+  atan2 (`car.facing`). `T.facing(heading)` on turnaround()'s result, or `route({ dirs })`.
+- [ ] **`anim({ bg })`**: refused (a scene takes it); a turning car on asphalt paints a rect first.
+- [ ] **Corners by mask and by place**: corners()'s callback gets no mask (a kerb's blocks run by it: 32 `base`
+  sprites recolor a band), and `tilemap({ corners, map })` picks one set by mask, not by where the tile lies (kerbs
+  on the bends, the line on the straights). The mask as the callback's fifth argument; `map(mask, col, row)`.
+- [ ] **trail() drops short stretches without a word**: a path stepped in its own units that moves under 0.8 px a
+  step draws nothing. A warning, or `step` in px.
+- [ ] **Small lib papercuts**: the 5x7 font has no `_ < >`; a card's `draw` mats are keys of its entry's palette
+  (each file included with `palette: true`, palettes clashing); one heading of turnaround() is always `<name>_s` (a
+  `base` alias per prop); a file included twice by the same path runs twice ("Identifier 'trees' has already been
+  declared"); a card's cells keyed by camera and density can't hold two genres at `topdown/16`; `sprite({ png })`
+  of a turnaround's PNG loses its pivot (a bush floated over its shadow); `trees.grow(spec)` handed to turnaround()
+  fails with an error that names no field.
+- [ ] **A line outside a genre's box**: the 1 px line round a 32 px barrier makes it 34, so two laid a box apart
+  overlap. The genre's boxes (and `pxl lib draft`'s fit) saying whether the line counts.
+- [ ] **`pxl study` on a lib sprite's edge**: `--px` takes 2..64, so a 1x sprite is read as a 2.51x one (38%
+  near-black for a 100% line); and its edge reading can't tell a line all round from one on the shadow side, nor
+  see a two-tone line's corner as line. `--px 1`, the edge read as the outer ring, and its share facing the light.
 
 ## Characters (from dogfooding a 64 px character)
 

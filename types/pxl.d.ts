@@ -363,8 +363,8 @@ declare global {
     part?: string;
     /** a pixel artist's pass before its lines (default true): no black run 2 px thick, the outline whole, a pixel sticking out cut away */
     clean?: boolean;
-    /** a line of this key all round outside it, a px wide (the sprite needs the room) */
-    ink?: PxColor;
+    /** a line of this key all round outside it, a px wide (the sprite needs the room); true: each line pixel its material's line tone, its ramp's first key (the fill and tones from the rest); 2: its first two, the second where the line faces the light */
+    ink?: PxColor | boolean | 1 | 2;
     /** each material's ramp cut to this many tones, its darkest and lightest kept (a genre's tones at a density) */
     tones?: number;
   }
@@ -833,6 +833,8 @@ declare global {
    * `name`; pxl check runs its `checks` on the assets naming it (`genre: "fighting"`). Other fields are kept.
    */
   function genre(name: string, spec: PxGenre): PxGenre & { name: string };
+  /** a genre() defined before it: its data, as genre(name, spec) gave it */
+  function genre(name: string): PxGenre & { name: string };
   /**
    * A library entry's card, just after what it describes (an asset, group, rig3d figure, turnaround,
    * font, or "make3d.<builder>"): what it is, its cells ("<camera>/<grid>": "✓" approved, "◐" a 3D

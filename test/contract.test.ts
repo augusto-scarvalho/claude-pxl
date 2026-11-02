@@ -75,6 +75,9 @@ sprite("x", { w: 1, h: 1 }, px(0, 0, G.steer[1] === 2 && G.name === "racing" && 
     [`{ grid: 0 }`, /grid is a tile's px/],
   ] as const) assert.throws(() => loadSource(PAL + `genre("g", ${spec})`, "t.px.js"), err);
   assert.throws(() => loadSource(PAL + `genre("g", {}); genre("g", {})`, "t.px.js"), /genre 'g' is already defined at t.px.js:1/);
+  // genre(name): its data back, for a kit reading its profile's numbers
+  assert.equal(keys(loadSource(PAL + `genre("g", { stand: 58 }); sprite("x", { w: 1, h: 1 }, px(0, 0, genre("g").stand === 58 && genre("g").name === "g" ? "r" : "k"))`, "t.px.js"), "x"), "r");
+  assert.throws(() => loadSource(PAL + `genre("g", {}); genre("h")`, "t.px.js"), /genre 'h' is no genre\(\) defined before it/);
   assert.throws(() => loadSource(PAL + `sprite("s", { genre: 3 }, px(0, 0, "r"))`, "t.px.js"), /genre names a genre\(\) it is made for/);
   // rig3d passes it to its painted moves (their directions a family), not to the blocks
   const q = loadSource(PAL + `rig3d("f", { body: { h: 30, heads: 3 }, n: 4, blocks: true, genre: "td", parts: (j) => ({ body: j.limb(j.pelvis, j.chest, 3, 3, "w") }), moves: { idle: { frames: 1, pose: () => ({}) } } })`, "t.px.js");

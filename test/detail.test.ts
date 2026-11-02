@@ -76,6 +76,25 @@ sprite("ink2d", { base: "all", outline: "k" })`, "t.px.js");
   assert.equal(keys(p, "ink"), keys(p, "ink2d").split("\n").slice(1, -1).map((r) => r.slice(1, -1)).join("\n"));
 });
 
+test("surface: ink true lines each material in its ramp's first key, its fill the rest; ink 2 its second where the line faces the light", () => {
+  const p = loadSource(PAL + `pal({ A: "#103010", B: "#205020", C: "#40a040", D: "#80e080", E: "#301010", F: "#502020", G: "#a04040", H: "#e08080", I: "#183c18", J: "#401818" })
+const F = sdf.union([sdf.sphere(0.5).at(-0.5, 0, 0.5).mat("a"), sdf.sphere(0.5).at(0.5, 0, 0.5).mat("b")]), V = { view: { kind: "side", pitch: 0 }, ppm: 12, at: [16, 15], outline: false }
+sprite("plain", { w: 32, h: 16 }, surface(F, { ...V, mats: { a: "BCD", b: "FGH" } }))
+sprite("k", { w: 32, h: 16 }, surface(F, { ...V, mats: { a: "BCD", b: "FGH" }, ink: "k" }))
+sprite("one", { w: 32, h: 16 }, surface(F, { ...V, mats: { a: "ABCD", b: "EFGH" }, ink: true }))
+sprite("two", { w: 32, h: 16 }, surface(F, { ...V, mats: { a: "AIBCD", b: "EJFGH" }, ink: 2 }))`, "t.px.js");
+  const [plain, k, one, two] = ["plain", "k", "one", "two"].map((n) => keys(p, n).replace(/\n/g, ""));
+  for (let i = 0; i < plain.length; i++) {
+    // the fill as the plain ramps draw it; the line where ink "k" draws its own, in each ball's line tones
+    for (const s of [one, two]) assert.equal(s[i], plain[i] !== "." ? plain[i] : k[i] === "k" ? s[i] : ".", `at ${i}`);
+    if (plain[i] === "." && k[i] === "k") assert.ok("AE".includes(one[i]) && "AIEJ".includes(two[i]), `${one[i]} ${two[i]} at ${i}`);
+  }
+  // the left ball's line its own green, the right one's its red; facing the light (the upper left) the second tone
+  const row = keys(p, "two").split("\n")[8];
+  assert.deepEqual([row.match(/[A-J]/)![0], row.match(/[A-J](?=\.*$)/)![0], keys(p, "one").split("\n")[8].match(/[A-J]/)![0]], ["I", "E", "A"]);
+  assert.throws(() => loadSource(PAL + `sprite("x", { w: 8, h: 8 }, surface(sdf.sphere(0.3), { mats: { "": "kr" }, ink: 2 }))`, "t.px.js").image("x"), /first 2 keys are the line, its fill the rest/);
+});
+
 test("foliage: tufts stepped from the tone under them, in rows step apart; none on the ramp's darkest or off it; vary keeps a seed's", () => {
   const p = loadSource(PAL + `sprite("f", { w: 6, h: 4 }, rect(0, 0, 6, 4, "g"), rect(0, 3, 6, 1, "k"), foliage("krgw", { tufts: ["+"], step: [2, 2], vary: 0 }))
 sprite("v1", { w: 24, h: 12 }, rect(0, 0, 24, 12, "r"), foliage("krgw", { step: [4, 3], seed: 2 }))

@@ -1180,9 +1180,13 @@ export class Project implements BuildCtx {
     // genre(name, { camera, grid or ppm, scale, heads, dirs, states, contract, pitch, tones, ink, mix, checks }): a
     // profile as data; the file reads its fields, pxl check runs its checks on the assets that name it (genre: "fighting")
     env.genre = (name: unknown, spec: unknown) => {
-      const loc = this.callerLoc();
-      if (typeof name !== "string" || !name || !isPlainObject(spec)) throw new PxError('genre("fighting", { camera, grid, scale: { character: [tall, wide] }, heads, dirs, states, contract: { boxes }, pitch, checks: ["ground"] })', loc);
-      const had = this.genres.get(name);
+      const loc = this.callerLoc(), had = typeof name === "string" ? this.genres.get(name) : undefined;
+      // genre(name): its data, as card(name) gives a card's (a kit reads its profile's pitch from one place)
+      if (spec === undefined && typeof name === "string" && name) {
+        if (!had) throw new PxError(`genre '${name}' is no genre() defined before it${didYouMean(name, this.genres.keys())}`, loc);
+        const { loc: _, ...g } = had; return g;
+      }
+      if (typeof name !== "string" || !name || !isPlainObject(spec)) throw new PxError('genre("fighting", { camera, grid, scale: { character: [tall, wide] }, heads, dirs, states, contract: { boxes }, pitch, checks: ["ground"] }), or genre(name): its data', loc);
       // (the same line again: the profile included twice, by a scene and by an entry it includes)
       if (had && had.loc === loc) { const { loc: _, ...g } = had; return g; }
       if (had) throw new PxError(`genre '${name}' is already defined at ${had.loc}`, loc);

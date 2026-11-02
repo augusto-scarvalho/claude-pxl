@@ -63,7 +63,9 @@ hand at `topdown/32` over their drafts); a platformer's world side on (`side.px.
 ground as tiles by their open sides under a grass lip, their faces and undersides ragged, slopes, water, an oak, a
 pine, two bushes, the backdrop's far and near clouds and hills; `side.ground(map)` draws a level; the same at dusk
 and at night by a palette swap, `side.DUSK` and `side.NIGHT`, with the sky as the air at each time, `side.sky`, and
-the full moon).
+the full moon); the trackside's oak (`make3d.oak_lifted`, its crown lifted so its trunk shows), spruce, bush and rock
+for `racing_topdown`, drawn by their 3D builders from its 58 degrees in the track kit's colors, each part lined all
+round in its own dark tones (`trackside.px.js`).
 
 ![nature](../docs/gallery/lib/nature.png)
 
@@ -87,13 +89,24 @@ as 3D builders, `make3d.castle` (towers, a curtain wall with real crenellations,
 heading or camera) and `make3d.keep` (the tower-house the walls guard: bartizans, a steep roof, lancets), its curtain,
 tower, gate and keep drawn by hand over their side views, lancets, two gargoyles, a banner, the courtyard from inside
 (the curtain, the stairs up to the walk, the gate's back, a terrace and the keep's door opening) and the castle on its
-crag for the night's backdrop (`side_castle.px.js`).
+crag for the night's backdrop (`side_castle.px.js`). A race track seen from above for `racing_topdown` (`track.px.js`): its corner
+tiles, the white edge line (`track_<mask>`) or a kerb (`kerb_<mask>`) on the island's grass, a start line on any of them
+(`start_<mask>`, `start_v_<mask>`), a grid slot, `track.skid()` a car's skid marks behind it on any path; and its
+things as 3D builders in meters at the car's scale, so racing from above and from behind draw the same models
+(`make3d.tyres`, `cone`, `barrier`, `gantry`, `lamp`), drawn at `racing_topdown` from its 58 degrees, each part lined
+all round in its material's dark tones, never black (`tyres`, `tyre_wall`, `cone`, `barrier`, `lamp`: twice the car's
+scale, the genre's boxes; `gantry`).
 
 ![architecture](../docs/gallery/lib/architecture.png)
 
 **UI** (`ui/`): the dialogue box, the 5x7 font, life hearts (top-down at 16 and 32, side on).
 
 ![ui](../docs/gallery/lib/ui.png)
+
+**Vehicles** (`vehicles/`): a car for racing, `make3d.car` (a coupe with a ducktail wing, two liveries by roles,
+its roof's mark a decal, sockets `exhaust` and `tow`), turned to its 32 rotations from 58 degrees at
+`racing_topdown` (`car_fuego`, `car_laguna`; `car.facing()` a route's heading to its rotation); `racing_behind`'s cells
+to come.
 
 **Styles** (`styles/`): the engine's own builders (`make3d.rock`, `house`, `bush`, `pine`) in the
 fields style, drafted at their first cells; `hand32.px.js` the hand pass's steps for a 32 px 3D draft (the draft
