@@ -618,6 +618,14 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   Done (F5 5e): an asset's `category` beside its `genre` (sprite, anim, `turnaround()`, `rig3d()`), read by the
   genre's `ink` (`character`; `"own"`: pxl study's measure, its share and side in the warning); a sprite's
   `ink: [ramps]` lines a hand pass all round; topdown32's kit lined with it, its `ink` now `"own"`.
+- [ ] **The cottage under the ink**: `_cottage_td32` says `category: "house"`, a key topdown32's `ink` doesn't name;
+  read as a prop, 83% of its edge is lined (the left post's column `#3e2018` near-black, the chimney's top unlined,
+  the plinth's corners 3 px deep). Fix those, then `house: "own"` in the profile.
+- [ ] **The heroes under the ink**: hero32, hero and hero_side fail "near-black all round" by 2-5% (skin pixels at
+  the throat), their attacks by 9-29% (the slash's arc, an effect with no line). Close the throat, the arc on a layer
+  the check skips, then `category: "character"` on their rig3d().
+- [ ] **How light a line may go**: an `"own"` line was taken as light as the check allows, capped by hand at L 0.5 so
+  it reads on the grass. The genre's ink a floor against its ground, and `--readings` saying each line's room.
 - [ ] **A decal at some headings**: a builder's decal is drawn at every heading turnaround() draws (the roof's number
   only square on took two turnarounds a livery). A decal's `headings`.
 - [ ] **Shrink keeps the boxes**: a shrunk turnaround sprite loses its `footprint` box, so the genre's footprint check
