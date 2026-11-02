@@ -50,7 +50,7 @@ test("genre(): its density a tile's px or px a meter, its mix said; its cell as 
   assert.deepEqual([...loadProject(join(dir, "s.px.js")).genres.keys()], ["g"]);
   assert.match(failure(`genre("g", {})\ngenre("g", {})`).message, /t\.px\.js:2.*genre 'g' is already defined at/);
   const { genres } = catalog();
-  assert.deepEqual(["hd2d", "topdown16", "racing_behind"].map((g) => genres.get(g)!.cell), ["hd2d/24ppm", "topdown/16", "behind/?"]);
+  assert.deepEqual(["hd2d", "topdown16", "racing_behind"].map((g) => genres.get(g)!.cell), ["hd2d/24ppm", "topdown/16", "behind/24ppm"]);
   assert.deepEqual([genres.get("topdown16")!.g.pitch, genres.get("topdown16")!.g.stand, genres.get("hd2d")!.g.mix], [45, 30, true]);
   assert.match(libList({ cell: "hd2d/17ppm" }).join("\n"), /crates\._crate_face +sprite +hd2d\/17ppm ✓/);
 });
@@ -140,6 +140,26 @@ test("make3d.car (lib/vehicles/car): parts, sockets, its decal; 32 rotations a l
   }
   // a route's heading on the picture (up it is n) to the rotation facing it, the nearest of 32
   assert.deepEqual(["[0, -1]", "[1, 0]", "[-1, 0.9]", "[0.1, 1]", "[1, -0.2]"].map((h) => p.scope!(`car.facing("laguna", ${h})`)), ["car_laguna_n", "car_laguna_e", "car_laguna_sw", "car_laguna_169", "car_laguna_79"]);
+});
+
+test("make3d.kart (lib/vehicles/kart): parts, sockets; the hero seated, 48 headings a livery, the east half the west's mirrors; kart.facing", () => {
+  const p = loadProject("lib/vehicles/kart.px.js"), make = (s: string) => p.scope!(`make3d.kart(${s})`) as { parts: object; sockets: object };
+  assert.deepEqual([Object.keys(make("{}").parts), Object.keys(make("{}").sockets)], [["body", "seat", "engine", "wheels", "steer"], ["seat", "wheel", "pedals", "exhaust"]]);
+  assert.throws(() => make("{ width: 3 }"), /width/);
+  for (const liv of ["fuego", "laguna"]) {
+    const names = p.groups.get(`kart_${liv}`)!.members;
+    assert.equal(names.length, 48);
+    assert.deepEqual([names[0], names[1], names[3], names[12], names[24]], [`kart_${liv}_n`, `kart_${liv}_8`, `kart_${liv}_nne`, `kart_${liv}_e`, `kart_${liv}_s`]);
+  }
+  // seen from behind at racing_behind's 24 px a meter: Super Circuit's 32 across with its line, its tyres 4 rows under its pivot
+  const back = p.image("kart_fuego_n"), b = back.bounds()!;
+  assert.deepEqual([b.w, b.y + b.h - 1 - back.pivot![1]], [32, 4]);
+  // the east drawn as the west's mirror (Super Circuit's 23 flipped): their drawings, cut to their bounds, row for row reversed
+  const cut = (n: string) => { const im = p.image(n), b = im.bounds()!; return [...Array(b.h).keys()].map((y) => [...Array(b.w).keys()].map((x) => im.data[(b.y + y) * im.w + b.x + x])); };
+  const e = cut("kart_fuego_e"), w = cut("kart_fuego_w");
+  assert.deepEqual(e, w.map((r) => [...r].reverse()), "e is w flipped");
+  // a heading against the camera (0: driving away, clockwise) to the nearest of 48
+  assert.deepEqual(["0", "7", "90", "-90", "181"].map((d) => p.scope!(`kart.facing("laguna", ${d})`)), ["kart_laguna_n", "kart_laguna_8", "kart_laguna_e", "kart_laguna_w", "kart_laguna_s"]);
 });
 
 test("lib/architecture/track: the kerb's blocks meet at every tile side (red leaving by the left or top, white by the right or bottom); a start line on any tile's asphalt; its 3D things at the car's scale, lined all round in their materials' line tones, none near-black", () => {

@@ -698,6 +698,25 @@ scene("s", { w: 100, h: 60, bg: "k" }, plane(P, (x, z) => (z > 10 && z < 12 ? "w
   assert.throws(() => perspective({ w: 100, horizon: 20, eye: 0 }), /perspective: \{ w, horizon, eye \}/);
 });
 
+test("plane with a drawn asset: laid on the ground, its top the farthest; clear pixels and off it left as they are", () => {
+  // a 4 x 4 map, its top row "w", the rest "g" but one clear pixel, 1 m a pixel, its top left at x -2, z 14: under the
+  // same camera as above, rows 30 (10 m) to 34 (just over 7 m) see its rows 3 and 2; row 29 (10.5 m) row 3 too
+  const p = loadSource(PAL + `const P = perspective({ w: 100, horizon: 20, eye: 2, fov: 90 })
+sprite("_map", "wwww\\ngggg\\ngg.g\\ngggg")
+scene("s", { w: 100, h: 60, bg: "k" }, plane(P, { tex: "_map", texel: 1, at: [-2, 14] }))`, "t.px.js");
+  const rows = keys(p, "s").split("\n"), P = perspective({ w: 100, horizon: 20, eye: 2, fov: 90 });
+  // z 13.5 (the map's row 0, "w") lands on row 20 + 2 * 50 / 13.5 = 27.4: rows 26-27 see 13.3-14.3 m
+  assert.equal(rows[27][50], "w");
+  assert.equal(rows[40][50], "k", "nearer than its bottom edge (z 10): the background");
+  assert.equal(rows[19][50], "k", "above the horizon");
+  const [cx, cy] = P.ground(0.5, 11.5);   // its row 2, column 2: the clear pixel
+  assert.equal(rows[Math.floor(cy)][Math.floor(cx)], "k");
+  const [gx, gy] = P.ground(-1.5, 11.5);  // its row 2, column 0
+  assert.equal(rows[Math.floor(gy)][Math.floor(gx)], "g");
+  assert.throws(() => keys(loadSource(PAL + `scene("s", { w: 10, h: 10 }, plane({ w: 10, horizon: 2, eye: 1 }, { tex: "x", texel: 0 }))`, "t.px.js"), "s"), /plane: the ground is .* a drawn asset laid on it \{ tex/);
+  assert.match(failure(PAL + `scene("s", { w: 10, h: 10 }, plane({ w: 10, horizon: 2, eye: 1 }, 3))`).message, /plane: argument 2 \(fn\) must be \(x, z, col, row\) => key, or a drawn asset/);
+});
+
 test("perspective: tilted up, uprights meet at a third point above, the horizon drops, and pixels still find their ground", () => {
   const near = (a: number[] | null, b: number[], eps = 1e-6) => assert.ok(a && a.every((v, i) => Math.abs(v - b[i]) < eps), `${a} ~ ${b}`);
   const env = { w: 100, horizon: 80, eye: 1.5, fov: 90, yaw: 30 };

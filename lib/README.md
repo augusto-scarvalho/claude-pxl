@@ -105,8 +105,10 @@ scale, the genre's boxes; `gantry`).
 
 **Vehicles** (`vehicles/`): a car for racing, `make3d.car` (a coupe with a ducktail wing, two liveries by roles,
 its roof's mark a decal, sockets `exhaust` and `tow`), turned to its 32 rotations from 58 degrees at
-`racing_topdown` (`car_fuego`, `car_laguna`; `car.facing()` a route's heading to its rotation); `racing_behind`'s cells
-to come.
+`racing_topdown` (`car_fuego`, `car_laguna`; `car.facing()` a route's heading to its rotation). A kart for
+`racing_behind` (Mario Kart's kind), `make3d.kart` (an open pipe-frame kart, two liveries by roles) with the top-down
+hero seated in it (`kart.racer()`), turned to its 48 headings (`kart_fuego`, `kart_laguna`; `kart.facing()`): blocks
+for now.
 
 ![vehicles](../docs/gallery/lib/vehicles.png)
 

@@ -246,6 +246,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   with `perspective()` (reference: Perspective). The ground is a `plane()`: each pixel gets the color
   of the ground point it sees, so stripes and rows run to the vanishing point by themselves. Long thin
   lines (joints, rails, wires) draw better as `line`s between two `ground()` points than per pixel.
+  A ground drawn from above once (a kart track, Mode 7's map) is laid on it by `plane(P, { tex, texel, at })`.
 - A road that bends: `perspective({ ..., bend })`, its curvature in 1/m (a point z m ahead sits
   bend·z²/2 to the side). Lay everything in meters along the road and across it as if it were
   straight; the camera bends it, the ground, the things on it and their shadows alike. A bend that

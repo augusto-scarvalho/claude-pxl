@@ -1211,13 +1211,30 @@ export class Canvas {
     });
   }
 
-  plane(view: Partial<View>, fn: (x: number, z: number, col: number, row: number) => string | null | undefined, where?: Region): void {
+  plane(view: Partial<View>, fn: ((x: number, z: number, col: number, row: number) => string | null | undefined) | { tex: string; texel?: number; at?: number[] }, where?: Region): void {
     const P = perspective({ ...view, w: view.w ?? this.img.w } as View), inside = where === undefined ? undefined : regionPred(where);
+    // a drawn asset laid on the ground (a track drawn from above, Mode 7's map): its top left at `at` [x, z], `texel` m a
+    // pixel, its rows coming toward the eye (its top the farthest at yaw 0); each pixel the nearest of its pixels, clear
+    // ones and off it left as they are
+    let tex: ((x: number, z: number) => Color | null) | undefined;
+    if (typeof fn !== "function") {
+      const { tex: name, texel = 1, at = [0, 0], ...rest } = fn;
+      if (typeof name !== "string" || !(texel > 0) || !(Array.isArray(at) && at.length === 2 && at.every(Number.isFinite)) || Object.keys(rest).length)
+        throw new PxError(`plane: the ground is (x, z, col, row) => key, or a drawn asset laid on it { tex: "name", texel (m a pixel, default 1), at: [x, z] (its top left, default [0, 0]) }, got ${JSON.stringify(fn)}`);
+      const T = this.asset(name), [ax, az] = at;
+      tex = (x, z) => {
+        const u = Math.floor((x - ax) / texel), v = Math.floor((az - z) / texel);
+        if (u < 0 || v < 0 || u >= T.w || v >= T.h) return null;
+        const c = T.data[v * T.w + u];
+        return (c & 255) < 128 ? null : c;
+      };
+    }
     for (let row = Math.max(-this.oy, Math.floor(P.horizon)); row < this.img.h - this.oy; row++) {
       for (let col = -this.ox; col < this.img.w - this.ox; col++) {
         const g = P.at(col, row);
         if (!g || (inside && !inside(col, row))) continue;
-        const k = fn(g[0], g[1], col, row);
+        if (tex) { this.plot(col, row, tex(g[0], g[1])); continue; }
+        const k = (fn as (x: number, z: number, col: number, row: number) => string | null | undefined)(g[0], g[1], col, row);
         if (k && k !== ".") this.px(col, row, k);
       }
     }

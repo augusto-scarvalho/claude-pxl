@@ -39,7 +39,8 @@ import { bayer, fbm, globRe, gridRows, lane, latticeHash, profile, rng, vec, vno
 /**
  * Op signatures: name:type, "?" marks the first optional argument.
  * n number, c color, s string, t text (string|number), S colors ("abc" or array),
- * a point array, r region, o object, b boolean, f function, v a camera (object or function), I items (rest).
+ * a point array, r region, o object, b boolean, f function, v a camera (object or function), G a ground (function or
+ * { tex } object), I items (rest).
  */
 export const SIGNATURES: Record<string, string> = {
   px: "x:n y:n c:c",
@@ -64,7 +65,7 @@ export const SIGNATURES: Record<string, string> = {
   relight: "?where:r opts:o",
   warp: "fn:f ?where:r",
   effect: "name:s ?opts:o",
-  plane: "view:o fn:f ?where:r",
+  plane: "view:o fn:G ?where:r",
   terrain: "view:o height:f fn:f ?opts:o",
   solids: "view:o shapes:a ?opts:o",
   shadows: "view:o shapes:a opts:o",
@@ -240,6 +241,7 @@ function checkArgs(name: string, args: unknown[]): void {
       case "o": if (typeof v !== "object" || v === null || Array.isArray(v)) bad("an options object"); break;
       case "b": if (typeof v !== "boolean") bad("true/false"); break;
       case "f": if (typeof v !== "function") bad("a function"); break;
+      case "G": if (typeof v !== "function" && (typeof v !== "object" || v === null || Array.isArray(v))) bad("(x, z, col, row) => key, or a drawn asset laid on the ground: { tex, texel?, at? }"); break;
       case "v": if (typeof v !== "function" && !["side", "top", "iso"].includes(v as string) && (typeof v !== "object" || v === null || Array.isArray(v))) bad("a camera: perspective(...) or its { w, horizon, eye, ... }, an orthographic view (\"side\", \"top\", \"iso\" or { kind, yaw, pitch, origin, grid }), or a function from a point to [col, row, depth]"); break;
     }
   });

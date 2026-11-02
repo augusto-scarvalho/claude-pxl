@@ -463,6 +463,8 @@ declare global {
     far?: number; top?: number; bound?: (x: number, z: number) => number; margin?: number;
     sky?: (col: number, row: number) => PxColor | null | undefined;
   }
+  /** plane()'s ground as a drawn asset laid on it (a track drawn from above, Mode 7's map): its top left at `at` [x, z] (default [0, 0]), `texel` m a pixel (default 1), its rows coming toward the eye; each pixel the nearest of its, clear ones and off it left as they are. */
+  interface PxGround { tex: string; texel?: number; at?: [number, number] }
   /** A pinhole camera over flat ground, in meters: the horizon's row, the eye's height, a field of view. */
   interface PxView {
     w?: number; horizon?: number; eye?: number; fov?: number; focal?: number;
@@ -741,7 +743,7 @@ declare global {
     /** A shader's effect on what the canvas holds so far, in place, on its clock and seed: dissolve, pixelate, dither, tint, distort, sway, emit. */
     effect(...fx: PxEffect): void;
     /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away ("." or nothing: leave it). */
-    plane(view: PxView | PxPerspective, fn: (x: number, z: number, col: number, row: number) => PxColor | null | undefined, where?: PxRegion): void;
+    plane(view: PxView | PxPerspective, ground: ((x: number, z: number, col: number, row: number) => PxColor | null | undefined) | PxGround, where?: PxRegion): void;
     /** A tapered capsule painted round (px), shaded across toward the light along `ramp`, a rim on the lit edge. */
     capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts?: { light?: [number, number]; rim?: boolean }): void;
     /** Flames rising from (x, y), about `size` px tall, flickering with the frame, leaning with `wind`; `keys` root to tip, the last for edges. */
@@ -932,7 +934,7 @@ declare global {
   /** A pinhole camera over flat ground, turned (yaw) and tilted (pitch): ground(x, z, up) -> screen, at(col, row) -> ground, scale(z), vanish(angle), vertical(), ray(col, row), toward(dir). */
   function perspective(view: PxView & { w: number }): PxPerspective;
   /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away. */
-  function plane(view: PxView | PxPerspective, fn: (x: number, z: number, col: number, row: number) => PxColor | null | undefined, where?: PxRegion): PxOp;
+  function plane(view: PxView | PxPerspective, ground: ((x: number, z: number, col: number, row: number) => PxColor | null | undefined) | PxGround, where?: PxRegion): PxOp;
   /** A tapered capsule painted round (px): every pixel shaded across it toward the light along `ramp` (dark to light), a rim on the lit edge. */
   function capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts?: { light?: [number, number]; rim?: boolean }): PxOp;
   /** Flames rising from (x, y), about `size` px tall: tongues flickering with the frame, leaning with `wind`; `keys` from the root to the tip, the last for their edges. */
