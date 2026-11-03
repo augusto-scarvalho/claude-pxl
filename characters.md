@@ -197,9 +197,29 @@ directions walking, idle, kneeling and casting;
    long stride, on the diagonals between (`gait()`'s numbers). Seen from steeply above (a top-down game's
    45 degrees) a foot nearer us stands lower: `soles: true` puts every view's soles on one row.
 
-`pxl check` reads every pose at every heading: both feet off the ground (it floats; `air: true` on a
-jump's frames), a leg pulled longer than its bones, an elbow bent forward (ahead of the shoulder-hand
-line). The elbows bend by a hint, mostly down by default: an arm swung back bends forward with it, so a
+**A foot that behaves like one.** A pose's `toes: [left, right]` turns each foot out from the hips'
+forward (degrees), and its knee turns with it: a knee points over its toes (0, the default, points both
+where the hips do). The 3D games turn a fighter's rear foot 30 to 90 degrees out from profile (median
+60): `toes` is that less the hips' own opening. `heel: [left, right]`
+raises a heel that many px, the foot turned on its ball: the toes stay flat on the floor, the heel and
+the ankle rise on an arc round the ball and the shin tilts with them (a punch's drive, a toe-off);
+`lift` still raises the whole foot (a step), and with `heel` too a swinging foot points its toe down.
+Each leg's sole is in the joints, `j.legs[i].heel`, `.ball` and `.toe` on the floor (up with the foot),
+`.foot` its middle along the foot's own `.heading`: build a shoe on them (`j.limb(L.heel, L.ball, ...)`,
+`j.limb(L.ball, L.toe, ...)`), as the blocks' foot runs heel to toe and bends at the ball.
+
+```js
+// facing right, the hips in profile: the rear foot (her right) 60 out, its knee over it; on the punch, its heel up on the ball
+pose: (i) => ({ feet: [[8, -2], [-8, 2]], down: 2, toes: [10, 60], heel: [0, i === 2 ? 3 : 0] })
+```
+
+`pxl check` reads every pose at every heading: both feet off the ground (the lowest point of a sole,
+the toe when the heel is up: it floats; `air: true` on a jump's frames), a leg pulled longer than its
+bones, an elbow bent forward (ahead of the shoulder-hand line), and on a pose that gives `toes` or
+`heel`, a foot bent past its ankle (an ankle bends about 20 degrees up and 45 down from square; past that
+it reads broken: a shin leaning far over a flat foot wants its heel up, or the knee less bent; the flat
+foot of before, under the figures drawn on it, isn't read: their stances, walks and kneels lean a shin
+25 to 105 degrees over it). The elbows bend by a hint, mostly down by default: an arm swung back bends forward with it, so a
 run or a side walk gives its poses `elbow: [-1, 0.5, 0]` (behind him), `[-1, 0.5, -1]` with a hand at or
 over the shoulder; an arm out level behind and one ahead want opposite hints, so keep a hand under the
 shoulder when the other swings (`lib/characters/hero.px.js`'s run).
@@ -1022,9 +1042,10 @@ drawings: the cheaper to draw by hand, and the nearer to flat blocks).
 
 The hips go most of the way to profile while the shoulders twist back toward us. The angles below
 weren't measured on the sprites; they are the `rig3d` settings whose blocks matched the references'
-stances. Facing right: `turn` -70 and `twist` 34, the chest ~54° open to us, `lean` 10. On the punch the
-twist reverses to about -35 (the shoulders turned away, the chest closing), `lean` 20, the rear heel
-up. A first try narrower and more upright (feet 0.43, gap 0.11, line 13°, twist 18) read stiff.
+stances. Facing right: `turn` -70 and `twist` 34, the chest ~54° open to us, `lean` 10; the 3D games
+turn the rear foot out 30–90° from profile (median 60: `toes`, its knee over it). On the punch the twist reverses
+to about -35 (the shoulders turned away, the chest closing), `lean` 20, the rear heel up (`heel`: the
+foot turned on its ball). A first try narrower and more upright (feet 0.43, gap 0.11, line 13°, twist 18) read stiff.
 
 **Pushed parts**, against H: the fist 0.6–0.75 (9×8 to 13×10 px), the foot 0.9–1.2, the waist
 1.5–2.1, across the shoulders with the guard 2.9–3.9 (3S's 3.1 is mostly deltoid); each deltoid about

@@ -467,6 +467,8 @@ From top-down 32's bodies at 48 px (F5 4a-4d, `lib/characters/hero.px.js`'s G32 
 - [ ] **A foot that rolls**: rig3d's foot is a level ball, with no heel strike and no toe-off; `lift`
   raises the whole foot, and a passing or kicked-back foot can't point its toe down to show its sole
   (F5 4f: the slim's passing leg could only change its knee and its place). A pose's `roll` per foot.
+  F5 6a7 did half: `heel` turns a foot on its ball (a toe-off; with `lift`, a swinging foot's toe pointed
+  down) and `toes` turns it out; a heel strike (the toes up, the foot turned on its heel) is still to do.
 - [ ] **Hair and cloth after the body**: the head is baked and the plain outfit has no drapes, so
   nothing lags a frame or two as in every reference (`dress()` has trail and sway).
 - [ ] **A stride seen from above**: a long leg's true stride runs down the screen (the slim's feet

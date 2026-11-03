@@ -253,6 +253,40 @@ test("rig3d: soles puts each heading's soles on the row they end on facing us (a
   assert.throws(() => loadSource(`${PAL}rig3d("g", { blocks: true, soles: 1, moves: { m: { frames: 1, pose: () => ({}) } } })`, "t.px.js"), /soles is true/);
 });
 
+test("rig3d's foot: toes and heel 0 the joints as they were; a foot turned out, its knee over it; a heel up, the foot turned on its ball; pxl check: the toe on the ground, a foot bent past its ankle", () => {
+  const B = bodyOf({ h: 34, heads: 3 }), k = B.r.foot[1] / 2.3;
+  // as rig3d put them before the foot: the knee aimed where the hips face, the foot's middle 1.1 k ahead of the ankle that way, its sole under it
+  for (const p of [{ turn: 0 }, { feet: [[5, -2], [-5, 2]], lift: [0, 2], turn: -30, down: 2 }, { lean: 10, turn: 20, away: 1, down: 1 }]) for (const h of [0, 90, 180, 225]) {
+    const j = jointsOf(B, p, h);
+    assert.deepEqual(jointsOf(B, { ...p, toes: [0, 0], heel: [0, 0] }, h).legs, j.legs);
+    for (const L of j.legs) {
+      assert.deepEqual(L.knee, ik3(L.hip, L.ankle, B.thigh, B.shin, [j.f[0] + 0, j.f[1] + 0, j.f[2] + 0.3]));
+      assert.deepEqual(L.foot, [0, 1, 2].map((e) => L.ankle[e] + j.f[e] * (1.1 * k)));
+      assert.ok([L.heel, L.ball, L.toe].every((q) => Math.abs(q[2] - (L.ankle[2] - B.ankle)) < 1e-9) && L.heading === h + p.turn, `${L.heel} ${L.toe}`);
+    }
+  }
+  const flat = (a: number[], b: number[]) => { const v = [b[0] - a[0], b[1] - a[1]], n = Math.hypot(v[0], v[1]); return [v[0] / n, v[1] / n]; };
+  const deg = (u: number[], v: number[]) => (Math.acos(Math.min(1, u[0] * v[0] + u[1] * v[1])) * 180) / Math.PI;
+  // facing east, the right foot 60 out (toward us): its sole that way, and its knee out over it (seen from above, off the hip-ankle line); the left as it was
+  const a = jointsOf(B, { down: 3 }, 90), o = jointsOf(B, { down: 3, toes: [0, 60] }, 90), R = o.legs[1];
+  const out = (L: (typeof a.legs)[number]) => flat(L.hip.map((v, e) => (v + L.ankle[e]) / 2), L.knee);
+  assert.ok(deg(flat(R.heel, R.toe), [Math.sin((150 * Math.PI) / 180), Math.cos((150 * Math.PI) / 180)]) < 1e-6 && R.heading === 150);
+  assert.ok(deg(out(R), flat(R.heel, R.toe)) < 1 && deg(out(a.legs[1]), flat([0, 0], a.f)) < 1, `${out(R)} ${out(a.legs[1])}`);
+  assert.deepEqual(o.legs[0], a.legs[0]);
+  // the right heel up 1.5: the ball and the toe where they were, the heel 1.5 higher, the ankle as far from the ball (on the arc round it), up and nearer it
+  const u = jointsOf(B, { down: 3, heel: [0, 1.5] }, 90), F = a.legs[1], U = u.legs[1];
+  assert.deepEqual(u.legs[0], a.legs[0]);
+  assert.ok(dist(U.ball, F.ball) < 1e-9 && dist(U.toe, F.toe) < 1e-9 && Math.abs(U.heel[2] - F.heel[2] - 1.5) < 1e-9, `${U.heel} ${F.heel}`);
+  assert.ok(Math.abs(dist(U.ankle, U.ball) - dist(F.ankle, F.ball)) < 1e-9 && U.ankle[2] > F.ankle[2] + 0.5 && Math.hypot(U.ankle[0] - U.ball[0], U.ankle[1] - U.ball[1]) < Math.hypot(F.ankle[0] - F.ball[0], F.ankle[1] - F.ball[1]));
+  // pxl check: the sole's lowest point on the ground (a heel up doesn't float); a deep bend over a flat foot, and a heel up past 45 down, bend it past
+  // the ankle, read on the poses that give the foot (toes or heel: one that gives neither keeps the flat foot of before, unread)
+  assert.ok(Math.abs(poseFlaws(B, u).floats) < 1e-9 && poseFlaws(B, jointsOf(B, {}, 90)).ankle === 0 && poseFlaws(B, a).ankle > 20);
+  const p = loadSource(`${PAL}rig3d("f", { headings: ["e"], blocks: true, moves: { m: { frames: 4, pose: (i) => [{ heel: [0, 1] }, { down: 3, toes: [0, 0] }, { heel: [0, 3.4] }, { down: 3 }][i] } } })`, "t.px.js");
+  const lines = checkProject(p).lines.filter((l) => l.startsWith("f ›"));
+  assert.equal(lines.length, 1, lines.join("\n"));
+  assert.match(lines[0], /^f › m e › WARNING: a foot bent past its ankle \(up to \d+ degrees past .*\(frames 1-2\)$/);
+});
+
 test("surface: pieces of one part parted by its own darkest tone, parts by the line; decal: depth, how far a nearer surface may be and still take it", () => {
   const p = loadSource(`${PAL}
 ramps("kgw", "krw")
