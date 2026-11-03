@@ -142,9 +142,15 @@ sprite's, an anim's, and `rig3d()` and `turnaround()` pass it on): a `"character
 round; an `"own"` one a line all round outside its fill, each edge pixel over 0.08 of lightness darker
 than what is a px or two inside it and none near-black (`pxl study`'s measure; a line beside a
 near-black inside, a hole or a black pattern, passes), its warning saying the share of the edge that
-isn't, on its lit side (up and left) and away from the light, past 2% of it (two lines meeting). A
-category its `ink` doesn't name (the ground cover, tiles, UI, effects), an asset with none, and a
-string `ink` aren't read. See scenes.md, "Profiles".
+isn't, on its lit side (up and left) and away from the light, past 2% of it (two lines meeting). An
+`ink` of `"material"` (the whole `ink`, every category; or one category's) is a line by material, KOF's
+(`fighting`): each edge pixel at least as dark as its material's fill a px or two inside it, where a
+ramp of the asset's palette holds both (no later along it), two colors in no ramp by lightness (not
+over 0.08 lighter); the ink, and another material's line or the ink beside it, pass. Its warning counts
+the pixels lighter than the fill inside them (a lit tone on the edge, or a line a px in), past 2%; what
+ran says the share of the edge near-black, never a warning. A category its `ink` doesn't name (the
+ground cover, tiles, UI, effects), an asset with none, and another string `ink` aren't read. See
+scenes.md, "Profiles".
 
 `card(name, { is, cells, vary?, tiles?, category?, draw? })`, just after what it describes, is a library entry's
 card: what its code can't show. `name` is an asset, group, `rig3d()` figure, `turnaround()` family

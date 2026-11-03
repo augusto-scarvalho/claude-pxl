@@ -78,7 +78,9 @@ Reva's chibi), the villager and the elder at 48 px on the slim body (`villagers3
 walk, run and the sword attack with its crescent) and on its chibi body (`chibi_*`, to approve), the same hero side on for a platformer (`hero_side.px.js`,
 `platformer16`: idle, walk, run and sprint (a run that speeds up), a dash with its afterimage and dust, a jump in four to loop the rise and the fall (jump, apex,
 fall, land), hurt, a ladder's climb and his back at a door), a slime (also at 32),
-the knight, a beetle that walks and a bat that flies (a platformer's enemies).
+the knight, a beetle that walks and a bat that flies (a platformer's enemies); Reva the fighter, 110 px side on in KOF
+2002's school (`reva_fighter.px.js`, `fighting`: idle, a strike and hurt, her parts drawn by hand on a 2D rig, hurt and
+hit boxes and frame data, 3 palette slots on her sheet).
 
 ![characters](../docs/gallery/lib/characters.png)
 

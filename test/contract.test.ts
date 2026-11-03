@@ -101,7 +101,7 @@ anim("odd", { frames: 2, fps: 10, w: 1, h: 1, genre: "fightin" }, (c) => c.px(0,
 test("genre checks: its ink by category (a character near-black all round, \"own\" a line all round darker than its fill, its lit side named); a sprite's ink lines a drawing all round, one geometry every side, an L's elbow the fill's", () => {
   // a box lit from the upper left, its darkest along its lower right (a hand pass's line there: fill to the ink)
   const p = loadSource(PAL + `genre("td", { ink: { character: "#1a1620", prop: "own" } })
-genre("said", { ink: "material" })
+genre("said", { ink: "selout, by hand" })
 sprite("_box", { w: 8, h: 8 }, (c) => { c.rect(1, 1, 6, 6, "#e8763e"); c.rect(6, 1, 1, 6, "#6e2420"); c.rect(1, 6, 6, 1, "#6e2420") })
 sprite("box", { base: "_box", ink: [["#4a0e02", "#832e24", "#6e2420", "#e8763e"]], genre: "td", category: "prop" })
 sprite("bare", { base: "_box", genre: "td", category: "prop" })
@@ -123,6 +123,31 @@ sprite("step", { w: 8, h: 8, ink: [["#4a0e02", "#832e24", "#e8763e"]] }, (c) => 
   assert.match(r.coverage, /genres' ink by category on 3 frames/);
   assert.throws(() => loadSource(PAL + `sprite("x", { w: 4, h: 4, ink: [["#6e2420", "#832e24", "#e8763e"]] }, (c) => c.rect(1, 1, 2, 2, "#ffffff"))`, "t.px.js").image("x"), /ink: #ffffff at its edge is in none of its ramps/);
   assert.throws(() => loadSource(PAL + `sprite("x", { w: 1, h: 1, category: "prop" })`, "t.px.js"), /category is what it is by its genre's ink.*and no genre/);
+});
+
+test("genre checks: an ink \"material\" (KOF's line), each edge pixel at least as dark as its material's fill inside it, the near-black share said", () => {
+  // a block of the fill: its lit tone on the top and left edges over the fill (later along the ramp), lined in its
+  // darkest, the fill to the edge (unlined), in the ink, its darkest over the ink (the ink a ramp starts at is no fill);
+  // two colors in no ramp, a white rim over grey (by lightness)
+  const block = (k: string) => `(c) => { c.rect(1, 1, 6, 6, "${k}") }`;
+  const p = loadSource(`pal({ k: "#1a1220", D: "#6e2420", d: "#b4452c", l: "#e8763e" })
+ramps("kDdl")
+genre("kof", { ink: "material" })
+genre("one", { ink: { character: "material", prop: "own" } })
+sprite("rim", { w: 8, h: 8, genre: "kof", category: "character" }, ${block("d")}, (c) => { c.rect(1, 1, 6, 1, "l"); c.rect(1, 1, 1, 6, "l") })
+sprite("lined", { w: 8, h: 8, genre: "kof", category: "character" }, ${block("D")}, (c) => c.rect(2, 2, 4, 4, "d"))
+sprite("flat", { w: 8, h: 8, genre: "one", category: "character" }, ${block("d")})
+sprite("inked", { w: 8, h: 8, genre: "kof", category: "character" }, ${block("k")}, (c) => c.rect(2, 2, 4, 4, "l"))
+sprite("behind", { w: 8, h: 8, genre: "kof", category: "character" }, ${block("D")}, (c) => { c.rect(2, 2, 4, 4, "k"); c.rect(3, 3, 2, 2, "d") })
+sprite("pale", { w: 8, h: 8, genre: "kof", category: "prop" }, ${block("#808080")}, (c) => c.rect(1, 1, 6, 1, "#ffffff"))`, "t.px.js");
+  const r = checkProject(p);
+  assert.equal(r.lines.length, 2, r.lines.join("\n"));
+  // (the corner's own tone runs on both ways in: nothing to weigh it against; the two other corners face up and right, down and left)
+  assert.match(r.lines[0], /^rim › WARNING: genre 'kof': a character's edge is a line by material, each pixel at least as dark as its material's fill inside it, or the ink \(its ink's "material"\), but 50% of its edge isn't, 40% on its lit side \(up and left\) and 10% away from the light: 10 px lighter than the fill inside them/);
+  assert.match(r.lines[1], /^pale › WARNING: genre 'kof': a prop's edge is a line by material.*: 6 px lighter than the fill inside them/);
+  // the ink's 20 edge pixels of 120, said and never flagged
+  assert.match(r.coverage, /genres' ink by material on 6 frames \(17% of the edge near-black\)/);
+  assert.doesNotMatch(r.coverage, /ink by category/);
 });
 
 test("genre checks: a family stands as tall over its ground point in every direction (action top-down)", () => {

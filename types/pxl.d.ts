@@ -188,7 +188,7 @@ declare global {
     checks?: ("ground" | "height" | "footprint")[];
     /** the tones a turnaround() or rig3d() naming it draws its surface in (where its surface gives none); a range or by size: notes */
     tones?: number | [number, number] | Record<string, number>;
-    /** its line: a color all round (surface's ink; pxl lib draft draws it), or by category ({ character: "#1a1620", tree: "selective" }), or words */
+    /** its line: a color all round (surface's ink; pxl lib draft draws it), or by category ({ character: "#1a1620", tree: "selective" }), "material" (a line by material, KOF's: pxl check reads each edge pixel no lighter than its material's fill inside it), or words */
     ink?: string | Record<string, unknown>;
     /** densities mixed on purpose (HD-2D's sprites in a finer world): pxl check doesn't warn at the mix */
     mix?: boolean;

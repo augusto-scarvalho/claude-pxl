@@ -1053,7 +1053,9 @@ rig3d("hero", { body: { h: TOPDOWN.scale.character[0] * TOPDOWN.grid, heads: TOP
   category or in words the file reads it. By category, `pxl check` reads it on what names the genre
   and its `category` (`{ genre: "topdown32", category: "prop" }`): `character` near-black all round,
   `"own"` a line all round in the part's own darks, none near-black (a 2D sprite's `ink: [ramps]`, a
-  3D one's `surface: { ink: 2 }`); a string `ink`, or a category it doesn't name, unread. A
+  3D one's `surface: { ink: 2 }`); `"material"`, the whole `ink` or a category's, a line by material
+  (KOF's, `fighting`'s): no edge pixel lighter than its material's fill inside it, the ink passing, its
+  near-black share said; another string `ink`, or a category it doesn't name, unread. A
   builder's texture in screen px (the drawing call's ppm, environment §3). An approved cell is frozen (`frozen`): pxl check says when the live render
   drifted from it.
 

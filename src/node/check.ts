@@ -59,7 +59,7 @@ const frameImgs = (p: Project, n: string) => (p.assets.get(n)!.kind === "anim" ?
  * where it meets the ground (its footprint box, a turnaround()'s), within a px, in every frame (what is
  * nearer us may hang lower: a bumper seen from above).
  */
-function genreLines(p: Project, name: string, ran: { genre: number; ink: number }): string[] {
+function genreLines(p: Project, name: string, ran: { genre: number; ink: number; material: number; black: number; edge: number }): string[] {
   const gn = p.assets.get(name)!.opts.genre!, g = p.genres.get(gn), out: string[] = [];
   if (!g) return [`${name} › WARNING: genre '${gn}' is no genre() here${didYouMean(gn, p.genres.keys())}${p.genres.size ? ` (there are: ${[...p.genres.keys()].join(", ")})` : ""}: its checks didn't run`];
   const fr = frameImgs(p, name), low = fr.map((im) => { const b = im.bounds(); return b ? b.y + b.h - 1 : -1; });
@@ -81,26 +81,41 @@ function genreLines(p: Project, name: string, ran: { genre: number; ink: number 
     const off = said((i) => { const f = fr[i].boxes?.footprint?.[0]; return f && low[i] + 1 < f[1] + f[3] - 1 ? `${low[i]}, its footprint's ${f[1] + f[3] - 1}` : undefined; });
     if (off.length) out.push(`${name} › WARNING: genre '${gn}': its drawing doesn't reach where it meets the ground: its lowest row is ${off.join("; ")}: drawn lifted, or its wheels or feet hidden or cut, it floats there`);
   }
-  // its ink by its category (a key of the genre's ink, an object; a string ink, or a key it doesn't name, unread): a
+  // its ink by its category (a key of the genre's ink, an object; another string ink, or a key it doesn't name, unread): a
   // character's edge near-black all round; "own", a line all round outside its fill, each pixel darker than the fill
   // inside it and none near-black (pxl study's measure, edgeOf); its lit side the edge facing the upper left; past 2% of
-  // its edge (all its frames together)
-  const cat = p.assets.get(name)!.opts.category, ink = g.ink as Record<string, unknown> | undefined;
-  const rule = cat !== undefined && typeof ink === "object" && ink !== null && !Array.isArray(ink) && cat in ink ? (cat === "character" ? "character" : ink[cat] === "own" ? "own" : undefined) : undefined;
+  // its edge (all its frames together). "material" (the whole ink, or a category's): a line by material (KOF's), each
+  // edge pixel at least as dark as its material's fill a px or two inside it (a ramp holding both: no later along it;
+  // two colors in no ramp, by lightness: not over 0.08 lighter), the ink, and another material's line or the ink beside
+  // it, passing; its near-black share said in what ran, never a warning
+  const def = p.assets.get(name)!, cat = def.opts.category, ink = g.ink as unknown;
+  const rule = cat === undefined ? undefined : ink === "material" ? "material" : typeof ink === "object" && ink !== null && !Array.isArray(ink) && cat in ink
+    ? ((ink as Record<string, unknown>)[cat] === "material" ? "material" : cat === "character" ? "character" : (ink as Record<string, unknown>)[cat] === "own" ? "own" : undefined) : undefined;
+  const ramps = rule === "material" ? def.pal.ramps.map((r) => [...r].map((k) => def.pal.resolve(k) as Color)) : [];
+  const lighter = (c: Color, n: Color) => {
+    // (the ink a ramp starts at isn't a fill: the ramps' first key, near-black)
+    if (ramps.some((r) => r[0] === n && lch(n).L < 0.3 && lch(n).C < 0.08)) return false;
+    const r = ramps.find((r) => r.includes(c) && r.includes(n));
+    return r ? r.indexOf(c) > r.indexOf(n) : !ramps.some((r) => r.includes(c) || r.includes(n)) && lch(c).L - lch(n).L > 0.08;
+  };
   if (rule) {
-    ran.ink += fr.length;
+    ran[rule === "material" ? "material" : "ink"] += fr.length;
     let n = 0;
     const bad = { lit: 0, away: 0, black: 0, fill: 0 }, at: number[] = [];
     fr.forEach((im, i) => {
       // (a line beside a near-black inside, a hole or a black pattern, can't be darker than it and not near-black)
-      const e = edgeOf(im), wrong = e.filter((q) => (rule === "character" ? q.kind !== "black" : q.kind === "black" || (q.kind === "none" && !(q.inner !== undefined && lch(q.inner).L < 0.3 && lch(q.inner).C < 0.08))));
+      const e = edgeOf(im), wrong = e.filter((q) => (rule === "character" ? q.kind !== "black" : rule === "material" ? q.kind !== "black" && q.inner !== undefined && lighter(q.c, q.inner) : q.kind === "black" || (q.kind === "none" && !(q.inner !== undefined && lch(q.inner).L < 0.3 && lch(q.inner).C < 0.08))));
+      if (rule === "material") { ran.black += e.filter((q) => q.kind === "black").length; ran.edge += e.length; }
       n += e.length;
       if (wrong.length) at.push(i);
       for (const q of wrong) { bad[q.out[0] + q.out[1] < 0 ? "lit" : "away"]++; bad[q.kind === "black" ? "black" : "fill"]++; }
     });
     const pc = (k: number) => (k && k < n / 100 ? "under 1%" : `${Math.round((100 * k) / n)}%`), all = bad.lit + bad.away;
-    const want = rule === "character" ? `near-black all round (its ink's "character")` : `a line all round outside its fill, each pixel darker than the fill inside it, none near-black (its ink's "own")`;
-    const why = rule === "own" ? `: ${[bad.black ? `${bad.black} px near-black` : "", bad.fill ? `${bad.fill} px no darker than inside it (the fill, unlined)` : ""].filter(Boolean).join(", ")}` : "";
+    const want = rule === "character" ? `near-black all round (its ink's "character")`
+      : rule === "material" ? `a line by material, each pixel at least as dark as its material's fill inside it, or the ink (its ink's "material")`
+      : `a line all round outside its fill, each pixel darker than the fill inside it, none near-black (its ink's "own")`;
+    const why = rule === "own" ? `: ${[bad.black ? `${bad.black} px near-black` : "", bad.fill ? `${bad.fill} px no darker than inside it (the fill, unlined)` : ""].filter(Boolean).join(", ")}`
+      : rule === "material" ? `: ${bad.fill} px lighter than the fill inside them (a lit tone, or a line behind the edge)` : "";
     // (two pixels in a hundred pass: where two lines meet, or a line folds on itself, three deep)
     if (all > n / 50) out.push(`${name} › WARNING: genre '${gn}': a ${cat}'s edge is ${want}, but ${pc(all)} of its edge isn't, ${pc(bad.lit)} on its lit side (up and left) and ${pc(bad.away)} away from the light${why}${fr.length > 1 && at.length < fr.length ? ` (frame${at.length > 1 ? "s" : ""} ${ranges(at)})` : ""}`);
   }
@@ -269,7 +284,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, ink: 0, frozen: 0, cards: 0, density: 0, edges: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, ink: 0, material: 0, black: 0, edge: 0, frozen: 0, cards: 0, density: 0, edges: 0 };
   let cellsBy: Map<string, string[]> | undefined;
   let lightSaid = false, groundSaid = false, fixes: CheckResult["fixes"], rulesAll = 0, rulesHeld = 0;
   const failed: string[] = [];
@@ -522,6 +537,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.boxes) run.push(`boxes on ${ran.boxes} frame${ran.boxes > 1 ? "s" : ""}`);
   if (ran.genre) run.push(`genres' checks on ${ran.genre} frame${ran.genre > 1 ? "s" : ""}`);
   if (ran.ink) run.push(`genres' ink by category on ${ran.ink} frame${ran.ink > 1 ? "s" : ""}`);
+  if (ran.material) run.push(`genres' ink by material on ${ran.material} frame${ran.material > 1 ? "s" : ""} (${Math.round((100 * ran.black) / Math.max(ran.edge, 1))}% of the edge near-black)`);
   if (ran.frozen) run.push(`frozen cells against their live render on ${ran.frozen}`);
   if (ran.cards) run.push(`cards' cells against their drawing on ${ran.cards}`);
   if (ran.density) run.push(`densities on ${ran.density}`);
