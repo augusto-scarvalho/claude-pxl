@@ -442,22 +442,23 @@ export function viewWarnings(set: { name: string; views: [string, Rows | undefin
  * far an elbow lies on the wrong side of its shoulder-hand line: ahead of it as he faces, while the hand is
  * below the shoulder (seen from the side, the elbow's side turns with the arm: under the line of a hand
  * raised ahead, ahead of a hand overhead; an arm out sideways isn't read); and in degrees, how far a foot is bent
- * past its ankle: the shin's lean along the foot from square, over the toes up to 20, back (the heel up) to 45. More
- * than half a pixel (or a degree) warns: `FLAWS` says each.
+ * past its ankle: the shin's lean along the foot from square, over the toes up to 40 (an ankle with the weight on
+ * it and its knee bent, as in every standing pose; 20 off the ground with the knee straight), back (the heel up) to
+ * 45. More than half a pixel (or a degree) warns: `FLAWS` says each.
  */
 export function poseFlaws(B: Body, j: Joints): { floats: number; reach: number; elbow: number; ankle: number } {
   const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   const elbow = Math.max(...j.arms.map((A) => { const back = cross(unit(sub(A.hand, A.sh)), j.sh.r), n = len(back); return n < 0.3 ? 0 : -dot(sub(A.elbow, A.sh), back) / n; }));
   const ankle = Math.max(...j.legs.map((L) => {
     const fw = unit(sub(L.ball, L.heel)), up = unit(sub(UP, mul(fw, fw[2]))), s = sub(L.knee, L.ankle), a = (Math.atan2(dot(s, fw), dot(s, up)) * 180) / Math.PI;
-    return Math.max(0, a - 20, -45 - a);
+    return Math.max(0, a - 40, -45 - a);
   }));
   return { floats: Math.min(...j.legs.map((L) => Math.min(L.heel[2], L.toe[2]))), reach: Math.max(...j.legs.map((L) => len(sub(L.ankle, L.hip)) - B.thigh - B.shin)), elbow, ankle };
 }
 export const FLAWS = {
   floats: (v: number) => `both feet off the ground (up to ${v.toFixed(1)} px): it floats`,
   reach: (v: number) => `a leg longer than its bones (by up to ${v.toFixed(1)} px): its foot out of reach; lower the pelvis or bring the foot in`,
-  ankle: (v: number) => `a foot bent past its ankle (up to ${Math.round(v)} degrees past what an ankle bends: 20 up, 45 down from square): a shin leaning far over its toes wants its heel up (heel), one leaning back the foot under the knee or the heel lower`,
+  ankle: (v: number) => `a foot bent past its ankle (up to ${Math.round(v)} degrees past what an ankle bends: 40 up with the weight on it, 45 down from square): a shin leaning far over its toes wants its heel up (heel), one leaning back the foot under the knee or the heel lower`,
   elbow: (v: number) => `an elbow bent the wrong way (up to ${v.toFixed(1)} px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder)`,
 };
 

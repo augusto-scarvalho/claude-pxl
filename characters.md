@@ -216,7 +216,7 @@ pose: (i) => ({ feet: [[8, -2], [-8, 2]], down: 2, toes: [10, 60], heel: [0, i =
 `pxl check` reads every pose at every heading: both feet off the ground (the lowest point of a sole,
 the toe when the heel is up: it floats; `air: true` on a jump's frames), a leg pulled longer than its
 bones, an elbow bent forward (ahead of the shoulder-hand line), and on a pose that gives `toes` or
-`heel`, a foot bent past its ankle (an ankle bends about 20 degrees up and 45 down from square; past that
+`heel`, a foot bent past its ankle (an ankle with the weight on it and its knee bent bends about 40 degrees up, 20 off the ground with the knee straight, and 45 down from square; past that
 it reads broken: a shin leaning far over a flat foot wants its heel up, or the knee less bent; the flat
 foot of before, under the figures drawn on it, isn't read: their stances, walks and kneels lean a shin
 25 to 105 degrees over it). The elbows bend by a hint, mostly down by default: an arm swung back bends forward with it, so a

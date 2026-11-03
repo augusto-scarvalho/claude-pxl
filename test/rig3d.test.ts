@@ -280,7 +280,7 @@ test("rig3d's foot: toes and heel 0 the joints as they were; a foot turned out, 
   assert.ok(Math.abs(dist(U.ankle, U.ball) - dist(F.ankle, F.ball)) < 1e-9 && U.ankle[2] > F.ankle[2] + 0.5 && Math.hypot(U.ankle[0] - U.ball[0], U.ankle[1] - U.ball[1]) < Math.hypot(F.ankle[0] - F.ball[0], F.ankle[1] - F.ball[1]));
   // pxl check: the sole's lowest point on the ground (a heel up doesn't float); a deep bend over a flat foot, and a heel up past 45 down, bend it past
   // the ankle, read on the poses that give the foot (toes or heel: one that gives neither keeps the flat foot of before, unread)
-  assert.ok(Math.abs(poseFlaws(B, u).floats) < 1e-9 && poseFlaws(B, jointsOf(B, {}, 90)).ankle === 0 && poseFlaws(B, a).ankle > 20);
+  assert.ok(Math.abs(poseFlaws(B, u).floats) < 1e-9 && poseFlaws(B, jointsOf(B, {}, 90)).ankle === 0 && poseFlaws(B, a).ankle > 10);
   const p = loadSource(`${PAL}rig3d("f", { headings: ["e"], blocks: true, moves: { m: { frames: 4, pose: (i) => [{ heel: [0, 1] }, { down: 3, toes: [0, 0] }, { heel: [0, 3.4] }, { down: 3 }][i] } } })`, "t.px.js");
   const lines = checkProject(p).lines.filter((l) => l.startsWith("f ›"));
   assert.equal(lines.length, 1, lines.join("\n"));
