@@ -393,10 +393,10 @@ test file for what you changed, or the quick suite:
 node --test test/docs.test.ts                            # one file: the commands and flags the docs cite
 npm run test:quick                                       # every test but the two slowest, 9 to 16 s (45 after a change to pxl's sources)
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts      # the examples check, on one folder (or hd2d/harbor, or a,b)
-npm run check                                            # types and every test, 13 to 20 s (2 min after an engine change): before the commit
+npm run check                                            # types and every test, 13 s (26 after a lib file's edit, 4 min after an engine change): before the commit
 ```
 
-The two slowest tests are the check of every example (70 to 120 s on a 4-core laptop when all 69
+The two slowest tests are the check of every example (3.5 min on a 4-core laptop when all 121
 run, in one thread per four of the machine's, the slowest of the last run first) and the study of
 the gallery's GIFs (7 to 27 s); a change to a check, to `study` or to an example is what they
 catch. Both leave alone what already passed. Each example that passed is noted in
@@ -412,9 +412,12 @@ or writing docs changes none of them, so the suite then runs only `docs.test.ts`
 which read more than they could list (the guides and every file they link to; `pxl help` over the
 examples, git, the scripts). A new test file starts with
 `const test = whenChanged("test/<file>.test.ts", [what else it reads])` (`test/passed.ts`), naming
-any example, doc or fixture it reads; one that can't say what it reads keeps node:test's `test`.
-Delete `examples-passed.json`, `gallery-passed.txt` or a `<file>-passed.txt` there to run them
-anyway.
+any example, doc or fixture it reads, and what an art file it names includes (its other files, its
+PNGs); one that can't say what it reads keeps node:test's `test`. A cached test file that reads a
+file it doesn't name fails, naming it, and an example whose check reads a file the loader didn't
+count (`p.files`) says so in its lines: the cache is trusted, so run `npm run check` as it is.
+Delete `examples-passed.json`, `gallery-passed.txt` or a `<file>-passed.txt` there only for a clean
+run (a measurement: about 4 minutes of all four cores).
 
 The suite runs three test files at a time, below normal priority, as `pxl` itself does: on a 4-core
 laptop seven at a time took as long, burned a fifth more processor and froze the user's programs.
@@ -498,7 +501,7 @@ Agents run `pxl shot`, `check` and `study` many times a session, and the test su
 every example: a slow path costs every turn. Before and after a change to the engine:
 
 ```sh
-npm run check                                           # types and tests: an engine change rechecks every example, about 2 min
+npm run check                                           # types and tests: an engine change rechecks every example, about 4 min
 node scripts/hashes.ts --vs HEAD                        # every example's assets built by the last commit's pxl and by yours: what differs
 node scripts/hashes.ts --vs HEAD --frames 12 examples/hd2d/graveyard.px.js   # the animated ones' frames too, 12 over each loop (--frames: all)
 node scripts/perf.ts                                    # pxl check's time, processor time and peak memory on every example

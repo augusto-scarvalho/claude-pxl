@@ -15,7 +15,8 @@ import { sdf } from "../src/core/sdf.ts";
 import { bodyOf } from "../src/core/rig3d.ts";
 import { whenChanged } from "./passed.ts";
 
-const test = whenChanged("test/detail.test.ts", ["lib/nature/trees.px.js"]);
+const test = whenChanged("test/detail.test.ts", ["lib/nature/trees.px.js", "lib/styles/hand32.px.js", "lib/profiles/topdown32.px.js",
+  ...["momiji_td16", "momiji_td32", "oak_td16", "oak_td32"].map((n) => `lib/nature/frozen/${n}.png`)]);
 
 test("make3d.tree given its ppm: leaves a 3 px brush, none nearer than make3d.px.cluster; without it the meters it had", () => {
   assert.deepEqual([tree({ leaves: 28 }).details.leaves.count, tree({ leaves: 28 }).details.leaves.size], [28, 0.1]);
@@ -146,6 +147,7 @@ sprite("brushed", { base: "cell" }, px(0, 0, "g"))`;
   try {
     writeFileSync(file, src("w"));
     let p = loadProject(file);
+    assert.ok(p.files.includes(join(dir, "cell.png")), "counted before it's written: the tests' cache checks it again when it comes");
     writeOutputs(p, join(dir, "out"), { preview: false });
     assert.ok(existsSync(join(dir, "cell.png")));
     writeFileSync(file, src("k"));

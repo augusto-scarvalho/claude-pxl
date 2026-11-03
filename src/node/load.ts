@@ -74,7 +74,8 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
     p.addFile(abs); // the live viewer rebuilds when it changes
     try { return decodePng(bytes); } catch (e) { throw new PxError(`${abs}: ${(e as Error).message}`); }
   };
-  p.whereHook = (path) => { const abs = near(path); return { abs, there: existsSync(abs) }; };
+  // (counted while it isn't there too: the build writes it, and what watches p.files sees it come)
+  p.whereHook = (path) => { const abs = near(path); p.addFile(abs); return { abs, there: existsSync(abs) }; };
   p.readHook = (path) => {
     const abs = near(path);
     try {

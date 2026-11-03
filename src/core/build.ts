@@ -42,6 +42,8 @@ export interface BuildOut {
   img: Img;
   layers: LayerOut[];
   trace?: Trace;
+  /** The ops it painted with (the outermost calls, its layers' too), in the order first used: what pxl lib and check's cards read it is drawn with. */
+  ops?: Set<string>;
   /** Set when the asset is animated (an anim, or places one). */
   anim?: Timeline;
   /** The tilemaps it placed, cell by cell (for a Tiled export). */
@@ -280,9 +282,9 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     : undefined;
   if (snap && def.kind === "scene") snap("background", def.loc);
 
+  const ops = new Set<string>();
   const hook = (c: Canvas, tag = "") => {
-    if (!snap) return;
-    c.onOp = (name, args) => snap(`${name}(${fmtArgs(args)})${tag}`, c.loc ?? ctx.callerLoc());
+    c.onOp = snap ? (name, args) => { ops.add(name); snap(`${name}(${fmtArgs(args)})${tag}`, c.loc ?? ctx.callerLoc()); } : (name) => ops.add(name);
   };
 
   const layers: LayerOut[] = [];
@@ -448,7 +450,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   if (whole && cam) for (let i = 0; i < opts.w!; i++) for (let j = 0; j < opts.h!; j++) if (!i || !j || i === opts.w! - 1 || j === opts.h! - 1) img.set(cam[0] + i, cam[1] + j, pack(255, 0, 255));
   trace?.finish(img);
   const guide = refs.length ? guideOver(img, refs, def) : undefined;
-  return { img, layers, trace, anim: tl, placements: log, ...(lamps ? { lamps } : {}), ...(tick ? { clocked: true } : {}), ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}),
+  return { img, layers, trace, ops, anim: tl, placements: log, ...(lamps ? { lamps } : {}), ...(tick ? { clocked: true } : {}), ...(maps.length ? { tilemaps: maps } : {}), ...(guide ? { guide, refs } : {}), ...(under ? { under } : {}),
     ...(cam ? { camera: { at: cam, world: (opts.camera as CameraOpts).world, shift } } : {}) };
 }
 

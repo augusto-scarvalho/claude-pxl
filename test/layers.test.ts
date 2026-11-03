@@ -7,7 +7,7 @@ import { main } from "../src/node/cli.ts";
 import { loadSource } from "../src/node/load.ts";
 import { whenChanged } from "./passed.ts";
 
-const test = whenChanged("test/layers.test.ts", ["lib/nature/kit.px.js", "lib/styles/nature.px.js"]);
+const test = whenChanged("test/layers.test.ts", ["lib/nature/kit.px.js", "lib/styles/nature.px.js", "lib/profiles/topdown32.px.js", "lib/nature/frozen/spruce_td16.png", "lib/nature/frozen/spruce_td32.png"]);
 
 const LIT = '{ light: [1, 0], reach: 1, ramps: ["1d6"] }';
 

@@ -13,8 +13,9 @@ import { encodePng } from "../src/node/png.ts";
 import { failure } from "./helpers.ts";
 import { whenChanged } from "./passed.ts";
 
-const LIB = (readdirSync("lib", { recursive: true }) as string[]).filter((f) => f.endsWith(".px.js")).map((f) => `lib/${f.replaceAll("\\", "/")}`).sort();
-const test = whenChanged("test/lib.test.ts", LIB);
+// what it reads: the library's art files and PNGs (pxl lib loads them all), and the examples' kept lines
+const LIB = (readdirSync("lib", { recursive: true }) as string[]).filter((f) => /\.(px\.js|png)$/.test(f)).map((f) => `lib/${f.replaceAll("\\", "/")}`).sort();
+const test = whenChanged("test/lib.test.ts", [...LIB, "test/examples.checks.txt"]);
 
 test("card(): kept by its full name, its data given back; a name or an asset it can't find fails at its line", () => {
   const p = loadSource(`sprite("_post", "1"); card("_post", { is: "a post", cells: { "side/16": "✓", "hd2d/24": ["◐", "_post"] } })\nsprite("_back", { w: card("_post").is.length }, "1")`);
@@ -287,5 +288,6 @@ card("_post", { is: "a post", cells: { "side/16": "◐" } })`);
   assert.match(lines, /_ball \(art\.px\.js:3:1\) › WARNING: its card's cell side\/16 is ✓, but '_ball' is a live 3D sprite: freeze it/);
   assert.match(lines, /cell iso\/16 is ✎ \(by hand over a 3D draft\), but '_ball' is the 3D render alone/);
   assert.match(lines, /_post .*cell side\/16 is ◐ \(a 3D render to look at\), but '_post' is drawn by hand/);
-  for (const f of LIB) assert.deepEqual(cardLines(loadProject(f, { checksOnly: true }), f.replace(/^.*\//, "")).lines, [], f);
+  // clean on lib/: examples.test.ts runs pxl check (these card lines too) on every lib file against its kept lines, which say none
+  assert.doesNotMatch(readFileSync("test/examples.checks.txt", "utf8"), /^lib\/.*\n(?: {2}.*\n)*? {2}.*its card's cell/m);
 });

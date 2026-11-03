@@ -4,9 +4,8 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { PxError, didYouMean } from "../core/errors.ts";
-import { animTimeline, buildAsset } from "../core/build.ts";
+import { animTimeline } from "../core/build.ts";
 import type { Img } from "../core/image.ts";
-import { Trace } from "../core/trace.ts";
 import { type Card, type Project, CELL, cellOf } from "../core/project.ts";
 import { loadProject } from "./load.ts";
 import { writeOutputs } from "./output.ts";
@@ -29,8 +28,12 @@ function takeOf(abs: string): { take?: string; as?: string; opts?: string } {
 /** A genre() of lib/profiles: its cell, its file, its data. */
 export interface LibGenre { cell: string; file: string; g: Record<string, unknown> & { name: string } }
 
+// ponytail: read once a process (a pxl lib command reads it once, lib.test.ts a dozen times, 3 s each); a
+// long-lived caller (the viewer) would key it on lib/'s files
+let known: ReturnType<typeof readCatalog> | undefined;
 /** Every lib file loaded (no builds): its own cards as entries, and the genres of lib/profiles. */
-export function catalog(): { files: Map<string, string[]>; entries: Entry[]; genres: Map<string, LibGenre> } {
+export const catalog = () => (known ??= readCatalog());
+function readCatalog(): { files: Map<string, string[]>; entries: Entry[]; genres: Map<string, LibGenre> } {
   const files = new Map<string, string[]>(), entries: Entry[] = [], genres = new Map<string, LibGenre>();
   const subjects = readdirSync(LIB, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
   for (const subject of subjects) for (const f of readdirSync(join(LIB, subject)).filter((f) => f.endsWith(".px.js")).sort()) {
@@ -108,19 +111,17 @@ export function findEntry(name: string, entries = catalog().entries): Entry {
 }
 
 /**
- * What an asset is drawn with: the ops a build of its frame 0 painted with, its base followed to its
- * source, the 3D ones apart; or frozen (a render kept as a PNG; `hand` its retouch over it by `base`), or
- * imported (a png).
+ * What an asset is drawn with: the ops its frame 0's build painted with (the one pxl check made already:
+ * building it again, traced, took most of a lib file's check), its base followed to its source, the 3D
+ * ones apart; or frozen (a render kept as a PNG; `hand` its retouch over it by `base`), or imported (a png).
  */
 export function drawnWith(p: Project, name: string): { three: string[]; hand: string[]; frozen?: boolean; png?: boolean } {
   let d = p.assets.get(name)!, over = false;
   for (let i = 0; i < 8 && typeof d.opts.base === "string" && !d.opts.frozen; i++) { over ||= d.items.length > 0; d = p.assets.get(d.opts.base) ?? p.assets.get((d.ns ?? "") + d.opts.base) ?? d; }
   if (d.opts.frozen) return { three: [], hand: over ? ["retouch"] : [], frozen: true };
   if (d.png) return { three: [], hand: [], png: true };
-  const tr = new Trace(), ops = new Set<string>();
-  buildAsset(p, d, 0, tr);
-  for (const f of tr.frames) { const m = /^([\w.]+)\(/.exec(f.label); if (m) ops.add(m[1]); }
-  return { three: [...ops].filter((o) => THREE.has(o)), hand: [...ops].filter((o) => !THREE.has(o)) };
+  const ops = [...(p.build(d.name, 0, 0, false).ops ?? [])];
+  return { three: ops.filter((o) => THREE.has(o)), hand: ops.filter((o) => !THREE.has(o)) };
 }
 
 /** How its drawing is made, in words. */

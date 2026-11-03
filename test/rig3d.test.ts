@@ -12,7 +12,7 @@ import { loadProject, loadSource } from "../src/node/load.ts";
 import { PAL, keys } from "./helpers.ts";
 import { whenChanged } from "./passed.ts";
 
-const test = whenChanged("test/rig3d.test.ts", ["lib/characters/traveler.px.js"]);
+const test = whenChanged("test/rig3d.test.ts", ["lib/characters/traveler.px.js", "lib/characters/dress.px.js"]);
 
 const dist = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
