@@ -642,8 +642,13 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   ways linearly (4 degrees off the tangent; park.px.js's runners read it, so a fix is shown first); a route doesn't
   close (its start mid-straight so the last corner rounds); a speed by place (slower into the bends) needs its time
   per px summed and inverted by hand. The tangent, `loop: true`, `route({ speed: (s) => v, frames })`.
+  F5 7c's race_behind wrote its own course again (straights and arcs of their own radii, the lap closed by solving
+  two straights, the time per px summed and inverted): a radius per corner, `round: [r, ...]`.
 - [ ] **expect on what lies under, and against many** (F5 5g): "on the asphalt" recomputed corners()'s blend in a
   region function; "on no prop" took 104 `apart` rules. `inside: [a, { layer, keys }]`, `apart: [a, layer or list]`.
+  F5 7c: from behind the floor under a kart turns with the camera, so no screen region says it (the demo checks the
+  tyres on the map in its own code); and a rule on a placement drawn only some frames fails where it isn't: spans by
+  hand. A region given the frame; rules that hold where their placements are drawn.
 - [ ] **skid()'s span** (F5 5g): marks laid over a bend and left there need `t` held at its end and the length cut by
   hand (skid passes trail no `from`; trail has no `until`). `from`, `until` and a wear time.
 - [ ] **Small lib papercuts**: the 5x7 font has no `_ < >`; a card's `draw` mats are keys of its entry's palette

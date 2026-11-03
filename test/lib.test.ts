@@ -187,6 +187,20 @@ test("lib/architecture/track_behind and lib/nature/trackside_behind: racing_behi
   }
 });
 
+test("kart.small (lib/vehicles/kart): kart.LADDER's two last rungs by hand, 8 headings a livery, the east the west's mirror, laguna by its roles", () => {
+  const p = loadProject("lib/vehicles/kart.px.js");
+  const cut = (n: string) => { const im = p.image(n), b = im.bounds()!; return [...Array(b.h).keys()].map((y) => [...Array(b.w).keys()].map((x) => im.data[(b.y + y) * im.w + b.x + x])); };
+  for (const px of [9, 6]) {
+    assert.equal(p.groups.get(`kart_laguna_${px}px`)!.members.length, 8);
+    assert.equal(p.image(`kart_fuego_${px}px_n`).bounds()!.w, px, "its px across from behind");
+    assert.deepEqual(cut(`kart_fuego_${px}px_e`), cut(`kart_fuego_${px}px_w`).map((r) => [...r].reverse()), "e is w flipped");
+    assert.notDeepEqual(cut(`kart_laguna_${px}px_n`), cut(`kart_fuego_${px}px_n`), "laguna its own colors");
+  }
+  assert.deepEqual(["0", "44", "90", "-90", "225"].map((d) => p.scope!(`kart.small("laguna", 9).facing(${d})`)), ["kart_laguna_9px_n", "kart_laguna_9px_ne", "kart_laguna_9px_e", "kart_laguna_9px_w", "kart_laguna_9px_sw"]);
+  assert.throws(() => p.scope!(`kart.small("fuego", 13)`), /9 or 6/);
+  assert.equal(p.scope!(`kart.rival("_r", "laguna", 6).facing(180)`), "kart_laguna_6px_s", "kart.rival's two last rungs the hand ones");
+});
+
 test("lib/architecture/track: the kerb's blocks meet at every tile side (red leaving by the left or top, white by the right or bottom); a start line on any tile's asphalt; its 3D things at the car's scale, lined all round in their materials' line tones, none near-black", () => {
   const p = loadProject("lib/architecture/track.px.js"), RED = pack(0xe8, 0x41, 0x4b), WHITE = pack(0xee, 0xeb, 0xe0);
   for (const m of [1, 2, 3, 4, 5, 7, 8, 10, 11, 12, 13, 14]) {

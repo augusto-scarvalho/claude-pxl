@@ -335,6 +335,20 @@ drawn in 32 rotations at the genre's 58 degrees, each frame taking the rotation 
 in its own dark tones. Two cars lap it in 4 s, slower into the bends, passing and passed back, with skid
 marks in the bends; the scene's `expect` holds them on the track, off the props and off each other.
 
+### Racing from behind
+
+<p>
+  <img src="docs/gallery/racing_behind.gif" width="100%" alt="Animated pixel art in the style of a handheld kart racer, seen from just behind and above the player's kart: a red-orange open kart with a brown-haired driver in a blue tunic sits low in the middle of the screen on a flat grey asphalt track laid in perspective, white edge lines and red and white kerbs on the bends, sand runoff outside the fast ones; the camera turns with the kart through a right-hander, a tight hairpin, a left kink and a long sweep, the floor turning under it while a backdrop of clouds, blue-green hills and a line of round trees slides sideways at their own speeds; at the start a chequered gantry passes overhead with flags, lamps, a grandstand with its crowd and a billboard beside the track, and tyre walls, chevron signs, guardrails, full oaks, palms and spruces stand along it at their sizes; two teal karts race alongside, seen from behind and shrinking with distance: the player passes one off a boost strip on the start straight and the other inside the kink, and both come back past round the last sweep">
+</p>
+
+[`examples/race_behind.px.js`](examples/race_behind.px.js): the library's demo for racing from behind,
+Mario Kart's kind (`lib/profiles/racing_behind.px.js`), every piece from `lib/`. The track is a map drawn from
+above by corner sets and laid on the ground by `plane()`, seen through a camera behind your kart that turns with it
+(`perspective({ yaw })`), the backdrop's layers sliding at their own speeds. The kart and its driver are drafted in
+3D and painted in 48 headings; your kart steers a step at a time, and each rival takes the drawing of its heading
+against the line of sight at the size its distance gives (`kart.rival()`, the smallest by hand). One lap in 8.4 s,
+two passes and two passes back; what stands along the track is drawn at a ladder of sizes for its distance.
+
 ### A platformer from the library
 
 <p>

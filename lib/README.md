@@ -66,7 +66,8 @@ and at night by a palette swap, `side.DUSK` and `side.NIGHT`, with the sky as th
 the full moon); the trackside's oak (`make3d.oak_lifted`, its crown lifted so its trunk shows), spruce, bush and rock
 for `racing_topdown`, drawn by their 3D builders from its 58 degrees in the track kit's colors, each part lined all
 round in its own dark tones (`trackside.px.js`); the same and a palm for `racing_behind`, each at a ladder of sizes for
-its distances (`oak_0` to `oak_3`: 64, 32, 16, 8 px tall), and the backdrop strip that wraps in four layers, `sky`, `clouds`,
+its distances (`oak_0` to `oak_3`: 64, 32, 16, 8 px tall, `make3d.oak_full`: forking low, its crown full), and the
+backdrop strip that wraps in four layers, `sky`, `clouds`,
 `hills`, `treeline` (`trackside_behind.px.js`).
 
 ![nature](../docs/gallery/lib/nature.png)
@@ -115,7 +116,7 @@ its roof's mark a decal, sockets `exhaust` and `tow`), turned to its 32 rotation
 `racing_behind` (Mario Kart's kind), `make3d.kart` (an open pipe-frame kart, two liveries by roles) with the top-down
 hero seated in it (`kart.racer()`), turned to its 48 headings (`kart_fuego`, `kart_laguna`; `kart.facing()`), painted
 (the hero's own head and face), your kart steering from behind (`kart_fuego_left1` to `_right3`), and a rival at
-its size (`kart.rival()`, `kart.LADDER`).
+its size (`kart.rival()`, `kart.LADDER`; its two smallest, 9 and 6 px, drawn by hand: `kart.small()`).
 
 ![vehicles](../docs/gallery/lib/vehicles.png)
 
