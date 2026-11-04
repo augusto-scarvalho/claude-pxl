@@ -1064,9 +1064,10 @@ Set each key's lightness to these and keep its hue: a first palette read flat be
 skin's line and band too light, the dark cloth's light too dark. Look with
 `PXL shot <file> <name> --grey`.
 
-**How to make one.** Every frame in these games is drawn and cleaned by hand; a render alone isn't
+**How to make one.** Every frame in these games is drawn and cleaned by hand; a plain render isn't
 enough at this size (a `rig3d` paint of a 100 px fighter read soft and stiff: the far forearm a club,
-the guard arm folded over the chest, a bob read as a helmet). The 3D is for pose and timing:
+the guard arm folded over the chest, a bob read as a helmet). Two ways hold: by hand, the 3D for pose
+and timing (below), or the 3D painted by design with the head drawn (after it). By hand:
 
 1. **Blocks first**: the moves posed and timed as `rig3d` blocks (`blocks: true`) against the numbers
    above, approved before any painting.
@@ -1087,6 +1088,18 @@ the guard arm folded over the chest, a bob read as a helmet). The 3D is for pose
 7. **The boxes from the same joints** (`c.setBox`, `c.setData({ phase })`, §13): the hurt boxes on
    the head, body and legs and the punching arm while it is out, the hit box round the fist on the
    active frames. They can't drift off the art.
+
+**Or in 3D, painted by design** (Guilty Gear Xrd's way; `lib/characters/reva_fighter.px.js`, which
+replaced her 2D rig). The blocks first, as above; then the body a `rig3d` painted by `surface()`
+(`ink: true, inner: "dark"`, no shadows or AO of its own), each material a ramp of 24 steps cut where
+its terminator should fall and a place's bias moving the cuts: the shadow a part casts and a crease
+asked of the bones near it (a step toward the light, a distance), not lit; the trousers' folds placed
+from the side of the bone the camera sees; a cleanup by rule over each frame in its `draw` (a line's
+L-corner, a lone speckle). The stance opened to the camera as the 3D games stand (the hips 40 degrees
+from profile, the chest 60, the head 40, the rear foot 78 out on `toes`, its `heel` up on the drive).
+The head drawn by hand at 3/4 (the guard's, a shout's, the hurt's) and stamped between two renders,
+the body without the near arm and then that arm alone: the guard holds its fist before the face. The
+boxes and the line by material as above.
 
 **How the forms are built**, learned copying Chun-Li (SFA3) and Ryu (3S) at 1× until ~99% of the
 pixels matched:
