@@ -14,6 +14,7 @@ import { figure } from "./rig.ts";
 const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const mul = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k], dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const len = (a: V3) => Math.hypot(a[0], a[1], a[2]), unit = (a: V3) => mul(a, 1 / (len(a) || 1));
+const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const RAD = Math.PI / 180, UP: V3 = [0, 0, 1];
 const v3 = (v: unknown, what: string): V3 => {
   if (!Array.isArray(v) || v.length !== 3 || !v.every(Number.isFinite)) throw new PxError(`${what} is a point [x, y, z], got ${JSON.stringify(v)}`);
@@ -72,8 +73,9 @@ export function bodyOf(spec: Record<string, unknown> = {}): Body {
  * A pose: the file's own numbers, each with a default. feet: [[forward, right], ...] of each foot
  * (left, right) on the floor from under the pelvis; lift: each foot up (the whole foot: a step); toes: each foot's
  * heading, degrees out from the hips' forward (its knee aims over it); heel: px each heel is raised, the foot turned
- * on its ball (the toes on the floor, the ankle up on the arc round it); down: the pelvis lowered; rise: the
- * chest and the head raised along the spine over a still pelvis (a breath; a head that lags the bob); lean:
+ * on its ball (the toes on the floor, the ankle up on the arc round it); point: degrees each foot off the floor
+ * turns at its ankle from square to its shin (+ pointed, - flexed; null the rig's level foot), its toes the way its
+ * knee points; down: the pelvis lowered; rise: the chest and the head raised along the spine over a still pelvis (a breath; a head that lags the bob); lean:
  * degrees forward, tilt: to the right; turn: the hips turned from the heading (degrees, clockwise from
  * above), twist: the shoulders against the hips, head: the head against the shoulders; hands:
  * [[forward, right, up], ...] of each hand from its shoulder; grip: both hands on one line instead (a
@@ -83,7 +85,7 @@ export function bodyOf(spec: Record<string, unknown> = {}): Body {
  * frames: pxl check doesn't ask its feet to be on the ground, the frame's data says air); away: both feet moved
  * that far from us along the view's depth (px; rig3d's soles sets it by heading).
  */
-export interface Pose { feet?: number[][]; lift?: number[]; toes?: number[]; heel?: number[]; down?: number; rise?: number; away?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; elbow?: number[]; grip?: { from: number[]; to: number[]; at: number[] }; air?: boolean; [k: string]: unknown }
+export interface Pose { feet?: number[][]; lift?: number[]; toes?: number[]; heel?: number[]; point?: (number | null)[]; down?: number; rise?: number; away?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; elbow?: number[]; grip?: { from: number[]; to: number[]; at: number[] }; air?: boolean; [k: string]: unknown }
 
 /** A piece of a part: its field, and where on it a point is: h along it (0..1) and a round it (radians from the way the body faces, toward its right), and its paint. */
 export interface Piece { field: Sdf; at: (p: V3) => [number, number, V3]; paint?: unknown }
@@ -95,7 +97,7 @@ export interface Joints {
   /** the shoulders' and the head's frames (twist, head) */
   sh: { f: V3; r: V3 }; hd: { f: V3; r: V3; heading: number };
   /** each leg: its sole's heel, ball and toe (on the floor, up with lift, the heel with heel), foot its middle along the foot's own heading */
-  legs: { hip: V3; knee: V3; ankle: V3; foot: V3; heel: V3; ball: V3; toe: V3; heading: number }[];
+  legs: { hip: V3; knee: V3; ankle: V3; foot: V3; heel: V3; ball: V3; toe: V3; heading: number; point?: number }[];
   arms: { sh: V3; elbow: V3; hand: V3 }[];
   /** the pose's grip, [from, to]: the line the hands hold */
   grip?: [V3, V3];
@@ -133,6 +135,8 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
     return v;
   };
   const lift = two("lift"), toes = two("toes", ", each foot's heading in degrees out from the hips' forward"), heel = two("heel", ", px each heel is raised (0 or more), the foot turned on its ball");
+  const point = (p.point ?? [null, null]) as (number | null)[];
+  if (!Array.isArray(point) || point.length !== 2 || !point.every((v) => v === null || Number.isFinite(v))) throw new PxError(`rig3d: a pose's point is [left, right], degrees each foot off the floor turns at its ankle from square to its shin (+ pointed, - flexed; null keeps the rig's level foot), got ${JSON.stringify(p.point)}`);
   const feet = pairs(p.feet, [[0, -B.hips], [0, B.hips]], 2, "feet"), reach = B.upper + B.fore;
   const hands = pairs(p.hands, [[0, -B.r.arm[0], -reach], [0, B.r.arm[0], -reach]], 3, "hands");
   // the way the elbows bend: a hint [forward, out, up] in the shoulders' frame, mostly down by default
@@ -159,7 +163,14 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
       const s = Math.min(1, heel[i] / (bd + back)), c = Math.sqrt(1 - s * s), on = (a: number, u: number) => add(ball, add(mul(ff, a * c + u * s), [0, 0, u * c - a * s]));
       ankle = on(-bd, B.ankle); hl = on(-bd - back, 0); way = add(mul(ff, c), [0, 0, -s]);
     }
-    return { hip, ankle, knee: ik3(hip, ankle, B.thigh, B.shin, add(ff, [0, 0, 0.3])), foot: add(ankle, mul(way, 1.1 * k)), heel: hl, ball, toe, heading: fh };
+    const hint = add(ff, [0, 0, 0.3]), knee = ik3(hip, ankle, B.thigh, B.shin, hint), pt = point[i];
+    if (pt === null) return { hip, ankle, knee, foot: add(ankle, mul(way, 1.1 * k)), heel: hl, ball, toe, heading: fh };
+    if (heel[i] > 0) throw new PxError(`rig3d: a pose's heel turns a foot on its ball on the floor, its point a foot off it at the ankle: give the ${i ? "right" : "left"} foot one of them`);
+    // a free foot: square to its shin in the knee's plane (its toes the way the knee points, as ik3 bends it), turned
+    // round the knee's hinge toward the shin's line by point; its sole B.ankle under the ankle along it
+    const u = unit(sub(ankle, hip)), hinge = cross(u, unit(sub(hint, mul(u, dot(hint, u))))), s = unit(sub(ankle, knee)), sq = cross(hinge, s);
+    const c = Math.cos(pt * RAD), sn = Math.sin(pt * RAD), fw = add(mul(sq, c), mul(s, sn)), dn = sub(mul(s, c), mul(sq, sn)), at = (d: number) => add(add(ankle, mul(fw, d)), mul(dn, B.ankle));
+    return { hip, ankle, knee, foot: add(ankle, mul(fw, 1.1 * k)), heel: at(-back), ball: at(bd), toe: at(ahead), heading: fh, point: pt };
   });
   const arms = [0, 1].map((i) => {
     const s = local(chest, sh, B.shoulders[0], i ? B.shoulders[1] : -B.shoulders[1], B.shoulders[2]);
@@ -244,6 +255,8 @@ export function blocksOf(B: Body, j: Joints): Sdf {
   // a foot: heel to toe along its heading; its heel up, what is behind the ball turned up on it (jointsOf's angle)
   const foot = (L: Joints["legs"][number]) => {
     const e = sdf.ellipsoid(R.foot), up = L.heel[2] - L.ball[2];
+    // a free foot (point): along its own heel-toe line
+    if (L.point !== undefined) { const d = unit(sub(L.toe, L.heel)); return e.rotate((Math.asin(Math.max(-1, Math.min(1, d[2]))) * 180) / Math.PI, "x").rotate((-Math.atan2(d[0], d[1]) * 180) / Math.PI, "z").at(L.foot); }
     if (!(up > 0)) return e.rotate(-L.heading, "z").at(L.foot);
     const mid = e.at(0, -R.foot[1] / 2, B.ankle), deg = (Math.asin(Math.min(1, up / (1.5 * R.foot[1]))) * 180) / Math.PI;
     return sdf.union(mid.intersect(sdf.plane([0, -1, 0])), mid.intersect(sdf.plane([0, 1, 0])).rotate(-deg, "x")).rotate(-L.heading, "z").at(L.ball);
@@ -444,13 +457,15 @@ export function viewWarnings(set: { name: string; views: [string, Rows | undefin
  * raised ahead, ahead of a hand overhead; an arm out sideways isn't read); and in degrees, how far a foot is bent
  * past its ankle: the shin's lean along the foot from square, over the toes up to 40 (an ankle with the weight on
  * it and its knee bent, as in every standing pose; 20 off the ground with the knee straight), back (the heel up) to
- * 45. More than half a pixel (or a degree) warns: `FLAWS` says each.
+ * 45; a foot turned by `point`, against its shin: square is 90 degrees, pointed to 60 past it, flexed to 30. More
+ * than half a pixel (or a degree) warns: `FLAWS` says each.
  */
 export function poseFlaws(B: Body, j: Joints): { floats: number; reach: number; elbow: number; ankle: number } {
-  const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   const elbow = Math.max(...j.arms.map((A) => { const back = cross(unit(sub(A.hand, A.sh)), j.sh.r), n = len(back); return n < 0.3 ? 0 : -dot(sub(A.elbow, A.sh), back) / n; }));
   const ankle = Math.max(...j.legs.map((L) => {
-    const fw = unit(sub(L.ball, L.heel)), up = unit(sub(UP, mul(fw, fw[2]))), s = sub(L.knee, L.ankle), a = (Math.atan2(dot(s, fw), dot(s, up)) * 180) / Math.PI;
+    const fw = unit(sub(L.ball, L.heel)), s = sub(L.knee, L.ankle);
+    if (L.point !== undefined) { const p = (Math.acos(Math.max(-1, Math.min(1, dot(fw, unit(s))))) * 180) / Math.PI - 90; return Math.max(0, p - 60, -30 - p); }
+    const up = unit(sub(UP, mul(fw, fw[2]))), a = (Math.atan2(dot(s, fw), dot(s, up)) * 180) / Math.PI;
     return Math.max(0, a - 40, -45 - a);
   }));
   return { floats: Math.min(...j.legs.map((L) => Math.min(L.heel[2], L.toe[2]))), reach: Math.max(...j.legs.map((L) => len(sub(L.ankle, L.hip)) - B.thigh - B.shin)), elbow, ankle };
@@ -458,7 +473,7 @@ export function poseFlaws(B: Body, j: Joints): { floats: number; reach: number; 
 export const FLAWS = {
   floats: (v: number) => `both feet off the ground (up to ${v.toFixed(1)} px): it floats`,
   reach: (v: number) => `a leg longer than its bones (by up to ${v.toFixed(1)} px): its foot out of reach; lower the pelvis or bring the foot in`,
-  ankle: (v: number) => `a foot bent past its ankle (up to ${Math.round(v)} degrees past what an ankle bends: 40 up with the weight on it, 45 down from square): a shin leaning far over its toes wants its heel up (heel), one leaning back the foot under the knee or the heel lower`,
+  ankle: (v: number) => `a foot bent past its ankle (up to ${Math.round(v)} degrees past what an ankle bends: 40 up with the weight on it, 45 down from square; a foot turned by point, 60 pointed and 30 flexed from square to its shin): a shin leaning far over its toes wants its heel up (heel), one leaning back the foot under the knee or the heel lower`,
   elbow: (v: number) => `an elbow bent the wrong way (up to ${v.toFixed(1)} px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder)`,
 };
 

@@ -489,7 +489,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         const pose = M.pose(i, hd.deg), fl = poseFlaws(F.body, jointsOf(F.body, pose, hd.deg));
         if (pose.air === true) fl.floats = 0;
         // (the ankle read where the pose gives the foot: rig3d's flat foot of before, under every figure drawn on it, leans their shins far past it)
-        if (pose.toes === undefined && pose.heel === undefined) fl.ankle = 0;
+        if (pose.toes === undefined && pose.heel === undefined && pose.point === undefined) fl.ankle = 0;
         for (const k of K) if (fl[k] > 0.5) { at[k].push(i); worst[k] = Math.max(worst[k], fl[k]); }
       }
       for (const k of K) if (at[k].length) lines.push(`${name} › ${M.m} ${hd.name} › WARNING: ${FLAWS[k](worst[k])} (frame${at[k].length > 1 ? "s" : ""} ${ranges(at[k])})`);

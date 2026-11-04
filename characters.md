@@ -204,6 +204,9 @@ where the hips do). The 3D games turn a fighter's rear foot 30 to 90 degrees out
 raises a heel that many px, the foot turned on its ball: the toes stay flat on the floor, the heel and
 the ankle rise on an arc round the ball and the shin tilts with them (a punch's drive, a toe-off);
 `lift` still raises the whole foot (a step), and with `heel` too a swinging foot points its toe down.
+A foot off the floor turns at its ankle by `point: [left, right]`, degrees from square to its shin (+ pointed:
+a roundhouse's instep, a jump's toes; − flexed: a front kick's ball; `null` keeps the rig's level foot), its
+toes the way its knee points (`toes` turns them out: a side kick's edge leading).
 Each leg's sole is in the joints, `j.legs[i].heel`, `.ball` and `.toe` on the floor (up with the foot),
 `.foot` its middle along the foot's own `.heading`: build a shoe on them (`j.limb(L.heel, L.ball, ...)`,
 `j.limb(L.ball, L.toe, ...)`), as the blocks' foot runs heel to toe and bends at the ball.
@@ -215,8 +218,8 @@ pose: (i) => ({ feet: [[8, -2], [-8, 2]], down: 2, toes: [10, 60], heel: [0, i =
 
 `pxl check` reads every pose at every heading: both feet off the ground (the lowest point of a sole,
 the toe when the heel is up: it floats; `air: true` on a jump's frames), a leg pulled longer than its
-bones, an elbow bent forward (ahead of the shoulder-hand line), and on a pose that gives `toes` or
-`heel`, a foot bent past its ankle (an ankle with the weight on it and its knee bent bends about 40 degrees up, 20 off the ground with the knee straight, and 45 down from square; past that
+bones, an elbow bent forward (ahead of the shoulder-hand line), and on a pose that gives `toes`, `heel`
+or `point`, a foot bent past its ankle (an ankle with the weight on it and its knee bent bends about 40 degrees up, 20 off the ground with the knee straight, and 45 down from square; a foot given `point` is read against its shin, to 60 pointed and 30 flexed; past that
 it reads broken: a shin leaning far over a flat foot wants its heel up, or the knee less bent; the flat
 foot of before, under the figures drawn on it, isn't read: their stances, walks and kneels lean a shin
 25 to 105 degrees over it). The elbows bend by a hint, mostly down by default: an arm swung back bends forward with it, so a

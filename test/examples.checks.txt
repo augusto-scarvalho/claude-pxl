@@ -199,7 +199,7 @@ lib/characters/miko.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements
 lib/characters/reva.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: cards' cells against their drawing on 1; not run: front marker (nothing has one)
 lib/characters/reva_fighter.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: lines on 14, boxes on 75 frames, genres' checks on 75 frames, genres' ink by material on 75 frames (61% of the edge near-black), cards' cells against their drawing on 1, figures' feet on 150 poses; not run: front marker (nothing has one)
+  ran: lines on 14, boxes on 113 frames, genres' checks on 113 frames, genres' ink by material on 113 frames (60% of the edge near-black), cards' cells against their drawing on 1, figures' feet on 226 poses; not run: front marker (nothing has one)
 lib/characters/slime.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: boxes on 4 frames, frozen cells against their live render on 4, cards' cells against their drawing on 2; not run: front marker (nothing has one)
 lib/characters/traveler.px.js: 8 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)

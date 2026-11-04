@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
-import { bodyOf, gait, ik3, jointsOf, poseFlaws } from "../src/core/rig3d.ts";
+import { FLAWS, bodyOf, gait, ik3, jointsOf, poseFlaws } from "../src/core/rig3d.ts";
 import { sdf } from "../src/core/sdf.ts";
 import { checkProject } from "../src/node/check.ts";
 import { loadProject, loadSource } from "../src/node/load.ts";
@@ -285,6 +285,23 @@ test("rig3d's foot: toes and heel 0 the joints as they were; a foot turned out, 
   const lines = checkProject(p).lines.filter((l) => l.startsWith("f ›"));
   assert.equal(lines.length, 1, lines.join("\n"));
   assert.match(lines[0], /^f › m e › WARNING: a foot bent past its ankle \(up to \d+ degrees past .*\(frames 1-2\)$/);
+});
+
+test("rig3d's point: a free foot turned at its ankle from square to its shin, its sole with it; null the rig's foot; pxl check reads it against its shin", () => {
+  const B = bodyOf({ h: 34, heads: 3 }), k = B.r.foot[1] / 2.3, kick = { feet: [[0, -2], [9, 2]], lift: [0, 8], down: 1 };
+  const a = jointsOf(B, kick, 90), shin = (L: (typeof a.legs)[number]) => (Math.acos(Math.min(1, Math.max(-1, [0, 1, 2].reduce((s, e) => s + ((L.toe[e] - L.heel[e]) / dist(L.toe, L.heel)) * ((L.knee[e] - L.ankle[e]) / dist(L.knee, L.ankle)), 0)))) * 180) / Math.PI;
+  assert.deepEqual(jointsOf(B, { ...kick, point: [null, null] }, 90).legs, a.legs);
+  for (const pt of [-30, 0, 45, 60]) {
+    const L = jointsOf(B, { ...kick, point: [null, pt] }, 90).legs[1];
+    // the knee and the ankle where they were, the foot square to the shin turned pt toward its line, the sole B.ankle under the ankle along it
+    assert.ok(dist(L.knee, a.legs[1].knee) < 1e-9 && dist(L.ankle, a.legs[1].ankle) < 1e-9 && Math.abs(shin(L) - 90 - pt) < 1e-6 && Math.abs(dist(L.foot, L.ankle) - 1.1 * k) < 1e-9 && L.point === pt, `${pt}: ${shin(L)}`);
+  }
+  const flaw = (pt: number) => poseFlaws(B, jointsOf(B, { ...kick, point: [null, pt] }, 90)).ankle;
+  assert.ok(flaw(60) < 1e-9 && flaw(-30) < 1e-9 && Math.abs(flaw(75) - 15) < 1e-6 && Math.abs(flaw(-40) - 10) < 1e-6);
+  assert.throws(() => jointsOf(B, { ...kick, heel: [0, 1], point: [null, 30] }, 90), /heel turns a foot on its ball/);
+  // read on a pose that gives only point
+  const p = loadSource(`${PAL}rig3d("f", { headings: ["e"], blocks: true, moves: { m: { frames: 2, pose: (i) => ({ ...${JSON.stringify(kick)}, air: true, point: [null, [50, 80][i]] }) } } })`, "t.px.js");
+  assert.deepEqual(checkProject(p).lines.filter((l) => l.startsWith("f ›")).map((l) => l.replace(/\d+ degrees/, "N degrees")), [`f › m e › WARNING: ${FLAWS.ankle(20).replace(/\d+ degrees/, "N degrees")} (frame 1)`]);
 });
 
 test("surface: pieces of one part parted by its own darkest tone, parts by the line; decal: depth, how far a nearer surface may be and still take it", () => {
