@@ -1051,6 +1051,24 @@ foot turned on its ball). A first try narrower and more upright (feet 0.43, gap 
 1.5–2.1, across the shoulders with the guard 2.9–3.9 (3S's 3.1 is mostly deltoid); each deltoid about
 0.6 H across (the width that read right on the study's fighter, not a measure of the references).
 
+**The moves**, read frame by frame with their ticks (60 a second): MUGEN conversions of KOF 2002 (Vanessa, May Lee,
+Whip), KOF '98 (King, Athena, Mature), KOF XI (Leona) and the Alpha games (Cammy, Karin), their `.air` and `.cns`;
+SF III 3rd Strike's frame-by-frame captures (Ibuki, Chun-Li, Elena, Makoto, Ryu); against each fighter's guard (H) and
+standing height (S). Numbers only, never their pixels.
+
+| | What the body does | Ticks |
+|---|---|---|
+| Walk | KOF's: step and join, the lead foot always ahead (Vanessa, May Lee, Whip, King); the upright dancers pass their legs (Mature, Leona, Cammy). The body as tall as the guard or taller: the pelvis up 0.04-0.12 S as the feet close, the knees 5-25° at contact, 0-20° on the standing leg (the lifted one 50-60°); none walks under its guard | 30-32 a cycle in 5-8 drawings (Vanessa 8 x 4; May Lee 7,5,4,7,7: the extremes held, the in-betweens quick); 2.6-3.3 px a tick |
+| Walk back | the walk the other way round, as tall; as fast or 25% slower | 30-40 |
+| Crouch | a kneel: the rear knee to the floor, the lead shin upright, the guard at the chin; 0.60-0.73 H | 4-9 down in 1-3 drawings; held breathing 1-3% in 6-12 drawings of 3-7 |
+| Jump | stretched, the knees rising, tucked round the apex, opening, one leg reaching: the arms against the knees (up, down, out, up); apex 0.73-0.86 S; the landing the prejump played back; forward, a somersault | prejump 3-5, 36-40 in the air (the tuck 8-16 of them), landing 2-6 |
+| Block | the guard closed at the guard's height (chin down, elbows in, curled); the hit is time: frozen and shaken 10-12, slid back 10-18 (3S: an impact drawing held 12, 3-6 back) | up in 2-12 |
+
+Reva follows them (`lib/profiles/fighting.px.js`, its states): the step and join of 8 drawings over 32 ticks at 2.75
+px a tick, her pelvis 5.5-9 px over her guard's; a kneel in 4 ticks and a breath of 8; a jump of 37 ticks in the
+air, 92 px up; a block whose hit is 12 ticks shaken by its steps and a 30 px slide. Her frames are drawn in place and
+each says its motion (`step`) and, off the ground, `air`.
+
 **Values**, OKLab lightness (0 black, 1 white), read on the references:
 
 | | Line | Shadow band | Plane | Light |
