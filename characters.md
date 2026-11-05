@@ -207,6 +207,11 @@ the ankle rise on an arc round the ball and the shin tilts with them (a punch's 
 A foot off the floor turns at its ankle by `point: [left, right]`, degrees from square to its shin (+ pointed:
 a roundhouse's instep, a jump's toes; − flexed: a front kick's ball; `null` keeps the rig's level foot), its
 toes the way its knee points (`toes` turns them out: a side kick's edge leading).
+The whole figure turns by `roll`, degrees in the picture's plane about its pelvis (+ its head toward the picture's
+left: back, for a figure facing right): it is posed upright as the rest says, its legs on a floor of its own (`lift`
+below 0 straightens them under a pelvis lowered by `down`), then turned, so a fall, a body lying on the floor and
+a getting-up are posed as a stance is; `parts` are built on it upright and turned with it, `joints()` gives it as
+drawn (`lib/characters/reva_fighter.px.js`'s knockdown, down and get_up).
 Each leg's sole is in the joints, `j.legs[i].heel`, `.ball` and `.toe` on the floor (up with the foot),
 `.foot` its middle along the foot's own `.heading`: build a shoe on them (`j.limb(L.heel, L.ball, ...)`,
 `j.limb(L.ball, L.toe, ...)`), as the blocks' foot runs heel to toe and bends at the ball.
@@ -217,7 +222,7 @@ pose: (i) => ({ feet: [[8, -2], [-8, 2]], down: 2, toes: [10, 60], heel: [0, i =
 ```
 
 `pxl check` reads every pose at every heading: both feet off the ground (the lowest point of a sole,
-the toe when the heel is up: it floats; `air: true` on a jump's frames), a leg pulled longer than its
+the toe when the heel is up: it floats; `air: true` on a jump's frames; a pose turned by `roll`, its lowest bone past 3 px), a leg pulled longer than its
 bones, an elbow bent forward (ahead of the shoulder-hand line), and on a pose that gives `toes`, `heel`
 or `point`, a foot bent past its ankle (an ankle with the weight on it and its knee bent bends about 40 degrees up, 20 off the ground with the knee straight, and 45 down from square; a foot given `point` is read against its shin, to 60 pointed and 30 flexed; past that
 it reads broken: a shin leaning far over a flat foot wants its heel up, or the knee less bent; the flat

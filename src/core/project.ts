@@ -7,7 +7,7 @@ import { solid } from "./solids.ts";
 import { model, turnFaces, turnPoint } from "./mesh.ts";
 import { Sdf, compile, sdf } from "./sdf.ts";
 import { COMPASS, clocksOf, contactOf, headingsOf, mirrorSymmetric, topOf, turnLight, turnViews } from "./turnaround.ts";
-import { BLOCK_MATS, type Body, type Joints, type Pose, blocksOf, bodyOf, gait, ik3, jointsOf, partsOf, solesOf } from "./rig3d.ts";
+import { BLOCK_MATS, type Body, type Joints, type Pose, blocksOf, bodyOf, gait, ik3, jointsOf, partsOf, solesOf, turned } from "./rig3d.ts";
 import { SURFACE_OPTS, VOXEL_OPTS, projection, surfaceSize } from "./surface.ts";
 import { Mesh3, Voxels, surfaceNets, voxelize } from "./grids.ts";
 import { VOLUME_OPTS } from "./volume.ts";
@@ -975,7 +975,7 @@ export class Project implements BuildCtx {
         const SP = Math.sin((pitch * Math.PI) / 180), CP = Math.cos((pitch * Math.PI) / 180);
         // where a point lands on the sprite (its foot point at the pivot) and how near us it is: the joints' escape hatch
         const project = (px: number, py: number) => (q: number[]): [number, number] => [px + q[0], py - q[1] * SP - q[2] * CP], depth = (q: number[]) => q[2] * SP - q[1] * CP;
-        const fields = (j: Joints, p: Pose) => [...(prefix !== undefined ? [blocksOf(B, j)] : []), ...(o.parts ? [partsOf((o.parts as (j: Joints, p: Pose) => unknown)(j, p), j).field, sdf.sphere(B.r.head).at(j.head)] : [])];
+        const fields = (j: Joints, p: Pose) => [...(prefix !== undefined ? [blocksOf(B, j)] : []), ...(o.parts ? [partsOf((o.parts as (j: Joints, p: Pose) => unknown)(j, p), j).field, sdf.sphere(B.r.head).at(turned(j).head)] : [])];
         // one size for all: given, or every field's box seen at every frame and heading, a pixel round it
         let { w, h, pivot } = o;
         if (w === undefined || h === undefined || pivot === undefined) {
@@ -997,7 +997,8 @@ export class Project implements BuildCtx {
         if (!(Number.isInteger(w) && Number.isInteger(h) && Array.isArray(pivot) && pivot.length === 2 && pivot.every(Number.isInteger))) throw new PxError(`rig3d: w, h and pivot (the pixel the figure's foot point lands on, [x, y]) are whole numbers, got ${JSON.stringify({ w, h, pivot })}`);
         const [px, py] = pivot as [number, number];
         const screen = project(px, py);
-        const joints = (p: Pose, heading: number) => Object.assign(jointsOf(B, p, heading), { screen, depth });
+        // (as drawn: a pose's roll turns them; parts() is given them upright, its fields turned after)
+        const joints = (p: Pose, heading: number) => Object.assign(turned(jointsOf(B, p, heading)), { screen, depth });
         const view = { kind: "side" as const, pitch }, at = [px + 0.5, py + 0.5], ink = typeof o.ink === "string" ? o.ink : typeof o.outline === "string" ? o.outline : this.pal.keys.has("k") ? "k" : "#000000";
         const look = this.look3d, light = o.light ?? look?.light ?? [0, -0.6, 0.75];
         // the east drawn as the west's mirror where the light comes from the picture's middle (as turnaround's)
@@ -1041,13 +1042,13 @@ export class Project implements BuildCtx {
           };
         };
         const paint = (c: Canvas, p: Pose, deg: number, flat: boolean, M: (typeof moves)[number]) => {
-          const j = joints(p, deg);
+          const j0 = Object.assign(jointsOf(B, p, deg), { screen, depth }), j = j0.roll ? joints(p, deg) : j0;
           let hd: { at: (x: number, y: number) => boolean; z: number } | undefined;
           if (flat) {
-            c.surface(blocksOf(B, j), { view, ppm: 1, at, mats: BLOCK_MATS, outline: false, rim: false, shadows: false, ao: 0, inner: ink });
+            c.surface(blocksOf(B, j0), { view, ppm: 1, at, mats: BLOCK_MATS, outline: false, rim: false, shadows: false, ao: 0, inner: ink });
             ring(c);
           } else {
-            const P = partsOf((o.parts as (j: Joints, p: Pose) => unknown)(j, p), j);
+            const P = partsOf((o.parts as (j: Joints, p: Pose) => unknown)(j0, p), j0);
             // ink: a line all round outside and on the part behind (the traveler's; `inner: "dark"` there the darkest tone of
             // the part behind instead); else surface()'s, on the shadow side
             const line = o.ink !== undefined ? { outline: false, rim: false, inner: o.inner ?? o.ink } : { outline: o.outline ?? true, inner: o.inner ?? true };

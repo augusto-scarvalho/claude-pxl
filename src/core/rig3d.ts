@@ -83,9 +83,12 @@ export function bodyOf(spec: Record<string, unknown> = {}): Body {
  * hand `at` [left, right] of the way; elbow: the way the elbows bend, [forward, out, up] in the shoulders'
  * frame (out mirrored for the left arm; default [-0.4, 0.5, -1], mostly down); air: in the air (a jump's
  * frames: pxl check doesn't ask its feet to be on the ground, the frame's data says air); away: both feet moved
- * that far from us along the view's depth (px; rig3d's soles sets it by heading).
+ * that far from us along the view's depth (px; rig3d's soles sets it by heading); roll: degrees the whole figure,
+ * posed as the rest says (its feet on a floor of its own, down its pelvis's height), is then turned in the picture's
+ * plane about its pelvis, + its head toward the picture's left (back, for a figure facing right: a fall, lying on
+ * the floor): its parts are built on it upright and turned with it.
  */
-export interface Pose { feet?: number[][]; lift?: number[]; toes?: number[]; heel?: number[]; point?: (number | null)[]; down?: number; rise?: number; away?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; elbow?: number[]; grip?: { from: number[]; to: number[]; at: number[] }; air?: boolean; [k: string]: unknown }
+export interface Pose { feet?: number[][]; lift?: number[]; toes?: number[]; heel?: number[]; point?: (number | null)[]; down?: number; rise?: number; away?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; elbow?: number[]; grip?: { from: number[]; to: number[]; at: number[] }; air?: boolean; roll?: number; [k: string]: unknown }
 
 /** A piece of a part: its field, and where on it a point is: h along it (0..1) and a round it (radians from the way the body faces, toward its right), and its paint. */
 export interface Piece { field: Sdf; at: (p: V3) => [number, number, V3]; paint?: unknown }
@@ -101,6 +104,8 @@ export interface Joints {
   arms: { sh: V3; elbow: V3; hand: V3 }[];
   /** the pose's grip, [from, to]: the line the hands hold */
   grip?: [V3, V3];
+  /** the pose's roll: these joints upright, as the parts are built on them; turned() gives them as drawn */
+  roll?: number;
   /** in a draw hook: a line of pixels from a to b in the figure's own depth (a held broom, a staff) */
   rod?(a: V3, b: V3, paint: unknown): void;
   /** a limb along a bone, a ball turned with the body: pieces for parts() */
@@ -128,7 +133,7 @@ const pairs = (v: unknown, d: number[][], n: number, what: string) => {
 export function jointsOf(B: Body, p: Pose, heading: number): Joints {
   const turn = num(p.turn, 0, "turn"), twist = num(p.twist, 0, "twist"), hdeg = num(p.head, 0, "head");
   const { f, r } = frameAt(heading + turn), sh = frameAt(heading + turn + twist), hd = { ...frameAt(heading + turn + twist + hdeg), heading: heading + turn + twist + hdeg };
-  const lean = num(p.lean, 0, "lean") * RAD, tilt = num(p.tilt, 0, "tilt") * RAD, down = num(p.down, 0, "down"), rise = num(p.rise, 0, "rise"), away = num(p.away, 0, "away");
+  const lean = num(p.lean, 0, "lean") * RAD, tilt = num(p.tilt, 0, "tilt") * RAD, down = num(p.down, 0, "down"), rise = num(p.rise, 0, "rise"), away = num(p.away, 0, "away"), roll = num(p.roll, 0, "roll");
   const two = (key: "lift" | "toes" | "heel", what = "") => {
     const v = p[key] ?? [0, 0];
     if (!Array.isArray(v) || v.length !== 2 || !v.every(Number.isFinite) || (key === "heel" && !v.every((x) => x >= 0))) throw new PxError(`rig3d: a pose's ${key} is [left, right]${what}, got ${JSON.stringify(p[key])}`);
@@ -184,7 +189,7 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
     return v;
   };
   return {
-    heading, f, r, up: UP, spine, pelvis, chest, head, sh, hd, legs, arms, ...(grip ? { grip } : {}),
+    heading, f, r, up: UP, spine, pelvis, chest, head, sh, hd, legs, arms, ...(grip ? { grip } : {}), ...(roll ? { roll } : {}),
     limb: (a, b, r0, r1 = r0, paint) => {
       v3(a, "limb(a, b, r0, r1, paint): a"); v3(b, "limb: b");
       if (!(r0 > 0) || !(r1 >= 0)) throw new PxError(`limb(a, b, r0, r1, paint): radii in px, above 0, got ${r0}, ${r1}`);
@@ -238,6 +243,23 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
   };
 }
 
+// ---------------------------------------------------------------- roll: the whole figure turned
+// about its pelvis in the picture's plane (round the view's depth, y), + its top toward -x
+const turn = (j: Joints) => {
+  const c = Math.cos((j.roll ?? 0) * RAD), s = Math.sin((j.roll ?? 0) * RAD), v = (q: V3): V3 => [q[0] * c - q[2] * s, q[1], q[0] * s + q[2] * c];
+  return { v, p: (q: V3) => add(j.pelvis, v(sub(q, j.pelvis))) };
+};
+/** The joints as drawn: turned by the pose's roll (the joints jointsOf gives are upright, as the parts are built on them). */
+export function turned(j: Joints): Joints {
+  if (!j.roll) return j;
+  const { v, p } = turn(j);
+  return { ...j, roll: 0, f: v(j.f), r: v(j.r), up: v(j.up), spine: v(j.spine), chest: p(j.chest), head: p(j.head), sh: { f: v(j.sh.f), r: v(j.sh.r) }, hd: { ...j.hd, f: v(j.hd.f), r: v(j.hd.r) },
+    legs: j.legs.map((L) => ({ ...L, hip: p(L.hip), knee: p(L.knee), ankle: p(L.ankle), foot: p(L.foot), heel: p(L.heel), ball: p(L.ball), toe: p(L.toe) })),
+    arms: j.arms.map((A) => ({ sh: p(A.sh), elbow: p(A.elbow), hand: p(A.hand) })), ...(j.grip ? { grip: [p(j.grip[0]), p(j.grip[1])] as [V3, V3] } : {}) };
+}
+/** A field built on the joints upright, turned with them. */
+export const turnField = (j: Joints, f: Sdf): Sdf => (j.roll ? f.at(mul(j.pelvis, -1)).rotate(-j.roll, "y").at(j.pelvis) : f);
+
 /** The flat blocks' colors: the head, the face patch, the body, the right limbs (light), the left (dark). */
 export const BLOCKS = { head: "#f2cd3a", face: "#d8402e", body: "#e7763a", right: "#98e2ec", left: "#2b6b91" };
 /** Nothing below the ground: what lies on it stops there. */
@@ -268,7 +290,7 @@ export function blocksOf(B: Body, j: Joints): Sdf {
   const k = R.head / 5.5;
   parts.push(sdf.sphere(R.head).at(j.head).mat("head").part("head"));
   parts.push(sdf.ellipsoid([2.4 * k, 2.4 * k, 2 * k]).rotate(-j.hd.heading, "z").at(add(j.head, mul(j.hd.f, R.head * 0.85))).mat("face").part("face"));
-  return sdf.union(parts).intersect(GROUND);
+  return turnField(j, sdf.union(parts)).intersect(GROUND);
 }
 export const BLOCK_MATS = Object.fromEntries(Object.entries(BLOCKS).map(([k, v]) => [k, [v]]));
 
@@ -320,7 +342,11 @@ export function partsOf(spec: unknown, j: Joints): { field: Sdf; ramps: string[]
     if (list.length) all.push(sdf.union(list).part(name));
   }
   if (!all.length) throw new PxError("rig3d: parts(j, pose) gave no parts");
-  return { field: sdf.union(all).intersect(GROUND), ramps: [...ramps], decals, brushes };
+  // (a pose's roll turns what is pinned and scattered on it too)
+  const { v, p } = turn(j), rolled = !!j.roll;
+  return { field: turnField(j, sdf.union(all)).intersect(GROUND), ramps: [...ramps],
+    decals: rolled ? decals.map((d) => ({ ...d, point: p(d.point), ...(d.up ? { up: v(d.up) } : {}), ...(d.on ? { on: turnField(j, d.on) } : {}) })) : decals,
+    brushes: rolled ? brushes.map((b) => ({ ...b, field: turnField(j, b.field) })) : brushes };
 }
 
 // ---------------------------------------------------------------- the walk's numbers
@@ -458,7 +484,8 @@ export function viewWarnings(set: { name: string; views: [string, Rows | undefin
  * past its ankle: the shin's lean along the foot from square, over the toes up to 40 (an ankle with the weight on
  * it and its knee bent, as in every standing pose; 20 off the ground with the knee straight), back (the heel up) to
  * 45; a foot turned by `point`, against its shin: square is 90 degrees, pointed to 60 past it, flexed to 30. More
- * than half a pixel (or a degree) warns: `FLAWS` says each.
+ * than half a pixel (or a degree) warns: `FLAWS` says each. A pose turned by roll floats by its lowest bone (the blocks'
+ * thickness round it) past 3 px, its other flaws read upright.
  */
 export function poseFlaws(B: Body, j: Joints): { floats: number; reach: number; elbow: number; ankle: number } {
   const elbow = Math.max(...j.arms.map((A) => { const back = cross(unit(sub(A.hand, A.sh)), j.sh.r), n = len(back); return n < 0.3 ? 0 : -dot(sub(A.elbow, A.sh), back) / n; }));
@@ -468,10 +495,15 @@ export function poseFlaws(B: Body, j: Joints): { floats: number; reach: number; 
     const up = unit(sub(UP, mul(fw, fw[2]))), a = (Math.atan2(dot(s, fw), dot(s, up)) * 180) / Math.PI;
     return Math.max(0, a - 40, -45 - a);
   }));
-  return { floats: Math.min(...j.legs.map((L) => Math.min(L.heel[2], L.toe[2]))), reach: Math.max(...j.legs.map((L) => len(sub(L.ankle, L.hip)) - B.thigh - B.shin)), elbow, ankle };
+  // (a pose turned by roll: how far its lowest bone, the blocks' thickness round it, is off the ground, past the 3 px
+  // that thickness is a guess at a painted figure's: the genre's ground rule reads the drawing itself)
+  const t = turned(j), R = B.r, low = (q: V3, r: number) => q[2] - r;
+  const floats = j.roll ? -3 + Math.min(low(t.pelvis, R.body[0]), low(t.chest, R.body[1]), low(t.head, R.head), ...t.legs.flatMap((L) => [low(L.knee, R.leg[1]), low(L.ankle, R.leg[2]), L.heel[2], L.toe[2]]), ...t.arms.flatMap((A) => [low(A.elbow, R.arm[1]), low(A.hand, R.hand)]))
+    : Math.min(...j.legs.map((L) => Math.min(L.heel[2], L.toe[2])));
+  return { floats, reach: Math.max(...j.legs.map((L) => len(sub(L.ankle, L.hip)) - B.thigh - B.shin)), elbow, ankle };
 }
 export const FLAWS = {
-  floats: (v: number) => `both feet off the ground (up to ${v.toFixed(1)} px): it floats`,
+  floats: (v: number) => `both feet off the ground (up to ${v.toFixed(1)} px; a pose turned by roll: its lowest part): it floats`,
   reach: (v: number) => `a leg longer than its bones (by up to ${v.toFixed(1)} px): its foot out of reach; lower the pelvis or bring the foot in`,
   ankle: (v: number) => `a foot bent past its ankle (up to ${Math.round(v)} degrees past what an ankle bends: 40 up with the weight on it, 45 down from square; a foot turned by point, 60 pointed and 30 flexed from square to its shin): a shin leaning far over its toes wants its heel up (heel), one leaning back the foot under the knee or the heel lower`,
   elbow: (v: number) => `an elbow bent the wrong way (up to ${v.toFixed(1)} px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder)`,

@@ -5,8 +5,8 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
-import { FLAWS, bodyOf, gait, ik3, jointsOf, poseFlaws } from "../src/core/rig3d.ts";
-import { sdf } from "../src/core/sdf.ts";
+import { FLAWS, blocksOf, bodyOf, gait, ik3, jointsOf, poseFlaws, turned } from "../src/core/rig3d.ts";
+import { compile, sdf } from "../src/core/sdf.ts";
 import { checkProject } from "../src/node/check.ts";
 import { loadProject, loadSource } from "../src/node/load.ts";
 import { PAL, keys } from "./helpers.ts";
@@ -209,8 +209,8 @@ rig3d("c", { w: 26, h: 40, pivot: [13, 38], headings: ["s", "n"], ink: "k", surf
   for (const r of s.filter((q) => /[^.]/.test(q))) assert.ok(r.replace(/[.]/g, "").startsWith("k") && r.replace(/[.]/g, "").endsWith("k"), r);
   const lines = checkProject(p).lines;
   assert.deepEqual(lines.filter((l) => l.startsWith("c ›")), [
-    "c › hop s › WARNING: both feet off the ground (up to 2.0 px): it floats (frame 1)",
-    "c › hop n › WARNING: both feet off the ground (up to 2.0 px): it floats (frame 1)",
+    "c › hop s › WARNING: both feet off the ground (up to 2.0 px; a pose turned by roll: its lowest part): it floats (frame 1)",
+    "c › hop n › WARNING: both feet off the ground (up to 2.0 px; a pose turned by roll: its lowest part): it floats (frame 1)",
     "c › reach s › WARNING: a leg longer than its bones (by up to 3.0 px): its foot out of reach; lower the pelvis or bring the foot in (frame 0)",
     "c › reach n › WARNING: a leg longer than its bones (by up to 3.0 px): its foot out of reach; lower the pelvis or bring the foot in (frame 0)",
   ]);
@@ -302,6 +302,20 @@ test("rig3d's point: a free foot turned at its ankle from square to its shin, it
   // read on a pose that gives only point
   const p = loadSource(`${PAL}rig3d("f", { headings: ["e"], blocks: true, moves: { m: { frames: 2, pose: (i) => ({ ...${JSON.stringify(kick)}, air: true, point: [null, [50, 80][i]] }) } } })`, "t.px.js");
   assert.deepEqual(checkProject(p).lines.filter((l) => l.startsWith("f ›")).map((l) => l.replace(/\d+ degrees/, "N degrees")), [`f › m e › WARNING: ${FLAWS.ankle(20).replace(/\d+ degrees/, "N degrees")} (frame 1)`]);
+});
+
+test("rig3d's roll: the whole figure turned about its pelvis in the picture's plane, as drawn; its parts built upright and turned with it; pxl check reads its lowest part", () => {
+  const B = bodyOf({ h: 34, heads: 3 }), lie = { down: B.hip - B.r.body[0], lift: [-(B.hip - B.r.body[0]), -(B.hip - B.r.body[0])] };
+  const up = jointsOf(B, lie, 90), j = jointsOf(B, { ...lie, roll: 90 }, 90), t = turned(j);
+  // upright as given (the parts are built on it), turned as drawn: the head behind the pelvis at its height, the feet ahead
+  assert.deepEqual(j.legs, up.legs);
+  assert.ok(Math.abs(t.head[2] - j.pelvis[2]) < 1e-9 && Math.abs(t.head[0] - (j.pelvis[0] - (j.head[2] - j.pelvis[2]))) < 1e-9 && t.legs.every((L) => L.ankle[0] > j.pelvis[0] + 5), `${t.head} ${t.legs[0].ankle}`);
+  assert.equal(turned(up), up);
+  // the blocks turned with it: the head's ball where the turned joints put it, none left over the pelvis
+  const f = compile(blocksOf(B, j));
+  assert.ok(f.d(...t.head) < 0 && f.d(j.pelvis[0], j.pelvis[1], j.head[2]) > 0.5);
+  // lying on the floor it doesn't float; lifted 6 px, it does (by its lowest bone past 3 px; the feet off the ground are no flaw)
+  assert.ok(poseFlaws(B, j).floats < 0.5 && poseFlaws(B, jointsOf(B, { ...lie, down: lie.down - 6, roll: 90 }, 90)).floats > 0.5);
 });
 
 test("surface: pieces of one part parted by its own darkest tone, parts by the line; decal: depth, how far a nearer surface may be and still take it", () => {

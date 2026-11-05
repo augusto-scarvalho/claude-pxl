@@ -81,7 +81,8 @@ fall, land), hurt, a ladder's climb and his back at a door), a slime (also at 32
 the knight, a beetle that walks and a bat that flies (a platformer's enemies); Reva the fighter, 110 px side on in KOF
 2002's school (`reva_fighter.px.js`, `fighting`: idle, hurt, the walks forward and back, the crouch and its
 breath, a straight jump, the blocks standing and low and her normals drawn for their impact (a jab, a cross, a front
-kick, a roundhouse to the head, a low kick, a jumping kick), in 3D on her rig with her head drawn by hand, hurt and hit boxes
+kick, a roundhouse to the head, a low kick, a jumping kick), her reactions (hit in the body, hit kneeling, knocked down,
+lying, getting up), in 3D on her rig with her head drawn by hand, hurt and hit boxes
 and frame data with the motion an engine applies, 3 palette slots on her sheet).
 
 ![characters](../docs/gallery/lib/characters.png)
