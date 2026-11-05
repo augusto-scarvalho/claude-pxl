@@ -82,7 +82,8 @@ the knight, a beetle that walks and a bat that flies (a platformer's enemies); R
 2002's school (`reva_fighter.px.js`, `fighting`: idle, hurt, the walks forward and back, the crouch and its
 breath, a straight jump, the blocks standing and low and her normals drawn for their impact (a jab, a cross, a front
 kick, a roundhouse to the head, a low kick, a jumping kick), her reactions (hit in the body, hit kneeling, knocked down,
-lying, getting up), in 3D on her rig with her head drawn by hand, hurt and hit boxes
+lying, getting up), her specials (a gold wave pushed from both palms, and the wave itself; a rising spinning kick with
+a gold trail), in 3D on her rig with her head drawn by hand, hurt and hit boxes
 and frame data with the motion an engine applies, 3 palette slots on her sheet).
 
 ![characters](../docs/gallery/lib/characters.png)
@@ -132,11 +133,13 @@ a sprite's `ink` lines it all round; `even32` a lone step evened, for a pass tha
 
 ![styles](../docs/gallery/lib/styles.png)
 
-**VFX** (`vfx/`): a puff of dust (top-down at 16 and 32), and side on a landing's and a running heel's (the volumes' densities have no picture).
+**VFX** (`vfx/`): a puff of dust (top-down at 16 and 32), and side on a landing's, a running heel's and a knockdown's
+at a fighter's size; a fighting game's hit sparks, light and heavy, and a block's (`sparks.px.js`) (the volumes'
+densities have no picture).
 
 ![vfx](../docs/gallery/lib/vfx.png)
 
 `styles/` holds palettes (and, in `fields`, the cards of the engine's own builders, `make3d.rock`,
 `house`, `bush`, `pine`, drawn in its colors), `profiles/` the genres (`topdown16`, `topdown32`,
 `platformer16`, `hd2d`, `fighting`, `racing_behind`, `racing_topdown`: each number's source beside
-it) and their starter kits, `vfx/` the volumes' densities and dust.
+it) and their starter kits, `vfx/` the volumes' densities, dust and sparks.
