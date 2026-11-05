@@ -84,7 +84,11 @@ breath, a straight jump, the blocks standing and low and her normals drawn for t
 kick, a roundhouse to the head, a low kick, a jumping kick), her reactions (hit in the body, hit kneeling, knocked down,
 lying, getting up), her specials (a gold wave pushed from both palms, and the wave itself; a rising spinning kick with
 a gold trail), in 3D on her rig with her head drawn by hand, hurt and hit boxes
-and frame data with the motion an engine applies, 3 palette slots on her sheet).
+and frame data with the motion an engine applies, 3 palette slots on her sheet); her opponent Haldor the smith, a heavy
+grappler 140 px side on (`haldor_fighter.px.js`, `fighting`'s heavy: bald, a braided beard, a leather apron, gauntlets
+and boots, in a grappler's low, wide guard, his hands open claws ready to grab; idle, made as she is, his hands
+modeled on his rig (their shape, roll and wrist a pose's numbers), hurt boxes and frame data, 3 palette slots on his sheet); what the
+two share, the vectors, the toon, the shadows by design, the cleanup and the boxes (`fighter.px.js`).
 
 ![characters](../docs/gallery/lib/characters.png)
 
