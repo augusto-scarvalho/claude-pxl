@@ -83,15 +83,17 @@ the knight, a beetle that walks and a bat that flies (a platformer's enemies); R
 breath, a straight jump, the blocks standing and low and her normals drawn for their impact (a jab, a cross, a front
 kick, a roundhouse to the head, a low kick, a jumping kick), her reactions (hit in the body, hit kneeling, knocked down,
 lying, getting up), her specials (a gold wave pushed from both palms, and the wave itself; a rising spinning kick with
-a gold trail), her drawings for being thrown (grabbed, folded over an arm, stretched face up and face down, each turned
-to the angles a throw asks), in 3D on her rig with her head drawn by hand, hurt and hit boxes
+a gold trail), her drawings for being thrown (grabbed, folded over an arm, stretched face up and face down, slammed flat on her
+face, each turned to the angles a throw asks), in 3D on her rig with her head drawn by hand, hurt and hit boxes
 and frame data with the motion an engine applies, 3 palette slots on her sheet); her opponent Haldor the smith, a heavy
 grappler 140 px side on (`haldor_fighter.px.js`, `fighting`'s heavy: bald, a braided beard, a leather apron, gauntlets
 and boots, in a grappler's low, wide guard, his hands open claws ready to grab; idle, the walks forward and back (a gait
 whose legs pass each other), a wrestler's crouch and its breath, a heavy's straight jump, the blocks standing and low,
 and his normals as a heavy strikes, his weight dropped into each (a jab, a smith's hammer blow, a boot to the shins, a
 push kick facing her, a straight leg shot out from his crouch, a kick in the air) and his throw (a smith's handling: her
-folded over his arm, turned over and slammed on her back, bound frame by frame to her thrown drawings), made as she is, his hands modeled on his rig (their
+folded over his arm, turned over and slammed on her back, bound frame by frame to her thrown drawings, held between his
+arms) and his command throw in three strengths (the Sledge, the Anvil, the Rivet: a smith bringing iron down on an
+anvil), made as she is, his hands modeled on his rig (their
 shape, roll and wrist a pose's numbers), hurt and hit boxes and frame data with the motion an engine applies, 3 palette
 slots on his sheet); what the two share, the vectors, the toon, the shadows by design, the cleanup and the boxes, and
 her strikes' smear (`fighter.px.js`).
