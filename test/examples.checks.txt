@@ -283,7 +283,7 @@ lib/vehicles/car.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 
 lib/vehicles/kart.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 10, boxes on 204 frames, genres' checks on 108 frames, genres' ink by category on 108 frames, cards' cells against their drawing on 2, views' rows on 1; not run: front marker (nothing has one)
 lib/vfx/dust.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: cards' cells against their drawing on 5; not run: front marker (nothing has one)
+  ran: cards' cells against their drawing on 8; not run: front marker (nothing has one)
 lib/vfx/sparks.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: cards' cells against their drawing on 3; not run: front marker (nothing has one)
 lib/vfx/volumes.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)

@@ -149,7 +149,7 @@ a sprite's `ink` lines it all round; `even32` a lone step evened, for a pass tha
 ![styles](../docs/gallery/lib/styles.png)
 
 **VFX** (`vfx/`): a puff of dust (top-down at 16 and 32), and side on a landing's, a running heel's and a knockdown's
-at a fighter's size; a fighting game's hit sparks, light and heavy, and a block's (`sparks.px.js`) (the volumes'
+at a fighter's size, a fighter's jump landing, and a heavy's landing and knockdown; a fighting game's hit sparks, light and heavy, and a block's (`sparks.px.js`) (the volumes'
 densities have no picture).
 
 ![vfx](../docs/gallery/lib/vfx.png)
