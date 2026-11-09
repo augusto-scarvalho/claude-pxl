@@ -212,6 +212,9 @@ left: back, for a figure facing right): it is posed upright as the rest says, it
 below 0 straightens them under a pelvis lowered by `down`), then turned, so a fall, a body lying on the floor and
 a getting-up are posed as a stance is; `parts` are built on it upright and turned with it, `joints()` gives it as
 drawn (`lib/characters/reva_fighter.px.js`'s knockdown, down and get_up).
+The neck bends by `nod`, degrees it stands from upright as drawn (the chest to the head's middle turned about the
+chest in the picture's plane, + toward the picture's right): lying back on an elbow, the head stands over the chest
+with its chin on it, where a head drawn that far chin down is stamped (her get_up; none: the neck along the spine).
 Each leg's sole is in the joints, `j.legs[i].heel`, `.ball` and `.toe` on the floor (up with the foot),
 `.foot` its middle along the foot's own `.heading`: build a shoe on them (`j.limb(L.heel, L.ball, ...)`,
 `j.limb(L.ball, L.toe, ...)`), as the blocks' foot runs heel to toe and bends at the ball.

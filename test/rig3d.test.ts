@@ -318,6 +318,16 @@ test("rig3d's roll: the whole figure turned about its pelvis in the picture's pl
   assert.ok(poseFlaws(B, j).floats < 0.5 && poseFlaws(B, jointsOf(B, { ...lie, down: lie.down - 6, roll: 90 }, 90)).floats > 0.5);
 });
 
+test("rig3d's nod: the neck turned about the chest in the picture's plane to stand that far from upright as drawn", () => {
+  const B = bodyOf({ h: 34, heads: 3 }), pose = { lean: 10, turn: -50, roll: 70 }, plain = jointsOf(B, pose, 180);
+  for (const nod of [12, -20]) {
+    const j = jointsOf(B, { ...pose, nod }, 180), t = turned(j), n = [0, 1, 2].map((e) => t.head[e] - t.chest[e]);
+    // as drawn, nod degrees from upright toward the picture's right; the neck's length and its depth kept; the rest still
+    assert.ok(Math.abs((Math.atan2(n[0], n[2]) * 180) / Math.PI - nod) < 1e-9 && Math.abs(dist(j.head, j.chest) - B.neck) < 1e-9 && Math.abs(j.head[1] - plain.head[1]) < 1e-9, `${nod}: ${n}`);
+    assert.deepEqual([j.chest, j.legs, j.arms], [plain.chest, plain.legs, plain.arms]);
+  }
+});
+
 test("surface: pieces of one part parted by its own darkest tone, parts by the line; decal: depth, how far a nearer surface may be and still take it", () => {
   const p = loadSource(`${PAL}
 ramps("kgw", "krw")

@@ -86,9 +86,11 @@ export function bodyOf(spec: Record<string, unknown> = {}): Body {
  * that far from us along the view's depth (px; rig3d's soles sets it by heading); roll: degrees the whole figure,
  * posed as the rest says (its feet on a floor of its own, down its pelvis's height), is then turned in the picture's
  * plane about its pelvis, + its head toward the picture's left (back, for a figure facing right: a fall, lying on
- * the floor): its parts are built on it upright and turned with it.
+ * the floor): its parts are built on it upright and turned with it; nod: degrees the neck (the chest to the head's
+ * middle) stands from upright as drawn, turned to it in the picture's plane about the chest, + its head toward the
+ * picture's right (forward, for a figure facing right: lying back, the head stands over the chest, the chin on it).
  */
-export interface Pose { feet?: number[][]; lift?: number[]; toes?: number[]; heel?: number[]; point?: (number | null)[]; down?: number; rise?: number; away?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; elbow?: number[]; grip?: { from: number[]; to: number[]; at: number[] }; air?: boolean; roll?: number; [k: string]: unknown }
+export interface Pose { feet?: number[][]; lift?: number[]; toes?: number[]; heel?: number[]; point?: (number | null)[]; down?: number; rise?: number; away?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; elbow?: number[]; grip?: { from: number[]; to: number[]; at: number[] }; air?: boolean; roll?: number; nod?: number; [k: string]: unknown }
 
 /** A piece of a part: its field, and where on it a point is: h along it (0..1) and a round it (radians from the way the body faces, toward its right), and its paint. */
 export interface Piece { field: Sdf; at: (p: V3) => [number, number, V3]; paint?: unknown }
@@ -153,7 +155,13 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
     throw new PxError(`rig3d: a pose's grip is { from: [forward, right, up], to: [...] (px from under the pelvis), at: [left, right] (each hand's share of the way) }, got ${JSON.stringify(p.grip)}`);
   const grip = g && ([local([0, 0, 0], sh, ...g.from), local([0, 0, 0], sh, ...g.to)] as [V3, V3]);
   const spine = unit(add(add(mul(UP, Math.cos(lean)), mul(sh.f, Math.sin(lean))), mul(sh.r, Math.sin(tilt))));
-  const pelvis: V3 = [0, 0, B.hip - down], chest = add(pelvis, mul(spine, B.torso + rise)), head = add(chest, mul(spine, B.neck));
+  const pelvis: V3 = [0, 0, B.hip - down], chest = add(pelvis, mul(spine, B.torso + rise));
+  // the neck along the spine, or turned about the chest to stand `nod` from upright once roll has turned the figure
+  let head = add(chest, mul(spine, B.neck));
+  if (p.nod !== undefined) {
+    const n = sub(head, chest), b = (num(p.nod, 0, "nod") + roll) * RAD - Math.atan2(n[0], n[2]);
+    head = add(chest, [n[0] * Math.cos(b) + n[2] * Math.sin(b), n[1], n[2] * Math.cos(b) - n[0] * Math.sin(b)]);
+  }
   // a foot along its own heading (toes out from the hips': its knee aimed over it), its sole on the floor under the
   // ankle as the blocks' foot runs: the heel `back` behind the ankle, the toe `ahead`, the ball halfway from the foot's
   // middle to the toe; a heel raised turns the foot on its ball, the ankle on the arc round it (lift raises it all)
