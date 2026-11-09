@@ -205,6 +205,19 @@ function sunCast(def: AssetDef, l: Layer): [number, number] {
   return [-L[0] / L[2], L[1] / L[2]];
 }
 
+/**
+ * A layer's parallax by row, a floor in perspective: `{ top, bottom, rows: [y0, y1] }` (top at row y0 and above,
+ * bottom at y1 and below, in line between) or `(y) => k`, y the layer's own row; undefined for a number or [x, y].
+ */
+function rowParallax(name: string, k: unknown): ((y: number) => number) | undefined {
+  if (typeof k === "function") return k as (y: number) => number;
+  if (typeof k !== "object" || k === null || Array.isArray(k)) return undefined;
+  const { top, bottom, rows } = k as { top?: number; bottom?: number; rows?: number[] };
+  if (!(Number.isFinite(top) && Number.isFinite(bottom) && Array.isArray(rows) && rows.length === 2 && rows.every(Number.isFinite) && rows[1] > rows[0]) || Object.keys(k).length !== 3)
+    throw new PxError(`layer '${name}': parallax by row is { top, bottom, rows: [y0, y1] } (top at row y0 and above, bottom at y1 and below: a floor 0.75 at its back, 1 at the fighters' line) or (y) => k, got ${fmtArgs([k])}`);
+  return (y) => top! + (bottom! - top!) * Math.min(1, Math.max(0, (y - rows[0]) / (rows[1] - rows[0])));
+}
+
 function isFrameOpts(v: unknown): boolean {
   return typeof v === "object" && v !== null && !Array.isArray(v) && !isOp(v) && !isLayer(v);
 }
@@ -367,10 +380,27 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     // the whole world: what stays on the screen (parallax 0: a sky, a HUD, a fade) isn't in it
     if (whole && [l.opts.parallax].flat().every((k) => k === 0)) return;
     under ??= base.copy();
-    const limg = new Img(base.w, base.h);
-    const lc = onCamera(timed(new Canvas(limg, pal, ctx, l.opts.x ?? 0, l.opts.y ?? 0, seed)), moved(l.name, l.opts.parallax));
+    const limg = new Img(base.w, base.h), byRow = rowParallax(l.name, l.opts.parallax);
+    // a floor in perspective (MUGEN's xscale): drawn on a canvas as wide as its rows' shifts reach, each
+    // row then cut from it at its own; what has a pivot goes by whole at its pivot's row (Canvas.rowShift)
+    let lc: Canvas, wide: Img | undefined;
+    if (byRow && look) {
+      const oy = (l.opts.y ?? 0) - look[1], at = (r: number) => {
+        const k = byRow(r - oy);
+        if (!Number.isFinite(k)) throw new PxError(`layer '${l.name}': parallax (y) => k gave ${fmtArgs([k])} for row ${r - oy}: a number (1 the world, 0.75 a floor's back)`, l.loc);
+        return Math.round(look[0] * k);
+      };
+      const s = Array.from({ length: base.h }, (_, r) => at(r)), s0 = Math.min(...s);
+      wide = new Img(base.w + Math.max(...s) - s0, base.h);
+      lc = timed(new Canvas(wide, pal, ctx, (l.opts.x ?? 0) - s0, oy, seed));
+      lc.rowShift = (r) => at(r) - s0;
+      // ponytail: describe's world place of a stamp on it takes its bottom row's shift; per stamp if one misreads
+      shift[l.name] = [s[base.h - 1], look[1]];
+    } else {
+      lc = onCamera(timed(new Canvas(limg, pal, ctx, l.opts.x ?? 0, l.opts.y ?? 0, seed)), moved(l.name, l.opts.parallax));
+      lc.below = base;
+    }
     lc.layerName = l.name;
-    lc.below = base;
     if (l.opts.sort !== undefined) {
       if (l.opts.sort !== "y" && l.opts.sort !== "z") throw new PxError(`layer '${l.name}': sort must be "y" or "z", got ${fmtArgs([l.opts.sort])}`, l.loc);
       lc.sorted = { by: l.opts.sort, queue: [] };
@@ -382,6 +412,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     try {
       runItems(ctx, l.opts.of === undefined ? l.items : [...l.items, ...castsOf(def, l)], lc, l.loc);
       lc.flush();
+      if (wide) for (let r = 0; r < base.h; r++) limg.blit(wide.sub(lc.rowShift!(r), r, base.w, 1), 0, r);
       // a palette map on all it drew (stamps, tiles, strips, functions): the same art at another time of day
       if (l.opts.swap !== undefined) {
         const list = [l.opts.swap].flat(), plain = (m: unknown) => !!m && typeof m === "object" && !Array.isArray(m);

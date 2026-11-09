@@ -363,6 +363,21 @@ speeds up into a sprint with its soles planted, dashes, jumps by the genre's gra
 tops (their `sockets()`) and a ladder climb. The light changes along the level by a palette swap per
 layer mixed by the camera's x, and the backdrop's planes are places that scroll in, never copies.
 
+### A fighting game's stages from the library
+
+<p>
+  <img src="docs/gallery/fighting_shrine.gif" width="100%" alt="Animated pixel art of a 2D fighting game's round about to start, on three Shinto shrine stages in turn, the camera panning from each stage's left end to its right end and back so its planes slide at their own speeds: at dusk in autumn, a paved approach under a vermilion torii with the sun setting between its posts, red, orange and gold maples and stone lanterns with flickering flames in a moss bed behind a stone curb, violet mountain ranges, a maple leaf falling; at noon in spring, a hall with a green copper roof between two stone foxes, cherries in bloom in stone planters dropping petals, white gravel, cedar hills and a blue range, clouds drifting; at night in snow, a torii and lanterns sunk in the snow, black pines in tree wells, a moonlit snowy massif with mist at its foot, snow falling; on each, a slim woman fighter in a white top and blue trousers and a huge bald smith in a leather apron in their fighting stances, a shadow under each, a shrine maiden in white and red watching from the back, the life bars, names and timer of a lacquer or a paper HUD on top">
+</p>
+
+[`examples/fighting/`](examples/fighting/shrine_round.px.js): the library's three shrine stages for
+the fighting genre (`lib/stages/shrine.px.js`, on `lib/profiles/fighting.px.js`'s 320×224 screen), drawn as
+an engine draws a stage from its layout: each layer a sprite as wide as its parallax shows it, the floor
+going by row (`parallax: { top, bottom, rows }`: 0.75 at its back, 1 at the fighters' line), what stands
+on it at its row's speed, the far ranges by `terrain()`, the kit's torii, hall, lanterns, foxes and trees
+drawn in 3D through the fighting camera and planted on their drawn foot (`turnaround(..., { pivot:
+"foot" })`). The stage's loops play (flames, a falling leaf, clouds, petals, snow, mist), Reva and Haldor
+idle where a round starts, the miko watches in the stage's palette slot, and the HUD is the library's.
+
 ### 3D as code: fields, voxels, volumes, splats, decals
 
 <p>

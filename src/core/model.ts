@@ -52,7 +52,7 @@ export interface LayerOpts {
    */
   ref?: boolean | number;
   /** With the scene's camera: how much the layer moves with it (1 the world, 0.2 a far backdrop, 0 the screen), or [x, y]. */
-  parallax?: number | [number, number];
+  parallax?: number | [number, number] | { top: number; bottom: number; rows: [number, number] } | ((y: number) => number);
   /** A palette map (keys or "#hex" to keys or "#hex", read in the scene's palette) on everything the layer draws: a time of day. */
   swap?: Record<string, string> | Record<string, string>[];
   /** With a list of swaps: where it is along them (0 the first, 1.5 halfway from the second to the third), the later ordered-dithered in; or (c) => that, c the layer's canvas (c.frame, c.camera). */

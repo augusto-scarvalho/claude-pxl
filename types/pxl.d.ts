@@ -199,8 +199,8 @@ declare global {
     /** Draw the layer's stamps sorted: "y" by where they stand (top-down props), "z" by their z. */
     sort?: "y" | "z";
     x?: number; y?: number; hidden?: boolean; density?: number; solid?: boolean; wall?: boolean; unlit?: boolean;
-    /** With the scene's camera: how much it moves with it, 1 the world (default), 0.2 a far backdrop, 0 the screen (a HUD); or [x, y]. */
-    parallax?: number | [number, number];
+    /** With the scene's camera: how much it moves with it, 1 the world (default), 0.2 a far backdrop, 0 the screen (a HUD); or [x, y]; by row, a floor in perspective: { top, bottom, rows: [y0, y1] } or (y) => k, what has a pivot going by whole at its pivot's row. */
+    parallax?: number | [number, number] | { top: number; bottom: number; rows: [number, number] } | ((y: number) => number);
     /** A palette map on everything the layer draws (stamps, tiles, strips, functions), keys read in the scene's palette: another time of day (a kit's side.DUSK); or a list of them, mixed by `mix`. */
     swap?: Record<string, PxColor> | Record<string, PxColor>[];
     /** With a list of swaps: where it is along them (0 the first, 1.5 halfway from the second to the third), the later one ordered-dithered in; or (c) => that (c.frame, c.camera). */
@@ -869,7 +869,7 @@ declare global {
    * else their index), a group of them; through an orthographic view or a perspective() camera; the east
    * the west flipped where the thing is its own mirror and its light from the picture's middle (mirror: "auto").
    */
-  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown>; draw?: (c: PxCanvas, v: { heading: string; screen(p: number[]): number[]; depth(p: number[]): number }) => void; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number; /** the genre() its sprites are made for */ genre?: string; /** what they are by its ink (character, tree, prop) */ category?: string }): PxTurnaround;
+  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown>; draw?: (c: PxCanvas, v: { heading: string; screen(p: number[]): number[]; depth(p: number[]): number }) => void; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number; /** "foot": each sprite's pivot on its drawn foot (its data's foot: the lowest row over where it meets the ground), not the origin */ pivot?: "foot"; /** the genre() its sprites are made for */ genre?: string; /** what they are by its ink (character, tree, prop) */ category?: string }): PxTurnaround;
   /**
    * A figure on the 3D layer: a skeleton (`body`) posed per frame by the file's own `pose(i, heading)`,
    * its parts fields along the bones (`parts(j, pose)`: j.limb, j.ball or fields, each painted by a

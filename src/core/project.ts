@@ -779,8 +779,9 @@ export class Project implements BuildCtx {
       try {
         if (typeof given !== "string" || !given || !isPlainObject(opts)) throw new PxError('turnaround("house", make3d.house(), { view: "iso", n: 8, ppm: 16 })');
         const name = this.qualify(given);
-        checkKeys("turnaround", opts, ["view", "ppm", "n", "headings", "part", "mats", "light", "as", "size", "spacing", "surface", "draw", "frames", "fps", "mirror", "pad", "genre", "category"]);
-        const o = opts as { view?: unknown; ppm?: number; n?: number; headings?: unknown; part?: string; mats?: unknown; light?: unknown; as?: string; size?: number; spacing?: number; surface?: unknown; draw?: unknown; frames?: number; fps?: number; mirror?: unknown; pad?: number; genre?: string; category?: string };
+        checkKeys("turnaround", opts, ["view", "ppm", "n", "headings", "part", "mats", "light", "as", "size", "spacing", "surface", "draw", "frames", "fps", "mirror", "pad", "pivot", "genre", "category"]);
+        const o = opts as { view?: unknown; ppm?: number; n?: number; headings?: unknown; part?: string; mats?: unknown; light?: unknown; as?: string; size?: number; spacing?: number; surface?: unknown; draw?: unknown; frames?: number; fps?: number; mirror?: unknown; pad?: number; pivot?: unknown; genre?: string; category?: string };
+        if (!(o.pivot === undefined || o.pivot === "foot")) throw new PxError(`turnaround: pivot "foot" puts each sprite's pivot on its drawn foot (its lowest pixel over where it meets the ground); without it, the thing's origin. Got ${JSON.stringify(o.pivot)}`);
         if (!(o.draw === undefined || typeof o.draw === "function")) throw new PxError(`turnaround: draw is (c, v) => { ... }, drawing by hand over each heading (v.screen(p), v.depth(p) of a point in m), got ${JSON.stringify(o.draw)}`);
         if (!(o.surface === undefined || isPlainObject(o.surface))) throw new PxError(`turnaround: surface is more of surface()'s options ({ soft, outline, rim, ao, shadows }), got ${JSON.stringify(o.surface)}`);
         const { frames, fps = 8, ppm = 16, pad = 2, mirror = "auto", view = "iso" } = o;
@@ -801,6 +802,7 @@ export class Project implements BuildCtx {
         const field = b?.field;
         if (!(field instanceof Sdf)) throw new PxError("turnaround: a field (sdf.*), a built thing (make3d.house(...)) or a world with { part }: something solid");
         if (persp && o.draw) throw new PxError("turnaround: draw (by hand over each heading) is for an orthographic view (\"side\", \"top\", \"iso\" or { kind, pitch })");
+        if (persp && o.pivot) throw new PxError("turnaround: pivot \"foot\" is for an orthographic view (\"side\", \"top\", \"iso\" or { kind, pitch }): through a camera, where it stands is where it looks");
         const H = headingsOf(o.n ?? 8, o.headings, !persp && kind === "iso"), clocks = clocksOf(frames, fps);
         const T = turnViews(view, ppm, field, H.map((h) => h.deg), clocks, pad);
         // mirrored (the east from the west, as the traveler's) where the thing is its own mirror and its light
@@ -828,6 +830,18 @@ export class Project implements BuildCtx {
           const [l, t, r, b] = [x0, y0, x1, y1].map(Math.round);
           if (pts.length) c.setBox("footprint", l, t, r - l, b - t);
         };
+        // its drawn foot, the frame's data (and its pivot by pivot: "foot"): the lowest row drawn over where it meets
+        // the ground (the footprint's columns; none: the origin's), at the origin's x. At pitch 10 a trunk's near
+        // side reaches 6-8 px under the origin: stamped by the origin on a bed's row, it went into the paving under it
+        const foot = (c: Canvas) => {
+          const img = c.img, fp = img.boxes?.footprint?.[0], px = Math.floor(T.pivot[0]);
+          const [a, b] = fp ? [Math.max(0, fp[0]), Math.min(img.w - 1, fp[0] + fp[2])] : [px - 1, px];
+          for (let y = img.h - 1; y >= 0; y--) for (let x = a; x <= b; x++) if (img.data[y * img.w + x] !== TRANSPARENT) {
+            c.setData({ foot: [T.pivot[0], y] });
+            if (o.pivot) img.pivot = [T.pivot[0], y];
+            return;
+          }
+        };
         H.forEach((_, i) => {
           if (twin[i] >= 0) return;
           const v = T.views[i], light = Array.isArray(L) ? turnLight(L as number[], v.turn) : L;
@@ -838,14 +852,16 @@ export class Project implements BuildCtx {
           const lay = (p: number[], q: number[]) => (p[0] + at0[0]) * q[0] + (p[1] + at0[1]) * q[1] + (p[2] + at0[2]) * q[2];
           const screen = pr && ((p: number[]) => [org[0] + lay(p, pr.a), org[1] + lay(p, pr.b)]);
           const hand = pr && o.draw ? { heading: H[i].name, screen, depth: (p: number[]) => -lay(p, pr.D) } : undefined;
-          define(kindA, names[i], [{ w: T.w, h: T.h, pivot: T.pivot, ...height, ...genre, ...(frames ? { frames, fps } : {}) }, (c: Canvas) => {
+          define(kindA, names[i], [{ w: T.w, h: T.h, ...(o.pivot ? {} : { pivot: T.pivot }), ...height, ...genre, ...(frames ? { frames, fps } : {}) }, (c: Canvas) => {
             const gt = this.genreTones(o.genre);
             c.draw3d(thing, ("tones" in gt ? { ...draw, surface: { ...gt, ...(o.surface as object) } } : draw) as never);
             if (hand) (o.draw as (c: Canvas, v: unknown) => void)(c, hand);
-            if (screen) footprint(c, c.frame, screen);
+            if (screen) { footprint(c, c.frame, screen); foot(c); }
           }]);
         });
-        H.forEach((_, i) => { if (twin[i] >= 0) define(kindA, names[i], [{ base: names[twin[i]], flip: "x", pivot: T.pivot, ...genre }]); });
+        // (a mirror's foot mirrored with it: the flip carries the data as it is; by pivot: "foot", its pivot is its twin's, flipped)
+        const mirrorFoot = (c: Canvas) => { const f = c.img.info?.foot as number[] | undefined; if (f) c.setData({ foot: [c.img.w - f[0], f[1]] }); };
+        H.forEach((_, i) => { if (twin[i] >= 0) define(kindA, names[i], [{ base: names[twin[i]], flip: "x", ...(o.pivot ? {} : { pivot: T.pivot }), ...genre }, mirrorFoot]); });
         for (const n of names) this.assets.get(n)!.grounded = true;
         (env.group as (n: string, m: string[]) => void)(name, names);
         this.turnarounds.set(name, { heads: H, loc });

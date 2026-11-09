@@ -298,6 +298,24 @@ scene("s", { w: 40, h: 40, world: { scale: 16, ground: 30 } }, stamp("b_s", 12, 
   assert.match(r.lines[0], /b_n @-, feet [\d,]+ › WARNING: its feet \(y 33\) are 3 px below the ground \(y 30\)/);
 });
 
+test("turnaround's foot: each heading's drawn foot as data (the lowest row over where it meets the ground), pivot \"foot\" puts its pivot there, the pixels the same", () => {
+  // a trunk as a capsule from the origin up: its round tip and its near side, seen at pitch 10, reach under the origin
+  const src = (o: string) => loadSource(PAL + `ramps("kgw")
+const F = sdf.capsule([0, 0, 0], [0, 0, 1.6], 0.15).union(sdf.sphere(0.35).at(0, 0, 1.6))
+turnaround("t", F, { view: { kind: "side", pitch: 10 }, ppm: 36, n: 4, mats: { "": "kgw" }, light: [0, -0.5, 1]${o} })`, "t.px.js");
+  const p = src(""), q = src(', pivot: "foot"'), low = (im: ReturnType<typeof p.image>) => { let y0 = -1; for (let y = 0; y < im.h; y++) for (let x = 0; x < im.w; x++) if ((im.get(x, y) & 255) > 0) y0 = y; return y0; };
+  for (const h of ["n", "e", "s", "w"]) {
+    const a = p.image(`t_${h}`), b = q.image(`t_${h}`), f = a.info!.foot as number[];
+    assert.equal(a.hash(), b.hash(), `${h}: the same pixels`);
+    assert.deepEqual([f[1], a.pivot![1] < f[1] - 4], [low(a), true], `${h}: the foot is its lowest row, ${f[1] - a.pivot![1]} px under the origin`);
+    assert.deepEqual([b.pivot, b.info!.foot], [f, f], `${h}: pivot "foot" on it`);
+  }
+  // the east, its west's mirror: its foot mirrored with it
+  assert.equal(p.assets.get("t_e")!.opts.base, "t_w");
+  assert.deepEqual([p.image("t_e").info!.foot, q.image("t_e").pivot], [[p.image("t_w").w - (p.image("t_w").info!.foot as number[])[0], (p.image("t_w").info!.foot as number[])[1]], p.image("t_e").info!.foot]);
+  assert.match(failure(PAL + `turnaround("e", sdf.sphere(0.3), { view: "side", pivot: "bottom" })`).message, /pivot "foot" puts each sprite's pivot on its drawn foot/);
+});
+
 test("surface: a material's hems hang under it, its strokes lighter where the sun is, a back rim at least that far up its ramp", () => {
   const draw = (mat: string, o = "") => keys(loadSource(PAL + `sprite("a", { w: 24, h: 24 }, surface(sdf.box([0.6, 0.4, 0.4]).at(0, 0, 0.5), { view: "side", ppm: 24, at: [12, 20], mats: { m: ${mat} }${o} }))`, "t.px.js"), "a").split("\n");
   const plain = draw('"kgrw"'), low = (rows: string[]) => Math.max(...rows.flatMap((r, y) => (/[^.]/.test(r) ? [y] : [])));

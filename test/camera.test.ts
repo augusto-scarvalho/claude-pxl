@@ -88,6 +88,23 @@ test("layers by depth: the world moves with the camera, a backdrop by its parall
   assert.match(failure(PAL + 'scene("s", { w: 4, h: 4 }, layer("l", { parallax: 0.5 }, px(0, 0, "r")))', "s").message, /parallax moves a layer with the scene's camera/);
 });
 
+test("a layer's parallax by row (a floor in perspective): each row its own, what has a pivot goes by whole at its pivot's row", () => {
+  // the camera 20 px along at frame 5; the floor 0.5 at row 2 and above, 1 at row 6 and below; a post (pivot at its foot, row 5) and a pivotless slab
+  const p = loadSource(PAL + `sprite("post", { w: 1, h: 4, pivot: [0, 3] }, rect(0, 0, 1, 4, "r"))
+sprite("slab", { w: 1, h: 6 }, rect(0, 0, 1, 6, "b"))
+scene("lv", { w: 20, h: 8, bg: "k", frames: 11, fps: 10, camera: { world: [100, 8], follow: (f) => [10 + 4 * f, 6], window: [0, 0], ahead: 0, ease: 1, speed: 1000 } },
+  layer("floor", { parallax: { top: 0.5, bottom: 1, rows: [2, 6] } }, (c) => { for (let y = 0; y < 8; y++) c.px(28, y, "w") }, stamp("post", 32, 5), stamp("slab", 26, 1)))`, "t.px.js");
+  const b = p.build("lv", 0, 500), cx = b.camera!.at[0], at = (key: number, y: number) => { for (let x = 0; x < 20; x++) if (b.img.get(x, y) === key) return x; return -1; };
+  const [w, r, bl] = ["w", "r", "b"].map((k) => p.assets.get("lv")!.pal.resolve(k)!), k = (y: number) => 0.5 + 0.5 * Math.min(1, Math.max(0, (y - 2) / 4));
+  assert.equal(cx, 20);
+  assert.deepEqual([0, 2, 4, 6, 7].map((y) => at(w, y)), [18, 18, 13, 8, 8], "the painted column: each row by its own");
+  assert.deepEqual([2, 3, 4, 5].map((y) => at(r, y)), [14, 14, 14, 14], "the post: whole, by its pivot's row");
+  assert.deepEqual([1, 3, 6].map((y) => at(bl, y)), [16, 13, 6], "the slab (no pivot): laid on it, row by row");
+  assert.equal(b.placements.find((q) => q.name === "post")!.x, 32 - Math.round(cx * k(5)), "logged where it is drawn");
+  assert.match(failure(PAL + 'scene("s", { w: 4, h: 4 }, layer("l", { parallax: { top: 0.5, bottom: 1, rows: [0, 3] } }, px(0, 0, "r")))', "s").message, /parallax moves a layer with the scene's camera/);
+  assert.match(failure(PAL + 'scene("s", { w: 4, h: 4, camera: { world: [8, 4], follow: () => [0, 0] } }, layer("l", { parallax: { top: 0.5 } }, px(0, 0, "r")))', "s").message, /parallax by row is \{ top, bottom, rows/);
+});
+
 test("what is off the window isn't drawn and changes no pixel: each frame is the whole world cut at the camera; --world draws its box", () => {
   const p = level(), w = level("at", { wholeWorld: true });
   for (const f of [0, 9, 24]) {

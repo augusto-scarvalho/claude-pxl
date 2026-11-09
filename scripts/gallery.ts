@@ -56,6 +56,7 @@ const shots: [string, string, number, number?, string?][] = [
   ["race_topdown.px.js", "race_topdown", 640, 1, "racing_topdown"],
   ["race_behind.px.js", "race_behind", 480, 1, "racing_behind"],
   ["nightfall/nightfall.px.js", "nightfall", 640, 2, "platformer16_nightfall"],
+  ["fighting/shrine_round.px.js", "shrine_round", 640, 1, "fighting_shrine"],
 ];
 
 // --lib: a contact sheet per subject, each card's cells at frame 0 (a family's s heading), bottoms aligned,

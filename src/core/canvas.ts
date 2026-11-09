@@ -158,6 +158,11 @@ export class Canvas {
   get view(): [number, number, number, number] { return [-this.ox, -this.oy, this.img.w, this.img.h]; }
   /** A scene's camera this frame, [x, y, w, h] in the world, the same in every layer whatever its parallax (--world: the frame's real one); none without a camera. */
   camera?: [number, number, number, number];
+  /**
+   * On a layer whose parallax goes by row (a floor in perspective): how far the row of this canvas at image
+   * row r is cut from it, so what has a pivot is drawn sheared against the rows and goes by whole at its pivot's.
+   */
+  rowShift?: (r: number) => number;
 
   color(c: unknown): Resolved {
     return this.pal.resolve(c);
@@ -1505,10 +1510,17 @@ export class Canvas {
   /** Draw `src` with its pivot (default: `def`, as a fraction of its size) on (x, y). */
   private putAt(src: Img, x: number, y: number, def: [number, number], ok?: Pred, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc" | "sort" | "rel" | "code">): void {
     const [px, py] = src.pivot ?? [src.w * def[0], src.h * def[1]];
-    if (sub) this.subPut(src, x - Math.floor(px), y - Math.floor(py), sub);
+    // on a floor by row: what stands (it has a pivot) goes by at its pivot's row, each of its rows put against its own
+    const rs = src.pivot && this.rowShift, top = Math.floor(y) - Math.floor(py), d0 = rs ? rs(this.oy + Math.floor(y)) : 0;
+    if (rs) for (let j = 0; j < src.h; j++) {
+      const row = src.sub(0, j, src.w, 1);
+      if (j) row.lamps = undefined;
+      this.put(row, x - Math.floor(px) + rs(this.oy + top + j) - d0, top + j, ok);
+    }
+    else if (sub) this.subPut(src, x - Math.floor(px), y - Math.floor(py), sub);
     else this.put(src, x - Math.floor(px), y - Math.floor(py), ok);
     // logged where it was drawn: blit floors a fractional position (stamp("p", 282 + 8 * 0.88, y))
-    if (name) this.log?.push({ name, x: Math.floor(this.ox + x - Math.floor(px)), y: Math.floor(this.oy + y - Math.floor(py)), w: src.w, h: src.h, layer: this.layerName, img: src, ...meta });
+    if (name) this.log?.push({ name, x: Math.floor(this.ox + x - Math.floor(px)) - d0, y: Math.floor(this.oy + y - Math.floor(py)), w: src.w, h: src.h, layer: this.layerName, img: src, ...meta });
   }
 
   stamp(name: string, x: number | PlaceOpts = 0, y: number | "ground" = 0, opts?: PlaceOpts): void {

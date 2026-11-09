@@ -160,6 +160,14 @@ densities have no picture).
 
 ![vfx](../docs/gallery/lib/vfx.png)
 
+**Stages** (`stages/`): a fighting game's stages as an engine takes them (MUGEN's stage `.def`): the shrine at dusk,
+at noon and at night (`shrine.px.js`, on the `fighting` genre), each its layers as sprites at their parallax widths (the
+sky, three ranges by `terrain()`, the middle planes, the floor going by row), its loops (the lanterns' flames, a
+falling leaf, clouds, petals, snow, mist) and its layout as data (`stage.LAYOUT`, on its still's frame), drawn in a
+scene by `stage.layers()` through `stage.camera()` (`examples/fighting/shrine_round.px.js`).
+
+![stages](../docs/gallery/lib/stages.png)
+
 `styles/` holds palettes (and, in `fields`, the cards of the engine's own builders, `make3d.rock`,
 `house`, `bush`, `pine`, drawn in its colors), `profiles/` the genres (`topdown16`, `topdown32`,
 `platformer16`, `hd2d`, `fighting`, `racing_behind`, `racing_topdown`: each number's source beside

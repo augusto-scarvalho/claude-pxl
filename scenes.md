@@ -502,6 +502,13 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   world with the camera's box, to judge the framing (`--world --every 20`: the box every 20 frames on
   one world, each showing its own frame); `describe` says where each thing is in the world
   and what is off the picture (`examples/camera.px.js`).
+- **A floor in perspective** (a fighting stage's, a beat 'em up's): its rows go by at their own speeds,
+  slower at its back, the world's at the fighters' line (MUGEN's floor `xscale` top and bottom; 3S's in
+  42 strips), so what stands at its back doesn't slide on it: `parallax: { top: 0.75, bottom: 1, rows:
+  [162, 204] }` on its layer (or `(y) => k`). What it paints goes row by row; what it stamps with a pivot
+  (a tree, its bed and curb, a lantern) goes by whole at its pivot's row, so it stays on the ground it
+  stands on (`lib/stages/shrine.px.js`: the stage's floor, and each thing on it as a plane at its row's
+  parallax, the way a stage's `.def` gives an engine its layers).
 - **The hero's way through it**: `route({ px: "side", pace, ground, gravity, rise, walk, idle, air })`,
   each leg its own pace and anim (a run, a dash, a walk to a door), `{ to: x }` along the ground,
   `{ jump: [x, y] }` by gravity in the anim's four parts (`air: { jump, apex, fall, land }`, picked by
@@ -995,7 +1002,9 @@ and drawn as pixel art (`PXL help sdf`; `examples/sdf/`). A billboard tree drawn
   surface()'s look (a tree's); `draw: (c, v) => ...` draws by hand over each heading where `v.screen(p)`
   puts a point: what hangs off it (paper streamers under a rope), which a decal, cut at its surface, can't. Something symmetric lit from above or in front mirrors its west
   for its east, as a game flips it (`examples/sdf/turnaround.px.js`): a sprite the game flips is lit
-  from straight above.
+  from straight above. Its pivot is the thing's origin; what reaches under it (a trunk's round tip and near side, 6-8 px at
+  pitch 10) goes into what is under the row it is stamped on: `pivot: "foot"` puts each sprite's pivot on
+  its drawn foot (the lowest row over where it meets the ground, `foot` in each frame's data either way).
 - **Out to other tools.** `export3d` writes `.vox`, `.obj`, `.glb` and `.ply`; something that moves,
   as a function of the clock with `frames`, goes out as one `.glb` that plays (and a file a moment for
   the others). `pxl serve` shows the `.glb` and `.ply` to turn round at `/3d`. `mesh()` draws a mesh
