@@ -200,6 +200,8 @@ lib/characters/knight.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placemen
   ran: front marker on 150, cards' cells against their drawing on 1, rig parts 690
 lib/characters/miko.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: cards' cells against their drawing on 1, views' rows on 1, figures' feet on 320 poses; not run: front marker (nothing has one)
+lib/characters/miko_spectator.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: lines on 2, genres' checks on 16 frames, genres' ink by material on 16 frames (12% of the edge near-black), cards' cells against their drawing on 1, figures' feet on 32 poses; not run: front marker (nothing has one)
 lib/characters/reva.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: cards' cells against their drawing on 1; not run: front marker (nothing has one)
 lib/characters/reva_fighter.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
@@ -274,6 +276,8 @@ lib/styles/nature.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements),
   ran: nothing; not run: front marker (nothing has one)
 lib/ui/dialog.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: cards' cells against their drawing on 1; not run: front marker (nothing has one)
+lib/ui/fight_hud.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: cards' cells against their drawing on 2; not run: front marker (nothing has one)
 lib/ui/font5x7.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: cards' cells against their drawing on 2; not run: front marker (nothing has one)
 lib/ui/hearts.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)

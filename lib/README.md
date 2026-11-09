@@ -99,7 +99,10 @@ miss and a hold (the Tongs, a low running grab that swings her past his hip onto
 round to her; the Quench, an anti-air grab over his head that plunges her straight down before his feet), made as she is, his hands modeled on his rig (their
 shape, roll and wrist a pose's numbers), hurt and hit boxes and frame data with the motion an engine applies, 3 palette
 slots on his sheet); what the two share, the vectors, the lying legs, the toon, the shadows by design, the cleanup and the
-boxes, and her strikes' smear (`fighter.px.js`).
+boxes, and her strikes' smear (`fighter.px.js`); the miko as their stage's spectator, 64 px at the fighters' proportions
+(`miko_spectator.px.js`, `fighting`: watching, a breath, cheering, her arms thrown up, and sweeping with a bamboo
+broom, made as they are, her clothes as games' models that dress like her build theirs, her head turned by pxl to 3/4
+and mended, a palette slot per stage's light).
 
 ![characters](../docs/gallery/lib/characters.png)
 
@@ -127,7 +130,10 @@ rung for a distance.
 
 ![architecture](../docs/gallery/lib/architecture.png)
 
-**UI** (`ui/`): the dialogue box, the 5x7 font, life hearts (top-down at 16 and 32, side on).
+**UI** (`ui/`): the dialogue box, the 5x7 font, life hearts (top-down at 16 and 32, side on); a fighting game's HUD in
+two styles, lacquer and gold, paper and ink (`fight_hud.px.js`, `fighting`: the life bars as MUGEN builds them, a back,
+the lag and the front for an engine to crop, the timer's plate and digits, the round markers, and where each goes as
+data).
 
 ![ui](../docs/gallery/lib/ui.png)
 
