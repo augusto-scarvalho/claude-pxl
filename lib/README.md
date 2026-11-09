@@ -94,7 +94,9 @@ push kick facing her, a straight leg shot out from his crouch, a kick in the air
 folded over his arm, turned over and slammed on her back, bound frame by frame to her thrown drawings, held between his
 arms) and his command throw in three strengths (the Sledge, the Anvil, the Rivet: a smith bringing iron down on an
 anvil), his reactions as a heavy takes a hit (hit high, in the body, crouching, knocked off his feet
-onto his shoulders, lying in profile, getting up by a push from the floor), made as she is, his hands modeled on his rig (their
+onto his shoulders, lying in profile, getting up by a push from the floor), his two specials, each an attempt with its
+miss and a hold (the Tongs, a low running grab that swings her past his hip onto her back behind him, then turns him
+round to her; the Quench, an anti-air grab over his head that plunges her straight down before his feet), made as she is, his hands modeled on his rig (their
 shape, roll and wrist a pose's numbers), hurt and hit boxes and frame data with the motion an engine applies, 3 palette
 slots on his sheet); what the two share, the vectors, the lying legs, the toon, the shadows by design, the cleanup and the
 boxes, and her strikes' smear (`fighter.px.js`).
