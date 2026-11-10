@@ -20,7 +20,8 @@
 // grabs (`bind`, `release`, `caught`, `takes`), the wave (`spawn`), the sparks, the shake, the dust (`fx`). As it runs
 // it checks: no two bodies overlapping on the floor, both inside the screen and the camera inside its bounds, no move
 // ending with a fighter's back to the other, life falling only on a hit and never below 0, a hit or a block on the
-// floor landing at most 20 px deep (the reach table's); a broken rule throws, naming its tick.
+// floor landing at most 20 px deep (the reach table's), a jump kick asked only in a jump's air; a broken rule throws,
+// naming its tick.
 // round.result() gives what the engine kept, for a file that includes this one: `sim` (a tick each: the camera, each
 // fighter's frame where he is), `real` (the scene's clock: the timer, the bars, the miko) and `log` (one line per event:
 // each move started, each hit, block or whiff and its spark, each knockdown, turn, grab and release, each life).
@@ -232,7 +233,9 @@ round.play = (script) => {
     if (move === "guard") { f.queue.shift(); f.guard = n + arg; return start(f) }
     if (f.bound || f.ko || !(NEUTRAL.has(f.cur.move) || (move === "jump_kick" && f.cur.move === "jump" && frame(f).data.air))) return
     f.queue.shift()
-    if (move === "jump_kick") { f.body = f.cur; play(f, "jump_kick"); f.cur.boxed = true; return }
+    // (a jump kick is played over a jump's air: asked anywhere else, it is the choreography's mistake)
+    if (move === "jump_kick") { if (f.cur.move !== "jump") throw new Error(`round: tick ${n}: ${f.id}'s jump_kick asked in ${f.cur.move}, out of a jump's air`)
+      f.body = f.cur; play(f, "jump_kick"); f.cur.boxed = true; return }
     if (move === "walk_f" || move === "walk_b") { f.walk = n + arg; if (f.cur.move !== move) play(f, move); return }
     if (move === "crouch") { f.crouch = n + arg; if (!CROUCHED.has(f.cur.move)) play(f, "crouch"); return }
     if (move === "jump") { play(f, "jump"); f.jv = (arg > 0 ? f.jump[0] : arg < 0 ? f.jump[1] : 0) * f.s; return }
