@@ -59,6 +59,7 @@ ik(a, b, [x, y], bend?)                 // two bones from (0, 0) reaching for th
 ik3(a, b, l1, l2, hint)                 // the same in 3D: bones l1 and l2 from point a reaching for b, the joint between them pushed toward the way `hint` (a knee forward); out of reach, straight
 has(name)                               // is there an asset or a group of that name yet (a generated part made once)
 sockets(name)                           // an asset's sockets from where a stamp puts it (its pivot), read as the file loads: { top: [dx, dy] }, a route's point on a prop's top (examples/nightfall/)
+timeline(name)                          // an anim's frames as an engine reads them, in playback order (a still: one), each { ms, w, h, pivot, bounds (the drawn pixels' box [x, y, w, h]), boxes, data }, not its pixels; read when called (as the file loads, or from a scene's function): a fight played from its fighters' frame data (examples/fighting/round.px.js)
 ```
 
 A rig is a sprite: each slot is a joint `at`, a box `size` (the part's size, outline included), the

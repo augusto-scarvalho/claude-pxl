@@ -59,9 +59,13 @@ export function encodeGif(frames: GifFrame[]): Buffer {
   out.push(0x21, 0xff, 11, ...Buffer.from("NETSCAPE2.0"), 3, 1, 0, 0, 0);   // loop forever
 
   const minSize = Math.max(2, bits);
-  let prev: Uint8Array | undefined;
+  let prev: Uint8Array | undefined, due = 0;
   for (const { img, ms } of merged) {
-    const cs = Math.max(2, Math.round(ms / 10));
+    // in centiseconds, each frame's rounding carried to the next, so the loop keeps its length (30 fps: 3, 4, 3 cs); only
+    // the rounding's half a cs at most: what the 2 cs floor adds (60 fps) isn't taken from a later frame
+    due += ms / 10;
+    const cs = Math.max(2, Math.round(due));
+    due = Math.max(-0.5, Math.min(0.5, due - cs));
     const idx = new Uint8Array(w * h);
     for (let y = 0; y < img.h; y++)
       for (let x = 0; x < img.w; x++) {

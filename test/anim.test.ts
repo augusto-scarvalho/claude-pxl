@@ -148,6 +148,14 @@ test("gif: frames decode back to the same pixels and delays", () => {
   assert.deepEqual(g.frames[0].rgba[1], 0xff0000);
   assert.deepEqual(g.frames[1].rgba[7], 0xffffff);
   assert.deepEqual(g.frames[1].rgba[8], 0x0000ff);
+  // a delay in no whole centisecond: each frame's rounding carried on, the loop as long as its frames (30 fps)
+  const c = new Img(1, 1), d = new Img(1, 1);
+  c.fill(pack(255, 0, 0)); d.fill(pack(0, 0, 255));
+  const thirty = decodeGif(encodeGif(Array.from({ length: 6 }, (_, i) => ({ img: i % 2 ? c : d, ms: 1000 / 30 }))));
+  assert.deepEqual(thirty.frames.map((f) => f.delay), [3, 4, 3, 3, 4, 3]);
+  // frames under 2 cs (60 fps) shown at 2 cs: no debt carried, a hold after them keeps its length
+  const sixty = decodeGif(encodeGif([...Array.from({ length: 100 }, (_, i) => ({ img: i % 2 ? c : d, ms: 1000 / 60 })), { img: d, ms: 500 }]));
+  assert.equal(sixty.frames[100].delay, 50);
 });
 
 test("gif: a scene stores only what changed in each frame, and decodes back to every pixel", () => {
@@ -412,4 +420,18 @@ test("anim: c.setBox and c.setData reach the sheet's JSON and the .aseprite, a f
   assert.deepEqual(r.lines, ["wild › WARNING: box 'hit' [2, 1, 5, 1] leaves its 4x4 frame (frame 1): an engine reads it as it is; keep it inside, or give the asset room (w, h)"]);
   assert.match(r.coverage, /boxes on 6 frames/);
   assert.throws(() => loadSource(PAL + `sprite("s", { w: 2, h: 2 }, (c) => c.setBox("hit", 0, 0, -1, 1))`, "t.px.js").image("s"), /setBox\(kind, x, y, w, h\)/);
+});
+
+test("anim: timeline() reads an anim's frames in playback order, their ms, pivot, boxes and data, as the file loads or as a scene draws", () => {
+  const p = loadSource(PAL + `anim("jab", { w: 8, h: 6, pivot: [2, 5] }, rect(0, 0, 8, 6, "r"),
+    frame({ ms: 50 }, (c) => c.setBox("hurt", 1, 1, 4, 5)), frame({ ms: 33 }, (c) => { c.setBox("hit", 5, 2, 3, 1); c.setData({ damage: 3, step: [2, 0] }) }))
+  sprite("rock", { w: 2, h: 2 }, rect(0, 0, 2, 2, "r"))
+  const T = timeline("jab"); T[1].data.step[0] = 9
+  sprite("read", { w: 1, h: 1 }, (c) => c.setData({ T, again: timeline("jab")[1].data.step[0], rock: timeline("rock") }))`, "t.px.js");
+  const { T, again, rock } = p.image("read").info as { T: unknown[]; again: number; rock: unknown[] };
+  assert.deepEqual(T, [{ ms: 50, w: 8, h: 6, pivot: [2, 5], bounds: [0, 0, 8, 6], boxes: { hurt: [[1, 1, 4, 5]] } },
+    { ms: 33, w: 8, h: 6, pivot: [2, 5], bounds: [0, 0, 8, 6], boxes: { hit: [[5, 2, 3, 1]] }, data: { damage: 3, step: [9, 0] } }]);
+  assert.equal(again, 2, "a copy: changing it leaves the anim's own");
+  assert.deepEqual(rock, [{ ms: 0, w: 2, h: 2, bounds: [0, 0, 2, 2] }], "a still: one frame");
+  assert.throws(() => loadSource(PAL + `timeline("nope")`, "t.px.js"), /timeline: the name of an asset defined so far/);
 });

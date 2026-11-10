@@ -57,6 +57,7 @@ const shots: [string, string, number, number?, string?][] = [
   ["race_behind.px.js", "race_behind", 480, 1, "racing_behind"],
   ["nightfall/nightfall.px.js", "nightfall", 640, 2, "platformer16_nightfall"],
   ["fighting/shrine_round.px.js", "shrine_round", 640, 1, "fighting_shrine"],
+  ["fighting/round.px.js", "round", 640, 1, "fighting_round"],
 ];
 
 // --lib: a contact sheet per subject, each card's cells at frame 0 (a family's s heading), bottoms aligned,
@@ -110,10 +111,11 @@ for (const [file, name, width, every0 = 1, as = name] of (args.includes("--lib")
   const b = p.build(name);
   const s = Math.max(1, Math.floor(width / b.img.w)), every = EVERY || every0, tl = b.anim;
   if (tl) {
-    // one frame in N: only those built (on a clock; frames of their own lengths are all built)
+    // one frame in N: only those built (on a clock; frames of their own lengths are all built); the whole loop, past
+    // the 600 frames a preview stops at (the fighting round's 680)
     const frames = every > 1 && !tl.durations
       ? Array.from({ length: Math.ceil(Math.round(tl.loop / tl.step) / every) }, (_, i) => ({ img: p.build(name, 0, i * every * tl.step).img.scale(s), ms: tl.step * every }))
-      : p.frames(name).filter((_, i) => i % every === 0).map((f) => ({ img: f.img.scale(s), ms: f.ms * every }));
+      : p.frames(name, 0, Infinity).filter((_, i) => i % every === 0).map((f) => ({ img: f.img.scale(s), ms: f.ms * every }));
     writeFileSync(join(out, as + ".gif"), encodeGif(frames));
   } else writeFileSync(join(out, as + ".png"), encodePng(b.img.scale(s)));
   console.log(`${name} ${b.img.w}x${b.img.h} @${s}x`);

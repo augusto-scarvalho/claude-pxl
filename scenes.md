@@ -1043,7 +1043,10 @@ rig3d("hero", { body: { h: TOPDOWN.scale.character[0] * TOPDOWN.grid, heads: TOP
 
 - **Fighting:** the feet on one ground line through each move (`"ground"`): a front foot drawn a row
   up on the active frames is the float a player sees. Hit and hurt boxes by `c.setBox`, the phase by
-  `c.setData`; palette slots by `sheet(..., { slots })`.
+  `c.setData`; palette slots by `sheet(..., { slots })`. A round played from that data, as an engine reads it
+  (`examples/fighting/round.px.js`): `timeline(name)` gives each frame's ticks, drawn box, boxes and data, the file's
+  engine runs a choreography once at 60 ticks a second (steps, pushes, hits, blocks, throws, the camera, the KO) and
+  the scene draws a picture every 2 ticks from what it kept.
 - **Action top-down:** the same height in every direction (`"height"`, the head over the ground
   point: feet that land a row apart seen from behind don't count). The figures are seen from the
   ground's 45 (`pitch`) with a chibi's body, 2.1 heads in 3D, the torso twice the legs: the head 54% of

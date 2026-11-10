@@ -1085,6 +1085,8 @@ declare global {
   function has(name: string): boolean;
   /** An asset's sockets from where a stamp puts it (its pivot), read as the file loads: { top: [dx, dy] }, a route's point on a prop's top. */
   function sockets(name: string): Record<string, [number, number]>;
+  /** An anim's frames as an engine reads them, in playback order (a still: one): each its ms, size, pivot, the drawn pixels' box, boxes and data, not its pixels; read when called. */
+  function timeline(name: string): { ms: number; w: number; h: number; pivot?: [number, number]; bounds?: [number, number, number, number]; boxes?: Record<string, [number, number, number, number][]>; data?: Record<string, unknown> }[];
 
   function px(x: number, y: number, c: PxColor): PxOp;
   function closeLine(keys?: string | string[]): PxOp;

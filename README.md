@@ -378,6 +378,21 @@ drawn in 3D through the fighting camera and planted on their drawn foot (`turnar
 "foot" })`). The stage's loops play (flames, a falling leaf, clouds, petals, snow, mist), Reva and Haldor
 idle where a round starts, the miko watches in the stage's palette slot, and the HUD is the library's.
 
+<p>
+  <img src="docs/gallery/fighting_round.gif" width="100%" alt="Animated pixel art of a 2D fighting game's round on a Shinto shrine's approach at dusk, under a vermilion torii, maples and stone lanterns: a slim woman fighter in a red top and blue trousers against a huge bald smith in a leather apron. They walk in; her jab and her low kick are blocked high and low with cold sparks; his hammer blow folds her and she slides back; she walks back in and her front kick hits his belly; she throws a golden wave of energy that hits him; he jumps over a second wave and kicks her head; he grabs her, turns her over and slams her on her back in a cloud of dust as the screen shakes, and she gets up; she jumps in with a kick to his head and, landing, steps back and punches his body; she jumps over him and lands behind, both turn to face each other; her roundhouse kick hits his head as he crouches; she crosses him again, both turn crouching, and she steps back and sweeps him; he catches her in the air as she jumps in and plunges her to the floor; at the end he jumps at her and her rising spinning kick meets him in the air, the game slows down and he falls and lies still while she steps in and, as her round marker lights, throws one fist up over her head, holding the pose to the end, both in view. The camera follows them, each has a shadow, a shrine maiden at the back throws her arms up on each fall, and the life bars fall, the timer counts down and a round marker lights">
+</p>
+
+[`examples/fighting/round.px.js`](examples/fighting/round.px.js): the round itself, played by an engine in the file
+from the fighters' frame data, as `lib/profiles/fighting.px.js` says an engine reads it: `timeline()` gives each
+frame's ticks, drawn box, hit and hurt boxes and data, and a choreography runs once at 60 ticks a second, each move
+asked waiting until its fighter is free. Steps and turns, the bodies pushed apart, hits once a move with their
+hitstop, shake, pushback and reaction, blocks high and low, a throw and an anti-air grab binding her between his arms,
+the wave, sparks, dust and the screen's shake; the camera following the two by the games' tension (after the KO, both
+as drawn), the bars and their lag, the timer, the KO slowed, the winner's pose (`win`) as her marker lights. Its rules
+are checked every tick (no bodies overlapping, both on the screen, no move ending with a back to the other, life
+falling only on a hit, no hit on the floor landing deeper than the reach table's 20 px), and the scene draws a picture
+every 2 ticks from what it kept.
+
 ### 3D as code: fields, voxels, volumes, splats, decals
 
 <p>

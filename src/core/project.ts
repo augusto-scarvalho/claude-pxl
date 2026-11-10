@@ -1390,6 +1390,19 @@ export class Project implements BuildCtx {
       const img = this.image(name, 0, 0, false), [px, py] = img.pivot ?? [0, 0];
       return Object.fromEntries(Object.entries(img.sockets ?? {}).map(([k, [x, y]]) => [k, [x - Math.floor(px), y - Math.floor(py)]]));
     };
+    // timeline("name"): an anim's frames as an engine reads them, in playback order (a still: one), each { ms, w, h, pivot,
+    // bounds, boxes, data }, not its pixels (bounds: the drawn pixels' box); read when called, as the file loads or from a
+    // scene's function (a fight played from them)
+    env.timeline = (name: unknown) => {
+      if (typeof name !== "string" || !this.has(name)) throw new PxError(`timeline: the name of an asset defined so far, got ${JSON.stringify(name)}`, this.callerLoc());
+      const pick = this.candidates(name)[0], tl = this.timeline(pick), ms = tl ? tl.durations ?? Array.from({ length: Math.round(tl.loop / tl.step) }, () => tl.step) : [0];
+      let t = 0;
+      return ms.map((d) => {
+        const im = this.image(pick, 0, t, false), b = im.bounds();
+        t += d;
+        return { ms: d, w: im.w, h: im.h, ...(im.pivot ? { pivot: [...im.pivot] } : {}), ...(b ? { bounds: [b.x, b.y, b.w, b.h] } : {}), ...(im.boxes ? { boxes: structuredClone(im.boxes) } : {}), ...(im.info ? { data: structuredClone(im.info) } : {}) };
+      });
+    };
     env.figure = (h: unknown, heads?: unknown) => {
       try { return figure(h as number, heads as number | undefined); } catch (e) { throw wrap(e).within("figure", this.callerLoc()); }
     };
