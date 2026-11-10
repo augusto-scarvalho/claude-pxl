@@ -137,8 +137,8 @@ rung for a distance.
 
 **UI** (`ui/`): the dialogue box, the 5x7 font, life hearts (top-down at 16 and 32, side on); a fighting game's HUD in
 two styles, lacquer and gold, paper and ink (`fight_hud.px.js`, `fighting`: the life bars as MUGEN builds them, a back,
-the lag and the front for an engine to crop, the timer's plate and digits, the round markers, and where each goes as
-data).
+the lag and the front for an engine to crop, the timer's plate and digits, the round markers, the announcer's calls
+ROUND 1-3, FIGHT! and K.O., and where each goes and when each call shows as data).
 
 ![ui](../docs/gallery/lib/ui.png)
 

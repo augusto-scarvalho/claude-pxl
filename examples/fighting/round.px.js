@@ -13,7 +13,11 @@
 // the timer 60 counts of 60 ticks; the KO 60 ticks slowed to a quarter (back to full over its last 45), the timer
 // stopped, the loser lying for good (the winner's moves still played), the winner's round marker lit 90 ticks after
 // and her win pose (`win`, MUGEN's 181) played from her guard with it, its last drawing held to the end (15.6);
-// the miko cheering 120 ticks on each knockdown and on the KO. The rest is the profile's: a frame's `step` as it shows
+// the miko cheering 120 ticks on each knockdown and on the KO. Before control, the announcer's calls, the HUD's, as its
+// layout times them (15.8): both in their guards with the timer at 60, ROUND 1 from tick 30, FIGHT! from 126, control at
+// 144 (the choreography's ticks and the timer count from it; 144 ticks are 3 of her idles and 2 of his, so both guards
+// stand at their first drawing then, as the round started before); K.O. at the KO's hit, over the slowed fall, 120
+// ticks of the scene's clock. The rest is the profile's: a frame's `step` as it shows
 // (a walk's spread over its ticks, its speed), `flip`, the hits (once a move, `hitstop` freezing both, the one hit
 // shaking, `pushback` sliding him at the friction of 0.85 a tick, his reaction as he stood, `knockdown`, `invuln`,
 // `damage`), the blocks (a low attack blocked only crouching, an attack from the air only standing), the throws and
@@ -23,8 +27,9 @@
 // floor landing at most 20 px deep (the reach table's), a jump kick asked only in a jump's air; a broken rule throws,
 // naming its tick.
 // round.result() gives what the engine kept, for a file that includes this one: `sim` (a tick each: the camera, each
-// fighter's frame where he is), `real` (the scene's clock: the timer, the bars, the miko) and `log` (one line per event:
-// each move started, each hit, block or whiff and its spark, each knockdown, turn, grab and release, each life).
+// fighter's frame where he is), `real` (the scene's clock: the timer, the bars, the miko, the call) and `log` (one line per
+// event: each call and control, each move started, each hit, block or whiff and its spark, each knockdown, turn, grab
+// and release, each life).
 include("../../lib/stages/shrine.px.js", { palette: true, as: "shrine" })
 include("../../lib/characters/reva_fighter.px.js", { as: "reva_fighter" })
 include("../../lib/characters/haldor_fighter.px.js", { as: "haldor_fighter" })
@@ -38,6 +43,8 @@ var round = {}
 {
 const STAGE = "shrine_dusk", L = stage.LAYOUT[STAGE], [W, H] = genre("fighting").screen, FLOOR = L.floor, [X0, X1] = L.camera.x
 const TICK = 1000 / 60, tk = (ms) => Math.round(ms / TICK), TICKS = 1420
+// the announcer's calls before control (the HUD's layout): the round's ticks from control, the scene's from its start
+const CALLS = fightHud.LAYOUT.lacquer.announce, INTRO = CALLS.ctrl, ALL = INTRO + TICKS
 // the engine's numbers (the study's 15.5)
 const TENSION = 60, EDGE = 15, FRICTION = 0.85, SLOW = { ticks: 60, speed: 0.25, back: 45 }, OVER = 45, COUNT = 60, CHEER = 120, QUAKE = 12, DEEP = 20
 // the fighters: their bodies on the floor [front, back] and in the air, the height a jump must clear to pass over them,
@@ -224,11 +231,11 @@ round.play = (script) => {
     cam = Math.max(X0, Math.min(X1, Math.round(ko ? cam + Math.max(-1, Math.min(1, c - cam)) : c)))
     for (const f of F) if (!f.bound) f.x = Math.max(cam + EDGE, Math.min(cam + W - EDGE, f.x))
   }
-  // the choreography: the next move asked, started once he is free (a walk or a crouch for its ticks, a guard held);
-  // after the KO only the winner's
+  // the choreography: the next move asked (its tick counted from control), started once he is free (a walk or a crouch
+  // for its ticks, a guard held); after the KO only the winner's
   const start = (f) => {
     const q = f.queue[0]
-    if (!q || q[0] > n || (ko && f !== ko.winner)) return
+    if (!q || q[0] + INTRO > n || (ko && f !== ko.winner)) return
     const [, move, arg] = q
     if (move === "guard") { f.queue.shift(); f.guard = n + arg; return start(f) }
     if (f.bound || f.ko || !(NEUTRAL.has(f.cur.move) || (move === "jump_kick" && f.cur.move === "jump" && frame(f).data.air))) return
@@ -309,10 +316,11 @@ round.play = (script) => {
     sim.push(snap()); n++
   }
   // the clock the scene sees: 60 ticks a second, the game's own slowed after the KO (a quarter, back to full over the
-  // last 45 of its 60); the timer, the bars' lag, the miko and the round marker on it
+  // last 45 of its 60); the timer (from control), the bars' lag, the miko, the round marker and the calls on it
   const real = [], lag = [1, 1], wait = [0, 0], LAG = fightHud.LAYOUT.lacquer.lag, LEN = fightHud.LAYOUT.lacquer.bars.length
   let was = [1, 1], acc = 0, koT = -1, cheer = -Infinity, seen = 0
-  for (let T = 0; T < TICKS; T++) {
+  const tick4 = (T) => `t${String(T).padStart(4, "0")}`
+  for (let T = 0; T < ALL; T++) {
     const u = koT < 0 ? Infinity : T - koT
     acc += u < SLOW.ticks - SLOW.back ? SLOW.speed : u < SLOW.ticks ? SLOW.speed + ((1 - SLOW.speed) * (u - SLOW.ticks + SLOW.back)) / SLOW.back : 1
     while (acc >= 1 - 1e-9) { step(); acc -= 1; if (ko && koT < 0) koT = T }
@@ -321,14 +329,19 @@ round.play = (script) => {
     // (the lag: after each hit it waits LAG.wait ticks, then falls LAG.speed px a tick to the life)
     for (const k of [0, 1]) if (life[k] < was[k]) wait[k] = LAG.wait; else if (lag[k] > life[k]) { if (wait[k] > 0) wait[k]--; else lag[k] = Math.max(life[k], lag[k] - LAG.speed / LEN) }
     was = life
-    real.push({ n: n - 1, life, lag: [...lag], time: String(Math.max(0, COUNT - Math.floor((koT < 0 ? T : koT) / 60))).padStart(2, "0"),
-      wins: koT >= 0 && T >= koT + 2 * OVER ? F.map((f) => (f === ko.winner ? 1 : 0)) : [0, 0], miko: T - cheer < CHEER ? ["miko_spectator.cheer", (T - cheer) * TICK] : ["miko_spectator.watch", T * TICK] })
+    // (the calls: said in the log as each comes; the K.O.'s ticks are the scene's, the sim's slowed under them)
+    const call = fightHud.calling("lacquer", T, { ko: koT < 0 ? undefined : koT }), A = call && CALLS[call.text]
+    if (call?.t === 0) log.push(`${tick4(T)} the announcer calls ${call.text === "round" ? "ROUND 1" : call.text === "fight" ? "FIGHT!" : "K.O."}, ${A.show} ticks of the scene's clock`)
+    if (T === INTRO) log.push(`${tick4(T)} control: both free, the timer counting from ${COUNT}`)
+    real.push({ n: n - 1, life, lag: [...lag], time: String(Math.max(0, COUNT - Math.floor(Math.max(0, (koT < 0 ? T : koT) - INTRO) / 60))).padStart(2, "0"), call,
+      wins: koT >= 0 && T >= koT + 2 * OVER ? F.map((f) => (f === ko.winner ? 1 : 0)) : [0, 0], miko: T - cheer < CHEER ? ["miko_spectator.cheer", (T - cheer) * TICK] : ["miko_spectator.watch", (T - INTRO) * TICK] })
   }
   return { sim, real, sparks, dusts, quakes, log, ko, koT }
 }
 
 // ---------------------------------------------------------------- the choreography: each fighter's moves and when each is asked
-// [tick, move, then the ticks a walk, a crouch or a held guard lasts, or a jump's way: 1 forward, -1 back]. The beats,
+// [tick from control, move, then the ticks a walk, a crouch or a held guard lasts, or a jump's way: 1 forward, -1 back]
+// (the engine starts each INTRO ticks later, after the calls). The beats,
 // each where 6h1's reach table says its attack lands:
 // 1 the round starts, both in their guards where the layout puts them;
 // 2 footsies: they walk in; her jab, blocked high; her low kick, blocked low (he crouches for it); his hammer blow
@@ -345,7 +358,7 @@ round.play = (script) => {
 //   cheering;
 // 7 both low, he jumps at her and her rise_kick meets him in the air: the KO, slowed; he lies, she steps in as the
 //   slowdown ends (his fall carries him 149 px: from where it left her, the two as drawn would not fit the screen), and
-//   when her round marker lights (sim tick 1230: 90 ticks of the scene's clock after the KO, 15.6) she plays her win,
+//   when her round marker lights (tick 1230: 90 ticks of the scene's clock after the KO, 15.6) she plays her win,
 //   its pose reached 36 ticks later and held 2 s to the end
 const SCRIPT = {
   reva: [[60, "walk_f", 10], [72, "jab"], [100, "walk_f", 10], [116, "crouch_kick"], [210, "walk_f", 26], [236, "kick_l"],
@@ -366,7 +379,7 @@ const SCRIPT = {
 // ---------------------------------------------------------------- the scene: a picture every 2 ticks
 let R
 const result = () => { if (!R) { R = round.play(SCRIPT); if (!R.ko) throw new Error(`round: no KO in its ${TICKS} ticks: the choreography's last beat missed`) } return R }
-const at = (f) => result().real[Math.min(TICKS - 1, 2 * f)], sim = (f) => { const r = at(f); return R.sim[r.n] }
+const at = (f) => result().real[Math.min(ALL - 1, 2 * f)], sim = (f) => { const r = at(f); return R.sim[r.n] }
 // (the shake: the picture thrown down only, 3 px to 1 as it dies away, every other 2 ticks; the strip it leaves at the
 // top repeats the sky's first row, flat under the HUD, where one thrown up would repeat the paving's last row in streaks)
 const quakeAt = (n) => { const q = R.quakes.find(([n0, d]) => n >= n0 && n < n0 + d); return q && Math.floor(n / 2) % 2 ? Math.ceil((3 * (q[0] + q[1] - n)) / q[1]) : 0 }
@@ -376,13 +389,15 @@ const ticksOf = {}
 const effects = (c, list, n, cam) => { for (const e of list) { const fr = (ticksOf[e.name] ??= timeline(e.name).map((q) => tk(q.ms))); let t = n - e.n, k = 0
   while (k < fr.length && t >= fr[k]) t -= fr[k++]
   if (t >= 0 && k < fr.length) c.stamp(e.name, Math.round(e.x - cam), FLOOR + Math.round(e.y ?? 0), { frame: k, ...(e.s < 0 ? { flip: "x" } : {}) }) } }
-const FRAMES = TICKS / 2
+const FRAMES = ALL / 2
+// (the stage's loops on the round's clock from control, as stage.layers counts a scene's time over the fight's frames:
+// the intro before it plays the loops' end)
 scene("round", { w: W, h: H, frames: FRAMES, fps: 30, camera: stage.camera(STAGE, (f) => sim(f).cam), check: { every: 10 } },
-  ...stage.layers(STAGE, { ticks: TICKS, spectator: { name: (c) => at(c.frame).miko, swap: mikoSpectator.SLOTS },
+  ...stage.layers(STAGE, { ticks: ALL, clock: (c) => ((c.frame - INTRO / 2) * TICKS * TICK) / (TICKS / 2), spectator: { name: (c) => at(c.frame).miko, swap: mikoSpectator.SLOTS },
     shadows: (c) => { const s = sim(c.frame); return s.shadows.map(([x, rx]) => [Math.round(x - s.cam), FLOOR + 1, rx, 3]) },
     fighters: [layer("fighters", { parallax: 0 }, (c) => { const s = sim(c.frame), n = at(c.frame).n
       effects(c, R.dusts, n, s.cam); s.F.forEach((f) => stampOf(c, s.cam, f)); s.W.forEach((w) => stampOf(c, s.cam, w)); effects(c, R.sparks, n, s.cam) })] }),
   (c) => c.shake(0, quakeAt(at(c.frame).n)),
-  layer("hud", { parallax: 0 }, (c) => { const r = at(c.frame); fightHud.draw(c, "lacquer", { life: r.life, lag: r.lag, time: r.time, names: FIGHTERS.map((f) => f.name), wins: r.wins }) }))
-Object.assign(round, { SCRIPT, FIGHTERS, TICKS, result })
+  layer("hud", { parallax: 0 }, (c) => { const r = at(c.frame); fightHud.draw(c, "lacquer", { life: r.life, lag: r.lag, time: r.time, names: FIGHTERS.map((f) => f.name), wins: r.wins, announce: r.call }) }))
+Object.assign(round, { SCRIPT, FIGHTERS, TICKS, INTRO, result })
 }
