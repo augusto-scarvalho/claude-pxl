@@ -173,9 +173,10 @@ test("make3d.car (lib/vehicles/car): parts, sockets, its decal; 32 rotations a l
   // its camera, scale, light and line (car.TD) and the model's settings for them (car.TOP): another number of turns, the same car
   const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");
   writeFileSync(f, `include(${JSON.stringify(join(import.meta.dirname, "../lib/vehicles/car.px.js"))}, { as: "car", palette: true })
-turnaround("racer", make3d.car({ ...car.SPEC.laguna, ...car.TOP, number: "roundel_laguna" }), { ...car.TD, n: 16, mats: car.LIVERY.laguna })`);
+const T = turnaround("_racer3", make3d.car({ ...car.SPEC.laguna, ...car.TOP, number: "roundel_laguna" }), { ...car.TD, ppm: car.TD.ppm * 1.05 * 3, n: 16, mats: car.LIVERY.laguna })
+T.names.forEach((n) => sprite(n.replace("_racer3", "racer"), { base: n, shrink: { by: 3 } }))`);
   const q = loadProject(f);
-  assert.equal(q.groups.get("racer")!.members.length, 16);
+  assert.equal(q.groups.get("_racer3")!.members.length, 16);
   assert.equal(q.image("racer_ne").hash(), p.image("car_laguna_ne").hash());
 });
 

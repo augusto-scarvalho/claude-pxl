@@ -60,8 +60,8 @@ grass by corners, the field's tiles, tall grass, a bank's earth front and a hedg
 and a bed of them, a bush, a rock, a stump; the same ground at a 32 px grid by its band functions (four drawings a piece, richer), three flowers
 redrawn there, tufts, tall grass (and cut), a bush and a rock drafted in 3D and finished by hand: `island32.px.js`, `topdown32`; the oak, the maple, the spruce and the boulder also by
 hand at `topdown/32` over their drafts); a platformer's world side on (`side.px.js`, `platformer16`: the
-ground as tiles by their open sides under a grass lip, their faces and undersides ragged, slopes, water, an oak, a
-pine, two bushes, the backdrop's far and near clouds and hills; `side.ground(map)` draws a level; the same at dusk
+ground as tiles by their open sides under a grass lip, their faces and undersides ragged, slopes, water, oaks and
+pines at 40, 60 and 80 px (`oak_small`, `oak`, `pine`, `pine_tall`), a set-piece oak at 128 (`oak_big`, its wood a 3D render frozen), two bushes, the backdrop's far and near clouds and hills; `side.ground(map)` draws a level; the same at dusk
 and at night by a palette swap, `side.DUSK` and `side.NIGHT`, with the sky as the air at each time, `side.sky`, and
 the full moon); the trackside's oak (`make3d.oak_lifted`, its crown lifted so its trunk shows), spruce, bush and rock
 for `racing_topdown`, drawn by their 3D builders from its 58 degrees in the track kit's colors, each part lined all
@@ -74,7 +74,7 @@ backdrop strip that wraps in four layers, `sky`, `clouds`,
 
 **Characters** (`characters/`): the traveler and the people on his figure (the crew, the miko), what
 they wear (`dress.px.js`), the top-down hero and the people made from him (`hero.character()`: two villagers,
-Reva's chibi), the villager and the elder at 48 px on the slim body (`villagers32.px.js`, by `hero32.character()`), the same hero at 48 px for top-down 32 on the genre's slim body (`hero32.px.js`, `topdown32`: idle,
+Reva's chibi in her vest and in her fighter's clothes, `reva_fight_*`), the villager and the elder at 48 px on the slim body (`villagers32.px.js`, by `hero32.character()`), the same hero at 48 px for top-down 32 on the genre's slim body (`hero32.px.js`, `topdown32`: idle,
 walk, run and the sword attack with its crescent) and on its chibi body (`chibi_*`, to approve), the same hero side on for a platformer (`hero_side.px.js`,
 `platformer16`: idle, walk, run and sprint (a run that speeds up), a dash with its afterimage and dust, a jump in four to loop the rise and the fall (jump, apex,
 fall, land), hurt, a ladder's climb and his back at a door), a slime (also at 32),
@@ -143,7 +143,7 @@ ROUND 1-3, FIGHT! and K.O., and where each goes and when each call shows as data
 ![ui](../docs/gallery/lib/ui.png)
 
 **Vehicles** (`vehicles/`): a car for racing, `make3d.car` (a coupe with a ducktail wing, two liveries by roles,
-its roof's mark a decal, sockets `exhaust` and `tow`), turned to its 32 rotations from 58 degrees at
+its roof's mark a decal, sockets `exhaust` and `tow`), turned to its 32 rotations from 58 degrees (each drawn 3 times over and brought down by `shrink`) at
 `racing_topdown` (`car_fuego`, `car_laguna`; `car.facing()` a route's heading to its rotation). A kart for
 `racing_behind` (Mario Kart's kind), `make3d.kart` (an open pipe-frame kart, two liveries by roles) with the top-down
 hero seated in it (`kart.racer()`), turned to its 48 headings (`kart_fuego`, `kart_laguna`; `kart.facing()`), painted

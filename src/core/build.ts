@@ -3,7 +3,7 @@
 import { Canvas, FACING, type Placed, type Placement, type Resolver, betweenKey } from "./canvas.ts";
 import { type Color, MIXES, TRANSPARENT, oklab, pack, toHex } from "./color.ts";
 import { PxError, wrap } from "./errors.ts";
-import { Img, type Lamp } from "./image.ts";
+import { Img, type Lamp, mapPoints, moveBoxes } from "./image.ts";
 import { reduceEdges } from "./vision.ts";
 import { applyGlow } from "./glow.ts";
 import { applyLighting } from "./light.ts";
@@ -260,8 +260,14 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     if (opts.shrink !== undefined) {
       const pv = base.pivot, k = typeof opts.shrink === "number" ? opts.shrink : opts.shrink.by, o = pv ? pv.map((v) => ((Math.round(v) % k) + k) % k) : [0, 0];
       if (o[0] || o[1]) base = base.sub(o[0], o[1], base.w - o[0], base.h - o[1]);
+      const { sockets, boxes, grounded } = base, down = (f: (v: number) => number) => (x: number, y: number): [number, number] => [f(x / k), f(y / k)];
       base = shrinkBy(base, opts.shrink, pal);
       if (pv) base.pivot = [Math.floor((pv[0] - o[0]) / k), Math.floor((pv[1] - o[1]) / k)];
+      // its sockets and boxes (a turnaround's footprint) with it: a socket in its pixel's block, as the pivot is; a
+      // box's edges to the nearest block's; and that it stands on its pivot (a turnaround's drawing)
+      if (sockets) base.sockets = mapPoints(sockets, down(Math.floor));
+      if (boxes) base.boxes = moveBoxes(boxes, down(Math.round));
+      if (grounded) base.grounded = true;
     }
   } else if (def.png) {
     // A strip anim ({ frames: n }) shows the n-th equal slice; anything else the whole image.

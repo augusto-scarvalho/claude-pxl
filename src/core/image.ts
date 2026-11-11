@@ -483,7 +483,7 @@ export function mapPoints(pts: Record<string, [number, number]>, f: (x: number, 
 }
 
 /** A copy of boxes, each moved by f: the box round its four corners moved (a flip, a quarter turn, a shift keep it exact). */
-function moveBoxes(boxes: NonNullable<Img["boxes"]>, f: (x: number, y: number) => [number, number]): NonNullable<Img["boxes"]> {
+export function moveBoxes(boxes: NonNullable<Img["boxes"]>, f: (x: number, y: number) => [number, number]): NonNullable<Img["boxes"]> {
   return Object.fromEntries(Object.entries(boxes).map(([k, bs]) => [k, bs.map(([x, y, w, h]) => {
     const c = [f(x, y), f(x + w, y), f(x, y + h), f(x + w, y + h)], xs = c.map((p) => p[0]), ys = c.map((p) => p[1]);
     const x0 = Math.min(...xs), y0 = Math.min(...ys);

@@ -106,6 +106,15 @@ sprite("lined", { w: 6, h: 6 }, rect(0, 0, 6, 6, "f"), rect(5, 0, 1, 2, "k"), re
   bad(`sprite("x", { w: 2, h: 2 }, (c) => c.closeLine(5))`, /closeLine takes the line's keys/);
 });
 
+test("shrink on a base carries its sockets and boxes, scaled as its pivot is (a turnaround's footprint)", () => {
+  const p = loadSource(`pal({ f: "#c8783c" })
+sprite("big", { w: 31, h: 31, pivot: [16, 31], sockets: { hand: [27, 12] } }, rect(4, 4, 24, 24, "f"), (c) => c.setBox("footprint", 7, 22, 18, 9))
+sprite("small", { base: "big", shrink: { by: 3 } })
+sprite("plain", { base: "big", shrink: 3 })`, "s.px.js");
+  // (a block left off at the pivot's 16 % 3 and 31 % 3, then a third: the socket 27, 12 in the block 8, 3, as a pixel is; the box's corners 7, 22 and 25, 31 at 2, 7 and 8, 10)
+  for (const n of ["small", "plain"]) assert.deepEqual([p.image(n).pivot, p.image(n).sockets, p.image(n).boxes], [[5, 10], { hand: [8, 3] }, { footprint: [[2, 7, 6, 3]] }], n);
+});
+
 test("pxl check --edges: a LOOK line on any sprite, base or not, naming each kind with where", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-edges-")), file = join(dir, "a.px.js");
   writeFileSync(file, `pal({ f: "#c8783c" })
