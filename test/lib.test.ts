@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, resolve, sep } from "node:path";
 import { pack } from "../src/core/color.ts";
 import { Img } from "../src/core/image.ts";
 import { lch } from "../src/core/vision.ts";
@@ -71,7 +71,7 @@ test("pxl lib: the catalog by subject, filters by cell and genre", () => {
 
 test("pxl lib <entry>: a card with what a build of it reads; --genre hd2d lists its cell", () => {
   const lamp = libCard("lamps._lamp").join("\n"), oak = libCard("make3d.oak").join("\n"), tr = libCard("traveler.tr").join("\n");
-  assert.match(lamp, /take +include\("lib\/props\/lamps\.px\.js", \{ as: "lamps" \}\)/);
+  assert.ok(lamp.includes(`take      include("${resolve("lib/props/lamps.px.js").split(sep).join("/")}", { as: "lamps" })  // its whole path`), lamp);
   assert.match(lamp, /source +2D by hand \(rect\)\n.*\n +size +7x30, pivot 3\.5,30\n/);
   assert.match(lamp, /roles +frame F, light Ll: base "lamps\._lamp", swap: roleSwap\(lamps\.ROLES\._lamp/);
   assert.match(oak, /params +height 0\.5\.\.40, season spring summer autumn bare, color 0\.\.9/);
@@ -87,6 +87,18 @@ test("pxl lib <entry>: a card with what a build of it reads; --genre hd2d lists 
   assert.doesNotMatch(hd2d, /_lamp_tiny|make3d\.birch/);
 });
 
+test("pxl lib <entry>: its take an include of the file's whole path, right in an art file in any folder (it was relative to where pxl ran)", () => {
+  const was = process.cwd(), dir = mkdtempSync(join(tmpdir(), "pxl-take-"));
+  try {
+    process.chdir(dir);
+    const m = /take +(include\("([^"]+)", \{ as: "car", palette: true \}\))/.exec(libCard("car").join("\n"))!;
+    assert.ok(m && isAbsolute(m[2]) && !m[2].includes("\\") && existsSync(m[2]) && resolve(m[2]) === resolve(was, "lib/vehicles/car.px.js"), m?.[0]);
+    // pasted into a file in another folder, it builds the car there
+    writeFileSync(join(dir, "race.px.js"), `${m[1]}\nsprite("mine", { base: "car.car_fuego_ne" })\n`);
+    assert.equal(loadProject(join(dir, "race.px.js")).image("mine").w, loadProject(m[2]).image("car_fuego_ne").w);
+  } finally { process.chdir(was); }
+});
+
 test("pxl lib draft: a builder at a cell it lacks, written and built; a 2D entry refused", () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-draft-"));
   const said = libDraft("make3d.chozubachi", { cell: "side/16" }, dir).join("\n");
@@ -96,11 +108,12 @@ test("pxl lib draft: a builder at a cell it lacks, written and built; a 2D entry
   assert.ok(existsSync(join(dir, "sprites", "chozubachi_side16_s.png")));
   assert.throws(() => libDraft("lamps._lamp", { cell: "side/16" }, dir), /drawn in 2D: at a new density it is redrawn simpler/);
   // by a genre: its camera, what stands at its stand pitch (topdown16's figures from 45, the rest from 30), fitted to the
-  // card's box (neither side over), its tones; no line (topdown16's ink is the figures' alone, a color by category)
+  // card's box (neither side over: seen from above, both), its tones; its line topdown16's ink for the rest, "selout":
+  // each material lined in its own darkest (surface's ink true)
   const rock = libDraft("make3d.rock", { genre: "topdown16" }, dir).join("\n"), m = /drawn (\d+) tall, (\d+) wide/.exec(rock)!;
-  assert.match(rock, /seen from 30 degrees \(what stands; the ground's 45\), in 3 tones\n/);
+  assert.match(rock, /seen from 30 degrees \(what stands; the ground's 45\), in 3 tones, each material lined in its own darkest \(its ink "selout"\)\n/);
   assert.ok(+m[1] <= 32 && +m[2] <= 32 && Math.max(+m[1], +m[2]) >= 31, rock);
-  assert.match(readFileSync(join(dir, "rock_topdown16.px.js"), "utf8"), /genre\("topdown16", \{ camera: \{ kind: "topdown", pitch: 45 \}, pitch: 45, stand: 30, grid: 16, tones: 3, ink: \{ character: "#1a1620", rest: "selout".*\}\)\nturnaround\("rock_topdown16", make3d\.rock\(\), \{ \.\.\.card\("make3d\.rock"\)\.draw, view: \{ kind: "side", pitch: 30 \}/);
+  assert.match(readFileSync(join(dir, "rock_topdown16.px.js"), "utf8"), /genre\("topdown16", \{ camera: \{ kind: "topdown", pitch: 45 \}, pitch: 45, stand: 30, grid: 16, tones: 3, ink: \{ character: "#1a1620", rest: "selout".*\}\)\nturnaround\("rock_topdown16", make3d\.rock\(\), \{ \.\.\.card\("make3d\.rock"\)\.draw, surface: \{ \.\.\.card\("make3d\.rock"\)\.draw\?\.surface, ink: true \}, view: \{ kind: "side", pitch: 30 \}/);
   assert.throws(() => libDraft("make3d.rock", { genre: "racing_behind" }, dir), /its camera is behind; lib draft draws side, topdown, iso, hd2d/);
   // hd2d: a billboard from its figure's 20 degrees, fitted to the genre's box for the card's category (a bush 0.5 m
   // tall, 0.8 across: 12 x 19 px at 24 px a meter), not at the builder's own height
@@ -127,6 +140,18 @@ test("make3d.cottage (lib/architecture/houses): params in their ranges, parts an
 const edge = (im: Img) => im.data.filter((c, i) => c >>> 24 && [[-1, 0], [1, 0], [0, -1], [0, 1]].some(([u, v]) => { const x = (i % im.w) + u, y = Math.floor(i / im.w) + v; return x < 0 || y < 0 || x >= im.w || y >= im.h || !(im.data[y * im.w + x] >>> 24); }));
 // near-black as pxl study reads an edge: dark and nearly grey
 const black = (c: number) => { const k = lch(c); return k.L < 0.3 && k.C < 0.08; };
+
+test("pxl lib draft make3d.oak --genre platformer16: side on its height fills the tree's box, its width its own; lined by the genre's ink for the rest (selout: each material its own darkest); its clusters a tile", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-draft16-"));
+  const said = libDraft("make3d.oak", { genre: "platformer16" }, dir).join("\n"), m = /drawn (\d+) tall, (\d+) wide/.exec(said)!;
+  // (it stood 33 px in the 64 px box, fitted to the box's 48 px width)
+  assert.ok(+m[1] >= 61 && +m[1] <= 64 && +m[2] > 48, said);
+  assert.match(said, /\(side on, its height fills the box; its own width\).* clusters a tile across \(\{ cluster: 16 \}\), in 3 tones, each material lined in its own darkest \(its ink "selout"\)/);
+  assert.match(readFileSync(join(dir, "oak_platformer16.px.js"), "utf8"), /turnaround\("oak_platformer16", make3d\.oak\(\{ cluster: 16 \}\), \{ \.\.\.card\("make3d\.oak"\)\.draw, surface: \{ \.\.\.card\("make3d\.oak"\)\.draw\?\.surface, ink: true \}/);
+  // its edge the leaves' and the bark's darkest (lib/nature/trees.px.js's oak_summer and bark), nothing lighter
+  const im = loadProject(join(dir, "oak_platformer16.px.js")).image("oak_platformer16_s");
+  assert.deepEqual([...new Set(edge(im))].sort(), [pack(0x14, 0x2a, 0x1a), pack(0x23, 0x1a, 0x20)].sort());
+});
 
 test("make3d.car (lib/vehicles/car): parts, sockets, its decal; 32 rotations a livery from 58, each on its footprint's middle, its line near-black all round; car.facing", () => {
   const p = loadProject("lib/vehicles/car.px.js"), make = (s: string) => p.scope!(`make3d.car(${s})`) as { parts: object; sockets: object; decals: object };

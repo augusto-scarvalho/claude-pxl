@@ -183,10 +183,13 @@ by subject (`pxl lib --genre hd2d`, `pxl lib --cell side/32`); `pxl lib lamps._l
 full name, or the last part of it when only one entry has that: `pxl lib car` is `make3d.car`; none, or
 several, names the near ones) with
 what a build of it reads (its source, size, pivot, footprint, sockets, boxes, frames, roles) and the
-`include` that takes it; `pxl lib draft make3d.oak --genre topdown16` draws a builder in a genre (its
+`include` that takes it, by the file's whole path (paste it in an art file in any folder); `pxl lib draft make3d.oak --genre topdown16` draws a builder in a genre (its
 camera, what stands at its `stand`, else its `pitch`, hd2d's a billboard from 20 degrees; fitted to the genre's box for
 the card's `category`, in tiles on its grid or m at its `ppm`, else to the card's `tiles` on the grid,
-else its own height at the `ppm`; its `tones` and `ink`; `--cell topdown/16` a cell alone). `pxl check` on the file warns where a cell's
+else its own height at the `ppm`: neither side over, but side on its height fills the box and its width is its own;
+its `tones`, and its line the genre's `ink` for its category (else the `rest`): a color all round, or each material
+in its own darkest for `"selout"`, `"own"`, `"material"` (`surface`'s `ink: true`); at a 16 px grid and under, a
+builder that takes `cluster` gets a tile, so a crown reads as a few masses; `--cell topdown/16` a cell alone). `pxl check` on the file warns where a cell's
 status disagrees with how its asset is drawn: a ✎ cell that is the 3D render alone (a retouch by `base`
 over a frozen one is by hand), a ◐ cell drawn by hand, a ✓ live 3D sprite not `frozen`. And it warns at densities mixed by accident (scenes §19),
 unless a genre says the mix (`mix: true`; for a scene, a genre at one of the cells it mixes): a scene

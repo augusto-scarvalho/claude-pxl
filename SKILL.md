@@ -42,16 +42,16 @@ lists every command and flag.
    beside the new one and show both (`PXL shot art.px.js name name_old`); against a reference or an
    approved part, `PXL compare` lists each row's extents. More: `PXL help "scenes 14"`.
 7. If the user wants to watch: start `PXL serve art.px.js` in the background, give them the URL,
-   and stop it when you're done. Never open a page in a headless browser (one froze a laptop), and
-   run one heavy job (a long render, a test run) at a time.
+   and stop it when you're done. Never open a page in a headless browser, and run one heavy job (a
+   long render, a test run) at a time.
 
 ## A big scene: ask how to make it
 
 For a big, busy scene (320×180 and up, many props, animated), ask the user first, with the numbers
 and how long this conversation already is:
 
-- **One agent** (the default): the cheapest and the most coherent (a 320×180 animated street: 85
-  turns, 31 min). In a long conversation, a fresh agent given a brief costs less than going on.
+- **One agent** (the default): cheapest and most coherent (a 320×180 animated street: 85 turns). In
+  a long conversation a fresh agent with a brief costs less.
 - **A pipeline**: a planner and one fork per part, then a fork that puts the scene together:
   denser but less coherent, ~5× the tokens and ~2× the time. Run it from a new session, never
   forked from a long one (each fork rereads all of it).
@@ -154,7 +154,9 @@ closest:
   (a tileset as a level), `topdown.px.js`, `isometric.px.js`.
 - **The library** (`lib/`), to `include` rather than redraw: `PXL lib` lists its entries by subject
   (`--genre topdown16`, `--cell side/32`), `PXL lib <entry>` gives one's card and the `include` that takes it;
-  a 3D entry in a genre: `PXL lib draft <entry> --genre topdown16` (the genres: `lib/profiles/`).
+  a 3D entry in a genre: `PXL lib draft <entry> --genre topdown16` (the genres: `lib/profiles/`). A near fit (its
+  look right; its size, colors or a part wrong) is mended, not redrawn: its params, a `swap`, the part redone. Its
+  pieces beat redrawn ones, defects and all.
 - **Characters**: in `lib/characters/`, `hero` (four directions, a tagged sheet), `knight` (skeleton
   first), `traveler`, `crew`, `miko` (`rig3d`, 8 directions, blocks first); `rig/warden.px.js`,
   `tropical/girl.px.js` (a walk).

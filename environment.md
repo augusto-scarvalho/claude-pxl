@@ -120,7 +120,9 @@ round it.
   says (`marks`: a birch's dashes, a palm's rings, a cherry's lenticels). `season` picks the leaves:
   spring, summer, autumn and bare (a sakura's spring is its blossom); the acacia's summer (the
   rains) and autumn (dry), the baobab's summer and bare; the evergreens the same all year. `color`
-  picks one of an autumn's, `height` is its top, `wind` m its sway (negative: to the west). A new
+  picks one of an autumn's, `height` is its top, `wind` m its sway (negative: to the west), `cluster` the px its
+  leaf clusters are at least across where it's drawn (`make3d.px.cluster`'s 10; a tile at a 16 px grid, as `pxl lib
+  draft` gives it there: a crown of a few masses). A new
   species: the nearest spec copied (a beech the oak's, a sugi the cypress's), its leaves in
   `trees.mats`, then `make3d.define("beech", (o) => trees.grow(BEECH, o), trees.params(BEECH))` (its
   parameters declared: a season it has no leaves for refused); judge it as flat blocks first (a tone

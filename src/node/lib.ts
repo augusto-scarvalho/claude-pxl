@@ -18,11 +18,14 @@ const THREE = new Set(["surface", "mesh", "voxels", "volume", "draw3d", "splats"
 /** A library entry: its card, its file, how a scene takes it (`include(...)`, from the file's header) and the names it goes under. */
 export interface Entry { name: string; card: Card; file: string; subject: string; take?: string; as?: string; opts?: string; genres: string[] }
 
-/** A lib file's own header line `include("<path>/lib/...", { ... })`: how a scene takes it, and its `as`. */
+/**
+ * A lib file's own header line `include("<path>/lib/...", { ... })`: how a scene takes it, by the file's whole path (a
+ * path relative to where pxl ran was wrong in the user's file, anywhere else: the car run's), and its `as`.
+ */
 function takeOf(abs: string): { take?: string; as?: string; opts?: string } {
   const head = readFileSync(abs, "utf8").split("\n").filter((l) => l.startsWith("//")).map((l) => l.slice(2).trim()).join(" ");
   const m = /include\("<path>\/(lib\/[^"]+)"(, \{[^}]*\})?\)/.exec(head);
-  return m ? { take: `include("${rel(join(LIB, "..", m[1]))}"${m[2] ?? ""})`, as: /as: "(\w+)"/.exec(m[2] ?? "")?.[1], opts: m[2] } : {};
+  return m ? { take: `include("${join(LIB, "..", m[1]).split(sep).join("/")}"${m[2] ?? ""})`, as: /as: "(\w+)"/.exec(m[2] ?? "")?.[1], opts: m[2] } : {};
 }
 
 /** A genre() of lib/profiles: its cell, its file, its data. */
@@ -148,7 +151,7 @@ export function libCard(name: string): string[] {
   const row = (k: string, v: string) => out.push(`  ${k.padEnd(9)} ${v}`);
   const ns = e.as, code = (s: string) => { try { return p.scope?.(s); } catch { return undefined; } };
   const kit = ns ? (code(`Object.keys(${ns})`) as string[] | undefined) : undefined;
-  if (e.take) row("take", e.take);
+  if (e.take) row("take", `${e.take}  // its whole path, for an art file in any folder`);
   if (kit?.length) row("kit", `${ns}.${kit.join(", ")}`);
   const cells = Object.entries(c.cells);
   if (c.category) row("category", `${c.category}: a genre's scale box for it sizes its drafts`);
@@ -241,16 +244,22 @@ export function libDraft(name: string | undefined, at: { cell?: string; genre?: 
   // faces us: scenes §16; HD-2D's billboards, as rig3d draws its figures)
   const stand = [G.stand, G.pitch].find((v) => typeof v === "number") as number | undefined;
   const want = box?.map((t) => Math.round(t * (grid ?? ppmG!))), pitch = stand ?? cam.pitch ?? CAMS[kind].pitch ?? 0, board = kind === "hd2d" && stand !== undefined;
-  const tones = Number.isInteger(G.tones) ? (G.tones as number) : undefined, ink = typeof G.ink === "string" && /^(#|.$)/.test(G.ink) ? G.ink : undefined;
+  // its line the genre's ink for what it is (by kind: its card's category, else the rest): a color all round, or each
+  // material lined in its own darkest ("selout", "own", "material": surface's ink true); "none", or a kind it doesn't
+  // name, none
+  const inks = G.ink as unknown, mine = inks && typeof inks === "object" ? (inks as Record<string, unknown>)[c.category ?? ""] ?? (inks as Record<string, unknown>).rest : inks;
+  const tones = Number.isInteger(G.tones) ? (G.tones as number) : undefined, ink = typeof mine !== "string" ? undefined : /^(#|.$)/.test(mine) ? mine : ["selout", "own", "material"].includes(mine) ? true : undefined;
   const view = (ppm: number) => (kind === "iso" ? `"iso"` : kind === "hd2d" && !board ? `perspective({ w: 320, h: 180, pitch: ${cam.pitch ?? -38}, fov: ${cam.fov ?? 30}, ppm: ${ppm} })` : `{ kind: "side", pitch: ${pitch} }`);
   const seen = kind === "iso" ? "in iso" : board ? `from ${pitch} degrees as a billboard (the figure's; the camera's ${-(cam.pitch ?? -38)} down)` : kind === "hd2d" ? `through the HD-2D camera (${-(cam.pitch ?? -38)} degrees down, a ${cam.fov ?? 30} degree lens)`
     : !pitch ? "from the side" : `from ${pitch} degrees${cam.pitch !== undefined && pitch !== cam.pitch ? ` (${typeof G.stand === "number" ? "what stands" : "the figure's"}; the ground's ${cam.pitch})` : ""}`;
   const b = c.name.slice(7), p = loadProject(e.file), tall = (p.scope!(`make3d[${JSON.stringify(b)}]()`) as { field: { bounds(): number[][] } }).field.bounds()[1][2];
+  // at a 16 px grid and under, a builder that takes `cluster` (its clusters' px) gets a tile: a crown a few masses
+  const args = grid && grid <= 16 && "cluster" in (p.builders.get(b)?.params ?? {}) ? `{ cluster: ${grid} }` : "";
   const dir = resolve(out ?? join("out", "_draft")), base = `${b}_${at.genre ?? G.name.replace("/", "")}`, file = join(dir, `${base}.px.js`), up = relative(dir, e.file).split(sep).join("/");
   // its file as pxl's repo names it, for where an approved draft goes
   const home = relative(join(LIB, ".."), e.file).split(sep).join("/"), s = `${base}_s`;
   const size = want ? `${box!.length > 1 ? `a box ${box![0]} ${unit} tall, ${box![1]} wide` : `${box![0]} ${unit} tall`} (${gbox ? `${G.name}'s ${c.category}` : "its card's"}) ${grid ? `on a ${grid} px grid` : `at ${ppmG} px a meter`}` : `at ${ppmG} px a meter`;
-  const how = `${tones ? `, in ${tones} tones` : ""}${ink ? `, a line of ${ink} all round` : ""}`;
+  const how = `${args ? `, clusters a tile across (${args})` : ""}${tones ? `, in ${tones} tones` : ""}${ink === true ? `, each material lined in its own darkest (its ink "${mine}")` : ink ? `, a line of ${ink} all round` : ""}`;
   const say = `pxl lib draft ${e.name} ${at.genre !== undefined ? `--genre ${at.genre}` : `--cell ${at.cell}`}: ${size}, seen ${seen}${how}: the ✎ draft to clean by hand, or ◐ to look at. Change its knobs here; approved, move the turnaround into ${home} and the cell into its card.`;
   const lines = say.split(" ").reduce<string[]>((ls, w) => { if (ls.length && (ls[ls.length - 1] + " " + w).length <= 104) ls[ls.length - 1] += " " + w; else ls.push(`// ${w}`); return ls; }, []);
   const spec = Object.fromEntries(["camera", "pitch", "stand", "grid", "ppm", "tones", "ink"].filter((k) => G[k] !== undefined && G[k] !== null).map((k) => [k, G[k]]));
@@ -258,17 +267,18 @@ export function libDraft(name: string | undefined, at: { cell?: string; genre?: 
     ...lines,
     `include("${up}"${e.opts ?? ""})`,
     `genre("${G.name}", ${js(spec)})`,
-    `turnaround("${base}", make3d.${b}(), { ...card("${c.name}").draw, ${ink ? `surface: { ...card("${c.name}").draw?.surface, ink: "${ink}" }, ` : ""}view: ${view(ppm)}, ppm: ${ppm}, headings: ["s"], genre: "${G.name}" })`,
+    `turnaround("${base}", make3d.${b}(${args}), { ...card("${c.name}").draw, ${ink ? `surface: { ...card("${c.name}").draw?.surface, ink: ${JSON.stringify(ink)} }, ` : ""}view: ${view(ppm)}, ppm: ${ppm}, headings: ["s"], genre: "${G.name}" })`,
     "",
   ].join("\n");
   // fitted to the box: drawn, measured, the ppm scaled by how far off it is (a little under where it's over),
-  // until neither side is over and one is within 6%
+  // until neither side is over and one is within 6%; side on, its height alone (the box's width is air over the
+  // ground there: a broad oak in a tree's box stood half its height), its width its own
   let ppm = want ? +(want[0] / tall).toFixed(2) : ppmG!, q: Project, img: Img;
   for (let i = 0; ; i++) {
     const text = src(ppm);
     q = loadProject(file, {}, (abs) => (abs === file ? text : readFileSync(abs, "utf8")));
     img = q.image(s);
-    const bb = img.bounds(), f = !want || !bb ? 1 : Math.min(want[0] / bb.h, want[1] ? want[1] / bb.w : Infinity);
+    const bb = img.bounds(), f = !want || !bb ? 1 : Math.min(want[0] / bb.h, want[1] && kind !== "side" ? want[1] / bb.w : Infinity);
     if (i === 5 || (f >= 1 && f < 1.06)) break;
     ppm = +(ppm * (f < 1 ? f * 0.98 : f)).toFixed(2);
   }
@@ -278,7 +288,7 @@ export function libDraft(name: string | undefined, at: { cell?: string; genre?: 
   if (r.errors.length) throw r.errors[0];
   const bb = img.bounds();
   return [
-    `${e.name} at ${G.name}: ${want ? `${size}: ${want.length > 1 ? `${want[0]} px tall, ${want[1]} wide` : `${want[0]} px tall`}; drawn ${bb?.h ?? 0} tall, ${bb?.w ?? 0} wide` : size}, its ${tall.toFixed(1)} m at ${ppm} px/m${ppmG && ppm !== ppmG ? ` (drawn ${((bb?.h ?? 0) / ppmG).toFixed(1)} m at ${ppmG})` : ""}, seen ${seen}${how}`,
+    `${e.name} at ${G.name}: ${want ? `${size}: ${want.length > 1 ? `${want[0]} px tall, ${want[1]} wide` : `${want[0]} px tall`}; drawn ${bb?.h ?? 0} tall, ${bb?.w ?? 0} wide${want[1] && kind === "side" && (bb?.w ?? 0) > want[1] ? ` (side on, its height fills the box; its own width)` : ""}` : size}, its ${tall.toFixed(1)} m at ${ppm} px/m${ppmG && ppm !== ppmG ? ` (drawn ${((bb?.h ?? 0) / ppmG).toFixed(1)} m at ${ppmG})` : ""}, seen ${seen}${how}`,
     `  ${rel(file).padEnd(40)} the art file: change its knobs here`,
     `  ${rel(join(dir, "sprites", `${s}.png`)).padEnd(40)} ${img.w}x${img.h}, pivot ${img.pivot?.join(",") ?? "-"}${img.boxes?.footprint ? ", footprint" : ""}: the ✎ draft, or ◐ to look at`,
     `next: pxl shot ${rel(file)} ${s}. Approved: the turnaround into ${home}, the cell into its card (◐ as drawn, ✎ once retouched, ✓ frozen)`,
