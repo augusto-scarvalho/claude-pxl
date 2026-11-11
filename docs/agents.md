@@ -518,7 +518,10 @@ node scripts/pulse.ts walk.px.js walk walk_hybrid       # how many of a walk's n
 stash. `hashes.ts --vs` prints only the lines that differ and a count, and exits 1 when one does (an
 asset the revision hasn't, a new library entry, is listed and counted as new, apart): a
 change meant to move no pixel ends with `0 differ`, frame by frame for the animated files
-(`--only <regex>` narrows a file to some assets; a long scene's frames take a second each). `perf.ts --vs` builds each frame with one
+(`--only <regex>` narrows a file to some assets; a long scene's frames take a second each). A file whose every
+input is the same at the revision (pxl's `src/` and each file it reads: itself, its includes, palettes, PNGs) isn't
+built, and is counted apart: a build is a function of those alone, so an art change costs only the files it reaches
+(`--all` builds every file anyway). `perf.ts --vs` builds each frame with one
 pxl and then the other, alternating, because a laptop's speed drifts within seconds: two runs a
 minute apart differ by more than most changes, and the same pxl against itself reads within 6% on a
 figure. `meter.ts`, preloaded, prints each test file's time, processor time and peak memory: which

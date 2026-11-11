@@ -17,12 +17,16 @@
 // name under them ("crew.tr_walk_e") is keyed without them ("tr_walk_e"), unless the file has that name
 // of its own: the same pixels after an include takes an `as`. A file that doesn't build on its own
 // (included only) prints SKIP; an asset that fails prints ERR and the error's first words.
-import { existsSync } from "node:fs";
+// --vs builds nothing of a file whose every input is the same at the revision: pxl's src/ and each file it reads
+// (itself, its includes, palettes, PNGs: the loader's list). A build is a function of those alone, so its pixels are
+// the same without tracing them; such files are counted apart. --all builds them anyway.
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { frameCount, frameTime } from "../src/node/shot.ts";
 import { examples, inTree, loader, pick, repo, revTree } from "./vs.ts";
 
 const args = process.argv.slice(2), opt = (k: string) => { const i = args.indexOf(k); return i < 0 ? undefined : args.splice(i, 2)[1]; };
+const all = args.includes("--all") && !!args.splice(args.indexOf("--all"), 1);
 const vs = opt("--vs"), only = new RegExp(opt("--only") ?? ""), strip = opt("--strip"), under = strip && new RegExp(`^((${strip})\\.)+`);
 let cap = 1;
 const fi = args.indexOf("--frames");
@@ -49,8 +53,14 @@ function lines(load: (f: string) => any, file: string, name: string): Map<string
 }
 
 const here = await loader(repo), tree = vs ? revTree(vs) : "", there = vs ? await loader(tree) : undefined;
-let same = 0, differ = 0, added = 0;
+// the same bytes here and at the revision: one file, and pxl's whole src/
+const sameFile = (f: string) => { const o = inTree(tree, f); return o === resolve(f) || (existsSync(o) && readFileSync(o).equals(readFileSync(f))); };
+const srcOf = (root: string) => (readdirSync(join(root, "src"), { recursive: true }) as string[]).filter((f) => statSync(join(root, "src", f)).isFile()).sort();
+const sameSrc = !!vs && !all && srcOf(repo).join() === srcOf(tree).join() && srcOf(repo).every((f) => sameFile(join(repo, "src", f)));
+const untouched = (f: string) => { try { return sameSrc && (here(f).files as string[]).every(sameFile); } catch { return false; } };
+let same = 0, differ = 0, added = 0, spared = 0;
 for (const f of files) {
+  if (untouched(f)) { spared++; continue; }
   const rel = relative(join(repo, "examples"), f).split("\\").join("/"), name = rel.startsWith("..") ? f : rel, b = lines(here, f, name);
   if (!there) { for (const [k, h] of b) console.log(`${k} ${h}`); continue; }
   // a file the revision hasn't (a new example): all its lines new, not a SKIP that differs
@@ -63,6 +73,6 @@ for (const f of files) {
   }
 }
 if (vs) {
-  console.log(`${same} the same, ${differ} differ${added ? `, ${added} new` : ""} (${vs} against the working tree)`);
+  console.log(`${same} the same, ${differ} differ${added ? `, ${added} new` : ""} (${vs} against the working tree)${spared ? `; ${spared} file${spared > 1 ? "s" : ""} not built: what ${spared > 1 ? "they read" : "it reads"} and pxl's src are the same at ${vs}` : ""}`);
   if (differ) process.exitCode = 1;
 }

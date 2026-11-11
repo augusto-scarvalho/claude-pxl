@@ -495,7 +495,9 @@ sprite("dot", { w: 4, h: 4 }, (c) => c.rect(1, 1, 2, 2, "r"))
 anim("blink", { w: 4, h: 4, frames: 3, fps: 4 }, (c) => c.rect(c.frame, 0, 1, 1, "k"))`);
   const run = (...a: string[]) => execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "scripts/hashes.ts", ...a, file], { cwd: join(import.meta.dirname, ".."), encoding: "utf8" });
   assert.deepEqual(run("--frames").split("\n").map((l) => l.split(" ")[1]), ["dot", "blink", "blink@1", "blink@2", undefined]);
-  assert.equal(run("--vs", "HEAD", "--frames", "2"), "3 the same, 0 differ (HEAD against the working tree)\n");
+  assert.equal(run("--vs", "HEAD", "--all", "--frames", "2"), "3 the same, 0 differ (HEAD against the working tree)\n");
+  // without --all, a file isn't built when all it reads and pxl's src are the same at the revision (so: when src/ has no change)
+  assert.match(run("--vs", "HEAD", "--frames", "2"), /^(3 the same, 0 differ \(HEAD against the working tree\)|0 the same, 0 differ \(HEAD against the working tree\); 1 file not built: what it reads and pxl's src are the same at HEAD)\n$/);
 });
 
 test("scripts/pulse.ts and served.ts: a blob carried along keeps its normals, one that grows turns them; what the viewer sends", () => {
