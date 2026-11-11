@@ -176,7 +176,7 @@ export function lightWords(img: Img, light?: [number, number], steps?: Steps): s
   const from = `lit from ${side ? dirWords(d[0], d[1]) : dirWords(0, d[1])}`;
   if (!light) return from;
   if (side && Math.abs(light[0]) > 0.2 && Math.sign(d[0]) !== Math.sign(light[0]))
-    return `WARNING: ${from}, but its light comes from ${dirWords(light[0], light[1])} (a flipped drawing carries its light to the other side)`;
+    return `WARNING: ${from}, but its light comes from ${dirWords(light[0], light[1])} (a flipped drawing carries its light to the other side): its ${d[0] > 0 ? "right" : "left"} edge reads lighter than the pixels just inside it, its ${d[0] > 0 ? "left" : "right"} edge darker (PXL help "scenes 14")`;
   return `${from}${side ? ", as its light" : ""}`;
 }
 

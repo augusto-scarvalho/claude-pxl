@@ -65,6 +65,26 @@ sheet("kit", ["gun", "wave"])`, "t.px.js");
   });
 });
 
+test("directions(): each keeps its pose's pivot, a hand-drawn one's own; sheet cell: [w, h] puts each on its pivot in a cell of one size", () => {
+  // the pose at 0 a 3x6 bar turning about its middle; the one at 45 drawn by hand at its own size, its pivot off its canvas's middle
+  const src = (cell: string) => PAL + `sprite("_car", { w: 3, h: 6, pivot: [1.5, 3] }, rect(0, 0, 3, 6, "r"))
+sprite("_car45", { w: 5, h: 6, pivot: [2, 4] }, rect(0, 1, 4, 4, "g"))
+directions("car", 8, { from: "_car", symmetric: true, draw: { 45: "_car45" } })
+sheet("cars", ["car"], { cols: 8${cell} })`;
+  const p = loadSource(src(", cell: [9, 9]"), "t.px.js");
+  assert.deepEqual([p.image("car_0").pivot, p.image("car_1").pivot, [p.image("car_3").w, p.image("car_3").h, ...p.image("car_3").pivot!]], [[1.5, 3], [2, 4], [6, 5, 2, 2]], "a quarter turn of the hand pose carries its pivot");
+  built(p, ["cars"], (dir) => {
+    const j = json(dir, "cars");
+    // (a pivot on a whole px lands half a px off an odd cell's middle)
+    const fs = Object.values(j.frames) as { frame: { w: number; h: number }; pivot: { x: number; y: number } }[];
+    assert.deepEqual(j.meta.size, { w: 72, h: 9 });
+    assert.ok(fs.every((f) => f.frame.w === 9 && f.frame.h === 9 && Math.abs(f.pivot.x * 9 - 4.5) <= 0.51 && Math.abs(f.pivot.y * 9 - 4.5) <= 0.51), JSON.stringify(fs));
+  });
+  const errs = writeOutputs(loadSource(src(", cell: [5, 5]"), "t.px.js"), mkdtempSync(join(tmpdir(), "pxl-")), { only: ["cars"], preview: false }).errors.map((e) => e.message);
+  assert.match(errs[0], /cell \[5, 5\] is too small: 'car_0' doesn't fit round its pivot; cell: \[\d+, \d+\] holds every frame/);
+  assert.throws(() => loadSource(PAL + `sheet("s", [], { cell: [0, 4] })`, "t.px.js"), /cell is each frame's \[w, h\] in px/);
+});
+
 test("genre(): a profile as data, given back with its name; scale a box, checks by name", () => {
   const p = loadSource(PAL + `const G = genre("racing", { camera: { kind: "side", pitch: { flat: 6 } }, grid: 16, scale: { car: [1, 2] }, steer: [-2, 2], checks: ["footprint"] })
 sprite("x", { w: 1, h: 1 }, px(0, 0, G.steer[1] === 2 && G.name === "racing" && G.scale.car[1] === 2 ? "r" : "k"))`, "t.px.js");

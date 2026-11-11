@@ -17,7 +17,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { loadProject } from "./load.ts";
 import { decodePng } from "./png.ts";
 import { encodeGif, reduceColors } from "./gif.ts";
-import { writeOutputs, writePng } from "./output.ts";
+import { packedSheet, writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 import { checkProject, writeMoves } from "./check.ts";
 
@@ -25,7 +25,7 @@ import { checkProject, writeMoves } from "./check.ts";
 const EDGE_RINGS: ["steps" | "doubled" | "tips" | "bridges" | "notches" | "gaps" | "corners", number][] = [["steps", 0xe8202aff], ["doubled", 0xff8c14ff], ["tips", 0xd020d0ff], ["bridges", 0xd020d0ff], ["notches", 0x10c8e0ff], ["gaps", 0xffe020ff], ["corners", 0x20c040ff]];
 import { edit, inspect } from "./edit.ts";
 import { setKnobInSource } from "../core/world3d.ts";
-import { cellRow, diffRow, frameCount, frameTime, greyRow, otherVersion, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
+import { cellRow, diffRow, frameCount, frameTime, greyRow, membersRow, otherVersion, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
 import { libCard, libDraft, libList } from "./lib.ts";
 import { listProject, listText } from "./list.ts";
@@ -43,7 +43,8 @@ const USAGE = `pxl — pixel-art DSL
       pxl's library (lib/): its entries by subject, a line each (its cells: camera/density, a tile's
       px or px a meter (hd2d/24ppm), ✓ approved, ◐ a 3D render to look at, ✎ by hand over a 3D draft),
       only those at the genre's cell or naming it (a genre() of lib/profiles), or at that cell (--cell
-      side: any density). An entry: its card
+      side: any density). An entry (its full name, or its last part when one entry alone has it: car
+      is make3d.car; else the near names): its card
       (what it is, its source, its cells, size, pivot, footprint, sockets, boxes, frames, roles, what
       varies) and the include that takes it.
   pxl lib draft <entry> --genre <name> | --cell <camera>/<density> [--out DIR]
@@ -54,9 +55,11 @@ const USAGE = `pxl — pixel-art DSL
       its own height at the px a meter; in the genre's tones and ink; a cell alone (side, topdown at 45 degrees, iso, hd2d):
       3 tones at 16-32 px. Built to out/_draft/ (or DIR): the ✎ draft to clean by hand, or ◐ to look
       at. A 2D entry is redrawn simpler at a new density, never drafted.
-  pxl build <art.px.js> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world]
+  pxl build <art.px.js> [--out DIR] [--only a,b] [--all] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world]
       Build PNGs (out/sprites, out/scenes, out/anims strips + JSON + GIF, sheets + JSON) and
-      previews (out/_preview; animated assets also get a .gif). --share N also writes out/share/:
+      previews (out/_preview; animated assets also get a .gif): the file's own assets, sheets and
+      scenes (what they use from its includes drawn in them); what an included file defines only
+      when --only names it, or all of it with --all (a file of includes alone writes theirs). --share N also writes out/share/:
       each asset N times bigger, nearest neighbour, clear kept, no checker or grid (and a GIF when
       it moves), to post. A whole file of more than 12 assets
       prints a count of what it wrote; --only and --list print a line per asset (size, frames,
@@ -70,7 +73,8 @@ const USAGE = `pxl — pixel-art DSL
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
       Live viewer: rebuilds on save and replays each asset's painting steps.
   pxl ascii <art.px.js> <name> [--frame N]
-      Print an asset as palette keys with x/y rulers (anims: every frame; --frame N: that one).
+      Print an asset as palette keys with x/y rulers (anims: every frame; --frame N: that one); a color
+      the palette hasn't (a swap's) as the key the swap gave it, else a free one, said under the grid.
   pxl list  <art.px.js>
       A map of the file (and what it includes): each top-level statement that defines assets, each
       function and each const of 5 lines or more, its line range, the comment above it and what it
@@ -137,11 +141,13 @@ const USAGE = `pxl — pixel-art DSL
       what is placed by a relation to it moves too), searched without a model and written into the file
       where the number is (a computed one is said and left); it says each change, and the rules
       that held still hold (a scene's checked rebuilt before anything is written).
-  pxl shot <art.px.js> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--world [--every N]] [--out DIR]
+  pxl shot <art.px.js> <name | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--world [--every N]] [--out DIR]
   pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
       to the region, side by side (in rows when too wide for one: a contact sheet), enlarged,
-      written to <out>/_shot/<name>.png. --vs puts the same
+      written to <out>/_shot/<name>.png; clear shows as a mid grey. A sheet: as the build packs it; a
+      group or a glob ("car_*"): its members side by side, each labelled with what its name adds (n,
+      nne, ne...), checked together. --vs puts the same
       shot of another version above it (at a git revision, the file and what it includes as they
       were there); --diff adds a row with the pixels that changed in red; --grey adds it all again in
       values only (each pixel's lightness), to see the planes read before the color; --ref draws
@@ -381,7 +387,7 @@ export async function main(argv: string[]): Promise<number> {
   try {
     switch (a.cmd) {
       case "build": {
-        const build = () => { const p = loadProject(file, { wholeWorld: a.world }); return { p, r: writeOutputs(p, outDir, { only: a.only, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every, share: a.share }) }; };
+        const build = () => { const p = loadProject(file, { wholeWorld: a.world }); return { p, r: writeOutputs(p, outDir, { only: a.only, all: a.all, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every, share: a.share }) }; };
         let report = "";
         const { p, r } = a.profile ? await profiled(build).then(({ result, profile }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times); return result; }) : build();
         for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);
@@ -394,6 +400,7 @@ export async function main(argv: string[]): Promise<number> {
           for (const l of r.lines) if (/ -- |\(tiled: /.test(l)) console.log(l);
           console.log(`${r.lines.length} written: ${[...kinds].map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(", ")} (--list: one line each)`);
         }
+        if (r.left) console.log(`(${r.left} defined by its includes not written: --only names them, --all writes them)`);
         for (const e of r.errors) console.error("error: " + e.message);
         if (report) console.log(report);
         console.log(`-> ${outDir}${r.errors.length ? ` (${r.errors.length} error${r.errors.length > 1 ? "s" : ""})` : ""}`);
@@ -403,11 +410,13 @@ export async function main(argv: string[]): Promise<number> {
         const name = a.rest[0];
         if (!name) throw new PxError("ascii needs an asset name: pxl ascii <file> <name>");
         const p = loadProject(file);
-        const pal = p.assets.get(name)?.pal ?? p.pal;
-        if (a.frame !== undefined) console.log(`frame ${a.frame}\n${ascii(p.image(name, 0, frameTime(p, name, a.frame)), pal)}`);
+        const pal = p.assets.get(name)?.pal ?? p.pal, swap: Record<string, unknown> = {};
+        // the swaps along its bases (a flip of a recolored walk): the keys they gave their colors
+        for (let d = p.assets.get(name), i = 0; d && i < 8; d = typeof d.opts.base === "string" ? p.assets.get(d.opts.base) ?? p.assets.get((d.ns ?? "") + d.opts.base) : undefined, i++) Object.assign(swap, d.opts.swap, swap);
+        if (a.frame !== undefined) console.log(`frame ${a.frame}\n${ascii(p.image(name, 0, frameTime(p, name, a.frame)), pal, swap)}`);
         else if (p.assets.get(name)?.kind === "anim")
-          p.drawn(name).forEach((f, i) => console.log(`frame ${i} (${f.ms}ms)\n${ascii(f.img, pal)}\n`));
-        else console.log(ascii(p.image(name), pal));
+          p.drawn(name).forEach((f, i) => console.log(`frame ${i} (${f.ms}ms)\n${ascii(f.img, pal, swap)}\n`));
+        else console.log(ascii(p.image(name), pal, swap));
         return 0;
       }
       case "study": {
@@ -602,10 +611,17 @@ export async function main(argv: string[]): Promise<number> {
           return have.length ? have : [0];
         };
         const projects = new Map<string, Project>(), proj = (f: string) => projects.get(f) ?? projects.set(f, loadProject(f, { wholeWorld: a.world })).get(f)!;
-        const shots = entries.map((e) => {
+        const shots = entries.map((e): { png?: string; file?: string; name: string; img?: Img; names?: string[]; members?: boolean } => {
           if (MEDIA.test(e)) return { png: resolve(e), name: basename(e).replace(MEDIA, "") };
-          const m = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(e);
-          return m ? { file: resolve(m[1]), name: m[2] } : { file, name: e };
+          const m = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(e), s = m ? { file: resolve(m[1]), name: m[2] } : { file, name: e };
+          // a sheet as it is packed; a group's or a glob's members in a row, each labelled
+          const p = proj(s.file);
+          if (p.assets.has(s.name)) return s;
+          const sh = p.sheets.find((x) => x.name === s.name);
+          if (sh) return { ...s, img: packedSheet(p, sh).sheet, names: p.sheetNames(sh) };
+          if (!(p.groups.has(s.name) || s.name.includes("*"))) return s;
+          const names = [...new Set(p.candidates(s.name))];
+          return { ...s, img: membersRow(p, names, a.frames?.[0] ?? a.frame ?? 0, a.ref), names, members: true };
         });
         // --gif: the same things playing side by side (8 to a row), each its own loop on one clock as long
         // as the longest, a shorter one starting over; a cell per thing, its regions together in it
@@ -613,8 +629,9 @@ export async function main(argv: string[]): Promise<number> {
           if (a.vs) throw new PxError("shot --gif plays things side by side: --vs isn't for it (shoot the two versions as other.px.js:name)");
           const clips = shots.map((s) => {
             if ("png" in s) { const m = readMedia(s.png!); return { imgs: m.frames, ms: m.ms }; }
+            if ("img" in s) return { imgs: [s.img!], ms: [1000] };
             // --every N: one frame in N built and shown, lasting until the next (a long loop's preview)
-            const p = proj(s.file), n = frameCount(p, s.name), tl = p.timeline(s.name), k = Math.max(1, Math.floor(a.every ?? 1)), keep = Array.from({ length: Math.ceil(n / k) }, (_, i) => i * k), t = keep.map((f) => frameTime(p, s.name, f));
+            const p = proj(s.file!), n = frameCount(p, s.name), tl = p.timeline(s.name), k = Math.max(1, Math.floor(a.every ?? 1)), keep = Array.from({ length: Math.ceil(n / k) }, (_, i) => i * k), t = keep.map((f) => frameTime(p, s.name, f));
             return { imgs: keep.map((f) => shotFrame(p, s.name, f, a.ref)), ms: t.map((v, i) => (i + 1 < keep.length ? t[i + 1] : (tl?.loop ?? 1000)) - v) };
           });
           const loops = clips.map((c) => c.ms.reduce((x, y) => x + y, 0)), T = Math.max(...loops);
@@ -648,7 +665,7 @@ export async function main(argv: string[]): Promise<number> {
           return 0;
         }
         // several things, or several regions: a row each, one under the other, a column per region
-        if (shots.length > 1 || regions.length > 1 || png) {
+        if (shots.length > 1 || regions.length > 1 || png || "img" in shots[0]) {
           if (a.vs) throw new PxError("shot --vs compares one asset with another version of it: give it one name and one region");
           const many = shots.map((s) => {
             if ("png" in s) {
@@ -656,7 +673,8 @@ export async function main(argv: string[]): Promise<number> {
               if (!pick.length) throw new PxError(`${s.png}: it has ${m.frames.length} frame${m.frames.length === 1 ? "" : "s"} (0-${m.frames.length - 1})`);
               return { ...s, row: wrapRow(pick.map((f) => m.frames[f]), regions), note: m.frames.length > 1 || m.drawnAt ? `${basename(s.png!)}: ${m.kind}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, shown at 1x` : ""}${m.frames.length > 1 ? `, frames ${pick.length === m.frames.length ? `all ${m.frames.length}` : pick.join(",")}, ms ${runs(pick.map((f) => m.ms[f]))}` : ""}` : "" };
             }
-            const p = proj(s.file), frames = framesFor(p, s.name);
+            if ("img" in s) return { ...s, row: wrapRow([s.img!], regions), note: `${s.name}: ${s.members ? `${s.names!.length} members, left to right, each labelled with what its name adds` : `the sheet, ${s.img!.w}x${s.img!.h}, ${s.names!.length} entries`}` };
+            const p = proj(s.file!), frames = framesFor(p, s.name);
             return { ...s, row: wrapRow(frames.map((f) => shotFrame(p, s.name, f, a.ref)), regions), frames };
           });
           const sheet = a.grey ? stack([stack(many.map((s) => s.row)), greyRow(stack(many.map((s) => s.row)))]) : stack(many.map((s) => s.row)), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
@@ -670,7 +688,7 @@ export async function main(argv: string[]): Promise<number> {
           for (const s of many) if ("note" in s && s.note) console.log(s.note);
           for (const s of many) {
             if (!("file" in s)) continue;
-            const p = proj(s.file!), r = checkProject(p, { names: [s.name], frames: framesFor(p, s.name) });
+            const p = proj(s.file!), r = "img" in s ? checkProject(p, { names: s.names }) : checkProject(p, { names: [s.name], frames: framesFor(p, s.name) });
             for (const l of [...r.lines, ...r.notes]) console.log(l);
             if (r.warnings || p.assets.get(s.name)?.kind === "scene" || p.rigs.has(s.name))
               console.log(`${s.name}: ${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);

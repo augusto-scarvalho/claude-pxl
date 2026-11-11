@@ -11,7 +11,7 @@ import type { Frame } from "../core/trace.ts";
 import type { AssetDef } from "../core/model.ts";
 import type { Project } from "../core/project.ts";
 import { loadProject } from "./load.ts";
-import { writeOutputs } from "./output.ts";
+import { writeOutputs, written } from "./output.ts";
 import { encodePng } from "./png.ts";
 import { frameCount, frameTime } from "./shot.ts";
 
@@ -168,7 +168,7 @@ export function serve(file: string, opts: ServeOptions = {}): Promise<{ url: str
       next.sheets = project.sheets.map((s) => s.name);
       if (out) {
         // a long loop's frames, GIFs and sheets aren't written on every save (pxl build --only writes them)
-        const only = long.length ? [...project.exported().filter((n) => !long.includes(n)), ...project.sheets.map((s) => s.name), ...project.models.map((m) => m.name)] : undefined;
+        const only = long.length ? written(project).filter((n) => !long.includes(n)) : undefined;
         const r = writeOutputs(project, out, { preview: opts.preview, only });
         // asset failures are already listed per asset; keep the rest (sheets, unknown names)
         next.errors = r.errors.filter((e) => !next.assets.some((a) => a.error?.message === e.message)).map(errInfo);

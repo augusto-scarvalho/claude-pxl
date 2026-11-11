@@ -59,7 +59,7 @@ export function didYouMean(name: string, candidates: Iterable<string>): string {
   return best && bestD <= Math.max(2, Math.floor(name.length / 3)) ? ` (did you mean '${best}'?)` : "";
 }
 
-function distance(a: string, b: string): number {
+export function distance(a: string, b: string): number {
   const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i++) {
     let diag = prev[0];

@@ -280,6 +280,8 @@ export interface SheetOpts {
   extrude?: number;
   /** "tag": each animation starts a row of its own (`cols` still wraps a long one). */
   rows?: "tag";
+  /** Each frame in a cell of [w, h] px, its pivot (else its middle) at the cell's middle: rotations drawn at their own sizes at one size. */
+  cell?: [number, number];
   /** Palette slots: { name: swap } (keys to colors), exported as a palette a slot beside the sheet's own. */
   slots?: Record<string, Record<string, string>>;
 }

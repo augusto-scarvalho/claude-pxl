@@ -3,7 +3,7 @@
 // No art file: it reads pxl's own lib/.
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
-import { PxError, didYouMean } from "../core/errors.ts";
+import { PxError, didYouMean, distance } from "../core/errors.ts";
 import { animTimeline } from "../core/build.ts";
 import type { Img } from "../core/image.ts";
 import { type Card, type Project, CELL, cellOf } from "../core/project.ts";
@@ -103,11 +103,16 @@ export function members(p: Project, name: string): string[] {
   return p.groups.get(name)?.members ?? [];
 }
 
-/** An entry by its full name (lamps._lamp, make3d.oak), or by its own name when only one has it. */
+/** An entry by its full name (lamps._lamp, make3d.oak), or by its own name or its name's last part (car: make3d.car) when only one has it. */
 export function findEntry(name: string, entries = catalog().entries): Entry {
-  const e = entries.find((e) => e.name === name) ?? (entries.filter((e) => e.card.name === name).length === 1 ? entries.find((e) => e.card.name === name) : undefined);
-  if (!e) throw new PxError(`no entry '${name}' in the library${didYouMean(name, entries.map((e) => e.name))} (pxl lib lists them)`);
-  return e;
+  const last = (n: string) => n.slice(n.lastIndexOf(".") + 1), one = (f: (e: Entry) => boolean) => { const m = entries.filter(f); return m.length === 1 ? m[0] : undefined; };
+  const e = entries.find((e) => e.name === name) ?? one((e) => e.card.name === name) ?? one((e) => last(e.name) === name || last(e.name) === `_${name}`);
+  if (e) return e;
+  // the near names: those whose last part it is or is a letter or two off, then those that have it in them
+  const low = name.toLowerCase(), off = (n: string) => distance(last(n).replace(/^_/, "").toLowerCase(), low), names = entries.map((e) => e.name);
+  const near = [...names.filter((n) => off(n) <= Math.max(1, Math.floor(low.length / 3))).sort((a, b) => off(a) - off(b)), ...names.filter((n) => n.toLowerCase().includes(low))].filter((n, i, all) => all.indexOf(n) === i);
+  const said = near.length ? ` (near: ${near.slice(0, 8).join(", ")}${near.length > 8 ? `, ... ${near.length - 8} more` : ""})` : didYouMean(name, names);
+  throw new PxError(`no entry '${name}' in the library${said} (pxl lib lists them)`);
 }
 
 /**

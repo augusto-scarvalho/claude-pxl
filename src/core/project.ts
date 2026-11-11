@@ -193,7 +193,7 @@ function buildBytes(b: BuildOut): number {
   return px(b.img) + px(b.guide) + px(b.under) + b.layers.reduce((s, l) => s + px(l.img), 0) + (b.refs ?? []).reduce((s, r) => s + px(r.img), 0) + b.placements.reduce((s, p) => s + 64 + px(p.img), 0);
 }
 export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "of", "cast", "except", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline", "parallax", "swap", "mix"];
-const SHEET_OPTS = ["cols", "pad", "extrude", "rows", "slots"];
+const SHEET_OPTS = ["cols", "pad", "extrude", "rows", "slots", "cell"];
 /** The checks a genre() can ask pxl check for (check.ts runs them on the assets naming it). */
 export const GENRE_CHECKS = ["ground", "height", "footprint"];
 /** A card's cells: the cameras, and the statuses (approved; a 3D render to look at; by hand over a 3D draft). */
@@ -348,6 +348,8 @@ export class Project implements BuildCtx {
   private glyphCache = new Map<string, (ch: string) => string[]>();
   /** Art files loaded so far (absolute paths or virtual names), for locations and watching. */
   readonly files: string[] = [];
+  /** The assets, sheets and 3D files an include() defined (and what it included): a build writes them only when asked. */
+  readonly included = new Set<string>();
   pal: Palette = Palette.builtin("pico8").asDefault();
   /** Where each ramp was first made (ramps(), shades()), for pal()'s warning when it recolors one. */
   private rampLoc = new Map<string, string | undefined>();
@@ -1158,6 +1160,9 @@ export class Project implements BuildCtx {
       const loc = this.callerLoc();
       if (typeof name !== "string" || !Array.isArray(entries)) throw new PxError('sheet("name", ["a", "b*"], { cols, pad })', loc);
       checkKeys(`sheet '${name}'`, opts, SHEET_OPTS, loc);
+      const cell = opts.cell as unknown;
+      if (cell !== undefined && !(Array.isArray(cell) && cell.length === 2 && cell.every((v) => Number.isInteger(v) && v > 0)))
+        throw new PxError(`sheet '${name}': cell is each frame's [w, h] in px, its pivot at the middle (cell: [20, 20]), got ${JSON.stringify(cell)}`, loc);
       // palette slots: each a swap ({ R: "#30544b" }, roleSwap(...)) in the palette here, exported as a palette a slot
       const sl = opts.slots;
       if (sl !== undefined && !(isPlainObject(sl) && Object.keys(sl).length && Object.values(sl).every(isPlainObject)))
@@ -1177,11 +1182,12 @@ export class Project implements BuildCtx {
       if (!this.includeHook) throw new PxError("include() is not available here", loc);
       // The included file's use()/pal()/ramps() stay with its own assets, unless the includer
       // asks for them ({ palette: true }: a shared palette file). Its names go under `as`, if given.
-      const pal = this.pal, outer = this.outerRamps, ns = this.ns, shared = opts.palette === true, from = this.order.length;
+      const pal = this.pal, outer = this.outerRamps, ns = this.ns, shared = opts.palette === true, from = this.order.length, sheets = this.sheets.length, models = this.models.length;
       if (!shared) this.outerRamps = new Set(pal.ramps);
       if (opts.as !== undefined) { this.ns = `${ns}${opts.as}.`; this.spaced = true; }
       this.depth++;
       try { this.includeHook(path); } finally {
+        for (const n of [...this.order.slice(from), ...this.sheets.slice(sheets).map((s) => s.name), ...this.models.slice(models).map((m) => m.name)]) this.included.add(n);
         this.ns = ns;
         // what the file included with "mine" takes its palette now it has run; this one's, once its includer has
         this.overlay(this.depth--);

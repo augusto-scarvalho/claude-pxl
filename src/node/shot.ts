@@ -8,6 +8,7 @@ import { Img } from "../core/image.ts";
 import { TRANSPARENT } from "../core/color.ts";
 import { PxError } from "../core/errors.ts";
 import { lab } from "../core/vision.ts";
+import { glyph, lineWidth } from "../core/font.ts";
 
 /** How many frames an asset's loop has, as `frames()` numbers them, read off its clock (nothing drawn). */
 export function frameCount(p: Project, name: string): number {
@@ -24,7 +25,8 @@ export function frameTime(p: Project, name: string, n: number): number {
   return tl.durations ? tl.durations.slice(0, n).reduce((a, b) => a + b, 0) : n * tl.step;
 }
 
-const GAP = 2, GAP_C = 0x1b1b22ff, EMPTY = 0x4a4a55ff;
+// clear shows as a mid grey (OKLab L 0.64): a near-black line and a dark tyre read on it, and so does white
+const GAP = 2, GAP_C = 0x1b1b22ff, EMPTY = 0x8c8c96ff, LABEL = 0xd8d8e0ff;
 
 /**
  * Frames to a row: all of them when they fit the 1568 px a model is shown at 1x, else rows as even as
@@ -45,6 +47,23 @@ export function shotRow(p: Project, name: string, frames: number[], at?: number[
 export function shotFrame(p: Project, name: string, f: number, ref = false): Img {
   const b = p.build(name, 0, frameTime(p, name, f));
   return ref && b.guide ? b.guide : b.img;
+}
+
+/**
+ * A group's or a glob's members side by side, frame f of each (its last when it has fewer), each
+ * labelled under it with what its name adds to the others' (n, nne, ne, ...: a turn's headings).
+ */
+export function membersRow(p: Project, names: string[], f: number, ref = false): Img {
+  let pre = names.length > 1 ? names.reduce((a, n) => { let i = 0; while (i < a.length && a[i] === n[i]) i++; return a.slice(0, i); }) : "";
+  pre = pre.slice(0, Math.max(pre.lastIndexOf("_"), pre.lastIndexOf(".")) + 1);
+  const cells = names.map((n) => {
+    const img = shotFrame(p, n, Math.min(f, frameCount(p, n) - 1), ref), label = n.slice(pre.length) || n, cell = new Img(Math.max(img.w, lineWidth(label)), img.h + 7).fill(GAP_C);
+    for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) cell.data[y * cell.w + x] = img.data[y * img.w + x] === TRANSPARENT ? EMPTY : img.data[y * img.w + x];
+    let x = 0;
+    for (const ch of label) { glyph(ch).forEach((r, j) => [...r].forEach((v, i) => v === "#" && cell.set(x + i, img.h + 2 + j, LABEL))); x += glyph(ch)[0].length + 1; }
+    return cell;
+  });
+  return stack(Array.from({ length: Math.ceil(cells.length / 16) }, (_, r) => cellRow(cells.slice(r * 16, (r + 1) * 16), [undefined])));
 }
 
 /**

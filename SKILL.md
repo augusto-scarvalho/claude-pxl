@@ -18,7 +18,7 @@ lists every command and flag.
 2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
    `out/_shot/<name>.png` (read it); its text says what changed since your last shot of it and
    the warnings `check` finds on it. `--frames 0,12,30`, `--at x,y,w,h` (enlarged), more names (a row
-   each), `--gif`, `--grey` (values only). Exact pixels: `PXL ascii art.px.js <name>`. Scenes: `PXL describe art.px.js <scene>`
+   each), a sheet or a group (its members labelled), `--gif`, `--grey` (values only). Exact pixels: `PXL ascii art.px.js <name>`. Scenes: `PXL describe art.px.js <scene>`
    (`--brief` when busy) gives each object's position, gaps, cover, contrast and motion as text:
    answer layout questions from it, not by eyeballing.
 3. Fix everything one look showed, then look again: all the edits in the same message (every turn
@@ -30,8 +30,8 @@ lists every command and flag.
    turn): `PXL inspect art.px.js <scene> --find stall` (`--id <id>` for one), then
    `PXL edit art.px.js <scene> '{ "op": "move", "target": "<id>", "by": [-3, 0] }' --dry`, then without
    `--dry` (it writes where the value lives and runs `check`). What code computes is refused: edit that by hand (`PXL help "scenes 14"`).
-5. `PXL build art.px.js` writes the PNGs, sheets and GIFs to `out/`, previews to `out/_preview/`
-   (`--only a,b`; `--profile` when it has grown slow).
+5. `PXL build art.px.js` writes its own PNGs, sheets and GIFs to `out/` (an include's by `--only a,b`
+   or `--all`), previews to `out/_preview/` (`--profile` when it has grown slow).
 6. Before handing over, `PXL check art.px.js`: every scene, rig and frame of the file
    (`check: { every: N }` on a long story), warnings only, with their frames. Fix each or say why
    it's meant. LOOK lines (L-corners, jaggies, tones too close; `--edges`: any sprite's edges, a 3D

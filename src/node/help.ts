@@ -123,9 +123,11 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
   const refWhole = refs.length <= 2 ? refs : [];
   for (const s of refWhole) out.push(`[reference.md: ${s.head}]`, s.text);
   if (refs.length > refWhole.length) out.push(`[reference.md: ${refs.length} sections]`, ...refs.slice(0, 8).map((s) => `  pxl help "${s.head}" (${k(s.text.length)})`));
-  // a name with no row or section of its own, defined in prose as a call (`vnoise(x, y)` in a bullet of
+  // a name with no row or section of its own, defined by its signature in a code block (`sheet(name,
+  // [...], { cols?, ... })` under "Assets": that line) or in prose as a call (`vnoise(x, y)` in a bullet of
   // "Procedural texture", `corners("dirt", ...)` under "Terrain tilesets"): that paragraph whole, first
-  if (!own.length && !refs.length) print((own = all.filter((e) => !e.row && e.text.includes("`" + t + "("))));
+  const code = all.filter((e) => !e.row && e.text.startsWith("```")).flatMap((e) => e.text.split("\n").filter((l) => l.startsWith(t + "(")).map((l) => ({ ...e, text: l, block: e })));
+  if (!own.length && !refs.length) print((own = [...code, ...all.filter((e) => !e.row && !e.text.startsWith("```") && e.text.includes("`" + t + "("))]));
   const whole = !own.length && !refWhole.length && (secs.length <= 2 || nums) ? secs : [];
   for (const s of whole) out.push(`[${s.file}]`, s.text);
   if (secs.length > whole.length) {
@@ -134,7 +136,7 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
   }
   // other places in the reference that mention it: a line each (a paragraph counts only when it names
   // it in code: "loops that wrap seamlessly" is not `wrap`)
-  const mention = all.filter((e) => !own.includes(e) && (e.row ? word.test(e.text) : inCode.test(e.text)));
+  const mention = all.filter((e) => !own.includes(e) && !own.some((o) => (o as { block?: Entry }).block === e) && (e.row ? word.test(e.text) : inCode.test(e.text)));
   const shown = opts.all ? mention : mention.slice(0, FEW.mention);
   if (shown.length) out.push(`[reference.md: also mentioned in]`);
   for (const e of shown) {

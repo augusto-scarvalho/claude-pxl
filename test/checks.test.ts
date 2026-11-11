@@ -63,6 +63,8 @@ sprite("head_l", { base: "head", flip: "x" })`, "t.px.js");
   assert.ok(d[0] > 0 && d[1] < 0, `lit from the top right, got ${d}`);
   assert.equal(lightWords(p.image("head"), [0.6, -1]), "lit from the top right, as its light");
   assert.match(lightWords(p.image("head_l"), [0.6, -1]), /^WARNING: lit from the top left, but its light comes from the top right/);
+  // why, in the warning: which edge read lighter, which darker, and the guide's section on it
+  assert.match(lightWords(p.image("head_l"), [0.6, -1]), /: its left edge reads lighter than the pixels just inside it, its right edge darker \(PXL help "scenes 14"\)$/);
 });
 
 test("light: what an unlit layer holds (sparks, smears) isn't read for its lit side", async () => {
@@ -256,13 +258,26 @@ scene("s", { w: 40, h: 14, bg: "d", world: { scale: 10, light: [0.6, -1] } },
   assert.match(text(full), /head_l @-[^\n]*WARNING: lit from the top left/);
 });
 
+test("check's last line names the rules that didn't run and why: one height without a group(); on sprites alone, what they get", () => {
+  const walk = PAL + `genre("td", { checks: ["height"] })
+for (const d of ["s", "e", "n", "w"]) sprite("walk_" + d, { w: 3, h: 8, pivot: [1, 7], genre: "td", category: "character" }, (c) => c.rect(1, 2, 1, 6, "r"))
+`;
+  const not = /not run: [^\n]*one height across the directions \(genre 'td' asks for it: a move's directions in a group\(\)/;
+  assert.match(checkProject(loadSource(walk, "t.px.js")).coverage, not);
+  assert.doesNotMatch(checkProject(loadSource(walk + `group("walk", ["walk_s", "walk_e", "walk_n", "walk_w"])`, "t.px.js")).coverage, /one height/);
+  assert.doesNotMatch(checkProject(loadSource(walk.replaceAll('"character"', '"prop"'), "t.px.js")).coverage, /one height/, "a prop has no directions to hold");
+  assert.match(checkProject(loadSource(PAL + `sprite("bush", { w: 4, h: 4 }, (c) => c.rect(0, 0, 4, 4, "r"))`, "t.px.js")).coverage,
+    /^ran: nothing \(sprites get lines when drawn by hand, grids and runs\(\); --edges reads any one's edges; genre: on them, its checks; a scene placing them, lit side and feet\)/);
+  assert.equal(checkProject(loadSource(PAL, "t.px.js")).coverage, "ran: nothing; not run: front marker (nothing has one)", "nothing to say on a file of no sprites (a palette)");
+});
+
 test("check --readings: what the lit-side rule read on every placement, warning or not, and a tally", () => {
   const src = PAL + `ramps("1d6")
 ` + HEAD + `
 sprite("head_l", { base: "head", flip: "x" })
 scene("s", { w: 60, h: 14, bg: "d", world: { scale: 10, light: [0.6, -1] } }, stamp("head", 2, 2), stamp("head_l", 30, 2))`;
   const r = checkProject(loadSource(src, "t.px.js"), { readings: true });
-  assert.deepEqual(r.readings, ["s › head @- › lit from the top right, as its light", "s › head_l @- › WARNING: lit from the top left, but its light comes from the top right (a flipped drawing carries its light to the other side)"]);
+  assert.deepEqual(r.readings, ["s › head @- › lit from the top right, as its light", "s › head_l @- › WARNING: lit from the top left, but its light comes from the top right (a flipped drawing carries its light to the other side): its left edge reads lighter than the pixels just inside it, its right edge darker (PXL help \"scenes 14\")"]);
   assert.equal(r.tally, "2 placements read: 1 lit as their light, 1 against it, 0 with no side to tell");
   assert.equal(checkProject(loadSource(src, "t.px.js")).readings, undefined, "only when asked");
 });

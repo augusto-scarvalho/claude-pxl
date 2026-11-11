@@ -281,12 +281,14 @@ export function writeMoves(file: string, p: Project, r: CheckResult, frame?: num
 export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string; readings?: boolean; fix?: boolean; edges?: boolean } = {}): CheckResult {
   const reads = new Set<string>(), tally = { agree: 0, against: 0, unclear: 0 };
   const lines: string[] = [], notes: string[] = [];
-  let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0;
+  let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0, sprites = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
   const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, ink: 0, material: 0, black: 0, edge: 0, frozen: 0, cards: 0, density: 0, edges: 0 };
   let cellsBy: Map<string, string[]> | undefined;
   let lightSaid = false, groundSaid = false, fixes: CheckResult["fixes"], rulesAll = 0, rulesHeld = 0;
+  // the genres asking for one height across the directions, until a family of theirs is held to it
+  const tall = new Set<string>();
   const failed: string[] = [];
   // by default what the file itself defines (what it includes is checked where it's defined)
   const own = (n: string) => !opts.file || (p.assets.get(n)?.loc ?? "").split(":")[0] === opts.file;
@@ -309,6 +311,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       // a part or a prop: its own front marker (its light and its feet are read where it's placed), and
       // its 1 px lines where it's drawn by hand, parts too (not a variant, not drawn square on purpose)
       const img = p.image(name);
+      sprites++;
       if (!def.opts.base && !def.opts.outline8 && byHand(def.items)) {
         ran.lines++;
         const fl = (def.kind === "anim" ? p.frames(name).map((f) => f.img) : [img]).map((im) => lineFlaws(im));
@@ -349,7 +352,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         for (const [s, fs] of out) lines.push(`${name} › WARNING: box ${s}${fr.length > 1 ? ` (frame${fs.length > 1 ? "s" : ""} ${ranges(fs)})` : ""}: an engine reads it as it is; keep it inside, or give the asset room (w, h)`);
       }
       // the genre() it is made for: its checks on its frames (the height across directions is a family's, below)
-      if (def.opts.genre !== undefined) lines.push(...genreLines(p, name, ran));
+      if (def.opts.genre !== undefined) { lines.push(...genreLines(p, name, ran)); if (def.opts.category === "character" && p.genres.get(def.opts.genre)?.checks.includes("height")) tall.add(def.opts.genre); }
       // a png at a density not its own: blown up, or shrunk from a finer drawing
       const pd = pngDensity(p, name);
       if (pd) { ran.density++; lines.push(...pd); }
@@ -475,6 +478,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     if (!genre?.checks.includes("height") || ms.length < 2 || !ms.every((m) => p.assets.get(m)?.opts.genre === gn)) continue;
     const fs = ms.map((m) => frameImgs(p, m)), hs = fs.map((f) => Math.max(...f.map((im) => { const b = im.figure ? { y: im.figure[1], h: im.figure[3] } : im.bounds(); return !b ? 0 : im.pivot ? Math.round(im.pivot[1] - b.y) : b.h; })));
     ran.genre += fs.flat().length;
+    tall.delete(gn!);
     if (new Set(hs).size > 1) lines.push(`${gname} › WARNING: genre '${gn}': its directions aren't one height: ${ms.map((m, i) => `${m.slice(m.lastIndexOf("_") + 1)} ${hs[i]}`).join(", ")} px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces`);
   }
   // rig3d() figures: every pose of every move at its headings, on the ground (unless in the air), within the
@@ -547,6 +551,9 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.views) run.push(`views' rows on ${ran.views}`);
   if (ran.poses) run.push(`figures' feet on ${ran.poses} poses`);
   if (rigs) run.push(`rig parts ${ran.parts}`);
+  if (!opts.names && tall.size) not.push(`one height across the directions (genre ${[...tall].map((g) => `'${g}'`).join(", ")} asks for it: a move's directions in a group(), group("walk", ["walk_s", "walk_e", "walk_n", "walk_w"]))`);
+  // nothing ran: what a file of sprites gets, and what makes the rest run
+  if (!run.length && sprites) run.push("nothing (sprites get lines when drawn by hand, grids and runs(); --edges reads any one's edges; genre: on them, its checks; a scene placing them, lit side and feet)");
   const readings = opts.readings ? { readings: [...reads], tally: `${tally.agree + tally.against + tally.unclear} placements read: ${tally.agree} lit as their light, ${tally.against} against it, ${tally.unclear} with no side to tell` } : {};
   return { ...readings, ...(fixes ? { fixes } : {}), failed, lines, notes, warnings: lines.length,
     coverage: `ran: ${run.join(", ") || "nothing"}${not.length ? `; not run: ${not.join(", ")}` : ""}`,

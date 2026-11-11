@@ -1,5 +1,5 @@
 // Derived views of built images: previews for eyes, ASCII for exact checks, sheet packing.
-import { type Color, TRANSPARENT, darken, pack } from "./color.ts";
+import { type Color, TRANSPARENT, darken, pack, toHex } from "./color.ts";
 import { Img } from "./image.ts";
 import type { Palette } from "./palette.ts";
 
@@ -40,9 +40,20 @@ export function tiled(img: Img, nx: number, ny: number): Img {
   return o;
 }
 
-/** Text dump with x/y rulers; colors shown as palette keys ("." transparent, "?" unknown). */
-export function ascii(img: Img, pal: Palette): string {
-  const rev = pal.reverse();
+/** Text dump with x/y rulers; colors shown as palette keys ("." transparent), one the palette hasn't (a swap's) as a key said under it. */
+export function ascii(img: Img, pal: Palette, swap?: Record<string, unknown>): string {
+  const rev = pal.reverse(), extra: string[] = [], drawn = new Set(img.data);
+  // colors the palette hasn't (a swap's): the key the swap gave this color, when that key's own color isn't
+  // drawn here, else a key the palette hasn't; each said under the grid with its color
+  const used = new Set([...drawn].filter((c) => rev.has(c)).map((c) => rev.get(c)!)), to = (v: unknown) => { try { return pal.resolve(v as string); } catch { return undefined; } };
+  for (const c of drawn) {
+    if (c === TRANSPARENT || rev.has(c)) continue;
+    const k = Object.entries(swap ?? {}).find(([k, v]) => !used.has(k) && to(v) === c)?.[0] ?? [..."0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"].find((f) => !pal.keys.has(f) && !used.has(f));
+    if (k === undefined) continue;
+    rev.set(c, k);
+    used.add(k);
+    extra.push(`${k} ${toHex(c)}`);
+  }
   const tens = "    " + Array.from({ length: img.w }, (_, x) => (x % 10 === 0 ? String(Math.floor(x / 10) % 10) : " ")).join("");
   const ones = "    " + Array.from({ length: img.w }, (_, x) => String(x % 10)).join("");
   const lines = img.w > 10 ? [tens, ones] : [ones];
@@ -54,6 +65,7 @@ export function ascii(img: Img, pal: Palette): string {
     }
     lines.push(row);
   }
+  if (extra.length) lines.push(`not in the palette (a swap's): ${extra.join(", ")}`);
   return lines.join("\n");
 }
 

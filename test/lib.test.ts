@@ -63,6 +63,10 @@ test("pxl lib: the catalog by subject, filters by cell and genre", () => {
   assert.throws(() => libList({ cell: "side/x" }), /--cell is <camera>\/<density>/);
   assert.throws(() => libList({ genre: "racing-behind" }), /no genre 'racing-behind' in lib\/profiles/);
   assert.throws(() => findEntry("nothing.here"), /no entry 'nothing\.here' in the library/);
+  // a name its entry's last part (pxl lib car: make3d.car); when none or several, the near names
+  assert.equal(findEntry("car").name, "make3d.car");
+  assert.throws(() => findEntry("cars"), /no entry 'cars' in the library \(near: make3d\.car\)/);
+  assert.throws(() => findEntry("lamp"), /no entry 'lamp' in the library \(near: make3d\.lamp, lamps\._lamp, /);
 });
 
 test("pxl lib <entry>: a card with what a build of it reads; --genre hd2d lists its cell", () => {
@@ -141,6 +145,13 @@ test("make3d.car (lib/vehicles/car): parts, sockets, its decal; 32 rotations a l
   }
   // a route's heading on the picture (up it is n) to the rotation facing it, the nearest of 32
   assert.deepEqual(["[0, -1]", "[1, 0]", "[-1, 0.9]", "[0.1, 1]", "[1, -0.2]"].map((h) => p.scope!(`car.facing("laguna", ${h})`)), ["car_laguna_n", "car_laguna_e", "car_laguna_sw", "car_laguna_169", "car_laguna_79"]);
+  // its camera, scale, light and line (car.TD) and the model's settings for them (car.TOP): another number of turns, the same car
+  const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");
+  writeFileSync(f, `include(${JSON.stringify(join(import.meta.dirname, "../lib/vehicles/car.px.js"))}, { as: "car", palette: true })
+turnaround("racer", make3d.car({ ...car.SPEC.laguna, ...car.TOP, number: "roundel_laguna" }), { ...car.TD, n: 16, mats: car.LIVERY.laguna })`);
+  const q = loadProject(f);
+  assert.equal(q.groups.get("racer")!.members.length, 16);
+  assert.equal(q.image("racer_ne").hash(), p.image("car_laguna_ne").hash());
 });
 
 test("make3d.kart (lib/vehicles/kart): parts, sockets; the hero seated, 48 headings a livery, the east half the west's mirrors; kart.facing", () => {

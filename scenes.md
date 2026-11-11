@@ -854,6 +854,10 @@ is along a level (§10); the same `mix` on every layer, the sky's with its own m
   things) is refused, saying where it is: change that by hand.
 - `PXL check <file>` before handing over: every frame of the loop; its last line says which rules
   ran, and `--readings` shows what the lit-side rule read on each thing when a warning looks wrong.
+  That rule reads a thing's rim: each pixel on its edge (inside its outline) against the pixels up
+  to 3 px inside it, as steps along its ramp; the edges facing one way lighter and the other way
+  darker give its lit side (seen on 6 rim pixels each way at least). A flipped copy is the usual
+  cause; a bush or a building whose outline is mostly trims or tufts can read wrong: look first.
   Checks and `world` rules cover `scene()`s (and rigs), and an `anim()` given a `world`: what its
   functions paint is seen when they name it, `c.as("bench", (c) => { ... }, { height })`
   (`examples/perspective/park.px.js`); `check: { every: 24 }` on a long one.

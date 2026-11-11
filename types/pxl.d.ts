@@ -859,7 +859,8 @@ declare global {
   function layer(name: string, ...items: PxItem[]): PxLayer;
   function group(name: string, members: string[]): void;
   function sheet(name: string, entries: string[], opts?: { cols?: number; pad?: number; extrude?: number; /** each animation on a row of its own */ rows?: "tag";
-    /** palette slots: { jade: swap }, keys to colors; the JSON gets meta.palette and meta.slots, a .hex each */ slots?: Record<string, Record<string, string>> }): void;
+    /** palette slots: { jade: swap }, keys to colors; the JSON gets meta.palette and meta.slots, a .hex each */ slots?: Record<string, Record<string, string>>;
+    /** each frame in a cell of [w, h] px, its pivot (else its middle) at the cell's middle */ cell?: [number, number] }): void;
   /** A bitmap font from glyphs drawn in w x h cells on a sprite, in the order of `chars`; use it with text(..., { font }). */
   function font(name: string, sprite: string, opts: { chars: string; w: number; h: number; cols?: number; mono?: boolean }): void;
   /** n directions (sprites name_0.. + group name) from a pose pointing up, via exact quarter turns and diagonal mirrors where possible. See rotation.md. */

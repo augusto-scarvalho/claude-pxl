@@ -411,6 +411,41 @@ test("cli build of a whole file counts what it wrote; --list (or --only) gives a
   assert.match(await said("build", file, "--only", "d3"), /^sprite d3 1x1 @16x$/m);
 });
 
+test("cli build writes the file's own assets, sheets and scenes, not what it includes (--only names one, --all writes all; a stub writes its include's)", async () => {
+  const { dir, file } = tmpArt(`use("pico8")\ninclude("kit.px.js", { as: "kit" })\nsprite("mine", "7")\nscene("s", { w: 4, h: 4 }, stamp("kit.lamp", 1, 1))\nsheet("both", ["mine", "kit.lamp"])`);
+  writeFileSync(join(dir, "kit.px.js"), `use("pico8")\nsprite("lamp", "8")\nsprite("post", "9")\nsheet("kit_sheet", ["lamp", "post"])`);
+  writeFileSync(join(dir, "stub.px.js"), `include("kit.px.js")`);
+  const files = (out: string) => (readdirSync(out, { recursive: true }) as string[]).filter((f) => f.endsWith(".png") && !f.includes("_preview")).map((f) => f.split("\\").join("/")).sort();
+  const run = async (f: string, out: string, ...flags: string[]) => { const s = await said("build", f, "--out", join(dir, out), ...flags); return { s, files: files(join(dir, out)) }; };
+  const own = await run(file, "own");
+  assert.deepEqual(own.files, ["both.png", "scenes/s.png", "sprites/mine.png"]);
+  assert.match(own.s, /\(3 defined by its includes not written: --only names them, --all writes them\)/);
+  assert.deepEqual((await run(file, "only", "--only", "kit.post")).files, ["sprites/kit.post.png"]);
+  assert.deepEqual((await run(file, "all", "--all")).files, ["both.png", "kit.kit_sheet.png", "scenes/s.png", "sprites/kit.lamp.png", "sprites/kit.post.png", "sprites/mine.png"]);
+  assert.deepEqual((await run(join(dir, "stub.px.js"), "stub")).files, ["kit_sheet.png", "sprites/lamp.png", "sprites/post.png"]);
+});
+
+test("cli ascii: a color a swap brought in prints as the key the swap gave it (else a free one), said under the grid", async () => {
+  const { file } = tmpArt(`use("pico8")\nsprite("a", { w: 3, h: 1 }, px(0, 0, "8"), px(1, 0, "7"), px(2, 0, "c"))\nsprite("b", { base: "a", swap: { 8: "#123456", 7: "#abcdef" } })\nsprite("b_l", { base: "b", flip: "x" })`);
+  const b = await said("ascii", file, "b");
+  assert.match(b, /^ {2}0 87c$/m);
+  assert.match(b, /^not in the palette \(a swap's\): 8 #123456, 7 #abcdef$/m);
+  assert.match(await said("ascii", file, "b_l"), /^ {2}0 c78\n/m, "a flip of it reads its base's swap");
+  assert.doesNotMatch(await said("ascii", file, "a"), /not in the palette|\?/);
+});
+
+test("cli shot of a sheet shows it as packed; of a group or a glob, its members in a row, each labelled", async () => {
+  const { dir, file } = tmpArt(`use("pico8")\nfor (const d of ["n", "e", "s", "w"]) sprite("car_" + d, { w: 3, h: 4 }, rect(0, 0, 3, 4, "8"))\ngroup("car", ["car_n", "car_e", "car_s", "car_w"])\nsheet("cars", ["car"], { pad: 1, cols: 4 })`);
+  const out = join(dir, "out"), png = (n: string) => decodePng(readFileSync(join(out, "_shot", n + ".png")));
+  assert.match(await said("shot", file, "cars", "--out", out, "--scale", "1"), /cars: the sheet, 15x4, 4 entries/);
+  assert.equal(png("cars").w, 15);
+  assert.match(await said("shot", file, "car", "--out", out, "--scale", "1"), /car: 4 members, left to right/);
+  const row = png("car");
+  assert.deepEqual([row.w, row.h], [4 * 3 + 3 * 2, 4 + 7], "4 cells of 3 px, 2 apart; the art over a row for its label");
+  assert.ok(row.data.slice(5 * row.w, 11 * row.w).some((c) => c === 0xd8d8e0ff), "the labels (N, E, S, W) drawn under the art");
+  assert.match(await said("shot", file, "car_*", "--out", out), /car_\*: 4 members/);
+});
+
 test("cli shot: one call per look: the picture, what changed since the last shot, check's warnings", async () => {
   // a figure whose pivot is 3 px under its sole: it floats, and the shot says so
   const { dir, file } = tmpArt(`use("pico8")
@@ -886,6 +921,12 @@ test("pxl help is short: other mentions a line each, a guide section by its head
   assert.match(await said("help", "castBase"), /^\| `castBase: "pivot" \\| "column"` \|/m);
   // an op written up in prose (no row of its own), found by its name first
   assert.match(await said("help", "corners"), /^\[reference\.md: Ops > Terrain tilesets\]\nDraw the 16 pieces from one function: `corners\(/);
+  // an op whose reference is its signature in a code block (sheet under Assets): that line first, before a guide section sharing its word
+  const sheet = await said("help", "sheet");
+  assert.match(sheet, /^\[reference\.md: Assets\]\nsheet\(name, \["slime\*", "heart", groupName\], \{ cols\?, pad\?, extrude\?, rows\?, slots\?, cell\? \}\)/);
+  assert.match(sheet, /\[guides: 1 sections?\]\n {2}pxl help "environment 1\. Learning from a game's sheet"/);
+  // directions(): its signature, then the paragraph that says how its poses' pivots are placed, with an example
+  assert.match(await said("help", "directions"), /^directions\("ship", 16, [^\n]*\n`directions\("car", 16, [^]*Each direction keeps its pose's pivot, turned with it/m);
 });
 
 test("cli shot of a GIF: drawn larger, read at 1x; all its frames in rows of 12; a range picks some", async () => {

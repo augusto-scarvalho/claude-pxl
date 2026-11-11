@@ -39,7 +39,7 @@ scene(name, { w, h, bg?, ... }, ...items)
 layer(name, layerOpts?, ...items)      // only as an item of a sprite or scene (layers don't nest)
 plate(relightOpts?, ...items)          // the items drawn and lit on their own, then laid down: anywhere
 group(name, ["a", "b", "rock_*", ...])  // random pick per placement; repeat a name to weight it
-sheet(name, ["slime*", "heart", groupName], { cols?, pad?, extrude?, rows?, slots? })  // extrude: repeat edge pixels n px out; rows: "tag", each animation on a row of its own; slots: palette slots for an engine (Output for engines); a sheet of animations also plays them all at once in _preview/<sheet>.gif
+sheet(name, ["slime*", "heart", groupName], { cols?, pad?, extrude?, rows?, slots?, cell? })  // extrude: repeat edge pixels n px out; rows: "tag", each animation on a row of its own; slots: palette slots for an engine (Output for engines); cell: [w, h], every frame in a cell that size, its pivot (else its middle) at the cell's middle (rotations drawn at their own sizes on one grid; too small says the cell that holds them all); a sheet of animations also plays them all at once in _preview/<sheet>.gif
 include("other.px.js")                  // path relative to the current file; included files share one scope: a const of one is seen by the other (name what they share, like a cue frame; each name declared once)
 directions("ship", 16, { from, outline?, outline8?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
 turnaround("house", thing, { view?, ppm?, n?, headings?, part?, ... })  // a thing in 3D seen from n headings: house_n, house_ne, ... + group "house"; see turnaround() below
@@ -61,6 +61,17 @@ has(name)                               // is there an asset or a group of that 
 sockets(name)                           // an asset's sockets from where a stamp puts it (its pivot), read as the file loads: { top: [dx, dy] }, a route's point on a prop's top (examples/nightfall/)
 timeline(name)                          // an anim's frames as an engine reads them, in playback order (a still: one), each { ms, w, h, pivot, bounds (the drawn pixels' box [x, y, w, h]), boxes, data }, not its pixels; read when called (as the file loads, or from a scene's function): a fight played from its fighters' frame data (examples/fighting/round.px.js)
 ```
+
+`directions("car", 16, { from: "_car", symmetric: true, draw: { 22.5: "_car_22", 45: "_car_45" } })`
+makes `car_0` ... `car_15` (i × 22.5 degrees clockwise from pointing up) and a group `car`: each angle
+within a quarter turn is a pose (the one `draw` gives for it, drawn finished, else `from` turned by
+`angle`; with `symmetric`, 90 − a pose's angle is that pose mirrored), every other a quarter turn of
+one. Each direction keeps its pose's pivot, turned with it: `from`'s, or a hand-drawn pose's own. Draw
+each pose at its size and put its `pivot` on the point it turns about (a car's middle:
+`sprite("_car_22", { pivot: [5.5, 8] }, ...)`); `pivot: "center"` (or `"bottom"`, `[x, y]`) on
+directions() instead sets each direction's on its own canvas, right only when every pose is drawn
+centred on it. The poses come at their own sizes (11x16, 16x19, 17x17): `sheet("cars", ["car"], {
+cell: [20, 20] })` puts each in a cell of one size on its pivot. More: rotation.md.
 
 A rig is a sprite: each slot is a joint `at`, a box `size` (the part's size, outline included), the
 point of the part on the joint (`pivot`, default its top middle), its body side (`side: "l" | "r"`)
@@ -168,7 +179,9 @@ category's on the scale curve, scenes §19; or how many tall alone: a draft's si
 (a key of a genre's `scale`: `tree`, `pine`, `bush`, `boulder`, `lamp`, `house`, `character`; the
 genre's box for it then sizes its drafts, before its `tiles`) and `draw` (its drawing call's options). A name or an asset it can't find fails the load at its line.
 `card(name)` gives its data back (`card("make3d.oak").draw`). `pxl lib` lists the library's cards
-by subject (`pxl lib --genre hd2d`, `pxl lib --cell side/32`); `pxl lib lamps._lamp` prints one with
+by subject (`pxl lib --genre hd2d`, `pxl lib --cell side/32`); `pxl lib lamps._lamp` prints one (by its
+full name, or the last part of it when only one entry has that: `pxl lib car` is `make3d.car`; none, or
+several, names the near ones) with
 what a build of it reads (its source, size, pivot, footprint, sockets, boxes, frames, roles) and the
 `include` that takes it; `pxl lib draft make3d.oak --genre topdown16` draws a builder in a genre (its
 camera, what stands at its `stand`, else its `pitch`, hd2d's a billboard from 20 degrees; fitted to the genre's box for
@@ -749,11 +762,11 @@ painting replay ends ("animate" toggle).
 ## CLI
 
 ```
-node <pxl>/bin/pxl.js shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif] [--world [--every N]] [--out DIR]
+node <pxl>/bin/pxl.js shot <file> <name | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif] [--world [--every N]] [--out DIR]
 node <pxl>/bin/pxl.js shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
 node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings] [--fix] [--edges]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
-node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world]
+node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--all] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
 node <pxl>/bin/pxl.js ascii <file> <name> [--frame N]
 node <pxl>/bin/pxl.js list  <file>
@@ -798,7 +811,10 @@ call (its layer). `inspect`'s `--find` takes its words quoted or not.
 region, enlarged to about 600k px, at most 16x and 1568 px on the longer side), what changed since the last shot of the same frames and region
 (pixels, and the box around them in the asset's coordinates; for one asset and one region), and the
 warnings `check` finds on it at those frames. `--frames` takes numbers, ranges (`0-17`, `0-3,12`) or
-`all`. Several names make a row each, one under the other (`other.px.js:name` takes another file's,
+`all`. A sheet's name shows the sheet as `build` packs it; a group's or a glob's (`car`, `"car_*"`)
+its members side by side (16 to a row), each labelled under it with what its name adds (`n`, `nne`,
+`ne`): a set of rotations or directions at once, its check on all of them. What is clear shows as a mid
+grey (#8c8c96), so a near-black line and a dark tyre read on it. Several names make a row each, one under the other (`other.px.js:name` takes another file's,
 and a picture or a clip from anywhere is a row too), and several `--at` a column each: two versions of
 a scene, one scene from two agents, three details of a big one. A clip (a GIF, a video, read as
 `study` reads them) shows all its frames unless `--frames` picks some, drawn larger it is shown at 1×,
@@ -806,7 +822,10 @@ and more than 12 frames go on in rows of 12: a reference's whole animation on on
 Give PNGs at 1× (`out/scenes/x.png`, not an enlarged `_shot`): rows are enlarged together, so a big
 one leaves no room for the rest. `--vs <rev | file>` puts the same shot of another version above (one
 name, one region; at a git revision, the file and the art files it includes as they were there); `--diff` with it adds a row with the pixels that changed, in red. `check` makes every check `describe` can warn on, on every scene
-and rig of a file at every frame (exit 1 on a warning), and lists as LOOK lines (not warnings: a
+and rig of a file at every frame (exit 1 on a warning; its last line says the rules that ran and those that
+couldn't, with what each needs: a genre's one height across the directions wants each move's directions
+in a `group()`; on a file whose sprites got no rule, what sprites get; a lit-side warning says which edge
+read lighter and which darker), and lists as LOOK lines (not warnings: a
 corner is often meant) the L-corners and jaggies in the 1 px lines of every sprite and part drawn by
 hand (grid strings, `grid()`, `runs()`; not variants or `outline8`, nor a line whose steps are nearly
 all L's: drawn square on purpose), and tones side by side too close to tell apart; `--readings` also lists what the lit-side
@@ -814,7 +833,11 @@ rule read on every placement, warning or not, with a tally; `--fix` fixes each f
 with one number (see `expect3d`), and each failing rule of a scene's `expect` by moving a placement it
 names (see `expect:`), and says what it wrote. A `build` of a
 whole file with more than 12 assets prints how many of each kind it wrote; `--list` or `--only`
-print a line each (a smaller file prints them anyway).
+print a line each (a smaller file prints them anyway). A `build` writes the file's own assets, sheets
+and scenes (what they use from its includes drawn in them), not what its includes define (a library's
+hundred sprites): `--only` names those, `--all` writes all of it, and says how many it left; a file of
+includes alone (a stub at an old path) writes theirs. `ascii` prints a color the palette hasn't (a
+swap's) as the key the swap gave it (else a free one), and lists those under the grid with their colors.
 A preview GIF past 4 MB says so; `--every N` keeps one frame in N in the previews (the GIFs in
 `out/` keep every frame). A build that has grown slow: `--profile` prints where the time went, read
 off the CPU profiler: the slowest assets, then the functions that spent the most time themselves,
@@ -824,8 +847,8 @@ times, a per-pixel search) and in pxl.
 5 lines or more, its line range, the comment above it and what it defines (a loop's or a helper's
 many assets on one line). A file that doesn't run on its own (one meant to be included) is mapped
 from its text, without the assets its loops make. `help` prints the
-rows that define a name in full (an op written up in prose, `corners()` under Terrain tilesets: that
-paragraph, first), one line for each other place that mentions it and a few uses in the
+rows that define a name in full (an op given by its signature in a code block, `sheet(name, ...)` under
+Assets: that line; written up in prose, `corners()` under Terrain tilesets: that paragraph, first), one line for each other place that mentions it and a few uses in the
 examples (`--all`: everything in full); a guide's name with numbers or words of a heading prints those
 sections.
 

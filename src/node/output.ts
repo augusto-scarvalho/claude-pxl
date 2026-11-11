@@ -5,7 +5,8 @@ import { PxError, didYouMean, wrap } from "../core/errors.ts";
 import type { Img } from "../core/image.ts";
 import { TRANSPARENT, toHex } from "../core/color.ts";
 import type { Project } from "../core/project.ts";
-import { type FrameTag, onionSheet, packSheet, playAll, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
+import type { SheetDef } from "../core/model.ts";
+import { type FrameTag, type SheetFrame, onionSheet, packSheet, playAll, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
 import { emitImage, glows, normalImage } from "../core/normals.ts";
 import { tiledMap } from "../core/tiled.ts";
 import { encodeAseprite } from "./aseprite.ts";
@@ -16,8 +17,10 @@ import { Splats } from "../core/splats.ts";
 import { type Mesh3, Voxels } from "../core/grids.ts";
 
 export interface OutputOptions {
-  /** Only these assets/sheets (default: everything exported). */
+  /** Only these assets/sheets (default: the file's own, as `written` lists them). */
   only?: string[];
+  /** Also what the file's include()s define (`pxl build --all`). */
+  all?: boolean;
   /** Write upscaled previews to out/_preview (default true). */
   preview?: boolean;
   /** Fixed preview scale (default: auto). */
@@ -35,6 +38,8 @@ const BIG_GIF = 4e6;
 
 export interface OutputResult {
   lines: string[];
+  /** How many of what the includes define were left unwritten (no `only`, no `all`). */
+  left: number;
   errors: PxError[];
   /** How long each asset took to build and write, in ms. */
   times: [string, number][];
@@ -49,6 +54,40 @@ export function writePng(path: string, img: Img): void {
   write(path, encodePng(img));
 }
 
+/**
+ * What a build writes when not told: the file's own assets, sheets and 3D files (its sheets and scenes
+ * draw what they use from its includes); with `all`, or in a file that defines nothing itself (a stub
+ * keeping an old path), what its includes define too.
+ */
+export function written(p: Project, all = false): string[] {
+  const every = [...p.exported(), ...p.sheets.map((s) => s.name), ...p.models.map((m) => m.name)], own = every.filter((n) => !p.included.has(n));
+  return all || !own.length ? every : own;
+}
+
+/** A sheet packed: its frames (an anim's each, name_0, name_1, ... with durations and a tag), in a cell each with `cell`, and the rows "tag" starts. */
+export function packedSheet(p: Project, s: SheetDef): { items: { name: string; img: Img; ms?: number }[]; tags: FrameTag[]; rows?: Set<number>; sheet: Img; frames: SheetFrame[] } {
+  let items: { name: string; img: Img; ms?: number }[] = [];
+  const tags: FrameTag[] = [];
+  for (const name of p.sheetNames(s)) {
+    const fr = p.drawn(name);
+    if (!fr.length) { items.push({ name, img: p.image(name) }); continue; }
+    tags.push({ name, from: items.length, to: items.length + fr.length - 1, direction: p.direction(name) });
+    fr.forEach((f, i) => items.push({ name: `${name}_${i}`, img: f.img, ms: f.ms }));
+  }
+  if (!items.length) throw new PxError("sheet is empty (no entries matched)");
+  if (s.opts.rows !== undefined && s.opts.rows !== "tag") throw new PxError(`rows can only be "tag" (each animation on a row of its own), got ${JSON.stringify(s.opts.rows)}`);
+  if (s.opts.cell) {
+    // one size for all (rotations drawn at their own sizes): each frame's pivot (else its middle) at its cell's middle
+    const [cw, ch] = s.opts.cell, at = (img: Img) => img.pivot ?? [img.w / 2, img.h / 2];
+    const need = items.map(({ img }) => { const b = img.bounds(), [px, py] = at(img); return b ? [2 * Math.max(px - b.x, b.x + b.w - px), 2 * Math.max(py - b.y, b.y + b.h - py)].map(Math.ceil) : [0, 0]; });
+    const big = [Math.max(...need.map((n) => n[0])), Math.max(...need.map((n) => n[1]))], worst = items[need.findIndex((n) => n[0] > cw || n[1] > ch)];
+    if (worst) throw new PxError(`cell [${cw}, ${ch}] is too small: '${worst.name}' doesn't fit round its pivot; cell: [${big.join(", ")}] holds every frame`);
+    items = items.map((it) => { const [px, py] = at(it.img); return { ...it, img: it.img.sub(Math.round(px - cw / 2), Math.round(py - ch / 2), cw, ch) }; });
+  }
+  const rows = s.opts.rows === "tag" ? new Set(tags.flatMap((g) => [g.from, g.to + 1])) : undefined;
+  return { items, tags, rows, ...packSheet(items, s.opts.cols, s.opts.pad, s.opts.extrude, rows) };
+}
+
 /** Build and write. Each asset fails independently; errors are collected, not thrown. */
 export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}): OutputResult {
   const lines: string[] = [], errors: PxError[] = [], times: [string, number][] = [];
@@ -58,7 +97,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       if (!p.assets.has(n) && !sheetNames.has(n))
         errors.push(new PxError(`unknown asset or sheet '${n}'${didYouMean(n, [...p.order, ...sheetNames])}`));
 
-  const want = opts.only ? new Set(opts.only) : undefined;
+  const want = new Set(opts.only ?? written(p, opts.all)), left = opts.only ? 0 : written(p, true).filter((n) => !want.has(n)).length;
   const prev = (name: string, img: Img): string => {
     if (opts.preview === false) return "";
     const s = opts.scale ?? previewScale(img);
@@ -66,7 +105,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
     return ` @${s}x`;
   };
 
-  const names = want ? p.order.filter((n) => want.has(n)) : p.exported();
+  const names = p.order.filter((n) => want.has(n));
   // a map's file (<x>_n.png, <x>_e.png) that is another's own (an asset x with normals beside an asset
   // x_n, a sheet beside a sheet x_n): an error naming both, and the map not written over it
   const folder = (k: string) => (k === "scene" ? "scenes" : k === "anim" ? "anims" : "sprites"), files = new Set(p.exported());
@@ -155,20 +194,9 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
   }
 
   for (const s of p.sheets) {
-    if (want && !want.has(s.name)) continue;
+    if (!want.has(s.name)) continue;
     try {
-      // Animated entries expand to one frame each (name_0, name_1, ...) with durations and a tag.
-      const items: { name: string; img: Img; ms?: number }[] = [], tags: FrameTag[] = [];
-      for (const name of p.sheetNames(s)) {
-        const fr = p.drawn(name);
-        if (!fr.length) { items.push({ name, img: p.image(name) }); continue; }
-        tags.push({ name, from: items.length, to: items.length + fr.length - 1, direction: p.direction(name) });
-        fr.forEach((f, i) => items.push({ name: `${name}_${i}`, img: f.img, ms: f.ms }));
-      }
-      if (!items.length) throw new PxError("sheet is empty (no entries matched)");
-      if (s.opts.rows !== undefined && s.opts.rows !== "tag") throw new PxError(`rows can only be "tag" (each animation on a row of its own), got ${JSON.stringify(s.opts.rows)}`);
-      const rows = s.opts.rows === "tag" ? new Set(tags.flatMap((g) => [g.from, g.to + 1])) : undefined;
-      const { sheet, frames } = packSheet(items, s.opts.cols, s.opts.pad, s.opts.extrude, rows);
+      const { items, tags, rows, sheet, frames } = packedSheet(p, s);
       writePng(join(out, s.name + ".png"), sheet);
       // palette slots: the sheet's colors as they first appear, and each slot's in the same order (a
       // palette swap's lookup), in the JSON and as .hex files beside it (rrggbb: alpha stays the art's)
@@ -192,7 +220,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
   }
   // 3D files, each read back to say what it holds
   for (const m of p.models) {
-    if (want && !want.has(m.name)) continue;
+    if (!want.has(m.name)) continue;
     try {
       const kb = (b: { length: number }) => `${(b.length / 1024).toFixed(1)} KB`;
       // the moments of a loop (one, unless made by a function of the clock), each painted by its materials
@@ -231,5 +259,5 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       errors.push(wrap(e).within(`export3d '${m.name}'`, m.loc));
     }
   }
-  return { lines, errors, times };
+  return { lines, errors, times, left };
 }
