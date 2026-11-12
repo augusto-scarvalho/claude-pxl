@@ -208,7 +208,11 @@ const USAGE = `pxl — pixel-art DSL
       in the region reads best). PNG and
       GIF are read by pxl; JPEG, WebP and video through ffmpeg if on PATH.
 
-Art files may be .js or .ts. Default out dir: <art file dir>/out.`;
+Art files may be .js or .ts. Default out dir: <art file dir>/out. A build that took long (a 3D figure's
+frame) is kept on disk under a key of all it reads (pxl's sources, every file the art file loaded, the
+asset, its time and seed), in node_modules/.cache/pxl/builds/ in a checkout, else the temp folder's
+pxl-builds/: the same build in a later command is read back, never stale. --no-cache (any command) or
+PXL_CACHE=0 builds everything.`;
 
 interface Args {
   cmd?: string;
@@ -324,6 +328,7 @@ function parse(argv: string[]): Args {
     else if (v === "--allow") a.allow = val().split(",").map((s) => s.trim()).filter(Boolean);
     else if (v === "--profile") a.profile = true;
     else if (v === "--world") a.world = true;
+    else if (v === "--no-cache") process.env.PXL_CACHE = "0";
     else if (v === "--colors") a.colors = Number(val());
     else if (v === "--to") {
       const m = /^(\d+)x(\d+)$/.exec(val().trim());

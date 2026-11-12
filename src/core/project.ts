@@ -317,11 +317,15 @@ export class Project implements BuildCtx {
   /** What building found wrong but not fatal (a shade step that left its ramp): the CLI prints them, pxl check counts them; `by` the assets being built when it was found. */
   readonly warnings: { msg: string; loc?: string; by?: Set<string> }[] = [];
 
-  warn(msg: string, loc?: string): void {
+  warn(msg: string, loc?: string): void { this.warnAs(msg, loc, this.inner()); }
+  private warnAs(msg: string, loc: string | undefined, by: string | undefined): void {
     let w = this.warnings.find((v) => v.msg === msg && v.loc === loc);
     if (!w) this.warnings.push((w = { msg, loc }));
-    const by = this.inner();
     if (by !== undefined) (w.by ??= new Set()).add(by);
+    if (!this.logs.length) return;
+    const f = JSON.stringify([msg, loc, by]);
+    this.said.add(f);
+    for (const l of this.logs) l.fx.add(f);
   }
   /**
    * What each asset's builds read: the assets they built or found built, the groups, globs and names
@@ -444,15 +448,65 @@ export class Project implements BuildCtx {
   private timed = new Map<string, { out: BuildOut; bytes: number }>();
   private timedBytes = 0;
   private readonly timedBudget: number;
+  /**
+   * The options a build can branch on. Each read is noted on the builds in progress: one kept on disk is served
+   * only where those it read are the same (a figure's frame, which reads none, to check and shot alike).
+   */
+  private readonly opt: Record<Opt, boolean>;
   /** Builds for checking only (see BuildCtx.checksOnly). */
-  readonly checksOnly: boolean;
-  readonly wholeWorld: boolean;
+  get checksOnly(): boolean { return this.uses("checksOnly"); }
+  get wholeWorld(): boolean { return this.uses("wholeWorld"); }
+  get tracing(): boolean { return this.uses("tracing"); }
+  private uses(k: Opt): boolean {
+    const v = this.opt[k];
+    for (const l of this.logs) l.needs[k] = v;
+    // (read while the file loads, outside a build: what it defines may hang on it, which no build would note)
+    if (!this.logs.length && !this.disk) this.early = true;
+    return v;
+  }
+  /** An option was read while the art file loaded (or offDisk() said so): the loader keeps no build on disk. */
+  early = false;
+  /**
+   * Builds stop being a function of the files from here (the art threw dice or read the clock, or read a file after
+   * it loaded): nothing more read from or kept on disk, nor the builds in progress; as the file loads, none at all.
+   */
+  offDisk(): void {
+    this.early = true;
+    this.disk = undefined;
+    for (const l of this.logs) l.bad = true;
+  }
+  /**
+   * Set by a loader: builds kept on disk between commands (src/node/store.ts) under a key of all the project
+   * read; `key` adds the asset's name, seed, time and clock. A build is kept with what it did (DiskLog).
+   */
+  disk?: { get(key: string, opt: Record<string, boolean>): { out: BuildOut; log: DiskLog } | undefined; put(key: string, out: BuildOut, log: DiskLog, ms: number): void };
+  /** The builds in progress' logs, innermost last (`inner`: the ms of the builds made inside it), and each build's log once made. */
+  private logs: { needs: Record<string, boolean>; fx: Set<string>; bad?: boolean; inner: number }[] = [];
+  private logOf = new WeakMap<BuildOut, DiskLog>();
+  /**
+   * The warnings given so far by the builds made (and those in their logs), in order. A build is kept only if those
+   * there when it began are in its own log: its art code may reach an earlier build's work through a memo of its own
+   * (the round's bout), and made first, in another command, it would give them itself.
+   */
+  private said = new Set<string>();
+  /** The options the builds made read so far (theirs and those in their logs): one kept goes with them too, for the same reason. */
+  private opted: Record<string, boolean> = {};
+  /** A build found made, in memory or on disk: its log on the builds around it. One without (adopt()'s) spoils them: what it did isn't known. */
+  private joined(log: DiskLog | undefined): void {
+    // (found by art code that is running, which may keep it in a memo: what it read and said counts from here, not
+    // from the end of the build that found it, for the builds made inside that one)
+    if (log && this.logs.length) { Object.assign(this.opted, log.needs); for (const f of log.fx) this.said.add(f); }
+    for (const l of this.logs) {
+      if (!log || log.bad) { l.bad = true; continue; }
+      Object.assign(l.needs, log.needs);
+      for (const f of log.fx) l.fx.add(f);
+    }
+  }
   /** Timelines gathered from animated assets placed by the builds in progress (innermost last). */
   private collect: Acc[] = [];
   private building = new Set<string>();
   private cands = new Map<string, string[]>();
   private failed = new Map<string, PxError>();
-  readonly tracing: boolean;
   readonly where: boolean;
   /**
    * pxl inspect --id: what the asset being built stamps itself is drawn as nothing (its clock kept, an
@@ -461,11 +515,9 @@ export class Project implements BuildCtx {
   stub?: (name: string) => boolean;
 
   constructor(opts: ProjectOptions = {}) {
-    this.tracing = !!opts.trace;
+    this.opt = { checksOnly: !!opts.checksOnly, wholeWorld: !!opts.wholeWorld, tracing: !!opts.trace };
     this.where = !!opts.where;
     this.timedBudget = opts.timedBytes ?? TIMED_BYTES;
-    this.checksOnly = !!opts.checksOnly;
-    this.wholeWorld = !!opts.wholeWorld;
   }
 
   // ---------------------------------------------------------------- locations
@@ -1746,7 +1798,9 @@ export class Project implements BuildCtx {
     if ((kept || timed) && !again) {
       // most recently used last, so the oldest goes first when the timed cache is full
       if (timed) { this.timed.delete(key); this.timed.set(key, timed); }
-      return kept ?? timed!.out;
+      const out = kept ?? timed!.out;
+      this.joined(this.logOf.get(out));
+      return out;
     }
     const def = this.assets.get(name);
     if (!def) {
@@ -1755,11 +1809,25 @@ export class Project implements BuildCtx {
       throw new PxError(`unknown asset '${name}'${didYouMean(name, this.order)}`);
     }
     const failed = this.failed.get(key);
-    if (failed) throw new PxError(`depends on '${name}', which failed`);
+    if (failed) { this.joined(undefined); throw new PxError(`depends on '${name}', which failed`); }
     if (this.building.has(name)) throw new PxError(`reference cycle through '${name}'`);
     // ponytail: a sprite animated by the anims it stamps, stubbed, leaves the scene's clock (not one anim)
     if (this.stub && this.building.size === 1 && this.stub(name)) return { img: new Img(1, 1), layers: [], placements: [], ...(def.kind === "anim" ? { anim: animTimeline(def) } : {}) };
+    // on disk: not a build traced (its trace isn't kept), nor one with stubs
+    const t0 = performance.now(), up = this.logs[this.logs.length - 1];
+    const dk = this.disk && !this.stub && !(this.opt.tracing && seed === 0 && t === 0) ? key + (clock ? ` ${JSON.stringify(clock)}` : "") : undefined;
+    const hit = dk ? this.disk!.get(dk, this.opt) : undefined, said = dk ? [...this.said] : [], opted = { ...this.opted };
+    if (hit && Object.entries(hit.log.needs).every(([k, v]) => this.opt[k as Opt] === v)) {
+      for (const f of hit.log.fx) { const [msg, loc, by] = JSON.parse(f); this.warnAs(msg, loc ?? undefined, by ?? undefined); }
+      this.joined(hit.log);
+      this.logOf.set(hit.out, hit.log);
+      this.keep(key, hit.out, t);
+      if (up) up.inner += performance.now() - t0;
+      return hit.out;
+    }
     this.building.add(name);
+    const log: Project["logs"][number] = { needs: {}, fx: new Set<string>(), inner: 0 };
+    this.logs.push(log);
     const acc: Acc = {};
     // a scene may keep a clock of its own, as an anim does ({ frames, fps }): its functions read it
     // (c.t, c.frame), and the anims it stamps join it (one stamped at a frame it picks doesn't)
@@ -1770,29 +1838,41 @@ export class Project implements BuildCtx {
     }
     this.collect.push(acc);
     try {
-      const out = buildAsset(this, def, seed, this.tracing && seed === 0 && t === 0 ? new Trace() : undefined, t, clock);
+      const out = buildAsset(this, def, seed, this.opt.tracing && seed === 0 && t === 0 ? new Trace() : undefined, t, clock);
       // Anims keep their own frame timing; other assets are as animated as what they place.
       if (!out.anim && acc.loop) out.anim = { loop: acc.loop, step: acc.step!, ...(acc.capped ? { capped: true } : {}), ...longLoop(acc) };
-      if (!t) this.cache.set(key, out);
-      else {
-        const old = this.timed.get(key), bytes = buildBytes(out);
-        if (old) { this.timedBytes -= old.bytes; this.timed.delete(key); }
-        this.timed.set(key, { out, bytes });
-        this.timedBytes += bytes;
-        for (const [k, v] of this.timed) {
-          if (this.timedBytes <= this.timedBudget || this.timed.size <= 1) break;
-          this.timed.delete(k);
-          this.timedBytes -= v.bytes;
-        }
-      }
+      this.keep(key, out, t);
+      const done: DiskLog = { needs: { ...opted, ...log.needs }, fx: [...log.fx], ...(log.bad ? { bad: true } : {}) };
+      this.logOf.set(out, done);
+      if (dk && this.disk && !log.bad && said.every((f) => log.fx.has(f))) this.disk.put(dk, out, done, performance.now() - t0 - log.inner);
       return out;
     } catch (e) {
       const err = this.keyHint(wrap(e, (s) => this.locFromStack(s)).within(`${def.kind} '${name}'`, def.loc));
       this.failed.set(key, err);
+      // (a build that caught a failure inside it isn't kept: a later build of what failed says so, not the error)
+      for (const l of this.logs) l.bad = true;
       throw err;
     } finally {
+      this.logs.pop();
+      for (const f of log.fx) this.said.add(f);
+      Object.assign(this.opted, log.needs);
+      if (up) up.inner += performance.now() - t0;
       this.collect.pop();
       this.building.delete(name);
+    }
+  }
+
+  /** A build in memory: one at time 0 for good, one at another time among the most recently used (Project.timed). */
+  private keep(key: string, out: BuildOut, t: number): void {
+    if (!t) { this.cache.set(key, out); return; }
+    const old = this.timed.get(key), bytes = buildBytes(out);
+    if (old) { this.timedBytes -= old.bytes; this.timed.delete(key); }
+    this.timed.set(key, { out, bytes });
+    this.timedBytes += bytes;
+    for (const [k, v] of this.timed) {
+      if (this.timedBytes <= this.timedBudget || this.timed.size <= 1) break;
+      this.timed.delete(k);
+      this.timedBytes -= v.bytes;
     }
   }
 
@@ -1818,6 +1898,14 @@ export class Project implements BuildCtx {
   }
 }
 
+/** The options a build can branch on (Project.opt). */
+type Opt = "checksOnly" | "wholeWorld" | "tracing";
+/**
+ * What a build did besides its result, kept with it on disk: the options it read and their values (it holds where
+ * they're the same), the warnings it gave, its own and those of the builds inside it (given again when it is read
+ * back), and whether something in it failed (then it isn't kept).
+ */
+export interface DiskLog { needs: Record<string, boolean>; fx: string[]; bad?: boolean }
 /** A combined timeline being gathered, and the loop of each thing joining it. */
 type Acc = Partial<Timeline> & { by?: Map<string, number> };
 /** Past this many frames, a loop longer than all it plays (their loops don't divide) is said. */

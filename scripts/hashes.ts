@@ -25,6 +25,9 @@ import { join, relative, resolve } from "node:path";
 import { frameCount, frameTime } from "../src/node/shot.ts";
 import { examples, inTree, loader, pick, repo, revTree } from "./vs.ts";
 
+// real builds on both sides, never those kept on disk (store.ts): a comparison read from it would prove nothing
+process.env.PXL_CACHE = "0";
+
 const args = process.argv.slice(2), opt = (k: string) => { const i = args.indexOf(k); return i < 0 ? undefined : args.splice(i, 2)[1]; };
 const all = args.includes("--all") && !!args.splice(args.indexOf("--all"), 1);
 const vs = opt("--vs"), only = new RegExp(opt("--only") ?? ""), strip = opt("--strip"), under = strip && new RegExp(`^((${strip})\\.)+`);

@@ -1031,6 +1031,22 @@ Outputs go to `<file dir>/out`: `sprites/<n>.png`, `scenes/<n>.png`, `anims/<n>.
 (TexturePacker hash format: Phaser, Godot importers, ...), `_preview/<n>.png` (upscaled to
 ~768px, checkerboard behind transparency, pixel grid at scale ≥ 6 with every 8th line darker).
 
+Builds kept on disk: a build whose own work took 10 ms or more, and 300 ms or more for each MB it takes there (a 3D
+figure's frame; not a scene's frame, composed again in 40 ms of those kept), is kept under a key
+of all it reads (pxl's sources, Node's version, the time zone and language; the bytes of every file the art file
+loaded: itself, its includes, palettes, PNGs, poses; the asset, its seed, time and clock; the options it read, and
+those read earlier in the command: check's, `--world`'s, a trace's), with the warnings it gave, and any later command
+making the same build reads it back (a figure's 217 traced frames: `check` 137 s, then 4). A check's build and a
+shot's are kept side by side. It can't go stale: an edit to any of those files, or to pxl, is a new key. That holds
+for art whose every build is a function of the files. A memo in the art file is fine (the same value whoever fills
+it). A variable that one build writes and another draws with (a scene setting a width its sprite then reads) is not:
+such a build depends on the builds made before it, and one read back may be another order's or another command's;
+keep that state out of the art, or build with `--no-cache`. Where builds
+stop being a function of the files nothing more is kept: the art's own `Math.random`, `Date.now`, `Date()`, a
+`new Date()` or a date formatted without a date (as the file loads: none at all), a file read once the art file has
+loaded. In `node_modules/.cache/pxl/builds/` in a checkout, else `pxl-builds/` in the system's temp folder, 512 MB,
+the least recently used dropped first. `--no-cache` (any command) or `PXL_CACHE=0` builds everything.
+
 ### Output for engines
 
 Beside the art of a sprite, scene, anim or sheet, a build writes two maps laid out in the same

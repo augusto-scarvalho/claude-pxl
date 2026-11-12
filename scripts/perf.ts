@@ -20,6 +20,9 @@ import { pathToFileURL } from "node:url";
 import { frameCount, frameTime } from "../src/node/shot.ts";
 import { examples, inTree, loader, pick, repo, revTree } from "./vs.ts";
 
+// the builds' own time: none read back from disk (store.ts)
+process.env.PXL_CACHE = "0";
+
 const args = process.argv.slice(2), opt = (k: string) => { const i = args.indexOf(k); return i < 0 ? undefined : args.splice(i, 2)[1]; };
 const vs = opt("--vs");
 if (args[0] === "--one") {

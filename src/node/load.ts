@@ -7,15 +7,28 @@ import { stripTypeScriptTypes } from "node:module";
 import { PxError, wrap } from "../core/errors.ts";
 import { Project, type ProjectOptions } from "../core/project.ts";
 import { decodePng } from "./png.ts";
+import { diskOf, sha1 } from "./store.ts";
 
 /**
  * A fresh context whose globals are the DSL. Not contextified: its global object is an ordinary one,
  * so an art file's own hot loops reading globals (Math, its helpers) run at full speed (a figure drawn
  * of 14k samples took 150 ms through the contextified one's interceptors).
  */
-function sandbox(env: Record<string, unknown>): vm.Context {
+function sandbox(env: Record<string, unknown>, impure: () => void): vm.Context {
   const ctx = vm.createContext(vm.constants.DONT_CONTEXTIFY);
   Object.assign(ctx, env, { console });
+  // its own dice and clock say they were used (store.ts: its builds are then no function of the files): Math.random,
+  // Date.now, Date() and a new Date() without a date, a date formatted without one
+  const { Math: M, Date: D, Intl: I } = vm.runInContext("({ Math, Date, Intl })", ctx);
+  const told = (f: (...a: unknown[]) => unknown, when = (_: unknown[]) => true) => function (this: unknown, ...a: unknown[]) { if (when(a)) impure(); return f.apply(this, a); };
+  const dated = (a: unknown[]) => a[0] === undefined, F = I.DateTimeFormat.prototype, format = Object.getOwnPropertyDescriptor(F, "format")!.get!;
+  M.random = told(M.random);
+  D.now = told(D.now);
+  F.formatToParts = told(F.formatToParts, dated);
+  Object.defineProperty(F, "format", { get() { return told(format.call(this), dated); } });
+  const clock: object = new Proxy(D, { apply: (t, s, a) => (impure(), Reflect.apply(t, s, a)), construct: (t, a, n) => (a.length || impure(), Reflect.construct(t, a, n)) });
+  D.prototype.constructor = clock;
+  ctx.Date = clock;
   return ctx;
 }
 
@@ -30,8 +43,12 @@ function compile(code: string, file: string): string {
  */
 export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs: string) => readFileSync(abs, "utf8")): Project {
   const p = new Project(opts), env = p.env();
-  const ctx = sandbox(env);
-  const stack: string[] = [], codes = new Map<string, string>();
+  const ctx = sandbox(env, () => p.offDisk());
+  // (each file's hash as it was read: the key of the builds kept on disk, store.ts; a file read once the art file has
+  // loaded, by code a build runs, is no part of it: then nothing is kept)
+  const stack: string[] = [], codes = new Map<string, string>(), seen = new Map<string, string>();
+  let loaded = false;
+  const late = () => { if (loaded) p.offDisk(); };
   // a file in locations: its path from the main file's folder ("kit.px.js", "../nature/kit.px.js": two kits apart)
   const home = dirname(resolve(file));
   p.short = (abs) => { const r = relative(home, abs); return isAbsolute(r) ? abs.replace(/^.*[\\/]/, "") : r.split(sep).join("/"); };
@@ -44,6 +61,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
     }
     p.addFile(abs);
     codes.set(abs, code);
+    seen.set(abs, sha1(code));
     stack.push(abs);
     try {
       vm.runInContext(compile(code, abs), ctx, { filename: abs });
@@ -65,36 +83,43 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
     if (!stack.length) throw new PxError(`'${path}' is read while the art file loads: call use(), pose(), motion() or png at the top of the file, not inside a drawing function`);
     return resolve(dirname(stack[stack.length - 1]), path);
   };
-  p.includeHook = (path) => run(near(path));
-  p.scope = (code) => vm.runInContext(code, ctx);
+  p.includeHook = (path) => { late(); run(near(path)); };
+  p.scope = (code) => { late(); return vm.runInContext(code, ctx); };
   p.pngHook = (path) => {
+    late();
     const abs = near(path);
     let bytes: Buffer;
     try { bytes = readFileSync(abs); } catch { throw new PxError(`cannot read '${abs}'`); }
     p.addFile(abs); // the live viewer rebuilds when it changes
+    seen.set(abs, sha1(bytes));
     try { return decodePng(bytes); } catch (e) { throw new PxError(`${abs}: ${(e as Error).message}`); }
   };
   // (counted while it isn't there too: the build writes it, and what watches p.files sees it come)
-  p.whereHook = (path) => { const abs = near(path); p.addFile(abs); return { abs, there: existsSync(abs) }; };
+  p.whereHook = (path) => { late(); const abs = near(path); p.addFile(abs); return { abs, there: existsSync(abs) }; };
   p.readHook = (path) => {
+    late();
     const abs = near(path);
     try {
       const text = readFileSync(abs, "utf8");
       p.addFile(abs); // the live viewer rebuilds when it changes
+      seen.set(abs, sha1(text));
       return text;
     } catch {
       throw new PxError(`cannot read '${abs}'`);
     }
   };
   try { run(file); p.loaded(); } catch (e) { throw hiding(e, ctx, env); }
+  loaded = true;
   warnHiding(p, ctx, env, codes);
+  // (not for edit and inspect, whose reads of each build, p.reads, a build read back wouldn't give)
+  if (!p.early && !opts.where) p.disk = diskOf(p.files, seen);
   return p;
 }
 
 /** Load art source from a string (tests, embedding). `name` appears in error locations. */
 export function loadSource(src: string, name = "art.px.js", opts: ProjectOptions = {}): Project {
   const p = new Project(opts), env = p.env();
-  const ctx = sandbox(env);
+  const ctx = sandbox(env, () => p.offDisk());
   p.addFile(name);
   try {
     vm.runInContext(compile(src, name), ctx, { filename: name });

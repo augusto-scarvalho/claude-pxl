@@ -417,7 +417,8 @@ PNGs); one that can't say what it reads keeps node:test's `test`. A cached test 
 file it doesn't name fails, naming it, and an example whose check reads a file the loader didn't
 count (`p.files`) says so in its lines: the cache is trusted, so run `npm run check` as it is.
 Delete `examples-passed.json`, `gallery-passed.txt` or a `<file>-passed.txt` there only for a clean
-run (a measurement: about 4 minutes of all four cores).
+run (a measurement: about 4 minutes of all four cores; `PXL_CACHE=0` too, or it reads back the builds kept in
+`builds/`).
 
 The suite runs three test files at a time, below normal priority, as `pxl` itself does: on a 4-core
 laptop seven at a time took as long, burned a fifth more processor and froze the user's programs.
@@ -527,6 +528,23 @@ minute apart differ by more than most changes, and the same pxl against itself r
 figure. `meter.ts`, preloaded, prints each test file's time, processor time and peak memory: which
 files hold the suite back (the three `study` files, 6 to 9 s each when they run; `node.test.ts`,
 which runs every time, 6 s, part of it waiting on the processes it starts).
+
+A build that took 10 ms or more of its own, and 300 ms or more for each MB it takes, is kept on disk between commands
+(`src/node/store.ts`,
+[the reference](../reference.md#cli)): under a key of all it reads (pxl's sources, Node's version, the bytes of every
+file the project loaded, the asset, its seed, time and clock, and the options it read on the way or that builds read
+earlier in the command, in the entry's name: a check's build and a shot's side by side), with the warnings it gave, so
+a build read back is the build. That is proven for art whose builds are each a function of the files: a memo in the
+art file is covered (the rules below), a variable one build writes and another draws with is not (the build then
+depends on the order it was made in, which no key holds), so art keeps no such state. Haldor's `check` went from
+137 s to 4 the second time, the round's from 142 to 8, the round's frame 100 shot from 131 to 4; an edit to a file
+the project loaded, or to `src/`, makes its builds again (the round's edit, Haldor's frames in it too): the cache
+speeds a command run again, not the first look after an edit. Not kept: a build under that floor (the round's scene frames, composed again of the parts kept), a build that can't be written as data (a
+`mesh()` with a sun, a stamp placed by a relation), one made after a warning its log lacks (art code may hold that
+work in a memo of its own, as the round's bout does), any of `edit` and `inspect`, anything after the art's own
+`Math.random` or clock, or a file read once it has loaded. Turn it off with `--no-cache` or
+`PXL_CACHE=0`. `hashes.ts` and `perf.ts` never read it (a comparison or a time read back from it would prove
+nothing); the tests do, as every command.
 
 `served.ts` starts the live viewer's server on a file and fetches what the page would when an asset
 is picked: run it after a change to the viewer or to what a build traces (a scene's frames all sent
