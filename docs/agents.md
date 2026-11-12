@@ -538,13 +538,26 @@ a build read back is the build. That is proven for art whose builds are each a f
 art file is covered (the rules below), a variable one build writes and another draws with is not (the build then
 depends on the order it was made in, which no key holds), so art keeps no such state. Haldor's `check` went from
 137 s to 4 the second time, the round's from 142 to 8, the round's frame 100 shot from 131 to 4; an edit to a file
-the project loaded, or to `src/`, makes its builds again (the round's edit, Haldor's frames in it too): the cache
-speeds a command run again, not the first look after an edit. Not kept: a build under that floor (the round's scene frames, composed again of the parts kept), a build that can't be written as data (a
+the project loaded, or to `src/`, makes its builds again (the round's edit, Haldor's frames in it too), what their
+traces march to read back where their fields are pure (below). Not kept: a build under that floor (the round's scene frames, composed again of the parts kept), a build that can't be written as data (a
 `mesh()` with a sun, a stamp placed by a relation), one made after a warning its log lacks (art code may hold that
 work in a memo of its own, as the round's bout does), any of `edit` and `inspect`, anything after the art's own
 `Math.random` or clock, or a file read once it has loaded. Turn it off with `--no-cache` or
 `PXL_CACHE=0`. `hashes.ts` and `perf.ts` never read it (a comparison or a time read back from it would prove
 nothing); the tests do, as every command.
+
+What a trace's march finds is kept apart from the builds, under a key of the field itself (`surface.ts`'s `kept`,
+`store.ts`): pxl's sources and Node's, the field's key (`sdf.ts`'s `Compiled.key`: its code and numbers, exactly) and
+the rays the trace asks of it (each one's origin, way, where it enters and leaves the field's box and how near it must
+come). The march reads nothing else, so the key is complete by construction, whatever view, size, step or canvas made
+the rays. A field given by a function has a key only when the function is `pure()`, rebuilt from its source in a scope
+of `Math` and its data alone ([the reference](../reference.md)); a field with a plain closure in it is traced as
+before and not kept. Each ray's hit is kept (8 bytes; the five fighting files' traces 18.5 MiB on disk); the normal,
+the shadow rays, the creases and the paint are worked out again from it, so a hit spares the march, two thirds of
+Haldor's cold frame (the paint is 17% of it, the normal's taps 8%). An edit then marches again only the frames whose
+fields it changed, whatever file asks them: Haldor's check after an edit to a comment went from 95 s to 49 (2026-11),
+the paint and the arms' small traces, under the store's floor, made again. His and Reva's trunks, sweeps and skirts are
+pure functions.
 
 `served.ts` starts the live viewer's server on a file and fetches what the page would when an asset
 is picked: run it after a change to the viewer or to what a build traces (a scene's frames all sent

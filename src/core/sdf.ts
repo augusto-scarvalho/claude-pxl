@@ -40,7 +40,7 @@ type Node =
   | { op: "paint"; of: Sdf; name: string; where: (p: V3, n: V3) => unknown }
   | { op: "paintBy"; of: Sdf; by: (p: V3, n: V3) => unknown }
   | { op: "part"; of: Sdf; name: string }
-  | { op: "fn"; d: (x: number, y: number, z: number) => number; lo: V3; hi: V3; lip: number; id: number };
+  | { op: "fn"; d: (x: number, y: number, z: number) => number; lo: V3; hi: V3; lip: number; id: number; key?: string; intact?: () => string | undefined };
 
 /** A field compiled at one moment: its distance, its material (an index into `mats`, -1 none) and its named part (into `parts`, -1 none) at a point with its normal, its box, its stretch. */
 export interface Compiled {
@@ -50,8 +50,12 @@ export interface Compiled {
   /** both at once: (material + 1) + 1024 (part + 1), 0 neither */
   mp(x: number, y: number, z: number, nx: number, ny: number, nz: number): number;
   parts: string[];
-  /** its distance's code and numbers: the same key, the same field (a fingerprint) */
+  /** its distance's code and numbers, exactly (-0 too), each field given by a function there its pure key (pure()) or its id: the same key, the same field */
   key: string;
+  /** every field given by a function in it pure (pure()): its key then names all its distance reads, and what a trace of it finds is kept under it (surface.ts) */
+  pure: boolean;
+  /** undefined while every pure function in it holds its data as it was given; else what one changed (src/node/pure.ts) */
+  intact(): string | undefined;
   lo: V3;
   hi: V3;
   lip: number;
@@ -287,7 +291,16 @@ export class Appearance {
  * march steps d / lip): what the primitives can't make (rig3d's sweeps: a cloak round a body).
  */
 let FNS = 0;
-export const fieldOf = (d: (x: number, y: number, z: number) => number, lo: V3, hi: V3, lip = 1): Sdf => new Sdf({ op: "fn", d, lo, hi, lip, id: ++FNS });
+/** (`key`: d a function of what the key names alone, its code and every value it reads: rig3d's sweep of pure functions) */
+export const fieldOf = (d: (x: number, y: number, z: number) => number, lo: V3, hi: V3, lip = 1, key?: string, intact?: () => string | undefined): Sdf => new Sdf({ op: "fn", d, lo, hi, lip, id: ++FNS, key, intact });
+/** The pure functions (pure(), src/node/pure.ts) and each one's key: "" when its data holds a field that isn't pure. */
+export const PURE = new WeakMap<object, string>();
+/** Each pure function's check that its data's arrays (its only state) are as it was given them: undefined, or what changed. */
+export const INTACT = new WeakMap<object, () => string | undefined>();
+/** pure(data, fn), set by Node (src/node/pure.ts): fn rebuilt from its source in a scope of Math and its data alone. */
+export const bare: { pure?: <F extends (...a: never[]) => unknown>(data: Record<string, unknown>, fn: F) => F } = {};
+/** Numbers exactly (-0 too), joined. */
+export const exact = (v: readonly number[]) => v.map((n) => (Object.is(n, -0) ? "-0" : String(n))).join(",");
 
 /** "a density", "an occupancy". */
 export const article = (w: string) => `${/^[aeiou]/.test(w) ? "an" : "a"} ${w}`;
@@ -327,7 +340,8 @@ export const sdf = {
   /** A field of the file's own: `d(x, y, z)` its distance (or less: never more), inside the box `lo`..`hi` (an axe's head cut to its outline). */
   field: (d: (x: number, y: number, z: number) => number, lo: number[], hi: number[]) => {
     if (typeof d !== "function" || ![lo, hi].every((v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite))) throw new PxError("sdf.field((x, y, z) => distance, [lo x, y, z], [hi x, y, z])");
-    return fieldOf(d, lo as V3, hi as V3);
+    const k = PURE.get(d);
+    return fieldOf(d, lo as V3, hi as V3, 1, k ? `field(${exact(lo)};${exact(hi)};${k})` : undefined, INTACT.get(d));
   },
   /** An ellipsoid round the origin, radii [x, y, z]. */
   ellipsoid: (r: Vec) => new Sdf({ op: "ellipsoid", r }),
@@ -362,6 +376,10 @@ class Code {
   constructor(track = false) { this.track = track; }
   /** distance functions the code calls (a field given by one) */
   F: ((x: number, y: number, z: number) => number)[] = [];
+  /** each one's place in K and what it is there: its pure key, or "#" and its id */
+  FK = new Map<number, string>();
+  /** their pure functions' checks of their data */
+  IN: (() => string | undefined)[] = [];
   /** the memos it writes (Sdf.memo): a field asked on its own, its point and distance each time this code works it out */
   M: Float64Array[] = [];
   memo(m: Float64Array, x: string, y: string, z: string, v: string): void {
@@ -402,9 +420,9 @@ const RUN = 250;
 type Factory = (K: number[], smin: (a: number, b: number, k: number) => number, fbm: typeof fbm3, F: Fd[], W: Int32Array | undefined, M: Float64Array[]) => Fd;
 const FACTORIES = new Map<string, Factory>(), TRACKING = new Map<string, string>();
 /** A distance's code (tracking: each join also writing which child it takes), its numbers and the functions it calls. */
-function written(e: Part["e"], track = false): { src: string; K: number[]; F: Fd[]; M: Float64Array[] } {
+function written(e: Part["e"], track = false): { src: string; K: number[]; F: Fd[]; M: Float64Array[]; FK: Map<number, string>; IN: (() => string | undefined)[] } {
   const c = new Code(track), r = e(c, "x", "y", "z");
-  return { src: `${c.subs.join("\n")}\nreturn (x, y, z) => {\n${c.lines.join("\n")}\nreturn ${r};\n}`, K: c.K, F: c.F, M: c.M };
+  return { src: `${c.subs.join("\n")}\nreturn (x, y, z) => {\n${c.lines.join("\n")}\nreturn ${r};\n}`, K: c.K, F: c.F, M: c.M, FK: c.FK, IN: c.IN };
 }
 /** Code as a function, its source made once. */
 function made(src: string, K: number[], F: Fd[], M: Float64Array[], W?: Int32Array): Fd {
@@ -732,7 +750,7 @@ function compiled(f: Sdf, clock: Clock): Compiled {
       case "fn": {
         // (its id among the numbers: two such fields are never the same field)
         const fd = n.d, [lo, hi] = shift(n.lo, n.hi);
-        return { m: NONE, lo, hi, lip: n.lip, e: (c, x, y, z) => { c.k(n.id); c.F.push(fd); return c.v(`F[${c.F.length - 1}](${x}, ${y}, ${z})`); } };
+        return { m: NONE, lo, hi, lip: n.lip, e: (c, x, y, z) => { c.FK.set(c.K.length, n.key ?? `#${n.id}`); if (n.intact) c.IN.push(n.intact); c.k(n.id); c.F.push(fd); return c.v(`F[${c.F.length - 1}](${x}, ${y}, ${z})`); } };
       }
       case "part": {
         // its full name: the parts round it first; the innermost names a point
@@ -758,7 +776,10 @@ function compiled(f: Sdf, clock: Clock): Compiled {
   const mp: Fm = !tracks ? raw : (x, y, z, a, b, c) => { (track ??= tracker())(x, y, z); return raw(x, y, z, a, b, c); };
   return {
     // (its key without the memos' lines: the same field whether or not a part of it was asked on its own)
-    d: made(D.src, D.K, D.F, D.M), get key() { return `${D.src.replace(/^M\[.*\n/gm, "")}#${D.K.join(",")}`; }, lo: P.lo, hi: P.hi, lip: P.lip, mats, parts, mp, timed,
+    d: made(D.src, D.K, D.F, D.M), lo: P.lo, hi: P.hi, lip: P.lip, mats, parts, mp, timed,
+    get key() { return `${D.src.replace(/^M\[.*\n/gm, "")}#${D.K.map((v, i) => D.FK.get(i) ?? exact([v])).join(",")}`; },
+    pure: [...D.FK.values()].every((k) => k[0] !== "#"),
+    intact: () => { for (const f of D.IN) { const e = f(); if (e) return e; } return undefined; },
     m: (x, y, z, a, b, c) => (mp(x, y, z, a, b, c) % 1024) - 1,
     part: (x, y, z, a, b, c) => Math.floor(mp(x, y, z, a, b, c) / 1024) - 1,
   };

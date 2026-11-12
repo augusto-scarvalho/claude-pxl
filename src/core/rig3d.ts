@@ -7,7 +7,7 @@
 // face, the body orange, the right limbs light and the left dark) is how a new move is judged before
 // it is painted. gait() gives a walk's numbers by the view, views() places hand-drawn heads.
 import { PxError } from "./errors.ts";
-import { Sdf, fieldOf, sdf, type V3 } from "./sdf.ts";
+import { INTACT, PURE, Sdf, bare, exact, fieldOf, sdf, type V3 } from "./sdf.ts";
 import { figure } from "./rig.ts";
 
 // 3D vectors, written out: a pose is a few dozen of them
@@ -233,8 +233,15 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
         const v = Math.min(Math.max(side, cap), 0) + Math.sqrt(Math.max(side, 0) ** 2 + Math.max(cap, 0) ** 2);
         return keep && !keep(h, a) ? Math.max(v, 0.3) : v;
       };
-      const field = fieldOf(d, [bx + x0 - pad, by + y0 - pad, z0 - 0.5], [bx + x1 + pad, by + y1 + pad, z1 + 0.5], 1.5);
-      return { field, paint: paintOf(paint, "a sweep"), at: (q) => {
+      // (its radius, keep and shift pure, pure(): d reads nothing but them and these numbers, which name it, and its `at`
+      // is pure too, the same steps, for a pure function to read)
+      const fns = [radius, keep, shift].map((g) => (g === undefined ? "-" : PURE.get(g))), key = fns.every((k) => k) ? `sweep(${exact([bx, by, z0, z1, fx, fy, rx, ry, shell])};${fns.join(";")})` : undefined;
+      const checks = [radius, keep, shift].flatMap((g) => (g && INTACT.get(g)) || []);
+      const field = fieldOf(d, [bx + x0 - pad, by + y0 - pad, z0 - 0.5], [bx + x1 + pad, by + y1 + pad, z1 + 0.5], 1.5, key, key ? () => { for (const c of checks) { const e = c(); if (e) return e; } return undefined; } : undefined);
+      return { field, paint: paintOf(paint, "a sweep"), at: key && bare.pure ? bare.pure({ z0, H, bx, by, shift, f, r }, (q: V3): [number, number, V3] => {
+        const h = Math.max(0, Math.min(1, (q[2] - z0) / H)), s = shift?.(h) ?? [0, 0, 0], o: V3 = [q[0] - bx - s[0], q[1] - by - s[1], 0];
+        return [h, Math.atan2(o[0] * r[0] + o[1] * r[1] + o[2] * r[2], o[0] * f[0] + o[1] * f[1] + o[2] * f[2]), o];
+      }) : (q) => {
         const h = Math.max(0, Math.min(1, (q[2] - z0) / H)), s = shift?.(h) ?? [0, 0, 0], o: V3 = [q[0] - bx - s[0], q[1] - by - s[1], 0];
         return [h, round(o), o];
       } };

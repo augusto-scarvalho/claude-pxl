@@ -195,7 +195,19 @@ interface Tracer {
   ao?(p: V3, n: V3): number;
   /** a cell's size, for a voxel grid */
   cell?: V3;
+  /** what hit() reads besides its rays, when that is all it reads (a pure field's key and its stretch): what it finds kept by it */
+  key?: string;
+  /** with a key: undefined while the pure functions it calls hold their data as given (their only state), else what changed */
+  intact?: () => string | undefined;
 }
+
+/**
+ * What the march finds, kept between commands (set by src/node/store.ts): `trace(key, rays)` for a tracer's key and
+ * the rays asked of it (each one's origin, way, t0, t1 and nearness, in order), the hits kept (each ray's t, or -1) and
+ * where to keep them once marched. hit() reads nothing else, so the same field through the same rays finds the same.
+ * `on()` false: nothing is kept now, and a trace builds neither its key nor its rays.
+ */
+export const kept: { on?: () => boolean; trace?: (key: string, rays: Float64Array) => { t?: Float64Array; put(t: Float64Array, ms: number): void } | undefined } = {};
 
 /** A field's surface: marched by its distance. */
 function fieldTracer(C: Compiled): Tracer {
@@ -210,7 +222,7 @@ function fieldTracer(C: Compiled): Tracer {
     return -1;
   };
   return {
-    lo: C.lo, hi: C.hi, names: C.mats, parts: C.parts,
+    lo: C.lo, hi: C.hi, names: C.mats, parts: C.parts, get key() { return C.pure ? `${C.key}|${lip}` : undefined; }, intact: C.intact,
     hit: (o, r, t0, t1, e) => march(o[0], o[1], o[2], r[0], r[1], r[2], t0, t1, e),
     shade: (p, e) => {
       // the normal (four taps, Inigo Quilez's tetrahedron), the material there
@@ -455,14 +467,49 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
     return !!s && s[1] >= t0 && T.hit(p, L, Math.max(t0, s[0]), s[1], e) >= 0;
   };
   const vis = c.img.depth;
+  // a cell's ray, where it enters and leaves the box, and how near the march must come
+  // (left in these, not in an object a cell)
+  let ar: NonNullable<ReturnType<typeof ray>>, at0 = 0, at1 = 0, ae = 0;
+  const aim = (gx: number, gy: number): boolean => {
+    const a = ray((gx0 + gx) * K + K / 2, (gy0 + gy) * K + K / 2), s = a && slab(a.o, a.d, T.lo, T.hi);
+    if (!a || !s) return false;
+    ar = a; at0 = Math.max(s[0], persp ? 0.05 : -Infinity); at1 = s[1]; ae = near(Math.max(s[0], 0.05));
+    return true;
+  };
+  // what the march found, kept under the field's key and these rays (kept): read back, or kept once marched
+  // (each cell aimed once: its ray, and its nine numbers in `rays`, the trace's key; the hits read back, or all
+  // marched here, timed as one, and kept: the cells below then take theirs in order, shading as they did)
+  let hits: Float64Array | undefined, cells: (typeof ar | undefined)[] | undefined, rays: Float64Array | undefined, ri = 0;
+  // (a pure function's data as it was given: then the march is what a fresh one would be, and leaves it so; one
+  // that wrote into it, here or between traces, is an error, nothing kept)
+  const intact = () => { const bad = T.intact?.(); if (bad) throw new PxError(`${who}: ${bad}`); };
+  const key = kept.trace && kept.on?.() !== false ? T.key : undefined;
+  if (key) {
+    const all = new Float64Array(GW * GH * 9), rs: typeof cells = new Array(GW * GH);
+    let n = 0;
+    for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) if (aim(gx, gy)) {
+      rs[gy * GW + gx] = ar!;
+      all.set(ar!.o, n); all.set(ar!.d, n + 3); all[n + 6] = at0; all[n + 7] = at1; all[n + 8] = ae;
+      n += 9;
+    }
+    const mine = all.slice(0, n), k = kept.trace!(key, mine);
+    if (k) {
+      intact();
+      cells = rs; rays = mine; hits = k.t?.length === n / 9 ? k.t : undefined;
+      if (!hits) {
+        const t = (hits = new Float64Array(n / 9)), m0 = performance.now();
+        for (let i = 0, j = 0; i < rs.length; i++) { const a = rs[i]; if (a) { t[j] = T.hit(a.o, a.d, mine[9 * j + 6], mine[9 * j + 7], mine[9 * j + 8]); j++; } }
+        const ms = performance.now() - m0;
+        intact(); k.put(t, ms);
+      }
+    }
+  }
   for (let gy = 0; gy < GH; gy++)
     for (let gx = 0; gx < GW; gx++) {
-      const cx = (gx0 + gx) * K + K / 2, cy = (gy0 + gy) * K + K / 2, r = ray(cx, cy);
-      if (!r) continue;
-      const s = slab(r.o, r.d, T.lo, T.hi);
-      if (!s) continue;
-      const e = near(Math.max(s[0], 0.05));
-      const t = T.hit(r.o, r.d, Math.max(s[0], persp ? 0.05 : -Infinity), s[1], e);
+      let r: typeof ar, e: number, t: number;
+      if (hits) { const a = cells![gy * GW + gx]; if (!a) continue; r = a; e = rays![9 * ri + 8]; t = hits[ri++]; }
+      else { if (!aim(gx, gy)) continue; r = ar!; e = ae; t = T.hit(r.o, r.d, at0, at1, e); }
+      const cx = (gx0 + gx) * K + K / 2, cy = (gy0 + gy) * K + K / 2;
       if (t < 0) continue;
       const p: V3 = [r.o[0] + r.d[0] * t, r.o[1] + r.d[1] * t, r.o[2] + r.d[2] * t], i = gy * GW + gx;
       depth[i] = axisDepth(p);

@@ -8,6 +8,7 @@ import { PxError, wrap } from "../core/errors.ts";
 import { Project, type ProjectOptions } from "../core/project.ts";
 import { decodePng } from "./png.ts";
 import { diskOf, sha1 } from "./store.ts";
+import "./pure.ts"; // (pure(): the bare scope its functions are rebuilt in)
 
 /**
  * A fresh context whose globals are the DSL. Not contextified: its global object is an ordinary one,

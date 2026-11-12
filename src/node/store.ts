@@ -25,6 +25,7 @@ import { threadId } from "node:worker_threads";
 import { deflateSync, inflateSync } from "node:zlib";
 import type { BuildOut } from "../core/build.ts";
 import { Img } from "../core/image.ts";
+import { kept } from "../core/surface.ts";
 import type { DiskLog, Project } from "../core/project.ts";
 
 const code = join(import.meta.dirname, ".."), top = join(code, "..");
@@ -76,6 +77,19 @@ export function diskOf(files: string[], seen: Map<string, string>): Project["dis
 }
 
 const fileOf = (key: string) => join(DIR, sha1(key));
+
+// What a trace's march finds (surface.ts's kept), beside the builds: under pxl's sources and Node's, the field's key
+// and the rays asked, whatever file asks it and whatever else that file holds. Each ray's hit, 8 bytes, deflated.
+/** The entry's key for a field's key and its rays (undefined: turned off, or pxl changed since it started). */
+export const traceKey = (field: string, rays: Float64Array) =>
+  process.env.PXL_CACHE === "0" || !(src ??= sourcesOf(code, performance.timeOrigin)) ? undefined : `trace\0${src}\0${sha1(field)}\0${sha1(new Uint8Array(rays.buffer))}`;
+kept.on = () => process.env.PXL_CACHE !== "0";
+kept.trace = (field, rays) => {
+  const key = traceKey(field, rays);
+  if (!key) return undefined;
+  const t = (get(key)?.out as { t?: unknown } | undefined)?.t;
+  return { t: t instanceof Float64Array ? t : undefined, put: (t, ms) => { if (ms >= DISK_MS) put(key, { t } as unknown as BuildOut, { needs: {}, fx: [] }, ms); } };
+};
 
 /**
  * The entries there when this process first looked, and those it wrote since: a build not among them isn't looked

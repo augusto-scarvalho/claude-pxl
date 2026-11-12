@@ -5,7 +5,7 @@ import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from 
 import { type View, perspective } from "./perspective.ts";
 import { solid } from "./solids.ts";
 import { model, turnFaces, turnPoint } from "./mesh.ts";
-import { Sdf, compile, sdf } from "./sdf.ts";
+import { Sdf, bare, compile, sdf } from "./sdf.ts";
 import { COMPASS, clocksOf, contactOf, headingsOf, mirrorSymmetric, topOf, turnLight, turnViews } from "./turnaround.ts";
 import { BLOCK_MATS, type Body, type Joints, type Pose, blocksOf, bodyOf, gait, ik3, jointsOf, partsOf, solesOf, turned } from "./rig3d.ts";
 import { SURFACE_OPTS, VOXEL_OPTS, projection, surfaceSize } from "./surface.ts";
@@ -1344,6 +1344,11 @@ export class Project implements BuildCtx {
     // a model for mesh(): faces, strips, lofts and boxes in meters, each of a material
     // model.turn(faces, c, axis, th, lift) and model.turnPoint(p, ...): a hull on its bob and what rides it
     env.model = Object.assign(() => model(), { turn: turnFaces, turnPoint });
+    // pure(data, fn): fn rebuilt in a scope of Math and its data alone (src/node/pure.ts), so a field drawn of it is kept by its key
+    env.pure = (data: Record<string, unknown>, fn: (...a: never[]) => unknown) => {
+      if (!bare.pure) throw new PxError("pure() needs Node (its bare scope)", this.callerLoc());
+      try { return bare.pure(data, fn); } catch (e) { throw wrap(e).within("pure", this.callerLoc()); }
+    };
     // fields in 3D, in meters: sdf.sphere(r), .union(...), .bend(k), ... drawn by surface(); sdf.size(field, { view, ppm }) a sprite's size for it
     // sdf.voxels(field, { size, clock }) a voxel grid, sdf.mesh(field, { size, clock }) a mesh by surface nets
     env.sdf = {

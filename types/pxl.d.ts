@@ -1017,6 +1017,8 @@ declare global {
   /** Written by build: a grid as name.vox (and .obj/.glb of its blocks), a mesh as name.obj (+ .mtl) and name.glb, Y up; each read back. */
   /** A function of the clock with frames: n moments of its loop: an animated .glb, a file a moment for the others. */
   function export3d(name: string, thing: PxVoxels | PxMesh3 | PxSplats | ((c: PxClock) => PxVoxels | PxMesh3 | PxSplats), opts?: { mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[] }>; as?: ("vox" | "obj" | "glb" | "ply")[]; frames?: number; fps?: number }): void;
+  /** fn rebuilt from its source in a scope of Math (no random) and `data` alone (numbers, strings, arrays and plain objects of them, copied (the objects frozen, the arrays plain and checked at each trace kept); fields, asked dist(p); other pure functions): a name it reads that isn't there is an error saying so. A field given by pure functions (sdf.field's, a sweep's radius, keep and shift) has a key of its source and data, and what a trace of it finds is kept on disk under it. */
+  function pure(data: Record<string, unknown>, fn: (...a: any[]) => any): (...a: any[]) => any;
   /** Fields in 3D, in meters ([x, y ahead, z up]): primitives (round the origin; cylinder and cone standing on it), joins, and the other kinds made from a distance. */
   const sdf: {
     sphere(r: PxNum): PxSdf; box(size: PxVec | PxNum, o?: { round?: PxNum }): PxSdf; capsule(a: PxVec, b: PxVec, r: PxNum, r2?: PxNum): PxSdf;
