@@ -552,7 +552,7 @@ the rays the trace asks of it (each one's origin, way, where it enters and leave
 come). The march reads nothing else, so the key is complete by construction, whatever view, size, step or canvas made
 the rays. A field given by a function has a key only when the function is `pure()`, rebuilt from its source in a scope
 of `Math` and its data alone ([the reference](../reference.md)); a field with a plain closure in it is traced as
-before and not kept. Each ray's hit is kept (8 bytes; the five fighting files' traces 18.5 MiB on disk); the normal,
+before and not kept (`pxl build --profile` names those, the closures and the time they march). Each ray's hit is kept (8 bytes; the five fighting files' traces 18.5 MiB on disk); the normal,
 the shadow rays, the creases and the paint are worked out again from it, so a hit spares the march, two thirds of
 Haldor's cold frame (the paint is 17% of it, the normal's taps 8%). An edit then marches again only the frames whose
 fields it changed, whatever file asks them: Haldor's check after an edit to a comment went from 95 s to 49 (2026-11),

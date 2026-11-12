@@ -94,6 +94,8 @@ export interface SurfaceCanvas {
   plot(x: number, y: number, c: Color): boolean;
   /** px to an art pixel (a scene's size): a camera's px k times, a ray to k x k px unless `pixel` says */
   k?: number;
+  /** the asset drawn on it */
+  owner?: { name: string };
 }
 
 const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -199,18 +201,25 @@ interface Tracer {
   key?: string;
   /** with a key: undefined while the pure functions it calls hold their data as given (their only state), else what changed */
   intact?: () => string | undefined;
+  /** a field that has no key, a function in it not pure (sdf.ts's notPure): for kept.left */
+  impure?: Sdf;
 }
 
 /**
  * What the march finds, kept between commands (set by src/node/store.ts): `trace(key, rays)` for a tracer's key and
  * the rays asked of it (each one's origin, way, t0, t1 and nearness, in order), the hits kept (each ray's t, or -1) and
  * where to keep them once marched. hit() reads nothing else, so the same field through the same rays finds the same.
- * `on()` false: nothing is kept now, and a trace builds neither its key nor its rays.
+ * `on()` false: nothing is kept now, and a trace builds neither its key nor its rays. `left`, set only while pxl build
+ * --profile runs (src/node/profile.ts): told of each trace of a field that can't be kept, a function in it not pure,
+ * who drew it and how long its rays marched (each timed then; without it the march is as it was).
  */
-export const kept: { on?: () => boolean; trace?: (key: string, rays: Float64Array) => { t?: Float64Array; put(t: Float64Array, ms: number): void } | undefined } = {};
+export const kept: {
+  on?: () => boolean; trace?: (key: string, rays: Float64Array) => { t?: Float64Array; put(t: Float64Array, ms: number): void } | undefined;
+  left?: (who: string, field: Sdf, ms: number) => void;
+} = {};
 
 /** A field's surface: marched by its distance. */
-function fieldTracer(C: Compiled): Tracer {
+function fieldTracer(C: Compiled, f: Sdf): Tracer {
   const lip = C.lip * 1.05, d = C.d;
   const march = (ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, t0: number, t1: number, e: number): number => {
     let t = t0;
@@ -222,7 +231,7 @@ function fieldTracer(C: Compiled): Tracer {
     return -1;
   };
   return {
-    lo: C.lo, hi: C.hi, names: C.mats, parts: C.parts, get key() { return C.pure ? `${C.key}|${lip}` : undefined; }, intact: C.intact,
+    lo: C.lo, hi: C.hi, names: C.mats, parts: C.parts, get key() { return C.pure ? `${C.key}|${lip}` : undefined; }, intact: C.intact, impure: C.pure ? undefined : f,
     hit: (o, r, t0, t1, e) => march(o[0], o[1], o[2], r[0], r[1], r[2], t0, t1, e),
     shade: (p, e) => {
       // the normal (four taps, Inigo Quilez's tetrahedron), the material there
@@ -291,7 +300,7 @@ export function drawSurface(c: SurfaceCanvas, field: unknown, o: SurfaceOpts = {
   const f = atPpm(field, drawnPpm(o.view, o.ppm, o.at, o.pixel ?? c.k ?? 1))?.field ?? field;
   const C = compile(f, clockOf(c));
   finite(C);
-  drawTraced(c, fieldTracer(C), { ...o, clean: o.clean ?? true }, "surface");
+  drawTraced(c, fieldTracer(C, f), { ...o, clean: o.clean ?? true }, "surface");
 }
 
 /** Draw a voxel grid, or a field made voxels of `size` m at this moment, a cube to a cell (see the top of this file). */
@@ -504,11 +513,15 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       }
     }
   }
+  // (pxl build --profile, kept.left: a field that can't be kept, each ray's march timed and told; else T.hit itself)
+  const left = T.impure && kept.left;
+  let marched = 0;
+  const hit = left ? (q: V3, w: V3, a: number, b: number, e: number) => { const m0 = performance.now(), t = T.hit(q, w, a, b, e); marched += performance.now() - m0; return t; } : T.hit;
   for (let gy = 0; gy < GH; gy++)
     for (let gx = 0; gx < GW; gx++) {
       let r: typeof ar, e: number, t: number;
       if (hits) { const a = cells![gy * GW + gx]; if (!a) continue; r = a; e = rays![9 * ri + 8]; t = hits[ri++]; }
-      else { if (!aim(gx, gy)) continue; r = ar!; e = ae; t = T.hit(r.o, r.d, at0, at1, e); }
+      else { if (!aim(gx, gy)) continue; r = ar!; e = ae; t = hit(r.o, r.d, at0, at1, e); }
       const cx = (gx0 + gx) * K + K / 2, cy = (gy0 + gy) * K + K / 2;
       if (t < 0) continue;
       const p: V3 = [r.o[0] + r.d[0] * t, r.o[1] + r.d[1] * t, r.o[2] + r.d[2] * t], i = gy * GW + gx;
@@ -537,6 +550,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       }
       tone[i] = Math.max(0, Math.min(ramp.length - 1, Math.round(lv * (ramp.length - 1))));
     }
+  if (left) left(`${c.owner?.name ?? "?"}${o.part ? `, part ${o.part}` : ""}`, T.impure!, marched);
   // tones in clusters: a cell whose tone none of its four neighbours of the same material share takes
   // the one most of them have (three or four)
   const was = tone.slice();

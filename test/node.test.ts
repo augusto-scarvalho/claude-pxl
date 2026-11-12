@@ -17,6 +17,7 @@ import { latticeHash } from "../src/core/util.ts";
 import { writeOutputs, writePng } from "../src/node/output.ts";
 import { serve } from "../src/node/server.ts";
 import { checkProject } from "../src/node/check.ts";
+import { kept } from "../src/core/surface.ts";
 
 function chunks(buf: Buffer): { type: string; data: Buffer; crcOk: boolean }[] {
   const out = [];
@@ -195,6 +196,30 @@ sprite("quick", "7")`);
   const out = lines.join("\n");
   assert.match(out, /profile: .* in all; slowest assets: busy/);
   assert.match(out, /slow +a\.px\.js:2/);
+});
+
+test("cli build --profile names a traced field a plain closure keeps from being kept, not a pure one; without it no march is timed", async () => {
+  const art = () => tmpArt(`pal({ k: "#101010", a: "#404040", b: "#808080", c: "#c0c0c0" })
+ramps("kabc")
+const R = 3, slow = (x, y, z) => { let s = 0; for (let i = 0; i < 300; i++) s += Math.sin(i) * 1e-12; return Math.hypot(x, y, z - R) - R + s }
+const d = pure({ R, SALT: ${Math.random()} }, (x, y, z) => { let s = 0; for (let i = 0; i < 300; i++) s += Math.sin(i) * 1e-12; return Math.hypot(x, y, z - R) - R + s })
+sprite("closure", { w: 48, h: 48 }, surface(sdf.field(slow, [-R, -R, 0], [R, R, 2 * R]).part("orb"), { ppm: 6 }))
+sprite("pured", { w: 48, h: 48 }, surface(sdf.field(d, [-R, -R, 0], [R, R, 2 * R]), { ppm: 6 }))`).file;
+  // (surface.ts's hook, set by --profile alone and unset after)
+  let left: unknown, sets = 0;
+  Object.defineProperty(kept, "left", { configurable: true, enumerable: true, get: () => left, set: (v) => { sets++; left = v; } });
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try {
+    assert.equal(await main(["build", art(), "--no-preview"]), 0);
+    assert.equal(sets, 0, "no hook without --profile");
+    assert.equal(await main(["build", art(), "--profile", "--no-preview"]), 0);
+  } finally { console.log = log; delete kept.left; }
+  assert.deepEqual([sets, left], [2, undefined]);
+  const out = lines.join("\n").split("traced again at every build")[1] ?? "";
+  assert.match(out, /^, not kept: .*\n +[\d.]+ m?s +1 trace +closure\n +sdf\.field \(part orb\): a\.px\.js:3 \(x, y, z\) => \{ let s/);
+  assert.match(out, /pxl help pure/);
+  assert.doesNotMatch(out, /pured/);
 });
 
 test("cli build writes sprites, previews, layered exports and sheets", async () => {

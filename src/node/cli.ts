@@ -68,7 +68,8 @@ const USAGE = `pxl — pixel-art DSL
       editing in Aseprite; pxl never reads it back and the next --aseprite build overwrites it, so
       copy it out of out/. --profile: where the time went, read off the CPU profiler: the slowest
       assets, then the functions that spent the most time themselves, in the art file (what to make
-      faster: work done again every frame, a noise called millions of times) and in pxl. --world: a
+      faster: work done again every frame, a noise called millions of times) and in pxl, and the
+      traced fields marched again at every build, not kept: a function in them not pure(). --world: a
       scene with a camera as its whole world, the camera's box on it (a magenta line) each frame.
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
       Live viewer: rebuilds on save and replays each asset's painting steps.
@@ -394,7 +395,7 @@ export async function main(argv: string[]): Promise<number> {
       case "build": {
         const build = () => { const p = loadProject(file, { wholeWorld: a.world }); return { p, r: writeOutputs(p, outDir, { only: a.only, all: a.all, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every, share: a.share }) }; };
         let report = "";
-        const { p, r } = a.profile ? await profiled(build).then(({ result, profile }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times); return result; }) : build();
+        const { p, r } = a.profile ? await profiled(build).then(({ result, profile, left }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times, left); return result; }) : build();
         for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);
         if (a.only || a.list || r.lines.length <= 12) for (const l of r.lines) console.log(l);
         else {

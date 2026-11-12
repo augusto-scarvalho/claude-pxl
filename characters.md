@@ -179,7 +179,9 @@ directions walking, idle, kneeling and casting;
    meets the hips or a hem, the games' way, §7); `surface()` cleans what is drawn that small
    (`clean`, on unless `false`: a pixel sticking out cut away, no line doubled, the outline whole).
    What no primitive gives is a field of the file's own (`sdf.field`: the warden's axe head) or drawn
-   by hand after the figure (`draw`).
+   by hand after the figure (`draw`). Give a sweep's radius, `keep` and `shift` and a field's distance
+   as `pure({ ... }, fn)` (`PXL help pure`, Haldor's trunk): what their trace finds is then kept between
+   builds; a plain closure is traced again every time (`pxl build --profile` names those).
 4. **The head**, as a pixel artist paints over a 3D render: modeled (the skull, and on it the hair, a
    beard, a hat or a bandana as fields in the head's frame) and drawn once per view by
    `views(name, field, { retouch })` (five views for 8 directions, the east the west's mirror; all of

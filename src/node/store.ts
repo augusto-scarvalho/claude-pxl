@@ -31,7 +31,9 @@ import type { DiskLog, Project } from "../core/project.ts";
 const code = join(import.meta.dirname, ".."), top = join(code, "..");
 /** Where the builds are kept. */
 export const DIR = existsSync(join(top, "node_modules")) ? join(top, "node_modules", ".cache", "pxl", "builds") : join(tmpdir(), "pxl-builds");
-const DISK_MS = 10, WORTH = 300, BUDGET = 512 * 2 ** 20;
+/** (DISK_MS: a build or a trace that took less isn't kept) */
+export const DISK_MS = 10;
+const WORTH = 300, BUDGET = 512 * 2 ** 20;
 export const sha1 = (b: string | Uint8Array) => createHash("sha1").update(b).digest("hex");
 
 /** A hash of every file under `dir` and of the Node running it; "" if one changed after `since` (ms). */

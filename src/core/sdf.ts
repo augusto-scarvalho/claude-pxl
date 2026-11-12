@@ -40,7 +40,7 @@ type Node =
   | { op: "paint"; of: Sdf; name: string; where: (p: V3, n: V3) => unknown }
   | { op: "paintBy"; of: Sdf; by: (p: V3, n: V3) => unknown }
   | { op: "part"; of: Sdf; name: string }
-  | { op: "fn"; d: (x: number, y: number, z: number) => number; lo: V3; hi: V3; lip: number; id: number; key?: string; intact?: () => string | undefined };
+  | { op: "fn"; d: (x: number, y: number, z: number) => number; lo: V3; hi: V3; lip: number; id: number; key?: string; intact?: () => string | undefined; why?: [string, unknown][] };
 
 /** A field compiled at one moment: its distance, its material (an index into `mats`, -1 none) and its named part (into `parts`, -1 none) at a point with its normal, its box, its stretch. */
 export interface Compiled {
@@ -291,8 +291,19 @@ export class Appearance {
  * march steps d / lip): what the primitives can't make (rig3d's sweeps: a cloak round a body).
  */
 let FNS = 0;
-/** (`key`: d a function of what the key names alone, its code and every value it reads: rig3d's sweep of pure functions) */
-export const fieldOf = (d: (x: number, y: number, z: number) => number, lo: V3, hi: V3, lip = 1, key?: string, intact?: () => string | undefined): Sdf => new Sdf({ op: "fn", d, lo, hi, lip, id: ++FNS, key, intact });
+/** (`key`: d a function of what the key names alone, its code and every value it reads: rig3d's sweep of pure functions; without one, `why` the art's functions in the way if not d, each with what it is: [[a sweep's radius, it]]) */
+export const fieldOf = (d: (x: number, y: number, z: number) => number, lo: V3, hi: V3, lip = 1, key?: string, intact?: () => string | undefined, why?: [string, unknown][]): Sdf => new Sdf({ op: "fn", d, lo, hi, lip, id: ++FNS, key, intact, why });
+/** The functions in a field that aren't pure, so a trace of it isn't kept: each one's .part() names, what it is and the function (pxl build --profile names them). */
+export function notPure(f: Sdf, at = "", out: { part: string; what: string; fn: unknown }[] = []): typeof out {
+  const n = f.node;
+  if (n.op === "fn") {
+    if (n.key === undefined) for (const [what, fn] of n.why ?? [["sdf.field", n.d]]) out.push({ part: at, what: PURE.get(fn as object) === "" ? `${what} (pure, but a field in its data isn't)` : what, fn });
+    return out;
+  }
+  const of = (n as { of?: Sdf | Sdf[] }).of, inner = n.op === "part" ? (at ? `${at}.${n.name}` : n.name) : at;
+  for (const s of Array.isArray(of) ? of : of ? [of] : []) notPure(s, inner, out);
+  return out;
+}
 /** The pure functions (pure(), src/node/pure.ts) and each one's key: "" when its data holds a field that isn't pure. */
 export const PURE = new WeakMap<object, string>();
 /** Each pure function's check that its data's arrays (its only state) are as it was given them: undefined, or what changed. */

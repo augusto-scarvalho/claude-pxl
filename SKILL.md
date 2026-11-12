@@ -31,7 +31,7 @@ lists every command and flag.
    `PXL edit art.px.js <scene> '{ "op": "move", "target": "<id>", "by": [-3, 0] }' --dry`, then without
    `--dry` (it writes where the value lives and runs `check`). What code computes is refused: edit that by hand (`PXL help "scenes 14"`).
 5. `PXL build art.px.js` writes its own PNGs, sheets and GIFs to `out/` (an include's by `--only a,b`
-   or `--all`), previews to `out/_preview/` (`--profile` when it has grown slow).
+   or `--all`), previews to `out/_preview/` (`--profile` when it has grown slow; it names 3D fields not kept: `PXL help pure`).
 6. Before handing over, `PXL check art.px.js`: every scene, rig and frame of the file
    (`check: { every: N }` on a long story), warnings only, with their frames. Fix each or say why
    it's meant. LOOK lines (L-corners, jaggies, tones too close; `--edges`: any sprite's edges, a 3D
@@ -98,7 +98,7 @@ sprite("slime", { mx: true, outline: "k", pivot: "bottom" }, `
   .tttttt`)
 sprite("slime_red", { base: "slime", swap: { g: "r", G: "R", l: "#f6b0a8" } })   // variant: 1 line
 
-sprite("_eye", "wk\nkk")                                            // "_" = part, not exported
+sprite("_eye", "wk\nkk")   // "_" = part, not exported
 sprite("chest", { w: 16, h: 12, outline: "k" },
   rect(0, 3, 16, 9, "R"), rect(0, 0, 16, 4, "r"), stamp("_eye", 7, 4), shade([0, 9, 16, 3]))
 
