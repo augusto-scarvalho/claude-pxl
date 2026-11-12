@@ -56,6 +56,8 @@ export interface Compiled {
   hi: V3;
   lip: number;
   mats: string[];
+  /** whether a number of it read the clock (a function of it): if not, it is the same field at every moment */
+  timed: boolean;
 }
 type Fd = (x: number, y: number, z: number) => number;
 type Fm = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => number;
@@ -66,9 +68,11 @@ const fin = (v: unknown, what: string): number => {
   if (typeof v !== "number" || !Number.isFinite(v)) throw new PxError(`sdf: ${what} must be a number (or a function of the clock giving one), got ${JSON.stringify(v)}`);
   return v;
 };
-export const num = (v: Num, c: Clock, what: string): number => fin(typeof v === "function" ? v(c) : v, what);
+// (how many numbers have been read off the clock: a compile that read none made a field the same at every moment)
+let CLOCKED = 0;
+export const num = (v: Num, c: Clock, what: string): number => fin(typeof v === "function" ? (CLOCKED++, v(c)) : v, what);
 export const vec = (v: Num | Vec, c: Clock, what: string, n = 3): number[] => {
-  const a = typeof v === "function" ? (v as (c: Clock) => unknown)(c) : v;
+  const a = typeof v === "function" ? (CLOCKED++, (v as (c: Clock) => unknown)(c)) : v;
   if (typeof a === "number") return Array(n).fill(fin(a, what));
   if (!Array.isArray(a) || a.length !== n) throw new PxError(`sdf: ${what} must be [${"xyz".slice(0, n).split("").join(", ")}] (or a function of the clock giving it), got ${JSON.stringify(a)}`);
   return a.map((x, i) => num(x as Num, c, `${what}[${i}]`));
@@ -124,6 +128,8 @@ export function fbm3(x: number, y: number, z: number, s = 0, octaves = 2): numbe
 export class Sdf {
   readonly kind = "distance";
   readonly node: Node;
+  /** asked its distance on its own (dist()), the same at every moment: the point a field drawing it last worked it out at and the value there, [x, y, z, d] */
+  memo: Float64Array | undefined;
   constructor(node: Node) { this.node = node; }
 
   /** This and others as one (smooth: how far, in m, they melt into each other). */
@@ -182,7 +188,15 @@ export class Sdf {
   /** Its box [lo, hi] at a moment (Infinity for a plane's sides). */
   bounds(clock: Clock = STILL): [V3, V3] { const c = compile(this, clock); return [c.lo, c.hi]; }
   /** The distance at a point, at a moment. */
-  dist(p: readonly number[], clock: Clock = STILL): number { return compile(this, clock).d(p[0], p[1], p[2]); }
+  dist(p: readonly number[], clock: Clock = STILL): number {
+    // (a paint, or a field() of the art's own, asking a part of what is being drawn at the point just worked out: the
+    // number that code wrote, the same steps on the same numbers as this one's own code)
+    const m = this.memo;
+    if (m && m[0] === p[0] && Object.is(m[0], p[0]) && Object.is(m[1], p[1]) && Object.is(m[2], p[2])) return m[3];
+    const C = compile(this, clock);
+    if (!m && !C.timed) this.memo = new Float64Array([NaN, NaN, NaN, NaN]); // (no point yet: no x is NaN)
+    return C.d(p[0], p[1], p[2]);
+  }
 }
 
 /** Inside or not: what voxels are made of. From a distance field: inside where it is 0 or less. */
@@ -348,6 +362,12 @@ class Code {
   constructor(track = false) { this.track = track; }
   /** distance functions the code calls (a field given by one) */
   F: ((x: number, y: number, z: number) => number)[] = [];
+  /** the memos it writes (Sdf.memo): a field asked on its own, its point and distance each time this code works it out */
+  M: Float64Array[] = [];
+  memo(m: Float64Array, x: string, y: string, z: string, v: string): void {
+    const i = this.M.includes(m) ? this.M.indexOf(m) : this.M.push(m) - 1;
+    this.lines.push(`M[${i}][0] = ${x}; M[${i}][1] = ${y}; M[${i}][2] = ${z}; M[${i}][3] = ${v};`);
+  }
   private n = 0;
   /** a number of the field, by reference (its value changes with the clock, the code doesn't) */
   k(v: number): string { this.K.push(v); return `K[${this.K.length - 1}]`; }
@@ -379,22 +399,22 @@ class Code {
   }
 }
 const RUN = 250;
-type Factory = (K: number[], smin: (a: number, b: number, k: number) => number, fbm: typeof fbm3, F: Fd[], W?: Int32Array) => Fd;
+type Factory = (K: number[], smin: (a: number, b: number, k: number) => number, fbm: typeof fbm3, F: Fd[], W: Int32Array | undefined, M: Float64Array[]) => Fd;
 const FACTORIES = new Map<string, Factory>(), TRACKING = new Map<string, string>();
 /** A distance's code (tracking: each join also writing which child it takes), its numbers and the functions it calls. */
-function written(e: Part["e"], track = false): { src: string; K: number[]; F: Fd[] } {
+function written(e: Part["e"], track = false): { src: string; K: number[]; F: Fd[]; M: Float64Array[] } {
   const c = new Code(track), r = e(c, "x", "y", "z");
-  return { src: `${c.subs.join("\n")}\nreturn (x, y, z) => {\n${c.lines.join("\n")}\nreturn ${r};\n}`, K: c.K, F: c.F };
+  return { src: `${c.subs.join("\n")}\nreturn (x, y, z) => {\n${c.lines.join("\n")}\nreturn ${r};\n}`, K: c.K, F: c.F, M: c.M };
 }
 /** Code as a function, its source made once. */
-function made(src: string, K: number[], F: Fd[], W?: Int32Array): Fd {
+function made(src: string, K: number[], F: Fd[], M: Float64Array[], W?: Int32Array): Fd {
   let f = FACTORIES.get(src);
   if (!f) {
-    f = new Function("K", "smin", "fbm3", "F", "W", src) as Factory;
+    f = new Function("K", "smin", "fbm3", "F", "W", "M", src) as Factory;
     if (FACTORIES.size > 256) FACTORIES.clear();
     FACTORIES.set(src, f);
   }
-  return f(K, smin, fbm3, F, W);
+  return f(K, smin, fbm3, F, W, M);
 }
 
 /** Each field's last compile: drawn and a decal laid on it at one moment, or its dist() asked again, it is compiled once. */
@@ -410,12 +430,18 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
   return C;
 }
 function compiled(f: Sdf, clock: Clock): Compiled {
-  const mats: string[] = [], parts: string[] = [], prefix: string[] = [];
+  const mats: string[] = [], parts: string[] = [], prefix: string[] = [], clocked = CLOCKED;
   // (each join's slot in W: the child it took at the point a material is asked for)
   let slots = 0, W = new Int32Array(0), tracks = false;
   const idx = (name: string) => { const i = mats.indexOf(name); return i >= 0 ? i : mats.push(name) - 1; };
-  // (a primitive moved by at() takes the move itself, (ox, oy, oz): one function a point, not two)
+  // (a field asked on its own before (Sdf.memo): its code notes each point it works it out at and the value there; not
+  // a primitive given its parent's move, whose point is the parent's)
   const go = (s: Sdf, ox = 0, oy = 0, oz = 0): Part => {
+    const P = own(s, ox, oy, oz), M = s.memo;
+    return !M || ox || oy || oz ? P : { ...P, e: (c, x, y, z) => { const v = P.e(c, x, y, z); c.memo(M, x, y, z, v); return v; } };
+  };
+  // (a primitive moved by at() takes the move itself, (ox, oy, oz): one function a point, not two)
+  const own = (s: Sdf, ox: number, oy: number, oz: number): Part => {
     const n = s.node;
     const shift = (lo: V3, hi: V3): [V3, V3] => [[lo[0] + ox, lo[1] + oy, lo[2] + oz], [hi[0] + ox, hi[1] + oy, hi[2] + oz]];
     switch (n.op) {
@@ -640,7 +666,7 @@ function compiled(f: Sdf, clock: Clock): Compiled {
         };
       }
       case "bend": {
-        const kv = typeof n.k === "function" ? (n.k as (c: Clock) => unknown)(clock) : n.k;
+        const kv = typeof n.k === "function" ? (CLOCKED++, (n.k as (c: Clock) => unknown)(clock)) : n.k;
         const [kx, ky] = typeof kv === "object" ? vec(kv as Vec, clock, "bend's [kx, ky]", 2) : [num(kv as Num, clock, "bend's k"), 0], C = go(n.of), Z = Math.max(0, C.hi[2]), off = (z: number) => (z > 0 ? (z * z) / 2 : 0);
         const ex = kx * off(Z), ey = ky * off(Z);
         return {
@@ -718,7 +744,7 @@ function compiled(f: Sdf, clock: Clock): Compiled {
       }
     }
   };
-  const P = go(f), raw = P.m, D = written(P.e);
+  const P = go(f), raw = P.m, D = written(P.e), timed = CLOCKED !== clocked;
   W = new Int32Array(slots);
   // a material asked for: the distance there once more, writing which child each join takes, then down
   // that way through the joins. The tracking code is the distance's with those lines, the same numbers
@@ -727,11 +753,12 @@ function compiled(f: Sdf, clock: Clock): Compiled {
   const tracker = () => {
     let src = TRACKING.get(D.src);
     if (!src) { if (TRACKING.size > 256) TRACKING.clear(); TRACKING.set(D.src, (src = written(P.e, true).src)); }
-    return made(src, D.K, D.F, W);
+    return made(src, D.K, D.F, D.M, W);
   };
   const mp: Fm = !tracks ? raw : (x, y, z, a, b, c) => { (track ??= tracker())(x, y, z); return raw(x, y, z, a, b, c); };
   return {
-    d: made(D.src, D.K, D.F), get key() { return `${D.src}#${D.K.join(",")}`; }, lo: P.lo, hi: P.hi, lip: P.lip, mats, parts, mp,
+    // (its key without the memos' lines: the same field whether or not a part of it was asked on its own)
+    d: made(D.src, D.K, D.F, D.M), get key() { return `${D.src.replace(/^M\[.*\n/gm, "")}#${D.K.join(",")}`; }, lo: P.lo, hi: P.hi, lip: P.lip, mats, parts, mp, timed,
     m: (x, y, z, a, b, c) => (mp(x, y, z, a, b, c) % 1024) - 1,
     part: (x, y, z, a, b, c) => Math.floor(mp(x, y, z, a, b, c) / 1024) - 1,
   };

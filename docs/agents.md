@@ -564,7 +564,12 @@ graveyard_3d's tree of 105 rods took 8 µs a point, 1.5 in runs), a long union t
 children's box before the children (a big tree 1.5× as fast), and a material is one more pass noting
 which child each join took. On the i5-1035G1 (2026-10): a figure's frame 5-6 ms warm (the warden 22;
 a third of a body's time is its cloth's sweeps and their art functions), graveyard_3d 0.7 s a frame
-(1.2 before the runs).
+(1.2 before the runs). A field the art asks its `dist()` while it is traced (Haldor's bib, a shell round his torso,
+asks the torso at each point) answers from the point the trace just worked it out, when what it asks is the object
+drawn and reads no clock: his file asks `out.torso`, not the same parts joined again (a copy is worked out twice), and
+his cold check went from 89 s to 76 (2026-11). The march can't pass more over by boxes without moving pixels: a
+union's first child is always worked out, and an `sdf.field`'s distance may be less than the truth, so a box is no
+bound on it.
 
 ### Measuring sessions and models
 

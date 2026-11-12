@@ -117,6 +117,20 @@ test("sdf: compiled once a moment (drawn, then a decal laid on it): at another m
   assert.notEqual(compile(g), c1);
 });
 
+test("sdf: a part asked its dist() on its own, worked out inside a field drawn, answers from there: the same number, the same key; one that reads the clock is asked afresh", () => {
+  const make = () => { const a = sdf.union(sdf.sphere(1).at(0.3, 0, 0), sdf.box([1, 1, 1]).at(-0.5, 0.2, 0), { smooth: 0.4 }).paint(() => "skin"); return { a, f: sdf.union(a, sdf.capsule([0, 0, 0], [0, 2, 0], 0.3), { smooth: 0.2 }).rotate(30, "x") } };
+  const { a, f } = make(), plain = compile(make().f);
+  a.dist([9, 9, 9]);
+  const C = compile(f), v = C.d(0.4, 0.7, -0.2), q = [...a.memo!];
+  assert.equal(v, plain.d(0.4, 0.7, -0.2));
+  assert.equal(q[3], compile(make().a).d(q[0], q[1], q[2]));
+  assert.equal(a.dist(q.slice(0, 3)), q[3]);
+  assert.equal(C.key, plain.key);
+  const t = sdf.sphere((c) => 1 + c.phase);
+  t.dist([2, 0, 0]);
+  assert.equal(t.memo, undefined);
+});
+
 test("sdf: whatever is inside lies within the bounds; distances stretch no more than lip", () => {
   const leaf = sdf.ellipsoid([0.6, 0.5, 0.4]).noise({ amp: 0.1, scale: 0.25, seed: 2 });
   const fields: Sdf[] = [
