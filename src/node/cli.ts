@@ -20,6 +20,7 @@ import { encodeGif, reduceColors } from "./gif.ts";
 import { packedSheet, writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 import { checkProject, writeMoves } from "./check.ts";
+import { startWorkers } from "./workers.ts";
 
 /** The edge flaws ringed in shot's look image, by kind. */
 const EDGE_RINGS: ["steps" | "doubled" | "tips" | "bridges" | "notches" | "gaps" | "corners", number][] = [["steps", 0xe8202aff], ["doubled", 0xff8c14ff], ["tips", 0xd020d0ff], ["bridges", 0xd020d0ff], ["notches", 0x10c8e0ff], ["gaps", 0xffe020ff], ["corners", 0x20c040ff]];
@@ -213,7 +214,8 @@ Art files may be .js or .ts. Default out dir: <art file dir>/out. A build that t
 frame) is kept on disk under a key of all it reads (pxl's sources, every file the art file loaded, the
 asset, its time and seed), in node_modules/.cache/pxl/builds/ in a checkout, else the temp folder's
 pxl-builds/: the same build in a later command is read back, never stale. --no-cache (any command) or
-PXL_CACHE=0 builds everything.`;
+PXL_CACHE=0 builds everything. check and build share a file's builds among worker threads where that was
+measured to pay on this machine for that file (PXL_WORKERS=N forces N; 1 makes them all on one thread).`;
 
 interface Args {
   cmd?: string;
@@ -393,7 +395,7 @@ export async function main(argv: string[]): Promise<number> {
   try {
     switch (a.cmd) {
       case "build": {
-        const build = () => { const p = loadProject(file, { wholeWorld: a.world }); return { p, r: writeOutputs(p, outDir, { only: a.only, all: a.all, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every, share: a.share }) }; };
+        const build = () => { const p = loadProject(file, { wholeWorld: a.world }); startWorkers(p, file, { wholeWorld: a.world }, "build"); return { p, r: writeOutputs(p, outDir, { only: a.only, all: a.all, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every, share: a.share }) }; };
         let report = "";
         const { p, r } = a.profile ? await profiled(build).then(({ result, profile, left }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times, left); return result; }) : build();
         for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);
@@ -578,6 +580,7 @@ export async function main(argv: string[]): Promise<number> {
       }
       case "check": {
         const p = loadProject(file, { checksOnly: true });
+        startWorkers(p, file, { checksOnly: true }, "check");
         const r = checkProject(p, { names: a.rest.length ? a.rest : undefined, frame: a.frame, file: basename(file), readings: a.readings, fix: a.fix, edges: a.edges });
         for (const l of [...r.lines, ...r.notes]) console.log(l);
         // --fix: each failing rule's number written into the file, where the part's spec is written there

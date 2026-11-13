@@ -1458,7 +1458,10 @@ export class Project implements BuildCtx {
     // scene's function (a fight played from them)
     env.timeline = (name: unknown) => {
       if (typeof name !== "string" || !this.has(name)) throw new PxError(`timeline: the name of an asset defined so far, got ${JSON.stringify(name)}`, this.callerLoc());
-      const pick = this.candidates(name)[0], tl = this.timeline(pick), ms = tl ? tl.durations ?? Array.from({ length: Math.round(tl.loop / tl.step) }, () => tl.step) : [0];
+      const pick = this.candidates(name)[0];
+      // (every frame of it read: handed out to the workers, if any)
+      this.handOut(pick);
+      const tl = this.timeline(pick), ms = tl ? tl.durations ?? Array.from({ length: Math.round(tl.loop / tl.step) }, () => tl.step) : [0];
       let t = 0;
       return ms.map((d) => {
         const im = this.image(pick, 0, t, false), b = im.bounds();
@@ -1708,6 +1711,15 @@ export class Project implements BuildCtx {
   }
 
   timeline(name: string, seed = 0): Timeline | undefined {
+    // (in a worker, an anim of more than one frame whose frame 0 it hasn't made: from its definition, as that frame
+    // gives it, noting it was asked; workers.ts)
+    if (this.skipped) {
+      const nm = this.resolve(name), def = this.assets.get(nm), k0 = seed === 0 ? nm : `${nm}@${seed}`;
+      if (def?.kind === "anim" && !this.cache.has(k0)) {
+        const tl = animTimeline(def);
+        if (tl.durations!.length > 1) { this.skipped.add(k0); return tl; }
+      }
+    }
     return this.build(name, seed, 0, false).anim;
   }
 
@@ -1717,11 +1729,15 @@ export class Project implements BuildCtx {
    */
   build(name: string, seed = 0, t = 0, track = true): BuildOut {
     name = this.resolve(name);
-    let first = this.buildAt(name, seed, 0);
-    const tl = first.anim, def = this.assets.get(name);
+    const def = this.assets.get(name), k0 = seed === 0 ? name : `${name}@${seed}`;
+    // (a worker asked an anim's frame other than 0 takes its timeline from its definition, as frame 0 gives it, when it
+    // hasn't made that frame: noted, workers.ts)
+    let first: BuildOut | undefined = this.skipped && t !== 0 && def?.kind === "anim" && !this.cache.has(k0) ? undefined : this.buildAt(name, seed, 0);
+    if (!first) this.skipped!.add(k0);
+    const tl = first ? first.anim : animTimeline(def!);
     // animated by what it places: its functions run on that loop. The loop is known once built, so a
     // first frame drawn by functions is drawn again knowing it (c.frames)
-    if (tl && def && def.kind !== "anim" && !first.clocked && drawsWithFunctions(def.items)) first = this.buildAt(name, seed, 0, tl, true);
+    if (tl && def && def.kind !== "anim" && !first!.clocked && drawsWithFunctions(def.items)) first = this.buildAt(name, seed, 0, tl, true);
     // an anim of one frame is still: its clock (8 fps unless it says) doesn't join the loop of what
     // places it (with a scene at 12 fps, 125 ms and 83 ms made a 1 ms step and a 60,000-frame loop);
     // and if its code reads its frame or phase, it was meant to move: say so
@@ -1735,10 +1751,46 @@ export class Project implements BuildCtx {
       acc.step = acc.step ? gcd(acc.step, tl.step) : tl.step;
       (acc.by ??= new Map()).set(name, tl.loop);
     }
-    if (!tl || t === 0) return first;
+    if (!tl || t === 0) return first!;
     const tt = tl.once ? Math.min(Math.max(0, t), tl.loop) : ((t % tl.loop) + tl.loop) % tl.loop;
-    return tt === 0 ? first : this.buildAt(name, seed, tt, def?.kind !== "anim" ? tl : undefined);
+    return tt === 0 ? (first ?? this.buildAt(name, seed, 0)) : this.buildAt(name, seed, tt, def?.kind !== "anim" ? tl : undefined);
   }
+  /**
+   * An anim's frames that will be asked handed out to the workers, if any (workers.ts): those at `ts` (ms), or its first
+   * `max`. Only by what is sure to ask them all (frames(), timeline(), a check's or a build's list): never on a guess.
+   */
+  handOut(name: string, seed = 0, ts?: number[], max = Infinity): void {
+    const def = this.elsewhere && !this.inJob ? this.assets.get(name) : undefined;
+    if (def?.kind !== "anim") return;
+    if (!ts) {
+      ts = [];
+      let s = 0;
+      for (const d of animTimeline(def).durations!) { if (ts.length >= max) break; ts.push(s); s += d; }
+    }
+    this.elsewhere!.ahead(ts.map((x) => [name, seed, x]));
+  }
+  /**
+   * Set by workers.ts: whole builds made by worker threads. ahead() hands out builds this thread will ask (by key);
+   * get() a key's, if made there (waiting while one is making it); zero() a frame 0 a worker made inside one, sent
+   * with it; built() the ms of one handed out and made here after all.
+   */
+  elsewhere?: {
+    ahead(list: [string, number, number][]): void; isJob(key: string): boolean; built(key: string, ms: number): void;
+    get(key: string): (Kept & { need: string[]; skipped: string[] }) | undefined; zero(key: string): Kept | undefined;
+  };
+  /** Inside a build handed out and made here after all: what it asks is its own work, handed out to none. */
+  private inJob = 0;
+  /**
+   * In a worker (workers.ts): the frames 0 its job asked for a timeline and didn't make (undefined elsewhere), and
+   * every build at time 0 it asked: what this thread must hold to serve it as made here.
+   */
+  skipped?: Set<string>;
+  touched?: Set<string>;
+  /** Builds made here (not found made), and builds made by a worker not served (what they asked isn't held here). */
+  made = 0;
+  refused = 0;
+  /** A build at time 0 held in memory, with its log (workers.ts sends it). */
+  held(key: string): Kept | undefined { const out = this.cache.get(key), log = out && this.logOf.get(out); return out && log ? { out, log } : undefined; }
 
   /** Drop a build at time t from the cache (a scene's frame checked once: kept, it would push out the anims its frames share). */
   forget(name: string, t: number): void {
@@ -1763,6 +1815,7 @@ export class Project implements BuildCtx {
    * with its reference layers over it, when it has any (previews only).
    */
   frames(name: string, seed = 0, max = 600): { img: Img; ms: number; t: number; guide?: Img }[] {
+    this.handOut(this.resolve(name), seed, undefined, max);
     const tl = this.build(name, seed).anim;
     if (!tl) return [];
     const at = (t: number, ms: number) => {
@@ -1799,6 +1852,7 @@ export class Project implements BuildCtx {
   private buildAt(name: string, seed: number, t: number, clock?: Timeline, again = false): BuildOut {
     const key = (seed === 0 ? name : `${name}@${seed}`) + (t ? `#${t}` : "");
     this.read(name);
+    if (this.touched && t === 0 && !clock) this.touched.add(key);
     const kept = this.cache.get(key), timed = kept ? undefined : this.timed.get(key);
     if ((kept || timed) && !again) {
       // most recently used last, so the oldest goes first when the timed cache is full
@@ -1821,7 +1875,21 @@ export class Project implements BuildCtx {
     // on disk: not a build traced (its trace isn't kept), nor one with stubs
     const t0 = performance.now(), up = this.logs[this.logs.length - 1];
     const dk = this.disk && !this.stub && !(this.opt.tracing && seed === 0 && t === 0) ? key + (clock ? ` ${JSON.stringify(clock)}` : "") : undefined;
-    const hit = dk ? this.disk!.get(dk, this.opt) : undefined, said = dk ? [...this.said] : [], opted = { ...this.opted };
+    // or made by a worker (workers.ts), served as from the disk, under the same conditions, and as made here: each build
+    // at time 0 it asked held here, or sent with it (then held, as made inside it), and the frames 0 it took a timeline
+    // from without making them, their logs joined to its own, as found here. Else made here, as always
+    const ek = this.elsewhere && !this.early && !this.stub && !clock && !(this.opt.tracing && seed === 0 && t === 0) ? key : undefined;
+    let hit: Kept | undefined = dk ? this.disk!.get(dk, this.opt) : undefined;
+    const w = !hit && ek ? this.elsewhere!.get(ek) : undefined;
+    if (w) {
+      const zs = w.need.map((k) => (this.cache.has(k) ? null : this.elsewhere!.zero(k)));
+      if (zs.every((z) => z !== undefined)) {
+        zs.forEach((z, i) => { if (z) { this.cache.set(w.need[i], z.out); this.logOf.set(z.out, z.log); } });
+        const logs = w.skipped.map((k) => this.logOf.get(this.cache.get(k)!));
+        hit = { out: w.out, log: logs.reduce<DiskLog>((a, l) => (l ? { ...a, needs: { ...l.needs, ...a.needs }, fx: [...new Set([...a.fx, ...l.fx])], ...(l.bad ? { bad: true } : {}) } : { ...a, bad: true }), w.log) };
+      } else this.refused++;
+    }
+    const said = dk ? [...this.said] : [], opted = { ...this.opted };
     if (hit && Object.entries(hit.log.needs).every(([k, v]) => this.opt[k as Opt] === v)) {
       for (const f of hit.log.fx) { const [msg, loc, by] = JSON.parse(f); this.warnAs(msg, loc ?? undefined, by ?? undefined); }
       this.joined(hit.log);
@@ -1831,6 +1899,9 @@ export class Project implements BuildCtx {
       return hit.out;
     }
     this.building.add(name);
+    this.made++;
+    const job = !!ek && this.elsewhere!.isJob(ek);
+    if (job) this.inJob++;
     const log: Project["logs"][number] = { needs: {}, fx: new Set<string>(), inner: 0 };
     this.logs.push(log);
     const acc: Acc = {};
@@ -1850,6 +1921,7 @@ export class Project implements BuildCtx {
       const done: DiskLog = { needs: { ...opted, ...log.needs }, fx: [...log.fx], ...(log.bad ? { bad: true } : {}) };
       this.logOf.set(out, done);
       if (dk && this.disk && !log.bad && said.every((f) => log.fx.has(f))) this.disk.put(dk, out, done, performance.now() - t0 - log.inner);
+      if (job) this.elsewhere!.built(ek!, performance.now() - t0);
       return out;
     } catch (e) {
       const err = this.keyHint(wrap(e, (s) => this.locFromStack(s)).within(`${def.kind} '${name}'`, def.loc));
@@ -1858,6 +1930,7 @@ export class Project implements BuildCtx {
       for (const l of this.logs) l.bad = true;
       throw err;
     } finally {
+      if (job) this.inJob--;
       this.logs.pop();
       for (const f of log.fx) this.said.add(f);
       Object.assign(this.opted, log.needs);
@@ -1911,6 +1984,8 @@ type Opt = "checksOnly" | "wholeWorld" | "tracing";
  * back), and whether something in it failed (then it isn't kept).
  */
 export interface DiskLog { needs: Record<string, boolean>; fx: string[]; bad?: boolean }
+/** A build found made (on disk, or by a worker), with its log. */
+export type Kept = { out: BuildOut; log: DiskLog };
 /** A combined timeline being gathered, and the loop of each thing joining it. */
 type Acc = Partial<Timeline> & { by?: Map<string, number> };
 /** Past this many frames, a loop longer than all it plays (their loops don't divide) is said. */

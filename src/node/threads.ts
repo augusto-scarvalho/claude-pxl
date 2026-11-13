@@ -97,8 +97,11 @@ let broken = false;
 export const stats = { asked: 0, spread: 0, here: 0 };
 
 spread.threads = threads;
+/** Workers are making builds (workers.ts): they hold the cores, so a march here takes no more threads. */
+let crowded = false;
+export const crowd = () => { crowded = true; };
 spread.march = (P, rays) => {
-  const k = spread.threads!() - 1;
+  const k = crowded ? 0 : spread.threads!() - 1;
   if (broken || k < 1 || P.C.intact()) return undefined;
   let r: Code;
   try { r = recipe(P.C); } catch (e) { if (e === CANT) return undefined; throw e; }
@@ -130,7 +133,7 @@ spread.march = (P, rays) => {
 // the processor change, or after AGE.
 const GAIN = 1.15, ENOUGH = 60_000, AGE = 30 * 86_400_000, FILE = join(dirname(DIR), "pxl-threads.json");
 /** The record: whose (Node, the processor), since when, the number settled, or the two being measured and their traces' ms and cells by shape. */
-interface Rec { key: string; at: number; n?: number; said?: string; best: number; next: number; runs: Record<number, Record<string, [number, number]>> }
+interface Rec { key: string; at: number; n?: number; said?: string; best: number; next: number; runs: Record<number, Record<string, [number, number]>>; files?: Record<string, FileRec> }
 let n: number | undefined, why = "", rec: Rec | undefined;
 const mine = new Map<string, [number, number]>();
 
@@ -142,7 +145,7 @@ function threads(): number {
   if (f !== undefined && /^\d+$/.test(f) && +f >= 1) { why = `forced, PXL_THREADS=${f}`; return (n = +f); }
   if (!isMainThread) { why = "inside a worker thread, which takes no more"; return (n = 1); }
   // (the machine's, not pxl's sources': a laptop that settles on 1 doesn't pay the trial again at every change to pxl)
-  const top = availableParallelism(), key = sha1(`${process.version} ${cpus()[0]?.model} ${top}`);
+  const top = availableParallelism(), key = machine();
   rec = read(key) ?? { key, at: Date.now(), best: 1, next: Math.min(2, top), runs: {} };
   if (rec.n !== undefined || rec.next <= rec.best) { why = rec.said ?? "this machine runs one thread at a time"; return (n = rec.n ?? rec.best); }
   const ms = (k: number) => Object.values(rec!.runs[k] ?? {}).reduce((a, [m]) => a + m, 0), b = ms(rec.best), x = ms(rec.next);
@@ -160,7 +163,7 @@ function read(key: string): Rec | undefined {
 /** This command's times into the record (read again: another command may have written since), and what they settle. */
 function save(): void {
   const r = read(rec!.key) ?? rec!;
-  if (!mine.size || r.n !== undefined || (n !== r.best && n !== r.next)) return;
+  if (crowded || !mine.size || r.n !== undefined || (n !== r.best && n !== r.next)) return;
   const runs = (r.runs[n] ??= {});
   for (const [src, [ms, cells]] of mine) { const e = (runs[sha1(src).slice(0, 12)] ??= [0, 0]); e[0] += ms; e[1] += cells; }
   // (what the best's rates make of the next's work, against what that work took)
@@ -172,8 +175,62 @@ function save(): void {
     if (gain >= GAIN && r.next < top) Object.assign(r, { best: r.next, next: Math.min(2 * r.next, top), runs: { [r.next]: N } });
     else Object.assign(r, { n: gain >= GAIN ? r.next : r.best, runs: {} });
   }
+  write(r);
+}
+
+function write(r: Rec): void {
   try { const aside = `${FILE}.${process.pid}.tmp`; mkdirSync(dirname(FILE), { recursive: true }); writeFileSync(aside, JSON.stringify(r)); renameSync(aside, FILE); } catch { /* measured again by the next command */ }
 }
+
+// ---------------------------------------------------------------- how many workers: measured on this machine, file by file
+// The same way, in the same record, but for each command on each file (`id`): what a check or a build has to hand out,
+// and how much of it this thread does itself, are the file's (Haldor's 328 frames all at once; the round's bout reading
+// one move's frames at a time, its scene frames here), and so is the gain. A command whose builds handed out took under
+// MIN_WORK ms the last time it ran starts none. Else, while unsettled, each runs on the best so far or twice it (the
+// one measured less) and adds what its work would have taken on one thread (its builds handed out at the ms each name's
+// took on one thread, and this thread's own time, slowed as much as the workers' builds were) and what it took; once
+// each has ENOUGH of work, twice the best becomes the best if it did the same work GAIN times as fast, else the best is
+// settled. A run on one thread measures each name's ms.
+const MIN_WORK = 10_000;
+interface FileRec { best: number; next: number; n?: number; said?: string; work?: number; runs: Record<number, [number, number]>; cost: Record<string, [number, number]> }
+
+/** How many workers make a command's builds: PXL_WORKERS, 1 inside a worker thread, else measured for this command on this file. */
+export function workersFor(id: string): { n: number; why: string; measure: boolean; cost: Record<string, [number, number]> } {
+  const f = process.env.PXL_WORKERS;
+  if (!isMainThread) return { n: 1, why: "inside a worker thread, which starts none", measure: false, cost: {} };
+  if (f !== undefined && /^\d+$/.test(f) && +f >= 1) return { n: +f, why: `forced, PXL_WORKERS=${f}`, measure: false, cost: {} };
+  const r = read(machine()), F = r?.files?.[id];
+  if (!F) return { n: 1, why: "this file's builds not measured yet", measure: true, cost: {} };
+  if ((F.work ?? 0) < MIN_WORK) return { n: 1, why: `its builds handed out took ${Math.round((F.work ?? 0) / 1000)} s on one thread the last time, too few to share`, measure: true, cost: F.cost };
+  // (settled: one thread costs nothing more; more keep their work measured, so a command with little to share starts none)
+  if (F.n !== undefined || F.next <= F.best) return { n: F.n ?? F.best, why: F.said ?? "this machine makes one build at a time", measure: (F.n ?? F.best) > 1, cost: F.cost };
+  const b = F.runs[F.best]?.[0] ?? 0, x = F.runs[F.next]?.[0] ?? 0;
+  return { n: b <= x ? F.best : F.next, why: `being measured on this file, ${F.best} against ${F.next} workers (${Math.round(b / 1000)} s and ${Math.round(x / 1000)} s of work so far)${F.said ? `; ${F.said}` : ""}`, measure: true, cost: F.cost };
+}
+
+/** What a command's run on `n` workers did (work: its builds handed out at one thread's ms; est: all it did, at one thread's; ms: its time), and on one, each name's ms. */
+export function workersSaw(id: string, n: number, run: { work: number; est: number; ms: number; cost?: Record<string, [number, number]> }): void {
+  const key = machine(), r = read(key) ?? { key, at: Date.now(), best: 1, next: Math.min(2, availableParallelism()), runs: {} };
+  // (a file with little to share is never written down)
+  if (!r.files?.[id] && run.work < MIN_WORK) return;
+  const F = ((r.files ??= {})[id] ??= { best: 1, next: Math.min(2, availableParallelism()), runs: {}, cost: {} });
+  F.work = run.work;
+  for (const [k, [ms, c]] of Object.entries(run.cost ?? {})) F.cost[k] = [ms, c];
+  if (F.n === undefined && F.next > F.best && (n === F.best || n === F.next) && run.est > 0) {
+    const e = (F.runs[n] ??= [0, 0]);
+    e[0] += run.est; e[1] += run.ms;
+    const B = F.runs[F.best], N = F.runs[F.next];
+    if (B?.[0] >= ENOUGH && N?.[0] >= ENOUGH) {
+      const gain = N[0] / N[1] / (B[0] / B[1]), top = availableParallelism();
+      F.said = `measured here on this file, ${F.next} workers did ${F.best}'s work ${gain.toFixed(2)}x as fast (${Math.round(N[1] / 1000)} s against ${Math.round(B[1] / 1000)} s; more pays from ${GAIN}x)`;
+      if (gain >= GAIN && F.next < top) Object.assign(F, { best: F.next, next: Math.min(2 * F.next, top), runs: { [F.next]: N } });
+      else Object.assign(F, { n: gain >= GAIN ? F.next : F.best, runs: {} });
+    }
+  }
+  write(r);
+}
+
+const machine = () => sha1(`${process.version} ${cpus()[0]?.model} ${availableParallelism()}`);
 
 /** A line for pxl build --profile: how many threads marched and why. */
 export function threadsSaid(): string {

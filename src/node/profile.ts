@@ -12,6 +12,7 @@ import { notPure } from "../core/sdf.ts";
 import { kept } from "../core/surface.ts";
 import { DISK_MS } from "./store.ts";
 import { threadsSaid } from "./threads.ts";
+import { workersSaid } from "./workers.ts";
 
 interface Node { id: number; callFrame: { functionName: string; url: string; lineNumber: number } }
 interface CpuProfile { nodes: Node[]; samples: number[]; timeDeltas: number[] }
@@ -68,6 +69,7 @@ export function profileReport(profile: CpuProfile, art: string[], times: [string
   return [
     `profile: ${fmt(total).trim()} in all${slow ? `; slowest assets: ${slow}` : ""}`,
     threadsSaid(),
+    workersSaid(),
     "time spent in each function itself, in the art files (what to make faster):",
     ...(artRows.length ? artRows : ["  (none worth naming)"]),
     "and in pxl:",

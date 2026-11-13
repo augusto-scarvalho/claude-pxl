@@ -292,6 +292,13 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   const failed: string[] = [];
   // by default what the file itself defines (what it includes is checked where it's defined)
   const own = (n: string) => !opts.file || (p.assets.get(n)?.loc ?? "").split(":")[0] === opts.file;
+  // the builds it goes through handed out to the workers, if any (workers.ts): each sprite's and anim's first frame,
+  // every frame of an anim whose genre's checks read them
+  if (p.elsewhere) for (const n of opts.names ?? p.order.filter(own)) {
+    const d = p.assets.get(n);
+    if (!d || p.rigs.has(n) || d.kind === "scene" || (d.kind === "anim" && d.opts.world)) continue;
+    if (d.kind === "anim" && d.opts.genre !== undefined) p.handOut(n); else p.elsewhere.ahead([[n, 0, 0]]);
+  }
   for (const name of opts.names ?? p.order.filter(own)) {
     const def = p.assets.get(name);
     if (!def) throw new PxError(`unknown asset '${name}'`);

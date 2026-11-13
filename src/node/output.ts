@@ -106,6 +106,8 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
   };
 
   const names = p.order.filter((n) => want.has(n));
+  // (handed out to the workers, if any, workers.ts: each anim's frames, a sprite; a scene's frames stay here)
+  if (p.elsewhere) for (const n of names) { const k = p.assets.get(n)!.kind; if (k === "anim") p.handOut(n, 0, undefined, 600); else if (k !== "scene") p.elsewhere.ahead([[n, 0, 0]]); }
   // a map's file (<x>_n.png, <x>_e.png) that is another's own (an asset x with normals beside an asset
   // x_n, a sheet beside a sheet x_n): an error naming both, and the map not written over it
   const folder = (k: string) => (k === "scene" ? "scenes" : k === "anim" ? "anims" : "sprites"), files = new Set(p.exported());

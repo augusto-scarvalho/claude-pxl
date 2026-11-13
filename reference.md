@@ -1068,6 +1068,21 @@ timed again (a record beside the builds, `pxl-threads.json`; measured again when
 always); a field with a plain closure in it, a smaller trace and a march already inside a worker thread take one.
 `pxl build --profile` says how many marched and why.
 
+More workers: `pxl check` and `pxl build` of a file can share its builds among worker threads, each loading the project
+once and making whole builds (the art's code, the march on one thread, the paint): an anim's frames when one other than
+its first is asked or `timeline()` reads them all, and the first frames of what the command goes through. A scene's
+frames stay on the command's own thread (a scene's code may carry another build's work in a memo of its own, as the
+fighting round's bout does). A build a worker made is used as one read back from the store is, only where the store
+would keep it (made before the art's own dice, clock or late read, holding every warning said before it, writable as
+data) and where it is what the command's thread would have made there: every file written, warning and line printed
+is what one thread makes, in the same order. How many is measured for each command on each file, on the machine, in the
+record of the march's threads: a file whose shared builds took under 10 s on one thread the last time starts none; else
+its commands take turns on the best number so far and twice it, each adding what its work would have taken on one
+thread and what it took, and from a minute of work each the larger is kept only if it was 1.15× as fast or more, else
+the smaller is settled. Never more workers than the free memory holds (each about the project's memory and 256 MB of
+builds); while they run, a march on the command's thread takes one thread. `PXL_WORKERS=N` forces N (1: one thread,
+as always); a command inside a worker thread starts none. `pxl build --profile` says how many and why.
+
 ### Output for engines
 
 Beside the art of a sprite, scene, anim or sheet, a build writes two maps laid out in the same

@@ -575,6 +575,21 @@ commands: his check 63 s forced to 1 and 48 s by itself (8 no faster than 4, 16 
 again after 30 days. `PXL_THREADS=N` forces a number; a test's own worker
 thread marches on one.
 
+`pxl check` and `pxl build` of a file can also share whole builds among worker threads (`src/node/workers.ts`), each
+loading the project once and taking an anim's frames, the march, the paint and the art's code with them: perf F's threads
+spread only the march, 64% of Haldor's frame, and wait on the rest. A worker's build reaches the command's thread as one
+read back from the store does, under the store's conditions and only where it is what that thread would have made
+there (each build at time 0 it asked held there, or sent with it), so what is printed and written is one thread's, in
+the same order; a scene's frames are never handed out (the round's bout carries Haldor's frames in a memo of its own).
+On the i7-13700K (2026-11, `--no-cache`, the march on one thread in each) Haldor's check took 63 s on one thread, 47
+with perf F's 4 march threads, 18 with 4 workers, 16 with 6, 17 with 8 and 26 with 16; the round's 54 to 62 s, 32 to
+39 with 4 workers and slower from 8: its bout reads one move's frames at a time, and its own thread still makes about
+900 of its builds (the scene's frames, each move's first frame). On the i5-1035G1 two or three workers made Haldor's
+check 1.3× as fast and the round not at all: four busy threads run each about 2.5× as slow there (the clock falls from
+2.2 to 1.6 GHz, threads share cores). So how many is measured per command and file, in `pxl-threads.json` beside the
+threads' record: what a command has to hand out and how much its own thread does are the file's. `PXL_WORKERS=N`
+forces a number (1: one thread, as always); `hashes.ts` and `pxl build` take the same path with it.
+
 `served.ts` starts the live viewer's server on a file and fetches what the page would when an asset
 is picked: run it after a change to the viewer or to what a build traces (a scene's frames all sent
 with it held 2.65 GB on the HD graveyard's page and froze the browser; as PNGs on demand, 1.6 MB and

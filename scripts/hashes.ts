@@ -23,6 +23,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { frameCount, frameTime } from "../src/node/shot.ts";
+import { startWorkers } from "../src/node/workers.ts";
 import { examples, inTree, loader, pick, repo, revTree } from "./vs.ts";
 
 // real builds on both sides, never those kept on disk (store.ts): a comparison read from it would prove nothing
@@ -45,7 +46,10 @@ function lines(load: (f: string) => any, file: string, name: string): Map<string
     if (!only.test(n)) continue;
     const bare = under ? n.replace(under, "") : n, k = mine.has(bare) && bare !== n ? n : bare;
     try {
-      for (const i of pick(frameCount(p, n), cap)) {
+      const fr = pick(frameCount(p, n), cap);
+      // (an anim's frames it will build handed out to the workers, if any: PXL_WORKERS)
+      p.handOut?.(n, 0, fr.map((i) => frameTime(p, n, i)));
+      for (const i of fr) {
         const t = frameTime(p, n, i);
         out.set(i ? `${name} ${k}@${i}` : `${name} ${k}`, p.image(n, 0, t).hash());
         p.forget(n, t);
@@ -55,7 +59,9 @@ function lines(load: (f: string) => any, file: string, name: string): Map<string
   return out;
 }
 
-const here = await loader(repo), tree = vs ? revTree(vs) : "", there = vs ? await loader(tree) : undefined;
+// (PXL_WORKERS=N: the working tree's builds made by N workers, as pxl build's are, workers.ts)
+const load = await loader(repo), here = (f: string) => { const p = load(f); if (process.env.PXL_WORKERS) startWorkers(p, f, {}, "build"); return p; };
+const tree = vs ? revTree(vs) : "", there = vs ? await loader(tree) : undefined;
 // the same bytes here and at the revision: one file, and pxl's whole src/
 const sameFile = (f: string) => { const o = inTree(tree, f); return o === resolve(f) || (existsSync(o) && readFileSync(o).equals(readFileSync(f))); };
 const srcOf = (root: string) => (readdirSync(join(root, "src"), { recursive: true }) as string[]).filter((f) => statSync(join(root, "src", f)).isFile()).sort();
