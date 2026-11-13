@@ -9,6 +9,7 @@ import { Project, type ProjectOptions } from "../core/project.ts";
 import { decodePng } from "./png.ts";
 import { diskOf, sha1 } from "./store.ts";
 import "./pure.ts"; // (pure(): the bare scope its functions are rebuilt in)
+import "./threads.ts"; // (a pure field's march on more threads)
 
 /**
  * A fresh context whose globals are the DSL. Not contextified: its global object is an ordinary one,

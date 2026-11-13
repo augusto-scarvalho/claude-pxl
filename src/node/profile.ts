@@ -3,7 +3,7 @@
 // that spent the most time themselves: first those in the art files (what you can make faster:
 // a march, a sky worked out again every frame), then pxl's own; and the slowest assets. Then the traced
 // fields whose march isn't kept between builds, a function in them not pure() (surface.ts's kept.left,
-// set only while this runs: without it no march is timed).
+// set only while this runs: without it no march is timed), and how many threads marched (threads.ts).
 import { readFileSync } from "node:fs";
 import { Session } from "node:inspector/promises";
 import { basename, relative, sep } from "node:path";
@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { notPure } from "../core/sdf.ts";
 import { kept } from "../core/surface.ts";
 import { DISK_MS } from "./store.ts";
+import { threadsSaid } from "./threads.ts";
 
 interface Node { id: number; callFrame: { functionName: string; url: string; lineNumber: number } }
 interface CpuProfile { nodes: Node[]; samples: number[]; timeDeltas: number[] }
@@ -66,6 +67,7 @@ export function profileReport(profile: CpuProfile, art: string[], times: [string
   const artRows = rows(true), pxlRows = rows(false);
   return [
     `profile: ${fmt(total).trim()} in all${slow ? `; slowest assets: ${slow}` : ""}`,
+    threadsSaid(),
     "time spent in each function itself, in the art files (what to make faster):",
     ...(artRows.length ? artRows : ["  (none worth naming)"]),
     "and in pxl:",

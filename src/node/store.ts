@@ -51,13 +51,15 @@ export function sourcesOf(dir: string, since = Infinity): string {
  * not be the code running: then nothing is kept or read back.
  */
 let src: string | undefined;
+/** That hash of pxl's own code, once a process ("": edited since it started). */
+export const pxlSources = () => (src ??= sourcesOf(code, performance.timeOrigin));
 
 /**
  * The disk for a project loaded from `files` (p.files, in the order read), `seen` the hash of each as it was read
  * (a file not in it is read now; one not there counts as gone). Undefined: turned off, or pxl changed since it started.
  */
 export function diskOf(files: string[], seen: Map<string, string>): Project["disk"] {
-  if (process.env.PXL_CACHE === "0" || !(src ??= sourcesOf(code, performance.timeOrigin))) return undefined;
+  if (process.env.PXL_CACHE === "0" || !pxlSources()) return undefined;
   // (and the time zone and language a date or a number is written in where the art doesn't say)
   const { timeZone, locale } = Intl.DateTimeFormat().resolvedOptions(), h = createHash("sha1").update(`${src} ${timeZone} ${locale}\0`);
   for (const f of files) {
@@ -84,7 +86,7 @@ const fileOf = (key: string) => join(DIR, sha1(key));
 // and the rays asked, whatever file asks it and whatever else that file holds. Each ray's hit, 8 bytes, deflated.
 /** The entry's key for a field's key and its rays (undefined: turned off, or pxl changed since it started). */
 export const traceKey = (field: string, rays: Float64Array) =>
-  process.env.PXL_CACHE === "0" || !(src ??= sourcesOf(code, performance.timeOrigin)) ? undefined : `trace\0${src}\0${sha1(field)}\0${sha1(new Uint8Array(rays.buffer))}`;
+  process.env.PXL_CACHE === "0" || !pxlSources() ? undefined : `trace\0${src}\0${sha1(field)}\0${sha1(new Uint8Array(rays.buffer))}`;
 kept.on = () => process.env.PXL_CACHE !== "0";
 kept.trace = (field, rays) => {
   const key = traceKey(field, rays);

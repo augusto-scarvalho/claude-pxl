@@ -62,6 +62,8 @@ export interface Compiled {
   mats: string[];
   /** whether a number of it read the clock (a function of it): if not, it is the same field at every moment */
   timed: boolean;
+  /** its distance as made: its code, its numbers, the functions it calls and the memos it writes (d is made(src, K, F, M)) */
+  code: { src: string; K: number[]; F: Fd[]; M: Float64Array[] };
 }
 type Fd = (x: number, y: number, z: number) => number;
 type Fm = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => number;
@@ -308,6 +310,8 @@ export function notPure(f: Sdf, at = "", out: { part: string; what: string; fn: 
 export const PURE = new WeakMap<object, string>();
 /** Each pure function's check that its data's arrays (its only state) are as it was given them: undefined, or what changed. */
 export const INTACT = new WeakMap<object, () => string | undefined>();
+/** How a function a field calls is made again in another thread (src/node/threads.ts): a pure function's source, its data's names and values as its scope holds them; a sweep's numbers and functions; a field in a pure function's data (its scope's stand-in), the field. */
+export const HOW = new WeakMap<object, unknown>();
 /** pure(data, fn), set by Node (src/node/pure.ts): fn rebuilt from its source in a scope of Math and its data alone. */
 export const bare: { pure?: <F extends (...a: never[]) => unknown>(data: Record<string, unknown>, fn: F) => F } = {};
 /** Numbers exactly (-0 too), joined. */
@@ -436,7 +440,7 @@ function written(e: Part["e"], track = false): { src: string; K: number[]; F: Fd
   return { src: `${c.subs.join("\n")}\nreturn (x, y, z) => {\n${c.lines.join("\n")}\nreturn ${r};\n}`, K: c.K, F: c.F, M: c.M, FK: c.FK, IN: c.IN };
 }
 /** Code as a function, its source made once. */
-function made(src: string, K: number[], F: Fd[], M: Float64Array[], W?: Int32Array): Fd {
+export function made(src: string, K: number[], F: Fd[], M: Float64Array[], W?: Int32Array): Fd {
   let f = FACTORIES.get(src);
   if (!f) {
     f = new Function("K", "smin", "fbm3", "F", "W", "M", src) as Factory;
@@ -787,7 +791,7 @@ function compiled(f: Sdf, clock: Clock): Compiled {
   const mp: Fm = !tracks ? raw : (x, y, z, a, b, c) => { (track ??= tracker())(x, y, z); return raw(x, y, z, a, b, c); };
   return {
     // (its key without the memos' lines: the same field whether or not a part of it was asked on its own)
-    d: made(D.src, D.K, D.F, D.M), lo: P.lo, hi: P.hi, lip: P.lip, mats, parts, mp, timed,
+    d: made(D.src, D.K, D.F, D.M), lo: P.lo, hi: P.hi, lip: P.lip, mats, parts, mp, timed, code: D,
     get key() { return `${D.src.replace(/^M\[.*\n/gm, "")}#${D.K.map((v, i) => D.FK.get(i) ?? exact([v])).join(",")}`; },
     pure: [...D.FK.values()].every((k) => k[0] !== "#"),
     intact: () => { for (const f of D.IN) { const e = f(); if (e) return e; } return undefined; },

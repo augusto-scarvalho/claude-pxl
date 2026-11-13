@@ -559,6 +559,22 @@ fields it changed, whatever file asks them: Haldor's check after an edit to a co
 the paint and the arms' small traces, under the store's floor, made again. His and Reva's trunks, sweeps and skirts are
 pure functions.
 
+Such a field's march can also run on more threads (`src/node/threads.ts`, surface.ts's `spread`): a trace of 4096 cells
+or more hands each thread the field as data (its code, its numbers, each pure function's source and data, sdf.ts's
+`HOW`), each makes it again and marches runs of the rays into shared memory while this thread marches runs of a copy
+made the same way; a field that can't cross, a pure function's data changed, a thread that throws: marched here as
+before, the same error at the same place. The same JavaScript on the same rays gives the same hits in any order, which
+`hashes.ts` proves with `PXL_THREADS=2` (it turns the store off; the threads don't need it). How many is measured over
+the machine's real commands, never read off a table of processors (the record `pxl-threads.json` beside `builds/`):
+commands take turns on the best number and twice it until each has a minute of traces of the same fields, the larger
+kept from 1.15× as fast. On the i5-1035G1 (2026-11) two threads marched Haldor 1.5× as fast for a few seconds and 1.1×
+over his whole check (the march 64% of it; with 3 and 4 threads no faster, the paint slower as the laptop heats): the
+check 1.06× at best, so it settles on 1 and times nothing more. On an i7-13700K (16 cores) it settled on 4 after eight
+commands: his check 63 s forced to 1 and 48 s by itself (8 no faster than 4, 16 slower), the same files with 1, 8 and
+16 threads. The record is the machine's (Node, the processor), not pxl's sources', so it is measured once a machine,
+again after 30 days. `PXL_THREADS=N` forces a number; a test's own worker
+thread marches on one.
+
 `served.ts` starts the live viewer's server on a file and fetches what the page would when an asset
 is picked: run it after a change to the viewer or to what a build traces (a scene's frames all sent
 with it held 2.65 GB on the HD graveyard's page and froze the browser; as PNGs on demand, 1.6 MB and

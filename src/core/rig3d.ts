@@ -7,8 +7,27 @@
 // face, the body orange, the right limbs light and the left dark) is how a new move is judged before
 // it is painted. gait() gives a walk's numbers by the view, views() places hand-drawn heads.
 import { PxError } from "./errors.ts";
-import { INTACT, PURE, Sdf, bare, exact, fieldOf, sdf, type V3 } from "./sdf.ts";
+import { HOW, INTACT, PURE, Sdf, bare, exact, fieldOf, sdf, type V3 } from "./sdf.ts";
 import { figure } from "./rig.ts";
+
+/** A sweep's numbers: its base [x, y], z0, z1, the ways the body faces [x, y] and its right [x, y], its shell. */
+export type Sweep = [number, number, number, number, number, number, number, number, number];
+type Fn = (...a: number[]) => unknown;
+/**
+ * A sweep's distance: across to the swept rim (a cloth: its two faces), and up to its ends; where it is cut away, at
+ * least a step (ponytail: a bound only while the radius changes slowly: lip 1.5). Made here and, for a sweep of pure
+ * functions, again in another thread of the same numbers and functions (src/node/threads.ts).
+ */
+export function sweepDist([bx, by, z0, z1, fx, fy, rx, ry, shell]: Sweep, radius: Fn, keep?: Fn, shift?: Fn) {
+  const H = z1 - z0;
+  return (x: number, y: number, z: number) => {
+    const h = Math.max(0, Math.min(1, (z - z0) / H)), s = shift ? shift(h) as number[] : undefined, vx = x - bx - (s ? s[0] : 0), vy = y - by - (s ? s[1] : 0);
+    const a = Math.atan2(vx * rx + vy * ry, vx * fx + vy * fy), rr = Math.sqrt(vx * vx + vy * vy), Rr = radius(h, a) as number;
+    const side = shell ? Math.abs(rr - Rr) - shell : rr - Rr, cap = Math.max(z0 - z, z - z1);
+    const v = Math.min(Math.max(side, cap), 0) + Math.sqrt(Math.max(side, 0) ** 2 + Math.max(cap, 0) ** 2);
+    return keep && !keep(h, a) ? Math.max(v, 0.3) : v;
+  };
+}
 
 // 3D vectors, written out: a pose is a few dozen of them
 const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -223,19 +242,11 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
         x0 = Math.min(x0, s[0]); x1 = Math.max(x1, s[0]); y0 = Math.min(y0, s[1]); y1 = Math.max(y1, s[1]);
         for (let k = 0; k < 24; k++) R = Math.max(R, radius(i / 8, (k / 24) * 2 * Math.PI - Math.PI));
       }
-      const pad = R * 1.25 + shell + 0.5;
-      // the distance: across to the swept rim (a cloth: its two faces), and up to its ends; where it is cut
-      // away, at least a step (ponytail: a bound only while the radius changes slowly: lip 1.5)
-      const d = (x: number, y: number, z: number) => {
-        const h = Math.max(0, Math.min(1, (z - z0) / H)), s = shift ? shift(h) : undefined, vx = x - bx - (s ? s[0] : 0), vy = y - by - (s ? s[1] : 0);
-        const a = Math.atan2(vx * rx + vy * ry, vx * fx + vy * fy), rr = Math.sqrt(vx * vx + vy * vy), Rr = radius(h, a);
-        const side = shell ? Math.abs(rr - Rr) - shell : rr - Rr, cap = Math.max(z0 - z, z - z1);
-        const v = Math.min(Math.max(side, cap), 0) + Math.sqrt(Math.max(side, 0) ** 2 + Math.max(cap, 0) ** 2);
-        return keep && !keep(h, a) ? Math.max(v, 0.3) : v;
-      };
+      const pad = R * 1.25 + shell + 0.5, nums: Sweep = [bx, by, z0, z1, fx, fy, rx, ry, shell], d = sweepDist(nums, radius, keep, shift);
       // (its radius, keep and shift pure, pure(): d reads nothing but them and these numbers, which name it, and its `at`
-      // is pure too, the same steps, for a pure function to read)
-      const fns = [radius, keep, shift].map((g) => (g === undefined ? "-" : PURE.get(g))), key = fns.every((k) => k) ? `sweep(${exact([bx, by, z0, z1, fx, fy, rx, ry, shell])};${fns.join(";")})` : undefined;
+      // is pure too, the same steps, for a pure function to read; made again of them in another thread, HOW)
+      const fns = [radius, keep, shift].map((g) => (g === undefined ? "-" : PURE.get(g))), key = fns.every((k) => k) ? `sweep(${exact(nums)};${fns.join(";")})` : undefined;
+      if (key) HOW.set(d, { sweep: nums, fns: [radius, keep, shift] });
       const checks = [radius, keep, shift].flatMap((g) => (g && INTACT.get(g)) || []);
       const field = fieldOf(d, [bx + x0 - pad, by + y0 - pad, z0 - 0.5], [bx + x1 + pad, by + y1 + pad, z1 + 0.5], 1.5, key, key ? () => { for (const c of checks) { const e = c(); if (e) return e; } return undefined; } : undefined,
         key ? undefined : [radius, keep, shift].flatMap((g, i): [string, unknown][] => (fns[i] ? [] : [[`a sweep's ${["radius", "keep", "shift"][i]}`, g]])));

@@ -18,7 +18,7 @@
 import { createHash } from "node:crypto";
 import * as vm from "node:vm";
 import { PxError } from "../core/errors.ts";
-import { INTACT, PURE, Sdf, bare, compile, exact } from "../core/sdf.ts";
+import { HOW, INTACT, PURE, Sdf, bare, compile, exact } from "../core/sdf.ts";
 
 // (no code from a string inside it: a function made there by the Function constructor would have its global as `this`)
 const realm = vm.createContext(vm.constants.DONT_CONTEXTIFY, { codeGeneration: { strings: false, wasm: false } });
@@ -60,7 +60,13 @@ const NAME = /^[A-Za-z_$][\w$]*$/, TAKEN = ["Math", "arguments", "eval", "$$"];
 /** fn rebuilt in the bare scope with `data`, and its key (PURE): its source, its data's names and values. */
 export function pure<F extends (...a: never[]) => unknown>(data: Record<string, unknown>, fn: F): F {
   if (!data || typeof data !== "object" || Array.isArray(data) || typeof fn !== "function") tell("pure({ name: value, ... }, (args) => ...): the values it reads, then the function");
-  const src = Function.prototype.toString.call(fn), names = Object.keys(data), keys: string[] = [], held: Held = { arrays: [], checks: [] };
+  return pureOf(data, Function.prototype.toString.call(fn)) as F;
+}
+bare.pure = pure;
+
+/** pure() of a function's source: what another thread makes again of HOW's (src/node/threads.ts). */
+export function pureOf(data: Record<string, unknown>, src: string): (...a: never[]) => unknown {
+  const names = Object.keys(data), keys: string[] = [], held: Held = { arrays: [], checks: [] };
   // (import(): its failure, caught later, is an error of pxl's realm: a way out of the scope)
   if (/\bimport\b/.test(src)) tell("the word 'import' is in it: a pure function loads nothing (name it otherwise, in a comment or a string too)");
   for (const n of names) if (!NAME.test(n) || TAKEN.includes(n)) tell(`its data's names are the function's names for them: '${n}' isn't one it can have`);
@@ -75,12 +81,12 @@ export function pure<F extends (...a: never[]) => unknown>(data: Record<string, 
   }
   const args = B.arr();
   args.push(B.F, B.M, ...values);
-  const f = B.harden(make!(args)) as F;
+  const f = B.harden(make!(args)) as (...a: never[]) => unknown;
   PURE.set(f, keys.includes("") ? "" : createHash("sha1").update(`${src}\0${names}\0${keys.join(" ")}`).digest("hex"));
   INTACT.set(f, intact(held, src));
+  HOW.set(f, { src, names, values });
   return f;
 }
-bare.pure = pure;
 
 /** A pure function's arrays (each copy, what was put there, its name) and the checks of the pure functions and fields in its data. */
 interface Held { arrays: { a: unknown[]; v: unknown[]; at: string }[]; checks: (() => string | undefined)[] }
@@ -111,10 +117,12 @@ function into(v: unknown, at: string, keys: string[], held: Held): unknown {
     const C = compile(v);
     keys.push(C.pure ? `field ${createHash("sha1").update(C.key).digest("hex")}` : "");
     held.checks.push(C.intact);
-    return B.field((p, c) => {
+    const w = B.field((p, c) => {
       try { if (c === undefined) return v.dist(p); } catch (e) { return B.fail(String((e as Error)?.message ?? e)); }
       return B.fail(`pure: '${at}' is a field: a pure function asks it at its still moment, ${at}.dist(p)`);
     });
+    HOW.set(w, v);
+    return w;
   }
   if (Array.isArray(v)) {
     const a = B.arr();

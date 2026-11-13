@@ -203,6 +203,8 @@ interface Tracer {
   intact?: () => string | undefined;
   /** a field that has no key, a function in it not pure (sdf.ts's notPure): for kept.left */
   impure?: Sdf;
+  /** a pure field, compiled, and its march's stretch: what another thread marches it by (spread) */
+  pure?: { C: Compiled; lip: number };
 }
 
 /**
@@ -218,10 +220,22 @@ export const kept: {
   left?: (who: string, field: Sdf, ms: number) => void;
 } = {};
 
-/** A field's surface: marched by its distance. */
-function fieldTracer(C: Compiled, f: Sdf): Tracer {
-  const lip = C.lip * 1.05, d = C.d;
-  const march = (ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, t0: number, t1: number, e: number): number => {
+/**
+ * More threads for a pure field's march (set by src/node/threads.ts): `threads()` how many march a trace (1: this
+ * thread alone, as always), `march` each ray's hit (t or -1, as hit() finds it) for the rays asked (their nine numbers,
+ * as kept's) and the ms the threads marched in all, or undefined (then marched here); `timed`, while the number is
+ * being measured, told how long each trace big enough took in all (its cells).
+ */
+export const spread: {
+  threads?: () => number; march?: (P: { C: Compiled; lip: number }, rays: Float64Array) => { t: Float64Array; ms: number } | undefined;
+  timed?: (P: { C: Compiled; lip: number }, cells: number, ms: number) => void;
+} = {};
+/** (a trace of fewer cells is marched here: not worth the handover) */
+export const SPREAD_MIN = 4096;
+
+/** A march along o + d t through distance d (stepping v / lip): the first t in t0..t1 where it comes within e, or -1. */
+export const marchOf = (d: (x: number, y: number, z: number) => number, lip: number) =>
+  (ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, t0: number, t1: number, e: number): number => {
     let t = t0;
     for (let i = 0; i < 160 && t <= t1; i++) {
       const v = d(ox + dx * t, oy + dy * t, oz + dz * t);
@@ -230,8 +244,13 @@ function fieldTracer(C: Compiled, f: Sdf): Tracer {
     }
     return -1;
   };
+
+/** A field's surface: marched by its distance. */
+function fieldTracer(C: Compiled, f: Sdf): Tracer {
+  const lip = C.lip * 1.05, d = C.d, march = marchOf(d, lip);
   return {
     lo: C.lo, hi: C.hi, names: C.mats, parts: C.parts, get key() { return C.pure ? `${C.key}|${lip}` : undefined; }, intact: C.intact, impure: C.pure ? undefined : f,
+    pure: C.pure ? { C, lip } : undefined,
     hit: (o, r, t0, t1, e) => march(o[0], o[1], o[2], r[0], r[1], r[2], t0, t1, e),
     shade: (p, e) => {
       // the normal (four taps, Inigo Quilez's tetrahedron), the material there
@@ -493,7 +512,11 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   // that wrote into it, here or between traces, is an error, nothing kept)
   const intact = () => { const bad = T.intact?.(); if (bad) throw new PxError(`${who}: ${bad}`); };
   const key = kept.trace && kept.on?.() !== false ? T.key : undefined;
-  if (key) {
+  // (a pure field's trace big enough, where more threads march faster (spread): its rays aimed first, as for the store,
+  // and marched there, or here when they can't be; each such trace timed while the number is measured)
+  const big = !!T.pure && N >= SPREAD_MIN, th = big ? spread.threads?.() ?? 1 : 1, many = th > 1;
+  let w0 = big && spread.timed ? performance.now() : 0;
+  if (key || many) {
     const all = new Float64Array(GW * GH * 9), rs: typeof cells = new Array(GW * GH);
     let n = 0;
     for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) if (aim(gx, gy)) {
@@ -501,15 +524,21 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       all.set(ar!.o, n); all.set(ar!.d, n + 3); all[n + 6] = at0; all[n + 7] = at1; all[n + 8] = ae;
       n += 9;
     }
-    const mine = all.slice(0, n), k = kept.trace!(key, mine);
-    if (k) {
-      intact();
-      cells = rs; rays = mine; hits = k.t?.length === n / 9 ? k.t : undefined;
-      if (!hits) {
-        const t = (hits = new Float64Array(n / 9)), m0 = performance.now();
-        for (let i = 0, j = 0; i < rs.length; i++) { const a = rs[i]; if (a) { t[j] = T.hit(a.o, a.d, mine[9 * j + 6], mine[9 * j + 7], mine[9 * j + 8]); j++; } }
-        const ms = performance.now() - m0;
-        intact(); k.put(t, ms);
+    const mine = all.slice(0, n), k = key ? kept.trace!(key, mine) : undefined;
+    if (k || many) {
+      if (k) intact();
+      cells = rs; rays = mine; hits = k?.t?.length === n / 9 ? k.t : undefined;
+      if (hits) w0 = 0;
+      else {
+        const m0 = performance.now(), s = many ? spread.march!(T.pure!, mine) : undefined;
+        let ms = s?.ms ?? 0;
+        if (s) hits = s.t;
+        else {
+          const t = (hits = new Float64Array(n / 9));
+          for (let i = 0, j = 0; i < rs.length; i++) { const a = rs[i]; if (a) { t[j] = T.hit(a.o, a.d, mine[9 * j + 6], mine[9 * j + 7], mine[9 * j + 8]); j++; } }
+          ms = performance.now() - m0;
+        }
+        if (k) { intact(); k.put(hits, ms); }
       }
     }
   }
@@ -551,6 +580,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       tone[i] = Math.max(0, Math.min(ramp.length - 1, Math.round(lv * (ramp.length - 1))));
     }
   if (left) left(`${c.owner?.name ?? "?"}${o.part ? `, part ${o.part}` : ""}`, T.impure!, marched);
+  if (w0) spread.timed!(T.pure!, N, performance.now() - w0);
   // tones in clusters: a cell whose tone none of its four neighbours of the same material share takes
   // the one most of them have (three or four)
   const was = tone.slice();

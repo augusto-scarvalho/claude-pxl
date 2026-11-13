@@ -1057,6 +1057,17 @@ is still asked, once a pixel). In `node_modules/.cache/pxl/builds/` in a checkou
 temp folder, 512 MB, the least recently used dropped first. `--no-cache` (any command) or `PXL_CACHE=0` builds
 everything and keeps no trace.
 
+More threads: a trace of a field whose every function is `pure()`, over 4096 cells or more, can march its rays on
+several threads (each makes the field again of its code, numbers and pure functions' sources and data, and takes runs
+of the rays; the paint, normals and shadows stay on one), the same hits as one thread marches, so the same pixels. How
+many is measured on the machine pxl runs on, over its real commands: while it is unsettled, commands take turns on the
+best number so far and twice it, each big pure trace timed whole, and once each has a minute of traces of the same
+fields the larger is kept only if it did the same work 1.15× as fast or more, else the smaller is settled and nothing is
+timed again (a record beside the builds, `pxl-threads.json`; measured again when Node or the processor change, or after
+30 days). A 4-core laptop that throttles settles on 1; a 16-core desktop settled on 4, its check 1.3× as fast. `PXL_THREADS=N` forces N (1: one thread, as
+always); a field with a plain closure in it, a smaller trace and a march already inside a worker thread take one.
+`pxl build --profile` says how many marched and why.
+
 ### Output for engines
 
 Beside the art of a sprite, scene, anim or sheet, a build writes two maps laid out in the same
