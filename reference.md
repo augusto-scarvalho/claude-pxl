@@ -1049,11 +1049,14 @@ stop being a function of the files nothing more is kept: the art's own `Math.ran
 `new Date()` or a date formatted without a date (as the file loads: none at all), a file read once the art file has
 loaded. What a trace's march finds is kept beside them under a key of the field itself: pxl's sources and Node's, the
 field's code and numbers (a field given by a function only when the function is `pure()`), and the rays the trace asks
-(each one's origin, way, where it enters and leaves the field's box, how near it must come: all the march reads), each
-ray's hit in 8 bytes. It is read back wherever the same field is asked through the same rays, whatever file asks it
-and whatever else that file holds; the normals, shadows, creases and paint are worked out again from it. So an edit to
-one of a figure's moves marches again only that move's frames, and an edit to a scene none of its figures' (the paint
-is still asked, once a pixel). In `node_modules/.cache/pxl/builds/` in a checkout, else `pxl-builds/` in the system's
+(each one's origin, way, where it enters and leaves the field's box, how near it must come: all the march reads): each
+ray's hit in 8 bytes, and at each hit what else reads the field alone, its normal (the three numbers the light and the
+paint are given) and which child each of its joins takes there (the material's choice, a byte a join). It is read
+back wherever the same field is asked through the same rays, whatever file asks it and whatever else that file holds;
+the shadows, creases and paint are worked out again from it, the paint by the functions of the file that reads it.
+So an edit to one of a figure's moves marches again only that move's frames, and an edit to a scene none of its
+figures' (the paint is still asked, once a pixel). In `node_modules/.cache/pxl/builds/` in a checkout, else
+`pxl-builds/` in the system's
 temp folder, 512 MB, the least recently used dropped first. `--no-cache` (any command) or `PXL_CACHE=0` builds
 everything and keeps no trace.
 

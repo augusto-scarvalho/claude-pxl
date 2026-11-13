@@ -2,7 +2,8 @@
 // field given by a function keyable (src/node/pure.ts): a pure function reads its arguments, Math and its data alone
 // (any other name is an error that says what to do); the same field asked from two files, or from one before and after
 // an unrelated edit, marches once; a change to its source, its data, the view, the size or a ray's step marches again;
-// a field of a plain closure is never kept; a broken entry is marched again; the store off gives the same pixels.
+// a field of a plain closure is never kept; a broken entry is marched again; the store off gives the same pixels; the
+// normals and the joins' choices kept with the hits paint as made, by the paint functions of the file that reads them.
 import assert from "node:assert/strict";
 import { mkdtempSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,14 +16,16 @@ import { kept } from "../src/core/surface.ts";
 const test = whenChanged("test/trace.test.ts");
 const text = (v: unknown) => { const bufs: ArrayBufferView[] = []; return JSON.stringify(encode(v, bufs)) + bufs.map((b) => Buffer.from(b.buffer).toString("base64")).join(); };
 
-// every trace kept, as if each took long; what each asked counted, and the entries it wrote
+// every trace kept, as if each took long; what each asked counted (read: its hits, normals and joins' choices read
+// back whole), the entries it wrote and what the last one held
 const real = kept.trace!, n = { asked: 0, marched: 0, read: 0 }, files: string[] = [];
+let last: { key: string; rays: Float64Array; t: Float64Array; n?: Float64Array; w?: Int32Array } | undefined;
 kept.trace = (k, r) => {
   const o = real(k, r);
   if (!o) return o;
   n.asked++;
-  if (o.t) n.read++; else n.marched++;
-  return { t: o.t, put: (t) => { o.put(t, 1e6); files.push(join(DIR, sha1(traceKey(k, r)!))); } };
+  if (o.t && o.n && o.w) n.read++; else n.marched++;
+  return { ...o, put: (t, _ms, nn, w) => { o.put(t, 1e6, nn, w); files.push(join(DIR, sha1(traceKey(k, r)!))); last = { key: k, rays: r, t, n: nn, w }; } };
 };
 const dir = mkdtempSync(join(tmpdir(), "pxl-trace-")), salt = Math.random();
 // a ball given by its distance, pure; `body` the function's source, `opts` surface()'s, `more` the rest of the file
@@ -102,6 +105,44 @@ sprite("ball", { w: 24, h: 24 }, (c) => { ${before} }, surface(sdf.field(d, [-R,
     assert.throws(() => p.build("ball"), /changed its data's 'T/, w);
     assert.equal(files.length, was, w);
   }
+});
+
+// a pure ball and a box joined (a join whose material is tracked), each its material, painted by a closure of the file
+const joined = (paint: string, more = "") => `pal({ k: "#101010", a: "#404040", b: "#808080", c: "#c0c0c0", d: "#e0e0e0" })
+ramps("kabcd")
+const R = 3, SALT = ${salt}
+const d = pure({ R, SALT }, (x, y, z) => Math.hypot(x, y, z - R) - R)
+const f = sdf.union(sdf.field(d, [-R, -R, 0], [R, R, 2 * R]).mat("a").part("ball"), sdf.box([4, 4, 2]).at(0, 0, 5.5).mat("b").part("cap"), { smooth: 0.5 })
+sprite("ball", { w: 24, h: 24 }, surface(f.paint(${paint}), { ppm: 3, mats: { a: "kab", b: "abc", c: "bcd" } }))
+${more}`;
+const cold = (name: string, src: string) => { process.env.PXL_CACHE = "0"; try { return ball(name, src).out; } finally { delete process.env.PXL_CACHE; } };
+
+test("a trace's normals and its joins' choices read back paint as made; an edit to a paint function paints with the new one", () => {
+  const P1 = "(p, n) => (n[0] > 0.4 ? \"c\" : undefined)", P2 = "(p, n) => (p[2] > 4.5 && n[1] < 0 ? \"c\" : undefined)";
+  const a = ball("j.px.js", joined(P1));
+  assert.deepEqual([a.marched, a.read], [1, 0]);
+  // (kept with the hits: three numbers a hit, and a choice for each join at each hit)
+  const H = [...last!.t].filter((t) => !(t < 0)).length;
+  assert.ok(H > 50 && last!.n!.length === 3 * H && last!.w!.length > 0 && last!.w!.length % H === 0);
+  const b = ball("j.px.js", joined(P1, "// an edit"));
+  assert.deepEqual([b.marched, b.read], [0, 1]);
+  assert.equal(b.out, a.out);
+  assert.equal(cold("j.px.js", joined(P1)), a.out);
+  // the paint changed, the field not: its trace read back, painted by the new function as a first build paints it
+  const c = ball("j.px.js", joined(P2));
+  assert.deepEqual([c.marched, c.read], [0, 1]);
+  assert.notEqual(c.out, a.out);
+  assert.equal(c.out, cold("j.px.js", joined(P2)));
+});
+
+test("an entry whose normals don't fit its hits is made again, not trusted", () => {
+  const src = joined("(p, n) => (n[2] > 0.5 ? \"c\" : undefined)", "// short");
+  const a = ball("k.px.js", src), was = last!;
+  real(was.key, was.rays)!.put(was.t, 1e6, was.n!.slice(3), was.w);
+  const before = files.length, b = ball("k.px.js", src);
+  assert.equal(files.length, before + 1, "made and kept again");
+  assert.equal(b.out, a.out);
+  assert.equal(ball("k.px.js", src).read, 1);
 });
 
 test("a field of a plain closure is never kept; a broken entry is marched again", () => {

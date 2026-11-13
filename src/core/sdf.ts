@@ -49,6 +49,12 @@ export interface Compiled {
   part(x: number, y: number, z: number, nx: number, ny: number, nz: number): number;
   /** both at once: (material + 1) + 1024 (part + 1), 0 neither */
   mp(x: number, y: number, z: number, nx: number, ny: number, nz: number): number;
+  /**
+   * mp in two, with joins whose material is tracked: `track` works the distance out once more, writing into W which
+   * child each join takes there (a function of the key and the point), and `raw` reads the material and part down that
+   * way (the art's paint functions); a trace keeps W with its hits (surface.ts)
+   */
+  route?: { W: Int32Array; track(x: number, y: number, z: number): void; raw(x: number, y: number, z: number, nx: number, ny: number, nz: number): number };
   parts: string[];
   /** its distance's code and numbers, exactly (-0 too), each field given by a function there its pure key (pure()) or its id: the same key, the same field */
   key: string;
@@ -792,6 +798,7 @@ function compiled(f: Sdf, clock: Clock): Compiled {
   return {
     // (its key without the memos' lines: the same field whether or not a part of it was asked on its own)
     d: made(D.src, D.K, D.F, D.M), lo: P.lo, hi: P.hi, lip: P.lip, mats, parts, mp, timed, code: D,
+    route: tracks ? { W, track: (x, y, z) => { (track ??= tracker())(x, y, z); }, raw } : undefined,
     get key() { return `${D.src.replace(/^M\[.*\n/gm, "")}#${D.K.map((v, i) => D.FK.get(i) ?? exact([v])).join(",")}`; },
     pure: [...D.FK.values()].every((k) => k[0] !== "#"),
     intact: () => { for (const f of D.IN) { const e = f(); if (e) return e; } return undefined; },

@@ -83,7 +83,9 @@ export function diskOf(files: string[], seen: Map<string, string>): Project["dis
 const fileOf = (key: string) => join(DIR, sha1(key));
 
 // What a trace's march finds (surface.ts's kept), beside the builds: under pxl's sources and Node's, the field's key
-// and the rays asked, whatever file asks it and whatever else that file holds. Each ray's hit, 8 bytes, deflated.
+// and the rays asked, whatever file asks it and whatever else that file holds. Each ray's hit (8 bytes), and at each
+// hit its normal (24: the numbers as computed) and which child each of the field's joins took there (a byte each while
+// they have fewer than 256 children), deflated.
 /** The entry's key for a field's key and its rays (undefined: turned off, or pxl changed since it started). */
 export const traceKey = (field: string, rays: Float64Array) =>
   process.env.PXL_CACHE === "0" || !pxlSources() ? undefined : `trace\0${src}\0${sha1(field)}\0${sha1(new Uint8Array(rays.buffer))}`;
@@ -91,8 +93,18 @@ kept.on = () => process.env.PXL_CACHE !== "0";
 kept.trace = (field, rays) => {
   const key = traceKey(field, rays);
   if (!key) return undefined;
-  const t = (get(key)?.out as { t?: unknown } | undefined)?.t;
-  return { t: t instanceof Float64Array ? t : undefined, put: (t, ms) => { if (ms >= DISK_MS) put(key, { t } as unknown as BuildOut, { needs: {}, fx: [] }, ms); } };
+  const o = get(key)?.out as { t?: unknown; n?: unknown; w?: unknown } | undefined, w = o?.w;
+  return {
+    t: o?.t instanceof Float64Array ? o.t : undefined, n: o?.n instanceof Float64Array ? o.n : undefined,
+    w: w instanceof Uint8Array || w instanceof Uint16Array || w instanceof Int32Array ? w : undefined,
+    put: (t, ms, n, w) => { if (ms >= DISK_MS) put(key, { t, n, w: w && narrow(w) } as unknown as BuildOut, { needs: {}, fx: [] }, ms); },
+  };
+};
+/** The same numbers in the fewest bytes a number. */
+const narrow = (w: Int32Array) => {
+  let lo = 0, hi = 0;
+  for (let i = 0; i < w.length; i++) { if (w[i] < lo) lo = w[i]; if (w[i] > hi) hi = w[i]; }
+  return lo < 0 ? w : hi < 256 ? Uint8Array.from(w) : hi < 65536 ? Uint16Array.from(w) : w;
 };
 
 /**

@@ -552,12 +552,16 @@ the rays the trace asks of it (each one's origin, way, where it enters and leave
 come). The march reads nothing else, so the key is complete by construction, whatever view, size, step or canvas made
 the rays. A field given by a function has a key only when the function is `pure()`, rebuilt from its source in a scope
 of `Math` and its data alone ([the reference](../reference.md)); a field with a plain closure in it is traced as
-before and not kept (`pxl build --profile` names those, the closures and the time they march). Each ray's hit is kept (8 bytes; the five fighting files' traces 18.5 MiB on disk); the normal,
-the shadow rays, the creases and the paint are worked out again from it, so a hit spares the march, two thirds of
-Haldor's cold frame (the paint is 17% of it, the normal's taps 8%). An edit then marches again only the frames whose
-fields it changed, whatever file asks them: Haldor's check after an edit to a comment went from 95 s to 49 (2026-11),
-the paint and the arms' small traces, under the store's floor, made again. His and Reva's trunks, sweeps and skirts are
-pure functions.
+before and not kept (`pxl build --profile` names those, the closures and the time they march). Each ray's hit is kept
+(8 bytes), and at each hit what else reads only the field: its normal (24 bytes, the numbers the light and the paint
+are given, which don't compress) and which child each of its joins takes there (a byte a join: the pass that finds a
+point's material works the distance out once more to learn it). A hit spares the march, two thirds of Haldor's cold
+frame; with the march kept, the normal's four taps were 34% of his check after an edit and that pass 19% (Reva's 27%
+and 13%), so they are kept too, and only the paint's own functions, the light and the lines run again. An edit then
+marches again only the frames whose fields it changed, whatever file asks them: Haldor's check after an edit to a
+comment went from 95 s to 49 (2026-11, the hits kept), and with the normals and choices kept too from 76 s to 37 (one
+thread, the last commit's pxl against the new one the same hour); the five fighting files' traces take 76.6 MiB on
+disk (18.5 with the hits alone; the store's budget is 512). His and Reva's trunks, sweeps and skirts are pure functions.
 
 Such a field's march can also run on more threads (`src/node/threads.ts`, surface.ts's `spread`): a trace of 4096 cells
 or more hands each thread the field as data (its code, its numbers, each pure function's source and data, sdf.ts's

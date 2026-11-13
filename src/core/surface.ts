@@ -205,18 +205,28 @@ interface Tracer {
   impure?: Sdf;
   /** a pure field, compiled, and its march's stretch: what another thread marches it by (spread) */
   pure?: { C: Compiled; lip: number };
+  /**
+   * a pure field's shade in two, kept with its hits (what is the field's alone, then the paint): `field` the normal into
+   * n and which child each of its `slots` joins takes there into w, at the i-th hit; `again` those read back; `paint`
+   * the material and part there, read down the joins' last choices (the art's paint functions)
+   */
+  own?: { slots: number; field(p: V3, e: number, n: Float64Array, w: Int32Array, i: number): V3; again(n: Float64Array, w: Slots, i: number): V3; paint(p: V3, n: V3): { n: V3; m: number; part?: number } };
 }
+/** which child each join of a field took at its hits, as kept (narrowed to the bytes it needs: the same numbers) */
+export type Slots = Uint8Array | Uint16Array | Int32Array;
 
 /**
  * What the march finds, kept between commands (set by src/node/store.ts): `trace(key, rays)` for a tracer's key and
- * the rays asked of it (each one's origin, way, t0, t1 and nearness, in order), the hits kept (each ray's t, or -1) and
- * where to keep them once marched. hit() reads nothing else, so the same field through the same rays finds the same.
+ * the rays asked of it (each one's origin, way, t0, t1 and nearness, in order), the hits kept (each ray's t, or -1),
+ * and at each hit in order its normal (`n`, three numbers) and which child each join took there (`w`, Tracer's own),
+ * and where to keep them once made. hit(), the normal's taps and the joins' choices read nothing else (the field's
+ * code and numbers, the rays), so the same field through the same rays finds the same.
  * `on()` false: nothing is kept now, and a trace builds neither its key nor its rays. `left`, set only while pxl build
  * --profile runs (src/node/profile.ts): told of each trace of a field that can't be kept, a function in it not pure,
  * who drew it and how long its rays marched (each timed then; without it the march is as it was).
  */
 export const kept: {
-  on?: () => boolean; trace?: (key: string, rays: Float64Array) => { t?: Float64Array; put(t: Float64Array, ms: number): void } | undefined;
+  on?: () => boolean; trace?: (key: string, rays: Float64Array) => { t?: Float64Array; n?: Float64Array; w?: Slots; put(t: Float64Array, ms: number, n?: Float64Array, w?: Int32Array): void } | undefined;
   left?: (who: string, field: Sdf, ms: number) => void;
 } = {};
 
@@ -247,16 +257,24 @@ export const marchOf = (d: (x: number, y: number, z: number) => number, lip: num
 
 /** A field's surface: marched by its distance. */
 function fieldTracer(C: Compiled, f: Sdf): Tracer {
-  const lip = C.lip * 1.05, d = C.d, march = marchOf(d, lip);
+  const lip = C.lip * 1.05, d = C.d, march = marchOf(d, lip), R = C.route, S = R ? R.W.length : 0;
+  // the normal (four taps, Inigo Quilez's tetrahedron); the material there (mp: the joins' choices worked out, then read)
+  const normal = (p: V3, e: number) => {
+    const h = Math.max(1e-4, e * 0.6), a = d(p[0] + h, p[1] - h, p[2] - h), b = d(p[0] - h, p[1] - h, p[2] + h), cc = d(p[0] - h, p[1] + h, p[2] - h), dd = d(p[0] + h, p[1] + h, p[2] + h);
+    return unit([a - b - cc + dd, -a - b + cc + dd, -a + b - cc + dd]);
+  };
+  const at = (p: V3, n: V3, mp: Compiled["mp"]) => { const v = mp(p[0], p[1], p[2], n[0], n[1], n[2]); return { n, m: (v % 1024) - 1, part: C.parts.length ? Math.floor(v / 1024) - 1 : -1 }; };
   return {
     lo: C.lo, hi: C.hi, names: C.mats, parts: C.parts, get key() { return C.pure ? `${C.key}|${lip}` : undefined; }, intact: C.intact, impure: C.pure ? undefined : f,
     pure: C.pure ? { C, lip } : undefined,
     hit: (o, r, t0, t1, e) => march(o[0], o[1], o[2], r[0], r[1], r[2], t0, t1, e),
-    shade: (p, e) => {
-      // the normal (four taps, Inigo Quilez's tetrahedron), the material there
-      const h = Math.max(1e-4, e * 0.6), a = d(p[0] + h, p[1] - h, p[2] - h), b = d(p[0] - h, p[1] - h, p[2] + h), cc = d(p[0] - h, p[1] + h, p[2] - h), dd = d(p[0] + h, p[1] + h, p[2] + h);
-      const n = unit([a - b - cc + dd, -a - b + cc + dd, -a + b - cc + dd]), v = C.mp(p[0], p[1], p[2], n[0], n[1], n[2]);
-      return { n, m: (v % 1024) - 1, part: C.parts.length ? Math.floor(v / 1024) - 1 : -1 };
+    shade: (p, e) => at(p, normal(p, e), C.mp),
+    // (the same steps as shade's, the field's kept: the normal as computed, W as the tracking pass left it)
+    own: {
+      slots: S,
+      field: (p, e, nk, wk, i) => { const n = normal(p, e); nk[3 * i] = n[0]; nk[3 * i + 1] = n[1]; nk[3 * i + 2] = n[2]; if (R) { R.track(p[0], p[1], p[2]); wk.set(R.W, i * S); } return n; },
+      again: (nk, wk, i) => { if (R) R.W.set(wk.subarray(i * S, i * S + S)); return [nk[3 * i], nk[3 * i + 1], nk[3 * i + 2]]; },
+      paint: (p, n) => at(p, n, R ? R.raw : C.mp),
     },
     lift: (e) => 2 * e,
     // creases: how much nearer the field comes than the open air along the normal, a few steps out
@@ -504,10 +522,14 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
     ar = a; at0 = Math.max(s[0], persp ? 0.05 : -Infinity); at1 = s[1]; ae = near(Math.max(s[0], 0.05));
     return true;
   };
-  // what the march found, kept under the field's key and these rays (kept): read back, or kept once marched
+  // what the march found, kept under the field's key and these rays (kept): read back, or kept once made
   // (each cell aimed once: its ray, and its nine numbers in `rays`, the trace's key; the hits read back, or all
-  // marched here, timed as one, and kept: the cells below then take theirs in order, shading as they did)
+  // marched here, timed as one: the cells below then take theirs in order, shading as they did)
   let hits: Float64Array | undefined, cells: (typeof ar | undefined)[] | undefined, rays: Float64Array | undefined, ri = 0;
+  // (and with them, at each hit in order, what of its shade is the field's alone (T.own): its normal and the joins'
+  // choices, read back (kn, kw), or worked out as shade() does, timed, and kept with the hits after the cells below)
+  let kn: Float64Array | undefined, kw: Slots | undefined, keepHits: (() => void) | undefined, hi = 0, ownMs = 0;
+  const hitsIn = (t: Float64Array) => { let h = 0; for (let i = 0; i < t.length; i++) if (!(t[i] < 0)) h++; return h; };
   // (a pure function's data as it was given: then the march is what a fresh one would be, and leaves it so; one
   // that wrote into it, here or between traces, is an error, nothing kept)
   const intact = () => { const bad = T.intact?.(); if (bad) throw new PxError(`${who}: ${bad}`); };
@@ -527,8 +549,10 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
     const mine = all.slice(0, n), k = key ? kept.trace!(key, mine) : undefined;
     if (k || many) {
       if (k) intact();
-      cells = rs; rays = mine; hits = k?.t?.length === n / 9 ? k.t : undefined;
-      if (hits) w0 = 0;
+      cells = rs; rays = mine;
+      // (read back only whole: a hit's three numbers and its joins' choices for each hit, or all of it made again)
+      const S = T.own!.slots, H = k?.t?.length === n / 9 ? hitsIn(k.t) : -1;
+      if (H >= 0 && k!.n?.length === 3 * H && k!.w?.length === S * H) { hits = k!.t; kn = k!.n; kw = k!.w; w0 = 0; }
       else {
         const m0 = performance.now(), s = many ? spread.march!(T.pure!, mine) : undefined;
         let ms = s?.ms ?? 0;
@@ -538,7 +562,12 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
           for (let i = 0, j = 0; i < rs.length; i++) { const a = rs[i]; if (a) { t[j] = T.hit(a.o, a.d, mine[9 * j + 6], mine[9 * j + 7], mine[9 * j + 8]); j++; } }
           ms = performance.now() - m0;
         }
-        if (k) { intact(); k.put(hits, ms); }
+        if (k) {
+          intact();
+          const H = hitsIn(hits), tk = hits, nk = new Float64Array(3 * H), wk = new Int32Array(S * H);
+          kn = nk; kw = wk;
+          keepHits = () => { if (hi === H) { intact(); k.put(tk, ms + ownMs, nk, wk); } };
+        }
       }
     }
   }
@@ -558,7 +587,11 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       // drawn already nearer the eye (mesh()'s depth): there, but hidden
       if (vis) { const q = c.index(cx - K / 2, cy - K / 2); if (q >= 0 && vis[q] < depth[i]) hidden[i] = 1; }
       // the normal, the material there, the light
-      const { n, m: mi, part } = T.shade(p, e), k = mi < 0 ? drawn(0) : matIndex(mi);
+      let s: ReturnType<Tracer["shade"]>;
+      if (!kn) s = T.shade(p, e);
+      else if (keepHits) { const m0 = performance.now(), nn = T.own!.field(p, e, kn, kw as Int32Array, hi++); ownMs += performance.now() - m0; s = T.own!.paint(p, nn); }
+      else s = T.own!.paint(p, T.own!.again(kn, kw!, hi++));
+      const { n, m: mi, part } = s, k = mi < 0 ? drawn(0) : matIndex(mi);
       pt[i] = part ?? -1;
       nrm[i * 3] = n[0]; nrm[i * 3 + 1] = n[1]; nrm[i * 3 + 2] = n[2];
       m[i] = k;
@@ -579,6 +612,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       }
       tone[i] = Math.max(0, Math.min(ramp.length - 1, Math.round(lv * (ramp.length - 1))));
     }
+  keepHits?.();
   if (left) left(`${c.owner?.name ?? "?"}${o.part ? `, part ${o.part}` : ""}`, T.impure!, marched);
   if (w0) spread.timed!(T.pure!, N, performance.now() - w0);
   // tones in clusters: a cell whose tone none of its four neighbours of the same material share takes
