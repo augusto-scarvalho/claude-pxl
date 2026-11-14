@@ -640,13 +640,17 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   their figures still fail on the head turned between the views and the crown (hero32's attack_e about 3%, attack_n
   4%; hero's attack_e 2.0% since F5l's crown, on the line). Line those, then rig3d keeping the figure's pixels before
   its hooks (as it keeps their box for the height check) for the ink check to read, and the category on the attack
-  rigs. The chibi (`chibi_*`) unread too (idle_e 2.6%: its nose, a px of hair at the nape, the chin; run_e 2.9%: the
-  nose and 2 px of the throat).
+  rigs (the chibi's attack too).
   Done (F5l): the 16 px hero's walking moves, which failed in profile (idle_e 3.4%, walk_e and run_e 5%): the crown's
   back px in the line (his profile head's STRANDS.w), the throat by a draw hook on character()'s walking rigs as
   hero_side's (the line under the chin where it lies on nothing: a px walking and running in profile; the villager's
   and Reva's walk too); the nose's lit px kept out of the line (1.7% of the edge in profile, under the 2%);
   `category: "character"` on his walking rig (character()'s `category`), read and passing.
+  Done (F5m): the chibi's walking moves (`chibi_*`), which failed in profile (idle_e 2.6%, walk_e 1.6%, run_e 2.9%):
+  the line under its head where it lies on nothing by a draw hook on its walking rig (figure()'s `under`, the chin's
+  and the hair's dark: the chin's corner in each move, running 2 px of its front, at rest the nape's last px; 37 px
+  over the frames, none facing us or away); the nose's lit px kept out of the line (0.9% of the edge in profile);
+  `category: "character"` on its walking rig, read and passing.
 - [ ] **How light a line may go**: an `"own"` line was taken as light as the check allows, capped by hand at L 0.5 so
   it reads on the grass. The genre's ink a floor against its ground, and `--readings` saying each line's room.
 - [ ] **A decal at some headings**: a builder's decal is drawn at every heading turnaround() draws (the roof's number
