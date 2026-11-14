@@ -196,6 +196,7 @@ sprite("quick", "7")`);
   const out = lines.join("\n");
   assert.match(out, /profile: .* in all; slowest assets: busy/);
   assert.match(out, /slow +a\.px\.js:2/);
+  assert.doesNotMatch(out, /pure functions/);
 });
 
 test("cli build --profile names a traced field a plain closure keeps from being kept, not a pure one; without it no march is timed", async () => {
@@ -204,7 +205,10 @@ ramps("kabc")
 const R = 3, slow = (x, y, z) => { let s = 0; for (let i = 0; i < 300; i++) s += Math.sin(i) * 1e-12; return Math.hypot(x, y, z - R) - R + s }
 const d = pure({ R, SALT: ${Math.random()} }, (x, y, z) => { let s = 0; for (let i = 0; i < 300; i++) s += Math.sin(i) * 1e-12; return Math.hypot(x, y, z - R) - R + s })
 sprite("closure", { w: 48, h: 48 }, surface(sdf.field(slow, [-R, -R, 0], [R, R, 2 * R]).part("orb"), { ppm: 6 }))
-sprite("pured", { w: 48, h: 48 }, surface(sdf.field(d, [-R, -R, 0], [R, R, 2 * R]), { ppm: 6 }))`).file;
+sprite("pured", { w: 48, h: 48 }, surface(sdf.field(d, [-R, -R, 0], [R, R, 2 * R]), { ppm: 6 }))
+const tone = (p, n) => { let s = 0; for (let i = 0; i < 2000; i++) s += Math.sin(i) * 1e-12; return n[2] + s > 0.5 ? "c" : undefined }
+sprite("painted", { w: 48, h: 48 }, surface(sdf.field(d, [-R, -R, 0], [R, R, 2 * R]).paint(tone), { ppm: 6 }))
+sprite("purely", { w: 48, h: 48 }, surface(sdf.field(d, [-R, -R, 0], [R, R, 2 * R]).paint(pure({}, tone)), { ppm: 6 }))`).file;
   // (surface.ts's hook, set by --profile alone and unset after)
   let left: unknown, sets = 0;
   Object.defineProperty(kept, "left", { configurable: true, enumerable: true, get: () => left, set: (v) => { sets++; left = v; } });
@@ -219,7 +223,14 @@ sprite("pured", { w: 48, h: 48 }, surface(sdf.field(d, [-R, -R, 0], [R, R, 2 * R
   const out = lines.join("\n").split("traced again at every build")[1] ?? "";
   assert.match(out, /^, not kept: .*\n +[\d.]+ m?s +1 trace +closure\n +sdf\.field \(part orb\): a\.px\.js:3 \(x, y, z\) => \{ let s/);
   assert.match(out, /pxl help pure/);
-  assert.doesNotMatch(out, /pured/);
+  assert.doesNotMatch(out.split("painted again")[0], /pured|painted/);
+  // (a pure field painted by a plain closure: its trace kept, its paint named; the same paint pure, not)
+  const paint = out.split("painted again at every build")[1] ?? "";
+  assert.match(paint, /^, its trace kept: .*\n +[\d.]+ m?s +1 trace +painted\n +a paint function: a\.px\.js:\d+ \(p, n\) => \{ let s/);
+  assert.match(paint, /what it paints is kept on disk: pxl help pure/);
+  assert.doesNotMatch(paint, /purely/);
+  // (what making pure functions took, and the draws whose paint was under the store's floor: nothing of theirs kept)
+  assert.match(lines.join("\n"), /\npure functions: \d+ made, \d+ given back made already \(the same source and data\), [\d.]+ s in all; their paint read back at 0 draws, 0\.0 s of painting saved; \d+ draws? painted under 10 ms, nothing of theirs kept/);
 });
 
 test("cli build writes sprites, previews, layered exports and sheets", async () => {

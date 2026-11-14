@@ -85,7 +85,8 @@ const fileOf = (key: string) => join(DIR, sha1(key));
 // What a trace's march finds (surface.ts's kept), beside the builds: under pxl's sources and Node's, the field's key
 // and the rays asked, whatever file asks it and whatever else that file holds. Each ray's hit (8 bytes), and at each
 // hit its normal (24: the numbers as computed) and which child each of the field's joins took there (a byte each while
-// they have fewer than 256 children), deflated.
+// they have fewer than 256 children), deflated. Beside it, when the field's paint functions are pure, what the paint
+// gave at each hit (a material and a part as one number, two bytes) under its looks too (sdf.ts's Compiled.looks).
 /** The entry's key for a field's key and its rays (undefined: turned off, or pxl changed since it started). */
 export const traceKey = (field: string, rays: Float64Array) =>
   process.env.PXL_CACHE === "0" || !pxlSources() ? undefined : `trace\0${src}\0${sha1(field)}\0${sha1(new Uint8Array(rays.buffer))}`;
@@ -95,11 +96,25 @@ kept.trace = (field, rays) => {
   if (!key) return undefined;
   const o = get(key)?.out as { t?: unknown; n?: unknown; w?: unknown } | undefined, w = o?.w;
   return {
-    t: o?.t instanceof Float64Array ? o.t : undefined, n: o?.n instanceof Float64Array ? o.n : undefined,
-    w: w instanceof Uint8Array || w instanceof Uint16Array || w instanceof Int32Array ? w : undefined,
+    t: o?.t instanceof Float64Array ? o.t : undefined, n: o?.n instanceof Float64Array ? o.n : undefined, w: slots(w),
     put: (t, ms, n, w) => { if (ms >= DISK_MS) put(key, { t, n, w: w && narrow(w) } as unknown as BuildOut, { needs: {}, fx: [] }, ms); },
+    // (what the paint gave at those hits, beside it: under the paint's looks too, so an edit to a paint function paints
+    // again over the hits read back)
+    paint: (looks) => {
+      const pk = `${key}\0paint\0${sha1(looks)}`, e = get(pk), p = e?.out as { v?: unknown; names?: unknown; base?: unknown } | undefined;
+      const names = Array.isArray(p?.names) && p.names.every((s) => typeof s === "string") ? (p.names as string[]) : undefined;
+      const v = names && typeof p?.base === "number" ? slots(p.v) : undefined;
+      if (v) { paintSaid.back++; paintSaid.saved += e?.ms ?? 0; }
+      return {
+        v, names: names ?? [], base: typeof p?.base === "number" ? p.base : -1,
+        put: (v, names, base, ms) => { if (ms >= DISK_MS) put(pk, { v: narrow(v), names, base } as unknown as BuildOut, { needs: {}, fx: [] }, ms); else { paintSaid.under++; paintSaid.underMs += ms; } },
+      };
+    },
   };
 };
+const slots = (w: unknown) => (w instanceof Uint8Array || w instanceof Uint16Array || w instanceof Int32Array ? w : undefined);
+/** What the traces' paint did in this thread (pxl build --profile tells it): read back (and the ms making it had taken), made under DISK_MS (nothing kept). */
+export const paintSaid = { back: 0, saved: 0, under: 0, underMs: 0 };
 /** The same numbers in the fewest bytes a number. */
 const narrow = (w: Int32Array) => {
   let lo = 0, hi = 0;

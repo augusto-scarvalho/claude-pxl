@@ -3,7 +3,9 @@
 // (any other name is an error that says what to do); the same field asked from two files, or from one before and after
 // an unrelated edit, marches once; a change to its source, its data, the view, the size or a ray's step marches again;
 // a field of a plain closure is never kept; a broken entry is marched again; the store off gives the same pixels; the
-// normals and the joins' choices kept with the hits paint as made, by the paint functions of the file that reads them.
+// normals and the joins' choices kept with the hits paint as made, by the paint functions of the file that reads them;
+// what pure paint functions give at the hits is kept beside them, under their keys too, and read back as made; pure()
+// asked again with the same source and data gives back the function it made.
 import assert from "node:assert/strict";
 import { mkdtempSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,15 +19,19 @@ const test = whenChanged("test/trace.test.ts");
 const text = (v: unknown) => { const bufs: ArrayBufferView[] = []; return JSON.stringify(encode(v, bufs)) + bufs.map((b) => Buffer.from(b.buffer).toString("base64")).join(); };
 
 // every trace kept, as if each took long; what each asked counted (read: its hits, normals and joins' choices read
-// back whole), the entries it wrote and what the last one held
-const real = kept.trace!, n = { asked: 0, marched: 0, read: 0 }, files: string[] = [];
+// back whole; painted: its paint's answers asked and made, back: read back; kept: made and kept), the entries it wrote
+// and what the last one held
+const real = kept.trace!, n = { asked: 0, marched: 0, read: 0, painted: 0, back: 0, kept: 0 }, files: string[] = [];
 let last: { key: string; rays: Float64Array; t: Float64Array; n?: Float64Array; w?: Int32Array } | undefined;
 kept.trace = (k, r) => {
   const o = real(k, r);
   if (!o) return o;
   n.asked++;
   if (o.t && o.n && o.w) n.read++; else n.marched++;
-  return { ...o, put: (t, _ms, nn, w) => { o.put(t, 1e6, nn, w); files.push(join(DIR, sha1(traceKey(k, r)!))); last = { key: k, rays: r, t, n: nn, w }; } };
+  return {
+    ...o, put: (t, _ms, nn, w) => { o.put(t, 1e6, nn, w); files.push(join(DIR, sha1(traceKey(k, r)!))); last = { key: k, rays: r, t, n: nn, w }; },
+    paint: (looks) => { const P = o.paint!(looks); if (P.v) n.back++; else n.painted++; return { ...P, put: (v, names, base) => { n.kept++; P.put(v, names, base, 1e6); } }; },
+  };
 };
 const dir = mkdtempSync(join(tmpdir(), "pxl-trace-")), salt = Math.random();
 // a ball given by its distance, pure; `body` the function's source, `opts` surface()'s, `more` the rest of the file
@@ -41,7 +47,7 @@ const ball = (name: string, src: string) => {
   const p = loadProject(join(dir, name)), was = { ...n };
   p.disk = undefined;
   const out = text(p.build("ball"));
-  return { out, marched: n.marched - was.marched, read: n.read - was.read, asked: n.asked - was.asked };
+  return { out, marched: n.marched - was.marched, read: n.read - was.read, asked: n.asked - was.asked, painted: n.painted - was.painted, back: n.back - was.back, kept: n.kept - was.kept };
 };
 
 test("a pure function reads its arguments, Math and its data alone: another name says what to do", () => {
@@ -70,6 +76,9 @@ test("a pure function reads its arguments, Math and its data alone: another name
   }
   assert.throws(() => loadSource(`pure({}, () => import("node:fs"))`), /the word 'import' is in it/);
   loadSource(`const d = pure({}, () => new Error("x").stack)\nsprite("s", { w: 2, h: 2 }, (c) => { if (d() !== "Error: x") throw new Error("a stack") })`).build("s");
+  // sdf.fbm there, a number of its arguments alone, as outside; what it throws the scope's own
+  loadSource(`const d = pure({}, (x) => sdf.fbm(x, 1.5, 2, 7, 2) + sdf.fbm(x, 0, 1))\nsprite("s", { w: 2, h: 2 }, (c) => { if (d(0.3) !== sdf.fbm(0.3, 1.5, 2, 7, 2) + sdf.fbm(0.3, 0, 1)) throw new Error("fbm") })`).build("s");
+  assert.throws(() => loadSource(`const d = pure({}, () => { try { return sdf.fbm(1n, 0, 0) } catch (e) { return typeof e.constructor.constructor('return process')() } })\nsprite("s", { w: 2, h: 2 }, (c) => { d() })`).build("s"), /Code generation from strings/);
 });
 
 test("the same field marches once, whatever file asks it and whatever else that file holds", () => {
@@ -156,4 +165,68 @@ test("a field of a plain closure is never kept; a broken entry is marched again"
   assert.deepEqual([again.marched, again.read], [1, 0]);
   assert.equal(again.out, one.out);
   assert.equal(ball("e.px.js", art({ R: 2.5 })).read, 1);
+});
+
+// (its paint a pure function of its data: what it gives at each hit kept beside the trace, under the function's key)
+const P1 = "pure({ L: 0.4 }, (p, n) => (n[0] > L ? \"c\" : undefined))";
+test("what a pure paint function gives is read back as made; an edit to it or its data paints again over the hits read back", () => {
+  const a = ball("p.px.js", joined(P1));
+  assert.deepEqual([a.asked, a.painted, a.kept, a.back], [1, 1, 1, 0]);
+  const b = ball("p.px.js", joined(P1, "// an edit"));
+  assert.deepEqual([b.read, b.back, b.kept], [1, 1, 0]);
+  assert.equal(b.out, a.out);
+  assert.equal(cold("p.px.js", joined(P1)), a.out);
+  for (const P of [P1.replace("L ?", "L + 0.3 ?"), P1.replace("L: 0.4", "L: 0.1")]) {
+    const c = ball("p.px.js", joined(P));
+    assert.deepEqual([c.read, c.back, c.painted], [1, 0, 1], P);
+    assert.notEqual(c.out, a.out, P);
+    assert.equal(c.out, cold("p.px.js", joined(P)), P);
+  }
+});
+
+test("the light, the palette, an option: the paint read back, the rest made as a first build makes it; another draw read back whole", () => {
+  const two = (src: string) => src + `
+sprite("cap", { w: 24, h: 24 }, surface(sdf.field(d, [-R, -R, 0], [R, R, 2 * R]).paint(pure({}, (p) => (p[2] > 4 ? "c" : "a"))), { ppm: 2, mats: { a: "kab", c: "bcd" } }))`;
+  const a = ball("q.px.js", two(joined(P1)));
+  for (const edit of [(s: string) => s.replace("{ ppm: 3, mats", "{ ppm: 3, light: [1, 0, 1], mats"), (s: string) => s.replace('c: "#c0c0c0"', 'c: "#c8c0b0"'), (s: string) => s.replace("{ ppm: 3, mats", "{ ppm: 3, rim: false, mats")]) {
+    const src = two(edit(joined(P1))), b = ball("q.px.js", src);
+    assert.deepEqual([b.marched, b.back, b.painted], [0, 1, 0], edit.toString());
+    assert.notEqual(b.out, a.out, edit.toString());
+    assert.equal(b.out, cold("q.px.js", src), edit.toString());
+  }
+  // (both sprites built, then the first's paint function edited: only it paints again, the other read back)
+  const both = (src: string) => { writeFileSync(join(dir, "q.px.js"), src); const q = loadProject(join(dir, "q.px.js")), was = { ...n }; q.disk = undefined; q.build("cap"); q.build("ball"); return [n.back - was.back, n.painted - was.painted]; };
+  both(two(joined(P1)));
+  assert.deepEqual(both(two(joined(P1.replace("0.4", "0.5")))), [1, 1]);
+});
+
+test("a paint function that isn't pure keeps nothing; one that changes its data is an error at its trace; an error read back is the one made", () => {
+  const plain = ball("r.px.js", joined("(p, n) => (n[0] > 0.4 ? \"c\" : undefined)"));
+  assert.deepEqual([plain.marched + plain.read, plain.painted, plain.back], [1, 0, 0]);
+  const was = n.kept, w = loadSource(joined("pure({ T: [1] }, (p, n) => { T[0] = p[0]; return undefined })"), `w${Math.random()}.px.js`);
+  assert.throws(() => w.build("ball"), /changed its data's 'T'/);
+  assert.equal(n.kept, was);
+  // (its answers kept, then the material it names taken out of mats: the same error, at the same place, read back)
+  const G = P1.replace('"c"', '"glow"');
+  ball("s.px.js", joined(G).replace('c: "bcd"', 'glow: "bcd"'));
+  const src = joined(G).replace(', c: "bcd"', ""), err = (f: () => unknown) => { try { f(); } catch (e) { return (e as Error).message; } return "none"; };
+  const back = n.back, e1 = err(() => ball("s.px.js", src));
+  assert.equal(n.back, back + 1);
+  assert.match(e1, /material 'glow' is not in mats/);
+  assert.equal(err(() => cold("s.px.js", src)), e1);
+});
+
+// (pure() asked again with the same source and data gives back the function it made: the very functions and fields in its
+// data, its arrays as they were put there; else, or with a field in it that isn't pure, a new one)
+test("pure() gives back the function it made for the same source and data, not for other data nor a field that isn't pure; one whose array was written is refused at its trace", () => {
+  loadSource(`const id = pure({}, (v) => v), mk = (L, T) => pure({ L, T }, (x) => T(x) + L[0])
+const a = mk([0.4, 1], id), b = mk([0.4, 1], pure({}, (v) => v)), c = mk([0.4, 2], id), e = mk([0.4, 1], pure({ k: 9 }, (v) => v))
+const g = sdf.sphere(1), on = (f) => pure({ f }, (p) => f.dist(p)), h = sdf.field((x, y, z) => Math.hypot(x, y, z) - 1, [-1, -1, -1], [1, 1, 1])
+const ok = [a === b, a !== c, a !== e, a(1) === 1.4, c(1) === 1.4, on(g) === on(g), on(g) !== on(sdf.sphere(1)), on(h) !== on(h), on(h)([0, 0, 2]) === 1]
+sprite("s", { w: 2, h: 2 }, (c) => { if (ok.some((v) => !v)) throw new Error(\`shared wrong: \${ok}\`) })`).build("s");
+  // (a paint function that hands out its array, written there: not given back again; the one written, at its trace, refused)
+  const W = "pure({ T: [0.4], SALT: " + salt + " }, (p, n) => (p === \"T\" ? T : n[0] > T[0] ? \"c\" : undefined))";
+  const broke = `(() => { const w1 = ${W}, w2 = ${W}; if (w1 !== w2) throw new Error("not given back"); w1("T")[0] = 0.9; if (${W} === w1) throw new Error("given back written"); return w2 })()`;
+  assert.throws(() => ball("x.px.js", joined(broke)), /changed its data's 'T'/);
+  assert.equal(ball("y.px.js", joined(W)).out, cold("y.px.js", joined(W)));
 });

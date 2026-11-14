@@ -200,7 +200,7 @@ interface Tracer {
   /** what hit() reads besides its rays, when that is all it reads (a pure field's key and its stretch): what it finds kept by it */
   key?: string;
   /** with a key: undefined while the pure functions it calls hold their data as given (their only state), else what changed */
-  intact?: () => string | undefined;
+  intact?: (seen?: Set<unknown>) => string | undefined;
   /** a field that has no key, a function in it not pure (sdf.ts's notPure): for kept.left */
   impure?: Sdf;
   /** a pure field, compiled, and its march's stretch: what another thread marches it by (spread) */
@@ -208,9 +208,14 @@ interface Tracer {
   /**
    * a pure field's shade in two, kept with its hits (what is the field's alone, then the paint): `field` the normal into
    * n and which child each of its `slots` joins takes there into w, at the i-th hit; `again` those read back; `paint`
-   * the material and part there, read down the joins' last choices (the art's paint functions)
+   * the material and part there as one number, read down the joins' last choices (the art's paint functions), `shade`
+   * the normal with it; `looks` what else that reads, when its paint functions are pure (sdf.ts's Compiled.looks); `of`
+   * the field
    */
-  own?: { slots: number; field(p: V3, e: number, n: Float64Array, w: Int32Array, i: number): V3; again(n: Float64Array, w: Slots, i: number): V3; paint(p: V3, n: V3): { n: V3; m: number; part?: number } };
+  own?: {
+    slots: number; field(p: V3, e: number, n: Float64Array, w: Int32Array, i: number): V3; again(n: Float64Array, w: Slots, i: number): V3;
+    paint(p: V3, n: V3): number; shade(n: V3, v: number): { n: V3; m: number; part?: number }; looks(): Compiled["looks"]; of: Sdf;
+  };
 }
 /** which child each join of a field took at its hits, as kept (narrowed to the bytes it needs: the same numbers) */
 export type Slots = Uint8Array | Uint16Array | Int32Array;
@@ -221,13 +226,22 @@ export type Slots = Uint8Array | Uint16Array | Int32Array;
  * and at each hit in order its normal (`n`, three numbers) and which child each join took there (`w`, Tracer's own),
  * and where to keep them once made. hit(), the normal's taps and the joins' choices read nothing else (the field's
  * code and numbers, the rays), so the same field through the same rays finds the same.
+ * `paint(looks)` beside it: what the paint gave at each hit in order (`v`, Tracer's own.paint), the names of materials
+ * it gave that the field didn't have (`names`, after its `base` many), and where to keep them once made, under the
+ * trace's key and Compiled.looks: the paint reads nothing else (its point and normal, the joins' choices there, its
+ * functions' source and data, the field's code and numbers).
  * `on()` false: nothing is kept now, and a trace builds neither its key nor its rays. `left`, set only while pxl build
  * --profile runs (src/node/profile.ts): told of each trace of a field that can't be kept, a function in it not pure,
- * who drew it and how long its rays marched (each timed then; without it the march is as it was).
+ * who drew it and how long its rays marched (each timed then; without it the march is as it was); `paint` true: a
+ * trace kept whose paint can't be, a paint function not pure, and how long it painted.
  */
 export const kept: {
-  on?: () => boolean; trace?: (key: string, rays: Float64Array) => { t?: Float64Array; n?: Float64Array; w?: Slots; put(t: Float64Array, ms: number, n?: Float64Array, w?: Int32Array): void } | undefined;
-  left?: (who: string, field: Sdf, ms: number) => void;
+  on?: () => boolean;
+  trace?: (key: string, rays: Float64Array) => {
+    t?: Float64Array; n?: Float64Array; w?: Slots; put(t: Float64Array, ms: number, n?: Float64Array, w?: Int32Array): void;
+    paint?(looks: string): { v?: Slots; names: string[]; base: number; put(v: Int32Array, names: string[], base: number, ms: number): void };
+  } | undefined;
+  left?: (who: string, field: Sdf, ms: number, paint?: boolean) => void;
 } = {};
 
 /**
@@ -263,7 +277,8 @@ function fieldTracer(C: Compiled, f: Sdf): Tracer {
     const h = Math.max(1e-4, e * 0.6), a = d(p[0] + h, p[1] - h, p[2] - h), b = d(p[0] - h, p[1] - h, p[2] + h), cc = d(p[0] - h, p[1] + h, p[2] - h), dd = d(p[0] + h, p[1] + h, p[2] + h);
     return unit([a - b - cc + dd, -a - b + cc + dd, -a + b - cc + dd]);
   };
-  const at = (p: V3, n: V3, mp: Compiled["mp"]) => { const v = mp(p[0], p[1], p[2], n[0], n[1], n[2]); return { n, m: (v % 1024) - 1, part: C.parts.length ? Math.floor(v / 1024) - 1 : -1 }; };
+  const split = (n: V3, v: number) => ({ n, m: (v % 1024) - 1, part: C.parts.length ? Math.floor(v / 1024) - 1 : -1 });
+  const at = (p: V3, n: V3, mp: Compiled["mp"]) => split(n, mp(p[0], p[1], p[2], n[0], n[1], n[2]));
   return {
     lo: C.lo, hi: C.hi, names: C.mats, parts: C.parts, get key() { return C.pure ? `${C.key}|${lip}` : undefined; }, intact: C.intact, impure: C.pure ? undefined : f,
     pure: C.pure ? { C, lip } : undefined,
@@ -274,7 +289,8 @@ function fieldTracer(C: Compiled, f: Sdf): Tracer {
       slots: S,
       field: (p, e, nk, wk, i) => { const n = normal(p, e); nk[3 * i] = n[0]; nk[3 * i + 1] = n[1]; nk[3 * i + 2] = n[2]; if (R) { R.track(p[0], p[1], p[2]); wk.set(R.W, i * S); } return n; },
       again: (nk, wk, i) => { if (R) R.W.set(wk.subarray(i * S, i * S + S)); return [nk[3 * i], nk[3 * i + 1], nk[3 * i + 2]]; },
-      paint: (p, n) => at(p, n, R ? R.raw : C.mp),
+      paint: (p, n) => (R ? R.raw : C.mp)(p[0], p[1], p[2], n[0], n[1], n[2]),
+      shade: split, looks: () => C.looks, of: f,
     },
     lift: (e) => 2 * e,
     // creases: how much nearer the field comes than the open air along the normal, a few steps out
@@ -537,7 +553,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   // (a pure field's trace big enough, where more threads march faster (spread): its rays aimed first, as for the store,
   // and marched there, or here when they can't be; each such trace timed while the number is measured)
   const big = !!T.pure && N >= SPREAD_MIN, th = big ? spread.threads?.() ?? 1 : 1, many = th > 1;
-  let w0 = big && spread.timed ? performance.now() : 0;
+  let w0 = big && spread.timed ? performance.now() : 0, k: ReturnType<NonNullable<typeof kept.trace>> = undefined;
   if (key || many) {
     const all = new Float64Array(GW * GH * 9), rs: typeof cells = new Array(GW * GH);
     let n = 0;
@@ -546,7 +562,8 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       all.set(ar!.o, n); all.set(ar!.d, n + 3); all[n + 6] = at0; all[n + 7] = at1; all[n + 8] = ae;
       n += 9;
     }
-    const mine = all.slice(0, n), k = key ? kept.trace!(key, mine) : undefined;
+    const mine = all.slice(0, n);
+    k = key ? kept.trace!(key, mine) : undefined;
     if (k || many) {
       if (k) intact();
       cells = rs; rays = mine;
@@ -564,13 +581,27 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
         }
         if (k) {
           intact();
-          const H = hitsIn(hits), tk = hits, nk = new Float64Array(3 * H), wk = new Int32Array(S * H);
+          const H = hitsIn(hits), tk = hits, nk = new Float64Array(3 * H), wk = new Int32Array(S * H), kk = k;
           kn = nk; kw = wk;
-          keepHits = () => { if (hi === H) { intact(); k.put(tk, ms + ownMs, nk, wk); } };
+          keepHits = () => { if (hi === H) { intact(); kk.put(tk, ms + ownMs, nk, wk); } };
         }
       }
     }
   }
+  // (and at each hit what the paint gives, the material and the part as one number, under the trace's key and the
+  // field's looks, when its paint functions are pure: read back whole (the names it gave that the field hadn't joining
+  // its materials, as giving them did), or made, each timed, and kept after the cells below; their data as given before
+  // and after. A pure field painted by a function that isn't: timed and told under --profile, kept.left)
+  const looks = k?.paint && kn ? T.own!.looks() : undefined, base = T.names.length;
+  let pv: Slots | undefined, pk: Int32Array | undefined, keepPaint: (() => void) | undefined, paintMs = 0;
+  const painted = () => { const bad = looks!.intact(); if (bad) throw new PxError(`${who}: ${bad}`); };
+  if (looks) {
+    painted();
+    const P = k!.paint!(looks.key), H = kn!.length / 3;
+    if (P.v?.length === H && P.base === base) { pv = P.v; T.names.push(...P.names); }
+    else { const v = (pk = new Int32Array(H)); keepPaint = () => { if (hi === H) { painted(); P.put(v, T.names.slice(base), base, paintMs); } }; }
+  }
+  const timePaint = !!pk || (!!k?.paint && !!kn && !looks && !!kept.left);
   // (pxl build --profile, kept.left: a field that can't be kept, each ray's march timed and told; else T.hit itself)
   const left = T.impure && kept.left;
   let marched = 0;
@@ -589,8 +620,16 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       // the normal, the material there, the light
       let s: ReturnType<Tracer["shade"]>;
       if (!kn) s = T.shade(p, e);
-      else if (keepHits) { const m0 = performance.now(), nn = T.own!.field(p, e, kn, kw as Int32Array, hi++); ownMs += performance.now() - m0; s = T.own!.paint(p, nn); }
-      else s = T.own!.paint(p, T.own!.again(kn, kw!, hi++));
+      else {
+        let nn: V3, v: number;
+        if (keepHits) { const m0 = performance.now(); nn = T.own!.field(p, e, kn, kw as Int32Array, hi); ownMs += performance.now() - m0; }
+        else nn = pv ? [kn[3 * hi], kn[3 * hi + 1], kn[3 * hi + 2]] : T.own!.again(kn, kw!, hi);
+        if (pv) v = pv[hi];
+        else if (timePaint) { const m0 = performance.now(); v = T.own!.paint(p, nn); paintMs += performance.now() - m0; if (pk) pk[hi] = v; }
+        else v = T.own!.paint(p, nn);
+        hi++;
+        s = T.own!.shade(nn, v);
+      }
       const { n, m: mi, part } = s, k = mi < 0 ? drawn(0) : matIndex(mi);
       pt[i] = part ?? -1;
       nrm[i * 3] = n[0]; nrm[i * 3 + 1] = n[1]; nrm[i * 3 + 2] = n[2];
@@ -613,7 +652,10 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       tone[i] = Math.max(0, Math.min(ramp.length - 1, Math.round(lv * (ramp.length - 1))));
     }
   keepHits?.();
-  if (left) left(`${c.owner?.name ?? "?"}${o.part ? `, part ${o.part}` : ""}`, T.impure!, marched);
+  keepPaint?.();
+  const by = `${c.owner?.name ?? "?"}${o.part ? `, part ${o.part}` : ""}`;
+  if (left) left(by, T.impure!, marched);
+  if (timePaint && !pk) kept.left!(by, T.own!.of, paintMs, true);
   if (w0) spread.timed!(T.pure!, N, performance.now() - w0);
   // tones in clusters: a cell whose tone none of its four neighbours of the same material share takes
   // the one most of them have (three or four)

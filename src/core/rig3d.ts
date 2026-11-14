@@ -7,7 +7,7 @@
 // face, the body orange, the right limbs light and the left dark) is how a new move is judged before
 // it is painted. gait() gives a walk's numbers by the view, views() places hand-drawn heads.
 import { PxError } from "./errors.ts";
-import { HOW, INTACT, PURE, Sdf, bare, exact, fieldOf, sdf, type V3 } from "./sdf.ts";
+import { HOW, INTACT, PURE, Sdf, bare, exact, fieldOf, onceEach, sdf, type V3 } from "./sdf.ts";
 import { figure } from "./rig.ts";
 
 /** A sweep's numbers: its base [x, y], z0, z1, the ways the body faces [x, y] and its right [x, y], its shell. */
@@ -248,7 +248,7 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
       const fns = [radius, keep, shift].map((g) => (g === undefined ? "-" : PURE.get(g))), key = fns.every((k) => k) ? `sweep(${exact(nums)};${fns.join(";")})` : undefined;
       if (key) HOW.set(d, { sweep: nums, fns: [radius, keep, shift] });
       const checks = [radius, keep, shift].flatMap((g) => (g && INTACT.get(g)) || []);
-      const field = fieldOf(d, [bx + x0 - pad, by + y0 - pad, z0 - 0.5], [bx + x1 + pad, by + y1 + pad, z1 + 0.5], 1.5, key, key ? () => { for (const c of checks) { const e = c(); if (e) return e; } return undefined; } : undefined,
+      const field = fieldOf(d, [bx + x0 - pad, by + y0 - pad, z0 - 0.5], [bx + x1 + pad, by + y1 + pad, z1 + 0.5], 1.5, key, key ? (seen) => onceEach(checks, seen) : undefined,
         key ? undefined : [radius, keep, shift].flatMap((g, i): [string, unknown][] => (fns[i] ? [] : [[`a sweep's ${["radius", "keep", "shift"][i]}`, g]])));
       return { field, paint: paintOf(paint, "a sweep"), at: key && bare.pure ? bare.pure({ z0, H, bx, by, shift, f, r }, (q: V3): [number, number, V3] => {
         const h = Math.max(0, Math.min(1, (q[2] - z0) / H)), s = shift?.(h) ?? [0, 0, 0], o: V3 = [q[0] - bx - s[0], q[1] - by - s[1], 0];

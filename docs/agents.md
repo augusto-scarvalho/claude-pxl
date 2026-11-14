@@ -562,6 +562,39 @@ marches again only the frames whose fields it changed, whatever file asks them: 
 comment went from 95 s to 49 (2026-11, the hits kept), and with the normals and choices kept too from 76 s to 37 (one
 thread, the last commit's pxl against the new one the same hour); the five fighting files' traces take 76.6 MiB on
 disk (18.5 with the hits alone; the store's budget is 512). His and Reva's trunks, sweeps and skirts are pure functions.
+Their paint functions too (`fighter.paint`, `pure()` with the helpers they call): with the march, the normals and the
+choices kept, those functions were about 14 s of his 37 s check after an edit (Reva's 4.4 of 16), so where a field's
+every paint function is pure what it gives at each hit (a material and a part, 2 bytes) is kept beside the trace, under
+the trace's key and the field's looks (sdf.ts's `Compiled.looks`: where each `mat()`, `part()` and `paint()` stands in
+it, by name, each paint function by its pure key). The paint reads nothing else, so the light, the palette and the
+drawing's options stay out of that key: an edit to them lights and lines again over the paint read back, one to a paint
+function paints again over the hits read back. A pure function asked once a pixel runs in a realm of its own, entered
+from pxl's at each pixel, and there V8 runs destructuring, spread, `for...of` and an array's methods taking a function
+several times slower (a destructured `[a, b] = q` 8×, `.some` 3×, measured on the i5-1035G1), and its helpers, being its
+data, are called, not inlined: his idle and jab (14 frames, every store off) took 6.0 s painted by closures and 6.7 to
+7.7 s by pure functions so written; with the hot ones indexed and `fighter.capD` (under `shadowed`, asked dozens of
+times a pixel) and a bone's paint worked out on numbers, the same operations in the same order, 5.1 to 5.2 s against
+5.1 (the same pixels, `hashes.ts`). With it, on the i5-1035G1 (2026-11, one thread, the last commit's pxl against the
+new one alternating): Haldor's check after an edit to a comment or to one move went from 21 to 22 s to 14 to 16; after
+an edit to one paint function from 20 to 22 s to 19 to 21 (that field is painted again in every frame).
+Each paint function is made by `pure()`: its data copied into its scope, hardened and hashed, 20 to 40 µs on the
+i5-1035G1 for one among a dozen helpers. A figure's `parts(j, p)` makes its sixty or so again every frame, and the
+fighters' is asked twice a frame (the body's rig and the near arm's): about 29,000 `pure()` calls in Reva's check,
+which cost more than reading her paint back saved (half her draws paint under the store's 10 ms floor, so they are
+painted at every build whatever is kept), and the checks of their data ran once for every way a draw reached them.
+So `pure()` asked again with the same source and data, the very same functions and fields in it and its arrays as
+given, gives back the function it made (8 to 12 µs: a new one would hold the same, so it would be that function; 64
+a source kept), and a trace's checks run each pure function's once a pass (nothing runs between them that could
+change one). Her check now makes about 7,200 and gives back 21,800; `pxl build --profile` says what making them took
+against what reading paint back saved, and what to do when it took more. A check after an edit, one
+thread, alternating runs, before step B / step B with every function made anew / with them given back: on the
+i5-1035G1 (2026-11, two or three runs each, the laptop an hour into them) Reva's 10.6 to 12.9 s / 9.4 to 14.4 / 11.8
+to 12.1, Haldor's 24.8 to 32.1 s / 14.1 to 19.9 / 18.2 to 19.2, the round's 35.9 to 37.0 s / 32.8 to 33.3 / 30.7 to
+32.4; on an i7-13700K (four runs each) Reva's 4.2 to 5.9 s / 5.0 to 5.3 / 4.4 to 7.0 (their medians 4.7 / 5.1 / 4.8;
+her CPU time 6.3 s / 7.0 / 7.0, so some of step B's cost is still paid there), Haldor's 11.9 to 13.2 s / 6.5
+to 7.7 / 6.1 to 7.3, the round's 17.5 to 18.5 s / 15.8 to 17.7 / 15.3 to 17.3. A first check, nothing kept yet, is the
+same within either machine's noise (on the i7, Reva's 13.3 to 13.9 s / 13.4 to 16.2 / 13.1 to 14.0, Haldor's 57 to
+61 s / 56 to 58 / 53 to 59).
 
 Such a field's march can also run on more threads (`src/node/threads.ts`, surface.ts's `spread`): a trace of 4096 cells
 or more hands each thread the field as data (its code, its numbers, each pure function's source and data, sdf.ts's

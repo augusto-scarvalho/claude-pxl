@@ -3,29 +3,33 @@
 // that spent the most time themselves: first those in the art files (what you can make faster:
 // a march, a sky worked out again every frame), then pxl's own; and the slowest assets. Then the traced
 // fields whose march isn't kept between builds, a function in them not pure() (surface.ts's kept.left,
-// set only while this runs: without it no march is timed), and how many threads marched (threads.ts).
+// set only while this runs: without it no march is timed), those whose march is kept and their paint not, a paint
+// function not pure, what making pure functions took against what reading their paint back saved (pure.ts's
+// pureSaid, store.ts's paintSaid: counted always, a few additions), and how many threads marched (threads.ts).
 import { readFileSync } from "node:fs";
 import { Session } from "node:inspector/promises";
 import { basename, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { notPure } from "../core/sdf.ts";
 import { kept } from "../core/surface.ts";
-import { DISK_MS } from "./store.ts";
+import { pureSaid } from "./pure.ts";
+import { DISK_MS, paintSaid } from "./store.ts";
 import { threadsSaid } from "./threads.ts";
 import { workersSaid } from "./workers.ts";
 
 interface Node { id: number; callFrame: { functionName: string; url: string; lineNumber: number } }
 interface CpuProfile { nodes: Node[]; samples: number[]; timeDeltas: number[] }
-/** A field traced again at every build: the functions in it that aren't pure, who drew it, its traces, their march (ms in all, the longest). */
-export interface Left { fns: { part: string; what: string; src: string }[]; who: string[]; n: number; ms: number; max: number }
+/** A field traced again at every build (`paint`: painted again): the functions in it that aren't pure, who drew it, its traces, their march or paint (ms in all, the longest). */
+export interface Left { fns: { part: string; what: string; src: string }[]; who: string[]; n: number; ms: number; max: number; paint?: boolean }
 
 /** Run `fn` under the CPU profiler; its result, the profile, and the fields traced that can't be kept. */
 export async function profiled<T>(fn: () => T): Promise<{ result: T; profile: CpuProfile; left: Left[] }> {
   const s = new Session(), left = new Map<string, Left>();
+  Object.assign(pureSaid, { made: 0, shared: 0, ms: 0 }); Object.assign(paintSaid, { back: 0, saved: 0, under: 0, underMs: 0 });
   // (each trace of such a field, by the functions in its way: one move's frames, or a figure's every move)
-  kept.left = (who, field, ms) => {
-    const fns = [...new Map(notPure(field).map(({ part, what, fn }) => { const f = { part, what, src: Function.prototype.toString.call(fn) }; return [JSON.stringify(f), f]; })).values()];
-    const k = JSON.stringify(fns), e = left.get(k) ?? left.set(k, { fns, who: [], n: 0, ms: 0, max: 0 }).get(k)!;
+  kept.left = (who, field, ms, paint) => {
+    const fns = [...new Map(notPure(field, "", [], paint).map(({ part, what, fn }) => { const f = { part, what, src: Function.prototype.toString.call(fn) }; return [JSON.stringify(f), f]; })).values()];
+    const k = `${paint ? "paint " : ""}${JSON.stringify(fns)}`, e = left.get(k) ?? left.set(k, { fns, who: [], n: 0, ms: 0, max: 0, paint }).get(k)!;
     if (!e.who.includes(who)) e.who.push(who);
     e.n++; e.ms += ms; e.max = Math.max(e.max, ms);
   };
@@ -74,12 +78,27 @@ export function profileReport(profile: CpuProfile, art: string[], times: [string
     ...(artRows.length ? artRows : ["  (none worth naming)"]),
     "and in pxl:",
     ...(pxlRows.length ? pxlRows : ["  (none worth naming)"]),
-    ...notKept(left, art, fmt),
+    ...notKept(left.filter((e) => !e.paint), art, fmt),
+    ...notKept(left.filter((e) => e.paint), art, fmt, true),
+    ...pureCost(),
   ].join("\n");
 }
 
-/** The fields traced again at every build, the slowest first (a handful; none whose every trace is under the store's floor, kept or not). */
-function notKept(left: Left[], art: string[], fmt: (ms: number) => string): string[] {
+/**
+ * What making pure functions took in this thread, against what reading their paint back saved (the ms its making had
+ * taken) and the draws painted under the store's floor (nothing of theirs kept): when there is paint to tell of or the
+ * making took 0.1 s; and when, on a build that read paint back, making took more than that saved, what to do.
+ */
+function pureCost(): string[] {
+  const { made, shared, ms } = pureSaid, { back, saved, under, underMs } = paintSaid, s = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
+  if (!back && !under && ms < 100) return [];
+  const out = [`pure functions: ${made} made, ${shared} given back made already (the same source and data), ${s(ms)} in all; their paint read back at ${back} draw${back === 1 ? "" : "s"}, ${s(saved)} of painting saved${under ? `; ${under} draw${under === 1 ? "" : "s"} painted under ${DISK_MS} ms, nothing of theirs kept (${s(underMs)})` : ""}`];
+  if (back && ms > saved) out.push("  making them took more than reading their paint back saved: make a pure function once, at the file's top or once a frame, not once a part (pxl help pure)");
+  return out;
+}
+
+/** The fields traced again at every build (`paint`: painted again), the slowest first (a handful; none whose every trace is under the store's floor, kept or not). */
+function notKept(left: Left[], art: string[], fmt: (ms: number) => string, paint = false): string[] {
   const rows = left.filter((e) => e.max >= DISK_MS).sort((a, b) => b.ms - a.ms);
   if (!rows.length) return [];
   // a function: where in the art files its source is, and its start
@@ -93,13 +112,13 @@ function notKept(left: Left[], art: string[], fmt: (ms: number) => string): stri
     return "";
   };
   const start = (src: string) => { const s = src.replace(/\s+/g, " "); return s.length > 44 ? `${s.slice(0, 44)}...` : s; };
-  const out = ["traced again at every build, not kept: a function in the field isn't pure (the slowest first):"];
+  const out = [paint ? "painted again at every build, its trace kept: a paint function in the field isn't pure (the slowest first):" : "traced again at every build, not kept: a function in the field isn't pure (the slowest first):"];
   for (const e of rows.slice(0, 5)) {
     out.push(`  ${fmt(e.ms)} ${String(e.n).padStart(4)} trace${e.n > 1 ? "s" : " "}  ${e.who.slice(0, 2).join(", ")}${e.who.length > 2 ? ` and ${e.who.length - 2} more` : ""}`);
     for (const f of e.fns.slice(0, 6)) out.push(`      ${f.what}${f.part ? ` (part ${f.part})` : ""}: ${where(f.src)}${start(f.src)}`);
     if (e.fns.length > 6) out.push(`      and ${e.fns.length - 6} more`);
   }
   if (rows.length > 5) out.push(`  and ${rows.length - 5} more field${rows.length > 6 ? "s" : ""}, ${fmt(rows.slice(5).reduce((s, e) => s + e.ms, 0)).trim()}`);
-  out.push("  give such a function as pure({ name: value, ... }, fn) and what its traces find is kept on disk: pxl help pure");
+  out.push(`  give such a function as pure({ name: value, ... }, fn) and what ${paint ? "it paints" : "its traces find"} is kept on disk: pxl help pure`);
   return out;
 }

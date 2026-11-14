@@ -179,9 +179,17 @@ directions walking, idle, kneeling and casting;
    meets the hips or a hem, the games' way, §7); `surface()` cleans what is drawn that small
    (`clean`, on unless `false`: a pixel sticking out cut away, no line doubled, the outline whole).
    What no primitive gives is a field of the file's own (`sdf.field`: the warden's axe head) or drawn
-   by hand after the figure (`draw`). Give a sweep's radius, `keep` and `shift` and a field's distance
-   as `pure({ ... }, fn)` (`PXL help pure`, Haldor's trunk): what their trace finds is then kept between
-   builds; a plain closure is traced again every time (`pxl build --profile` names those).
+   by hand after the figure (`draw`). Give a sweep's radius, `keep` and `shift`, a field's distance
+   and its paint functions as `pure({ ... }, fn)` (`PXL help pure`, Haldor's trunk and his paint,
+   `fighter.paint`): what their trace finds and what they paint are then kept between builds; a plain
+   closure is traced, or painted, again every time (`pxl build --profile` names those). A paint
+   function is asked once a pixel: index its arrays there rather than destructure or spread them, and
+   loop rather than `.map` or `.some` (several times slower in a pure function: `docs/agents.md`).
+   Make each where its data is: at the file's top when nothing in it changes (a fold's shape, a
+   table of tones), once a frame when it holds the frame's joints, not once a part; `pure()` asked
+   again with the same source and data gives back the one it made (a fighter's `parts(j, p)`, asked
+   by both her rigs a frame), and `pxl build --profile` says when making them cost more than
+   reading their paint back saved.
 4. **The head**, as a pixel artist paints over a 3D render: modeled (the skull, and on it the hair, a
    beard, a hat or a bandana as fields in the head's frame) and drawn once per view by
    `views(name, field, { retouch })` (five views for 8 directions, the east the west's mirror; all of

@@ -40,7 +40,7 @@ type Node =
   | { op: "paint"; of: Sdf; name: string; where: (p: V3, n: V3) => unknown }
   | { op: "paintBy"; of: Sdf; by: (p: V3, n: V3) => unknown }
   | { op: "part"; of: Sdf; name: string }
-  | { op: "fn"; d: (x: number, y: number, z: number) => number; lo: V3; hi: V3; lip: number; id: number; key?: string; intact?: () => string | undefined; why?: [string, unknown][] };
+  | { op: "fn"; d: (x: number, y: number, z: number) => number; lo: V3; hi: V3; lip: number; id: number; key?: string; intact?: (seen?: Set<unknown>) => string | undefined; why?: [string, unknown][] };
 
 /** A field compiled at one moment: its distance, its material (an index into `mats`, -1 none) and its named part (into `parts`, -1 none) at a point with its normal, its box, its stretch. */
 export interface Compiled {
@@ -60,8 +60,13 @@ export interface Compiled {
   key: string;
   /** every field given by a function in it pure (pure()): its key then names all its distance reads, and what a trace of it finds is kept under it (surface.ts) */
   pure: boolean;
-  /** undefined while every pure function in it holds its data as it was given; else what one changed (src/node/pure.ts) */
-  intact(): string | undefined;
+  /** undefined while every pure function in it holds its data as it was given; else what one changed (src/node/pure.ts; `seen` the checks run already in this pass) */
+  intact(seen?: Set<unknown>): string | undefined;
+  /**
+   * what its material reads besides its distance's key and the joins' choices, when every paint function in it is pure:
+   * its mat(), part() and paint() nodes where they stand in it, each paint function by its pure key (looksOf)
+   */
+  readonly looks: { key: string; intact(seen?: Set<unknown>): string | undefined } | undefined;
   lo: V3;
   hi: V3;
   lip: number;
@@ -300,22 +305,58 @@ export class Appearance {
  */
 let FNS = 0;
 /** (`key`: d a function of what the key names alone, its code and every value it reads: rig3d's sweep of pure functions; without one, `why` the art's functions in the way if not d, each with what it is: [[a sweep's radius, it]]) */
-export const fieldOf = (d: (x: number, y: number, z: number) => number, lo: V3, hi: V3, lip = 1, key?: string, intact?: () => string | undefined, why?: [string, unknown][]): Sdf => new Sdf({ op: "fn", d, lo, hi, lip, id: ++FNS, key, intact, why });
-/** The functions in a field that aren't pure, so a trace of it isn't kept: each one's .part() names, what it is and the function (pxl build --profile names them). */
-export function notPure(f: Sdf, at = "", out: { part: string; what: string; fn: unknown }[] = []): typeof out {
-  const n = f.node;
+export const fieldOf = (d: (x: number, y: number, z: number) => number, lo: V3, hi: V3, lip = 1, key?: string, intact?: (seen?: Set<unknown>) => string | undefined, why?: [string, unknown][]): Sdf => new Sdf({ op: "fn", d, lo, hi, lip, id: ++FNS, key, intact, why });
+/**
+ * The functions in a field that aren't pure, so a trace of it isn't kept (`paint`: its paint functions, so what they
+ * paint isn't): each one's .part() names, what it is and the function (pxl build --profile names them).
+ */
+export function notPure(f: Sdf, at = "", out: { part: string; what: string; fn: unknown }[] = [], paint = false): typeof out {
+  const n = f.node, fn = n.op === "paint" ? n.where : n.op === "paintBy" ? n.by : undefined;
+  const say = (what: string, fn: unknown) => out.push({ part: at, what: PURE.get(fn as object) === "" ? `${what} (pure, but a field in its data isn't)` : what, fn });
   if (n.op === "fn") {
-    if (n.key === undefined) for (const [what, fn] of n.why ?? [["sdf.field", n.d]]) out.push({ part: at, what: PURE.get(fn as object) === "" ? `${what} (pure, but a field in its data isn't)` : what, fn });
+    if (n.key === undefined && !paint) for (const [what, fn] of n.why ?? [["sdf.field", n.d]]) say(what, fn);
     return out;
   }
+  if (paint && fn && !PURE.get(fn)) say("a paint function", fn);
   const of = (n as { of?: Sdf | Sdf[] }).of, inner = n.op === "part" ? (at ? `${at}.${n.name}` : n.name) : at;
-  for (const s of Array.isArray(of) ? of : of ? [of] : []) notPure(s, inner, out);
+  for (const s of Array.isArray(of) ? of : of ? [of] : []) notPure(s, inner, out, paint);
   return out;
+}
+/**
+ * A field's material as its distance's key doesn't name it (Compiled.looks): each node where it stands in it, by its op
+ * and how many it joins, its mat(), part() and paint() names, each paint function by its pure key; undefined when one
+ * isn't pure (or holds a field that isn't). With the field's key (its code and every number, those the material's moves
+ * read among them) and the joins' choices at a point, it names all the material reads there.
+ */
+function looksOf(f: Sdf): Compiled["looks"] {
+  const out: string[] = [], checks: ((seen?: Set<unknown>) => string | undefined)[] = [];
+  const go = (s: Sdf): boolean => {
+    const n = s.node, fn = n.op === "paint" ? n.where : n.op === "paintBy" ? n.by : undefined;
+    const of = (n as { of?: Sdf | Sdf[] }).of, kids = Array.isArray(of) ? of : of ? [of] : [];
+    out.push(n.op, String(kids.length));
+    if (n.op === "mat" || n.op === "part" || n.op === "paint") out.push(JSON.stringify(n.name));
+    if (fn) { const k = PURE.get(fn); if (!k) return false; out.push(k); checks.push(INTACT.get(fn)!); }
+    return kids.every(go);
+  };
+  return go(f) ? { key: out.join(" "), intact: (seen = new Set()) => onceEach(checks, seen) } : undefined;
 }
 /** The pure functions (pure(), src/node/pure.ts) and each one's key: "" when its data holds a field that isn't pure. */
 export const PURE = new WeakMap<object, string>();
-/** Each pure function's check that its data's arrays (its only state) are as it was given them: undefined, or what changed. */
-export const INTACT = new WeakMap<object, () => string | undefined>();
+/** Each pure function's check that its data's arrays (its only state) are as it was given them: undefined, or what changed (`seen`: the checks run already in this pass, skipped). */
+export const INTACT = new WeakMap<object, (seen?: Set<unknown>) => string | undefined>();
+/**
+ * The checks, each run once in a pass (`seen`: one trace's question, before or after its march or its paint, asked of
+ * every pure function it reaches; nothing runs between them that could change what one finds): undefined, or what one
+ * found changed.
+ */
+export function onceEach(checks: ((seen?: Set<unknown>) => string | undefined)[], seen?: Set<unknown>): string | undefined {
+  for (const c of checks) {
+    if (seen) { if (seen.has(c)) continue; seen.add(c); }
+    const e = c(seen);
+    if (e) return e;
+  }
+  return undefined;
+}
 /** How a function a field calls is made again in another thread (src/node/threads.ts): a pure function's source, its data's names and values as its scope holds them; a sweep's numbers and functions; a field in a pure function's data (its scope's stand-in), the field. */
 export const HOW = new WeakMap<object, unknown>();
 /** pure(data, fn), set by Node (src/node/pure.ts): fn rebuilt from its source in a scope of Math and its data alone. */
@@ -801,7 +842,8 @@ function compiled(f: Sdf, clock: Clock): Compiled {
     route: tracks ? { W, track: (x, y, z) => { (track ??= tracker())(x, y, z); }, raw } : undefined,
     get key() { return `${D.src.replace(/^M\[.*\n/gm, "")}#${D.K.map((v, i) => D.FK.get(i) ?? exact([v])).join(",")}`; },
     pure: [...D.FK.values()].every((k) => k[0] !== "#"),
-    intact: () => { for (const f of D.IN) { const e = f(); if (e) return e; } return undefined; },
+    intact: (seen = new Set()) => onceEach(D.IN, seen),
+    get looks() { return looksOf(f); },
     m: (x, y, z, a, b, c) => (mp(x, y, z, a, b, c) % 1024) - 1,
     part: (x, y, z, a, b, c) => Math.floor(mp(x, y, z, a, b, c) / 1024) - 1,
   };
