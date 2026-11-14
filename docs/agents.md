@@ -568,16 +568,18 @@ or more hands each thread the field as data (its code, its numbers, each pure fu
 `HOW`), each makes it again and marches runs of the rays into shared memory while this thread marches runs of a copy
 made the same way; a field that can't cross, a pure function's data changed, a thread that throws: marched here as
 before, the same error at the same place. The same JavaScript on the same rays gives the same hits in any order, which
-`hashes.ts` proves with `PXL_THREADS=2` (it turns the store off; the threads don't need it). How many is measured over
-the machine's real commands, never read off a table of processors (the record `pxl-threads.json` beside `builds/`):
-commands take turns on the best number and twice it until each has a minute of traces of the same fields, the larger
-kept from 1.15× as fast. On the i5-1035G1 (2026-11) two threads marched Haldor 1.5× as fast for a few seconds and 1.1×
-over his whole check (the march 64% of it; with 3 and 4 threads no faster, the paint slower as the laptop heats): the
-check 1.06× at best, so it settles on 1 and times nothing more. On an i7-13700K (16 cores) it settled on 4 after eight
-commands: his check 63 s forced to 1 and 48 s by itself (8 no faster than 4, 16 slower), the same files with 1, 8 and
-16 threads. The record is the machine's (Node, the processor), not pxl's sources', so it is measured once a machine,
-again after 30 days. `PXL_THREADS=N` forces a number; a test's own worker
-thread marches on one.
+`hashes.ts` proves with `PXL_THREADS=2` (it turns the store off; the threads don't need it). How many is a first guess
+of the machine (threads.ts's `guess`: a quarter of its threads, 8 at most), taken from the first command where it is 3
+or more: whoever installs pxl on a good machine pays no slow commands for pxl to find a number. Where it is 2 the
+machine may be a laptop that heats, so there it is measured over the machine's real commands, never read off a table
+of processors (the record `pxl-threads.json` beside `builds/`): commands take turns on 1 and 2 until each has a minute
+of traces of the same fields, 2 kept from 1.15× as fast. On the i5-1035G1 (2026-11) two threads marched Haldor 1.5× as
+fast for a few seconds and 1.1× over his whole check (the march 64% of it; with 3 and 4 threads no faster, the paint
+slower as the laptop heats): the check 1.06× at best, so it settles on 1 and times nothing more. On an i7-13700K (16
+cores, 24 threads) the guess is 6: his check 63 s forced to 1, 46 s on 4 threads and 45 s on the 6 (measured before
+the guess, 8 were no faster than 4 and 16 slower; the ladder that found 4 took eight commands). The record is the
+machine's (Node, the processor), not pxl's sources', so a laptop measures once, again after 30 days. `PXL_THREADS=N`
+forces a number; a test's own worker thread marches on one.
 
 `pxl check` and `pxl build` of a file can also share whole builds among worker threads (`src/node/workers.ts`), each
 loading the project once and taking an anim's frames, the march, the paint and the art's code with them: perf F's threads
@@ -591,8 +593,49 @@ with perf F's 4 march threads, 18 with 4 workers, 16 with 6, 17 with 8 and 26 wi
 900 of its builds (the scene's frames, each move's first frame). On the i5-1035G1 two or three workers made Haldor's
 check 1.3× as fast and the round not at all: four busy threads run each about 2.5× as slow there (the clock falls from
 2.2 to 1.6 GHz, threads share cores). So how many is measured per command and file, in `pxl-threads.json` beside the
-threads' record: what a command has to hand out and how much its own thread does are the file's. `PXL_WORKERS=N`
-forces a number (1: one thread, as always); `hashes.ts` and `pxl build` take the same path with it.
+threads' record: what a command has to hand out and how much its own thread does are the file's. A file's first
+command runs on one thread and notes each build's ms there (a file with under 10 s to share starts none; a command that
+found every build made leaves the note as it was), and its own thread's time apart from them (the load, the scene
+frames, the checks, the files written: the same whoever makes those builds). Where the first guess is 3 or more (12
+threads: 3; the i7-13700K's 24: 6) the next command takes it, and every command on more than one weighs that own time
+and its builds handed out at those ms against what it took, the heat in it, at no cost. It is judged only against a
+command on one thread made the same way, cold or warm (most traces read back from the store, a build counted by its
+own): after an edit Haldor's check took 20 s on one thread against 74 cold, so the cold ms read his 3 workers, 1.15× as
+fast there, as 4×, and Reva's, 0.92×, as 2.3×. With none such, the next command runs on one thread to note it. Each
+command with builds to share is a row in the file's log, its last 16 kept in `pxl-threads.json` (when, how many
+workers, cold or warm, its builds at one thread's ms, its own thread's time, what it took, when its workers were cut),
+and the number is read off the rows, on the safe side rather than the fastest (the user's rule: no campaign of trials
+on their machine): halved for that command and file (3 to 1) when its last two commands judged at that number both
+read under 1.15× as fast, so one command slowed by something else on the machine changes nothing; after 8 commands on
+a lowered number one runs on the number above, kept there from 1.15×, else back, the next try after twice as many
+commands (16, 32, 64 at most). A file that stays on workers keeps the one-thread measure it had (not renewed: no
+command runs on one thread for it); one on one thread renews it at each command. A command still slower than one
+thread by a fifth 30 s after its workers began, even with its own thread's time taken as slowed as theirs, stops them
+and makes the rest itself: its workers, not the number. A
+machine where two commands judged on its full guess read 2× as fast or more (any files) is trusted: from then on no
+command runs on one thread to learn, a file's first command takes the guess, and only what is known already is judged,
+until its last three judged on the full guess all read under 1.15×. The i5 guessing as 12 read 0.96× to 1.46× (its
+fastest check, Haldor's cold one when the laptop ran slow: 136 s on one thread, 93 on 3); the i7-13700K, `--no-cache`,
+read Haldor's check 64 s on one thread then 16 to 17 s on 6 (4.05×), the round's 52 then 31 to 32 (1.68×), Reva's 12.9
+then 3.2 to 3.8 (3.71×), every run's text the same. So a new user there pays a file's first command on one thread until
+two commands have read 2× (Haldor's check used three times: once), and a weak machine keeps the whole correction. A
+file not seen for 30 days leaves the record, and the oldest beyond 200 files; nothing leaves the machine, and deleting
+`pxl-threads.json` starts over. `pxl build --profile` says what a file's log holds (how many commands, on how many
+workers, what each judged read). A file's first command, and one whose workers were measured down to 1, march on one
+thread too: on the i5 guessing as 12 threads, the march on the guess's 3 made the round's check 94 to 101 s against 80
+to 87 on one. On the i5-1035G1 made to guess as a 12-thread machine does (a preload setting `os.availableParallelism`
+and threads.ts's `record.file`; the tests pass `top`), `--no-cache`, each file's first command and its second:
+Haldor's check 82 s then 63 on 3 workers (1.31×; on 2, 65 to 66 s), his build 108 then 88 (1.23×); Reva's check 21
+then 22 (0.96×), her build 40 then 34 (1.18×); the round's check 77 then 75 (1.03×), its build 159 then 160, its
+workers stopped 126 s in (1.00×): the readings under 1.15× halve their file's number at the second. Every file
+written and line printed was one thread's. Two estimates that spared that first command read far from whole commands
+on one thread there: builds timed alone for a second or two at the start (the workers' first
+builds, cold and made while the others load, run far slower than their later ones: Reva's check read as 0.80× where it
+gained 1.09×, Haldor's was cut 30 s in where it gained 1.28×), and the command's own thread taken as slowed as the
+workers' builds (it encodes and writes, which slows less: Haldor's check within 6%, but Reva's build read as 0.93× where
+it gained 1.18×). Where the guess is 2, commands take turns on 1 and 2 until each has a minute of work, as above.
+`PXL_WORKERS=N` forces a number (1: one thread, as always); `hashes.ts` takes `pxl build`'s path (the record unforced,
+read from a copy).
 
 `served.ts` starts the live viewer's server on a file and fetches what the page would when an asset
 is picked: run it after a change to the viewer or to what a build traces (a scene's frames all sent

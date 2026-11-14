@@ -20,9 +20,11 @@
 // --vs builds nothing of a file whose every input is the same at the revision: pxl's src/ and each file it reads
 // (itself, its includes, palettes, PNGs: the loader's list). A build is a function of those alone, so its pixels are
 // the same without tracing them; such files are counted apart. --all builds them anyway.
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, readdirSync, statSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { frameCount, frameTime } from "../src/node/shot.ts";
+import { record } from "../src/node/threads.ts";
 import { startWorkers } from "../src/node/workers.ts";
 import { examples, inTree, loader, pick, repo, revTree } from "./vs.ts";
 
@@ -59,8 +61,12 @@ function lines(load: (f: string) => any, file: string, name: string): Map<string
   return out;
 }
 
-// (PXL_WORKERS=N: the working tree's builds made by N workers, as pxl build's are, workers.ts)
-const load = await loader(repo), here = (f: string) => { const p = load(f); if (process.env.PXL_WORKERS) startWorkers(p, f, {}, "build"); return p; };
+// (the working tree's builds made by as many workers as pxl build's, workers.ts: PXL_WORKERS=N, else the machine's
+// record, read from a copy of it, as a time taken here beside the revision's builds would mean nothing)
+const copy = join(tmpdir(), `pxl-threads-${process.pid}.json`);
+try { copyFileSync(record.file, copy); } catch { /* no record yet */ }
+record.file = copy;
+const load = await loader(repo), here = (f: string) => { const p = load(f); startWorkers(p, f, {}, "build"); return p; };
 const tree = vs ? revTree(vs) : "", there = vs ? await loader(tree) : undefined;
 // the same bytes here and at the revision: one file, and pxl's whole src/
 const sameFile = (f: string) => { const o = inTree(tree, f); return o === resolve(f) || (existsSync(o) && readFileSync(o).equals(readFileSync(f))); };
@@ -81,6 +87,8 @@ for (const f of files) {
     console.log(`${k}: ${a.get(k) ?? "(none)"} at ${vs}, ${b.get(k) ?? "(none)"} here`);
   }
 }
+// (after the last command's measure is written into the copy, at exit)
+process.on("exit", () => { try { unlinkSync(copy); } catch { /* none written */ } });
 if (vs) {
   console.log(`${same} the same, ${differ} differ${added ? `, ${added} new` : ""} (${vs} against the working tree)${spared ? `; ${spared} file${spared > 1 ? "s" : ""} not built: what ${spared > 1 ? "they read" : "it reads"} and pxl's src are the same at ${vs}` : ""}`);
   if (differ) process.exitCode = 1;

@@ -1063,11 +1063,14 @@ everything and keeps no trace.
 More threads: a trace of a field whose every function is `pure()`, over 4096 cells or more, can march its rays on
 several threads (each makes the field again of its code, numbers and pure functions' sources and data, and takes runs
 of the rays; the paint, normals and shadows stay on one), the same hits as one thread marches, so the same pixels. How
-many is measured on the machine pxl runs on, over its real commands: while it is unsettled, commands take turns on the
-best number so far and twice it, each big pure trace timed whole, and once each has a minute of traces of the same
-fields the larger is kept only if it did the same work 1.15× as fast or more, else the smaller is settled and nothing is
-timed again (a record beside the builds, `pxl-threads.json`; measured again when Node or the processor change, or after
-30 days). A 4-core laptop that throttles settles on 1; a 16-core desktop settled on 4, its check 1.3× as fast. `PXL_THREADS=N` forces N (1: one thread, as
+many: a quarter of the machine's threads, 8 at most, from the first command and with nothing measured (24 threads: 6;
+one where the workers' record keeps a file's command on one, below).
+Only where that is 2 (a laptop of 4 cores, which may heat and run 2 slower than 1) is it measured, over the machine's
+real commands: while it is unsettled, commands take turns on 1 and 2, each big pure trace timed whole, and once each
+has a minute of traces of the same fields 2 is kept only if it did the same work 1.15× as fast or more, else 1 is
+settled and nothing is timed again (a record beside the builds, `pxl-threads.json`; measured again when Node or the
+processor change, or after 30 days). A 4-core laptop that throttles settles on 1; a 16-core desktop takes 6 from its
+first command, its check 1.4× as fast. `PXL_THREADS=N` forces N (1: one thread, as
 always); a field with a plain closure in it, a smaller trace and a march already inside a worker thread take one.
 `pxl build --profile` says how many marched and why.
 
@@ -1078,13 +1081,31 @@ frames stay on the command's own thread (a scene's code may carry another build'
 fighting round's bout does). A build a worker made is used as one read back from the store is, only where the store
 would keep it (made before the art's own dice, clock or late read, holding every warning said before it, writable as
 data) and where it is what the command's thread would have made there: every file written, warning and line printed
-is what one thread makes, in the same order. How many is measured for each command on each file, on the machine, in the
-record of the march's threads: a file whose shared builds took under 10 s on one thread the last time starts none; else
-its commands take turns on the best number so far and twice it, each adding what its work would have taken on one
-thread and what it took, and from a minute of work each the larger is kept only if it was 1.15× as fast or more, else
-the smaller is settled. Never more workers than the free memory holds (each about the project's memory and 256 MB of
-builds); while they run, a march on the command's thread takes one thread. `PXL_WORKERS=N` forces N (1: one thread,
-as always); a command inside a worker thread starts none. `pxl build --profile` says how many and why.
+is what one thread makes, in the same order. How many is measured for each command on each file, in the record of the
+march's threads. A file's first command runs on one thread and notes each build's ms there, and the rest of its time;
+a file whose shared builds took under 10 s starts none. Where the march's first number is 3 or more (a quarter of the
+machine's threads, 8 at most: 6 on 24), the next command takes that many workers, and every command on more than one
+weighs what its work would have taken on one thread (its builds at those ms, the rest as the first command took it)
+against what it took, the machine's heat in it, judged only against a command on one thread made the same way (cold,
+or with most of its traces read back from the store: after an edit, a quarter of the time), else the next runs on one
+thread to note it. Each command with builds to share is a row in that file's log (its last 16: when, how many
+workers, cold or warm, its builds at one thread's ms, its own thread's time, what it took, when its workers were
+cut), and the number is read off it: halved for that command on that file (3 to 1) when its last two commands judged
+at that number both read under 1.15× as fast (one alone changes nothing); after 8 commands on a lowered number one
+runs on the number above, kept there from 1.15×, else back, the next try after twice as many commands, 64 at most. A
+file on workers keeps the one-thread measure it had (not renewed); a command on one thread renews it. A machine where
+two commands judged on its full guess read 2× as fast or more (any files) is trusted: there no command runs on one
+thread to learn, and a file's first command takes the guess (a 24-thread desktop read 4.05×, 1.68× and 3.71× on three
+files; a 4-core laptop guessing as 12, 0.96× to 1.46×), until its last three judged on the full guess all read under
+1.15×. A command still a fifth slower than one thread 30 s after its workers began stops them and makes the rest
+itself (its workers, not the number). There a file's first command, and one whose workers were measured down to 1,
+march on one thread too. A file not seen for 30 days leaves the record, and the oldest beyond 200 files; nothing
+leaves the machine, and deleting `pxl-threads.json` (beside the builds) starts over. Where that number is 2 (a laptop
+of 4 cores, which may heat and run 2 slower than 1) the commands take turns on 1 and 2 until each has a minute of work,
+2 kept from 1.15× as fast (a laptop of 4 cores settled on 2 for one fighter's check and on 1 for the round's). Never
+more workers than the free memory holds (each about the project's memory and 256 MB of builds); while they run, a
+march on the command's thread takes one thread. `PXL_WORKERS=N` forces N (1: one thread, as always); a command inside
+a worker thread starts none. `pxl build --profile` says how many and why, and what the file's log holds.
 
 ### Output for engines
 
