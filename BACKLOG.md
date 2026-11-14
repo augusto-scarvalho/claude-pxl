@@ -620,12 +620,29 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   Done (F5 5e): an asset's `category` beside its `genre` (sprite, anim, `turnaround()`, `rig3d()`), read by the
   genre's `ink` (`character`; `"own"`: pxl study's measure, its share and side in the warning); a sprite's
   `ink: [ramps]` lines a hand pass all round; topdown32's kit lined with it, its `ink` now `"own"`.
-- [ ] **The cottage under the ink**: `_cottage_td32` says `category: "house"`, a key topdown32's `ink` doesn't name;
+- [x] **The cottage under the ink**: `_cottage_td32` says `category: "house"`, a key topdown32's `ink` doesn't name;
   read as a prop, 83% of its edge is lined (the left post's column `#3e2018` near-black, the chimney's top unlined,
   the plinth's corners 3 px deep). Fix those, then `house: "own"` in the profile.
-- [ ] **The heroes under the ink**: hero32, hero and hero_side fail "near-black all round" by 2-5% (skin pixels at
+  Done (F5k): the post's outer column the wood's dark, the chimney's cap lined over the roof in the stone's darkest,
+  the plinth's last stone out to its line as the first and each joint's foot in the stones' shade, the porch floor's
+  line under itself, the step lined 1 px all round (its face two rows of shade, as the floor's): 160 px; topdown32's
+  `ink` has `house: "own"`, 98.5% of the edge lined (left: the posts' 5 rows in the eaves' shade, the wood's dark on
+  itself, it having none between that and its near-black).
+- [x] **The heroes under the ink**: hero32, hero and hero_side fail "near-black all round" by 2-5% (skin pixels at
   the throat), their attacks by 9-29% (the slash's arc, an effect with no line). Close the throat, the arc on a layer
   the check skips, then `category: "character"` on their rig3d().
+  Done in part (F5k): hero32's throat closed in its head's views (facing us the line at the chin's two ends, in
+  profile 2 px under the jaw's front), hero_side's by a draw hook (the line under the chin where it lies on nothing:
+  the run's and the dash's lean); `category: "character"` on hero32's walking rig (`figure()`'s `category`) and on
+  hero_side's rigs, read and passing. The rest below.
+- [ ] **The heroes' rest under the ink (F5k)**: the 16 px hero (hero.px.js) fails in profile on its crown and its
+  nose, not its throat (idle_e 3.4%, walk_e and run_e 5%: a px of hair at the crown's back, the nose's lit px out of
+  the line, the throat a px in the walk and the run only); its face is every 16 px person's (reva, the villagers). The
+  attacks (hero32's, hero's) aren't read: the crescent is painted by the move's draw hook into the figure's own frame,
+  in its depth, so no category or layer leaves it out; without it their figures still fail on the head turned between
+  the views and the crown (hero32's attack_e about 3%, attack_n 4%, hero's attack_e 4%). Line those, then rig3d
+  keeping the figure's pixels before its hooks (as it keeps their box for the height check) for the ink check to read,
+  and the category on the attack rigs. The chibi (`chibi_*`) unread too (idle_e 2.6%: its crown and nose).
 - [ ] **How light a line may go**: an `"own"` line was taken as light as the check allows, capped by hand at L 0.5 so
   it reads on the grass. The genre's ink a floor against its ground, and `--readings` saying each line's room.
 - [ ] **A decal at some headings**: a builder's decal is drawn at every heading turnaround() draws (the roof's number
