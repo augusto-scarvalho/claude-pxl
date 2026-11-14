@@ -635,14 +635,18 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   profile 2 px under the jaw's front), hero_side's by a draw hook (the line under the chin where it lies on nothing:
   the run's and the dash's lean); `category: "character"` on hero32's walking rig (`figure()`'s `category`) and on
   hero_side's rigs, read and passing. The rest below.
-- [ ] **The heroes' rest under the ink (F5k)**: the 16 px hero (hero.px.js) fails in profile on its crown and its
-  nose, not its throat (idle_e 3.4%, walk_e and run_e 5%: a px of hair at the crown's back, the nose's lit px out of
-  the line, the throat a px in the walk and the run only); its face is every 16 px person's (reva, the villagers). The
-  attacks (hero32's, hero's) aren't read: the crescent is painted by the move's draw hook into the figure's own frame,
-  in its depth, so no category or layer leaves it out; without it their figures still fail on the head turned between
-  the views and the crown (hero32's attack_e about 3%, attack_n 4%, hero's attack_e 4%). Line those, then rig3d
-  keeping the figure's pixels before its hooks (as it keeps their box for the height check) for the ink check to read,
-  and the category on the attack rigs. The chibi (`chibi_*`) unread too (idle_e 2.6%: its crown and nose).
+- [ ] **The heroes' rest under the ink (F5k)**: the attacks (hero32's, hero's) aren't read: the crescent is painted by
+  the move's draw hook into the figure's own frame, in its depth, so no category or layer leaves it out; without it
+  their figures still fail on the head turned between the views and the crown (hero32's attack_e about 3%, attack_n
+  4%; hero's attack_e 2.0% since F5l's crown, on the line). Line those, then rig3d keeping the figure's pixels before
+  its hooks (as it keeps their box for the height check) for the ink check to read, and the category on the attack
+  rigs. The chibi (`chibi_*`) unread too (idle_e 2.6%: its nose, a px of hair at the nape, the chin; run_e 2.9%: the
+  nose and 2 px of the throat).
+  Done (F5l): the 16 px hero's walking moves, which failed in profile (idle_e 3.4%, walk_e and run_e 5%): the crown's
+  back px in the line (his profile head's STRANDS.w), the throat by a draw hook on character()'s walking rigs as
+  hero_side's (the line under the chin where it lies on nothing: a px walking and running in profile; the villager's
+  and Reva's walk too); the nose's lit px kept out of the line (1.7% of the edge in profile, under the 2%);
+  `category: "character"` on his walking rig (character()'s `category`), read and passing.
 - [ ] **How light a line may go**: an `"own"` line was taken as light as the check allows, capped by hand at L 0.5 so
   it reads on the grass. The genre's ink a floor against its ground, and `--readings` saying each line's room.
 - [ ] **A decal at some headings**: a builder's decal is drawn at every heading turnaround() draws (the roof's number
