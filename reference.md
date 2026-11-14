@@ -44,7 +44,7 @@ include("other.px.js")                  // path relative to the current file; in
 directions("ship", 16, { from, outline?, outline8?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
 turnaround("house", thing, { view?, ppm?, n?, headings?, part?, ... })  // a thing in 3D seen from n headings: house_n, house_ne, ... + group "house"; see turnaround() below
 rig3d("tr", { body, moves: { walk: { frames, ms, pose } }, n?, parts?, head?, blocks? })  // a figure on the 3D layer in n headings: tr_walk_s, ... + group "tr_walk"; see rig3d() below
-genre("fighting", { camera, grid or ppm, scale, heads, dirs, states, contract, pitch, stand, tones, ink, mix, checks })  // a profile as data, its checks run by pxl check on what names it: see genre() below
+genre("fighting", { camera, grid or ppm, scale, heads, dirs, states, contract, pitch, stand, tones, ink, mix, roles, checks })  // a profile as data, its checks run by pxl check on what names it: see genre() below
 card("_lamp", { is, cells: { "hd2d/24ppm": "✓" }, vary?, tiles?, draw? })  // a library entry's card, just after it: see card() below
 views("_head", { s: grid, sw, w, nw, n }, { anchor, like? })  // hand-drawn views pivoted on an anchor, the others mirrored: _head_s, ... + group "_head"; see views() below
 font(name, "glyph_sprite", { chars: "ABC...", w, h, cols?, mono? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional), or all as wide as the widest with mono: true (a score, a timer)
@@ -113,7 +113,11 @@ kits that both have a `lamp` can be included side by side. Inside it nothing cha
 asks for `lamp` and gets its own (its stamps, `base`, groups, globs, `has()`, fonts look in its
 namespace first, then outside). `nature._grass` stays a part (not exported). It doesn't cover
 JavaScript: included files still share one scope, so a top-level `const` or `function` of the same
-name in two files clashes (wrap a kit's own helpers in a block `{ ... }`). Names are looked up by
+name in two files clashes (wrap a kit's own helpers in a block `{ ... }`). One file reached by two include paths
+(a scene and a file it includes both take the side kit) runs once where both include it under the same names (`as`)
+and its palette its own (one that sets no palette draws in its includer's: once only under the same one); under other
+names, or with `palette: true` (its colors go into each includer's), it runs at each, and a clash of its top-level names
+says the two paths that reach it. Names are looked up by
 the asset being drawn, not by where the code was written: a kit's helper that your own asset calls
 finds names as yours does (give it `nature.lamp`); the names it hands back (`R.names`,
 `turnaround()`'s) are full ones. So a kit's constant that holds its own names takes them by `own()`
@@ -137,7 +141,9 @@ figures: topdown16's figures from 45, its trees from 30), `tones` (what a `turna
 naming it draws its surface in, where its
 `surface` gives none: 3 at 16-32 px), `ink` (its line: a color, all round, `surface: { ink }`'s; or
 by category, `{ character: "#1a1620", tree: "selective" }`, or words), `mix` (`true`: densities mixed
-on purpose, HD-2D's sprites in a finer world) and `checks`; any other field is kept as given, for the
+on purpose, HD-2D's sprites in a finer world), `roles` (the colors a 3D draft takes by role: `{ from:
+"../nature/side.px.js", leaf: "RKML", bark: "ewW" }`, each role a ramp of keys dark to light, the line first where its
+ink is by material, then `tones` of fill, in the palette of the file `from` names, its kit's, else its own file's) and `checks`; any other field is kept as given, for the
 file (`steer`). Its cell is its camera's kind and its density: `topdown/16`, `hd2d/24ppm`. It
 returns them with `name`; `genre(name)` gives them back after (`genre("racing_topdown").stand`: a kit
 reads its profile's numbers from one place). A profile's file included twice (by a scene and by an entry that names its
@@ -164,7 +170,7 @@ ran says the share of the edge near-black, never a warning. A category its `ink`
 ground cover, tiles, UI, effects), an asset with none, and another string `ink` aren't read. See
 scenes.md, "Profiles".
 
-`card(name, { is, cells, vary?, tiles?, category?, draw? })`, just after what it describes, is a library entry's
+`card(name, { is, cells, vary?, tiles?, category?, draw?, roles? })`, just after what it describes, is a library entry's
 card: what its code can't show. `name` is an asset, group, `rig3d()` figure, `turnaround()` family
 or font defined above it (under an `as`, its full name: `lamps._lamp`), or `"make3d.<builder>"`;
 `is` what it is, in a line (its silhouette, its parts, its look); `cells` the (camera × density)
@@ -177,11 +183,15 @@ its code doesn't show, a line or one a channel (`{ color, part, shape, seed }`: 
 and seed are read from the code); a builder's `tiles` (its box in tiles, `[tall, wide]`, its
 category's on the scale curve, scenes §19; or how many tall alone: a draft's size), its `category`
 (a key of a genre's `scale`: `tree`, `pine`, `bush`, `boulder`, `lamp`, `house`, `character`; the
-genre's box for it then sizes its drafts, before its `tiles`) and `draw` (its drawing call's options). A name or an asset it can't find fails the load at its line.
+genre's box for it then sizes its drafts, before its `tiles`), `draw` (its drawing call's options) and a builder's
+`roles` (its materials by role, `{ leaf: ["oak_summer"], bark: ["bark"] }`; a material named as a role, fields'
+`leaf`, is that role). A name or an asset it can't find fails the load at its line.
 `card(name)` gives its data back (`card("make3d.oak").draw`). `pxl lib` lists the library's cards
 by subject (`pxl lib --genre hd2d`, `pxl lib --cell side/32`); `pxl lib lamps._lamp` prints one (by its
 full name, or the last part of it when only one entry has that: `pxl lib car` is `make3d.car`; none, or
-several, names the near ones) with
+several, names the near ones; a drawing with no card of its own that a card names, `pxl lib side.oak_small`, gives
+that card, its cells and the drawing's size; a genre's name, `pxl lib platformer16`, the genre's card: its cell,
+scale, tones and ink, and the colors its drafts take by role) with
 what a build of it reads (its source, size, pivot, footprint, sockets, boxes, frames, roles) and the
 `include` that takes it, by the file's whole path (paste it in an art file in any folder); `pxl lib draft make3d.oak --genre topdown16` draws a builder in a genre (its
 camera, what stands at its `stand`, else its `pitch`, hd2d's a billboard from 20 degrees; fitted to the genre's box for
@@ -189,7 +199,8 @@ the card's `category`, in tiles on its grid or m at its `ppm`, else to the card'
 else its own height at the `ppm`: neither side over, but side on its height fills the box and its width is its own;
 its `tones`, and its line the genre's `ink` for its category (else the `rest`): a color all round, or each material
 in its own darkest for `"selout"`, `"own"`, `"material"` (`surface`'s `ink: true`); at a 16 px grid and under, a
-builder that takes `cluster` gets a tile, so a crown reads as a few masses; `--cell topdown/16` a cell alone). `pxl check` on the file warns where a cell's
+builder that takes `cluster` gets a tile, so a crown reads as a few masses; each material its field names in the
+genre's ramp for its role, its card's `roles`, the rest in the builder's colors, the draft's text saying which; `--cell topdown/16` a cell alone). `pxl check` on the file warns where a cell's
 status disagrees with how its asset is drawn: a ✎ cell that is the 3D render alone (a retouch by `base`
 over a frozen one is by hand), a ◐ cell drawn by hand, a ✓ live 3D sprite not `frozen`. And it warns at densities mixed by accident (scenes §19),
 unless a genre says the mix (`mix: true`; for a scene, a genre at one of the cells it mixes): a scene
@@ -283,7 +294,7 @@ with a `world` (and `check`) is checked as a scene (functions naming what they p
 | `key: "#ff00ff"` | With `png`: that color read as clear before `area`, `shrink` and `palettize` (a ripped sheet's cell fill; `pxl study` names it). |
 | `palettize: true` | With `png`: snap every color to the nearest keyed palette color, so `ascii`, `swap` and `recolor` see keys. |
 | `shrink: n` | With `png`: shrink by a whole factor (1 leaves it as it is), after `area`. Each n×n block becomes its most common opaque color (ties: the first, scanning the block column by column), or transparent when fewer than half of its pixels are opaque. Keeps silhouettes and the curves of shapes far better than sampling one pixel per block: the start for a smaller version of finished art (then redraw what it breaks; see characters.md). With `base` too: a 3D draft drawn n times over (`turnaround(..., { ppm: 32 * 3 })`) brought to its grid, its blocks lined up on its pivot (where the origin lands: at 1x, on a pixel's corner), its pivot, sockets and boxes (a turnaround's footprint) with it, scaled the same. |
-| `shrink: { by, cover?, ink? }` | `shrink` with its edges treated, coverage first, then the colors: a block is in where `cover` of it is drawn (0.5; a third keeps the bulk a one-ray-a-pixel render has); the silhouette then evened, a block partly drawn (or a notch) flipped where that takes away steps out of order, tips, notches, bridges or a box's clipped corner, its holes (but pinholes of 1-2 px) and bodies kept (`pxl check --edges` names them); each block's color the commonest in it, but on the edge the commonest of its pixels on the fine contour (the line or the lit rim a pixel thin there, outvoted by the fill in a plain vote); inside, a tone alone merged into its neighbours' when near it (Blubs PixelForge's despeckle); the line doubled at a corner cut; its gaps along the edge closed with the `ink` keys (default the colors it lines its edge with, those darker than what lies inside them, as `check --edges` reads them; `false` none). For a render with its line (`surface: { outline: true }`): `sprite("pot_draft", { base: "_pot_draft3", shrink: { by: 3 } })`. |
+| `shrink: { by, cover?, ink? }` | `shrink` with its edges treated (a `_` part only taken as the base of shrunk sprites, a turnaround drawn 3 times over, isn't read by `pxl check`'s genre and box checks nor counted: the shrunk sprite is), coverage first, then the colors: a block is in where `cover` of it is drawn (0.5; a third keeps the bulk a one-ray-a-pixel render has); the silhouette then evened, a block partly drawn (or a notch) flipped where that takes away steps out of order, tips, notches, bridges or a box's clipped corner, its holes (but pinholes of 1-2 px) and bodies kept (`pxl check --edges` names them); each block's color the commonest in it, but on the edge the commonest of its pixels on the fine contour (the line or the lit rim a pixel thin there, outvoted by the fill in a plain vote); inside, a tone alone merged into its neighbours' when near it (Blubs PixelForge's despeckle); the line doubled at a corner cut; its gaps along the edge closed with the `ink` keys (default the colors it lines its edge with, those darker than what lies inside them, as `check --edges` reads them; `false` none). For a render with its line (`surface: { outline: true }`): `sprite("pot_draft", { base: "_pot_draft3", shrink: { by: 3 } })`. |
 | `slice: n \| [left, top, right, bottom]` | 9-slice margins of the final image (outline included) for `panel()`; flips and rotations turn them; sheets export them as Aseprite `meta.slices` (bounds + center). |
 | `wrap: true \| "x" \| "y"` | Seamless tile (Aseprite's tiled mode): drawing, stamps, fills and reads past those edges continue on the opposite side, and the preview lays the tile out 3×3 (3×1, 1×3) so seams show. For tiles that repeat themselves; random variants placed side by side don't line up across edges. |
 | `pivot: "bottom" \| "center" \| [x, y]` | The point `stamp`, `scatter` and wire hangs put on the given position. `"bottom"` is the middle of the final image's bottom edge, so `stamp("tree", x, groundY)` stands it on row `groundY` whatever its size. `[x, y]` is in drawing coordinates (pixel corners) and moves with flip, rot, outline and crop, here and in placements. A `base` variant starts with its base's pivot. Sheets export it as a normalized `pivot` (0.5, 1 = bottom center). |

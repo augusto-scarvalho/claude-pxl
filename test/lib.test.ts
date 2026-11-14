@@ -8,7 +8,7 @@ import { Img } from "../src/core/image.ts";
 import { lch } from "../src/core/vision.ts";
 import { loadProject, loadSource } from "../src/node/load.ts";
 import { cardLines, checkProject } from "../src/node/check.ts";
-import { catalog, findEntry, libCard, libDraft, libList } from "../src/node/lib.ts";
+import { catalog, findEntry, genreRoles, libCard, libDraft, libList } from "../src/node/lib.ts";
 import { encodePng } from "../src/node/png.ts";
 import { failure } from "./helpers.ts";
 import { whenChanged } from "./passed.ts";
@@ -148,9 +148,37 @@ test("pxl lib draft make3d.oak --genre platformer16: side on its height fills th
   assert.ok(+m[1] >= 61 && +m[1] <= 64 && +m[2] > 48, said);
   assert.match(said, /\(side on, its height fills the box; its own width\).* clusters a tile across \(\{ cluster: 16 \}\), in 3 tones, each material lined in its own darkest \(its ink "selout"\)/);
   assert.match(readFileSync(join(dir, "oak_platformer16.px.js"), "utf8"), /turnaround\("oak_platformer16", make3d\.oak\(\{ cluster: 16 \}\), \{ \.\.\.card\("make3d\.oak"\)\.draw, surface: \{ \.\.\.card\("make3d\.oak"\)\.draw\?\.surface, ink: true \}/);
-  // its edge the leaves' and the bark's darkest (lib/nature/trees.px.js's oak_summer and bark), nothing lighter
+  // its edge the leaves' and the bark's darkest, in the genre's colors by role: the side kit's R and e (its oak_summer
+  // and bark were trees.px.js's #142a1a and #231a20), nothing lighter
   const im = loadProject(join(dir, "oak_platformer16.px.js")).image("oak_platformer16_s");
-  assert.deepEqual([...new Set(edge(im))].sort(), [pack(0x14, 0x2a, 0x1a), pack(0x23, 0x1a, 0x20)].sort());
+  assert.deepEqual([...new Set(edge(im))].sort(), [pack(0x1f, 0x46, 0x36), pack(0x3a, 0x24, 0x20)].sort());
+});
+
+test("pxl lib draft --genre: each material by its role in the genre's ramp (its kit's keys), the rest the builder's, said; pxl lib <genre> shows the roles", () => {
+  // the genre's card: its roles, read from its kit's palette (platformer16's the side kit's)
+  assert.match(libCard("platformer16").join("\n"), /^platformer16: a genre \(lib\/profiles\), its cell side\/16\n[^]*\n +colors +leaf RKML \(#1f4636 #2e6a38 #4f9a3c #97cd55\), bark ewW \(#3a2420 #6b4430 #9c6a40\): lib\/nature\/side\.px\.js's keys\./);
+  // the birch at topdown16: its summer leaves the island's greens; its white bark and its marks, roles the genre doesn't
+  // name, its own, and the draft says so
+  const dir = mkdtempSync(join(tmpdir(), "pxl-roles-")), said = libDraft("make3d.birch", { genre: "topdown16" }, dir).join("\n");
+  assert.match(said, /\n {2}in topdown16's colors by role, lib\/styles\/island\.px\.js's keys: leaf hGMm \(#1b4d34 #288556 #50ad39 #64c83c\) on birch_summer; the builder's own on birch_mark, birch_bark \(roles topdown16 doesn't name\)\n/);
+  assert.match(readFileSync(join(dir, "birch_topdown16.px.js"), "utf8"), /headings: \["s"\], mats: \{ \.\.\.card\("make3d\.birch"\)\.draw\.mats, birch_summer: \["#1b4d34","#288556","#50ad39","#64c83c"\] \}, genre: "topdown16" \}\)/);
+  const cs = new Set(loadProject(join(dir, "birch_topdown16.px.js")).image("birch_topdown16_s").data.filter((c) => c >>> 24));
+  const hex = (h: string) => pack(parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16));
+  assert.ok(["#50ad39", "#ece8de"].every((h) => cs.has(hex(h))) && !["#5a8a34", "#8cb448", "#7cd640"].some((h) => cs.has(hex(h))), "the island's darker greens and the birch's own bark, none of its summer greens nor the field's (a crown in it is lost in the grass)");
+  // a genre the entry's own file includes already (trees.px.js's topdown32): the draft doesn't define it again
+  assert.match(libDraft("make3d.oak", { genre: "topdown32" }, dir).join("\n"), /leaf hGMmg \(#1b4d34 #288556 #50ad39 #64c83c #7cd640\) on oak_summer/);
+  assert.doesNotMatch(readFileSync(join(dir, "oak_topdown32.px.js"), "utf8"), /^genre\(/m);
+  // a role's key its kit's palette lacks
+  writeFileSync(join(dir, "kit.px.js"), `pal({ R: "#102030" })\n`);
+  assert.throws(() => genreRoles({ cell: "side/16", file: join(dir, "g.px.js"), g: { name: "g", roles: { from: "kit.px.js", leaf: "Rq" } } }), /genre 'g': roles\.leaf is a ramp of .*kit\.px\.js's keys, dark to light \("RKML"\), got "Rq" \(not in its palette: q\)/);
+});
+
+test("pxl lib <name>: a drawing a card names (oak_small in the oak's) answers with that card, its cells and the drawing", () => {
+  for (const n of ["side.oak_small", "oak_small"]) assert.match(libCard(n)[0], /^(side\.)?oak_small: no card of its own, named by side\.oak's card \(its cells side\/16 ✎ oak\): 32x40, pivot 16,40, in .*lib\/nature\/side\.px\.js\. The card:$/);
+  assert.match(libCard("side.oak_small")[1], /^side\.oak: an oak side on/);
+  assert.throws(() => libCard("side.oak_smal"), /no entry 'side\.oak_smal'/);
+  // a word some card's line says that is no drawing: no entry, not that card
+  assert.throws(() => libCard("tree"), /no entry 'tree' in the library.*\(pxl lib lists them\)$/);
 });
 
 test("make3d.car (lib/vehicles/car): parts, sockets, its decal; 32 rotations a livery from 58, each on its footprint's middle, its line near-black all round; car.facing", () => {

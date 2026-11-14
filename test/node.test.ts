@@ -367,6 +367,23 @@ test("include: a top-level name declared in two files says that included files s
   assert.throws(() => loadProject(file), (e) => /lib\.px\.js:3/.test(String(e)) && !/share one scope/.test(String(e)));
 });
 
+test("include: one file reached by two include paths under the same names runs once; under others, the error names both paths", () => {
+  // the side kit's case: a scene includes a kit and another file that includes it too
+  const { dir, file } = tmpArt(`include("kit.px.js", { as: "kit" })\ninclude("other.px.js")\nsprite("mine", { base: "kit.dot" })`);
+  writeFileSync(join(dir, "kit.px.js"), `const kit = {}\nsprite("dot", "r")\n`);
+  writeFileSync(join(dir, "other.px.js"), `include("kit.px.js", { as: "kit" })\nsprite("theirs", { base: "kit.dot" })\n`);
+  assert.deepEqual([...loadProject(file).assets.keys()].sort(), ["kit.dot", "mine", "theirs"]);
+  // other names (another `as`): both can't hold, and the error says the two paths that reach it
+  writeFileSync(join(dir, "other.px.js"), `include("kit.px.js", { as: "k2" })\n`);
+  assert.throws(() => loadProject(file), /kit\.px\.js: Identifier 'kit' has already been declared: the file is reached by two include paths, a\.px\.js -> kit\.px\.js \(as "kit"\) and a\.px\.js -> other\.px\.js -> kit\.px\.js \(as "k2"\)/);
+  // a kit that sets no palette draws in its includer's: under another palette it runs again (and says so), never once
+  // in the first one's colors
+  writeFileSync(join(dir, "other.px.js"), `pal({ r: "#0000ff" })\ninclude("kit.px.js", { as: "kit" })\n`);
+  assert.throws(() => loadProject(file), /reached by two include paths/);
+  writeFileSync(join(dir, "kit.px.js"), `pal({ r: "#00ff00" })\nconst kit = {}\nsprite("dot", "r")\n`);
+  assert.deepEqual([...loadProject(file).assets.keys()].sort(), ["kit.dot", "mine"]);
+});
+
 test("include { palette: true } shares the included palette", () => {
   const { dir, file } = tmpArt(`include("pal.px.js", { palette: true })\nsprite("b", "z")`);
   writeFileSync(join(dir, "pal.px.js"), `pal({ z: "#ff0000" })`);

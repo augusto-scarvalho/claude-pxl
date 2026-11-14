@@ -54,9 +54,16 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
   // a file in locations: its path from the main file's folder ("kit.px.js", "../nature/kit.px.js": two kits apart)
   const home = dirname(resolve(file));
   p.short = (abs) => { const r = relative(home, abs); return isAbsolute(r) ? abs.replace(/^.*[\\/]/, "") : r.split(sep).join("/"); };
-  const run = (path: string) => {
-    const abs = resolve(path);
+  // each file's include paths, its names (`as`) with each: one file reached by two paths runs once under the same names
+  // and its palette its own; else both are said where its top-level names clash
+  // (a file that sets no palette draws in its includer's: once only where that is the same one)
+  const reached = new Map<string, string[]>(), once = new Map<string, unknown>();
+  const run = (path: string, ns?: string) => {
+    const abs = resolve(path), k = `${abs}\n${ns}`, had = p.pal, was = once.get(k);
     if (stack.includes(abs)) throw new PxError(`include cycle: ${[...stack, abs].join(" -> ")}`);
+    if (ns !== undefined && once.has(k) && (was === undefined || was === had)) return;
+    const way = `${[...stack, abs].map((f) => p.short(f)).join(" -> ")}${ns ? ` (as "${ns.slice(0, -1)}")` : ""}${ns === undefined && stack.length ? " (its palette into the includer's)" : ""}`;
+    reached.set(abs, [...(reached.get(abs) ?? []), way]);
     let code: string;
     try { code = read(abs); } catch {
       throw new PxError(`cannot read art file '${abs}'`, p.callerLoc());
@@ -72,20 +79,24 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
       // file compiles on its own (the clash is with another file's name); a name declared twice within
       // this file is its own error, with its line
       const alone = () => { try { new vm.Script(compile(code, abs)); return true; } catch { return false; } };
-      if ((e as Error)?.name === "SyntaxError" && /has already been declared/.test((e as Error).message) && stack.length > 1 && alone())
+      if ((e as Error)?.name === "SyntaxError" && /has already been declared/.test((e as Error).message) && stack.length > 1 && alone()) {
+        const ways = reached.get(abs)!;
+        if (ways.length > 1) throw new PxError(`${p.short(abs)}: ${(e as Error).message}: the file is reached by two include paths, ${ways.at(-2)} and ${ways.at(-1)}, and runs at each (a file runs once where both include it under the same names, \`as\`, its palette its own); include it under the same names in both, or once`);
         throw new PxError(`${p.short(abs)}: ${(e as Error).message}. Included files share one scope for top-level names, so each const/let/function name can be declared in only one of them; rename it in one file`);
+      }
       throw syntaxAware(e, abs, p);
     } finally {
       stack.pop();
     }
+    if (ns !== undefined) once.set(k, p.pal === had ? had : undefined);
   };
-  const near = (path: string) => {
+  const near =(path: string) => {
     if (isAbsolute(path)) return path;
     // Files are read while the art file runs; drawing functions run later, at build time.
     if (!stack.length) throw new PxError(`'${path}' is read while the art file loads: call use(), pose(), motion() or png at the top of the file, not inside a drawing function`);
     return resolve(dirname(stack[stack.length - 1]), path);
   };
-  p.includeHook = (path) => { late(); run(near(path)); };
+  p.includeHook = (path, ns) => { late(); run(near(path), ns); };
   p.scope = (code) => { late(); return vm.runInContext(code, ctx); };
   p.pngHook = (path) => {
     late();

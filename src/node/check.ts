@@ -272,6 +272,16 @@ export function writeMoves(file: string, p: Project, r: CheckResult, frame?: num
   return [`fix: wrote ${said.join(", ")}; check again`];
 }
 
+/** The `_` parts whose only use is as the base of shrunk sprites (`shrink`), not in a sheet: their stamps aren't known, so a part stamped elsewhere too is among them. */
+function shrinkBases(p: Project): Set<string> {
+  const only = new Map<string, boolean>(), sheets = new Set(p.sheets.flatMap((s) => p.sheetNames(s)));
+  for (const d of p.assets.values()) if (typeof d.opts.base === "string") {
+    const b = p.assets.has((d.ns ?? "") + d.opts.base) ? (d.ns ?? "") + d.opts.base : d.opts.base;
+    only.set(b, (only.get(b) ?? true) && !!d.opts.shrink);
+  }
+  return new Set([...only].filter(([n, o]) => o && n.slice(n.lastIndexOf(".") + 1).startsWith("_") && !sheets.has(n)).map(([n]) => n));
+}
+
 /**
  * The warnings, one line each: `asset › where › what`, `where` being the placement or the rig slot,
  * and, for an animated scene, the frames it happens at. `file`: only the assets defined in the file of
@@ -292,6 +302,9 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   const failed: string[] = [];
   // by default what the file itself defines (what it includes is checked where it's defined)
   const own = (n: string) => !opts.file || (p.assets.get(n)?.loc ?? "").split(":")[0] === opts.file;
+  // a `_` part whose only use is as the base of shrunk sprites (a turnaround drawn 3 times over): the shrunk sprite is
+  // the game's, read by the genre's checks and its boxes; the part neither, nor counted
+  const shrunkOnly = shrinkBases(p);
   // the builds it goes through handed out to the workers, if any (workers.ts): each sprite's and anim's first frame,
   // every frame of an anim whose genre's checks read them
   if (p.elsewhere) for (const n of opts.names ?? p.order.filter(own)) {
@@ -349,7 +362,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       }
       // its boxes (c.setBox) inside each frame: every frame of an anim whose first frame has one (a
       // fighter's hurtbox is on every frame)
-      if (img.boxes) {
+      if (img.boxes && !shrunkOnly.has(name)) {
         const fr = def.kind === "anim" ? p.drawn(name).map((f) => f.img) : [img], out = new Map<string, number[]>();
         fr.forEach((im, i) => {
           for (const [k, bs] of Object.entries(im.boxes ?? {})) for (const [x, y, w, h] of bs)
@@ -359,7 +372,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         for (const [s, fs] of out) lines.push(`${name} › WARNING: box ${s}${fr.length > 1 ? ` (frame${fs.length > 1 ? "s" : ""} ${ranges(fs)})` : ""}: an engine reads it as it is; keep it inside, or give the asset room (w, h)`);
       }
       // the genre() it is made for: its checks on its frames (the height across directions is a family's, below)
-      if (def.opts.genre !== undefined) { lines.push(...genreLines(p, name, ran)); if (def.opts.category === "character" && p.genres.get(def.opts.genre)?.checks.includes("height")) tall.add(def.opts.genre); }
+      if (def.opts.genre !== undefined && !shrunkOnly.has(name)) { lines.push(...genreLines(p, name, ran)); if (def.opts.category === "character" && p.genres.get(def.opts.genre)?.checks.includes("height")) tall.add(def.opts.genre); }
       // a png at a density not its own: blown up, or shrunk from a finer drawing
       const pd = pngDensity(p, name);
       if (pd) { ran.density++; lines.push(...pd); }

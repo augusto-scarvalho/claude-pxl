@@ -210,6 +210,8 @@ export interface Card {
   tiles?: number | [number, number];
   /** what it is on a genre's scale curve (tree, bush, lamp: a key of genre()'s scale): its drafts sized by that box */
   category?: string;
+  /** a builder's colors by role: each role's materials ({ leaf: ["oak_summer"], bark: ["bark"] }), a material named as a role being that role; pxl lib draft paints them in a genre's `roles` */
+  roles?: Record<string, string[]>;
 }
 
 function checkArgs(name: string, args: unknown[]): void {
@@ -361,8 +363,8 @@ export class Project implements BuildCtx {
   private outerRamps = new Set<string>();
   /** look3d()'s light and mats: the 3D ops' when they don't say them, taken by each asset defined after it, as the palette is. */
   look3d?: { light?: number[]; mats?: Record<string, unknown> };
-  /** Set by a loader to support include(). */
-  includeHook?: (path: string) => void;
+  /** Set by a loader to support include(); `once`: the names it goes under (its `as` path), a file run once for them. */
+  includeHook?: (path: string, once?: string) => void;
   /** A loaded file as locations name it: the loader's (its path from the main file's folder), else its own name. */
   short: (file: string) => string = shortName;
   /** include's `as`: what the names the running file defines go under ("nature." while nature's runs). */
@@ -1238,7 +1240,9 @@ export class Project implements BuildCtx {
       if (!shared) this.outerRamps = new Set(pal.ramps);
       if (opts.as !== undefined) { this.ns = `${ns}${opts.as}.`; this.spaced = true; }
       this.depth++;
-      try { this.includeHook(path); } finally {
+      // (its palette its own: the loader runs it once for these names, its `as` path; with palette true or "mine" its colors
+      // go into the includer's, so it runs at each)
+      try { this.includeHook(path, opts.palette ? undefined : this.ns); } finally {
         for (const n of [...this.order.slice(from), ...this.sheets.slice(sheets).map((s) => s.name), ...this.models.slice(models).map((m) => m.name)]) this.included.add(n);
         this.ns = ns;
         // what the file included with "mine" takes its palette now it has run; this one's, once its includer has
@@ -1282,7 +1286,7 @@ export class Project implements BuildCtx {
     // card(name, { is, cells: { "hd2d/24": "✓" | [status, asset] }, vary?, tiles?, category?, draw? }): a library entry's card, just
     // after what it describes (pxl lib reads the rest off a build); card(name): its data, as genre() gives it
     env.card = (given: unknown, spec?: unknown) => {
-      const loc = this.callerLoc(), use = 'card("_lamp", { is: "what it is, a line", cells: { "hd2d/24": "✓" }, vary?, tiles?, category?, draw? }), or card(name): its data';
+      const loc = this.callerLoc(), use = 'card("_lamp", { is: "what it is, a line", cells: { "hd2d/24": "✓" }, vary?, tiles?, category?, draw?, roles? }), or card(name): its data';
       if (typeof given !== "string" || !given) throw new PxError(use, loc);
       const builder = given.startsWith("make3d."), has = (n: string) => this.assets.has(n) || this.groups.has(n) || this.figures.has(n) || this.turnarounds.has(n) || this.fonts.has(n);
       if (spec === undefined) {
@@ -1292,13 +1296,13 @@ export class Project implements BuildCtx {
       }
       const name = builder ? given : this.qualify(given), what = `card '${name}'`;
       if (!isPlainObject(spec)) throw new PxError(use, loc);
-      checkKeys(what, spec, ["is", "cells", "vary", "tiles", "category", "draw"], loc);
+      checkKeys(what, spec, ["is", "cells", "vary", "tiles", "category", "draw", "roles"], loc);
       const had = this.cards.get(name);
       if (had) throw new PxError(`${what} is already defined at ${had.loc}`, loc);
       const kind = builder ? (makers[given.slice(7)] ? "builder" : undefined) : this.figures.has(name) ? "rig3d" : this.turnarounds.has(name) ? "turnaround"
         : this.assets.get(name)?.kind ?? (this.groups.has(name) ? "group" : this.fonts.has(name) ? "font" : undefined);
       if (!kind) throw new PxError(`${what}: ${builder ? `${given} is no builder (make3d.define)` : `'${name}' is no asset, group, rig3d figure, turnaround or font defined before it`}${didYouMean(builder ? given.slice(7) : name, builder ? Object.keys(makers) : [...this.assets.keys(), ...this.groups.keys(), ...this.figures.keys()])}`, loc);
-      const { is, cells, vary, tiles, category, draw } = spec as { is?: unknown; cells?: unknown; vary?: unknown; tiles?: unknown; category?: unknown; draw?: unknown };
+      const { is, cells, vary, tiles, category, draw, roles } = spec as { is?: unknown; cells?: unknown; vary?: unknown; tiles?: unknown; category?: unknown; draw?: unknown; roles?: unknown };
       if (typeof is !== "string" || !is) throw new PxError(`${what}: is says what it is in a line (its silhouette, its parts, its look), got ${JSON.stringify(is)}`, loc);
       if (!isPlainObject(cells) || !Object.keys(cells).length) throw new PxError(`${what}: cells are where it exists, { "<camera>/<grid>": status or [status, asset] }: { "hd2d/24": "✓" }, got ${JSON.stringify(cells)}`, loc);
       const out: Card["cells"] = {};
@@ -1314,13 +1318,15 @@ export class Project implements BuildCtx {
       }
       if (!(vary === undefined || typeof vary === "string" || (isPlainObject(vary) && Object.entries(vary).every(([k, t]) => ["color", "part", "shape", "seed"].includes(k) && typeof t === "string"))))
         throw new PxError(`${what}: vary is what varies that its code doesn't show, a line, or one a channel: { color, part, shape, seed }, got ${JSON.stringify(vary)}`, loc);
-      if ((tiles !== undefined || draw !== undefined) && !builder) throw new PxError(`${what}: tiles and draw are a builder's (make3d.<name>): its box in tiles, its drawing call's options`, loc);
+      if ((tiles !== undefined || draw !== undefined || roles !== undefined) && !builder) throw new PxError(`${what}: tiles, draw and roles are a builder's (make3d.<name>): its box in tiles, its drawing call's options, its materials by role`, loc);
+      if (!(roles === undefined || (isPlainObject(roles) && Object.values(roles).every((m) => Array.isArray(m) && m.every((n) => typeof n === "string" && n)))))
+        throw new PxError(`${what}: roles are its materials by role, { leaf: ["oak_summer"], bark: ["bark"] } (a material named as a role is that role), got ${JSON.stringify(roles)}`, loc);
       const pos = (t: unknown) => typeof t === "number" && t > 0;
       if (!(tiles === undefined || pos(tiles) || (Array.isArray(tiles) && tiles.length === 2 && tiles.every(pos)))) throw new PxError(`${what}: tiles is its box in tiles, [tall, wide] ([2.5, 2.5]), or how many tall alone (2.5), got ${JSON.stringify(tiles)}`, loc);
       if (!(draw === undefined || isPlainObject(draw))) throw new PxError(`${what}: draw is its drawing call's options ({ mats, surface, light }), got ${JSON.stringify(draw)}`, loc);
       if (!(category === undefined || (typeof category === "string" && /^\w+$/.test(category)))) throw new PxError(`${what}: category is a key of a genre's scale (tree, bush, rock, lamp, house, character), got ${JSON.stringify(category)}`, loc);
       const data = { ...(spec as Record<string, unknown>), name };
-      this.cards.set(name, { name, kind, is, cells: out, ...(vary !== undefined ? { vary: vary as Card["vary"] } : {}), ...(tiles !== undefined ? { tiles: tiles as Card["tiles"] } : {}), ...(category !== undefined ? { category: category as string } : {}), ...(draw !== undefined ? { draw: draw as Record<string, unknown> } : {}), loc, ns: this.ns, data });
+      this.cards.set(name, { name, kind, is, cells: out, ...(vary !== undefined ? { vary: vary as Card["vary"] } : {}), ...(tiles !== undefined ? { tiles: tiles as Card["tiles"] } : {}), ...(category !== undefined ? { category: category as string } : {}), ...(draw !== undefined ? { draw: draw as Record<string, unknown> } : {}), ...(roles !== undefined ? { roles: roles as Card["roles"] } : {}), loc, ns: this.ns, data });
       return data;
     };
     // procedural texture, the same in every file: hash(i, j), vnoise(x, y), fbm(x, y, octaves), bayer(x, y)

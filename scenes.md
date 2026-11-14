@@ -1087,7 +1087,8 @@ Start a work from one:
    `pxl lib --genre topdown16`, and `pxl lib <entry>` for one's card and the `include` that takes it.
    A 3D entry it lacks: `pxl lib draft <entry> --genre topdown16` draws one in the genre (its camera,
    what stands at its pitch, fitted to the genre's box for the card's category, its tones and line)
-   to look at or clean by hand.
+   to look at or clean by hand, each material in the genre's colors for its role (its `roles`, its kit's keys:
+   `pxl lib platformer16` shows them), the rest in the builder's, said.
 3. Size each thing from the genre's `scale` × `grid` (the curve, §19): a character `[1.5, 1]` on a
    16 px grid is 24 px tall. Never size by eye.
 4. Name the genre on what you make (`genre: "hd2d"`), and `pxl check` runs its checks.

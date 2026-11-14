@@ -169,6 +169,8 @@ declare global {
     /** what it is on a genre's scale (a key of genre()'s scale: tree, pine, bush, boulder, lamp, house, character): pxl lib draft --genre sizes it by that box */
     category?: string;
     draw?: Record<string, unknown>;
+    /** a builder's materials by role ({ leaf: ["oak_summer"], bark: ["bark"] }; a material named as a role is that role): pxl lib draft --genre paints them in the genre's roles */
+    roles?: Record<string, string[]>;
   }
   interface PxGenre {
     camera?: { kind?: string; pitch?: number | Record<string, number> };
@@ -192,6 +194,8 @@ declare global {
     ink?: string | Record<string, unknown>;
     /** densities mixed on purpose (HD-2D's sprites in a finer world): pxl check doesn't warn at the mix */
     mix?: boolean;
+    /** the colors a 3D draft takes by role (pxl lib draft): each a ramp of keys dark to light in the palette of `from`'s file (a path from the genre's file: its kit's), else the genre's file's */
+    roles?: { from?: string; [role: string]: string | undefined };
     /** any other field, kept for the file to read (steer) */
     [field: string]: any;
   }

@@ -118,6 +118,20 @@ anim("odd", { frames: 2, fps: 10, w: 1, h: 1, genre: "fightin" }, (c) => c.px(0,
   assert.match(r.coverage, /genres' checks on 9 frames/);
 });
 
+test("genre checks: a `_` part only fed to a shrink (a turnaround drawn 3 times over) is neither read nor counted; the shrunk sprite is", () => {
+  // _big's hurt box leaves its frame, and the shrunk sprite carries it scaled (the car's _car3_* parts: 128 frames read
+  // for 64 turns)
+  const src = (also: string) => PAL + `genre("racing", { checks: ["footprint"] })
+sprite("_big", { w: 6, h: 6, genre: "racing" }, (c) => { c.rect(0, 0, 6, 6, "r"); c.setBox("footprint", 0, 3, 6, 3); c.setBox("hurt", 0, 0, 6, 9) })
+sprite("small", { base: "_big", shrink: { by: 3 }, genre: "racing" })${also}`;
+  const r = checkProject(loadSource(src(""), "t.px.js"));
+  assert.deepEqual(r.lines, ["small › WARNING: box 'hurt' [0, 0, 2, 3] leaves its 2x2 frame: an engine reads it as it is; keep it inside, or give the asset room (w, h)"]);
+  assert.match(r.coverage, /boxes on 1 frame, genres' checks on 1 frame[,;]/);
+  // a part a sprite takes as its plain base too is read, as before
+  const t = checkProject(loadSource(src(`\nsprite("big2", { base: "_big" })`), "t.px.js"));
+  assert.ok(t.lines.some((l) => l.startsWith("_big › WARNING: box 'hurt'")) && /genres' checks on 2 frames/.test(t.coverage), t.lines.join("\n") + t.coverage);
+});
+
 test("genre checks: its ink by category (a character near-black all round, \"own\" a line all round darker than its fill, its lit side named); a sprite's ink lines a drawing all round, one geometry every side, an L's elbow the fill's", () => {
   // a box lit from the upper left, its darkest along its lower right (a hand pass's line there: fill to the ink)
   const p = loadSource(PAL + `genre("td", { ink: { character: "#1a1620", prop: "own" } })

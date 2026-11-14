@@ -2,7 +2,7 @@
 // of it reads (size, pivot, contract, frames, roles, its source); a 3D entry drafted at a cell it lacks.
 // No art file: it reads pxl's own lib/.
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { PxError, didYouMean, distance } from "../core/errors.ts";
 import { animTimeline } from "../core/build.ts";
 import type { Img } from "../core/image.ts";
@@ -13,6 +13,8 @@ import { writeOutputs } from "./output.ts";
 export const LIB = join(import.meta.dirname, "..", "..", "lib");
 /** A path as the user's shell reaches it from where pxl runs. */
 const rel = (abs: string) => relative(process.cwd(), abs).split(sep).join("/");
+/** A file as pxl's repo names it (lib/nature/side.px.js). */
+const inRepo = (abs: string) => relative(join(LIB, ".."), abs).split(sep).join("/");
 const THREE = new Set(["surface", "mesh", "voxels", "volume", "draw3d", "splats", "decal"]);
 
 /** A library entry: its card, its file, how a scene takes it (`include(...)`, from the file's header) and the names it goes under. */
@@ -61,6 +63,46 @@ function genreOf(name: string, genres = catalog().genres): LibGenre {
   const g = genres.get(name);
   if (!g) throw new PxError(`--genre: no genre '${name}' in lib/profiles${didYouMean(name, genres.keys())} (there are: ${[...genres.keys()].join(", ") || "none"})`);
   return g;
+}
+
+/**
+ * A genre's colors by role (its `roles`: { from, leaf: "RKML", ... }): each role's ramp of keys, dark to light, in the
+ * palette of the file `from` names (a path from the genre's file: its kit's palette, never typed again), else of the
+ * genre's own file; with their colors as that file has them.
+ */
+export function genreRoles(G: LibGenre): { from: string; roles: Map<string, { keys: string; colors: string[] }> } | undefined {
+  if (G.g.roles === undefined) return undefined;
+  const { from, ...roles } = G.g.roles as Record<string, unknown>, file = typeof from === "string" ? resolve(dirname(G.file), from) : G.file, t = loadProject(file).pal.table();
+  const out = new Map<string, { keys: string; colors: string[] }>();
+  for (const [r, keys] of Object.entries(roles)) {
+    const gone = typeof keys === "string" ? [...keys].filter((k) => !(k in t)) : [];
+    if (typeof keys !== "string" || !keys || gone.length) throw new PxError(`genre '${G.g.name}': roles.${r} is a ramp of ${inRepo(file)}'s keys, dark to light ("RKML"), got ${JSON.stringify(keys)}${gone.length ? ` (not in its palette: ${gone.join(" ")})` : ""}`);
+    out.set(r, { keys, colors: [...keys].map((k) => t[k]) });
+  }
+  return { from: inRepo(file), roles: out };
+}
+const saidRoles = (R: NonNullable<ReturnType<typeof genreRoles>>, on?: Map<string, string[]>) =>
+  [...R.roles].filter(([r]) => !on || on.has(r)).map(([r, v]) => `${r} ${v.keys} (${v.colors.join(" ")})${on ? ` on ${on.get(r)!.join(", ")}` : ""}`).join(", ");
+
+/** pxl lib <genre>: a genre of lib/profiles as a card: its cell, its scale, tones and ink, and the colors its drafts take by role. */
+function genreCard(G: LibGenre): string[] {
+  const g = G.g, out = [`${g.name}: a genre (lib/profiles), its cell ${G.cell}`], row = (k: string, v: string) => out.push(`  ${k.padEnd(9)} ${v}`);
+  row("take", `include("${G.file.split(sep).join("/")}")  // its whole path, for an art file in any folder`);
+  if (g.scale) row("scale", `${Object.entries(g.scale as Record<string, number[]>).map(([k, [t, w]]) => `${k} ${t}x${w}`).join(", ")} (${g.grid ? "tiles" : g.ppm ? "m" : "px"}, tall x wide)`);
+  row("style", `tones ${js(g.tones ?? "-")}, ink ${js(g.ink ?? "-")}`);
+  const R = genreRoles(G);
+  row("colors", R ? `${saidRoles(R)}: ${R.from}'s keys. pxl lib draft paints a builder's materials of these roles in them, the rest in its own` : "no roles: pxl lib draft keeps a builder's own colors");
+  row("entries", `pxl lib --genre ${g.name}; a 3D entry in it: pxl lib draft <entry> --genre ${g.name}`);
+  row("code", `pxl list ${rel(G.file)} (its genre() at line ${String(g.loc ?? "").split(":")[1] ?? "-"})`);
+  return out;
+}
+
+/** The entry whose card names a drawing with no card of its own (oak_small in the oak's: "...; oak_small 32 x 40"), in its `is` or a cell, under the same `as`. */
+function namedBy(name: string, entries = catalog().entries): { e: Entry; own: string } | undefined {
+  const dot = name.lastIndexOf("."), ns = dot < 0 ? undefined : name.slice(0, dot), own = name.slice(dot + 1);
+  if (!/^\w+$/.test(own)) return undefined;
+  const word = new RegExp(`(^|[^\\w.])${own}\\b`), e = entries.find((e) => e.card.kind !== "builder" && (ns === undefined || e.as === ns) && (word.test(e.card.is) || Object.values(e.card.cells).some((v) => v.asset === own || v.asset === `${e.as}.${own}`)));
+  return e && { e, own };
 }
 
 /** pxl lib [--genre g] [--cell camera/density]: the entries by subject, a line each. */
@@ -147,7 +189,21 @@ const ms = (p: Project, n: string) => {
 
 /** pxl lib <entry>: its card, with what a build of it reads. */
 export function libCard(name: string): string[] {
-  const e = findEntry(name), c = e.card, p = loadProject(e.file), out = [`${e.name}: ${c.is}`];
+  let e: Entry, by: { e: Entry; own: string } | undefined, none: unknown;
+  try { e = findEntry(name); } catch (err) {
+    const G = catalog().genres.get(name);
+    if (G) return genreCard(G);
+    if (!(by = namedBy(name))) throw err;
+    e = by.e; none = err;
+  }
+  const c = e.card, p = loadProject(e.file), out = [`${e.name}: ${c.is}`];
+  if (by) {
+    // a drawing a card names: that card, and where the drawing is
+    // (a word of a card's line that is no drawing of its file, `pxl lib tree`: no entry, as before)
+    if (!p.assets.has(by.own)) throw none;
+    const img = p.build(by.own).img, cells = Object.entries(c.cells).map(([k, v]) => `${k} ${v.status} ${v.asset ?? "-"}`).join(", ");
+    out.unshift(`${name}: no card of its own, named by ${e.name}'s card (its cells ${cells}): ${img.w}x${img.h}, pivot ${img.pivot ? img.pivot.join(",") : "-"}, in ${rel(e.file)}. The card:`);
+  }
   const row = (k: string, v: string) => out.push(`  ${k.padEnd(9)} ${v}`);
   const ns = e.as, code = (s: string) => { try { return p.scope?.(s); } catch { return undefined; } };
   const kit = ns ? (code(`Object.keys(${ns})`) as string[] | undefined) : undefined;
@@ -207,6 +263,16 @@ export function libCard(name: string): string[] {
   return out;
 }
 
+/** A field's node, as sdf.ts builds it: its op, a material's name, what it is made of. */
+interface Node { node: { op: string; name?: string; of?: Node | Node[] } }
+/** The materials a field names (its mat() and paint() nodes), in order; those a paint function picks aren't known. */
+const matsOf = (f: Node, out = new Set<string>()): string[] => {
+  const n = f.node;
+  if ((n.op === "mat" || n.op === "paint") && n.name) out.add(n.name);
+  for (const k of Array.isArray(n.of) ? n.of : n.of ? [n.of] : []) matsOf(k, out);
+  return [...out];
+};
+
 /** A cell's camera where no genre gives one, as the profiles' (lib/profiles): side on, a top-down ground at 45 degrees, iso, HD-2D 38 down through a 30 degree lens. */
 const CAMS: Record<string, { pitch?: number; fov?: number }> = { side: { pitch: 0 }, topdown: { pitch: 45 }, iso: {}, hd2d: { pitch: -38, fov: 30 } };
 /** A value as the art file writes it: { kind: "side", pitch: 30 }. */
@@ -255,19 +321,32 @@ export function libDraft(name: string | undefined, at: { cell?: string; genre?: 
   const b = c.name.slice(7), p = loadProject(e.file), tall = (p.scope!(`make3d[${JSON.stringify(b)}]()`) as { field: { bounds(): number[][] } }).field.bounds()[1][2];
   // at a 16 px grid and under, a builder that takes `cluster` (its clusters' px) gets a tile: a crown a few masses
   const args = grid && grid <= 16 && "cluster" in (p.builders.get(b)?.params ?? {}) ? `{ cluster: ${grid} }` : "";
+  // its colors: each material its field names (mat(), paint()) by its role (its card's roles, else its own name), in the
+  // genre's ramp for that role (its kit's keys); a material whose role the genre doesn't name keeps the builder's
+  const R = at.genre !== undefined ? genreRoles(genreOf(at.genre)) : undefined, mats = R ? matsOf((p.scope!(`make3d[${JSON.stringify(b)}](${args})`) as { field: Node }).field) : [];
+  const roleOf = (m: string) => Object.entries(c.roles ?? {}).find(([, ms]) => ms.includes(m))?.[0] ?? m, by = new Map<string, string[]>();
+  const paints = !!c.draw && typeof c.draw.mats === "object";
+  if (paints) for (const m of mats) if (R!.roles.has(roleOf(m))) by.set(roleOf(m), [...(by.get(roleOf(m)) ?? []), m]);
+  const kept = mats.filter((m) => ![...by.values()].flat().includes(m));
+  const colors = !R ? "" : `in ${G.name}'s colors by role, ${R.from}'s keys: ${by.size ? saidRoles(R, by) : "none of its materials"}${kept.length ? `; the builder's own on ${kept.join(", ")} (${paints ? `roles ${G.name} doesn't name` : "its card's draw names no mats"})` : ""}`;
+  // (a material given as { ramp, strokes, hem } keeps the rest: only its ramp is the role's)
+  const id = (m: string) => (/^[A-Za-z_]\w*$/.test(m) ? m : JSON.stringify(m)), was = (m: string) => (c.draw?.mats as Record<string, unknown> | undefined)?.[m];
+  const tone = (m: string, cs: string[]) => (was(m) && typeof was(m) === "object" && !Array.isArray(was(m)) ? `{ ...card("${c.name}").draw.mats[${JSON.stringify(m)}], ramp: ${JSON.stringify(cs)} }` : JSON.stringify(cs));
+  const recolor = by.size ? `, mats: { ...card("${c.name}").draw.mats, ${[...by].flatMap(([r, ms]) => ms.map((m) => `${id(m)}: ${tone(m, R!.roles.get(r)!.colors)}`)).join(", ")} }` : "";
   const dir = resolve(out ?? join("out", "_draft")), base = `${b}_${at.genre ?? G.name.replace("/", "")}`, file = join(dir, `${base}.px.js`), up = relative(dir, e.file).split(sep).join("/");
   // its file as pxl's repo names it, for where an approved draft goes
-  const home = relative(join(LIB, ".."), e.file).split(sep).join("/"), s = `${base}_s`;
+  const home = inRepo(e.file), s = `${base}_s`;
   const size = want ? `${box!.length > 1 ? `a box ${box![0]} ${unit} tall, ${box![1]} wide` : `${box![0]} ${unit} tall`} (${gbox ? `${G.name}'s ${c.category}` : "its card's"}) ${grid ? `on a ${grid} px grid` : `at ${ppmG} px a meter`}` : `at ${ppmG} px a meter`;
   const how = `${args ? `, clusters a tile across (${args})` : ""}${tones ? `, in ${tones} tones` : ""}${ink === true ? `, each material lined in its own darkest (its ink "${mine}")` : ink ? `, a line of ${ink} all round` : ""}`;
-  const say = `pxl lib draft ${e.name} ${at.genre !== undefined ? `--genre ${at.genre}` : `--cell ${at.cell}`}: ${size}, seen ${seen}${how}: the ✎ draft to clean by hand, or ◐ to look at. Change its knobs here; approved, move the turnaround into ${home} and the cell into its card.`;
+  const say = `pxl lib draft ${e.name} ${at.genre !== undefined ? `--genre ${at.genre}` : `--cell ${at.cell}`}: ${size}, seen ${seen}${how}${colors ? `; ${colors}` : ""}: the ✎ draft to clean by hand, or ◐ to look at. Change its knobs here; approved, move the turnaround into ${home} and the cell into its card.`;
   const lines = say.split(" ").reduce<string[]>((ls, w) => { if (ls.length && (ls[ls.length - 1] + " " + w).length <= 104) ls[ls.length - 1] += " " + w; else ls.push(`// ${w}`); return ls; }, []);
   const spec = Object.fromEntries(["camera", "pitch", "stand", "grid", "ppm", "tones", "ink"].filter((k) => G[k] !== undefined && G[k] !== null).map((k) => [k, G[k]]));
   const src = (ppm: number) => [
     ...lines,
     `include("${up}"${e.opts ?? ""})`,
-    `genre("${G.name}", ${js(spec)})`,
-    `turnaround("${base}", make3d.${b}(${args}), { ...card("${c.name}").draw, ${ink ? `surface: { ...card("${c.name}").draw?.surface, ink: ${JSON.stringify(ink)} }, ` : ""}view: ${view(ppm)}, ppm: ${ppm}, headings: ["s"], genre: "${G.name}" })`,
+    // (a genre its entry's file includes already, trees.px.js's topdown32: the profile's own stands)
+    ...(p.genres.has(G.name) ? [] : [`genre("${G.name}", ${js(spec)})`]),
+    `turnaround("${base}", make3d.${b}(${args}), { ...card("${c.name}").draw, ${ink ? `surface: { ...card("${c.name}").draw?.surface, ink: ${JSON.stringify(ink)} }, ` : ""}view: ${view(ppm)}, ppm: ${ppm}, headings: ["s"]${recolor}, genre: "${G.name}" })`,
     "",
   ].join("\n");
   // fitted to the box: drawn, measured, the ppm scaled by how far off it is (a little under where it's over),
@@ -289,6 +368,7 @@ export function libDraft(name: string | undefined, at: { cell?: string; genre?: 
   const bb = img.bounds();
   return [
     `${e.name} at ${G.name}: ${want ? `${size}: ${want.length > 1 ? `${want[0]} px tall, ${want[1]} wide` : `${want[0]} px tall`}; drawn ${bb?.h ?? 0} tall, ${bb?.w ?? 0} wide${want[1] && kind === "side" && (bb?.w ?? 0) > want[1] ? ` (side on, its height fills the box; its own width)` : ""}` : size}, its ${tall.toFixed(1)} m at ${ppm} px/m${ppmG && ppm !== ppmG ? ` (drawn ${((bb?.h ?? 0) / ppmG).toFixed(1)} m at ${ppmG})` : ""}, seen ${seen}${how}`,
+    ...(colors ? [`  ${colors}`] : []),
     `  ${rel(file).padEnd(40)} the art file: change its knobs here`,
     `  ${rel(join(dir, "sprites", `${s}.png`)).padEnd(40)} ${img.w}x${img.h}, pivot ${img.pivot?.join(",") ?? "-"}${img.boxes?.footprint ? ", footprint" : ""}: the ✎ draft, or ◐ to look at`,
     `next: pxl shot ${rel(file)} ${s}. Approved: the turnaround into ${home}, the cell into its card (◐ as drawn, ✎ once retouched, ✓ frozen)`,
