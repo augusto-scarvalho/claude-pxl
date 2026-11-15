@@ -228,10 +228,13 @@ still hold, and the rest wait on these:
   steam off lava climbed past the height where its underside keeps the lava's red, and its rim
   dithered from birth, eating that red. Done: `steady: true`, and `thin: "age"` (a young puff
   whole, its rim crisp).
-- [ ] **`rig3d`'s head by the pose, at its depth**: `head` takes one `views()` set, stamped over
+- [x] **`rig3d`'s head by the pose, at its depth**: `head` takes one `views()` set, stamped over
   everything, so the warden's calm, grit and shout faces can't change with the pose, and an axe
   held before the face goes behind the head; `stampHead` (10 lines) still does both. `head` as a
-  function of the pose, and the head drawn at its depth, the nearer parts over it.
+  function of the pose, and the head drawn at its depth, the nearer parts over it. Done: `head:
+  (pose, j) => name`, and `over: [parts]` (each kept over the head where its mean depth under the head
+  is nearer than the head joint's, a line of the ink beside it); the warden's `stampHead` gone, its
+  frames the same.
 - [ ] **Big puffs with a tone inside and a light from below** (extinction's ash column):
   `plume`/`smoke` shade each puff in three flat bands, so at 10-90 px the column comes out a flat
   diagonal sheet without its modeled billows, and nothing lights it from below (the crater's fire).

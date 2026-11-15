@@ -394,23 +394,13 @@ const WFACE3 = {
 const LIGHT3 = [-0.6, -0.45, 0.65]
 for (const look of ["calm", "grit", "shout"]) views(look === "calm" ? "_whead" : `_whead_${look}`, sdf.union(WSKULL, WHAIR), { pitch: 12, light: LIGHT3, ink: "k",
   anchor: { s: [6, 8], se: [6, 8], e: [7, 8], w: [7, 8], sw: [6, 8] }, retouch: WFACE3[look] })
-// the head stamped by the look on the head joint; the axe and the tail of hair kept over it where they
-// are nearer, a line on the head round them
-const stampHead = (c, j, p) => {
-  const ids = c.img.parts?.ids, names = c.img.parts?.names ?? [], near = (q) => j.depth(q) > j.depth(j.head), data = c.img.data
-  const over = new Set([...(near(j.arms[1].hand) ? ["axe"] : []), ...(near(sub(j.head, mul(j.hd.f, 5))) ? ["tail"] : [])].map((n) => names.indexOf(n)))
-  const keep = ids ? [...ids.keys()].filter((i) => over.has(ids[i])) : [], was = keep.map((i) => data[i]), before = data.slice()
-  const [x, y] = j.screen(j.head).map(Math.round)
-  c.stamp(p.look === "calm" ? "_whead" : `_whead_${p.look}`, x, y, { heading: j.hd.heading })
-  const kept = new Set(keep.filter((i, n) => data[i] !== was[n])), ink = c.color("k")
-  keep.forEach((i, n) => { data[i] = was[n] })
-  for (const i of kept) for (const d of [1, -1, c.img.w, -c.img.w]) if (!kept.has(i + d) && data[i + d] !== before[i + d] && !over.has(ids[i + d])) data[i + d] = ink
-}
 
-// ---- the figure: the moves on rig3d, 12 degrees down, lit from the upper left in front
+// ---- the figure: the moves on rig3d, 12 degrees down, lit from the upper left in front; the head by the
+// look, the axe and the tail of hair kept over it where they are nearer (a line on the head round them)
 const B3 = { h: 48, hip: HIP, torso: TORSO, neck: NECK, thigh: THIGH, shin: SHIN, upper: UPPER, fore: FORE, ankle: 2, hips: HIPW, shoulders: [0, SHW, -1] }
 const R = rig3d("_warden", { body: B3, headings: ["s"], pitch: 12, w: W, h: H, pivot: [OX, OY], light: LIGHT3, ink: "k", parts: parts3,
-  moves: { combo: { frames: FRAMES, ms: 1000 / 11, pose: (i) => pose3(i), draw: stampHead } } })
+  head: (p) => (p.look === "calm" ? "_whead" : `_whead_${p.look}`), over: ["axe", "tail"],
+  moves: { combo: { frames: FRAMES, ms: 1000 / 11, pose: (i) => pose3(i) } } })
 
 // The blade's edge always faces the way the cut goes, so it never strikes with the flat or the back
 // like a club. Where the axe head cuts (moves fast into a frame with a smear), that is the way it

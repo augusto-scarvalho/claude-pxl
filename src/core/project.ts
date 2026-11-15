@@ -1015,8 +1015,8 @@ export class Project implements BuildCtx {
       try {
         if (typeof given !== "string" || !given || !isPlainObject(opts)) throw new PxError('rig3d("tr", { body: { h: 34, heads: 3 }, moves: { walk: { frames: 8, ms: 110, pose: (i, heading) => ({ feet, lift, hands }) } }, n: 8, blocks: true })');
         const name = this.qualify(given);
-        checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "ink", "surface", "head", "chin", "blocks", "mirror", "draw", "genre", "category", "soles"]);
-        const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; ink?: unknown; surface?: Record<string, unknown>; head?: unknown; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown; genre?: string; category?: string; soles?: unknown };
+        checkKeys("rig3d", opts, ["body", "moves", "n", "headings", "pitch", "w", "h", "pivot", "parts", "mats", "light", "outline", "inner", "ink", "surface", "head", "over", "chin", "blocks", "mirror", "draw", "genre", "category", "soles"]);
+        const o = opts as { body?: Record<string, unknown>; moves?: unknown; n?: number; headings?: unknown; pitch?: number; w?: number; h?: number; pivot?: number[]; parts?: unknown; mats?: Record<string, unknown>; light?: number[]; outline?: unknown; inner?: unknown; ink?: unknown; surface?: Record<string, unknown>; head?: unknown; over?: string[]; chin?: unknown; blocks?: unknown; mirror?: unknown; draw?: unknown; genre?: string; category?: string; soles?: unknown };
         if (o.surface !== undefined) { if (!isPlainObject(o.surface)) throw new PxError("rig3d: surface is surface()'s options for the painted figure ({ soft, shadows, ao, rim, ... })"); checkKeys("rig3d surface", o.surface, SURFACE_OPTS.filter((k) => !["view", "ppm", "at", "part"].includes(k))); }
         if (o.chin !== undefined && typeof o.chin !== "string" && !(Array.isArray(o.chin) && o.chin.length === 2 && o.chin.every((k) => typeof k === "string" && k) && !o.head))
           throw new PxError(`rig3d: chin is a key (the line under the head), or with a head modeled [key, the skin's ramp] (the line under the jaw only), got ${JSON.stringify(o.chin)}`);
@@ -1032,7 +1032,8 @@ export class Project implements BuildCtx {
         if (o.parts !== undefined && typeof o.parts !== "function") throw new PxError("rig3d: parts is (j, pose) => ({ name: piece or [pieces] }): j.limb(a, b, r0, r1, paint), j.ball(c, r, paint) or fields");
         if (!o.parts && prefix === undefined) throw new PxError("rig3d: give it parts (the figure painted) or blocks (its flat blocks), or both");
         for (const k of ["draw"] as const) if (o[k] !== undefined && typeof o[k] !== "function") throw new PxError(`rig3d: ${k} is (c, j, pose) => { ... }`);
-        if (o.head !== undefined && typeof o.head !== "string") throw new PxError(`rig3d: head names a views() set (or a group of compass-named views) stamped on the head, got ${JSON.stringify(o.head)}`);
+        if (o.head !== undefined && typeof o.head !== "string" && typeof o.head !== "function") throw new PxError(`rig3d: head names a views() set (or a group of compass-named views) stamped on the head, or is (pose, j) => that name, got ${JSON.stringify(o.head)}`);
+        if (o.over !== undefined && !(o.head && Array.isArray(o.over) && o.over.every((n) => typeof n === "string"))) throw new PxError(`rig3d: over names the parts kept over the head where they are nearer than it (["axe", "tail"]), with a head, got ${JSON.stringify(o.over)}`);
         if (!isPlainObject(o.moves) || !Object.keys(o.moves).length) throw new PxError("rig3d: moves is { walk: { frames, ms, pose: (i, heading) => pose, dirs?, draw? }, ... }");
         const moves = Object.entries(o.moves).map(([m, M]) => {
           if (!isPlainObject(M)) throw new PxError(`rig3d: move '${m}' is { frames, ms, pose, dirs?, draw? }`);
@@ -1148,15 +1149,31 @@ export class Project implements BuildCtx {
             }
             for (const D of P.decals) c.decal(D.asset, { on: D.on ?? P.field, point: D.point, ...(D.views ? { views: D.views } : {}), ...(D.up ? { up: D.up } : {}), ...(D.lit !== undefined ? { lit: D.lit } : {}), ...(D.depth !== undefined ? { depth: D.depth } : {}), ...(o.surface?.clean !== false ? { clean: true } : {}), view, ppm: 1, at, light, part: D.part });
             if (o.ink !== undefined) ring(c);
-            const head = o.head as string | undefined;
-            if (head) {
-              // the head by hand over all, the view its heading's; a line of `chin` under it where it meets the body
-              const [hx, hy] = screen(j.head).map(Math.round), img = c.asset(head, { heading: j.hd.heading }), [ax, ay] = img.pivot ?? [0, 0], x0 = hx - Math.floor(ax), y0 = hy - Math.floor(ay);
+            const head = typeof o.head === "function" ? (o.head as (p: Pose, j: Joints) => unknown)(p, j) : o.head;
+            if (head !== undefined) {
+              // the head by hand over all (its set by the pose where head is a function), the view its heading's; a line of
+              // `chin` under it where it meets the body
+              let img: Img;
+              try {
+                if (typeof head !== "string" || !head) throw new PxError(`head(pose, j) gives a views() set's name, got ${JSON.stringify(head)}`);
+                img = c.asset(head, { heading: j.hd.heading });
+              } catch (e) { throw wrap(e).within(`rig3d head at frame ${c.frame}`); }
+              const [hx, hy] = screen(j.head).map(Math.round), [ax, ay] = img.pivot ?? [0, 0], x0 = hx - Math.floor(ax), y0 = hy - Math.floor(ay);
+              const ids = o.over && c.img.parts?.ids.slice(), was = ids && c.img.data.slice();
               c.stamp(head, hx, hy, { heading: j.hd.heading });
               if (typeof o.chin === "string") for (let x = 0; x < img.w; x++) {
                 let r = img.h - 1;
                 while (r >= 0 && (img.data[r * img.w + x] & 255) < 128) r--;
                 if (r >= 0 && c.get(x0 + x, y0 + r + 1)) c.px(x0 + x, y0 + r + 1, o.chin);
+              }
+              // `over`: those parts kept over the head where they are nearer (each whole: its mean depth where the head
+              // covers it against the head joint's), a line of the ink on the head's pixels beside them
+              if (ids && was) {
+                const { data, w: W } = c.img, Z = c.img.depth!, names = c.img.parts!.names, at = new Map<number, number[]>(), kept = new Set<number>();
+                for (let i = 0; i < data.length; i++) if (ids[i] >= 0 && data[i] !== was[i] && o.over!.includes(names[ids[i]])) { const a = at.get(ids[i]) ?? [0, 0]; a[0] += Z[i]; a[1]++; at.set(ids[i], a); }
+                const near = new Set([...at].filter(([, [s, n]]) => s / n < -depth(j.head)).map(([k]) => k)), line = c.color(ink)!;
+                for (let i = 0; i < data.length; i++) if (near.has(ids[i]) && data[i] !== was[i]) { kept.add(i); data[i] = was[i]; }
+                for (const i of kept) for (const d of [1, -1, W, -W]) if (!kept.has(i + d) && data[i + d] !== was[i + d]) data[i + d] = line;
               }
               hd = { at: (x, y) => x >= x0 && y >= y0 && x < x0 + img.w && y < y0 + img.h && (img.data[(y - y0) * img.w + x - x0] & 255) >= 128, z: -depth(j.head) };
             }

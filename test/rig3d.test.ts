@@ -142,6 +142,29 @@ rig3d("f", { body: { h: 30, heads: 3 }, headings: ["s"], parts, moves: { strike:
   assert.throws(() => loadSource(`${PAL}rig3d("e", { blocks: true, moves: { m: { frames: 2, ms: [60], pose: () => ({}) } } })`, "t.px.js"), /a list, a number a frame/);
 });
 
+test("rig3d: head by the pose ((pose, j) => a views() set); over keeps a part over the head where it is nearer (a line of the ink on the head beside it), under it where not", () => {
+  // a bar across the head, before the face in one move and behind it in the other; a head of its own in each
+  const src = (head: string, over = "") => `use("pico8"); pal({ k: 0, w: 7, b: 12, r: 8, y: 10 })
+views("_ha", { s: "rrrrrrr\\n".repeat(6) + "rrrrrrr" }, { anchor: [3, 3] })
+views("_hb", { s: "yyyyyyy\\n".repeat(6) + "yyyyyyy" }, { anchor: [3, 3] })
+rig3d("h", { headings: ["s"], ink: "k", head: ${head}${over}, moves: { front: { frames: 1, pose: () => ({ i: 0 }) }, back: { frames: 1, pose: () => ({ i: 1 }) } },
+  parts: (j, p) => ({ body: j.limb(j.pelvis, j.chest, 3, 3, "w"), bar: j.limb([-7, p.i ? 5 : -5, j.head[2]], [7, p.i ? 5 : -5, j.head[2]], 1.2, 1.2, "b") }) })`;
+  const byPose = '(p) => (p.i ? "_hb" : "_ha")', p = loadSource(src(byPose, ', over: ["bar"]'), "t.px.js");
+  // the head's 7x7 from its top-left pixel of key k
+  const box = (q: typeof p, name: string, k: string) => {
+    const rows = keys(q, name).split("\n"), y = rows.findIndex((r) => r.includes(k)), x = Math.min(...rows.filter((r) => r.includes(k)).map((r) => r.indexOf(k)));
+    return rows.slice(y, y + 7).map((r) => r.slice(x, x + 7)).join("\n");
+  };
+  const front = box(p, "h_front_s", "r");
+  assert.ok(/b/.test(front) && /k/.test(front) && /r/.test(front), front);
+  assert.match(box(p, "h_back_s", "y"), /^(y{7}\n){6}y{7}$/, "behind, under the head (the pose's)");
+  assert.match(keys(p, "h_back_s"), /b/, "the bar beside the head");
+  // without over, the head over all as before
+  assert.match(box(loadSource(src(byPose), "t.px.js"), "h_front_s", "r"), /^(r{7}\n){6}r{7}$/);
+  assert.throws(() => loadSource(src('() => "_nope"'), "t.px.js").image("h_front_s"), /rig3d head at frame 0/);
+  assert.throws(() => loadSource(src("undefined", ', over: ["bar"]'), "t.px.js"), /over names the parts/);
+});
+
 test("dress() (lib/characters/traveler.px.js): the shirt's body swept along the spine; spine: false, round an upright through the hips", () => {
   // a point on the spine under the chest of a figure leaning 30 degrees: inside the one, outside the other
   const f = join(mkdtempSync(join(tmpdir(), "pxl-")), "t.px.js");
