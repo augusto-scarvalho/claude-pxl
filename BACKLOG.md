@@ -207,14 +207,19 @@ lines).
   that fades whole puffs (`thin: "dither" | "fade"`). Before extinction's refresh (C13). Done: puffs
   smaller than the default stray less, in proportion (bigger ones keep its stray: the train's
   unchanged), and `thin: "shrink"` takes a puff away whole instead of dithering it.
-- [ ] **A light's own color on an emitting sprite**: `effect("emit")` whitens the glass, and the
+- [x] **A light's own color on an emitting sprite**: `effect("emit")` whitens the glass, and the
   light a mesh() sprite gives is the mean of those pixels times the emit's strength, so the plaza's
   lamps by emit lit a pale pool at half strength (strength 3.2 brings the strength back, nothing
   the warmth). `light: { color }` on the sprite, apart from its pixels.
-- [ ] **`selout` / `floor` per layer**: they're the whole sprite's, so `floor: "k"` takes the black
+  Done (F3 small): `light: { color }` takes the place of the pixels' mean, still times the emit's strength (a
+  pulse keeps pulsing; `strength: 2` makes up the default 0.5); the plaza keeps its hand lamps until the user sees it.
+- [x] **`selout` / `floor` per layer**: they're the whole sprite's, so `floor: "k"` takes the black
   off the sword too (the blade's line goes pale steel and stops reading on grass), and on the
   knight's plates the seams go dark steel and the plates part less. Layers already take
   `outline: false`; the same for these.
+  Done (F3 small): a layer's `selout` (false, true, n) and `floor` ("k", false), over the asset's, for the line where it
+  touches that layer's pixels, through mirror, flip, rot and angle as `outline: false` is. The hero and the knight
+  draw their swords and plates in rig hooks and parts, not layers: no art moved onto it.
 - [ ] **The plaza's cobbles drawn larger** (`lib/architecture/surfaces.px.js`'s `_cobble`): at 16 texels to
   the meter a texel is 1.5 px, so the stones come out 7 and 9 px wide by turns; with `texel:
   "screen"` they shrink to 2/3 and the paving gets busy behind the figures. Stones drawn about
@@ -242,9 +247,11 @@ still hold, and the rest wait on these:
 - [ ] **`views()` closing the cheek into a chin**: the same jowl under the ear in the 3/4 and
   profile views is mended by hand in five of the crew's heads, and a bald crown comes out a shiny
   egg. A `views()` option that closes the cheek into a chin n px deep in those views.
-- [ ] **`palettize: "rest"`**: `palettize` runs at load, before the items, so trees mapped by
+- [x] **`palettize: "rest"`**: `palettize` runs at load, before the items, so trees mapped by
   `rampmap` leave every color no `rampmap` takes (the LPC trees' #101820 line) off the palette.
   `"rest"`, applied after the items, to what's left.
+  Done (F3 small): `palettize: "rest"` snaps after the items (before the line), so only what they left off the
+  palette moves; the tropical trees keep `palettize: true` until the user sees them mapped.
 
 ## From the library's catalog (library F4)
 

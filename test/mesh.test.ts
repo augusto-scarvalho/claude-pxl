@@ -285,6 +285,15 @@ test("mesh emission: what gives light is drawn as it is and lights the floor rou
   }
 });
 
+test("mesh emission: light: { color } gives the sprite's light a color of its own, apart from its pixels'", () => {
+  const at = (o: string) => glow(`scene("a", { w: 40, h: 40 }, night([{ name: "_gem_lit", at: [0, 4], shadow: 0${o} }]))`);
+  const blue = at(""), red = at(', light: { color: "r" }'), ch = (i: Img, sh: number) => (i.get(20, 21) >>> sh) & 255;
+  assert.ok(ch(red, 24) > ch(blue, 24) + 10 && ch(red, 8) < ch(blue, 8) - 10, "the floor before the blue gem lit red");
+  assert.equal(red.get(19, 18), blue.get(19, 18), "its pixels as they are");
+  assert.equal(at(", light: {}").get(20, 23), blue.get(20, 23), "not given: their color");
+  assert.match(failure(PAL + STAGE + GLOW + `scene("a", { w: 40, h: 40 }, night([{ name: "_gem_lit", at: [0, 4], light: { color: "." } }]))`, "a").message, /color \(a key or "#hex"\)/);
+});
+
 test("mesh dissolve: a face's holes show what is behind it and let the sun through; progress 0 changes nothing", () => {
   const wall = (d: string, sun = "") => rows(`const D = model(); D.face("f", [-9, 1.5, 0], [9, 1.5, 0], [9, 60, 0], [-9, 60, 0]); D.box("stone", [-1.5, 3, 0], [1.5, 3.2, 1.5])
 scene("a", { w: 40, h: 40 }, (c) => c.mesh(V, D.faces, { f: { tex: "_white" }, stone: { ramp: "kg"${d} } }, { sprites: [{ name: "s", at: [0, 4], shadow: 0 }]${sun} }))`);

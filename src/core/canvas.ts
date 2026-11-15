@@ -1108,7 +1108,8 @@ export class Canvas {
       if (s.veil !== undefined && !(s.veil >= 0 && s.veil <= 1 && s.blend === "alpha")) throw new PxError(`mesh: sprite ${k} has veil ${JSON.stringify(s.veil)}: the share of the sun a sprite blended "alpha" holds back, 0..1`);
       if (s.air !== undefined && typeof s.air !== "boolean") throw new PxError(`mesh: sprite ${k} has air ${JSON.stringify(s.air)}: true when it flies (check doesn't ask its feet to be on the model)`);
       if (s.id !== undefined && typeof s.id !== "string") throw new PxError(`mesh: sprite ${k} has id ${JSON.stringify(s.id)}: a name for its sockets ("hero": "hero.hand")`);
-      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, veil: s.veil, light: s.light, air: s.air };
+      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, veil: s.veil, light: s.light, air: s.air,
+        ...(s.light && s.light.color !== undefined ? { tint: this.color(s.light.color) } : {}) };
     });
     // looked up on first use: a palette without ramps has nothing to step (and needs nothing stepped without textures or sprites)
     let maps: Map<Color, Color>[] | undefined;

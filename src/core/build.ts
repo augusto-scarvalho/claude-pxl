@@ -275,7 +275,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     if (fw < 1) throw new PxError(`png is ${def.png.w}px wide: too narrow for ${n} frames`);
     base = n > 1 ? def.png.sub(frame * fw, 0, fw, def.png.h) : def.png.copy();
     if (def.mirror) base = base.flip("x");
-    if (opts.palettize) base = base.remap(pal.snapMap(base.data));
+    if (opts.palettize === true) base = base.remap(pal.snapMap(base.data));
   } else {
     let { w, h } = opts;
     if (!w || !h) {
@@ -311,8 +311,11 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   let under: Img | undefined;
   // Pixels of solid / wall layers, for lighting().
   let solid: Uint8Array | undefined, wall: Uint8Array | undefined, unlit: Uint8Array | undefined;
-  // Pixels of `outline: false` layers still showing: the asset's outline isn't drawn around them.
+  // Pixels of `outline: false` layers still showing (the asset's outline isn't drawn around them), and of layers with
+  // their own selout / floor: each its layer's place in `tags`, 1 up.
   let loose: Uint8Array | undefined;
+  const tags: LayerOpts[] = [];
+  if (![undefined, true, false, "rest"].includes(opts.palettize)) throw new PxError(`palettize is true (a png's colors to the nearest keys, before the items) or "rest" (after them, what they left off the palette), got ${fmtArgs([opts.palettize])}`);
   if (![undefined, true, false, "x", "y"].includes(opts.wrap)) throw new PxError(`wrap must be true, "x" or "y", got ${fmtArgs([opts.wrap])}`);
   const edges = opts.wrap ? { x: opts.wrap !== "y", y: opts.wrap !== "x" } : undefined;
   const maps: TileLayer[] = [];
@@ -461,9 +464,11 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
       }
       if (l.opts.outline !== undefined && l.opts.outline !== false)
         throw new PxError(`layer '${l.name}': outline can only be false (its pixels left out of the asset's outline), got ${fmtArgs([l.opts.outline])}`, l.loc);
-      if (l.opts.outline === false || loose) {
+      // a line of its own (left out of it, or its own selout / floor): its pixels tagged with its opts, 1 up
+      const own = l.opts.outline === false || l.opts.selout !== undefined || l.opts.floor !== undefined;
+      if (own || loose) {
         loose ??= new Uint8Array(base.data.length);
-        const v = l.opts.outline === false ? 1 : 0;
+        const v = own ? tags.push(l.opts) : 0;
         for (let i = 0; i < loose.length; i++) if (limg.data[i] !== TRANSPARENT) loose[i] = v;
       }
     }
@@ -482,7 +487,9 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     register(base, refs.map((r) => r.img), opts.register, pal, frame);
     snap?.(`register on '${typeof opts.register === "string" ? opts.register : opts.register.key}'`, def.loc);
   }
-  const img = finish(base, def, pal, trace, loose);
+  // palettize "rest": what the items left off the palette (the colors no rampmap took) to the nearest key
+  if (opts.palettize === "rest") { base = base.remap(pal.snapMap(base.data)); snap?.("palettize rest", def.loc); }
+  const img = finish(base, def, pal, trace, loose, tags);
   // the whole world: the camera's box on it, a magenta line round what it shows this frame
   if (whole && cam) for (let i = 0; i < opts.w!; i++) for (let j = 0; j < opts.h!; j++) if (!i || !j || i === opts.w! - 1 || j === opts.h! - 1) img.set(cam[0] + i, cam[1] + j, pack(255, 0, 255));
   trace?.finish(img);
@@ -620,21 +627,23 @@ function inferSize(items: Item[]): { w: number; h: number } {
 
 /** facing -> the front's direction in picture space (x right, y down, z into the picture). */
 
-function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Uint8Array): Img {
+function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Uint8Array, tags: LayerOpts[] = []): Img {
   const o = def.opts;
-  // `outline: false` layers: their pixels, as a mask moved along with the art until the line is drawn
+  // the layers with a line of their own: their pixels, each its tag (an opaque color), as a mask moved along with the
+  // art until the line is drawn
   let mask: Img | undefined;
   if (loose?.some((v) => v) && (o.outline || o.outline8 || o.inline)) {
     mask = new Img(img.w, img.h);
-    for (let i = 0; i < loose.length; i++) if (loose[i]) mask.data[i] = 0xffffffff;
+    for (let i = 0; i < loose.length; i++) if (loose[i]) mask.data[i] = (loose[i] << 8) | 255;
   }
+  const tag = (x: number, y: number) => (mask ? mask.get(x, y) >>> 8 : 0);
   const step = (label: string, f: () => Img | void, m?: (k: Img) => Img) => {
     const r = f();
     if (r) img = r;
     if (mask && m) mask = m(mask);
     trace?.record(label, def.loc, img);
   };
-  const skip = () => mask && Uint8Array.from(mask.data, (c) => (c === TRANSPARENT ? 0 : 1));
+  const skip = () => mask && Uint8Array.from(mask.data, (c) => (tags[(c >>> 8) - 1]?.outline === false ? 1 : 0));
   // [x, y] is in drawing coords and moves with flip/rot/outline/crop; keywords use the final size.
   const pv = o.pivot;
   if (pv !== undefined && !(pv === "bottom" || pv === "center" || (Array.isArray(pv) && pv.length === 2 && pv.every(Number.isFinite))))
@@ -687,7 +696,14 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
   const floor = o.floor === undefined ? undefined : pal.floorOf(o.floor);
   const sel = o.selout ? seloutPick(pal, o.selout === true ? 2 : o.selout, floor) : undefined;
   if (o.selout && !o.outline && !o.outline8 && !o.inline) throw new PxError("selout recolors a line: add outline, outline8 or inline");
-  const as = (c: Color) => (sel ? (t: Color) => sel(t, c) : undefined);
+  // a layer's own selout / floor, over the asset's, for the line round its pixels (false: none)
+  const mine = tags.map((t) => {
+    const s = t.selout ?? o.selout, f = t.floor ?? o.floor;
+    if ((t.selout !== undefined || t.floor !== undefined) && !o.outline && !o.outline8 && !o.inline) throw new PxError("a layer's selout and floor recolor the asset's line: add outline, outline8 or inline");
+    if (t.floor && !s) throw new PxError("a layer's floor stops selout's steps above those keys: give the layer or the asset selout");
+    return s ? seloutPick(pal, s === true ? 2 : s, f ? pal.floorOf(f) : undefined) : undefined;
+  });
+  const as = (c: Color) => (sel || mine.some(Boolean) ? (t: Color, x: number, y: number) => { const p = tag(x, y) ? mine[tag(x, y) - 1] : sel; return p ? p(t, c) : c; } : undefined);
   if (o.inline) {
     // inline: "k", or { color: "k", keep: "Kk12" } to close only the gaps of an outline already there
     const spec = typeof o.inline === "string" ? { color: o.inline } : o.inline;

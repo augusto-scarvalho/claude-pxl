@@ -101,7 +101,9 @@ declare global {
     /** Seamless tile: drawing past these edges continues on the other side; previews repeat 3x3. */
     wrap?: boolean | "x" | "y";
     /** Start from a PNG file (relative to the art file); anims with frames split it into a strip. */
-    png?: string; area?: [number, number, number, number]; palettize?: boolean;
+    png?: string; area?: [number, number, number, number];
+    /** With png: its colors to the nearest keys, at load; "rest": after the items, only what they left off the palette (what no rampmap took). */
+    palettize?: boolean | "rest";
     /** With png: a frozen cell, the png a render of this (live) asset: the build reads the PNG, pxl check warns when the live render drifted; no PNG yet, the build writes it. */
     frozen?: string;
     /** With png: this "#rrggbb" read as clear, before area, shrink and palettize (a ripped sheet's cell fill). */
@@ -218,6 +220,8 @@ declare global {
     ref?: boolean | number;
     /** false: the asset's outline isn't drawn around this layer's pixels (1px ropes, pegs, smears stay 1px). */
     outline?: false;
+    /** The asset's selout and floor for its line round this layer's pixels, false none: a sword's plain ink (selout: false) by a body's selout: 2, floor: "k". */
+    selout?: boolean | number; floor?: string | false;
   }
   interface PxPose {
     /** Joint (x, y) lands at (x * scale + x, y * scale + y). */
@@ -315,8 +319,8 @@ declare global {
     fx?: PxEffect | PxEffect[];
     /** laid over what is behind by its alpha (smoke: "alpha"; light: "add", "screen"), no shadow; `veil` (an "alpha" one): the share of the sun its pixels hold back, a faint shadow */
     blend?: "alpha" | "add" | "screen"; opacity?: number; veil?: number;
-    /** the light its effect("emit") pixels give round them: r m, strength, a lamp for `each` part glowing apart; false for none */
-    light?: false | { r?: number; strength?: number; each?: boolean };
+    /** the light its effect("emit") pixels give round them: r m, strength, a lamp for `each` part glowing apart, `color` its own in place of its pixels' (still times the emit's strength); false for none */
+    light?: false | { r?: number; strength?: number; each?: boolean; color?: PxColor };
     /** its feet on the model: on the highest face looking up under it (true), or on those materials'; `air`: it flies or hangs (check doesn't ask its feet to be on the model) */
     stand?: boolean | string[]; air?: boolean }
   /** mesh()'s light: the way toward it in the points' frame, or a face's light (0 dark, 1 lit) from its normal toward the eye, its middle, the face; sprites standing among the faces (a perspective view). */

@@ -45,6 +45,9 @@ export interface LayerOpts {
   unlit?: boolean;
   /** false: the asset's outline isn't drawn around this layer's pixels (1 px ropes, pegs, smears). */
   outline?: false;
+  /** The asset's selout and floor for the line round this layer's pixels (false: none; a sword's plain ink by a body's selout). */
+  selout?: boolean | number;
+  floor?: string | false;
   /**
    * Reference / guide layer: previews show it over the art (true = full strength, 0..1 = that
    * strength over drawn pixels); the exported PNG, sheets and stamps of this asset leave it out.
@@ -127,8 +130,8 @@ export interface AssetOpts {
   area?: [number, number, number, number];
   /** With `png`: this "#rrggbb" read as clear (a ripped sheet's cell fill, #ff00ff), before `area`, `shrink` and `palettize`. */
   key?: string;
-  /** Snap the PNG's colors to the nearest keyed palette color. */
-  palettize?: boolean;
+  /** Snap the PNG's colors to the nearest keyed palette color; "rest": after the items, what they left off the palette. */
+  palettize?: boolean | "rest";
   /**
    * Shrink the PNG by this whole factor: each n x n block becomes its most common opaque color
    * (ties: the first, scanning the block column by column), or transparent when fewer than half

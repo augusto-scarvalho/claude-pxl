@@ -105,9 +105,10 @@ export interface MeshSprite {
   /**
    * the light its emitting pixels (effect("emit")) give round it, a lamp at their middle: how far (m,
    * default 3), how strong (default 1); `each`: a lamp for each part that glows apart from the others
-   * (two lanterns on a beam), the strength shared by their pixels; false for none
+   * (two lanterns on a beam), the strength shared by their pixels; `color`: its own (a key or "#hex") in
+   * place of its pixels' mean, still times the emit's strength; false for none
    */
-  light?: false | { r?: number; strength?: number; each?: boolean };
+  light?: false | { r?: number; strength?: number; each?: boolean; color?: string };
 }
 export interface MeshOpts {
   /** the way toward the light, in the points' frame, or a function giving a face's light (0 dark, 1 lit) */
@@ -155,7 +156,7 @@ export interface MeshWorld {
   masks?: Record<string, Img>;
   /** a dissolving material's look, its keys resolved: the edge's keys over the progress (or the neutral ring's tone), its char, its glow */
   looks?: Record<string, { over?: Color[][]; neutral?: Color; char?: { width: number; tones: Color[]; amount: number; desat: number }; glow: number }>;
-  sprites: { name: string; img: Img; at: V3; shadow?: number; blend?: MeshSprite["blend"]; opacity?: number; veil?: number; light?: MeshSprite["light"]; air?: boolean }[];
+  sprites: { name: string; img: Img; at: V3; shadow?: number; blend?: MeshSprite["blend"]; opacity?: number; veil?: number; light?: MeshSprite["light"]; tint?: Color | null; air?: boolean }[];
   step(c: Color, n: number): Color;
   /** the light, its colors resolved (with `sun`) */
   lit?: Lit;
@@ -418,7 +419,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       const e = s.img.emit, img = s.img;
       if (!e || s.light === false) return;
       const o = s.light ?? {}, R = o.r ?? 3, S = o.strength ?? 1;
-      if (!(R > 0) || !(S >= 0)) throw new PxError(`mesh: sprite '${s.name}' has light ${JSON.stringify(s.light)}: false, or { r (m, above 0), strength (0 up), each }`);
+      if (!(R > 0) || !(S >= 0) || s.tint === null || s.tint === TRANSPARENT) throw new PxError(`mesh: sprite '${s.name}' has light ${JSON.stringify(s.light)}: false, or { r (m, above 0), strength (0 up), each, color (a key or "#hex") }`);
       const on = (q: number) => e[q] > 0 && (img.data[q] & 255) !== 0;
       // each part: the glowing pixels touching (8 ways), found by a flood; else all of them as one
       const part = new Int32Array(e.length).fill(-1);
@@ -441,7 +442,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
       let n0 = 0;
       for (let q = 0; q < e.length; q++) {
         if (part[q] < 0) continue;
-        const c = img.data[q], wq = e[q] / 255, A = acc[part[q]];
+        const c = s.tint ?? img.data[q], wq = e[q] / 255, A = acc[part[q]];
         n0++; A[0] += wq; A[1] += wq * (q % img.w); A[2] += wq * Math.floor(q / img.w);
         A[3] += wq * LIN[c >>> 24]; A[4] += wq * LIN[(c >>> 16) & 255]; A[5] += wq * LIN[(c >>> 8) & 255];
       }

@@ -60,6 +60,18 @@ sprite("ringed", { w: 6, h: 3, outline: "k" }, ${body}, layer("rope", ${rope}))`
   assert.match(art(src, "ringed").split("\n")[0], /kkk/);
 });
 
+test("a layer's own selout and floor for the line round its pixels: a body's selout, the sword beside it in plain ink, through a flip", () => {
+  // a body and a sword side by side, ramps from the ink; the line's top row
+  const two = (o: string, l = "") => art(PAL + `ramps("k1d6")
+sprite("a", { w: 5, h: 1, outline: "k", ${o} }, rect(0, 0, 2, 1, "d"), layer("sword", ${l}rect(3, 0, 2, 1, "d")))`, "a").split("\n")[0];
+  assert.equal(two("selout: 1"), ".11.11.", "not given: the asset's");
+  assert.equal(two("selout: 1", "{ selout: false }, "), ".11.kk.");
+  assert.equal(two('selout: 1, flip: "x"', "{ selout: false }, "), ".kk.11.");
+  assert.equal(two('selout: 2, floor: "k"', "{ floor: false }, "), ".11.kk.", "the body's floor, none on the sword");
+  assert.equal(two("", "{ selout: 1 }, "), ".kk.11.", "a selout of its own alone");
+  assert.match(failure(PAL + 'ramps("k1d6"); sprite("a", { w: 2, h: 1 }, layer("l", { selout: 1 }, rect(0, 0, 2, 1, "d")))', "a").message, /recolor the asset's line/);
+});
+
 test("describe: a blend layer's line says what it covers and what drawn later hides of it", async () => {
   const src = PAL + `
 sprite("box", { w: 4, h: 4 }, rect(0, 0, 4, 4, "8"))

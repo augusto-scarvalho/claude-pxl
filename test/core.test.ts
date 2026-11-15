@@ -620,6 +620,14 @@ test("rampmap: colors dark to light take a ramp's keys in order; hue picks which
   assert.match(failure(PAL + 'sprite("a", { w: 1, h: 1 }, px(0, 0, "r"), rampmap("kq"))', "a").message, /unknown color key 'q'|'q'/);
 });
 
+test('palettize: "rest": after the items, what no rampmap took to its nearest key; not given, left off the palette', () => {
+  // two greens mapped by hue, and an outline's blue-black no rampmap takes
+  const src = (o: string) => PAL + `sprite("a", { w: 3, h: 1${o} }, px(0, 0, "#30c030"), px(1, 0, "#60f060"), px(2, 0, "#101820"), rampmap("3b", { hue: [70, 170] }))`;
+  eq(art(src(', palettize: "rest"'), "a"), "3g1");
+  eq(art(src(""), "a"), "3g?");
+  assert.match(failure(src(', palettize: "Rest"'), "a").message, /palettize is true .* or "rest"/);
+});
+
 test("arc: a quarter clockwise or the other way round, a filled sector, a smear thickening toward its head", () => {
   const src = PAL + `
 sprite("quarter", { w: 7, h: 7 }, arc(3, 3, 3, 0, 90, "r"))

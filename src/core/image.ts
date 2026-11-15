@@ -332,30 +332,30 @@ export class Img {
 
   /**
    * 1px outline around opaque pixels; grows the canvas by 1 on every side. With `pick`, each
-   * outline pixel takes pick(the sprite color it touches) instead of `c` (selout).
+   * outline pixel takes pick(the sprite color it touches, where that is in this image) instead of `c` (selout).
    */
-  outline(c: Color, diagonal = false, pick?: (touching: Color) => Color, skip?: Uint8Array): Img {
+  outline(c: Color, diagonal = false, pick?: (touching: Color, x: number, y: number) => Color, skip?: Uint8Array): Img {
     const src = this.pad(1), o = src.copy();
     // `skip`: pixels the line isn't drawn around (they stay, but don't count as the shape's edge)
     const shape = skip ? this.without(skip).pad(1) : src;
     for (let y = 0; y < src.h; y++)
       for (let x = 0; x < src.w; x++) {
         if (src.get(x, y) !== TRANSPARENT) continue;
-        const nb = touching(shape, x, y, diagonal, (p) => p !== TRANSPARENT);
-        if (nb !== undefined) o.set(x, y, pick ? pick(nb) : c);
+        const i = touching(shape, x, y, diagonal, (p) => p !== TRANSPARENT), X = x + NEAR8[i], Y = y + NEAR8[i + 1];
+        if (i >= 0) o.set(x, y, pick ? pick(shape.get(X, Y), X - 1, Y - 1) : c);
       }
     return o;
   }
 
   /** 1px line over the sprite's own edge pixels (an inside outline): the canvas keeps its size. */
   /** Edge pixels become the line; colors in `keep` stay as they are (an outline already there). */
-  inline(c: Color, diagonal = false, pick?: (under: Color) => Color, keep?: Set<Color>, skip?: Uint8Array): Img {
+  inline(c: Color, diagonal = false, pick?: (under: Color, x: number, y: number) => Color, keep?: Set<Color>, skip?: Uint8Array): Img {
     const o = this.copy(), shape = skip ? this.without(skip) : this;
     for (let y = 0; y < this.h; y++)
       for (let x = 0; x < this.w; x++) {
         const p = shape.get(x, y);
         if (p === TRANSPARENT || keep?.has(p)) continue;
-        if (touching(shape, x, y, diagonal, (q) => q === TRANSPARENT) !== undefined) o.set(x, y, pick ? pick(p) : c);
+        if (touching(shape, x, y, diagonal, (q) => q === TRANSPARENT) >= 0) o.set(x, y, pick ? pick(p, x, y) : c);
       }
     return o;
   }
@@ -496,14 +496,9 @@ export function moveBoxes(boxes: NonNullable<Img["boxes"]>, f: (x: number, y: nu
   })]));
 }
 
-/** The first 4-neighbour (then diagonal) of (x, y) that `want` accepts, or undefined. */
-function touching(img: Img, x: number, y: number, diagonal: boolean, want: (c: Color) => boolean): Color | undefined {
-  const near = diagonal ? NEAR8 : NEAR4;
-  for (let i = 0; i < near.length; i += 2) {
-    const c = img.get(x + near[i], y + near[i + 1]);
-    if (want(c)) return c;
-  }
-  return undefined;
+/** The first 4-neighbour (then diagonal) of (x, y) that `want` accepts, as its place in NEAR8, or -1. */
+function touching(img: Img, x: number, y: number, diagonal: boolean, want: (c: Color) => boolean): number {
+  for (let i = 0; i < (diagonal ? 16 : 8); i += 2) if (want(img.get(x + NEAR8[i], y + NEAR8[i + 1]))) return i;
+  return -1;
 }
-const NEAR4 = [0, 1, 0, -1, -1, 0, 1, 0];
-const NEAR8 = [...NEAR4, -1, 1, 1, 1, -1, -1, 1, -1];
+const NEAR8 = [0, 1, 0, -1, -1, 0, 1, 0, -1, 1, 1, 1, -1, -1, 1, -1];
