@@ -197,8 +197,9 @@ directions walking, idle, kneeling and casting;
    keeps the render's pixel, `"_"` erases one): the eyes, the nose, the mouth, the brow, the cheek's
    edge, cut from approved hand heads (§5); in profile the face a pixel wider than the hair leaves it
    and the nose's tip past the line; turned away (sw, w), the cheek closed on a chin 3 px wide where
-   the render leaves the skull's shade under the ear (a jowl): a side lock dark down to the jaw, or,
-   the hair drawn back, the jaw's line in the skin's dark up toward the ear. The 3D gets right the volumes hand drawing struggles with (the
+   the render leaves the skull's shade under the ear (a jowl): `jowl: 2` closes it (the jaw's line in
+   the skin's dark up toward the ear), a side lock dark down to the jaw painted over it if the hair
+   comes down there. The 3D gets right the volumes hand drawing struggles with (the
    hair, a beard); a face of fields and decals reads worse than a painted one, so the face is painted.
    `rig3d`'s `head` stamps it by the heading, as it would hand-drawn views (`views(name, { s: grid,
    sw, w, nw, n })`: front, front 3/4, profile, back 3/4, back, their crown, chin and anchor on the

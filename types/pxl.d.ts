@@ -664,6 +664,10 @@ declare global {
     shape?: "column" | "puff" | "bank" | "ring"; count?: number; size?: [number, number]; vary?: number; rise?: number; path?: number[];
     wind?: number | [number, number]; spread?: number; length?: number; flat?: number; turbulence?: number; rough?: number; thin?: number;
     life?: number; alpha?: [number, number, number]; light?: [number, number]; pixel?: number; seed?: number; frame?: number;
+    /** billows bigger than this (px in radius) shaded in one tone over all the keys (three or more, lit to shaded), an ordered dither where two meet; standing whole, the lower in front */
+    inside?: number;
+    /** a second light at x, y under it (a fire): the undersides of billows within `reach` px of it (m with a view) step into `keys`, dim to bright, through the same dither */
+    below?: { keys: string | string[]; reach: number; strength?: number };
     /** through a perspective() camera: where it stands, [x, z, up] m; the lengths given then meters there, each billow as far as it is */
     view?: PxView | PxPerspective; at?: [number, number, number];
   }
@@ -897,7 +901,7 @@ declare global {
    * their crown and chin to one row, and with `like` each row within a pixel of that set's.
    */
   /** A head modeled (a field in its own frame), drawn once per view (the west, the east mirrored where the light is in the middle), each view's `retouch` grid painted over it ("." keeps, "_" erases), its `anchor` on the head's middle. */
-  function views(name: string, field: PxSdf, opts?: { n?: 8 | 16; pitch?: number; light?: PxVec; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: [string, string]; anchor?: [number, number] | Record<string, [number, number]>; retouch?: Record<string, string>; like?: string; chin?: number; swap?: Record<string, PxColor> }): string[];
+  function views(name: string, field: PxSdf, opts?: { n?: 8 | 16; pitch?: number; light?: PxVec; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: [string, string]; /** turned 45 to 90 degrees, the cheek closed into the chin this many px deep (with ink and jaw) */ jowl?: number; anchor?: [number, number] | Record<string, [number, number]>; retouch?: Record<string, string>; like?: string; chin?: number; swap?: Record<string, PxColor> }): string[];
   function views(name: string, grids: Record<string, string | string[] | PxItem[]>, opts?: { anchor?: [number, number] | "center" | "bottom" | Record<string, [number, number] | "center" | "bottom">; like?: string; /** the chin's row in every grid (a set whose lowest rows aren't the chin: a beard) */ chin?: number; swap?: Record<string, PxColor>; outline?: PxColor; outline8?: PxColor; inline?: PxColor; selout?: boolean | number }): string[];
   /** A walk's numbers at t (0..1 over the cycle) by the view a heading gives (or `view`): each foot [forward, up], the body's dip, each hand [forward, up] from hanging; the guide's measured values, each overridable (`stride`, `lift`, `bob`, `hands`; for one view: `profile: { stride }`). */
   function gait(t: number, opts?: { heading?: number; view?: "front" | "back" | "diagonal" | "profile"; stride?: number | number[]; lift?: number | number[]; bob?: number[]; hands?: number[][]; front?: object; diagonal?: object; profile?: object }): { view: string; a: number; feet: [number, number][]; bob: number; hands: [number, number][]; pace: number };

@@ -617,7 +617,10 @@ happens after another, never all at once.
   churning, thin at the ends; a ring of 14 spreading flat on the ground. On a dark ground give the
   shaded key a mid grey: a dark one reads as a gap and the puff splits in two bands. In a diorama or
   a perspective scene, `smoke()` and `plume()` take its camera: `{ view, at: [x, z, up] }`, the sizes
-  in meters, each billow as far as it is.
+  in meters, each billow as far as it is. Billows of 10 to 90 px (an ash column) in three flat bands
+  read as a flat sheet: `inside` shades the big ones in one tone over four keys with a dithered band
+  where two meet, `below` lights their undersides from a fire under them, through the same dither
+  (`examples/perspective/extinction.px.js`).
 - **Auras** (`effect("aura")`): 3-4 px round a 26 px figure in three keys, the lightest next to it,
   flicker 0.6 on cells of 3.5 px (at 2 px the edge turned to speckle).
 - **What eats a thing** (the dissolve's `look`): a burn browns and blackens a band ahead of its

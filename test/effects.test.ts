@@ -298,6 +298,24 @@ test("smoke: a column, a puff, a bank and a ring in clustered tones and three op
   assert.match(failure(PALS + 'sprite("s", { w: 4, h: 4 }, smoke(2, 2, "wgk", { shape: "cone" }))', "s").message, /shape is "column", "puff", "bank" or "ring"/);
 });
 
+test("smoke's inside and below: a big billow's one tone over all its keys, dithered where two meet; small ones and no options as before; undersides near (x, y) in below's keys, the nearer the more", () => {
+  const sm = (o: string, keys = "wgk") => load(`sprite("s", { w: 64, h: 64 }, smoke(32, 62, "${keys}", { count: 5, size: [9, 14], rise: 30, alpha: [0.9, 0.9, 0.9], thin: 0, seed: 2${o} }))`).image("s");
+  // each pixel's key (9 clear), and the share of those drawn whose four neighbours are all drawn in a key next to theirs (a dither's checker)
+  const keys = (img: Img, K: number[]) => Array.from(img.data, (c) => (c & 255 ? K.indexOf(c >>> 8) : 9));
+  const checker = (t: number[]) => t.filter((k, i) => k < 9 && [i - 1, i + 1, i - 64, i + 64].every((j) => Math.abs(t[j] - k) === 1)).length / t.filter((k) => k < 9).length;
+  const plain = sm(""), K3 = [0xfff1e8, 0x00e436, 0x000000], K4 = [0xfff1e8, 0xc2c3c7, 0x5f574f, 0x000000];
+  const four = keys(sm(", inside: 6", "w65k"), K4), three = keys(sm(", inside: 6"), K3);
+  assert.ok([0, 1, 2, 3].every((k) => four.includes(k)) && !four.includes(-1), "inside: every one of its four keys, no other");
+  assert.ok(checker(four) > 0.03 && checker(three) > 0.03 && checker(keys(plain, K3)) < 0.005, `where two keys meet, a dithered band: ${checker(four).toFixed(3)}, ${checker(three).toFixed(3)} of its pixels a checker (without: ${checker(keys(plain, K3)).toFixed(3)})`);
+  assert.ok(same(plain, sm(", inside: 20")), "billows smaller than inside: as they were");
+  const F = new Set([0xffec27, 0xffa300]), lit = (img: Img) => { const ys: number[] = []; img.data.forEach((c, i) => { if (F.has(c >>> 8) && (c & 255)) ys.push(Math.floor(i / 64)); }); return ys; };
+  const mean = (ys: number[]) => ys.reduce((a, b) => a + b, 0) / ys.length, far = lit(sm(', below: { keys: "yo", reach: 40 }')), near = lit(sm(', below: { keys: "yo", reach: 8 }'));
+  assert.ok(far.length > near.length && near.length > 0, `the farther it reaches, the more: ${far.length} > ${near.length}`);
+  assert.ok(mean(near) > mean(far) && mean(far) > 32, "beneath, near (x, y)");
+  assert.match(failure(PALS + 'sprite("s", { w: 4, h: 4 }, smoke(2, 2, "wgk", { below: { keys: "yo" } }))', "s").message, /below \{ keys: "QGH"/);
+  assert.match(failure(PALS + 'sprite("s", { w: 4, h: 4 }, smoke(2, 2, "w65k"))', "s").message, /keys are three.*more, lit to shaded, with inside/);
+});
+
 test("dissolve looks: neutral by default, edge: false, keys over the progress, a char ahead of the edge, glow, debris, presets", () => {
   const sq = (fx: string) => load(`sprite("s", { w: 24, h: 24 }, rect(4, 4, 16, 16, "g"), rect(4, 4, 16, 2, "w"), ${fx})`).image("s");
   const plain = sq('rect(0, 0, 1, 1, "_")'), G = 0x00e436ff, Wt = 0xfff1e8;

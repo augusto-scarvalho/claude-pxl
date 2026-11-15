@@ -37,6 +37,17 @@ export interface SmokeOpts {
   alpha?: [number, number, number];
   /** the way to the light on the picture (default the upper left, [-0.6, -0.8]) */
   light?: [number, number];
+  /**
+   * billows bigger than this (px of the art, in radius) shaded as one paints them: one tone (the light across it, its rim
+   * lifted, a noise 5 px across) cut into all the keys (three or more, lit to shaded), an ordered dither where two meet, the
+   * edge in lobes; every billow then stands whole, the lower in front
+   */
+  inside?: number;
+  /**
+   * a second light at (x, y) under it (a fire): `keys` dim to bright, the undersides of billows within `reach` px of it
+   * (m with a view) stepping into them through the same dither, the more the nearer (`strength`, default 0.9); not on the lit key
+   */
+  below?: { keys: string | string[]; reach: number; strength?: number };
   /** px to a pixel of the art (an HD picture: 4) */
   pixel?: number;
   seed?: number;
@@ -59,7 +70,7 @@ export interface SmokeCanvas {
   plot(x: number, y: number, c: Color): boolean;
 }
 
-const KEYS = ["shape", "count", "size", "vary", "rise", "path", "wind", "spread", "length", "flat", "turbulence", "rough", "thin", "life", "alpha", "light", "pixel", "seed", "frame", "view", "at"];
+const KEYS = ["shape", "count", "size", "vary", "rise", "path", "wind", "spread", "length", "flat", "turbulence", "rough", "thin", "life", "alpha", "light", "inside", "below", "pixel", "seed", "frame", "view", "at"];
 /** A camera smoke is seen through: where a world point [x, z, up] lands, px a meter there, its yaw (degrees). */
 export interface SmokeCamera { ground(x: number, z: number, u: number): [number, number]; scale(z: number, x: number, u: number): number; yaw?: number }
 /** Lengths in meters at `at` to px there (the given ones only), and a billow's offset back into the world, seen through the camera. */
@@ -100,13 +111,16 @@ export function drawSmoke(c: SmokeCanvas, x0: number, y0: number, keys: string |
   const shape = o.shape ?? "column";
   if (!["column", "puff", "bank", "ring"].includes(shape)) throw new PxError(`smoke: shape is "column", "puff", "bank" or "ring", got ${JSON.stringify(o.shape)}`);
   const ks = colorList(keys).map((k) => c.color(k));
-  if (ks.length !== 3 || ks.some((k) => k === null || k === TRANSPARENT)) throw new PxError(`smoke: keys are three: lit, middle, shaded ("wmd"), got ${JSON.stringify(keys)}`);
+  if (!(ks.length === 3 || (ks.length > 3 && o.inside !== undefined)) || ks.some((k) => k === null || k === TRANSPARENT)) throw new PxError(`smoke: keys are three: lit, middle, shaded ("wmd") (more, lit to shaded, with inside), got ${JSON.stringify(keys)}`);
   const N = o.count ?? { column: 16, puff: 12, bank: 8, ring: 14 }[shape], [s0, s1] = o.size ?? [3, 8], vary = o.vary ?? 0.3, turb = o.turbulence ?? 2, rough = o.rough ?? 0.35;
   const thin = o.thin ?? 0.35, life = o.life ?? 1, alpha = o.alpha ?? [0.4, 0.62, 0.85], [lx, ly] = o.light ?? [-0.6, -0.8], K = o.pixel ?? 1;
   const num = (v: unknown, lo: number) => typeof v === "number" && Number.isFinite(v) && v >= lo;
   if (!(Number.isInteger(N) && N >= 1 && N <= 200) || !num(s0, 0.5) || !num(s1, 0.5) || !num(vary, 0) || !num(turb, 0) || !num(rough, 0) || !(thin >= 0 && thin <= 1) || !(life > 0 && life <= 1) || !(Number.isInteger(K) && K >= 1)
     || !(Array.isArray(alpha) && alpha.length === 3 && alpha.every((a) => a >= 0 && a <= 1)) || (o.path !== undefined && !(Array.isArray(o.path) && o.path.length >= 4 && o.path.length % 2 === 0 && o.path.every(Number.isFinite))))
     throw new PxError(`smoke: options out of range, got ${JSON.stringify(o)} (count 1..200, size [r0, r1] from 0.5, vary/turbulence/rough from 0, thin 0..1, life above 0 to 1, alpha three of 0..1, path [x0, y0, x1, y1, ...], pixel a whole number)`);
+  const B = o.below, bk = B && typeof B === "object" && B.keys ? colorList(B.keys).map((k) => c.color(k)) : [];
+  if ((o.inside !== undefined && !num(o.inside, 0)) || (B !== undefined && !(bk.length && bk.every((k) => k !== null && k !== TRANSPARENT) && num(B.reach, 0.01) && (B.strength === undefined || num(B.strength, 0)))))
+    throw new PxError(`smoke: inside is the px of a billow's radius above which it is modeled; below { keys: "QGH" (dim to bright), reach: px from (x, y), strength }, got ${JSON.stringify({ inside: o.inside, below: B })}`);
   const [wx, wy] = typeof o.wind === "number" ? [o.wind, 0] : o.wind ?? [0, 0], seed = o.seed ?? 1;
   const t = c.frames > 1 ? ((((o.frame ?? c.frame) % c.frames) + c.frames) % c.frames) / c.frames : 0;
   const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
@@ -143,18 +157,29 @@ export function drawSmoke(c: SmokeCanvas, x0: number, y0: number, keys: string |
   const ll = Math.hypot(lx, ly, 0.7) || 1, Lx = lx / ll, Ly = ly / ll, Lz = 0.7 / ll;
   let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
   for (const b of billows) { bx0 = Math.min(bx0, b.x - b.r * 1.4); by0 = Math.min(by0, b.y - b.r * 1.4); bx1 = Math.max(bx1, b.x + b.r * 1.4); by1 = Math.max(by1, b.y + b.r * 1.4); }
-  const X0 = x0 / K, Y0 = y0 / K;
+  const X0 = x0 / K, Y0 = y0 / K, [fx, fy] = M ? M.place(0, 0).map((v) => v / K) : [0, 0], reach = B ? (B.reach * (M ? M.k : 1)) / K : 1;
   for (let ay = Math.floor(Y0 + by0); ay <= Math.ceil(Y0 + by1); ay++)
     for (let ax = Math.floor(X0 + bx0); ax <= Math.ceil(X0 + bx1); ax++) {
-      let best: Billow | undefined, depth = 0, dx = 0, dy = 0;
+      let best: Billow | undefined, score = 0, depth = 0, dx = 0, dy = 0;
       for (const b of billows) {
-        const ex = (ax + 0.5 - X0 - b.x) / b.r, ey = (ay + 0.5 - Y0 - b.y) / b.r, rag = rough * (vnoise((ax + b.id * 7.3) * 0.45, ay * 0.45 + seed) - 0.5);
+        const ex = (ax + 0.5 - X0 - b.x) / b.r, ey = (ay + 0.5 - Y0 - b.y) / b.r, big = o.inside !== undefined && b.r > o.inside;
+        // its edge ragged a pixel or two across; a big billow's in lobes a third of it across (scalloped, not frayed)
+        const rag = rough * ((big ? vnoise(ex * 3 + b.id * 7.3, ey * 3 + seed) : vnoise((ax + b.id * 7.3) * 0.45, ay * 0.45 + seed)) - 0.5);
         const q = 1 - Math.hypot(ex, ey) + rag - b.erode * (0.4 + 0.6 * vnoise(ax * 0.7 + b.id, ay * 0.7));
-        if (q > depth) { depth = q; best = b; dx = ex; dy = ey; }
+        // each pixel the billow it is deepest in; big ones stand round and whole over the small, the lower in front (as one paints them)
+        const front = big && q > 0 ? 1e6 + b.y : q;
+        if (front > score) { score = front; depth = q; best = b; dx = ex; dy = ey; }
       }
       if (!best) continue;
-      const nz = Math.sqrt(Math.max(0, 1 - dx * dx - dy * dy)), l = dx * Lx + dy * Ly + nz * Lz;
-      const key = ks[l > 0.55 ? 0 : l > 0.15 && dy < 0.45 ? 1 : 2]!, lv = Math.max(0, best.level - (depth < 0.12 ? 1 : 0)), a = alpha[lv];
+      const nz = Math.sqrt(Math.max(0, 1 - dx * dx - dy * dy)), l = dx * Lx + dy * Ly + nz * Lz, n = ks.length - 1, dz = (bayer(ax, ay) - 0.5) * 0.6;
+      // a big billow: one tone from its light, its rim lifted and a noise 5 px across going with it, cut evenly into all the keys
+      // (four: at 0.62, 0.31 and 0), an ordered dither 0.6 of a step wide where two meet
+      const big = o.inside !== undefined && best.r > o.inside;
+      const tone = big ? ((dx * lx + dy * ly) / Math.hypot(lx, ly)) * 0.7 + Math.hypot(dx, dy) * 0.25 + (vnoise((ax - X0 - best.x) / 5 + best.id * 7.3, (ay - Y0 - best.y) / 5 + seed) - 0.5) * 0.4 : 0;
+      let key = ks[big ? Math.max(0, Math.min(n, Math.floor(((0.93 - tone) / 1.24) * (n + 1) + dz))) : [0, Math.round(n / 2), n][l > 0.55 ? 0 : l > 0.15 && dy < 0.45 ? 1 : 2]]!;
+      // the light from below: the lower in its billow and the nearer the fire, the brighter the key it steps into, through the same dither
+      if (bk.length && key !== ks[0]) { const i = Math.floor((dy + (B!.strength ?? 0.9) * (1 - Math.hypot(ax + 0.5 - X0 - fx, ay + 0.5 - Y0 - fy) / reach) - 0.75) / 0.3 + dz); if (i >= 0) key = bk[Math.min(i, bk.length - 1)]!; }
+      const lv = Math.max(0, best.level - (depth < 0.12 ? 1 : 0)), a = alpha[lv];
       for (let j = 0; j < K; j++)
         for (let i = 0; i < K; i++) {
           const px = ax * K + i, py = ay * K + j, under = c.get(px, py);

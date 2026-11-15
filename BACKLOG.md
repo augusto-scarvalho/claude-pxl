@@ -245,13 +245,26 @@ still hold, and the rest wait on these:
   (pose, j) => name`, and `over: [parts]` (each kept over the head where its mean depth under the head
   is nearer than the head joint's, a line of the ink beside it); the warden's `stampHead` gone, its
   frames the same.
-- [ ] **Big puffs with a tone inside and a light from below** (extinction's ash column):
+- [x] **Big puffs with a tone inside and a light from below** (extinction's ash column):
   `plume`/`smoke` shade each puff in three flat bands, so at 10-90 px the column comes out a flat
   diagonal sheet without its modeled billows, and nothing lights it from below (the crater's fire).
   A texture of tone inside big puffs and a second light by height.
-- [ ] **`views()` closing the cheek into a chin**: the same jowl under the ear in the 3/4 and
-  profile views is mended by hand in five of the crew's heads, and a bald crown comes out a shiny
-  egg. A `views()` option that closes the cheek into a chin n px deep in those views.
+  Done (F3 chin and puffs, then the hand column's technique): `smoke()`'s `inside: px` shades billows over that radius
+  as the hand did: one tone (the light, the rim, a noise 5 px across) cut into all its keys (four in extinction), an
+  ordered dither at each border, edges in lobes, the lower in front; `below: { keys, reach, strength }` steps the
+  undersides within `reach` of the fire into its keys through the same dither; extinction's column drawn by `smoke()`
+  on both instead of by hand (only its pixels moved). `plume()` hasn't them: nothing of its draws puffs that big.
+- [x] **`views()` closing the cheek into a chin**: the same jowl under the ear in the 3/4 and
+  profile views is mended by hand in five heads (the crew's bandana, flat cap and grey hair, the
+  traveler's, the mourner's). A `views()` option that closes the cheek into a chin n px deep in those views.
+  Done (F3 chin and puffs): `jowl: 2`, turned 45 to 90 degrees: the chin 3 px wide (2 in profile), the jaw's line up its
+  back, the skin behind it the darkest, the chin's row behind it and the line under it cleared; the crew's three heads
+  on it, their pixels the same (the side locks and the grey head's tail pixel stay painted over it). The traveler's
+  and the mourner's (`traveler.px.js`) keep their hand mends until the user sees them on it.
+- [ ] **The bald crown, a shiny egg**: the render lights the crew's bald crown as a blob of the skin's
+  lightest 5 px wide, the same in every view; its retouch keeps a dash of 3 under the dome's top and
+  paints the rest in skin by hand, in all five views. A highlight by the view (where the light falls
+  on the dome as it turns) would take the hand pixels out.
 - [x] **`palettize: "rest"`**: `palettize` runs at load, before the items, so trees mapped by
   `rampmap` leave every color no `rampmap` takes (the LPC trees' #101820 line) off the palette.
   `"rest"`, applied after the items, to what's left.

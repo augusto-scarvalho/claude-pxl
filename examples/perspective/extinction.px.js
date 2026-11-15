@@ -159,33 +159,14 @@ function sky(col, row, breath = 0, a = 0) {
 }
 
 // ================================================================ the plume
-// The ash column above the crater: billows in 3D, rising and spreading, bent over to the right by the
-// strong wind, so it streams away across the sky; each lit on its upper left by the sun, dark below,
-// the lowest red from the fire in the crater. Drawn top first, so lower billows stand in front.
-const PLUME = (() => {
-  const r = rng(77), out = []
-  for (let i = 0; i < 70; i++) {
-    const s = (i / 70) ** 1.3 * 5000, a = r() * Math.PI * 2, rad = 170 + s * 0.32, off = rad * 0.5 * r()
-    out.push({ p: [VX + 0.5 * s + 0.00012 * s * s + Math.cos(a) * off, VZ + Math.sin(a) * off * 0.5, RIM - 40 + s * 0.62 + Math.sin(a) * off * 0.5], rad: rad * (0.55 + r() * 0.45), s, k: i })
-  }
-  return out.sort((m, n) => n.s - m.s)
-})()
+// The ash column above the crater: billows rising and spreading, bent over to the right by the strong
+// wind, so it streams away across the sky (smoke() along its path through the camera, solid); each lit
+// on its upper left by the sun, the big ones shaded in four tones dithered where they meet, their
+// undersides red from the fire in the crater, the more the nearer.
+const COLUMN = Array.from({ length: 11 }, (_, i) => { const s = (i / 10) * 5600; return [0.42 * s + 0.00014 * s * s, -0.62 * s] }).flat()
 function drawPlume(c) {
-  for (const b of PLUME) {
-    const [cx, cy] = P.ground(...b.p), R = b.rad * P.scale(b.p[1], b.p[0], b.p[2])
-    if (cy + R < 0 || cy - R > H) continue
-    for (let y = Math.floor(cy - R - 2); y <= Math.ceil(cy + R + 2); y++) for (let x = Math.floor(cx - R - 2); x <= Math.ceil(cx + R + 2); x++) {
-      if (x < 0 || x >= W || y < 0 || y >= H) continue
-      const ox = x + 0.5 - cx, oy = y + 0.5 - cy, ang = Math.atan2(oy, ox), edge = R * (0.86 + 0.22 * vnoise(ang * 2.5 + b.k * 7, b.k))
-      const dd = Math.hypot(ox, oy)
-      if (dd > edge) continue
-      // lit by the sun on its upper left, its belly red with the fire below, more the lower it is
-      const lit = (-ox * 0.6 - oy * 0.8) / edge, rim = dd / edge, v = lit * 0.7 + rim * 0.25 + (vnoise(x / 5 + b.k, y / 5) - 0.5) * 0.4 + ditherAt(x, y) * 0.15
-      const belly = oy / edge + (1 - b.s / 1800) * 0.9 + ditherAt(x, y) * 0.2
-      if (belly > 0.75 && lit < 0.3) c.px(x, y, belly > 1.35 ? "H" : belly > 1.0 ? "G" : "Q")
-      else c.px(x, y, v > 0.62 ? "E" : v > 0.3 ? "D" : v > 0.0 ? "C" : "B")
-    }
-  }
+  c.smoke(0, 0, "EDCB", { view: P, at: [VX, VZ, RIM + 30], path: COLUMN, count: 200, size: [230, 2000], vary: 0.45, turbulence: 3000, rough: 0.3, thin: 0,
+    alpha: [0.85, 0.85, 0.85], inside: 8, below: { keys: "QGH", reach: 1500, strength: 0.85 }, seed: 77 })
 }
 
 // ================================================================ lava

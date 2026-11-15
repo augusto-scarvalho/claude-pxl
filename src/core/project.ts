@@ -933,9 +933,9 @@ export class Project implements BuildCtx {
         const model = grids instanceof Sdf ? grids : undefined;
         if (typeof given !== "string" || !given || !(model || isPlainObject(grids)) || !isPlainObject(opts)) throw new PxError('views("_head", { s: grid, sw: grid, w: grid, nw: grid, n: grid } or a field (the head modeled), { anchor: [x, y] (or { s: [x, y], ... }), like: "_other_head" })');
         const name = this.qualify(given);
-        const BAKE = ["n", "pitch", "light", "mats", "surface", "ink", "jaw", "retouch"];
+        const BAKE = ["n", "pitch", "light", "mats", "surface", "ink", "jaw", "jowl", "retouch"];
         checkKeys("views", opts, ["anchor", "like", "chin", "swap", "outline", "outline8", "inline", "selout", ...(model ? BAKE : [])]);
-        const { anchor, like, chin, n: nv, pitch, light, mats, surface: sopts, ink, jaw, retouch, ...so } = opts as { anchor?: unknown; like?: unknown; chin?: unknown; n?: number; pitch?: number; light?: number[]; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: string[]; retouch?: Record<string, string> };
+        const { anchor, like, chin, n: nv, pitch, light, mats, surface: sopts, ink, jaw, jowl, retouch, ...so } = opts as { anchor?: unknown; like?: unknown; chin?: unknown; n?: number; pitch?: number; light?: number[]; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: string[]; jowl?: number; retouch?: Record<string, string> };
         // a head modeled (a field in its own frame: x its right, y ahead, z up, px, its middle where it is
         // stamped), drawn once per view as rig3d draws a figure (surface(), the line all round it, `jaw`'s
         // line under the skin), then each view's `retouch` painted over it by hand ("." keeps the render's
@@ -945,6 +945,7 @@ export class Project implements BuildCtx {
           if (nv !== undefined && nv !== 8 && nv !== 16) throw new PxError(`views: n is 8 or 16, the directions it is drawn for, got ${JSON.stringify(nv)}`);
           if (sopts !== undefined) { if (!isPlainObject(sopts)) throw new PxError("views: surface is surface()'s options ({ soft, clean, ... })"); checkKeys("views surface", sopts, SURFACE_OPTS.filter((k) => !["view", "ppm", "at", "part"].includes(k))); }
           if (jaw !== undefined && !(Array.isArray(jaw) && jaw.length === 2 && jaw.every((k) => typeof k === "string" && k))) throw new PxError(`views: jaw is [key, the skin's ramp]: the line of key under the skin, where the line round it is under the face, got ${JSON.stringify(jaw)}`);
+          if (jowl !== undefined && !(Number.isInteger(jowl) && jowl > 0 && jaw && ink !== undefined)) throw new PxError(`views: jowl is the px the cheek closes into the chin, turned 45 to 90 degrees (2: the hand heads'), with ink and jaw (where the skin is), got ${JSON.stringify(jowl)}`);
           if (retouch !== undefined && !(isPlainObject(retouch) && Object.entries(retouch).every(([d, g]) => COMPASS.includes(d) && typeof g === "string"))) throw new PxError("views: retouch is { s: grid, ... }: per view, pixels painted over the render (\".\" keeps it, \"_\" erases)");
           const sp = Math.sin(((pitch ?? 20) * Math.PI) / 180), cp = Math.cos(((pitch ?? 20) * Math.PI) / 180), { lo, hi, mats: names } = compile(model);
           // one size for every view: the farthest the head reaches from its middle, turned any way, and a pixel of line round it
@@ -959,6 +960,24 @@ export class Project implements BuildCtx {
               const skin = new Set([...(jaw?.[1] ?? "")].map((k) => c.color(k))), out: [number, number, string][] = [];
               for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) if (!on(x, y) && (on(x + 1, y) || on(x - 1, y) || on(x, y + 1) || on(x, y - 1))) out.push([x, y, jaw && on(x, y - 1) && skin.has(data[(y - 1) * W + x]) ? jaw[0] : ink]);
               for (const [x, y, k] of out) c.px(x - c.ox, y - c.oy, k);
+            }
+            // `jowl`: turned 45 to 90 degrees from the front, the cheek closed into the chin n px deep (the round
+            // skull leaves a jowl under the ear): the chin 3 px wide (2 in profile), the jaw's line up from its
+            // back, the skin behind that the darkest (the neck in shadow), the chin's row behind it cleared (the
+            // line under hair kept) and the line under it
+            const ci = COMPASS.indexOf(d), turn = Math.abs(ci - 8) * 22.5;
+            if (jowl && jaw && turn >= 45 && turn <= 90) {
+              const skin = new Set([...jaw[1]].map((k) => c.color(k))), J = c.color(jaw[0]), dark = c.color(jaw[1][0]), K = c.color(ink);
+              const at = (x: number, y: number) => (x >= 0 && y >= 0 && x < W && y < Hh ? data[y * W + x] : TRANSPARENT);
+              let yb = Hh - 1;
+              while (yb > 0 && !data.subarray(yb * W, yb * W + W).some((p) => skin.has(p))) yb--;
+              const row = [...Array(W).keys()].filter((x) => skin.has(at(x, yb))), s = ci > 8 ? 1 : -1, xj = (s > 0 ? row[0] : row.at(-1)!) + s * (turn < 60 ? 3 : 2);
+              for (let y = yb - jowl + 1; row.length && y <= yb + 1; y++) for (let x = xj; x >= 0 && x < W; x += s) {
+                const p = at(x, y), up = at(x, y - 1), set = (k: typeof J) => c.plot(x - c.ox, y - c.oy, k);
+                if (x === xj && y <= yb) { if (p !== TRANSPARENT) set(J); }
+                else if (y < yb) { if (skin.has(p)) set(dark); }
+                else if (y === yb ? skin.has(p) || p === J : p === J) set(y === yb && up !== TRANSPARENT && up !== J && !skin.has(up) ? K : TRANSPARENT);
+              }
             }
             const g = retouch?.[d];
             if (!g) return;

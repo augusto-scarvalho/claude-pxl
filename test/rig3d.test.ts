@@ -9,7 +9,8 @@ import { FLAWS, blocksOf, bodyOf, gait, ik3, jointsOf, poseFlaws, turned } from 
 import { compile, sdf } from "../src/core/sdf.ts";
 import { checkProject } from "../src/node/check.ts";
 import { loadProject, loadSource } from "../src/node/load.ts";
-import { PAL, keys } from "./helpers.ts";
+import type { Project } from "../src/core/project.ts";
+import { PAL, failure, keys } from "./helpers.ts";
 import { whenChanged } from "./passed.ts";
 
 const test = whenChanged("test/rig3d.test.ts", ["lib/characters/traveler.px.js", "lib/characters/dress.px.js"]);
@@ -439,4 +440,26 @@ views("_m", sdf.sphere(3).mat("krw"), { ink: "k", anchor: [1, 1], retouch: { s: 
   assert.equal(at(x, cy), K("k"));
   const slab = sdf.field((x, y, z) => Math.max(Math.abs(x), Math.abs(y), Math.abs(z)) - 2, [-2, -2, -2], [2, 2, 2]);
   assert.ok(Math.abs(slab.dist([3, 0, 0]) - 1) < 1e-9 && slab.dist([0, 0, 0]) < 0);
+});
+
+test("views' jowl: turned 45 to 90 degrees, the cheek closed into the chin (3 px wide, 2 in profile), the jaw's line up its back; facing, from behind and not given, as before", () => {
+  const head = (o: string) => loadSource(`${PAL} pal({ D: "#5a2a1a", z: "#8a4a3a", s: "#c07050", S: "#e09070" }); ramps("zsS")
+views("_h", sdf.ellipsoid([4.6, 5, 5.3]).mat("zsS"), { ink: "k", jaw: ["D", "zsS"]${o} })`, "t.px.js");
+  const plain = head(""), shut = head(", jowl: 2"), same = (n: string) => plain.image(n).data.every((c, i) => c === shut.image(n).data[i]);
+  assert.ok(same("_h_s") && same("_h_n") && same("_h_nw"), "facing and from behind: as before");
+  const skin = new Set(["z", "s", "S"].map((k) => shut.pal.keys.get(k)));
+  // the lowest row of skin and where it is
+  const chin = (p: Project, v: string) => {
+    const img = p.image(`_h_${v}`), at = (x: number, y: number) => img.data[y * img.w + x], xs = (y: number) => [...Array(img.w).keys()].filter((x) => skin.has(at(x, y)));
+    let y = img.h - 1;
+    while (!xs(y).length) y--;
+    return { xs: xs(y), at: (x: number) => at(x, y), under: (x: number) => at(x, y + 1) };
+  };
+  for (const [v, wide] of [["sw", 3], ["w", 2]] as const) {
+    const before = chin(plain, v), after = chin(shut, v), x0 = after.xs[0];
+    assert.ok(before.xs.length > wide && after.xs.length === wide && x0 === before.xs[0], `${v}: the chin ${wide} px, was ${before.xs.length}`);
+    assert.equal(after.at(x0 + wide), shut.pal.keys.get("D"), `${v}: the jaw's line at its back`);
+    assert.ok([1, 2].every((d) => (after.at(x0 + wide + d) & 255) === 0 && (after.under(x0 + wide + d - 1) & 255) === 0), `${v}: behind it, the jowl and the line under it cleared`);
+  }
+  assert.match(failure(`${PAL} views("_h", sdf.sphere(4).mat("krw"), { ink: "k", jowl: 2 })`).message, /jowl is the px .* with ink and jaw/);
 });
