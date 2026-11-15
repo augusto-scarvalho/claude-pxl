@@ -734,15 +734,17 @@ export async function main(argv: string[]): Promise<number> {
         const r = checkProject(p, { names: [name], frames, edges: true });
         for (const l of [...r.lines, ...r.notes]) console.log(l);
         // the faults the LOOK lines name, ringed on the asset: its lines' (corners orange, jaggies blue) and its edges'
-        const lines = r.notes.some((l) => / LOOK: \d+ (L-corner|jagg)/.test(l)), edges = r.notes.some((l) => / LOOK: edges: /.test(l));
-        if (lines || edges) {
+        const lines = r.notes.some((l) => / LOOK: \d+ (L-corner|jagg)/.test(l)), edges = r.notes.some((l) => / LOOK: edges: /.test(l)), ells = r.notes.some((l) => / LOOK: genre '[^']*': \d+ L-corner/.test(l));
+        if (lines || edges || ells) {
           const img = p.assets.get(name)!.kind === "anim" ? (p.frames(name)[frames[0]] ?? p.frames(name)[0]).img : p.image(name), s = Math.max(4, k), out = img.scale(s);
           const ring = (x: number, y: number, c: Color) => { for (let i = 0; i < s; i++) for (let t = 0; t < (s >= 8 ? 2 : 1); t++) for (const [u, v] of [[i, t], [i, s - 1 - t], [t, i], [s - 1 - t, i]]) out.set(x * s + u, y * s + v, c); };
           if (lines) { const f = lineFlaws(img); for (const [x, y] of f.corners) ring(x, y, pack(255, 140, 20)); for (const [x, y] of f.jaggies) ring(x, y, pack(40, 120, 255)); }
           if (edges) { const f = edgeFlaws(img); for (const [kind, c] of EDGE_RINGS) for (const [x, y] of f[kind]) ring(x, y, c); }
+          // (the genre's line as its ink reads it: the figure without what its move paints, where the frame shows it)
+          if (ells) { const shown = img.figureImg && edgeFlaws(img).doubled.map(String); for (const [x, y] of edgeFlaws(img.figureImg ?? img).doubled) if (!shown || shown.includes(`${x},${y}`)) ring(x, y, pack(255, 140, 20)); }
           const lookPath = base + "_look.png";
           writePng(lookPath, out);
-          console.log(`-> ${lookPath} (the LOOK lines' pixels ringed, frame ${frames[0]}: ${lines ? "L-corners orange, jaggies blue" : ""}${lines && edges ? "; " : ""}${edges ? "edges: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners green" : ""})`);
+          console.log(`-> ${lookPath} (the LOOK lines' pixels ringed, frame ${frames[0]}: ${[lines && "L-corners orange, jaggies blue", edges && "edges: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners green", ells && "its genre's line: L-corners orange"].filter(Boolean).join("; ")})`);
         }
         if (r.warnings || p.assets.get(name)?.kind === "scene" || p.rigs.has(name))
           console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);

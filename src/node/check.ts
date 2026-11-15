@@ -59,7 +59,7 @@ const frameImgs = (p: Project, n: string) => (p.assets.get(n)!.kind === "anim" ?
  * where it meets the ground (its footprint box, a turnaround()'s), within a px, in every frame (what is
  * nearer us may hang lower: a bumper seen from above).
  */
-function genreLines(p: Project, name: string, ran: { genre: number; ink: number; material: number; black: number; edge: number }): string[] {
+function genreLines(p: Project, name: string, ran: { genre: number; ink: number; material: number; black: number; edge: number }, notes: string[]): string[] {
   const gn = p.assets.get(name)!.opts.genre!, g = p.genres.get(gn), out: string[] = [];
   if (!g) return [`${name} › WARNING: genre '${gn}' is no genre() here${didYouMean(gn, p.genres.keys())}${p.genres.size ? ` (there are: ${[...p.genres.keys()].join(", ")})` : ""}: its checks didn't run`];
   const fr = frameImgs(p, name), low = fr.map((im) => { const b = im.bounds(); return b ? b.y + b.h - 1 : -1; });
@@ -102,8 +102,12 @@ function genreLines(p: Project, name: string, ran: { genre: number; ink: number;
   if (rule) {
     ran[rule === "material" ? "material" : "ink"] += fr.length;
     let n = 0;
-    const bad = { lit: 0, away: 0, black: 0, fill: 0 }, at: number[] = [];
+    const bad = { lit: 0, away: 0, black: 0, fill: 0 }, at: number[] = [], ells: [number, number, number][] = [];
     fr.forEach((im, i) => {
+      // (its line's shape too, on the same pixels: an L's elbow at the edge, --edges' doubled, where the frame shows it,
+      // not under what a move paints; a line by material isn't one all round)
+      const fig = im.figureImg, shown = fig && rule !== "material" ? new Set(edgeFlaws(im).doubled.map(([x, y]) => y * im.w + x)) : undefined;
+      if (rule !== "material") for (const [x, y] of edgeFlaws(fig ?? im).doubled) if (!shown || shown.has(y * im.w + x)) ells.push([i, x, y]);
       // (a line beside a near-black inside, a hole or a black pattern, can't be darker than it and not near-black)
       const e = edgeOf(im.figureImg ?? im), wrong = e.filter((q) => (rule === "character" ? q.kind !== "black" : rule === "material" ? q.kind !== "black" && q.inner !== undefined && lighter(q.c, q.inner) : q.kind === "black" || (q.kind === "none" && !(q.inner !== undefined && lch(q.inner).L < 0.3 && lch(q.inner).C < 0.08))));
       if (rule === "material") { ran.black += e.filter((q) => q.kind === "black").length; ran.edge += e.length; }
@@ -119,6 +123,9 @@ function genreLines(p: Project, name: string, ran: { genre: number; ink: number;
       : rule === "material" ? `: ${bad.fill} px lighter than the fill inside them (a lit tone, or a line behind the edge)` : "";
     // (two pixels in a hundred pass: where two lines meet, or a line folds on itself, three deep)
     if (all > n / 50) out.push(`${name} › WARNING: genre '${gn}': a ${cat}'s edge is ${want}, but ${pc(all)} of its edge isn't, ${pc(bad.lit)} on its lit side (up and left) and ${pc(bad.away)} away from the light${why}${fr.length > 1 && at.length < fr.length ? ` (frame${at.length > 1 ? "s" : ""} ${ranges(at)})` : ""}`);
+    // (a note, not a warning: a sword's guard, a box's corner are L-corners meant as one)
+    const ln = ells.length, on = new Set(ells.map(([i]) => i)).size, where = ells.slice(0, 4).map(([i, x, y]) => `${fr.length > 1 ? `frame ${i}: ` : ""}${x},${y}`);
+    if (ln) notes.push(`${name} › LOOK: genre '${gn}': ${ln} L-corner${ln > 1 ? "s" : ""} in a ${cat}'s line at its edge${fr.length > 1 ? ` over ${on} of its ${fr.length} frames` : ""} (at ${where.join("; ")}${ln > 4 ? "; ..." : ""}): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")`);
   }
   return out;
 }
@@ -373,7 +380,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         for (const [s, fs] of out) lines.push(`${name} › WARNING: box ${s}${fr.length > 1 ? ` (frame${fs.length > 1 ? "s" : ""} ${ranges(fs)})` : ""}: an engine reads it as it is; keep it inside, or give the asset room (w, h)`);
       }
       // the genre() it is made for: its checks on its frames (the height across directions is a family's, below)
-      if (def.opts.genre !== undefined && !shrunkOnly.has(name)) { lines.push(...genreLines(p, name, ran)); if (def.opts.category === "character" && p.genres.get(def.opts.genre)?.checks.includes("height")) tall.add(def.opts.genre); }
+      if (def.opts.genre !== undefined && !shrunkOnly.has(name)) { lines.push(...genreLines(p, name, ran, notes)); if (def.opts.category === "character" && p.genres.get(def.opts.genre)?.checks.includes("height")) tall.add(def.opts.genre); }
       // a png at a density not its own: blown up, or shrunk from a finer drawing
       const pd = pngDensity(p, name);
       if (pd) { ran.density++; lines.push(...pd); }
@@ -563,7 +570,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.lines) run.push(`lines on ${ran.lines}`);
   if (ran.boxes) run.push(`boxes on ${ran.boxes} frame${ran.boxes > 1 ? "s" : ""}`);
   if (ran.genre) run.push(`genres' checks on ${ran.genre} frame${ran.genre > 1 ? "s" : ""}`);
-  if (ran.ink) run.push(`genres' ink by category on ${ran.ink} frame${ran.ink > 1 ? "s" : ""}`);
+  if (ran.ink) run.push(`genres' ink by category on ${ran.ink} frame${ran.ink > 1 ? "s" : ""} (and its line's L-corners)`);
   if (ran.material) run.push(`genres' ink by material on ${ran.material} frame${ran.material > 1 ? "s" : ""} (${Math.round((100 * ran.black) / Math.max(ran.edge, 1))}% of the edge near-black)`);
   if (ran.frozen) run.push(`frozen cells against their live render on ${ran.frozen}`);
   if (ran.cards) run.push(`cards' cells against their drawing on ${ran.cards}`);

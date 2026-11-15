@@ -159,6 +159,19 @@ sprite("step", { w: 8, h: 8, ink: [["#4a0e02", "#832e24", "#e8763e"]] }, (c) => 
   assert.throws(() => loadSource(PAL + `sprite("x", { w: 1, h: 1, category: "prop" })`, "t.px.js"), /category is what it is by its genre's ink.*and no genre/);
 });
 
+test("genre checks: its ink by category reads the line's L-corners at the edge too, every frame, as a LOOK line; the line stepping diagonally, none", () => {
+  // a block lined near-black, its right side stepping out a px diagonally; on guy's frame 1 through an elbow, an L
+  const draw = (l: boolean) => `(c) => { c.rect(0, 0, 10, 14, "#1a1620"); c.rect(0, 7, 11, 7, "#1a1620"); c.rect(1, 1, 8, 6, "#e8763e"); c.rect(1, 7, 9, 6, "#e8763e"); if (${l} && c.frame === 1) c.rect(10, 6, 1, 1, "#1a1620") }`;
+  const p = loadSource(PAL + `genre("td", { ink: { character: "#1a1620" } })
+anim("guy", { frames: 2, fps: 4, w: 11, h: 14, genre: "td", category: "character" }, ${draw(true)})
+anim("clean", { frames: 2, fps: 4, w: 11, h: 14, genre: "td", category: "character" }, ${draw(false)})`, "t.px.js");
+  const r = checkProject(p);
+  assert.deepEqual(r.lines, []);
+  assert.equal(r.notes.length, 1, r.notes.join("\n"));
+  assert.match(r.notes[0], /^guy › LOOK: genre 'td': 1 L-corner in a character's line at its edge over 1 of its 2 frames \(at frame 1: 9,6\): .*\(PXL help "edges"\)$/);
+  assert.match(r.coverage, /genres' ink by category on 4 frames \(and its line's L-corners\)/);
+});
+
 test("genre checks: an ink \"material\" (KOF's line), each edge pixel at least as dark as its material's fill inside it, the near-black share said", () => {
   // a block of the fill: its lit tone on the top and left edges over the fill (later along the ramp), lined in its
   // darkest, the fill to the edge (unlined), in the ink, its darkest over the ink (the ink a ramp starts at is no fill);

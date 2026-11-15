@@ -160,7 +160,9 @@ sprite's, an anim's, and `rig3d()` and `turnaround()` pass it on): a `"character
 round; an `"own"` one a line all round outside its fill, each edge pixel over 0.08 of lightness darker
 than what is a px or two inside it and none near-black (`pxl study`'s measure; a line beside a
 near-black inside, a hole or a black pattern, passes), its warning saying the share of the edge that
-isn't, on its lit side (up and left) and away from the light, past 2% of it (two lines meeting). A
+isn't, on its lit side (up and left) and away from the light, past 2% of it (two lines meeting). Its
+shape on the same pixels too: the line's L-corners at the edge (`--edges`' doubled) the frame shows, on every frame, a LOOK
+line saying how many over how many frames and where (`frame f: x,y`; a sword's guard may be meant). A
 `rig3d()` figure is read as itself: without what a move's `draw` paints (the sword, a slash's
 crescent), with what the rig's own `draw` adds after it (a throat's line). An
 `ink` of `"material"` (the whole `ink`, every category; or one category's) is a line by material, KOF's
@@ -802,7 +804,7 @@ to another `--out`, its files named as the scene's); `shot --world --every N`: o
 every N frames on it, each box showing what its own frame has there (its light, who is where), the
 boxes' `[frame, x, y]` printed. `build --share N` also writes `out/share/`: each asset N times bigger, nearest neighbour, clear kept,
 no checker or grid, a GIF when it moves: to post. `shot` writes `<name>_look.png` when its check has
-LOOK lines (the pixels they name ringed: L-corners orange, jaggies blue; its edges' as `--edges`
+LOOK lines (the pixels they name ringed: L-corners orange, a genre's line's too, jaggies blue; its edges' as `--edges`
 names them: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners
 green), and a clip's note gives each shown frame's ms.
 
@@ -845,7 +847,8 @@ in a `group()`; on a file whose sprites got no rule, what sprites get; a lit-sid
 read lighter and which darker), and lists as LOOK lines (not warnings: a
 corner is often meant) the L-corners and jaggies in the 1 px lines of every sprite and part drawn by
 hand (grid strings, `grid()`, `runs()`; not variants or `outline8`, nor a line whose steps are nearly
-all L's: drawn square on purpose), and tones side by side too close to tell apart; `--readings` also lists what the lit-side
+all L's: drawn square on purpose), tones side by side too close to tell apart, and the L-corners at the
+edge of a line a genre's `ink` reads by category (every frame); `--readings` also lists what the lit-side
 rule read on every placement, warning or not, with a tally; `--fix` fixes each failing `expect3d` rule
 with one number (see `expect3d`), and each failing rule of a scene's `expect` by moving a placement it
 names (see `expect:`), and says what it wrote. A `build` of a

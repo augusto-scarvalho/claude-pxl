@@ -678,9 +678,15 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   attack's sword and crescent taken in its own hook, the guard's corners kept). Doubled 0 on every move but hero32's
   attack_up (its guard, 1 px), no new 2x2, L or clump of the line against 5ee0986, notches not grown; the 16 px
   villagers and Reva with them (villagers32's own figures unchanged).
-- [ ] **The genre's ink reads the line's color, not its shape**: "near-black all round" passes a line with L-corners,
+- [x] **The genre's ink reads the line's color, not its shape**: "near-black all round" passes a line with L-corners,
   and check --edges' doubled is a LOOK read on one frame of an anim (`--frame N`), so four gates closed the heroes'
   line with Ls and passed. The ink rule reading the doubled over every frame (as a share, or a LOOK line per anim).
+  Done (F5q): where the ink reads by category ("character" or "own"), it counts edgeFlaws().doubled on the same frames
+  and pixels (the figure without what its move paints, where the frame shows them: not under a sword or a crescent):
+  a LOOK line per asset, how many over how many frames and the first four `frame f: x,y`; what ran says "(and its
+  line's L-corners)"; `shot` rings them orange on the frame shown.
+- [ ] **The L-corners the genre's ink now reads (F5q)**, for the user to decide which are meant: the cars 16 of 64
+  headings 1 each (car.px.js), the karts 29 of 108, 47 in all (kart.px.js), track_behind's `_lamp_0_s` 1.
 - [ ] **How light a line may go**: an `"own"` line was taken as light as the check allows, capped by hand at L 0.5 so
   it reads on the grass. The genre's ink a floor against its ground, and `--readings` saying each line's room.
 - [ ] **A decal at some headings**: a builder's decal is drawn at every heading turnaround() draws (the roof's number
