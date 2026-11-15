@@ -1,6 +1,7 @@
 // HD-2D: a little plaza in a pine wood, seen as Octopath Traveler and Triangle Strategy see theirs,
 // from high up through a long lens (45 degrees down, 30 across), modelled in meters as boxes whose
-// faces are tiled with pixel-art textures, 16 texels to the meter; the hero (lib/characters/hero.px.js),
+// faces are tiled with pixel-art textures, 16 texels to the meter (the paving a texel to a pixel where the
+// camera looks, texel: "screen", so its stones come out as drawn); the hero (lib/characters/hero.px.js),
 // the pines, bushes and lamps stand in it as flat sprites turned to the camera. One mesh() draws them all
 // with a depth per pixel, so the low wall hides the legs of the hero walking behind it and not his
 // head, the crate half hides another, and each stands on a contact shadow. Light in the world: a
@@ -10,7 +11,7 @@
 include("../../lib/characters/hero.px.js", { as: "hero" })
 include("../../lib/profiles/hd2d.px.js", { palette: true })   // the palette, the textures, the pines, bushes and lamps
 
-const MATS = { cobble: { tex: "_cobble" }, wall: { tex: "_wall" }, grass: { tex: "_grass" }, wood: { tex: "_planks" } }
+const MATS = { cobble: { tex: "_cobble_big", texel: "screen" }, wall: { tex: "_wall" }, grass: { tex: "_grass" }, wood: { tex: "_planks" } }
 
 // The camera: 24 px to the meter where it looks (the hero, a chibi 24 px tall, stands 1 m), the
 // middle of the picture on the ground Z m ahead.

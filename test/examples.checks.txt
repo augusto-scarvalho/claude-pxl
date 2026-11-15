@@ -177,7 +177,7 @@ lib/architecture/side_castle.px.js: 0 warnings (0 scenes (0 frames, 0 distinct p
 lib/architecture/side_village.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: boxes on 3 frames, cards' cells against their drawing on 18; not run: front marker (nothing has one)
 lib/architecture/surfaces.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: cards' cells against their drawing on 3; not run: front marker (nothing has one)
+  ran: cards' cells against their drawing on 4; not run: front marker (nothing has one)
 lib/architecture/track.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 1, boxes on 12 frames, genres' checks on 6 frames, genres' ink by category on 6 frames (and its line's L-corners), cards' cells against their drawing on 10; not run: front marker (nothing has one)
 lib/architecture/track_behind.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)

@@ -220,10 +220,15 @@ lines).
   Done (F3 small): a layer's `selout` (false, true, n) and `floor` ("k", false), over the asset's, for the line where it
   touches that layer's pixels, through mirror, flip, rot and angle as `outline: false` is. The hero and the knight
   draw their swords and plates in rig hooks and parts, not layers: no art moved onto it.
-- [ ] **The plaza's cobbles drawn larger** (`lib/architecture/surfaces.px.js`'s `_cobble`): at 16 texels to
+- [x] **The plaza's cobbles drawn larger** (`lib/architecture/surfaces.px.js`'s `_cobble`): at 16 texels to
   the meter a texel is 1.5 px, so the stones come out 7 and 9 px wide by turns; with `texel:
   "screen"` they shrink to 2/3 and the paving gets busy behind the figures. Stones drawn about
   1.5 times as big, then `texel: "screen"` (a change for the user to see before and after).
+  Done (F3 cobbles): `_cobble_big` beside `_cobble` (which stays, its pixels the same), the stones 5 to 8 px wide and
+  4 tall over a 1 px gap on a 24x20 tile, no joint nearer than 3 px to the next row's; the plaza's paving (its top and
+  the pillars' tops) laid with it at `texel: "screen"`. Where the camera looks each stone comes out as drawn; a texel
+  is 1.08 px at the front edge and 0.92 at the back, so there one stone in a few is a pixel wider or narrower, and at
+  the back a gap column now and then drops out and two stones join. Only the paving's pixels moved, in every frame.
 
 Wave 3 (sodium_hour, crew, warden, extinction, tropical) kept sodium_hour's steam by `plume`
 and extinction's lava steam by `plume` (with the two options below); the crew's hand mends all
