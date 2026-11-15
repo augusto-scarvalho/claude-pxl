@@ -1,9 +1,9 @@
 // What an engine reads off a sheet and what a thing is made for: colors by role (roleSwap), palette
 // slots in a sheet's export, sockets and a turnaround's footprint in the JSON, genre() and its checks.
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { keys, PAL } from "./helpers.ts";
 import { loadSource } from "../src/node/load.ts";
 import { writeOutputs } from "../src/node/output.ts";
@@ -170,6 +170,27 @@ anim("clean", { frames: 2, fps: 4, w: 11, h: 14, genre: "td", category: "charact
   assert.equal(r.notes.length, 1, r.notes.join("\n"));
   assert.match(r.notes[0], /^guy › LOOK: genre 'td': 1 L-corner in a character's line at its edge over 1 of its 2 frames \(at frame 1: 9,6\): .*\(PXL help "edges"\)$/);
   assert.match(r.coverage, /genres' ink by category on 4 frames \(and its line's L-corners\)/);
+});
+
+test("genre checks: an \"own\" line against the ground its genre says (on, its kit's keys): a LOOK past the floor, its room in --readings; a genre with no ground read as before", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-floor-")), kit = join(dir, "kit.px.js").split(sep).join("/");
+  writeFileSync(kit, `pal({ m: "#64c83c", g: "#7cd640" })\n`);
+  // a pale box lined all round in its own darks: a deep green (L 0.38), a slate (0.65); the grass's darkest m 0.74
+  const src = (on: string) => PAL + `genre("td", { ink: { prop: "own" }, roles: { from: "${kit}" }${on} })
+sprite("_box", { w: 8, h: 8 }, (c) => c.rect(1, 1, 6, 6, "#eeebe0"))
+sprite("dark", { base: "_box", ink: [["#1b4d34", "#1b4d34", "#eeebe0"]], genre: "td", category: "prop" })
+sprite("pale", { base: "_box", ink: [["#8a8ca0", "#8a8ca0", "#eeebe0"]], genre: "td", category: "prop" })`;
+  try {
+    const r = checkProject(loadSource(src(`, on: { prop: "mg" }`), "t.px.js"), { readings: true });
+    assert.deepEqual([r.lines, r.notes.length], [[], 1], r.notes.join("\n"));
+    assert.match(r.notes[0], /^pale › LOOK: genre 'td': 24 px of a prop's line lighter than the floor against its ground, past 2% of its edge \(at .*; \.\.\.\): its lightest L 0\.65, its ground's darkest 0\.74 \('m' of its on "mg"\), 0\.10 apart, the floor 0\.24: on that ground the line may not read/);
+    assert.ok(r.readings!.includes(`dark › genre 'td': a prop's line: its lightest L 0.38, its ground's darkest 0.74 ('m' of its on "mg"), 0.37 apart, the floor 0.24`), r.readings!.join("\n"));
+    assert.match(r.coverage, /genres' ink by category on 2 frames \(and its line's L-corners; against its ground on 2\)/);
+    // no ground said: no room, no LOOK, what ran as before
+    const t = checkProject(loadSource(src(""), "t.px.js"), { readings: true });
+    assert.deepEqual([t.lines, t.notes, t.readings], [[], [], []]);
+    assert.match(t.coverage, /genres' ink by category on 2 frames \(and its line's L-corners\)/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("genre checks: an ink \"material\" (KOF's line), each edge pixel at least as dark as its material's fill inside it, the near-black share said", () => {

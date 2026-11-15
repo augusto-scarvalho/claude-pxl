@@ -8,14 +8,14 @@ import { rigLines } from "../core/rig.ts";
 import { frontWords, rampSteps } from "../core/checks.ts";
 import { PxError, didYouMean } from "../core/errors.ts";
 import { dE, edgeFlaws, edgeOf, lch, lineFlaws } from "../core/vision.ts";
-import { type Color, toHex } from "../core/color.ts";
+import { type Color, parseHex, toHex } from "../core/color.ts";
 import type { Img } from "../core/image.ts";
 import type { Item, World } from "../core/model.ts";
 import { type Knob, fixRule, runExpects, turnKnob } from "../core/world3d.ts";
 import { type Frame2d, type Knob2d, type Rule2d, type Shift, fixRule2d, moveInSource, nameAll, namesOf, runRules2d } from "../core/expect.ts";
 import { readFileSync, writeFileSync } from "node:fs";
 import { loadProject } from "./load.ts";
-import { drawnWith, members } from "./lib.ts";
+import { drawnWith, genreRoles, members } from "./lib.ts";
 import { FLAWS, jointsOf, poseFlaws, viewRows, viewWarnings } from "../core/rig3d.ts";
 
 /** --edges's words for an asset's frames: each kind of edge flaw found, how many, where (frame by frame, once). */
@@ -39,7 +39,7 @@ export interface CheckResult {
   lines: string[]; warnings: number; checked: string; coverage: string;
   /** Things to look at, not wrong for sure: a hand-drawn line's L-corners and jaggies (a corner is often meant). No exit code. */
   notes: string[];
-  /** With `readings`: every placement's lit side against the scene's light, warning or not, and a tally (to tune the rule). */
+  /** With `readings`: every placement's lit side against the scene's light, warning or not, and a tally (to tune the rule); each "own" line's room against its genre's ground. */
   readings?: string[]; tally?: string;
   /**
    * With `fix`: each failing expect3d rule's one number that makes it hold (fixRule), or none found; a
@@ -53,13 +53,16 @@ export interface CheckResult {
 /** An asset's frames (a still one's image). */
 const frameImgs = (p: Project, n: string) => (p.assets.get(n)!.kind === "anim" ? p.drawn(n).map((f) => f.img) : [p.image(n)]);
 
+// how much darker than its ground an "own" line stays (OKLab L, under the ground's darkest tone): the least topdown32's
+// approved lines keep on the grass (its oak's 0.249: a line at L 0.5, where its hand pass capped it to read on the grass)
+const FLOOR = 0.24;
 /**
  * The checks of the genre an asset names, on its frames: "ground", the feet (its drawing's lowest row) on
  * one row in every frame but those whose data says air (a jump's); "footprint", that lowest row down to
  * where it meets the ground (its footprint box, a turnaround()'s), within a px, in every frame (what is
  * nearer us may hang lower: a bumper seen from above).
  */
-function genreLines(p: Project, name: string, ran: { genre: number; ink: number; material: number; black: number; edge: number }, notes: string[]): string[] {
+function genreLines(p: Project, name: string, ran: { genre: number; ink: number; material: number; black: number; edge: number; room: number }, notes: string[], kits: Map<string, ReturnType<typeof genreRoles>>, rooms?: Set<string>): string[] {
   const gn = p.assets.get(name)!.opts.genre!, g = p.genres.get(gn), out: string[] = [];
   if (!g) return [`${name} › WARNING: genre '${gn}' is no genre() here${didYouMean(gn, p.genres.keys())}${p.genres.size ? ` (there are: ${[...p.genres.keys()].join(", ")})` : ""}: its checks didn't run`];
   const fr = frameImgs(p, name), low = fr.map((im) => { const b = im.bounds(); return b ? b.y + b.h - 1 : -1; });
@@ -99,10 +102,16 @@ function genreLines(p: Project, name: string, ran: { genre: number; ink: number;
     const r = ramps.find((r) => r.includes(c) && r.includes(n));
     return r ? r.indexOf(c) > r.indexOf(n) : !ramps.some((r) => r.includes(c) || r.includes(n)) && lch(c).L - lch(n).L > 0.08;
   };
+  // (an "own" line against the ground its genre says a thing of its category stands on, `on`, its kit's keys: its
+  // darkest; the kit's files counted the project's, so what keeps a check's lines sees an edit there)
+  const hasOn = rule === "own" && typeof (g.on as Record<string, unknown> | undefined)?.[cat!] === "string";
+  if (hasOn && !kits.has(gn)) { const R = genreRoles({ cell: "", file: p.fileOf(g.loc!)!, g }, "on")!; kits.set(gn, R); R.files.forEach((f) => p.addFile(f)); }
+  const onG = hasOn ? kits.get(gn)!.roles.get(cat!)! : undefined;
+  const ground = onG && onG.colors.map((c, i) => ({ L: lch(parseHex(c)!).L, k: onG.keys[i] })).sort((a, b) => a.L - b.L)[0];
   if (rule) {
     ran[rule === "material" ? "material" : "ink"] += fr.length;
     let n = 0;
-    const bad = { lit: 0, away: 0, black: 0, fill: 0 }, at: number[] = [], ells: [number, number, number][] = [];
+    const bad = { lit: 0, away: 0, black: 0, fill: 0 }, at: number[] = [], ells: [number, number, number][] = [], lit: [number, number, number, number][] = [];
     fr.forEach((im, i) => {
       // (its line's shape too, on the same pixels: an L's elbow at the edge, --edges' doubled, where the frame shows it,
       // not under what a move paints; a line by material isn't one all round)
@@ -111,6 +120,7 @@ function genreLines(p: Project, name: string, ran: { genre: number; ink: number;
       // (a line beside a near-black inside, a hole or a black pattern, can't be darker than it and not near-black)
       const e = edgeOf(im.figureImg ?? im), wrong = e.filter((q) => (rule === "character" ? q.kind !== "black" : rule === "material" ? q.kind !== "black" && q.inner !== undefined && lighter(q.c, q.inner) : q.kind === "black" || (q.kind === "none" && !(q.inner !== undefined && lch(q.inner).L < 0.3 && lch(q.inner).C < 0.08))));
       if (rule === "material") { ran.black += e.filter((q) => q.kind === "black").length; ran.edge += e.length; }
+      if (ground) for (const q of e) lit.push([i, q.x, q.y, lch(q.c).L]);
       n += e.length;
       if (wrong.length) at.push(i);
       for (const q of wrong) { bad[q.out[0] + q.out[1] < 0 ? "lit" : "away"]++; bad[q.kind === "black" ? "black" : "fill"]++; }
@@ -126,6 +136,14 @@ function genreLines(p: Project, name: string, ran: { genre: number; ink: number;
     // (a note, not a warning: a sword's guard, a box's corner are L-corners meant as one)
     const ln = ells.length, on = new Set(ells.map(([i]) => i)).size, where = ells.slice(0, 4).map(([i, x, y]) => `${fr.length > 1 ? `frame ${i}: ` : ""}${x},${y}`);
     if (ln) notes.push(`${name} › LOOK: genre '${gn}': ${ln} L-corner${ln > 1 ? "s" : ""} in a ${cat}'s line at its edge${fr.length > 1 ? ` over ${on} of its ${fr.length} frames` : ""} (at ${where.join("; ")}${ln > 4 ? "; ..." : ""}): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")`);
+    // its room: its lightest once the 2% the rule passes are left out, under the ground's darkest; a LOOK past the floor
+    if (ground) {
+      ran.room += fr.length;
+      const top = lit.map((v) => v[3]).sort((a, b) => b - a)[Math.floor(n / 50)] ?? 0, over = lit.filter((v) => ground.L - v[3] < FLOOR);
+      const room = `its lightest L ${top.toFixed(2)}, its ground's darkest ${ground.L.toFixed(2)} ('${ground.k}' of its on "${onG!.keys}"), ${(ground.L - top).toFixed(2)} apart, the floor ${FLOOR}`;
+      rooms?.add(`${name} › genre '${gn}': a ${cat}'s line: ${room}`);
+      if (over.length > n / 50) notes.push(`${name} › LOOK: genre '${gn}': ${over.length} px of a ${cat}'s line lighter than the floor against its ground, past 2% of its edge (at ${over.slice(0, 4).map(([i, x, y]) => `${fr.length > 1 ? `frame ${i}: ` : ""}${x},${y}`).join("; ")}${over.length > 4 ? "; ..." : ""}): ${room}: on that ground the line may not read; take those a tone darker`);
+    }
   }
   return out;
 }
@@ -302,8 +320,10 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0, sprites = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
   // count where it did, so "no warnings" isn't read as "checked"
-  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, ink: 0, material: 0, black: 0, edge: 0, frozen: 0, cards: 0, density: 0, edges: 0 };
+  const ran = { front: 0, light: 0, read: 0, feet: 0, ground: 0, text: 0, parts: 0, lines: 0, stand: 0, views: 0, poses: 0, boxes: 0, genre: 0, ink: 0, material: 0, black: 0, edge: 0, room: 0, frozen: 0, cards: 0, density: 0, edges: 0 };
   let cellsBy: Map<string, string[]> | undefined;
+  // (the grounds the genres say, from their kits' palettes, read once)
+  const kits = new Map<string, ReturnType<typeof genreRoles>>();
   let lightSaid = false, groundSaid = false, fixes: CheckResult["fixes"], rulesAll = 0, rulesHeld = 0;
   // the genres asking for one height across the directions, until a family of theirs is held to it
   const tall = new Set<string>();
@@ -380,7 +400,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         for (const [s, fs] of out) lines.push(`${name} › WARNING: box ${s}${fr.length > 1 ? ` (frame${fs.length > 1 ? "s" : ""} ${ranges(fs)})` : ""}: an engine reads it as it is; keep it inside, or give the asset room (w, h)`);
       }
       // the genre() it is made for: its checks on its frames (the height across directions is a family's, below)
-      if (def.opts.genre !== undefined && !shrunkOnly.has(name)) { lines.push(...genreLines(p, name, ran, notes)); if (def.opts.category === "character" && p.genres.get(def.opts.genre)?.checks.includes("height")) tall.add(def.opts.genre); }
+      if (def.opts.genre !== undefined && !shrunkOnly.has(name)) { lines.push(...genreLines(p, name, ran, notes, kits, opts.readings ? reads : undefined)); if (def.opts.category === "character" && p.genres.get(def.opts.genre)?.checks.includes("height")) tall.add(def.opts.genre); }
       // a png at a density not its own: blown up, or shrunk from a finer drawing
       const pd = pngDensity(p, name);
       if (pd) { ran.density++; lines.push(...pd); }
@@ -570,7 +590,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   if (ran.lines) run.push(`lines on ${ran.lines}`);
   if (ran.boxes) run.push(`boxes on ${ran.boxes} frame${ran.boxes > 1 ? "s" : ""}`);
   if (ran.genre) run.push(`genres' checks on ${ran.genre} frame${ran.genre > 1 ? "s" : ""}`);
-  if (ran.ink) run.push(`genres' ink by category on ${ran.ink} frame${ran.ink > 1 ? "s" : ""} (and its line's L-corners)`);
+  if (ran.ink) run.push(`genres' ink by category on ${ran.ink} frame${ran.ink > 1 ? "s" : ""} (and its line's L-corners${ran.room ? `; against its ground on ${ran.room}` : ""})`);
   if (ran.material) run.push(`genres' ink by material on ${ran.material} frame${ran.material > 1 ? "s" : ""} (${Math.round((100 * ran.black) / Math.max(ran.edge, 1))}% of the edge near-black)`);
   if (ran.frozen) run.push(`frozen cells against their live render on ${ran.frozen}`);
   if (ran.cards) run.push(`cards' cells against their drawing on ${ran.cards}`);

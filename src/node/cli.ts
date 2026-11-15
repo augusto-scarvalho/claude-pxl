@@ -135,7 +135,8 @@ const USAGE = `pxl — pixel-art DSL
       line on every sprite and anim, by hand or over a base (a 3D draft and its pass), naming what a
       reduction leaves at its edges: steps out of order, doubled line, tips, bridges, notches, gaps in
       the line, clipped corners (pxl help edges; shot rings them). --readings also lists what the lit-side rule read on every placement,
-      warning or not, with a tally: to see where it agrees and where it can't tell. A scene's
+      warning or not, with a tally: to see where it agrees and where it can't tell; and each "own" line's room
+      against the ground its genre says (on): its lightest, the ground's darkest, the gap and the floor. A scene's
       expect rules (beside, before, apart, inside, onGround, while) run at the frames it checks.
       --fix: each expect3d rule that fails, fixed by one number of the parts it names (where one
       stands, its gap beside another, then a parameter), and each scene rule by one number of a
@@ -601,7 +602,7 @@ export async function main(argv: string[]): Promise<number> {
         }
         console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}${r.notes.length ? `, ${r.notes.length} to look at` : ""} (checked ${r.checked}${a.frame ? `, at frame ${a.frame}` : ""})`);
         console.log(r.coverage);
-        if (r.readings) console.log(["", "readings (each placement's lit side against its light, warning or not):", ...r.readings.map((l) => "  " + l), r.tally].join("\n"));
+        if (r.readings) console.log(["", "readings (each placement's lit side against its light, and each genre's \"own\" line's room against its ground, warning or not):", ...r.readings.map((l) => "  " + l), r.tally].join("\n"));
         return r.warnings ? 1 : 0;
       }
       case "shot": {

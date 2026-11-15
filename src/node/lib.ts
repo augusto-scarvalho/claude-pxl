@@ -68,18 +68,21 @@ function genreOf(name: string, genres = catalog().genres): LibGenre {
 /**
  * A genre's colors by role (its `roles`: { from, leaf: "RKML", ... }): each role's ramp of keys, dark to light, in the
  * palette of the file `from` names (a path from the genre's file: its kit's palette, never typed again), else of the
- * genre's own file; with their colors as that file has them.
+ * genre's own file; with their colors as that file has them. `key` "on": the ground a thing of each category stands on
+ * ({ tree: "mg" }), in the same palette. `files`: what reading that palette read.
  */
-export function genreRoles(G: LibGenre): { from: string; roles: Map<string, { keys: string; colors: string[] }> } | undefined {
-  if (G.g.roles === undefined) return undefined;
-  const { from, ...roles } = G.g.roles as Record<string, unknown>, file = typeof from === "string" ? resolve(dirname(G.file), from) : G.file, t = loadProject(file).pal.table();
-  const out = new Map<string, { keys: string; colors: string[] }>();
+export function genreRoles(G: LibGenre, key: "roles" | "on" = "roles"): { from: string; roles: Map<string, { keys: string; colors: string[] }>; files: string[] } | undefined {
+  const spec = G.g[key];
+  if (spec === undefined) return undefined;
+  if (typeof spec !== "object" || spec === null || Array.isArray(spec)) throw new PxError(`genre '${G.g.name}': ${key} is { ${key === "on" ? "tree" : "leaf"}: "keys" }, got ${JSON.stringify(spec)}`);
+  const { from: _, ...roles } = spec as Record<string, unknown>, from = (G.g.roles as { from?: unknown } | undefined)?.from;
+  const file = typeof from === "string" ? resolve(dirname(G.file), from) : G.file, kit = loadProject(file), t = kit.pal.table(), out = new Map<string, { keys: string; colors: string[] }>();
   for (const [r, keys] of Object.entries(roles)) {
     const gone = typeof keys === "string" ? [...keys].filter((k) => !(k in t)) : [];
-    if (typeof keys !== "string" || !keys || gone.length) throw new PxError(`genre '${G.g.name}': roles.${r} is a ramp of ${inRepo(file)}'s keys, dark to light ("RKML"), got ${JSON.stringify(keys)}${gone.length ? ` (not in its palette: ${gone.join(" ")})` : ""}`);
+    if (typeof keys !== "string" || !keys || gone.length) throw new PxError(`genre '${G.g.name}': ${key}.${r} is ${key === "on" ? "the ground it stands on in" : "a ramp of"} ${inRepo(file)}'s keys, dark to light ("RKML"), got ${JSON.stringify(keys)}${gone.length ? ` (not in its palette: ${gone.join(" ")})` : ""}`);
     out.set(r, { keys, colors: [...keys].map((k) => t[k]) });
   }
-  return { from: inRepo(file), roles: out };
+  return { from: inRepo(file), roles: out, files: kit.files };
 }
 const saidRoles = (R: NonNullable<ReturnType<typeof genreRoles>>, on?: Map<string, string[]>) =>
   [...R.roles].filter(([r]) => !on || on.has(r)).map(([r, v]) => `${r} ${v.keys} (${v.colors.join(" ")})${on ? ` on ${on.get(r)!.join(", ")}` : ""}`).join(", ");

@@ -198,6 +198,8 @@ declare global {
     mix?: boolean;
     /** the colors a 3D draft takes by role (pxl lib draft): each a ramp of keys dark to light in the palette of `from`'s file (a path from the genre's file: its kit's), else the genre's file's */
     roles?: { from?: string; [role: string]: string | undefined };
+    /** the ground a thing of each category stands on ({ tree: "mg" }), keys of `roles`' palette: pxl check reads an "own" line against its darkest, a LOOK past the floor */
+    on?: Record<string, string>;
     /** any other field, kept for the file to read (steer) */
     [field: string]: any;
   }

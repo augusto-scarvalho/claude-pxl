@@ -715,8 +715,19 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   line's L-corners)"; `shot` rings them orange on the frame shown.
 - [ ] **The L-corners the genre's ink now reads (F5q)**, for the user to decide which are meant: the cars 16 of 64
   headings 1 each (car.px.js), the karts 29 of 108, 47 in all (kart.px.js), track_behind's `_lamp_0_s` 1.
-- [ ] **How light a line may go**: an `"own"` line was taken as light as the check allows, capped by hand at L 0.5 so
+- [x] **How light a line may go**: an `"own"` line was taken as light as the check allows, capped by hand at L 0.5 so
   it reads on the grass. The genre's ink a floor against its ground, and `--readings` saying each line's room.
+  Done (F5r): a genre says the ground each category stands on, `on: { tree: "mg" }` in its roles' keys (topdown32's
+  and racing_topdown's the island's grass, m 0.74 its darkest); where it does, pxl check reads an `"own"` line against
+  it, a LOOK past 2% of its edge lighter than the floor, 0.24 under the ground's darkest (the least topdown32's 19
+  approved lines keep: its oak's 0.249, its line at the hand cap; median of the library's 29 "own" lines 0.295), and
+  `--readings` says each line's lightest, the ground's darkest, the gap and the floor. pxl lib draft unchanged: its
+  line is its role's first key, by hand in the profile, and every role's line key of both genres keeps the floor
+  (the lightest h, 0.38).
+- [ ] **The floor reads lightness alone (F5r)**: racing_topdown's barrier (its white blocks' slate line, L 0.58-0.65,
+  0.10 under the grass's m) and gantry (its posts' slate, 0.58, 0.16 under), track.px.js, are under it and read on the
+  grass all the same, slate on green (the user looked: they stay as drawn, pxl check's LOOK on them with them). A floor
+  that reads the hue too, if such notes pile up.
 - [ ] **A decal at some headings**: a builder's decal is drawn at every heading turnaround() draws (the roof's number
   only square on took two turnarounds a livery). A decal's `headings`.
 - [ ] **Shrink keeps the boxes**: a shrunk turnaround sprite loses its `footprint` box, so the genre's footprint check

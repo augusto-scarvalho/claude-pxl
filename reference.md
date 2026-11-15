@@ -44,7 +44,7 @@ include("other.px.js")                  // path relative to the current file; in
 directions("ship", 16, { from, outline?, outline8?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
 turnaround("house", thing, { view?, ppm?, n?, headings?, part?, ... })  // a thing in 3D seen from n headings: house_n, house_ne, ... + group "house"; see turnaround() below
 rig3d("tr", { body, moves: { walk: { frames, ms, pose } }, n?, parts?, head?, blocks? })  // a figure on the 3D layer in n headings: tr_walk_s, ... + group "tr_walk"; see rig3d() below
-genre("fighting", { camera, grid or ppm, scale, heads, dirs, states, contract, pitch, stand, tones, ink, mix, roles, checks })  // a profile as data, its checks run by pxl check on what names it: see genre() below
+genre("fighting", { camera, grid or ppm, scale, heads, dirs, states, contract, pitch, stand, tones, ink, mix, roles, on, checks })  // a profile as data, its checks run by pxl check on what names it: see genre() below
 card("_lamp", { is, cells: { "hd2d/24ppm": "✓" }, vary?, tiles?, draw? })  // a library entry's card, just after it: see card() below
 views("_head", { s: grid, sw, w, nw, n }, { anchor, like? })  // hand-drawn views pivoted on an anchor, the others mirrored: _head_s, ... + group "_head"; see views() below
 font(name, "glyph_sprite", { chars: "ABC...", w, h, cols?, mono? })  // bitmap font: glyphs in w x h cells, in chars order; trimmed to their ink (proportional), or all as wide as the widest with mono: true (a score, a timer)
@@ -143,7 +143,8 @@ naming it draws its surface in, where its
 by category, `{ character: "#1a1620", tree: "selective" }`, or words), `mix` (`true`: densities mixed
 on purpose, HD-2D's sprites in a finer world), `roles` (the colors a 3D draft takes by role: `{ from:
 "../nature/side.px.js", leaf: "RKML", bark: "ewW" }`, each role a ramp of keys dark to light (`leaf`, `needle`,
-`bark`, `bark_light`, `stone`: what the cards name), the line first where its ink is by material, then `tones` of fill, in the palette of the file `from` names, its kit's, else its own file's) and `checks`; any other field is kept as given, for the
+`bark`, `bark_light`, `stone`: what the cards name), the line first where its ink is by material, then `tones` of fill, in the palette of the file `from` names, its kit's, else its own file's), `on` (the ground a thing
+of each category stands on, in `roles`' keys: topdown32's `{ tree: "mg", prop: "mg", house: "mg" }`, its grass) and `checks`; any other field is kept as given, for the
 file (`steer`). Its cell is its camera's kind and its density: `topdown/16`, `hd2d/24ppm`. It
 returns them with `name`; `genre(name)` gives them back after (`genre("racing_topdown").stand`: a kit
 reads its profile's numbers from one place). A profile's file included twice (by a scene and by an entry that names its
@@ -162,7 +163,11 @@ than what is a px or two inside it and none near-black (`pxl study`'s measure; a
 near-black inside, a hole or a black pattern, passes), its warning saying the share of the edge that
 isn't, on its lit side (up and left) and away from the light, past 2% of it (two lines meeting). Its
 shape on the same pixels too: the line's L-corners at the edge (`--edges`' doubled) the frame shows, on every frame, a LOOK
-line saying how many over how many frames and where (`frame f: x,y`; a sword's guard may be meant). A
+line saying how many over how many frames and where (`frame f: x,y`; a sword's guard may be meant). Where
+the genre says the ground its category stands on (`on`), an `"own"` line against it: its pixels lighter than the
+floor (0.24 of lightness under the ground's darkest tone: the least topdown32's approved lines keep on its grass)
+past 2% of its edge, a LOOK line saying how many, where, the line's lightest (the 2% left out), the ground's darkest
+and the gap; `--readings` says that room on each. A
 `rig3d()` figure is read as itself: without what a move's `draw` paints (the sword, a slash's
 crescent), with what the rig's own `draw` adds after it (a throat's line). An
 `ink` of `"material"` (the whole `ink`, every category; or one category's) is a line by material, KOF's
@@ -851,8 +856,10 @@ read lighter and which darker), and lists as LOOK lines (not warnings: a
 corner is often meant) the L-corners and jaggies in the 1 px lines of every sprite and part drawn by
 hand (grid strings, `grid()`, `runs()`; not variants or `outline8`, nor a line whose steps are nearly
 all L's: drawn square on purpose), tones side by side too close to tell apart, and the L-corners at the
-edge of a line a genre's `ink` reads by category (every frame); `--readings` also lists what the lit-side
-rule read on every placement, warning or not, with a tally; `--fix` fixes each failing `expect3d` rule
+edge of a line a genre's `ink` reads by category (every frame), and an `"own"` line lighter than the floor
+against the ground its genre says (`on`); `--readings` also lists what the lit-side
+rule read on every placement, warning or not, with a tally, and each such line's room (its lightest, the ground's
+darkest, the gap, the floor); `--fix` fixes each failing `expect3d` rule
 with one number (see `expect3d`), and each failing rule of a scene's `expect` by moving a placement it
 names (see `expect:`), and says what it wrote. A `build` of a
 whole file with more than 12 assets prints how many of each kind it wrote; `--list` or `--only`
