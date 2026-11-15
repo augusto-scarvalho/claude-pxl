@@ -1,8 +1,9 @@
 // The builds kept on disk (src/node/store.ts): one read back is the build made, every field and the warnings it
 // gave; a change to anything it read (an include, a PNG, a palette, pxl's sources) builds it again and an unrelated
 // file doesn't; a check's build never serves a full one, and both are kept side by side; what the art's own memo
-// carries from one build to another (a warning, an option) goes with what's kept after it; the art's dice and clock,
-// and a file read after it loaded, keep nothing; a broken entry is made again. Each project here keeps every build
+// carries from one build to another (a warning, an option) goes with what's kept after it; what the art writes as it
+// draws (a mask) and another build reads, the art's dice and clock, and a file read after it loaded keep nothing from
+// there; a broken entry is made again. Each project here keeps every build
 // (as if each took long), and its art says each build it makes (console.debug("made"), counted here).
 import assert from "node:assert/strict";
 import { mkdtempSync, truncateSync, writeFileSync } from "node:fs";
@@ -50,6 +51,10 @@ put("memo3.px.js", `sprite("lit", { w: 8, h: 8 }, rect(0, 0, 8, 8, "#408040"), l
 let memo
 sprite("y", { w: 8, h: 8 }, (c) => { memo ??= c.asset("lit"); c.img.data.set(memo.data) })
 sprite("s", { w: 8, h: 8 }, (c) => { memo ??= c.asset("lit"); c.stamp("y", 0, 0) })`);
+// _hills's code fills a mask of the file's as it draws, dusk's frames draw from it: _hills found made would leave it empty
+put("mask.px.js", `const MASK = new Uint8Array(16)
+sprite("_hills", { w: 4, h: 4 }, (c) => { for (let i = 0; i < 16; i += 3) { MASK[i] = 1; c.px(i % 4, i >> 2, "#408040") } })
+anim("dusk", { w: 4, h: 4, frames: 2 }, stamp("_hills", 0, 0), (c) => { for (let i = 0; i < 16; i++) if (!MASK[i]) c.px(i % 4, i >> 2, c.frame ? "#202040" : "#101030") })`);
 const png = (c: number) => { const i = new Img(2, 2); i.data.fill(c); return encodePng(i); };
 put("part.px.js", "const SIZE = 6");
 put("pal.hex", "1b1630 k\n8ccf63 g\n4c8a44 G\n");
@@ -58,7 +63,7 @@ put("p.png", png(0xffffffff));
 /** A project keeping every build (`cold`: reading none), and how many builds the disk served it. */
 function load(opts: { cold?: boolean; checksOnly?: boolean; file?: string } = {}) {
   const p = loadProject(join(dir, opts.file ?? "a.px.js"), { checksOnly: opts.checksOnly }), d = p.disk!, n = { served: 0 };
-  p.disk = { get: (k, o) => { if (opts.cold) return undefined; const r = d.get(k, o); if (r) n.served++; return r; }, put: (k, out, log) => d.put(k, out, log, Infinity) };
+  p.disk = { get: (k, o) => { if (opts.cold) return undefined; const r = d.get(k, o); if (r) n.served++; return r; }, put: (k, out, log, _ms, skip) => d.put(k, out, log, Infinity, skip) };
   return { p, n };
 }
 /**
@@ -119,6 +124,18 @@ test("store: so does the option of a build found made (read back, not built) whi
   check.p.build("s");
   assert.equal(check.n.served, 1, "lit read back inside s, y made after it");
   assert.equal(text(load({ file: "memo3.px.js" }).p.build("y")), text(fresh.p.build("y")));
+});
+
+test("store: what the art writes as it draws and another build reads: cold, warm and off, the same pictures", () => {
+  // (_hills kept alone, as a slow build is, the frames made each time, as quick ones are)
+  const frames = (cache: boolean) => {
+    const p = loadProject(join(dir, "mask.px.js")), d = p.disk!;
+    p.disk = cache ? { get: (k, o) => d.get(k, o), put: (k, out, log, _ms, skip) => { if (k === "_hills") d.put(k, out, log, Infinity, skip); } } : undefined;
+    return text(p.frames("dusk").map((f) => f.img));
+  };
+  const cold = frames(true), warm = frames(true), off = frames(false);
+  assert.equal(cold, off);
+  assert.equal(warm, off, "_hills made again: its mask filled for the frames");
 });
 
 test("store: a check's and a full build of the same asset are kept side by side", () => {

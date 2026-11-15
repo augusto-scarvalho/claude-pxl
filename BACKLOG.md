@@ -1257,6 +1257,17 @@ one), and the art code itself (4% of the cost).
   profiler; extinction went from 17 s to 1m43s without anyone seeing why until a CPU profile was
   read by hand. Its first run found pxl's own: the onion sheet asked every pixel of every frame
   whether it ever changes, frames squared; worked out once, the park's build went from 94 s to 17 s.
+- [x] **A build found made never changes the picture** (perf K): extinction's `_bg` fills the file's `SKY` mask as
+  it draws and the soot clouds draw on it; read back from disk, `_bg` ran no code and every frame lost 1864 to 4172 px
+  (a worker's build, sent with its inner builds, did the same to the main thread with the store off). pxl now digests
+  what the file's top-level names hold (load.ts) before its first build and again where a build would be read back,
+  kept or taken from a worker, and from the first change lets the disk go for the command (`build --profile` says
+  where and which names). Cold, warm and off are the same 60 frames; extinction pays its cold 6 to 7 s again on each
+  command. Over the library at frame 0 three more files write as they draw, each a memo (park's `STAMPS`, race's
+  `wayAt`, harbor's `NEAR2`): right pictures, but no cache from there (park's frame 0 warm: 0.1 s before, 1.0 s
+  now); filled as the file loads they would keep it. Open: a variable a function closes over, and what a WeakMap
+  holds, aren't seen; `pxl edit`'s rebuild adopts the unchanged builds of the project before the edit, whose code
+  doesn't run in the new one (its CHANGES lines only, no pixel written).
 
 ## Parallax (from dogfooding the train)
 

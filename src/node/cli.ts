@@ -397,7 +397,7 @@ export async function main(argv: string[]): Promise<number> {
       case "build": {
         const build = () => { const p = loadProject(file, { wholeWorld: a.world }); startWorkers(p, file, { wholeWorld: a.world }, "build"); return { p, r: writeOutputs(p, outDir, { only: a.only, all: a.all, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every, share: a.share }) }; };
         let report = "";
-        const { p, r } = a.profile ? await profiled(build).then(({ result, profile, left }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times, left); return result; }) : build();
+        const { p, r } = a.profile ? await profiled(build).then(({ result, profile, left }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times, left, result.p.offWhy); return result; }) : build();
         for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);
         if (a.only || a.list || r.lines.length <= 12) for (const l of r.lines) console.log(l);
         else {

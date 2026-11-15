@@ -481,7 +481,32 @@ export class Project implements BuildCtx {
    * Set by a loader: builds kept on disk between commands (src/node/store.ts) under a key of all the project
    * read; `key` adds the asset's name, seed, time and clock. A build is kept with what it did (DiskLog).
    */
-  disk?: { get(key: string, opt: Record<string, boolean>): { out: BuildOut; log: DiskLog } | undefined; put(key: string, out: BuildOut, log: DiskLog, ms: number): void };
+  disk?: { get(key: string, opt: Record<string, boolean>): { out: BuildOut; log: DiskLog } | undefined; put(key: string, out: BuildOut, log: DiskLog, ms: number, skip?: (ms: number) => boolean): void };
+  /**
+   * Set by a loader: a digest of what each of the art's top-level names holds (load.ts). Taken before the first build
+   * made here, and again where a build would be found made or kept once art code ran since: changed, a build wrote what
+   * another may read, which no key holds (served, its code wouldn't run and what it writes would stay unwritten), and
+   * the disk and the workers' builds are let go from there, as for the art's dice.
+   */
+  state?: () => Record<string, string>;
+  private state0?: Record<string, string>;
+  private stateAt = -1;
+  /** (the ms the last digest took: a build that took less isn't worth keeping, as reading it back costs one) */
+  private stateMs = 0;
+  /** Why the art's state let the disk go (pxl build --profile says it). */
+  offWhy?: string;
+  /** Has the art's state changed since the first build made here? Then the disk is let go, at `name`. */
+  moved(name: string): boolean {
+    if (!this.state0 || (this.stateAt === this.made && !this.logs.length)) return false;
+    this.stateAt = this.made;
+    const t = performance.now(), now = this.state!(), was = this.state0;
+    this.stateMs = performance.now() - t;
+    const changed = Object.keys(now).filter((k) => now[k] !== was[k]);
+    if (!changed.length) return false;
+    this.offDisk();
+    this.offWhy = `builds kept on disk let go at '${name}': the art's ${changed.join(", ")} changed as it was made (a build found made runs no code: what it writes would stay unwritten for the builds after it)`;
+    return true;
+  }
   /** The builds in progress' logs, innermost last (`inner`: the ms of the builds made inside it), and each build's log once made. */
   private logs: { needs: Record<string, boolean>; fx: Set<string>; bad?: boolean; inner: number }[] = [];
   private logOf = new WeakMap<BuildOut, DiskLog>();
@@ -1927,8 +1952,10 @@ export class Project implements BuildCtx {
     // from without making them, their logs joined to its own, as found here. Else made here, as always
     const ek = this.elsewhere && !this.early && !this.stub && !clock && !(this.opt.tracing && seed === 0 && t === 0) ? key : undefined;
     let hit: Kept | undefined = dk ? this.disk!.get(dk, this.opt) : undefined;
-    const w = !hit && ek ? this.elsewhere!.get(ek) : undefined;
-    if (w) {
+    if (hit && this.moved(name)) hit = undefined;
+    const w = !hit && ek && !this.early ? this.elsewhere!.get(ek) : undefined;
+    if (w && this.moved(name)) this.refused++;
+    else if (w) {
       const zs = w.need.map((k) => (this.cache.has(k) ? null : this.elsewhere!.zero(k)));
       if (zs.every((z) => z !== undefined)) {
         zs.forEach((z, i) => { if (z) { this.cache.set(w.need[i], z.out); this.logOf.set(z.out, z.log); } });
@@ -1945,6 +1972,7 @@ export class Project implements BuildCtx {
       if (up) up.inner += performance.now() - t0;
       return hit.out;
     }
+    if (this.state && !this.state0 && (this.disk || this.elsewhere)) { const t = performance.now(); this.state0 = this.state(); this.stateMs = performance.now() - t; this.stateAt = this.made; }
     this.building.add(name);
     this.made++;
     const job = !!ek && this.elsewhere!.isJob(ek);
@@ -1967,7 +1995,7 @@ export class Project implements BuildCtx {
       this.keep(key, out, t);
       const done: DiskLog = { needs: { ...opted, ...log.needs }, fx: [...log.fx], ...(log.bad ? { bad: true } : {}) };
       this.logOf.set(out, done);
-      if (dk && this.disk && !log.bad && said.every((f) => log.fx.has(f))) this.disk.put(dk, out, done, performance.now() - t0 - log.inner);
+      if (dk && this.disk && !log.bad && said.every((f) => log.fx.has(f))) this.disk.put(dk, out, done, performance.now() - t0 - log.inner, (ms) => ms < this.stateMs || this.moved(name));
       if (job) this.elsewhere!.built(ek!, performance.now() - t0);
       return out;
     } catch (e) {

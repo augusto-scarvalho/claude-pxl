@@ -47,8 +47,8 @@ export async function profiled<T>(fn: () => T): Promise<{ result: T; profile: Cp
   }
 }
 
-/** The report: self time by function, the art files' first, then pxl's; `times`: ms per asset; `left`: the fields traced but not kept. */
-export function profileReport(profile: CpuProfile, art: string[], times: [string, number][], left: Left[] = [], top = 10): string {
+/** The report: self time by function, the art files' first, then pxl's; `times`: ms per asset; `left`: the fields traced but not kept; `off`: why the disk was let go (Project.offWhy). */
+export function profileReport(profile: CpuProfile, art: string[], times: [string, number][], left: Left[] = [], off?: string, top = 10): string {
   const byId = new Map(profile.nodes.map((n) => [n.id, n]));
   const self = new Map<string, { ms: number; name: string; where: string; art: boolean }>();
   let total = 0;
@@ -74,6 +74,7 @@ export function profileReport(profile: CpuProfile, art: string[], times: [string
     `profile: ${fmt(total).trim()} in all${slow ? `; slowest assets: ${slow}` : ""}`,
     threadsSaid(),
     workersSaid(),
+    ...(off ? [off] : []),
     "time spent in each function itself, in the art files (what to make faster):",
     ...(artRows.length ? artRows : ["  (none worth naming)"]),
     "and in pxl:",

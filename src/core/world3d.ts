@@ -55,7 +55,8 @@ export class World {
   readonly spec: WorldSpec;
   /** its builders: the eight built in and the art file's own (make3d.define) */
   readonly makers: Record<string, (p: Record<string, unknown>) => Built>;
-  private cache = new Map<string, Built>();
+  // (truly private: pxl's memo of the parts made, not the art's state that load.ts digests)
+  #cache = new Map<string, Built>();
   private scat = new WeakMap<Built, Map<string, Splats>>();
   constructor(spec: WorldSpec, makers: Record<string, (p: Record<string, unknown>) => Built> = BUILDERS) {
     this.makers = makers;
@@ -90,12 +91,12 @@ export class World {
     const p = this.spec.parts[name];
     if (!p) throw new PxError(`world3d: no part '${name}' (it has: ${this.names.join(", ")})`);
     const at = p.params?.ppm === undefined ? ppmFor(this.makers[p.make], ppm) : undefined, key = at === undefined ? name : `${name}@${at}`;
-    let b = this.cache.get(key);
+    let b = this.#cache.get(key);
     if (b) return b;
     const params: Record<string, unknown> = { seed: p.seed ?? partSeed(this.spec.seed ?? 1, name), ...p.params, ...(at !== undefined ? { ppm: at } : {}) };
     b = this.makers[p.make](params);
     if (b.windy && params.wind === undefined) b = this.makers[p.make]({ ...params, wind: this.wind() });
-    this.cache.set(key, b);
+    this.#cache.set(key, b);
     return b;
   }
   /** A part's details scattered on it (made at a ppm, as built()), made once. */

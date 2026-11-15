@@ -2,8 +2,9 @@
 // the time zone and language), every file the project loaded (its text as run, its PNGs, palettes, poses), the
 // asset's name, seed, time and clock, and the options it read on the way (pxl check's checksOnly, shot --world's whole
 // world, a trace). Kept under a key of all of that, a build read back is the build, not a copy that can go stale: for
-// art whose builds are each that function. A memo in the art file is covered below; a variable one build writes and
-// another draws with is not (that build depends on the order it was made in, which no key holds). The
+// art whose builds are each that function. A memo in the art file is covered below; what one build's code writes and
+// another's reads (a mask a sprite fills as it draws, a scene draws by) no key holds, and a build found made runs no
+// code: the project lets the disk go where it sees the art's state change (below). The
 // options are in an entry's name (a check's build beside a shot's), with every option read earlier in the command by
 // a build whose code ran, or found made while one's was running (art code may carry another build's pixels in a memo
 // of its own), and it is served only where
@@ -13,7 +14,11 @@
 // be written and read back as it was (a relation's functions, a mesh's sun map can't: such a build is made again), and
 // none made after a warning its own log lacks (that memo again: the round's bout). Where builds stop being a function
 // of the files, the project lets the disk go (load.ts): the art's own Math.random, Date.now, Date(), new Date() or a
-// date formatted without a date, a file read once the art file has loaded. Deflated, in node_modules/.cache/pxl/builds/
+// date formatted without a date, a file read once the art file has loaded, and its state changed by a build's code (what
+// its top-level names hold, digested before the first build made and again where one would be read back or kept, here or
+// by a worker: Project.moved; pxl build --profile names the build and the names; a build that took less than that digest
+// isn't kept, as reading it back would cost one). The digest can't see a variable a function closes over, nor what a
+// WeakMap or a private field holds. Deflated, in node_modules/.cache/pxl/builds/
 // in a checkout, else the system's temp folder (pxl-builds), up to BUDGET bytes, the least recently used dropped first;
 // written aside and renamed into place, so a reader never sees half of one, and one that doesn't read back whole is
 // ignored and made again. PXL_CACHE=0 (any command's --no-cache) builds without it.
@@ -76,7 +81,7 @@ export function diskOf(files: string[], seen: Map<string, string>): Project["dis
       for (let m = 0; m < 1 << o.length; m++) { const r = get(at(k, Object.fromEntries(o.filter((_, i) => m & (1 << i))))); if (r) return r; }
       return undefined;
     },
-    put: (k: string, out: BuildOut, log: DiskLog, ms: number) => { if (ms >= DISK_MS) put(at(k, log.needs), out, log, ms); },
+    put: (k: string, out: BuildOut, log: DiskLog, ms: number, skip?: (ms: number) => boolean) => { if (ms >= DISK_MS && !skip?.(ms)) put(at(k, log.needs), out, log, ms); },
   }, { file: (k: string, needs = {}) => fileOf(at(k, needs)) });
 }
 

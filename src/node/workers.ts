@@ -3,11 +3,11 @@
 // reads them all, and the first frames of what a check or a build goes through; never a scene's frame, whose code may
 // carry another build's work in a memo of its own, as the round's bout does), each claimed by one thread in memory they
 // share. A worker makes all of a build's work (the art's code, the march on one thread, the paint) and sends it back
-// only as the store would keep it (store.ts): made where the project keeps to the files (no Math.random, clock or late
-// read before it), its log holding every warning said before it began, every field writable as data. This thread goes
-// through the file in today's order and finds it made as a disk hit is (its log's warnings given again where it would
-// have been made, its options and warnings joined to the builds around it), only where it would be the same as made
-// here: each build at time 0 the worker's build asked is held here already, or sent with it (made inside it: then held,
+// only as the store would keep it (store.ts): made where the project keeps to the files (no Math.random, clock, late
+// read or change to the art's state before it or in it), its log holding every warning said before it began, every field
+// writable as data. This thread goes through the file in today's order and finds it made as a disk hit is (its log's
+// warnings given again where it would have been made, its options and warnings joined to the builds around it), only
+// where it would be the same as made here: each build at time 0 the worker's build asked is held here already, or sent with it (made inside it: then held,
 // as made here); a frame 0 the worker only read a timeline from (as its definition gives it, not made) is held here, and
 // its log joins the build's, as found here. Else (and for a build no worker has taken, one not made there, one that
 // threw there) it is made here, so an error is today's, at the same place. How many: threads.ts's record; workers
@@ -188,7 +188,7 @@ if (!isMainThread && workerData?.pxlBuilds) {
   p.touched = new Set();
   if (!p.early) p.disk = {
     get: (k, o) => { const h = real?.get(k, o); if (h) keep(k, h); return h; },
-    put: (k, out, log, ms) => { keep(k, { out, log }); real?.put(k, out, log, ms); },
+    put: (k, out, log, ms, skip) => { keep(k, { out, log }); real?.put(k, out, log, ms, skip); },
   };
   const list: [string, string, number, number, number][] = [];
   let at = 0;
@@ -203,8 +203,9 @@ if (!isMainThread && workerData?.pxlBuilds) {
         p.skipped!.clear();
         p.touched!.clear();
         p.build(name, seed, t, false);
+        // (one that changed the art's state is made where it is asked: sent, what it wrote would stay unwritten there)
         const r = kept.get(key);
-        if (r && p.disk) {
+        if (r && p.disk && !p.moved(key)) {
           sent.add(key);
           const need = [...p.touched!].filter((k) => k !== key);
           msg.made = { ...code(r), need: [...new Set([...need, ...p.skipped!])], skipped: [...p.skipped!] };

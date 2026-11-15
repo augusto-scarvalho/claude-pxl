@@ -1,6 +1,8 @@
 // Loads art files (.js or .ts) into a Project by running them in a vm sandbox whose globals
 // are the DSL. Each load gets a fresh context, so reloading after an edit is clean.
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { Session } from "node:inspector";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import * as vm from "node:vm";
 import { stripTypeScriptTypes } from "node:module";
@@ -16,8 +18,8 @@ import "./threads.ts"; // (a pure field's march on more threads)
  * so an art file's own hot loops reading globals (Math, its helpers) run at full speed (a figure drawn
  * of 14k samples took 150 ms through the contextified one's interceptors).
  */
-function sandbox(env: Record<string, unknown>, impure: () => void): vm.Context {
-  const ctx = vm.createContext(vm.constants.DONT_CONTEXTIFY);
+function sandbox(env: Record<string, unknown>, impure: () => void, name?: string): vm.Context {
+  const ctx = vm.createContext(vm.constants.DONT_CONTEXTIFY, { name });
   Object.assign(ctx, env, { console });
   // its own dice and clock say they were used (store.ts: its builds are then no function of the files): Math.random,
   // Date.now, Date() and a new Date() without a date, a date formatted without one
@@ -34,6 +36,58 @@ function sandbox(env: Record<string, unknown>, impure: () => void): vm.Context {
   return ctx;
 }
 
+/**
+ * What the art's top-level names hold, a digest each (Project.state): its const, let and class names (V8's inspector
+ * reads them once) and its var and function ones (its global's own, not the DSL's), each value walked through arrays,
+ * typed arrays and their buffers, Maps, Sets and every object's own fields, a function and a prototype by which one it
+ * is. Not seen: a variable a function closes over, what a WeakMap or a private field holds, a getter's value.
+ */
+function stateOf(ctx: vm.Context, name: string, env: Record<string, unknown>): () => Record<string, string> {
+  const s = new Session();
+  let id = 0, names: string[] = [], ok = false;
+  s.connect();
+  s.on("Runtime.executionContextCreated", ({ params: { context: c } }) => { if (c.name === name) id = c.id; });
+  s.post("Runtime.enable");
+  s.post("Runtime.disable");
+  s.post("Runtime.globalLexicalScopeNames", { executionContextId: id }, (e, r) => { if (!e && r) { names = r.names; ok = true; } });
+  s.disconnect();
+  // (the inspector gave no answer for this context: its state can't be read, a change each time, so nothing is kept)
+  if (!id || !ok) return () => ({ "(unreadable)": `${++unread}` });
+  const read = vm.runInContext(`() => [${names.join()}]`, ctx) as () => unknown[], lexical = names.length;
+  names.push(...Object.keys(ctx).filter((k) => !(k in env) && k !== "console" && k !== "Date"));
+  // (one that can't be read, a proxy's trap throwing: a change each time, so nothing is kept)
+  return () => { try { const d = digests([...read(), ...names.slice(lexical).map((k) => ctx[k])]); return Object.fromEntries(names.map((n, i) => [n, d[i]])); } catch { return { "(unreadable)": `${++unread}` }; } };
+}
+let contexts = 0, unread = 0;
+const ids = new WeakMap<object, number>(), TAG = Object.prototype.toString, ENTRIES = Map.prototype.entries, VALUES = Set.prototype.values;
+let idsMade = 0;
+const idOf = (o: object) => ids.get(o) ?? (ids.set(o, ++idsMade), idsMade);
+/** A sha1 of each value (an object met again in it is the place it was first met). */
+function digests(vs: unknown[]): string[] {
+  const seen = new Map<object, number>(), num = new Float64Array(8192);
+  let h = createHash("sha1"), s = "", n = 0;
+  const flush = () => { h.update(s).update(new Uint8Array(num.buffer, 0, n * 8)); s = ""; n = 0; };
+  const walk = (v: unknown): void => {
+    if (typeof v === "number") { s += "n"; num[n++] = v; if (n === num.length) flush(); return; }
+    if (v === null || (typeof v !== "object" && typeof v !== "function")) { s += typeof v === "string" ? JSON.stringify(v) : `${typeof v}${String(v)};`; return; }
+    if (seen.has(v)) { s += `@${seen.get(v)};`; return; }
+    seen.set(v, seen.size);
+    const t = TAG.call(v);
+    if (typeof v === "function") s += `f${idOf(v)};`;
+    else if (ArrayBuffer.isView(v) || t === "[object ArrayBuffer]") { flush(); h.update(ArrayBuffer.isView(v) ? new Uint8Array(v.buffer, v.byteOffset, v.byteLength) : new Uint8Array(v as ArrayBuffer)); s += "t;"; }
+    else if (Array.isArray(v)) { s += `[${v.length};`; for (let i = 0; i < v.length; i++) walk(v[i]); s += "]"; }
+    else if (t === "[object Map]") { s += "M"; for (const [k, x] of ENTRIES.call(v as Map<unknown, unknown>)) { walk(k); walk(x); } s += "]"; }
+    else if (t === "[object Set]") { s += "S"; for (const x of VALUES.call(v as Set<unknown>)) walk(x); s += "]"; }
+    else {
+      const p = Object.getPrototypeOf(v);
+      s += `{${p ? idOf(p) : 0};`;
+      for (const k of Object.keys(v)) { const d = Object.getOwnPropertyDescriptor(v, k); if (d && "value" in d) { s += JSON.stringify(k); walk(d.value); } }
+      s += "}";
+    }
+  };
+  return vs.map((v) => { seen.clear(); walk(v); flush(); const d = h.digest("hex"); h = createHash("sha1"); return d; });
+}
+
 function compile(code: string, file: string): string {
   // Type stripping keeps every line and column in place, so error locations stay exact.
   return /\.[cm]?ts$/.test(file) ? stripTypeScriptTypes(code, { mode: "strip" }) : code;
@@ -44,8 +98,8 @@ function compile(code: string, file: string): string {
  * the art files (this one and what it includes): another version of them, e.g. at a git revision.
  */
 export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs: string) => readFileSync(abs, "utf8")): Project {
-  const p = new Project(opts), env = p.env();
-  const ctx = sandbox(env, () => p.offDisk());
+  const p = new Project(opts), env = p.env(), name = `pxl art ${++contexts}`;
+  const ctx = sandbox(env, () => p.offDisk(), name);
   // (each file's hash as it was read: the key of the builds kept on disk, store.ts; a file read once the art file has
   // loaded, by code a build runs, is no part of it: then nothing is kept)
   const stack: string[] = [], codes = new Map<string, string>(), seen = new Map<string, string>();
@@ -125,7 +179,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
   loaded = true;
   warnHiding(p, ctx, env, codes);
   // (not for edit and inspect, whose reads of each build, p.reads, a build read back wouldn't give)
-  if (!p.early && !opts.where) p.disk = diskOf(p.files, seen);
+  if (!p.early && !opts.where) { p.disk = diskOf(p.files, seen); p.state = stateOf(ctx, name, env); }
   return p;
 }
 
