@@ -160,7 +160,9 @@ sprite's, an anim's, and `rig3d()` and `turnaround()` pass it on): a `"character
 round; an `"own"` one a line all round outside its fill, each edge pixel over 0.08 of lightness darker
 than what is a px or two inside it and none near-black (`pxl study`'s measure; a line beside a
 near-black inside, a hole or a black pattern, passes), its warning saying the share of the edge that
-isn't, on its lit side (up and left) and away from the light, past 2% of it (two lines meeting). An
+isn't, on its lit side (up and left) and away from the light, past 2% of it (two lines meeting). A
+`rig3d()` figure is read as itself: without what a move's `draw` paints (the sword, a slash's
+crescent), with what the rig's own `draw` adds after it (a throat's line). An
 `ink` of `"material"` (the whole `ink`, every category; or one category's) is a line by material, KOF's
 (`fighting`): each edge pixel at least as dark as its material's fill a px or two inside it, where a
 ramp of the asset's palette holds both (no later along it), two colors in no ramp by lightness (not

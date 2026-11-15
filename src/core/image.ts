@@ -82,6 +82,8 @@ export class Img {
   info?: Record<string, unknown>;
   /** A rig3d() figure's box before its draw hooks (without the sword it holds): the genre's height check reads it. It travels like the boxes, never exported. */
   figure?: [number, number, number, number];
+  /** Its pixels without what the move's hook drew (the sword, a slash's crescent), with what the rig's own did: the genre's ink reads them. A copy, a flip and a swap keep it; other ops drop it (read whole), never exported. */
+  figureImg?: Img;
 
   constructor(w: number, h: number, data?: Uint32Array) {
     w = Math.floor(w);
@@ -124,6 +126,7 @@ export class Img {
     if (this.boxes) o.boxes = moveBoxes(this.boxes, (x, y) => [x, y]);
     if (this.info) o.info = { ...this.info };
     if (this.figure) o.figure = [...this.figure];
+    if (this.figureImg) o.figureImg = this.figureImg;
     return o;
   }
 
@@ -233,6 +236,7 @@ export class Img {
         if (this.parts) (o.parts ??= { ids: new Int32Array(this.w * this.h), names: [...this.parts.names] }).ids[y * this.w + x] = this.parts.ids[j];
       }
     this.movePivot(o, (x, y) => [fx ? this.w - x : x, fy ? this.h - y : y]);
+    if (this.figureImg) o.figureImg = this.figureImg.flip(axis);
     if (this.slice) { const [l, t, r, b] = this.slice; o.slice = [fx ? r : l, fy ? b : t, fx ? l : r, fy ? t : b]; }
     return this.moveLamps(o, (x, y) => [fx ? this.w - 1 - x : x, fy ? this.h - 1 - y : y]);
   }
@@ -401,6 +405,7 @@ export class Img {
       const to = map.get(o.data[i]);
       if (to !== undefined) o.data[i] = to;
     }
+    if (o.figureImg) o.figureImg = o.figureImg.remap(map);
     return o;
   }
 

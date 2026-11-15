@@ -631,11 +631,12 @@ done here: `genre(name)`, surface's `ink: true | 2`):
 - [x] **The heroes under the ink**: hero32, hero and hero_side fail "near-black all round" by 2-5% (skin pixels at
   the throat), their attacks by 9-29% (the slash's arc, an effect with no line). Close the throat, the arc on a layer
   the check skips, then `category: "character"` on their rig3d().
-  Done in part (F5k): hero32's throat closed in its head's views (facing us the line at the chin's two ends, in
-  profile 2 px under the jaw's front), hero_side's by a draw hook (the line under the chin where it lies on nothing:
-  the run's and the dash's lean); `category: "character"` on hero32's walking rig (`figure()`'s `category`) and on
+  Done in part (F5k): hero32's throat closed (facing us the line at the chin's two ends, in its head's view; in
+  profile the jaw's front px made the line where they lie on nothing, since F5o by a draw hook), hero_side's by a draw
+  hook (the chin's px made the line where it lies on nothing: the run's and the dash's lean; since F5o the jaw's end
+  beside the collar too); `category: "character"` on hero32's walking rig (`figure()`'s `category`) and on
   hero_side's rigs, read and passing. The rest below.
-- [ ] **The heroes' rest under the ink (F5k)**: the attacks (hero32's, hero's) aren't read: the crescent is painted by
+- [x] **The heroes' rest under the ink (F5k)**: the attacks (hero32's, hero's) aren't read: the crescent is painted by
   the move's draw hook into the figure's own frame, in its depth, so no category or layer leaves it out; without it
   their figures still fail on the head turned between the views and the crown (hero32's attack_e about 3%, attack_n
   4%; hero's attack_e 2.0% since F5l's crown, on the line). Line those, then rig3d keeping the figure's pixels before
@@ -643,14 +644,43 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   rigs (the chibi's attack too).
   Done (F5l): the 16 px hero's walking moves, which failed in profile (idle_e 3.4%, walk_e and run_e 5%): the crown's
   back px in the line (his profile head's STRANDS.w), the throat by a draw hook on character()'s walking rigs as
-  hero_side's (the line under the chin where it lies on nothing: a px walking and running in profile; the villager's
-  and Reva's walk too); the nose's lit px kept out of the line (1.7% of the edge in profile, under the 2%);
+  hero_side's (the chin's px made the line where it lies on nothing: a px walking and running in profile; the
+  villager's and Reva's walk too); the nose's lit px kept out of the line (1.7% of the edge in profile, under the 2%);
   `category: "character"` on his walking rig (character()'s `category`), read and passing.
   Done (F5m): the chibi's walking moves (`chibi_*`), which failed in profile (idle_e 2.6%, walk_e 1.6%, run_e 2.9%):
-  the line under its head where it lies on nothing by a draw hook on its walking rig (figure()'s `under`, the chin's
-  and the hair's dark: the chin's corner in each move, running 2 px of its front, at rest the nape's last px; 37 px
-  over the frames, none facing us or away); the nose's lit px kept out of the line (0.9% of the edge in profile);
+  its head's px made the line where they lie on nothing by a draw hook on its walking rig (figure()'s `under`, the
+  chin's and the hair's dark: the chin's corner in each move, running 2 px of its front, at rest the nape's last px;
+  37 px over the frames, none facing us or away); the nose's lit px kept out of the line (0.9% of the edge in profile);
   `category: "character"` on its walking rig, read and passing.
+  Done (F5n): rig3d keeps a figure's pixels without what its move's hook paints and with what the rig's own hook adds
+  after it (`img.figureImg`, on a rig with a category whose move has a hook; a copy, a flip and a swap keep it), and
+  the genre's ink reads them; the attacks lined: the 16 px hero's by his walking rigs' throat hook (the chin's corner
+  in profile, 2 px over 2 frames), hero32's by the same hook on his attack rig (figure()'s `attackUnder`, the skin's
+  and the hair's dark: the head turned past the shoulders); the noses' lit px kept out; `category: "character"` on
+  the three attack rigs (the chibi's passing as drawn), read and passing (unlined: hero's s, e, n 1.7%, 1.9%, 0%;
+  hero32's 0.3%, 1.8%, 1.9% since F5o; the chibi's 0%, 0.9%, 0%).
+  Done (F5o): the four gates had closed the line by a px added outside the silhouette (under the exposed px, or a
+  retouch row's `k` beside it): 2x2 squares, Ls and bumps on the contour. Now the exposed px itself is the line, by
+  one hook (hero.px.js's `throat`, used by hero32's figure() and hero_side): none where the line would turn a corner
+  there (left in the 2%); hero_side's also the jaw's end beside the collar, turning but never a T. hero32's w row 21,
+  nw rows 7 and 10 undone; his nw jaw's back px and his n head's crown at its two steps (walking too) made the line;
+  the nw crown's top and a px at its side left unlined (a flat run or a px outside would close them). Against 5ee0986
+  no new 2x2, L or clump of the line on any move of the four but hero_side's idle (an L a frame, the jaw's end on the
+  collar's corner) and sprint (3 Ls over 2 frames), which fail the 2% without them; hero32's chin facing us keeps the
+  2 px outside at its ends (a clean diagonal). hero32's attack_up at 1.9%, hero_side's sprint at 2.0% unlined.
+  Done (F5p): the line's L-corners on the four (check --edges' doubled over every frame: 79 on the 16 px hero, 25 on
+  hero32, 45 on the chibi, 10 on hero_side). First F5o's own on hero_side: throat()'s `side` now turns a line px it
+  would make a corner of into the fill beside it when that px lies inside (the collar's corner under the chin: the
+  idle's 4, the sprint's), and leaves the px unlined when it lies on the edge (the sprint's chin over its pinhole);
+  the sprint 10 of 651 unlined. Then the approved art's: the crown's top in profile one px shorter in its rows (the 16
+  px hero's STRANDS.w row 7, the chibi's CRETOUCH.w row 5), and on the bodies one hook, hero.px.js's `ells` (every
+  figure's rigs after throat(); lineFlaws's rule: an elbow sticking out erased, one turned in the fill beside it; the
+  attack's sword and crescent taken in its own hook, the guard's corners kept). Doubled 0 on every move but hero32's
+  attack_up (its guard, 1 px), no new 2x2, L or clump of the line against 5ee0986, notches not grown; the 16 px
+  villagers and Reva with them (villagers32's own figures unchanged).
+- [ ] **The genre's ink reads the line's color, not its shape**: "near-black all round" passes a line with L-corners,
+  and check --edges' doubled is a LOOK read on one frame of an anim (`--frame N`), so four gates closed the heroes'
+  line with Ls and passed. The ink rule reading the doubled over every frame (as a share, or a LOOK line per anim).
 - [ ] **How light a line may go**: an `"own"` line was taken as light as the check allows, capped by hand at L 0.5 so
   it reads on the grass. The genre's ink a floor against its ground, and `--readings` saying each line's room.
 - [ ] **A decal at some headings**: a builder's decal is drawn at every heading turnaround() draws (the roof's number

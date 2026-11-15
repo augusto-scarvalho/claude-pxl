@@ -87,7 +87,8 @@ function genreLines(p: Project, name: string, ran: { genre: number; ink: number;
   // its edge (all its frames together). "material" (the whole ink, or a category's): a line by material (KOF's), each
   // edge pixel at least as dark as its material's fill a px or two inside it (a ramp holding both: no later along it;
   // two colors in no ramp, by lightness: not over 0.08 lighter), the ink, and another material's line or the ink beside
-  // it, passing; its near-black share said in what ran, never a warning
+  // it, passing; its near-black share said in what ran, never a warning. A rig3d() figure is read without what its
+  // move's hook paints (the sword, a slash's crescent: figureImg)
   const def = p.assets.get(name)!, cat = def.opts.category, ink = g.ink as unknown;
   const rule = cat === undefined ? undefined : ink === "material" ? "material" : typeof ink === "object" && ink !== null && !Array.isArray(ink) && cat in ink
     ? ((ink as Record<string, unknown>)[cat] === "material" ? "material" : cat === "character" ? "character" : (ink as Record<string, unknown>)[cat] === "own" ? "own" : undefined) : undefined;
@@ -104,7 +105,7 @@ function genreLines(p: Project, name: string, ran: { genre: number; ink: number;
     const bad = { lit: 0, away: 0, black: 0, fill: 0 }, at: number[] = [];
     fr.forEach((im, i) => {
       // (a line beside a near-black inside, a hole or a black pattern, can't be darker than it and not near-black)
-      const e = edgeOf(im), wrong = e.filter((q) => (rule === "character" ? q.kind !== "black" : rule === "material" ? q.kind !== "black" && q.inner !== undefined && lighter(q.c, q.inner) : q.kind === "black" || (q.kind === "none" && !(q.inner !== undefined && lch(q.inner).L < 0.3 && lch(q.inner).C < 0.08))));
+      const e = edgeOf(im.figureImg ?? im), wrong = e.filter((q) => (rule === "character" ? q.kind !== "black" : rule === "material" ? q.kind !== "black" && q.inner !== undefined && lighter(q.c, q.inner) : q.kind === "black" || (q.kind === "none" && !(q.inner !== undefined && lch(q.inner).L < 0.3 && lch(q.inner).C < 0.08))));
       if (rule === "material") { ran.black += e.filter((q) => q.kind === "black").length; ran.edge += e.length; }
       n += e.length;
       if (wrong.length) at.push(i);

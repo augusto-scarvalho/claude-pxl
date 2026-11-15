@@ -1162,11 +1162,16 @@ export class Project implements BuildCtx {
             }
           }
           j.rod = rodOn(c, hd);
-          // what the figure is before its hooks draw what it holds (a sword): the genre's height check reads it
+          // what the figure is before its hooks draw what it holds (a sword): the genre's height check reads it; with a
+          // category, its pixels for the genre's ink: what the move's hook paints (the sword, a slash's crescent) left
+          // out, what the rig's own does after it (a throat's line) kept
           if (M.draw || o.draw) { const b = c.img.bounds(); if (b) c.img.figure = [b.x, b.y, b.w, b.h]; }
           if (p.air === true) c.setData({ air: true });
+          const own = M.draw && !flat && o.category !== undefined ? c.img.data.slice() : undefined;
           M.draw?.(c, j, p);
+          const held = own && c.img.data.slice();
           (o.draw as ((c: Canvas, j: Joints, p: Pose) => void) | undefined)?.(c, j, p);
+          if (own && held) { const d = c.img.data; for (let i = 0; i < d.length; i++) if (d[i] !== held[i]) own[i] = d[i]; c.img.figureImg = new Img(c.img.w, c.img.h, own); }
         };
         const names: string[] = [], frameOps = (M: (typeof moves)[number]) => Array.from({ length: M.frames }, (_, i) => ({ __op: true, name: "frame", args: [{ ms: Array.isArray(M.ms) ? M.ms[i] : M.ms }], loc }));
         for (const M of moves) {

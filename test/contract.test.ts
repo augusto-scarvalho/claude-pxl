@@ -203,6 +203,21 @@ rig3d("f", { body: { h: 30, heads: 3 }, headings: ["s", "e", "n"], w: 20, h: 48,
   assert.deepEqual(p.image("f_cut_n").figure, p.image("f_cut_s").figure);
 });
 
+test("genre checks: a rig3d() figure's ink is its own, not the effect its move's hook paints", () => {
+  // the move's hook paints an unlined crescent apart from him (the east the west's mirror); the rig's own hook, in
+  // "skin", a block of skin on his edge at the chest
+  const src = (skin: boolean, cat = ', category: "character"') => loadSource(PAL + `genre("td", { ink: { character: "#000000" } })
+rig3d("f", { body: { h: 30, heads: 3 }, headings: ["e", "w"], w: 30, h: 48, pivot: [15, 44], ink: "k", genre: "td"${cat}, parts: (j) => ({ body: j.limb(j.pelvis, j.head, 3, 3, "w") }),
+  moves: { cut: { frames: 1, pose: () => ({}), draw: (c) => c.rect(0, 10, 4, 6, "r") } }, draw: (c, j) => { const [x, y] = j.screen(j.chest).map(Math.round); if (${skin}) c.rect(x - 8, y, 4, 3, "w") } })`, "t.px.js");
+  const p = src(false), r = checkProject(p);
+  assert.ok(keys(p, "f_cut_e").includes("r") && keys(p, "f_cut_w").includes("r"));
+  assert.deepEqual(r.lines, []);
+  assert.match(r.coverage, /genres' ink by category on 2 frames/);
+  assert.match(checkProject(src(true)).lines[0], /^f_cut_[ew] › WARNING: genre 'td': a character's edge is near-black all round/);
+  // (no category: nothing kept)
+  assert.equal(src(false, "").image("f_cut_w").figureImg, undefined);
+});
+
 test("turnaround: a footprint box where the thing meets the ground at each heading; genre checks: the drawing reaches it (racing)", () => {
   const p = loadSource(PAL + `ramps("krw")
 genre("racing", { checks: ["footprint"] })
