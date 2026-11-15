@@ -55,14 +55,14 @@ lantern post (`side_village.px.js`).
 ![props](../docs/gallery/lib/props.png)
 
 **Nature** (`nature/`): the kit's ground, pines, bushes, rocks and dead trees; the tree species as
-builders, the oak, the maple and the spruce also by hand at `topdown/16` (their 3D drafts frozen in
-`frozen/`); the cave's caps; the top-down island's ground (`island.px.js`: the shore, a path and a darker
+builders, the oak, the maple and the spruce also by hand at `topdown/16` (their 3D drafts kept live
+beside them); the cave's caps; the top-down island's ground (`island.px.js`: the shore, a path and a darker
 grass by corners, the field's tiles, tall grass, a bank's earth front and a hedge in rows of tiles, flowers
 and a bed of them, a bush, a rock, a stump; the same ground at a 32 px grid by its band functions (four drawings a piece, richer), three flowers
 redrawn there, tufts, tall grass (and cut), a bush and a rock drafted in 3D and finished by hand: `island32.px.js`, `topdown32`; the oak, the maple, the spruce and the boulder also by
 hand at `topdown/32` over their drafts); a platformer's world side on (`side.px.js`, `platformer16`: the
 ground as tiles by their open sides under a grass lip, their faces and undersides ragged, slopes, water, oaks and
-pines at 40, 60 and 80 px (`oak_small`, `oak`, `pine`, `pine_tall`), a set-piece oak at 128 (`oak_big`, its wood a 3D render frozen), two bushes, the backdrop's far and near clouds and hills; `side.ground(map)` draws a level; the same at dusk
+pines at 40, 60 and 80 px (`oak_small`, `oak`, `pine`, `pine_tall`), a set-piece oak at 128 (`oak_big`, its wood a 3D render frozen, its recipe `oak_big_wood.px.js`), two bushes, the backdrop's far and near clouds and hills; `side.ground(map)` draws a level; the same at dusk
 and at night by a palette swap, `side.DUSK` and `side.NIGHT`, with the sky as the air at each time, `side.sky`, and
 the full moon); the trackside's oak (`make3d.oak_lifted`, its crown lifted so its trunk shows), spruce, bush and rock
 for `racing_topdown`, drawn by their 3D builders from its 58 degrees in the track kit's colors, each part lined all
@@ -113,7 +113,7 @@ and mended, a palette slot per stage's light).
 ![characters](../docs/gallery/lib/characters.png)
 
 **Architecture** (`architecture/`): the shrine's builders, the HD-2D surfaces, the cottage (by hand at
-`topdown/16`, mostly roof, and at `topdown/32` over its draft; its 3D drafts frozen), the island's pier; a platformer's one-way platforms, ladder,
+`topdown/16`, mostly roof, and at `topdown/32` over its draft; its chimney's 3D draft frozen), the island's pier; a platformer's one-way platforms, ladder,
 spikes and door (`side.px.js`, at dusk and at night by `built.DUSK` and `built.NIGHT`); a platformer village's old houses as a 3D builder, `make3d.old_house` (a stone
 floor, a half-timbered storey, a tile roof and its chimney), finished by hand with the painted doors, windows lit at
 dusk and shutters set into its openings, the same three drawn by hand of modules as alternatives (`house_a_2d`...),

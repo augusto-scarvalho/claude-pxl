@@ -600,6 +600,13 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
   after it ("unknown color key"). Scope it to the file.
 - [ ] **Frozen drafts**: the PNG is written only when the frozen sprite itself is built (parts and passes on top
   never write it), and `frozen` refuses `shrink`. Build missing frozen PNGs with whatever uses them; `shrink` beside `frozen`.
+  The library's frozen cells (F7): the seven that nothing read removed (the cottage's, the spruce's, the oak's and the
+  momiji's drafts at topdown/16, the cottage's at topdown/32, village32's pot and barrel), their live renders kept
+  where the comments send a reader for size and light; oak_big's trunk, read by side.px.js as a plain PNG, given its
+  recipe as a frozen cell of that PNG (lib/nature/oak_big_wood.px.js). The 23 left stay frozen with their proof, pxl
+  check's drift check (0 px, run by the examples' test): each is the base of an approved hand pass, and frozen it is
+  the alarm that fails a test when an engine change would move it; two are slow too (trees' oak at topdown/32, 37.6 s
+  live, and its momiji, 8.2 s), which freezing spares build, shot and serve (check still pays them).
 - [x] **A genre read back**: a file that includes topdown32 can't read its `shadow` (`genre(name)` with no spec
   throws); scenes copy the numbers by hand. Done (F5 5c): `genre("topdown32").shadow`.
 - [ ] **`sdf.lathe(points)`**: pots and barrels took a hand-written solid of revolution.

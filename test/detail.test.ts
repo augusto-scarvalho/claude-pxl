@@ -16,7 +16,7 @@ import { bodyOf } from "../src/core/rig3d.ts";
 import { whenChanged } from "./passed.ts";
 
 const test = whenChanged("test/detail.test.ts", ["lib/nature/trees.px.js", "lib/styles/hand32.px.js", "lib/profiles/topdown32.px.js",
-  ...["momiji_td16", "momiji_td32", "oak_td16", "oak_td32"].map((n) => `lib/nature/frozen/${n}.png`)]);
+  ...["momiji_td32", "oak_td32"].map((n) => `lib/nature/frozen/${n}.png`)]);
 
 test("make3d.tree given its ppm: leaves a 3 px brush, none nearer than make3d.px.cluster; without it the meters it had", () => {
   assert.deepEqual([tree({ leaves: 28 }).details.leaves.count, tree({ leaves: 28 }).details.leaves.size], [28, 0.1]);
