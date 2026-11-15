@@ -322,9 +322,10 @@ export function libDraft(name: string | undefined, at: { cell?: string; genre?: 
   // at a 16 px grid and under, a builder that takes `cluster` (its clusters' px) gets a tile: a crown a few masses
   const args = grid && grid <= 16 && "cluster" in (p.builders.get(b)?.params ?? {}) ? `{ cluster: ${grid} }` : "";
   // its colors: each material its field names (mat(), paint()) by its role (its card's roles, else its own name), in the
-  // genre's ramp for that role (its kit's keys); a material whose role the genre doesn't name keeps the builder's
+  // genre's ramp for that role (its kit's keys); a material whose role the genre doesn't name keeps the builder's. A
+  // material under several roles takes the first the genre names, then its own name (the spruce's needles: needle, else leaf)
   const R = at.genre !== undefined ? genreRoles(genreOf(at.genre)) : undefined, mats = R ? matsOf((p.scope!(`make3d[${JSON.stringify(b)}](${args})`) as { field: Node }).field) : [];
-  const roleOf = (m: string) => Object.entries(c.roles ?? {}).find(([, ms]) => ms.includes(m))?.[0] ?? m, by = new Map<string, string[]>();
+  const roleOf = (m: string) => { const rs = [...Object.entries(c.roles ?? {}).filter(([, ms]) => ms.includes(m)).map(([r]) => r), m]; return rs.find((r) => R?.roles.has(r)) ?? rs[0]; }, by = new Map<string, string[]>();
   const paints = !!c.draw && typeof c.draw.mats === "object";
   if (paints) for (const m of mats) if (R!.roles.has(roleOf(m))) by.set(roleOf(m), [...(by.get(roleOf(m)) ?? []), m]);
   const kept = mats.filter((m) => ![...by.values()].flat().includes(m));

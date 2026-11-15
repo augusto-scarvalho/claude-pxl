@@ -171,7 +171,7 @@ declare global {
     /** what it is on a genre's scale (a key of genre()'s scale: tree, pine, bush, boulder, lamp, house, character): pxl lib draft --genre sizes it by that box */
     category?: string;
     draw?: Record<string, unknown>;
-    /** a builder's materials by role ({ leaf: ["oak_summer"], bark: ["bark"] }; a material named as a role is that role): pxl lib draft --genre paints them in the genre's roles */
+    /** a builder's materials by role ({ leaf: ["oak_summer"], bark: ["bark"] }; a material named as a role is that role; one under several takes the first the genre names, then its own name): pxl lib draft --genre paints them in the genre's roles */
     roles?: Record<string, string[]>;
   }
   interface PxGenre {

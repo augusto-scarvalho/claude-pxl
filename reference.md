@@ -142,8 +142,8 @@ naming it draws its surface in, where its
 `surface` gives none: 3 at 16-32 px), `ink` (its line: a color, all round, `surface: { ink }`'s; or
 by category, `{ character: "#1a1620", tree: "selective" }`, or words), `mix` (`true`: densities mixed
 on purpose, HD-2D's sprites in a finer world), `roles` (the colors a 3D draft takes by role: `{ from:
-"../nature/side.px.js", leaf: "RKML", bark: "ewW" }`, each role a ramp of keys dark to light, the line first where its
-ink is by material, then `tones` of fill, in the palette of the file `from` names, its kit's, else its own file's) and `checks`; any other field is kept as given, for the
+"../nature/side.px.js", leaf: "RKML", bark: "ewW" }`, each role a ramp of keys dark to light (`leaf`, `needle`,
+`bark`, `bark_light`, `stone`: what the cards name), the line first where its ink is by material, then `tones` of fill, in the palette of the file `from` names, its kit's, else its own file's) and `checks`; any other field is kept as given, for the
 file (`steer`). Its cell is its camera's kind and its density: `topdown/16`, `hd2d/24ppm`. It
 returns them with `name`; `genre(name)` gives them back after (`genre("racing_topdown").stand`: a kit
 reads its profile's numbers from one place). A profile's file included twice (by a scene and by an entry that names its
@@ -189,7 +189,8 @@ category's on the scale curve, scenes §19; or how many tall alone: a draft's si
 (a key of a genre's `scale`: `tree`, `pine`, `bush`, `boulder`, `lamp`, `house`, `character`; the
 genre's box for it then sizes its drafts, before its `tiles`), `draw` (its drawing call's options) and a builder's
 `roles` (its materials by role, `{ leaf: ["oak_summer"], bark: ["bark"] }`; a material named as a role, fields'
-`leaf`, is that role). A name or an asset it can't find fails the load at its line.
+`leaf`, is that role; one under several roles takes the first the genre names, then its own name: the spruce's
+`{ needle: ["needles"], leaf: ["needles"] }` in a genre's `needle`, else its `leaf`). A name or an asset it can't find fails the load at its line.
 `card(name)` gives its data back (`card("make3d.oak").draw`). `pxl lib` lists the library's cards
 by subject (`pxl lib --genre hd2d`, `pxl lib --cell side/32`); `pxl lib lamps._lamp` prints one (by its
 full name, or the last part of it when only one entry has that: `pxl lib car` is `make3d.car`; none, or

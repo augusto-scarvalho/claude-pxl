@@ -173,6 +173,14 @@ test("pxl lib draft --genre: each material by its role in the genre's ramp (its 
   assert.throws(() => genreRoles({ cell: "side/16", file: join(dir, "g.px.js"), g: { name: "g", roles: { from: "kit.px.js", leaf: "Rq" } } }), /genre 'g': roles\.leaf is a ramp of .*kit\.px\.js's keys, dark to light \("RKML"\), got "Rq" \(not in its palette: q\)/);
 });
 
+test("pxl lib draft --genre: a material under several roles takes the first the genre names (the spruce's needles: needle, else leaf)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-needle-"));
+  // topdown16 names needle: the island's line, navy and teals (its kit's hand-drawn spruce's)
+  assert.match(libDraft("make3d.spruce", { genre: "topdown16" }, dir).join("\n"), /: needle CHPI \(#1f2a52 #2c4e7a #2f7c8a #36aa8c\) on needles, bark zOo/);
+  // platformer16 names none: the needles take its leaf, as before
+  assert.match(libDraft("make3d.spruce", { genre: "platformer16" }, dir).join("\n"), /: leaf RKML \(#1f4636 #2e6a38 #4f9a3c #97cd55\) on needles, bark ewW/);
+});
+
 test("pxl lib <name>: a drawing a card names (oak_small in the oak's) answers with that card, its cells and the drawing", () => {
   for (const n of ["side.oak_small", "oak_small"]) assert.match(libCard(n)[0], /^(side\.)?oak_small: no card of its own, named by side\.oak's card \(its cells side\/16 ✎ oak\): 32x40, pivot 16,40, in .*lib\/nature\/side\.px\.js\. The card:$/);
   assert.match(libCard("side.oak_small")[1], /^side\.oak: an oak side on/);
