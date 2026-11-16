@@ -233,6 +233,7 @@ Useful options:
 | post it | `pxl build art.px.js --share 4`: every asset 4 times bigger in `out/share/`, clean, a GIF when it moves |
 | get around a long file | `pxl list art.px.js` (each definition's line range and comment) |
 | look up an op or option | `pxl help <name>`; `pxl help` alone for the index |
+| take a ready prop, tree or character instead of drawing it | `pxl lib` lists the library, `pxl lib <entry>` prints a card and the `include` that takes it, `pxl lib draft make3d.oak --genre topdown16` turns a 3D one to a genre's camera ([lib/README.md](../lib/README.md)) |
 | match a reference sprite's silhouette | `pxl compare art.px.js hero ref.png --shrink 2`; `pxl compare ref.png` alone measures its rows |
 | hold a new part to one you approved, row by row | `pxl compare art.px.js head_new head_old` (or `other.px.js:head`) |
 | learn from finished art or a reference | `pxl study ref.gif` |
@@ -287,6 +288,10 @@ each piece as a strip. `--no-out` prints the text only.
   still working; tree species in their seasons, `lib/nature/trees.px.js`, shown by
   `examples/nature/trees.px.js`).
 - [lighting.md](../lighting.md): lamps, light blocked by walls, normal maps, glow.
+- [lib/README.md](../lib/README.md): the library, props, trees, characters and stages to `include`
+  rather than redraw (`pxl lib`, `pxl lib draft`), and the genres: a profile in
+  [`lib/profiles/`](../lib/profiles) holds a genre's camera, grid and sizes as data, read back by
+  `genre()` (`pxl help "scenes 18"`).
 - Effects as shaders do them (a dissolve, an aura, wind, energy), particles, trails and spells:
   `pxl help effects` and `pxl help abilities`, then [`spells.px.js`](../examples/spells.px.js),
   [`spell_variants.px.js`](../examples/spell_variants.px.js) and

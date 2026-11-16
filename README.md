@@ -502,9 +502,11 @@ Jungle" by bluecarrot16, Lanea Zimmerman (Sharm), Sevarihk, Hyptosis and others,
 npm install                                          # dev only: typescript, @types/node
 node --test test/docs.test.ts                        # one test file, while you iterate
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts  # the examples' check on one folder
-npm run test:quick                                   # every test but the two slowest (9-16 s; ~45 s after a change to pxl's sources)
-npm run check                                        # type check + every test (13-20 s; ~2 min after an engine change), before a commit
+npm run test:quick                                   # every test but the two slowest
+npm run check                                        # type check + every test, before a commit
 ```
+
+How long each takes, and what makes a run check everything again: [Tests](docs/agents.md#tests).
 
 ```
 src/core/     engine, no Node APIs: image, palette + ramps, canvas ops, build, trace, project, study
@@ -512,6 +514,7 @@ src/node/     vm sandbox loader, PNG/GIF encoders, outputs, CLI, live server
 src/viewer/   browser viewer (served type-stripped; no bundler)
 types/        pxl.d.ts globals for editor support in .px.ts files
 scripts/      the maintainers' scripts, below
+lib/          the library to include: props, buildings, nature, characters, vehicles, effects, UI, stages, styles, the genres' profiles
 examples/     example art files
 test/         node:test suites
 ```
@@ -535,7 +538,8 @@ test/         node:test suites
 | `scripts/mhtml.ts` | saved web pages (`.mhtml`) opened as text and images, to read tutorials |
 
 How to use them, and how to update the examples' snapshot after a change you meant, is in
-[Working with an agent](docs/agents.md#for-contributors).
+[Working with an agent](docs/agents.md#for-contributors); what each of pxl's speed-ups gained, machine by machine, is in
+the [performance notes](docs/perf-notes.md).
 
 In a clone the CLI runs the TypeScript sources directly. When installed as a package it runs
 `dist/`, which `npm install` / `npm pack` generate via `scripts/build.js` (Node won't strip types

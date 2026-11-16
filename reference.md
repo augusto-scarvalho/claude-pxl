@@ -1088,88 +1088,72 @@ Outputs go to `<file dir>/out`: `sprites/<n>.png`, `scenes/<n>.png`, `anims/<n>.
 (TexturePacker hash format: Phaser, Godot importers, ...), `_preview/<n>.png` (upscaled to
 ~768px, checkerboard behind transparency, pixel grid at scale ≥ 6 with every 8th line darker).
 
-Builds kept on disk: a build whose own work took 10 ms or more, and 300 ms or more for each MB it takes there (a 3D
-figure's frame; not a scene's frame, composed again in 40 ms of those kept), is kept under a key
-of all it reads (pxl's sources, Node's version, the time zone and language; the bytes of every file the art file
-loaded: itself, its includes, palettes, PNGs, poses; the asset, its seed, time and clock; the options it read, and
-those read earlier in the command: check's, `--world`'s, a trace's), with the warnings it gave, and any later command
-making the same build reads it back (a figure's 217 traced frames: `check` 137 s, then 4). A check's build and a
-shot's are kept side by side. It can't go stale: an edit to any of those files, or to pxl, is a new key. That holds
-for art whose every build is a function of the files. A variable that one build writes and another draws with (a
-mask a sprite fills as it draws and a scene reads, as extinction's `SKY`) is not, and a build read back runs no code:
-pxl sees it, digesting what the file's top-level names hold before its first build and again where a build would be
-read back or kept (a worker's too), and from the first change it reads and keeps nothing more in that command, which
-then costs what it costs with `--no-cache` (`build --profile` names the build and the names); a build quicker than
-that digest isn't kept (a file holding 90 ms of tables keeps only builds slower than that). A memo the art fills as
-it draws (a `Map` of what a function gave) is such a change too: right, but the builds after it aren't kept; fill it
-as the file loads to keep them. pxl can't see a variable a function closes over, nor what a
-`WeakMap` holds: keep such state out of the art, or build with `--no-cache`. Where builds
-stop being a function of the files nothing more is kept: the art's own `Math.random`, `Date.now`, `Date()`, a
-`new Date()` or a date formatted without a date (as the file loads: none at all), a file read once the art file has
-loaded, a change to its state. What a trace's march finds is kept beside them under a key of the field itself: pxl's sources and Node's, the
-field's code and numbers (a field given by a function only when the function is `pure()`), and the rays the trace asks
-(each one's origin, way, where it enters and leaves the field's box, how near it must come: all the march reads): each
-ray's hit in 8 bytes, and at each hit what else reads the field alone, its normal (the three numbers the light and the
-paint are given) and which child each of its joins takes there (the material's choice, a byte a join). It is read
-back wherever the same field is asked through the same rays, whatever file asks it and whatever else that file holds;
-the shadows, creases and paint are worked out again from it, the paint by the functions of the file that reads it.
-Where every paint function of the field is `pure()`, what the paint gives at each hit (its material and part, 2
-bytes) is kept beside the trace, under the trace's key and the field's looks: where each `mat()`, `part()` and
-`paint()` stands in it, by name, each paint function by its key (its source and data). That is all the paint reads
-besides the point and its normal; the light, the palette and the drawing's options are not in it, so an edit to them
+### Kept builds, threads and workers
+
+**What is kept.** A build whose own work took 10 ms or more, and 300 ms or more for each MB it takes there (a 3D
+figure's frame; not a scene's frame, composed again of those kept), is kept on disk with the warnings it gave, under a
+key of all it reads: pxl's sources, Node's version, the time zone and language; the bytes of every file the art file
+loaded (itself, its includes, palettes, PNGs, poses); the asset, its seed, time and clock; the options it read, and
+those read earlier in the command (check's, `--world`'s, a trace's). Any later command making the same build reads it
+back (a figure's 217 traced frames: `check` 137 s, then 4); a check's build and a shot's are kept side by side. It
+can't go stale: an edit to any of those files, or to pxl, is a new key.
+
+What a trace's march finds is kept too, under a key of the field itself (its code and numbers, and the rays the trace
+asks: all the march reads), and read back wherever the same field is asked through the same rays, whatever file asks
+it; the shadows, creases and paint are worked out again from it, the paint by the functions of the file that reads it.
+A field given by a function is kept only when the function is `pure()`. Where every paint function of the field is
+`pure()`, what the paint gives at each hit is kept too, so an edit to the light, the palette or the drawing's options
 lights and lines again over the paint read back, and an edit to a paint function or its data paints again over the
 hits read back. So an edit to one of a figure's moves marches and paints again only that move's frames, and an edit
-to a scene none of its figures' (with a plain paint function the paint is still asked, once a pixel). In `node_modules/.cache/pxl/builds/` in a checkout, else
-`pxl-builds/` in the system's
-temp folder, 512 MB, the least recently used dropped first. `--no-cache` (any command) or `PXL_CACHE=0` builds
-everything and keeps no trace.
+to a scene none of its figures' (with a plain paint function the paint is still asked, once a pixel).
 
-More threads: a trace of a field whose every function is `pure()`, over 4096 cells or more, can march its rays on
-several threads (each makes the field again of its code, numbers and pure functions' sources and data, and takes runs
-of the rays; the paint, normals and shadows stay on one), the same hits as one thread marches, so the same pixels. How
-many: a quarter of the machine's threads, 8 at most, from the first command and with nothing measured (24 threads: 6;
-one where the workers' record keeps a file's command on one, below).
-Only where that is 2 (a laptop of 4 cores, which may heat and run 2 slower than 1) is it measured, over the machine's
-real commands: while it is unsettled, commands take turns on 1 and 2, each big pure trace timed whole, and once each
-has a minute of traces of the same fields 2 is kept only if it did the same work 1.15× as fast or more, else 1 is
-settled and nothing is timed again (a record beside the builds, `pxl-threads.json`; measured again when Node or the
-processor change, or after 30 days). A 4-core laptop that throttles settles on 1; a 16-core desktop takes 6 from its
-first command, its check 1.4× as fast. `PXL_THREADS=N` forces N (1: one thread, as
-always); a field with a plain closure in it, a smaller trace and a march already inside a worker thread take one.
-`pxl build --profile` says how many marched and why.
+**When nothing more is kept, and when a build read back could be wrong.** Where a command's builds stop being a
+function of the files it keeps nothing more: after the art's own `Math.random`, `Date.now`, `Date()`, a `new Date()` or
+a date formatted without a date (as the file loads: none at all), a file read once the art file has loaded, or a
+change to the art's state. That state is what could make a build read back wrong, as a build read back runs no code: a
+variable that one build writes and another draws with (a mask a sprite fills as it draws and a scene reads, as
+extinction's `SKY`). pxl digests what the file's top-level names hold before its first build and again where a build
+would be read back or kept (a worker's too), and from the first change it reads and keeps nothing more in that
+command, which then costs what it costs with `--no-cache` (`build --profile` names the build and the names); a build
+quicker than that digest isn't kept. A memo the art fills as it draws (a `Map` of what a function gave) is such a
+change too: right, but the builds after it aren't kept; fill it as the file loads to keep them. pxl can't see a
+variable a function closes over, nor what a `WeakMap` holds: keep such state out of the art, or build with
+`--no-cache`.
 
-More workers: `pxl check` and `pxl build` of a file can share its builds among worker threads, each loading the project
-once and making whole builds (the art's code, the march on one thread, the paint): an anim's frames when one other than
-its first is asked or `timeline()` reads them all, and the first frames of what the command goes through. A scene's
-frames stay on the command's own thread (a scene's code may carry another build's work in a memo of its own, as the
-fighting round's bout does). A build a worker made is used as one read back from the store is, only where the store
-would keep it (made before the art's own dice, clock or late read, holding every warning said before it, writable as
-data) and where it is what the command's thread would have made there: every file written, warning and line printed
-is what one thread makes, in the same order. How many is measured for each command on each file, in the record of the
-march's threads. A file's first command runs on one thread and notes each build's ms there, and the rest of its time;
-a file whose shared builds took under 10 s starts none. Where the march's first number is 3 or more (a quarter of the
-machine's threads, 8 at most: 6 on 24), the next command takes that many workers, and every command on more than one
-weighs what its work would have taken on one thread (its builds at those ms, the rest as the first command took it)
-against what it took, the machine's heat in it, judged only against a command on one thread made the same way (cold,
-or with most of its traces read back from the store: after an edit, a quarter of the time), else the next runs on one
-thread to note it. Each command with builds to share is a row in that file's log (its last 16: when, how many
-workers, cold or warm, its builds at one thread's ms, its own thread's time, what it took, when its workers were
-cut), and the number is read off it: halved for that command on that file (3 to 1) when its last two commands judged
-at that number both read under 1.15× as fast (one alone changes nothing); after 8 commands on a lowered number one
-runs on the number above, kept there from 1.15×, else back, the next try after twice as many commands, 64 at most. A
-file on workers keeps the one-thread measure it had (not renewed); a command on one thread renews it. A machine where
-two commands judged on its full guess read 2× as fast or more (any files) is trusted: there no command runs on one
-thread to learn, and a file's first command takes the guess (a 24-thread desktop read 4.05×, 1.68× and 3.71× on three
-files; a 4-core laptop guessing as 12, 0.96× to 1.46×), until its last three judged on the full guess all read under
-1.15×. A command still a fifth slower than one thread 30 s after its workers began stops them and makes the rest
-itself (its workers, not the number). There a file's first command, and one whose workers were measured down to 1,
-march on one thread too. A file not seen for 30 days leaves the record, and the oldest beyond 200 files; nothing
-leaves the machine, and deleting `pxl-threads.json` (beside the builds) starts over. Where that number is 2 (a laptop
-of 4 cores, which may heat and run 2 slower than 1) the commands take turns on 1 and 2 until each has a minute of work,
-2 kept from 1.15× as fast (a laptop of 4 cores settled on 2 for one fighter's check and on 1 for the round's). Never
-more workers than the free memory holds (each about the project's memory and 256 MB of builds); while they run, a
-march on the command's thread takes one thread. `PXL_WORKERS=N` forces N (1: one thread, as always); a command inside
-a worker thread starts none. `pxl build --profile` says how many and why, and what the file's log holds.
+**Where, and off.** In `node_modules/.cache/pxl/builds/` in a checkout, else `pxl-builds/` in the system's temp
+folder, 512 MB, the least recently used dropped first; deleting it costs only the builds again. `--no-cache` (any
+command) or `PXL_CACHE=0` builds everything and keeps no trace.
+
+**More threads.** A trace of a field whose every function is `pure()`, over 4096 cells or more, marches its rays on
+several threads (the paint, normals and shadows stay on one): the same hits as one thread marches, so the same pixels.
+How many: a quarter of the machine's threads, 8 at most (24 threads: 6), from the first command, nothing measured.
+Where that is 2 (a 4-core laptop, which may heat and run 2 slower than 1) it is measured over the machine's real
+commands: they take turns on 1 and 2, and once each has a minute of traces of the same fields, 2 is kept only if it did
+the same work 1.15× as fast or more, else 1 is settled and nothing is timed again. A field with a plain closure in it,
+a smaller trace and a march inside a worker thread take one. `PXL_THREADS=N` forces N (1: one thread, as always).
+
+**More workers.** `pxl check` and `pxl build` of a file can share its builds among worker threads, each loading the
+project once and making whole builds (the art's code, the march on one thread, the paint): an anim's frames when one
+other than its first is asked or `timeline()` reads them all, and the first frames of what the command goes through. A
+scene's frames stay on the command's own thread. A build a worker made is used only where the store would keep it and
+where it is what the command's thread would have made there: every file written, warning and line printed is what one
+thread makes, in the same order. How many is measured for each command on each file: its first command runs on one
+thread and notes each build's time (a file whose shared builds took under 10 s starts none); later ones take the
+machine's number where it is 3 or more, and keep a number only while it reads 1.15× as fast as one thread or more. A
+command still a fifth slower than one thread 30 s after its workers began stops them and makes the rest itself.
+Never more workers than the free memory holds (each about the project's memory and 256 MB of builds); while they run,
+a march on the command's thread takes one thread. `PXL_WORKERS=N` forces N (1: one thread, as always); a command
+inside a worker thread starts none.
+
+**The record.** What the threads and the workers measured is kept in `pxl-threads.json`, beside the builds: the
+machine's number (measured again when Node or the processor change, or after 30 days) and each file's last 16
+commands. A file not seen for 30 days leaves it, and the oldest beyond 200 files; nothing leaves the machine, and
+deleting `pxl-threads.json` starts over.
+
+**What `build --profile` says** of them: how many threads marched and why; how many workers and why, and what the
+file's log holds (how many commands, on how many workers, what each read); the traced fields not kept, a function in
+them not `pure()`; the build and the top-level names that stopped the keeping. The `build` paragraphs above say what
+else it prints.
 
 ### Output for engines
 

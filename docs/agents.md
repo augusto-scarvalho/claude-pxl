@@ -18,8 +18,8 @@ result. To use pxl by hand, start with [Getting started](getting-started.md).
 - [A big scene: one agent, a fresh one, or a pipeline](#a-big-scene-one-agent-a-fresh-one-or-a-pipeline)
 - [Reviewing the result](#reviewing-the-result)
 - [When pxl gets in the agent's way](#when-pxl-gets-in-the-agents-way): the `FEEDBACK.md` loop
-- [For contributors](#for-contributors): tests, tutorials, calibrating `pxl study`, speed, measuring
-  sessions
+- [For contributors](#for-contributors): the rules of a change, tests, tutorials, calibrating
+  `pxl study`, speed (its measurements in the [performance notes](perf-notes.md)), measuring sessions
 
 ## A round, start to finish
 
@@ -287,9 +287,9 @@ token five, a token written to the cache two, as Claude Code keeps its cache an 
 What keeps a session cheap (the skill already asks the agent for the first three; see
 [How the agent works](#how-the-agent-works)):
 
-- **Read by section.** `SKILL.md` (about 3.5k tokens; a test keeps it under 14,000 characters) is
-  loaded when the task matches. `pxl help "scenes 1 3 11 14"` is about 3k tokens where `scenes.md`
-  whole is about 20k.
+- **Read by section.** `SKILL.md` (about 4k tokens; a test keeps it under 14,000 characters) is
+  loaded when the task matches. `pxl help "scenes 1 3 11 14"` is about 5k tokens where `scenes.md`
+  whole is about 28k (the size `pxl help` gives each section).
 - **Edit, don't rewrite.** A file written whole again stays in the conversation.
 - **Fewer turns.** One look per call, and all the fixes one look showed in one turn.
 - **One big asset per conversation.** Start a new conversation for the next asset rather than
@@ -382,7 +382,22 @@ turn each line into a fix, a new op or a doc line: in this fork every line becam
 ## For contributors
 
 The scripts below are in `scripts/`; the README's [Development](../README.md#development) section
-lists them.
+lists them. What holds for every change:
+
+- **A new op or option** goes in [reference.md](../reference.md) and [`types/pxl.d.ts`](../types/pxl.d.ts),
+  with a line in the guide section where an agent would look for it.
+- **No absolute path in a tracked file.** `pxl lib <entry>` prints its `include` by its whole path:
+  right in a user's art file, in any folder; in the repo, write it relative to the file
+  (`include("../lib/characters/hero.px.js", { as: "hero" })`).
+- **A change meant to move no pixel** ends `node scripts/hashes.ts --vs HEAD` with `0 differ`
+  ([Keeping pxl fast](#keeping-pxl-fast)). When the "before" isn't committed (an earlier change
+  still in the tree), keep it as text: `node scripts/hashes.ts <files> > before.txt`, the same
+  after into `after.txt`, then diff the two (`--frames` for the animated ones).
+- **Two versions side by side need no image script.** `pxl shot` stacks PNGs and
+  `other.px.js:name` as rows (two build folders, a copy of a file elsewhere), and `--diff` between
+  exactly two rows of one size counts the pixels that changed.
+- **A region as text:** `pxl describe <file> <name> --at x,y,w,h` prints its exact keys, with
+  rulers.
 
 ### Tests
 
@@ -391,15 +406,15 @@ test file for what you changed, or the quick suite:
 
 ```sh
 node --test test/docs.test.ts                            # one file: the commands and flags the docs cite
-npm run test:quick                                       # every test but the two slowest, 9 to 16 s (45 after a change to pxl's sources)
+npm run test:quick                                       # every test but the two slowest, 9 to 16 s (longer after a change to pxl's sources)
 PXL_EXAMPLES=hd2d node --test test/examples.test.ts      # the examples check, on one folder (or hd2d/harbor, or a,b)
-npm run check                                            # types and every test, 13 s (26 after a lib file's edit, 4 min after an engine change): before the commit
+npm run check                                            # types and every test, before the commit: under a minute after an art or docs edit, several minutes after an engine change
 ```
 
-The two slowest tests are the check of every example (3.5 min on a 4-core laptop when all 121
-run, in one thread per four of the machine's, the slowest of the last run first) and the study of
-the gallery's GIFs (7 to 27 s); a change to a check, to `study` or to an example is what they
-catch. Both leave alone what already passed. Each example that passed is noted in
+The two slowest tests are the check of every example and `lib/` file (minutes on a 4-core laptop
+when all of them run, in one thread per four of the machine's, the slowest of the last run first)
+and the study of the gallery's GIFs (7 to 27 s); a change to a check, to `study` or to an example
+is what they catch. Both leave alone what already passed. Each example that passed is noted in
 `node_modules/.cache/pxl/` with a hash of what its check read (pxl's sources, Node's version, the
 test, the example and every file it read: what it includes, its palettes, PNGs and poses), and the
 next run checks only the examples whose hash changed: an example edited reruns alone (half a
@@ -417,7 +432,7 @@ PNGs); one that can't say what it reads keeps node:test's `test`. A cached test 
 file it doesn't name fails, naming it, and an example whose check reads a file the loader didn't
 count (`p.files`) says so in its lines: the cache is trusted, so run `npm run check` as it is.
 Delete `examples-passed.json`, `gallery-passed.txt` or a `<file>-passed.txt` there only for a clean
-run (a measurement: about 4 minutes of all four cores; `PXL_CACHE=0` too, or it reads back the builds kept in
+run (a measurement: minutes of all four cores; `PXL_CACHE=0` too, or it reads back the builds kept in
 `builds/`).
 
 The suite runs three test files at a time, below normal priority, as `pxl` itself does: on a 4-core
@@ -502,7 +517,7 @@ Agents run `pxl shot`, `check` and `study` many times a session, and the test su
 every example: a slow path costs every turn. Before and after a change to the engine:
 
 ```sh
-npm run check                                           # types and tests: an engine change rechecks every example, about 4 min
+npm run check                                           # types and tests: an engine change rechecks every example (its time: Tests, above)
 node scripts/hashes.ts --vs HEAD                        # every example's and lib/ file's assets built by the last commit's pxl and by yours: what differs
 node scripts/hashes.ts --vs HEAD --frames 12 examples/hd2d/graveyard.px.js   # the animated ones' frames too, 12 over each loop (--frames: all)
 node scripts/perf.ts                                    # pxl check's time, processor time and peak memory on every example
@@ -514,191 +529,105 @@ node scripts/served.ts examples/hd2d/graveyard.px.js graveyard_hd   # what the l
 node scripts/pulse.ts walk.px.js walk walk_hybrid       # how many of a walk's normals turn on the parts that only moved
 ```
 
-`--vs <rev>` unpacks the revision's `src/` and `examples/` once into the system's temp folder
-(`pxl-rev-<commit>`, by `scripts/vs.ts`) and loads both pxls in one process: no worktree, no
-stash. `hashes.ts --vs` prints only the lines that differ and a count, and exits 1 when one does (an
-asset the revision hasn't, a new library entry, is listed and counted as new, apart): a
-change meant to move no pixel ends with `0 differ`, frame by frame for the animated files
-(`--only <regex>` narrows a file to some assets; a long scene's frames take a second each). A file whose every
-input is the same at the revision (pxl's `src/` and each file it reads: itself, its includes, palettes, PNGs) isn't
-built, and is counted apart: a build is a function of those alone, so an art change costs only the files it reaches
-(`--all` builds every file anyway). With no files it takes every example and `lib/` file, as the examples test lists
-them (132; the examples alone were 75): an art change costs 10 s of loading to skip what it doesn't reach, an engine
-change builds all of them on both sides (about 32 min on a 4-core laptop: 22 the examples, 10 `lib/`). A line that differs says where, that frame built again on both sides
-(`lib/characters/slime.px.js slime_hop@2: 1 px changed in 9,1 1x1`), and `--png <dir>` writes the two
-(`slime.slime_hop@2_HEAD.png`, `_here.png`) for `pxl shot <both> --diff`. `perf.ts --vs` builds each frame with one
-pxl and then the other, alternating, because a laptop's speed drifts within seconds: two runs a
-minute apart differ by more than most changes, and the same pxl against itself reads within 6% on a
-figure. `meter.ts`, preloaded, prints each test file's time, processor time and peak memory: which
-files hold the suite back (the three `study` files, 6 to 9 s each when they run; `node.test.ts`,
-which runs every time, 6 s, part of it waiting on the processes it starts).
+A paragraph a mechanism below: what it is and the rule a change must keep. What a user sees and sets (what is kept,
+`--no-cache`, `PXL_THREADS`, `PXL_WORKERS`, the record) is in
+[the reference](../reference.md#kept-builds-threads-and-workers) (`pxl help "kept builds"`); what each mechanism
+gained, machine by machine, and the paths tried and dropped, in the [performance notes](perf-notes.md).
 
-A build that took 10 ms or more of its own, and 300 ms or more for each MB it takes, is kept on disk between commands
-(`src/node/store.ts`,
-[the reference](../reference.md#cli)): under a key of all it reads (pxl's sources, Node's version, the bytes of every
+**Comparing with a revision.** `--vs <rev>` unpacks the revision's `src/` and `examples/` once into the system's temp
+folder (`pxl-rev-<commit>`, by `scripts/vs.ts`) and loads both pxls in one process: no worktree, no stash.
+
+**`hashes.ts`: no pixel moved.** `hashes.ts --vs` prints only the lines that differ and a count, and exits 1 when one
+does (an asset the revision hasn't, a new library entry, is listed and counted as new, apart). A change meant to move
+no pixel ends with `0 differ`, frame by frame for the animated files (`--only <regex>` narrows a file to some assets;
+a long scene's frames take a second each). A file whose every input is the same at the revision (pxl's `src/` and
+each file it reads: itself, its includes, palettes, PNGs) isn't built, and is counted apart: a build is a function of
+those alone, so an art change costs only the files it reaches (`--all` builds every file anyway). With no files it
+takes every example and `lib/` file, as the examples test lists them: an art change costs seconds of loading, an
+engine change builds all of them on both sides (about half an hour on a 4-core laptop). A line that differs says
+where, that frame built again on both sides (`lib/characters/slime.px.js slime_hop@2: 1 px changed in 9,1 1x1`), and
+`--png <dir>` writes the two (`slime.slime_hop@2_HEAD.png`, `_here.png`) for `pxl shot <both> --diff`. It never reads
+the builds kept on disk (below): a comparison read back from them would prove nothing of the engine. `--cache` does,
+to prove the store itself: the same files run off, on and on again give the same lines.
+
+**`perf.ts --vs`: times taken alternating.** It builds each frame with one pxl and then the other, alternating,
+because a laptop's speed drifts within seconds: two runs a minute apart differ by more than most changes. Compare
+times that way, never two runs apart. `perf.ts` never reads the builds kept on disk either: a time read back from them
+would prove nothing of the engine. `meter.ts`, preloaded, prints each test file's time, processor time and peak
+memory: which files hold the suite back.
+
+**Builds kept on disk** (`src/node/store.ts`). A build that took 10 ms or more of its own, and 300 ms or more for each
+MB it takes, is kept between commands under a key of all it reads (pxl's sources, Node's version, the bytes of every
 file the project loaded, the asset, its seed, time and clock, and the options it read on the way or that builds read
-earlier in the command, in the entry's name: a check's build and a shot's side by side), with the warnings it gave, so
-a build read back is the build. That is proven for art whose builds are each a function of the files: a memo in the
-art file is covered (the rules below), a variable one build writes and another draws with is not (the build then
-depends on the order it was made in, which no key holds), so art keeps no such state. Haldor's `check` went from
-137 s to 4 the second time, the round's from 142 to 8, the round's frame 100 shot from 131 to 4; an edit to a file
-the project loaded, or to `src/`, makes its builds again (the round's edit, Haldor's frames in it too), what their
-traces march to read back where their fields are pure (below). Not kept: a build under that floor (the round's scene frames, composed again of the parts kept), a build that can't be written as data (a
-`mesh()` with a sun, a stamp placed by a relation), one made after a warning its log lacks (art code may hold that
-work in a memo of its own, as the round's bout does), any of `edit` and `inspect`, anything after the art's own
-`Math.random` or clock, or a file read once it has loaded. Turn it off with `--no-cache` or
-`PXL_CACHE=0`. `hashes.ts` and `perf.ts` never read it (a comparison or a time read back from it would prove
-nothing of the engine); the tests do, as every command. `hashes.ts --cache` does, to prove the store: the same files
-run off, on and on again give the same lines (two fighters' idle and walk: 10 s, 8.5 s writing, 1.3 s read back).
+earlier in the command, in the entry's name: a check's build and a shot's side by side), with the warnings it gave,
+so a build read back is the build. The tests read it, as every command does. The rule: a build is a function of the
+files. A memo in the art file is covered (filled as the file loads), a variable one build writes and another draws
+with is not (the build then depends on the order it was made in, which no key holds), so art keeps no such state. What
+a change can stop from being kept: a build under that floor (a scene's frames, composed again of the parts kept), a
+build that can't be written as data (a `mesh()` with a sun, a stamp placed by a relation), one made after a warning its
+log lacks (art code may hold that work in a memo of its own, as `examples/fighting/round.px.js` does), any of `edit`
+and `inspect`, anything after the art's own `Math.random` or clock, or a file read once it has loaded.
 
-What a trace's march finds is kept apart from the builds, under a key of the field itself (`surface.ts`'s `kept`,
-`store.ts`): pxl's sources and Node's, the field's key (`sdf.ts`'s `Compiled.key`: its code and numbers, exactly) and
-the rays the trace asks of it (each one's origin, way, where it enters and leaves the field's box and how near it must
-come). The march reads nothing else, so the key is complete by construction, whatever view, size, step or canvas made
-the rays. A field given by a function has a key only when the function is `pure()`, rebuilt from its source in a scope
-of `Math` and its data alone ([the reference](../reference.md)); a field with a plain closure in it is traced as
-before and not kept (`pxl build --profile` names those, the closures and the time they march). Each ray's hit is kept
-(8 bytes), and at each hit what else reads only the field: its normal (24 bytes, the numbers the light and the paint
-are given, which don't compress) and which child each of its joins takes there (a byte a join: the pass that finds a
-point's material works the distance out once more to learn it). A hit spares the march, two thirds of Haldor's cold
-frame; with the march kept, the normal's four taps were 34% of his check after an edit and that pass 19% (Reva's 27%
-and 13%), so they are kept too, and only the paint's own functions, the light and the lines run again. An edit then
-marches again only the frames whose fields it changed, whatever file asks them: Haldor's check after an edit to a
-comment went from 95 s to 49 (2026-11, the hits kept), and with the normals and choices kept too from 76 s to 37 (one
-thread, the last commit's pxl against the new one the same hour); the five fighting files' traces take 76.6 MiB on
-disk (18.5 with the hits alone; the store's budget is 512). His and Reva's trunks, sweeps and skirts are pure functions.
-Their paint functions too (`fighter.paint`, `pure()` with the helpers they call): with the march, the normals and the
-choices kept, those functions were about 14 s of his 37 s check after an edit (Reva's 4.4 of 16), so where a field's
-every paint function is pure what it gives at each hit (a material and a part, 2 bytes) is kept beside the trace, under
-the trace's key and the field's looks (sdf.ts's `Compiled.looks`: where each `mat()`, `part()` and `paint()` stands in
-it, by name, each paint function by its pure key). The paint reads nothing else, so the light, the palette and the
-drawing's options stay out of that key: an edit to them lights and lines again over the paint read back, one to a paint
-function paints again over the hits read back. A pure function asked once a pixel runs in a realm of its own, entered
-from pxl's at each pixel, and there V8 runs destructuring, spread, `for...of` and an array's methods taking a function
-several times slower (a destructured `[a, b] = q` 8×, `.some` 3×, measured on the i5-1035G1), and its helpers, being its
-data, are called, not inlined: his idle and jab (14 frames, every store off) took 6.0 s painted by closures and 6.7 to
-7.7 s by pure functions so written; with the hot ones indexed and `fighter.capD` (under `shadowed`, asked dozens of
-times a pixel) and a bone's paint worked out on numbers, the same operations in the same order, 5.1 to 5.2 s against
-5.1 (the same pixels, `hashes.ts`). With it, on the i5-1035G1 (2026-11, one thread, the last commit's pxl against the
-new one alternating): Haldor's check after an edit to a comment or to one move went from 21 to 22 s to 14 to 16; after
-an edit to one paint function from 20 to 22 s to 19 to 21 (that field is painted again in every frame).
-Each paint function is made by `pure()`: its data copied into its scope, hardened and hashed, 20 to 40 µs on the
-i5-1035G1 for one among a dozen helpers. A figure's `parts(j, p)` makes its sixty or so again every frame, and the
-fighters' is asked twice a frame (the body's rig and the near arm's): about 29,000 `pure()` calls in Reva's check,
-which cost more than reading her paint back saved (half her draws paint under the store's 10 ms floor, so they are
-painted at every build whatever is kept), and the checks of their data ran once for every way a draw reached them.
-So `pure()` asked again with the same source and data, the very same functions and fields in it and its arrays as
-given, gives back the function it made (8 to 12 µs: a new one would hold the same, so it would be that function; 64
-a source kept), and a trace's checks run each pure function's once a pass (nothing runs between them that could
-change one). Her check now makes about 7,200 and gives back 21,800; `pxl build --profile` says what making them took
-against what reading paint back saved, and what to do when it took more. A check after an edit, one
-thread, alternating runs, before step B / step B with every function made anew / with them given back: on the
-i5-1035G1 (2026-11, two or three runs each, the laptop an hour into them) Reva's 10.6 to 12.9 s / 9.4 to 14.4 / 11.8
-to 12.1, Haldor's 24.8 to 32.1 s / 14.1 to 19.9 / 18.2 to 19.2, the round's 35.9 to 37.0 s / 32.8 to 33.3 / 30.7 to
-32.4; on an i7-13700K (four runs each) Reva's 4.2 to 5.9 s / 5.0 to 5.3 / 4.4 to 7.0 (their medians 4.7 / 5.1 / 4.8;
-her CPU time 6.3 s / 7.0 / 7.0, so some of step B's cost is still paid there), Haldor's 11.9 to 13.2 s / 6.5
-to 7.7 / 6.1 to 7.3, the round's 17.5 to 18.5 s / 15.8 to 17.7 / 15.3 to 17.3. A first check, nothing kept yet, is the
-same within either machine's noise (on the i7, Reva's 13.3 to 13.9 s / 13.4 to 16.2 / 13.1 to 14.0, Haldor's 57 to
-61 s / 56 to 58 / 53 to 59).
+**Traces kept** (`surface.ts`'s `kept`, `store.ts`). What a trace's march finds is kept apart from the builds, under a
+key of the field itself: pxl's sources and Node's, the field's key (`sdf.ts`'s `Compiled.key`: its code and numbers,
+exactly) and the rays the trace asks of it (each one's origin, way, where it enters and leaves the field's box and how
+near it must come). The march reads nothing else, so the key is complete by construction, whatever view, size, step or
+canvas made the rays. At each hit, what else reads only the field is kept with it: its normal and which child each of
+its joins takes there. Where a field's every paint function is pure, what the paint gives at each hit (a material and
+a part) is kept beside the trace, under the trace's key and the field's looks (`sdf.ts`'s `Compiled.looks`: where each
+`mat()`, `part()` and `paint()` stands in it, by name, each paint function by its pure key). The paint reads nothing
+else, so the light, the palette and the drawing's options stay out of that key: an edit to them lights and lines again
+over the paint read back, one to a paint function paints again over the hits read back. The rule: anything new the
+march or the paint reads goes into its key, or it isn't kept.
 
-Such a field's march can also run on more threads (`src/node/threads.ts`, surface.ts's `spread`): a trace of 4096 cells
-or more hands each thread the field as data (its code, its numbers, each pure function's source and data, sdf.ts's
-`HOW`), each makes it again and marches runs of the rays into shared memory while this thread marches runs of a copy
-made the same way; a field that can't cross, a pure function's data changed, a thread that throws: marched here as
-before, the same error at the same place. The same JavaScript on the same rays gives the same hits in any order, which
-`hashes.ts` proves with `PXL_THREADS=2` (it turns the store off; the threads don't need it). How many is a first guess
-of the machine (threads.ts's `guess`: a quarter of its threads, 8 at most), taken from the first command where it is 3
-or more: whoever installs pxl on a good machine pays no slow commands for pxl to find a number. Where it is 2 the
-machine may be a laptop that heats, so there it is measured over the machine's real commands, never read off a table
-of processors (the record `pxl-threads.json` beside `builds/`): commands take turns on 1 and 2 until each has a minute
-of traces of the same fields, 2 kept from 1.15× as fast. On the i5-1035G1 (2026-11) two threads marched Haldor 1.5× as
-fast for a few seconds and 1.1× over his whole check (the march 64% of it; with 3 and 4 threads no faster, the paint
-slower as the laptop heats): the check 1.06× at best, so it settles on 1 and times nothing more. On an i7-13700K (16
-cores, 24 threads) the guess is 6: his check 63 s forced to 1, 46 s on 4 threads and 45 s on the 6 (measured before
-the guess, 8 were no faster than 4 and 16 slower; the ladder that found 4 took eight commands). The record is the
-machine's (Node, the processor), not pxl's sources', so a laptop measures once, again after 30 days. `PXL_THREADS=N`
-forces a number; a test's own worker thread marches on one.
+**What makes a field not pure.** A field given by a function has a key only when the function is `pure()`, rebuilt
+from its source in a scope of `Math` and its data alone ([the reference](../reference.md)); a field with a plain
+closure in it is traced at every build and not kept (`pxl build --profile` names those, the closures and the time they
+march). The fighters' trunks, sweeps, skirts and paint (`lib/characters/haldor_fighter.px.js`, `reva_fighter.px.js`;
+`fighter.paint`, `pure()` with the helpers they call) are pure: a model to follow. A pure function runs in a realm of
+its own, where destructuring, spread, `for...of` and an array's methods taking a function run several times slower,
+and its helpers are called, not inlined: write a hot one on indexes and numbers. `pure()` asked again with the same source and data, the very same functions and fields in it and its arrays
+as given, gives back the function it made, and a trace's checks run each pure function's once a pass (nothing runs
+between them that could change one); `pxl build --profile` says what making them took against what reading paint back
+saved, and what to do when it took more.
 
-`pxl check` and `pxl build` of a file can also share whole builds among worker threads (`src/node/workers.ts`), each
-loading the project once and taking an anim's frames, the march, the paint and the art's code with them: perf F's threads
-spread only the march, 64% of Haldor's frame, and wait on the rest. A worker's build reaches the command's thread as one
-read back from the store does, under the store's conditions and only where it is what that thread would have made
-there (each build at time 0 it asked held there, or sent with it), so what is printed and written is one thread's, in
-the same order; a scene's frames are never handed out (the round's bout carries Haldor's frames in a memo of its own).
-On the i7-13700K (2026-11, `--no-cache`, the march on one thread in each) Haldor's check took 63 s on one thread, 47
-with perf F's 4 march threads, 18 with 4 workers, 16 with 6, 17 with 8 and 26 with 16; the round's 54 to 62 s, 32 to
-39 with 4 workers and slower from 8: its bout reads one move's frames at a time, and its own thread still makes about
-900 of its builds (the scene's frames, each move's first frame). On the i5-1035G1 two or three workers made Haldor's
-check 1.3× as fast and the round not at all: four busy threads run each about 2.5× as slow there (the clock falls from
-2.2 to 1.6 GHz, threads share cores). So how many is measured per command and file, in `pxl-threads.json` beside the
-threads' record: what a command has to hand out and how much its own thread does are the file's. A file's first
-command runs on one thread and notes each build's ms there (a file with under 10 s to share starts none; a command that
-found every build made leaves the note as it was), and its own thread's time apart from them (the load, the scene
-frames, the checks, the files written: the same whoever makes those builds). Where the first guess is 3 or more (12
-threads: 3; the i7-13700K's 24: 6) the next command takes it, and every command on more than one weighs that own time
-and its builds handed out at those ms against what it took, the heat in it, at no cost. It is judged only against a
-command on one thread made the same way, cold or warm (most traces read back from the store, a build counted by its
-own): after an edit Haldor's check took 20 s on one thread against 74 cold, so the cold ms read his 3 workers, 1.15× as
-fast there, as 4×, and Reva's, 0.92×, as 2.3×. With none such, the next command runs on one thread to note it. Each
-command with builds to share is a row in the file's log, its last 16 kept in `pxl-threads.json` (when, how many
-workers, cold or warm, its builds at one thread's ms, its own thread's time, what it took, when its workers were cut),
-and the number is read off the rows, on the safe side rather than the fastest (the user's rule: no campaign of trials
-on their machine): halved for that command and file (3 to 1) when its last two commands judged at that number both
-read under 1.15× as fast, so one command slowed by something else on the machine changes nothing; after 8 commands on
-a lowered number one runs on the number above, kept there from 1.15×, else back, the next try after twice as many
-commands (16, 32, 64 at most). A file that stays on workers keeps the one-thread measure it had (not renewed: no
-command runs on one thread for it); one on one thread renews it at each command. A command still slower than one
-thread by a fifth 30 s after its workers began, even with its own thread's time taken as slowed as theirs, stops them
-and makes the rest itself: its workers, not the number. A
-machine where two commands judged on its full guess read 2× as fast or more (any files) is trusted: from then on no
-command runs on one thread to learn, a file's first command takes the guess, and only what is known already is judged,
-until its last three judged on the full guess all read under 1.15×. The i5 guessing as 12 read 0.96× to 1.46× (its
-fastest check, Haldor's cold one when the laptop ran slow: 136 s on one thread, 93 on 3); the i7-13700K, `--no-cache`,
-read Haldor's check 64 s on one thread then 16 to 17 s on 6 (4.05×), the round's 52 then 31 to 32 (1.68×), Reva's 12.9
-then 3.2 to 3.8 (3.71×), every run's text the same. So a new user there pays a file's first command on one thread until
-two commands have read 2× (Haldor's check used three times: once), and a weak machine keeps the whole correction. A
-file not seen for 30 days leaves the record, and the oldest beyond 200 files; nothing leaves the machine, and deleting
-`pxl-threads.json` starts over. `pxl build --profile` says what a file's log holds (how many commands, on how many
-workers, what each judged read). A file's first command, and one whose workers were measured down to 1, march on one
-thread too: on the i5 guessing as 12 threads, the march on the guess's 3 made the round's check 94 to 101 s against 80
-to 87 on one. On the i5-1035G1 made to guess as a 12-thread machine does (a preload setting `os.availableParallelism`
-and threads.ts's `record.file`; the tests pass `top`), `--no-cache`, each file's first command and its second:
-Haldor's check 82 s then 63 on 3 workers (1.31×; on 2, 65 to 66 s), his build 108 then 88 (1.23×); Reva's check 21
-then 22 (0.96×), her build 40 then 34 (1.18×); the round's check 77 then 75 (1.03×), its build 159 then 160, its
-workers stopped 126 s in (1.00×): the readings under 1.15× halve their file's number at the second. Every file
-written and line printed was one thread's. Two estimates that spared that first command read far from whole commands
-on one thread there: builds timed alone for a second or two at the start (the workers' first
-builds, cold and made while the others load, run far slower than their later ones: Reva's check read as 0.80× where it
-gained 1.09×, Haldor's was cut 30 s in where it gained 1.28×), and the command's own thread taken as slowed as the
-workers' builds (it encodes and writes, which slows less: Haldor's check within 6%, but Reva's build read as 0.93× where
-it gained 1.18×). Where the guess is 2, commands take turns on 1 and 2 until each has a minute of work, as above.
-`PXL_WORKERS=N` forces a number (1: one thread, as always); `hashes.ts` takes `pxl build`'s path (the record unforced,
-read from a copy).
+**The march on more threads** (`src/node/threads.ts`, surface.ts's `spread`). A pure field's trace of 4096 cells or
+more hands each thread the field as data (its code, its numbers, each pure function's source and data, sdf.ts's
+`HOW`); each makes it again and marches runs of the rays into shared memory while this thread marches runs of a copy
+made the same way. A field that can't cross, a pure function's data changed, a thread that throws: marched here as
+before, the same error at the same place. The rule: the same JavaScript on the same rays gives the same hits in any
+order, which `hashes.ts` proves with `PXL_THREADS=2` (it turns the store off; the threads don't need it). How many is
+a first guess of the machine where it is 3 or more, so whoever installs pxl on a good machine pays no slow commands for
+pxl to find a number; on a machine that may heat it is measured over the machine's real commands, never read off a
+table of processors. A test's own worker thread marches on one.
 
-`served.ts` starts the live viewer's server on a file and fetches what the page would when an asset
-is picked: run it after a change to the viewer or to what a build traces (a scene's frames all sent
-with it held 2.65 GB on the HD graveyard's page and froze the browser; as PNGs on demand, 1.6 MB and
-then half a megabyte a frame). `pulse.ts` follows an animation's normals from frame to frame over the
-pixels that only moved: a `bump` made a frame at a time turns 6% of the traveler's walk, his 3D
-model's own normals 1% ([lighting.md](../lighting.md)).
+**Whole builds on worker threads** (`src/node/workers.ts`). `pxl check` and `pxl build` of a file can share whole
+builds among worker threads, each loading the project once and taking an anim's frames, the march, the paint and the
+art's code with them. The rule: a worker's build reaches the command's thread as one read back from the store does,
+under the store's conditions and only where it is what that thread would have made there (each build at time 0 it
+asked held there, or sent with it), so what is printed and written is one thread's, in the same order; a scene's frames
+are never handed out (a scene's code may carry another build's work in a memo of its own). How many is measured per
+command and file, on the safe side rather than the fastest (the user's rule: no campaign of trials on their machine): how, in
+the comments of `threads.ts` and the [performance notes](perf-notes.md#whole-builds-on-worker-threads). `hashes.ts`
+takes `pxl build`'s path (the record unforced, read from a copy).
 
-`pxl build --profile` names the slow functions of one art file's build. Keep a new test to what it
-checks: a few frames, a small picture (a 3D one: a 30 px sprite, cells of 0.25 m), `study --seconds`
-for part of a long clip.
+**The 3D march's code** (`sdf.ts`'s `Code`). 3D marches a ray to each pixel through a field's distance, written as
+code; a change to the march (where a ray starts, a box that lets it skip) moves pixels, so speed comes from that code:
+a join's children go in runs of 250 lines a function (V8 doesn't optimize one of thousands), a long union tests each
+group of 8 children's box before the children, and a material is one more pass noting which child each join took. A
+field the art asks its `dist()` while it is traced answers from the point the trace just worked it out, when what it
+asks is the object drawn and reads no clock: ask for that object (the fighters' `out.torso`), not the same parts joined
+again (a copy is worked out twice). The march can't pass more over by boxes without moving pixels: a union's first child is always worked out, and
+an `sdf.field`'s distance may be less than the truth, so a box is no bound on it.
 
-3D marches a ray to each pixel through a field's distance, written as code (`sdf.ts`'s `Code`); a
-change to the march (where a ray starts, a box that lets it skip) moves pixels, so speed comes from
-that code: a join's children go in runs of 250 lines a function (V8 doesn't optimize one of thousands:
-graveyard_3d's tree of 105 rods took 8 µs a point, 1.5 in runs), a long union tests each group of 8
-children's box before the children (a big tree 1.5× as fast), and a material is one more pass noting
-which child each join took. On the i5-1035G1 (2026-10): a figure's frame 5-6 ms warm (the warden 22;
-a third of a body's time is its cloth's sweeps and their art functions), graveyard_3d 0.7 s a frame
-(1.2 before the runs). A field the art asks its `dist()` while it is traced (Haldor's bib, a shell round his torso,
-asks the torso at each point) answers from the point the trace just worked it out, when what it asks is the object
-drawn and reads no clock: his file asks `out.torso`, not the same parts joined again (a copy is worked out twice), and
-his cold check went from 89 s to 76 (2026-11). The march can't pass more over by boxes without moving pixels: a
-union's first child is always worked out, and an `sdf.field`'s distance may be less than the truth, so a box is no
-bound on it.
+**The live viewer and the normals.** `served.ts` starts the live viewer's server on a file and fetches what the page
+would when an asset is picked: run it after a change to the viewer or to what a build traces (a scene's frames all sent
+with it once froze the browser; they go as PNGs on demand). `pulse.ts` follows an animation's normals from frame to
+frame over the pixels that only moved ([lighting.md](../lighting.md)).
+
+**Small tests.** `pxl build --profile` names the slow functions of one art file's build. Keep a new test to what it
+checks: a few frames, a small picture (a 3D one: a 30 px sprite, cells of 0.25 m), `study --seconds` for part of a
+long clip.
 
 ### Measuring sessions and models
 

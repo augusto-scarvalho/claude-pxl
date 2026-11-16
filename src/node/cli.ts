@@ -223,14 +223,10 @@ const USAGE = `pxl — pixel-art DSL
       GIF are read by pxl; JPEG, WebP and video through ffmpeg if on PATH.
 
 Art files may be .js or .ts. Default out dir: <art file dir>/out. A build that took long (a 3D figure's
-frame) is kept on disk under a key of all it reads (pxl's sources, every file the art file loaded, the
-asset, its time and seed), in node_modules/.cache/pxl/builds/ in a checkout, else the temp folder's
-pxl-builds/: the same build in a later command is read back, never stale for art whose every build is a
-function of those files (state a function closes over or a WeakMap holds, pxl can't see: --no-cache).
---no-cache (any command) or PXL_CACHE=0 builds everything. A big trace of a pure() field marches on
-several threads (PXL_THREADS=N forces N), and check and build share a file's builds among worker threads,
-how many guessed from the machine, then measured for that file (PXL_WORKERS=N forces N; 1 makes them all
-on one thread).`;
+frame) is kept on disk and read back by a later command making the same build; --no-cache (any command)
+or PXL_CACHE=0 builds everything. PXL_THREADS=N forces how many threads march a big trace of a pure()
+field, PXL_WORKERS=N how many worker threads check and build share a file's builds among (1: one thread).
+What is kept and when not, where, and how those numbers are found: pxl help "kept builds".`;
 
 interface Args {
   cmd?: string;
