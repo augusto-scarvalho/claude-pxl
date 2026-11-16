@@ -720,8 +720,17 @@ done here: `genre(name)`, surface's `ink: true | 2`):
   and pixels (the figure without what its move paints, where the frame shows them: not under a sword or a crescent):
   a LOOK line per asset, how many over how many frames and the first four `frame f: x,y`; what ran says "(and its
   line's L-corners)"; `shot` rings them orange on the frame shown.
-- [ ] **The L-corners the genre's ink now reads (F5q)**, for the user to decide which are meant: the cars 16 of 64
+- [x] **The L-corners the genre's ink now reads (F5q)**, for the user to decide which are meant: the cars 16 of 64
   headings 1 each (car.px.js), the karts 29 of 108, 47 in all (kart.px.js), track_behind's `_lamp_0_s` 1.
+  Done (F5s): each one turned inward (the clear across its elbow) the fill beside it, the silhouette as it was, by one
+  hook after the shrink, car.px.js's `ells` (hero.ells()'s rule for a line in a given ink: the car's line is the
+  genre's ink, not its `k`); the kart's by an include of the car, after its head, hand pass and foot (the jaw's line on
+  the wheel among them), the east by the mirror: 10 of the cars' 16, 40 of the karts' 47, a px each. The lamp's by
+  hand in STAND (its stepped foot's slope, a px: the iron's fill). Kept, 13 LOOK lines: the elbows sticking out (the
+  cars' side at a wheel's cut, ne and sw; a near tyre's lower corner, laguna 101 and 281, and the karts', 240 and
+  120), each erased steps the silhouette out of order (check --edges' steps +1: the cut shrink's own refuses), and two
+  Ls of a fill's tone beside the line, not the line (kart 255 the frame's trim F, fuego 278 the tyre's T). check
+  --edges' steps, tips, notches, bridges and gaps the same on every heading.
 - [x] **How light a line may go**: an `"own"` line was taken as light as the check allows, capped by hand at L 0.5 so
   it reads on the grass. The genre's ink a floor against its ground, and `--readings` saying each line's room.
   Done (F5r): a genre says the ground each category stands on, `on: { tree: "mg" }` in its roles' keys (topdown32's
