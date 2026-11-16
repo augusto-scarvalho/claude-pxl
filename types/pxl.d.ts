@@ -487,13 +487,17 @@ declare global {
     yaw?: number;
     /** Degrees the camera is tilted up, down if negative: three-point perspective (default 0). */
     pitch?: number;
-    /** The way's curvature (1/m): its z lines bend right (left if negative), a point z m along bend·z²/2 m to the side (default 0). */
-    bend?: number;
+    /**
+     * The way's curvature (1/m): its z lines bend right (left if negative), a point z m along bend·z²/2 m to the side (default 0).
+     * Or by sections, [[z0, k0], [z1, k1], ...]: k from each z m ahead (0 or more, ascending) up to the next, straight before the
+     * first, heading and place running on where two meet ([[0, 0.02], [30, 0], [60, -0.02]]: right now, straight from 30 m, left from 60).
+     */
+    bend?: number | [number, number][];
     /** m the way runs straight before it bends (with bend): a point z m along bend·max(0, z − bendFrom)²/2 m to the side (default 0). */
     bendFrom?: number;
   }
   interface PxPerspective {
-    readonly w: number; readonly horizon: number; readonly eye: number; readonly focal: number; readonly vp: number; readonly yaw: number; readonly pitch: number; readonly bend: number; readonly bendFrom: number; readonly fov?: number;
+    readonly w: number; readonly horizon: number; readonly eye: number; readonly focal: number; readonly vp: number; readonly yaw: number; readonly pitch: number; readonly bend: number | [number, number][]; readonly bendFrom: number; readonly fov?: number;
     /** The picture's height, when given one ({ w, h, pitch, ppm }). */
     readonly h?: number;
     /** Looking down: the ground z m ahead where it looks, dist m from the eye along its axis (post() focuses there), the texels a texel to a pixel there on a floor and on a wall. */

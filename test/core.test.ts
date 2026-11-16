@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { art, failure, keys, PAL } from "./helpers.ts";
-import { perspective } from "../src/core/perspective.ts";
+import { perspective, side } from "../src/core/perspective.ts";
 import { bayer, fbm, latticeHash, seamless, vec, vnoise } from "../src/core/util.ts";
 import { loadSource } from "../src/node/load.ts";
 import { compareSilhouettes, packSheet, playAll, sheetJson } from "../src/core/render.ts";
@@ -791,6 +791,27 @@ scene("t", { w: 80, h: 50, bg: "k" }, terrain(${bent}, () => 0, ${line}))`, "t.p
   assert.match(failure(PAL + `perspective({ ...${JSON.stringify(view)}, bendFrom: 20 })`).message, /bendFrom is where a bend starts .* give the bend too/);
   assert.match(failure(PAL + `perspective({ ...${JSON.stringify(view)}, bend: 0.01, bendFrom: -5 })`).message, /bendFrom is how many m the way runs straight before it bends, 0 or more, got -5/);
   assert.throws(() => perspective({ ...view, bend: 0.01, bendFrom: "x" as unknown as number }), /0 or more, got "x"/);
+});
+
+test("perspective with a bend by sections: one is bend with bendFrom, shadows too; heading and place run on at the joints; at() gives back ground() across them; an S ends straight", () => {
+  const near = (a: number[] | null, b: number[], eps = 1e-6) => assert.ok(a && a.every((v, i) => Math.abs(v - b[i]) < eps), `${a} ~ ${b}`);
+  const view = { w: 80, horizon: 30, eye: 2, fov: 90 }, F = perspective({ ...view, bend: 0.01, bendFrom: 20 }), L = perspective({ ...view, bend: [[20, 0.01]] });
+  for (const z of [5, 20, 33.3, 90]) for (const x of [-2, 0, 1.5]) assert.deepEqual(L.ground(x, z, 0.5), F.ground(x, z, 0.5));
+  for (const [c, r] of [[10, 40], [60, 33], [40, 49]]) assert.deepEqual(L.at(c, r), F.at(c, r));
+  const sh = (v: object) => `shadows(${JSON.stringify({ ...view, ...v })}, [solid.stick([1, 10, 0], [1, 10, 2], 0.3, "r")], { sun: { from: [-0.5, 1], up: 25 }, shade: { g: "k" } })`;
+  const p = loadSource(PAL + `scene("f", { w: 80, h: 50, bg: "g" }, ${sh({ bend: 0.02, bendFrom: 4 })})
+scene("l", { w: 80, h: 50, bg: "g" }, ${sh({ bend: [[4, 0.02]] })})`, "t.px.js");
+  assert.equal(keys(p, "l"), keys(p, "f"));
+  assert.match(keys(p, "l"), /k/);
+  // an S: right from here, straight from 30 m, left from 60, straight from 90: heading back to 0, 36 m to the side
+  const S: [number, number][] = [[0, 0.02], [30, 0], [60, -0.02], [90, 0]], e = 1e-6, slope = (z: number) => (side(S, 0, z + e) - side(S, 0, z - e)) / (2 * e);
+  for (const j of [30, 60, 90]) { near([side(S, 0, j - 1e-9)], [side(S, 0, j + 1e-9)]); near([slope(j - 1e-3)], [slope(j + 1e-3)], 1e-4); }
+  near([slope(45), slope(120), side(S, 0, 120)], [0.6, 0, 36]);
+  const P = perspective({ ...view, bend: S });
+  for (const [x, z] of [[-2, 6], [1, 29], [0.5, 31], [3, 61], [2, 95]]) { const [c, r] = P.ground(x, z); near(P.at(c - 0.5, r - 0.5), [x, z]); }
+  for (const bad of ["[[5, 0.01], [3, 0.02]]", "[[-1, 0.01]]", `[[0, "x"]]`, "[0.01]"])
+    assert.match(failure(PAL + `perspective({ ...${JSON.stringify(view)}, bend: ${bad} })`).message, /bend by sections is \[\[z, k\], \.\.\.\].*each z 0 or more and ascending/);
+  assert.match(failure(PAL + `perspective({ ...${JSON.stringify(view)}, bend: [[0, 0.01]], bendFrom: 20 })`).message, /with sections put the start in the list/);
 });
 
 test("terrain: flat land paints what plane does; a hill rises over the horizon; the rest is sky", () => {

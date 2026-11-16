@@ -1377,6 +1377,11 @@ one), and the art code itself (4% of the cost).
   ground, every prop and every shadow through it by hand. Now `bendFrom: m` on the camera: straight up
   to it, `bend·(z − bendFrom)²/2` past it, followed as `bend` is (one function, `side()`, works it out).
   Left out: a bend that ends, one that changes along the way (a new camera each frame).
+- [x] **A bend that ends, an S**: with one `bendFrom` camera a cab went round the same bend for ever, the
+  sun standing still. Now `bend` also takes sections, `[[z0, k0], [z1, k1], ...]`, the curvature from
+  each z ahead to the next, heading and place running on at the joints (`side()` again, so all that
+  follows `bend` follows them). A camera driving a road laid out once takes the sections not yet behind
+  it and turns by the heading: two lines of art, so no helper (written both ways, the same pixels).
 - [x] **A mesh op**: the cockpit (`examples/perspective/cockpit.px.js`) is modelled in 3D and carried
   its own renderer, `render3d`: flat faces in meters through the road's camera, the nearest face kept
   per pixel, each face toned along its material's ramp by how it lies to the light, an outline where a

@@ -11,9 +11,11 @@
 // world { horizon, eye }, which sets px per meter by row, with the sideways half added.
 // With a `bend`, the ground is a way that curves: its z lines bend to the right (left if negative),
 // a point z m along it sitting bend·z²/2 m to the side (with `bendFrom`, straight up to that many m and
-// bend·(z − bendFrom)²/2 past it: side() alone works it out), so ground(), at() and scale() take and give
-// places on the way, and everything drawn through the camera follows the bend (plane, solids,
-// shadows, mesh, terrain). Directions (toward, ray, vanish) don't bend: the far things stay put.
+// bend·(z − bendFrom)²/2 past it; by sections [[z0, k0], ...], each curvature from its z to the next, the
+// heading and the place running on at the joints: side() alone works it out), so ground(), at() and
+// scale() take and give places on the way, and everything drawn through the camera follows the bend
+// (plane, solids, shadows, mesh, terrain). Directions (toward, ray, vanish) don't bend: the far things
+// stay put.
 import { PxError } from "./errors.ts";
 
 export interface View {
@@ -37,16 +39,27 @@ export interface View {
   yaw?: number;
   /** Degrees the camera is tilted up, down if negative (default 0): three-point perspective. */
   pitch?: number;
-  /** The way's curvature (1/m): a point z m along sits bend·z²/2 m to the right (left if negative); default 0. */
-  bend?: number;
+  /**
+   * The way's curvature (1/m): a point z m along sits bend·z²/2 m to the right (left if negative); default 0. Or by
+   * sections, [[z0, k0], [z1, k1], ...]: k from each z m ahead (0 or more, ascending) up to the next, straight before the first.
+   */
+  bend?: number | [number, number][];
   /** m the way runs straight before it bends (with a bend): a point z m along sits bend·max(0, z − bendFrom)²/2 m to the side; default 0. */
   bendFrom?: number;
 }
 
-/** How far the way z m along sits to the side of straight: bend·z²/2, or straight up to `from` m and bending past it. */
-export const side = (bend: number, from: number, z: number): number => {
-  const d = from ? Math.max(0, z - from) : z;
-  return (bend * d * d) / 2;
+/**
+ * How far the way z m along sits to the side of straight: bend·z²/2, or straight up to `from` m and bending past it;
+ * by sections, each one's curvature summed twice from the camera, k·d²/2 on the place and the slope it had at its start.
+ */
+export const side = (bend: number | [number, number][], from: number, z: number): number => {
+  if (typeof bend === "number") { const d = from ? Math.max(0, z - from) : z; return (bend * d * d) / 2; }
+  let off = 0, slope = 0;
+  for (let i = 0; i < bend.length && z > bend[i][0]; i++) {
+    const d = Math.min(z, bend[i + 1]?.[0] ?? z) - bend[i][0], k = bend[i][1];
+    off += slope * d + (k * d * d) / 2; slope += k * d;
+  }
+  return off;
 };
 
 export interface Perspective extends Required<Omit<View, "fov" | "h" | "ppm">> {
@@ -93,9 +106,12 @@ export function perspective(v: View): Perspective {
     dist = ppm !== undefined ? f / ppm : v.eye / Math.sin(-p * rad);
     v = { ...v, horizon: v.h / 2 + f * Math.tan(p * rad), eye: ppm !== undefined ? dist * Math.sin(-p * rad) : v.eye };
   }
-  const num = (k: keyof View) => v[k] === undefined || Number.isFinite(v[k]);
-  if (!(v && Number.isFinite(v.w) && v.w > 0 && Number.isFinite(v.horizon) && v.eye > 0 && num("fov") && num("focal") && num("vp") && num("yaw") && num("pitch") && num("bend")))
-    throw new PxError(`perspective: { w, horizon, eye } (width in px, the horizon's row, the eye's height in m; or { w, h, pitch, ppm }, looking down at the picture's middle), and fov (degrees) or focal (px), vp (the column looked at), yaw (degrees turned right), pitch (degrees tilted up), bend (the way's curvature, 1/m); got ${JSON.stringify(v)}`);
+  const num = (k: keyof View) => v[k] === undefined || Number.isFinite(v[k]), list = Array.isArray(v?.bend);
+  if (!(v && Number.isFinite(v.w) && v.w > 0 && Number.isFinite(v.horizon) && v.eye > 0 && num("fov") && num("focal") && num("vp") && num("yaw") && num("pitch") && (num("bend") || list)))
+    throw new PxError(`perspective: { w, horizon, eye } (width in px, the horizon's row, the eye's height in m; or { w, h, pitch, ppm }, looking down at the picture's middle), and fov (degrees) or focal (px), vp (the column looked at), yaw (degrees turned right), pitch (degrees tilted up), bend (the way's curvature, 1/m, or by sections [[z, k], ...]); got ${JSON.stringify(v)}`);
+  if (list && !(v.bend as unknown[]).every((s, i, a) => Array.isArray(s) && s.length === 2 && s.every(Number.isFinite) && (i ? s[0] > (a[i - 1] as number[])[0] : s[0] >= 0)))
+    throw new PxError(`perspective: bend by sections is [[z, k], ...]: the way's curvature k (1/m) from z m ahead up to the next z, straight before the first, each z 0 or more and ascending (a right bend now, straight from 30 m, a left one from 60: [[0, 0.02], [30, 0], [60, -0.02]]); got ${JSON.stringify(v.bend)}`);
+  if (list && v.bendFrom) throw new PxError(`perspective: bendFrom is where one bend starts; with sections put the start in the list (straight up to 20 m: bend: [[20, 0.02]]), got bendFrom ${JSON.stringify(v.bendFrom)} with bend ${JSON.stringify(v.bend)}`);
   if (v.fov !== undefined && !(v.fov > 0 && v.fov < 180)) throw new PxError(`perspective: fov is the field of view across the picture, between 0 and 180 degrees, got ${v.fov}`);
   if (v.pitch !== undefined && !(Math.abs(v.pitch) < 90)) throw new PxError(`perspective: pitch is how far the camera tilts up (down if negative), between -90 and 90 degrees, got ${v.pitch}`);
   if (v.bendFrom !== undefined && v.bend === undefined) throw new PxError(`perspective: bendFrom is where a bend starts (the way straight up to that many m): give the bend too, { bend, bendFrom } (its curvature, 1/m), got bendFrom ${v.bendFrom} alone`);

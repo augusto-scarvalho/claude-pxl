@@ -276,6 +276,10 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   and bending up ahead: `bendFrom: z`, the way straight for z m and bending from there. A bend that
   changes as you go is a new camera each frame, and the heading turns with it: the far things
   (the sun, the ranges) slide across by `focal · heading` px (`examples/perspective/race.px.js`).
+  A bend that ends, or an S: `bend: [[z0, k0], [z1, k1], ...]`, the curvature from each z m ahead to
+  the next (`[[0, 0.02], [30, 0], [60, -0.02]]`). Through a road laid out once by its sections, a
+  camera each frame takes those not yet behind it, `[max(0, si − s), ki]` s m along, and the sun and
+  the far things turn by its heading, the sum of k · the length of each behind it (reference: perspective).
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
   `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:
   each is lit or in shade by which way it faces the sun. People walking in such a scene: pose a body
