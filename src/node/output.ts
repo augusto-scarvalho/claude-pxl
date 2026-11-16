@@ -155,7 +155,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         // 16,777,216 px an image holds once scaled (a long anim's strip) is left out and said, its GIF still written
         const s = opts.share, drawn = def.kind === "anim" ? p.drawn(n) : [], art = drawn.length ? packSheet(drawn.map((f, i) => ({ name: `${n}_${i}`, img: f.img })), drawn.length).sheet : b.img;
         if (art.w * art.h * s * s <= 16_777_216) writePng(join(out, "share", n + ".png"), art.scale(s));
-        else info += ` -- share/${n}.png not written: ${drawn.length ? `its ${drawn.length} frames in one strip` : "it"} at ${s}x would be ${art.w * s}x${art.h * s} px, past the 16,777,216 an image holds${frames.length ? `; share/${n}.gif written` : ""}`;
+        else info += ` -- share/${n}.png not written: ${drawn.length ? `its ${drawn.length} frames in one strip` : "it"} at ${s}x would be ${art.w * s}x${art.h * s} px, past the 16,777,216 an image holds${frames.length ? `; share/${n}.gif written, ${frames[0].img.w * s}x${frames[0].img.h * s}` : ""}`;
         if (frames.length) write(join(out, "share", n + ".gif"), encodeGif(frames.map((f) => ({ img: f.img.scale(s), ms: f.ms }))));
       }
       if (def.opts.layers) for (const l of b.layers) writePng(join(out, dir, n, l.name + ".png"), l.img);

@@ -80,7 +80,7 @@ declare global {
   /** bubble(): the box a 9-slice `panel`, its `tail` down to the point (its top rows over the panel's bottom border), a `rule` under the title, the prompt `more` (an anim at frame `t`); `side` 1 right of the point, -1 left; its pixel `unit` of the art's (0.75); `pad` px in to the words (7). */
   interface PxBubble { panel: string; tail?: string; rule?: string; more?: string; font?: string; color?: PxColor | [PxColor, PxColor]; side?: number; t?: number; unit?: number; pad?: number }
   interface PxAssetOpts {
-    w?: number; h?: number; base?: string; mx?: boolean | "c"; my?: boolean | "c";
+    w?: number; h?: number; base?: string; /** with an anim as `base`: that frame of it (from 0), a still (without it the sprite plays the anim) */ frame?: number; mx?: boolean | "c"; my?: boolean | "c";
     /** Recolor after drawing; with a `base` from another file its keys are read in the base's palette, the new colors in yours. */
     swap?: Record<string, PxColor>;
     flip?: "x" | "y" | "xy"; rot?: 90 | 180 | 270; angle?: number; rotate?: "auto" | "rotsprite" | "shear" | "nearest"; outline?: PxColor; outline8?: PxColor; /** a line all round outside, each part in its own, one geometry every side: [ramps] dark to light, the first key the line away from the light, the second facing it, the rest the fill; an L's elbow takes the fill */ ink?: (string | string[])[]; crop?: boolean; layers?: boolean;
@@ -136,7 +136,7 @@ declare global {
     ground?: number | number[] | number[][];
   }
   /** A scene takes the transforms, outlines, crop, layers, pivot and wrap; what starts from or labels a drawing is for sprites and anims. */
-  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "png" | "normals" | "area" | "key" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register" | "genre"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number }; /** rules on its placements, run by pxl check and fixed by --fix */ expect?: PxRule2d[];
+  interface PxSceneOpts extends Omit<PxAssetOpts, "base" | "frame" | "png" | "normals" | "area" | "key" | "palettize" | "shrink" | "slice" | "sockets" | "facing" | "height" | "twin" | "register" | "genre"> { w: number; h: number; bg?: PxColor; world?: PxWorld; /** a clock of its own: its functions read it (c.t, c.frame), what it stamps joins it */ frames?: number; fps?: number; /** false: check skips it (an HD render of a scene checked at its own size); { every: n } checks one frame in n (a long story) */ check?: boolean | { every: number }; /** rules on its placements, run by pxl check and fixed by --fix */ expect?: PxRule2d[];
     /** px to an art pixel (w and h the picture's): mesh(), the 3D ops, meshSocket() and post() draw that many times as big */
     pixel?: number;
     /** the same scene k times as big under other names, not checked ({ name_hd: 4 }); post() runs only there */
@@ -159,7 +159,7 @@ declare global {
     /** y moves when the target lands on another height, not while it jumps (default true); with no third value, standing is y still `settle` frames (default 3) */
     snap?: boolean; settle?: number;
   }
-  interface PxAnimOpts extends PxAssetOpts { fps?: number; frames?: number; /** a frame's ms instead of fps, or each frame's (as many frames) */ ms?: number | number[]; loop?: boolean; dir?: "forward" | "reverse" | "pingpong"; /** checked as a scene (c.as() names what its functions paint) */ world?: PxWorld; check?: boolean | { every: number }; camera?: PxCamera }
+  interface PxAnimOpts extends Omit<PxAssetOpts, "frame"> { fps?: number; frames?: number; /** a frame's ms instead of fps, or each frame's (as many frames) */ ms?: number | number[]; loop?: boolean; dir?: "forward" | "reverse" | "pingpong"; /** checked as a scene (c.as() names what its functions paint) */ world?: PxWorld; check?: boolean | { every: number }; camera?: PxCamera }
   interface PxFrame { ms?: number; hold?: number }
   interface PxCard {
     is: string;

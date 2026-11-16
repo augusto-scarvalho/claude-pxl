@@ -283,7 +283,7 @@ with a `world` (and `check`) is checked as a scene (functions naming what they p
 | Option | Meaning |
 |---|---|
 | `w, h` | Canvas size. Sprites infer it from grid strings (including grids inside layers) when omitted; scenes require it. |
-| `base: "name"` | Start from a copy of another asset (variant). Overlay coordinates are the base's final coordinates (outline included). An anim made from an anim, with no `frame()` of its own, plays as its base: its frames, each as long as the base's (100/50/150 ms stay so), its loop, `dir` and pivot, unless it gives `fps` or `ms`: `anim("hero_red", { base: "hero_walk", swap: { b: "r" } })`. |
+| `base: "name"` | Start from a copy of another asset (variant). Overlay coordinates are the base's final coordinates (outline included). An anim made from an anim, with no `frame()` of its own, plays as its base: its frames, each as long as the base's (100/50/150 ms stay so), its loop, `dir` and pivot, unless it gives `fps` or `ms`: `anim("hero_red", { base: "hero_walk", swap: { b: "r" } })`. A sprite made from an anim plays it too; `frame: n` makes it that frame (from 0), a still, before its own options: `sprite("hero", { base: "hero_idle", frame: 0 })`. |
 | `bg` | Scene background color. |
 | `mx: true` | Mirror the left half onto the right after all items. Inferred width doubles (write half a row). `mx: "c"`: odd width, shared center column. `my` likewise vertically. |
 | `swap: { g: "r" }` | Recolor after drawing. With a `base` from another file, its keys are that file's (the base's palette), the new colors yours. |

@@ -1,6 +1,6 @@
 // Turns an asset definition into an image: base -> items (ops, grids, functions, layers)
 // -> post-processing (mirror, swap, flip, rot, outline, crop). Optionally traced.
-import { Canvas, FACING, type Placed, type Placement, type Resolver, betweenKey } from "./canvas.ts";
+import { Canvas, FACING, type Placed, type Placement, type Resolver, betweenKey, frameStart } from "./canvas.ts";
 import { type Color, MIXES, TRANSPARENT, oklab, pack, toHex } from "./color.ts";
 import { PxError, wrap } from "./errors.ts";
 import { Img, type Lamp, mapPoints, moveBoxes } from "./image.ts";
@@ -138,6 +138,15 @@ export function drawnFrames(tl: Timeline): number {
   return tl.order ? Math.max(...tl.order) + 1 : tl.durations!.length;
 }
 
+/** A sprite's `frame: n` of the anim its base names: when that frame starts in it. */
+function frameOf(ctx: BuildCtx, base: string, seed: number, n: unknown): number {
+  const tl = ctx.timeline(base, seed);
+  if (!tl?.durations) throw new PxError(`frame ${fmtArgs([n])}: base '${base}' is ${tl ? "animated by what it places" : "still"}, not an anim (frame takes one of an anim's frames)`);
+  const count = drawnFrames(tl);
+  if (!Number.isInteger(n) || (n as number) < 0 || (n as number) >= count) throw new PxError(`frame ${fmtArgs([n])} of '${base}': its frames are 0 to ${count - 1}`);
+  return frameStart(tl, n as number);
+}
+
 /** Index of the frame showing at time t. */
 export function frameAt(tl: Timeline, t: number): number {
   const d = tl.durations!;
@@ -254,7 +263,9 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
       if (bg !== null) base.fill(bg);
     }
   } else if (opts.base) {
-    base = def.mirror ? ctx.image(opts.base, seed, t).flip("x") : ctx.image(opts.base, seed, t).copy();
+    // frame: n, that frame of the anim it names, a still (without it, a sprite made from an anim plays it)
+    const from = opts.frame === undefined ? ctx.image(opts.base, seed, t) : ctx.image(opts.base, seed, frameOf(ctx, opts.base, seed, opts.frame), false);
+    base = def.mirror ? from.flip("x") : from.copy();
     // a finer drawing (a 3D draft drawn k times over) brought down to its own pixels, its blocks lined up on its pivot
     // (where a render's origin lands: drawn at 1x, on a pixel's corner) and its pivot with it
     if (opts.shrink !== undefined) {

@@ -77,6 +77,8 @@ export interface AssetOpts {
   w?: number;
   h?: number;
   base?: string;
+  /** sprite: with a `base` that is an anim, that frame of it (from 0), a still. */
+  frame?: number;
   mx?: boolean | "c";
   my?: boolean | "c";
   swap?: Record<string, string>;

@@ -1075,12 +1075,12 @@ anim("blink", { w: 2, h: 1, frames: 2, fps: 4 }, (c) => c.px(c.frame, 0, "g"))`)
   assert.match(said.join("\n"), /--share is a whole number/);
 });
 
-test("build --share N: an anim whose strip is past an image's size once scaled writes its GIF and says the PNG it left out", async () => {
+test("build --share N: an anim whose strip is past an image's size once scaled writes its GIF (its size said, not read as the preview's @Nx) and says the PNG it left out", async () => {
   const { dir, file } = tmpArt(`pal({ g: "#8ccf63" }); anim("blink", { w: 1, h: 1, frames: 2, fps: 4 }, (c) => { if (c.frame) c.px(0, 0, "g") })`);
   const log = console.log, lines: string[] = [];
   console.log = (s: string) => lines.push(String(s));
   try { assert.equal(await main(["build", file, "--share", "2897", "--no-preview"]), 0); } finally { console.log = log; }
-  assert.match(lines.join("\n"), /^anim blink 1x1 \(2 frames, 500ms\) -- share\/blink\.png not written: its 2 frames in one strip at 2897x would be 5794x2897 px, past the 16,777,216 an image holds; share\/blink\.gif written$/m);
+  assert.match(lines.join("\n"), /^anim blink 1x1 \(2 frames, 500ms\) -- share\/blink\.png not written: its 2 frames in one strip at 2897x would be 5794x2897 px, past the 16,777,216 an image holds; share\/blink\.gif written, 2897x2897$/m);
   assert.ok(existsSync(join(dir, "out", "share", "blink.gif")) && !existsSync(join(dir, "out", "share", "blink.png")));
 });
 

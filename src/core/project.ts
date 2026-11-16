@@ -167,7 +167,7 @@ export const OP_OPTS: Record<string, string[]> = {
 };
 
 export const ASSET_OPTS: Record<AssetKind, string[]> = {
-  sprite: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "ink", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "frozen", "normals", "area", "key", "palettize", "shrink", "facing", "height", "twin", "register", "genre", "category"],
+  sprite: ["w", "h", "base", "frame", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "ink", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "frozen", "normals", "area", "key", "palettize", "shrink", "facing", "height", "twin", "register", "genre", "category"],
   scene: ["w", "h", "bg", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "inline", "selout", "floor", "crop", "layers", "pivot", "wrap", "world", "frames", "fps", "check", "expect", "pixel", "sizes", "camera"],
   anim: ["w", "h", "base", "mx", "my", "swap", "flip", "rot", "angle", "rotate", "outline", "outline8", "ink", "inline", "selout", "caps", "floor", "aa", "crop", "layers", "pivot", "sockets", "wrap", "slice", "png", "normals", "area", "key", "palettize", "shrink", "fps", "frames", "ms", "loop", "dir", "facing", "height", "twin", "register", "world", "check", "genre", "category", "camera"],
 };
@@ -662,6 +662,7 @@ export class Project implements BuildCtx {
       if (opts.category !== undefined && (typeof opts.category !== "string" || !/^\w+$/.test(opts.category) || opts.genre === undefined)) throw new PxError(`${kind} '${name}': category is what it is by its genre's ink, a key of it (character, tree, prop), beside genre: pxl check reads its edge by that key, got ${JSON.stringify(opts.category)}${opts.genre === undefined ? " and no genre" : ""}`, loc);
       if (opts.expect !== undefined) try { checkExpect(opts.expect, opts.world); } catch (e) { throw wrap(e).within(`${kind} '${name}'`, loc); }
       if (opts.normals !== undefined && opts.png === undefined) throw new PxError(`${kind} '${name}': normals is the normal map of its png: give png too`, loc);
+      if (opts.frame !== undefined && opts.base === undefined) throw new PxError(`${kind} '${name}': frame ${JSON.stringify(opts.frame)} is a frame of the anim its base names: give base too`, loc);
       // frozen: a render of another asset kept as its PNG (the build reads it; check renders the live one); none yet, that one's image, written by the build
       let frozen = {};
       if (opts.frozen !== undefined) {
@@ -1567,7 +1568,7 @@ export class Project implements BuildCtx {
       if (typeof name !== "string" || !name || !isPlainObject(opts)) throw new PxError('rig("name", { w, h, facing, slots: { torso: { at, size }, ... } }, ...retouch items)', loc);
       const { slots, guide = true, parts, light, turn, far, ...rest } = opts as Record<string, unknown>;
       const rig = readRig(name, rest.facing, slots, parts, light, far, loc);
-      checkKeys(`rig '${name}'`, rest, ASSET_OPTS.sprite.filter((k) => !["base", "png", "normals", "area", "key", "palettize", "shrink", "flip", "rot", "angle", "mx", "my"].includes(k)), loc);
+      checkKeys(`rig '${name}'`, rest, ASSET_OPTS.sprite.filter((k) => !["base", "frame", "png", "normals", "area", "key", "palettize", "shrink", "flip", "rot", "angle", "mx", "my"].includes(k)), loc);
       const layer = (n: string, o: LayerOpts, items: Item[]): Layer => ({ __layer: true, name: n, opts: o, items, loc });
       const stampOp = (...args: unknown[]): Op => ({ __op: true, name: "stamp", args, loc });
       // the retouch is a sprite of its own, the rig's size, so a turned rig can stamp it mirrored

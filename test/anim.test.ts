@@ -378,6 +378,18 @@ anim("pq", { base: "pp", swap: { r: "g" } })`, "t.px.js");
   assert.equal(q.drawn("pq").length, 3);
 });
 
+test("a sprite with an anim as base: frame: n is that frame, a still, then its own options; without frame it plays the anim", () => {
+  const p = loadSource(PAL + `anim("a", { w: 3, h: 1, frames: 3, fps: 10, dir: "pingpong" }, (c) => c.px(c.frame, 0, "r"))
+sprite("whole", { base: "a" })
+sprite("two", { base: "a", frame: 2, swap: { r: "g" }, flip: "x" })`, "t.px.js");
+  assert.equal(keys(p, "two"), "g..");
+  assert.equal(p.timeline("two"), undefined, "a still");
+  assert.equal(p.timeline("whole")!.loop, 400, "without frame: the anim, playing");
+  assert.match(failure(PAL + `anim("a", { w: 1, h: 1, frames: 3 }, "r")\nsprite("s", { base: "a", frame: 3 })`, "s").message, /sprite 's': frame 3 of 'a': its frames are 0 to 2/);
+  assert.match(failure(PAL + `sprite("t", "r")\nsprite("s", { base: "t", frame: 0 })`, "s").message, /sprite 's': frame 0: base 't' is still, not an anim/);
+  assert.match(failure(PAL + `sprite("s", { frame: 0 }, "r")`).message, /frame 0 is a frame of the anim its base names: give base too/);
+});
+
 test("anim: a loop of many frames longer than all it plays says which loops don't divide (build and check)", async () => {
   const p = loadSource(PAL + `anim("idle", { w: 1, h: 1, frames: 4, ms: 250 }, (c) => c.px(0, 0, "w"))
 anim("walk", { w: 1, h: 1, frames: 8, ms: 110 }, (c) => c.px(0, 0, "r"))
