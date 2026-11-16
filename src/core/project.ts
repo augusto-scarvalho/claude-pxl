@@ -146,9 +146,9 @@ export const OP_OPTS: Record<string, string[]> = {
   glow: ["where", "r", "strength", "color", "bands", "ramp", "keep"],
   post: ["focus", "sharp", "soft", "blur", "bloom", "fog", "vignette", "pixel", "sharpen", "lut", "grain", "palette", "px"],
   terrain: ["far", "top", "bound", "margin", "sky"],
-  // one options object serves both: solids ignores shade and near, shadows ramps and light
-  solids: ["at", "sun", "scale", "ramps", "light", "shade", "near"],
-  shadows: ["at", "sun", "scale", "shade", "ramps", "light", "near"],
+  // one options object serves both: solids ignores shade, near, thin and soft, shadows ramps and light
+  solids: ["at", "sun", "scale", "ramps", "light", "shade", "near", "thin", "soft"],
+  shadows: ["at", "sun", "scale", "shade", "ramps", "light", "near", "thin", "soft"],
   mesh: ["light", "sprites", "pixel", "sun", "sky", "lamps", "emit", "shadows", "ppm", "at", "stand"],
   surface: SURFACE_OPTS,
   voxels: VOXEL_OPTS,

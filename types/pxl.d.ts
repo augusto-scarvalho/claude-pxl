@@ -308,6 +308,10 @@ declare global {
     shade?: Record<string, PxColor>;
     /** shadows(): a shadow reaching past the eye "drop"ped whole (default) or "cut" 0.4 m ahead of the eye, the rest drawn */
     near?: "drop" | "cut";
+    /** shadows(): a stick's shadow under a px wide sampled at the pixels' middles, dashes far off ("dash", default), or a "line" a px wide joined along it */
+    thin?: "dash" | "line";
+    /** shadows(): a soft edge px wide (default 1) round the shadows, each ground color turned into its middle tone by `shade` (keys not in it left) */
+    soft?: { shade: Record<string, PxColor>; px?: number };
   }
   /** A flat face of a model, its corners in meters. */
   interface PxFace { mat: string; pts: PxV3[] }

@@ -1401,6 +1401,18 @@ one), and the art code itself (4% of the cost).
   (one line, every kind of shape) and draws the rest. An option, `"drop"` the default: as the default
   it moves the race's approved frames (109 of 622, 1 to 28 px each: a lamp pole's long shadow across
   the right verge as it comes near), for the owner to look at first.
+- [x] **`shadows()` filled by spans**: it tested every pixel of each shadow's box on the picture, point in
+  polygon (and spread its bounds again at every pixel), 44% of the winter road's build; long thin
+  shadows fill 5% of their boxes. Now each row's crossings of the polygon, sorted, and the pixels
+  between: the same test, the same pixels (every frame of park, race and bend), 18 times as fast for
+  60 long cones in a lab.
+- [x] **A soft edge on `shadows()`**: it took a second call with every caster wider and the sun lower.
+  Now `soft: { shade, px }`: the ground within px of the shadows turned into its middle tone, one call.
+- [x] **A thin stick's shadow kept joined**: far off, a pole's shadow under a px wide broke into dashes.
+  Now `thin: "line"` draws it there as a line a px wide joined along it. An option, `"dash"` the
+  default: as the default it moves the park's approved frames (241 of 309, ~187 px each: the swings'
+  bars and the benches' legs), for the owner to look at first. The lit gaps between shadows still
+  break so.
 - [x] **A mesh op**: the cockpit (`examples/perspective/cockpit.px.js`) is modelled in 3D and carried
   its own renderer, `render3d`: flat faces in meters through the road's camera, the nearest face kept
   per pixel, each face toned along its material's ramp by how it lies to the light, an outline where a

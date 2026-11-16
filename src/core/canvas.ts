@@ -10,7 +10,7 @@ import { type SmokeOpts, drawSmoke, inMeters } from "./smoke.ts";
 import { type Particle, type TrailOpts, drawParticles, drawTrail } from "./vfx.ts";
 import type { Spell } from "./spells.ts";
 import { type Perspective, type View, perspective, scaled, side } from "./perspective.ts";
-import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
+import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids, penumbra } from "./solids.ts";
 import { type SurfaceCanvas, type SurfaceOpts, type SurfaceView, type VoxelOpts, drawSurface, drawVoxels, partIndex } from "./surface.ts";
 import { type VolumeOpts, drawVolume } from "./volume.ts";
 import { type SplatOpts, drawSplats } from "./splats.ts";
@@ -1039,11 +1039,19 @@ export class Canvas {
   shadows(view: Partial<View>, shapes: Solid[], opts: SolidOpts): void {
     if (!opts?.shade || !opts.sun) throw new PxError("shadows(view, shapes, { sun: { from: [x, z], up: degrees }, shade: { ground: shade, ... } }): where the sun is and what each ground color turns into in shade");
     if (opts.near !== undefined && opts.near !== "drop" && opts.near !== "cut") throw new PxError(`shadows(): near is "drop" (a shadow reaching past the eye left out, the default) or "cut" (cut 0.4 m ahead of the eye, the rest drawn), got ${JSON.stringify(opts.near)}`);
-    const w = this.img.w, x0 = -this.ox, y0 = -this.oy;
-    for (const i of castSolids(perspective({ ...view, w: view.w ?? this.img.w } as View), shapes, opts, w, this.img.h, x0, y0)) {
-      const x = (i % w) + x0, y = Math.floor(i / w) + y0, d = opts.shade[this.key(x, y)];
-      if (d) this.px(x, y, d);
-    }
+    if (opts.thin !== undefined && opts.thin !== "dash" && opts.thin !== "line") throw new PxError(`shadows(): thin is "dash" (a stick's shadow under a px wide sampled at the pixels' middles, dashes far off, the default) or "line" (a line a px wide there, joined along it), got ${JSON.stringify(opts.thin)}`);
+    const s = opts.soft;
+    if (s !== undefined && !(s && typeof s === "object" && s.shade && typeof s.shade === "object" && (s.px === undefined || (Number.isInteger(s.px) && s.px > 0))))
+      throw new PxError(`shadows(): soft is { shade: { ground: middle tone, ... }, px? }, a soft edge px wide round the shadows (default 1) in each ground color's middle tone, got ${JSON.stringify(s)}`);
+    const w = this.img.w, h = this.img.h, x0 = -this.ox, y0 = -this.oy, P = perspective({ ...view, w: view.w ?? this.img.w } as View), set = castSolids(P, shapes, opts, w, h, x0, y0);
+    const paint = (pixels: Set<number>, shade: Record<string, string>) => {
+      for (const i of pixels) {
+        const x = (i % w) + x0, y = Math.floor(i / w) + y0, d = shade[this.key(x, y)];
+        if (d) this.px(x, y, d);
+      }
+    };
+    paint(set, opts.shade);
+    if (s) paint(penumbra(set, w, h, s.px ?? 1, Math.max(0, Math.ceil(P.horizon) + 1 - y0)), s.shade);
   }
 
   /** Flat faces in meters (model()) drawn through the camera, the nearest kept per pixel, toned along their material's ramp: see mesh.ts. */

@@ -36,6 +36,10 @@ export interface SolidOpts {
   shade?: Record<string, string>;
   /** a shadow reaching past the eye: "drop" it whole (default) or "cut" it 0.4 m ahead of the eye and draw the rest */
   near?: "drop" | "cut";
+  /** a stick's shadow thinner than a px: sampled at the pixels' middles, dashes far off ("dash", default), or a "line" a px wide joined along it */
+  thin?: "dash" | "line";
+  /** shadows: a soft edge px wide (default 1) round them, each ground color turned into its middle tone by shade */
+  soft?: { shade: Record<string, string>; px?: number };
 }
 export interface SolidCanvas {
   poly(points: number[], c: string): void;
@@ -128,15 +132,37 @@ export function castSolids(P: Perspective, shapes: Solid[], o: SolidOpts, w: num
     });
     if (poly.length < 3) return;
     const sp = poly.map(([x, z]) => S.ground(x - F.ax, z - F.az)), xs = sp.map((p) => p[0]), ys = sp.map((p) => p[1]);
-    for (let y = Math.max(Math.ceil(P.horizon) + 1, Math.floor(Math.min(...ys)), y0); y <= Math.min(y0 + h - 1, Math.ceil(Math.max(...ys))); y++)
-      for (let x = Math.max(x0, Math.floor(Math.min(...xs))); x <= Math.min(x0 + w - 1, Math.ceil(Math.max(...xs))); x++) {
-        let inside = false;
-        for (let i = 0, j = sp.length - 1; i < sp.length; j = i++) {
-          const [xi, yi] = sp[i], [xj, yj] = sp[j];
-          if (yi > y + 0.5 !== yj > y + 0.5 && x + 0.5 < ((xj - xi) * (y + 0.5 - yi)) / (yj - yi) + xi) inside = !inside;
-        }
-        if (inside && !(dapple && latticeHash(x * 7 + y, y * 13 - x) > dapple)) out.add((y - y0) * w + (x - x0));
+    // by spans: a pixel is in when its middle is (even-odd), so each row's crossings of the polygon at the
+    // pixels' middle, sorted, and the pixels from the 1st to the 2nd, the 3rd to the 4th (the same test as one per pixel)
+    const lo = Math.max(x0, Math.floor(Math.min(...xs))), hi = Math.min(x0 + w - 1, Math.ceil(Math.max(...xs))), cs: number[] = [];
+    for (let y = Math.max(Math.ceil(P.horizon) + 1, Math.floor(Math.min(...ys)), y0); y <= Math.min(y0 + h - 1, Math.ceil(Math.max(...ys))); y++) {
+      cs.length = 0;
+      for (let i = 0, j = sp.length - 1; i < sp.length; j = i++) {
+        const [xi, yi] = sp[i], [xj, yj] = sp[j];
+        if (yi > y + 0.5 !== yj > y + 0.5) cs.push(((xj - xi) * (y + 0.5 - yi)) / (yj - yi) + xi);
       }
+      cs.sort((a, b) => a - b);
+      for (let k = 0; k + 1 < cs.length; k += 2)
+        for (let x = Math.max(lo, Math.floor(cs[k] - 0.5)); x <= hi && x + 0.5 < cs[k + 1]; x++)
+          if (x + 0.5 >= cs[k] && !(dapple && latticeHash(x * 7 + y, y * 13 - x) > dapple)) out.add((y - y0) * w + (x - x0));
+    }
+  };
+  // a stick's shadow (A to B, n its half width across) thinner than a px where it lies, whose middles miss most
+  // rows (dashes): a line a px wide there, joined along it, as solids() draws a far pole; its part 0.4 m or more ahead
+  const joined = (A: number[], B: number[], nx: number, nz: number) => {
+    const a = F.ahead(A[0], A[1]) - 0.4, b = F.ahead(B[0], B[1]) - 0.4;
+    if (a < 0 && b < 0) return;
+    const g = (t: number, f = 0) => S.ground(A[0] + (B[0] - A[0]) * t + nx * f - F.ax, A[1] + (B[1] - A[1]) * t + nz * f - F.az);
+    const t0 = a < 0 ? a / (a - b) : 0, t1 = b < 0 ? a / (a - b) : 1, [c0, r0] = g(t0), [c1, r1] = g(t1), dc = c1 - c0, dr = r1 - r0, l = Math.hypot(dc, dr) || 1;
+    // its width on the picture across the line, read off a hundredth of it either side (so the probe stays ahead of the eye)
+    const wide = (t: number) => { const [e, f] = g(t, 0.01), [m, k] = g(t, -0.01); return (Math.abs((e - m) * dr - (f - k) * dc) * 100) / l; };
+    const w0 = wide(t0), w1 = wide(t1), n = Math.ceil(Math.max(Math.abs(dc), Math.abs(dr)));
+    if (w0 >= 1 && w1 >= 1) return;
+    // a px at most a step, so the pixels touch; the width goes linearly between the ends' (two straight edges)
+    for (let i = 0; i <= n; i++) {
+      const t = n ? i / n : 0, x = Math.floor(c0 + dc * t), y = Math.floor(r0 + dr * t);
+      if (w0 + (w1 - w0) * t < 1 && y > Math.ceil(P.horizon) && y >= y0 && y < y0 + h && x >= x0 && x < x0 + w) out.add((y - y0) * w + (x - x0));
+    }
   };
   for (const q of shapes) {
     if (q.noShadow) continue;
@@ -160,7 +186,22 @@ export function castSolids(P: Perspective, shapes: Solid[], o: SolidOpts, w: num
     }
     if (!q.a || !q.b || (q.half ?? 0) < 0.012) continue;
     const A = drop(q.a), B = drop(q.b), half = q.half!, dx = B[0] - A[0], dz = B[1] - A[1], len = Math.hypot(dx, dz) || 1, nx = (-dz / len) * half, nz = (dx / len) * half;
-    fill(len < 0.02 ? [[A[0] - half, A[1] - half], [A[0] + half, A[1] - half], [A[0] + half, A[1] + half], [A[0] - half, A[1] + half]] : [[A[0] + nx, A[1] + nz], [B[0] + nx, B[1] + nz], [B[0] - nx, B[1] - nz], [A[0] - nx, A[1] - nz]]);
+    const quad = len < 0.02 ? [[A[0] - half, A[1] - half], [A[0] + half, A[1] - half], [A[0] + half, A[1] + half], [A[0] - half, A[1] + half]] : [[A[0] + nx, A[1] + nz], [B[0] + nx, B[1] + nz], [B[0] - nx, B[1] - nz], [A[0] - nx, A[1] - nz]];
+    fill(quad);
+    if (o.thin === "line" && len >= 0.02 && (o.near === "cut" || !quad.some(([x, z]) => F.ahead(x, z) < 0.4))) joined(A, B, nx, nz);
+  }
+  return out;
+}
+
+/** The ground pixels (rows from `top`) within px of castSolids()' shadows and not in them: their soft edge. */
+export function penumbra(set: Set<number>, w: number, h: number, px: number, top: number): Set<number> {
+  const out = new Set<number>();
+  for (const i of set) {
+    const x = i % w, y = (i - x) / w;
+    for (let dy = -px; dy <= px; dy++) for (let dx = -px; dx <= px; dx++) {
+      const X = x + dx, Y = y + dy, j = Y * w + X;
+      if (dx * dx + dy * dy <= px * px && X >= 0 && X < w && Y >= top && Y < h && !set.has(j)) out.add(j);
+    }
   }
   return out;
 }

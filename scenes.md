@@ -582,7 +582,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   In true perspective, things built of `solid` shapes cast with `shadows()` instead: each shape
   swept away from the sun in meters, so the shadow foreshortens with the ground. With a low sun ahead
   a shadow that reaches past the eye is left out whole, vanishing as its thing comes near: `near: "cut"`
-  draws the part ahead of the eye instead, to the picture's bottom.
+  draws the part ahead of the eye instead, to the picture's bottom. `soft: { shade }` gives the shadows
+  a soft edge a px wide in a middle tone (snow to a pale blue-grey, in one call); `thin: "line"` keeps a
+  far pole's shadow a joined line instead of dashes.
 - Effects that give light or take none (sparks, smears, glows, flames drawn as shapes) go on a layer
   with `unlit: true`: describe doesn't read a lit side off them (a white smear with a gray rim
   reads as a thing lit from that side).

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { art, failure, keys, PAL } from "./helpers.ts";
 import { perspective, road, side } from "../src/core/perspective.ts";
 import { bayer, fbm, latticeHash, seamless, vec, vnoise } from "../src/core/util.ts";
@@ -891,6 +892,52 @@ test(`shadows near: "cut": a shadow reaching past the eye, of every kind of shap
   assert.match(sh(short), /k/);
   assert.equal(sh(short, `, near: "cut"`), sh(short));
   assert.match(failure(PAL + `scene("s", { w: 8, h: 8 }, shadows(${V}, [], { sun: { from: [0, 1], up: 15 }, shade: {}, near: true }))`, "s").message, /near is "drop" .* or "cut" .*got true/);
+});
+
+test("shadows filled a row at a time between their edges: every kind of shape, a dappled crown, cut at the eye, the pixels a test per pixel gave", () => {
+  const V = JSON.stringify({ w: 64, horizon: 12, eye: 2, fov: 80 });
+  const p = loadSource(PAL + `const shapes = [solid.cone([-3, 9, 0], 1, [-3, 9, 6], 0, "r"), solid.blob([3, 14, 3], 1.5, 1.2, "r", { dapple: 0.6 }), solid.box([0.5, 6, 2, 7, 0, 2.5], {}),
+  solid.stick([-1, 20, 0], [0.5, 21, 4], 0.15, "r"), solid.poly([[4, 5, 0], [6, 5, 0], [5, 6, 3]], "r"), solid.stick([-6, 3, 0], [-6, 3, 3], 0.2, "r")]
+scene("s", { w: 64, h: 40, bg: "g" }, shadows(${V}, shapes, { sun: { from: [0.4, 1], up: 18 }, shade: { g: "k" }, near: "cut" }))`, "t.px.js");
+  // the keys' sha1 as the point-in-polygon test per pixel of each shadow's box drew them (fa79961): 539 px in shade
+  assert.equal(createHash("sha1").update(keys(p, "s")).digest("hex"), "ca8a80832becaa6db7e1b735fcc79605529feb65");
+});
+
+test(`shadows soft: a soft edge a px wide round them in each ground color's middle tone, on the lit ground beside a shadow and nowhere else; the shadow as without it`, () => {
+  const V = JSON.stringify({ w: 80, horizon: 20, eye: 2, fov: 90 });
+  const sh = (o = "") => keys(loadSource(PAL + `scene("s", { w: 80, h: 50, bg: "g" }, shadows(${V}, [solid.box([2, 9, 4, 11, 0, 1.5], {}), solid.cone([-3, 12, 0], 1, [-3, 12, 4], 0, "r")], { sun: { from: [-1, 0.3], up: 30 }, shade: { g: "k" }${o} }))`, "t.px.js"), "s");
+  const soft = sh(`, soft: { shade: { g: "w" } }`), rows = soft.split("\n");
+  assert.equal(soft.replaceAll("w", "g"), sh());
+  assert.match(soft, /w/);
+  for (let y = 21; y < 50; y++) for (let x = 0; x < 80; x++)
+    if (rows[y][x] !== "k") assert.equal(rows[y][x] === "w", [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => rows[y + dy]?.[x + dx] === "k"), `${x},${y}`);
+  assert.match(failure(PAL + `scene("s", { w: 8, h: 8 }, shadows(${V}, [], { sun: { from: [0, 1], up: 15 }, shade: {}, soft: { px: 1 } }))`, "s").message, /soft is \{ shade: .*got \{"px":1\}/);
+});
+
+test(`shadows thin: "line": a far pole's shadow under a px wide drawn as a line a px wide, joined along it, over the dashes its middles give`, () => {
+  const V = JSON.stringify({ w: 80, horizon: 20, eye: 2, fov: 90 });
+  const sh = (o = "") => keys(loadSource(PAL + `scene("s", { w: 80, h: 50, bg: "g" }, shadows(${V}, [solid.stick([-4, 6, 0], [-4, 6, 3], 0.05, "r")], { sun: { from: [-1, -1.5], up: 10 }, shade: { g: "k" }${o} }))`, "t.px.js"), "s");
+  // the shade's pixels in pieces that touch (a side or a corner)
+  const pieces = (s: string) => {
+    const rows = s.split("\n"), seen = new Set<number>();
+    let n = 0;
+    for (let i = 0; i < 80 * 50; i++) {
+      if (rows[Math.floor(i / 80)][i % 80] !== "k" || seen.has(i)) continue;
+      n++;
+      for (const st = [i]; st.length; ) {
+        const j = st.pop()!, x = j % 80, y = Math.floor(j / 80);
+        if (seen.has(j) || rows[y]?.[x] !== "k") continue;
+        seen.add(j);
+        for (const d of [-81, -80, -79, -1, 1, 79, 80, 81]) if (Math.abs(((j + d) % 80) - x) <= 1) st.push(j + d);
+      }
+    }
+    return n;
+  };
+  const dash = sh(), line = sh(`, thin: "line"`);
+  assert.ok(pieces(dash) > 1, "dashes by default");
+  assert.equal(pieces(line), 1, "one line");
+  assert.ok([...dash].every((c, i) => c !== "k" || line[i] === "k") && (line.match(/k/g) ?? []).length > 10);
+  assert.match(failure(PAL + `scene("s", { w: 8, h: 8 }, shadows(${V}, [], { sun: { from: [0, 1], up: 15 }, shade: {}, thin: true }))`, "s").message, /thin is "dash" .* or "line" .*got true/);
 });
 
 test("mesh: the nearest face per pixel, toned along its material's ramp by the light, outlined where it ends in front of another; a camera of one's own", () => {
