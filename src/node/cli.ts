@@ -65,7 +65,8 @@ const USAGE = `pxl — pixel-art DSL
       scenes (what they use from its includes drawn in them); what an included file defines only
       when --only names it, or all of it with --all (a file of includes alone writes theirs). --share N also writes out/share/:
       each asset N times bigger, nearest neighbour, clear kept, no checker or grid (and a GIF when
-      it moves), to post. A whole file of more than 12 assets
+      it moves), to post; an image past 16,777,216 px after the scale (4096x4096; an anim's PNG is its
+      frames in one sheet) fails the build. A whole file of more than 12 assets
       prints a count of what it wrote; --only and --list print a line per asset (size, frames,
       preview scale). --every N: preview GIFs keep one frame in N (a long loop's runs to many MB).
       --aseprite also writes each asset as <name>.aseprite (layers, frames, tag, palette) to keep
@@ -134,7 +135,10 @@ const USAGE = `pxl — pixel-art DSL
       lines of every sprite drawn by hand (grids, runs()), a doubled step or a corner the shape has
       (a line whose steps are nearly all L's is drawn square on purpose: none), and tones side by side
       too close to tell apart. A card()'s cells are checked against how their assets are drawn (a ✎
-      that is the 3D render alone, a ◐ drawn by hand, a ✓ live 3D sprite not frozen). --edges: a LOOK
+      that is the 3D render alone, a ◐ drawn by hand, a ✓ live 3D sprite not frozen). An asset that
+      names a genre() gets the checks the genre lists (ground, footprint; height across a family's
+      directions) and its ink by its category (scenes 18); a frozen cell is held to its live render
+      (a drift is a warning). --edges: a LOOK
       line on every sprite and anim, by hand or over a base (a 3D draft and its pass), naming what a
       reduction leaves at its edges: steps out of order, doubled line, tips, bridges, notches, gaps in
       the line, clipped corners (pxl help edges; shot rings them); on an anim, the holes that open
@@ -221,9 +225,12 @@ const USAGE = `pxl — pixel-art DSL
 Art files may be .js or .ts. Default out dir: <art file dir>/out. A build that took long (a 3D figure's
 frame) is kept on disk under a key of all it reads (pxl's sources, every file the art file loaded, the
 asset, its time and seed), in node_modules/.cache/pxl/builds/ in a checkout, else the temp folder's
-pxl-builds/: the same build in a later command is read back, never stale. --no-cache (any command) or
-PXL_CACHE=0 builds everything. check and build share a file's builds among worker threads where that was
-measured to pay on this machine for that file (PXL_WORKERS=N forces N; 1 makes them all on one thread).`;
+pxl-builds/: the same build in a later command is read back, never stale for art whose every build is a
+function of those files (state a function closes over or a WeakMap holds, pxl can't see: --no-cache).
+--no-cache (any command) or PXL_CACHE=0 builds everything. A big trace of a pure() field marches on
+several threads (PXL_THREADS=N forces N), and check and build share a file's builds among worker threads,
+how many guessed from the machine, then measured for that file (PXL_WORKERS=N forces N; 1 makes them all
+on one thread).`;
 
 interface Args {
   cmd?: string;

@@ -646,8 +646,9 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
   gives a placement's final box at draw time), so `village32` places by numbers and writes the relations as `expect`
   rules; those rules judge a placement's whole drawing (a person south of a road "overlaps" it) and refuse a
   negative gap. A foot option on the rules, and a placement's box readable by its shadow.
-- [ ] **`delay` runs ahead**: reference.md says "start later", but the stamp adds it to the clock (a copy with delay
+- [x] **`delay` runs ahead**: reference.md says "start later", but the stamp adds it to the clock (a copy with delay
   100 shows its frame 1 at t 0), so sway's "delay growing with x" sends a gust from the right. Fix the doc or the sign.
+  Done: the doc. `delay` is said as ahead by `ms`, and sway's line and environment.md say which way a gust then runs.
 - [ ] **`effect("sway")` on lib sprites**: they're cropped close (no room to lean: copied onto wider canvases by
   hand); its `mask` replaces the height weighting; it swings by a sine only. Room by an option, a `tone` mask, a
   `profile(phase)` for a gust that overshoots and settles, and a `lag` for a crown's clumps.

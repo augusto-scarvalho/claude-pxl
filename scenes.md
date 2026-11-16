@@ -1095,7 +1095,7 @@ Start a work from one:
    to look at or clean by hand, each material in the genre's colors for its role (its `roles`, its kit's keys:
    `pxl lib platformer16` shows them), the rest in the builder's, said.
 3. Size each thing from the genre's `scale` × `grid` (the curve, §19): a character `[1.5, 1]` on a
-   16 px grid is 24 px tall. Never size by eye.
+   16 px grid is 24 px tall. Never size by eye, and measure what you drew: no check reads `scale` (`pxl lib draft` alone sizes by it).
 4. Name the genre on what you make (`genre: "hd2d"`), and `pxl check` runs its checks.
 5. Freeze an approved 3D cell (`frozen`), and give the entry a `card()` (reference, under Assets).
 

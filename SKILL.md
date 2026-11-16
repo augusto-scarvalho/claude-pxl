@@ -14,7 +14,7 @@ lists every command and flag.
 1. Start from the closest example or library entry ([below](#examples); `PXL list <file>` maps it: read the lines you
    need) and the template. Given a reference (PNG, GIF; JPEG, WebP or video need ffmpeg):
    `PXL shot ref.gif` shows it, `PXL study ref.gif` reads it (palette, ramps, light, perspective, timing,
-   moving pieces) and what in pxl makes each part (`PXL help "characters 2 3"`).
+   moving pieces) and what in pxl makes each part (`PXL help "characters 2"`).
 2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
    `out/_shot/<name>.png` (read it); its text says what changed since your last shot of it and
    the warnings `check` finds on it. `--frames 0,12,30`, `--at x,y,w,h` (enlarged), more names (a row
@@ -32,10 +32,10 @@ lists every command and flag.
    `--dry` (it writes where the value lives and runs `check`). What code computes is refused: edit that by hand (`PXL help "scenes 14"`).
 5. `PXL build art.px.js` writes its own PNGs, sheets and GIFs to `out/` (an include's by `--only a,b`
    or `--all`), previews to `out/_preview/` (`--profile` when it has grown slow; it names 3D fields not kept: `PXL help pure`).
-6. Before handing over, `PXL check art.px.js`: every scene, rig and frame of the file
-   (`check: { every: N }` on a long story), warnings only, with their frames. Fix each or say why
-   it's meant. LOOK lines (L-corners, jaggies, tones too close; `--edges`: any sprite's edges, a 3D
-   draft's after `shrink: { by: 3 }`) don't fail it: look at each. Its
+6. While iterating, `PXL check art.px.js <name>`: that one alone. Before handing over, `PXL check art.px.js`: every
+   scene, rig and frame of the file (`check: { every: N }` on a long story), warnings only, with their frames. Fix
+   each or say why it's meant. LOOK lines (L-corners, jaggies, tones too close; edges, in every `shot` and by
+   `--edges`: any sprite's, a 3D draft's after `shrink: { by: 3 }`) don't fail it: look at each. Its
    last line says which rules ran: "not run: lit side" means nothing about the light was checked
    (give the scene `world.light`, or lamps and `lighting()`); a scene's `expect` and `expect3d`
    rules run there too (`--fix`). Then look as a critic. Replacing approved art: keep `name_old`
@@ -48,18 +48,12 @@ lists every command and flag.
 ## A big scene: ask how to make it
 
 For a big, busy scene (320×180 and up, many props, animated), ask the user first, with the numbers
-and how long this conversation already is:
-
-- **One agent** (the default): cheapest and most coherent (a 320×180 animated street: 85 turns). In
-  a long conversation a fresh agent with a brief costs less.
-- **A pipeline**: a planner and one fork per part, then a fork that puts the scene together:
-  denser but less coherent, ~5× the tokens and ~2× the time. Run it from a new session, never
-  forked from a long one (each fork rereads all of it).
-
-How to run each: [docs/agents.md](docs/agents.md#a-big-scene-one-agent-a-fresh-one-or-a-pipeline).
-Either way, show it in stages for the user to approve before painting on: the camera and the ground
-as blocks, the props, then the people; a new move as flat blocks first (`bk_<move>_<dir>` in
-`lib/characters/traveler.px.js`).
+and how long this conversation already is: **one agent** (the default, cheapest and most coherent: a
+320×180 street took 85 turns; in a long conversation a fresh agent with a brief) or **a pipeline** (a
+fork per part, from a new session: denser, less coherent, ~5× the tokens, ~2× the time):
+[docs/agents.md](docs/agents.md#a-big-scene-one-agent-a-fresh-one-or-a-pipeline). Either way, show it
+in stages for the user to approve: the camera and the ground as blocks, the props, then the people; a
+new move as flat blocks first (`bk_<move>_<dir>` in `lib/characters/traveler.px.js`).
 
 ## Looking things up
 
@@ -76,10 +70,10 @@ and uses; `PXL help "<guide> <numbers or words of a heading>"` those sections:
 | a figure that turns to 4 or 8 directions and walks (a field sprite) | `PXL help "a body that turns"` (`rig3d`, blocks first; the head baked per view, its face retouched by hand), then `"characters 5 6 10"` |
 | a story: figures walking a path and talking | `PXL help route`, `PXL help bubble`; `hd2d/graveyard.px.js` |
 | a scene, level, building or environment | `PXL help "scenes 1 3 11 14"`; then by need: 2 ground, 4 trees, 5 water, 6 distance, 7 perspective and HD-2D, 8-10 loops and parallax, 16 a game's projections; grass, trees, rocks, walls: `PXL help "environment 10"` (the kit) |
-| lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~3k tokens) |
+| lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~3.5k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
 | a thing in 3D: turns, sways, seen from several cameras | `PXL help "scenes 17"`; start from `examples/sdf/world.px.js`; a prop turned into a game's sprites: `turnaround` |
-| an effect a shader would do, particles, smoke, a spell | `PXL help effects`, `PXL help abilities`, `PXL help "scenes 12"`; your own element: `PXL help "designing an element"` |
+| an effect a shader would do, particles, smoke, a spell | by need `PXL help effect`, `emitter`, `smoke`, `spell`; hits and explosions `PXL help "scenes 12"`; your own element `"designing an element"` |
 
 ## Template
 
@@ -152,9 +146,9 @@ closest:
 
 - **First files**: `basics.px.js` (mirror, outline, variants, parts, a sheet), `platformer.px.js`
   (a tileset as a level), `topdown.px.js`, `isometric.px.js`.
-- **The library** (`lib/`), to `include` rather than redraw: `PXL lib` lists its entries by subject
-  (`--genre topdown16`, `--cell side/32`), `PXL lib <entry>` gives one's card and the `include` that takes it;
-  a 3D entry in a genre: `PXL lib draft <entry> --genre topdown16` (the genres: `lib/profiles/`). A near fit (its
+- **The library** (`lib/`), to `include` rather than redraw: `PXL lib` counts its entries by subject
+  and names the genres and cells to filter by; `PXL lib props`, `--genre topdown16` or `--cell side/32` lists them, `PXL lib <entry>` gives
+  one's card and the `include` that takes it; a 3D entry in a genre: `PXL lib draft <entry> --genre topdown16`. A near fit (its
   look right; its size, colors or a part wrong) is mended, not redrawn: its params, a `swap`, the part redone. Its
   pieces beat redrawn ones, defects and all.
 - **Characters**: in `lib/characters/`, `hero` (four directions, a tagged sheet), `knight` (skeleton

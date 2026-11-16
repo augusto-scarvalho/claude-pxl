@@ -14,7 +14,9 @@ Turning pixel art by an arbitrary angle always costs something: pixels get dropp
 3. **A thing built in 3D** (a field, `make3d`'s, a world's part) turns without resampling:
    `turnaround()` draws it from each heading, named by the compass (`n`, `ne`, `e`, ... 16 adds
    `nne`, `ene`, ...; iso's 4 its diagonals), the east its west flipped when it is symmetric and lit
-   from the picture's middle (`PXL help turnaround`).
+   from the picture's middle (`PXL help turnaround`). A head or figure drawn by hand and turned about its
+   upright (a profile to the front) is no rotation, which turns only in the picture's plane: model it and
+   draw it per view (`views()` a head, `rig3d()` a figure, `turnaround()` a thing).
 4. **A thing spinning on its upright** needs only half a turn drawn: the frames from 180° on are the
    first half flipped (`flip: "x"`); block the turn out with `model()`/`mesh()` in a `ref: true` layer.
 5. **Shapes, not surfaces.** No rotation keeps a checker dither a checker, and texture or

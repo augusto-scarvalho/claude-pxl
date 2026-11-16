@@ -70,9 +70,10 @@ round it.
   ground where the player is draws the eye.
 - Tufts in the wind: grass sways twice in the trees' loop (`cycles: 2`), power 1 (blades bend from
   the root), 1-2 px at the top, `vary: 0.5`; one wind for the field, a gust rolling across it as a
-  `delay` of 10 ms a px of x (120 ms a m in a `mesh()`), so neighbours move together and the far side
-  later. Someone walking through: the tufts within 9 px of the feet pushed away from them, 3 px at
-  the feet down to none, standing back up as they pass (`PXL help effect`, sway).
+  `delay` of 10 ms a px of x (120 ms a m in a `mesh()`), so neighbours move together and the gust
+  runs right to left (a copy is ahead by its delay; falling with x, left to right). Someone walking
+  through: the tufts within 9 px of the feet pushed away from them, 3 px at the feet down to none,
+  standing back up as they pass (`PXL help effect`, sway).
 - Tiles laid in a map, details scattered over them, corner tilesets: scenes §2.
 - On a floor seen at an angle (`mesh()`, `plane()`), lay the texture a texel to a pixel where the
   camera looks (`texel: "screen"` in `mesh()`; `[1 / ppm, 1 / (ppm * sin pitch)]` by hand): at a fixed
