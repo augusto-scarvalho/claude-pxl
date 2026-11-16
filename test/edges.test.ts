@@ -9,6 +9,7 @@ import { pack } from "../src/core/color.ts";
 import { closeGaps, edgeFlaws, reduceEdges } from "../src/core/vision.ts";
 import { loadSource } from "../src/node/load.ts";
 import { main } from "../src/node/cli.ts";
+import { decodePng } from "../src/node/png.ts";
 import { whenChanged } from "./passed.ts";
 
 const test = whenChanged("test/edges.test.ts");
@@ -129,4 +130,27 @@ sprite("b", { base: "a" })
   assert.match(text, /b › LOOK: edges: 1 tips \(at 7,2\)/);
   assert.match(text, /ran: edges on 2/);
   assert.equal(text.split("LOOK: edges").length, 3, "without --edges, none");
+});
+
+test("check --edges: the holes that open in an anim, not one its first frame has; shot rings them, and says loose pixels in one line", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-edges-")), file = join(dir, "a.px.js");
+  // a handle (a hole on both frames: meant) over a body an arm closes on in frame 1; a sprite of loose pixels
+  writeFileSync(file, `pal({ k: "#1a1620" })
+anim("man", { w: 9, h: 6, frames: 2, fps: 4 }, (c) => {
+  for (const [x, y] of [[1, 0], [2, 0], [3, 0], [1, 1], [3, 1]]) c.px(x, y, "k")
+  c.rect(0, 2, 5, 4, "k")
+  if (c.frame) { c.rect(5, 2, 3, 1, "k"); c.rect(7, 3, 1, 2, "k"); c.rect(5, 5, 3, 1, "k") }
+})
+sprite("dust", { w: 16, h: 16 }, (c) => { for (let x = 0; x < 16; x += 3) for (let y = 0; y < 16; y += 3) c.px(x, y, "k") })
+`);
+  const log = console.log, lines: string[] = [];
+  console.log = (s: string) => lines.push(s);
+  try { await main(["check", file, "--edges"]); await main(["shot", file, "man", "--frames", "1", "--scale", "4", "--out", join(dir, "out")]); await main(["shot", file, "dust", "--out", join(dir, "out")]); } finally { console.log = log; }
+  const text = lines.join("\n");
+  assert.equal(text.split("man › LOOK: holes: 4 px of clear the figure encloses on frame 1 where frame 0 has none (the largest 4 px at 5,3 2x2, frame 1)").length, 3, "check's and shot's");
+  assert.match(text, /man_look\.png \(the LOOK lines' pixels ringed, frame 1: .*holes that opened violet\)/);
+  assert.ok(decodePng(readFileSync(join(dir, "out", "_shot", "man_look.png"))).data.includes(pack(150, 60, 255)));
+  assert.match(text, /^dust › LOOK: edges: 36 tips/m, "check lists them");
+  assert.match(text, /^dust › LOOK: edges read as loose pixels \(particles, smoke, grass blades, a texture\), not an outline: 36 tips and bridges on 36 px of edge; pxl check <file> dust --edges lists them$/m, "shot says one line");
+  assert.doesNotMatch(text, /dust_look/);
 });

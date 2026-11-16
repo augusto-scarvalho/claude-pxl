@@ -100,14 +100,16 @@ export function diffRow(was: Img, now: Img): { img: Img; changed: number } {
 
 /**
  * What changed between two shots of the same frames and region: per frame, how many pixels and the
- * box around them, in the asset's coordinates (so an edit that did nothing, or hit the wrong place, shows).
+ * box around them, in the asset's coordinates (so an edit that did nothing, or hit the wrong place, shows);
+ * frames unchanged side by side in one ("frames 4-9: no change"). `cols`: frames to a row (else shotRow's).
  */
-export function shotChanges(was: Img, now: Img, frames: number[], at?: number[]): string {
+export function shotChanges(was: Img, now: Img, frames: number[], at?: number[], cols?: number): string {
   if (was.w !== now.w || was.h !== now.h) return `size ${was.w}x${was.h} -> ${now.w}x${now.h}`;
   // the frames' grid as shotRow laid it out: the most to a row whose cells' width fits
-  const N = frames.length, cols = Array.from({ length: N }, (_, i) => N - i).find((c) => { const w = (now.w + GAP) / c - GAP; return Number.isInteger(w) && perRow(N, w) === c; }) ?? N;
+  const N = frames.length;
+  cols ??= Array.from({ length: N }, (_, i) => N - i).find((c) => { const w = (now.w + GAP) / c - GAP; return Number.isInteger(w) && perRow(N, w) === c; }) ?? N;
   const rows = Math.ceil(N / cols), w = (now.w + GAP) / cols - GAP, h = (now.h + GAP) / rows - GAP, [ox, oy] = at ?? [0, 0];
-  return frames.map((f, i) => {
+  const per = frames.map((f, i) => {
     let n = 0, x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const k = (Math.floor(i / cols) * (h + GAP) + y) * now.w + (i % cols) * (w + GAP) + x;
@@ -115,9 +117,13 @@ export function shotChanges(was: Img, now: Img, frames: number[], at?: number[])
       n++;
       x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
     }
-    const what = n ? `${n} px changed in ${ox + x0},${oy + y0} ${x1 - x0 + 1}x${y1 - y0 + 1}` : "no change";
-    return frames.length > 1 ? `frame ${f}: ${what}` : what;
-  }).join("; ");
+    return n ? `${n} px changed in ${ox + x0},${oy + y0} ${x1 - x0 + 1}x${y1 - y0 + 1}` : "no change";
+  });
+  if (N === 1) return per[0];
+  const runs: [number[], string][] = [];
+  per.forEach((what, i) => { const l = runs.at(-1); if (l && what === "no change" && l[1] === what) l[0].push(frames[i]); else runs.push([[frames[i]], what]); });
+  const moved = per.filter((s) => s !== "no change").length;
+  return `${moved ? `${moved} of ${N} frames changed: ` : ""}${runs.map(([f, what]) => `${f.length > 1 ? `frames ${f.every((v, i) => v === f[0] + i) ? `${f[0]}-${f.at(-1)}` : f.join(",")}` : `frame ${f[0]}`}: ${what}`).join("; ")}`;
 }
 
 /**

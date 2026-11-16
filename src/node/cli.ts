@@ -19,7 +19,7 @@ import { decodePng } from "./png.ts";
 import { encodeGif, reduceColors } from "./gif.ts";
 import { packedSheet, writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
-import { checkProject, writeMoves } from "./check.ts";
+import { checkProject, newHoles, writeMoves } from "./check.ts";
 import { startWorkers } from "./workers.ts";
 
 /** The edge flaws ringed in shot's look image, by kind. */
@@ -137,7 +137,8 @@ const USAGE = `pxl — pixel-art DSL
       that is the 3D render alone, a ◐ drawn by hand, a ✓ live 3D sprite not frozen). --edges: a LOOK
       line on every sprite and anim, by hand or over a base (a 3D draft and its pass), naming what a
       reduction leaves at its edges: steps out of order, doubled line, tips, bridges, notches, gaps in
-      the line, clipped corners (pxl help edges; shot rings them). --readings also lists what the lit-side rule read on every placement,
+      the line, clipped corners (pxl help edges; shot rings them); on an anim, the holes that open
+      (clear pixels its figure encloses on frames where the first frame has none). --readings also lists what the lit-side rule read on every placement,
       warning or not, with a tally: to see where it agrees and where it can't tell; and each "own" line's room
       against the ground its genre says (on): its lightest, the ground's darkest, the gap and the floor. A scene's
       expect rules (beside, before, apart, inside, onGround, while) run at the frames it checks.
@@ -155,12 +156,15 @@ const USAGE = `pxl — pixel-art DSL
       group or a glob ("car_*"): its members side by side, each labelled with what its name adds (n,
       nne, ne...), checked together. --vs puts the same
       shot of another version above it (at a git revision, the file and what it includes as they
-      were there); --diff adds a row with the pixels that changed in red; --grey adds it all again in
+      were there); --diff adds a row with the pixels that changed in red and says per frame how many
+      and where (without --vs: between exactly two rows of one size, a frozen cell and its live
+      render); --grey adds it all again in
       values only (each pixel's lightness), to see the planes read before the color; --ref draws
       the asset's ref: true layers over it (guide rows, a skeleton), as the build's previews do. It
       also prints what changed since the last shot of the same frames and region (one asset, one
       region: pixels, where) and the warnings pxl check finds on the asset at those frames (its
-      LOOK lines too, the pixels they name ringed in <name>_look.png): one call per look. A clip's
+      LOOK lines too, the pixels they name ringed in <name>_look.png; loose pixels, as particles and
+      grass, said in one line instead of their edges): one call per look. A clip's
       note gives each shown frame's ms. Several names (another file's as other.px.js:name, or any PNG) make a row each, one
       under the other, and several --at a column each: two versions, two agents' scenes, details of
       a big one.
@@ -614,7 +618,7 @@ export async function main(argv: string[]): Promise<number> {
         const png = MEDIA.test(file), entries = png ? [file, ...a.rest] : a.rest;
         if (!entries.length) throw new PxError("shot needs an asset name: pxl shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs rev] [--diff]");
         if (a.ats.some((r) => r.length !== 4)) throw new PxError("shot --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
-        if (a.diff && !a.vs) throw new PxError("shot --diff compares with another version: give it --vs <git rev | file>");
+        if (a.diff && !a.vs && (entries.length !== 2 || a.ats.length > 1)) throw new PxError("shot --diff compares with another version (--vs <git rev | file>), or two rows of one size: two names, name other.px.js:name or two PNGs, one region");
         const regions = a.ats.length ? a.ats : [undefined];
         // each name its own frames: all of its loop, or those asked for that it has (a still sprite in a
         // row of anims shows its one frame)
@@ -684,20 +688,31 @@ export async function main(argv: string[]): Promise<number> {
             if ("png" in s) {
               const m = readMedia(s.png!), pick = a.allFrames || (!a.frames && m.frames.length > 1) ? m.frames.map((_, i) => i) : (a.frames ?? [0]).filter((f) => f < m.frames.length);
               if (!pick.length) throw new PxError(`${s.png}: it has ${m.frames.length} frame${m.frames.length === 1 ? "" : "s"} (0-${m.frames.length - 1})`);
-              return { ...s, row: wrapRow(pick.map((f) => m.frames[f]), regions), note: m.frames.length > 1 || m.drawnAt ? `${basename(s.png!)}: ${m.kind}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, shown at 1x` : ""}${m.frames.length > 1 ? `, frames ${pick.length === m.frames.length ? `all ${m.frames.length}` : pick.join(",")}, ms ${runs(pick.map((f) => m.ms[f]))}` : ""}` : "" };
+              return { ...s, row: wrapRow(pick.map((f) => m.frames[f]), regions), picked: pick, note: m.frames.length > 1 || m.drawnAt ? `${basename(s.png!)}: ${m.kind}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, shown at 1x` : ""}${m.frames.length > 1 ? `, frames ${pick.length === m.frames.length ? `all ${m.frames.length}` : pick.join(",")}, ms ${runs(pick.map((f) => m.ms[f]))}` : ""}` : "" };
             }
             if ("img" in s) return { ...s, row: wrapRow([s.img!], regions), note: `${s.name}: ${s.members ? `${s.names!.length} members, left to right, each labelled with what its name adds` : `the sheet, ${s.img!.w}x${s.img!.h}, ${s.names!.length} entries`}` };
             const p = proj(s.file!), frames = framesFor(p, s.name);
             return { ...s, row: wrapRow(frames.map((f) => shotFrame(p, s.name, f, a.ref)), regions), frames };
           });
-          const sheet = a.grey ? stack([stack(many.map((s) => s.row)), greyRow(stack(many.map((s) => s.row)))]) : stack(many.map((s) => s.row)), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
+          // --diff between the two rows (a frozen cell and its live render, a saved build and the new one): the
+          // pixels that changed in a row under them, and per frame how many and where
+          const rows = many.map((s) => s.row), shown = entries.map((e) => (MEDIA.test(e) ? basename(e) : e));
+          let changes = "";
+          if (a.diff) {
+            const [x, y] = rows, f = ("frames" in many[0] ? many[0].frames : "picked" in many[0] ? many[0].picked : undefined) ?? [0];
+            if (x.w !== y.w || x.h !== y.h) throw new PxError(`shot --diff: ${shown[0]} is ${x.w}x${x.h} and ${shown[1]} ${y.w}x${y.h}: it compares two rows of one size`);
+            rows.push(diffRow(x, y).img);
+            changes = shotChanges(x, y, f, a.at, Math.min(f.length, 12));
+          }
+          const sheet = a.grey ? stack([stack(rows), greyRow(stack(rows))]) : stack(rows), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
           const path = join(outDir, "_shot", many.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".png");
           writePng(path, sheet.scale(k));
           // each row's frames (they differ when a still sprite sits among anims)
           const span = (f: number[]) => (f.length > 2 && f.every((v, i) => v === f[0] + i) ? `${f[0]}-${f.at(-1)}` : f.join(","));
           const rowsFrames = many.filter((s) => "frames" in s).map((s) => [s.name, span((s as { frames: number[] }).frames)]);
           const sameFrames = new Set(rowsFrames.map((r) => r[1])).size <= 1;
-          console.log(`-> ${path} (${rowsFrames.length ? `frames ${sameFrames ? rowsFrames[0][1] : rowsFrames.map(([n, f]) => `${n} ${f}`).join(", ")}; ` : ""}rows, top down: ${entries.map((e) => (MEDIA.test(e) ? basename(e) : e)).join(", ")}${regions.length > 1 ? `; columns: ${a.ats.map((r) => r.join(",")).join(" | ")}` : ""}; ${k}x)`);
+          console.log(`-> ${path} (${rowsFrames.length ? `frames ${sameFrames ? rowsFrames[0][1] : rowsFrames.map(([n, f]) => `${n} ${f}`).join(", ")}; ` : ""}rows, top down: ${shown.join(", ")}${a.diff ? "; below: what changed" : ""}${regions.length > 1 ? `; columns: ${a.ats.map((r) => r.join(",")).join(" | ")}` : ""}; ${k}x)`);
+          if (changes) console.log(changes);
           for (const s of many) if ("note" in s && s.note) console.log(s.note);
           for (const s of many) {
             if (!("file" in s)) continue;
@@ -716,9 +731,8 @@ export async function main(argv: string[]): Promise<number> {
           try { was = shotRow(loadProject(o.path, {}, o.read), name, frames, a.at, a.ref); } catch (e) { throw wrap(e).within(`--vs ${a.vs}`); }
           rows.unshift(was);
           if (a.diff) {
-            const d = diffRow(was, now);
-            rows.push(d.img);
-            console.log(`${d.changed} px changed`);
+            rows.push(diffRow(was, now).img);
+            console.log(shotChanges(was, now, frames, a.at));
           }
         }
         // as big as ~600k px allow (an image costs ~w*h/750 tokens: about what a preview costs), never
@@ -735,20 +749,23 @@ export async function main(argv: string[]): Promise<number> {
         writePng(last + ".last.png", now);
         writeFileSync(last + ".last.json", key);
         // what pxl check finds on it at these frames, so a look needs no other call
-        const r = checkProject(p, { names: [name], frames, edges: true });
+        const r = checkProject(p, { names: [name], frames, edges: "shot" });
         for (const l of [...r.lines, ...r.notes]) console.log(l);
-        // the faults the LOOK lines name, ringed on the asset: its lines' (corners orange, jaggies blue) and its edges'
+        // the faults the LOOK lines name, ringed on the asset: its lines' (corners orange, jaggies blue) and its edges';
+        // the holes that opened, on the first frame shown that has one (else the first shown)
         const lines = r.notes.some((l) => / LOOK: \d+ (L-corner|jagg)/.test(l)), edges = r.notes.some((l) => / LOOK: edges: /.test(l)), ells = r.notes.some((l) => / LOOK: genre '[^']*': \d+ L-corner/.test(l));
-        if (lines || edges || ells) {
-          const img = p.assets.get(name)!.kind === "anim" ? (p.frames(name)[frames[0]] ?? p.frames(name)[0]).img : p.image(name), s = Math.max(4, k), out = img.scale(s);
+        const open = r.notes.some((l) => / LOOK: holes: /.test(l)) ? newHoles(p.frames(name).map((f) => f.img)) : [], lf = frames.find((f) => open[f]?.px.length) ?? frames[0], holes = !!open[lf]?.px.length;
+        if (lines || edges || ells || holes) {
+          const img = p.assets.get(name)!.kind === "anim" ? (p.frames(name)[lf] ?? p.frames(name)[0]).img : p.image(name), s = Math.max(4, k), out = img.scale(s);
           const ring = (x: number, y: number, c: Color) => { for (let i = 0; i < s; i++) for (let t = 0; t < (s >= 8 ? 2 : 1); t++) for (const [u, v] of [[i, t], [i, s - 1 - t], [t, i], [s - 1 - t, i]]) out.set(x * s + u, y * s + v, c); };
           if (lines) { const f = lineFlaws(img); for (const [x, y] of f.corners) ring(x, y, pack(255, 140, 20)); for (const [x, y] of f.jaggies) ring(x, y, pack(40, 120, 255)); }
           if (edges) { const f = edgeFlaws(img); for (const [kind, c] of EDGE_RINGS) for (const [x, y] of f[kind]) ring(x, y, c); }
           // (the genre's line as its ink reads it: the figure without what its move paints, where the frame shows it)
           if (ells) { const shown = img.figureImg && edgeFlaws(img).doubled.map(String); for (const [x, y] of edgeFlaws(img.figureImg ?? img).doubled) if (!shown || shown.includes(`${x},${y}`)) ring(x, y, pack(255, 140, 20)); }
+          if (holes) for (const i of open[lf].px) ring(i % img.w, Math.floor(i / img.w), pack(150, 60, 255));
           const lookPath = base + "_look.png";
           writePng(lookPath, out);
-          console.log(`-> ${lookPath} (the LOOK lines' pixels ringed, frame ${frames[0]}: ${[lines && "L-corners orange, jaggies blue", edges && "edges: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners green", ells && "its genre's line: L-corners orange"].filter(Boolean).join("; ")})`);
+          console.log(`-> ${lookPath} (the LOOK lines' pixels ringed, frame ${lf}: ${[lines && "L-corners orange, jaggies blue", edges && "edges: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners green", ells && "its genre's line: L-corners orange", holes && "holes that opened violet"].filter(Boolean).join("; ")})`);
         }
         if (r.warnings || p.assets.get(name)?.kind === "scene" || p.rigs.has(name))
           console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);

@@ -815,7 +815,7 @@ boxes' `[frame, x, y]` printed. `build --share N` also writes `out/share/`: each
 no checker or grid, a GIF when it moves: to post. `shot` writes `<name>_look.png` when its check has
 LOOK lines (the pixels they name ringed: L-corners orange, a genre's line's too, jaggies blue; its edges' as `--edges`
 names them: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners
-green), and a clip's note gives each shown frame's ms.
+green; the holes that opened violet, on the first frame shown that has one), and a clip's note gives each shown frame's ms.
 
 `check --edges` (and every `shot`): a LOOK line on each sprite and anim, made by hand or over a `base`
 (a 3D draft and the pass on it), naming what a reduction leaves at its edges, each kind with where:
@@ -828,7 +828,12 @@ body hanging by a pixel, or by a corner), notches (a dent or pinhole a pixel wid
 on most of the edge) and corners clipped (two straight edges of 4 px meeting without their corner: a
 box's bitten, a round thing's meant). A corner the shape has (a lip over a neck) reads as a step: look
 before fixing. `shrink: { by }` evens what it can when it reduces; `closeLine()` closes a hand pass's
-gaps.
+gaps. On an anim, a second LOOK line names the holes that open: clear pixels the figure encloses (a
+flood from the frame's edge doesn't reach them) on frames where the first frame has none there, how many
+px and the largest's box (a handle, an arm's gap at rest, the first frame has: meant, not said). `shot`
+says its edges in one line instead of the lists, without the rings and the holes, where tips and bridges
+are over 6% of the edge px (and 8 or more): loose pixels (particles, smoke, grass blades, a pine's
+needles) with no outline to read; figures and props measured 0-4%, effects and grass 8-98%.
 
 `edit`'s ops (the EditIR, `scenes 14`): `move`, `set`, `recolor`, `flip`, `frame`, `relation`, `swap`,
 `as` on a thing `inspect` names, and `add`: `{ "op": "add", "target": <new id>, "asset" | "like": <id>,
@@ -849,7 +854,7 @@ a scene, one scene from two agents, three details of a big one. A clip (a GIF, a
 and more than 12 frames go on in rows of 12: a reference's whole animation on one sheet.
 Give PNGs at 1× (`out/scenes/x.png`, not an enlarged `_shot`): rows are enlarged together, so a big
 one leaves no room for the rest. `--vs <rev | file>` puts the same shot of another version above (one
-name, one region; at a git revision, the file and the art files it includes as they were there); `--diff` with it adds a row with the pixels that changed, in red.
+name, one region; at a git revision, the file and the art files it includes as they were there); `--diff` with it adds a row with the pixels that changed, in red, and says per frame how many and their box ("1 of 4 frames changed: frames 0-1: no change; frame 2: 1 px changed in 9,1 1x1; frame 3: no change", frames unchanged side by side in one). Without `--vs`, `--diff` takes exactly two rows of one size (two names, `name other.px.js:name`, two PNGs: a frozen cell and its live render, a saved build and the new one; one region); rows of two sizes are refused, both sizes said.
 
 `check` makes every check `describe` can warn on, on every scene
 and rig of a file at every frame (exit 1 on a warning; its last line says the rules that ran and those that

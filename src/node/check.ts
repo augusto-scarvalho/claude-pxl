@@ -18,15 +18,83 @@ import { loadProject } from "./load.ts";
 import { drawnWith, genreRoles, members } from "./lib.ts";
 import { FLAWS, jointsOf, poseFlaws, viewRows, viewWarnings } from "../core/rig3d.ts";
 
-/** --edges's words for an asset's frames: each kind of edge flaw found, how many, where (frame by frame, once). */
-export function edgeLook(frames: Img[], ink?: Set<Color>): string {
+/**
+ * --edges's words for an asset's frames: each kind of edge flaw found, how many, where (frame by frame, once).
+ * `loose` (shot's, the asset's name): one line instead where tips and bridges are over 6% of the edge (and 8 or more): loose pixels,
+ * no outline to read. Measured on 33 assets: figures, props and broadleaf trees 0-4%; pines 10-12%, spells,
+ * sparks, dust, a fighter's projectile and grass tufts 8-98%. Flaws of every kind per edge px didn't separate them.
+ */
+export function edgeLook(frames: Img[], ink?: Set<Color>, loose?: string): string {
   const fl = frames.map((im) => edgeFlaws(im, ink)), say: string[] = [];
+  if (loose) {
+    const tb = fl.reduce((n, f) => n + f.tips.length + f.bridges.length, 0), edge = frames.reduce((n, im) => n + edgePx(im), 0);
+    if (tb >= 8 && tb > 0.06 * edge) return `read as loose pixels (particles, smoke, grass blades, a texture), not an outline: ${tb} tips and bridges on ${edge} px of edge${frames.length > 1 ? ` over ${frames.length} frames` : ""}; pxl check <file> ${loose} --edges lists them`;
+  }
   const WHAT: [keyof ReturnType<typeof edgeFlaws>, string][] = [["steps", "steps out of order"], ["doubled", "doubled in its line"], ["tips", "tips"], ["bridges", "bridges"], ["notches", "notches"], ["gaps", "gaps in its line"], ["corners", "corners clipped"]];
   for (const [k, w] of WHAT) {
     const at = [...new Set(fl.flatMap((f) => f[k].map(([x, y]) => `${x},${y}`)))];
     if (at.length) say.push(`${at.length} ${w} (at ${at.slice(0, 4).join("; ")}${at.length > 4 ? "; ..." : ""})`);
   }
   return say.length ? `${say.join(", ")} (PXL help "edges")` : "";
+}
+/** Drawn pixels with a clear 4-neighbour (or the frame's edge). */
+const edgePx = (im: Img) => {
+  const on = (x: number, y: number) => x >= 0 && y >= 0 && x < im.w && y < im.h && (im.data[y * im.w + x] & 255) >= 128;
+  let n = 0;
+  for (let y = 0; y < im.h; y++) for (let x = 0; x < im.w; x++) if (on(x, y) && !(on(x - 1, y) && on(x + 1, y) && on(x, y - 1) && on(x, y + 1))) n++;
+  return n;
+};
+/**
+ * Holes that open in an anim: per frame, the clear pixels its figure encloses (a 4-connected flood from the frame's
+ * edge doesn't reach them), in areas [px, x, y, w, h], those touching none of the first frame's left out (a handle,
+ * the gap between an arm and the body at rest: meant), and those of one px (a pinhole: a notch, named with them).
+ * `px`: their pixels' indices.
+ */
+export function newHoles(frames: Img[]): { px: number[]; areas: number[][] }[] {
+  const enclosed = (im: Img) => {
+    const W = im.w, H = im.h, seen = new Uint8Array(W * H), clear = (i: number) => (im.data[i] & 255) < 128, st: number[] = [];
+    for (let x = 0; x < W; x++) st.push(x, (H - 1) * W + x);
+    for (let y = 0; y < H; y++) st.push(y * W, y * W + W - 1);
+    while (st.length) {
+      const i = st.pop()!, x = i % W;
+      if (seen[i] || !clear(i)) continue;
+      seen[i] = 1;
+      if (x > 0) st.push(i - 1);
+      if (x < W - 1) st.push(i + 1);
+      if (i >= W) st.push(i - W);
+      if (i + W < W * H) st.push(i + W);
+    }
+    return seen.map((s, i) => +(!s && clear(i)));
+  };
+  const first = enclosed(frames[0]);
+  return frames.map((im, k) => {
+    const out = { px: [] as number[], areas: [] as number[][] };
+    if (!k) return out;
+    const m = enclosed(im), W = im.w;
+    for (let s = 0; s < m.length; s++) {
+      if (!m[s]) continue;
+      // an area: its pixels, flooded off the mask
+      const area: number[] = [], st = [s], box = [W, m.length, -1, -1];
+      m[s] = 0;
+      while (st.length) {
+        const i = st.pop()!, x = i % W, y = (i - x) / W;
+        area.push(i);
+        box[0] = Math.min(box[0], x); box[1] = Math.min(box[1], y); box[2] = Math.max(box[2], x); box[3] = Math.max(box[3], y);
+        for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) if (j >= 0 && j < m.length && m[j]) { m[j] = 0; st.push(j); }
+      }
+      if (area.length < 2 || (first.length === m.length && area.some((i) => first[i]))) continue;
+      for (const i of area) out.px.push(i);
+      out.areas.push([area.length, box[0], box[1], box[2] - box[0] + 1, box[3] - box[1] + 1]);
+    }
+    return out;
+  });
+}
+/** --edges's words for the holes that open in an anim: on which frames, how many px, the largest. */
+function holesLook(frames: Img[]): string {
+  const h = newHoles(frames), on = h.map((f, i) => (f.px.length ? i : -1)).filter((i) => i >= 0);
+  if (!on.length) return "";
+  const [n, x, y, w, ht, f] = h.flatMap((fr, i) => fr.areas.map((a) => [...a, i])).sort((a, b) => b[0] - a[0])[0];
+  return `${h.reduce((s, fr) => s + fr.px.length, 0)} px of clear the figure encloses on frame${on.length > 1 ? "s" : ""} ${ranges(on)} where frame 0 has none (the largest ${n} px at ${x},${y} ${w}x${ht}, frame ${f}): a gap opened between parts, or one meant (shot rings them)`;
 }
 /** Drawn by hand somewhere: a grid string, grid() or runs(), here or in a layer (line(), curve() and code draw their own lines clean, or as they mean to). */
 const byHand = (items: Item[]): boolean => items.some((i) => typeof i === "string"
@@ -314,7 +382,7 @@ function shrinkBases(p: Project): Set<string> {
  * that name (not those it includes), unless `names` are given. `frame` / `frames`: those frames of
  * each animated scene only, instead of all of them.
  */
-export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string; readings?: boolean; fix?: boolean; edges?: boolean } = {}): CheckResult {
+export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string; readings?: boolean; fix?: boolean; edges?: boolean | "shot" } = {}): CheckResult {
   const reads = new Set<string>(), tally = { agree: 0, against: 0, unclear: 0 };
   const lines: string[] = [], notes: string[] = [];
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0, sprites = 0;
@@ -382,11 +450,14 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         if (twins.length) notes.push(`${name} › LOOK: ${twins.length} pair${twins.length > 1 ? "s" : ""} of tones side by side too close to tell apart (under 0.03 in OKLab): ${twins.slice(0, 3).join(", ")}${twins.length > 3 ? " ..." : ""}; merge each, or spread it if both are meant`);
         if (jaggies.length) notes.push(`${name} › LOOK: ${jaggies.length} jagg${jaggies.length > 1 ? "ies" : "y"} in its 1 px lines (${list(jaggies)}): a run out of order along a curve (3 2 4 where 2 3 4 reads smooth); unless the shape bumps there, let the runs grow or shrink steadily (PXL help "characters 7")`);
       }
-      // --edges: what a reduction leaves at its edges, on any sprite (a 3D draft and the pass over it too)
+      // --edges: what a reduction leaves at its edges, on any sprite (a 3D draft and the pass over it too), and on an
+      // anim the holes that open in its figure; shot's: loose pixels said in one line, without holes
       if (opts.edges) {
         ran.edges++;
-        const words = edgeLook(def.kind === "anim" ? p.frames(name).map((f) => f.img) : [img]);
-        if (words) notes.push(`${name} › LOOK: edges: ${words}`);
+        const fr = def.kind === "anim" ? p.frames(name).map((f) => f.img) : [img], words = edgeLook(fr, undefined, opts.edges === "shot" ? name : undefined), loose = words.startsWith("read as loose");
+        if (words) notes.push(`${name} › LOOK: edges${loose ? " " : ": "}${words}`);
+        const holes = fr.length > 1 && !loose ? holesLook(fr) : "";
+        if (holes) notes.push(`${name} › LOOK: holes: ${holes}`);
       }
       // its boxes (c.setBox) inside each frame: every frame of an anim whose first frame has one (a
       // fighter's hurtbox is on every frame)
@@ -410,7 +481,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         const now = p.image(def.live);
         if (now.hash() !== img.hash()) {
           const n = now.w === img.w && now.h === img.h ? now.data.reduce((k, c, i) => k + +(c !== img.data[i]), 0) : -1;
-          lines.push(`${name} › WARNING: frozen: its live render '${def.live}' drifted from ${def.opts.png}: ${n < 0 ? `${now.w}x${now.h}, the frozen one ${img.w}x${img.h}` : `${n} px differ`}; look at both (pxl shot <file> ${name} ${def.live}); approved, delete the PNG and build to freeze it again`);
+          lines.push(`${name} › WARNING: frozen: its live render '${def.live}' drifted from ${def.opts.png}: ${n < 0 ? `${now.w}x${now.h}, the frozen one ${img.w}x${img.h}` : `${n} px differ`}; look at both (pxl shot <file> ${name} ${def.live} --diff); approved, delete the PNG and build to freeze it again`);
         }
       }
       if (!img.sockets?.front) continue;

@@ -3,16 +3,19 @@
 // (pxl-rev-<commit>, kept for the next run), each tree's own loader, the examples as the tests list them,
 // frames over a loop.
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const repo = resolve(import.meta.dirname, "..");
 
-/** The examples the tests check (no `_` files, no `out/`, no pipeline parts): paths under examples/. */
-export const examples = () => (readdirSync(join(repo, "examples"), { recursive: true }) as string[]).map((f) => f.split("\\").join("/"))
+/** The examples the tests check (no `_` files, no `out/`, no pipeline parts): paths under examples/ (or `dir`). */
+export const examples = (dir = "examples") => (readdirSync(join(repo, dir), { recursive: true }) as string[]).map((f) => f.split("\\").join("/"))
   .filter((f) => f.endsWith(".px.js") && !f.split("/").some((s) => s.startsWith("_") || s === "out") && !/(^|\/)pipeline\/part_/.test(f)).sort();
+
+/** What the examples test checks, paths from the repo: the examples (a stub left at an old path, "// Moved to lib/...", is its lib file's) and every lib/ file. */
+export const artFiles = () => [...examples().map((f) => `examples/${f}`).filter((f) => !readFileSync(join(repo, f), "utf8").startsWith("// Moved to lib/")), ...examples("lib").map((f) => `lib/${f}`)];
 
 /** The folder holding the revision's src/, examples/ and lib/ (one from before lib/ hasn't it): unpacked on the first call. */
 export function revTree(rev: string): string {

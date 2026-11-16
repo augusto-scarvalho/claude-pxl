@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { globSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { globSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -18,6 +18,7 @@ import { writeOutputs, writePng } from "../src/node/output.ts";
 import { serve } from "../src/node/server.ts";
 import { checkProject } from "../src/node/check.ts";
 import { kept } from "../src/core/surface.ts";
+import { artFiles, revTree } from "../scripts/vs.ts";
 
 function chunks(buf: Buffer): { type: string; data: Buffer; crcOk: boolean }[] {
   const out = [];
@@ -538,7 +539,20 @@ sprite("a", { w: 2, h: 2 }, rect(0, 0, 2, 2, KEY))`);
   const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, stdio: "ignore" });
   git("init", "-q"); git("add", "."); git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "a");
   writeFileSync(part, `const KEY = "c"`);
-  assert.match(await said("shot", file, "a", "--vs", "HEAD", "--diff"), /^4 px changed$/m);
+  assert.match(await said("shot", file, "a", "--vs", "HEAD", "--diff"), /^4 px changed in 0,0 2x2$/m);
+});
+
+test("cli shot --diff between two rows of one size: per frame what changed, unchanged frames in one; two sizes refused", async () => {
+  const anim = (k: string) => `use("pico8")\nanim("a", { w: 3, h: 2, frames: 4, fps: 4 }, (c) => c.px(1, 1, c.frame === 2 ? "${k}" : "8"))\nsprite("b", { w: 3, h: 2 }, px(0, 0, "8"))`;
+  const { dir, file } = tmpArt(anim("8")), other = join(dir, "b.px.js");
+  writeFileSync(other, anim("c"));
+  const text = await said("shot", file, "a", `${other}:a`, "--frames", "all", "--diff", "--scale", "1");
+  assert.match(text, /below: what changed; 1x\)\n1 of 4 frames changed: frames 0-1: no change; frame 2: 1 px changed in 1,1 1x1; frame 3: no change$/m);
+  assert.equal(decodePng(readFileSync(join(dir, "out", "_shot", "a+a.png"))).h, 3 * 2 + 2 * 2, "the two rows and the diff's");
+  const err = console.error, errors: string[] = [];
+  console.error = (s: string) => errors.push(s);
+  try { assert.equal(await main(["shot", file, "a", "b", "--frames", "all", "--diff"]), 1); } finally { console.error = err; }
+  assert.match(errors.join("\n"), /a is 18x2 and b 3x2: it compares two rows of one size/);
 });
 
 test("scripts/hashes.ts: an asset's frames a line each; --vs builds them with the last commit's pxl too and counts what differs", () => {
@@ -551,6 +565,18 @@ anim("blink", { w: 4, h: 4, frames: 3, fps: 4 }, (c) => c.rect(c.frame, 0, 1, 1,
   assert.equal(run("--vs", "HEAD", "--all", "--frames", "2"), "3 the same, 0 differ (HEAD against the working tree)\n");
   // without --all, a file isn't built when all it reads and pxl's src are the same at the revision (so: when src/ has no change)
   assert.match(run("--vs", "HEAD", "--frames", "2"), /^(3 the same, 0 differ \(HEAD against the working tree\)|0 the same, 0 differ \(HEAD against the working tree\); 1 file not built: what it reads and pxl's src are the same at HEAD)\n$/);
+  // --cache: the store as the environment has it, the same lines
+  assert.equal(run("--cache", "--frames"), run("--frames"));
+  // no files: every example and lib/ file, as the examples test lists them (a stub at an old path is its lib file's)
+  const repo = join(import.meta.dirname, ".."), art = artFiles();
+  assert.ok(art.includes("lib/nature/kit.px.js") && art.includes("examples/basics.px.js") && !art.some((f) => readFileSync(join(repo, f), "utf8").startsWith("// Moved to lib/")));
+  // a frame that differs says where, and --png writes the two (a file in the repo's out/, another version of it in the revision's tree)
+  const rel = `out/_hashes_${process.pid}.px.js`, mine = join(repo, rel), theirs = join(revTree("HEAD"), rel), pngs = join(dir, "png");
+  for (const [f, src] of [[theirs, readFileSync(file, "utf8")], [mine, readFileSync(file, "utf8").replace("c.rect(1, 1, 2, 2", "c.rect(1, 1, 2, 1")]]) { mkdirSync(join(f, ".."), { recursive: true }); writeFileSync(f, src); }
+  let said = "";
+  try { execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "scripts/hashes.ts", "--vs", "HEAD", "--png", pngs, mine], { cwd: repo, encoding: "utf8" }); } catch (e) { said = (e as { stdout: string }).stdout; } finally { rmSync(mine); rmSync(theirs); }
+  assert.match(said, new RegExp(`^${rel} dot: 2 px changed in 1,2 2x1\\n.*\\n1 the same, 1 differ \\(HEAD against the working tree\\)\\n$`));
+  assert.deepEqual(readdirSync(pngs).sort(), [`_hashes_${process.pid}.dot@0_HEAD.png`, `_hashes_${process.pid}.dot@0_here.png`]);
 });
 
 test("scripts/pulse.ts and served.ts: a blob carried along keeps its normals, one that grows turns them; what the viewer sends", () => {

@@ -503,7 +503,7 @@ every example: a slow path costs every turn. Before and after a change to the en
 
 ```sh
 npm run check                                           # types and tests: an engine change rechecks every example, about 4 min
-node scripts/hashes.ts --vs HEAD                        # every example's assets built by the last commit's pxl and by yours: what differs
+node scripts/hashes.ts --vs HEAD                        # every example's and lib/ file's assets built by the last commit's pxl and by yours: what differs
 node scripts/hashes.ts --vs HEAD --frames 12 examples/hd2d/graveyard.px.js   # the animated ones' frames too, 12 over each loop (--frames: all)
 node scripts/perf.ts                                    # pxl check's time, processor time and peak memory on every example
 node scripts/perf.ts --vs HEAD examples/hd2d/traveler.px.js --only "^tr_walk_"   # ms a frame, the last commit's pxl against yours
@@ -522,7 +522,11 @@ change meant to move no pixel ends with `0 differ`, frame by frame for the anima
 (`--only <regex>` narrows a file to some assets; a long scene's frames take a second each). A file whose every
 input is the same at the revision (pxl's `src/` and each file it reads: itself, its includes, palettes, PNGs) isn't
 built, and is counted apart: a build is a function of those alone, so an art change costs only the files it reaches
-(`--all` builds every file anyway). `perf.ts --vs` builds each frame with one
+(`--all` builds every file anyway). With no files it takes every example and `lib/` file, as the examples test lists
+them (132; the examples alone were 75): an art change costs 10 s of loading to skip what it doesn't reach, an engine
+change builds all of them on both sides (about 32 min on a 4-core laptop: 22 the examples, 10 `lib/`). A line that differs says where, that frame built again on both sides
+(`lib/characters/slime.px.js slime_hop@2: 1 px changed in 9,1 1x1`), and `--png <dir>` writes the two
+(`slime.slime_hop@2_HEAD.png`, `_here.png`) for `pxl shot <both> --diff`. `perf.ts --vs` builds each frame with one
 pxl and then the other, alternating, because a laptop's speed drifts within seconds: two runs a
 minute apart differ by more than most changes, and the same pxl against itself reads within 6% on a
 figure. `meter.ts`, preloaded, prints each test file's time, processor time and peak memory: which
@@ -544,7 +548,8 @@ traces march to read back where their fields are pure (below). Not kept: a build
 work in a memo of its own, as the round's bout does), any of `edit` and `inspect`, anything after the art's own
 `Math.random` or clock, or a file read once it has loaded. Turn it off with `--no-cache` or
 `PXL_CACHE=0`. `hashes.ts` and `perf.ts` never read it (a comparison or a time read back from it would prove
-nothing); the tests do, as every command.
+nothing of the engine); the tests do, as every command. `hashes.ts --cache` does, to prove the store: the same files
+run off, on and on again give the same lines (two fighters' idle and walk: 10 s, 8.5 s writing, 1.3 s read back).
 
 What a trace's march finds is kept apart from the builds, under a key of the field itself (`surface.ts`'s `kept`,
 `store.ts`): pxl's sources and Node's, the field's key (`sdf.ts`'s `Compiled.key`: its code and numbers, exactly) and

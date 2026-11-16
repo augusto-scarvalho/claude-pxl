@@ -431,8 +431,10 @@ From the village and the castle (F5 3d-3f):
   a draft; new hand art awaiting the user has no mark of its own.
 - [ ] **`c.clip(region, fn)` inside a function** calls `fn` with no canvas ("Cannot read properties
   of undefined (reading 'stamp')"). Pass it the canvas.
-- [ ] **`hashes.ts --vs HEAD` covering `lib/`**: with no files it hashes `examples/` only, so a
-  brief's guard skipped the lib entries. Hash `lib/` too by default.
+- [x] **`hashes.ts --vs HEAD` covering `lib/`**: with no files it hashes `examples/` only, so a
+  brief's guard skipped the lib entries. Hash `lib/` too by default. Done (H2): every example and lib/ file, as
+  the examples test lists them (132); a line that differs says where (`N px changed in x,y wxh`, `--png` writes
+  both frames); `--cache` proves the store.
 - [ ] **Before and after from a file**: to show an entry before and after, a lib file was copied
   aside and a scene built twice and stacked by script. A `shot --vs <file>` beside `--vs HEAD`.
 - [ ] **`pxl shot a b` names its file**: it writes `_shot/a+b.png` and says no path, and a stale
@@ -627,6 +629,8 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
 - [ ] **`check --edges` on things made of pieces**: blades, leaves and a flat-footed outlined figure read as tips,
   notches, gaps and clipped corners. A card or sprite flag (`pieces: true`, `foot: "flat"`), and a repair helper
   (exact patches) beside the check: a 20 px pot's lip-over-shoulder S took a lab search.
+  In part (H2): `shot` says loose pixels (blades, sparks, smoke) in one line instead of the lists; `check --edges`
+  lists them as before, and a flat-footed figure's flags are still open.
 - [x] **A line key a step darker**: topdown32's line is each ramp's darkest, which shading also lands on, so the
   check reads doubled lines. Done (F5 5d): surface's `ink: true` or `2`, the line its ramp's first key (or two),
   the fill never landing on it, as racing_topdown's kit draws it; topdown32's approved kit keeps its line.
@@ -1050,6 +1054,12 @@ Wave 3: experiments, measured before anything is built.
   use counted (`make3d.oak(`: `help make3d` shows examples); lib/README.md among the guides (`pxl help
   "lib taking an entry"`); reference.md's "Library" is "Node API". `pxl lib` alone: a summary (1.7k
   characters, was 30k), the whole list by `--all` or a subject (`pxl lib props`).
+- [x] **The scratch tools agents rewrote, in `shot` and `check --edges`** (an inventory of ~1,100 scripts,
+  2026-11): `--diff` says per frame what changed and where (unchanged frames in one), and takes two rows of one
+  size without `--vs` (a frozen cell and its live render: frozen's warning names that command); `--edges` names
+  the holes that open in an anim's figure (`holes.py`, a proof in 21 briefs), ringed violet by `shot`; `shot`
+  says loose pixels' edges in one line (tips and bridges over 6% of the edge: figures and props measured 0-4%,
+  spells, sparks, dust and grass 8-98%).
 
 Not worth it (measured): images (previews cap at 768 px, ~340 tokens each), a shorter CLI
 invocation (~12 tokens a call), new ops for helpers the examples repeat (at most 3 files share

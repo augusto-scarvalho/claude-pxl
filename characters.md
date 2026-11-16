@@ -129,7 +129,10 @@ the edge takes its fine contour's colors (the line, the lit rim) and its line's 
 `pxl check <file> <name> --edges` (or any `pxl shot`, which rings them): steps out of order, doubled
 line, tips, bridges, notches, gaps in the line, clipped corners. A corner the shape has (a lip over a
 neck) reads as a step: say so and keep it. A hand pass that lines its own edge closes its dashes with
-`c.closeLine()`.
+`c.closeLine()`. On an anim it also names the holes that open (the clear an arm encloses against the body
+on frames where the first frame has none: a handle there at rest is meant), ringed violet by `shot`. Loose
+pixels (sparks, smoke, grass blades: tips and bridges over 6% of the edge) `shot` says in one line; the
+check lists them.
 
 ### A base body in the view you need: dress it
 
