@@ -306,6 +306,8 @@ declare global {
     /** drawn on a plate lit along these ramps, the light from `light` on screen */
     ramps?: string[]; light?: [number, number];
     shade?: Record<string, PxColor>;
+    /** shadows(): a shadow reaching past the eye "drop"ped whole (default) or "cut" 0.4 m ahead of the eye, the rest drawn */
+    near?: "drop" | "cut";
   }
   /** A flat face of a model, its corners in meters. */
   interface PxFace { mat: string; pts: PxV3[] }

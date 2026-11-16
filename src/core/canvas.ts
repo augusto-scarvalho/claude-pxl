@@ -1038,6 +1038,7 @@ export class Canvas {
   /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade by opts.shade. */
   shadows(view: Partial<View>, shapes: Solid[], opts: SolidOpts): void {
     if (!opts?.shade || !opts.sun) throw new PxError("shadows(view, shapes, { sun: { from: [x, z], up: degrees }, shade: { ground: shade, ... } }): where the sun is and what each ground color turns into in shade");
+    if (opts.near !== undefined && opts.near !== "drop" && opts.near !== "cut") throw new PxError(`shadows(): near is "drop" (a shadow reaching past the eye left out, the default) or "cut" (cut 0.4 m ahead of the eye, the rest drawn), got ${JSON.stringify(opts.near)}`);
     const w = this.img.w, x0 = -this.ox, y0 = -this.oy;
     for (const i of castSolids(perspective({ ...view, w: view.w ?? this.img.w } as View), shapes, opts, w, this.img.h, x0, y0)) {
       const x = (i % w) + x0, y = Math.floor(i / w) + y0, d = opts.shade[this.key(x, y)];

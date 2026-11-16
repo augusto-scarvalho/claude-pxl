@@ -34,6 +34,8 @@ export interface SolidOpts {
   ramps?: string[]; light?: [number, number];
   /** shadows: what each ground color turns into in shade (keys not in it are left) */
   shade?: Record<string, string>;
+  /** a shadow reaching past the eye: "drop" it whole (default) or "cut" it 0.4 m ahead of the eye and draw the rest */
+  near?: "drop" | "cut";
 }
 export interface SolidCanvas {
   poly(points: number[], c: string): void;
@@ -117,8 +119,14 @@ export function castSolids(P: Perspective, shapes: Solid[], o: SolidOpts, w: num
   const F = frame(P, o), out = new Set<number>(), B = P.bend, S = B ? perspective({ ...P, bend: 0 }) : P;
   // (one bend without bendFrom: the product in the order it always had, side()'s differs in the last bit, an edge pixel's worth)
   const drop = ([x, z, u]: V3): number[] => [x + (B ? (typeof B === "number" && !P.bendFrom ? (B * (z - F.az) ** 2) / 2 : side(B, P.bendFrom, z - F.az)) : 0) + u * F.sox, z + u * F.soz];
-  const fill = (poly: number[][], dapple?: number) => {
-    if (poly.some(([x, z]) => F.ahead(x, z) < 0.4)) return;
+  const fill = (whole: number[][], dapple?: number) => {
+    // a shadow reaching past the eye: dropped whole, or (near: "cut") the part of it 0.4 m or more ahead, cut along that line
+    if (o.near !== "cut" && whole.some(([x, z]) => F.ahead(x, z) < 0.4)) return;
+    const poly = whole.flatMap((p, i) => {
+      const q = whole[(i + 1) % whole.length], a = F.ahead(p[0], p[1]) - 0.4, b = F.ahead(q[0], q[1]) - 0.4, t = a / (a - b);
+      return [...(a >= 0 ? [p] : []), ...(a < 0 !== b < 0 ? [[p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]] : [])];
+    });
+    if (poly.length < 3) return;
     const sp = poly.map(([x, z]) => S.ground(x - F.ax, z - F.az)), xs = sp.map((p) => p[0]), ys = sp.map((p) => p[1]);
     for (let y = Math.max(Math.ceil(P.horizon) + 1, Math.floor(Math.min(...ys)), y0); y <= Math.min(y0 + h - 1, Math.ceil(Math.max(...ys))); y++)
       for (let x = Math.max(x0, Math.floor(Math.min(...xs))); x <= Math.min(x0 + w - 1, Math.ceil(Math.max(...xs))); x++) {

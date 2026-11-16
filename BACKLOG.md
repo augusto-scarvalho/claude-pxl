@@ -1382,6 +1382,12 @@ one), and the art code itself (4% of the cost).
   each z ahead to the next, heading and place running on at the joints (`side()` again, so all that
   follows `bend` follows them). A camera driving a road laid out once takes the sections not yet behind
   it and turns by the heading: two lines of art, so no helper (written both ways, the same pixels).
+- [x] **A shadow cut at the camera, not dropped**: with a low sun ahead, `shadows()` left out any shadow
+  with a point behind the eye, so long shadows vanished as their things came near, and an example cut
+  its casters' heights (blunt shadows). Now `near: "cut"` clips the swept shape 0.4 m ahead of the eye
+  (one line, every kind of shape) and draws the rest. An option, `"drop"` the default: as the default
+  it moves the race's approved frames (109 of 622, 1 to 28 px each: a lamp pole's long shadow across
+  the right verge as it comes near), for the owner to look at first.
 - [x] **A mesh op**: the cockpit (`examples/perspective/cockpit.px.js`) is modelled in 3D and carried
   its own renderer, `render3d`: flat faces in meters through the road's camera, the nearest face kept
   per pixel, each face toned along its material's ramp by how it lies to the light, an outline where a
