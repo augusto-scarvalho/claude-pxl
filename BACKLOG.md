@@ -1372,6 +1372,11 @@ one), and the art code itself (4% of the cost).
   and then project; directions don't bend. `plane`'s function also gets the pixel's column and row
   (the race's sun glitter needed the column). The race's three cameras use it: 67 px of 230k changed
   over four frames (a rival's shadow now follows the bend along its length, a few glints).
+- [x] **A road straight near that bends up ahead**: two agents asked for a desert road "bending to the
+  right up ahead" found `bend` curving from under the camera and wrote their own offset, passing the
+  ground, every prop and every shadow through it by hand. Now `bendFrom: m` on the camera: straight up
+  to it, `bend·(z − bendFrom)²/2` past it, followed as `bend` is (one function, `side()`, works it out).
+  Left out: a bend that ends, one that changes along the way (a new camera each frame).
 - [x] **A mesh op**: the cockpit (`examples/perspective/cockpit.px.js`) is modelled in 3D and carried
   its own renderer, `render3d`: flat faces in meters through the road's camera, the nearest face kept
   per pixel, each face toned along its material's ramp by how it lies to the light, an outline where a

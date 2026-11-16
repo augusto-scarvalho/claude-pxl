@@ -272,7 +272,8 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 
 - A road that bends: `perspective({ ..., bend })`, its curvature in 1/m (a point z m ahead sits
   bend·z²/2 to the side). Lay everything in meters along the road and across it as if it were
-  straight; the camera bends it, the ground, the things on it and their shadows alike. A bend that
+  straight; the camera bends it, the ground, the things on it and their shadows alike. Straight near
+  and bending up ahead: `bendFrom: z`, the way straight for z m and bending from there. A bend that
   changes as you go is a new camera each frame, and the heading turns with it: the far things
   (the sun, the ranges) slide across by `focal · heading` px (`examples/perspective/race.px.js`).
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to

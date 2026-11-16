@@ -777,6 +777,22 @@ scene("c", { w: 80, h: 50, bg: "k" }, plane(${JSON.stringify(view)}, (x, z, col,
   assert.equal(keys(p, "c").split("\n")[40][7], "w", "plane gives the pixel's column and row");
 });
 
+test("perspective with a bend from 20 m: the straight camera up to it, bend·(z − 20)²/2 past it, at() gives back ground() on both sides; terrain follows it", () => {
+  const near = (a: number[] | null, b: number[], eps = 1e-6) => assert.ok(a && a.every((v, i) => Math.abs(v - b[i]) < eps), `${a} ~ ${b}`);
+  const view = { w: 80, horizon: 30, eye: 2, fov: 90 }, S = perspective(view), F = perspective({ ...view, bend: 0.01, bendFrom: 20 });
+  for (const z of [1, 8, 19.5, 20]) assert.deepEqual(F.ground(1.5, z, 0.5), S.ground(1.5, z, 0.5));
+  near(F.ground(0, 30), S.ground(0.5, 30), 1e-9);
+  near([F.scale(30, 0)], [S.scale(30, 0.5)]);
+  for (const [x, z] of [[-2, 6], [1, 19], [0.5, 21], [3, 45]]) { const [c, r] = F.ground(x, z); near(F.at(c - 0.5, r - 0.5), [x, z]); }
+  const line = `(x, z) => (Math.abs(x) < 0.3 ? "r" : "g")`, bent = JSON.stringify({ ...view, bend: 0.01, bendFrom: 20 });
+  const p = loadSource(PAL + `scene("p", { w: 80, h: 50, bg: "k" }, plane(${bent}, ${line}))
+scene("t", { w: 80, h: 50, bg: "k" }, terrain(${bent}, () => 0, ${line}))`, "t.px.js");
+  assert.equal(keys(p, "t"), keys(p, "p"));
+  assert.match(failure(PAL + `perspective({ ...${JSON.stringify(view)}, bendFrom: 20 })`).message, /bendFrom is where a bend starts .* give the bend too/);
+  assert.match(failure(PAL + `perspective({ ...${JSON.stringify(view)}, bend: 0.01, bendFrom: -5 })`).message, /bendFrom is how many m the way runs straight before it bends, 0 or more, got -5/);
+  assert.throws(() => perspective({ ...view, bend: 0.01, bendFrom: "x" as unknown as number }), /0 or more, got "x"/);
+});
+
 test("terrain: flat land paints what plane does; a hill rises over the horizon; the rest is sky", () => {
   const view = { w: 80, horizon: 30, eye: 2, fov: 90 };
   const flat = loadSource(PAL + `scene("t", { w: 80, h: 50, bg: "k" }, terrain(${JSON.stringify(view)}, () => 0, () => "g", { sky: () => "w" }))

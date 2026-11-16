@@ -10,7 +10,8 @@
 // below) vp: three-point, see vertical(). Level, it is the same model as a scene's
 // world { horizon, eye }, which sets px per meter by row, with the sideways half added.
 // With a `bend`, the ground is a way that curves: its z lines bend to the right (left if negative),
-// a point z m along it sitting bend·z²/2 m to the side, so ground(), at() and scale() take and give
+// a point z m along it sitting bend·z²/2 m to the side (with `bendFrom`, straight up to that many m and
+// bend·(z − bendFrom)²/2 past it: side() alone works it out), so ground(), at() and scale() take and give
 // places on the way, and everything drawn through the camera follows the bend (plane, solids,
 // shadows, mesh, terrain). Directions (toward, ray, vanish) don't bend: the far things stay put.
 import { PxError } from "./errors.ts";
@@ -38,7 +39,15 @@ export interface View {
   pitch?: number;
   /** The way's curvature (1/m): a point z m along sits bend·z²/2 m to the right (left if negative); default 0. */
   bend?: number;
+  /** m the way runs straight before it bends (with a bend): a point z m along sits bend·max(0, z − bendFrom)²/2 m to the side; default 0. */
+  bendFrom?: number;
 }
+
+/** How far the way z m along sits to the side of straight: bend·z²/2, or straight up to `from` m and bending past it. */
+export const side = (bend: number, from: number, z: number): number => {
+  const d = from ? Math.max(0, z - from) : z;
+  return (bend * d * d) / 2;
+};
 
 export interface Perspective extends Required<Omit<View, "fov" | "h" | "ppm">> {
   /** its field of view, when given one (a picture k times as big keeps it) */
@@ -89,13 +98,15 @@ export function perspective(v: View): Perspective {
     throw new PxError(`perspective: { w, horizon, eye } (width in px, the horizon's row, the eye's height in m; or { w, h, pitch, ppm }, looking down at the picture's middle), and fov (degrees) or focal (px), vp (the column looked at), yaw (degrees turned right), pitch (degrees tilted up), bend (the way's curvature, 1/m); got ${JSON.stringify(v)}`);
   if (v.fov !== undefined && !(v.fov > 0 && v.fov < 180)) throw new PxError(`perspective: fov is the field of view across the picture, between 0 and 180 degrees, got ${v.fov}`);
   if (v.pitch !== undefined && !(Math.abs(v.pitch) < 90)) throw new PxError(`perspective: pitch is how far the camera tilts up (down if negative), between -90 and 90 degrees, got ${v.pitch}`);
-  const focal = v.focal ?? v.w / 2 / Math.tan(((v.fov ?? 90) * Math.PI) / 360), vp = v.vp ?? v.w / 2, yaw = v.yaw ?? 0, pitch = v.pitch ?? 0, bend = v.bend ?? 0, { horizon, eye, w } = v;
+  if (v.bendFrom !== undefined && v.bend === undefined) throw new PxError(`perspective: bendFrom is where a bend starts (the way straight up to that many m): give the bend too, { bend, bendFrom } (its curvature, 1/m), got bendFrom ${v.bendFrom} alone`);
+  if (v.bendFrom !== undefined && !(Number.isFinite(v.bendFrom) && v.bendFrom >= 0)) throw new PxError(`perspective: bendFrom is how many m the way runs straight before it bends, 0 or more, got ${JSON.stringify(v.bendFrom)}`);
+  const focal = v.focal ?? v.w / 2 / Math.tan(((v.fov ?? 90) * Math.PI) / 360), vp = v.vp ?? v.w / 2, yaw = v.yaw ?? 0, pitch = v.pitch ?? 0, bend = v.bend ?? 0, from = v.bendFrom ?? 0, { horizon, eye, w } = v;
   const cos = Math.cos((yaw * Math.PI) / 180), sin = Math.sin((yaw * Math.PI) / 180);
   const cp = Math.cos((pitch * Math.PI) / 180), sp = Math.sin((pitch * Math.PI) / 180), cy = horizon - focal * (sp / cp);
   // a point into the camera's frame: across, up, and depth along the camera's axis (a place on a
   // bending way first moved to where the bend puts it)
   const cam = (x: number, z: number, up: number) => {
-    if (bend) x = x + (bend * z * z) / 2;
+    if (bend) x = x + side(bend, from, z);
     const h = x * sin + z * cos, du = up - eye;
     return [x * cos - z * sin, du * cp - h * sp, h * cp + du * sp];
   };
@@ -103,7 +114,7 @@ export function perspective(v: View): Perspective {
   const down = -pitch * rad, d = dist ?? eye / Math.sin(down), k = ppm ?? focal / d, z = d * Math.cos(down);
   const look = pitch < 0 ? { z, dist: d, floor: [1 / k, 1 / (k * Math.sin(down))] as [number, number], wall: [1 / k, 1 / (k * Math.cos(down))] as [number, number] } : {};
   return {
-    w, horizon, eye, focal, vp, yaw, pitch, bend, ...(v.fov !== undefined && v.focal === undefined ? { fov: v.fov } : {}), ...(v.h !== undefined ? { h: v.h } : {}), ...look,
+    w, horizon, eye, focal, vp, yaw, pitch, bend, bendFrom: from, ...(v.fov !== undefined && v.focal === undefined ? { fov: v.fov } : {}), ...(v.h !== undefined ? { h: v.h } : {}), ...look,
     aim: (mid, up = 0) => {
       if (!(pitch < 0) || !Number.isFinite(mid) || !Number.isFinite(up)) throw new PxError(`perspective: aim(mid, up) is for a camera looking down (pitch below 0), mid and up in m, got ${JSON.stringify([mid, up])} with pitch ${pitch}`);
       const a = z - mid / Math.tan(down);
@@ -115,7 +126,7 @@ export function perspective(v: View): Perspective {
       // the ray through the pixel, level and down parts; it meets the ground eye m below
       const a = (col + 0.5 - vp) / focal, b = (cy - row - 0.5) / focal, h = cp - b * sp, t = eye / -(sp + b * cp), xc = a * t, zc = h * t;
       const gx = xc * cos + zc * sin, gz = zc * cos - xc * sin;
-      return [bend ? gx - (bend * gz * gz) / 2 : gx, gz];
+      return [bend ? gx - side(bend, from, gz) : gx, gz];
     },
     scale: (z, x = 0, up = 0) => focal / cam(x, z, up)[2],
     vanish: (angle = 0) => vp + (focal * Math.tan(((angle - yaw) * Math.PI) / 180)) / cp,

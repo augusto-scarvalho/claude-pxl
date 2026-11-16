@@ -9,7 +9,7 @@ import { LOOKS, dissolveChar, dissolveEdge, lightestOf, runEffect } from "./effe
 import { type SmokeOpts, drawSmoke, inMeters } from "./smoke.ts";
 import { type Particle, type TrailOpts, drawParticles, drawTrail } from "./vfx.ts";
 import type { Spell } from "./spells.ts";
-import { type Perspective, type View, perspective, scaled } from "./perspective.ts";
+import { type Perspective, type View, perspective, scaled, side } from "./perspective.ts";
 import { type Solid, type SolidCanvas, type SolidOpts, castSolids, drawSolids } from "./solids.ts";
 import { type SurfaceCanvas, type SurfaceOpts, type SurfaceView, type VoxelOpts, drawSurface, drawVoxels, partIndex } from "./surface.ts";
 import { type VolumeOpts, drawVolume } from "./volume.ts";
@@ -697,7 +697,7 @@ export class Canvas {
     opts: { far?: number; top?: number; bound?: (x: number, z: number) => number; margin?: number; sky?: (col: number, row: number) => string | null | undefined } = {}): void {
     const P = perspective({ ...view, w: view.w ?? this.img.w } as View), far = opts.far ?? 10000, top = opts.top ?? Infinity, margin = opts.margin ?? 0, eye = P.eye;
     // the march goes straight; on a bending way, the land is asked for where the bend puts that point
-    const bent = <A extends unknown[]>(g: (x: number, z: number, ...a: A) => any) => (P.bend ? (x: number, z: number, ...a: A) => g(x - (P.bend * z * z) / 2, z, ...a) : g);
+    const bent = <A extends unknown[]>(g: (x: number, z: number, ...a: A) => any) => (P.bend ? (x: number, z: number, ...a: A) => g(x - side(P.bend, P.bendFrom, z), z, ...a) : g);
     height = bent(height); fn = bent(fn);
     const bound = opts.bound ? bent(opts.bound) : height;
     const put = (col: number, row: number, k: string | null | undefined) => { if (k && k !== ".") this.px(col, row, k); };
