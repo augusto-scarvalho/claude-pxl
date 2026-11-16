@@ -463,3 +463,21 @@ views("_h", sdf.ellipsoid([4.6, 5, 5.3]).mat("zsS"), { ink: "k", jaw: ["D", "zsS
   }
   assert.match(failure(`${PAL} views("_h", sdf.sphere(4).mat("krw"), { ink: "k", jowl: 2 })`).message, /jowl is the px .* with ink and jaw/);
 });
+
+test("views' crown: of the bald dome's lightest blob only a dash n px long a pixel under its top, the rest a step down, its sides another; in every view", () => {
+  const head = (o: string) => loadSource(`${PAL} pal({ D: "#5a2a1a", z: "#8a4a3a", s: "#c07050", S: "#e09070", L: "#f8d0b0" }); ramps("zsSL")
+views("_h", sdf.ellipsoid([4.6, 5, 5.3]).mat("zsSL"), { ink: "k", jaw: ["D", "zsSL"], surface: { soft: 0.55 }${o} })`, "t.px.js");
+  const plain = head(""), lit = head(", crown: 3"), K = (k: string) => plain.pal.keys.get(k);
+  for (const v of ["s", "sw", "w", "nw", "n"]) {
+    const a = plain.image(`_h_${v}`), b = lit.image(`_h_${v}`), W = a.w, at = (img: typeof a, x: number, y: number) => img.data[y * W + x];
+    const blob = [...a.data.keys()].filter((i) => a.data[i] === K("L")), shine = [...b.data.keys()].filter((i) => b.data[i] === K("L"));
+    const y1 = Math.floor(blob[0] / W) + 1, run = blob.filter((i) => Math.floor(i / W) === y1);
+    assert.ok(blob.length > 3 && shine.length === 3 && shine.every((i, k) => Math.floor(i / W) === y1 && i === shine[0] + k), `${v}: a dash of 3 on the blob's second row, of ${blob.length}`);
+    assert.ok(Math.abs(shine[0] + 1 - (run[0] + run.at(-1)!) / 2) <= 0.5, `${v}: centred on the blob there`);
+    assert.ok(blob.every((i) => shine.includes(i) || b.data[i] === K("S")), `${v}: the rest a step down`);
+    // under the dash, the skin at the row's ends a step darker
+    const y = y1 + 1, xs = [...Array(W).keys()].filter((x) => [K("s"), K("S"), K("L")].includes(at(a, x, y)));
+    assert.ok([xs[0], xs.at(-1)!].every((x) => at(a, x, y) === K("S") && at(b, x, y) === K("s")), `${v}: its sides a step darker`);
+  }
+  assert.match(failure(`${PAL} views("_h", sdf.sphere(4).mat("krw"), { ink: "k", crown: 3 })`).message, /crown is the px .* with jaw/);
+});

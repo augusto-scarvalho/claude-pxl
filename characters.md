@@ -199,8 +199,10 @@ directions walking, idle, kneeling and casting;
    and the nose's tip past the line; turned away (sw, w), the cheek closed on a chin 3 px wide where
    the render leaves the skull's shade under the ear (a jowl): `jowl: 2` closes it (the jaw's line in
    the skin's dark up toward the ear), a side lock dark down to the jaw painted over it if the hair
-   comes down there. The 3D gets right the volumes hand drawing struggles with (the
-   hair, a beard); a face of fields and decals reads worse than a painted one, so the face is painted.
+   comes down there; a bald crown the render lights as a blob of the skin's lightest: `crown: 3` keeps
+   its shine a dash 3 px long a pixel under the dome's top, the rest a step down, its sides another.
+   The 3D gets right the volumes hand drawing struggles with (the hair, a beard); a face of fields
+   and decals reads worse than a painted one, so the face is painted.
    `rig3d`'s `head` stamps it by the heading, as it would hand-drawn views (`views(name, { s: grid,
    sw, w, nw, n })`: front, front 3/4, profile, back 3/4, back, their crown, chin and anchor on the
    same rows); drawn once per view, a head costs nothing per frame.

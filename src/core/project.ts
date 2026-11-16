@@ -958,9 +958,9 @@ export class Project implements BuildCtx {
         const model = grids instanceof Sdf ? grids : undefined;
         if (typeof given !== "string" || !given || !(model || isPlainObject(grids)) || !isPlainObject(opts)) throw new PxError('views("_head", { s: grid, sw: grid, w: grid, nw: grid, n: grid } or a field (the head modeled), { anchor: [x, y] (or { s: [x, y], ... }), like: "_other_head" })');
         const name = this.qualify(given);
-        const BAKE = ["n", "pitch", "light", "mats", "surface", "ink", "jaw", "jowl", "retouch"];
+        const BAKE = ["n", "pitch", "light", "mats", "surface", "ink", "jaw", "jowl", "crown", "retouch"];
         checkKeys("views", opts, ["anchor", "like", "chin", "swap", "outline", "outline8", "inline", "selout", ...(model ? BAKE : [])]);
-        const { anchor, like, chin, n: nv, pitch, light, mats, surface: sopts, ink, jaw, jowl, retouch, ...so } = opts as { anchor?: unknown; like?: unknown; chin?: unknown; n?: number; pitch?: number; light?: number[]; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: string[]; jowl?: number; retouch?: Record<string, string> };
+        const { anchor, like, chin, n: nv, pitch, light, mats, surface: sopts, ink, jaw, jowl, crown, retouch, ...so } = opts as { anchor?: unknown; like?: unknown; chin?: unknown; n?: number; pitch?: number; light?: number[]; mats?: Record<string, unknown>; surface?: Record<string, unknown>; ink?: string; jaw?: string[]; jowl?: number; crown?: number; retouch?: Record<string, string> };
         // a head modeled (a field in its own frame: x its right, y ahead, z up, px, its middle where it is
         // stamped), drawn once per view as rig3d draws a figure (surface(), the line all round it, `jaw`'s
         // line under the skin), then each view's `retouch` painted over it by hand ("." keeps the render's
@@ -971,6 +971,7 @@ export class Project implements BuildCtx {
           if (sopts !== undefined) { if (!isPlainObject(sopts)) throw new PxError("views: surface is surface()'s options ({ soft, clean, ... })"); checkKeys("views surface", sopts, SURFACE_OPTS.filter((k) => !["view", "ppm", "at", "part"].includes(k))); }
           if (jaw !== undefined && !(Array.isArray(jaw) && jaw.length === 2 && jaw.every((k) => typeof k === "string" && k))) throw new PxError(`views: jaw is [key, the skin's ramp]: the line of key under the skin, where the line round it is under the face, got ${JSON.stringify(jaw)}`);
           if (jowl !== undefined && !(Number.isInteger(jowl) && jowl > 0 && jaw && ink !== undefined)) throw new PxError(`views: jowl is the px the cheek closes into the chin, turned 45 to 90 degrees (2: the hand heads'), with ink and jaw (where the skin is), got ${JSON.stringify(jowl)}`);
+          if (crown !== undefined && !(Number.isInteger(crown) && crown > 0 && jaw)) throw new PxError(`views: crown is the px of the bald crown's shine, a dash under its top (3: the crew's bald head), with jaw (the skin's ramp), got ${JSON.stringify(crown)}`);
           if (retouch !== undefined && !(isPlainObject(retouch) && Object.entries(retouch).every(([d, g]) => COMPASS.includes(d) && typeof g === "string"))) throw new PxError("views: retouch is { s: grid, ... }: per view, pixels painted over the render (\".\" keeps it, \"_\" erases)");
           const sp = Math.sin(((pitch ?? 20) * Math.PI) / 180), cp = Math.cos(((pitch ?? 20) * Math.PI) / 180), { lo, hi, mats: names } = compile(model);
           // one size for every view: the farthest the head reaches from its middle, turned any way, and a pixel of line round it
@@ -1002,6 +1003,23 @@ export class Project implements BuildCtx {
                 if (x === xj && y <= yb) { if (p !== TRANSPARENT) set(J); }
                 else if (y < yb) { if (skin.has(p)) set(dark); }
                 else if (y === yb ? skin.has(p) || p === J : p === J) set(y === yb && up !== TRANSPARENT && up !== J && !skin.has(up) ? K : TRANSPARENT);
+              }
+            }
+            // `crown`: a bald crown's shine. The render lights the dome as a blob of the skin's lightest as wide as
+            // the light falls; of it only a dash n px long on its second row (a pixel under its top) is kept,
+            // centred on the blob there, the rest a step down the skin's ramp, and on its rows under the dash the
+            // skin at each end of the row a step down again (the dome's sides turning from the light)
+            if (crown && jaw) {
+              const ramp = [...jaw[1]].map((k) => c.color(k)), top = ramp.at(-1)!, blob: number[] = [], seen = new Set<number>(), todo = [data.indexOf(top)];
+              while (todo.length) { const i = todo.pop()!; if (i < 0 || i >= data.length || seen.has(i) || data[i] !== top) continue; seen.add(i); blob.push(i); todo.push(i - W, i + W, ...(i % W ? [i - 1] : []), ...((i + 1) % W ? [i + 1] : [])); }
+              const row = (y: number) => blob.filter((i) => Math.floor(i / W) === y).map((i) => i % W), y1 = Math.floor(Math.min(...blob) / W) + 1, dash = row(y1);
+              const x0 = Math.round((Math.min(...dash) + Math.max(...dash)) / 2 - (crown - 1) / 2), set = (x: number, y: number, k: typeof top) => c.plot(x - c.ox, y - c.oy, k);
+              for (const i of blob) if (Math.floor(i / W) !== y1 || i % W < x0 || i % W >= x0 + crown) set(i % W, Math.floor(i / W), ramp.at(-2)!);
+              for (let y = y1 + 1, xs = row(y); xs.length; xs = row(++y)) for (const s of [-1, 1]) {
+                let x = s < 0 ? Math.min(...xs) : Math.max(...xs);
+                while (x + s >= 0 && x + s < W && ramp.includes(data[y * W + x + s])) x += s;
+                const k = ramp.indexOf(data[y * W + x]);
+                if (k > 0) set(x, y, ramp[k - 1]!);
               }
             }
             const g = retouch?.[d];

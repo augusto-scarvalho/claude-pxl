@@ -88,7 +88,7 @@ Mark items `[x]` when they ship, with the commit.
     edge, a pixel of its shadow on the brow (6 px a head, the w grid three columns wider). The bald
     crown was a blob of the skin's lightest 5 px wide, the same in every view: now a dash of 3 a pixel
     under the dome's top, the rest in skin, the dome's lower sides a step darker, in all five views
-    (nw and n retouched too: their anchors in the traveler's `ANCHOR`);
+    (nw and n retouched too; since F3 jaw and crown by views()' `crown`, no hand pixel);
   - 1 px creases (knee, elbow) hardly read; the cloak's and boots' accents do. Done (round 6),
     approved: only the traveler and the mourner had them (`parts3m`); a tone darker on every frame,
     they blinked with the idle's breath (its 1 px down bends the knees 51 degrees). Now a pair, only
@@ -260,11 +260,19 @@ still hold, and the rest wait on these:
   Done (F3 chin and puffs): `jowl: 2`, turned 45 to 90 degrees: the chin 3 px wide (2 in profile), the jaw's line up its
   back, the skin behind it the darkest, the chin's row behind it and the line under it cleared; the crew's three heads
   on it, their pixels the same (the side locks and the grey head's tail pixel stay painted over it). The traveler's
-  and the mourner's (`traveler.px.js`) keep their hand mends until the user sees them on it.
-- [ ] **The bald crown, a shiny egg**: the render lights the crew's bald crown as a blob of the skin's
+  and the mourner's (`traveler.px.js`) on it too (F3 jaw and crown), their pixels the same: his side lock painted over
+  it (in 3/4 it covers all the option draws; in profile the line under the chin and a gap before the lock's end stay
+  by hand, the render's chin row having hair there), her pixel of hair behind the neck (in profile its line too).
+- [x] **The bald crown, a shiny egg**: the render lights the crew's bald crown as a blob of the skin's
   lightest 5 px wide, the same in every view; its retouch keeps a dash of 3 under the dome's top and
   paints the rest in skin by hand, in all five views. A highlight by the view (where the light falls
   on the dome as it turns) would take the hand pixels out.
+  Done (F3 jaw and crown): nothing views() or surface() had gives it (the light is as bright on the dome's third row as
+  on its second, so no ramp keeps the dash alone; `shine` glints lower, `rim` on the top row; `soft`, `light` and
+  `tones` move the beard and the band too). `crown: 3`: of the blob only a dash of 3 on its second row kept, centred on
+  it there (where the light falls), the rest a step down the skin's ramp, the skin at the ends of its rows under the
+  dash another; the bald head on it, its pixels the same in all five views, its nw and n grids gone (and the
+  traveler's anchors for them).
 - [x] **`palettize: "rest"`**: `palettize` runs at load, before the items, so trees mapped by
   `rampmap` leave every color no `rampmap` takes (the LPC trees' #101820 line) off the palette.
   `"rest"`, applied after the items, to what's left.
