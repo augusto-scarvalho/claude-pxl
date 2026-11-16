@@ -65,6 +65,8 @@ normals.px.js: 0 warnings (3 scenes (3 frames, 18 distinct placements), 0 rigs, 
   ran: lit side on 14 (a clear reading on 0), lines on 3; not run: front marker (nothing has one), feet (nothing placed has a height)
 parallax/train.px.js: 0 warnings (1 scene (8 frames, 61 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 61 (a clear reading on 0), lines on 2; not run: front marker (nothing has one), feet (nothing placed has a height)
+perspective/bend.px.js: 0 warnings (1 scene (10 frames, 925 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: lit side on 925 (a clear reading on 0); not run: front marker (nothing has one), feet (nothing placed has a height)
 perspective/cockpit.px.js: included only (doesn't build on its own: its palette comes from the file including it)
 perspective/extinction.px.js: 0 warnings (1 scene (5 frames, 70 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 70 (a clear reading on 0), lines on 6; not run: front marker (nothing has one), feet (nothing placed has a height)
