@@ -70,6 +70,10 @@ test("docs: every guide section the guides send the agent to prints; a command's
   const help = async (q: string) => { const log = console.log, out: string[] = []; console.log = (s: string) => out.push(String(s)); try { await main(["help", q]); } finally { console.log = log; } return out.join("\n"); };
   const docs = new Set([...GUIDES, ...readdirSync(join(root, "docs")).filter((f) => f.endsWith(".md")).map((f) => `docs/${f}`)]);
   for (const f of docs) for (const [, q] of read(f).matchAll(/pxl help "([^"<]+)"/gi)) assert.match(await help(q), /^###? /m, `${f}: pxl help "${q}" prints no section`);
+  // SKILL.md's table names routes by their words alone ("walks and idles"): each prints a section or names them
+  for (const row of read("SKILL.md").split("\n").filter((l) => l.startsWith("| "))) for (const [, q] of row.matchAll(/"([a-z][a-z0-9 ]+)"/g)) assert.match(await help(q), /^###? |^\[guides: /m, `SKILL.md: "${q}" prints no section`);
+  // a ### whose word its ## has too prints once, inside it
+  assert.equal((await help("diagonal")).match(/^### Turned to a diagonal/gm)?.length, 1);
   // help shot printed scenes' "One-shot effects" whole (20 KB): a command's block of the usage comes first
   for (const cmd of usage.keys()) assert.match(await help(cmd), new RegExp(`^\\[pxl --help\\]\\n {2}pxl ${cmd}\\b`), `pxl help ${cmd}`);
   // a method by its name after the dot: box() and sdf.box, the shorter first, each labelled

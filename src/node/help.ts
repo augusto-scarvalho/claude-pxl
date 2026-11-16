@@ -140,7 +140,7 @@ export function help(term?: string, opts: { all?: boolean; usage?: string } = {}
     if (!rest.length) return i >= 0;
     const numbered = (w: string) => /^\d+$/.test(w) ? /^(\d+)\./.exec(s.head)?.[1] === w : inHead(w, s);
     return nums ? (i >= 0 || !words.some(guide)) && rest.some(numbered) : rest.every((w) => inHead(w, s));
-  });
+  }).filter((s, _, a) => !a.some((p) => p !== s && p.file === s.file && p.text.includes(s.text)));   // not a ### again under its ## ("diagonal")
   // a section of the reference itself whose heading starts with its words ("glow": Glow, "anim":
   // Animation) is where a name with no row of its own is defined: that one whole, the guides named
   const refs = !own.length && !nums && words.length

@@ -317,9 +317,10 @@ half new.
 
 ## 5. Faces
 
+### Face basics: eyes, mouth and hair by size
+
 (A portrait: the eyes at half the head's height; quarter lines for the hairline, the eyes and the tip
 of the nose; the corners of the mouth straight below the pupils.)
-
 
 - **16 px:**
   - Eyes are 2×2, right under the bangs. Leave one row of skin between the bangs and the eyes.
@@ -333,6 +334,33 @@ of the nose; the corners of the mouth straight below the pupils.)
   - Brows sit 2 rows above the eyes. The mouth is small.
   - Whites and brows look more natural here than chibi eyes that are all dark. Offer both if
     unsure.
+- **Hair on a small head** (11-13 rows; Octopath, the Manas, Terranigma, Chrono Trigger, CrossCode,
+  FFT, Tactics Ogre, Sword of Mana measured; final boss blues', SLYNYRD's and Saint11's tutorials):
+  - Never a circle. Either a flat top (a run of 4-8 px reaching full width in 2-3 rows: Sword of Mana's
+    hero, Randi) or a narrow top widest at the eyes, where tufts stand out at the temples (Olberic: 6,
+    8, 10, 10, 12, 12, 14, 12, 10, 10, 9 px). Break the dome with a parting (a 1 px notch off the
+    middle), a tuft 1-3 rows above the mass, or lock tips 1-2 px out at the sides every 2-3 rows.
+    Short hair stands 1-2 rows over the skull and 0-1 px out at the sides.
+  - The face narrower than the hair (7-9 px under 13-16), side locks 2-3 px wide hanging to the jaw,
+    the jaw closing in about 2 px a row over its last 2-3 rows: what keeps the head from being a ball.
+    A fringe of 3-4 pointed locks ending on the brow or the eyes, skin between their tips.
+  - 3-4 tones and a highlight, in about equal amounts, a small step between tones (Octopath's 4-5).
+    The light only in the upper third, as short strokes along the strands (a broken band, mirrored
+    pairs on two lobes), never dots in a checker or a column-by-column alternation; from behind a ring
+    round the crown; the nape the darkest everywhere. Outline it in its own darkest tone, the lit top
+    edge in a mid or dark hair tone, no black between hair and skin (a black ring round the whole head
+    with a lighter ring inside it is pillow shading).
+  - In profile the mass reaches 2-3 px behind the skull and the fringe overhangs the brow a pixel;
+    from behind it keeps the front's top and narrows to a nape of 4-6 px ending in points, the ears
+    peeking out a pixel. One haircut, the same locks seen from every side.
+- **Pupils:** keep at least 1 px of skin between a pupil and the outline, or it reads as a crease.
+- **How eyes read:**
+  - Both irises shifted the same way reads as a glance.
+  - White on the outer side of both eyes looks cross-eyed.
+  - A full dark lash row over a short iris looks sleepy.
+
+### A face turned three quarters, at a head of 13-16 px
+
 - **A face turned three quarters, at a head of 13-16 px** (Octopath, Triangle Strategy, FFT, Tactics
   Ogre, measured; `lib/characters/traveler.px.js`):
   - The face 5-7 px wide and 5-7 rows from the lids to the chin, low in the head (the eyes about
@@ -353,25 +381,9 @@ of the nose; the corners of the mouth straight below the pupils.)
   - Expressions move the lids: closed, a 2 px dark line; alert, more white; angry, the near lid's
     inner end lower; sad, its outer end lower; surprised, the lids up a row and a black mouth. A
     blink: one frame of 100-150 ms with the lids down, every 2-4 s.
-- **Hair on a small head** (11-13 rows; Octopath, the Manas, Terranigma, Chrono Trigger, CrossCode,
-  FFT, Tactics Ogre, Sword of Mana measured; final boss blues', SLYNYRD's and Saint11's tutorials):
-  - Never a circle. Either a flat top (a run of 4-8 px reaching full width in 2-3 rows: Sword of Mana's
-    hero, Randi) or a narrow top widest at the eyes, where tufts stand out at the temples (Olberic: 6,
-    8, 10, 10, 12, 12, 14, 12, 10, 10, 9 px). Break the dome with a parting (a 1 px notch off the
-    middle), a tuft 1-3 rows above the mass, or lock tips 1-2 px out at the sides every 2-3 rows.
-    Short hair stands 1-2 rows over the skull and 0-1 px out at the sides.
-  - The face narrower than the hair (7-9 px under 13-16), side locks 2-3 px wide hanging to the jaw,
-    the jaw closing in about 2 px a row over its last 2-3 rows: what keeps the head from being a ball.
-    A fringe of 3-4 pointed locks ending on the brow or the eyes, skin between their tips.
-  - 3-4 tones and a highlight, in about equal amounts, a small step between tones (Octopath's 4-5).
-    The light only in the upper third, as short strokes along the strands (a broken band, mirrored
-    pairs on two lobes), never dots in a checker or a column-by-column alternation; from behind a ring
-    round the crown; the nape the darkest everywhere. Outline it in its own darkest tone, the lit top
-    edge in a mid or dark hair tone, no black between hair and skin (a black ring round the whole head
-    with a lighter ring inside it is pillow shading).
-  - In profile the mass reaches 2-3 px behind the skull and the fringe overhangs the brow a pixel;
-    from behind it keeps the front's top and narrows to a nape of 4-6 px ending in points, the ears
-    peeking out a pixel. One haircut, the same locks seen from every side.
+
+### A new head on an approved body
+
 - **A new head on an approved body** (the harbor's crew, `lib/characters/crew.px.js`): start from the
   approved head's grid in each view and change only the hair, hat or beard, keeping the face, eye, ear
   and jaw pixels. Row by row the new skull stays within ±1 px of the approved one's extents (print each
@@ -384,13 +396,10 @@ of the nose; the corners of the mouth straight below the pupils.)
   knot; a cap or bandana sits on the skull and overhangs the brow by a pixel; a ponytail, braid or queue
   hangs down behind the neck from a small dark knot at ear height (2 px wide, 3-4 long), never out
   sideways, and nothing else hangs below the skull (strands at its edges read as tentacles).
-- **Pupils:** keep at least 1 px of skin between a pupil and the outline, or it reads as a crease.
-- **How eyes read:**
-  - Both irises shifted the same way reads as a glance.
-  - White on the outer side of both eyes looks cross-eyed.
-  - A full dark lash row over a short iris looks sleepy.
 
 ## 6. 3/4 (diagonal) and profile views
+
+### View basics: near side, far side, profile
 
 - **Face:**
   - Eyes and mouth shift toward the side the character faces, and the far eye moves in.
@@ -410,6 +419,21 @@ of the nose; the corners of the mouth straight below the pupils.)
   - The waist is no wider than the chest, and a skirt flares 1 px a side at most.
   - Forearms and wrists are narrower than the sleeves above them.
   - Shoulders slope down from the neck. Flat shoulders read as shoulder pads.
+- **Profile (side view):** everything says which way the figure faces. The far arm and far leg hide
+  behind the near ones or show as a darker sliver on the same side (moving, keep them a ramp step
+  darker in every frame, `stamp(limb, x, y, { shade: 1 })`, so crossing legs never swap; when every
+  ramp starts at the ink, add `floor: "k"` (each ramp stops at its darkest above the black, as
+  `selout`'s line does with it), or the far leg gets a black line and black bands; a far leg
+  all shadow, with near-black under it, or it reads as raised; an RPG's side idle may spread both legs for a solid stance); a far arm drawn out on the back
+  with a tail beside it made a werewolf's body read as facing away from its head. Fix one part at a
+  time against the facing; when fixes start contradicting each other, go back to the last version
+  that read right.
+- **A chosen silhouette, redrawn in another way** (shapes to a hand grid, or the reverse), grows: a
+  chest pushed forward 2 px reads as a pot belly. Compare the redraw with the chosen version side by
+  side before replacing it.
+
+### Four directions: facing us, in profile, from behind
+
 - **Four views of one figure** (final boss blues' RPG base): shared guide rows in a `ref: true` layer
   (the top, the soles, the shoulders, the chin, the crotch, the ankles); the back view starts as a
   copy of the front's silhouette; the side view about 0.6 of the front's width (15 of 24), drawn
@@ -443,6 +467,9 @@ of the nose; the corners of the mouth straight below the pupils.)
   - A sprite the game mirrors for the other side (E from W, NE from NW, SE from SW) is lit from above
     and toward us, hair and body alike: lit from the upper left, its mirror takes the light to the
     right while the scene's stays left.
+
+### Turned to a diagonal (tactics, HD-2D)
+
 - **Turned to a diagonal** (tactics games and HD-2D: FFT, FFTA, Tactics Ogre, Triangle Strategy,
   Octopath; down-left, up-left, the other two flipped). Facing down and to the left, the figure has
   turned to its right: its left side comes toward us, so the near arm and the near foot are on the
@@ -477,18 +504,6 @@ of the nose; the corners of the mouth straight below the pupils.)
     tail and the hair a frame late. Feet moved 1 px each way never part and read as shuffling.
   `lib/characters/traveler.px.js` stands on these numbers (its body a figure in 3D, `rig3d()` and
   `gait()`, §3).
-- **Profile (side view):** everything says which way the figure faces. The far arm and far leg hide
-  behind the near ones or show as a darker sliver on the same side (moving, keep them a ramp step
-  darker in every frame, `stamp(limb, x, y, { shade: 1 })`, so crossing legs never swap; when every
-  ramp starts at the ink, add `floor: "k"` (each ramp stops at its darkest above the black, as
-  `selout`'s line does with it), or the far leg gets a black line and black bands; a far leg
-  all shadow, with near-black under it, or it reads as raised; an RPG's side idle may spread both legs for a solid stance); a far arm drawn out on the back
-  with a tail beside it made a werewolf's body read as facing away from its head. Fix one part at a
-  time against the facing; when fixes start contradicting each other, go back to the last version
-  that read right.
-- **A chosen silhouette, redrawn in another way** (shapes to a hand grid, or the reverse), grows: a
-  chest pushed forward 2 px reads as a pot belly. Compare the redraw with the chosen version side by
-  side before replacing it.
 
 ## 7. Placing the pixels
 
@@ -660,6 +675,8 @@ offset points back to, so nothing tears open and no color is made up.
 
 ## 10. Animating with parts
 
+### Limbs drawn per pose: walks and idles
+
 How a previous studio pipeline (Smack Studio rigs, Warp pin meshes, mocap guides) got to animation
 its curator accepted, after rejecting most of what it tried first:
 
@@ -680,6 +697,43 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
     c.stamp(`arm_${c.frame}`, 0, 0, { at: "body.shoulder", z: ARM_Z[c.frame] })   // in front or behind
   }))
 ```
+
+- **A 2-frame idle** works when its down frame is a squash: the knees bend and the arms open, so the
+  body widens as much as it drops (a plain one-pixel bob doesn't; see the next point), or when it is
+  slow: 800 ms a drawing carries a plain bob on a small sprite (SLYNYRD). More frames go to overlap
+  in the same cycle (the head leads, then the arms, then the hair), not to a longer one. Under about
+  24 px wide a pixel is 5% of the body and a breath reads as a spasm: move one axis only, or give it a
+  rare idle action instead (a look round, a stretch).
+- **Walk and run key poses** (Saint11): a walk goes contact, down (lowest, just after contact, the
+  arms widest), passing, up (highest); 6 frames at low resolution, 12 for fluid; the arms swing
+  against the legs and the planted foot moves back every frame. A game's walk keeps to 8 frames or
+  fewer (final boss blues: 4 keys at 200 ms, or 8 at 100–150; SLYNYRD's 8 at 140 ms, its passing
+  frame the highest: the head 0, 0, +2, +1 px from contact), and its bob is a triangle (1 px a step),
+  never a sine. A run step is 4 poses: airborne (highest), fall, contact on a straight front leg,
+  recover (lowest); a game's run, 3 (§12). Top-down, a front or back walk
+  is half the cycle and the same half flipped (`flip: "x"`), redrawing only what isn't symmetric,
+  with less bob walking up. In-betweens halve each frame's time, so the cycle keeps its length.
+  `gait(t, { heading })` gives a walk's numbers by the view, overridable, and its `pace`: a figure
+  moved that fast (`route()`'s pace by direction) keeps the planted foot still (`PXL help gait`).
+- **Animate a dummy first** (SLYNYRD, final boss blues): the figure in flat parts, each in its own
+  color (the head, the torso, the near limbs light, the far ones dark), through every move; then
+  paint the costume over it frame by frame. One leg first (4 keys, then 8 frames), the other the same
+  cycle half a cycle later; then re-time the bob (once per step, not per cycle); the arms last, the
+  idle arm in both passing frames, the elbow bent only on the forward swing. Gear on a layer of its
+  own (it stays in one hand). To move while shooting, split the legs from the torso and place the
+  torso's shooting drawings over every leg frame (3 over an 8-frame run: 24 torsos).
+- **Register the whole figure by one point**, the pelvis: move the entire frame so it lands on the
+  same x every frame, with one constant y offset per cycle for the bob. Never centre frames on
+  their bounding box (an arm reaching out moves it), and never pin head and feet separately (the
+  torso goes soft). `register: "m"` on the anim does it: a marker pixel on the pelvis in each
+  frame, in a `ref: true` layer, and every frame moves sideways to put it on one x.
+- **Review the whole cycle**, not the key frames: `_preview/<name>_onion.png` (from `PXL build`),
+  the half-cycle pairs (frame i next to i + n/2: `PXL shot file walk --frames 0,4` and `1,5`...), and
+  the seam (last → 0 → 1: `--frames 7,0,1`). Fixing a limb only on the contact
+  frame leaves the wrong leg moving in the in-betweens. Draw left and right limbs in distinct guide
+  colors while working so their identity can't swap. Check that shoulders stay on the torso.
+
+### Attacks, swings and jumps
 
 - **A drawn part turned on its joint** (a big figure's in-betweens: a 110 px fighter's forearm
   between its guard and its reach): `stamp(part, x, y, { angle })` turns it round its pivot, so give
@@ -717,30 +771,9 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   the fastest frames (the takeoff). A jump's takeoff frame carries most of the rise and the steps
   about halve to the top, which holds 1–3 frames; the fall speeds up to the ground. Redraw those
   frames (or `warp` them), never scale them.
-- **A 2-frame idle** works when its down frame is a squash: the knees bend and the arms open, so the
-  body widens as much as it drops (a plain one-pixel bob doesn't; see the next point), or when it is
-  slow: 800 ms a drawing carries a plain bob on a small sprite (SLYNYRD). More frames go to overlap
-  in the same cycle (the head leads, then the arms, then the hair), not to a longer one. Under about
-  24 px wide a pixel is 5% of the body and a breath reads as a spasm: move one axis only, or give it a
-  rare idle action instead (a look round, a stretch).
-- **Walk and run key poses** (Saint11): a walk goes contact, down (lowest, just after contact, the
-  arms widest), passing, up (highest); 6 frames at low resolution, 12 for fluid; the arms swing
-  against the legs and the planted foot moves back every frame. A game's walk keeps to 8 frames or
-  fewer (final boss blues: 4 keys at 200 ms, or 8 at 100–150; SLYNYRD's 8 at 140 ms, its passing
-  frame the highest: the head 0, 0, +2, +1 px from contact), and its bob is a triangle (1 px a step),
-  never a sine. A run step is 4 poses: airborne (highest), fall, contact on a straight front leg,
-  recover (lowest); a game's run, 3 (§12). Top-down, a front or back walk
-  is half the cycle and the same half flipped (`flip: "x"`), redrawing only what isn't symmetric,
-  with less bob walking up. In-betweens halve each frame's time, so the cycle keeps its length.
-  `gait(t, { heading })` gives a walk's numbers by the view, overridable, and its `pace`: a figure
-  moved that fast (`route()`'s pace by direction) keeps the planted foot still (`PXL help gait`).
-- **Animate a dummy first** (SLYNYRD, final boss blues): the figure in flat parts, each in its own
-  color (the head, the torso, the near limbs light, the far ones dark), through every move; then
-  paint the costume over it frame by frame. One leg first (4 keys, then 8 frames), the other the same
-  cycle half a cycle later; then re-time the bob (once per step, not per cycle); the arms last, the
-  idle arm in both passing frames, the elbow bent only on the forward swing. Gear on a layer of its
-  own (it stays in one hand). To move while shooting, split the legs from the torso and place the
-  torso's shooting drawings over every leg frame (3 over an 8-frame run: 24 torsos).
+
+### Subpixel: less than a pixel of motion
+
 - **Subpixel: less than a pixel of motion** (after ApplefatGOV's How-to-subpixel and 2D Will Never
   Die's: "animate the anti-aliasing"). An idle doesn't need the whole body to drop a pixel (the
   tutorial's is a fighting stance in its beat, a boxer finding his rhythm, about a second a sway; a
@@ -766,16 +799,9 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
     it goes (or draw it in `c.subpixel(dx, dy, () => ..., [dx, dy])`); give each ramp its steps toward
     the ink (`examples/subpixel.px.js`). `pxl study` tells it in a clip ("Subpixel: ..."), with the tones it
     takes.
-- **Register the whole figure by one point**, the pelvis: move the entire frame so it lands on the
-  same x every frame, with one constant y offset per cycle for the bob. Never centre frames on
-  their bounding box (an arm reaching out moves it), and never pin head and feet separately (the
-  torso goes soft). `register: "m"` on the anim does it: a marker pixel on the pelvis in each
-  frame, in a `ref: true` layer, and every frame moves sideways to put it on one x.
-- **Review the whole cycle**, not the key frames: `_preview/<name>_onion.png` (from `PXL build`),
-  the half-cycle pairs (frame i next to i + n/2: `PXL shot file walk --frames 0,4` and `1,5`...), and
-  the seam (last → 0 → 1: `--frames 7,0,1`). Fixing a limb only on the contact
-  frame leaves the wrong leg moving in the in-betweens. Draw left and right limbs in distinct guide
-  colors while working so their identity can't swap. Check that shoulders stay on the torso.
+
+### Motion references: mocap, a video
+
 - Motion references (mocap, a video, a CC0 walk cycle) are guides for timing and arcs, drawn in
   a `ref: true` layer under the pose; they are not the authority on the body's proportions.
   `examples/motion/` has CC0 walk and run cycles in 8 directions: `motion("walk.json", { dir })`
@@ -784,6 +810,9 @@ anim("walk", { w: 32, h: 40, frames: 8, fps: 8, outline: "k" },
   stride down (her feet move a pixel or two, not the guide's length), show a step forward as the
   foot lower on screen as much as to the side, keep the legs from crossing, and let the body rise
   a pixel in the passing frames. Review it as pairs, frames 0–3 above 4–7.
+
+### A hand on something that moves
+
 - **A hand on something that moves** (a wheel that turns, a lever): at 30–60 px a hand is a puppet,
   a few joints in the hand's own frame read off a photo of the grip, set every frame by a transform
   (where, which way, how big) that lays the line the grip takes across the hand on the line the

@@ -242,16 +242,13 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 
 ## 7. True perspective (vanishing points)
 
+### Perspective basics: the ground and what stands on it
+
 - A road, rails, a corridor, a square seen from the ground: lay everything in meters and project it
   with `perspective()` (reference: Perspective). The ground is a `plane()`: each pixel gets the color
   of the ground point it sees, so stripes and rows run to the vanishing point by themselves. Long thin
   lines (joints, rails, wires) draw better as `line`s between two `ground()` points than per pixel.
   A ground drawn from above once (a kart track, Mode 7's map) is laid on it by `plane(P, { tex, texel, at })`.
-- A road that bends: `perspective({ ..., bend })`, its curvature in 1/m (a point z m ahead sits
-  bend·z²/2 to the side). Lay everything in meters along the road and across it as if it were
-  straight; the camera bends it, the ground, the things on it and their shadows alike. A bend that
-  changes as you go is a new camera each frame, and the heading turns with it: the far things
-  (the sun, the ranges) slide across by `focal · heading` px (`examples/perspective/race.px.js`).
 - Things on the ground stand at `ground(x, z)`, sized by `scale(z, x)` (and `up` when tilted); poles, posts and fences are a
   loop over z. A figure walking into the distance changes size only at each step's contact, and under
   ~15 px takes a hand-drawn sprite for its size (`fit`): drawn by code that small, it is a blob.
@@ -264,6 +261,33 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   same parts twice: `solids()` projects and draws them, `shadows()` sweeps them onto the ground away
   from the sun, so the shadow has the thing's shape and stays right as it recedes. Near ones on a plate with `relight` for the rim; far ones in the haze
   color; under a few px, a simple tuft.
+- The ground and what grows and lies on it (grass, trees, bushes, rocks, walls, paths, tufts,
+  flowers), as 16-bit games draw them: the environment guide (by section in `pxl help`)
+  and its kit, `lib/nature/kit.px.js`, to include.
+- Anything far off sits on a direction, not a point: the sun at `toward(sunDir)`, a sky colored by
+  `ray(col, row)` (its height above the horizon and its angle from the sun). Things moving the same
+  way (meteors, birds in a flock) run along parallel lines, which meet at `toward(theirDirection)`.
+
+### A road that bends, two points, three points
+
+- A road that bends: `perspective({ ..., bend })`, its curvature in 1/m (a point z m ahead sits
+  bend·z²/2 to the side). Lay everything in meters along the road and across it as if it were
+  straight; the camera bends it, the ground, the things on it and their shadows alike. A bend that
+  changes as you go is a new camera each frame, and the heading turns with it: the far things
+  (the sun, the ranges) slide across by `focal · heading` px (`examples/perspective/race.px.js`).
+- Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
+  `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:
+  each is lit or in shade by which way it faces the sun. People walking in such a scene: pose a body
+  in meters (feet, knees by two-bone IK, arms against the legs) and project it, rather than drawing
+  sprites per direction (`examples/perspective/park.px.js`).
+- Three-point: tilt the camera (`pitch`). Looking up (a worm's-eye view), put the horizon low in the
+  picture yourself (`horizon` near the bottom: pitch keeps it on that row and looks above it), and
+  every upright leans in toward `vertical()` above it: trunks, poles, a tower; looking
+  down, they spread toward a point below. A moderate tilt (15-20°) shows it without warping
+  everything; the uprights near the picture's edges show it most, so put tall things there.
+
+### Something you are inside of: a cockpit, a room
+
 - Something you are inside of or that wraps round itself (a car's dash round the driver, a wheel's
   rim in front of its own spokes, a ship's bridge, a room): `solids()` sorts whole shapes, so it
   draws those in the wrong order. Model it as flat faces in meters with `model()` (faces, strips
@@ -272,6 +296,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   outlined where a surface ends in front of another. A dozen sections per surface is plenty; paint
   the small parts (dials, vents, buttons, stitching) over it by hand where the camera puts them
   (`examples/perspective/cockpit.px.js`).
+
+### An HD-2D diorama
+
 - A diorama (HD-2D, as Octopath Traveler and Triangle Strategy): a camera high up through a long lens
   (`pitch` -30 to -50, `fov` 20 to 35), the ground, steps and walls as `model()` boxes whose
   materials are textures (`{ tex: "_cobble" }`, 16 px tiles to the meter), and the characters as
@@ -321,6 +348,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   drawn solid; thick smoke a faint one, `veil: 0.3`), and doesn't light anything unless it has `emit`
   on it (two lanterns on one sprite: `light: { each: true }`, a lamp for each). Draw smoke in 2-3 alpha levels
   in clusters, as its tones would be (50%, 70%, 85%), not as a smooth fade.
+
+### A diorama after a reference: its camera, a ship, wood
+
 - Matching a reference's camera (the harbor, after an Octopath Traveler II screenshot): measure it.
   The tilt from foreshortening: a floor's plank width across against along (the sine of the pitch), a
   crate's top against its front (the tangent), a deck's depth against its length; three readings gave
@@ -345,6 +375,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   in nine, nail heads over the joists, joints staggered; the board ends along its front as end grain; a
   hull's strakes over a line of tar, algae climbing from the waterline in streaks; a rowboat clinker,
   a shadow line under each strake's lip.
+
+### A story in a diorama
+
 - A story in a diorama (the graveyard's visit): `route()` walks its legs and holds by name, each leg
   facing its way, at the walk's own pace by its way (`pace: (dir) => ...`, from `gait()`'s `pace` over
   the walk's frames at the scene's px to the meter; slower or faster, the feet slide), the feet on its
@@ -365,27 +398,14 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   to include (its old path, `examples/hd2d/dialog.px.js`, still works), `dialog.PARCHMENT` the options;
   drawn after `post()`,
   so it stays sharp, in pixels finer than the art's (`unit: 0.75`). A loop that long checked one frame in 24: `check: { every: 24 }` (no rule runs on it but the frames building: fewer keep the tests fast).
-- The ground and what grows and lies on it (grass, trees, bushes, rocks, walls, paths, tufts,
-  flowers), as 16-bit games draw them: the environment guide (by section in `pxl help`)
-  and its kit, `lib/nature/kit.px.js`, to include.
-- Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
-  `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:
-  each is lit or in shade by which way it faces the sun. People walking in such a scene: pose a body
-  in meters (feet, knees by two-bone IK, arms against the legs) and project it, rather than drawing
-  sprites per direction (`examples/perspective/park.px.js`).
-- Three-point: tilt the camera (`pitch`). Looking up (a worm's-eye view), put the horizon low in the
-  picture yourself (`horizon` near the bottom: pitch keeps it on that row and looks above it), and
-  every upright leans in toward `vertical()` above it: trunks, poles, a tower; looking
-  down, they spread toward a point below. A moderate tilt (15-20°) shows it without warping
-  everything; the uprights near the picture's edges show it most, so put tall things there.
+
+### Mountains, creatures and fire
+
 - Mountains, hills, a volcano: `terrain()` with a height in meters, ray-marched through the same
   camera, so its silhouette, its ravines and what stands on it all agree. Build the shape as an
   old range first and the peak on it (a lone smooth cone reads as a drawing, not a mountain), then
   cut ridges and ravines that only lower it (`bound` stays a true upper bound). Things on it stand at
   `ground(x, z, height(x, z))`; flows go down the steepest way, step by step.
-- Anything far off sits on a direction, not a point: the sun at `toward(sunDir)`, a sky colored by
-  `ray(col, row)` (its height above the horizon and its angle from the sun). Things moving the same
-  way (meteors, birds in a flock) run along parallel lines, which meet at `toward(theirDirection)`.
 - Creatures in perspective: the big ones near (a tyrannosaur, a horse) as a profile in meters, their
   top and bottom lines from tail to snout, projected and painted in slices across, the jaw its own
   hinged piece, legs posed in 3D and painted round with `capsule`; round tubes and cones read as a fish with legs, and a head built
@@ -577,6 +597,8 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 
 ## 12. One-shot effects (explosions, sparks, hits)
 
+### The effect cards, frame by frame
+
 From Saint11's effect cards, read frame by frame (80 ms frames unless said); each one an `anim`
 played once, stamped where it happens. An effect often outlives the pose that made it, and one thing
 happens after another, never all at once.
@@ -628,22 +650,6 @@ happens after another, never all at once.
   material ahead of a green edge, drips falling; frost pales it blue behind a white crystal edge;
   magic is gold with sparkles. Without a theme, `neutral`: a thin ring of the thing's own lightest
   tone, half clear. Give the edge's keys over the progress for a color that changes as it goes.
-- **A spell in a scene** (`examples/hd2d/clearing.px.js`): a `spell()` of the kit in the file's own
-  fire (`ball`, `trail: { ghosts }`, `impact: { anim }`), from the hand of the caster's `mesh()` sprite
-  (`id: "hero"`), its burn on the target `fx: S.hit(c.t, ...)`; its phases (charge 600 ms,
-  cast 200, flight 600, impact 200, the target burning 2300, back 600, in 5 s); every loop in it a
-  divisor of the scene's (20 fps: the idle's 1000 ms, the fire's 500, the wind's 2500 into 5000: at
-  12.5 fps with the 250 ms idle the loops met only after 60 s). The ball a 4 px disc of
-  `effect("energy")` in 4 fire tones (scale 1.6: at 4 its noise was one band) with a 1 px `distort`;
-  its trail three of it at 50 ms steps back, fainter; its light the spell's lamps (`reach: 120, power: 3.75`: 2.5 m, 3). The aura 3
-  px in 3 tones, flicker 0.6 on 3.5 px cells, at 0.2-0.6 opacity (at 0.85 it hid the figure). A
-  target catching fire: the burn spreading from where it was hit over 2.4 s, flames 10 px from a third
-  of the front, a smoke column of 18 billows growing 3 to 10 px fading in over the first 15% and out
-  over the last 35%, the target's light `{ r: 3, strength: 2.5 }` flickering with its flames.
-- **A spell kit** (`spell()`, `examples/spells.px.js`): one call a whole cast, `cast(spell("ice", 2,
-  { from, to, ground }))`, the nine elements at three tiers on a 4 s loop at 20 fps (the third tier
-  lasts 3.3 s). How each is made, and how to make one: "Designing an element", below; its variants
-  and views (`examples/spell_variants.px.js`): "Variants and views", below that.
 - **Shader effects** (`effect()`, `PXL help effect`): a teleport or a death as a dissolve over 1 s
   (12 frames), holes in blobs about a quarter of the figure wide and 2 rings, the first white-yellow;
   a hit's poison or frost as a `tint` of 0.3-0.5 then `dither` back to the palette; a ghost or heat
@@ -675,6 +681,25 @@ happens after another, never all at once.
   a laser aims a thin line 4 frames and fires 2; a flame jet burns bright 2 and smokes ~6; a saw spins
   as a blurred disc, its art never rotated. A thruster's 5-frame loop at 60 ms: a round burst
   (lighting the ship's rear), a long thin flame, the mass thrown back, wider and darker, smallest.
+
+### A spell in a scene, the spell kit
+
+- **A spell in a scene** (`examples/hd2d/clearing.px.js`): a `spell()` of the kit in the file's own
+  fire (`ball`, `trail: { ghosts }`, `impact: { anim }`), from the hand of the caster's `mesh()` sprite
+  (`id: "hero"`), its burn on the target `fx: S.hit(c.t, ...)`; its phases (charge 600 ms,
+  cast 200, flight 600, impact 200, the target burning 2300, back 600, in 5 s); every loop in it a
+  divisor of the scene's (20 fps: the idle's 1000 ms, the fire's 500, the wind's 2500 into 5000: at
+  12.5 fps with the 250 ms idle the loops met only after 60 s). The ball a 4 px disc of
+  `effect("energy")` in 4 fire tones (scale 1.6: at 4 its noise was one band) with a 1 px `distort`;
+  its trail three of it at 50 ms steps back, fainter; its light the spell's lamps (`reach: 120, power: 3.75`: 2.5 m, 3). The aura 3
+  px in 3 tones, flicker 0.6 on 3.5 px cells, at 0.2-0.6 opacity (at 0.85 it hid the figure). A
+  target catching fire: the burn spreading from where it was hit over 2.4 s, flames 10 px from a third
+  of the front, a smoke column of 18 billows growing 3 to 10 px fading in over the first 15% and out
+  over the last 35%, the target's light `{ r: 3, strength: 2.5 }` flickering with its flames.
+- **A spell kit** (`spell()`, `examples/spells.px.js`): one call a whole cast, `cast(spell("ice", 2,
+  { from, to, ground }))`, the nine elements at three tiers on a 4 s loop at 20 fps (the third tier
+  lasts 3.3 s). How each is made, and how to make one: "Designing an element", below; its variants
+  and views (`examples/spell_variants.px.js`): "Variants and views", below that.
 
 ### Designing an element
 
@@ -818,6 +843,8 @@ is along a level (§10); the same `mix` on every layer, the sky's with its own m
 
 ## 14. Checking a scene
 
+### Shot, describe and check
+
 - `PXL shot <file> <scene>`: the look, with what changed since the last shot and the warnings on
   it; `--at x,y,w,h` again and again for details side by side, `--frames` for moments of the loop,
   another version as a second name (`old.px.js:scene`) for a before and after, or `--vs HEAD --diff`
@@ -828,6 +855,29 @@ is along a level (§10); the same `mix` on every layer, the sky's with its own m
   Give what you will edit an `id` (a stamp's, `c.as`'s, a `mesh()` sprite's): describe, `--diff` and
   `steps --at` name it by that (else "lantern #2", which another lantern stamped before it renumbers),
   and its random picks follow the id, so moving it keeps its look.
+- `PXL check <file>` before handing over: every frame of the loop; its last line says which rules
+  ran, and `--readings` shows what the lit-side rule read on each thing when a warning looks wrong.
+  That rule reads a thing's rim: each pixel on its edge (inside its outline) against the pixels up
+  to 3 px inside it, as steps along its ramp; the edges facing one way lighter and the other way
+  darker give its lit side (seen on 6 rim pixels each way at least). A flipped copy is the usual
+  cause; a bush or a building whose outline is mostly trims or tufts can read wrong: look first.
+  Checks and `world` rules cover `scene()`s (and rigs), and an `anim()` given a `world`: what its
+  functions paint is seen when they name it, `c.as("bench", (c) => { ... }, { height })`
+  (`examples/perspective/park.px.js`); `check: { every: 24 }` on a long one.
+- What the layout must keep, said once on the scene so `PXL check` holds it at every frame it checks:
+  `expect: [{ beside: ["pot", "campfire", { gap: [2, 6], side: "left" }] }, { before: ["bedroll", "tent"] }]`
+  (also `apart`, `inside`, `onGround`; over a loop, `while` and a rule's `frames`), a placement named
+  by its stamp's `id` or its asset placed once. A rule broken by an edit: `PXL check --fix` moves the
+  placement back by the fewest px (its relation's gap, or s along a path, before its x, y), written
+  where its number is (`PXL help expect`; the sunset's camp,
+  the island in `topdown.px.js`, the shrine's lanterns and miko).
+- A scene built from separate maps (terrain, props): `throw` in the placement loop when a prop lands
+  on the wrong ground; it catches the drift before anyone sees it.
+- Before handing over, look as a critic: tiles repeating into a visible grid, props floating or on
+  the wrong ground, big flat areas with no detail, dither as texture.
+
+### A small change: inspect and edit
+
 - A small change to what is placed, without reading the file: `PXL inspect <file> <scene>` lists what
   an edit can name (by id) with its box and the operations it takes (`--find stone lantern`: only
   those whose id, asset or the comment above their call or their asset's definition has the words,
@@ -855,26 +905,6 @@ is along a level (§10); the same `mix` on every layer, the sky's with its own m
   refuses an id in use, a relation to the ground, a path or a world3d part, and a thing code places.
   What code computes (a stamp a function makes, a number worked out, one call placing several
   things) is refused, saying where it is: change that by hand.
-- `PXL check <file>` before handing over: every frame of the loop; its last line says which rules
-  ran, and `--readings` shows what the lit-side rule read on each thing when a warning looks wrong.
-  That rule reads a thing's rim: each pixel on its edge (inside its outline) against the pixels up
-  to 3 px inside it, as steps along its ramp; the edges facing one way lighter and the other way
-  darker give its lit side (seen on 6 rim pixels each way at least). A flipped copy is the usual
-  cause; a bush or a building whose outline is mostly trims or tufts can read wrong: look first.
-  Checks and `world` rules cover `scene()`s (and rigs), and an `anim()` given a `world`: what its
-  functions paint is seen when they name it, `c.as("bench", (c) => { ... }, { height })`
-  (`examples/perspective/park.px.js`); `check: { every: 24 }` on a long one.
-- What the layout must keep, said once on the scene so `PXL check` holds it at every frame it checks:
-  `expect: [{ beside: ["pot", "campfire", { gap: [2, 6], side: "left" }] }, { before: ["bedroll", "tent"] }]`
-  (also `apart`, `inside`, `onGround`; over a loop, `while` and a rule's `frames`), a placement named
-  by its stamp's `id` or its asset placed once. A rule broken by an edit: `PXL check --fix` moves the
-  placement back by the fewest px (its relation's gap, or s along a path, before its x, y), written
-  where its number is (`PXL help expect`; the sunset's camp,
-  the island in `topdown.px.js`, the shrine's lanterns and miko).
-- A scene built from separate maps (terrain, props): `throw` in the placement loop when a prop lands
-  on the wrong ground; it catches the drift before anyone sees it.
-- Before handing over, look as a critic: tiles repeating into a visible grid, props floating or on
-  the wrong ground, big flat areas with no detail, dither as texture.
 
 ## 15. A game's screen
 

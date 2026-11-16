@@ -13,12 +13,11 @@ lists every command and flag.
 
 1. Start from the closest example or library entry ([below](#examples); `PXL list <file>` maps it: read the lines you
    need) and the template. Given a reference (PNG, GIF; JPEG, WebP or video need ffmpeg):
-   `PXL shot ref.gif` shows it, `PXL study ref.gif` reads it (palette, ramps, light, perspective, timing,
-   moving pieces) and what in pxl makes each part (`PXL help "characters 2"`).
+   `PXL shot ref.gif` shows it, `PXL study ref.gif` reads it and what in pxl makes each part (`PXL help "characters 2"`).
 2. Look with one call: `PXL shot art.px.js <name>` builds just that asset and writes
    `out/_shot/<name>.png` (read it); its text says what changed since your last shot of it and
    the warnings `check` finds on it. `--frames 0,12,30`, `--at x,y,w,h` (enlarged), more names (a row
-   each), a sheet or a group (its members labelled), `--gif`, `--grey` (values only). Exact pixels: `PXL ascii art.px.js <name>`. Scenes: `PXL describe art.px.js <scene>`
+   each), a sheet or a group, `--gif`, `--grey` (values only). Exact pixels: `PXL ascii art.px.js <name>`. Scenes: `PXL describe art.px.js <scene>`
    (`--brief` when busy) gives each object's position, gaps, cover, contrast and motion as text:
    answer layout questions from it, not by eyeballing.
 3. Fix everything one look showed, then look again: all the edits in the same message (every turn
@@ -29,7 +28,7 @@ lists every command and flag.
 4. A user's change to a scene ("move the stall left", "add a lantern beside it", recolor, flip,
    turn): `PXL inspect art.px.js <scene> --find stall` (`--id <id>` for one), then
    `PXL edit art.px.js <scene> '{ "op": "move", "target": "<id>", "by": [-3, 0] }' --dry`, then without
-   `--dry` (it writes where the value lives and runs `check`). What code computes is refused: edit that by hand (`PXL help "scenes 14"`).
+   `--dry` (it writes where the value lives and runs `check`). What code computes is refused: edit that by hand (`PXL help "inspect and edit"`).
 5. `PXL build art.px.js` writes its own PNGs, sheets and GIFs to `out/` (an include's by `--only a,b`
    or `--all`), previews to `out/_preview/` (`--profile` when it has grown slow; it names 3D fields not kept: `PXL help pure`).
 6. While iterating, `PXL check art.px.js <name>`: that one alone. Before handing over, `PXL check art.px.js`: every
@@ -64,16 +63,16 @@ and uses; `PXL help "<guide> <numbers or words of a heading>"` those sections:
 | Making | Read |
 |---|---|
 | sprites for a game (platformer, top-down, fighting, racing, HD-2D) | pick the profile first: `PXL help "scenes 18 19"` (`genre()`; a new density is drawn simpler, never scaled) |
-| a person or humanoid | `PXL help "characters 1 4 5 6 7"` (style, build order, faces, views, placing pixels); 2 and 3 with a reference or existing art, 8 variants, 10 animated limbs, 12 frame counts, 13 a game's look, 14 a fighting-game sprite |
+| a person or humanoid | `PXL help "characters 1 4 7"`, `"characters basics"`; by need "three quarters", "new head", "four directions", "turned to a diagonal"; 2 and 3 with a reference or existing art, 8 variants, 10 animated limbs, 12 frame counts, 13 a game's look, 14 a fighting-game sprite |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a figure that turns to 4 or 8 directions and walks (a field sprite) | `PXL help "a body that turns"` (`rig3d`, blocks first; the head baked per view, its face retouched by hand), then `"characters 5 6 10"` |
-| a story: figures walking a path and talking | `PXL help route`, `PXL help bubble`; `hd2d/graveyard.px.js` |
-| a scene, level, building or environment | `PXL help "scenes 1 3 11 14"`; then by need: 2 ground, 4 trees, 5 water, 6 distance, 7 perspective and HD-2D, 8-10 loops and parallax, 16 a game's projections; grass, trees, rocks, walls: `PXL help "environment 10"` (the kit) |
+| a figure that turns to 4 or 8 directions and walks (a field sprite) | `PXL help "a body that turns"` (`rig3d`, blocks first; the head baked per view, its face retouched by hand), then "characters 5 6", "walks and idles"; by need "attacks", "subpixel" |
+| a story: figures walking a path and talking | `PXL help route`, `PXL help bubble`, `"story in a diorama"` |
+| a scene, level, building or environment | `PXL help "scenes 1 3 11"`, `"shot describe and check"`; then by need: 2 ground, 4 trees, 5 water, 6 distance, 7 perspective ("perspective basics", HD-2D "diorama"), 8-10 loops and parallax, 16 a game's projections; grass, trees, rocks, walls: `PXL help "environment 10"` (the kit) |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~3.5k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
-| a thing in 3D: turns, sways, seen from several cameras | `PXL help "scenes 17"`; start from `examples/sdf/world.px.js`; a prop turned into a game's sprites: `turnaround` |
-| an effect a shader would do, particles, smoke, a spell | by need `PXL help effect`, `emitter`, `smoke`, `spell`; hits and explosions `PXL help "scenes 12"`; your own element `"designing an element"` |
+| a thing in 3D: turns, sways, seen from several cameras | `PXL help "scenes 17"`; a prop turned into a game's sprites: `turnaround` |
+| an effect a shader would do, particles, smoke, a spell | by need `PXL help effect`, `emitter`, `smoke`, `spell`; hits and explosions `PXL help "effect cards"`; your own element `"designing an element"` |
 
 ## Template
 
