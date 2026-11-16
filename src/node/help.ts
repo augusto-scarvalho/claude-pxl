@@ -1,7 +1,8 @@
 // `pxl help [term]`: the reference looked up instead of read. With no term, an index: each section
 // of reference.md with the names it documents, and each guide's sections with their size. With a
 // term, only what names it: a command's block of the usage and the CLI paragraphs that begin with it;
-// the reference rows that define it in full (a method's by its name after the dot), one line for each other place
+// the reference rows that define it in full (a method's by its name after the dot; a sub-row by its name and subject,
+// "rig3d head", the name alone naming its sub-rows), one line for each other place
 // that mentions it, the guide sections whose heading has its words (in full, when it names no op or
 // option), and a few places the examples use it. A lookup costs a few hundred tokens; the whole
 // reference costs ~12k. `all`: every mention and use in full.
@@ -17,8 +18,9 @@ const gname = (g: string) => (g === "lib/README.md" ? "lib" : g.replace(".md", "
 /** Mentions, guide lines and example uses shown before "(…N more)". */
 const FEW = { mention: 5, guide: 2, example: 3 };
 
-/** `names`: what the row's first cell starts its code with (`sdf.box(`: sdf); `methods`: a name after its dot (box, `.rotate`: rotate). */
-interface Entry { section: string; text: string; names: string[]; methods: string[]; row: boolean }
+/** `names`: what the row's first cell starts its code with (`sdf.box(`: sdf); `methods`: a name after its dot (box, `.rotate`: rotate);
+ * `sub`: a sub-row's subject (`rig3d` `head`: head), not a name of its own. */
+interface Entry { section: string; text: string; names: string[]; methods: string[]; row: boolean; sub?: string }
 interface Section { file: string; head: string; level: number; text: string }
 
 /** reference.md as entries: table rows (with the names in their first cell) and paragraphs. */
@@ -34,8 +36,8 @@ function entries(): Entry[] {
     if (line.startsWith("### ")) { flush(); h3 = line.slice(4); continue; }
     if (line.startsWith("| `")) {
       flush();
-      const first = line.split(" | ")[0];
-      out.push({ section: h3 ? `${h2} > ${h3}` : h2, text: line, names: [...first.matchAll(/`(?:c\.)?([A-Za-z_$][\w$]*)/g)].map((m) => m[1]), methods: [...first.matchAll(/`(?:[A-Za-z_$][\w$]*)?\.([A-Za-z_$][\w$]*)/g)].map((m) => m[1]), row: true });
+      const first = line.split(" | ")[0], sub = /^\| `([\w$]+)` `([\w$]+)`/.exec(first);
+      out.push({ section: h3 ? `${h2} > ${h3}` : h2, text: line, names: sub ? [sub[1]] : [...first.matchAll(/`(?:c\.)?([A-Za-z_$][\w$]*)/g)].map((m) => m[1]), methods: [...first.matchAll(/`(?:[A-Za-z_$][\w$]*)?\.([A-Za-z_$][\w$]*)/g)].map((m) => m[1]), row: true, sub: sub?.[2] });
       continue;
     }
     if (!line.trim() || line.startsWith("|") || line.startsWith("#")) { flush(); continue; }
@@ -114,11 +116,16 @@ export function help(term?: string, opts: { all?: boolean; usage?: string } = {}
   // reference: the rows that document it, whole; a method by its name too (sdf.box, .rotate). A name that is
   // both (box(), sdf.box): the shorter row first, each labelled as it is written
   const is = (n: string) => n.toLowerCase() === low;
-  const rows = all.filter((e) => e.row && (e.names.some(is) || e.methods.some(is)));
+  // a sub-row (`rig3d` `head`) whole by its two words ("rig3d head"); by its name or its subject alone a line
+  // saying how to ask for it (--all: whole), so `help light` doesn't print mesh()'s light
+  const kin = all.filter((e) => e.sub && (is(e.names[0]) || is(e.sub)));
+  const rows = all.filter((e) => e.row && (e.sub ? is(`${e.names[0]} ${e.sub}`) : e.names.some(is) || e.methods.some(is)));
   const both = rows.some((e) => e.names.some(is)) && rows.some((e) => !e.names.some(is));
   if (both) rows.sort((a, b) => a.text.length - b.text.length);
+  if (opts.all) rows.push(...kin);
   print(rows, (e) => (both ? ` ${new RegExp("`((?:[A-Za-z_$][\\w$]*)?\\.?" + esc + ")\\b", "i").exec(e.text)?.[1] ?? t}` : ""));
-  let own = [...cli, ...rows];
+  if (!opts.all && kin.length) out.push("[reference.md: by subject]", ...kin.map((e) => `  pxl help "${e.names[0]} ${e.sub}" (${k(e.text.length)})${e.text.split(" | ")[0].replace(/^\| `[\w$]+` `[\w$]+`,?\s*/, "").replace(/^(?=.)/, ": ")}`));
+  let own = [...cli, ...rows, ...kin];
   // guide sections whose file and heading have every word of the term: whole when the term is no
   // op or option (a topic: "small animals", "characters 9"), else named so they can be asked for
   const words = low.split(/[^a-z0-9§]+/).map((w) => w.replace(/^§/, "")).filter((w) => w.length > 1 || /\d/.test(w));

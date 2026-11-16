@@ -40,8 +40,8 @@ const USAGE = `pxl — pixel-art DSL
       What the reference says about an op or option: the rows that define it, a line for each other
       mention, and a few uses in the examples (--all: everything in full). Words of a guide's
       heading print that section ("characters 9", "small animals"; lib: lib/README.md). A method by
-      its name after the dot (box: box() and sdf.box); a command's name: its block here and the
-      reference's paragraphs on it. No name: an index.
+      its name after the dot (box: box() and sdf.box); a row split by subject by both words ("rig3d
+      head"); a command's name: its block here and the reference's paragraphs on it. No name: an index.
   pxl lib [entry | subject] [--genre <name>] [--cell <camera>/<density>] [--all]
       pxl's library (lib/). Alone: its subjects, the entries each has, the genres and cells to filter
       by. --all, a subject (props) or a filter: its entries by subject, a line each (its cells: camera/density, a tile's

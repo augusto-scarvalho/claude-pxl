@@ -1008,6 +1008,18 @@ test("pxl help is short: other mentions a line each, a guide section by its head
   assert.match(sheet, /\[guides: 2 sections\]\n {2}pxl help "environment 1\. Learning from a game's sheet" \([^)]*\)\n {2}pxl help "lib The sheets"/);
   // directions(): its signature, then the paragraph that says how its poses' pivots are placed, with an example
   assert.match(await said("help", "directions"), /^directions\("ship", 16, [^\n]*\n`directions\("car", 16, [^]*Each direction keeps its pose's pivot, turned with it/m);
+  // a row split by subject (rig3d's): its two words print that row alone; the name its main row and a line a sub-row
+  // (--all: whole); a subject that is an op's name too (mesh()'s light) prints no sub-row whole
+  const head = await said("help", "rig3d head");
+  assert.match(head, /^\[reference\.md: [^\]\n]*\]\n\| `rig3d` `head` \|/);
+  assert.equal(head.match(/^\| /gm)?.length, 1);
+  const rig = await said("help", "rig3d");
+  assert.match(rig, /^\| `rig3d\(name, [^]*\n\[reference\.md: by subject\]\n {2}pxl help "rig3d moves" \(~[\d.]+k tokens\)\n {2}pxl help "rig3d parts"/m);
+  assert.doesNotMatch(rig, /^\| `rig3d` `/m);
+  assert.match(await said("help", "rig3d", "--all"), /^\| `rig3d` `head` \|/m);
+  const light = await said("help", "light");
+  assert.match(light, /^ {2}pxl help "mesh light" \(/m);
+  assert.doesNotMatch(light, /^\| `mesh` `light` \|/m);
 });
 
 test("cli shot of a GIF: drawn larger, read at 1x; all its frames in rows of 12; a range picks some", async () => {
