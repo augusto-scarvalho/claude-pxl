@@ -31,23 +31,20 @@ const LOOP_M = 200, FAR = 140, LANE = 1.75
 // 100 m: it turns us 0.5 rad, 29 degrees, a road's bend at 72 km/h), 40 m straight, the left bend that
 // turns us back, straight: its turns sum to 0, so the heading is back to 0 when the loop closes.
 const K = 0.01, WAY = [[0, 0], [30, K], [80, 0], [120, -K], [170, 0]]
-// the sections ahead of us s m along (this lap's and the next's, so the bend past the loop's end shows),
-// as perspective()'s bend takes them: from each one's distance ahead, the one we are in from 0
-const ahead = (s) => [...WAY, ...WAY.map(([p, k]) => [p + LOOP_M, k])].filter((_, i, a) => (a[i + 1]?.[0] ?? Infinity) > s).map(([p, k]) => [Math.max(0, p - s), k])
-// our heading s m along, radians to the right: k times the length of each section behind us
-const heading = (s) => WAY.reduce((h, [p, k], i) => h + k * Math.max(0, Math.min(s, WAY[i + 1]?.[0] ?? LOOP_M) - p), 0)
+// s m along: the sections still ahead of us as perspective()'s bend takes them (this lap's and the next's, so the
+// bend past the loop's end shows) and our heading, radians to the right (k times the length of each section behind)
+const way = road(WAY, LOOP_M)
 // The eye 2.5 m up (a cab: from a car's 1.4 m a bend ahead lies in a few rows and hardly reads), 70 degrees
 // across. The sun 20 degrees left of the first straight, 12 up: turned right by our heading, it is further left.
 const VIEW = { w: W, horizon: 58, eye: 2.5, fov: 70 }, SUN_AZ = -20 * DEG, LIGHT = [-1, -0.3]
 const SUN0 = [Math.sin(SUN_AZ), Math.cos(SUN_AZ), Math.tan(12 * DEG)]          // the sun at heading 0 (the firs are lit by it)
 const WIND = [0.68, 0.73]                     // the way the wind blows on the ground (across, along): from behind us on the left
-// Each frame first sets its camera (P, from the sections ahead) and its sun (turned by our heading): all below reads them
-let P, SUN_N, SUN_COL, BANK_SH
+// Each frame makes its camera (P, from the sections ahead) and its sun (turned by our heading), passed to all
+// below that reads them (made in the frame, not kept in a file-level let: so pxl keeps the frames it builds)
 const look = (s) => {
-  s %= LOOP_M; const hd = heading(s), az = SUN_AZ - hd, v = [Math.sin(az), Math.cos(az), Math.tan(12 * DEG)]
-  P = perspective({ ...VIEW, bend: ahead(s) })
-  SUN_N = v.map((x) => x / Math.hypot(...v)); SUN_COL = P.toward(SUN_N)?.[0] ?? -999; BANK_SH = (0.9 * -v[0]) / v[2]
-  return hd
+  const { bend, heading: hd } = way(s), az = SUN_AZ - hd, v = [Math.sin(az), Math.cos(az), Math.tan(12 * DEG)]
+  const P = perspective({ ...VIEW, bend }), SUN_N = v.map((x) => x / Math.hypot(...v))
+  return { P, hd, SUN_N, SUN_COL: P.toward(SUN_N)?.[0] ?? -999, BANK_SH: (0.9 * -v[0]) / v[2] }
 }
 // a value between tones, dithered only near the step up to the next (soft bands, not noise)
 const tone = (v, x, y) => { const k = Math.floor(v), t = v - k; return k + (t > 0.6 && bayer(x, y) < (t - 0.6) / 0.4 ? 1 : 0) }
@@ -57,7 +54,7 @@ const wrap = (v) => ((((v % LOOP_M) + LOOP_M * 1.5) % LOOP_M) - LOOP_M / 2)
 // ================================================================ far off: the sky, the range, the sun
 // by the way each pixel looks (ray): lighter toward the horizon and the sun; the range, 10 km off, by the
 // world's direction (the ray's turned by our heading): it slides across as we turn, and comes back
-function sky(c, hd) {
+function sky(c, { P, hd, SUN_N }) {
   for (let y = 0; y <= P.horizon; y++) for (let x = 0; x < W; x++) {
     const r = P.ray(x, y), up = Math.asin(r[2]) / DEG, apart = Math.acos(r[0] * SUN_N[0] + r[1] * SUN_N[1] + r[2] * SUN_N[2]) / DEG
     c.px(x, y, String(Math.min(7, Math.max(1, tone(5.6 - up / 6 + Math.max(0, 1.4 - apart / 22), x, y)))))
@@ -107,9 +104,9 @@ const EDGE = 3.3, ROAD = 3.5, SHOULDER = 4.3, CREST = 5.2, BANK = 6.4           
 // (off to the side, it runs out to the vanishing point), and more where the road bends across the
 // view. Sampled per pixel it breaks into dots unless each row's run of it is as long as that step, so
 // its width is the larger of its own and that step (at least 0.6 px), in meters where it is.
-const step = (x, z) => { const [c0, r0] = P.ground(x, z), [c1, r1] = P.ground(x, z * 1.02); return Math.abs((c1 - c0) / (r1 - r0)) }
-const wide = (w, x, z) => Math.max(w, Math.max(0.6, step(x, z)) / P.scale(z, x))
-const on = (u, z, w, ...at) => at.some((a) => Math.abs(u - a) < 1 && Math.abs(u - a) < wide(w, a - LANE, z) / 2)
+const step = (P, x, z) => { const [c0, r0] = P.ground(x, z), [c1, r1] = P.ground(x, z * 1.02); return Math.abs((c1 - c0) / (r1 - r0)) }
+const wide = (P, w, x, z) => Math.max(w, Math.max(0.6, step(P, x, z)) / P.scale(z, x))
+const on = (P, u, z, w, ...at) => at.some((a) => Math.abs(u - a) < 1 && Math.abs(u - a) < wide(P, w, a - LANE, z) / 2)
 // the house: m along the loop (in the right bend, on its outside: the left), m across; SIDE: which side
 const HOUSE = { at: 58, u: -13.5 }, SIDE = Math.sign(HOUSE.u), ROW1 = VIEW.eye * (W / 2 / Math.tan(35 * DEG))
 // s: how far we have gone; p = z + s, a place along the road round the loop (0 to 200 m): each mark repeats
@@ -130,27 +127,27 @@ const streamer = (u, p, t, z, col, row) => {
   const on = SPIN(a - 6 * t, k * 1.7) - (0.8 - 0.7 * dens)
   return on > 0.08 || (on > 0 && bayer(col, row) < on / 0.08) ? (on > 0.2 && u < -1.5 ? "C" : "c") : ""
 }
-const ground = (s) => (x, z, col, row) => {
+const ground = (V, s) => (x, z, col, row) => {
   const u = x + LANE, au = Math.abs(u), p = (z + s) % LOOP_M, near = z < 30, crest = CREST + 0.3 * N.crest(p, 3)
   // a bank 0.9 m high throws its shadow BANK_SH m to the right (the left one's onto the road's edge)
-  const key = paint(u, au, p, z, col, row, crest, near, s / 20)
-  return (u < 0 ? u > -crest && u < BANK_SH - crest : u > crest && u < crest + BANK_SH) && SHADE[key] && !(u < 0 && au > SHOULDER) ? SHADE[key] : key
+  const key = paint(V, u, au, p, z, col, row, crest, near, s / 20)
+  return (u < 0 ? u > -crest && u < V.BANK_SH - crest : u > crest && u < crest + V.BANK_SH) && SHADE[key] && !(u < 0 && au > SHOULDER) ? SHADE[key] : key
 }
-const paint = (u, au, p, z, col, row, crest, near, t) => {
-  if (au < ROAD || (z > 70 && au < wide(2 * ROAD, -LANE, z) / 2)) {
+const paint = ({ P, SUN_N, SUN_COL }, u, au, p, z, col, row, crest, near, t) => {
+  if (au < ROAD || (z > 70 && au < wide(P, 2 * ROAD, -LANE, z) / 2)) {
     if (z > 70) return "a"                                                       // far, the road is a thin line itself
-    if (on(u, z, 0.15, EDGE, -EDGE)) return "l"                                  // the edge lines
+    if (on(P, u, z, 0.15, EDGE, -EDGE)) return "l"                               // the edge lines
     if (au > EDGE) return "s"                                                    // packed snow outside them, where no tyre goes
-    if (on(u, z, 0.12, 0) && p % 10 < 3) return "y"                              // the centre line, 3 m in 10
+    if (on(P, u, z, 0.12, 0) && p % 10 < 3) return "y"                           // the centre line, 3 m in 10
     const sp = streamer(u, p, t, z, col, row); if (sp) return sp
     // the tyres keep two tracks wet; far off toward the sun the meltwater in them mirrors the bright sky
-    if (on(u, z, 0.3, 0.95, 2.55, -0.95, -2.55)) return z > 30 && Math.abs(col - SUN_COL) < z / 4 ? "Q" : "q"
+    if (on(P, u, z, 0.3, 0.95, 2.55, -0.95, -2.55)) return z > 30 && Math.abs(col - SUN_COL) < z / 4 ? "Q" : "q"
     return "a"
   }
   const a = (u - HOUSE.u) * SIDE, b = wrap(p - HOUSE.at)
   if (u * SIDE > SHOULDER && a < -2.5 && b > -5 && b < 4 && (a > -5.5 || (b > -0.5 && b < 3))) return yard(a, b, z)
   // slush, the sander's grit churned into streaks along it by the tyres
-  if (au < SHOULDER) return on(u, z, 0.06, 3.75, 4.05, -3.75, -4.05) && N.grit(p, au * 3) > 0.45 ? "r" : "g"
+  if (au < SHOULDER) return on(P, u, z, 0.06, 3.75, 4.05, -3.75, -4.05) && N.grit(p, au * 3) > 0.45 ? "r" : "g"
   if (au < BANK) {
     // the ploughed bank: its face to the road turned to the sun on the right, away on the left; the
     // tyres' spray greys its foot; chunks the plough threw lie on it, each lit on its left
@@ -163,8 +160,8 @@ const paint = (u, au, p, z, col, row, crest, near, t) => {
   // (each one's lee a step down, over the drifts too), a ski trail on the left (two grooves, the poles'
   // marks beside them), a fox's line of prints on the right, a rare glint toward the sun
   const ski = -7.6 - 0.8 * Math.sin((p * Math.PI) / 20), fox = 8.5 + 2.5 * Math.sin((p * Math.PI) / 10)
-  if (z < 50 && (on(u, z, 0.07, ski - 0.1, ski + 0.1) || (z < 20 && p % 1.6 < 0.12 && on(u, z, 0.08, ski - 0.6, ski + 0.6)))) return "B"
-  const lv = z < 45 ? drift(u, p, col, row) : 2
+  if (z < 50 && (on(P, u, z, 0.07, ski - 0.1, ski + 0.1) || (z < 20 && p % 1.6 < 0.12 && on(P, u, z, 0.08, ski - 0.6, ski + 0.6)))) return "B"
+  const lv = z < 45 ? drift(u, p, col, row, SUN_N) : 2
   if (!near) return lv !== 2 ? "BWwx"[lv] : "wWv"[Math.min(2, Math.max(0, tone(Math.log2(z / 30), col, row)))]
   if (z < 20 && Math.abs(u - fox) < 0.07 && p % 0.4 < 0.12) return "B"
   // (a ripple every 2 m, 100 to the loop, drawn only where it spans a row: z² / (focal · eye) m)
@@ -183,7 +180,7 @@ const heap = (u, p) => { let h = 0
   }
   return h
 }
-const drift = (u, p, col, row) => {
+const drift = (u, p, col, row, SUN_N) => {
   const h = heap(u, p), gu = (heap(u + 0.08, p) - h) / 0.08, gp = (heap(u, p + 0.08) - h) / 0.08, [Lu, Lp, Lz] = SUN_N
   const lit = 0.5 + (0.5 * (Lz - Lu * gu - Lp * gp)) / Lz / Math.hypot(gu, gp, 1)
   return Math.min(3, Math.max(0, tone(4 * (lit - 0.5), col, row)))           // B, W, w (flat), x (toward the sun)
@@ -270,7 +267,7 @@ for (let i = 0; i < LOOP_M / 5; i++) for (const [row, u0, dense] of ROWS) {
     FIRS.push({ i, u, p, k, seed: hash(i, row + 39) < 0.5 ? 3 : 9, delay: R(((((-125 * (u * WIND[0] + p * WIND[1])) % 2000) + 2000) % 2000)) })
 }
 const SLOT = Array.from({ length: LOOP_M / 5 }, (_, i) => FIRS.filter((f) => f.i === i))
-function things(s) {
+function things({ P }, s) {
   const m = model(), sprites = [], ghosts = [], soft = []
   // what casts a shadow, twice: as it is, and f m wider with the sun a little lower, for the soft edge
   const cast = (make) => { ghosts.push(...make(0, { ghost: true })); soft.push(...make(0.12, { ghost: true })) }
@@ -309,7 +306,7 @@ function things(s) {
 // short streak, a mid one a px, past 25 m fewer and paler, a veil; spindrift low and three times as fast.
 const AIR = perspective(VIEW), FLAKES = Array.from({ length: 100 }, (_, k) => [16 * hash(k, 1, 7), 20 * hash(k, 2, 7), 10 * hash(k, 3, 7), k < 8])
 const SUM = [[0, 0]]
-for (let f = 0; f < FRAMES; f++) { const a = Math.atan2(...WIND) - heading((f / FRAMES) * LOOP_M); SUM.push([SUM[f][0] + (2.9 * Math.sin(a)) / FPS, SUM[f][1] + (2.9 * Math.cos(a)) / FPS]) }
+for (let f = 0; f < FRAMES; f++) { const a = Math.atan2(...WIND) - way((f / FRAMES) * LOOP_M).heading; SUM.push([SUM[f][0] + (2.9 * Math.sin(a)) / FPS, SUM[f][1] + (2.9 * Math.cos(a)) / FPS]) }
 const blow = (f, i) => { const box = [16, 20][i], end = SUM[FRAMES][i]; return ((SUM[f % FRAMES][i] + Math.floor(f / FRAMES) * end) * box * Math.max(1, R(end / box))) / end }
 function snowfall(c, f, s) {
   f %= FRAMES; const t = f / FPS, z0 = s % 20                  // (the next lap's first frame is this one's, to the bit)
@@ -327,9 +324,9 @@ function snowfall(c, f, s) {
 }
 
 anim("bend", { w: W, h: H, frames: FRAMES, fps: FPS, world: { horizon: VIEW.horizon, eye: VIEW.eye, light: LIGHT }, check: { every: 16 } }, (c) => {
-  const s = (c.frame / FRAMES) * LOOP_M, hd = look(s), T = things(s), sun = { from: SUN_N.slice(0, 2), up: 12 }
-  sky(c, hd)
-  c.plane(P, ground(s))
+  const s = (c.frame / FRAMES) * LOOP_M, V = look(s), { P, hd, SUN_N } = V, T = things(V, s), sun = { from: SUN_N.slice(0, 2), up: 12 }
+  sky(c, V)
+  c.plane(P, ground(V, s))
   c.shadows(P, T.soft, { sun: { ...sun, up: 11.8 }, shade: SOFT, near: "cut" })
   c.shadows(P, T.ghosts, { sun, shade: SHADE, near: "cut" })
   c.mesh(P, T.faces, MATS, { light: SUN_N, sprites: T.sprites })

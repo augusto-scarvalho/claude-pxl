@@ -291,10 +291,10 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   A bend that changes as you go is a new camera each frame, and the heading turns with it: the far
   things (the sun, the ranges) slide across by `focal · heading` px (`examples/perspective/race.px.js`).
   A bend that ends, or an S: `bend: [[z0, k0], [z1, k1], ...]`, the curvature from each z m ahead to
-  the next (`[[0, 0.02], [30, 0], [60, -0.02]]`). Through a road laid out once by its sections, a
-  camera each frame takes those not yet behind it, `[max(0, si − s), ki]` s m along (s taken round
-  the loop, the next lap's sections after this lap's), and the sun and
-  the far things turn by its heading, the sum of k · the length of each behind it (reference: perspective).
+  the next (`[[0, 0.02], [30, 0], [60, -0.02]]`). Through a road laid out once by its sections,
+  `road(sections, loop)(s)` gives the camera s m along those still ahead (its `bend`, s taken round
+  the loop, the next lap's after this lap's) and its `heading`, by which the sun and the far things
+  turn (reference: road).
   An S driven through in a loop, the firs, the house and the snow riding its bends, the sun, the range
   and the wind turned by the heading: `examples/perspective/bend.px.js`.
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
@@ -467,6 +467,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 
 ## 9. Closing a loop
 
+- Prove the seam on the file: `pxl shot <file> <anim> --frames 0,N --diff`, N its frame count, draws the
+  frame one loop on at its own time (its code sees frame N, every loop as it is) and says "frame N
+  against frame 0: no change" when it closes.
 - Something crossing the picture: let it cover more than the picture's width (plus its own length) in
   one loop (`c.cross(x0, { span: L, per: -L, from: -L / 2 })` from the picture's middle, L = v times the loop's length; `c.moved(per)` for how far a plane has gone): it leaves on one side and
   comes back on the other while it can't be seen. Or end its way behind something (a hedge, a cart, a

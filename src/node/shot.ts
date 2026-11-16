@@ -43,9 +43,16 @@ export function shotRow(p: Project, name: string, frames: number[], at?: number[
   return stack(Array.from({ length: Math.ceil(imgs.length / cols) }, (_, r) => cellRow(imgs.slice(r * cols, (r + 1) * cols), [at])));
 }
 
-/** Frame f of an asset as shot shows it: with its `ref: true` layers over it (guide rows, a skeleton) when asked. */
+/** Does shot draw this asset's frames past its loop (an anim of more than one frame that loops)? */
+export const pastLoop = (p: Project, name: string) => p.assets.get(name)?.kind === "anim" && !p.timeline(name)!.once && frameCount(p, name) > 1;
+
+/**
+ * Frame f of an asset as shot shows it: with its `ref: true` layers over it (guide rows, a skeleton) when asked. An anim
+ * that loops draws f from its frame count on too, at its own time (f = its count: the frame one loop on, its seam).
+ */
 export function shotFrame(p: Project, name: string, f: number, ref = false): Img {
-  const b = p.build(name, 0, frameTime(p, name, f));
+  const n = frameCount(p, name), past = f >= n && pastLoop(p, name);
+  const b = past ? p.build(name, 0, Math.floor(f / n) * p.timeline(name)!.loop + frameTime(p, name, f % n), true, true) : p.build(name, 0, frameTime(p, name, f));
   return ref && b.guide ? b.guide : b.img;
 }
 

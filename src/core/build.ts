@@ -337,7 +337,8 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     c.log = log;
     c.wrap = edges;
     c.t = t;
-    c.frame = tick?.frame ?? frame;
+    // (an anim's t past its loop, as shot --frames N asks: the frame one loop on, a whole loop's frames more)
+    c.frame = tick?.frame ?? frame + (tl && !tl.once ? Math.floor(t / tl.loop) * frames : 0);
     c.frames = tick?.frames ?? frames;
     c.inAnim = !!tl;
     c.mirrored = !!def.mirror;
@@ -582,7 +583,7 @@ function runItems(
       try {
         if (item.name === "frame") {
           if (!c.inAnim) throw new PxError("frame() only goes inside an anim (directly or in its layers)");
-          if (frameNo++ === c.frame) {
+          if (frameNo++ === c.frame % c.frames) {
             const inner = (isFrameOpts(item.args[0]) ? item.args.slice(1) : item.args) as Item[];
             runItems(ctx, inner, c, item.loc, undefined, undefined, true);
           }

@@ -678,7 +678,7 @@ declare global {
     inside?: number;
     /** a second light at x, y under it (a fire): the undersides of billows within `reach` px of it (m with a view) step into `keys`, dim to bright, through the same dither */
     below?: { keys: string | string[]; reach: number; strength?: number };
-    /** through a perspective() camera: where it stands, [x, z, up] m; the lengths given then meters there, each billow as far as it is */
+    /** through a perspective() camera: where it stands, [x, z, up] m; the lengths given then meters there, each billow as far as it is (a size under half a px there drawn at half a px) */
     view?: PxView | PxPerspective; at?: [number, number, number];
   }
   /** pixelate: cells of `size` px, each the color most of its pixels have. */
@@ -957,6 +957,8 @@ declare global {
   function clip(where: PxRegion, ...items: PxItem[]): PxOp;
   /** A pinhole camera over flat ground, turned (yaw) and tilted (pitch): ground(x, z, up) -> screen, at(col, row) -> ground, scale(z), vanish(angle), vertical(), ray(col, row), toward(dir). */
   function perspective(view: PxView & { w: number }): PxPerspective;
+  /** A road laid out once by its sections [[0, k0], [s1, k1], ...] (1/m from each s m along it) round a loop `loop` m long: at s m along, the sections ahead as perspective()'s `bend` (s taken round the loop, the next lap's after this lap's) and the `heading`, radians turned right. */
+  function road(sections: [number, number][], loop: number): (s: number) => { bend: [number, number][]; heading: number };
   /** Flat ground in perspective, row by row: fn(x, z) gives the color at x m across, z m away. */
   function plane(view: PxView | PxPerspective, ground: ((x: number, z: number, col: number, row: number) => PxColor | null | undefined) | PxGround, where?: PxRegion): PxOp;
   /** A tapered capsule painted round (px): every pixel shaded across it toward the light along `ramp` (dark to light), a rim on the lit edge. */

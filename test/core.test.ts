@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { art, failure, keys, PAL } from "./helpers.ts";
-import { perspective, side } from "../src/core/perspective.ts";
+import { perspective, road, side } from "../src/core/perspective.ts";
 import { bayer, fbm, latticeHash, seamless, vec, vnoise } from "../src/core/util.ts";
 import { loadSource } from "../src/node/load.ts";
 import { compareSilhouettes, packSheet, playAll, sheetJson } from "../src/core/render.ts";
@@ -812,6 +812,18 @@ scene("l", { w: 80, h: 50, bg: "g" }, ${sh({ bend: [[4, 0.02]] })})`, "t.px.js")
   for (const bad of ["[[5, 0.01], [3, 0.02]]", "[[-1, 0.01]]", `[[0, "x"]]`, "[0.01]"])
     assert.match(failure(PAL + `perspective({ ...${JSON.stringify(view)}, bend: ${bad} })`).message, /bend by sections is \[\[z, k\], \.\.\.\].*each z 0 or more and ascending/);
   assert.match(failure(PAL + `perspective({ ...${JSON.stringify(view)}, bend: [[0, 0.01]], bendFrom: 20 })`).message, /with sections put the start in the list/);
+});
+
+test("road(): at s the sections ahead with the next lap's and the heading, s taken round the loop, as a driving loop writes them by hand", () => {
+  const W: [number, number][] = [[0, 0], [30, 0.01], [80, 0], [120, -0.01], [170, 0]], L = 200, at = road(W, L);
+  const ahead = (s: number) => [...W, ...W.map(([p, k]) => [p + L, k])].filter((_, i, a) => (a[i + 1]?.[0] ?? Infinity) > s).map(([p, k]) => [Math.max(0, p - s), k]);
+  const heading = (s: number) => W.reduce((h, [p, k], i) => h + k * Math.max(0, Math.min(s, W[i + 1]?.[0] ?? L) - p), 0);
+  for (const s of [0, 12.5, 30, 101.25, 170, 199]) assert.deepEqual(at(s), { bend: ahead(s), heading: heading(s) });
+  assert.deepEqual(at(150), { bend: [[0, -0.01], [20, 0], [50, 0], [80, 0.01], [130, 0], [170, -0.01], [220, 0]], heading: 0.2 });
+  // one loop on, and before 0: the same road as s round it (at the seam the bend past the loop's end still ahead)
+  assert.deepEqual(at(L), at(0)); assert.deepEqual(at(L + 40), at(40)); assert.deepEqual(at(-10), at(190));
+  for (const bad of ["[[5, 0.01]], 100", "[[0, 0], [0, 0.01]], 100", "[[0, 0], [120, 0.01]], 100", "[], 100", "[[0, 0]], 0"])
+    assert.match(failure(PAL + `road(${bad})`).message, /road\(sections, loop\).*from 0, ascending, under the loop's length/);
 });
 
 test("terrain: flat land paints what plane does; a hill rises over the horizon; the rest is sky", () => {

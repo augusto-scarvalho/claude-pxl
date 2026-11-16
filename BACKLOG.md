@@ -1321,6 +1321,19 @@ one), and the art code itself (4% of the cost).
   now); filled as the file loads they would keep it. Open: a variable a function closes over, and what a WeakMap
   holds, aren't seen; `pxl edit`'s rebuild adopts the unchanged builds of the project before the edit, whose code
   doesn't run in the new one (its CHANGES lines only, no pixel written).
+- [x] **A road laid out once** (H12d, H13): `road(sections, loop)(s)` gives the sections still ahead as `bend` takes
+  them (s taken round the loop, the next lap's after this lap's) and the heading: the two lines every driving loop wrote
+  by hand, and the two ways they went wrong. `bend.px.js` uses it, its 160 frames the same.
+- [x] **`smoke()` far off through a camera** (H12b): a size under half a px there is drawn at half a px, its least
+  billow, where it threw (`size [r0, r1] from 0.5`). bend's cut of the chimney's smoke at 90 m stays: its frames show
+  none past it, and without the cut they would.
+- [x] **The frame one loop on** (H12d): `pxl shot <file> <anim> --frames 0,N --diff` draws frame N at its own time,
+  every loop as it is, and says "frame N against frame 0: no change" when the seam closes; it used to leave N out and
+  took a copy of the file with a frame more, which moved what the scene's loop times (bend's smoke).
+- [x] **bend kept on disk** (I1): its camera of each frame lived in a file-level `let P`, so the first frame made let
+  the disk go and every command built it all (55 to 61 s); made in the frame and passed to what reads it, a second
+  build reads it back (61 s cold, then 7 s). Its ladder of fir sizes keeps its own code: the ladder itself is two
+  lines (the rungs, the nearest), the rest is what a helper can't decide (the light, the snow, the haze, the sway).
 
 ## Parallax (from dogfooding the train)
 

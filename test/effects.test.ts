@@ -373,6 +373,10 @@ test("smoke and plume through a camera: meters where they stand, smaller farther
   const far = box(`smoke(0, 0, "wgk", { shape: "puff", view: ${V}, at: [0, 8, 1], spread: 0.4, size: [0.3, 0.6] })`);
   assert.ok(far.w < near.w * 0.7 && near.w > 6, `a puff 8 m away about half as wide as 4 m away: ${far.w} and ${near.w} px`);
   assert.ok(Math.abs(near.cx - 32) < 3 && Math.abs(near.cy - 10) < 4, `where [0, 4, 1] lands: ${near.cx}, ${near.cy}`);
+  // far off, under half a px (0.3 m at 100 m is 0.12 px): its least billows, a speck, not an error; a size of 0 still refused
+  const speck = box(`smoke(0, 0, "wgk", { view: ${V}, at: [0, 100, 1], rise: 0.5, size: [0.3, 0.6] })`);
+  assert.ok(speck.w >= 1 && speck.w <= 3, `a chimney's smoke 100 m off a px or two: ${speck.w} px`);
+  assert.match(failure(PALS + `anim("a", { w: 9, h: 9, frames: 2 }, smoke(0, 0, "wgk", { view: ${V}, at: [0, 4, 1], size: [0, 0.6] }))`, "a").message, /size \[r0, r1\] from 0\.5/);
   const p4 = box(`plume(0, 0, "wgk", { view: ${V}, at: [0, 4, 0], rise: 1, size: [0.2, 0.5] })`), p8 = box(`plume(0, 0, "wgk", { view: ${V}, at: [0, 8, 0], rise: 1, size: [0.2, 0.5] })`);
   assert.ok(p8.w < p4.w * 0.75, `a plume farther, narrower: ${p8.w} and ${p4.w} px`);
   assert.match(failure(PALS + `anim("a", { w: 9, h: 9, frames: 2 }, smoke(0, 0, "wgk", { view: ${V} }))`, "a").message, /at is where it stands/);

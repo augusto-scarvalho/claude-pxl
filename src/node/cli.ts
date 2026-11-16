@@ -26,7 +26,7 @@ import { startWorkers } from "./workers.ts";
 const EDGE_RINGS: ["steps" | "doubled" | "tips" | "bridges" | "notches" | "gaps" | "corners", number][] = [["steps", 0xe8202aff], ["doubled", 0xff8c14ff], ["tips", 0xd020d0ff], ["bridges", 0xd020d0ff], ["notches", 0x10c8e0ff], ["gaps", 0xffe020ff], ["corners", 0x20c040ff]];
 import { edit, inspect } from "./edit.ts";
 import { setKnobInSource } from "../core/world3d.ts";
-import { cellRow, diffRow, frameCount, frameTime, greyRow, membersRow, otherVersion, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
+import { cellRow, diffRow, frameCount, frameTime, greyRow, membersRow, otherVersion, pastLoop, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
 import { libCard, libDraft, libList } from "./lib.ts";
 import { listProject, listText } from "./list.ts";
@@ -155,7 +155,8 @@ const USAGE = `pxl — pixel-art DSL
       that held still hold (a scene's checked rebuilt before anything is written).
   pxl shot <art.px.js> <name | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--world [--every N]] [--out DIR]
   pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
-      A picture to look at: those frames of the asset (numbered as for --frame; default 0) cropped
+      A picture to look at: those frames of the asset (numbered as for --frame; default 0; an anim's
+      past its loop too, at their own time: N, its frame count, is the frame one loop on) cropped
       to the region, side by side (in rows when too wide for one: a contact sheet), enlarged,
       written to <out>/_shot/<name>.png; clear shows as a mid grey. A sheet: as the build packs it; a
       group or a glob ("car_*"): its members side by side, each labelled with what its name adds (n,
@@ -163,7 +164,7 @@ const USAGE = `pxl — pixel-art DSL
       shot of another version above it (at a git revision, the file and what it includes as they
       were there); --diff adds a row with the pixels that changed in red and says per frame how many
       and where (without --vs: between exactly two rows of one size, a frozen cell and its live
-      render); --grey adds it all again in
+      render, or two frames of one asset, --frames 0,N: its loop's seam); --grey adds it all again in
       values only (each pixel's lightness), to see the planes read before the color; --ref draws
       the asset's ref: true layers over it (guide rows, a skeleton), as the build's previews do. It
       also prints what changed since the last shot of the same frames and region (one asset, one
@@ -622,15 +623,17 @@ export async function main(argv: string[]): Promise<number> {
         const png = MEDIA.test(file), entries = png ? [file, ...a.rest] : a.rest;
         if (!entries.length) throw new PxError("shot needs an asset name: pxl shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs rev] [--diff]");
         if (a.ats.some((r) => r.length !== 4)) throw new PxError("shot --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
-        if (a.diff && !a.vs && (entries.length !== 2 || a.ats.length > 1)) throw new PxError("shot --diff compares with another version (--vs <git rev | file>), or two rows of one size: two names, name other.px.js:name or two PNGs, one region");
+        if (a.diff && !a.vs && ((entries.length !== 2 && !(entries.length === 1 && !png && a.frames?.length === 2)) || a.ats.length > 1)) throw new PxError("shot --diff compares with another version (--vs <git rev | file>), two rows of one size (two names, name other.px.js:name or two PNGs, one region), or two frames of one asset (--frames 0,N: its loop's seam)");
         const regions = a.ats.length ? a.ats : [undefined];
         // each name its own frames: all of its loop, or those asked for that it has (a still sprite in a
-        // row of anims shows its one frame)
+        // row of anims shows its one frame); an anim that loops has them past its loop too, drawn at their
+        // time (N, its frame count: the frame one loop on, its seam), and checked where they fall in it
         const framesFor = (p: Project, name: string) => {
           const n = frameCount(p, name), asked = a.allFrames ? Array.from({ length: n }, (_, i) => i) : a.frames ?? (a.frame !== undefined ? [a.frame] : [0]);
-          const have = asked.filter((f) => f < n);
+          const have = asked.filter((f) => f < n || pastLoop(p, name));
           return have.length ? have : [0];
         };
+        const looped = (p: Project, name: string, fs: number[]) => [...new Set(fs.map((f) => f % frameCount(p, name)))];
         const projects = new Map<string, Project>(), proj = (f: string) => projects.get(f) ?? projects.set(f, loadProject(f, { wholeWorld: a.world })).get(f)!;
         const shots = entries.map((e): { png?: string; file?: string; name: string; img?: Img; names?: string[]; members?: boolean } => {
           if (MEDIA.test(e)) return { png: resolve(e), name: basename(e).replace(MEDIA, "") };
@@ -704,6 +707,7 @@ export async function main(argv: string[]): Promise<number> {
           let changes = "";
           if (a.diff) {
             const [x, y] = rows, f = ("frames" in many[0] ? many[0].frames : "picked" in many[0] ? many[0].picked : undefined) ?? [0];
+            if (!y) throw new PxError(`shot --diff: ${shown[0]} is one row: it compares two rows, or two frames of one asset`);
             if (x.w !== y.w || x.h !== y.h) throw new PxError(`shot --diff: ${shown[0]} is ${x.w}x${x.h} and ${shown[1]} ${y.w}x${y.h}: it compares two rows of one size`);
             rows.push(diffRow(x, y).img);
             changes = shotChanges(x, y, f, a.at, Math.min(f.length, 12));
@@ -720,7 +724,7 @@ export async function main(argv: string[]): Promise<number> {
           for (const s of many) if ("note" in s && s.note) console.log(s.note);
           for (const s of many) {
             if (!("file" in s)) continue;
-            const p = proj(s.file!), r = "img" in s ? checkProject(p, { names: s.names }) : checkProject(p, { names: [s.name], frames: framesFor(p, s.name) });
+            const p = proj(s.file!), r = "img" in s ? checkProject(p, { names: s.names }) : checkProject(p, { names: [s.name], frames: looped(p, s.name, framesFor(p, s.name)) });
             for (const l of [...r.lines, ...r.notes]) console.log(l);
             if (r.warnings || p.assets.get(s.name)?.kind === "scene" || p.rigs.has(s.name))
               console.log(`${s.name}: ${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
@@ -738,6 +742,12 @@ export async function main(argv: string[]): Promise<number> {
             rows.push(diffRow(was, now).img);
             console.log(shotChanges(was, now, frames, a.at));
           }
+        } else if (a.diff) {
+          // two frames of one asset: the second against the first (0 and N: the loop's seam)
+          if (frames.length !== 2) throw new PxError(`shot --diff on one asset compares two of its frames (--frames 0,N), got ${frames.join(",")}`);
+          const [x, y] = frames.map((f) => shotRow(p, name, [f], a.at, a.ref));
+          rows.push(diffRow(x, y).img);
+          console.log(`frame ${frames[1]} against frame ${frames[0]}: ${shotChanges(x, y, [frames[1]], a.at)}`);
         }
         // as big as ~600k px allow (an image costs ~w*h/750 tokens: about what a preview costs), never
         // past the 1568 px a model is shown
@@ -753,7 +763,7 @@ export async function main(argv: string[]): Promise<number> {
         writePng(last + ".last.png", now);
         writeFileSync(last + ".last.json", key);
         // what pxl check finds on it at these frames, so a look needs no other call
-        const r = checkProject(p, { names: [name], frames, edges: "shot" });
+        const r = checkProject(p, { names: [name], frames: looped(p, name, frames), edges: "shot" });
         for (const l of [...r.lines, ...r.notes]) console.log(l);
         // the faults the LOOK lines name, ringed on the asset: its lines' (corners orange, jaggies blue) and its edges';
         // the holes that opened, on the first frame shown that has one (else the first shown)

@@ -107,6 +107,8 @@ export function drawSmoke(c: SmokeCanvas, x0: number, y0: number, keys: string |
   if (M) {
     const m = (v: number) => (v * M.k) / (o.pixel ?? 1), mm = (v: unknown) => (Array.isArray(v) ? v.map(m) : typeof v === "number" ? m(v) : v);
     o = { ...o, ...Object.fromEntries((["size", "rise", "path", "wind", "spread", "length", "turbulence"] as const).filter((n) => o[n] !== undefined).map((n) => [n, mm(o[n])])) };
+    // far off, a size under the least it draws (half a px) is that least: a chimney's smoke a speck, not an error
+    if (Array.isArray(o.size)) o.size = o.size.map((v) => (v > 0 && v < 0.5 ? 0.5 : v)) as [number, number];
   }
   const shape = o.shape ?? "column";
   if (!["column", "puff", "bank", "ring"].includes(shape)) throw new PxError(`smoke: shape is "column", "puff", "bank" or "ring", got ${JSON.stringify(o.shape)}`);

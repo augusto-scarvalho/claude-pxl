@@ -555,6 +555,17 @@ test("cli shot --diff between two rows of one size: per frame what changed, unch
   assert.match(errors.join("\n"), /a is 18x2 and b 3x2: it compares two rows of one size/);
 });
 
+test("cli shot --frames N on an anim: the frame one loop on, drawn at its time (its code sees frame N); --diff of two frames, its seam", async () => {
+  const { file } = tmpArt(`use("pico8")
+anim("a", { w: 3, h: 2, frames: 4, fps: 4 }, (c) => c.px(1, 1, c.frame === 4 ? "c" : "8"))
+anim("b", { w: 3, h: 2, frames: 4, fps: 4 }, (c) => c.px(1, 1, c.frame % 4 ? "c" : "8"))
+anim("f", { w: 3, h: 2, fps: 4 }, frame(px(1, 1, "8")), frame(px(1, 1, "c")))`);
+  assert.match(await said("shot", file, "f", "--frames", "1,3", "--diff", "--scale", "1"), /^frame 3 against frame 1: no change$/m, "frame() items one loop on");
+  assert.match(await said("shot", file, "a", "--frames", "3,0,4", "--scale", "1"), /\(frames 3,0,4; 1x\)/);
+  assert.match(await said("shot", file, "a", "--frames", "0,4", "--diff", "--scale", "1"), /^frame 4 against frame 0: 1 px changed in 1,1 1x1$/m);
+  assert.match(await said("shot", file, "b", "--frames", "0,4", "--diff", "--scale", "1"), /^frame 4 against frame 0: no change$/m);
+});
+
 test("scripts/hashes.ts: an asset's frames a line each; --vs builds them with the last commit's pxl too and counts what differs", () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
   writeFileSync(file, `use("pico8"); pal({ k: 0, r: 8 })

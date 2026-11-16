@@ -2,7 +2,7 @@
 import { type BuildCtx, type BuildOut, animTimeline, buildAsset, drawnFrames, gcd, shrinkBy } from "./build.ts";
 import { type Canvas, OPS } from "./canvas.ts";
 import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from "./rig.ts";
-import { type View, perspective } from "./perspective.ts";
+import { type View, perspective, road } from "./perspective.ts";
 import { solid } from "./solids.ts";
 import { model, turnFaces, turnPoint } from "./mesh.ts";
 import { Sdf, bare, compile, sdf } from "./sdf.ts";
@@ -1533,6 +1533,10 @@ export class Project implements BuildCtx {
     env.perspective = (view: unknown) => {
       try { return perspective(view as View); } catch (e) { throw wrap(e).within("perspective", this.callerLoc()); }
     };
+    // road(sections, loop)(s): a road laid out once, at s m along the sections ahead as perspective()'s bend and the heading
+    env.road = (sections: unknown, loop: unknown) => {
+      try { return road(sections as [number, number][], loop as number); } catch (e) { throw wrap(e).within("road", this.callerLoc()); }
+    };
     env.ik = (a: unknown, b: unknown, target: unknown, bend: unknown = 1) => {
       try { return ik(a as number, b as number, target as [number, number], bend as number); } catch (e) { throw wrap(e).within("ik", this.callerLoc()); }
     };
@@ -1816,9 +1820,10 @@ export class Project implements BuildCtx {
 
   /**
    * Build an asset at time t (ms). Still assets ignore t. Unless `track` is false, an animated
-   * result makes the asset being built around this call animated too.
+   * result makes the asset being built around this call animated too. `past`: an anim's t past its loop kept as it is,
+   * its code seeing the frame one loop on (shot --frames N: a seam proved on the file), its loops and what it places as ever.
    */
-  build(name: string, seed = 0, t = 0, track = true): BuildOut {
+  build(name: string, seed = 0, t = 0, track = true, past = false): BuildOut {
     name = this.resolve(name);
     const def = this.assets.get(name), k0 = seed === 0 ? name : `${name}@${seed}`;
     // (a worker asked an anim's frame other than 0 takes its timeline from its definition, as frame 0 gives it, when it
@@ -1843,7 +1848,7 @@ export class Project implements BuildCtx {
       (acc.by ??= new Map()).set(name, tl.loop);
     }
     if (!tl || t === 0) return first!;
-    const tt = tl.once ? Math.min(Math.max(0, t), tl.loop) : ((t % tl.loop) + tl.loop) % tl.loop;
+    const tt = tl.once ? Math.min(Math.max(0, t), tl.loop) : past && def?.kind === "anim" && t >= tl.loop ? t : ((t % tl.loop) + tl.loop) % tl.loop;
     return tt === 0 ? (first ?? this.buildAt(name, seed, 0)) : this.buildAt(name, seed, tt, def?.kind !== "anim" ? tl : undefined);
   }
   /**

@@ -158,6 +158,27 @@ export function perspective(v: View): Perspective {
   };
 }
 
+/**
+ * A road laid out once by its sections, [[0, k0], [s1, k1], ...] (k in 1/m from each s m along it to the next), round a
+ * loop `loop` m long: at s m along, what a camera there needs. `bend`: the sections still ahead as perspective() takes
+ * them, s taken round the loop first and the next lap's sections after this lap's (without either, a bend past the
+ * loop's end is straight at the seam or pops in at the wrap); `heading`: radians turned right since 0, k times the
+ * length of each section behind, summed.
+ */
+export function road(sections: [number, number][], loop: number): (s: number) => { bend: [number, number][]; heading: number } {
+  if (!(Number.isFinite(loop) && loop > 0 && Array.isArray(sections) && sections.length && sections.every((x, i, a) => Array.isArray(x) && x.length === 2 && x.every(Number.isFinite) && (i ? x[0] > a[i - 1][0] : x[0] === 0) && x[0] < loop)))
+    throw new PxError(`road(sections, loop): the road's sections along it, [[0, k0], [s1, k1], ...] (its curvature k, 1/m, from each s m to the next: from 0, ascending, under the loop's length), and the loop's length in m; got ${JSON.stringify([sections, loop])}`);
+  const laps = [...sections, ...sections.map(([p, k]): [number, number] => [p + loop, k])];
+  return (s) => {
+    s %= loop;
+    if (s < 0) s += loop;
+    return {
+      bend: laps.filter((_, i) => (laps[i + 1]?.[0] ?? Infinity) > s).map(([p, k]) => [Math.max(0, p - s), k]),
+      heading: sections.reduce((h, [p, k], i) => h + k * Math.max(0, Math.min(s, sections[i + 1]?.[0] ?? loop) - p), 0),
+    };
+  };
+}
+
 /** The same camera for a picture k times as big (a scene's `pixel: k`): its px k times; one given its fov keeps it, the focal length following the width. */
 export function scaled<T>(view: T, k: number): T {
   const v = view as unknown as Partial<Perspective>;
