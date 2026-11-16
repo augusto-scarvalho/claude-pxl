@@ -267,7 +267,14 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   color; under a few px, a simple tuft.
 - The ground and what grows and lies on it (grass, trees, bushes, rocks, walls, paths, tufts,
   flowers), as 16-bit games draw them: the environment guide (by section in `pxl help`)
-  and its kit, `lib/nature/kit.px.js`, to include.
+  and its kit, `lib/nature/kit.px.js`, to include. What lies on the ground at a thing's foot (a drift,
+  the well round a trunk, ruts) is the ground's: paint it in the `plane()` function by the thing's
+  place, in the ground's own tones and light; modelled on the sprite it reads as a blob set on top.
+- A thing in 3D coming toward a moving camera (firs along a road driven): draw it once at a ladder of
+  heights and stand it in `mesh()` as the sprite nearest its height on screen, the rungs a px apart
+  while small, then as far apart as it grows in a frame (h² · d / (H · focal) px, h px tall, H m, d m
+  nearer a frame), so it never pops; a game's sizes, each twice the last, are too coarse for it
+  (`examples/perspective/bend.px.js`).
 - Anything far off sits on a direction, not a point: the sun at `toward(sunDir)`, a sky colored by
   `ray(col, row)` (its height above the horizon and its angle from the sun). Things moving the same
   way (meteors, birds in a flock) run along parallel lines, which meet at `toward(theirDirection)`.
@@ -277,12 +284,16 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - A road that bends: `perspective({ ..., bend })`, its curvature in 1/m (a point z m ahead sits
   bend·z²/2 to the side). Lay everything in meters along the road and across it as if it were
   straight; the camera bends it, the ground, the things on it and their shadows alike. Straight near
-  and bending up ahead: `bendFrom: z`, the way straight for z m and bending from there.
+  and bending up ahead: `bendFrom: z`, the way straight for z m and bending from there. A bend from
+  z m ahead begins `focal · eye / z` rows under the horizon: from a car's eye (1.4 m) one 25 m ahead
+  begins 13 rows down (320 px at 70 degrees) and all of it lies in those rows; a higher eye or a
+  nearer start shows it (2.5 m and 22 m: 26 rows).
   A bend that changes as you go is a new camera each frame, and the heading turns with it: the far
   things (the sun, the ranges) slide across by `focal · heading` px (`examples/perspective/race.px.js`).
   A bend that ends, or an S: `bend: [[z0, k0], [z1, k1], ...]`, the curvature from each z m ahead to
   the next (`[[0, 0.02], [30, 0], [60, -0.02]]`). Through a road laid out once by its sections, a
-  camera each frame takes those not yet behind it, `[max(0, si − s), ki]` s m along, and the sun and
+  camera each frame takes those not yet behind it, `[max(0, si − s), ki]` s m along (s taken round
+  the loop, the next lap's sections after this lap's), and the sun and
   the far things turn by its heading, the sum of k · the length of each behind it (reference: perspective).
   An S driven through in a loop, the firs, the house and the snow riding its bends, the sun, the range
   and the wind turned by the heading: `examples/perspective/bend.px.js`.
@@ -464,6 +475,9 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
 - Anything picked by where it is along a way that goes by (`hash(p)` of a crown, a patch, a stone):
   take `p` modulo the distance gone in the loop, or the first frame picks other ones than the last.
   Every flutter (`sin(f · k)`) a whole number of cycles in the loop: `sin(2π · f / frames · n)`.
+  A ground drawn by `plane()` under a camera moving along it (p = z + s): every mark in it repeats a
+  whole number of times over the loop's length (a sine, a cell, a `%`; noise by
+  `seamless(fn, length)`), or the ground jumps where p comes round.
 - A speed that changes in the loop (a burst, a stop at a light): write the speed as a profile in
   time (steady, eased up, held, eased down; a half-cosine ramp has an integral in closed form) and
   move everything by its integral, the distance gone. Set the steady speed so that integral over the
