@@ -1,6 +1,7 @@
 // `pxl help [term]`: the reference looked up instead of read. With no term, an index: each section
 // of reference.md with the names it documents, and each guide's sections with their size. With a
-// term, only what names it: the reference rows that define it in full, one line for each other place
+// term, only what names it: a command's block of the usage and the CLI paragraphs that begin with it;
+// the reference rows that define it in full (a method's by its name after the dot), one line for each other place
 // that mentions it, the guide sections whose heading has its words (in full, when it names no op or
 // option), and a few places the examples use it. A lookup costs a few hundred tokens; the whole
 // reference costs ~12k. `all`: every mention and use in full.
@@ -10,11 +11,14 @@ import { fileURLToPath } from "node:url";
 import { didYouMean } from "../core/errors.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const GUIDES = ["scenes.md", "characters.md", "environment.md", "lighting.md", "rotation.md"];
+const GUIDES = ["scenes.md", "characters.md", "environment.md", "lighting.md", "rotation.md", "lib/README.md"];
+/** A guide as a word of the term picks it ("scenes 12"; the library's README: "lib taking an entry"). */
+const gname = (g: string) => (g === "lib/README.md" ? "lib" : g.replace(".md", ""));
 /** Mentions, guide lines and example uses shown before "(…N more)". */
 const FEW = { mention: 5, guide: 2, example: 3 };
 
-interface Entry { section: string; text: string; names: string[]; row: boolean }
+/** `names`: what the row's first cell starts its code with (`sdf.box(`: sdf); `methods`: a name after its dot (box, `.rotate`: rotate). */
+interface Entry { section: string; text: string; names: string[]; methods: string[]; row: boolean }
 interface Section { file: string; head: string; level: number; text: string }
 
 /** reference.md as entries: table rows (with the names in their first cell) and paragraphs. */
@@ -22,7 +26,7 @@ function entries(): Entry[] {
   const lines = readFileSync(join(ROOT, "reference.md"), "utf8").split(/\r?\n/), out: Entry[] = [];
   let h2 = "", h3 = "", para: string[] = [];
   const flush = () => {
-    if (para.length) out.push({ section: h3 ? `${h2} > ${h3}` : h2, text: para.join("\n"), names: [], row: false });
+    if (para.length) out.push({ section: h3 ? `${h2} > ${h3}` : h2, text: para.join("\n"), names: [], methods: [], row: false });
     para = [];
   };
   for (const line of lines) {
@@ -31,7 +35,7 @@ function entries(): Entry[] {
     if (line.startsWith("| `")) {
       flush();
       const first = line.split(" | ")[0];
-      out.push({ section: h3 ? `${h2} > ${h3}` : h2, text: line, names: [...first.matchAll(/`(?:c\.)?([A-Za-z_$][\w$]*)/g)].map((m) => m[1]), row: true });
+      out.push({ section: h3 ? `${h2} > ${h3}` : h2, text: line, names: [...first.matchAll(/`(?:c\.)?([A-Za-z_$][\w$]*)/g)].map((m) => m[1]), methods: [...first.matchAll(/`(?:[A-Za-z_$][\w$]*)?\.([A-Za-z_$][\w$]*)/g)].map((m) => m[1]), row: true });
       continue;
     }
     if (!line.trim() || line.startsWith("|") || line.startsWith("#")) { flush(); continue; }
@@ -79,7 +83,7 @@ function snippet(text: string, re: RegExp, n = 150): string {
   return (at ? "…" : "") + hit.slice(at, at + n).trim() + "…";
 }
 
-export function help(term?: string, opts: { all?: boolean } = {}): string {
+export function help(term?: string, opts: { all?: boolean; usage?: string } = {}): string {
   const all = entries();
   if (!term) {
     // the index: one line per section, the names it documents
@@ -98,10 +102,23 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
   const t = term.replace(/[()`]/g, "").trim(), low = t.toLowerCase(), out: string[] = [];
   const esc = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const word = new RegExp(`\\b${esc}\\b`, "i"), inCode = new RegExp("`[^`]*\\b" + esc + "\\b[^`]*`", "i");
-  // reference: the rows that document it, whole
-  let own = all.filter((e) => e.row && e.names.some((n) => n.toLowerCase() === low)), last = "";
-  const print = (es: Entry[]) => { for (const e of es) { if (e.section !== last) { out.push(`[reference.md: ${e.section}]`); last = e.section; } out.push(e.text); } };
-  print(own);
+  let last = "";
+  const print = (es: Entry[], label = (_: Entry) => "") => { for (const e of es) { const h = `[reference.md: ${e.section}]${label(e)}`; if (h !== last) out.push((last = h)); out.push(e.text); } };
+  // a command (shot, lib): its block of the usage, then the CLI paragraphs that begin with it (and the bullets after them), whole
+  let cur = "";
+  const block = (opts.usage ?? "").split("\n").filter((l) => (cur = /^ {2}pxl (\w+)/.exec(l)?.[1] ?? (l.startsWith("      ") ? cur : "")) === low);
+  if (block.length) out.push("[pxl --help]", ...block);
+  const begins = new RegExp("^(?:An? )?`" + esc + "\\b", "i"), cli: Entry[] = [];
+  if (block.length) all.forEach((e, i) => { if (e.section.startsWith("CLI") && (begins.test(e.text) || (e.text.startsWith("- ") && cli.includes(all[i - 1])))) cli.push(e); });
+  print(cli);
+  // reference: the rows that document it, whole; a method by its name too (sdf.box, .rotate). A name that is
+  // both (box(), sdf.box): the shorter row first, each labelled as it is written
+  const is = (n: string) => n.toLowerCase() === low;
+  const rows = all.filter((e) => e.row && (e.names.some(is) || e.methods.some(is)));
+  const both = rows.some((e) => e.names.some(is)) && rows.some((e) => !e.names.some(is));
+  if (both) rows.sort((a, b) => a.text.length - b.text.length);
+  print(rows, (e) => (both ? ` ${new RegExp("`((?:[A-Za-z_$][\\w$]*)?\\.?" + esc + ")\\b", "i").exec(e.text)?.[1] ?? t}` : ""));
+  let own = [...cli, ...rows];
   // guide sections whose file and heading have every word of the term: whole when the term is no
   // op or option (a topic: "small animals", "characters 9"), else named so they can be asked for
   const words = low.split(/[^a-z0-9§]+/).map((w) => w.replace(/^§/, "")).filter((w) => w.length > 1 || /\d/.test(w));
@@ -109,12 +126,13 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
   // "characters 1 4 5")
   // whole words, a plural too ("shadow": "Shadows and light"), so "anim" doesn't pick "Small animals"
   const inHead = (w: string, s: Section) => new RegExp(`(^|[^a-z0-9])${w}${/^\d+$/.test(w) ? "" : "s?"}([^a-z0-9]|$)`).test(s.head.toLowerCase());
-  const nums = words.some((w) => /^\d+$/.test(w)) && words.every((w) => /^\d+$/.test(w) || GUIDES.includes(`${w}.md`));
+  const guide = (w: string) => GUIDES.some((g) => gname(g) === w);
+  const nums = words.some((w) => /^\d+$/.test(w)) && words.every((w) => /^\d+$/.test(w) || guide(w));
   const secs = sections().filter((s) => {
-    const i = words.indexOf(s.file.replace(".md", "")), rest = words.filter((_, j) => j !== i);
+    const i = words.indexOf(gname(s.file)), rest = words.filter((_, j) => j !== i);
     if (!rest.length) return i >= 0;
     const numbered = (w: string) => /^\d+$/.test(w) ? /^(\d+)\./.exec(s.head)?.[1] === w : inHead(w, s);
-    return nums ? (i >= 0 || !words.some((w) => GUIDES.includes(`${w}.md`))) && rest.some(numbered) : rest.every((w) => inHead(w, s));
+    return nums ? (i >= 0 || !words.some(guide)) && rest.some(numbered) : rest.every((w) => inHead(w, s));
   });
   // a section of the reference itself whose heading starts with its words ("glow": Glow, "anim":
   // Animation) is where a name with no row of its own is defined: that one whole, the guides named
@@ -128,11 +146,11 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
   // "Procedural texture", `corners("dirt", ...)` under "Terrain tilesets"): that paragraph whole, first
   const code = all.filter((e) => !e.row && e.text.startsWith("```")).flatMap((e) => e.text.split("\n").filter((l) => l.startsWith(t + "(")).map((l) => ({ ...e, text: l, block: e })));
   if (!own.length && !refs.length) print((own = [...code, ...all.filter((e) => !e.row && !e.text.startsWith("```") && e.text.includes("`" + t + "("))]));
-  const whole = !own.length && !refWhole.length && (secs.length <= 2 || nums) ? secs : [];
+  const whole = !block.length && !own.length && !refWhole.length && (secs.length <= 2 || nums) ? secs : [];
   for (const s of whole) out.push(`[${s.file}]`, s.text);
   if (secs.length > whole.length) {
     const list = opts.all ? secs : secs.slice(0, 8);
-    out.push(`[guides: ${secs.length} sections]`, ...list.map((s) => `  pxl help "${s.file.replace(".md", "")} ${s.head}" (${k(s.text.length)})`), ...(secs.length > list.length ? [`  (…${secs.length - list.length} more)`] : []));
+    out.push(`[guides: ${secs.length} sections]`, ...list.map((s) => `  pxl help "${gname(s.file)} ${s.head}" (${k(s.text.length)})`), ...(secs.length > list.length ? [`  (…${secs.length - list.length} more)`] : []));
   }
   // other places in the reference that mention it: a line each (a paragraph counts only when it names
   // it in code: "loops that wrap seamlessly" is not `wrap`)
@@ -153,8 +171,10 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
     const few = opts.all ? hits : hits.slice(0, FEW.guide);
     if (few.length) out.push(`[${g}]`, ...few.map(([l, i]) => `  ${i + 1}: ${opts.all ? l.trim() : snippet(l, inCode, 140)}`), ...(hits.length > few.length ? [`  (…${hits.length - few.length} more)`] : []));
   }
-  // examples (and the library, lib/): where it is used, one per file first
-  const use = new RegExp(`\\b${esc}\\s*[(:]`);
+  // examples (and the library, lib/): where it is used (a call, a key; a method of a name the reference
+  // writes with its methods: make3d.oak, not floor.slice), one per file first
+  const dot = all.some((e) => e.row && e.text.split(" | ")[0].includes("`" + t + "."));
+  const use = new RegExp(`\\b${esc}\\s*(?:[(:]${dot ? "|\\.[A-Za-z_$]" : ""})`);
   const used: { file: string; line: string }[] = [];
   for (const f of [...examples(), ...examples(join(ROOT, "lib"))]) {
     const file = relative(ROOT, f).replace(/\\/g, "/");
@@ -166,7 +186,7 @@ export function help(term?: string, opts: { all?: boolean } = {}): string {
     out.push(`[examples: ${used.length} uses${used.length > pick.length ? `, ${pick.length} shown` : ""}]`, ...pick.map((u) => u.line));
   }
   if (!out.length) {
-    const names = [...new Set(all.flatMap((e) => e.names))];
+    const names = [...new Set(all.flatMap((e) => [...e.names, ...e.methods]))];
     return `nothing about '${t}'${didYouMean(t, names)}. pxl help lists every section.`;
   }
   return out.join("\n");

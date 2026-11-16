@@ -366,7 +366,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   drawn after `post()`,
   so it stays sharp, in pixels finer than the art's (`unit: 0.75`). A loop that long checked one frame in 24: `check: { every: 24 }` (no rule runs on it but the frames building: fewer keep the tests fast).
 - The ground and what grows and lies on it (grass, trees, bushes, rocks, walls, paths, tufts,
-  flowers), as 16-bit games draw them: the environment guide (`pxl help "environment"`, by section)
+  flowers), as 16-bit games draw them: the environment guide (by section in `pxl help`)
   and its kit, `lib/nature/kit.px.js`, to include.
 - Two-point: turn the camera (`yaw`). Whatever is laid on the world's x and z axes then runs to
   `vanish(0)` and `vanish(90)`, often both off the picture; verticals stay vertical. A box's faces:

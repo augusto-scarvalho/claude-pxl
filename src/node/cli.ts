@@ -39,9 +39,12 @@ const USAGE = `pxl — pixel-art DSL
   pxl help [name | "words of a heading"] [--all]
       What the reference says about an op or option: the rows that define it, a line for each other
       mention, and a few uses in the examples (--all: everything in full). Words of a guide's
-      heading print that section ("characters 9", "small animals"). No name: an index.
-  pxl lib [entry] [--genre <name>] [--cell <camera>/<density>]
-      pxl's library (lib/): its entries by subject, a line each (its cells: camera/density, a tile's
+      heading print that section ("characters 9", "small animals"; lib: lib/README.md). A method by
+      its name after the dot (box: box() and sdf.box); a command's name: its block here and the
+      reference's paragraphs on it. No name: an index.
+  pxl lib [entry | subject] [--genre <name>] [--cell <camera>/<density>] [--all]
+      pxl's library (lib/). Alone: its subjects, the entries each has, the genres and cells to filter
+      by. --all, a subject (props) or a filter: its entries by subject, a line each (its cells: camera/density, a tile's
       px or px a meter (hd2d/24ppm), ✓ approved, ◐ a 3D render to look at, ✎ by hand over a 3D draft),
       only those at the genre's cell or naming it (a genre() of lib/profiles), or at that cell (--cell
       side: any density). An entry (its full name, or its last part when one entry alone has it: car
@@ -376,13 +379,13 @@ export async function main(argv: string[]): Promise<number> {
   try { a = parse(argv); } catch (e) { console.error(wrap(e).message); return 2; }
   if (a.cmd === "help") {
     // the reference looked up, not read: an index, or what it says about one name
-    console.log(help(a.file, { all: a.all }) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | inspect | edit | check | shot | compare | blind | study | lib | help (pxl --help for their options)"));
+    console.log(help(a.file, { all: a.all, usage: USAGE }) + (a.file ? "" : "\n\nCommands: pxl build | serve | ascii | list | steps | describe | inspect | edit | check | shot | compare | blind | study | lib | help (pxl --help for their options)"));
     return 0;
   }
   if (a.cmd === "lib") {
     // no art file: the library's own
     try {
-      const out = a.file === "draft" ? libDraft(a.rest[0], { cell: a.cell, genre: a.genre }, typeof a.out === "string" ? a.out : undefined) : a.file ? libCard(a.file) : libList({ genre: a.genre, cell: a.cell });
+      const out = a.file === "draft" ? libDraft(a.rest[0], { cell: a.cell, genre: a.genre }, typeof a.out === "string" ? a.out : undefined) : a.file ? libCard(a.file) : libList({ genre: a.genre, cell: a.cell, all: a.all });
       for (const l of out) console.log(l);
       return 0;
     } catch (e) { console.error("error: " + wrap(e).message); return 1; }

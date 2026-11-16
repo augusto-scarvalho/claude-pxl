@@ -196,8 +196,9 @@ genre's box for it then sizes its drafts, before its `tiles`), `draw` (its drawi
 `roles` (its materials by role, `{ leaf: ["oak_summer"], bark: ["bark"] }`; a material named as a role, fields'
 `leaf`, is that role; one under several roles takes the first the genre names, then its own name: the spruce's
 `{ needle: ["needles"], leaf: ["needles"] }` in a genre's `needle`, else its `leaf`). A name or an asset it can't find fails the load at its line.
-`card(name)` gives its data back (`card("make3d.oak").draw`). `pxl lib` lists the library's cards
-by subject (`pxl lib --genre hd2d`, `pxl lib --cell side/32`); `pxl lib lamps._lamp` prints one (by its
+`card(name)` gives its data back (`card("make3d.oak").draw`). `pxl lib` alone sums the library up (each
+subject's count of cards, the genres and cells to filter by); `pxl lib --all`, a subject (`pxl lib props`) or a filter
+(`pxl lib --genre hd2d`, `pxl lib --cell side/32`) lists its cards by subject, a line each; `pxl lib lamps._lamp` prints one (by its
 full name, or the last part of it when only one entry has that: `pxl lib car` is `make3d.car`; none, or
 several, names the near ones; a drawing with no card of its own that a card names, `pxl lib side.oak_small`, gives
 that card, its cells and the drawing's size; a genre's name, `pxl lib platformer16`, the genre's card: its cell,
@@ -848,7 +849,9 @@ a scene, one scene from two agents, three details of a big one. A clip (a GIF, a
 and more than 12 frames go on in rows of 12: a reference's whole animation on one sheet.
 Give PNGs at 1× (`out/scenes/x.png`, not an enlarged `_shot`): rows are enlarged together, so a big
 one leaves no room for the rest. `--vs <rev | file>` puts the same shot of another version above (one
-name, one region; at a git revision, the file and the art files it includes as they were there); `--diff` with it adds a row with the pixels that changed, in red. `check` makes every check `describe` can warn on, on every scene
+name, one region; at a git revision, the file and the art files it includes as they were there); `--diff` with it adds a row with the pixels that changed, in red.
+
+`check` makes every check `describe` can warn on, on every scene
 and rig of a file at every frame (exit 1 on a warning; its last line says the rules that ran and those that
 couldn't, with what each needs: a genre's one height across the directions wants each move's directions
 in a `group()`; on a file whose sprites got no rule, what sprites get; a lit-side warning says which edge
@@ -861,14 +864,19 @@ against the ground its genre says (`on`); `--readings` also lists what the lit-s
 rule read on every placement, warning or not, with a tally, and each such line's room (its lightest, the ground's
 darkest, the gap, the floor); `--fix` fixes each failing `expect3d` rule
 with one number (see `expect3d`), and each failing rule of a scene's `expect` by moving a placement it
-names (see `expect:`), and says what it wrote. A `build` of a
+names (see `expect:`), and says what it wrote.
+
+A `build` of a
 whole file with more than 12 assets prints how many of each kind it wrote; `--list` or `--only`
 print a line each (a smaller file prints them anyway). A `build` writes the file's own assets, sheets
 and scenes (what they use from its includes drawn in them), not what its includes define (a library's
 hundred sprites): `--only` names those, `--all` writes all of it, and says how many it left; a file of
-includes alone (a stub at an old path) writes theirs. `ascii` prints a color the palette hasn't (a
+includes alone (a stub at an old path) writes theirs.
+
+`ascii` prints a color the palette hasn't (a
 swap's) as the key the swap gave it (else a free one), and lists those under the grid with their colors.
-A preview GIF past 4 MB says so; `--every N` keeps one frame in N in the previews (the GIFs in
+
+A `build`'s preview GIF past 4 MB says so; `--every N` keeps one frame in N in the previews (the GIFs in
 `out/` keep every frame). A build that has grown slow: `--profile` prints where the time went, read
 off the CPU profiler: the slowest assets, then the functions that spent the most time themselves,
 in the art file (work redone every frame that could be done once, a noise called millions of
@@ -879,14 +887,19 @@ trace is kept but whose paint isn't, a paint function in them not `pure()` (the 
 Then, when there is any, what making pure functions took (how many made, how many given back made already) against
 what reading their paint back saved, and the draws painted under that 10 ms, nothing of theirs kept; when making took
 more, it says to make them once, at the file's top or once a frame.
+
 `list` maps a file: each top-level statement that defines assets, each function and each const of
 5 lines or more, its line range, the comment above it and what it defines (a loop's or a helper's
 many assets on one line). A file that doesn't run on its own (one meant to be included) is mapped
-from its text, without the assets its loops make. `help` prints the
+from its text, without the assets its loops make.
+
+`help` prints the
 rows that define a name in full (an op given by its signature in a code block, `sheet(name, ...)` under
-Assets: that line; written up in prose, `corners()` under Terrain tilesets: that paragraph, first), one line for each other place that mentions it and a few uses in the
-examples (`--all`: everything in full); a guide's name with numbers or words of a heading prints those
-sections.
+Assets: that line; written up in prose, `corners()` under Terrain tilesets: that paragraph, first; a method by its
+name after the dot too, `help box`: `box()`'s row and `sdf.box`'s, the shorter first, each labelled), one line for each other place that mentions it and a few uses in the
+examples (`--all`: everything in full). A command's name (`help shot`) prints its block of `pxl --help` and the
+paragraphs of this section that begin with it first, and only names the guide sections that share its word. A guide's
+name with numbers or words of a heading prints those sections (`lib` is lib/README.md: `help "lib taking an entry"`).
 
 `study --at x,y,w,h` reads a region, in the drawing's own pixels (as `shot`'s and the places study
 prints are); on a clip it also follows what moves in it (THE REGION: the colors rare in it, where they
@@ -1204,7 +1217,7 @@ previous frame tinted red and the next tinted blue underneath; `,` and `.` step 
 exports `.glb` or `.ply` (`export3d`) gets a "3D" link: `/3d` shows them to turn round, a moving
 `.glb` playing (three.js from a CDN: the one part of pxl that needs the network).
 
-## Library
+## Node API
 
 ```ts
 import { loadProject, loadSource, writeOutputs, serve, ascii, preview } from "pxl-pixelart";

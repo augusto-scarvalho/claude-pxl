@@ -57,9 +57,14 @@ test("genre(): its density a tile's px or px a meter, its mix said; its cell as 
 });
 
 test("pxl lib: the catalog by subject, filters by cell and genre", () => {
-  const all = libList();
-  assert.match(all[0], /^pxl's library \(lib\/\), by subject/);
+  // alone a summary (the whole list is ~30 KB): a count a subject, the filters; --all or a subject: the entries
+  const sum = libList(), all = libList({ all: true });
+  assert.ok(sum.some((l) => /^props +\d+ +lib\/props: crates lamps side side_village village village32$/.test(l)));
+  assert.match(sum.at(-1)!, /^Filters: --genre <name> \([^)]*topdown16[^)]*\)[^]*--cell <camera>\/<density> \(side\/16 \d+, /);
+  assert.ok(sum.length < 20 && all.length > 200, `${sum.length} vs ${all.length}`);
+  assert.match(all[0], /^pxl's library \(lib\/\), by subject: an entry a line/);
   assert.ok(all.some((l) => /^props +lib\/props: crates lamps side side_village village village32$/.test(l)));
+  assert.match(libCard("vfx").join("\n"), /^pxl's library \(lib\/\), by subject, vfx only[^]*\n {2}dust\.dust +anim/);
   assert.throws(() => libList({ cell: "side/x" }), /--cell is <camera>\/<density>/);
   assert.throws(() => libList({ genre: "racing-behind" }), /no genre 'racing-behind' in lib\/profiles/);
   assert.throws(() => findEntry("nothing.here"), /no entry 'nothing\.here' in the library/);
@@ -186,7 +191,7 @@ test("pxl lib <name>: a drawing a card names (oak_small in the oak's) answers wi
   assert.match(libCard("side.oak_small")[1], /^side\.oak: an oak side on/);
   assert.throws(() => libCard("side.oak_smal"), /no entry 'side\.oak_smal'/);
   // a word some card's line says that is no drawing: no entry, not that card
-  assert.throws(() => libCard("tree"), /no entry 'tree' in the library.*\(pxl lib lists them\)$/);
+  assert.throws(() => libCard("tree"), /no entry 'tree' in the library.*\(pxl lib --all lists them\)$/);
 });
 
 test("make3d.car (lib/vehicles/car): parts, sockets, its decal; 32 rotations a livery from 58, each on its footprint's middle, its line near-black all round; car.facing", () => {

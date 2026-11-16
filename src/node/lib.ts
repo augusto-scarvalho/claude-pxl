@@ -108,8 +108,11 @@ function namedBy(name: string, entries = catalog().entries): { e: Entry; own: st
   return e && { e, own };
 }
 
-/** pxl lib [--genre g] [--cell camera/density]: the entries by subject, a line each. */
-export function libList(opts: { genre?: string; cell?: string } = {}): string[] {
+/**
+ * pxl lib [--genre g] [--cell camera/density] [<subject>] [--all]: the entries by subject, a line each. With none of
+ * them a summary (the whole list is ~30 KB): each subject's count, and what it can be filtered by.
+ */
+export function libList(opts: { genre?: string; cell?: string; subject?: string; all?: boolean } = {}): string[] {
   const m = opts.cell === undefined ? undefined : /^(\w+)(?:\/(\d+(?:ppm)?|\?))?$/.exec(opts.cell);
   if (m === null) throw new PxError(`--cell is <camera>/<density> (side/32, hd2d/24ppm) or a camera alone (side: any density), got "${opts.cell}"`);
   const { files, entries, genres } = catalog();
@@ -125,16 +128,29 @@ export function libList(opts: { genre?: string; cell?: string } = {}): string[] 
     keep = (e) => was(e) && Object.keys(e.card.cells).some((k) => (m[2] === undefined ? k.startsWith(`${m[1]}/`) : k === opts.cell));
     said += ` at ${opts.cell}`;
   }
-  const out = [`pxl's library (lib/), by subject${said}: an entry a line. pxl lib <entry>: its card.`, "Cells: camera/density (a tile's px, or px a meter: 24ppm), ✓ approved, ◐ a 3D render to look at, ✎ by hand over a 3D draft."];
+  if (opts.subject !== undefined) {
+    const was = keep;
+    keep = (e) => was(e) && e.subject === opts.subject;
+    said += `, ${opts.subject} only`;
+  }
+  const summary = !said && !opts.all;
+  const out = [summary ? `pxl's library (lib/), by subject: ${entries.length} entries, a count a subject. pxl lib <subject>: its entries, a line each; pxl lib <entry>: its card; --all: every entry.` : `pxl's library (lib/), by subject${said}: an entry a line. pxl lib <entry>: its card.`, "Cells: camera/density (a tile's px, or px a meter: 24ppm), ✓ approved, ◐ a 3D render to look at, ✎ by hand over a 3D draft."];
   const w = Math.max(20, ...entries.map((e) => e.name.length)) + 2;
   for (const [subject, fs] of files) {
     const es = entries.filter((e) => e.subject === subject && keep(e)), gs = [...genres].filter(([, g]) => g.file.includes(`${sep}${subject}${sep}`));
-    if (said && !es.length) continue;
-    out.push(`${subject.padEnd(13)} lib/${subject}: ${fs.join(" ")}${gs.length ? `; genres ${gs.map(([n, g]) => `${n} (${g.cell})`).join(", ")}` : ""}`);
+    if (said && !es.length && subject !== opts.subject) continue;
+    const head = `lib/${subject}: ${fs.join(" ")}${gs.length ? `; genres ${gs.map(([n, g]) => `${n} (${g.cell})`).join(", ")}` : ""}`;
+    if (summary) { out.push(`${subject.padEnd(13)}${String(es.length).padStart(3)}  ${head}`); continue; }
+    out.push(`${subject.padEnd(13)} ${head}`);
     for (const e of es) {
       const cells = cellsOf(e.card).join(" ");
       out.push(`  ${e.name.padEnd(w)} ${e.card.kind.padEnd(10)} ${cells.padEnd(28)} ${short(e.card.is, Math.max(30, 118 - w - 42 - Math.max(0, cells.length - 28)))}`);
     }
+  }
+  if (summary) {
+    const n = new Map<string, number>();
+    for (const e of entries) for (const k of Object.keys(e.card.cells)) n.set(k, (n.get(k) ?? 0) + 1);
+    out.push(`Filters: --genre <name> (${[...genres.keys()].join(" ")}): those at its cell or naming it; --cell <camera>/<density> (${[...n].sort((a, b) => b[1] - a[1]).map(([k, c]) => `${k} ${c}`).join(", ")}; a camera alone: any density).`);
   }
   return out;
 }
@@ -160,7 +176,7 @@ export function findEntry(name: string, entries = catalog().entries): Entry {
   const low = name.toLowerCase(), off = (n: string) => distance(last(n).replace(/^_/, "").toLowerCase(), low), names = entries.map((e) => e.name);
   const near = [...names.filter((n) => off(n) <= Math.max(1, Math.floor(low.length / 3))).sort((a, b) => off(a) - off(b)), ...names.filter((n) => n.toLowerCase().includes(low))].filter((n, i, all) => all.indexOf(n) === i);
   const said = near.length ? ` (near: ${near.slice(0, 8).join(", ")}${near.length > 8 ? `, ... ${near.length - 8} more` : ""})` : didYouMean(name, names);
-  throw new PxError(`no entry '${name}' in the library${said} (pxl lib lists them)`);
+  throw new PxError(`no entry '${name}' in the library${said} (pxl lib --all lists them)`);
 }
 
 /**
@@ -196,6 +212,7 @@ export function libCard(name: string): string[] {
   try { e = findEntry(name); } catch (err) {
     const G = catalog().genres.get(name);
     if (G) return genreCard(G);
+    if (catalog().files.has(name)) return libList({ subject: name });
     if (!(by = namedBy(name))) throw err;
     e = by.e; none = err;
   }

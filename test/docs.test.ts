@@ -65,10 +65,15 @@ test("docs: SKILL.md stays a map: under 14 KB, the details in the guides it poin
   assert.ok(read("SKILL.md").length < 14000, `SKILL.md is ${read("SKILL.md").length} characters: move a detail to its guide and point to it`);
 });
 
-test("docs: every guide section SKILL.md sends the agent to prints", async () => {
+test("docs: every guide section the guides send the agent to prints; a command's name its usage, a method's name its row", async () => {
   // in this process, not a node each (ten of those took 16 s of the suite)
   const help = async (q: string) => { const log = console.log, out: string[] = []; console.log = (s: string) => out.push(String(s)); try { await main(["help", q]); } finally { console.log = log; } return out.join("\n"); };
-  for (const [, q] of read("SKILL.md").matchAll(/PXL help "([^"<]+)"/g)) assert.match(await help(q), /^###? /m, `pxl help "${q}" prints no section`);
+  const docs = new Set([...GUIDES, ...readdirSync(join(root, "docs")).filter((f) => f.endsWith(".md")).map((f) => `docs/${f}`)]);
+  for (const f of docs) for (const [, q] of read(f).matchAll(/pxl help "([^"<]+)"/gi)) assert.match(await help(q), /^###? /m, `${f}: pxl help "${q}" prints no section`);
+  // help shot printed scenes' "One-shot effects" whole (20 KB): a command's block of the usage comes first
+  for (const cmd of usage.keys()) assert.match(await help(cmd), new RegExp(`^\\[pxl --help\\]\\n {2}pxl ${cmd}\\b`), `pxl help ${cmd}`);
+  // a method by its name after the dot: box() and sdf.box, the shorter first, each labelled
+  assert.match(await help("box"), /^\[reference\.md: Ops > Shapes\] box\n[^\n]*\n\[reference\.md: Ops > Fields in 3D\] sdf\.box\n\| `sdf\.sphere/);
 });
 
 test("docs: every op and DSL global is in the reference, and every example the examples' list names exists", () => {

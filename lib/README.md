@@ -25,7 +25,8 @@ sprite("lamp", { base: "lamps._lamp_square", swap: roleSwap(lamps.ROLES._lamp_sq
 
 ## What exists, and at which cells
 
-`pxl lib` lists the entries by subject, a line each, with their cells: the camera and the density each
+`pxl lib` alone sums them up (each subject's count, the genres and cells to filter by); `pxl lib --all`,
+`pxl lib props` (a subject) or a filter lists the entries by subject, a line each, with their cells: the camera and the density each
 exists at (a tile's px, `topdown/16`; px a meter in a world with no tiles, `hd2d/24ppm`), ✓ approved,
 ◐ a 3D render to look at, ✎ by hand over a 3D draft (`side/?`: drawn for one scene, neither).
 `pxl lib --genre topdown16` keeps those at a profile's cell, `pxl lib --cell side/32` those at a cell.

@@ -979,7 +979,7 @@ test("pxl help is short: other mentions a line each, a guide section by its head
   // an op whose reference is its signature in a code block (sheet under Assets): that line first, before a guide section sharing its word
   const sheet = await said("help", "sheet");
   assert.match(sheet, /^\[reference\.md: Assets\]\nsheet\(name, \["slime\*", "heart", groupName\], \{ cols\?, pad\?, extrude\?, rows\?, slots\?, cell\? \}\)/);
-  assert.match(sheet, /\[guides: 1 sections?\]\n {2}pxl help "environment 1\. Learning from a game's sheet"/);
+  assert.match(sheet, /\[guides: 2 sections\]\n {2}pxl help "environment 1\. Learning from a game's sheet" \([^)]*\)\n {2}pxl help "lib The sheets"/);
   // directions(): its signature, then the paragraph that says how its poses' pivots are placed, with an example
   assert.match(await said("help", "directions"), /^directions\("ship", 16, [^\n]*\n`directions\("car", 16, [^]*Each direction keeps its pose's pivot, turned with it/m);
 });

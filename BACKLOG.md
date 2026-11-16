@@ -1043,6 +1043,13 @@ Wave 3: experiments, measured before anything is built.
   saying how to get the full text.
   Closed, not done: SKILL.md already says `--brief` on busy scenes and the A/B agents used it;
   reading less early didn't move a run's cost, which the agent's own reasoning sets.
+- [x] **`pxl help` answers what was asked** (a docs audit, 2026-11): a command's name printed a guide
+  section holding the word (`help shot`: scenes' "One-shot effects", 20.7k characters); now its block of
+  `pxl --help` and the CLI paragraphs that begin with it (6.8k), the guide sections only named. A method
+  by its name after the dot (`help box`: `box()` and `sdf.box`, the shorter first, labelled); a builder's
+  use counted (`make3d.oak(`: `help make3d` shows examples); lib/README.md among the guides (`pxl help
+  "lib taking an entry"`); reference.md's "Library" is "Node API". `pxl lib` alone: a summary (1.7k
+  characters, was 30k), the whole list by `--all` or a subject (`pxl lib props`).
 
 Not worth it (measured): images (previews cap at 768 px, ~340 tokens each), a shorter CLI
 invocation (~12 tokens a call), new ops for helpers the examples repeat (at most 3 files share
