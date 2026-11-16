@@ -1059,8 +1059,8 @@ Wave 3: experiments, measured before anything is built.
   2026-11): `--diff` says per frame what changed and where (unchanged frames in one), and takes two rows of one
   size without `--vs` (a frozen cell and its live render: frozen's warning names that command); `--edges` names
   the holes that open in an anim's figure (`holes.py`, a proof in 21 briefs), ringed violet by `shot`; `shot`
-  says loose pixels' edges in one line (tips and bridges over 6% of the edge: figures and props measured 0-4%,
-  spells, sparks, dust and grass 8-98%).
+  says loose pixels' edges in one line (tips and bridges over 10% of the edge, 6% at first: figures and props
+  measured 0-4%, a mage's staff 6.6%, spells, sparks, dust and grass 8-98%).
 
 Not worth it (measured): images (previews cap at 768 px, ~340 tokens each), a shorter CLI
 invocation (~12 tokens a call), new ops for helpers the examples repeat (at most 3 files share

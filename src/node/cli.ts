@@ -39,7 +39,8 @@ const USAGE = `pxl — pixel-art DSL
   pxl help [name | "words of a heading"] [--all]
       What the reference says about an op or option: the rows that define it, a line for each other
       mention, and a few uses in the examples (--all: everything in full). Words of a guide's
-      heading print that section ("characters 9", "small animals"; lib: lib/README.md). A method by
+      heading print that section ("characters 9", "small animals"; lib: lib/README.md); numbers and
+      words in one term, both ("characters 1 4 7 basics": 1, 4, 7 and the headings with basics). A method by
       its name after the dot (box: box() and sdf.box); a row split by subject by both words ("rig3d
       head"); a command's name: its block here and the reference's paragraphs on it. No name: an index.
   pxl lib [entry | subject] [--genre <name>] [--cell <camera>/<density>] [--all]
@@ -65,8 +66,8 @@ const USAGE = `pxl — pixel-art DSL
       scenes (what they use from its includes drawn in them); what an included file defines only
       when --only names it, or all of it with --all (a file of includes alone writes theirs). --share N also writes out/share/:
       each asset N times bigger, nearest neighbour, clear kept, no checker or grid (and a GIF when
-      it moves), to post; an image past 16,777,216 px after the scale (4096x4096; an anim's PNG is its
-      frames in one sheet) fails the build. A whole file of more than 12 assets
+      it moves), to post; a PNG past 16,777,216 px after the scale (4096x4096; an anim's PNG is its
+      frames in one sheet) is not written, said in its line (the GIF is). A whole file of more than 12 assets
       prints a count of what it wrote; --only and --list print a line per asset (size, frames,
       preview scale). --every N: preview GIFs keep one frame in N (a long loop's runs to many MB).
       --aseprite also writes each asset as <name>.aseprite (layers, frames, tag, palette) to keep

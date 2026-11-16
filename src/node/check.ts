@@ -20,15 +20,17 @@ import { FLAWS, jointsOf, poseFlaws, viewRows, viewWarnings } from "../core/rig3
 
 /**
  * --edges's words for an asset's frames: each kind of edge flaw found, how many, where (frame by frame, once).
- * `loose` (shot's, the asset's name): one line instead where tips and bridges are over 6% of the edge (and 8 or more): loose pixels,
+ * `loose` (shot's, the asset's name): one line instead where tips and bridges are over 10% of the edge (and 8 or more): loose pixels,
  * no outline to read. Measured on 33 assets: figures, props and broadleaf trees 0-4%; pines 10-12%, spells,
- * sparks, dust, a fighter's projectile and grass tufts 8-98%. Flaws of every kind per edge px didn't separate them.
+ * sparks, dust, a fighter's projectile and grass tufts 8-98%; a 24 px mage with a staff and a hat's tip 6.6% (at 6%
+ * it was called loose: a figure's flaws hidden cost more than an effect's counts listed). Flaws of every kind per
+ * edge px didn't separate them.
  */
 export function edgeLook(frames: Img[], ink?: Set<Color>, loose?: string): string {
   const fl = frames.map((im) => edgeFlaws(im, ink)), say: string[] = [];
   if (loose) {
     const tb = fl.reduce((n, f) => n + f.tips.length + f.bridges.length, 0), edge = frames.reduce((n, im) => n + edgePx(im), 0);
-    if (tb >= 8 && tb > 0.06 * edge) return `read as loose pixels (particles, smoke, grass blades, a texture), not an outline: ${tb} tips and bridges on ${edge} px of edge${frames.length > 1 ? ` over ${frames.length} frames` : ""}; pxl check <file> ${loose} --edges lists them`;
+    if (tb >= 8 && tb > 0.1 * edge) return `read as loose pixels (particles, smoke, grass blades, a texture), not an outline: ${tb} tips and bridges on ${edge} px of edge${frames.length > 1 ? ` over ${frames.length} frames` : ""}; pxl check <file> ${loose} --edges lists them`;
   }
   const WHAT: [keyof ReturnType<typeof edgeFlaws>, string][] = [["steps", "steps out of order"], ["doubled", "doubled in its line"], ["tips", "tips"], ["bridges", "bridges"], ["notches", "notches"], ["gaps", "gaps in its line"], ["corners", "corners clipped"]];
   for (const [k, w] of WHAT) {

@@ -151,9 +151,12 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         info = play === "forward" ? ` (${frames.length} frames, ${b.anim!.loop}ms)` : ` (${p.drawn(n).length} frames ${play}, ${b.anim!.loop}ms)`;
       }
       if (opts.share) {
-        // to post: the art itself enlarged by a whole number, nearest neighbour, nothing drawn over it
-        writePng(join(out, "share", n + ".png"), (def.kind === "anim" ? packSheet(p.drawn(n).map((f, i) => ({ name: `${n}_${i}`, img: f.img })), p.drawn(n).length).sheet : b.img).scale(opts.share));
-        if (frames.length) write(join(out, "share", n + ".gif"), encodeGif(frames.map((f) => ({ img: f.img.scale(opts.share!), ms: f.ms }))));
+        // to post: the art itself enlarged by a whole number, nearest neighbour, nothing drawn over it; a PNG past the
+        // 16,777,216 px an image holds once scaled (a long anim's strip) is left out and said, its GIF still written
+        const s = opts.share, drawn = def.kind === "anim" ? p.drawn(n) : [], art = drawn.length ? packSheet(drawn.map((f, i) => ({ name: `${n}_${i}`, img: f.img })), drawn.length).sheet : b.img;
+        if (art.w * art.h * s * s <= 16_777_216) writePng(join(out, "share", n + ".png"), art.scale(s));
+        else info += ` -- share/${n}.png not written: ${drawn.length ? `its ${drawn.length} frames in one strip` : "it"} at ${s}x would be ${art.w * s}x${art.h * s} px, past the 16,777,216 an image holds${frames.length ? `; share/${n}.gif written` : ""}`;
+        if (frames.length) write(join(out, "share", n + ".gif"), encodeGif(frames.map((f) => ({ img: f.img.scale(s), ms: f.ms }))));
       }
       if (def.opts.layers) for (const l of b.layers) writePng(join(out, dir, n, l.name + ".png"), l.img);
       if (b.tilemaps) {

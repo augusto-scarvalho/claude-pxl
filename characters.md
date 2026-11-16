@@ -131,7 +131,7 @@ line, tips, bridges, notches, gaps in the line, clipped corners. A corner the sh
 neck) reads as a step: say so and keep it. A hand pass that lines its own edge closes its dashes with
 `c.closeLine()`. On an anim it also names the holes that open (the clear an arm encloses against the body
 on frames where the first frame has none: a handle there at rest is meant), ringed violet by `shot`. Loose
-pixels (sparks, smoke, grass blades: tips and bridges over 6% of the edge) `shot` says in one line; the
+pixels (sparks, smoke, grass blades: tips and bridges over 10% of the edge) `shot` says in one line; the
 check lists them.
 
 ### A base body in the view you need: dress it

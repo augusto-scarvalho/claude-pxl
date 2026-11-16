@@ -829,8 +829,9 @@ node <pxl>/bin/pxl.js study <picture | gif | video> [--at x,y,w,h] [--from S] [-
 to another `--out`, its files named as the scene's); `shot --world --every N`: one world, the camera's box
 every N frames on it, each box showing what its own frame has there (its light, who is where), the
 boxes' `[frame, x, y]` printed. `build --share N` also writes `out/share/`: each asset N times bigger, nearest neighbour, clear kept,
-no checker or grid, a GIF when it moves: to post (an image past 16,777,216 px after the scale, 4096×4096, fails the
-build, "image too large"; an anim's PNG is its frames in one sheet). `shot` writes `<name>_look.png` when its check has
+no checker or grid, a GIF when it moves: to post (a PNG past 16,777,216 px after the scale, 4096×4096, is said
+in its line and not written, the GIF still is: an anim's PNG is its frames in one sheet, 80 frames of 320×180 at 3x
+76,800×540). `shot` writes `<name>_look.png` when its check has
 LOOK lines (the pixels they name ringed: L-corners orange, a genre's line's too, jaggies blue; its edges' as `--edges`
 names them: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners
 green; the holes that opened violet, on the first frame shown that has one), and a clip's note gives each shown frame's ms.
@@ -850,8 +851,8 @@ gaps. On an anim, a second LOOK line names the holes that open: clear pixels the
 flood from the frame's edge doesn't reach them) on frames where the first frame has none there, how many
 px and the largest's box (a handle, an arm's gap at rest, the first frame has: meant, not said). `shot`
 says its edges in one line instead of the lists, without the rings and the holes, where tips and bridges
-are over 6% of the edge px (and 8 or more): loose pixels (particles, smoke, grass blades, a pine's
-needles) with no outline to read; figures and props measured 0-4%, effects and grass 8-98%.
+are over 10% of the edge px (and 8 or more): loose pixels (particles, smoke, grass blades, a pine's
+needles) with no outline to read; figures and props measured 0-7%, effects and grass 8-98% (those under 10% listed).
 
 `edit`'s ops (the EditIR, `scenes 14`): `move`, `set`, `recolor`, `flip`, `frame`, `relation`, `swap`,
 `as` on a thing `inspect` names, and `add`: `{ "op": "add", "target": <new id>, "asset" | "like": <id>,
@@ -923,7 +924,8 @@ by subject, by its name and subject, `help "rig3d head"`, the name alone printin
 one line for each other place that mentions it and a few uses in the examples (`--all`: everything in full). A
 command's name (`help shot`) prints its block of `pxl --help` and the paragraphs of this section that begin with it
 first, and only names the guide sections that share its word. A guide's name with numbers or words of a heading prints
-those sections (`lib` is lib/README.md: `help "lib taking an entry"`).
+those sections (`lib` is lib/README.md: `help "lib taking an entry"`); with both, the sections by number and those whose
+heading has the words, each once (`help "characters 1 4 basics"`).
 
 `study --at x,y,w,h` reads a region, in the drawing's own pixels (as `shot`'s and the places study
 prints are); on a clip it also follows what moves in it (THE REGION: the colors rare in it, where they

@@ -9,6 +9,7 @@ import { pack } from "../src/core/color.ts";
 import { closeGaps, edgeFlaws, reduceEdges } from "../src/core/vision.ts";
 import { loadSource } from "../src/node/load.ts";
 import { main } from "../src/node/cli.ts";
+import { edgeLook } from "../src/node/check.ts";
 import { decodePng } from "../src/node/png.ts";
 import { whenChanged } from "./passed.ts";
 
@@ -153,4 +154,13 @@ sprite("dust", { w: 16, h: 16 }, (c) => { for (let x = 0; x < 16; x += 3) for (l
   assert.match(text, /^dust › LOOK: edges: 36 tips/m, "check lists them");
   assert.match(text, /^dust › LOOK: edges read as loose pixels \(particles, smoke, grass blades, a texture\), not an outline: 36 tips and bridges on 36 px of edge; pxl check <file> dust --edges lists them$/m, "shot says one line");
   assert.doesNotMatch(text, /dust_look/);
+});
+
+test("shot's loose pixels: a figure with a few tips (8 on 104 px of edge, a staff's or a hat's) still has them listed", () => {
+  const im = new Img(31, 31);
+  for (let y = 2; y < 29; y++) for (let x = 2; x < 29; x++) im.set(x, y, K);
+  for (let x = 4; x < 28; x += 3) im.set(x, 1, K);
+  const words = edgeLook([im], undefined, "fig");
+  assert.doesNotMatch(words, /loose/);
+  assert.match(words, /\b8 tips \(at/);
 });

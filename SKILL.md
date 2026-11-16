@@ -63,12 +63,12 @@ and uses; `PXL help "<guide> <numbers or words of a heading>"` those sections:
 | Making | Read |
 |---|---|
 | sprites for a game (platformer, top-down, fighting, racing, HD-2D) | pick the profile first: `PXL help "scenes 18 19"` (`genre()`; a new density is drawn simpler, never scaled) |
-| a person or humanoid | `PXL help "characters 1 4 7"`, `"characters basics"`; by need "three quarters", "new head", "four directions", "turned to a diagonal"; 2 and 3 with a reference or existing art, 8 variants, 10 animated limbs, 12 frame counts, 13 a game's look, 14 a fighting-game sprite |
+| a person or humanoid | `PXL help "characters 1 4 7 basics"`; by need "three quarters", "new head", "four directions", "turned to a diagonal"; 2 and 3 with a reference or existing art, 8 variants, 10 animated limbs, 12 frame counts, 13 a game's look, 14 a fighting-game sprite |
 | a small animal | `PXL help "characters 1 9"` |
 | a big figure or prop (48 px and up), built part by part on a skeleton | `PXL help "characters 11"` (`rig`) |
-| a figure that turns to 4 or 8 directions and walks (a field sprite) | `PXL help "a body that turns"` (`rig3d`, blocks first; the head baked per view, its face retouched by hand), then "characters 5 6", "walks and idles"; by need "attacks", "subpixel" |
+| a figure that turns to 4 or 8 directions and walks (a field sprite) | `PXL help "a body that turns"` (`rig3d`, blocks first; the head baked per view, its face retouched by hand), then `PXL help "characters 5 6 idles"`; by need "attacks", "subpixel" |
 | a story: figures walking a path and talking | `PXL help route`, `PXL help bubble`, `"story in a diorama"` |
-| a scene, level, building or environment | `PXL help "scenes 1 3 11"`, `"shot describe and check"`; then by need: 2 ground, 4 trees, 5 water, 6 distance, 7 perspective ("perspective basics", HD-2D "diorama"), 8-10 loops and parallax, 16 a game's projections; grass, trees, rocks, walls: `PXL help "environment 10"` (the kit) |
+| a scene, level, building or environment | `PXL help "scenes 1 3 11 shot describe and check"`; then by need: 2 ground, 4 trees, 5 water, 6 distance, 7 perspective ("perspective basics", HD-2D "diorama"), 8-10 loops and parallax, 16 a game's projections; grass, trees, rocks, walls: `PXL help "environment 10"` (the kit) |
 | lamps, night, light blocked by walls | [lighting.md](lighting.md), whole (~3.5k tokens) |
 | a turn that isn't a quarter turn; 8/16 directions | `PXL help "rotation short version"`, then "rotation angles" |
 | a thing in 3D: turns, sways, seen from several cameras | `PXL help "scenes 17"`; a prop turned into a game's sprites: `turnaround` |
