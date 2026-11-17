@@ -10,7 +10,8 @@
 // of its own), and it is served only where
 // they are the same (a 3D figure's frame, which reads none, serves check and shot alike). Only a build whose own work
 // took DISK_MS or more, and WORTH ms or more a MiB it takes, is kept (a figure's traced frame, not a thousand 2 ms
-// sprites, nor a scene's frame composed of what is kept), only one whose every field can
+// sprites, nor a scene's frame composed of what is kept), or one handed out to workers whatever it took (workers.ts:
+// one not found starts them), only one whose every field can
 // be written and read back as it was (a relation's functions, a mesh's sun map can't: such a build is made again), and
 // none made after a warning its own log lacks (that memo again: the round's bout). Where builds stop being a function
 // of the files, the project lets the disk go (load.ts): the art's own Math.random, Date.now, Date(), new Date() or a

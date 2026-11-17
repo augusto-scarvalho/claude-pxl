@@ -559,10 +559,11 @@ would prove nothing of the engine. `meter.ts`, preloaded, prints each test file'
 memory: which files hold the suite back.
 
 **Builds kept on disk** (`src/node/store.ts`). A build that took 10 ms or more of its own, and 300 ms or more for each
-MB it takes, is kept between commands under a key of all it reads (pxl's sources, Node's version, the bytes of every
-file the project loaded, the asset, its seed, time and clock, and the options it read on the way or that builds read
-earlier in the command, in the entry's name: a check's build and a shot's side by side), with the warnings it gave,
-so a build read back is the build. The tests read it, as every command does. The rule: a build is a function of the
+MB it takes (or one handed out to workers, whatever it took: one not found on disk starts them), is kept between
+commands under a key of all it reads (pxl's sources, Node's version, the bytes of every file the project loaded, the
+asset, its seed, time and clock, and the options it read on the way or that builds read earlier in the command, in
+the entry's name: a check's build and a shot's side by side), with the warnings it gave, so a build read back is the
+build. The tests read it, as every command does. The rule: a build is a function of the
 files. A memo in the art file is covered (filled as the file loads), a variable one build writes and another draws
 with is not (the build then depends on the order it was made in, which no key holds), so art keeps no such state. What
 a change can stop from being kept: a build under that floor (a scene's frames, composed again of the parts kept), a

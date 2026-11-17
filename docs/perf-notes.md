@@ -92,10 +92,44 @@ What the store holds (the i5-1035G1, 2026-11, a store of its own; each file's `b
   lines, `hashes.ts --cache` on both (475 lines), and the last commit's files against the new ones: none differs. Warm
   builds, the last commit's pxl and the new one alternating (wall s): Haldor 21.2, 14.5, 14.2 against 14.0, 17.9,
   14.3; bend 23.2, 13.6, 10.6 against 19.0, 18.3, 13.7, the noise of what each warm build makes again (below).
-- Left: a build read back touching the traces it stands on (its log would name them); a warm build of Haldor makes
-  37 to 60 builds again each time (11 to 265 ms each, 29 the median), not the same ones: they are kept or not as
-  their milliseconds fall against `WORTH`, so his four workers start every time (1 GB at the peak, against 600 MB
-  when nothing is made; the same 15 s), and a warm build of bend 89 to 150 (10 to 23 s).
+
+What a fighter's warm build made again (the i5-1035G1, 2026-11, a store of its own, Haldor's build on the 4 workers
+his record gives it, Reva's on 2; a lab copy of pxl naming each build made, its own ms, its bytes and what the store
+did with it): his anim frames themselves, each the body and the near arm kept under it composed again with the head,
+the mends and the boxes, 3 to 25 ms of their own on one thread and 76 KB on disk (Reva's 37). None had been kept and
+then not found (under another key, or dropped): each had never been kept, under the floor (10 ms) or `WORTH` (22 ms at
+76 KB) as the laptop's load moved its ms. One not found starts the workers, whose load makes the next ones slower, so a
+few more are kept each time, never the same:
+
+| warm builds in a row | 1 | 2 | 3 | 4 | 5 | forced to one thread (two) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Haldor: made again (kept by it) | 272 (81) | 187 (35) | 152 (53) | 99 (26) | 71 (25) | 40 (1), 39 (1) |
+| CPU s, peak MB, wall s | 38, 1012, 14.8 | 32, 1084, 12.3 | 36, 1108, 13.8 | 30, 1155, 11.6 | 31, 1206, 13.6 | 15 to 17, 588, 10.4 to 11.3 |
+| Reva: made again (kept by it) | 301 (69) | 224 (25) | 194 (15) | 172 (30) | 136 (18) | 96 (5), 91 (4) |
+| CPU s, peak MB, wall s | 26, 536, 10.7 | 20, 505, 9.8 | 22, 549, 10.7 | 24, 527, 11.7 | 21, 555, 10.6 | 16 to 17, 363 to 373, 12.2 |
+
+On one thread the same 40 come back each time (the throws' and the specials' frames, 3 to 17 ms), 0.3 s in all
+(Reva's 91 to 96, 0.4 s): the workers they start are the cost, twice the CPU and 0.5 GB for no time. Read back, such a
+frame takes 1.8 ms (Reva's 1.2), against 10.5 (8.2) made again with its parts read back.
+
+- So a build handed out to workers (an anim's frame, in a check or a build whose record gives it more than one) is
+  kept whatever it took (`workers.ts`), and a warm build that finds every frame starts none. Five warm builds in a row,
+  the last commit's pxl and the new one alternating: Haldor 11.5 to 14.7 s, 30 to 36 s of CPU and a peak of 1,009 to
+  1,105 MB (his workers each time) against 9.9 to 12.0 s, 14 to 17 s and 584 to 593 MB, nothing made again; Reva 7.6
+  to 10.2 s, 16 to 26 s, 511 to 596 MB against 7.0 to 8.3 s, 10 to 12 s, 362 to 382 MB. His store keeps all his 273
+  frames: 65 MB after his cold build against 46 (Reva's 24 against 17), where five warm builds had taken it to 62
+  before. Writing them costs his cold build about 0.6 s of deflating (his frames are 290 MB raw), lost in its noise
+  (83 against 97 s, then 106 against 110 the other way round, the laptop warming). The same files and lines, store
+  off, on and on again (Haldor, Reva, `traveler.px.js`, hero32), and `hashes.ts --cache` on those four (586 lines).
+- Left to this thread instead (no worker started for a few cheap builds), the workers would go as in the runs on one
+  thread above, but those 40 (91) would still be made again at every build.
+- An edit of one of his moves (a number in the jab, after a warm build) marches and paints again that move's changed
+  frame, as before; with it, both pxls kept one trace or paint the build before had made under the floor.
+- Left: a build read back touching the traces it stands on (its log would name them); a warm build of bend makes 89
+  to 150 builds again (10 to 23 s; its build is on one thread here), and of `traveler.px.js` 639 to 811 (1 to 10 ms
+  each, 2 to 4 s in all; hero32's 179 to 246, 0.1 to 1.4 s), kept or not as their milliseconds fall against the
+  floor, with no worker to start. Where bend's build has workers (a machine guessing 3 or more), its 160 frames of
+  320x180 are kept too (not measured).
 
 ## Traces kept
 

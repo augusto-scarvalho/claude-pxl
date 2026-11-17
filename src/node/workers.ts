@@ -71,6 +71,10 @@ export function startWorkers(p: Project, file: string, opts: ProjectOptions, cmd
   if (n < 2 && !pick.measure) return;
   const sab = new SharedArrayBuffer(4 * (MAX + 1)), st = new Int32Array(sab), ports: MessagePort[] = [], ws: Worker[] = [];
   const jobs = new Map<string, [number, string]>(), list: [string, string, number, number, number][] = [], got = new Map<string, Msg>(), zeros = new Map<string, Coded>();
+  // (a build handed out is kept whatever it took, made here or by a worker (below): one not found on disk starts the
+  // workers, and a fighter's frame composed again of what is kept, 3 to 25 ms of its own, fell either side of the store's
+  // floor and WORTH from one command to the next, so every warm build of his started them)
+  if (n > 1 && p.disk) { const put = p.disk.put; p.disk.put = (k, out, log, ms, skip) => put(k, out, log, jobs.has(k) ? Infinity : ms, skip); }
   // (this run's work at one thread's ms: each name's, measured here on one thread; the workers' ms of those served; the
   // builds handed out it made itself while they ran, at that ms, else at theirs)
   const cost: Record<string, [number, number]> = {}, did = { known: 0, theirs: 0, unknown: 0, ours: 0 };
@@ -192,7 +196,7 @@ if (!isMainThread && workerData?.pxlBuilds) {
   if (!p.early) p.disk = {
     // (the job itself dropped from the store is said by the thread that asked it)
     get: (k, o) => { const d = storeSaid.dropped, h = real?.get(k, o); if (k === job) storeSaid.dropped = d; if (h) keep(k, h); return h; },
-    put: (k, out, log, ms, skip) => { keep(k, { out, log }); real?.put(k, out, log, ms, skip); },
+    put: (k, out, log, ms, skip) => { keep(k, { out, log }); real?.put(k, out, log, want.has(k) ? Infinity : ms, skip); },
   };
   const list: [string, string, number, number, number][] = [];
   let at = 0, job = "";

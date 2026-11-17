@@ -1130,7 +1130,9 @@ key of all it reads: pxl's sources, Node's version, the time zone and language; 
 loaded (itself, its includes, palettes, PNGs, poses); the asset, its seed, time and clock; the options it read, and
 those read earlier in the command (check's, `--world`'s, a trace's). Any later command making the same build reads it
 back (a figure's 217 traced frames: `check` 137 s, then 4); a check's build and a shot's are kept side by side. It
-can't go stale: an edit to any of those files, or to pxl, is a new key.
+can't go stale: an edit to any of those files, or to pxl, is a new key. In a `check` or a `build` whose builds are
+shared among workers (below), each anim frame handed out to them is kept whatever it took: one not found on disk
+starts them, so a warm build that finds every frame starts none.
 
 What a trace's march finds is kept too, under a key of the field itself (its code and numbers, and the rays the trace
 asks: all the march reads), and read back wherever the same field is asked through the same rays, whatever file asks

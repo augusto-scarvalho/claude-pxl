@@ -3,16 +3,17 @@
 // file doesn't; a check's build never serves a full one, and both are kept side by side; what the art's own memo
 // carries from one build to another (a warning, an option) goes with what's kept after it; what the art writes as it
 // draws (a mask) and another build reads, the art's dice and clock, and a file read after it loaded keep nothing from
-// there; a broken entry is made again. Each project here keeps every build
-// (as if each took long), and its art says each build it makes (console.debug("made"), counted here).
+// there; a broken entry is made again; a frame handed out to workers is kept whatever it took. Each project here keeps
+// every build (as if each took long), and its art says each build it makes (console.debug("made"), counted here).
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { whenChanged } from "./passed.ts";
 import { loadProject } from "../src/node/load.ts";
 import { encodePng } from "../src/node/png.ts";
 import { budget, decode, encode, prune, sourcesOf } from "../src/node/store.ts";
+import { startWorkers } from "../src/node/workers.ts";
 import { Img } from "../src/core/image.ts";
 import type { Project } from "../src/core/project.ts";
 
@@ -212,6 +213,23 @@ test("store: every field comes back as it was, and what can't (a function) isn't
   assert.deepEqual(Object.keys(back.img), Object.keys(i));
   assert.throws(() => encode({ f: () => 1 }, []), /unstorable/);
   assert.throws(() => encode(Object.freeze({ a: 1 }), []), /unstorable/);
+});
+
+test("store: a frame handed out to workers is kept whatever it took (one not found starts them); with none, one under the floor isn't", () => {
+  put("jobs.px.js", `anim("tick", { w: 4, h: 4, frames: 4 }, (c) => c.px(c.frame, 0, "#ffffff"))`);
+  const file = join(dir, "jobs.px.js"), kept = (n: string) => {
+    process.env.PXL_WORKERS = n;
+    try {
+      const p = loadProject(file), d = p.disk as unknown as { file: (k: string) => string };
+      startWorkers(p, file, {}, "build");
+      // (its frames after the first, each made in well under a millisecond)
+      const on = p.frames("tick").filter((f) => f.t).map((f) => existsSync(d.file(`tick#${f.t}`)));
+      p.elsewhere?.end();
+      return on;
+    } finally { delete process.env.PXL_WORKERS; }
+  };
+  assert.deepEqual(kept("1"), [false, false, false]);
+  assert.deepEqual(kept("2"), [true, true, true]);
 });
 
 test("store: past its budget the least used go first, and .pruned names them until they are written again", () => {
