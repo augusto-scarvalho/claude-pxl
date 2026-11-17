@@ -38,8 +38,8 @@ export function perRow(n: number, w: number): number {
 }
 
 /** The frames side by side (gaps between), in rows when they are too wide for one, cropped to `at`; transparent shows as a flat gray. */
-export function shotRow(p: Project, name: string, frames: number[], at?: number[], ref = false): Img {
-  const imgs = frames.map((f) => shotFrame(p, name, f, ref)), cols = perRow(imgs.length, at?.[2] ?? imgs[0].w);
+export function shotRow(p: Project, name: string, frames: number[], at?: number[], ref = false, boxes?: Boxes): Img {
+  const imgs = frames.map((f) => shotFrame(p, name, f, ref, boxes)), cols = perRow(imgs.length, at?.[2] ?? imgs[0].w);
   return stack(Array.from({ length: Math.ceil(imgs.length / cols) }, (_, r) => cellRow(imgs.slice(r * cols, (r + 1) * cols), [at])));
 }
 
@@ -50,10 +50,29 @@ export const pastLoop = (p: Project, name: string) => p.assets.get(name)?.kind =
  * Frame f of an asset as shot shows it: with its `ref: true` layers over it (guide rows, a skeleton) when asked. An anim
  * that loops draws f from its frame count on too, at its own time (f = its count: the frame one loop on, its seam).
  */
-export function shotFrame(p: Project, name: string, f: number, ref = false): Img {
+export function shotFrame(p: Project, name: string, f: number, ref = false, boxes?: Boxes): Img {
   const n = frameCount(p, name), past = f >= n && pastLoop(p, name);
   const b = past ? p.build(name, 0, Math.floor(f / n) * p.timeline(name)!.loop + frameTime(p, name, f % n), true, true) : p.build(name, 0, frameTime(p, name, f));
-  return ref && b.guide ? b.guide : b.img;
+  const img = ref && b.guide ? b.guide : b.img;
+  return boxes && b.img.boxes ? boxed(img, b.img.boxes, `${name} frame ${f}`, boxes) : img;
+}
+
+/** shot --boxes: each kind's colour as met (hit red, hurt blue, others in turn), and the boxes that leave their frame. */
+export type Boxes = { kinds: Map<string, string>; clipped: string[] };
+const BOX_RGB: Record<string, number> = { red: 0xff3030ff, blue: 0x3c78ffff, yellow: 0xffe040ff, green: 0x40e060ff, magenta: 0xff40ffff, orange: 0xff9020ff };
+/** A copy of the frame with each box (c.setBox) outlined 1 px inside its edge, clipped to the frame. */
+function boxed(img: Img, all: Record<string, number[][]>, where: string, seen: Boxes): Img {
+  const out = img.copy();
+  for (const [k, bs] of Object.entries(all)) {
+    const name = seen.kinds.get(k) ?? ({ hit: "red", hurt: "blue" } as Record<string, string>)[k] ?? ["yellow", "green", "magenta", "orange"][seen.kinds.size % 4], c = BOX_RGB[name];
+    seen.kinds.set(k, name);
+    for (const [x, y, w, h] of bs) {
+      if (x < 0 || y < 0 || x + w > img.w || y + h > img.h) seen.clipped.push(`${k} [${x}, ${y}, ${w}, ${h}] on ${where}`);
+      for (let i = x; i < x + w; i++) { out.set(i, y, c); out.set(i, y + h - 1, c); }
+      for (let j = y; j < y + h; j++) { out.set(x, j, c); out.set(x + w - 1, j, c); }
+    }
+  }
+  return out;
 }
 
 /**

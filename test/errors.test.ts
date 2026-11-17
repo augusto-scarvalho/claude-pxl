@@ -42,6 +42,12 @@ test("a top-level name hiding a global is a warning when the file loads, at its 
   assert.deepEqual(loadSource(PAL + 'sprite("a", "r")', "t.px.js").warnings, []);
 });
 
+test("an unknown top-level call names the DSL global it begins with, or one a letter off; a part's constant none", () => {
+  has(failure('palette({ k: "#000000" })').message, "palette is not defined (did you mean 'pal'?)");
+  has(failure('sprit("a", "r")').message, "did you mean 'sprite'?");
+  for (const n of ["W", "HEAD", "BODY", "zzzz"]) assert.equal(failure(`${n}()`).message, `t.px.js:1:1: ${n} is not defined`);
+});
+
 test("unknown options get suggestions", () => {
   has(failure(PAL + 'sprite("a", { outlin: "k" }, "r")').message, "unknown option 'outlin'", "did you mean 'outline'");
   has(failure(PAL + 'sprite("a", "r", layer("l", { hiden: true }))').message, "unknown option 'hiden'", "did you mean 'hidden'");

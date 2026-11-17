@@ -708,7 +708,7 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
   if (o.floor !== undefined && !o.selout && !o.caps) throw new PxError("floor stops selout's and caps' steps above those keys: add selout or caps");
   const floor = o.floor === undefined ? undefined : pal.floorOf(o.floor);
   const sel = o.selout ? seloutPick(pal, o.selout === true ? 2 : o.selout, floor) : undefined;
-  if (o.selout && !o.outline && !o.outline8 && !o.inline) throw new PxError("selout recolors a line: add outline, outline8 or inline");
+  if (o.selout && !o.outline && !o.outline8 && !o.inline) throw new PxError(`selout recolors a line: add outline, outline8 or inline${o.base ? " (a base's line is already in its pixels, and a variant's outline would go round it: to compare with and without selout, base both on one drawing without a line, a `_` sprite, each with its own outline)" : ""}`);
   // a layer's own selout / floor, over the asset's, for the line round its pixels (false: none)
   const mine = tags.map((t) => {
     const s = t.selout ?? o.selout, f = t.floor ?? o.floor;

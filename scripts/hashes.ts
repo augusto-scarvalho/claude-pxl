@@ -9,6 +9,7 @@
 //   node scripts/hashes.ts --vs HEAD --strip "crew|lamps"   names under those includes' `as` taken without it
 //   node scripts/hashes.ts --vs HEAD --png diffs      each frame that differs written there, the revision's and yours
 //   node scripts/hashes.ts --cache a.px.js b.px.js    builds read back from the store where it has them
+//   node scripts/hashes.ts --vs HEAD --data --frames lib/characters/x.px.js   each frame's boxes, sockets, pivot, ms and data too
 //
 // --vs <rev> builds each file with the pxl and the examples at a git revision too (unpacked once into
 // the system's temp folder, see vs.ts), in this process, and prints only the lines that differ and a
@@ -18,7 +19,7 @@
 // cheap look at a long scene). --only <regex>: the assets whose name matches. --strip <namespaces>: a
 // name under them ("crew.tr_walk_e") is keyed without them ("tr_walk_e"), unless the file has that name
 // of its own: the same pixels after an include takes an `as`. A file that doesn't build on its own
-// (included only) prints SKIP; an asset that fails prints ERR and the error's first words.
+// (included only) prints SKIP; an asset that fails prints ERR and the error's first line.
 // --vs builds nothing of a file whose every input is the same at the revision: pxl's src/ and each file it reads
 // (itself, its includes, palettes, PNGs: the loader's list). A build is a function of those alone, so its pixels are
 // the same without tracing them; such files are counted apart. --all builds them anyway.
@@ -27,6 +28,9 @@
 // with pxl shot (two PNGs and --diff). --cache leaves PXL_CACHE as the environment has it (else it is off): the same
 // files run off, on and on again, the three outputs the same, prove a build read back from the store is the build
 // made; not an engine change (a build read back may be one made before it): that proof runs without --cache.
+// --data hashes with each frame's pixels what an engine reads off it (its boxes, sockets, pivot, ms and setData's
+// data), "data <hash>" after them; a line that differs names the fields that do ("the same pixels; not the same: boxes").
+import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, readFileSync, readdirSync, statSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
@@ -38,7 +42,7 @@ import { artFiles, inTree, loader, pick, repo, revTree } from "./vs.ts";
 
 const args = process.argv.slice(2), opt = (k: string) => { const i = args.indexOf(k); return i < 0 ? undefined : args.splice(i, 2)[1]; };
 const flag = (k: string) => args.includes(k) && !!args.splice(args.indexOf(k), 1);
-const all = flag("--all");
+const all = flag("--all"), data = flag("--data");
 // real builds on both sides, never those kept on disk (store.ts), unless --cache: a comparison read from it proves nothing of the engine
 if (!flag("--cache")) process.env.PXL_CACHE = "0";
 const vs = opt("--vs"), png = opt("--png"), only = new RegExp(opt("--only") ?? ""), strip = opt("--strip"), under = strip && new RegExp(`^((${strip})\\.)+`);
@@ -47,9 +51,15 @@ const fi = args.indexOf("--frames");
 if (fi >= 0) { cap = /^\d+$/.test(args[fi + 1] ?? "") ? +args[fi + 1] : Infinity; args.splice(fi, cap === Infinity ? 1 : 2); }
 const files = args.length ? args.map((f) => resolve(f)) : artFiles().map((f) => join(repo, f));
 
-// each line's hash, and its asset, time and label (asset@frame) to build that frame again where it differs
-function lines(load: (f: string) => any, file: string, name: string): { out: Map<string, string>; at: Map<string, [string, number, string]>; p?: any } {
-  const out = new Map<string, string>(), at = new Map<string, [string, number, string]>();
+// --data: what an engine reads off the frame besides its pixels, hashed with them
+const fields = (p: any, n: string, i: number, img: any) => {
+  const tl = p.timeline(n);
+  return { boxes: img.boxes, sockets: img.sockets, pivot: img.pivot, ms: tl ? (tl.durations?.[i] ?? tl.step) : undefined, data: img.info };
+};
+
+// each line's hash, and its asset, time, label (asset@frame) to build that frame again where it differs, and --data's fields
+function lines(load: (f: string) => any, file: string, name: string): { out: Map<string, string>; at: Map<string, [string, number, string, Record<string, unknown>?]>; p?: any } {
+  const out = new Map<string, string>(), at = new Map<string, [string, number, string, Record<string, unknown>?]>();
   let p;
   try { p = load(file); } catch { return { out: out.set(name, "SKIP"), at }; }
   const order = p.order as string[], mine = new Set(order);
@@ -61,12 +71,12 @@ function lines(load: (f: string) => any, file: string, name: string): { out: Map
       // (an anim's frames it will build handed out to the workers, if any: PXL_WORKERS)
       p.handOut?.(n, 0, fr.map((i) => frameTime(p, n, i)));
       for (const i of fr) {
-        const t = frameTime(p, n, i), key = i ? `${name} ${k}@${i}` : `${name} ${k}`;
-        out.set(key, p.image(n, 0, t).hash());
-        at.set(key, [n, t, `${k}@${i}`]);
+        const t = frameTime(p, n, i), key = i ? `${name} ${k}@${i}` : `${name} ${k}`, img = p.image(n, 0, t), d = data ? fields(p, n, i, img) : undefined;
+        out.set(key, img.hash() + (d ? ` data ${createHash("sha1").update(JSON.stringify(d)).digest("hex").slice(0, 8)}` : ""));
+        at.set(key, [n, t, `${k}@${i}`, d]);
         p.forget(n, t);
       }
-    } catch (e) { out.set(`${name} ${k}`, `ERR ${(e as Error).message.slice(0, 60)}`); }
+    } catch (e) { out.set(`${name} ${k}`, `ERR ${(e as Error).message.split("\n")[0]}`); }
   }
   return { out, at, p };
 }
@@ -77,6 +87,10 @@ let wrote = 0;
 const where = (a: Lines, b: Lines, k: string, file: string): string => {
   const said = `${a.out.get(k) ?? "(none)"} at ${vs}, ${b.out.get(k) ?? "(none)"} here`, was = a.at.get(k), now = b.at.get(k);
   if (!was || !now || [a.out.get(k), b.out.get(k)].some((h) => /^(ERR|SKIP)/.test(h!))) return said;
+  // --data: which of its fields differ (by name: one renamed between the two reads as two)
+  const moved = was[3] && now[3] ? [...new Set([...Object.keys(was[3]), ...Object.keys(now[3])])].filter((f) => JSON.stringify(was[3]![f]) !== JSON.stringify(now[3]![f])) : [];
+  const also = moved.length ? `; not the same: ${moved.join(", ")}` : "";
+  if (a.out.get(k)!.split(" ")[0] === b.out.get(k)!.split(" ")[0]) return `the same pixels${also}`;
   try {
     const A = a.p.image(was[0], 0, was[1]), B = b.p.image(now[0], 0, now[1]);
     if (png) {
@@ -85,8 +99,8 @@ const where = (a: Lines, b: Lines, k: string, file: string): string => {
       writePng(`${base}_here.png`, B);
       wrote++;
     }
-    return shotChanges(A, B, [0]);
-  } catch { return said; }
+    return shotChanges(A, B, [0]) + also;
+  } catch { return said + also; }
 };
 
 // (the working tree's builds made by as many workers as pxl build's, workers.ts: PXL_WORKERS=N, else the machine's

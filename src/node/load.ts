@@ -6,7 +6,7 @@ import { Session } from "node:inspector";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import * as vm from "node:vm";
 import { stripTypeScriptTypes } from "node:module";
-import { PxError, wrap } from "../core/errors.ts";
+import { PxError, distance, wrap } from "../core/errors.ts";
 import { Project, type ProjectOptions } from "../core/project.ts";
 import { decodePng } from "./png.ts";
 import { diskOf, sha1 } from "./store.ts";
@@ -138,7 +138,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
         if (ways.length > 1) throw new PxError(`${p.short(abs)}: ${(e as Error).message}: the file is reached by two include paths, ${ways.at(-2)} and ${ways.at(-1)}, and runs at each (a file runs once where both include it under the same names, \`as\`, its palette its own); include it under the same names in both, or once`);
         throw new PxError(`${p.short(abs)}: ${(e as Error).message}. Included files share one scope for top-level names, so each const/let/function name can be declared in only one of them; rename it in one file`);
       }
-      throw syntaxAware(e, abs, p);
+      throw syntaxAware(e, abs, p, env);
     } finally {
       stack.pop();
     }
@@ -191,7 +191,7 @@ export function loadSource(src: string, name = "art.px.js", opts: ProjectOptions
   try {
     vm.runInContext(compile(src, name), ctx, { filename: name });
   } catch (e) {
-    throw hiding(syntaxAware(e, name, p), ctx, env);
+    throw hiding(syntaxAware(e, name, p, env), ctx, env);
   }
   warnHiding(p, ctx, env, new Map([[name, src]]));
   return p;
@@ -231,8 +231,15 @@ function warnHiding(p: Project, ctx: vm.Context, env: Record<string, unknown>, c
   }
 }
 
-function syntaxAware(e: unknown, file: string, p: Project): PxError {
+function syntaxAware(e: unknown, file: string, p: Project, env: Record<string, unknown>): PxError {
   const err = wrap(e, (s) => p.locFromStack(s));
+  // a name the file calls that is no global: the DSL global it begins with ("palette": pal), or one a letter off
+  // ("sprit"); not didYouMean's 2 letters, which named one for a part's own constants (W: own, HEAD: road)
+  const un = (e as Error)?.name === "ReferenceError" && /^(\w+) is not defined$/.exec(err.detail)?.[1];
+  if (un) {
+    const g = Object.keys(env), near = g.filter((k) => k.length > 2 && un.startsWith(k)).sort((a, b) => b.length - a.length)[0] ?? g.find((k) => distance(un, k) === 1);
+    if (near) { err.detail += ` (did you mean '${near}'?)`; err.message = err.format(); }
+  }
   // SyntaxErrors put the location in the first stack line ("file:line"): the file's own, also when an
   // include called it (the call stack's place would be the include's line)
   if ((!err.loc || (e as Error)?.name === "SyntaxError") && typeof e === "object" && e && "stack" in e) {

@@ -26,7 +26,7 @@ import { startWorkers } from "./workers.ts";
 const EDGE_RINGS: ["steps" | "doubled" | "tips" | "bridges" | "notches" | "gaps" | "corners", number][] = [["steps", 0xe8202aff], ["doubled", 0xff8c14ff], ["tips", 0xd020d0ff], ["bridges", 0xd020d0ff], ["notches", 0x10c8e0ff], ["gaps", 0xffe020ff], ["corners", 0x20c040ff]];
 import { edit, inspect } from "./edit.ts";
 import { setKnobInSource } from "../core/world3d.ts";
-import { cellRow, diffRow, frameCount, frameTime, greyRow, membersRow, otherVersion, pastLoop, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
+import { type Boxes, cellRow, diffRow, frameCount, frameTime, greyRow, membersRow, otherVersion, pastLoop, shotChanges, shotFrame, shotRow, stack } from "./shot.ts";
 import { help } from "./help.ts";
 import { libCard, libDraft, libList } from "./lib.ts";
 import { listProject, listText } from "./list.ts";
@@ -153,10 +153,11 @@ const USAGE = `pxl — pixel-art DSL
       what is placed by a relation to it moves too), searched without a model and written into the file
       where the number is (a computed one is said and left); it says each change, and the rules
       that held still hold (a scene's checked rebuilt before anything is written).
-  pxl shot <art.px.js> <name | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif [--every N]] [--world [--every N]] [--out DIR]
+  pxl shot <art.px.js> <name | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--boxes] [--gif [--every N]] [--world [--every N]] [--out DIR]
   pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0; an anim's
-      past its loop too, at their own time: N, its frame count, is the frame one loop on) cropped
+      past its loop too, at their own time: N, its frame count, is the frame one loop on; a clip's or an
+      anim's that plays once past its end are said, "it has 4 frames (0-3): 6, 9 left out") cropped
       to the region, side by side (in rows when too wide for one: a contact sheet), enlarged,
       written to <out>/_shot/<name>.png; clear shows as a mid grey. A sheet: as the build packs it; a
       group or a glob ("car_*"): its members side by side, each labelled with what its name adds (n,
@@ -166,14 +167,16 @@ const USAGE = `pxl — pixel-art DSL
       and where (without --vs: between exactly two rows of one size, a frozen cell and its live
       render, or two frames of one asset, --frames 0,N: its loop's seam); --grey adds it all again in
       values only (each pixel's lightness), to see the planes read before the color; --ref draws
-      the asset's ref: true layers over it (guide rows, a skeleton), as the build's previews do. It
+      the asset's ref: true layers over it (guide rows, a skeleton), as the build's previews do;
+      --boxes outlines each shown frame's boxes (c.setBox), a colour a kind (hit red, hurt blue),
+      the kinds named in a line, a box past the frame clipped and said. It
       also prints what changed since the last shot of the same frames and region (one asset, one
       region: pixels, where) and the warnings pxl check finds on the asset at those frames (its
       LOOK lines too, the pixels they name ringed in <name>_look.png; loose pixels, as particles and
       grass, said in one line instead of their edges): one call per look. A clip's
       note gives each shown frame's ms. Several names (another file's as other.px.js:name, or any PNG) make a row each, one
       under the other, and several --at a column each: two versions, two agents' scenes, details of
-      a big one.
+      a big one. A row's own frame instead of --frames: clip.gif@82, name@3, other.px.js:name@3.
       Give PNGs at 1x (out/scenes/x.png): rows are enlarged together.
       --gif plays them instead, side by side (8 to a row), each its own loop on one clock, to
       <out>/_shot/<names>.gif: a walk in 8 directions, two versions of a scene moving; --every N
@@ -252,6 +255,7 @@ interface Args {
   grey?: boolean;
   gif?: boolean;
   ref?: boolean;
+  boxes?: boolean;
   brief?: boolean;
   sheet?: boolean;
   shrink?: number;
@@ -326,6 +330,7 @@ function parse(argv: string[]): Args {
     else if (v === "--grey" || v === "--gray") a.grey = true;
     else if (v === "--gif") a.gif = true;
     else if (v === "--ref") a.ref = true;
+    else if (v === "--boxes") a.boxes = true;
     else if (v === "--brief") a.brief = true;
     else if (v === "--check") a.check = val();
     else if (v === "--frame") a.frame = Number(val());
@@ -620,7 +625,8 @@ export async function main(argv: string[]): Promise<number> {
       case "shot": {
         // what to shoot: assets of this file, another's (`other.px.js:name`), or any picture or clip
         // (`a.png`, `ref.gif`, a JPEG, a video: a clip shows all its frames, drawn larger it is read at 1x)
-        const png = MEDIA.test(file), entries = png ? [file, ...a.rest] : a.rest;
+        // (a row's own frame: clip.gif@82, other.px.js:name@3)
+        const bare = (e: string) => e.replace(/@\d+$/, ""), png = MEDIA.test(bare(file)), entries = png ? [file, ...a.rest] : a.rest;
         if (!entries.length) throw new PxError("shot needs an asset name: pxl shot <file> <name> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs rev] [--diff]");
         if (a.ats.some((r) => r.length !== 4)) throw new PxError("shot --at needs a region x,y,w,h (e.g. --at 120,140,40,30)");
         if (a.diff && !a.vs && ((entries.length !== 2 && !(entries.length === 1 && !png && a.frames?.length === 2)) || a.ats.length > 1)) throw new PxError("shot --diff compares with another version (--vs <git rev | file>), two rows of one size (two names, name other.px.js:name or two PNGs, one region), or two frames of one asset (--frames 0,N: its loop's seam)");
@@ -634,10 +640,17 @@ export async function main(argv: string[]): Promise<number> {
           return have.length ? have : [0];
         };
         const looped = (p: Project, name: string, fs: number[]) => [...new Set(fs.map((f) => f % frameCount(p, name)))];
+        // frames asked past the end of a clip or of an anim that doesn't loop: said, not left out in silence (an anim
+        // that loops draws them, one loop on)
+        const past = (n: number, fs: number[], once = "") => { const out = fs.filter((f) => f >= n); return out.length ? `it has ${n} frame${n > 1 ? "s" : ""} (0-${n - 1})${once}: ${out.join(", ")} left out` : ""; };
+        const pastOf = (p: Project, name: string) => (p.assets.get(name)?.kind === "anim" && !pastLoop(p, name) ? past(frameCount(p, name), a.frames ?? (a.frame !== undefined ? [a.frame] : []), p.timeline(name)?.once ? ", played once" : "") : "");
+        const boxes: Boxes | undefined = a.boxes ? { kinds: new Map(), clipped: [] } : undefined;
+        const boxLine = () => boxes && `boxes: ${boxes.kinds.size ? [...boxes.kinds].map(([k, c]) => `${k} ${c}`).join(", ") : "none on these frames"}${boxes.clipped.length ? `; past the frame, clipped: ${boxes.clipped.join("; ")}` : ""}`;
         const projects = new Map<string, Project>(), proj = (f: string) => projects.get(f) ?? projects.set(f, loadProject(f, { wholeWorld: a.world })).get(f)!;
-        const shots = entries.map((e): { png?: string; file?: string; name: string; img?: Img; names?: string[]; members?: boolean } => {
-          if (MEDIA.test(e)) return { png: resolve(e), name: basename(e).replace(MEDIA, "") };
-          const m = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(e), s = m ? { file: resolve(m[1]), name: m[2] } : { file, name: e };
+        const shots = entries.map((at): { png?: string; file?: string; name: string; img?: Img; names?: string[]; members?: boolean; own?: number[] } => {
+          const e = bare(at), own = e !== at ? [Number(at.slice(e.length + 1))] : undefined;
+          if (MEDIA.test(e)) return { png: resolve(e), name: basename(e).replace(MEDIA, ""), own };
+          const m = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(e), s = m ? { file: resolve(m[1]), name: m[2], own } : { file, name: e, own };
           // a sheet as it is packed; a group's or a glob's members in a row, each labelled
           const p = proj(s.file);
           if (p.assets.has(s.name)) return s;
@@ -645,7 +658,7 @@ export async function main(argv: string[]): Promise<number> {
           if (sh) return { ...s, img: packedSheet(p, sh).sheet, names: p.sheetNames(sh) };
           if (!(p.groups.has(s.name) || s.name.includes("*"))) return s;
           const names = [...new Set(p.candidates(s.name))];
-          return { ...s, img: membersRow(p, names, a.frames?.[0] ?? a.frame ?? 0, a.ref), names, members: true };
+          return { ...s, img: membersRow(p, names, s.own?.[0] ?? a.frames?.[0] ?? a.frame ?? 0, a.ref), names, members: true };
         });
         // --gif: the same things playing side by side (8 to a row), each its own loop on one clock as long
         // as the longest, a shorter one starting over; a cell per thing, its regions together in it
@@ -656,7 +669,7 @@ export async function main(argv: string[]): Promise<number> {
             if ("img" in s) return { imgs: [s.img!], ms: [1000] };
             // --every N: one frame in N built and shown, lasting until the next (a long loop's preview)
             const p = proj(s.file!), n = frameCount(p, s.name), tl = p.timeline(s.name), k = Math.max(1, Math.floor(a.every ?? 1)), keep = Array.from({ length: Math.ceil(n / k) }, (_, i) => i * k), t = keep.map((f) => frameTime(p, s.name, f));
-            return { imgs: keep.map((f) => shotFrame(p, s.name, f, a.ref)), ms: t.map((v, i) => (i + 1 < keep.length ? t[i + 1] : (tl?.loop ?? 1000)) - v) };
+            return { imgs: keep.map((f) => shotFrame(p, s.name, f, a.ref, boxes)), ms: t.map((v, i) => (i + 1 < keep.length ? t[i + 1] : (tl?.loop ?? 1000)) - v) };
           });
           const loops = clips.map((c) => c.ms.reduce((x, y) => x + y, 0)), T = Math.max(...loops);
           const cuts = [...new Set(clips.flatMap((c, i) => { const out: number[] = []; for (let s = 0; s < T; s += loops[i]) { let t = s; for (const m of c.ms) { if (t < T) out.push(t); t += m; } } return out; }))].sort((x, y) => x - y);
@@ -668,6 +681,7 @@ export async function main(argv: string[]): Promise<number> {
           const gif = encodeGif(sheets.map((img, i) => ({ img: img.scale(k), ms: (cuts[i + 1] ?? T) - cuts[i] })));
           writeFileSync(path, gif);
           console.log(`-> ${path} (${(gif.length / 1e6).toFixed(1)} MB, ${cuts.length} frames, a loop of ${T} ms${new Set(loops).size > 1 ? `: ${loops.join(", ")} ms each, the shorter starting over` : ""}; across: ${shots.map((s) => s.name).join(", ")}; ${k}x)`);
+          if (boxes) console.log(boxLine());
           return 0;
         }
         // --world --every N: the scene's world once, the camera's box every N frames on it, each box what that frame shows there
@@ -693,17 +707,18 @@ export async function main(argv: string[]): Promise<number> {
           if (a.vs) throw new PxError("shot --vs compares one asset with another version of it: give it one name and one region");
           const many = shots.map((s) => {
             if ("png" in s) {
-              const m = readMedia(s.png!), pick = a.allFrames || (!a.frames && m.frames.length > 1) ? m.frames.map((_, i) => i) : (a.frames ?? [0]).filter((f) => f < m.frames.length);
+              const m = readMedia(s.png!), want = s.own ?? a.frames, left = past(m.frames.length, want ?? []);
+              const pick = (a.allFrames && !s.own) || (!want && m.frames.length > 1) ? m.frames.map((_, i) => i) : (want ?? [0]).filter((f) => f < m.frames.length);
               if (!pick.length) throw new PxError(`${s.png}: it has ${m.frames.length} frame${m.frames.length === 1 ? "" : "s"} (0-${m.frames.length - 1})`);
-              return { ...s, row: wrapRow(pick.map((f) => m.frames[f]), regions), picked: pick, note: m.frames.length > 1 || m.drawnAt ? `${basename(s.png!)}: ${m.kind}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, shown at 1x` : ""}${m.frames.length > 1 ? `, frames ${pick.length === m.frames.length ? `all ${m.frames.length}` : pick.join(",")}, ms ${runs(pick.map((f) => m.ms[f]))}` : ""}` : "" };
+              return { ...s, row: wrapRow(pick.map((f) => m.frames[f]), regions), picked: pick, note: m.frames.length > 1 || m.drawnAt || left ? `${basename(s.png!)}: ${m.kind}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, shown at 1x` : ""}${m.frames.length > 1 ? `, frames ${pick.length === m.frames.length ? `all ${m.frames.length}` : pick.join(",")}, ms ${runs(pick.map((f) => m.ms[f]))}` : ""}${left ? `; ${left}` : ""}` : "" };
             }
             if ("img" in s) return { ...s, row: wrapRow([s.img!], regions), note: `${s.name}: ${s.members ? `${s.names!.length} members, left to right, each labelled with what its name adds` : `the sheet, ${s.img!.w}x${s.img!.h}, ${s.names!.length} entries`}` };
-            const p = proj(s.file!), frames = framesFor(p, s.name);
-            return { ...s, row: wrapRow(frames.map((f) => shotFrame(p, s.name, f, a.ref)), regions), frames };
+            const p = proj(s.file!), frames = s.own ?? framesFor(p, s.name), left = s.own ? "" : pastOf(p, s.name);
+            return { ...s, row: wrapRow(frames.map((f) => shotFrame(p, s.name, f, a.ref, boxes)), regions), frames, note: left && `${s.name}: ${left}` };
           });
           // --diff between the two rows (a frozen cell and its live render, a saved build and the new one): the
           // pixels that changed in a row under them, and per frame how many and where
-          const rows = many.map((s) => s.row), shown = entries.map((e) => (MEDIA.test(e) ? basename(e) : e));
+          const rows = many.map((s) => s.row), shown = entries.map((e) => (MEDIA.test(bare(e)) ? basename(e) : e));
           let changes = "";
           if (a.diff) {
             const [x, y] = rows, f = ("frames" in many[0] ? many[0].frames : "picked" in many[0] ? many[0].picked : undefined) ?? [0];
@@ -720,23 +735,24 @@ export async function main(argv: string[]): Promise<number> {
           const rowsFrames = many.filter((s) => "frames" in s).map((s) => [s.name, span((s as { frames: number[] }).frames)]);
           const sameFrames = new Set(rowsFrames.map((r) => r[1])).size <= 1;
           console.log(`-> ${path} (${rowsFrames.length ? `frames ${sameFrames ? rowsFrames[0][1] : rowsFrames.map(([n, f]) => `${n} ${f}`).join(", ")}; ` : ""}rows, top down: ${shown.join(", ")}${a.diff ? "; below: what changed" : ""}${regions.length > 1 ? `; columns: ${a.ats.map((r) => r.join(",")).join(" | ")}` : ""}; ${k}x)`);
+          if (boxes) console.log(boxLine());
           if (changes) console.log(changes);
           for (const s of many) if ("note" in s && s.note) console.log(s.note);
           for (const s of many) {
             if (!("file" in s)) continue;
-            const p = proj(s.file!), r = "img" in s ? checkProject(p, { names: s.names }) : checkProject(p, { names: [s.name], frames: looped(p, s.name, framesFor(p, s.name)) });
+            const p = proj(s.file!), r = "img" in s ? checkProject(p, { names: s.names }) : checkProject(p, { names: [s.name], frames: looped(p, s.name, (s as { frames: number[] }).frames) });
             for (const l of [...r.lines, ...r.notes]) console.log(l);
             if (r.warnings || p.assets.get(s.name)?.kind === "scene" || p.rigs.has(s.name))
               console.log(`${s.name}: ${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
           }
           return 0;
         }
-        const { name } = shots[0], p = proj(shots[0].file!), frames = framesFor(p, name), now = shotRow(p, name, frames, a.at, a.ref);
+        const { name, own } = shots[0], p = proj(shots[0].file!), frames = own ?? framesFor(p, name), now = shotRow(p, name, frames, a.at, a.ref, boxes);
         const rows = [now];
         if (a.vs) {
           const o = otherVersion(file, a.vs);
           let was: Img;
-          try { was = shotRow(loadProject(o.path, {}, o.read), name, frames, a.at, a.ref); } catch (e) { throw wrap(e).within(`--vs ${a.vs}`); }
+          try { was = shotRow(loadProject(o.path, {}, o.read), name, frames, a.at, a.ref, boxes); } catch (e) { throw wrap(e).within(`--vs ${a.vs}`); }
           rows.unshift(was);
           if (a.diff) {
             rows.push(diffRow(was, now).img);
@@ -756,8 +772,11 @@ export async function main(argv: string[]): Promise<number> {
         const base = join(outDir, "_shot", name.replace(/[^\w.-]/g, "_")), path = base + ".png", last = join(outDir, "_shot", `${fileTag(file)}.${name.replace(/[^\w.-]/g, "_")}`);
         writePng(path, sheet.scale(k));
         console.log(`-> ${path} (frames ${frames.join(",")}${a.vs ? `; above: ${a.vs}` : ""}${a.diff ? "; below: what changed" : ""}${a.grey ? "; at the bottom: its values, each pixel's lightness as a grey" : ""}; ${k}x)`);
+        if (boxes) console.log(boxLine());
+        const left = own ? "" : pastOf(p, name);
+        if (left) console.log(`${name}: ${left}`);
         // against the last shot of the same frames and region: did the edit change anything, and where
-        const key = JSON.stringify({ frames, at: a.at ?? null });
+        const key = JSON.stringify({ frames, at: a.at ?? null, ...(boxes ? { boxes: true } : {}) });
         if (existsSync(last + ".last.json") && readFileSync(last + ".last.json", "utf8") === key)
           console.log(`since the last shot: ${shotChanges(decodePng(readFileSync(last + ".last.png")), now, frames, a.at)}`);
         writePng(last + ".last.png", now);

@@ -541,7 +541,12 @@ and fix dither and shading. Upscaled, round off the big square blocks and redraw
 - `line()`, `curve()`, `wire()` and `outline` draw clean lines; grids and `runs` are as clean as you
   write them: `PXL check` and `PXL shot` list both faults with their positions (`PXL study` does the
   same on any picture). A line whose steps are nearly all L's reads as drawn square, a style: no LOOK
-  line for it.
+  line for it. Those positions (a warning's, `shot --at`'s) are the built sprite's: an `outline` adds a
+  px on each side, so your grid's x,y is theirs less 1.
+- **Two outlined shapes 3 px apart** (a staff's gem beside a face) leave a 1 px line of the ground
+  between their outlines, read as a scratch or a hole: move one a px so the outlines meet, or a px
+  farther so the gap reads as space, or fill it with the line. Enclosed, `shot` names such a pixel
+  among its edges' notches; approved figures have some (between legs), so it is no rule.
 - **Square lines,** every step joined by an L, are a style: chunkier, a 1 px line reads about 1.5 px.
   `outline8` draws an outline so; draw the inner lines the same way.
 - **Inner lines take color.** Keep the near-black for the silhouette and where very different forms
@@ -1161,7 +1166,8 @@ and timing (below), or the 3D painted by design with the head drawn (after it). 
    for the hair and the shoes, as KOF keeps it for hair and belt.
 7. **The boxes from the same joints** (`c.setBox`, `c.setData({ phase })`, §13): the hurt boxes on
    the head, body and legs and the punching arm while it is out, the hit box round the fist on the
-   active frames. They can't drift off the art.
+   active frames. They can't drift off the art. `PXL shot <file> <move> --frames all --boxes` outlines them
+   on the frames (hit red, hurt blue).
 
 **Or in 3D, painted by design** (Guilty Gear Xrd's way; `lib/characters/reva_fighter.px.js`, which
 replaced her 2D rig). The blocks first, as above; then the body a `rig3d` painted by `surface()`

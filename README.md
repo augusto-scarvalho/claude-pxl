@@ -529,7 +529,7 @@ test/         node:test suites
 | `scripts/gallery.ts` | regenerates `docs/gallery/` from the examples (`--out DIR` to look first, `--every N` for a quick look; `--lib`: the library's sheets) |
 | `scripts/calibrate.ts` | scores `pxl study` against the examples' own source |
 | `scripts/perf.ts` | `pxl check`'s time, processor time and peak memory on every example; `--vs <rev>`: ms a frame, that revision's pxl against yours |
-| `scripts/hashes.ts` | a hash of every asset of the files given (none: every example and `lib/` file); `--vs <rev>`: what differs from that revision's pxl and where (`--png` writes both), `--frames` frame by frame, for an engine change that shouldn't move a pixel |
+| `scripts/hashes.ts` | a hash of every asset of the files given (none: every example and `lib/` file); `--vs <rev>`: what differs from that revision's pxl and where (`--png` writes both), `--frames` frame by frame, `--data` with each frame's boxes, sockets, pivot, ms and data, for an engine change that shouldn't move a pixel |
 | `scripts/vs.ts` | what `hashes.ts`, `perf.ts` and `served.ts` share: a revision's `src/` and `examples/` unpacked once into the temp folder |
 | `scripts/served.ts` | what the live viewer sends and holds for one asset (`--vs <rev>`: that revision's server first) |
 | `scripts/pulse.ts` | how many of an animation's normals turn from frame to frame on the parts that only moved |

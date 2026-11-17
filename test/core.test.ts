@@ -157,6 +157,8 @@ test("inline and selout: lines on the sprite's own edge, lines that take the col
   // outline + selout: each outline pixel is the sprite color it touches, a step darker; no ramp -> the line color
   eq(art(R + 'sprite("t", { w: 2, h: 1, outline: "k", selout: 1 }, "dw")', "t"), ".Dk.\nDdwk\n.Dk.");
   assert.match(failure(R + 'sprite("t", { selout: true }, "d")', "t").message, /selout recolors a line/);
+  // a variant: its base's line is in its pixels, so the error says to base both on one drawing without a line
+  assert.match(failure(R + 'sprite("t", { outline: "k" }, "d"); sprite("u", { base: "t", selout: true })', "u").message, /a base's line is already in its pixels.*one drawing without a line/);
 });
 
 test("shades: keys from one base color, dark to light, hue-shifted, registered as a ramp", () => {

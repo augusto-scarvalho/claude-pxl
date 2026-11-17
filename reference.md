@@ -853,7 +853,8 @@ body hanging by a pixel, or by a corner), notches (a dent or pinhole a pixel wid
 on most of the edge) and corners clipped (two straight edges of 4 px meeting without their corner: a
 box's bitten, a round thing's meant). A corner the shape has (a lip over a neck) reads as a step: look
 before fixing. `shrink: { by }` evens what it can when it reduces; `closeLine()` closes a hand pass's
-gaps. On an anim, a second LOOK line names the holes that open: clear pixels the figure encloses (a
+gaps. Every LOOK line's x,y (and a warning's, `shot --at`'s) is the built asset's: an `outline` adds a px on each
+side, so the art's grid's x,y is one less. On an anim, a second LOOK line names the holes that open: clear pixels the figure encloses (a
 flood from the frame's edge doesn't reach them) on frames where the first frame has none there, how many
 px and the largest's box (a handle, an arm's gap at rest, the first frame has: meant, not said). `shot`
 says its edges in one line instead of the lists, without the rings and the holes, where tips and bridges
@@ -872,7 +873,11 @@ warnings `check` finds on it at those frames. `--frames` takes numbers, ranges (
 `all`; an anim that loops takes them past its loop too, each drawn at its own time with every loop as it is (its code
 sees frame N, the frame one loop on; checked where it falls in the loop), so a seam is proved on the file itself:
 `--frames 159,0,160` shows it, `--frames 0,160 --diff` says "frame 160 against frame 0: no change" (a still asset's
-frames past its one are left out). A sheet's name shows the sheet as `build` packs it; a group's or a glob's (`car`, `"car_*"`)
+frames past its one are left out; a clip's, and an anim's that plays once, are left out and said: "it has 192 frames
+(0-191): 300, 500 left out", so a frame drawn one loop on is told from one left out by that line). A row's own frame
+instead of `--frames`: `clip.gif@82`, `name@3`, `other.px.js:name@3` (a GIF's frame beside a PNG of it). `--boxes`
+outlines each shown frame's boxes (`c.setBox`) 1 px inside their edges, a colour a kind (hit red, hurt blue, others
+yellow, green, magenta, orange as met), named in a line under the picture's; a box past the frame is clipped and said. A sheet's name shows the sheet as `build` packs it; a group's or a glob's (`car`, `"car_*"`)
 its members side by side (16 to a row), each labelled under it with what its name adds (`n`, `nne`,
 `ne`): a set of rotations or directions at once, its check on all of them. What is clear shows as a mid
 grey (#8c8c96), so a near-black line and a dark tyre read on it. Several names make a row each, one under the other (`other.px.js:name` takes another file's,

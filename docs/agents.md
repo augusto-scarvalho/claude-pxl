@@ -546,7 +546,9 @@ those alone, so an art change costs only the files it reaches (`--all` builds ev
 takes every example and `lib/` file, as the examples test lists them: an art change costs seconds of loading, an
 engine change builds all of them on both sides (about half an hour on a 4-core laptop). A line that differs says
 where, that frame built again on both sides (`lib/characters/slime.px.js slime_hop@2: 1 px changed in 9,1 1x1`), and
-`--png <dir>` writes the two (`slime.slime_hop@2_HEAD.png`, `_here.png`) for `pxl shot <both> --diff`. It never reads
+`--png <dir>` writes the two (`slime.slime_hop@2_HEAD.png`, `_here.png`) for `pxl shot <both> --diff`. `--data` hashes
+with each frame's pixels what an engine reads off it (its boxes, sockets, pivot, ms and `setData`'s data), and a line
+that differs names those that do (`... jab@2: the same pixels; not the same: boxes`): a fighter's kit. It never reads
 the builds kept on disk (below): a comparison read back from them would prove nothing of the engine. `--cache` does,
 to prove the store itself: the same files run off, on and on again give the same lines.
 

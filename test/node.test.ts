@@ -566,6 +566,19 @@ anim("f", { w: 3, h: 2, fps: 4 }, frame(px(1, 1, "8")), frame(px(1, 1, "c")))`);
   assert.match(await said("shot", file, "b", "--frames", "0,4", "--diff", "--scale", "1"), /^frame 4 against frame 0: no change$/m);
 });
 
+test("cli shot --boxes outlines each kind; frames past a clip's end or an anim played once are said; a row's own frame (clip.gif@2)", async () => {
+  const { dir, file } = tmpArt(`use("pico8")
+anim("a", { w: 4, h: 4, frames: 3, fps: 4, loop: false }, (c) => { c.rect(1, 1, 2 + (c.frame % 2), 2, "8"); c.setBox("hurt", 1, 1, 2, 2); if (c.frame === 1) c.setBox("hit", 2, 0, 4, 2) })`);
+  const s = await said("shot", file, "a", "--frames", "0,1,5", "--boxes", "--scale", "1");
+  assert.match(s, /^boxes: hurt blue, hit red; past the frame, clipped: hit \[2, 0, 4, 2\] on a frame 1$/m);
+  assert.match(s, /^a: it has 3 frames \(0-2\), played once: 5 left out$/m);
+  assert.equal(decodePng(readFileSync(join(dir, "out", "_shot", "a.png"))).get(1, 1), 0x3c78ffff, "frame 0's hurt box, blue");
+  await said("build", file, "--no-preview");
+  const gif = join(dir, "out", "anims", "a.gif");
+  assert.match(await said("shot", gif, "--frames", "0,7", "--scale", "1"), /^a\.gif: GIF, frames 0, ms \d+; it has 3 frames \(0-2\): 7 left out$/m);
+  assert.match(await said("shot", `${gif}@2`, `${file}:a@1`, "--scale", "1"), /\(frames 1; rows, top down: a\.gif@2, .*a\.px\.js:a@1; 1x\)/);
+});
+
 test("scripts/hashes.ts: an asset's frames a line each; --vs builds them with the last commit's pxl too and counts what differs", () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-")), file = join(dir, "a.px.js");
   writeFileSync(file, `use("pico8"); pal({ k: 0, r: 8 })
@@ -588,6 +601,11 @@ anim("blink", { w: 4, h: 4, frames: 3, fps: 4 }, (c) => c.rect(c.frame, 0, 1, 1,
   try { execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "scripts/hashes.ts", "--vs", "HEAD", "--png", pngs, mine], { cwd: repo, encoding: "utf8" }); } catch (e) { said = (e as { stdout: string }).stdout; } finally { rmSync(mine); rmSync(theirs); }
   assert.match(said, new RegExp(`^${rel} dot: 2 px changed in 1,2 2x1\\n.*\\n1 the same, 1 differ \\(HEAD against the working tree\\)\\n$`));
   assert.deepEqual(readdirSync(pngs).sort(), [`_hashes_${process.pid}.dot@0_HEAD.png`, `_hashes_${process.pid}.dot@0_here.png`]);
+  // --data: a frame's boxes (sockets, pivot, ms, data) hashed with its pixels, and a line that differs names them
+  assert.match(run("--data"), /^\S+ dot \w+ data [0-9a-f]{8}$/m);
+  for (const [f, w] of [[theirs, 1], [mine, 2]]) writeFileSync(f as string, `sprite("b", { w: 2, h: 2 }, (c) => c.setBox("hit", 0, 0, ${w}, 1))`);
+  try { execFileSync(process.execPath, ["--disable-warning=ExperimentalWarning", "scripts/hashes.ts", "--vs", "HEAD", "--data", mine], { cwd: repo, encoding: "utf8" }); } catch (e) { said = (e as { stdout: string }).stdout; } finally { rmSync(mine); rmSync(theirs); }
+  assert.match(said, new RegExp(`^${rel} b: the same pixels; not the same: boxes$`, "m"));
 });
 
 test("scripts/pulse.ts and served.ts: a blob carried along keeps its normals, one that grows turns them; what the viewer sends", () => {
