@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { notPure } from "../core/sdf.ts";
 import { kept } from "../core/surface.ts";
 import { pureSaid } from "./pure.ts";
-import { DISK_MS, paintSaid } from "./store.ts";
+import { DISK_MS, paintSaid, storeSaid } from "./store.ts";
 import { threadsSaid } from "./threads.ts";
 import { workersSaid } from "./workers.ts";
 
@@ -25,7 +25,7 @@ export interface Left { fns: { part: string; what: string; src: string }[]; who:
 /** Run `fn` under the CPU profiler; its result, the profile, and the fields traced that can't be kept. */
 export async function profiled<T>(fn: () => T): Promise<{ result: T; profile: CpuProfile; left: Left[] }> {
   const s = new Session(), left = new Map<string, Left>();
-  Object.assign(pureSaid, { made: 0, shared: 0, ms: 0 }); Object.assign(paintSaid, { back: 0, saved: 0, under: 0, underMs: 0 });
+  Object.assign(pureSaid, { made: 0, shared: 0, ms: 0 }); Object.assign(paintSaid, { back: 0, saved: 0, under: 0, underMs: 0 }); Object.assign(storeSaid, { back: 0, dropped: 0 });
   // (each trace of such a field, by the functions in its way: one move's frames, or a figure's every move)
   kept.left = (who, field, ms, paint) => {
     const fns = [...new Map(notPure(field, "", [], paint).map(({ part, what, fn }) => { const f = { part, what, src: Function.prototype.toString.call(fn) }; return [JSON.stringify(f), f]; })).values()];
@@ -47,8 +47,8 @@ export async function profiled<T>(fn: () => T): Promise<{ result: T; profile: Cp
   }
 }
 
-/** The report: self time by function, the art files' first, then pxl's; `times`: ms per asset; `left`: the fields traced but not kept; `off`: why the disk was let go (Project.offWhy). */
-export function profileReport(profile: CpuProfile, art: string[], times: [string, number][], left: Left[] = [], off?: string, top = 10): string {
+/** The report: self time by function, the art files' first, then pxl's; `times`: ms per asset; `left`: the fields traced but not kept; `off`: why the disk was let go (Project.offWhy); `made`: builds made on this thread (Project.made). */
+export function profileReport(profile: CpuProfile, art: string[], times: [string, number][], left: Left[] = [], off?: string, made = 0, top = 10): string {
   const byId = new Map(profile.nodes.map((n) => [n.id, n]));
   const self = new Map<string, { ms: number; name: string; where: string; art: boolean }>();
   let total = 0;
@@ -73,6 +73,7 @@ export function profileReport(profile: CpuProfile, art: string[], times: [string
   return [
     `profile: ${fmt(total).trim()} in all${slow ? `; slowest assets: ${slow}` : ""}`,
     `peak memory: ${Math.round(process.resourceUsage().maxRSS / 1024)} MB, the most this process held (its workers' too)`,
+    `store: ${storeSaid.back} builds and traces read back on this thread, ${made} builds made on it`,
     threadsSaid(),
     workersSaid(),
     ...(off ? [off] : []),

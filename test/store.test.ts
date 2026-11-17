@@ -6,13 +6,13 @@
 // there; a broken entry is made again. Each project here keeps every build
 // (as if each took long), and its art says each build it makes (console.debug("made"), counted here).
 import assert from "node:assert/strict";
-import { mkdtempSync, truncateSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { whenChanged } from "./passed.ts";
 import { loadProject } from "../src/node/load.ts";
 import { encodePng } from "../src/node/png.ts";
-import { decode, encode, sourcesOf } from "../src/node/store.ts";
+import { budget, decode, encode, prune, sourcesOf } from "../src/node/store.ts";
 import { Img } from "../src/core/image.ts";
 import type { Project } from "../src/core/project.ts";
 
@@ -212,4 +212,17 @@ test("store: every field comes back as it was, and what can't (a function) isn't
   assert.deepEqual(Object.keys(back.img), Object.keys(i));
   assert.throws(() => encode({ f: () => 1 }, []), /unstorable/);
   assert.throws(() => encode(Object.freeze({ a: 1 }), []), /unstorable/);
+});
+
+test("store: past its budget the least used go first, and .pruned names them until they are written again", () => {
+  const d = mkdtempSync(join(tmpdir(), "pxl-prune-")), entry = (c: string, t: number) => { writeFileSync(join(d, c.repeat(40)), Buffer.alloc(100)); utimesSync(join(d, c.repeat(40)), t, t); };
+  entry("a", 1000); entry("b", 3000); entry("c", 2000);
+  prune(250, d);
+  assert.deepEqual(readdirSync(d).sort(), [".pruned", "b".repeat(40), "c".repeat(40)]);
+  const note = () => readFileSync(join(d, ".pruned"), "utf8").split("\n");
+  assert.deepEqual(note(), ["1 100 250", "a".repeat(16)]);
+  entry("a", 4000);
+  prune(250, d);
+  assert.deepEqual(note(), ["1 100 250", "c".repeat(16)], "a written again: no longer named");
+  assert.ok(budget() >= 2 ** 29 && budget() <= 2 ** 31);
 });

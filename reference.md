@@ -1159,8 +1159,14 @@ command builds it all again (`build --profile` names it). Made in the frame and 
 are kept.
 
 **Where, and off.** In `node_modules/.cache/pxl/builds/` in a checkout, else `pxl-builds/` in the system's temp
-folder, 512 MB, the least recently used dropped first; deleting it costs only the builds again. `--no-cache` (any
-command) or `PXL_CACHE=0` builds everything and keeps no trace.
+folder, up to a tenth of the disk's free space, 512 MB to 2 GB (one pxl's builds of every example and `lib/` file
+take about 270 MB, and an edit to pxl or to an art file leaves the old ones behind), the least recently used dropped
+first; deleting it costs only the builds again. A command that passed the budget says so on its last lines
+(`store: past its budget of 2048 MB (...), the 218 builds and traces least used dropped (18 MB)`), and one that
+made again what had been dropped says how many (`store: 660 builds and traces it had kept made again, dropped since to
+keep within its budget (...)`): why a command meant to be quick wasn't. `build --profile` says how many builds and
+traces its thread read back and how many builds it made. `--no-cache` (any command) or `PXL_CACHE=0` builds
+everything and keeps no trace.
 
 **More threads.** A trace of a field whose every function is `pure()`, over 4096 cells or more, marches its rays on
 several threads (the paint, normals and shadows stay on one): the same hits as one thread marches, so the same pixels.

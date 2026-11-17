@@ -19,11 +19,11 @@
 // by a worker: Project.moved; pxl build --profile names the build and the names; a build that took less than that digest
 // isn't kept, as reading it back would cost one). The digest can't see a variable a function closes over, nor what a
 // WeakMap or a private field holds. Deflated, in node_modules/.cache/pxl/builds/
-// in a checkout, else the system's temp folder (pxl-builds), up to BUDGET bytes, the least recently used dropped first;
+// in a checkout, else the system's temp folder (pxl-builds), up to budget() bytes, the least recently used dropped first;
 // written aside and renamed into place, so a reader never sees half of one, and one that doesn't read back whole is
 // ignored and made again. PXL_CACHE=0 (any command's --no-cache) builds without it.
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statfsSync, statSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { threadId } from "node:worker_threads";
@@ -38,7 +38,7 @@ const code = join(import.meta.dirname, ".."), top = join(code, "..");
 export const DIR = existsSync(join(top, "node_modules")) ? join(top, "node_modules", ".cache", "pxl", "builds") : join(tmpdir(), "pxl-builds");
 /** (DISK_MS: a build or a trace that took less isn't kept) */
 export const DISK_MS = 10;
-const WORTH = 300, BUDGET = 512 * 2 ** 20;
+const WORTH = 300, BUDGET = 512 * 2 ** 20; // (the budget's floor)
 export const sha1 = (b: string | Uint8Array) => createHash("sha1").update(b).digest("hex");
 
 /** A hash of every file under `dir` and of the Node running it; "" if one changed after `since` (ms). */
@@ -132,10 +132,17 @@ const narrow = (w: Int32Array) => {
  * for (an open that fails, on each of a big scene's thousand small builds).
  */
 let there: Set<string> | undefined;
+/** What the store did in this thread (pxl says it, cli.ts and build --profile): builds read back, and asked again after a prune dropped them. */
+export const storeSaid = { back: 0, dropped: 0 };
+/** The entries prunes dropped, not written again since (.pruned's lines but its first; a name's first 16 characters): read at this thread's first miss. */
+let gone: Set<string> | undefined;
 
 function get(key: string): { out: BuildOut; log: DiskLog; ms?: number } | undefined {
-  const file = fileOf(key);
-  if (!(there ??= new Set((() => { try { return readdirSync(DIR); } catch { return []; } })())).has(basename(file))) return undefined;
+  const file = fileOf(key), name = basename(file);
+  if (!(there ??= new Set((() => { try { return readdirSync(DIR); } catch { return []; } })())).has(name)) {
+    if ((gone ??= new Set((() => { try { return readFileSync(join(DIR, ".pruned"), "utf8").split("\n").slice(1); } catch { return []; } })())).delete(name.slice(0, 16))) storeSaid.dropped++;
+    return undefined;
+  }
   try {
     const raw = inflateSync(readFileSync(file)), n = raw.readUInt32LE(0), head = JSON.parse(raw.toString("utf8", 4, 4 + n));
     if (head.key !== key) return undefined;
@@ -144,6 +151,7 @@ function get(key: string): { out: BuildOut; log: DiskLog; ms?: number } | undefi
     if (at !== raw.length) return undefined;
     const out = decode(head.v, bufs) as BuildOut;
     try { const now = new Date(); utimesSync(file, now, now); } catch { /* its age only orders what's dropped */ }
+    storeSaid.back++;
     return { out, log: head.log, ms: head.ms as number };
   } catch {
     return undefined;
@@ -174,20 +182,61 @@ function put(key: string, out: BuildOut, log: DiskLog, ms: number): void {
   // pruned when this process has written an eighth of the budget, and by the first process that writes after ten
   // minutes without (a stat of each entry: 0.1 s at 9000 of them, not paid by every command)
   if (!looked) { looked = true; try { if (Date.now() - statSync(join(DIR, ".pruned")).mtimeMs > 600_000) written = Infinity; } catch { written = Infinity; } }
-  if ((written += data.length) > BUDGET / 8) prune();
+  if ((written += data.length) > (cap ??= budget()) / 8) prune(cap);
 }
 
-/** Down to the budget, the least recently used first (a build read back is touched); and what a killed writer left aside. */
-export function prune(budget = BUDGET): void {
+/**
+ * The store's budget: a tenth of the disk's free space, 512 MiB to 2 GiB (one pxl's builds of every example and lib/
+ * file, as the tests keep them, take 271 MB; each edit to pxl or to an art file leaves its old builds behind).
+ */
+export const budget = () => { try { const s = statfsSync(DIR); return Math.min(2 ** 31, Math.max(BUDGET, (s.bavail * s.bsize) / 10)); } catch { return BUDGET; } };
+let cap: number | undefined;
+
+/**
+ * Down to the budget, the least recently used first (a build read back is touched); and what a killed writer left aside.
+ * .pruned says when, how many it dropped (its first line: entries, bytes, the budget) and which, with those dropped
+ * before and not written since (20,000 at most): a build asked again among them is said (storeSaid).
+ */
+export function prune(cap = budget(), dir = DIR): void {
   written = 0;
-  try { writeFileSync(join(DIR, ".pruned"), ""); } catch { /* no folder yet */ }
+  const note = join(dir, ".pruned");
+  let was: string[] = [];
+  try { was = readFileSync(note, "utf8").split("\n").slice(1); } catch { /* none yet */ }
+  try { writeFileSync(note, ""); } catch { /* no folder yet */ }
   let names: string[];
-  try { names = readdirSync(DIR); } catch { return; }
-  const now = Date.now(), all = names.flatMap((f) => { try { const s = statSync(join(DIR, f)); return [{ f, t: s.mtimeMs, n: s.size }]; } catch { return []; } });
-  let sum = 0;
-  for (const e of all.filter((e) => e.f !== ".pruned").sort((a, b) => b.t - a.t))
-    if ((sum += e.n) > budget || (e.f.endsWith(".tmp") && now - e.t > 600_000)) try { unlinkSync(join(DIR, e.f)); } catch { /* another process took it */ }
+  try { names = readdirSync(dir); } catch { return; }
+  const now = Date.now(), all = names.flatMap((f) => { try { const s = statSync(join(dir, f)); return [{ f, t: s.mtimeMs, n: s.size }]; } catch { return []; } });
+  let sum = 0, bytes = 0;
+  const dropped: string[] = [], left = new Set<string>();
+  for (const e of all.filter((e) => e.f !== ".pruned").sort((a, b) => b.t - a.t)) {
+    if ((sum += e.n) > cap || (e.f.endsWith(".tmp") && now - e.t > 600_000)) {
+      try { unlinkSync(join(dir, e.f)); } catch { continue; /* another process took it */ }
+      if (!e.f.endsWith(".tmp")) { dropped.push(e.f.slice(0, 16)); bytes += e.n; }
+    } else left.add(e.f.slice(0, 16));
+  }
+  try { writeFileSync(note, [`${dropped.length} ${bytes} ${Math.round(cap)}`, ...new Set([...dropped, ...was.filter((f) => !left.has(f))])].slice(0, 20_001).join("\n")); } catch { /* the folder went */ }
 }
+
+/**
+ * The lines a command ends with (cli.ts): a prune since the last command (in any thread, or another pxl at the same
+ * time) that dropped entries, and the builds and traces made again here that one had dropped.
+ */
+export function storeLines(): string[] {
+  const out: string[] = [], { dropped } = storeSaid;
+  storeSaid.dropped = 0;
+  if (process.env.PXL_CACHE === "0") return out;
+  try {
+    const note = join(DIR, ".pruned"), t = statSync(note).mtimeMs;
+    if (t >= saidAt) {
+      saidAt = t + 1;
+      const [n, bytes, cap] = readFileSync(note, "utf8").split("\n", 1)[0].split(" ").map(Number);
+      if (n > 0) out.push(`store: past its budget of ${Math.round(cap / 2 ** 20)} MB (a tenth of the free disk, 512 MB to 2 GB), the ${n} builds and traces least used dropped (${Math.round(bytes / 2 ** 20)} MB)`);
+    }
+  } catch { /* nothing kept yet */ }
+  if (dropped) out.push(`store: ${dropped} build${dropped > 1 ? "s and traces" : " or trace"} it had kept made again, dropped since to keep within its budget (${Math.round(budget() / 2 ** 20)} MB: a tenth of the free disk, 512 MB to 2 GB)`);
+  return out;
+}
+let saidAt = performance.timeOrigin;
 
 // ---------------------------------------------------------------- a build as data and back
 // Every value as it was: numbers (NaN, -0 too), undefined, holes, the order of keys, the objects shared within it

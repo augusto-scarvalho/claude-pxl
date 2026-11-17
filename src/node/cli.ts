@@ -21,6 +21,7 @@ import { packedSheet, writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 import { checkProject, newHoles, writeMoves } from "./check.ts";
 import { startWorkers } from "./workers.ts";
+import { storeLines } from "./store.ts";
 
 /** The edge flaws ringed in shot's look image, by kind. */
 const EDGE_RINGS: ["steps" | "doubled" | "tips" | "bridges" | "notches" | "gaps" | "corners", number][] = [["steps", 0xe8202aff], ["doubled", 0xff8c14ff], ["tips", 0xd020d0ff], ["bridges", 0xd020d0ff], ["notches", 0x10c8e0ff], ["gaps", 0xffe020ff], ["corners", 0x20c040ff]];
@@ -416,7 +417,7 @@ export async function main(argv: string[]): Promise<number> {
       case "build": {
         const build = () => { const p = loadProject(file, { wholeWorld: a.world }); startWorkers(p, file, { wholeWorld: a.world }, "build"); return { p, r: writeOutputs(p, outDir, { only: a.only, all: a.all, preview: a.preview, scale: a.scale, aseprite: a.aseprite, every: a.every, share: a.share }) }; };
         let report = "";
-        const { p, r } = a.profile ? await profiled(build).then(({ result, profile, left }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times, left, result.p.offWhy); return result; }) : build();
+        const { p, r } = a.profile ? await profiled(build).then(({ result, profile, left }) => { report = profileReport(profile, [file, ...result.p.files], result.r.times, left, result.p.offWhy, result.p.made); return result; }) : build();
         for (const w of p.warnings) console.error(`warning: ${w.loc ? w.loc + ": " : ""}${w.msg}`);
         if (a.only || a.list || r.lines.length <= 12) for (const l of r.lines) console.log(l);
         else {
@@ -895,5 +896,8 @@ export async function main(argv: string[]): Promise<number> {
   } catch (e) {
     console.error("error: " + wrap(e).message);
     return 1;
+  } finally {
+    // (what the store dropped, and made again here: a command meant warm that ran cold says why)
+    for (const l of storeLines()) console.error(l);
   }
 }

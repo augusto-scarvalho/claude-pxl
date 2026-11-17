@@ -18,7 +18,7 @@ import type { BuildOut } from "../core/build.ts";
 import type { DiskLog, Kept, Project, ProjectOptions } from "../core/project.ts";
 import { kept } from "../core/surface.ts";
 import { loadProject } from "./load.ts";
-import { decode, encode, sha1 } from "./store.ts";
+import { decode, encode, sha1, storeSaid } from "./store.ts";
 import { crowd, guess, workersFor, workersSaw } from "./threads.ts";
 
 // (the traces this thread asked the store for, read back or not: a build that read most of its own back was made
@@ -36,7 +36,7 @@ const FREE = 0, THEIRS = 1, MINE = 2, MADE = 3, NOT = 4;
 const KEEP = 256 * 2 ** 20;
 const keyOf = (name: string, seed: number, t: number) => (seed === 0 ? name : `${name}@${seed}`) + (t ? `#${t}` : "");
 type Coded = { v: unknown; bufs: ArrayBuffer[]; log: DiskLog };
-type Msg = { key: string; ms: number; made?: Coded & { need: string[]; skipped: string[] }; zeros: [string, Coded][]; tr: [number, number] };
+type Msg = { key: string; ms: number; made?: Coded & { need: string[]; skipped: string[] }; zeros: [string, Coded][]; tr: [number, number]; dr: number };
 const code = (h: Kept): Coded => { const bufs: ArrayBufferView[] = [], v = encode(h.out, bufs); return { v, bufs: bufs.map((b) => b.buffer as ArrayBuffer), log: h.log }; };
 const uncode = (c: Coded): Kept => ({ out: decode(c.v, c.bufs) as BuildOut, log: c.log });
 
@@ -148,6 +148,8 @@ export function startWorkers(p: Project, file: string, opts: ProjectOptions, cmd
               const known = pick.cost[named(j[1], m.tr[0] > m.tr[1])];
               if (known) { did.known += known[0] / known[1]; did.theirs += m.ms; } else did.unknown += m.ms;
               theirs.read += m.tr[0]; theirs.made += m.tr[1]; asks.delete(key);
+              // (what it made again that the store had dropped, said with this thread's: store.ts's storeLines)
+              storeSaid.dropped += m.dr;
               stats.served++;
               for (const k of m.made!.need) if (p.held(k)) zeros.delete(k);
               return { ...uncode(m.made!), need: m.made!.need, skipped: m.made!.skipped };
@@ -188,18 +190,20 @@ if (!isMainThread && workerData?.pxlBuilds) {
   p.skipped = new Set();
   p.touched = new Set();
   if (!p.early) p.disk = {
-    get: (k, o) => { const h = real?.get(k, o); if (h) keep(k, h); return h; },
+    // (the job itself dropped from the store is said by the thread that asked it)
+    get: (k, o) => { const d = storeSaid.dropped, h = real?.get(k, o); if (k === job) storeSaid.dropped = d; if (h) keep(k, h); return h; },
     put: (k, out, log, ms, skip) => { keep(k, { out, log }); real?.put(k, out, log, ms, skip); },
   };
   const list: [string, string, number, number, number][] = [];
-  let at = 0;
+  let at = 0, job = "";
   parentPort!.on("message", (add: typeof list) => {
     list.push(...add);
     for (const j of add) want.add(j[0]);
     for (; at < list.length; at++) {
       const [key, name, seed, t, i] = list[at];
       if (Atomics.compareExchange(st, 1 + i, FREE, THEIRS) !== FREE) continue;
-      const t0 = performance.now(), msg: Msg = { key, ms: 0, zeros: [], tr: [0, 0] }, was = { ...traces };
+      const t0 = performance.now(), msg: Msg = { key, ms: 0, zeros: [], tr: [0, 0], dr: 0 }, was = { ...traces }, d0 = storeSaid.dropped;
+      job = key;
       try {
         p.skipped!.clear();
         p.touched!.clear();
@@ -216,6 +220,7 @@ if (!isMainThread && workerData?.pxlBuilds) {
       if (!want.has(key) || key.includes("#")) kept.delete(key);
       msg.ms = performance.now() - t0;
       msg.tr = [traces.read - was.read, traces.made - was.made];
+      msg.dr = storeSaid.dropped - d0;
       port.postMessage(msg);
       Atomics.store(st, 1 + i, msg.made ? MADE : NOT);
       Atomics.add(st, 0, 1);

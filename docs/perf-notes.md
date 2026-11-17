@@ -54,6 +54,49 @@ traces read back from the store. Most readings say their month and how they were
 - A build quicker than the digest of the art's state isn't kept, as reading it back would cost one: a file holding
   90 ms of tables keeps only builds slower than that.
 
+What the store holds (the i5-1035G1, 2026-11, a store of its own; each file's `build` cold, the round's `check`):
+
+| file | entries (traces, builds, paint) | on disk | raw | deflate 6 | its making took | read back whole |
+| --- | --- | --- | --- | --- | --- | --- |
+| Haldor | 978 (327, 465, 186) | 44.2 MB | 264 MB | 41.9 MB | 545 s of work (101 s wall) | 0.7 s |
+| Reva | 696 (192, 343, 161) | 15.8 | 104 | 14.9 | 78 s | 0.25 s |
+| the round's check | 461 | 10.8 | 135 | 9.7 | 26 s | 0.26 s |
+| bend | 284 (71 traces) | 48.5 | 474 | 41.6 | 36 s | 1.0 s |
+| `lib/characters/traveler.px.js` | 90 | 0.4 | 1.6 | 0.3 | 1.9 s | 0.01 s |
+| hero32 | 146 | 1.0 | 11.4 | 0.9 | 3.2 s | 0.03 s |
+
+- What the bytes are: a build's pixels, which part each shows (an `Int32Array` as big), its depth and its normals,
+  deflated at level 1 to a sixth (Haldor) or a tenth (bend); a trace's hits and normals (8 and 24 bytes a ray, which hardly deflate) and its
+  joins' choices. Level 6 takes 5% (Haldor) to 14% (bend) less, for 1.6 to 3.2 times the time to write (Haldor's 1.8 s
+  of deflating to 3.1), and reads back as fast: not worth it. Reading a file's entries back costs from a 36th (bend)
+  to an 800th (Haldor) of making them.
+- One fighter does not fill it: Haldor's is 44 MB (and 3 to 4 MB more after each warm build, below). Every example's
+  and `lib/` file's builds under one pxl, as the tests and the builds of a day keep them, are 271 MB (195 of builds,
+  75 of traces); the repo's store held 565 MB in 13,315 entries, 294 of them three earlier pxls' that nothing reads
+  again (pxl's sources are in each key). Listing it, as each command's first lookup does, took 16 to 29 ms; a prune,
+  which reads each entry's date, 280 ms.
+- What was dropped first: the least recently used, as a read touches an entry; but a warm build reads back only its
+  frames (411 of Haldor's 978 entries), so his traces and the builds inside his frames keep the date they were made,
+  and go first, while they are what an edit to him needs again. The case that failed (Haldor's build, then 480 MB of
+  entries standing for other work, then edited copies of Reva and bend built, then an edited copy of Haldor built: his
+  traces wanted): with 512 MB, 98 s and 135 s of CPU, his traces made again; with the budget at a tenth of the free disk
+  (2 GB here), 23 s and 32 s of CPU, read back. Nothing said why before; now the command says it (below).
+- So the budget is a tenth of the disk's free space, 512 MB to 2 GB: on this laptop seven of those generations, where
+  512 MB held less than two. A command that passes it says so, `store: past its budget of 2048 MB (a tenth of the free
+  disk, 512 MB to 2 GB), the 218 builds and traces least used dropped (18 MB)`, and `.pruned` keeps the names it
+  dropped (their first 16 characters, the last 20,000 not written again since), so a command that made some again
+  says how many, its workers' too (Reva's copy after a prune of all: `store: 660 builds and traces it had kept made
+  again, dropped since to keep within its budget (2048 MB: ...)`). `build --profile`: `store: 294 builds and traces
+  read back on this thread, 11 builds made on it`.
+- The same bytes: Haldor's and bend's builds with the store off, on and on again, their 273 files and their printed
+  lines, `hashes.ts --cache` on both (475 lines), and the last commit's files against the new ones: none differs. Warm
+  builds, the last commit's pxl and the new one alternating (wall s): Haldor 21.2, 14.5, 14.2 against 14.0, 17.9,
+  14.3; bend 23.2, 13.6, 10.6 against 19.0, 18.3, 13.7, the noise of what each warm build makes again (below).
+- Left: a build read back touching the traces it stands on (its log would name them); a warm build of Haldor makes
+  37 to 60 builds again each time (11 to 265 ms each, 29 the median), not the same ones: they are kept or not as
+  their milliseconds fall against `WORTH`, so his four workers start every time (1 GB at the peak, against 600 MB
+  when nothing is made; the same 15 s), and a warm build of bend 89 to 150 (10 to 23 s).
+
 ## Traces kept
 
 - What is kept at each hit, and why. Each ray's hit is kept (8 bytes). A hit spares the march, two thirds of Haldor's
@@ -400,5 +443,14 @@ again. The sheet's files take some 150 MB more for a few seconds (its cells cut 
 - Left: the workers while they work (their number is the record's; a warm build whose missing builds read their
   traces back gains no time from them: 11 to 16 s, twice the CPU); the builds kept whole in the project's cache (the
   files need the pixels and normals, 50 of the 250 MB; `check` and `steps` read the rest); the sheet's 150 MB; and
-  a scene's builds read back from the store, which hold more than when made (bend's array buffers 650 MB warm against
-  335 cold; why, not looked at).
+  what builds read back from the store hold more than made (below).
+- **Why builds read back hold more** (bend's anims built on one thread, the project's builds walked after a gc,
+  2026-11): not garbage, nor a view keeping its entry's buffer alive (each typed array read back is sliced into a
+  buffer of its own and the entry let go), but sharing lost. Made, one image is held once by every build that has it: a
+  fir's sway frame that left it as it was is its base's image, and each of the scene's frames that stamps that frame
+  places the same image. An entry holds its build whole, so read back each one brings its own copy: bend's 159 frames
+  place 13,933 images against 4,152 made, 11,162 pixel buffers are the same bytes as another's (157 MB) against 3,316
+  (35 MB), and its array buffers are 613 MB against 254 (Haldor's 266 against 244: his frames read back whole need
+  none of the builds inside them). What it would take: an image read back given as the one already held with the same
+  bytes (a hash of each image read, about 0.4 s of bend's 470 MB, and the certainty that no build changes an image it
+  took), or an entry naming the build an image came from instead of holding it (a change of the format). Left.
