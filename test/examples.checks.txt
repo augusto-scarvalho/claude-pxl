@@ -27,6 +27,8 @@ halloween/party.px.js: 1 warning (1 scene (16 frames, 124 distinct placements), 
   ran: lit side on 124 (a clear reading on 29), lettering on 2; not run: front marker (nothing has one), feet (nothing placed has a height)
   party › crypt @back, feet 44,127 › WARNING: lit from the top left, but its light comes from the top right (a flipped drawing carries its light to the other side): its left edge reads lighter than the pixels just inside it, its right edge darker (PXL help "scenes 14") (frames 0-15)
 halloween/props.px.js: included only (doesn't build on its own: its palette comes from the file including it)
+hd2d/character_kit.px.js: 0 warnings (2 scenes (2 frames, 128 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: feet on 128, expects 80 (80 held); not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh())
 hd2d/clearing.px.js: 0 warnings (1 scene (13 frames, 96 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 96 (a clear reading on 53), feet on 8, standing on 84, densities on 1; not run: front marker (nothing has one)
   clearing_md › not checked (check: false)
@@ -204,6 +206,8 @@ lib/characters/hero32.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placemen
   ran: boxes on 360 frames, genres' checks on 180 frames, genres' ink by category on 180 frames (and its line's L-corners), cards' cells against their drawing on 2, views' rows on 2, figures' feet on 180 poses; not run: front marker (nothing has one)
 lib/characters/hero_side.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: boxes on 108 frames, genres' checks on 53 frames, genres' ink by category on 54 frames (and its line's L-corners), cards' cells against their drawing on 1, views' rows on 1, figures' feet on 108 poses; not run: front marker (nothing has one)
+lib/characters/kit.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: cards' cells against their drawing on 4, views' rows on 2, figures' feet on 64 poses; not run: front marker (nothing has one)
 lib/characters/knight.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 69 rigs, 150 other assets with a front marker)
   ran: front marker on 150, cards' cells against their drawing on 1, rig parts 690
 lib/characters/miko.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
