@@ -1046,7 +1046,7 @@ export class Canvas {
   /** The same shapes' shadows on the ground, from the sun: each ground color turned into its shade by opts.shade. */
   shadows(view: Partial<View>, shapes: Solid[], opts: SolidOpts): void {
     if (!opts?.shade || !opts.sun) throw new PxError("shadows(view, shapes, { sun: { from: [x, z], up: degrees }, shade: { ground: shade, ... } }): where the sun is and what each ground color turns into in shade");
-    if (opts.near !== undefined && opts.near !== "drop" && opts.near !== "cut") throw new PxError(`shadows(): near is "drop" (a shadow reaching past the eye left out, the default) or "cut" (cut 0.4 m ahead of the eye, the rest drawn), got ${JSON.stringify(opts.near)}`);
+    if (opts.near !== undefined && opts.near !== "drop" && opts.near !== "cut") throw new PxError(`shadows(): near is "cut" (a shadow reaching past the eye cut 0.4 m ahead of the eye, the rest drawn, the default) or "drop" (left out whole), got ${JSON.stringify(opts.near)}`);
     if (opts.thin !== undefined && opts.thin !== "dash" && opts.thin !== "line") throw new PxError(`shadows(): thin is "dash" (a stick's shadow under a px wide sampled at the pixels' middles, dashes far off, the default) or "line" (a line a px wide there, joined along it), got ${JSON.stringify(opts.thin)}`);
     const s = opts.soft;
     if (s !== undefined && !(s && typeof s === "object" && s.shade && typeof s.shade === "object" && (s.px === undefined || (Number.isInteger(s.px) && s.px > 0))))

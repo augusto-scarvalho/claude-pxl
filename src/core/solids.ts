@@ -34,7 +34,7 @@ export interface SolidOpts {
   ramps?: string[]; light?: [number, number];
   /** shadows: what each ground color turns into in shade (keys not in it are left) */
   shade?: Record<string, string>;
-  /** a shadow reaching past the eye: "drop" it whole (default) or "cut" it 0.4 m ahead of the eye and draw the rest */
+  /** a shadow reaching past the eye: "cut" it 0.4 m ahead of the eye and draw the rest (default) or "drop" it whole */
   near?: "drop" | "cut";
   /** a stick's shadow thinner than a px: sampled at the pixels' middles, dashes far off ("dash", default), or a "line" a px wide joined along it */
   thin?: "dash" | "line";
@@ -124,8 +124,8 @@ export function castSolids(P: Perspective, shapes: Solid[], o: SolidOpts, w: num
   // (one bend without bendFrom: the product in the order it always had, side()'s differs in the last bit, an edge pixel's worth)
   const drop = ([x, z, u]: V3): number[] => [x + (B ? (typeof B === "number" && !P.bendFrom ? (B * (z - F.az) ** 2) / 2 : side(B, P.bendFrom, z - F.az)) : 0) + u * F.sox, z + u * F.soz];
   const fill = (whole: number[][], dapple?: number) => {
-    // a shadow reaching past the eye: dropped whole, or (near: "cut") the part of it 0.4 m or more ahead, cut along that line
-    if (o.near !== "cut" && whole.some(([x, z]) => F.ahead(x, z) < 0.4)) return;
+    // a shadow reaching past the eye: the part of it 0.4 m or more ahead, cut along that line, or (near: "drop") dropped whole
+    if (o.near === "drop" && whole.some(([x, z]) => F.ahead(x, z) < 0.4)) return;
     const poly = whole.flatMap((p, i) => {
       const q = whole[(i + 1) % whole.length], a = F.ahead(p[0], p[1]) - 0.4, b = F.ahead(q[0], q[1]) - 0.4, t = a / (a - b);
       return [...(a >= 0 ? [p] : []), ...(a < 0 !== b < 0 ? [[p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]] : [])];
@@ -188,7 +188,7 @@ export function castSolids(P: Perspective, shapes: Solid[], o: SolidOpts, w: num
     const A = drop(q.a), B = drop(q.b), half = q.half!, dx = B[0] - A[0], dz = B[1] - A[1], len = Math.hypot(dx, dz) || 1, nx = (-dz / len) * half, nz = (dx / len) * half;
     const quad = len < 0.02 ? [[A[0] - half, A[1] - half], [A[0] + half, A[1] - half], [A[0] + half, A[1] + half], [A[0] - half, A[1] + half]] : [[A[0] + nx, A[1] + nz], [B[0] + nx, B[1] + nz], [B[0] - nx, B[1] - nz], [A[0] - nx, A[1] - nz]];
     fill(quad);
-    if (o.thin === "line" && len >= 0.02 && (o.near === "cut" || !quad.some(([x, z]) => F.ahead(x, z) < 0.4))) joined(A, B, nx, nz);
+    if (o.thin === "line" && len >= 0.02 && (o.near !== "drop" || !quad.some(([x, z]) => F.ahead(x, z) < 0.4))) joined(A, B, nx, nz);
   }
   return out;
 }

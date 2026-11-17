@@ -877,21 +877,22 @@ scene("s", { w: 80, h: 50, bg: "g" }, shadows(${V}, shapes, opts), solids(${V}, 
   assert.match(failure(PAL + `scene("s", { w: 8, h: 8 }, shadows(${V}, [], {}))`, "s").message, /where the sun is/);
 });
 
-test(`shadows near: "cut": a shadow reaching past the eye, of every kind of shape, cut there and the part ahead drawn (dropped by default); one wholly ahead as it was`, () => {
+test(`shadows near: a shadow reaching past the eye, of every kind of shape, cut there and the part ahead drawn (dropped whole by "drop"); one wholly ahead as it was`, () => {
   const V = JSON.stringify({ w: 80, horizon: 20, eye: 2, fov: 90 });
   const sh = (q: string, near = "") => keys(loadSource(PAL + `scene("s", { w: 80, h: 50, bg: "g" }, shadows(${V}, [${q}], { sun: { from: [0, 1], up: 15 }, shade: { g: "k" }${near} }))`, "t.px.js"), "s");
   // each up to 5 m tall, 10 m ahead and 1 m right, the sun low ahead: its shadow falls 18.7 m toward us, past the eye
   for (const q of [`solid.stick([1, 10, 0], [1, 10, 5], 0.3, "r")`, `solid.blob([1, 10, 2.5], 0.6, 1, "r", { dapple: 0.6 })`, `solid.box([0.7, 9.7, 1.3, 10.3, 0, 5], {})`,
     `solid.cone([1, 10, 0], 0.6, [1, 10, 5], 0, "r")`, `solid.poly([[0.7, 10, 0], [1.3, 10, 0], [1, 10, 5]], "r", { ghost: true })`]) {
-    assert.doesNotMatch(sh(q), /k/, `${q}: dropped by default`);
-    const rows = sh(q, `, near: "cut"`).split("\n");
+    assert.doesNotMatch(sh(q, `, near: "drop"`), /k/, `${q}: dropped`);
+    const rows = sh(q).split("\n");
+    assert.equal(sh(q, `, near: "cut"`), rows.join("\n"), `${q}: cut by default`);
     assert.match(rows[49], /k/, `${q}: cut, it runs to the picture's bottom`);
     assert.ok(rows.every((r, y) => !(y < 26 ? r : r.slice(0, 40)).includes("k")), `${q}: nothing beyond its foot or left of the middle`);
   }
   const short = `solid.stick([1, 10, 0], [1, 10, 1], 0.3, "r")`;
   assert.match(sh(short), /k/);
-  assert.equal(sh(short, `, near: "cut"`), sh(short));
-  assert.match(failure(PAL + `scene("s", { w: 8, h: 8 }, shadows(${V}, [], { sun: { from: [0, 1], up: 15 }, shade: {}, near: true }))`, "s").message, /near is "drop" .* or "cut" .*got true/);
+  assert.equal(sh(short, `, near: "drop"`), sh(short));
+  assert.match(failure(PAL + `scene("s", { w: 8, h: 8 }, shadows(${V}, [], { sun: { from: [0, 1], up: 15 }, shade: {}, near: true }))`, "s").message, /near is "cut" .* or "drop" .*got true/);
 });
 
 test("shadows filled a row at a time between their edges: every kind of shape, a dappled crown, cut at the eye, the pixels a test per pixel gave", () => {

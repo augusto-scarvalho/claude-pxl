@@ -328,7 +328,7 @@ declare global {
     /** drawn on a plate lit along these ramps, the light from `light` on screen */
     ramps?: string[]; light?: [number, number];
     shade?: Record<string, PxColor>;
-    /** shadows(): a shadow reaching past the eye "drop"ped whole (default) or "cut" 0.4 m ahead of the eye, the rest drawn */
+    /** shadows(): a shadow reaching past the eye "cut" 0.4 m ahead of the eye, the rest drawn (default), or "drop"ped whole */
     near?: "drop" | "cut";
     /** shadows(): a stick's shadow under a px wide sampled at the pixels' middles, dashes far off ("dash", default), or a "line" a px wide joined along it */
     thin?: "dash" | "line";

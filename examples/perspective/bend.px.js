@@ -285,7 +285,7 @@ function things({ P }, s) {
     const dd = (((p - s) % LOOP_M) + LOOP_M) % LOOP_M, x = u - LANE, tall = FIR_M * k
     if (dd < 3 || dd > FAR) continue
     sprites.push({ name: firName(seed, tall * P.scale(dd, x)), at: [x, dd], shadow: 0, delay })
-    // Its shadow a spruce's, at its full length (shadows' near: "cut" draws what lies ahead of us): a short
+    // Its shadow a spruce's, at its full length (shadows() draws what lies ahead of us): a short
     // trunk, four tiers of boughs, each a cone wider at its foot than the tier above it there (so the edge is
     // serrated, notches of 0.2 of its girth), the spire to a point. Where all of it lies past 60 m (12 m
     // fall about 54 m), a notch is under 1.5 px: one cone; the soft edge is one cone, the notches in it
@@ -327,8 +327,8 @@ anim("bend", { w: W, h: H, frames: FRAMES, fps: FPS, world: { horizon: VIEW.hori
   const s = (c.frame / FRAMES) * LOOP_M, V = look(s), { P, hd, SUN_N } = V, T = things(V, s), sun = { from: SUN_N.slice(0, 2), up: 12 }
   sky(c, V)
   c.plane(P, ground(V, s))
-  c.shadows(P, T.soft, { sun: { ...sun, up: 11.8 }, shade: SOFT, near: "cut" })
-  c.shadows(P, T.ghosts, { sun, shade: SHADE, near: "cut" })
+  c.shadows(P, T.soft, { sun: { ...sun, up: 11.8 }, shade: SOFT })
+  c.shadows(P, T.ghosts, { sun, shade: SHADE })
   c.mesh(P, T.faces, MATS, { light: SUN_N, sprites: T.sprites })
   // a thin smoke from the chimney, leaning with the wind across our view (the billows born round the loop)
   if (T.dh > 2 && T.dh < 90) c.smoke(0, 0, "WBi", { view: P, at: [HOUSE.u - LANE + 0.9 * SIDE, T.dh + 1.2, 6.3], rise: 2.5, wind: 4.4 * Math.sin(Math.atan2(...WIND) - hd), size: [0.25, 0.7], count: 10, alpha: [0.3, 0.45, 0.6] })
