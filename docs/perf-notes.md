@@ -15,6 +15,7 @@ a user sees and sets is in [the reference](../reference.md#kept-builds-threads-a
 - [Whole builds on worker threads](#whole-builds-on-worker-threads)
 - [The 3D march's code](#the-3d-marchs-code)
 - [The live viewer and the normals](#the-live-viewer-and-the-normals)
+- [Writing the files](#writing-the-files)
 
 ## The machines and the files
 
@@ -185,3 +186,52 @@ until its last three judged on the full guess all read under 1.15×.
 - `served.ts` on the HD graveyard's page: a scene's frames all sent with it held 2.65 GB and froze the browser; as
   PNGs on demand, 1.6 MB and then half a megabyte a frame.
 - `pulse.ts`: a `bump` made a frame at a time turns 6% of the traveler's walk, his 3D model's own normals 1%.
+
+## Writing the files
+
+A build's PNGs and GIFs were most of a cold build's time: on the i5-1035G1 (2026-11, `--no-cache`, one thread,
+`PXL_WORKERS=1`), each file written timed by kind (the asset's PNG or strip, its GIF, the previews, the onion
+sheet), split into a PNG's filtering and deflate and a GIF's palette, LZW and frame deltas. Seconds of encoding and
+writing in a build, then the build's wall time, two cold runs each, the last commit's pxl and the new one alternating:
+
+| build | encoding before | after | wall before | after |
+| --- | --- | --- | --- | --- |
+| `examples/spells.px.js` (221 files) | 25.5 s | 8.5 | 43.9, 41.2 s | 25.9, 23.0 |
+| `examples/grotto.px.js` (106 files) | 7.2 s | 2.7 | 14.4, 14.0 s | 8.1, 9.1 |
+| `examples/perspective/bend.px.js` (6 files, a strip of 160 frames of 320x180) | 13.0 s | 5.1 | 41.9, 43.1 s | 38.7, 35.1 |
+| `examples/perspective/extinction.px.js` (6 files) | 1.6 s | 1.0 | 10.1, 8.5 s | 7.7, 7.7 |
+
+Every file of the four builds decodes to the same pixels, frames and delays as before (PNGs to RGBA, GIFs to their
+frames composited); the GIFs are the same bytes. What each change took, measured alone:
+
+- **A preview GIF at 1x was the asset's GIF made again.** A scene's preview, and a long anim's (its frames side by
+  side pass 2048 px, so 1x), with no clear pixel and no guide, has the asset's own frames: its GIF is now the
+  asset's bytes written again. The spells' scene (352x768, 80 frames, 207,240 colors) took 8.7 s for the second
+  copy; the grotto's 2.9 s, bend's 0.9.
+- **The median cut asked every box its range and weight at every cut**: 255 cuts over all the colors. Each box's
+  score is worked out once, when it is made, the same palette: the spells' scene 3.8 to 5.6 s to 1.5 to 1.9, the
+  grotto's 2.6 to 4.7 s to 1.1 to 1.7 (one process, the same frames, alternating). What is left is the k-means'
+  four passes of the nearest entry over every color.
+- **Deflate at level 7, not 9.** The PNGs of the four builds deflated at each level, the seconds and the bytes:
+
+  | build | level 9 | 8 | 7 | 6 |
+  | --- | --- | --- | --- | --- |
+  | spells | 6.07 s, 4.30 MB | 2.75 s, 4.32 | 1.55 s, 4.62 | 1.44 s, 4.68 |
+  | grotto | 0.85 s, 6.39 MB | 0.62 s, 6.39 | 0.46 s, 6.43 | 0.44 s, 6.47 |
+  | bend | 11.54 s, 6.24 MB | 7.57 s, 6.33 | 2.84 s, 6.66 | 1.92 s, 6.85 |
+  | extinction | 1.01 s, 0.60 MB | 0.55 s, 0.60 | 0.23 s, 0.62 | 0.16 s, 0.63 |
+
+  Level 6 made bend's strip 10% larger. At 7 the builds' files are 0.5% (grotto) to 4% (bend) larger in all; 61 small
+  files grow by more than 10% (each under 42 KB before, 174 KB together, most of it the spells' normal maps, 2.5 KB
+  each).
+- **A pixel the same as the one before it asks no map**: the PNG's palette index, the GIF's color count and its entry
+  for each pixel, taken once a run (the colors met in the same order). About 1.1 s of the spells' encoding, 0.3 of
+  the grotto's.
+- Tried and dropped: the PNG filters Sub and Up on every row (bend's strip 3.2 to 3.3 MB against 2.1 with none, only
+  the grotto's smaller); `Z_FILTERED` (larger, no quicker); `Z_RLE` (bend's strip 19.6 MB); a larger `memLevel` (the
+  same); the nearest entry's sum left as soon as it is no nearer (as quick: 250 to 300 ms a pass over 207,240 colors
+  either way). The encoders on worker threads: a GIF is one palette over every frame and a strip one image, so the
+  costly ones are single calls; not built.
+- Left: the spells' scene GIF, 3.6 s of the 8.5 (the median cut 1.6, most of it the k-means; each run's entry and the
+  frame deltas 1.0; the colors counted in a map 0.6; LZW 0.5); bend's three PNGs 51,000 px wide (the strip, its
+  preview and its onion sheet), 1.2 to 1.5 s each.

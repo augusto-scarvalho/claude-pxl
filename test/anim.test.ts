@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -179,6 +180,32 @@ test("gif: many colors are reduced to one palette and still decode", () => {
   for (let i = 0; i < img.data.length; i++) img.data[i] = pack(i % 256, (i * 7) % 256, (i * 13) % 256);
   const g = decodeGif(encodeGif([{ img, ms: 100 }]));
   assert.equal(g.frames[0].rgba.length, 1600);
+});
+
+test("gif: few colors in runs, clear runs across frames: exactly those colors, and many the same bytes as before the cut kept its boxes' scores", () => {
+  const picture = (n: number) => [0, 1, 2].map((k) => {
+    const img = new Img(60, 40);
+    for (let i = 0; i < img.data.length; i++) { const r = (i >> 2) % n; img.data[i] = r % 9 === 0 ? TRANSPARENT : pack((r * 7 + k * 40) & 255, (r * 3) & 255, (r * 11 + k) & 255, r % 5 ? 255 : 128); }
+    return { img, ms: 100 };
+  });
+  const few = picture(50), g = decodeGif(encodeGif(few));
+  for (let k = 0; k < 3; k++) assert.deepEqual(g.frames[k].rgba, [...few[k].img.data].map((c) => (c & 255 ? c >>> 8 : -1)), `frame ${k}`);
+  // 768 colors: the palette by median cut, each pixel's entry, the runs counted: the bytes of the encoder before them
+  assert.equal(createHash("sha1").update(encodeGif(picture(Infinity))).digest("hex").slice(0, 12), "d13f83dbfffd");
+});
+
+test("anim: a preview GIF at 1x of frames with no clear pixel is the anim's own GIF; one with clear pixels shows the checker", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-anim-"));
+  try {
+    const p = load(`anim("dot", { fps: 4, w: 2, h: 1 }, frame(px(0, 0, "w")), frame(px(1, 0, "w")))`);
+    assert.deepEqual(writeOutputs(p, dir, { scale: 1 }).errors, []);
+    const file = (f: string) => readFileSync(join(dir, f));
+    assert.deepEqual(file("_preview/blink.gif"), file("anims/blink.gif"));
+    assert.equal(decodeGif(file("_preview/dot.gif")).frames[0].rgba[1], 0xc8c8c8, "the checker behind the clear pixel");
+    assert.equal(decodeGif(file("anims/dot.gif")).frames[0].rgba[1], -1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 /** Minimal GIF decoder for the tests: global palette, full-frame images. */

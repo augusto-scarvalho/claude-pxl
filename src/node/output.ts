@@ -122,7 +122,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       const b = p.build(n);
       const dir = def.kind === "scene" ? "scenes" : def.kind === "anim" ? "anims" : "sprites";
       const frames = b.anim ? p.frames(n) : [];
-      let shown = b.img, info = "";
+      let shown = b.img, info = "", own: Buffer | undefined;
       if (def.kind === "anim") {
         // Anims: a horizontal strip of the drawn frames + Aseprite-style JSON (the tag carries the
         // direction), plus a GIF of the full playback.
@@ -146,7 +146,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         if (glows(b.img)) writeMap(def.kind, n, dir, "_e", () => emitImage(b.img), def.loc);
       }
       if (frames.length) {
-        write(join(out, dir, n + ".gif"), encodeGif(frames));
+        write(join(out, dir, n + ".gif"), (own = encodeGif(frames)));
         const play = p.direction(n);
         info = play === "forward" ? ` (${frames.length} frames, ${b.anim!.loop}ms)` : ` (${p.drawn(n).length} frames ${play}, ${b.anim!.loop}ms)`;
       }
@@ -178,7 +178,10 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         writePng(join(out, "_preview", n + ".png"), preview(shown, s));
         if (frames.length) {
           const k = Math.max(1, Math.floor(opts.every ?? 1));
-          const gif = encodeGif(frames.filter((_, i) => i % k === 0).map((f) => ({ img: preview(f.guide ?? f.img, s), ms: f.ms * k })));
+          // at 1x, every frame, no guide and no clear pixel (a scene, a long anim's preview), the preview's frames are the
+          // asset's own: its GIF's bytes again, not the same frames encoded twice
+          const gif = k === 1 && s === 1 && frames.every((f) => !f.guide && !f.img.data.some((c) => (c & 255) === 0)) ? own!
+            : encodeGif(frames.filter((_, i) => i % k === 0).map((f) => ({ img: preview(f.guide ?? f.img, s), ms: f.ms * k })));
           write(join(out, "_preview", n + ".gif"), gif);
           if (gif.length > BIG_GIF && k === 1) info += ` -- preview GIF ${(gif.length / 1e6).toFixed(1)} MB (${frames.length} frames): --every 3 keeps one frame in three`;
         }

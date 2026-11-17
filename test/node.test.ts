@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { crc32, deflateSync, inflateSync } from "node:zlib";
 import { Img } from "../src/core/image.ts";
-import { pack } from "../src/core/color.ts";
+import { TRANSPARENT, pack } from "../src/core/color.ts";
 import { Palette } from "../src/core/palette.ts";
 import { decodePng, encodePng } from "../src/node/png.ts";
 import { encodeGif, medianCut } from "../src/node/gif.ts";
@@ -48,6 +48,16 @@ test("png: RGBA when more than 256 colors", () => {
   const c = chunks(encodePng(img));
   assert.equal(c[0].data[9], 6);
   assert.equal(inflateSync(c.find((x) => x.type === "IDAT")!.data).length, 20 * (20 * 4 + 1));
+});
+
+test("png: runs of one color, some clear, some across rows, round-trip indexed and RGBA", () => {
+  for (const n of [200, 1000]) {
+    const img = new Img(60, 40);
+    for (let i = 0; i < img.data.length; i++) { const r = (i >> 3) % n; img.data[i] = r % 7 === 0 ? TRANSPARENT : pack(r & 255, (r * 5) & 255, r >> 2, r % 3 ? 255 : 90); }
+    const c = chunks(encodePng(img));
+    assert.equal(c[0].data[9], n === 200 ? 3 : 6);
+    assert.deepEqual([...decodePng(encodePng(img)).data], [...img.data]);
+  }
 });
 
 /** A PNG from raw (unfiltered) rows, each row filtered with `filter(row)`, as other encoders write them. */

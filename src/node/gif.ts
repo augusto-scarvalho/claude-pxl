@@ -19,16 +19,20 @@ export function encodeGif(frames: GifFrame[]): Buffer {
   const merged = mergeRepeats(frames);
 
   // Palette: every opaque color, reduced if needed; index 0 is transparent when any pixel is.
+  // (a run of one color counted at its end: no map asked at each pixel, the colors met in the same order)
   const counts = new Map<number, number>();
-  let transparent = false;
+  let transparent = false, of = -1, run = 0;
+  const add = () => { if (run) counts.set(of >>> 8, (counts.get(of >>> 8) ?? 0) + run); };
   for (const { img } of merged) {
     if (img.w < w || img.h < h) transparent = true;
     for (const c of img.data) {
-      if (isClear(c)) { transparent = true; continue; }
-      const rgb = c >>> 8;
-      counts.set(rgb, (counts.get(rgb) ?? 0) + 1);
+      if (c === of) { run++; continue; }
+      add();
+      if (isClear(c)) { transparent = true; of = -1; run = 0; }
+      else { of = c; run = 1; }
     }
   }
+  add();
   // index 0 is kept for "transparent": a clear pixel in a sprite, or in a scene, "as before"
   const room = 255;
   const pal = counts.size <= room ? [...counts.keys()] : medianCut(counts, room);
@@ -67,10 +71,12 @@ export function encodeGif(frames: GifFrame[]): Buffer {
     const cs = Math.max(2, Math.round(due));
     due = Math.max(-0.5, Math.min(0.5, due - cs));
     const idx = new Uint8Array(w * h);
+    let last = -1, at = 0;   // (a pixel the same as the one before it asks no map)
     for (let y = 0; y < img.h; y++)
       for (let x = 0; x < img.w; x++) {
         const c = img.data[y * img.w + x];
-        idx[y * w + x] = isClear(c) ? 0 : indexOf(c >>> 8);
+        if (c !== last) { last = c; at = isClear(c) ? 0 : indexOf(c >>> 8); }
+        idx[y * w + x] = at;
       }
     // A sprite with clear pixels: whole frames, the area restored to background between them so they
     // don't pile up. A scene: after the first frame, only the rectangle that changed, what stayed the
@@ -179,17 +185,20 @@ function lzw(index: Uint8Array, minSize: number): number[] {
  * colors) this took the mean error from 17.5 to 1.9 and the worst on a small figure from 186 to 24.
  */
 export function medianCut(counts: Map<number, number>, n: number): number[] {
-  type Box = { cs: number[] };
+  // a box's score and axis worked out once, when it is made (asked again at every cut, they made the cut cost n times the colors)
+  type Box = { cs: number[]; s: number; axis: number };
   const ch = (c: number, k: number) => (c >> (16 - 8 * k)) & 255;
   const wt = (c: number) => Math.sqrt(counts.get(c)!);
-  const range = (b: Box) => {
-    let best = 0, axis = 0;
+  const box = (cs: number[]): Box => {
+    if (cs.length < 2) return { cs, s: 0, axis: 0 };
+    let best = 0, axis = 0, wsum = 0;
     for (let k = 0; k < 3; k++) {
       let lo = 255, hi = 0;
-      for (const c of b.cs) { const v = ch(c, k); if (v < lo) lo = v; if (v > hi) hi = v; }
+      for (const c of cs) { const v = ch(c, k); if (v < lo) lo = v; if (v > hi) hi = v; }
       if (hi - lo > best) { best = hi - lo; axis = k; }
     }
-    return { best, axis };
+    for (const c of cs) wsum += wt(c);
+    return { cs, s: best * Math.sqrt(wsum), axis };
   };
   const mean = (cs: number[], w: (c: number) => number) => {
     let r = 0, g = 0, bl = 0, wsum = 0;
@@ -199,19 +208,12 @@ export function medianCut(counts: Map<number, number>, n: number): number[] {
     }
     return (Math.round(r / wsum) << 16) | (Math.round(g / wsum) << 8) | Math.round(bl / wsum);
   };
-  const boxes: Box[] = [{ cs: [...counts.keys()] }];
+  const boxes: Box[] = [box([...counts.keys()])];
   while (boxes.length < n) {
-    let pick = -1, score = 0, axis = 0;
-    boxes.forEach((b, i) => {
-      if (b.cs.length < 2) return;
-      const r = range(b);
-      let wsum = 0;
-      for (const c of b.cs) wsum += wt(c);
-      const s = r.best * Math.sqrt(wsum);
-      if (s > score) { score = s; pick = i; axis = r.axis; }
-    });
+    let pick = -1, score = 0;
+    boxes.forEach((b, i) => { if (b.s > score) { score = b.s; pick = i; } });
     if (pick < 0) break;
-    const b = boxes[pick];
+    const b = boxes[pick], axis = b.axis;
     b.cs.sort((p, q) => ch(p, axis) - ch(q, axis));
     let total = 0;
     for (const c of b.cs) total += wt(c);
@@ -220,7 +222,7 @@ export function medianCut(counts: Map<number, number>, n: number): number[] {
       acc += wt(b.cs[i]);
       if (acc >= total / 2) { cut = i + 1; break; }
     }
-    boxes.splice(pick, 1, { cs: b.cs.slice(0, cut) }, { cs: b.cs.slice(cut) });
+    boxes.splice(pick, 1, box(b.cs.slice(0, cut)), box(b.cs.slice(cut)));
   }
   let pal = boxes.map((b) => mean(b.cs, wt));
   for (let pass = 0; pass < 4; pass++) {
