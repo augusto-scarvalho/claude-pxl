@@ -318,3 +318,40 @@ Haldor's sheet GIF's frames (one process, alternating, the median of three):
 - Left: the sheet's GIF, 7.1 s of Haldor's 10.8 (the indexes and the deltas over its every pixel 3.6). `playAll`'s
   144 sheets and their 144 previews are held at once before the encoder takes them: 2 GB of pixels for Haldor's, by
   their sizes (not measured).
+
+**The sheet's GIF from a fraction of the memory.** Measured then, a build whose frames are all read back from the store
+(the peak by `process.resourceUsage().maxRSS`): Haldor's peaked at 3,317 to 3,412 MB writing that file, Reva's at 1,782
+to 2,088. `playAll`'s sheets also carried the normals their frames brought (5.2 MB more a sheet of Haldor's). A tick
+of that GIF draws again 8.6 of Haldor's 37 anims (11.7 of Reva's 35), and 2% of a frame's pixels really change. Now,
+the same bytes:
+
+- the encoder takes its frames on demand, from a function it calls twice (the colors, then the encoding), holding
+  one: a copy of what it read, to find the frames the same as the one before. `playAll` makes them over one sheet,
+  drawing an anim again only when it steps, without its normals (the sheet never shows them; drawn, they were most
+  of the drawing's time);
+- at 1x the checker goes in place (`checker()`), only where a frame changed: no second copy;
+- each frame says where it changed (for each anim that stepped, the box of its frame before and this one: 13% of
+  Haldor's frame a tick, 14% of Reva's), and the encoder indexes, compares and cuts only there, the rest being the
+  frame before's;
+- the colors: the first frame counted pixel by pixel, the others only where they changed, for a color not met yet.
+  One such color at most keeps the palette's order (it comes last: Reva's white, from her sixth frame); two or more,
+  or past 255 colors, and the frames are read once more, whole. A caller that says nothing (every other GIF) is read
+  as before.
+
+| | the build's peak, before | after | the build, before | after | the sheet's GIF alone, before | after |
+| --- | --- | --- | --- | --- | --- | --- |
+| Haldor | 3,317 to 3,412 MB | 1,130 to 1,314 | 19.4 to 22.4 s | 11.6 to 16.2 | 9.6 s, +2,480 MB | 2.5, +100 |
+| Reva | 1,782 to 2,088 MB | 682 | 16.1 to 19.0 s | 10.3 | 5.5 s, +1,510 MB | 1.8, +100 |
+
+The builds alternate the last commit's pxl and the new one, three of Haldor's each, one or two of Reva's (`pxl build`,
+the workers as the record sets them). The GIF alone is `playAll`, `preview()` and the encoder in one process over the
+frames read back, three pairs alternating (the median; CPU 11.8 s to 3.0 for Haldor's, 6.2 to 2.2 for Reva's), and
+what its process held more. Each way measured alone, in that order, on Haldor's: the frames on demand took what the
+GIF holds from 2.5 GB to 0.1 and no time (10.6 s to 10.9); the checker in place no time either; looking only at the
+anims' cells that stepped, 5.8 s; the colors there too, 4.8; the frames drawn without their normals, 3.3 to 4.0; the
+boxes of the frames, not their cells, 3.0 to 3.9 (single runs, the laptop warming). Every file of the two fighters'
+builds and of the four builds above, a gallery GIF and a `shot --gif` are the same bytes. Left: LZW, about 1 s of
+Haldor's 2.5, over the rectangle that changed (half the frame: two anims far apart make it wide); the frames made
+twice, 0.4 s. An anim's or a scene's GIF gains nothing and loses nothing (bend's 160 frames of 320x180 encoded in 0.52
+to 0.57 s before, 0.55 to 0.60 after; its build's peak 724 MB and 723): its frames are made all at once for its strip
+and onion sheet anyway (37 MB for bend's), and they say nothing of where they changed.

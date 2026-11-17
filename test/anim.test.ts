@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { failure, keys, PAL } from "./helpers.ts";
 import { loadSource } from "../src/node/load.ts";
 import { writeOutputs } from "../src/node/output.ts";
-import { encodeGif } from "../src/node/gif.ts";
+import { encodeGif, type GifFrame } from "../src/node/gif.ts";
 import { Img } from "../src/core/image.ts";
 import { pack, TRANSPARENT } from "../src/core/color.ts";
 import { whenChanged } from "./passed.ts";
@@ -209,6 +209,28 @@ test("gif: two colors at every other pixel (a preview's checker at 1x) and a fra
   for (let i = 0; i < noise.data.length; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; noise.data[i] = pack((s >> 8) % 200, 40, 90); }
   assert.equal(sha(encodeGif([{ img: noise, ms: 100 }])), "1bba87db05d6");
   assert.equal(sha(encodeGif([{ img: noise, ms: 100 }])), "1bba87db05d6");
+});
+
+test("gif: frames made on demand, drawn over one image and saying where they changed, are the bytes of the same frames given whole", () => {
+  // a dot moving over a ground of three colors (clear above it with `clear`), still for a frame (merged), then in a color
+  // not met before, then in another (two met late: the colors read again whole)
+  const [r, a, b] = [pack(220, 40, 40), pack(30, 30, 200), pack(250, 250, 250)];
+  const play = (clear: boolean, two: boolean) => function* (): Generator<GifFrame> {
+    const img = new Img(40, 12), xs = [2, 7, 12, 12, 17, 22], cs = [r, r, r, r, a, two ? b : a];
+    const ground = (x: number, y: number) => (clear && y < 8 ? TRANSPARENT : [pack(40, 120, 60), pack(200, 200, 90), pack(90, 90, 90)][(x + y) % 3]);
+    for (let i = 0; i < img.data.length; i++) img.data[i] = ground(i % 40, Math.floor(i / 40));
+    for (let k = 0; k < xs.length; k++) {
+      const was = xs[Math.max(0, k - 1)];
+      for (let y = 4; y < 7; y++) for (let x = was; x < was + 3; x++) img.data[y * 40 + x] = ground(x, y);
+      for (let y = 4; y < 7; y++) for (let x = xs[k]; x < xs[k] + 3; x++) img.data[y * 40 + x] = cs[k];
+      yield { img, ms: 100, changed: k ? [[was, 4, xs[k] + 3 - was, 3]] : undefined };
+    }
+  };
+  for (const clear of [false, true])
+    for (const two of [false, true]) {
+      const whole = Array.from(play(clear, two)(), (f) => ({ img: f.img.copy(), ms: f.ms }));
+      assert.deepEqual(encodeGif(play(clear, two)), encodeGif(whole), `clear ${clear}, two colors met late ${two}`);
+    }
 });
 
 test("anim: a preview GIF at 1x of frames with no clear pixel is the anim's own GIF; one with clear pixels shows the checker", () => {

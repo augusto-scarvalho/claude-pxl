@@ -356,8 +356,10 @@ test("preview: clear, half-clear and opaque pixels at 1x, 2x, 6x (the grid) and 
 test("playAll: a sheet's animations playing at once, each at its own timing, in cells of a grid", () => {
   const dot = (c: number) => { const i = new Img(2, 2); i.fill(c); return i; }, r = pack(255, 0, 0), w = pack(255, 255, 255), g = pack(0, 255, 0);
   // a blink of two frames at 100 ms, a still of one at 300: a clock of 100 ms steps, 300 ms long
-  const play = playAll([{ name: "blink", from: 0, to: 1 }, { name: "still", from: 2, to: 2 }], [{ img: dot(r), ms: 100 }, { img: dot(w), ms: 100 }, { img: dot(g), ms: 300 }]);
+  // (one sheet drawn over at each frame: kept as copies)
+  const play = Array.from(playAll([{ name: "blink", from: 0, to: 1 }, { name: "still", from: 2, to: 2 }], [{ img: dot(r), ms: 100 }, { img: dot(w), ms: 100 }, { img: dot(g), ms: 300 }]), (f) => ({ ...f, img: f.img.copy() }));
   assert.deepEqual(play.map((f) => f.ms), [100, 100, 100]);
+  assert.deepEqual(play.map((f) => f.changed?.length), [undefined, 1, 1], "after the first, only the blink's cell changes");
   const at = (f: number, x: number) => play[f].img.get(x, 1);
   assert.deepEqual([at(0, 1), at(1, 1), at(2, 1)], [r, w, r]);
   assert.ok(play.every((f) => f.img.data.includes(g)), "the still one shows every frame");

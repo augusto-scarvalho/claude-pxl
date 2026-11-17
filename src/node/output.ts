@@ -6,7 +6,7 @@ import type { Img } from "../core/image.ts";
 import { TRANSPARENT, toHex } from "../core/color.ts";
 import type { Project } from "../core/project.ts";
 import type { SheetDef } from "../core/model.ts";
-import { type FrameTag, type SheetFrame, onionSheet, packSheet, playAll, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
+import { type FrameTag, type SheetFrame, checker, onionSheet, packSheet, playAll, preview, previewScale, sheetJson, tiled } from "../core/render.ts";
 import { emitImage, glows, normalImage } from "../core/normals.ts";
 import { tiledMap } from "../core/tiled.ts";
 import { encodeAseprite } from "./aseprite.ts";
@@ -218,9 +218,15 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       lines.push(`sheet ${s.name} ${sheet.w}x${sheet.h} (${frames.length} frames)${prev(s.name, sheet)}`);
       // a sheet of animations also plays them all at once in its preview, each in a cell of its own at
       // its own timing (a character's moves side by side, to judge them together)
+      // (its frames made as the encoder asks for them, one held at a time; at 1x the checker put in only where they changed)
       if (tags.length && opts.preview !== false) {
-        const play = playAll(tags, items), k = opts.scale ?? previewScale(play[0].img);
-        write(join(out, "_preview", s.name + ".gif"), encodeGif(play.map((f) => ({ img: preview(f.img, k), ms: f.ms }))));
+        write(join(out, "_preview", s.name + ".gif"), encodeGif(function* () {
+          let k = 0;
+          for (const f of playAll(tags, items)) {
+            k ||= opts.scale ?? previewScale(f.img);
+            yield k === 1 ? { ...f, img: checker(f.img, f.changed) } : { img: preview(f.img, k), ms: f.ms, changed: f.changed?.map((r) => r.map((v) => v * k)) };
+          }
+        }));
       }
     } catch (e) {
       errors.push(wrap(e).within(`sheet '${s.name}'`, s.loc));

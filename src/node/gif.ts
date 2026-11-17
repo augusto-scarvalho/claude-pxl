@@ -11,31 +11,17 @@ export interface GifFrame {
   img: Img;
   /** Duration in ms (GIF stores centiseconds; minimum 20ms). */
   ms: number;
+  /** The rectangles ([x, y, w, h]) out of which it is the frame before, pixel for pixel: only they are read (else all). */
+  changed?: number[][];
 }
 
-export function encodeGif(frames: GifFrame[]): Buffer {
-  if (!frames.length) throw new Error("gif needs at least one frame");
-  const w = Math.max(...frames.map((f) => f.img.w)), h = Math.max(...frames.map((f) => f.img.h));
-  const merged = mergeRepeats(frames);
-
-  // Palette: every opaque color, reduced if needed; index 0 is transparent when any pixel is.
-  // (the last two colors met counted when a third comes, the older first: no map asked at each pixel, the colors met in
-  // the same order; two, as the checker behind a preview's clear pixels at 1x changes at every pixel)
-  const counts = new Map<number, number>();
-  let transparent = false, a = -1, na = 0, b = -1, nb = 0;
-  const add = (c: number, n: number) => { if (n) counts.set(c >>> 8, (counts.get(c >>> 8) ?? 0) + n); };
-  for (const { img } of merged) {
-    if (img.w < w || img.h < h) transparent = true;
-    const d = img.data;
-    for (let i = 0; i < d.length; i++) {
-      const c = d[i];
-      if (c === b) nb++;
-      else if (c === a) na++;
-      else if (isClear(c)) transparent = true;
-      else { add(a, na); a = b; na = nb; b = c; nb = 1; }
-    }
-  }
-  add(a, na); add(b, nb);
+/**
+ * The frames given at once, or made on demand: a function giving them afresh at each call (twice: the colors, then the
+ * encoding), each frame read before the next is asked for, so one may be drawn over the one before (playAll's).
+ */
+export function encodeGif(frames: GifFrame[] | (() => Iterable<GifFrame>)): Buffer {
+  const each = typeof frames === "function" ? frames : () => frames;
+  const copy = each === frames, { w, h, transparent, counts, repeat, ms } = scan(each, copy, false) ?? scan(each, copy, true)!;
   // index 0 is kept for "transparent": a clear pixel in a sprite, or in a scene, "as before"
   const room = 255;
   const pal = counts.size <= room ? [...counts.keys()] : medianCut(counts, room);
@@ -66,41 +52,48 @@ export function encodeGif(frames: GifFrame[]): Buffer {
   out.push(0x21, 0xff, 11, ...Buffer.from("NETSCAPE2.0"), 3, 1, 0, 0, 0);   // loop forever
 
   const minSize = Math.max(2, bits);
-  let prev: Uint8Array | undefined, due = 0;
-  for (const { img, ms } of merged) {
+  let prev: Uint8Array | undefined, due = 0, n = 0, k = 0, pw = 0, ph = 0;
+  for (const f of each()) {
+    if (repeat[n++]) continue;
     // in centiseconds, each frame's rounding carried to the next, so the loop keeps its length (30 fps: 3, 4, 3 cs); only
     // the rounding's half a cs at most: what the 2 cs floor adds (60 fps) isn't taken from a later frame
-    due += ms / 10;
+    due += ms[k++] / 10;
     const cs = Math.max(2, Math.round(due));
     due = Math.max(-0.5, Math.min(0.5, due - cs));
-    const idx = new Uint8Array(w * h);
+    // (what changed indexed again, the rest the frame before's)
+    const { img } = f, rects = prev && pw === img.w && ph === img.h ? f.changed : undefined, idx = rects ? prev!.slice() : new Uint8Array(w * h);
+    pw = img.w; ph = img.h;
     let last = -1, at = 0, l2 = -1, a2 = 0;   // (a pixel the same as one of the two colors before it asks no map)
-    for (let y = 0; y < img.h; y++)
-      for (let x = 0; x < img.w; x++) {
-        const c = img.data[y * img.w + x];
-        if (c !== last) {
-          const i = c === l2 ? a2 : isClear(c) ? 0 : indexOf(c >>> 8);
-          l2 = last; a2 = at; last = c; at = i;
+    for (const [rx, ry, rw, rh] of rects ?? [[0, 0, img.w, img.h]])
+      for (let y = ry; y < ry + rh; y++)
+        for (let x = rx; x < rx + rw; x++) {
+          const c = img.data[y * img.w + x];
+          if (c !== last) {
+            const i = c === l2 ? a2 : isClear(c) ? 0 : indexOf(c >>> 8);
+            l2 = last; a2 = at; last = c; at = i;
+          }
+          idx[y * w + x] = at;
         }
-        idx[y * w + x] = at;
-      }
     // A sprite with clear pixels: whole frames, the area restored to background between them so they
     // don't pile up. A scene: after the first frame, only the rectangle that changed, what stayed the
     // same in it as index 0 (transparent), each frame left in place for the next to draw over.
     let [x0, y0, x1, y1] = [0, 0, w - 1, h - 1];
     if (!transparent && prev) {
       [x0, y0, x1, y1] = [w, h, -1, -1];
-      for (let y = 0; y < h; y++)
-        for (let x = 0; x < w; x++)
-          if (idx[y * w + x] !== prev[y * w + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      for (const [rx, ry, rw, rh] of rects ?? [[0, 0, w, h]])
+        for (let y = ry; y < ry + rh; y++)
+          for (let x = rx; x < rx + rw; x++)
+            if (idx[y * w + x] !== prev[y * w + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
       if (x1 < 0) [x0, y0, x1, y1] = [0, 0, 0, 0];
     }
+    // (in a scene, out of what changed it is the frame before: index 0, as the rectangle starts)
     const fw = x1 - x0 + 1, fh = y1 - y0 + 1, part = new Uint8Array(fw * fh);
-    for (let y = 0; y < fh; y++)
-      for (let x = 0; x < fw; x++) {
-        const i = (y + y0) * w + x + x0;
-        part[y * fw + x] = !transparent && prev && idx[i] === prev[i] ? 0 : idx[i];
-      }
+    for (const [rx, ry, rw, rh] of !transparent && rects ? rects : [[x0, y0, fw, fh]])
+      for (let y = Math.max(ry, y0); y < Math.min(ry + rh, y1 + 1); y++)
+        for (let x = Math.max(rx, x0), e = Math.min(rx + rw, x1 + 1); x < e; x++) {
+          const i = y * w + x;
+          part[(y - y0) * fw + x - x0] = !transparent && prev && idx[i] === prev[i] ? 0 : idx[i];
+        }
     out.push(0x21, 0xf9, 4, ((transparent ? 2 : 1) << 2) | (transparent || prev ? 1 : 0));
     u16(cs);
     out.push(0, 0);
@@ -121,24 +114,65 @@ export function encodeGif(frames: GifFrame[]): Buffer {
   return Buffer.from(out);
 }
 
+/**
+ * The frames read once: the canvas, the frames the same as the one before (their time added to it; one held, a copy of
+ * what was read when they are made on demand, as a frame may be drawn over the one before), and the colors: every
+ * opaque one, counted in the order met, which is the palette's. `whole`: every frame's colors counted pixel by pixel;
+ * else, once a frame comes that says where it changed, only there, for colors not met yet. Those come last, so the
+ * palette's order is known when there is one at most and the palette holds them all (no cut, which reads the counts):
+ * else undefined, to be read again whole.
+ */
+function scan(each: () => Iterable<GifFrame>, copy: boolean, whole: boolean) {
+  let w = 0, h = 0, mw = Infinity, mh = Infinity, held: Uint32Array | undefined, hw = 0, hh = 0, by = false;
+  const repeat: boolean[] = [], ms: number[] = [], later = new Set<number>();
+  // (the last two colors met counted when a third comes, the older first: no map asked at each pixel, the colors met in
+  // the same order; two, as the checker behind a preview's clear pixels at 1x changes at every pixel)
+  const counts = new Map<number, number>();
+  let transparent = false, a = -1, na = 0, b = -1, nb = 0;
+  const add = (c: number, n: number) => { if (n) counts.set(c >>> 8, (counts.get(c >>> 8) ?? 0) + n); };
+  for (const f of each()) {
+    const { img } = f, d = img.data, rects = held && hw === img.w && hh === img.h ? f.changed : undefined;
+    let same = !!held && hw === img.w && hh === img.h;
+    for (const [x0, y0, rw, rh] of rects ?? [[0, 0, img.w, img.h]])
+      for (let y = y0; y < y0 + rh && same; y++)
+        for (let i = y * img.w + x0, e = i + rw; i < e; i++) if (d[i] !== held![i]) { same = false; break; }
+    repeat.push(same);
+    if (same) { ms[ms.length - 1] += f.ms; continue; }
+    if (rects && copy) for (const [x0, y0, rw, rh] of rects) for (let y = y0; y < y0 + rh; y++) held!.set(d.subarray(y * img.w + x0, y * img.w + x0 + rw), y * img.w + x0);
+    else { held = copy ? d.slice() : d; hw = img.w; hh = img.h; }
+    w = Math.max(w, img.w); h = Math.max(h, img.h); mw = Math.min(mw, img.w); mh = Math.min(mh, img.h);
+    ms.push(f.ms);
+    if ((by ||= !whole && !!rects)) {
+      let l1 = -1, l2 = -1;
+      for (const [x0, y0, rw, rh] of rects ?? [[0, 0, img.w, img.h]])
+        for (let y = y0; y < y0 + rh; y++)
+          for (let i = y * img.w + x0, e = i + rw; i < e; i++) {
+            const c = d[i];
+            if (c === l1 || c === l2) continue;
+            l2 = l1; l1 = c;
+            if (isClear(c)) transparent = true;
+            else if (!counts.has(c >>> 8)) later.add(c >>> 8);
+          }
+      continue;
+    }
+    for (let i = 0; i < d.length; i++) {
+      const c = d[i];
+      if (c === b) nb++;
+      else if (c === a) na++;
+      else if (isClear(c)) transparent = true;
+      else { add(a, na); a = b; na = nb; b = c; nb = 1; }
+    }
+  }
+  if (!ms.length) throw new Error("gif needs at least one frame");
+  for (const c of by ? [a, b] : []) if (c !== -1 && !counts.has(c >>> 8)) later.add(c >>> 8);
+  if (by && (later.size > 1 || counts.size + later.size > 255)) return undefined;
+  add(a, na); add(b, nb);
+  for (const c of later) if (!counts.has(c)) counts.set(c, 1);
+  return { w, h, transparent: transparent || mw < w || mh < h, counts, repeat, ms };
+}
+
 function isClear(c: number): boolean {
   return c === TRANSPARENT || (c & 255) === 0;
-}
-
-function mergeRepeats(frames: GifFrame[]): GifFrame[] {
-  const out: GifFrame[] = [];
-  for (const f of frames) {
-    const prev = out[out.length - 1];
-    if (prev && same(prev.img, f.img)) prev.ms += f.ms;
-    else out.push({ img: f.img, ms: f.ms });
-  }
-  return out;
-}
-
-function same(a: Img, b: Img): boolean {
-  if (a.w !== b.w || a.h !== b.h) return false;
-  for (let i = 0; i < a.data.length; i++) if (a.data[i] !== b.data[i]) return false;
-  return true;
 }
 
 // LZW's table, at (code << 8) | the index after it: the code of the two (0: none), emptied of what it was given after

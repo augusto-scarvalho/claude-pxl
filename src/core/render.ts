@@ -16,13 +16,9 @@ export function previewScale(img: Img, max = 768): number {
  */
 export function preview(img: Img, scale = previewScale(img)): Img {
   const s = scale, grid = s >= 6;
+  // (at 1x, as a sheet's GIF of every anim is: each pixel once, half the time of the loop below)
+  if (s === 1) return checker(new Img(img.w, img.h, img.data.slice()));
   const o = new Img(img.w * s, img.h * s);
-  if (s === 1) {
-    // (at 1x, as a sheet's GIF of every anim is: each pixel once, half the time of the loop below)
-    for (let y = 0, i = 0; y < img.h; y++)
-      for (let x = 0; x < img.w; x++, i++) { const c = img.data[i]; o.data[i] = c === TRANSPARENT || (c & 255) === 0 ? ((x + y) & 1 ? DARK : LIGHT) : c; }
-    return o;
-  }
   // (a source pixel's color worked out once a row, and a row the same as the one above it, past a grid line, copied)
   for (let y = 0; y < o.h; y++) {
     const sy = Math.floor(y / s), at = y * o.w, gy = grid && y % s === 0, my = gy && sy % 8 === 0;
@@ -34,6 +30,14 @@ export function preview(img: Img, scale = previewScale(img)): Img {
     }
   }
   return o;
+}
+
+/** preview() at 1x made in place, over the rectangles given ([x, y, w, h]; else all of it): the checker where a pixel is clear. */
+export function checker(img: Img, rects: number[][] = [[0, 0, img.w, img.h]]): Img {
+  for (const [x0, y0, w, h] of rects)
+    for (let y = y0; y < y0 + h; y++)
+      for (let x = x0, i = y * img.w + x; x < x0 + w; x++, i++) { const c = img.data[i]; if (c === TRANSPARENT || (c & 255) === 0) img.data[i] = (x + y) & 1 ? DARK : LIGHT; }
+  return img;
 }
 
 /** The image repeated nx by ny times: how a seamless tile looks laid out (seams show). */
@@ -147,9 +151,11 @@ export interface FrameTag {
  * Every animation of a sheet playing at once, each in a cell of its own (a grid near square), at its
  * own timing and in its own direction, their pivots (else their bottom middles) on one line: frames of
  * one clock, `step` ms apart (the frames' common divisor, 20 ms at least), as long as the longest loop
- * (6 s at most). For a sheet's preview.
+ * (6 s at most). For a sheet's preview. Made a frame at a time over one sheet, an anim drawn again only when it
+ * steps: the next frame draws over the one given, which says where it changed (`changed`: for each anim that stepped,
+ * the box of its frame before and this one, [x, y, w, h]; none on the first), for an encoder to look only there.
  */
-export function playAll(tags: FrameTag[], items: { img: Img; ms?: number }[]): { img: Img; ms: number }[] {
+export function* playAll(tags: FrameTag[], items: { img: Img; ms?: number }[]): Generator<{ img: Img; ms: number; changed?: number[][] }> {
   const anims = tags.map((g) => {
     const fr = items.slice(g.from, g.to + 1), n = fr.length;
     const order = g.direction === "reverse" ? fr.map((_, i) => n - 1 - i) : g.direction === "pingpong" && n > 2 ? [...fr.keys(), ...fr.slice(1, -1).map((_, i) => n - 2 - i)] : [...fr.keys()];
@@ -162,17 +168,25 @@ export function playAll(tags: FrameTag[], items: { img: Img; ms?: number }[]): {
   const cw = left + right + 2, ch = up + down + 2, cols = Math.max(1, Math.min(anims.length, Math.round(Math.sqrt((anims.length * ch) / cw)))), rows = Math.ceil(anims.length / cols);
   const loops = anims.map((a) => a.reduce((s, f) => s + f.ms, 0));
   const step = Math.max(20, anims.flat().map((f) => f.ms).reduce((a, b) => { while (b) [a, b] = [b, a % b]; return a; }));
-  const length = Math.min(6000, Math.max(...loops)), out: { img: Img; ms: number }[] = [];
+  const length = Math.min(6000, Math.max(...loops)), sheet = new Img(cols * cw, rows * ch), shown: Img[] = [], drawn: number[][] = [];
   for (let t = 0; t < length; t += step) {
-    const sheet = new Img(cols * cw, rows * ch);
+    const changed: number[][] = [];
     anims.forEach((a, k) => {
       let at = t % loops[k], f = a[0];
       for (const g of a) { if (at < g.ms) { f = g; break; } at -= g.ms; }
-      sheet.blit(f.img, (k % cols) * cw + 1 + left - Math.round(px(f.img)), Math.floor(k / cols) * ch + 1 + up - Math.round(py(f.img)));
+      if (shown[k] === f.img) return;
+      // what the frame before covered cleared and this one drawn (its pixels only: what normals a frame has aren't
+      // shown, and drawn they took most of the time); the box of the two changed
+      const o = drawn[k], r = [(k % cols) * cw + 1 + left - Math.round(px(f.img)), Math.floor(k / cols) * ch + 1 + up - Math.round(py(f.img)), f.img.w, f.img.h];
+      if (o) for (let y = o[1]; y < o[1] + o[3]; y++) sheet.data.fill(TRANSPARENT, y * sheet.w + o[0], y * sheet.w + o[0] + o[2]);
+      sheet.blit(new Img(f.img.w, f.img.h, f.img.data), r[0], r[1]);
+      const x = Math.min(r[0], o?.[0] ?? r[0]), y = Math.min(r[1], o?.[1] ?? r[1]);
+      changed.push([x, y, Math.max(r[0] + r[2], o ? o[0] + o[2] : 0) - x, Math.max(r[1] + r[3], o ? o[1] + o[3] : 0) - y]);
+      shown[k] = f.img;
+      drawn[k] = r;
     });
-    out.push({ img: sheet, ms: step });
+    yield { img: sheet, ms: step, changed: t ? changed : undefined };
   }
-  return out;
 }
 
 /**
