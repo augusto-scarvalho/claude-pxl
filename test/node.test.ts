@@ -60,6 +60,13 @@ test("png: runs of one color, some clear, some across rows, round-trip indexed a
   }
 });
 
+test("png: two colors at every other pixel between runs (a preview's checker at 1x) round-trip indexed", () => {
+  const img = new Img(60, 40);
+  for (let i = 0; i < img.data.length; i++) img.data[i] = i & 1 ? ((i >> 6) & 1 ? pack(228, 228, 228) : pack(200, 200, 200)) : pack((i >> 3) % 200, 9, 9);
+  assert.equal(chunks(encodePng(img))[0].data[9], 3);
+  assert.deepEqual([...decodePng(encodePng(img)).data], [...img.data]);
+});
+
 /** A PNG from raw (unfiltered) rows, each row filtered with `filter(row)`, as other encoders write them. */
 function rawPng(w: number, h: number, type: number, depth: number, rows: number[][], filter: (y: number) => number, extra: [string, number[]][] = []): Buffer {
   const chunk = (t: string, d: Buffer) => {

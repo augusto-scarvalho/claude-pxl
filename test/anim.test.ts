@@ -194,6 +194,23 @@ test("gif: few colors in runs, clear runs across frames: exactly those colors, a
   assert.equal(createHash("sha1").update(encodeGif(picture(Infinity))).digest("hex").slice(0, 12), "d13f83dbfffd");
 });
 
+test("gif: two colors at every other pixel (a preview's checker at 1x) and a frame past 4096 codes: exactly those colors, the bytes of the encoder before", () => {
+  const alt = (n: number) => [0, 1, 2].map((k) => {
+    const img = new Img(60, 40);
+    for (let i = 0; i < img.data.length; i++) { const r = (i >> 2) % n; img.data[i] = i & 1 ? ((i >> 6) & 1 ? pack(228, 228, 228) : pack(200, 200, 200)) : r % 9 === 0 ? TRANSPARENT : pack((r * 7 + k * 40) & 255, (r * 3) & 255, (r * 11 + k) & 255, r % 5 ? 255 : 128); }
+    return { img, ms: 100 };
+  });
+  const few = alt(50), g = decodeGif(encodeGif(few)), sha = (b: Buffer) => createHash("sha1").update(b).digest("hex").slice(0, 12);
+  for (let k = 0; k < 3; k++) assert.deepEqual(g.frames[k].rgba, [...few[k].img.data].map((c) => (c & 255 ? c >>> 8 : -1)), `frame ${k}`);
+  assert.equal(sha(encodeGif(alt(Infinity))), "377f446e235f", "past 255 colors: the same counts in the same order to the median cut");
+  // noise of 200 colors: LZW's table fills and is emptied many times, and is empty again for the next GIF
+  const noise = new Img(160, 120);
+  let s = 7;
+  for (let i = 0; i < noise.data.length; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; noise.data[i] = pack((s >> 8) % 200, 40, 90); }
+  assert.equal(sha(encodeGif([{ img: noise, ms: 100 }])), "1bba87db05d6");
+  assert.equal(sha(encodeGif([{ img: noise, ms: 100 }])), "1bba87db05d6");
+});
+
 test("anim: a preview GIF at 1x of frames with no clear pixel is the anim's own GIF; one with clear pixels shows the checker", () => {
   const dir = mkdtempSync(join(tmpdir(), "pxl-anim-"));
   try {

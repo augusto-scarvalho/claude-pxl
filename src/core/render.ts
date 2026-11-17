@@ -15,19 +15,22 @@ export function previewScale(img: Img, max = 768): number {
  * at scale >= 6, a pixel grid with every 8th line darker for reading coordinates.
  */
 export function preview(img: Img, scale = previewScale(img)): Img {
-  const s = scale;
+  const s = scale, grid = s >= 6;
   const o = new Img(img.w * s, img.h * s);
+  if (s === 1) {
+    // (at 1x, as a sheet's GIF of every anim is: each pixel once, half the time of the loop below)
+    for (let y = 0, i = 0; y < img.h; y++)
+      for (let x = 0; x < img.w; x++, i++) { const c = img.data[i]; o.data[i] = c === TRANSPARENT || (c & 255) === 0 ? ((x + y) & 1 ? DARK : LIGHT) : c; }
+    return o;
+  }
+  // (a source pixel's color worked out once a row, and a row the same as the one above it, past a grid line, copied)
   for (let y = 0; y < o.h; y++) {
-    const sy = Math.floor(y / s);
-    for (let x = 0; x < o.w; x++) {
-      const sx = Math.floor(x / s);
+    const sy = Math.floor(y / s), at = y * o.w, gy = grid && y % s === 0, my = gy && sy % 8 === 0;
+    if (y % s > (grid ? 1 : 0)) { o.data.copyWithin(at, at - o.w, at); continue; }
+    for (let sx = 0; sx < img.w; sx++) {
       let c: Color = img.data[sy * img.w + sx];
       if (c === TRANSPARENT || (c & 255) === 0) c = (sx + sy) % 2 === 0 ? LIGHT : DARK;
-      if (s >= 6 && (x % s === 0 || y % s === 0)) {
-        const major = (x % s === 0 && sx % 8 === 0) || (y % s === 0 && sy % 8 === 0);
-        c = darken(c, major ? 0.45 : 0.18);
-      }
-      o.data[y * o.w + x] = c;
+      for (let k = 0, x = at + sx * s; k < s; k++, x++) o.data[x] = grid && (k === 0 || gy) ? darken(c, (k === 0 && sx % 8 === 0) || my ? 0.45 : 0.18) : c;
     }
   }
   return o;

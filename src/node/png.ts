@@ -15,18 +15,19 @@ function chunk(type: string, data: Buffer): Buffer {
 export function encodePng(img: Img): Buffer {
   const { w, h, data } = img;
   const index = new Map<number, number>();
-  // (a pixel the same as the one before it asks no map: pixel art's runs made these lookups most of a strip's time)
-  for (let i = 0; i < data.length && index.size <= 256; i++) if (data[i] !== data[i - 1] && !index.has(data[i])) index.set(data[i], index.size);
+  // (a pixel the same as one of the two before it asks no map: pixel art's runs made these lookups most of a strip's time,
+  // and a preview's checker at 1x changes at every pixel)
+  for (let i = 0; i < data.length && index.size <= 256; i++) if (data[i] !== data[i - 1] && data[i] !== data[i - 2] && !index.has(data[i])) index.set(data[i], index.size);
   const indexed = index.size <= 256;
 
   const rowLen = indexed ? w + 1 : w * 4 + 1;
   const raw = Buffer.alloc(rowLen * h);
-  let last = -1, at = 0;
+  let last = -1, at = 0, l2 = -1, a2 = 0;
   for (let y = 0; y < h; y++) {
     let o = y * rowLen + 1; // filter byte 0
     for (let x = 0; x < w; x++) {
       const c = data[y * w + x];
-      if (indexed) { if (c !== last) { last = c; at = index.get(c)!; } raw[o++] = at; }
+      if (indexed) { if (c !== last) { const i = c === l2 ? a2 : index.get(c)!; l2 = last; a2 = at; last = c; at = i; } raw[o++] = at; }
       else { raw[o++] = c >>> 24; raw[o++] = (c >>> 16) & 255; raw[o++] = (c >>> 8) & 255; raw[o++] = c & 255; }
     }
   }

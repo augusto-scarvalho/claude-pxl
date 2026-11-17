@@ -277,3 +277,44 @@ frames composited); the GIFs are the same bytes. What each change took, measured
 - Left: the spells' scene GIF, 3.6 s of the 8.5 (the median cut 1.6, most of it the k-means; each run's entry and the
   frame deltas 1.0; the colors counted in a map 0.6; LZW 0.5); bend's three PNGs 51,000 px wide (the strip, its
   preview and its onion sheet), 1.2 to 1.5 s each.
+
+### A fighter's files
+
+A fighter writes what those four builds don't: many anims of one figure (Haldor: 37 of 150x150, 273 frames), each
+with its previews at a scale, and a sheet whose preview GIF plays them all at once, each in a cell of its own
+(`playAll`), a frame every 20 ms (his frames of 1/60 s have no longer step in common) over his longest loop. That GIF
+led: 144 frames of 1284x1344 at 1x, 248 million pixels, 35 times all his anims' own GIFs together, nine in ten of
+them the checker behind clear pixels. Measured as above (2026-11, the i5-1035G1, `--no-cache`, `PXL_WORKERS=1`),
+seconds of encoding and writing in Haldor's build, by kind:
+
+| Haldor's files | before | after |
+| --- | --- | --- |
+| the sheet's GIF (1 file) | 18.4 s: the colors counted 8.1, indexes and deltas 4.4, LZW 2.4, `preview()` 3.4 | 7.1: 1.4, 3.6, 1.1, 1.0 |
+| the previews: PNGs, GIFs, onion sheets (112) | 3.4 s | 2.2 |
+| the strips, the anims' GIFs, the sheet and its maps (113) | 1.6 s | 1.5 |
+| all 267 | 23.4 s | 10.8 |
+
+Reva's build: 17.3 s to 7.0 (her sheet's GIF, 130 frames of 1064x1100, 13.1 to 3.8). The median cut never runs on a
+fighter (20 and 22 colors). Haldor's wall time, cold pairs alternating, the last commit's pxl and the new one: 102.7 and
+95.8 s, 104.1 and 95.9, then with the laptop hot 117.3 and 140.5, 143.6 and 109.1 (Reva's build took 52.7 s then, 39.0
+before). The sheet's GIF is the last file a build writes, on the command's thread, every anim done: with the workers
+the record set, from the sheet's PNG to its GIF took 20.5 s and now 10.1 (the builds 127.0 and 124.1 s, hot). Every
+file of the two fighters and of the four builds above is the same bytes. What each change took, measured alone on
+Haldor's sheet GIF's frames (one process, alternating, the median of three):
+
+- **At 1x the checker changes at every pixel**, so "a pixel the same as the one before it asks no map" asked the map
+  at nearly every pixel. The last two colors are held now: counted when a third comes, the older first (the same
+  counts in the same order: the same palette, a median cut's too), 14.3 s to 9.3; a loop on indexes, not `for...of`
+  over the pixels, 6.2 s to 5.4. An entry asked only for a color that is neither of the last two: 8.8 s to 7.5. The
+  PNG's palette index the same way: the sheet's 1x preview PNG (1818x5982) 0.56 s to 0.39.
+- **LZW's table in a typed array**, not a map, emptied of what it was given after each use: 8.1 s to 7.2.
+- **`preview()` at 1x in one pass over the pixels** (10.9 million: 96 ms to 50), and at a scale each source pixel's
+  color worked out once a row and a row the same as the one above it copied (4x 30 ms to 8, 8x 167 to 59). Its share
+  of Haldor's build: 4.0 s to 1.2.
+- Tried and dropped: the pixels read as an `Int32Array` in the count and the indexes, and the arrays held in locals in
+  `preview()`'s loop (no gain past the laptop's noise). Not built: a preview GIF at a scale from the 1x frames'
+  indexes (Haldor's 37 took 1.0 s before, 0.5 after); the sheet's GIF on a worker (the only work left by then, one
+  palette over its every frame: splitting its frames among workers would send them 248 million pixels).
+- Left: the sheet's GIF, 7.1 s of Haldor's 10.8 (the indexes and the deltas over its every pixel 3.6). `playAll`'s
+  144 sheets and their 144 previews are held at once before the encoder takes them: 2 GB of pixels for Haldor's, by
+  their sizes (not measured).

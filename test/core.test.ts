@@ -4,8 +4,8 @@ import { art, failure, keys, PAL } from "./helpers.ts";
 import { perspective, road, side } from "../src/core/perspective.ts";
 import { bayer, fbm, latticeHash, seamless, vec, vnoise } from "../src/core/util.ts";
 import { loadSource } from "../src/node/load.ts";
-import { compareSilhouettes, packSheet, playAll, sheetJson } from "../src/core/render.ts";
-import { pack } from "../src/core/color.ts";
+import { compareSilhouettes, packSheet, playAll, preview, sheetJson } from "../src/core/render.ts";
+import { TRANSPARENT, pack } from "../src/core/color.ts";
 import { readJoints, readMotion, sideColor } from "../src/core/pose.ts";
 import { chain } from "../src/core/chain.ts";
 import { rotate } from "../src/core/rotate.ts";
@@ -344,6 +344,13 @@ test("caps: a line's straight runs end a step darker where they step on diagonal
   const diag = new Img(4, 4);
   for (let i = 0; i < 4; i++) diag.set(i, i, l);
   assert.ok([0, 1, 2, 3].every((i) => capEnds(diag, new Map([[l, d]]), 1).get(i, i) === l));
+});
+
+test("preview: clear, half-clear and opaque pixels at 1x, 2x, 6x (the grid) and 9x, as the loop over every pixel before it made them", () => {
+  const img = new Img(19, 11);
+  for (let i = 0; i < img.data.length; i++) img.data[i] = i % 5 === 0 ? TRANSPARENT : i % 7 === 0 ? pack(10, 200, 30, 0) : pack((i * 13) & 255, (i * 29) & 255, 90, i % 3 ? 255 : 120);
+  const sha = (s: number) => createHash("sha1").update(new Uint8Array(preview(img, s).data.buffer)).digest("hex").slice(0, 12);
+  assert.deepEqual([1, 2, 6, 9].map(sha), ["e3ef4c07abf8", "0ab0f771711e", "1a5dd7a9992d", "b1976e110469"]);
 });
 
 test("playAll: a sheet's animations playing at once, each at its own timing, in cells of a grid", () => {

@@ -19,20 +19,23 @@ export function encodeGif(frames: GifFrame[]): Buffer {
   const merged = mergeRepeats(frames);
 
   // Palette: every opaque color, reduced if needed; index 0 is transparent when any pixel is.
-  // (a run of one color counted at its end: no map asked at each pixel, the colors met in the same order)
+  // (the last two colors met counted when a third comes, the older first: no map asked at each pixel, the colors met in
+  // the same order; two, as the checker behind a preview's clear pixels at 1x changes at every pixel)
   const counts = new Map<number, number>();
-  let transparent = false, of = -1, run = 0;
-  const add = () => { if (run) counts.set(of >>> 8, (counts.get(of >>> 8) ?? 0) + run); };
+  let transparent = false, a = -1, na = 0, b = -1, nb = 0;
+  const add = (c: number, n: number) => { if (n) counts.set(c >>> 8, (counts.get(c >>> 8) ?? 0) + n); };
   for (const { img } of merged) {
     if (img.w < w || img.h < h) transparent = true;
-    for (const c of img.data) {
-      if (c === of) { run++; continue; }
-      add();
-      if (isClear(c)) { transparent = true; of = -1; run = 0; }
-      else { of = c; run = 1; }
+    const d = img.data;
+    for (let i = 0; i < d.length; i++) {
+      const c = d[i];
+      if (c === b) nb++;
+      else if (c === a) na++;
+      else if (isClear(c)) transparent = true;
+      else { add(a, na); a = b; na = nb; b = c; nb = 1; }
     }
   }
-  add();
+  add(a, na); add(b, nb);
   // index 0 is kept for "transparent": a clear pixel in a sprite, or in a scene, "as before"
   const room = 255;
   const pal = counts.size <= room ? [...counts.keys()] : medianCut(counts, room);
@@ -71,11 +74,14 @@ export function encodeGif(frames: GifFrame[]): Buffer {
     const cs = Math.max(2, Math.round(due));
     due = Math.max(-0.5, Math.min(0.5, due - cs));
     const idx = new Uint8Array(w * h);
-    let last = -1, at = 0;   // (a pixel the same as the one before it asks no map)
+    let last = -1, at = 0, l2 = -1, a2 = 0;   // (a pixel the same as one of the two colors before it asks no map)
     for (let y = 0; y < img.h; y++)
       for (let x = 0; x < img.w; x++) {
         const c = img.data[y * img.w + x];
-        if (c !== last) { last = c; at = isClear(c) ? 0 : indexOf(c >>> 8); }
+        if (c !== last) {
+          const i = c === l2 ? a2 : isClear(c) ? 0 : indexOf(c >>> 8);
+          l2 = last; a2 = at; last = c; at = i;
+        }
         idx[y * w + x] = at;
       }
     // A sprite with clear pixels: whole frames, the area restored to background between them so they
@@ -135,11 +141,15 @@ function same(a: Img, b: Img): boolean {
   return true;
 }
 
+// LZW's table, at (code << 8) | the index after it: the code of the two (0: none), emptied of what it was given after
+// each use (a map asked at each pixel was most of a big GIF's LZW)
+const table = new Uint16Array(4096 << 8), used: number[] = [];
+
 /** LZW with variable code size, clearing the table when it fills (4096 codes). */
 function lzw(index: Uint8Array, minSize: number): number[] {
   const clear = 1 << minSize, eoi = clear + 1;
   let size = minSize + 1, next = eoi + 1;
-  let table = new Map<number, number>();
+  const empty = () => { for (const k of used) table[k] = 0; used.length = 0; };
   const out: number[] = [];
   let cur = 0, shift = 0;
   const emit = (code: number) => {
@@ -154,26 +164,28 @@ function lzw(index: Uint8Array, minSize: number): number[] {
   emit(clear);
   let code = index[0];
   for (let i = 1; i < index.length; i++) {
-    const k = index[i], key = (code << 8) | k, hit = table.get(key);
-    if (hit !== undefined) {
+    const k = index[i], key = (code << 8) | k, hit = table[key];
+    if (hit) {
       code = hit;
       continue;
     }
     emit(code);
     if (next === 4096) {
       emit(clear);
-      table = new Map();
+      empty();
       size = minSize + 1;
       next = eoi + 1;
     } else {
       if (next >= 1 << size) size++;
-      table.set(key, next++);
+      table[key] = next++;
+      used.push(key);
     }
     code = k;
   }
   emit(code);
   emit(eoi);
   if (shift > 0) out.push(cur & 255);
+  empty();
   return out;
 }
 
