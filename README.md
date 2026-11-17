@@ -456,12 +456,16 @@ on one clock.
 <p>
   <img src="docs/gallery/extinction.gif" width="100%" alt="Animated pixel-art end of the Cretaceous in three-point perspective, seen from low down looking up: a huge volcano erupting, a fountain of lava from its crater and rivers of lava down its gullies, its ash column bent over by the wind; a soot-dark sky with the four o'clock sun breaking through, the glow of the big meteor's strike behind the mountain and smaller meteors still falling; burning araucarias whose trunks lean in toward a vanishing point above the picture; a tyrannosaur and a herd of gallimimus running left in front of a burning fire front, pterosaurs fleeing overhead, embers and ash blowing on the wind">
 </p>
+<p>
+  <img src="docs/gallery/bend.gif" width="100%" alt="Animated pixel-art drive along a winding road in the far north at midwinter noon, seen from a truck's cab: snow falling in a wind under a thin overcast, the low sun a pale disc, the ploughed road with its wet tracks bending right and then back left, snow-laden spruces swaying in the gusts, orange snow poles, a red house with white trim on the outside of a bend, smoke from its chimney, the long faint shadows of the firs reaching across the snow and the road toward us">
+</p>
 
 Scenes laid out in meters through a camera ([`examples/perspective/`](examples/perspective)): the
 [road](examples/perspective/road.px.js) in one point, the walker shrinking into sprites drawn by hand
 for the small sizes; the [park](examples/perspective/park.px.js) in two, solid shapes cast by one sun;
 the [extinction](examples/perspective/extinction.px.js) in three, a volcano by `terrain()` and
-everything burning by `flame()`.
+everything burning by `flame()`; the [winter road](examples/perspective/bend.px.js) from a cab, a road
+laid out once whose bends the camera puts into the ground, the shadows and the 3D firs alike.
 
 ### Parallax and a cockpit
 
