@@ -7,6 +7,7 @@ import type { BubbleOpts, BumpOpts, LampOpts, PlaceOpts, PoseOpts, RelightOpts, 
 import { bump, dirOf, setNormal } from "./normals.ts";
 import { LOOKS, dissolveChar, dissolveEdge, lightestOf, runEffect } from "./effects.ts";
 import { type SmokeOpts, drawSmoke, inMeters } from "./smoke.ts";
+import { type WeatherOpts, type WeatherUsed, drawWeather } from "./weather.ts";
 import { type Particle, type TrailOpts, drawParticles, drawTrail } from "./vfx.ts";
 import type { Spell } from "./spells.ts";
 import { type Perspective, type View, perspective, scaled, side } from "./perspective.ts";
@@ -98,6 +99,8 @@ export class Canvas {
   /** Inside an anim: the frame being drawn and the frame count (for procedural animation). */
   frame = 0;
   frames = 1;
+  /** The loop's length in ms (an anim's, a clocked scene's); 0 when still. */
+  loop = 0;
   /** Building an anim (frame() items allowed). */
   inAnim = false;
   /** px to an art pixel (a scene's `pixel`, its `sizes`): mesh(), the 3D ops, meshSocket() and post() draw k times as big. */
@@ -1020,6 +1023,11 @@ export class Canvas {
   /** Smoke of a shape (a column, a puff, a bank, a ring) at this moment of the loop: see smoke.ts. */
   smoke(x: number, y: number, keys: string | string[], opts: SmokeOpts = {}): void {
     drawSmoke(this as unknown as Parameters<typeof drawSmoke>[0], x, y, keys, opts, this.viewCam(opts?.view, "smoke"));
+  }
+
+  /** Snow or rain in the air a perspective() camera looks through, in meters, closing on the loop, hidden behind mesh()'s depth: see weather.ts. */
+  weather(view: Partial<View>, opts: WeatherOpts): WeatherUsed {
+    return drawWeather(this as unknown as Parameters<typeof drawWeather>[0], view as View, opts);
   }
 
   /** A view given to a 2D op (smoke, plume): the perspective() camera at this canvas's size (k times as big at a scene's size). */
@@ -2202,7 +2210,7 @@ const TUFTS = [`
 export const OPS = [
   "px", "closeLine", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "foliage", "warp", "effect",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "bubble", "cells", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "voxels", "volume", "splats", "decal", "draw3d", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "particles", "trail", "cast", "shake",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "bubble", "cells", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "voxels", "volume", "splats", "decal", "draw3d", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "weather", "particles", "trail", "cast", "shake",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

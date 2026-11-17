@@ -360,6 +360,23 @@ anim("off", { base: "s", frames: 2 }, effect("dissolve", { progress: 0.4, patter
   assert.ok(load(`sprite("s", { w: 8, h: 8 }, rect(0, 0, 8, 8, "g"), effect("dissolve", { look: "burn", progress: 0.5 }))`).image("s").emit!.some((v) => v === 255));
 });
 
+test("weather: the loop closes, a seed its picture, more density more drops, a drop behind a mesh() wall hidden", () => {
+  // a level camera 1 m up, going 3 m/s in a 1 s loop of 8 frames, a wind across; keys near, mid, far (past 6 m)
+  const V = "{ w: 64, horizon: 16, eye: 1, focal: 40 }", wall = 'const m = model(); m.face("q", [-9, 4, 0], [9, 4, 0], [9, 4, 6], [-9, 4, 6]); c.mesh(V, m.faces, { q: { ramp: "r" } }); ';
+  const scene = (o: string, behind = "") => load(`const V = ${V}; anim("a", { w: 64, h: 40, frames: 8, fps: 8 }, (c) => { ${behind}c.weather(V, { keys: "wgk", speed: 3, wind: [1.5, 0], far: 20, veil: 6, ${o} }) })`);
+  const count = (img: Img, keys: number[], x0 = 0, y0 = 0, x1 = img.w, y1 = img.h) => { let n = 0; for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (keys.includes(img.get(x, y))) n++; return n; };
+  const p = scene("seed: 3"), [w, g, k] = ["w", "g", "k"].map((c) => p.pal.resolve(c) as number);
+  const f0 = p.image("a", 0, 0), loop = p.image("a", 0, 1000);
+  assert.ok(same(f0, loop), "the frame one loop on is frame 0");
+  assert.ok(!same(f0, p.image("a", 0, 500)), "and it moves");
+  assert.ok(same(f0, scene("seed: 3").image("a", 0, 0)) && !same(f0, scene("seed: 4").image("a", 0, 0)), "a seed its picture");
+  assert.ok(count(scene("seed: 3, density: 0.3").image("a"), [w, g, k]) > count(scene("seed: 3, density: 0.1").image("a"), [w, g, k]) * 1.8, "three times the density, more drops");
+  // the wall 4 m ahead across the picture: no drop past the veil (6 m) shows on it; without it they do
+  const walled = scene("seed: 3", wall).image("a"), [x0, y0, x1, y1] = [8, 4, 56, 16];
+  assert.ok(count(walled, [k], x0, y0, x1, y1) === 0 && count(f0, [k], x0, y0, x1, y1) > 3, `far drops on the wall: ${count(walled, [k], x0, y0, x1, y1)}, without it ${count(f0, [k], x0, y0, x1, y1)}`);
+  assert.match(failure(PALS + `anim("a", { w: 9, h: 9, frames: 2 }, weather(${V}, { keys: "w" }))`, "a").message, /keys are two or three/);
+});
+
 test("smoke and plume through a camera: meters where they stand, smaller farther, on the picture where that is", () => {
   // a level camera 1 m up, the horizon on row 10, 40 px of focal length: 10 px a meter 4 m ahead, 5 at 8 m
   const V = "{ w: 64, horizon: 10, eye: 1, focal: 40 }";

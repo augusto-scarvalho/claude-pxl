@@ -340,6 +340,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     // (an anim's t past its loop, as shot --frames N asks: the frame one loop on, a whole loop's frames more)
     c.frame = tick?.frame ?? frame + (tl && !tl.once ? Math.floor(t / tl.loop) * frames : 0);
     c.frames = tick?.frames ?? frames;
+    c.loop = tl ? tl.loop : clock?.loop ?? 0;
     c.inAnim = !!tl;
     c.mirrored = !!def.mirror;
     c.k = opts.pixel ?? 1;

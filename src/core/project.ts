@@ -32,6 +32,7 @@ import { Trace } from "./trace.ts";
 import { readNormals } from "./normals.ts";
 import { type Lut, readCube, readStrip } from "./post.ts";
 import { SMOKE_OPTS } from "./smoke.ts";
+import { WEATHER_OPTS } from "./weather.ts";
 import { ability, emitter, follow, route, turnToward, tween, unroll } from "./vfx.ts";
 import { SPELL_OPTS, spell } from "./spells.ts";
 import { bayer, fbm, globRe, gridRows, lane, latticeHash, profile, rng, vec, vnoise, seamless } from "./util.ts";
@@ -82,6 +83,7 @@ export const SIGNATURES: Record<string, string> = {
   clouds: "opts:o",
   plume: "x:n y:n keys:s ?opts:o",
   smoke: "x:n y:n keys:S ?opts:o",
+  weather: "view:o opts:o",
   particles: "emit:f keys:S ?opts:o",
   trail: "path:f keys:S ?opts:o",
   cast: "spell:o ?opts:o",
@@ -110,7 +112,7 @@ export const SIGNATURES: Record<string, string> = {
 };
 
 /** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
-const CLOCKED = new Set(["surface", "voxels", "volume", "splats", "decal", "draw3d", "flame", "scroll", "clouds", "plume", "effect", "smoke", "particles", "trail", "cast", "shake"]);
+const CLOCKED = new Set(["surface", "voxels", "volume", "splats", "decal", "draw3d", "flame", "scroll", "clouds", "plume", "effect", "smoke", "weather", "particles", "trail", "cast", "shake"]);
 /** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
 function drawsWithFunctions(items: Item[]): boolean {
   return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
@@ -162,6 +164,7 @@ export const OP_OPTS: Record<string, string[]> = {
   clouds: ["y", "gap", "w", "h", "n", "seed", "keys", "x", "empty", "sizes", "frame"],
   plume: ["every", "life", "rise", "wind", "inertia", "size", "young", "seed", "frame", "light", "view", "at", "thin", "steady"],
   smoke: SMOKE_OPTS,
+  weather: WEATHER_OPTS,
   particles: ["x", "y", "trail", "size"],
   trail: ["length", "width", "fade", "step", "from", "t", "taper", "side"],
 };

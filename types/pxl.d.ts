@@ -297,6 +297,28 @@ declare global {
     /** rise at a steady rate, not quickly at first */
     steady?: boolean;
   }
+  /** weather(): snow or rain in meters round the eye, seen through a perspective() camera, closing on the loop. */
+  interface PxWeather {
+    /** "snow" (default: 1.2 m/s, swaying, short streaks) or "rain" (7 m/s, long thin streaks): the defaults of the rest */
+    kind?: "snow" | "rain";
+    /** two or three, near to far: a drop a px across or more, a mid one (the near's with two), the veil's */
+    keys: string | string[];
+    /** drops a m³ (snow 0.12, rain 0.08); m across a drop (snow 0.05, rain 0.02); m/s it falls */
+    density?: number; size?: number; fall?: number;
+    /** m/s the air goes over the ground, [across, along] the world at heading 0 */
+    wind?: [number, number];
+    /** m/s the camera goes forward along its way; radians it is turned right (road()'s), or a function of the frame */
+    speed?: number; heading?: number | ((frame: number) => number);
+    /** the box of air [across, along, up] m (snow [8, 8, 4], rain [8, 8, 8]), stretched so the loop closes */
+    box?: [number, number, number];
+    /** m from the eye: the nearest drawn (0.8), the farthest (snow 50, rain 40), where they thin (far / 2) */
+    near?: number; far?: number; veil?: number;
+    /** px a streak is at most (snow 3, rain 10) */
+    streak?: number;
+    seed?: number; frame?: number;
+  }
+  /** What weather() used: the box, whole boxes each axis went round in the loop [across, along, up], the fall and wind after that, drops drawn and hidden by depth. */
+  interface PxWeatherUsed { box: [number, number, number]; boxes: [number, number, number]; fall: number; wind: [number, number]; drawn: number; hidden: number }
   interface PxSolidOpts {
     /** where the eye stands in the world [x, z] (default 0, 0) */
     at?: [number, number];
@@ -717,7 +739,7 @@ declare global {
     /** A scene's camera this frame, [x, y, w, h] in the world: the same on every layer whatever its parallax (with --world the frame's real one); undefined without a camera. */
     readonly camera?: [number, number, number, number];
     /** Time in ms; inside an anim (or a scene animated by what it places) also the frame index, frame count and frame / frames. */
-    readonly t: number; readonly frame: number; readonly frames: number; readonly phase: number;
+    readonly t: number; readonly frame: number; readonly frames: number; readonly phase: number; /** the loop's ms (an anim's, a clocked scene's), 0 when still */ readonly loop: number;
     /** Drawing a twin: every x lands mirrored (for the few choices a mirror doesn't make by itself). */
     readonly mirrored: boolean;
     /** px to an art pixel: a scene's pixel (its sizes), 1 elsewhere. */
@@ -787,6 +809,8 @@ declare global {
     plume(x: number, y: number, keys: string, opts?: PxPlume): void;
     /** Smoke of a shape: a column on a path, a puff, a bank drifting, a ring spreading (keys lit, middle, shaded). */
     smoke(x: number, y: number, keys: string | string[], opts?: PxSmoke): void;
+    /** Snow or rain in the air a perspective() camera looks through, in meters, closing on the loop, hidden behind mesh()'s depth; gives back what it used. */
+    weather(view: PxView | PxPerspective, opts: PxWeather): PxWeatherUsed;
     /** An emitter's particles now, each in the key of its age (young first), streaked `trail` ms back. */
     particles(emit: (t: number) => PxParticle[], keys: string | string[], opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): void;
     /** A trail behind what goes along path(t), `length` ms of it now, `width` [head, tail] px, keys head to tail; a blade's, path(t, i) giving its edge [[tip], [inner point]]: the band it swept. */
@@ -974,6 +998,8 @@ declare global {
   function plume(x: number, y: number, keys: string, opts?: PxPlume): PxOp;
   /** Smoke of a shape: a column on a path, a puff, a bank drifting, a ring spreading (keys lit, middle, shaded). */
   function smoke(x: number, y: number, keys: string | string[], opts?: PxSmoke): PxOp;
+  /** Snow or rain in the air a perspective() camera looks through, in meters, closing on the loop, hidden behind mesh()'s depth. */
+  function weather(view: PxView | PxPerspective, opts: PxWeather): PxOp;
   /** An emitter's particles now, each in the key of its age. */
   function particles(emit: (t: number) => PxParticle[], keys: string | string[], opts?: { x?: number; y?: number; trail?: number; size?: [number, number] }): PxOp;
   /** A trail behind what goes along path(t); a blade's smear, the band its edge [[tip], [inner point]] swept. */

@@ -1334,6 +1334,11 @@ one), and the art code itself (4% of the cost).
   the disk go and every command built it all (55 to 61 s); made in the frame and passed to what reads it, a second
   build reads it back (61 s cold, then 7 s). Its ladder of fir sizes keeps its own code: the ladder itself is two
   lines (the rungs, the nearest), the rest is what a helper can't decide (the light, the snow, the haze, the sway).
+- [x] **Weather through a camera** (H12b, I4): `weather(view, { kind: "snow" | "rain", keys, density, size, fall, wind,
+  speed, heading })`: drops in meters in a box of air repeated round the eye, near ones bigger and streaked, far ones a
+  px, then fewer in a veil; the fall, a wind in the world and the camera's travel turned into it by the heading; the box
+  stretched so each axis comes round whole over the loop, and what it used given back; hidden behind `mesh()`'s depth.
+  bend.px.js keeps its hand-written snowfall: the op in its place is a proposal shown beside it, not applied.
 
 ## Parallax (from dogfooding the train)
 

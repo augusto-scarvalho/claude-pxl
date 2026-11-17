@@ -459,6 +459,13 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   a dip handed to the next leaf downwind a frame later. A gust's swirl: a 1 px line over 10 frames
   at 80 ms (dot, dash, longer dash, a curve, a loop, a hook, dash, dot, ~25 px). Dust kicked up: one
   flat color from the ground, a teardrop leaning downwind, a comma, bits, dots, 16 frames at 80 ms.
+- **Snow and rain through a camera** (`weather()`, `pxl help weather`): drops in meters round the eye,
+  seen through the scene's `perspective()`, a near one bigger and streaked, a far one a px, then fewer
+  in a veil; give it the camera's own `speed` and `heading` (road()'s) and near drops stream out from
+  where we go, a turn swings them and slants the wind. It closes the loop itself and gives back what
+  it rounded. Draw it after the `mesh()`: a flake behind a tree is hidden. Keys near to far: the near
+  a shade dimmer than the mid (out of focus), the far close to the sky; over white snow only the sky
+  and dark things show the flakes, so frame them against those.
 - Thin, a cloud is a long pale wisp in a tone close to the sky's (puffs losing their height faster
   than their length, a flat base joining them), not a row of small blobs. A heaped cloud takes its
   light from the top down as it gains body (a white cap thickening row by row, then a gray
