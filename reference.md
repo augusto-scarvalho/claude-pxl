@@ -800,7 +800,12 @@ the time in ms. A sun's aura can pulse in the scene itself, over the sky it read
 
 **Output**: anims go to `anims/<name>.png` (horizontal strip), `anims/<name>.json` (per-frame
 `duration` + `meta.frameTags`, Aseprite style: Phaser, Godot, ... read it) and `anims/<name>.gif`.
-Animated sprites and scenes get `<name>.gif` next to their PNG (which shows frame 0). Previews:
+Animated sprites and scenes get `<name>.gif` next to their PNG (which shows frame 0). A GIF holds
+one palette for all its frames (past 256 colors they are reduced), frames the same as the one before
+as one frame held longer, and, where no pixel is clear (a scene, a preview over its checker), each
+frame after the first as only the rectangle that changed, what stayed the same inside it left as it
+was: a scene where a few things move is a small file, one where every pixel changes each frame (an
+animated `grain`, a camera that pans) a large one. A sprite with clear pixels is whole frames. Previews:
 `_preview/<name>.png` shows an anim's frames side by side; anything animated also gets
 `_preview/<name>.gif`. Reference layers (`ref`) show over every frame in an anim's previews, never in its exports. Anims also get `_preview/<name>_onion.png`, a review sheet for eyes that
 can't watch a GIF: first a motion map (what stays put, dimmed; what moves, gray, with each frame's
