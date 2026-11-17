@@ -299,29 +299,12 @@ function things({ P }, s) {
 }
 
 // ================================================================ the snow falling
-// Flakes in a box 16 m across, 20 along, 10 high, laid again and again: each falls 1 m/s (the box's height in
-// the loop's 10 s) and we drive through 10 boxes. The wind blows one way over the land: turned by our heading
-// it crosses our view at another slant. Its drift in our frame, summed frame by frame, is scaled to whole
-// boxes over the loop, so it closes. Through the camera without the bend (the air near us): a near flake a
-// short streak, a mid one a px, past 25 m fewer and paler, a veil; spindrift low and three times as fast.
-const AIR = perspective(VIEW), FLAKES = Array.from({ length: 100 }, (_, k) => [16 * hash(k, 1, 7), 20 * hash(k, 2, 7), 10 * hash(k, 3, 7), k < 8])
-const SUM = [[0, 0]]
-for (let f = 0; f < FRAMES; f++) { const a = Math.atan2(...WIND) - way((f / FRAMES) * LOOP_M).heading; SUM.push([SUM[f][0] + (2.9 * Math.sin(a)) / FPS, SUM[f][1] + (2.9 * Math.cos(a)) / FPS]) }
-const blow = (f, i) => { const box = [16, 20][i], end = SUM[FRAMES][i]; return ((SUM[f % FRAMES][i] + Math.floor(f / FRAMES) * end) * box * Math.max(1, R(end / box))) / end }
-function snowfall(c, f, s) {
-  f %= FRAMES; const t = f / FPS, z0 = s % 20                  // (the next lap's first frame is this one's, to the bit)
-  for (const [x0, zb, y0, low] of FLAKES) for (let n = 0; n < 5; n++) for (let mm = 0; mm < 5; mm++) {
-    const dx = (blow(f + 1, 0) - blow(f, 0)) * (low ? 3 : 1), dz = blow(f + 1, 1) - blow(f, 1), zw = zb + blow(f, 1)
-    const z = zw - 20 * Math.floor(zw / 20) + 20 * n - z0, y = low ? 0.15 + y0 / 12 : (((y0 - t) % 10) + 10) % 10
-    const x = (((x0 + blow(f, 0) * (low ? 3 : 1)) % 16) + 16) % 16 + 16 * mm - 40, key = hash(n * 5 + mm, R(x0 * 1000))
-    if (z < (low ? 4 : 0.6) || z > (low ? 30 : 100) || (z > 25 && key > 25 / z)) continue
-    const [c1, r1] = AIR.ground(x, z, y), [cp, rp] = AIR.ground(x - dx, z + 1.25 - dz, low ? y : y + 1 / FPS)
-    if (c1 < -4 || c1 > W + 4 || r1 < -4 || r1 > H + 4) continue
-    const len = Math.hypot(c1 - cp, r1 - rp), k = Math.min(1, 3 / len), c0 = c1 + (cp - c1) * k, r0 = r1 + (rp - r1) * k   // 3 px at most
-    if (low || z < 6) c.line(R(c0), R(r0), R(c1), R(r1), "W", 1)                                    // the near ones dimmer, blurred
-    else c.px(R(c1), R(r1), z > 25 ? "W" : "x")
-  }
-}
+// pxl's weather(): flakes in meters round the eye (0.05 a m³), each falling
+// 1 m/s, a wind of 2.9 m/s over the land turned by our heading, our 20 m/s along the way; it rounds what doesn't
+// come round the loop's 10 s in whole boxes and closes. A near flake a short streak, a mid one a px, past 25 m
+// fewer, out to 100 m; behind a fir or the house (mesh()'s depth) it is hidden.
+const SNOW = { kind: "snow", keys: "WxW", density: 0.05, size: 0.03, fall: 1, wind: WIND.map((v) => 2.9 * v), speed: LOOP_M / (FRAMES / FPS),
+  heading: (f) => way((f / FRAMES) * LOOP_M).heading, far: 100, veil: 25, box: [16, 20, 10] }
 
 anim("bend", { w: W, h: H, frames: FRAMES, fps: FPS, world: { horizon: VIEW.horizon, eye: VIEW.eye, light: LIGHT }, check: { every: 16 } }, (c) => {
   const s = (c.frame / FRAMES) * LOOP_M, V = look(s), { P, hd, SUN_N } = V, T = things(V, s), sun = { from: SUN_N.slice(0, 2), up: 12 }
@@ -332,5 +315,5 @@ anim("bend", { w: W, h: H, frames: FRAMES, fps: FPS, world: { horizon: VIEW.hori
   c.mesh(P, T.faces, MATS, { light: SUN_N, sprites: T.sprites })
   // a thin smoke from the chimney, leaning with the wind across our view (the billows born round the loop)
   if (T.dh > 2 && T.dh < 90) c.smoke(0, 0, "WBi", { view: P, at: [HOUSE.u - LANE + 0.9 * SIDE, T.dh + 1.2, 6.3], rise: 2.5, wind: 4.4 * Math.sin(Math.atan2(...WIND) - hd), size: [0.25, 0.7], count: 10, alpha: [0.3, 0.45, 0.6] })
-  snowfall(c, c.frame, s)
+  c.weather(P, SNOW)
 })

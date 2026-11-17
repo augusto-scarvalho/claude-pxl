@@ -465,7 +465,7 @@ on the ground, not over it: tufts at the edges of paths and at the foot of trees
   where we go, a turn swings them and slants the wind. It closes the loop itself and gives back what
   it rounded. Draw it after the `mesh()`: a flake behind a tree is hidden. Keys near to far: the near
   a shade dimmer than the mid (out of focus), the far close to the sky; over white snow only the sky
-  and dark things show the flakes, so frame them against those.
+  and dark things show the flakes, so frame them against those (`examples/perspective/bend.px.js`).
 - Thin, a cloud is a long pale wisp in a tone close to the sky's (puffs losing their height faster
   than their length, a flat base joining them), not a row of small blobs. A heaped cloud takes its
   light from the top down as it gains body (a white cap thickening row by row, then a gray
