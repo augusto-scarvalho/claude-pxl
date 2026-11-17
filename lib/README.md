@@ -80,7 +80,10 @@ they wear (`dress.px.js`), the character kit that makes people of their parts fr
 and a beast-headed one (a wolf's head, the neck's mane, a tail, paws; three furs); a bare mannequin and each garment worn over it as a layer of its own, the pieces
 mixing by rule (a slot, a layer, what each needs and excludes, its own colors), a spec that doesn't fit refused with
 the reason; headwear, caps, a hood, a straw hat, helmets to a great helm, each saying by rule what of the hair it
-covers and what it does to the face, the wolf's head wearing those that fit it; drafts), the top-down hero and the people made from him (`hero.character()`: two villagers,
+covers and what it does to the face, the wolf's head wearing those that fit it; what a hand holds and the hip and
+the back carry, a sword and its scabbard, a short blade, an axe, a mace, a spear, two staffs, a bow and a quiver, two
+shields, a pack, a pouch, a lantern, each a part of the figure on the skeleton's pose, in front of the body or behind it
+by its depth, sized by its bearer's body; drafts), the top-down hero and the people made from him (`hero.character()`: two villagers,
 Reva's chibi in her vest and in her fighter's clothes, `reva_fight_*`), the villager and the elder at 48 px on the slim body (`villagers32.px.js`, by `hero32.character()`), the same hero at 48 px for top-down 32 on the genre's slim body (`hero32.px.js`, `topdown32`: idle,
 walk, run and the sword attack with its crescent) and on its chibi body (`chibi_*`, to approve), the same hero side on for a platformer (`hero_side.px.js`,
 `platformer16`: idle, walk, run and sprint (a run that speeds up), a dash with its afterimage and dust, a jump in four to loop the rise and the fall (jump, apex,
