@@ -1,7 +1,8 @@
 // Whole builds made by worker threads (src/node/workers.ts): with 1, 2 and 3 workers every file written, every warning
 // (its order, the assets it names) and check's lines the same, an inner anim's frame 0 that warns, read only for its
 // timeline by a worker, included; a build the store wouldn't serve made here (the art's dice; a scene's frame, which may
-// carry another build's work in a memo of its own, never handed out); an error thrown by the art in a worker is today's;
+// carry another build's work in a memo of its own, never handed out); a build with a sheet stops its workers once the
+// sheet's frames are in hand; an error thrown by the art in a worker is today's;
 // the process ends by itself after a build, a check and a failed build; a command inside a worker thread starts none.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -84,6 +85,20 @@ test("a build made here or served, dropped from memory and asked again, is made 
     assert.deepEqual(files(at("again-a")), one.files);
     assert.deepEqual(files(at("again-b")), one.files);
   } finally { if (was === undefined) delete process.env.PXL_WORKERS; else process.env.PXL_WORKERS = was; }
+});
+
+test("a build stops its workers once its last sheet's frames are in hand, and writes the same files", () => {
+  writeFileSync(at("sheet.px.js"), ART + `sheet("all", ["move", "other"])\n`);
+  const one = built("sheet.px.js", 1), terminate = Worker.prototype.terminate;
+  let ended = 0;
+  Worker.prototype.terminate = function () { ended++; return terminate.call(this); };
+  try {
+    const two = built("sheet.px.js", 2);
+    assert.ok(stats.served > 0, "the workers made builds");
+    assert.equal(ended, 2, "both stopped by the build");
+    assert.deepEqual(two.files, one.files);
+    assert.deepEqual(two.warnings, one.warnings);
+  } finally { Worker.prototype.terminate = terminate; }
 });
 
 test("an error thrown by the art in a worker is today's error, at the same place", () => {

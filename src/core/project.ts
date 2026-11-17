@@ -1871,11 +1871,12 @@ export class Project implements BuildCtx {
   /**
    * Set by workers.ts: whole builds made by worker threads. ahead() hands out builds this thread will ask (by key);
    * get() a key's, if made there (waiting while one is making it); zero() a frame 0 a worker made inside one, sent
-   * with it; built() the ms of one handed out and made here after all.
+   * with it; built() the ms of one handed out and made here after all; end() stops the workers (nothing more to ask:
+   * what they hold goes), and anything asked after is made here.
    */
   elsewhere?: {
     ahead(list: [string, number, number][]): void; isJob(key: string): boolean; built(key: string, ms: number): void;
-    get(key: string): (Kept & { need: string[]; skipped: string[] }) | undefined; zero(key: string): Kept | undefined;
+    get(key: string): (Kept & { need: string[]; skipped: string[] }) | undefined; zero(key: string): Kept | undefined; end(): void;
   };
   /** Inside a build handed out and made here after all: what it asks is its own work, handed out to none. */
   private inJob = 0;

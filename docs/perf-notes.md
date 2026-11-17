@@ -17,6 +17,7 @@ a user sees and sets is in [the reference](../reference.md#kept-builds-threads-a
 - [The march on the GPU, tried and left](#the-march-on-the-gpu-tried-and-left)
 - [The live viewer and the normals](#the-live-viewer-and-the-normals)
 - [Writing the files](#writing-the-files)
+- [What a build holds](#what-a-build-holds)
 
 ## The machines and the files
 
@@ -355,3 +356,49 @@ Haldor's 2.5, over the rectangle that changed (half the frame: two anims far apa
 twice, 0.4 s. An anim's or a scene's GIF gains nothing and loses nothing (bend's 160 frames of 320x180 encoded in 0.52
 to 0.57 s before, 0.55 to 0.60 after; its build's peak 724 MB and 723): its frames are made all at once for its strip
 and onion sheet anyway (37 MB for bend's), and they say nothing of where they changed.
+
+## What a build holds
+
+Measured on the i5-1035G1 (2026-11): the process's peak (`process.resourceUsage().maxRSS`), and at each file written
+its resident size, V8's heap and its array buffers (`process.memoryUsage()`, read by a preload). The builds of Haldor,
+Reva, `lib/characters/hero32.px.js` and `examples/perspective/bend.px.js`, the last commit's pxl and the new one:
+
+| build | peak before | after |
+| --- | --- | --- |
+| Haldor, warm, 4 workers (the record's), started for the builds the store had dropped | 1,065 to 1,361 MB (7 runs) | 1,017 to 1,191 (4) |
+| Haldor, warm, every build on disk: no worker starts | 574 to 616 MB | the same path |
+| Haldor, warm, one thread | 566, 588 MB | 590 |
+| Haldor, cold (`--no-cache`), 4 workers | 1,727 to 1,820 MB (71 to 104 s) | 1,651 (110 s) |
+| Haldor, cold, one thread | 738 MB (109 s) | the same path |
+| Reva, warm | 764 to 822 MB | 650 |
+| hero32 | 161, 162 MB | 156; 192 part warm |
+| bend (no sheet) | 717 part warm, 966 warm | 722 part warm, 1,043 warm |
+
+What Haldor's gigabyte is: **mostly copies of pxl**. Warm, the four workers start at the first build handed out that
+the store hasn't (the repo's store, past its 512 MB budget, drops some of his now and then), read the rest back and send
+it: each is a whole pxl with the project loaded (about 90 MB) and the builds it made, kept after it sent them (60 to 90
+MB by its own count). They lived to the end of the command, and the peak was while the sheet's files were written.
+Cold, the four held 1 GB of the 1.75 (the trace's work: each worker's heap). The command's thread holds 430 MB at the
+end of his anims: 100 MB of Node and pxl, and 250 MB of builds kept to the end (his 273 frames, 313 builds inside them
+at other times, 104 at time 0), 9 times his frames' 28 MB of pixels: each image carries which part each pixel shows
+(an `Int32Array` as big as the pixels), its normals and its depth, and the figure each frame placed carries them
+again. The sheet's files take some 150 MB more for a few seconds (its cells cut with their normals, the sheet of
+1818x5982, its normal map, its preview at 1x).
+
+- **The workers stop once the last sheet has its frames** (`p.elsewhere.end()`, before the sheet's files): nothing
+  more is built, so nothing they hold is needed. Warm, the process falls by 330 to 370 MB there, and the peak is now
+  the end of the anims; cold, it already was. The same bytes, and no build more. Haldor's warm wall time in three
+  alternating pairs, 13.2, 13.1, 12.2 s before and 15.5, 18.4, 17.1 after, is not a measure of it: the old store
+  held all his builds (no worker started), the new one, written again since `src/` changed, lacked some (they
+  started). Cold, the store off, one pair: 103.2 s and 110.2 (the new first), as the laptop's noise goes.
+- **`build --profile` says the command's peak**: `peak memory: 1050 MB, the most this process held (its workers'
+  too)`.
+- Tried and left: a worker keeping 32 MiB of builds, not 256 (what it sent is held by the command's thread). Keeping
+  none, each of Haldor's workers held 13 to 36 MB of array buffers warm, not 63 to 82; at 32 MiB his cold peak fell by
+  100 to 200 MB, but 12 more builds were made (831 against 819), and the cold pairs ran 3 to 10 s slower, within the
+  laptop's noise (the same pair with only the workers' stop: 7 s): not proven free, so not kept.
+- Left: the workers while they work (their number is the record's; a warm build whose missing builds read their
+  traces back gains no time from them: 11 to 16 s, twice the CPU); the builds kept whole in the project's cache (the
+  files need the pixels and normals, 50 of the 250 MB; `check` and `steps` read the rest); the sheet's 150 MB; and
+  a scene's builds read back from the store, which hold more than when made (bend's array buffers 650 MB warm against
+  335 cold; why, not looked at).

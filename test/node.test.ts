@@ -213,6 +213,7 @@ sprite("quick", "7")`);
   try { assert.equal(await main(["build", file, "--profile", "--no-preview"]), 0); } finally { console.log = log; }
   const out = lines.join("\n");
   assert.match(out, /profile: .* in all; slowest assets: busy/);
+  assert.match(out, /^peak memory: [1-9]\d* MB, the most this process held/m);
   assert.match(out, /slow +a\.px\.js:2/);
   assert.doesNotMatch(out, /pure functions/);
 });

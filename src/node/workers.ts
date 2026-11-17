@@ -99,6 +99,7 @@ export function startWorkers(p: Project, file: string, opts: ProjectOptions, cmd
   stop = () => { for (const w of ws) void w.terminate(); };
   const drain = () => { for (const pt of ports) for (let m = receiveMessageOnPort(pt); m; m = receiveMessageOnPort(pt)) { const g = m.message as Msg; got.set(g.key, g); if (g.made) stats.made++; for (const [k, z] of g.zeros) zeros.set(k, z); } };
   p.elsewhere = {
+    end: () => { broken = true; for (const w of ws) void w.terminate(); },
     isJob: (key) => jobs.has(key),
     ahead: (add) => {
       const fresh: typeof list = [];

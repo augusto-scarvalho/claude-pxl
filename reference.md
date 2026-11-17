@@ -921,8 +921,8 @@ swap's) as the key the swap gave it (else a free one), and lists those under the
 
 A `build`'s preview GIF past 4 MB says so; `--every N` keeps one frame in N in the previews (the GIFs in
 `out/` keep every frame). A build that has grown slow: `--profile` prints where the time went, read
-off the CPU profiler: the slowest assets, then the functions that spent the most time themselves,
-in the art file (work redone every frame that could be done once, a noise called millions of
+off the CPU profiler: the slowest assets, the most memory the command held (its workers' too), then
+the functions that spent the most time themselves, in the art file (work redone every frame that could be done once, a noise called millions of
 times, a per-pixel search) and in pxl; then the traced fields marched again at every build, not kept
 because a function in them isn't `pure()` (who drew each, those functions with their file and line,
 its traces and how long they marched; the slowest few, none whose every trace is under 10 ms), and those whose
@@ -1179,8 +1179,8 @@ thread makes, in the same order. How many is measured for each command on each f
 thread and notes each build's time (a file whose shared builds took under 10 s starts none); later ones take the
 machine's number where it is 3 or more, and keep a number only while it reads 1.15× as fast as one thread or more. A
 command still a fifth slower than one thread 30 s after its workers began stops them and makes the rest itself.
-Never more workers than the free memory holds (each about the project's memory and 256 MB of builds); while they run,
-a march on the command's thread takes one thread. `PXL_WORKERS=N` forces N (1: one thread, as always); a command
+Never more workers than the free memory holds (each about the project's memory and 256 MB of builds); a build stops them
+once its last sheet has its frames; while they run, a march on the command's thread takes one thread. `PXL_WORKERS=N` forces N (1: one thread, as always); a command
 inside a worker thread starts none.
 
 **The record.** What the threads and the workers measured is kept in `pxl-threads.json`, beside the builds: the

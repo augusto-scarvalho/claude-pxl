@@ -72,6 +72,7 @@ export function profileReport(profile: CpuProfile, art: string[], times: [string
   const artRows = rows(true), pxlRows = rows(false);
   return [
     `profile: ${fmt(total).trim()} in all${slow ? `; slowest assets: ${slow}` : ""}`,
+    `peak memory: ${Math.round(process.resourceUsage().maxRSS / 1024)} MB, the most this process held (its workers' too)`,
     threadsSaid(),
     workersSaid(),
     ...(off ? [off] : []),

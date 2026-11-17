@@ -205,6 +205,9 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
     if (!want.has(s.name)) continue;
     try {
       const { items, tags, rows, sheet, frames } = packedSheet(p, s);
+      // (the last sheet's frames in hand, nothing more is built: the workers stop, and what they hold goes before its
+      // files are written, the most this thread holds)
+      if (s === p.sheets.findLast((x) => want.has(x.name))) p.elsewhere?.end();
       writePng(join(out, s.name + ".png"), sheet);
       // palette slots: the sheet's colors as they first appear, and each slot's in the same order (a
       // palette swap's lookup), in the JSON and as .hex files beside it (rrggbb: alpha stays the art's)

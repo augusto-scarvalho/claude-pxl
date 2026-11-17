@@ -73,10 +73,11 @@ const USAGE = `pxl — pixel-art DSL
       --aseprite also writes each asset as <name>.aseprite (layers, frames, tag, palette) to keep
       editing in Aseprite; pxl never reads it back and the next --aseprite build overwrites it, so
       copy it out of out/. --profile: where the time went, read off the CPU profiler: the slowest
-      assets, then the functions that spent the most time themselves, in the art file (what to make
-      faster: work done again every frame, a noise called millions of times) and in pxl, and the
-      traced fields marched again at every build, not kept: a function in them not pure(). --world: a
-      scene with a camera as its whole world, the camera's box on it (a magenta line) each frame.
+      assets, the most memory held, then the functions that spent the most time themselves, in the
+      art file (what to make faster: work done again every frame, a noise called millions of times)
+      and in pxl, and the traced fields marched again at every build, not kept: a function in them
+      not pure(). --world: a scene with a camera as its whole world, the camera's box on it (a
+      magenta line) each frame.
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
       Live viewer: rebuilds on save and replays each asset's painting steps.
   pxl ascii <art.px.js> <name> [--frame N]
