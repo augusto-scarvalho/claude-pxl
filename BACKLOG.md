@@ -1855,6 +1855,18 @@ What the phases left, each waiting for a reason:
   diorama with a tree, smoke and mist 0.6 to 1.3 s a frame, the HD-2D scenes' checks 5 s or so a file
   alone, every 24th frame. When: a long HD sequence is measured slow (minutes a render), or an
   interactive tool needs frames at 30 fps.
+- [ ] **The march on the desktop's GPU** (the i7-13700K's RTX 3090): the opt-in GPU march was built
+  and left out, measured on the 4-core laptop's MX350 and Intel UHD
+  ([perf notes](docs/perf-notes.md#the-march-on-the-gpu-tried-and-left)): a body's trace 8× as fast,
+  a build no faster than the worker threads already make it, 0.06% of a fighter's pixels other. The
+  desktop is unmeasured, and differs both ways: a shader's compile would not take the command's
+  cores and the card is far faster, but six workers already make Haldor's check 4× as fast there. To
+  find out, on that machine: the mode as it was built (the translator to WGSL and the executor, kept
+  as a patch outside the repo), workers on and off, shaders new to the driver and seen; then what
+  the laptop could not show: one GPU thread marching for every worker, one shader a figure that
+  loops over its parts as data (a pipeline a figure, not one a pose), several frames a dispatch. It
+  goes in only if it beats the workers by enough to pay for a native package the user fetches and
+  for pixels that are not the CPU's.
 - [x] **An interactive 3D view**: `pxl serve` serves `/3d` (and a "3D" link in the viewer): the `.glb`
   and `.ply` export3d wrote, turned with the mouse, a moving `.glb` playing; three.js 0.169 from a
   pinned CDN build, nothing installed, and nothing else of pxl needs the network.

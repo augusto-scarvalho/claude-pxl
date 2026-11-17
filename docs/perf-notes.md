@@ -14,6 +14,7 @@ a user sees and sets is in [the reference](../reference.md#kept-builds-threads-a
 - [The march on more threads](#the-march-on-more-threads)
 - [Whole builds on worker threads](#whole-builds-on-worker-threads)
 - [The 3D march's code](#the-3d-marchs-code)
+- [The march on the GPU, tried and left](#the-march-on-the-gpu-tried-and-left)
 - [The live viewer and the normals](#the-live-viewer-and-the-normals)
 - [Writing the files](#writing-the-files)
 
@@ -180,6 +181,47 @@ until its last three judged on the full guess all read under 1.15×.
   sweeps and their art functions), graveyard_3d 0.7 s a frame (1.2 before the runs).
 - A field the art asks its `dist()` while it is traced: Haldor's bib, a shell round his torso, asks the torso at each
   point; asking `out.torso`, not the same parts joined again, his cold check went from 89 s to 76 (2026-11).
+
+## The march on the GPU, tried and left
+
+Built whole as an opt-in mode and not merged (2026-11): on the i5-1035G1 laptop it gains no more than the worker
+threads do, and its pixels are not the CPU's. The laptop has two GPUs, an NVIDIA MX350 (2 GB) and an Intel UHD, both
+reached by D3D12 through Dawn's Node bindings (the `webgpu` package, pinned at 0.6.2, its native binary checked by
+hash before it loaded; Node itself has no GPU interface).
+
+- **What was built.** A translator from a field's compiled distance to WGSL, the art's `pure()` functions included:
+  their restricted JavaScript read by a small parser and run symbolically over their data, so frames of one shape
+  give one shader with other numbers. It is exact: the text read back as JavaScript in f64 is pxl's distance bit for
+  bit (28,000 points of seven fields: Haldor's body and arm, Reva's body, two examples). And an executor behind the
+  seam the march's threads use: a trace of 4,096 cells or more goes to the GPU and comes back as each ray's hit and
+  normal; the joins' choices, the paint and the files stay on the CPU.
+- **A trace is fast.** A body's trace of Haldor (15,000 rays, with the normal): 184 ms on one CPU thread, 20 to 25 ms
+  on either GPU.
+- **A shader is slow to make.** A body's pipeline the first time: 10 s on the MX350, 35 s on the UHD (by DXC; FXC
+  took 310 s); 2.4 to 3.6 s once the driver has seen it, which each process pays again: the bindings keep no compiled
+  shader between processes. Skipping the compiler's optimizations and the bounds checks: 1.4 to 1.7 s seen, the same
+  new. Haldor's body is 15 shaders, one a pose's shape (a clip plane or a turn folded away); laid onto each other
+  with neutral numbers they are 3 when all are known, 6 or 7 as a build meets them. Reva's stay 13: her poses differ
+  by the parts present. One shader for every field, a register machine running a field's code as data: 9 to 13×
+  slower than the generated one, as slow as the CPU.
+- **Haldor's cold build, one worker**: 105 to 110 s with the GPU off; on the MX350 88 s with its shaders seen and 99 s
+  new; on the UHD 92 s and 97 s. Reva's: 38.5 s off, 47.4 s on the MX350. Of Haldor's 226 big traces 43 to 74 stayed
+  on the CPU, marched there while their shader compiled (nothing waits for one) or in the command's first 10 s (a
+  rule a `shot` of one frame needed: Dawn finding the adapters and a compile under it made it 6.0 s against 4.2).
+- **With three workers**, as the laptop builds him: 91 and 112 s off, 122 and 143 s on (four builds, alternating; the
+  laptop heating over them).
+- **Why so little.** The march is under half the build's time (the files are a quarter of it, the GIF 17 s); a
+  new shader's compile takes about 16 s of other cores, which on four cores slows the command's own thread; and
+  three workers already make this build 1.23× as fast, every pixel the same.
+- **The pixels.** Against the GPU-off build: on the MX350 105 of Haldor's 273 frames differ, 814 of 1,360,230 painted
+  pixels (0.060%), all but 3 a tone step inside a region, 43 in the worst frame; on the UHD 110 frames and 883
+  pixels; Reva on the MX350 16 of 203 frames, 126 of 549,865 pixels. The two adapters differ from each other too
+  (16% of their hits' distances in the last bits). So such builds were kept under keys of their own.
+- **The native code.** The process aborted when a command ended while a compile was under way (three times before
+  the exit was made to wait for it), and when Dawn's objects were collected.
+- **What could change it**, unmeasured: a machine with many cores (a compile then takes nothing from the command) and
+  a far faster card; one GPU thread marching for every worker; a shader a figure that loops over its parts as data;
+  compiled shaders kept on disk, which Dawn has (Chrome uses it) and these bindings do not expose.
 
 ## The live viewer and the normals
 
