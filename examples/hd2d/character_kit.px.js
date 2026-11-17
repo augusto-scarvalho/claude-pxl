@@ -3,7 +3,8 @@
 // each standing in the four diagonals a tactics game shows (sw, se, nw, ne). A draft for the owner's eyes.
 // The second scene is the kit's own check that a figure's cell holds what it wears: every body with every drape (a
 // cloak, a coat's tails, a long skirt, an apron; the beast's tail) in the five drawn directions, and `pxl check` says
-// where a figure touches its cell's edge (a pixel inside its margin).
+// where a figure touches its cell's edge (a pixel inside its margin); the third the same for every headwear on every
+// body whose head it fits.
 include("../../lib/characters/kit.px.js", { as: "kit", palette: true })
 const TWELVE = [
   ["aldo", { hair: "tousled", torso: "shirt", over: "vest", legs: "canvas", feet: "boots", belt: "belt", colors: { over: "red", torso: "navy", legs: "brown", hair: "dark" } }],
@@ -38,3 +39,13 @@ const CX = 40, CY = 64, at = (i, k) => [4 + k * CX + 20, 4 + i * CY + 54]
 scene("character_kit_cells", { w: DIRS.length * CX + 8, h: boxes.length * CY + 8, bg: "#7a7a80",
   expect: boxes.flatMap(([n, c], i) => DIRS.map((d, k) => { const [x, y] = at(i, k); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
   ...boxes.flatMap(([n], i) => DIRS.map((d, k) => stamp(`${n}_stand_${d}`, ...at(i, k), { id: `${n}_${d}` }))))
+// and every headwear (kit.HATS) on every body whose head it fits, the bare mannequin under it: the cell holds a brim, a
+// pointed hat's tip, a hood's cowl
+const hats = []
+for (const b of Object.keys(kit.BODIES)) for (const [k, P] of Object.entries(kit.HATS)) if (P.fits.head.includes(kit.BODIES[b].head ?? "human")) {
+  const { cell } = kit.character(`hw_${b}_${k}`, { body: b, outfit: "bare", hair: "none", headwear: k, dirs: DIRS })
+  hats.push([`hw_${b}_${k}`, cell])
+}
+scene("character_kit_headwear", { w: DIRS.length * CX + 8, h: hats.length * CY + 8, bg: "#7a7a80",
+  expect: hats.flatMap(([n, c], i) => DIRS.map((d, k) => { const [x, y] = at(i, k); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
+  ...hats.flatMap(([n], i) => DIRS.map((d, k) => stamp(`${n}_stand_${d}`, ...at(i, k), { id: `${n}_${d}` }))))
