@@ -5,7 +5,7 @@
 // cloak, a coat's tails, a long skirt, an apron; the beast's tail) in the five drawn directions, and `pxl check` says
 // where a figure touches its cell's edge (a pixel inside its margin); the third the same for every headwear on every
 // body whose head it fits; the fourth for what the hands hold and the back carries; the fifth for the hairs and beards
-// that reach farthest past the head.
+// that reach farthest past the head; the sixth for the classes' outfits (armor and robes, a tabard, a fur mantle).
 include("../../lib/characters/kit.px.js", { as: "kit", palette: true })
 const TWELVE = [
   ["aldo", { hair: "tousled", torso: "shirt", over: "vest", legs: "canvas", feet: "boots", belt: "belt", colors: { over: "red", torso: "navy", legs: "brown", hair: "dark" } }],
@@ -74,3 +74,14 @@ for (const b of Object.keys(kit.BODIES).filter((b) => !kit.BODIES[b].head)) for 
 scene("character_kit_hair", { w: DIRS.length * CX + 8, h: hairs.length * CY + 8, bg: "#7a7a80",
   expect: hairs.flatMap(([n, c], i) => DIRS.map((d, k) => { const [x, y] = at(i, k); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
   ...hairs.flatMap(([n], i) => DIRS.map((d, k) => stamp(`${n}_stand_${d}`, ...at(i, k), { id: `${n}_${d}` }))))
+// and every class outfit (kit.OUTFITS: plate and a tabard, mail, robes, vestments, a fur mantle) on every body it fits
+const CLASSES = ["knight", "manatarms", "ranger", "rogue", "mage", "cleric", "monk", "barbarian", "noble", "peasant"], outfits = []
+for (const b of Object.keys(kit.BODIES)) for (const o of CLASSES) {
+  const s = { body: b, outfit: o, hair: "none", dirs: DIRS }
+  if (kit.check(s)) continue
+  const { cell } = kit.character(`cl_${b}_${o}`, s)
+  outfits.push([`cl_${b}_${o}`, cell])
+}
+scene("character_kit_outfits", { w: DIRS.length * CX + 8, h: outfits.length * CY + 8, bg: "#7a7a80",
+  expect: outfits.flatMap(([n, c], i) => DIRS.map((d, k) => { const [x, y] = at(i, k); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
+  ...outfits.flatMap(([n], i) => DIRS.map((d, k) => stamp(`${n}_stand_${d}`, ...at(i, k), { id: `${n}_${d}` }))))
