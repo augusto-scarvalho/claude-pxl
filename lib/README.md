@@ -87,7 +87,8 @@ by its depth, sized by its bearer's body; the face a slot of its own, painted by
 stern, old, scarred, freckled, each with a woman's cut; eye colors; the wolf's own, scarred, grown old), twenty hairs
 and eight beards that go with any face and say what a hat does to them; armor worn in layers, a gambeson, mail, a
 leather jerkin plain or studded, a breastplate, faulds, pauldrons, vambraces or bracers, gauntlets or gloves, greaves
-and sabatons, a tabard over it all, and the classes' cloth, a mage's robe, a monk's habit, a cleric's vestments, a sash,
+and sabatons, a tabard over it all (the mail, the studded jerkin, the breastplate and the pauldrons each with an
+alternative drawn another way: mail2, studded2, breastplate2, pauldrons2), and the classes' cloth, a mage's robe, a monk's habit, a cleric's vestments, a sash,
 a fur mantle, sets of them as ten generic class outfits whose pieces mix; drafts), the top-down hero and the people made from him (`hero.character()`: two villagers,
 Reva's chibi in her vest and in her fighter's clothes, `reva_fight_*`), the villager and the elder at 48 px on the slim body (`villagers32.px.js`, by `hero32.character()`), the same hero at 48 px for top-down 32 on the genre's slim body (`hero32.px.js`, `topdown32`: idle,
 walk, run and the sword attack with its crescent) and on its chibi body (`chibi_*`, to approve), the same hero side on for a platformer (`hero_side.px.js`,

@@ -5,7 +5,8 @@
 // cloak, a coat's tails, a long skirt, an apron; the beast's tail) in the five drawn directions, and `pxl check` says
 // where a figure touches its cell's edge (a pixel inside its margin); the third the same for every headwear on every
 // body whose head it fits; the fourth for what the hands hold and the back carries; the fifth for the hairs and beards
-// that reach farthest past the head; the sixth for the classes' outfits (armor and robes, a tabard, a fur mantle).
+// that reach farthest past the head; the sixth for the classes' outfits (armor and robes, a tabard, a fur mantle); the
+// seventh for the armor's alternatives (mail2, studded2, breastplate2, pauldrons2) in the outfits that wear the originals.
 include("../../lib/characters/kit.px.js", { as: "kit", palette: true })
 const TWELVE = [
   ["aldo", { hair: "tousled", torso: "shirt", over: "vest", legs: "canvas", feet: "boots", belt: "belt", colors: { over: "red", torso: "navy", legs: "brown", hair: "dark" } }],
@@ -85,3 +86,15 @@ for (const b of Object.keys(kit.BODIES)) for (const o of CLASSES) {
 scene("character_kit_outfits", { w: DIRS.length * CX + 8, h: outfits.length * CY + 8, bg: "#7a7a80",
   expect: outfits.flatMap(([n, c], i) => DIRS.map((d, k) => { const [x, y] = at(i, k); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
   ...outfits.flatMap(([n], i) => DIRS.map((d, k) => stamp(`${n}_stand_${d}`, ...at(i, k), { id: `${n}_${d}` }))))
+// and the armor's alternatives in the outfits that wear the originals, on every body they fit
+const ALTS = { knight2: { outfit: "knight", mail: "mail2", over: "breastplate2", shoulders: "pauldrons2" }, manatarms2: { outfit: "manatarms", mail: "mail2" },
+  rogue2: { outfit: "rogue", over: "studded2" }, cleric2: { outfit: "cleric", mail: "mail2" } }, alts = []
+for (const b of Object.keys(kit.BODIES)) for (const [k, o] of Object.entries(ALTS)) {
+  const s = { body: b, hair: "none", ...o, dirs: DIRS }
+  if (kit.check(s)) continue
+  const { cell } = kit.character(`al_${b}_${k}`, s)
+  alts.push([`al_${b}_${k}`, cell])
+}
+scene("character_kit_armor2", { w: DIRS.length * CX + 8, h: alts.length * CY + 8, bg: "#7a7a80",
+  expect: alts.flatMap(([n, c], i) => DIRS.map((d, k) => { const [x, y] = at(i, k); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
+  ...alts.flatMap(([n], i) => DIRS.map((d, k) => stamp(`${n}_stand_${d}`, ...at(i, k), { id: `${n}_${d}` }))))
