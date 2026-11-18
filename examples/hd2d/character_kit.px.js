@@ -7,7 +7,8 @@
 // body whose head it fits; the fourth for what the hands hold and the back carries; the fifth for the hairs and beards
 // that reach farthest past the head; the sixth for the classes' outfits (armor and robes, a tabard, a fur mantle); the
 // seventh for the armor's alternatives (mail2, studded2, breastplate2, pauldrons2) in the outfits that wear the originals;
-// the eighth walking: the longest things on each body in the eight directions, every frame.
+// the eighth walking: the longest things on each body in the eight directions, every frame; the ninth fighting: the
+// moves that reach farthest with the longest things, on each body in the eight directions, every frame.
 include("../../lib/characters/kit.px.js", { as: "kit", palette: true })
 const TWELVE = [
   ["aldo", { hair: "tousled", torso: "shirt", over: "vest", legs: "canvas", feet: "boots", belt: "belt", colors: { over: "red", torso: "navy", legs: "brown", hair: "dark" } }],
@@ -110,3 +111,19 @@ for (const [b, s] of Object.entries(WALKS)) walks.push([`wk_${b}`, kit.character
 scene("character_kit_walk", { w: DIRS8.length * TX + 8, h: walks.length * TY + 8, bg: "#7a7a80",
   expect: walks.flatMap(([n, c], i) => DIRS8.map((d, k) => { const [x, y] = tat(i, k); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
   ...walks.flatMap(([n], i) => DIRS8.map((d, k) => stamp(`${n}_walk_${d}`, ...tat(i, k), { id: `${n}_${d}` }))))
+// and fighting (the ninth): the moves that reach farthest, on each body in the eight directions, every frame inside the
+// cell (the swing's smear and the cast's light, drawn after the figure, too): a spear's thrust and a tall shield's block, a
+// bow drawn and loosed, a mage's staff conjuring and cast in one hand and cast in both, an axe swung, a quarterstaff held
+// across
+const FIGHTS = { spear: [{ held: "spear", off: "tallshield" }, ["thrust", "block"]], bow: [{ off: "bow", back: "quiver" }, ["shoot"]], staff: [{ held: "magestaff" }, ["cast", "conjure"]],
+  staff2: [{ held: "magestaff", staff: "two" }, ["cast"]], axe: [{ held: "axe" }, ["slash"]], quarter: [{ held: "quarterstaff" }, ["ready"]] }, fights = []
+for (const b of Object.keys(kit.BODIES)) for (const [k, [s, moves]] of Object.entries(FIGHTS)) {
+  const { cell } = kit.character(`ft_${b}_${k}`, { body: b, outfit: "bare", hair: "none", ...s, moves })
+  for (const m of moves) fights.push([`ft_${b}_${k}_${m}`, cell])
+}
+// (each played here at 100 ms a frame, the moves' own timing aside, so the scene's loop closes and every frame is checked)
+for (const [n] of fights) for (const d of DIRS8) anim(`${n}_${d}_ck`, { base: `${n}_${d}`, ms: 100 })
+const FX = Math.max(...fights.map(([, c]) => c.w)) + 2, FY = Math.max(...fights.map(([, c]) => c.h)) + 2, fat = (i, k, c) => [4 + k * FX + c.pivot[0], 4 + i * FY + c.pivot[1]]
+scene("character_kit_fight", { w: DIRS8.length * FX + 8, h: fights.length * FY + 8, bg: "#7a7a80",
+  expect: fights.flatMap(([n, c], i) => DIRS8.map((d, k) => { const [x, y] = fat(i, k, c); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
+  ...fights.flatMap(([n, c], i) => DIRS8.map((d, k) => stamp(`${n}_${d}_ck`, ...fat(i, k, c), { id: `${n}_${d}` }))))
