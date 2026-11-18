@@ -4,7 +4,8 @@
 // The second scene is the kit's own check that a figure's cell holds what it wears: every body with every drape (a
 // cloak, a coat's tails, a long skirt, an apron; the beast's tail) in the five drawn directions, and `pxl check` says
 // where a figure touches its cell's edge (a pixel inside its margin); the third the same for every headwear on every
-// body whose head it fits; the fourth for what the hands hold and the back carries.
+// body whose head it fits; the fourth for what the hands hold and the back carries; the fifth for the hairs and beards
+// that reach farthest past the head.
 include("../../lib/characters/kit.px.js", { as: "kit", palette: true })
 const TWELVE = [
   ["aldo", { hair: "tousled", torso: "shirt", over: "vest", legs: "canvas", feet: "boots", belt: "belt", colors: { over: "red", torso: "navy", legs: "brown", hair: "dark" } }],
@@ -62,3 +63,14 @@ const TX = 40, TY = 76, tat = (i, k) => [4 + k * TX + 20, 4 + i * TY + 70]
 scene("character_kit_held", { w: DIRS8.length * TX + 8, h: held.length * TY + 8, bg: "#7a7a80",
   expect: held.flatMap(([n, c], i) => DIRS8.map((d, k) => { const [x, y] = tat(i, k); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
   ...held.flatMap(([n], i) => DIRS8.map((d, k) => stamp(`${n}_stand_${d}`, ...tat(i, k), { id: `${n}_${d}` }))))
+// and the hairs and beards that reach farthest past the head (a high tail, two tails, a topknot, a crest, long hair, a
+// tail down the back, a long beard, a dwarf's braids) on every body they fit, each with a face of its own
+const LONG = { ponytail: { hair: "ponytail", face: "young_f" }, twotails: { hair: "twotails", face: "freckled_f" }, topknot: { hair: "topknot", face: "stern" }, crest: { hair: "crest", face: "scarred" },
+  loose: { hair: "loose", face: "young" }, longback: { hair: "longback", face: "old_f" }, lowtie: { hair: "lowtie", face: "plain" }, long: { hair: "ring", beard: "long", face: "old" }, dwarf: { hair: "cropped", beard: "dwarf", face: "stern" } }, hairs = []
+for (const b of Object.keys(kit.BODIES).filter((b) => !kit.BODIES[b].head)) for (const [k, s] of Object.entries(LONG)) {
+  const { cell } = kit.character(`hr_${b}_${k}`, { body: b, outfit: "bare", ...s, dirs: DIRS })
+  hairs.push([`hr_${b}_${k}`, cell])
+}
+scene("character_kit_hair", { w: DIRS.length * CX + 8, h: hairs.length * CY + 8, bg: "#7a7a80",
+  expect: hairs.flatMap(([n, c], i) => DIRS.map((d, k) => { const [x, y] = at(i, k); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
+  ...hairs.flatMap(([n], i) => DIRS.map((d, k) => stamp(`${n}_stand_${d}`, ...at(i, k), { id: `${n}_${d}` }))))
