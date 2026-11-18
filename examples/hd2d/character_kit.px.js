@@ -6,7 +6,8 @@
 // where a figure touches its cell's edge (a pixel inside its margin); the third the same for every headwear on every
 // body whose head it fits; the fourth for what the hands hold and the back carries; the fifth for the hairs and beards
 // that reach farthest past the head; the sixth for the classes' outfits (armor and robes, a tabard, a fur mantle); the
-// seventh for the armor's alternatives (mail2, studded2, breastplate2, pauldrons2) in the outfits that wear the originals.
+// seventh for the armor's alternatives (mail2, studded2, breastplate2, pauldrons2) in the outfits that wear the originals;
+// the eighth walking: the longest things on each body in the eight directions, every frame.
 include("../../lib/characters/kit.px.js", { as: "kit", palette: true })
 const TWELVE = [
   ["aldo", { hair: "tousled", torso: "shirt", over: "vest", legs: "canvas", feet: "boots", belt: "belt", colors: { over: "red", torso: "navy", legs: "brown", hair: "dark" } }],
@@ -98,3 +99,14 @@ for (const b of Object.keys(kit.BODIES)) for (const [k, o] of Object.entries(ALT
 scene("character_kit_armor2", { w: DIRS.length * CX + 8, h: alts.length * CY + 8, bg: "#7a7a80",
   expect: alts.flatMap(([n, c], i) => DIRS.map((d, k) => { const [x, y] = at(i, k); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
   ...alts.flatMap(([n], i) => DIRS.map((d, k) => stamp(`${n}_stand_${d}`, ...at(i, k), { id: `${n}_${d}` }))))
+// and walking (the eighth): the longest things on each body in the eight directions, every frame inside the cell: a spear
+// and a tall shield, a quarterstaff or a mage's staff as a walking staff, a long robe or habit over the stepping legs, long
+// hair down the back, a high tail and two tails hanging a frame behind, a cloak, a pack, a lantern swinging
+const WALKS = { medium: { held: "spear", off: "tallshield", torso: "robe", legs: "trousers", feet: "shoes", hair: "longback" },
+  short: { held: "quarterstaff", back: "pack", torso: "habit", legs: "trousers", feet: "shoes", hair: "ponytail", beard: "dwarf" },
+  tall: { held: "spear", off: "tallshield", torso: "robe", legs: "trousers", feet: "shoes", hair: "twotails", cloak: "travel" },
+  beast: { held: "magestaff", off: "lantern", torso: "robe", legs: "trousers", feet: "shoes", cloak: "travel" } }, walks = []
+for (const [b, s] of Object.entries(WALKS)) walks.push([`wk_${b}`, kit.character(`wk_${b}`, { body: b, ...s, moves: ["walk"] }).cell])
+scene("character_kit_walk", { w: DIRS8.length * TX + 8, h: walks.length * TY + 8, bg: "#7a7a80",
+  expect: walks.flatMap(([n, c], i) => DIRS8.map((d, k) => { const [x, y] = tat(i, k); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
+  ...walks.flatMap(([n], i) => DIRS8.map((d, k) => stamp(`${n}_walk_${d}`, ...tat(i, k), { id: `${n}_${d}` }))))
