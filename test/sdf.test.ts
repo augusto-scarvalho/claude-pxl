@@ -344,3 +344,22 @@ test("surface: a material's hems hang under it, its strokes lighter where the su
   assert.ok(!b0.includes("9") && b1.includes("9") && b1.replace(/9/g, "").length > b1.length - 8, "rim 1: the edge's corners toward the light the ramp's top, a few of them");
   assert.match(failure(PAL + 'sprite("a", { w: 9, h: 9 }, surface(sdf.sphere(0.2), { mats: { m: { ramp: "kw", hem: 1.5 } } }))', "a").message, /hem whole px/);
 });
+
+test("surface & volume cast shadow: a floating field or volume projects its full shadow down to the ground (z = 0), not clipped at lo[2]", () => {
+  // a ball floating at z = 1.4 m (via field .at and via surface/volume at[2]) above a ground plane at z = 0;
+  // sun from upper-left-front so the shadow lands on the ground to the right, well below T.lo[2] in screen y
+  const render = (draw: string) => keys(loadSource(PAL + `ramps("kgw")
+const V = perspective({ w: 48, h: 48, pitch: -30, fov: 30, ppm: 14 }), Z = V.z, M = model()
+M.face("g", [-6, Z - 6, 0], [6, Z - 6, 0], [6, Z + 8, 0], [-6, Z + 8, 0])
+scene("a", { w: 48, h: 48 }, (c) => c.mesh(V, M.faces, { g: { ramp: "w" } }), ${draw})`, "t.px.js"), "a").split("\n");
+  const shadowRows = (rows: string[]) => rows.flatMap((r, y) => (y >= 16 && r.slice(24).includes("g") ? [y] : []));
+  // 1. surface() with field lifted via .at(0, 0, 1.4)
+  const sField = shadowRows(render(`(c) => c.surface(sdf.sphere(0.4).at(0, 0, 1.4), { view: V, at: [0, Z, 0], mats: { m: "kgw" }, light: [-0.6, -0.4, 0.7] })`));
+  // 2. surface() lifted via at: [0, Z, 1.4]
+  const sAt = shadowRows(render(`(c) => c.surface(sdf.sphere(0.4), { view: V, at: [0, Z, 1.4], mats: { m: "kgw" }, light: [-0.6, -0.4, 0.7] })`));
+  // 3. volume() floating at z = 1.4 with cast: 0.8
+  const vAt = shadowRows(render(`(c) => c.volume(sdf.density(sdf.sphere(0.4), { edge: 0.1 }), { view: V, at: [0, Z, 1.4], ramp: "kgw", thickness: 8, cast: 0.8, light: [-0.6, -0.4, 0.7] })`));
+  assert.ok(sField.length >= 4, `floating surface (.at) casts full shadow on ground: rows ${sField}`);
+  assert.deepEqual(sAt, sField, "surface lifted via at[2] casts the same ground shadow as field .at");
+  assert.ok(vAt.length >= 3, `floating volume casts full shadow on ground: rows ${vAt}`);
+});

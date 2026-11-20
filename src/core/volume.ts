@@ -195,13 +195,14 @@ export function drawVolume(c: SurfaceCanvas, density: unknown, o: VolumeOpts = {
     const f = k > 0 ? 0.35 : -0.4, tc = toward ?? col;
     return fromLinear(LIN[col >>> 24] + (k > 0 ? LIN[tc >>> 24] * f : LIN[col >>> 24] * f), LIN[(col >>> 16) & 255] + (k > 0 ? LIN[(tc >>> 16) & 255] * f : LIN[(col >>> 16) & 255] * f), LIN[(col >>> 8) & 255] + (k > 0 ? LIN[(tc >>> 8) & 255] * f : LIN[(col >>> 8) & 255] * f), col);
   };
-  // where: round the box (its shadow carried away from the light to its foot, or the glow's reach)
-  const R = eramp && glowR > 0 ? glowR : 0, foot = lo[2] - R;
-  const reach: V3[] = corners([lo[0] - R, lo[1] - R, lo[2] - R], [hi[0] + R, hi[1] + R, hi[2] + R]).flatMap((p) => { const s = castK > 0 && L[2] > 0.05 ? (p[2] - foot) / L[2] : 0; return [p, [p[0] - L[0] * s, p[1] - L[1] * s, foot] as V3]; });
+  // where: round the box (its shadow carried away from the light down to the ground or its foot, or the glow's reach)
+  const R = eramp && glowR > 0 ? glowR : 0, foot = Math.min(lo[2] - R, castK > 0 ? -cam.at[2] : lo[2] - R);
+  const reach: V3[] = corners([lo[0] - R, lo[1] - R, lo[2] - R], [hi[0] + R, hi[1] + R, hi[2] + R]).flatMap((p) => { const s = castK > 0 && L[2] > 0.05 ? Math.max(0, (p[2] - foot) / L[2]) : 0; return [p, [p[0] - L[0] * s, p[1] - L[1] * s, foot] as V3]; });
   const sp = reach.map(cam.toScreen);
-  if (!sp.every((p) => p)) return;
-  const sx0 = Math.max(x0, Math.floor(Math.min(...sp.map((p) => p![0]))) - K), sx1 = Math.min(x0 + W, Math.ceil(Math.max(...sp.map((p) => p![0]))) + K);
-  const sy0 = Math.max(y0, Math.floor(Math.min(...sp.map((p) => p![1]))) - K), sy1 = Math.min(y0 + H, Math.ceil(Math.max(...sp.map((p) => p![1]))) + K);
+  if (!sp.some((p) => p)) return;
+  const all = sp.every((p) => p);
+  const sx0 = all ? Math.max(x0, Math.floor(Math.min(...sp.map((p) => p![0]))) - K) : x0, sx1 = all ? Math.min(x0 + W, Math.ceil(Math.max(...sp.map((p) => p![0]))) + K) : x0 + W;
+  const sy0 = all ? Math.max(y0, Math.floor(Math.min(...sp.map((p) => p![1]))) - K) : y0, sy1 = all ? Math.min(y0 + H, Math.ceil(Math.max(...sp.map((p) => p![1]))) + K) : y0 + H;
   const glowCol = eramp ? eramp[eramp.length - 1] : null;
   for (let by = Math.floor(sy0 / K); by * K < sy1; by++)
     for (let bx = Math.floor(sx0 / K); bx * K < sx1; bx++) {
