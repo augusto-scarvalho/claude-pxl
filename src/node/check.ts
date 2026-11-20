@@ -534,7 +534,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         const key = `${q.name}|${q.layer}|${q.x},${q.y}|${q.img.w}x${q.img.h}|${hash(q.img.data)}|${q.stand && Math.abs(q.stand.off) > STAND ? q.stand.off.toFixed(2) : ""}`;
         let ws = seen.get(key);
         if (!ws) {
-          const o = q.img.orient, dark = unlit.has(q.layer ?? "");
+          const o = q.img.orient, dark = unlit.has(q.layer ?? "") || !!q.unlit;
           const all = many ? [standWords(q.stand)] : [...placementChecks(q, wo, steps, dark, b.lamps), ...(o ? orientWords(o).split(", ") : [])];
           // read against a light: the world's, or else the one it was drawn under (a mesh's, a lamp's)
           const lit = !many && !dark && wo?.light !== false && (!!wo?.light || !!lightFor(wo, q, b.lamps));

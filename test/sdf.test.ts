@@ -363,3 +363,58 @@ scene("a", { w: 48, h: 48 }, (c) => c.mesh(V, M.faces, { g: { ramp: "w" } }), ${
   assert.deepEqual(sAt, sField, "surface lifted via at[2] casts the same ground shadow as field .at");
   assert.ok(vAt.length >= 3, `floating volume casts full shadow on ground: rows ${vAt}`);
 });
+
+test("sdf: when() and scale(0) compile to empty geometry; mat({ override: true }) overrides make3d internal materials", () => {
+  // 1. when(false) skips inner evaluation (even sphere(0)) and produces empty bounds; scale(0) is empty; scale(-1) still throws
+  const off = sdf.sphere((c) => c.phase).when((c) => c.phase > 0.5);
+  const c0 = compile(off, { t: 0, phase: 0, frame: 0, frames: 2 });
+  const c1 = compile(off, { t: 500, phase: 0.75, frame: 1, frames: 2 });
+  assert.ok(c0.lo[0] > c0.hi[0] && c0.d(0, 0, 0) === Infinity, "when(false) compiles to empty");
+  assert.ok(c1.d(0, 0, 0) < 0, "when(true) compiles inner sphere");
+  const z = compile(sdf.sphere(1).scale(0));
+  assert.ok(z.lo[0] > z.hi[0] && z.d(0, 0, 0) === Infinity, "scale(0) compiles to empty");
+  assert.throws(() => compile(sdf.sphere(1).scale(-0.5)), /scale must be >= 0/);
+  // Union / subtract / surface / volume handle empty parts cleanly without errors
+  const u = compile(sdf.union(sdf.sphere(1).scale(0), sdf.sphere(0.5).at(2, 0, 0)));
+  near(u.d(2, 0, 0), -0.5);
+  const pEmpty = loadSource(PAL + `sprite("s", { w: 12, h: 12 }, surface(sdf.sphere(1).scale(0), { mats: { m: "kgw" } }), volume(sdf.density(sdf.sphere(1).when(false)), { ramp: "kgw" }))`, "t.px.js");
+  assert.ok(pEmpty.image("s").data.every((c) => c === 0), "empty surface and volume draw nothing cleanly");
+  // 2. mat(name, { override: true }) replaces make3d.rock()'s internal "stone" and "moss", preserves .part("stone"), and keeps C.looks pure
+  const pRock = loadSource(PAL + `const r = make3d.rock({ size: 0.6, moss: 0 }).field.mat("lava", { override: true })
+sprite("s", { w: 24, h: 24 }, surface(r, { view: "side", ppm: 16, mats: { lava: "kgrw" } }))`, "t.px.js");
+  const img = pRock.image("s");
+  assert.ok(img.data.some((c) => c !== 0), "make3d.rock overridden with a single custom material draws without needing stone/moss in mats");
+  assert.ok(img.parts?.names.includes("stone"), "inner .part('stone') is preserved under mat override");
+});
+
+test("surface: unlit and material emit skip world-light darkening and populate img.emit; decal tracks through intersect/mat", () => {
+  // 1. Dark mesh world + surface with unlit: true vs material emit: true vs normal lit surface
+  const render = (opts: string, mats: string) => loadSource(PAL + `ramps("kgw")
+const V = perspective({ w: 32, h: 32, pitch: -25, fov: 30, ppm: 14 }), Z = V.z, M = model()
+M.face("g", [-6, Z - 6, 0], [6, Z - 6, 0], [6, Z + 6, 0], [-6, Z + 6, 0])
+scene("a", { w: 32, h: 32 },
+  (c) => c.mesh(V, M.faces, { g: { ramp: "k" } }, { light: [-0.5, -0.5, 0.8], sun: { color: "w", strength: 0.2 }, sky: { color: "w", strength: 0.05 } }),
+  surface(sdf.sphere(0.45).at(0, 0, 0.45).mat("fire"), { view: V, at: [0, Z, 0], mats: ${mats}, outline: false${opts} }))`, "t.px.js").image("a");
+  const lit = render("", '{ fire: "kgrw" }');
+  const unlit = render(", unlit: true", '{ fire: "kgrw" }');
+  const emitting = render("", '{ fire: { ramp: "kgrw", emit: true } }');
+  const peak = (im: ReturnType<typeof render>) => Math.max(...[...im.data].map((c) => c >>> 24));
+  assert.ok(peak(lit) < 180, `normal surface darkened by dim world light (${peak(lit)})`);
+  assert.equal(peak(unlit), 255, "unlit: true preserves bright ramp peak");
+  assert.equal(peak(emitting), 255, "material emit: true preserves bright ramp peak");
+  assert.ok(emitting.emit && emitting.emit.some((v) => v === 255), "material emit: true writes to img.emit");
+  assert.equal(unlit.emit, undefined, "unlit: true alone does not force bloom emission");
+  // 2. decal() tracks an animated .at(...) even when wrapped by .intersect(sdf.plane(...)).mat("body").part("slime")
+  const dec = loadSource(PAL + `sprite("eye", "w")
+const body = sdf.sphere(0.4).at((c) => [0, 0, 0.4 + c.frame * 0.5]).intersect(sdf.plane([0, 0, -1], 0)).mat("b").part("slime")
+anim("a", { w: 28, h: 36, frames: 2, fps: 4 },
+  surface(body, { view: "side", ppm: 16, at: [14, 32], mats: { b: "kgr" } }),
+  decal("eye", { on: body, point: [0, -0.4, 0.4], lit: false, view: "side", ppm: 16, at: [14, 32] }))`, "t.px.js");
+  const eyeY = (f: number) => {
+    const im = dec.frames("a")[f].img;
+    for (let y = 0; y < im.h; y++) for (let x = 0; x < im.w; x++) if (im.get(x, y) === dec.pal.resolve("w")) return y;
+    return -1;
+  };
+  const y0 = eyeY(0), y1 = eyeY(1);
+  assert.ok(y0 >= 0 && y1 >= 0 && y0 - y1 >= 6, `decal moves up with animated body through intersect/mat/part: frame 0 y=${y0}, frame 1 y=${y1}`);
+});

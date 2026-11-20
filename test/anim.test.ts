@@ -513,3 +513,35 @@ test("anim: timeline() reads an anim's frames in playback order, their ms, pivot
   assert.deepEqual(rock, [{ ms: 0, w: 2, h: 2, bounds: [0, 0, 2, 2] }], "a still: one frame");
   assert.throws(() => loadSource(PAL + `timeline("nope")`, "t.px.js"), /timeline: the name of an asset defined so far/);
 });
+
+test("gif: scale & shared palette options match pre-scaled encoding byte-for-byte; writeAtomic leaves no temp files", async () => {
+  const { readdirSync } = await import("node:fs");
+  const { writeAtomic } = await import("../src/node/output.ts");
+  // Multi-frame >256 color animation so medianCut + k-means + frame-diffing + scaling are all exercised.
+  const frames: GifFrame[] = Array.from({ length: 4 }, (_, f) => {
+    const img = new Img(24, 24);
+    for (let y = 0; y < 24; y++) for (let x = 0; x < 24; x++) {
+      const moving = x >= 4 + f * 2 && x < 12 + f * 2 && y >= 6 && y < 14;
+      const r = moving ? (x * 11 + f * 37) & 255 : (x * 10) & 255;
+      const g = moving ? (y * 13 + f * 29) & 255 : (y * 10) & 255;
+      const b = ((x + y) * 7 + (moving ? 90 : 0)) & 255;
+      img.set(x, y, pack(r, g, b));
+    }
+    return { img, ms: 80 };
+  });
+  let captured: number[] | undefined;
+  const g1 = encodeGif(frames, { onPalette: (p) => { captured = p; } });
+  assert.ok(g1.length > 0 && captured && captured.length === 255);
+  const directScaled = encodeGif(frames.map((f) => ({ ...f, img: f.img.scale(3) })));
+  const fastScaled = encodeGif(frames, { scale: 3, palette: captured });
+  assert.deepEqual(fastScaled, directScaled, "1x quantize + diff + SxS expand is byte-identical to pre-scaled encodeGif");
+  // writeAtomic writes exact bytes and leaves zero temporary files behind
+  const dir = mkdtempSync(join(tmpdir(), "pxl-atomic-"));
+  try {
+    const target = join(dir, "out.bin");
+    writeAtomic(target, fastScaled);
+    writeAtomic(target, g1);
+    assert.deepEqual(readFileSync(target), Buffer.from(g1));
+    assert.deepEqual(readdirSync(dir), ["out.bin"]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

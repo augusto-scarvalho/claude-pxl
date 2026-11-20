@@ -102,6 +102,8 @@ export interface MeshSprite {
   stand?: boolean | string[];
   /** it flies (a gull, a leaf, a spell): check doesn't ask its feet to be on the model */
   air?: boolean;
+  /** true: drawn in its own colors (ignores world sun/sky/lamps and suppresses check's lit-side warning — for fire, spells, embers) */
+  unlit?: boolean;
   /**
    * the light its emitting pixels (effect("emit")) give round it, a lamp at their middle: how far (m,
    * default 3), how strong (default 1); `each`: a lamp for each part that glows apart from the others
@@ -156,7 +158,7 @@ export interface MeshWorld {
   masks?: Record<string, Img>;
   /** a dissolving material's look, its keys resolved: the edge's keys over the progress (or the neutral ring's tone), its char, its glow */
   looks?: Record<string, { over?: Color[][]; neutral?: Color; char?: { width: number; tones: Color[]; amount: number; desat: number }; glow: number }>;
-  sprites: { name: string; img: Img; at: V3; shadow?: number; blend?: MeshSprite["blend"]; opacity?: number; veil?: number; light?: MeshSprite["light"]; tint?: Color | null; air?: boolean }[];
+  sprites: { name: string; img: Img; at: V3; shadow?: number; blend?: MeshSprite["blend"]; opacity?: number; veil?: number; light?: MeshSprite["light"]; tint?: Color | null; air?: boolean; unlit?: boolean }[];
   step(c: Color, n: number): Color;
   /** the light, its colors resolved (with `sun`) */
   lit?: Lit;
@@ -279,7 +281,7 @@ export function groundOf(faces: Face[]): (x: number, z: number) => { u: number; 
   };
 }
 
-export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}, world?: MeshWorld): { name: string; x: number; y: number; img: Img; light?: [number, number]; at?: V3; air?: boolean; k?: number }[] {
+export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}, world?: MeshWorld): { name: string; x: number; y: number; img: Img; light?: [number, number]; at?: V3; air?: boolean; unlit?: boolean; k?: number }[] {
   const W = c.img.w, H = c.img.h, x0 = -c.ox, y0 = -c.oy, cam = camera(view, c, opts), eye = cam.eye;
   const sunDir = unit(Array.isArray(opts.light) ? (opts.light as V3) : cam.light);
   const lightOf = typeof opts.light === "function" ? opts.light : (n: V3) => 0.3 + 0.6 * Math.max(0, dot(n, sunDir));
@@ -299,59 +301,81 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     if (!M || !(typeof M.ramp === "string" || Array.isArray(M.ramp)) || M.ramp.length === 0) throw new PxError(`mesh: material '${name}' needs a ramp of keys, dark to light (e.g. { ramp: "0-=~^" }), or a tex (an asset to tile its faces with)`);
     ramps[name] = [...M.ramp];
   }
-  // per pixel: the nearest face's depth and index, and the point of it seen there (textures, shadows)
-  const n = W * H, depth = new Float32Array(n).fill(1e9), who = new Int32Array(n).fill(-1), pos = new Float32Array(n * 3);
-  // over a depth already drawn: each pixel there as near as what is there, of none of these faces (-2)
-  const had = opts.over ? c.img.depth : undefined;
-  if (had) for (let i = 0; i < n; i++) if (had[i] < Infinity) { depth[i] = had[i] + cam.off; who[i] = -2; }
-  const normals: V3[] = [], lights: number[] = [];
-  // which coordinate is up, and which runs away from the camera: [x, z, up] through perspective(), [x, y up, z ahead]
-  // otherwise; per textured face, the coordinates its texture runs across and down (a floor across and
-  // away, a wall across and down), where it starts, and whether it has holes
+  const n = W * H, hasFaces = faces.length > 0;
+  const L = world?.lit, K = opts.pixel ?? 1;
+  if (L && !L.map) L.dir = sunDir;
+  if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`mesh: pixel is how many px a sprite's pixel takes, a whole number from 1, got ${K}`);
+  if ((L || world?.sprites.length) && !cam.P) throw new PxError(`mesh: ${L ? "a sun" : "sprites"} need a perspective view ({ w, horizon, eye, ... }), not ${cam.off ? "an orthographic one" : "a camera function"}`);
+  if (!hasFaces && !world?.sprites.length) return [];
+  // which coordinate is up, and which runs away from the camera: [x, z, up] through perspective(), [x, y up, z ahead] otherwise
   const UP = cam.up[2] ? 2 : 1, AHEAD = UP === 2 ? 1 : 2;
+  // per pixel: the nearest face's depth and index, and the point of it seen there (allocated only when there are faces,
+  // or when drawing solid sprites without `over: true` over an existing depth buffer)
+  let depth: Float32Array;
+  let who: Int32Array | undefined;
+  let pos: Float32Array | undefined;
+  const directDepth = !hasFaces && !!opts.over;
+  if (hasFaces) {
+    depth = new Float32Array(n).fill(1e9);
+    who = new Int32Array(n).fill(-1);
+    pos = new Float32Array(n * 3);
+    // over a depth already drawn: each pixel there as near as what is there, of none of these faces (-2)
+    const had = opts.over ? c.img.depth : undefined;
+    if (had) for (let i = 0; i < n; i++) if (had[i] < Infinity) { depth[i] = had[i] + cam.off; who[i] = -2; }
+  } else if (directDepth) {
+    const hasSolid = !!world?.sprites.some((s) => !s.blend);
+    depth = c.img.depth ?? (hasSolid ? (c.img.depth = new Float32Array(n).fill(Infinity)) : new Float32Array(0));
+  } else {
+    depth = new Float32Array(n).fill(Infinity);
+  }
+  const normals: V3[] = [], lights: number[] = [];
   // which way on the picture is away from the light (a block material's outline is on that side)
   const camRight: V3 = cam.P ? [Math.cos((cam.P.yaw * Math.PI) / 180), -Math.sin((cam.P.yaw * Math.PI) / 180), 0] : cam.right ?? [1, 0, 0], away = dot(sunDir, camRight) < 0 ? 1 : -1;
   const texOf: ({ T: Img; su: number; sv: number; ua: number; va: number; u0: number; v0: number; holes: boolean } | undefined)[] = [];
   const holed = new Map<Img, boolean>();
   const texel = (t: NonNullable<(typeof texOf)[number]>, X: number, Y: number, Z: number) => {
-    const P = [X, Y, Z], u = (P[t.ua] - t.u0) * t.su + 1e-6, v = (-P[t.va] - t.v0) * t.sv + 1e-6;
+    const pu = t.ua === 0 ? X : t.ua === 1 ? Y : Z;
+    const pv = t.va === 0 ? X : t.va === 1 ? Y : Z;
+    const u = (pu - t.u0) * t.su + 1e-6, v = (-pv - t.v0) * t.sv + 1e-6;
     return mod(Math.floor(v), t.T.h) * t.T.w + mod(Math.floor(u), t.T.w);
   };
   // a dissolving material's coverage at a point of its face, read across the face's two other axes
   // (on the texture's texels when it has one): 0 there, 1 a hole, 2 the burning edge
   const holes = new Map<string, (X: number, Y: number, Z: number, N: V3) => number>();
-  for (const [name, M] of Object.entries(mats)) {
-    const D = M?.dissolve;
-    if (!D) continue;
-    const { progress, scale = 0.25, seed = 0, width = 0.06, pattern = "noise", ragged = 0.25 } = D;
-    if (!(typeof progress === "number" && progress >= 0 && progress <= 1) || !(scale > 0) || !Number.isInteger(seed) || !(width >= 0 && width <= 1) || !PATTERNS.includes(pattern) || !(ragged >= 0 && ragged <= 1)
-      || (D.at !== undefined && !(Array.isArray(D.at) && D.at.length === 3 && D.at.every(Number.isFinite))) || (pattern === "mask" && !world?.masks?.[name]))
-      throw new PxError(`mesh: material '${name}' has dissolve ${JSON.stringify(D)}: { progress (0..1), scale (m, above 0), seed (whole), edge (a key), width (0..1), pattern (${PATTERNS.join(", ")}), ragged (0..1), at ([x, z, up]), mask (an asset, for pattern "mask") }`);
-    const lk = world?.looks?.[name], ch = lk?.char, w = lk?.over || lk?.neutral ? width : 0, cw = ch ? 0.03 * ch.width : 0, f = noise(seed), thr = -w + progress * (1 + w);
-    const TF = texelOf(M, true), TW = texelOf(M, false), snap = M.tex !== undefined;
-    // the extent of its faces, for the sweeps, the radial order and the mask
-    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
-    for (const F of faces) if (F?.mat === name) for (const p of F.pts) for (let e = 0; e < 3; e++) { lo[e] = Math.min(lo[e], p[e]); hi[e] = Math.max(hi[e], p[e]); }
-    const span = (e: number, v: number) => (v - lo[e]) / Math.max(1e-9, hi[e] - lo[e]), ctr = D.at ?? [0, 1, 2].map((e) => (lo[e] + hi[e]) / 2);
-    const far = Math.max(1e-9, ...[0, 1, 2, 3, 4, 5, 6, 7].map((c) => Math.hypot(...[0, 1, 2].map((e) => ((c >> e) & 1 ? hi[e] : lo[e]) - ctr[e]))));
-    const mask = world?.masks?.[name];
-    holes.set(name, (X, Y, Z, N) => {
-      if (progress <= 0) return 0;
-      const P = [X, Y, Z], a = [0, 1, 2].reduce((m, e) => (Math.abs(N[e]) > Math.abs(N[m]) ? e : m), 0), [ua, va] = a === 0 ? [1, 2] : a === 1 ? [0, 2] : [0, 1], [tu, tv] = a === UP ? TF : TW;
-      const u = snap ? (Math.floor(P[ua] / tu) + 0.5) * tu : P[ua], v = snap ? (Math.floor(P[va] / tv) + 0.5) * tv : P[va], nz = f(u / scale, v / scale);
-      // (on its texels, as the noise is: snapped where it has a texture)
-      const Q = [X, Y, Z];
-      if (snap) { Q[ua] = u; Q[va] = v; }
-      const rag = (pos: number) => Math.min(0.9999, Math.max(0, pos * (1 - ragged) + ragged * nz)), up = span(UP, Q[UP]), across = span(a === 0 ? AHEAD : 0, Q[a === 0 ? AHEAD : 0]);
-      const o = pattern === "top" ? rag(1 - up) : pattern === "bottom" ? rag(up) : pattern === "left" ? rag(across) : pattern === "right" ? rag(1 - across)
-        : pattern === "out" || pattern === "in" ? rag(Math.abs((pattern === "in" ? 1 : 0) - Math.hypot(Q[0] - ctr[0], Q[1] - ctr[1], Q[2] - ctr[2]) / far))
-        : pattern === "scatter" ? hash(Math.floor(u / (snap ? tu : scale / 4)), Math.floor(v / (snap ? tv : scale / 4)), seed + a * 7919) / 4294967296
-        : pattern === "scan" ? (SCAN[((Math.floor(Q[UP] / (snap ? tv : scale / 4)) % 4) + 4) % 4] + Math.min(0.9999, 1 - up)) / 4
-        : pattern === "mask" ? (() => { const c = mask!.get(Math.floor(across * mask!.w), Math.floor((1 - up) * mask!.h)); return c === TRANSPARENT ? 0.9999 : Math.min(0.9999, (0.2126 * (c >>> 24) + 0.7152 * ((c >>> 16) & 255) + 0.0722 * ((c >>> 8) & 255)) / 255); })()
-        : nz;
-      // a hole; the edge (2 and up: 2 + its band's place, 0..1); the char ahead of it (-t, its strength)
-      return o < thr ? 1 : o < thr + w ? 2 + (o - thr) / w : o < thr + w + cw ? -(1 - (o - thr - w) / cw) : 0;
-    });
+  if (hasFaces) {
+    for (const [name, M] of Object.entries(mats)) {
+      const D = M?.dissolve;
+      if (!D) continue;
+      const { progress, scale = 0.25, seed = 0, width = 0.06, pattern = "noise", ragged = 0.25 } = D;
+      if (!(typeof progress === "number" && progress >= 0 && progress <= 1) || !(scale > 0) || !Number.isInteger(seed) || !(width >= 0 && width <= 1) || !PATTERNS.includes(pattern) || !(ragged >= 0 && ragged <= 1)
+        || (D.at !== undefined && !(Array.isArray(D.at) && D.at.length === 3 && D.at.every(Number.isFinite))) || (pattern === "mask" && !world?.masks?.[name]))
+        throw new PxError(`mesh: material '${name}' has dissolve ${JSON.stringify(D)}: { progress (0..1), scale (m, above 0), seed (whole), edge (a key), width (0..1), pattern (${PATTERNS.join(", ")}), ragged (0..1), at ([x, z, up]), mask (an asset, for pattern "mask") }`);
+      const lk = world?.looks?.[name], ch = lk?.char, w = lk?.over || lk?.neutral ? width : 0, cw = ch ? 0.03 * ch.width : 0, f = noise(seed), thr = -w + progress * (1 + w);
+      const TF = texelOf(M, true), TW = texelOf(M, false), snap = M.tex !== undefined;
+      // the extent of its faces, for the sweeps, the radial order and the mask
+      const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+      for (const F of faces) if (F?.mat === name) for (const p of F.pts) for (let e = 0; e < 3; e++) { lo[e] = Math.min(lo[e], p[e]); hi[e] = Math.max(hi[e], p[e]); }
+      const span = (e: number, v: number) => (v - lo[e]) / Math.max(1e-9, hi[e] - lo[e]), ctr = D.at ?? [0, 1, 2].map((e) => (lo[e] + hi[e]) / 2);
+      const far = Math.max(1e-9, ...[0, 1, 2, 3, 4, 5, 6, 7].map((c) => Math.hypot(...[0, 1, 2].map((e) => ((c >> e) & 1 ? hi[e] : lo[e]) - ctr[e]))));
+      const mask = world?.masks?.[name];
+      holes.set(name, (X, Y, Z, N) => {
+        if (progress <= 0) return 0;
+        const P = [X, Y, Z], a = [0, 1, 2].reduce((m, e) => (Math.abs(N[e]) > Math.abs(N[m]) ? e : m), 0), [ua, va] = a === 0 ? [1, 2] : a === 1 ? [0, 2] : [0, 1], [tu, tv] = a === UP ? TF : TW;
+        const u = snap ? (Math.floor(P[ua] / tu) + 0.5) * tu : P[ua], v = snap ? (Math.floor(P[va] / tv) + 0.5) * tv : P[va], nz = f(u / scale, v / scale);
+        // (on its texels, as the noise is: snapped where it has a texture)
+        const Q = [X, Y, Z];
+        if (snap) { Q[ua] = u; Q[va] = v; }
+        const rag = (pos: number) => Math.min(0.9999, Math.max(0, pos * (1 - ragged) + ragged * nz)), up = span(UP, Q[UP]), across = span(a === 0 ? AHEAD : 0, Q[a === 0 ? AHEAD : 0]);
+        const o = pattern === "top" ? rag(1 - up) : pattern === "bottom" ? rag(up) : pattern === "left" ? rag(across) : pattern === "right" ? rag(1 - across)
+          : pattern === "out" || pattern === "in" ? rag(Math.abs((pattern === "in" ? 1 : 0) - Math.hypot(Q[0] - ctr[0], Q[1] - ctr[1], Q[2] - ctr[2]) / far))
+          : pattern === "scatter" ? hash(Math.floor(u / (snap ? tu : scale / 4)), Math.floor(v / (snap ? tv : scale / 4)), seed + a * 7919) / 4294967296
+          : pattern === "scan" ? (SCAN[((Math.floor(Q[UP] / (snap ? tv : scale / 4)) % 4) + 4) % 4] + Math.min(0.9999, 1 - up)) / 4
+          : pattern === "mask" ? (() => { const c = mask!.get(Math.floor(across * mask!.w), Math.floor((1 - up) * mask!.h)); return c === TRANSPARENT ? 0.9999 : Math.min(0.9999, (0.2126 * (c >>> 24) + 0.7152 * ((c >>> 16) & 255) + 0.0722 * ((c >>> 8) & 255)) / 255); })()
+          : nz;
+        // a hole; the edge (2 and up: 2 + its band's place, 0..1); the char ahead of it (-t, its strength)
+        return o < thr ? 1 : o < thr + w ? 2 + (o - thr) / w : o < thr + w + cw ? -(1 - (o - thr - w) / cw) : 0;
+      });
+    }
   }
   const burn = holes.size ? new Float32Array(W * H) : undefined;
   faces.forEach((F, k) => {
@@ -359,7 +383,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     const M = mats[F.mat];
     if (!M) throw new PxError(`mesh: face ${k} is of material '${F.mat}', which mats doesn't have (it has: ${Object.keys(mats).join(", ")})`);
     const N = faceNormal(F.pts);
-    const L = F.pts.length, mid = F.pts.reduce<V3>((s, p) => [s[0] + p[0] / L, s[1] + p[1] / L, s[2] + p[2] / L], [0, 0, 0]);
+    const len = F.pts.length, mid = F.pts.reduce<V3>((s, p) => [s[0] + p[0] / len, s[1] + p[1] / len, s[2] + p[2] / len], [0, 0, 0]);
     // the side we see: the one toward the eye
     const toward = dot(sub(mid, eye), N) > 0 ? -1 : 1;
     normals[k] = N.map((v) => v * toward) as V3;
@@ -377,37 +401,78 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     if (P.some((p) => p[2] < cam.near)) [pts, P] = clipNear(pts, P, cam.project, cam.near);
     for (let t = 1; t + 1 < P.length; t++) {
       const [a, b, d] = [P[0], P[t], P[t + 1]], [A, B, D] = [pts[0], pts[t], pts[t + 1]];
-      const Az = A.map((v) => v / a[2]), Bz = B.map((v) => v / b[2]), Dz = D.map((v) => v / d[2]);
+      const az = 1 / a[2], bz = 1 / b[2], dz = 1 / d[2];
+      const Az0 = A[0] * az, Az1 = A[1] * az, Az2 = A[2] * az;
+      const Bz0 = B[0] * bz, Bz1 = B[1] * bz, Bz2 = B[2] * bz;
+      const Dz0 = D[0] * dz, Dz1 = D[1] * dz, Dz2 = D[2] * dz;
       const area = (b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0]);
       if (Math.abs(area) < 1e-6) continue;
+      const invA = 1 / area, ax = a[0], ay = a[1];
+      const dax = d[0] - ax, day = d[1] - ay, bax = b[0] - ax, bay = b[1] - ay;
       // (in blocks: every pixel of a block whose middle the face covers)
       const lo = (v: number) => Math.floor(Math.floor(v) / Bk) * Bk, hi = (v: number) => Math.ceil((Math.ceil(v) + 1) / Bk) * Bk - 1;
       const xa = Math.max(x0, lo(Math.min(a[0], b[0], d[0]))), xb = Math.min(x0 + W - 1, hi(Math.max(a[0], b[0], d[0])));
       const ya = Math.max(y0, lo(Math.min(a[1], b[1], d[1]))), yb = Math.min(y0 + H - 1, hi(Math.max(a[1], b[1], d[1])));
-      for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) {
-        const px = Bk > 1 ? Math.floor(x / Bk) * Bk + Bk / 2 : x + 0.5, py = Bk > 1 ? Math.floor(y / Bk) * Bk + Bk / 2 : y + 0.5;
-        const w1 = ((d[0] - a[0]) * (py - a[1]) - (d[1] - a[1]) * (px - a[0])) / -area, w2 = ((b[0] - a[0]) * (py - a[1]) - (b[1] - a[1]) * (px - a[0])) / area;
-        const w0 = 1 - w1 - w2;
-        if (w0 < -1e-4 || w1 < -1e-4 || w2 < -1e-4) continue;
-        const z = 1 / (w0 / a[2] + w1 / b[2] + w2 / d[2]), i = (y - y0) * W + (x - x0);
-        if (z >= depth[i]) continue;
-        // the point seen, interpolated in perspective; through a hole in its texture, not this face
-        const X = (w0 * Az[0] + w1 * Bz[0] + w2 * Dz[0]) * z, Y = (w0 * Az[1] + w1 * Bz[1] + w2 * Dz[1]) * z, Z = (w0 * Az[2] + w1 * Bz[2] + w2 * Dz[2]) * z;
-        if (tk?.holes && (tk.T.data[texel(tk, X, Y, Z)] & 255) < 128) continue;
-        const hole = hk ? hk(X, Y, Z, N) : 0;
-        if (hole === 1) continue;
-        if (burn) burn[i] = hole;
-        depth[i] = z; who[i] = k;
-        pos[i * 3] = X; pos[i * 3 + 1] = Y; pos[i * 3 + 2] = Z;
+      if (Bk > 1) {
+        const yStart = Math.floor(ya / Bk) * Bk, xStart = Math.floor(xa / Bk) * Bk, half = Bk / 2;
+        for (let by = yStart; by <= yb; by += Bk) {
+          const py = by + half, dy = py - ay;
+          const wy1 = dax * dy, wy2 = bax * dy;
+          const yLo = Math.max(ya, by), yHi = Math.min(yb, by + Bk - 1);
+          for (let bx = xStart; bx <= xb; bx += Bk) {
+            const px = bx + half, dx = px - ax;
+            const w1 = (wy1 - day * dx) * -invA, w2 = (wy2 - bay * dx) * invA, w0 = 1 - w1 - w2;
+            if (w0 < -1e-4 || w1 < -1e-4 || w2 < -1e-4) continue;
+            const z = 1 / (w0 * az + w1 * bz + w2 * dz);
+            const xLo = Math.max(xa, bx), xHi = Math.min(xb, bx + Bk - 1);
+            let any = false;
+            for (let y = yLo; y <= yHi && !any; y++) {
+              const row = (y - y0) * W - x0;
+              for (let x = xLo; x <= xHi; x++) if (z < depth[row + x]) { any = true; break; }
+            }
+            if (!any) continue;
+            const X = (w0 * Az0 + w1 * Bz0 + w2 * Dz0) * z, Y = (w0 * Az1 + w1 * Bz1 + w2 * Dz1) * z, Z = (w0 * Az2 + w1 * Bz2 + w2 * Dz2) * z;
+            if (tk?.holes && (tk.T.data[texel(tk, X, Y, Z)] & 255) < 128) continue;
+            const hole = hk ? hk(X, Y, Z, N) : 0;
+            if (hole === 1) continue;
+            for (let y = yLo; y <= yHi; y++) {
+              const row = (y - y0) * W - x0;
+              for (let x = xLo; x <= xHi; x++) {
+                const i = row + x;
+                if (z >= depth[i]) continue;
+                if (burn) burn[i] = hole;
+                depth[i] = z; who![i] = k;
+                const i3 = i * 3;
+                pos![i3] = X; pos![i3 + 1] = Y; pos![i3 + 2] = Z;
+              }
+            }
+          }
+        }
+      } else {
+        for (let y = ya; y <= yb; y++) {
+          const py = y + 0.5, dy = py - ay, wy1 = dax * dy, wy2 = bax * dy, row = (y - y0) * W - x0;
+          for (let x = xa; x <= xb; x++) {
+            const dx = x + 0.5 - ax;
+            const w1 = (wy1 - day * dx) * -invA, w2 = (wy2 - bay * dx) * invA, w0 = 1 - w1 - w2;
+            if (w0 < -1e-4 || w1 < -1e-4 || w2 < -1e-4) continue;
+            const z = 1 / (w0 * az + w1 * bz + w2 * dz), i = row + x;
+            if (z >= depth[i]) continue;
+            // the point seen, interpolated in perspective; through a hole in its texture, not this face
+            const X = (w0 * Az0 + w1 * Bz0 + w2 * Dz0) * z, Y = (w0 * Az1 + w1 * Bz1 + w2 * Dz1) * z, Z = (w0 * Az2 + w1 * Bz2 + w2 * Dz2) * z;
+            if (tk?.holes && (tk.T.data[texel(tk, X, Y, Z)] & 255) < 128) continue;
+            const hole = hk ? hk(X, Y, Z, N) : 0;
+            if (hole === 1) continue;
+            if (burn) burn[i] = hole;
+            depth[i] = z; who![i] = k;
+            const i3 = i * 3;
+            pos![i3] = X; pos![i3 + 1] = Y; pos![i3 + 2] = Z;
+          }
+        }
       }
     }
   });
   // the light in the world: what the sun sees, every face and every sprite turned to it, over what
   // the camera sees (a point in four of the picture's, and the sprites' feet)
-  const L = world?.lit, K = opts.pixel ?? 1;
-  if (L) L.dir = sunDir;
-  if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`mesh: pixel is how many px a sprite's pixel takes, a whole number from 1, got ${K}`);
-  if ((L || world?.sprites.length) && !cam.P) throw new PxError(`mesh: ${L ? "a sun" : "sprites"} need a perspective view ({ w, horizon, eye, ... }), not ${cam.off ? "an orthographic one" : "a camera function"}`);
   const feet = (world?.sprites ?? []).map((s) => cam.project(s.at)), perM = feet.map((f) => cam.P!.focal / f[2]);
   // a sprite's right, the world's up, and its face (toward the camera, level)
   const yaw = cam.P ? (cam.P.yaw * Math.PI) / 180 : 0, right: V3 = [Math.cos(yaw), -Math.sin(yaw), 0], front: V3 = [-Math.sin(yaw), -Math.cos(yaw), 0];
@@ -454,150 +519,188 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
     });
     if (glows.length) L.lamps = [...L.lamps, ...glows];
   }
-  let sunMap: SunMap | undefined;
-  // (without a sun, cast from `light`: not from a light function, which has no way it comes from)
-  if (L ? L.shadows : opts.shadows ?? typeof opts.light !== "function") {
-    const seen = (visit: (x: number, y: number, z: number) => void) => {
-      for (let i = 0; i < n; i += 4) if (who[i] >= 0) visit(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
-      for (const s of world?.sprites ?? []) visit(...s.at);
-    };
-    // 1024 cells across what is seen (2048 for a picture that big): a few cm on a diorama, so a shadow
-    // starts at the foot of what throws it
-    sunMap = new SunMap(sunDir, seen, Math.min(2048, Math.max(1024, Math.max(W, H) / 2)));
-    if (L) L.map = sunMap;
-    faces.forEach((F, k) => {
-      const tk = texOf[k];
-      for (let t = 1; t + 1 < F.pts.length; t++) {
-        const [A, B, D] = [F.pts[0], F.pts[t], F.pts[t + 1]];
-        // (a texture's holes let the sun through, and so do a dissolve's)
-        const hl = holes.get(F.mat), Nk = normals[k];
-        const keep = tk?.holes || hl ? (w0: number, w1: number, w2: number) => {
-          const X = w0 * A[0] + w1 * B[0] + w2 * D[0], Y = w0 * A[1] + w1 * B[1] + w2 * D[1], Z = w0 * A[2] + w1 * B[2] + w2 * D[2];
-          return !(tk?.holes && (tk.T.data[texel(tk, X, Y, Z)] & 255) < 128) && !(hl && hl(X, Y, Z, Nk) === 1);
-        } : undefined;
-        sunMap!.tri(A, B, D, k, keep);
+  let sunMap: SunMap | undefined = !hasFaces && L?.map ? L.map : undefined;
+  const spriteCastsSun = !!world?.sprites.some((s) => !s.blend || !!s.veil);
+  const needsSunMap = (L ? L.shadows : opts.shadows ?? typeof opts.light !== "function") && !sunMap;
+  if (needsSunMap) {
+    // Skip SunMap when it can cast no shadows:
+    // 1) No faces and either no shadow-casting sprites or no lit sprites that could receive them.
+    // 2) Only a flat horizontal ground plane (all vertices at one z <= 0), camera & sun above it, and no shadow-casting sprites.
+    let skip = false;
+    if (!hasFaces) {
+      const anyLitSprite = !!L && !!world?.sprites.some((s) => !s.unlit && s.blend !== "add" && s.blend !== "screen");
+      skip = !spriteCastsSun || !anyLitSprite;
+    } else if (!spriteCastsSun && sunDir[UP] > 0.05 && eye[UP] > 0) {
+      let z0 = NaN, flat = true;
+      outer: for (const F of faces) for (const p of F.pts) {
+        if (Number.isNaN(z0)) { z0 = p[UP]; if (z0 > 1e-6) { flat = false; break outer; } }
+        else if (Math.abs(p[UP] - z0) > 1e-6) { flat = false; break outer; }
       }
-    });
-    // (a blended sprite, smoke or light, throws none)
-    world?.sprites.forEach((s, k) => {
-      if (!s.blend) sunMap!.sprite(s.img, s.at, K / perM[k], -2 - k, right);
-      else if (s.veil) sunMap!.sprite(s.img, s.at, K / perM[k], -2 - k, right, s.veil * (s.opacity ?? 1));
-    });
+      if (flat && !Number.isNaN(z0) && eye[UP] > z0) skip = true;
+    }
+    if (!skip) {
+      const seen = (visit: (x: number, y: number, z: number) => void) => {
+        if (who && pos) for (let i = 0; i < n; i += 4) if (who[i] >= 0) visit(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
+        for (const s of world?.sprites ?? []) visit(...s.at);
+      };
+      // 1024 cells across what is seen (2048 for a picture that big): a few cm on a diorama, so a shadow
+      // starts at the foot of what throws it
+      sunMap = new SunMap(sunDir, seen, Math.min(2048, Math.max(1024, Math.max(W, H) / 2)));
+      if (L && hasFaces) L.map = sunMap;
+      faces.forEach((F, k) => {
+        const tk = texOf[k];
+        for (let t = 1; t + 1 < F.pts.length; t++) {
+          const [A, B, D] = [F.pts[0], F.pts[t], F.pts[t + 1]];
+          // (a texture's holes let the sun through, and so do a dissolve's)
+          const hl = holes.get(F.mat), Nk = normals[k];
+          const keep = tk?.holes || hl ? (w0: number, w1: number, w2: number) => {
+            const X = w0 * A[0] + w1 * B[0] + w2 * D[0], Y = w0 * A[1] + w1 * B[1] + w2 * D[1], Z = w0 * A[2] + w1 * B[2] + w2 * D[2];
+            return !(tk?.holes && (tk.T.data[texel(tk, X, Y, Z)] & 255) < 128) && !(hl && hl(X, Y, Z, Nk) === 1);
+          } : undefined;
+          sunMap!.tri(A, B, D, k, keep);
+        }
+      });
+      // (a blended sprite, smoke or light, throws none)
+      world?.sprites.forEach((s, k) => {
+        if (!s.blend) sunMap!.sprite(s.img, s.at, K / perM[k], -2 - k, right);
+        else if (s.veil) sunMap!.sprite(s.img, s.at, K / perM[k], -2 - k, right, s.veil * (s.opacity ?? 1));
+      });
+    }
   }
   // each face's texture stepped once by its light (the faces of a material in one light share it)
-  const lits = new Map<string, Uint32Array>(), litOf: Uint32Array[] = [];
-  const litTex = (k: number, T: Img) => {
-    if (litOf[k]) return litOf[k];
-    const n = Math.round((lights[k] - 0.75) * 5), key = faces[k].mat + "|" + n;
-    let t = lits.get(key);
-    if (!t) lits.set(key, (t = T.data.map((col) => (col === TRANSPARENT ? col : world!.step(col, n)))));
-    return (litOf[k] = t);
-  };
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const i = y * W + x, k = who[i];
-    if (k < 0) continue;
-    const F = faces[k], M = mats[F.mat], r = ramps[F.mat], N = normals[k], B = M.block ?? 1, bx = Math.floor((x + x0) / B), by = Math.floor((y + y0) / B);
-    // a dissolving face's edge in its keys of the moment, drawn as it is (the neutral one and the char after)
-    const lk = burn?.[i] && burn[i] >= 2 ? world?.looks?.[F.mat] : undefined;
-    if (lk?.over) {
-      const keys = lk.over[Math.min(lk.over.length - 1, Math.floor(M.dissolve!.progress * lk.over.length))];
-      c.plot(x + x0, y + y0, keys[Math.min(keys.length - 1, Math.floor((burn![i] - 2) * keys.length))]);
-      if (lk.glow) (c.img.emit ??= new Uint8Array(n))[i] = Math.round(255 * lk.glow);
-      continue;
-    }
-    // a floor reads the texture across and away, a wall across and down; light steps each texel along its ramp
-    const texCol = () => {
-      const tk = texOf[k]!, lit = L ? tk.T.data : litTex(k, tk.T);
-      let col = lit[texel(tk, pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2])];
+  if (hasFaces) {
+    const lits = new Map<string, Uint32Array>(), litOf: Uint32Array[] = [];
+    const litTex = (k: number, T: Img) => {
+      if (litOf[k]) return litOf[k];
+      const n = Math.round((lights[k] - 0.75) * 5), key = faces[k].mat + "|" + n;
+      let t = lits.get(key);
+      if (!t) lits.set(key, (t = T.data.map((col) => (col === TRANSPARENT ? col : world!.step(col, n)))));
+      return (litOf[k] = t);
+    };
+    const texColAt = (i: number, k: number, N: V3) => {
+      const tk = texOf[k]!, lit = L ? tk.T.data : litTex(k, tk.T), i3 = i * 3;
+      const px = pos![i3], py = pos![i3 + 1], pz = pos![i3 + 2];
+      let col = lit[texel(tk, px, py, pz)];
       if (col !== TRANSPARENT && L) {
-        const px = pos[i * 3], py = pos[i * 3 + 1], pz = pos[i * 3 + 2], facing = dot(N, L.dir);
+        const facing = dot(N, L.dir);
         col = shine(col, N, px, py, pz, L, facing > 0 && (!sunMap || sunMap.sun(px, py, pz, k, facing)), 0);
       }
       return col;
     };
-    if (M.tex !== undefined && M.edge === undefined) {
-      const col = texCol();
-      if (col === TRANSPARENT) continue;
-      if (c.raw) c.raw[i] = col;
-      else c.plot(x + x0, y + y0, col);
-      continue;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, k = who![i];
+      if (k < 0) continue;
+      const F = faces[k], M = mats[F.mat], r = ramps[F.mat], N = normals[k], B = M.block ?? 1, bx = Math.floor((x + x0) / B), by = Math.floor((y + y0) / B);
+      // a dissolving face's edge in its keys of the moment, drawn as it is (the neutral one and the char after)
+      const lk = burn?.[i] && burn[i] >= 2 ? world?.looks?.[F.mat] : undefined;
+      if (lk?.over) {
+        const keys = lk.over[Math.min(lk.over.length - 1, Math.floor(M.dissolve!.progress * lk.over.length))];
+        c.plot(x + x0, y + y0, keys[Math.min(keys.length - 1, Math.floor((burn![i] - 2) * keys.length))]);
+        if (lk.glow) (c.img.emit ??= new Uint8Array(n))[i] = Math.round(255 * lk.glow);
+        continue;
+      }
+      // a floor reads the texture across and away, a wall across and down; light steps each texel along its ramp
+      if (M.tex !== undefined && M.edge === undefined) {
+        // In block mode (B > 1, e.g. HD pixel: K), identical adjacent (k, pos) pixels share the exact same shaded color.
+        if (B > 1 && c.raw && !burn && !texOf[k]!.holes) {
+          const i3 = i * 3, px = pos![i3], py = pos![i3 + 1], pz = pos![i3 + 2];
+          if (x > 0 && who![i - 1] === k && pos![i3 - 3] === px && pos![i3 - 2] === py && pos![i3 - 1] === pz) { c.raw[i] = c.raw[i - 1]; continue; }
+          if (y > 0 && who![i - W] === k) {
+            const u3 = (i - W) * 3;
+            if (pos![u3] === px && pos![u3 + 1] === py && pos![u3 + 2] === pz) { c.raw[i] = c.raw[i - W]; continue; }
+          }
+        }
+        const col = texColAt(i, k, N);
+        if (col === TRANSPARENT) continue;
+        if (c.raw) c.raw[i] = col;
+        else c.plot(x + x0, y + y0, col);
+        continue;
+      }
+      // an outline where this surface is in front of another or of nothing; a crease where faces meet
+      let line: string | null = null;
+      for (const [dx, dy] of B > 1 ? [[away * B, 0], [0, B]] : [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const j = yy * W + xx, k2 = who![j];
+        if (k2 === k) continue;
+        if (k2 === -1 || depth[j] > depth[i] * 1.06) { line = M.edge ?? r[0]; break; }
+        const same = k2 >= 0 && faces[k2].mat === F.mat;
+        if (!same && depth[j] >= depth[i]) line = line ?? M.edge ?? r[0];
+        else if (same && !M.smooth && dot(N, normals[k2]) < 0.82 && depth[j] >= depth[i]) line = line ?? r[0];
+      }
+      if (M.tex !== undefined) {
+        // its outline, and inside it the texture
+        if (line) c.px(x + x0, y + y0, line);
+        else { const col = texColAt(i, k, N); if (col !== TRANSPARENT) c.plot(x + x0, y + y0, col); }
+        continue;
+      }
+      let lv = Math.max(0, Math.min(r.length - 1, Math.floor(lights[k] * r.length + (bayer(bx, by) - 0.5) * (M.dither ?? 0))));
+      // without a sun: a step down the ramp where something stands between it and the light
+      // (never into its darkest, the line's tone: no dark specks inside a form)
+      if (sunMap && !L) { const f = dot(N, sunDir); if (f > 0 && lv > 1 && !sunMap.sees(pos![i * 3], pos![i * 3 + 1], pos![i * 3 + 2], k, f)) lv--; }
+      // the top edge of a surface, just under its outline, catches the light: a step lighter
+      const up1 = y >= B ? who![i - B * W] : -1, up2 = y >= 2 * B ? who![i - 2 * B * W] : -1;
+      const rim = !line && up1 === k && (up2 === -1 || (up2 !== k && depth[i - 2 * B * W] > depth[i] * 1.06)) && dot(N, cam.up) > -0.3;
+      const tx = M.texture && !line && !rim ? Math.round(M.texture(B > 1 ? bx : x + x0, B > 1 ? by : y + y0)) : 0;
+      c.px(x + x0, y + y0, line ?? (rim ? M.top ?? r[Math.min(r.length - 1, lv + 1)] : r[Math.max(0, Math.min(r.length - 1, lv + tx))]));
     }
-    // an outline where this surface is in front of another or of nothing; a crease where faces meet
-    let line: string | null = null;
-    for (const [dx, dy] of B > 1 ? [[away * B, 0], [0, B]] : [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const xx = x + dx, yy = y + dy;
-      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
-      const j = yy * W + xx, k2 = who[j];
-      if (k2 === k) continue;
-      if (k2 === -1 || depth[j] > depth[i] * 1.06) { line = M.edge ?? r[0]; break; }
-      const same = k2 >= 0 && faces[k2].mat === F.mat;
-      if (!same && depth[j] >= depth[i]) line = line ?? M.edge ?? r[0];
-      else if (same && !M.smooth && dot(N, normals[k2]) < 0.82 && depth[j] >= depth[i]) line = line ?? r[0];
-    }
-    if (M.tex !== undefined) {
-      // its outline, and inside it the texture
-      if (line) c.px(x + x0, y + y0, line);
-      else { const col = texCol(); if (col !== TRANSPARENT) c.plot(x + x0, y + y0, col); }
-      continue;
-    }
-    let lv = Math.max(0, Math.min(r.length - 1, Math.floor(lights[k] * r.length + (bayer(bx, by) - 0.5) * (M.dither ?? 0))));
-    // without a sun: a step down the ramp where something stands between it and the light
-    // (never into its darkest, the line's tone: no dark specks inside a form)
-    if (sunMap && !L) { const f = dot(N, sunDir); if (f > 0 && lv > 1 && !sunMap.sees(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], k, f)) lv--; }
-    // the top edge of a surface, just under its outline, catches the light: a step lighter
-    const up1 = y >= B ? who[i - B * W] : -1, up2 = y >= 2 * B ? who[i - 2 * B * W] : -1;
-    const rim = !line && up1 === k && (up2 === -1 || (up2 !== k && depth[i - 2 * B * W] > depth[i] * 1.06)) && dot(N, cam.up) > -0.3;
-    const tx = M.texture && !line && !rim ? Math.round(M.texture(B > 1 ? bx : x + x0, B > 1 ? by : y + y0)) : 0;
-    c.px(x + x0, y + y0, line ?? (rim ? M.top ?? r[Math.min(r.length - 1, lv + 1)] : r[Math.max(0, Math.min(r.length - 1, lv + tx))]));
+    // the char ahead of a dissolving face's edge, and the neutral ring: over what the face drew
+    if (burn)
+      for (let i = 0; i < n; i++) {
+        const b = burn[i], k = who![i];
+        if (!b || k < 0 || b === 1) continue;
+        const lk = world?.looks?.[faces[k].mat], x = (i % W) + x0, y = Math.floor(i / W) + y0, col = c.get(x, y);
+        if (!lk || col === TRANSPARENT) continue;
+        if (b >= 2 && lk.neutral !== undefined) c.plot(x, y, toward(col, lk.neutral, 0.5 * (1 - Math.max(0, (mats[faces[k].mat].dissolve!.progress - 0.85) / 0.15))));
+        else if (b < 0 && lk.char) c.plot(x, y, toward(col, lk.char.tones[Math.min(lk.char.tones.length - 1, Math.floor(-b * lk.char.tones.length))], lk.char.amount * -b, lk.char.desat));
+      }
   }
-  // the char ahead of a dissolving face's edge, and the neutral ring: over what the face drew
-  if (burn)
-    for (let i = 0; i < n; i++) {
-      const b = burn[i], k = who[i];
-      if (!b || k < 0 || b === 1) continue;
-      const lk = world?.looks?.[faces[k].mat], x = (i % W) + x0, y = Math.floor(i / W) + y0, col = c.get(x, y);
-      if (!lk || col === TRANSPARENT) continue;
-      if (b >= 2 && lk.neutral !== undefined) c.plot(x, y, toward(col, lk.neutral, 0.5 * (1 - Math.max(0, (mats[faces[k].mat].dissolve!.progress - 0.85) / 0.15))));
-      else if (b < 0 && lk.char) c.plot(x, y, toward(col, lk.char.tones[Math.min(lk.char.tones.length - 1, Math.floor(-b * lk.char.tones.length))], lk.char.amount * -b, lk.char.desat));
-    }
   const keep = () => {
+    if (directDepth) return;
     // the depth stays on the image for post(); a second mesh() keeps the nearer of the two
     const d = (c.img.depth ??= new Float32Array(n).fill(Infinity));
-    for (let i = 0; i < n; i++) if (who[i] !== -1 && depth[i] - cam.off < d[i]) d[i] = depth[i] - cam.off;
+    if (who) {
+      for (let i = 0; i < n; i++) if (who[i] !== -1 && depth[i] - cam.off < d[i]) d[i] = depth[i] - cam.off;
+    } else {
+      for (let i = 0; i < n; i++) if (depth[i] < d[i]) d[i] = depth[i];
+    }
   };
   if (!world?.sprites.length) { keep(); return []; }
-  const placed: { name: string; x: number; y: number; img: Img; light?: [number, number]; at: V3; air?: boolean; k: number }[] = [];
+  const placed: { name: string; x: number; y: number; img: Img; light?: [number, number]; at: V3; air?: boolean; unlit?: boolean; k: number }[] = [];
   // contact shadows: what each sprite stands on, two steps darker in the middle and one out to the
   // radius (the darkest where two overlap)
-  const shade = new Uint8Array(n);
-  world.sprites.forEach((s, k) => {
-    const [fx, fz, fu] = s.at, R = s.shadow ?? (s.blend ? 0 : (s.img.w * K) / 2.5 / perM[k]);
-    if (!(R > 0)) return;
-    const box = [[fx - R, fz - R], [fx + R, fz - R], [fx - R, fz + R], [fx + R, fz + R]].map(([x, z]) => cam.project([x, z, fu]));
-    const xa = Math.max(0, Math.floor(Math.min(...box.map((b) => b[0]))) - x0), xb = Math.min(W - 1, Math.ceil(Math.max(...box.map((b) => b[0]))) - x0);
-    const ya = Math.max(0, Math.floor(Math.min(...box.map((b) => b[1]))) - y0), yb = Math.min(H - 1, Math.ceil(Math.max(...box.map((b) => b[1]))) - y0);
-    for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) {
-      const i = y * W + x, r = Math.hypot(pos[i * 3] - fx, pos[i * 3 + 1] - fz);
-      if (who[i] >= 0 && Math.abs(pos[i * 3 + 2] - fu) < 0.05 && r <= R) shade[i] = Math.max(shade[i], r <= 0.6 * R ? 2 : 1);
+  if (hasFaces) {
+    const shade = new Uint8Array(n);
+    world.sprites.forEach((s, k) => {
+      const [fx, fz, fu] = s.at, R = s.shadow ?? (s.blend ? 0 : (s.img.w * K) / 2.5 / perM[k]);
+      if (!(R > 0)) return;
+      const box = [[fx - R, fz - R], [fx + R, fz - R], [fx - R, fz + R], [fx + R, fz + R]].map(([x, z]) => cam.project([x, z, fu]));
+      const xa = Math.max(0, Math.floor(Math.min(...box.map((b) => b[0]))) - x0), xb = Math.min(W - 1, Math.ceil(Math.max(...box.map((b) => b[0]))) - x0);
+      const ya = Math.max(0, Math.floor(Math.min(...box.map((b) => b[1]))) - y0), yb = Math.min(H - 1, Math.ceil(Math.max(...box.map((b) => b[1]))) - y0);
+      for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) {
+        const i = y * W + x, r = Math.hypot(pos![i * 3] - fx, pos![i * 3 + 1] - fz);
+        if (who![i] >= 0 && Math.abs(pos![i * 3 + 2] - fu) < 0.05 && r <= R) shade[i] = Math.max(shade[i], r <= 0.6 * R ? 2 : 1);
+      }
+    });
+    // (in the world's light, a share of the light taken away instead of ramp steps)
+    for (let i = 0; i < n; i++) {
+      if (!shade[i]) continue;
+      const x = (i % W) + x0, y = Math.floor(i / W) + y0, col = c.get(x, y), f = shade[i] === 2 ? 0.55 : 0.75;
+      c.plot(x, y, L ? fromLinear(LIN[col >>> 24] * f, LIN[(col >>> 16) & 255] * f, LIN[(col >>> 8) & 255] * f, col) : world.step(col, -shade[i]));
     }
-  });
-  // (in the world's light, a share of the light taken away instead of ramp steps)
-  for (let i = 0; i < n; i++) {
-    if (!shade[i]) continue;
-    const x = (i % W) + x0, y = Math.floor(i / W) + y0, col = c.get(x, y), f = shade[i] === 2 ? 0.55 : 0.75;
-    c.plot(x, y, L ? fromLinear(LIN[col >>> 24] * f, LIN[(col >>> 16) & 255] * f, LIN[(col >>> 8) & 255] * f, col) : world.step(col, -shade[i]));
   }
   // the sprites: upright at their feet, a pixel to K x K px, each row as deep as that height above the
   // feet; a pixel less than half opaque is cut (it neither shows nor hides what's behind). The
   // blended ones after all the solid ones, the farthest first, over what is drawn by their alpha
   const order = world.sprites.map((_, k) => k).filter((k) => !world.sprites[k].blend);
   order.push(...world.sprites.map((_, k) => k).filter((k) => world.sprites[k].blend).sort((a, b) => feet[b][2] - feet[a][2]));
+  const hasDepth = depth.length > 0;
   for (const k of order) {
     const s = world.sprites[k], { img } = s, [px, py] = img.pivot ?? [img.w / 2, img.h], m = K / perM[k], e = img.emit;
     const X0 = Math.round(feet[k][0] - px * K), Y0 = Math.round(feet[k][1] - py * K);
     // in the world's light, each of its pixels lit the first time it shows: where it stands on the
     // sprite's plane, which way it faces (0: not lit yet; a lit color is never 0, its alpha isn't)
-    const lit = L ? new Uint32Array(img.data.length) : undefined, nm = img.norm, blend = s.blend, opacity = s.opacity ?? 1;
+    const lit = L && !s.unlit ? new Uint32Array(img.data.length) : undefined, nm = img.norm, blend = s.blend, opacity = s.opacity ?? 1;
     const colorAt = (q: number, i: number, j: number) => {
       if (!lit || e?.[q]) return img.data[q];
       if (lit[q]) return lit[q];
@@ -616,7 +719,7 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
         if (blend) {
           // over what is drawn there, by its alpha; what stands in front hides it; it hides nothing
           const a = ((col & 255) / 255) * opacity;
-          if (a <= 0 || xi < 0 || xi >= W || d >= depth[q]) continue;
+          if (a <= 0 || xi < 0 || xi >= W || (hasDepth && d >= depth[q])) continue;
           const sc = blend === "alpha" ? colorAt(row + si, si, Math.floor(j / K)) : col, u = c.get(X0 + i, Y0 + j);
           if (u === TRANSPARENT) { c.plot(X0 + i, Y0 + j, ((sc & ~255) | Math.round(a * 255)) >>> 0); continue; }
           const mix = (U: number, S: number) => (blend === "alpha" ? U + (S - U) * a : blend === "add" ? U + S * a : 1 - (1 - U) * (1 - S * a));
@@ -626,16 +729,25 @@ export function drawMesh(c: MeshCanvas, view: unknown, faces: Face[], mats: Reco
         }
         if ((col & 255) < 128 || xi < 0 || xi >= W || d >= depth[q]) continue;
         depth[q] = d;
-        who[q] = -2;
+        if (who) who[q] = -2;
         c.plot(X0 + i, Y0 + j, colorAt(row + si, si, Math.floor(j / K)));
         // what gives light marks the picture, for post()'s bloom
         if (e || c.img.emit) (c.img.emit ??= new Uint8Array(n))[q] = e ? e[row + si] : 0;
       }
     }
+    // Self-emitting or explicitly unlit sprites (fire, sparks, spells) do not take directional scene light.
+    let allEmit = false;
+    if (e) {
+      let opaque = 0;
+      allEmit = true;
+      for (let q = 0; q < img.data.length; q++) if ((img.data[q] & 255) >= 128) { opaque++; if (!e[q]) { allEmit = false; break; } }
+      if (!opaque) allEmit = false;
+    }
+    const isUnlit = !!(s.unlit || s.blend === "add" || s.blend === "screen" || allEmit);
     // the way to the light on the picture where it stands, its middle a meter toward the light (none for a light of your own, or one straight at the eye)
     const mid: V3 = [s.at[0], s.at[1], s.at[2] + (py * K) / 2 / perM[k]], a = cam.project(mid), b = cam.project([mid[0] + sunDir[0], mid[1] + sunDir[1], mid[2] + sunDir[2]]);
-    const lx = b[0] - a[0], ly = b[1] - a[1], ll = Math.hypot(lx, ly), seen = typeof opts.light !== "function" && ll > 0.25 * perM[k];
-    placed.push({ name: s.name, x: X0, y: Y0, img: K > 1 ? img.scale(K) : img, ...(seen ? { light: [lx / ll, ly / ll] as [number, number] } : {}), at: s.at, ...(s.air || s.blend ? { air: true } : {}), k });
+    const lx = b[0] - a[0], ly = b[1] - a[1], ll = Math.hypot(lx, ly), seen = !isUnlit && typeof opts.light !== "function" && ll > 0.25 * perM[k];
+    placed.push({ name: s.name, x: X0, y: Y0, img: K > 1 ? img.scale(K) : img, ...(seen ? { light: [lx / ll, ly / ll] as [number, number] } : {}), at: s.at, ...(s.air || s.blend ? { air: true } : {}), ...(isUnlit ? { unlit: true } : {}), k });
   }
   keep();
   return placed;

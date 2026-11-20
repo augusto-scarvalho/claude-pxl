@@ -61,19 +61,12 @@ const toward = (n: V3): [number, number, number, number] => {
   return [w, -n[1] * k, n[0] * k, 0];
 };
 
-/**
- * A field's moves at its root (at, rotate, scale, bend), peeled off: the form inside, and how a point on
- * it is carried by them at a moment. What is scattered on the form at rest goes where the form goes.
- */
-export function peel(f: Sdf): { inner: Sdf; carry: (clock: Clock) => (p: V3) => V3; back: (clock: Clock) => (p: V3) => V3 } {
-  const outer: Sdf[] = [];
-  let s = f;
-  while (["at", "rotate", "scale", "bend"].includes(s.node.op)) { outer.push(s); s = (s.node as { of: Sdf }).of; }
-  // each move at a moment, as a step forward and a step back
+/** Build carry/back point transform functions for a list of peeled move nodes (outermost first). */
+function moveFns(outer: Sdf[]): { carry: (clock: Clock) => (p: V3) => V3; back: (clock: Clock) => (p: V3) => V3 } {
   const moves = (clock: Clock) => outer.slice().reverse().map((o): [(p: V3) => V3, (p: V3) => V3] => {
     const n = o.node;
     if (n.op === "at") { const v = vec(n.v, clock, "at"); return [(p) => [p[0] + v[0], p[1] + v[1], p[2] + v[2]], (p) => [p[0] - v[0], p[1] - v[1], p[2] - v[2]]]; }
-    if (n.op === "scale") { const k = vec(n.s, clock, "scale"); return [(p) => [p[0] * k[0], p[1] * k[1], p[2] * k[2]], (p) => [p[0] / k[0], p[1] / k[1], p[2] / k[2]]]; }
+    if (n.op === "scale") { const k = vec(n.s, clock, "scale"); return [(p) => [p[0] * k[0], p[1] * k[1], p[2] * k[2]], (p) => [k[0] ? p[0] / k[0] : 0, k[1] ? p[1] / k[1] : 0, k[2] ? p[2] / k[2] : 0]]; }
     if (n.op === "bend") {
       const kv = typeof n.k === "function" ? (n.k as (c: Clock) => unknown)(clock) : n.k;
       const [kx, ky] = typeof kv === "object" ? vec(kv as number[], clock, "bend", 2) : [num(kv as number, clock, "bend"), 0];
@@ -85,11 +78,43 @@ export function peel(f: Sdf): { inner: Sdf; carry: (clock: Clock) => (p: V3) => 
     return [(p) => [M[0] * p[0] + M[1] * p[1] + M[2] * p[2], M[3] * p[0] + M[4] * p[1] + M[5] * p[2], M[6] * p[0] + M[7] * p[1] + M[8] * p[2]], (p) => [M[0] * p[0] + M[3] * p[1] + M[6] * p[2], M[1] * p[0] + M[4] * p[1] + M[7] * p[2], M[2] * p[0] + M[5] * p[1] + M[8] * p[2]]];
   });
   return {
-    inner: s,
     // innermost first forward; outermost first back
     carry: (clock) => { const m = moves(clock); return (p) => m.reduce((q, st) => st[0](q), p); },
     back: (clock) => { const m = moves(clock); return (p) => m.reduceRight((q, st) => st[1](q), p); },
   };
+}
+
+/**
+ * A field's moves at its root (at, rotate, scale, bend), peeled off: the form inside, and how a point on
+ * it is carried by them at a moment. What is scattered on the form at rest goes where the form goes.
+ */
+export function peel(f: Sdf): { inner: Sdf; carry: (clock: Clock) => (p: V3) => V3; back: (clock: Clock) => (p: V3) => V3 } {
+  const outer: Sdf[] = [];
+  let s = f;
+  while (["at", "rotate", "scale", "bend"].includes(s.node.op)) { outer.push(s); s = (s.node as { of: Sdf }).of; }
+  return { inner: s, ...moveFns(outer) };
+}
+
+/**
+ * Like `peel()`, but traverses through material/part/paint/when wrappers and the primary operand of
+ * `intersect`/`subtract` (e.g. a ground-clipping plane) so `decal()` still tracks animated moves
+ * wrapped inside `.mat()`, `.part()`, `.paint()`, or `.intersect(sdf.plane(...))`.
+ */
+export function peelMoves(f: Sdf): { carry: (clock: Clock) => (p: V3) => V3; back: (clock: Clock) => (p: V3) => V3 } {
+  const outer: Sdf[] = [];
+  let s: Sdf | undefined = f;
+  while (s) {
+    const op = s.node.op;
+    if (op === "at" || op === "rotate" || op === "scale" || op === "bend") {
+      outer.push(s);
+      s = (s.node as { of: Sdf }).of;
+    } else if (op === "mat" || op === "part" || op === "paint" || op === "paintBy" || op === "when") {
+      s = (s.node as { of: Sdf }).of;
+    } else if (op === "intersect" || op === "subtract") {
+      s = (s.node as { of: Sdf[] }).of[0];
+    } else break;
+  }
+  return moveFns(outer);
 }
 
 /** Scatter small things on a field's surface (see the top of this file): a splat set that draws as brushes. */

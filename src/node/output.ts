@@ -1,6 +1,7 @@
 // Writes build results to disk: PNGs, layer PNGs, sheets + JSON, previews.
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { threadId } from "node:worker_threads";
 import { PxError, didYouMean, wrap } from "../core/errors.ts";
 import type { Img } from "../core/image.ts";
 import { TRANSPARENT, toHex } from "../core/color.ts";
@@ -45,9 +46,49 @@ export interface OutputResult {
   times: [string, number][];
 }
 
-function write(path: string, data: string | Buffer): void {
+let atomicSeq = 0;
+const RETRY_CODES = new Set(["EBUSY", "EPERM", "EACCES", "UNKNOWN"]);
+const pauseBuf = new Int32Array(new SharedArrayBuffer(4));
+const sleepMs = (ms: number) => { try { Atomics.wait(pauseBuf, 0, 0, ms); } catch { const end = Date.now() + ms; while (Date.now() < end) { /* fallback */ } } };
+
+/**
+ * Atomic file write with brief retry on transient Windows file locks (e.g. a viewer or agent reading
+ * a PNG/GIF right as pxl overwrites it). Writes to a sibling temp file first so readers never see a
+ * half-written file.
+ */
+export function writeAtomic(path: string, data: string | Buffer): void {
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, data);
+  const tmp = `${path}.${process.pid}.${threadId}.${++atomicSeq}.tmp`;
+  writeFileSync(tmp, data);
+  try {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        renameSync(tmp, path);
+        return;
+      } catch (e) {
+        const code = (e as NodeJS.ErrnoException)?.code ?? "";
+        if (attempt < 5 && RETRY_CODES.has(code)) {
+          sleepMs(15 * (attempt + 1));
+          continue;
+        }
+        // Fallback: direct overwrite retry if rename is blocked on Windows, else rethrow
+        if (attempt === 5 && RETRY_CODES.has(code)) {
+          sleepMs(60);
+          writeFileSync(path, data);
+          try { unlinkSync(tmp); } catch { /* cleaned best-effort */ }
+          return;
+        }
+        throw e;
+      }
+    }
+  } catch (e) {
+    try { unlinkSync(tmp); } catch { /* cleaned best-effort */ }
+    throw e;
+  }
+}
+
+function write(path: string, data: string | Buffer): void {
+  writeAtomic(path, data);
 }
 
 export function writePng(path: string, img: Img): void {
@@ -122,7 +163,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       const b = p.build(n);
       const dir = def.kind === "scene" ? "scenes" : def.kind === "anim" ? "anims" : "sprites";
       const frames = b.anim ? p.frames(n) : [];
-      let shown = b.img, info = "", own: Buffer | undefined;
+      let shown = b.img, info = "", own: Buffer | undefined, ownPal: number[] | undefined;
       if (def.kind === "anim") {
         // Anims: a horizontal strip of the drawn frames + Aseprite-style JSON (the tag carries the
         // direction), plus a GIF of the full playback.
@@ -146,7 +187,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         if (glows(b.img)) writeMap(def.kind, n, dir, "_e", () => emitImage(b.img), def.loc);
       }
       if (frames.length) {
-        write(join(out, dir, n + ".gif"), (own = encodeGif(frames)));
+        write(join(out, dir, n + ".gif"), (own = encodeGif(frames, { onPalette: (pl) => { ownPal = pl; } })));
         const play = p.direction(n);
         info = play === "forward" ? ` (${frames.length} frames, ${b.anim!.loop}ms)` : ` (${p.drawn(n).length} frames ${play}, ${b.anim!.loop}ms)`;
       }
@@ -156,7 +197,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         const s = opts.share, drawn = def.kind === "anim" ? p.drawn(n) : [], art = drawn.length ? packSheet(drawn.map((f, i) => ({ name: `${n}_${i}`, img: f.img })), drawn.length).sheet : b.img;
         if (art.w * art.h * s * s <= 16_777_216) writePng(join(out, "share", n + ".png"), art.scale(s));
         else info += ` -- share/${n}.png not written: ${drawn.length ? `its ${drawn.length} frames in one strip` : "it"} at ${s}x would be ${art.w * s}x${art.h * s} px, past the 16,777,216 an image holds${frames.length ? `; share/${n}.gif written, ${frames[0].img.w * s}x${frames[0].img.h * s}` : ""}`;
-        if (frames.length) write(join(out, "share", n + ".gif"), encodeGif(frames.map((f) => ({ img: f.img.scale(s), ms: f.ms }))));
+        if (frames.length) write(join(out, "share", n + ".gif"), encodeGif(frames, { scale: s, palette: ownPal }));
       }
       if (def.opts.layers) for (const l of b.layers) writePng(join(out, dir, n, l.name + ".png"), l.img);
       if (b.tilemaps) {
@@ -178,9 +219,12 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         writePng(join(out, "_preview", n + ".png"), preview(shown, s));
         if (frames.length) {
           const k = Math.max(1, Math.floor(opts.every ?? 1));
-          // at 1x, every frame, no guide and no clear pixel (a scene, a long anim's preview), the preview's frames are the
-          // asset's own: its GIF's bytes again, not the same frames encoded twice
-          const gif = k === 1 && s === 1 && frames.every((f) => !f.guide && !f.img.data.some((c) => (c & 255) === 0)) ? own!
+          const opaque = frames.every((f) => !f.guide && !f.img.data.some((c) => (c & 255) === 0));
+          // At 1x, every frame, opaque: reuse the asset's own GIF bytes directly.
+          // At 2x..5x (no pixel grid drawn) and opaque: encode from 1x frames with nearest-neighbor scale
+          // (reusing the 1x palette when k === 1), producing byte-identical output without s²x scan/medianCut.
+          const gif = k === 1 && s === 1 && opaque ? own!
+            : s < 6 && opaque ? encodeGif(frames.filter((_, i) => i % k === 0).map((f) => ({ img: f.img, ms: f.ms * k })), { scale: s, palette: k === 1 ? ownPal : undefined })
             : encodeGif(frames.filter((_, i) => i % k === 0).map((f) => ({ img: preview(f.guide ?? f.img, s), ms: f.ms * k })));
           write(join(out, "_preview", n + ".gif"), gif);
           if (gif.length > BIG_GIF && k === 1) info += ` -- preview GIF ${(gif.length / 1e6).toFixed(1)} MB (${frames.length} frames): --every 3 keeps one frame in three`;

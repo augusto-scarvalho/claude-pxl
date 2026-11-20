@@ -13,5 +13,5 @@ export * from "./light.ts";
 export * from "./glow.ts";
 export * from "./normals.ts";
 export * from "./perspective.ts";
-export { gridRows, gridSize, rng, hash, bayer, regionPred, globRe, fmtArgs } from "./util.ts";
+export { gridRows, gridSize, rng, hash, bayer, regionPred, globRe, fmtArgs, fbmLoop, type FbmLoopOpts } from "./util.ts";
 export { glyph, textWidth } from "./font.ts";

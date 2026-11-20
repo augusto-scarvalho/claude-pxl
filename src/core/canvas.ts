@@ -23,7 +23,7 @@ import { type Face, type Material, type MeshCanvas, type MeshOpts, type MeshSpri
 import type { Lit } from "./sunlight.ts";
 import { POSE_BONES, sideColor } from "./pose.ts";
 import { closeGaps, lineColors } from "./vision.ts";
-import { bayer, colorList, gridRows, hash, lane, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
+import { bayer, colorList, fbmLoop, gridRows, hash, lane, polyBounds, type Region, regionPred, rng, vnoise } from "./util.ts";
 
 /** How a canvas reaches other assets. */
 export interface Resolver {
@@ -64,6 +64,7 @@ export const RELATIONS = ["beside", "on", "along", "apart"] as const;
 export type Rel = { to?: string; knobs: { key: "beside" | "along"; i: number; label: string; move: (d: number) => [number, number] }[] };
 /** What was stamped where, in drawing order (top-left in asset coords): for `pxl describe`. */
 export type Placement = { name: string; x: number; y: number; w: number; h: number; layer?: string; img: Img; /** the light it was drawn under, on the picture (a sprite in mesh()) */ light?: [number, number];
+  /** true for self-emitting or unlit 3D sprites: check and describe skip directional lit-side readings */ unlit?: boolean;
   /** a sprite in mesh(): how far its feet are over (under: below 0) the nearest face looking up under them, m, and its material */ stand?: { off: number; on: string };
   /** a stamp's: its id, where the call is in the art file (a stamp() item's, not a function's), its y in a layer sorted by y, its relation (for a scene's expect rules and --fix) */ id?: string; loc?: string; sort?: number; rel?: Rel;
   /** not a stamp: what c.as() named, or a sprite in mesh() */ via?: "as" | "mesh";
@@ -756,13 +757,55 @@ export class Canvas {
   }
 
   /**
-   * Flames rising from (x, y), about `size` px tall: a few tongues, each flickering to its own beat (a
-   * cycle of `period` frames, default 6), leaning with the wind (`wind` px across per px up at the
-   * tip, default 0.55; negative leans left), `keys` from the root, hottest, to the tip, the last one
-   * for their edges. Inside an anim it follows the frame; `seed` keeps two fires apart.
+   * Flames rising from (x, y), about `size` px tall.
+   * - `style: "tongues"` (default): separate flickering tongues leaning with `wind` (default 0.55), cycling every `period` frames (default 6).
+   * - `style: "plume"`: organic seamless-looping fluid fire via cylindrical 3D fBm (`fbmLoop`), with solid heated core, curling body and rising wisps.
+   * `keys` runs from hottest core (`keys[0]`) to coolest outer tip/rim (`keys[keys.length - 1]`).
    */
-  flame(x: number, y: number, size: number, keys: string, opts: { wind?: number; period?: number; seed?: number; frame?: number } = {}): void {
-    const k = [...keys], core = k.length > 1 ? k.slice(0, -1) : k, edge = k[k.length - 1], m = core.length;
+  flame(x: number, y: number, size: number, keys: string, opts: {
+    wind?: number; period?: number; seed?: number; frame?: number;
+    style?: "tongues" | "plume"; phase?: number; cycles?: number; curl?: number; wide?: number;
+  } = {}): void {
+    const style = opts.style ?? "tongues";
+    if (style !== "tongues" && style !== "plume") throw new PxError(`flame: style is "tongues" or "plume", got ${JSON.stringify(opts.style)}`);
+    const k = [...keys];
+    if (!k.length) return;
+    if (style === "plume") {
+      const seed = opts.seed ?? 1, wind = opts.wind ?? 0.25, cycles = opts.cycles ?? 2, curl = opts.curl ?? 0.35, wide = opts.wide ?? 0.42;
+      const phase = opts.phase ?? (this.frames > 1 ? this.phase : (opts.frame ?? this.frame) / (opts.period ?? 6));
+      if (!(size > 0) || !Number.isFinite(wind) || !Number.isFinite(cycles) || !(curl >= 0) || !(wide > 0))
+        throw new PxError(`flame (plume): size > 0, wide > 0, curl >= 0, got ${JSON.stringify(opts)}`);
+      const halfW = Math.ceil(size * (wide + Math.abs(wind) + curl) + 2);
+      const topH = Math.ceil(size * 1.15) + 1, botH = Math.ceil(size * 0.16) + 1;
+      const [x0, x1] = this.span(Math.floor(x) - halfW, Math.ceil(x) + halfW + 1, "x");
+      const [y0, y1] = this.span(Math.floor(y) - topH, Math.ceil(y) + botH + 1, "y");
+      const warpScale = Math.max(3, size * 0.36), warpPeriod = Math.max(8, size * 1.1);
+      const bodyScale = Math.max(2.5, size * 0.28), bodyPeriod = Math.max(8, size * 0.95);
+      for (let py = y0; py < y1; py++) {
+        const h = (y - py) / size;
+        if (h < -0.15 || h > 1.15) continue;
+        const hp = Math.max(0, h);
+        const lean = hp ** 1.4 * size * wind;
+        const baseCap = h < 0 ? Math.sqrt(Math.max(0, 1 - (h / 0.15) ** 2)) : 1;
+        const widthAtH = Math.max(0.08, (1 - hp * 0.88) * baseCap);
+        const curlAmt = size * curl * hp ** 0.85;
+        const turbGain = 0.55 + 0.65 * hp;
+        for (let px = x0; px < x1; px++) {
+          const flowX = px - x - lean;
+          const warp = curl > 0 ? (fbmLoop(flowX, py, phase, { scale: warpScale, period: warpPeriod, cycles, seed: seed + 17, octaves: 2 }) - 0.5) * 2 * curlAmt : 0;
+          const nx = (flowX + warp) / (size * wide);
+          const radial = Math.hypot(nx / widthAtH, h < 0 ? -h / 0.15 : 0);
+          if (radial > 1.55) continue;
+          const n = fbmLoop(flowX + warp * 0.5, py, phase, { scale: bodyScale, period: bodyPeriod, cycles, seed, octaves: 3 });
+          const T = (1 - hp * 0.72) - radial * radial * 0.76 + (n - 0.36) * turbGain;
+          if (T <= 0.16) continue;
+          const u = Math.max(0, Math.min(0.9999, (T - 0.16) / 0.84));
+          this.px(px, py, k[Math.floor((1 - u) * k.length)]);
+        }
+      }
+      return;
+    }
+    const core = k.length > 1 ? k.slice(0, -1) : k, edge = k[k.length - 1], m = core.length;
     const r = rng(opts.seed ?? 1), n = Math.max(1, Math.round(size * 0.5)), wind = opts.wind ?? 0.55, frame = opts.frame ?? this.frame, period = opts.period ?? 6;
     for (let i = 0; i < n; i++) {
       const ph = (frame / period + r()) % 1, h = size * (0.7 + 0.6 * Math.sin((ph + i * 0.3) * Math.PI * 2) ** 2) * (0.6 + r() * 0.6);
@@ -1064,6 +1107,23 @@ export class Canvas {
 
   /** Flat faces in meters (model()) drawn through the camera, the nearest kept per pixel, toned along their material's ramp: see mesh.ts. */
   mesh(view: Partial<View> | SurfaceView | ((p: [number, number, number]) => [number, number, number]), faces: Face[], mats: Record<string, Material>, opts: MeshOpts = {}): void {
+    this._mesh(view, faces, mats, opts, false);
+  }
+
+  /**
+   * 3D billboard sprites composited into the existing depth buffer (after `mesh()` and/or `surface()`)
+   * without building faces, shadow maps or contact-shadow buffers. Inherits the canvas's existing
+   * `world` lighting unless `unlit: true` (or custom `sun`) is given.
+   */
+  sprites3d(view: Partial<View> | SurfaceView | ((p: [number, number, number]) => [number, number, number]), sprites: MeshSprite[], opts: Omit<MeshOpts, "sprites" | "over" | "ppm" | "at" | "stand"> & { unlit?: boolean } = {}): void {
+    if (!Array.isArray(sprites)) throw new PxError(`sprites3d(view, sprites, opts?): sprites must be an array, got ${JSON.stringify(sprites)}`);
+    if (opts.unlit !== undefined && typeof opts.unlit !== "boolean") throw new PxError(`sprites3d: unlit is true or false, got ${JSON.stringify(opts.unlit)}`);
+    const { unlit, ...rest } = opts;
+    const mapped = unlit === undefined ? sprites : sprites.map((s) => (s && s.unlit === undefined ? { ...s, unlit } : s));
+    this._mesh(view, [], {}, { ...rest, sprites: mapped, over: true }, !unlit);
+  }
+
+  private _mesh(view: Partial<View> | SurfaceView | ((p: [number, number, number]) => [number, number, number]), faces: Face[], mats: Record<string, Material>, opts: MeshOpts, inheritWorld: boolean): void {
     // k times as big: the camera, the sprites' pixel, and the materials in blocks of it, ramps and textures
     // (a texel a block, as pixel art; a material's own block wins)
     const k = this.k, view0 = view;
@@ -1102,7 +1162,7 @@ export class Canvas {
       }
       return out;
     }), ms = opts.stand;
-    const ground = S.some((s) => s?.stand) || ms || (this.res as { checksOnly?: boolean }).checksOnly ? groundOf(faces ?? []) : undefined;
+    const ground = faces.length && (S.some((s) => s?.stand) || ms || (this.res as { checksOnly?: boolean }).checksOnly) ? groundOf(faces ?? []) : undefined;
     const mats3 = (v: unknown, what: string) => {
       if (!(v === undefined || typeof v === "boolean" || (Array.isArray(v) && v.every((m) => typeof m === "string")))) throw new PxError(`mesh: ${what} stand is true (on the highest face looking up under it) or materials' names, ["deck", "flags"], got ${JSON.stringify(v)}`);
       return v;
@@ -1111,21 +1171,22 @@ export class Canvas {
     const sprites = S.map((s, k) => {
       let at = s?.at;
       const st = mats3(s?.stand, `sprite ${k}'s`) ?? (Array.isArray(at) && at.length === 2 && !s.air ? ms : undefined);
-      if (st && Array.isArray(at)) {
+      if (st && Array.isArray(at) && ground) {
         // on the highest face looking up under it (of those materials), or where it is
-        const hs = ground!(at[0], at[1]).filter((h) => st === true || (st as string[]).includes(h.mat));
+        const hs = ground(at[0], at[1]).filter((h) => st === true || (st as string[]).includes(h.mat));
         if (hs.length) at = [at[0], at[1], Math.max(...hs.map((h) => h.u))];
       }
       if (!s || typeof s.name !== "string" || !Array.isArray(at) || (at.length !== 2 && at.length !== 3) || !at.every(Number.isFinite))
-        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m; or a function of the time giving them), id?, heading?, flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, veil?, light?, stand?, air?, ghosts? }, got ${JSON.stringify(s)}`);
+        throw new PxError(`mesh: sprite ${k} is { name, at: [x, z] or [x, z, up] (its feet, in m; or a function of the time giving them), id?, heading?, flip?, frame?, delay?, rdelay?, seed?, reseed?, fx?, shadow?, blend?, opacity?, veil?, light?, stand?, air?, unlit?, ghosts? }, got ${JSON.stringify(s)}`);
       // its own time in its loop and its own random choices, as a stamp's, picked by its id or else where it stands (cm)
       const o = { flip: s.flip, frame: s.frame, delay: s.delay, rdelay: s.rdelay, seed: s.seed, reseed: s.reseed, fx: s.fx, heading: s.heading, id: s.id };
       if (s.blend !== undefined && !["alpha", "add", "screen"].includes(s.blend)) throw new PxError(`mesh: sprite ${k} has blend ${JSON.stringify(s.blend)}: "alpha" (over, lit), "add" or "screen" (light)`);
       if (s.opacity !== undefined && !(s.opacity >= 0 && s.opacity <= 1)) throw new PxError(`mesh: sprite ${k} has opacity ${JSON.stringify(s.opacity)}: 0..1`);
       if (s.veil !== undefined && !(s.veil >= 0 && s.veil <= 1 && s.blend === "alpha")) throw new PxError(`mesh: sprite ${k} has veil ${JSON.stringify(s.veil)}: the share of the sun a sprite blended "alpha" holds back, 0..1`);
       if (s.air !== undefined && typeof s.air !== "boolean") throw new PxError(`mesh: sprite ${k} has air ${JSON.stringify(s.air)}: true when it flies (check doesn't ask its feet to be on the model)`);
+      if (s.unlit !== undefined && typeof s.unlit !== "boolean") throw new PxError(`mesh: sprite ${k} has unlit ${JSON.stringify(s.unlit)}: true to draw in its own colors (ignores scene lighting)`);
       if (s.id !== undefined && typeof s.id !== "string") throw new PxError(`mesh: sprite ${k} has id ${JSON.stringify(s.id)}: a name for its sockets ("hero": "hero.hand")`);
-      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, veil: s.veil, light: s.light, air: s.air,
+      return { name: s.name, img: this.asset(s.name, o, Math.round(at[0] * 100), Math.round(at[1] * 100)), at: [at[0], at[1], at[2] ?? 0] as [number, number, number], shadow: s.shadow, blend: s.blend, opacity: s.opacity, veil: s.veil, light: s.light, air: s.air, unlit: s.unlit,
         ...(s.light && s.light.color !== undefined ? { tint: this.color(s.light.color) } : {}) };
     });
     // looked up on first use: a palette without ramps has nothing to step (and needs nothing stepped without textures or sprites)
@@ -1144,7 +1205,8 @@ export class Canvas {
     // the light in the world: its colors in linear light, times their strengths (see sunlight.ts)
     // (not when only checking: the checks read what was placed, not the light on it, as with lighting())
     let lit: Lit | undefined;
-    if (opts.sun !== undefined && !(this.res as { checksOnly?: boolean }).checksOnly) {
+    const ownSun = opts.sun !== undefined && !(this.res as { checksOnly?: boolean }).checksOnly;
+    if (ownSun) {
       const rgb = (v: unknown, what: string): [number, number, number] => {
         const o = (typeof v === "string" ? { color: v } : v) as { color?: unknown; strength?: unknown } | undefined;
         const c = typeof o?.color === "string" ? this.color(o.color) : null, k = o?.strength ?? 1;
@@ -1161,6 +1223,8 @@ export class Canvas {
       });
       const emit = new Set([...(opts.emit ?? "")].map((k) => this.color(k)).filter((c): c is Color => c !== null));
       lit = { sun, sky, dir: [0, 0, 1], lamps, emit, shadows: opts.shadows !== false };
+    } else if (inheritWorld && this.img.world && !(this.res as { checksOnly?: boolean }).checksOnly) {
+      lit = { ...this.img.world, lamps: this.img.world.lamps };
     }
     // straight into the pixels when nothing stands between (a clip, a twin's mirror, a wrapped edge)
     const mc = Object.assign(Object.create(this) as MeshCanvas, { raw: this.clipPred || this.mirrored || this.wrap ? undefined : this.img.data });
@@ -1171,9 +1235,9 @@ export class Canvas {
       if (id) this.placed?.set(id, { x: this.ox + p.x, y: this.oy + p.y, sockets: Object.fromEntries(Object.entries(sp.img.sockets ?? {}).map(([n, [x, y]]) => [n, [x * K, y * K]])), m3: (sk) => this.socketIn(view0 as Partial<View>, sp.name, sp.img, sp.at, sk, K) });
       // (its feet against the nearest face looking up under them; none under, or flying: not asked)
       const hs = ground && p.at && !p.air ? ground(p.at[0], p.at[1]) : [], h = hs.reduce<{ u: number; mat: string } | undefined>((b, q) => (!b || Math.abs(q.u - p.at![2]) < Math.abs(b.u - p.at![2]) ? q : b), undefined);
-      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}), ...(h ? { stand: { off: p.at![2] - h.u, on: h.mat } } : {}), via: "mesh", ...(id ? { id } : {}), ...code });
+      this.log?.push({ name: p.name, x: this.ox + p.x, y: this.oy + p.y, w: p.img.w, h: p.img.h, layer: this.layerName, img: p.img, ...(p.light ? { light: p.light } : {}), ...(p.unlit ? { unlit: true } : {}), ...(h ? { stand: { off: p.at![2] - h.u, on: h.mat } } : {}), via: "mesh", ...(id ? { id } : {}), ...code });
     }
-    if (lit) this.img.world = lit;
+    if (ownSun && lit) this.img.world = lit;
   }
 
   /**
@@ -2210,7 +2274,7 @@ const TUFTS = [`
 export const OPS = [
   "px", "closeLine", "rect", "box", "line", "curve", "hline", "vline", "ellipse", "circ", "ring", "arc", "poly", "fill",
   "dither", "grad", "noise", "recolor", "shade", "light", "relight", "rampmap", "foliage", "warp", "effect",
-  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "bubble", "cells", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "surface", "voxels", "volume", "splats", "decal", "draw3d", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "weather", "particles", "trail", "cast", "shake",
+  "stamp", "tile", "pattern", "panel", "tilemap", "scatter", "grid", "runs", "wire", "text", "bubble", "cells", "lamp", "bump", "normals", "pose", "plane", "terrain", "solids", "shadows", "mesh", "sprites3d", "surface", "voxels", "volume", "splats", "decal", "draw3d", "capsule", "flame", "scroll", "clouds", "plume", "smoke", "weather", "particles", "trail", "cast", "shake",
 ] as const;
 export type OpName = (typeof OPS)[number];
 

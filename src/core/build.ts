@@ -380,7 +380,9 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
       return;
     }
     if (name === "glow") {
-      base.data.set(applyGlow(base, args[0] as Parameters<typeof applyGlow>[1], (args[1] ?? {}) as GlowOpts, pal, keyed()).data);
+      const go = (args[1] ?? {}) as GlowOpts;
+      const gOpts = main.k > 1 && !go.px && go.pixel === undefined ? { ...go, pixel: main.k } : go;
+      base.data.set(applyGlow(base, args[0] as Parameters<typeof applyGlow>[1], gOpts, pal, keyed()).data);
       snap?.("glow", loc);
       return;
     }

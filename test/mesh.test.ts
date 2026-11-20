@@ -449,3 +449,47 @@ test("a face's normal from its first corners that turn: a plan starting midway a
   assert.deepEqual(mid.map((v) => Math.abs(v)), [0, 0, 1]);
   assert.deepEqual(faceNormal([[0, 0, 0], [2, 0, 0], [2, 1, 0]]), [0, 0, 1]);
 });
+
+test("sprites3d: depth occlusion, world-light inheritance, unlit sprites & check lit-side suppression", async () => {
+  const { checkProject } = await import("../src/node/check.ts");
+  // Dark scene lighting so lit sprites visibly darken while unlit / emit-keep sprites preserve full RGB.
+  const src = (extra: string) => PAL + `ramps("kgw")
+const V = { w: 40, horizon: 10, eye: 1, focal: 40 }
+sprite("_white", "w")
+sprite("card", { w: 8, h: 12, pivot: "bottom" }, rect(0, 0, 8, 12, "w"), rect(0, 0, 3, 12, "k"), rect(5, 0, 3, 12, "w"))
+sprite("flame_card", { w: 8, h: 12, pivot: "bottom" }, rect(0, 0, 8, 12, "r"), rect(0, 0, 3, 12, "k"), rect(5, 0, 3, 12, "w"), effect("emit", { keep: true }))
+const F = model()
+F.face("g", [-5, 1.5, 0], [5, 1.5, 0], [5, 20, 0], [-5, 20, 0])
+F.box("wall", [-1, 3, 0], [1, 3.2, 0.5])
+scene("a", { w: 40, h: 40 },
+  (c) => c.mesh(V, F.faces, { g: { tex: "_white" }, wall: { ramp: "kgw" } }, { light: [-1, 0, 0.8], sun: { color: "w", strength: 0.4 }, sky: { color: "w", strength: 0.1 } }),
+  ${extra})`;
+  // 1. Depth occlusion behind the wall + world-light inheritance vs unlit: true
+  const lit = loadSource(src(`sprites3d(V, [{ name: "card", at: [0, 4], shadow: 0 }])`), "t.px.js").image("a");
+  const unlit = loadSource(src(`sprites3d(V, [{ name: "card", at: [0, 4], shadow: 0 }], { unlit: true })`), "t.px.js").image("a");
+  // Row 12 is above the wall top (row 16.25); col 22 is the white side of card
+  assert.ok((lit.get(22, 12) >>> 24) < 190, `lit sprite inherits dark scene lighting (${lit.get(22, 12) >>> 24})`);
+  assert.equal(unlit.get(22, 12) >>> 24, 255, "unlit: true keeps exact full brightness");
+  // Row 18 is below the wall top -> card occluded by wall in both
+  assert.notEqual(unlit.get(22, 18) >>> 24, 255, "depth-occluded behind wall");
+  // 2. pxl check warns on lit card (shaded opposite to left light), but NOT on unlit: true, blend: "add", or emit-keep sprite
+  const warnLit = checkProject(loadSource(src(`sprites3d(V, [{ name: "card", at: [0, 4], shadow: 0 }])`), "t.px.js", { checksOnly: true }));
+  assert.ok(warnLit.lines.some((l) => /lit from/.test(l)), `lit card with flipped shading warns: ${warnLit.lines}`);
+  for (const okCall of [
+    `sprites3d(V, [{ name: "card", at: [0, 4], shadow: 0, unlit: true }])`,
+    `sprites3d(V, [{ name: "card", at: [0, 4], shadow: 0 }], { unlit: true })`,
+    `sprites3d(V, [{ name: "card", at: [0, 4], blend: "add" }])`,
+    `sprites3d(V, [{ name: "flame_card", at: [0, 4], shadow: 0 }])`,
+  ]) {
+    const r = checkProject(loadSource(src(okCall), "t.px.js", { checksOnly: true }));
+    assert.equal(r.lines.filter((l) => /lit from/.test(l)).length, 0, `${okCall} should not warn on lit side: ${r.lines}`);
+  }
+  // 3. Flat-floor SunMap skip + block > 1 textured fast-path produces exact pixels matching shadows: false and clipped (non-raw) rendering
+  const flat = (extraOpts: string, clip = false) => loadSource(PAL + `ramps("kgw")
+const V = { w: 36, horizon: 8, eye: 1, focal: 36 }
+sprite("_t", "wk\\nkw")
+const G = model(); G.face("f", [-6, 1.5, 0], [6, 1.5, 0], [6, 20, 0], [-6, 20, 0])
+scene("a", { w: 36, h: 36 }, (c) => { const draw = () => c.mesh(V, G.faces, { f: { tex: "_t", texel: 0.5, block: 3 } }, { light: [-0.5, -0.3, 0.8], sun: "w", sky: { color: "w", strength: 0.2 }${extraOpts} }); ${clip ? "c.clip([0, 0, 36, 36], draw)" : "draw()"} })`, "t.px.js").image("a");
+  assert.equal(flat("").hash(), flat(", shadows: false").hash(), "flat floor with shadows enabled matches shadows: false");
+  assert.equal(flat("").hash(), flat("", true).hash(), "block > 1 fast raw shading cache matches non-raw path bit-for-bit");
+});

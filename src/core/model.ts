@@ -527,6 +527,10 @@ export interface GlowOpts {
   ramp?: number;
   /** Keys the halo leaves as drawn: what the glowing thing is made of (the logs and stones under flames). */
   keep?: string | string[];
+  /** Art-pixel block size (auto-follows a scene's `pixel` / `sizes`, scaling `r` by `pixel` unless `px: true`). */
+  pixel?: number;
+  /** In a scene k times as big (`sizes` / `pixel`), keep `r` in picture px instead of art px. */
+  px?: boolean;
 }
 
 export interface TextOpts {

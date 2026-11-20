@@ -15,16 +15,28 @@ export interface GifFrame {
   changed?: number[][];
 }
 
+export interface GifOpts {
+  /** Nearest-neighbor integer upscale applied to indexed frames before LZW (exact match to pre-scaled frames, s²x faster scan/quantize). */
+  scale?: number;
+  /** Reuse a precomputed RGB palette (skipping medianCut when encoding an upscaled preview of the same frames). */
+  palette?: number[];
+  /** Called with the chosen RGB palette so callers can reuse it for a derived preview GIF. */
+  onPalette?: (pal: number[]) => void;
+}
+
 /**
  * The frames given at once, or made on demand: a function giving them afresh at each call (twice: the colors, then the
  * encoding), each frame read before the next is asked for, so one may be drawn over the one before (playAll's).
  */
-export function encodeGif(frames: GifFrame[] | (() => Iterable<GifFrame>)): Buffer {
+export function encodeGif(frames: GifFrame[] | (() => Iterable<GifFrame>), opts: GifOpts = {}): Buffer {
+  const S = Math.max(1, Math.floor(opts.scale ?? 1));
   const each = typeof frames === "function" ? frames : () => frames;
-  const copy = each === frames, { w, h, transparent, counts, repeat, ms } = scan(each, copy, false) ?? scan(each, copy, true)!;
+  const copy = each === frames, { w: rw, h: rh, transparent, counts, repeat, ms } = scan(each, copy, false) ?? scan(each, copy, true)!;
+  const w = rw * S, h = rh * S;
   // index 0 is kept for "transparent": a clear pixel in a sprite, or in a scene, "as before"
   const room = 255;
-  const pal = counts.size <= room ? [...counts.keys()] : medianCut(counts, room);
+  const pal = opts.palette ?? (counts.size <= room ? [...counts.keys()] : medianCut(counts, room));
+  opts.onPalette?.(pal);
   const colors = [0, ...pal];
   const base = 1;
   let bits = 1;
@@ -61,44 +73,58 @@ export function encodeGif(frames: GifFrame[] | (() => Iterable<GifFrame>)): Buff
     const cs = Math.max(2, Math.round(due));
     due = Math.max(-0.5, Math.min(0.5, due - cs));
     // (what changed indexed again, the rest the frame before's)
-    const { img } = f, rects = prev && pw === img.w && ph === img.h ? f.changed : undefined, idx = rects ? prev!.slice() : new Uint8Array(w * h);
+    const { img } = f, rects = prev && pw === img.w && ph === img.h ? f.changed : undefined, idx = rects ? prev!.slice() : new Uint8Array(rw * rh);
     pw = img.w; ph = img.h;
     let last = -1, at = 0, l2 = -1, a2 = 0;   // (a pixel the same as one of the two colors before it asks no map)
-    for (const [rx, ry, rw, rh] of rects ?? [[0, 0, img.w, img.h]])
-      for (let y = ry; y < ry + rh; y++)
-        for (let x = rx; x < rx + rw; x++) {
+    for (const [rx, ry, rw0, rh0] of rects ?? [[0, 0, img.w, img.h]])
+      for (let y = ry; y < ry + rh0; y++)
+        for (let x = rx; x < rx + rw0; x++) {
           const c = img.data[y * img.w + x];
           if (c !== last) {
             const i = c === l2 ? a2 : isClear(c) ? 0 : indexOf(c >>> 8);
             l2 = last; a2 = at; last = c; at = i;
           }
-          idx[y * w + x] = at;
+          idx[y * rw + x] = at;
         }
     // A sprite with clear pixels: whole frames, the area restored to background between them so they
     // don't pile up. A scene: after the first frame, only the rectangle that changed, what stayed the
     // same in it as index 0 (transparent), each frame left in place for the next to draw over.
-    let [x0, y0, x1, y1] = [0, 0, w - 1, h - 1];
+    let [x0, y0, x1, y1] = [0, 0, rw - 1, rh - 1];
     if (!transparent && prev) {
-      [x0, y0, x1, y1] = [w, h, -1, -1];
-      for (const [rx, ry, rw, rh] of rects ?? [[0, 0, w, h]])
-        for (let y = ry; y < ry + rh; y++)
-          for (let x = rx; x < rx + rw; x++)
-            if (idx[y * w + x] !== prev[y * w + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      [x0, y0, x1, y1] = [rw, rh, -1, -1];
+      for (const [rx, ry, rw0, rh0] of rects ?? [[0, 0, rw, rh]])
+        for (let y = ry; y < ry + rh0; y++)
+          for (let x = rx; x < rx + rw0; x++)
+            if (idx[y * rw + x] !== prev[y * rw + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
       if (x1 < 0) [x0, y0, x1, y1] = [0, 0, 0, 0];
     }
     // (in a scene, out of what changed it is the frame before: index 0, as the rectangle starts)
-    const fw = x1 - x0 + 1, fh = y1 - y0 + 1, part = new Uint8Array(fw * fh);
-    for (const [rx, ry, rw, rh] of !transparent && rects ? rects : [[x0, y0, fw, fh]])
-      for (let y = Math.max(ry, y0); y < Math.min(ry + rh, y1 + 1); y++)
-        for (let x = Math.max(rx, x0), e = Math.min(rx + rw, x1 + 1); x < e; x++) {
-          const i = y * w + x;
-          part[(y - y0) * fw + x - x0] = !transparent && prev && idx[i] === prev[i] ? 0 : idx[i];
+    const rfw = x1 - x0 + 1, rfh = y1 - y0 + 1, fw = rfw * S, fh = rfh * S, part = new Uint8Array(fw * fh);
+    if (S === 1) {
+      for (const [rx, ry, rw0, rh0] of !transparent && rects ? rects : [[x0, y0, rfw, rfh]])
+        for (let y = Math.max(ry, y0); y < Math.min(ry + rh0, y1 + 1); y++)
+          for (let x = Math.max(rx, x0), e = Math.min(rx + rw0, x1 + 1); x < e; x++) {
+            const i = y * rw + x;
+            part[(y - y0) * fw + x - x0] = !transparent && prev && idx[i] === prev[i] ? 0 : idx[i];
+          }
+    } else {
+      for (const [rx, ry, rw0, rh0] of !transparent && rects ? rects : [[x0, y0, rfw, rfh]])
+        for (let y = Math.max(ry, y0); y < Math.min(ry + rh0, y1 + 1); y++) {
+          const baseRow = (y - y0) * S * fw;
+          for (let x = Math.max(rx, x0), e = Math.min(rx + rw0, x1 + 1); x < e; x++) {
+            const i = y * rw + x, v = !transparent && prev && idx[i] === prev[i] ? 0 : idx[i];
+            if (!v) continue;
+            const bx = baseRow + (x - x0) * S;
+            for (let sx = 0; sx < S; sx++) part[bx + sx] = v;
+          }
+          for (let sy = 1; sy < S; sy++) part.copyWithin(baseRow + sy * fw, baseRow, baseRow + fw);
         }
+    }
     out.push(0x21, 0xf9, 4, ((transparent ? 2 : 1) << 2) | (transparent || prev ? 1 : 0));
     u16(cs);
     out.push(0, 0);
     out.push(0x2c);
-    u16(x0); u16(y0); u16(fw); u16(fh);
+    u16(x0 * S); u16(y0 * S); u16(fw); u16(fh);
     out.push(0);
     prev = idx;
     out.push(minSize);
@@ -271,10 +297,31 @@ export function medianCut(counts: Map<number, number>, n: number): number[] {
     boxes.splice(pick, 1, box(b.cs.slice(0, cut)), box(b.cs.slice(cut)));
   }
   let pal = boxes.map((b) => mean(b.cs, wt));
+  // Unpack unique colors and palette into flat typed arrays once; green has the largest weight (4),
+  // so checking 4 * dg² >= bd skips most palette entries in the 4 k-means passes without changing any pick.
+  const M = counts.size, cr = new Int32Array(M), cg = new Int32Array(M), cb = new Int32Array(M), cw = new Float64Array(M);
+  let mi = 0;
+  for (const [c, cnt] of counts) { cr[mi] = (c >> 16) & 255; cg[mi] = (c >> 8) & 255; cb[mi] = c & 255; cw[mi] = cnt; mi++; }
+  const P = pal.length, pr = new Int32Array(P), pg = new Int32Array(P), pb = new Int32Array(P);
+  const sr = new Float64Array(P), sg = new Float64Array(P), sb = new Float64Array(P), sw = new Float64Array(P);
   for (let pass = 0; pass < 4; pass++) {
-    const groups: number[][] = pal.map(() => []);
-    for (const c of counts.keys()) groups[nearest(pal, c)].push(c);
-    pal = groups.map((g, i) => (g.length ? mean(g, (c) => counts.get(c)!) : pal[i]));
+    for (let i = 0; i < P; i++) { const c = pal[i]; pr[i] = (c >> 16) & 255; pg[i] = (c >> 8) & 255; pb[i] = c & 255; }
+    sr.fill(0); sg.fill(0); sb.fill(0); sw.fill(0);
+    for (let j = 0; j < M; j++) {
+      const r = cr[j], g = cg[j], b = cb[j], w = cw[j];
+      let best = 0, bd = 1e9;
+      for (let i = 0; i < P; i++) {
+        const dg = pg[i] - g, d0 = 4 * dg * dg;
+        if (d0 >= bd) continue;
+        const dr = pr[i] - r, d1 = d0 + 2 * dr * dr;
+        if (d1 >= bd) continue;
+        const db = pb[i] - b, d = d1 + 3 * db * db;
+        if (d < bd) { bd = d; best = i; }
+      }
+      sr[best] += r * w; sg[best] += g * w; sb[best] += b * w; sw[best] += w;
+    }
+    for (let i = 0; i < P; i++)
+      if (sw[i] > 0) pal[i] = (Math.round(sr[i] / sw[i]) << 16) | (Math.round(sg[i] / sw[i]) << 8) | Math.round(sb[i] / sw[i]);
   }
   return pal;
 }

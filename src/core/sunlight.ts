@@ -59,15 +59,22 @@ export class SunMap {
     if (Math.abs(area) < 1e-9) return;
     const xa = Math.max(0, Math.floor(Math.min(A[0], B[0], D[0]))), xb = Math.min(this.w - 1, Math.ceil(Math.max(A[0], B[0], D[0])));
     const ya = Math.max(0, Math.floor(Math.min(A[1], B[1], D[1]))), yb = Math.min(this.h - 1, Math.ceil(Math.max(A[1], B[1], D[1])));
-    for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) {
-      const px = x + 0.5, py = y + 0.5;
-      const w1 = ((D[0] - A[0]) * (py - A[1]) - (D[1] - A[1]) * (px - A[0])) / -area, w2 = ((B[0] - A[0]) * (py - A[1]) - (B[1] - A[1]) * (px - A[0])) / area, w0 = 1 - w1 - w2;
-      if (w0 < -1e-4 || w1 < -1e-4 || w2 < -1e-4) continue;
-      const k = keep ? keep(w0, w1, w2) : 1;
-      if (!k) continue;
-      const z = w0 * A[2] + w1 * B[2] + w2 * D[2], i = y * this.w + x;
-      if (veil) { this.vdepth![i] = Math.min(this.vdepth![i], z); this.valpha![i] = Math.max(this.valpha![i], +k); }
-      else if (z < this.depth[i]) { this.depth[i] = z; this.who[i] = id; }
+    const invA = 1 / area, ax = A[0], ay = A[1], az = A[2], bz = B[2], dz = D[2];
+    const d1x = (D[1] - ay) * invA, d1y = -(D[0] - ax) * invA;
+    const d2x = -(B[1] - ay) * invA, d2y = (B[0] - ax) * invA;
+    const w = this.w, depth = this.depth, who = this.who, vdepth = this.vdepth, valpha = this.valpha;
+    for (let y = ya; y <= yb; y++) {
+      const dy = y + 0.5 - ay, dx0 = xa + 0.5 - ax, row = y * w;
+      let w1 = d1y * dy + d1x * dx0, w2 = d2y * dy + d2x * dx0;
+      for (let x = xa; x <= xb; x++, w1 += d1x, w2 += d2x) {
+        const w0 = 1 - w1 - w2;
+        if (w0 < -1e-4 || w1 < -1e-4 || w2 < -1e-4) continue;
+        const k = keep ? keep(w0, w1, w2) : 1;
+        if (!k) continue;
+        const z = w0 * az + w1 * bz + w2 * dz, i = row + x;
+        if (veil) { if (z < vdepth![i]) vdepth![i] = z; const ka = +k; if (ka > valpha![i]) valpha![i] = ka; }
+        else if (z < depth[i]) { depth[i] = z; who[i] = id; }
+      }
     }
   }
   /** A sprite as a cut-out where it stands, its feet at `at`, `m` m to its pixel, `right` its right in the world (the camera's); with `veil`, see-through: that share of the sun held back by its alpha. */
@@ -109,18 +116,25 @@ export class SunMap {
   lee(slope: number): number { return this.cell * (0.5 + 1 / Math.max(0.2, slope)) + 0.005; }
 }
 
-/** How much of a light a surface takes, its cosine to it `d`, the light wrapping `wrap` past the edge. */
-const take = (d: number, wrap: number) => Math.max(0, (d + wrap) / (1 + wrap));
-
 /** The art's color `c` under the light at (px, py, pz), its normal N, `sunlit` how much of the sun reaches it; `wrap` how far the light goes past the edge (0 faces, 0.5 sprites). */
 export function shine(c: Color, N: V3, px: number, py: number, pz: number, L: Lit, sunlit: boolean | number, wrap: number): Color {
-  if (L.emit.has(c)) return c;
+  if (L.emit.size > 0 && L.emit.has(c)) return c;
   let r = L.sky[0], g = L.sky[1], b = L.sky[2];
-  if (sunlit) { const k = take(dot(N, L.dir), wrap) * +sunlit; r += L.sun[0] * k; g += L.sun[1] * k; b += L.sun[2] * k; }
-  for (const l of L.lamps) {
-    const dx = l.at[0] - px, dy = l.at[1] - py, dz = l.at[2] - pz, d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (d >= l.r) continue;
-    const f = (1 - d / l.r) ** 2 * take(d > 1e-6 ? (N[0] * dx + N[1] * dy + N[2] * dz) / d : 1, wrap);
+  const nx = N[0], ny = N[1], nz = N[2], invW = 1 / (1 + wrap);
+  if (sunlit) {
+    const dt = (nx * L.dir[0] + ny * L.dir[1] + nz * L.dir[2] + wrap) * invW;
+    if (dt > 0) { const k = dt * +sunlit; r += L.sun[0] * k; g += L.sun[1] * k; b += L.sun[2] * k; }
+  }
+  const lamps = L.lamps;
+  for (let i = 0, len = lamps.length; i < len; i++) {
+    const l = lamps[i], lr = l.r;
+    const dx = l.at[0] - px, dy = l.at[1] - py, dz = l.at[2] - pz;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 >= lr * lr) continue;
+    const d = Math.sqrt(d2);
+    const dt = ((d > 1e-6 ? (nx * dx + ny * dy + nz * dz) / d : 1) + wrap) * invW;
+    if (dt <= 0) continue;
+    const u = 1 - d / lr, f = u * u * dt;
     r += l.rgb[0] * f; g += l.rgb[1] * f; b += l.rgb[2] * f;
   }
   return fromLinear(LIN[c >>> 24] * r, LIN[(c >>> 16) & 255] * g, LIN[(c >>> 8) & 255] * b, c);

@@ -1,5 +1,6 @@
 // Small shared helpers: grids, randomness, regions, dithering.
 import { PxError } from "./errors.ts";
+import { fbm3 } from "./sdf.ts";
 
 /** Grid string -> rows: each row trimmed, blank leading/trailing rows dropped. */
 export function gridRows(s: string): string[] {
@@ -66,6 +67,37 @@ export function fbm(x: number, y: number, octaves = 4): number {
   let s = 0, a = 0.5, f = 1;
   for (let i = 0; i < octaves; i++) { s += a * vnoise(x * f, y * f); a *= 0.5; f *= 2.03; }
   return s / (1 - 0.5 ** octaves);
+}
+
+export interface FbmLoopOpts {
+  /** Noise cell size across the non-flowing axis in px (default 8). */
+  scale?: number;
+  /** Wavelength along the flowing axis in px (default 24). */
+  period?: number;
+  /** Integer cycles traveled per loop (default 2; negative reverses flow direction). */
+  cycles?: number;
+  /** Seed for deterministic variation (default 1). */
+  seed?: number;
+  /** Number of fBm octaves, 1..6 (default 3). */
+  octaves?: number;
+  /** Flow axis: "y" flows upward as phase increases (fire, smoke, waterfalls), "x" flows leftward (wind, rivers). */
+  axis?: "x" | "y";
+}
+
+/**
+ * Seamless-looping 2D flowing noise in [0, 1] via cylindrical periodic mapping over 3D fBm:
+ * features advect continuously along `axis` by `cycles` wavelengths as `phase` goes 0..1, closing
+ * exactly with zero crossfade ghosting. Ideal for looping fire, lava, waterfalls, smoke and energy.
+ */
+export function fbmLoop(x: number, y: number, phase: number, opts: FbmLoopOpts = {}): number {
+  const { scale = 8, period = 24, cycles = 2, seed = 1, octaves = 3, axis = "y" } = opts;
+  if (!(scale > 0) || !(period > 0) || !Number.isFinite(cycles) || !Number.isInteger(seed) || !(Number.isInteger(octaves) && octaves >= 1 && octaves <= 6) || (axis !== "x" && axis !== "y"))
+    throw new PxError(`fbmLoop(x, y, phase, { scale, period, cycles, seed, octaves, axis }): scale/period > 0, seed whole, octaves 1..6, axis "x" | "y", got ${JSON.stringify(opts)}`);
+  const flow = axis === "y" ? y : x;
+  const cross = axis === "y" ? x : y;
+  const a = 2 * Math.PI * (flow / period + phase * cycles);
+  const rad = 0.85;
+  return fbm3(cross / scale, Math.cos(a) * rad, Math.sin(a) * rad, seed, octaves);
 }
 
 /**

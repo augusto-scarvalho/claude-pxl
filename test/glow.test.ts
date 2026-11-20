@@ -79,3 +79,18 @@ scene("s", { w: 20, h: 20, bg: "k" }, surface(sdf.sphere(0.15).mat("lamp"), { vi
   assert.equal(lamp('glow(["#f2b450", "#ffeab0"], { r: 6, strength: 1 })').image("s").hash(), lit.hash(), "the same as its colors");
   assert.match(failure(PAL + 'scene("s", { w: 4, h: 4 }, glow({ colors: "r" }))').message, /a 3D material \(\{ ramp \}\)/);
 });
+
+test("glow: filled multi-color block (interior skip) matches edge-only falloff; pixel & sizes auto-scale halos", () => {
+  // Large 8x8 filled glowing block surrounded by dark pixels: interior cells are skipped, border cells govern all falloff.
+  const block = loadSource(PAL + `scene("s", { w: 24, h: 24, bg: "k" }, rect(8, 8, 8, 8, "r"), rect(10, 10, 4, 4, "w"), glow("rw", { r: 5, strength: 1 }))`, "t.px.js").image("s");
+  assert.ok((block.get(7, 12) >>> 24) > (block.get(5, 12) >>> 24), "red outer ring glows leftward");
+  assert.ok(((block.get(16, 12) >>> 16) & 255) > 0, "inner white core still reaches past the 2px red border within r=5");
+  assert.equal(block.get(2, 12) >>> 24, 0, "beyond r from outer edge stays black");
+  // In a sizes scene (2x), glow scales radius in art pixels automatically unless px: true keeps raw screen pixels.
+  const hd = loadSource(PAL + `scene("a", { w: 20, h: 5, bg: "k", sizes: { a_hd: 2 } }, (c) => { c.rect(9 * c.k, 2 * c.k, c.k, c.k, "r") }, glow("r", { r: 4, strength: 1 }))`, "t.px.js");
+  const a1 = hd.image("a"), a2 = hd.image("a_hd");
+  assert.equal(a2.get(17, 4) >>> 24, a1.get(8, 2) >>> 24, "1 art px away in 2x matches 1x");
+  assert.ok((a2.get(11, 4) >>> 24) > 0, "3.5 art px away (7 raw px) still lit in 2x");
+  const rawPx = loadSource(PAL + `scene("a", { w: 20, h: 5, bg: "k", sizes: { a_hd: 2 } }, (c) => { c.rect(9 * c.k, 2 * c.k, c.k, c.k, "r") }, glow("r", { r: 4, strength: 1, px: true }))`, "t.px.js").image("a_hd");
+  assert.equal(rawPx.get(11, 4) >>> 24, 0, "px: true keeps r in raw screen pixels (7 raw px > 4)");
+});

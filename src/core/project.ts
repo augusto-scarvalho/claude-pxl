@@ -35,7 +35,7 @@ import { SMOKE_OPTS } from "./smoke.ts";
 import { WEATHER_OPTS } from "./weather.ts";
 import { ability, emitter, follow, route, turnToward, tween, unroll } from "./vfx.ts";
 import { SPELL_OPTS, spell } from "./spells.ts";
-import { bayer, fbm, globRe, gridRows, lane, latticeHash, profile, rng, vec, vnoise, seamless } from "./util.ts";
+import { bayer, fbm, fbmLoop, globRe, gridRows, lane, latticeHash, profile, rng, vec, vnoise, seamless } from "./util.ts";
 
 /**
  * Op signatures: name:type, "?" marks the first optional argument.
@@ -71,6 +71,7 @@ export const SIGNATURES: Record<string, string> = {
   solids: "view:o shapes:a ?opts:o",
   shadows: "view:o shapes:a opts:o",
   mesh: "view:v faces:a mats:o ?opts:o",
+  sprites3d: "view:v sprites:a ?opts:o",
   surface: "field:o ?opts:o",
   voxels: "grid:o ?opts:o",
   volume: "density:o ?opts:o",
@@ -145,13 +146,14 @@ export const OP_OPTS: Record<string, string[]> = {
   foliage: ["tufts", "step", "vary", "seed", "where"],
   bump: ["w", "depth", "on", "where", "shapeRadius", "shapeStrength", "shapeSoftness", "detailStrength", "detailScale"],
   lighting: ["cell", "ambient", "ambientColor", "sky", "skyColor", "skyReach", "block", "smooth", "emit", "emitLight", "shape", "relief", "skyDir"],
-  glow: ["where", "r", "strength", "color", "bands", "ramp", "keep"],
+  glow: ["where", "r", "strength", "color", "bands", "ramp", "keep", "pixel", "px"],
   post: ["focus", "sharp", "soft", "blur", "bloom", "fog", "vignette", "pixel", "sharpen", "lut", "grain", "palette", "px"],
   terrain: ["far", "top", "bound", "margin", "sky"],
   // one options object serves both: solids ignores shade, near, thin and soft, shadows ramps and light
   solids: ["at", "sun", "scale", "ramps", "light", "shade", "near", "thin", "soft"],
   shadows: ["at", "sun", "scale", "shade", "ramps", "light", "near", "thin", "soft"],
   mesh: ["light", "sprites", "pixel", "sun", "sky", "lamps", "emit", "shadows", "ppm", "at", "stand"],
+  sprites3d: ["pixel", "light", "sun", "sky", "lamps", "emit", "shadows", "unlit"],
   surface: SURFACE_OPTS,
   voxels: VOXEL_OPTS,
   volume: VOLUME_OPTS,
@@ -159,7 +161,7 @@ export const OP_OPTS: Record<string, string[]> = {
   decal: DECAL_OPTS,
   draw3d: DRAW3D_OPTS,
   capsule: ["light", "rim"],
-  flame: ["wind", "period", "seed", "frame"],
+  flame: ["wind", "period", "seed", "frame", "style", "phase", "cycles", "curl", "wide"],
   scroll: ["x", "y", "frame", "axis"],
   clouds: ["y", "gap", "w", "h", "n", "seed", "keys", "x", "empty", "sizes", "frame"],
   plume: ["every", "life", "rise", "wind", "inertia", "size", "young", "seed", "frame", "light", "view", "at", "thin", "steady"],
@@ -1425,6 +1427,7 @@ export class Project implements BuildCtx {
     };
     env.vnoise = vnoise;
     env.fbm = fbm;
+    env.fbmLoop = fbmLoop;
     env.bayer = bayer;
     env.seamless = seamless;
     // vectors as arrays: vec.add, sub, mul, dot, cross, len, unit

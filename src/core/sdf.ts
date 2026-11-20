@@ -36,10 +36,11 @@ type Node =
   | { op: "mirror"; of: Sdf; axes: string }
   | { op: "repeat"; of: Sdf; step: Vec; count: Vec }
   | { op: "noise"; of: Sdf; amp: Num; scale: Num; seed: number; octaves: number }
-  | { op: "mat"; of: Sdf; name: string }
+  | { op: "mat"; of: Sdf; name: string; override?: boolean }
   | { op: "paint"; of: Sdf; name: string; where: (p: V3, n: V3) => unknown }
   | { op: "paintBy"; of: Sdf; by: (p: V3, n: V3) => unknown }
   | { op: "part"; of: Sdf; name: string }
+  | { op: "when"; of: Sdf; show: boolean | ((clock: Clock) => unknown) }
   | { op: "fn"; d: (x: number, y: number, z: number) => number; lo: V3; hi: V3; lip: number; id: number; key?: string; intact?: (seen?: Set<unknown>) => string | undefined; why?: [string, unknown][] };
 
 /** A field compiled at one moment: its distance, its material (an index into `mats`, -1 none) and its named part (into `parts`, -1 none) at a point with its normal, its box, its stretch. */
@@ -186,10 +187,19 @@ export class Sdf {
     if (!Number.isInteger(seed) || !(Number.isInteger(octaves) && octaves >= 1 && octaves <= 6)) throw new PxError(`sdf: noise: seed is a whole number, octaves 1 to 6, got ${JSON.stringify(o)}`);
     return new Sdf({ op: "noise", of: this, amp, scale, seed, octaves });
   }
-  /** Its material, by name (a key of the renderer's mats); a material given inside it wins. */
-  mat(name: string): Sdf {
-    if (typeof name !== "string" || !name) throw new PxError(`sdf: mat(name): a material's name, got ${JSON.stringify(name)}`);
-    return new Sdf({ op: "mat", of: this, name });
+  /** Its material, by name (a key of the renderer's mats); a material given inside it wins unless `{ override: true }` replaces it. */
+  mat(name: string, opts?: { override?: boolean }): Sdf {
+    if (typeof name !== "string" || !name) throw new PxError(`sdf: mat(name, opts?): a material's name, got ${JSON.stringify(name)}`);
+    if (opts !== undefined) {
+      if (typeof opts !== "object" || opts === null || Array.isArray(opts) || Object.keys(opts).some((k) => k !== "override") || (opts.override !== undefined && typeof opts.override !== "boolean"))
+        throw new PxError(`sdf: mat(name, { override }): override is true or false, got ${JSON.stringify(opts)}`);
+    }
+    return new Sdf({ op: "mat", of: this, name, ...(opts?.override ? { override: true } : {}) });
+  }
+  /** Shown only when `show` is truthy (boolean or `(clock) => boolean`); otherwise compiles to empty geometry. */
+  when(show: boolean | ((clock: Clock) => unknown)): Sdf {
+    if (typeof show !== "boolean" && typeof show !== "function") throw new PxError(`sdf: when(show): true/false or (clock) => boolean, got ${JSON.stringify(show)}`);
+    return new Sdf({ op: "when", of: this, show });
   }
   /** A name for this part of it (the trunk, the canopy): what painted a pixel is said by it (pxl steps --at), its parts' names joined ("oak.canopy"). */
   part(name: string): Sdf {
@@ -266,7 +276,9 @@ export class Density {
 }
 /** A density at a moment: rho(x, y, z) 0..1, and its box (the shape's, grown by the noise's reach). */
 export function compileDensity(D: Density, clock: Clock = STILL): { rho: (x: number, y: number, z: number) => number; lo: V3; hi: V3 } {
-  const C = compile(D.of, clock), o = D.o, A = Math.abs(num(o.noise ?? 0, clock, "density's noise")), sc = pos(num(o.scale ?? 0.5, clock, "density's scale"), "density's scale");
+  const C = compile(D.of, clock);
+  if (isEmpty(C.lo, C.hi)) return { rho: () => 0, lo: EMPTY_LO, hi: EMPTY_HI };
+  const o = D.o, A = Math.abs(num(o.noise ?? 0, clock, "density's noise")), sc = pos(num(o.scale ?? 0.5, clock, "density's scale"), "density's scale");
   const seed = o.seed ?? 1, oc = o.octaves ?? 3, f = vec(o.flow ?? [0, 0, 0], clock, "density's flow"), ph = clock.phase, edge = D.edge, fade = o.fade;
   const moves = f.some((v) => v !== 0), w0 = 1 - ph, w1 = ph, norm = 1 / Math.sqrt(w0 * w0 + w1 * w1);
   // the noise carried by flow over the loop: at phase 0 and 1 the same, so it closes; the two crossfaded
@@ -310,16 +322,17 @@ export const fieldOf = (d: (x: number, y: number, z: number) => number, lo: V3, 
  * The functions in a field that aren't pure, so a trace of it isn't kept (`paint`: its paint functions, so what they
  * paint isn't): each one's .part() names, what it is and the function (pxl build --profile names them).
  */
-export function notPure(f: Sdf, at = "", out: { part: string; what: string; fn: unknown }[] = [], paint = false): typeof out {
+export function notPure(f: Sdf, at = "", out: { part: string; what: string; fn: unknown }[] = [], paint = false, overridden = false): typeof out {
   const n = f.node, fn = n.op === "paint" ? n.where : n.op === "paintBy" ? n.by : undefined;
   const say = (what: string, fn: unknown) => out.push({ part: at, what: PURE.get(fn as object) === "" ? `${what} (pure, but a field in its data isn't)` : what, fn });
   if (n.op === "fn") {
     if (n.key === undefined && !paint) for (const [what, fn] of n.why ?? [["sdf.field", n.d]]) say(what, fn);
     return out;
   }
-  if (paint && fn && !PURE.get(fn)) say("a paint function", fn);
+  if (paint && !overridden && fn && !PURE.get(fn)) say("a paint function", fn);
   const of = (n as { of?: Sdf | Sdf[] }).of, inner = n.op === "part" ? (at ? `${at}.${n.name}` : n.name) : at;
-  for (const s of Array.isArray(of) ? of : of ? [of] : []) notPure(s, inner, out, paint);
+  const nextOver = overridden || (n.op === "mat" && !!n.override);
+  for (const s of Array.isArray(of) ? of : of ? [of] : []) notPure(s, inner, out, paint, nextOver);
   return out;
 }
 /**
@@ -330,15 +343,17 @@ export function notPure(f: Sdf, at = "", out: { part: string; what: string; fn: 
  */
 function looksOf(f: Sdf): Compiled["looks"] {
   const out: string[] = [], checks: ((seen?: Set<unknown>) => string | undefined)[] = [];
-  const go = (s: Sdf): boolean => {
+  const go = (s: Sdf, overridden: boolean): boolean => {
     const n = s.node, fn = n.op === "paint" ? n.where : n.op === "paintBy" ? n.by : undefined;
     const of = (n as { of?: Sdf | Sdf[] }).of, kids = Array.isArray(of) ? of : of ? [of] : [];
     out.push(n.op, String(kids.length));
-    if (n.op === "mat" || n.op === "part" || n.op === "paint") out.push(JSON.stringify(n.name));
-    if (fn) { const k = PURE.get(fn); if (!k) return false; out.push(k); checks.push(INTACT.get(fn)!); }
-    return kids.every(go);
+    if (n.op === "mat") out.push(JSON.stringify(n.name), n.override ? "!" : "");
+    else if (n.op === "part" || n.op === "paint") out.push(JSON.stringify(n.name));
+    if (fn && !overridden) { const k = PURE.get(fn); if (!k) return false; out.push(k); checks.push(INTACT.get(fn)!); }
+    const nextOver = overridden || (n.op === "mat" && !!n.override);
+    return kids.every((k) => go(k, nextOver));
   };
-  return go(f) ? { key: out.join(" "), intact: (seen = new Set()) => onceEach(checks, seen) } : undefined;
+  return go(f, false) ? { key: out.join(" "), intact: (seen = new Set()) => onceEach(checks, seen) } : undefined;
 }
 /** The pure functions (pure(), src/node/pure.ts) and each one's key: "" when its data holds a field that isn't pure. */
 export const PURE = new WeakMap<object, string>();
@@ -418,9 +433,13 @@ export const sdf = {
 
 // ---------------------------------------------------------------- compiling
 const INF = Infinity;
+const EMPTY_LO: V3 = [INF, INF, INF], EMPTY_HI: V3 = [-INF, -INF, -INF];
+/** True when a compiled field has no geometry (e.g. `.when(false)` or `.scale(0)`). */
+export const isEmpty = (lo: readonly number[], hi: readonly number[]): boolean => lo[0] > hi[0] || lo[1] > hi[1] || lo[2] > hi[2];
 const smin = (a: number, b: number, k: number) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; };
 // (inside, a lookup gives the material and the part as one number: (material + 1) + 1024 (part + 1), 0 none)
 const NONE: Fm = () => 0;
+const EMPTY_PART: Part = { m: NONE, lo: EMPTY_LO, hi: EMPTY_HI, lip: 1, e: (c) => c.v("Infinity") };
 const MOVES_ITSELF = new Set(["sphere", "box", "cylinder", "cone", "torus", "ellipsoid"]);
 const corners = (lo: V3, hi: V3): V3[] => [0, 1, 2, 3, 4, 5, 6, 7].map((i) => [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]]);
 const boxOf = (pts: V3[]): [V3, V3] => [[0, 1, 2].map((e) => Math.min(...pts.map((p) => p[e]))) as V3, [0, 1, 2].map((e) => Math.max(...pts.map((p) => p[e]))) as V3];
@@ -512,7 +531,7 @@ export function compile(f: Sdf, clock: Clock = STILL): Compiled {
 function compiled(f: Sdf, clock: Clock): Compiled {
   const mats: string[] = [], parts: string[] = [], prefix: string[] = [], clocked = CLOCKED;
   // (each join's slot in W: the child it took at the point a material is asked for)
-  let slots = 0, W = new Int32Array(0), tracks = false;
+  let slots = 0, W = new Int32Array(0), tracks = false, skipMat = 0;
   const idx = (name: string) => { const i = mats.indexOf(name); return i >= 0 ? i : mats.push(name) - 1; };
   // (a field asked on its own before (Sdf.memo): its code notes each point it works it out at and the value there; not
   // a primitive given its parent's move, whose point is the parent's)
@@ -617,11 +636,17 @@ function compiled(f: Sdf, clock: Clock): Compiled {
         };
       }
       case "union": case "intersect": {
-        const ps = n.of.map((o) => go(o)), k = Math.max(0, num(n.k, clock, `${n.op}'s smooth`)), uni = n.op === "union";
+        const rawPs = n.of.map((o) => go(o)), k = Math.max(0, num(n.k, clock, `${n.op}'s smooth`)), uni = n.op === "union";
+        const ps = uni ? rawPs.filter((p) => !isEmpty(p.lo, p.hi)) : rawPs;
+        if (uni) {
+          if (!ps.length) return EMPTY_PART;
+          if (ps.length === 1) return ps[0];
+        } else if (ps.some((p) => isEmpty(p.lo, p.hi))) return EMPTY_PART;
         const lip = Math.max(...ps.map((p) => p.lip)), grow = k / 4;
         const [lo, hi] = uni
           ? [[0, 1, 2].map((e) => Math.min(...ps.map((p) => p.lo[e])) - grow) as V3, [0, 1, 2].map((e) => Math.max(...ps.map((p) => p.hi[e])) + grow) as V3]
           : [[0, 1, 2].map((e) => Math.max(...ps.map((p) => p.lo[e]))) as V3, [0, 1, 2].map((e) => Math.min(...ps.map((p) => p.hi[e]))) as V3];
+        if (!uni && isEmpty(lo, hi)) return EMPTY_PART;
         const N = ps.length, bx = new Float64Array(N * 7);
         ps.forEach((p, i) => bx.set([...p.lo, ...p.hi, p.lip], i * 7));
         // the nearest child (a union) or the farthest (an intersection), and the distance joined: child i's
@@ -692,6 +717,8 @@ function compiled(f: Sdf, clock: Clock): Compiled {
       }
       case "subtract": {
         const [A, B] = n.of.map((o) => go(o)), k = Math.max(0, num(n.k, clock, "subtract's smooth"));
+        if (isEmpty(A.lo, A.hi)) return EMPTY_PART;
+        if (isEmpty(B.lo, B.hi)) return A;
         return {
           m: A.m, lo: A.lo, hi: A.hi, lip: Math.max(A.lip, B.lip),
           e: (c, x, y, z) => {
@@ -709,6 +736,7 @@ function compiled(f: Sdf, clock: Clock): Compiled {
         const [vx, vy, vz] = vec(n.v, clock, "at's [x, y, z]");
         if (MOVES_ITSELF.has(n.of.node.op)) return go(n.of, vx, vy, vz);
         const C = go(n.of);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
         return {
           m: C.m === NONE ? NONE : (x, y, z, a, b, c) => C.m(x - vx, y - vy, z - vz, a, b, c), lo: [C.lo[0] + vx, C.lo[1] + vy, C.lo[2] + vz], hi: [C.hi[0] + vx, C.hi[1] + vy, C.hi[2] + vz], lip: C.lip,
           e: (c, x, y, z) => C.e(c, c.v(`${x} - ${c.k(vx)}`), c.v(`${y} - ${c.k(vy)}`), c.v(`${z} - ${c.k(vz)}`)),
@@ -717,6 +745,7 @@ function compiled(f: Sdf, clock: Clock): Compiled {
       case "rotate": {
         const ax = vec(n.axis, clock, "rotate's axis"), l = Math.hypot(ax[0], ax[1], ax[2]), C = go(n.of);
         if (!(l > 0)) throw new PxError("sdf: rotate(deg, axis): the axis can't be [0, 0, 0]");
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
         const [u, v, w] = ax.map((e) => e / l), g = (num(n.deg, clock, "rotate's deg") * Math.PI) / 180, co = Math.cos(g), si = Math.sin(g), t = 1 - co;
         // M turns the field into the world; a point goes back into the field by M's transpose
         const M = [t * u * u + co, t * u * v - si * w, t * u * w + si * v, t * u * v + si * w, t * v * v + co, t * v * w - si * u, t * u * w - si * v, t * v * w + si * u, t * w * w + co];
@@ -730,7 +759,11 @@ function compiled(f: Sdf, clock: Clock): Compiled {
         };
       }
       case "scale": {
-        const [sx, sy, sz] = vec(n.s, clock, "scale").map((v) => pos(v, "scale")), C = go(n.of), k = Math.min(sx, sy, sz);
+        const [sx, sy, sz] = vec(n.s, clock, "scale").map((v) => { if (!(v >= 0)) throw new PxError(`sdf: scale must be >= 0, got ${v}`); return v; });
+        if (sx === 0 || sy === 0 || sz === 0) return EMPTY_PART;
+        const C = go(n.of);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
+        const k = Math.min(sx, sy, sz);
         const lo: V3 = [C.lo[0] * sx, C.lo[1] * sy, C.lo[2] * sz], hi: V3 = [C.hi[0] * sx, C.hi[1] * sy, C.hi[2] * sz];
         return {
           m: C.m === NONE ? NONE : (x, y, z, a, b, c) => C.m(x / sx, y / sy, z / sz, a * sx, b * sy, c * sz), lo, hi, lip: C.lip,
@@ -738,7 +771,9 @@ function compiled(f: Sdf, clock: Clock): Compiled {
         };
       }
       case "twist": {
-        const k = (num(n.deg, clock, "twist's deg") * Math.PI) / 180, C = go(n.of), R = Math.max(...[C.lo[0], C.lo[1], C.hi[0], C.hi[1]].map(Math.abs)) * Math.SQRT2;
+        const k = (num(n.deg, clock, "twist's deg") * Math.PI) / 180, C = go(n.of);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
+        const R = Math.max(...[C.lo[0], C.lo[1], C.hi[0], C.hi[1]].map(Math.abs)) * Math.SQRT2;
         return {
           m: C.m === NONE ? NONE : (x, y, z, a, b, cc) => { const g = -k * z, c = Math.cos(g), si = Math.sin(g); return C.m(c * x - si * y, si * x + c * y, z, c * a - si * b, si * a + c * b, cc); },
           lo: [-R, -R, C.lo[2]], hi: [R, R, C.hi[2]], lip: C.lip * Math.hypot(1, k * R),
@@ -747,7 +782,9 @@ function compiled(f: Sdf, clock: Clock): Compiled {
       }
       case "bend": {
         const kv = typeof n.k === "function" ? (CLOCKED++, (n.k as (c: Clock) => unknown)(clock)) : n.k;
-        const [kx, ky] = typeof kv === "object" ? vec(kv as Vec, clock, "bend's [kx, ky]", 2) : [num(kv as Num, clock, "bend's k"), 0], C = go(n.of), Z = Math.max(0, C.hi[2]), off = (z: number) => (z > 0 ? (z * z) / 2 : 0);
+        const [kx, ky] = typeof kv === "object" ? vec(kv as Vec, clock, "bend's [kx, ky]", 2) : [num(kv as Num, clock, "bend's k"), 0], C = go(n.of);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
+        const Z = Math.max(0, C.hi[2]), off = (z: number) => (z > 0 ? (z * z) / 2 : 0);
         const ex = kx * off(Z), ey = ky * off(Z);
         return {
           m: C.m === NONE ? NONE : (x, y, z, a, b, c) => C.m(x - kx * off(z), y - ky * off(z), z, a, b, c),
@@ -757,7 +794,9 @@ function compiled(f: Sdf, clock: Clock): Compiled {
         };
       }
       case "mirror": {
-        const C = go(n.of), mx = n.axes.includes("x"), my = n.axes.includes("y"), mz = n.axes.includes("z");
+        const C = go(n.of);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
+        const mx = n.axes.includes("x"), my = n.axes.includes("y"), mz = n.axes.includes("z");
         const lo = [...C.lo] as V3, hi = [...C.hi] as V3;
         [mx, my, mz].forEach((on, e) => { if (on) { const r = Math.max(Math.abs(lo[e]), Math.abs(hi[e])); lo[e] = -r; hi[e] = r; } });
         return {
@@ -768,6 +807,7 @@ function compiled(f: Sdf, clock: Clock): Compiled {
       }
       case "repeat": {
         const s = vec(n.step, clock, "repeat's step"), cnt = vec(n.count, clock, "repeat's count").map((v) => Math.max(0, Math.round(v))), C = go(n.of);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
         const q = (v: number, e: number) => (s[e] > 0 ? v - s[e] * Math.max(-cnt[e], Math.min(cnt[e], Math.round(v / s[e]))) : v);
         return {
           m: C.m === NONE ? NONE : (x, y, z, a, b, c) => C.m(q(x, 0), q(y, 1), q(z, 2), a, b, c),
@@ -780,6 +820,7 @@ function compiled(f: Sdf, clock: Clock): Compiled {
       }
       case "noise": {
         const amp = num(n.amp, clock, "noise's amp"), sc = pos(num(n.scale, clock, "noise's scale"), "noise's scale"), C = go(n.of), seed = n.seed, oc = n.octaves, A = Math.abs(amp);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
         // how steep it can get: a value noise rises at most 1.5 a cell along an axis, each octave twice as
         // fine and half as strong (the sum over the axes would be sqrt 3 times that, never met in practice)
         let S = 0;
@@ -796,17 +837,38 @@ function compiled(f: Sdf, clock: Clock): Compiled {
           },
         };
       }
+      case "when": {
+        const on = typeof n.show === "function" ? (CLOCKED++, !!(n.show as (c: Clock) => unknown)(clock)) : n.show;
+        return on ? go(n.of, ox, oy, oz) : EMPTY_PART;
+      }
       case "mat": {
-        const C = go(n.of), k = idx(n.name);
+        if (skipMat > 0) return go(n.of);
+        if (n.override) {
+          skipMat++;
+          const C = go(n.of);
+          skipMat--;
+          if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
+          const k = idx(n.name);
+          return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c); return v - (v % 1024) + k + 1; } };
+        }
+        const C = go(n.of);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
+        const k = idx(n.name);
         return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c); return v % 1024 ? v : v + k + 1; } };
       }
       case "paint": {
-        const C = go(n.of), k = idx(n.name), where = n.where;
+        if (skipMat > 0) return go(n.of);
+        const C = go(n.of);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
+        const k = idx(n.name), where = n.where;
         return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c); return where([x, y, z], [a, b, c]) ? v - (v % 1024) + k + 1 : v; } };
       }
       case "paintBy": {
+        if (skipMat > 0) return go(n.of);
         // (the names it gives join `mats` as they come: a renderer looks up those it hasn't seen)
-        const C = go(n.of), by = n.by;
+        const C = go(n.of);
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
+        const by = n.by;
         return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c), w = by([x, y, z], [a, b, c]); return typeof w === "string" && w ? v - (v % 1024) + idx(w) + 1 : v; } };
       }
       case "fn": {
@@ -820,6 +882,7 @@ function compiled(f: Sdf, clock: Clock): Compiled {
         prefix.push(n.name);
         const C = go(n.of);
         prefix.pop();
+        if (isEmpty(C.lo, C.hi)) return EMPTY_PART;
         return { ...C, m: (x, y, z, a, b, c) => { const v = C.m(x, y, z, a, b, c); return v >= 1024 ? v : v + 1024 * (k + 1); } };
       }
     }

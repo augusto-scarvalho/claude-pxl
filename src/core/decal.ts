@@ -13,8 +13,8 @@
 import type { Color } from "./color.ts";
 import { PxError } from "./errors.ts";
 import type { Img } from "./image.ts";
-import { peel } from "./scatter.ts";
-import { STILL, Sdf, type V3, compile } from "./sdf.ts";
+import { peelMoves } from "./scatter.ts";
+import { STILL, Sdf, type V3, compile, isEmpty } from "./sdf.ts";
 import { type SurfaceCanvas, type SurfaceView, clockOf, partIndex, viewOf } from "./surface.ts";
 
 export interface DecalOpts {
@@ -63,9 +63,10 @@ export function drawDecal(c: DecalCanvas, name: string, o: DecalOpts = {}): void
   if (o.depth !== undefined && !(o.depth > 0)) throw new PxError(`${who}: depth is m in front of or behind its point it may be laid on, above 0, got ${JSON.stringify(o.depth)}`);
   const persp = !!o.view && typeof o.view === "object" && "horizon" in o.view, origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
   const clock = clockOf(c), C = compile(o.on, clock), d = C.d;
+  if (isEmpty(C.lo, C.hi)) return;
   // the anchor: a point of the field as it stands at rest, carried by its moves to this moment, put back
   // on its surface; its normal there
-  const { carry, back } = peel(o.on);
+  const { carry, back } = peelMoves(o.on);
   let p = carry(clock)(back(STILL)(o.point as V3));
   const h = 0.005, grad = (q: V3): V3 => {
     const a = d(q[0] + h, q[1] - h, q[2] - h), b = d(q[0] - h, q[1] - h, q[2] + h), cc = d(q[0] - h, q[1] + h, q[2] - h), e = d(q[0] + h, q[1] + h, q[2] + h);
@@ -82,16 +83,16 @@ export function drawDecal(c: DecalCanvas, name: string, o: DecalOpts = {}): void
   const vname = ang < 25 || !o.views ? name : ang < 65 ? o.views.three ?? name : o.views.profile ?? o.views.three ?? name;
   let img = c.asset(vname);
   if (vname !== name && !right) img = img.flip("x");
-  const vis = c.img.depth, steps = [c.pal.stepMap(-1), c.pal.stepMap(1)];
+  const vis = c.img.depth, steps = lit ? [c.pal.stepMap(-1), c.pal.stepMap(1)] : undefined;
   const light = (q: V3, nn: V3) => 0.1 + 0.65 * Math.max(0, dot(nn, L)) + 0.2 * (0.5 + 0.5 * nn[2]);
   // k steps along its ramp (clean: never down into a ramp's darkest, the outline's ink: a mouth in shadow stays a mouth)
   const walk = (col: Color, k: number) => {
-    while (k) { const s = steps[k < 0 ? 0 : 1].get(col); if (s === undefined || s === col || (o.clean && k < 0 && !steps[0].has(s))) break; col = s; k -= Math.sign(k); }
+    while (k && steps) { const s = steps[k < 0 ? 0 : 1].get(col); if (s === undefined || s === col || (o.clean && k < 0 && !steps[0].has(s))) break; col = s; k -= Math.sign(k); }
     return col;
   };
   const tone = (col: Color, lv: number) => (!lit || under ? col : walk(col, Math.max(-2, Math.min(2, Math.round((lv - 0.62) * 4)))));
   // lit "surface": each texel's steps from the art's commonest tone (a color's place on its ramp: its steps down to the darkest)
-  const rank = (col: Color) => { let n = 0; for (let s = steps[0].get(col); s !== undefined && s !== col && n < 64; s = steps[0].get((col = s))) n++; return n; };
+  const rank = (col: Color) => { let n = 0; if (steps) for (let s = steps[0].get(col); s !== undefined && s !== col && n < 64; s = steps[0].get((col = s))) n++; return n; };
   if (o.clean !== undefined && typeof o.clean !== "boolean") throw new PxError(`${who}: clean is true or false, got ${JSON.stringify(o.clean)}`);
   const pk = partIndex(c.img, o.part ?? `decal ${name}`), emit = o.glow ?? !lit, nrm = o.clean ? c.img.normals() : undefined;
   let mid = 0;

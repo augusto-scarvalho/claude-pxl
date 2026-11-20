@@ -17,7 +17,7 @@ import type { Img } from "./image.ts";
 import { setNormal } from "./normals.ts";
 import type { Palette } from "./palette.ts";
 import { type Perspective, type View, perspective, scaled } from "./perspective.ts";
-import { type Clock, type Compiled, Sdf, type V3, article, compile } from "./sdf.ts";
+import { type Clock, type Compiled, Sdf, type V3, article, compile, isEmpty } from "./sdf.ts";
 import { Voxels, sizeOf, voxelize } from "./grids.ts";
 import { atPpm, drawnPpm } from "./builders.ts";
 import { type Lit, shine } from "./sunlight.ts";
@@ -28,9 +28,10 @@ export type SurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "is
  * A material: its ramp dark to light; `shine` a glint where the light reflects toward the eye (0..1);
  * `strokes` its sunlit part a step lighter in strokes that far apart (m), a quarter of that wide, across
  * the way round its upright (needles along a branch); `hem` px of it hanging in points under it where
- * nothing is below, every other column, a step darker a px (a conifer's tiers)
+ * nothing is below, every other column, a step darker a px (a conifer's tiers); `emit` self-luminous
+ * (true or 0..1: keeps its own ramp colors under `light: "mesh"` and marks the emission map for bloom)
  */
-export interface SurfaceMat { ramp: string | string[]; shine?: number; strokes?: number; hem?: number }
+export interface SurfaceMat { ramp: string | string[]; shine?: number; strokes?: number; hem?: number; emit?: boolean | number }
 export interface SurfaceOpts {
   view?: SurfaceView;
   /** px to the meter (an orthographic view; default 16) */
@@ -67,10 +68,12 @@ export interface SurfaceOpts {
   part?: string;
   /** a pixel artist's pass before its lines (default true; voxels() false): a pixel sticking out cut away, no black run 2 px thick (an inner line along the outline or under another line left to that one line), the outline whole */
   clean?: boolean;
+  /** true: skip scene world sun/sky/lamp multiplication (`light: "mesh"`) while preserving the field's own ramp shading (for fire, lava, magic) */
+  unlit?: boolean;
   /** (light: "mesh": the light of the mesh() drawn before it, on what it draws as on mesh()'s sprites) */
   world?: Lit;
 }
-export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "soft", "outline", "inner", "rim", "shadows", "ao", "pixel", "cast", "hide", "part", "clean", "ink", "tones"];
+export const SURFACE_OPTS = ["view", "ppm", "at", "mats", "light", "soft", "outline", "inner", "rim", "shadows", "ao", "pixel", "cast", "hide", "part", "clean", "ink", "tones", "unlit"];
 /** The index of a part's name in the picture's list of what painted each pixel (see Img.parts). */
 export function partIndex(img: Img, name: string): number {
   if (typeof name !== "string" || !name) throw new PxError(`part is a name, got ${JSON.stringify(name)}`);
@@ -129,12 +132,13 @@ export function surfaceSize(thing: Sdf | Voxels, o: { view?: SurfaceView; ppm?: 
   for (let f = 0; f < n; f++) {
     let lo: V3, hi: V3;
     if (thing instanceof Voxels) [lo, hi] = thing.bounds();
-    else { const C = compile(thing, { t: 0, phase: f / n, frame: f, frames: n }); finite(C); ({ lo, hi } = C); }
+    else { const C = compile(thing, { t: 0, phase: f / n, frame: f, frames: n }); if (isEmpty(C.lo, C.hi)) continue; finite(C); ({ lo, hi } = C); }
     for (const p of corners(lo, hi)) {
       const sx = pr.grid ? dot(p, pr.a) : dot(p, pr.R) * pr.k, sy = pr.grid ? dot(p, pr.b) : -dot(p, pr.U) * pr.k;
       x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
     }
   }
+  if (x0 === Infinity) return { w: 2 * pad, h: 2 * pad, pivot: [pad, pad] };
   const L = Math.floor(x0) - pad, T = Math.floor(y0) - pad;
   return { w: Math.ceil(x1) + pad - L, h: Math.ceil(y1) + pad - T, pivot: [-L, -T] };
 }
@@ -352,6 +356,7 @@ export function drawSurface(c: SurfaceCanvas, field: unknown, o: SurfaceOpts = {
   // a builder's field made without a ppm: made again at the one it is drawn at, its texture in screen px
   const f = atPpm(field, drawnPpm(o.view, o.ppm, o.at, o.pixel ?? c.k ?? 1))?.field ?? field;
   const C = compile(f, clockOf(c));
+  if (isEmpty(C.lo, C.hi)) return;
   finite(C);
   drawTraced(c, fieldTracer(C, f), { ...o, clean: o.clean ?? true }, "surface");
 }
@@ -446,6 +451,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   if (!(soft >= 0 && soft <= 1)) throw new PxError(`${who}: soft is 0..1, how far the light wraps round the form, got ${JSON.stringify(o.soft)}`);
   if (!(o.rim === undefined || typeof o.rim === "boolean" || (typeof o.rim === "number" && o.rim >= 0 && o.rim <= 1))) throw new PxError(`${who}: rim is true, false or 0..1 (the share up its ramp the lit edge takes at least), got ${JSON.stringify(o.rim)}`);
   if (o.clean !== undefined && typeof o.clean !== "boolean") throw new PxError(`${who}: clean is true or false, got ${JSON.stringify(o.clean)}`);
+  if (o.unlit !== undefined && typeof o.unlit !== "boolean") throw new PxError(`${who}: unlit is true or false, got ${JSON.stringify(o.unlit)}`);
   if (o.tones !== undefined && !(Number.isInteger(o.tones) && o.tones >= 2)) throw new PxError(`${who}: tones is how many of each ramp's tones it draws in, a whole number from 2, got ${JSON.stringify(o.tones)}`);
   const origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
   if (origin !== undefined && !(Array.isArray(origin) && origin.length === 2 && origin.every(Number.isFinite))) throw new PxError(`${who}: view's origin is where the world's [0, 0, 0] lands, [x, y] px, got ${JSON.stringify(origin)}`);
@@ -453,14 +459,14 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
     throw new PxError(`${who}: at is ${persp ? "where it stands, [x, z, up] m" : "where its origin lands, [x, y] px, or where it stands in the view's world, [x, y, z] m"}, got ${JSON.stringify(o.at)}`);
   // the materials: each a ramp of resolved colors, dark to light, and its glint
   const names = Object.keys(o.mats ?? {});
-  const ramps: Color[][] = [], shines: number[] = [], strokes: number[] = [], hems: number[] = [], lines: Color[][] = [];
+  const ramps: Color[][] = [], shines: number[] = [], strokes: number[] = [], hems: number[] = [], emits: number[] = [], lines: Color[][] = [];
   // ink true or 2: each material's line tones are its ramp's first one or two keys, its fill the rest
   if (!(o.ink === undefined || typeof o.ink === "string" || typeof o.ink === "boolean" || o.ink === 1 || o.ink === 2)) throw new PxError(`${who}: ink is a key (a line of it all round), true (each material's line tone, its ramp's first key) or 2 (its first two, the second facing the light), got ${JSON.stringify(o.ink)}`);
   const lineN = o.ink === true ? 1 : typeof o.ink === "number" ? o.ink : 0, short = new Map<number, string>();
   const mat = (spec: unknown, name: string) => {
     const s = (typeof spec === "string" || Array.isArray(spec) ? { ramp: spec } : spec) as SurfaceMat;
     let keys = typeof s?.ramp === "string" ? [...s.ramp] : s?.ramp;
-    if (!Array.isArray(keys) || !keys.length) throw new PxError(`${who}: material '${name}' is a ramp of keys dark to light ("asdf"), or { ramp, shine }, got ${JSON.stringify(spec)}`);
+    if (!Array.isArray(keys) || !keys.length) throw new PxError(`${who}: material '${name}' is a ramp of keys dark to light ("asdf"), or { ramp, shine, emit }, got ${JSON.stringify(spec)}`);
     // (one too short for its line only an error where the field draws it: a shared table of mats)
     if (keys.length <= lineN) short.set(ramps.length, name);
     const tone = (k: string) => { const col = c.color(k); if (col === null || col === TRANSPARENT) throw new PxError(`${who}: material '${name}': '${k}' is not a color`); return col; };
@@ -472,8 +478,11 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
     ramps.push(keys.map(tone));
     shines.push(s.shine ?? 0);
     if (!(s.strokes === undefined || s.strokes > 0) || !(s.hem === undefined || (Number.isInteger(s.hem) && s.hem >= 0))) throw new PxError(`${who}: material '${name}': strokes is m apart (above 0), hem whole px (0 up), got ${JSON.stringify([s.strokes, s.hem])}`);
+    const em = s.emit === undefined || s.emit === false ? 0 : s.emit === true ? 1 : s.emit;
+    if (!(typeof em === "number" && em >= 0 && em <= 1)) throw new PxError(`${who}: material '${name}': emit is true, false or 0..1, got ${JSON.stringify(s.emit)}`);
     strokes.push(s.strokes ?? 0);
     hems.push(s.hem ?? 0);
+    emits.push(em);
   };
   if (names.length) names.forEach((n) => mat(o.mats![n], n));
   else if (c.pal.ramps.length) mat(c.pal.ramps[0], "the palette's first ramp");
@@ -753,8 +762,9 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       else if (toward && o.rim !== false) col = ramp[Math.min(ramp.length - 1, Math.max(tone[i] + 1, typeof o.rim === "number" && both === 3 ? Math.round(o.rim * (ramp.length - 1)) : 0))];
       // the normal as the picture sees it (x right, y down, z toward the eye)
       const n: V3 = [nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]], nx = dot(n, R), ny = -dot(n, U), nz = -dot(n, F);
-      // in the world's light, as mesh() lights its sprites: the art's tone times the sky's and the sun's
-      if (Wl) col = shine(col, n, wpos![i * 3], wpos![i * 3 + 1], wpos![i * 3 + 2], Wl, wsun![i], 0.5);
+      const em = emits[m[i]];
+      // in the world's light, as mesh() lights its sprites: the art's tone times the sky's and the sun's (skipped when unlit or self-emitting)
+      if (Wl && !o.unlit && !em) col = shine(col, n, wpos![i * 3], wpos![i * 3 + 1], wpos![i * 3 + 2], Wl, wsun![i], 0.5);
       for (let y = 0; y < K; y++)
         for (let x = 0; x < K; x++) {
           const px = (gx0 + gx) * K + x, py = (gy0 + gy) * K + y, j = c.index(px, py);
@@ -762,6 +772,8 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
           if (!c.plot(px, py, col)) continue;
           setNormal(norm, j, nx, ny, nz);
           zbuf[j] = depth[i];
+          if (em > 0) (c.img.emit ??= new Uint8Array(W * H))[j] = Math.round(255 * em);
+          else if (c.img.emit) c.img.emit[j] = 0;
           const pk = pt[i] >= 0 ? own[pt[i]] : whole;
           if (pk >= 0) c.img.parts!.ids[j] = pk;
         }

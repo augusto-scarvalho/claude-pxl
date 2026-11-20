@@ -351,8 +351,8 @@ declare global {
     blend?: "alpha" | "add" | "screen"; opacity?: number; veil?: number;
     /** the light its effect("emit") pixels give round them: r m, strength, a lamp for `each` part glowing apart, `color` its own in place of its pixels' (still times the emit's strength); false for none */
     light?: false | { r?: number; strength?: number; each?: boolean; color?: PxColor };
-    /** its feet on the model: on the highest face looking up under it (true), or on those materials'; `air`: it flies or hangs (check doesn't ask its feet to be on the model) */
-    stand?: boolean | string[]; air?: boolean }
+    /** its feet on the model: on the highest face looking up under it (true), or on those materials'; `air`: it flies or hangs (check doesn't ask its feet to be on the model); `unlit`: drawn in its own colors (ignores scene lighting and check's lit-side warning) */
+    stand?: boolean | string[]; air?: boolean; unlit?: boolean }
   /** mesh()'s light: the way toward it in the points' frame, or a face's light (0 dark, 1 lit) from its normal toward the eye, its middle, the face; sprites standing among the faces (a perspective view). */
   interface PxMeshOpts {
     light?: PxV3 | ((normal: PxV3, middle: PxV3, face: PxFace) => number); sprites?: PxMeshSprite[]; /** px to a sprite's pixel (an HD picture: 4) */ pixel?: number;
@@ -382,7 +382,10 @@ declare global {
     /** a point z m up moved k z^2 / 2 m along x (or [kx, ky]) */ bend(k: PxNum | PxVec): PxSdf;
     mirror(axes?: string): PxSdf; repeat(step: PxVec, count?: PxNum | PxVec): PxSdf;
     noise(o: { amp: PxNum; scale?: PxNum; seed?: number; octaves?: number }): PxSdf;
-    mat(name: string): PxSdf; paint(name: string, where: (p: PxV3, n: PxV3) => unknown): PxSdf;
+    /** its material, by name; `{ override: true }` replaces any inner material (e.g. overriding make3d.rock's "stone"/"moss") */
+    mat(name: string, opts?: { override?: boolean }): PxSdf; paint(name: string, where: (p: PxV3, n: PxV3) => unknown): PxSdf;
+    /** shown only when `show` is truthy (boolean or `(clock) => boolean`); otherwise compiles to empty geometry */
+    when(show: boolean | ((clock: PxClock) => unknown)): PxSdf;
     /** the material it names at each point (nothing: what it was); a name not in mats that is a ramp of keys ("RPp") is that ramp */
     paint(by: (p: PxV3, n: PxV3) => string | null | undefined): PxSdf;
     /** a name for this part of it: what painted a pixel is said by it (pxl steps --at) */
@@ -393,8 +396,8 @@ declare global {
   type PxSurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number; origin?: [number, number]; grid?: boolean } | PxView;
   /** surface()'s options: the view (orthographic at ppm px to the meter, its origin at `at` px; or a perspective() view, standing `at` [x, z, up] m), the materials' ramps, the light, the outline, the rim, its own shadows, the creases, a ray to K x K px, its shadow on what is drawn. */
   interface PxSurfaceOpts {
-    /** a material: its ramp, a glint (shine), strokes m apart lighter where the sun is (needles), hem px hanging in points under it */
-    view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number; strokes?: number; hem?: number }>;
+    /** a material: its ramp, a glint (shine), strokes m apart lighter where the sun is (needles), hem px hanging in points under it, emit (true or 0..1: self-luminous, skips scene world light and marks emission map) */
+    view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number; strokes?: number; hem?: number; emit?: boolean | number }>;
     /** the way toward the light; "view": its view's own (from the upper left) where look3d() gives another; "mesh": the light of the mesh() drawn before it with a sun (its way, sun, sky and lamps) */
     light?: number[] | "view" | "mesh"; /** the light wrapped round the form, 0..1: a side square to it lit soft / (1 + soft) */ soft?: number; outline?: boolean | PxColor; /** a line where one part lies in front of another, on the one behind: a key, true (the outline's), or "dark" (the darkest tone of the part behind) */ inner?: boolean | PxColor | "dark"; /** a step lighter toward the light; a number: where open both ways it comes from, at least that share up the ramp (a sun behind) */ rim?: boolean | number; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
     /** through a camera: its shadow alone (a mesh made of it in its place) */
@@ -407,6 +410,8 @@ declare global {
     ink?: PxColor | boolean | 1 | 2;
     /** each material's ramp cut to this many tones, its darkest and lightest kept (a genre's tones at a density) */
     tones?: number;
+    /** true: skip scene world sun/sky/lamp multiplication (`light: "mesh"`) while preserving the field's own ramp shading */
+    unlit?: boolean;
   }
   /** A density's options: its soft edge (m), the noise eating it (m, billows scale m across, octaves), carried flow m over the loop, thinned away up from fade [z0, z1]. */
   interface PxDensityOpts { edge?: number; noise?: PxNum; scale?: PxNum; seed?: number; octaves?: number; flow?: PxVec; fade?: [number, number] }
@@ -715,8 +720,8 @@ declare global {
   interface PxTint extends PxEffectBase { color: PxColor; amount?: number; blend?: "normal" | "multiply" | "screen" | "add" | "overlay"; ramp?: boolean | string | string[] }
   /** distort: each pixel takes the one up to `amount` px away, offsets read off noise `scale` px a cell that goes `speed` cells round a circle over the loop. */
   interface PxDistort extends PxEffectBase { amount?: number; scale?: number; speed?: number; axis?: "xy" | "x" | "y"; pixel?: number }
-  /** emit: `strength` of `color` (default their own) added in linear light, past white into white; `pulse` breathes it over the loop. */
-  interface PxEmit extends PxEffectBase { color?: PxColor; strength?: number; pulse?: number }
+  /** emit: `strength` of `color` (default their own) added in linear light, past white into white; `pulse` breathes it over the loop; `keep: true` marks pixels as self-emitting without brightening their RGB colors. */
+  interface PxEmit extends PxEffectBase { color?: PxColor; strength?: number; pulse?: number; keep?: boolean }
   /** sway: rows moved sideways by their height over the base, `amount` px at the top (negative: to the left), `lean` of it always downwind, `cycles` a loop. */
   interface PxSway extends PxEffectBase { amount?: number; lean?: number; power?: number; still?: number; cycles?: number; flutter?: number; vary?: number; pixel?: number;
     /** something passing through at column `push` (px from the left): the stems within `reach` px bent away from it, `bend` px at the top */
@@ -730,6 +735,30 @@ declare global {
     where?: PxRegion; r?: number; strength?: number; color?: PxColor; bands?: number; ramp?: number;
     /** Keys the halo leaves as drawn: what the glowing thing is made of (the logs and stones under flames). */
     keep?: string | string[];
+    /** Art-pixel block size for halo evaluation (defaults to scene `pixel` / `sizes` factor K). */
+    pixel?: number;
+    /** In a scene scaled by `pixel` / `sizes`, true keeps `r` and evaluation in raw screen pixels instead of art pixels. */
+    px?: boolean;
+  }
+  interface PxFlameOpts {
+    wind?: number; period?: number; seed?: number; frame?: number;
+    /** "tongues" (default: separate flickering tongues) or "plume" (seamless-looping organic fluid fire via fbmLoop). */
+    style?: "tongues" | "plume";
+    /** Plume style: explicit 0..1 loop phase (defaults to canvas phase). */
+    phase?: number;
+    /** Plume style: integer noise flow cycles per loop (default 2). */
+    cycles?: number;
+    /** Plume style: horizontal turbulent curl amplitude (default 0.35). */
+    curl?: number;
+    /** Plume style: base half-width as a fraction of size (default 0.42). */
+    wide?: number;
+  }
+  interface PxFbmLoopOpts {
+    scale?: number; period?: number; cycles?: number; seed?: number; octaves?: number; axis?: "x" | "y";
+  }
+  interface PxSprites3dOpts extends Omit<PxMeshOpts, "sprites" | "ppm" | "at" | "stand"> {
+    /** Default `unlit` flag for sprites in this call (true skips scene lighting and check's lit-side warning). */
+    unlit?: boolean;
   }
 
   interface PxCanvas {
@@ -795,8 +824,8 @@ declare global {
     plane(view: PxView | PxPerspective, ground: ((x: number, z: number, col: number, row: number) => PxColor | null | undefined) | PxGround, where?: PxRegion): void;
     /** A tapered capsule painted round (px), shaded across toward the light along `ramp`, a rim on the lit edge. */
     capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts?: { light?: [number, number]; rim?: boolean }): void;
-    /** Flames rising from (x, y), about `size` px tall, flickering with the frame, leaning with `wind`; `keys` root to tip, the last for edges. */
-    flame(x: number, y: number, size: number, keys: string, opts?: { wind?: number; period?: number; seed?: number; frame?: number }): void;
+    /** Flames rising from (x, y), about `size` px tall: flickering tongues (default) or organic seamless-looping plume (`style: "plume"`). */
+    flame(x: number, y: number, size: number, keys: string, opts?: PxFlameOpts): void;
     /** A strip that wraps going by, `per` px a loop (a whole number of its widths): a parallax plane. */
     scroll(name: string, y: number, per: number, opts?: { x?: number; y?: number; frame?: number; axis?: "x" | "y" }): void;
     /** How far something going `per` px a loop has moved at this frame (whole px). */
@@ -833,6 +862,8 @@ declare global {
     solids(view: PxView | PxPerspective, shapes: PxSolid[], opts?: PxSolidOpts): void;
     /** Flat faces in meters (model()) through the camera, the nearest per pixel, toned along their material's ramp, outlined where a surface ends. */
     mesh(view: PxView | PxPerspective | PxSurfaceView | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): void;
+    /** 3D billboard sprites composited into the existing depth buffer (after mesh()/surface()) without building faces or shadow maps. */
+    sprites3d(view: PxView | PxPerspective | PxSurfaceView | PxProject, sprites: PxMeshSprite[], opts?: PxSprites3dOpts): void;
     /** A distance field drawn as pixel art: ramps stepped by the light, an outline away from it, its normals and depth; through a camera after a mesh(), at its depth, its shadow on what is drawn. */
     surface(field: PxSdf, opts?: PxSurfaceOpts): void;
     /** A voxel grid, or a field made voxels of `size` m now, drawn as pixel-art cubes: a tone a face, the outline on the shaded side; iso and top on the pixel grid. */
@@ -961,6 +992,8 @@ declare global {
   function vnoise(x: number, y: number): number;
   /** Octaves of vnoise, finer and fainter each, in [0, 1] (default 4): billows, clouds, rock. */
   function fbm(x: number, y: number, octaves?: number): number;
+  /** Seamless-looping 2D flowing noise in [0, 1] via cylindrical 3D fBm advection along `axis` ("y" upward or "x" leftward). */
+  function fbmLoop(x: number, y: number, phase: number, opts?: PxFbmLoopOpts): number;
   /** Ordered-dither threshold in (0, 1) for pixel (x, y) (a 4x4 Bayer matrix). */
   function bayer(x: number, y: number): number;
   /** Vectors as arrays (any length; dot and cross in 3D): add, sub, mul by a number, dot, cross, len, unit (length 1; [0, 0, 0] as it is). */
@@ -991,8 +1024,8 @@ declare global {
   function plane(view: PxView | PxPerspective, ground: ((x: number, z: number, col: number, row: number) => PxColor | null | undefined) | PxGround, where?: PxRegion): PxOp;
   /** A tapered capsule painted round (px): every pixel shaded across it toward the light along `ramp` (dark to light), a rim on the lit edge. */
   function capsule(x0: number, y0: number, r0: number, x1: number, y1: number, r1: number, ramp: string, opts?: { light?: [number, number]; rim?: boolean }): PxOp;
-  /** Flames rising from (x, y), about `size` px tall: tongues flickering with the frame, leaning with `wind`; `keys` from the root to the tip, the last for their edges. */
-  function flame(x: number, y: number, size: number, keys: string, opts?: { wind?: number; period?: number; seed?: number; frame?: number }): PxOp;
+  /** Flames rising from (x, y), about `size` px tall: flickering tongues (default) or organic seamless-looping plume (`style: "plume"`). */
+  function flame(x: number, y: number, size: number, keys: string, opts?: PxFlameOpts): PxOp;
   function scroll(name: string, y: number, per: number, opts?: { x?: number; y?: number; frame?: number; axis?: "x" | "y" }): PxOp;
   function clouds(opts: PxClouds): PxOp;
   function plume(x: number, y: number, keys: string, opts?: PxPlume): PxOp;
@@ -1043,6 +1076,8 @@ declare global {
   function shadows(view: PxView | PxPerspective, shapes: PxSolid[], opts: PxSolidOpts & { sun: PxSun; shade: Record<string, string> }): PxOp;
   /** Flat faces in meters drawn through the camera with a depth per pixel (a dash round a driver, a wheel in front of its spokes): each toned along its material's ramp by how it lies to the light, outlined where a surface ends in front of another, creased where two faces of one material meet, its top edge a step lighter. Through perspective() points are [x, z, up]; a function camera takes [x right, y up, z ahead] from the eye. */
   function mesh(view: PxView | PxPerspective | PxSurfaceView | PxProject, faces: PxFace[], mats: Record<string, PxMaterial>, opts?: PxMeshOpts): PxOp;
+  /** 3D billboard sprites composited into the existing depth buffer (after mesh()/surface()) without building faces or shadow maps. */
+  function sprites3d(view: PxView | PxPerspective | PxSurfaceView | PxProject, sprites: PxMeshSprite[], opts?: PxSprites3dOpts): PxOp;
   /** A distance field drawn as pixel art from the side, the top, in iso, or through a perspective() camera after a mesh(), at its depth, its shadow on what is drawn. */
   function surface(field: PxSdf, opts?: PxSurfaceOpts): PxOp;
   /** A voxel grid, or a field made voxels of `size` m at each moment, drawn as pixel-art cubes. */

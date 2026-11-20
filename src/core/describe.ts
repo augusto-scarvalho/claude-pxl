@@ -98,7 +98,7 @@ export const STAND = 0.15;
 
 export function placementChecks(p: Placement, wo: World | undefined, steps: Steps | undefined, unlit = false, lamps?: Lamp[]): string[] {
   const light = lightFor(wo, p, lamps);
-  const checks = [frontWords(p.img), light && !unlit ? lightWords(p.img, light, steps) : ""];
+  const checks = [frontWords(p.img), light && !unlit && !p.unlit ? lightWords(p.img, light, steps) : ""];
   const bb = p.img.bounds(), pv = p.img.pivot;
   if (bb && (p.img.meters || p.img.grounded)) {   // what has a real height stands on the ground: a ghost may float
     const [x, feet] = feetOf(p)!, off = pv ? Math.round(p.y + pv[1] - feet) : 0;

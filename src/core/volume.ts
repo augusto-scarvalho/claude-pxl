@@ -9,7 +9,7 @@
 // glows lights what is round it (`emit.glow`, m).
 import { type Color, LIN, TRANSPARENT, fromLinear } from "./color.ts";
 import { PxError } from "./errors.ts";
-import { Density, type V3, article, compileDensity } from "./sdf.ts";
+import { Density, type V3, article, compileDensity, isEmpty } from "./sdf.ts";
 import { type SurfaceCanvas, type SurfaceView, clockOf, corners, partIndex, slab, viewOf } from "./surface.ts";
 import { bayer } from "./util.ts";
 import { type Lit, shine } from "./sunlight.ts";
@@ -70,6 +70,7 @@ export function drawVolume(c: SurfaceCanvas, density: unknown, o: VolumeOpts = {
 
   // the grid: points over its box, the density at each; what glows, its middle
   const Dn = compileDensity(density, clockOf(c)), lo = Dn.lo, hi = Dn.hi;
+  if (isEmpty(lo, hi)) return;
   if (![...lo, ...hi].every(Number.isFinite)) throw new PxError(`${who}: the density's shape goes on without end (a plane): intersect it with something that ends`);
   const ext = [0, 1, 2].map((e) => Math.max(1e-6, hi[e] - lo[e])), cell = o.cell ?? Math.max(...ext) / 40;
   if (!(cell > 0)) throw new PxError(`${who}: cell is the grid's step in m, above 0, got ${JSON.stringify(o.cell)}`);

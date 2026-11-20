@@ -488,3 +488,55 @@ again. The sheet's files take some 150 MB more for a few seconds (its cells cut 
   none of the builds inside them). What it would take: an image read back given as the one already held with the same
   bytes (a hash of each image read, about 0.4 s of bend's 470 MB, and the certainty that no build changes an image it
   took), or an entry naming the build an image came from instead of holding it (a change of the format). Left.
+
+## HD-2D 3D scenes: glow, mesh, sunlight, and scaled GIFs (2026-11)
+
+Profiled while building and iterating on a 24-frame HD-2D jumping fire slime scene (`160x160` `@4x` preview + `480x480`
+`sizes: { fire_slime_hd: 3 }` render with SDF rocks/slime, textured volcanic floor, dynamic point lamps, billboard flame
+and spark overlays, `glow()`, and `post()` bloom/fog/vignette). See [fire-slime-improvements.md](fire-slime-improvements.md)
+for the full motivation, root-cause analysis, and accompanying DSL/DX fixes.
+
+Measured on the Windows laptop (Node 22, single-threaded traces as measured by the thread benchmark):
+
+| `fire_slime_scene` + `fire_slime_hd` (`pxl build --profile`) | total | `fire_slime_scene` (160×160 @4x) | `fire_slime_hd` (480×480 @1x) | peak memory |
+| --- | --- | --- | --- | --- |
+| Before (baseline engine, original scene) | 24.1 s | 13.7 s | 10.3 s | 743 MB |
+| After engine optimizations (unmodified scene, cold-to-warm) | 14.2 s (−41%) | 6.2 s (−55%) | 7.9 s (−23%) | 504 MB (−32%) |
+| After scene refactored to new APIs (`sprites3d`, `override`, `pure`, `fbmLoop`, cold-to-warm) | 11.6 s (−52%) | 4.7 s (−66%) | 6.9 s (−33%) | 437 MB (−41%) |
+| Warm store (every build and trace read back) | 2.6–2.9 s | 0.9–1.0 s | 1.6–1.8 s | 331–335 MB |
+
+Hotspots before vs. after (same cold-to-warm build): `drawMesh` 1.3 s → 572 ms (−56%), mesh rasterizer 523 ms → 172 ms
+(−67%), `encodeGif` 603 ms → 464 ms, and `applyGlow` (890 ms), `shine` (872 ms), and `SunMap.tri` (598 ms) all dropped
+completely out of the top 10. What changed (byte-identical GIFs and visually verified HD parity):
+
+- **Scaled GIF encoding and palette reuse** (`src/node/gif.ts`, `src/node/output.ts`, `src/node/cli.ts`): `encodeGif`
+  now accepts `{ scale, palette, onPalette }`, running `scan()`, `medianCut()`, color indexing, and frame-diffing at 1×
+  and nearest-neighbor upscaling only the changed `part` rectangle by `S × S` immediately before `lzw()` (byte-identical
+  to pre-scaled frames, avoiding `S²×` pixel scans and upscaled `Img` allocations for `--share`, `shot --gif`, and opaque
+  `_preview/*.gif`). `writeOutputs()` captures the 1× GIF's quantized palette via `onPalette` and passes it straight to
+  the scaled preview/share GIFs, skipping duplicate `medianCut` work. `medianCut()`'s k-means pass uses flat typed arrays
+  with a green-first (`4 * dg * dg >= bd`) early-out.
+- **Exact interior-skip glow and HD block scaling** (`src/core/glow.ts`, `src/core/build.ts`): `applyGlow` precomputes
+  the circular falloff kernel `(kdx, kdy, kf)`, skips strictly interior glowing cells whose four cardinal neighbors share
+  the identical effective glow color (`tint ?? c`, which cannot win the per-pixel `max` anywhere outside their own cell),
+  skips allocating the `Float32Array(w * h * 3)` RGB buffer when a single tint or single source color is used, and works
+  on art-pixel blocks (`pixel: K`, auto-bound in `sizes`/`pixel` scenes unless `px: true`), cutting HD glow work by
+  `K² ×` while fixing the 1×-vs-HD halo radius mismatch.
+- **`drawMesh` fast paths and HD block-stepping** (`src/core/mesh.ts`):
+  - *Empty-faces fast path* (`faces.length === 0`, used by `sprites3d()` and sprite-only overlays): skips `pos`/`who`/`shade`
+    allocations, face shading, and contact-shadow loops, reuses `c.img.depth` in place when `over: true`, and skips
+    `SunMap` construction unless both shadow-casting and lit sprites are present.
+  - *Flat-floor `SunMap` skip*: when every face vertex sits on a single horizontal plane (`UP` spread ≤ `1e-6`), the eye
+    is above it, the sun is above the horizon, and no sprite casts sun shadows, skips the 1024×1024 shadow map (a flat
+    floor cannot self-shadow).
+  - *Zero-allocation `texel()` and lifted `texColAt()`*: eliminates per-pixel `[x, y, z]` array and closure allocations.
+  - *Block-stepping rasterizer & raw-buffer neighbor cache*: when `block > 1` (HD `pixel: K`), evaluates barycentrics and
+    world position once per `Bk × Bk` block; during shading, copies `c.raw[i - 1]` or `c.raw[i - W]` when `(k, pos)` match
+    on opaque textured blocks (`B²×` fewer `texColAt`/`shine` calls).
+- **Incremental `SunMap.tri()` and faster `shine()`** (`src/core/sunlight.ts`): `SunMap.tri()` steps barycentrics
+  incrementally across rows/columns instead of recomputing full cross products per pixel; `shine()` skips `L.emit.has()`
+  when empty and uses an indexed loop with a squared-distance (`d2 >= lr * lr`) check before `Math.sqrt`.
+- **Making `make3d.rock` overrides pure** (`src/core/sdf.ts`): `field.mat(name, { override: true })` suppresses inner
+  `.paint()` callbacks (such as `make3d.rock`'s `fbm3` moss callback when `moss: 0`), letting re-skinned rock outcrops
+  be fully pure and eliminating 215 ms of per-build repainting across 250 rock traces.
+

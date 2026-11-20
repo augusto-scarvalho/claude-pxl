@@ -571,10 +571,17 @@ export const EFFECTS: Record<string, Effect> = {
   /**
    * Emission: the pixels (`on` keys, `where`) give light: `strength` of `color` (default their own)
    * added in linear light, what goes past white spilling into the other channels (a hot core turns
-   * white). `pulse` takes that much of it away and back over the loop.
+   * white). `keep: true` marks pixels as self-luminous / emitting (for mesh(), lighting(), post()
+   * bloom, and pxl check) without altering or bleaching their drawn colors. `pulse` takes that much
+   * of it away and back over the loop.
    */
   emit: {
-    params: { color: color(false), strength: num(0.5, 0), pulse: num(0, 0, 1) },
+    params: {
+      color: color(false),
+      strength: num(0.5, 0),
+      pulse: num(0, 0, 1),
+      keep: (v, what) => { if (v !== undefined && typeof v !== "boolean") throw new PxError(`${what} is true or false`); return !!v; },
+    },
     run(src, p, x) {
       const k = p.strength * (1 - p.pulse * (0.5 - 0.5 * Math.cos(2 * Math.PI * turn(x)))), out = new Img(src.w, src.h, src.data.slice());
       if (!k) return out;
@@ -584,6 +591,7 @@ export const EFFECTS: Record<string, Effect> = {
         const c = out.data[i];
         if (c === TRANSPARENT) continue;
         glow[i] = g;
+        if (p.keep) continue;
         let o = memo.get(c);
         if (o === undefined) {
           const r = LIN[c >>> 24], g = LIN[(c >>> 16) & 255], b = LIN[(c >>> 8) & 255], E = e ?? c;

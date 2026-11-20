@@ -399,3 +399,37 @@ test("smoke and plume through a camera: meters where they stand, smaller farther
   assert.match(failure(PALS + `anim("a", { w: 9, h: 9, frames: 2 }, smoke(0, 0, "wgk", { view: ${V} }))`, "a").message, /at is where it stands/);
   assert.match(failure(PALS + 'anim("a", { w: 9, h: 9, frames: 2 }, plume(0, 0, "wgk", { view: "side", at: [0, 4, 0] }))', "a").message, /view is a perspective\(\) camera/);
 });
+
+test("emit keep, fbmLoop seamless advection, and organic flame style: 'plume'", async () => {
+  const { fbmLoop } = await import("../src/core/util.ts");
+  // 1. effect("emit", { keep: true }) preserves exact RGB while populating img.emit
+  const base = sprite();
+  const kept = sprite('effect("emit", { keep: true, strength: 1 })');
+  assert.ok(same(kept, base), "keep: true preserves exact pixel RGB");
+  assert.ok(kept.emit && kept.emit[3 * 16 + 4] === 255 && kept.emit[0] === 0, "marks opaque pixels as emitting, clear as 0");
+  const keptHalf = sprite('effect("emit", { keep: true })');
+  assert.ok(same(keptHalf, base) && keptHalf.emit && keptHalf.emit[3 * 16 + 4] === 128, "default strength 0.5 marks emit=128 without altering RGB");
+  // 2. fbmLoop closes seamlessly at phase 0 == phase 1 and advects upward along y (and leftward along x)
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+    const a = fbmLoop(x, y, 0, { scale: 6, period: 16, cycles: 2, seed: 7 });
+    const b = fbmLoop(x, y, 1, { scale: 6, period: 16, cycles: 2, seed: 7 });
+    assert.ok(a >= 0 && a <= 1, "in [0, 1]");
+    assert.ok(Math.abs(a - b) < 1e-12, `seamless closure at (${x},${y}): ${a} vs ${b}`);
+  }
+  // Shifting y by -period/cycles is identical to advancing phase by +1/cycles (Wait: y/period + phase*cycles -> y-8, phase+0.5 at period=16, cycles=1)
+  const u0 = fbmLoop(5, 12, 0, { scale: 6, period: 16, cycles: 1, seed: 3, axis: "y" });
+  const u1 = fbmLoop(5, 4, 0.5, { scale: 6, period: 16, cycles: 1, seed: 3, axis: "y" });
+  assert.ok(Math.abs(u0 - u1) < 1e-12, "y advection moves upward as phase increases");
+  const x0 = fbmLoop(12, 5, 0, { scale: 6, period: 16, cycles: 1, seed: 3, axis: "x" });
+  const x1 = fbmLoop(4, 5, 0.5, { scale: 6, period: 16, cycles: 1, seed: 3, axis: "x" });
+  assert.ok(Math.abs(x0 - x1) < 1e-12, "x advection moves leftward as phase increases");
+  // 3. flame(..., { style: "plume" }) renders multi-band organic fire, animates, and loops seamlessly
+  const fp = load(`anim("f", { w: 28, h: 32, frames: 8, fps: 8 }, flame(14, 28, 22, "wyor", { style: "plume", seed: 5, wind: 0.15 }))`);
+  const f0 = fp.image("f", 0, 0), f2 = fp.image("f", 0, 250), f4 = fp.image("f", 0, 500), fLoop = fp.image("f", 0, 1000);
+  assert.ok(same(f0, fLoop), "plume flame closes its loop seamlessly");
+  assert.ok(same(f0, f4), "default cycles: 2 repeats cleanly twice per loop");
+  assert.ok(!same(f0, f2), "plume flame moves across frames");
+  const cols = new Set([...f0.data].filter((c) => c !== 0));
+  assert.ok(cols.size >= 3, `plume flame uses core-to-rim keys (${cols.size} colors)`);
+  assert.match(failure(PALS + 'sprite("s", { w: 12, h: 12 }, flame(6, 10, 8, "wyor", { style: "laser" }))', "s").message, /style is "tongues" or "plume"/);
+});

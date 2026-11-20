@@ -29,7 +29,9 @@ export function applyGlow(img: Img, keys: string | string[] | { ramp: string | s
   }
   const r = o.r ?? 6;
   if (!(r > 0)) throw new PxError(`glow r must be > 0, got ${r}`);
-  const inside = o.where === undefined ? undefined : regionPred(o.where)
+  const K = o.pixel ?? 1;
+  if (!(Number.isInteger(K) && K >= 1)) throw new PxError(`glow pixel must be a whole number >= 1, got ${JSON.stringify(o.pixel)}`);
+  const inside = o.where === undefined ? undefined : regionPred(o.where);
   const strength = o.strength ?? 0.5, bands = Math.max(0, Math.floor(o.bands ?? 0));
   let tint: Color | undefined;
   if (o.color !== undefined) {
@@ -38,47 +40,108 @@ export function applyGlow(img: Img, keys: string | string[] | { ramp: string | s
     tint = c;
   }
 
-  // Strongest contribution per pixel (max, like lamps), weight falling off as (1 - d/r)^2.
+  // Precompute the circular falloff kernel once (avoids Math.hypot / Math.pow in the inner loop).
   const { w, h, data } = img;
-  const weight = new Float32Array(w * h), rgb = new Float32Array(w * h * 3);
+  const gw = K > 1 ? Math.ceil(w / K) : w, gh = K > 1 ? Math.ceil(h / K) : h;
   const R = Math.ceil(r);
-  for (let sy = 0; sy < h; sy++)
-    for (let sx = 0; sx < w; sx++) {
+  const kdx: number[] = [], kdy: number[] = [], kf: number[] = [];
+  for (let dy = -R; dy <= R; dy++)
+    for (let dx = -R; dx <= R; dx++) {
+      const d = Math.hypot(dx, dy);
+      if (d > r) continue;
+      let f = (1 - d / (r + 1)) ** 2;
+      if (bands) f = Math.ceil(f * bands) / bands;
+      kdx.push(dx); kdy.push(dy); kf.push(f);
+    }
+  const kn = kf.length;
+
+  // Resolve source color per art-pixel cell (when K > 1, sample the block's center pixel),
+  // then skip strictly interior cells surrounded on all 4 sides by the exact same effective glow color:
+  // since glow takes the per-pixel max, interior cells are strictly dominated by their border neighbors.
+  const cellSrc = new Uint32Array(gw * gh); // 0 = not glowing, else effective Color (tint ?? c)
+  const singleColor = tint !== undefined || src.size === 1;
+  const [tr, tg, tb] = tint !== undefined ? channels(tint) : src.size === 1 ? channels([...src][0]) : [0, 0, 0];
+  for (let gy = 0; gy < gh; gy++) {
+    const sy = Math.min(h - 1, gy * K + (K >> 1));
+    for (let gx = 0; gx < gw; gx++) {
+      const sx = Math.min(w - 1, gx * K + (K >> 1));
       const c = keyed[sy * w + sx];
       if (!src.has(c) || (inside && !inside(sx, sy))) continue;
-      const [cr, cg, cb] = channels(tint ?? c);
-      for (let y = Math.max(0, sy - R); y <= Math.min(h - 1, sy + R); y++)
-        for (let x = Math.max(0, sx - R); x <= Math.min(w - 1, sx + R); x++) {
-          const d = Math.hypot(x - sx, y - sy);
-          if (d > r) continue;
-          let f = (1 - d / (r + 1)) ** 2;
-          if (bands) f = Math.ceil(f * bands) / bands;
-          const i = y * w + x;
-          if (f > weight[i]) weight[i] = f;
-          rgb[i * 3] = Math.max(rgb[i * 3], f * cr);
-          rgb[i * 3 + 1] = Math.max(rgb[i * 3 + 1], f * cg);
-          rgb[i * 3 + 2] = Math.max(rgb[i * 3 + 2], f * cb);
-        }
+      cellSrc[gy * gw + gx] = tint ?? c;
     }
+  }
+
+  // Strongest contribution per cell (max, like lamps), weight falling off as (1 - d/r)^2.
+  const weight = new Float32Array(gw * gh);
+  const rgb = singleColor ? undefined : new Float32Array(gw * gh * 3);
+  for (let gy = 0; gy < gh; gy++) {
+    const row = gy * gw;
+    for (let gx = 0; gx < gw; gx++) {
+      const eff = cellSrc[row + gx];
+      if (!eff) continue;
+      // Interior skip: if all 4 cardinal neighbors carry the exact same effective glow color,
+      // every pixel other than (gx, gy) itself is closer to at least one neighbor, so this cell
+      // cannot win max anywhere else (still record its own cell for mixed K > 1 blocks).
+      if (gx > 0 && gx < gw - 1 && gy > 0 && gy < gh - 1 &&
+        cellSrc[row + gx - 1] === eff && cellSrc[row + gx + 1] === eff &&
+        cellSrc[row - gw + gx] === eff && cellSrc[row + gw + gx] === eff) {
+        const i = row + gx;
+        weight[i] = 1;
+        if (!singleColor) {
+          const o3 = i * 3, cr = eff >>> 24, cg = (eff >>> 16) & 255, cb = (eff >>> 8) & 255;
+          if (cr > rgb![o3]) rgb![o3] = cr;
+          if (cg > rgb![o3 + 1]) rgb![o3 + 1] = cg;
+          if (cb > rgb![o3 + 2]) rgb![o3 + 2] = cb;
+        }
+        continue;
+      }
+      if (singleColor) {
+        for (let k = 0; k < kn; k++) {
+          const x = gx + kdx[k], y = gy + kdy[k];
+          if (x < 0 || x >= gw || y < 0 || y >= gh) continue;
+          const i = y * gw + x, f = kf[k];
+          if (f > weight[i]) weight[i] = f;
+        }
+      } else {
+        const cr = eff >>> 24, cg = (eff >>> 16) & 255, cb = (eff >>> 8) & 255;
+        for (let k = 0; k < kn; k++) {
+          const x = gx + kdx[k], y = gy + kdy[k];
+          if (x < 0 || x >= gw || y < 0 || y >= gh) continue;
+          const i = y * gw + x, f = kf[k];
+          if (f > weight[i]) weight[i] = f;
+          const o3 = i * 3, fr = f * cr, fg = f * cg, fb = f * cb;
+          if (fr > rgb![o3]) rgb![o3] = fr;
+          if (fg > rgb![o3 + 1]) rgb![o3 + 1] = fg;
+          if (fb > rgb![o3 + 2]) rgb![o3 + 2] = fb;
+        }
+      }
+    }
+  }
 
   const out = img.copy();
   const steps = o.ramp;
   const up = steps ? pal.stepMap(1) : undefined;
-  for (let i = 0; i < data.length; i++) {
-    const c = data[i];
-    if (c === TRANSPARENT || src.has(keyed[i]) || kept.has(keyed[i]) || weight[i] === 0) continue;
-    if (up) {
-      // Whole steps near the source, ordered dither on the fractional step: crisp, in palette.
-      const s = weight[i] * steps!, x = i % w, y = (i - x) / w;
-      let n = Math.floor(s) + (bayer(x, y) < s - Math.floor(s) ? 1 : 0), v = c;
-      while (n-- > 0) v = up.get(v) ?? v;
-      out.data[i] = v;
-      continue;
+  for (let py = 0; py < h; py++) {
+    const gy = K > 1 ? Math.floor(py / K) : py, grow = gy * gw, prow = py * w;
+    for (let px = 0; px < w; px++) {
+      const i = prow + px, c = data[i];
+      if (c === TRANSPARENT || src.has(keyed[i]) || kept.has(keyed[i])) continue;
+      const gi = grow + (K > 1 ? Math.floor(px / K) : px), wt = weight[gi];
+      if (wt === 0) continue;
+      if (up) {
+        // Whole steps near the source, ordered dither on the fractional step: crisp, in palette.
+        const s = wt * steps!, n = Math.floor(s) + (bayer(K > 1 ? Math.floor(px / K) : px, gy) < s - Math.floor(s) ? 1 : 0);
+        let v = c;
+        for (let m = 0; m < n; m++) v = up.get(v) ?? v;
+        out.data[i] = v;
+        continue;
+      }
+      // Screen blend: brightens toward the glow color without ever overshooting white.
+      const [br, bg, bb, a] = channels(c);
+      const gr = singleColor ? wt * tr : rgb![gi * 3], gg = singleColor ? wt * tg : rgb![gi * 3 + 1], gb = singleColor ? wt * tb : rgb![gi * 3 + 2];
+      const scr = (b: number, g: number) => 255 - ((255 - b) * (255 - Math.min(255, g * strength))) / 255;
+      out.data[i] = pack(byte(scr(br, gr)), byte(scr(bg, gg)), byte(scr(bb, gb)), a);
     }
-    // Screen blend: brightens toward the glow color without ever overshooting white.
-    const [br, bg, bb, a] = channels(c);
-    const scr = (b: number, g: number) => 255 - ((255 - b) * (255 - Math.min(255, g * strength))) / 255;
-    out.data[i] = pack(byte(scr(br, rgb[i * 3])), byte(scr(bg, rgb[i * 3 + 1])), byte(scr(bb, rgb[i * 3 + 2])), a);
   }
   return out;
 }

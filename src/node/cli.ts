@@ -17,7 +17,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { loadProject } from "./load.ts";
 import { decodePng } from "./png.ts";
 import { encodeGif, reduceColors } from "./gif.ts";
-import { packedSheet, writeOutputs, writePng } from "./output.ts";
+import { packedSheet, writeAtomic, writeOutputs, writePng } from "./output.ts";
 import { serve } from "./server.ts";
 import { checkProject, newHoles, writeMoves } from "./check.ts";
 import { startWorkers } from "./workers.ts";
@@ -516,7 +516,7 @@ export async function main(argv: string[]): Promise<number> {
         if (a.out !== false) {
           writePng(keep + ".png", r.snap.img);
           writePng(keep + ".unlit.png", r.snap.unlit);
-          writeFileSync(keep + ".json", JSON.stringify({ name, time: new Date().toISOString(), objects: r.snap.objects }, null, 1) + "\n");
+          writeAtomic(keep + ".json", JSON.stringify({ name, time: new Date().toISOString(), objects: r.snap.objects }, null, 1) + "\n");
         }
         return 0;
       }
@@ -680,8 +680,8 @@ export async function main(argv: string[]): Promise<number> {
           const k = a.scale ?? Math.max(1, Math.min(8, Math.floor(1024 / Math.max(sheets[0].w, sheets[0].h))));
           const path = join(outDir, "_shot", shots.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".gif");
           mkdirSync(dirname(path), { recursive: true });
-          const gif = encodeGif(sheets.map((img, i) => ({ img: img.scale(k), ms: (cuts[i + 1] ?? T) - cuts[i] })));
-          writeFileSync(path, gif);
+          const gif = encodeGif(sheets.map((img, i) => ({ img, ms: (cuts[i + 1] ?? T) - cuts[i] })), { scale: k });
+          writeAtomic(path, gif);
           console.log(`-> ${path} (${(gif.length / 1e6).toFixed(1)} MB, ${cuts.length} frames, a loop of ${T} ms${new Set(loops).size > 1 ? `: ${loops.join(", ")} ms each, the shorter starting over` : ""}; across: ${shots.map((s) => s.name).join(", ")}; ${k}x)`);
           if (boxes) console.log(boxLine());
           return 0;
@@ -782,7 +782,7 @@ export async function main(argv: string[]): Promise<number> {
         if (existsSync(last + ".last.json") && readFileSync(last + ".last.json", "utf8") === key)
           console.log(`since the last shot: ${shotChanges(decodePng(readFileSync(last + ".last.png")), now, frames, a.at)}`);
         writePng(last + ".last.png", now);
-        writeFileSync(last + ".last.json", key);
+        writeAtomic(last + ".last.json", key);
         // what pxl check finds on it at these frames, so a look needs no other call
         const r = checkProject(p, { names: [name], frames: looped(p, name, frames), edges: "shot" });
         for (const l of [...r.lines, ...r.notes]) console.log(l);
@@ -879,7 +879,7 @@ export async function main(argv: string[]): Promise<number> {
           writePng(join(dir, `${i + 1}.png`), o);
           return { n: i + 1, name, facing };
         });
-        writeFileSync(join(dir, "key.json"), JSON.stringify(key, null, 1) + "\n");
+        writeAtomic(join(dir, "key.json"), JSON.stringify(key, null, 1) + "\n");
         console.log(`${key.length} images in ${dir} (1.png ... ${key.length}.png), the labels in key.json.`);
         console.log(`Give a reader only the images (not the art file, not key.json) and ask, for each: which way does it face: right, left, front (toward us) or back? Save the answers as {"1": "right", ...} and run: pxl blind ${a.file} --check answers.json${a.out ? ` --out ${a.out}` : ""}`);
         return 0;
