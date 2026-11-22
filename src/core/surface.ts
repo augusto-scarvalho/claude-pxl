@@ -17,7 +17,7 @@ import type { Img } from "./image.ts";
 import { setNormal } from "./normals.ts";
 import type { Palette } from "./palette.ts";
 import { type Perspective, type View, perspective, scaled } from "./perspective.ts";
-import { type Clock, type Compiled, Sdf, type V3, article, compile, isEmpty } from "./sdf.ts";
+import { type Clock, type Compiled, Sdf, type V3, article, boundsOf, compile, isEmpty } from "./sdf.ts";
 import { Voxels, sizeOf, voxelize } from "./grids.ts";
 import { atPpm, drawnPpm } from "./builders.ts";
 import { type Lit, shine } from "./sunlight.ts";
@@ -132,7 +132,7 @@ export function surfaceSize(thing: Sdf | Voxels, o: { view?: SurfaceView; ppm?: 
   for (let f = 0; f < n; f++) {
     let lo: V3, hi: V3;
     if (thing instanceof Voxels) [lo, hi] = thing.bounds();
-    else { const C = compile(thing, { t: 0, phase: f / n, frame: f, frames: n }); if (isEmpty(C.lo, C.hi)) continue; finite(C); ({ lo, hi } = C); }
+    else { [lo, hi] = boundsOf(thing, { t: 0, phase: f / n, frame: f, frames: n }); if (isEmpty(lo, hi)) continue; finite({ lo, hi }); }
     for (const p of corners(lo, hi)) {
       const sx = pr.grid ? dot(p, pr.a) : dot(p, pr.R) * pr.k, sy = pr.grid ? dot(p, pr.b) : -dot(p, pr.U) * pr.k;
       x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
@@ -169,7 +169,7 @@ export function projection(view: SurfaceView | undefined, ppm: number | undefine
   return { a: [R[0] * k, R[1] * k, R[2] * k], b: [-U[0] * k, -U[1] * k, -U[2] * k], D: F, R, U, F, k, grid };
 }
 
-function finite(C: Compiled) {
+function finite(C: { lo: V3; hi: V3 }) {
   if (![...C.lo, ...C.hi].every(Number.isFinite)) throw new PxError("surface: the field goes on without end (a plane): intersect it with something that ends (sdf.box(...).intersect(sdf.plane()))");
 }
 
@@ -717,7 +717,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
       for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) { const i = gy * GW + gx; if (m[i] >= 0 && f(gx, gy, i)) cut.push(i); }
       for (const i of cut) m[i] = -1;
     };
-    if (innerOn) cutAll((gx, gy, i) => D4.some(([dx, dy]) => inkBy(i, gx + dx, gy + dy) && !on(gx - dx, gy - dy)));
+    if (innerOn && !dark) cutAll((gx, gy, i) => D4.some(([dx, dy]) => inkBy(i, gx + dx, gy + dy) && !on(gx - dx, gy - dy)));
     const nbs = (x: number, y: number) => +on(x - 1, y) + +on(x + 1, y) + +on(x, y - 1) + +on(x, y + 1);
     cutAll((gx, gy) => { const n = nbs(gx, gy); return !n || (n === 1 && D4.some(([dx, dy]) => on(gx + dx, gy + dy) && nbs(gx + dx, gy + dy) >= 3)); });
   }

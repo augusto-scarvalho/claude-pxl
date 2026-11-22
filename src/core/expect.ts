@@ -87,13 +87,32 @@ export function namesOf(rules: Rule2d[]): string[] {
 export type Frame2d = { f: number; at: Map<string, Named>; refs?: Map<string, string> };
 /** Each name's placement in a frame (not in a layer that only blends: a shadow, a light): its stamp's id, else its asset's name, as `at: "id.socket"` names them. */
 export function nameAll(placements: Placement[], blended: Set<string>, names: string[]): Omit<Frame2d, "f"> {
-  const at = new Map<string, Named>(), all = placements.map((p, i) => ({ p, i })).filter(({ p }) => !blended.has(p.layer ?? ""));
-  for (const n of names) {
-    const own = all.filter(({ p }) => (p.id ?? p.name) === n), ids = all.filter(({ p }) => p.id && p.name === n).map(({ p }) => p.id);
-    at.set(n, own.length === 1 ? own[0] : own.length ? `'${n}' is placed ${own.length} times: give the one the rule means an id (stamp(..., { id: "${n}_1" }))` : `nothing is placed as '${n}'${ids.length ? ` (its placements are named by their ids: ${[...new Set(ids)].join(", ")})` : ""}`);
+  const at = new Map<string, Named>(), byKey = new Map<string, { p: Placement; i: number }[]>(), byNameIds = new Map<string, string[]>();
+  let refs: Map<string, string> | undefined;
+  for (let i = 0; i < placements.length; i++) {
+    const p = placements[i];
+    if (blended.has(p.layer ?? "")) continue;
+    const k = p.id ?? p.name;
+    let list = byKey.get(k);
+    if (!list) byKey.set(k, (list = []));
+    list.push({ p, i });
+    if (p.id) {
+      let ids = byNameIds.get(p.name);
+      if (!ids) byNameIds.set(p.name, (ids = []));
+      ids.push(p.id);
+    }
+    if (p.rel?.to) (refs ??= new Map()).set(k, p.rel.to);
   }
-  const refs = new Map(all.filter(({ p }) => p.rel?.to).map(({ p }) => [p.id ?? p.name, p.rel!.to!]));
-  return { at, ...(refs.size ? { refs } : {}) };
+  for (const n of names) {
+    const own = byKey.get(n);
+    if (own?.length === 1) at.set(n, own[0]);
+    else if (own?.length) at.set(n, `'${n}' is placed ${own.length} times: give the one the rule means an id (stamp(..., { id: "${n}_1" }))`);
+    else {
+      const ids = byNameIds.get(n);
+      at.set(n, `nothing is placed as '${n}'${ids?.length ? ` (its placements are named by their ids: ${[...new Set(ids)].join(", ")})` : ""}`);
+    }
+  }
+  return { at, ...(refs ? { refs } : {}) };
 }
 
 /** Where each name stands moved to, px: the fix's trials. */

@@ -1,11 +1,11 @@
 // Project: the registry an art file fills in, plus the lazy, cached, cycle-checked resolver.
-import { type BuildCtx, type BuildOut, animTimeline, buildAsset, drawnFrames, gcd, shrinkBy } from "./build.ts";
-import { type Canvas, OPS } from "./canvas.ts";
+import { type BuildCtx, type BuildOut, animTimeline, buildAsset, drawnFrames, drawsWithFunctions, frameAt, gcd, shrinkBy } from "./build.ts";
+import { type Canvas, OPS, frameStart } from "./canvas.ts";
 import { type RigDef, drawGuide, drawParts, figure, ik, readRig, turnRig } from "./rig.ts";
 import { type View, perspective, road } from "./perspective.ts";
 import { solid } from "./solids.ts";
 import { model, turnFaces, turnPoint } from "./mesh.ts";
-import { Sdf, bare, compile, sdf } from "./sdf.ts";
+import { Sdf, bare, boundsOf, compile, sdf } from "./sdf.ts";
 import { COMPASS, clocksOf, contactOf, headingsOf, mirrorSymmetric, topOf, turnLight, turnViews } from "./turnaround.ts";
 import { BLOCK_MATS, type Body, type Joints, type Pose, blocksOf, bodyOf, gait, ik3, jointsOf, partsOf, solesOf, turned } from "./rig3d.ts";
 import { SURFACE_OPTS, VOXEL_OPTS, projection, surfaceSize } from "./surface.ts";
@@ -112,13 +112,6 @@ export const SIGNATURES: Record<string, string> = {
   post: "?opts:o",
 };
 
-/** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
-const CLOCKED = new Set(["surface", "voxels", "volume", "splats", "decal", "draw3d", "flame", "scroll", "clouds", "plume", "effect", "smoke", "weather", "particles", "trail", "cast", "shake"]);
-/** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
-function drawsWithFunctions(items: Item[]): boolean {
-  return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
-}
-
 /** A function among these items whose code reads its canvas's frame or phase (c.frame, c.phase). */
 function readsClock(items: Item[]): boolean {
   return items.some((v) => (typeof v === "function" && /\b[a-zA-Z_$][\w$]*\.(frame|phase)\b/.test(String(v))) || (isLayer(v) && readsClock(v.items)));
@@ -198,7 +191,7 @@ function buildBytes(b: BuildOut): number {
   return px(b.img) + px(b.guide) + px(b.under) + b.layers.reduce((s, l) => s + px(l.img), 0) + (b.refs ?? []).reduce((s, r) => s + px(r.img), 0) + b.placements.reduce((s, p) => s + 64 + px(p.img), 0);
 }
 export const LAYER_OPTS = ["x", "y", "sort", "hidden", "shade", "light", "of", "cast", "except", "density", "blend", "opacity", "palettize", "solid", "wall", "unlit", "ref", "outline", "selout", "floor", "parallax", "swap", "mix"];
-const SHEET_OPTS = ["cols", "pad", "extrude", "rows", "slots", "cell"];
+const SHEET_OPTS = ["cols", "pad", "extrude", "rows", "slots", "cell", "pivot", "format", "scale", "meta", "names", "sockets"];
 /** The checks a genre() can ask pxl check for (check.ts runs them on the assets naming it). */
 export const GENRE_CHECKS = ["ground", "height", "footprint"];
 /** A card's cells: the cameras, and the statuses (approved; a 3D render to look at; by hand over a 3D draft). */
@@ -359,6 +352,7 @@ export class Project implements BuildCtx {
   private glyphCache = new Map<string, (ch: string) => string[]>();
   /** Art files loaded so far (absolute paths or virtual names), for locations and watching. */
   readonly files: string[] = [];
+  private fileSet = new Set<string>();
   /** The assets, sheets and 3D files an include() defined (and what it included): a build writes them only when asked. */
   readonly included = new Set<string>();
   pal: Palette = Palette.builtin("pico8").asDefault();
@@ -496,14 +490,22 @@ export class Project implements BuildCtx {
   state?: () => Record<string, string>;
   private state0?: Record<string, string>;
   private stateAt = -1;
+  /** Counter of art JS callback entries/exits and active nesting depth: declarative builds (stamp, base+swap, flip) never increment it, so moved() skips redundant top-level digests when no art JS has run. */
+  private artRan = 0;
+  private inArt = 0;
+  runArt<T>(fn: () => T): T {
+    this.inArt++;
+    this.artRan++;
+    try { return fn(); } finally { this.inArt--; this.artRan++; }
+  }
   /** (the ms the last digest took: a build that took less isn't worth keeping, as reading it back costs one) */
   private stateMs = 0;
   /** Why the art's state let the disk go (pxl build --profile says it). */
   offWhy?: string;
   /** Has the art's state changed since the first build made here? Then the disk is let go, at `name`. */
   moved(name: string): boolean {
-    if (!this.state0 || (this.stateAt === this.made && !this.logs.length)) return false;
-    this.stateAt = this.made;
+    if (!this.state0 || (this.stateAt === this.artRan && !this.inArt)) return false;
+    this.stateAt = this.artRan;
     const t = performance.now(), now = this.state!(), was = this.state0;
     this.stateMs = performance.now() - t;
     const changed = Object.keys(now).filter((k) => now[k] !== was[k]);
@@ -539,6 +541,10 @@ export class Project implements BuildCtx {
   private building = new Set<string>();
   private cands = new Map<string, string[]>();
   private failed = new Map<string, PxError>();
+  /** Populates lazy rig3d() bounds directly from cached/worker Img results without running boundsOf(). */
+  private rigHits = new WeakMap<AssetDef, (img: Img) => void>();
+  /** Non-zero timestamp currently traced by traceFrame() (pxl steps --frame N / describe --frame N). */
+  private traceT: number | undefined;
   readonly where: boolean;
   /**
    * pxl inspect --id: what the asset being built stamps itself is drawn as nothing (its clock kept, an
@@ -555,7 +561,7 @@ export class Project implements BuildCtx {
   // ---------------------------------------------------------------- locations
 
   addFile(file: string): void {
-    if (!this.files.includes(file)) this.files.push(file);
+    if (!this.fileSet.has(file)) { this.fileSet.add(file); this.files.push(file); }
   }
 
   /**
@@ -579,12 +585,83 @@ export class Project implements BuildCtx {
     return found;
   }
 
-  callerLoc(outer = false): string | undefined {
+  /** Innermost and outermost call-site locations in the art file from a single stack capture. */
+  callerLocs(): [string | undefined, string | undefined] {
+    if (!this.files.length) return [undefined, undefined];
+    const E = Error as typeof Error & {
+      prepareStackTrace?: (err: Error, sites: { getFileName(): string | null | undefined; getLineNumber(): number | null; getColumnNumber(): number | null }[]) => unknown;
+      captureStackTrace?: (target: object, ctor?: (...a: never[]) => unknown) => void;
+    };
+    if (typeof E.captureStackTrace === "function") {
+      const limit = Error.stackTraceLimit, prev = E.prepareStackTrace;
+      Error.stackTraceLimit = 60;
+      E.prepareStackTrace = (_, sites) => sites;
+      try {
+        const holder: { stack?: { getFileName(): string | null | undefined; getLineNumber(): number | null; getColumnNumber(): number | null }[] } = {};
+        E.captureStackTrace(holder, this.callerLocs as (...a: never[]) => unknown);
+        const sites = holder.stack;
+        if (!Array.isArray(sites)) return [undefined, undefined];
+        let inner: string | undefined, outer: string | undefined, file: string | undefined;
+        for (let i = 0; i < sites.length; i++) {
+          const fn = sites[i].getFileName();
+          if (!fn || !this.fileSet.has(fn) || (file && fn !== file)) continue;
+          const line = sites[i].getLineNumber(), col = sites[i].getColumnNumber();
+          if (line == null || col == null) continue;
+          const at = `${this.short(fn)}:${line}:${col}`;
+          inner ??= at;
+          outer = at;
+          file = fn;
+        }
+        return [inner, outer];
+      } finally {
+        E.prepareStackTrace = prev;
+        Error.stackTraceLimit = limit;
+      }
+    }
     const limit = Error.stackTraceLimit;
     Error.stackTraceLimit = 60;
     const stack = new Error().stack ?? "";
     Error.stackTraceLimit = limit;
-    return this.locFromStack(stack, outer);
+    return [this.locFromStack(stack, false), this.locFromStack(stack, true)];
+  }
+
+  callerLoc(outer = false): string | undefined {
+    if (!this.files.length) return undefined;
+    if (outer) return this.callerLocs()[1];
+    const E = Error as typeof Error & {
+      prepareStackTrace?: (err: Error, sites: { getFileName(): string | null | undefined; getLineNumber(): number | null; getColumnNumber(): number | null }[]) => unknown;
+      captureStackTrace?: (target: object, ctor?: (...a: never[]) => unknown) => void;
+    };
+    if (typeof E.captureStackTrace === "function") {
+      const scan = (depth: number): string | undefined => {
+        const limit = Error.stackTraceLimit, prev = E.prepareStackTrace;
+        Error.stackTraceLimit = depth;
+        E.prepareStackTrace = (_, sites) => sites;
+        try {
+          const holder: { stack?: { getFileName(): string | null | undefined; getLineNumber(): number | null; getColumnNumber(): number | null }[] } = {};
+          E.captureStackTrace(holder, this.callerLoc as (...a: never[]) => unknown);
+          const sites = holder.stack;
+          if (!Array.isArray(sites)) return undefined;
+          for (let i = 0; i < sites.length; i++) {
+            const fn = sites[i].getFileName();
+            if (!fn || !this.fileSet.has(fn)) continue;
+            const line = sites[i].getLineNumber(), col = sites[i].getColumnNumber();
+            if (line == null || col == null) continue;
+            return `${this.short(fn)}:${line}:${col}`;
+          }
+          return undefined;
+        } finally {
+          E.prepareStackTrace = prev;
+          Error.stackTraceLimit = limit;
+        }
+      };
+      return scan(8) ?? scan(60);
+    }
+    const limit = Error.stackTraceLimit;
+    Error.stackTraceLimit = 60;
+    const stack = new Error().stack ?? "";
+    Error.stackTraceLimit = limit;
+    return this.locFromStack(stack, false);
   }
 
   /** The loaded file a location ("kit.px.js:13:3", "../nature/kit.px.js:13") points into. */
@@ -630,20 +707,31 @@ export class Project implements BuildCtx {
   /** Functions visible to art files. */
   env(): Record<string, unknown> {
     const env: Record<string, unknown> = {};
-    const define = (kind: AssetKind, given: unknown, rest: unknown[]) => {
-      const loc = this.callerLoc();
+    const define = (kind: AssetKind, given: unknown, rest: unknown[], locOverride?: string, topOverride?: string) => {
+      let loc: string | undefined, top: string | undefined;
+      if (locOverride !== undefined) { loc = locOverride; top = topOverride ?? this.callerLoc(true); }
+      else [loc, top] = this.callerLocs();
       if (typeof given !== "string" || !given) throw new PxError(`${kind} needs a name string first`, loc);
       const name = this.qualify(given);
       const prev = this.assets.get(name) ?? this.groups.get(name);
       if (prev) throw new PxError(`'${name}' is already defined at ${prev.loc}`, loc);
       const opts = (isPlainObject(rest[0]) ? rest.shift() : {}) as AssetOpts;
       checkKeys(`${kind} '${name}'`, opts, ASSET_OPTS[kind], loc);
+      // Copy an option descriptor without invoking lazy getters (e.g. rig3d()'s deferred pivot).
+      const inheritOpt = (dst: AssetOpts, src: AssetOpts, k: keyof AssetOpts) => {
+        const ownD = Object.getOwnPropertyDescriptor(dst, k);
+        if (ownD && (ownD.get || ownD.value !== undefined)) return;
+        const srcD = Object.getOwnPropertyDescriptor(src, k);
+        if (!srcD) return;
+        if (srcD.get) Object.defineProperty(dst, k, srcD);
+        else if (srcD.value !== undefined) (dst as Record<string, unknown>)[k] = srcD.value;
+      };
       // a variant of an anim (base + swap) plays as it does: its clock and pivot, unless it says
       // otherwise (it drew one frame at 8 fps, still, where its base moved)
       const from = kind === "anim" && typeof opts.base === "string" ? this.assets.get(this.resolve(opts.base)) : undefined;
       if (from?.kind === "anim" && !rest.some((v) => isOp(v) && v.name === "frame")) {
         const said = opts.fps !== undefined || opts.ms !== undefined;
-        for (const k of ["fps", "frames", "loop", "dir", "pivot"] as const) if (opts[k] === undefined && from.opts[k] !== undefined) (opts as Record<string, unknown>)[k] = from.opts[k];
+        for (const k of ["fps", "frames", "loop", "dir", "pivot"] as const) inheritOpt(opts, from.opts, k);
         // the frames it draws, each as long as its base's (reverse and pingpong play some again, in their order)
         const tl = animTimeline(from), d = tl.order ? Array.from({ length: drawnFrames(tl) }, (_, k) => tl.durations![tl.order!.indexOf(k)]) : tl.durations!;
         if (opts.frames === undefined) opts.frames = d.length;
@@ -677,11 +765,11 @@ export class Project implements BuildCtx {
         const live = this.qualify(opts.frozen), of = this.assets.get(live), where = this.whereHook?.(opts.png);
         if (!of) throw new PxError(`${kind} '${name}': frozen '${live}' is no asset defined before it (the live one its png is a render of)`, loc);
         if (!where) throw new PxError(`${kind} '${name}': frozen needs an art file on disk`, loc);
-        opts.pivot ??= of.opts.pivot;
+        inheritOpt(opts, of.opts, "pivot");
         frozen = { live, ...(where.there ? {} : { freeze: where.abs }) };
         if (!where.there) { delete opts.png; opts.base = live; }
       }
-      const read = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), png = read?.img, top = this.callerLoc(true), look3d = this.look3d, ns = this.ns ? { ns: this.ns } : {};
+      const read = opts.png === undefined ? undefined : this.readPng(`${kind} '${name}'`, opts, loc), png = read?.img, look3d = this.look3d, ns = this.ns ? { ns: this.ns } : {};
       // a swap on a base from another file recolors that file's drawing: its keys are read in the base's
       // palette (a kit's lamp by the kit's own keys, which yours needn't have, or has as other colors)
       const b = opts.swap && typeof opts.base === "string" ? this.assets.get(this.resolve(opts.base)) : undefined, file = (l?: string) => l?.replace(/:\d+(:\d+)?$/, "");
@@ -788,8 +876,8 @@ export class Project implements BuildCtx {
       checkKeys(`layer '${name}'`, opts, LAYER_OPTS, loc);
       return { __layer: true, name, opts, items: checkItems(`layer '${name}'`, rest, loc), loc };
     };
-    env.group = (given: unknown, members: unknown) => {
-      const loc = this.callerLoc();
+    const addGroup = (given: unknown, members: unknown, locOverride?: string) => {
+      const loc = locOverride ?? this.callerLoc();
       if (typeof given !== "string" || !Array.isArray(members) || !members.every((m) => typeof m === "string"))
         throw new PxError('group("name", ["a", "b*", ...])', loc);
       const name = this.qualify(given);
@@ -797,6 +885,7 @@ export class Project implements BuildCtx {
       if (prev) throw new PxError(`'${name}' is already defined at ${prev.loc}`, loc);
       this.groups.set(name, { name, members, loc, ...(this.ns ? { ns: this.ns } : {}) });
     };
+    env.group = (given: unknown, members: unknown) => addGroup(given, members);
     // corners(prefix, { size, variants, smooth }, (x, y, t, v) => key): a corner terrain's 16 pieces, `prefix_<mask>`
     env.corners = (prefix: unknown, opts: unknown, fn: unknown) => {
       const loc = this.callerLoc();
@@ -959,7 +1048,7 @@ export class Project implements BuildCtx {
     // sprite each pivoted on its anchor, the views not drawn the mirrors of those across; a group to
     // stamp by heading (rig3d.ts); pxl check holds their rows together
     env.views = (given: unknown, grids: unknown, opts: unknown = {}) => {
-      const loc = this.callerLoc();
+      const [loc, top] = this.callerLocs();
       try {
         const model = grids instanceof Sdf ? grids : undefined;
         if (typeof given !== "string" || !given || !(model || isPlainObject(grids)) || !isPlainObject(opts)) throw new PxError('views("_head", { s: grid, sw: grid, w: grid, nw: grid, n: grid } or a field (the head modeled), { anchor: [x, y] (or { s: [x, y], ... }), like: "_other_head" })');
@@ -1032,7 +1121,26 @@ export class Project implements BuildCtx {
             if (!g) return;
             const a = isPlainObject(anchor) ? anchor[d] : anchor;
             if (!(Array.isArray(a) && a.length === 2 && a.every(Number.isInteger))) throw new PxError(`views: retouch '${d}' needs its anchor, the pixel [col, row] of its grid on the head's middle`);
-            gridRows(g).forEach((row, y) => [...row].forEach((k, x) => { if (k !== ".") { const px = R + x - a[0], py = R + y - a[1]; if (k === "_") c.plot(px, py, TRANSPARENT); else c.px(px, py, k); } }));
+            const inkCol = ink !== undefined ? c.color(ink) : null, jawCol = jaw ? c.color(jaw[0]) : null;
+            const before = inkCol !== null ? data.slice() : undefined;
+            const touchedPx: [number, number][] = [];
+            gridRows(g).forEach((row, y) => [...row].forEach((k, x) => {
+              if (k === ".") return;
+              const px = R + x - a[0], py = R + y - a[1];
+              if (k === "_") c.plot(px, py, TRANSPARENT);
+              else { c.px(px, py, k); if (before) touchedPx.push([px + c.ox, py + c.oy]); }
+            }));
+            // Detect outer silhouette outline pixels overwritten with a non-ink/non-jaw fill color (surfaced by `pxl check --edges` / `pxl shot`)
+            if (before && inkCol !== null) {
+              const gaps: [number, number][] = [];
+              for (const [x, y] of touchedPx) {
+                if (x < 0 || y < 0 || x >= W || y >= Hh) continue;
+                const col = data[y * W + x], prev = before[y * W + x];
+                if (col === inkCol || col === jawCol || (prev !== inkCol && prev !== TRANSPARENT)) continue;
+                if (!on(x - 1, y) || !on(x + 1, y) || !on(x, y - 1) || !on(x, y + 1)) gaps.push([x, y]);
+              }
+              if (gaps.length) c.img.retouchGaps = gaps;
+            }
           };
           // the west drawn and the east its mirror where the light comes from the middle (as rig3d's), else every one
           const all = COMPASS.filter((_, i) => nv === 16 || i % 2 === 0), level = Math.abs(L[0]) < 0.05 * Math.hypot(...L);
@@ -1051,21 +1159,21 @@ export class Project implements BuildCtx {
           throw new PxError(`views: an anchor is the pixel [col, row] of the view that lands where it is stamped, "center" or "bottom" (one for all, or { ${d}: [col, row], ... }), got ${JSON.stringify(a)}`);
         };
         for (const d of drawn) {
-          if (baked) { define("sprite", `${name}_${d}`, [{ ...so, w: 2 * R + 1, h: 2 * R + 1, pivot: [R + 0.5, R + 0.5] }, baked[d]]); continue; }
+          if (baked) { define("sprite", `${name}_${d}`, [{ ...so, w: 2 * R + 1, h: 2 * R + 1, pivot: [R + 0.5, R + 0.5] }, baked[d]], loc, top); continue; }
           const g = G[d], rows = Array.isArray(g) && g.every((r) => typeof r === "string" && !r.includes("\n"));
           // rows padded to one width, a grid string, or items (a grid and runs())
           const items = typeof g === "string" ? [g] : rows ? [(g as string[]).map((r) => r.padEnd(Math.max(...(g as string[]).map((q) => q.length)), ".")).join("\n")] : Array.isArray(g) ? g : undefined;
           if (!items) throw new PxError(`views: view '${d}' is a grid (a string, or its rows), or items ([grid, runs(...)]), got ${JSON.stringify(g)?.slice(0, 60)}`);
-          define("sprite", `${name}_${d}`, [{ ...so, ...pivotOf(d) }, ...items]);
+          define("sprite", `${name}_${d}`, [{ ...so, ...pivotOf(d) }, ...items], loc, top);
         }
         const names: string[] = [];
         for (const [i, d] of COMPASS.entries()) {
           const twin = COMPASS[(16 - i) % 16];
           if (!drawn.includes(d) && !drawn.includes(twin)) continue;
-          if (!drawn.includes(d)) define("sprite", `${name}_${d}`, [{ base: `${name}_${twin}`, flip: "x" }]);
+          if (!drawn.includes(d)) define("sprite", `${name}_${d}`, [{ base: `${name}_${twin}`, flip: "x" }], loc, top);
           names.push(`${name}_${d}`);
         }
-        (env.group as (n: string, m: string[]) => void)(name, names);
+        addGroup(name, names, loc);
         // the chin from each view's anchor (its pixel's row)
         const chins = chin === undefined ? undefined : Object.fromEntries(drawn.map((d) => {
           const a = isPlainObject(anchor) ? anchor[d] : anchor;
@@ -1079,7 +1187,7 @@ export class Project implements BuildCtx {
     // rig3d(name, { body, moves, n, parts, head, blocks, ... }): a figure on the 3D layer, its moves in
     // every direction asked, drawn by surface(); its flat blocks to judge a move (rig3d.ts)
     env.rig3d = (given: unknown, opts: unknown) => {
-      const loc = this.callerLoc();
+      const [loc, top] = this.callerLocs();
       try {
         if (typeof given !== "string" || !given || !isPlainObject(opts)) throw new PxError('rig3d("tr", { body: { h: 34, heads: 3 }, moves: { walk: { frames: 8, ms: 110, pose: (i, heading) => ({ feet, lift, hands }) } }, n: 8, blocks: true })');
         const name = this.qualify(given);
@@ -1117,30 +1225,37 @@ export class Project implements BuildCtx {
         // where a point lands on the sprite (its foot point at the pivot) and how near us it is: the joints' escape hatch
         const project = (px: number, py: number) => (q: number[]): [number, number] => [px + q[0], py - q[1] * SP - q[2] * CP], depth = (q: number[]) => q[2] * SP - q[1] * CP;
         const fields = (j: Joints, p: Pose) => [...(prefix !== undefined ? [blocksOf(B, j)] : []), ...(o.parts ? [partsOf((o.parts as (j: Joints, p: Pose) => unknown)(j, p), j).field, sdf.sphere(B.r.head).at(turned(j).head)] : [])];
-        // one size for all: given, or every field's box seen at every frame and heading, a pixel round it
-        let { w, h, pivot } = o;
-        if (w === undefined || h === undefined || pivot === undefined) {
-          let x0 = 0, x1 = 0, y0 = 0, y1 = 0;
-          for (const M of moves) for (const hd of M.heads) for (let i = 0; i < M.frames; i++) {
-            // (the parts given the joints they're drawn with: those that read j.depth or j.screen too, the foot point at 0, 0)
-            const p = M.pose(i, hd.deg), j = Object.assign(jointsOf(B, p, hd.deg), { screen: project(0, 0), depth });
-            for (const f of fields(j, p)) {
-              const { lo, hi } = compile(f);
-              for (let c = 0; c < 8; c++) {
-                const q = [c & 1 ? hi[0] : lo[0], c & 2 ? hi[1] : lo[1], c & 4 ? hi[2] : lo[2]], sx = q[0], sy = -q[1] * SP - q[2] * CP;
-                x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+        // one size for all: given, or lazily computed on first build / size access as every field's box seen at every frame and heading, a pixel round it
+        if ((o.w !== undefined && !Number.isInteger(o.w)) || (o.h !== undefined && !Number.isInteger(o.h))
+          || (o.pivot !== undefined && !(Array.isArray(o.pivot) && o.pivot.length === 2 && o.pivot.every(Number.isInteger))))
+          throw new PxError(`rig3d: w, h and pivot (the pixel the figure's foot point lands on, [x, y]) are whole numbers, got ${JSON.stringify({ w: o.w, h: o.h, pivot: o.pivot })}`);
+        type RigSize = { w: number; h: number; pivot: [number, number] };
+        let sized: RigSize | undefined = o.w !== undefined && o.h !== undefined && o.pivot !== undefined ? { w: o.w, h: o.h, pivot: o.pivot as [number, number] } : undefined;
+        const size = (): RigSize => {
+          if (sized) return sized;
+          try {
+            let x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+            for (const M of moves) for (const hd of M.heads) for (let i = 0; i < M.frames; i++) {
+              // (the parts given the joints they're drawn with: those that read j.depth or j.screen too, the foot point at 0, 0)
+              const p = M.pose(i, hd.deg), j = Object.assign(jointsOf(B, p, hd.deg), { screen: project(0, 0), depth });
+              for (const f of fields(j, p)) {
+                const [lo, hi] = boundsOf(f);
+                for (let c = 0; c < 8; c++) {
+                  const q = [c & 1 ? hi[0] : lo[0], c & 2 ? hi[1] : lo[1], c & 4 ? hi[2] : lo[2]], sx = q[0], sy = -q[1] * SP - q[2] * CP;
+                  x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+                }
               }
             }
-          }
-          const L = Math.ceil(-x0) + 2, T = Math.ceil(-y0) + 2;
-          pivot ??= [L, T]; w ??= pivot[0] + Math.ceil(x1) + 3; h ??= pivot[1] + Math.ceil(y1) + 3;
-        }
-        if (!(Number.isInteger(w) && Number.isInteger(h) && Array.isArray(pivot) && pivot.length === 2 && pivot.every(Number.isInteger))) throw new PxError(`rig3d: w, h and pivot (the pixel the figure's foot point lands on, [x, y]) are whole numbers, got ${JSON.stringify({ w, h, pivot })}`);
-        const [px, py] = pivot as [number, number];
-        const screen = project(px, py);
+            const L = Math.ceil(-x0) + 2, T = Math.ceil(-y0) + 2;
+            const pv = (o.pivot ?? [L, T]) as [number, number];
+            const W = o.w ?? pv[0] + Math.ceil(x1) + 3, Hh = o.h ?? pv[1] + Math.ceil(y1) + 3;
+            return (sized = { w: W, h: Hh, pivot: pv });
+          } catch (e) { throw wrap(e).within("rig3d", loc); }
+        };
+        const screen = (q: number[]): [number, number] => { const [px, py] = size().pivot; return [px + q[0], py - q[1] * SP - q[2] * CP]; };
         // (as drawn: a pose's roll turns them; parts() is given them upright, its fields turned after)
         const joints = (p: Pose, heading: number) => Object.assign(turned(jointsOf(B, p, heading)), { screen, depth });
-        const view = { kind: "side" as const, pitch }, at = [px + 0.5, py + 0.5], ink = typeof o.ink === "string" ? o.ink : typeof o.outline === "string" ? o.outline : this.pal.keys.has("k") ? "k" : "#000000";
+        const view = { kind: "side" as const, pitch }, ink = typeof o.ink === "string" ? o.ink : typeof o.outline === "string" ? o.outline : this.pal.keys.has("k") ? "k" : "#000000";
         const look = this.look3d, light = o.light ?? look?.light ?? [0, -0.6, 0.75];
         // the east drawn as the west's mirror where the light comes from the picture's middle (as turnaround's)
         const level = Array.isArray(light) && Math.abs(light[0]) < 0.05 * Math.hypot(...light), sym = o.mirror === true || ((o.mirror ?? "auto") === "auto" && level);
@@ -1183,6 +1298,7 @@ export class Project implements BuildCtx {
           };
         };
         const paint = (c: Canvas, p: Pose, deg: number, flat: boolean, M: (typeof moves)[number]) => {
+          const [px, py] = size().pivot, at = [px + 0.5, py + 0.5];
           const j0 = Object.assign(jointsOf(B, p, deg), { screen, depth }), j = j0.roll ? joints(p, deg) : j0;
           let hd: { at: (x: number, y: number) => boolean; z: number } | undefined;
           if (flat) {
@@ -1268,18 +1384,40 @@ export class Project implements BuildCtx {
             // (a move of one frame never reads the clock: a still pose)
             const draw = (hd: (typeof H)[number]) => (M.frames > 1 ? (c: Canvas) => paint(c, M.pose(c.frame, hd.deg), hd.deg, flat, M) : (c: Canvas) => paint(c, M.pose(0, hd.deg), hd.deg, flat, M));
             const genre = !flat && o.genre !== undefined ? { genre: o.genre, ...(o.category !== undefined ? { category: o.category } : {}) } : {};
-            M.heads.forEach((hd, i) => { if (twin[i] < 0) define("anim", list[i], [{ w, h, pivot, ...genre }, draw(hd), ...frameOps(M)]); });
+            const pureRig = !(o.draw && /\.\s*t\b/.test(String(o.draw))) && !(M.draw && /\.\s*t\b/.test(String(M.draw))) && !(o.parts && /\.animate\b|\.\s*t\b/.test(String(o.parts)));
+            M.heads.forEach((hd, i) => {
+              if (twin[i] < 0) {
+                const aopts: AssetOpts = sized ? { w: sized.w, h: sized.h, pivot: sized.pivot, ...genre } : { ...genre };
+                if (!sized) Object.defineProperties(aopts, {
+                  w: { get: () => size().w, enumerable: true, configurable: true },
+                  h: { get: () => size().h, enumerable: true, configurable: true },
+                  pivot: { get: () => size().pivot, enumerable: true, configurable: true },
+                });
+                define("anim", list[i], [aopts, draw(hd), ...frameOps(M)], loc, top);
+                const def = this.assets.get(list[i])!;
+                if (pureRig) def.framePure = true;
+                if (!sized) this.rigHits.set(def, (img) => { if (!sized && img.pivot) sized = { w: img.w, h: img.h, pivot: [img.pivot[0], img.pivot[1]] }; });
+              }
+            });
             // (the mirrors after what they mirror, so they play as it does)
-            M.heads.forEach((hd, i) => { if (twin[i] >= 0) define("anim", list[i], [{ base: list[twin[i]], flip: "x", pivot: [px + 1, py], ...genre }]); });
+            M.heads.forEach((hd, i) => {
+              if (twin[i] >= 0) {
+                const mopts: AssetOpts = sized ? { base: list[twin[i]], flip: "x", pivot: [sized.pivot[0] + 1, sized.pivot[1]], ...genre } : { base: list[twin[i]], flip: "x", ...genre };
+                if (!sized) Object.defineProperty(mopts, "pivot", { get: () => { const [px, py] = size().pivot; return [px + 1, py]; }, enumerable: true, configurable: true });
+                define("anim", list[i], [mopts], loc, top);
+                const def = this.assets.get(list[i])!;
+                if (!sized) this.rigHits.set(def, (img) => { if (!sized && img.pivot) sized = { w: img.w, h: img.h, pivot: [img.w - 1 - img.pivot[0], img.pivot[1]] }; });
+              }
+            });
             // standing on its foot point: pxl check reads its feet there (in px, it has no height in meters)
             for (const n of list) this.assets.get(n)!.grounded = true;
             groups.push([fam, list]);
             names.push(...list);
           }
-          for (const [g, l] of groups) (env.group as (n: string, m: string[]) => void)(g, l);
+          for (const [g, l] of groups) addGroup(g, l, loc);
         }
         this.figures.set(name, { body: B, moves: moves.map(({ m, frames, pose, heads }) => ({ m, frames, pose, heads })), loc });
-        return { names, headings: H.map((hd) => hd.name), joints, screen, depth, w, h, pivot, body: B };
+        return { names, headings: H.map((hd) => hd.name), joints, screen, depth, get w() { return size().w; }, get h() { return size().h; }, get pivot() { return size().pivot; }, body: B };
       } catch (e) { throw wrap(e).within("rig3d", loc); }
     };
     // gait(t, { heading | view, stride, lift, bob, hands, front: {...}, ... }): a walk's numbers by the view (rig3d.ts)
@@ -1305,8 +1443,25 @@ export class Project implements BuildCtx {
       if (typeof name !== "string" || !Array.isArray(entries)) throw new PxError('sheet("name", ["a", "b*"], { cols, pad })', loc);
       checkKeys(`sheet '${name}'`, opts, SHEET_OPTS, loc);
       const cell = opts.cell as unknown;
-      if (cell !== undefined && !(Array.isArray(cell) && cell.length === 2 && cell.every((v) => Number.isInteger(v) && v > 0)))
-        throw new PxError(`sheet '${name}': cell is each frame's [w, h] in px, its pivot at the middle (cell: [20, 20]), got ${JSON.stringify(cell)}`, loc);
+      if (cell !== undefined && cell !== "auto" && !(Array.isArray(cell) && cell.length === 2 && cell.every((v) => Number.isInteger(v) && v > 0)))
+        throw new PxError(`sheet '${name}': cell is each frame's [w, h] in px, or "auto" (cell: [20, 20]), got ${JSON.stringify(cell)}`, loc);
+      const pv = opts.pivot as unknown;
+      if (pv !== undefined) {
+        if (cell === undefined) throw new PxError(`sheet '${name}': pivot places each frame inside its cell: add cell: [w, h] or cell: "auto"`, loc);
+        if (!(pv === "center" || pv === "bottom" || (Array.isArray(pv) && pv.length === 2 && pv.every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0))))
+          throw new PxError(`sheet '${name}': pivot must be "center", "bottom" or [x, y] in cell px, got ${JSON.stringify(pv)}`, loc);
+      }
+      if (opts.format !== undefined && !["hash", "array", "grid"].includes(opts.format))
+        throw new PxError(`sheet '${name}': format must be "hash", "array" or "grid", got ${JSON.stringify(opts.format)}`, loc);
+      if (opts.scale !== undefined && !(Number.isInteger(opts.scale) && opts.scale >= 1))
+        throw new PxError(`sheet '${name}': scale must be a whole number >= 1, got ${JSON.stringify(opts.scale)}`, loc);
+      if (opts.meta !== undefined && !isPlainObject(opts.meta))
+        throw new PxError(`sheet '${name}': meta must be a plain object, got ${JSON.stringify(opts.meta)}`, loc);
+      for (const field of ["names", "sockets"] as const) {
+        const map = opts[field] as unknown;
+        if (map !== undefined && !(isPlainObject(map) && Object.values(map).every((v) => typeof v === "string" && v.length > 0)))
+          throw new PxError(`sheet '${name}': ${field} must be { from: "to", ... } of non-empty strings, got ${JSON.stringify(map)}`, loc);
+      }
       // palette slots: each a swap ({ R: "#30544b" }, roleSwap(...)) in the palette here, exported as a palette a slot
       const sl = opts.slots;
       if (sl !== undefined && !(isPlainObject(sl) && Object.keys(sl).length && Object.values(sl).every(isPlainObject)))
@@ -1854,8 +2009,35 @@ export class Project implements BuildCtx {
       (acc.by ??= new Map()).set(name, tl.loop);
     }
     if (!tl || t === 0) return first!;
-    const tt = tl.once ? Math.min(Math.max(0, t), tl.loop) : past && def?.kind === "anim" && t >= tl.loop ? t : ((t % tl.loop) + tl.loop) % tl.loop;
+    let tt = tl.once ? Math.min(Math.max(0, t), tl.loop) : past && def?.kind === "anim" && t >= tl.loop ? t : ((t % tl.loop) + tl.loop) % tl.loop;
+    // Snap sub-frame times on pure frame-indexed anims (e.g. rig3d moves and their swap/flip variants) to the canonical
+    // start time of the drawn frame so repeated timestamps inside the same frame share one memory & disk cache entry.
+    if (def?.kind === "anim" && tl.durations && !past && (tl.once || tt < tl.loop) && this.isFramePure(def)) {
+      const at = frameAt(tl, tt);
+      tt = frameStart(tl, tl.order ? tl.order[at] : at);
+    }
     return tt === 0 ? (first ?? this.buildAt(name, seed, 0)) : this.buildAt(name, seed, tt, def?.kind !== "anim" ? tl : undefined);
+  }
+
+  /** Whether an anim's output depends only on its drawn frame index (never raw sub-frame `c.t`). */
+  private isFramePure(def: AssetDef, depth = 0): boolean {
+    if (def.framePure !== undefined) return def.framePure;
+    if (depth > 8 || def.kind !== "anim" || def.opts.camera != null) return (def.framePure = false);
+    if (def.opts.base !== undefined && def.opts.frame === undefined) {
+      if (def.items.length) return (def.framePure = false);
+      const b = this.assets.get(this.resolve(def.opts.base, def.ns ?? ""));
+      if (!b) return (def.framePure = false);
+      if (b.kind !== "anim") return (def.framePure = true);
+      const aTl = animTimeline(def), bTl = animTimeline(b);
+      const same = !!aTl.durations && !!bTl.durations && aTl.once === bTl.once && aTl.durations.length === bTl.durations.length
+        && aTl.durations.every((d, i) => d === bTl.durations![i])
+        && (aTl.order?.length ?? 0) === (bTl.order?.length ?? 0)
+        && (!aTl.order || aTl.order.every((v, i) => v === bTl.order![i]));
+      return (def.framePure = same && this.isFramePure(b, depth + 1));
+    }
+    if (drawsWithFunctions(def.items)) return (def.framePure = false);
+    const hasPlace = (items: Item[]): boolean => items.some((v) => isLayer(v) ? hasPlace(v.items) : isOp(v) && (["stamp", "tile", "pattern", "panel", "scatter", "tilemap", "wire", "mesh", "sprites3d"].includes(v.name) || hasPlace(v.args as Item[])));
+    return (def.framePure = !hasPlace(def.items));
   }
   /**
    * An anim's frames that will be asked handed out to the workers, if any (workers.ts): those at `ts` (ms), or its first
@@ -1952,12 +2134,20 @@ export class Project implements BuildCtx {
     return this.build(name).anim?.dir ?? "forward";
   }
 
+  /** Build an asset at time t (ms) with a painting Trace (pxl steps --frame N, describe --frame N). */
+  traceFrame(name: string, t = 0): BuildOut {
+    const prev = this.traceT;
+    this.traceT = t;
+    try { return this.build(name, 0, t); } finally { this.traceT = prev; }
+  }
+
   private buildAt(name: string, seed: number, t: number, clock?: Timeline, again = false): BuildOut {
     const key = (seed === 0 ? name : `${name}@${seed}`) + (t ? `#${t}` : "");
     this.read(name);
     if (this.touched && t === 0 && !clock) this.touched.add(key);
+    const wantTrace = this.opt.tracing && seed === 0 && (t === 0 || this.traceT === t);
     const kept = this.cache.get(key), timed = kept ? undefined : this.timed.get(key);
-    if ((kept || timed) && !again) {
+    if ((kept || timed) && !again && (!wantTrace || (kept ?? timed!.out).trace)) {
       // most recently used last, so the oldest goes first when the timed cache is full
       if (timed) { this.timed.delete(key); this.timed.set(key, timed); }
       const out = kept ?? timed!.out;
@@ -1977,11 +2167,11 @@ export class Project implements BuildCtx {
     if (this.stub && this.building.size === 1 && this.stub(name)) return { img: new Img(1, 1), layers: [], placements: [], ...(def.kind === "anim" ? { anim: animTimeline(def) } : {}) };
     // on disk: not a build traced (its trace isn't kept), nor one with stubs
     const t0 = performance.now(), up = this.logs[this.logs.length - 1];
-    const dk = this.disk && !this.stub && !(this.opt.tracing && seed === 0 && t === 0) ? key + (clock ? ` ${JSON.stringify(clock)}` : "") : undefined;
+    const dk = this.disk && !this.stub && !wantTrace ? key + (clock ? ` ${JSON.stringify(clock)}` : "") : undefined;
     // or made by a worker (workers.ts), served as from the disk, under the same conditions, and as made here: each build
     // at time 0 it asked held here, or sent with it (then held, as made inside it), and the frames 0 it took a timeline
     // from without making them, their logs joined to its own, as found here. Else made here, as always
-    const ek = this.elsewhere && !this.early && !this.stub && !clock && !(this.opt.tracing && seed === 0 && t === 0) ? key : undefined;
+    const ek = this.elsewhere && !this.early && !this.stub && !clock && !wantTrace ? key : undefined;
     let hit: Kept | undefined = dk ? this.disk!.get(dk, this.opt) : undefined;
     if (hit && this.moved(name)) hit = undefined;
     const w = !hit && ek && !this.early ? this.elsewhere!.get(ek) : undefined;
@@ -1996,6 +2186,7 @@ export class Project implements BuildCtx {
     }
     const said = dk ? [...this.said] : [], opted = { ...this.opted };
     if (hit && Object.entries(hit.log.needs).every(([k, v]) => this.opt[k as Opt] === v)) {
+      this.rigHits.get(def)?.(hit.out.img);
       for (const f of hit.log.fx) { const [msg, loc, by] = JSON.parse(f); this.warnAs(msg, loc ?? undefined, by ?? undefined); }
       this.joined(hit.log);
       this.logOf.set(hit.out, hit.log);
@@ -2003,7 +2194,7 @@ export class Project implements BuildCtx {
       if (up) up.inner += performance.now() - t0;
       return hit.out;
     }
-    if (this.state && !this.state0 && (this.disk || this.elsewhere)) { const t = performance.now(); this.state0 = this.state(); this.stateMs = performance.now() - t; this.stateAt = this.made; }
+    if (this.state && !this.state0 && (this.disk || this.elsewhere)) { const t = performance.now(); this.state0 = this.state(); this.stateMs = performance.now() - t; this.stateAt = this.artRan; }
     this.building.add(name);
     this.made++;
     const job = !!ek && this.elsewhere!.isJob(ek);
@@ -2020,7 +2211,7 @@ export class Project implements BuildCtx {
     }
     this.collect.push(acc);
     try {
-      const out = buildAsset(this, def, seed, this.opt.tracing && seed === 0 && t === 0 ? new Trace() : undefined, t, clock);
+      const out = buildAsset(this, def, seed, wantTrace ? new Trace() : undefined, t, clock);
       // Anims keep their own frame timing; other assets are as animated as what they place.
       if (!out.anim && acc.loop) out.anim = { loop: acc.loop, step: acc.step!, ...(acc.capped ? { capped: true } : {}), ...longLoop(acc) };
       this.keep(key, out, t);

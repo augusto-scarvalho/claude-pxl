@@ -142,13 +142,16 @@ export function fbm3(x: number, y: number, z: number, s = 0, octaves = 2): numbe
 }
 
 // ---------------------------------------------------------------- the field
+/** Single-point distance memos kept off Sdf instances so lazy dist() reads never mutate top-level art state. */
+const MEMOS = new WeakMap<Sdf, Float64Array>();
 /** A distance field: how far a point is from the surface, negative inside. Methods give new fields; it never changes. */
 export class Sdf {
   readonly kind = "distance";
   readonly node: Node;
-  /** asked its distance on its own (dist()), the same at every moment: the point a field drawing it last worked it out at and the value there, [x, y, z, d] */
-  memo: Float64Array | undefined;
   constructor(node: Node) { this.node = node; }
+  /** asked its distance on its own (dist()), the same at every moment: the point a field drawing it last worked it out at and the value there, [x, y, z, d] */
+  get memo(): Float64Array | undefined { return MEMOS.get(this); }
+  set memo(v: Float64Array | undefined) { if (v) MEMOS.set(this, v); else MEMOS.delete(this); }
 
   /** This and others as one (smooth: how far, in m, they melt into each other). */
   union(...a: (Sdf | { smooth?: Num })[]): Sdf { return join("union", [this, ...a]); }
@@ -213,15 +216,15 @@ export class Sdf {
     return new Sdf({ op: "paint", of: this, name, where });
   }
   /** Its box [lo, hi] at a moment (Infinity for a plane's sides). */
-  bounds(clock: Clock = STILL): [V3, V3] { const c = compile(this, clock); return [c.lo, c.hi]; }
+  bounds(clock: Clock = STILL): [V3, V3] { return boundsOf(this, clock); }
   /** The distance at a point, at a moment. */
   dist(p: readonly number[], clock: Clock = STILL): number {
     // (a paint, or a field() of the art's own, asking a part of what is being drawn at the point just worked out: the
     // number that code wrote, the same steps on the same numbers as this one's own code)
-    const m = this.memo;
-    if (m && m[0] === p[0] && Object.is(m[0], p[0]) && Object.is(m[1], p[1]) && Object.is(m[2], p[2])) return m[3];
+    const m = MEMOS.get(this);
+    if (m && m[0] === p[0] && m[1] === p[1] && m[2] === p[2] && Object.is(m[0], p[0]) && Object.is(m[1], p[1]) && Object.is(m[2], p[2])) return m[3];
     const C = compile(this, clock);
-    if (!m && !C.timed) this.memo = new Float64Array([NaN, NaN, NaN, NaN]); // (no point yet: no x is NaN)
+    if (!m && !C.timed) MEMOS.set(this, new Float64Array([NaN, NaN, NaN, NaN])); // (no point yet: no x is NaN)
     return C.d(p[0], p[1], p[2]);
   }
 }
@@ -497,9 +500,10 @@ class Code {
     flush();
   }
 }
-const RUN = 250;
+const RUN = 250, FACTORY_CAP = 2048;
 type Factory = (K: number[], smin: (a: number, b: number, k: number) => number, fbm: typeof fbm3, F: Fd[], W: Int32Array | undefined, M: Float64Array[]) => Fd;
 const FACTORIES = new Map<string, Factory>(), TRACKING = new Map<string, string>();
+const evict = <V>(m: Map<string, V>) => { if (m.size >= FACTORY_CAP) { const k = m.keys().next().value; if (k !== undefined) m.delete(k); } };
 /** A distance's code (tracking: each join also writing which child it takes), its numbers and the functions it calls. */
 function written(e: Part["e"], track = false): { src: string; K: number[]; F: Fd[]; M: Float64Array[]; FK: Map<number, string>; IN: (() => string | undefined)[] } {
   const c = new Code(track), r = e(c, "x", "y", "z");
@@ -510,22 +514,136 @@ export function made(src: string, K: number[], F: Fd[], M: Float64Array[], W?: I
   let f = FACTORIES.get(src);
   if (!f) {
     f = new Function("K", "smin", "fbm3", "F", "W", "M", src) as Factory;
-    if (FACTORIES.size > 256) FACTORIES.clear();
+    evict(FACTORIES);
     FACTORIES.set(src, f);
   }
   return f(K, smin, fbm3, F, W, M);
 }
 
+/** Fast axis-aligned bounds [lo, hi] without generating or JIT-compiling distance JS code. */
+export function boundsOf(f: Sdf, clock: Clock = STILL): [V3, V3] {
+  needSdf(f, "bounds");
+  const was = LAST.get(f), c = was?.clock;
+  if (was && c && was.C.mats.length === was.n && c.t === clock.t && c.phase === clock.phase && c.frame === clock.frame && c.frames === clock.frames) return [was.C.lo, was.C.hi];
+  const go = (s: Sdf, ox = 0, oy = 0, oz = 0): [V3, V3] => {
+    const n = s.node;
+    const shift = (lo: V3, hi: V3): [V3, V3] => [[lo[0] + ox, lo[1] + oy, lo[2] + oz], [hi[0] + ox, hi[1] + oy, hi[2] + oz]];
+    switch (n.op) {
+      case "sphere": { const r = pos(num(n.r, clock, "sphere's r"), "sphere's r"); return shift([-r, -r, -r], [r, r, r]); }
+      case "box": {
+        const sz = vec(n.size, clock, "box's size").map((v) => pos(v, "box's size") / 2);
+        Math.max(0, Math.min(num(n.round, clock, "box's round"), ...sz));
+        return shift([-sz[0], -sz[1], -sz[2]], [sz[0], sz[1], sz[2]]);
+      }
+      case "capsule": {
+        const a = vec(n.a, clock, "capsule's a"), b = vec(n.b, clock, "capsule's b"), r1 = pos(num(n.r, clock, "capsule's r"), "capsule's r"), r2 = n.r2 === undefined ? r1 : Math.max(0, num(n.r2, clock, "capsule's r2")), R = Math.max(r1, r2);
+        return [[Math.min(a[0], b[0]) - R, Math.min(a[1], b[1]) - R, Math.min(a[2], b[2]) - R], [Math.max(a[0], b[0]) + R, Math.max(a[1], b[1]) + R, Math.max(a[2], b[2]) + R]];
+      }
+      case "cylinder": { const r = pos(num(n.r, clock, "cylinder's r"), "cylinder's r"), h = pos(num(n.h, clock, "cylinder's h"), "cylinder's h"); return shift([-r, -r, 0], [r, r, h]); }
+      case "cone": { const r1 = pos(num(n.r, clock, "cone's r"), "cone's r"), H = pos(num(n.h, clock, "cone's h"), "cone's h"), r2 = Math.max(0, num(n.top, clock, "cone's top")), R = Math.max(r1, r2); return shift([-R, -R, 0], [R, R, H]); }
+      case "torus": { const R = pos(num(n.R, clock, "torus's R"), "torus's R"), r = pos(num(n.r, clock, "torus's r"), "torus's r"); return shift([-R - r, -R - r, -r], [R + r, R + r, r]); }
+      case "plane": {
+        const v = vec(n.n, clock, "plane's normal"), l = Math.hypot(v[0], v[1], v[2]), h = num(n.h, clock, "plane's h");
+        if (!(l > 0)) throw new PxError("sdf: plane(n, h): n is the way out of it, not [0, 0, 0]");
+        const lo: V3 = [-INF, -INF, -INF], hi: V3 = [INF, INF, INF];
+        [v[0] / l, v[1] / l, v[2] / l].forEach((q, e) => { if (Math.abs(q) > 0.9999) (q > 0 ? hi : lo)[e] = q > 0 ? h : -h; });
+        return [lo, hi];
+      }
+      case "ellipsoid": { const [a, b, c] = vec(n.r, clock, "ellipsoid's r").map((v) => pos(v, "ellipsoid's r")); return shift([-a, -b, -c], [a, b, c]); }
+      case "union": case "intersect": {
+        const raw = n.of.map((o) => go(o)), k = Math.max(0, num(n.k, clock, `${n.op}'s smooth`)), uni = n.op === "union";
+        const ps = uni ? raw.filter(([lo, hi]) => !isEmpty(lo, hi)) : raw;
+        if (uni) { if (!ps.length) return [EMPTY_LO, EMPTY_HI]; if (ps.length === 1) return ps[0]; }
+        else if (ps.some(([lo, hi]) => isEmpty(lo, hi))) return [EMPTY_LO, EMPTY_HI];
+        const grow = k / 4;
+        const lo: V3 = uni ? [Math.min(...ps.map((p) => p[0][0])) - grow, Math.min(...ps.map((p) => p[0][1])) - grow, Math.min(...ps.map((p) => p[0][2])) - grow]
+          : [Math.max(...ps.map((p) => p[0][0])), Math.max(...ps.map((p) => p[0][1])), Math.max(...ps.map((p) => p[0][2]))];
+        const hi: V3 = uni ? [Math.max(...ps.map((p) => p[1][0])) + grow, Math.max(...ps.map((p) => p[1][1])) + grow, Math.max(...ps.map((p) => p[1][2])) + grow]
+          : [Math.min(...ps.map((p) => p[1][0])), Math.min(...ps.map((p) => p[1][1])), Math.min(...ps.map((p) => p[1][2]))];
+        return !uni && isEmpty(lo, hi) ? [EMPTY_LO, EMPTY_HI] : [lo, hi];
+      }
+      case "subtract": {
+        const A = go(n.of[0]); go(n.of[1]); num(n.k, clock, "subtract's smooth");
+        return isEmpty(A[0], A[1]) ? [EMPTY_LO, EMPTY_HI] : A;
+      }
+      case "at": {
+        const [vx, vy, vz] = vec(n.v, clock, "at's [x, y, z]");
+        if (MOVES_ITSELF.has(n.of.node.op)) return go(n.of, vx, vy, vz);
+        const [lo, hi] = go(n.of);
+        return isEmpty(lo, hi) ? [EMPTY_LO, EMPTY_HI] : [[lo[0] + vx, lo[1] + vy, lo[2] + vz], [hi[0] + vx, hi[1] + vy, hi[2] + vz]];
+      }
+      case "rotate": {
+        const ax = vec(n.axis, clock, "rotate's axis"), l = Math.hypot(ax[0], ax[1], ax[2]), [lo, hi] = go(n.of);
+        if (!(l > 0)) throw new PxError("sdf: rotate(deg, axis): the axis can't be [0, 0, 0]");
+        if (isEmpty(lo, hi)) return [EMPTY_LO, EMPTY_HI];
+        const [u, v, w] = ax.map((e) => e / l), g = (num(n.deg, clock, "rotate's deg") * Math.PI) / 180, co = Math.cos(g), si = Math.sin(g), t = 1 - co;
+        const M = [t * u * u + co, t * u * v - si * w, t * u * w + si * v, t * u * v + si * w, t * v * v + co, t * v * w - si * u, t * u * w - si * v, t * v * w + si * u, t * w * w + co];
+        return Number.isFinite(lo[0] + lo[1] + lo[2] + hi[0] + hi[1] + hi[2])
+          ? boxOf(corners(lo, hi).map((p) => [M[0] * p[0] + M[1] * p[1] + M[2] * p[2], M[3] * p[0] + M[4] * p[1] + M[5] * p[2], M[6] * p[0] + M[7] * p[1] + M[8] * p[2]] as V3))
+          : [[-INF, -INF, -INF], [INF, INF, INF]];
+      }
+      case "scale": {
+        const [sx, sy, sz] = vec(n.s, clock, "scale").map((v) => { if (!(v >= 0)) throw new PxError(`sdf: scale must be >= 0, got ${v}`); return v; });
+        if (sx === 0 || sy === 0 || sz === 0) return [EMPTY_LO, EMPTY_HI];
+        const [lo, hi] = go(n.of);
+        return isEmpty(lo, hi) ? [EMPTY_LO, EMPTY_HI] : [[lo[0] * sx, lo[1] * sy, lo[2] * sz], [hi[0] * sx, hi[1] * sy, hi[2] * sz]];
+      }
+      case "twist": {
+        num(n.deg, clock, "twist's deg");
+        const [lo, hi] = go(n.of);
+        if (isEmpty(lo, hi)) return [EMPTY_LO, EMPTY_HI];
+        const R = Math.max(Math.abs(lo[0]), Math.abs(lo[1]), Math.abs(hi[0]), Math.abs(hi[1])) * Math.SQRT2;
+        return [[-R, -R, lo[2]], [R, R, hi[2]]];
+      }
+      case "bend": {
+        const kv = typeof n.k === "function" ? (n.k as (c: Clock) => unknown)(clock) : n.k;
+        const [kx, ky] = typeof kv === "object" ? vec(kv as Vec, clock, "bend's [kx, ky]", 2) : [num(kv as Num, clock, "bend's k"), 0];
+        const [lo, hi] = go(n.of);
+        if (isEmpty(lo, hi)) return [EMPTY_LO, EMPTY_HI];
+        const Z = Math.max(0, hi[2]), o = Z > 0 ? (Z * Z) / 2 : 0, ex = kx * o, ey = ky * o;
+        return [[lo[0] + Math.min(0, ex), lo[1] + Math.min(0, ey), lo[2]], [hi[0] + Math.max(0, ex), hi[1] + Math.max(0, ey), hi[2]]];
+      }
+      case "mirror": {
+        const [lo0, hi0] = go(n.of);
+        if (isEmpty(lo0, hi0)) return [EMPTY_LO, EMPTY_HI];
+        const lo: V3 = [...lo0], hi: V3 = [...hi0];
+        [n.axes.includes("x"), n.axes.includes("y"), n.axes.includes("z")].forEach((on, e) => { if (on) { const r = Math.max(Math.abs(lo[e]), Math.abs(hi[e])); lo[e] = -r; hi[e] = r; } });
+        return [lo, hi];
+      }
+      case "repeat": {
+        const st = vec(n.step, clock, "repeat's step"), cnt = vec(n.count, clock, "repeat's count").map((v) => Math.max(0, Math.round(v))), [lo, hi] = go(n.of);
+        if (isEmpty(lo, hi)) return [EMPTY_LO, EMPTY_HI];
+        return [[lo[0] - (st[0] > 0 ? st[0] * cnt[0] : 0), lo[1] - (st[1] > 0 ? st[1] * cnt[1] : 0), lo[2] - (st[2] > 0 ? st[2] * cnt[2] : 0)],
+          [hi[0] + (st[0] > 0 ? st[0] * cnt[0] : 0), hi[1] + (st[1] > 0 ? st[1] * cnt[1] : 0), hi[2] + (st[2] > 0 ? st[2] * cnt[2] : 0)]];
+      }
+      case "noise": {
+        const A = Math.abs(num(n.amp, clock, "noise's amp")); pos(num(n.scale, clock, "noise's scale"), "noise's scale");
+        const [lo, hi] = go(n.of);
+        return isEmpty(lo, hi) ? [EMPTY_LO, EMPTY_HI] : [[lo[0] - A, lo[1] - A, lo[2] - A], [hi[0] + A, hi[1] + A, hi[2] + A]];
+      }
+      case "when": return (typeof n.show === "function" ? !!(n.show as (c: Clock) => unknown)(clock) : n.show) ? go(n.of, ox, oy, oz) : [EMPTY_LO, EMPTY_HI];
+      case "mat": case "paint": case "paintBy": case "part": return go(n.of);
+      case "fn": return shift(n.lo, n.hi);
+    }
+  };
+  return go(f);
+}
+
 /** Each field's last compile: drawn and a decal laid on it at one moment, or its dist() asked again, it is compiled once. */
-const LAST = new WeakMap<Sdf, { clock: Clock; C: Compiled; n: number }>();
+const LAST = new WeakMap<Sdf, { clock: Clock; still: boolean; C: Compiled; n: number }>();
 /** The field at a moment, as functions. Materials are numbered in `mats`. */
 export function compile(f: Sdf, clock: Clock = STILL): Compiled {
   needSdf(f, "compile");
   // (not when a paint() function has named more materials since: a renderer tells them from those it had)
-  const was = LAST.get(f), c = was?.clock;
-  if (was && c && was.C.mats.length === was.n && c.t === clock.t && c.phase === clock.phase && c.frame === clock.frame && c.frames === clock.frames) return was.C;
+  const was = LAST.get(f);
+  if (was && was.C.mats.length === was.n) {
+    if (clock === STILL && was.still) return was.C;
+    const c = was.clock;
+    if (c.t === clock.t && c.phase === clock.phase && c.frame === clock.frame && c.frames === clock.frames) return was.C;
+  }
   const C = compiled(f, clock);
-  LAST.set(f, { clock: { t: clock.t, phase: clock.phase, frame: clock.frame, frames: clock.frames }, C, n: C.mats.length });
+  const still = clock === STILL || (clock.t === 0 && clock.phase === 0 && clock.frame === 0 && clock.frames === 1);
+  LAST.set(f, { clock: { t: clock.t, phase: clock.phase, frame: clock.frame, frames: clock.frames }, still, C, n: C.mats.length });
   return C;
 }
 function compiled(f: Sdf, clock: Clock): Compiled {
@@ -895,7 +1013,7 @@ function compiled(f: Sdf, clock: Clock): Compiled {
   let track: Fd | undefined;
   const tracker = () => {
     let src = TRACKING.get(D.src);
-    if (!src) { if (TRACKING.size > 256) TRACKING.clear(); TRACKING.set(D.src, (src = written(P.e, true).src)); }
+    if (!src) { evict(TRACKING); TRACKING.set(D.src, (src = written(P.e, true).src)); }
     return made(src, D.K, D.F, D.M, W);
   };
   const mp: Fm = !tracks ? raw : (x, y, z, a, b, c) => { (track ??= tracker())(x, y, z); return raw(x, y, z, a, b, c); };

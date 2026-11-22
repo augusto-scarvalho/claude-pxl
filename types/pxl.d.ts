@@ -941,7 +941,13 @@ declare global {
   function group(name: string, members: string[]): void;
   function sheet(name: string, entries: string[], opts?: { cols?: number; pad?: number; extrude?: number; /** each animation on a row of its own */ rows?: "tag";
     /** palette slots: { jade: swap }, keys to colors; the JSON gets meta.palette and meta.slots, a .hex each */ slots?: Record<string, Record<string, string>>;
-    /** each frame in a cell of [w, h] px, its pivot (else its middle) at the cell's middle */ cell?: [number, number] }): void;
+    /** each frame in a cell of [w, h] px, or "auto" to fit every frame tightly round its pivot */ cell?: [number, number] | "auto";
+    /** with cell: where each frame's pivot lands in its cell ("center", "bottom", or [x, y] in cell px) */ pivot?: [number, number] | "center" | "bottom";
+    /** export JSON format: "hash" (default), "array" (TexturePacker/Aseprite array), or "grid" (row/col manifest) */ format?: "hash" | "array" | "grid";
+    /** whole-number nearest-neighbor scale applied to the exported sheet, its maps and JSON coordinates */ scale?: number;
+    /** extra engine-agnostic metadata merged into the exported sheet JSON */ meta?: Record<string, unknown>;
+    /** optional map renaming asset/tag names in the exported sheet JSON */ names?: Record<string, string>;
+    /** optional map renaming exported socket names in this sheet */ sockets?: Record<string, string> }): void;
   /** A bitmap font from glyphs drawn in w x h cells on a sprite, in the order of `chars`; use it with text(..., { font }). */
   function font(name: string, sprite: string, opts: { chars: string; w: number; h: number; cols?: number; mono?: boolean }): void;
   /** n directions (sprites name_0.. + group name) from a pose pointing up, via exact quarter turns and diagonal mirrors where possible. See rotation.md. */

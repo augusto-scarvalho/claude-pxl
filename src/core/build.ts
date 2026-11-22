@@ -25,6 +25,26 @@ export interface BuildCtx extends Resolver {
   readonly checksOnly?: boolean;
   /** A scene with a camera is built as its whole world, the camera's box drawn on it (shot --world). */
   readonly wholeWorld?: boolean;
+  /** Keeping per-call source lines and pixel part ids (pxl inspect / pxl edit). */
+  readonly where?: boolean;
+  /** Runs an art-supplied callback so Project.moved() only re-digests top-level state when art JS may have mutated it. */
+  runArt?<T>(fn: () => T): T;
+}
+
+/** Ops that read the frame and the loop (c.frame, c.frames), as a function can. */
+const CLOCKED = new Set(["surface", "voxels", "volume", "splats", "decal", "draw3d", "flame", "scroll", "clouds", "plume", "effect", "smoke", "weather", "particles", "trail", "cast", "shake"]);
+/** Does any item draw with a function or a clocked op (top level, in layers, frames, clips, plates)? */
+export function drawsWithFunctions(items: Item[]): boolean {
+  return items.some((v) => typeof v === "function" || (isLayer(v) && drawsWithFunctions(v.items)) || (isOp(v) && (CLOCKED.has(v.name) || drawsWithFunctions(v.args as Item[]))));
+}
+/** Ops whose arguments may hold user JS closures (fields, shaders, emitters, paths). */
+const ART_OPS = new Set(["warp", "plane", "terrain", "mesh", "sprites3d", "surface", "voxels", "volume", "splats", "decal", "draw3d", "particles", "trail", "cast", "shake", "weather"]);
+function hasFunc(v: unknown, depth = 0): boolean {
+  if (typeof v === "function") return true;
+  if (!v || typeof v !== "object" || depth > 2) return false;
+  if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) if (hasFunc(v[i], depth + 1)) return true; return false; }
+  for (const k in v) if (hasFunc((v as Record<string, unknown>)[k], depth + 1)) return true;
+  return false;
 }
 
 export interface LayerOut {
@@ -86,7 +106,7 @@ function cameraAt(ctx: BuildCtx, def: AssetDef, seed: number, f: number, tOf: (f
     // (camera null: built with the camera at 0, 0)
     const id = o.follow, still = { ...def, opts: { ...def.opts, camera: null } } as unknown as AssetDef;
     // ponytail: following an id builds each frame once more; a function of the frame (a route's at) is free
-    const target = typeof id === "function" ? id : typeof id === "string" ? (g: number) => {
+    const target = typeof id === "function" ? (g: number) => (ctx.runArt ? ctx.runArt(() => id(g)) : id(g)) : typeof id === "string" ? (g: number) => {
       const p = buildAsset(ctx, still, seed, undefined, tOf(g), clock).placements.findLast((q) => q.id === id);
       // (where it was stamped: its pivot, else its top-left)
       return p && [p.x + Math.floor(p.img.pivot?.[0] ?? 0), p.y + Math.floor(p.img.pivot?.[1] ?? 0)];
@@ -218,8 +238,8 @@ function sunCast(def: AssetDef, l: Layer): [number, number] {
  * A layer's parallax by row, a floor in perspective: `{ top, bottom, rows: [y0, y1] }` (top at row y0 and above,
  * bottom at y1 and below, in line between) or `(y) => k`, y the layer's own row; undefined for a number or [x, y].
  */
-function rowParallax(name: string, k: unknown): ((y: number) => number) | undefined {
-  if (typeof k === "function") return k as (y: number) => number;
+function rowParallax(name: string, k: unknown, ctx: BuildCtx): ((y: number) => number) | undefined {
+  if (typeof k === "function") return (y) => (ctx.runArt ? ctx.runArt(() => (k as (y: number) => number)(y)) : (k as (y: number) => number)(y));
   if (typeof k !== "object" || k === null || Array.isArray(k)) return undefined;
   const { top, bottom, rows } = k as { top?: number; bottom?: number; rows?: number[] };
   if (!(Number.isFinite(top) && Number.isFinite(bottom) && Array.isArray(rows) && rows.length === 2 && rows.every(Number.isFinite) && rows[1] > rows[0]) || Object.keys(k).length !== 3)
@@ -254,13 +274,22 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     if (!(Number.isFinite(kx) && Number.isFinite(ky))) throw new PxError(`layer '${name}': parallax is how much it moves with the camera, a number (1 the world, 0.2 far off, 0 the screen) or [x, y], got ${fmtArgs([k])}`);
     return (shift[name] = [Math.round(look[0] * kx), Math.round(look[1] * ky)]);
   };
+  // Declarative scenes checked by `pxl check` (`checksOnly && !where`) never run lighting/glow/post and never read
+  // scene-level norm/emit/parts buffers — and stamp-only declarative scenes never need their scene canvas filled/blitted
+  // (all checks read placements, lamps, layers and rules, not the composited scene pixels).
+  const onlyStamps = def.kind === "scene" && !opts.mx && !opts.my && !opts.swap && !opts.flip && !opts.rot && !opts.angle
+    && !opts.outline && !opts.outline8 && !opts.inline && !opts.ink && !opts.crop && !opts.register && !opts.palettize
+    && def.items.some((v) => isOp(v) && v.name === "stamp")
+    && def.items.every((v) => isOp(v) && (v.name === "stamp" || v.name === "text" || v.name === "rect" || v.name === "box" || v.name === "hline" || v.name === "vline" || v.name === "line" || v.name === "px" || v.name === "lamp" || v.name === "lighting" || v.name === "glow" || v.name === "post"));
+  const skipMeta = def.kind === "scene" && !drawsWithFunctions(def.items) && !ctx.where && !!ctx.checksOnly;
+  const skipPixels = onlyStamps && skipMeta;
   let base: Img;
   if (def.kind === "scene") {
     if (!opts.w || !opts.h) throw new PxError("scene needs { w, h }");
     base = whole ? new Img(whole[0], whole[1]) : new Img(opts.w, opts.h);
     if (opts.bg) {
       const bg = pal.resolve(opts.bg);
-      if (bg !== null) base.fill(bg);
+      if (bg !== null && !skipPixels) base.fill(bg);
     }
   } else if (opts.base) {
     // frame: n, that frame of the anim it names, a still (without it, a sprite made from an anim plays it)
@@ -347,6 +376,8 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     c.look3d = def.look3d;
     c.owner = { name: def.name, loc: def.loc };
     c.groundAt = groundAt;
+    c.skipMeta = skipMeta;
+    c.skipPixels = skipPixels;
     if (cam) c.camera = [cam[0], cam[1], opts.w!, opts.h!];
     return c;
   };
@@ -404,7 +435,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
     // the whole world: what stays on the screen (parallax 0: a sky, a HUD, a fade) isn't in it
     if (whole && [l.opts.parallax].flat().every((k) => k === 0)) return;
     under ??= base.copy();
-    const limg = new Img(base.w, base.h), byRow = rowParallax(l.name, l.opts.parallax);
+    const limg = new Img(base.w, base.h), byRow = rowParallax(l.name, l.opts.parallax, ctx);
     // a floor in perspective (MUGEN's xscale): drawn on a canvas as wide as its rows' shifts reach, each
     // row then cut from it at its own; what has a pivot goes by whole at its pivot's row (Canvas.rowShift)
     let lc: Canvas, wide: Img | undefined;
@@ -442,7 +473,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
         const list = [l.opts.swap].flat(), plain = (m: unknown) => !!m && typeof m === "object" && !Array.isArray(m);
         if (!list.length || !list.every(plain)) throw new PxError(`layer '${l.name}': swap is a palette map, { key or "#hex": key or "#hex" } (a kit's time of day, side.DUSK), or a list of them mixed by mix, got ${fmtArgs([l.opts.swap])}`, l.loc);
         // a list: two neighbours by mix (1.25: a quarter of the third over the second), the later one ordered-dithered in, the dither held to the layer's own coordinates
-        const mix = typeof l.opts.mix === "function" ? l.opts.mix(lc) : l.opts.mix ?? 0;
+        const mix = typeof l.opts.mix === "function" ? (ctx.runArt ? ctx.runArt(() => (l.opts.mix as (c: Canvas) => number)(lc)) : l.opts.mix(lc)) : l.opts.mix ?? 0;
         if (!Number.isFinite(mix)) throw new PxError(`layer '${l.name}': mix is where it is along swap's maps, 0 the first, 1 the second (1.5 halfway to the third), or (c) => that (c.frame, c.camera), got ${fmtArgs([mix])}`, l.loc);
         const t = Math.min(list.length - 1, Math.max(0, mix)), i = Math.min(list.length - 2, Math.floor(t)), s = t - i, maps = list.map((m) => lc.swapMap(m as Record<string, string>));
         if (list.length < 2 || s <= 0 || s >= 1) limg.data.set(limg.remap(maps[list.length < 2 ? 0 : s >= 1 ? i + 1 : i]).data);
@@ -592,7 +623,8 @@ function runItems(
           }
         } else if (item.name === "clip") {
           const [region, ...inner] = item.args as [Region, ...Item[]];
-          c.clip(region, () => runItems(ctx, inner, c, item.loc));
+          if (typeof region === "function" && ctx.runArt) ctx.runArt(() => c.clip(region, () => runItems(ctx, inner, c, item.loc)));
+          else c.clip(region, () => runItems(ctx, inner, c, item.loc));
         } else if (item.name === "plate") {
           const o = (isFrameOpts(item.args[0]) ? item.args[0] : {}) as RelightOpts;
           const inner = (isFrameOpts(item.args[0]) ? item.args.slice(1) : item.args) as Item[];
@@ -601,14 +633,16 @@ function runItems(
           if (!onPass) throw new PxError(`${item.name}() goes directly in a sprite or scene, after what it affects, not inside a layer or clip`);
           onPass(item.name, item.args, item.loc);
         } else {
-          (c as unknown as Record<string, (...a: unknown[]) => void>)[item.name](...item.args);
+          const fn = (c as unknown as Record<string, (...a: unknown[]) => void>)[item.name];
+          if (ctx.runArt && (ART_OPS.has(item.name) || hasFunc(item.args))) ctx.runArt(() => fn.apply(c, item.args));
+          else fn.apply(c, item.args);
         }
       } catch (e) {
         throw wrap(e, (st) => ctx.locFromStack(st)).within(item.name, item.loc);
       }
     } else if (typeof item === "function") {
       c.loc = undefined;
-      try { item(c); } catch (e) { throw wrap(e, (st) => ctx.locFromStack(st)).within("function", ownerLoc); }
+      try { if (ctx.runArt) ctx.runArt(() => item(c)); else item(c); } catch (e) { throw wrap(e, (st) => ctx.locFromStack(st)).within("function", ownerLoc); }
     } else if (isLayer(item)) {
       if (!onLayer) throw new PxError(`layer '${item.name}' can't be nested inside another layer`, item.loc);
       onLayer(item);

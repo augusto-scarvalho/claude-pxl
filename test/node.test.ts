@@ -1051,7 +1051,7 @@ test("pxl help is short: other mentions a line each, a guide section by its head
   assert.match(await said("help", "corners"), /^\[reference\.md: Ops > Terrain tilesets\]\nDraw the 16 pieces from one function: `corners\(/);
   // an op whose reference is its signature in a code block (sheet under Assets): that line first, before a guide section sharing its word
   const sheet = await said("help", "sheet");
-  assert.match(sheet, /^\[reference\.md: Assets\]\nsheet\(name, \["slime\*", "heart", groupName\], \{ cols\?, pad\?, extrude\?, rows\?, slots\?, cell\? \}\)/);
+  assert.match(sheet, /^\[reference\.md: Assets\]\nsheet\(name, \["slime\*", "heart", groupName\], \{ cols\?, pad\?, extrude\?, rows\?, slots\?, cell\?, pivot\?, format\?, scale\?, meta\?, names\?, sockets\? \}\)/);
   assert.match(sheet, /\[guides: 2 sections\]\n {2}pxl help "environment 1\. Learning from a game's sheet" \([^)]*\)\n {2}pxl help "lib The sheets"/);
   // directions(): its signature, then the paragraph that says how its poses' pivots are placed, with an example
   assert.match(await said("help", "directions"), /^directions\("ship", 16, [^\n]*\n`directions\("car", 16, [^]*Each direction keeps its pose's pivot, turned with it/m);
@@ -1139,4 +1139,92 @@ test("shot: a hand-drawn sprite's LOOK lines, their pixels ringed in <name>_look
   try { await main(["shot", file, "hand"]); } finally { console.log = log; }
   assert.match(lines.join("\n"), /hand › LOOK: 1 L-corner/);
   assert.ok(existsSync(join(dir, "out", "_shot", "hand_look.png")));
+});
+
+test("cli ascii --anchor, views() retouch outline-gap detection, and check --profile", async () => {
+  const { dir, file } = tmpArt(`pal({ k: "#141016", g: "#3c8c38", G: "#74cc54" })
+views("head", sdf.sphere(4).mat("gG"), { ink: "k", anchor: [2, 5], retouch: { s: "GGG\\n...\\n...\\n...\\n...\\n..." } })`);
+  const run = async (argv: string[]) => {
+    const lines: string[] = [], log = console.log;
+    console.log = (s: string) => lines.push(String(s));
+    try { const code = await main(argv); return { code, out: lines.join("\n") }; } finally { console.log = log; }
+  };
+  const asc = await run(["ascii", file, "head_s", "--anchor"]);
+  assert.equal(asc.code, 0);
+  assert.match(asc.out, /^bounds: .*pivot: \[8\.5, 8\.5\]  rel: x=-5\.\.5, y=-5\.\.5/m);
+  assert.match(asc.out, /^ -5 /m);
+  const sh = await run(["shot", file, "head_s"]);
+  assert.equal(sh.code, 0);
+  assert.match(sh.out, /head_s › LOOK: retouch broke 3 outer outline px \(anchor-rel -2,-5; -1,-5; 0,-5\)/);
+  assert.ok(existsSync(join(dir, "out", "_shot", "head_s_look.png")));
+  const chk = await run(["check", file, "head_s", "--edges", "--profile"]);
+  assert.equal(chk.code, 0);
+  assert.match(chk.out, /LOOK: retouch broke/);
+  assert.match(chk.out, /^profile: /m);
+});
+
+test("cli ergonomics: ascii --parts/--at, steps --at base-chain & --frame, compare --pixels (asset & PNG), shot --out file.png", async () => {
+  const { dir, file } = tmpArt(`pal({ k: "#141016", g: "#3c8c38", G: "#74cc54", r: "#c83838", R: "#f06858", b: "#3868c8" })
+rig3d("_f", {
+  w: 20, h: 28, pivot: [10, 26], headings: ["s", "w", "e"], ink: "k",
+  parts: (j) => ({ torso: j.limb(j.pelvis, j.chest, 3.5, 3.5, "gG"), head: j.ball(j.head, 4, "b") }),
+  moves: { walk: { frames: 2, ms: 100, pose: (i) => ({ down: i ? 2 : 0 }) } }
+})
+anim("hero_s", { base: "_f_walk_s", swap: { g: "r", G: "R" } })
+anim("hero_e", { base: "_f_walk_e", swap: { g: "r", G: "R" } })
+sprite("box_a", "kkkk\\nkggk\\nkggk\\nkkkk")
+sprite("box_b", "kkkk\\nkgrk\\nkggk\\nkkkk")`);
+  const run = async (argv: string[]) => {
+    const lines: string[] = [], log = console.log;
+    console.log = (s: string) => lines.push(String(s));
+    try { const code = await main(argv); return { code, out: lines.join("\n") }; } finally { console.log = log; }
+  };
+  // 1. ascii --parts + --at + --anchor on a base+swap anim
+  const parts = await run(["ascii", file, "hero_s", "--frame", "0", "--parts", "--anchor"]);
+  assert.equal(parts.code, 0);
+  assert.match(parts.out, /parts: .*torso \(\d+px\).*head \(\d+px\)/);
+  assert.match(parts.out, /#=unparted\/outline/);
+  const crop = await run(["ascii", file, "hero_s", "--frame", "0", "--at", "6,8,8,8"]);
+  assert.equal(crop.code, 0);
+  assert.match(crop.out, /^  8 /m);
+  assert.doesNotMatch(crop.out, /^  7 /m);
+
+  // 2. steps --at on a base+swap+flip anim follows the base chain and supports --frame
+  const p = loadProject(file);
+  const imgE = p.image("hero_e", 0, 100);
+  let tx = -1, ty = -1;
+  for (let i = 0; i < imgE.data.length; i++) if (imgE.parts && imgE.parts.names[imgE.parts.ids[i]] === "torso") { tx = i % imgE.w; ty = Math.floor(i / imgE.w); break; }
+  assert.ok(tx >= 0, "found torso pixel on mirrored swap anim");
+  const st = await run(["steps", file, "hero_e", "--frame", "1", "--at", `${tx},${ty}`]);
+  assert.equal(st.code, 0);
+  assert.match(st.out, /hero_e pixel .*frame 1/);
+  assert.match(st.out, /part: torso/);
+  assert.match(st.out, /from base _f_walk_e pixel/);
+  assert.match(st.out, /from base _f_walk_w pixel .* \(flip x\):/);
+  assert.match(st.out, /surface\(/);
+
+  // 3. compare --pixels on two assets AND two PNGs (plus direct --out file.png in shot!)
+  const cmpAsset = await run(["compare", file, "box_a", "box_b", "--pixels"]);
+  assert.equal(cmpAsset.code, 0);
+  assert.match(cmpAsset.out, /1 pixels differ in 2,1 1x1 \(\+0 added, -0 removed, ~1 recolored\)/);
+  assert.match(cmpAsset.out, /LEFT\s+\| RIGHT\s+\| DIFF/);
+
+  const pngA = join(dir, "direct", "a.png"), pngB = join(dir, "direct", "b.png");
+  const shA = await run(["shot", file, "box_a", "--scale", "1", "--out", pngA]);
+  const shB = await run(["shot", file, "box_b", "--scale", "1", "--out", pngB]);
+  assert.equal(shA.code, 0);
+  assert.equal(shB.code, 0);
+  assert.ok(existsSync(pngA) && existsSync(pngB), "shot --out file.png writes directly to target path");
+  assert.ok(!existsSync(join(dir, "direct", "_shot")), "shot --out file.png skips _shot/ wrapper and .last.* clutter");
+
+  const cmpPng = await run(["compare", pngA, pngB, "--pixels"]);
+  assert.equal(cmpPng.code, 0);
+  assert.match(cmpPng.out, /1 pixels differ in 2,1 1x1/);
+
+  // 4. scripts/build.js rewrites all relative .ts imports (including bare side-effect imports) in dist/
+  const distLoad = join(import.meta.dirname, "..", "dist", "node", "load.js");
+  if (existsSync(distLoad)) {
+    const src = readFileSync(distLoad, "utf8");
+    assert.doesNotMatch(src, /import\s+["']\.\/[^"']+\.ts["']/, "dist/node/load.js has no bare .ts side-effect imports");
+  }
 });

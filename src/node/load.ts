@@ -8,6 +8,7 @@ import * as vm from "node:vm";
 import { stripTypeScriptTypes } from "node:module";
 import { PxError, distance, wrap } from "../core/errors.ts";
 import { Project, type ProjectOptions } from "../core/project.ts";
+import { Sdf } from "../core/sdf.ts";
 import { decodePng } from "./png.ts";
 import { diskOf, sha1 } from "./store.ts";
 import "./pure.ts"; // (pure(): the bare scope its functions are rebuilt in)
@@ -66,24 +67,33 @@ const idOf = (o: object) => ids.get(o) ?? (ids.set(o, ++idsMade), idsMade);
 function digests(vs: unknown[]): string[] {
   const seen = new Map<object, number>(), num = new Float64Array(8192);
   let h = createHash("sha1"), s = "", n = 0;
-  const flush = () => { h.update(s).update(new Uint8Array(num.buffer, 0, n * 8)); s = ""; n = 0; };
+  const flush = () => { if (s) { h.update(s); s = ""; } if (n) { h.update(new Uint8Array(num.buffer, 0, n * 8)); n = 0; } };
+  const push = (str: string) => { s += str; if (s.length >= 16384) flush(); };
+  // Internal pxl SDF AST nodes are plain data literals with no getters; walk their fields directly to avoid descriptor overhead.
+  const walkPlain = (o: Record<string, unknown>): void => {
+    push("{0;");
+    for (const k of Object.keys(o)) { push(`"${k.length}:${k};`); walk(o[k]); }
+    push("}");
+  };
   const walk = (v: unknown): void => {
-    if (typeof v === "number") { s += "n"; num[n++] = v; if (n === num.length) flush(); return; }
-    if (v === null || (typeof v !== "object" && typeof v !== "function")) { s += typeof v === "string" ? JSON.stringify(v) : `${typeof v}${String(v)};`; return; }
-    if (seen.has(v)) { s += `@${seen.get(v)};`; return; }
+    if (typeof v === "number") { s += "n"; num[n++] = v; if (n === num.length || s.length >= 16384) flush(); return; }
+    if (typeof v === "string") { push(`"${v.length}:${v};`); return; }
+    if (v === null || (typeof v !== "object" && typeof v !== "function")) { push(`${typeof v}${String(v)};`); return; }
+    const hit = seen.get(v);
+    if (hit !== undefined) { push(`@${hit};`); return; }
     seen.set(v, seen.size);
+    if (typeof v === "function") { push(`f${idOf(v)};`); return; }
+    if (v instanceof Sdf) { push("D"); walkPlain(v.node as unknown as Record<string, unknown>); return; }
+    if (Array.isArray(v)) { push(`[${v.length};`); for (let i = 0; i < v.length; i++) walk(v[i]); push("]"); return; }
+    if (ArrayBuffer.isView(v)) { flush(); h.update(new Uint8Array(v.buffer, v.byteOffset, v.byteLength)); push("t;"); return; }
     const t = TAG.call(v);
-    if (typeof v === "function") s += `f${idOf(v)};`;
-    else if (ArrayBuffer.isView(v) || t === "[object ArrayBuffer]") { flush(); h.update(ArrayBuffer.isView(v) ? new Uint8Array(v.buffer, v.byteOffset, v.byteLength) : new Uint8Array(v as ArrayBuffer)); s += "t;"; }
-    else if (Array.isArray(v)) { s += `[${v.length};`; for (let i = 0; i < v.length; i++) walk(v[i]); s += "]"; }
-    else if (t === "[object Map]") { s += "M"; for (const [k, x] of ENTRIES.call(v as Map<unknown, unknown>)) { walk(k); walk(x); } s += "]"; }
-    else if (t === "[object Set]") { s += "S"; for (const x of VALUES.call(v as Set<unknown>)) walk(x); s += "]"; }
-    else {
-      const p = Object.getPrototypeOf(v);
-      s += `{${p ? idOf(p) : 0};`;
-      for (const k of Object.keys(v)) { const d = Object.getOwnPropertyDescriptor(v, k); if (d && "value" in d) { s += JSON.stringify(k); walk(d.value); } }
-      s += "}";
-    }
+    if (t === "[object ArrayBuffer]") { flush(); h.update(new Uint8Array(v as ArrayBuffer)); push("t;"); return; }
+    if (t === "[object Map]") { push("M"); for (const [k, x] of ENTRIES.call(v as Map<unknown, unknown>)) { walk(k); walk(x); } push("]"); return; }
+    if (t === "[object Set]") { push("S"); for (const x of VALUES.call(v as Set<unknown>)) walk(x); push("]"); return; }
+    const p = Object.getPrototypeOf(v);
+    push(`{${p ? idOf(p) : 0};`);
+    for (const k of Object.keys(v)) { const d = Object.getOwnPropertyDescriptor(v, k); if (d && "value" in d) { push(`"${k.length}:${k};`); walk(d.value); } }
+    push("}");
   };
   return vs.map((v) => { seen.clear(); walk(v); flush(); const d = h.digest("hex"); h = createHash("sha1"); return d; });
 }

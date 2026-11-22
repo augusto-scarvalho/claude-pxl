@@ -39,7 +39,7 @@ scene(name, { w, h, bg?, ... }, ...items)
 layer(name, layerOpts?, ...items)      // only as an item of a sprite or scene (layers don't nest)
 plate(relightOpts?, ...items)          // the items drawn and lit on their own, then laid down: anywhere
 group(name, ["a", "b", "rock_*", ...])  // random pick per placement; repeat a name to weight it
-sheet(name, ["slime*", "heart", groupName], { cols?, pad?, extrude?, rows?, slots?, cell? })  // extrude: repeat edge pixels n px out; rows: "tag", each animation on a row of its own; slots: palette slots for an engine (Output for engines); cell: [w, h], every frame in a cell that size, its pivot (else its middle) at the cell's middle (rotations drawn at their own sizes on one grid; too small says the cell that holds them all); a sheet of animations also plays them all at once in _preview/<sheet>.gif
+sheet(name, ["slime*", "heart", groupName], { cols?, pad?, extrude?, rows?, slots?, cell?, pivot?, format?, scale?, meta?, names?, sockets? })  // extrude: repeat edge pixels n px out; rows: "tag", each animation on a row of its own; slots: palette slots for an engine (Output for engines); cell: [w, h] or "auto" (fits every frame round its pivot on one grid; too small says the cell that holds them all); pivot: "center" (default) | "bottom" | [x, y] (where each frame's pivot sits in its cell); format: "hash" (default) | "array" | "grid" (uniform cell grid manifest); scale: integer upscale for sheet PNG, _n/_e maps and JSON coords; names / sockets: rename frame/tag keys or socket keys in JSON; meta: extra JSON metadata; a sheet of animations also plays them all at once in _preview/<sheet>.gif
 include("other.px.js")                  // path relative to the current file; included files share one scope: a const of one is seen by the other (name what they share, like a cue frame; each name declared once)
 directions("ship", 16, { from, outline?, outline8?, symmetric?, draw?, rotate?, pivot? })  // ship_0..ship_15 + group "ship"; see rotation.md
 turnaround("house", thing, { view?, ppm?, n?, headings?, part?, ... })  // a thing in 3D seen from n headings: house_n, house_ne, ... + group "house"; see turnaround() below
@@ -824,11 +824,11 @@ painting replay ends ("animate" toggle).
 ```
 node <pxl>/bin/pxl.js shot <file> <name | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--gif] [--world [--every N]] [--out DIR]
 node <pxl>/bin/pxl.js shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
-node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings] [--fix] [--edges]
+node <pxl>/bin/pxl.js check <file> [name...] [--frame N] [--readings] [--fix] [--edges] [--profile]
 node <pxl>/bin/pxl.js help [name | "<guide> <numbers or words of a heading>"] [--all]
 node <pxl>/bin/pxl.js build <file> [--out DIR] [--only a,b] [--all] [--scale N] [--share N] [--no-preview] [--aseprite] [--list] [--every N] [--profile] [--world]
 node <pxl>/bin/pxl.js serve <file> [--port 4321] [--out DIR | --no-out] [--no-preview]
-node <pxl>/bin/pxl.js ascii <file> <name> [--frame N]
+node <pxl>/bin/pxl.js ascii <file> <name> [--frame N] [--anchor]
 node <pxl>/bin/pxl.js list  <file>
 node <pxl>/bin/pxl.js steps <file> <name> [--at x,y] [--sheet] [--out DIR]
 node <pxl>/bin/pxl.js inspect <file> <scene> [--id x | --find words] [--frame N] [--json]
@@ -876,7 +876,7 @@ needles) with no outline to read; figures and props measured 0-7%, effects and g
 call (its layer). `inspect`'s `--find` takes its words quoted or not.
 
 `shot` is the look while iterating: the asset built at those frames (side by side, cropped to the
-region, enlarged to about 600k px, at most 16x and 1568 px on the longer side), what changed since the last shot of the same frames and region
+region, enlarged to about 600k px, at most 16x and 1568 px on the longer side), written to `<out>/_shot/<name>.png` (or straight to that file when `--out` ends in `.png` or `.gif`), what changed since the last shot of the same frames and region
 (pixels, and the box around them in the asset's coordinates; for one asset and one region), and the
 warnings `check` finds on it at those frames. `--frames` takes numbers, ranges (`0-17`, `0-3,12`) or
 `all`; an anim that loops takes them past its loop too, each drawn at its own time with every loop as it is (its code
@@ -922,6 +922,8 @@ includes alone (a stub at an old path) writes theirs.
 
 `ascii` prints a color the palette hasn't (a
 swap's) as the key the swap gave it (else a free one), and lists those under the grid with their colors.
+`--parts` prints the 3D part-ID map (`surface()`, `rig3d()`, `turnaround()`, including `base` + `swap` and `flip`
+variants: `.` clear, `#` unparted/outline, a character per part with pixel counts); `--at x,y,w,h` crops to that region.
 
 A `build`'s preview GIF past 4 MB says so; `--every N` keeps one frame in N in the previews (the GIFs in
 `out/` keep every frame). A build that has grown slow: `--profile` prints where the time went, read
@@ -1070,8 +1072,10 @@ own time; a lossless one's pixels are taken as exact, a lossy one's as a JPEG's.
 `other.px.js:name`: a new head against an approved one): for every row, the opaque runs of the
 reference (a PNG shrunk by N first; placed at x,y in the asset's coordinates) and of the asset, and how
 many px wider the asset is on each side, then a summary. A picture alone gives its own rows' runs and
-widths, to draw a figure to. A figure 1 to 3 px too wide per side reads
-as heavy or "fat" without anyone being able to say why in a preview; this shows where.
+widths, to draw a figure to; two pictures compare against each other. A figure 1 to 3 px too wide per side reads
+as heavy or "fat" without anyone being able to say why in a preview; this shows where. `--pixels` prints a
+pixel-by-pixel color diff (changed count, bbox, `LEFT | RIGHT | DIFF`, color hex legend; `--at x,y,w,h` crops the
+window, `--frame N` picks an anim frame).
 
 `describe` gives a whole asset as text to read at once, objects first, with what a reader would
 otherwise work out by counting characters already worked out (object lists beat raw grids for
@@ -1119,8 +1123,10 @@ breaks into light bands: for a pxl scene, describe the scene, not its PNG.
 `steps` prints how an asset was painted: every top-level op, layer and post-processing step in
 order, with its file:line, the pixels it changed and where ("no change" = it painted nothing).
 `--at x,y` keeps only the steps that changed that pixel of the final image, with its color after
-each: which line painted it wrong. `--sheet` also writes `_preview/<name>_steps.png`, a numbered
-thumbnail per step (every k-th of a long build). Anims show frame 0.
+each, its 3D part name, and automatically follows `base` chains (such as `swap` and `flip` variants)
+down to the underlying paint steps: which line painted it wrong. `--frame N` inspects frame N of an anim
+(default frame 0). `--sheet` also writes `_preview/<name>_steps.png`, a numbered
+thumbnail per step (every k-th of a long build).
 
 Outputs go to `<file dir>/out`: `sprites/<n>.png`, `scenes/<n>.png`, `anims/<n>.png` (a strip; see Animation), `<sheet>.png` + `<sheet>.json`
 (TexturePacker hash format: Phaser, Godot importers, ...), `_preview/<n>.png` (upscaled to
@@ -1217,7 +1223,15 @@ rectangles (the art's JSON serves all three), each with the art's own alpha:
 
 A sheet's JSON (and an anim's own) gives each frame its `boxes` and `data` (`c.setBox`, `c.setData`:
 a fighter's hit and hurt boxes, a turnaround's `footprint`) and its `sockets` (`{ "hand": { x, y } }`,
-the asset's `sockets` and `c.setSocket`'s, in the frame's px). A sheet with `slots: { jade: swap,
+the asset's `sockets` and `c.setSocket`'s, in the frame's px). A sheet also accepts `cell: [w, h] | "auto"`
+and `pivot: "center" | "bottom" | [x, y]` (aligning frames of varying sizes onto a uniform cell grid, e.g.
+feet anchored at `pivot: "bottom"`), `format: "hash" | "array" | "grid"` (TexturePacker hash, TexturePacker array, or uniform grid manifest with
+top-level `cell`, `cols`, `rows`, `pad`, `extrude`, `scale`, `animations`, and per-frame `col`/`row`/`pivot`),
+`scale` (integer pixel upscale applied identically to the sheet PNG, `_n.png`, `_e.png` and all JSON coordinates,
+pivots, sockets and boxes), `names` and `sockets` (key rename maps for engine conventions), and `meta` (custom
+key-value metadata merged into `meta`). When normal or emission maps are written beside a sheet, `normalMap` and
+`emissionMap` record their filenames (inside `meta` for hash/array, top-level for grid).
+A sheet with `slots: { jade: swap,
 dusk: swap }` (each a swap of keys to colors, `{ R: "#30544b" }`, or a `roleSwap()`) also gives
 `meta.palette`, the sheet's colors in the order they first appear, and `meta.slots`, each slot's
 colors in that order (a palette swap's lookup: color i becomes the slot's color i), and writes them

@@ -19,13 +19,16 @@ type Fn = (...a: number[]) => unknown;
  * functions, again in another thread of the same numbers and functions (src/node/threads.ts).
  */
 export function sweepDist([bx, by, z0, z1, fx, fy, rx, ry, shell]: Sweep, radius: Fn, keep?: Fn, shift?: Fn) {
-  const H = z1 - z0;
+  const invH = 1 / (z1 - z0);
   return (x: number, y: number, z: number) => {
-    const h = Math.max(0, Math.min(1, (z - z0) / H)), s = shift ? shift(h) as number[] : undefined, vx = x - bx - (s ? s[0] : 0), vy = y - by - (s ? s[1] : 0);
+    let h = (z - z0) * invH;
+    if (h < 0) h = 0; else if (h > 1) h = 1;
+    const s = shift ? shift(h) as number[] : undefined, vx = x - bx - (s ? s[0] : 0), vy = y - by - (s ? s[1] : 0);
     const a = Math.atan2(vx * rx + vy * ry, vx * fx + vy * fy), rr = Math.sqrt(vx * vx + vy * vy), Rr = radius(h, a) as number;
-    const side = shell ? Math.abs(rr - Rr) - shell : rr - Rr, cap = Math.max(z0 - z, z - z1);
-    const v = Math.min(Math.max(side, cap), 0) + Math.sqrt(Math.max(side, 0) ** 2 + Math.max(cap, 0) ** 2);
-    return keep && !keep(h, a) ? Math.max(v, 0.3) : v;
+    const side = shell ? Math.abs(rr - Rr) - shell : rr - Rr, cap = z0 - z > z - z1 ? z0 - z : z - z1;
+    const ms = side > 0 ? side : 0, mc = cap > 0 ? cap : 0;
+    const v = (side > cap ? (side < 0 ? side : 0) : (cap < 0 ? cap : 0)) + (ms === 0 ? mc : mc === 0 ? ms : Math.sqrt(ms * ms + mc * mc));
+    return keep && !keep(h, a) ? (v > 0.3 ? v : 0.3) : v;
   };
 }
 
@@ -35,6 +38,7 @@ const mul = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k], dot = (a: 
 const len = (a: V3) => Math.hypot(a[0], a[1], a[2]), unit = (a: V3) => mul(a, 1 / (len(a) || 1));
 const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const RAD = Math.PI / 180, UP: V3 = [0, 0, 1];
+const SWEEP_A = Array.from({ length: 24 }, (_, k) => (k / 24) * 2 * Math.PI - Math.PI);
 const v3 = (v: unknown, what: string): V3 => {
   if (!Array.isArray(v) || v.length !== 3 || !v.every(Number.isFinite)) throw new PxError(`${what} is a point [x, y, z], got ${JSON.stringify(v)}`);
   return v as V3;
@@ -238,9 +242,9 @@ export function jointsOf(B: Body, p: Pose, heading: number): Joints {
       // its box: the radius and the shift sampled over it
       let R = 0, x0 = 0, x1 = 0, y0 = 0, y1 = 0;
       for (let i = 0; i <= 8; i++) {
-        const s = shift?.(i / 8) ?? [0, 0, 0];
-        x0 = Math.min(x0, s[0]); x1 = Math.max(x1, s[0]); y0 = Math.min(y0, s[1]); y1 = Math.max(y1, s[1]);
-        for (let k = 0; k < 24; k++) R = Math.max(R, radius(i / 8, (k / 24) * 2 * Math.PI - Math.PI));
+        const h = i * 0.125, s = shift?.(h);
+        if (s) { if (s[0] < x0) x0 = s[0]; if (s[0] > x1) x1 = s[0]; if (s[1] < y0) y0 = s[1]; if (s[1] > y1) y1 = s[1]; }
+        for (let k = 0; k < 24; k++) { const r2 = radius(h, SWEEP_A[k]); if (r2 > R) R = r2; }
       }
       const pad = R * 1.25 + shell + 0.5, nums: Sweep = [bx, by, z0, z1, fx, fy, rx, ry, shell], d = sweepDist(nums, radius, keep, shift);
       // (its radius, keep and shift pure, pure(): d reads nothing but them and these numbers, which name it, and its `at`
@@ -328,21 +332,42 @@ export const BLOCK_MATS = Object.fromEntries(Object.entries(BLOCKS).map(([k, v])
  * seen from above, a foot nearer us stands lower, so a profile's near foot (the hips' width nearer) and a heel
  * toward us (facing away, the toes ahead) end on rows of their own.
  */
+const solesCache = new Map<string, Map<number, number>>();
 export function solesOf(B: Body, headings: number[], pitch: number): Map<number, number> {
-  const SP = Math.sin(pitch * RAD), CP = Math.cos(pitch * RAD), [a, b, c] = B.r.foot, e = B.r.leg[2];
+  const [a, b, c] = B.r.foot, e = B.r.leg[2];
+  const key = `${B.hip},${B.torso},${B.neck},${B.thigh},${B.shin},${B.upper},${B.fore},${B.ankle},${B.hips},${B.shoulders[0]},${B.shoulders[1]},${B.shoulders[2]},${a},${b},${c},${e},${pitch}|${headings.join(",")}`;
+  const hit = solesCache.get(key);
+  if (hit) return hit;
+  const SP = Math.sin(pitch * RAD), CP = Math.cos(pitch * RAD);
+  const cu = new Float64Array(48), su = new Float64Array(48), sv = new Float64Array(25), cv = new Float64Array(25);
+  for (let u = 0; u < 48; u++) { const ang = (u * Math.PI) / 24; cu[u] = Math.cos(ang); su[u] = Math.sin(ang); }
+  for (let v = 0; v <= 24; v++) { const ang = (v * Math.PI) / 24; sv[v] = Math.sin(ang); cv[v] = Math.cos(ang); }
   // the lowest point on the screen (more is lower) of the feet's ellipsoids and the shins' ends above the ground, sampled
   const low = (deg: number) => {
-    const j = jointsOf(B, {}, deg);
+    const j = jointsOf(B, {}, deg), rx = j.r[0], ry = j.r[1], rz = j.r[2], fx = j.f[0], fy = j.f[1], fz = j.f[2];
     let m = -Infinity;
-    for (const L of j.legs) for (let u = 0; u < 48; u++) for (let v = 0; v <= 24; v++) {
-      const cu = Math.cos((u * Math.PI) / 24), su = Math.sin((u * Math.PI) / 24), sv = Math.sin((v * Math.PI) / 24), cv = Math.cos((v * Math.PI) / 24);
-      for (const q of [add(add(add(L.foot, mul(j.r, a * cu * sv)), mul(j.f, b * su * sv)), [0, 0, c * cv]), add(L.ankle, [e * cu * sv, e * su * sv, e * cv])])
-        if (q[2] >= -0.2) m = Math.max(m, -q[1] * SP - q[2] * CP);
+    for (let li = 0; li < j.legs.length; li++) {
+      const L = j.legs[li], fy0 = L.foot[1], fz0 = L.foot[2], ay0 = L.ankle[1], az0 = L.ankle[2];
+      for (let u = 0; u < 48; u++) {
+        const ccu = cu[u], ssu = su[u];
+        const dyFoot = ry * a * ccu + fy * b * ssu, dzFoot = rz * a * ccu + fz * b * ssu;
+        const dyAnkle = e * ssu;
+        for (let v = 0; v <= 24; v++) {
+          const ssv = sv[v], ccv = cv[v];
+          const qz1 = fz0 + dzFoot * ssv + c * ccv;
+          if (qz1 >= -0.2) { const s = -(fy0 + dyFoot * ssv) * SP - qz1 * CP; if (s > m) m = s; }
+          const qz2 = az0 + e * ccv;
+          if (qz2 >= -0.2) { const s = -(ay0 + dyAnkle * ssv) * SP - qz2 * CP; if (s > m) m = s; }
+        }
+      }
     }
     return m;
   };
   const ref = low(180);
-  return new Map(headings.map((d) => [d, (low(d) - ref) / (SP || 1)]));
+  const out = new Map(headings.map((d) => [d, (low(d) - ref) / (SP || 1)]));
+  if (solesCache.size >= 512) solesCache.clear();
+  solesCache.set(key, out);
+  return out;
 }
 
 /**

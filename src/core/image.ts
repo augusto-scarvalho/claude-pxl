@@ -78,6 +78,8 @@ export class Img {
   grounded?: boolean;
   /** Boxes an engine reads off this frame (a fighter's hit and hurt boxes), by kind: [x, y, w, h] in pixel-corner coords, from `c.setBox`; they travel like the pivot. */
   boxes?: Record<string, [number, number, number, number][]>;
+  /** Outer silhouette outline pixels overwritten with non-ink colors by `views()` `retouch`, as `[x, y]` in image coords (read by `pxl check --edges` and `pxl shot`). */
+  retouchGaps?: [number, number][];
   /** This frame's data for an engine (`c.setData`: a move's phase, its damage), exported with the frame. */
   info?: Record<string, unknown>;
   /** A rig3d() figure's box before its draw hooks (without the sword it holds): the genre's height check reads it. It travels like the boxes, never exported. */
@@ -194,32 +196,35 @@ export class Img {
     return o;
   }
 
-  blit(src: Img, dx: number, dy: number): void {
+  blit(src: Img, dx: number, dy: number, pixelsOnly = false): void {
     dx = Math.floor(dx);
     dy = Math.floor(dy);
-    if (!src.norm && !this.norm && !src.emit && !this.emit) {
+    const xa = Math.max(0, -dx), xb = Math.min(src.w, this.w - dx);
+    const ya = Math.max(0, -dy), yb = Math.min(src.h, this.h - dy);
+    if (xa >= xb || ya >= yb) return;
+    const s = src.data, d = this.data, sw = src.w, tw = this.w;
+    if (pixelsOnly || (!src.norm && !this.norm && !src.emit && !this.emit)) {
       // (no normals or light either side: just the overlap, row by row)
-      const xa = Math.max(0, -dx), xb = Math.min(src.w, this.w - dx), s = src.data, d = this.data;
-      for (let y = Math.max(0, -dy); y < Math.min(src.h, this.h - dy); y++) {
-        const so = y * src.w, to = (dy + y) * this.w + dx;
+      for (let y = ya; y < yb; y++) {
+        const so = y * sw, to = (dy + y) * tw + dx;
         for (let x = xa; x < xb; x++) { const c = s[so + x]; if (c !== TRANSPARENT) d[to + x] = c; }
       }
       return;
     }
-    for (let y = 0; y < src.h; y++) {
-      const ty = dy + y;
-      if (ty < 0 || ty >= this.h) continue;
-      for (let x = 0; x < src.w; x++) {
-        const c = src.data[y * src.w + x];
-        const tx = dx + x;
-        if (c === TRANSPARENT || tx < 0 || tx >= this.w) continue;
-        const i = ty * this.w + tx;
-        this.data[i] = c;
+    const sn = src.norm, dn = sn ? this.normals() : this.norm;
+    const se = src.emit, de = se || this.emit ? (this.emit ??= new Uint8Array(tw * this.h)) : undefined;
+    for (let y = ya; y < yb; y++) {
+      const so = y * sw, to = (dy + y) * tw + dx;
+      for (let x = xa; x < xb; x++) {
+        const j = so + x, c = s[j];
+        if (c === TRANSPARENT) continue;
+        const i = to + x;
+        d[i] = c;
         // Normals come along; flat art drawn over a bumped surface clears it.
-        if (src.norm) Img.moveNorm(src.norm, y * src.w + x, this.normals(), i);
-        else if (this.norm) this.norm[i * 3 + 2] = 0;
+        if (sn) { const j3 = j * 3, i3 = i * 3; dn![i3] = sn[j3]; dn![i3 + 1] = sn[j3 + 1]; dn![i3 + 2] = sn[j3 + 2]; }
+        else if (dn) dn[i * 3 + 2] = 0;
         // what it draws over gives no light unless it does
-        if (src.emit || this.emit) (this.emit ??= new Uint8Array(this.w * this.h))[i] = src.emit ? src.emit[y * src.w + x] : 0;
+        if (de) de[i] = se ? se[j] : 0;
       }
     }
   }
@@ -308,11 +313,16 @@ export class Img {
 
   sub(x: number, y: number, w: number, h: number): Img {
     const o = new Img(w, h);
+    if (this.parts) o.parts = { ids: new Int32Array(w * h).fill(-1), names: [...this.parts.names] };
     for (let yy = 0; yy < h; yy++)
       for (let xx = 0; xx < w; xx++) {
         o.data[yy * w + xx] = this.get(x + xx, y + yy);
-        if (this.norm && this.inside(x + xx, y + yy)) Img.moveNorm(this.norm, (y + yy) * this.w + x + xx, o.normals(), yy * w + xx);
-        if (this.emit && this.inside(x + xx, y + yy)) (o.emit ??= new Uint8Array(w * h))[yy * w + xx] = this.emit[(y + yy) * this.w + x + xx];
+        if (this.inside(x + xx, y + yy)) {
+          const j = (y + yy) * this.w + x + xx, i = yy * w + xx;
+          if (this.norm) Img.moveNorm(this.norm, j, o.normals(), i);
+          if (this.emit) (o.emit ??= new Uint8Array(w * h))[i] = this.emit[j];
+          if (this.parts) o.parts!.ids[i] = this.parts.ids[j];
+        }
       }
     this.movePivot(o, (px, py) => [px - x, py - y]);
     return this.moveLamps(o, (lx, ly) => [lx - x, ly - y]);
@@ -466,7 +476,9 @@ export class Img {
         if (e) o.emit![i] = e[j];
       }
     }
-    return o;
+    this.movePivot(o, (x, y) => [x * s, y * s]);
+    if (this.slice) o.slice = this.slice.map((v) => v * s) as [number, number, number, number];
+    return this.moveLamps(o, (x, y) => [x * s, y * s]);
   }
 
   /** FNV-1a over size + pixels, for change detection. */

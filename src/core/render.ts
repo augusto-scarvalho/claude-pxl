@@ -47,9 +47,42 @@ export function tiled(img: Img, nx: number, ny: number): Img {
   return o;
 }
 
-/** Text dump with x/y rulers; colors shown as palette keys ("." transparent), one the palette hasn't (a swap's) as a key said under it. */
-export function ascii(img: Img, pal: Palette, swap?: Record<string, unknown>): string {
-  const rev = pal.reverse(), extra: string[] = [], drawn = new Set(img.data);
+/** Shared window + x/y ruler helper for ascii() and asciiParts(). */
+function asciiWindow(img: Img, opts?: { anchor?: boolean; at?: [number, number, number, number] }) {
+  let x0 = 0, y0 = 0, x1 = img.w, y1 = img.h;
+  const b = opts?.anchor && !opts?.at ? img.bounds() : null;
+  if (opts?.at) {
+    x0 = Math.max(0, Math.min(img.w, opts.at[0]));
+    y0 = Math.max(0, Math.min(img.h, opts.at[1]));
+    x1 = Math.max(x0, Math.min(img.w, opts.at[0] + opts.at[2]));
+    y1 = Math.max(y0, Math.min(img.h, opts.at[1] + opts.at[3]));
+  } else if (b) {
+    x0 = b.x; y0 = b.y; x1 = b.x + b.w; y1 = b.y + b.h;
+  }
+  const ax = opts?.anchor && img.pivot ? Math.floor(img.pivot[0]) : 0, ay = opts?.anchor && img.pivot ? Math.floor(img.pivot[1]) : 0;
+  const header: string[] = [];
+  if (opts?.anchor) {
+    const pv = img.pivot ? `[${img.pivot[0]}, ${img.pivot[1]}]` : "none";
+    if (opts.at) header.push(`region: ${x0},${y0} ${x1 - x0}x${y1 - y0}  pivot: ${pv}  rel: x=${x0 - ax}..${x1 - 1 - ax}, y=${y0 - ay}..${y1 - 1 - ay}`);
+    else header.push(b ? `bounds: ${b.x},${b.y} ${b.w}x${b.h}  pivot: ${pv}  rel: x=${x0 - ax}..${x1 - 1 - ax}, y=${y0 - ay}..${y1 - 1 - ay}` : `(empty ${img.w}x${img.h}, pivot: ${pv})`);
+    const xs = Array.from({ length: x1 - x0 }, (_, i) => x0 + i - ax);
+    if (xs.some((v) => v < 0)) header.push("    " + xs.map((v) => (v < 0 ? "-" : " ")).join(""));
+    if (xs.some((v) => Math.abs(v) >= 100)) header.push("    " + xs.map((v) => (Math.abs(v) >= 100 ? String(Math.floor(Math.abs(v) / 100) % 10) : " ")).join(""));
+    if (xs.some((v) => Math.abs(v) >= 10)) header.push("    " + xs.map((v) => (Math.abs(v) >= 10 ? String(Math.floor(Math.abs(v) / 10) % 10) : " ")).join(""));
+    header.push("    " + xs.map((v) => String(Math.abs(v) % 10)).join(""));
+  } else {
+    if (x1 > 100) header.push("    " + Array.from({ length: x1 - x0 }, (_, i) => { const x = x0 + i; return x % 100 === 0 || (i === 0 && x >= 100) ? String(Math.floor(x / 100) % 10) : " "; }).join(""));
+    if (x1 > 10 || x0 > 0) header.push("    " + Array.from({ length: x1 - x0 }, (_, i) => { const x = x0 + i; return x % 10 === 0 || (i === 0 && x0 > 0 && x >= 10) ? String(Math.floor(x / 10) % 10) : " "; }).join(""));
+    header.push("    " + Array.from({ length: x1 - x0 }, (_, i) => String((x0 + i) % 10)).join(""));
+  }
+  return { x0, y0, x1, y1, ay, header };
+}
+
+/** Text dump with x/y rulers; colors shown as palette keys ("." transparent), one the palette hasn't (a swap's) as a key said under it. With `anchor: true`, crops tightly to opaque bounds and numbers axes relative to the pivot. With `at`, crops to [x, y, w, h]. */
+export function ascii(img: Img, pal: Palette, swap?: Record<string, unknown>, opts?: { anchor?: boolean; at?: [number, number, number, number] }): string {
+  const { x0, y0, x1, y1, ay, header } = asciiWindow(img, opts);
+  const rev = pal.reverse(), extra: string[] = [], drawn = new Set<Color>();
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) drawn.add(img.data[y * img.w + x]);
   // colors the palette hasn't (a swap's): the key the swap gave this color, when that key's own color isn't
   // drawn here, else a key the palette hasn't; each said under the grid with its color
   const used = new Set([...drawn].filter((c) => rev.has(c)).map((c) => rev.get(c)!)), to = (v: unknown) => { try { return pal.resolve(v as string); } catch { return undefined; } };
@@ -61,18 +94,58 @@ export function ascii(img: Img, pal: Palette, swap?: Record<string, unknown>): s
     used.add(k);
     extra.push(`${k} ${toHex(c)}`);
   }
-  const tens = "    " + Array.from({ length: img.w }, (_, x) => (x % 10 === 0 ? String(Math.floor(x / 10) % 10) : " ")).join("");
-  const ones = "    " + Array.from({ length: img.w }, (_, x) => String(x % 10)).join("");
-  const lines = img.w > 10 ? [tens, ones] : [ones];
-  for (let y = 0; y < img.h; y++) {
-    let row = String(y).padStart(3) + " ";
-    for (let x = 0; x < img.w; x++) {
+  const lines = [...header];
+  for (let y = y0; y < y1; y++) {
+    let row = String(y - ay).padStart(3) + " ";
+    for (let x = x0; x < x1; x++) {
       const c = img.data[y * img.w + x];
       row += c === TRANSPARENT ? "." : rev.get(c) ?? "?";
     }
     lines.push(row);
   }
   if (extra.length) lines.push(`not in the palette (a swap's): ${extra.join(", ")}`);
+  return lines.join("\n");
+}
+
+const PART_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+/** Text dump of 3D part IDs (`img.parts`) with x/y rulers and per-part pixel counts ("." transparent, "#" opaque unparted/outline). */
+export function asciiParts(img: Img, opts?: { anchor?: boolean; at?: [number, number, number, number] }): string {
+  if (!img.parts) return `(no 3D part map on this ${img.w}x${img.h} image — parts are recorded by surface(), voxels(), volume(), splats(), decal(), rig3d() and turnaround())`;
+  const { x0, y0, x1, y1, ay, header } = asciiWindow(img, opts);
+  const { ids, names } = img.parts;
+  const counts = new Map<number, number>();
+  let unparted = 0;
+  for (let y = y0; y < y1; y++)
+    for (let x = x0; x < x1; x++) {
+      const i = y * img.w + x;
+      if (img.data[i] === TRANSPARENT) continue;
+      const pk = ids[i];
+      if (pk < 0) unparted++;
+      else counts.set(pk, (counts.get(pk) ?? 0) + 1);
+    }
+  const order = [...counts.entries()].sort((a, b) => b[1] - a[1] || (names[a[0]] ?? "").localeCompare(names[b[0]] ?? ""));
+  const used = new Set<string>(), chOf = new Map<number, string>();
+  for (const [id] of order) {
+    const nm = names[id] ?? String(id);
+    let ch = [...nm].find((c) => PART_CHARS.includes(c) && !used.has(c));
+    ch ??= [...PART_CHARS].find((c) => !used.has(c)) ?? "?";
+    used.add(ch);
+    chOf.set(id, ch);
+  }
+  const lines = [...header];
+  for (let y = y0; y < y1; y++) {
+    let row = String(y - ay).padStart(3) + " ";
+    for (let x = x0; x < x1; x++) {
+      const i = y * img.w + x;
+      if (img.data[i] === TRANSPARENT) row += ".";
+      else { const pk = ids[i]; row += pk < 0 ? "#" : chOf.get(pk) ?? "?"; }
+    }
+    lines.push(row);
+  }
+  const legend = order.map(([id, n]) => `${chOf.get(id)}=${names[id] ?? id} (${n}px)`);
+  if (unparted) legend.push(`#=unparted/outline (${unparted}px)`);
+  lines.push(legend.length ? `parts: ${legend.join(", ")}` : "parts: (none opaque)");
   return lines.join("\n");
 }
 
@@ -135,8 +208,20 @@ export interface SheetFrame {
   img: Img;
   x: number;
   y: number;
+  /** 0-based column and row in the packed sheet. */
+  col?: number;
+  row?: number;
   /** Animation frames: duration in ms. */
   ms?: number;
+}
+
+export interface SheetJsonOpts {
+  format?: "hash" | "array" | "grid";
+  scale?: number;
+  pad?: number;
+  extrude?: number;
+  normalMap?: string;
+  emissionMap?: string;
 }
 
 /** A named run of animation frames in a sheet (Aseprite "frameTags"). */
@@ -200,11 +285,11 @@ export function packSheet(items: { name: string; img: Img; ms?: number }[], cols
   // (`newRowAt`: items that start a row of their own, each animation's first frame with rows: "tag")
   const perRow = cols ?? (newRowAt ? Infinity : Math.ceil(Math.sqrt(items.length)));
   const frames: SheetFrame[] = [], e = extrude;
-  let x = 0, y = 0, rowH = 0, W = 0, col = 0;
+  let x = 0, y = 0, rowH = 0, W = 0, col = 0, row = 0;
   items.forEach((it, i) => {
-    if (i > 0 && (col === perRow || newRowAt?.has(i))) { x = 0; y += rowH + pad; rowH = 0; col = 0; }
+    if (i > 0 && (col === perRow || newRowAt?.has(i))) { x = 0; y += rowH + pad; rowH = 0; col = 0; row++; }
+    frames.push({ ...it, x: x + e, y: y + e, col, row });
     col++;
-    frames.push({ ...it, x: x + e, y: y + e });
     W = Math.max(W, x + it.img.w + 2 * e);
     x += it.img.w + 2 * e + pad;
     rowH = Math.max(rowH, it.img.h + 2 * e);
@@ -220,36 +305,111 @@ export function packSheet(items: { name: string; img: Img; ms?: number }[], cols
 }
 
 /**
- * TexturePacker "hash" JSON (read by Phaser, Godot importers, etc.). Animation frames add a
- * `duration` (ms) and `meta.frameTags`, as Aseprite exports them; a frame with boxes, data or sockets
- * (`c.setBox`, `c.setData`, `sockets`) its `boxes`, `data` and `sockets`; `more` goes into `meta`.
+ * Sheet manifest JSON: TexturePacker/Aseprite "hash" (default) or "array", or a row/column "grid"
+ * manifest for uniform sprite-grid loaders. Animation frames add `duration` (ms) and `frameTags` /
+ * `animations`; a frame with boxes, data or sockets exports them in its own pixel coordinates;
+ * `more` merges into `meta`.
  */
-export function sheetJson(image: string, sheet: Img, frames: SheetFrame[], tags: FrameTag[] = [], more: Record<string, unknown> = {}): string {
-  const out: Record<string, unknown> = {};
-  for (const f of frames) {
-    const { w, h } = f.img;
-    out[f.name] = {
+export function sheetJson(
+  image: string,
+  sheet: Img,
+  frames: SheetFrame[],
+  tags: FrameTag[] = [],
+  more: Record<string, unknown> = {},
+  opts: SheetJsonOpts = {},
+): string {
+  const fmt = opts.format ?? "hash", scale = opts.scale ?? 1;
+  const boxesOf = (img: Img) => img.boxes && Object.fromEntries(Object.entries(img.boxes).map(([k, bs]) => [k, bs.map(([x, y, w, h]) => ({ x, y, w, h }))]));
+  const socketsOf = (img: Img) => img.sockets && Object.fromEntries(Object.entries(img.sockets).map(([k, [x, y]]) => [k, { x: +x.toFixed(2), y: +y.toFixed(2) }]));
+  const slices = frames.flatMap((f, i) => {
+    if (!f.img.slice) return [];
+    const [l, t, r, b] = f.img.slice, { w, h } = f.img;
+    return [{ name: f.name, color: "#0000ffff", keys: [{ frame: i, bounds: { x: 0, y: 0, w, h }, center: { x: l, y: t, w: w - l - r, h: h - t - b } }] }];
+  });
+  if (fmt === "grid") {
+    const cols = frames.reduce((m, f) => Math.max(m, (f.col ?? 0) + 1), 0);
+    const rows = frames.reduce((m, f) => Math.max(m, (f.row ?? 0) + 1), 0);
+    const w0 = frames[0]?.img.w, h0 = frames[0]?.img.h;
+    const uniform = frames.length > 0 && frames.every((f) => f.img.w === w0 && f.img.h === h0);
+    const animations = tags.map((t) => {
+      const slice = frames.slice(t.from, t.to + 1), durations = slice.map((f) => f.ms ?? 0);
+      return {
+        name: t.name,
+        row: slice[0]?.row ?? 0,
+        from: t.from,
+        to: t.to,
+        frames: slice.length,
+        direction: t.direction ?? "forward",
+        durations,
+        totalMs: durations.reduce((a, b) => a + b, 0),
+      };
+    });
+    const gridFrames = frames.map((f, index) => {
+      const { w, h } = f.img, boxes = boxesOf(f.img), sockets = socketsOf(f.img);
+      return {
+        name: f.name,
+        index,
+        col: f.col ?? index,
+        row: f.row ?? 0,
+        x: f.x, y: f.y, w, h,
+        ...(f.ms !== undefined ? { duration: f.ms } : {}),
+        ...(f.img.pivot ? {
+          pivot: { x: +f.img.pivot[0].toFixed(2), y: +f.img.pivot[1].toFixed(2) },
+          pivotNorm: { x: +(f.img.pivot[0] / w).toFixed(4), y: +(f.img.pivot[1] / h).toFixed(4) },
+        } : {}),
+        ...(sockets ? { sockets } : {}),
+        ...(boxes ? { boxes } : {}),
+        ...(f.img.info ? { data: f.img.info } : {}),
+      };
+    });
+    const out: Record<string, unknown> = {
+      app: "pxl",
+      format: "grid",
+      image,
+      ...(opts.normalMap ? { normalMap: opts.normalMap } : {}),
+      ...(opts.emissionMap ? { emissionMap: opts.emissionMap } : {}),
+      size: { w: sheet.w, h: sheet.h },
+      scale,
+      ...(uniform ? { cell: { w: w0, h: h0 } } : {}),
+      pad: opts.pad ?? 0,
+      extrude: opts.extrude ?? 0,
+      cols,
+      rows,
+      ...(animations.length ? { animations } : {}),
+      frames: gridFrames,
+      ...(slices.length ? { slices } : {}),
+      ...(Object.keys(more).length ? { meta: more } : {}),
+    };
+    return JSON.stringify(out, null, 1) + "\n";
+  }
+  const entry = (f: SheetFrame) => {
+    const { w, h } = f.img, boxes = boxesOf(f.img), sockets = socketsOf(f.img);
+    return {
       frame: { x: f.x, y: f.y, w, h }, rotated: false, trimmed: false,
       spriteSourceSize: { x: 0, y: 0, w, h }, sourceSize: { w, h },
       ...(f.ms !== undefined ? { duration: f.ms } : {}),
       // TexturePacker convention: normalized, (0.5, 1) = bottom center.
       ...(f.img.pivot ? { pivot: { x: +(f.img.pivot[0] / w).toFixed(4), y: +(f.img.pivot[1] / h).toFixed(4) } } : {}),
       // a fighter's hit and hurt boxes (c.setBox), in the frame's own px, and its data (c.setData)
-      ...(f.img.boxes ? { boxes: Object.fromEntries(Object.entries(f.img.boxes).map(([k, bs]) => [k, bs.map(([x, y, w, h]) => ({ x, y, w, h }))])) } : {}),
+      ...(boxes ? { boxes } : {}),
       ...(f.img.info ? { data: f.img.info } : {}),
       // named points (a hand, a muzzle) in the frame's own px, as the boxes
-      ...(f.img.sockets ? { sockets: Object.fromEntries(Object.entries(f.img.sockets).map(([k, [x, y]]) => [k, { x: +x.toFixed(2), y: +y.toFixed(2) }])) } : {}),
+      ...(sockets ? { sockets } : {}),
     };
-  }
-  const meta: Record<string, unknown> = { app: "pxl", image, format: "RGBA8888", size: { w: sheet.w, h: sheet.h }, scale: "1", ...more };
+  };
+  const meta: Record<string, unknown> = {
+    app: "pxl", image, format: "RGBA8888", size: { w: sheet.w, h: sheet.h }, scale: String(scale),
+    ...(opts.normalMap ? { normalMap: opts.normalMap } : {}),
+    ...(opts.emissionMap ? { emissionMap: opts.emissionMap } : {}),
+    ...more,
+  };
   if (tags.length) meta.frameTags = tags.map((t) => ({ ...t, direction: t.direction ?? "forward" }));
-  // 9-slice margins, as Aseprite exports slices: bounds and center in the frame's own coordinates.
-  const slices = frames.flatMap((f, i) => {
-    if (!f.img.slice) return [];
-    const [l, t, r, b] = f.img.slice, { w, h } = f.img;
-    return [{ name: f.name, color: "#0000ffff", keys: [{ frame: i, bounds: { x: 0, y: 0, w, h }, center: { x: l, y: t, w: w - l - r, h: h - t - b } }] }];
-  });
   if (slices.length) meta.slices = slices;
+  if (fmt === "array") {
+    return JSON.stringify({ frames: frames.map((f) => ({ filename: f.name, ...entry(f) })), meta }, null, 1) + "\n";
+  }
+  const out: Record<string, unknown> = {};
+  for (const f of frames) out[f.name] = entry(f);
   return JSON.stringify({ frames: out, meta }, null, 1) + "\n";
 }
 
@@ -312,4 +472,101 @@ export function compareSilhouettes(img: Img, ref: Img, ox = 0, oy = 0): string {
   }
   out.push("", `${rows} rows in both: the asset is wider on ${wider} (up to +${maxL} left, +${maxR} right), narrower on ${narrower} (down to ${minL} left, ${minR} right), the same on ${same}.`);
   return out.join("\n");
+}
+
+const KEY_POOL = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/**
+ * Pixel-by-pixel color diff between `img` (left) and `ref` (right, placed at ox, oy in `img`'s coordinates):
+ * changed count + bounding box, side-by-side ASCII (`LEFT | RIGHT | DIFF`, where DIFF shows `.` unchanged,
+ * `-` erased to transparent, or the right color key), and a color hex legend.
+ */
+export function comparePixels(
+  img: Img,
+  ref: Img,
+  opts?: { ox?: number; oy?: number; at?: [number, number, number, number]; pal?: Palette; swap?: Record<string, unknown> },
+): string {
+  const ox = opts?.ox ?? 0, oy = opts?.oy ?? 0;
+  let x0: number, y0: number, x1: number, y1: number;
+  if (opts?.at) {
+    [x0, y0] = opts.at;
+    x1 = x0 + opts.at[2];
+    y1 = y0 + opts.at[3];
+  } else {
+    const loX = Math.min(0, ox), hiX = Math.max(img.w, ref.w + ox), loY = Math.min(0, oy), hiY = Math.max(img.h, ref.h + oy);
+    x0 = hiX; y0 = hiY; x1 = loX; y1 = loY;
+    for (let y = loY; y < hiY; y++)
+      for (let x = loX; x < hiX; x++)
+        if (img.get(x, y) !== TRANSPARENT || ref.get(x - ox, y - oy) !== TRANSPARENT) {
+          if (x < x0) x0 = x;
+          if (x + 1 > x1) x1 = x + 1;
+          if (y < y0) y0 = y;
+          if (y + 1 > y1) y1 = y + 1;
+        }
+    if (x0 >= x1 || y0 >= y1) return "identical (both empty)";
+  }
+  let diffCount = 0, added = 0, removed = 0, recolored = 0;
+  let dx0 = Infinity, dy0 = Infinity, dx1 = -Infinity, dy1 = -Infinity;
+  for (let y = y0; y < y1; y++)
+    for (let x = x0; x < x1; x++) {
+      const a = img.get(x, y), b = ref.get(x - ox, y - oy);
+      if (a === b) continue;
+      diffCount++;
+      if (a === TRANSPARENT) added++;
+      else if (b === TRANSPARENT) removed++;
+      else recolored++;
+      if (x < dx0) dx0 = x;
+      if (x > dx1) dx1 = x;
+      if (y < dy0) dy0 = y;
+      if (y > dy1) dy1 = y;
+    }
+  if (!diffCount) return `identical (0 pixels differ in ${x1 - x0}x${y1 - y0})`;
+  // Focus on the diff region when comparing large sheets without an explicit --at window
+  let rx0 = x0, ry0 = y0, rx1 = x1, ry1 = y1, cropped = false;
+  if (!opts?.at && (x1 - x0 > 48 || y1 - y0 > 48)) {
+    rx0 = Math.max(x0, dx0 - 2); rx1 = Math.min(x1, dx1 + 3);
+    ry0 = Math.max(y0, dy0 - 2); ry1 = Math.min(y1, dy1 + 3);
+    cropped = rx0 !== x0 || rx1 !== x1 || ry0 !== y0 || ry1 !== y1;
+  }
+  const rev = opts?.pal ? opts.pal.reverse() : new Map<Color, string>(), drawn = new Set<Color>(), diffCols = new Set<Color>();
+  for (let y = ry0; y < ry1; y++)
+    for (let x = rx0; x < rx1; x++) {
+      const a = img.get(x, y), b = ref.get(x - ox, y - oy);
+      if (a !== TRANSPARENT) drawn.add(a);
+      if (b !== TRANSPARENT) drawn.add(b);
+      if (a !== b) { if (a !== TRANSPARENT) diffCols.add(a); if (b !== TRANSPARENT) diffCols.add(b); }
+    }
+  const used = new Set([...drawn].filter((c) => rev.has(c)).map((c) => rev.get(c)!));
+  const to = (v: unknown) => { try { return opts?.pal?.resolve(v as string); } catch { return undefined; } };
+  for (const c of drawn) {
+    if (rev.has(c)) continue;
+    const k = Object.entries(opts?.swap ?? {}).find(([k, v]) => !used.has(k) && to(v) === c)?.[0]
+      ?? [...KEY_POOL].find((f) => !(opts?.pal?.keys.has(f)) && !used.has(f))
+      ?? [...KEY_POOL].find((f) => !used.has(f));
+    if (k === undefined) continue;
+    rev.set(c, k);
+    used.add(k);
+  }
+  const ch = (c: Color) => (c === TRANSPARENT ? "." : rev.get(c) ?? "?");
+  const w = rx1 - rx0, padW = Math.max(w, 5);
+  const ones = Array.from({ length: w }, (_, i) => String(Math.abs(rx0 + i) % 10)).join("").padEnd(padW);
+  const lines = [
+    `${diffCount} pixels differ in ${dx0},${dy0} ${dx1 - dx0 + 1}x${dy1 - dy0 + 1} (+${added} added, -${removed} removed, ~${recolored} recolored)`,
+  ];
+  if (cropped) lines.push(`(showing ${rx0},${ry0} ${rx1 - rx0}x${ry1 - ry0} around diffs; pass --at x,y,w,h for any region)`);
+  lines.push(`     ${"LEFT".padEnd(padW)} | ${"RIGHT".padEnd(padW)} | DIFF`);
+  lines.push(`     ${ones} | ${ones} | ${ones}`);
+  for (let y = ry0; y < ry1; y++) {
+    let l = "", r = "", d = "";
+    for (let x = rx0; x < rx1; x++) {
+      const a = img.get(x, y), b = ref.get(x - ox, y - oy);
+      l += ch(a);
+      r += ch(b);
+      d += a === b ? "." : b === TRANSPARENT ? "-" : ch(b);
+    }
+    lines.push(`${String(y).padStart(4)} ${l.padEnd(padW)} | ${r.padEnd(padW)} | ${d}`);
+  }
+  const legendCols = drawn.size <= 24 ? [...drawn] : [...diffCols];
+  if (legendCols.length) lines.push(`colors: ${legendCols.map((c) => `${ch(c)}=${toHex(c)}`).join(", ")}`);
+  return lines.join("\n");
 }

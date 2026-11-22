@@ -128,6 +128,10 @@ export class Canvas {
   sorted?: { by: "y" | "z"; queue: { key: number; seq: number; draw: () => void }[] };
   /** Called after each top-level (non-nested) op call; used for tracing. */
   onOp?: (name: string, args: unknown[]) => void;
+  /** Skip carrying norm/emit/parts metadata when stamping onto declarative scenes during `pxl check` (`checksOnly && !where`). */
+  skipMeta = false;
+  /** Skip blitting stamped pixels onto the scene canvas for stamp-only declarative scenes during `pxl check` (`checksOnly && !where`): placements, lamps, boxes, relations and warnings stay intact. */
+  skipPixels = false;
   /** Art-file location of the op item currently running (set by the builder). */
   loc?: string;
   /** The asset drawn on it and where it is defined: a warning from inside a function still says where. */
@@ -1538,16 +1542,18 @@ export class Canvas {
       const dx = this.ox + Math.floor(x), dy = this.oy + Math.floor(y), w = this.img.w;
       (this.img.lamps ??= []).push(...src.lamps.map((l) => ({ ...l, x: this.mirrored ? w - 1 - (l.x + dx) : l.x + dx, y: l.y + dy })));
     }
+    if (this.skipPixels) return;
     // a twin draws pixel by pixel, each one landing mirrored
     if (!ok && !this.clipPred && !this.wrap && !this.mirrored) {
-      this.img.blit(src, this.ox + x, this.oy + y);
-      this.carryParts(src, x, y);
+      this.img.blit(src, this.ox + x, this.oy + y, this.skipMeta);
+      if (!this.skipMeta) this.carryParts(src, x, y);
       return;
     }
     for (let yy = 0; yy < src.h; yy++)
       for (let xx = 0; xx < src.w; xx++) {
         const c = src.data[yy * src.w + xx];
         if (c === TRANSPARENT || (ok && !ok(x + xx, y + yy)) || !this.plot(x + xx, y + yy, c)) continue;
+        if (this.skipMeta) continue;
         const i = this.index(Math.floor(x) + xx, Math.floor(y) + yy), j = yy * src.w + xx;
         if (src.norm) {
           const n = this.img.normals();
@@ -1555,21 +1561,25 @@ export class Canvas {
         } else if (this.img.norm) this.img.norm[i * 3 + 2] = 0;
         if (src.emit || this.img.emit) (this.img.emit ??= new Uint8Array(this.img.w * this.img.h))[i] = src.emit ? src.emit[j] : 0;
       }
-    this.carryParts(src, x, y);
+    if (!this.skipMeta) this.carryParts(src, x, y);
   }
 
   /** What painted each pixel of a 3D thing (Img.parts) comes along with a stamp; what it covers no longer says it. */
   private carryParts(src: Img, x: number, y: number): void {
     if (!src.parts && !this.img.parts) return;
     const map = src.parts?.names.map((n) => partIndex(this.img, n)), ids = (this.img.parts ??= { ids: new Int32Array(this.img.w * this.img.h).fill(-1), names: [] }).ids;
-    const X = Math.floor(this.ox + x), Y = Math.floor(this.oy + y), W = this.img.w;
-    for (let yy = Math.max(0, -Y); yy < Math.min(src.h, this.img.h - Y); yy++)
-      for (let xx = Math.max(0, -X); xx < Math.min(src.w, W - X); xx++) {
-        const j = yy * src.w + xx, i = (Y + yy) * W + X + xx, c = src.data[j];
-        if (c === TRANSPARENT || this.img.data[i] !== c) continue;
-        const k = src.parts ? src.parts.ids[j] : -1;
+    const X = Math.floor(this.ox + x), Y = Math.floor(this.oy + y), W = this.img.w, sw = src.w;
+    const ya = Math.max(0, -Y), yb = Math.min(src.h, this.img.h - Y), xa = Math.max(0, -X), xb = Math.min(sw, W - X);
+    const sData = src.data, dData = this.img.data, sIds = src.parts?.ids;
+    for (let yy = ya; yy < yb; yy++) {
+      const so = yy * sw, to = (Y + yy) * W + X;
+      for (let xx = xa; xx < xb; xx++) {
+        const j = so + xx, i = to + xx, c = sData[j];
+        if (c === TRANSPARENT || dData[i] !== c) continue;
+        const k = sIds ? sIds[j] : -1;
         ids[i] = k >= 0 ? map![k] : -1;
       }
+    }
   }
 
   /** Is there an asset or group of this name (a part drawn yet)? */

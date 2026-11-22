@@ -24,7 +24,7 @@ function walk(dir) {
       cpSync(p, out);
     } else if (e.name.endsWith(".ts")) {
       const code = stripTypeScriptTypes(readFileSync(p, "utf8"), { mode: "strip" })
-        .replace(/(from\s+|import\(\s*)(["'])(\.{1,2}\/[^"']+)\.ts\2/g, "$1$2$3.js$2");
+        .replace(/(from\s+|import\s+|import\(\s*)(["'])(\.{1,2}\/[^"']+)\.ts\2/g, "$1$2$3.js$2");
       mkdirSync(dirname(out), { recursive: true });
       writeFileSync(out.replace(/\.ts$/, ".js"), code);
     }

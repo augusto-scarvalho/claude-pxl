@@ -242,5 +242,57 @@ test("store: past its budget the least used go first, and .pruned names them unt
   entry("a", 4000);
   prune(250, d);
   assert.deepEqual(note(), ["1 100 250", "c".repeat(16)], "a written again: no longer named");
+  prune(10_000, d, 1);
+  assert.deepEqual(readdirSync(d).sort(), [".pruned", "a".repeat(40)], "maxEntries caps flat-dir growth even under byte budget");
+  assert.equal(note()[0], "1 100 10000 1", "entry-cap prune records maxEntries in header");
+  // headroom trims below limit when triggered, and skips pruning when under both limits
+  entry("d", 5000); entry("e", 6000); entry("f", 7000); entry("g", 8000);
+  prune(10_000, d, 10, 0.5);
+  assert.equal(readdirSync(d).length, 6, "under both limits: headroom does not prune early");
+  prune(10_000, d, 4, 0.5);
+  assert.equal(readdirSync(d).length, 3, "over maxEntries=4 with headroom=0.5: trims down to 2 entries + .pruned");
   assert.ok(budget() >= 2 ** 29 && budget() <= 2 ** 31);
+});
+
+test("store: lazy Sdf.dist() memo on a top-level field does not invalidate the disk cache", () => {
+  put("sdfmemo.px.js", `const BALL = sdf.sphere(4)
+sprite("a", { w: 10, h: 10 }, (c) => { console.debug("made"); if (BALL.dist([0, 0, 0]) < 0) c.rect(2, 2, 6, 6, "#ffffff") })
+sprite("b", { w: 10, h: 10 }, (c) => { console.debug("made"); c.stamp("a", 0, 0); if (BALL.dist([1, 0, 0]) < 0) c.px(5, 5, "#ff0000") })`);
+  const cold = load({ cold: true, file: "sdfmemo.px.js" });
+  cold.p.build("b");
+  assert.equal(cold.p.offWhy, undefined, "Sdf.dist() memo must stay invisible to top-level state digest");
+  assert.ok(cold.p.disk, "disk cache stays active after Sdf.dist()");
+  const warm = load({ file: "sdfmemo.px.js" });
+  assert.equal(count(() => warm.p.build("b")), 0, "both builds read back from disk");
+  assert.equal(warm.n.served, 1);
+});
+
+test("store: declarative scene builds skip redundant top-level digests when no art JS runs", () => {
+  put("decl.px.js", `sprite("dot", { w: 4, h: 4 }, (c) => { console.debug("made"); c.rect(0, 0, 4, 4, "#ff0000") })
+sprite("dot_b", { base: "dot", swap: { "#ff0000": "#00ff00" } })
+scene("board", { w: 16, h: 8 }, stamp("dot_b", 0, 0), stamp("dot_b", 6, 0))`);
+  load({ cold: true, file: "decl.px.js" }).p.build("dot");
+  const warm = load({ file: "decl.px.js" });
+  let digests = 0;
+  const orig = warm.p.state!;
+  warm.p.state = () => { digests++; return orig(); };
+  warm.p.build("board");
+  assert.ok(digests <= 1, `expected at most 1 baseline digest when no art JS ran, got ${digests}`);
+  assert.equal(warm.n.served, 1, "dot served from disk");
+});
+
+test("store: frame-pure anim snaps sub-frame timestamps to canonical frame start", () => {
+  put("snap.px.js", `anim("walk", { w: 4, h: 4 },
+  frame({ ms: 80 }, rect(0, 0, 4, 4, "#ff0000")),
+  frame({ ms: 180 }, rect(0, 0, 4, 4, "#00ff00")),
+  frame({ ms: 100 }, rect(0, 0, 4, 4, "#0000ff")))
+anim("walk_b", { base: "walk", swap: { "#00ff00": "#ffff00" } })`);
+  const { p } = load({ cold: true, file: "snap.px.js" });
+  const a = p.build("walk_b", 0, 80);
+  const madeBefore = p.made;
+  const b = p.build("walk_b", 0, 100);
+  const c = p.build("walk_b", 0, 200);
+  assert.equal(p.made, madeBefore, "timestamps inside the same frame (80, 100, 200) share one build");
+  assert.strictEqual(a, b);
+  assert.strictEqual(a, c);
 });

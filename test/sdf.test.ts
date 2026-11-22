@@ -418,3 +418,23 @@ anim("a", { w: 28, h: 36, frames: 2, fps: 4 },
   const y0 = eyeY(0), y1 = eyeY(1);
   assert.ok(y0 >= 0 && y1 >= 0 && y0 - y1 >= 6, `decal moves up with animated body through intersect/mat/part: frame 0 y=${y0}, frame 1 y=${y1}`);
 });
+
+test("sdf: boundsOf() matches compile() bounds across primitives, transforms, joins and empty nodes without compiling JS", () => {
+  const cases = [
+    sdf.sphere(1.2).at(1, -2, 3),
+    sdf.box([2, 3, 4], { round: 0.2 }).rotate(35, [1, 1, 0]),
+    sdf.capsule([-1, 0, 0], [2, 3, 4], 0.4, 0.9),
+    sdf.cylinder(0.8, 2.5).scale([1, 2, 0.5]),
+    sdf.cone(1, 3, 0.2).twist(20),
+    sdf.torus(2, 0.4).bend([0.1, -0.05]),
+    sdf.ellipsoid([1, 2, 3]).mirror("xy").repeat([4, 0, 0], 1),
+    sdf.sphere(1).noise({ amp: 0.2, scale: 0.5, seed: 3 }).union(sdf.box([1, 1, 1]).at(1.5, 0, 0), { smooth: 0.4 }),
+    sdf.box([3, 3, 3]).subtract(sdf.sphere(1)).intersect(sdf.plane([0, 0, -1], 0)),
+    sdf.sphere(1).when(false),
+    sdf.sphere(1).scale(0),
+  ];
+  for (const f of cases) {
+    const b = f.bounds(), c = compile(f);
+    assert.deepEqual(b, [c.lo, c.hi]);
+  }
+});

@@ -11,7 +11,7 @@ import type { World } from "../core/model.ts";
 import type { Project } from "../core/project.ts";
 import { rigLines } from "../core/rig.ts";
 import { rampSteps } from "../core/checks.ts";
-import { ascii, compareSilhouettes, preview, rowExtents } from "../core/render.ts";
+import { ascii, asciiParts, comparePixels, compareSilhouettes, preview, rowExtents } from "../core/render.ts";
 import { mapPixel, replay, stepSheet } from "../core/steps.ts";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { loadProject } from "./load.ts";
@@ -81,9 +81,12 @@ const USAGE = `pxl — pixel-art DSL
       magenta line) each frame.
   pxl serve <art.px.js> [--port 4321] [--out DIR | --no-out] [--no-preview]
       Live viewer: rebuilds on save and replays each asset's painting steps.
-  pxl ascii <art.px.js> <name> [--frame N]
+  pxl ascii <art.px.js> <name> [--frame N] [--anchor] [--parts] [--at x,y,w,h]
       Print an asset as palette keys with x/y rulers (anims: every frame; --frame N: that one); a color
       the palette hasn't (a swap's) as the key the swap gave it, else a free one, said under the grid.
+      --anchor crops to the opaque bounds and numbers axes relative to the asset's pivot (ready for views() retouch / runs()).
+      --parts prints the 3D part-ID map instead of colors ("." clear, "#" unparted/outline, a char per part with pixel counts).
+      --at x,y,w,h crops to that region (for inspecting part of a sprite or scene).
   pxl list  <art.px.js>
       A map of the file (and what it includes): each top-level statement that defines assets, each
       function and each const of 5 lines or more, its line range, the comment above it and what it
@@ -128,7 +131,7 @@ const USAGE = `pxl — pixel-art DSL
       One that changes nothing says so; one that never will (a flip of its own mirror, z in a layer
       sorted by y) is refused, saying why. --dry: the source lines it would change (- now, + after)
       and what would change in the picture, nothing written.
-  pxl check <art.px.js> [name...] [--frame N] [--readings] [--fix] [--edges]
+  pxl check <art.px.js> [name...] [--frame N] [--readings] [--fix] [--edges] [--profile]
       Every check describe makes that can warn (facing, front marker, lit side, parallel parts, feet
       on the ground, lettering), on every scene and rig the file defines (not those it includes, or
       just the named assets) and the front marker of any other asset that has one, from one load: the
@@ -155,13 +158,13 @@ const USAGE = `pxl — pixel-art DSL
       what is placed by a relation to it moves too), searched without a model and written into the file
       where the number is (a computed one is said and left); it says each change, and the rules
       that held still hold (a scene's checked rebuilt before anything is written).
-  pxl shot <art.px.js> <name | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--boxes] [--gif [--every N]] [--world [--every N]] [--out DIR]
-  pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR]
+  pxl shot <art.px.js> <name | sheet | group | glob> [<name> | <other.px.js>:<name> | <image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--vs <git rev | file>] [--diff] [--grey] [--ref] [--boxes] [--gif [--every N]] [--world [--every N]] [--out DIR | FILE.png | FILE.gif]
+  pxl shot <image or clip> [<image or clip> ...] [--frames a,b,c | a-b | all] [--at x,y,w,h ...] [--scale N] [--grey] [--gif] [--out DIR | FILE.png | FILE.gif]
       A picture to look at: those frames of the asset (numbered as for --frame; default 0; an anim's
       past its loop too, at their own time: N, its frame count, is the frame one loop on; a clip's or an
       anim's that plays once past its end are said, "it has 4 frames (0-3): 6, 9 left out") cropped
       to the region, side by side (in rows when too wide for one: a contact sheet), enlarged,
-      written to <out>/_shot/<name>.png; clear shows as a mid grey. A sheet: as the build packs it; a
+      written to <out>/_shot/<name>.png (or straight to FILE.png / FILE.gif when --out ends in .png/.gif); clear shows as a mid grey. A sheet: as the build packs it; a
       group or a glob ("car_*"): its members side by side, each labelled with what its name adds (n,
       nne, ne...), checked together. --vs puts the same
       shot of another version above it (at a git revision, the file and what it includes as they
@@ -186,22 +189,25 @@ const USAGE = `pxl — pixel-art DSL
       --world: a scene with a camera as its whole world, the camera's box on it (a magenta line), the
       screen's layers (parallax 0) left out, to judge the framing (--frames for a strip of moments;
       --every N: one world, the camera's box every N frames on it, each showing its own frame there).
-  pxl steps <art.px.js> <name> [--at x,y] [--sheet] [--out DIR]
-      How an asset was painted: every step (op, file:line, pixels changed, where), in order.
+  pxl steps <art.px.js> <name> [--at x,y] [--frame N] [--sheet] [--out DIR]
+      How an asset was painted: every step (op, file:line, pixels changed, where), in order (--frame N: that frame of an anim).
       --at x,y lists only the steps that changed that pixel of the final image, and its color
-      after each, then the placement on top there as describe names it (its id, else name #n);
+      after each, then its 3D part, its placement on top as describe names it (its id, else name #n),
+      and follows base chains (swap/flip variants) down to the underlying paint steps;
       --sheet also writes a thumbnail per step to _preview/<name>_steps.png.
   pxl blind <art.px.js> <name...> [--out DIR]   |   pxl blind <art.px.js> --check answers.json
       Check facing labels against the drawings with a reader who doesn't know them: writes each
       asset (a rig: each of its parts) to <out>/_blind/<n>.png, shuffled and unnamed, and the
       labels to key.json. Show only the images to the reader, ask which way each one faces (right,
       left, front = toward us, back), save the answers as {"1": "right", ...}; --check compares.
-  pxl compare <art.px.js> <name> <other name | other.px.js:name | ref.png> [--shrink N] [--offset x,y]
-  pxl compare <picture or clip> [--frame N] [--shrink N]
+  pxl compare <art.px.js> <name> <other name | other.px.js:name | ref.png> [--shrink N] [--offset x,y] [--pixels] [--at x,y,w,h] [--frame N]
+  pxl compare <picture or clip> [<other picture or clip>] [--frame N] [--shrink N] [--offset x,y] [--pixels] [--at x,y,w,h]
       Silhouette check: each row's opaque extents in the asset and in a reference (a PNG shrunk by N
       first, or another asset: a new head against an approved one), placed at x,y, and how many px
       wider the asset is on each side. A picture alone: its own rows' extents and widths (an upscale
-      read at 1x), the rows to draw a figure to.
+      read at 1x), the rows to draw a figure to; two pictures compare against each other. --pixels
+      prints a pixel-by-pixel color diff (changed count, bbox, LEFT | RIGHT | DIFF and color hex legend;
+      --at x,y,w,h crops the diff window).
   pxl study <picture | gif | video> [--at x,y,w,h] [--from S] [--seconds S] [--fps N] [--colors N] [--to WxH] [--px N] [--out DIR | --no-out]
       Learn from finished art or a reference: what it is made of and what to use in pxl to make the
       same. Pixel art (an upscale found by its grid, blurred or not; --px N when the size it finds
@@ -259,6 +265,9 @@ interface Args {
   ref?: boolean;
   boxes?: boolean;
   brief?: boolean;
+  anchor?: boolean;
+  parts?: boolean;
+  pixels?: boolean;
   sheet?: boolean;
   shrink?: number;
   offset?: [number, number];
@@ -334,6 +343,9 @@ function parse(argv: string[]): Args {
     else if (v === "--ref") a.ref = true;
     else if (v === "--boxes") a.boxes = true;
     else if (v === "--brief") a.brief = true;
+    else if (v === "--anchor") a.anchor = true;
+    else if (v === "--parts") a.parts = true;
+    else if (v === "--pixels") a.pixels = true;
     else if (v === "--check") a.check = val();
     else if (v === "--frame") a.frame = Number(val());
     else if (v === "--frames") { const f = val().trim(); if (f === "all") a.allFrames = true; else a.frames = framesFrom(f); }
@@ -437,14 +449,17 @@ export async function main(argv: string[]): Promise<number> {
       case "ascii": {
         const name = a.rest[0];
         if (!name) throw new PxError("ascii needs an asset name: pxl ascii <file> <name>");
+        if (a.at && a.at.length !== 4) throw new PxError("ascii --at needs a region x,y,w,h (e.g. --at 0,10,20,24)");
         const p = loadProject(file);
         const pal = p.assets.get(name)?.pal ?? p.pal, swap: Record<string, unknown> = {};
+        const ao = a.anchor || a.at ? { ...(a.anchor ? { anchor: true } : {}), ...(a.at ? { at: a.at as [number, number, number, number] } : {}) } : undefined;
         // the swaps along its bases (a flip of a recolored walk): the keys they gave their colors
         for (let d = p.assets.get(name), i = 0; d && i < 8; d = typeof d.opts.base === "string" ? p.assets.get(d.opts.base) ?? p.assets.get((d.ns ?? "") + d.opts.base) : undefined, i++) Object.assign(swap, d.opts.swap, swap);
-        if (a.frame !== undefined) console.log(`frame ${a.frame}\n${ascii(p.image(name, 0, frameTime(p, name, a.frame)), pal, swap)}`);
+        const show = (img: Img) => (a.parts ? asciiParts(img, ao) : ascii(img, pal, swap, ao));
+        if (a.frame !== undefined) console.log(`frame ${a.frame}\n${show(p.image(name, 0, frameTime(p, name, a.frame)))}`);
         else if (p.assets.get(name)?.kind === "anim")
-          p.drawn(name).forEach((f, i) => console.log(`frame ${i} (${f.ms}ms)\n${ascii(f.img, pal, swap)}\n`));
-        else console.log(ascii(p.image(name), pal, swap));
+          p.drawn(name).forEach((f, i) => console.log(`frame ${i} (${f.ms}ms)\n${show(f.img)}\n`));
+        else console.log(show(p.image(name)));
         return 0;
       }
       case "study": {
@@ -497,7 +512,7 @@ export async function main(argv: string[]): Promise<number> {
           const p = loadProject(file, { trace: true });
           const def = p.assets.get(name);
           if (!def) throw new PxError(`unknown asset '${name}'`);
-          b = p.build(name, 0, a.frame ? frameTime(p, name, a.frame) : 0);
+          b = a.frame ? p.traceFrame(name, frameTime(p, name, a.frame)) : p.build(name, 0, 0);
           pal = def.pal;
           world = def.opts.world;
           const rig = p.rigs.get(name);
@@ -540,50 +555,73 @@ export async function main(argv: string[]): Promise<number> {
       }
       case "steps": {
         const name = a.rest[0];
-        if (!name) throw new PxError("steps needs an asset name: pxl steps <file> <name> [--at x,y] [--sheet]");
+        if (!name) throw new PxError("steps needs an asset name: pxl steps <file> <name> [--at x,y] [--frame N] [--sheet]");
         const p = loadProject(file, { trace: true });
         const def = p.assets.get(name);
-        const b = p.build(name);
+        const t0 = a.frame !== undefined ? frameTime(p, name, a.frame) : 0;
+        const b = a.frame !== undefined ? p.traceFrame(name, t0) : p.build(name);
         if (!def || !b.trace) throw new PxError(`no painting log for '${name}'`);
-        const rev = def.pal.reverse();
-        const key = (c: Color) => (c === TRANSPARENT ? "." : rev.get(c) ?? toHex(c));
         const label = (s: string) => (s.length > 48 ? s.slice(0, 47) + "…" : s).padEnd(48);
         const row = (n: number, text: string, loc: string | undefined, info: string) =>
           console.log(`${String(n).padStart(4)}  ${label(text)}  ${(loc ?? "").padEnd(22)}  ${info}`);
-        const final = { w: b.img.w, h: b.img.h }, frame0 = b.anim ? ", frame 0" : "";
+        const final = { w: b.img.w, h: b.img.h }, frameNote = b.anim ? `, frame ${a.frame ?? 0}` : "";
         if (a.at) {
           const [x, y] = a.at;
           if (x >= final.w || y >= final.h) throw new PxError(`(${x}, ${y}) is outside ${name} (${final.w}x${final.h})`);
-          console.log(`${name} pixel (${x}, ${y}): the steps that changed it${frame0}`);
-          let prev: Color = TRANSPARENT, lost = false, last = "";
-          // a shade or light step: the ramps it went along (where a shadow left its ramp for another's)
-          const via = (from: Color, to: Color, label: string) => {
-            if (from === TRANSPARENT || !def.pal.ramps.length || !/^(shade|light)\(| in (shade|light) layer '/.test(label)) return "";
-            const path = def.pal.stepPath(from, to, -1) ?? def.pal.stepPath(from, to, 1);
-            return path ? `  (${path})` : "";
-          };
-          replay(b.trace, (s, img) => {
-            const i = mapPixel(x, y, final, s.w, s.h);
-            if (i === undefined) {
-              if (!lost) row(s.n, s.label, s.loc, "(canvas cropped here: the pixel can't be followed)");
-              lost = true;
-              return;
+          const dumpAt = (curName: string, cx: number, cy: number, ct: number, header: string, depth: number, firstBuild?: BuildOut) => {
+            const cdef = p.assets.get(curName);
+            if (!cdef) return;
+            const cb = firstBuild ?? p.traceFrame(curName, ct);
+            if (!cb.trace) return;
+            const cf = { w: cb.img.w, h: cb.img.h };
+            if (cx < 0 || cy < 0 || cx >= cf.w || cy >= cf.h) { console.log(`${header} (outside ${curName} ${cf.w}x${cf.h})`); return; }
+            const crev = cdef.pal.reverse();
+            const ckey = (c: Color) => (c === TRANSPARENT ? "." : crev.get(c) ?? toHex(c));
+            const cvia = (from: Color, to: Color, lbl: string) => {
+              if (from === TRANSPARENT || !cdef.pal.ramps.length || !/^(shade|light)\(| in (shade|light) layer '/.test(lbl)) return "";
+              const path = cdef.pal.stepPath(from, to, -1) ?? cdef.pal.stepPath(from, to, 1);
+              return path ? `  (${path})` : "";
+            };
+            console.log(header);
+            let prev: Color = TRANSPARENT, lost = false, last = "", hits = 0;
+            replay(cb.trace, (s, img) => {
+              const i = mapPixel(cx, cy, cf, s.w, s.h);
+              if (i === undefined) {
+                if (!lost) row(s.n, s.label, s.loc, "(canvas cropped here: the pixel can't be followed)");
+                lost = true;
+                return;
+              }
+              lost = false;
+              if (img.data[i] !== prev) { row(s.n, s.label, s.loc, `-> ${ckey(img.data[i])}${cvia(prev, img.data[i], s.label)}`); last = s.label; hits++; }
+              prev = img.data[i];
+            });
+            if (!hits && cdef.opts.base) console.log("  (unchanged from base)");
+            // a 3D thing's named part there (surface(), voxels(), volume(), splats(), decal(), stamp, or a swap/flip over one)
+            const pk = cb.img.parts?.ids[cy * cf.w + cx] ?? -1;
+            if (pk >= 0 && (!last || /^(surface|voxels|volume|splats|decal|draw3d|stamp)\(|^(swap|flip|rot|mirror)\b/.test(last))) console.log(`part: ${cb.img.parts!.names[pk]}`);
+            // the placement on top there, as describe names it (a shadow or a light only changes what is under it)
+            const blended = new Set(cb.layers.filter((l) => l.how === "blended").map((l) => l.name));
+            const on = cb.placements.filter((q) => !blended.has(q.layer ?? "") && cx >= q.x && cy >= q.y && cx < q.x + q.img.w && cy < q.y + q.img.h && q.img.data[(cy - q.y) * q.img.w + cx - q.x] !== TRANSPARENT).at(-1);
+            if (on) console.log(`placement: ${labelOf(on, cb.placements.filter((q) => q.name === on.name && q.layer === on.layer))}${on.id ? ` (${on.name})` : ""} @${on.layer ?? "-"}`);
+            const baseOpt = cdef.opts.base;
+            if (depth < 8 && typeof baseOpt === "string") {
+              const o = cdef.opts;
+              if (o.crop || o.rot || o.angle || o.shrink || o.outline || o.outline8 || o.ink) return;
+              const bName = p.assets.has(baseOpt) ? baseOpt : (cdef.ns ?? "") + baseOpt;
+              if (!p.assets.has(bName)) return;
+              let bx = cx, by = cy;
+              if (o.flip?.includes("x")) bx = cf.w - 1 - bx;
+              if (o.flip?.includes("y")) by = cf.h - 1 - by;
+              if (cdef.mirror) bx = cf.w - 1 - bx;
+              const bt = o.frame !== undefined ? frameTime(p, bName, o.frame) : ct;
+              const xform = [o.flip ? `flip ${o.flip}` : "", cdef.mirror ? "mirror" : "", o.frame !== undefined ? `frame ${o.frame}` : ""].filter(Boolean).join(", ");
+              dumpAt(bName, bx, by, bt, `from base ${bName} pixel (${bx}, ${by})${xform ? ` (${xform})` : ""}:`, depth + 1);
             }
-            lost = false;
-            if (img.data[i] !== prev) { row(s.n, s.label, s.loc, `-> ${key(img.data[i])}${via(prev, img.data[i], s.label)}`); last = s.label; }
-            prev = img.data[i];
-          });
-          // a 3D thing's named part there (surface(), voxels(), volume(), splats(), decal(), or a stamp of
-          // one), when one of those painted it last
-          const pk = b.img.parts?.ids[y * final.w + x] ?? -1;
-          if (pk >= 0 && /^(surface|voxels|volume|splats|decal|draw3d|stamp)\(/.test(last)) console.log(`part: ${b.img.parts!.names[pk]}`);
-          // the placement on top there, as describe names it (a shadow or a light only changes what is under it)
-          const blended = new Set(b.layers.filter((l) => l.how === "blended").map((l) => l.name));
-          const on = b.placements.filter((q) => !blended.has(q.layer ?? "") && x >= q.x && y >= q.y && x < q.x + q.img.w && y < q.y + q.img.h && q.img.data[(y - q.y) * q.img.w + x - q.x] !== TRANSPARENT).at(-1);
-          if (on) console.log(`placement: ${labelOf(on, b.placements.filter((q) => q.name === on.name && q.layer === on.layer))}${on.id ? ` (${on.name})` : ""} @${on.layer ?? "-"}`);
+          };
+          dumpAt(name, x, y, t0, `${name} pixel (${x}, ${y}): the steps that changed it${frameNote}`, 0, b);
           return 0;
         }
-        console.log(`${name}: ${b.trace.frames.length} steps (${def.kind} ${final.w}x${final.h}${frame0})`);
+        console.log(`${name}: ${b.trace.frames.length} steps (${def.kind} ${final.w}x${final.h}${frameNote})`);
         // A sheet holds up to 120 steps: every k-th one (and the last) when there are more.
         const thumbs: { n: number; img: Img }[] = [], total = b.trace.frames.length, every = Math.ceil(total / 120);
         replay(b.trace, (s, img) => {
@@ -599,9 +637,13 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
       case "check": {
-        const p = loadProject(file, { checksOnly: true });
-        startWorkers(p, file, { checksOnly: true }, "check");
-        const r = checkProject(p, { names: a.rest.length ? a.rest : undefined, frame: a.frame, file: basename(file), readings: a.readings, fix: a.fix, edges: a.edges });
+        const runCheck = () => {
+          const p = loadProject(file, { checksOnly: true });
+          startWorkers(p, file, { checksOnly: true }, "check");
+          return { p, r: checkProject(p, { names: a.rest.length ? a.rest : undefined, frame: a.frame, file: basename(file), readings: a.readings, fix: a.fix, edges: a.edges }) };
+        };
+        let report = "";
+        const { p, r } = a.profile ? await profiled(runCheck).then(({ result, profile, left }) => { report = profileReport(profile, [file, ...result.p.files], [], left, result.p.offWhy, result.p.made); return result; }) : runCheck();
         for (const l of [...r.lines, ...r.notes]) console.log(l);
         // --fix: each failing rule's number written into the file, where the part's spec is written there
         if (r.fixes) {
@@ -622,6 +664,7 @@ export async function main(argv: string[]): Promise<number> {
         console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}${r.notes.length ? `, ${r.notes.length} to look at` : ""} (checked ${r.checked}${a.frame ? `, at frame ${a.frame}` : ""})`);
         console.log(r.coverage);
         if (r.readings) console.log(["", "readings (each placement's lit side against its light, and each genre's \"own\" line's room against its ground, warning or not):", ...r.readings.map((l) => "  " + l), r.tally].join("\n"));
+        if (report) console.log(report);
         return r.warnings ? 1 : 0;
       }
       case "shot": {
@@ -662,6 +705,7 @@ export async function main(argv: string[]): Promise<number> {
           const names = [...new Set(p.candidates(s.name))];
           return { ...s, img: membersRow(p, names, s.own?.[0] ?? a.frames?.[0] ?? a.frame ?? 0, a.ref), names, members: true };
         });
+        const directOut = typeof a.out === "string" && (a.gif ? /\.gif$/i.test(a.out) : /\.png$/i.test(a.out)) ? resolve(a.out) : undefined;
         // --gif: the same things playing side by side (8 to a row), each its own loop on one clock as long
         // as the longest, a shorter one starting over; a cell per thing, its regions together in it
         if (a.gif) {
@@ -678,7 +722,7 @@ export async function main(argv: string[]): Promise<number> {
           const at = (i: number, t: number) => { let r = t % loops[i], f = 0; while (r >= clips[i].ms[f] && f < clips[i].ms.length - 1) r -= clips[i].ms[f++]; return f; };
           const sheets = cuts.map((t) => wrapRow(clips.map((c, i) => cellRow([c.imgs[at(i, t)]], regions)), [undefined], 8));
           const k = a.scale ?? Math.max(1, Math.min(8, Math.floor(1024 / Math.max(sheets[0].w, sheets[0].h))));
-          const path = join(outDir, "_shot", shots.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".gif");
+          const path = directOut ?? join(outDir, "_shot", shots.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".gif");
           mkdirSync(dirname(path), { recursive: true });
           const gif = encodeGif(sheets.map((img, i) => ({ img, ms: (cuts[i + 1] ?? T) - cuts[i] })), { scale: k });
           writeAtomic(path, gif);
@@ -699,7 +743,7 @@ export async function main(argv: string[]): Promise<number> {
             boxes.push([f, cx, cy]);
           }
           for (const [, cx, cy] of boxes) for (let i = 0; i < o.w!; i++) for (let j = 0; j < o.h!; j++) if (!i || !j || i === o.w! - 1 || j === o.h! - 1) img!.set(cx + i, cy + j, pack(255, 0, 255));
-          const sc = a.scale ?? Math.max(1, Math.floor(1568 / Math.max(img!.w, img!.h))), path = join(outDir, "_shot", `${s.name.replace(/[^\w.-]/g, "_")}_world.png`);
+          const sc = a.scale ?? Math.max(1, Math.floor(1568 / Math.max(img!.w, img!.h))), path = directOut ?? join(outDir, "_shot", `${s.name.replace(/[^\w.-]/g, "_")}_world.png`);
           writePng(path, img!.scale(sc));
           console.log(`-> ${path} (the world with the camera's box every ${k} frames, each showing its own frame; ${sc}x)\nboxes [frame, x, y]: ${boxes.map((b) => b.join(",")).join(" ")}`);
           return 0;
@@ -730,7 +774,7 @@ export async function main(argv: string[]): Promise<number> {
             changes = shotChanges(x, y, f, a.at, Math.min(f.length, 12));
           }
           const sheet = a.grey ? stack([stack(rows), greyRow(stack(rows))]) : stack(rows), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
-          const path = join(outDir, "_shot", many.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".png");
+          const path = directOut ?? join(outDir, "_shot", many.map((s) => s.name).join("+").replace(/[^\w.+-]/g, "_").slice(0, 100) + ".png");
           writePng(path, sheet.scale(k));
           // each row's frames (they differ when a still sprite sits among anims)
           const span = (f: number[]) => (f.length > 2 && f.every((v, i) => v === f[0] + i) ? `${f[0]}-${f.at(-1)}` : f.join(","));
@@ -771,26 +815,28 @@ export async function main(argv: string[]): Promise<number> {
         // past the 1568 px a model is shown
         if (a.grey) rows.push(greyRow(stack(rows)));
         const sheet = stack(rows), k = a.scale ?? Math.max(1, Math.min(16, Math.floor(Math.sqrt(600000 / (sheet.w * sheet.h))), Math.floor(1568 / Math.max(sheet.w, sheet.h))));
-        const base = join(outDir, "_shot", name.replace(/[^\w.-]/g, "_")), path = base + ".png", last = join(outDir, "_shot", `${fileTag(file)}.${name.replace(/[^\w.-]/g, "_")}`);
+        const base = directOut ? directOut.replace(/\.png$/i, "") : join(outDir, "_shot", name.replace(/[^\w.-]/g, "_")), path = directOut ?? base + ".png", last = join(outDir, "_shot", `${fileTag(file)}.${name.replace(/[^\w.-]/g, "_")}`);
         writePng(path, sheet.scale(k));
         console.log(`-> ${path} (frames ${frames.join(",")}${a.vs ? `; above: ${a.vs}` : ""}${a.diff ? "; below: what changed" : ""}${a.grey ? "; at the bottom: its values, each pixel's lightness as a grey" : ""}; ${k}x)`);
         if (boxes) console.log(boxLine());
         const left = own ? "" : pastOf(p, name);
         if (left) console.log(`${name}: ${left}`);
-        // against the last shot of the same frames and region: did the edit change anything, and where
-        const key = JSON.stringify({ frames, at: a.at ?? null, ...(boxes ? { boxes: true } : {}) });
-        if (existsSync(last + ".last.json") && readFileSync(last + ".last.json", "utf8") === key)
-          console.log(`since the last shot: ${shotChanges(decodePng(readFileSync(last + ".last.png")), now, frames, a.at)}`);
-        writePng(last + ".last.png", now);
-        writeAtomic(last + ".last.json", key);
+        // against the last shot of the same frames and region: did the edit change anything, and where (skipped when --out names an exact PNG file)
+        if (!directOut) {
+          const key = JSON.stringify({ frames, at: a.at ?? null, ...(boxes ? { boxes: true } : {}) });
+          if (existsSync(last + ".last.json") && readFileSync(last + ".last.json", "utf8") === key)
+            console.log(`since the last shot: ${shotChanges(decodePng(readFileSync(last + ".last.png")), now, frames, a.at)}`);
+          writePng(last + ".last.png", now);
+          writeAtomic(last + ".last.json", key);
+        }
         // what pxl check finds on it at these frames, so a look needs no other call
         const r = checkProject(p, { names: [name], frames: looped(p, name, frames), edges: "shot" });
         for (const l of [...r.lines, ...r.notes]) console.log(l);
         // the faults the LOOK lines name, ringed on the asset: its lines' (corners orange, jaggies blue) and its edges';
         // the holes that opened, on the first frame shown that has one (else the first shown)
-        const lines = r.notes.some((l) => / LOOK: \d+ (L-corner|jagg)/.test(l)), edges = r.notes.some((l) => / LOOK: edges: /.test(l)), ells = r.notes.some((l) => / LOOK: genre '[^']*': \d+ L-corner/.test(l));
+        const lines = r.notes.some((l) => / LOOK: \d+ (L-corner|jagg)/.test(l)), edges = r.notes.some((l) => / LOOK: edges: /.test(l)), ells = r.notes.some((l) => / LOOK: genre '[^']*': \d+ L-corner/.test(l)), rgaps = r.notes.some((l) => / LOOK: retouch broke /.test(l));
         const open = r.notes.some((l) => / LOOK: holes: /.test(l)) ? newHoles(p.frames(name).map((f) => f.img)) : [], lf = frames.find((f) => open[f]?.px.length) ?? frames[0], holes = !!open[lf]?.px.length;
-        if (lines || edges || ells || holes) {
+        if (lines || edges || ells || holes || rgaps) {
           const img = p.assets.get(name)!.kind === "anim" ? (p.frames(name)[lf] ?? p.frames(name)[0]).img : p.image(name), s = Math.max(4, k), out = img.scale(s);
           const ring = (x: number, y: number, c: Color) => { for (let i = 0; i < s; i++) for (let t = 0; t < (s >= 8 ? 2 : 1); t++) for (const [u, v] of [[i, t], [i, s - 1 - t], [t, i], [s - 1 - t, i]]) out.set(x * s + u, y * s + v, c); };
           if (lines) { const f = lineFlaws(img); for (const [x, y] of f.corners) ring(x, y, pack(255, 140, 20)); for (const [x, y] of f.jaggies) ring(x, y, pack(40, 120, 255)); }
@@ -798,9 +844,10 @@ export async function main(argv: string[]): Promise<number> {
           // (the genre's line as its ink reads it: the figure without what its move paints, where the frame shows it)
           if (ells) { const shown = img.figureImg && edgeFlaws(img).doubled.map(String); for (const [x, y] of edgeFlaws(img.figureImg ?? img).doubled) if (!shown || shown.includes(`${x},${y}`)) ring(x, y, pack(255, 140, 20)); }
           if (holes) for (const i of open[lf].px) ring(i % img.w, Math.floor(i / img.w), pack(150, 60, 255));
+          if (rgaps && img.retouchGaps) for (const [x, y] of img.retouchGaps) ring(x, y, pack(255, 224, 32));
           const lookPath = base + "_look.png";
           writePng(lookPath, out);
-          console.log(`-> ${lookPath} (the LOOK lines' pixels ringed, frame ${lf}: ${[lines && "L-corners orange, jaggies blue", edges && "edges: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners green", ells && "its genre's line: L-corners orange", holes && "holes that opened violet"].filter(Boolean).join("; ")})`);
+          console.log(`-> ${lookPath} (the LOOK lines' pixels ringed, frame ${lf}: ${[lines && "L-corners orange, jaggies blue", edges && "edges: steps red, doubled orange, tips and bridges magenta, notches cyan, gaps yellow, corners green", ells && "its genre's line: L-corners orange", holes && "holes that opened violet", rgaps && "retouch outline gaps yellow"].filter(Boolean).join("; ")})`);
         }
         if (r.warnings || p.assets.get(name)?.kind === "scene" || p.rigs.has(name))
           console.log(`${r.warnings ? `${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : "no warnings"}; ${r.coverage}`);
@@ -808,28 +855,49 @@ export async function main(argv: string[]): Promise<number> {
       }
       case "compare": {
         if (a.shrink !== undefined && !(Number.isInteger(a.shrink) && a.shrink >= 1)) throw new PxError(`--shrink must be a whole factor >= 1, got ${a.shrink}`);
-        // a picture alone: its rows measured, to draw to (an upscale read at 1x, a clip's --frame N)
+        if (a.at && a.at.length !== 4) throw new PxError("compare --at needs a region x,y,w,h (e.g. --at 0,10,24,24)");
+        const at = a.at as [number, number, number, number] | undefined;
+        const [ox, oy] = a.offset ?? [0, 0];
+        // a picture alone: its rows measured, to draw to (an upscale read at 1x, a clip's --frame N);
+        // with a second picture or art.px.js:name, compares the two directly (silhouette or --pixels)
         if (MEDIA.test(file)) {
           const m = readMedia(file), f = a.frame ?? 0;
           if (!m.frames[f]) throw new PxError(`${basename(file)}: it has ${m.frames.length} frame${m.frames.length === 1 ? "" : "s"} (0-${m.frames.length - 1})`);
-          const r = a.shrink ? m.frames[f].shrink(a.shrink) : m.frames[f];
-          console.log(`${basename(file)} (${r.w}x${r.h}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, read at 1x` : ""}${a.shrink ? `, shrunk ${a.shrink}x` : ""}${m.frames.length > 1 ? `, frame ${f} of ${m.frames.length}` : ""})`);
-          console.log(rowExtents(r));
+          const left = a.shrink ? m.frames[f].shrink(a.shrink) : m.frames[f];
+          const ref = a.rest[0];
+          if (!ref) {
+            console.log(`${basename(file)} (${left.w}x${left.h}${m.drawnAt ? `, drawn at ${m.drawnAt.sx}x, read at 1x` : ""}${a.shrink ? `, shrunk ${a.shrink}x` : ""}${m.frames.length > 1 ? `, frame ${f} of ${m.frames.length}` : ""})`);
+            console.log(rowExtents(left));
+            return 0;
+          }
+          const other = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(ref);
+          let right: Img;
+          if (other) { const op = loadProject(resolve(other[1])); right = a.frame !== undefined ? op.image(other[2], 0, frameTime(op, other[2], a.frame)) : op.image(other[2]); }
+          else {
+            const rm = readMedia(resolve(ref)), rf = a.frame !== undefined && rm.frames[a.frame] ? a.frame : 0;
+            right = a.shrink ? rm.frames[rf].shrink(a.shrink) : rm.frames[rf];
+          }
+          console.log(`${basename(file)} (${left.w}x${left.h}) against ${ref} (${right.w}x${right.h}${a.shrink ? `, shrunk ${a.shrink}x` : ""}${a.offset ? ` at ${a.offset.join(",")}` : ""})`);
+          console.log(a.pixels ? comparePixels(left, right, { ox, oy, at }) : compareSilhouettes(left, right, ox, oy));
           return 0;
         }
         const [name, ref] = a.rest;
-        if (!name || !ref) throw new PxError("compare needs an asset and what to hold it against: pxl compare <file> <name> <other name | other.px.js:name | ref.png> [--shrink N] [--offset x,y]");
+        if (!name || !ref) throw new PxError("compare needs an asset and what to hold it against: pxl compare <file> <name> <other name | other.px.js:name | ref.png> [--shrink N] [--offset x,y] [--pixels] [--at x,y,w,h] [--frame N]");
         const p = loadProject(file);
-        const img = p.image(name);
+        const img = a.frame !== undefined ? p.image(name, 0, frameTime(p, name, a.frame)) : p.image(name);
         // against a picture, another asset of the file, or one of another file's (a new head against an approved one)
         const other = /^(.+\.px\.(?:js|ts)):([^:]+)$/.exec(ref);
         let r: Img;
-        if (other) r = loadProject(resolve(other[1])).image(other[2]);
-        else if (!/\.png$/i.test(ref)) r = p.image(ref);
+        if (other) { const op = loadProject(resolve(other[1])); r = a.frame !== undefined ? op.image(other[2], 0, frameTime(op, other[2], a.frame)) : op.image(other[2]); }
+        else if (!MEDIA.test(ref)) r = a.frame !== undefined ? p.image(ref, 0, frameTime(p, ref, a.frame)) : p.image(ref);
         else try { r = decodePng(readFileSync(resolve(ref))); } catch (e) { throw new PxError(`${ref}: ${(e as Error).message}`); }
         if (a.shrink !== undefined) r = r.shrink(a.shrink);
-        console.log(`${name} (${img.w}x${img.h}) against ${ref} (${r.w}x${r.h}${a.shrink ? `, shrunk ${a.shrink}x` : ""}${a.offset ? ` at ${a.offset.join(",")}` : ""})`);
-        console.log(compareSilhouettes(img, r, ...(a.offset ?? [0, 0])));
+        console.log(`${name} (${img.w}x${img.h}${a.frame !== undefined ? `, frame ${a.frame}` : ""}) against ${ref} (${r.w}x${r.h}${a.shrink ? `, shrunk ${a.shrink}x` : ""}${a.offset ? ` at ${a.offset.join(",")}` : ""})`);
+        if (a.pixels) {
+          const pal = p.assets.get(name)?.pal ?? p.pal, swap: Record<string, unknown> = {};
+          for (let d = p.assets.get(name), i = 0; d && i < 8; d = typeof d.opts.base === "string" ? p.assets.get(d.opts.base) ?? p.assets.get((d.ns ?? "") + d.opts.base) : undefined, i++) Object.assign(swap, d.opts.swap, swap);
+          console.log(comparePixels(img, r, { ox, oy, at, pal, swap }));
+        } else console.log(compareSilhouettes(img, r, ox, oy));
         return 0;
       }
       case "blind": {

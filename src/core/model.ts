@@ -269,6 +269,8 @@ export interface AssetDef {
   swapPal?: Palette;
   /** A frozen cell: the live asset its PNG is a render of (pxl check compares them); `freeze`: the PNG to write, not there yet. */
   live?: string; freeze?: string;
+  /** True when an anim's output depends only on its drawn frame index (never raw sub-frame `c.t`), so times inside the same frame share one canonical cache/disk key. */
+  framePure?: boolean;
 }
 
 export interface GroupDef {
@@ -285,8 +287,20 @@ export interface SheetOpts {
   extrude?: number;
   /** "tag": each animation starts a row of its own (`cols` still wraps a long one). */
   rows?: "tag";
-  /** Each frame in a cell of [w, h] px, its pivot (else its middle) at the cell's middle: rotations drawn at their own sizes at one size. */
-  cell?: [number, number];
+  /** Each frame in a cell of [w, h] px, or "auto" to fit every frame tightly round its pivot. */
+  cell?: [number, number] | "auto";
+  /** With `cell`: where each frame's pivot lands in its cell: "center" (default), "bottom", or [x, y] in cell px. */
+  pivot?: [number, number] | "center" | "bottom";
+  /** Export JSON format: "hash" (default TexturePacker/Aseprite hash), "array" (TexturePacker/Aseprite array), or "grid" (row/col manifest). */
+  format?: "hash" | "array" | "grid";
+  /** Whole-number nearest-neighbor scale applied to the exported sheet, its maps and JSON coordinates (default 1). */
+  scale?: number;
+  /** Extra engine-agnostic metadata merged into the sheet JSON's `meta`. */
+  meta?: Record<string, unknown>;
+  /** Optional map renaming asset/tag names in the exported sheet JSON (`{ _hero_slash_sw: "attack_sw" }`). */
+  names?: Record<string, string>;
+  /** Optional map renaming exported socket names in this sheet (`{ head_top: "overhead" }`). */
+  sockets?: Record<string, string>;
   /** Palette slots: { name: swap } (keys to colors), exported as a palette a slot beside the sheet's own. */
   slots?: Record<string, Record<string, string>>;
 }

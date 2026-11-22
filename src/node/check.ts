@@ -386,6 +386,7 @@ function shrinkBases(p: Project): Set<string> {
  */
 export function checkProject(p: Project, opts: { names?: string[]; frame?: number; frames?: number[]; file?: string; readings?: boolean; fix?: boolean; edges?: boolean | "shot" } = {}): CheckResult {
   const reads = new Set<string>(), tally = { agree: 0, against: 0, unclear: 0 };
+  const imgHashes = new WeakMap<Img, number>(), imgHash = (im: Img) => { let h = imgHashes.get(im); if (h === undefined) imgHashes.set(im, (h = hash(im.data))); return h; };
   const lines: string[] = [], notes: string[] = [];
   let scenes = 0, rigs = 0, others = 0, frames = 0, distinct = 0, sprites = 0;
   // a rule only runs where the art says what it needs (a light, a ground, a height, a front marker):
@@ -460,6 +461,11 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
         if (words) notes.push(`${name} › LOOK: edges${loose ? " " : ": "}${words}`);
         const holes = fr.length > 1 && !loose ? holesLook(fr) : "";
         if (holes) notes.push(`${name} › LOOK: holes: ${holes}`);
+        if (img.retouchGaps?.length) {
+          const [ax, ay] = (img.pivot ?? [0, 0]).map(Math.floor);
+          const at = img.retouchGaps.slice(0, 6).map(([x, y]) => `${x - ax},${y - ay}`).join("; ");
+          notes.push(`${name} › LOOK: retouch broke ${img.retouchGaps.length} outer outline px (anchor-rel ${at}${img.retouchGaps.length > 6 ? "; ..." : ""}): non-ink retouch exposed on the outer silhouette edge`);
+        }
       }
       // its boxes (c.setBox) inside each frame: every frame of an anim whose first frame has one (a
       // fighter's hurtbox is on every frame)
@@ -531,7 +537,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
       for (const q of shown) {
         const many = copies.get(`${q.name}@${q.layer}`)! > MANY;
         if (many && !standWords(q.stand)) continue;
-        const key = `${q.name}|${q.layer}|${q.x},${q.y}|${q.img.w}x${q.img.h}|${hash(q.img.data)}|${q.stand && Math.abs(q.stand.off) > STAND ? q.stand.off.toFixed(2) : ""}`;
+        const key = `${q.name}|${q.layer}|${q.x},${q.y}|${q.img.w}x${q.img.h}|${imgHash(q.img)}|${q.stand && Math.abs(q.stand.off) > STAND ? q.stand.off.toFixed(2) : ""}`;
         let ws = seen.get(key);
         if (!ws) {
           const o = q.img.orient, dark = unlit.has(q.layer ?? "") || !!q.unlit;

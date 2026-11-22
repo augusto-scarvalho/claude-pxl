@@ -26,7 +26,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statfsSync, statSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, join, sep } from "node:path";
 import { threadId } from "node:worker_threads";
 import { deflateSync, inflateSync } from "node:zlib";
 import type { BuildOut } from "../core/build.ts";
@@ -39,7 +39,7 @@ const code = join(import.meta.dirname, ".."), top = join(code, "..");
 export const DIR = existsSync(join(top, "node_modules")) ? join(top, "node_modules", ".cache", "pxl", "builds") : join(tmpdir(), "pxl-builds");
 /** (DISK_MS: a build or a trace that took less isn't kept) */
 export const DISK_MS = 10;
-const WORTH = 300, BUDGET = 512 * 2 ** 20; // (the budget's floor)
+const WORTH = 300, BUDGET = 512 * 2 ** 20, MAX_ENTRIES = 25_000; // (the budget's floor and flat-dir entry cap)
 export const sha1 = (b: string | Uint8Array) => createHash("sha1").update(b).digest("hex");
 
 /** A hash of every file under `dir` and of the Node running it; "" if one changed after `since` (ms). */
@@ -138,6 +138,8 @@ export const storeSaid = { back: 0, dropped: 0 };
 /** The entries prunes dropped, not written again since (.pruned's lines but its first; a name's first 16 characters): read at this thread's first miss. */
 let gone: Set<string> | undefined;
 
+/** Entries already touched in this process (avoids redundant utimesSync syscalls on repeated hits). */
+const touched = new Set<string>();
 function get(key: string): { out: BuildOut; log: DiskLog; ms?: number } | undefined {
   const file = fileOf(key), name = basename(file);
   if (!(there ??= new Set((() => { try { return readdirSync(DIR); } catch { return []; } })())).has(name)) {
@@ -151,7 +153,7 @@ function get(key: string): { out: BuildOut; log: DiskLog; ms?: number } | undefi
     const bufs = (head.sizes as number[]).map((s) => raw.buffer.slice(raw.byteOffset + at, raw.byteOffset + (at += s)));
     if (at !== raw.length) return undefined;
     const out = decode(head.v, bufs) as BuildOut;
-    try { const now = new Date(); utimesSync(file, now, now); } catch { /* its age only orders what's dropped */ }
+    if (!touched.has(name)) { touched.add(name); try { const now = new Date(); utimesSync(file, now, now); } catch { /* its age only orders what's dropped */ } }
     storeSaid.back++;
     return { out, log: head.log, ms: head.ms as number };
   } catch {
@@ -166,9 +168,16 @@ function put(key: string, out: BuildOut, log: DiskLog, ms: number): void {
   try { v = encode(out, bufs); } catch (e) { if (e === UNSTORABLE) return; throw e; }
   const head = Buffer.from(JSON.stringify({ key, v, sizes: bufs.map((b) => b.byteLength), log, ms })), len = Buffer.alloc(4);
   len.writeUInt32LE(head.length);
-  const data = deflateSync(Buffer.concat([len, head, ...bufs.map((b) => new Uint8Array(b.buffer, b.byteOffset, b.byteLength))]), { level: 1 });
   // worth its bytes: WORTH ms of work a MiB kept (the round's scene frames, 40 ms each to compose again, were three
   // quarters of the bytes, and pushed out the traced parts under them: 295 MiB for the file, 9 without them)
+  const maxOut = Number.isFinite(ms) ? Math.floor((ms * 2 ** 20) / WORTH) : Infinity;
+  let data: Buffer;
+  try {
+    data = deflateSync(Buffer.concat([len, head, ...bufs.map((b) => new Uint8Array(b.buffer, b.byteOffset, b.byteLength))]), { level: 1, ...(maxOut < Infinity ? { maxOutputLength: maxOut } : {}) });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException)?.code === "ERR_BUFFER_TOO_LARGE") return;
+    throw e;
+  }
   if (ms * 2 ** 20 < WORTH * data.length) return;
   const file = fileOf(key), aside = `${file}.${process.pid}-${threadId}.tmp`;
   try {
@@ -183,7 +192,7 @@ function put(key: string, out: BuildOut, log: DiskLog, ms: number): void {
   // pruned when this process has written an eighth of the budget, and by the first process that writes after ten
   // minutes without (a stat of each entry: 0.1 s at 9000 of them, not paid by every command)
   if (!looked) { looked = true; try { if (Date.now() - statSync(join(DIR, ".pruned")).mtimeMs > 600_000) written = Infinity; } catch { written = Infinity; } }
-  if ((written += data.length) > (cap ??= budget()) / 8) prune(cap);
+  if ((written += data.length) > (cap ??= budget()) / 8) prune(cap, DIR, MAX_ENTRIES, 0.85);
 }
 
 /**
@@ -195,27 +204,46 @@ let cap: number | undefined;
 
 /**
  * Down to the budget, the least recently used first (a build read back is touched); and what a killed writer left aside.
- * .pruned says when, how many it dropped (its first line: entries, bytes, the budget) and which, with those dropped
- * before and not written since (20,000 at most): a build asked again among them is said (storeSaid).
+ * .pruned says when, how many it dropped (its first line: entries, bytes, the budget, and maxEntries when entry count
+ * triggered pruning under the byte budget) and which, with those dropped before and not written since (20,000 at most):
+ * a build asked again among them is said (storeSaid). `headroom` (< 1) trims slightly below the limit when triggered
+ * so bursts don't re-scan the whole cache directory on every write.
  */
-export function prune(cap = budget(), dir = DIR): void {
+export function prune(cap = budget(), dir = DIR, maxEntries = MAX_ENTRIES, headroom = 1): void {
   written = 0;
-  const note = join(dir, ".pruned");
+  const pre = dir.endsWith(sep) ? dir : dir + sep, note = pre + ".pruned";
   let was: string[] = [];
   try { was = readFileSync(note, "utf8").split("\n").slice(1); } catch { /* none yet */ }
   try { writeFileSync(note, ""); } catch { /* no folder yet */ }
   let names: string[];
   try { names = readdirSync(dir); } catch { return; }
-  const now = Date.now(), all = names.flatMap((f) => { try { const s = statSync(join(dir, f)); return [{ f, t: s.mtimeMs, n: s.size }]; } catch { return []; } });
-  let sum = 0, bytes = 0;
-  const dropped: string[] = [], left = new Set<string>();
-  for (const e of all.filter((e) => e.f !== ".pruned").sort((a, b) => b.t - a.t)) {
-    if ((sum += e.n) > cap || (e.f.endsWith(".tmp") && now - e.t > 600_000)) {
-      try { unlinkSync(join(dir, e.f)); } catch { continue; /* another process took it */ }
-      if (!e.f.endsWith(".tmp")) { dropped.push(e.f.slice(0, 16)); bytes += e.n; }
-    } else left.add(e.f.slice(0, 16));
+  const now = Date.now(), all: { f: string; t: number; n: number }[] = [];
+  let totalBytes = 0, totalEntries = 0;
+  for (let i = 0; i < names.length; i++) {
+    const f = names[i];
+    if (f === ".pruned") continue;
+    try {
+      const s = statSync(pre + f);
+      all.push({ f, t: s.mtimeMs, n: s.size });
+      if (!f.endsWith(".tmp")) { totalBytes += s.size; totalEntries++; }
+    } catch { /* vanished */ }
   }
-  try { writeFileSync(note, [`${dropped.length} ${bytes} ${Math.round(cap)}`, ...new Set([...dropped, ...was.filter((f) => !left.has(f))])].slice(0, 20_001).join("\n")); } catch { /* the folder went */ }
+  const overBytes = totalBytes > cap, overEntries = totalEntries > maxEntries;
+  const targetCap = overBytes ? Math.floor(cap * headroom) : cap;
+  const targetEntries = overEntries ? Math.max(1, Math.floor(maxEntries * headroom)) : maxEntries;
+  all.sort((a, b) => b.t - a.t);
+  let sum = 0, bytes = 0, keptCount = 0;
+  const dropped: string[] = [], left = new Set<string>();
+  for (let i = 0; i < all.length; i++) {
+    const e = all[i], tmp = e.f.endsWith(".tmp");
+    if ((overBytes && (sum += e.n) > targetCap) || (!tmp && overEntries && keptCount >= targetEntries) || (tmp && now - e.t > 600_000)) {
+      try { unlinkSync(pre + e.f); } catch { continue; /* another process took it */ }
+      if (!tmp) { dropped.push(e.f.slice(0, 16)); bytes += e.n; }
+    } else { if (!tmp) keptCount++; left.add(e.f.slice(0, 16)); }
+  }
+  const byEntries = !overBytes && overEntries;
+  const headLine = byEntries ? `${dropped.length} ${bytes} ${Math.round(cap)} ${maxEntries}` : `${dropped.length} ${bytes} ${Math.round(cap)}`;
+  try { writeFileSync(note, [headLine, ...new Set([...dropped, ...was.filter((f) => !left.has(f))])].slice(0, 20_001).join("\n")); } catch { /* the folder went */ }
 }
 
 /**
@@ -230,8 +258,10 @@ export function storeLines(): string[] {
     const note = join(DIR, ".pruned"), t = statSync(note).mtimeMs;
     if (t >= saidAt) {
       saidAt = t + 1;
-      const [n, bytes, cap] = readFileSync(note, "utf8").split("\n", 1)[0].split(" ").map(Number);
-      if (n > 0) out.push(`store: past its budget of ${Math.round(cap / 2 ** 20)} MB (a tenth of the free disk, 512 MB to 2 GB), the ${n} builds and traces least used dropped (${Math.round(bytes / 2 ** 20)} MB)`);
+      const [n, bytes, cap, byEntries] = readFileSync(note, "utf8").split("\n", 1)[0].split(" ").map(Number);
+      if (n > 0) out.push(byEntries
+        ? `store: past its ${byEntries}-entry limit, the ${n} builds and traces least used dropped (${Math.round(bytes / 2 ** 20)} MB)`
+        : `store: past its budget of ${Math.round(cap / 2 ** 20)} MB (a tenth of the free disk, 512 MB to 2 GB), the ${n} builds and traces least used dropped (${Math.round(bytes / 2 ** 20)} MB)`);
     }
   } catch { /* nothing kept yet */ }
   if (dropped) out.push(`store: ${dropped} build${dropped > 1 ? "s and traces" : " or trace"} it had kept made again, dropped since to keep within its budget (${Math.round(budget() / 2 ** 20)} MB: a tenth of the free disk, 512 MB to 2 GB)`);

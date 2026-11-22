@@ -109,21 +109,73 @@ export function written(p: Project, all = false): string[] {
 export function packedSheet(p: Project, s: SheetDef): { items: { name: string; img: Img; ms?: number }[]; tags: FrameTag[]; rows?: Set<number>; sheet: Img; frames: SheetFrame[] } {
   let items: { name: string; img: Img; ms?: number }[] = [];
   const tags: FrameTag[] = [];
+  const rename = s.opts.names, sockMap = s.opts.sockets;
+  const mapImg = (img: Img) => {
+    if (!sockMap || !img.sockets) return img;
+    const o = img.copy();
+    o.sockets = Object.fromEntries(Object.entries(img.sockets).map(([k, v]) => [sockMap[k] ?? k, v]));
+    return o;
+  };
   for (const name of p.sheetNames(s)) {
+    const outName = rename?.[name] ?? (s.ns && name.startsWith(s.ns) ? rename?.[name.slice(s.ns.length)] : undefined) ?? name;
     const fr = p.drawn(name);
-    if (!fr.length) { items.push({ name, img: p.image(name) }); continue; }
-    tags.push({ name, from: items.length, to: items.length + fr.length - 1, direction: p.direction(name) });
-    fr.forEach((f, i) => items.push({ name: `${name}_${i}`, img: f.img, ms: f.ms }));
+    if (!fr.length) { items.push({ name: outName, img: mapImg(p.image(name)) }); continue; }
+    tags.push({ name: outName, from: items.length, to: items.length + fr.length - 1, direction: p.direction(name) });
+    fr.forEach((f, i) => items.push({ name: `${outName}_${i}`, img: mapImg(f.img), ms: f.ms }));
   }
   if (!items.length) throw new PxError("sheet is empty (no entries matched)");
   if (s.opts.rows !== undefined && s.opts.rows !== "tag") throw new PxError(`rows can only be "tag" (each animation on a row of its own), got ${JSON.stringify(s.opts.rows)}`);
   if (s.opts.cell) {
-    // one size for all (rotations drawn at their own sizes): each frame's pivot (else its middle) at its cell's middle
-    const [cw, ch] = s.opts.cell, at = (img: Img) => img.pivot ?? [img.w / 2, img.h / 2];
-    const need = items.map(({ img }) => { const b = img.bounds(), [px, py] = at(img); return b ? [2 * Math.max(px - b.x, b.x + b.w - px), 2 * Math.max(py - b.y, b.y + b.h - py)].map(Math.ceil) : [0, 0]; });
-    const big = [Math.max(...need.map((n) => n[0])), Math.max(...need.map((n) => n[1]))], worst = items[need.findIndex((n) => n[0] > cw || n[1] > ch)];
-    if (worst) throw new PxError(`cell [${cw}, ${ch}] is too small: '${worst.name}' doesn't fit round its pivot; cell: [${big.join(", ")}] holds every frame`);
-    items = items.map((it) => { const [px, py] = at(it.img); return { ...it, img: it.img.sub(Math.round(px - cw / 2), Math.round(py - ch / 2), cw, ch) }; });
+    // one size for all: each frame's pivot (else its middle) lands on the cell's anchor (`pivot`: "center", "bottom", or [ax, ay])
+    const at = (img: Img) => img.pivot ?? [img.w / 2, img.h / 2];
+    const spans = items.map(({ img }) => {
+      const b = img.bounds(), [px, py] = at(img);
+      if (!b) return [0, 0, 0, 0];
+      return [Math.max(0, px - b.x), Math.max(0, b.x + b.w - px), Math.max(0, py - b.y), Math.max(0, b.y + b.h - py)];
+    });
+    const maxL = Math.ceil(Math.max(0, ...spans.map((v) => v[0]))), maxR = Math.ceil(Math.max(0, ...spans.map((v) => v[1])));
+    const maxA = Math.ceil(Math.max(0, ...spans.map((v) => v[2]))), maxB = Math.ceil(Math.max(0, ...spans.map((v) => v[3])));
+    const pv = s.opts.pivot ?? "center";
+    let cw: number, ch: number, ax: number, ay: number;
+    if (s.opts.cell === "auto") {
+      if (Array.isArray(pv)) {
+        [ax, ay] = pv;
+        if (ax < maxL || ay < maxA) throw new PxError(`pivot [${ax}, ${ay}] is too close to the edge for cell: "auto": need at least [${maxL}, ${maxA}]`);
+        cw = Math.max(1, Math.ceil(ax + maxR));
+        ch = Math.max(1, Math.ceil(ay + maxB));
+      } else if (pv === "bottom") {
+        cw = Math.max(1, 2 * Math.max(maxL, maxR));
+        ch = Math.max(1, maxA + maxB);
+        ax = cw / 2; ay = maxA;
+      } else {
+        cw = Math.max(1, 2 * Math.max(maxL, maxR));
+        ch = Math.max(1, 2 * Math.max(maxA, maxB));
+        ax = cw / 2; ay = ch / 2;
+      }
+    } else {
+      [cw, ch] = s.opts.cell;
+      if (Array.isArray(pv)) {
+        [ax, ay] = pv;
+        const bad = spans.findIndex(([l, r, a, b]) => l > ax || r > cw - ax || a > ay || b > ch - ay);
+        if (bad >= 0) {
+          const big = [Math.ceil(Math.max(maxL, ax) + maxR), Math.ceil(Math.max(maxA, ay) + maxB)];
+          throw new PxError(`cell [${cw}, ${ch}] is too small: '${items[bad].name}' doesn't fit round its pivot; cell: [${big.join(", ")}] holds every frame`);
+        }
+      } else if (pv === "bottom") {
+        ax = cw / 2; ay = ch - maxB;
+        const bad = spans.findIndex(([l, r, a, b]) => 2 * Math.max(l, r) > cw || a + b > ch);
+        if (bad >= 0) {
+          const big = [2 * Math.max(maxL, maxR), maxA + maxB];
+          throw new PxError(`cell [${cw}, ${ch}] is too small: '${items[bad].name}' doesn't fit round its pivot; cell: [${big.join(", ")}] holds every frame`);
+        }
+      } else {
+        ax = cw / 2; ay = ch / 2;
+        const need = spans.map(([l, r, a, b]) => [Math.ceil(2 * Math.max(l, r)), Math.ceil(2 * Math.max(a, b))]);
+        const big = [Math.max(...need.map((n) => n[0])), Math.max(...need.map((n) => n[1]))], worst = items[need.findIndex((n) => n[0] > cw || n[1] > ch)];
+        if (worst) throw new PxError(`cell [${cw}, ${ch}] is too small: '${worst.name}' doesn't fit round its pivot; cell: [${big.join(", ")}] holds every frame`);
+      }
+    }
+    items = items.map((it) => { const [px, py] = at(it.img); return { ...it, img: it.img.sub(Math.round(px - ax), Math.round(py - ay), cw, ch) }; });
   }
   const rows = s.opts.rows === "tag" ? new Set(tags.flatMap((g) => [g.from, g.to + 1])) : undefined;
   return { items, tags, rows, ...packSheet(items, s.opts.cols, s.opts.pad, s.opts.extrude, rows) };
@@ -152,10 +204,11 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
   // a map's file (<x>_n.png, <x>_e.png) that is another's own (an asset x with normals beside an asset
   // x_n, a sheet beside a sheet x_n): an error naming both, and the map not written over it
   const folder = (k: string) => (k === "scene" ? "scenes" : k === "anim" ? "anims" : "sprites"), files = new Set(p.exported());
-  const writeMap = (what: string, n: string, dir: string, suffix: "_n" | "_e", img: () => Img, loc?: string) => {
+  const writeMap = (what: string, n: string, dir: string, suffix: "_n" | "_e", img: () => Img, loc?: string): boolean => {
     const o = n + suffix, d = p.assets.get(o), other = dir ? d && files.has(o) && folder(d.kind) === dir && `${d.kind} '${o}'` : p.sheets.some((s) => s.name === o) && `sheet '${o}'`;
-    if (other) errors.push(new PxError(`${what} '${n}': its ${suffix === "_n" ? "normal" : "emission"} map would be ${dir ? dir + "/" : ""}${o}.png, the file of ${other} too (a heading's sprite?): rename one of them; the map isn't written`, loc));
-    else writePng(join(out, dir, o + ".png"), img());
+    if (other) { errors.push(new PxError(`${what} '${n}': its ${suffix === "_n" ? "normal" : "emission"} map would be ${dir ? dir + "/" : ""}${o}.png, the file of ${other} too (a heading's sprite?): rename one of them; the map isn't written`, loc)); return false; }
+    writePng(join(out, dir, o + ".png"), img());
+    return true;
   };
   for (const n of names) {
     const def = p.assets.get(n)!, t0 = performance.now();
@@ -252,17 +305,36 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       // (the last sheet's frames in hand, nothing more is built: the workers stop, and what they hold goes before its
       // files are written, the most this thread holds)
       if (s === p.sheets.findLast((x) => want.has(x.name))) p.elsewhere?.end();
-      writePng(join(out, s.name + ".png"), sheet);
+      const sc = s.opts.scale ?? 1;
+      const outSheet = sc > 1 ? sheet.scale(sc) : sheet;
+      const outFrames = sc > 1 ? frames.map((f) => ({ ...f, x: f.x * sc, y: f.y * sc, img: f.img.scale(sc) })) : frames;
+      writePng(join(out, s.name + ".png"), outSheet);
+      // the normal and emission maps in the same rectangles, for engine lights (the art's json serves both)
+      let normalMap: string | undefined, emissionMap: string | undefined;
+      if (items.some((it) => it.img.norm)) {
+        const ok = writeMap("sheet", s.name, "", "_n", () => {
+          const m = packSheet(items.map((it) => ({ ...it, img: normalImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet;
+          return sc > 1 ? m.scale(sc) : m;
+        }, s.loc);
+        if (ok) normalMap = `${s.name}_n.png`;
+      }
+      if (items.some((it) => glows(it.img))) {
+        const ok = writeMap("sheet", s.name, "", "_e", () => {
+          const m = packSheet(items.map((it) => ({ ...it, img: emitImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet;
+          return sc > 1 ? m.scale(sc) : m;
+        }, s.loc);
+        if (ok) emissionMap = `${s.name}_e.png`;
+      }
       // palette slots: the sheet's colors as they first appear, and each slot's in the same order (a
       // palette swap's lookup), in the JSON and as .hex files beside it (rrggbb: alpha stays the art's)
       const cs = s.slots && [...new Set(sheet.data)].filter((c) => c !== TRANSPARENT);
       const pals = cs && { palette: cs.map(toHex), slots: Object.fromEntries(s.slots!.map(([n, m]) => [n, cs.map((c) => toHex(m.get(c) ?? c))])) };
-      write(join(out, s.name + ".json"), sheetJson(s.name + ".png", sheet, frames, tags, pals ?? {}));
+      const more = { ...(pals ?? {}), ...(s.opts.meta ?? {}) };
+      write(join(out, s.name + ".json"), sheetJson(s.name + ".png", outSheet, outFrames, tags, more, {
+        format: s.opts.format, scale: sc, pad: (s.opts.pad ?? 0) * sc, extrude: (s.opts.extrude ?? 0) * sc, normalMap, emissionMap,
+      }));
       if (pals) for (const [n, l] of [["", pals.palette], ...Object.entries(pals.slots)] as [string, string[]][]) write(join(out, `${s.name}${n && "." + n}.hex`), l.map((h) => h.slice(1, 7) + "\n").join(""));
-      // the normal maps in the same rectangles, for engine lights (the art's json serves both)
-      if (items.some((it) => it.img.norm)) writeMap("sheet", s.name, "", "_n", () => packSheet(items.map((it) => ({ ...it, img: normalImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet, s.loc);
-      if (items.some((it) => glows(it.img))) writeMap("sheet", s.name, "", "_e", () => packSheet(items.map((it) => ({ ...it, img: emitImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet, s.loc);
-      lines.push(`sheet ${s.name} ${sheet.w}x${sheet.h} (${frames.length} frames)${prev(s.name, sheet)}`);
+      lines.push(`sheet ${s.name} ${outSheet.w}x${outSheet.h} (${frames.length} frames)${prev(s.name, outSheet)}`);
       // a sheet of animations also plays them all at once in its preview, each in a cell of its own at
       // its own timing (a character's moves side by side, to judge them together)
       // (its frames made as the encoder asks for them, one held at a time; at 1x the checker put in only where they changed)

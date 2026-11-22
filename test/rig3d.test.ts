@@ -481,3 +481,27 @@ views("_h", sdf.ellipsoid([4.6, 5, 5.3]).mat("zsSL"), { ink: "k", jaw: ["D", "zs
   }
   assert.match(failure(`${PAL} views("_h", sdf.sphere(4).mat("krw"), { ink: "k", crown: 3 })`).message, /crown is the px .* with jaw/);
 });
+
+test("rig3d: auto-sizing is deferred until first build or explicit dimension read, and inherits lazily through base+swap variants", () => {
+  const p = loadSource(`${PAL}
+let calls = 0;
+const R = rig3d("_f", {
+  headings: ["s", "w", "e"], ink: "k",
+  parts: (j) => { calls++; return { body: j.limb(j.pelvis, j.chest, 3, 3, "g"), head: j.ball(j.head, 4, "w") }; },
+  moves: { idle: { frames: 1, pose: () => ({}) } }
+});
+for (const n of R.names) anim("v" + n.slice(2), { base: n, swap: { g: "r" } });
+sprite("load_calls", { w: 4, h: 1 }, (c) => { for (let x = 0; x < Math.min(4, calls); x++) c.px(x, 0, "w"); });
+sprite("dim_check", { w: 1, h: 1 }, (c) => { if (R.w > 0 && R.h > 0 && R.pivot.length === 2) c.px(0, 0, "g"); });`, "t.px.js");
+  // Load + base+swap anim definitions must not trigger eager boundsOf() evaluation
+  const before = p.image("load_calls");
+  assert.equal(before.get(0, 0), 0, "rig3d auto-sizing did not run during file load");
+  // Building a swap variant or mirrored variant computes exact bounds and preserves 3D parts
+  const s = p.image("v_idle_s"), e = p.image("v_idle_e");
+  assert.ok(s.w > 8 && s.h > 20 && s.pivot && e.pivot);
+  assert.equal(e.w, s.w);
+  assert.equal(e.h, s.h);
+  assert.ok(s.parts && s.parts.names.includes("body"), "swap variant preserves 3D parts");
+  assert.ok(e.parts && e.parts.names.includes("body"), "mirrored swap variant preserves 3D parts");
+  assert.equal(p.image("dim_check").get(0, 0), p.pal.keys.get("g"), "lazy R.w/R.h/R.pivot getters resolve");
+});

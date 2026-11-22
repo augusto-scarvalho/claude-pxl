@@ -270,3 +270,75 @@ sheet("cubes", ["cube"])`, "t.px.js");
     "lifted › WARNING: genre 'racing': its drawing doesn't reach where it meets the ground: its lowest row is 2, its footprint's 5: drawn lifted, or its wheels or feet hidden or cut, it floats there",
   ]);
 });
+
+test("sheet export options: cell 'auto', pivot 'bottom'/[x,y], format 'array'/'grid', scale (with _n/_e), meta, names and sockets", () => {
+  const p = loadSource(PAL + `
+    sprite("small", { w: 4, h: 6, pivot: [2, 5], sockets: { head_top: [2, 1] } },
+      (c) => { c.rect(1, 1, 2, 4, "r"); c.px(2, 2, "g"); c.setBox("hurt", 1, 1, 2, 4) },
+      bump("dome"), effect("emit", { on: "g", strength: 0.8 }))
+    anim("wide", { frames: 2, fps: 10, w: 8, h: 6, pivot: [4, 5] },
+      (c) => { c.rect(1, 1, 6, 4, "r"); c.px(4 + c.frame, 2, "g"); c.setSocket("head_top", 4, 1) },
+      bump("dome"), effect("emit", { on: "g", strength: 0.8 }))
+    sheet("grid_s", ["small", "wide"], {
+      cell: "auto", pivot: "bottom", format: "grid", scale: 2, pad: 1, extrude: 1, rows: "tag",
+      names: { small: "stand", wide: "walk" },
+      sockets: { head_top: "ui_top" },
+      meta: { unit: "hero", custom: 42 },
+    })
+    sheet("arr_s", ["small", "wide"], {
+      cell: [10, 10], pivot: [5, 8], format: "array",
+      names: { small: "stand", wide: "walk" },
+    })
+  `, "t.px.js");
+  built(p, ["grid_s", "arr_s"], (dir) => {
+    const g = json(dir, "grid_s");
+    // auto cell tightly fits visible bounds of small (rect 1,1,2,4 pivot 2,5) and wide (rect 1,1,6,4 pivot 4,5) -> 6x4, scaled x2 -> 12x8
+    assert.equal(g.format, "grid");
+    assert.equal(g.scale, 2);
+    assert.equal(g.pad, 2);
+    assert.equal(g.extrude, 2);
+    assert.deepEqual(g.cell, { w: 12, h: 8 });
+    assert.equal(g.cols, 2);
+    assert.equal(g.rows, 2);
+    assert.equal(g.meta.unit, "hero");
+    assert.equal(g.meta.custom, 42);
+    assert.equal(g.normalMap, "grid_s_n.png");
+    assert.equal(g.emissionMap, "grid_s_e.png");
+    assert.ok(readFileSync(join(dir, "grid_s_n.png")).length > 0);
+    assert.ok(readFileSync(join(dir, "grid_s_e.png")).length > 0);
+    assert.equal(g.frames[0].name, "stand");
+    assert.equal(g.frames[0].col, 0);
+    assert.equal(g.frames[0].row, 0);
+    assert.deepEqual([g.frames[0].x, g.frames[0].y, g.frames[0].w, g.frames[0].h], [2, 2, 12, 8]);
+    assert.deepEqual(g.frames[0].pivot, { x: 6, y: 8 });
+    // small shifted +1 in x, -1 in y to align pivot [2,5] onto [3,4], then scaled x2 -> socket head_top [2,1] => [3,0] => [6,0]
+    assert.deepEqual(g.frames[0].sockets, { ui_top: { x: 6, y: 0 } });
+    assert.deepEqual(g.frames[0].boxes, { hurt: [{ x: 4, y: 0, w: 4, h: 8 }] });
+    assert.equal(g.frames[1].name, "walk_0");
+    assert.deepEqual(g.frames[1].sockets, { ui_top: { x: 6, y: 0 } });
+    assert.equal(g.frames[2].name, "walk_1");
+    assert.equal(g.frames[2].col, 1);
+    assert.equal(g.frames[2].row, 1);
+    assert.equal(g.animations[0].name, "walk");
+    assert.equal(g.animations[0].row, 1);
+    assert.equal(g.animations[0].frames, 2);
+    // array format
+    const a = json(dir, "arr_s");
+    assert.ok(Array.isArray(a.frames));
+    assert.deepEqual(a.frames.map((f: { filename: string }) => f.filename), ["stand", "walk_0", "walk_1"]);
+    assert.deepEqual(a.frames[0].frame, { x: 0, y: 0, w: 10, h: 10 });
+    assert.deepEqual(a.frames[0].pivot, { x: 0.5, y: 0.8 });
+    assert.equal(a.meta.normalMap, "arr_s_n.png");
+    assert.equal(a.meta.emissionMap, "arr_s_e.png");
+    assert.deepEqual(a.meta.frameTags, [{ name: "walk", from: 1, to: 2, direction: "forward" }]);
+  });
+  // validation checks
+  assert.throws(() => loadSource(PAL + `sheet("s", [], { cell: "tight" })`, "t.px.js"), /cell is each frame's \[w, h\] in px, or "auto"/);
+  assert.throws(() => loadSource(PAL + `sheet("s", [], { pivot: "bottom" })`, "t.px.js"), /pivot places each frame inside its cell/);
+  assert.throws(() => loadSource(PAL + `sheet("s", [], { cell: "auto", pivot: "top" })`, "t.px.js"), /pivot must be "center", "bottom" or \[x, y\]/);
+  assert.throws(() => loadSource(PAL + `sheet("s", [], { format: "xml" })`, "t.px.js"), /format must be "hash", "array" or "grid"/);
+  assert.throws(() => loadSource(PAL + `sheet("s", [], { scale: 1.5 })`, "t.px.js"), /scale must be a whole number >= 1/);
+  assert.throws(() => loadSource(PAL + `sheet("s", [], { meta: [] })`, "t.px.js"), /meta must be a plain object/);
+  assert.throws(() => loadSource(PAL + `sheet("s", [], { names: { a: 1 } })`, "t.px.js"), /names must be \{ from: "to", \.\.\. \} of non-empty strings/);
+  assert.throws(() => loadSource(PAL + `sheet("s", [], { sockets: { a: 1 } })`, "t.px.js"), /sockets must be \{ from: "to", \.\.\. \} of non-empty strings/);
+});
