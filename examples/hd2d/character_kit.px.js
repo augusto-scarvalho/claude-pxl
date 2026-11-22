@@ -8,7 +8,9 @@
 // that reach farthest past the head; the sixth for the classes' outfits (armor and robes, a tabard, a fur mantle); the
 // seventh for the armor's alternatives (mail2, studded2, breastplate2, pauldrons2) in the outfits that wear the originals;
 // the eighth walking: the longest things on each body in the eight directions, every frame; the ninth fighting: the
-// moves that reach farthest with the longest things, on each body in the eight directions, every frame.
+// moves that reach farthest with the longest things, on each body in the eight directions, every frame; the tenth
+// modular fantasy race parts (ears, horns, wings, non-human heads, digitigrade legs); the eleventh status & evade moves
+// (dodge, downed, dead) on every body in the eight directions, every frame.
 include("../../lib/characters/kit.px.js", { as: "kit", palette: true })
 const TWELVE = [
   ["aldo", { hair: "tousled", torso: "shirt", over: "vest", legs: "canvas", feet: "boots", belt: "belt", colors: { over: "red", torso: "navy", legs: "brown", hair: "dark" } }],
@@ -106,6 +108,7 @@ scene("character_kit_armor2", { w: DIRS.length * CX + 8, h: alts.length * CY + 8
 const WALKS = { medium: { held: "spear", off: "tallshield", torso: "robe", legs: "trousers", feet: "shoes", hair: "longback" },
   short: { held: "quarterstaff", back: "pack", torso: "habit", legs: "trousers", feet: "shoes", hair: "ponytail", beard: "dwarf" },
   tall: { held: "spear", off: "tallshield", torso: "robe", legs: "trousers", feet: "shoes", hair: "twotails", cloak: "travel" },
+  large: { held: "axe", torso: "harness", legs: "breeches", feet: "hooves", digi: true, head: "bull", mane: "bull", tail: "bull", belt: "belt" },
   beast: { held: "magestaff", off: "lantern", torso: "robe", legs: "trousers", feet: "shoes", cloak: "travel" } }, walks = []
 for (const [b, s] of Object.entries(WALKS)) walks.push([`wk_${b}`, kit.character(`wk_${b}`, { body: b, ...s, moves: ["walk"] }).cell])
 scene("character_kit_walk", { w: DIRS8.length * TX + 8, h: walks.length * TY + 8, bg: "#7a7a80",
@@ -127,3 +130,40 @@ const FX = Math.max(...fights.map(([, c]) => c.w)) + 2, FY = Math.max(...fights.
 scene("character_kit_fight", { w: DIRS8.length * FX + 8, h: fights.length * FY + 8, bg: "#7a7a80",
   expect: fights.flatMap(([n, c], i) => DIRS8.map((d, k) => { const [x, y] = fat(i, k, c); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
   ...fights.flatMap(([n, c], i) => DIRS8.map((d, k) => stamp(`${n}_${d}_ck`, ...fat(i, k, c), { id: `${n}_${d}` }))))
+// and the modular fantasy race parts (the tenth): ears (pointed, cat, rabbit, goblin), horns (curved, ram, bull,
+// antlers), wings and batwings, new heads (reptile, frog, skull, automaton), digitigrade legs and the tapered great helm
+const RACES = {
+  elf: { ears: "pointed", hair: "loose", outfit: "ranger", colors: { hair: "blond", cloak: "green" } },
+  catkin: { ears: "cat", tail: "cat", digi: true, outfit: "rogue", colors: { hair: "ginger", skin: "fair" } },
+  harekin: { ears: "rabbit", tail: "rabbit", digi: true, hair: "bob", torso: "tunic", legs: "breeches", feet: "boots", colors: { hair: "white", torso: "teal" } },
+  jackalope: { head: "rabbit", horns: "antlers", tail: "rabbit", digi: true, outfit: "ranger", colors: { fur: "cream", horns: "bone", cloak: "olive" } },
+  goblin: { body: "short", ears: "goblin", hair: "spiky", torso: "smock", legs: "rolled", feet: "bare", colors: { skin: "olive", hair: "dark" } },
+  tiefling: { ears: "pointed", horns: "curved", back: "batwings", tail: "devil", hair: "sidepart", outfit: "mage", colors: { skin: "crimson", horns: "obsidian", wings: "crimson", hair: "black", torso: "plum" } },
+  ramkin: { body: "short", horns: "ram", digi: true, feet: "hooves", beard: "full", outfit: "barbarian", colors: { horns: "bone", hair: "dark", feet: "black" } },
+  bullkin: { body: "large", head: "bull", digi: true, mane: "bull", tail: "bull", torso: "harness", legs: "breeches", feet: "hooves", belt: "belt", arms: "bracers", colors: { fur: "brown", horns: "ivory", torso: "black", legs: "tweed", feet: "black" } },
+  werewolf: { body: "large", head: "werewolf", digi: true, tail: "wolf", mane: "wolf", hands: "wolf", outfit: "bare", torso: "harness", legs: "rolled", feet: "paws", belt: "belt", arms: "bracers", colors: { fur: "grey", torso: "black", legs: "slate", feet: "black" } },
+  stagkin: { horns: "antlers", hair: "longback", back: "wings", outfit: "cleric", colors: { horns: "bone", wings: "white", hair: "auburn" } },
+  reptile: { head: "reptile", tail: "reptile", digi: true, outfit: "barbarian", colors: { scales: "emerald", eyes: "amber" } },
+  frog: { body: "short", head: "frog", outfit: "cleric", off: "roundshield", colors: { scales: "frog" } },
+  skull: { head: "skull", outfit: "bare", torso: "harness", over: "breastplate2", shoulders: "pauldrons2", belt: "belt", feet: "boots", headwear: "helmet", colors: { bones: "ivory", plate: "iron", shoulders: "iron", helm: "iron" } },
+  automaton: { body: "tall", head: "automaton", outfit: "knight", colors: { chassis: "gilt", visor: "ember", plate: "bronze", apron: "navy" } },
+}, races = []
+for (const [k, s] of Object.entries(RACES)) {
+  const { cell } = kit.character(`rc_${k}`, { ...s, dirs: DIRS })
+  races.push([`rc_${k}`, cell])
+}
+const RX = Math.max(...races.map(([, c]) => c.w)) + 2, RY = Math.max(...races.map(([, c]) => c.h)) + 2, rat = (i, k, c) => [4 + k * RX + c.pivot[0], 4 + i * RY + c.pivot[1]]
+scene("character_kit_races", { w: DIRS.length * RX + 8, h: races.length * RY + 8, bg: "#7a7a80",
+  expect: races.flatMap(([n, c], i) => DIRS.map((d, k) => { const [x, y] = rat(i, k, c); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
+  ...races.flatMap(([n, c], i) => DIRS.map((d, k) => stamp(`${n}_stand_${d}`, ...rat(i, k, c), { id: `${n}_${d}` }))))
+// and status & evade moves (the eleventh): dodge, downed and dead on every body in the eight directions, every frame
+const STATUS_MOVES = ["dodge", "downed", "dead"], statuses = []
+for (const b of Object.keys(kit.BODIES)) {
+  const { cell } = kit.character(`st_${b}`, { body: b, outfit: "bare", hair: "none", moves: STATUS_MOVES })
+  for (const m of STATUS_MOVES) statuses.push([`st_${b}_${m}`, cell])
+}
+for (const [n] of statuses) for (const d of DIRS8) anim(`${n}_${d}_ck`, { base: `${n}_${d}`, ms: 100 })
+const SX = Math.max(...statuses.map(([, c]) => c.w)) + 2, SY = Math.max(...statuses.map(([, c]) => c.h)) + 2, sat = (i, k, c) => [4 + k * SX + c.pivot[0], 4 + i * SY + c.pivot[1]]
+scene("character_kit_status", { w: DIRS8.length * SX + 8, h: statuses.length * SY + 8, bg: "#7a7a80",
+  expect: statuses.flatMap(([n, c], i) => DIRS8.map((d, k) => { const [x, y] = sat(i, k, c); return { inside: [`${n}_${d}`, [x - c.pivot[0] + 1, y - c.pivot[1] + 1, c.w - 2, c.h - 2]] } })) },
+  ...statuses.flatMap(([n, c], i) => DIRS8.map((d, k) => stamp(`${n}_${d}_ck`, ...sat(i, k, c), { id: `${n}_${d}` }))))

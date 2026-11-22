@@ -76,20 +76,20 @@ backdrop strip that wraps in four layers, `sky`, `clouds`,
 
 **Characters** (`characters/`): the traveler and the people on his figure (the crew, the miko), what
 they wear (`dress.px.js`), the character kit that makes people of their parts from a one-line spec (`kit.px.js`:
-`kit.character(name, spec)`, `kit.random(name, seed)`; the body by numbers, his and three more, a dwarf, a tall one
-and a beast-headed one (a wolf's head, the neck's mane, a tail, paws; three furs); a bare mannequin and each garment worn over it as a layer of its own, the pieces
+`kit.character(name, spec)`, `kit.random(name, seed)`, `kit.swap(spec, colors)` and engine-agnostic sheet packaging via `kit.export(name, spec, opts)` with `"atlas"`, `"per-dir"` or `"strips"` layouts, direction/move presets, aliases, uniform cell + bottom pivot, `"hash"`/`"array"`/`"grid"` manifests, upscale, palette slots and automatic `_n.png`/`_e.png` maps; the body by numbers, his and four more, a dwarf (`short`), a tall one (`tall`), a tall broad muscular one (`large`)
+and a beast-headed one (a wolf's head, the neck's mane, a tail, paws; six furs), plus optional digitigrade/unguligrade legs (`digi: true`), sculpted 3D skeletal anatomy (`bony: true`, automatic on `head: "skull"` with ribcage, exposed spine, pelvis and bony limbs), cloven `hooves`, clawed beast `paws`, bare-chest leather `harness` and selectable interior line tone (`line: "dark" | "ink"`); modular fantasy heads (`human`, `wolf`, `werewolf`, `rabbit`, `bull`, `reptile`, `frog`, `skull` with optional `face: "skullglow"`, `automaton` with glowing visor optics), `ears` (`pointed`, `cat`, `rabbit`, `goblin`), `horns` (`curved`, `ram`, `bull`, `antlers`, combinable with `rabbit` for jackalopes and `bull` for minotaurs), `tail` (`wolf`, `cat`, `rabbit`, `reptile`, `bull`, `devil`), `mane` (`wolf`, `bull`), back `wings`/`batwings` and fantasy skin tones (`crimson`, `rose`, `violet`, `azure`, `dusk`, `ashen`, `olive`, `emerald`); a bare mannequin and each garment worn over it as a layer of its own, the pieces
 mixing by rule (a slot, a layer, what each needs and excludes, its own colors), a spec that doesn't fit refused with
-the reason; headwear, caps, a hood, a straw hat, helmets to a great helm, each saying by rule what of the hair it
-covers and what it does to the face, the wolf's head wearing those that fit it; what a hand holds and the hip and
+the reason; headwear, caps, a hood, a straw hat, helmets to a tapered great helm, each saying by rule what of the hair it
+covers and what it does to the face, non-human heads wearing those that fit them; what a hand holds and the hip and
 the back carry, a sword and its scabbard, a short blade, an axe, a mace, a spear, two staffs, a bow and a quiver, two
 shields, a pack, a pouch, a lantern, each a part of the figure on the skeleton's pose, in front of the body or behind it
-by its depth, sized by its bearer's body; the face a slot of its own, painted by hand per view (the approved one, young,
-stern, old, scarred, freckled, each with a woman's cut; eye colors; the wolf's own, scarred, grown old), twenty hairs
+by its depth, sized by its bearer's body, with emission maps on gems, lantern flames, visors, arcane casts and guard sparks; the face a slot of its own, painted by hand per view (the approved one, young,
+stern, old, scarred, freckled, each with a woman's cut; eye colors; the wolf's own, scarred, grown old; reptile, frog, skull and automaton faces; dynamic combat expressions `grit`, `wince`, `dead`), twenty hairs
 and eight beards that go with any face and say what a hat does to them; armor worn in layers, a gambeson, mail, a
 leather jerkin plain or studded, a breastplate, faulds, pauldrons, vambraces or bracers, gauntlets or gloves, greaves
 and sabatons, a tabard over it all (the mail, the studded jerkin, the breastplate and the pauldrons each with an
 alternative drawn another way: mail2, studded2, breastplate2, pauldrons2), and the classes' cloth, a mage's robe, a monk's habit, a cleric's vestments, a sash,
-a fur mantle, sets of them as ten generic class outfits whose pieces mix; drafts), the top-down hero and the people made from him (`hero.character()`: two villagers,
+a fur mantle, sets of them as ten generic class outfits whose pieces mix; full combat & status moves (`ready`, `slash`, `thrust`, `shoot`, `conjure`, `cast`, `block`, `dodge`, `hurt`, `weak`, `downed`, `dead`) with universal frame sockets (`head_top`, `center`, `main`, `off` plus combat anchors `tip`, `hit`, `shield`, `cast`); drafts), the top-down hero and the people made from him (`hero.character()`: two villagers,
 Reva's chibi in her vest and in her fighter's clothes, `reva_fight_*`), the villager and the elder at 48 px on the slim body (`villagers32.px.js`, by `hero32.character()`), the same hero at 48 px for top-down 32 on the genre's slim body (`hero32.px.js`, `topdown32`: idle,
 walk, run and the sword attack with its crescent) and on its chibi body (`chibi_*`, to approve), the same hero side on for a platformer (`hero_side.px.js`,
 `platformer16`: idle, walk, run and sprint (a run that speeds up), a dash with its afterimage and dust, a jump in four to loop the rise and the fall (jump, apex,
