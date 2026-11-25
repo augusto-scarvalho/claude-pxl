@@ -8,7 +8,7 @@ declare global {
   type PxRegion = undefined | null | number[] | ((x: number, y: number) => boolean);
   interface PxOp { readonly __op: true }
   interface PxLayer { readonly __layer: true }
-  type PxItem = string | PxOp | PxLayer | ((c: PxCanvas) => void);
+  type PxItem = string | PxOp | PxLayer | ((c: PxCanvas, frame: number) => void);
 
   /** A lane(): (x, y) => [s along it, u to its right]; total its length; point(s, u) where that is. */
   type PxLane = ((x: number, y: number) => [number, number]) & { total: number; point(s: number, u?: number): [number, number] };
@@ -969,6 +969,10 @@ declare global {
   function rig3d(name: string, opts: { body?: PxBody; moves: Record<string, { frames: number; /** each frame's (100), or a list, a number a frame */ ms?: number | number[]; pose: (i: number, heading: number) => PxPose; dirs?: string[]; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }>;
     n?: number; headings?: (string | number)[]; pitch?: number; w?: number; h?: number; pivot?: [number, number]; parts?: (j: PxJoints, pose: PxPose) => Record<string, PxPiece | PxSdf | { decal: object } | { scatter: object } | (PxPiece | PxSdf | { decal: object } | { scatter: object })[]>;
     mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; /** with ink: "dark", the line on the part behind its darkest tone, the ink only all round */ inner?: boolean | PxColor | "dark"; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; /** a views() set stamped on the head, or (pose, j) => one: its set by the pose */ head?: string | ((pose: PxPose, j: PxJoints) => string); /** the parts kept over the head where they are nearer than it, a line of the ink on the head beside them */ over?: string[]; /** the line under the head; a head modeled: [key, the skin's ramp], under the jaw only */ chin?: PxColor | [PxColor, string]; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void; /** the genre() its painted moves are made for */ genre?: string; /** what they are by its ink (character) */ category?: string; /** each heading's feet moved along the view's depth so the soles end on the row they do facing us */ soles?: boolean }): PxRig3d;
+  namespace rig3d {
+    /** Solve a rig3d skeleton pose directly without registering assets: returns joints (pelvis, chest, head, legs, arms) plus limb/ball/sweep helpers. */
+    function joints(body?: PxBody, pose?: PxPose, heading?: number): PxJoints;
+  }
   /**
    * Hand-drawn views of a thing (a head), named by the compass ({ s, sw, w, nw, n }: grids, rows, or items):
    * a sprite each, pivoted on its `anchor` pixel ([col, row], per view or one for all; "center", "bottom"),

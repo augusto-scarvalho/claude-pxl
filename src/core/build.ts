@@ -134,6 +134,8 @@ export function animTimeline(def: AssetDef): Timeline {
   walk(def.items);
   lists = lists.filter((l) => l.length);
   const n = lists.length ? Math.max(...lists.map((l) => l.length)) : Math.max(1, Math.floor(def.opts.frames ?? each?.length ?? 1));
+  if (!lists.length && each && def.opts.frames !== undefined && Math.floor(def.opts.frames) !== each.length)
+    throw new PxError(`frames (${Math.floor(def.opts.frames)}) and ms (${each.length} entries) disagree: give one duration per frame or omit frames`, def.loc);
   const durations: number[] = [];
   for (let i = 0; i < n; i++) {
     // The first list that has frame i sets its duration.
@@ -535,7 +537,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   }
   // palettize "rest": what the items left off the palette (the colors no rampmap took) to the nearest key
   if (opts.palettize === "rest") { base = base.remap(pal.snapMap(base.data)); snap?.("palettize rest", def.loc); }
-  const img = finish(base, def, pal, trace, loose, tags);
+  const img = finish(base, def, pal, trace, loose, tags, ctx.warn ? (msg) => ctx.warn!(msg, def.loc) : undefined);
   // the whole world: the camera's box on it, a magenta line round what it shows this frame
   if (whole && cam) for (let i = 0; i < opts.w!; i++) for (let j = 0; j < opts.h!; j++) if (!i || !j || i === opts.w! - 1 || j === opts.h! - 1) img.set(cam[0] + i, cam[1] + j, pack(255, 0, 255));
   trace?.finish(img);
@@ -642,7 +644,7 @@ function runItems(
       }
     } else if (typeof item === "function") {
       c.loc = undefined;
-      try { if (ctx.runArt) ctx.runArt(() => item(c)); else item(c); } catch (e) { throw wrap(e, (st) => ctx.locFromStack(st)).within("function", ownerLoc); }
+      try { if (ctx.runArt) ctx.runArt(() => (item as (c: Canvas, frame: number) => void)(c, c.frame)); else (item as (c: Canvas, frame: number) => void)(c, c.frame); } catch (e) { throw wrap(e, (st) => ctx.locFromStack(st)).within("function", ownerLoc); }
     } else if (isLayer(item)) {
       if (!onLayer) throw new PxError(`layer '${item.name}' can't be nested inside another layer`, item.loc);
       onLayer(item);
@@ -676,7 +678,7 @@ function inferSize(items: Item[]): { w: number; h: number } {
 
 /** facing -> the front's direction in picture space (x right, y down, z into the picture). */
 
-function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Uint8Array, tags: LayerOpts[] = []): Img {
+function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Uint8Array, tags: LayerOpts[] = [], warn?: (msg: string) => void): Img {
   const o = def.opts;
   // the layers with a line of their own: their pixels, each its tag (an opaque color), as a mask moved along with the
   // art until the line is drawn
@@ -721,12 +723,18 @@ function finish(img: Img, def: AssetDef, pal: Palette, trace?: Trace, loose?: Ui
   if (o.swap) {
     const sw = o.swap;
     step(`swap ${fmtArgs([sw])}`, () => {
-      const m = new Map<Color, Color>();
+      const m = new Map<Color, Color>(), by = new Map<Color, string>();
       for (const k of Object.keys(sw)) {
         let a;
         try { a = (def.swapPal ?? pal).resolve(k); } catch (e) { throw def.swapPal ? wrap(e).within(`swap on '${def.opts.base}' (its keys read in the palette of the file that defines it)`) : e; }
         const b = pal.resolve(sw[k]);
-        if (a !== null && b !== null) m.set(a, b);
+        if (a !== null && b !== null) {
+          const prev = by.get(a);
+          if (prev !== undefined && m.get(a) !== b)
+            warn?.(`swap: keys '${prev}' and '${k}' share the same color ${toHex(a)} and swap to different colors (${toHex(m.get(a)!)} vs ${toHex(b)}); swap maps by color, so '${k}' overwrites '${prev}' — give each swappable role distinct default hex values`);
+          m.set(a, b);
+          by.set(a, k);
+        }
       }
       return img.remap(m);
     });

@@ -240,9 +240,11 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         if (glows(b.img)) writeMap(def.kind, n, dir, "_e", () => emitImage(b.img), def.loc);
       }
       if (frames.length) {
-        write(join(out, dir, n + ".gif"), (own = encodeGif(frames, { onPalette: (pl) => { ownPal = pl; } })));
+        let gifUnique = frames.length;
+        write(join(out, dir, n + ".gif"), (own = encodeGif(frames, { onPalette: (pl) => { ownPal = pl; }, onInfo: (i) => { gifUnique = i.unique; } })));
         const play = p.direction(n);
         info = play === "forward" ? ` (${frames.length} frames, ${b.anim!.loop}ms)` : ` (${p.drawn(n).length} frames ${play}, ${b.anim!.loop}ms)`;
+        if (def.kind === "anim" && frames.length > 1 && gifUnique === 1) info += ` -- static: all ${frames.length} frames identical`;
       }
       if (opts.share) {
         // to post: the art itself enlarged by a whole number, nearest neighbour, nothing drawn over it; a PNG past the

@@ -1228,3 +1228,115 @@ sprite("box_b", "kkkk\\nkgrk\\nkggk\\nkkkk")`);
     assert.doesNotMatch(src, /import\s+["']\.\/[^"']+\.ts["']/, "dist/node/load.js has no bare .ts side-effect imports");
   }
 });
+
+test("cli shot 3D models (.glb and .obj): orthographic turnaround, proportions, flags", async () => {
+  const { dir, file } = tmpArt(`pal({ k: "#141016", b: "#8a5a36", B: "#c88a50", g: "#3c8c38", G: "#74cc54" })
+ramps("kbB", "kgG")
+const shape = sdf.box([0.8, 1.4, 1.0]).at(0, 0, 0.5).mat("wood").union(sdf.cone(0.35, 0.5).at(0, -0.4, 1.0).mat("leaf"))
+export3d("crate", sdf.mesh(shape, { size: 0.2 }), { mats: { wood: "kbB", leaf: "kgG" }, as: ["glb", "obj"] })`);
+  const run = async (argv: string[]) => {
+    const lines: string[] = [], log = console.log;
+    console.log = (s: string) => lines.push(String(s));
+    try { const code = await main(argv); return { code, out: lines.join("\n") }; } finally { console.log = log; }
+  };
+  const outDir = join(dir, "out");
+  assert.equal((await run(["build", file, "--no-preview", "--out", outDir])).code, 0);
+  const glbPath = join(outDir, "crate.glb");
+  const objPath = join(outDir, "crate.obj");
+  assert.ok(existsSync(glbPath) && existsSync(objPath));
+
+  // Default 5-dir GLB turnaround with direct --out file.png
+  const turnPng = join(dir, "turn.png");
+  const g = await run(["shot", glbPath, "--out", turnPng]);
+  assert.equal(g.code, 0);
+  assert.match(g.out, /3D turnaround: S, SW, W, NW, N; pitch 20 deg, 160px; 1x/);
+  assert.match(g.out, /crate\.glb: \d+ vertices, \d+ triangles, 2 materials/);
+  assert.match(g.out, /bounds \(W x D x H\): .* \(ratios: W\/H=.*, D\/H=.*, D\/W=.*\)/);
+  const gImg = decodePng(readFileSync(turnPng));
+  assert.equal(gImg.w, 160 * 5 + 2 * 4);
+  assert.equal(gImg.h, 160 + 7);
+  // Every one of the 5 view cells has shaded non-background pixels
+  for (let v = 0; v < 5; v++) {
+    let shaded = 0;
+    const x0 = v * 162;
+    for (let y = 0; y < 160; y++) for (let x = x0; x < x0 + 160; x++) if (gImg.get(x, y) !== 0x8c8c96ff) shaded++;
+    assert.ok(shaded > 500, `view ${v} has ${shaded} shaded pixels`);
+  }
+
+  // Custom 4-dir OBJ turnaround with --pitch, --size, --grey
+  const objPng = join(dir, "obj_turn.png");
+  const o = await run(["shot", objPath, "--dirs", "4", "--pitch", "30", "--size", "64", "--grey", "--out", objPng]);
+  assert.equal(o.code, 0);
+  assert.match(o.out, /3D turnaround: S, W, N, E; pitch 30 deg, 64px; below: values; 1x/);
+  const oImg = decodePng(readFileSync(objPng));
+  assert.equal(oImg.w, 64 * 4 + 2 * 3);
+  assert.equal(oImg.h, (64 + 7) * 2 + 2);
+});
+
+test("cli shot --sockets and static-GIF warning in build & shot --gif", async () => {
+  const { dir, file } = tmpArt(`pal({ k: "#141016", r: "#c83838", g: "#3c8c38", b: "#3868c8" })
+sprite("mount", { w: 12, h: 12, sockets: { seat: [6, 5], bridle: [3, 4] } }, rect(2, 2, 8, 8, "r"))
+anim("frozen", { w: 8, h: 8, frames: 4, fps: 8 }, (c) => {
+  c.rect(1, 1, 6, 6, "g")
+  c.setSocket("hand", 4, 4)
+  c.setSocket("far", 20, 2)
+})
+anim("moving", { w: 8, h: 8, frames: 3, fps: 8 }, (c, fi) => {
+  c.rect(1, 1, 6, 6, "b")
+  c.px(2 + fi, 3, "r")
+  c.setSocket("tip", 2 + fi, 3)
+})`);
+  const run = async (argv: string[]) => {
+    const lines: string[] = [], log = console.log;
+    console.log = (s: string) => lines.push(String(s));
+    try { const code = await main(argv); return { code, out: lines.join("\n") }; } finally { console.log = log; }
+  };
+
+  // --sockets on a still sprite draws centered white pixel + colored cross arms
+  const sPng = join(dir, "sock.png");
+  const s1 = await run(["shot", file, "mount", "--sockets", "--scale", "1", "--out", sPng]);
+  assert.equal(s1.code, 0);
+  assert.match(s1.out, /sockets: seat cyan \[6,5\], bridle magenta \[3,4\]/);
+  const sImg = decodePng(readFileSync(sPng));
+  assert.equal(sImg.get(6, 5), 0xffffffff, "socket exact center is white");
+  assert.equal(sImg.get(7, 5), 0x20e8ffff, "seat cross arm is cyan");
+  assert.equal(sImg.get(3, 3), 0xff40ffff, "bridle cross arm is magenta");
+
+  // --sockets on an anim reports out-of-frame sockets and --gif warns on static anims
+  const staticGif = join(dir, "frozen.gif");
+  const gStatic = await run(["shot", file, "frozen", "--gif", "--sockets", "--scale", "1", "--out", staticGif]);
+  assert.equal(gStatic.code, 0);
+  assert.match(gStatic.out, /warning: all 4 frames are identical \(static GIF\)/);
+  assert.match(gStatic.out, /sockets: hand cyan \[4,4\], far magenta \[20,2\]; outside the frame: far \[20, 2\]/);
+
+  // Moving anim emits no static GIF warning; moving socket omits fixed [x,y] since it changes per frame
+  const moveGif = join(dir, "moving.gif");
+  const gMove = await run(["shot", file, "moving", "--gif", "--sockets", "--scale", "1", "--out", moveGif]);
+  assert.equal(gMove.code, 0);
+  assert.doesNotMatch(gMove.out, /static GIF/);
+  assert.match(gMove.out, /sockets: tip cyan$/m);
+
+  // pxl build reports static multi-frame anim in its output line
+  const b = await run(["build", file, "--list", "--no-preview", "--out", join(dir, "out")]);
+  assert.equal(b.code, 0);
+  assert.match(b.out, /anim frozen .* -- static: all 4 frames identical/);
+  assert.doesNotMatch(b.out, /anim moving .* -- static:/);
+});
+
+test("profile: anonymous compiled SDF Function samples are attributed to src/core/sdf.ts (generated)", async () => {
+  const { profileReport } = await import("../src/node/profile.ts");
+  const fakeProfile = {
+    nodes: [
+      { id: 1, callFrame: { functionName: "(root)", url: "", lineNumber: -1 } },
+      { id: 2, callFrame: { functionName: "anonymous", url: "", lineNumber: 42 } },
+      { id: 3, callFrame: { functionName: "", url: "", lineNumber: 7 } },
+      { id: 4, callFrame: { functionName: "readFileUtf8", url: "", lineNumber: -1 } },
+      { id: 5, callFrame: { functionName: "(idle)", url: "", lineNumber: -1 } },
+    ],
+    samples: [2, 2, 3, 4, 5],
+    timeDeltas: [20000, 20000, 20000, 25000, 10000],
+  };
+  const report = profileReport(fakeProfile as never, [], []);
+  assert.match(report, /60 ms.*\(compiled sdf\).*src\/core\/sdf\.ts \(generated\)/);
+  assert.doesNotMatch(report, /readFileUtf8/);
+});

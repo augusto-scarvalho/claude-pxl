@@ -3,11 +3,11 @@ import { TRANSPARENT, pack } from "../core/color.ts";
 import { Img } from "../core/image.ts";
 
 function chunk(type: string, data: Buffer): Buffer {
-  const head = Buffer.alloc(8);
+  const head = Buffer.allocUnsafe(8);
   head.writeUInt32BE(data.length, 0);
   head.write(type, 4, "ascii");
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(Buffer.concat([head.subarray(4), data])) >>> 0, 0);
+  const crc = Buffer.allocUnsafe(4);
+  crc.writeUInt32BE(crc32(data, crc32(head.subarray(4))) >>> 0, 0);
   return Buffer.concat([head, data, crc]);
 }
 
@@ -21,14 +21,27 @@ export function encodePng(img: Img): Buffer {
   const indexed = index.size <= 256;
 
   const rowLen = indexed ? w + 1 : w * 4 + 1;
-  const raw = Buffer.alloc(rowLen * h);
-  let last = -1, at = 0, l2 = -1, a2 = 0;
-  for (let y = 0; y < h; y++) {
-    let o = y * rowLen + 1; // filter byte 0
-    for (let x = 0; x < w; x++) {
-      const c = data[y * w + x];
-      if (indexed) { if (c !== last) { const i = c === l2 ? a2 : index.get(c)!; l2 = last; a2 = at; last = c; at = i; } raw[o++] = at; }
-      else { raw[o++] = c >>> 24; raw[o++] = (c >>> 16) & 255; raw[o++] = (c >>> 8) & 255; raw[o++] = c & 255; }
+  const raw = Buffer.allocUnsafe(rowLen * h);
+  if (indexed) {
+    let last = -1, at = 0, l2 = -1, a2 = 0, src = 0;
+    for (let y = 0; y < h; y++) {
+      let o = y * rowLen;
+      raw[o++] = 0; // filter byte 0
+      for (let x = 0; x < w; x++) {
+        const c = data[src++];
+        if (c !== last) { const i = c === l2 ? a2 : index.get(c)!; l2 = last; a2 = at; last = c; at = i; }
+        raw[o++] = at;
+      }
+    }
+  } else {
+    let src = 0;
+    for (let y = 0; y < h; y++) {
+      let o = y * rowLen;
+      raw[o++] = 0; // filter byte 0
+      for (let x = 0; x < w; x++) {
+        const c = data[src++];
+        raw[o++] = c >>> 24; raw[o++] = (c >>> 16) & 255; raw[o++] = (c >>> 8) & 255; raw[o++] = c & 255;
+      }
     }
   }
 

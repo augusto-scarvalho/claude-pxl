@@ -112,9 +112,9 @@ export const SIGNATURES: Record<string, string> = {
   post: "?opts:o",
 };
 
-/** A function among these items whose code reads its canvas's frame or phase (c.frame, c.phase). */
+/** A function among these items whose code reads its canvas's frame or phase (c.frame, c.phase) or takes a second frame-index argument `(c, fi)`. */
 function readsClock(items: Item[]): boolean {
-  return items.some((v) => (typeof v === "function" && /\b[a-zA-Z_$][\w$]*\.(frame|phase)\b/.test(String(v))) || (isLayer(v) && readsClock(v.items)));
+  return items.some((v) => (typeof v === "function" && (v.length >= 2 || /\b[a-zA-Z_$][\w$]*\.(frame|phase)\b/.test(String(v)))) || (isLayer(v) && readsClock(v.items)));
 }
 
 /** Options every placement takes (stamp, tile, pattern, panel, scatter, tilemap, wire hangs). */
@@ -1186,7 +1186,7 @@ export class Project implements BuildCtx {
     };
     // rig3d(name, { body, moves, n, parts, head, blocks, ... }): a figure on the 3D layer, its moves in
     // every direction asked, drawn by surface(); its flat blocks to judge a move (rig3d.ts)
-    env.rig3d = (given: unknown, opts: unknown) => {
+    const rig3dFn = (given: unknown, opts: unknown) => {
       const [loc, top] = this.callerLocs();
       try {
         if (typeof given !== "string" || !given || !isPlainObject(opts)) throw new PxError('rig3d("tr", { body: { h: 34, heads: 3 }, moves: { walk: { frames: 8, ms: 110, pose: (i, heading) => ({ feet, lift, hands }) } }, n: 8, blocks: true })');
@@ -1420,6 +1420,16 @@ export class Project implements BuildCtx {
         return { names, headings: H.map((hd) => hd.name), joints, screen, depth, get w() { return size().w; }, get h() { return size().h; }, get pivot() { return size().pivot; }, body: B };
       } catch (e) { throw wrap(e).within("rig3d", loc); }
     };
+    env.rig3d = Object.assign(rig3dFn, {
+      joints: (body: unknown, pose: unknown = {}, heading: unknown = 180) => {
+        try {
+          if (body !== undefined && !isPlainObject(body)) throw new PxError("rig3d.joints(body, pose, heading): body is a rig3d body object");
+          if (!isPlainObject(pose)) throw new PxError("rig3d.joints(body, pose, heading): pose is a pose object");
+          if (typeof heading !== "number" || !Number.isFinite(heading)) throw new PxError(`rig3d.joints(body, pose, heading): heading is compass degrees, got ${JSON.stringify(heading)}`);
+          return jointsOf(bodyOf((body ?? {}) as Record<string, unknown>), pose as Pose, heading);
+        } catch (e) { throw wrap(e).within("rig3d.joints", this.callerLoc()); }
+      },
+    });
     // gait(t, { heading | view, stride, lift, bob, hands, front: {...}, ... }): a walk's numbers by the view (rig3d.ts)
     env.gait = (t: unknown, o: unknown = {}) => {
       try { if (!isPlainObject(o)) throw new PxError("gait(t, { heading, stride, lift, bob, hands })"); return gait(t as number, o); } catch (e) { throw wrap(e).within("gait", this.callerLoc()); }
@@ -1468,7 +1478,18 @@ export class Project implements BuildCtx {
         throw new PxError(`sheet '${name}': slots is { name: swap }, each a swap of keys to colors ({ jade: { R: "#30544b" } } or roleSwap(...)), got ${JSON.stringify(sl)}`, loc);
       let slots: [string, Map<Color, Color>][] | undefined;
       const col = (c: unknown) => { const v = this.pal.resolve(c); if (v === null) throw new PxError("'.' is no color"); return v; };
-      try { slots = sl && Object.entries(sl).map(([n, sw]) => [n, new Map(Object.entries(sw as Record<string, unknown>).map(([k, c]) => [col(k), col(c)]))]); } catch (e) { throw this.keyHint(wrap(e).within(`sheet '${name}' slots`, loc)); }
+      try {
+        slots = sl && Object.entries(sl).map(([n, sw]) => {
+          const m = new Map<Color, Color>(), by = new Map<Color, string>();
+          for (const [k, c] of Object.entries(sw as Record<string, unknown>)) {
+            const a = col(k), b = col(c), prev = by.get(a);
+            if (prev !== undefined && m.get(a) !== b)
+              this.warn(`sheet '${name}' slot '${n}': keys '${prev}' and '${k}' share the same color ${toHex(a)} and swap to different colors (${toHex(m.get(a)!)} vs ${toHex(b)}); swap maps by color, so '${k}' overwrites '${prev}'`, loc);
+            m.set(a, b); by.set(a, k);
+          }
+          return [n, m] as [string, Map<Color, Color>];
+        });
+      } catch (e) { throw this.keyHint(wrap(e).within(`sheet '${name}' slots`, loc)); }
       this.sheets.push({ name: this.qualify(name), entries, opts, loc, ...(slots ? { slots } : {}), ...(this.ns ? { ns: this.ns } : {}) });
     };
     env.include = (path: unknown, opts: { palette?: boolean | "mine"; as?: string } = {}) => {

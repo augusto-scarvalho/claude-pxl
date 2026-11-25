@@ -1,4 +1,4 @@
-import { type Color, LIN, TRANSPARENT, oklab } from "./color.ts";
+import { type Color, LIN, TRANSPARENT, oklab, toHex } from "./color.ts";
 import { Img } from "./image.ts";
 import type { Palette, Resolved } from "./palette.ts";
 import { PxError } from "./errors.ts";
@@ -1433,10 +1433,16 @@ export class Canvas {
    */
   swapMap(swap: Record<string, string>, own?: Palette): Map<Color, Color> {
     const read = (k: string, a: Palette, b?: Palette) => (b && !a.keys.has(k) && b.keys.has(k) ? b : a).resolve(k);
-    const m = new Map<Color, Color>();
+    const m = new Map<Color, Color>(), by = new Map<Color, string>();
     for (const from of Object.keys(swap)) {
       const a = own ? read(from, own, this.pal) : this.color(from), b = own ? read(swap[from], this.pal, own) : this.color(swap[from]);
-      if (a !== null && b !== null) m.set(a, b);
+      if (a !== null && b !== null) {
+        const prev = by.get(a);
+        if (prev !== undefined && m.get(a) !== b)
+          this.res.warn?.(`swap: keys '${prev}' and '${from}' share the same color ${toHex(a)} and swap to different colors (${toHex(m.get(a)!)} vs ${toHex(b)}); swap maps by color, so '${from}' overwrites '${prev}' — give each swappable role distinct default hex values`, this.loc ?? this.owner?.loc);
+        m.set(a, b);
+        by.set(a, from);
+      }
     }
     return m;
   }

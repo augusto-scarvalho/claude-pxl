@@ -57,7 +57,13 @@ export function profileReport(profile: CpuProfile, art: string[], times: [string
     total += ms;
     if (!n) return;
     const { functionName, url, lineNumber } = n.callFrame;
-    if (!url) return;                                           // (program), (garbage collector), (idle)
+    if (!url && (functionName === "" || functionName === "anonymous")) {
+      const key = "sdf-compiled", e = self.get(key) ?? { ms: 0, name: "(compiled sdf)", where: "src/core/sdf.ts (generated)", art: false };
+      e.ms += ms;
+      self.set(key, e);
+      return;
+    }
+    if (!url) return;
     const file = url.startsWith("file:") ? fileURLToPath(url) : url, isArt = art.some((a) => file === a);
     const where = isArt ? `${basename(file)}:${lineNumber + 1}` : relative(process.cwd(), file).split(sep).join("/") + `:${lineNumber + 1}`;
     const key = where + " " + functionName, e = self.get(key) ?? { ms: 0, name: functionName || "(anonymous)", where, art: isArt };

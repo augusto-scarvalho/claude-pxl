@@ -18,6 +18,8 @@ a user sees and sets is in [the reference](../reference.md#kept-builds-threads-a
 - [The live viewer and the normals](#the-live-viewer-and-the-normals)
 - [Writing the files](#writing-the-files)
 - [What a build holds](#what-a-build-holds)
+- [HD-2D 3D scenes: glow, mesh, sunlight, and scaled GIFs (2026-11)](#hd-2d-3d-scenes-glow-mesh-sunlight-and-scaled-gifs-2026-11)
+- [Mounts iteration: GIF/LZW sub-blocks, PNG encoding, and profiler SDF attribution (2026-11)](#mounts-iteration-giflzw-sub-blocks-png-encoding-and-profiler-sdf-attribution-2026-11)
 
 ## The machines and the files
 
@@ -539,4 +541,45 @@ completely out of the top 10. What changed (byte-identical GIFs and visually ver
 - **Making `make3d.rock` overrides pure** (`src/core/sdf.ts`): `field.mat(name, { override: true })` suppresses inner
   `.paint()` callbacks (such as `make3d.rock`'s `fbm3` moss callback when `moss: 0`), letting re-skinned rock outcrops
   be fully pure and eliminating 215 ms of per-build repainting across 250 rock traces.
+
+## Mounts iteration: GIF/LZW sub-blocks, PNG encoding, and profiler SDF attribution (2026-11)
+
+Measured while building and refining the HD-2D mounts & mounted riders library ([mounts.px.js](../lib/characters/mounts.px.js),
+[mounts-improvements.md](mounts-improvements.md)). Every timing below is the median of **5 alternating rounds** against
+`HEAD` (flipping order each round on the Windows laptop, Node 24) with **100% byte-identical output**:
+
+| benchmark (5 rounds alternating vs `HEAD`) | `HEAD` median (min..max) | after median (min..max) | speedup |
+| --- | ---: | ---: | ---: |
+| GIF transparent sprite `24×192×192` (`encodeGif`) | 20.7 ms (19.7..24.2) | 17.0 ms (16.2..18.4) | **1.22× (−18.1%)** |
+| GIF noisy LZW-heavy `8×320×180` (`encodeGif`) | 306.0 ms (296.4..313.1) | 281.0 ms (277.4..321.0) | **1.09× (−8.2%)** |
+| GIF opaque `24×256×256` (`encodeGif`) | 95.6 ms (92.7..113.5) | 89.7 ms (83.5..90.8) | **1.07× (−6.1%)** |
+| PNG RGBA `512×512` (`encodePng`) | 27.0 ms (26.2..28.6) | 25.5 ms (25.0..25.8) | **1.06× (−5.7%)** |
+| PNG indexed `1024×512` (`encodePng`) | 10.4 ms (10.1..10.6) | 10.3 ms (9.8..10.8) | 1.01× (deflate-bound) |
+
+What changed:
+
+- **Direct LZW sub-block emission & zero-copy frame path** (`src/node/gif.ts`): replaced `lzw()` (which pushed encoded
+  bytes into a boxed `number[]` via a nested closure and then re-sliced it into 255-byte sub-blocks in a second `number[]`)
+  with `lzwSubBlocks()`, which inlines the bit-packer and emits 255-byte GIF sub-blocks straight into a pre-sized reusable
+  `Uint8Array`, assembling the file once via `Buffer.concat(chunks)`. When `S === 1 && (transparent || !prev)`, passes
+  `part = idx` directly with zero pixel copy.
+- **Two-step PNG CRC32 & split scanline loops** (`src/node/png.ts`): `chunk()` computes `crc32(data, crc32(head.subarray(4)))`
+  instead of `Buffer.concat([head.subarray(4), data])` (eliminating a full copy of every compressed `IDAT` payload), uses
+  `Buffer.allocUnsafe` for overwritten scanlines, and splits indexed vs RGBA row loops.
+- **Zero-cost compiled SDF attribution** (`src/node/profile.ts`): `profileReport()` maps V8 profiler frames with
+  `!url && (functionName === "" || functionName === "anonymous")` to `(compiled sdf) src/core/sdf.ts (generated)` without
+  touching `src/core/sdf.ts`.
+
+Tried and dropped (measured on alternating runs):
+
+- **`ByteBuf` writer class in `gif.ts`:** `0.94×` slower on opaque `24×256×256` GIFs from temporary `[...]` arrays passed
+  to `out.bytes(...)` and per-code capacity checks; replaced by `lzwSubBlocks()` + `Buffer.concat(chunks)`.
+- **`//# sourceURL=` and named `function _pxlSdf` in `src/core/sdf.ts`:** appending `//# sourceURL=` to `new Function()`
+  regressed SDF-heavy builds by **20–25% (`0.79×–0.80×`)** because V8 leaves its anonymous-script fast path; naming the
+  returned function also added overhead. `src/core/sdf.ts` stays unchanged.
+- **Zero-allocation `slabHit`/`rayInto`/scalar cluster loops in `src/core/surface.ts`:** pixel-identical (`188/188` frames
+  checked), but only `1.025×` on `examples/sdf/fields.px.js` (722.0 ms [626.1..851.6] → 704.5 ms [587.5..751.0], 5 rounds)
+  and `1.030×` on 12 heavy mount frames (1249.5 → 1213.5 ms, 3 rounds) — inside laptop thermal noise because ~90% of
+  `surface()` time is spent in compiled SDF distance and art sweep closures. Reverted to keep `surface.ts` clean.
+
 

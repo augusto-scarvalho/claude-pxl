@@ -1943,3 +1943,30 @@ Left from phase 7 (evaluation):
   graveyard, the harbor). Decided against (round 6, R3, the user's choice): lit by those normals the
   line on the sun's side turns pale and the figure loses its edge against the ground; flat, the ink
   keeps its contrast.
+
+## Mounts iteration improvements (2026-11)
+
+See [docs/mounts-improvements.md](docs/mounts-improvements.md) and [docs/perf-notes.md](docs/perf-notes.md#mounts-iteration-giflzw-sub-blocks-png-encoding-and-profiler-sdf-attribution-2026-11).
+
+- [x] **3D reference model turnarounds (`pxl shot <model.glb | model.obj>`)**: native `.glb` (glTF 2.0) and
+  `.obj`/`.mtl` loader converting Y-up to pxl Z-up `(x, -z, y)`, embedded PNG/JPEG/WebP textures, orthographic
+  5/8/4/1-direction turnarounds matching `pxl`'s `orthoBasis` pitch/headings (`--pitch`, `--dirs`, `--size`,
+  `--grey`, `--scale`, `--out`), and `W × D × H` proportion ratios.
+- [x] **Socket crosshair overlay (`pxl shot --sockets`)**: 5×5 contrast-halo crosshairs, color legend, and
+  out-of-frame socket warnings across stills, multi-row shots, groups/globs, `--vs`, and `--gif`.
+- [x] **Animation `(c, fi)` callback, `frames`/`ms` validation, and static-GIF warnings**: `runItems` passes
+  `(c, c.frame)`, `animTimeline` throws when explicit `frames` and `ms` array lengths disagree, and both
+  `pxl build` and `pxl shot --gif` warn when every frame of a multi-frame animation is identical.
+- [x] **Duplicate-hex `swap` / `slots` collision warnings**: warns when two keys in the same `swap` or sheet
+  `slots` share an RGBA color and map to different targets (caught a real barding/armor collision in
+  `lib/characters/mounts.px.js`).
+- [x] **Standalone `rig3d.joints(body, pose, heading)`**: queries world-space 3D rig joints without registering
+  assets.
+- [x] **Profiler compiled-SDF attribution**: `pxl build --profile` attributes anonymous `new Function` SDF
+  samples to `(compiled sdf) src/core/sdf.ts (generated)` at zero runtime overhead (no `//# sourceURL=` penalty).
+- [x] **Example test snapshot ergonomics & `font5x7` glyphs**: `PXL_UPDATE=1` exits 0 with a summary of changed
+  files, normal mismatches list exact filenames + update command, and `lib/ui/font5x7.px.js` adds `;` and `_`.
+- [x] **Encoder optimizations (`gif.ts`, `png.ts`) & `SKILL.md` cleanup**: direct `lzwSubBlocks` + zero-copy
+  1× frame path (1.07×–1.22× on 5-round alternating medians, byte-identical), two-step PNG CRC32 (1.06× on
+  512×512 RGBA, byte-identical), and `SKILL.md` trimmed from 13,991 to 12,354 chars while documenting all new
+  tools and APIs.

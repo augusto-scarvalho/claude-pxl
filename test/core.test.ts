@@ -1100,3 +1100,43 @@ scene("s", { w: 44, h: 30, bg: "k" }, cells([["a", "b"], [["b", "1"], "a"]], { a
   assert.ok(w(2, 7, 22, 25) && w(2, 7, 33, 36), "titles 2 px into each column, 8 over the first row");
   assert.ok(w(16, 21, 2, 5), "a row's title at x 2 by its middle");
 });
+
+test("swap: conflicting targets for two keys sharing the same hex warn; identical targets do not", () => {
+  const dupPal = 'pal({ a: "#112233", b: "#112233", r: "#cc3333", g: "#33cc33" })\n';
+  // 1. Asset-level opts.swap conflict warns
+  const p1 = loadSource(dupPal + 'sprite("base", "ab")\nsprite("v", { base: "base", swap: { a: "r", b: "g" } })', "t.px.js");
+  p1.image("v");
+  assert.equal(p1.warnings.length, 1);
+  assert.match(p1.warnings[0].msg, /swap: keys 'a' and 'b' share the same color #112233 and swap to different colors/);
+
+  // 2. Identical targets for duplicate-hex keys produce zero warnings
+  const p2 = loadSource(dupPal + 'sprite("base", "ab")\nsprite("v", { base: "base", swap: { a: "r", b: "r" } })', "t.px.js");
+  p2.image("v");
+  assert.equal(p2.warnings.length, 0);
+
+  // 3. Canvas-level stamp/recolor/layer swap conflict warns
+  const p3 = loadSource(dupPal + 'sprite("base", "ab")\nsprite("s", { w: 2, h: 1 }, stamp("base", 0, 0, { swap: { a: "r", b: "g" } }))', "t.px.js");
+  p3.image("s");
+  assert.equal(p3.warnings.length, 1);
+  assert.match(p3.warnings[0].msg, /swap: keys 'a' and 'b' share the same color #112233/);
+
+  // 4. Sheet slots swap conflict warns
+  const p4 = loadSource(dupPal + 'sprite("base", "ab")\nsheet("sh", ["base"], { slots: { alt: { a: "r", b: "g" } } })', "t.px.js");
+  assert.equal(p4.warnings.length, 1);
+  assert.match(p4.warnings[0].msg, /sheet 'sh' slot 'alt': keys 'a' and 'b' share the same color #112233/);
+});
+
+test("rig3d.joints: standalone skeleton pose helper matches rig.joints()", () => {
+  const p = loadSource(`pal({ k: "#141016", r: "#c83838" })
+const bodySpec = { h: 34, heads: 3 }
+const poseSpec = { lean: 10, feet: [[2, -2], [-2, 2]], hands: [[3, -4, -6], [3, 4, -6]] }
+const r3 = rig3d("r", { body: bodySpec, headings: ["s"], ink: "k", blocks: true, moves: { idle: { frames: 1, pose: () => poseSpec } } })
+const a = r3.joints(poseSpec, 180)
+const b = rig3d.joints(bodySpec, poseSpec, 180)
+const ok = a.pelvis.every((v, i) => Math.abs(v - b.pelvis[i]) < 1e-6)
+  && a.head.every((v, i) => Math.abs(v - b.head[i]) < 1e-6)
+  && a.arms[1].hand.every((v, i) => Math.abs(v - b.arms[1].hand[i]) < 1e-6)
+  && typeof b.limb === "function" && typeof b.ball === "function" && typeof b.sweep === "function"
+sprite("chk", { w: 1, h: 1 }, px(0, 0, ok ? "r" : "k"))`, "t.px.js");
+  assert.equal(keys(p, "chk"), "r");
+});

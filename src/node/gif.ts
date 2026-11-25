@@ -22,6 +22,8 @@ export interface GifOpts {
   palette?: number[];
   /** Called with the chosen RGB palette so callers can reuse it for a derived preview GIF. */
   onPalette?: (pal: number[]) => void;
+  /** Called with total input frames vs unique frames after deduplication (catches accidental static GIFs). */
+  onInfo?: (info: { frames: number; unique: number }) => void;
 }
 
 /**
@@ -32,6 +34,7 @@ export function encodeGif(frames: GifFrame[] | (() => Iterable<GifFrame>), opts:
   const S = Math.max(1, Math.floor(opts.scale ?? 1));
   const each = typeof frames === "function" ? frames : () => frames;
   const copy = each === frames, { w: rw, h: rh, transparent, counts, repeat, ms } = scan(each, copy, false) ?? scan(each, copy, true)!;
+  opts.onInfo?.({ frames: repeat.length, unique: ms.length });
   const w = rw * S, h = rh * S;
   // index 0 is kept for "transparent": a clear pixel in a sprite, or in a scene, "as before"
   const room = 255;
@@ -52,16 +55,15 @@ export function encodeGif(frames: GifFrame[] | (() => Iterable<GifFrame>), opts:
     return i;
   };
 
-  const out: number[] = [];
-  const u16 = (v: number) => out.push(v & 255, (v >> 8) & 255);
-  out.push(...Buffer.from("GIF89a"));
-  u16(w); u16(h);
-  out.push(0x80 | 0x70 | (bits - 1), 0, 0);
+  const gctSize = (1 << bits) * 3;
+  const head = new Uint8Array(13 + gctSize + 19);
+  head.set([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, w & 255, (w >> 8) & 255, h & 255, (h >> 8) & 255, 0x80 | 0x70 | (bits - 1), 0, 0], 0);
   for (let i = 0; i < 1 << bits; i++) {
-    const c = colors[i] ?? 0;
-    out.push((c >> 16) & 255, (c >> 8) & 255, c & 255);
+    const c = colors[i] ?? 0, o = 13 + i * 3;
+    head[o] = (c >> 16) & 255; head[o + 1] = (c >> 8) & 255; head[o + 2] = c & 255;
   }
-  out.push(0x21, 0xff, 11, ...Buffer.from("NETSCAPE2.0"), 3, 1, 0, 0, 0);   // loop forever
+  head.set([0x21, 0xff, 11, 0x4e, 0x45, 0x54, 0x53, 0x43, 0x41, 0x50, 0x45, 0x32, 0x2e, 0x30, 3, 1, 0, 0, 0], 13 + gctSize);
+  const chunks: Uint8Array[] = [head];
 
   const minSize = Math.max(2, bits);
   let prev: Uint8Array | undefined, due = 0, n = 0, k = 0, pw = 0, ph = 0;
@@ -78,13 +80,13 @@ export function encodeGif(frames: GifFrame[] | (() => Iterable<GifFrame>), opts:
     let last = -1, at = 0, l2 = -1, a2 = 0;   // (a pixel the same as one of the two colors before it asks no map)
     for (const [rx, ry, rw0, rh0] of rects ?? [[0, 0, img.w, img.h]])
       for (let y = ry; y < ry + rh0; y++)
-        for (let x = rx; x < rx + rw0; x++) {
-          const c = img.data[y * img.w + x];
+        for (let x = rx, i = y * img.w + rx, o = y * rw + rx, e = rx + rw0; x < e; x++, i++, o++) {
+          const c = img.data[i];
           if (c !== last) {
-            const i = c === l2 ? a2 : isClear(c) ? 0 : indexOf(c >>> 8);
-            l2 = last; a2 = at; last = c; at = i;
+            const iv = c === l2 ? a2 : isClear(c) ? 0 : indexOf(c >>> 8);
+            l2 = last; a2 = at; last = c; at = iv;
           }
-          idx[y * rw + x] = at;
+          idx[o] = at;
         }
     // A sprite with clear pixels: whole frames, the area restored to background between them so they
     // don't pile up. A scene: after the first frame, only the rectangle that changed, what stayed the
@@ -94,50 +96,60 @@ export function encodeGif(frames: GifFrame[] | (() => Iterable<GifFrame>), opts:
       [x0, y0, x1, y1] = [rw, rh, -1, -1];
       for (const [rx, ry, rw0, rh0] of rects ?? [[0, 0, rw, rh]])
         for (let y = ry; y < ry + rh0; y++)
-          for (let x = rx; x < rx + rw0; x++)
-            if (idx[y * rw + x] !== prev[y * rw + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+          for (let x = rx, i = y * rw + rx, e = rx + rw0; x < e; x++, i++)
+            if (idx[i] !== prev[i]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
       if (x1 < 0) [x0, y0, x1, y1] = [0, 0, 0, 0];
     }
     // (in a scene, out of what changed it is the frame before: index 0, as the rectangle starts)
-    const rfw = x1 - x0 + 1, rfh = y1 - y0 + 1, fw = rfw * S, fh = rfh * S, part = new Uint8Array(fw * fh);
-    if (S === 1) {
-      for (const [rx, ry, rw0, rh0] of !transparent && rects ? rects : [[x0, y0, rfw, rfh]])
-        for (let y = Math.max(ry, y0); y < Math.min(ry + rh0, y1 + 1); y++)
-          for (let x = Math.max(rx, x0), e = Math.min(rx + rw0, x1 + 1); x < e; x++) {
-            const i = y * rw + x;
-            part[(y - y0) * fw + x - x0] = !transparent && prev && idx[i] === prev[i] ? 0 : idx[i];
-          }
+    const rfw = x1 - x0 + 1, rfh = y1 - y0 + 1, fw = rfw * S, fh = rfh * S;
+    let part: Uint8Array;
+    if (S === 1 && (transparent || !prev)) {
+      part = idx;
     } else {
-      for (const [rx, ry, rw0, rh0] of !transparent && rects ? rects : [[x0, y0, rfw, rfh]])
-        for (let y = Math.max(ry, y0); y < Math.min(ry + rh0, y1 + 1); y++) {
-          const baseRow = (y - y0) * S * fw;
-          for (let x = Math.max(rx, x0), e = Math.min(rx + rw0, x1 + 1); x < e; x++) {
-            const i = y * rw + x, v = !transparent && prev && idx[i] === prev[i] ? 0 : idx[i];
-            if (!v) continue;
-            const bx = baseRow + (x - x0) * S;
-            for (let sx = 0; sx < S; sx++) part[bx + sx] = v;
+      part = new Uint8Array(fw * fh);
+      if (S === 1) {
+        if (!transparent && rects) {
+          for (const [rx, ry, rw0, rh0] of rects)
+            for (let y = Math.max(ry, y0); y < Math.min(ry + rh0, y1 + 1); y++)
+              for (let x = Math.max(rx, x0), e = Math.min(rx + rw0, x1 + 1); x < e; x++) {
+                const i = y * rw + x;
+                part[(y - y0) * fw + x - x0] = idx[i] === prev![i] ? 0 : idx[i];
+              }
+        } else {
+          for (let y = y0; y <= y1; y++) {
+            const pRow = (y - y0) * fw, sRow = y * rw;
+            for (let x = x0; x <= x1; x++) {
+              const i = sRow + x;
+              part[pRow + x - x0] = idx[i] === prev![i] ? 0 : idx[i];
+            }
           }
-          for (let sy = 1; sy < S; sy++) part.copyWithin(baseRow + sy * fw, baseRow, baseRow + fw);
         }
+      } else {
+        for (const [rx, ry, rw0, rh0] of !transparent && rects ? rects : [[x0, y0, rfw, rfh]])
+          for (let y = Math.max(ry, y0); y < Math.min(ry + rh0, y1 + 1); y++) {
+            const baseRow = (y - y0) * S * fw;
+            for (let x = Math.max(rx, x0), e = Math.min(rx + rw0, x1 + 1); x < e; x++) {
+              const i = y * rw + x, v = !transparent && prev && idx[i] === prev[i] ? 0 : idx[i];
+              if (!v) continue;
+              const bx = baseRow + (x - x0) * S;
+              for (let sx = 0; sx < S; sx++) part[bx + sx] = v;
+            }
+            for (let sy = 1; sy < S; sy++) part.copyWithin(baseRow + sy * fw, baseRow, baseRow + fw);
+          }
+      }
     }
-    out.push(0x21, 0xf9, 4, ((transparent ? 2 : 1) << 2) | (transparent || prev ? 1 : 0));
-    u16(cs);
-    out.push(0, 0);
-    out.push(0x2c);
-    u16(x0 * S); u16(y0 * S); u16(fw); u16(fh);
-    out.push(0);
+    const sx = x0 * S, sy = y0 * S;
+    const fhead = new Uint8Array([
+      0x21, 0xf9, 4, ((transparent ? 2 : 1) << 2) | (transparent || prev ? 1 : 0),
+      cs & 255, (cs >> 8) & 255, 0, 0,
+      0x2c, sx & 255, (sx >> 8) & 255, sy & 255, (sy >> 8) & 255,
+      fw & 255, (fw >> 8) & 255, fh & 255, (fh >> 8) & 255, 0, minSize,
+    ]);
     prev = idx;
-    out.push(minSize);
-    const data = lzw(part, minSize);
-    for (let i = 0; i < data.length; i += 255) {
-      const n = Math.min(255, data.length - i);
-      out.push(n);
-      for (let j = 0; j < n; j++) out.push(data[i + j]);
-    }
-    out.push(0);
+    chunks.push(fhead, lzwSubBlocks(part, minSize));
   }
-  out.push(0x3b);
-  return Buffer.from(out);
+  chunks.push(new Uint8Array([0x3b]));
+  return Buffer.concat(chunks);
 }
 
 /**
@@ -203,50 +215,89 @@ function isClear(c: number): boolean {
 
 // LZW's table, at (code << 8) | the index after it: the code of the two (0: none), emptied of what it was given after
 // each use (a map asked at each pixel was most of a big GIF's LZW)
-const table = new Uint16Array(4096 << 8), used: number[] = [];
+const table = new Uint16Array(4096 << 8), used = new Int32Array(4096);
+let lzwBuf = new Uint8Array(65536);
 
-/** LZW with variable code size, clearing the table when it fills (4096 codes). */
-function lzw(index: Uint8Array, minSize: number): number[] {
+/** LZW with variable code size, emitting GIF 255-byte sub-blocks + terminator directly into a single flat slice. */
+function lzwSubBlocks(index: Uint8Array, minSize: number): Uint8Array {
   const clear = 1 << minSize, eoi = clear + 1;
-  let size = minSize + 1, next = eoi + 1;
-  const empty = () => { for (const k of used) table[k] = 0; used.length = 0; };
-  const out: number[] = [];
-  let cur = 0, shift = 0;
-  const emit = (code: number) => {
-    cur |= code << shift;
-    shift += size;
-    while (shift >= 8) {
-      out.push(cur & 255);
-      cur >>>= 8;
-      shift -= 8;
-    }
-  };
-  emit(clear);
+  // Worst-case LZW bytes (<= 1.6x pixels) plus sub-block length headers (1/255) and terminator
+  const maxBytes = index.length * 2 + 64;
+  if (lzwBuf.length < maxBytes) lzwBuf = new Uint8Array(Math.max(maxBytes, lzwBuf.length * 2));
+  const out = lzwBuf;
+  let size = minSize + 1, next = eoi + 1, usedLen = 0;
+  let subPos = 0, subLen = 0, outLen = 1;
+  let cur = clear, shift = size;
+  while (shift >= 8) {
+    out[outLen++] = cur & 255;
+    cur >>>= 8;
+    shift -= 8;
+    subLen++;
+  }
   let code = index[0];
-  for (let i = 1; i < index.length; i++) {
+  for (let i = 1, len = index.length; i < len; i++) {
     const k = index[i], key = (code << 8) | k, hit = table[key];
     if (hit) {
       code = hit;
       continue;
     }
-    emit(code);
+    cur |= code << shift;
+    shift += size;
+    while (shift >= 8) {
+      if (subLen === 255) { out[subPos] = 255; subPos = outLen++; subLen = 0; }
+      out[outLen++] = cur & 255;
+      cur >>>= 8;
+      shift -= 8;
+      subLen++;
+    }
     if (next === 4096) {
-      emit(clear);
-      empty();
+      cur |= clear << shift;
+      shift += size;
+      while (shift >= 8) {
+        if (subLen === 255) { out[subPos] = 255; subPos = outLen++; subLen = 0; }
+        out[outLen++] = cur & 255;
+        cur >>>= 8;
+        shift -= 8;
+        subLen++;
+      }
+      for (let u = 0; u < usedLen; u++) table[used[u]] = 0;
+      usedLen = 0;
       size = minSize + 1;
       next = eoi + 1;
     } else {
       if (next >= 1 << size) size++;
       table[key] = next++;
-      used.push(key);
+      used[usedLen++] = key;
     }
     code = k;
   }
-  emit(code);
-  emit(eoi);
-  if (shift > 0) out.push(cur & 255);
-  empty();
-  return out;
+  cur |= code << shift;
+  shift += size;
+  while (shift >= 8) {
+    if (subLen === 255) { out[subPos] = 255; subPos = outLen++; subLen = 0; }
+    out[outLen++] = cur & 255;
+    cur >>>= 8;
+    shift -= 8;
+    subLen++;
+  }
+  cur |= eoi << shift;
+  shift += size;
+  while (shift >= 8) {
+    if (subLen === 255) { out[subPos] = 255; subPos = outLen++; subLen = 0; }
+    out[outLen++] = cur & 255;
+    cur >>>= 8;
+    shift -= 8;
+    subLen++;
+  }
+  if (shift > 0) {
+    if (subLen === 255) { out[subPos] = 255; subPos = outLen++; subLen = 0; }
+    out[outLen++] = cur & 255;
+    subLen++;
+  }
+  out[subPos] = subLen;
+  out[outLen++] = 0;
+  for (let u = 0; u < usedLen; u++) table[used[u]] = 0;
+  return out.slice(0, outLen);
 }
 
 /**

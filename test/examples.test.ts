@@ -72,14 +72,33 @@ test(`pxl check on ${only ? `${files.length} of the ${all.length} examples (PXL_
   }
   pass("examples-times.json", JSON.stringify(took));
   const update = process.env.PXL_UPDATE || !existsSync(SNAP);
-  if (update) writeFileSync(SNAP, text(all));
-  // each example checked that passed (said its kept lines, or wrote them) noted with what its check read
+  const expected = only ? files.flatMap((f) => blocks.get(f) ?? []).join("\n") + "\n" : kept;
+  const actual = text(files);
+  if (update) {
+    const updated = files.filter((f) => said.has(f) && !same(said.get(f), blocks.get(f)));
+    const removed = only ? [] : [...blocks.keys()].filter((f) => !all.includes(f));
+    writeFileSync(SNAP, text(all));
+    for (const f of run) before[f] = { files: read.get(f)!, key: key(read.get(f)!), said: said.get(f)! };
+    pass("examples-passed.json", JSON.stringify(before));
+    t.diagnostic(`PXL_UPDATE: wrote test/examples.checks.txt (${updated.length} updated${updated.length ? `: ${updated.join(", ")}` : ""}${removed.length ? `, ${removed.length} removed: ${removed.join(", ")}` : ""})`);
+    return;
+  }
+  // each example checked that passed (said its kept lines) noted with what its check read
   for (const f of run) {
-    if (update || same(said.get(f), blocks.get(f))) before[f] = { files: read.get(f)!, key: key(read.get(f)!), said: said.get(f)! };
+    if (same(said.get(f), blocks.get(f))) before[f] = { files: read.get(f)!, key: key(read.get(f)!), said: said.get(f)! };
     else delete before[f];
   }
   pass("examples-passed.json", JSON.stringify(before));
-  assert.equal(text(files), only ? files.flatMap((f) => blocks.get(f) ?? []).join("\n") + "\n" : kept);
+  if (actual !== expected) {
+    const diffed = files.filter((f) => said.has(f) && !same(said.get(f), blocks.get(f)));
+    const removed = only ? [] : [...blocks.keys()].filter((f) => !all.includes(f));
+    const parts = [
+      diffed.length ? `changed (${diffed.length}): ${diffed.join(", ")}` : "",
+      removed.length ? `removed (${removed.length}): ${removed.join(", ")}` : "",
+    ].filter(Boolean);
+    const hint = only ? `PXL_UPDATE=1 PXL_EXAMPLES=${only.join(",")} node --test test/examples.test.ts` : "PXL_UPDATE=1 node --test test/examples.test.ts";
+    assert.equal(actual, expected, `examples.checks.txt mismatch — ${parts.join("; ")}\nIf intentional, update with: ${hint}`);
+  }
 });
 
 test("a stub left at an old path defines exactly the names of the lib file it includes (loaded, not drawn)", () => {

@@ -545,3 +545,27 @@ test("gif: scale & shared palette options match pre-scaled encoding byte-for-byt
     assert.deepEqual(readdirSync(dir), ["out.bin"]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("anim: (c, fi) receives frame index, frames/ms length mismatch errors, and 1-frame (c, fi) warns", () => {
+  // 1. Item functions receive (c, frameIndex) in anims, layers, and clips
+  const p = loadSource(PAL + `anim("step", { w: 4, h: 1, frames: 3, fps: 10 }, (c, fi) => c.px(fi, 0, "w"))
+anim("layered", { w: 4, h: 1, frames: 2, fps: 10 }, layer("a", (c, fi) => c.px(fi + 1, 0, "r")))`, "t.px.js");
+  const stepKeys = p.frames("step").map((f) => [...f.img.data].map((c) => (c ? "w" : ".")).join(""));
+  assert.deepEqual(stepKeys, ["w...", ".w..", "..w."]);
+  const layerKeys = p.frames("layered").map((f) => [...f.img.data].map((c) => (c ? "r" : ".")).join(""));
+  assert.deepEqual(layerKeys, [".r..", "..r."]);
+
+  // 2. Explicit frames: N and ms: [...] with different lengths throws a clear error
+  assert.throws(
+    () => loadSource(PAL + `anim("bad", { w: 2, h: 2, frames: 4, ms: [100, 100, 200] }, rect(0, 0, 2, 2, "r"))`, "t.px.js").frames("bad"),
+    /frames \(4\) and ms \(3 entries\) disagree/,
+  );
+  // Matching frames and ms array length works cleanly
+  const ok = loadSource(PAL + `anim("good", { w: 2, h: 2, frames: 3, ms: [100, 150, 200] }, (c, fi) => c.px(fi % 2, 0, "r"))`, "t.px.js");
+  assert.deepEqual(ok.frames("good").map((f) => f.ms), [100, 150, 200]);
+
+  // 3. A 1-frame anim whose callback declares a 2nd frame-index parameter triggers the 1-frame warning
+  const warnProj = loadSource(PAL + `anim("still_fi", { w: 2, h: 2 }, (c, fi) => c.px(fi % 2, 0, "r"))`, "t.px.js");
+  warnProj.frames("still_fi");
+  assert.ok(warnProj.warnings.some((w) => w.msg.includes("still_fi") && w.msg.includes("one frame")), warnProj.warnings.map((w) => w.msg).join("\n"));
+});
