@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 import { loadProject } from "../src/node/load.ts";
 import { writeOutputs } from "../src/node/output.ts";
+import { kept } from "../src/core/surface.ts";
 import type { Project } from "../src/core/project.ts";
 import { root, whenChanged } from "./passed.ts";
 
@@ -227,4 +228,24 @@ test("mounts.swap() and mounts.export() across atlas, per-dir and strips layouts
   assert.throws(() => loadArt(INC + `mounts.export("x", {}, { mode: "pet" })`, "e.px.js"), /mode must be "mount", "mounted" or "rider"/);
   assert.throws(() => loadArt(INC + `mounts.export("x", {}, { dirs: "16" })`, "e.px.js"), /unknown dirs preset '16'/);
   assert.throws(() => loadArt(INC + `mounts.export("x", {}, { moves: "dance" })`, "e.px.js"), /moves must be "basic", "ambient", "combat", "all"/);
+});
+
+test("mounted riders and mounts trace with zero non-pure distance closures (100% disk-cacheable)", () => {
+  const p = loadArt(INC + `
+    mounts.mounted("pure_cav", { outfit: "knight", cloak: "travel", held: "spear", off: "tallshield" }, { species: "warhorse", coat: "dapple", dirs: ["sw", "w"], moves: ["stand", "walk"] })
+    mounts.mount("pure_wolf", { species: "wolf", coat: "timber", dirs: ["sw"], moves: ["stand"] })
+  `, "mounts-pure.px.js");
+  const prevOn = kept.on, prevLeft = kept.left;
+  const impure: string[] = [];
+  kept.on = () => true;
+  kept.left = (who, _f, _ms, paint) => { if (!paint) impure.push(who); };
+  try {
+    p.image("pure_cav_stand_sw");
+    p.image("pure_cav_walk_w");
+    p.image("pure_wolf_stand_sw");
+  } finally {
+    kept.on = prevOn;
+    kept.left = prevLeft;
+  }
+  assert.deepEqual(impure, [], `expected 0 non-pure distance fields in mounts, got: ${impure.join(", ")}`);
 });

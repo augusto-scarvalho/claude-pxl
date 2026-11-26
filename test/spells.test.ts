@@ -223,3 +223,37 @@ scene("a", { w: 96, h: 64, frames: 20, fps: 20, sizes: { a2: 2 } }, (c) => c.mes
   const big = p.image("a2", 0, 100);
   assert.ok([[0, 0], [1, 0], [0, 1], [1, 1]].every(([i, j]) => big.get(2 * x + i, 2 * y + j) === e), "twice as big: the same pixel, 2 x 2");
 });
+
+test("cast: per-primitive depth occludes behind closer walls and draws in front; depth: 'single' restores legacy depth", () => {
+  // Wall at z = 10 spanning x = [-4, 4], height 3 m. Bolt runs from x = -2, z = 14 (behind wall) to x = 2, z = 6 (in front of wall).
+  const V = { w: 80, h: 60, horizon: 18, eye: 2.5, fov: 45 };
+  const src = (opt: string) => `
+const V = perspective(${JSON.stringify(V)})
+const M = model()
+M.face("wall", [-4, 10, 0], [4, 10, 0], [4, 10, 3], [-4, 10, 3])
+const sp = spell("lightning", 2, { from: [-2, 14, 1.2], to: [2, 6, 1.2], view: V, start: 0, particles: false })
+scene("wall_only", { w: 80, h: 60, bg: "k", frames: 30, fps: 20 }, mesh(V, M.faces, { wall: { ramp: "gg" } }))
+scene("casted", { w: 80, h: 60, bg: "k", frames: 30, fps: 20 }, mesh(V, M.faces, { wall: { ramp: "gg" } }), cast(sp${opt}))`;
+  const pPart = load(src(""));
+  const pSingle = load(src(`, { depth: "single" }`));
+  const sp = spell("lightning", 2, { from: [-2, 14, 1.2], to: [2, 6, 1.2], view: perspective(V), start: 0, particles: false });
+  const tEarly = sp.ability.start("travel") + 15; // sp.at(tEarly) is still behind the wall (z > 10)
+  const tLate = sp.ability.start("travel") + 120; // sp.at(tLate) is in front of the wall (z < 10)
+  const wall = pPart.image("wall_only", 0, tEarly);
+  const diffCols = (im: typeof wall, x0: number, x1: number) => {
+    let n = 0;
+    for (let y = 0; y < im.h; y++) for (let x = x0; x < x1; x++) if (im.get(x, y) !== wall.get(x, y)) n++;
+    return n;
+  };
+  // Per-primitive depth at tLate: bolt spans x = -2..2 (cols ~26..72, crossing z = 10 near col 40).
+  // Left side (x < 33, behind z = 10) is occluded by wall; right side (x >= 45, in front of z = 10) draws over the wall!
+  const imPart = pPart.image("casted", 0, tLate);
+  assert.ok(diffCols(imPart, 45, 75) > 10, "per-primitive depth draws front half of bolt in front of wall");
+  assert.equal(diffCols(imPart, 15, 33), 0, "per-primitive depth occludes back half of bolt behind wall");
+  // Legacy single depth at tLate (when sp.at(tLate) is in front of wall): entire bolt draws over wall, including left half!
+  const imSingleLate = pSingle.image("casted", 0, tLate);
+  assert.ok(diffCols(imSingleLate, 15, 33) > 5, "depth: 'single' draws the whole bolt at one depth when spell center is in front of wall");
+  // Legacy single depth at tEarly (when sp.at(tEarly) is behind wall): entire bolt is occluded, including right half!
+  const imSingleEarly = pSingle.image("casted", 0, tEarly);
+  assert.equal(diffCols(imSingleEarly, 45, 75), 0, "depth: 'single' occludes the whole bolt when spell center is behind wall");
+});

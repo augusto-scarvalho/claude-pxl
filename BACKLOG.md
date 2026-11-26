@@ -336,11 +336,8 @@ still hold, and the rest wait on these:
   and 20, up to 5 px. With the hand drawn back at the shoulder's height a real arm opens sideways, so
   the profile alone doesn't settle the cast: look at each before giving it an `elbow` hint, and show
   it before and after.
-- [ ] **An elbow hint per arm**: a pose's `elbow` serves both arms, so with one arm level ahead and
-  the other behind (a jump's apex, a fall) one of them bends wrong; the platformer blocks kept the
-  back hand under the shoulder. One hint per arm, or "anatomical" as an option.
-- [ ] **A hand out of the arm's reach, said**: rig3d shortens it in silence (the platformer study's
-  raised fist landed inside the head). pxl check warns at a leg out of reach; the arm the same.
+- [x] **An elbow hint per arm**: done: `Pose.elbow` accepts a shared `V3`, per-arm `[leftV3, rightV3]`, or `{ l?, r? }`.
+- [x] **A hand out of the arm's reach, said**: done: `poseFlaws().armReach` and `pxl check` now warn when a hand over-extends past `upper + fore` by more than 1.5 px.
 - [ ] **The blocks' face patch at pitch 0**: seen from the side and upright, the red face patch
   sticks 1.5 px out of the head and drowns in its own line; the blocks leant 1 to show it. A bigger
   patch, or one drawn over the line, in profile.
@@ -349,8 +346,7 @@ still hold, and the rest wait on these:
   folder, or say where it wrote); it read a 1x GIF of Madeline as "drawn at 2x2.23" and `--px 1` is
   refused (let 1 say "this is 1x"); on still crops it leaves out the "Light:" line on some (X,
   Richter, Zero, Vent) and writes "flat" on others, without saying why.
-- [ ] **`rig3d({ ink })` checked against the palette**: an ink key not in `pal` fails only at the
-  stamp ("unknown color key 'k'"); rig3d could say so where it is set.
+- [x] **`rig3d({ ink })` checked against the palette**: done: `rig3d` validates `ink` against the active palette with contextual error `rig3d '<name>' ink` + key hints.
 - [ ] **Calibrate the platformer hero's walk and run by speed** (the user's call): the speeds in px a
   frame are set in the platformer demo, where he moves through a level, and the walk's and run's
   timings follow if they slide.
@@ -359,8 +355,7 @@ still hold, and the rest wait on these:
   line. The side hero widened both in his own outfit. Their height, edge and the buckle's angle as
   fields.
 - [ ] **A fist in `dress()`**: a hand is a ball, and the side hero's finger line is a `draw` hook.
-- [ ] **A frame size per move in rig3d**: one size for every move, so the side hero's 40-wide dash
-  is a second `rig3d()` (as the top-down hero's attack). w, h and the pivot by move.
+- [x] **A frame size per move in rig3d**: done: each move in `rig3d(..., { moves })` accepts optional `w`, `h`, and `pivot` overriding the rig's default frame size.
 - [ ] **`clean` erasing a planted foot**: in the side walk the boot behind, mostly hidden by the
   near one, was cleaned away and the foot vanished. The genre's ground check caught it, rig3d's feet
   check didn't.
@@ -409,9 +404,7 @@ still hold, and the rest wait on these:
   roof, a cart's wheels at any heading, barrels in a stack). Not now, by the brief.
 
 From the village and the castle (F5 3d-3f):
-- [ ] **A kit included twice**: included files share one scope, so a lab file and its scene both
-  including `side_village.px.js` failed ("Identifier 'village' has already been declared"). Include
-  a file once per build, or scope each include.
+- [x] **A kit included twice**: done: `include()` is idempotent under matching `as` (replaying `pal`/`ramps`/`look3d` when `palette: true`), and pure palette/style/profile files with no defined assets replay cleanly across different `as` namespaces without re-executing top-level declarations.
 - [ ] **`make3d.define` params taking a word**: `gate: "none"` was refused ("gate is -1 to 1"), so
   the castle grew a second param (`gatehouse: "yes" | "no"`). Let a number param also take named
   values.
@@ -421,9 +414,7 @@ From the village and the castle (F5 3d-3f):
   on) turns to noise: warn, or offer a period in screen px.
 - [ ] **`surface()` and closed planes**: a hipped roof as four planes and a floor was refused ("the
   field goes on without end") though the five close it; worked round by intersecting a box.
-- [ ] **A socket from a 3D model**: a gargoyle stands on the wall-walk behind the parapet, 7 px under
-  the crenels' sill (`G - 65`, `G - 76`), a number only the cards say in prose. Let `turnaround()`
-  carry a model's named points to the side view as sockets a scene stamps at.
+- [x] **A socket from a 3D model**: done: `turnaround(..., { sockets: true | { name: [x, y, z] } })` projects builder `sockets` or explicit 3D points onto every heading sprite via `c.setSocket()` (symmetry-aware under `mirror: "auto"`).
 - [ ] **Density by parallax**: the keep behind the curtain is drawn at 12 px/m for a plane at 0.75
   the playfield's speed; `pxl check`'s density rule can't be told a layer's density follows its
   parallax.
@@ -441,9 +432,7 @@ From the village and the castle (F5 3d-3f):
   `_shot/b.png` was looked at first. Print the path.
 - [ ] **A `log()` in a .px.js**: picking a seed for which lancets are lit, the only way to print a
   value was to throw. A `log()` that `build` and `shot` print.
-- [ ] **`_n` scenes and normal maps**: scenes `show` and `show_n` built in `shot`, then `build`
-  refused the file (the `_n` suffix names normal maps). `shot` should say so too, or the normal maps
-  take another suffix.
+- [x] **`_n` scenes and normal maps**: done: `pxl check` warns early when an exported asset's `_n`/`_e` map clashes with another exported asset in the same folder, and `sheet()` accepts `normalSuffix` / `emitSuffix` (e.g. `".normal"`, `".emit"`) propagated into sheet JSON (`normalMap`/`emissionMap`).
 
 From the platformer demo's art (F5 3h-3i):
 - [ ] **A heading per move in `rig3d()`**: a rig draws one set of headings, so the side hero's climb
@@ -499,9 +488,7 @@ From the platformer demo (F5 3j-3k, `examples/nightfall/`):
 - [ ] **`shot --gif --vs`**: before and after for a phone, one above the other, took a PIL script.
 
 From top-down 32's bodies at 48 px (F5 4a-4d, `lib/characters/hero.px.js`'s G32 and SLIM32):
-- [ ] **A smear that follows the blade in 3D**: `arc()` is a ring in the picture; it can't follow the
-  tip's path seen from 45 degrees nor hide behind the body where the blade swings round his back. The
-  crescent took 240 `j.rod` lines in a draw hook. `j.smear(path, width(t), paint)` in rig3d.
+- [x] **A smear that follows the blade in 3D**: done: `j.smear(path, width, paint, { behind? })` in `rig3d` draw hooks renders depth-tested 3D blade trails (`V3[]` ribbons or `[V3, V3][]` quad strips) occluded behind the body, alongside `j.rod(..., { behind? })`.
 - [ ] **A foot that rolls**: rig3d's foot is a level ball, with no heel strike and no toe-off; `lift`
   raises the whole foot, and a passing or kicked-back foot can't point its toe down to show its sole
   (F5 4f: the slim's passing leg could only change its knee and its place). A pose's `roll` per foot.
@@ -516,8 +503,7 @@ From top-down 32's bodies at 48 px (F5 4a-4d, `lib/characters/hero.px.js`'s G32 
   attack that turns them 80 degrees tilted the head 4 rows. Worked round in `posed()`.
 - [ ] **A bob apart from the stride**: the stride grows with the leg (`legs`) while the bob stays in
   screen px, so the slim's run reached past its bones by a pixel. A cell's `bob`.
-- [ ] **rig3d cuts at its frame silently**: the fists and the leaning head were cut at the genre's
-  32 x 64 frame with no word. A warning when a pose leaves `w`/`h`.
+- [x] **rig3d cuts at its frame silently**: done: explicit `w`/`h` frames now emit a `rig3d:` warning naming clipped edges whenever non-ink fill pixels (or uninked bounds) overshoot the frame.
 - [ ] **`genre` on a rig's blocks**: it goes to the painted moves only, so the lab wrapped each block
   anim in an anim naming the genre (6 lines).
 - [ ] **`pxl study` on frames**: a move given as a folder of frames with pivots, an atlas, joint tracks
@@ -538,8 +524,7 @@ From painting the slim (F5 4e-4f, `lib/characters/hero32.px.js`; the user: a hun
   while the grid stays 31, so `pxl ascii` prints columns 2 off and the render shows through rows the grid
   doesn't give (worked round by rows that erase). `rest: "erase"`, ascii in the grid's columns, and a row
   as [column, keys] (placing a 13 px face by counting 31 columns went wrong twice).
-- [ ] **Arms longer than their bones**: a hand goes to its target past the arm's reach (the forearm
-  stretched) and check flags only legs: 4e's arms were 2.2 px too long. The same check on the arms.
+- [x] **Arms longer than their bones**: done: `poseFlaws().armReach` + `pxl check` warns past 1.5 px over-extension.
 - [ ] **A genre's `colors` and body shares checked**: nothing reads topdown32's 24 against a figure's colors
   (a lab sprite counted 18), nor its `body` shares (head, legs) against the blocks: the chibi's legs 0.29 was
   the hip in 3D over 48, the sprite reads 0.23 (F5 4g). As check reads `height`.
@@ -549,8 +534,7 @@ From painting the slim (F5 4e-4f, `lib/characters/hero32.px.js`; the user: a hun
 - [ ] **dress() paint by px across**: a V neckline by angle came out a column of skin where the tunic
   narrows (worked round by reading bodyRadius in the paint); and the skirt is 2.4 px whatever the body.
   The paint given the point's px across; the skirt's length a field.
-- [ ] **A normal map's name clash**: a scene soles_walk_n beside soles_walk stopped the build
-  (soles_walk_n.png is both). soles_walk.normal.png.
+- [x] **A normal map's name clash**: done: `sheet(..., { normalSuffix, emitSuffix })` + early clash warning in `pxl check`.
 
 From painting the chibi and reading 3D models for it (F5 4h-4i, `lib/characters/hero32.px.js`'s `chibi_*`; the user:
 puffed sleeves, domes on the shoulders, big hips):
@@ -558,8 +542,7 @@ puffed sleeves, domes on the shoulders, big hips):
   2-3 rows over the tunic's tapering shoulder, outlined (worked round by a lower joint, `cap`); the skirt is
   round while the body is 0.84 as deep, so it stood 2 px out behind and ahead (17 px against 13). A
   `sleeveFrom`, and the skirt flattened as the body is.
-- [ ] **dress()'s far arm on a tie**: facing us the shoulders' depths tie and floating noise darkens one
-  forearm. `farBy: px`, or a tie taken as neither.
+- [x] **dress()'s far arm on a tie**: done: `dress({ farBy })` skips far-limb darkening when left/right depth difference is within `farBy` px.
 - [ ] **An elbow bowed out**: an arm a px longer than its reach bends out by the default hint (the chibi's
   hanging elbows 1.6-2.5 px out, the sleeve widest there) and nothing says so. A LOOK in check, or a hint
   whose out is 0 for a hanging arm.
@@ -586,28 +569,22 @@ trousers in two colors; done here: surface()'s and rig3d's `inner: "dark"`, dres
 - [ ] **Melt pieces into one part**: rig3d's parts can't be smooth-unioned nor named as parts inside a part,
   so dress() builds the trousers' field by hand (the seat halved by planes, a smooth union per leg).
   `j.union(pieces, { smooth, part })`.
-- [ ] **dress()'s far limb on a tie** (the forearms in 4h, the legs here): facing us one leg took the far
-  ramp, no light tone at all. A tie within a px taken as neither.
+- [x] **dress()'s far limb on a tie** (the forearms in 4h, the legs here): done via `dress({ farBy })`.
 - [ ] **Where a figure's lines fall**: `pxl study` counts the inside's dark lines, not where they fall (a
   joint, a hem, a limb in front); and no command lists a frame's parts by row (img.parts knows them).
-- [ ] **`clean` cuts the silhouette's last pixel**: a seam pixel with the clear beyond it is cut (no 2 px black
-  run), so a belt a hair wider than the shirt (0.05 px, or the walk's lean) opened a 1 px notch in the slim's
-  profile, ahead and behind; worked round by the belt a hair inside. With `inner: "dark"` there is no black run
-  to avoid: spare the silhouette's last pixel.
+- [x] **`clean` cuts the silhouette's last pixel**: done: sliver cutting is skipped under `inner: "dark"` where no 2-px black run exists, and `surface({ clean: { slivers?, specks?, keepGlint? } })` gives granular control (plus `SurfaceMat.flat: true` to eliminate checker speckle on thin blades/shafts).
 - [ ] **`shot --vs` an uncommitted before**: the before had to be built to a folder and composed by hand
   (~120 lines of Python). `--vs <a folder of built strips>`.
 
 From the top-down 32 kit (F5 4k-4n: 3D drafts reduced and finished by hand; the user: jagged edges, thin shapes, gaps in
 the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` with its edges treated, `pxl check --edges`,
 `c.closeLine()`):
-- [ ] **A kit's maker and its checks**: a file whose figures come from an included maker (villagers32 through
-  `hero32.character`) checks "0 rigs": feet, head rows and the genre's height never run there.
+- [x] **A kit's maker and its checks**: done: `Project` tracks `included: this.depth > 0` on `groups`, `views`, and `figures` so `pxl check` covers figures/views/groups generated by calling an included kit's maker from the main file (and resolves cross-namespace `views({ like })`).
 - [ ] **`pxl compare` on views() heads**: bakes differ in size with the field (27-33 px) and compare aligns top
   left corners, so rows read 1-3 px off without a hand-worked `--offset`. Align on the anchor.
 - [ ] **`pxl lib draft` options**: it takes no builder options (a momiji's season), and doesn't say the colors it
   drew in (the hand pass needed each tone's hex). `--params` and a palette line.
-- [ ] **`look3d({ mats })` leaks**: a file calling it at its top (fields.px.js) changes the 3D of files included
-  after it ("unknown color key"). Scope it to the file.
+- [x] **`look3d({ mats })` leaks**: done: `look3d()` is now saved/restored across non-shared `include()` calls (while `{ palette: true }` style includes continue to share `look3d`).
 - [ ] **Frozen drafts**: the PNG is written only when the frozen sprite itself is built (parts and passes on top
   never write it), and `frozen` refuses `shrink`. Build missing frozen PNGs with whatever uses them; `shrink` beside `frozen`.
   The library's frozen cells (F7): the seven that nothing read removed (the cottage's, the spruce's, the oak's and the
@@ -656,8 +633,7 @@ the contour, a square patch of grass; done here: `shrink: { by, cover, ink }` wi
   built GIF merges still frames, so frames can't be stepped. Per-frame LOOK lines; `shot --frames ... --at` in rows
   at its zoom.
 - [ ] **`hero32.pace`**: route() wants a pace by direction and hero32.px.js exports none (the traveler has one).
-- [ ] **Sort ties**: two props' feet on one row sort by call order, so no row puts a figure between them (the hero's
-  blade between the pot and the lamp). A stamp's own sort row.
+- [x] **Sort ties**: done: `sort: "y"` now breaks equal-row ties by `z` (and `c.y(y, z, fn)`), and `stamp(..., { sortY })` sets an explicit sort row without moving the drawn `y`.
 
 From racing top-down (F5 5a-5d, `lib/vehicles/car.px.js`, `lib/architecture/track.px.js`, `lib/nature/trackside.px.js`;
 the user: one camera at 58 degrees for the cars and what stands, a line all round each prop in its own darker tones;
@@ -1736,10 +1712,7 @@ What the phases left, each waiting for a reason:
   in the 3D round: the slow passes are now fields and volumes ray-marched on the CPU (a 320x180
   diorama with a leafy tree, smoke and mist 0.6 to 1.3 s a frame; `pxl check` on `sdf/volumes.px.js`,
   one frame of each scene, 3.4 s), and those are a GPU engine's case (below), not the effects'.
-- [ ] **A cast's depth part by part**: `cast()` in `mesh()`'s depth takes one depth for all of the
-  spell, its head's (nearer by its size). A beam reaching toward the eye, or a mark on the ground half
-  behind a wall, would need a depth for each primitive it draws (its points are in the world, so the
-  view could hand one out): when a scene shows the one depth wrong.
+- [x] **A cast's depth part by part**: done: `cast()` now tests per-primitive world depth (`depth: "part"`, default) across bolts, beams, rings, marks, columns, trails, particles and solids against `mesh()` depth, with `cast(sp, { depth: "single" })` for legacy fallback.
 - [x] **A spell's art pieces blended in cast()**: `cast()` plots the file's anims (`ball`, `impact`,
   `big`) as they are, so an energy ball's dark rim shows; the clearing's hand version laid them
   `blend: "add"` in mesh() and they glowed. Done (round 5, R2): `spell(..., { blend: "add" | "screen" })`

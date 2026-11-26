@@ -53,8 +53,10 @@ declare global {
     at?: string;
     /** Which one this stamp is: `at`, relations, expect rules and describe name it by this (default: the asset name); its random picks (a group's member, reseed, rswap, rflip, rdelay) come from it, not from where it stands, so moving it keeps its look. */
     id?: string;
-    /** Draw order in a layer with sort: "z" (default 0; ties keep call order). */
+    /** Draw order in a layer with sort: "z" (default 0; ties keep call order), or tie-breaker at the same row in sort: "y". */
     z?: number;
+    /** stamp only: explicit sort row in a layer with sort: "y" (default: the stamp's own y; ties broken by z, then call order). */
+    sortY?: number;
   }
   interface PxScatter extends PxPlace {
     on?: string; clip?: boolean; below?: boolean; even?: boolean;
@@ -396,16 +398,16 @@ declare global {
   type PxSurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "iso"; yaw?: number; pitch?: number; origin?: [number, number]; grid?: boolean } | PxView;
   /** surface()'s options: the view (orthographic at ppm px to the meter, its origin at `at` px; or a perspective() view, standing `at` [x, z, up] m), the materials' ramps, the light, the outline, the rim, its own shadows, the creases, a ray to K x K px, its shadow on what is drawn. */
   interface PxSurfaceOpts {
-    /** a material: its ramp, a glint (shine), strokes m apart lighter where the sun is (needles), hem px hanging in points under it, emit (true or 0..1: self-luminous, skips scene world light and marks emission map) */
-    view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number; strokes?: number; hem?: number; emit?: boolean | number }>;
+    /** a material: its ramp, a glint (shine), strokes m apart lighter where the sun is (needles), hem px hanging in points under it, emit (true or 0..1: self-luminous, skips scene world light and marks emission map), flat (true: flatten per-pixel checker speckle on thin 1-2 px parts) */
+    view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, string | PxColor[] | { ramp: string | PxColor[]; shine?: number; strokes?: number; hem?: number; emit?: boolean | number; flat?: boolean }>;
     /** the way toward the light; "view": its view's own (from the upper left) where look3d() gives another; "mesh": the light of the mesh() drawn before it with a sun (its way, sun, sky and lamps) */
     light?: number[] | "view" | "mesh"; /** the light wrapped round the form, 0..1: a side square to it lit soft / (1 + soft) */ soft?: number; outline?: boolean | PxColor; /** a line where one part lies in front of another, on the one behind: a key, true (the outline's), or "dark" (the darkest tone of the part behind) */ inner?: boolean | PxColor | "dark"; /** a step lighter toward the light; a number: where open both ways it comes from, at least that share up the ramp (a sun behind) */ rim?: boolean | number; shadows?: boolean; ao?: number; pixel?: number; cast?: number;
     /** through a camera: its shadow alone (a mesh made of it in its place) */
     hide?: boolean;
     /** the name of the part it is (pxl steps --at) */
     part?: string;
-    /** a pixel artist's pass before its lines (default true): no black run 2 px thick, the outline whole, a pixel sticking out cut away */
-    clean?: boolean;
+    /** a pixel artist's pass before its lines (default true): boolean or { slivers?, specks?, keepGlint? } */
+    clean?: boolean | { slivers?: boolean; specks?: boolean; keepGlint?: boolean };
     /** a line of this key all round outside it, a px wide (the sprite needs the room); true: each line pixel its material's line tone, its ramp's first key (the fill and tones from the rest); 2: its first two, the second where the line faces the light */
     ink?: PxColor | boolean | 1 | 2;
     /** each material's ramp cut to this many tones, its darkest and lightest kept (a genre's tones at a density) */
@@ -462,7 +464,7 @@ declare global {
   /** draw3d()'s options: the view, where the world stands, its materials and light, a ray a block, these parts only; how its solids are drawn (`as`), the cell of voxels and of a mesh (`size`, m, 0.1), the splats' spacing; more of surface()'s options (`surface`: soft, outline, rim, ao, shadows). */
   interface PxDraw3dOpts { view?: PxSurfaceView; ppm?: number; at?: number[]; mats?: Record<string, unknown>; light?: number[] | "view" | "mesh"; pixel?: number; only?: string[]; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown> }
   /** A figure's pose, the file's own numbers: each foot [forward, right] on the floor from under the pelvis (left, right), lifted (the whole foot), each foot turned out from the hips' forward (toes, deg: its knee over it) and its heel raised (heel, px: the foot turned on its ball, the toes on the floor); the pelvis down; leaning forward and to the right (deg); the hips turned from the heading, the shoulders against them, the head against those (deg, clockwise from above); each hand [forward, right, up] from its shoulder, the way the elbows bend (elbow: a hint [forward, out, up] in the shoulders' frame, out mirrored for the left arm; default [-0.4, 0.5, -1], mostly down), in the air (air: the frame's data says so, pxl check doesn't ask its feet to be on the ground), or both on one line (grip: its ends [forward, right, up] from under the pelvis as the shoulders face, each hand `at` its share of the way, [left, right]). Other keys pass to parts(). */
-  interface PxPose { feet?: number[][]; lift?: number[]; /** each foot's heading, degrees out from the hips' forward [left, right] (its knee over it) */ toes?: number[]; /** px each heel is raised [left, right], the foot turned on its ball */ heel?: number[]; /** degrees each foot off the floor turns at its ankle from square to its shin [left, right] (+ pointed, - flexed; null the rig's level foot), its toes the way its knee points */ point?: (number | null)[]; down?: number; rise?: number; /** both feet px farther from us along the view's depth (rig3d's soles sets it by heading) */ away?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; elbow?: PxV3; air?: boolean; grip?: { from: PxV3; to: PxV3; at: [number, number] }; /** degrees the whole figure, posed upright, is turned in the picture's plane about its pelvis (+ its head toward the picture's left): a fall, lying down; its parts built upright and turned with it */ roll?: number; /** degrees the neck (the chest to the head's middle) stands from upright as drawn, turned to it in the picture's plane about the chest (+ its head toward the picture's right: the chin on the chest); none: along the spine */ nod?: number; [k: string]: unknown }
+  interface PxPose { feet?: number[][]; lift?: number[]; /** each foot's heading, degrees out from the hips' forward [left, right] (its knee over it) */ toes?: number[]; /** px each heel is raised [left, right], the foot turned on its ball */ heel?: number[]; /** degrees each foot off the floor turns at its ankle from square to its shin [left, right] (+ pointed, - flexed; null the rig's level foot), its toes the way its knee points */ point?: (number | null)[]; down?: number; rise?: number; /** both feet px farther from us along the view's depth (rig3d's soles sets it by heading) */ away?: number; lean?: number; tilt?: number; turn?: number; twist?: number; head?: number; hands?: number[][]; /** elbow bend hint [forward, out, up] for both arms, or per-arm [left, right] / { l?, r? } */ elbow?: PxV3 | [PxV3, PxV3] | { l?: PxV3; r?: PxV3 }; air?: boolean; grip?: { from: PxV3; to: PxV3; at: [number, number] }; /** degrees the whole figure, posed upright, is turned in the picture's plane about its pelvis (+ its head toward the picture's left): a fall, lying down; its parts built upright and turned with it */ roll?: number; /** degrees the neck (the chest to the head's middle) stands from upright as drawn, turned to it in the picture's plane about the chest (+ its head toward the picture's right: the chin on the chest); none: along the spine */ nod?: number; [k: string]: unknown }
   /** A piece of a figure's part: a field, and its paint: a material (a ramp of keys or a name in mats) or (h along it 0..1, a round it from the way the body faces, outside) => one. */
   interface PxPiece { field: PxSdf; paint?: string | ((h: number, a: number, outside: boolean) => string | null | undefined) }
   /** The joints a pose puts where at a heading, in the sprite's px (x across, y away from us, z up); limb() and ball() make pieces along them; screen() where a point lands on the sprite, depth() how near us it is. */
@@ -473,8 +475,10 @@ declare global {
     legs: { hip: PxV3; knee: PxV3; ankle: PxV3; foot: PxV3; heel: PxV3; ball: PxV3; toe: PxV3; heading: number; /** the pose's point for this foot, when it gives one: the sole then lies square to the shin turned that far */ point?: number }[]; arms: { sh: PxV3; elbow: PxV3; hand: PxV3 }[];
     /** the pose's grip, [from, to]: the line the hands hold */
     grip?: [PxV3, PxV3];
-    /** in a draw hook: a line of pixels from a to b in the figure's own depth (a held broom), paint a key or (t) => key along it */
-    rod(a: PxV3, b: PxV3, paint: string | ((t: number) => string | undefined)): void;
+    /** in a draw hook: a line of pixels from a to b in the figure's own depth (a held broom), paint a key or (t) => key along it; `{ behind: true }` draws only behind the figure */
+    rod(a: PxV3, b: PxV3, paint: string | ((t: number) => string | undefined), opts?: { behind?: boolean }): void;
+    /** in a draw hook: a 3D blade/motion smear along tip points `PxV3[]` or `[root, tip][]` pairs, depth-tested against the figure (`{ behind: true }` only behind it) */
+    smear(path: (PxV3 | [PxV3, PxV3])[], width: number | ((t: number) => number), paint: string | ((t: number, u: number) => string | undefined), opts?: { behind?: boolean }): void;
     limb(a: PxV3, b: PxV3, r0: number, r1?: number, paint?: PxPiece["paint"]): PxPiece;
     ball(c: PxV3, r: number | PxV3, paint?: PxPiece["paint"]): PxPiece;
     /** a surface swept round an upright through base from z0 up to z1: keep(h, a) the part there is, shift(h) [dx, dy] that height carried off the axis, shell half its thickness (a cloth) */
@@ -787,6 +791,7 @@ declare global {
     /** A drawing in its turn among a sorted layer's (or a c.sort()'s) stamps: at depth z / row y, ties in call order; outside one, now. */
     z(z: number, fn: (c: PxCanvas) => void): void;
     y(y: number, fn: (c: PxCanvas) => void): void;
+    y(y: number, z: number, fn: (c: PxCanvas) => void): void;
     /** What fn stamps and hands to c.z() / c.y() drawn in that order when it ends. */
     sort(by: "y" | "z", fn: () => void): void;
     /** What fn paints, a placement by that name (id: which one, as a stamp's): describe lists it, check reads it as a stamp (height m, facing). */
@@ -845,7 +850,7 @@ declare global {
     /** A trail behind what goes along path(t), `length` ms of it now, `width` [head, tail] px, keys head to tail; a blade's, path(t, i) giving its edge [[tip], [inner point]]: the band it swept. */
     trail(path: (t: number, i: number) => number[] | number[][], keys: string | string[], opts?: PxTrail): void;
     /** A spell as it is now: its mark, what gives light (emitting, unlit), its smoke, its lamps, its flash and shake (`shake: false`: none); after a mesh() through its camera, at its depth. */
-    cast(spell: PxSpell, opts?: { shake?: boolean }): void;
+    cast(spell: PxSpell, opts?: { shake?: boolean; depth?: "part" | "single" }): void;
     /** All drawn so far thrown by a spell's shake now, or [dx, dy] px. */
     shake(by: PxSpell | number, dy?: number): void;
     /** Where a socket of an earlier placement is ("hero.hand"), in canvas coords. */
@@ -947,7 +952,9 @@ declare global {
     /** whole-number nearest-neighbor scale applied to the exported sheet, its maps and JSON coordinates */ scale?: number;
     /** extra engine-agnostic metadata merged into the exported sheet JSON */ meta?: Record<string, unknown>;
     /** optional map renaming asset/tag names in the exported sheet JSON */ names?: Record<string, string>;
-    /** optional map renaming exported socket names in this sheet */ sockets?: Record<string, string> }): void;
+    /** optional map renaming exported socket names in this sheet */ sockets?: Record<string, string>;
+    /** suffix for the exported normal map PNG (default "_n", e.g. ".normal" to avoid north-facing "_n" clashes) */ normalSuffix?: string;
+    /** suffix for the exported emission map PNG (default "_e", e.g. ".emit") */ emitSuffix?: string }): void;
   /** A bitmap font from glyphs drawn in w x h cells on a sprite, in the order of `chars`; use it with text(..., { font }). */
   function font(name: string, sprite: string, opts: { chars: string; w: number; h: number; cols?: number; mono?: boolean }): void;
   /** n directions (sprites name_0.. + group name) from a pose pointing up, via exact quarter turns and diagonal mirrors where possible. See rotation.md. */
@@ -957,7 +964,7 @@ declare global {
    * else their index), a group of them; through an orthographic view or a perspective() camera; the east
    * the west flipped where the thing is its own mirror and its light from the picture's middle (mirror: "auto").
    */
-  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown>; draw?: (c: PxCanvas, v: { heading: string; screen(p: number[]): number[]; depth(p: number[]): number }) => void; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number; /** "foot": each sprite's pivot on its drawn foot (its data's foot: the lowest row over where it meets the ground), not the origin */ pivot?: "foot"; /** the genre() its sprites are made for */ genre?: string; /** what they are by its ink (character, tree, prop) */ category?: string }): PxTurnaround;
+  function turnaround(name: string, thing: PxSdf | PxBuilt | PxWorld, opts?: { view?: PxSurfaceView; ppm?: number; n?: number; headings?: (string | number)[]; part?: string; mats?: Record<string, unknown>; light?: number[] | "view"; as?: PxAs; size?: number; spacing?: number; surface?: Record<string, unknown>; draw?: (c: PxCanvas, v: { heading: string; screen(p: number[]): number[]; depth(p: number[]): number }) => void; frames?: number; fps?: number; mirror?: boolean | "auto"; pad?: number; /** "foot": each sprite's pivot on its drawn foot (its data's foot: the lowest row over where it meets the ground), not the origin */ pivot?: "foot"; /** true: carry the builder's 3D sockets to each heading; or { name: [x, y, z] } in m projected onto each sprite */ sockets?: boolean | Record<string, [number, number, number]>; /** the genre() its sprites are made for */ genre?: string; /** what they are by its ink (character, tree, prop) */ category?: string }): PxTurnaround;
   /**
    * A figure on the 3D layer: a skeleton (`body`) posed per frame by the file's own `pose(i, heading)`,
    * its parts fields along the bones (`parts(j, pose)`: j.limb, j.ball or fields, each painted by a
@@ -966,9 +973,9 @@ declare global {
    * light is in the picture's middle; `head` a views() set stamped on the head (`chin` a line under it).
    * `blocks`: the flat blocks too (bk_<move>_<dir>, or that prefix), to judge a move before painting.
    */
-  function rig3d(name: string, opts: { body?: PxBody; moves: Record<string, { frames: number; /** each frame's (100), or a list, a number a frame */ ms?: number | number[]; pose: (i: number, heading: number) => PxPose; dirs?: string[]; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void }>;
+  function rig3d(name: string, opts: { body?: PxBody; moves: Record<string, { frames: number; /** each frame's (100), or a list, a number a frame */ ms?: number | number[]; pose: (i: number, heading: number) => PxPose; dirs?: string[]; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void; /** optional per-move canvas size & pivot overriding the rig's */ w?: number; h?: number; pivot?: [number, number] }>;
     n?: number; headings?: (string | number)[]; pitch?: number; w?: number; h?: number; pivot?: [number, number]; parts?: (j: PxJoints, pose: PxPose) => Record<string, PxPiece | PxSdf | { decal: object } | { scatter: object } | (PxPiece | PxSdf | { decal: object } | { scatter: object })[]>;
-    mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; /** with ink: "dark", the line on the part behind its darkest tone, the ink only all round */ inner?: boolean | PxColor | "dark"; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; /** a views() set stamped on the head, or (pose, j) => one: its set by the pose */ head?: string | ((pose: PxPose, j: PxJoints) => string); /** the parts kept over the head where they are nearer than it, a line of the ink on the head beside them */ over?: string[]; /** the line under the head; a head modeled: [key, the skin's ramp], under the jaw only */ chin?: PxColor | [PxColor, string]; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void; /** the genre() its painted moves are made for */ genre?: string; /** what they are by its ink (character) */ category?: string; /** each heading's feet moved along the view's depth so the soles end on the row they do facing us */ soles?: boolean }): PxRig3d;
+    mats?: Record<string, unknown>; light?: PxV3; outline?: boolean | PxColor; /** with ink: "dark", the line on the part behind its darkest tone, the ink only all round */ inner?: boolean | PxColor | "dark"; ink?: PxColor; surface?: Partial<PxSurfaceOpts>; /** a views() set stamped on the head, or (pose, j) => one: its set by the pose */ head?: string | ((pose: PxPose, j: PxJoints) => string); /** the parts kept over the head where nearer than it (array with prefix match, "depth" for per-pixel all parts, or { parts, mode: "part" | "pixel" }) */ over?: string[] | "depth" | { parts: string[]; mode?: "part" | "pixel" }; /** the line under the head; a head modeled: [key, the skin's ramp], under the jaw only */ chin?: PxColor | [PxColor, string]; blocks?: boolean | string; mirror?: boolean | "auto"; draw?: (c: PxCanvas, j: PxJoints, pose: PxPose) => void; /** the genre() its painted moves are made for */ genre?: string; /** what they are by its ink (character) */ category?: string; /** each heading's feet moved along the view's depth so the soles end on the row they do facing us */ soles?: boolean }): PxRig3d;
   namespace rig3d {
     /** Solve a rig3d skeleton pose directly without registering assets: returns joints (pelvis, chest, head, legs, arms) plus limb/ball/sweep helpers. */
     function joints(body?: PxBody, pose?: PxPose, heading?: number): PxJoints;
@@ -1069,7 +1076,7 @@ declare global {
   /** A whole cast of an element at a tier (1 fire, 2 fira, 3 firaga): spell("fire", 3, { from: [x, y], to: [x, y], ground }); draw it with cast(). */
   function spell(element: string | PxElement, tier: 1 | 2 | 3, opts: PxSpellOpts): PxSpell;
   /** A spell as it is now (see PxCanvas.cast). */
-  function cast(spell: PxSpell, opts?: { shake?: boolean }): PxOp;
+  function cast(spell: PxSpell, opts?: { shake?: boolean; depth?: "part" | "single" }): PxOp;
   /** All drawn so far thrown by a spell's shake now: a whole scene shaking from a cast in one cell of it (cast there with shake: false). */
   function shake(spell: PxSpell): PxOp;
   /** A function of (x, y) made to close over w (and h): for noise on strips and tiles that wrap. */

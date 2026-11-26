@@ -505,3 +505,143 @@ sprite("dim_check", { w: 1, h: 1 }, (c) => { if (R.w > 0 && R.h > 0 && R.pivot.l
   assert.ok(e.parts && e.parts.names.includes("body"), "mirrored swap variant preserves 3D parts");
   assert.equal(p.image("dim_check").get(0, 0), p.pal.keys.get("g"), "lazy R.w/R.h/R.pivot getters resolve");
 });
+
+test("rig3d: ink key validation, per-arm elbow hints, armReach flaw/check, per-move size/pivot, and explicit-frame clip warning", () => {
+  // 1. Missing ink key fails with contextual key hint
+  assert.match(
+    failure(`${PAL} rig3d("bad", { ink: "z", headings: ["s"], parts: (j) => ({ h: j.ball(j.head, 4, "w") }), moves: { idle: { frames: 1, pose: () => ({}) } } })`, "bad_idle_s").message,
+    /rig3d 'bad' ink.*unknown color key 'z'/,
+  );
+
+  // 2. Per-arm elbow hint ([l, r] and { l, r })
+  const B = bodyOf();
+  const baseHands: [[number, number, number], [number, number, number]] = [[2, 3, -4], [2, -3, -4]];
+  const jTuple = jointsOf(B, { hands: baseHands, elbow: [[0, 1, 0], [0, -1, 0]] }, 180);
+  const jObj = jointsOf(B, { hands: baseHands, elbow: { l: [0, 1, 0], r: [0, -1, 0] } }, 180);
+  const jFlipped = jointsOf(B, { hands: baseHands, elbow: { l: [0, 1, 0], r: [0, 1, 0] } }, 180);
+  assert.deepEqual(jTuple.arms[0].elbow, jObj.arms[0].elbow);
+  assert.deepEqual(jTuple.arms[1].elbow, jObj.arms[1].elbow);
+  assert.ok(dist(jObj.arms[1].elbow, jFlipped.arms[1].elbow) > 1, "per-arm elbow hint bends right arm independently");
+
+  // 3. poseFlaws().armReach + pxl check warning
+  const okFlaw = poseFlaws(B, jointsOf(B, {}, 180));
+  assert.ok(okFlaw.armReach <= 0.1, `neutral pose armReach should be <= 0.1, got ${okFlaw.armReach}`);
+  const farFlaw = poseFlaws(B, jointsOf(B, { hands: [[0, 0, -2], [20, 0, 0]] }, 180));
+  assert.ok(farFlaw.armReach > 5, `expected over-reach > 5 px, got ${farFlaw.armReach}`);
+  assert.match(FLAWS.armReach(farFlaw.armReach), /arm longer than its bones/);
+
+  const pReach = loadSource(`${PAL}
+rig3d("stretch", {
+  headings: ["s"], ink: "k", blocks: true,
+  moves: {
+    idle: { frames: 1, pose: () => ({}) },
+    reach: { frames: 1, pose: () => ({ hands: [[0, 0, -2], [18, 0, 0]] }) },
+  }
+})`, "reach.px.js");
+  const rChk = checkProject(pReach, { file: "reach.px.js" });
+  assert.ok(rChk.lines.some((l) => l.includes("arm longer than its bones")), rChk.lines.join("\n"));
+
+  // 4. Per-move w, h, pivot + explicit-frame clip warning
+  const pSize = loadSource(`${PAL}
+rig3d("mv", {
+  w: 36, h: 44, pivot: [18, 42], headings: ["s"], ink: "k",
+  parts: (j) => ({ body: j.limb(j.pelvis, j.chest, 3.5, 4, "g"), head: j.ball(j.head, 4, "w"), leg: j.limb(j.legs[0].hip, j.legs[0].ankle, 2, 2, "g") }),
+  moves: {
+    idle: { frames: 1, pose: () => ({}) },
+    wide: { frames: 1, w: 52, h: 48, pivot: [26, 46], pose: () => ({}) },
+    tight: { frames: 1, w: 12, h: 16, pivot: [6, 15], pose: () => ({}) },
+  }
+})`, "size.px.js");
+  const imIdle = pSize.image("mv_idle_s"), imWide = pSize.image("mv_wide_s"), imTight = pSize.image("mv_tight_s");
+  assert.deepEqual([imIdle.w, imIdle.h, imIdle.pivot], [36, 44, [18, 42]]);
+  assert.deepEqual([imWide.w, imWide.h, imWide.pivot], [52, 48, [26, 46]]);
+  assert.deepEqual([imTight.w, imTight.h, imTight.pivot], [12, 16, [6, 15]]);
+  assert.ok(pSize.warnings.some((w) => w.msg.includes("rig3d: 'mv' (tight): pose clipped at")), pSize.warnings.map((w) => w.msg).join("\n"));
+  assert.ok(!pSize.warnings.some((w) => w.msg.includes("(idle): pose clipped")), "generous frame emits no clip warning");
+});
+
+test("rig3d: over prefix/depth/pixel modes, j.rod({ behind }), j.smear(), SurfaceMat.flat, SurfaceOpts.clean, and dress({ farBy })", () => {
+  // 1. over prefix matching ("held" matches "held.guard" and "held.tip"), over: "depth", and over: { parts, mode: "pixel" }
+  const overSrc = (overOpt: string) => `${PAL}
+views("_hd", { s: "gggggggg\\ngggggggg\\ngggggggg\\ngggggggg\\ngggggggg\\ngggggggg\\ngggggggg\\ngggggggg" }, { anchor: [4, 4] })
+rig3d("ov", {
+  w: 32, h: 42, pivot: [16, 40], headings: ["s"], ink: "k", head: "_hd", ${overOpt},
+  parts: (j) => ({
+    torso: j.limb(j.pelvis, j.chest, 4, 4, "g"),
+    held: [
+      j.ball([j.head[0], j.head[1] + 4, j.head[2]], 2.8, "r").field.mat("r").part("guard"),
+      j.ball([j.head[0], j.head[1] - 4, j.head[2]], 2.8, "w").field.mat("w").part("tip"),
+    ],
+  }),
+  moves: { a: { frames: 1, pose: () => ({}) } }
+})`;
+  const pPre = loadSource(overSrc('over: ["held"]'), "t.px.js");
+  const pDep = loadSource(overSrc('over: "depth"'), "t.px.js");
+  const pPix = loadSource(overSrc('over: { parts: ["held"], mode: "pixel" }'), "t.px.js");
+  const R = pPre.pal.resolve("r")!, W = pPre.pal.resolve("w")!;
+  const count = (im: ReturnType<Project["image"]>, c: number) => [...im.data].filter((v) => v === c).length;
+  // In "s" view, +y is behind the stamped head and -y is in front:
+  // held.tip (front) is always over the head under all three modes; held.guard (behind) is occluded behind the head
+  assert.ok(count(pPre.image("ov_a_s"), W) > 5, "prefix 'held' matches 'held.tip' over stamped head");
+  assert.ok(count(pDep.image("ov_a_s"), W) > 5, "over: 'depth' keeps front held.tip over stamped head");
+  assert.equal(count(pDep.image("ov_a_s"), R), 0, "over: 'depth' keeps rear held.guard occluded behind stamped head");
+  assert.ok(count(pPix.image("ov_a_s"), W) > 5, "pixel mode keeps front held.tip over stamped head");
+  assert.equal(count(pPix.image("ov_a_s"), R), 0, "pixel mode keeps rear held.guard occluded behind stamped head");
+
+  // 2. j.rod(..., { behind }) and j.smear(path, width, paint, { behind? }) (both V3[] and [V3, V3][])
+  const pHooks = loadSource(`${PAL}
+rig3d("hk", {
+  w: 36, h: 42, pivot: [18, 40], headings: ["s"], ink: "k",
+  parts: (j) => ({ torso: j.limb(j.pelvis, j.chest, 4.5, 4.5, "g") }),
+  moves: {
+    front: { frames: 1, pose: () => ({}), draw: (c, j) => {
+      j.rod([j.chest[0] - 3, j.chest[1] - 6, j.chest[2]], [j.chest[0] + 3, j.chest[1] - 6, j.chest[2]], "r");
+      j.smear([[j.chest[0] + 4, 0, j.chest[2] + 3], [j.chest[0] + 8, 0, j.chest[2]], [j.chest[0] + 5, 0, j.chest[2] - 3]], 2, "w");
+    } },
+    back: { frames: 1, pose: () => ({}), draw: (c, j) => {
+      j.rod([j.chest[0] - 3, j.chest[1] - 6, j.chest[2]], [j.chest[0] + 3, j.chest[1] - 6, j.chest[2]], "r", { behind: true });
+      j.smear([[[j.chest[0] - 8, 0, j.chest[2] + 3], [j.chest[0] - 5, 0, j.chest[2] + 2]], [[j.chest[0] - 9, 0, j.chest[2] - 2], [j.chest[0] - 5, 0, j.chest[2] - 2]]], 1, "w", { behind: true });
+    } },
+  }
+})`, "t.px.js");
+  const imFront = pHooks.image("hk_front_s"), imBack = pHooks.image("hk_back_s");
+  assert.ok(count(imFront, R) > 4, "j.rod draws over torso by default");
+  assert.equal(count(imBack, R), 0, "j.rod({ behind: true }) is occluded behind torso");
+  assert.ok(count(imFront, W) > 6, "j.smear(V3[]) draws visible weapon trail");
+  assert.ok(count(imBack, W) > 6, "j.smear([V3, V3][], { behind: true }) draws visible quad strip outside torso");
+
+  // 3. SurfaceMat.flat flattens per-pixel checker tones on thin 1-2 px blade; SurfaceOpts.clean object
+  const pSurf = loadSource(`pal({ k: "#111111", d: "#555555", m: "#999999", w: "#eeeeee" })
+const blade = sdf.box([0.11, 0.11, 1.1]).at(0, 0, 0.6).mat("b").part("blade")
+sprite("plain", { w: 12, h: 24 }, surface(blade, { view: { kind: "side", yaw: 35, pitch: 20 }, ppm: 16, mats: { b: "kdmw" }, outline: false, rim: false }))
+sprite("flat",  { w: 12, h: 24 }, surface(blade, { view: { kind: "side", yaw: 35, pitch: 20 }, ppm: 16, mats: { b: { ramp: "kdmw", flat: true } }, outline: false, rim: false }))
+sprite("cln",   { w: 12, h: 24 }, surface(blade, { view: { kind: "side", yaw: 35, pitch: 20 }, ppm: 16, mats: { b: "kdmw" }, outline: false, clean: { slivers: false, specks: true, keepGlint: true } }))`, "t.px.js");
+  const tones = (im: ReturnType<Project["image"]>) => new Set([...im.data].filter((c) => c !== 0)).size;
+  assert.ok(tones(pSurf.image("plain")) >= 2, "unflattened thin blade has multiple tones across faces");
+  assert.equal(tones(pSurf.image("flat")), 1, "SurfaceMat.flat snaps thin 1-2 px blade to a single dominant tone");
+  assert.ok(tones(pSurf.image("cln")) >= 1, "SurfaceOpts.clean object runs cleanly");
+
+  // 4. dress({ farBy }) suppresses far-limb darkening when threshold exceeds depth delta
+  const dir = mkdtempSync(join(tmpdir(), "pxl-dress-farby-"));
+  const travPath = join(import.meta.dirname, "../lib/characters/traveler.px.js").replaceAll("\\", "/");
+  const file = join(dir, "t.px.js");
+  writeFileSync(file, `include("${travPath}")
+const T = traveler, R = rig3d("q", { ...T.FIG, parts: T.dress(T.TRAVELER), moves: { m: { frames: 1, pose: () => ({}) } } })
+let farDef = 0, farBig = 0
+const mk = (farBy, bump) => T.dress({ ...T.TRAVELER, ...(farBy !== undefined ? { farBy } : {}), sleeve: (far) => { if (far) bump(); return "k" }, fore: () => "k", hand: () => "k", legs: (far) => { if (far) bump(); return { tr: "k", shin: "k", foot: "k" } } })
+const j = R.joints({}, 270) // profile: clear depth gap between near and far limbs
+mk(undefined, () => farDef++)(j, {})
+mk(99, () => farBig++)(j, {})
+const jTie = R.joints({}, 180) // facing front: depth tie (~0 px)
+let farTie = 0, farProf1 = 0
+mk(1, () => farTie++)(jTie, {})
+mk(1, () => farProf1++)(j, {})
+sprite("ok", { w: 4, h: 1 }, (c) => {
+  if (farDef === 2) c.px(0, 0, "#00ff00")
+  if (farBig === 0) c.px(1, 0, "#00ff00")
+  if (farTie === 0) c.px(2, 0, "#00ff00")
+  if (farProf1 === 2) c.px(3, 0, "#00ff00")
+})`);
+  const pDress = loadProject(file);
+  assert.deepEqual([...pDress.image("ok").data].map((v) => (v & 255) === 255), [true, true, true, true], "farBy: 1 skips front-facing ties while preserving profile far-limb shading; farBy: 99 suppresses both");
+});

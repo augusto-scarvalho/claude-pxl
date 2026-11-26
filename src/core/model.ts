@@ -277,6 +277,8 @@ export interface GroupDef {
   name: string;
   members: string[];
   loc?: string;
+  top?: string;
+  included?: boolean;
   ns?: string;
 }
 
@@ -303,6 +305,10 @@ export interface SheetOpts {
   sockets?: Record<string, string>;
   /** Palette slots: { name: swap } (keys to colors), exported as a palette a slot beside the sheet's own. */
   slots?: Record<string, Record<string, string>>;
+  /** Suffix for the exported normal map PNG (default "_n", e.g. ".normal" to avoid clashing with north-facing "_n" names). */
+  normalSuffix?: string;
+  /** Suffix for the exported emission map PNG (default "_e", e.g. ".emit" to avoid clashing with east-facing "_e" names). */
+  emitSuffix?: string;
 }
 
 export interface SheetDef {
@@ -357,8 +363,10 @@ export interface PlaceOpts {
   along?: [number[] | ((x: number, y: number) => [number, number]), number, number?];
   /** stamp only: at x, y but out of another stamp's box, [id, gap px], the shorter way. */
   apart?: [string, number?] | string;
-  /** Draw order in a layer with sort: "z" (default 0; ties keep call order). */
+  /** Draw order in a layer with sort: "z" (default 0; ties keep call order), or tie-breaker at the same row in sort: "y". */
   z?: number;
+  /** stamp only: explicit sort row in a layer with sort: "y" (default: the stamp's own y; ties broken by z, then call order). */
+  sortY?: number;
   seed?: number;
   /** Rebuild the placed asset with its own random choices (true = derived from position, or its id). */
   reseed?: boolean | number;

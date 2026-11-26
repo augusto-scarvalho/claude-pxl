@@ -27,10 +27,58 @@ halloween/party.px.js: 1 warning (1 scene (16 frames, 124 distinct placements), 
   ran: lit side on 124 (a clear reading on 29), lettering on 2; not run: front marker (nothing has one), feet (nothing placed has a height)
   party › crypt @back, feet 44,127 › WARNING: lit from the top left, but its light comes from the top right (a flipped drawing carries its light to the other side): its left edge reads lighter than the pixels just inside it, its right edge darker (PXL help "scenes 14") (frames 0-15)
 halloween/props.px.js: included only (doesn't build on its own: its palette comes from the file including it)
-hd2d/character_kit.px.js: 0 warnings (11 scenes (440 frames, 3102 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: feet on 3102, expects 1625 (1625 held); not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh())
+hd2d/character_kit.px.js: 48 warnings (11 scenes (440 frames, 3102 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: feet on 3102, expects 1625 (1625 held), views' rows on 58, figures' feet on 3801 poses; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh())
+  _kf226 › shoot n › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1, 3-5)
+  _kf226 › shoot ne › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1, 3-5)
+  _kf226 › shoot e › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1, 3-5)
+  _kf226 › shoot se › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1, 3-5)
+  _kf226 › shoot s › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1, 3-5)
+  _kf226 › shoot sw › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1, 3-5)
+  _kf226 › shoot w › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1, 3-5)
+  _kf226 › shoot nw › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1, 3-5)
+  _kf232 › shoot n › WARNING: an elbow bent the wrong way (up to 1.9 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-3, 5)
+  _kf232 › shoot ne › WARNING: an elbow bent the wrong way (up to 1.9 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-3, 5)
+  _kf232 › shoot e › WARNING: an elbow bent the wrong way (up to 1.9 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-3, 5)
+  _kf232 › shoot se › WARNING: an elbow bent the wrong way (up to 1.9 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-3, 5)
+  _kf232 › shoot s › WARNING: an elbow bent the wrong way (up to 1.9 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-3, 5)
+  _kf232 › shoot sw › WARNING: an elbow bent the wrong way (up to 1.9 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-3, 5)
+  _kf232 › shoot w › WARNING: an elbow bent the wrong way (up to 1.9 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-3, 5)
+  _kf232 › shoot nw › WARNING: an elbow bent the wrong way (up to 1.9 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-3, 5)
+  _kf235 › slash n › WARNING: an elbow bent the wrong way (up to 1.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frame 4)
+  _kf235 › slash ne › WARNING: an elbow bent the wrong way (up to 1.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frame 4)
+  _kf235 › slash e › WARNING: an elbow bent the wrong way (up to 1.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frame 4)
+  _kf235 › slash se › WARNING: an elbow bent the wrong way (up to 1.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frame 4)
+  _kf235 › slash s › WARNING: an elbow bent the wrong way (up to 1.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frame 4)
+  _kf235 › slash sw › WARNING: an elbow bent the wrong way (up to 1.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frame 4)
+  _kf235 › slash w › WARNING: an elbow bent the wrong way (up to 1.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frame 4)
+  _kf235 › slash nw › WARNING: an elbow bent the wrong way (up to 1.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frame 4)
+  _kf238 › shoot n › WARNING: an elbow bent the wrong way (up to 4.2 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 2-5)
+  _kf238 › shoot ne › WARNING: an elbow bent the wrong way (up to 4.2 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 2-5)
+  _kf238 › shoot e › WARNING: an elbow bent the wrong way (up to 4.2 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 2-5)
+  _kf238 › shoot se › WARNING: an elbow bent the wrong way (up to 4.2 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 2-5)
+  _kf238 › shoot s › WARNING: an elbow bent the wrong way (up to 4.2 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 2-5)
+  _kf238 › shoot sw › WARNING: an elbow bent the wrong way (up to 4.2 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 2-5)
+  _kf238 › shoot w › WARNING: an elbow bent the wrong way (up to 4.2 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 2-5)
+  _kf238 › shoot nw › WARNING: an elbow bent the wrong way (up to 4.2 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 2-5)
+  _kf244 › shoot n › WARNING: an elbow bent the wrong way (up to 4.1 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf244 › shoot ne › WARNING: an elbow bent the wrong way (up to 4.1 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf244 › shoot e › WARNING: an elbow bent the wrong way (up to 4.1 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf244 › shoot se › WARNING: an elbow bent the wrong way (up to 4.1 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf244 › shoot s › WARNING: an elbow bent the wrong way (up to 4.1 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf244 › shoot sw › WARNING: an elbow bent the wrong way (up to 4.1 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf244 › shoot w › WARNING: an elbow bent the wrong way (up to 4.1 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf244 › shoot nw › WARNING: an elbow bent the wrong way (up to 4.1 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf250 › shoot n › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf250 › shoot ne › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf250 › shoot e › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf250 › shoot se › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf250 › shoot s › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf250 › shoot sw › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf250 › shoot w › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _kf250 › shoot nw › WARNING: an elbow bent the wrong way (up to 2.6 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
 hd2d/clearing.px.js: 0 warnings (1 scene (13 frames, 96 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: lit side on 96 (a clear reading on 53), feet on 8, standing on 84, densities on 1; not run: front marker (nothing has one)
+  ran: lit side on 94 (a clear reading on 53), feet on 8, standing on 84, densities on 1; not run: front marker (nothing has one)
   clearing_md › not checked (check: false)
 hd2d/crew.px.js: 0 warnings (2 scenes (5 frames, 84 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: feet on 54; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh())
@@ -43,7 +91,7 @@ hd2d/harbor.px.js: 0 warnings (1 scene (12 frames, 79 distinct placements), 0 ri
   harbor_md › not checked (check: false)
   harbor_clip › not checked (check: false)
 hd2d/mounts.px.js: 0 warnings (3 scenes (3 frames, 66 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: nothing; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh()), feet (nothing placed has a height)
+  ran: views' rows on 5; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh()), feet (nothing placed has a height)
 hd2d/plaza.px.js: 0 warnings (1 scene (16 frames, 21 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lit side on 21 (a clear reading on 0), feet on 19, standing on 21, densities on 1; not run: front marker (nothing has one)
   plaza_hd › not checked (check: false)
@@ -85,8 +133,80 @@ perspective/road.px.js: 0 warnings (1 scene (11 frames, 31 distinct placements),
   ran: lit side on 31 (a clear reading on 0), feet on 3; not run: front marker (nothing has one)
 platformer.px.js: 0 warnings (1 scene (1 frame, 8 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 8; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh()), feet (nothing placed has a height)
-race_behind.px.js: 0 warnings (1 scene (140 frames, 3137 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: feet on 2502, expects 22 (22 held), densities on 1; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh())
+race_behind.px.js: 32 warnings (1 scene (140 frames, 3137 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: feet on 2502, expects 22 (22 held), boxes on 176 frames, genres' checks on 176 frames, genres' ink by category on 176 frames (and its line's L-corners), densities on 1; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh())
+  _rv_laguna_13_n › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 42% of its edge isn't, 27% on its lit side (up and left) and 15% away from the light
+  _rv_laguna_13_s › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 44% of its edge isn't, 28% on its lit side (up and left) and 16% away from the light
+  _rv_laguna_13_ssw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 56% of its edge isn't, 31% on its lit side (up and left) and 24% away from the light
+  _rv_laguna_13_sw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 52% of its edge isn't, 31% on its lit side (up and left) and 20% away from the light
+  _rv_laguna_13_wsw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 66% of its edge isn't, 38% on its lit side (up and left) and 28% away from the light
+  _rv_laguna_13_w › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 51% of its edge isn't, 25% on its lit side (up and left) and 25% away from the light
+  _rv_laguna_13_wnw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 58% of its edge isn't, 28% on its lit side (up and left) and 30% away from the light
+  _rv_laguna_13_nw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 70% of its edge isn't, 32% on its lit side (up and left) and 38% away from the light
+  _rv_laguna_13_nnw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 71% of its edge isn't, 39% on its lit side (up and left) and 33% away from the light
+  _rv_laguna_13_nne › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 71% of its edge isn't, 29% on its lit side (up and left) and 43% away from the light
+  _rv_laguna_13_ne › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 70% of its edge isn't, 32% on its lit side (up and left) and 38% away from the light
+  _rv_laguna_13_ene › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 58% of its edge isn't, 28% on its lit side (up and left) and 30% away from the light
+  _rv_laguna_13_e › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 51% of its edge isn't, 35% on its lit side (up and left) and 16% away from the light
+  _rv_laguna_13_ese › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 66% of its edge isn't, 36% on its lit side (up and left) and 30% away from the light
+  _rv_laguna_13_se › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 52% of its edge isn't, 30% on its lit side (up and left) and 22% away from the light
+  _rv_laguna_13_sse › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 56% of its edge isn't, 41% on its lit side (up and left) and 15% away from the light
+  _rv_fuego_13_n › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 54% of its edge isn't, 27% on its lit side (up and left) and 27% away from the light
+  _rv_fuego_13_s › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 60% of its edge isn't, 28% on its lit side (up and left) and 32% away from the light
+  _rv_fuego_13_ssw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 74% of its edge isn't, 33% on its lit side (up and left) and 41% away from the light
+  _rv_fuego_13_sw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 70% of its edge isn't, 33% on its lit side (up and left) and 37% away from the light
+  _rv_fuego_13_wsw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 81% of its edge isn't, 38% on its lit side (up and left) and 43% away from the light
+  _rv_fuego_13_w › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 63% of its edge isn't, 25% on its lit side (up and left) and 37% away from the light
+  _rv_fuego_13_wnw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 68% of its edge isn't, 28% on its lit side (up and left) and 40% away from the light
+  _rv_fuego_13_nw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 78% of its edge isn't, 32% on its lit side (up and left) and 46% away from the light
+  _rv_fuego_13_nnw › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 80% of its edge isn't, 39% on its lit side (up and left) and 41% away from the light
+  _rv_fuego_13_nne › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 80% of its edge isn't, 31% on its lit side (up and left) and 49% away from the light
+  _rv_fuego_13_ne › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 78% of its edge isn't, 34% on its lit side (up and left) and 44% away from the light
+  _rv_fuego_13_ene › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 68% of its edge isn't, 28% on its lit side (up and left) and 40% away from the light
+  _rv_fuego_13_e › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 63% of its edge isn't, 35% on its lit side (up and left) and 27% away from the light
+  _rv_fuego_13_ese › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 81% of its edge isn't, 36% on its lit side (up and left) and 45% away from the light
+  _rv_fuego_13_se › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 70% of its edge isn't, 30% on its lit side (up and left) and 41% away from the light
+  _rv_fuego_13_sse › WARNING: genre 'racing_behind': a character's edge is near-black all round (its ink's "character"), but 74% of its edge isn't, 41% on its lit side (up and left) and 33% away from the light
+  _rv_laguna_24_210 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 14,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_233 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 24,28): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_wsw › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 37,26): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_255 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 36,27): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_285 › LOOK: genre 'racing_behind': 2 L-corners in a character's line at its edge (at 36,20; 7,27): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_wnw › LOOK: genre 'racing_behind': 2 L-corners in a character's line at its edge (at 37,21; 6,26): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_308 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 19,28): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_nw › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 28,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_323 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 28,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_38 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 15,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_ne › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 15,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_53 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 24,28): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_ene › LOOK: genre 'racing_behind': 2 L-corners in a character's line at its edge (at 6,21; 37,26): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_75 › LOOK: genre 'racing_behind': 2 L-corners in a character's line at its edge (at 7,20; 36,27): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_105 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 7,27): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_ese › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 6,26): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_128 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 19,28): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_24_150 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 29,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_18_210 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 10,15): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_laguna_18_150 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 21,15): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_210 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 14,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_233 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 24,28): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_wsw › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 37,26): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_255 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 36,27): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_285 › LOOK: genre 'racing_behind': 2 L-corners in a character's line at its edge (at 36,20; 7,27): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_wnw › LOOK: genre 'racing_behind': 2 L-corners in a character's line at its edge (at 37,21; 6,26): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_308 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 19,28): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_nw › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 28,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_323 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 28,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_38 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 15,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_ne › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 15,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_53 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 24,28): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_ene › LOOK: genre 'racing_behind': 2 L-corners in a character's line at its edge (at 6,21; 37,26): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_75 › LOOK: genre 'racing_behind': 2 L-corners in a character's line at its edge (at 7,20; 36,27): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_105 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 7,27): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_ese › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 6,26): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_128 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 19,28): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_24_150 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 29,19): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_18_210 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 10,15): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
+  _rv_fuego_18_150 › LOOK: genre 'racing_behind': 1 L-corner in a character's line at its edge (at 21,15): where the line steps, the elbow of three pixels in an L doubles it; erase it, or make it the fill where it turns in. A corner the shape has (a sword's guard, a box's) stays (PXL help "edges")
 race_topdown.px.js: 0 warnings (1 scene (100 frames, 514 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: feet on 225, expects 107 (107 held), densities on 1; not run: front marker (nothing has one), lit side (no light: no scene has world.light, lamps lit by lighting() or sprites in mesh())
 rig/knight.px.js: 1 warning (3 scenes (98 frames, 123 distinct placements), 0 rigs, 0 other assets with a front marker)
@@ -194,50 +314,166 @@ lib/characters/bat.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements)
   ran: cards' cells against their drawing on 1; not run: front marker (nothing has one)
 lib/characters/beetle.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: cards' cells against their drawing on 1; not run: front marker (nothing has one)
-lib/characters/crew.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+lib/characters/crew.px.js: 9 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: cards' cells against their drawing on 6, views' rows on 5, figures' feet on 736 poses; not run: front marker (nothing has one)
+  rig3d (crew.px.js:357:43) › WARNING: rig3d: '_ogcoat' (idle): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (crew.px.js:357:43) › WARNING: rig3d: '_sastripes' (idle): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (crew.px.js:357:43) › WARNING: rig3d: '_bdvest' (idle): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (crew.px.js:357:43) › WARNING: rig3d: '_fcapron' (idle): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (crew.px.js:357:43) › WARNING: rig3d: '_fcapron' (carryidle): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (crew.px.js:357:43) › WARNING: rig3d: '_fcvest' (idle): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (crew.px.js:357:43) › WARNING: rig3d: '_brdress' (idle): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (crew.px.js:357:43) › WARNING: rig3d: '_brdress' (walk): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (crew.px.js:367:1) › WARNING: rig3d: '_carry' (carrylow): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
 lib/characters/dress.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one)
 lib/characters/fighter.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one)
-lib/characters/haldor_fighter.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: lines on 13, boxes on 213 frames, genres' checks on 217 frames, genres' ink by material on 217 frames (59% of the edge near-black), cards' cells against their drawing on 1, figures' feet on 434 poses; not run: front marker (nothing has one)
+lib/characters/haldor_fighter.px.js: 25 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: lines on 13, boxes on 213 frames, genres' checks on 217 frames, genres' ink by material on 217 frames (60% of the edge near-black), cards' cells against their drawing on 1, figures' feet on 434 poses; not run: front marker (nothing has one)
+  _hf_body › jab s › WARNING: an arm longer than its bones (by up to 9.3 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-2)
+  _hf_body › strike s › WARNING: an arm longer than its bones (by up to 12.9 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 2-3)
+  _hf_body › throw s › WARNING: an arm longer than its bones (by up to 6.6 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 4-5)
+  _hf_arm › jab s › WARNING: an arm longer than its bones (by up to 9.3 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-2)
+  _hf_arm › strike s › WARNING: an arm longer than its bones (by up to 12.9 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 2-3)
+  _hf_arm › throw s › WARNING: an arm longer than its bones (by up to 6.6 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 4-5)
+  _hf_tall › anvil_l s › WARNING: an arm longer than its bones (by up to 3.6 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 0, 2, 5)
+  _hf_tall › anvil_m s › WARNING: an arm longer than its bones (by up to 3.6 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 0, 2)
+  _hf_tall › anvil_h s › WARNING: an arm longer than its bones (by up to 3.6 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 0, 2)
+  _hf_tall › quench s › WARNING: an arm longer than its bones (by up to 8.3 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 2-3)
+  _hf_tall › quench_hold s › WARNING: an arm longer than its bones (by up to 9.0 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 0-1, 3)
+  _hf_tall_arm › anvil_l s › WARNING: an arm longer than its bones (by up to 3.6 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 0, 2, 5)
+  _hf_tall_arm › anvil_m s › WARNING: an arm longer than its bones (by up to 3.6 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 0, 2)
+  _hf_tall_arm › anvil_h s › WARNING: an arm longer than its bones (by up to 3.6 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 0, 2)
+  _hf_tall_arm › quench s › WARNING: an arm longer than its bones (by up to 8.3 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 2-3)
+  _hf_tall_arm › quench_hold s › WARNING: an arm longer than its bones (by up to 9.0 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 0-1, 3)
+  _hf_fall › get_up s › WARNING: an arm longer than its bones (by up to 5.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 2)
+  _hf_fall › tongs s › WARNING: an arm longer than its bones (by up to 5.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 4-5)
+  _hf_fall › tongs_hold s › WARNING: an arm longer than its bones (by up to 24.9 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 3-4)
+  _hf_fall_arm › get_up s › WARNING: an arm longer than its bones (by up to 5.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 2)
+  _hf_fall_arm › tongs s › WARNING: an arm longer than its bones (by up to 5.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 4-5)
+  _hf_fall_arm › tongs_hold s › WARNING: an arm longer than its bones (by up to 24.9 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 3-4)
+  rig3d (haldor_fighter.px.js:889:15) › WARNING: rig3d: '_hf_body' (strike): pose clipped at left of its 150x150 frame; widen w/h or omit them to auto-size
+  rig3d (haldor_fighter.px.js:890:3) › WARNING: rig3d: '_hf_arm' (kick_h): pose clipped at left of its 150x150 frame; widen w/h or omit them to auto-size
+  rig3d (haldor_fighter.px.js:890:3) › WARNING: rig3d: '_hf_fall_arm' (knockdown): pose clipped at bottom of its 180x150 frame; widen w/h or omit them to auto-size
 lib/characters/hero.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: boxes on 216 frames, genres' checks on 72 frames, genres' ink by category on 72 frames (and its line's L-corners), cards' cells against their drawing on 1, views' rows on 1, figures' feet on 144 poses; not run: front marker (nothing has one)
-lib/characters/hero32.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+lib/characters/hero32.px.js: 7 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: boxes on 360 frames, genres' checks on 180 frames, genres' ink by category on 180 frames (and its line's L-corners), cards' cells against their drawing on 2, views' rows on 2, figures' feet on 180 poses; not run: front marker (nothing has one)
+  _r32 › idle s › WARNING: an arm longer than its bones (by up to 1.5 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
+  _r32 › idle e › WARNING: an arm longer than its bones (by up to 1.6 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
+  _r32 › idle n › WARNING: an arm longer than its bones (by up to 1.5 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
+  _ra32 › attack s › WARNING: an arm longer than its bones (by up to 2.3 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 3)
+  _ra32 › attack e › WARNING: an arm longer than its bones (by up to 2.3 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 3)
+  _ra32 › attack n › WARNING: an arm longer than its bones (by up to 2.3 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 3)
+  _rc32 › idle e › WARNING: an arm longer than its bones (by up to 1.5 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
 lib/characters/hero_side.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: boxes on 108 frames, genres' checks on 53 frames, genres' ink by category on 54 frames (and its line's L-corners), cards' cells against their drawing on 1, views' rows on 1, figures' feet on 108 poses; not run: front marker (nothing has one)
-lib/characters/kit.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+lib/characters/kit.px.js: 1 warning (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: cards' cells against their drawing on 5, views' rows on 2, figures' feet on 80 poses; not run: front marker (nothing has one)
+  rig3d (kit.px.js:3997:3) › WARNING: rig3d: '_kb_beast' (stand): pose clipped at bottom of its 30x42 frame; widen w/h or omit them to auto-size
 lib/characters/knight.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 69 rigs, 150 other assets with a front marker)
   ran: front marker on 150, cards' cells against their drawing on 1, rig parts 690
-lib/characters/miko.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+lib/characters/miko.px.js: 16 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: cards' cells against their drawing on 1, views' rows on 1, figures' feet on 320 poses; not run: front marker (nothing has one)
+  mk › sweep n › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  mk › sweep ne › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  mk › sweep e › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  mk › sweep se › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  mk › sweep s › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  mk › sweep sw › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  mk › sweep w › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  mk › sweep nw › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  _mkb › sweep n › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  _mkb › sweep ne › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  _mkb › sweep e › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  _mkb › sweep se › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  _mkb › sweep s › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  _mkb › sweep sw › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  _mkb › sweep w › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
+  _mkb › sweep nw › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-7)
 lib/characters/miko_spectator.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 2, genres' checks on 16 frames, genres' ink by material on 16 frames (12% of the edge near-black), cards' cells against their drawing on 1, figures' feet on 32 poses; not run: front marker (nothing has one)
 lib/characters/mounts.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: nothing; not run: front marker (nothing has one)
-lib/characters/reva.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: cards' cells against their drawing on 2; not run: front marker (nothing has one)
-lib/characters/reva_fighter.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: lines on 29, boxes on 180 frames, genres' checks on 187 frames, genres' ink by material on 187 frames (59% of the edge near-black), cards' cells against their drawing on 1, figures' feet on 374 poses; not run: front marker (nothing has one)
+lib/characters/reva.px.js: 4 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: boxes on 120 frames, genres' checks on 60 frames, cards' cells against their drawing on 2, views' rows on 2, figures' feet on 60 poses; not run: front marker (nothing has one)
+  _r_reva_idle › WARNING: genre 'topdown16': its directions aren't one height: s 22, e 21, n 22 px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces
+  _r_reva_walk › WARNING: genre 'topdown16': its directions aren't one height: s 22, e 21, n 22 px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces
+  _r_reva_fight_idle › WARNING: genre 'topdown16': its directions aren't one height: s 22, e 21, n 22 px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces
+  _r_reva_fight_walk › WARNING: genre 'topdown16': its directions aren't one height: s 22, e 21, n 22 px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces
+lib/characters/reva_fighter.px.js: 9 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: lines on 29, boxes on 180 frames, genres' checks on 187 frames, genres' ink by material on 187 frames (60% of the edge near-black), cards' cells against their drawing on 1, figures' feet on 374 poses; not run: front marker (nothing has one)
+  _rf_body › strike s › WARNING: an arm longer than its bones (by up to 5.3 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 2-3)
+  _rf_body › jab s › WARNING: an arm longer than its bones (by up to 2.4 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
+  _rf_body › wave s › WARNING: an arm longer than its bones (by up to 2.4 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 2)
+  _rf_arm › strike s › WARNING: an arm longer than its bones (by up to 5.3 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 2-3)
+  _rf_arm › jab s › WARNING: an arm longer than its bones (by up to 2.4 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
+  _rf_arm › wave s › WARNING: an arm longer than its bones (by up to 2.4 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 2)
+  _rf_tall › win s › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 2, 4)
+  _rf_tall_arm › win s › WARNING: an arm longer than its bones (by up to 2.8 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 2, 4)
+  rig3d (reva_fighter.px.js:763:13) › WARNING: rig3d: '_rf_body' (rise_kick): pose clipped at left of its 130x118 frame; widen w/h or omit them to auto-size
 lib/characters/slime.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: boxes on 4 frames, frozen cells against their live render on 4, cards' cells against their drawing on 2; not run: front marker (nothing has one)
-lib/characters/traveler.px.js: 8 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+lib/characters/traveler.px.js: 32 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 1, cards' cells against their drawing on 2, views' rows on 2, figures' feet on 424 poses; not run: front marker (nothing has one)
+  tr › kneel n › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  tr › kneel ne › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  tr › kneel e › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  tr › kneel se › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  tr › kneel s › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  tr › kneel sw › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  tr › kneel w › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  tr › kneel nw › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
   tr › cast e › WARNING: an elbow bent the wrong way (up to 2.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
   tr › cast se › WARNING: an elbow bent the wrong way (up to 2.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
   tr › cast sw › WARNING: an elbow bent the wrong way (up to 2.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
   tr › cast w › WARNING: an elbow bent the wrong way (up to 2.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
+  _mo › kneel n › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  _mo › kneel ne › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  _mo › kneel e › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  _mo › kneel se › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  _mo › kneel s › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  _mo › kneel sw › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  _mo › kneel w › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
+  _mo › kneel nw › WARNING: an arm longer than its bones (by up to 2.7 px): its hand out of reach; bring the hand or grip closer to the shoulder (frames 1-4)
   _mo › cast e › WARNING: an elbow bent the wrong way (up to 2.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
   _mo › cast se › WARNING: an elbow bent the wrong way (up to 2.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
   _mo › cast sw › WARNING: an elbow bent the wrong way (up to 2.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
   _mo › cast w › WARNING: an elbow bent the wrong way (up to 2.5 px ahead of its shoulder-hand line): give the pose an elbow hint behind him: elbow: [-1, 0.5, 0] ([-1, 0.5, -1] with the hand at or over the shoulder) (frames 1-5)
-lib/characters/villagers.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: cards' cells against their drawing on 2; not run: front marker (nothing has one)
-lib/characters/villagers32.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
-  ran: cards' cells against their drawing on 2; not run: front marker (nothing has one)
+  rig3d (traveler.px.js:248:1) › WARNING: rig3d: 'tr' (walk): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (traveler.px.js:248:1) › WARNING: rig3d: 'tr' (idle): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (traveler.px.js:248:1) › WARNING: rig3d: 'tr' (kneel): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (traveler.px.js:248:1) › WARNING: rig3d: 'tr' (cast): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (traveler.px.js:248:1) › WARNING: rig3d: 'tr' (turn): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (traveler.px.js:296:17) › WARNING: rig3d: '_mo' (idle): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (traveler.px.js:296:17) › WARNING: rig3d: '_mo' (kneel): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+  rig3d (traveler.px.js:296:17) › WARNING: rig3d: '_mo' (cast): pose clipped at bottom of its 26x40 frame; widen w/h or omit them to auto-size
+lib/characters/villagers.px.js: 4 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: boxes on 120 frames, genres' checks on 60 frames, cards' cells against their drawing on 2, views' rows on 2, figures' feet on 60 poses; not run: front marker (nothing has one)
+  _r_villager_idle › WARNING: genre 'topdown16': its directions aren't one height: s 22, e 21, n 22 px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces
+  _r_villager_walk › WARNING: genre 'topdown16': its directions aren't one height: s 22, e 21, n 22 px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces
+  _r_elder_idle › WARNING: genre 'topdown16': its directions aren't one height: s 21, e 20, n 21 px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces
+  _r_elder_walk › WARNING: genre 'topdown16': its directions aren't one height: s 21, e 20, n 21 px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces
+lib/characters/villagers32.px.js: 17 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
+  ran: boxes on 168 frames, genres' checks on 84 frames, cards' cells against their drawing on 2, views' rows on 2, figures' feet on 84 poses; not run: front marker (nothing has one)
+  _hd32_villager32 › WARNING: n: row 3 (2 px left, 2 px right) from the anchor sticks out past _hd32_n by more than a pixel
+  _hd32_villager32 › WARNING: s: rows 3 (2 px left, 2 px right), 4 (3 px left, 3 px right) from the anchor stick out past _hd32_s by more than a pixel
+  _hd32_villager32 › WARNING: sw: rows 1 (2 px right), 2 (3 px right), 3 (5 px right), 4 (5 px right) from the anchor stick out past _hd32_sw by more than a pixel
+  _hd32_villager32 › WARNING: w: rows 2 (2 px right), 3 (3 px right), 4 (4 px right) from the anchor stick out past _hd32_w by more than a pixel
+  _hd32_villager32 › WARNING: nw: row 4 (3 px right) from the anchor sticks out past _hd32_nw by more than a pixel
+  _hd32_elder32 › WARNING: s: row 4 (2 px left, 2 px right) from the anchor sticks out past _hd32_s by more than a pixel
+  _hd32_elder32 › WARNING: sw: rows 3 (3 px right), 4 (2 px right) from the anchor stick out past _hd32_sw by more than a pixel
+  _rvillager32 › idle s › WARNING: an arm longer than its bones (by up to 1.5 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
+  _rvillager32 › idle e › WARNING: an arm longer than its bones (by up to 1.6 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
+  _rvillager32 › idle n › WARNING: an arm longer than its bones (by up to 1.5 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
+  _relder32 › idle s › WARNING: an arm longer than its bones (by up to 1.5 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
+  _relder32 › idle e › WARNING: an arm longer than its bones (by up to 1.6 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
+  _relder32 › idle n › WARNING: an arm longer than its bones (by up to 1.5 px): its hand out of reach; bring the hand or grip closer to the shoulder (frame 1)
+  swap (hero32.px.js:250:5) › WARNING: swap: keys 'j' and 'D' share the same color #4e2519 and swap to different colors (#4a4650 vs #3a3640); swap maps by color, so 'D' overwrites 'j' — give each swappable role distinct default hex values
+  swap (hero32.px.js:250:5) › WARNING: swap: keys 'h' and 'd' share the same color #7f3f25 and swap to different colors (#7c7884 vs #5e5866); swap maps by color, so 'd' overwrites 'h' — give each swappable role distinct default hex values
+  swap (hero32.px.js:250:5) › WARNING: swap: keys 'Y' and 'l' share the same color #b5653a and swap to different colors (#b4b0b8 vs #878090); swap maps by color, so 'l' overwrites 'Y' — give each swappable role distinct default hex values
+  swap (hero32.px.js:250:5) › WARNING: swap: keys 'L' and 'e' share the same color #d68b52 and swap to different colors (#e2dee4 vs #b2aab4); swap maps by color, so 'e' overwrites 'L' — give each swappable role distinct default hex values
 lib/nature/cave.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)
   ran: lines on 4, cards' cells against their drawing on 2; not run: front marker (nothing has one)
 lib/nature/island.px.js: 0 warnings (0 scenes (0 frames, 0 distinct placements), 0 rigs, 0 other assets with a front marker)

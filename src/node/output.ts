@@ -199,19 +199,34 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
   };
 
   const names = p.order.filter((n) => want.has(n));
+  // Precompute which assets are still referenced by wanted sheets or as bases, so finished standalone assets
+  // and sheet members can be evicted from memory promptly on large multi-figure rosters.
+  const wantSheets = p.sheets.filter((s) => want.has(s.name));
+  const sheetMembers = new Map<SheetDef, string[]>();
+  const sheetUse = new Map<string, number>();
+  for (const s of wantSheets) {
+    try {
+      const ms = p.sheetNames(s);
+      sheetMembers.set(s, ms);
+      for (const m of ms) sheetUse.set(m, (sheetUse.get(m) ?? 0) + 1);
+    } catch { /* errors surface in the sheet loop below */ }
+  }
+  const baseUsed = new Set<string>();
+  for (const d of p.assets.values()) if (d.opts.base) baseUsed.add(d.opts.base);
+  const lastScene = names.findLastIndex((n) => p.assets.get(n)!.kind === "scene");
   // (handed out to the workers, if any, workers.ts: each anim's frames, a sprite; a scene's frames stay here)
   if (p.elsewhere) for (const n of names) { const k = p.assets.get(n)!.kind; if (k === "anim") p.handOut(n, 0, undefined, 600); else if (k !== "scene") p.elsewhere.ahead([[n, 0, 0]]); }
   // a map's file (<x>_n.png, <x>_e.png) that is another's own (an asset x with normals beside an asset
   // x_n, a sheet beside a sheet x_n): an error naming both, and the map not written over it
   const folder = (k: string) => (k === "scene" ? "scenes" : k === "anim" ? "anims" : "sprites"), files = new Set(p.exported());
-  const writeMap = (what: string, n: string, dir: string, suffix: "_n" | "_e", img: () => Img, loc?: string): boolean => {
+  const writeMap = (what: string, n: string, dir: string, suffix: string, kind: "normal" | "emission", img: () => Img, loc?: string): boolean => {
     const o = n + suffix, d = p.assets.get(o), other = dir ? d && files.has(o) && folder(d.kind) === dir && `${d.kind} '${o}'` : p.sheets.some((s) => s.name === o) && `sheet '${o}'`;
-    if (other) { errors.push(new PxError(`${what} '${n}': its ${suffix === "_n" ? "normal" : "emission"} map would be ${dir ? dir + "/" : ""}${o}.png, the file of ${other} too (a heading's sprite?): rename one of them; the map isn't written`, loc)); return false; }
+    if (other) { errors.push(new PxError(`${what} '${n}': its ${kind} map would be ${dir ? dir + "/" : ""}${o}.png, the file of ${other} too (a heading's sprite?): rename one of them${what === "sheet" ? ` (or pass ${kind === "normal" ? 'normalSuffix: ".normal"' : 'emitSuffix: ".emit"'})` : ""}; the map isn't written`, loc)); return false; }
     writePng(join(out, dir, o + ".png"), img());
     return true;
   };
-  for (const n of names) {
-    const def = p.assets.get(n)!, t0 = performance.now();
+  for (let idx = 0; idx < names.length; idx++) {
+    const n = names[idx], def = p.assets.get(n)!, t0 = performance.now();
     try {
       const b = p.build(n);
       const dir = def.kind === "scene" ? "scenes" : def.kind === "anim" ? "anims" : "sprites";
@@ -224,8 +239,8 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         const { sheet, frames: fr } = packSheet(drawn.map((f, i) => ({ name: `${n}_${i}`, img: f.img, ms: f.ms })), drawn.length);
         writePng(join(out, dir, n + ".png"), sheet);
         write(join(out, dir, n + ".json"), sheetJson(n + ".png", sheet, fr, [{ name: n, from: 0, to: fr.length - 1, direction: p.direction(n) }]));
-        if (drawn.some((f) => f.img.norm)) writeMap(def.kind, n, dir, "_n", () => packSheet(drawn.map((f) => ({ name: "", img: normalImage(f.img) })), drawn.length).sheet, def.loc); // laid out as the art
-        if (drawn.some((f) => glows(f.img))) writeMap(def.kind, n, dir, "_e", () => packSheet(drawn.map((f) => ({ name: "", img: emitImage(f.img) })), drawn.length).sheet, def.loc);
+        if (drawn.some((f) => f.img.norm)) writeMap(def.kind, n, dir, "_n", "normal", () => packSheet(drawn.map((f) => ({ name: "", img: normalImage(f.img) })), drawn.length).sheet, def.loc); // laid out as the art
+        if (drawn.some((f) => glows(f.img))) writeMap(def.kind, n, dir, "_e", "emission", () => packSheet(drawn.map((f) => ({ name: "", img: emitImage(f.img) })), drawn.length).sheet, def.loc);
         // previews show reference layers (guides) over each frame, like still assets do
         shown = packSheet(frames.map((f) => ({ name: "", img: f.guide ?? f.img })), frames.length, 1).sheet;
       } else {
@@ -236,8 +251,8 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
         writePng(join(out, dir, n + ".png"), b.img);
         // a frozen cell with no PNG yet: its live render, written where it is read from next time
         if (def.freeze) { writePng(def.freeze, b.img); info += ` (frozen: wrote ${def.freeze})`; }
-        if (b.img.norm) writeMap(def.kind, n, dir, "_n", () => normalImage(b.img), def.loc); // for engine lights
-        if (glows(b.img)) writeMap(def.kind, n, dir, "_e", () => emitImage(b.img), def.loc);
+        if (b.img.norm) writeMap(def.kind, n, dir, "_n", "normal", () => normalImage(b.img), def.loc); // for engine lights
+        if (glows(b.img)) writeMap(def.kind, n, dir, "_e", "emission", () => emitImage(b.img), def.loc);
       }
       if (frames.length) {
         let gifUnique = frames.length;
@@ -297,6 +312,7 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
     } catch (e) {
       errors.push(wrap(e));
     }
+    if (!p.elsewhere && idx > lastScene && !sheetUse.has(n) && !baseUsed.has(n) && !p.named(n)) p.evict(n);
     times.push([n, performance.now() - t0]);
   }
 
@@ -313,19 +329,20 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       writePng(join(out, s.name + ".png"), outSheet);
       // the normal and emission maps in the same rectangles, for engine lights (the art's json serves both)
       let normalMap: string | undefined, emissionMap: string | undefined;
+      const nSuf = s.opts.normalSuffix ?? "_n", eSuf = s.opts.emitSuffix ?? "_e";
       if (items.some((it) => it.img.norm)) {
-        const ok = writeMap("sheet", s.name, "", "_n", () => {
+        const ok = writeMap("sheet", s.name, "", nSuf, "normal", () => {
           const m = packSheet(items.map((it) => ({ ...it, img: normalImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet;
           return sc > 1 ? m.scale(sc) : m;
         }, s.loc);
-        if (ok) normalMap = `${s.name}_n.png`;
+        if (ok) normalMap = `${s.name}${nSuf}.png`;
       }
       if (items.some((it) => glows(it.img))) {
-        const ok = writeMap("sheet", s.name, "", "_e", () => {
+        const ok = writeMap("sheet", s.name, "", eSuf, "emission", () => {
           const m = packSheet(items.map((it) => ({ ...it, img: emitImage(it.img) })), s.opts.cols, s.opts.pad, s.opts.extrude, rows).sheet;
           return sc > 1 ? m.scale(sc) : m;
         }, s.loc);
-        if (ok) emissionMap = `${s.name}_e.png`;
+        if (ok) emissionMap = `${s.name}${eSuf}.png`;
       }
       // palette slots: the sheet's colors as they first appear, and each slot's in the same order (a
       // palette swap's lookup), in the JSON and as .hex files beside it (rrggbb: alpha stays the art's)
@@ -351,6 +368,15 @@ export function writeOutputs(p: Project, out: string, opts: OutputOptions = {}):
       }
     } catch (e) {
       errors.push(wrap(e).within(`sheet '${s.name}'`, s.loc));
+    }
+    const ms = sheetMembers.get(s);
+    if (ms && !p.elsewhere) {
+      for (const m of ms) {
+        const leftUses = (sheetUse.get(m) ?? 1) - 1;
+        if (leftUses > 0) { sheetUse.set(m, leftUses); continue; }
+        sheetUse.delete(m);
+        if (!baseUsed.has(m) && !p.named(m)) p.evict(m);
+      }
     }
   }
   // 3D files, each read back to say what it holds

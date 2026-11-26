@@ -125,7 +125,7 @@ export class Canvas {
   /** Stamps placed so far in this asset (shared by its layers), for stamp(..., { at }). */
   placed?: Placed;
   /** A layer with sort: its stamps wait here and draw in order on flush(). */
-  sorted?: { by: "y" | "z"; queue: { key: number; seq: number; draw: () => void }[] };
+  sorted?: { by: "y" | "z"; queue: { key: number; tie: number; seq: number; draw: () => void }[] };
   /** Called after each top-level (non-nested) op call; used for tracing. */
   onOp?: (name: string, args: unknown[]) => void;
   /** Skip carrying norm/emit/parts metadata when stamping onto declarative scenes during `pxl check` (`checksOnly && !where`). */
@@ -302,10 +302,13 @@ export class Canvas {
 
   /**
    * `fn` drawn in its turn among a sorted layer's stamps (or a `c.sort()`'s): at depth `z` (sort: "z")
-   * or row `y` (sort: "y"), ties in call order; outside one, now. What it stamps is drawn as it is.
+   * or row `y` (sort: "y", with optional `z` tie-breaker: c.y(y, z, fn)), ties in call order; outside one, now. What it stamps is drawn as it is.
    */
   z(z: number, fn: (c: Canvas) => void): void { this.inTurn("z", z, fn); }
-  y(y: number, fn: (c: Canvas) => void): void { this.inTurn("y", y, fn); }
+  y(y: number, zOrFn: number | ((c: Canvas) => void), maybeFn?: (c: Canvas) => void): void {
+    if (typeof zOrFn === "number") this.inTurn("y", y, maybeFn!, zOrFn);
+    else this.inTurn("y", y, zOrFn);
+  }
   /** What `fn` stamps and hands to c.z() / c.y() drawn in that order when it is done: a sorted layer inside a function. */
   sort(by: "y" | "z", fn: () => void): void {
     if ((by !== "y" && by !== "z") || typeof fn !== "function") throw new PxError(`c.sort("y" or "z", () => { ... }): stamps and c.${by === "y" ? "y" : "z"}(key, fn) drawings in their order, got ${JSON.stringify(by)}`);
@@ -313,13 +316,13 @@ export class Canvas {
     this.sorted = { by, queue: [] };
     try { fn(); this.flush(); } finally { this.sorted = prev; }
   }
-  private inTurn(by: "y" | "z", key: number, fn: (c: Canvas) => void): void {
-    if (!Number.isFinite(key) || typeof fn !== "function") throw new PxError(`c.${by}(${by === "z" ? "depth" : "row"}, (c) => { ... }), got ${JSON.stringify(key)}`);
+  private inTurn(by: "y" | "z", key: number, fn: (c: Canvas) => void, tie = 0): void {
+    if (!Number.isFinite(key) || !Number.isFinite(tie) || typeof fn !== "function") throw new PxError(`c.${by}(${by === "z" ? "depth" : "row[, z]"}, (c) => { ... }), got ${JSON.stringify(key)}`);
     if (!this.sorted) return fn(this);
     if (this.sorted.by !== by) throw new PxError(`c.${by}() in a layer sorted by ${this.sorted.by}: give its ${this.sorted.by} with c.${this.sorted.by}()`);
     // drawn later, in order, under the clip of the call; what it stamps is drawn at once
     const clip = this.clipPred, q = this.sorted.queue;
-    q.push({ key, seq: q.length, draw: () => {
+    q.push({ key, tie, seq: q.length, draw: () => {
       const s = this.sorted, c = this.clipPred;
       this.sorted = undefined; this.clipPred = clip;
       try { fn(this); } finally { this.sorted = s; this.clipPred = c; }
@@ -966,28 +969,50 @@ export class Canvas {
    * throw a whole scene): see spells.ts. Through the perspective() camera of a mesh() drawn before it,
    * it is drawn at the depth of where it is now: what stands nearer the eye stays in front of it.
    */
-  cast(s: Spell, opts: { shake?: boolean } = {}): void {
+  cast(s: Spell, opts: { shake?: boolean; depth?: "part" | "single" } = {}): void {
     if (!s || typeof s.draw !== "function") throw new PxError('cast(spell("fire", 2, { from: [x, y], to: [x, y] })): a spell');
-    const bad = Object.keys(opts ?? {}).find((k) => k !== "shake");
-    if (bad) throw new PxError(`cast(spell, { shake }): no option '${bad}'`);
+    const bad = Object.keys(opts ?? {}).find((k) => k !== "shake" && k !== "depth");
+    if (bad) throw new PxError(`cast(spell, { shake, depth }): no option '${bad}'`);
+    if (opts.depth !== undefined && opts.depth !== "part" && opts.depth !== "single")
+      throw new PxError(`cast: depth is "part" (default: per-primitive world depth) or "single" (whole spell at its head), got ${JSON.stringify(opts.depth)}`);
     // in the art's pixel: on a picture k times as big (a scene's sizes) each of its pixels k x k, its view the art's
-    const k = this.k, sc: Canvas = k === 1 ? this : Object.assign(Object.create(this) as Canvas, {
-      plot: (x: number, y: number, col: Color) => { let any = false; for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) any = this.plot(x * k + i, y * k + j, col) || any; return any; },
-      get: (x: number, y: number) => this.get(x * k, y * k),
-      socket: (at: string) => this.socket(at).map((v) => v / k) as [number, number],
+    const D = this.img.depth, perPart = !!D && !!s.view?.z && opts.depth !== "single";
+    let curZ: number | undefined, usedDepth = false;
+    const k = this.k;
+    const plotPx = (px: number, py: number, col: Color): boolean => {
+      if (perPart && curZ !== undefined) {
+        const i = this.index(px, py);
+        if (i >= 0 && D![i] < curZ) return false;
+      }
+      return this.plot(px, py, col);
+    };
+    const sc: Canvas = k === 1 && !perPart ? this : Object.assign(Object.create(this) as Canvas, {
+      ...(perPart ? { setDepth: (zv: number | undefined) => { curZ = zv; if (zv !== undefined) usedDepth = true; } } : {}),
+      plot: (x: number, y: number, col: Color) => {
+        if (k === 1) return plotPx(x, y, col);
+        let any = false;
+        for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) any = plotPx(x * k + i, y * k + j, col) || any;
+        return any;
+      },
+      ...(k === 1 ? {} : {
+        get: (x: number, y: number) => this.get(x * k, y * k),
+        socket: (at: string) => this.socket(at).map((v) => v / k) as [number, number],
+      }),
     });
     s.bind(sc);
-    const D = this.img.depth, z = D ? s.depth?.(this.t) : undefined, before = z !== undefined ? { d: this.img.data.slice(), e: this.img.emit?.slice() } : undefined;
+    const z = D ? s.depth?.(this.t) : undefined, before = z !== undefined ? { d: this.img.data.slice(), e: this.img.emit?.slice() } : undefined;
     s.under(sc);
     const d = this.img.data, a = d.slice();
     s.draw(sc);
     const b = d.slice();
     s.over(sc);
+    curZ = undefined;
     const g = Math.round(255 * Math.max(0, Math.min(1, s.glow)));
     const e = g ? (this.img.emit ??= new Uint8Array(d.length)) : this.img.emit;
     if (e) for (let i = 0; i < d.length; i++) if (d[i] !== b[i]) e[i] = 0; else if (b[i] !== a[i]) e[i] = Math.max(e[i], g);
-    // in mesh()'s depth: where something drawn is nearer the eye than the spell, it stays as it was
-    if (before) for (let i = 0; i < d.length; i++) if (D![i] < z! && d[i] !== before.d[i]) { d[i] = before.d[i]; if (e) e[i] = before.e?.[i] ?? 0; }
+    // in mesh()'s depth: if the spell tested per-primitive world depth via setDepth(), occluded pixels were already skipped;
+    // otherwise (depth: "single" or custom spells without setDepth), fall back to the single head-depth pass
+    if (before && !usedDepth) for (let i = 0; i < d.length; i++) if (D![i] < z! && d[i] !== before.d[i]) { d[i] = before.d[i]; if (e) e[i] = before.e?.[i] ?? 0; }
     for (const l of s.lights(this.t)) if (l.power > 0) this.lamp(l.x * k, l.y * k, { r: Math.max(1, l.r * k), power: l.power, color: l.color });
     const f = s.flash(this.t);
     if (f) this.effect("tint", f);
@@ -1646,9 +1671,9 @@ export class Canvas {
       throw new PxError(`sub is true, [dx, dy] the way the part moves (1 right / down, -1 left / up), or { from: [x, y] } where it was, got ${JSON.stringify(sub)}`);
     if (opts?.smear !== undefined) {
       if (sub) throw new PxError("smear and sub don't go together: a smear is a move of more than a pixel");
-      return this.place(this.smeared(src, opts.smear, x, y), x, y, [0, 0], undefined, opts?.z, name, undefined, { id: opts?.id, loc: this.loc, rel, ...this.code() });
+      return this.place(this.smeared(src, opts.smear, x, y), x, y, [0, 0], undefined, opts?.z, name, undefined, { id: opts?.id, loc: this.loc, rel, ...this.code() }, opts?.sortY);
     }
-    this.place(src, x, y, [0, 0], undefined, opts?.z, name, sub ? (Array.isArray(sub) ? (sub as [number, number]) : [1, 1]) : undefined, { id: opts?.id, loc: this.loc, rel, ...this.code() });
+    this.place(src, x, y, [0, 0], undefined, opts?.z, name, sub ? (Array.isArray(sub) ? (sub as [number, number]) : [1, 1]) : undefined, { id: opts?.id, loc: this.loc, rel, ...this.code() }, opts?.sortY);
   }
 
   /**
@@ -1824,24 +1849,25 @@ export class Canvas {
 
   /**
    * Put a placed asset's pivot on (x, y): drawn now, or in a sorted layer queued and drawn on
-   * flush() by y (where it stands) or z.
+   * flush() by y (where it stands, or explicit sortY; ties broken by z, then call order) or z.
    */
-  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc" | "rel" | "code">): void {
+  private place(src: Img, x: number, y: number, def: [number, number], ok?: Pred, z = 0, name?: string, sub?: [number, number], meta?: Pick<Placement, "id" | "loc" | "rel" | "code">, sortY?: number): void {
     if (!this.sorted) return this.putAt(src, x, y, def, ok, name, sub, meta);
     if (!Number.isFinite(z)) throw new PxError(`z must be a number, got ${JSON.stringify(z)}`);
+    if (sortY !== undefined && !Number.isFinite(sortY)) throw new PxError(`sortY must be a number, got ${JSON.stringify(sortY)}`);
     // Drawn later, in order: keep the clip that was active at the call.
-    const clip = this.clipPred, q = this.sorted.queue, byY = this.sorted.by === "y";
-    q.push({ key: byY ? y : z, seq: q.length, draw: () => {
+    const clip = this.clipPred, q = this.sorted.queue, byY = this.sorted.by === "y", row = sortY ?? y;
+    q.push({ key: byY ? row : z, tie: byY ? z : 0, seq: q.length, draw: () => {
       const prev = this.clipPred;
       this.clipPred = clip;
-      try { this.putAt(src, x, y, def, ok, name, sub, meta && byY ? { ...meta, sort: y } : meta); } finally { this.clipPred = prev; }
+      try { this.putAt(src, x, y, def, ok, name, sub, meta && byY ? { ...meta, sort: row } : meta); } finally { this.clipPred = prev; }
     } });
   }
 
-  /** Draw the stamps a sorted layer queued: by key (y or z), ties in call order. */
+  /** Draw the stamps a sorted layer queued: by key (y or z), ties by z (in sort: "y") then call order. */
   flush(): void {
     if (!this.sorted) return;
-    const q = this.sorted.queue.splice(0).sort((a, b) => a.key - b.key || a.seq - b.seq);
+    const q = this.sorted.queue.splice(0).sort((a, b) => a.key - b.key || a.tie - b.tie || a.seq - b.seq);
     for (const d of q) d.draw();
   }
 

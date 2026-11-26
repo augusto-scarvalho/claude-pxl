@@ -457,8 +457,8 @@ export function emitter(o: EmitterOpts = {}): Emitter {
   return run;
 }
 
-/** What the particles and trails draw on (a blade's trail fills polygons). */
-export interface VfxCanvas { t: number; color(k: unknown): Color | null; get(x: number, y: number): Color; plot(x: number, y: number, c: Color): boolean; poly?(pts: number[], c: string): void }
+/** What the particles and trails draw on (a blade's trail fills polygons; setDepth tests against mesh() depth). */
+export interface VfxCanvas { t: number; color(k: unknown): Color | null; get(x: number, y: number): Color; plot(x: number, y: number, c: Color): boolean; poly?(pts: number[], c: string): void; setDepth?(z: number | undefined): void }
 
 const keysOf = (c: VfxCanvas, keys: string | string[], what: string) => {
   const ks = colorList(keys).map((k) => c.color(k));
@@ -517,7 +517,8 @@ export function drawTrail(c: VfxCanvas, path: (t: number, i: number) => number[]
   for (let s = 0; s <= n; s++) {
     const k = s / n, tt = t - k * L;
     if (o.from !== undefined && tt < o.from) break;
-    const [x, y] = path(tt, n - s) as number[], r = Math.max(0, (w0 + (w1 - w0) * k) / 2 - 0.5), key = ks[Math.min(ks.length - 1, Math.floor(k * ks.length))];
+    const pt = path(tt, n - s) as number[], [x, y] = pt, r = Math.max(0, (w0 + (w1 - w0) * k) / 2 - 0.5), key = ks[Math.min(ks.length - 1, Math.floor(k * ks.length))];
+    if (pt.length > 2 && pt[2] !== undefined) c.setDepth?.(pt[2]);
     for (let dy = -Math.ceil(r); dy <= Math.ceil(r); dy++)
       for (let dx = -Math.ceil(r); dx <= Math.ceil(r); dx++) {
         if (dx * dx + dy * dy > r * r + 0.5) continue;
@@ -527,4 +528,5 @@ export function drawTrail(c: VfxCanvas, path: (t: number, i: number) => number[]
         c.plot(px, py, key);
       }
   }
+  c.setDepth?.(undefined);
 }

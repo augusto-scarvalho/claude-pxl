@@ -7,6 +7,8 @@ import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import * as vm from "node:vm";
 import { stripTypeScriptTypes } from "node:module";
 import { PxError, distance, wrap } from "../core/errors.ts";
+import { toHex } from "../core/color.ts";
+import type { Palette } from "../core/palette.ts";
 import { Project, type ProjectOptions } from "../core/project.ts";
 import { Sdf } from "../core/sdf.ts";
 import { decodePng } from "./png.ts";
@@ -119,14 +121,28 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
   const home = dirname(resolve(file));
   p.short = (abs) => { const r = relative(home, abs); return isAbsolute(r) ? abs.replace(/^.*[\\/]/, "") : r.split(sep).join("/"); };
   // each file's include paths, its names (`as`) with each: one file reached by two paths runs once under the same names
-  // and its palette its own; else both are said where its top-level names clash
+  // (replaying its palette/look3d additions when included with palette: true); else both are said where top-level names clash
   // (a file that sets no palette draws in its includer's: once only where that is the same one)
-  const reached = new Map<string, string[]>(), once = new Map<string, unknown>();
-  const run = (path: string, ns?: string) => {
-    const abs = resolve(path), k = `${abs}\n${ns}`, had = p.pal, was = once.get(k);
+  type OnceEntry = { had: Palette; usedIncluderPal: boolean; assetCount: number; addedKeys: Record<string, string>; addedRamps: string[]; addedLook?: { light?: number[]; mats?: Record<string, unknown> } };
+  const reached = new Map<string, string[]>(), once = new Map<string, OnceEntry>(), onceByFile = new Map<string, OnceEntry>();
+  const run = (path: string, ns?: string, sharePal = false) => {
+    const abs = resolve(path), k = `${abs}\n${ns}`, had = p.pal;
+    // Exact (file + namespace) match, or a pure palette/style/profile file (no defined assets) shared across namespaces
+    const was = once.get(k) ?? (sharePal && onceByFile.get(abs)?.assetCount === 0 ? onceByFile.get(abs) : undefined);
     if (stack.includes(abs)) throw new PxError(`include cycle: ${[...stack, abs].join(" -> ")}`);
-    if (ns !== undefined && once.has(k) && (was === undefined || was === had)) return;
-    const way = `${[...stack, abs].map((f) => p.short(f)).join(" -> ")}${ns ? ` (as "${ns.slice(0, -1)}")` : ""}${ns === undefined && stack.length ? " (its palette into the includer's)" : ""}`;
+    if (ns !== undefined && was) {
+      if (sharePal) {
+        if (Object.keys(was.addedKeys).length) p.pal = p.pal.extend(was.addedKeys);
+        const newRamps = was.addedRamps.filter((r) => !p.pal.ramps.includes(r));
+        if (newRamps.length) p.pal = p.pal.withRamps(newRamps);
+        if (was.addedLook) p.look3d = { ...p.look3d, ...(was.addedLook.light ? { light: was.addedLook.light } : {}), ...(was.addedLook.mats ? { mats: was.addedLook.mats } : {}) };
+        return;
+      }
+      if (!was.usedIncluderPal || was.had === had) return;
+    }
+    const prevKeys = new Map(had.keys), prevOwn = had.own(), prevRamps = new Set(had.ramps), prevLook = p.look3d;
+    const prevAssets = p.order.length + p.sheets.length + p.models.length;
+    const way = `${[...stack, abs].map((f) => p.short(f)).join(" -> ")}${ns ? ` (as "${ns.slice(0, -1)}")` : ""}${sharePal || (ns === undefined && stack.length) ? " (its palette into the includer's)" : ""}`;
     reached.set(abs, [...(reached.get(abs) ?? []), way]);
     let code: string;
     try { code = read(abs); } catch {
@@ -152,7 +168,18 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
     } finally {
       stack.pop();
     }
-    if (ns !== undefined) once.set(k, p.pal === had ? had : undefined);
+    if (ns !== undefined) {
+      const addedKeys: Record<string, string> = {};
+      if (p.pal !== had) {
+        const nowOwn = p.pal.own();
+        for (const [key, col] of p.pal.keys) if (prevKeys.get(key) !== col || (!prevOwn.has(key) && nowOwn.has(key))) addedKeys[key] = toHex(col);
+      }
+      const addedRamps = p.pal.ramps.filter((r) => !prevRamps.has(r));
+      const addedLook = p.look3d !== prevLook ? p.look3d : undefined;
+      const entry: OnceEntry = { had, usedIncluderPal: p.pal === had, assetCount: p.order.length + p.sheets.length + p.models.length - prevAssets, addedKeys, addedRamps, addedLook };
+      once.set(k, entry);
+      if (!onceByFile.has(abs)) onceByFile.set(abs, entry);
+    }
   };
   const near =(path: string) => {
     if (isAbsolute(path)) return path;
@@ -160,7 +187,7 @@ export function loadProject(file: string, opts: ProjectOptions = {}, read = (abs
     if (!stack.length) throw new PxError(`'${path}' is read while the art file loads: call use(), pose(), motion() or png at the top of the file, not inside a drawing function`);
     return resolve(dirname(stack[stack.length - 1]), path);
   };
-  p.includeHook = (path, ns) => { late(); run(near(path), ns); };
+  p.includeHook = (path, ns, sharePal) => { late(); run(near(path), ns, sharePal); };
   p.scope = (code) => { late(); return vm.runInContext(code, ctx); };
   p.pngHook = (path) => {
     late();

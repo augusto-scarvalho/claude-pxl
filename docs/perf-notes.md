@@ -20,6 +20,7 @@ a user sees and sets is in [the reference](../reference.md#kept-builds-threads-a
 - [What a build holds](#what-a-build-holds)
 - [HD-2D 3D scenes: glow, mesh, sunlight, and scaled GIFs (2026-11)](#hd-2d-3d-scenes-glow-mesh-sunlight-and-scaled-gifs-2026-11)
 - [Mounts iteration: GIF/LZW sub-blocks, PNG encoding, and profiler SDF attribution (2026-11)](#mounts-iteration-giflzw-sub-blocks-png-encoding-and-profiler-sdf-attribution-2026-11)
+- [Tier 1-2 scale: `pure()` character/mount traces and bounded cache memory (2026-11)](#tier-1-2-scale-pure-charactermount-traces-and-bounded-cache-memory-2026-11)
 
 ## The machines and the files
 
@@ -581,5 +582,36 @@ Tried and dropped (measured on alternating runs):
   checked), but only `1.025×` on `examples/sdf/fields.px.js` (722.0 ms [626.1..851.6] → 704.5 ms [587.5..751.0], 5 rounds)
   and `1.030×` on 12 heavy mount frames (1249.5 → 1213.5 ms, 3 rounds) — inside laptop thermal noise because ~90% of
   `surface()` time is spent in compiled SDF distance and art sweep closures. Reverted to keep `surface.ts` clean.
+
+## Tier 1-2 scale: `pure()` character/mount traces and bounded cache memory (2026-11)
+
+Measured via alternating multi-run rounds against `HEAD` (`cc2ab5c`, detached temporary git worktree, `PXL_WORKERS=1`,
+Windows laptop, Node 24; full details in [tier1-tier2-improvements.md](tier1-tier2-improvements.md)):
+
+| benchmark (alternating rounds vs `HEAD`) | rounds | `HEAD` median (min..max) | after median (min..max) | change |
+| --- | ---: | ---: | ---: | ---: |
+| Mounted riders warm trace-cache rebuild (after edit) | 5 | 6.80 s (5.79..8.05) | **2.45 s** (2.41..2.59) | **2.78× (−64.0%)** |
+| `kit.character` warm trace-cache rebuild (after edit) | 5 | 8.36 s (7.66..9.63) | **3.35 s** (3.18..3.42) | **2.50× (−59.9%)** |
+| `mounts_cavalry` cold (`--no-cache`, 1 worker) | 5 | 5.24 s (4.05..5.45) | 4.89 s (4.40..5.03) | 1.07× (−6.7%) |
+| 800 × 256×256 normal-mapped assets — peak `maxRSS` | 3 | 460.6 MB (459.7..466.0) | **119.4 MB** (119.4..119.5) | **−74.1%** |
+| 800 × 256×256 normal-mapped assets — end RSS | 3 | 460.6 MB (459.7..465.9) | **92.7 MB** (91.0..95.0) | **−79.9%** |
+| 800 × 256×256 normal-mapped assets — wall time | 3 | 11.1 s (10.9..11.2) | 11.1 s (11.0..11.2) | 0.0% overhead |
+
+What changed:
+
+- **100% `pure()` distance closures across character and mount libraries** (`lib/characters/mounts.px.js`, `dress.px.js`,
+  `traveler.px.js`, `crew.px.js`, `kit.px.js`): replaced non-pure distance/sweep/drape/keep/shift/shell/inFrame/inPoly/strap
+  closures with `pure(...)` (and `asPure` fallbacks for external plain closures), and switched `mounts.px.js`'s
+  `mountedRiderJoints` from a hand-rolled closure `sweep` to `rig3d.joints({}, { turn }, heading).sweep`. `pxl build --profile`
+  now reports **0** `traced again at every build` fields across both `mounts` and `kit`. Pixel invariance verified on
+  `crew.px.js` and `character_kit.px.js` (5,455/5,455 frames identical).
+- **Scaled `pure()` factory LRU caches** (`src/node/pure.ts`): raised `FACTORIES` from 256 → 512 and per-factory `made`
+  from 64 → 512 with single-entry LRU eviction + hit recency refresh instead of clearing the whole map on overflow.
+- **Bounded `Project.cache` LRU + post-export eviction** (`src/core/project.ts`, `src/node/output.ts`): added a configurable
+  `cacheBytes` LRU budget (default 512 MB) to `Project.cache` (accounting for `img.parts.ids` bytes too), LRU refresh on hit,
+  and `Project.evict(name)`. `writeOutputs()` precomputes `sheetUse`, `baseUsed`, and `lastScene`, evicting finished standalone
+  assets and sheet members as soon as their last consumer finishes — keeping large multi-asset builds flat in memory instead of
+  growing linearly with asset count.
+
 
 

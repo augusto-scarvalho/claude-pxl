@@ -124,19 +124,21 @@ One line per area; `PXL help <name>` prints full details for any op or option.
   `plume()`, `c.cross()` loop seamlessly; `tween()` keys poses; `route()` walks paths (`px: true`
   top-down, `px: "side"` platformer).
 - **Existing art**: `sprite("x", { png, normals, area, shrink, palettize })`, `anim(..., { png, frames })`, `rampmap`.
-- **Out**: `sheet()` (+ JSON with tags, `cell`, `format`, `scale`, `slots`), GIFs, Tiled `.tmj`,
-  `build --aseprite`, `build --share 4`.
+- **Out**: `sheet()` (+ JSON with tags, `cell`, `format`, `scale`, `slots`, `normalSuffix`/`emitSuffix`),
+  GIFs, Tiled `.tmj`, `build --aseprite`, `build --share 4`.
 - **Light**: `shade:`/`light:` layers, `cast` shadows (`of` a layer; `"sun"` for `look3d`),
   `relight`/`plate()`, `glow`, `lighting()` ([lighting.md](lighting.md)).
 - **Text**: built-in 3×5 `text()`, or `include` `lib/ui/font5x7.px.js` for `{ font: "5x7" }`; `bubble()`.
 - **Meters & HD-2D**: `perspective()`, `plane()`, `terrain()`, `solids()`/`shadows()`, `mesh()` +
   `model()`, `sprites3d()`, `sizes`, `post()` (DoF, bloom, `lut`, `grain`); `capsule`, `flame`
-  (`PXL help "scenes 7"`, `PXL help post`).
+  (`PXL help "scenes 7"`, `PXL help post`). In `sort: "y"` layers, `z` breaks ties and `sortY` overrides the row.
 - **Effects & spells**: `effect(kind)` (dissolve, pixelate, dither, tint, distort, emit, aura, sway,
-  energy), per-copy `fx`; `smoke()`, `emitter()` + `particles()`, `trail()`, `ability()`; `cast(spell(...))`.
-- **3D fields**: `sdf` via `surface()`, `voxels()`, `mesh()`, `volume()`, or `draw3d(thing, { as })`;
-  `sdf.scatter` + `splats()`, `decal()`, `world3d` + `make3d` + `expect3d`, `look3d`, `turnaround()`,
-  `rig3d` (`rig3d.joints()` for standalone pose queries), `export3d` (`PXL help "scenes 17"`).
+  energy), per-copy `fx`; `smoke()`, `emitter()` + `particles()`, `trail()`, `ability()`; `cast(spell(...))`
+  (per-primitive depth in `mesh()`; `depth: "single"` for legacy).
+- **3D fields**: `sdf` via `surface()` (`flat`, `clean: { slivers, specks, keepGlint }`), `voxels()`,
+  `mesh()`, `volume()`, or `draw3d()`; `sdf.scatter` + `splats()`, `decal()`, `world3d` + `make3d` +
+  `expect3d`, scoped `look3d`, `turnaround({ sockets })`, `rig3d` (`rig3d.joints()`, per-move `w`/`h`/`pivot`,
+  per-arm `elbow`, `j.smear()`, `over: "depth"`), `export3d` (`PXL help "scenes 17"`).
 - **Procedural texture**: `hash`, `vnoise`, `fbm`, `fbmLoop`, `bayer`, `seamless` (`PXL help vnoise`).
 
 ## Examples

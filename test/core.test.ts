@@ -1140,3 +1140,20 @@ const ok = a.pelvis.every((v, i) => Math.abs(v - b.pelvis[i]) < 1e-6)
 sprite("chk", { w: 1, h: 1 }, px(0, 0, ok ? "r" : "k"))`, "t.px.js");
   assert.equal(keys(p, "chk"), "r");
 });
+
+test("sort: 'y' tie-breaks equal rows by z, honors explicit sortY override, and supports c.y(y, z, fn)", () => {
+  const base = PAL + `sprite("r2", { w: 2, h: 2 }, rect(0, 0, 2, 2, "r"))
+sprite("g2", { w: 2, h: 2 }, rect(0, 0, 2, 2, "g"))
+`;
+  // 1. Default z = 0 preserves call order
+  eq(art(base + `scene("s", { w: 4, h: 4 }, layer("l", { sort: "y" }, stamp("r2", 1, 1), stamp("g2", 1, 1)))`, "s"), "....\n.gg.\n.gg.\n....");
+  // 2. z tie-breaker lifts earlier stamp over later stamp at identical y
+  eq(art(base + `scene("s", { w: 4, h: 4 }, layer("l", { sort: "y" }, stamp("r2", 1, 1, { z: 1 }), stamp("g2", 1, 1, { z: 0 })))`, "s"), "....\n.rr.\n.rr.\n....");
+  // 3. Explicit sortY overrides draw y for depth ordering
+  eq(art(base + `scene("s", { w: 4, h: 4 }, layer("l", { sort: "y" }, stamp("r2", 1, 1, { sortY: 10 }), stamp("g2", 1, 1, { sortY: 2 })))`, "s"), "....\n.rr.\n.rr.\n....");
+  // 4. c.y(y, z, fn) tie-breaks code callbacks on the same row
+  eq(art(base + `scene("s", { w: 4, h: 4 }, layer("l", { sort: "y" }, (c) => {
+    c.y(2, 5, () => c.rect(1, 1, 2, 2, "r"));
+    c.y(2, 1, () => c.rect(1, 1, 2, 2, "g"));
+  }))`, "s"), "....\n.rr.\n.rr.\n....");
+});

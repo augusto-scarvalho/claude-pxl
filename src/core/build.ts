@@ -27,6 +27,8 @@ export interface BuildCtx extends Resolver {
   readonly wholeWorld?: boolean;
   /** Keeping per-call source lines and pixel part ids (pxl inspect / pxl edit). */
   readonly where?: boolean;
+  /** Assets defined inside an include(): host scenes don't re-emit their swap warnings. */
+  readonly included?: ReadonlySet<string>;
   /** Runs an art-supplied callback so Project.moved() only re-digests top-level state when art JS may have mutated it. */
   runArt?<T>(fn: () => T): T;
 }
@@ -537,7 +539,7 @@ export function buildAsset(ctx: BuildCtx, def: AssetDef, seed: number, trace?: T
   }
   // palettize "rest": what the items left off the palette (the colors no rampmap took) to the nearest key
   if (opts.palettize === "rest") { base = base.remap(pal.snapMap(base.data)); snap?.("palettize rest", def.loc); }
-  const img = finish(base, def, pal, trace, loose, tags, ctx.warn ? (msg) => ctx.warn!(msg, def.loc) : undefined);
+  const img = finish(base, def, pal, trace, loose, tags, ctx.warn && !ctx.included?.has(def.name) ? (msg) => ctx.warn!(msg, def.loc) : undefined);
   // the whole world: the camera's box on it, a magenta line round what it shows this frame
   if (whole && cam) for (let i = 0; i < opts.w!; i++) for (let j = 0; j < opts.h!; j++) if (!i || !j || i === opts.w! - 1 || j === opts.h! - 1) img.set(cam[0] + i, cam[1] + j, pack(255, 0, 255));
   trace?.finish(img);

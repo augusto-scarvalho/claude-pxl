@@ -62,7 +62,7 @@ Object.preventExtensions(realm);
 // they were put there, pure() gives back the one made, which holds what a new one would (copies of the same values, the
 // very same functions and fields), so it is the function a new one would be: a parts(j, p) asked twice a frame makes its
 // paint functions once, a helper whose data no frame changes once a process. Never one holding a field that isn't pure
-// (its key ""). 256 sources, 64 functions each: past that, they are made anew.
+// (its key ""). 512 sources, 512 functions each (LRU): past that, the oldest is dropped.
 const FACTORIES = new Map<string, { make: (a: unknown[]) => (...a: never[]) => unknown; made: Map<string, { f: (...a: never[]) => unknown; held: Held }> }>();
 const NAME = /^[A-Za-z_$][\w$]*$/, TAKEN = ["Math", "sdf", "arguments", "eval", "$$"], IDS = new WeakMap<object, number>();
 let ids = 0;
@@ -88,8 +88,13 @@ export function pureOf(data: Record<string, unknown>, src: string): (...a: never
   // (what it would be made of first, nothing copied, the same errors: the one made of it given back, or made)
   const look: string[] = [];
   for (const n of names) into(data[n], n, look);
-  const was = look.includes("") ? undefined : fac?.made.get(look.join(" "));
-  if (was && !unchanged(was.held, src)) { pureSaid.shared++; pureSaid.ms += performance.now() - m0; return was.f; }
+  const lk = look.includes("") ? undefined : look.join(" ");
+  const was = lk !== undefined ? fac?.made.get(lk) : undefined;
+  if (was && !unchanged(was.held, src)) {
+    fac!.made.delete(lk!); fac!.made.set(lk!, was);
+    pureSaid.shared++; pureSaid.ms += performance.now() - m0;
+    return was.f;
+  }
   const keys: string[] = [], held: Held = { arrays: [], checks: [] }, mine: string[] = [];
   const values = names.map((n) => into(data[n], n, mine, keys, held));
   if (!fac) {
@@ -97,7 +102,7 @@ export function pureOf(data: Record<string, unknown>, src: string): (...a: never
     const consts = ["Math", "sdf", ...names].map((n, i) => `${n} = $$[${i + 1}]`).join(", ");
     let make: (a: unknown[]) => (...a: never[]) => unknown;
     try { make = vm.runInContext(`(function ($$) { "use strict"; $$[0](arguments); $$[0]($$); const ${consts}; { const $$ = undefined; return (${src}); } })`, realm); } catch { tell(`it is an arrow function or a function expression, written in the file (not a method, a bound or a built-in one), got ${src.slice(0, 60)}`); }
-    if (FACTORIES.size > 256) FACTORIES.clear();
+    if (FACTORIES.size >= 512) FACTORIES.delete(FACTORIES.keys().next().value!);
     FACTORIES.set(fk, (fac = { make: make!, made: new Map() }));
   }
   const args = B.arr();
@@ -106,7 +111,11 @@ export function pureOf(data: Record<string, unknown>, src: string): (...a: never
   PURE.set(f, keys.includes("") ? "" : createHash("sha1").update(id).digest("hex"));
   INTACT.set(f, intact(held, src));
   HOW.set(f, { src, names, values });
-  if (!keys.includes("")) { if (fac.made.size >= 64) fac.made.clear(); fac.made.set(mine.join(" "), { f, held }); }
+  if (!keys.includes("")) {
+    const mk = mine.join(" ");
+    if (fac.made.size >= 512) fac.made.delete(fac.made.keys().next().value!);
+    fac.made.set(mk, { f, held });
+  }
   pureSaid.made++; pureSaid.ms += performance.now() - m0;
   return f;
 }

@@ -31,7 +31,7 @@ export type SurfaceView = "side" | "top" | "iso" | { kind?: "side" | "top" | "is
  * nothing is below, every other column, a step darker a px (a conifer's tiers); `emit` self-luminous
  * (true or 0..1: keeps its own ramp colors under `light: "mesh"` and marks the emission map for bloom)
  */
-export interface SurfaceMat { ramp: string | string[]; shine?: number; strokes?: number; hem?: number; emit?: boolean | number }
+export interface SurfaceMat { ramp: string | string[]; shine?: number; strokes?: number; hem?: number; emit?: boolean | number; /** true: flatten per-pixel checker speckle on thin (1-2 px) parts by snapping each part's pixels of this material to their dominant tone */ flat?: boolean }
 export interface SurfaceOpts {
   view?: SurfaceView;
   /** px to the meter (an orthographic view; default 16) */
@@ -66,8 +66,8 @@ export interface SurfaceOpts {
   hide?: boolean;
   /** the name of the part it is (pxl steps --at says what part painted a pixel; a field's own .part() names go after it) */
   part?: string;
-  /** a pixel artist's pass before its lines (default true; voxels() false): a pixel sticking out cut away, no black run 2 px thick (an inner line along the outline or under another line left to that one line), the outline whole */
-  clean?: boolean;
+  /** a pixel artist's pass before its lines (default true; voxels() false): boolean or { slivers?, specks?, keepGlint? } */
+  clean?: boolean | { slivers?: boolean; specks?: boolean; keepGlint?: boolean };
   /** true: skip scene world sun/sky/lamp multiplication (`light: "mesh"`) while preserving the field's own ramp shading (for fire, lava, magic) */
   unlit?: boolean;
   /** (light: "mesh": the light of the mesh() drawn before it, on what it draws as on mesh()'s sprites) */
@@ -450,7 +450,18 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   const soft = o.soft ?? 0;
   if (!(soft >= 0 && soft <= 1)) throw new PxError(`${who}: soft is 0..1, how far the light wraps round the form, got ${JSON.stringify(o.soft)}`);
   if (!(o.rim === undefined || typeof o.rim === "boolean" || (typeof o.rim === "number" && o.rim >= 0 && o.rim <= 1))) throw new PxError(`${who}: rim is true, false or 0..1 (the share up its ramp the lit edge takes at least), got ${JSON.stringify(o.rim)}`);
-  if (o.clean !== undefined && typeof o.clean !== "boolean") throw new PxError(`${who}: clean is true or false, got ${JSON.stringify(o.clean)}`);
+  let cleanSlivers = false, cleanSpecks = false, keepGlint = false;
+  if (o.clean === true) { cleanSlivers = true; cleanSpecks = true; }
+  else if (o.clean && typeof o.clean === "object" && !Array.isArray(o.clean)) {
+    const co = o.clean as Record<string, unknown>;
+    for (const k of Object.keys(co)) if (!["slivers", "specks", "keepGlint"].includes(k)) throw new PxError(`${who}: clean takes true, false, or { slivers?, specks?, keepGlint? }, not '${k}'`);
+    cleanSlivers = co.slivers !== false;
+    cleanSpecks = co.specks !== false;
+    keepGlint = co.keepGlint === true;
+  } else if (o.clean !== undefined && typeof o.clean !== "boolean") {
+    throw new PxError(`${who}: clean is true, false, or { slivers?, specks?, keepGlint? }, got ${JSON.stringify(o.clean)}`);
+  }
+  const cleanAny = cleanSlivers || cleanSpecks;
   if (o.unlit !== undefined && typeof o.unlit !== "boolean") throw new PxError(`${who}: unlit is true or false, got ${JSON.stringify(o.unlit)}`);
   if (o.tones !== undefined && !(Number.isInteger(o.tones) && o.tones >= 2)) throw new PxError(`${who}: tones is how many of each ramp's tones it draws in, a whole number from 2, got ${JSON.stringify(o.tones)}`);
   const origin = !persp && o.view && typeof o.view === "object" ? (o.view as { origin?: unknown }).origin : undefined;
@@ -459,7 +470,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
     throw new PxError(`${who}: at is ${persp ? "where it stands, [x, z, up] m" : "where its origin lands, [x, y] px, or where it stands in the view's world, [x, y, z] m"}, got ${JSON.stringify(o.at)}`);
   // the materials: each a ramp of resolved colors, dark to light, and its glint
   const names = Object.keys(o.mats ?? {});
-  const ramps: Color[][] = [], shines: number[] = [], strokes: number[] = [], hems: number[] = [], emits: number[] = [], lines: Color[][] = [];
+  const ramps: Color[][] = [], shines: number[] = [], strokes: number[] = [], hems: number[] = [], emits: number[] = [], flats: boolean[] = [], lines: Color[][] = [];
   // ink true or 2: each material's line tones are its ramp's first one or two keys, its fill the rest
   if (!(o.ink === undefined || typeof o.ink === "string" || typeof o.ink === "boolean" || o.ink === 1 || o.ink === 2)) throw new PxError(`${who}: ink is a key (a line of it all round), true (each material's line tone, its ramp's first key) or 2 (its first two, the second facing the light), got ${JSON.stringify(o.ink)}`);
   const lineN = o.ink === true ? 1 : typeof o.ink === "number" ? o.ink : 0, short = new Map<number, string>();
@@ -480,9 +491,11 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
     if (!(s.strokes === undefined || s.strokes > 0) || !(s.hem === undefined || (Number.isInteger(s.hem) && s.hem >= 0))) throw new PxError(`${who}: material '${name}': strokes is m apart (above 0), hem whole px (0 up), got ${JSON.stringify([s.strokes, s.hem])}`);
     const em = s.emit === undefined || s.emit === false ? 0 : s.emit === true ? 1 : s.emit;
     if (!(typeof em === "number" && em >= 0 && em <= 1)) throw new PxError(`${who}: material '${name}': emit is true, false or 0..1, got ${JSON.stringify(s.emit)}`);
+    if (s.flat !== undefined && typeof s.flat !== "boolean") throw new PxError(`${who}: material '${name}': flat is true or false, got ${JSON.stringify(s.flat)}`);
     strokes.push(s.strokes ?? 0);
     hems.push(s.hem ?? 0);
     emits.push(em);
+    flats.push(s.flat === true);
   };
   if (names.length) names.forEach((n) => mat(o.mats![n], n));
   else if (c.pal.ramps.length) mat(c.pal.ramps[0], "the palette's first ramp");
@@ -666,13 +679,38 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
   if (left) left(by, T.impure!, marched);
   if (timePaint && !pk) kept.left!(by, T.own!.of, paintMs, true);
   if (w0) spread.timed!(T.pure!, N, performance.now() - w0);
+  // flat materials (e.g. 2 px blades): snap each (part, material) group to its dominant tone to eliminate per-pixel checker speckle
+  if (flats.some(Boolean)) {
+    const counts = new Map<string, Map<number, number>>();
+    for (let i = 0; i < N; i++) {
+      const k = m[i];
+      if (k < 0 || !flats[k]) continue;
+      const gk = `${pt[i]}:${k}`;
+      let cm = counts.get(gk);
+      if (!cm) counts.set(gk, (cm = new Map()));
+      cm.set(tone[i], (cm.get(tone[i]) ?? 0) + 1);
+    }
+    const mode = new Map<string, number>();
+    for (const [gk, cm] of counts) {
+      let bestT = 0, bestN = -1;
+      for (const [t, cnt] of cm) if (cnt > bestN || (cnt === bestN && t > bestT)) { bestN = cnt; bestT = t; }
+      mode.set(gk, bestT);
+    }
+    for (let i = 0; i < N; i++) {
+      const k = m[i];
+      if (k < 0 || !flats[k]) continue;
+      if (keepGlint && tone[i] === ramps[k].length - 1) continue;
+      tone[i] = mode.get(`${pt[i]}:${k}`)!;
+    }
+  }
   // tones in clusters: a cell whose tone none of its four neighbours of the same material share takes
-  // the one most of them have (three or four)
+  // the one most of them have (three or four); with clean: { keepGlint: true }, isolated top-ramp glints are preserved
   const was = tone.slice();
   for (let gy = 1; gy < GH - 1; gy++)
     for (let gx = 1; gx < GW - 1; gx++) {
       const i = gy * GW + gx, k = m[i];
       if (k < 0) continue;
+      if (keepGlint && was[i] === ramps[k].length - 1) continue;
       const nb = [i - 1, i + 1, i - GW, i + GW].filter((j) => m[j] === k).map((j) => was[j]);
       if (nb.length < 3 || nb.includes(was[i])) continue;
       const best = nb.find((v) => nb.filter((u) => u === v).length >= 3) ?? (nb.length === 4 && nb.filter((u) => u === nb[0]).length === 2 ? nb[0] : undefined);
@@ -710,16 +748,18 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
     const j = y * GW + x;
     return x >= 0 && y >= 0 && x < GW && y < GH && m[j] >= 0 && !hidden[j] && pt[j] !== pt[i] && depth[j] < depth[i] - nearBy && (pt[j] < 0 || pt[i] < 0 || top[pt[j]] !== top[pt[i]]);
   };
-  if (o.clean) {
+  if (cleanAny) {
     const on = (x: number, y: number) => x >= 0 && y >= 0 && x < GW && y < GH && m[y * GW + x] >= 0;
     const cutAll = (f: (gx: number, gy: number, i: number) => boolean) => {
       const cut: number[] = [];
       for (let gy = 0; gy < GH; gy++) for (let gx = 0; gx < GW; gx++) { const i = gy * GW + gx; if (m[i] >= 0 && f(gx, gy, i)) cut.push(i); }
       for (const i of cut) m[i] = -1;
     };
-    if (innerOn && !dark) cutAll((gx, gy, i) => D4.some(([dx, dy]) => inkBy(i, gx + dx, gy + dy) && !on(gx - dx, gy - dy)));
-    const nbs = (x: number, y: number) => +on(x - 1, y) + +on(x + 1, y) + +on(x, y - 1) + +on(x, y + 1);
-    cutAll((gx, gy) => { const n = nbs(gx, gy); return !n || (n === 1 && D4.some(([dx, dy]) => on(gx + dx, gy + dy) && nbs(gx + dx, gy + dy) >= 3)); });
+    if (cleanSlivers && innerOn && !dark) cutAll((gx, gy, i) => D4.some(([dx, dy]) => inkBy(i, gx + dx, gy + dy) && !on(gx - dx, gy - dy)));
+    if (cleanSpecks) {
+      const nbs = (x: number, y: number) => +on(x - 1, y) + +on(x + 1, y) + +on(x, y - 1) + +on(x, y + 1);
+      cutAll((gx, gy) => { const n = nbs(gx, gy); return !n || (n === 1 && D4.some(([dx, dy]) => on(gx + dx, gy + dy) && nbs(gx + dx, gy + dy) >= 3)); });
+    }
   }
   // hems: under a material that hangs, where nothing is below, every other column a point of it 1 to
   // `hem` px long, a step darker each px, as deep as what it hangs from (after clean: points, not
@@ -756,7 +796,7 @@ function drawTraced(c: SurfaceCanvas, T: Tracer, o: SurfaceOpts & { px?: number 
         if (dx * lx + dy * ly > 0) { toward = true; both += dx * lx > 0 || dy * ly > 0 ? (dx ? 1 : 2) : 0; }
         else if (!open(gx - dx, gy - dy, i)) away = true;
       }
-      const seam = innerOn && !(o.clean && twice(gx, gy, i)) ? behind(gx, gy, i) : 0;
+      const seam = innerOn && !(cleanSlivers && twice(gx, gy, i)) ? behind(gx, gy, i) : 0;
       if (seam) col = seam === 2 ? ramp[0] : innerKey ?? ramp[0];
       else if (away && o.outline !== false) col = outKey ?? ramp[0];
       else if (toward && o.rim !== false) col = ramp[Math.min(ramp.length - 1, Math.max(tone[i] + 1, typeof o.rim === "number" && both === 3 ? Math.round(o.rim * (ramp.length - 1)) : 0))];

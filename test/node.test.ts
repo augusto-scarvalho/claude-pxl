@@ -12,7 +12,7 @@ import { decodePng, encodePng } from "../src/node/png.ts";
 import { encodeGif, medianCut } from "../src/node/gif.ts";
 import { decodeGif } from "../src/node/gifread.ts";
 import { main } from "../src/node/cli.ts";
-import { loadProject } from "../src/node/load.ts";
+import { loadProject, loadSource } from "../src/node/load.ts";
 import { latticeHash } from "../src/core/util.ts";
 import { writeOutputs, writePng } from "../src/node/output.ts";
 import { serve } from "../src/node/server.ts";
@@ -1051,7 +1051,7 @@ test("pxl help is short: other mentions a line each, a guide section by its head
   assert.match(await said("help", "corners"), /^\[reference\.md: Ops > Terrain tilesets\]\nDraw the 16 pieces from one function: `corners\(/);
   // an op whose reference is its signature in a code block (sheet under Assets): that line first, before a guide section sharing its word
   const sheet = await said("help", "sheet");
-  assert.match(sheet, /^\[reference\.md: Assets\]\nsheet\(name, \["slime\*", "heart", groupName\], \{ cols\?, pad\?, extrude\?, rows\?, slots\?, cell\?, pivot\?, format\?, scale\?, meta\?, names\?, sockets\? \}\)/);
+  assert.match(sheet, /^\[reference\.md: Assets\]\nsheet\(name, \["slime\*", "heart", groupName\], \{ cols\?, pad\?, extrude\?, rows\?, slots\?, cell\?, pivot\?, format\?, scale\?, normalSuffix\?, emitSuffix\?, meta\?, names\?, sockets\? \}\)/);
   assert.match(sheet, /\[guides: 2 sections\]\n {2}pxl help "environment 1\. Learning from a game's sheet" \([^)]*\)\n {2}pxl help "lib The sheets"/);
   // directions(): its signature, then the paragraph that says how its poses' pivots are placed, with an example
   assert.match(await said("help", "directions"), /^directions\("ship", 16, [^\n]*\n`directions\("car", 16, [^]*Each direction keeps its pose's pivot, turned with it/m);
@@ -1417,4 +1417,91 @@ anim("static_a", { w: 4, h: 4, frames: 3, fps: 8 }, (c) => c.rect(1, 1, 2, 2, "g
   assert.doesNotMatch(bQuiet.out, /sprite m_wolf_s/);
   assert.match(bQuiet.out, /static_a.*-- static: all 3 frames identical/);
   assert.match(bQuiet.out, /-> .* \(6 written\)/);
+});
+
+test("include idempotency, look3d scoping across includes, kit-generated check coverage, and early map clash warnings", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-w1-"));
+  try {
+    // 1. Style file (pure palette/ramps/look3d) included in a diamond across `as` runs once and replays pal/ramps/look3d;
+    //    an asset-defining file runs once under the same `as`, errors under conflicting `as`;
+    //    and a non-shared library's own look3d({ mats }) stays scoped and does not leak into the caller.
+    writeFileSync(join(dir, "style.px.js"), `
+const STYLE_VER = 1
+pal({ k: "#111111", r: "#cc3333", g: "#33aa33", w: "#eeeeee" })
+ramps("krw", "kgw")
+look3d({ mats: { wood: "krw" } })`);
+    writeFileSync(join(dir, "part.px.js"), `
+const PART_VER = 1
+pal({ k: "#111111", r: "#cc3333" })
+sprite("tag_part", "r")`);
+    writeFileSync(join(dir, "kitlib.px.js"), `
+include("./style.px.js", { palette: true })
+look3d({ mats: { leaked: "kgw" } })
+function makeHero(name) {
+  rig3d(name, {
+    headings: ["s"], ink: "k", blocks: true,
+    moves: {
+      idle: { frames: 1, pose: () => ({}) },
+      reach: { frames: 1, pose: () => ({ hands: [[0, 0, -2], [18, 0, 0]] }) },
+    },
+  })
+  views(name + "_v", sdf.sphere(0.4).mat("wood"), { n: 8, ink: "k" })
+  group(name + "_g", [name + "_idle_s"])
+}`);
+    const mainFile = join(dir, "main.px.js");
+    writeFileSync(mainFile, `
+include("./style.px.js", { palette: true })
+include("./part.px.js", { as: "pt", palette: true })
+include("./part.px.js", { as: "pt", palette: true })
+include("./kitlib.px.js", { as: "kit" })
+makeHero("hero")
+sprite("from_style", { w: 12, h: 12 }, surface(sdf.sphere(0.35).at(0, 0, 0.35).mat("wood"), { view: "side", ppm: 12 }))
+sprite("box", { w: 4, h: 4 }, rect(0, 0, 4, 4, "r"), bump("hybrid"))
+sprite("box_n", "rr")`);
+
+    const p = loadProject(mainFile);
+    // Replayed style.px.js look3d({ mats: { wood } }) works in mainFile
+    assert.ok(p.image("from_style").bounds() !== null, "shared palette: true include replays look3d mats");
+
+    // Non-shared kitlib.px.js look3d({ mats: { leaked } }) did NOT leak into caller
+    const leakFile = join(dir, "leak.px.js");
+    writeFileSync(leakFile, `include("./style.px.js", { palette: true })\ninclude("./kitlib.px.js", { as: "kit" })\nsprite("bad_leak", { w: 12, h: 12 }, surface(sdf.sphere(0.35).at(0, 0, 0.35).mat("leaked"), { view: "side", ppm: 12 }))`);
+    assert.throws(() => loadProject(leakFile).image("bad_leak"), /material 'leaked'/);
+
+    // Conflicting `as` name for the same asset-defining included file still throws
+    const conflictFile = join(dir, "conflict.px.js");
+    writeFileSync(conflictFile, `include("./part.px.js", { as: "pt", palette: true })\ninclude("./part.px.js", { as: "other", palette: true })`);
+    assert.throws(() => loadProject(conflictFile), /two include paths|already been declared/);
+
+    // 2. pxl check covers kit-generated figures and views, and warns early on box + box_n clash
+    const chk = checkProject(p, { file: mainFile });
+    assert.match(chk.coverage, /figures' feet/);
+    assert.match(chk.coverage, /views' rows/);
+    assert.ok(chk.lines.some((l) => l.includes("hero") && l.includes("arm longer than its bones")), chk.lines.join("\n"));
+    assert.ok(chk.lines.some((l) => l.includes("normal map") && l.includes("box_n")), chk.lines.join("\n"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("Project cacheBytes LRU eviction and evict(name) bound cache memory and rebuild cleanly on demand", () => {
+  const src = `pal({ k: "#111111", r: "#cc3333", g: "#33aa33" })
+let built = 0
+for (let i = 0; i < 6; i++) sprite("s" + i, { w: 32, h: 32 }, (c) => { built++; c.rect(0, 0, 32, 32, i % 2 ? "r" : "g"); })
+sprite("count", { w: 1, h: 1 }, (c) => c.px(0, 0, built > 6 ? "r" : "g"))`;
+  // Each 32x32 RGBA Img is ~4 KB. Setting cacheBytes to 9 KB holds at most 2 images before evicting oldest.
+  const p = loadSource(src, "lru.px.js", { cacheBytes: 9000 });
+  for (let i = 0; i < 6; i++) assert.equal(p.image("s" + i).w, 32);
+  // s0 was evicted by LRU, so requesting s0 again rebuilds it (incrementing `built` past 6)
+  assert.equal(p.image("s0").get(0, 0), p.pal.resolve("g"));
+  assert.equal(p.image("count").get(0, 0), p.pal.resolve("r"), "evicted asset rebuilt cleanly on demand");
+
+  // Explicit p.evict(name) drops frame-0 cache entry and rebuilds on next read
+  const p2 = loadSource(`pal({ r: "#cc3333", g: "#33aa33" })
+let n = 0
+sprite("a", { w: 4, h: 4 }, (c) => { n++; c.rect(0, 0, 4, 4, n === 1 ? "r" : "g"); })`, "ev.px.js");
+  assert.equal(p2.image("a").get(0, 0), p2.pal.resolve("r"));
+  assert.equal(p2.image("a").get(0, 0), p2.pal.resolve("r"), "cached before evict");
+  p2.evict("a");
+  assert.equal(p2.image("a").get(0, 0), p2.pal.resolve("g"), "rebuilt after evict");
 });

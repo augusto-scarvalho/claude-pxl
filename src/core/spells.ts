@@ -352,13 +352,17 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
 
   // ------------------------------------------------ what each variant draws
   /** The solid now: rising out of the ground or falling with a slow turn, there, cracking, broken. */
+  // per-primitive depth helper when cast() runs over a mesh() depth buffer through a perspective() camera
+  const zAt = (p: number[], biasPx = 6 * S): number | undefined => (V.z ? V.z(p) - biasPx * U : undefined);
   const drawBody = (c: SpellCanvas, t: number) => {
     if (!SO || t < (del === "fall" ? t0r : hit) || t >= brk) return;
     const rise = del === "fall" ? 1 : ease(clamp01((t - hit) / (A.start("dissipate") - hit)));
     const ctr: V3 = del === "fall" ? (t < hit ? path(t) : rest) : [rest[0], rest[1], rest[2] - SO.up * (1 - rise) * 1.1 * U];
     const spin = (2.2 * (Math.min(t, hit) - t0r)) / 1000, rot = del === "fall" ? turn([0.3, 1, 0.25], spin + (seed % 7) * 0.4) : turn([0, 0, 1], (seed % 7) * 0.4);
     const crack = VR.burning ? 1 : clamp01((t - (brk - F.stay * 0.6)) / (F.stay * 0.6));
+    c.setDepth?.(zAt(ctr, SO.r));
     drawSolid(c, V, ctr, U, SO, rot, mat, { seed, crack, crackAt: del === "fall" ? [0, 0, -SO.up] : [0, 0, SO.up * 0.6], ground: del === "fall" ? undefined : ctr[2] / U, hot: hot(c), look });
+    c.setDepth?.(undefined);
   };
   /** Its pieces once it breaks, flying out and falling, lying a while, going. */
   const drawPieces = (c: SpellCanvas, t: number, n0: number[], list: typeof pcs, kind: SolidKind, g = 260) => {
@@ -366,9 +370,11 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
     const s = (t - brk) / 1000, fade = 1 - clamp01((t - brk - (end - brk) * 0.55) / ((end - brk) * 0.45));
     for (const p of list) {
       const { at: q, ang } = pieceAt(p, s, g * SS / 2, p.size * 0.4);
-      const piece = makeSolid(kind, p.seed, p.size, 7, 0.4);
-      drawSolid(c, V, [n0[0] + q[0] * U, n0[1] + q[1] * U, n0[2] + q[2] * U], U, piece, turn(p.axis, ang), mat, { seed: p.seed, density: fade, hot: hot(c), look });
+      const piece = makeSolid(kind, p.seed, p.size, 7, 0.4), ctr: V3 = [n0[0] + q[0] * U, n0[1] + q[1] * U, n0[2] + q[2] * U];
+      c.setDepth?.(zAt(ctr, piece.r));
+      drawSolid(c, V, ctr, U, piece, turn(p.axis, ang), mat, { seed: p.seed, density: fade, hot: hot(c), look });
     }
+    c.setDepth?.(undefined);
   };
   /** Fissures on the ground from g, `n` of them `len` px long at most, grown by k, opened by w px. */
   const fissures = (c: SpellCanvas, g: V3, n: number, len: number, k: number, keys: Color[], density = 1) => {
@@ -378,12 +384,14 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
       for (let s = 0; s < L; s += 0.5) {
         if (s % 4 < 0.5) a = a0 + (rr() - 0.5) * 1.2;
         x += Math.cos(a) * 0.5; y += Math.sin(a) * 0.5;
-        const [px, py] = scr([g[0] + x * U, g[1] + y * U, 0]), wide = s < L * 0.5 ? 1 : 0;
+        const pt: V3 = [g[0] + x * U, g[1] + y * U, 0], [px, py] = scr(pt), wide = s < L * 0.5 ? 1 : 0;
+        c.setDepth?.(zAt(pt, 2));
         put(c, px, py, keys[1], density);
         put(c, px, py - 1, keys[0], density * 0.8);
         if (wide) put(c, px + 1, py, keys[1], density);
       }
     }
+    c.setDepth?.(undefined);
   };
   /** A wall of it running along the ground from the hand to where it lands (fire's flames, water's curling crest). */
   const waveWall = (c: SpellCanvas, t: number, ks: Color[]) => {
@@ -415,14 +423,16 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
       const go = (tt: number) => ease(clamp01((tt - t0r - i * 90) / (hit - t0r - (F.count - 1) * 90))), k = go(t);
       if (t < t0r + i * 90 || k >= 1) continue;
       const lift = (i - (F.count - 1) / 2) * 6 * S * U * Math.sin(k * Math.PI), pt = (kk: number) => [A3[0] + (B3[0] - A3[0]) * kk, A3[1] + (B3[1] - A3[1]) * kk, A3[2] + (B3[2] - A3[2]) * kk];
-      const p = pt(k), q = pt(go(t + 15) + 0.01);
-      const [x, y] = scr([p[0], p[1], p[2] + lift]), [x2, y2] = scr([q[0], q[1], q[2] + lift]), m = Math.hypot(x2 - x, y2 - y) || 1, mx = (x2 - x) / m, my = (y2 - y) / m, rb = 5 * S * sc(p);
+      const p = pt(k), q = pt(go(t + 15) + 0.01), pl: V3 = [p[0], p[1], p[2] + lift];
+      const [x, y] = scr(pl), [x2, y2] = scr([q[0], q[1], q[2] + lift]), m = Math.hypot(x2 - x, y2 - y) || 1, mx = (x2 - x) / m, my = (y2 - y) / m, rb = 5 * S * sc(p);
+      c.setDepth?.(zAt(pl, 5 * S));
       for (let a = -1.3; a <= 1.3; a += 0.12)
         for (let w = 0; w < Math.max(1, S); w++) {
           const rr = rb - w, X = x + rr * (Math.cos(a) * mx - Math.sin(a) * my), Y = y + rr * (Math.cos(a) * my + Math.sin(a) * mx);
           put(c, X, Y, ks[Math.min(ks.length - 1, w + (Math.abs(a) > 0.9 ? 1 : 0))]);
         }
     }
+    c.setDepth?.(undefined);
   };
 
   /** The centerpiece: a big thing at the target, its own way, k through impact and dissipate. */
@@ -444,8 +454,8 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
       case "bolts":
         for (let i = 0; i < 3; i++)
           if (Math.floor(t / 50 + i) % 3 !== 0 && die > 0.2) {
-            const from3: V3 = [G3[0] + ((i - 1) * 9 * SS + (hash(i, Math.floor(t / 100), seed) % 9) - 4) * U, G3[1], (top ? 100 : 160) * U];
-            bolt(c, scr(from3), scr([G3[0] + (i - 1) * 3 * U, G3[1], 0]), ks, seed + i * 7 + Math.floor(t / 50), i === 1 ? 1 : 0);
+            const from3: V3 = [G3[0] + ((i - 1) * 9 * SS + (hash(i, Math.floor(t / 100), seed) % 9) - 4) * U, G3[1], (top ? 100 : 160) * U], to3: V3 = [G3[0] + (i - 1) * 3 * U, G3[1], 0];
+            bolt(c, scr(from3), scr(to3), ks, seed + i * 7 + Math.floor(t / 50), i === 1 ? 1 : 0, true, zAt(from3, 3), zAt(to3, 3));
           }
         break;
       case "spikes":
@@ -462,26 +472,31 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
           for (let s = 0; s < strands; s++) {
             const f = z / Hcol, a = b === "tornado" ? z / 4 + t / 70 + s * 2.1 : z / (5 * SS) - t / 80 + s * Math.PI;
             const Rr = b === "tornado" ? (3 + 14 * f ** 1.2) * SS * 0.6 * die : 7 * SS * (1 - z / (90 * SS)), sway = b === "tornado" ? Math.sin(z / 9 + t / 200) * 3 : 0;
-            const [x, y] = scr([G3[0] + (Math.cos(a) * Rr + sway) * U, G3[1] + Math.sin(a) * Rr * U, z * U]), front = Math.sin(a) > 0;
+            const pt: V3 = [G3[0] + (Math.cos(a) * Rr + sway) * U, G3[1] + Math.sin(a) * Rr * U, z * U], [x, y] = scr(pt), front = Math.sin(a) > 0;
+            c.setDepth?.(zAt(pt, 3));
             put(c, x, y, b === "tornado" ? ks[Math.min(ks.length - 1, s + (front ? 0 : 1))] : ks[front ? 0 : 2], (b === "tornado" ? 0.8 : front ? 1 : 0.6) * die);
           }
         if (b === "helix") {
           for (let j = 0; j < 4 * SS; j++) {
             const z = (j * 17 + t / 10) % (60 * SS), a = z / (5 * SS) - t / 80 + (j % 2) * Math.PI, Rr = 7 * SS * (1 - z / (90 * SS));
-            const [x, y] = scr([G3[0] + Math.cos(a) * Rr * U, G3[1] + Math.sin(a) * Rr * U, z * U]);
+            const pt: V3 = [G3[0] + Math.cos(a) * Rr * U, G3[1] + Math.sin(a) * Rr * U, z * U], [x, y] = scr(pt);
+            c.setDepth?.(zAt(pt, 3));
             if (z < Hh && die > 0.3) spark(c, x, y, 1, ks, t + j * 40);
           }
+          c.setDepth?.(undefined);
           gring(c, V, U, G3, 9 * SS, ks.slice(1, 3), die);
-        }
+        } else c.setDepth?.(undefined);
         break;
       }
       case "sphere": {
         const [x, y] = scr(B3), Rr = 14 * SS * grow * die * sc(B3);
+        c.setDepth?.(zAt(B3, 14 * SS));
         for (let dy = -Math.ceil(Rr); dy <= Rr; dy++)
           for (let dx = -Math.ceil(Rr); dx <= Rr; dx++) {
             const d = Math.hypot(dx, dy) / Math.max(1, Rr);
             if (d <= 1) put(c, x + dx, y + dy, d > 0.88 ? ks[1] : d > 0.75 ? ks[2] : ks[3], d > 0.88 ? 1 : 0.9);
           }
+        c.setDepth?.(undefined);
         break;
       }
       case "nova": {
@@ -503,10 +518,12 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
           const rr = rng(hash(seed, i, 71)), born = hit + rr() * (F.stay + 300 * D), life = 380, s = (t - born) / life;
           if (s < 0 || s > 1.25) continue;
           const g: V3 = [G3[0] + (rr() - 0.5) * 36 * SS * U, G3[1] + (rr() - 0.5) * 18 * SS * U, 0], v: V3 = [34 * SS * U, 0, -70 * SS * U];
-          if (s > 1) { const [x, y] = scr(g); spark(c, x, y, 0, ks, t); continue; }
+          if (s > 1) { const [x, y] = scr(g); c.setDepth?.(zAt(g, 2)); spark(c, x, y, 0, ks, t); continue; }
           const p: V3 = [g[0] - v[0] * (1 - s), g[1], -v[2] * (1 - s)], [x, y] = scr(p), [x2, y2] = scr([p[0] - v[0] * 0.05, p[1], p[2] - v[2] * 0.05]);
+          c.setDepth?.(zAt(p, 2));
           line(c, x, y, x2, y2, [ks[0], ks[1], ks[2]]);
         }
+        c.setDepth?.(undefined);
         shape(c, V, U, "swirl", B3, G3, SS, ks, clamp01(kb), k, seed, t);
         break;
       }
@@ -517,10 +534,12 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
           const rr = rng(hash(seed, i, 81)), born = hit + rr() * F.stay, s = (t - born) / 140;
           if (s < 0 || s > 2.2) continue;
           const g: V3 = [G3[0] + (rr() - 0.5) * 34 * SS * U, G3[1] + (rr() - 0.5) * 22 * SS * U, 0];
-          if (s > 1) { const [x, y] = scr(g); spark(c, x, y, 1, ks, t); gring(c, V, U, g, 2 + (s - 1) * 4 * SS, ks.slice(1, 3), 1 - (s - 1) / 1.2); continue; }
-          const z = 90 * (1 - s) * U, [x, y] = scr([g[0], g[1], z]), [x2, y2] = scr([g[0], g[1], z + 12 * SS * U]);
+          if (s > 1) { const [x, y] = scr(g); c.setDepth?.(zAt(g, 2)); spark(c, x, y, 1, ks, t); c.setDepth?.(undefined); gring(c, V, U, g, 2 + (s - 1) * 4 * SS, ks.slice(1, 3), 1 - (s - 1) / 1.2); continue; }
+          const z = 90 * (1 - s) * U, pt: V3 = [g[0], g[1], z], [x, y] = scr(pt), [x2, y2] = scr([g[0], g[1], z + 12 * SS * U]);
+          c.setDepth?.(zAt(pt, 2));
           line(c, x, y, x2, y2, [ks[0], ks[1], ks[2]]);
         }
+        c.setDepth?.(undefined);
         break;
       }
       case "grasp": {
@@ -533,20 +552,23 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
             const pull = 0.8 * u * u * k2, wig = Math.sin(u * 5 + t / 150 + i) * 2 * SS * u;
             const p: V3 = [b0[0] + (G3[0] - b0[0]) * pull - Math.sin(a) * wig * U, b0[1] + (G3[1] - b0[1]) * pull + Math.cos(a) * wig * U, Hh * u * k2 * U];
             const [x, y] = scr(p), w = (1.3 * (1 - u) + 0.4) * SS * sc(p);
+            c.setDepth?.(zAt(p, 2));
             for (let dy = -Math.ceil(w); dy <= w; dy++) for (let dx = -Math.ceil(w); dx <= w; dx++) {
               const d = Math.hypot(dx, dy) / Math.max(0.6, w);
               if (d <= 1) put(c, x + dx, y + dy, u > 0.85 ? ks[1] : d > 0.7 ? ks[2] : ks[3]);
             }
           }
         }
+        c.setDepth?.(undefined);
         break;
       }
       case "leaves": {
         // leaves whirling up round the target in a ring, turning their light side and their dark one to us
         for (let i = 0; i < F.count; i++) {
           const rr = rng(hash(seed, i, 101)), a = rr() * 6.28 + kb * 3.2, Rr = (9 + 5 * Math.sin(i * 1.7)) * SS * (0.6 + 0.4 * grow), z = ((4 + i * 2.3 + kb * 22) % 40) * SS;
-          const [x, y] = scr([G3[0] + Math.cos(a) * Rr * U, G3[1] + Math.sin(a) * Rr * U, z * U]), front = Math.sin(a + kb * 5) > 0;
+          const pt: V3 = [G3[0] + Math.cos(a) * Rr * U, G3[1] + Math.sin(a) * Rr * U, z * U], [x, y] = scr(pt), front = Math.sin(a + kb * 5) > 0;
           if (die < 0.2) continue;
+          c.setDepth?.(zAt(pt, 2));
           // a leaf: a lens 2 px of the spell long turning as it goes, its light side or its dark one to us
           const turnA = a * 2 + i, L = 1.6 * SS * sc(G3), lx = Math.cos(turnA), ly = Math.sin(turnA) * 0.6;
           for (let q = -L; q <= L; q += 0.5) for (const side of [0, 1]) {
@@ -554,6 +576,7 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
             put(c, x + lx * q - ly * wq * side, y + ly * q + lx * wq * side, ks[front ? (side ? 2 : 1) : 3], die);
           }
         }
+        c.setDepth?.(undefined);
         shape(c, V, U, "sparkle", B3, G3, SS, ks, clamp01(kb), k, seed, t);
         gring(c, V, U, G3, 11 * SS, ks.slice(1, 3), die * 0.8);
         break;
@@ -601,29 +624,38 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
       if (!live(t)) return;
       const ks = keysOf(c, E.keys), hand = scr(A3), rh = r * sc(A3);
       if (p.name === "charge") {
+        c.setDepth?.(zAt(A3, Math.max(6 * S, rh)));
         drawParticles(c, charge, E.keys.slice(0, 3));
         if (E.ball !== false) ball(c, hand[0], hand[1], Math.max(1, rh * (0.3 + 0.7 * p.k)), ks, t, p.k);
         else spark(c, hand[0], hand[1], 1 + Math.round(2 * p.k), ks, t);
+        c.setDepth?.(undefined);
       } else if (p.name === "cast") {
+        c.setDepth?.(zAt(A3, Math.max(6 * S, rh)));
         ring(c, hand[0], hand[1], rh + 1 + p.k * 4 * S, ks.slice(0, 2), 1 - p.k);
         if (E.ball !== false) ball(c, hand[0], hand[1], rh, ks, t);
+        c.setDepth?.(undefined);
       } else if (p.name === "travel") {
         const here = path(t), [x, y] = scr(here);
-        if (del === "bolt" || del === "chain") bolt(c, hand, [x, y], ks, seed + Math.floor(t / 50), Math.max(1, Math.round(S / 1.5)));
+        const trailPt = (tt: number) => { const q = path(tt), [tx, ty] = scr(q); return V.z ? [tx, ty, V.z(q) - Math.max(2, r) * U] : [tx, ty]; };
+        if (del === "bolt" || del === "chain") bolt(c, hand, [x, y], ks, seed + Math.floor(t / 50), Math.max(1, Math.round(S / 1.5)), true, zAt(A3, 3), zAt(here, 3));
         else if (del === "wave") waveWall(c, t, ks);
         else if (del === "blades") blades(c, t, ks);
         else if (del === "fall") {
           // what falls: burning, a ball of fire round the rock and a trail of it; the slide's rocks are solids
           if (VR.burning || !SO) {
             if (big !== "slide") {
-              drawTrail(c, (tt) => scr(path(tt)), E.keys, { length: 200 * D, width: [Math.round((SO ? SO.r * 1.4 : r * 1.6) * sc(here)), 1], from: t0r });
+              drawTrail(c, trailPt, E.keys, { length: 200 * D, width: [Math.round((SO ? SO.r * 1.4 : r * 1.6) * sc(here)), 1], from: t0r });
+              c.setDepth?.(zAt(here, Math.max(6 * S, SO ? SO.r * 1.25 : r)));
               ball(c, x, y, (SO ? SO.r * 1.25 : r) * sc(here), ks, t);
+              c.setDepth?.(undefined);
             }
           }
         } else if (del === "ground") {
           // born at the target: the hand lets it go into the ground, which glows and stirs where it will come up
           const k = kTravel(t);
+          c.setDepth?.(zAt(A3, Math.max(6 * S, rh)));
           if (E.ball !== false) ball(c, hand[0], hand[1], rh * (1 - k), ks, t, 1 - k);
+          c.setDepth?.(undefined);
           gring(c, V, U, G3, (3 + 10 * k) * S, ks.slice(0, 2), 0.35 + 0.65 * k);
           gring(c, V, U, G3, (1 + 5 * k) * S, ks.slice(1, 3), 0.5 * k);
         } else if (del !== "sky") {
@@ -632,34 +664,45 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
           for (let i = gh; i >= 1; i--) {
             const tt = t - i * (tr.every ?? 50);
             if (tt < t0r) continue;
-            const [gx, gy] = scr(path(tt));
+            const gq = path(tt), [gx, gy] = scr(gq);
+            c.setDepth?.(zAt(gq, Math.max(2, r)));
             if (balls) piece(c, balls[Math.max(0, balls.length - 1 - i)], gx, gy, tt - start, false, 1 - i / (gh + 1), E.blend);
             else orb(c, gx, gy, rr * (1 - i / (gh + 1)), ks, E, seed, tt);
           }
-          if (E.trail !== false && !gh) drawTrail(c, (tt) => scr(path(tt)), E.keys, { length: (E.trail?.length ?? 160) * D, width: E.trail?.width ? (E.trail.width.map((w) => w * S) as [number, number]) : [Math.round(rr * 1.6), 1], from: t0r });
+          c.setDepth?.(undefined);
+          if (E.trail !== false && !gh) drawTrail(c, trailPt, E.keys, { length: (E.trail?.length ?? 160) * D, width: E.trail?.width ? (E.trail.width.map((w) => w * S) as [number, number]) : [Math.round(rr * 1.6), 1], from: t0r });
+          c.setDepth?.(zAt(here, Math.max(6 * S, r)));
           ball(c, x, y, rr, ks, t);
+          c.setDepth?.(undefined);
         }
-        if (fly) drawParticles(c, fly, pk);
+        if (fly) { c.setDepth?.(zAt(here, 6 * S)); drawParticles(c, fly, pk); c.setDepth?.(undefined); }
       } else {
         // the impact: the centerpiece, its shape, (tier 2 on) a shockwave on the ground, sparks
         const k = after(t), ki = into(t);
-        if (bigArt) piece(c, tierArt(bigArt), ...scr(G3), t - hit, true, 1, E.blend);
+        if (bigArt) { c.setDepth?.(zAt(G3, 6 * S)); piece(c, tierArt(bigArt), ...scr(G3), t - hit, true, 1, E.blend); c.setDepth?.(undefined); }
         else if (big) centerpiece(c, big, ks, t);
-        if (del === "sky" && ki < 0.6 && Math.floor(t / 40) % 3 !== 2) bolt(c, scr([G3[0] + 6 * U, G3[1], (top ? 100 : 160) * U]), scr(B3), ks, seed + Math.floor(t / 40), 1);
+        if (del === "sky" && ki < 0.6 && Math.floor(t / 40) % 3 !== 2) {
+          const topPt: V3 = [G3[0] + 6 * U, G3[1], (top ? 100 : 160) * U];
+          bolt(c, scr(topPt), scr(B3), ks, seed + Math.floor(t / 40), 1, true, zAt(topPt, 3), zAt(B3, 3));
+        }
         if (del === "chain")
           for (let i = 1; i <= F.count; i++) {
             const j0 = i === 1 ? B3 : chainAt(i - 1), j1 = chainAt(i), t1 = hit + (i - 1) * 110;
             if (t < t1 || t > t1 + 320 || Math.floor(t / 40) % 4 === 3) continue;
-            bolt(c, scr(j0), scr(j1), ks, seed + i * 13 + Math.floor(t / 50), 1);
+            bolt(c, scr(j0), scr(j1), ks, seed + i * 13 + Math.floor(t / 50), 1, true, zAt(j0, 3), zAt(j1, 3));
             const [x, y] = scr(j1);
             shape(c, V, U, "rays", j1, [j1[0], j1[1], 0], S * 0.6, ks, clamp01((t - t1) / 200), clamp01((t - t1) / 260), seed + i, t);
+            c.setDepth?.(zAt(j1, 4 * S));
             spark(c, x, y, 1, ks, t);
+            c.setDepth?.(undefined);
           }
-        if (hitArt) piece(c, tierArt(hitArt), ...scr(I3), t - hit, true, 1, E.blend);
+        if (hitArt) { c.setDepth?.(zAt(I3, 6 * S)); piece(c, tierArt(hitArt), ...scr(I3), t - hit, true, 1, E.blend); c.setDepth?.(undefined); }
         else shape(c, V, U, shapeName, I3, G3, S * (VR.burning ? 1.8 : SO ? 0.8 : 1), E.impact?.keys ? keysOf(c, E.impact.keys) : ks, ki, k, seed, t);
         if (T.ring) gring(c, V, U, G3, Math.round(4 + ease(ki) * 18 * S), ks.slice(1, 3), 1 - ki);
+        c.setDepth?.(zAt(I3, 6 * S));
         drawParticles(c, burst, pk, { trail: 30 });
-        if (shards) drawParticles(c, shards, look ? ((T6) => [look.glint ?? T6[5], look.rim ?? T6[5], T6[3]])(spread(look.tones, 6)) : ["#ffffff", "#c8f0ff", "#6ac8f0"]);
+        if (shards) { c.setDepth?.(zAt(rest, 6 * S)); drawParticles(c, shards, look ? ((T6) => [look.glint ?? T6[5], look.rim ?? T6[5], T6[3]])(spread(look.tones, 6)) : ["#ffffff", "#c8f0ff", "#6ac8f0"]); }
+        c.setDepth?.(undefined);
       }
     },
     over(c) {
@@ -669,7 +712,9 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
       const smoke = E.impact?.smoke;
       if (smoke && t >= hit && !(SO && del === "ground" && mat === "ice")) {
         const [x, y] = scr(G3), kz = sc(G3);
+        c.setDepth?.(zAt(G3, 6 * S));
         drawSmoke(c, x, y, smoke, { shape: "puff", spread: 6 * S * kz * (SO ? 1.6 : 1), size: [2 * S * kz, 5 * S * kz], count: Math.round(6 + 3 * N), seed, frame: Math.floor(Math.min(0.99, after(t)) * c.frames), ...(top ? { flat: 1 } : {}) });
+        c.setDepth?.(undefined);
       }
       drawBody(c, t);
       if (SO) drawPieces(c, t, [rest[0], rest[1], 0], pcs, mat === "ice" ? "shard" : "chunk");
@@ -724,8 +769,10 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
       const k = clamp01((t - t1) / fall), s0: V3 = [g[0] - 45 * S * U, g[1], 95 * U + g[2]], kk = k * k;
       const roll = k >= 1 ? Math.min(1, (t - t1 - fall) / 220) : 0, ctr: V3 = [s0[0] + (g[0] - s0[0]) * kk + roll * 3 * S * U, s0[1] + (g[1] - s0[1]) * kk, s0[2] + (g[2] - s0[2]) * kk];
       const gone = clamp01((t - brk) / ((end - brk) * 0.8));
+      c.setDepth?.(zAt(ctr, solid.r));
       drawSolid(c, V, ctr, U, solid, turn([0.2, 1, 0.3], (Math.min(t, t1 + fall) - t1) / 160 + roll), mat, { seed: seed + i, density: 1 - gone, crack: gone * 2, look });
     }
+    c.setDepth?.(undefined);
   }
   // the quake: rocks thrust up along its fissures as they open, standing, then sinking back
   function quakeRocks(c: SpellCanvas, t: number) {
@@ -736,9 +783,11 @@ export function spell(name: string | Element, tier: number, o: SpellOpts): Spell
         if (t < t1) continue;
         const solid = makeSolid("spire", seed + i * 7 + j, size, F.facets, F.jag), up = ease(clamp01((t - t1) / 180)) - ease(clamp01((t - brk) / 400));
         const ctr: V3 = [G3[0] + Math.cos(a0) * d * U, G3[1] + Math.sin(a0) * d * U, solid.up * (0.3 - 1.3 * (1 - up)) * U];
+        c.setDepth?.(zAt(ctr, solid.r));
         drawSolid(c, V, ctr, U, solid, turn([Math.cos(a0), Math.sin(a0), 3], 0.25), mat, { seed: seed + i * 7 + j, ground: ctr[2] / U, look });
       }
     }
+    c.setDepth?.(undefined);
   }
 }
 
@@ -803,9 +852,11 @@ function gring(c: VfxCanvas, V: SpellView, U: number, g: number[], R: number, ks
     const a = (i / steps) * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
     for (let j = 0; j < w; j++) {
       const f = 1 - j / Math.max(1, R);
+      if (V.z) c.setDepth?.(V.z([g[0] + R * U * ca * f, g[1] + R * U * sa * f, g[2] ?? 0]) - 2 * U);
       put(c, cx + ((ux - cx) * ca + (vx - cx) * sa) * f, cy + ((uy - cy) * ca + (vy - cy) * sa) * f, ks[Math.min(ks.length - 1, j)], density);
     }
   }
+  if (V.z) c.setDepth?.(undefined);
 }
 /** A disc of radius R on the ground at g, as the view sees it, each pixel colored by how far out it is (0..1). */
 function gdisc(c: VfxCanvas, V: SpellView, U: number, g: number[], R: number, color: (d: number) => Color | null, density = 1): void {
@@ -818,8 +869,12 @@ function gdisc(c: VfxCanvas, V: SpellView, U: number, g: number[], R: number, co
       const dx = x + 0.5 - cx, dy = y + 0.5 - cy, a = (dx * b2 - dy * b1) / det, b = (a1 * dy - a2 * dx) / det, d = Math.hypot(a, b);
       if (d > 1) continue;
       const col = color(d);
-      if (col !== null) put(c, x, y, col, density);
+      if (col !== null) {
+        if (V.z) c.setDepth?.(V.z([g[0] + a * R * U, g[1] + b * R * U, g[2] ?? 0]) - 2 * U);
+        put(c, x, y, col, density);
+      }
     }
+  if (V.z) c.setDepth?.(undefined);
 }
 /**
  * A column standing at `base`, `H` px of the spell high: at each height `f` (0 its foot, 1 its top) a
@@ -831,18 +886,21 @@ function column(c: VfxCanvas, V: SpellView, U: number, base: number[], H: number
   if (!V.top) {
     const [bx, by] = V.P(base), [tx, ty] = V.P([base[0], base[1], (base[2] ?? 0) + H * U]), n = Math.max(1, Math.ceil(Math.hypot(tx - bx, ty - by)));
     for (let i = 0; i <= n; i++) {
-      const f = i / n, sh = shift?.(f) ?? [0, 0], x = bx + (tx - bx) * f + sh[0], y = by + (ty - by) * f + sh[1], k = V.s([base[0], base[1], (base[2] ?? 0) + H * U * f]) * U;
+      const f = i / n, sh = shift?.(f) ?? [0, 0], x = bx + (tx - bx) * f + sh[0], y = by + (ty - by) * f + sh[1], pt = [base[0], base[1], (base[2] ?? 0) + H * U * f], k = V.s(pt) * U;
       const hl = half(f, -1) * k, hr = half(f, 1) * k;
+      if (V.z) c.setDepth?.(V.z(pt) - Math.max(half(f, -1), half(f, 1), 2) * U);
       for (let dx = -Math.ceil(hl); dx <= hr; dx++) {
         const col = color(dx < 0 ? -dx / Math.max(1, hl) : dx / Math.max(1, hr), f, dx);
         if (col !== null) put(c, x + dx, y, col, density);
       }
     }
+    if (V.z) c.setDepth?.(undefined);
     return;
   }
   const n = Math.max(2, Math.ceil(H / 2));
   for (let i = 0; i <= n; i++) {
     const f = i / n, p = [base[0], base[1], (base[2] ?? 0) + H * U * f], [x, y] = V.P(p), hw = half(f, 1) * V.s(p) * U;
+    if (V.z) c.setDepth?.(V.z(p) - Math.max(half(f, 1), 2) * U);
     for (let dy = -Math.ceil(hw); dy <= hw; dy++)
       for (let dx = -Math.ceil(hw); dx <= hw; dx++) {
         const d = Math.hypot(dx, dy) / Math.max(1, hw);
@@ -851,6 +909,7 @@ function column(c: VfxCanvas, V: SpellView, U: number, base: number[], H: number
         if (col !== null) put(c, x + dx, y + dy, col, density);
       }
   }
+  if (V.z) c.setDepth?.(undefined);
 }
 /** A small spark (a plus) that twinkles. */
 function spark(c: VfxCanvas, x: number, y: number, s: number, ks: Color[], t: number): void {
@@ -859,24 +918,26 @@ function spark(c: VfxCanvas, x: number, y: number, s: number, ks: Color[], t: nu
   for (let k = 1; k <= s + on; k++) for (const [dx, dy] of [[k, 0], [-k, 0], [0, k], [0, -k]]) put(c, x + dx, y + dy, ks[Math.min(ks.length - 1, k)]);
 }
 /** A jagged bolt from a to b on the picture, a kink every 7 px, `w` px each side of its white core, forking (forks thinner, dimmer). */
-function bolt(c: VfxCanvas, a: number[], b: number[], ks: Color[], seed: number, w = 1, fork = true): void {
+function bolt(c: VfxCanvas, a: number[], b: number[], ks: Color[], seed: number, w = 1, fork = true, za?: number, zb?: number): void {
   const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
   if (L < 1) return;
   const r = rng(hash(seed, 17, 3)), n = Math.max(2, Math.round(L / 7)), ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L, steep = Math.abs(uy) > Math.abs(ux);
   let px = a[0], py = a[1];
   for (let i = 1; i <= n; i++) {
-    const k = i / n, jit = i === n ? 0 : (r() - 0.5) * 12, qx = a[0] + (b[0] - a[0]) * k - uy * jit, qy = a[1] + (b[1] - a[1]) * k + ux * jit;
+    const k0 = (i - 1) / n, k = i / n, jit = i === n ? 0 : (r() - 0.5) * 12, qx = a[0] + (b[0] - a[0]) * k - uy * jit, qy = a[1] + (b[1] - a[1]) * k + ux * jit;
     const m = Math.max(1, Math.ceil(Math.hypot(qx - px, qy - py)));
     for (let s = 0; s <= m; s++) {
-      const x = px + ((qx - px) * s) / m, y = py + ((qy - py) * s) / m;
+      const f = s / m, x = px + (qx - px) * f, y = py + (qy - py) * f;
+      if (za !== undefined && zb !== undefined) c.setDepth?.(za + (zb - za) * (k0 + (k - k0) * f));
       for (let d = -w; d <= w; d++) put(c, x + (steep ? d : 0), y + (steep ? 0 : d), ks[Math.min(ks.length - 1, d ? Math.abs(d) + 1 : 0)]);
     }
     if (fork && i < n - 1 && r() < 0.3) {
-      const side = r() < 0.5 ? -1 : 1, fl = (6 + r() * 8) * 0.7;
-      bolt(c, [qx, qy], [qx + (ux - side * uy) * fl, qy + (uy + side * ux) * fl], ks.slice(1), seed + i * 31, 0, false);
+      const side = r() < 0.5 ? -1 : 1, fl = (6 + r() * 8) * 0.7, zf = za !== undefined && zb !== undefined ? za + (zb - za) * k : undefined;
+      bolt(c, [qx, qy], [qx + (ux - side * uy) * fl, qy + (uy + side * ux) * fl], ks.slice(1), seed + i * 31, 0, false, zf, zf);
     }
     px = qx; py = qy;
   }
+  if (fork && za !== undefined && zb !== undefined) c.setDepth?.(undefined);
 }
 /** The mark on the ground: a disc as the view sees it, its rim one key and its middle the other, going in a dither. */
 function mark(c: VfxCanvas, V: SpellView, U: number, g: number[], R: number, ks: Color[], density: number): void {
@@ -886,10 +947,13 @@ function mark(c: VfxCanvas, V: SpellView, U: number, g: number[], R: number, ks:
 function shape(c: VfxCanvas, V: SpellView, U: number, s: Shape, to: number[], g: number[], S: number, ks: Color[], ki: number, k: number, seed: number, t: number): void {
   const [x, y] = V.P(to), kk = V.s(to) * U, R = ease(ki) * 9 * S * kk, fade = 1 - clamp01((k - 0.5) / 0.5), r = rng(hash(seed, 5, 9));
   // a thrown drop or stone, in the world: out and up from `to`, falling, lying on the ground
-  const thrown = (i: number, v: number, up: number, tt: number, grav: number): [number, number] => {
+  const thrown = (i: number, v: number, up: number, tt: number, grav: number): [number, number, number[]] => {
     const a = r() * Math.PI * 2, sp = v * (0.6 + 0.6 * r()), z = Math.max(0, (to[2] ?? 0) / U + up * tt - grav * tt * tt);
-    return V.P([to[0] + Math.cos(a) * sp * tt * U, to[1] + Math.sin(a) * sp * tt * U, z * U]);
+    const pt = [to[0] + Math.cos(a) * sp * tt * U, to[1] + Math.sin(a) * sp * tt * U, z * U];
+    const [sx, sy] = V.P(pt);
+    return [sx, sy, pt];
   };
+  if (V.z && s !== "splash" && s !== "debris" && s !== "swirl" && s !== "sparkle") c.setDepth?.(V.z(to) - 6 * S * U);
   switch (s) {
     case "burst":
       for (let dy = -Math.ceil(R); dy <= R; dy++)
@@ -910,26 +974,31 @@ function shape(c: VfxCanvas, V: SpellView, U: number, s: Shape, to: number[], g:
     }
     case "splash":
       gring(c, V, U, g, Math.round(2 + ease(ki) * 12 * S), ks.slice(1, 3), fade);
-      for (let i = 0; i < 6 * S; i++) { const [X, Y] = thrown(i, 30 * S, 45 * S, ki * 0.6, 60 * S); put(c, X, Y, ks[1 + (i % 2)], fade); }
+      for (let i = 0; i < 6 * S; i++) { const [X, Y, pt] = thrown(i, 30 * S, 45 * S, ki * 0.6, 60 * S); if (V.z) c.setDepth?.(V.z(pt) - 2 * U); put(c, X, Y, ks[1 + (i % 2)], fade); }
       break;
     case "debris":
       for (let i = 0; i < 5 * S; i++) {
-        const [X, Y] = thrown(i, 28 * S, 40 * S, ki * 0.7, 70 * S);
+        const [X, Y, pt] = thrown(i, 28 * S, 40 * S, ki * 0.7, 70 * S);
+        if (V.z) c.setDepth?.(V.z(pt) - 2 * U);
         for (let q = 0; q < 2; q++) for (let w = 0; w < 2; w++) put(c, X + q, Y + w, ks[Math.min(ks.length - 1, 2 + ((q + w) % 2))]);
       }
       break;
     case "swirl":
       for (let i = 0; i < 3; i++)
         for (let j = 0; j < 24; j++) {
-          const a = (j / 24) * Math.PI * 1.5 + i * 2.1 + t / 120, rr = (3 + j * 0.35) * S * (0.4 + ki), [X, Y] = V.P([to[0] + Math.cos(a) * rr * U, to[1] + Math.sin(a) * rr * (V.kind === "side" ? 1.7 : 1) * U, to[2]]);
+          const a = (j / 24) * Math.PI * 1.5 + i * 2.1 + t / 120, rr = (3 + j * 0.35) * S * (0.4 + ki), pt = [to[0] + Math.cos(a) * rr * U, to[1] + Math.sin(a) * rr * (V.kind === "side" ? 1.7 : 1) * U, to[2]];
+          const [X, Y] = V.P(pt);
+          if (V.z) c.setDepth?.(V.z(pt) - 2 * U);
           put(c, X, Y, ks[Math.min(ks.length - 1, Math.floor(j / 8))], fade);
         }
       break;
     case "sparkle":
       for (let i = 0; i < 5 * S; i++) {
-        const [X, Y] = V.P([to[0] + (r() - 0.5) * 14 * S * U, to[1] + (r() - 0.5) * 8 * S * U, to[2] + ((r() * 0.4 + ki) * 14 * S - 4 * S) * U]);
+        const pt = [to[0] + (r() - 0.5) * 14 * S * U, to[1] + (r() - 0.5) * 8 * S * U, to[2] + ((r() * 0.4 + ki) * 14 * S - 4 * S) * U], [X, Y] = V.P(pt);
+        if (V.z) c.setDepth?.(V.z(pt) - 2 * U);
         if (Math.floor(t / 90 + i) % 3 && fade > 0.2) spark(c, X, Y, 1, ks, t + i * 40);
       }
       break;
   }
+  if (V.z) c.setDepth?.(undefined);
 }

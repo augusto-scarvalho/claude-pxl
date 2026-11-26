@@ -248,3 +248,27 @@ anim("car_e_n", { w: 1, h: 1, frames: 2 }, (c) => c.px(0, 0, "g"))`);
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("sheet normalSuffix and emitSuffix avoid _n/_e clashes and write matching JSON map fields", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pxl-mapsuf-"));
+  try {
+    const p = load(`
+sprite("hero", { w: 4, h: 4 }, rect(0, 0, 4, 4, "r"), bump("hybrid"), effect("emit", { on: "r", strength: 0.8 }))
+sheet("hero_n", ["hero"])
+sheet("hero_e", ["hero"])
+sheet("hero", ["hero"], { normalSuffix: ".normal", emitSuffix: ".emit" })
+sheet("hero_grid", ["hero"], { format: "grid", normalSuffix: "_nrm", emitSuffix: "_lum" })`);
+    const out = writeOutputs(p, dir, { preview: false });
+    assert.equal(out.errors.length, 0, out.errors.map((e) => e.message).join("\n"));
+    for (const f of ["hero_n.png", "hero_e.png", "hero.png", "hero.normal.png", "hero.emit.png", "hero.json", "hero_grid_nrm.png", "hero_grid_lum.png"])
+      assert.ok(existsSync(join(dir, f)), `expected ${f}`);
+    const hashMeta = JSON.parse(readFileSync(join(dir, "hero.json"), "utf8"));
+    assert.equal(hashMeta.meta.normalMap, "hero.normal.png");
+    assert.equal(hashMeta.meta.emissionMap, "hero.emit.png");
+    const gridMeta = JSON.parse(readFileSync(join(dir, "hero_grid.json"), "utf8"));
+    assert.equal(gridMeta.normalMap, "hero_grid_nrm.png");
+    assert.equal(gridMeta.emissionMap, "hero_grid_lum.png");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

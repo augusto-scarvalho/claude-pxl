@@ -438,3 +438,32 @@ test("sdf: boundsOf() matches compile() bounds across primitives, transforms, jo
     assert.deepEqual(b, [c.lo, c.hi]);
   }
 });
+
+test("turnaround: sockets: true projects builder sockets and object projects explicit 3D points with symmetry-aware mirroring", () => {
+  const p = loadSource(PAL + `
+const T = make3d.tree({ seed: 1 })
+turnaround("tr", T, { headings: ["s", "w", "e"], ppm: 14, mats: { bark: "kgr", leaf: "kgw" }, sockets: true })
+const S = sdf.sphere(0.5).at(0, 0, 0.5).mat("m")
+turnaround("sym", S, { headings: ["s", "w", "e"], ppm: 16, mats: { m: "kgrw" }, sockets: { top: [0, 0, 1], front: [0, -0.5, 0.5] } })
+turnaround("asym", S, { headings: ["w", "e"], ppm: 16, mats: { m: "kgrw" }, sockets: { side: [0.4, 0, 0.5] } })`, "t.px.js");
+
+  // 1. Builder sockets projected automatically with sockets: true
+  for (const h of ["s", "w", "e"]) {
+    const im = p.image(`tr_${h}`);
+    assert.ok(im.sockets?.top, `tr_${h} should expose builder 'top' socket`);
+    assert.ok(im.sockets.top[1] < im.pivot![1], `tr_${h} top socket sits above ground pivot`);
+  }
+
+  // 2. Symmetric sockets (x = 0) mirror cleanly across e/w
+  const symW = p.image("sym_w"), symE = p.image("sym_e");
+  assert.ok(symW.sockets?.top && symE.sockets?.top && symW.sockets?.front && symE.sockets?.front);
+  assert.equal(symE.sockets.front[0], symW.w - symW.sockets.front[0], "symmetric front socket mirrors horizontally on e");
+  assert.equal(symE.sockets.front[1], symW.sockets.front[1]);
+
+  // 3. Asymmetric socket (x != 0) disables east mirroring and projects accurately in both views
+  const asymW = p.image("asym_w"), asymE = p.image("asym_e");
+  assert.ok(asymW.sockets?.side && asymE.sockets?.side);
+  // Looking from west (yaw -90) vs east (yaw +90), [0.4, 0, 0.5] is along the camera's depth axis, so x stays centered
+  // whereas mirroring would have reflected a non-centered x; check y differs slightly due to pitch (behind vs in front of center)
+  assert.notEqual(asymW.sockets.side[1], asymE.sockets.side[1], "asymmetric 3D socket projects its true depth-shifted height in w vs e");
+});

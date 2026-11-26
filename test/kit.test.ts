@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 import { loadProject } from "../src/node/load.ts";
 import { writeOutputs } from "../src/node/output.ts";
+import { kept } from "../src/core/surface.ts";
 import type { Project } from "../src/core/project.ts";
 import { root, whenChanged } from "./passed.ts";
 
@@ -201,4 +202,24 @@ test("tall body coat shoulders, jerkin back arms, and dark inner-line silhouette
   const rn = p.image("rogue_cat_stand_n");
   const rb = rn.bounds()!;
   assert.ok(rb.w >= 13, `rogue_cat n should keep sleeves visible (>=13px wide), got ${rb.w}`);
+});
+
+test("kit characters with cloaks, robes, wings and straps trace with zero non-pure distance closures", () => {
+  const p = loadArt(INC + `
+    kit.character("pure_knight", { outfit: "knight", cloak: "travel", held: "sword", off: "tallshield", dirs: ["sw", "w"], moves: ["stand"] })
+    kit.character("pure_mage", { outfit: "mage", back: "wings", headwear: "pointed", held: "magestaff", dirs: ["sw"], moves: ["stand"] })
+  `, "kit-pure.px.js");
+  const prevOn = kept.on, prevLeft = kept.left;
+  const impure: string[] = [];
+  kept.on = () => true;
+  kept.left = (who, _f, _ms, paint) => { if (!paint) impure.push(who); };
+  try {
+    p.image("pure_knight_stand_sw");
+    p.image("pure_knight_stand_w");
+    p.image("pure_mage_stand_sw");
+  } finally {
+    kept.on = prevOn;
+    kept.left = prevLeft;
+  }
+  assert.deepEqual(impure, [], `expected 0 non-pure distance fields in kit, got: ${impure.join(", ")}`);
 });

@@ -399,8 +399,11 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   // the genres asking for one height across the directions, until a family of theirs is held to it
   const tall = new Set<string>();
   const failed: string[] = [];
-  // by default what the file itself defines (what it includes is checked where it's defined)
-  const own = (n: string) => !opts.file || (p.assets.get(n)?.loc ?? "").split(":")[0] === opts.file;
+  // by default what the file itself defines (including assets/figures/views/groups created by calling an
+  // included kit's maker from this file, which run at include depth 0 and are not marked included)
+  const isOwn = (loc?: string, top?: string, inc?: boolean) => !opts.file || (inc !== undefined ? !inc : (top ?? loc ?? "").split(":")[0] === opts.file);
+  const own = (n: string) => { const d = p.assets.get(n); return isOwn(d?.loc, d?.top, p.included.has(n)); };
+  const exported = new Set(p.exported());
   // a `_` part whose only use is as the base of shrunk sprites (a turnaround drawn 3 times over): the shrunk sprite is
   // the game's, read by the genre's checks and its boxes; the part neither, nor counted
   const shrunkOnly = shrinkBases(p);
@@ -491,6 +494,16 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
           const n = now.w === img.w && now.h === img.h ? now.data.reduce((k, c, i) => k + +(c !== img.data[i]), 0) : -1;
           lines.push(`${name} › WARNING: frozen: its live render '${def.live}' drifted from ${def.opts.png}: ${n < 0 ? `${now.w}x${now.h}, the frozen one ${img.w}x${img.h}` : `${n} px differ`}; look at both (pxl shot <file> ${name} ${def.live} --diff); approved, delete the PNG and build to freeze it again`);
         }
+      }
+      // warn early when an exported asset's normal/emission map (<name>_n / <name>_e) would clash with another exported asset in the same folder
+      if (exported.has(name)) {
+        const checkMapClash = (suf: "_n" | "_e", label: string) => {
+          const other = p.assets.get(name + suf);
+          if (other && other.kind === def.kind && exported.has(name + suf))
+            lines.push(`${name} › WARNING: its ${label} map would be ${name}${suf}.png, clashing with ${other.kind} '${name}${suf}': rename one of them`);
+        };
+        if (img.norm) checkMapClash("_n", "normal");
+        if (img.emit && img.emit.some((v) => v > 0)) checkMapClash("_e", "emission");
       }
       if (!img.sockets?.front) continue;
       others++;
@@ -586,10 +599,10 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   }
   // views() sets: their crown and chin on one row in every view, and kept to the set they're like
   if (!opts.names) for (const [name, V] of p.views) {
-    if (opts.file && (V.loc ?? "").split(":")[0] !== opts.file) continue;
+    if (!isOwn(V.loc, V.top, V.included)) continue;
     ran.views++;
     const rows = (s: { drawn: string[]; chin?: Record<string, number> }) => new Map(s.drawn.map((n) => [n.slice(n.lastIndexOf("_") + 1), viewRows(p.image(n), s.chin?.[n])]));
-    const like = V.like ? p.views.get(V.like) : undefined;
+    const like = V.like ? (p.views.get(V.like) ?? (() => { const m = [...p.views.entries()].filter(([k]) => k.endsWith("." + V.like)); return m.length === 1 ? m[0][1] : undefined; })()) : undefined;
     if (V.like && !like) lines.push(`${name} › WARNING: like '${V.like}' is no views() set`);
     for (const w of viewWarnings({ name, views: [...rows(V)], baked: V.baked, ...(like ? { like: { name: V.like!, views: rows(like) } } : {}) })) lines.push(`${name} › WARNING: ${w}`);
   }
@@ -598,7 +611,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   // (no pivot: its ink's height), so the feet that land a row apart seen from behind don't count; a rig3d()
   // figure's top without what its hooks drew (the sword raised over its head)
   if (!opts.names) for (const [gname, G] of p.groups) {
-    if (opts.file && (G.loc ?? "").split(":")[0] !== opts.file) continue;
+    if (!isOwn(G.loc, G.top, G.included)) continue;
     let ms: string[];
     try { ms = p.candidates(gname); } catch { continue; }
     const gn = p.assets.get(ms[0])?.opts.genre, genre = gn === undefined ? undefined : p.genres.get(gn);
@@ -609,19 +622,20 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
     if (new Set(hs).size > 1) lines.push(`${gname} › WARNING: genre '${gn}': its directions aren't one height: ${ms.map((m, i) => `${m.slice(m.lastIndexOf("_") + 1)} ${hs[i]}`).join(", ")} px over its ground point (the tallest frame of each); the same figure stands as tall whichever way it faces`);
   }
   // rig3d() figures: every pose of every move at its headings, on the ground (unless in the air), within the
-  // legs' reach, the elbows bent the way elbows bend, the feet within their ankles' bend (a pose that gives toes or heel)
+  // legs' and arms' reach, the elbows bent the way elbows bend, the feet within their ankles' bend (a pose that gives toes or heel)
   if (!opts.names) for (const [name, F] of p.figures) {
-    if (opts.file && (F.loc ?? "").split(":")[0] !== opts.file) continue;
-    const K = ["floats", "reach", "elbow", "ankle"] as const;
+    if (!isOwn(F.loc, F.top, F.included)) continue;
+    const K = ["floats", "reach", "armReach", "elbow", "ankle"] as const;
+    const MIN = { floats: 0.5, reach: 0.5, armReach: 1.5, elbow: 0.5, ankle: 0.5 } as const;
     for (const M of F.moves) for (const hd of M.heads) {
-      const worst = { floats: 0, reach: 0, elbow: 0, ankle: 0 }, at = { floats: [] as number[], reach: [] as number[], elbow: [] as number[], ankle: [] as number[] };
+      const worst = { floats: 0, reach: 0, armReach: 0, elbow: 0, ankle: 0 }, at = { floats: [] as number[], reach: [] as number[], armReach: [] as number[], elbow: [] as number[], ankle: [] as number[] };
       for (let i = 0; i < M.frames; i++) {
         ran.poses++;
         const pose = M.pose(i, hd.deg), fl = poseFlaws(F.body, jointsOf(F.body, pose, hd.deg));
         if (pose.air === true) fl.floats = 0;
         // (the ankle read where the pose gives the foot: rig3d's flat foot of before, under every figure drawn on it, leans their shins far past it)
         if (pose.toes === undefined && pose.heel === undefined && pose.point === undefined) fl.ankle = 0;
-        for (const k of K) if (fl[k] > 0.5) { at[k].push(i); worst[k] = Math.max(worst[k], fl[k]); }
+        for (const k of K) if (fl[k] > MIN[k]) { at[k].push(i); worst[k] = Math.max(worst[k], fl[k]); }
       }
       for (const k of K) if (at[k].length) lines.push(`${name} › ${M.m} ${hd.name} › WARNING: ${FLAWS[k](worst[k])} (frame${at[k].length > 1 ? "s" : ""} ${ranges(at[k])})`);
     }
@@ -634,7 +648,7 @@ export function checkProject(p: Project, opts: { names?: string[]; frame?: numbe
   // what building found on the way (a shade step that left its ramp), where it was asked for
   for (const w of p.warnings) {
     const sub = /^'([^']*)': (a stamp half a pixel.*)$/.exec(w.msg);
-    const op = /^([a-z]+): /.exec(w.msg)?.[1] ?? "ramps";
+    const op = /^([a-z][a-z0-9]*): /.exec(w.msg)?.[1] ?? "ramps";
     lines.push(sub ? `${sub[1]}${w.loc ? ` (${w.loc})` : ""} › WARNING: ${sub[2]}` : `${op}${w.loc ? ` (${w.loc})` : ""} › WARNING: ${w.msg}`);
   }
   const n = (k: number, w: string) => `${k} ${w}${k === 1 ? "" : "s"}`;
